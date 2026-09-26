@@ -11,30 +11,30 @@
  *
  * Examples:	Different speeds:
  *
- *			gen_packets -o z1.wav
- *			atest z1.wav
+ *			samoyed-gen_packets -o z1.wav
+ *			samoyed-atest z1.wav
  *
- *			gen_packets -B 300 -o z3.wav
- *			atest -B 300 z3.wav
+ *			samoyed-gen_packets -B 300 -o z3.wav
+ *			samoyed-atest -B 300 z3.wav
  *
- *			gen_packets -B 9600 -o z9.wav
- *			atest -B 300 z9.wav
+ *			samoyed-gen_packets -B 9600 -o z9.wav
+ *			samoyed-atest -B 9600 z9.wav
  *
  *		User-defined content:
  *
- *			echo "WB2OSZ>APDW12:This is a test" | gen_packets -o z.wav -
- *			atest z.wav
+ *			echo "WB2OSZ>APDW12:This is a test" | samoyed-gen_packets -o z.wav -
+ *			samoyed-atest z.wav
  *
  *			echo "WB2OSZ>APDW12:Test line 1" >  z.txt
  *			echo "WB2OSZ>APDW12:Test line 2" >> z.txt
  *			echo "WB2OSZ>APDW12:Test line 3" >> z.txt
- *			gen_packets -o z.wav z.txt
- *			atest z.wav
+ *			samoyed-gen_packets -o z.wav z.txt
+ *			samoyed-atest z.wav
  *
  *		With artificial noise added:
  *
- *			gen_packets -n 100 -o z2.wav
- *			atest z2.wav
+ *			samoyed-gen_packets -n 100 -o z2.wav
+ *			samoyed-atest z2.wav
  *
  *		Variable speed. e.g. 95% to 105% of normal speed.
  *		Required parameter is max % below and above normal.
@@ -42,8 +42,8 @@
  *		Used to test how tolerant TNCs are to senders not
  *		not using exactly the right baud rate.
  *
- *			gen_packets -v 5
- *			gen_packets -v 5,0.5
+ *			samoyed-gen_packets -v 5 -o z.wav
+ *			samoyed-gen_packets -v 5,0.5 -o z.wav
  *
  *------------------------------------------------------------------*/
 
@@ -245,23 +245,23 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "    WB2OSZ-1>APDW12,WIDE2-2:!4237.14NS07120.83W#\n")
 	fmt.Fprintf(os.Stderr, "User defined content can't be used with -n option.\n")
 	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "Example:  gen_packets -o x.wav \n")
+	fmt.Fprintf(os.Stderr, "Example:  samoyed-gen_packets -o x.wav \n")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "    With all defaults, a built-in test message is generated\n")
 	fmt.Fprintf(os.Stderr, "    with standard Bell 202 tones used for packet radio on ordinary\n")
 	fmt.Fprintf(os.Stderr, "    VHF FM transceivers.\n")
 	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "Example:  gen_packets -o x.wav -g -b 9600\n")
-	fmt.Fprintf(os.Stderr, "Shortcut: gen_packets -o x.wav -B 9600\n")
+	fmt.Fprintf(os.Stderr, "Example:  samoyed-gen_packets -o x.wav -g -b 9600\n")
+	fmt.Fprintf(os.Stderr, "Shortcut: samoyed-gen_packets -o x.wav -B 9600\n")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "    9600 baud mode.\n")
 	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "Example:  gen_packets -o x.wav -m 1600 -s 1800 -b 300\n")
-	fmt.Fprintf(os.Stderr, "Shortcut: gen_packets -o x.wav -B 300\n")
+	fmt.Fprintf(os.Stderr, "Example:  samoyed-gen_packets -o x.wav -m 1600 -s 1800 -b 300\n")
+	fmt.Fprintf(os.Stderr, "Shortcut: samoyed-gen_packets -o x.wav -B 300\n")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "    200 Hz shift, 300 baud, suitable for HF SSB transceiver.\n")
 	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "Example:  echo -n \"WB2OSZ>WORLD:Hello, world!\" | gen_packets -a 25 -o x.wav -\n")
+	fmt.Fprintf(os.Stderr, "Example:  echo -n \"WB2OSZ>WORLD:Hello, world!\" | samoyed-gen_packets -a 25 -o x.wav -\n")
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "    Read message from stdin and put quarter volume sound into the file x.wav.\n")
 }
