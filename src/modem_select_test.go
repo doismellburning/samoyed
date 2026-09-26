@@ -99,7 +99,7 @@ func genPacketsModemOptions(t *testing.T, args ...string) (modemResult, error) {
 
 	var audio = genPacketsDefaultAudio()
 	var fs = pflag.NewFlagSet("gen_packets", pflag.ContinueOnError)
-	var f = addGenPacketsModemFlags(fs)
+	var f = AddGenPacketsModemFlags(fs)
 	var parseErr = fs.Parse(args)
 	if parseErr != nil {
 		return modemResult{}, parseErr

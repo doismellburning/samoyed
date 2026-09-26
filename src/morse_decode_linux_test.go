@@ -40,12 +40,14 @@ func morseToFile(t *testing.T, filename string, message string) {
 
 	modem.chan_medium[0] = MEDIUM_RADIO
 
-	var sink = audio_file_open(filename, &modem)
+	var sink, err = audio_file_open(filename, &modem)
+	require.NoError(t, err)
+
 	var amplitude = 100
 	gen_tone_init(&modem, amplitude, sink)
 	morse_init(&modem, amplitude)
 	morse_send(0, message, morseWPM, 100, 100)
-	audio_file_close(sink) // I just realised this all works on globals :s
+	require.NoError(t, audio_file_close(sink)) // I just realised this all works on globals :s
 }
 
 // gen_packets will generate Morse, so let's test it and try to decode
