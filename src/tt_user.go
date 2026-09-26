@@ -596,6 +596,81 @@ func xmit_object_report(i int, first_time bool) {
 	//			save_tt_config_p.obj_recv_chan, save_tt_config_p.obj_xmit_chan);
 	Assert(i >= 0 && i < MAX_TT_USERS)
 
+	var stemp = object_report_text(i, first_time)
+
+	if first_time {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("[APRStt] %s\n", stemp)
+	}
+
+	/*
+	 * Convert text to packet.
+	 */
+	var pp = AX25FromText(stemp, true)
+
+	if pp == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("\"%s\"\n", stemp)
+
+		return
+	}
+
+	/*
+	 * Send to one or more of the following depending on configuration:
+	 *	Transmit queue.
+	 *	Any attached application(s).
+	 * 	IGate.
+	 *
+	 * When transmitting over the radio, it gets sent multiple times, to help
+	 * probability of being heard, with increasing delays between.
+	 *
+	 * The other methods are reliable so we only want to send it once.
+	 */
+
+	if first_time && save_tt_config_p.obj_send_to_app > 0 {
+		// TODO1.3:  Put a wrapper around this so we only call one function to send by all methods.
+		// We see the same sequence in direwolf.c.
+		var fbuf = AX25Pack(pp)
+
+		agwServer.SendRecPacket(save_tt_config_p.obj_recv_chan, pp, fbuf)
+		kissNetSvc.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
+		kissSerial.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
+		kissPT.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
+	}
+
+	if first_time && save_tt_config_p.obj_send_to_ig > 0 {
+		// text_color_set(DW_COLOR_DEBUG);
+		// dw_printf ("xmit_object_report (): send to IGate\n");
+		igate.sendRecPacket(save_tt_config_p.obj_recv_chan, pp)
+	}
+
+	if !first_time && save_tt_config_p.obj_xmit_chan >= 0 {
+		/* Remember it so we don't digipeat our own. */
+		aprsDigipeater.Remember(pp, save_tt_config_p.obj_xmit_chan)
+
+		transmitQueue.Append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
+	}
+}
+
+/*------------------------------------------------------------------
+ *
+ * Name:        object_report_text
+ *
+ * Purpose:     Build the text form of the object report packet for
+ *		xmit_object_report.
+ *
+ * Inputs:      i	   - Index into user table.
+ *
+ *		first_time - As for xmit_object_report; the via path is
+ *				only added for the later, radio, transmissions.
+ *
+ * Returns:     Monitor format packet, e.g. "MYCALL>SMYD00:;WB2OSZ-12*..."
+ *
+ *----------------------------------------------------------------*/
+
+func object_report_text(i int, first_time bool) string {
+	Assert(i >= 0 && i < MAX_TT_USERS)
+
 	/*
 	 * Prepare the object name.
 	 * Tack on "-12" if it is a callsign.
@@ -726,58 +801,7 @@ func xmit_object_report(i int, first_time bool) {
 		maybe.Nothing[float64](), /* offset */
 		info_comment)
 
-	if first_time {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("[APRStt] %s\n", stemp)
-	}
-
-	/*
-	 * Convert text to packet.
-	 */
-	var pp = AX25FromText(stemp, true)
-
-	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\"%s\"\n", stemp)
-
-		return
-	}
-
-	/*
-	 * Send to one or more of the following depending on configuration:
-	 *	Transmit queue.
-	 *	Any attached application(s).
-	 * 	IGate.
-	 *
-	 * When transmitting over the radio, it gets sent multiple times, to help
-	 * probability of being heard, with increasing delays between.
-	 *
-	 * The other methods are reliable so we only want to send it once.
-	 */
-
-	if first_time && save_tt_config_p.obj_send_to_app > 0 {
-		// TODO1.3:  Put a wrapper around this so we only call one function to send by all methods.
-		// We see the same sequence in direwolf.c.
-		var fbuf = AX25Pack(pp)
-
-		agwServer.SendRecPacket(save_tt_config_p.obj_recv_chan, pp, fbuf)
-		kissNetSvc.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
-		kissSerial.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
-		kissPT.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
-	}
-
-	if first_time && save_tt_config_p.obj_send_to_ig > 0 {
-		// text_color_set(DW_COLOR_DEBUG);
-		// dw_printf ("xmit_object_report (): send to IGate\n");
-		igate.sendRecPacket(save_tt_config_p.obj_recv_chan, pp)
-	}
-
-	if !first_time && save_tt_config_p.obj_xmit_chan >= 0 {
-		/* Remember it so we don't digipeat our own. */
-		aprsDigipeater.Remember(pp, save_tt_config_p.obj_xmit_chan)
-
-		transmitQueue.Append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
-	}
+	return stemp
 }
 
 var letters = []string{
