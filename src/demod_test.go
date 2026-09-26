@@ -112,17 +112,9 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 // safe to share between them.  Run under -race.
 func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 	var channel = 0
-	var audioConfig = newTestAudioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
-
-	var savedConfig = save_audio_config_p
-
-	t.Cleanup(func() {
-		save_audio_config_p = savedConfig
-
-		demod_mute_input(channel, 0)
-	})
-
-	save_audio_config_p = audioConfig
+	var d = new(Demodulator)
+	d.channel = channel
+	d.audioConfig = newTestAudioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
 
 	var done = make(chan struct{})
 
@@ -130,12 +122,12 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 		defer close(done)
 
 		for i := range 1000 {
-			demod_mute_input(channel, i%2)
+			d.Mute(i%2 != 0)
 		}
 	}()
 
 	for range 1000 {
-		demod_process_sample(channel, 0, 1000)
+		d.ProcessSample(0, 1000)
 	}
 
 	<-done

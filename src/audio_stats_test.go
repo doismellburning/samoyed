@@ -14,14 +14,6 @@ import (
 func newTestAudioStats(t *testing.T) *[MAX_ADEVS]AudioStats {
 	t.Helper()
 
-	var savedConfig = save_audio_config_p
-
-	t.Cleanup(func() {
-		save_audio_config_p = savedConfig
-	})
-
-	save_audio_config_p = new(audio_s)
-
 	setTestAudioLevels(t)
 
 	return new([MAX_ADEVS]AudioStats)
@@ -33,40 +25,31 @@ func audioStatsTestLevel(ch int) int {
 	return 10 * (ch + 1)
 }
 
-// setTestAudioLevels points each channel's demodulator state at a known peak,
-// so demod_get_audio_level returns audioStatsTestLevel rather than whatever
-// some earlier test left in the global demodulator state.
+// setTestAudioLevels gives each channel a Demodulator of its own, at a known
+// peak, so demod_get_audio_level returns audioStatsTestLevel rather than
+// whatever some earlier test left behind.
 func setTestAudioLevels(t *testing.T) {
 	t.Helper()
 
-	type savedLevel struct {
-		num_slicers int
-		peak        float64
-		valley      float64
-	}
-
-	var saved [MAX_RADIO_CHANS]savedLevel
-
-	for ch := range MAX_RADIO_CHANS {
-		var D = &demodulators[ch].states[0]
-
-		saved[ch] = savedLevel{num_slicers: D.num_slicers, peak: D.alevel_rec_peak, valley: D.alevel_rec_valley}
-
-		// demod_get_audio_level halves the peak-to-peak swing, in units of 100.
-		D.num_slicers = 1
-		D.alevel_rec_peak = float64(audioStatsTestLevel(ch)) / 50.0
-		D.alevel_rec_valley = 0
-	}
+	var saved = demodulators
 
 	t.Cleanup(func() {
-		for ch := range MAX_RADIO_CHANS {
-			var D = &demodulators[ch].states[0]
-
-			D.num_slicers = saved[ch].num_slicers
-			D.alevel_rec_peak = saved[ch].peak
-			D.alevel_rec_valley = saved[ch].valley
-		}
+		demodulators = saved
 	})
+
+	var audioConfig = new(audio_s)
+
+	for ch := range MAX_RADIO_CHANS {
+		var d = new(Demodulator)
+		d.channel = ch
+		d.audioConfig = audioConfig
+
+		// demod_get_audio_level halves the peak-to-peak swing, in units of 100.
+		d.states[0].num_slicers = 1
+		d.states[0].alevel_rec_peak = float64(audioStatsTestLevel(ch)) / 50.0
+
+		demodulators[ch] = d
+	}
 }
 
 // audioStatsTestInterval is the reporting interval, in seconds, that the tests

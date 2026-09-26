@@ -31,8 +31,15 @@ import (
 // by PTT.Set on the transmit thread, hence atomic.
 type Demodulator struct {
 	channel int
-	states  [MAX_SUBCHANS]demodulator_state_s // One per subchannel.
-	muted   atomic.Bool
+
+	// audioConfig is shared, not copied: demod_init writes what it derives -
+	// num_subchan, num_slicers, the normalised profiles, decimate and so on -
+	// back into it, and the HDLC receiver and multi_modem read them from
+	// there.
+	audioConfig *audio_s
+
+	states [MAX_SUBCHANS]demodulator_state_s // One per subchannel.
+	muted  atomic.Bool
 }
 
 // demodulators holds every channel's Demodulator, built at package
@@ -113,6 +120,8 @@ func demod_init(pa *audio_s) {
 	save_audio_config_p = pa
 
 	for channel := range MAX_RADIO_CHANS {
+		demodulators[channel].audioConfig = pa
+
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 			/*
 			 * These are derived from config file parameters.
@@ -976,6 +985,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 
 	var channel = d.channel
+	var achan = &d.audioConfig.achan[channel]
 
 	if d.muted.Load() {
 		sam = 0
@@ -1023,19 +1033,19 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 	 * Select decoder based on modulation type.
 	 */
 
-	switch save_audio_config_p.achan[channel].modem_type {
+	switch achan.modem_type {
 	case MODEM_OFF:
 
 		// Might have channel only listening to DTMF for APRStt gateway.
 		// Don't waste CPU time running a demodulator here.
 
 	case MODEM_AFSK, MODEM_EAS:
-		if save_audio_config_p.achan[channel].decimate > 1 {
+		if achan.decimate > 1 {
 			D.decimate_sum += sam
 
 			D.decimate_count++
-			if D.decimate_count >= save_audio_config_p.achan[channel].decimate {
-				var decimated = D.decimate_sum / save_audio_config_p.achan[channel].decimate
+			if D.decimate_count >= achan.decimate {
+				var decimated = D.decimate_sum / achan.decimate
 
 				D.decimate_sum = 0
 				D.decimate_count = 0
@@ -1057,7 +1067,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 		  case MODEM_SCRAMBLE:
 		  case MODEM_AIS:
 		*/
-		demod_9600_process_sample(channel, sam, save_audio_config_p.achan[channel].upsample, D)
+		demod_9600_process_sample(channel, sam, achan.upsample, D)
 	} /* switch modem_type */
 } /* end ProcessSample */
 
@@ -1077,7 +1087,7 @@ func demod_get_audio_level(channel int, subchan int) ALevel {
 func (d *Demodulator) AudioLevel(subchan int) ALevel {
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 
-	var channel = d.channel
+	var achan = &d.audioConfig.achan[d.channel]
 
 	/* We have to consider two different cases here. */
 	/* N demodulators, each with own slicer and HDLC decoder. */
@@ -1094,7 +1104,7 @@ func (d *Demodulator) AudioLevel(subchan int) ALevel {
 
 	alevel.rec = int((D.alevel_rec_peak-D.alevel_rec_valley)*50.0 + 0.5)
 
-	switch save_audio_config_p.achan[channel].modem_type {
+	switch achan.modem_type {
 	case MODEM_AFSK, MODEM_EAS:
 		/* For AFSK, we have mark and space amplitudes. */
 		alevel.mark = (int)((D.alevel_mark_peak)*100.0 + 0.5)
