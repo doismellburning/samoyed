@@ -781,14 +781,12 @@ func object_report_text(i int, first_time bool) string {
 
 	var freq maybe.Maybe[float64]
 	if tt_user[i].freq != "" {
-		var megahertz, _ = strconv.ParseFloat(tt_user[i].freq, 64)
-		freq = maybe.Just(megahertz)
+		freq = maybe.Just(leadingFloat(tt_user[i].freq))
 	}
 
 	var ctcss maybe.Maybe[float64]
 	if tt_user[i].ctcss != "" {
-		var hertz, _ = strconv.ParseFloat(tt_user[i].ctcss, 64)
-		ctcss = maybe.Just(hertz)
+		ctcss = maybe.Just(leadingFloat(tt_user[i].ctcss))
 	}
 
 	// info part of Object Report packet
@@ -802,6 +800,22 @@ func object_report_text(i int, first_time bool) string {
 		info_comment)
 
 	return stemp
+}
+
+// leadingFloat reads the number at the start of s, ignoring leading spaces and
+// anything after it, as C's atof does - so "146.520MHz" is 146.52.  With no
+// number there it is 0.
+func leadingFloat(s string) float64 {
+	s = strings.TrimLeft(s, " \t")
+
+	for end := len(s); end > 0; end-- {
+		var f, err = strconv.ParseFloat(s[:end], 64)
+		if err == nil {
+			return f
+		}
+	}
+
+	return 0
 }
 
 var letters = []string{

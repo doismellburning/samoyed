@@ -84,13 +84,11 @@ func Test_TTUser(t *testing.T) {
 
 	tt_user_heard("679", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75), maybe.Just(0), "", " ", " ", ' ', "!T99!")
 	assertObjectReport(t, "WB2OSZ", true, "WB20SZ-15>SMYD00:;WB2OSZ-12*260628z3715.00NJ07145.00WAToff   !T99!")
-	// These pin what the reports say today, which isn't right: "146.520MHz"
-	// doesn't parse as a float, so the frequency never reaches the report.
 	tt_user_heard("WB2OSZ", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "146.520MHz", "", "", ' ', "!T99!")
-	assertObjectReport(t, "WB2OSZ", true, "WB20SZ-15>SMYD00:;WB2OSZ-12*260628z3715.00NJ07145.00WAToff   !T99!")
+	assertObjectReport(t, "WB2OSZ", true, "WB20SZ-15>SMYD00:;WB2OSZ-12*260628z3715.00NJ07145.00WA146.520MHz Toff   !T99!")
 	tt_user_heard("WB1GOF", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "146.955MHz", "074", "", ' ', "!T99!")
-	assertObjectReport(t, "WB1GOF", true, "WB20SZ-15>SMYD00:;WB1GOF-12*260628z4237.06NJ07120.83WAT074 !T99!")
+	assertObjectReport(t, "WB1GOF", true, "WB20SZ-15>SMYD00:;WB1GOF-12*260628z4237.06NJ07120.83WA146.955MHz T074 !T99!")
 	tt_user_heard("679", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "", "", "Hello, world", '9', "!T99!")
-	assertObjectReport(t, "WB2OSZ", true, "WB20SZ-15>SMYD00:;WB2OSZ-12*260628z3715.00NJ07145.00WAToff Hello, world / !T99!")
+	assertObjectReport(t, "WB2OSZ", true, "WB20SZ-15>SMYD00:;WB2OSZ-12*260628z3715.00NJ07145.00WA146.520MHz Toff Hello, world / !T99!")
 	tt_user_dump()
 }
