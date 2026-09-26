@@ -58,12 +58,13 @@ package main
  *---------------------------------------------------------------*/
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
-	"strconv"
+	"strings"
 
 	direwolf "github.com/doismellburning/samoyed/src"
 )
@@ -261,10 +262,10 @@ func process_from_tnc(cmd *AGWPECommand) {
 		// agw_cb_C_connection_received (cmd.Header.Portx, cmd.Header.CallFrom, cmd.Header.CallTo, data_len, cmd.data);
 		// TODO:  compute session id
 		// There are two different cases to consider here.
-		if string(cmd.Data[:24]) == "*** CONNECTED To Station" {
+		if bytes.HasPrefix(cmd.Data, []byte("*** CONNECTED To Station")) {
 			// Incoming: Other station initiated the connect request.
 			on_C_connection_received(cmd.Header.Portx, cmd.Header.CallFrom, cmd.Header.CallTo, true, cmd.Data)
-		} else if string(cmd.Data[:26]) == "*** CONNECTED With Station" {
+		} else if bytes.HasPrefix(cmd.Data, []byte("*** CONNECTED With Station")) {
 			// Outgoing: Other station accepted my connect request.
 			on_C_connection_received(cmd.Header.Portx, cmd.Header.CallFrom, cmd.Header.CallTo, false, cmd.Data)
 		} else { //nolint:staticcheck
@@ -283,23 +284,33 @@ func process_from_tnc(cmd *AGWPECommand) {
 		// Data part should be fields separated by semicolon.
 		// First field is number of ports (we call them channels).
 		// Other fields are of the form "Port99 comment" where first is number 1.
-		var num_chan = 1 // FIXME: FIXME: actually parse it.
+		// The ports themselves are what matter, and the TNC can leave gaps
+		// in the numbering, so the count is not needed.
+		var fields = strings.Split(strings.TrimRight(string(cmd.Data), "\x00"), ";")
 
-		var chans = make([]string, 2)
+		var chans []string
 
-		chans[0] = "Port1 blah blah"
-		chans[1] = "Port2 blah blah"
-		agw_cb_G_port_information(num_chan, chans)
-		// TODO: Maybe fill in more someday.
+		for _, field := range fields[1:] {
+			if field != "" {
+				chans = append(chans, field)
+			}
+		}
+
+		agw_cb_G_port_information(len(chans), chans)
 
 	case 'g': // Reply to capabilities of a port.
 	case 'K': // Received AX.25 frame in raw format. (Enabled with 'k' command.)
 	case 'U': // Received AX.25 frame in monitor format. (Enabled with 'm' command.)
 	case 'y': // Outstanding frames waiting on a Port
 	case 'Y': // How many frames waiting for transmit for a particular station
-		var dataStr = string(cmd.Data)
+		// The count is a 32-bit little-endian integer, like the header's.
+		if len(cmd.Data) < 4 {
+			fmt.Printf("Outstanding frame count from network TNC is %d bytes, not 4.\n", len(cmd.Data))
 
-		var frameCount, _ = strconv.Atoi(dataStr)
+			return
+		}
+
+		var frameCount = int(binary.LittleEndian.Uint32(cmd.Data))
 
 		agw_cb_Y_outstanding_frames_for_station(cmd.Header.Portx, cmd.Header.CallFrom, cmd.Header.CallTo, frameCount)
 	default:
@@ -342,7 +353,7 @@ func agwlib_X_register_callsign(channel byte, call_from Callsign) error {
  *
  *--------------------------------------------------------------------*/
 
-func agwlib_x_unregister_callsign(channel byte, call_from Callsign) error { //nolint:unused
+func agwlib_x_unregister_callsign(channel byte, call_from Callsign) error {
 	var h = new(AGWPEHeader)
 
 	h.Portx = channel
@@ -387,7 +398,7 @@ func agwlib_G_ask_port_information() error {
  *
  *--------------------------------------------------------------------*/
 
-func agwlib_C_connect(channel byte, call_from Callsign, call_to Callsign) error { //nolint:unused
+func agwlib_C_connect(channel byte, call_from Callsign, call_to Callsign) error {
 	var h = new(AGWPEHeader)
 
 	h.Portx = channel

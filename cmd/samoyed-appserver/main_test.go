@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,6 +19,9 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // fakeTNC stands in for the socket to the TNC: agwlib writes frames into it and
@@ -493,4 +497,100 @@ func TestTimingTestSummaryIsInSeconds(t *testing.T) {
 	if rate <= 0 {
 		t.Errorf("Summary reported a rate of %s bytes/sec", summary[2])
 	}
+}
+
+// The main loop's poll only asks the TNC about sessions with something
+// waiting on the answer - here, a goodbye.
+func TestPollAsksAboutSessionsWithWorkInHand(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	connect(t, tnc)
+
+	srv.poll()
+	assert.Empty(t, tnc.frames(t), "nothing to ask about yet")
+
+	send(t, tnc, "bye")
+
+	srv.poll()
+
+	var asked bool
+
+	for _, f := range tnc.frames(t) {
+		if f.kind == 'Y' && f.callTo == testTheirCall {
+			asked = true
+		}
+	}
+
+	assert.True(t, asked, "should ask how much is still to go to the station")
+}
+
+func TestMain(m *testing.M) {
+	testutils.RunMainIfAsked(main)
+
+	os.Exit(m.Run())
+}
+
+func TestMainRefusesBadArguments(t *testing.T) {
+	var gone = testutils.UnusedPort(t)
+
+	var testCases = map[string]struct {
+		args []string
+		want string
+	}{
+		"no callsign":   {nil, "Exactly one argument required (MYCALL)"},
+		"two callsigns": {[]string{"Q1TEST", "Q2TEST"}, "Exactly one argument required (MYCALL)"},
+		"long callsign": {[]string{"Q1TESTTOOLONG"}, "Callsign Q1TESTTOOLONG too long"},
+		"no TNC":        {[]string{"-h", "127.0.0.1", "-p", gone, "Q1TEST"}, "Could not attach to network TNC"},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var result = testutils.RunMain(t, "", tc.args...)
+
+			assert.Equal(t, 1, result.Status)
+			assert.Contains(t, result.Output(), tc.want)
+		})
+	}
+}
+
+func TestMainHelp(t *testing.T) {
+	var result = testutils.RunMain(t, "", "--help")
+
+	assert.Equal(t, 0, result.Status)
+	assert.Contains(t, result.Output(), "Simple application server for connected mode AX.25")
+}
+
+// On attaching to the TNC, main asks what ports it has, and registers its
+// callsign on each.
+func TestMainRegistersOnEachPort(t *testing.T) {
+	var ln, port = testutils.Listen(t)
+
+	testutils.StartMain(t, "-h", "127.0.0.1", "-p", port, "q1test")
+
+	var tnc = testutils.Accept(t, ln)
+
+	var h = new(AGWPEHeader)
+
+	require.NoError(t, binary.Read(tnc, binary.LittleEndian, h))
+	assert.Equal(t, byte('G'), h.DataKind)
+
+	var ports = "2;Port1 first;Port2 second;"
+
+	var reply = new(AGWPEHeader)
+	reply.DataKind = 'G'
+	reply.DataLen = uint32(len(ports))
+
+	require.NoError(t, binary.Write(tnc, binary.LittleEndian, reply))
+
+	var _, writeErr = tnc.Write([]byte(ports))
+	require.NoError(t, writeErr)
+
+	require.NoError(t, binary.Read(tnc, binary.LittleEndian, h))
+	assert.Equal(t, byte('X'), h.DataKind)
+	assert.Equal(t, byte(0), h.Portx)
+	assert.Equal(t, testMyCall, h.CallFrom, "the callsign should be upper cased")
+
+	require.NoError(t, binary.Read(tnc, binary.LittleEndian, h))
+	assert.Equal(t, byte('X'), h.DataKind)
+	assert.Equal(t, byte(1), h.Portx, "and on the second port too")
 }

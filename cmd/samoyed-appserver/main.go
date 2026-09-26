@@ -816,33 +816,45 @@ func agw_cb_G_port_information(num_chan_avail int, chan_descriptions []string) {
 		var p = chan_descriptions[n]
 
 		// Expecting something like this:  "Port1 first soundcard mono"
+		// That came from the TNC, so check it before trusting it.
 
-		if strings.EqualFold(p[:4], "Port") && unicode.IsDigit(rune(p[4])) {
-			var port, desc, _ = strings.Cut(p, " ")
+		var port, desc, _ = strings.Cut(p, " ")
 
-			var _channel, _ = strconv.Atoi(port[4:])
-
-			if _channel >= 0 && _channel < MAX_TOTAL_CHANS {
-				var channel = byte(_channel)
-
-				channel -= 1 // "Port1" is our channel 0.
-
-				fmt.Printf("  Channel %d: %s\n", channel, desc)
-
-				// Later? Use 'g' to get speed and maybe other properties?
-				// Though I'm not sure why we would care here.
-
-				/*
-				 * Send command to register my callsign for incoming connect requests.
-				 */
-
-				agwlib_X_register_callsign(channel, mycall)
-			} else {
-				fmt.Printf("Radio channel number is out of bounds: %s\n", p)
-			}
-		} else {
+		if len(port) <= len("Port") || !strings.EqualFold(port[:len("Port")], "Port") {
 			fmt.Printf("Radio channel description not in expected format: %s\n", p)
+
+			continue
 		}
+
+		// Atoi on its own would also take a sign, as in "Port+3".
+		var digits = port[len("Port"):]
+
+		var number, numberErr = strconv.Atoi(digits)
+		if numberErr != nil || strings.ContainsFunc(digits, func(r rune) bool { return !unicode.IsDigit(r) }) {
+			fmt.Printf("Radio channel description not in expected format: %s\n", p)
+
+			continue
+		}
+
+		// "Port1" is our channel 0.
+		if number < 1 || number > MAX_TOTAL_CHANS {
+			fmt.Printf("Radio channel number is out of bounds: %s\n", p)
+
+			continue
+		}
+
+		var channel = byte(number - 1)
+
+		fmt.Printf("  Channel %d: %s\n", channel, desc)
+
+		// Later? Use 'g' to get speed and maybe other properties?
+		// Though I'm not sure why we would care here.
+
+		/*
+		 * Send command to register my callsign for incoming connect requests.
+		 */
+
+		agwlib_X_register_callsign(channel, mycall)
 	}
 } /* end agw_cb_G_port_information */
 
