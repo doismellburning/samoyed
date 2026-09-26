@@ -99,8 +99,24 @@ func main() {
 
 		if mon_cmd.DataKind == 'K' {
 			var channel = mon_cmd.Portx
+
+			// The first byte is the KISS command byte, and the AX.25 frame
+			// follows.  Anything the TNC hands us came off the air, so it
+			// can be empty or not AX.25 at all.
+			if len(data) < 1 {
+				fmt.Printf("[%d] Empty frame from server.\n", channel)
+
+				continue
+			}
+
 			var alevel direwolf.ALevel
-			var pp = direwolf.AX25FromFrame(data[1:mon_cmd.DataLen], alevel)
+			var pp = direwolf.AX25FromFrame(data[1:], alevel)
+
+			if pp == nil {
+				fmt.Printf("[%d] Invalid AX.25 frame from server.\n", channel)
+
+				continue
+			}
 
 			var result = direwolf.AX25FormatAddrs(pp)
 
