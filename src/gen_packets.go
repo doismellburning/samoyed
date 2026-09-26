@@ -103,7 +103,7 @@ func GenPacketsMain() {
 	var packet_count = 0
 	var addNoise = false
 
-	var modemFlags = addGenPacketsModemFlags(pflag.CommandLine)
+	var modemFlags = AddGenPacketsModemFlags(pflag.CommandLine)
 	var noisyPacketCount = pflag.IntP("noisy-packet-count", "n", 0, "Generate specified number of frames with increasing noise.")
 	var packetCount = pflag.IntP("packet-count", "N", 0, "Generate specified number of frames.")
 	var amplitude = pflag.IntP("amplitude", "a", 50, "Signal amplitude in range of 0 - 200%.") // 100% is actually half of the digital signal range so we have some headroom for adding noise, etc.
@@ -676,8 +676,8 @@ func (sink *wavFileSink) Flush(_ int) int {
 	return 0
 }
 
-// genPacketsModemFlags are the command line options that set up the modulator.
-type genPacketsModemFlags struct {
+// GenPacketsModemFlags are the command line options that set up the modulator.
+type GenPacketsModemFlags struct {
 	modem           *ModemFlags
 	layer2          *layer2TxFlags
 	bitrateOverride *string
@@ -686,8 +686,9 @@ type genPacketsModemFlags struct {
 	il2pVersion     *string
 }
 
-func addGenPacketsModemFlags(fs *pflag.FlagSet) *genPacketsModemFlags {
-	var f = new(genPacketsModemFlags)
+// AddGenPacketsModemFlags registers the modulator options on fs.
+func AddGenPacketsModemFlags(fs *pflag.FlagSet) *GenPacketsModemFlags {
+	var f = new(GenPacketsModemFlags)
 	f.modem = AddModemFlags(fs, false)
 	f.layer2 = addLayer2TxFlags(fs, "--il2p-version")
 	f.bitrateOverride = fs.StringP("bitrate-override", "b", "", "Bits / second for data, keeping the modem -B chose.")
@@ -702,7 +703,7 @@ func addGenPacketsModemFlags(fs *pflag.FlagSet) *genPacketsModemFlags {
 }
 
 // apply sets up achan from the options, once they have been parsed.
-func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
+func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
 	var err = f.modem.apply(achan)
 	if err != nil {
 		return err
