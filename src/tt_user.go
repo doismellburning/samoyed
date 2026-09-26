@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -834,46 +833,52 @@ func leadingFloat(s string) float64 {
 	return 0
 }
 
-var letters = []string{
-	"Alpha",
-	"Bravo",
-	"Charlie",
-	"Delta",
-	"Echo",
-	"Foxtrot",
-	"Golf",
-	"Hotel",
-	"India",
-	"Juliet",
-	"Kilo",
-	"Lima",
-	"Mike",
-	"November",
-	"Oscar",
-	"Papa",
-	"Quebec",
-	"Romeo",
-	"Sierra",
-	"Tango",
-	"Uniform",
-	"Victor",
-	"Whiskey",
-	"X-ray",
-	"Yankee",
-	"Zulu",
+// phoneticLetters names A to Z for TTCALLPH.
+func phoneticLetters() [26]string {
+	return [26]string{
+		"Alpha",
+		"Bravo",
+		"Charlie",
+		"Delta",
+		"Echo",
+		"Foxtrot",
+		"Golf",
+		"Hotel",
+		"India",
+		"Juliet",
+		"Kilo",
+		"Lima",
+		"Mike",
+		"November",
+		"Oscar",
+		"Papa",
+		"Quebec",
+		"Romeo",
+		"Sierra",
+		"Tango",
+		"Uniform",
+		"Victor",
+		"Whiskey",
+		"X-ray",
+		"Yankee",
+		"Zulu",
+	}
 }
 
-var digits = []string{
-	"Zero",
-	"One",
-	"Two",
-	"Three",
-	"Four",
-	"Five",
-	"Six",
-	"Seven",
-	"Eight",
-	"Nine",
+// phoneticDigits names 0 to 9 for TTCALLPH.
+func phoneticDigits() [10]string {
+	return [10]string{
+		"Zero",
+		"One",
+		"Two",
+		"Three",
+		"Four",
+		"Five",
+		"Six",
+		"Seven",
+		"Eight",
+		"Nine",
+	}
 }
 
 /*------------------------------------------------------------------
@@ -895,6 +900,8 @@ func (u *ttUsers) setenv(i int) {
 	os.Setenv("TTCALL", u.user[i].callsign)
 
 	os.Setenv("TTCALLSP", strings.Join(strings.Split(u.user[i].callsign, ""), " "))
+
+	var letters, digits = phoneticLetters(), phoneticDigits()
 
 	var phonetics []string
 
