@@ -281,7 +281,7 @@ func TestDWGPSNMEAInitLeavesTheIGateDebugLevelAlone(t *testing.T) {
 	igate.config.rx2ig_dedupe_time = 30
 
 	// No serial port configured, so this does nothing but record the level.
-	require.Equal(t, 0, dwgpsnmea_init(t.Context(), new(misc_config_s), 0))
+	require.Equal(t, 0, dwgpsnmea_init(t.Context(), new(GPS), new(misc_config_s), 0))
 
 	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)

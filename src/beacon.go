@@ -22,6 +22,7 @@ type BeaconService struct {
 	modemConfig       *audio_s
 	miscConfig        *misc_config_s
 	igateConfig       *igate_config_s
+	gps               *GPS
 	trackerDebugLevel int
 }
 
@@ -50,11 +51,12 @@ type BeaconService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s) *BeaconService {
+func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s, gps *GPS) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct_v5
 		modemConfig: pmodem,
 		miscConfig:  pconfig,
 		igateConfig: pigate,
+		gps:         gps,
 	}
 
 	/*
@@ -122,7 +124,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 					{
 						var gpsinfo dwgps_info_t
 
-						var fix = dwgps_read(&gpsinfo)
+						var fix = bs.gps.Read(&gpsinfo)
 						if fix == DWFIX_NOT_INIT {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Config file, line %d: GPS must be configured to use TBEACON.\n", bs.miscConfig.beacon[j].lineno)
@@ -386,7 +388,7 @@ func (bs *BeaconService) thread(ctx context.Context) {
 		var gpsinfo dwgps_info_t
 
 		if number_of_tbeacons > 0 {
-			var fix = dwgps_read(&gpsinfo)
+			var fix = bs.gps.Read(&gpsinfo)
 			var my_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.speed_knots)
 
 			if bs.trackerDebugLevel >= 1 {

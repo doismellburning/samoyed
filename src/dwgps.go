@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -15,16 +14,16 @@ package direwolf
  *		    no separate library dependency is needed.
  *
  *
- * API:		dwgps_init	Connect to data stream at start up time.
+ * API:		NewGPS		Connect to data stream at start up time.
  *
- *		dwgps_read	Return most recent location to application.
+ *		GPS.Read	Return most recent location to application.
  *
  *		dwgps_print	Print contents of structure for debugging.
  *
- *		dwgps_term	Shutdown on exit.
+ *		GPS.Term	Shutdown on exit.
  *
  *
- * from below:	dwgps_set_data	Called from other two implementations to
+ * from below:	GPS.setData	Called from other two implementations to
  *				save data until it is needed.
  *
  *---------------------------------------------------------------*/
@@ -75,35 +74,24 @@ type dwgps_info_t struct {
 	altitude    maybe.Maybe[float64] /* meters above mean sea level. Valid if fix == 3. */
 }
 
-var s_dwgps_debug = 0 /* Enable debug output. */
-/* >= 2 show updates from GPS. */
-/* >= 1 show results from dwgps_read. */
+// GPS holds the most recent position report from whichever GPS receivers
+// NewGPS started.  The reader goroutines deposit it with setData as it
+// arrives and Read hands a copy to the application; mu keeps the fields of
+// one report together.
+//
+// A nil *GPS is one that was never started: Read reports DWFIX_NOT_INIT, as
+// a GPS with no receiver configured does, and Term does nothing.  So code that
+// can run before startup has got this far needs no guard.
+type GPS struct {
+	debug int /* >= 1 show results from Read.  Set once by NewGPS. */
 
-/*
- * The GPS reader threads deposit current data here when it becomes available.
- * dwgps_read returns it to the requesting application.
- *
- * A critical region to avoid inconsistency between fields.
- */
-
-var s_dwgps_info = newUninitialisedGPSInfo()
-
-// newUninitialisedGPSInfo is what dwgps_read reports before any GPS receiver
-// has been opened: a fix of DWFIX_NOT_INIT, which the reader goroutines
-// replace with DWFIX_NOT_SEEN once they are running.  One that stays is how a
-// caller tells that no GPS was configured, or that it couldn't be opened.
-func newUninitialisedGPSInfo() *dwgps_info_t {
-	var info = new(dwgps_info_t)
-	info.fix = DWFIX_NOT_INIT
-
-	return info
+	mu   sync.Mutex
+	info dwgps_info_t
 }
-
-var s_gps_mutex sync.Mutex
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgps_init
+ * Name:        NewGPS
  *
  * Purpose:    	Initialize the GPS interface.
  *
@@ -111,13 +99,14 @@ var s_gps_mutex sync.Mutex
  *				serial port name for direct connect and host
  *				name or address for network connection.
  *
- *		debug	- If >= 1, print results when dwgps_read is called.
+ *		debug	- If >= 1, print results when Read is called.
  *				(In this file.)
  *
  *			  If >= 2, location updates are also printed.
  *				(In other two related files.)
  *
- * Returns:	none
+ * Returns:	The GPS.  Its fix stays DWFIX_NOT_INIT if no receiver was
+ *		configured, or none could be opened.
  *
  * Description:	Call corresponding functions for implementations.
  * 		Normally we would expect someone to use either GPSNMEA or
@@ -126,22 +115,24 @@ var s_gps_mutex sync.Mutex
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_init(ctx context.Context, pconfig *misc_config_s, debug int) {
-	dwgps_set_data(newUninitialisedGPSInfo()) // Init the global
+func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
+	var g = new(GPS)
+	g.debug = debug
+	g.info.fix = DWFIX_NOT_INIT // The reader goroutines replace it with DWFIX_NOT_SEEN once they are running.
 
-	s_dwgps_debug = debug
+	dwgpsnmea_init(ctx, g, pconfig, debug)
 
-	dwgpsnmea_init(ctx, pconfig, debug)
-
-	dwgpsd_init(ctx, pconfig, debug)
+	dwgpsd_init(ctx, g, pconfig, debug)
 
 	SLEEP_MS(500) /* So receive thread(s) can clear the */
 	/* not init status before it gets checked. */
-} /* end dwgps_init */
+
+	return g
+} /* end NewGPS */
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgps_read
+ * Name:        Read
  *
  * Purpose:     Return most recent location data available.
  *
@@ -152,14 +143,22 @@ func dwgps_init(ctx context.Context, pconfig *misc_config_s, debug int) {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
-	s_gps_mutex.Lock()
+func (g *GPS) Read(gpsinfo *dwgps_info_t) dwfix_t {
+	if g == nil {
+		var none dwgps_info_t
+		none.fix = DWFIX_NOT_INIT
+		*gpsinfo = none
 
-	*gpsinfo = *s_dwgps_info
+		return gpsinfo.fix
+	}
 
-	s_gps_mutex.Unlock()
+	g.mu.Lock()
 
-	if s_dwgps_debug >= 1 {
+	*gpsinfo = g.info
+
+	g.mu.Unlock()
+
+	if g.debug >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
 		dwgps_print("gps_read: ", gpsinfo)
 	}
@@ -190,7 +189,7 @@ func dwgps_print(msg string, gpsinfo *dwgps_info_t) {
 		formatMaybeFloat("%.6f", gpsinfo.dlat), formatMaybeFloat("%.6f", gpsinfo.dlon),
 		formatMaybeFloat("%.0f", gpsinfo.track), formatMaybeFloat("%.1f", gpsinfo.speed_knots),
 		formatMaybeFloat("%.0f", gpsinfo.altitude))
-} /* end dwgps_set_data */
+} /* end dwgps_print */
 
 // formatMaybeFloat renders m with the given verb, or as "unknown" for Nothing.
 func formatMaybeFloat(format string, m maybe.Maybe[float64]) string {
@@ -201,7 +200,7 @@ func formatMaybeFloat(format string, m maybe.Maybe[float64]) string {
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgps_term
+ * Name:        Term
  *
  * Purpose:    	Shut down GPS interface before exiting from application.
  *
@@ -211,15 +210,19 @@ func formatMaybeFloat(format string, m maybe.Maybe[float64]) string {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_term() {
+func (g *GPS) Term() {
+	if g == nil {
+		return
+	}
+
 	dwgpsnmea_term()
 
 	dwgpsd_term()
-} /* end dwgps_term */
+} /* end Term */
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgps_set_data
+ * Name:        setData
  *
  * Purpose:     Called by the GPS interfaces when new data is available.
  *
@@ -227,14 +230,14 @@ func dwgps_term() {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_set_data(gpsinfo *dwgps_info_t) {
+func (g *GPS) setData(gpsinfo *dwgps_info_t) {
 	/* Debug print is handled by the two callers so */
 	/* we can distinguish the source. */
-	s_gps_mutex.Lock()
+	g.mu.Lock()
 
-	*s_dwgps_info = *gpsinfo
+	g.info = *gpsinfo
 
-	s_gps_mutex.Unlock()
-} /* end dwgps_set_data */
+	g.mu.Unlock()
+} /* end setData */
 
 /* end dwgps.c */

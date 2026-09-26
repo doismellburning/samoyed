@@ -56,15 +56,17 @@ var s_save_configp *misc_config_s
  *
  * Purpose:    	Open serial port for the GPS receiver.
  *
- * Inputs:	pconfig		Configuration settings.  This includes
+ * Inputs:	gps		Where to deposit location reports.
+ *
+ *		pconfig		Configuration settings.  This includes
  *				serial port name for direct connect.
  *
- *		debug	- If >= 1, print results when dwgps_read is called.
+ *		debug	- If >= 1, print results when GPS.Read is called.
  *				(In different file.)
  *
  *			  If >= 2, location updates are also printed.
  *				(In this file.)
- *				Why not do it in dwgps_set_data() ?
+ *				Why not do it in GPS.setData() ?
  *				Here, we can prefix it with GPSNMEA to
  *				distinguish it from GPSD.
  *
@@ -80,9 +82,9 @@ var s_save_configp *misc_config_s
  *			- Open the appropriate serial port.
  *			- Start up thread to process incoming data.
  *			  It reads from the serial port and deposits into
- *			  dwgps_info, above.
+ *			  the GPS it was given.
  *
- * 		The application calls dwgps_read to get the most recent information.
+ * 		The application calls GPS.Read to get the most recent information.
  *
  *--------------------------------------------------------------------*/
 
@@ -90,7 +92,7 @@ var s_save_configp *misc_config_s
 
 var s_gpsnmea_port_fd *term.Term
 
-func dwgpsnmea_init(ctx context.Context, pconfig *misc_config_s, debug int) int {
+func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug int) int {
 	//dwgps_info_t info;
 	//int e;
 	s_gpsnmea_debug = debug
@@ -113,7 +115,7 @@ func dwgpsnmea_init(ctx context.Context, pconfig *misc_config_s, debug int) int 
 	s_gpsnmea_port_fd = SerialPortOpen(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
 
 	if s_gpsnmea_port_fd != nil {
-		go read_gpsnmea_thread(ctx, s_gpsnmea_port_fd)
+		go read_gpsnmea_thread(ctx, gps, s_gpsnmea_port_fd, debug)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not open serial port %s for GPS receiver.\n", pconfig.gpsnmea_port)
@@ -141,9 +143,15 @@ func dwgpsnmea_get_fd(wp_port_name string, speed int) *term.Term {
  * Name:        read_gpsnmea_thread
  *
  * Purpose:     Read information from GPS, as it becomes available, and
- *		store it for later retrieval by dwgps_read.
+ *		store it for later retrieval by GPS.Read.
  *
- * Inputs:	fd	- File descriptor for serial port.
+ * Inputs:	gps	- Where to deposit location reports.
+ *
+ *		fd	- File descriptor for serial port.
+ *
+ *		debug	- As for dwgpsnmea_init.  Given by value rather than
+ *			  read from s_gpsnmea_debug, which the next
+ *			  dwgpsnmea_init writes while this may still be running.
  *
  * Description:	This version reads from serial port and parses the
  *		NMEA sentences.
@@ -152,24 +160,24 @@ func dwgpsnmea_get_fd(wp_port_name string, speed int) *term.Term {
 
 const TIMEOUT = 5
 
-func read_gpsnmea_thread(ctx context.Context, fd *term.Term) {
+func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int) {
 	// Maximum length of message from GPS receiver is 82 according to some people.
 	// Make buffer considerably larger to be safe.
 	const NMEA_MAX_LEN = 160
 
-	if s_gpsnmea_debug >= 2 {
+	if debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("read_gpsnmea_thread (%+v)\n", fd)
 	}
 
 	var info = new(dwgps_info_t) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
 
-	if s_gpsnmea_debug >= 2 {
+	if debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dwgps_print("GPSNMEA: ", info)
 	}
 
-	dwgps_set_data(info)
+	gps.setData(info)
 
 	var gps_msg string
 
@@ -195,12 +203,12 @@ func read_gpsnmea_thread(ctx context.Context, fd *term.Term) {
 
 			info.fix = DWFIX_ERROR
 
-			if s_gpsnmea_debug >= 2 {
+			if debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dwgps_print("GPSNMEA: ", info)
 			}
 
-			dwgps_set_data(info)
+			gps.setData(info)
 
 			serial_port_close(s_gpsnmea_port_fd)
 			s_gpsnmea_port_fd = nil
@@ -217,7 +225,7 @@ func read_gpsnmea_thread(ctx context.Context, fd *term.Term) {
 			gps_msg = string(ch)
 		case '\r', '\n':
 			if len(gps_msg) >= 6 && gps_msg[0] == '$' {
-				if s_gpsnmea_debug >= 3 {
+				if debug >= 3 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("%s\n", gps_msg)
 				}
@@ -270,12 +278,12 @@ func read_gpsnmea_thread(ctx context.Context, fd *term.Term) {
 
 						info.timestamp = time.Now()
 
-						if s_gpsnmea_debug >= 2 {
+						if debug >= 2 {
 							text_color_set(DW_COLOR_DEBUG)
 							dwgps_print("GPSNMEA: ", info)
 						}
 
-						dwgps_set_data(info)
+						gps.setData(info)
 					}
 				}
 			}

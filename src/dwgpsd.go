@@ -44,14 +44,11 @@ var errNotTPV = errors.New("gpsd report is not a TPV")
 
 // gpsdClient holds the state for the connection to the gpsd daemon.
 //
-// debug is set once in dwgpsd_init, before the reader goroutine is started, and
-// only read afterwards, so it doesn't need mutex protection. conn is touched by
-// both dwgpsd_term (caller's goroutine) and read_gpsd_thread (reader goroutine),
-// so it's guarded by mu.
+// conn is touched by both dwgpsd_term (caller's goroutine) and
+// read_gpsd_thread (reader goroutine), so it's guarded by mu.
 type gpsdClient struct {
-	debug int
-	mu    sync.Mutex
-	conn  net.Conn
+	mu   sync.Mutex
+	conn net.Conn
 }
 
 var s_gpsd = new(gpsdClient)
@@ -94,10 +91,12 @@ func (c *gpsdClient) closeAndClear() {
  *
  * Purpose:    	Initialize the GPSD interface.
  *
- * Inputs:	pconfig		Configuration settings.  This includes
+ * Inputs:	gps		Where to deposit location reports.
+ *
+ *		pconfig		Configuration settings.  This includes
  *				host name/address and port for gpsd.
  *
- *		debug	- If >= 1, print results when dwgps_read is called.
+ *		debug	- If >= 1, print results when GPS.Read is called.
  *				(In dwgps.go.)
  *
  *			  If >= 2, location updates are also printed.
@@ -111,17 +110,15 @@ func (c *gpsdClient) closeAndClear() {
  *		- Enable streaming of JSON reports.
  *		- Start up thread to process incoming data.
  *		  It reads from the daemon and deposits into
- *		  shared region via dwgps_set_data.
+ *		  shared region via GPS.setData.
  *
- * 		The application calls dwgps_read to get the most
+ * 		The application calls GPS.Read to get the most
  *		recent information.
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsd_init(ctx context.Context, pconfig *misc_config_s, debug int) int {
-	s_gpsd.debug = debug
-
-	if s_gpsd.debug >= 2 {
+func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug int) int {
+	if debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dwgpsd_init()\n")
 	}
@@ -160,7 +157,7 @@ func dwgpsd_init(ctx context.Context, pconfig *misc_config_s, debug int) int {
 
 	s_gpsd.setConn(conn)
 
-	go read_gpsd_thread(ctx, conn)
+	go read_gpsd_thread(ctx, gps, conn, debug)
 
 	/* success */
 
@@ -172,9 +169,15 @@ func dwgpsd_init(ctx context.Context, pconfig *misc_config_s, debug int) int {
  * Name:        read_gpsd_thread
  *
  * Purpose:     Read information from GPSD, as it becomes available, and
- *		store it for later retrieval by dwgps_read.
+ *		store it for later retrieval by GPS.Read.
  *
- * Inputs:	conn	- Connection to gpsd daemon.
+ * Inputs:	gps	- Where to deposit location reports.
+ *
+ *		conn	- Connection to gpsd daemon.
+ *
+ *		debug	- As for dwgpsd_init.  Given by value rather than
+ *			  read from s_gpsd, whose debug the next dwgpsd_init
+ *			  writes while this may still be running.
  *
  * Description:	This reads newline delimited JSON objects from gpsd and
  *		picks out the "TPV" (Time-Position-Velocity) reports.
@@ -182,20 +185,20 @@ func dwgpsd_init(ctx context.Context, pconfig *misc_config_s, debug int) int {
  *
  *--------------------------------------------------------------------*/
 
-func read_gpsd_thread(ctx context.Context, conn net.Conn) {
-	if s_gpsd.debug >= 2 {
+func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
+	if debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("read_gpsd_thread (%+v)\n", conn)
 	}
 
 	var info = new(dwgps_info_t) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
 
-	if s_gpsd.debug >= 2 {
+	if debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dwgps_print("GPSD: ", info)
 	}
 
-	dwgps_set_data(info)
+	gps.setData(info)
 
 	// Scan blocks until gpsd says something, which it need not ever do, so
 	// closing the connection is what gets this goroutine back when we are
@@ -215,12 +218,12 @@ func read_gpsd_thread(ctx context.Context, conn net.Conn) {
 
 		info.timestamp = time.Now()
 
-		if s_gpsd.debug >= 2 {
+		if debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dwgps_print("GPSD: ", info)
 		}
 
-		dwgps_set_data(info)
+		gps.setData(info)
 	}
 
 	if ctx.Err() != nil {
@@ -236,12 +239,12 @@ func read_gpsd_thread(ctx context.Context, conn net.Conn) {
 
 	info.fix = DWFIX_ERROR
 
-	if s_gpsd.debug >= 2 {
+	if debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dwgps_print("GPSD: ", info)
 	}
 
-	dwgps_set_data(info)
+	gps.setData(info)
 
 	s_gpsd.clearConnIfCurrent(conn)
 

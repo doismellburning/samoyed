@@ -10,20 +10,20 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
-// DWGPSInit is a wrapper around dwgps_init, without exposing misc_config_s.
-func DWGPSInit(ctx context.Context, gpsnmeaPort string, debug int) {
+// DWGPSInit is a wrapper around NewGPS, without exposing misc_config_s.
+func DWGPSInit(ctx context.Context, gpsnmeaPort string, debug int) *GPS {
 	var config misc_config_s
 	config.gpsnmea_port = gpsnmeaPort
 
-	dwgps_init(ctx, &config, debug)
+	return NewGPS(ctx, &config, debug)
 }
 
-// DWGPSRead is a wrapper around dwgps_read, without exposing dwgps_info_t.
-func DWGPSRead() (fix int, lat maybe.Maybe[float64], lon maybe.Maybe[float64],
+// DWGPSRead is a wrapper around GPS.Read, without exposing dwgps_info_t.
+func DWGPSRead(gps *GPS) (fix int, lat maybe.Maybe[float64], lon maybe.Maybe[float64],
 	speedKnots maybe.Maybe[float64], track maybe.Maybe[float64], altitude maybe.Maybe[float64],
 ) {
 	var info dwgps_info_t
-	var f = dwgps_read(&info)
+	var f = gps.Read(&info)
 
 	return int(f), info.dlat, info.dlon, info.speed_knots, info.track, info.altitude
 }

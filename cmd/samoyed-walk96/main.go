@@ -56,7 +56,7 @@ func main() {
 	defer stop()
 
 	var debug_gps = 0
-	direwolf.DWGPSInit(ctx, gpsSerialPort, debug_gps)
+	var gps = direwolf.DWGPSInit(ctx, gpsSerialPort, debug_gps)
 
 	// Wait for sample before reading.  An interrupt cuts the wait short, and
 	// the loop below then does nothing, so we carry on to leaving KISS mode
@@ -68,7 +68,7 @@ func main() {
 			break
 		}
 
-		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead()
+		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead(gps)
 
 		// A fix is reported before the position fields are, so a receiver can
 		// claim a 3D fix while gpsd has yet to report a latitude at all.
