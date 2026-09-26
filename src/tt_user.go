@@ -370,6 +370,21 @@ func (u *ttUsers) heard(callsign string, ssid int, overlay rune, symbol rune, lo
 		return (TT_ERROR_NO_CALL)
 	}
 
+	var report = u.record(callsign, ssid, overlay, symbol, loc_text, latitude, longitude, ambiguity, freq, ctcss, comment, mic_e, dao)
+
+	/*
+	 * Send to applications and IGate immediately.
+	 */
+
+	u.sendObjectReport(report, true)
+
+	return (0) /* Success! */
+} /* end heard */
+
+// record stores what heard was told about a user, schedules its object
+// report transmissions, and returns the report to send straight away.
+func (u *ttUsers) record(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude maybe.Maybe[float64],
+	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) string {
 	/*
 	 * Is it someone new or a returning user?
 	 */
@@ -472,20 +487,14 @@ func (u *ttUsers) heard(callsign string, ssid int, overlay rune, symbol rune, lo
 	u.user[i].next_xmit = u.user[i].last_heard.Add(time.Duration(u.ttConfig.xmit_delay[0]) * time.Second)
 
 	/*
-	 * Send to applications and IGate immediately.
-	 */
-
-	u.xmitObjectReport(i, true)
-
-	/*
 	 * Put properties into environment variables in preparation
 	 * for calling a user-specified script.
 	 */
 
 	u.setenv(i)
 
-	return (0) /* Success! */
-} /* end heard */
+	return u.objectReportText(i, true)
+} /* end record */
 
 /*------------------------------------------------------------------
  *
@@ -504,7 +513,15 @@ func (u *ttUsers) heard(callsign string, ssid int, overlay rune, symbol rune, lo
  *----------------------------------------------------------------*/
 
 func (u *ttUsers) background() {
-	var now = time.Now()
+	for _, report := range u.dueReports(time.Now()) {
+		u.sendObjectReport(report, false)
+	}
+}
+
+// dueReports returns the object reports whose transmission time has come,
+// scheduling the next of each, and purges users not heard for too long.
+func (u *ttUsers) dueReports(now time.Time) []string {
+	var reports []string
 
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("tt_user_background()  now = %d\n", (int)now);
@@ -517,7 +534,7 @@ func (u *ttUsers) background() {
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("tt_user_background()  now = %d\n", (int)now);
 				// tt_user_dump ();
-				u.xmitObjectReport(i, false)
+				reports = append(reports, u.objectReportText(i, false))
 
 				/* Increase count of number times this one was sent. */
 				u.user[i].xmits++
@@ -542,15 +559,17 @@ func (u *ttUsers) background() {
 			}
 		}
 	}
+
+	return reports
 }
 
 /*------------------------------------------------------------------
  *
- * Name:        xmitObjectReport
+ * Name:        sendObjectReport
  *
  * Purpose:     Create object report packet and put into transmit queue.
  *
- * Inputs:      i	   - Index into user table.
+ * Inputs:      stemp	   - The report, from objectReportText.
  *
  *		first_time - Is this being called immediately after the tone sequence
  *			 	was received or after some delay?
@@ -577,14 +596,7 @@ func (u *ttUsers) background() {
  *
  *----------------------------------------------------------------*/
 
-func (u *ttUsers) xmitObjectReport(i int, first_time bool) {
-	// text_color_set(DW_COLOR_DEBUG);
-	// printf ("xmit_object_report (index = %d, first_time = %d) rx = %d, tx = %d\n", i, first_time,
-	//			u.ttConfig.obj_recv_chan, u.ttConfig.obj_xmit_chan);
-	Assert(i >= 0 && i < MAX_TT_USERS)
-
-	var stemp = u.objectReportText(i, first_time)
-
+func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	if first_time {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("[APRStt] %s\n", stemp)
@@ -644,11 +656,11 @@ func (u *ttUsers) xmitObjectReport(i int, first_time bool) {
  * Name:        objectReportText
  *
  * Purpose:     Build the text form of the object report packet for
- *		xmitObjectReport.
+ *		sendObjectReport.
  *
  * Inputs:      i	   - Index into user table.
  *
- *		first_time - As for xmitObjectReport; the via path is
+ *		first_time - As for sendObjectReport; the via path is
  *				only added for the later, radio, transmissions.
  *
  * Returns:     Monitor format packet, e.g. "MYCALL>SMYD00:;WB2OSZ-12*..."
