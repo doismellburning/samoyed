@@ -193,7 +193,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 
 	t.Cleanup(func() { ttGateway = origGateway })
 
-	ttGateway = NewTTGateway(new(tt_config_s), 0)
+	ttGateway = NewTTGateway(new(audio_s), new(tt_config_s), 0)
 
 	var failed = recv_init(t.Context(), audioConfig, src)
 
@@ -218,7 +218,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 
 	t.Cleanup(func() { ttGateway = origGateway })
 
-	ttGateway = NewTTGateway(new(tt_config_s), 0)
+	ttGateway = NewTTGateway(new(audio_s), new(tt_config_s), 0)
 
 	var failed = recv_init(t.Context(), audioConfig, src)
 
