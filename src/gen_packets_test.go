@@ -47,7 +47,10 @@ func Test_GenPackets_sendsWhatAtestDecodes(t *testing.T) {
 			require.NoError(t, g.SendPacket("Q1TEST>APDW17:>First"))
 			require.NoError(t, g.SendPacket("Q2TEST-9>APDW17,WIDE1-1:!4237.14NS07120.83W#Second"))
 		}, 2},
-		"variable speed": {func(_ *testing.T, g *GenPackets) { g.SendVariableSpeed(1, 0.5) }, 5},
+		"variable speed": {func(t *testing.T, g *GenPackets) {
+			t.Helper()
+			require.NoError(t, g.SendVariableSpeed(1, 0.5))
+		}, 5},
 	}
 
 	for name, tc := range testCases {
@@ -86,6 +89,15 @@ func Test_GenPackets_SendPacket_refusesWhatIsNotTNC2(t *testing.T) {
 	defer g.Close()
 
 	assert.ErrorContains(t, g.SendPacket("bogus"), "not valid TNC2 monitoring format")
+}
+
+func Test_GenPackets_SendVariableSpeed_refusesNoIncrement(t *testing.T) {
+	var g, err = NewGenPackets(newGenPacketsOptions(), filepath.Join(t.TempDir(), "out.wav"))
+	require.NoError(t, err)
+
+	defer g.Close()
+
+	assert.ErrorContains(t, g.SendVariableSpeed(5, 0), "increment must be more than 0")
 }
 
 func Test_NewGenPackets_refusesBadOptions(t *testing.T) {

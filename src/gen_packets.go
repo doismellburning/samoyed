@@ -243,7 +243,8 @@ func genPacketsSend(g *GenPackets, files []string, noisyPacketCount int, packetC
 	switch {
 	case variableSpeedMaxError != 0:
 		fmt.Printf("Variable speed.\n")
-		g.SendVariableSpeed(variableSpeedMaxError, variableSpeedIncrement)
+
+		return g.SendVariableSpeed(variableSpeedMaxError, variableSpeedIncrement)
 	case noisyPacketCount > 0:
 		g.SendNumbered(noisyPacketCount, true)
 	case packetCount > 0:
@@ -472,7 +473,11 @@ func (g *GenPackets) SendNumbered(count int, noisy bool) {
 // SendVariableSpeed sends the test message at a range of speeds, from
 // maxError percent below the bit rate to maxError percent above it, in steps
 // of increment percent.  The bit rate is back where it was afterwards.
-func (g *GenPackets) SendVariableSpeed(maxError float64, increment float64) {
+func (g *GenPackets) SendVariableSpeed(maxError float64, increment float64) error {
+	if increment <= 0 {
+		return fmt.Errorf("variable speed increment must be more than 0, not %g", increment)
+	}
+
 	var normal_speed = g.audio.achan[0].baud
 
 	for speed_error := -maxError; speed_error <= maxError+0.001; speed_error += increment {
@@ -485,6 +490,8 @@ func (g *GenPackets) SendVariableSpeed(maxError float64, increment float64) {
 
 	g.audio.achan[0].baud = normal_speed
 	gen_tone_init(g.audio, g.amplitude/2, g.sink)
+
+	return nil
 }
 
 // mustSendPacket sends one of the built in messages, which are always valid.
