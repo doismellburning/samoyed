@@ -54,3 +54,29 @@ func TestMorseSendWithoutToneGenerator(t *testing.T) {
 
 	assert.Equal(t, 300+int(TIME_UNITS_TO_MS(units, 10)+0.5)+250, morse_send(0, "E", 10, 300, 250))
 }
+
+// At a sample rate that isn't a multiple of 1000, the sample counts for tones
+// and for txdelay/txtail must not be truncated by integer division (issue #762).
+func TestMorseSampleCountsAt44100(t *testing.T) {
+	const channel = 0
+	const sampleRate = 44100
+
+	var audioConfig = new(audio_s)
+	audioConfig.adev[0].num_channels = 1
+	audioConfig.adev[0].bits_per_sample = 16
+	audioConfig.adev[0].samples_per_sec = sampleRate
+	audioConfig.chan_medium[channel] = MEDIUM_RADIO
+
+	var sink = new(byteSink)
+	var tg = NewToneGenerator(channel, audioConfig, 50, sink)
+
+	// One unit at 10 WPM is 120 ms, which is 5292 samples.
+	tg.morseTone(1, 10)
+	assert.Equal(t, 5292, len(sink.data)/2, "dot")
+
+	sink.data = nil
+
+	// 5 ms is 220.5 samples, which rounds to 221.
+	tg.morseQuietMs(5)
+	assert.Equal(t, 221, len(sink.data)/2, "quiet ms")
+}
