@@ -3,7 +3,11 @@
 
 package direwolf
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 const il2pTestText = `'... As I was saying, that seems to be done right - though I haven't time to look it over thoroughly just now - and ` +
 	`that shows that there are three hundred and sixty-four days when you might get un-birthday presents -'
@@ -26,6 +30,7 @@ type il2pLoopbackFrame struct {
 
 // il2pLoopbackRecorder collects the frames that came back out of the receiver.
 type il2pLoopbackRecorder struct {
+	rx     *il2pReceiver
 	frames []il2pLoopbackFrame
 }
 
@@ -37,12 +42,10 @@ func (r *il2pLoopbackRecorder) take() []il2pLoopbackFrame {
 	return frames
 }
 
-// clearIL2PReceivers forgets any partly-received frame, on every channel.  A
-// decoder left part way through gathering a payload swallows the next frame it
-// is given while it resynchronises, which a deliberate version mismatch is apt
-// to leave behind.
-func clearIL2PReceivers() {
-	il2p_context = [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*il2p_context_s{}
+// flush sends the receiver the one extra bit its state machine needs to
+// finish decoding a frame whose last bit it has already seen.
+func (r *il2pLoopbackRecorder) flush() {
+	r.rx.recBit(0)
 }
 
 // il2pLoopback wires the transmitter's bit stream straight into the receiver
@@ -64,13 +67,15 @@ func il2pLoopback(t *testing.T) *il2pLoopbackRecorder {
 		toneGenCapture, multiModemRecCapture = savedTone, savedRec
 	})
 
-	// Start from a receiver with nothing in flight, and leave one behind, so
-	// this test neither inherits nor bequeaths a half-gathered frame.
-	clearIL2PReceivers()
-	t.Cleanup(clearIL2PReceivers)
+	// A receiver of its own, so this test neither inherits nor bequeaths a
+	// half-gathered frame.  A decoder left part way through gathering a payload
+	// swallows the next frame it is given while it resynchronises, which a
+	// deliberate version mismatch is apt to leave behind.
+	recorder.rx = newIL2PReceiver(0, 0, 0)
 
 	toneGenCapture = func(channel int, data int) {
-		il2p_rec_bit(channel, 0, 0, data)
+		require.Zero(t, channel)
+		recorder.rx.recBit(data)
 	}
 
 	multiModemRecCapture = func(_ int, _ int, _ int, pp *packet_t, _ ALevel, retries BitFixLevel, _ fec_type_t) {

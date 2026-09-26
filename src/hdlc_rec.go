@@ -74,6 +74,8 @@ type hdlcState struct {
 	easPlusFound bool /* "+" seen, indicating end of geographical area list. */
 
 	easFieldsAfterPlus int /* Number of "-" characters after the "+". */
+
+	il2p *il2pReceiver /* IL2P decoder fed the same raw bits. */
 }
 
 // HDLCReceiver holds the HDLC bit-decoder state for every (channel, subchannel, slicer)
@@ -105,6 +107,8 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 	// Should loop on number of slicers, not max.
 
 	s.rrbb = rrbb_new(channel, subchannel, slice, scrambled, s.lfsr, s.prevDescram)
+
+	s.il2p = newIL2PReceiver(channel, subchannel, slice)
 
 	return s
 }
@@ -449,7 +453,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 
 	if r.audio.achan[channel].modem_type != MODEM_AIS {
 		FX25RecBit(channel, subchannel, slice, IfThenElse(dbit, 1, 0))
-		il2p_rec_bit(channel, subchannel, slice, IfThenElse(raw, 1, 0)) // Note: skip NRZI.
+		s.il2p.recBit(IfThenElse(raw, 1, 0)) // Note: skip NRZI.
 	}
 
 	/*
