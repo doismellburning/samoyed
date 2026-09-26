@@ -105,6 +105,7 @@ func Test_NewGenPackets_refusesBadOptions(t *testing.T) {
 		change func(opts *GenPacketsOptions)
 		want   string
 	}{
+		"amplitude too low":  {func(opts *GenPacketsOptions) { opts.Amplitude = -1 }, "amplitude must be in range"},
 		"amplitude too high": {func(opts *GenPacketsOptions) { opts.Amplitude = 201 }, "amplitude must be in range"},
 		"sample rate":        {func(opts *GenPacketsOptions) { opts.SampleRate = 100 }, "more reasonable audio sample rate"},
 		"morse too slow":     {func(opts *GenPacketsOptions) { opts.MorseWPM = 4 }, "morse code speed must be in range"},

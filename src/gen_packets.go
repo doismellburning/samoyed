@@ -333,7 +333,7 @@ type GenPackets struct {
 func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, error) {
 	var audio = genPacketsDefaultAudio()
 
-	if opts.Amplitude > 200 {
+	if opts.Amplitude < 0 || opts.Amplitude > 200 {
 		return nil, fmt.Errorf("amplitude must be in range of 0 to 200, not %d", opts.Amplitude)
 	}
 
