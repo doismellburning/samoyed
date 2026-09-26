@@ -42,10 +42,10 @@ func run(ctx context.Context, args []string, out io.Writer) int {
 		gpsPort = args[0]
 	}
 
-	direwolf.DWGPSInit(ctx, gpsPort, 3)
+	var gps = direwolf.DWGPSInit(ctx, gpsPort, 3)
 
 	for ctx.Err() == nil {
-		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead()
+		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead(gps)
 
 		switch fix {
 		case int(direwolf.DWFIX_2D), int(direwolf.DWFIX_3D):

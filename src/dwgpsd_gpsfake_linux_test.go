@@ -92,7 +92,9 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	config.gpsd_host = "127.0.0.1"
 	config.gpsd_port = port
 
-	require.Equal(t, 1, dwgpsd_init(t.Context(), config, 3))
+	var gps = new(GPS)
+
+	require.Equal(t, 1, dwgpsd_init(t.Context(), gps, config, 3))
 
 	t.Cleanup(dwgpsd_term)
 
@@ -106,7 +108,7 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	// for that last one rather than just the first 3D report.
 	var deadline = time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		fix = dwgps_read(info)
+		fix = gps.Read(info)
 		if fix >= DWFIX_3D && info.altitude.IsJust() {
 			break
 		}

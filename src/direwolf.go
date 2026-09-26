@@ -57,6 +57,7 @@ var waypointSender *WaypointSender
 var packetLogger *PacketLogger
 var telemetryState = NewTelemetryState()
 var beaconService *BeaconService
+var gpsReceiver *GPS
 var kissNetSvc *KissNetService
 var kissPT *KissPT
 var kissSerial *KissSerial
@@ -681,7 +682,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Open port for communication with GPS.
 	 */
-	dwgps_init(ctx, misc_config, d_g_opt)
+	gpsReceiver = NewGPS(ctx, misc_config, d_g_opt)
 
 	var waypointErr error
 	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config)
@@ -701,7 +702,7 @@ x = Silence FX.25 information.`)
 	 */
 
 	packetLogger = NewPacketLogger(misc_config.log_daily_names, misc_config.log_path)
-	beaconService = NewBeaconService(audio_config, misc_config, &igate_config)
+	beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
 	stopIfCancelled(ctx)
@@ -1215,7 +1216,7 @@ func teardown() {
 			packetLogger.Close()
 		}
 		pttControl.Term()
-		dwgps_term()
+		gpsReceiver.Term()
 
 		if waypointSender != nil {
 			waypointSender.Close()
