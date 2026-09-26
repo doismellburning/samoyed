@@ -88,23 +88,6 @@ var MORSE []morse_s = []morse_s{
 
 const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
 
-/*------------------------------------------------------------------
- *
- * Name:        morse_init
- *
- * Purpose:     Save the audio configuration.
- *
- * Inputs:      audio_config_p		- Pointer to audio configuration structure.
- *
- *		amp		- Ignored: Morse goes through the channel's tone
- *				  generator, which has its own sine table.
- *
- *----------------------------------------------------------------*/
-
-func morse_init(audio_config_p *audio_s, _ int) {
-	save_audio_config_p = audio_config_p
-} /* end morse_init */
-
 /*-------------------------------------------------------------------
  *
  * Name:        morse_send
