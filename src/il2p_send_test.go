@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestIL2PSendFrameCRCDefaultMatchesEnabled verifies that il2p_send_frame uses
+// TestIL2PSendFrameCRCDefaultMatchesEnabled verifies that sendIL2PFrame uses
 // the same CRC defaulting logic as il2p_crc_enabled: when save_audio_config_p
 // is nil, CRC should be enabled (il2p_crc_enabled returns true), so the
 // transmitted frame must include IL2P_CRC_ENCODED_SIZE extra bytes.
@@ -38,6 +38,6 @@ func TestIL2PSendFrameCRCDefaultMatchesEnabled(t *testing.T) {
 	var _, lenWithCRC = il2p_encode_frame(pp, IL2P_VERSION_COMPAT, 0, true)
 	var expectedBits = (1 + IL2P_SYNC_WORD_SIZE + lenWithCRC) * 8
 
-	var actual = il2p_send_frame(0, pp, IL2P_VERSION_COMPAT, 0, 0)
-	assert.Equal(t, expectedBits, actual, "il2p_send_frame should append CRC when il2p_crc_enabled returns true")
+	var actual = NewHDLCSender(0, nil).sendIL2PFrame(pp, IL2P_VERSION_COMPAT, 0, 0)
+	assert.Equal(t, expectedBits, actual, "sendIL2PFrame should append CRC when il2p_crc_enabled returns true")
 }

@@ -70,7 +70,7 @@ func (s *HDLCSender) SendFrame(pp *packet_t, badFCS bool) int {
 	var achan = &s.audioConfig.achan[s.channel]
 
 	if achan.layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
-		var n = il2p_send_frame(s.channel, pp, achan.il2p_version, achan.il2p_max_fec, achan.il2p_invert_polarity)
+		var n = s.sendIL2PFrame(pp, achan.il2p_version, achan.il2p_max_fec, achan.il2p_invert_polarity)
 		if n > 0 {
 			return n
 		}
@@ -190,6 +190,10 @@ func (s *HDLCSender) sendAX25Frame(fbuf []byte, badFCS bool) int {
 
 // The next one is only for IL2P.  No NRZI.
 // MSB first, opposite of AX.25.
+// NRZI would be applied for AX.25 but IL2P does not use it.
+// However we do have an option to invert the signal.
+// The direwolf receive implementation will automatically compensate
+// for either polarity but other implementations might not.
 
 func (s *HDLCSender) sendByteMSBFirst(x int, polarity int) {
 	for range 8 {
