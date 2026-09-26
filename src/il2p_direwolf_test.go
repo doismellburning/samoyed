@@ -767,11 +767,11 @@ func test_serdes(t *testing.T) {
 		var pp = AX25FromText(packet, true)
 		assert.NotNil(t, pp)
 
-		var channel = 0
+		var sender = NewHDLCSender(0, nil)
 
 		for max_fec := range 2 {
 			for polarity := range 3 { // 2 means throw in some errors.
-				var num_bits_sent = il2p_send_frame(channel, pp, IL2P_VERSION_0_4, max_fec, polarity)
+				var num_bits_sent = sender.sendIL2PFrame(pp, IL2P_VERSION_0_4, max_fec, polarity)
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.

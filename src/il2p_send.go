@@ -1,17 +1,12 @@
-//nolint:gochecknoglobals
 package direwolf
-
-var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "il2p_send_frame"
 
 /*-------------------------------------------------------------
  *
- * Name:	il2p_send_frame
+ * Name:	sendIL2PFrame (il2p_send_frame in Dire Wolf)
  *
  * Purpose:	Convert frames to a stream of bits in IL2P format.
  *
- * Inputs:	chan	- Audio channel number, 0 = first.
- *
- *		pp	- Pointer to packet object.
+ * Inputs:	pp	- Pointer to packet object.
  *
  *		version	- IL2P version to speak.
  *
@@ -46,14 +41,14 @@ var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent b
  *
  *--------------------------------------------------------------*/
 
-func il2p_send_frame(channel int, pp *packet_t, version il2p_version_t, max_fec int, polarity int) int {
+func (s *HDLCSender) sendIL2PFrame(pp *packet_t, version il2p_version_t, max_fec int, polarity int) int {
 	var syncWordBytes = []byte{
 		(IL2P_SYNC_WORD >> 16) & 0xff,
 		(IL2P_SYNC_WORD >> 8) & 0xff,
 		(IL2P_SYNC_WORD) & 0xff,
 	}
 
-	var encoded, elen = il2p_encode_frame(pp, version, max_fec, il2p_crc_enabled(channel))
+	var encoded, elen = il2p_encode_frame(pp, version, max_fec, il2p_crc_enabled(s.channel))
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
@@ -63,7 +58,7 @@ func il2p_send_frame(channel int, pp *packet_t, version il2p_version_t, max_fec 
 
 	var data = append(syncWordBytes, encoded...)
 
-	number_of_il2p_bits_sent[channel] = 0
+	s.bitsSent = 0
 
 	if il2p_get_debug() >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
@@ -80,35 +75,13 @@ func il2p_send_frame(channel int, pp *packet_t, version il2p_version_t, max_fec 
 
 	// Send bits to modulator.
 
-	send_il2p_bytes(channel, []byte{IL2P_PREAMBLE}, polarity)
-	send_il2p_bytes(channel, data, polarity)
+	s.sendByteMSBFirst(IL2P_PREAMBLE, polarity)
 
-	return number_of_il2p_bits_sent[channel]
-}
-
-func send_il2p_bytes(channel int, b []byte, polarity int) {
-	for _, x := range b {
-		for range 8 {
-			var bit = 0
-			if (x & 0x80) != 0 {
-				bit = 1
-			}
-
-			send_il2p_bit(channel, bit, polarity)
-
-			x <<= 1
-		}
+	for _, x := range data {
+		s.sendByteMSBFirst(int(x), polarity)
 	}
-}
 
-// NRZI would be applied for AX.25 but IL2P does not use it.
-// However we do have an option to invert the signal.
-// The direwolf receive implementation will automatically compensate
-// for either polarity but other implementations might not.
-
-func send_il2p_bit(channel int, b int, polarity int) {
-	tone_gen_put_bit(channel, (b^polarity)&1)
-	number_of_il2p_bits_sent[channel]++
+	return s.bitsSent
 }
 
 // end il2p_send.c
