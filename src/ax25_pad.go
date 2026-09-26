@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -150,7 +149,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -234,8 +232,6 @@ const SSID_SSID_SHIFT = 1
 const SSID_LAST_MASK = 0x01
 
 type packet_t struct {
-	seq int /* unique sequence number for debugging. */
-
 	release_time time.Time /* When to release from the SATgate mode delay queue. */
 
 	nextp *packet_t /* Pointer to next in queue. */
@@ -313,8 +309,6 @@ type ALevel struct {
 	//float ms_ratio;	// TODO: take out after temporary investigation.
 }
 
-var last_seq_num atomic.Int64
-
 // addrStrictness says how fussy ax25_parse_addr should be about an address.
 type addrStrictness int
 
@@ -367,11 +361,8 @@ func isxdigit(b byte) bool {
  *------------------------------------------------------------------------------*/
 
 func ax25_new() *packet_t {
-	var seq = last_seq_num.Add(1)
-
 	var this_p = new(packet_t)
 
-	this_p.seq = int(seq)
 	this_p.num_addr = (-1)
 
 	return (this_p)
@@ -740,13 +731,9 @@ func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
  *------------------------------------------------------------------------------*/
 
 func ax25_dup(copy_from *packet_t) *packet_t {
-	var this_p = ax25_new()
-
-	var save_seq = this_p.seq
+	var this_p = new(packet_t)
 
 	*this_p = *copy_from
-
-	this_p.seq = save_seq
 
 	return (this_p)
 }
@@ -791,10 +778,14 @@ func ax25_dup(copy_from *packet_t) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-var position_name = [1 + AX25_MAX_ADDRS]string{
-	"", "Destination ", "Source ",
-	"Digi1 ", "Digi2 ", "Digi3 ", "Digi4 ",
-	"Digi5 ", "Digi6 ", "Digi7 ", "Digi8 "}
+// addrPositionNames returns the prefixes ax25_parse_addr's messages use to
+// say which address they are about, indexed by position + 1.
+func addrPositionNames() [1 + AX25_MAX_ADDRS]string {
+	return [1 + AX25_MAX_ADDRS]string{
+		"", "Destination ", "Source ",
+		"Digi1 ", "Digi2 ", "Digi3 ", "Digi4 ",
+		"Digi5 ", "Digi6 ", "Digi7 ", "Digi8 "}
+}
 
 func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (string, int, bool, bool) {
 	var out_addr string
@@ -811,7 +802,9 @@ func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (s
 		position = AX25_REPEATER_8
 	}
 
-	position++ /* Adjust for position_name above. */
+	position++ /* Adjust for addrPositionNames above. */
+
+	var position_name = addrPositionNames()
 
 	if len(in_addr) == 0 {
 		text_color_set(DW_COLOR_ERROR)
