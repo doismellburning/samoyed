@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -28,7 +27,7 @@ import (
  * Information required for Connected mode digipeating.
  *
  * The configuration file reader fills in this information
- * and it is passed to cdigipeater_init at application start up time.
+ * and it is passed to NewConnectedDigipeater at application start up time.
  */
 
 type cdigi_config_s struct {
@@ -54,27 +53,18 @@ type cdigi_config_s struct {
 	// NULL or optional Packet Filter strings such as "t/m".
 }
 
-/*
- * Keep pointer to configuration options.
- * Set by cdigipeater_init and used later.
- */
-
-var save_audio_config_p *audio_s
-var save_cdigi_config_p *cdigi_config_s
-
-/*
- * Maintain count of packets digipeated for each combination of from/to channel.
- */
-
-var cdigi_count [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
-
-func cdigipeater_get_count(from_chan int, to_chan int) int {
-	return (cdigi_count[from_chan][to_chan])
+// ConnectedDigipeater is the connected mode digipeater: the configuration it
+// was started with, and a count of packets digipeated for each combination of
+// from/to channel.
+type ConnectedDigipeater struct {
+	audioConfig *audio_s
+	config      *cdigi_config_s
+	count       [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	cdigipeater_init
+ * Name:	NewConnectedDigipeater
  *
  * Purpose:	Initialize with stuff from configuration file.
  *
@@ -82,20 +72,25 @@ func cdigipeater_get_count(from_chan int, to_chan int) int {
  *
  *		p_cdigi_config	- Connected Digipeater configuration details.
  *
- * Outputs:	Save pointers to configuration for later use.
- *
  * Description:	Called once at application startup time.
  *
  *------------------------------------------------------------------------------*/
 
-func cdigipeater_init(p_audio_config *audio_s, p_cdigi_config *cdigi_config_s) {
-	save_audio_config_p = p_audio_config
-	save_cdigi_config_p = p_cdigi_config
+func NewConnectedDigipeater(p_audio_config *audio_s, p_cdigi_config *cdigi_config_s) *ConnectedDigipeater {
+	var d = new(ConnectedDigipeater)
+	d.audioConfig = p_audio_config
+	d.config = p_cdigi_config
+
+	return d
+}
+
+func (d *ConnectedDigipeater) GetCount(from_chan, to_chan int) int {
+	return d.count[from_chan][to_chan]
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	cdigipeater
+ * Name:	Digipeat
  *
  * Purpose:	Re-transmit packet if it matches the rules.
  *
@@ -107,12 +102,12 @@ func cdigipeater_init(p_audio_config *audio_s, p_cdigi_config *cdigi_config_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func cdigipeater(from_chan int, pp *packet_t) {
+func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *packet_t) {
 	// Connected mode is allowed only for channels with internal modem.
 	// It probably wouldn't matter for digipeating but let's keep that rule simple and consistent.
 	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS ||
-		(save_audio_config_p.chan_medium[from_chan] != MEDIUM_RADIO &&
-			save_audio_config_p.chan_medium[from_chan] != MEDIUM_NETTNC) {
+		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
+			d.audioConfig.chan_medium[from_chan] != MEDIUM_NETTNC) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("cdigipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
 
@@ -127,18 +122,8 @@ func cdigipeater(from_chan int, pp *packet_t) {
 	 */
 
 	for to_chan := range MAX_RADIO_CHANS {
-		if save_cdigi_config_p.enabled[from_chan][to_chan] {
-			if to_chan == from_chan {
-				var result = cdigipeat_match(from_chan, pp, save_audio_config_p.mycall[from_chan],
-					save_audio_config_p.mycall[to_chan],
-					save_cdigi_config_p.has_alias[from_chan][to_chan],
-					save_cdigi_config_p.alias[from_chan][to_chan], to_chan,
-					save_cdigi_config_p.cfilter_str[from_chan][to_chan])
-				if result != nil {
-					transmitQueue.Append(to_chan, TQ_PRIO_0_HI, result)
-					cdigi_count[from_chan][to_chan]++
-				}
-			}
+		if d.config.enabled[from_chan][to_chan] && to_chan == from_chan {
+			d.digipeatTo(from_chan, to_chan, pp)
 		}
 	}
 
@@ -147,21 +132,25 @@ func cdigipeater(from_chan int, pp *packet_t) {
 	 */
 
 	for to_chan := range MAX_RADIO_CHANS {
-		if save_cdigi_config_p.enabled[from_chan][to_chan] {
-			if to_chan != from_chan {
-				var result = cdigipeat_match(from_chan, pp, save_audio_config_p.mycall[from_chan],
-					save_audio_config_p.mycall[to_chan],
-					save_cdigi_config_p.has_alias[from_chan][to_chan],
-					save_cdigi_config_p.alias[from_chan][to_chan], to_chan,
-					save_cdigi_config_p.cfilter_str[from_chan][to_chan])
-				if result != nil {
-					transmitQueue.Append(to_chan, TQ_PRIO_0_HI, result)
-					cdigi_count[from_chan][to_chan]++
-				}
-			}
+		if d.config.enabled[from_chan][to_chan] && to_chan != from_chan {
+			d.digipeatTo(from_chan, to_chan, pp)
 		}
 	}
-} /* end cdigipeater */
+} /* end Digipeat */
+
+// digipeatTo queues pp for transmission on to_chan if the from/to channel
+// pair's rules say it should be repeated.
+func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *packet_t) {
+	var result = cdigipeat_match(from_chan, pp, d.audioConfig.mycall[from_chan],
+		d.audioConfig.mycall[to_chan],
+		d.config.has_alias[from_chan][to_chan],
+		d.config.alias[from_chan][to_chan], to_chan,
+		d.config.cfilter_str[from_chan][to_chan])
+	if result != nil {
+		transmitQueue.Append(to_chan, TQ_PRIO_0_HI, result)
+		d.count[from_chan][to_chan]++
+	}
+}
 
 /*------------------------------------------------------------------------------
  *
