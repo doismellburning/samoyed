@@ -1,7 +1,10 @@
 package direwolf
 
 import (
+	"bufio"
+	"net"
 	"testing"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
@@ -175,4 +178,78 @@ func Test_apply_gpsd_tpv_absent_fields_are_nothing(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[float64](), info.track)
 	assert.Equal(t, maybe.Nothing[float64](), info.speed_knots)
 	assert.Equal(t, maybe.Nothing[float64](), info.altitude)
+}
+
+// fakeGpsd listens as a gpsd would, returning a configuration pointing at it
+// and a channel that hands over the connection once the client has asked to
+// WATCH, so the test can send it reports.
+func fakeGpsd(t *testing.T) (*misc_config_s, <-chan net.Conn) {
+	t.Helper()
+
+	var listener, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, listenErr)
+
+	t.Cleanup(func() { listener.Close() })
+
+	var conns = make(chan net.Conn, 1)
+
+	go func() {
+		var conn, acceptErr = listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+
+		t.Cleanup(func() { conn.Close() })
+
+		_, _ = bufio.NewReader(conn).ReadString('\n') // ?WATCH=...
+
+		conns <- conn
+	}()
+
+	var config = new(misc_config_s)
+	config.gpsd_host = "127.0.0.1"
+	config.gpsd_port = listener.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert // A TCP listener has a TCP address.
+
+	return config, conns
+}
+
+// Every GPS used to share one gpsd connection handle, so Term on one closed
+// whichever connection had been made last - another GPS's.
+func TestGPSTermLeavesAnotherGPSsGpsdConnectionAlone(t *testing.T) {
+	var config1, conns1 = fakeGpsd(t)
+	var config2, conns2 = fakeGpsd(t)
+
+	var gps1, gps2 = new(GPS), new(GPS)
+
+	require.Equal(t, 1, dwgpsd_init(t.Context(), gps1, config1, 0))
+	require.Equal(t, 1, dwgpsd_init(t.Context(), gps2, config2, 0))
+
+	<-conns1
+	var server2 = <-conns2
+
+	gps1.Term()
+
+	// Let gps1's reader finish reporting its lost connection before carrying
+	// on, so it isn't still printing once the test is over.
+	require.Eventually(t, func() bool { return gps1.Read(new(dwgps_info_t)) == DWFIX_ERROR },
+		5*time.Second, 10*time.Millisecond, "gps1's reader never noticed it had been shut down")
+
+	var _, writeErr = server2.Write([]byte(`{"class":"TPV","mode":3,"lat":42.6,"lon":-71.3,"altMSL":33.5}` + "\n"))
+	require.NoError(t, writeErr)
+
+	var info = new(dwgps_info_t)
+
+	var fix dwfix_t
+
+	var deadline = time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		fix = gps2.Read(info)
+		if fix == DWFIX_3D || fix == DWFIX_ERROR {
+			break
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	assert.Equal(t, DWFIX_3D, fix, "the other GPS lost its connection to gpsd")
 }
