@@ -180,6 +180,11 @@ func multi_modem_init(pa *audio_s, sink ReceiveSink) {
 		m.audioConfig = pa
 		m.sink = sink
 
+		// Anything still waiting to be picked came from before, e.g. the
+		// previous file atest decoded, and would otherwise be handed on as
+		// part of what comes next.
+		m.candidates = [MAX_SUBCHANS][MAX_SLICERS]candidate_t{}
+
 		if pa.chan_medium[channel] == MEDIUM_RADIO {
 			if pa.achan[channel].baud <= 0 {
 				text_color_set(DW_COLOR_ERROR)
