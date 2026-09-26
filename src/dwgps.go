@@ -87,6 +87,9 @@ type GPS struct {
 
 	mu   sync.Mutex
 	info dwgps_info_t
+
+	nmea gpsnmeaPort // The GPSNMEA receiver's serial port, if one was opened.
+	gpsd gpsdClient  // The connection to gpsd, if one was made.
 }
 
 /*-------------------------------------------------------------------
@@ -217,7 +220,7 @@ func (g *GPS) Term() {
 
 	dwgpsnmea_term()
 
-	dwgpsd_term()
+	g.gpsd.closeAndClear() // Shut down the GPSD interface.
 } /* end Term */
 
 /*-------------------------------------------------------------------

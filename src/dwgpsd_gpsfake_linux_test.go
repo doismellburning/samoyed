@@ -96,7 +96,7 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 
 	require.Equal(t, 1, dwgpsd_init(t.Context(), gps, config, 3))
 
-	t.Cleanup(dwgpsd_term)
+	t.Cleanup(gps.Term)
 
 	var info = new(dwgps_info_t)
 

@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -31,6 +30,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/latlong"
@@ -38,17 +38,18 @@ import (
 	"github.com/pkg/term"
 )
 
-// s_gpsnmea_debug is how much this file has to say for itself.
-// See dwgpsnmea_init's description for the values.
+// gpsnmeaPort is the serial port a GPS receiver is read from, as opened by
+// dwgpsnmea_init.  The waypoint sender can share it (see GPS.sharedNMEAPort),
+// and the reader goroutine closes it and clears fd if the receiver goes away,
+// so fd is guarded by mu.
 //
-// This was a file-scope static in Dire Wolf, as the IGate's own debug level
-// was; the port flattened both into one package variable named s_debug, so
-// whichever of the two inits ran last decided the level for both.
-// DirewolfMain starts the GPS after the IGate, so -dg silently overrode -di.
-// See issue #674.
-var s_gpsnmea_debug int
-
-var s_save_configp *misc_config_s
+// Its zero value is a port that was never opened.
+type gpsnmeaPort struct {
+	mu    sync.Mutex
+	name  string
+	speed int
+	fd    *term.Term
+}
 
 /*-------------------------------------------------------------------
  *
@@ -88,17 +89,8 @@ var s_save_configp *misc_config_s
  *
  *--------------------------------------------------------------------*/
 
-/* Make this static and available to all functions so term function can access it. */
-
-var s_gpsnmea_port_fd *term.Term
-
 func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug int) int {
-	//dwgps_info_t info;
-	//int e;
-	s_gpsnmea_debug = debug
-	s_save_configp = pconfig
-
-	if s_gpsnmea_debug >= 2 {
+	if debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dwgpsnmea_init()\n")
 	}
@@ -112,10 +104,16 @@ func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug
 	 * Open serial port connection.
 	 */
 
-	s_gpsnmea_port_fd = SerialPortOpen(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
+	var fd = SerialPortOpen(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
 
-	if s_gpsnmea_port_fd != nil {
-		go read_gpsnmea_thread(ctx, gps, s_gpsnmea_port_fd, debug)
+	if fd != nil {
+		gps.nmea.mu.Lock()
+		gps.nmea.name = pconfig.gpsnmea_port
+		gps.nmea.speed = pconfig.gpsnmea_speed
+		gps.nmea.fd = fd
+		gps.nmea.mu.Unlock()
+
+		go read_gpsnmea_thread(ctx, gps, fd, debug)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not open serial port %s for GPS receiver.\n", pconfig.gpsnmea_port)
@@ -128,14 +126,35 @@ func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug
 	return (1)
 } /* end dwgpsnmea_init */
 
-/* Return fd to share if waypoint wants same device. */
+// sharedNMEAPort returns the GPS receiver's serial port, for the waypoint
+// sender to share, if it is the one named, at the same speed, and still open.
+// Otherwise, or for a nil GPS, it returns nil.
+func (g *GPS) sharedNMEAPort(name string, speed int) *term.Term {
+	if g == nil {
+		return nil
+	}
 
-func dwgpsnmea_get_fd(wp_port_name string, speed int) *term.Term {
-	if s_save_configp.gpsnmea_port == wp_port_name && speed == s_save_configp.gpsnmea_speed {
-		return (s_gpsnmea_port_fd)
+	g.nmea.mu.Lock()
+	defer g.nmea.mu.Unlock()
+
+	if g.nmea.fd != nil && g.nmea.name == name && g.nmea.speed == speed {
+		return g.nmea.fd
 	}
 
 	return nil
+}
+
+// closeIfCurrent closes fd, and forgets it if it is still the port's.
+func (p *gpsnmeaPort) closeIfCurrent(fd *term.Term) {
+	p.mu.Lock()
+
+	if p.fd == fd {
+		p.fd = nil
+	}
+
+	p.mu.Unlock()
+
+	serial_port_close(fd)
 }
 
 /*-------------------------------------------------------------------
@@ -149,9 +168,7 @@ func dwgpsnmea_get_fd(wp_port_name string, speed int) *term.Term {
  *
  *		fd	- File descriptor for serial port.
  *
- *		debug	- As for dwgpsnmea_init.  Given by value rather than
- *			  read from s_gpsnmea_debug, which the next
- *			  dwgpsnmea_init writes while this may still be running.
+ *		debug	- As for dwgpsnmea_init.
  *
  * Description:	This version reads from serial port and parses the
  *		NMEA sentences.
@@ -185,7 +202,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 	// rather than during one: the port is read directly rather than through
 	// something the runtime can interrupt, so closing it would not get this
 	// goroutine back - and this port can be shared with the waypoint sender
-	// (see dwgpsnmea_get_fd), which closes it in its own teardown.
+	// (see GPS.sharedNMEAPort), which closes it in its own teardown.
 	for ctx.Err() == nil {
 		var ch, err = SerialPortGet1(fd)
 		if err != nil {
@@ -201,6 +218,10 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 			dw_printf("GPSNMEA: Lost communication with GPS receiver.\n")
 			dw_printf("----------------------------------------------\n")
 
+			// Close the port before reporting the error, so that nobody
+			// who has seen DWFIX_ERROR can still be handed it to share.
+			gps.nmea.closeIfCurrent(fd)
+
 			info.fix = DWFIX_ERROR
 
 			if debug >= 2 {
@@ -209,9 +230,6 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 			}
 
 			gps.setData(info)
-
-			serial_port_close(s_gpsnmea_port_fd)
-			s_gpsnmea_port_fd = nil
 
 			// TODO: If the open() was in this thread, we could wait a while and
 			// try to open again.  That would allow recovery if the USB GPS device
@@ -726,7 +744,7 @@ func dwgpsnmea_term() {
 	// Should probably kill reader thread before closing device to avoid
 	// message about read error.
 
-	// serial_port_close (s_gpsnmea_port_fd);
+	// serial_port_close (the port's fd);
 
 } /* end dwgps_term */
 

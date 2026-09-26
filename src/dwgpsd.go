@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -42,16 +41,16 @@ const GPSD_CONNECT_TIMEOUT = 10 * time.Second
 // errNotTPV means the report was valid JSON but not a "class":"TPV" one, so there's nothing to apply.
 var errNotTPV = errors.New("gpsd report is not a TPV")
 
-// gpsdClient holds the state for the connection to the gpsd daemon.
+// gpsdClient holds the state for a GPS's connection to the gpsd daemon.
 //
-// conn is touched by both dwgpsd_term (caller's goroutine) and
+// conn is touched by both GPS.Term (caller's goroutine) and
 // read_gpsd_thread (reader goroutine), so it's guarded by mu.
+//
+// Its zero value is a client that was never connected.
 type gpsdClient struct {
 	mu   sync.Mutex
 	conn net.Conn
 }
-
-var s_gpsd = new(gpsdClient)
 
 func (c *gpsdClient) setConn(conn net.Conn) {
 	c.mu.Lock()
@@ -155,7 +154,7 @@ func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug in
 		return -1
 	}
 
-	s_gpsd.setConn(conn)
+	gps.gpsd.setConn(conn)
 
 	go read_gpsd_thread(ctx, gps, conn, debug)
 
@@ -175,9 +174,7 @@ func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug in
  *
  *		conn	- Connection to gpsd daemon.
  *
- *		debug	- As for dwgpsd_init.  Given by value rather than
- *			  read from s_gpsd, whose debug the next dwgpsd_init
- *			  writes while this may still be running.
+ *		debug	- As for dwgpsd_init.
  *
  * Description:	This reads newline delimited JSON objects from gpsd and
  *		picks out the "TPV" (Time-Position-Velocity) reports.
@@ -246,7 +243,7 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 
 	gps.setData(info)
 
-	s_gpsd.clearConnIfCurrent(conn)
+	gps.gpsd.clearConnIfCurrent(conn)
 
 	conn.Close()
 }
@@ -358,20 +355,4 @@ func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
 	}
 	/* Otherwise keep last known altitude when we downgrade from 3D to 2D fix. */
 	/* Caller knows altitude is outdated if info.fix == DWFIX_2D. */
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        dwgpsd_term
- *
- * Purpose:    	Shut down GPSD interface before exiting from application.
- *
- * Inputs:	none.
- *
- * Returns:	none.
- *
- *--------------------------------------------------------------------*/
-
-func dwgpsd_term() {
-	s_gpsd.closeAndClear()
 }
