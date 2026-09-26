@@ -16,12 +16,6 @@ import (
 )
 
 func Test_TTUser(t *testing.T) {
-	TT_TESTS_RUNNING = true
-
-	defer func() {
-		TT_TESTS_RUNNING = false
-	}()
-
 	/* Fake audio config - All we care about is mycall for constructing object report packet. */
 
 	var my_audio_config audio_s

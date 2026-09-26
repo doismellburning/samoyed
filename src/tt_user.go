@@ -33,8 +33,6 @@ import (
  * For now, just use a fixed size array for simplicity.
  */
 
-var TT_TESTS_RUNNING = false
-
 const MAX_TT_USERS = 100
 
 const MAX_CALLSIGN_LEN = 9 /* "Object Report" names can be up to 9 characters. */
@@ -126,8 +124,6 @@ var tt_user [MAX_TT_USERS]tt_user_s
  *
  * Description:	The main program needs to call this at application
  *		start up time after reading the configuration file.
- *
- *		TT_TESTS_RUNNING is defined for unit testing.
  *
  *----------------------------------------------------------------*/
 
@@ -729,12 +725,6 @@ func xmit_object_report(i int, first_time bool) {
 		ctcss,
 		maybe.Nothing[float64](), /* offset */
 		info_comment)
-
-	if TT_TESTS_RUNNING {
-		dw_printf("---> %s\n\n", stemp)
-
-		return
-	}
 
 	if first_time {
 		text_color_set(DW_COLOR_DEBUG)
