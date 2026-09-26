@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"testing"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
@@ -66,4 +67,20 @@ func Test_EncodePosition_explicit_zero_frequency_spec(t *testing.T) {
 		EncodePosition(false, false, 42+34.61/60, -(71+26.47/60), 0, none, 'D', '&',
 			none, none, none, "", none, maybe.Just(0), noFloat, noFloat, noFloat, ""),
 		"nothing to say")
+}
+
+// An object report's timestamp is day, hour and minute in UTC, the "z" says
+// so.  It was formatted with Go's "03", the 12-hour clock, and in whatever zone
+// the time carried, so an evening report from east of Greenwich came out hours
+// off and could not be told from a morning one.
+func Test_encode_object_timestamp_is_24_hour_utc(t *testing.T) {
+	var eastOfGreenwich = time.FixedZone("UTC+1", 60*60)
+
+	var info = encode_object("Q1TEST", false, time.Date(2026, 9, 26, 18, 30, 0, 0, eastOfGreenwich),
+		42.5, -71.5, 0, '/', '-',
+		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
+		maybe.Nothing[int](), maybe.Nothing[int](),
+		maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
+
+	assert.Equal(t, ";Q1TEST   *261730z", info[:18])
 }
