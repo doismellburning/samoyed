@@ -72,10 +72,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Properties of the radio channels.
-
-// TODO KG static struct audio_s          *save_audio_config_p;
-
 // Candidates for further processing.
 
 type candidate_t struct {
@@ -93,13 +89,44 @@ type candidate_t struct {
 	score int
 }
 
-var candidate [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]candidate_t
-
 //#define PROCESS_AFTER_BITS 2		// version 1.4.  Was a little short for skew of PSK with different modem types, optional pre-filter
 
 const PROCESS_AFTER_BITS = 3
 
-var process_age [MAX_RADIO_CHANS]int
+// A MultiModem is one radio channel's layer between its demodulators and the
+// rest of the program: the frames its subchannels and slicers have decoded,
+// held for a few bit times so the best can be picked, and the running DC bias
+// of its input.
+//
+// It is driven by its audio device's goroutine, which both feeds it samples
+// and, by way of the HDLC, FX.25 and IL2P decoders, hands it frames.
+type MultiModem struct {
+	channel     int
+	audioConfig *audio_s
+	sink        ReceiveSink // Where the frames it picks go.
+
+	candidates [MAX_SUBCHANS][MAX_SLICERS]candidate_t
+
+	// processAge is how many samples a candidate waits for others to turn up.
+	processAge int
+
+	dcAverage float64
+}
+
+// multiModems holds every channel's MultiModem, built at package
+// initialisation so the decoders that hand frames on never find one nil.
+var multiModems = newMultiModems()
+
+func newMultiModems() [MAX_RADIO_CHANS]*MultiModem {
+	var m [MAX_RADIO_CHANS]*MultiModem
+
+	for channel := range m {
+		m[channel] = new(MultiModem)
+		m[channel].channel = channel
+	}
+
+	return m
+}
 
 // A ReceiveSink is where what the demodulators hear ends up: the frames they
 // decode, and the data carrier detect state they derive from the incoming
@@ -128,12 +155,6 @@ func (s *radioSink) DCDChange(channel int, state int) {
 	pttControl.Set(OCTYPE_DCD, channel, state)
 }
 
-// receiveSink is where this file sends the frames it decodes.  multi_modem_init
-// sets it, the same way it saves the audio configuration, because a frame
-// arrives by way of several files' worth of decoding that have no reason to
-// carry it along.
-var receiveSink ReceiveSink
-
 /*------------------------------------------------------------------------------
  *
  * Name:	multi_modem_init
@@ -152,33 +173,35 @@ var receiveSink ReceiveSink
  *------------------------------------------------------------------------------*/
 
 func multi_modem_init(pa *audio_s, sink ReceiveSink) {
-	/*
-	 * Save audio configuration for later use.
-	 */
-	save_audio_config_p = pa
-	receiveSink = sink
+	demod_init(pa)
+	hdlcReceiver = NewHDLCReceiver(pa, sink)
 
-	demod_init(save_audio_config_p)
-	hdlcReceiver = NewHDLCReceiver(save_audio_config_p, sink)
+	for channel, m := range multiModems {
+		m.audioConfig = pa
+		m.sink = sink
 
-	for channel := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-			if save_audio_config_p.achan[channel].baud <= 0 {
+		// Anything still waiting to be picked came from before, e.g. the
+		// previous file atest decoded, and would otherwise be handed on as
+		// part of what comes next.
+		m.candidates = [MAX_SUBCHANS][MAX_SLICERS]candidate_t{}
+
+		if pa.chan_medium[channel] == MEDIUM_RADIO {
+			if pa.achan[channel].baud <= 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Internal multi_modem_init error, channel=%d\n", channel)
-				save_audio_config_p.achan[channel].baud = DEFAULT_BAUD
+				pa.achan[channel].baud = DEFAULT_BAUD
 			}
 
-			var real_baud = save_audio_config_p.achan[channel].baud
-			if save_audio_config_p.achan[channel].modem_type == MODEM_QPSK {
-				real_baud = save_audio_config_p.achan[channel].baud / 2
+			var real_baud = pa.achan[channel].baud
+			if pa.achan[channel].modem_type == MODEM_QPSK {
+				real_baud = pa.achan[channel].baud / 2
 			}
 
-			if save_audio_config_p.achan[channel].modem_type == MODEM_8PSK {
-				real_baud = save_audio_config_p.achan[channel].baud / 3
+			if pa.achan[channel].modem_type == MODEM_8PSK {
+				real_baud = pa.achan[channel].baud / 3
 			}
 
-			process_age[channel] = PROCESS_AFTER_BITS * save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec / real_baud
+			m.processAge = PROCESS_AFTER_BITS * pa.adev[ACHAN2ADEV(channel)].samples_per_sec / real_baud
 			//crc_queue_of_last_to_app[channel] = nil;
 		}
 	}
@@ -215,30 +238,38 @@ func multi_modem_init(pa *audio_s, sink ReceiveSink) {
  *
  *------------------------------------------------------------------------------*/
 
-var dc_average [MAX_RADIO_CHANS]float64
-
 func multi_modem_get_dc_average(channel int) int { //nolint:unused
 	// Scale to +- 200 so it will like the deviation measurement.
-	return int(float64(dc_average[channel]) * (200.0 / 32767.0))
+	return int(multiModems[channel].dcAverage * (200.0 / 32767.0))
 }
 
 func multi_modem_process_sample(channel int, audio_sample int) {
+	multiModems[channel].ProcessSample(audio_sample)
+}
+
+// ProcessSample feeds one audio sample to each of the channel's demodulators,
+// and sends on the best of the frames decoded once they have waited long
+// enough for the others to catch up.
+func (m *MultiModem) ProcessSample(audio_sample int) {
+	var channel = m.channel
+	var pa = m.audioConfig
+
 	// Accumulate an average DC bias level.
 	// Shouldn't happen with a soundcard but could with mistuned SDR.
-	dc_average[channel] = dc_average[channel]*0.999 + float64(audio_sample)*0.001
+	m.dcAverage = m.dcAverage*0.999 + float64(audio_sample)*0.001
 
 	// Issue 128.  Someone ran into this.
 
 	//assert (save_audio_config_p.achan[channel].num_subchan > 0 && save_audio_config_p.achan[channel].num_subchan <= MAX_SUBCHANS);
 	//assert (save_audio_config_p.achan[channel].num_slicers > 0 && save_audio_config_p.achan[channel].num_slicers <= MAX_SLICERS);
 
-	if save_audio_config_p.achan[channel].num_subchan <= 0 || save_audio_config_p.achan[channel].num_subchan > MAX_SUBCHANS ||
-		save_audio_config_p.achan[channel].num_slicers <= 0 || save_audio_config_p.achan[channel].num_slicers > MAX_SLICERS {
+	if pa.achan[channel].num_subchan <= 0 || pa.achan[channel].num_subchan > MAX_SUBCHANS ||
+		pa.achan[channel].num_slicers <= 0 || pa.achan[channel].num_slicers > MAX_SLICERS {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR!  Something is seriously wrong in multi_modem_process_sample\n")
 		dw_printf("channel = %d, num_subchan = %d [max %d], num_slicers = %d [max %d]\n", channel,
-			save_audio_config_p.achan[channel].num_subchan, MAX_SUBCHANS,
-			save_audio_config_p.achan[channel].num_slicers, MAX_SLICERS)
+			pa.achan[channel].num_subchan, MAX_SUBCHANS,
+			pa.achan[channel].num_slicers, MAX_SLICERS)
 		dw_printf("Please report this message and include a copy of your configuration file.\n")
 		os.Exit(1)
 	}
@@ -247,19 +278,20 @@ func multi_modem_process_sample(channel int, audio_sample int) {
 	/* 1.2: We can feed one demodulator but end up with multiple outputs. */
 
 	/* Send same thing to all. */
-	for d := range save_audio_config_p.achan[channel].num_subchan {
+	for d := range pa.achan[channel].num_subchan {
 		demod_process_sample(channel, d, audio_sample)
 	}
 
-	for subchan := range save_audio_config_p.achan[channel].num_subchan {
-		for slice := range save_audio_config_p.achan[channel].num_slicers {
-			if candidate[channel][subchan][slice].packet_p != nil {
-				candidate[channel][subchan][slice].age++
-				if candidate[channel][subchan][slice].age > process_age[channel] {
+	for subchan := range pa.achan[channel].num_subchan {
+		for slice := range pa.achan[channel].num_slicers {
+			var c = &m.candidates[subchan][slice]
+			if c.packet_p != nil {
+				c.age++
+				if c.age > m.processAge {
 					if hdlcReceiver.fx25Busy(channel) {
-						candidate[channel][subchan][slice].age = 0
+						c.age = 0
 					} else {
-						pick_best_candidate(channel)
+						m.pickBestCandidate()
 					}
 				}
 			}
@@ -295,11 +327,13 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
 
+	var pa = multiModems[channel].audioConfig
+
 	// Special encapsulation for AIS & EAS so they can be treated normally pretty much everywhere else.
 
 	var pp *packet_t
 
-	switch save_audio_config_p.achan[channel].modem_type {
+	switch pa.achan[channel].modem_type {
 	case MODEM_AIS:
 		var nmea, err = ais.ToNMEA(fbuf)
 		if err != nil {
@@ -335,6 +369,16 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 // TODO: Eliminate function above and move code elsewhere?
 
 func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
+	multiModems[channel].processRecPacket(subchan, slice, pp, alevel, retries, fec_type)
+}
+
+// processRecPacket takes a frame one of the channel's decoders found: straight
+// on if there is only the one decoder, otherwise as a candidate for
+// pickBestCandidate.
+func (m *MultiModem) processRecPacket(subchan int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
+	var channel = m.channel
+	var pa = m.audioConfig
+
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unexpected internal problem in multi_modem_process_rec_packet_real\n")
@@ -346,28 +390,28 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 	 * If only one demodulator/slicer, and no FX.25 in progress,
 	 * push it thru and forget about all this foolishness.
 	 */
-	if save_audio_config_p.achan[channel].num_subchan == 1 &&
-		save_audio_config_p.achan[channel].num_slicers == 1 &&
+	if pa.achan[channel].num_subchan == 1 &&
+		pa.achan[channel].num_slicers == 1 &&
 		!hdlcReceiver.fx25Busy(channel) {
 		var drop_it = false
 
-		if save_audio_config_p.recv_error_rate != 0 {
+		if pa.recv_error_rate != 0 {
 			var r = float64(rand.Int63n(1<<53)) / (1 << 53) // Random, 0.0 to 1.0
 
 			//text_color_set(DW_COLOR_INFO);
 			//dw_printf ("TEMP DEBUG.  recv error rate = %d\n", save_audio_config_p.recv_error_rate);
 
-			if float64(save_audio_config_p.recv_error_rate)/100.0 > r {
+			if float64(pa.recv_error_rate)/100.0 > r {
 				drop_it = true
 
 				text_color_set(DW_COLOR_INFO)
-				dw_printf("Intentionally dropping incoming frame.  Recv Error rate = %d per cent.\n", save_audio_config_p.recv_error_rate)
+				dw_printf("Intentionally dropping incoming frame.  Recv Error rate = %d per cent.\n", pa.recv_error_rate)
 			}
 		}
 
 		if !drop_it {
 			recordRadioFrame(channel, fec_type, retries)
-			receiveSink.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, "")
+			m.sink.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, "")
 		}
 
 		return
@@ -376,18 +420,16 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 	/*
 	 * Otherwise, save them up for a few bit times so we can pick the best.
 	 */
-	if candidate[channel][subchan][slice].packet_p != nil {
-		/* Plain old AX.25: Oops!  Didn't expect it to be there. */
-		/* FX.25: Quietly replace anything already there.  It will have priority. */
-		candidate[channel][subchan][slice].packet_p = nil
-	}
+	/* Plain old AX.25: Oops!  Didn't expect one to be there already. */
+	/* FX.25: Quietly replace anything already there.  It will have priority. */
+	var c = &m.candidates[subchan][slice]
 
-	candidate[channel][subchan][slice].packet_p = pp
-	candidate[channel][subchan][slice].alevel = alevel
-	candidate[channel][subchan][slice].fec_type = fec_type
-	candidate[channel][subchan][slice].retries = retries
-	candidate[channel][subchan][slice].age = 0
-	candidate[channel][subchan][slice].crc = ax25_m_m_crc(pp)
+	c.packet_p = pp
+	c.alevel = alevel
+	c.fec_type = fec_type
+	c.retries = retries
+	c.age = 0
+	c.crc = ax25_m_m_crc(pp)
 }
 
 /*-------------------------------------------------------------------
@@ -410,41 +452,44 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 /* multiple slicers are of questionable value for HF SSB. */
 
 // #define subchan_from_n(x) ((x) % save_audio_config_p.achan[channel].num_subchan)
-func subchan_from_n(channel int, x int) int {
-	return x % save_audio_config_p.achan[channel].num_subchan
+func (m *MultiModem) subchanFromN(x int) int {
+	return x % m.audioConfig.achan[m.channel].num_subchan
 }
 
 // #define slice_from_n(x)   ((x) / save_audio_config_p.achan[channel].num_subchan)
-func slice_from_n(channel int, x int) int {
-	return x / save_audio_config_p.achan[channel].num_subchan
+func (m *MultiModem) sliceFromN(x int) int {
+	return x / m.audioConfig.achan[m.channel].num_subchan
 }
 
-func pick_best_candidate(channel int) {
-	if save_audio_config_p.achan[channel].num_slicers < 1 {
-		save_audio_config_p.achan[channel].num_slicers = 1
+func (m *MultiModem) pickBestCandidate() {
+	var channel = m.channel
+	var pa = m.audioConfig
+
+	if pa.achan[channel].num_slicers < 1 {
+		pa.achan[channel].num_slicers = 1
 	}
-	var num_bars = save_audio_config_p.achan[channel].num_slicers * save_audio_config_p.achan[channel].num_subchan
+	var num_bars = pa.achan[channel].num_slicers * pa.achan[channel].num_subchan
 
 	var spectrum [MAX_SUBCHANS*MAX_SLICERS + 1]byte
 
 	for n := range num_bars {
-		var j = subchan_from_n(channel, n)
-		var k = slice_from_n(channel, n)
+		var j = m.subchanFromN(n)
+		var k = m.sliceFromN(n)
 
 		/* Build the spectrum display. */
 
-		if candidate[channel][j][k].packet_p == nil {
+		if m.candidates[j][k].packet_p == nil {
 			spectrum[n] = '_'
-		} else if candidate[channel][j][k].fec_type != fec_type_none { // FX.25 or IL2P
+		} else if m.candidates[j][k].fec_type != fec_type_none { // FX.25 or IL2P
 			// FIXME: using retries both as an enum and later int too.
-			if (int)(candidate[channel][j][k].retries) <= 9 {
-				spectrum[n] = '0' + byte(candidate[channel][j][k].retries)
+			if (int)(m.candidates[j][k].retries) <= 9 {
+				spectrum[n] = '0' + byte(m.candidates[j][k].retries)
 			} else {
 				spectrum[n] = '+'
 			}
-		} else if candidate[channel][j][k].retries == RETRY_NONE { // AX.25 below
+		} else if m.candidates[j][k].retries == RETRY_NONE { // AX.25 below
 			spectrum[n] = '|'
-		} else if candidate[channel][j][k].retries == RETRY_INVERT_SINGLE {
+		} else if m.candidates[j][k].retries == RETRY_INVERT_SINGLE {
 			spectrum[n] = ':'
 		} else {
 			spectrum[n] = '.'
@@ -452,17 +497,17 @@ func pick_best_candidate(channel int) {
 
 		/* Beginning score depends on effort to get a valid frame CRC. */
 
-		if candidate[channel][j][k].packet_p == nil {
-			candidate[channel][j][k].score = 0
+		if m.candidates[j][k].packet_p == nil {
+			m.candidates[j][k].score = 0
 		} else {
-			if candidate[channel][j][k].fec_type != fec_type_none {
-				candidate[channel][j][k].score = 9000 - 100*int(candidate[channel][j][k].retries) // has FEC
+			if m.candidates[j][k].fec_type != fec_type_none {
+				m.candidates[j][k].score = 9000 - 100*int(m.candidates[j][k].retries) // has FEC
 			} else {
 				/* Originally, this produced 0 for the PASSALL case. */
 				/* This didn't work so well when looking for the best score. */
 				/* Around 1.3 dev H, we add an extra 1 in here so the minimum */
 				/* score should now be 1 for anything received.  */
-				candidate[channel][j][k].score = int(BitFixPassall)*1000 - int(candidate[channel][j][k].retries*1000) + 1
+				m.candidates[j][k].score = int(BitFixPassall)*1000 - int(m.candidates[j][k].retries*1000) + 1
 			}
 		}
 	}
@@ -472,17 +517,17 @@ func pick_best_candidate(channel int) {
 	/* Bump it up slightly if others nearby have the same CRC. */
 
 	for n := range num_bars {
-		var j = subchan_from_n(channel, n)
-		var k = slice_from_n(channel, n)
+		var j = m.subchanFromN(n)
+		var k = m.sliceFromN(n)
 
-		if candidate[channel][j][k].packet_p != nil {
-			for m := range num_bars {
-				var mj = subchan_from_n(channel, m)
-				var mk = slice_from_n(channel, m)
+		if m.candidates[j][k].packet_p != nil {
+			for o := range num_bars {
+				var oj = m.subchanFromN(o)
+				var ok = m.sliceFromN(o)
 
-				if m != n && candidate[channel][mj][mk].packet_p != nil {
-					if candidate[channel][j][k].crc == candidate[channel][mj][mk].crc {
-						candidate[channel][j][k].score += (num_bars + 1) - int(math.Abs(float64(m-n)))
+				if o != n && m.candidates[oj][ok].packet_p != nil {
+					if m.candidates[j][k].crc == m.candidates[oj][ok].crc {
+						m.candidates[j][k].score += (num_bars + 1) - int(math.Abs(float64(o-n)))
 					}
 				}
 			}
@@ -493,24 +538,24 @@ func pick_best_candidate(channel int) {
 	var best_score = 0
 
 	for n := range num_bars {
-		var j = subchan_from_n(channel, n)
-		var k = slice_from_n(channel, n)
+		var j = m.subchanFromN(n)
+		var k = m.sliceFromN(n)
 
-		if candidate[channel][j][k].packet_p != nil {
-			if candidate[channel][j][k].score > best_score {
-				best_score = candidate[channel][j][k].score
+		if m.candidates[j][k].packet_p != nil {
+			if m.candidates[j][k].score > best_score {
+				best_score = m.candidates[j][k].score
 				best_n = n
 			}
 		}
 	}
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		logrus.WithField("spectrum", spectrum).Trace("pick_best_candidate")
+		logrus.WithField("spectrum", spectrum).Trace("pickBestCandidate")
 
 		for n := range num_bars {
-			var j = subchan_from_n(channel, n)
-			var k = slice_from_n(channel, n)
-			var c = &candidate[channel][j][k]
+			var j = m.subchanFromN(n)
+			var k = m.sliceFromN(n)
+			var c = &m.candidates[j][k]
 
 			var logEntry = logrus.WithFields(logrus.Fields{
 				"channel": channel,
@@ -545,54 +590,54 @@ func pick_best_candidate(channel int) {
 	/* Discard those not chosen. */
 
 	for n := range num_bars {
-		var j = subchan_from_n(channel, n)
+		var j = m.subchanFromN(n)
 
-		var k = slice_from_n(channel, n)
-		if n != best_n && candidate[channel][j][k].packet_p != nil {
-			candidate[channel][j][k].packet_p = nil
+		var k = m.sliceFromN(n)
+		if n != best_n && m.candidates[j][k].packet_p != nil {
+			m.candidates[j][k].packet_p = nil
 		}
 	}
 
 	/* Pass along one. */
 
-	var j = subchan_from_n(channel, best_n)
-	var k = slice_from_n(channel, best_n)
+	var j = m.subchanFromN(best_n)
+	var k = m.sliceFromN(best_n)
 
 	var drop_it = false
 
-	if save_audio_config_p.recv_error_rate != 0 {
+	if pa.recv_error_rate != 0 {
 		var r = float64(rand.Int63n(1<<53)) / (1 << 53) // Random, 0.0 to 1.0
 
 		//text_color_set(DW_COLOR_INFO);
 		//dw_printf ("TEMP DEBUG.  recv error rate = %d\n", save_audio_config_p.recv_error_rate);
 
-		if float64(save_audio_config_p.recv_error_rate)/100.0 > r {
+		if float64(pa.recv_error_rate)/100.0 > r {
 			drop_it = true
 
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Intentionally dropping incoming frame.  Recv Error rate = %d per cent.\n", save_audio_config_p.recv_error_rate)
+			dw_printf("Intentionally dropping incoming frame.  Recv Error rate = %d per cent.\n", pa.recv_error_rate)
 		}
 	}
 
 	if drop_it {
-		candidate[channel][j][k].packet_p = nil
+		m.candidates[j][k].packet_p = nil
 	} else {
-		Assert(candidate[channel][j][k].packet_p != nil)
-		recordRadioFrame(channel, candidate[channel][j][k].fec_type, candidate[channel][j][k].retries)
-		receiveSink.RecFrame(channel, j, k,
-			candidate[channel][j][k].packet_p,
-			candidate[channel][j][k].alevel,
-			candidate[channel][j][k].fec_type,
-			(candidate[channel][j][k].retries),
+		Assert(m.candidates[j][k].packet_p != nil)
+		recordRadioFrame(channel, m.candidates[j][k].fec_type, m.candidates[j][k].retries)
+		m.sink.RecFrame(channel, j, k,
+			m.candidates[j][k].packet_p,
+			m.candidates[j][k].alevel,
+			m.candidates[j][k].fec_type,
+			(m.candidates[j][k].retries),
 			string(spectrum[:num_bars]))
 
 		/* Ownership has been transferred, so drop our reference. */
-		candidate[channel][j][k].packet_p = nil
+		m.candidates[j][k].packet_p = nil
 	}
 
 	/* Clear in preparation for next time. */
 
-	candidate[channel] = [MAX_SUBCHANS][MAX_SLICERS]candidate_t{} // TODO KG Gotta be a nicer way to do this
-} /* end pick_best_candidate */
+	m.candidates = [MAX_SUBCHANS][MAX_SLICERS]candidate_t{}
+} /* end pickBestCandidate */
 
 /* end multi_modem.c */

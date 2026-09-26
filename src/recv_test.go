@@ -166,8 +166,8 @@ func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
 
 	var src = setupRecvTest(t, audioConfig, samples16(samples))
 
-	dc_average[0] = 0
-	dc_average[1] = 0
+	multiModems[0].dcAverage = 0
+	multiModems[1].dcAverage = 0
 
 	var failed = recv_init(t.Context(), audioConfig, src)
 
@@ -177,8 +177,8 @@ func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
 		t.Fatal("no failure reported after the audio ran out")
 	}
 
-	assert.Positive(t, dc_average[0], "channel 0 should have been fed the left samples")
-	assert.Negative(t, dc_average[1], "channel 1 should have been fed the right samples")
+	assert.Positive(t, multiModems[0].dcAverage, "channel 0 should have been fed the left samples")
+	assert.Negative(t, multiModems[1].dcAverage, "channel 1 should have been fed the right samples")
 }
 
 // Touch tones are decoded only where the APRStt gateway is configured for the
