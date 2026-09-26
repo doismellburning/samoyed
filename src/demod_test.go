@@ -112,9 +112,7 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 // safe to share between them.  Run under -race.
 func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 	var channel = 0
-	var d = new(Demodulator)
-	d.channel = channel
-	d.audioConfig = newTestAudioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
+	var d = NewDemodulator(channel, newTestAudioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100))
 
 	var done = make(chan struct{})
 
@@ -131,4 +129,59 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 	}
 
 	<-done
+}
+
+// The derived values NewDemodulator writes back must land in the
+// configuration the rest of the receive path reads, not in a copy of it.
+func TestNewDemodulatorSharesAudioConfig(t *testing.T) {
+	var channel = 1
+	var audioConfig = newTestAudioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	audioConfig.achan[channel].num_freq = 1
+	audioConfig.achan[channel].profiles = "ab"
+
+	var d = NewDemodulator(channel, audioConfig)
+
+	assert.Same(t, audioConfig, d.audioConfig)
+	assert.Equal(t, 2, audioConfig.achan[channel].num_subchan)
+	assert.Equal(t, "AB", audioConfig.achan[channel].profiles)
+}
+
+// Only a radio channel gets a Demodulator, and until demod_init has run there
+// are none at all, so what reaches one by channel number has to cope.
+func TestDemodNilChannel(t *testing.T) {
+	var saved = demodulators
+
+	t.Cleanup(func() {
+		demodulators = saved
+	})
+
+	demodulators = [MAX_RADIO_CHANS]*Demodulator{}
+
+	var zero ALevel
+
+	assert.Equal(t, zero, demod_get_audio_level(0, 0))
+	assert.NotPanics(t, func() { demod_mute_input(0, 1) })
+	assert.Panics(t, func() { demod_process_sample(0, 0, 0) })
+}
+
+// demod_init builds a Demodulator for each radio channel, and drops any left
+// over from before for a channel that no longer is one.
+func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
+	var saved = demodulators
+
+	t.Cleanup(func() {
+		demodulators = saved
+	})
+
+	demodulators[1] = new(Demodulator)
+
+	var audioConfig = newTestAudioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	audioConfig.achan[0].num_freq = 1
+
+	demod_init(audioConfig)
+
+	require.NotNil(t, demodulators[0])
+	assert.Equal(t, 0, demodulators[0].channel)
+	assert.Same(t, audioConfig, demodulators[0].audioConfig)
+	assert.Nil(t, demodulators[1])
 }
