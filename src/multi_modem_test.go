@@ -59,3 +59,26 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 	assert.Empty(t, first.frames)
 	assert.Empty(t, second.frames)
 }
+
+// demod_init works out how many subchannels a channel has and writes it back
+// into the configuration, where NewHDLCReceiver reads it to size itself.  Were
+// the two to work from different copies of the configuration, the HDLC
+// receiver would have decoders for one subchannel while the demodulators ran
+// three - which fails silently, and only on a multi-decoder configuration.
+func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
+	var origAudioConfig = save_audio_config_p
+
+	t.Cleanup(func() {
+		save_audio_config_p = origAudioConfig
+		multiModems = newMultiModems()
+	})
+
+	var audioConfig = newRecvTestAudioConfig(1)
+	audioConfig.achan[0].profiles = "ABA"
+	audioConfig.achan[0].num_freq = 1
+
+	multi_modem_init(audioConfig, new(recordingReceiveSink))
+
+	assert.Equal(t, 3, audioConfig.achan[0].num_subchan)
+	assert.Equal(t, 3, hdlcReceiver.numSubchannel[0])
+}
