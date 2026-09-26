@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -779,10 +778,14 @@ func ax25_dup(copy_from *packet_t) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-var position_name = [1 + AX25_MAX_ADDRS]string{
-	"", "Destination ", "Source ",
-	"Digi1 ", "Digi2 ", "Digi3 ", "Digi4 ",
-	"Digi5 ", "Digi6 ", "Digi7 ", "Digi8 "}
+// addrPositionNames returns the prefixes ax25_parse_addr's messages use to
+// say which address they are about, indexed by position + 1.
+func addrPositionNames() [1 + AX25_MAX_ADDRS]string {
+	return [1 + AX25_MAX_ADDRS]string{
+		"", "Destination ", "Source ",
+		"Digi1 ", "Digi2 ", "Digi3 ", "Digi4 ",
+		"Digi5 ", "Digi6 ", "Digi7 ", "Digi8 "}
+}
 
 func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (string, int, bool, bool) {
 	var out_addr string
@@ -799,7 +802,9 @@ func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (s
 		position = AX25_REPEATER_8
 	}
 
-	position++ /* Adjust for position_name above. */
+	position++ /* Adjust for addrPositionNames above. */
+
+	var position_name = addrPositionNames()
 
 	if len(in_addr) == 0 {
 		text_color_set(DW_COLOR_ERROR)
