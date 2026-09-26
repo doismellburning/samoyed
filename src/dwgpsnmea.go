@@ -187,7 +187,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 		dw_printf("read_gpsnmea_thread (%+v)\n", fd)
 	}
 
-	var info = new(dwgps_info_t) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
+	var info = new(GPSInfo) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
 
 	if debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)

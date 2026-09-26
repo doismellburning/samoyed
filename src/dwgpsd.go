@@ -188,7 +188,7 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 		dw_printf("read_gpsd_thread (%+v)\n", conn)
 	}
 
-	var info = new(dwgps_info_t) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
+	var info = new(GPSInfo) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
 
 	if debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
@@ -256,7 +256,7 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
  *
  * Description:	Fields are pointers so we can tell "absent" from "zero",
  *		which is the same distinction maybe.Maybe makes once the
- *		report reaches dwgps_info_t.
+ *		report reaches GPSInfo.
  *
  *		altMSL is the current field name for altitude above mean
  *		sea level; older gpsd versions (< 3.20) called it "alt".
@@ -298,7 +298,7 @@ func parse_gpsd_tpv(line []byte) (*gpsdTPV, error) {
 	return report, nil
 }
 
-func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
+func apply_gpsd_tpv(info *GPSInfo, report *gpsdTPV) {
 	var newFix GPSFix
 
 	switch {

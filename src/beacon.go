@@ -122,7 +122,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 
 				case BEACON_TRACKER:
 					{
-						var gpsinfo dwgps_info_t
+						var gpsinfo GPSInfo
 
 						var fix = bs.gps.Read(&gpsinfo)
 						if fix == DWFIX_NOT_INIT {
@@ -385,7 +385,7 @@ func (bs *BeaconService) thread(ctx context.Context) {
 		 * This needs to be done before the next scheduled tracker
 		 * beacon because corner pegging make it sooner.
 		 */
-		var gpsinfo dwgps_info_t
+		var gpsinfo GPSInfo
 
 		if number_of_tbeacons > 0 {
 			var fix = bs.gps.Read(&gpsinfo)
@@ -612,7 +612,7 @@ func (bs *BeaconService) sbCalculateNextTime(
 // having reported a latitude and longitude.  The scheduler asks the same
 // question as send does, so a beacon that was skipped is not scheduled for as
 // though it had gone out.
-func trackerPosition(gpsinfo *dwgps_info_t) (float64, float64, bool) {
+func trackerPosition(gpsinfo *GPSInfo) (float64, float64, bool) {
 	var dlat, haveLat = gpsinfo.dlat.Get()
 	var dlon, haveLon = gpsinfo.dlon.Get()
 
@@ -672,7 +672,7 @@ func beaconAltitudeFeet(alt_m maybe.Maybe[float64]) maybe.Maybe[int] {
  *
  *--------------------------------------------------------------------*/
 
-func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps_info_t) {
+func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *GPSInfo) {
 	var bp = &(bs.miscConfig.beacon[j])
 
 	if bp.sendto_chan < 0 {

@@ -338,7 +338,7 @@ func TestSharedNMEAPortAfterReceiverIsLost(t *testing.T) {
 
 	require.NoError(t, master.Close())
 
-	var info = new(dwgps_info_t)
+	var info = new(GPSInfo)
 
 	var deadline = time.Now().Add(5 * time.Second)
 	for gps.Read(info) != DWFIX_ERROR && time.Now().Before(deadline) {

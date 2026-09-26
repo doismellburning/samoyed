@@ -50,7 +50,7 @@ import (
  *
  */
 
-// GPSFix is how good a position dwgps_info_t holds: one of the DWFIX_* values.
+// GPSFix is how good a position GPSInfo holds: one of the DWFIX_* values.
 type GPSFix int
 
 const (
@@ -62,10 +62,10 @@ const (
 	DWFIX_3D       GPSFix = 3
 )
 
-// dwgps_info_t is the most recent position report from a GPS receiver.  Its
+// GPSInfo is the most recent position report from a GPS receiver.  Its
 // zero value is "nothing heard yet", so a freshly declared one needs no
 // clearing.
-type dwgps_info_t struct {
+type GPSInfo struct {
 	timestamp   time.Time            /* When last updated.  System time. */
 	fix         GPSFix               /* Quality of position fix. */
 	dlat        maybe.Maybe[float64] /* Latitude.  Valid if fix >= 2. */
@@ -87,7 +87,7 @@ type GPS struct {
 	debug int /* >= 1 show results from Read.  Set once by NewGPS. */
 
 	mu   sync.Mutex
-	info dwgps_info_t
+	info GPSInfo
 
 	nmea gpsnmeaPort // The GPSNMEA receiver's serial port, if one was opened.
 	gpsd gpsdClient  // The connection to gpsd, if one was made.
@@ -147,9 +147,9 @@ func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
  *
  *--------------------------------------------------------------------*/
 
-func (g *GPS) Read(gpsinfo *dwgps_info_t) GPSFix {
+func (g *GPS) Read(gpsinfo *GPSInfo) GPSFix {
 	if g == nil {
-		var none dwgps_info_t
+		var none GPSInfo
 		none.fix = DWFIX_NOT_INIT
 		*gpsinfo = none
 
@@ -186,7 +186,7 @@ func (g *GPS) Read(gpsinfo *dwgps_info_t) GPSFix {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_print(msg string, gpsinfo *dwgps_info_t) {
+func dwgps_print(msg string, gpsinfo *GPSInfo) {
 	dw_printf("%stime=%s fix=%d lat=%s lon=%s trk=%s spd=%s alt=%s\n",
 		msg,
 		gpsinfo.timestamp.Format(time.RFC3339), gpsinfo.fix,
@@ -234,7 +234,7 @@ func (g *GPS) Term() {
  *
  *--------------------------------------------------------------------*/
 
-func (g *GPS) setData(gpsinfo *dwgps_info_t) {
+func (g *GPS) setData(gpsinfo *GPSInfo) {
 	/* Debug print is handled by the two callers so */
 	/* we can distinguish the source. */
 	g.mu.Lock()

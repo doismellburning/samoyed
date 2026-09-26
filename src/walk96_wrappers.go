@@ -22,7 +22,7 @@ func DWGPSInit(ctx context.Context, gpsnmeaPort string, debug int) *GPS {
 func DWGPSRead(gps *GPS) (fix int, lat maybe.Maybe[float64], lon maybe.Maybe[float64],
 	speedKnots maybe.Maybe[float64], track maybe.Maybe[float64], altitude maybe.Maybe[float64],
 ) {
-	var info dwgps_info_t
+	var info GPSInfo
 	var f = gps.Read(&info)
 
 	return int(f), info.dlat, info.dlon, info.speed_knots, info.track, info.altitude

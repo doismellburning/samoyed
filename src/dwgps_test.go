@@ -30,7 +30,7 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 
 			var gps = NewGPS(context.Background(), config, 0)
 
-			var info dwgps_info_t
+			var info GPSInfo
 
 			assert.Equal(t, DWFIX_NOT_INIT, gps.Read(&info))
 		})
@@ -42,7 +42,7 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 func TestDWGPSNilReadsAsNotInitialised(t *testing.T) {
 	var gps *GPS
 
-	var info dwgps_info_t
+	var info GPSInfo
 	info.dlat = maybe.Just(1.0)
 
 	assert.Equal(t, DWFIX_NOT_INIT, gps.Read(&info))
@@ -55,7 +55,7 @@ func TestDWGPSNilReadsAsNotInitialised(t *testing.T) {
 func TestDWGPSReadReturnsWhatWasSet(t *testing.T) {
 	var gps = new(GPS)
 
-	var report = new(dwgps_info_t)
+	var report = new(GPSInfo)
 	report.timestamp = time.Now()
 	report.fix = DWFIX_3D
 	report.dlat = maybe.Just(42.6)
@@ -64,7 +64,7 @@ func TestDWGPSReadReturnsWhatWasSet(t *testing.T) {
 
 	gps.setData(report)
 
-	var info dwgps_info_t
+	var info GPSInfo
 
 	assert.Equal(t, DWFIX_3D, gps.Read(&info))
 	assert.Equal(t, *report, info)
@@ -78,7 +78,7 @@ func TestDWGPSConcurrentSetAndRead(t *testing.T) {
 
 	wg.Go(func() {
 		for i := range 1000 {
-			var report = new(dwgps_info_t)
+			var report = new(GPSInfo)
 			report.fix = DWFIX_2D
 			report.dlat = maybe.Just(float64(i))
 			report.dlon = maybe.Just(float64(i))
@@ -89,7 +89,7 @@ func TestDWGPSConcurrentSetAndRead(t *testing.T) {
 
 	wg.Go(func() {
 		for range 1000 {
-			var info dwgps_info_t
+			var info GPSInfo
 
 			gps.Read(&info)
 

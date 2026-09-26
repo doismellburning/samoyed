@@ -26,7 +26,7 @@ func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
 		igateConfig: new(igate_config_s),
 	}
 
-	var gpsinfo = new(dwgps_info_t)
+	var gpsinfo = new(GPSInfo)
 	gpsinfo.fix = DWFIX_2D
 
 	for dataLinkQueue.Remove() != nil {
@@ -46,7 +46,7 @@ func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
 // out, and under SmartBeaconing that put the next attempt a whole slow_rate
 // away.
 func Test_trackerPosition_needs_more_than_a_fix(t *testing.T) {
-	var gpsinfo = new(dwgps_info_t)
+	var gpsinfo = new(GPSInfo)
 
 	gpsinfo.fix = DWFIX_2D
 	var _, _, havePosition = trackerPosition(gpsinfo)

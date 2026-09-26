@@ -105,7 +105,7 @@ func Test_parse_gpsd_tpv(t *testing.T) {
 				assert.InDelta(t, tt.wantLat, *report.Lat, 0.00001)
 			}
 
-			var info = new(dwgps_info_t)
+			var info = new(GPSInfo)
 			apply_gpsd_tpv(info, report)
 
 			if tt.checkAlt {
@@ -120,7 +120,7 @@ func Test_parse_gpsd_tpv(t *testing.T) {
 }
 
 func Test_apply_gpsd_tpv_no_fix_keeps_last_location(t *testing.T) {
-	var info = new(dwgps_info_t)
+	var info = new(GPSInfo)
 	info.fix = DWFIX_3D
 	info.dlat = maybe.Just(42.0)
 	info.dlon = maybe.Just(-71.0)
@@ -139,7 +139,7 @@ func Test_apply_gpsd_tpv_no_fix_keeps_last_location(t *testing.T) {
 }
 
 func Test_apply_gpsd_tpv_2d_keeps_last_altitude(t *testing.T) {
-	var info = new(dwgps_info_t)
+	var info = new(GPSInfo)
 	info.fix = DWFIX_3D
 	info.altitude = maybe.Just(123.0)
 
@@ -154,7 +154,7 @@ func Test_apply_gpsd_tpv_2d_keeps_last_altitude(t *testing.T) {
 }
 
 func Test_dwgps_info_zero_value_is_nothing_known(t *testing.T) {
-	var info dwgps_info_t
+	var info GPSInfo
 
 	assert.Equal(t, DWFIX_NOT_SEEN, info.fix)
 	assert.Equal(t, maybe.Nothing[float64](), info.dlat)
@@ -165,7 +165,7 @@ func Test_dwgps_info_zero_value_is_nothing_known(t *testing.T) {
 }
 
 func Test_apply_gpsd_tpv_absent_fields_are_nothing(t *testing.T) {
-	var info = new(dwgps_info_t)
+	var info = new(GPSInfo)
 
 	// A 2D report from $GPRMC alone carries neither altitude nor, when
 	// stationary, a track.
@@ -231,13 +231,13 @@ func TestGPSTermLeavesAnotherGPSsGpsdConnectionAlone(t *testing.T) {
 
 	// Let gps1's reader finish reporting its lost connection before carrying
 	// on, so it isn't still printing once the test is over.
-	require.Eventually(t, func() bool { return gps1.Read(new(dwgps_info_t)) == DWFIX_ERROR },
+	require.Eventually(t, func() bool { return gps1.Read(new(GPSInfo)) == DWFIX_ERROR },
 		5*time.Second, 10*time.Millisecond, "gps1's reader never noticed it had been shut down")
 
 	var _, writeErr = server2.Write([]byte(`{"class":"TPV","mode":3,"lat":42.6,"lon":-71.3,"altMSL":33.5}` + "\n"))
 	require.NoError(t, writeErr)
 
-	var info = new(dwgps_info_t)
+	var info = new(GPSInfo)
 
 	var fix GPSFix
 

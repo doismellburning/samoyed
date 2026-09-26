@@ -98,7 +98,7 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 
 	t.Cleanup(gps.Term)
 
-	var info = new(dwgps_info_t)
+	var info = new(GPSInfo)
 
 	var fix GPSFix
 
