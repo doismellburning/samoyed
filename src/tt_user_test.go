@@ -5,6 +5,7 @@
 package direwolf
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -13,7 +14,7 @@ import (
 )
 
 // A user's position ambiguity comes from its own B-field, which a later touch
-// tone sequence need not repeat.  tt_user_heard keeps the stored value when
+// tone sequence need not repeat.  heard keeps the stored value when
 // the new message does not carry one - but the parse state started ambiguity
 // at 0, a perfectly real value meaning "omit no digits", so the guard never
 // fired and every ambiguity-less message silently reset it.
@@ -28,21 +29,21 @@ func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 	my_tt_config.num_xmits = 1
 	my_tt_config.xmit_delay[0] = 3
 
-	tt_user_init(&my_audio_config, &my_tt_config)
+	var users = newTTUsers(&my_audio_config, &my_tt_config)
 
-	require.Equal(t, 0, tt_user_heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
+	require.Equal(t, 0, users.heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
 		maybe.Just(2), "", "", "", ' ', "!T99!"))
 
-	var i = tt_user_search("Q2TEST", 'J')
+	var i = users.search("Q2TEST", 'J')
 	require.GreaterOrEqual(t, i, 0, "the user should have been recorded")
-	require.Equal(t, maybe.Just(2), tt_user[i].ambiguity)
+	require.Equal(t, maybe.Just(2), users.user[i].ambiguity)
 
 	// A second sequence that says nothing about ambiguity, as the parse state
 	// hands it over.
-	require.Equal(t, 0, tt_user_heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
+	require.Equal(t, 0, users.heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
 		newTTParseState().ambiguity, "", "", "", ' ', "!T99!"))
 
-	assert.Equal(t, maybe.Just(2), tt_user[i].ambiguity,
+	assert.Equal(t, maybe.Just(2), users.user[i].ambiguity,
 		"an ambiguity-less message should leave the earlier ambiguity alone")
 }
 
@@ -61,13 +62,48 @@ func TestObjectReportCarriesFrequency(t *testing.T) {
 	my_tt_config.num_xmits = 1
 	my_tt_config.xmit_delay[0] = 3
 
-	tt_user_init(&my_audio_config, &my_tt_config)
+	var users = newTTUsers(&my_audio_config, &my_tt_config)
 
-	require.Equal(t, 0, tt_user_heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
+	require.Equal(t, 0, users.heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
 		maybe.Just(0), "146.955MHz", "074", "", ' ', ""))
 
-	var i = tt_user_search("Q2TEST", 'J')
+	var i = users.search("Q2TEST", 'J')
 	require.GreaterOrEqual(t, i, 0, "the user should have been recorded")
 
-	assert.Contains(t, object_report_text(i, true), "146.955MHz T074 ")
+	assert.Contains(t, users.objectReportText(i, true), "146.955MHz T074 ")
+}
+
+// The receive processing goroutine records users as their tone sequences
+// arrive, while the TTOBJ receive channel's audio goroutine polls the same
+// table, through Button's idle ticks, to send the object reports it has
+// scheduled.  Nothing ordered the two, so they raced on the table.
+func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
+	var my_audio_config audio_s
+
+	my_audio_config.mycall[0] = "Q1TEST-15"
+
+	var my_tt_config tt_config_s
+
+	my_tt_config.retain_time = 20
+	my_tt_config.num_xmits = 1
+	my_tt_config.obj_xmit_chan = -1 // Keep the reports off the transmit queue.
+
+	var gw = NewTTGateway(&my_audio_config, &my_tt_config, 0)
+
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for range 100 * 39 {
+			gw.Button(0, '.')
+		}
+	}()
+
+	for i := range 100 {
+		require.Equal(t, 0, gw.users.heard(fmt.Sprintf("Q%dTEST", i%10), 12, 'J', 'A', "",
+			maybe.Just(37.25), maybe.Just(-71.75), maybe.Just(0), "", "", "", ' ', ""))
+	}
+
+	<-done
 }

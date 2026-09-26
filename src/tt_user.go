@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -21,6 +20,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -108,40 +108,34 @@ type tt_user_s struct {
 	dao string /* Enhanced position information. */
 }
 
-var tt_user [MAX_TT_USERS]tt_user_s
+// ttUsers is the APRStt gateway's table of recently heard users.
+//
+// The receive processing goroutine records users as their tone sequences
+// arrive, and the audio goroutine of the TTOBJ receive channel polls the
+// table to send the object reports it has scheduled, so mu guards user.
+// The reports are sent with it released.
+type ttUsers struct {
+	audioConfig *audio_s
+	ttConfig    *tt_config_s
 
-/*------------------------------------------------------------------
- *
- * Name:        tt_user_init
- *
- * Purpose:     Initialize the APRStt gateway at system startup time.
- *
- * Inputs:      Configuration options gathered by config.c.
- *
- * Global out:	Make our own local copy of the structure here.
- *
- * Returns:     None
- *
- * Description:	The main program needs to call this at application
- *		start up time after reading the configuration file.
- *
- *----------------------------------------------------------------*/
+	mu   sync.Mutex
+	user [MAX_TT_USERS]tt_user_s
+}
 
-var save_tt_config_p *tt_config_s
+// newTTUsers makes an empty user table.  audioConfig supplies the mycall
+// object reports are sent from, and ttConfig when and where they are sent.
+func newTTUsers(audioConfig *audio_s, ttConfig *tt_config_s) *ttUsers {
+	var u = new(ttUsers)
 
-func tt_user_init(p_audio_config *audio_s, p_tt_config *tt_config_s) {
-	save_audio_config_p = p_audio_config
+	u.audioConfig = audioConfig
+	u.ttConfig = ttConfig
 
-	save_tt_config_p = p_tt_config
-
-	for i := range MAX_TT_USERS {
-		clear_user(i)
-	}
+	return u
 }
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_user_search
+ * Name:        search
  *
  * Purpose:     Search for user in recent history.
  *
@@ -155,13 +149,13 @@ func tt_user_init(p_audio_config *audio_s, p_tt_config *tt_config_s) {
  *
  *----------------------------------------------------------------*/
 
-func tt_user_search(callsign string, overlay rune) int {
+func (u *ttUsers) search(callsign string, overlay rune) int {
 	/*
 	 * First, look for exact match to full call and overlay.
 	 */
 	for i := range MAX_TT_USERS {
-		if callsign == tt_user[i].callsign &&
-			overlay == tt_user[i].overlay {
+		if callsign == u.user[i].callsign &&
+			overlay == u.user[i].overlay {
 			return (i)
 		}
 	}
@@ -170,9 +164,9 @@ func tt_user_search(callsign string, overlay rune) int {
 	 * Look for digits only suffix plus overlay.
 	 */
 	for i := range MAX_TT_USERS {
-		if callsign == tt_user[i].digit_suffix &&
+		if callsign == u.user[i].digit_suffix &&
 			overlay != ' ' &&
-			overlay == tt_user[i].overlay {
+			overlay == u.user[i].overlay {
 			return (i)
 		}
 	}
@@ -181,7 +175,7 @@ func tt_user_search(callsign string, overlay rune) int {
 	 * Look for digits only suffix if no overlay was specified.
 	 */
 	for i := range MAX_TT_USERS {
-		if callsign == tt_user[i].digit_suffix &&
+		if callsign == u.user[i].digit_suffix &&
 			overlay == ' ' {
 			return (i)
 		}
@@ -191,11 +185,11 @@ func tt_user_search(callsign string, overlay rune) int {
 	 * Not sure about the new spelled suffix yet...
 	 */
 	return (-1)
-} /* end tt_user_search */
+} /* end search */
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_3char_suffix_search
+ * Name:        threeCharSuffixSearch
  *
  * Purpose:     Search for new style 3 CHARACTER (vs. 3 digit) suffix in recent history.
  *
@@ -210,15 +204,18 @@ func tt_user_search(callsign string, overlay rune) int {
  *
  *----------------------------------------------------------------*/
 
-func tt_3char_suffix_search(suffix string) (string, int) {
+func (u *ttUsers) threeCharSuffixSearch(suffix string) (string, int) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	/*
 	 * Look for suffix in list of known calls.
 	 */
 	for i := range MAX_TT_USERS {
-		var length = len(tt_user[i].callsign)
+		var length = len(u.user[i].callsign)
 
-		if length >= 3 && length <= 6 && tt_user[i].callsign[length-3:] == suffix {
-			return tt_user[i].callsign, i
+		if length >= 3 && length <= 6 && u.user[i].callsign[length-3:] == suffix {
+			return u.user[i].callsign, i
 		}
 	}
 
@@ -226,11 +223,11 @@ func tt_3char_suffix_search(suffix string) (string, int) {
 	 * Not found.
 	 */
 	return "", -1
-} /* end tt_3char_suffix_search */
+} /* end threeCharSuffixSearch */
 
 /*------------------------------------------------------------------
  *
- * Name:        clear_user
+ * Name:        clear
  *
  * Purpose:     Clear specified user table entry.
  *
@@ -238,15 +235,15 @@ func tt_3char_suffix_search(suffix string) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func clear_user(i int) {
+func (u *ttUsers) clear(i int) {
 	Assert(i >= 0 && i < MAX_TT_USERS)
 
-	tt_user[i] = tt_user_s{} //nolint:exhaustruct_v5
-} /* end clear_user */
+	u.user[i] = tt_user_s{} //nolint:exhaustruct_v5
+} /* end clear */
 
 /*------------------------------------------------------------------
  *
- * Name:        find_avail
+ * Name:        findAvail
  *
  * Purpose:     Find an available user table location.
  *
@@ -259,10 +256,10 @@ func clear_user(i int) {
  *
  *----------------------------------------------------------------*/
 
-func find_avail() int {
+func (u *ttUsers) findAvail() int {
 	for i := range MAX_TT_USERS {
-		if tt_user[i].callsign == "" {
-			clear_user(i)
+		if u.user[i].callsign == "" {
+			u.clear(i)
 
 			return (i)
 		}
@@ -273,19 +270,19 @@ func find_avail() int {
 	var i_oldest = 0
 
 	for i := range MAX_TT_USERS {
-		if tt_user[i].last_heard.Before(tt_user[i_oldest].last_heard) {
+		if u.user[i].last_heard.Before(u.user[i_oldest].last_heard) {
 			i_oldest = i
 		}
 	}
 
-	clear_user(i_oldest)
+	u.clear(i_oldest)
 
 	return (i_oldest)
-} /* end find_avail */
+} /* end findAvail */
 
 /*------------------------------------------------------------------
  *
- * Name:        corral_slot
+ * Name:        corralSlot
  *
  * Purpose:     Find an available position in the corral.
  *
@@ -295,11 +292,11 @@ func find_avail() int {
  *
  *----------------------------------------------------------------*/
 
-func corral_slot() int {
+func (u *ttUsers) corralSlot() int {
 	for slot := 1; ; slot++ {
 		var used = false
 		for i := 0; i < MAX_TT_USERS && !used; i++ {
-			if tt_user[i].callsign != "" && tt_user[i].corral_slot == slot {
+			if u.user[i].callsign != "" && u.user[i].corral_slot == slot {
 				used = true
 			}
 		}
@@ -308,7 +305,7 @@ func corral_slot() int {
 			return (slot)
 		}
 	}
-} /* end corral_slot */
+} /* end corralSlot */
 
 /*------------------------------------------------------------------
  *
@@ -340,7 +337,7 @@ func digit_suffix(callsign string) string {
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_user_heard
+ * Name:        heard
  *
  * Purpose:     Record information from an APRStt transmission.
  *
@@ -366,7 +363,7 @@ func digit_suffix(callsign string) string {
  *
  *----------------------------------------------------------------*/
 
-func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude maybe.Maybe[float64],
+func (u *ttUsers) heard(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude maybe.Maybe[float64],
 	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) int {
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("tt_user_heard (%s, %d, %c, %c, %s, ...)\n", callsign, ssid, overlay, symbol, loc_text);
@@ -383,45 +380,63 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 		return (TT_ERROR_NO_CALL)
 	}
 
+	var report = u.record(callsign, ssid, overlay, symbol, loc_text, latitude, longitude, ambiguity, freq, ctcss, comment, mic_e, dao)
+
+	/*
+	 * Send to applications and IGate immediately.
+	 */
+
+	u.sendObjectReport(report, true)
+
+	return (0) /* Success! */
+} /* end heard */
+
+// record stores what heard was told about a user, schedules its object
+// report transmissions, and returns the report to send straight away.
+func (u *ttUsers) record(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude maybe.Maybe[float64],
+	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	/*
 	 * Is it someone new or a returning user?
 	 */
-	var i = tt_user_search(callsign, overlay)
+	var i = u.search(callsign, overlay)
 	if i == -1 {
 		/*
 		 * New person.  Create new table entry with all available information.
 		 */
-		i = find_avail()
+		i = u.findAvail()
 
 		Assert(i >= 0 && i < MAX_TT_USERS)
-		tt_user[i].callsign = callsign
-		tt_user[i].count = 1
-		tt_user[i].ssid = ssid
-		tt_user[i].overlay = overlay
-		tt_user[i].symbol = symbol
-		tt_user[i].digit_suffix = digit_suffix(tt_user[i].callsign)
-		tt_user[i].loc_text = loc_text
+		u.user[i].callsign = callsign
+		u.user[i].count = 1
+		u.user[i].ssid = ssid
+		u.user[i].overlay = overlay
+		u.user[i].symbol = symbol
+		u.user[i].digit_suffix = digit_suffix(u.user[i].callsign)
+		u.user[i].loc_text = loc_text
 
 		var lat, haveLat = latitude.Get()
 		var lon, haveLon = longitude.Get()
 
 		if haveLat && haveLon {
 			/* We have specific location. */
-			tt_user[i].corral_slot = 0
-			tt_user[i].latitude = lat
-			tt_user[i].longitude = lon
+			u.user[i].corral_slot = 0
+			u.user[i].latitude = lat
+			u.user[i].longitude = lon
 		} else {
 			/* Unknown location, put it in the corral. */
-			tt_user[i].corral_slot = corral_slot()
+			u.user[i].corral_slot = u.corralSlot()
 		}
 
-		tt_user[i].ambiguity = ambiguity
+		u.user[i].ambiguity = ambiguity
 
-		tt_user[i].freq = freq
-		tt_user[i].ctcss = ctcss
-		tt_user[i].comment = comment
-		tt_user[i].mic_e = mic_e
-		tt_user[i].dao = dao
+		u.user[i].freq = freq
+		u.user[i].ctcss = ctcss
+		u.user[i].comment = comment
+		u.user[i].mic_e = mic_e
+		u.user[i].dao = dao
 	} else {
 		/*
 		 * Known user.  Update with any new information.
@@ -429,19 +444,19 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 		 */
 		Assert(i >= 0 && i < MAX_TT_USERS)
 
-		tt_user[i].count++
+		u.user[i].count++
 
 		/* Any reason to look at ssid here? */
 
 		/* Update the symbol if not the default. */
 
 		if overlay != APRSTT_DEFAULT_SYMTAB || symbol != APRSTT_DEFAULT_SYMBOL {
-			tt_user[i].overlay = overlay
-			tt_user[i].symbol = symbol
+			u.user[i].overlay = overlay
+			u.user[i].symbol = symbol
 		}
 
 		if loc_text != "" {
-			tt_user[i].loc_text = loc_text
+			u.user[i].loc_text = loc_text
 		}
 
 		var lat, haveLat = latitude.Get()
@@ -449,60 +464,54 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 
 		if haveLat && haveLon {
 			/* We have specific location. */
-			tt_user[i].corral_slot = 0
-			tt_user[i].latitude = lat
-			tt_user[i].longitude = lon
+			u.user[i].corral_slot = 0
+			u.user[i].latitude = lat
+			u.user[i].longitude = lon
 		}
 
-		tt_user[i].ambiguity = ambiguity.Or(tt_user[i].ambiguity)
+		u.user[i].ambiguity = ambiguity.Or(u.user[i].ambiguity)
 
 		if freq != "" {
-			tt_user[i].freq = freq
+			u.user[i].freq = freq
 		}
 
 		if ctcss != "" {
-			tt_user[i].ctcss = ctcss
+			u.user[i].ctcss = ctcss
 		}
 
 		if comment != "" {
-			tt_user[i].comment = comment
+			u.user[i].comment = comment
 		}
 
 		if mic_e != ' ' {
-			tt_user[i].mic_e = mic_e
+			u.user[i].mic_e = mic_e
 		}
 
 		if dao != "" {
-			tt_user[i].dao = dao
+			u.user[i].dao = dao
 		}
 	}
 
 	/*
 	 * In both cases, note last time heard and schedule object report transmission.
 	 */
-	tt_user[i].last_heard = time.Now()
-	tt_user[i].xmits = 0
-	tt_user[i].next_xmit = tt_user[i].last_heard.Add(time.Duration(save_tt_config_p.xmit_delay[0]) * time.Second)
-
-	/*
-	 * Send to applications and IGate immediately.
-	 */
-
-	xmit_object_report(i, true)
+	u.user[i].last_heard = time.Now()
+	u.user[i].xmits = 0
+	u.user[i].next_xmit = u.user[i].last_heard.Add(time.Duration(u.ttConfig.xmit_delay[0]) * time.Second)
 
 	/*
 	 * Put properties into environment variables in preparation
 	 * for calling a user-specified script.
 	 */
 
-	tt_setenv(i)
+	u.setenv(i)
 
-	return (0) /* Success! */
-} /* end tt_user_heard */
+	return u.objectReportText(i, true)
+} /* end record */
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_user_background
+ * Name:        background
  *
  * Purpose:
  *
@@ -516,8 +525,19 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
  *
  *----------------------------------------------------------------*/
 
-func tt_user_background() {
-	var now = time.Now()
+func (u *ttUsers) background() {
+	for _, report := range u.dueReports(time.Now()) {
+		u.sendObjectReport(report, false)
+	}
+}
+
+// dueReports returns the object reports whose transmission time has come,
+// scheduling the next of each, and purges users not heard for too long.
+func (u *ttUsers) dueReports(now time.Time) []string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	var reports []string
 
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("tt_user_background()  now = %d\n", (int)now);
@@ -525,18 +545,18 @@ func tt_user_background() {
 	for i := range MAX_TT_USERS {
 		Assert(i >= 0 && i < MAX_TT_USERS)
 
-		if tt_user[i].callsign != "" {
-			if tt_user[i].xmits < save_tt_config_p.num_xmits && !tt_user[i].next_xmit.After(now) {
+		if u.user[i].callsign != "" {
+			if u.user[i].xmits < u.ttConfig.num_xmits && !u.user[i].next_xmit.After(now) {
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("tt_user_background()  now = %d\n", (int)now);
 				// tt_user_dump ();
-				xmit_object_report(i, false)
+				reports = append(reports, u.objectReportText(i, false))
 
 				/* Increase count of number times this one was sent. */
-				tt_user[i].xmits++
-				if tt_user[i].xmits < save_tt_config_p.num_xmits {
+				u.user[i].xmits++
+				if u.user[i].xmits < u.ttConfig.num_xmits {
 					/* Schedule next one. */
-					tt_user[i].next_xmit = tt_user[i].next_xmit.Add(time.Duration(save_tt_config_p.xmit_delay[tt_user[i].xmits]) * time.Second)
+					u.user[i].next_xmit = u.user[i].next_xmit.Add(time.Duration(u.ttConfig.xmit_delay[u.user[i].xmits]) * time.Second)
 				}
 
 				// tt_user_dump ();
@@ -548,22 +568,24 @@ func tt_user_background() {
 	 * Purge if too old.
 	 */
 	for i := range MAX_TT_USERS {
-		if tt_user[i].callsign != "" {
-			if tt_user[i].last_heard.Add(time.Duration(save_tt_config_p.retain_time) * time.Second).Before(now) {
+		if u.user[i].callsign != "" {
+			if u.user[i].last_heard.Add(time.Duration(u.ttConfig.retain_time) * time.Second).Before(now) {
 				// dw_printf ("debug: purging expired user %d\n", i);
-				clear_user(i)
+				u.clear(i)
 			}
 		}
 	}
+
+	return reports
 }
 
 /*------------------------------------------------------------------
  *
- * Name:        xmit_object_report
+ * Name:        sendObjectReport
  *
  * Purpose:     Create object report packet and put into transmit queue.
  *
- * Inputs:      i	   - Index into user table.
+ * Inputs:      stemp	   - The report, from objectReportText.
  *
  *		first_time - Is this being called immediately after the tone sequence
  *			 	was received or after some delay?
@@ -590,14 +612,7 @@ func tt_user_background() {
  *
  *----------------------------------------------------------------*/
 
-func xmit_object_report(i int, first_time bool) {
-	// text_color_set(DW_COLOR_DEBUG);
-	// printf ("xmit_object_report (index = %d, first_time = %d) rx = %d, tx = %d\n", i, first_time,
-	//			save_tt_config_p.obj_recv_chan, save_tt_config_p.obj_xmit_chan);
-	Assert(i >= 0 && i < MAX_TT_USERS)
-
-	var stemp = object_report_text(i, first_time)
-
+func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	if first_time {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("[APRStt] %s\n", stemp)
@@ -627,80 +642,80 @@ func xmit_object_report(i int, first_time bool) {
 	 * The other methods are reliable so we only want to send it once.
 	 */
 
-	if first_time && save_tt_config_p.obj_send_to_app > 0 {
+	if first_time && u.ttConfig.obj_send_to_app > 0 {
 		// TODO1.3:  Put a wrapper around this so we only call one function to send by all methods.
 		// We see the same sequence in direwolf.c.
 		var fbuf = AX25Pack(pp)
 
-		agwServer.SendRecPacket(save_tt_config_p.obj_recv_chan, pp, fbuf)
-		kissNetSvc.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
-		kissSerial.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
-		kissPT.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
+		agwServer.SendRecPacket(u.ttConfig.obj_recv_chan, pp, fbuf)
+		kissNetSvc.SendRecPacket(u.ttConfig.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
+		kissSerial.SendRecPacket(u.ttConfig.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
+		kissPT.SendRecPacket(u.ttConfig.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
 	}
 
-	if first_time && save_tt_config_p.obj_send_to_ig > 0 {
+	if first_time && u.ttConfig.obj_send_to_ig > 0 {
 		// text_color_set(DW_COLOR_DEBUG);
 		// dw_printf ("xmit_object_report (): send to IGate\n");
-		igate.sendRecPacket(save_tt_config_p.obj_recv_chan, pp)
+		igate.sendRecPacket(u.ttConfig.obj_recv_chan, pp)
 	}
 
-	if !first_time && save_tt_config_p.obj_xmit_chan >= 0 {
+	if !first_time && u.ttConfig.obj_xmit_chan >= 0 {
 		/* Remember it so we don't digipeat our own. */
-		aprsDigipeater.Remember(pp, save_tt_config_p.obj_xmit_chan)
+		aprsDigipeater.Remember(pp, u.ttConfig.obj_xmit_chan)
 
-		transmitQueue.Append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
+		transmitQueue.Append(u.ttConfig.obj_xmit_chan, TQ_PRIO_1_LO, pp)
 	}
 }
 
 /*------------------------------------------------------------------
  *
- * Name:        object_report_text
+ * Name:        objectReportText
  *
  * Purpose:     Build the text form of the object report packet for
- *		xmit_object_report.
+ *		sendObjectReport.  u.mu must be held.
  *
  * Inputs:      i	   - Index into user table.
  *
- *		first_time - As for xmit_object_report; the via path is
+ *		first_time - As for sendObjectReport; the via path is
  *				only added for the later, radio, transmissions.
  *
  * Returns:     Monitor format packet, e.g. "MYCALL>SMYD00:;WB2OSZ-12*..."
  *
  *----------------------------------------------------------------*/
 
-func object_report_text(i int, first_time bool) string {
+func (u *ttUsers) objectReportText(i int, first_time bool) string {
 	Assert(i >= 0 && i < MAX_TT_USERS)
 
 	/*
 	 * Prepare the object name.
 	 * Tack on "-12" if it is a callsign.
 	 */
-	var object_name = tt_user[i].callsign
+	var object_name = u.user[i].callsign
 
-	if len(object_name) <= 6 && tt_user[i].ssid != 0 {
-		object_name += fmt.Sprintf("-%d", tt_user[i].ssid)
+	if len(object_name) <= 6 && u.user[i].ssid != 0 {
+		object_name += fmt.Sprintf("-%d", u.user[i].ssid)
 	}
 
 	var olat, olong float64
 	var oambig int
 
-	if tt_user[i].corral_slot == 0 {
+	if u.user[i].corral_slot == 0 {
 		/*
 		 * Known location.
 		 */
-		olat = tt_user[i].latitude
-		olong = tt_user[i].longitude
+		olat = u.user[i].latitude
+		olong = u.user[i].longitude
 
-		oambig = maybe.FromMaybe(0, tt_user[i].ambiguity)
+		oambig = maybe.FromMaybe(0, u.user[i].ambiguity)
 	} else {
 		/*
 		 * Use made up position in the corral.
 		 */
-		var c_lat = save_tt_config_p.corral_lat     // Corral latitude.
-		var c_long = save_tt_config_p.corral_lon    // Corral longitude.
-		var c_offs = save_tt_config_p.corral_offset // Corral (latitude) offset.
+		var c_lat = u.ttConfig.corral_lat     // Corral latitude.
+		var c_long = u.ttConfig.corral_lon    // Corral longitude.
+		var c_offs = u.ttConfig.corral_offset // Corral (latitude) offset.
 
-		olat = float64(c_lat - float64(tt_user[i].corral_slot-1)*c_offs)
+		olat = float64(c_lat - float64(u.user[i].corral_slot-1)*c_offs)
 		olong = float64(c_long)
 		oambig = 0
 	}
@@ -714,39 +729,39 @@ func object_report_text(i int, first_time bool) string {
 	 */
 	var info_comment string
 
-	if tt_user[i].comment != "" {
-		info_comment = tt_user[i].comment
+	if u.user[i].comment != "" {
+		info_comment = u.user[i].comment
 	}
 
-	if tt_user[i].loc_text != "" {
+	if u.user[i].loc_text != "" {
 		if info_comment != "" {
 			info_comment += " "
 		}
 
 		info_comment += "["
-		info_comment += tt_user[i].loc_text
+		info_comment += u.user[i].loc_text
 		info_comment += "]"
 	}
 
-	if tt_user[i].mic_e >= '1' && tt_user[i].mic_e <= '9' {
+	if u.user[i].mic_e >= '1' && u.user[i].mic_e <= '9' {
 		if len(info_comment) > 0 {
 			info_comment += " "
 		}
 
 		// Insert "/" if status does not already begin with it.
-		if !strings.HasPrefix(save_tt_config_p.status[tt_user[i].mic_e-'0'], "/") {
+		if !strings.HasPrefix(u.ttConfig.status[u.user[i].mic_e-'0'], "/") {
 			info_comment += "/"
 		}
 
-		info_comment += save_tt_config_p.status[tt_user[i].mic_e-'0']
+		info_comment += u.ttConfig.status[u.user[i].mic_e-'0']
 	}
 
-	if tt_user[i].dao != "" {
+	if u.user[i].dao != "" {
 		if len(info_comment) > 0 {
 			info_comment += " "
 		}
 
-		info_comment += tt_user[i].dao
+		info_comment += u.user[i].dao
 	}
 
 	/* Official limit is 43 characters. */
@@ -757,10 +772,10 @@ func object_report_text(i int, first_time bool) string {
 	 */
 
 	var stemp string
-	if save_tt_config_p.obj_xmit_chan >= 0 {
-		stemp = save_audio_config_p.mycall[save_tt_config_p.obj_xmit_chan]
+	if u.ttConfig.obj_xmit_chan >= 0 {
+		stemp = u.audioConfig.mycall[u.ttConfig.obj_xmit_chan]
 	} else {
-		stemp = save_audio_config_p.mycall[save_tt_config_p.obj_recv_chan]
+		stemp = u.audioConfig.mycall[u.ttConfig.obj_recv_chan]
 	}
 
 	stemp += ">"
@@ -772,26 +787,26 @@ func object_report_text(i int, first_time bool) string {
 	 * Append via path, for transmission, if specified.
 	 */
 
-	if !first_time && save_tt_config_p.obj_xmit_via != "" {
+	if !first_time && u.ttConfig.obj_xmit_via != "" {
 		stemp += ","
-		stemp += save_tt_config_p.obj_xmit_via
+		stemp += u.ttConfig.obj_xmit_via
 	}
 
 	stemp += ":"
 
 	var freq maybe.Maybe[float64]
-	if tt_user[i].freq != "" {
-		freq = maybe.Just(leadingFloat(tt_user[i].freq))
+	if u.user[i].freq != "" {
+		freq = maybe.Just(leadingFloat(u.user[i].freq))
 	}
 
 	var ctcss maybe.Maybe[float64]
-	if tt_user[i].ctcss != "" {
-		ctcss = maybe.Just(leadingFloat(tt_user[i].ctcss))
+	if u.user[i].ctcss != "" {
+		ctcss = maybe.Just(leadingFloat(u.user[i].ctcss))
 	}
 
 	// info part of Object Report packet
-	stemp += encode_object(object_name, false, tt_user[i].last_heard, olat, olong, oambig,
-		byte(tt_user[i].overlay), byte(tt_user[i].symbol),
+	stemp += encode_object(object_name, false, u.user[i].last_heard, olat, olong, oambig,
+		byte(u.user[i].overlay), byte(u.user[i].symbol),
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", /* PHGD */
 		maybe.Nothing[int](), maybe.Nothing[int](), /* Course/Speed */
 		freq,
@@ -818,71 +833,79 @@ func leadingFloat(s string) float64 {
 	return 0
 }
 
-var letters = []string{
-	"Alpha",
-	"Bravo",
-	"Charlie",
-	"Delta",
-	"Echo",
-	"Foxtrot",
-	"Golf",
-	"Hotel",
-	"India",
-	"Juliet",
-	"Kilo",
-	"Lima",
-	"Mike",
-	"November",
-	"Oscar",
-	"Papa",
-	"Quebec",
-	"Romeo",
-	"Sierra",
-	"Tango",
-	"Uniform",
-	"Victor",
-	"Whiskey",
-	"X-ray",
-	"Yankee",
-	"Zulu",
+// phoneticLetters names A to Z for TTCALLPH.
+func phoneticLetters() [26]string {
+	return [26]string{
+		"Alpha",
+		"Bravo",
+		"Charlie",
+		"Delta",
+		"Echo",
+		"Foxtrot",
+		"Golf",
+		"Hotel",
+		"India",
+		"Juliet",
+		"Kilo",
+		"Lima",
+		"Mike",
+		"November",
+		"Oscar",
+		"Papa",
+		"Quebec",
+		"Romeo",
+		"Sierra",
+		"Tango",
+		"Uniform",
+		"Victor",
+		"Whiskey",
+		"X-ray",
+		"Yankee",
+		"Zulu",
+	}
 }
 
-var digits = []string{
-	"Zero",
-	"One",
-	"Two",
-	"Three",
-	"Four",
-	"Five",
-	"Six",
-	"Seven",
-	"Eight",
-	"Nine",
+// phoneticDigits names 0 to 9 for TTCALLPH.
+func phoneticDigits() [10]string {
+	return [10]string{
+		"Zero",
+		"One",
+		"Two",
+		"Three",
+		"Four",
+		"Five",
+		"Six",
+		"Seven",
+		"Eight",
+		"Nine",
+	}
 }
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_setenv
+ * Name:        setenv
  *
  * Purpose:     Put information in environment variables in preparation
  *		for calling a user-supplied script for custom processing.
  *
- * Inputs:      i	- Index into tt_user table.
+ * Inputs:      i	- Index into user table.
  *
  * Description:	Timestamps displayed relative to current time.
  *
  *----------------------------------------------------------------*/
 
-func tt_setenv(i int) {
+func (u *ttUsers) setenv(i int) {
 	Assert(i >= 0 && i < MAX_TT_USERS)
 
-	os.Setenv("TTCALL", tt_user[i].callsign)
+	os.Setenv("TTCALL", u.user[i].callsign)
 
-	os.Setenv("TTCALLSP", strings.Join(strings.Split(tt_user[i].callsign, ""), " "))
+	os.Setenv("TTCALLSP", strings.Join(strings.Split(u.user[i].callsign, ""), " "))
+
+	var letters, digits = phoneticLetters(), phoneticDigits()
 
 	var phonetics []string
 
-	for _, p := range tt_user[i].callsign {
+	for _, p := range u.user[i].callsign {
 		if unicode.IsUpper(p) {
 			phonetics = append(phonetics, letters[p-'A'])
 		} else if unicode.IsLower(p) {
@@ -896,41 +919,41 @@ func tt_setenv(i int) {
 
 	os.Setenv("TTCALLPH", strings.Join(phonetics, " "))
 
-	os.Setenv("TTSSID", strconv.Itoa(tt_user[i].ssid))
+	os.Setenv("TTSSID", strconv.Itoa(u.user[i].ssid))
 
-	os.Setenv("TTCOUNT", strconv.Itoa(tt_user[i].count))
+	os.Setenv("TTCOUNT", strconv.Itoa(u.user[i].count))
 
-	os.Setenv("TTSYMBOL", fmt.Sprintf("%c%c", tt_user[i].overlay, tt_user[i].symbol))
+	os.Setenv("TTSYMBOL", fmt.Sprintf("%c%c", u.user[i].overlay, u.user[i].symbol))
 
-	os.Setenv("TTLAT", fmt.Sprintf("%.6f", tt_user[i].latitude))
+	os.Setenv("TTLAT", fmt.Sprintf("%.6f", u.user[i].latitude))
 
-	os.Setenv("TTLON", fmt.Sprintf("%.6f", tt_user[i].longitude))
+	os.Setenv("TTLON", fmt.Sprintf("%.6f", u.user[i].longitude))
 
-	os.Setenv("TTFREQ", tt_user[i].freq)
+	os.Setenv("TTFREQ", u.user[i].freq)
 
 	// TODO: Should convert to actual frequency. e.g.  074 becomes 74.4
 	// There is some code for this in decode_aprs.c but not broken out
 	// into a function that we could use from here.
 	// TODO: Document this environment variable after converting.
 
-	os.Setenv("TTCTCSS", tt_user[i].ctcss)
+	os.Setenv("TTCTCSS", u.user[i].ctcss)
 
-	os.Setenv("TTCOMMENT", tt_user[i].comment)
+	os.Setenv("TTCOMMENT", u.user[i].comment)
 
-	os.Setenv("TTLOC", tt_user[i].loc_text)
+	os.Setenv("TTLOC", u.user[i].loc_text)
 
-	if tt_user[i].mic_e >= '1' && tt_user[i].mic_e <= '9' {
-		os.Setenv("TTSTATUS", save_tt_config_p.status[tt_user[i].mic_e-'0'])
+	if u.user[i].mic_e >= '1' && u.user[i].mic_e <= '9' {
+		os.Setenv("TTSTATUS", u.ttConfig.status[u.user[i].mic_e-'0'])
 	} else {
 		os.Setenv("TTSTATUS", "")
 	}
 
-	os.Setenv("TTDAO", tt_user[i].dao)
-} /* end tt_setenv */
+	os.Setenv("TTDAO", u.user[i].dao)
+} /* end setenv */
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_user_dump
+ * Name:        dump
  *
  * Purpose:     Print information about known users for debugging.
  *
@@ -940,28 +963,31 @@ func tt_setenv(i int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_user_dump() {
+func (u *ttUsers) dump() {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	var now = time.Now()
 
 	dw_printf("call   ov suf lsthrd xmit nxt cor  lat    long freq     ctcss m comment\n")
 
 	for i := range MAX_TT_USERS {
-		if tt_user[i].callsign != "" {
+		if u.user[i].callsign != "" {
 			dw_printf("%-6s %c%c %-3s %6d %d %+6d %d %6.2f %7.2f %-10s %-3s %c %s\n",
-				tt_user[i].callsign,
-				tt_user[i].overlay,
-				tt_user[i].symbol,
-				tt_user[i].digit_suffix,
-				int(tt_user[i].last_heard.Sub(now).Seconds()),
-				tt_user[i].xmits,
-				int(tt_user[i].next_xmit.Sub(now).Seconds()),
-				tt_user[i].corral_slot,
-				tt_user[i].latitude,
-				tt_user[i].longitude,
-				tt_user[i].freq,
-				tt_user[i].ctcss,
-				tt_user[i].mic_e,
-				tt_user[i].comment)
+				u.user[i].callsign,
+				u.user[i].overlay,
+				u.user[i].symbol,
+				u.user[i].digit_suffix,
+				int(u.user[i].last_heard.Sub(now).Seconds()),
+				u.user[i].xmits,
+				int(u.user[i].next_xmit.Sub(now).Seconds()),
+				u.user[i].corral_slot,
+				u.user[i].latitude,
+				u.user[i].longitude,
+				u.user[i].freq,
+				u.user[i].ctcss,
+				u.user[i].mic_e,
+				u.user[i].comment)
 		}
 	}
 }

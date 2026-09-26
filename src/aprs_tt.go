@@ -262,6 +262,7 @@ func newTTParseState() ttParseState {
 type TTGateway struct {
 	config         *tt_config_s
 	debug          int
+	users          *ttUsers
 	msgStr         [MAX_RADIO_CHANS]string
 	pollPeriod     int
 	runningTests   bool
@@ -274,7 +275,8 @@ type TTGateway struct {
  *
  * Purpose:     Initialize and return a new TTGateway.
  *
- * Inputs:      p	- Pointer to configuration options gathered by config.c.
+ * Inputs:      audioConfig	- Audio configuration, for the mycall of object reports.
+ *		p	- Pointer to configuration options gathered by config.c.
  *		debug	- Debug printing control.
  *
  * Returns:     Pointer to new TTGateway.
@@ -284,10 +286,11 @@ type TTGateway struct {
  *
  *----------------------------------------------------------------*/
 
-func NewTTGateway(p *tt_config_s, debug int) *TTGateway {
+func NewTTGateway(audioConfig *audio_s, p *tt_config_s, debug int) *TTGateway {
 	var g = &TTGateway{debug: debug} //nolint:exhaustruct_v5
 
 	g.config = p
+	g.users = newTTUsers(audioConfig, p)
 
 	return g
 }
@@ -358,7 +361,7 @@ func (g *TTGateway) Button(channel int, button rune) {
 			if g.pollPeriod >= 39 {
 				g.pollPeriod = 0
 
-				tt_user_background()
+				g.users.background()
 			}
 		}
 	}
@@ -437,7 +440,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	 */
 
 	if err == 0 {
-		err = tt_user_heard(state.callsign, state.ssid, state.symtabOrOverlay, state.symbolCode,
+		err = g.users.heard(state.callsign, state.ssid, state.symtabOrOverlay, state.symbolCode,
 			state.locText, state.latitude, state.longitude, state.ambiguity,
 			state.freq, state.ctcss, state.comment, state.micE, string(state.dao[:]))
 	}
@@ -1062,7 +1065,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 				/* For unit test, use suffix rather than trying lookup. */
 				state.callsign = suffix
 			} else {
-				var _call, _idx = tt_3char_suffix_search(suffix)
+				var _call, _idx = g.users.threeCharSuffixSearch(suffix)
 
 				/* In normal operation, try to find full callsign for the suffix received. */
 

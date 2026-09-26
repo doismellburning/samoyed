@@ -493,8 +493,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the APRStt gateway.  Each audio device's receive thread
 	 * makes the touch tone decoders for its own channels.
 	 */
-	ttGateway = NewTTGateway(&dw_tt_config, aprstt_debug)
-	tt_user_init(audio_config, &dw_tt_config)
+	ttGateway = NewTTGateway(audio_config, &dw_tt_config, aprstt_debug)
 
 	/*
 	 * Should there be an option for audio output level?
