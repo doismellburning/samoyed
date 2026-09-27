@@ -1,4 +1,11 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package ax25 assembles and disassembles AX.25 frames: building a Packet from
+// the monitor text format or from a received frame, taking it apart address by
+// address, and turning it back into bytes to send. It started as Dire Wolf's
+// ax25_pad.c and ax25_pad2.c.
+package ax25
 
 /*------------------------------------------------------------------
  *
@@ -132,8 +139,8 @@ package direwolf
  *
  *
  * Constructors: ax25_init		- Clear everything.
- *		AX25FromText		- Tear apart a text string
- *		AX25FromFrame		- Tear apart an AX.25 frame.
+ *		FromText		- Tear apart a text string
+ *		FromFrame		- Tear apart an AX.25 frame.
  *					  Must be called before any other function.
  *
  * Get methods:	....			- Extract destination, source, or digipeater
@@ -157,30 +164,30 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const AX25_MAX_REPEATERS = 8
-const AX25_MIN_ADDRS = 2  /* Destination & Source. */
-const AX25_MAX_ADDRS = 10 /* Destination, Source, 8 digipeaters. */
+const MaxRepeaters = 8
+const MinAddrs = 2  /* Destination & Source. */
+const MaxAddrs = 10 /* Destination, Source, 8 digipeaters. */
 
-const AX25_DESTINATION = 0 /* Address positions in frame. */
-const AX25_SOURCE = 1
-const AX25_REPEATER_1 = 2
-const AX25_REPEATER_2 = 3
-const AX25_REPEATER_3 = 4
-const AX25_REPEATER_4 = 5
-const AX25_REPEATER_5 = 6
-const AX25_REPEATER_6 = 7
-const AX25_REPEATER_7 = 8
-const AX25_REPEATER_8 = 9
+const Destination = 0 /* Address positions in frame. */
+const Source = 1
+const Repeater1 = 2
+const Repeater2 = 3
+const Repeater3 = 4
+const Repeater4 = 5
+const Repeater5 = 6
+const Repeater6 = 7
+const Repeater7 = 8
+const Repeater8 = 9
 
-const AX25_MAX_ADDR_LEN = 12 /* In theory, you would expect the maximum length */
+const MaxAddrLen = 12 /* In theory, you would expect the maximum length */
 /* to be 6 letters, dash, 2 digits, and nul for a */
 /* total of 10.  However, object labels can be 10 */
 /* characters so throw in a couple extra bytes */
 /* to be safe. */
 
-const AX25_MIN_INFO_LEN = 0 /* Previously 1 when considering only APRS. */
+const MinInfoLen = 0 /* Previously 1 when considering only APRS. */
 
-const AX25_MAX_INFO_LEN = 2048 /* Maximum size for APRS. */
+const MaxInfoLen = 2048 /* Maximum size for APRS. */
 /* AX.25 starts out with 256 as the default max */
 /* length but the end stations can negotiate */
 /* something different. */
@@ -190,18 +197,18 @@ const AX25_MAX_INFO_LEN = 2048 /* Maximum size for APRS. */
 /* These don't include the 2 bytes for the */
 /* HDLC frame FCS. */
 
-const AX25_MIN_PACKET_LEN = (2*7 + 1)
+const MinPacketLen = (2*7 + 1)
 
-const AX25_MAX_PACKET_LEN = (AX25_MAX_ADDRS*7 + 2 + 3 + AX25_MAX_INFO_LEN)
+const MaxPacketLen = (MaxAddrs*7 + 2 + 3 + MaxInfoLen)
 
-const AX25_UI_FRAME = 3 /* Control field value. */
+const UIFrame = 3 /* Control field value. */
 
-const AX25_PID_NO_LAYER_3 = 0xf0 /* protocol ID used for APRS */
-const AX25_PID_NETROM = 0xcf     /* protocol ID used for NET/ROM */
-const AX25_PID_SEGMENTATION_FRAGMENT = 0x08
-const AX25_PID_ESCAPE_CHARACTER = 0xff
+const PIDNoLayer3 = 0xf0 /* protocol ID used for APRS */
+const PIDNetROM = 0xcf   /* protocol ID used for NET/ROM */
+const PIDSegmentationFragment = 0x08
+const PIDEscapeCharacter = 0xff
 
-const AX25_ALEVEL_TO_TEXT_SIZE = 40 // overkill but safe.
+const ALevelToTextSize = 40 // overkill but safe.
 
 /*
 * The 7th octet of each address contains:
@@ -222,31 +229,31 @@ const AX25_ALEVEL_TO_TEXT_SIZE = 40 // overkill but safe.
 *   0		Usually 0 but 1 for last address.
 */
 
-const SSID_H_MASK = 0x80
-const SSID_H_SHIFT = 7
+const SSIDHMask = 0x80
+const SSIDHShift = 7
 
-const SSID_RR_MASK = 0x60
-const SSID_RR_SHIFT = 5
+const SSIDRRMask = 0x60
+const SSIDRRShift = 5
 
-const SSID_SSID_MASK = 0x1e
-const SSID_SSID_SHIFT = 1
+const SSIDSSIDMask = 0x1e
+const SSIDSSIDShift = 1
 
-const SSID_LAST_MASK = 0x01
+const SSIDLastMask = 0x01
 
-type packet_t struct {
+type Packet struct {
 	release_time time.Time /* When to release from the SATgate mode delay queue. */
 
-	nextp *packet_t /* Pointer to next in queue. */
+	nextp *Packet /* Pointer to next in queue. */
 
 	num_addr int /* Number of addresses in frame. */
-	/* Range of AX25_MIN_ADDRS .. AX25_MAX_ADDRS for AX.25. */
+	/* Range of MinAddrs .. MaxAddrs for AX.25. */
 	/* It will be 0 if it doesn't look like AX.25. */
 	/* -1 is used temporarily at allocation to mean */
 	/* not determined yet. */
 
 	frame_len int /* Frame length without CRC. */
 
-	modulo ax25_modulo_t /* I & S frames have sequence numbers of either 3 bits (modulo 8) */
+	modulo Modulo /* I & S frames have sequence numbers of either 3 bits (modulo 8) */
 	/* or 7 bits (modulo 128).  This is conveyed by either 1 or 2 */
 	/* control bytes.  Unfortunately, we can't determine this by looking */
 	/* at an isolated frame.  We need to know about the context.  If we */
@@ -256,46 +263,46 @@ type packet_t struct {
 	/* For U frames:   	set to 0 - not applicable */
 	/* For I & S frames:	8 or 128 if known.  0 if unknown. */
 
-	frame_data [AX25_MAX_PACKET_LEN + 1]byte
+	frame_data [MaxPacketLen + 1]byte
 	/* Raw frame contents, without the CRC. */
 }
 
-type cmdres_t int
+type CmdRes int
 
 const (
-	cr_00  cmdres_t = 2
-	cr_cmd cmdres_t = 1
-	cr_res cmdres_t = 0
-	cr_11  cmdres_t = 3
+	CR00  CmdRes = 2
+	CRCmd CmdRes = 1
+	CRRes CmdRes = 0
+	CR11  CmdRes = 3
 )
 
-type ax25_modulo_t int
+type Modulo int
 
 const (
-	modulo_unknown ax25_modulo_t = 0
-	modulo_8       ax25_modulo_t = 8
-	modulo_128     ax25_modulo_t = 128
+	ModuloUnknown Modulo = 0
+	Modulo8       Modulo = 8
+	Modulo128     Modulo = 128
 )
 
-type ax25_frame_type_t int
+type FrameType int
 
 const (
-	frame_type_I       ax25_frame_type_t = iota // Information
-	frame_type_S_RR                             // Receive Ready - System Ready To Receive
-	frame_type_S_RNR                            // Receive Not Ready - TNC Buffer Full
-	frame_type_S_REJ                            // Reject Frame - Out of Sequence or Duplicate
-	frame_type_S_SREJ                           // Selective Reject - Request single frame repeat
-	frame_type_U_SABME                          // Set Async Balanced Mode, Extended
-	frame_type_U_SABM                           // Set Async Balanced Mode
-	frame_type_U_DISC                           // Disconnect
-	frame_type_U_DM                             // Disconnect Mode
-	frame_type_U_UA                             // Unnumbered Acknowledge
-	frame_type_U_FRMR                           // Frame Reject
-	frame_type_U_UI                             // Unnumbered Information
-	frame_type_U_XID                            // Exchange Identification
-	frame_type_U_TEST                           // Test
-	frame_type_U                                // other Unnumbered, not used by AX.25.
-	frame_not_AX25                              // Could not get control byte from frame. This must be last because value plus 1 is for the size of an array.
+	FrameTypeI      FrameType = iota // Information
+	FrameTypeSRR                     // Receive Ready - System Ready To Receive
+	FrameTypeSRNR                    // Receive Not Ready - TNC Buffer Full
+	FrameTypeSREJ                    // Reject Frame - Out of Sequence or Duplicate
+	FrameTypeSSREJ                   // Selective Reject - Request single frame repeat
+	FrameTypeUSABME                  // Set Async Balanced Mode, Extended
+	FrameTypeUSABM                   // Set Async Balanced Mode
+	FrameTypeUDISC                   // Disconnect
+	FrameTypeUDM                     // Disconnect Mode
+	FrameTypeUUA                     // Unnumbered Acknowledge
+	FrameTypeUFRMR                   // Frame Reject
+	FrameTypeUUI                     // Unnumbered Information
+	FrameTypeUXID                    // Exchange Identification
+	FrameTypeUTEST                   // Test
+	FrameTypeU                       // other Unnumbered, not used by AX.25.
+	FrameNotAX25                     // Could not get control byte from frame. This must be last because value plus 1 is for the size of an array.
 )
 
 /*
@@ -305,13 +312,13 @@ const (
  */
 
 type ALevel struct {
-	rec   int
-	mark  int
-	space int
+	Rec   int
+	Mark  int
+	Space int
 	//float ms_ratio;	// TODO: take out after temporary investigation.
 }
 
-// AddrStrictness says how fussy ax25_parse_addr should be about an address.
+// AddrStrictness says how fussy ParseAddr should be about an address.
 type AddrStrictness int
 
 const (
@@ -339,21 +346,13 @@ func (s AddrStrictness) strict() bool {
 	return s != AddrLenient
 }
 
-func CLEAR_LAST_ADDR_FLAG(this_p *packet_t) {
-	this_p.frame_data[this_p.num_addr*7-1] &= ^(byte(SSID_LAST_MASK))
-}
-
-func SET_LAST_ADDR_FLAG(this_p *packet_t) {
-	this_p.frame_data[this_p.num_addr*7-1] |= SSID_LAST_MASK
-}
-
 func isxdigit(b byte) bool {
 	return slices.Contains([]byte("0123456789abcdefABCDEF"), b)
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_new
+ * Name:	New
  *
  * Purpose:	Allocate memory for a new packet object.
  *
@@ -362,8 +361,8 @@ func isxdigit(b byte) bool {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_new() *packet_t {
-	var this_p = new(packet_t)
+func New() *Packet {
+	var this_p = new(Packet)
 
 	this_p.num_addr = (-1)
 
@@ -372,7 +371,7 @@ func ax25_new() *packet_t {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	AX25FromText
+ * Name:	FromText
  *
  * Purpose:	Parse a frame in human-readable monitoring format and change
  *		to internal representation.
@@ -391,7 +390,7 @@ func ax25_new() *packet_t {
  *
  *		strict	- True to enforce rules for packets sent over the air.
  *			  False to be more lenient for packets from IGate server.
- *			  AX25FromTextWithStrictness takes the AddrStrictness directly, for the
+ *			  FromTextWithStrictness takes the AddrStrictness directly, for the
  *			  decode_aprs utility which wants AddrStrictLowerCaseWarning.
  *
  *			  Packets from an IGate server can have longer
@@ -421,15 +420,15 @@ func ax25_new() *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func AX25FromText(monitor string, strict bool) *packet_t {
-	return AX25FromTextWithStrictness(monitor, dwutil.IfThenElse(strict, AddrStrict, AddrLenient))
+func FromText(monitor string, strict bool) *Packet {
+	return FromTextWithStrictness(monitor, dwutil.IfThenElse(strict, AddrStrict, AddrLenient))
 }
 
-// MustAX25FromText is AX25FromText, strictly, for text known to be a valid
+// MustFromText is FromText, strictly, for text known to be a valid
 // packet, such as a constant in a test.  Like regexp.MustCompile, it panics if
 // the text isn't one.
-func MustAX25FromText(monitor string) *packet_t {
-	var pp = AX25FromText(monitor, true)
+func MustFromText(monitor string) *Packet {
+	var pp = FromText(monitor, true)
 	if pp == nil {
 		panic("not an AX.25 packet: " + monitor)
 	}
@@ -437,15 +436,15 @@ func MustAX25FromText(monitor string) *packet_t {
 	return pp
 }
 
-func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *packet_t {
+func FromTextWithStrictness(monitor string, strictness AddrStrictness) *Packet {
 	/*
 	 * Tearing it apart is destructive so make our own copy first.
 	 */
 
 	// text_color_set(DW_COLOR_DEBUG);
-	// dw_printf ("DEBUG: AX25FromTextWithStrictness ('%s', %d)\n", monitor, strictness);
+	// dw_printf ("DEBUG: FromTextWithStrictness ('%s', %d)\n", monitor, strictness);
 	// fflush(stdout); sleep(1);
-	var this_p = ax25_new()
+	var this_p = New()
 
 	/* Is it possible to have a nul character (zero byte) in the */
 	/* information field of an AX.25 frame? */
@@ -459,18 +458,18 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 	 * Initialize the packet structure with two addresses and control/pid
 	 * for APRS.
 	 */
-	copy(this_p.frame_data[AX25_DESTINATION*7:], bytes.Repeat([]byte{' ' << 1}, 6))
-	this_p.frame_data[AX25_DESTINATION*7+6] = SSID_H_MASK | SSID_RR_MASK
+	copy(this_p.frame_data[Destination*7:], bytes.Repeat([]byte{' ' << 1}, 6))
+	this_p.frame_data[Destination*7+6] = SSIDHMask | SSIDRRMask
 
-	copy(this_p.frame_data[AX25_SOURCE*7:], bytes.Repeat([]byte{' ' << 1}, 6))
-	this_p.frame_data[AX25_SOURCE*7+6] = SSID_RR_MASK | SSID_LAST_MASK
+	copy(this_p.frame_data[Source*7:], bytes.Repeat([]byte{' ' << 1}, 6))
+	this_p.frame_data[Source*7+6] = SSIDRRMask | SSIDLastMask
 
-	this_p.frame_data[14] = AX25_UI_FRAME
-	this_p.frame_data[15] = AX25_PID_NO_LAYER_3
+	this_p.frame_data[14] = UIFrame
+	this_p.frame_data[15] = PIDNoLayer3
 
 	this_p.frame_len = 7 + 7 + 1 + 1
 	this_p.num_addr = (-1)
-	ax25_get_num_addr(this_p) // when num_addr is -1, this sets it properly.
+	this_p.NumAddr() // when num_addr is -1, this sets it properly.
 	dwutil.Assert(this_p.num_addr == 2)
 
 	/*
@@ -503,7 +502,7 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 		return (nil)
 	}
 
-	var addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_SOURCE, string(pa), strictness)
+	var addrTemp, ssidTemp, _, ok = ParseAddr(Source, string(pa), strictness)
 
 	if !ok {
 		logrus.WithField("monitor", monitor).Warn("Failed to create packet from text: bad source address")
@@ -511,9 +510,9 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 		return (nil)
 	}
 
-	ax25_set_addr(this_p, AX25_SOURCE, addrTemp)
-	ax25_set_h(this_p, AX25_SOURCE) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
-	ax25_set_ssid(this_p, AX25_SOURCE, ssidTemp)
+	this_p.SetAddr(Source, addrTemp)
+	this_p.SetH(Source) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
+	this_p.SetSSID(Source, ssidTemp)
 
 	/*
 	 * Destination address.
@@ -522,7 +521,7 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 	pa, stuff, _ = bytes.Cut(stuff, []byte{','})
 	// Note: if no comma found, pa contains the destination and stuff is empty (no digipeaters)
 
-	addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_DESTINATION, string(pa), strictness)
+	addrTemp, ssidTemp, _, ok = ParseAddr(Destination, string(pa), strictness)
 
 	if !ok {
 		logrus.WithField("monitor", monitor).Warn("Failed to create packet from text: bad destination address")
@@ -530,9 +529,9 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 		return (nil)
 	}
 
-	ax25_set_addr(this_p, AX25_DESTINATION, addrTemp)
-	ax25_set_h(this_p, AX25_DESTINATION) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
-	ax25_set_ssid(this_p, AX25_DESTINATION, ssidTemp)
+	this_p.SetAddr(Destination, addrTemp)
+	this_p.SetH(Destination) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
+	this_p.SetSSID(Destination, ssidTemp)
 
 	/*
 	 * VIA path.
@@ -552,7 +551,7 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 
 	// Use strsep instead.  This does not collapse adjacent delimiters.
 
-	for len(stuff) > 0 && this_p.num_addr < AX25_MAX_ADDRS {
+	for len(stuff) > 0 && this_p.num_addr < MaxAddrs {
 		pa, stuff, found = bytes.Cut(stuff, []byte{','})
 
 		var k = this_p.num_addr
@@ -568,23 +567,23 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 
 		var heardTemp bool
 
-		addrTemp, ssidTemp, heardTemp, ok = ax25_parse_addr(k, string(pa), strictness)
+		addrTemp, ssidTemp, heardTemp, ok = ParseAddr(k, string(pa), strictness)
 		if !ok {
 			logrus.WithField("monitor", monitor).Warn("Failed to create packet from text: bad digipeater address")
 
 			return (nil)
 		}
 
-		ax25_set_addr(this_p, k, addrTemp)
-		ax25_set_ssid(this_p, k, ssidTemp)
+		this_p.SetAddr(k, addrTemp)
+		this_p.SetSSID(k, ssidTemp)
 
 		// Does it have an "*" at the end?
 		// TODO: Complain if more than one "*".
 		// Could also check for all has been repeated bits are adjacent.
 
 		if heardTemp {
-			for ; k >= AX25_REPEATER_1; k-- {
-				ax25_set_h(this_p, k)
+			for ; k >= Repeater1; k-- {
+				this_p.SetH(k)
 			}
 		}
 
@@ -608,17 +607,17 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 	   #if DEBUG14H
 	   	text_color_set(DW_COLOR_DEBUG);
 	   	dw_printf ("BEFORE: %s\nSAFE:   ", pinfo);
-	   	AX25SafePrint (pinfo, -1, 0);
+	   	SafePrint (pinfo, -1, 0);
 	   	dw_printf ("\n");
 	   #endif
 	*/
 
 	var info_part []byte
 	for len(pinfo) > 0 {
-		if len(info_part) >= AX25_MAX_INFO_LEN {
+		if len(info_part) >= MaxInfoLen {
 			logrus.WithFields(logrus.Fields{
 				"monitor": monitor,
-				"max":     AX25_MAX_INFO_LEN,
+				"max":     MaxInfoLen,
 			}).Warn("Failed to create packet from text: info part too long")
 
 			return (nil)
@@ -644,7 +643,7 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 		#if DEBUG14H
 			text_color_set(DW_COLOR_DEBUG);
 			dw_printf ("AFTER:  %s\nSAFE:   ", info_part);
-			AX25SafePrint (info_part, info_len, 0);
+			SafePrint (info_part, info_len, 0);
 			dw_printf ("\n");
 		#endif
 	*/
@@ -660,7 +659,7 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 
 /*------------------------------------------------------------------------------
  *
- * Name:	AX25FromFrame
+ * Name:	FromFrame
  *
  * Purpose:	Split apart an HDLC frame to components.
  *
@@ -676,7 +675,7 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
  *
  *------------------------------------------------------------------------------*/
 
-func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
+func FromFrame(data []byte, alevel ALevel) *Packet {
 	/*
 	 * First make sure we have an acceptable length:
 	 *
@@ -694,17 +693,17 @@ func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
 	 *
 	 */
 	var flen = len(data)
-	if flen < AX25_MIN_PACKET_LEN || flen > AX25_MAX_PACKET_LEN {
+	if flen < MinPacketLen || flen > MaxPacketLen {
 		logrus.WithFields(logrus.Fields{
 			"length": flen,
-			"min":    AX25_MIN_PACKET_LEN,
-			"max":    AX25_MAX_PACKET_LEN,
+			"min":    MinPacketLen,
+			"max":    MaxPacketLen,
 		}).Warn("Frame length not in allowable range")
 
 		return (nil)
 	}
 
-	var this_p = ax25_new()
+	var this_p = New()
 
 	/* Copy the whole thing intact. */
 
@@ -715,14 +714,14 @@ func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
 	/* Find number of addresses. */
 
 	this_p.num_addr = (-1)
-	ax25_get_num_addr(this_p)
+	this_p.NumAddr()
 
 	return (this_p)
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_dup
+ * Name:	Dup
  *
  * Purpose:	Make a copy of given packet object.
  *
@@ -733,21 +732,29 @@ func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_dup(copy_from *packet_t) *packet_t {
-	var this_p = new(packet_t)
+func (this_p *Packet) Dup() *Packet {
+	var dup = new(Packet)
 
-	*this_p = *copy_from
+	*dup = *this_p
 
-	return (this_p)
+	return (dup)
+}
+
+func (this_p *Packet) clearLastAddrFlag() {
+	this_p.frame_data[this_p.num_addr*7-1] &= ^(byte(SSIDLastMask))
+}
+
+func (this_p *Packet) setLastAddrFlag() {
+	this_p.frame_data[this_p.num_addr*7-1] |= SSIDLastMask
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_parse_addr
+ * Name:	ParseAddr
  *
  * Purpose:	Parse address with optional ssid.
  *
- * Inputs:	position	- AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER_1...
+ * Inputs:	position	- Destination, Source, Repeater1...
  *				  Used for more specific error message.  -1 if not used.
  *
  *		in_addr		- Input such as "WB2OSZ-15*"
@@ -769,7 +776,7 @@ func ax25_dup(copy_from *packet_t) *packet_t {
  *				  case rather than rejecting the address.
  *
  * Returns:	out_addr	- Address without any SSID.
- *				  Must be at least AX25_MAX_ADDR_LEN bytes.
+ *				  Must be at least MaxAddrLen bytes.
  *
  *		out_ssid	- Numeric value of SSID.
  *
@@ -781,28 +788,28 @@ func ax25_dup(copy_from *packet_t) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-// addrPositionNames returns the prefixes ax25_parse_addr's messages use to
+// addrPositionNames returns the prefixes ParseAddr's messages use to
 // say which address they are about, indexed by position + 1.
-func addrPositionNames() [1 + AX25_MAX_ADDRS]string {
-	return [1 + AX25_MAX_ADDRS]string{
+func addrPositionNames() [1 + MaxAddrs]string {
+	return [1 + MaxAddrs]string{
 		"", "Destination ", "Source ",
 		"Digi1 ", "Digi2 ", "Digi3 ", "Digi4 ",
 		"Digi5 ", "Digi6 ", "Digi7 ", "Digi8 "}
 }
 
-func ax25_parse_addr(position int, in_addr string, strictness AddrStrictness) (string, int, bool, bool) {
+func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string, int, bool, bool) {
 	var out_addr string
 	var ssid int
 	var heard bool
 
-	// dw_printf ("ax25_parse_addr in: position=%d, '%s', strict=%d\n", position, in_addr, strict);
+	// dw_printf ("ParseAddr in: position=%d, '%s', strict=%d\n", position, in_addr, strict);
 
 	if position < -1 {
 		position = -1
 	}
 
-	if position > AX25_REPEATER_8 {
-		position = AX25_REPEATER_8
+	if position > Repeater8 {
+		position = Repeater8
 	}
 
 	position++ /* Adjust for addrPositionNames above. */
@@ -828,9 +835,9 @@ func ax25_parse_addr(position int, in_addr string, strictness AddrStrictness) (s
 		log().Warn("Address is a \"q-construct\" used for communicating with APRS Internet Servers - it should never appear when going over the radio")
 	}
 
-	// dw_printf ("ax25_parse_addr in: %s\n", in_addr);
+	// dw_printf ("ParseAddr in: %s\n", in_addr);
 
-	var maxlen = dwutil.IfThenElse(strictness.strict(), 6, (AX25_MAX_ADDR_LEN - 1))
+	var maxlen = dwutil.IfThenElse(strictness.strict(), 6, (MaxAddrLen - 1))
 
 	for i, p := range in_addr {
 		if p == '-' || p == '*' {
@@ -928,21 +935,21 @@ func ax25_parse_addr(position int, in_addr string, strictness AddrStrictness) (s
 		return out_addr, ssid, heard, false
 	}
 
-	// dw_printf ("ax25_parse_addr out: '%s' %d %d\n", out_addr, *out_ssid, *out_heard);
+	// dw_printf ("ParseAddr out: '%s' %d %d\n", out_addr, *out_ssid, *out_heard);
 
 	return out_addr, ssid, heard, true
-} /* end ax25_parse_addr */
+} /* end ParseAddr */
 
 /*-------------------------------------------------------------------
  *
- * Name:        AX25CheckAddresses
+ * Name:        CheckAddresses
  *
  * Purpose:     Check addresses of given packet and print message if any issues.
  *		We call this when receiving and transmitting.
  *
  * Inputs:	pp		- packet object pointer.
  *
- *		strictness	- How fussy to be; see ax25_parse_addr.  Anything
+ *		strictness	- How fussy to be; see ParseAddr.  Anything
  *				  received or transmitted over the air is AddrStrict.
  *
  * Errors:	Print error message.
@@ -979,13 +986,13 @@ func ax25_parse_addr(position int, in_addr string, strictness AddrStrictness) (s
  *
  *--------------------------------------------------------------------*/
 
-func AX25CheckAddresses(pp *packet_t, strictness AddrStrictness) bool {
+func (this_p *Packet) CheckAddresses(strictness AddrStrictness) bool {
 	var all_ok = true
 
-	for n := range ax25_get_num_addr(pp) {
-		var addr = ax25_get_addr_with_ssid(pp, n)
+	for n := range this_p.NumAddr() {
+		var addr = this_p.AddrWithSSID(n)
 
-		var _, _, _, ok = ax25_parse_addr(n, addr, strictness)
+		var _, _, _, ok = ParseAddr(n, addr, strictness)
 
 		all_ok = all_ok && ok
 	}
@@ -995,11 +1002,11 @@ func AX25CheckAddresses(pp *packet_t, strictness AddrStrictness) bool {
 	}
 
 	return all_ok
-} /* end AX25CheckAddresses */
+} /* end CheckAddresses */
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_unwrap_third_party
+ * Name:	UnwrapThirdParty
  *
  * Purpose:	Unwrap a third party message from the header.
  *
@@ -1012,56 +1019,56 @@ func AX25CheckAddresses(pp *packet_t, strictness AddrStrictness) bool {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
-	if ax25_get_dti(from_pp) != '}' {
-		logrus.Error("Internal error: ax25_unwrap_third_party: wrong data type")
+func (this_p *Packet) UnwrapThirdParty() *Packet {
+	if this_p.DTI() != '}' {
+		logrus.Error("Internal error: UnwrapThirdParty: wrong data type")
 
 		return (nil)
 	}
 
-	var info = AX25GetInfo(from_pp)
+	var info = this_p.Info()
 
 	// Want strict because addresses should conform to AX.25 here.
 	// That's not the case for something from an Internet Server.
 
-	var result_pp = AX25FromText(string(info[1:]), true)
+	var result_pp = FromText(string(info[1:]), true)
 
 	return (result_pp)
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_set_addr
+ * Name:	SetAddr
  *
  * Purpose:	Add or change an address.
  *
  * Inputs:	n	- Index of address.   Use the symbols
- *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
+ *			  Destination, Source, AX25_REPEATER1, etc.
  *
  *			  Must be either an existing address or one greater
  *			  than the final which causes a new one to be added.
  *
  *		ad	- Address with optional dash and substation id.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
- * TODO:  	AX25FromText could use this.
+ * TODO:  	FromText could use this.
  *
  * Returns:	None.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_addr(this_p *packet_t, n int, ad string) {
-	dwutil.Assert(n >= 0 && n < AX25_MAX_ADDRS)
+func (this_p *Packet) SetAddr(n int, ad string) {
+	dwutil.Assert(n >= 0 && n < MaxAddrs)
 
-	//dw_printf ("ax25_set_addr (%d, %s) num_addr=%d\n", n, ad, this_p.num_addr);
+	//dw_printf ("SetAddr (%d, %s) num_addr=%d\n", n, ad, this_p.num_addr);
 
 	if len(ad) == 0 {
 		logrus.WithField("position", n).Error("Set address error: station address is empty")
 	}
 
 	if n >= 0 && n < this_p.num_addr {
-		//dw_printf ("ax25_set_addr , existing case\n");
+		//dw_printf ("SetAddr , existing case\n");
 		/*
 		 * Set existing address position.
 		 */
@@ -1069,7 +1076,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 		// Why aren't we setting 'strict' here?
 		// Messages from IGate have q-constructs.
 		// We use this to parse it and later remove unwanted parts.
-		var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, AddrLenient)
+		var addrTemp, ssidTemp, _, _ = ParseAddr(n, ad, AddrLenient)
 
 		copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 
@@ -1081,29 +1088,29 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 			this_p.frame_data[n*7+i] = byte(c << 1)
 		}
 
-		ax25_set_ssid(this_p, n, ssidTemp)
+		this_p.SetSSID(n, ssidTemp)
 	} else if n == this_p.num_addr {
-		//dw_printf ("ax25_set_addr , appending case\n");
+		//dw_printf ("SetAddr , appending case\n");
 		/*
 		 * One beyond last position, process as insert.
 		 */
-		ax25_insert_addr(this_p, n, ad)
+		this_p.InsertAddr(n, ad)
 	} else {
 		logrus.WithFields(logrus.Fields{
 			"position": n,
 			"address":  ad,
-		}).Error("Internal error: ax25_set_addr: bad position")
+		}).Error("Internal error: SetAddr: bad position")
 	}
 
 	//dw_printf ("------\n");
-	//dw_printf ("dump after ax25_set_addr (%d, %s)\n", n, ad);
-	//AX25HexDump (this_p);
+	//dw_printf ("dump after SetAddr (%d, %s)\n", n, ad);
+	//HexDump (this_p);
 	//dw_printf ("------\n");
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_insert_addr
+ * Name:	InsertAddr
  *
  * Purpose:	Insert address at specified position, shifting others up one
  *		position.
@@ -1115,23 +1122,23 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
  *			W1ABC>TEST,WB2OSZ-1*,WIDE3-2
  *
  * Inputs:	n	- Index of address.   Use the symbols
- *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
+ *			  Destination, Source, AX25_REPEATER1, etc.
  *
  *		ad	- Address with optional dash and substation id.
  *
  * Bugs:	Little validity or bounds checking is performed.  Be careful.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	None.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_insert_addr(this_p *packet_t, n int, ad string) {
-	dwutil.Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
+func (this_p *Packet) InsertAddr(n int, ad string) {
+	dwutil.Assert(n >= Repeater1 && n < MaxAddrs)
 
-	//dw_printf ("ax25_insert_addr (%d, %s)\n", n, ad);
+	//dw_printf ("InsertAddr (%d, %s)\n", n, ad);
 
 	if len(ad) == 0 {
 		logrus.WithField("position", n).Error("Set address error: station address is empty")
@@ -1140,26 +1147,26 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 	/* Don't do it if we already have the maximum number. */
 	/* Should probably return success/fail code but currently the caller doesn't care. */
 
-	if this_p.num_addr >= AX25_MAX_ADDRS {
+	if this_p.num_addr >= MaxAddrs {
 		return
 	}
 
-	CLEAR_LAST_ADDR_FLAG(this_p)
+	this_p.clearLastAddrFlag()
 
 	this_p.num_addr++
 
 	copy(this_p.frame_data[(n+1)*7:], this_p.frame_data[n*7:this_p.frame_len])
 	copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 	this_p.frame_len += 7
-	this_p.frame_data[n*7+6] = SSID_RR_MASK
+	this_p.frame_data[n*7+6] = SSIDRRMask
 
-	SET_LAST_ADDR_FLAG(this_p)
+	this_p.setLastAddrFlag()
 
 	// Why aren't we setting 'strict' here?
 	// Messages from IGate have q-constructs.
 	// We use this to parse it and later remove unwanted parts.
 
-	var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, AddrLenient)
+	var addrTemp, ssidTemp, _, _ = ParseAddr(n, ad, AddrLenient)
 	copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 
 	for i, c := range addrTemp {
@@ -1170,24 +1177,24 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 		this_p.frame_data[n*7+i] = byte(c << 1)
 	}
 
-	ax25_set_ssid(this_p, n, ssidTemp)
+	this_p.SetSSID(n, ssidTemp)
 
 	// Sanity check after messing with number of addresses.
 
 	var expect = this_p.num_addr
 
 	this_p.num_addr = (-1)
-	if expect != ax25_get_num_addr(this_p) {
+	if expect != this_p.NumAddr() {
 		logrus.WithFields(logrus.Fields{
 			"expected": expect,
 			"actual":   this_p.num_addr,
-		}).Error("Internal error: ax25_insert_addr: unexpected number of addresses")
+		}).Error("Internal error: InsertAddr: unexpected number of addresses")
 	}
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_remove_addr
+ * Name:	RemoveAddr
  *
  * Purpose:	Remove address at specified position, shifting others down one position.
  *		This is used when we want to remove something from the digipeater list.
@@ -1197,55 +1204,55 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
  *
  * Bugs:	Little validity or bounds checking is performed.  Be careful.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	None.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_remove_addr(this_p *packet_t, n int) {
-	dwutil.Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
+func (this_p *Packet) RemoveAddr(n int) {
+	dwutil.Assert(n >= Repeater1 && n < MaxAddrs)
 
 	/* Shift those beyond to fill this position. */
 
-	CLEAR_LAST_ADDR_FLAG(this_p)
+	this_p.clearLastAddrFlag()
 
 	this_p.num_addr--
 
 	copy(this_p.frame_data[n*7:], this_p.frame_data[(n+1)*7:this_p.frame_len])
 	this_p.frame_len -= 7
-	SET_LAST_ADDR_FLAG(this_p)
+	this_p.setLastAddrFlag()
 
 	// Sanity check after messing with number of addresses.
 
 	var expect = this_p.num_addr
 
 	this_p.num_addr = (-1)
-	if expect != ax25_get_num_addr(this_p) {
+	if expect != this_p.NumAddr() {
 		logrus.WithFields(logrus.Fields{
 			"expected": expect,
 			"actual":   this_p.num_addr,
-		}).Error("Internal error: ax25_remove_addr: unexpected number of addresses")
+		}).Error("Internal error: RemoveAddr: unexpected number of addresses")
 	}
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_num_addr
+ * Name:	NumAddr
  *
  * Purpose:	Return number of addresses in current packet.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	Number of addresses in the current packet.
- *		Should be in the range of 2 .. AX25_MAX_ADDRS.
+ *		Should be in the range of 2 .. MaxAddrs.
  *
  * Version 0.9:	Could be zero for a non AX.25 frame in KISS mode.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_num_addr(this_p *packet_t) int {
+func (this_p *Packet) NumAddr() int {
 	/* Use cached value if already set. */
 
 	if this_p.num_addr >= 0 {
@@ -1258,14 +1265,14 @@ func ax25_get_num_addr(this_p *packet_t) int {
 
 	var addr_bytes = 0
 	for a := 0; a < this_p.frame_len && addr_bytes == 0; a++ {
-		if this_p.frame_data[a]&SSID_LAST_MASK != 0 {
+		if this_p.frame_data[a]&SSIDLastMask != 0 {
 			addr_bytes = a + 1
 		}
 	}
 
 	if addr_bytes%7 == 0 {
 		var addrs = addr_bytes / 7
-		if addrs >= AX25_MIN_ADDRS && addrs <= AX25_MAX_ADDRS {
+		if addrs >= MinAddrs && addrs <= MaxAddrs {
 			this_p.num_addr = addrs
 		}
 	}
@@ -1275,18 +1282,18 @@ func ax25_get_num_addr(this_p *packet_t) int {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_num_repeaters
+ * Name:	NumRepeaters
  *
  * Purpose:	Return number of repeater addresses in current packet.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	Number of addresses in the current packet - 2.
- *		Should be in the range of 0 .. AX25_MAX_ADDRS - 2.
+ *		Should be in the range of 0 .. MaxAddrs - 2.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_num_repeaters(this_p *packet_t) int {
+func (this_p *Packet) NumRepeaters() int {
 	if this_p.num_addr >= 2 {
 		return this_p.num_addr - 2
 	}
@@ -1296,30 +1303,30 @@ func ax25_get_num_repeaters(this_p *packet_t) int {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_addr_with_ssid
+ * Name:	AddrWithSSID
  *
  * Purpose:	Return specified address with any SSID in current packet.
  *
  * Inputs:	n	- Index of address.   Use the symbols
- *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
+ *			  Destination, Source, AX25_REPEATER1, etc.
  *
  * Returns:	station - String representation of the station, including the SSID.
  *			e.g.  "WB2OSZ-15"
- *			  Usually variables will be AX25_MAX_ADDR_LEN bytes
+ *			  Usually variables will be MaxAddrLen bytes
  *			  but 10 would be adequate.
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	Character string in usual human readable format,
  *
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
+func (this_p *Packet) AddrWithSSID(n int) string {
 	if n < 0 {
-		logrus.WithField("index", n).Error("Internal error: ax25_get_addr_with_ssid: address index is less than zero")
+		logrus.WithField("index", n).Error("Internal error: AddrWithSSID: address index is less than zero")
 
 		return "??????"
 	}
@@ -1328,7 +1335,7 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 		logrus.WithFields(logrus.Fields{
 			"index":    n,
 			"num_addr": this_p.num_addr,
-		}).Error("Internal error: ax25_get_addr_with_ssid: address index is too large")
+		}).Error("Internal error: AddrWithSSID: address index is too large")
 
 		return "??????"
 	}
@@ -1355,40 +1362,40 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 		logrus.WithField("position", n).Warn("Station address is empty - this is not a valid AX.25 frame")
 	}
 
-	var ssid = ax25_get_ssid(this_p, n)
+	var ssid = this_p.SSID(n)
 	if ssid != 0 {
 		station += fmt.Sprintf("-%d", ssid)
 	}
 
 	return station
-} /* end ax25_get_addr_with_ssid */
+} /* end AddrWithSSID */
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_addr_no_ssid
+ * Name:	AddrNoSSID
  *
  * Purpose:	Return specified address WITHOUT any SSID.
  *
  * Inputs:	n	- Index of address.   Use the symbols
- *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
+ *			  Destination, Source, AX25_REPEATER1, etc.
  *
  * Returns:	station - String representation of the station, WITHOUT the SSID.
  *			e.g.  "WB2OSZ"
- *			  Usually variables will be AX25_MAX_ADDR_LEN bytes
+ *			  Usually variables will be MaxAddrLen bytes
  *			  but 7 would be adequate.
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	Character string in usual human readable format,
  *
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
+func (this_p *Packet) AddrNoSSID(n int) string {
 	if n < 0 {
-		logrus.WithField("index", n).Error("Internal error: ax25_get_addr_no_ssid: address index is less than zero")
+		logrus.WithField("index", n).Error("Internal error: AddrNoSSID: address index is less than zero")
 
 		return "??????"
 	}
@@ -1397,7 +1404,7 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
 		logrus.WithFields(logrus.Fields{
 			"index":    n,
 			"num_addr": this_p.num_addr,
-		}).Error("Internal error: ax25_get_addr_no_ssid: address index is too large")
+		}).Error("Internal error: AddrNoSSID: address index is too large")
 
 		return "??????"
 	}
@@ -1419,31 +1426,31 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
 	}
 
 	return station
-} /* end ax25_get_addr_no_ssid */
+} /* end AddrNoSSID */
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_ssid
+ * Name:	SSID
  *
  * Purpose:	Return SSID of specified address in current packet.
  *
  * Inputs:	n	- Index of address.   Use the symbols
- *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
+ *			  Destination, Source, AX25_REPEATER1, etc.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	Substation id, as integer 0 .. 15.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_ssid(this_p *packet_t, n int) int {
+func (this_p *Packet) SSID(n int) int {
 	if n >= 0 && n < this_p.num_addr {
-		return int((this_p.frame_data[n*7+6] & SSID_SSID_MASK) >> SSID_SSID_SHIFT)
+		return int((this_p.frame_data[n*7+6] & SSIDSSIDMask) >> SSIDSSIDShift)
 	} else {
 		logrus.WithFields(logrus.Fields{
 			"index":    n,
 			"num_addr": this_p.num_addr,
-		}).Error("Internal error: ax25_get_ssid: bad address index")
+		}).Error("Internal error: SSID: bad address index")
 
 		return (0)
 	}
@@ -1451,61 +1458,61 @@ func ax25_get_ssid(this_p *packet_t, n int) int {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_set_ssid
+ * Name:	SetSSID
  *
  * Purpose:	Set the SSID of specified address in current packet.
  *
  * Inputs:	n	- Index of address.   Use the symbols
- *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
+ *			  Destination, Source, AX25_REPEATER1, etc.
  *
  *		ssid	- New SSID.  Must be in range of 0 to 15.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Bugs:	Rewrite to keep call and SSID separate internally.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
+func (this_p *Packet) SetSSID(n int, ssid int) {
 	if n >= 0 && n < this_p.num_addr {
-		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(byte(SSID_SSID_MASK))) |
-			byte((ssid<<SSID_SSID_SHIFT)&SSID_SSID_MASK)
+		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(byte(SSIDSSIDMask))) |
+			byte((ssid<<SSIDSSIDShift)&SSIDSSIDMask)
 	} else {
 		logrus.WithFields(logrus.Fields{
 			"index":    n,
 			"ssid":     ssid,
 			"num_addr": this_p.num_addr,
-		}).Error("Internal error: ax25_set_ssid: bad address index")
+		}).Error("Internal error: SetSSID: bad address index")
 	}
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_h
+ * Name:	H
  *
  * Purpose:	Return "has been repeated" flag of specified address in current packet.
  *
  * Inputs:	n	- Index of address.   Use the symbols
- *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
+ *			  Destination, Source, AX25_REPEATER1, etc.
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	True or false.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_h(this_p *packet_t, n int) int {
+func (this_p *Packet) H(n int) int {
 	dwutil.Assert(n >= 0 && n < this_p.num_addr)
 
 	if n >= 0 && n < this_p.num_addr {
-		return int((this_p.frame_data[n*7+6] & SSID_H_MASK) >> SSID_H_SHIFT)
+		return int((this_p.frame_data[n*7+6] & SSIDHMask) >> SSIDHShift)
 	} else {
 		logrus.WithFields(logrus.Fields{
 			"index":    n,
 			"num_addr": this_p.num_addr,
-		}).Error("Internal error: ax25_get_h: bad address index")
+		}).Error("Internal error: H: bad address index")
 
 		return (0)
 	}
@@ -1513,53 +1520,53 @@ func ax25_get_h(this_p *packet_t, n int) int {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_set_h
+ * Name:	SetH
  *
  * Purpose:	Set the "has been repeated" flag of specified address in current packet.
  *
  * Inputs:	n	- Index of address.   Use the symbols
- *			 Should be in range of AX25_REPEATER_1 .. AX25_REPEATER_8.
+ *			 Should be in range of Repeater1 .. Repeater8.
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	None
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_h(this_p *packet_t, n int) {
+func (this_p *Packet) SetH(n int) {
 	if n >= 0 && n < this_p.num_addr {
-		this_p.frame_data[n*7+6] |= SSID_H_MASK
+		this_p.frame_data[n*7+6] |= SSIDHMask
 	} else {
 		logrus.WithFields(logrus.Fields{
 			"index":    n,
 			"num_addr": this_p.num_addr,
-		}).Error("Internal error: ax25_set_h: bad address index")
+		}).Error("Internal error: SetH: bad address index")
 	}
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_heard
+ * Name:	Heard
  *
  * Purpose:	Return index of the station that we heard.
  *
  * Inputs:	none
  *
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	If any of the digipeaters have the has-been-repeated bit set,
  *		return the index of the last one.  Otherwise return index for source.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_heard(this_p *packet_t) int {
-	var result = AX25_SOURCE
+func (this_p *Packet) Heard() int {
+	var result = Source
 
-	for i := AX25_REPEATER_1; i < ax25_get_num_addr(this_p); i++ {
-		if ax25_get_h(this_p, i) != 0 {
+	for i := Repeater1; i < this_p.NumAddr(); i++ {
+		if this_p.H(i) != 0 {
 			result = i
 		}
 	}
@@ -1569,7 +1576,7 @@ func ax25_get_heard(this_p *packet_t) int {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_first_not_repeated
+ * Name:	FirstNotRepeated
  *
  * Purpose:	Return index of the first repeater that does NOT have the
  *		"has been repeated" flag set or -1 if none.
@@ -1577,15 +1584,15 @@ func ax25_get_heard(this_p *packet_t) int {
  * Inputs:	none
  *
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	In range of X25_REPEATER_1 .. X25_REPEATER_8 or -1 if none.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_first_not_repeated(this_p *packet_t) int {
-	for i := AX25_REPEATER_1; i < ax25_get_num_addr(this_p); i++ {
-		if ax25_get_h(this_p, i) == 0 {
+func (this_p *Packet) FirstNotRepeated() int {
+	for i := Repeater1; i < this_p.NumAddr(); i++ {
+		if this_p.H(i) == 0 {
 			return i
 		}
 	}
@@ -1595,29 +1602,29 @@ func ax25_get_first_not_repeated(this_p *packet_t) int {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_rr
+ * Name:	RR
  *
  * Purpose:	Return the two reserved "RR" bits in the specified address field.
  *
  * Inputs:	pp	- Packet object.
  *
  *		n	- Index of address.   Use the symbols
- *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
+ *			  Destination, Source, AX25_REPEATER1, etc.
  *
  * Returns:	0, 1, 2, or 3.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_rr(this_p *packet_t, n int) int {
+func (this_p *Packet) RR(n int) int {
 	dwutil.Assert(n >= 0 && n < this_p.num_addr)
 
 	if n >= 0 && n < this_p.num_addr {
-		return int((this_p.frame_data[n*7+6] & SSID_RR_MASK) >> SSID_RR_SHIFT)
+		return int((this_p.frame_data[n*7+6] & SSIDRRMask) >> SSIDRRShift)
 	} else {
 		logrus.WithFields(logrus.Fields{
 			"index":    n,
 			"num_addr": this_p.num_addr,
-		}).Error("Internal error: ax25_get_rr: bad address index")
+		}).Error("Internal error: RR: bad address index")
 
 		return (0)
 	}
@@ -1625,26 +1632,26 @@ func ax25_get_rr(this_p *packet_t, n int) int {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	AX25GetInfo
+ * Name:	Info
  *
  * Purpose:	Obtain Information part of current packet.
  *
  * Inputs:	this_p	- Packet object pointer.
  *
  * Returns:	paddr	- Byte slice of the information part
- *		Should have length in the range of AX25_MIN_INFO_LEN .. AX25_MAX_INFO_LEN.
+ *		Should have length in the range of MinInfoLen .. MaxInfoLen.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func AX25GetInfo(this_p *packet_t) []byte {
+func (this_p *Packet) Info() []byte {
 	if this_p.num_addr >= 2 {
 		/* AX.25 */
 		/* The shortest frame we accept is addresses plus a control byte, with */
 		/* no PID and no information part, so the offset can land past the end. */
-		var offset = ax25_get_info_offset(this_p)
+		var offset = this_p.InfoOffset()
 		if offset >= this_p.frame_len {
 			return nil
 		}
@@ -1652,26 +1659,26 @@ func AX25GetInfo(this_p *packet_t) []byte {
 		return this_p.frame_data[offset:this_p.frame_len]
 	} else {
 		/* Not AX.25.  Treat Whole packet as info. */
-		return ax25_get_frame_data(this_p)
+		return this_p.FrameData()
 	}
-} /* end AX25GetInfo */
+} /* end Info */
 
-func ax25_set_info(this_p *packet_t, new_info []byte) {
-	var old_info = AX25GetInfo(this_p)
+func (this_p *Packet) SetInfo(new_info []byte) {
+	var old_info = this_p.Info()
 	this_p.frame_len -= len(old_info)
 
-	if len(new_info) > AX25_MAX_INFO_LEN {
-		new_info = new_info[:AX25_MAX_INFO_LEN]
+	if len(new_info) > MaxInfoLen {
+		new_info = new_info[:MaxInfoLen]
 	}
 
-	copy(this_p.frame_data[ax25_get_info_offset(this_p):], new_info)
+	copy(this_p.frame_data[this_p.InfoOffset():], new_info)
 
 	this_p.frame_len += len(new_info)
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_cut_at_crlf
+ * Name:	CutAtCRLF
  *
  * Purpose:	Truncate the information part at the first CR or LF.
  *		This is used for the RF>IS IGate function.
@@ -1685,12 +1692,12 @@ func ax25_set_info(this_p *packet_t, new_info []byte) {
  * Returns:	Number of characters removed from the end.
  *		0 if not changed.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_cut_at_crlf(this_p *packet_t) int {
-	var info = AX25GetInfo(this_p)
+func (this_p *Packet) CutAtCRLF() int {
+	var info = this_p.Info()
 
 	for j, b := range info {
 		if b == '\r' || b == '\n' {
@@ -1707,21 +1714,21 @@ func ax25_cut_at_crlf(this_p *packet_t) int {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_dti
+ * Name:	DTI
  *
  * Purpose:	Get Data Type Identifier from Information part.
  *
  * Inputs:	None.
  *
- * Assumption:	AX25FromText or AX25FromFrame was called first.
+ * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	First byte from the information part.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_dti(this_p *packet_t) byte {
+func (this_p *Packet) DTI() byte {
 	if this_p.num_addr >= 2 {
-		var info = AX25GetInfo(this_p)
+		var info = this_p.Info()
 		if len(info) > 0 {
 			return info[0]
 		}
@@ -1732,7 +1739,7 @@ func ax25_get_dti(this_p *packet_t) byte {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_set_nextp
+ * Name:	SetNext
  *
  * Purpose:	Set next packet object in queue.
  *
@@ -1744,13 +1751,13 @@ func ax25_get_dti(this_p *packet_t) byte {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_nextp(this_p *packet_t, next_p *packet_t) {
+func (this_p *Packet) SetNext(next_p *Packet) {
 	this_p.nextp = next_p
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_nextp
+ * Name:	Next
  *
  * Purpose:	Obtain next packet object in queue.
  *
@@ -1760,13 +1767,13 @@ func ax25_set_nextp(this_p *packet_t, next_p *packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_nextp(this_p *packet_t) *packet_t {
+func (this_p *Packet) Next() *Packet {
 	return (this_p.nextp)
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_set_release_time
+ * Name:	SetReleaseTime
  *
  * Purpose:	Set release time
  *
@@ -1776,37 +1783,37 @@ func ax25_get_nextp(this_p *packet_t) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_release_time(this_p *packet_t, release_time time.Time) {
+func (this_p *Packet) SetReleaseTime(release_time time.Time) {
 	this_p.release_time = release_time
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_release_time
+ * Name:	ReleaseTime
  *
  * Purpose:	Get release time.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_release_time(this_p *packet_t) time.Time {
+func (this_p *Packet) ReleaseTime() time.Time {
 	return (this_p.release_time)
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_set_modulo
+ * Name:	SetModulo
  *
  * Purpose:	Set modulo value for I and S frame sequence numbers.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_modulo(this_p *packet_t, modulo ax25_modulo_t) {
+func (this_p *Packet) SetModulo(modulo Modulo) {
 	this_p.modulo = modulo
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_modulo
+ * Name:	Modulo
  *
  * Purpose:	Get modulo value for I and S frame sequence numbers.
  *
@@ -1815,13 +1822,13 @@ func ax25_set_modulo(this_p *packet_t, modulo ax25_modulo_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
+func (this_p *Packet) Modulo() Modulo {
 	return (this_p.modulo)
 }
 
 /*------------------------------------------------------------------
  *
- * Function:	AX25FormatAddrs
+ * Function:	FormatAddrs
  *
  * Purpose:	Format all the addresses suitable for printing.
  *
@@ -1849,7 +1856,7 @@ func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
 
 // TODO: max len for result.  buffer overflow?
 
-func AX25FormatAddrs(this_p *packet_t) string {
+func (this_p *Packet) FormatAddrs() string {
 	/* New in 0.9. */
 	/* Don't get upset if no addresses.  */
 	/* This will allow packets that do not comply to AX.25 format. */
@@ -1859,17 +1866,17 @@ func AX25FormatAddrs(this_p *packet_t) string {
 	}
 
 	var result strings.Builder
-	result.WriteString(ax25_get_addr_with_ssid(this_p, AX25_SOURCE))
+	result.WriteString(this_p.AddrWithSSID(Source))
 
 	result.WriteString(">")
 
-	result.WriteString(ax25_get_addr_with_ssid(this_p, AX25_DESTINATION))
+	result.WriteString(this_p.AddrWithSSID(Destination))
 
-	var heard = ax25_get_heard(this_p)
+	var heard = this_p.Heard()
 
-	for i := AX25_REPEATER_1; i < this_p.num_addr; i++ {
+	for i := Repeater1; i < this_p.num_addr; i++ {
 		result.WriteString(",")
-		result.WriteString(ax25_get_addr_with_ssid(this_p, i))
+		result.WriteString(this_p.AddrWithSSID(i))
 
 		if i == heard {
 			result.WriteString("*")
@@ -1880,12 +1887,12 @@ func AX25FormatAddrs(this_p *packet_t) string {
 
 	return result.String()
 
-	// dw_printf ("DEBUG AX25FormatAddrs, num_addr = %d, result = '%s'\n", this_p.num_addr, result);
+	// dw_printf ("DEBUG FormatAddrs, num_addr = %d, result = '%s'\n", this_p.num_addr, result);
 }
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_format_via_path
+ * Function:	FormatViaPath
  *
  * Purpose:	Format via path addresses suitable for printing.
  *
@@ -1908,7 +1915,7 @@ func AX25FormatAddrs(this_p *packet_t) string {
  *
  *------------------------------------------------------------------*/
 
-func ax25_format_via_path(this_p *packet_t) string {
+func (this_p *Packet) FormatViaPath() string {
 	/* Don't get upset if no addresses.  */
 	/* This will allow packets that do not comply to AX.25 format. */
 
@@ -1916,26 +1923,26 @@ func ax25_format_via_path(this_p *packet_t) string {
 		return ""
 	}
 
-	var heard = ax25_get_heard(this_p)
+	var heard = this_p.Heard()
 	var result strings.Builder
 
-	for i := AX25_REPEATER_1; i < this_p.num_addr; i++ {
-		if i > AX25_REPEATER_1 {
+	for i := Repeater1; i < this_p.num_addr; i++ {
+		if i > Repeater1 {
 			result.WriteString(",")
 		}
 
-		result.WriteString(ax25_get_addr_with_ssid(this_p, i))
+		result.WriteString(this_p.AddrWithSSID(i))
 		if i == heard {
 			result.WriteString("*")
 		}
 	}
 
 	return result.String()
-} /* end ax25_format_via_path */
+} /* end FormatViaPath */
 
 /*------------------------------------------------------------------
  *
- * Function:	AX25Pack
+ * Function:	Pack
  *
  * Purpose:	Put all the pieces into format ready for transmission.
  *
@@ -1945,8 +1952,8 @@ func ax25_format_via_path(this_p *packet_t) string {
  *
  *------------------------------------------------------------------*/
 
-func AX25Pack(this_p *packet_t) []byte {
-	dwutil.Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
+func (this_p *Packet) Pack() []byte {
+	dwutil.Assert(this_p.frame_len >= 0 && this_p.frame_len <= MaxPacketLen)
 
 	var result = make([]byte, this_p.frame_len)
 	copy(result, this_p.frame_data[:this_p.frame_len])
@@ -1956,7 +1963,7 @@ func AX25Pack(this_p *packet_t) []byte {
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_frame_type
+ * Function:	FrameType
  *
  * Purpose:	Extract the type of frame.
  *		This is derived from the control byte(s) but
@@ -1980,24 +1987,24 @@ func AX25Pack(this_p *packet_t) []byte {
  *
  *------------------------------------------------------------------*/
 
-func ax25_frame_type_only(this_p *packet_t) ax25_frame_type_t {
-	var _, _, _, _, _, frameType = ax25_frame_type(this_p)
+func (this_p *Packet) FrameTypeOnly() FrameType {
+	var _, _, _, _, _, frameType = this_p.FrameType()
 
 	return frameType
 }
 
-func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int, ns int, frameType ax25_frame_type_t) {
+func (this_p *Packet) FrameType() (cr CmdRes, desc string, pf int, nr int, ns int, frameType FrameType) {
 	desc = "????"
-	cr = cr_11
+	cr = CR11
 	pf = -1
 	nr = -1
 	ns = -1
 
 	// U frames are always one control byte.
-	var c = ax25_get_control(this_p)
+	var c = this_p.Control()
 	if c < 0 {
 		desc = "Not AX.25"
-		frameType = frame_not_AX25
+		frameType = FrameNotAX25
 
 		return
 	}
@@ -2025,42 +2032,42 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 	 * It's in common usage so I should lobby to get that in the official protocol spec.
 	 */
 
-	if this_p.modulo == 0 && (c&3) == 1 && ax25_get_c2(this_p) != -1 {
-		this_p.modulo = modulo_128
-	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.frame_data[ax25_get_info_offset(this_p)] == 0xF0 {
-		this_p.modulo = modulo_128
-	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.frame_data[ax25_get_info_offset(this_p)] == 0x08 { // same for segments
-		this_p.modulo = modulo_128
+	if this_p.modulo == 0 && (c&3) == 1 && this_p.C2() != -1 {
+		this_p.modulo = Modulo128
+	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.frame_data[this_p.InfoOffset()] == 0xF0 {
+		this_p.modulo = Modulo128
+	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.frame_data[this_p.InfoOffset()] == 0x08 { // same for segments
+		this_p.modulo = Modulo128
 	}
 
 	var c2 int // I & S frames can have second Control byte.
-	if this_p.modulo == modulo_128 {
-		c2 = ax25_get_c2(this_p)
+	if this_p.modulo == Modulo128 {
+		c2 = this_p.C2()
 	}
 
-	var dst_c = this_p.frame_data[AX25_DESTINATION*7+6] & SSID_H_MASK
-	var src_c = this_p.frame_data[AX25_SOURCE*7+6] & SSID_H_MASK
+	var dst_c = this_p.frame_data[Destination*7+6] & SSIDHMask
+	var src_c = this_p.frame_data[Source*7+6] & SSIDHMask
 
 	var cr_text string
 	var pf_text string
 
 	if dst_c != 0 {
 		if src_c != 0 {
-			cr = cr_11
+			cr = CR11
 			cr_text = "cc=11"
 			pf_text = "p/f"
 		} else {
-			cr = cr_cmd
+			cr = CRCmd
 			cr_text = "cmd"
 			pf_text = "p"
 		}
 	} else {
 		if src_c != 0 {
-			cr = cr_res
+			cr = CRRes
 			cr_text = "res"
 			pf_text = "f"
 		} else {
-			cr = cr_00
+			cr = CR00
 			cr_text = "cc=00"
 			pf_text = "p/f"
 		}
@@ -2068,7 +2075,7 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 
 	if (c & 1) == 0 {
 		// Information 			rrr p sss 0		or	sssssss 0  rrrrrrr p
-		if this_p.modulo == modulo_128 {
+		if this_p.modulo == Modulo128 {
 			ns = (c >> 1) & 0x7f
 			pf = c2 & 1
 			nr = (c2 >> 1) & 0x7f
@@ -2079,13 +2086,13 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 		}
 
 		//snprintf (desc, DESC_SIZ, "I %s, n(s)=%d, n(r)=%d, %s=%d", cr_text, *ns, nr, pf_text, pf);
-		desc = fmt.Sprintf("I %s, n(s)=%d, n(r)=%d, %s=%d, pid=0x%02x", cr_text, ns, nr, pf_text, pf, ax25_get_pid(this_p))
-		frameType = frame_type_I
+		desc = fmt.Sprintf("I %s, n(s)=%d, n(r)=%d, %s=%d, pid=0x%02x", cr_text, ns, nr, pf_text, pf, this_p.PID())
+		frameType = FrameTypeI
 
 		return
 	} else if (c & 2) == 0 {
 		// Supervisory			rrr p/f ss 0 1		or	0000 ss 0 1  rrrrrrr p/f
-		if this_p.modulo == modulo_128 {
+		if this_p.modulo == Modulo128 {
 			pf = c2 & 1
 			nr = (c2 >> 1) & 0x7f
 		} else {
@@ -2097,22 +2104,22 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 		switch (c >> 2) & 3 {
 		case 0:
 			desc = fmt.Sprintf("RR %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
-			frameType = (frame_type_S_RR)
+			frameType = (FrameTypeSRR)
 
 			return
 		case 1:
 			desc = fmt.Sprintf("RNR %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
-			frameType = (frame_type_S_RNR)
+			frameType = (FrameTypeSRNR)
 
 			return
 		case 2:
 			desc = fmt.Sprintf("REJ %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
-			frameType = (frame_type_S_REJ)
+			frameType = (FrameTypeSREJ)
 
 			return
 		case 3:
 			desc = fmt.Sprintf("SREJ %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
-			frameType = (frame_type_S_SREJ)
+			frameType = (FrameTypeSSREJ)
 
 			return
 		}
@@ -2123,52 +2130,52 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 		switch c & 0xef {
 		case 0x6f:
 			desc = fmt.Sprintf("SABME %s, %s=%d", cr_text, pf_text, pf)
-			frameType = (frame_type_U_SABME)
+			frameType = (FrameTypeUSABME)
 
 			return
 		case 0x2f:
 			desc = fmt.Sprintf("SABM %s, %s=%d", cr_text, pf_text, pf)
-			frameType = (frame_type_U_SABM)
+			frameType = (FrameTypeUSABM)
 
 			return
 		case 0x43:
 			desc = fmt.Sprintf("DISC %s, %s=%d", cr_text, pf_text, pf)
-			frameType = (frame_type_U_DISC)
+			frameType = (FrameTypeUDISC)
 
 			return
 		case 0x0f:
 			desc = fmt.Sprintf("DM %s, %s=%d", cr_text, pf_text, pf)
-			frameType = (frame_type_U_DM)
+			frameType = (FrameTypeUDM)
 
 			return
 		case 0x63:
 			desc = fmt.Sprintf("UA %s, %s=%d", cr_text, pf_text, pf)
-			frameType = (frame_type_U_UA)
+			frameType = (FrameTypeUUA)
 
 			return
 		case 0x87:
 			desc = fmt.Sprintf("FRMR %s, %s=%d", cr_text, pf_text, pf)
-			frameType = (frame_type_U_FRMR)
+			frameType = (FrameTypeUFRMR)
 
 			return
 		case 0x03:
 			desc = fmt.Sprintf("UI %s, %s=%d", cr_text, pf_text, pf)
-			frameType = (frame_type_U_UI)
+			frameType = (FrameTypeUUI)
 
 			return
 		case 0xaf:
 			desc = fmt.Sprintf("XID %s, %s=%d", cr_text, pf_text, pf)
-			frameType = (frame_type_U_XID)
+			frameType = (FrameTypeUXID)
 
 			return
 		case 0xe3:
 			desc = fmt.Sprintf("TEST %s, %s=%d", cr_text, pf_text, pf)
-			frameType = (frame_type_U_TEST)
+			frameType = (FrameTypeUTEST)
 
 			return
 		default:
 			desc = "U other???"
-			frameType = (frame_type_U)
+			frameType = (FrameTypeU)
 
 			return
 		}
@@ -2177,14 +2184,14 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 	// Should be unreachable but compiler doesn't realize that.
 	// Here only to suppress "warning: control reaches end of non-void function"
 
-	frameType = (frame_not_AX25)
+	frameType = (FrameNotAX25)
 
 	return
-} /* end ax25_frame_type */
+} /* end FrameType */
 
 /*------------------------------------------------------------------
  *
- * Function:	AX25HexDump
+ * Function:	HexDump
  *
  * Purpose:	Print out packet in hexadecimal for debugging.
  *
@@ -2197,9 +2204,9 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 /* Text description of control octet. */
 // FIXME:  this is wrong.  It doesn't handle modulo 128.
 
-// TODO: use ax25_frame_type() instead.
+// TODO: use FrameType() instead.
 
-func ctrl_to_text(c int) string {
+func ctrlToText(c int) string {
 	if (c & 1) == 0 {
 		return fmt.Sprintf("I frame: n(r)=%d, p=%d, n(s)=%d", (c>>5)&7, (c>>4)&1, (c>>1)&7)
 	} else if (c & 0xf) == 0x01 {
@@ -2235,7 +2242,7 @@ func ctrl_to_text(c int) string {
 
 /* Text description of protocol id octet. */
 
-func pid_to_text(p int) string {
+func pidToText(p int) string {
 	if (p & 0x30) == 0x10 {
 		return "AX.25 layer 3 implemented."
 	} else if (p & 0x30) == 0x20 {
@@ -2273,18 +2280,18 @@ func pid_to_text(p int) string {
 	}
 }
 
-func AX25HexDump(this_p *packet_t) {
+func (this_p *Packet) HexDump() {
 	var fptr = this_p.frame_data
 
-	if this_p.num_addr >= AX25_MIN_ADDRS && this_p.num_addr <= AX25_MAX_ADDRS {
+	if this_p.num_addr >= MinAddrs && this_p.num_addr <= MaxAddrs {
 		var c = fptr[this_p.num_addr*7]
 		var p = fptr[this_p.num_addr*7+1]
 
-		var cp_text = ctrl_to_text(int(c)) // TODO: use ax25_frame_type() instead.
+		var cp_text = ctrlToText(int(c)) // TODO: use FrameType() instead.
 
 		if (c&0x01) == 0 || /* I   xxxx xxx0 */
 			c == 0x03 || c == 0x13 { /* UI  000x 0011 */
-			var pid_text = pid_to_text(int(p))
+			var pid_text = pidToText(int(p))
 
 			cp_text += ", " + pid_text
 		}
@@ -2307,10 +2314,10 @@ func AX25HexDump(this_p *packet_t) {
 		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[3]>>1)), fptr[3]>>1, '.'),
 		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[4]>>1)), fptr[4]>>1, '.'),
 		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[5]>>1)), fptr[5]>>1, '.'),
-		(fptr[6]&SSID_SSID_MASK)>>SSID_SSID_SHIFT,
-		(fptr[6]&SSID_H_MASK)>>SSID_H_SHIFT,
-		(fptr[6]&SSID_RR_MASK)>>SSID_RR_SHIFT,
-		fptr[6]&SSID_LAST_MASK)
+		(fptr[6]&SSIDSSIDMask)>>SSIDSSIDShift,
+		(fptr[6]&SSIDHMask)>>SSIDHShift,
+		(fptr[6]&SSIDRRMask)>>SSIDRRShift,
+		fptr[6]&SSIDLastMask)
 
 	fmt.Printf(" source  %c%c%c%c%c%c %2d c/r=%d res=%d last=%d\n",
 		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[7]>>1)), fptr[7]>>1, '.'),
@@ -2319,10 +2326,10 @@ func AX25HexDump(this_p *packet_t) {
 		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[10]>>1)), fptr[10]>>1, '.'),
 		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[11]>>1)), fptr[11]>>1, '.'),
 		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[12]>>1)), fptr[12]>>1, '.'),
-		(fptr[13]&SSID_SSID_MASK)>>SSID_SSID_SHIFT,
-		(fptr[13]&SSID_H_MASK)>>SSID_H_SHIFT,
-		(fptr[13]&SSID_RR_MASK)>>SSID_RR_SHIFT,
-		fptr[13]&SSID_LAST_MASK)
+		(fptr[13]&SSIDSSIDMask)>>SSIDSSIDShift,
+		(fptr[13]&SSIDHMask)>>SSIDHShift,
+		(fptr[13]&SSIDRRMask)>>SSIDRRShift,
+		fptr[13]&SSIDLastMask)
 
 	for n := 2; n < this_p.num_addr; n++ {
 		fmt.Printf(" digi %d  %c%c%c%c%c%c %2d   h=%d res=%d last=%d\n",
@@ -2333,18 +2340,18 @@ func AX25HexDump(this_p *packet_t) {
 			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+3]>>1)), fptr[n*7+3]>>1, '.'),
 			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+4]>>1)), fptr[n*7+4]>>1, '.'),
 			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+5]>>1)), fptr[n*7+5]>>1, '.'),
-			(fptr[n*7+6]&SSID_SSID_MASK)>>SSID_SSID_SHIFT,
-			(fptr[n*7+6]&SSID_H_MASK)>>SSID_H_SHIFT,
-			(fptr[n*7+6]&SSID_RR_MASK)>>SSID_RR_SHIFT,
-			fptr[n*7+6]&SSID_LAST_MASK)
+			(fptr[n*7+6]&SSIDSSIDMask)>>SSIDSSIDShift,
+			(fptr[n*7+6]&SSIDHMask)>>SSIDHShift,
+			(fptr[n*7+6]&SSIDRRMask)>>SSIDRRShift,
+			fptr[n*7+6]&SSIDLastMask)
 	}
 
 	dwutil.HexDump(fptr[:this_p.frame_len])
-} /* end AX25HexDump */
+} /* end HexDump */
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_is_aprs
+ * Function:	IsAPRS
  *
  * Purpose:	Is this packet APRS format?
  *
@@ -2363,22 +2370,22 @@ func AX25HexDump(this_p *packet_t) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_is_aprs(this_p *packet_t) bool {
+func (this_p *Packet) IsAPRS() bool {
 	if this_p.frame_len == 0 {
 		return false
 	}
 
-	var ctrl = ax25_get_control(this_p)
-	var pid = ax25_get_pid(this_p)
+	var ctrl = this_p.Control()
+	var pid = this_p.PID()
 
-	var is_aprs = this_p.num_addr >= 2 && ctrl == AX25_UI_FRAME && pid == AX25_PID_NO_LAYER_3
+	var is_aprs = this_p.num_addr >= 2 && ctrl == UIFrame && pid == PIDNoLayer3
 
 	return is_aprs
 }
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_is_null_frame
+ * Function:	IsNullFrame
  *
  * Purpose:	Is this packet structure empty?
  *
@@ -2392,7 +2399,7 @@ func ax25_is_aprs(this_p *packet_t) bool {
  *
  *------------------------------------------------------------------*/
 
-func ax25_is_null_frame(this_p *packet_t) bool {
+func (this_p *Packet) IsNullFrame() bool {
 	var is_null = this_p.frame_len == 0
 
 	return is_null
@@ -2400,37 +2407,37 @@ func ax25_is_null_frame(this_p *packet_t) bool {
 
 /*------------------------------------------------------------------
 *
-* Function:	ax25_get_control
-		ax25_get_c2
+* Function:	Control
+		C2
 *
 * Purpose:	Get Control field from packet.
 *
 * Inputs:	this_p	- pointer to packet object.
 *
-* Returns:	APRS uses AX25_UI_FRAME.
+* Returns:	APRS uses UIFrame.
 *		This could also be used in other situations.
 *
 *------------------------------------------------------------------*/
 
-func ax25_get_control(this_p *packet_t) int {
+func (this_p *Packet) Control() int {
 	if this_p.frame_len == 0 {
 		return -1
 	}
 
 	if this_p.num_addr >= 2 {
-		return int(this_p.frame_data[ax25_get_control_offset(this_p)])
+		return int(this_p.frame_data[this_p.ControlOffset()])
 	}
 
 	return (-1)
 }
 
-func ax25_get_c2(this_p *packet_t) int {
+func (this_p *Packet) C2() int {
 	if this_p.frame_len == 0 {
 		return (-1)
 	}
 
 	if this_p.num_addr >= 2 {
-		var offset2 = ax25_get_control_offset(this_p) + 1
+		var offset2 = this_p.ControlOffset() + 1
 
 		if offset2 < this_p.frame_len {
 			return int(this_p.frame_data[offset2])
@@ -2444,7 +2451,7 @@ func ax25_get_c2(this_p *packet_t) int {
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_set_pid
+ * Function:	SetPID
  *
  * Purpose:	Set protocol ID in packet.
  *
@@ -2458,12 +2465,12 @@ func ax25_get_c2(this_p *packet_t) int {
  *
  *------------------------------------------------------------------*/
 
-func ax25_set_pid(this_p *packet_t, pid byte) {
+func (this_p *Packet) SetPID(pid byte) {
 	// Some applications set this to 0 which is an error.
 	// Change 0 to 0xF0 meaning no layer 3 protocol.
 
 	if pid == 0 {
-		pid = AX25_PID_NO_LAYER_3
+		pid = PIDNoLayer3
 	}
 
 	// Sanity check: is it I or UI frame?
@@ -2472,23 +2479,23 @@ func ax25_set_pid(this_p *packet_t, pid byte) {
 		return
 	}
 
-	var frame_type = ax25_frame_type_only(this_p)
+	var frame_type = this_p.FrameTypeOnly()
 
-	if frame_type != frame_type_I && frame_type != frame_type_U_UI {
-		logrus.WithField("pid", fmt.Sprintf("0x%02x", pid)).Error("ax25_set_pid: packet type is not I or UI")
+	if frame_type != FrameTypeI && frame_type != FrameTypeUUI {
+		logrus.WithField("pid", fmt.Sprintf("0x%02x", pid)).Error("SetPID: packet type is not I or UI")
 
 		return
 	}
 
 	// TODO: handle 2 control byte case.
 	if this_p.num_addr >= 2 {
-		this_p.frame_data[ax25_get_pid_offset(this_p)] = pid
+		this_p.frame_data[this_p.PIDOffset()] = pid
 	}
 }
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_get_pid
+ * Function:	PID
  *
  * Purpose:	Get protocol ID from packet.
  *
@@ -2503,7 +2510,7 @@ func ax25_set_pid(this_p *packet_t, pid byte) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_get_pid(this_p *packet_t) int {
+func (this_p *Packet) PID() int {
 	// TODO: handle 2 control byte case.
 	// TODO: sanity check: is it I or UI frame?
 
@@ -2512,7 +2519,7 @@ func ax25_get_pid(this_p *packet_t) int {
 	}
 
 	if this_p.num_addr >= 2 {
-		return int(this_p.frame_data[ax25_get_pid_offset(this_p)])
+		return int(this_p.frame_data[this_p.PIDOffset()])
 	}
 
 	return (-1)
@@ -2520,7 +2527,7 @@ func ax25_get_pid(this_p *packet_t) int {
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_get_frame_len
+ * Function:	FrameLen
  *
  * Purpose:	Get length of frame.
  *
@@ -2531,19 +2538,19 @@ func ax25_get_pid(this_p *packet_t) int {
  *
  *------------------------------------------------------------------*/
 
-func ax25_get_frame_len(this_p *packet_t) int {
-	dwutil.Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
+func (this_p *Packet) FrameLen() int {
+	dwutil.Assert(this_p.frame_len >= 0 && this_p.frame_len <= MaxPacketLen)
 
 	return (this_p.frame_len)
-} /* end ax25_get_frame_len */
+} /* end FrameLen */
 
-func ax25_get_frame_data(this_p *packet_t) []byte {
+func (this_p *Packet) FrameData() []byte {
 	return this_p.frame_data[:this_p.frame_len]
 } /* end ax25_get_frame_data_ptr */
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_dedupe_crc
+ * Name:	DedupeCRC
  *
  * Purpose:	Calculate a checksum for the packet source, destination, and
  *		information but NOT the digipeaters.
@@ -2590,12 +2597,12 @@ func ax25_get_frame_data(this_p *packet_t) []byte {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_dedupe_crc(pp *packet_t) uint16 {
-	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+func (this_p *Packet) DedupeCRC() uint16 {
+	var src = this_p.AddrWithSSID(Source)
 
-	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+	var dest = this_p.AddrWithSSID(Destination)
 
-	var info = AX25GetInfo(pp)
+	var info = this_p.Info()
 
 	for len(info) >= 1 && (info[len(info)-1] == '\r' ||
 		info[len(info)-1] == '\n' ||
@@ -2604,7 +2611,7 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 
 		//  if (pinfo[info_len-1] == ' ') {
 		//    text_color_set(DW_COLOR_ERROR);
-		//    dw_printf ("DEBUG:  ax25_dedupe_crc ignoring trailing space.\n");
+		//    dw_printf ("DEBUG:  DedupeCRC ignoring trailing space.\n");
 		//  }
 		info = info[:len(info)-1]
 	}
@@ -2619,7 +2626,7 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_m_m_crc
+ * Name:	MultiModemCRC
  *
  * Purpose:	Calculate a checksum for the packet.
  *		This is used for the multimodem duplicate detection.
@@ -2639,9 +2646,9 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 
  *------------------------------------------------------------------------------*/
 
-func ax25_m_m_crc(pp *packet_t) uint16 {
+func (this_p *Packet) MultiModemCRC() uint16 {
 	// TODO: I think this can be more efficient by getting the packet content pointer instead of copying.
-	var fbuf = AX25Pack(pp)
+	var fbuf = this_p.Pack()
 
 	var crc uint16 = 0xffff
 	crc = fcs.CRC16(fbuf, crc)
@@ -2651,7 +2658,7 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
 
 /*------------------------------------------------------------------
  *
- * Function:	AX25SafePrint
+ * Function:	SafePrint
  *
  * Purpose:	Print given string, changing non printable characters to
  *		hexadecimal notation.   Note that character values
@@ -2672,7 +2679,7 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
  *		For example, a Line Feed character will appear as <0x0a>
  *		rather than dropping down to the next line on the screen.
  *
- *		AX25FromText can accept this format.
+ *		FromText can accept this format.
  *
  *
  * Example:	W1MED-1>T2QP0S,N1OHZ,N8VIM*,WIDE1-1:'cQBl <0x1c>-/]<0x0d>
@@ -2690,11 +2697,11 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
  *
  *------------------------------------------------------------------*/
 
-const MAXSAFE = AX25_MAX_INFO_LEN
+const MaxSafe = MaxInfoLen
 
-func AX25SafePrint(info []byte, ascii_only bool) {
-	if len(info) > MAXSAFE {
-		info = info[:MAXSAFE]
+func SafePrint(info []byte, ascii_only bool) {
+	if len(info) > MaxSafe {
+		info = info[:MaxSafe]
 	}
 
 	var safe_str strings.Builder
@@ -2720,31 +2727,31 @@ func AX25SafePrint(info []byte, ascii_only bool) {
 	// TODO1.2: should return string rather printing to remove a race condition.
 
 	fmt.Print(safe_str.String())
-} /* end AX25SafePrint */
+} /* end SafePrint */
 
 /*------------------------------------------------------------------
  *
  * Function:	NoteSafePrintTruncation
  *
- * Purpose:	Say that AX25SafePrint showed only part of what it was given.
+ * Purpose:	Say that SafePrint showed only part of what it was given.
  *
- * Inputs:	length	- Number of bytes handed to AX25SafePrint.
+ * Inputs:	length	- Number of bytes handed to SafePrint.
  *
- * Description:	AX25SafePrint stops after MAXSAFE bytes without mentioning it,
+ * Description:	SafePrint stops after MaxSafe bytes without mentioning it,
  *		which is fine for monitoring but not for anything inspecting a
  *		capture: the reader would take the part for the whole.
  *
  *------------------------------------------------------------------*/
 
 func NoteSafePrintTruncation(length int) {
-	if length > MAXSAFE {
-		fmt.Printf("(Only the first %d of %d bytes are shown above.)\n", MAXSAFE, length)
+	if length > MaxSafe {
+		fmt.Printf("(Only the first %d of %d bytes are shown above.)\n", MaxSafe, length)
 	}
 }
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_alevel_to_text
+ * Function:	Text
  *
  * Purpose:	Convert audio level to text representation.
  *
@@ -2759,7 +2766,7 @@ func NoteSafePrintTruncation(length int) {
  *			  Comma is to be avoided because one place this
  *			  ends up is in a CSV format file.
  *
- *			  size should be AX25_ALEVEL_TO_TEXT_SIZE.
+ *			  size should be ALevelToTextSize.
  *
  * Description:	Audio level used to be simple; it was a single number.
  *		In version 1.2, we start collecting more details.
@@ -2772,8 +2779,8 @@ func NoteSafePrintTruncation(length int) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_alevel_to_text(alevel ALevel) string {
-	if alevel.rec < 0 {
+func (alevel ALevel) Text() string {
+	if alevel.Rec < 0 {
 		return ""
 	}
 
@@ -2782,19 +2789,19 @@ func ax25_alevel_to_text(alevel ALevel) string {
 
 	// For DTMF omit the two extra numbers.
 
-	if alevel.mark >= 0 && alevel.space < 0 { /* baseband */
-		return fmt.Sprintf("%d(%+d/%+d)", alevel.rec, alevel.mark, alevel.space)
-	} else if (alevel.mark == -1 && alevel.space == -1) || /* PSK */
-		(alevel.mark == -99 && alevel.space == -99) { /* v. 1.7 "B" FM demodulator. */
+	if alevel.Mark >= 0 && alevel.Space < 0 { /* baseband */
+		return fmt.Sprintf("%d(%+d/%+d)", alevel.Rec, alevel.Mark, alevel.Space)
+	} else if (alevel.Mark == -1 && alevel.Space == -1) || /* PSK */
+		(alevel.Mark == -99 && alevel.Space == -99) { /* v. 1.7 "B" FM demodulator. */
 		// ?? Where does -99 come from?
-		return strconv.Itoa(alevel.rec)
-	} else if alevel.mark == -2 && alevel.space == -2 { /* DTMF - single number. */
-		return strconv.Itoa(alevel.rec)
+		return strconv.Itoa(alevel.Rec)
+	} else if alevel.Mark == -2 && alevel.Space == -2 { /* DTMF - single number. */
+		return strconv.Itoa(alevel.Rec)
 	} else { /* AFSK */
-		//snprintf (text, AX25_ALEVEL_TO_TEXT_SIZE, "%d:%d(%d/%d=%05.3f=)", alevel.original, alevel.rec, alevel.mark, alevel.space, alevel.ms_ratio);
-		return fmt.Sprintf("%d(%d/%d)", alevel.rec, alevel.mark, alevel.space)
+		//snprintf (text, ALevelToTextSize, "%d:%d(%d/%d=%05.3f=)", alevel.original, alevel.Rec, alevel.Mark, alevel.Space, alevel.ms_ratio);
+		return fmt.Sprintf("%d(%d/%d)", alevel.Rec, alevel.Mark, alevel.Space)
 	}
-} /* end ax25_alevel_to_text */
+} /* end Text */
 
 /*
  * APRS always has one control octet of 0x03 but the more
@@ -2804,17 +2811,17 @@ func ax25_alevel_to_text(alevel ALevel) string {
 
 //#define DEBUGX 1
 
-func ax25_get_control_offset(this_p *packet_t) int {
+func (this_p *Packet) ControlOffset() int {
 	return (this_p.num_addr * 7)
 }
 
-func ax25_get_num_control(this_p *packet_t) int {
-	var c = this_p.frame_data[ax25_get_control_offset(this_p)]
+func (this_p *Packet) NumControl() int {
+	var c = this_p.frame_data[this_p.ControlOffset()]
 
 	if (c & 0x01) == 0 { /* I   xxxx xxx0 */
 		/*
 			#if DEBUGX
-				  dw_printf ("ax25_get_num_control, %02x is I frame, returns %d\n", c, (this_p.modulo == 128) ? 2 : 1);
+				  dw_printf ("NumControl, %02x is I frame, returns %d\n", c, (this_p.modulo == 128) ? 2 : 1);
 			#endif
 		*/
 		if this_p.modulo == 128 {
@@ -2827,7 +2834,7 @@ func ax25_get_num_control(this_p *packet_t) int {
 	if (c & 0x03) == 1 { /* S   xxxx xx01 */
 		/*
 			#if DEBUGX
-				  dw_printf ("ax25_get_num_control, %02x is S frame, returns %d\n", c, (this_p.modulo == 128) ? 2 : 1);
+				  dw_printf ("NumControl, %02x is S frame, returns %d\n", c, (this_p.modulo == 128) ? 2 : 1);
 			#endif
 		*/
 		if this_p.modulo == 128 {
@@ -2839,7 +2846,7 @@ func ax25_get_num_control(this_p *packet_t) int {
 
 	/*
 		#if DEBUGX
-			dw_printf ("ax25_get_num_control, %02x is U frame, always returns 1.\n", c);
+			dw_printf ("NumControl, %02x is U frame, always returns 1.\n", c);
 		#endif
 	*/
 
@@ -2851,24 +2858,24 @@ func ax25_get_num_control(this_p *packet_t) int {
  * protocol but the more general case is 0, 1 or 2 protocol ID octets.
  */
 
-func ax25_get_pid_offset(this_p *packet_t) int {
-	return (ax25_get_control_offset(this_p) + ax25_get_num_control(this_p))
+func (this_p *Packet) PIDOffset() int {
+	return (this_p.ControlOffset() + this_p.NumControl())
 }
 
-func ax25_get_num_pid(this_p *packet_t) int {
-	var c = this_p.frame_data[ax25_get_control_offset(this_p)]
+func (this_p *Packet) NumPID() int {
+	var c = this_p.frame_data[this_p.ControlOffset()]
 
 	var pid int
 
 	if (c&0x01) == 0 || /* I   xxxx xxx0 */
 		c == 0x03 || c == 0x13 { /* UI  000x 0011 */
-		pid = int(this_p.frame_data[ax25_get_pid_offset(this_p)])
+		pid = int(this_p.frame_data[this_p.PIDOffset()])
 		/*
 			#if DEBUGX
-				  dw_printf ("ax25_get_num_pid, %02x is I or UI frame, pid = %02x, returns %d\n", c, pid, (pid==AX25_PID_ESCAPE_CHARACTER) ? 2 : 1);
+				  dw_printf ("NumPID, %02x is I or UI frame, pid = %02x, returns %d\n", c, pid, (pid==PIDEscapeCharacter) ? 2 : 1);
 			#endif
 		*/
-		if pid == AX25_PID_ESCAPE_CHARACTER {
+		if pid == PIDEscapeCharacter {
 			return (2) /* pid 1111 1111 means another follows. */
 		}
 
@@ -2877,7 +2884,7 @@ func ax25_get_num_pid(this_p *packet_t) int {
 
 	/*
 		#if DEBUGX
-			dw_printf ("ax25_get_num_pid, %02x is neither I nor UI frame, returns 0\n", c);
+			dw_printf ("NumPID, %02x is neither I nor UI frame, returns 0\n", c);
 		#endif
 	*/
 
@@ -2896,19 +2903,19 @@ func ax25_get_num_pid(this_p *packet_t) int {
  * APRS always has an Information field with at least one octet for the Data Type Indicator.
  */
 
-func ax25_get_info_offset(this_p *packet_t) int {
-	var offset = ax25_get_control_offset(this_p) + ax25_get_num_control(this_p) + ax25_get_num_pid(this_p)
+func (this_p *Packet) InfoOffset() int {
+	var offset = this_p.ControlOffset() + this_p.NumControl() + this_p.NumPID()
 	/*
 		#if DEBUGX
-			dw_printf ("ax25_get_info_offset, returns %d\n", offset);
+			dw_printf ("InfoOffset, returns %d\n", offset);
 		#endif
 	*/
 	return (offset)
 }
 
-func ax25_get_num_info(this_p *packet_t) int {
+func (this_p *Packet) NumInfo() int {
 	/* assuming AX.25 frame. */
-	var length = this_p.frame_len - this_p.num_addr*7 - ax25_get_num_control(this_p) - ax25_get_num_pid(this_p)
+	var length = this_p.frame_len - this_p.num_addr*7 - this_p.NumControl() - this_p.NumPID()
 	if length < 0 {
 		length = 0 /* print error? */
 	}

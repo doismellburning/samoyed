@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package ax25
 
 /*------------------------------------------------------------------
  *
@@ -106,9 +109,9 @@ package direwolf
  *
  *
  * Constructors:
- *		ax25_u_frame		- Construct a U frame.
- *		ax25_s_frame		- Construct a S frame.
- *		ax25_i_frame		- Construct a I frame.
+ *		UFrame		- Construct a U frame.
+ *		SFrame		- Construct a S frame.
+ *		IFrame		- Construct a I frame.
  *
  * Get methods:	....			???
  *
@@ -124,7 +127,7 @@ import (
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_u_frame
+ * Name:	UFrame
  *
  * Purpose:	Construct a U frame.
  *
@@ -132,18 +135,18 @@ import (
  *
  *		num_addr	- Number of addresses, range 2 .. 10.
  *
- *		cr		- cr_cmd command frame, cr_res for a response frame.
+ *		cr		- CRCmd command frame, CRRes for a response frame.
  *
  *		ftype		- One of:
- *				        frame_type_U_SABME     // Set Async Balanced Mode, Extended
- *				        frame_type_U_SABM      // Set Async Balanced Mode
- *				        frame_type_U_DISC      // Disconnect
- *				        frame_type_U_DM        // Disconnect Mode
- *				        frame_type_U_UA        // Unnumbered Acknowledge
- *				        frame_type_U_FRMR      // Frame Reject
- *				        frame_type_U_UI        // Unnumbered Information
- *				        frame_type_U_XID       // Exchange Identification
- *				        frame_type_U_TEST      // Test
+ *				        FrameTypeUSABME     // Set Async Balanced Mode, Extended
+ *				        FrameTypeUSABM      // Set Async Balanced Mode
+ *				        FrameTypeUDISC      // Disconnect
+ *				        FrameTypeUDM        // Disconnect Mode
+ *				        FrameTypeUUA        // Unnumbered Acknowledge
+ *				        FrameTypeUFRMR      // Frame Reject
+ *				        FrameTypeUUI        // Unnumbered Information
+ *				        FrameTypeUXID       // Exchange Identification
+ *				        FrameTypeUTEST      // Test
  *
  *		pf		- Poll/Final flag.
  *
@@ -158,8 +161,8 @@ import (
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype ax25_frame_type_t, pf int, pid int, info []byte) *packet_t {
-	var this_p = ax25_new()
+func UFrame(addrs [MaxAddrs]string, num_addr int, cr CmdRes, ftype FrameType, pf int, pid int, info []byte) *Packet {
+	var this_p = New()
 
 	if this_p == nil {
 		return (nil)
@@ -167,51 +170,51 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 
 	this_p.modulo = 0
 
-	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
-		logrus.Error("Internal error: ax25_u_frame: could not set addresses")
+	if this_p.setAddrs(addrs, num_addr, cr) == 0 {
+		logrus.Error("Internal error: UFrame: could not set addresses")
 
 		return (nil)
 	}
 
 	var ctrl int
-	var t cmdres_t // 1 = must be cmd, 0 = must be response, 2 = can be either.
-	var i = false  // Is Info part allowed?
+	var t CmdRes  // 1 = must be cmd, 0 = must be response, 2 = can be either.
+	var i = false // Is Info part allowed?
 
 	switch ftype {
 	// 1 = cmd only, 0 = res only, 2 = either
-	case frame_type_U_SABME:
+	case FrameTypeUSABME:
 		ctrl = 0x6f
 		t = 1
-	case frame_type_U_SABM:
+	case FrameTypeUSABM:
 		ctrl = 0x2f
 		t = 1
-	case frame_type_U_DISC:
+	case FrameTypeUDISC:
 		ctrl = 0x43
 		t = 1
-	case frame_type_U_DM:
+	case FrameTypeUDM:
 		ctrl = 0x0f
 		t = 0
-	case frame_type_U_UA:
+	case FrameTypeUUA:
 		ctrl = 0x63
 		t = 0
-	case frame_type_U_FRMR:
+	case FrameTypeUFRMR:
 		ctrl = 0x87
 		t = 0
 		i = true
-	case frame_type_U_UI:
+	case FrameTypeUUI:
 		ctrl = 0x03
 		t = 2
 		i = true
-	case frame_type_U_XID:
+	case FrameTypeUXID:
 		ctrl = 0xaf
 		t = 2
 		i = true
-	case frame_type_U_TEST:
+	case FrameTypeUTEST:
 		ctrl = 0xe3
 		t = 2
 		i = true
 	default:
-		logrus.WithField("ftype", ftype).Error("Internal error: ax25_u_frame: invalid frame type for U frame")
+		logrus.WithField("ftype", ftype).Error("Internal error: UFrame: invalid frame type for U frame")
 
 		return (nil)
 	}
@@ -226,19 +229,19 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 				"cr":          cr,
 				"expected_cr": t,
 				"ftype":       ftype,
-			}).Error("Internal error: ax25_u_frame: wrong command/response for U frame")
+			}).Error("Internal error: UFrame: wrong command/response for U frame")
 		}
 	}
 
 	this_p.frame_data[this_p.frame_len] = byte(ctrl)
 	this_p.frame_len++
 
-	if ftype == frame_type_U_UI {
+	if ftype == FrameTypeUUI {
 		// Definitely don't want pid value of 0 (not in valid list)
 		// or 0xff (which means more bytes follow).
 		if pid < 0 || pid == 0 || pid == 0xff {
-			logrus.WithField("pid", fmt.Sprintf("0x%02x", pid)).Error("Internal error: ax25_u_frame: invalid PID for U frame")
-			pid = AX25_PID_NO_LAYER_3
+			logrus.WithField("pid", fmt.Sprintf("0x%02x", pid)).Error("Internal error: UFrame: invalid PID for U frame")
+			pid = PIDNoLayer3
 		}
 
 		this_p.frame_data[this_p.frame_len] = byte(pid)
@@ -247,9 +250,9 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 
 	if i {
 		if len(info) > 0 {
-			if len(info) > AX25_MAX_INFO_LEN {
-				logrus.WithField("length", len(info)).Error("Internal error: ax25_u_frame: invalid information field length for U frame")
-				info = info[:AX25_MAX_INFO_LEN]
+			if len(info) > MaxInfoLen {
+				logrus.WithField("length", len(info)).Error("Internal error: UFrame: invalid information field length for U frame")
+				info = info[:MaxInfoLen]
 			}
 
 			copy(this_p.frame_data[this_p.frame_len:], info)
@@ -257,16 +260,16 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 		}
 	} else {
 		if len(info) > 0 {
-			logrus.Error("Internal error: ax25_u_frame: info part not allowed for this U frame type")
+			logrus.Error("Internal error: UFrame: info part not allowed for this U frame type")
 		}
 	}
 
 	return (this_p)
-} /* end ax25_u_frame */
+} /* end UFrame */
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_s_frame
+ * Name:	SFrame
  *
  * Purpose:	Construct an S frame.
  *
@@ -274,13 +277,13 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
  *
  *		num_addr	- Number of addresses, range 2 .. 10.
  *
- *		cr		- cr_cmd command frame, cr_res for a response frame.
+ *		cr		- CRCmd command frame, CRRes for a response frame.
  *
  *		ftype		- One of:
- *				        frame_type_S_RR,        // Receive Ready - System Ready To Receive
- *				        frame_type_S_RNR,       // Receive Not Ready - TNC Buffer Full
- *				        frame_type_S_REJ,       // Reject Frame - Out of Sequence or Duplicate
- *				        frame_type_S_SREJ,      // Selective Reject - Request single frame repeat
+ *				        FrameTypeSRR,        // Receive Ready - System Ready To Receive
+ *				        FrameTypeSRNR,       // Receive Not Ready - TNC Buffer Full
+ *				        FrameTypeSREJ,       // Reject Frame - Out of Sequence or Duplicate
+ *				        FrameTypeSSREJ,      // Selective Reject - Request single frame repeat
  *
  *		modulo		- 8 or 128.  Determines if we have 1 or 2 control bytes.
  *
@@ -295,60 +298,60 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_s_frame(
-	addrs [AX25_MAX_ADDRS]string,
+func SFrame(
+	addrs [MaxAddrs]string,
 	num_addr int,
-	cr cmdres_t,
-	ftype ax25_frame_type_t,
-	modulo ax25_modulo_t,
+	cr CmdRes,
+	ftype FrameType,
+	modulo Modulo,
 	nr int,
 	pf int,
 	info []byte,
-) *packet_t {
-	var this_p = ax25_new()
+) *Packet {
+	var this_p = New()
 
 	if this_p == nil {
 		return (nil)
 	}
 
-	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
-		logrus.Error("Internal error: ax25_s_frame: could not set addresses")
+	if this_p.setAddrs(addrs, num_addr, cr) == 0 {
+		logrus.Error("Internal error: SFrame: could not set addresses")
 
 		return (nil)
 	}
 
 	if modulo != 8 && modulo != 128 {
-		logrus.WithField("modulo", modulo).Error("Internal error: ax25_s_frame: invalid modulo for S frame")
+		logrus.WithField("modulo", modulo).Error("Internal error: SFrame: invalid modulo for S frame")
 		modulo = 8
 	}
 
 	this_p.modulo = modulo
 
 	if nr < 0 || nr >= int(modulo) {
-		logrus.WithField("nr", nr).Error("Internal error: ax25_s_frame: invalid N(R) for S frame")
+		logrus.WithField("nr", nr).Error("Internal error: SFrame: invalid N(R) for S frame")
 		nr &= int(modulo - 1)
 	}
 
 	// Erratum: The AX.25 spec is not clear about whether SREJ should be command, response, or both.
 	// The underlying X.25 spec clearly says it is response only.  Let's go with that.
 
-	if ftype == frame_type_S_SREJ && cr != cr_res {
-		logrus.Error("Internal error: ax25_s_frame: SREJ must be response")
+	if ftype == FrameTypeSSREJ && cr != CRRes {
+		logrus.Error("Internal error: SFrame: SREJ must be response")
 	}
 
 	var ctrl int
 
 	switch ftype {
-	case frame_type_S_RR:
+	case FrameTypeSRR:
 		ctrl = 0x01
-	case frame_type_S_RNR:
+	case FrameTypeSRNR:
 		ctrl = 0x05
-	case frame_type_S_REJ:
+	case FrameTypeSREJ:
 		ctrl = 0x09
-	case frame_type_S_SREJ:
+	case FrameTypeSSREJ:
 		ctrl = 0x0d
 	default:
-		logrus.WithField("ftype", ftype).Error("Internal error: ax25_s_frame: invalid frame type for S frame")
+		logrus.WithField("ftype", ftype).Error("Internal error: SFrame: invalid frame type for S frame")
 
 		return (nil)
 	}
@@ -371,11 +374,11 @@ func ax25_s_frame(
 		this_p.frame_len++
 	}
 
-	if ftype == frame_type_S_SREJ {
+	if ftype == FrameTypeSSREJ {
 		if len(info) > 0 {
-			if len(info) > AX25_MAX_INFO_LEN {
-				logrus.WithField("length", len(info)).Error("Internal error: ax25_s_frame: invalid information field length for SREJ frame")
-				info = info[:AX25_MAX_INFO_LEN]
+			if len(info) > MaxInfoLen {
+				logrus.WithField("length", len(info)).Error("Internal error: SFrame: invalid information field length for SREJ frame")
+				info = info[:MaxInfoLen]
 			}
 
 			copy(this_p.frame_data[this_p.frame_len:], info)
@@ -383,16 +386,16 @@ func ax25_s_frame(
 		}
 	} else {
 		if len(info) > 0 {
-			logrus.Error("Internal error: ax25_s_frame: info part not allowed for RR, RNR, REJ frame")
+			logrus.Error("Internal error: SFrame: info part not allowed for RR, RNR, REJ frame")
 		}
 	}
 
 	return (this_p)
-} /* end ax25_s_frame */
+} /* end SFrame */
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_i_frame
+ * Name:	IFrame
  *
  * Purpose:	Construct an I frame.
  *
@@ -400,7 +403,7 @@ func ax25_s_frame(
  *
  *		num_addr	- Number of addresses, range 2 .. 10.
  *
- *		cr		- cr_cmd command frame, cr_res for a response frame.
+ *		cr		- CRCmd command frame, CRRes for a response frame.
  *
  *		modulo		- 8 or 128.
  *
@@ -421,43 +424,43 @@ func ax25_s_frame(
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_i_frame(
-	addrs [AX25_MAX_ADDRS]string,
+func IFrame(
+	addrs [MaxAddrs]string,
 	num_addr int,
-	cr cmdres_t,
-	modulo ax25_modulo_t,
+	cr CmdRes,
+	modulo Modulo,
 	nr int,
 	ns int,
 	pf int,
 	pid int,
 	info []byte,
-) *packet_t {
-	var this_p = ax25_new()
+) *Packet {
+	var this_p = New()
 
 	if this_p == nil {
 		return (nil)
 	}
 
-	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
-		logrus.Error("Internal error: ax25_i_frame: could not set addresses")
+	if this_p.setAddrs(addrs, num_addr, cr) == 0 {
+		logrus.Error("Internal error: IFrame: could not set addresses")
 
 		return (nil)
 	}
 
 	if modulo != 8 && modulo != 128 {
-		logrus.WithField("modulo", modulo).Error("Internal error: ax25_i_frame: invalid modulo for I frame")
+		logrus.WithField("modulo", modulo).Error("Internal error: IFrame: invalid modulo for I frame")
 		modulo = 8
 	}
 
 	this_p.modulo = modulo
 
 	if nr < 0 || nr >= int(modulo) {
-		logrus.WithField("nr", nr).Error("Internal error: ax25_i_frame: invalid N(R) for I frame")
+		logrus.WithField("nr", nr).Error("Internal error: IFrame: invalid N(R) for I frame")
 		nr &= int(modulo - 1)
 	}
 
 	if ns < 0 || ns >= int(modulo) {
-		logrus.WithField("ns", ns).Error("Internal error: ax25_i_frame: invalid N(S) for I frame")
+		logrus.WithField("ns", ns).Error("Internal error: IFrame: invalid N(S) for I frame")
 		ns &= int(modulo - 1)
 	}
 
@@ -489,16 +492,16 @@ func ax25_i_frame(
 
 	if pid < 0 || pid == 0 || pid == 0xff {
 		logrus.WithField("pid", fmt.Sprintf("0x%02x", pid)).Warn("Client application provided invalid PID for I frame")
-		pid = AX25_PID_NO_LAYER_3
+		pid = PIDNoLayer3
 	}
 
 	this_p.frame_data[this_p.frame_len] = byte(pid)
 	this_p.frame_len++
 
 	if len(info) > 0 {
-		if len(info) > AX25_MAX_INFO_LEN {
-			logrus.WithField("length", len(info)).Error("Internal error: ax25_i_frame: invalid information field length for I frame")
-			info = info[:AX25_MAX_INFO_LEN]
+		if len(info) > MaxInfoLen {
+			logrus.WithField("length", len(info)).Error("Internal error: IFrame: invalid information field length for I frame")
+			info = info[:MaxInfoLen]
 		}
 
 		copy(this_p.frame_data[this_p.frame_len:], info)
@@ -506,11 +509,11 @@ func ax25_i_frame(
 	}
 
 	return (this_p)
-} /* end ax25_i_frame */
+} /* end IFrame */
 
 /*------------------------------------------------------------------------------
  *
- * Name:	set_addrs
+ * Name:	setAddrs
  *
  * Purpose:	Set address fields
  *
@@ -520,7 +523,7 @@ func ax25_i_frame(
  *
  *		num_addr	- Number of addresses, range 2 .. 10.
  *
- *		cr		- cr_cmd command frame, cr_res for a response frame.
+ *		cr		- CRCmd command frame, CRRes for a response frame.
  *
  * Output:	pp.frame_data 	- 7 bytes for each address.
  *
@@ -532,18 +535,18 @@ func ax25_i_frame(
  *
  *------------------------------------------------------------------------------*/
 
-func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t) int {
-	dwutil.Assert(pp.frame_len == 0)
-	dwutil.Assert(cr == cr_cmd || cr == cr_res)
+func (this_p *Packet) setAddrs(addrs [MaxAddrs]string, num_addr int, cr CmdRes) int {
+	dwutil.Assert(this_p.frame_len == 0)
+	dwutil.Assert(cr == CRCmd || cr == CRRes)
 
-	if num_addr < AX25_MIN_ADDRS || num_addr > AX25_MAX_ADDRS {
-		logrus.WithField("num_addr", num_addr).Error("Internal error: set_addrs: bad number of addresses")
+	if num_addr < MinAddrs || num_addr > MaxAddrs {
+		logrus.WithField("num_addr", num_addr).Error("Internal error: setAddrs: bad number of addresses")
 
 		return (0)
 	}
 
 	for n := range num_addr {
-		var oaddr, ssid, _, ok = ax25_parse_addr(n, addrs[n], AddrStrict)
+		var oaddr, ssid, _, ok = ParseAddr(n, addrs[n], AddrStrict)
 
 		if !ok {
 			return (0)
@@ -551,26 +554,26 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdr
 
 		// Fill in address.
 
-		copy(pp.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
+		copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 
 		for i, c := range oaddr {
-			pp.frame_data[n*7+i] = byte(c << 1)
+			this_p.frame_data[n*7+i] = byte(c << 1)
 		}
 
 		// Fill in SSID.
 
-		pp.frame_data[n*7+6] = byte(0x60 | ((ssid & 0xf) << 1))
+		this_p.frame_data[n*7+6] = byte(0x60 | ((ssid & 0xf) << 1))
 
 		// Command / response flag.
 
 		switch n {
-		case AX25_DESTINATION:
-			if cr == cr_cmd {
-				pp.frame_data[n*7+6] |= 0x80
+		case Destination:
+			if cr == CRCmd {
+				this_p.frame_data[n*7+6] |= 0x80
 			}
-		case AX25_SOURCE:
-			if cr == cr_res {
-				pp.frame_data[n*7+6] |= 0x80
+		case Source:
+			if cr == CRRes {
+				this_p.frame_data[n*7+6] |= 0x80
 			}
 		default:
 		}
@@ -578,13 +581,13 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdr
 		// Is this the end of address field?
 
 		if n == num_addr-1 {
-			pp.frame_data[n*7+6] |= 1
+			this_p.frame_data[n*7+6] |= 1
 		}
 
-		pp.frame_len += 7
+		this_p.frame_len += 7
 	}
 
-	pp.num_addr = num_addr
+	this_p.num_addr = num_addr
 
 	return (1)
-} /* end set_addrs */
+} /* end setAddrs */

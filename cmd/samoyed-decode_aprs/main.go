@@ -64,6 +64,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	direwolf "github.com/doismellburning/samoyed/src"
 )
@@ -98,7 +99,7 @@ func main() {
 func decodeAPRSLine(line string) {
 	/* Try to process it. */
 	fmt.Printf("\n")
-	direwolf.AX25SafePrint([]byte(line), false)
+	ax25.SafePrint([]byte(line), false)
 	fmt.Printf("\n")
 
 	// Do we have monitor format, KISS, or AX.25 frame?
@@ -160,32 +161,32 @@ func decodeAPRSLine(line string) {
 
 		// Treat as AX.25.
 
-		var alevel direwolf.ALevel
+		var alevel ax25.ALevel
 
-		var pp = direwolf.AX25FromFrame(bytes, alevel)
+		var pp = ax25.FromFrame(bytes, alevel)
 		if pp != nil {
 			fmt.Printf("--- AX.25 frame ---\n")
-			direwolf.AX25HexDump(pp)
+			pp.HexDump()
 			fmt.Printf("-------------------\n")
 
-			var addrs = direwolf.AX25FormatAddrs(pp)
+			var addrs = pp.FormatAddrs()
 			fmt.Printf("%s", addrs)
 
-			var info = direwolf.AX25GetInfo(pp)
-			direwolf.AX25SafePrint(info, true) // Display non-ASCII to hexadecimal.
+			var info = pp.Info()
+			ax25.SafePrint(info, true) // Display non-ASCII to hexadecimal.
 			fmt.Printf("\n")
 
 			var A = direwolf.DecodeAPRS(pp, false, "") // Extract information into structure.
 
 			direwolf.DecodeAPRSPrint(A) // Now print it in human readable format.
 
-			direwolf.AX25CheckAddresses(pp, direwolf.AddrStrictLowerCaseWarning) // Errors for invalid addresses.
+			pp.CheckAddresses(ax25.AddrStrictLowerCaseWarning) // Errors for invalid addresses.
 		} else {
 			fmt.Printf("Could not construct AX.25 frame from bytes supplied!\n\n")
 		}
 	} else {
 		// Normal monitoring format.
-		var pp = direwolf.AX25FromTextWithStrictness(line, direwolf.AddrStrictLowerCaseWarning)
+		var pp = ax25.FromTextWithStrictness(line, ax25.AddrStrictLowerCaseWarning)
 		if pp != nil {
 			var A = direwolf.DecodeAPRS(pp, false, "") // Extract information into structure.
 

@@ -1658,8 +1658,8 @@ func raw_tt_data_to_app(channel int, msg string) {
 
 	if pp != nil {
 		var alevel = demod_get_audio_level(channel, 0)
-		alevel.mark = -2
-		alevel.space = -2
+		alevel.Mark = -2
+		alevel.Space = -2
 
 		dataLinkQueue.RecFrame(channel, -1, 0, pp, alevel, fec_type_none, RETRY_NONE, "tt")
 	} else {

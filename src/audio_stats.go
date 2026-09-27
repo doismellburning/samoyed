@@ -120,13 +120,13 @@ func (s *AudioStats) record(adev int, nchan int, nsamp int, interval int) {
 					var alevel1 = demod_get_audio_level(ch1, 0)
 
 					dw_printf("\nADEVICE%d: Sample rate approx. %.1f k, %d errors, receive audio levels CH%d %d, CH%d %d\n\n",
-						adev, ave_rate, s.errorCount, ch0, alevel0.rec, ch1, alevel1.rec)
+						adev, ave_rate, s.errorCount, ch0, alevel0.Rec, ch1, alevel1.Rec)
 				} else {
 					var ch0 = ADEVFIRSTCHAN(adev)
 					var alevel0 = demod_get_audio_level(ch0, 0)
 
 					dw_printf("\nADEVICE%d: Sample rate approx. %.1f k, %d errors, receive audio level CH%d %d\n\n",
-						adev, ave_rate, s.errorCount, ch0, alevel0.rec)
+						adev, ave_rate, s.errorCount, ch0, alevel0.Rec)
 				}
 			}
 

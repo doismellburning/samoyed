@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package ax25
 
 import (
 	"testing"
@@ -11,7 +14,7 @@ import (
  * Purpose:	Quick unit test for ax25_pad2.c
  *
  * Description:	Generate a variety of frames.
- *		Each function calls ax25_frame_type to verify results.
+ *		Each function calls FrameType to verify results.
  *
  *------------------------------------------------------------------------------*/
 
@@ -19,45 +22,45 @@ func Test_AX25_PAD2(t *testing.T) {
 	var pid = 0xf0
 	var info []byte
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [MaxAddrs]string
 	addrs[0] = "W2UB"
 	addrs[1] = "WB2OSZ-15"
 	var num_addr = 2
 
 	/* U frame */
 
-	for ftype := frame_type_U_SABME; ftype <= frame_type_U_TEST; ftype++ {
+	for ftype := FrameTypeUSABME; ftype <= FrameTypeUTEST; ftype++ {
 		for pf := range 2 {
-			var cmin cmdres_t = 0
-			var cmax cmdres_t = 0
+			var cmin CmdRes = 0
+			var cmax CmdRes = 0
 
 			switch ftype {
 			// 0 = response, 1 = command
-			case frame_type_U_SABME:
+			case FrameTypeUSABME:
 				cmin = 1
 				cmax = 1
-			case frame_type_U_SABM:
+			case FrameTypeUSABM:
 				cmin = 1
 				cmax = 1
-			case frame_type_U_DISC:
+			case FrameTypeUDISC:
 				cmin = 1
 				cmax = 1
-			case frame_type_U_DM:
+			case FrameTypeUDM:
 				cmin = 0
 				cmax = 0
-			case frame_type_U_UA:
+			case FrameTypeUUA:
 				cmin = 0
 				cmax = 0
-			case frame_type_U_FRMR:
+			case FrameTypeUFRMR:
 				cmin = 0
 				cmax = 0
-			case frame_type_U_UI:
+			case FrameTypeUUI:
 				cmin = 0
 				cmax = 1
-			case frame_type_U_XID:
+			case FrameTypeUXID:
 				cmin = 0
 				cmax = 1
-			case frame_type_U_TEST:
+			case FrameTypeUTEST:
 				cmin = 0
 				cmax = 1
 			default:
@@ -66,9 +69,9 @@ func Test_AX25_PAD2(t *testing.T) {
 			for cr := cmin; cr <= cmax; cr++ {
 				t.Logf("Construct U frame, cr=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
-				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, nil)
+				var pp = UFrame(addrs, num_addr, cr, ftype, pf, pid, nil)
 				check_ax25_u_frame(t, pp, cr, ftype, pf)
-				AX25HexDump(pp)
+				pp.HexDump()
 			}
 		}
 	}
@@ -78,30 +81,30 @@ func Test_AX25_PAD2(t *testing.T) {
 	addrs[2] = "DIGI1-1"
 	num_addr = 3
 
-	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
+	for ftype := FrameTypeSRR; ftype <= FrameTypeSSREJ; ftype++ {
 		for pf := range 2 {
-			var modulo = modulo_8
+			var modulo = Modulo8
 			var nr = int(modulo/2 + 1)
 
-			for cr := cmdres_t(0); cr <= 1; cr++ {
+			for cr := CmdRes(0); cr <= 1; cr++ {
 				t.Logf("Construct S frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
-				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
+				var pp = SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
-				AX25HexDump(pp)
+				pp.HexDump()
 			}
 
-			modulo = modulo_128
+			modulo = Modulo128
 			nr = int(modulo/2 + 1)
 
-			for cr := cmdres_t(0); cr <= 1; cr++ {
+			for cr := CmdRes(0); cr <= 1; cr++ {
 				t.Logf("Construct S frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
-				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
+				var pp = SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
-				AX25HexDump(pp)
+				pp.HexDump()
 			}
 		}
 	}
@@ -110,19 +113,19 @@ func Test_AX25_PAD2(t *testing.T) {
 
 	var srej_info = []byte{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
-	var ftype = frame_type_S_SREJ
+	var ftype = FrameTypeSSREJ
 
 	for pf := range 2 {
-		var modulo = modulo_128
+		var modulo = Modulo128
 		var nr = 127
-		var cr = cr_res
+		var cr = CRRes
 
 		t.Logf("Construct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
-		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
+		var pp = SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
 		check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
-		AX25HexDump(pp)
+		pp.HexDump()
 	}
 
 	/* I frame */
@@ -130,38 +133,38 @@ func Test_AX25_PAD2(t *testing.T) {
 	info = []byte("The rain in Spain stays mainly on the plain.")
 
 	for pf := range 2 {
-		var modulo = modulo_8
+		var modulo = Modulo8
 		var nr = 0x55 & int(modulo-1)
 		var ns = 0xaa & int(modulo-1)
 
-		for cr := cmdres_t(0); cr <= 1; cr++ {
+		for cr := CmdRes(0); cr <= 1; cr++ {
 			t.Logf("Construct I frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
-			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
+			var pp = IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
 			check_ax25_i_frame(t, pp, cr, pf, nr, ns, info)
 
-			AX25HexDump(pp)
+			pp.HexDump()
 		}
 
-		modulo = modulo_128
+		modulo = Modulo128
 		nr = 0x55 & int(modulo-1)
 		ns = 0xaa & int(modulo-1)
 
-		for cr := cmdres_t(0); cr <= 1; cr++ {
+		for cr := CmdRes(0); cr <= 1; cr++ {
 			t.Logf("Construct I frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
-			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
+			var pp = IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
 			check_ax25_i_frame(t, pp, cr, pf, nr, ns, info)
 
-			AX25HexDump(pp)
+			pp.HexDump()
 		}
 	}
 } /* end main */
 
-func check_ax25_u_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_frame_type_t, pf int) {
+func check_ax25_u_frame(t *testing.T, packet *Packet, cr CmdRes, ftype FrameType, pf int) {
 	t.Helper()
 
-	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = ax25_frame_type(packet)
+	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = packet.FrameType()
 
 	t.Logf("check: ftype=%d, desc=\"%s\", pf=%d", check_ftype, check_desc, check_pf)
 
@@ -172,11 +175,11 @@ func check_ax25_u_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_
 	assert.Equal(t, -1, check_ns)
 }
 
-func check_ax25_s_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_frame_type_t, pf int, nr int) {
+func check_ax25_s_frame(t *testing.T, packet *Packet, cr CmdRes, ftype FrameType, pf int, nr int) {
 	t.Helper()
 
 	// todo modulo must be input.
-	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = ax25_frame_type(packet)
+	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = packet.FrameType()
 
 	t.Logf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d", check_ftype, check_desc, check_pf, check_nr)
 
@@ -187,17 +190,17 @@ func check_ax25_s_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_
 	assert.Equal(t, -1, check_ns)
 }
 
-func check_ax25_i_frame(t *testing.T, packet *packet_t, cr cmdres_t, pf int, nr int, ns int, info []byte) {
+func check_ax25_i_frame(t *testing.T, packet *Packet, cr CmdRes, pf int, nr int, ns int, info []byte) {
 	t.Helper()
 
-	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = ax25_frame_type(packet)
+	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = packet.FrameType()
 
 	t.Logf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d, ns=%d", check_ftype, check_desc, check_pf, check_nr, check_ns)
 
-	var check_info = AX25GetInfo(packet)
+	var check_info = packet.Info()
 
 	assert.Equal(t, cr, check_cr)
-	assert.Equal(t, frame_type_I, check_ftype)
+	assert.Equal(t, FrameTypeI, check_ftype)
 	assert.Equal(t, pf, check_pf)
 	assert.Equal(t, nr, check_nr)
 	assert.Equal(t, ns, check_ns)

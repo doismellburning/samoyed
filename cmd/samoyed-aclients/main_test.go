@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/creack/pty"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/stretchr/testify/assert"
@@ -78,13 +79,13 @@ func Test_main(t *testing.T) {
 
 		p.WaitFor(t, "Client 1 now connected to Serial on "+serialPort)
 
-		sendMonitored(t, tnc, 0, direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>APDW17:>Over the network")))
+		sendMonitored(t, tnc, 0, ax25.MustFromText("Q1TEST>APDW17:>Over the network").Pack())
 
 		var seen = p.WaitFor(t, "Q1TEST>APDW17:>Over the network")
 
 		// Only the first port heard from counts, as a TNC can report the
 		// same thing on more than one.
-		sendMonitored(t, tnc, 1, direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>APDW17:>Ignored")))
+		sendMonitored(t, tnc, 1, ax25.MustFromText("Q1TEST>APDW17:>Ignored").Pack())
 
 		// Something the far end can't make sense of is reported, and the
 		// client carries on.

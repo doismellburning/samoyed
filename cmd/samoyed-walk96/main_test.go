@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	direwolf "github.com/doismellburning/samoyed/src"
@@ -97,10 +98,10 @@ func Test_walk96(t *testing.T) {
 
 	// What went to the TNC is that same report as a KISS data frame for
 	// channel 0.
-	var pp = direwolf.AX25FromText(report, true)
+	var pp = ax25.FromText(report, true)
 	require.NotNil(t, pp)
 
-	var want = direwolf.KissEncapsulate(append([]byte{0}, direwolf.AX25Pack(pp)...))
+	var want = direwolf.KissEncapsulate(append([]byte{0}, pp.Pack()...))
 
 	assert.Equal(t, want, readN(t, master, len(want)))
 

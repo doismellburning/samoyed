@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/spf13/pflag"
@@ -290,9 +291,9 @@ func dumpCommand(command byte, payload []byte) int {
 		}
 
 		fmt.Printf("TNC-specific: ")
-		direwolf.AX25SafePrint(payload, true)
+		ax25.SafePrint(payload, true)
 		fmt.Printf("\n")
-		direwolf.NoteSafePrintTruncation(len(payload))
+		ax25.NoteSafePrintTruncation(len(payload))
 
 		return 0
 

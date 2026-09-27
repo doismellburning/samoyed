@@ -982,7 +982,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 		if D.alevel_metric_countdown <= 0 {
 			D.alevel_metric_countdown = audioLevelDecimation
 
-			metrics.SetAudioLevel(channel, demod_get_audio_level(channel, 0).rec)
+			metrics.SetAudioLevel(channel, demod_get_audio_level(channel, 0).Rec)
 		}
 	}
 
@@ -1066,23 +1066,23 @@ func (d *Demodulator) AudioLevel(subchan int) ALevel {
 
 	// Take half of peak-to-peak for received audio level.
 
-	alevel.rec = int((D.alevel_rec_peak-D.alevel_rec_valley)*50.0 + 0.5)
+	alevel.Rec = int((D.alevel_rec_peak-D.alevel_rec_valley)*50.0 + 0.5)
 
 	switch d.modemType {
 	case MODEM_AFSK, MODEM_EAS:
 		/* For AFSK, we have mark and space amplitudes. */
-		alevel.mark = (int)((D.alevel_mark_peak)*100.0 + 0.5)
-		alevel.space = (int)((D.alevel_space_peak)*100.0 + 0.5)
+		alevel.Mark = (int)((D.alevel_mark_peak)*100.0 + 0.5)
+		alevel.Space = (int)((D.alevel_space_peak)*100.0 + 0.5)
 	case MODEM_QPSK, MODEM_8PSK, MODEM_BPSK:
-		alevel.mark = -1
-		alevel.space = -1
+		alevel.Mark = -1
+		alevel.Space = -1
 	default:
 		// TODO KG #if 1
 		/* Display the + and - peaks.  */
 		/* Normally we'd expect them to be about the same. */
 		/* However, with SDR, or other DC coupling, we could have an offset. */
-		alevel.mark = (int)((D.alevel_mark_peak)*200.0 + 0.5)
-		alevel.space = (int)((D.alevel_space_peak)*200.0 - 0.5)
+		alevel.Mark = (int)((D.alevel_mark_peak)*200.0 + 0.5)
+		alevel.Space = (int)((D.alevel_space_peak)*200.0 - 0.5)
 
 		/* TODO KG
 		#else

@@ -1,0 +1,283 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package direwolf
+
+// The packet assembler/disassembler now lives in internal/ax25. These are its
+// old names, kept so the rest of package direwolf needn't change all at once;
+// new code should use internal/ax25 directly.
+//
+// Only the names package direwolf itself still uses are here. This is a
+// stepping stone for our own code, not a compatibility layer for anything
+// outside it: the commands under cmd, which used some of the other exported
+// names (MustAX25FromText, AX25Pack, MAXSAFE, ...), now use internal/ax25.
+
+import (
+	"time"
+
+	"github.com/doismellburning/samoyed/internal/ax25"
+)
+
+type packet_t = ax25.Packet
+type cmdres_t = ax25.CmdRes
+type ax25_modulo_t = ax25.Modulo
+type ax25_frame_type_t = ax25.FrameType
+type ALevel = ax25.ALevel
+type AddrStrictness = ax25.AddrStrictness
+
+const (
+	AX25_MAX_REPEATERS             = ax25.MaxRepeaters
+	AX25_MIN_ADDRS                 = ax25.MinAddrs
+	AX25_MAX_ADDRS                 = ax25.MaxAddrs
+	AX25_DESTINATION               = ax25.Destination
+	AX25_SOURCE                    = ax25.Source
+	AX25_REPEATER_1                = ax25.Repeater1
+	AX25_REPEATER_2                = ax25.Repeater2
+	AX25_MAX_INFO_LEN              = ax25.MaxInfoLen
+	AX25_MIN_PACKET_LEN            = ax25.MinPacketLen
+	AX25_MAX_PACKET_LEN            = ax25.MaxPacketLen
+	AX25_PID_NO_LAYER_3            = ax25.PIDNoLayer3
+	AX25_PID_SEGMENTATION_FRAGMENT = ax25.PIDSegmentationFragment
+	cr_cmd                         = ax25.CRCmd
+	cr_res                         = ax25.CRRes
+	cr_11                          = ax25.CR11
+	modulo_unknown                 = ax25.ModuloUnknown
+	modulo_8                       = ax25.Modulo8
+	modulo_128                     = ax25.Modulo128
+	frame_type_I                   = ax25.FrameTypeI
+	frame_type_S_RR                = ax25.FrameTypeSRR
+	frame_type_S_RNR               = ax25.FrameTypeSRNR
+	frame_type_S_REJ               = ax25.FrameTypeSREJ
+	frame_type_S_SREJ              = ax25.FrameTypeSSREJ
+	frame_type_U_SABME             = ax25.FrameTypeUSABME
+	frame_type_U_SABM              = ax25.FrameTypeUSABM
+	frame_type_U_DISC              = ax25.FrameTypeUDISC
+	frame_type_U_DM                = ax25.FrameTypeUDM
+	frame_type_U_UA                = ax25.FrameTypeUUA
+	frame_type_U_FRMR              = ax25.FrameTypeUFRMR
+	frame_type_U_UI                = ax25.FrameTypeUUI
+	frame_type_U_XID               = ax25.FrameTypeUXID
+	frame_type_U_TEST              = ax25.FrameTypeUTEST
+	frame_type_U                   = ax25.FrameTypeU
+	frame_not_AX25                 = ax25.FrameNotAX25
+	AddrLenient                    = ax25.AddrLenient
+	AddrStrict                     = ax25.AddrStrict
+	AddrStrictNoStar               = ax25.AddrStrictNoStar
+	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
+)
+
+func ax25_new() *packet_t {
+	return ax25.New()
+}
+
+func AX25FromText(monitor string, strict bool) *packet_t {
+	return ax25.FromText(monitor, strict)
+}
+
+func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *packet_t {
+	return ax25.FromTextWithStrictness(monitor, strictness)
+}
+
+func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
+	return ax25.FromFrame(data, alevel)
+}
+
+func ax25_dup(copy_from *packet_t) *packet_t {
+	return copy_from.Dup()
+}
+
+func ax25_parse_addr(position int, in_addr string, strictness AddrStrictness) (string, int, bool, bool) {
+	return ax25.ParseAddr(position, in_addr, strictness)
+}
+
+func AX25CheckAddresses(pp *packet_t, strictness AddrStrictness) bool {
+	return pp.CheckAddresses(strictness)
+}
+
+func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
+	return from_pp.UnwrapThirdParty()
+}
+
+func ax25_set_addr(this_p *packet_t, n int, ad string) {
+	this_p.SetAddr(n, ad)
+}
+
+func ax25_insert_addr(this_p *packet_t, n int, ad string) {
+	this_p.InsertAddr(n, ad)
+}
+
+func ax25_remove_addr(this_p *packet_t, n int) {
+	this_p.RemoveAddr(n)
+}
+
+func ax25_get_num_addr(this_p *packet_t) int {
+	return this_p.NumAddr()
+}
+
+func ax25_get_num_repeaters(this_p *packet_t) int {
+	return this_p.NumRepeaters()
+}
+
+func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
+	return this_p.AddrWithSSID(n)
+}
+
+func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
+	return this_p.AddrNoSSID(n)
+}
+
+func ax25_get_ssid(this_p *packet_t, n int) int {
+	return this_p.SSID(n)
+}
+
+func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
+	this_p.SetSSID(n, ssid)
+}
+
+func ax25_get_h(this_p *packet_t, n int) int {
+	return this_p.H(n)
+}
+
+func ax25_set_h(this_p *packet_t, n int) {
+	this_p.SetH(n)
+}
+
+func ax25_get_heard(this_p *packet_t) int {
+	return this_p.Heard()
+}
+
+func ax25_get_first_not_repeated(this_p *packet_t) int {
+	return this_p.FirstNotRepeated()
+}
+
+func ax25_get_rr(this_p *packet_t, n int) int {
+	return this_p.RR(n)
+}
+
+func AX25GetInfo(this_p *packet_t) []byte {
+	return this_p.Info()
+}
+
+func ax25_set_info(this_p *packet_t, new_info []byte) {
+	this_p.SetInfo(new_info)
+}
+
+func ax25_cut_at_crlf(this_p *packet_t) int {
+	return this_p.CutAtCRLF()
+}
+
+func ax25_get_dti(this_p *packet_t) byte {
+	return this_p.DTI()
+}
+
+func ax25_set_nextp(this_p *packet_t, next_p *packet_t) {
+	this_p.SetNext(next_p)
+}
+
+func ax25_get_nextp(this_p *packet_t) *packet_t {
+	return this_p.Next()
+}
+
+func ax25_set_release_time(this_p *packet_t, release_time time.Time) {
+	this_p.SetReleaseTime(release_time)
+}
+
+func ax25_get_release_time(this_p *packet_t) time.Time {
+	return this_p.ReleaseTime()
+}
+
+func ax25_set_modulo(this_p *packet_t, modulo ax25_modulo_t) {
+	this_p.SetModulo(modulo)
+}
+
+func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
+	return this_p.Modulo()
+}
+
+func AX25FormatAddrs(this_p *packet_t) string {
+	return this_p.FormatAddrs()
+}
+
+func ax25_format_via_path(this_p *packet_t) string {
+	return this_p.FormatViaPath()
+}
+
+func AX25Pack(this_p *packet_t) []byte {
+	return this_p.Pack()
+}
+
+func ax25_frame_type_only(this_p *packet_t) ax25_frame_type_t {
+	return this_p.FrameTypeOnly()
+}
+
+func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int, ns int, frameType ax25_frame_type_t) {
+	return this_p.FrameType()
+}
+
+func AX25HexDump(this_p *packet_t) {
+	this_p.HexDump()
+}
+
+func ax25_is_aprs(this_p *packet_t) bool {
+	return this_p.IsAPRS()
+}
+
+func ax25_is_null_frame(this_p *packet_t) bool {
+	return this_p.IsNullFrame()
+}
+
+func ax25_set_pid(this_p *packet_t, pid byte) {
+	this_p.SetPID(pid)
+}
+
+func ax25_get_pid(this_p *packet_t) int {
+	return this_p.PID()
+}
+
+func ax25_get_frame_len(this_p *packet_t) int {
+	return this_p.FrameLen()
+}
+
+func ax25_get_frame_data(this_p *packet_t) []byte {
+	return this_p.FrameData()
+}
+
+func ax25_dedupe_crc(pp *packet_t) uint16 {
+	return pp.DedupeCRC()
+}
+
+func ax25_m_m_crc(pp *packet_t) uint16 {
+	return pp.MultiModemCRC()
+}
+
+func AX25SafePrint(info []byte, ascii_only bool) {
+	ax25.SafePrint(info, ascii_only)
+}
+
+func NoteSafePrintTruncation(length int) {
+	ax25.NoteSafePrintTruncation(length)
+}
+
+func ax25_alevel_to_text(alevel ALevel) string {
+	return alevel.Text()
+}
+
+func ax25_get_control_offset(this_p *packet_t) int {
+	return this_p.ControlOffset()
+}
+
+func ax25_get_info_offset(this_p *packet_t) int {
+	return this_p.InfoOffset()
+}
+
+func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype ax25_frame_type_t, pf int, pid int, info []byte) *packet_t {
+	return ax25.UFrame(addrs, num_addr, cr, ftype, pf, pid, info)
+}
+
+func ax25_s_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype ax25_frame_type_t, modulo ax25_modulo_t, nr int, pf int, info []byte) *packet_t {
+	return ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, info)
+}
+
+func ax25_i_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, modulo ax25_modulo_t, nr int, ns int, pf int, pid int, info []byte) *packet_t {
+	return ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
+}
