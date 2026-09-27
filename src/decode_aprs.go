@@ -271,7 +271,7 @@ func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t
 	// W1KU-4>APDW15,W1IMD,WIDE1,KQ1L-8,N3LLO-3,WIDE2*:}EB1EBT-9>NOGATE,TCPIP,W1KU-4*::DF1AKR-9 :73{4
 	// NE1CU-10>RFONLY,KB1AEV-15,N3LLO-3,WIDE2*:}W1HS-11>APMI06,TCPIP,NE1CU-10*:T#050,190,039,008,095,20403,00000000
 
-	var atemp = ax25_get_addr_no_ssid(pp, AX25_DESTINATION)
+	var atemp = pp.AddrNoSSID(AX25_DESTINATION)
 
 	if !quiet {
 		if atemp == "RFONLY" || atemp == "NOGATE" {
@@ -284,7 +284,7 @@ func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t
 	// Complain if obsolete WIDE or RELAY is found in via path.
 
 	for i := range pp.NumRepeaters() {
-		atemp = ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+i)
+		atemp = pp.AddrNoSSID(AX25_REPEATER_1 + i)
 		if !quiet {
 			if atemp == "RELAY" || atemp == "WIDE" || atemp == "TRACE" {
 				text_color_set(DW_COLOR_ERROR)

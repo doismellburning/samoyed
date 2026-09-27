@@ -194,7 +194,7 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 
 	if hops > 1 {
 		for k := range pp.NumRepeaters() {
-			var digi = ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+k)
+			var digi = pp.AddrNoSSID(AX25_REPEATER_1 + k)
 			var ssid = ax25_get_ssid(pp, AX25_REPEATER_1+k)
 			var used = ax25_get_h(pp, AX25_REPEATER_1+k)
 

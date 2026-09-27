@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
-	return this_p.AddrNoSSID(n)
-}
-
 func ax25_get_ssid(this_p *packet_t, n int) int {
 	return this_p.SSID(n)
 }

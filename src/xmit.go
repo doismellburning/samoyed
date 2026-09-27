@@ -276,7 +276,7 @@ const (
 func frame_flavor(pp *packet_t) flavor_t {
 	if ax25_is_aprs(pp) { // UI frame, PID 0xF0.
 		// It's unfortunate APRS did not use its own special PID.
-		var dest = ax25_get_addr_no_ssid(pp, AX25_DESTINATION)
+		var dest = pp.AddrNoSSID(AX25_DESTINATION)
 
 		if dest == "SPEECH" {
 			return (FLAVOR_SPEECH)
