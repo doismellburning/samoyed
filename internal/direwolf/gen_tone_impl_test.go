@@ -5,6 +5,7 @@ package direwolf
 // A failing test may thus be a problem with the test itself rather than any future changes...
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -94,4 +95,365 @@ func TestToneGeneratorSineTableFollowsAmplitude(t *testing.T) {
 	assert.Equal(t, int16(16383), half.sineTable[64])
 	assert.Zero(t, full.sineTable[0])
 	assert.Equal(t, int16(-32767), full.sineTable[192])
+}
+
+// newCapturingToneGenerator makes a mono, 16 bit tone generator for channel 0
+// whose samples land in the returned byteSink.
+func newCapturingToneGenerator(modemType modem_t, baud int, samplesPerSec int) (*ToneGenerator, *byteSink, *AudioConfig) {
+	var audioConfig = newTestAudioConfig(0, modemType, baud, 1200, 2200, samplesPerSec)
+	var sink = new(byteSink)
+
+	return NewToneGenerator(0, audioConfig, 100, sink), sink, audioConfig
+}
+
+// ticksFor is the rounded phase-accumulator ticks in 1/perSecond of a second
+// (or 1/perSecond of a cycle).
+func ticksFor(perSecond float64) int {
+	return int(math.Floor(TICKS_PER_CYCLE/perSecond + 0.5))
+}
+
+// decodeMono16 decodes little-endian signed 16 bit mono samples.
+func decodeMono16(data []byte) []int16 {
+	var out = make([]int16, 0, len(data)/2)
+
+	for i := 0; i+1 < len(data); i += 2 {
+		out = append(out, int16(uint16(data[i])|uint16(data[i+1])<<8))
+	}
+
+	return out
+}
+
+func TestToneGeneratorPutBitAFSK(t *testing.T) {
+	// 12000 samples/sec at 1200 baud is ten samples a bit.
+	var tg, sink, _ = newCapturingToneGenerator(MODEM_AFSK, 1200, 12000)
+
+	tg.PutBit(1)
+	require.Len(t, sink.data, 20)
+
+	// A '1' is the mark tone: phase advances by f1 per sample.
+	assert.Equal(t, 10*tg.f1ChangePerSample, tg.tonePhase)
+	assert.Equal(t, tg.sineTable[(tg.f1ChangePerSample>>24)&0xff], decodeMono16(sink.data)[0])
+	assert.Equal(t, 1, tg.prevDat)
+
+	var before = tg.tonePhase
+
+	tg.PutBit(0)
+	require.Len(t, sink.data, 40)
+	assert.Equal(t, before+10*tg.f2ChangePerSample, tg.tonePhase)
+	assert.Zero(t, tg.prevDat)
+}
+
+func TestToneGeneratorPutBitNegativeInsertsExtraTime(t *testing.T) {
+	var tg, sink, _ = newCapturingToneGenerator(MODEM_AFSK, 1200, 12000)
+
+	// -1 knocks a whole bit time off the accumulator first, so it
+	// produces two bits' worth of samples of the '0' tone.
+	tg.PutBit(-1)
+
+	assert.Len(t, sink.data, 40)
+	assert.Equal(t, 20*tg.f2ChangePerSample, tg.tonePhase)
+	assert.Zero(t, tg.prevDat)
+}
+
+func TestToneGeneratorPutBitEAS(t *testing.T) {
+	var tg, sink, _ = newCapturingToneGenerator(MODEM_EAS, 0, 48000)
+
+	assert.Equal(t, int(math.Floor((TICKS_PER_CYCLE/520.833333333333)+0.5)), tg.ticksPerBit)
+	assert.NotEqual(t, tg.f1ChangePerSample, tg.f2ChangePerSample)
+
+	tg.PutBit(1)
+
+	var n = len(sink.data) / 2
+	// 48000 / 520.83 is about 92 samples.
+	assert.InDelta(t, 92, n, 1)
+	assert.Equal(t, uint(n)*tg.f1ChangePerSample, tg.tonePhase)
+
+	var before = tg.tonePhase
+
+	sink.data = nil
+
+	tg.PutBit(0)
+	assert.Equal(t, before+uint(len(sink.data)/2)*tg.f2ChangePerSample, tg.tonePhase)
+}
+
+func TestToneGeneratorPutBitBPSK(t *testing.T) {
+	// 2400 baud at 24000 samples/sec is ten samples a symbol.
+	var tg, sink, _ = newCapturingToneGenerator(MODEM_BPSK, 2400, 24000)
+
+	var start = tg.tonePhase
+
+	tg.PutBit(0)
+	require.Len(t, sink.data, 20)
+	assert.Equal(t, start+10*tg.f1ChangePerSample, tg.tonePhase)
+
+	var before = tg.tonePhase
+
+	// A '1' flips the phase by 180 degrees before the samples go out.
+	tg.PutBit(1)
+	require.Len(t, sink.data, 40)
+	assert.Equal(t, before+PHASE_SHIFT_180+10*tg.f1ChangePerSample, tg.tonePhase)
+}
+
+func TestNewToneGeneratorQPSKAnd8PSK(t *testing.T) {
+	var qpsk, _, qcfg = newCapturingToneGenerator(MODEM_QPSK, 2400, 44100)
+
+	assert.Equal(t, 1800, qcfg.achan[0].mark_freq)
+	assert.Equal(t, 1800, qcfg.achan[0].space_freq)
+	assert.Equal(t, ticksFor(1200), qpsk.ticksPerBit)
+	assert.InDelta(t, 2*44100.0/2400.0, qpsk.samplesPerSymbol, 0.0001)
+	assert.Equal(t, PHASE_SHIFT_45, qpsk.tonePhase)
+
+	var psk8, _, ecfg = newCapturingToneGenerator(MODEM_8PSK, 4800, 44100)
+
+	assert.Equal(t, 1800, ecfg.achan[0].mark_freq)
+	assert.Equal(t, ticksFor(1600), psk8.ticksPerBit)
+	assert.InDelta(t, 3*44100.0/4800.0, psk8.samplesPerSymbol, 0.0001)
+	assert.Zero(t, psk8.tonePhase)
+}
+
+func TestToneGeneratorPutBitQPSK(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		alt   v26_e
+		extra uint
+	}{
+		{"V26A", V26_A, 0},
+		{"V26B", V26_B, PHASE_SHIFT_45},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// 2400 bps is 1200 symbols/sec: ten samples a symbol at 12000.
+			var tg, sink, cfg = newCapturingToneGenerator(MODEM_QPSK, 2400, 12000)
+			cfg.achan[0].v26_alternative = tc.alt
+
+			var start = tg.tonePhase
+
+			// The first bit of each pair is only remembered.
+			tg.PutBit(1)
+			assert.Empty(t, sink.data)
+			assert.Equal(t, 1, tg.saveBit)
+			assert.Equal(t, start, tg.tonePhase)
+
+			// Dibit 10 is Gray code for 3 * 90 degrees.
+			tg.PutBit(0)
+			require.Len(t, sink.data, 20)
+			assert.Equal(t, start+3*PHASE_SHIFT_90+tc.extra+10*tg.f1ChangePerSample, tg.tonePhase)
+			assert.Equal(t, 2, tg.bitCount)
+		})
+	}
+}
+
+func TestToneGeneratorPutBit8PSK(t *testing.T) {
+	// 3600 bps is 1200 symbols/sec: ten samples a symbol at 12000.
+	var tg, sink, _ = newCapturingToneGenerator(MODEM_8PSK, 3600, 12000)
+
+	tg.PutBit(1)
+	tg.PutBit(1)
+	assert.Empty(t, sink.data)
+	assert.Equal(t, 3, tg.saveBit)
+	assert.Equal(t, 2, tg.bitCount)
+
+	// Tribit 111 is Gray code for 4 * 45 degrees.
+	tg.PutBit(1)
+	require.Len(t, sink.data, 20)
+	assert.Equal(t, 4*PHASE_SHIFT_45+10*tg.f1ChangePerSample, tg.tonePhase)
+	assert.Zero(t, tg.saveBit)
+	assert.Zero(t, tg.bitCount)
+}
+
+func TestNewToneGeneratorBaseband(t *testing.T) {
+	for _, mt := range []modem_t{MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS} {
+		var tg, _, _ = newCapturingToneGenerator(mt, 9600, 48000)
+
+		assert.Equal(t, ticksFor(9600), tg.ticksPerBit)
+		assert.Equal(t, uint(ticksFor(10)), tg.f1ChangePerSample)
+		assert.InDelta(t, 5.0, tg.samplesPerSymbol, 0.0001)
+	}
+}
+
+func TestToneGeneratorPutBitBaseband(t *testing.T) {
+	var tg, sink, _ = newCapturingToneGenerator(MODEM_BASEBAND, 9600, 48000)
+
+	// Same as the previous bit (0), in the upper half of the cycle: hold
+	// at 90 degrees, the positive peak.
+	tg.PutBit(0)
+	// Five samples a bit, near enough: the fractional part accumulates.
+	assert.InDelta(t, 5, len(sink.data)/2, 1)
+	assert.Equal(t, uint(0x40000000), tg.tonePhase)
+
+	for _, s := range decodeMono16(sink.data) {
+		assert.Equal(t, int16(32767), s)
+	}
+
+	// A change of bit sweeps the phase along.
+	var before = len(sink.data)
+
+	tg.PutBit(1)
+
+	var n = uint((len(sink.data) - before) / 2)
+	assert.Equal(t, uint(0x40000000)+n*tg.f1ChangePerSample, tg.tonePhase)
+	assert.Equal(t, 1, tg.prevDat)
+
+	// In the lower half of the cycle, a repeated bit holds at 270 degrees,
+	// the negative peak.
+	tg.tonePhase = 0x90000000
+	sink.data = nil
+
+	tg.PutBit(1)
+	assert.Equal(t, uint(0xc0000000), tg.tonePhase)
+
+	for _, s := range decodeMono16(sink.data) {
+		assert.Equal(t, int16(-32767), s)
+	}
+}
+
+func TestToneGeneratorPutBitScrambles(t *testing.T) {
+	var tg, _, _ = newCapturingToneGenerator(MODEM_SCRAMBLE, 9600, 48000)
+
+	// With an empty shift register, the scrambler passes the first bits
+	// through, and they go into the register.
+	tg.PutBit(1)
+	assert.Equal(t, 1, tg.lfsr)
+	assert.Equal(t, 1, tg.prevDat)
+
+	tg.PutBit(0)
+	assert.Equal(t, 2, tg.lfsr)
+	assert.Equal(t, 0, tg.prevDat)
+
+	// Once a set bit reaches tap 11, a 0 in comes out as a 1.
+	tg.lfsr = 1 << 11
+
+	tg.PutBit(0)
+	assert.Equal(t, 1, tg.prevDat)
+	assert.Equal(t, (1<<12)|1, tg.lfsr)
+}
+
+func TestToneGeneratorPutBitIL2PNotScrambled(t *testing.T) {
+	var tg, _, cfg = newCapturingToneGenerator(MODEM_SCRAMBLE, 9600, 48000)
+	cfg.achan[0].layer2_xmit = LAYER2_IL2P
+
+	tg.lfsr = 1 << 11
+
+	tg.PutBit(0)
+	assert.Equal(t, 0, tg.prevDat)
+	assert.Equal(t, 1<<11, tg.lfsr)
+}
+
+func TestToneGeneratorPutSampleFormats(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		channels int
+		bits     int
+		channel  int
+		sample   int
+		want     []byte
+	}{
+		{"mono 16", 1, 16, 0, 0x1234, []byte{0x34, 0x12}},
+		{"mono 16 negative", 1, 16, 0, -2, []byte{0xfe, 0xff}},
+		{"mono 8", 1, 8, 0, 0, []byte{0x80}},
+		{"mono 8 max", 1, 8, 0, 32767, []byte{0xff}},
+		{"stereo 16 left", 2, 16, 0, 0x1234, []byte{0x34, 0x12, 0, 0}},
+		{"stereo 16 right", 2, 16, 1, 0x1234, []byte{0, 0, 0x34, 0x12}},
+		{"stereo 8 left", 2, 8, 0, -32767, []byte{0x00, 0}},
+		{"stereo 8 right", 2, 8, 1, 0x100, []byte{0, 0x81}},
+		{"clipped high", 1, 16, 0, 40000, []byte{0xff, 0x7f}},
+		{"clipped low", 1, 16, 0, -40000, []byte{0x01, 0x80}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var audioConfig = newTestAudioConfig(tc.channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
+			audioConfig.adev[0].num_channels = tc.channels
+			audioConfig.adev[0].bits_per_sample = tc.bits
+
+			var sink = new(byteSink)
+			var tg = NewToneGenerator(tc.channel, audioConfig, 100, sink)
+
+			tg.PutSample(tc.sample)
+
+			assert.Equal(t, tc.want, sink.data)
+		})
+	}
+}
+
+func TestToneGeneratorPutQuietMsAndFlush(t *testing.T) {
+	var tg, sink, _ = newCapturingToneGenerator(MODEM_AFSK, 1200, 8000)
+
+	tg.tonePhase = 12345
+
+	tg.PutQuietMs(10)
+
+	require.Len(t, sink.data, 160) // 80 samples, 2 bytes each.
+
+	for _, b := range sink.data {
+		assert.Zero(t, b)
+	}
+
+	assert.Zero(t, tg.tonePhase, "phase resets so the next tone starts cleanly")
+	assert.Zero(t, sink.flushes)
+
+	tg.Flush()
+	assert.Equal(t, 1, sink.flushes)
+}
+
+func TestNewSineTableClipsExcessiveAmplitude(t *testing.T) {
+	var table = newSineTable(200)
+
+	assert.Equal(t, int16(32767), table[64])
+	assert.Equal(t, int16(-32768), table[192])
+	assert.Zero(t, table[0])
+}
+
+func TestGray2Phase(t *testing.T) {
+	assert.Equal(t, []uint{0, 1, 3, 2}, []uint{gray2phaseV26(0), gray2phaseV26(1), gray2phaseV26(2), gray2phaseV26(3)})
+
+	var got = make([]uint, 0, 8)
+	for i := range 8 {
+		got = append(got, gray2phaseV27(i))
+	}
+
+	assert.Equal(t, []uint{1, 0, 2, 3, 6, 7, 5, 4}, got)
+}
+
+func TestNewGenToneTestConfig(t *testing.T) {
+	var config = NewGenToneTestConfig(2, true)
+
+	assert.Equal(t, DEFAULT_ADEVICE, config.adev[0].adevice_in)
+	assert.Equal(t, DEFAULT_ADEVICE, config.adev[0].adevice_out)
+	assert.Equal(t, 2, config.adev[0].num_channels)
+	assert.Equal(t, MEDIUM_RADIO, config.chan_medium[0])
+
+	config = NewGenToneTestConfig(1, false)
+	assert.Equal(t, MEDIUM_NONE, config.chan_medium[0])
+}
+
+func TestGenToneInitAndChannelFunctions(t *testing.T) {
+	var saved = toneGenerators
+
+	t.Cleanup(func() { toneGenerators = saved })
+
+	var audioConfig = newTestAudioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 12000)
+	var sink = new(byteSink)
+
+	assert.Zero(t, GenToneInit(audioConfig, 100, sink))
+	require.NotNil(t, toneGenerators[0])
+	assert.Nil(t, toneGenerators[1], "only radio channels get a tone generator")
+
+	tone_gen_put_bit_real(0, 1)
+	assert.Len(t, sink.data, 20)
+
+	gen_tone_put_sample(0, 0, 0x0102)
+	assert.Equal(t, []byte{0x02, 0x01}, sink.data[20:])
+
+	gen_tone_put_quiet_ms(0, 1) // 12 samples.
+	assert.Len(t, sink.data, 22+24)
+
+	gen_tone_flush(0)
+	assert.Equal(t, 1, sink.flushes)
+
+	// A channel without a tone generator is reported and ignored.
+	tone_gen_put_bit_real(1, 1)
+	gen_tone_put_sample(1, 0, 0)
+	gen_tone_put_quiet_ms(1, 10)
+	gen_tone_flush(1)
+
+	assert.Len(t, sink.data, 46)
+	assert.Equal(t, 1, sink.flushes)
 }
