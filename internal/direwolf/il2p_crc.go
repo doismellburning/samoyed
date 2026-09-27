@@ -123,23 +123,3 @@ func il2p_crc_check(frame_data []byte, encoded_crc []byte) bool {
 
 	return expected == received
 }
-
-/*-------------------------------------------------------------
- *
- * Name:	il2p_crc_enabled
- *
- * Purpose:	Check if IL2P trailing CRC is enabled for a channel.
- *
- * Inputs:	channel	- Radio channel number.
- *
- * Returns:	true if CRC is enabled, false otherwise.
- *
- *--------------------------------------------------------------*/
-
-func il2p_crc_enabled(channel int) bool {
-	if save_audio_config_p == nil {
-		return true // Default to enabled if no config available.
-	}
-
-	return save_audio_config_p.achan[channel].il2p_crc
-}

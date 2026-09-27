@@ -770,7 +770,7 @@ func test_serdes(t *testing.T) {
 
 		for max_fec := range 2 {
 			for polarity := range 3 { // 2 means throw in some errors.
-				var num_bits_sent = sender.sendIL2PFrame(pp, IL2P_VERSION_0_4, max_fec, polarity)
+				var num_bits_sent = sender.sendIL2PFrame(pp, IL2P_VERSION_0_4, max_fec, true, polarity)
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.

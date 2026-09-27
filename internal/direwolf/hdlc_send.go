@@ -71,7 +71,7 @@ func (s *HDLCSender) SendFrame(pp *ax25.Packet, badFCS bool) int {
 	var achan = &s.audioConfig.achan[s.channel]
 
 	if achan.layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
-		var n = s.sendIL2PFrame(pp, achan.il2p_version, achan.il2p_max_fec, achan.il2p_invert_polarity)
+		var n = s.sendIL2PFrame(pp, achan.il2p_version, achan.il2p_max_fec, achan.il2p_crc, achan.il2p_invert_polarity)
 		if n > 0 {
 			return n
 		}
