@@ -428,13 +428,11 @@ func Test_audioOutType(t *testing.T) {
 // output device name too, which is nothing we can transmit through.
 func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 	var prevAdev = adev
-	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
 		AudioClose()
 
 		adev = prevAdev
-		save_audio_config_p = prevConfig
 	})
 
 	var pa = makeAudioConfig("stdin", "stdin")
@@ -464,13 +462,11 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 // leaves the station receive-only rather than stopping it.
 func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
 	var prevAdev = adev
-	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
 		AudioClose()
 
 		adev = prevAdev
-		save_audio_config_p = prevConfig
 	})
 
 	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
@@ -485,13 +481,11 @@ func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
 // quietly transmit nothing.
 func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
 	var prevAdev = adev
-	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
 		AudioClose()
 
 		adev = prevAdev
-		save_audio_config_p = prevConfig
 	})
 
 	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
@@ -504,13 +498,11 @@ func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
 // is a configuration error too - neither can transmit.
 func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
 	var prevAdev = adev
-	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
 		AudioClose()
 
 		adev = prevAdev
-		save_audio_config_p = prevConfig
 	})
 
 	var pa = makeAudioConfig("stdin", "stdin")
@@ -530,14 +522,12 @@ func Test_audioClose_waitsForUDPSilenceKeepalive(t *testing.T) {
 	defer listener.Close()
 
 	var prevAdev = adev
-	var prevConfig = save_audio_config_p
 	var prevXmitSvc = xmitSvc
 
 	t.Cleanup(func() {
 		AudioClose()
 
 		adev = prevAdev
-		save_audio_config_p = prevConfig
 		xmitSvc = prevXmitSvc
 	})
 

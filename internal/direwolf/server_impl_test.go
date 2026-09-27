@@ -260,11 +260,6 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 	var s = new(AGWServer)
 	s.audioConfigP = new(AudioConfig)
 
-	// The 'V' handler queues the frame for transmission, and TransmitQueue.Append reads
-	// the audio configuration for itself.
-	save_audio_config_p = new(AudioConfig)
-	t.Cleanup(func() { save_audio_config_p = nil })
-
 	rapid.Check(t, func(t *rapid.T) {
 		var cmd = new(AGWPEMessage)
 		cmd.Header.DataKind = 'V'
@@ -282,10 +277,6 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 	var s = new(AGWServer)
 	s.audioConfigP = new(AudioConfig)
-
-	// As above: a 'K' that survives the bounds checks is queued too.
-	save_audio_config_p = new(AudioConfig)
-	t.Cleanup(func() { save_audio_config_p = nil })
 
 	rapid.Check(t, func(t *rapid.T) {
 		var cmd = new(AGWPEMessage)

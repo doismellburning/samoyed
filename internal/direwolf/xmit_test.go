@@ -283,10 +283,10 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 
 	const channel = 0
 
-	var origAudio, origToneGen, origGenerators, origADev = save_audio_config_p, toneGenCapture, toneGenerators, adev[0]
+	var origToneGen, origGenerators, origADev = toneGenCapture, toneGenerators, adev[0]
 
 	t.Cleanup(func() {
-		save_audio_config_p, toneGenCapture, toneGenerators, adev[0] = origAudio, origToneGen, origGenerators, origADev
+		toneGenCapture, toneGenerators, adev[0] = origToneGen, origGenerators, origADev
 
 		for p := range TQ_NUM_PRIO {
 			for transmitQueue.Remove(channel, p) != nil { //revive:disable-line:empty-block

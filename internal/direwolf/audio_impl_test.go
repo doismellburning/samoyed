@@ -199,13 +199,11 @@ func setStdin(t *testing.T) (*os.File, *os.File) {
 
 func TestAudioImpl_audioOpen_stdin_audioGet(t *testing.T) {
 	var prevAdev = adev
-	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
 		AudioClose()
 
 		adev = prevAdev
-		save_audio_config_p = prevConfig
 	})
 
 	var r, w = setStdin(t)
@@ -240,13 +238,11 @@ func TestAudioImpl_audioOpen_stdin_audioGet(t *testing.T) {
 
 func TestAudioImpl_audioOpen_udpInput_audioGet(t *testing.T) {
 	var prevAdev = adev
-	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
 		AudioClose()
 
 		adev = prevAdev
-		save_audio_config_p = prevConfig
 	})
 
 	// Port 0: let the system pick a free one.  The same name on the output
@@ -291,13 +287,11 @@ func TestAudioImpl_audioOpen_udpInput_audioGet(t *testing.T) {
 
 func TestAudioImpl_audioOpen_udpInput_badAddress(t *testing.T) {
 	var prevAdev = adev
-	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
 		AudioClose()
 
 		adev = prevAdev
-		save_audio_config_p = prevConfig
 	})
 
 	var pa = makeAudioConfig("udp:Q1TEST", "stdin")
@@ -307,13 +301,11 @@ func TestAudioImpl_audioOpen_udpInput_badAddress(t *testing.T) {
 
 func TestAudioImpl_audioOpen_udpInput_portInUse(t *testing.T) {
 	var prevAdev = adev
-	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
 		AudioClose()
 
 		adev = prevAdev
-		save_audio_config_p = prevConfig
 	})
 
 	var busy, err = new(net.ListenConfig).ListenPacket(t.Context(), "udp", ":0")
@@ -414,13 +406,11 @@ func TestAudioImpl_audioOpen_udpOutput_dialFails(t *testing.T) {
 	for _, specified := range []bool{false, true} {
 		t.Run(map[bool]string{false: "defaulted", true: "specified"}[specified], func(t *testing.T) {
 			var prevAdev = adev
-			var prevConfig = save_audio_config_p
 
 			t.Cleanup(func() {
 				AudioClose()
 
 				adev = prevAdev
-				save_audio_config_p = prevConfig
 			})
 
 			// No port, so there is nothing to dial.
@@ -444,13 +434,11 @@ func TestAudioImpl_audioOpen_udpOutput_dialFails(t *testing.T) {
 // is fatal, as there is then nothing to receive from.
 func TestAudioImpl_audioOpen_missingInputDevice_isFatal(t *testing.T) {
 	var prevAdev = adev
-	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
 		AudioClose()
 
 		adev = prevAdev
-		save_audio_config_p = prevConfig
 	})
 
 	var refsBefore = portaudioRefCount

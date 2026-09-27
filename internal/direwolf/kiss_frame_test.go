@@ -95,16 +95,13 @@ func kissTestAudioConfig() *AudioConfig {
 // setupKissProcessMsg gives kiss_process_msg the things it reaches for besides
 // the channel table, which each call is handed: the transmit settings it
 // applies parameters to, and the service that copies frames between clients.
-//
-// save_audio_config_p is cleared for the duration, so that a test passes only
-// if the channel check reads the table it was given.
 func setupKissProcessMsg(t *testing.T) *XmitService {
 	t.Helper()
 
-	var origAudio, origXmit, origKissNet = save_audio_config_p, xmitSvc, kissNetSvc
+	var origXmit, origKissNet = xmitSvc, kissNetSvc
 
 	t.Cleanup(func() {
-		save_audio_config_p, xmitSvc, kissNetSvc = origAudio, origXmit, origKissNet
+		xmitSvc, kissNetSvc = origXmit, origKissNet
 
 		for c := range MAX_RADIO_CHANS {
 			for p := range TQ_NUM_PRIO {
@@ -115,8 +112,6 @@ func setupKissProcessMsg(t *testing.T) *XmitService {
 	})
 
 	var audioConfig = kissTestAudioConfig()
-
-	save_audio_config_p = nil
 
 	xmitSvc = new(XmitService)
 	kissNetSvc = NewKissNetService(new(misc_config_s), audioConfig, 0)
