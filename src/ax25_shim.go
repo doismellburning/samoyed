@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func AX25CheckAddresses(pp *packet_t, strictness AddrStrictness) bool {
-	return pp.CheckAddresses(strictness)
-}
-
 func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
 	return from_pp.UnwrapThirdParty()
 }
