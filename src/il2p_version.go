@@ -120,23 +120,3 @@ func il2p_rx_max_fec(version il2p_version_t, fec_level int) int {
 
 	return 1 // v0.6 mandates 16 parity symbols per payload block.
 }
-
-/*-------------------------------------------------------------
- *
- * Name:	il2p_channel_version
- *
- * Purpose:	Look up the IL2P version configured for a channel.
- *
- * Inputs:	channel	- Radio channel number.
- *
- * Returns:	The configured version, or the default if there is no config.
- *
- *--------------------------------------------------------------*/
-
-func il2p_channel_version(channel int) il2p_version_t {
-	if save_audio_config_p == nil {
-		return IL2P_VERSION_0_6
-	}
-
-	return save_audio_config_p.achan[channel].il2p_version
-}

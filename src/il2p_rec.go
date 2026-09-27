@@ -25,6 +25,9 @@ const IL2P_CRC IL2PState = 4
 type il2pReceiver struct {
 	channel, subchannel, slice int
 
+	version il2p_version_t // IL2P protocol version spoken on this channel.
+	crc     bool           // true if frames carry a trailing CRC.
+
 	state IL2PState
 
 	acc uint // Accumulate most recent 24 bits for sync word matching. Lower 8 bits are also used for accumulating bytes for the header and payload.
@@ -49,7 +52,7 @@ type il2pReceiver struct {
 	corrected int // Number of symbols corrected by RS FEC.
 }
 
-func newIL2PReceiver(channel int, subchannel int, slice int) *il2pReceiver {
+func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_version_t, crc bool) *il2pReceiver {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -58,6 +61,8 @@ func newIL2PReceiver(channel int, subchannel int, slice int) *il2pReceiver {
 	F.channel = channel
 	F.subchannel = subchannel
 	F.slice = slice
+	F.version = version
+	F.crc = crc
 
 	return F
 }
@@ -135,7 +140,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 				if F.corrected >= 0 { // Good header.
 					// How much payload is expected?
 					var hdr_type, fec_level, length = il2p_get_header_attributes(F.uhdr[:])
-					var max_fec = il2p_rx_max_fec(il2p_channel_version(channel), fec_level)
+					var max_fec = il2p_rx_max_fec(F.version, fec_level)
 
 					var plprop, eplen = il2p_payload_compute(length, max_fec)
 					F.eplen = eplen
@@ -156,7 +161,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 						F.state = IL2P_PAYLOAD
 					} else if F.eplen == 0 { // No payload.
 						F.pc = 0
-						if il2p_crc_enabled(channel) {
+						if F.crc {
 							F.cc = 0
 							F.state = IL2P_CRC
 						} else {
@@ -192,7 +197,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 			if F.pc == F.eplen {
 				// TODO?: for symmetry it seems like we should clarify the payload before combining.
 
-				if il2p_crc_enabled(channel) {
+				if F.crc {
 					F.cc = 0
 					F.state = IL2P_CRC
 				} else {
@@ -228,7 +233,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 		// TODO?:  for symmetry, we might decode the payload here and later build the frame.
 		{
 			// Compute encoded payload size (includes parity symbols).
-			var version = il2p_channel_version(channel)
+			var version = F.version
 			var _, fec_level, payload_len = il2p_get_header_attributes(F.uhdr[:])
 			var max_fec = il2p_rx_max_fec(version, fec_level)
 			var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
@@ -251,7 +256,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 			}
 
 			// Validate trailing CRC if we collected one.
-			if pp != nil && il2p_crc_enabled(channel) {
+			if pp != nil && F.crc {
 				var frame_data = ax25_get_frame_data(pp)
 				if !il2p_crc_check(frame_data, F.scrc[:]) {
 					if il2p_get_debug() >= 1 {

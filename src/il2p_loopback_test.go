@@ -53,25 +53,27 @@ func (r *il2pLoopbackRecorder) flush() {
 // That is the same serialize and deserialize path used on the air, standing in
 // for the audio hardware at one end and the data link queue at the other.
 //
-// The caller points save_audio_config_p at a configuration first - the receive
-// path reads the channel's IL2P version from it, and its audio level from the
-// demodulator state - so il2pTestChannelVersion comes before this.
-func il2pLoopback(t *testing.T) *il2pLoopbackRecorder {
+// The receiver speaks the given version and expects a trailing CRC.  The
+// transmitter adds one because it finds no configuration in
+// save_audio_config_p, which is cleared for the duration.
+func il2pLoopback(t *testing.T, version il2p_version_t) *il2pLoopbackRecorder {
 	t.Helper()
 
 	var recorder = new(il2pLoopbackRecorder)
 
-	var savedTone, savedRec = toneGenCapture, multiModemRecCapture
+	var savedTone, savedRec, savedConfig = toneGenCapture, multiModemRecCapture, save_audio_config_p
 
 	t.Cleanup(func() {
-		toneGenCapture, multiModemRecCapture = savedTone, savedRec
+		toneGenCapture, multiModemRecCapture, save_audio_config_p = savedTone, savedRec, savedConfig
 	})
+
+	save_audio_config_p = nil
 
 	// A receiver of its own, so this test neither inherits nor bequeaths a
 	// half-gathered frame.  A decoder left part way through gathering a payload
 	// swallows the next frame it is given while it resynchronises, which a
 	// deliberate version mismatch is apt to leave behind.
-	recorder.rx = newIL2PReceiver(0, 0, 0)
+	recorder.rx = newIL2PReceiver(0, 0, 0, version, true)
 
 	toneGenCapture = func(channel int, data int) {
 		require.Zero(t, channel)

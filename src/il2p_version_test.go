@@ -7,23 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// il2pTestChannelVersion points the IL2P receiver at a configuration speaking
-// the given version, restoring whatever was there before when the test ends.
-func il2pTestChannelVersion(t *testing.T, version il2p_version_t) {
-	t.Helper()
-
-	var saved = save_audio_config_p
-	t.Cleanup(func() { save_audio_config_p = saved })
-
-	var config = new(audio_s)
-	for i := range config.achan {
-		config.achan[i].il2p_version = version
-		config.achan[i].il2p_crc = true // Same as the default with no configuration.
-	}
-
-	save_audio_config_p = config
-}
-
 func TestIL2PTXFEC(t *testing.T) {
 	var testData = []struct {
 		version     il2p_version_t
@@ -59,19 +42,8 @@ func TestIL2PRXMaxFEC(t *testing.T) {
 	assert.Equal(t, 1, il2p_rx_max_fec(IL2P_VERSION_COMPAT, 1))
 }
 
-func TestIL2PChannelVersionDefault(t *testing.T) {
-	var saved = save_audio_config_p
-	t.Cleanup(func() { save_audio_config_p = saved })
-
-	save_audio_config_p = nil
-	assert.Equal(t, IL2P_VERSION_0_6, il2p_channel_version(0))
-
-	il2pTestChannelVersion(t, IL2P_VERSION_0_4)
-	assert.Equal(t, IL2P_VERSION_0_4, il2p_channel_version(0))
-}
-
 // Send a frame over the fake modem and see whether the receiver, speaking the
-// version configured for the channel, makes sense of it.
+// version it was given, makes sense of it.
 func TestIL2POnAirVersions(t *testing.T) {
 	il2p_init(0)
 
@@ -113,9 +85,7 @@ func TestIL2POnAirVersions(t *testing.T) {
 
 	for _, testDatum := range testData {
 		t.Run(testDatum.name, func(t *testing.T) {
-			il2pTestChannelVersion(t, testDatum.rx_version)
-
-			var recorder = il2pLoopback(t)
+			var recorder = il2pLoopback(t, testDatum.rx_version)
 
 			require.Positive(t, NewHDLCSender(0, nil).sendIL2PFrame(pp, testDatum.tx_version, testDatum.max_fec, 0))
 
