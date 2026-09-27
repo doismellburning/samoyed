@@ -4,11 +4,16 @@
 package direwolf
 
 import (
+	"context"
+	"fmt"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 )
 
@@ -466,4 +471,726 @@ func Test_sbCalculateNextTime_result_within_rate_bounds(t *testing.T) {
 		assert.False(t, next.Before(lo), "next should be >= last_xmit + sb_fast_rate")
 		assert.False(t, next.After(hi), "next should be <= last_xmit + sb_slow_rate")
 	})
+}
+
+// send and thread tests
+//
+// Beacons that go to a radio channel end up in the transmit queue, so that is
+// where these look for what was sent.
+
+// setupBeaconTransmitQueue points the transmit queue at the given modem
+// configuration and empties it again once the test is done.
+func setupBeaconTransmitQueue(t *testing.T, modem *AudioConfig) {
+	t.Helper()
+
+	var drain = func() {
+		for c := range MAX_RADIO_CHANS {
+			for p := range TQ_NUM_PRIO {
+				for transmitQueue.Remove(c, p) != nil { //revive:disable-line:empty-block
+				}
+			}
+		}
+	}
+
+	transmitQueue.Init(modem)
+	drain()
+	t.Cleanup(drain)
+}
+
+// newSendTestBeaconService is a BeaconService with one beacon, sending to
+// radio channel 0 with Q1TEST as its call, and a transmit queue ready to
+// catch what it sends.
+func newSendTestBeaconService(t *testing.T) *BeaconService {
+	t.Helper()
+
+	var modem = makeBeaconModemConfig()
+	setupBeaconTransmitQueue(t, modem)
+
+	var cfg = new(misc_config_s)
+	cfg.num_beacons = 1
+	cfg.beacon[0].sendto_chan = 0
+	cfg.beacon[0].sendto_type = SENDTO_XMIT
+	cfg.beacon[0].symtab = '/'
+	cfg.beacon[0].symbol = '-'
+	cfg.beacon[0].every = 3600
+
+	return &BeaconService{ //nolint:exhaustruct_v5
+		modemConfig: modem,
+		miscConfig:  cfg,
+		igateConfig: makeBeaconIGateConfig(),
+	}
+}
+
+// sentBeacon is the one beacon the test expects in the low priority queue of
+// channel 0, formatted as monitor text.
+func sentBeacon(t *testing.T) string {
+	t.Helper()
+
+	var pp = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+	require.NotNil(t, pp, "no beacon was transmitted")
+
+	var more = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+	assert.Nil(t, more, "more than one beacon was transmitted")
+
+	return pp.FormatAddrs() + string(pp.Info())
+}
+
+func assertNothingSent(t *testing.T) {
+	t.Helper()
+
+	for p := range TQ_NUM_PRIO {
+		var pp = transmitQueue.Remove(0, p)
+		if pp != nil {
+			t.Errorf("transmitted %s", pp.FormatAddrs()+string(pp.Info()))
+		}
+	}
+}
+
+// beaconDefaultDest is the destination a beacon without DEST gets: our tocall and version.
+func beaconDefaultDest() string {
+	return fmt.Sprintf("%s%1d%1d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
+}
+
+func Test_BeaconSend_position(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_POSITION
+	bp.lat = maybe.Just(42.5)
+	bp.lon = maybe.Just(-71.25)
+	bp.alt_m = maybe.Just(100.0)
+	bp.power = 10
+	bp.height = 20
+	bp.gain = 3
+	bp.comment = "Q1TEST beacon"
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	var got = sentBeacon(t)
+	assert.True(t, strings.HasPrefix(got, "Q1TEST>"+beaconDefaultDest()+":!4230.00N/07115.00W-"), got)
+	assert.Contains(t, got, "PHG")
+	assert.Contains(t, got, "/A=000328")
+	assert.True(t, strings.HasSuffix(got, "Q1TEST beacon"), got)
+}
+
+func Test_BeaconSend_position_with_explicit_addresses(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_POSITION
+	bp.lat = maybe.Just(42.5)
+	bp.lon = maybe.Just(-71.25)
+	bp.source = "Q2TEST-5"
+	bp.dest = "APZQ1T"
+	bp.via = "WIDE1-1,WIDE2-1"
+	bp.messaging = true
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assert.Equal(t, "Q2TEST-5>APZQ1T,WIDE1-1,WIDE2-1:=4230.00N/07115.00W-", sentBeacon(t))
+}
+
+func Test_BeaconSend_position_without_a_position_sends_nothing(t *testing.T) {
+	// NewBeaconService refuses such a beacon, so this is only a backstop.
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_POSITION
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assertNothingSent(t)
+}
+
+func Test_BeaconSend_object(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_OBJECT
+	bp.objname = "Q1OBJ"
+	bp.lat = maybe.Just(42.5)
+	bp.lon = maybe.Just(-71.25)
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	var got = sentBeacon(t)
+	assert.True(t, strings.HasPrefix(got, "Q1TEST>"+beaconDefaultDest()+":;Q1OBJ    *"), got)
+	assert.Contains(t, got, "4230.00N/07115.00W-")
+}
+
+func Test_BeaconSend_object_without_a_position_sends_nothing(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_OBJECT
+	bs.miscConfig.beacon[0].objname = "Q1OBJ"
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assertNothingSent(t)
+}
+
+func Test_BeaconSend_custom_info(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_info = ">Hello from Q1TEST"
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+":>Hello from Q1TEST", sentBeacon(t))
+}
+
+func Test_BeaconSend_custom_without_info_sends_nothing(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assertNothingSent(t)
+}
+
+func Test_BeaconSend_custom_infocmd_failure_sends_nothing(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_infocmd = "/nonexistent/q1test-infocmd"
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assertNothingSent(t)
+}
+
+func Test_BeaconSend_custom_infocmd_output_is_the_info(t *testing.T) {
+	// dw_run_cmd runs the command without a shell, so an argument-free command
+	// with predictable output is what is needed: "true" prints nothing.
+	var truePath, err = exec.LookPath("true")
+	if err != nil {
+		t.Skip("no true command available")
+	}
+
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_infocmd = truePath
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+":", sentBeacon(t))
+}
+
+func Test_BeaconSend_commentcmd_failure_keeps_fixed_comment(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_POSITION
+	bp.lat = maybe.Just(42.5)
+	bp.lon = maybe.Just(-71.25)
+	bp.comment = "fixed"
+	bp.commentcmd = "/nonexistent/q1test-commentcmd"
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assert.True(t, strings.HasSuffix(sentBeacon(t), "-fixed"))
+}
+
+func Test_BeaconSend_commentcmd_output_is_appended(t *testing.T) {
+	var truePath, err = exec.LookPath("true")
+	if err != nil {
+		t.Skip("no true command available")
+	}
+
+	var bs = newSendTestBeaconService(t)
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_POSITION
+	bp.lat = maybe.Just(42.5)
+	bp.lon = maybe.Just(-71.25)
+	bp.comment = "fixed"
+	bp.commentcmd = truePath
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assert.True(t, strings.HasSuffix(sentBeacon(t), "-fixed"))
+}
+
+func Test_BeaconSend_igate_status(t *testing.T) {
+	var savedMheard = mheardDB
+
+	mheardDB = NewMHeardDB(0)
+
+	t.Cleanup(func() { mheardDB = savedMheard })
+
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_IGATE
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+
+		":<IGATE,MSG_CNT=0,PKT_CNT=0,DIR_CNT=0,LOC_CNT=0,RF_CNT=0,UPL_CNT=0,DNL_CNT=0",
+		sentBeacon(t))
+}
+
+func Test_BeaconSend_tracker_with_a_3D_fix(t *testing.T) {
+	var savedLogger = packetLogger
+
+	packetLogger = new(PacketLogger) // No path, so it writes nothing.
+
+	t.Cleanup(func() { packetLogger = savedLogger })
+
+	var bs = newSendTestBeaconService(t)
+	bs.SetDebug(3)
+
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_TRACKER
+	bp.symbol = '>'
+	bp.alt_m = maybe.Just(1.0) // Any positive altitude asks for the GPS one.
+
+	var gpsinfo = new(GPSInfo)
+	gpsinfo.Fix = DWFIX_3D
+	gpsinfo.Lat = maybe.Just(42.5)
+	gpsinfo.Lon = maybe.Just(-71.25)
+	gpsinfo.Altitude = maybe.Just(100.0)
+	gpsinfo.Track = maybe.Just(90.4)
+	gpsinfo.SpeedKnots = maybe.Just(10.6)
+
+	bs.send(t.Context(), 0, gpsinfo)
+
+	var got = sentBeacon(t)
+	assert.True(t, strings.HasPrefix(got, "Q1TEST>"+beaconDefaultDest()+":!4230.00N/07115.00W>090/011"), got)
+	assert.Contains(t, got, "/A=000328")
+}
+
+func Test_BeaconSend_tracker_with_a_2D_fix_has_no_altitude(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_TRACKER
+	bp.symbol = '>'
+	bp.alt_m = maybe.Just(1.0)
+
+	var gpsinfo = new(GPSInfo)
+	gpsinfo.Fix = DWFIX_2D
+	gpsinfo.Lat = maybe.Just(42.5)
+	gpsinfo.Lon = maybe.Just(-71.25)
+	gpsinfo.Altitude = maybe.Just(100.0)
+
+	bs.send(t.Context(), 0, gpsinfo)
+
+	var got = sentBeacon(t)
+	assert.True(t, strings.HasPrefix(got, "Q1TEST>"+beaconDefaultDest()+":!4230.00N/07115.00W>"), got)
+	assert.NotContains(t, got, "/A=")
+}
+
+func Test_BeaconSend_no_channel_sends_nothing(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_info = ">Hello"
+	bs.miscConfig.beacon[0].sendto_chan = -1
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assertNothingSent(t)
+}
+
+func Test_BeaconSend_no_mycall_sends_nothing(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.modemConfig.mycall[0] = ""
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_info = ">Hello"
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assertNothingSent(t)
+}
+
+func Test_BeaconSend_unparseable_packet_sends_nothing(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_info = ">Hello"
+	bs.miscConfig.beacon[0].dest = "NOT A VALID CALL"
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assertNothingSent(t)
+}
+
+func Test_BeaconSend_ichannel_uses_channel_0_call(t *testing.T) {
+	// An ICHANNEL beacon takes the call of channel 0.  The transmit queue
+	// hands it to the IGate, which silently drops it when not connected, so
+	// the only thing to check is that no radio channel was sent it.
+	var bs = newSendTestBeaconService(t)
+	bs.modemConfig.chan_medium[1] = MEDIUM_IGATE
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_info = ">Hello"
+	bs.miscConfig.beacon[0].sendto_chan = 1
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assertNothingSent(t)
+	assert.Nil(t, transmitQueue.Remove(1, TQ_PRIO_1_LO))
+}
+
+func Test_BeaconSend_to_igate_bypasses_transmit_queue(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_info = ">Hello"
+	bs.miscConfig.beacon[0].sendto_type = SENDTO_IGATE
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assertNothingSent(t)
+}
+
+func Test_BeaconSend_to_recv_is_simulated_reception(t *testing.T) {
+	for dataLinkQueue.Remove() != nil { //revive:disable-line:empty-block
+	}
+
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_info = ">Hello"
+	bs.miscConfig.beacon[0].sendto_type = SENDTO_RECV
+
+	bs.send(t.Context(), 0, new(GPSInfo))
+
+	assertNothingSent(t)
+
+	var item = dataLinkQueue.Remove()
+	require.NotNil(t, item)
+	assert.Equal(t, ">Hello", string(item.pp.Info()))
+	assert.Nil(t, dataLinkQueue.Remove())
+}
+
+// runBeaconThread runs bs.thread until the test calls the returned stop, which
+// waits for the thread to have returned.  bs must not be touched while the
+// thread runs.
+func runBeaconThread(t *testing.T, bs *BeaconService) func() {
+	t.Helper()
+
+	var ctx, cancel = context.WithCancel(t.Context())
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		bs.thread(ctx)
+	}()
+
+	var stop = func() {
+		cancel()
+		<-done
+	}
+
+	t.Cleanup(stop)
+
+	return stop
+}
+
+// waitForBeacon polls the transmit queue of channel 0 for a beacon.
+func waitForBeacon(t *testing.T) string {
+	t.Helper()
+
+	var deadline = time.Now().Add(5 * time.Second)
+
+	for time.Now().Before(deadline) {
+		var pp = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+		if pp != nil {
+			return pp.FormatAddrs() + string(pp.Info())
+		}
+
+		time.Sleep(time.Millisecond)
+	}
+
+	t.Fatal("no beacon was transmitted")
+
+	return ""
+}
+
+// runBeaconThreadUntilRescheduled runs bs.thread until beacon 0 is scheduled
+// for later than first.  Nothing is sent to wait for, and the schedule can
+// be read only while the thread is stopped, so it is run in short bursts.
+func runBeaconThreadUntilRescheduled(t *testing.T, bs *BeaconService, first time.Time) {
+	t.Helper()
+
+	var deadline = time.Now().Add(5 * time.Second)
+
+	for time.Now().Before(deadline) {
+		var stop = runBeaconThread(t, bs)
+
+		time.Sleep(10 * time.Millisecond)
+		stop()
+
+		if bs.miscConfig.beacon[0].next.After(first) {
+			return
+		}
+	}
+
+	t.Fatal("beacon was never rescheduled")
+}
+
+func Test_BeaconThread_sends_a_due_beacon_then_waits(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_CUSTOM
+	bp.custom_info = ">Hello"
+	// Well overdue, as though the clock had jumped forward: the schedule is
+	// rebuilt from now rather than sending every missed beacon.
+	bp.next = time.Now().Add(-2 * time.Hour)
+	bp.every = 60
+
+	// An ignored beacon is left alone.
+	bs.miscConfig.num_beacons = 2
+	bs.miscConfig.beacon[1].btype = BEACON_IGNORE
+
+	var start = time.Now()
+	var stop = runBeaconThread(t, bs)
+
+	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+":>Hello", waitForBeacon(t))
+
+	stop()
+
+	assertNothingSent(t)
+	assert.WithinDuration(t, start.Add(60*time.Second), bp.next, 5*time.Second)
+}
+
+func Test_BeaconThread_fixed_rate_tracker(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.SetDebug(1)
+
+	var gpsinfo = new(GPSInfo)
+	gpsinfo.Fix = DWFIX_3D
+	gpsinfo.Lat = maybe.Just(42.5)
+	gpsinfo.Lon = maybe.Just(-71.25)
+	gpsinfo.Altitude = maybe.Just(100.0)
+	gpsinfo.Track = maybe.Just(90.0)
+	gpsinfo.SpeedKnots = maybe.Just(10.0)
+
+	bs.gps = new(GPS)
+	bs.gps.setData(gpsinfo)
+
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_TRACKER
+	bp.symbol = '>'
+
+	var first = time.Now()
+	bp.next = first
+
+	var stop = runBeaconThread(t, bs)
+
+	assert.Contains(t, waitForBeacon(t), ":!4230.00N/07115.00W>090/010")
+
+	stop()
+
+	assert.Equal(t, first.Add(3600*time.Second), bp.next)
+}
+
+func Test_BeaconThread_fixed_rate_tracker_without_position_keeps_schedule(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.SetDebug(1)
+
+	var gpsinfo = new(GPSInfo)
+	gpsinfo.Fix = DWFIX_NO_FIX
+
+	bs.gps = new(GPS)
+	bs.gps.setData(gpsinfo)
+
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_TRACKER
+
+	var first = time.Now()
+	bp.next = first
+
+	runBeaconThreadUntilRescheduled(t, bs, first)
+
+	assertNothingSent(t)
+	assert.Equal(t, first.Add(3600*time.Second), bp.next)
+}
+
+func Test_BeaconThread_smartbeaconing_tracker(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.SetDebug(2)
+
+	var sb = makeSBConfig()
+	bs.miscConfig.sb_configured = sb.sb_configured
+	bs.miscConfig.sb_fast_speed = sb.sb_fast_speed
+	bs.miscConfig.sb_fast_rate = sb.sb_fast_rate
+	bs.miscConfig.sb_slow_speed = sb.sb_slow_speed
+	bs.miscConfig.sb_slow_rate = sb.sb_slow_rate
+	bs.miscConfig.sb_turn_time = sb.sb_turn_time
+	bs.miscConfig.sb_turn_angle = sb.sb_turn_angle
+	bs.miscConfig.sb_turn_slope = sb.sb_turn_slope
+
+	var gpsinfo = new(GPSInfo)
+	gpsinfo.Fix = DWFIX_2D
+	gpsinfo.Lat = maybe.Just(42.5)
+	gpsinfo.Lon = maybe.Just(-71.25)
+	gpsinfo.Track = maybe.Just(180.0)
+	gpsinfo.SpeedKnots = maybe.Just(100.0) // Faster than sb_fast_speed.
+
+	bs.gps = new(GPS)
+	bs.gps.setData(gpsinfo)
+
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_TRACKER
+	bp.symbol = '>'
+	bp.next = time.Now()
+
+	var start = time.Now()
+	var stop = runBeaconThread(t, bs)
+
+	assert.Contains(t, waitForBeacon(t), ":!4230.00N/07115.00W>180/100")
+
+	stop()
+
+	assert.WithinDuration(t, start.Add(time.Duration(sb.sb_fast_rate)*time.Second), bp.next, 5*time.Second)
+}
+
+func Test_BeaconThread_smartbeaconing_tracker_without_position_retries_soon(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+
+	bs.miscConfig.sb_configured = true
+	bs.miscConfig.sb_fast_rate = 30
+	bs.miscConfig.sb_turn_time = 15
+
+	var gpsinfo = new(GPSInfo)
+	gpsinfo.Fix = DWFIX_2D // A mode, but never a position.
+
+	bs.gps = new(GPS)
+	bs.gps.setData(gpsinfo)
+
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_TRACKER
+
+	var first = time.Now()
+	bp.next = first
+
+	runBeaconThreadUntilRescheduled(t, bs, first)
+
+	assertNothingSent(t)
+	assert.WithinDuration(t, first.Add(2*time.Second), bp.next, time.Second)
+}
+
+func Test_BeaconThread_returns_when_cancelled_before_anything_is_due(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_info = ">Hello"
+	bs.miscConfig.beacon[0].next = time.Now().Add(time.Hour)
+
+	var stop = runBeaconThread(t, bs)
+
+	stop()
+
+	assertNothingSent(t)
+}
+
+func Test_BeaconService_Start_runs_thread(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_info = ">Hello"
+	bs.miscConfig.beacon[0].next = time.Now()
+
+	var ctx, cancel = context.WithCancel(t.Context())
+	defer cancel()
+
+	bs.Start(ctx)
+
+	// Once this has gone out the thread sleeps until the next one, an hour
+	// away, and returns on cancellation without touching anything else.
+	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+":>Hello", waitForBeacon(t))
+}
+
+// More NewBeaconService validation tests
+
+func Test_NewBeaconService_tbeacon_without_gps_is_ignored(t *testing.T) {
+	var cfg = new(misc_config_s)
+	cfg.num_beacons = 1
+	cfg.beacon[0].btype = BEACON_TRACKER
+	cfg.beacon[0].every = 600
+
+	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil)
+	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
+}
+
+func Test_NewBeaconService_tbeacon_with_gps_not_ignored(t *testing.T) {
+	var gps = new(GPS)
+	var gpsinfo = new(GPSInfo)
+	gpsinfo.Fix = DWFIX_NO_FIX
+	gps.setData(gpsinfo)
+
+	var cfg = new(misc_config_s)
+	cfg.num_beacons = 1
+	cfg.beacon[0].btype = BEACON_TRACKER
+	cfg.beacon[0].every = 600
+
+	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), gps)
+	assert.Equal(t, BEACON_TRACKER, bs.miscConfig.beacon[0].btype)
+}
+
+func Test_NewBeaconService_info_on_non_custom_beacons_is_only_complained_about(t *testing.T) {
+	var gps = new(GPS)
+	var gpsinfo = new(GPSInfo)
+	gpsinfo.Fix = DWFIX_NO_FIX
+	gps.setData(gpsinfo)
+
+	var cfg = new(misc_config_s)
+	cfg.num_beacons = 2
+	cfg.beacon[0].btype = BEACON_POSITION
+	cfg.beacon[0].lat = maybe.Just(42.0)
+	cfg.beacon[0].lon = maybe.Just(-71.0)
+	cfg.beacon[0].custom_info = ">Hello"
+	cfg.beacon[1].btype = BEACON_TRACKER
+	cfg.beacon[1].custom_infocmd = "q1test-cmd"
+
+	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), gps)
+	assert.Equal(t, BEACON_POSITION, bs.miscConfig.beacon[0].btype)
+	assert.Equal(t, BEACON_TRACKER, bs.miscConfig.beacon[1].btype)
+}
+
+func Test_NewBeaconService_obeacon_with_objname_and_position_not_ignored(t *testing.T) {
+	var cfg = new(misc_config_s)
+	cfg.num_beacons = 1
+	cfg.beacon[0].btype = BEACON_OBJECT
+	cfg.beacon[0].objname = "Q1OBJ"
+	cfg.beacon[0].lat = maybe.Just(42.0)
+	cfg.beacon[0].lon = maybe.Just(-71.0)
+
+	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil)
+	assert.Equal(t, BEACON_OBJECT, bs.miscConfig.beacon[0].btype)
+}
+
+func Test_NewBeaconService_out_of_range_channels_use_channel_0_call(t *testing.T) {
+	var cfg = new(misc_config_s)
+	cfg.num_beacons = 3
+	cfg.beacon[0].btype = BEACON_CUSTOM
+	cfg.beacon[0].custom_info = ">Hello"
+	cfg.beacon[0].sendto_chan = -1
+	cfg.beacon[1].btype = BEACON_CUSTOM
+	cfg.beacon[1].custom_info = ">Hello"
+	cfg.beacon[1].sendto_chan = MAX_TOTAL_CHANS
+	cfg.beacon[2].btype = BEACON_IGNORE
+
+	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil)
+	assert.Equal(t, BEACON_CUSTOM, bs.miscConfig.beacon[0].btype)
+	assert.Equal(t, BEACON_CUSTOM, bs.miscConfig.beacon[1].btype)
+	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[2].btype)
+}
+
+func Test_NewBeaconService_slotted_beacon_schedule(t *testing.T) {
+	var tests = []struct {
+		name      string
+		every     int
+		wantEvery int
+	}{
+		{"good interval kept", 600, 600},
+		{"adjusted up", 7, 8},
+		{"too long is capped at an hour", 7200, 3600},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg = new(misc_config_s)
+			cfg.num_beacons = 1
+			cfg.beacon[0].btype = BEACON_CUSTOM
+			cfg.beacon[0].custom_info = ">Hello"
+			cfg.beacon[0].slot = maybe.Just(30)
+			cfg.beacon[0].every = tt.every
+
+			var before = time.Now()
+			var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil)
+			var bp = bs.miscConfig.beacon[0]
+
+			assert.Equal(t, tt.wantEvery, bp.every)
+			assert.GreaterOrEqual(t, bp.delay, 5)
+			assert.LessOrEqual(t, bp.delay, bp.every+5)
+			assert.WithinDuration(t, before.Add(time.Duration(bp.delay)*time.Second), bp.next, 2*time.Second)
+		})
+	}
 }
