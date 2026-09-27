@@ -831,7 +831,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		if channel != audio_config.igate_vchannel { // suppress if from ICHANNEL
 			var logEntry = logrus.WithField("heard", heard)
 
-			if h != -1 && h != AX25_SOURCE {
+			if h != -1 && h != ax25.Source {
 				logEntry = logEntry.WithField("digipeater", true)
 			}
 
@@ -850,7 +850,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 			/* WIDEn-0, it is quite likely (but not guaranteed), that */
 			/* we are actually hearing the preceding station in the path. */
 
-			if h >= AX25_REPEATER_2 &&
+			if h >= ax25.Repeater2 &&
 				len(heard) == 5 &&
 				strings.EqualFold(heard[:4], "WIDE") &&
 				unicode.IsDigit(rune(heard[4])) {

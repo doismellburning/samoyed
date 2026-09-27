@@ -277,7 +277,7 @@ const (
 func frame_flavor(pp *packet_t) flavor_t {
 	if pp.IsAPRS() { // UI frame, PID 0xF0.
 		// It's unfortunate APRS did not use its own special PID.
-		var dest = pp.AddrNoSSID(AX25_DESTINATION)
+		var dest = pp.AddrNoSSID(ax25.Destination)
 
 		if dest == "SPEECH" {
 			return (FLAVOR_SPEECH)
@@ -294,7 +294,7 @@ func frame_flavor(pp *packet_t) flavor_t {
 		/* Is there at least one digipeater AND has first one been used? */
 		/* I could be the first in the list or later.  Doesn't matter. */
 
-		if pp.NumRepeaters() >= 1 && pp.H(AX25_REPEATER_1) > 0 {
+		if pp.NumRepeaters() >= 1 && pp.H(ax25.Repeater1) > 0 {
 			return (FLAVOR_APRS_DIGI)
 		}
 
@@ -482,7 +482,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 				xs.xmit_speech(ctx, channel, pp)
 
 			case FLAVOR_MORSE:
-				var ssid = pp.SSID(AX25_DESTINATION)
+				var ssid = pp.SSID(ax25.Destination)
 
 				var wpm = MORSE_DEFAULT_WPM
 				if ssid > 0 {
@@ -503,7 +503,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 				xs.xmit_morse(channel, pp, wpm)
 
 			case FLAVOR_DTMF:
-				var speed = pp.SSID(AX25_DESTINATION)
+				var speed = pp.SSID(ax25.Destination)
 				if speed == 0 {
 					speed = 5 // default half of maximum
 				}

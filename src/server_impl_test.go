@@ -7,6 +7,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
@@ -431,10 +432,10 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	require.NotNil(t, item)
 	assert.Equal(t, DLQ_CONNECT_REQUEST, item._type)
 	assert.Equal(t, 4, item.num_addr) // source + destination + 2 digipeaters
-	assert.Equal(t, "Q1TEST", item.addrs[AX25_SOURCE])
-	assert.Equal(t, "Q2TEST", item.addrs[AX25_DESTINATION])
-	assert.Equal(t, "Q3TEST", item.addrs[AX25_REPEATER_1])
-	assert.Equal(t, "Q4TEST", item.addrs[AX25_REPEATER_1+1])
+	assert.Equal(t, "Q1TEST", item.addrs[ax25.Source])
+	assert.Equal(t, "Q2TEST", item.addrs[ax25.Destination])
+	assert.Equal(t, "Q3TEST", item.addrs[ax25.Repeater1])
+	assert.Equal(t, "Q4TEST", item.addrs[ax25.Repeater1+1])
 }
 
 func TestConnectedModeAllowed_OutOfRange(t *testing.T) {

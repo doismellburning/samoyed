@@ -21,6 +21,8 @@ package direwolf
 
 import (
 	"regexp"
+
+	"github.com/doismellburning/samoyed/internal/ax25"
 )
 
 /*
@@ -233,7 +235,7 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec stri
 	 */
 	var r = pp.FirstNotRepeated()
 
-	if r < AX25_REPEATER_1 {
+	if r < ax25.Repeater1 {
 		return (nil) // Nothing to do.
 	}
 

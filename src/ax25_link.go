@@ -164,7 +164,7 @@ import (
 
 const AX25_N1_PACLEN_MIN = 1       // Max bytes in Information part of frame.
 const AX25_N1_PACLEN_DEFAULT = 256 // some v2.0 implementations have 128
-const AX25_N1_PACLEN_MAX = AX25_MAX_INFO_LEN
+const AX25_N1_PACLEN_MAX = ax25.MaxInfoLen
 
 const AX25_N2_RETRY_MIN = 1 // Number of times to retry before giving up.
 const AX25_N2_RETRY_DEFAULT = 10
@@ -272,14 +272,14 @@ const (
 	state_5_awaiting_v22_connection dlsm_state_e = 5
 )
 
-const OWNCALL = AX25_SOURCE
+const OWNCALL = ax25.Source
 
 // addrs[OWNCALL] is owncall for this end of link.
 // Note that we are acting on behalf of
 // a client application so the APRS mycall
 // might not be relevant.
 
-const PEERCALL = AX25_DESTINATION
+const PEERCALL = ax25.Destination
 
 // addrs[PEERCALL] is call for other end.
 
@@ -315,7 +315,7 @@ type ax25_dlsm_t struct {
 	// which client should receive the data or
 	// notifications about state changes.
 
-	addrs [AX25_MAX_ADDRS]string
+	addrs [ax25.MaxAddrs]string
 	// Up to 10 addresses, same order as in frame.
 
 	num_addr int // Number of addresses.  Should be in range 2 .. 10.
@@ -681,11 +681,11 @@ func ax25_link_init(pconfig *misc_config_s, debug int) {
  *
  *------------------------------------------------------------------------------*/
 
-func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, create bool) *ax25_dlsm_t {
+func get_link_handle(addrs [ax25.MaxAddrs]string, num_addr int, channel int, client int, create bool) *ax25_dlsm_t {
 	if ax25Link.debugLinkHandle {
 		text_color_set(DW_COLOR_DECODED)
 		dw_printf("get_link_handle (%s>%s, chan=%d, client=%d, create=%t)\n",
-			addrs[AX25_SOURCE], addrs[AX25_DESTINATION], channel, client, create)
+			addrs[ax25.Source], addrs[ax25.Destination], channel, client, create)
 	}
 
 	// Look for existing.
@@ -694,8 +694,8 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 		// address order is reversed for compare.
 		for p := ax25Link.listHead; p != nil; p = p.next {
 			if p.channel == channel &&
-				addrs[AX25_DESTINATION] == p.addrs[OWNCALL] &&
-				addrs[AX25_SOURCE] == p.addrs[PEERCALL] {
+				addrs[ax25.Destination] == p.addrs[OWNCALL] &&
+				addrs[ax25.Source] == p.addrs[PEERCALL] {
 				if ax25Link.debugLinkHandle {
 					text_color_set(DW_COLOR_DECODED)
 					dw_printf("get_link_handle returns existing stream id %d for incoming.\n", p.stream_id)
@@ -708,8 +708,8 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 		for p := ax25Link.listHead; p != nil; p = p.next {
 			if p.channel == channel &&
 				p.client == client &&
-				addrs[AX25_SOURCE] == p.addrs[OWNCALL] &&
-				addrs[AX25_DESTINATION] == p.addrs[PEERCALL] {
+				addrs[ax25.Source] == p.addrs[OWNCALL] &&
+				addrs[ax25.Destination] == p.addrs[PEERCALL] {
 				if ax25Link.debugLinkHandle {
 					text_color_set(DW_COLOR_DECODED)
 					dw_printf("get_link_handle returns existing stream id %d for outgoing.\n", p.stream_id)
@@ -739,7 +739,7 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 		var found *reg_callsign_t
 
 		for r := ax25Link.regCallsignList; r != nil && found == nil; r = r.next {
-			if addrs[AX25_DESTINATION] == r.callsign && channel == r.channel {
+			if addrs[ax25.Destination] == r.callsign && channel == r.channel {
 				found = r
 				incoming_for_client = r.client
 			}
@@ -775,13 +775,13 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 	// If it came in over the radio, we need to swap source/destination and reverse any digi path.
 
 	if incoming_for_client >= 0 {
-		p.addrs[AX25_SOURCE] = addrs[AX25_DESTINATION]
-		p.addrs[AX25_DESTINATION] = addrs[AX25_SOURCE]
+		p.addrs[ax25.Source] = addrs[ax25.Destination]
+		p.addrs[ax25.Destination] = addrs[ax25.Source]
 
-		var j = AX25_REPEATER_1
+		var j = ax25.Repeater1
 
 		var k = num_addr - 1
-		for k >= AX25_REPEATER_1 {
+		for k >= ax25.Repeater1 {
 			p.addrs[j] = addrs[k]
 			j++
 			k--
@@ -894,7 +894,7 @@ func dl_connect_request(E *dlq_item_t) {
 
 		var old_version = false
 		for n := 0; n < ax25Link.miscConfig.v20_count && !old_version; n++ {
-			if E.addrs[AX25_DESTINATION] == ax25Link.miscConfig.v20_addrs[n] {
+			if E.addrs[ax25.Destination] == ax25Link.miscConfig.v20_addrs[n] {
 				old_version = true
 			}
 		}
@@ -1523,7 +1523,7 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 		// Try swapping the addresses.
 		// this is communicating with the client app, not over the air,
 		// so we don't need to worry about digipeaters.
-		var swapped [AX25_MAX_ADDRS]string
+		var swapped [ax25.MaxAddrs]string
 		swapped[PEERCALL] = E.addrs[OWNCALL]
 		swapped[OWNCALL] = E.addrs[PEERCALL]
 
@@ -1627,7 +1627,7 @@ func dl_client_cleanup(E *dlq_item_t) {
 
 			if ax25Link.debugClientApp {
 				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("dl_client_cleanup: remove %s>%s\n", S.addrs[AX25_SOURCE], S.addrs[AX25_DESTINATION])
+				dw_printf("dl_client_cleanup: remove %s>%s\n", S.addrs[ax25.Source], S.addrs[ax25.Destination])
 			}
 
 			discard_i_queue(S)
@@ -1932,7 +1932,7 @@ func lm_data_indication(E *dlq_item_t) {
 
 	var any_unused_digi = false
 
-	for n := AX25_REPEATER_1; n < E.num_addr; n++ {
+	for n := ax25.Repeater1; n < E.num_addr; n++ {
 		if E.pp.H(n) == 0 {
 			any_unused_digi = true
 		}
@@ -1941,7 +1941,7 @@ func lm_data_indication(E *dlq_item_t) {
 	if any_unused_digi {
 		if ax25Link.debugRadio {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("lm_data_indication (%d, %s>%s) - ignore due to unused digi address.\n", E._chan, E.addrs[AX25_SOURCE], E.addrs[AX25_DESTINATION])
+			dw_printf("lm_data_indication (%d, %s>%s) - ignore due to unused digi address.\n", E._chan, E.addrs[ax25.Source], E.addrs[ax25.Destination])
 		}
 
 		return
@@ -1955,7 +1955,7 @@ func lm_data_indication(E *dlq_item_t) {
 
 	if ax25Link.debugRadio {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("lm_data_indication (%d, %s>%s)\n", E._chan, E.addrs[AX25_SOURCE], E.addrs[AX25_DESTINATION])
+		dw_printf("lm_data_indication (%d, %s>%s)\n", E._chan, E.addrs[ax25.Source], E.addrs[ax25.Destination])
 	}
 
 	// Look for existing, or possibly create new, link state matching addresses and channel.
@@ -1977,8 +1977,8 @@ func lm_data_indication(E *dlq_item_t) {
 	if S == nil {
 		var entry = logrus.WithFields(logrus.Fields{
 			"channel":     E._chan,
-			"source":      E.addrs[AX25_SOURCE],
-			"destination": E.addrs[AX25_DESTINATION],
+			"source":      E.addrs[ax25.Source],
+			"destination": E.addrs[ax25.Destination],
 		})
 
 		if ft == frame_type_U_SABM || ft == frame_type_U_SABME {
@@ -2242,7 +2242,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 		// that the other end will be doing the same.  With v2.2, the XID frame can be
 		// used to negotiate a maximum info length but with v2.0, there is no way for the
 		// other end to know our paclen value.
-		if len(info) <= AX25_MAX_INFO_LEN {
+		if len(info) <= ax25.MaxInfoLen {
 			if is_good_nr(S, nr) {
 				// Erratum?
 				// I wonder if this difference is intentional or if only one place was
@@ -2325,7 +2325,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 		} else { // Bad information length.
 			// Wouldn't even get to CRC check if not octet aligned.
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error O: Information part length, %d, not in range of 0 thru %d.\n", S.stream_id, len(info), AX25_MAX_INFO_LEN)
+			dw_printf("Stream %d: AX.25 Protocol Error O: Information part length, %d, not in range of 0 thru %d.\n", S.stream_id, len(info), ax25.MaxInfoLen)
 
 			establish_data_link(S)
 			S.layer_3_initiated = false

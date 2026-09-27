@@ -37,8 +37,8 @@ import (
  *------------------------------------------------------------------*/
 
 func DescribeAX25Frame(frame []byte) int {
-	if len(frame) < AX25_MIN_PACKET_LEN {
-		fmt.Printf("ERROR: The frame is %d bytes, too short for an AX.25 header of at least %d.\n", len(frame), AX25_MIN_PACKET_LEN)
+	if len(frame) < ax25.MinPacketLen {
+		fmt.Printf("ERROR: The frame is %d bytes, too short for an AX.25 header of at least %d.\n", len(frame), ax25.MinPacketLen)
 
 		return 1
 	}
@@ -59,14 +59,14 @@ func DescribeAX25Frame(frame []byte) int {
 	 * described in terms of the zero padding past its end.
 	 */
 
-	if pp.NumAddr() < AX25_MIN_ADDRS {
+	if pp.NumAddr() < ax25.MinAddrs {
 		/*
 		 * The end of address bit is not at the end of a 7 byte address, or it
 		 * marks out fewer than 2 or more than 10 addresses.  Without knowing
 		 * where the address field stops there is nothing more to say.
 		 */
 		fmt.Printf("ERROR: The address field is malformed - the end of address bit does not mark out %d to %d addresses of 7 bytes each.\n",
-			AX25_MIN_ADDRS, AX25_MAX_ADDRS)
+			ax25.MinAddrs, ax25.MaxAddrs)
 		dwutil.HexDump(frame)
 
 		return 1

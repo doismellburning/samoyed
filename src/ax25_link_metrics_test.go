@@ -41,7 +41,7 @@ func TestAX25LinkFirstTryConnectIsNotARetry(t *testing.T) {
 	dl_connect_request(E)
 
 	// Peer acknowledges first time, so nothing was ever retransmitted.
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 
@@ -117,7 +117,7 @@ func TestAX25LinkT3ExpiryIsNotARetry(t *testing.T) {
 
 	dl_connect_request(E)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 

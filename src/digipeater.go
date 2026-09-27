@@ -38,6 +38,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -386,7 +387,7 @@ func (d *Digipeater) match(
 	 */
 	var r = pp.FirstNotRepeated()
 
-	if r < AX25_REPEATER_1 {
+	if r < ax25.Repeater1 {
 		return (nil)
 	}
 
@@ -424,7 +425,7 @@ func (d *Digipeater) match(
 	 * Alternatively we might feed everything transmitted into
 	 * dedupe_remember rather than only frames out of digipeater.
 	 */
-	var source = pp.AddrWithSSID(AX25_SOURCE)
+	var source = pp.AddrWithSSID(ax25.Source)
 	if source == mycall_rec {
 		return (nil)
 	}
@@ -499,7 +500,7 @@ func (d *Digipeater) match(
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
-					for r2 > AX25_REPEATER_1 {
+					for r2 > ax25.Repeater1 {
 						result.RemoveAddr(r2 - 1)
 						r2--
 					}
@@ -508,7 +509,7 @@ func (d *Digipeater) match(
 					dw_printf("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
 					r2--
-					for r2 >= AX25_REPEATER_1 && result.H(r2) == 0 {
+					for r2 >= ax25.Repeater1 && result.H(r2) == 0 {
 						result.SetH(r2)
 						r2--
 					}
@@ -523,7 +524,7 @@ func (d *Digipeater) match(
 				// with this option.  Should it be renamed as
 				// PREEMPT which is more descriptive?
 				default:
-					for r2 > AX25_REPEATER_1 && result.H(r2-1) == 0 {
+					for r2 > ax25.Repeater1 && result.H(r2-1) == 0 {
 						result.RemoveAddr(r2 - 1)
 						r2--
 					}
@@ -559,8 +560,8 @@ func (d *Digipeater) match(
 
 				// First, remove any already used digipeaters.
 
-				for result.NumAddr() >= 3 && result.H(AX25_REPEATER_1) == 1 {
-					result.RemoveAddr(AX25_REPEATER_1)
+				for result.NumAddr() >= 3 && result.H(ax25.Repeater1) == 1 {
+					result.RemoveAddr(ax25.Repeater1)
 
 					r--
 				}
@@ -574,8 +575,8 @@ func (d *Digipeater) match(
 
 				// Insert own call at beginning and mark it used.
 
-				result.InsertAddr(AX25_REPEATER_1, mycall_xmit)
-				result.SetH(AX25_REPEATER_1)
+				result.InsertAddr(ax25.Repeater1, mycall_xmit)
+				result.SetH(ax25.Repeater1)
 
 				return (result)
 			}
@@ -605,7 +606,7 @@ func (d *Digipeater) match(
 
 			result.SetSSID(r, ssid-1) // should be at least 1
 
-			if pp.NumRepeaters() < AX25_MAX_REPEATERS {
+			if pp.NumRepeaters() < ax25.MaxRepeaters {
 				result.InsertAddr(r, mycall_xmit)
 				result.SetH(r)
 			}

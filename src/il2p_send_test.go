@@ -28,7 +28,7 @@ func TestIL2PSendFrameCRCDefaultMatchesEnabled(t *testing.T) {
 
 	il2p_init(0)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "Q1TEST"
 	addrs[1] = "Q2TEST"
 	var pinfo = []byte("hello")

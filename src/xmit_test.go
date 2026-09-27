@@ -229,9 +229,9 @@ func TestFrameFlavor(t *testing.T) {
 	}
 
 	// Connected mode frames are not APRS at all.
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "Q1TEST"
-	addrs[AX25_SOURCE] = "Q2TEST"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
 
 	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_SABM, 0, 0, nil)
 	require.NotNil(t, pp)
@@ -356,9 +356,9 @@ func TestSendOneFrame(t *testing.T) {
 func TestSendOneFrameNonAPRS(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "Q1TEST"
-	addrs[AX25_SOURCE] = "Q2TEST"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
 
 	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_SABM, 0, 0, nil)
 	require.NotNil(t, pp)
@@ -378,9 +378,9 @@ func TestSendOneFrameXID(t *testing.T) {
 
 	var info = xid_encode(&param, cr_cmd)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "Q1TEST"
-	addrs[AX25_SOURCE] = "Q2TEST"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
 
 	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_XID, 0, 0, info)
 	require.NotNil(t, pp)
@@ -510,9 +510,9 @@ func TestXmitAX25FramesTakesHighPriorityFirst(t *testing.T) {
 	var low = ax25.FromText("Q1TEST>Q2TEST:low", true)
 	require.NotNil(t, low)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "Q1TEST"
-	addrs[AX25_SOURCE] = "Q2TEST"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
 
 	var high = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_SABM, 0, 0, nil)
 	require.NotNil(t, high)

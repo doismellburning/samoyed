@@ -30,7 +30,7 @@ func TestIL2PDecodeFrameTruncatedPayloadReturnsNil(t *testing.T) {
 	il2p_init(0)
 
 	// Build a real frame and encode it, then truncate the payload portion.
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "Q1TEST"
 	addrs[1] = "Q2TEST"
 	var pinfo = []byte("hello world")
@@ -51,7 +51,7 @@ func TestIL2PDecodeFrameJunkTrailingBytesReturnsNil(t *testing.T) {
 
 	// A frame with 1–3 trailing bytes beyond encoded_payload_size is malformed:
 	// not enough to be a CRC, not exactly the right payload length. Must return nil.
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "Q1TEST"
 	addrs[1] = "Q2TEST"
 	var pinfo = []byte("hello world")

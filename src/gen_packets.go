@@ -301,7 +301,7 @@ func (g *GenPackets) SendPacket(str string) error {
 			pinfo = pinfo[3:]
 		}
 
-		var repeat = pp.SSID(AX25_DESTINATION)
+		var repeat = pp.SSID(ax25.Destination)
 		if repeat == 0 {
 			repeat = 1
 		}

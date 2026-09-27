@@ -506,7 +506,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 
 	dw_printf("%d:%06.3f ", minutes, sec)
 
-	if h != AX25_SOURCE {
+	if h != ax25.Source {
 		dw_printf("Digipeater ")
 	}
 
@@ -516,7 +516,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 	/* WIDEn-0, it is quite likely (but not guaranteed), that */
 	/* we are actually hearing the preceding station in the path. */
 
-	if h >= AX25_REPEATER_2 &&
+	if h >= ax25.Repeater2 &&
 		strings.HasPrefix(heard, "WIDE") &&
 		unicode.IsDigit(rune(heard[4])) &&
 		len(heard) == 5 {

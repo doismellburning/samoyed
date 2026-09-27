@@ -25,9 +25,9 @@ func newTestPacket(t *testing.T) *packet_t {
 		SOURCE = "Q2TEST"
 	)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = DEST
-	addrs[AX25_SOURCE] = SOURCE
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = DEST
+	addrs[ax25.Source] = SOURCE
 
 	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_TEST, 0, 0, []byte("hello"))
 	require.NotNil(t, pp)

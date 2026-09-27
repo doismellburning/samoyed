@@ -70,6 +70,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/sirupsen/logrus"
@@ -79,9 +80,9 @@ import (
  * Minimum & maximum sizes of an AX.25 frame including the 2 octet FCS.
  */
 
-const MIN_FRAME_LEN = ((AX25_MIN_PACKET_LEN) + 2)
+const MIN_FRAME_LEN = ((ax25.MinPacketLen) + 2)
 
-const MAX_FRAME_LEN = ((AX25_MAX_PACKET_LEN) + 2)
+const MAX_FRAME_LEN = ((ax25.MaxPacketLen) + 2)
 
 type retry_mode_t int
 

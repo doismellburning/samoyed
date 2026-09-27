@@ -246,11 +246,11 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 
 	// Destination and source addresses go into low bits 0-5 for bytes 0-11.
 
-	var dst_addr = pp.AddrNoSSID(AX25_DESTINATION)
-	var dst_ssid = pp.SSID(AX25_DESTINATION)
+	var dst_addr = pp.AddrNoSSID(ax25.Destination)
+	var dst_ssid = pp.SSID(ax25.Destination)
 
-	var src_addr = pp.AddrNoSSID(AX25_SOURCE)
-	var src_ssid = pp.SSID(AX25_SOURCE)
+	var src_addr = pp.AddrNoSSID(ax25.Source)
+	var src_ssid = pp.SSID(ax25.Source)
 
 	for i, b := range dst_addr {
 		if b < ' ' || b > '_' {
@@ -445,7 +445,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 
 	// First get the addresses including SSID.
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	var num_addr = 2
 
 	// The IL2P header uses 2 parity symbols which means a single corrupted symbol (byte)
@@ -476,9 +476,9 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		byteBuf = append(byteBuf, byte(sixbit_to_ascii(hdr[i]&0x3f)))
 	}
 
-	addrs[AX25_DESTINATION] = strings.TrimSpace(string(byteBuf))
+	addrs[ax25.Destination] = strings.TrimSpace(string(byteBuf))
 
-	for _, c := range addrs[AX25_DESTINATION] {
+	for _, c := range addrs[ax25.Destination] {
 		if !unicode.IsUpper(c) && !unicode.IsDigit(c) { // TODO KG How can this be true?
 			if num_sym_changed == 0 { //nolint:staticcheck
 				// This can pop up sporadically when receiving random noise.
@@ -492,16 +492,16 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		}
 	}
 	var destSSID = int((hdr[12] >> 4) & 0xf)
-	addrs[AX25_DESTINATION] += fmt.Sprintf("-%d", destSSID)
+	addrs[ax25.Destination] += fmt.Sprintf("-%d", destSSID)
 
 	byteBuf = []byte{}
 	for i := range 6 {
 		byteBuf = append(byteBuf, byte(sixbit_to_ascii(hdr[i+6]&0x3f)))
 	}
 
-	addrs[AX25_SOURCE] = strings.TrimSpace(string(byteBuf))
+	addrs[ax25.Source] = strings.TrimSpace(string(byteBuf))
 
-	for _, c := range addrs[AX25_SOURCE] {
+	for _, c := range addrs[ax25.Source] {
 		if !unicode.IsUpper(c) && !unicode.IsDigit(c) {
 			if num_sym_changed == 0 { //nolint:staticcheck
 				// This can pop up sporadically when receiving random noise.
@@ -515,7 +515,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		}
 	}
 	var srcSSID = int(hdr[12] & 0xf)
-	addrs[AX25_SOURCE] += fmt.Sprintf("-%d", srcSSID)
+	addrs[ax25.Source] += fmt.Sprintf("-%d", srcSSID)
 
 	// The PID field gives us the general type.
 	// 0 = 'S' frame.

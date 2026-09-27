@@ -102,7 +102,7 @@ func NewTransmitQueue() *TransmitQueue {
 // tq_is_real_packet reports whether a queue entry is a real packet rather than
 // LMSeizeRequest's null wake-up frame, matching countLocked's own test.
 func tq_is_real_packet(pp *packet_t) bool {
-	return pp.NumAddr() >= AX25_MIN_ADDRS
+	return pp.NumAddr() >= ax25.MinAddrs
 }
 
 /*-------------------------------------------------------------------
@@ -966,12 +966,12 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 	var pp = tq.head[channel][prio]
 
 	for pp != nil {
-		if pp.NumAddr() >= AX25_MIN_ADDRS {
+		if pp.NumAddr() >= ax25.MinAddrs {
 			// Consider only real packets.
 			var count_it = 1
 
 			if source != "" {
-				var frame_source = pp.AddrWithSSID(AX25_SOURCE)
+				var frame_source = pp.AddrWithSSID(ax25.Source)
 				if logrus.IsLevelEnabled(logrus.TraceLevel) {
 					logrus.WithField("frame_source", frame_source).Trace("tq_count: compare to frame source")
 				}
@@ -981,7 +981,7 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 			}
 
 			if count_it > 0 && dest != "" {
-				var frame_dest = pp.AddrWithSSID(AX25_DESTINATION)
+				var frame_dest = pp.AddrWithSSID(ax25.Destination)
 				if logrus.IsLevelEnabled(logrus.TraceLevel) {
 					logrus.WithField("frame_dest", frame_dest).Trace("tq_count: compare to frame destination")
 				}

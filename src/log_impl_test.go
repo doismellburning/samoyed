@@ -20,7 +20,7 @@ func TestLogRRBitsShortHeardDoesNotPanic(t *testing.T) {
 		t.Fatal("failed to parse test packet")
 	}
 
-	if pp.Heard() < AX25_REPEATER_2 {
+	if pp.Heard() < ax25.Repeater2 {
 		t.Fatal("test packet did not set up heard station at or beyond AX25_REPEATER_2")
 	}
 

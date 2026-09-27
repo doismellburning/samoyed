@@ -373,9 +373,9 @@ func TestIL2PPolarityInvertsEveryBit(t *testing.T) {
 func newHDLCSendTestPacket(t *testing.T, infoLen int) *packet_t {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "Q2TEST"
-	addrs[AX25_SOURCE] = "Q1TEST"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q2TEST"
+	addrs[ax25.Source] = "Q1TEST"
 
 	var pinfo = make([]byte, infoLen)
 	for i := range pinfo {

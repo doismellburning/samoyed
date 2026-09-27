@@ -357,9 +357,9 @@ func TestIgnoredConnectRequestIsLogged(t *testing.T) {
 
 	t.Cleanup(func() { logrus.SetLevel(previousLevel) })
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_SOURCE] = THEIR_CALL
-	addrs[AX25_DESTINATION] = MY_CALL
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Source] = THEIR_CALL
+	addrs[ax25.Destination] = MY_CALL
 
 	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_SABM, 1, 0, nil)
 	require.NotNil(t, pp)
@@ -465,7 +465,7 @@ func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			setupTestEnv(t)
 
-			var S = get_link_handle([AX25_MAX_ADDRS]string{OWNCALL: MY_CALL, PEERCALL: THEIR_CALL}, 2, CHANNEL, 0, true)
+			var S = get_link_handle([ax25.MaxAddrs]string{OWNCALL: MY_CALL, PEERCALL: THEIR_CALL}, 2, CHANNEL, 0, true)
 			require.NotNil(t, S)
 
 			S.modulo = testCase.modulo

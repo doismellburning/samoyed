@@ -361,7 +361,7 @@ func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 
 	startRecvProcess(t)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
 	addrs[PEERCALL] = "Q2TEST"
 
@@ -381,7 +381,7 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 
 	startRecvProcess(t)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
 	addrs[PEERCALL] = "Q2TEST"
 
@@ -460,7 +460,7 @@ func TestRecvProcessRunsTheLinkTimersWhileTheQueueIsEmpty(t *testing.T) {
 
 	startRecvProcess(t)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
 	addrs[PEERCALL] = "Q2TEST"
 

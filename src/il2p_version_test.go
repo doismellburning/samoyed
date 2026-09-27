@@ -52,7 +52,7 @@ func TestIL2POnAirVersions(t *testing.T) {
 	// build the frame directly rather than from text: the IL2P header cannot
 	// represent every combination of the AX.25 address C bits, and a frame
 	// that changes shape in flight fails the trailing CRC check.
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "Q1TEST"
 	addrs[1] = "Q2TEST"
 

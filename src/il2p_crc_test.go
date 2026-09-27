@@ -82,7 +82,7 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 	il2p_init(0)
 
 	// Encode a frame with CRC, then decode it and verify round-trip.
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "W2UB"
 	addrs[1] = "WB2OSZ-12"
 	var pinfo = []byte("Hello CRC test")

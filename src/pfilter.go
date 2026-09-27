@@ -535,7 +535,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* b - budlist */
 		/* Budlist - AX.25 source address */
 		/* Could be different than source encapsulated by 3rd party header. */
-		var addr = pf.pp.AddrWithSSID(AX25_SOURCE)
+		var addr = pf.pp.AddrWithSSID(ax25.Source)
 		result, err = filt_bodgu(pf, addr)
 
 		if pf.debug >= 2 {
@@ -554,7 +554,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* d - was digipeated by */
 		// Loop on all AX.25 digipeaters.
 		result = 0
-		for n := AX25_REPEATER_1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
+		for n := ax25.Repeater1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
 			// Consider only those with the H (has-been-used) bit set.
 			if pf.pp.H(n) > 0 {
 				var addr = pf.pp.AddrWithSSID(n)
@@ -576,7 +576,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* v - via not used */
 		// loop on all AX.25 digipeaters (mnemonic Via)
 		result = 0
-		for n := AX25_REPEATER_1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
+		for n := ax25.Repeater1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
 			// This is different than the previous "d" filter.
 			// Consider only those where the the H (has-been-used) bit is NOT set.
 			if pf.pp.H(n) == 0 {
@@ -622,7 +622,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* Probably want to exclude mic-e types */
 		/* because destination is used for part of location. */
 		if pf.pp.DTI() != '\'' && pf.pp.DTI() != '`' {
-			var addr = pf.pp.AddrWithSSID(AX25_DESTINATION)
+			var addr = pf.pp.AddrWithSSID(ax25.Destination)
 			result, err = filt_bodgu(pf, addr)
 
 			if pf.debug >= 2 {

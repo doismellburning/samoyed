@@ -707,7 +707,7 @@ func check_via_path(via_path string) (int, error) {
 	for _, part := range parts {
 		num_digi++
 
-		var addr, ssid, _, ok = ax25.ParseAddr(AX25_REPEATER_1-1+num_digi, part, AddrStrictNoStar)
+		var addr, ssid, _, ok = ax25.ParseAddr(ax25.Repeater1-1+num_digi, part, AddrStrictNoStar)
 
 		if !ok {
 			logrus.Debug("check_via_path bad address")
@@ -725,7 +725,7 @@ func check_via_path(via_path string) (int, error) {
 		}
 	}
 
-	if num_digi > AX25_MAX_REPEATERS {
+	if num_digi > ax25.MaxRepeaters {
 		return -1, errors.New("maximum of 8 digipeaters has been exceeded")
 	}
 
@@ -5622,7 +5622,7 @@ func handleV20(ps *parseState) error {
 	}
 
 	for t != "" {
-		var _, _, _, ok = ax25.ParseAddr(AX25_DESTINATION, t, AddrStrictNoStar)
+		var _, _, _, ok = ax25.ParseAddr(ax25.Destination, t, AddrStrictNoStar)
 
 		if ok {
 			ps.misc.v20_addrs = append(ps.misc.v20_addrs, t)
@@ -5653,7 +5653,7 @@ func handleNOXID(ps *parseState) error {
 	}
 
 	for t != "" {
-		var _, _, _, ok = ax25.ParseAddr(AX25_DESTINATION, t, AddrStrictNoStar)
+		var _, _, _, ok = ax25.ParseAddr(ax25.Destination, t, AddrStrictNoStar)
 
 		if ok {
 			ps.misc.noxid_addrs = append(ps.misc.noxid_addrs, t)

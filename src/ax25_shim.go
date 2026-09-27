@@ -24,16 +24,6 @@ type ALevel = ax25.ALevel
 type AddrStrictness = ax25.AddrStrictness
 
 const (
-	AX25_MAX_REPEATERS             = ax25.MaxRepeaters
-	AX25_MIN_ADDRS                 = ax25.MinAddrs
-	AX25_MAX_ADDRS                 = ax25.MaxAddrs
-	AX25_DESTINATION               = ax25.Destination
-	AX25_SOURCE                    = ax25.Source
-	AX25_REPEATER_1                = ax25.Repeater1
-	AX25_REPEATER_2                = ax25.Repeater2
-	AX25_MAX_INFO_LEN              = ax25.MaxInfoLen
-	AX25_MIN_PACKET_LEN            = ax25.MinPacketLen
-	AX25_MAX_PACKET_LEN            = ax25.MaxPacketLen
 	AX25_PID_NO_LAYER_3            = ax25.PIDNoLayer3
 	AX25_PID_SEGMENTATION_FRAGMENT = ax25.PIDSegmentationFragment
 	cr_cmd                         = ax25.CRCmd

@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/ax25"
 )
 
 type PacketLogger struct {
@@ -242,7 +244,7 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
 				heard = pp.AddrWithSSID(h)
 			}
 
-			if h >= AX25_REPEATER_2 &&
+			if h >= ax25.Repeater2 &&
 				len(heard) == 5 &&
 				heard[:4] == "WIDE" &&
 				unicode.IsDigit(rune(heard[4])) {
@@ -363,17 +365,17 @@ func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *packet_t) {
 			heard = pp.AddrWithSSID(h)
 		}
 
-		if h >= AX25_REPEATER_2 &&
+		if h >= ax25.Repeater2 &&
 			len(heard) == 5 &&
 			heard[:4] == "WIDE" &&
 			unicode.IsDigit(rune(heard[4])) {
 			heard = pp.AddrWithSSID(h-1) + "?"
 		}
 
-		var src_c = pp.H(AX25_SOURCE)
-		var dst_c = pp.H(AX25_DESTINATION)
-		var src_rr = pp.RR(AX25_SOURCE)
-		var dst_rr = pp.RR(AX25_DESTINATION)
+		var src_c = pp.H(ax25.Source)
+		var dst_c = pp.H(ax25.Destination)
+		var src_rr = pp.RR(ax25.Source)
+		var dst_rr = pp.RR(ax25.Destination)
 
 		// C RR	for source
 		// C RR	for destination

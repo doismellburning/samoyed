@@ -31,6 +31,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
@@ -150,7 +151,7 @@ func mheard_latlon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string 
 func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel ALevel, retries BitFixLevel) {
 	var now = time.Now()
 
-	var source = pp.AddrWithSSID(AX25_SOURCE)
+	var source = pp.AddrWithSSID(ax25.Source)
 
 	/*
 	 * How many digipeaters has it gone thru before we hear it?
@@ -162,7 +163,7 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 	 * situation.  Look for my rant in the User Guide.
 	 */
 
-	var hops = pp.Heard() - AX25_SOURCE
+	var hops = pp.Heard() - ax25.Source
 	/*
 	 *		Consider the following scenario:
 	 *
@@ -194,9 +195,9 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 
 	if hops > 1 {
 		for k := range pp.NumRepeaters() {
-			var digi = pp.AddrNoSSID(AX25_REPEATER_1 + k)
-			var ssid = pp.SSID(AX25_REPEATER_1 + k)
-			var used = pp.H(AX25_REPEATER_1 + k)
+			var digi = pp.AddrNoSSID(ax25.Repeater1 + k)
+			var ssid = pp.SSID(ax25.Repeater1 + k)
+			var used = pp.H(ax25.Repeater1 + k)
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Examining %s-%d  used=%d.\n", digi, ssid, used);

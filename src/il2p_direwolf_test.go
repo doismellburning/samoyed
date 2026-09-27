@@ -573,7 +573,7 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 func all_frame_types(t *testing.T) {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	var pinfo []byte
 	var pid = 0xf0
 

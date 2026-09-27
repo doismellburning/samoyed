@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -107,7 +108,7 @@ type dlq_item_t struct {
 
 	// Used by requests from a client application, connect, etc.
 
-	addrs [AX25_MAX_ADDRS]string
+	addrs [ax25.MaxAddrs]string
 
 	num_addr int /* Range 2 .. 10. */
 
@@ -299,7 +300,7 @@ func (q *DataLinkQueue) RecFrame(channel int, subchannel int, slice int, pp *pac
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) ConnectRequest(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, pid int) {
+func (q *DataLinkQueue) ConnectRequest(addrs [ax25.MaxAddrs]string, num_addr int, channel int, client int, pid int) {
 	logrus.WithFields(logrus.Fields{
 		"channel": channel,
 		"client":  client,
@@ -345,7 +346,7 @@ func (q *DataLinkQueue) ConnectRequest(addrs [AX25_MAX_ADDRS]string, num_addr in
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) DisconnectRequest(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int) {
+func (q *DataLinkQueue) DisconnectRequest(addrs [ax25.MaxAddrs]string, num_addr int, channel int, client int) {
 	logrus.WithFields(logrus.Fields{
 		"channel": channel,
 		"client":  client,
@@ -396,7 +397,7 @@ func (q *DataLinkQueue) DisconnectRequest(addrs [AX25_MAX_ADDRS]string, num_addr
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) OutstandingFramesRequest(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int) {
+func (q *DataLinkQueue) OutstandingFramesRequest(addrs [ax25.MaxAddrs]string, num_addr int, channel int, client int) {
 	logrus.WithFields(logrus.Fields{
 		"channel": channel,
 		"client":  client,
@@ -450,7 +451,7 @@ func (q *DataLinkQueue) OutstandingFramesRequest(addrs [AX25_MAX_ADDRS]string, n
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) XmitDataRequest(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, pid int, xdata []byte) {
+func (q *DataLinkQueue) XmitDataRequest(addrs [ax25.MaxAddrs]string, num_addr int, channel int, client int, pid int, xdata []byte) {
 	logrus.WithFields(logrus.Fields{
 		"channel": channel,
 		"client":  client,

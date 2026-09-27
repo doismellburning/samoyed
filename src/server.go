@@ -328,10 +328,10 @@ func (s *AGWServer) SendRecPacket(channel int, pp *packet_t, fbuf []byte) {
 
 			agwpe_msg.Header.DataKind = 'K'
 
-			var callFrom = pp.AddrWithSSID(AX25_SOURCE)
+			var callFrom = pp.AddrWithSSID(ax25.Source)
 			copy(agwpe_msg.Header.CallFrom[:], []byte(callFrom))
 
-			var callTo = pp.AddrWithSSID(AX25_DESTINATION)
+			var callTo = pp.AddrWithSSID(ax25.Destination)
 			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
 			agwpe_msg.Header.DataLen = uint32(len(fbuf) + 1)
@@ -380,10 +380,10 @@ func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
 
 			agwpe_msg.Header.Portx = byte(channel) // datakind is added later.
 
-			var callFrom = pp.AddrWithSSID(AX25_SOURCE)
+			var callFrom = pp.AddrWithSSID(ax25.Source)
 			copy(agwpe_msg.Header.CallFrom[:], []byte(callFrom))
 
-			var callTo = pp.AddrWithSSID(AX25_DESTINATION)
+			var callTo = pp.AddrWithSSID(ax25.Destination)
 			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
 			/* http://uz7ho.org.ua/includes/agwpeapi.htm#_Toc500723812 */
@@ -476,9 +476,9 @@ func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
 // rather than continuing to propagate historical inconsistencies.
 
 func mon_addrs(channel int, pp *packet_t) []byte {
-	var src = pp.AddrWithSSID(AX25_SOURCE)
+	var src = pp.AddrWithSSID(ax25.Source)
 
-	var dst = pp.AddrWithSSID(AX25_DESTINATION)
+	var dst = pp.AddrWithSSID(ax25.Destination)
 
 	var num_digi = pp.NumRepeaters()
 
@@ -490,14 +490,14 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 				via.WriteString(",") // comma if not first address
 			}
 
-			var digiaddr = pp.AddrWithSSID(AX25_REPEATER_1 + j)
+			var digiaddr = pp.AddrWithSSID(ax25.Repeater1 + j)
 			via.WriteString(digiaddr)
 			/*
 				#if 0  // Mark each used with * as seen in UZ7HO SoundModem.
 					    if (ax25_get_h(pp, AX25_REPEATER_1 + j)) {
 				#else */
 			// Mark only last used (i.e. the heard station) with * as in TNC-2 Monitoring format.
-			if AX25_REPEATER_1+j == pp.Heard() {
+			if ax25.Repeater1+j == pp.Heard() {
 				// #endif
 				via.WriteString("*")
 			}
@@ -727,10 +727,10 @@ func (s *AGWServer) RecConnData(channel int, client int, remote_call string, own
 	copy(reply.Header.CallFrom[:], []byte(remote_call))
 	copy(reply.Header.CallTo[:], []byte(own_call))
 
-	if len(data) > AX25_MAX_INFO_LEN {
+	if len(data) > ax25.MaxInfoLen {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid length %d for connected data to client %d.\n", len(data), client)
-		data = data[:AX25_MAX_INFO_LEN]
+		data = data[:ax25.MaxInfoLen]
 	}
 
 	reply.Data = make([]byte, len(data))
@@ -1747,7 +1747,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				/* the high priority queue. */
 				/* Otherwise, it is an original for the low priority queue. */
 				if pp.NumRepeaters() >= 1 &&
-					pp.H(AX25_REPEATER_1) > 0 {
+					pp.H(ax25.Repeater1) > 0 {
 					transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
 				} else {
 					transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
@@ -1819,9 +1819,9 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 					  char dcall[7][10];
 				        }
 			*/
-			var callsigns [AX25_MAX_ADDRS]string
-			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+			var callsigns [ax25.MaxAddrs]string
+			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
 
 			var pid byte = 0xf0 /* normal for AX.25 I frames. */
 			if cmd.Header.DataKind == 'c' {
@@ -1858,7 +1858,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 					}
 
 					for j := range numDigi {
-						callsigns[AX25_REPEATER_1+j] = ByteArrayToString(cmd.Data[1+10*j : 1+10*j+10])
+						callsigns[ax25.Repeater1+j] = ByteArrayToString(cmd.Data[1+10*j : 1+10*j+10])
 						num_calls++
 					}
 				} else {
@@ -1889,11 +1889,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			var callsigns [AX25_MAX_ADDRS]string
+			var callsigns [ax25.MaxAddrs]string
 			const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
 
-			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
 
 			dataLinkQueue.XmitDataRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
 		}
@@ -1907,11 +1907,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			var callsigns [AX25_MAX_ADDRS]string
+			var callsigns [ax25.MaxAddrs]string
 			const num_calls = 2 // only first 2 used.
 
-			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
 
 			dataLinkQueue.DisconnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}
@@ -2045,11 +2045,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			var callsigns [AX25_MAX_ADDRS]string
+			var callsigns [ax25.MaxAddrs]string
 			const num_calls = 2 // only first 2 used.
 
-			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
 
 			dataLinkQueue.OutstandingFramesRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}
