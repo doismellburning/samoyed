@@ -21,7 +21,7 @@ import (
 func newNegotiationTestLink() *ax25_dlsm_t {
 	var S = new(ax25_dlsm_t)
 
-	S.modulo = modulo_8
+	S.modulo = ax25.Modulo8
 	S.srej_enable = srej_none
 	S.n1_paclen = 128
 	S.k_maxframe = 2
@@ -46,7 +46,7 @@ func TestNegotiationResponseFillsInDefaults(t *testing.T) {
 
 	negotiation_response(S, param)
 
-	assert.Equal(t, modulo_8, param.modulo)
+	assert.Equal(t, ax25.Modulo8, param.modulo)
 	assert.Equal(t, srej_none, param.srej)
 	assert.Equal(t, maybe.Just(AX25_N1_PACLEN_DEFAULT), param.i_field_length_rx)
 	assert.Equal(t, maybe.Just(AX25_K_MAXFRAME_BASIC_DEFAULT), param.window_size_rx)
@@ -68,8 +68,8 @@ func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
 		modulo     ax25_modulo_t
 		wantWindow int
 	}{
-		{"modulo 8", modulo_8, AX25_K_MAXFRAME_BASIC_MAX},
-		{"modulo 128", modulo_128, AX25_K_MAXFRAME_EXTENDED_MAX},
+		{"modulo 8", ax25.Modulo8, AX25_K_MAXFRAME_BASIC_MAX},
+		{"modulo 128", ax25.Modulo128, AX25_K_MAXFRAME_EXTENDED_MAX},
 	}
 
 	for _, test := range tests {
@@ -119,7 +119,7 @@ func TestCompleteNegotiationKeepsWhatTheResponseOmits(t *testing.T) {
 
 	complete_negotiation(S, param)
 
-	assert.Equal(t, modulo_8, S.modulo)
+	assert.Equal(t, ax25.Modulo8, S.modulo)
 	assert.Equal(t, srej_none, S.srej_enable)
 	assert.Equal(t, 128, S.n1_paclen)
 	assert.Equal(t, 2, S.k_maxframe)
@@ -177,15 +177,15 @@ func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 		// complete_negotiation, so a command draws no warning.
 		negotiated bool
 	}{
-		{"I field too short", modulo_8, 0, 4, modulo_8, AX25_N1_PACLEN_MIN, 4, "i_field_length_rx", false},
-		{"I field negative", modulo_8, -8, 4, modulo_8, AX25_N1_PACLEN_MIN, 4, "i_field_length_rx", false},
-		{"I field too short for modulo 128", modulo_128, 2, 4, modulo_128, 3, 4, "i_field_length_rx", false},
-		{"I field too long", modulo_8, 8000, 4, modulo_8, AX25_N1_PACLEN_MAX, 4, "i_field_length_rx", true},
-		{"window too wide for modulo 8", modulo_8, 256, 127, modulo_8, 256, AX25_K_MAXFRAME_BASIC_MAX, "window_size_rx", true},
-		{"window too wide for modulo 128", modulo_128, 256, 127, modulo_128, 256, AX25_K_MAXFRAME_EXTENDED_MAX, "window_size_rx", true},
-		{"window closed", modulo_8, 256, 0, modulo_8, 256, AX25_K_MAXFRAME_BASIC_MIN, "window_size_rx", false},
-		{"window closed modulo 128", modulo_128, 256, 0, modulo_128, 256, AX25_K_MAXFRAME_EXTENDED_MIN, "window_size_rx", false},
-		{"modulo we don't implement", 16, 256, 4, modulo_8, 256, 4, "modulo", false},
+		{"I field too short", ax25.Modulo8, 0, 4, ax25.Modulo8, AX25_N1_PACLEN_MIN, 4, "i_field_length_rx", false},
+		{"I field negative", ax25.Modulo8, -8, 4, ax25.Modulo8, AX25_N1_PACLEN_MIN, 4, "i_field_length_rx", false},
+		{"I field too short for modulo 128", ax25.Modulo128, 2, 4, ax25.Modulo128, 3, 4, "i_field_length_rx", false},
+		{"I field too long", ax25.Modulo8, 8000, 4, ax25.Modulo8, AX25_N1_PACLEN_MAX, 4, "i_field_length_rx", true},
+		{"window too wide for modulo 8", ax25.Modulo8, 256, 127, ax25.Modulo8, 256, AX25_K_MAXFRAME_BASIC_MAX, "window_size_rx", true},
+		{"window too wide for modulo 128", ax25.Modulo128, 256, 127, ax25.Modulo128, 256, AX25_K_MAXFRAME_EXTENDED_MAX, "window_size_rx", true},
+		{"window closed", ax25.Modulo8, 256, 0, ax25.Modulo8, 256, AX25_K_MAXFRAME_BASIC_MIN, "window_size_rx", false},
+		{"window closed modulo 128", ax25.Modulo128, 256, 0, ax25.Modulo128, 256, AX25_K_MAXFRAME_EXTENDED_MIN, "window_size_rx", false},
+		{"modulo we don't implement", 16, 256, 4, ax25.Modulo8, 256, 4, "modulo", false},
 	}
 
 	for _, path := range paths {
@@ -252,7 +252,7 @@ func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 
 			var sent = new(xid_param_s)
 			sent.srej = srej_none
-			sent.modulo = modulo_8
+			sent.modulo = ax25.Modulo8
 			sent.window_size_rx = maybe.Just(0)
 
 			var param, _, status = xid_parse(xid_encode(sent, path.cr))
@@ -300,17 +300,17 @@ func TestCompleteNegotiationNarrowsTheWindowToTheNewModulo(t *testing.T) {
 	setupTestEnv(t)
 
 	var S = newNegotiationTestLink()
-	S.modulo = modulo_128
+	S.modulo = ax25.Modulo128
 	S.k_maxframe = 32
 
 	var param, _, status = xid_parse(nil)
 	assert.Equal(t, 1, status)
 
-	param.modulo = modulo_8
+	param.modulo = ax25.Modulo8
 
 	complete_negotiation(S, param)
 
-	assert.Equal(t, modulo_8, S.modulo)
+	assert.Equal(t, ax25.Modulo8, S.modulo)
 	assert.Equal(t, AX25_K_MAXFRAME_BASIC_MAX, S.k_maxframe)
 }
 
@@ -325,11 +325,11 @@ func TestCompleteNegotiationRaisesN1ToTheNewModulo(t *testing.T) {
 	var param, _, status = xid_parse(nil)
 	assert.Equal(t, 1, status)
 
-	param.modulo = modulo_128
+	param.modulo = ax25.Modulo128
 
 	complete_negotiation(S, param)
 
-	assert.Equal(t, modulo_128, S.modulo)
+	assert.Equal(t, ax25.Modulo128, S.modulo)
 	assert.Equal(t, 3, S.n1_paclen)
 }
 
@@ -436,7 +436,7 @@ func TestDataRequestForALinkThatWasNeverConnected(t *testing.T) {
 		"a new link should start out able to carry what this station is configured for")
 	assert.Equal(t, ax25Link.miscConfig.maxframe_basic, ax25Link.listHead.k_maxframe)
 	assert.Equal(t, ax25Link.miscConfig.retry, ax25Link.listHead.n2_retry)
-	assert.Equal(t, modulo_8, ax25Link.listHead.modulo)
+	assert.Equal(t, ax25.Modulo8, ax25Link.listHead.modulo)
 }
 
 // A link can end up with a maximum information field that nothing will fit
@@ -456,9 +456,9 @@ func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
 		modulo   ax25_modulo_t
 		n1Paclen int
 	}{
-		{"a v2.0 link with no room at all", modulo_8, 0},
-		{"a v2.2 link with no room for a segment header", modulo_128, 1},
-		{"a v2.2 link with no room for data behind the header", modulo_128, 2},
+		{"a v2.0 link with no room at all", ax25.Modulo8, 0},
+		{"a v2.2 link with no room for a segment header", ax25.Modulo128, 1},
+		{"a v2.2 link with no room for data behind the header", ax25.Modulo128, 2},
 	}
 
 	for _, testCase := range testCases {

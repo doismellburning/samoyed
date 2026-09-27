@@ -24,9 +24,6 @@ type ALevel = ax25.ALevel
 type AddrStrictness = ax25.AddrStrictness
 
 const (
-	modulo_unknown             = ax25.ModuloUnknown
-	modulo_8                   = ax25.Modulo8
-	modulo_128                 = ax25.Modulo128
 	frame_type_I               = ax25.FrameTypeI
 	frame_type_S_RR            = ax25.FrameTypeSRR
 	frame_type_S_RNR           = ax25.FrameTypeSRNR

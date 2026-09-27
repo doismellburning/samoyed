@@ -643,7 +643,7 @@ func all_frame_types(t *testing.T) {
 
 	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
 		for pf := range 2 {
-			var modulo = modulo_8
+			var modulo = ax25.Modulo8
 			var nr = int(modulo/2 + 1)
 
 			for cr := cmdres_t(0); cr <= ax25.CRCmd; cr++ {
@@ -660,7 +660,7 @@ func all_frame_types(t *testing.T) {
 				enc_dec_compare(t, pp)
 			}
 
-			modulo = modulo_128
+			modulo = ax25.Modulo128
 			nr = int(modulo/2 + 1)
 
 			for cr := cmdres_t(0); cr <= ax25.CRCmd; cr++ {
@@ -686,7 +686,7 @@ func all_frame_types(t *testing.T) {
 	var ftype = frame_type_S_SREJ
 
 	for pf := range 2 {
-		var modulo = modulo_128
+		var modulo = ax25.Modulo128
 		var nr = 127
 		var cr = ax25.CRRes
 
@@ -705,7 +705,7 @@ func all_frame_types(t *testing.T) {
 	pinfo = []byte("The rain in Spain stays mainly on the plain.")
 
 	for pf := range 2 {
-		var modulo = modulo_8
+		var modulo = ax25.Modulo8
 		var nr = 0x55 & int(modulo-1)
 		var ns = 0xaa & int(modulo-1)
 
@@ -718,7 +718,7 @@ func all_frame_types(t *testing.T) {
 			enc_dec_compare(t, pp)
 		}
 
-		modulo = modulo_128
+		modulo = ax25.Modulo128
 		nr = 0x55 & int(modulo-1)
 		ns = 0xaa & int(modulo-1)
 

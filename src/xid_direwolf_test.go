@@ -77,7 +77,7 @@ func Test_XID(t *testing.T) {
 	assert.Equal(t, 1, n)
 	assert.Equal(t, maybe.Just(false), param.full_duplex)
 	assert.Equal(t, srej_single, param.srej)
-	assert.Equal(t, modulo_128, param.modulo)
+	assert.Equal(t, ax25.Modulo128, param.modulo)
 	assert.Equal(t, maybe.Just(128), param.i_field_length_rx)
 	assert.Equal(t, maybe.Just(2), param.window_size_rx)
 	assert.Equal(t, maybe.Just(4096), param.ack_timer)
@@ -94,7 +94,7 @@ func Test_XID(t *testing.T) {
 
 	param.full_duplex = maybe.Just(true)
 	param.srej = srej_none
-	param.modulo = modulo_8
+	param.modulo = ax25.Modulo8
 	param.i_field_length_rx = maybe.Just(2048)
 	param.window_size_rx = maybe.Just(3)
 	param.ack_timer = maybe.Just(1234)
@@ -110,7 +110,7 @@ func Test_XID(t *testing.T) {
 
 	assert.Equal(t, maybe.Just(true), param2.full_duplex)
 	assert.Equal(t, srej_none, param2.srej)
-	assert.Equal(t, modulo_8, param2.modulo)
+	assert.Equal(t, ax25.Modulo8, param2.modulo)
 	assert.Equal(t, maybe.Just(2048), param2.i_field_length_rx)
 	assert.Equal(t, maybe.Just(3), param2.window_size_rx)
 	assert.Equal(t, maybe.Just(1234), param2.ack_timer)
@@ -120,7 +120,7 @@ func Test_XID(t *testing.T) {
 
 	param.full_duplex = maybe.Just(false)
 	param.srej = srej_single
-	param.modulo = modulo_8
+	param.modulo = ax25.Modulo8
 	param.i_field_length_rx = maybe.Just(61)
 	param.window_size_rx = maybe.Just(4)
 	param.ack_timer = maybe.Just(5555)
@@ -136,7 +136,7 @@ func Test_XID(t *testing.T) {
 
 	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
-	assert.Equal(t, modulo_8, param2.modulo)
+	assert.Equal(t, ax25.Modulo8, param2.modulo)
 	assert.Equal(t, maybe.Just(61), param2.i_field_length_rx)
 	assert.Equal(t, maybe.Just(4), param2.window_size_rx)
 	assert.Equal(t, maybe.Just(5555), param2.ack_timer)
@@ -146,7 +146,7 @@ func Test_XID(t *testing.T) {
 
 	param.full_duplex = maybe.Just(false)
 	param.srej = srej_multi
-	param.modulo = modulo_128
+	param.modulo = ax25.Modulo128
 	param.i_field_length_rx = maybe.Just(61)
 	param.window_size_rx = maybe.Just(4)
 	param.ack_timer = maybe.Just(5555)
@@ -162,7 +162,7 @@ func Test_XID(t *testing.T) {
 
 	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_multi, param2.srej)
-	assert.Equal(t, modulo_128, param2.modulo)
+	assert.Equal(t, ax25.Modulo128, param2.modulo)
 	assert.Equal(t, maybe.Just(61), param2.i_field_length_rx)
 	assert.Equal(t, maybe.Just(4), param2.window_size_rx)
 	assert.Equal(t, maybe.Just(5555), param2.ack_timer)
@@ -172,7 +172,7 @@ func Test_XID(t *testing.T) {
 
 	param.full_duplex = maybe.Just(false)
 	param.srej = srej_single
-	param.modulo = modulo_8
+	param.modulo = ax25.Modulo8
 	param.i_field_length_rx = maybe.Nothing[int]()
 	param.window_size_rx = maybe.Nothing[int]()
 	param.ack_timer = maybe.Just(999)
@@ -188,7 +188,7 @@ func Test_XID(t *testing.T) {
 
 	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
-	assert.Equal(t, modulo_8, param2.modulo)
+	assert.Equal(t, ax25.Modulo8, param2.modulo)
 	assert.Equal(t, maybe.Nothing[int](), param2.i_field_length_rx)
 	assert.Equal(t, maybe.Nothing[int](), param2.window_size_rx)
 	assert.Equal(t, maybe.Just(999), param2.ack_timer)
@@ -206,7 +206,7 @@ func Test_XID(t *testing.T) {
 
 	assert.Equal(t, maybe.Nothing[bool](), param2.full_duplex)
 	assert.Equal(t, srej_not_specified, param2.srej)
-	assert.Equal(t, modulo_unknown, param2.modulo)
+	assert.Equal(t, ax25.ModuloUnknown, param2.modulo)
 	assert.Equal(t, maybe.Nothing[int](), param2.i_field_length_rx)
 	assert.Equal(t, maybe.Nothing[int](), param2.window_size_rx)
 	assert.Equal(t, maybe.Nothing[int](), param2.ack_timer)

@@ -5958,10 +5958,10 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	// Other end might want 8.
 	// Seems unlikely.  If it implements XID it should have modulo 128.
 
-	if param.modulo == modulo_unknown {
-		param.modulo = modulo_8 // Not specified.  Set default.
+	if param.modulo == ax25.ModuloUnknown {
+		param.modulo = ax25.Modulo8 // Not specified.  Set default.
 	} else {
-		param.modulo = min(param.modulo, modulo_128)
+		param.modulo = min(param.modulo, ax25.Modulo128)
 	}
 
 	// We can do REJ or SREJ but won't combine them.
@@ -5990,14 +5990,14 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	// I'm limiting it to 63 for the reason mentioned in the SREJ logic.
 
 	if window, ok := param.window_size_rx.Get(); ok {
-		if param.modulo == modulo_128 {
+		if param.modulo == ax25.Modulo128 {
 			param.window_size_rx = maybe.Just(min(window, AX25_K_MAXFRAME_EXTENDED_MAX))
 		} else {
 			param.window_size_rx = maybe.Just(min(window, AX25_K_MAXFRAME_BASIC_MAX))
 		}
 	} else {
 		// not specified, set default.
-		if param.modulo == modulo_128 {
+		if param.modulo == ax25.Modulo128 {
 			param.window_size_rx = maybe.Just(32)
 		} else {
 			param.window_size_rx = maybe.Just(4)
@@ -6051,10 +6051,10 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	}
 
 	switch param.modulo {
-	case modulo_8, modulo_128:
+	case ax25.Modulo8, ax25.Modulo128:
 		// Disaster if aren't agreeing on this.
 		S.modulo = param.modulo
-	case modulo_unknown:
+	case ax25.ModuloUnknown:
 	default:
 		// Not one we implement, so keep what we have.
 		warnXIDOutOfRange(S, "modulo", int(param.modulo), int(S.modulo))
@@ -6076,7 +6076,7 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 
 	// Bounded by the modulus now in force, even if only the modulus changed.
 	var kMin, kMax = AX25_K_MAXFRAME_BASIC_MIN, AX25_K_MAXFRAME_BASIC_MAX
-	if S.modulo == modulo_128 {
+	if S.modulo == ax25.Modulo128 {
 		kMin, kMax = AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX
 	}
 	if window, ok := param.window_size_rx.Get(); ok {
@@ -6103,7 +6103,7 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 // three before any data fits - and it divides by N1-1, which is zero for an
 // N1 of one.
 func smallestUsableN1(modulo ax25_modulo_t) int {
-	if modulo == modulo_8 {
+	if modulo == ax25.Modulo8 {
 		return AX25_N1_PACLEN_MIN
 	}
 

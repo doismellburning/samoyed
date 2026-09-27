@@ -240,7 +240,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 
 	// Check does not apply for 'U' frames but put in one place rather than two.
 
-	if pp.Modulo() == modulo_128 {
+	if pp.Modulo() == ax25.Modulo128 {
 		return nil, -1
 	}
 
@@ -542,7 +542,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		default:
 			ftype = frame_type_S_SREJ
 		}
-		var modulo = modulo_8
+		var modulo = ax25.Modulo8
 		var nr = (control >> 3) & 0x07
 		var pf = (control >> 6) & 0x01
 		var pinfo []byte // Any info for SREJ will be added later.
@@ -599,7 +599,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		var pf = (control >> 6) & 0x01
 		var nr = (control >> 3) & 0x7
 		var ns = (control & 0x7)
-		var modulo = modulo_8
+		var modulo = ax25.Modulo8
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
 
