@@ -9,7 +9,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/fcs"
-	"github.com/doismellburning/samoyed/internal/wavwrite"
+	"github.com/doismellburning/samoyed/internal/wav"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -561,7 +561,7 @@ func setupEASSendTest(t *testing.T) {
 	t.Cleanup(func() { toneGenerators = origGenerators })
 
 	// Samples go to a file rather than to an audio device.
-	var w, err = wavwrite.Create(filepath.Join(t.TempDir(), "eas.wav"), wavwrite.Format{
+	var w, err = wav.Create(filepath.Join(t.TempDir(), "eas.wav"), wav.Format{
 		NumChannels:   audioConfig.adev[0].num_channels,
 		SamplesPerSec: audioConfig.adev[0].samples_per_sec,
 		BitsPerSample: audioConfig.adev[0].bits_per_sample,
