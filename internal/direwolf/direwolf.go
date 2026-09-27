@@ -88,6 +88,11 @@ var hdlcReceiver *HDLCReceiver
  *
  *--------------------------------------------------------------------*/
 
+// osExit ends the process.  Every way out of DirewolfMain goes through it, so
+// that a test can swap in one that unwinds instead and drive the command line
+// handling in-process.
+var osExit = os.Exit
+
 const audio_amplitude = 100 /* % of audio sample range. */
 /* This translates to +-32k for 16 bit samples. */
 /* Currently no option to change this. */
@@ -174,13 +179,13 @@ x = Silence FX.25 information.`)
 
 	if *help {
 		pflag.Usage()
-		os.Exit(1)
+		osExit(1)
 	}
 
 	if *showVersion {
 		TextColorInit(*textColor)
 		printVersion(true)
-		os.Exit(0)
+		osExit(0)
 	}
 
 	if *printUTF8Test {
@@ -189,13 +194,13 @@ x = Silence FX.25 information.`)
 			0xc2, 0xb0,
 			0xc3, 0xbc, 0xc3, 0x9f)
 
-		os.Exit(0)
+		osExit(0)
 	}
 
 	if *symbolDump {
 		aprsSymbolData = NewAPRSSymbolData()
 		aprsSymbolData.symbols_list()
-		os.Exit(0)
+		osExit(0)
 	}
 
 	if *aisToAPRS {
@@ -317,23 +322,23 @@ x = Silence FX.25 information.`)
 		reportConfigCheck(*configFileName, configResult.errors, configResult.warnings)
 
 		if configResult.errors > 0 {
-			os.Exit(1)
+			osExit(1)
 		}
 
-		os.Exit(0)
+		osExit(0)
 	}
 
 	// A configuration the daemon cannot use at all.  config_init reported it
 	// and read on so that a check run could show the whole file; there is
 	// nothing to start up with.
 	if configResult.fatal {
-		os.Exit(1)
+		osExit(1)
 	}
 
 	if *audioSampleRate != 0 {
 		if *audioSampleRate < MIN_SAMPLES_PER_SEC || *audioSampleRate > MAX_SAMPLES_PER_SEC {
 			fmt.Printf("-r option, audio samples/sec, is out of range.\n")
-			os.Exit(1)
+			osExit(1)
 		}
 
 		audio_config.adev[0].samples_per_sec = *audioSampleRate
@@ -342,7 +347,7 @@ x = Silence FX.25 information.`)
 	if *audioChannels != 0 {
 		if *audioChannels < 1 || *audioChannels > 2 {
 			fmt.Printf("-n option, number of audio channels, is out of range.\n")
-			os.Exit(1)
+			osExit(1)
 		}
 
 		audio_config.adev[0].num_channels = *audioChannels
@@ -354,7 +359,7 @@ x = Silence FX.25 information.`)
 	if *bitsPerSample != 0 {
 		if *bitsPerSample != 8 && *bitsPerSample != 16 {
 			fmt.Printf("-b option, bits per sample, must be 8 or 16.\n")
-			os.Exit(1)
+			osExit(1)
 		}
 
 		audio_config.adev[0].bits_per_sample = *bitsPerSample
@@ -369,7 +374,7 @@ x = Silence FX.25 information.`)
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Fprintf(os.Stderr, "%s\n", modemErr)
 		pflag.Usage()
-		os.Exit(1)
+		osExit(1)
 	}
 
 	if *audioStatsInterval > 0 {
@@ -409,7 +414,7 @@ x = Silence FX.25 information.`)
 
 	if *logDir != "" && *logFile != "" {
 		fmt.Printf("Logging options -l and -L can't be used together.  Pick one or the other.\n")
-		os.Exit(1)
+		osExit(1)
 	}
 
 	if *logFile != "" {
@@ -465,7 +470,7 @@ x = Silence FX.25 information.`)
 	var adevErr = audio_config.adev[0].validate()
 	if adevErr != nil {
 		logrus.WithError(adevErr).Error("Unusable audio device configuration")
-		os.Exit(1)
+		osExit(1)
 	}
 
 	var err = AudioOpen(ctx, audio_config)
@@ -476,7 +481,7 @@ x = Silence FX.25 information.`)
 		fmt.Printf("Pointless to continue without audio device.\n")
 		SLEEP_SEC(5)
 		pflag.Usage()
-		os.Exit(1)
+		osExit(1)
 	}
 
 	/*
@@ -518,7 +523,7 @@ x = Silence FX.25 information.`)
 
 	if pttErr != nil {
 		logrus.WithError(pttErr).Error("Could not set up PTT")
-		os.Exit(1)
+		osExit(1)
 	}
 
 	/*
@@ -562,7 +567,7 @@ x = Silence FX.25 information.`)
 				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Invalid option '%c' for -x. Must be a, m, s, or p.\n", p)
 				text_color_set(DW_COLOR_INFO)
-				os.Exit(1)
+				osExit(1)
 			}
 		}
 
@@ -570,7 +575,7 @@ x = Silence FX.25 information.`)
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Invalid channel %d for -x. \n", transmitCalibrationChannel)
 			text_color_set(DW_COLOR_INFO)
-			os.Exit(1)
+			osExit(1)
 		}
 
 		if audio_config.chan_medium[transmitCalibrationChannel] == MEDIUM_RADIO {
@@ -585,7 +590,7 @@ x = Silence FX.25 information.`)
 					fmt.Printf("Channel %d has no audio output device, so calibration tones cannot be sent.\n", transmitCalibrationChannel)
 					fmt.Printf("Use -x p to key PTT without audio.\n")
 					text_color_set(DW_COLOR_INFO)
-					os.Exit(1)
+					osExit(1)
 				}
 
 				var max_duration = 60
@@ -632,18 +637,18 @@ x = Silence FX.25 information.`)
 				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 0)
 				text_color_set(DW_COLOR_INFO)
 				stopIfCancelled(ctx)
-				os.Exit(0)
+				osExit(0)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("\nMark/Space frequencies not defined for channel %d. Cannot calibrate using this modem type.\n", transmitCalibrationChannel)
 				text_color_set(DW_COLOR_INFO)
-				os.Exit(1)
+				osExit(1)
 			}
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\nChannel %d is not configured as a radio channel.\n", transmitCalibrationChannel)
 			text_color_set(DW_COLOR_INFO)
-			os.Exit(1)
+			osExit(1)
 		}
 	}
 
@@ -694,7 +699,7 @@ x = Silence FX.25 information.`)
 	if waypointErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%v\n", waypointErr)
-		os.Exit(1)
+		osExit(1)
 	}
 	waypointSender.SetDebug(d_w_opt)
 
@@ -735,7 +740,7 @@ x = Silence FX.25 information.`)
 		// above all - so do it on the way out, and whether or not a stop
 		// arrives in the meantime.
 		teardown()
-		os.Exit(1)
+		osExit(1)
 	}
 }
 
@@ -1242,7 +1247,7 @@ func cleanup() {
 	// them.  Well inside any supervisor's patience - systemd waits 90s by
 	// default - and a second signal now skips it entirely.
 	SLEEP_SEC(1)
-	os.Exit(0)
+	osExit(0)
 }
 
 // reportConfigCheck says how a configuration file turned out, for --config-check.
