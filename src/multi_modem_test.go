@@ -13,10 +13,10 @@ import (
 
 // recordingReceiveSink keeps each frame handed to it.
 type recordingReceiveSink struct {
-	frames []*packet_t
+	frames []*ax25.Packet
 }
 
-func (s *recordingReceiveSink) RecFrame(_ int, _ int, _ int, pp *packet_t, _ ax25.ALevel, _ fec_type_t, _ BitFixLevel, _ string) {
+func (s *recordingReceiveSink) RecFrame(_ int, _ int, _ int, pp *ax25.Packet, _ ax25.ALevel, _ fec_type_t, _ BitFixLevel, _ string) {
 	s.frames = append(s.frames, pp)
 }
 

@@ -136,7 +136,7 @@ func (d *Digipeater) GetCount(from_chan, to_chan int) int {
 // digipeater will not repeat it when it is heard again.  It does nothing on a
 // nil receiver, so a caller need not check whether the digipeater has been
 // started yet.
-func (d *Digipeater) Remember(pp *packet_t, channel int) {
+func (d *Digipeater) Remember(pp *ax25.Packet, channel int) {
 	if d == nil {
 		return
 	}
@@ -159,7 +159,7 @@ func (d *Digipeater) Remember(pp *packet_t, channel int) {
  *
  *------------------------------------------------------------------------------*/
 
-func (d *Digipeater) Digipeat(from_chan int, pp *packet_t) {
+func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Network TNC is OK for UI frames where we don't care about timing.
 	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
 		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
@@ -269,7 +269,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func (d *Digipeater) Regen(from_chan int, pp *packet_t) {
+func (d *Digipeater) Regen(from_chan int, pp *ax25.Packet) {
 	/*
 		packet_t result;
 	*/
@@ -336,7 +336,7 @@ func (d *Digipeater) Regen(from_chan int, pp *packet_t) {
 
 func (d *Digipeater) match(
 	from_chan int,
-	pp *packet_t,
+	pp *ax25.Packet,
 	mycall_rec string,
 	mycall_xmit string,
 	alias *regexp.Regexp,
@@ -345,7 +345,7 @@ func (d *Digipeater) match(
 	preempt preempt_e,
 	atgp string,
 	filter_str string,
-) *packet_t {
+) *ax25.Packet {
 	/*
 	 * First check if filtering has been configured.
 	 */

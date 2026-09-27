@@ -156,7 +156,7 @@ type IGate struct {
 	debugLevel int
 
 	dpMutex     sync.Mutex /* Critical section for delayed packet queue. */
-	dpQueueHead *packet_t
+	dpQueueHead *ax25.Packet
 
 	sock net.Conn
 
@@ -474,7 +474,7 @@ const IGATE_MAX_MSG = 512 /* "All 'packets' sent to APRS-IS must be in the TNC2 
 /* by a carriage return, line feed sequence. No line may exceed 512 bytes */
 /* including the CR/LF sequence." */
 
-func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
+func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 	if ig.sock == nil {
 		return /* Silently discard if not connected. */
 	}
@@ -655,7 +655,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
  *
  *--------------------------------------------------------------------*/
 
-func (ig *IGate) sendPacketToServer(pp *packet_t, channel int) {
+func (ig *IGate) sendPacketToServer(pp *ax25.Packet, channel int) {
 	var pinfo = pp.Info()
 
 	/*
@@ -1139,7 +1139,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
  *
  *--------------------------------------------------------------------*/
 
-func (ig *IGate) satgateDelayPacket(pp *packet_t, channel int) { //nolint:unparam
+func (ig *IGate) satgateDelayPacket(pp *ax25.Packet, channel int) { //nolint:unparam
 	//if (ig.debugLevel >= 1) {
 	text_color_set(DW_COLOR_INFO)
 	dw_printf("Rx IGate: SATgate mode, delay packet heard directly.\n")
@@ -1150,7 +1150,7 @@ func (ig *IGate) satgateDelayPacket(pp *packet_t, channel int) { //nolint:unpara
 
 	ig.dpMutex.Lock()
 
-	var pnext, plast *packet_t
+	var pnext, plast *ax25.Packet
 
 	if ig.dpQueueHead == nil {
 		ig.dpQueueHead = pp
@@ -1600,7 +1600,7 @@ func (h *rx2igHistory) reset() {
 	*h = rx2igHistory{} //nolint:exhaustruct_v5
 }
 
-func (ig *IGate) rxToIgRemember(pp *packet_t) {
+func (ig *IGate) rxToIgRemember(pp *ax25.Packet) {
 	// No need to save the information if we are not doing duplicate checking.
 	if ig.config.rx2ig_dedupe_time == 0 {
 		return
@@ -1628,7 +1628,7 @@ func (ig *IGate) rxToIgRemember(pp *packet_t) {
 	}
 }
 
-func (ig *IGate) rxToIgAllow(pp *packet_t) bool {
+func (ig *IGate) rxToIgAllow(pp *ax25.Packet) bool {
 	var crc = pp.DedupeCRC()
 	var now = time.Now()
 
@@ -1911,7 +1911,7 @@ func (h *ig2txHistory) reset() {
 	}
 }
 
-func (ig *IGate) igToTxRemember(pp *packet_t, channel int, bydigi int) {
+func (ig *IGate) igToTxRemember(pp *ax25.Packet, channel int, bydigi int) {
 	var now = time.Now()
 	var crc = pp.DedupeCRC()
 
@@ -1942,7 +1942,7 @@ func (ig *IGate) igToTxRemember(pp *packet_t, channel int, bydigi int) {
 	}
 }
 
-func (ig *IGate) igToTxAllow(pp *packet_t, channel int) bool {
+func (ig *IGate) igToTxAllow(pp *ax25.Packet, channel int) bool {
 	var crc = pp.DedupeCRC()
 	var now = time.Now()
 

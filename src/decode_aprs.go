@@ -227,7 +227,7 @@ func DecodeAPRSInit() {
  *
  *------------------------------------------------------------------*/
 
-func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t {
+func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_aprs_t {
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
 	var pinfo = pp.Info()
 
@@ -1298,7 +1298,7 @@ func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int
 	return (0)
 }
 
-func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
+func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 	type aprs_mic_e_s struct {
 		DTI         byte    /* ' or ` */
 		Lon         [3]byte /* "d+28", "m+28", "h+28" */

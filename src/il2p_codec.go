@@ -47,7 +47,7 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ...bool) ([]byte, int) {
+func il2p_encode_frame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc ...bool) ([]byte, int) {
 	var appendCRC = len(crc) > 0 && crc[0]
 
 	var fec_level, use_max_fec = il2p_tx_fec(version, max_fec)
@@ -167,7 +167,7 @@ func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ..
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_frame(irec []byte, version il2p_version_t) *packet_t {
+func il2p_decode_frame(irec []byte, version il2p_version_t) *ax25.Packet {
 	if len(irec) < IL2P_HEADER_SIZE+IL2P_HEADER_PARITY {
 		return nil
 	}
@@ -231,7 +231,7 @@ func il2p_decode_frame(irec []byte, version il2p_version_t) *packet_t {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_version_t, symbols_corrected *int) *packet_t {
+func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_version_t, symbols_corrected *int) *ax25.Packet {
 	var hdr_type, fec_level, payload_len = il2p_get_header_attributes(uhdr)
 	var max_fec = il2p_rx_max_fec(version, fec_level)
 

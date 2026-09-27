@@ -410,7 +410,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
  *
  *-----------------------------------------------------------------*/
 
-func (nt *NetTNC) sendPacket(channel int, pp *packet_t) {
+func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) {
 	if nt == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Not connected to network TNC for channel %d. Discarding packet.\n", channel)

@@ -77,7 +77,7 @@ import (
 // Candidates for further processing.
 
 type candidate_t struct {
-	packet_p    *packet_t
+	packet_p    *ax25.Packet
 	alevel      ax25.ALevel
 	speed_error float64     //nolint:unused
 	fec_type    fec_type_t  // Type of FEC: none(0), fx25, il2p
@@ -140,7 +140,7 @@ func newMultiModems() [MAX_RADIO_CHANS]*MultiModem {
 // than to act on it, has its own.
 type ReceiveSink interface {
 	// RecFrame hands over a frame that has been decoded successfully.
-	RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
+	RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
 
 	// DCDChange reports that the decoders for a channel have collectively
 	// started (state 1) or stopped (state 0) seeing data.
@@ -150,7 +150,7 @@ type ReceiveSink interface {
 // radioSink is the ReceiveSink for a channel with a radio on the end of it.
 type radioSink struct{}
 
-func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	dataLinkQueue.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
 }
 
@@ -333,7 +333,7 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 
 	// Special encapsulation for AIS & EAS so they can be treated normally pretty much everywhere else.
 
-	var pp *packet_t
+	var pp *ax25.Packet
 
 	switch pa.achan[channel].modem_type {
 	case MODEM_AIS:
@@ -370,14 +370,14 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 
 // TODO: Eliminate function above and move code elsewhere?
 
-func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	multiModems[channel].processRecPacket(subchan, slice, pp, alevel, retries, fec_type)
 }
 
 // processRecPacket takes a frame one of the channel's decoders found: straight
 // on if there is only the one decoder, otherwise as a candidate for
 // pickBestCandidate.
-func (m *MultiModem) processRecPacket(subchan int, slice int, pp *packet_t, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
+func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	var channel = m.channel
 	var pa = m.audioConfig
 

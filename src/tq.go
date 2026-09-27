@@ -39,7 +39,7 @@ type TransmitQueue struct {
 	mu sync.Mutex /* Critical section for updating queues. */
 	/* Just one for all queues. */
 
-	head [MAX_RADIO_CHANS][TQ_NUM_PRIO]*packet_t /* Head of linked list for each queue. */
+	head [MAX_RADIO_CHANS][TQ_NUM_PRIO]*ax25.Packet /* Head of linked list for each queue. */
 
 	// Number of packets in each queue, maintained alongside head and guarded
 	// by the same mutex.  Remove pops the head in constant time, so counting
@@ -101,7 +101,7 @@ func NewTransmitQueue() *TransmitQueue {
 
 // tq_is_real_packet reports whether a queue entry is a real packet rather than
 // LMSeizeRequest's null wake-up frame, matching countLocked's own test.
-func tq_is_real_packet(pp *packet_t) bool {
+func tq_is_real_packet(pp *ax25.Packet) bool {
 	return pp.NumAddr() >= ax25.MinAddrs
 }
 
@@ -214,7 +214,7 @@ func (tq *TransmitQueue) SetNetTNCs(netTNCs [MAX_TOTAL_CHANS]*NetTNC) {
  *
  *--------------------------------------------------------------------*/
 
-func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
+func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 	dwutil.Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
@@ -342,7 +342,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 	if tq.head[channel][prio] == nil {
 		tq.head[channel][prio] = pp
 	} else {
-		var pnext *packet_t
+		var pnext *ax25.Packet
 
 		var plast = tq.head[channel][prio]
 		for {
@@ -444,7 +444,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 
 // TODO: FIXME:  this is a copy of Append.  Need to fine tune and explain why.
 
-func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
+func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *ax25.Packet) {
 	dwutil.Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
@@ -741,7 +741,7 @@ func (tq *TransmitQueue) WaitWhileEmpty(ctx context.Context, channel int) {
  *
  *--------------------------------------------------------------------*/
 
-func (tq *TransmitQueue) Remove(channel int, prio int) *packet_t {
+func (tq *TransmitQueue) Remove(channel int, prio int) *ax25.Packet {
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
@@ -750,7 +750,7 @@ func (tq *TransmitQueue) Remove(channel int, prio int) *packet_t {
 	}
 	tq.mu.Lock()
 
-	var result_p *packet_t
+	var result_p *ax25.Packet
 
 	if tq.head[channel][prio] == nil {
 		result_p = nil
@@ -806,7 +806,7 @@ func (tq *TransmitQueue) Remove(channel int, prio int) *packet_t {
  *
  *--------------------------------------------------------------------*/
 
-func (tq *TransmitQueue) Peek(channel int, prio int) *packet_t {
+func (tq *TransmitQueue) Peek(channel int, prio int) *ax25.Packet {
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,

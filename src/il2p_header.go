@@ -127,7 +127,7 @@ func GET_PAYLOAD_BYTE_COUNT(hdr []byte) int {
 // Here we squeeze the most common cases down to 4 bits.
 // Return -1 if translation is not possible.  Fall back to type 0 header in this case.
 
-func encode_pid(pp *packet_t) int {
+func encode_pid(pp *ax25.Packet) int {
 	var pid = pp.PID()
 
 	if (pid & 0x30) == 0x20 {
@@ -230,7 +230,7 @@ func decode_pid(pid int) int {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
+func il2p_type_1_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
 	var hdr = make([]byte, IL2P_HEADER_SIZE)
 
 	if pp.NumAddr() != 2 {
@@ -435,7 +435,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
+func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
 	if GET_HDR_TYPE(hdr) != 1 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P Internal error.  Should not be here: il2p_decode_header_type_1, when header type is 0.\n")
@@ -631,7 +631,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_type_0_header(pp *packet_t, fec_level int) ([]byte, int) {
+func il2p_type_0_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
 	var hdr = make([]byte, IL2P_HEADER_SIZE)
 
 	// Bit 7 has [FEC Level:1], [HDR Type:1], [Payload byte Count:10]

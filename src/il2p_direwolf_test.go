@@ -524,7 +524,7 @@ func test_example_headers(t *testing.T) {
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-func enc_dec_compare(t *testing.T, pp1 *packet_t) {
+func enc_dec_compare(t *testing.T, pp1 *ax25.Packet) {
 	t.Helper()
 
 	// Every version, and for v0.4 both FEC levels, should survive a round trip.

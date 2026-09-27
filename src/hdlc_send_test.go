@@ -370,7 +370,7 @@ func TestIL2PPolarityInvertsEveryBit(t *testing.T) {
 
 // newHDLCSendTestPacket is a packet with an information part of the requested
 // length.
-func newHDLCSendTestPacket(t *testing.T, infoLen int) *packet_t {
+func newHDLCSendTestPacket(t *testing.T, infoLen int) *ax25.Packet {
 	t.Helper()
 
 	var addrs [ax25.MaxAddrs]string

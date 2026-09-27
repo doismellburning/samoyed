@@ -1,6 +1,7 @@
 package direwolf
 
 import (
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/sirupsen/logrus"
 )
@@ -66,7 +67,7 @@ func NewHDLCSender(channel int, audioConfig *AudioConfig) *HDLCSender {
  *
  *--------------------------------------------------------------*/
 
-func (s *HDLCSender) SendFrame(pp *packet_t, badFCS bool) int {
+func (s *HDLCSender) SendFrame(pp *ax25.Packet, badFCS bool) int {
 	var achan = &s.audioConfig.achan[s.channel]
 
 	if achan.layer2_xmit == LAYER2_IL2P { //nolint:staticcheck

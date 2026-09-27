@@ -195,7 +195,7 @@ func initiateConnect(t *testing.T, myCall, theirCall string, channel int) {
 }
 
 // Helper to simulate receiving a frame
-func receiveFrame(t *testing.T, pp *packet_t, channel int) {
+func receiveFrame(t *testing.T, pp *ax25.Packet, channel int) {
 	t.Helper()
 
 	var E = new(dlq_item_t)
@@ -243,7 +243,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	setupTestEnv(t)
 
 	var E *dlq_item_t
-	var pp *packet_t
+	var pp *ax25.Packet
 	var addrs [ax25.MaxAddrs]string
 
 	// Connect request

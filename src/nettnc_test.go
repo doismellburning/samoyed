@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,7 +99,7 @@ func expectReceivedFrames(t *testing.T) {
 
 // kissFrameFor wraps a packet's on-air bytes the way a KISS TNC would before
 // putting them on the wire.
-func kissFrameFor(pp *packet_t) []byte {
+func kissFrameFor(pp *ax25.Packet) []byte {
 	return KissEncapsulate(append([]byte{0}, pp.FrameData()...))
 }
 

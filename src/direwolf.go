@@ -778,7 +778,7 @@ func ais_object_course_speed(A *decode_aprs_t) (maybe.Maybe[int], maybe.Maybe[in
 	return course, speed
 }
 
-func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice int, pp *packet_t, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
 	dwutil.Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)

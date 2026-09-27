@@ -108,7 +108,7 @@ func (d *ConnectedDigipeater) GetCount(from_chan, to_chan int) int {
  *
  *------------------------------------------------------------------------------*/
 
-func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *packet_t) {
+func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Connected mode is allowed only for channels with internal modem.
 	// It probably wouldn't matter for digipeating but let's keep that rule simple and consistent.
 	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS ||
@@ -146,7 +146,7 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *packet_t) {
 
 // digipeatTo queues pp for transmission on to_chan if the from/to channel
 // pair's rules say it should be repeated.
-func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *packet_t) {
+func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *ax25.Packet) {
 	var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
 		d.audioConfig.mycall[to_chan],
 		d.config.has_alias[from_chan][to_chan],
@@ -200,7 +200,7 @@ func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *packet_
  *
  *------------------------------------------------------------------------------*/
 
-func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan int, cfilter_str string) *packet_t {
+func (d *ConnectedDigipeater) match(from_chan int, pp *ax25.Packet, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan int, cfilter_str string) *ax25.Packet {
 	/*
 	 * First check if filtering has been configured.
 	 * Note that we have three different config file filter commands:

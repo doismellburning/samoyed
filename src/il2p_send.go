@@ -1,5 +1,9 @@
 package direwolf
 
+import (
+	"github.com/doismellburning/samoyed/internal/ax25"
+)
+
 /*-------------------------------------------------------------
  *
  * Name:	sendIL2PFrame (il2p_send_frame in Dire Wolf)
@@ -41,7 +45,7 @@ package direwolf
  *
  *--------------------------------------------------------------*/
 
-func (s *HDLCSender) sendIL2PFrame(pp *packet_t, version il2p_version_t, max_fec int, polarity int) int {
+func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_fec int, polarity int) int {
 	var syncWordBytes = []byte{
 		(IL2P_SYNC_WORD >> 16) & 0xff,
 		(IL2P_SYNC_WORD >> 8) & 0xff,

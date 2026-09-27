@@ -311,7 +311,7 @@ func NewAGWServer(ctx context.Context, audio_config_p *AudioConfig, mc *misc_con
  *
  *--------------------------------------------------------------------*/
 
-func (s *AGWServer) SendRecPacket(channel int, pp *packet_t, fbuf []byte) {
+func (s *AGWServer) SendRecPacket(channel int, pp *ax25.Packet, fbuf []byte) {
 	if s == nil {
 		return
 	}
@@ -361,7 +361,7 @@ func (s *AGWServer) SendRecPacket(channel int, pp *packet_t, fbuf []byte) {
 	s.SendMonitored(channel, pp, 0)
 } /* end SendRecPacket */
 
-func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
+func (s *AGWServer) SendMonitored(channel int, pp *ax25.Packet, own_xmit int) {
 	if s == nil {
 		return
 	}
@@ -475,7 +475,7 @@ func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
 // I think my opinion (which could change) is that we should try to be consistent with TNC-2 format
 // rather than continuing to propagate historical inconsistencies.
 
-func mon_addrs(channel int, pp *packet_t) []byte {
+func mon_addrs(channel int, pp *ax25.Packet) []byte {
 	var src = pp.AddrWithSSID(ax25.Source)
 
 	var dst = pp.AddrWithSSID(ax25.Destination)
@@ -519,7 +519,7 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 //	'U' for unnumbered information frame.
 //	'S' for supervisory and other unnumbered frames.
 
-func mon_desc(pp *packet_t) (byte, string) {
+func mon_desc(pp *ax25.Packet) (byte, string) {
 	var cr, _, pf, nr, ns, ftype = pp.FrameType()
 	var pf_text string // P or F depending on whether command or response.
 

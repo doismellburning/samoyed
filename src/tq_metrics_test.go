@@ -17,7 +17,7 @@ import (
 // newTestPacket builds the frame these tests queue.  The exact contents do not
 // matter to the queue; what matters is that it is a real packet, as opposed to
 // the null wake-up frame TransmitQueue.LMSeizeRequest queues.
-func newTestPacket(t *testing.T) *packet_t {
+func newTestPacket(t *testing.T) *ax25.Packet {
 	t.Helper()
 
 	const (
@@ -68,7 +68,7 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 	// Build the packets up front: ax25_new increments an unsynchronised global
 	// sequence counter, which is a separate matter from the queue and would
 	// otherwise be the only thing this test found under -race.
-	var packets = make([]*packet_t, 0, NUM_PKTS)
+	var packets = make([]*ax25.Packet, 0, NUM_PKTS)
 
 	for range NUM_PKTS {
 		var pp = newTestPacket(t)

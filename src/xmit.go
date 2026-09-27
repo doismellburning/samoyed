@@ -274,7 +274,7 @@ const (
 	FLAVOR_OTHER
 )
 
-func frame_flavor(pp *packet_t) flavor_t {
+func frame_flavor(pp *ax25.Packet) flavor_t {
 	if pp.IsAPRS() { // UI frame, PID 0xF0.
 		// It's unfortunate APRS did not use its own special PID.
 		var dest = pp.AddrNoSSID(ax25.Destination)
@@ -626,7 +626,7 @@ func priorityToRune(prio int) rune {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
+func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, max_bundle int) {
 	/*
 	 * These are for timing of a transmission.
 	 * All are in usual unix time (seconds since 1/1/1970) but higher resolution
@@ -839,7 +839,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
+func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 	if pp.IsNullFrame() {
 		// Issue 132 - We could end up in a situation where:
 		// Transmitter is already on.
@@ -957,7 +957,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *packet_t) {
+func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) {
 	/*
 	 * Print spoken packet.  Prefix by channel.
 	 */
@@ -1052,7 +1052,7 @@ func (xs *XmitService) timestampPrefix() string {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
+func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 	var ts = xs.timestampPrefix()
 
 	var pinfo = pp.Info()
@@ -1102,7 +1102,7 @@ func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_dtmf(c int, pp *packet_t, speed int) {
+func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 	var ts = xs.timestampPrefix()
 
 	var pinfo = pp.Info()

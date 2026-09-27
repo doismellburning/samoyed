@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,9 +46,9 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 	//
 	// queued is written only here, before either goroutine starts, so the
 	// peeker may read it freely.
-	var packets = make([]*packet_t, 0, NUM_PKTS)
+	var packets = make([]*ax25.Packet, 0, NUM_PKTS)
 
-	var queued = make(map[*packet_t]bool, NUM_PKTS)
+	var queued = make(map[*ax25.Packet]bool, NUM_PKTS)
 
 	for range NUM_PKTS {
 		var pp = newTestPacket(t)
@@ -135,9 +136,9 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 	// Built up front: ax25_new increments an unsynchronised global sequence
 	// counter, which is a separate matter from the queue and would otherwise
 	// be what -race reported.
-	var packets = make([][]*packet_t, CHANNELS)
+	var packets = make([][]*ax25.Packet, CHANNELS)
 	for c := range CHANNELS {
-		packets[c] = make([]*packet_t, 0, ROUNDS)
+		packets[c] = make([]*ax25.Packet, 0, ROUNDS)
 
 		for range ROUNDS {
 			packets[c] = append(packets[c], newTestPacket(t))

@@ -94,7 +94,7 @@ type dlq_item_t struct {
 
 	slice int /* Winning slicer. */
 
-	pp *packet_t /* Pointer to frame structure. */
+	pp *ax25.Packet /* Pointer to frame structure. */
 
 	alevel ax25.ALevel /* Audio level. */
 
@@ -231,7 +231,7 @@ func (q *DataLinkQueue) Init() {
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) RecFrame(channel int, subchannel int, slice int, pp *packet_t, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func (q *DataLinkQueue) RecFrame(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	logrus.WithField("channel", channel).Debug("dlq_rec_frame")
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL to include virtual channels.
 

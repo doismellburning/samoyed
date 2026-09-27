@@ -148,7 +148,7 @@ func mheard_latlon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string 
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel ax25.ALevel, retries BitFixLevel) {
+func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel) {
 	var now = time.Now()
 
 	var source = pp.AddrWithSSID(ax25.Source)

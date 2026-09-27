@@ -128,7 +128,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, alevel ax25.ALevel, retries BitFixLevel) {
+func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel) {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()
 
@@ -346,7 +346,7 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *packet_t) {
+func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *ax25.Packet) {
 	// Sanitize system type (manufacturer) changing any comma to period.
 	var smfr = strings.ReplaceAll(A.g_mfr, ",", ".")
 

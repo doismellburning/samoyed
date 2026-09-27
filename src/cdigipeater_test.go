@@ -155,7 +155,7 @@ func TestCDigipeatMatchFilterError(t *testing.T) {
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var result *packet_t
+	var result *ax25.Packet
 
 	var output = testutils.CaptureOutput(t, func() {
 		result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "z/nonsense")

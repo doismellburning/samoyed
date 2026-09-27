@@ -465,7 +465,7 @@ func (s *readerSampleSource) GetByte(_ int) int {
  * This is called when we have a good frame.
  */
 
-func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	s.packetsDecoded++
 
 	if hdlcReceiver.DataDetectAny(channel) == 0 {
