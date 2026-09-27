@@ -30,15 +30,15 @@ func fecTypeLabel(fecType fec_type_t) string {
 	return ""
 }
 
-// isRadioChannel reports whether a channel is a configured radio channel, as
-// opposed to a virtual one (ICHANNEL, a network TNC) or one that was never
-// configured at all.  Metrics that describe the radio - received frames, DCD,
-// audio level - are confined to these, and they are the channels metrics_init
-// marks up and seeds.
-func isRadioChannel(channel int) bool {
+// isRadioChannel reports whether a channel is a configured radio channel in
+// audio, as opposed to a virtual one (ICHANNEL, a network TNC) or one that was
+// never configured at all.  Metrics that describe the radio - received frames,
+// DCD, audio level - are confined to these, and they are the channels
+// metrics_init marks up and seeds.  A nil audio has no radio channels.
+func isRadioChannel(audio *AudioConfig, channel int) bool {
 	return channel >= 0 && channel < MAX_RADIO_CHANS &&
-		save_audio_config_p != nil &&
-		save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO
+		audio != nil &&
+		audio.chan_medium[channel] == MEDIUM_RADIO
 }
 
 // recordRadioFrame accounts for a frame the demodulator accepted.  It is called
@@ -69,10 +69,10 @@ func recordRadioFrame(channel int, fecType fec_type_t, retries BitFixLevel) {
 
 // metrics_init starts the Prometheus "/metrics" HTTP endpoint if a port was
 // configured with METRICSPORT, and pushes each channel's static up/down
-// state from the audio config, seeding the rest of that channel's series at
+// state from audio, seeding the rest of that channel's series at
 // zero (everything else pushes from its own subsystem as events happen).
 // A port of 0 (the default) disables it.
-func metrics_init(ctx context.Context, mc *misc_config_s) {
+func metrics_init(ctx context.Context, audio *AudioConfig, mc *misc_config_s) {
 	if mc.metrics_port == 0 {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Disabled Prometheus metrics endpoint.\n")
@@ -81,7 +81,7 @@ func metrics_init(ctx context.Context, mc *misc_config_s) {
 	}
 
 	for channel := range MAX_RADIO_CHANS {
-		var isRadio = isRadioChannel(channel)
+		var isRadio = isRadioChannel(audio, channel)
 
 		metrics.SetChannelUp(channel, isRadio)
 
