@@ -283,7 +283,7 @@ func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t
 
 	// Complain if obsolete WIDE or RELAY is found in via path.
 
-	for i := range ax25_get_num_repeaters(pp) {
+	for i := range pp.NumRepeaters() {
 		atemp = ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+i)
 		if !quiet {
 			if atemp == "RELAY" || atemp == "WIDE" || atemp == "TRACE" {

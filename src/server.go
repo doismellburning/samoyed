@@ -480,7 +480,7 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 
 	var dst = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
-	var num_digi = ax25_get_num_repeaters(pp)
+	var num_digi = pp.NumRepeaters()
 
 	if num_digi > 0 {
 		var via strings.Builder // complete via path
@@ -1746,7 +1746,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				/* that digipeater has been used, it should go out quickly thru */
 				/* the high priority queue. */
 				/* Otherwise, it is an original for the low priority queue. */
-				if ax25_get_num_repeaters(pp) >= 1 &&
+				if pp.NumRepeaters() >= 1 &&
 					ax25_get_h(pp, AX25_REPEATER_1) > 0 {
 					transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
 				} else {

@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_num_repeaters(this_p *packet_t) int {
-	return this_p.NumRepeaters()
-}
-
 func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 	return this_p.AddrWithSSID(n)
 }

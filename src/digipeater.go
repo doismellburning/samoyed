@@ -605,7 +605,7 @@ func (d *Digipeater) match(
 
 			ax25_set_ssid(result, r, ssid-1) // should be at least 1
 
-			if ax25_get_num_repeaters(pp) < AX25_MAX_REPEATERS {
+			if pp.NumRepeaters() < AX25_MAX_REPEATERS {
 				result.InsertAddr(r, mycall_xmit)
 				ax25_set_h(result, r)
 			}
