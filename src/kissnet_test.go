@@ -103,7 +103,7 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	mc.kiss_port[0] = port
 	mc.kiss_chan[0] = channel
 
-	return NewKissNetService(t.Context(), mc, kissTestAudioConfig()), port
+	return NewKissNetService(t.Context(), mc, kissTestAudioConfig(), 0), port
 }
 
 // dialKissNet attaches a client application to a running service, and hands
@@ -340,7 +340,8 @@ func TestKissNetCopyDoesNotModifyTheCallersFrame(t *testing.T) {
 func TestKissNetDebugPrints(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
-	kns.SetDebug(2)
+	// newAttachedKissNet starts no goroutines, so the level can be set directly.
+	kns.debug = 2
 
 	var output = testutils.CaptureOutput(t, func() {
 		kns.SendRecPacket(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
