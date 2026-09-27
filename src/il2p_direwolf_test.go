@@ -712,7 +712,7 @@ func all_frame_types(t *testing.T) {
 		for cr := cmdres_t(1); cr <= 1; cr++ { // can only be command
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
+			var pp = ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
 
 			pp.HexDump()
 			enc_dec_compare(t, pp)
@@ -725,7 +725,7 @@ func all_frame_types(t *testing.T) {
 		for cr := cmdres_t(1); cr <= 1; cr++ {
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
+			var pp = ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
 
 			pp.HexDump()
 			enc_dec_compare(t, pp)

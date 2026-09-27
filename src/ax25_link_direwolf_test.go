@@ -429,7 +429,7 @@ func TestAX25LinkIFrameExchange(t *testing.T) {
 	addrs[AX25_DESTINATION] = MY_CALL
 	addrs[AX25_SOURCE] = THEIR_CALL
 	var info = []byte("Hello")
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, info)
+	var pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, info)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -641,7 +641,7 @@ func TestAX25LinkMultipleIFrames(t *testing.T) {
 	// Receive I-frames 0, 1, 2 in sequence
 	for ns := range 3 {
 		var info = []byte("Frame " + string(rune('0'+ns)))
-		var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, ns, 0, AX25_PID_NO_LAYER_3, info)
+		var pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 0, ns, 0, AX25_PID_NO_LAYER_3, info)
 		assert.NotNil(t, pp)
 		receiveFrame(t, pp, CHANNEL)
 
@@ -669,12 +669,12 @@ func TestAX25LinkOutOfSequenceIFrame(t *testing.T) {
 	addrs[AX25_SOURCE] = THEIR_CALL
 
 	// Receive I-frame 0
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, []byte("Frame 0"))
+	var pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, []byte("Frame 0"))
 	receiveFrame(t, pp, CHANNEL)
 	assert.Equal(t, 1, S.vr, "V(R) should be 1")
 
 	// Receive I-frame 2 (out of sequence, expecting 1)
-	pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 2, 0, AX25_PID_NO_LAYER_3, []byte("Frame 2"))
+	pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 0, 2, 0, AX25_PID_NO_LAYER_3, []byte("Frame 2"))
 	receiveFrame(t, pp, CHANNEL)
 
 	// V(R) should NOT increment (frame rejected)
@@ -703,7 +703,7 @@ func TestAX25LinkIFrameWithAck(t *testing.T) {
 	addrs[AX25_SOURCE] = THEIR_CALL
 
 	// Receive I-frame with N(R)=2 (acknowledging our frames 0 and 1)
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 2, 0, 0, AX25_PID_NO_LAYER_3, []byte("Data"))
+	var pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 2, 0, 0, AX25_PID_NO_LAYER_3, []byte("Data"))
 	receiveFrame(t, pp, CHANNEL)
 
 	// V(A) should be updated to 2
@@ -1040,7 +1040,7 @@ func TestAX25LinkPollResponse(t *testing.T) {
 	addrs[AX25_SOURCE] = THEIR_CALL
 
 	// Receive I-frame with P=1 (poll)
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 1, AX25_PID_NO_LAYER_3, []byte("Poll"))
+	var pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 0, 0, 1, AX25_PID_NO_LAYER_3, []byte("Poll"))
 	receiveFrame(t, pp, CHANNEL)
 
 	// V(R) should increment
@@ -1456,7 +1456,7 @@ func TestAX25LinkIFrameAsCommand(t *testing.T) {
 	addrs[AX25_DESTINATION] = "TEST2"
 	addrs[AX25_SOURCE] = "TEST1"
 
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, []byte("test"))
+	var pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, []byte("test"))
 	assert.NotNil(t, pp)
 
 	cr, _, _, _, _, ftype := pp.FrameType() //nolint:dogsled
@@ -1871,7 +1871,7 @@ func TestAX25LinkIFrameTypeParsing(t *testing.T) {
 	addrs[AX25_SOURCE] = "TEST1"
 
 	// Modulo 8 I-frame
-	pp := ax25_i_frame(addrs, 2, cr_cmd, 8, 3, 2, 1, AX25_PID_NO_LAYER_3, []byte("test"))
+	pp := ax25.IFrame(addrs, 2, cr_cmd, 8, 3, 2, 1, AX25_PID_NO_LAYER_3, []byte("test"))
 	assert.NotNil(t, pp)
 
 	cr, _, pf, nr, ns, ftype := pp.FrameType()
@@ -1882,7 +1882,7 @@ func TestAX25LinkIFrameTypeParsing(t *testing.T) {
 	assert.Equal(t, 2, ns)
 
 	// Modulo 128 I-frame
-	pp = ax25_i_frame(addrs, 2, cr_cmd, 128, 100, 50, 1, AX25_PID_NO_LAYER_3, []byte("test"))
+	pp = ax25.IFrame(addrs, 2, cr_cmd, 128, 100, 50, 1, AX25_PID_NO_LAYER_3, []byte("test"))
 	assert.NotNil(t, pp)
 
 	_, _, pf, nr, ns, ftype = pp.FrameType()
@@ -1968,17 +1968,17 @@ func TestAX25LinkRejectExceptionFlag(t *testing.T) {
 	addrs[AX25_SOURCE] = THEIR_CALL
 
 	// First receive frame 0
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, []byte("0"))
+	var pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, []byte("0"))
 	receiveFrame(t, pp, CHANNEL)
 	assert.Equal(t, 1, S.vr)
 
 	// Now receive frame 2 (skip 1) - should set reject_exception
-	pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 2, 0, AX25_PID_NO_LAYER_3, []byte("2"))
+	pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 0, 2, 0, AX25_PID_NO_LAYER_3, []byte("2"))
 	receiveFrame(t, pp, CHANNEL)
 	assert.True(t, S.reject_exception, "Reject exception should be set")
 
 	// Receive expected frame 1 - should clear reject_exception
-	pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 1, 0, AX25_PID_NO_LAYER_3, []byte("1"))
+	pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 0, 1, 0, AX25_PID_NO_LAYER_3, []byte("1"))
 	receiveFrame(t, pp, CHANNEL)
 	assert.False(t, S.reject_exception, "Reject exception should be cleared")
 }
@@ -2187,7 +2187,7 @@ func TestAX25LinkFrameCountStats(t *testing.T) {
 
 	// Receive some I-frames
 	for i := range 3 {
-		var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, i, 0, AX25_PID_NO_LAYER_3, []byte("data"))
+		var pp = ax25.IFrame(addrs, 2, cr_cmd, 8, 0, i, 0, AX25_PID_NO_LAYER_3, []byte("data"))
 		receiveFrame(t, pp, CHANNEL)
 	}
 

@@ -603,7 +603,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
 
-		return (ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, axpid, pinfo))
+		return (ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, axpid, pinfo))
 	}
 }
 

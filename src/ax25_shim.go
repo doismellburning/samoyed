@@ -63,7 +63,3 @@ const (
 	AddrStrictNoStar               = ax25.AddrStrictNoStar
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
-
-func ax25_i_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, modulo ax25_modulo_t, nr int, ns int, pf int, pid int, info []byte) *packet_t {
-	return ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
-}

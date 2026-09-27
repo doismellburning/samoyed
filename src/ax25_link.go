@@ -3676,7 +3676,7 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 	var txdata = S.txdata_by_ns[i_frame_ns]
 
 	if txdata != nil {
-		var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, txdata.pid, txdata.data[:txdata.len])
+		var pp = ax25.IFrame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, txdata.pid, txdata.data[:txdata.len])
 		// dw_printf ("calling lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
 		transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
@@ -3707,7 +3707,7 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 
 		txdata = S.txdata_by_ns[i_frame_ns]
 		if txdata != nil {
-			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, txdata.pid, txdata.data[:txdata.len])
+			var pp = ax25.IFrame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, txdata.pid, txdata.data[:txdata.len])
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
 			num_resent++
@@ -5334,8 +5334,7 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 				dw_printf("invoke_retransmission(): Resending N(S) = %d\n", ns)
 			}
 
-			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p,
-				S.txdata_by_ns[ns].pid, S.txdata_by_ns[ns].data[:S.txdata_by_ns[ns].len])
+			var pp = ax25.IFrame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p, S.txdata_by_ns[ns].pid, S.txdata_by_ns[ns].data[:S.txdata_by_ns[ns].len])
 
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 			// Keep it around in case we need to send again.
@@ -5761,7 +5760,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 				// AX25SafePrint (txdata.data, txdata.len, 1);
 				// dw_printf ("\"\n");
 			}
-			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p, txdata.pid, txdata.data[:txdata.len])
+			var pp = ax25.IFrame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p, txdata.pid, txdata.data[:txdata.len])
 
 			if ax25Link.debugMisc { //nolint:staticcheck
 				// text_color_set(DW_COLOR_DEBUG);
