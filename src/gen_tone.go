@@ -728,7 +728,7 @@ func GenToneMain() {
 		}
 	}
 
-	audio_close()
+	AudioClose()
 
 	/* Now try stereo. */
 
@@ -758,5 +758,5 @@ func GenToneMain() {
 		}
 	}
 
-	audio_close()
+	AudioClose()
 }

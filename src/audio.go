@@ -775,7 +775,7 @@ var adev [MAX_ADEVS]*adev_s
 var save_audio_config_p *AudioConfig
 
 // portaudioMu guards portaudioRefCount and ensures Initialize/Terminate are
-// correctly paired even if AudioOpen/audio_close are called concurrently.
+// correctly paired even if AudioOpen/AudioClose are called concurrently.
 var portaudioMu sync.Mutex
 var portaudioRefCount int
 
@@ -833,9 +833,9 @@ func printAudioBackendNoise() {
 // portaudioHeldByOpen records whether the audio devices now open took a
 // PortAudio reference: an all-stdin/UDP configuration, or one whose only
 // soundcard was an output we could do without, never initializes PortAudio,
-// and audio_close must not then release a reference it never took.  There is
+// and AudioClose must not then release a reference it never took.  There is
 // one set of audio devices at a time - AudioOpen replaces the whole adev
-// table - so one flag describes the open that audio_close is paired with.
+// table - so one flag describes the open that AudioClose is paired with.
 var portaudioHeldByOpen bool
 
 // audioNameIsStdin reports whether an audio device name means standard input.
@@ -918,7 +918,7 @@ func applyCommandLineAudioSource(ad *adev_param_s, name string) {
 // send samples that go nowhere.
 //
 // Read it once the devices are open, and not from a goroutine racing
-// AudioOpen or audio_close: what it reports cannot change in between, as
+// AudioOpen or AudioClose: what it reports cannot change in between, as
 // nothing reopens an output device while running.
 func audio_transmit_available(a int) bool {
 	if a < 0 || a >= MAX_ADEVS || adev[a] == nil {
@@ -1260,7 +1260,7 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) int {
 	}
 
 	// If AudioOpen fails after this point, roll back the refcount increment
-	// so it stays correctly paired with audio_close calls.
+	// so it stays correctly paired with AudioClose calls.
 	var openSucceeded = false
 
 	defer func() {
@@ -2062,7 +2062,7 @@ func audioUDPSilenceKeepalive(ctx context.Context, a int, stop chan struct{}) {
 	for {
 		select {
 		case <-ctx.Done():
-			// Shutting down.  audio_close closes stop as well, but it
+			// Shutting down.  AudioClose closes stop as well, but it
 			// only runs if somebody gets as far as calling it.
 			return
 		case <-stop:
@@ -2072,7 +2072,7 @@ func audioUDPSilenceKeepalive(ctx context.Context, a int, stop chan struct{}) {
 				continue
 			}
 
-			// audio_close tears down udp_out_sock under the same lock, so
+			// AudioClose tears down udp_out_sock under the same lock, so
 			// re-check for nil here rather than assuming it's still open.
 			if adev[a].udp_out_sock != nil {
 				_, _ = adev[a].udp_out_sock.Write(chunk)
@@ -2122,7 +2122,7 @@ func audio_wait(a int) {
 
 /*------------------------------------------------------------------
  *
- * Name:        audio_close
+ * Name:        AudioClose
  *
  * Purpose:     Close the audio device(s).
  *
@@ -2132,7 +2132,7 @@ func audio_wait(a int) {
  *
  *----------------------------------------------------------------*/
 
-func audio_close() int { //nolint:unparam
+func AudioClose() int {
 	var err = 0
 
 	for a := range MAX_ADEVS {
@@ -2219,6 +2219,6 @@ func audio_close() int { //nolint:unparam
 	portaudioMu.Unlock()
 
 	return (err)
-} /* end audio_close */
+} /* end AudioClose */
 
 /* end audio.go */

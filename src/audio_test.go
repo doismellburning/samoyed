@@ -431,7 +431,7 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
-		audio_close()
+		AudioClose()
 
 		adev = prevAdev
 		save_audio_config_p = prevConfig
@@ -456,7 +456,7 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 	assert.Equal(t, 0, adev[0].outbufLen)
 
 	// Closing must not release a PortAudio reference this open never took.
-	audio_close()
+	AudioClose()
 	assert.Equal(t, refsBefore, portaudioRefCount)
 }
 
@@ -467,7 +467,7 @@ func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
 	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
-		audio_close()
+		AudioClose()
 
 		adev = prevAdev
 		save_audio_config_p = prevConfig
@@ -488,7 +488,7 @@ func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
 	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
-		audio_close()
+		AudioClose()
 
 		adev = prevAdev
 		save_audio_config_p = prevConfig
@@ -507,7 +507,7 @@ func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
 	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
-		audio_close()
+		AudioClose()
 
 		adev = prevAdev
 		save_audio_config_p = prevConfig
