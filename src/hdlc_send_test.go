@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/wavwrite"
 	"github.com/stretchr/testify/assert"
@@ -381,7 +382,7 @@ func newHDLCSendTestPacket(t *testing.T, infoLen int) *packet_t {
 		pinfo[i] = byte('a' + i%26)
 	}
 
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
+	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
 	return pp

@@ -627,7 +627,7 @@ func all_frame_types(t *testing.T) {
 			for cr := cmin; cr <= cmax; cr++ {
 				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo)
+				var pp = ax25.UFrame(addrs, num_addr, cr, ftype, pf, pid, pinfo)
 				pp.HexDump()
 				enc_dec_compare(t, pp)
 			}

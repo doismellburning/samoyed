@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +29,7 @@ func newTestPacket(t *testing.T) *packet_t {
 	addrs[AX25_DESTINATION] = DEST
 	addrs[AX25_SOURCE] = SOURCE
 
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_TEST, 0, 0, []byte("hello"))
+	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_TEST, 0, 0, []byte("hello"))
 	require.NotNil(t, pp)
 
 	return pp

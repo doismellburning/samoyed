@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -578,7 +579,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		var pf = (control >> 6) & 0x01
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
 
-		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo))
+		return (ax25.UFrame(addrs, num_addr, cr, ftype, pf, axpid, pinfo))
 	} else if ui != 0 {
 		// 'UI' frame.
 		// The control field contains: P/F OPCODE{3) C x x
@@ -589,7 +590,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
 
-		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo))
+		return (ax25.UFrame(addrs, num_addr, cr, ftype, pf, axpid, pinfo))
 	} else {
 		// 'I' frame.
 		// The control field contains: P/F N(R) N(S)

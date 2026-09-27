@@ -3,6 +3,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -85,7 +86,7 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 	addrs[0] = "W2UB"
 	addrs[1] = "WB2OSZ-12"
 	var pinfo = []byte("Hello CRC test")
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
+	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
 	for max_fec := range 2 {

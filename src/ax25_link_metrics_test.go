@@ -6,6 +6,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +45,7 @@ func TestAX25LinkFirstTryConnectIsNotARetry(t *testing.T) {
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	require.NotNil(t, pp)
 
 	E = new(dlq_item_t)
@@ -120,7 +121,7 @@ func TestAX25LinkT3ExpiryIsNotARetry(t *testing.T) {
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	require.NotNil(t, pp)
 
 	E = new(dlq_item_t)

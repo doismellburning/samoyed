@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -360,7 +361,7 @@ func TestIgnoredConnectRequestIsLogged(t *testing.T) {
 	addrs[AX25_SOURCE] = THEIR_CALL
 	addrs[AX25_DESTINATION] = MY_CALL
 
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_SABM, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_SABM, 1, 0, nil)
 	require.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)

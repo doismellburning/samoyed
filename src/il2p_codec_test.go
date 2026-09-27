@@ -3,6 +3,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,7 +34,7 @@ func TestIL2PDecodeFrameTruncatedPayloadReturnsNil(t *testing.T) {
 	addrs[0] = "Q1TEST"
 	addrs[1] = "Q2TEST"
 	var pinfo = []byte("hello world")
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
+	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
 	var encoded, elen = il2p_encode_frame(pp, IL2P_VERSION_0_4, 0)
@@ -54,7 +55,7 @@ func TestIL2PDecodeFrameJunkTrailingBytesReturnsNil(t *testing.T) {
 	addrs[0] = "Q1TEST"
 	addrs[1] = "Q2TEST"
 	var pinfo = []byte("hello world")
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
+	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
 	var encoded, elen = il2p_encode_frame(pp, IL2P_VERSION_0_4, 0)
