@@ -124,12 +124,15 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
  *
  * Inputs:	pa	- Audio configuration.
  *
+ *		demods	- Each radio channel's demodulators, which say how
+ *			  many subchannels it has; nil for any other channel.
+ *
  *		sink	- Where a change in the channel's data carrier detect
  *			  state is reported.
  *
  ***********************************************************************************/
 
-func NewHDLCReceiver(pa *audio_s, sink ReceiveSink) *HDLCReceiver {
+func NewHDLCReceiver(pa *audio_s, demods [MAX_RADIO_CHANS]*Demodulator, sink ReceiveSink) *HDLCReceiver {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("NewHDLCReceiver (%p) \n", pa);
 
@@ -138,9 +141,9 @@ func NewHDLCReceiver(pa *audio_s, sink ReceiveSink) *HDLCReceiver {
 	r.sink = sink
 	r.randSeed = 1
 
-	for ch := range MAX_RADIO_CHANS {
-		if pa.chan_medium[ch] == MEDIUM_RADIO {
-			r.numSubchannel[ch] = pa.achan[ch].num_subchan
+	for ch, d := range demods {
+		if d != nil {
+			r.numSubchannel[ch] = d.NumSubchan()
 
 			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {

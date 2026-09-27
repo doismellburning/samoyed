@@ -95,8 +95,8 @@ func demod_init(pa *audio_s) {
 			var d = NewDemodulator(channel, pa.achan[channel], pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
 			demodulators[channel] = d
 
-			// multi_modem and the HDLC receiver still read these from the
-			// configuration.
+			// atest and the received frame display still read these from
+			// the configuration.
 			pa.achan[channel].num_subchan = d.NumSubchan()
 			pa.achan[channel].num_slicers = d.NumSlicers()
 		}
@@ -869,7 +869,7 @@ func demod_get_sample(a int, src SampleSource) int {
 
 /*-------------------------------------------------------------------
  *
- * Name:        demod_process_sample
+ * Name:        Demodulator.ProcessSample
  *
  * Purpose:     (1) Demodulate the AFSK signal.
  *		(2) Recover clock and data.
@@ -927,15 +927,6 @@ func demod_mute_input(channel int, mute_during_xmit int) {
 // Mute silences the channel's input, or stops silencing it.
 func (d *Demodulator) Mute(mute bool) {
 	d.muted.Store(mute)
-}
-
-func demod_process_sample(channel int, subchan int, sam int) {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-
-	var d = demodulators[channel]
-	Assert(d != nil)
-
-	d.ProcessSample(subchan, sam)
 }
 
 // ProcessSample hands one audio sample, in the range -32768 to 32767, to the

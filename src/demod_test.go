@@ -208,7 +208,6 @@ func TestDemodNilChannel(t *testing.T) {
 
 	assert.Equal(t, zero, demod_get_audio_level(0, 0))
 	assert.NotPanics(t, func() { demod_mute_input(0, 1) })
-	assert.Panics(t, func() { demod_process_sample(0, 0, 0) })
 }
 
 // demod_init builds a Demodulator for each radio channel, and drops any left
