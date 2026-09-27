@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 )
 
 func main() {

@@ -3,7 +3,7 @@ DEB_STAGING = .deb-staging
 C_FILES = $(shell find * -name \*.c)
 GO_FILES = $(shell find * -name \*.go)
 SHELL_FILES = $(shell grep -rIl '^\#!.*sh' * .claude)
-SRC_DIRS = ./cmd/... ./internal/... ./src/...
+SRC_DIRS = ./cmd/... ./internal/...
 CMDS = $(notdir $(wildcard ./cmd/*))
 COVERAGE_FILE = cover.out
 GOLANGCI_LINT_VERSION = v2.13.2
@@ -28,7 +28,7 @@ cmds: $(CMDS)
 $(CMDS): $(addprefix $(DIST_DIR)/,$$@)
 
 $(DIST_DIR)/%: $(DIST_DIR) $(C_FILES) $(GO_FILES) ./cmd/%
-	go build -o $(DIST_DIR)/ -ldflags "-X 'github.com/doismellburning/samoyed/src.SAMOYED_VERSION=$(SAMOYED_VERSION)'" ./cmd/$*/...
+	go build -o $(DIST_DIR)/ -ldflags "-X 'github.com/doismellburning/samoyed/internal/direwolf.SAMOYED_VERSION=$(SAMOYED_VERSION)'" ./cmd/$*/...
 
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
@@ -53,7 +53,7 @@ test: gotest test-scripts
 
 .PHONY: gotest
 gotest:
-	go test $(GOTEST_FLAGS) -cover -coverpkg=./cmd/...,./internal/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
+	go test $(GOTEST_FLAGS) -cover -coverpkg=./cmd/...,./internal/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
 
 .PHONY: race
 race:
@@ -76,7 +76,7 @@ fuzz:
 # TODO Better output name, non-PHONY target, docs, etc.
 .PHONY: gotest-bin
 gotest-bin:
-	go test -c -gcflags "-N -l" ./src
+	go test -c -gcflags "-N -l" ./internal/direwolf
 
 .PHONY: test-scripts
 test-scripts: $(CMDS)
@@ -158,10 +158,6 @@ stats:
 	@echo "Code Stats"
 	@echo "=========="
 	@echo ""
-	@echo -n "C (src):      "
-	@find src -name \*.c -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
-	@echo -n "H (src):      "
-	@find src -name \*.h -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
 	@echo -n "C (external): "
 	@find external -name \*.c -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
 	@echo -n "H (external): "
@@ -172,4 +168,4 @@ stats:
 	@find * -name CMakeLists.txt -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
 
 tags: $(C_FILES) $(GO_FILES)
-	ctags --recurse --languages=C,Go --c-kinds=+p --fields=+iaS --extras=+q cmd/ internal/ src/
+	ctags --recurse --languages=C,Go --c-kinds=+p --fields=+iaS --extras=+q cmd/ internal/

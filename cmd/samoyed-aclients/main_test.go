@@ -18,8 +18,8 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/testutils"
-	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -52,7 +52,7 @@ import (
 	"time"
 	"unicode"
 
-	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/pkg/term"
 )
 

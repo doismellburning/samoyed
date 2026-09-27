@@ -30,8 +30,8 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
-	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/lestrrat-go/strftime"
 	"github.com/pkg/term"
 	"github.com/spf13/pflag"

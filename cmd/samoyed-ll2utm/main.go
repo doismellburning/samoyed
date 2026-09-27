@@ -7,7 +7,7 @@ import (
 	"os"
 	"strconv"
 
-	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/golang/geo/s1"
 	"github.com/golang/geo/s2"
 	"github.com/tzneal/coordconv"

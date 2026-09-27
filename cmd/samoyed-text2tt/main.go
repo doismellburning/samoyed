@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode"
 
-	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 )
 
 func checksum(tt string) int {

@@ -20,7 +20,7 @@ import (
 	"os"
 	"time"
 
-	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/spf13/pflag"
 )
 

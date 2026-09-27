@@ -25,8 +25,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/maybe"
-	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/spf13/pflag"
 )
 

@@ -15,8 +15,8 @@ import (
 	"os/signal"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/maybe"
-	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/pkg/term"
 )
 

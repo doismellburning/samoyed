@@ -33,7 +33,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
-	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 )
 
 func main() {

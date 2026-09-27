@@ -13,7 +13,7 @@ fi
 goto_tmpdir
 
 # Picks a port in the range direwolf's config parser accepts (KISSPORT
-# requires MIN_IP_PORT_NUMBER..MAX_IP_PORT_NUMBER, see src/config.go), that
+# requires MIN_IP_PORT_NUMBER..MAX_IP_PORT_NUMBER, see internal/direwolf/config.go), that
 # isn't already in use and isn't one of the ports already handed out earlier
 # in this script (passed in as arguments to exclude).  Takes the protocol
 # ("tcp" or "udp") to probe as its first argument, since the TCP and UDP

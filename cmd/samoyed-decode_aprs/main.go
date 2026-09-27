@@ -65,8 +65,8 @@ import (
 	"strings"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
-	direwolf "github.com/doismellburning/samoyed/src"
 )
 
 // hexLineRegexp matches a line of raw AX.25 or KISS bytes, e.g. "DE AD BE EF" or "DEADBEEF".

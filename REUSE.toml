@@ -21,7 +21,7 @@ path = [
 	"docs/**",
 	"go.mod",
 	"go.sum",
-	"src/*.go",
+	"internal/direwolf/*.go",
 	"test-scripts/**",
 	"upstream-tracker/**",
 ]

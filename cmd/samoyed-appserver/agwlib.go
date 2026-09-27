@@ -66,7 +66,7 @@ import (
 	"net"
 	"strings"
 
-	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 )
 
 const AX25_MAX_INFO_LEN = 2048 // Duplicated from C to avoid cgo

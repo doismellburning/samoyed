@@ -18,7 +18,7 @@ import (
 //
 // Seeds added here run as ordinary unit tests under "go test", so an input
 // that once crashed a decoder stays checked even when nobody is fuzzing.
-// Fuzzing proper is "go test ./src/ -run XXX -fuzz FuzzSomething".
+// Fuzzing proper is "go test ./internal/direwolf/ -run XXX -fuzz FuzzSomething".
 
 // The decoders narrate a malformed packet at length, and a fuzzing run has
 // nobody to read it, so point stdout at the bin for the duration.
