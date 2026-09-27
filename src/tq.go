@@ -354,7 +354,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 			plast = pnext
 		}
 
-		ax25_set_nextp(plast, pp)
+		plast.SetNext(pp)
 	}
 
 	if tq_is_real_packet(pp) {
@@ -514,7 +514,7 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
 			plast = pnext
 		}
 
-		ax25_set_nextp(plast, pp)
+		plast.SetNext(pp)
 	}
 
 	if tq_is_real_packet(pp) {
@@ -643,7 +643,7 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 			plast = pnext
 		}
 
-		ax25_set_nextp(plast, pp)
+		plast.SetNext(pp)
 	}
 
 	if tq_is_real_packet(pp) {
@@ -757,7 +757,7 @@ func (tq *TransmitQueue) Remove(channel int, prio int) *packet_t {
 	} else {
 		result_p = tq.head[channel][prio]
 		tq.head[channel][prio] = ax25_get_nextp(result_p)
-		ax25_set_nextp(result_p, nil)
+		result_p.SetNext(nil)
 
 		if tq_is_real_packet(result_p) {
 			tq.length[channel][prio]--

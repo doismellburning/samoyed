@@ -1165,7 +1165,7 @@ func (ig *IGate) satgateDelayPacket(pp *packet_t, channel int) { //nolint:unpara
 			plast = pnext
 		}
 
-		ax25_set_nextp(plast, pp)
+		plast.SetNext(pp)
 	}
 
 	ig.dpMutex.Unlock()
@@ -1207,7 +1207,7 @@ func (ig *IGate) satgateDelayThread(ctx context.Context) {
 				ig.dpQueueHead = ax25_get_nextp(pp)
 
 				ig.dpMutex.Unlock()
-				ax25_set_nextp(pp, nil)
+				pp.SetNext(nil)
 
 				ig.sendPacketToServer(pp, channel)
 			}

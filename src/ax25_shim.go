@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_set_nextp(this_p *packet_t, next_p *packet_t) {
-	this_p.SetNext(next_p)
-}
-
 func ax25_get_nextp(this_p *packet_t) *packet_t {
 	return this_p.Next()
 }
