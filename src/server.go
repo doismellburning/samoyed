@@ -542,46 +542,46 @@ func mon_desc(pp *packet_t) (byte, string) {
 	var pinfo = pp.Info()
 
 	switch ftype {
-	case frame_type_I:
+	case ax25.FrameTypeI:
 		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, pp.PID(), len(pinfo), pf_text, pf)
 
-	case frame_type_U_UI:
+	case ax25.FrameTypeUUI:
 		return 'U', fmt.Sprintf("<UI pid=%02X Len=%d %s=%d >", pp.PID(), len(pinfo), pf_text, pf)
 
-	case frame_type_S_RR:
+	case ax25.FrameTypeSRR:
 		return 'S', fmt.Sprintf("<RR R%d %s=%d >", nr, pf_text, pf)
 
-	case frame_type_S_RNR:
+	case ax25.FrameTypeSRNR:
 		return 'S', fmt.Sprintf("<RNR R%d %s=%d >", nr, pf_text, pf)
 
-	case frame_type_S_REJ:
+	case ax25.FrameTypeSREJ:
 		return 'S', fmt.Sprintf("<REJ R%d %s=%d >", nr, pf_text, pf)
 
-	case frame_type_S_SREJ:
+	case ax25.FrameTypeSSREJ:
 		return 'S', fmt.Sprintf("<SREJ R%d %s=%d Len=%d >", nr, pf_text, pf, len(pinfo))
 
-	case frame_type_U_SABME:
+	case ax25.FrameTypeUSABME:
 		return 'S', fmt.Sprintf("<SABME %s=%d >", pf_text, pf)
 
-	case frame_type_U_SABM:
+	case ax25.FrameTypeUSABM:
 		return 'S', fmt.Sprintf("<SABM %s=%d >", pf_text, pf)
 
-	case frame_type_U_DISC:
+	case ax25.FrameTypeUDISC:
 		return 'S', fmt.Sprintf("<DISC %s=%d >", pf_text, pf)
 
-	case frame_type_U_DM:
+	case ax25.FrameTypeUDM:
 		return 'S', fmt.Sprintf("<DM %s=%d >", pf_text, pf)
 
-	case frame_type_U_UA:
+	case ax25.FrameTypeUUA:
 		return 'S', fmt.Sprintf("<UA %s=%d >", pf_text, pf)
 
-	case frame_type_U_FRMR:
+	case ax25.FrameTypeUFRMR:
 		return 'S', fmt.Sprintf("<FRMR %s=%d >", pf_text, pf)
 
-	case frame_type_U_XID:
+	case ax25.FrameTypeUXID:
 		return 'S', fmt.Sprintf("<XID %s=%d Len=%d >", pf_text, pf, len(pinfo))
 
-	case frame_type_U_TEST:
+	case ax25.FrameTypeUTEST:
 		return 'S', fmt.Sprintf("<TEST %s=%d Len=%d >", pf_text, pf, len(pinfo))
 
 	default:

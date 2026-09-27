@@ -886,7 +886,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 
 		dw_printf("(%s)", desc)
 
-		if ftype == frame_type_U_XID {
+		if ftype == ax25.FrameTypeUXID {
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {

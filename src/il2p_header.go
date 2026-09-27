@@ -278,7 +278,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 	//dw_printf ("%s(): %s-%d>%s-%d: %s\n", __func__, src_addr, src_ssid, dst_addr, dst_ssid, description);
 
 	switch frame_type {
-	case frame_type_S_RR, frame_type_S_RNR, frame_type_S_REJ, frame_type_S_SREJ:
+	case ax25.FrameTypeSRR, ax25.FrameTypeSRNR, ax25.FrameTypeSREJ, ax25.FrameTypeSSREJ:
 		// Receive Ready - System Ready To Receive
 		// Receive Not Ready - TNC Buffer Full
 		// Reject Frame - Out of Sequence or Duplicate
@@ -295,18 +295,18 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 
 		// This gets OR'ed into the above.
 		switch frame_type {
-		case frame_type_S_RR:
+		case ax25.FrameTypeSRR:
 			SET_CONTROL(hdr, 0)
-		case frame_type_S_RNR:
+		case ax25.FrameTypeSRNR:
 			SET_CONTROL(hdr, 1)
-		case frame_type_S_REJ:
+		case ax25.FrameTypeSREJ:
 			SET_CONTROL(hdr, 2)
-		case frame_type_S_SREJ:
+		case ax25.FrameTypeSSREJ:
 			SET_CONTROL(hdr, 3)
 		default:
 		}
 
-	case frame_type_U_SABM, frame_type_U_DISC, frame_type_U_DM, frame_type_U_UA, frame_type_U_FRMR, frame_type_U_UI, frame_type_U_XID, frame_type_U_TEST:
+	case ax25.FrameTypeUSABM, ax25.FrameTypeUDISC, ax25.FrameTypeUDM, ax25.FrameTypeUUA, ax25.FrameTypeUFRMR, ax25.FrameTypeUUI, ax25.FrameTypeUXID, ax25.FrameTypeUTEST:
 		// Set Async Balanced Mode
 		// Disconnect
 		// Disconnect Mode
@@ -320,7 +320,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 		// The grayed out n/a bits are observed as 00 in the example.
 		// The header UI field must also be set for UI frames.
 		// PID is set to 1 for all U frames other than UI.
-		if frame_type == frame_type_U_UI {
+		if frame_type == ax25.FrameTypeUUI {
 			SET_UI(hdr, 1) // I guess this is how we distinguish 'I' and 'UI'
 			// on the receiving end.
 			var pid = encode_pid(pp)
@@ -356,26 +356,26 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 
 		// This gets OR'ed into the above.
 		switch frame_type {
-		case frame_type_U_SABM:
+		case ax25.FrameTypeUSABM:
 			SET_CONTROL(hdr, 0<<3)
-		case frame_type_U_DISC:
+		case ax25.FrameTypeUDISC:
 			SET_CONTROL(hdr, 1<<3)
-		case frame_type_U_DM:
+		case ax25.FrameTypeUDM:
 			SET_CONTROL(hdr, 2<<3)
-		case frame_type_U_UA:
+		case ax25.FrameTypeUUA:
 			SET_CONTROL(hdr, 3<<3)
-		case frame_type_U_FRMR:
+		case ax25.FrameTypeUFRMR:
 			SET_CONTROL(hdr, 4<<3)
-		case frame_type_U_UI:
+		case ax25.FrameTypeUUI:
 			SET_CONTROL(hdr, 5<<3)
-		case frame_type_U_XID:
+		case ax25.FrameTypeUXID:
 			SET_CONTROL(hdr, 6<<3)
-		case frame_type_U_TEST:
+		case ax25.FrameTypeUTEST:
 			SET_CONTROL(hdr, 7<<3)
 		default:
 		}
 
-	case frame_type_I: // Information
+	case ax25.FrameTypeI: // Information
 		// I frames (mod 8 only)
 		// encoded control: P/F N(R) N(S)
 		SET_UI(hdr, 0)
@@ -534,13 +534,13 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 
 		switch control & 0x03 {
 		case 0:
-			ftype = frame_type_S_RR
+			ftype = ax25.FrameTypeSRR
 		case 1:
-			ftype = frame_type_S_RNR
+			ftype = ax25.FrameTypeSRNR
 		case 2:
-			ftype = frame_type_S_REJ
+			ftype = ax25.FrameTypeSREJ
 		default:
-			ftype = frame_type_S_SREJ
+			ftype = ax25.FrameTypeSSREJ
 		}
 		var modulo = ax25.Modulo8
 		var nr = (control >> 3) & 0x07
@@ -558,23 +558,23 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 
 		switch (control >> 3) & 0x7 {
 		case 0:
-			ftype = frame_type_U_SABM
+			ftype = ax25.FrameTypeUSABM
 		case 1:
-			ftype = frame_type_U_DISC
+			ftype = ax25.FrameTypeUDISC
 		case 2:
-			ftype = frame_type_U_DM
+			ftype = ax25.FrameTypeUDM
 		case 3:
-			ftype = frame_type_U_UA
+			ftype = ax25.FrameTypeUUA
 		case 4:
-			ftype = frame_type_U_FRMR
+			ftype = ax25.FrameTypeUFRMR
 		case 5:
-			ftype = frame_type_U_UI
+			ftype = ax25.FrameTypeUUI
 			axpid = 0xf0
 			// Should not happen with IL2P pid == 1.
 		case 6:
-			ftype = frame_type_U_XID
+			ftype = ax25.FrameTypeUXID
 		default:
-			ftype = frame_type_U_TEST
+			ftype = ax25.FrameTypeUTEST
 		}
 		var pf = (control >> 6) & 0x01
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
@@ -585,7 +585,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// The control field contains: P/F OPCODE{3) C x x
 		var control = GET_CONTROL(hdr)
 		var cr = dwutil.IfThenElse((control&0x04) != 0, ax25.CRCmd, ax25.CRRes)
-		var ftype = frame_type_U_UI
+		var ftype = ax25.FrameTypeUUI
 		var pf = (control >> 6) & 0x01
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.

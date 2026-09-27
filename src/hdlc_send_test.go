@@ -382,7 +382,7 @@ func newHDLCSendTestPacket(t *testing.T, infoLen int) *packet_t {
 		pinfo[i] = byte('a' + i%26)
 	}
 
-	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, frame_type_U_UI, 0, 0xF0, pinfo)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
 	return pp

@@ -29,7 +29,7 @@ func newTestPacket(t *testing.T) *packet_t {
 	addrs[ax25.Destination] = DEST
 	addrs[ax25.Source] = SOURCE
 
-	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, frame_type_U_TEST, 0, 0, []byte("hello"))
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUTEST, 0, 0, []byte("hello"))
 	require.NotNil(t, pp)
 
 	return pp

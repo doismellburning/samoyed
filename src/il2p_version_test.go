@@ -56,7 +56,7 @@ func TestIL2POnAirVersions(t *testing.T) {
 	addrs[0] = "Q1TEST"
 	addrs[1] = "Q2TEST"
 
-	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, frame_type_U_UI, 0, 0xF0, []byte(il2pTestText))
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, []byte(il2pTestText))
 	require.NotNil(t, pp)
 
 	var testData = []struct {

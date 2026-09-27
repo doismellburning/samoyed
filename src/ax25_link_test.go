@@ -361,7 +361,7 @@ func TestIgnoredConnectRequestIsLogged(t *testing.T) {
 	addrs[ax25.Source] = THEIR_CALL
 	addrs[ax25.Destination] = MY_CALL
 
-	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, frame_type_U_SABM, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil)
 	require.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)

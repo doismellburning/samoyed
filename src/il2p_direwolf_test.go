@@ -587,37 +587,37 @@ func all_frame_types(t *testing.T) {
 
 	dw_printf("\nU frames...\n")
 
-	for ftype := frame_type_U_SABME; ftype <= frame_type_U_TEST; ftype++ {
+	for ftype := ax25.FrameTypeUSABME; ftype <= ax25.FrameTypeUTEST; ftype++ {
 		for pf := range 2 {
 			var cmin, cmax cmdres_t
 
 			switch ftype {
 			// 0 = response, 1 = command
-			case frame_type_U_SABME:
+			case ax25.FrameTypeUSABME:
 				cmin = 1
 				cmax = 1
-			case frame_type_U_SABM:
+			case ax25.FrameTypeUSABM:
 				cmin = 1
 				cmax = 1
-			case frame_type_U_DISC:
+			case ax25.FrameTypeUDISC:
 				cmin = 1
 				cmax = 1
-			case frame_type_U_DM:
+			case ax25.FrameTypeUDM:
 				cmin = 0
 				cmax = 0
-			case frame_type_U_UA:
+			case ax25.FrameTypeUUA:
 				cmin = 0
 				cmax = 0
-			case frame_type_U_FRMR:
+			case ax25.FrameTypeUFRMR:
 				cmin = 0
 				cmax = 0
-			case frame_type_U_UI:
+			case ax25.FrameTypeUUI:
 				cmin = 0
 				cmax = 1
-			case frame_type_U_XID:
+			case ax25.FrameTypeUXID:
 				cmin = 0
 				cmax = 1
-			case frame_type_U_TEST:
+			case ax25.FrameTypeUTEST:
 				cmin = 0
 				cmax = 1
 			default:
@@ -641,14 +641,14 @@ func all_frame_types(t *testing.T) {
 
 	dw_printf("\nS frames...\n")
 
-	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
+	for ftype := ax25.FrameTypeSRR; ftype <= ax25.FrameTypeSSREJ; ftype++ {
 		for pf := range 2 {
 			var modulo = ax25.Modulo8
 			var nr = int(modulo/2 + 1)
 
 			for cr := cmdres_t(0); cr <= ax25.CRCmd; cr++ {
 				// SREJ can only be response.
-				if ftype == frame_type_S_SREJ && cr != ax25.CRRes {
+				if ftype == ax25.FrameTypeSSREJ && cr != ax25.CRRes {
 					continue
 				}
 
@@ -665,7 +665,7 @@ func all_frame_types(t *testing.T) {
 
 			for cr := cmdres_t(0); cr <= ax25.CRCmd; cr++ {
 				// SREJ can only be response.
-				if ftype == frame_type_S_SREJ && cr != ax25.CRRes {
+				if ftype == ax25.FrameTypeSSREJ && cr != ax25.CRRes {
 					continue
 				}
 
@@ -683,7 +683,7 @@ func all_frame_types(t *testing.T) {
 
 	var srej_info = []byte{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
-	var ftype = frame_type_S_SREJ
+	var ftype = ax25.FrameTypeSSREJ
 
 	for pf := range 2 {
 		var modulo = ax25.Modulo128

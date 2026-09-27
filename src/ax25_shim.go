@@ -24,22 +24,6 @@ type ALevel = ax25.ALevel
 type AddrStrictness = ax25.AddrStrictness
 
 const (
-	frame_type_I               = ax25.FrameTypeI
-	frame_type_S_RR            = ax25.FrameTypeSRR
-	frame_type_S_RNR           = ax25.FrameTypeSRNR
-	frame_type_S_REJ           = ax25.FrameTypeSREJ
-	frame_type_S_SREJ          = ax25.FrameTypeSSREJ
-	frame_type_U_SABME         = ax25.FrameTypeUSABME
-	frame_type_U_SABM          = ax25.FrameTypeUSABM
-	frame_type_U_DISC          = ax25.FrameTypeUDISC
-	frame_type_U_DM            = ax25.FrameTypeUDM
-	frame_type_U_UA            = ax25.FrameTypeUUA
-	frame_type_U_FRMR          = ax25.FrameTypeUFRMR
-	frame_type_U_UI            = ax25.FrameTypeUUI
-	frame_type_U_XID           = ax25.FrameTypeUXID
-	frame_type_U_TEST          = ax25.FrameTypeUTEST
-	frame_type_U               = ax25.FrameTypeU
-	frame_not_AX25             = ax25.FrameNotAX25
 	AddrLenient                = ax25.AddrLenient
 	AddrStrict                 = ax25.AddrStrict
 	AddrStrictNoStar           = ax25.AddrStrictNoStar

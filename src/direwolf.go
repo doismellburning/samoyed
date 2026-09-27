@@ -951,7 +951,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		logEntry = logEntry.WithField("desc", desc)
 
-		if ftype == frame_type_U_XID {
+		if ftype == ax25.FrameTypeUXID {
 			var _, info2text, _ = xid_parse(pinfo)
 			logEntry.WithField("info", info2text).Info("Packet")
 		} else {
