@@ -9,6 +9,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -252,6 +253,13 @@ func parseConfig(t *testing.T, content string) configs {
 	}
 
 	c.output = testutils.CaptureOutput(t, func() {
+		// samoyed-direwolf sends logrus to stdout alongside everything else,
+		// so do the same here: what config_init logs belongs in the output too.
+		var oldLogOutput = logrus.StandardLogger().Out
+		logrus.SetOutput(os.Stdout)
+
+		defer logrus.SetOutput(oldLogOutput)
+
 		var report = config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
 		c.errors, c.warnings, c.fatal = report.errors, report.warnings, report.fatal
 	})
@@ -3999,7 +4007,7 @@ func directiveTests() map[string][]directiveCase {
 				config: "TTERR NO_CALL SEMAPHORE Some text\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Equal("?", c.tt.response[TT_ERROR_NO_CALL].mtext)
-					a.Contains(c.output, "has more than 6 characters")
+					a.Contains(c.output, "Address is too long")
 				},
 			},
 			{

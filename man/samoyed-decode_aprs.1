@@ -68,7 +68,7 @@ We can take it out with something like this:
 In the first case, we get,
 .P
 .RS
-Address has lower case letters. "n2cma" must be all upper case.
+level=warning msg="Address has lower case letters \- it must be all upper case" address=n2cma position=Source
 .RE
 .P
 After changing the source address to upper case, there are other issues.  Identifying them is left as an exercise for the reader.
@@ -90,7 +90,7 @@ In the third example,
 .PD 0
 Warning: Lower case letter in Maidenhead locator.  Specification requires upper case.
 .P
-Digi2 Address, " WIDE2-1" contains character other than letter or digit in character position 1.
+level=warning msg="Address contains character other than letter or digit" address=" WIDE2\-1" index=0 position=Digi2
 .PD
 .RE
 

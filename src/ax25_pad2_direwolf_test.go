@@ -64,8 +64,7 @@ func Test_AX25_PAD2(t *testing.T) {
 			}
 
 			for cr := cmin; cr <= cmax; cr++ {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+				t.Logf("Construct U frame, cr=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, nil)
 				check_ax25_u_frame(t, pp, cr, ftype, pf)
@@ -73,8 +72,6 @@ func Test_AX25_PAD2(t *testing.T) {
 			}
 		}
 	}
-
-	dw_printf("\n----------\n\n")
 
 	/* S frame */
 
@@ -87,8 +84,7 @@ func Test_AX25_PAD2(t *testing.T) {
 			var nr = int(modulo/2 + 1)
 
 			for cr := cmdres_t(0); cr <= 1; cr++ {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+				t.Logf("Construct S frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
@@ -100,8 +96,7 @@ func Test_AX25_PAD2(t *testing.T) {
 			nr = int(modulo/2 + 1)
 
 			for cr := cmdres_t(0); cr <= 1; cr++ {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+				t.Logf("Construct S frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
@@ -122,16 +117,13 @@ func Test_AX25_PAD2(t *testing.T) {
 		var nr = 127
 		var cr = cr_res
 
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+		t.Logf("Construct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
 		check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
 		AX25HexDump(pp)
 	}
-
-	dw_printf("\n----------\n\n")
 
 	/* I frame */
 
@@ -143,8 +135,7 @@ func Test_AX25_PAD2(t *testing.T) {
 		var ns = 0xaa & int(modulo-1)
 
 		for cr := cmdres_t(0); cr <= 1; cr++ {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+			t.Logf("Construct I frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
 			check_ax25_i_frame(t, pp, cr, pf, nr, ns, info)
@@ -157,8 +148,7 @@ func Test_AX25_PAD2(t *testing.T) {
 		ns = 0xaa & int(modulo-1)
 
 		for cr := cmdres_t(0); cr <= 1; cr++ {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+			t.Logf("Construct I frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
 			check_ax25_i_frame(t, pp, cr, pf, nr, ns, info)
@@ -166,10 +156,6 @@ func Test_AX25_PAD2(t *testing.T) {
 			AX25HexDump(pp)
 		}
 	}
-
-	text_color_set(DW_COLOR_REC)
-	dw_printf("\n----------\n\n")
-	dw_printf("\nSUCCESS!\n")
 } /* end main */
 
 func check_ax25_u_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_frame_type_t, pf int) {
@@ -177,7 +163,7 @@ func check_ax25_u_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_
 
 	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = ax25_frame_type(packet)
 
-	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d\n", check_ftype, check_desc, check_pf)
+	t.Logf("check: ftype=%d, desc=\"%s\", pf=%d", check_ftype, check_desc, check_pf)
 
 	assert.Equal(t, cr, check_cr)
 	assert.Equal(t, ftype, check_ftype)
@@ -192,7 +178,7 @@ func check_ax25_s_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_
 	// todo modulo must be input.
 	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = ax25_frame_type(packet)
 
-	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d\n", check_ftype, check_desc, check_pf, check_nr)
+	t.Logf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d", check_ftype, check_desc, check_pf, check_nr)
 
 	assert.Equal(t, cr, check_cr)
 	assert.Equal(t, ftype, check_ftype)
@@ -206,7 +192,7 @@ func check_ax25_i_frame(t *testing.T, packet *packet_t, cr cmdres_t, pf int, nr 
 
 	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = ax25_frame_type(packet)
 
-	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d, ns=%d\n", check_ftype, check_desc, check_pf, check_nr, check_ns)
+	t.Logf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d, ns=%d", check_ftype, check_desc, check_pf, check_nr, check_ns)
 
 	var check_info = AX25GetInfo(packet)
 
