@@ -11,7 +11,7 @@ import (
 // channel wants its own, and only one goroutine may drive it at a time.
 type HDLCSender struct {
 	channel     int
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 
 	bitsSent int // Count number of bits sent by SendFrame or SendPreamblePostamble.
 
@@ -24,7 +24,7 @@ type HDLCSender struct {
 
 // NewHDLCSender makes an HDLCSender for channel, sending the layer 2
 // protocol audioConfig says to use there.
-func NewHDLCSender(channel int, audioConfig *audio_s) *HDLCSender {
+func NewHDLCSender(channel int, audioConfig *AudioConfig) *HDLCSender {
 	var s = new(HDLCSender)
 	s.channel = channel
 	s.audioConfig = audioConfig

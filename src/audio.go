@@ -413,7 +413,7 @@ type achan_param_s struct {
 
 }
 
-type audio_s struct {
+type AudioConfig struct {
 
 	/* Previously we could handle only a single audio device. */
 	/* In version 1.2, we generalize this to handle multiple devices. */
@@ -772,7 +772,7 @@ var adev [MAX_ADEVS]*adev_s
 // that have not yet been given their own copy.  In Dire Wolf each of those
 // files had a static of its own; audio_open sets it first, and the other
 // init functions that still write it set it to the same config.
-var save_audio_config_p *audio_s
+var save_audio_config_p *AudioConfig
 
 // portaudioMu guards portaudioRefCount and ensures Initialize/Terminate are
 // correctly paired even if audio_open/audio_close are called concurrently.
@@ -930,7 +930,7 @@ func audio_transmit_available(a int) bool {
 
 // anyInputRequiresPortAudio reports whether any configured audio device needs
 // PortAudio to receive (i.e. is a soundcard rather than stdin or UDP).
-func anyInputRequiresPortAudio(pa *audio_s) bool {
+func anyInputRequiresPortAudio(pa *AudioConfig) bool {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined == 0 {
 			continue
@@ -947,7 +947,7 @@ func anyInputRequiresPortAudio(pa *audio_s) bool {
 
 // anyOutputRequiresPortAudio reports whether any configured audio device needs
 // PortAudio to transmit.
-func anyOutputRequiresPortAudio(pa *audio_s) bool {
+func anyOutputRequiresPortAudio(pa *AudioConfig) bool {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined == 0 {
 			continue
@@ -965,7 +965,7 @@ func anyOutputRequiresPortAudio(pa *audio_s) bool {
 // PortAudio in either direction.  Used to skip portaudio.Initialize() when all
 // devices are stdin/UDP, so that samoyed can run on systems with no working
 // PortAudio host backend (issue #501).
-func anyDeviceRequiresPortAudio(pa *audio_s) bool {
+func anyDeviceRequiresPortAudio(pa *AudioConfig) bool {
 	return anyInputRequiresPortAudio(pa) || anyOutputRequiresPortAudio(pa)
 }
 
@@ -1200,7 +1200,7 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
  *
  * Purpose:     Open the digital audio device.
  *
- * Inputs:      pa		- Address of structure of type audio_s.
+ * Inputs:      pa		- Address of structure of type AudioConfig.
  *
  *				Using a structure, rather than separate arguments
  *				seemed to make sense because we often pass around
@@ -1218,7 +1218,7 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
  *
  *----------------------------------------------------------------*/
 
-func audio_open(ctx context.Context, pa *audio_s) int {
+func audio_open(ctx context.Context, pa *AudioConfig) int {
 	save_audio_config_p = pa
 
 	// Initialize PortAudio only if at least one configured device needs a

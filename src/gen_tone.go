@@ -48,7 +48,7 @@ type AudioSink interface {
 type ToneGenerator struct {
 	channel     int
 	adevIndex   int
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 	sink        AudioSink // Where the samples go.
 	amplitude   int       // 0 .. 100, for DTMF; the rest use sineTable.
 
@@ -113,7 +113,7 @@ type ToneGenerator struct {
  *
  *----------------------------------------------------------------*/
 
-func NewToneGenerator(channel int, audioConfig *audio_s, amp int, sink AudioSink) *ToneGenerator {
+func NewToneGenerator(channel int, audioConfig *AudioConfig, amp int, sink AudioSink) *ToneGenerator {
 	var tg = &ToneGenerator{ //nolint:exhaustruct_v5
 		channel:     channel,
 		adevIndex:   ACHAN2ADEV(channel),
@@ -253,7 +253,7 @@ func newSineTable(amp int) [256]int16 {
  *
  *----------------------------------------------------------------*/
 
-func gen_tone_init(audio_config_p *audio_s, amp int, sink AudioSink) int { //nolint:unparam
+func gen_tone_init(audio_config_p *AudioConfig, amp int, sink AudioSink) int { //nolint:unparam
 	logrus.WithField("amp", amp).Debug("gen_tone_init")
 
 	for channel := range MAX_RADIO_CHANS {
@@ -710,7 +710,7 @@ func GenToneMain() {
 	/* to sound card */
 	/* one channel.  2 times:  one second of each tone. */
 
-	var my_audio_config audio_s
+	var my_audio_config AudioConfig
 	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
 	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
@@ -732,7 +732,7 @@ func GenToneMain() {
 
 	/* Now try stereo. */
 
-	my_audio_config = audio_s{} //nolint:exhaustruct_v5
+	my_audio_config = AudioConfig{} //nolint:exhaustruct_v5
 	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
 	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
 	my_audio_config.adev[0].num_channels = 2

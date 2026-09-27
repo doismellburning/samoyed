@@ -11,7 +11,7 @@ func Test_dtmf(t *testing.T) {
 	const c = 0 // radio channel.
 	const sampleRate = 44100
 
-	var my_audio_config audio_s
+	var my_audio_config AudioConfig
 
 	// A decoded button raises the channel's DCD, which goes to the HDLC
 	// receiver; nothing here wants to hear about it.

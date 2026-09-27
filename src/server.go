@@ -142,7 +142,7 @@ type AGWServer struct {
 	// What sort of thing each channel is, which decides the channels
 	// connected mode may be used on.  audio.go owns this; we only read it,
 	// and it is nil in tests that do not set one up.
-	audioConfigP *audio_s
+	audioConfigP *AudioConfig
 
 	// User names and passwords, any one of which a client may send in an
 	// "Application Login" frame before we honour any of its other commands.
@@ -227,7 +227,7 @@ type agwClient struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewAGWServer(ctx context.Context, audio_config_p *audio_s, mc *misc_config_s, debug int) *AGWServer {
+func NewAGWServer(ctx context.Context, audio_config_p *AudioConfig, mc *misc_config_s, debug int) *AGWServer {
 	var server_port = mc.agwpe_port /* Usually 8000 but can be changed. */
 
 	logrus.WithField("server_port", server_port).Debug("NewAGWServer")
@@ -1497,7 +1497,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			// reaching through the nil pointer would take the program out.
 			var cfg = s.audioConfigP
 			if cfg == nil {
-				cfg = new(audio_s)
+				cfg = new(AudioConfig)
 			}
 
 			var count = 0

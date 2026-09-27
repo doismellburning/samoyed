@@ -83,8 +83,8 @@ func recordingSendfun() (*[]sentToClient, kiss_sendfun) {
 // kissTestAudioConfig is the channel table the KISS tests hand to
 // kiss_process_msg, or to the transport that calls it, to check a transmit
 // request against: channels 0 and 1 are radios, and nothing else is set up.
-func kissTestAudioConfig() *audio_s {
-	var audioConfig = new(audio_s)
+func kissTestAudioConfig() *AudioConfig {
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 	audioConfig.chan_medium[1] = MEDIUM_RADIO
 

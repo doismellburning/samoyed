@@ -138,7 +138,7 @@ type IGate struct {
 	 * the radio call and SSID for each.  digiConfig: the packet filtering
 	 * options, which filter evaluates.
 	 */
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 	config      *igate_config_s
 	digiConfig  *digi_config_s
 	filter      *PacketFilter
@@ -219,7 +219,7 @@ var igate = NewIGate(nil, nil, nil, nil, 0)
 
 // NewIGate returns an IGate that knows what it is meant to do but is not yet
 // doing it.  start connects to the server and sets the goroutines going.
-func NewIGate(audioConfig *audio_s, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *PacketFilter, debugLevel int) *IGate {
+func NewIGate(audioConfig *AudioConfig, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *PacketFilter, debugLevel int) *IGate {
 	var ig = &IGate{ //nolint:exhaustruct_v5
 		audioConfig: audioConfig,
 		config:      igateConfig,

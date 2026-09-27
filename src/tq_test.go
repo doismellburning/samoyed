@@ -34,7 +34,7 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 		NUM_PKTS = 512
 	)
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)
@@ -125,7 +125,7 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 		WAKE_WAIT = 5 * time.Second
 	)
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	for c := range CHANNELS {
 		audioConfig.chan_medium[c] = MEDIUM_RADIO
 	}
@@ -201,7 +201,7 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 	const CHANNEL = 0
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)
@@ -233,7 +233,7 @@ func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 // TNC, before it had checked the channel was in range at all - so the request
 // the bounds check exists to reject panicked before reaching it.
 func TestTqAppendOutOfRangeChannel(t *testing.T) {
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)

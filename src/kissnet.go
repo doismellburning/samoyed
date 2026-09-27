@@ -156,7 +156,7 @@ import (
 // Each TCP port has its own status block in a linked list.
 type KissNetService struct {
 	miscConfigP  *misc_config_s
-	audioConfigP *audio_s // Which channels a client may transmit on.
+	audioConfigP *AudioConfig // Which channels a client may transmit on.
 	allPorts     *kissport_status_s
 	debug        int /* Print information flowing from and to client. */
 }
@@ -188,7 +188,7 @@ type KissNetService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewKissNetService(ctx context.Context, mc *misc_config_s, audioConfig *audio_s, debug int) *KissNetService {
+func NewKissNetService(ctx context.Context, mc *misc_config_s, audioConfig *AudioConfig, debug int) *KissNetService {
 	var kns = new(KissNetService)
 	kns.miscConfigP = mc
 	kns.audioConfigP = audioConfig

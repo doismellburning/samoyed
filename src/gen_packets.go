@@ -80,7 +80,7 @@ type GenPacketsOptions struct {
 
 // A GenPackets turns frames into audio, writing it to a .WAV file.
 type GenPackets struct {
-	audio     *audio_s
+	audio     *AudioConfig
 	amplitude int
 	morseWPM  int
 	rand      *genPacketsPRNG
@@ -354,7 +354,7 @@ func (g *GenPackets) SendPacket(str string) error {
  *
  * Inputs:      fname		- Name of .WAV file to create.
  *
- *		pa		- Address of structure of type audio_s.
+ *		pa		- Address of structure of type AudioConfig.
  *
  *				The fields that we care about are:
  *					num_channels
@@ -366,7 +366,7 @@ func (g *GenPackets) SendPacket(str string) error {
  *
  *----------------------------------------------------------------*/
 
-func audio_file_open(fname string, pa *audio_s) (*wavFileSink, error) {
+func audio_file_open(fname string, pa *AudioConfig) (*wavFileSink, error) {
 	/*
 	 * Fill in defaults for any missing values.
 	 */
@@ -588,8 +588,8 @@ func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
 }
 
 // genPacketsDefaultAudio is the audio configuration gen_packets starts from, before its options.
-func genPacketsDefaultAudio() *audio_s {
-	var audio = new(audio_s)
+func genPacketsDefaultAudio() *AudioConfig {
+	var audio = new(AudioConfig)
 
 	/*
 	 * Set up default values for the modem.

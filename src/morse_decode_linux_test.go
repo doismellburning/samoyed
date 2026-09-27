@@ -25,7 +25,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 
 	// Copied from gen_packets without using all the CLI parsing...
 
-	var modem audio_s
+	var modem AudioConfig
 	modem.adev[0].defined = 1
 	modem.adev[0].num_channels = DEFAULT_NUM_CHANNELS
 	modem.adev[0].samples_per_sec = morseSamplesPerSec

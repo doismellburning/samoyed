@@ -51,7 +51,7 @@ func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
 func TestDiscardUntransmittableEmptiesTheQueue(t *testing.T) {
 	var channel = 0
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)
@@ -78,7 +78,7 @@ func TestDiscardUntransmittableEmptiesTheQueue(t *testing.T) {
 func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 	var channel = 0
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)
@@ -112,7 +112,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 	var channel = 0
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)
@@ -144,7 +144,7 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 func TestXmitThreadStopsWhenCancelled(t *testing.T) {
 	var channel = 0
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
 	var ctx, cancel = context.WithCancel(t.Context())
@@ -179,7 +179,7 @@ func TestXmitThreadStopsWhenCancelled(t *testing.T) {
 func TestXmitThreadStopsWhenCancelledBeforeStarting(t *testing.T) {
 	var channel = 0
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
 	var ctx, cancel = context.WithCancel(t.Context())
@@ -262,7 +262,7 @@ func TestBitsAndMilliseconds(t *testing.T) {
 // against something else.
 func TestTimestampPrefix(t *testing.T) {
 	var xs = new(XmitService)
-	xs.p_modem = new(audio_s)
+	xs.p_modem = new(AudioConfig)
 
 	assert.Empty(t, xs.timestampPrefix(), "no format configured means no timestamp")
 
@@ -295,7 +295,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 		dataLinkQueue.Init()
 	})
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.adev[0].defined = 1
 	audioConfig.adev[0].num_channels = 1
 	audioConfig.adev[0].samples_per_sec = 44100

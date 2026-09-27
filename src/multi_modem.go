@@ -102,7 +102,7 @@ const PROCESS_AFTER_BITS = 3
 // and, by way of the HDLC, FX.25 and IL2P decoders, hands it frames.
 type MultiModem struct {
 	channel     int
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 	demodulator *Demodulator // nil for a channel that is not a radio.
 	sink        ReceiveSink  // Where the frames it picks go.
 
@@ -173,7 +173,7 @@ func (s *radioSink) DCDChange(channel int, state int) {
  *
  *------------------------------------------------------------------------------*/
 
-func multi_modem_init(pa *audio_s, sink ReceiveSink) {
+func multi_modem_init(pa *AudioConfig, sink ReceiveSink) {
 	demod_init(pa)
 	hdlcReceiver = NewHDLCReceiver(pa, demodulators, sink)
 
