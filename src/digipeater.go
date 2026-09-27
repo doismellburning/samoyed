@@ -413,7 +413,7 @@ func (d *Digipeater) match(
 
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
-		ax25_set_addr(result, r, mycall_xmit)
+		result.SetAddr(r, mycall_xmit)
 		ax25_set_h(result, r)
 
 		return (result)
@@ -465,7 +465,7 @@ func (d *Digipeater) match(
 	if alias.MatchString(repeater) {
 		var result = pp.Dup()
 
-		ax25_set_addr(result, r, mycall_xmit)
+		result.SetAddr(r, mycall_xmit)
 		ax25_set_h(result, r)
 
 		return (result)
@@ -490,7 +490,7 @@ func (d *Digipeater) match(
 			if repeater2 == mycall_rec || alias.MatchString(repeater2) {
 				var result = pp.Dup()
 
-				ax25_set_addr(result, r2, mycall_xmit)
+				result.SetAddr(r2, mycall_xmit)
 				ax25_set_h(result, r2)
 
 				switch preempt {
@@ -594,7 +594,7 @@ func (d *Digipeater) match(
 		if ssid == 1 {
 			var result = pp.Dup()
 
-			ax25_set_addr(result, r, mycall_xmit)
+			result.SetAddr(r, mycall_xmit)
 			ax25_set_h(result, r)
 
 			return (result)

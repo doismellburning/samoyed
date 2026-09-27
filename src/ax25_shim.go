@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_set_addr(this_p *packet_t, n int, ad string) {
-	this_p.SetAddr(n, ad)
-}
-
 func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 	this_p.InsertAddr(n, ad)
 }
