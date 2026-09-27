@@ -20,6 +20,12 @@ const chan2 = 1
 const baud = direwolf.DEFAULT_BAUD
 
 func main() {
+	genTone(direwolf.AudioDeviceSink{})
+}
+
+// genTone is main, but sending the samples to sink rather than necessarily
+// the audio device, so that a test can see what would have been played.
+func genTone(sink direwolf.AudioSink) {
 	fmt.Println("Warning, known to fail with an assertion error, needs debugging and fixing.")
 
 	/* to sound card */
@@ -28,7 +34,7 @@ func main() {
 	var config = direwolf.NewGenToneTestConfig(1, true)
 
 	direwolf.AudioOpen(context.Background(), config)
-	direwolf.GenToneInit(config, 100, direwolf.AudioDeviceSink{})
+	direwolf.GenToneInit(config, 100, sink)
 
 	for range 2 {
 		for range baud * 2 {
@@ -47,7 +53,7 @@ func main() {
 	config = direwolf.NewGenToneTestConfig(2, false)
 
 	direwolf.AudioOpen(context.Background(), config)
-	direwolf.GenToneInit(config, 100, direwolf.AudioDeviceSink{})
+	direwolf.GenToneInit(config, 100, sink)
 
 	for range 4 {
 		for range baud * 2 {
