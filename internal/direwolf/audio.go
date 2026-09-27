@@ -781,12 +781,6 @@ func (d *adev_s) recordRead(a int, nbytes int) {
 
 var adev [MAX_ADEVS]*adev_s
 
-// save_audio_config_p is the audio configuration, shared by the subsystems
-// that have not yet been given their own copy.  In Dire Wolf each of those
-// files had a static of its own; AudioOpen sets it first, and the other
-// init functions that still write it set it to the same config.
-var save_audio_config_p *AudioConfig
-
 // portaudioMu guards portaudioRefCount and ensures Initialize/Terminate are
 // correctly paired even if AudioOpen/AudioClose are called concurrently.
 var portaudioMu sync.Mutex
@@ -1232,8 +1226,6 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
  *----------------------------------------------------------------*/
 
 func AudioOpen(ctx context.Context, pa *AudioConfig) int {
-	save_audio_config_p = pa
-
 	// Initialize PortAudio only if at least one configured device needs a
 	// soundcard.  Pure stdin/UDP configurations must work on systems with no
 	// working PortAudio host backend (issue #501).
