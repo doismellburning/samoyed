@@ -164,7 +164,10 @@ func Test_split(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var result = split(tt.input, tt.restOfLine)
+			var ps = new(parseState)
+			ps.startLine(tt.input)
+
+			var result = ps.split(tt.restOfLine)
 			assert.Equal(t, tt.want, result)
 		})
 	}
