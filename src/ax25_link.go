@@ -1967,7 +1967,7 @@ func lm_data_indication(E *dlq_item_t) {
 	// Maybe we should have a shorter form that only returns the frame type.
 	// That is all we need at this point.
 
-	var ft = ax25_frame_type_only(E.pp)
+	var ft = E.pp.FrameTypeOnly()
 
 	var client_not_applicable = -1
 	var S = get_link_handle(E.addrs, E.num_addr, E._chan, client_not_applicable,

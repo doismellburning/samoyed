@@ -336,7 +336,7 @@ func test_example_headers(t *testing.T) {
 		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 	*/
 
-	var frame_type = ax25_frame_type_only(pp)
+	var frame_type = pp.FrameTypeOnly()
 	_ = frame_type // TODO Check this?
 
 	// TODO: compare binary.
@@ -410,7 +410,7 @@ func test_example_headers(t *testing.T) {
 		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 	*/
 
-	frame_type = ax25_frame_type_only(pp)
+	frame_type = pp.FrameTypeOnly()
 	_ = frame_type
 
 	// TODO: compare binary.
@@ -490,7 +490,7 @@ func test_example_headers(t *testing.T) {
 		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 	*/
 
-	frame_type = ax25_frame_type_only(pp)
+	frame_type = pp.FrameTypeOnly()
 	_ = frame_type
 
 	// TODO: compare binary.
