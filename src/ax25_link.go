@@ -1925,7 +1925,7 @@ func lm_data_indication(E *dlq_item_t) {
 		return
 	}
 
-	E.num_addr = ax25_get_num_addr(E.pp)
+	E.num_addr = E.pp.NumAddr()
 
 	// Digipeating is not done here so consider only those with no unused digipeater addresses.
 

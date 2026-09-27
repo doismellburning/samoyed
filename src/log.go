@@ -234,7 +234,7 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
 		var h int
 
 		if pp != nil {
-			if ax25_get_num_addr(pp) == 0 {
+			if pp.NumAddr() == 0 {
 				/* Not AX.25. No station to display below. */
 				h = -1
 			} else {
@@ -355,7 +355,7 @@ func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *packet_t) {
 
 	if pp != nil {
 		var h int
-		if ax25_get_num_addr(pp) == 0 {
+		if pp.NumAddr() == 0 {
 			/* Not AX.25. No station to display below. */
 			h = -1
 		} else {

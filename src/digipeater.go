@@ -481,7 +481,7 @@ func (d *Digipeater) match(
 	 */
 
 	if preempt != PREEMPT_OFF {
-		for r2 := r + 1; r2 < ax25_get_num_addr(pp); r2++ {
+		for r2 := r + 1; r2 < pp.NumAddr(); r2++ {
 			var repeater2 = ax25_get_addr_with_ssid(pp, r2)
 
 			// text_color_set (DW_COLOR_DEBUG);
@@ -559,7 +559,7 @@ func (d *Digipeater) match(
 
 				// First, remove any already used digipeaters.
 
-				for ax25_get_num_addr(result) >= 3 && ax25_get_h(result, AX25_REPEATER_1) == 1 {
+				for result.NumAddr() >= 3 && ax25_get_h(result, AX25_REPEATER_1) == 1 {
 					result.RemoveAddr(AX25_REPEATER_1)
 
 					r--

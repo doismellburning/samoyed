@@ -102,7 +102,7 @@ func NewTransmitQueue() *TransmitQueue {
 // tq_is_real_packet reports whether a queue entry is a real packet rather than
 // LMSeizeRequest's null wake-up frame, matching countLocked's own test.
 func tq_is_real_packet(pp *packet_t) bool {
-	return ax25_get_num_addr(pp) >= AX25_MIN_ADDRS
+	return pp.NumAddr() >= AX25_MIN_ADDRS
 }
 
 /*-------------------------------------------------------------------
@@ -966,7 +966,7 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 	var pp = tq.head[channel][prio]
 
 	for pp != nil {
-		if ax25_get_num_addr(pp) >= AX25_MIN_ADDRS {
+		if pp.NumAddr() >= AX25_MIN_ADDRS {
 			// Consider only real packets.
 			var count_it = 1
 

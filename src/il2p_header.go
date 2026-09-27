@@ -232,7 +232,7 @@ func decode_pid(pid int) int {
 func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 	var hdr = make([]byte, IL2P_HEADER_SIZE)
 
-	if ax25_get_num_addr(pp) != 2 {
+	if pp.NumAddr() != 2 {
 		// Only two addresses are allowed for type 1 header.
 		return nil, -1
 	}

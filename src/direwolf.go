@@ -814,7 +814,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	var h int
 	var heard string
 
-	if ax25_get_num_addr(pp) == 0 {
+	if pp.NumAddr() == 0 {
 		/* Not AX.25. No station to display below. */
 		h = -1
 	} else {

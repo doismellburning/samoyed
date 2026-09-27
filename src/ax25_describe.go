@@ -59,7 +59,7 @@ func DescribeAX25Frame(frame []byte) int {
 	 * described in terms of the zero padding past its end.
 	 */
 
-	if ax25_get_num_addr(pp) < AX25_MIN_ADDRS {
+	if pp.NumAddr() < AX25_MIN_ADDRS {
 		/*
 		 * The end of address bit is not at the end of a 7 byte address, or it
 		 * marks out fewer than 2 or more than 10 addresses.  Without knowing

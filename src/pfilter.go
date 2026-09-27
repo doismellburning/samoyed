@@ -554,7 +554,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* d - was digipeated by */
 		// Loop on all AX.25 digipeaters.
 		result = 0
-		for n := AX25_REPEATER_1; result == 0 && err == nil && n < ax25_get_num_addr(pf.pp); n++ {
+		for n := AX25_REPEATER_1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
 			// Consider only those with the H (has-been-used) bit set.
 			if ax25_get_h(pf.pp, n) > 0 {
 				var addr = ax25_get_addr_with_ssid(pf.pp, n)
@@ -576,7 +576,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* v - via not used */
 		// loop on all AX.25 digipeaters (mnemonic Via)
 		result = 0
-		for n := AX25_REPEATER_1; result == 0 && err == nil && n < ax25_get_num_addr(pf.pp); n++ {
+		for n := AX25_REPEATER_1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
 			// This is different than the previous "d" filter.
 			// Consider only those where the the H (has-been-used) bit is NOT set.
 			if ax25_get_h(pf.pp, n) == 0 {
