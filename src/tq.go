@@ -228,7 +228,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
 			"prio":    prio,
-			"info":    string(AX25GetInfo(pp)),
+			"info":    string(pp.Info()),
 		}).Debug("tq_append")
 	}
 
@@ -265,7 +265,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 
 		// Formated addresses.
 		var stemp = AX25FormatAddrs(pp)
-		var pinfo = AX25GetInfo(pp)
+		var pinfo = pp.Info()
 
 		text_color_set(DW_COLOR_XMIT)
 
@@ -458,7 +458,7 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
 			"prio":    prio,
-			"info":    string(AX25GetInfo(pp)),
+			"info":    string(pp.Info()),
 		}).Debug("lm_data_request")
 	}
 

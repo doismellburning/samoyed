@@ -402,7 +402,7 @@ func TestIGateTransmitFromServer(t *testing.T) {
 	var sent = transmitQueue.Remove(0, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "nothing was queued for transmission")
 
-	var info = string(AX25GetInfo(sent))
+	var info = string(sent.Info())
 
 	assert.Equal(t, "Q1TEST", sent.AddrWithSSID(AX25_SOURCE))
 	assert.Equal(t, "}Q2TEST-1>APWW10,TCPIP,Q1TEST*:>hello", info)
@@ -761,11 +761,11 @@ func TestIGateSatgateQueueKeepsOrder(t *testing.T) {
 	}
 
 	require.NotNil(t, igate.dpQueueHead)
-	assert.Equal(t, ">first", string(AX25GetInfo(igate.dpQueueHead)))
+	assert.Equal(t, ">first", string(igate.dpQueueHead.Info()))
 
 	var second = ax25_get_nextp(igate.dpQueueHead)
 	require.NotNil(t, second, "the second packet was not queued behind the first")
-	assert.Equal(t, ">second", string(AX25GetInfo(second)))
+	assert.Equal(t, ">second", string(second.Info()))
 }
 
 // "-d ig" and more of it prints what is happening at each stage, which is how

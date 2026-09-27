@@ -473,7 +473,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 
 	var stemp = AX25FormatAddrs(pp)
 
-	var info = AX25GetInfo(pp)
+	var info = pp.Info()
 
 	/* Print so we can see what is going on. */
 

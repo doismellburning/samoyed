@@ -229,7 +229,7 @@ func DecodeAPRSInit() {
 
 func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t {
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	//dw_printf ("DEBUG decode_aprs info=\"%s\"\n", pinfo);
 

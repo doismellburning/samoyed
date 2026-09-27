@@ -2066,7 +2066,7 @@ func lm_data_indication(E *dlq_item_t) {
 	case frame_type_I: // Information
 		{
 			var pid = ax25_get_pid(E.pp)
-			var info = AX25GetInfo(E.pp)
+			var info = E.pp.Info()
 
 			i_frame(S, cr, pf, nr, ns, pid, info)
 		}
@@ -2082,7 +2082,7 @@ func lm_data_indication(E *dlq_item_t) {
 
 	case frame_type_S_SREJ: // Selective Reject - Ask for selective frame(s) repeat
 		{
-			var info = AX25GetInfo(E.pp)
+			var info = E.pp.Info()
 			srej_frame(S, cr, pf, nr, info)
 		}
 
@@ -2109,14 +2109,14 @@ func lm_data_indication(E *dlq_item_t) {
 
 	case frame_type_U_XID: // Exchange Identification
 		{
-			var info = AX25GetInfo(E.pp)
+			var info = E.pp.Info()
 
 			xid_frame(S, cr, pf, info)
 		}
 
 	case frame_type_U_TEST: // Test
 		{
-			var info = AX25GetInfo(E.pp)
+			var info = E.pp.Info()
 
 			test_frame(S, cr, pf, info)
 		}

@@ -535,7 +535,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 
 			var stemp = AX25FormatAddrs(pp)
 
-			var pinfo = AX25GetInfo(pp)
+			var pinfo = pp.Info()
 
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("[%d%c] ", channel, priorityToRune(prio))
@@ -863,7 +863,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 
 	var stemp = AX25FormatAddrs(pp)
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	text_color_set(DW_COLOR_XMIT)
 	/*
@@ -962,7 +962,7 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *packet_t) {
 	 */
 	var ts = xs.timestampPrefix()
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.speech%s] \"%s\"\n", c, ts, string(pinfo))
@@ -1054,7 +1054,7 @@ func (xs *XmitService) timestampPrefix() string {
 func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
 	var ts = xs.timestampPrefix()
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, string(pinfo))
@@ -1104,7 +1104,7 @@ func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
 func (xs *XmitService) xmit_dtmf(c int, pp *packet_t, speed int) {
 	var ts = xs.timestampPrefix()
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, string(pinfo))

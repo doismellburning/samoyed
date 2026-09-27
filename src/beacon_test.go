@@ -36,7 +36,7 @@ func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
 
 	var item = dataLinkQueue.Remove()
 	if item != nil {
-		t.Errorf("transmitted %s", AX25FormatAddrs(item.pp)+string(AX25GetInfo(item.pp)))
+		t.Errorf("transmitted %s", AX25FormatAddrs(item.pp)+string(item.pp.Info()))
 	}
 }
 

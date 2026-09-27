@@ -607,7 +607,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 		}
 	}
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	/*
 	 * Someone around here occasionally sends a packet with no information part.
@@ -656,7 +656,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
  *--------------------------------------------------------------------*/
 
 func (ig *IGate) sendPacketToServer(pp *packet_t, channel int) {
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	/*
 	 * We will often see the same packet multiple times close together due to digipeating.
@@ -1382,7 +1382,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	// TODO: Not quite this simple.  Should have a function to check for position.
 	// $ raw gps could be a position.  @ could be weather data depending on symbol.
 
-	var pinfo = AX25GetInfo(pp3)
+	var pinfo = pp3.Info()
 
 	var msp_special_case = false
 
@@ -1612,7 +1612,7 @@ func (ig *IGate) rxToIgRemember(pp *packet_t) {
 	if ig.debugLevel >= 3 {
 		var src = pp.AddrWithSSID(AX25_SOURCE)
 		var dest = pp.AddrWithSSID(AX25_DESTINATION)
-		var pinfo = AX25GetInfo(pp)
+		var pinfo = pp.Info()
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_remember [%d] = %s %d \"%s>%s:%s\"\n",
@@ -1635,7 +1635,7 @@ func (ig *IGate) rxToIgAllow(pp *packet_t) bool {
 	if ig.debugLevel >= 2 {
 		var src = pp.AddrWithSSID(AX25_SOURCE)
 		var dest = pp.AddrWithSSID(AX25_DESTINATION)
-		var pinfo = AX25GetInfo(pp)
+		var pinfo = pp.Info()
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_allow? %d \"%s>%s:%s\"\n", crc, src, dest, string(pinfo))
@@ -1921,7 +1921,7 @@ func (ig *IGate) igToTxRemember(pp *packet_t, channel int, bydigi int) {
 	if ig.debugLevel >= 3 {
 		var src = pp.AddrWithSSID(AX25_SOURCE)
 		var dest = pp.AddrWithSSID(AX25_DESTINATION)
-		var pinfo = AX25GetInfo(pp)
+		var pinfo = pp.Info()
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("ig_to_tx_remember [%d] = ch%d d%d %s %d \"%s>%s:%s\"\n",
@@ -1946,7 +1946,7 @@ func (ig *IGate) igToTxAllow(pp *packet_t, channel int) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	if ig.debugLevel >= 2 {
 		var src = pp.AddrWithSSID(AX25_SOURCE)

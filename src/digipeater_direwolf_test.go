@@ -36,7 +36,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	assert.NotNil(t, pp)
 
 	var rec = AX25FormatAddrs(pp)
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 	rec += string(pinfo)
 
 	if in != rec {
@@ -59,7 +59,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	pp = ax25.FromFrame(frame, alevel)
 	assert.NotNil(t, pp)
 	rec = AX25FormatAddrs(pp)
-	pinfo = AX25GetInfo(pp)
+	pinfo = pp.Info()
 	rec += string(pinfo)
 
 	if in != rec {
@@ -87,7 +87,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	if result != nil {
 		digipeaterTestDigi.Remember(result, 0)
 		xmit = AX25FormatAddrs(result)
-		pinfo = AX25GetInfo(result)
+		pinfo = result.Info()
 		xmit += string(pinfo)
 	}
 

@@ -804,7 +804,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 	var stemp = AX25FormatAddrs(pp)
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	/* Print so we can see what is going on. */
 
@@ -947,7 +947,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		var _, desc, _, _, _, ftype = ax25_frame_type(pp)
 
 		/* Could change by 1, since earlier call, if we guess at modulo 128. */
-		pinfo = AX25GetInfo(pp)
+		pinfo = pp.Info()
 
 		logEntry = logEntry.WithField("desc", desc)
 
