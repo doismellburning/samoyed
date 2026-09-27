@@ -23,6 +23,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -93,7 +94,7 @@ type pfstate_t struct {
 	/*
 	 * Packet object.
 	 */
-	pp *packet_t
+	pp *ax25.Packet
 
 	/*
 	 * Are we processing APRS or connected mode?
@@ -179,7 +180,7 @@ func bool2text(val int) string {
  *
  *--------------------------------------------------------------------*/
 
-func (f *PacketFilter) pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool) (int, error) {
+func (f *PacketFilter) pfilter(from_chan int, to_chan int, filter string, pp *ax25.Packet, is_aprs bool) (int, error) {
 	return f.eval(from_chan, to_chan, filter, pp, is_aprs, false)
 }
 
@@ -187,7 +188,7 @@ func (f *PacketFilter) pfilter(from_chan int, to_chan int, filter string, pp *pa
 // syntax_only set, filter specs that would otherwise consult runtime state
 // stop once their arguments have been parsed, so an expression can be checked
 // against a synthetic packet - see pfilter_validate.
-func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool, syntax_only bool) (int, error) {
+func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.Packet, is_aprs bool, syntax_only bool) (int, error) {
 	dwutil.Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
 	dwutil.Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
 
@@ -534,7 +535,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* b - budlist */
 		/* Budlist - AX.25 source address */
 		/* Could be different than source encapsulated by 3rd party header. */
-		var addr = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
+		var addr = pf.pp.AddrWithSSID(ax25.Source)
 		result, err = filt_bodgu(pf, addr)
 
 		if pf.debug >= 2 {
@@ -553,16 +554,16 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* d - was digipeated by */
 		// Loop on all AX.25 digipeaters.
 		result = 0
-		for n := AX25_REPEATER_1; result == 0 && err == nil && n < ax25_get_num_addr(pf.pp); n++ {
+		for n := ax25.Repeater1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
 			// Consider only those with the H (has-been-used) bit set.
-			if ax25_get_h(pf.pp, n) > 0 {
-				var addr = ax25_get_addr_with_ssid(pf.pp, n)
+			if pf.pp.H(n) > 0 {
+				var addr = pf.pp.AddrWithSSID(n)
 				result, err = filt_bodgu(pf, addr)
 			}
 		}
 
 		if pf.debug >= 2 {
-			var path = ax25_format_via_path(pf.pp)
+			var path = pf.pp.FormatViaPath()
 
 			if len(path) == 0 {
 				path = "no digipeater path"
@@ -575,17 +576,17 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* v - via not used */
 		// loop on all AX.25 digipeaters (mnemonic Via)
 		result = 0
-		for n := AX25_REPEATER_1; result == 0 && err == nil && n < ax25_get_num_addr(pf.pp); n++ {
+		for n := ax25.Repeater1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
 			// This is different than the previous "d" filter.
 			// Consider only those where the the H (has-been-used) bit is NOT set.
-			if ax25_get_h(pf.pp, n) == 0 {
-				var addr = ax25_get_addr_with_ssid(pf.pp, n)
+			if pf.pp.H(n) == 0 {
+				var addr = pf.pp.AddrWithSSID(n)
 				result, err = filt_bodgu(pf, addr)
 			}
 		}
 
 		if pf.debug >= 2 {
-			var path = ax25_format_via_path(pf.pp)
+			var path = pf.pp.FormatViaPath()
 
 			if len(path) == 0 {
 				path = "no digipeater path"
@@ -620,8 +621,8 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* u - unproto (AX.25 destination) */
 		/* Probably want to exclude mic-e types */
 		/* because destination is used for part of location. */
-		if ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`' {
-			var addr = ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION)
+		if pf.pp.DTI() != '\'' && pf.pp.DTI() != '`' {
+			var addr = pf.pp.AddrWithSSID(ax25.Destination)
 			result, err = filt_bodgu(pf, addr)
 
 			if pf.debug >= 2 {
@@ -641,7 +642,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		result, err = filt_t(pf)
 
 		if pf.debug >= 2 {
-			var infop = AX25GetInfo(pf.pp)
+			var infop = pf.pp.Info()
 
 			if len(infop) > 0 {
 				text_color_set(DW_COLOR_DEBUG)
@@ -785,7 +786,7 @@ func filt_bodgu(pf *pfstate_t, arg string) (int, error) {
 
 func filt_t(pf *pfstate_t) (int, error) {
 	// TODO KG Why was this here? var src = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
-	var infop = AX25GetInfo(pf.pp)
+	var infop = pf.pp.Info()
 
 	// A frame with no information field has no data type indicator, so there
 	// is nothing here for a type filter to match.  linbpq's ID broadcasts are
@@ -1470,7 +1471,7 @@ const pfilterDummyMonitorLine = "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120
  *--------------------------------------------------------------------*/
 
 func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) error {
-	var pp = AX25FromText(pfilterDummyMonitorLine, true)
+	var pp = ax25.FromText(pfilterDummyMonitorLine, true)
 	if pp == nil {
 		return fmt.Errorf("pfilter_validate: failed to construct synthetic packet from %q", pfilterDummyMonitorLine)
 	}
@@ -1590,7 +1591,7 @@ func (f *PacketFilter) MonitorLine(from_chan int, to_chan int, filter string, is
 	// Lines pasted from an APRS-IS feed carry a lower case "q-construct" in
 	// the path, which is an error over the air but not on paper, so take the
 	// same view of one that samoyed-decode_aprs does.
-	var pp = AX25FromTextWithStrictness(monitor_line, AddrStrictLowerCaseWarning)
+	var pp = ax25.FromTextWithStrictness(monitor_line, ax25.AddrStrictLowerCaseWarning)
 	if pp == nil {
 		return false, fmt.Errorf("could not parse monitoring format input: %q", monitor_line)
 	}

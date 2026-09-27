@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,28 +44,28 @@ func FuzzAX25FromFrame(f *testing.F) {
 	fuzzQuietly(f)
 
 	// An ordinary APRS position report.
-	var pp = AX25FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
+	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
 	require.NotNil(f, pp)
-	f.Add(ax25_get_frame_data(pp))
+	f.Add(pp.FrameData())
 
 	// Addresses and a control byte, with no PID and no information part:
 	// the shortest frame AX25FromFrame accepts (issue #670).
 	f.Add([]byte("000000000000010"))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var pp = AX25FromFrame(data, ALevel{Rec: 50, Mark: 50, Space: 50})
+		var pp = ax25.FromFrame(data, ax25.ALevel{Rec: 50, Mark: 50, Space: 50})
 		if pp == nil {
 			return
 		}
 
-		AX25FormatAddrs(pp)
-		AX25GetInfo(pp)
-		ax25_format_via_path(pp)
-		ax25_frame_type(pp)
-		ax25_is_aprs(pp)
-		ax25_dedupe_crc(pp)
-		ax25_get_dti(pp)
-		AX25CheckAddresses(pp, AddrLenient)
+		pp.FormatAddrs()
+		pp.Info()
+		pp.FormatViaPath()
+		pp.FrameType()
+		pp.IsAPRS()
+		pp.DedupeCRC()
+		pp.DTI()
+		pp.CheckAddresses(ax25.AddrLenient)
 	})
 }
 
@@ -78,14 +79,14 @@ func FuzzAX25FromText(f *testing.F) {
 	f.Add(">:")
 
 	f.Fuzz(func(t *testing.T, monitor string) {
-		var pp = AX25FromTextWithStrictness(monitor, AddrLenient)
+		var pp = ax25.FromTextWithStrictness(monitor, ax25.AddrLenient)
 		if pp == nil {
 			return
 		}
 
-		AX25FormatAddrs(pp)
-		AX25GetInfo(pp)
-		ax25_frame_type(pp)
+		pp.FormatAddrs()
+		pp.Info()
+		pp.FrameType()
 	})
 }
 
@@ -125,7 +126,7 @@ func FuzzDecodeAPRS(f *testing.F) {
 	f.Add("Q1TEST>APDW17:>IO91/#  ")
 
 	f.Fuzz(func(t *testing.T, monitor string) {
-		var pp = AX25FromTextWithStrictness(monitor, AddrLenient)
+		var pp = ax25.FromTextWithStrictness(monitor, ax25.AddrLenient)
 		if pp == nil {
 			return
 		}
@@ -155,7 +156,7 @@ func FuzzIL2PDecodeFrame(f *testing.F) {
 
 	il2p_init(0)
 
-	var pp = AX25FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
+	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
 	require.NotNil(f, pp)
 
 	for _, version := range []il2p_version_t{IL2P_VERSION_0_4, IL2P_VERSION_0_6} {

@@ -21,6 +21,8 @@ package direwolf
 
 import (
 	"regexp"
+
+	"github.com/doismellburning/samoyed/internal/ax25"
 )
 
 /*
@@ -106,7 +108,7 @@ func (d *ConnectedDigipeater) GetCount(from_chan, to_chan int) int {
  *
  *------------------------------------------------------------------------------*/
 
-func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *packet_t) {
+func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Connected mode is allowed only for channels with internal modem.
 	// It probably wouldn't matter for digipeating but let's keep that rule simple and consistent.
 	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS ||
@@ -144,7 +146,7 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *packet_t) {
 
 // digipeatTo queues pp for transmission on to_chan if the from/to channel
 // pair's rules say it should be repeated.
-func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *packet_t) {
+func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *ax25.Packet) {
 	var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
 		d.audioConfig.mycall[to_chan],
 		d.config.has_alias[from_chan][to_chan],
@@ -198,7 +200,7 @@ func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *packet_
  *
  *------------------------------------------------------------------------------*/
 
-func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan int, cfilter_str string) *packet_t {
+func (d *ConnectedDigipeater) match(from_chan int, pp *ax25.Packet, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan int, cfilter_str string) *ax25.Packet {
 	/*
 	 * First check if filtering has been configured.
 	 * Note that we have three different config file filter commands:
@@ -231,13 +233,13 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec stri
 	 *
 	 * r = index of the address position in the frame.
 	 */
-	var r = ax25_get_first_not_repeated(pp)
+	var r = pp.FirstNotRepeated()
 
-	if r < AX25_REPEATER_1 {
+	if r < ax25.Repeater1 {
 		return (nil) // Nothing to do.
 	}
 
-	var repeater = ax25_get_addr_with_ssid(pp, r)
+	var repeater = pp.AddrWithSSID(r)
 
 	/*
 	 * First check for explicit use of my call.
@@ -245,12 +247,12 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec stri
 	 */
 
 	if repeater == mycall_rec {
-		var result = ax25_dup(pp)
+		var result = pp.Dup()
 
 		/* If using multiple radio channels, they could have different calls. */
 
-		ax25_set_addr(result, r, mycall_xmit)
-		ax25_set_h(result, r)
+		result.SetAddr(r, mycall_xmit)
+		result.SetH(r)
 
 		return (result)
 	}
@@ -260,10 +262,10 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec stri
 	 */
 	if has_alias {
 		if alias.MatchString(repeater) {
-			var result = ax25_dup(pp)
+			var result = pp.Dup()
 
-			ax25_set_addr(result, r, mycall_xmit)
-			ax25_set_h(result, r)
+			result.SetAddr(r, mycall_xmit)
+			result.SetH(r)
 
 			return (result)
 		}

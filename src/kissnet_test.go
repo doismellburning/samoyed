@@ -491,7 +491,7 @@ func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
 	var pp = newTestPacket(t)
 
 	// Channel 0 in the frame, which the port's own channel overrides.
-	var _, writeErr = conn.Write(KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...)))
+	var _, writeErr = conn.Write(KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, pp.FrameData()...)))
 	require.NoError(t, writeErr)
 
 	// The client's bytes are handled in order, so an answer to this means the

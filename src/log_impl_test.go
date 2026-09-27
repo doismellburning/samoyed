@@ -3,7 +3,11 @@
 
 package direwolf
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/doismellburning/samoyed/internal/ax25"
+)
 
 // Regression test for a bug where heard[:4] and heard[4] were indexed
 // before checking len(heard) == 5, causing a panic whenever the heard
@@ -11,12 +15,12 @@ import "testing"
 func TestLogRRBitsShortHeardDoesNotPanic(t *testing.T) {
 	t.Parallel()
 
-	var pp = AX25FromText("Q1TEST>APRS,Q2TEST*,AB*:test", true)
+	var pp = ax25.FromText("Q1TEST>APRS,Q2TEST*,AB*:test", true)
 	if pp == nil {
 		t.Fatal("failed to parse test packet")
 	}
 
-	if ax25_get_heard(pp) < AX25_REPEATER_2 {
+	if pp.Heard() < ax25.Repeater2 {
 		t.Fatal("test packet did not set up heard station at or beyond AX25_REPEATER_2")
 	}
 

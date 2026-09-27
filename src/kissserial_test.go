@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -258,7 +259,7 @@ func TestKissSerialSendRecPacketText(t *testing.T) {
 func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 0)
 
-	var frame = make([]byte, AX25_MAX_PACKET_LEN+10)
+	var frame = make([]byte, ax25.MaxPacketLen+10)
 	for i := range frame {
 		frame[i] = 'x'
 	}
@@ -274,7 +275,7 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	assert.Contains(t, output, "Truncated")
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
-	assert.Len(t, <-got, AX25_MAX_PACKET_LEN+3)
+	assert.Len(t, <-got, ax25.MaxPacketLen+3)
 }
 
 // The whole point of the serial port: a client writes a KISS data frame into
@@ -310,7 +311,7 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	var pp = newTestPacket(t)
 
 	var _, writeErr = client.Write(KissEncapsulate(append(
-		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, ax25_get_frame_data(pp)...)))
+		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, pp.FrameData()...)))
 	require.NoError(t, writeErr)
 
 	// TransmitQueue.Count rather than TransmitQueue.Peek: the queue is being filled by the

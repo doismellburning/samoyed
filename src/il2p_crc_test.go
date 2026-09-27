@@ -3,6 +3,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -81,11 +82,11 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 	il2p_init(0)
 
 	// Encode a frame with CRC, then decode it and verify round-trip.
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "W2UB"
 	addrs[1] = "WB2OSZ-12"
 	var pinfo = []byte("Hello CRC test")
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
 	for max_fec := range 2 {
@@ -101,7 +102,7 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 		var pp2 = il2p_decode_frame(encoded, IL2P_VERSION_0_4)
 		require.NotNil(t, pp2, "Failed to decode frame with CRC, max_fec=%d", max_fec)
 
-		assert.Equal(t, ax25_get_frame_data(pp), ax25_get_frame_data(pp2))
+		assert.Equal(t, pp.FrameData(), pp2.FrameData())
 	}
 }
 
@@ -133,7 +134,7 @@ func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 			var pp = il2p_decode_frame(b, IL2P_VERSION_COMPAT)
 			require.NotNil(t, pp)
 
-			var frameData = ax25_get_frame_data(pp)
+			var frameData = pp.FrameData()
 			assert.Equal(t, td.ax25Data, frameData)
 
 			// Verify CRC matches.

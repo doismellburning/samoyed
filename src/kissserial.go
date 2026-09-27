@@ -73,6 +73,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/pkg/term"
 	"github.com/sirupsen/logrus"
@@ -236,11 +237,11 @@ func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen
 		// slicing below used to happen once fbuf had already been copied into
 		// stemp, so the client was told the frame had been truncated and then
 		// handed the whole of it anyway.
-		if flen > AX25_MAX_PACKET_LEN {
+		if flen > ax25.MaxPacketLen {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS buffer too small.  Truncated.\n\n")
 
-			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
+			fbuf = fbuf[:ax25.MaxPacketLen]
 		}
 
 		var leader = byte((channel << 4) | kiss_cmd)

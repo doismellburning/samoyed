@@ -3,6 +3,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,11 +28,11 @@ func TestIL2PSendFrameCRCDefaultMatchesEnabled(t *testing.T) {
 
 	il2p_init(0)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "Q1TEST"
 	addrs[1] = "Q2TEST"
 	var pinfo = []byte("hello")
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
 	// Compute expected bits: preamble(1B) + sync(3B) + encoded-with-CRC.

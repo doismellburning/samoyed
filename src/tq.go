@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
@@ -38,7 +39,7 @@ type TransmitQueue struct {
 	mu sync.Mutex /* Critical section for updating queues. */
 	/* Just one for all queues. */
 
-	head [MAX_RADIO_CHANS][TQ_NUM_PRIO]*packet_t /* Head of linked list for each queue. */
+	head [MAX_RADIO_CHANS][TQ_NUM_PRIO]*ax25.Packet /* Head of linked list for each queue. */
 
 	// Number of packets in each queue, maintained alongside head and guarded
 	// by the same mutex.  Remove pops the head in constant time, so counting
@@ -100,8 +101,8 @@ func NewTransmitQueue() *TransmitQueue {
 
 // tq_is_real_packet reports whether a queue entry is a real packet rather than
 // LMSeizeRequest's null wake-up frame, matching countLocked's own test.
-func tq_is_real_packet(pp *packet_t) bool {
-	return ax25_get_num_addr(pp) >= AX25_MIN_ADDRS
+func tq_is_real_packet(pp *ax25.Packet) bool {
+	return pp.NumAddr() >= ax25.MinAddrs
 }
 
 /*-------------------------------------------------------------------
@@ -213,7 +214,7 @@ func (tq *TransmitQueue) SetNetTNCs(netTNCs [MAX_TOTAL_CHANS]*NetTNC) {
  *
  *--------------------------------------------------------------------*/
 
-func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
+func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 	dwutil.Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
@@ -227,7 +228,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
 			"prio":    prio,
-			"info":    string(AX25GetInfo(pp)),
+			"info":    string(pp.Info()),
 		}).Debug("tq_append")
 	}
 
@@ -263,22 +264,22 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 		}
 
 		// Formated addresses.
-		var stemp = AX25FormatAddrs(pp)
-		var pinfo = AX25GetInfo(pp)
+		var stemp = pp.FormatAddrs()
+		var pinfo = pp.Info()
 
 		text_color_set(DW_COLOR_XMIT)
 
 		if tq.audioConfig.chan_medium[channel] == MEDIUM_IGATE {
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 
 			igate.sendRecPacket(channel, pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 
 			tq.netTNCs[channel].sendPacket(channel, pp)
@@ -326,7 +327,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 	 * Limit was 20.  Changed to 100 in version 1.2 as a workaround.
 	 */
 
-	if ax25_is_aprs(pp) && tq.Count(channel, prio, "", "", false) > 100 {
+	if pp.IsAPRS() && tq.Count(channel, prio, "", "", false) > 100 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
@@ -341,11 +342,11 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 	if tq.head[channel][prio] == nil {
 		tq.head[channel][prio] = pp
 	} else {
-		var pnext *packet_t
+		var pnext *ax25.Packet
 
 		var plast = tq.head[channel][prio]
 		for {
-			pnext = ax25_get_nextp(plast)
+			pnext = plast.Next()
 			if pnext == nil {
 				break
 			}
@@ -353,7 +354,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 			plast = pnext
 		}
 
-		ax25_set_nextp(plast, pp)
+		plast.SetNext(pp)
 	}
 
 	if tq_is_real_packet(pp) {
@@ -443,7 +444,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 
 // TODO: FIXME:  this is a copy of Append.  Need to fine tune and explain why.
 
-func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
+func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *ax25.Packet) {
 	dwutil.Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
@@ -457,7 +458,7 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
 			"prio":    prio,
-			"info":    string(AX25GetInfo(pp)),
+			"info":    string(pp.Info()),
 		}).Debug("lm_data_request")
 	}
 
@@ -505,7 +506,7 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
 	} else {
 		var plast = tq.head[channel][prio]
 		for {
-			var pnext = ax25_get_nextp(plast)
+			var pnext = plast.Next()
 			if pnext == nil {
 				break
 			}
@@ -513,7 +514,7 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
 			plast = pnext
 		}
 
-		ax25_set_nextp(plast, pp)
+		plast.SetNext(pp)
 	}
 
 	if tq_is_real_packet(pp) {
@@ -613,7 +614,7 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 		return
 	}
 
-	var pp = ax25_new()
+	var pp = ax25.New()
 
 	/* TODO KG
 	#if AX25MEMDEBUG
@@ -634,7 +635,7 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 	} else {
 		var plast = tq.head[channel][prio]
 		for {
-			var pnext = ax25_get_nextp(plast)
+			var pnext = plast.Next()
 			if pnext == nil {
 				break
 			}
@@ -642,7 +643,7 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 			plast = pnext
 		}
 
-		ax25_set_nextp(plast, pp)
+		plast.SetNext(pp)
 	}
 
 	if tq_is_real_packet(pp) {
@@ -740,7 +741,7 @@ func (tq *TransmitQueue) WaitWhileEmpty(ctx context.Context, channel int) {
  *
  *--------------------------------------------------------------------*/
 
-func (tq *TransmitQueue) Remove(channel int, prio int) *packet_t {
+func (tq *TransmitQueue) Remove(channel int, prio int) *ax25.Packet {
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
@@ -749,14 +750,14 @@ func (tq *TransmitQueue) Remove(channel int, prio int) *packet_t {
 	}
 	tq.mu.Lock()
 
-	var result_p *packet_t
+	var result_p *ax25.Packet
 
 	if tq.head[channel][prio] == nil {
 		result_p = nil
 	} else {
 		result_p = tq.head[channel][prio]
-		tq.head[channel][prio] = ax25_get_nextp(result_p)
-		ax25_set_nextp(result_p, nil)
+		tq.head[channel][prio] = result_p.Next()
+		result_p.SetNext(nil)
 
 		if tq_is_real_packet(result_p) {
 			tq.length[channel][prio]--
@@ -805,7 +806,7 @@ func (tq *TransmitQueue) Remove(channel int, prio int) *packet_t {
  *
  *--------------------------------------------------------------------*/
 
-func (tq *TransmitQueue) Peek(channel int, prio int) *packet_t {
+func (tq *TransmitQueue) Peek(channel int, prio int) *ax25.Packet {
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
@@ -965,12 +966,12 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 	var pp = tq.head[channel][prio]
 
 	for pp != nil {
-		if ax25_get_num_addr(pp) >= AX25_MIN_ADDRS {
+		if pp.NumAddr() >= ax25.MinAddrs {
 			// Consider only real packets.
 			var count_it = 1
 
 			if source != "" {
-				var frame_source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+				var frame_source = pp.AddrWithSSID(ax25.Source)
 				if logrus.IsLevelEnabled(logrus.TraceLevel) {
 					logrus.WithField("frame_source", frame_source).Trace("tq_count: compare to frame source")
 				}
@@ -980,7 +981,7 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 			}
 
 			if count_it > 0 && dest != "" {
-				var frame_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+				var frame_dest = pp.AddrWithSSID(ax25.Destination)
 				if logrus.IsLevelEnabled(logrus.TraceLevel) {
 					logrus.WithField("frame_dest", frame_dest).Trace("tq_count: compare to frame destination")
 				}
@@ -991,14 +992,14 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 
 			if count_it > 0 {
 				if bytes {
-					n += ax25_get_frame_len(pp)
+					n += pp.FrameLen()
 				} else {
 					n++
 				}
 			}
 		}
 
-		pp = ax25_get_nextp(pp)
+		pp = pp.Next()
 	}
 
 	return (n)

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/require"
 )
 
@@ -116,7 +117,7 @@ func Test_dtmf(t *testing.T) {
 // discardReceiveSink is a ReceiveSink that ignores whatever it is told.
 type discardReceiveSink struct{}
 
-func (discardReceiveSink) RecFrame(int, int, int, *packet_t, ALevel, fec_type_t, BitFixLevel, string) {
+func (discardReceiveSink) RecFrame(int, int, int, *ax25.Packet, ax25.ALevel, fec_type_t, BitFixLevel, string) {
 }
 
 func (discardReceiveSink) DCDChange(int, int) {}

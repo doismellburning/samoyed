@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -192,7 +193,7 @@ func requireIGateSilent(t *testing.T, server net.Conn, msgAndArgs ...any) {
 func TestIGateSendRecPacket(t *testing.T) {
 	var server = setupIGate(t)
 
-	var pp = AX25FromText("Q2TEST>APDW17:=4237.14N/07120.83W#hello", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:=4237.14N/07120.83W#hello", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -208,7 +209,7 @@ func TestIGateSendRecPacketReceiveOnly(t *testing.T) {
 
 	igate.config.tx_chan = -1
 
-	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -224,7 +225,7 @@ func TestIGateSendRecPacketNotReady(t *testing.T) {
 
 	igate.okToSend = false
 
-	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -244,7 +245,7 @@ func TestIGateSendRecPacketPathSaysNo(t *testing.T) {
 		t.Run(via, func(t *testing.T) {
 			var server = setupIGate(t)
 
-			var pp = AX25FromText("Q2TEST>APDW17,"+via+":>hello", true)
+			var pp = ax25.FromText("Q2TEST>APDW17,"+via+":>hello", true)
 			require.NotNil(t, pp)
 
 			igate.sendRecPacket(0, pp)
@@ -259,7 +260,7 @@ func TestIGateSendRecPacketPathSaysNo(t *testing.T) {
 func TestIGateSendRecPacketGenericQuery(t *testing.T) {
 	var server = setupIGate(t)
 
-	var pp = AX25FromText("Q2TEST>APDW17:?APRS?", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:?APRS?", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -272,7 +273,7 @@ func TestIGateSendRecPacketGenericQuery(t *testing.T) {
 func TestIGateSendRecPacketEmptyInformation(t *testing.T) {
 	var server = setupIGate(t)
 
-	var pp = AX25FromText("Q2TEST>APDW17:", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -285,7 +286,7 @@ func TestIGateSendRecPacketEmptyInformation(t *testing.T) {
 func TestIGateSendRecPacketCutAtCR(t *testing.T) {
 	var server = setupIGate(t)
 
-	var pp = AX25FromText("Q2TEST>APDW17:>before\rafter", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:>before\rafter", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -298,7 +299,7 @@ func TestIGateSendRecPacketCutAtCR(t *testing.T) {
 func TestIGateSendRecPacketThirdParty(t *testing.T) {
 	var server = setupIGate(t)
 
-	var pp = AX25FromText("Q3TEST>APDW17:}Q2TEST>APDW17,Q3TEST*:>inner", true)
+	var pp = ax25.FromText("Q3TEST>APDW17:}Q2TEST>APDW17,Q3TEST*:>inner", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -313,7 +314,7 @@ func TestIGateSendRecPacketFiltered(t *testing.T) {
 
 	igate.digiConfig.filter_str[0][MAX_TOTAL_CHANS] = "b/Q9TEST"
 
-	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -328,7 +329,7 @@ func TestIGateDropsDuplicates(t *testing.T) {
 
 	igate.config.rx2ig_dedupe_time = 30
 
-	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -347,7 +348,7 @@ func TestIGateDedupeDisabled(t *testing.T) {
 
 	igate.config.rx2ig_dedupe_time = 0
 
-	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -401,9 +402,9 @@ func TestIGateTransmitFromServer(t *testing.T) {
 	var sent = transmitQueue.Remove(0, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "nothing was queued for transmission")
 
-	var info = string(AX25GetInfo(sent))
+	var info = string(sent.Info())
 
-	assert.Equal(t, "Q1TEST", ax25_get_addr_with_ssid(sent, AX25_SOURCE))
+	assert.Equal(t, "Q1TEST", sent.AddrWithSSID(ax25.Source))
 	assert.Equal(t, "}Q2TEST-1>APWW10,TCPIP,Q1TEST*:>hello", info)
 	assert.Equal(t, 1, igate.stats.rfXmitPackets)
 }
@@ -491,7 +492,7 @@ func TestIGateTransmitMessageRemembersTheSender(t *testing.T) {
 func TestIGToTxAllowDropsDuplicates(t *testing.T) {
 	setupIGate(t)
 
-	var pp = AX25FromText("Q2TEST>APWW10:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APWW10:>hello", true)
 	require.NotNil(t, pp)
 
 	assert.True(t, igate.igToTxAllow(pp, 0))
@@ -512,7 +513,7 @@ func TestIGToTxAllowDropsDuplicates(t *testing.T) {
 func TestIGToTxHistoryConcurrent(t *testing.T) {
 	setupIGate(t)
 
-	var pp = AX25FromText("Q2TEST>APWW10:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APWW10:>hello", true)
 	require.NotNil(t, pp)
 
 	var done = make(chan struct{})
@@ -541,7 +542,7 @@ func TestIGToTxHistoryConcurrent(t *testing.T) {
 func TestIGToTxAllowKeepsDuplicateMessages(t *testing.T) {
 	setupIGate(t)
 
-	var pp = AX25FromText("Q2TEST>APWW10::Q3TEST   :Hello there", true)
+	var pp = ax25.FromText("Q2TEST>APWW10::Q3TEST   :Hello there", true)
 	require.NotNil(t, pp)
 
 	igate.igToTxRemember(pp, 0, 0)
@@ -558,7 +559,7 @@ func TestIGToTxAllowRateLimits(t *testing.T) {
 	igate.config.tx_limit_5 = 100
 
 	for i := range 2 {
-		var pp = AX25FromText(fmt.Sprintf("Q2TEST>APWW10:>hello %d", i), true)
+		var pp = ax25.FromText(fmt.Sprintf("Q2TEST>APWW10:>hello %d", i), true)
 		require.NotNil(t, pp)
 
 		require.True(t, igate.igToTxAllow(pp, 0))
@@ -566,7 +567,7 @@ func TestIGToTxAllowRateLimits(t *testing.T) {
 		igate.igToTxRemember(pp, 0, 0)
 	}
 
-	var next = AX25FromText("Q2TEST>APWW10:>one too many", true)
+	var next = ax25.FromText("Q2TEST>APWW10:>one too many", true)
 	require.NotNil(t, next)
 
 	var output = testutils.CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(next, 0)) })
@@ -583,13 +584,13 @@ func TestIGToTxAllowFiveMinuteLimit(t *testing.T) {
 	igate.config.tx_limit_5 = 3
 
 	for i := range 3 {
-		var pp = AX25FromText(fmt.Sprintf("Q2TEST>APWW10:>hello %d", i), true)
+		var pp = ax25.FromText(fmt.Sprintf("Q2TEST>APWW10:>hello %d", i), true)
 		require.NotNil(t, pp)
 
 		igate.igToTxRemember(pp, 0, 0)
 	}
 
-	var next = AX25FromText("Q2TEST>APWW10:>one too many", true)
+	var next = ax25.FromText("Q2TEST>APWW10:>one too many", true)
 	require.NotNil(t, next)
 
 	var output = testutils.CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(next, 0)) })
@@ -605,12 +606,12 @@ func TestIGToTxAllowRaisesTheLimitForMessages(t *testing.T) {
 	igate.config.tx_limit_1 = 1
 	igate.config.tx_limit_5 = 100
 
-	var pp = AX25FromText("Q2TEST>APWW10:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APWW10:>hello", true)
 	require.NotNil(t, pp)
 
 	igate.igToTxRemember(pp, 0, 0)
 
-	var message = AX25FromText("Q2TEST>APWW10::Q3TEST   :Hello there", true)
+	var message = ax25.FromText("Q2TEST>APWW10::Q3TEST   :Hello there", true)
 	require.NotNil(t, message)
 
 	assert.True(t, igate.igToTxAllow(message, 0), "a message should get three times the limit")
@@ -624,12 +625,12 @@ func TestIGToTxAllowIgnoresDigipeatedFrames(t *testing.T) {
 	igate.config.tx_limit_1 = 1
 	igate.config.tx_limit_5 = 100
 
-	var pp = AX25FromText("Q2TEST>APWW10:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APWW10:>hello", true)
 	require.NotNil(t, pp)
 
 	igate.igToTxRemember(pp, 0, 1) // Transmitted by the digipeater, not the IGate.
 
-	var next = AX25FromText("Q2TEST>APWW10:>something else", true)
+	var next = ax25.FromText("Q2TEST>APWW10:>something else", true)
 	require.NotNil(t, next)
 
 	assert.True(t, igate.igToTxAllow(next, 0), "a digipeated frame should not count against the IGate's limit")
@@ -643,13 +644,13 @@ func TestIGToTxRememberWrapsAround(t *testing.T) {
 	igate.config.tx_limit_1 = 1000
 	igate.config.tx_limit_5 = 1000
 
-	var first = AX25FromText("Q2TEST>APWW10:>first", true)
+	var first = ax25.FromText("Q2TEST>APWW10:>first", true)
 	require.NotNil(t, first)
 
 	igate.igToTxRemember(first, 0, 0)
 
 	for i := range IG2TX_HISTORY_MAX {
-		var pp = AX25FromText(fmt.Sprintf("Q2TEST>APWW10:>filler %d", i), true)
+		var pp = ax25.FromText(fmt.Sprintf("Q2TEST>APWW10:>filler %d", i), true)
 		require.NotNil(t, pp)
 
 		igate.igToTxRemember(pp, 0, 0)
@@ -691,7 +692,7 @@ func TestIGateSatgateDelaysDirectPackets(t *testing.T) {
 
 	// Heard directly - no digipeater has been used - but with a path, so
 	// somebody else may yet repeat it.
-	var pp = AX25FromText("Q2TEST>APDW17,WIDE1-1:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APDW17,WIDE1-1:>hello", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
@@ -733,7 +734,7 @@ func TestIGateSatgateDoesNotDelayRepeatedPackets(t *testing.T) {
 	igate.config.satgate_delay = 1
 	igate.dpQueueHead = nil
 
-	var pp = AX25FromText("Q2TEST>APDW17,Q3TEST*:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APDW17,Q3TEST*:>hello", true)
 	require.NotNil(t, pp)
 
 	igate.sendRecPacket(0, pp)
@@ -753,18 +754,18 @@ func TestIGateSatgateQueueKeepsOrder(t *testing.T) {
 	igate.dpQueueHead = nil
 
 	for _, text := range []string{"Q2TEST>APDW17:>first", "Q2TEST>APDW17:>second"} {
-		var pp = AX25FromText(text, true)
+		var pp = ax25.FromText(text, true)
 		require.NotNil(t, pp)
 
 		testutils.CaptureOutput(t, func() { igate.satgateDelayPacket(pp, 0) })
 	}
 
 	require.NotNil(t, igate.dpQueueHead)
-	assert.Equal(t, ">first", string(AX25GetInfo(igate.dpQueueHead)))
+	assert.Equal(t, ">first", string(igate.dpQueueHead.Info()))
 
-	var second = ax25_get_nextp(igate.dpQueueHead)
+	var second = igate.dpQueueHead.Next()
 	require.NotNil(t, second, "the second packet was not queued behind the first")
-	assert.Equal(t, ">second", string(AX25GetInfo(second)))
+	assert.Equal(t, ">second", string(second.Info()))
 }
 
 // "-d ig" and more of it prints what is happening at each stage, which is how
@@ -775,7 +776,7 @@ func TestIGateDebugOutput(t *testing.T) {
 	igate.debugLevel = 3
 	igate.config.rx2ig_dedupe_time = 30
 
-	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
@@ -799,7 +800,7 @@ func TestIGateToRadioDebugOutput(t *testing.T) {
 
 	igate.debugLevel = 3
 
-	var pp = AX25FromText("Q2TEST>APWW10:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APWW10:>hello", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() {
@@ -839,7 +840,7 @@ func TestIGateSendRecPacketDebugOutput(t *testing.T) {
 		{"third party", "Q3TEST>APDW17:}Q2TEST>APDW17,TCPIP:>inner", "Do not relay with TCPIP in path"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var pp = AX25FromText(c.text, true)
+			var pp = ax25.FromText(c.text, true)
 			require.NotNil(t, pp)
 
 			var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
@@ -851,7 +852,7 @@ func TestIGateSendRecPacketDebugOutput(t *testing.T) {
 	// And the filter, which is off by default and only says so with -d ig.
 	igate.digiConfig.filter_str[0][MAX_TOTAL_CHANS] = "b/Q9TEST"
 
-	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
+	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })

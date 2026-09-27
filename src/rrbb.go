@@ -1,6 +1,9 @@
 package direwolf
 
-import "github.com/doismellburning/samoyed/internal/dwutil"
+import (
+	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwutil"
+)
 
 /********************************************************************************
  *
@@ -30,9 +33,9 @@ type rrbb_t struct {
 	subchannel int /* Which modem when more than one per channel. */
 	slice      int /* Which slicer. */
 
-	alevel      ALevel  /* Received audio level at time of frame capture. */
-	speed_error float64 /* Received data speed error as percentage. */
-	length      int     /* Current number of samples in array. */
+	alevel      ax25.ALevel /* Received audio level at time of frame capture. */
+	speed_error float64     /* Received data speed error as percentage. */
+	length      int         /* Current number of samples in array. */
 
 	is_scrambled  bool /* Is data scrambled G3RUH / K9NG style? */
 	descram_state int  /* Descrambler state before first data bit of frame. */
@@ -281,7 +284,7 @@ func rrbb_get_slice(b *rrbb_t) int {
  *
  ***********************************************************************************/
 
-func rrbb_set_audio_level(b *rrbb_t, alevel ALevel) {
+func rrbb_set_audio_level(b *rrbb_t, alevel ax25.ALevel) {
 	b.alevel = alevel
 }
 
@@ -295,7 +298,7 @@ func rrbb_set_audio_level(b *rrbb_t, alevel ALevel) {
  *
  ***********************************************************************************/
 
-func rrbb_get_audio_level(b *rrbb_t) ALevel {
+func rrbb_get_audio_level(b *rrbb_t) ax25.ALevel {
 	return (b.alevel)
 }
 

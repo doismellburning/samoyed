@@ -28,6 +28,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -226,9 +227,9 @@ func DecodeAPRSInit() {
  *
  *------------------------------------------------------------------*/
 
-func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t {
+func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_aprs_t {
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	//dw_printf ("DEBUG decode_aprs info=\"%s\"\n", pinfo);
 
@@ -248,10 +249,10 @@ func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t
 	if third_party_src != "" {
 		A.g_src = third_party_src
 	} else {
-		A.g_src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+		A.g_src = pp.AddrWithSSID(ax25.Source)
 	}
 
-	A.g_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+	A.g_dest = pp.AddrWithSSID(ax25.Destination)
 
 	if len(pinfo) == 0 {
 		A.g_data_type_desc = "AX.25 UI frame with empty information field"
@@ -270,7 +271,7 @@ func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t
 	// W1KU-4>APDW15,W1IMD,WIDE1,KQ1L-8,N3LLO-3,WIDE2*:}EB1EBT-9>NOGATE,TCPIP,W1KU-4*::DF1AKR-9 :73{4
 	// NE1CU-10>RFONLY,KB1AEV-15,N3LLO-3,WIDE2*:}W1HS-11>APMI06,TCPIP,NE1CU-10*:T#050,190,039,008,095,20403,00000000
 
-	var atemp = ax25_get_addr_no_ssid(pp, AX25_DESTINATION)
+	var atemp = pp.AddrNoSSID(ax25.Destination)
 
 	if !quiet {
 		if atemp == "RFONLY" || atemp == "NOGATE" {
@@ -282,8 +283,8 @@ func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t
 
 	// Complain if obsolete WIDE or RELAY is found in via path.
 
-	for i := range ax25_get_num_repeaters(pp) {
-		atemp = ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+i)
+	for i := range pp.NumRepeaters() {
+		atemp = pp.AddrNoSSID(ax25.Repeater1 + i)
 		if !quiet {
 			if atemp == "RELAY" || atemp == "WIDE" || atemp == "TRACE" {
 				text_color_set(DW_COLOR_ERROR)
@@ -311,7 +312,7 @@ func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t
 
 		// e.g.  WR2X-2>APRS,WA1PLE-13*:}
 		//		K1BOS-B>APOSB,TCPIP,WR2X-2*:@122015z4221.42ND07111.93W&/A=000000SharkRF openSPOT3 MMDVM446.025 MA/SW
-		var pp_payload = AX25FromText(string(pinfo[1:]), false)
+		var pp_payload = ax25.FromText(string(pinfo[1:]), false)
 		if pp_payload != nil {
 			var payload_src = pinfo[1:]
 			payload_src, _, _ = bytes.Cut(payload_src, []byte{'>'})
@@ -747,19 +748,19 @@ func DecodeAPRSPrint(A *decode_aprs_t) {
 	A.g_weather = strings.TrimSpace(A.g_weather)
 
 	if len(A.g_weather) > 0 {
-		AX25SafePrint([]byte(A.g_weather), false)
+		ax25.SafePrint([]byte(A.g_weather), false)
 		dw_printf("\n")
 	}
 
 	if len(A.g_telemetry) > 0 {
-		AX25SafePrint([]byte(A.g_telemetry), false)
+		ax25.SafePrint([]byte(A.g_telemetry), false)
 		dw_printf("\n")
 	}
 
 	A.g_comment = strings.TrimSpace(A.g_comment)
 
 	if len(A.g_comment) > 0 {
-		AX25SafePrint([]byte(A.g_comment), false)
+		ax25.SafePrint([]byte(A.g_comment), false)
 		dw_printf("\n")
 
 		/*
@@ -1297,7 +1298,7 @@ func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int
 	return (0)
 }
 
-func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
+func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 	type aprs_mic_e_s struct {
 		DTI         byte    /* ' or ` */
 		Lon         [3]byte /* "d+28", "m+28", "h+28" */
@@ -1324,7 +1325,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	/* Destination is really latitude of form ddmmhh. */
 	/* Message codes are buried in the first 3 digits. */
 
-	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+	var dest = pp.AddrWithSSID(ax25.Destination)
 
 	/* Trailing spaces are trimmed off the address, so a destination that is */
 	/* not really a latitude can be shorter than the six digits we read. */

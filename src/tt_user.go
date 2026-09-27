@@ -24,6 +24,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
@@ -622,7 +623,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	/*
 	 * Convert text to packet.
 	 */
-	var pp = AX25FromText(stemp, true)
+	var pp = ax25.FromText(stemp, true)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -646,7 +647,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	if first_time && u.ttConfig.obj_send_to_app > 0 {
 		// TODO1.3:  Put a wrapper around this so we only call one function to send by all methods.
 		// We see the same sequence in direwolf.c.
-		var fbuf = AX25Pack(pp)
+		var fbuf = pp.Pack()
 
 		agwServer.SendRecPacket(u.ttConfig.obj_recv_chan, pp, fbuf)
 		kissNetSvc.SendRecPacket(u.ttConfig.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)

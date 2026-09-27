@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/wavwrite"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -277,7 +278,7 @@ func (g *GenPackets) SendPacket(str string) error {
 		return nil
 	}
 
-	var pp = AX25FromText(str, true)
+	var pp = ax25.FromText(str, true)
 	if pp == nil {
 		return fmt.Errorf("%q is not valid TNC2 monitoring format", str)
 	}
@@ -295,12 +296,12 @@ func (g *GenPackets) SendPacket(str string) error {
 		// Examples:
 		//	X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-
 		//	X>X:NNNN
-		var pinfo = AX25GetInfo(pp)
+		var pinfo = pp.Info()
 		if len(pinfo) >= 3 && strings.HasPrefix(string(pinfo), "{DE") {
 			pinfo = pinfo[3:]
 		}
 
-		var repeat = ax25_get_ssid(pp, AX25_DESTINATION)
+		var repeat = pp.SSID(ax25.Destination)
 		if repeat == 0 {
 			repeat = 1
 		}

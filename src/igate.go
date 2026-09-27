@@ -34,6 +34,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/sirupsen/logrus"
@@ -155,7 +156,7 @@ type IGate struct {
 	debugLevel int
 
 	dpMutex     sync.Mutex /* Critical section for delayed packet queue. */
-	dpQueueHead *packet_t
+	dpQueueHead *ax25.Packet
 
 	sock net.Conn
 
@@ -473,7 +474,7 @@ const IGATE_MAX_MSG = 512 /* "All 'packets' sent to APRS-IS must be in the TNC2 
 /* by a carriage return, line feed sequence. No line may exceed 512 bytes */
 /* including the CR/LF sequence." */
 
-func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
+func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 	if ig.sock == nil {
 		return /* Silently discard if not connected. */
 	}
@@ -523,15 +524,15 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	 * First make a copy of it because it might be modified in place.
 	 */
 
-	var pp = ax25_dup(recv_pp)
+	var pp = recv_pp.Dup()
 
 	/*
 	 * Third party frames require special handling to unwrap payload.
 	 */
-	for ax25_get_dti(pp) == '}' {
-		for n := range ax25_get_num_repeaters(pp) {
+	for pp.DTI() == '}' {
+		for n := range pp.NumRepeaters() {
 			/* includes ssid. Do we want to ignore it? */
-			var via = ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1)
+			var via = pp.AddrWithSSID(n + ax25.Repeater1)
 
 			if via == "TCPIP" ||
 				via == "TCPXX" ||
@@ -551,7 +552,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 			dw_printf("Rx IGate: Unwrap third party message.\n")
 		}
 
-		var inner_pp = ax25_unwrap_third_party(pp)
+		var inner_pp = pp.UnwrapThirdParty()
 		if inner_pp == nil {
 			return
 		}
@@ -562,9 +563,9 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	/*
 	 * Do not relay packets with TCPIP, TCPXX, RFONLY, or NOGATE in the via path.
 	 */
-	for n := range ax25_get_num_repeaters(pp) {
+	for n := range pp.NumRepeaters() {
 		/* includes ssid. Do we want to ignore it? */
-		var via = ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1)
+		var via = pp.AddrWithSSID(n + ax25.Repeater1)
 
 		if via == "TCPIP" ||
 			via == "TCPXX" ||
@@ -583,7 +584,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	 * Do not relay generic query.
 	 * TODO:  Should probably block in other direction too, in case rf>is gateway did not drop.
 	 */
-	if ax25_get_dti(pp) == '?' {
+	if pp.DTI() == '?' {
 		if ig.debugLevel >= 1 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Do not relay generic query.\n")
@@ -599,14 +600,14 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	 * Starting in 1.4 we preserve any nul characters in the information part.
 	 */
 
-	if ax25_cut_at_crlf(pp) > 0 {
+	if pp.CutAtCRLF() > 0 {
 		if ig.debugLevel >= 1 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Truncated information part at CR.\n")
 		}
 	}
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	/*
 	 * Someone around here occasionally sends a packet with no information part.
@@ -629,8 +630,8 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	 * (Digis are all unused if we are hearing it directly from source.)
 	 */
 	if ig.config.satgate_delay > 0 &&
-		ax25_get_heard(pp) == AX25_SOURCE &&
-		ax25_get_num_repeaters(pp) > 0 {
+		pp.Heard() == ax25.Source &&
+		pp.NumRepeaters() > 0 {
 		ig.satgateDelayPacket(pp, channel)
 	} else {
 		ig.sendPacketToServer(pp, channel)
@@ -654,8 +655,8 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
  *
  *--------------------------------------------------------------------*/
 
-func (ig *IGate) sendPacketToServer(pp *packet_t, channel int) {
-	var pinfo = AX25GetInfo(pp)
+func (ig *IGate) sendPacketToServer(pp *ax25.Packet, channel int) {
+	var pinfo = pp.Info()
 
 	/*
 	 * We will often see the same packet multiple times close together due to digipeating.
@@ -702,7 +703,7 @@ func (ig *IGate) sendPacketToServer(pp *packet_t, channel int) {
 	 *		IGate that only gates to RF messages for stations heard directly.
 	 */
 
-	var msg = AX25FormatAddrs(pp)
+	var msg = pp.FormatAddrs()
 
 	msg = strings.TrimRight(msg, ":") /* Remove trailing ":" */
 
@@ -828,7 +829,7 @@ func (ig *IGate) sendMsgToServer(imsg string) {
 	if ig.debugLevel >= 1 {
 		text_color_set(DW_COLOR_XMIT)
 		dw_printf("[rx>ig] ")
-		AX25SafePrint([]byte(imsg), false)
+		ax25.SafePrint([]byte(imsg), false)
 		dw_printf("\n")
 	}
 
@@ -1004,7 +1005,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 			if !ig.okToSend {
 				text_color_set(DW_COLOR_REC)
 				dw_printf("[ig] ")
-				AX25SafePrint(message, false)
+				ax25.SafePrint(message, false)
 				dw_printf("\n")
 			}
 		} else {
@@ -1017,7 +1018,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 			 */
 			text_color_set(DW_COLOR_REC)
 			dw_printf("\n[ig>tx] ") // formerly just [ig]
-			AX25SafePrint(message, false)
+			ax25.SafePrint(message, false)
 			dw_printf("\n")
 
 			if bytes.Contains(message, []byte{0}) {
@@ -1079,9 +1080,9 @@ func (ig *IGate) recvThread(ctx context.Context) {
 
 				var stemp = append([]byte("X>X:}"), message...)
 
-				var pp3 = AX25FromText(string(stemp), false)
+				var pp3 = ax25.FromText(string(stemp), false)
 				if pp3 != nil {
-					var alevel ALevel
+					var alevel ax25.ALevel
 					alevel.Mark = -2 // FIXME: Do we want some other special case?
 					alevel.Space = -2
 
@@ -1138,25 +1139,25 @@ func (ig *IGate) recvThread(ctx context.Context) {
  *
  *--------------------------------------------------------------------*/
 
-func (ig *IGate) satgateDelayPacket(pp *packet_t, channel int) { //nolint:unparam
+func (ig *IGate) satgateDelayPacket(pp *ax25.Packet, channel int) { //nolint:unparam
 	//if (ig.debugLevel >= 1) {
 	text_color_set(DW_COLOR_INFO)
 	dw_printf("Rx IGate: SATgate mode, delay packet heard directly.\n")
 	//}
 
-	ax25_set_release_time(pp, time.Now().Add(time.Duration(ig.config.satgate_delay)*time.Second))
+	pp.SetReleaseTime(time.Now().Add(time.Duration(ig.config.satgate_delay) * time.Second))
 	//TODO: save channel too.
 
 	ig.dpMutex.Lock()
 
-	var pnext, plast *packet_t
+	var pnext, plast *ax25.Packet
 
 	if ig.dpQueueHead == nil {
 		ig.dpQueueHead = pp
 	} else {
 		plast = ig.dpQueueHead
 		for {
-			pnext = ax25_get_nextp(plast)
+			pnext = plast.Next()
 			if pnext == nil {
 				break
 			}
@@ -1164,7 +1165,7 @@ func (ig *IGate) satgateDelayPacket(pp *packet_t, channel int) { //nolint:unpara
 			plast = pnext
 		}
 
-		ax25_set_nextp(plast, pp)
+		plast.SetNext(pp)
 	}
 
 	ig.dpMutex.Unlock()
@@ -1197,16 +1198,16 @@ func (ig *IGate) satgateDelayThread(ctx context.Context) {
 		/* Don't need critical region just to peek */
 
 		if ig.dpQueueHead != nil {
-			var release_time = ax25_get_release_time(ig.dpQueueHead)
+			var release_time = ig.dpQueueHead.ReleaseTime()
 
 			if time.Now().After(release_time) {
 				ig.dpMutex.Lock()
 
 				var pp = ig.dpQueueHead
-				ig.dpQueueHead = ax25_get_nextp(pp)
+				ig.dpQueueHead = pp.Next()
 
 				ig.dpMutex.Unlock()
-				ax25_set_nextp(pp, nil)
+				pp.SetNext(nil)
 
 				ig.sendPacketToServer(pp, channel)
 			}
@@ -1307,7 +1308,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	 * Potential Bug:  Up to 8 digipeaters are allowed in radio format.
 	 * Is there a possibility of finding a larger number here?
 	 */
-	var pp3 = AX25FromText(string(message), false)
+	var pp3 = ax25.FromText(string(message), false)
 	if pp3 == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tx IGate: Could not parse message from server.\n")
@@ -1328,9 +1329,9 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	 *	NOGATE or RFONLY - means IGate should not pass them.
 	 *	TCPXX or qAX - means it came from somewhere that did not identify itself correctly.
 	 */
-	for n := range ax25_get_num_repeaters(pp3) {
+	for n := range pp3.NumRepeaters() {
 		/* includes ssid. Do we want to ignore it? */
-		var via = ax25_get_addr_with_ssid(pp3, n+AX25_REPEATER_1)
+		var via = pp3.AddrWithSSID(n + ax25.Repeater1)
 
 		// "QAX" rather than "qAX": the addresses come back from the parser
 		// upper-cased, whatever case they arrived in, so the q construct
@@ -1381,7 +1382,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	// TODO: Not quite this simple.  Should have a function to check for position.
 	// $ raw gps could be a position.  @ could be weather data depending on symbol.
 
-	var pinfo = AX25GetInfo(pp3)
+	var pinfo = pp3.Info()
 
 	var msp_special_case = false
 
@@ -1458,7 +1459,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	 */
 
 	/* Destination field. */
-	var dest = ax25_get_addr_with_ssid(pp3, AX25_DESTINATION)
+	var dest = pp3.AddrWithSSID(ax25.Destination)
 	var payload = fmt.Sprintf("%s>%s,TCPIP,%s*:%s", string(src), dest, ig.audioConfig.mycall[to_chan], pinfo)
 
 	logrus.WithField("payload", payload).Debug("Tx IGate")
@@ -1483,7 +1484,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 			ig.config.tx_via,
 			payload)
 
-		var pradio = AX25FromText(radio, true)
+		var pradio = ax25.FromText(radio, true)
 		if pradio != nil {
 			/* This consumes packet so don't reference it again! */
 			transmitQueue.Append(to_chan, TQ_PRIO_1_LO, pradio)
@@ -1599,19 +1600,19 @@ func (h *rx2igHistory) reset() {
 	*h = rx2igHistory{} //nolint:exhaustruct_v5
 }
 
-func (ig *IGate) rxToIgRemember(pp *packet_t) {
+func (ig *IGate) rxToIgRemember(pp *ax25.Packet) {
 	// No need to save the information if we are not doing duplicate checking.
 	if ig.config.rx2ig_dedupe_time == 0 {
 		return
 	}
 
 	ig.rx2ig.entries[ig.rx2ig.insertNext].timeStamp = time.Now()
-	ig.rx2ig.entries[ig.rx2ig.insertNext].checksum = int(ax25_dedupe_crc(pp))
+	ig.rx2ig.entries[ig.rx2ig.insertNext].checksum = int(pp.DedupeCRC())
 
 	if ig.debugLevel >= 3 {
-		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		var pinfo = AX25GetInfo(pp)
+		var src = pp.AddrWithSSID(ax25.Source)
+		var dest = pp.AddrWithSSID(ax25.Destination)
+		var pinfo = pp.Info()
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_remember [%d] = %s %d \"%s>%s:%s\"\n",
@@ -1627,14 +1628,14 @@ func (ig *IGate) rxToIgRemember(pp *packet_t) {
 	}
 }
 
-func (ig *IGate) rxToIgAllow(pp *packet_t) bool {
-	var crc = ax25_dedupe_crc(pp)
+func (ig *IGate) rxToIgAllow(pp *ax25.Packet) bool {
+	var crc = pp.DedupeCRC()
 	var now = time.Now()
 
 	if ig.debugLevel >= 2 {
-		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		var pinfo = AX25GetInfo(pp)
+		var src = pp.AddrWithSSID(ax25.Source)
+		var dest = pp.AddrWithSSID(ax25.Destination)
+		var pinfo = pp.Info()
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_allow? %d \"%s>%s:%s\"\n", crc, src, dest, string(pinfo))
@@ -1910,17 +1911,17 @@ func (h *ig2txHistory) reset() {
 	}
 }
 
-func (ig *IGate) igToTxRemember(pp *packet_t, channel int, bydigi int) {
+func (ig *IGate) igToTxRemember(pp *ax25.Packet, channel int, bydigi int) {
 	var now = time.Now()
-	var crc = ax25_dedupe_crc(pp)
+	var crc = pp.DedupeCRC()
 
 	ig.ig2tx.mu.Lock()
 	defer ig.ig2tx.mu.Unlock()
 
 	if ig.debugLevel >= 3 {
-		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		var pinfo = AX25GetInfo(pp)
+		var src = pp.AddrWithSSID(ax25.Source)
+		var dest = pp.AddrWithSSID(ax25.Destination)
+		var pinfo = pp.Info()
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("ig_to_tx_remember [%d] = ch%d d%d %s %d \"%s>%s:%s\"\n",
@@ -1941,15 +1942,15 @@ func (ig *IGate) igToTxRemember(pp *packet_t, channel int, bydigi int) {
 	}
 }
 
-func (ig *IGate) igToTxAllow(pp *packet_t, channel int) bool {
-	var crc = ax25_dedupe_crc(pp)
+func (ig *IGate) igToTxAllow(pp *ax25.Packet, channel int) bool {
+	var crc = pp.DedupeCRC()
 	var now = time.Now()
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	if ig.debugLevel >= 2 {
-		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src = pp.AddrWithSSID(ax25.Source)
+		var dest = pp.AddrWithSSID(ax25.Destination)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("ig_to_tx_allow? ch%d %d \"%s>%s:%s\"\n", channel, crc, src, dest, string(pinfo))

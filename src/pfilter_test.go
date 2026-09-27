@@ -3,6 +3,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +17,7 @@ func Test_pfilter_empty_info(t *testing.T) {
 
 	deviceIDData = NewDeviceIDData()
 
-	var pp = AX25FromText("Q1TEST>ID:", true)
+	var pp = ax25.FromText("Q1TEST>ID:", true)
 	require.NotNil(t, pp)
 
 	var result, err = packetFilter.pfilter(0, 0, "t/p", pp, true)
@@ -40,7 +41,7 @@ func Test_pfilter_igate_without_a_heard_database(t *testing.T) {
 
 	defer func() { mheardDB = saved_mheardDB }()
 
-	var pp = AX25FromText("Q1TEST>APDW17::Q2TEST   :Hello", true)
+	var pp = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Hello", true)
 	require.NotNil(t, pp)
 
 	var result, err = packetFilter.pfilter(MAX_TOTAL_CHANS, 0, "i/60/0/51.5/-0.1/50", pp, true)
@@ -106,14 +107,14 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	// Q1TEST has just been heard directly over the radio, and nothing at all
 	// has been heard from the addressee Q2TEST, so the filter has every reason
 	// to drop this message rather than pass it.
-	var heard = AX25FromText("Q1TEST>APDW17:!4237.14NS07120.83W#", true)
+	var heard = ax25.FromText("Q1TEST>APDW17:!4237.14NS07120.83W#", true)
 	require.NotNil(t, heard)
 
-	var alevel ALevel
+	var alevel ax25.ALevel
 
 	mheardDB.SaveRF(0, DecodeAPRS(heard, true, ""), heard, alevel, BitFixNone)
 
-	var message = AX25FromText("Q1TEST>APDW17::Q2TEST   :Happy Birthday{001", true)
+	var message = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Happy Birthday{001", true)
 	require.NotNil(t, message)
 
 	var result, err = packetFilter.pfilter(0, 0, "i/30", message, true)
@@ -144,10 +145,10 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 	var hearRF = func(t *testing.T, monitor string) {
 		t.Helper()
 
-		var pp = AX25FromText(monitor, true)
+		var pp = ax25.FromText(monitor, true)
 		require.NotNil(t, pp)
 
-		var alevel ALevel
+		var alevel ax25.ALevel
 
 		mheardDB.SaveRF(0, DecodeAPRS(pp, true, ""), pp, alevel, BitFixNone)
 	}
@@ -213,7 +214,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 				hearRF(t, monitor)
 			}
 
-			var message = AX25FromText(tc.message, true)
+			var message = ax25.FromText(tc.message, true)
 			require.NotNil(t, message)
 
 			var result, err = packetFilter.pfilter(0, 0, tc.filter, message, true)

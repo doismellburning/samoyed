@@ -6,16 +6,17 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // recordingReceiveSink keeps each frame handed to it.
 type recordingReceiveSink struct {
-	frames []*packet_t
+	frames []*ax25.Packet
 }
 
-func (s *recordingReceiveSink) RecFrame(_ int, _ int, _ int, pp *packet_t, _ ALevel, _ fec_type_t, _ BitFixLevel, _ string) {
+func (s *recordingReceiveSink) RecFrame(_ int, _ int, _ int, pp *ax25.Packet, _ ax25.ALevel, _ fec_type_t, _ BitFixLevel, _ string) {
 	s.frames = append(s.frames, pp)
 }
 
@@ -42,9 +43,9 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 	multi_modem_init(audioConfig, first)
 	require.Equal(t, 2, demodulators[0].NumSubchan())
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:left over", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:left over", true)
 	require.NotNil(t, pp)
-	var alevel ALevel
+	var alevel ax25.ALevel
 	multi_modem_process_rec_packet_real(0, 0, 0, pp, alevel, RETRY_NONE, fec_type_none)
 
 	var second = new(recordingReceiveSink)

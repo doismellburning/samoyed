@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -360,7 +361,7 @@ func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 
 	startRecvProcess(t)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
 	addrs[PEERCALL] = "Q2TEST"
 
@@ -380,14 +381,14 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 
 	startRecvProcess(t)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
 	addrs[PEERCALL] = "Q2TEST"
 
-	var pp = AX25FromTextWithStrictness("Q2TEST>Q1TEST:>Testing", AddrLenient)
+	var pp = ax25.FromTextWithStrictness("Q2TEST>Q1TEST:>Testing", ax25.AddrLenient)
 	require.NotNil(t, pp)
 
-	var alevel ALevel
+	var alevel ax25.ALevel
 
 	dataLinkQueue.RecFrame(0, 0, 0, pp, alevel, fec_type_none, RETRY_NONE, "")
 	dataLinkQueue.RegisterCallsign("Q1TEST", 0, 0)
@@ -459,7 +460,7 @@ func TestRecvProcessRunsTheLinkTimersWhileTheQueueIsEmpty(t *testing.T) {
 
 	startRecvProcess(t)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
 	addrs[PEERCALL] = "Q2TEST"
 

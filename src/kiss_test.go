@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -291,7 +292,7 @@ func TestKissPTSendRecPacketText(t *testing.T) {
 func TestKissPTSendRecPacketTruncates(t *testing.T) {
 	var kp, client = startKissPT(t, 0)
 
-	var frame = make([]byte, AX25_MAX_PACKET_LEN+10)
+	var frame = make([]byte, ax25.MaxPacketLen+10)
 	for i := range frame {
 		frame[i] = 'x'
 	}
@@ -307,7 +308,7 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 	assert.Contains(t, output, "Truncated")
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
-	assert.Len(t, <-got, AX25_MAX_PACKET_LEN+3)
+	assert.Len(t, <-got, ax25.MaxPacketLen+3)
 }
 
 // The whole point of the pseudo terminal: a client writes a KISS data frame
@@ -338,7 +339,7 @@ func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 	var pp = newTestPacket(t)
 
 	var kissFrame = KissEncapsulate(append(
-		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, ax25_get_frame_data(pp)...))
+		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, pp.FrameData()...))
 
 	var _, writeErr = client.Write(kissFrame)
 	require.NoError(t, writeErr)

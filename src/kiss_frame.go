@@ -66,6 +66,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -745,7 +746,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 		channel = int(kiss_msg[0]>>4) & 0xf
 	}
 
-	var alevel ALevel
+	var alevel ax25.ALevel
 	var cmd = kiss_msg[0] & 0xf
 
 	switch cmd {
@@ -824,9 +825,9 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 			return
 		}
 
-		alevel = ALevel{} //nolint:exhaustruct_v5
+		alevel = ax25.ALevel{} //nolint:exhaustruct_v5
 
-		var pp = AX25FromFrame(kiss_msg[1:], alevel)
+		var pp = ax25.FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR - Invalid KISS data frame from client app.\n")
@@ -836,8 +837,8 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 			/* that digipeater has been used, it should go out quickly thru */
 			/* the high priority queue. */
 			/* Otherwise, it is an original for the low priority queue. */
-			if ax25_get_num_repeaters(pp) >= 1 &&
-				ax25_get_h(pp, AX25_REPEATER_1) > 0 {
+			if pp.NumRepeaters() >= 1 &&
+				pp.H(ax25.Repeater1) > 0 {
 				transmitQueue.Append(channel, TQ_PRIO_0_HI, pp)
 			} else {
 				transmitQueue.Append(channel, TQ_PRIO_1_LO, pp)

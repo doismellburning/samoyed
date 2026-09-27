@@ -6,6 +6,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +21,7 @@ import (
 func TestXIDEncodeZeroValueOmitsOptionalParameters(t *testing.T) {
 	var param xid_param_s
 
-	var info = xid_encode(&param, cr_cmd)
+	var info = xid_encode(&param, ax25.CRCmd)
 
 	// Format Indicator, Group Identifier, two group length bytes, then only
 	// Classes of Procedures (4 bytes) and HDLC Optional Functions (5 bytes).

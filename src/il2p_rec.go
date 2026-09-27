@@ -249,7 +249,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 
 			if il2p_get_debug() >= 1 {
 				if pp != nil {
-					AX25HexDump(pp)
+					pp.HexDump()
 				} else {
 					// Most likely too many FEC errors.
 					text_color_set(DW_COLOR_ERROR)
@@ -259,7 +259,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 
 			// Validate trailing CRC if we collected one.
 			if pp != nil && F.crc {
-				var frame_data = ax25_get_frame_data(pp)
+				var frame_data = pp.FrameData()
 				if !il2p_crc_check(frame_data, F.scrc[:]) {
 					if il2p_get_debug() >= 1 {
 						text_color_set(DW_COLOR_ERROR)

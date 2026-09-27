@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -522,7 +523,7 @@ func (c *nullConn) RemoteAddr() net.Addr        { return c.addr }
 func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
 	var s = new(AGWServer)
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var conn = new(nullConn)
@@ -696,7 +697,7 @@ func (c *gatedConn) writeCount() int {
 func TestAGWServer_ConcurrentWritesToAClientKeepTheirFraming(t *testing.T) {
 	var s = new(AGWServer)
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var conn = newGatedConn(tcpAddr(t, "192.168.1.10"))

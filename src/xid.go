@@ -26,6 +26,7 @@ package direwolf
 import (
 	"fmt"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -110,7 +111,7 @@ type xid_param_s struct {
 
 	srej srej_e
 
-	modulo ax25_modulo_t
+	modulo ax25.Modulo
 
 	i_field_length_rx maybe.Maybe[int] /* In bytes.  XID has it in bits. */
 
@@ -156,7 +157,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	var result = new(xid_param_s)
 
 	result.srej = srej_not_specified
-	result.modulo = modulo_unknown
+	result.modulo = ax25.ModuloUnknown
 
 	var desc string
 
@@ -264,10 +265,10 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			}
 
 			if (pval&PV_HDLC_Optional_Functions_Modulo_8) > 0 && (pval&PV_HDLC_Optional_Functions_Modulo_128) == 0 {
-				result.modulo = modulo_8
+				result.modulo = ax25.Modulo8
 				desc += "modulo-8 "
 			} else if (pval&PV_HDLC_Optional_Functions_Modulo_128) > 0 && (pval&PV_HDLC_Optional_Functions_Modulo_8) == 0 {
-				result.modulo = modulo_128
+				result.modulo = ax25.Modulo128
 				desc += "modulo-128 "
 			} else {
 				text_color_set(DW_COLOR_ERROR)
@@ -412,7 +413,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
  *
  *--------------------------------------------------------------------*/
 
-func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
+func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 	var info []byte
 
 	info = append(info, FI_Format_Indicator)
@@ -475,7 +476,7 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 	//dw_printf ("******      XID temp hack - test no SREJ      ******\n");
 	// param.srej = srej_none;
 
-	if cr == cr_cmd {
+	if cr == ax25.CRCmd {
 		// offer a "menu" of acceptable choices.  i.e. 1, 2 or 3 bits set.
 		switch param.srej {
 		default: // Includes srej_none
@@ -500,7 +501,7 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 		}
 	}
 
-	if param.modulo == modulo_128 {
+	if param.modulo == ax25.Modulo128 {
 		x |= PV_HDLC_Optional_Functions_Modulo_128
 	} else { // includes modulo_8 and modulo_unknown
 		x |= PV_HDLC_Optional_Functions_Modulo_8

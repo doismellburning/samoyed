@@ -4,6 +4,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -237,7 +238,7 @@ func pftest(t *testing.T, test_num int, filter string, monitor string, expected 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("test number %d\n", test_num)
 
-	var pp = AX25FromText(monitor, true)
+	var pp = ax25.FromText(monitor, true)
 	assert.NotNil(t, pp)
 
 	// These cases exercise the filter grammar rather than the runtime state

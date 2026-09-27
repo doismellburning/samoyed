@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/ax25"
 )
 
 type PacketLogger struct {
@@ -126,7 +128,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, alevel ALevel, retries BitFixLevel) {
+func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel) {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()
 
@@ -234,27 +236,27 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
 		var h int
 
 		if pp != nil {
-			if ax25_get_num_addr(pp) == 0 {
+			if pp.NumAddr() == 0 {
 				/* Not AX.25. No station to display below. */
 				h = -1
 			} else {
-				h = ax25_get_heard(pp)
-				heard = ax25_get_addr_with_ssid(pp, h)
+				h = pp.Heard()
+				heard = pp.AddrWithSSID(h)
 			}
 
-			if h >= AX25_REPEATER_2 &&
+			if h >= ax25.Repeater2 &&
 				len(heard) == 5 &&
 				heard[:4] == "WIDE" &&
 				unicode.IsDigit(rune(heard[4])) {
-				heard = ax25_get_addr_with_ssid(pp, h-1) + "?"
+				heard = pp.AddrWithSSID(h-1) + "?"
 			}
 		}
 
-		var alevel_text = ax25_alevel_to_text(alevel)
+		var alevel_text = alevel.Text()
 
 		var sdti string
 		if pp != nil {
-			sdti = string(rune(ax25_get_dti(pp)))
+			sdti = string(rune(pp.DTI()))
 		}
 
 		var sname = A.g_src
@@ -344,7 +346,7 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *packet_t) {
+func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *ax25.Packet) {
 	// Sanitize system type (manufacturer) changing any comma to period.
 	var smfr = strings.ReplaceAll(A.g_mfr, ",", ".")
 
@@ -355,25 +357,25 @@ func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *packet_t) {
 
 	if pp != nil {
 		var h int
-		if ax25_get_num_addr(pp) == 0 {
+		if pp.NumAddr() == 0 {
 			/* Not AX.25. No station to display below. */
 			h = -1
 		} else {
-			h = ax25_get_heard(pp)
-			heard = ax25_get_addr_with_ssid(pp, h)
+			h = pp.Heard()
+			heard = pp.AddrWithSSID(h)
 		}
 
-		if h >= AX25_REPEATER_2 &&
+		if h >= ax25.Repeater2 &&
 			len(heard) == 5 &&
 			heard[:4] == "WIDE" &&
 			unicode.IsDigit(rune(heard[4])) {
-			heard = ax25_get_addr_with_ssid(pp, h-1) + "?"
+			heard = pp.AddrWithSSID(h-1) + "?"
 		}
 
-		var src_c = ax25_get_h(pp, AX25_SOURCE)
-		var dst_c = ax25_get_h(pp, AX25_DESTINATION)
-		var src_rr = ax25_get_rr(pp, AX25_SOURCE)
-		var dst_rr = ax25_get_rr(pp, AX25_DESTINATION)
+		var src_c = pp.H(ax25.Source)
+		var dst_c = pp.H(ax25.Destination)
+		var src_rr = pp.RR(ax25.Source)
+		var dst_rr = pp.RR(ax25.Destination)
 
 		// C RR	for source
 		// C RR	for destination

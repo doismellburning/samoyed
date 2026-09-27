@@ -15,6 +15,7 @@ package direwolf
 import (
 	"fmt"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -36,15 +37,15 @@ import (
  *------------------------------------------------------------------*/
 
 func DescribeAX25Frame(frame []byte) int {
-	if len(frame) < AX25_MIN_PACKET_LEN {
-		fmt.Printf("ERROR: The frame is %d bytes, too short for an AX.25 header of at least %d.\n", len(frame), AX25_MIN_PACKET_LEN)
+	if len(frame) < ax25.MinPacketLen {
+		fmt.Printf("ERROR: The frame is %d bytes, too short for an AX.25 header of at least %d.\n", len(frame), ax25.MinPacketLen)
 
 		return 1
 	}
 
-	var alevel ALevel
+	var alevel ax25.ALevel
 
-	var pp = AX25FromFrame(frame, alevel)
+	var pp = ax25.FromFrame(frame, alevel)
 	if pp == nil {
 		fmt.Printf("ERROR: Could not construct an AX.25 frame from those %d bytes.\n", len(frame))
 
@@ -58,54 +59,54 @@ func DescribeAX25Frame(frame []byte) int {
 	 * described in terms of the zero padding past its end.
 	 */
 
-	if ax25_get_num_addr(pp) < AX25_MIN_ADDRS {
+	if pp.NumAddr() < ax25.MinAddrs {
 		/*
 		 * The end of address bit is not at the end of a 7 byte address, or it
 		 * marks out fewer than 2 or more than 10 addresses.  Without knowing
 		 * where the address field stops there is nothing more to say.
 		 */
 		fmt.Printf("ERROR: The address field is malformed - the end of address bit does not mark out %d to %d addresses of 7 bytes each.\n",
-			AX25_MIN_ADDRS, AX25_MAX_ADDRS)
+			ax25.MinAddrs, ax25.MaxAddrs)
 		dwutil.HexDump(frame)
 
 		return 1
 	}
 
-	var frameLen = ax25_get_frame_len(pp)
+	var frameLen = pp.FrameLen()
 
-	if ax25_get_control_offset(pp) >= frameLen {
+	if pp.ControlOffset() >= frameLen {
 		fmt.Printf("ERROR: The frame ends after the address field - there is no control byte.\n")
 		dwutil.HexDump(frame)
 
 		return 1
 	}
 
-	if ax25_get_info_offset(pp) > frameLen {
+	if pp.InfoOffset() > frameLen {
 		fmt.Printf("ERROR: The frame is %d bytes, but the address, control and PID fields need %d - it ends before the information field.\n",
-			frameLen, ax25_get_info_offset(pp))
+			frameLen, pp.InfoOffset())
 		dwutil.HexDump(frame)
 
 		return 1
 	}
 
 	fmt.Printf("--- AX.25 frame ---\n")
-	AX25HexDump(pp)
+	pp.HexDump()
 	fmt.Printf("-------------------\n")
 
 	var problems = 0
 
-	fmt.Printf("%s\n", AX25FormatAddrs(pp))
+	fmt.Printf("%s\n", pp.FormatAddrs())
 
-	if !AX25CheckAddresses(pp, AddrStrict) {
+	if !pp.CheckAddresses(ax25.AddrStrict) {
 		problems++
 	}
 
-	var info = AX25GetInfo(pp)
+	var info = pp.Info()
 
-	if ax25_is_aprs(pp) {
-		AX25SafePrint(info, true) // Display non-ASCII as hexadecimal.
+	if pp.IsAPRS() {
+		ax25.SafePrint(info, true) // Display non-ASCII as hexadecimal.
 		fmt.Printf("\n")
-		NoteSafePrintTruncation(len(info))
+		ax25.NoteSafePrintTruncation(len(info))
 
 		var A = DecodeAPRS(pp, false, "") // Extract information into structure.
 
@@ -118,9 +119,9 @@ func DescribeAX25Frame(frame []byte) int {
 		fmt.Printf("APRS travels in a UI frame with PID 0xf0.  This is not one, so its %d byte information field is not decoded as APRS.\n", len(info))
 
 		if len(info) > 0 {
-			AX25SafePrint(info, true)
+			ax25.SafePrint(info, true)
 			fmt.Printf("\n")
-			NoteSafePrintTruncation(len(info))
+			ax25.NoteSafePrintTruncation(len(info))
 		}
 	}
 

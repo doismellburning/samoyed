@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -294,9 +295,9 @@ func test_example_headers(t *testing.T) {
 
 	var example1 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x6f, 0xb1}
 	var header1 = []byte{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
-	var alevel ALevel
+	var alevel ax25.ALevel
 
-	var pp = AX25FromFrame(example1, alevel)
+	var pp = ax25.FromFrame(example1, alevel)
 	assert.NotNil(t, pp)
 	var header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 0, e)
@@ -335,7 +336,7 @@ func test_example_headers(t *testing.T) {
 		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 	*/
 
-	var frame_type = ax25_frame_type_only(pp)
+	var frame_type = pp.FrameTypeOnly()
 	_ = frame_type // TODO Check this?
 
 	// TODO: compare binary.
@@ -364,9 +365,9 @@ func test_example_headers(t *testing.T) {
 	// dw_printf ("---------- example 2 ------------\n");
 	var example2 = []byte{0x86, 0xa2, 0x40, 0x40, 0x40, 0x40, 0x60, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x7f, 0x03, 0xf0}
 	var header2 = []byte{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
-	alevel = ALevel{} //nolint:exhaustruct_v5
+	alevel = ax25.ALevel{} //nolint:exhaustruct_v5
 
-	pp = AX25FromFrame(example2, alevel)
+	pp = ax25.FromFrame(example2, alevel)
 	assert.NotNil(t, pp)
 	header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 0, e)
@@ -409,7 +410,7 @@ func test_example_headers(t *testing.T) {
 		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 	*/
 
-	frame_type = ax25_frame_type_only(pp)
+	frame_type = pp.FrameTypeOnly()
 	_ = frame_type
 
 	// TODO: compare binary.
@@ -441,9 +442,9 @@ func test_example_headers(t *testing.T) {
 	var example3 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x65, 0xb8, 0xcf, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
 	var header3 = []byte{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
 	var complete3 = []byte{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
-	alevel = ALevel{} //nolint:exhaustruct_v5
+	alevel = ax25.ALevel{} //nolint:exhaustruct_v5
 
-	pp = AX25FromFrame(example3, alevel)
+	pp = ax25.FromFrame(example3, alevel)
 	assert.NotNil(t, pp)
 	header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 9, e)
@@ -489,7 +490,7 @@ func test_example_headers(t *testing.T) {
 		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 	*/
 
-	frame_type = ax25_frame_type_only(pp)
+	frame_type = pp.FrameTypeOnly()
 	_ = frame_type
 
 	// TODO: compare binary.
@@ -498,7 +499,7 @@ func test_example_headers(t *testing.T) {
 
 	// Example 3 again, this time the Information part is included.
 
-	pp = AX25FromFrame(example3, alevel)
+	pp = ax25.FromFrame(example3, alevel)
 	assert.NotNil(t, pp)
 
 	var max_fec = 0
@@ -523,7 +524,7 @@ func test_example_headers(t *testing.T) {
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-func enc_dec_compare(t *testing.T, pp1 *packet_t) {
+func enc_dec_compare(t *testing.T, pp1 *ax25.Packet) {
 	t.Helper()
 
 	// Every version, and for v0.4 both FEC levels, should survive a round trip.
@@ -547,21 +548,21 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 
 		// Is it the same after encoding to IL2P and then decoding?
 
-		var len1 = ax25_get_frame_len(pp1)
-		var data1 = ax25_get_frame_data(pp1)
+		var len1 = pp1.FrameLen()
+		var data1 = pp1.FrameData()
 
-		var len2 = ax25_get_frame_len(pp2)
-		var data2 = ax25_get_frame_data(pp2)
+		var len2 = pp2.FrameLen()
+		var data2 = pp2.FrameData()
 
 		if len1 != len2 || !slices.Equal(data1, data2) {
 			dw_printf("\nEncode/Decode Error.  Original:\n")
-			AX25HexDump(pp1)
+			pp1.HexDump()
 
 			dw_printf("IL2P encoded as:\n")
 			fx_hex_dump(encoded)
 
 			dw_printf("Got turned into this:\n")
-			AX25HexDump(pp2)
+			pp2.HexDump()
 		}
 
 		assert.Equal(t, len1, len2)
@@ -572,7 +573,7 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 func all_frame_types(t *testing.T) {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	var pinfo []byte
 	var pid = 0xf0
 
@@ -586,37 +587,37 @@ func all_frame_types(t *testing.T) {
 
 	dw_printf("\nU frames...\n")
 
-	for ftype := frame_type_U_SABME; ftype <= frame_type_U_TEST; ftype++ {
+	for ftype := ax25.FrameTypeUSABME; ftype <= ax25.FrameTypeUTEST; ftype++ {
 		for pf := range 2 {
-			var cmin, cmax cmdres_t
+			var cmin, cmax ax25.CmdRes
 
 			switch ftype {
 			// 0 = response, 1 = command
-			case frame_type_U_SABME:
+			case ax25.FrameTypeUSABME:
 				cmin = 1
 				cmax = 1
-			case frame_type_U_SABM:
+			case ax25.FrameTypeUSABM:
 				cmin = 1
 				cmax = 1
-			case frame_type_U_DISC:
+			case ax25.FrameTypeUDISC:
 				cmin = 1
 				cmax = 1
-			case frame_type_U_DM:
+			case ax25.FrameTypeUDM:
 				cmin = 0
 				cmax = 0
-			case frame_type_U_UA:
+			case ax25.FrameTypeUUA:
 				cmin = 0
 				cmax = 0
-			case frame_type_U_FRMR:
+			case ax25.FrameTypeUFRMR:
 				cmin = 0
 				cmax = 0
-			case frame_type_U_UI:
+			case ax25.FrameTypeUUI:
 				cmin = 0
 				cmax = 1
-			case frame_type_U_XID:
+			case ax25.FrameTypeUXID:
 				cmin = 0
 				cmax = 1
-			case frame_type_U_TEST:
+			case ax25.FrameTypeUTEST:
 				cmin = 0
 				cmax = 1
 			default:
@@ -626,8 +627,8 @@ func all_frame_types(t *testing.T) {
 			for cr := cmin; cr <= cmax; cr++ {
 				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo)
-				AX25HexDump(pp)
+				var pp = ax25.UFrame(addrs, num_addr, cr, ftype, pf, pid, pinfo)
+				pp.HexDump()
 				enc_dec_compare(t, pp)
 			}
 		}
@@ -640,39 +641,39 @@ func all_frame_types(t *testing.T) {
 
 	dw_printf("\nS frames...\n")
 
-	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
+	for ftype := ax25.FrameTypeSRR; ftype <= ax25.FrameTypeSSREJ; ftype++ {
 		for pf := range 2 {
-			var modulo = modulo_8
+			var modulo = ax25.Modulo8
 			var nr = int(modulo/2 + 1)
 
-			for cr := cmdres_t(0); cr <= cr_cmd; cr++ {
+			for cr := ax25.CmdRes(0); cr <= ax25.CRCmd; cr++ {
 				// SREJ can only be response.
-				if ftype == frame_type_S_SREJ && cr != cr_res {
+				if ftype == ax25.FrameTypeSSREJ && cr != ax25.CRRes {
 					continue
 				}
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
+				var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 
-				AX25HexDump(pp)
+				pp.HexDump()
 				enc_dec_compare(t, pp)
 			}
 
-			modulo = modulo_128
+			modulo = ax25.Modulo128
 			nr = int(modulo/2 + 1)
 
-			for cr := cmdres_t(0); cr <= cr_cmd; cr++ {
+			for cr := ax25.CmdRes(0); cr <= ax25.CRCmd; cr++ {
 				// SREJ can only be response.
-				if ftype == frame_type_S_SREJ && cr != cr_res {
+				if ftype == ax25.FrameTypeSSREJ && cr != ax25.CRRes {
 					continue
 				}
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
+				var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 
-				AX25HexDump(pp)
+				pp.HexDump()
 				enc_dec_compare(t, pp)
 			}
 		}
@@ -682,18 +683,18 @@ func all_frame_types(t *testing.T) {
 
 	var srej_info = []byte{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
-	var ftype = frame_type_S_SREJ
+	var ftype = ax25.FrameTypeSSREJ
 
 	for pf := range 2 {
-		var modulo = modulo_128
+		var modulo = ax25.Modulo128
 		var nr = 127
-		var cr = cr_res
+		var cr = ax25.CRRes
 
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
+		var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
 
-		AX25HexDump(pp)
+		pp.HexDump()
 		enc_dec_compare(t, pp)
 	}
 
@@ -704,29 +705,29 @@ func all_frame_types(t *testing.T) {
 	pinfo = []byte("The rain in Spain stays mainly on the plain.")
 
 	for pf := range 2 {
-		var modulo = modulo_8
+		var modulo = ax25.Modulo8
 		var nr = 0x55 & int(modulo-1)
 		var ns = 0xaa & int(modulo-1)
 
-		for cr := cmdres_t(1); cr <= 1; cr++ { // can only be command
+		for cr := ax25.CmdRes(1); cr <= 1; cr++ { // can only be command
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
+			var pp = ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
 
-			AX25HexDump(pp)
+			pp.HexDump()
 			enc_dec_compare(t, pp)
 		}
 
-		modulo = modulo_128
+		modulo = ax25.Modulo128
 		nr = 0x55 & int(modulo-1)
 		ns = 0xaa & int(modulo-1)
 
-		for cr := cmdres_t(1); cr <= 1; cr++ {
+		for cr := ax25.CmdRes(1); cr <= 1; cr++ {
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
+			var pp = ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
 
-			AX25HexDump(pp)
+			pp.HexDump()
 			enc_dec_compare(t, pp)
 		}
 	}
@@ -762,7 +763,7 @@ func test_serdes(t *testing.T) {
 		} else {
 			packet = fmt.Sprintf("%s:%s", addrs3, il2pTestText)
 		}
-		var pp = AX25FromText(packet, true)
+		var pp = ax25.FromText(packet, true)
 		assert.NotNil(t, pp)
 
 		var sender = NewHDLCSender(0, nil)

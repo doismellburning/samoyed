@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,11 +32,11 @@ func digipeater_test(t *testing.T, in, out string) {
 	 * As an extra test, change text to internal format back to
 	 * text again to make sure it comes out the same.
 	 */
-	var pp = AX25FromText(in, true)
+	var pp = ax25.FromText(in, true)
 	assert.NotNil(t, pp)
 
-	var rec = AX25FormatAddrs(pp)
-	var pinfo = AX25GetInfo(pp)
+	var rec = pp.FormatAddrs()
+	var pinfo = pp.Info()
 	rec += string(pinfo)
 
 	if in != rec {
@@ -48,17 +49,17 @@ func digipeater_test(t *testing.T, in, out string) {
 	 * again, and make sure it is still the same.
 	 */
 
-	var frame = AX25Pack(pp)
+	var frame = pp.Pack()
 
-	var alevel ALevel
+	var alevel ax25.ALevel
 	alevel.Rec = 50
 	alevel.Mark = 50
 	alevel.Space = 50
 
-	pp = AX25FromFrame(frame, alevel)
+	pp = ax25.FromFrame(frame, alevel)
 	assert.NotNil(t, pp)
-	rec = AX25FormatAddrs(pp)
-	pinfo = AX25GetInfo(pp)
+	rec = pp.FormatAddrs()
+	pinfo = pp.Info()
 	rec += string(pinfo)
 
 	if in != rec {
@@ -85,8 +86,8 @@ func digipeater_test(t *testing.T, in, out string) {
 
 	if result != nil {
 		digipeaterTestDigi.Remember(result, 0)
-		xmit = AX25FormatAddrs(result)
-		pinfo = AX25GetInfo(result)
+		xmit = result.FormatAddrs()
+		pinfo = result.Info()
 		xmit += string(pinfo)
 	}
 

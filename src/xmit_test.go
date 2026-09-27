@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,7 +87,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 
 	var xs = new(XmitService)
 
-	transmitQueue.Append(channel, TQ_PRIO_1_LO, ax25_new()) // What TransmitQueue.LMSeizeRequest queues.
+	transmitQueue.Append(channel, TQ_PRIO_1_LO, ax25.New()) // What TransmitQueue.LMSeizeRequest queues.
 	transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
 
 	xs.discard_untransmittable(channel)
@@ -220,7 +221,7 @@ func TestFrameFlavor(t *testing.T) {
 		{"DTMF", "Q1TEST>DTMF:hello", FLAVOR_DTMF},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var pp = AX25FromText(c.text, true)
+			var pp = ax25.FromText(c.text, true)
 			require.NotNil(t, pp)
 
 			assert.Equal(t, c.want, frame_flavor(pp))
@@ -228,11 +229,11 @@ func TestFrameFlavor(t *testing.T) {
 	}
 
 	// Connected mode frames are not APRS at all.
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "Q1TEST"
-	addrs[AX25_SOURCE] = "Q2TEST"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
 
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_SABM, 0, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 0, 0, nil)
 	require.NotNil(t, pp)
 
 	assert.Equal(t, FLAVOR_OTHER, frame_flavor(pp))
@@ -339,7 +340,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 func TestSendOneFrame(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var bits int
@@ -355,11 +356,11 @@ func TestSendOneFrame(t *testing.T) {
 func TestSendOneFrameNonAPRS(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "Q1TEST"
-	addrs[AX25_SOURCE] = "Q2TEST"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
 
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_SABM, 0, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 0, 0, nil)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_0_HI, pp) })
@@ -375,13 +376,13 @@ func TestSendOneFrameXID(t *testing.T) {
 
 	var param xid_param_s
 
-	var info = xid_encode(&param, cr_cmd)
+	var info = xid_encode(&param, ax25.CRCmd)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "Q1TEST"
-	addrs[AX25_SOURCE] = "Q2TEST"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
 
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_XID, 0, 0, info)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUXID, 0, 0, info)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_0_HI, pp) })
@@ -396,7 +397,7 @@ func TestSendOneFrameXID(t *testing.T) {
 func TestSendOneFrameNullFrame(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	assert.Equal(t, 0, xs.send_one_frame(0, TQ_PRIO_1_LO, ax25_new()))
+	assert.Equal(t, 0, xs.send_one_frame(0, TQ_PRIO_1_LO, ax25.New()))
 
 	var confirmed = false
 
@@ -416,7 +417,7 @@ func TestSendOneFrameDeliberateBadFCS(t *testing.T) {
 
 	xs.p_modem.xmit_error_rate = 100
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
@@ -431,7 +432,7 @@ func TestSendOneFrameDebugHexDump(t *testing.T) {
 
 	xs.debugXmitPacket = true
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
@@ -444,10 +445,10 @@ func TestSendOneFrameDebugHexDump(t *testing.T) {
 func TestXmitAX25FramesBundles(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var first = AX25FromText("Q1TEST>Q2TEST:first", true)
+	var first = ax25.FromText("Q1TEST>Q2TEST:first", true)
 	require.NotNil(t, first)
 
-	var second = AX25FromText("Q1TEST>Q2TEST:second", true)
+	var second = ax25.FromText("Q1TEST>Q2TEST:second", true)
 	require.NotNil(t, second)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, second)
@@ -464,10 +465,10 @@ func TestXmitAX25FramesBundles(t *testing.T) {
 func TestXmitAX25FramesDoesNotBundleDigipeated(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var first = AX25FromText("Q1TEST>Q2TEST:first", true)
+	var first = ax25.FromText("Q1TEST>Q2TEST:first", true)
 	require.NotNil(t, first)
 
-	var digipeated = AX25FromText("Q1TEST>Q2TEST,Q3TEST*:repeated", true)
+	var digipeated = ax25.FromText("Q1TEST>Q2TEST,Q3TEST*:repeated", true)
 	require.NotNil(t, digipeated)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, digipeated)
@@ -484,10 +485,10 @@ func TestXmitAX25FramesDoesNotBundleDigipeated(t *testing.T) {
 func TestXmitAX25FramesRespectsMaxBundle(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var first = AX25FromText("Q1TEST>Q2TEST:first", true)
+	var first = ax25.FromText("Q1TEST>Q2TEST:first", true)
 	require.NotNil(t, first)
 
-	var second = AX25FromText("Q1TEST>Q2TEST:second", true)
+	var second = ax25.FromText("Q1TEST>Q2TEST:second", true)
 	require.NotNil(t, second)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, second)
@@ -503,17 +504,17 @@ func TestXmitAX25FramesRespectsMaxBundle(t *testing.T) {
 func TestXmitAX25FramesTakesHighPriorityFirst(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var first = AX25FromText("Q1TEST>Q2TEST:first", true)
+	var first = ax25.FromText("Q1TEST>Q2TEST:first", true)
 	require.NotNil(t, first)
 
-	var low = AX25FromText("Q1TEST>Q2TEST:low", true)
+	var low = ax25.FromText("Q1TEST>Q2TEST:low", true)
 	require.NotNil(t, low)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "Q1TEST"
-	addrs[AX25_SOURCE] = "Q2TEST"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
 
-	var high = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_SABM, 0, 0, nil)
+	var high = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 0, 0, nil)
 	require.NotNil(t, high)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, low)
@@ -539,7 +540,7 @@ func TestXmitSpeech(t *testing.T) {
 
 	xs.p_modem.tts_script = script
 
-	var pp = AX25FromText("Q1TEST>SPEECH:Hello there", true)
+	var pp = ax25.FromText("Q1TEST>SPEECH:Hello there", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_speech(t.Context(), 0, pp) })
@@ -556,7 +557,7 @@ func TestXmitSpeech(t *testing.T) {
 func TestXmitSpeechWithoutAScript(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var pp = AX25FromText("Q1TEST>SPEECH:Hello there", true)
+	var pp = ax25.FromText("Q1TEST>SPEECH:Hello there", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_speech(t.Context(), 0, pp) })
@@ -585,10 +586,10 @@ func TestXmitNextDoesNotBundleBehindADigipeatedFrame(t *testing.T) {
 
 	xs.fulldup[0] = true // Skip the channel-busy check and random wait.
 
-	var digipeated = AX25FromText("Q1TEST>Q2TEST,Q3TEST*:repeated", true)
+	var digipeated = ax25.FromText("Q1TEST>Q2TEST,Q3TEST*:repeated", true)
 	require.NotNil(t, digipeated)
 
-	var other = AX25FromText("Q1TEST>Q2TEST:other", true)
+	var other = ax25.FromText("Q1TEST>Q2TEST:other", true)
 	require.NotNil(t, other)
 
 	transmitQueue.Append(0, TQ_PRIO_0_HI, digipeated)
@@ -609,7 +610,7 @@ func TestXmitNextBundlesOrdinaryFrames(t *testing.T) {
 	xs.fulldup[0] = true
 
 	for _, text := range []string{"Q1TEST>Q2TEST:first", "Q1TEST>Q2TEST:second"} {
-		var pp = AX25FromText(text, true)
+		var pp = ax25.FromText(text, true)
 		require.NotNil(t, pp)
 
 		transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
@@ -630,7 +631,7 @@ func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 
 	xs.fulldup[0] = true
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
@@ -648,7 +649,7 @@ func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 func TestXmitMorse(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var pp = AX25FromText("Q1TEST>MORSE:HI", true)
+	var pp = ax25.FromText("Q1TEST>MORSE:HI", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_morse(0, pp, MORSE_DEFAULT_WPM) })
@@ -661,7 +662,7 @@ func TestXmitMorse(t *testing.T) {
 func TestXmitDTMF(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var pp = AX25FromText("Q1TEST>DTMF:12", true)
+	var pp = ax25.FromText("Q1TEST>DTMF:12", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_dtmf(0, pp, 10) })
@@ -678,7 +679,7 @@ func TestXmitDTMF(t *testing.T) {
 func timeXmitNext(t *testing.T, xs *XmitService, text string) (time.Duration, string) {
 	t.Helper()
 
-	var pp = AX25FromText(text, true)
+	var pp = ax25.FromText(text, true)
 	require.NotNil(t, pp)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, pp)

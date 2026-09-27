@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -359,8 +360,8 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 
 			var subchan = -3
 			var slice = 0
-			var alevel ALevel
-			var pp = AX25FromFrame(unwrapped[1:], alevel)
+			var alevel ax25.ALevel
+			var pp = ax25.FromFrame(unwrapped[1:], alevel)
 
 			if pp != nil {
 				var fec_type = fec_type_none
@@ -409,7 +410,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
  *
  *-----------------------------------------------------------------*/
 
-func (nt *NetTNC) sendPacket(channel int, pp *packet_t) {
+func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) {
 	if nt == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Not connected to network TNC for channel %d. Discarding packet.\n", channel)
@@ -427,7 +428,7 @@ func (nt *NetTNC) sendPacket(channel int, pp *packet_t) {
 
 	// First, get the on-air frame format from packet object.
 	// Prepend 0 byte for KISS command and channel.
-	var fbuf = ax25_get_frame_data(pp)
+	var fbuf = pp.FrameData()
 
 	var frame_buff = []byte{0} // For now, set channel to 0.
 	frame_buff = append(frame_buff, fbuf...)

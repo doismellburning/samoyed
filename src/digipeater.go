@@ -38,6 +38,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -135,7 +136,7 @@ func (d *Digipeater) GetCount(from_chan, to_chan int) int {
 // digipeater will not repeat it when it is heard again.  It does nothing on a
 // nil receiver, so a caller need not check whether the digipeater has been
 // started yet.
-func (d *Digipeater) Remember(pp *packet_t, channel int) {
+func (d *Digipeater) Remember(pp *ax25.Packet, channel int) {
 	if d == nil {
 		return
 	}
@@ -158,7 +159,7 @@ func (d *Digipeater) Remember(pp *packet_t, channel int) {
  *
  *------------------------------------------------------------------------------*/
 
-func (d *Digipeater) Digipeat(from_chan int, pp *packet_t) {
+func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Network TNC is OK for UI frames where we don't care about timing.
 	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
 		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
@@ -268,7 +269,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func (d *Digipeater) Regen(from_chan int, pp *packet_t) {
+func (d *Digipeater) Regen(from_chan int, pp *ax25.Packet) {
 	/*
 		packet_t result;
 	*/
@@ -277,7 +278,7 @@ func (d *Digipeater) Regen(from_chan int, pp *packet_t) {
 
 	for to_chan := range MAX_TOTAL_CHANS {
 		if d.config.regen[from_chan][to_chan] {
-			var result = ax25_dup(pp)
+			var result = pp.Dup()
 			if result != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
 				transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result)
@@ -335,7 +336,7 @@ func (d *Digipeater) Regen(from_chan int, pp *packet_t) {
 
 func (d *Digipeater) match(
 	from_chan int,
-	pp *packet_t,
+	pp *ax25.Packet,
 	mycall_rec string,
 	mycall_xmit string,
 	alias *regexp.Regexp,
@@ -344,7 +345,7 @@ func (d *Digipeater) match(
 	preempt preempt_e,
 	atgp string,
 	filter_str string,
-) *packet_t {
+) *ax25.Packet {
 	/*
 	 * First check if filtering has been configured.
 	 */
@@ -384,14 +385,14 @@ func (d *Digipeater) match(
 	 *
 	 * r = index of the address position in the frame.
 	 */
-	var r = ax25_get_first_not_repeated(pp)
+	var r = pp.FirstNotRepeated()
 
-	if r < AX25_REPEATER_1 {
+	if r < ax25.Repeater1 {
 		return (nil)
 	}
 
-	var repeater = ax25_get_addr_with_ssid(pp, r)
-	var ssid = ax25_get_ssid(pp, r)
+	var repeater = pp.AddrWithSSID(r)
+	var ssid = pp.SSID(r)
 
 	logrus.WithFields(logrus.Fields{
 		"repeater": repeater,
@@ -409,12 +410,12 @@ func (d *Digipeater) match(
 	 */
 
 	if repeater == mycall_rec {
-		var result = ax25_dup(pp)
+		var result = pp.Dup()
 
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
-		ax25_set_addr(result, r, mycall_xmit)
-		ax25_set_h(result, r)
+		result.SetAddr(r, mycall_xmit)
+		result.SetH(r)
 
 		return (result)
 	}
@@ -424,7 +425,7 @@ func (d *Digipeater) match(
 	 * Alternatively we might feed everything transmitted into
 	 * dedupe_remember rather than only frames out of digipeater.
 	 */
-	var source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	var source = pp.AddrWithSSID(ax25.Source)
 	if source == mycall_rec {
 		return (nil)
 	}
@@ -463,10 +464,10 @@ func (d *Digipeater) match(
 	 */
 
 	if alias.MatchString(repeater) {
-		var result = ax25_dup(pp)
+		var result = pp.Dup()
 
-		ax25_set_addr(result, r, mycall_xmit)
-		ax25_set_h(result, r)
+		result.SetAddr(r, mycall_xmit)
+		result.SetH(r)
 
 		return (result)
 	}
@@ -481,17 +482,17 @@ func (d *Digipeater) match(
 	 */
 
 	if preempt != PREEMPT_OFF {
-		for r2 := r + 1; r2 < ax25_get_num_addr(pp); r2++ {
-			var repeater2 = ax25_get_addr_with_ssid(pp, r2)
+		for r2 := r + 1; r2 < pp.NumAddr(); r2++ {
+			var repeater2 = pp.AddrWithSSID(r2)
 
 			// text_color_set (DW_COLOR_DEBUG);
 			// dw_printf ("test match %d %s\n", r2, repeater2);
 
 			if repeater2 == mycall_rec || alias.MatchString(repeater2) {
-				var result = ax25_dup(pp)
+				var result = pp.Dup()
 
-				ax25_set_addr(result, r2, mycall_xmit)
-				ax25_set_h(result, r2)
+				result.SetAddr(r2, mycall_xmit)
+				result.SetH(r2)
 
 				switch preempt {
 				case PREEMPT_DROP: /* remove all prior */
@@ -499,8 +500,8 @@ func (d *Digipeater) match(
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
-					for r2 > AX25_REPEATER_1 {
-						ax25_remove_addr(result, r2-1)
+					for r2 > ax25.Repeater1 {
+						result.RemoveAddr(r2 - 1)
 						r2--
 					}
 				case PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
@@ -508,8 +509,8 @@ func (d *Digipeater) match(
 					dw_printf("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
 					r2--
-					for r2 >= AX25_REPEATER_1 && ax25_get_h(result, r2) == 0 {
-						ax25_set_h(result, r2)
+					for r2 >= ax25.Repeater1 && result.H(r2) == 0 {
+						result.SetH(r2)
 						r2--
 					}
 				/* 2025-07-29 KG Commenting out the PREEMPT_TRACE handling so it falls through to the default case,
@@ -523,8 +524,8 @@ func (d *Digipeater) match(
 				// with this option.  Should it be renamed as
 				// PREEMPT which is more descriptive?
 				default:
-					for r2 > AX25_REPEATER_1 && ax25_get_h(result, r2-1) == 0 {
-						ax25_remove_addr(result, r2-1)
+					for r2 > ax25.Repeater1 && result.H(r2-1) == 0 {
+						result.RemoveAddr(r2 - 1)
 						r2--
 					}
 				}
@@ -555,27 +556,27 @@ func (d *Digipeater) match(
 		// removed by the next digipeater.
 		if len(atgp) > 0 && strings.HasPrefix(strings.ToLower(repeater), strings.ToLower(atgp)) {
 			if ssid >= 1 && ssid <= 7 {
-				var result = ax25_dup(pp)
+				var result = pp.Dup()
 
 				// First, remove any already used digipeaters.
 
-				for ax25_get_num_addr(result) >= 3 && ax25_get_h(result, AX25_REPEATER_1) == 1 {
-					ax25_remove_addr(result, AX25_REPEATER_1)
+				for result.NumAddr() >= 3 && result.H(ax25.Repeater1) == 1 {
+					result.RemoveAddr(ax25.Repeater1)
 
 					r--
 				}
 
 				ssid--
-				ax25_set_ssid(result, r, ssid) // could be zero.
+				result.SetSSID(r, ssid) // could be zero.
 
 				if ssid == 0 {
-					ax25_set_h(result, r)
+					result.SetH(r)
 				}
 
 				// Insert own call at beginning and mark it used.
 
-				ax25_insert_addr(result, AX25_REPEATER_1, mycall_xmit)
-				ax25_set_h(result, AX25_REPEATER_1)
+				result.InsertAddr(ax25.Repeater1, mycall_xmit)
+				result.SetH(ax25.Repeater1)
 
 				return (result)
 			}
@@ -592,22 +593,22 @@ func (d *Digipeater) match(
 		 */
 
 		if ssid == 1 {
-			var result = ax25_dup(pp)
+			var result = pp.Dup()
 
-			ax25_set_addr(result, r, mycall_xmit)
-			ax25_set_h(result, r)
+			result.SetAddr(r, mycall_xmit)
+			result.SetH(r)
 
 			return (result)
 		}
 
 		if ssid >= 2 && ssid <= 7 {
-			var result = ax25_dup(pp)
+			var result = pp.Dup()
 
-			ax25_set_ssid(result, r, ssid-1) // should be at least 1
+			result.SetSSID(r, ssid-1) // should be at least 1
 
-			if ax25_get_num_repeaters(pp) < AX25_MAX_REPEATERS {
-				ax25_insert_addr(result, r, mycall_xmit)
-				ax25_set_h(result, r)
+			if pp.NumRepeaters() < ax25.MaxRepeaters {
+				result.InsertAddr(r, mycall_xmit)
+				result.SetH(r)
 			}
 
 			return (result)

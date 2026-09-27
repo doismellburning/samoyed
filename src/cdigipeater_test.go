@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,17 +55,17 @@ func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *AudioConfig, *cdigi_
 func TestCDigipeatMatchExplicitCall(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "")
 
 	require.NotNil(t, result, "a frame addressed to us was not repeated")
-	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", AX25FormatAddrs(result))
+	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", result.FormatAddrs())
 
 	// The original is repeated to every enabled channel in turn, so it has
 	// to come back unchanged.
-	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST:", AX25FormatAddrs(pp))
+	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST:", pp.FormatAddrs())
 }
 
 // An alias is the other way of asking: a pattern the configuration gives for
@@ -72,7 +73,7 @@ func TestCDigipeatMatchExplicitCall(t *testing.T) {
 func TestCDigipeatMatchAlias(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,WIDE1-1:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,WIDE1-1:hello", true)
 	require.NotNil(t, pp)
 
 	var alias = regexp.MustCompile("^WIDE[1-7]-[1-7]$")
@@ -80,14 +81,14 @@ func TestCDigipeatMatchAlias(t *testing.T) {
 	var result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", true, alias, cdigiToChan, "")
 
 	require.NotNil(t, result, "a frame addressed to one of our aliases was not repeated")
-	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", AX25FormatAddrs(result))
+	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", result.FormatAddrs())
 }
 
 // An alias that does not match is somebody else's business.
 func TestCDigipeatMatchAliasNoMatch(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q5TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q5TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var alias = regexp.MustCompile("^WIDE[1-7]-[1-7]$")
@@ -100,7 +101,7 @@ func TestCDigipeatMatchAliasNoMatch(t *testing.T) {
 func TestCDigipeatMatchNoAlias(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q5TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q5TEST:hello", true)
 	require.NotNil(t, pp)
 
 	assert.Nil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, ""))
@@ -110,7 +111,7 @@ func TestCDigipeatMatchNoAlias(t *testing.T) {
 func TestCDigipeatMatchNoDigipeaters(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>Q4TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST:hello", true)
 	require.NotNil(t, pp)
 
 	assert.Nil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, ""))
@@ -120,7 +121,7 @@ func TestCDigipeatMatchNoDigipeaters(t *testing.T) {
 func TestCDigipeatMatchPathExhausted(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST*:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST*:hello", true)
 	require.NotNil(t, pp)
 
 	assert.Nil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, ""))
@@ -131,7 +132,7 @@ func TestCDigipeatMatchPathExhausted(t *testing.T) {
 func TestCDigipeatMatchFilterRejects(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
 	assert.Nil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "b/Q9TEST"))
@@ -140,7 +141,7 @@ func TestCDigipeatMatchFilterRejects(t *testing.T) {
 func TestCDigipeatMatchFilterAccepts(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
 	assert.NotNil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "b/Q3TEST"))
@@ -151,10 +152,10 @@ func TestCDigipeatMatchFilterAccepts(t *testing.T) {
 func TestCDigipeatMatchFilterError(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var result *packet_t
+	var result *ax25.Packet
 
 	var output = testutils.CaptureOutput(t, func() {
 		result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "z/nonsense")
@@ -171,14 +172,14 @@ func TestCDigipeaterSameChannel(t *testing.T) {
 
 	cdigiConfig.enabled[cdigiFromChan][cdigiFromChan] = true
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
 	cdigi.Digipeat(cdigiFromChan, pp)
 
 	var sent = transmitQueue.Remove(cdigiFromChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
-	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST*:", AX25FormatAddrs(sent))
+	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST*:", sent.FormatAddrs())
 
 	assert.Equal(t, 1, cdigi.GetCount(cdigiFromChan, cdigiFromChan))
 }
@@ -191,7 +192,7 @@ func TestCDigipeaterCrossChannel(t *testing.T) {
 
 	cdigiConfig.enabled[cdigiFromChan][cdigiToChan] = true
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
 	cdigi.Digipeat(cdigiFromChan, pp)
@@ -200,7 +201,7 @@ func TestCDigipeaterCrossChannel(t *testing.T) {
 
 	var sent = transmitQueue.Remove(cdigiToChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for the other channel")
-	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", AX25FormatAddrs(sent))
+	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", sent.FormatAddrs())
 
 	assert.Equal(t, 1, cdigi.GetCount(cdigiFromChan, cdigiToChan))
 }
@@ -210,7 +211,7 @@ func TestCDigipeaterCrossChannel(t *testing.T) {
 func TestCDigipeaterNotEnabled(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
 	cdigi.Digipeat(cdigiFromChan, pp)
@@ -229,7 +230,7 @@ func TestCDigipeaterInvalidChannel(t *testing.T) {
 
 	audioConfig.chan_medium[2] = MEDIUM_IGATE
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
 	for _, channel := range []int{-1, 2, MAX_RADIO_CHANS} {
@@ -247,7 +248,7 @@ func TestCDigipeaterNetworkTNCChannel(t *testing.T) {
 	audioConfig.chan_medium[cdigiFromChan] = MEDIUM_NETTNC
 	cdigiConfig.enabled[cdigiFromChan][cdigiFromChan] = true
 
-	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
+	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
 	// A network TNC channel has no transmit queue of its own - TransmitQueue.Append

@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/lestrrat-go/strftime"
@@ -777,7 +778,7 @@ func ais_object_course_speed(A *decode_aprs_t) (maybe.Maybe[int], maybe.Maybe[in
 	return course, speed
 }
 
-func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
 	dwutil.Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -801,9 +802,9 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		}
 	}
 
-	var stemp = AX25FormatAddrs(pp)
+	var stemp = pp.FormatAddrs()
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	/* Print so we can see what is going on. */
 
@@ -813,12 +814,12 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	var h int
 	var heard string
 
-	if ax25_get_num_addr(pp) == 0 {
+	if pp.NumAddr() == 0 {
 		/* Not AX.25. No station to display below. */
 		h = -1
 	} else {
-		h = ax25_get_heard(pp)
-		heard = ax25_get_addr_with_ssid(pp, h)
+		h = pp.Heard()
+		heard = pp.AddrWithSSID(h)
 	}
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -830,11 +831,11 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		if channel != audio_config.igate_vchannel { // suppress if from ICHANNEL
 			var logEntry = logrus.WithField("heard", heard)
 
-			if h != -1 && h != AX25_SOURCE {
+			if h != -1 && h != ax25.Source {
 				logEntry = logEntry.WithField("digipeater", true)
 			}
 
-			var alevel_text = ax25_alevel_to_text(alevel)
+			var alevel_text = alevel.Text()
 
 			// Experiment: try displaying the DC bias.
 			// Should be 0 for soundcard but could show mistuning with SDR.
@@ -849,11 +850,11 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 			/* WIDEn-0, it is quite likely (but not guaranteed), that */
 			/* we are actually hearing the preceding station in the path. */
 
-			if h >= AX25_REPEATER_2 &&
+			if h >= ax25.Repeater2 &&
 				len(heard) == 5 &&
 				strings.EqualFold(heard[:4], "WIDE") &&
 				unicode.IsDigit(rune(heard[4])) {
-				var probably_really = ax25_get_addr_with_ssid(pp, h-1)
+				var probably_really = pp.AddrWithSSID(h - 1)
 				logEntry = logEntry.WithField("probably_really", probably_really)
 
 				// audio level applies only for internal modem channels.
@@ -926,7 +927,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 			logEntry = logEntry.WithField("slice", slice)
 		}
 
-		if ax25_is_aprs(pp) {
+		if pp.IsAPRS() {
 			text_color_set(DW_COLOR_REC)
 		} else {
 			text_color_set(DW_COLOR_DECODED)
@@ -938,24 +939,24 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
 
 	var asciiOnly = false
-	if !ax25_is_aprs(pp) && !d_u_opt {
+	if !pp.IsAPRS() && !d_u_opt {
 		asciiOnly = true
 	}
 
-	if !ax25_is_aprs(pp) {
-		var _, desc, _, _, _, ftype = ax25_frame_type(pp)
+	if !pp.IsAPRS() {
+		var _, desc, _, _, _, ftype = pp.FrameType()
 
 		/* Could change by 1, since earlier call, if we guess at modulo 128. */
-		pinfo = AX25GetInfo(pp)
+		pinfo = pp.Info()
 
 		logEntry = logEntry.WithField("desc", desc)
 
-		if ftype == frame_type_U_XID {
+		if ftype == ax25.FrameTypeUXID {
 			var _, info2text, _ = xid_parse(pinfo)
 			logEntry.WithField("info", info2text).Info("Packet")
 		} else {
 			logEntry.Info("Packet ax25_safe_print below:")
-			AX25SafePrint(pinfo, asciiOnly)
+			ax25.SafePrint(pinfo, asciiOnly)
 			dw_printf("\n")
 		}
 	} else {
@@ -965,7 +966,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		// TODO: Might want to use d_u_opt for transmitted frames too.
 		logEntry.Info("Packet ax25_safe_print below:")
-		AX25SafePrint(pinfo, asciiOnly)
+		ax25.SafePrint(pinfo, asciiOnly)
 		dw_printf("\n")
 	}
 
@@ -984,7 +985,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		if hasNonPrintable {
 			logrus.Debug("--debug u hexdump below:")
-			AX25SafePrint(pinfo, true)
+			ax25.SafePrint(pinfo, true)
 			dw_printf("\n")
 		}
 	}
@@ -993,7 +994,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 	if d_p_opt {
 		logrus.Debug("--debug p hexdump below:")
-		AX25HexDump(pp)
+		pp.HexDump()
 	}
 
 	/*
@@ -1004,7 +1005,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	 */
 	var ais_obj_packet string
 
-	if ax25_is_aprs(pp) {
+	if pp.IsAPRS() {
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
 		var A = DecodeAPRS(pp, q_d_opt, "")
@@ -1018,7 +1019,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		 * Perform validity check on each address.
 		 * This should print an error message if any issues.
 		 */
-		AX25CheckAddresses(pp, AddrStrict)
+		pp.CheckAddresses(ax25.AddrStrict)
 
 		// Send to log file.
 
@@ -1088,7 +1089,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	// TODO:  Put a wrapper around this so we only call one function to send by all methods.
 	// We see the same sequence in tt_user.c.
 
-	var fbuf = AX25Pack(pp)
+	var fbuf = pp.Pack()
 
 	agwServer.SendRecPacket(channel, pp, fbuf)                                       // AGW net protocol
 	kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS TCP
@@ -1096,9 +1097,9 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	kissPT.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
-		var ao_pp = AX25FromText(ais_obj_packet, true)
+		var ao_pp = ax25.FromText(ais_obj_packet, true)
 		if ao_pp != nil {
-			var ao_fbuf = AX25Pack(ao_pp)
+			var ao_fbuf = ao_pp.Pack()
 
 			agwServer.SendRecPacket(channel, ao_pp, ao_fbuf)
 			kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
@@ -1142,7 +1143,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
+		if pp.IsAPRS() && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
 			igate.sendRecPacket(channel, pp)
 		}
 
@@ -1160,7 +1161,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
+		if pp.IsAPRS() && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
 			aprsDigipeater.Digipeat(channel, pp)
 		}
 

@@ -69,6 +69,7 @@ import (
 	"os"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -76,8 +77,8 @@ import (
 // Candidates for further processing.
 
 type candidate_t struct {
-	packet_p    *packet_t
-	alevel      ALevel
+	packet_p    *ax25.Packet
+	alevel      ax25.ALevel
 	speed_error float64     //nolint:unused
 	fec_type    fec_type_t  // Type of FEC: none(0), fx25, il2p
 	retries     BitFixLevel // For the old "fix bits" strategy, this is the
@@ -139,7 +140,7 @@ func newMultiModems() [MAX_RADIO_CHANS]*MultiModem {
 // than to act on it, has its own.
 type ReceiveSink interface {
 	// RecFrame hands over a frame that has been decoded successfully.
-	RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
+	RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
 
 	// DCDChange reports that the decoders for a channel have collectively
 	// started (state 1) or stopped (state 0) seeing data.
@@ -149,7 +150,7 @@ type ReceiveSink interface {
 // radioSink is the ReceiveSink for a channel with a radio on the end of it.
 type radioSink struct{}
 
-func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	dataLinkQueue.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
 }
 
@@ -323,7 +324,7 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
  *
  *--------------------------------------------------------------------*/
 
-func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
+func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -332,7 +333,7 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 
 	// Special encapsulation for AIS & EAS so they can be treated normally pretty much everywhere else.
 
-	var pp *packet_t
+	var pp *ax25.Packet
 
 	switch pa.achan[channel].modem_type {
 	case MODEM_AIS:
@@ -352,16 +353,16 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 		// if it happens to get onto RF somehow.
 
 		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_AIS, string(nmea))
-		pp = AX25FromText(monfmt, true)
+		pp = ax25.FromText(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	case MODEM_EAS:
 		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_EAS, string(fbuf))
-		pp = AX25FromText(monfmt, true)
+		pp = ax25.FromText(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	default:
-		pp = AX25FromFrame(fbuf, alevel)
+		pp = ax25.FromFrame(fbuf, alevel)
 	}
 
 	multi_modem_process_rec_packet(channel, subchan, slice, pp, alevel, retries, fec_type)
@@ -369,14 +370,14 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 
 // TODO: Eliminate function above and move code elsewhere?
 
-func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	multiModems[channel].processRecPacket(subchan, slice, pp, alevel, retries, fec_type)
 }
 
 // processRecPacket takes a frame one of the channel's decoders found: straight
 // on if there is only the one decoder, otherwise as a candidate for
 // pickBestCandidate.
-func (m *MultiModem) processRecPacket(subchan int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
+func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	var channel = m.channel
 	var pa = m.audioConfig
 
@@ -432,7 +433,7 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *packet_t, alev
 	c.fec_type = fec_type
 	c.retries = retries
 	c.age = 0
-	c.crc = ax25_m_m_crc(pp)
+	c.crc = pp.MultiModemCRC()
 }
 
 /*-------------------------------------------------------------------

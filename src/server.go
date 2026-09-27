@@ -124,6 +124,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -310,7 +311,7 @@ func NewAGWServer(ctx context.Context, audio_config_p *AudioConfig, mc *misc_con
  *
  *--------------------------------------------------------------------*/
 
-func (s *AGWServer) SendRecPacket(channel int, pp *packet_t, fbuf []byte) {
+func (s *AGWServer) SendRecPacket(channel int, pp *ax25.Packet, fbuf []byte) {
 	if s == nil {
 		return
 	}
@@ -327,10 +328,10 @@ func (s *AGWServer) SendRecPacket(channel int, pp *packet_t, fbuf []byte) {
 
 			agwpe_msg.Header.DataKind = 'K'
 
-			var callFrom = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+			var callFrom = pp.AddrWithSSID(ax25.Source)
 			copy(agwpe_msg.Header.CallFrom[:], []byte(callFrom))
 
-			var callTo = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+			var callTo = pp.AddrWithSSID(ax25.Destination)
 			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
 			agwpe_msg.Header.DataLen = uint32(len(fbuf) + 1)
@@ -360,7 +361,7 @@ func (s *AGWServer) SendRecPacket(channel int, pp *packet_t, fbuf []byte) {
 	s.SendMonitored(channel, pp, 0)
 } /* end SendRecPacket */
 
-func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
+func (s *AGWServer) SendMonitored(channel int, pp *ax25.Packet, own_xmit int) {
 	if s == nil {
 		return
 	}
@@ -379,10 +380,10 @@ func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
 
 			agwpe_msg.Header.Portx = byte(channel) // datakind is added later.
 
-			var callFrom = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+			var callFrom = pp.AddrWithSSID(ax25.Source)
 			copy(agwpe_msg.Header.CallFrom[:], []byte(callFrom))
 
-			var callTo = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+			var callTo = pp.AddrWithSSID(ax25.Destination)
 			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
 			/* http://uz7ho.org.ua/includes/agwpeapi.htm#_Toc500723812 */
@@ -431,7 +432,7 @@ func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
 
 			// Information if any with \r.
 
-			var pinfo = AX25GetInfo(pp)
+			var pinfo = pp.Info()
 			var msg_data_len = len(agwpe_msg.Data) // result length so far
 
 			if len(pinfo) > 0 {
@@ -474,12 +475,12 @@ func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
 // I think my opinion (which could change) is that we should try to be consistent with TNC-2 format
 // rather than continuing to propagate historical inconsistencies.
 
-func mon_addrs(channel int, pp *packet_t) []byte {
-	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+func mon_addrs(channel int, pp *ax25.Packet) []byte {
+	var src = pp.AddrWithSSID(ax25.Source)
 
-	var dst = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+	var dst = pp.AddrWithSSID(ax25.Destination)
 
-	var num_digi = ax25_get_num_repeaters(pp)
+	var num_digi = pp.NumRepeaters()
 
 	if num_digi > 0 {
 		var via strings.Builder // complete via path
@@ -489,14 +490,14 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 				via.WriteString(",") // comma if not first address
 			}
 
-			var digiaddr = ax25_get_addr_with_ssid(pp, AX25_REPEATER_1+j)
+			var digiaddr = pp.AddrWithSSID(ax25.Repeater1 + j)
 			via.WriteString(digiaddr)
 			/*
 				#if 0  // Mark each used with * as seen in UZ7HO SoundModem.
 					    if (ax25_get_h(pp, AX25_REPEATER_1 + j)) {
 				#else */
 			// Mark only last used (i.e. the heard station) with * as in TNC-2 Monitoring format.
-			if AX25_REPEATER_1+j == ax25_get_heard(pp) {
+			if ax25.Repeater1+j == pp.Heard() {
 				// #endif
 				via.WriteString("*")
 			}
@@ -518,15 +519,15 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 //	'U' for unnumbered information frame.
 //	'S' for supervisory and other unnumbered frames.
 
-func mon_desc(pp *packet_t) (byte, string) {
-	var cr, _, pf, nr, ns, ftype = ax25_frame_type(pp)
+func mon_desc(pp *ax25.Packet) (byte, string) {
+	var cr, _, pf, nr, ns, ftype = pp.FrameType()
 	var pf_text string // P or F depending on whether command or response.
 
 	switch cr {
-	case cr_cmd:
+	case ax25.CRCmd:
 		// P only: I, SABME, SABM, DISC
 		pf_text = "P"
-	case cr_res:
+	case ax25.CRRes:
 		// F only: DM, UA, FRMR
 		// Either: RR, RNR, REJ, SREJ, UI, XID, TEST
 		pf_text = "F"
@@ -538,49 +539,49 @@ func mon_desc(pp *packet_t) (byte, string) {
 	}
 
 	// I, UI, XID, SREJ, TEST can have information part.
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	switch ftype {
-	case frame_type_I:
-		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, ax25_get_pid(pp), len(pinfo), pf_text, pf)
+	case ax25.FrameTypeI:
+		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, pp.PID(), len(pinfo), pf_text, pf)
 
-	case frame_type_U_UI:
-		return 'U', fmt.Sprintf("<UI pid=%02X Len=%d %s=%d >", ax25_get_pid(pp), len(pinfo), pf_text, pf)
+	case ax25.FrameTypeUUI:
+		return 'U', fmt.Sprintf("<UI pid=%02X Len=%d %s=%d >", pp.PID(), len(pinfo), pf_text, pf)
 
-	case frame_type_S_RR:
+	case ax25.FrameTypeSRR:
 		return 'S', fmt.Sprintf("<RR R%d %s=%d >", nr, pf_text, pf)
 
-	case frame_type_S_RNR:
+	case ax25.FrameTypeSRNR:
 		return 'S', fmt.Sprintf("<RNR R%d %s=%d >", nr, pf_text, pf)
 
-	case frame_type_S_REJ:
+	case ax25.FrameTypeSREJ:
 		return 'S', fmt.Sprintf("<REJ R%d %s=%d >", nr, pf_text, pf)
 
-	case frame_type_S_SREJ:
+	case ax25.FrameTypeSSREJ:
 		return 'S', fmt.Sprintf("<SREJ R%d %s=%d Len=%d >", nr, pf_text, pf, len(pinfo))
 
-	case frame_type_U_SABME:
+	case ax25.FrameTypeUSABME:
 		return 'S', fmt.Sprintf("<SABME %s=%d >", pf_text, pf)
 
-	case frame_type_U_SABM:
+	case ax25.FrameTypeUSABM:
 		return 'S', fmt.Sprintf("<SABM %s=%d >", pf_text, pf)
 
-	case frame_type_U_DISC:
+	case ax25.FrameTypeUDISC:
 		return 'S', fmt.Sprintf("<DISC %s=%d >", pf_text, pf)
 
-	case frame_type_U_DM:
+	case ax25.FrameTypeUDM:
 		return 'S', fmt.Sprintf("<DM %s=%d >", pf_text, pf)
 
-	case frame_type_U_UA:
+	case ax25.FrameTypeUUA:
 		return 'S', fmt.Sprintf("<UA %s=%d >", pf_text, pf)
 
-	case frame_type_U_FRMR:
+	case ax25.FrameTypeUFRMR:
 		return 'S', fmt.Sprintf("<FRMR %s=%d >", pf_text, pf)
 
-	case frame_type_U_XID:
+	case ax25.FrameTypeUXID:
 		return 'S', fmt.Sprintf("<XID %s=%d Len=%d >", pf_text, pf, len(pinfo))
 
-	case frame_type_U_TEST:
+	case ax25.FrameTypeUTEST:
 		return 'S', fmt.Sprintf("<TEST %s=%d Len=%d >", pf_text, pf, len(pinfo))
 
 	default:
@@ -726,10 +727,10 @@ func (s *AGWServer) RecConnData(channel int, client int, remote_call string, own
 	copy(reply.Header.CallFrom[:], []byte(remote_call))
 	copy(reply.Header.CallTo[:], []byte(own_call))
 
-	if len(data) > AX25_MAX_INFO_LEN {
+	if len(data) > ax25.MaxInfoLen {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid length %d for connected data to client %d.\n", len(data), client)
-		data = data[:AX25_MAX_INFO_LEN]
+		data = data[:ax25.MaxInfoLen]
 	}
 
 	reply.Data = make([]byte, len(data))
@@ -1673,7 +1674,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Transmit '%s'\n", stemp);
 
-			var pp = AX25FromText(stemp.String(), true)
+			var pp = ax25.FromText(stemp.String(), true)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)
@@ -1683,10 +1684,10 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			}
 
 			var data = cmd.Data[1+10*ndigi:]
-			ax25_set_info(pp, data)
+			pp.SetInfo(data)
 
 			// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-			ax25_set_pid(pp, pid)
+			pp.SetPID(pid)
 
 			/* This goes into the low priority queue because it is an original. */
 
@@ -1733,8 +1734,8 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			var alevel ALevel
-			var pp = AX25FromFrame(cmd.Data[1:cmd.Header.DataLen], alevel)
+			var alevel ax25.ALevel
+			var pp = ax25.FromFrame(cmd.Data[1:cmd.Header.DataLen], alevel)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)
@@ -1745,8 +1746,8 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				/* that digipeater has been used, it should go out quickly thru */
 				/* the high priority queue. */
 				/* Otherwise, it is an original for the low priority queue. */
-				if ax25_get_num_repeaters(pp) >= 1 &&
-					ax25_get_h(pp, AX25_REPEATER_1) > 0 {
+				if pp.NumRepeaters() >= 1 &&
+					pp.H(ax25.Repeater1) > 0 {
 					transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
 				} else {
 					transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
@@ -1818,9 +1819,9 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 					  char dcall[7][10];
 				        }
 			*/
-			var callsigns [AX25_MAX_ADDRS]string
-			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+			var callsigns [ax25.MaxAddrs]string
+			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
 
 			var pid byte = 0xf0 /* normal for AX.25 I frames. */
 			if cmd.Header.DataKind == 'c' {
@@ -1857,7 +1858,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 					}
 
 					for j := range numDigi {
-						callsigns[AX25_REPEATER_1+j] = ByteArrayToString(cmd.Data[1+10*j : 1+10*j+10])
+						callsigns[ax25.Repeater1+j] = ByteArrayToString(cmd.Data[1+10*j : 1+10*j+10])
 						num_calls++
 					}
 				} else {
@@ -1888,11 +1889,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			var callsigns [AX25_MAX_ADDRS]string
+			var callsigns [ax25.MaxAddrs]string
 			const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
 
-			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
 
 			dataLinkQueue.XmitDataRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
 		}
@@ -1906,11 +1907,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			var callsigns [AX25_MAX_ADDRS]string
+			var callsigns [ax25.MaxAddrs]string
 			const num_calls = 2 // only first 2 used.
 
-			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
 
 			dataLinkQueue.DisconnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}
@@ -1957,7 +1958,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Transmit '%s'\n", stemp);
 
-			var pp = AX25FromText(stemp, true)
+			var pp = ax25.FromText(stemp, true)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)
@@ -1966,9 +1967,9 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			ax25_set_info(pp, cmd.Data)
+			pp.SetInfo(cmd.Data)
 			// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-			ax25_set_pid(pp, pid)
+			pp.SetPID(pid)
 
 			transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
 		}
@@ -2044,11 +2045,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			var callsigns [AX25_MAX_ADDRS]string
+			var callsigns [ax25.MaxAddrs]string
 			const num_calls = 2 // only first 2 used.
 
-			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
 
 			dataLinkQueue.OutstandingFramesRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}

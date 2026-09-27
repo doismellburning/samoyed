@@ -3,6 +3,7 @@ package direwolf
 import (
 	"bytes"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/sirupsen/logrus"
 )
 
@@ -46,7 +47,7 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ...bool) ([]byte, int) {
+func il2p_encode_frame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc ...bool) ([]byte, int) {
 	var appendCRC = len(crc) > 0 && crc[0]
 
 	var fec_level, use_max_fec = il2p_tx_fec(version, max_fec)
@@ -72,7 +73,7 @@ func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ..
 		if e == 0 {
 			// Success. No info part.
 			if appendCRC {
-				var crcBytes = il2p_crc_encode(il2p_crc_calc(ax25_get_frame_data(pp)))
+				var crcBytes = il2p_crc_encode(il2p_crc_calc(pp.FrameData()))
 				outbuf.Write(crcBytes[:])
 			}
 
@@ -80,14 +81,14 @@ func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ..
 		}
 
 		// Payload is AX.25 info part.
-		var pinfo = AX25GetInfo(pp)
+		var pinfo = pp.Info()
 
 		var encodedPayload, k = il2p_encode_payload(pinfo, use_max_fec)
 		if k > 0 {
 			outbuf.Write(encodedPayload)
 
 			if appendCRC {
-				var crcBytes = il2p_crc_encode(il2p_crc_calc(ax25_get_frame_data(pp)))
+				var crcBytes = il2p_crc_encode(il2p_crc_calc(pp.FrameData()))
 				outbuf.Write(crcBytes[:])
 			}
 
@@ -118,7 +119,7 @@ func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ..
 
 			// Payload is entire AX.25 frame.
 
-			var frame_data = ax25_get_frame_data(pp)
+			var frame_data = pp.FrameData()
 
 			var encodedPayload, k = il2p_encode_payload(frame_data, use_max_fec)
 			if k > 0 {
@@ -166,7 +167,7 @@ func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ..
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_frame(irec []byte, version il2p_version_t) *packet_t {
+func il2p_decode_frame(irec []byte, version il2p_version_t) *ax25.Packet {
 	if len(irec) < IL2P_HEADER_SIZE+IL2P_HEADER_PARITY {
 		return nil
 	}
@@ -198,7 +199,7 @@ func il2p_decode_frame(irec []byte, version il2p_version_t) *packet_t {
 
 	// Validate CRC if present.
 	if pp != nil && crc_bytes != nil {
-		var frame_data = ax25_get_frame_data(pp)
+		var frame_data = pp.FrameData()
 		if !il2p_crc_check(frame_data, crc_bytes) {
 			if il2p_get_debug() >= 1 {
 				text_color_set(DW_COLOR_ERROR)
@@ -230,7 +231,7 @@ func il2p_decode_frame(irec []byte, version il2p_version_t) *packet_t {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_version_t, symbols_corrected *int) *packet_t {
+func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_version_t, symbols_corrected *int) *ax25.Packet {
 	var hdr_type, fec_level, payload_len = il2p_get_header_attributes(uhdr)
 	var max_fec = il2p_rx_max_fec(version, fec_level)
 
@@ -257,7 +258,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_versi
 				dw_printf("IL2P Internal Error: il2p_decode_header_payload(): hdr_type=%d, max_fec=%d, payload_len=%d, e=%d.\n", hdr_type, max_fec, payload_len, e)
 			}
 
-			ax25_set_info(pp, extracted)
+			pp.SetInfo(extracted)
 		}
 
 		return (pp)
@@ -276,12 +277,12 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_versi
 			return (nil)
 		}
 
-		var alevel ALevel
+		var alevel ax25.ALevel
 		//alevel = demod_get_audio_level (chan, subchan); 	// What TODO? We don't know channel here.
 		// I think alevel gets filled in somewhere later making
 		// this redundant.
 
-		var pp = AX25FromFrame(extracted, alevel)
+		var pp = ax25.FromFrame(extracted, alevel)
 
 		return (pp)
 	}

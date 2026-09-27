@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -45,7 +46,7 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
 	var sentence = aisPositionReport(t, 1023, 3600)
-	var pp = AX25FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
+	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
 	require.NotNil(t, pp)
 
 	var A = DecodeAPRS(pp, true, "")
@@ -76,7 +77,7 @@ func Test_ais_to_object_with_course_and_speed(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
 	var sentence = aisPositionReport(t, 208, 900) // 20.8 knots, 90 degrees
-	var pp = AX25FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
+	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
 	require.NotNil(t, pp)
 
 	var A = DecodeAPRS(pp, true, "")

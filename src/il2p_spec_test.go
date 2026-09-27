@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,19 +70,19 @@ func TestIL2PSpec(t *testing.T) {
 			require.NotNil(t, pp)
 
 			// Does it have the data we expect?
-			assert.Equal(t, testDatum.expectedAddrs, AX25FormatAddrs(pp))
+			assert.Equal(t, testDatum.expectedAddrs, pp.FormatAddrs())
 
 			// Does it match the AX.25 data in the spec?
-			assert.Equal(t, il2pDataStringToBytes(testDatum.ax25Data), AX25Pack(pp))
+			assert.Equal(t, il2pDataStringToBytes(testDatum.ax25Data), pp.Pack())
 
 			// Verify the trailing CRC bytes are valid for the decoded frame.
-			var frameData = ax25_get_frame_data(pp)
+			var frameData = pp.FrameData()
 			var crcBytes = b[len(b)-IL2P_CRC_ENCODED_SIZE:]
 			assert.True(t, il2p_crc_check(frameData, crcBytes),
 				"Trailing CRC mismatch for %s", testDatum.expectedAddrs)
 
 			// The default version receives v0.6 too.
-			assert.Equal(t, AX25Pack(pp), AX25Pack(il2p_decode_frame(b, IL2P_VERSION_COMPAT)))
+			assert.Equal(t, pp.Pack(), il2p_decode_frame(b, IL2P_VERSION_COMPAT).Pack())
 		})
 	}
 }
@@ -103,8 +104,8 @@ func TestIL2PSpecEncode(t *testing.T) {
 
 	for _, testDatum := range il2pSpecExamples {
 		t.Run(testDatum.name, func(t *testing.T) {
-			var alevel ALevel
-			var pp = AX25FromFrame(il2pDataStringToBytes(testDatum.ax25Data), alevel)
+			var alevel ax25.ALevel
+			var pp = ax25.FromFrame(il2pDataStringToBytes(testDatum.ax25Data), alevel)
 			require.NotNil(t, pp)
 
 			var encoded, elen = il2p_encode_frame(pp, IL2P_VERSION_0_6, 0, true)

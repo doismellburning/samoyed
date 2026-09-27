@@ -50,6 +50,7 @@ import (
 	"unicode"
 	"unsafe"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -464,16 +465,16 @@ func (s *readerSampleSource) GetByte(_ int) int {
  * This is called when we have a good frame.
  */
 
-func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	s.packetsDecoded++
 
 	if hdlcReceiver.DataDetectAny(channel) == 0 {
 		s.dcdMissingErrors++
 	}
 
-	var stemp = AX25FormatAddrs(pp)
+	var stemp = pp.FormatAddrs()
 
-	var info = AX25GetInfo(pp)
+	var info = pp.Info()
 
 	/* Print so we can see what is going on. */
 
@@ -485,12 +486,12 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 	var h int
 	var heard string
 
-	if ax25_get_num_addr(pp) == 0 {
+	if pp.NumAddr() == 0 {
 		/* Not AX.25. No station to display below. */
 		h = -1
 	} else {
-		h = ax25_get_heard(pp)
-		heard = ax25_get_addr_with_ssid(pp, h)
+		h = pp.Heard()
+		heard = pp.AddrWithSSID(h)
 	}
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -505,21 +506,21 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 
 	dw_printf("%d:%06.3f ", minutes, sec)
 
-	if h != AX25_SOURCE {
+	if h != ax25.Source {
 		dw_printf("Digipeater ")
 	}
 
-	var alevel_text = ax25_alevel_to_text(alevel)
+	var alevel_text = alevel.Text()
 
 	/* As suggested by KJ4ERJ, if we are receiving from */
 	/* WIDEn-0, it is quite likely (but not guaranteed), that */
 	/* we are actually hearing the preceding station in the path. */
 
-	if h >= AX25_REPEATER_2 &&
+	if h >= ax25.Repeater2 &&
 		strings.HasPrefix(heard, "WIDE") &&
 		unicode.IsDigit(rune(heard[4])) &&
 		len(heard) == 5 {
-		var probably_really = ax25_get_addr_with_ssid(pp, h-1)
+		var probably_really = pp.AddrWithSSID(h - 1)
 
 		heard += " (probably " + probably_really + ")"
 	}
@@ -544,7 +545,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 
 	// Display channel with subchannel/slice if applicable.
 
-	if ax25_is_aprs(pp) {
+	if pp.IsAPRS() {
 		text_color_set(DW_COLOR_REC)
 	} else {
 		text_color_set(DW_COLOR_DEBUG)
@@ -563,7 +564,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 	}
 
 	dw_printf("%s", stemp) /* stations followed by : */
-	AX25SafePrint(info, false)
+	ax25.SafePrint(info, false)
 	dw_printf("\n")
 
 	/*
@@ -573,7 +574,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 	if s.hexDisplay {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
-		AX25HexDump(pp)
+		pp.HexDump()
 		dw_printf("------\n")
 	}
 

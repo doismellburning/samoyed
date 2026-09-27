@@ -3,6 +3,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,11 +30,11 @@ func TestIL2PDecodeFrameTruncatedPayloadReturnsNil(t *testing.T) {
 	il2p_init(0)
 
 	// Build a real frame and encode it, then truncate the payload portion.
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "Q1TEST"
 	addrs[1] = "Q2TEST"
 	var pinfo = []byte("hello world")
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
 	var encoded, elen = il2p_encode_frame(pp, IL2P_VERSION_0_4, 0)
@@ -50,11 +51,11 @@ func TestIL2PDecodeFrameJunkTrailingBytesReturnsNil(t *testing.T) {
 
 	// A frame with 1–3 trailing bytes beyond encoded_payload_size is malformed:
 	// not enough to be a CRC, not exactly the right payload length. Must return nil.
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "Q1TEST"
 	addrs[1] = "Q2TEST"
 	var pinfo = []byte("hello world")
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
 	var encoded, elen = il2p_encode_frame(pp, IL2P_VERSION_0_4, 0)

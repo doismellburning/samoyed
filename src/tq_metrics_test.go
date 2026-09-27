@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +17,7 @@ import (
 // newTestPacket builds the frame these tests queue.  The exact contents do not
 // matter to the queue; what matters is that it is a real packet, as opposed to
 // the null wake-up frame TransmitQueue.LMSeizeRequest queues.
-func newTestPacket(t *testing.T) *packet_t {
+func newTestPacket(t *testing.T) *ax25.Packet {
 	t.Helper()
 
 	const (
@@ -24,11 +25,11 @@ func newTestPacket(t *testing.T) *packet_t {
 		SOURCE = "Q2TEST"
 	)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = DEST
-	addrs[AX25_SOURCE] = SOURCE
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = DEST
+	addrs[ax25.Source] = SOURCE
 
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_TEST, 0, 0, []byte("hello"))
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUTEST, 0, 0, []byte("hello"))
 	require.NotNil(t, pp)
 
 	return pp
@@ -67,7 +68,7 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 	// Build the packets up front: ax25_new increments an unsynchronised global
 	// sequence counter, which is a separate matter from the queue and would
 	// otherwise be the only thing this test found under -race.
-	var packets = make([]*packet_t, 0, NUM_PKTS)
+	var packets = make([]*ax25.Packet, 0, NUM_PKTS)
 
 	for range NUM_PKTS {
 		var pp = newTestPacket(t)

@@ -19,6 +19,7 @@ i.e. did we accidentally change/break something.
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 )
@@ -194,7 +195,7 @@ func initiateConnect(t *testing.T, myCall, theirCall string, channel int) {
 }
 
 // Helper to simulate receiving a frame
-func receiveFrame(t *testing.T, pp *packet_t, channel int) {
+func receiveFrame(t *testing.T, pp *ax25.Packet, channel int) {
 	t.Helper()
 
 	var E = new(dlq_item_t)
@@ -211,10 +212,10 @@ func establishConnection(t *testing.T, myCall, theirCall string, channel int) *a
 	initiateConnect(t, myCall, theirCall, channel)
 
 	// Receive UA response
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = theirCall
 	addrs[PEERCALL] = myCall
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, channel)
@@ -242,8 +243,8 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	setupTestEnv(t)
 
 	var E *dlq_item_t
-	var pp *packet_t
-	var addrs [AX25_MAX_ADDRS]string
+	var pp *ax25.Packet
+	var addrs [ax25.MaxAddrs]string
 
 	// Connect request
 	E = new(dlq_item_t)
@@ -258,7 +259,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	// Now acknowledge
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	assert.NotNil(t, pp)
 
 	E = new(dlq_item_t)
@@ -275,7 +276,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	assert.Equal(t, 0, ax25Link.listHead.vs, "V(S) should be 0")
 	assert.Equal(t, 0, ax25Link.listHead.vr, "V(R) should be 0")
 	assert.Equal(t, 0, ax25Link.listHead.va, "V(A) should be 0")
-	assert.Equal(t, ax25_modulo_t(8), ax25Link.listHead.modulo, "Should be modulo 8")
+	assert.Equal(t, ax25.Modulo(8), ax25Link.listHead.modulo, "Should be modulo 8")
 }
 
 // SABME/UA Exchange (Modulo 128)
@@ -296,17 +297,17 @@ func TestAX25LinkSABMEConnection(t *testing.T) {
 	assert.Equal(t, state_5_awaiting_v22_connection, ax25Link.listHead.state)
 
 	// Receive UA response (accepting v2.2)
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should now be connected with modulo 128
 	assert.Equal(t, state_3_connected, ax25Link.listHead.state)
-	assert.Equal(t, ax25_modulo_t(128), ax25Link.listHead.modulo, "Should be modulo 128 for v2.2")
+	assert.Equal(t, ax25.Modulo(128), ax25Link.listHead.modulo, "Should be modulo 128 for v2.2")
 }
 
 // Connection Rejected with DM
@@ -322,10 +323,10 @@ func TestAX25LinkConnectionRejectedWithDM(t *testing.T) {
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive DM response (connection rejected)
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_DM, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUDM, 1, 0, nil)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -363,10 +364,10 @@ func TestAX25LinkDISCDisconnection(t *testing.T) {
 	assert.Equal(t, state_2_awaiting_release, S.state)
 
 	// Receive UA response
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -394,10 +395,10 @@ func TestAX25LinkDISCInDisconnectedState(t *testing.T) {
 	dl_register_callsign(regE)
 
 	// Receive DISC in disconnected state
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_DISC, 1, 0, nil)
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUDISC, 1, 0, nil)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -424,11 +425,11 @@ func TestAX25LinkIFrameExchange(t *testing.T) {
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive I-frame with N(S)=0
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
 	var info = []byte("Hello")
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, info)
+	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 0, 0, ax25.PIDNoLayer3, info)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -451,10 +452,10 @@ func TestAX25LinkRRResponse(t *testing.T) {
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive RR with N(R)=0 (poll)
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 1, nil)
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSRR, 8, 0, 1, nil)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -476,10 +477,10 @@ func TestAX25LinkRNRFlowControl(t *testing.T) {
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive RNR (peer busy)
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RNR, 8, 0, 0, nil)
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSRNR, 8, 0, 0, nil)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -488,7 +489,7 @@ func TestAX25LinkRNRFlowControl(t *testing.T) {
 	assert.True(t, S.peer_receiver_busy, "Peer receiver busy should be set")
 
 	// Now receive RR to clear busy condition
-	pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 0, nil)
+	pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSRR, 8, 0, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Peer receiver busy should be cleared
@@ -514,10 +515,10 @@ func TestAX25LinkREJErrorRecovery(t *testing.T) {
 
 	// Receive REJ command with P=1 (poll)
 	// This tests REJ handling when no frames are outstanding
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_REJ, 8, 0, 1, nil) // P=1
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSREJ, 8, 0, 1, nil) // P=1
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -550,10 +551,10 @@ func TestAX25LinkIncomingSABM(t *testing.T) {
 	dl_register_callsign(regE)
 
 	// Receive SABM from peer
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_SABM, 1, 0, nil)
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -633,14 +634,14 @@ func TestAX25LinkMultipleIFrames(t *testing.T) {
 
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
 
 	// Receive I-frames 0, 1, 2 in sequence
 	for ns := range 3 {
 		var info = []byte("Frame " + string(rune('0'+ns)))
-		var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, ns, 0, AX25_PID_NO_LAYER_3, info)
+		var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, ns, 0, ax25.PIDNoLayer3, info)
 		assert.NotNil(t, pp)
 		receiveFrame(t, pp, CHANNEL)
 
@@ -663,17 +664,17 @@ func TestAX25LinkOutOfSequenceIFrame(t *testing.T) {
 
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
 
 	// Receive I-frame 0
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, []byte("Frame 0"))
+	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 0, 0, ax25.PIDNoLayer3, []byte("Frame 0"))
 	receiveFrame(t, pp, CHANNEL)
 	assert.Equal(t, 1, S.vr, "V(R) should be 1")
 
 	// Receive I-frame 2 (out of sequence, expecting 1)
-	pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 2, 0, AX25_PID_NO_LAYER_3, []byte("Frame 2"))
+	pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 2, 0, ax25.PIDNoLayer3, []byte("Frame 2"))
 	receiveFrame(t, pp, CHANNEL)
 
 	// V(R) should NOT increment (frame rejected)
@@ -697,12 +698,12 @@ func TestAX25LinkIFrameWithAck(t *testing.T) {
 	// Simulate that we've sent some frames by setting V(S)
 	S.vs = 3
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
 
 	// Receive I-frame with N(R)=2 (acknowledging our frames 0 and 1)
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 2, 0, 0, AX25_PID_NO_LAYER_3, []byte("Data"))
+	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 2, 0, 0, ax25.PIDNoLayer3, []byte("Data"))
 	receiveFrame(t, pp, CHANNEL)
 
 	// V(A) should be updated to 2
@@ -727,10 +728,10 @@ func TestAX25LinkDISCWhileConnected(t *testing.T) {
 	assert.Equal(t, state_3_connected, S.state)
 
 	// Receive DISC from peer
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_DISC, 1, 0, nil)
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUDISC, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should transition to disconnected
@@ -755,10 +756,10 @@ func TestAX25LinkSABMWhileConnected(t *testing.T) {
 	S.va = 1
 
 	// Receive SABM from peer (link reset)
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_SABM, 1, 0, nil)
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should remain connected but state variables reset
@@ -792,10 +793,10 @@ func TestAX25LinkDMAfterDISC(t *testing.T) {
 	assert.Equal(t, state_2_awaiting_release, S.state)
 
 	// Receive DM instead of UA
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_DM, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUDM, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should transition to disconnected
@@ -820,10 +821,10 @@ func TestAX25LinkSABMCollision(t *testing.T) {
 
 	// Receive SABM from peer (collision)
 	// Per the protocol, we send UA but stay in state 1 waiting for peer's UA
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_SABM, 1, 0, nil)
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Still in state 1 - we sent UA but still waiting for their UA
@@ -832,7 +833,7 @@ func TestAX25LinkSABMCollision(t *testing.T) {
 	// Now receive the UA from peer (completing the collision resolution)
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Now should be connected
@@ -856,10 +857,10 @@ func TestAX25LinkTimerRecoveryState(t *testing.T) {
 	assert.Equal(t, state_4_timer_recovery, S.state)
 
 	// Receive RR with F=1 (response to our poll)
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_s_frame(addrs, 2, cr_res, frame_type_S_RR, 8, 0, 1, nil) // F=1
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.SFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeSRR, 8, 0, 1, nil) // F=1
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should return to connected state
@@ -883,23 +884,23 @@ func TestAX25LinkSREJFrame(t *testing.T) {
 	// Establish v2.2 connection
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	var S = ax25Link.listHead
 	assert.Equal(t, state_3_connected, S.state)
-	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
 	// Simulate having sent frames by setting V(S)
 	S.vs = 5
 
 	// Receive SREJ requesting retransmission of frame 2
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	pp = ax25_s_frame(addrs, 2, cr_res, frame_type_S_SREJ, 128, 2, 1, nil)
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	pp = ax25.SFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeSSREJ, 128, 2, 1, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should still be connected
@@ -960,14 +961,14 @@ func TestAX25LinkWindowSizeMod128(t *testing.T) {
 	// Establish v2.2 connection
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	var S = ax25Link.listHead
-	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
 	// Default k=32 for modulo 128
 	S.k_maxframe = 32
@@ -1004,18 +1005,18 @@ func TestAX25LinkFRMRResponse(t *testing.T) {
 	assert.Equal(t, state_5_awaiting_v22_connection, ax25Link.listHead.state)
 
 	// Receive FRMR (peer doesn't understand SABME)
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 	// FRMR has info field with error details
 	var frmrInfo = []byte{0x00, 0x00, 0x00} // Minimal FRMR info
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_FRMR, 1, 0, frmrInfo)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUFRMR, 1, 0, frmrInfo)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should fall back to v2.0 and retry with SABM
 	// State should be awaiting connection (v2.0)
 	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
-	assert.Equal(t, ax25_modulo_t(8), ax25Link.listHead.modulo, "Should fall back to modulo 8")
+	assert.Equal(t, ax25.Modulo(8), ax25Link.listHead.modulo, "Should fall back to modulo 8")
 }
 
 // ============================================================================
@@ -1034,12 +1035,12 @@ func TestAX25LinkPollResponse(t *testing.T) {
 
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
 
 	// Receive I-frame with P=1 (poll)
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 1, AX25_PID_NO_LAYER_3, []byte("Poll"))
+	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 0, 1, ax25.PIDNoLayer3, []byte("Poll"))
 	receiveFrame(t, pp, CHANNEL)
 
 	// V(R) should increment
@@ -1060,12 +1061,12 @@ func TestAX25LinkRRPoll(t *testing.T) {
 
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
 
 	// Receive RR with P=1
-	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 1, nil)
+	var pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSRR, 8, 0, 1, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should remain connected
@@ -1256,10 +1257,10 @@ func TestAX25LinkSABMDISCCollision(t *testing.T) {
 	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
 
 	// Receive DISC while awaiting connection
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_DISC, 1, 0, nil)
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUDISC, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Protocol sends DM but stays in awaiting connection state
@@ -1283,10 +1284,10 @@ func TestAX25LinkUnexpectedUA(t *testing.T) {
 	S.vr = 2
 
 	// Receive unsolicited UA
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 0, 0, nil)
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 0, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should trigger link reset - state goes to awaiting connection
@@ -1327,7 +1328,7 @@ func TestAX25LinkXIDEncode(t *testing.T) {
 	param.retries = maybe.Just(10)
 
 	// Encode the parameters
-	info := xid_encode(&param, cr_cmd)
+	info := xid_encode(&param, ax25.CRCmd)
 	assert.NotNil(t, info, "XID encode should produce info field")
 	assert.Greater(t, len(info), 4, "XID info should have content")
 
@@ -1350,7 +1351,7 @@ func TestAX25LinkXIDRoundtrip(t *testing.T) {
 	original.retries = maybe.Just(15)
 
 	// Encode
-	info := xid_encode(&original, cr_cmd)
+	info := xid_encode(&original, ax25.CRCmd)
 	assert.NotNil(t, info)
 
 	// Parse back
@@ -1379,10 +1380,10 @@ func TestAX25LinkXIDFrameConnected(t *testing.T) {
 	// Establish v2.2 connection
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	var S = ax25Link.listHead
@@ -1398,11 +1399,11 @@ func TestAX25LinkXIDFrameConnected(t *testing.T) {
 	param.ack_timer = maybe.Just(3000)
 	param.retries = maybe.Just(10)
 
-	xidInfo := xid_encode(&param, cr_cmd)
+	xidInfo := xid_encode(&param, ax25.CRCmd)
 
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_XID, 1, 0, xidInfo)
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUXID, 1, 0, xidInfo)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should still be connected
@@ -1417,75 +1418,75 @@ func TestAX25LinkXIDFrameConnected(t *testing.T) {
 func TestAX25LinkCommandFrameEncoding(t *testing.T) {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "TEST2"
-	addrs[AX25_SOURCE] = "TEST1"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "TEST2"
+	addrs[ax25.Source] = "TEST1"
 
 	// Create SABM command
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_SABM, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil)
 	assert.NotNil(t, pp)
 
 	// Verify it's recognized as a command
-	cr, _, _, _, _, _ := ax25_frame_type(pp) //nolint:dogsled
-	assert.Equal(t, cr_cmd, cr, "SABM should be a command")
+	cr, _, _, _, _, _ := pp.FrameType() //nolint:dogsled
+	assert.Equal(t, ax25.CRCmd, cr, "SABM should be a command")
 }
 
 // Response frame has correct C/R bits
 func TestAX25LinkResponseFrameEncoding(t *testing.T) {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "TEST1"
-	addrs[AX25_SOURCE] = "TEST2"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "TEST1"
+	addrs[ax25.Source] = "TEST2"
 
 	// Create UA response
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	assert.NotNil(t, pp)
 
 	// Verify it's recognized as a response
-	cr, _, _, _, _, _ := ax25_frame_type(pp) //nolint:dogsled
-	assert.Equal(t, cr_res, cr, "UA should be a response")
+	cr, _, _, _, _, _ := pp.FrameType() //nolint:dogsled
+	assert.Equal(t, ax25.CRRes, cr, "UA should be a response")
 }
 
 // I-frame as command
 func TestAX25LinkIFrameAsCommand(t *testing.T) {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "TEST2"
-	addrs[AX25_SOURCE] = "TEST1"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "TEST2"
+	addrs[ax25.Source] = "TEST1"
 
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, []byte("test"))
+	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 0, 0, ax25.PIDNoLayer3, []byte("test"))
 	assert.NotNil(t, pp)
 
-	cr, _, _, _, _, ftype := ax25_frame_type(pp) //nolint:dogsled
-	assert.Equal(t, cr_cmd, cr, "I-frame should be a command")
-	assert.Equal(t, frame_type_I, ftype)
+	cr, _, _, _, _, ftype := pp.FrameType() //nolint:dogsled
+	assert.Equal(t, ax25.CRCmd, cr, "I-frame should be a command")
+	assert.Equal(t, ax25.FrameTypeI, ftype)
 }
 
 // S-frame as command and response
 func TestAX25LinkSFrameCommandResponse(t *testing.T) {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "TEST2"
-	addrs[AX25_SOURCE] = "TEST1"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "TEST2"
+	addrs[ax25.Source] = "TEST1"
 
 	// RR as command
-	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 1, nil)
+	var pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSRR, 8, 0, 1, nil)
 	assert.NotNil(t, pp)
 
-	cr, _, _, _, _, ftype := ax25_frame_type(pp) //nolint:dogsled
-	assert.Equal(t, cr_cmd, cr, "RR should be command")
-	assert.Equal(t, frame_type_S_RR, ftype)
+	cr, _, _, _, _, ftype := pp.FrameType() //nolint:dogsled
+	assert.Equal(t, ax25.CRCmd, cr, "RR should be command")
+	assert.Equal(t, ax25.FrameTypeSRR, ftype)
 
 	// RR as response
-	pp = ax25_s_frame(addrs, 2, cr_res, frame_type_S_RR, 8, 0, 1, nil)
+	pp = ax25.SFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeSRR, 8, 0, 1, nil)
 	assert.NotNil(t, pp)
 
-	cr, _, _, _, _, ftype = ax25_frame_type(pp) //nolint:dogsled
-	assert.Equal(t, cr_res, cr, "RR should be response")
-	assert.Equal(t, frame_type_S_RR, ftype)
+	cr, _, _, _, _, ftype = pp.FrameType() //nolint:dogsled
+	assert.Equal(t, ax25.CRRes, cr, "RR should be response")
+	assert.Equal(t, ax25.FrameTypeSRR, ftype)
 }
 
 // ============================================================================
@@ -1526,14 +1527,14 @@ func TestAX25LinkModulo128WrapAround(t *testing.T) {
 
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	var S = ax25Link.listHead
-	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
 	// Test sequence wrap from 127 to 0
 	S.vs = 127
@@ -1604,7 +1605,7 @@ func TestAX25LinkFirstSegmentFlag(t *testing.T) {
 	var segmentData = []byte{0x82, 0xF0, 'H', 'e', 'l', 'l', 'o'} // first segment, pid=0xF0
 
 	// Simulate receiving the segment via dl_data_indication
-	dl_data_indication(S, AX25_PID_SEGMENTATION_FRAGMENT, segmentData)
+	dl_data_indication(S, ax25.PIDSegmentationFragment, segmentData)
 
 	// Reassembler should now have a buffer allocated
 	assert.NotNil(t, S.ra_buff, "Reassembler buffer should be allocated after first segment")
@@ -1625,15 +1626,15 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 	assert.NotNil(t, ax25Link.listHead)
 	assert.Equal(t, state_5_awaiting_v22_connection, ax25Link.listHead.state)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	var S = ax25Link.listHead
 	assert.Equal(t, state_3_connected, S.state)
-	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
 	// Use a small n1_paclen to force segmentation with short data.
 	// With n1_paclen=4:
@@ -1668,15 +1669,15 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 	}
 
 	// seg 1: first-segment header (0x80 | 2 following = 0x82), original pid, data[0:2]
-	assert.Equal(t, AX25_PID_SEGMENTATION_FRAGMENT, frames[0].pid)
+	assert.Equal(t, ax25.PIDSegmentationFragment, frames[0].pid)
 	assert.Equal(t, []byte{0x82, 0xF0, 'A', 'B'}, frames[0].data[:frames[0].len])
 
 	// seg 2: header (1 more following), data[2:5]
-	assert.Equal(t, AX25_PID_SEGMENTATION_FRAGMENT, frames[1].pid)
+	assert.Equal(t, ax25.PIDSegmentationFragment, frames[1].pid)
 	assert.Equal(t, []byte{0x01, 'C', 'D', 'E'}, frames[1].data[:frames[1].len])
 
 	// seg 3: header (0 more = last), data[5:6]
-	assert.Equal(t, AX25_PID_SEGMENTATION_FRAGMENT, frames[2].pid)
+	assert.Equal(t, ax25.PIDSegmentationFragment, frames[2].pid)
 	assert.Equal(t, []byte{0x00, 'F'}, frames[2].data[:frames[2].len])
 }
 
@@ -1694,10 +1695,10 @@ func TestAX25LinkMultipleConcurrentLinks(t *testing.T) {
 
 	// Establish first connection
 	initiateConnect(t, "STA1", "STA2", CHANNEL)
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "STA2"
 	addrs[PEERCALL] = "STA1"
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	var link1 = ax25Link.listHead
@@ -1709,7 +1710,7 @@ func TestAX25LinkMultipleConcurrentLinks(t *testing.T) {
 
 	addrs[OWNCALL] = "STA3"
 	addrs[PEERCALL] = "STA1"
-	pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Both links should exist
@@ -1735,10 +1736,10 @@ func TestAX25LinkIsolation(t *testing.T) {
 
 	// Establish first connection
 	initiateConnect(t, "STA1", "STA2", CHANNEL)
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "STA2"
 	addrs[PEERCALL] = "STA1"
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	var link1 = ax25Link.listHead
@@ -1748,7 +1749,7 @@ func TestAX25LinkIsolation(t *testing.T) {
 
 	addrs[OWNCALL] = "STA3"
 	addrs[PEERCALL] = "STA1"
-	pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	var link2 = ax25Link.listHead
@@ -1795,39 +1796,39 @@ func TestAX25LinkChannelBusy(t *testing.T) {
 func TestAX25LinkFrameTypeParsing(t *testing.T) {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "TEST2"
-	addrs[AX25_SOURCE] = "TEST1"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "TEST2"
+	addrs[ax25.Source] = "TEST1"
 
 	// Test all U-frame types
-	uFrameTypes := []ax25_frame_type_t{
-		frame_type_U_SABM,
-		frame_type_U_SABME,
-		frame_type_U_DISC,
-		frame_type_U_DM,
-		frame_type_U_UA,
-		frame_type_U_UI,
-		frame_type_U_XID,
-		frame_type_U_TEST,
+	uFrameTypes := []ax25.FrameType{
+		ax25.FrameTypeUSABM,
+		ax25.FrameTypeUSABME,
+		ax25.FrameTypeUDISC,
+		ax25.FrameTypeUDM,
+		ax25.FrameTypeUUA,
+		ax25.FrameTypeUUI,
+		ax25.FrameTypeUXID,
+		ax25.FrameTypeUTEST,
 	}
 
 	for _, ftype := range uFrameTypes {
-		cr := cr_cmd
-		if ftype == frame_type_U_DM || ftype == frame_type_U_UA {
-			cr = cr_res
+		cr := ax25.CRCmd
+		if ftype == ax25.FrameTypeUDM || ftype == ax25.FrameTypeUUA {
+			cr = ax25.CRRes
 		}
 
 		pid := 0
-		if ftype == frame_type_U_UI {
-			pid = AX25_PID_NO_LAYER_3
+		if ftype == ax25.FrameTypeUUI {
+			pid = ax25.PIDNoLayer3
 		}
 
-		pp := ax25_u_frame(addrs, 2, cr, ftype, 1, pid, nil)
+		pp := ax25.UFrame(addrs, 2, cr, ftype, 1, pid, nil)
 		if pp == nil {
 			continue // Some combinations may not be valid
 		}
 
-		_, _, _, _, _, parsedType := ax25_frame_type(pp)
+		_, _, _, _, _, parsedType := pp.FrameType()
 		assert.Equal(t, ftype, parsedType, "Frame type should match for %v", ftype)
 	}
 }
@@ -1836,56 +1837,56 @@ func TestAX25LinkFrameTypeParsing(t *testing.T) {
 func TestAX25LinkSFrameTypeParsing(t *testing.T) {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "TEST2"
-	addrs[AX25_SOURCE] = "TEST1"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "TEST2"
+	addrs[ax25.Source] = "TEST1"
 
-	sFrameTypes := []ax25_frame_type_t{
-		frame_type_S_RR,
-		frame_type_S_RNR,
-		frame_type_S_REJ,
+	sFrameTypes := []ax25.FrameType{
+		ax25.FrameTypeSRR,
+		ax25.FrameTypeSRNR,
+		ax25.FrameTypeSREJ,
 	}
 
 	for _, ftype := range sFrameTypes {
-		pp := ax25_s_frame(addrs, 2, cr_cmd, ftype, 8, 0, 0, nil)
+		pp := ax25.SFrame(addrs, 2, ax25.CRCmd, ftype, 8, 0, 0, nil)
 		assert.NotNil(t, pp)
 
-		_, _, _, _, _, parsedType := ax25_frame_type(pp)
+		_, _, _, _, _, parsedType := pp.FrameType()
 		assert.Equal(t, ftype, parsedType, "S-Frame type should match for %v", ftype)
 	}
 
 	// SREJ must be response
-	pp := ax25_s_frame(addrs, 2, cr_res, frame_type_S_SREJ, 8, 0, 0, nil)
+	pp := ax25.SFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeSSREJ, 8, 0, 0, nil)
 	assert.NotNil(t, pp)
-	_, _, _, _, _, parsedType := ax25_frame_type(pp) //nolint:dogsled
-	assert.Equal(t, frame_type_S_SREJ, parsedType)
+	_, _, _, _, _, parsedType := pp.FrameType() //nolint:dogsled
+	assert.Equal(t, ax25.FrameTypeSSREJ, parsedType)
 }
 
 // I-frame type parsing
 func TestAX25LinkIFrameTypeParsing(t *testing.T) {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = "TEST2"
-	addrs[AX25_SOURCE] = "TEST1"
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "TEST2"
+	addrs[ax25.Source] = "TEST1"
 
 	// Modulo 8 I-frame
-	pp := ax25_i_frame(addrs, 2, cr_cmd, 8, 3, 2, 1, AX25_PID_NO_LAYER_3, []byte("test"))
+	pp := ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 3, 2, 1, ax25.PIDNoLayer3, []byte("test"))
 	assert.NotNil(t, pp)
 
-	cr, _, pf, nr, ns, ftype := ax25_frame_type(pp)
-	assert.Equal(t, frame_type_I, ftype)
-	assert.Equal(t, cr_cmd, cr)
+	cr, _, pf, nr, ns, ftype := pp.FrameType()
+	assert.Equal(t, ax25.FrameTypeI, ftype)
+	assert.Equal(t, ax25.CRCmd, cr)
 	assert.Equal(t, 1, pf)
 	assert.Equal(t, 3, nr)
 	assert.Equal(t, 2, ns)
 
 	// Modulo 128 I-frame
-	pp = ax25_i_frame(addrs, 2, cr_cmd, 128, 100, 50, 1, AX25_PID_NO_LAYER_3, []byte("test"))
+	pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 128, 100, 50, 1, ax25.PIDNoLayer3, []byte("test"))
 	assert.NotNil(t, pp)
 
-	_, _, pf, nr, ns, ftype = ax25_frame_type(pp)
-	assert.Equal(t, frame_type_I, ftype)
+	_, _, pf, nr, ns, ftype = pp.FrameType()
+	assert.Equal(t, ax25.FrameTypeI, ftype)
 	assert.Equal(t, 1, pf)
 	assert.Equal(t, 100, nr)
 	assert.Equal(t, 50, ns)
@@ -1962,22 +1963,22 @@ func TestAX25LinkRejectExceptionFlag(t *testing.T) {
 	assert.False(t, S.reject_exception)
 
 	// Receive out-of-sequence frame to set it
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
 
 	// First receive frame 0
-	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, []byte("0"))
+	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 0, 0, ax25.PIDNoLayer3, []byte("0"))
 	receiveFrame(t, pp, CHANNEL)
 	assert.Equal(t, 1, S.vr)
 
 	// Now receive frame 2 (skip 1) - should set reject_exception
-	pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 2, 0, AX25_PID_NO_LAYER_3, []byte("2"))
+	pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 2, 0, ax25.PIDNoLayer3, []byte("2"))
 	receiveFrame(t, pp, CHANNEL)
 	assert.True(t, S.reject_exception, "Reject exception should be set")
 
 	// Receive expected frame 1 - should clear reject_exception
-	pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 1, 0, AX25_PID_NO_LAYER_3, []byte("1"))
+	pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 1, 0, ax25.PIDNoLayer3, []byte("1"))
 	receiveFrame(t, pp, CHANNEL)
 	assert.False(t, S.reject_exception, "Reject exception should be cleared")
 }
@@ -2028,7 +2029,7 @@ func TestAX25LinkSetVersion20(t *testing.T) {
 	set_version_2_0(S)
 
 	assert.Equal(t, srej_none, S.srej_enable)
-	assert.Equal(t, ax25_modulo_t(8), S.modulo)
+	assert.Equal(t, ax25.Modulo(8), S.modulo)
 }
 
 // Set version 2.2
@@ -2043,17 +2044,17 @@ func TestAX25LinkSetVersion22(t *testing.T) {
 
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	var addrs [AX25_MAX_ADDRS]string
+	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	var S = ax25Link.listHead
 
 	// Should be v2.2
 	assert.Equal(t, srej_single, S.srej_enable)
-	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+	assert.Equal(t, ax25.Modulo(128), S.modulo)
 }
 
 // ============================================================================
@@ -2126,11 +2127,11 @@ func TestAX25LinkTESTFrame(t *testing.T) {
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive TEST command
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
 	var testInfo = []byte("Test data")
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_TEST, 1, 0, testInfo)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUTEST, 1, 0, testInfo)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should still be connected (TEST doesn't change state)
@@ -2154,10 +2155,10 @@ func TestAX25LinkUIFrameConnected(t *testing.T) {
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive UI frame
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, AX25_PID_NO_LAYER_3, []byte("UI data"))
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, ax25.PIDNoLayer3, []byte("UI data"))
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should still be connected
@@ -2180,16 +2181,16 @@ func TestAX25LinkFrameCountStats(t *testing.T) {
 
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	var addrs [AX25_MAX_ADDRS]string
-	addrs[AX25_DESTINATION] = MY_CALL
-	addrs[AX25_SOURCE] = THEIR_CALL
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = MY_CALL
+	addrs[ax25.Source] = THEIR_CALL
 
 	// Receive some I-frames
 	for i := range 3 {
-		var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, i, 0, AX25_PID_NO_LAYER_3, []byte("data"))
+		var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, i, 0, ax25.PIDNoLayer3, []byte("data"))
 		receiveFrame(t, pp, CHANNEL)
 	}
 
 	// Check that I-frame count increased
-	assert.GreaterOrEqual(t, S.count_recv_frame_type[frame_type_I], 3)
+	assert.GreaterOrEqual(t, S.count_recv_frame_type[ax25.FrameTypeI], 3)
 }

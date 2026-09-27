@@ -39,6 +39,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -273,10 +274,10 @@ const (
 	FLAVOR_OTHER
 )
 
-func frame_flavor(pp *packet_t) flavor_t {
-	if ax25_is_aprs(pp) { // UI frame, PID 0xF0.
+func frame_flavor(pp *ax25.Packet) flavor_t {
+	if pp.IsAPRS() { // UI frame, PID 0xF0.
 		// It's unfortunate APRS did not use its own special PID.
-		var dest = ax25_get_addr_no_ssid(pp, AX25_DESTINATION)
+		var dest = pp.AddrNoSSID(ax25.Destination)
 
 		if dest == "SPEECH" {
 			return (FLAVOR_SPEECH)
@@ -293,7 +294,7 @@ func frame_flavor(pp *packet_t) flavor_t {
 		/* Is there at least one digipeater AND has first one been used? */
 		/* I could be the first in the list or later.  Doesn't matter. */
 
-		if ax25_get_num_repeaters(pp) >= 1 && ax25_get_h(pp, AX25_REPEATER_1) > 0 {
+		if pp.NumRepeaters() >= 1 && pp.H(ax25.Repeater1) > 0 {
 			return (FLAVOR_APRS_DIGI)
 		}
 
@@ -410,7 +411,7 @@ func (xs *XmitService) discard_untransmittable(channel int) {
 				break
 			}
 
-			if ax25_is_null_frame(pp) {
+			if pp.IsNullFrame() {
 				dataLinkQueue.SeizeConfirm(channel) // C4.2.  "This primitive indicates, to the
 				// Data-link State machine, that the transmission opportunity has arrived."
 
@@ -481,7 +482,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 				xs.xmit_speech(ctx, channel, pp)
 
 			case FLAVOR_MORSE:
-				var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
+				var ssid = pp.SSID(ax25.Destination)
 
 				var wpm = MORSE_DEFAULT_WPM
 				if ssid > 0 {
@@ -502,7 +503,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 				xs.xmit_morse(channel, pp, wpm)
 
 			case FLAVOR_DTMF:
-				var speed = ax25_get_ssid(pp, AX25_DESTINATION)
+				var speed = pp.SSID(ax25.Destination)
 				if speed == 0 {
 					speed = 5 // default half of maximum
 				}
@@ -533,15 +534,15 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Waited too long for clear channel.  Discarding packet below.\n")
 
-			var stemp = AX25FormatAddrs(pp)
+			var stemp = pp.FormatAddrs()
 
-			var pinfo = AX25GetInfo(pp)
+			var pinfo = pp.Info()
 
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 		} /* wait for clear channel error. */
 	} /* Have pp */
@@ -625,7 +626,7 @@ func priorityToRune(prio int) rune {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
+func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, max_bundle int) {
 	/*
 	 * These are for timing of a transmission.
 	 * All are in usual unix time (seconds since 1/1/1970) but higher resolution
@@ -838,8 +839,8 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
-	if ax25_is_null_frame(pp) {
+func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
+	if pp.IsNullFrame() {
 		// Issue 132 - We could end up in a situation where:
 		// Transmitter is already on.
 		// Application wants to send a frame.
@@ -861,9 +862,9 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 
 	var ts = xs.timestampPrefix()
 
-	var stemp = AX25FormatAddrs(pp)
+	var stemp = pp.FormatAddrs()
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	text_color_set(DW_COLOR_XMIT)
 	/*
@@ -880,31 +881,31 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 
 	/* Demystify non-APRS.  Use same format for received frames in direwolf.c. */
 
-	if !ax25_is_aprs(pp) {
-		var _, desc, _, _, _, ftype = ax25_frame_type(pp)
+	if !pp.IsAPRS() {
+		var _, desc, _, _, _, ftype = pp.FrameType()
 
 		dw_printf("(%s)", desc)
 
-		if ftype == frame_type_U_XID {
+		if ftype == ax25.FrameTypeUXID {
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {
-			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 		}
 	} else {
-		AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+		ax25.SafePrint(pinfo, !pp.IsAPRS())
 		dw_printf("\n")
 	}
 
-	AX25CheckAddresses(pp, AddrStrict)
+	pp.CheckAddresses(ax25.AddrStrict)
 
 	/* Optional hex dump of packet. */
 
 	if xs.debugXmitPacket {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
-		AX25HexDump(pp)
+		pp.HexDump()
 		dw_printf("------\n")
 	}
 
@@ -956,13 +957,13 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *packet_t) {
+func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) {
 	/*
 	 * Print spoken packet.  Prefix by channel.
 	 */
 	var ts = xs.timestampPrefix()
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.speech%s] \"%s\"\n", c, ts, string(pinfo))
@@ -1051,10 +1052,10 @@ func (xs *XmitService) timestampPrefix() string {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
+func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 	var ts = xs.timestampPrefix()
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, string(pinfo))
@@ -1101,10 +1102,10 @@ func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_dtmf(c int, pp *packet_t, speed int) {
+func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 	var ts = xs.timestampPrefix()
 
-	var pinfo = AX25GetInfo(pp)
+	var pinfo = pp.Info()
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, string(pinfo))

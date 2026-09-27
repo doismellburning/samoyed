@@ -63,6 +63,7 @@ import (
 	"sync"
 
 	"github.com/creack/pty"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -236,11 +237,11 @@ func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen int
 	} else {
 		var stemp []byte
 
-		if flen > AX25_MAX_PACKET_LEN {
+		if flen > ax25.MaxPacketLen {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nPseudo Terminal KISS buffer too small.  Truncated.\n\n")
 
-			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
+			fbuf = fbuf[:ax25.MaxPacketLen]
 		}
 
 		stemp = []byte{byte((channel << 4) | kiss_cmd)}
