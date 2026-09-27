@@ -927,7 +927,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 			logEntry = logEntry.WithField("slice", slice)
 		}
 
-		if ax25_is_aprs(pp) {
+		if pp.IsAPRS() {
 			text_color_set(DW_COLOR_REC)
 		} else {
 			text_color_set(DW_COLOR_DECODED)
@@ -939,11 +939,11 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
 
 	var asciiOnly = false
-	if !ax25_is_aprs(pp) && !d_u_opt {
+	if !pp.IsAPRS() && !d_u_opt {
 		asciiOnly = true
 	}
 
-	if !ax25_is_aprs(pp) {
+	if !pp.IsAPRS() {
 		var _, desc, _, _, _, ftype = pp.FrameType()
 
 		/* Could change by 1, since earlier call, if we guess at modulo 128. */
@@ -1005,7 +1005,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	 */
 	var ais_obj_packet string
 
-	if ax25_is_aprs(pp) {
+	if pp.IsAPRS() {
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
 		var A = DecodeAPRS(pp, q_d_opt, "")
@@ -1143,7 +1143,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
+		if pp.IsAPRS() && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
 			igate.sendRecPacket(channel, pp)
 		}
 
@@ -1161,7 +1161,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
+		if pp.IsAPRS() && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
 			aprsDigipeater.Digipeat(channel, pp)
 		}
 

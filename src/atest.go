@@ -544,7 +544,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 
 	// Display channel with subchannel/slice if applicable.
 
-	if ax25_is_aprs(pp) {
+	if pp.IsAPRS() {
 		text_color_set(DW_COLOR_REC)
 	} else {
 		text_color_set(DW_COLOR_DEBUG)

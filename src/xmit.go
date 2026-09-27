@@ -274,7 +274,7 @@ const (
 )
 
 func frame_flavor(pp *packet_t) flavor_t {
-	if ax25_is_aprs(pp) { // UI frame, PID 0xF0.
+	if pp.IsAPRS() { // UI frame, PID 0xF0.
 		// It's unfortunate APRS did not use its own special PID.
 		var dest = pp.AddrNoSSID(AX25_DESTINATION)
 
@@ -541,7 +541,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 			dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+			AX25SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 		} /* wait for clear channel error. */
 	} /* Have pp */
@@ -880,7 +880,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 
 	/* Demystify non-APRS.  Use same format for received frames in direwolf.c. */
 
-	if !ax25_is_aprs(pp) {
+	if !pp.IsAPRS() {
 		var _, desc, _, _, _, ftype = pp.FrameType()
 
 		dw_printf("(%s)", desc)
@@ -889,11 +889,11 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {
-			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+			AX25SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 		}
 	} else {
-		AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+		AX25SafePrint(pinfo, !pp.IsAPRS())
 		dw_printf("\n")
 	}
 

@@ -62,7 +62,7 @@ func FuzzAX25FromFrame(f *testing.F) {
 		pp.Info()
 		pp.FormatViaPath()
 		pp.FrameType()
-		ax25_is_aprs(pp)
+		pp.IsAPRS()
 		ax25_dedupe_crc(pp)
 		pp.DTI()
 		pp.CheckAddresses(AddrLenient)

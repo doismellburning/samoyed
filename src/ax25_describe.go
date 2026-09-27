@@ -103,7 +103,7 @@ func DescribeAX25Frame(frame []byte) int {
 
 	var info = pp.Info()
 
-	if ax25_is_aprs(pp) {
+	if pp.IsAPRS() {
 		AX25SafePrint(info, true) // Display non-ASCII as hexadecimal.
 		fmt.Printf("\n")
 		NoteSafePrintTruncation(len(info))

@@ -272,14 +272,14 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 		if tq.audioConfig.chan_medium[channel] == MEDIUM_IGATE {
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+			AX25SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 
 			igate.sendRecPacket(channel, pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+			AX25SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 
 			tq.netTNCs[channel].sendPacket(channel, pp)
@@ -327,7 +327,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 	 * Limit was 20.  Changed to 100 in version 1.2 as a workaround.
 	 */
 
-	if ax25_is_aprs(pp) && tq.Count(channel, prio, "", "", false) > 100 {
+	if pp.IsAPRS() && tq.Count(channel, prio, "", "", false) > 100 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")

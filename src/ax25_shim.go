@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_is_aprs(this_p *packet_t) bool {
-	return this_p.IsAPRS()
-}
-
 func ax25_is_null_frame(this_p *packet_t) bool {
 	return this_p.IsNullFrame()
 }
