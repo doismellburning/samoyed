@@ -835,7 +835,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 				logEntry = logEntry.WithField("digipeater", true)
 			}
 
-			var alevel_text = ax25_alevel_to_text(alevel)
+			var alevel_text = alevel.Text()
 
 			// Experiment: try displaying the DC bias.
 			// Should be 0 for soundcard but could show mistuning with SDR.

@@ -510,7 +510,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 		dw_printf("Digipeater ")
 	}
 
-	var alevel_text = ax25_alevel_to_text(alevel)
+	var alevel_text = alevel.Text()
 
 	/* As suggested by KJ4ERJ, if we are receiving from */
 	/* WIDEn-0, it is quite likely (but not guaranteed), that */

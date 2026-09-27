@@ -250,7 +250,7 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
 			}
 		}
 
-		var alevel_text = ax25_alevel_to_text(alevel)
+		var alevel_text = alevel.Text()
 
 		var sdti string
 		if pp != nil {
