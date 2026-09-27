@@ -400,7 +400,7 @@ func TestLayer2SendFrameSendsAX25AsHDLC(t *testing.T) {
 
 	assert.Equal(t, len(bits), sent)
 
-	var fbuf = AX25Pack(pp)
+	var fbuf = pp.Pack()
 	var frameFCS = fcs.Calc(fbuf)
 	var expected = append(append([]byte{}, fbuf...), byte(frameFCS)&0xff, byte(frameFCS>>8)&0xff)
 
@@ -451,7 +451,7 @@ func TestLayer2SendFrameFallsBackToAX25WhenIL2PCannotCarryTheFrame(t *testing.T)
 	})
 
 	var asAX25 = captureBits(t, audioConfig, func(s *HDLCSender) {
-		s.sendAX25Frame(AX25Pack(pp), false)
+		s.sendAX25Frame(pp.Pack(), false)
 	})
 
 	assert.Equal(t, asAX25, viaIL2P, "an oversized frame should have gone out as plain AX.25")
@@ -475,7 +475,7 @@ func TestLayer2SendFrameSendsFX25WhenConfigured(t *testing.T) {
 	assert.Equal(t, len(bits), sent)
 
 	var asAX25 = captureBits(t, audioConfig, func(s *HDLCSender) {
-		s.sendAX25Frame(AX25Pack(pp), false)
+		s.sendAX25Frame(pp.Pack(), false)
 	})
 
 	assert.NotEqual(t, asAX25, bits, "the frame should have been wrapped up as FX.25")
@@ -498,7 +498,7 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 	})
 
 	var asAX25 = captureBits(t, audioConfig, func(s *HDLCSender) {
-		s.sendAX25Frame(AX25Pack(pp), false)
+		s.sendAX25Frame(pp.Pack(), false)
 	})
 
 	assert.Equal(t, asAX25, viaFX25, "an oversized frame should have gone out as plain AX.25")

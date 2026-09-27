@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func AX25Pack(this_p *packet_t) []byte {
-	return this_p.Pack()
-}
-
 func ax25_frame_type_only(this_p *packet_t) ax25_frame_type_t {
 	return this_p.FrameTypeOnly()
 }

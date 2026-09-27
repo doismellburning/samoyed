@@ -79,7 +79,7 @@ func (s *HDLCSender) SendFrame(pp *packet_t, badFCS bool) int {
 		dw_printf("Unable to send IL2p frame.  Falling back to regular AX.25.\n")
 		// Not sure if we should fall back to AX.25 or not here.
 	} else if achan.layer2_xmit == LAYER2_FX25 {
-		var fbuf = AX25Pack(pp)
+		var fbuf = pp.Pack()
 
 		var n = s.sendFX25Frame(fbuf, achan.fx25_strength)
 		if n > 0 {
@@ -92,7 +92,7 @@ func (s *HDLCSender) SendFrame(pp *packet_t, badFCS bool) int {
 		// the FX.25 frame length is so limited.
 	}
 
-	var fbuf = AX25Pack(pp)
+	var fbuf = pp.Pack()
 
 	return s.sendAX25Frame(fbuf, badFCS)
 }

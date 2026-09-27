@@ -647,7 +647,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	if first_time && u.ttConfig.obj_send_to_app > 0 {
 		// TODO1.3:  Put a wrapper around this so we only call one function to send by all methods.
 		// We see the same sequence in direwolf.c.
-		var fbuf = AX25Pack(pp)
+		var fbuf = pp.Pack()
 
 		agwServer.SendRecPacket(u.ttConfig.obj_recv_chan, pp, fbuf)
 		kissNetSvc.SendRecPacket(u.ttConfig.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)

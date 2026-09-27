@@ -49,7 +49,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	 * again, and make sure it is still the same.
 	 */
 
-	var frame = AX25Pack(pp)
+	var frame = pp.Pack()
 
 	var alevel ALevel
 	alevel.Rec = 50

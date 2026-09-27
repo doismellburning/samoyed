@@ -73,7 +73,7 @@ func TestIL2PSpec(t *testing.T) {
 			assert.Equal(t, testDatum.expectedAddrs, pp.FormatAddrs())
 
 			// Does it match the AX.25 data in the spec?
-			assert.Equal(t, il2pDataStringToBytes(testDatum.ax25Data), AX25Pack(pp))
+			assert.Equal(t, il2pDataStringToBytes(testDatum.ax25Data), pp.Pack())
 
 			// Verify the trailing CRC bytes are valid for the decoded frame.
 			var frameData = ax25_get_frame_data(pp)
@@ -82,7 +82,7 @@ func TestIL2PSpec(t *testing.T) {
 				"Trailing CRC mismatch for %s", testDatum.expectedAddrs)
 
 			// The default version receives v0.6 too.
-			assert.Equal(t, AX25Pack(pp), AX25Pack(il2p_decode_frame(b, IL2P_VERSION_COMPAT)))
+			assert.Equal(t, pp.Pack(), il2p_decode_frame(b, IL2P_VERSION_COMPAT).Pack())
 		})
 	}
 }
