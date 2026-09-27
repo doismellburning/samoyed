@@ -33,7 +33,7 @@ type il2pLoopbackFrame struct {
 
 // il2pLoopbackRecorder collects the frames that came back out of the receiver.
 type il2pLoopbackRecorder struct {
-	rx     *il2pReceiver
+	rx     *il2p.Receiver
 	frames []il2pLoopbackFrame
 }
 
@@ -48,7 +48,7 @@ func (r *il2pLoopbackRecorder) take() []il2pLoopbackFrame {
 // flush sends the receiver the one extra bit its state machine needs to
 // finish decoding a frame whose last bit it has already seen.
 func (r *il2pLoopbackRecorder) flush() {
-	r.rx.recBit(0)
+	r.rx.RecBit(0)
 }
 
 // il2pLoopback wires the transmitter's bit stream straight into the receiver
@@ -73,11 +73,11 @@ func il2pLoopback(t *testing.T, version il2p.Version) *il2pLoopbackRecorder {
 	// half-gathered frame.  A decoder left part way through gathering a payload
 	// swallows the next frame it is given while it resynchronises, which a
 	// deliberate version mismatch is apt to leave behind.
-	recorder.rx = newIL2PReceiver(0, 0, 0, version, true, il2p_deliver_packet)
+	recorder.rx = il2p.NewReceiver(0, 0, 0, version, true, il2p_deliver_packet)
 
 	toneGenCapture = func(channel int, data int) {
 		require.Zero(t, channel)
-		recorder.rx.recBit(data)
+		recorder.rx.RecBit(data)
 	}
 
 	multiModemRecCapture = func(_ int, _ int, _ int, pp *ax25.Packet, _ ax25.ALevel, retries BitFixLevel, _ fec_type_t) {

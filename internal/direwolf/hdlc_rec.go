@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
@@ -78,7 +79,7 @@ type hdlcState struct {
 
 	fx25 *fx25Receiver /* FX.25 decoder fed the same data bits. */
 
-	il2p *il2pReceiver /* IL2P decoder fed the same raw bits. */
+	il2p *il2p.Receiver /* IL2P decoder fed the same raw bits. */
 }
 
 // HDLCReceiver holds the HDLC bit-decoder state for every (channel, subchannel, slicer)
@@ -113,7 +114,7 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 	s.rrbb = rrbb_new(channel, subchannel, slice, scrambled, s.lfsr, s.prevDescram)
 
 	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
-	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, il2p_deliver_packet)
+	s.il2p = il2p.NewReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, il2p_deliver_packet)
 
 	return s
 }
@@ -463,7 +464,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 
 	if r.audio.achan[channel].modem_type != MODEM_AIS {
 		s.fx25.recBit(dwutil.IfThenElse(dbit, 1, 0))
-		s.il2p.recBit(dwutil.IfThenElse(raw, 1, 0)) // Note: skip NRZI.
+		s.il2p.RecBit(dwutil.IfThenElse(raw, 1, 0)) // Note: skip NRZI.
 	}
 
 	/*

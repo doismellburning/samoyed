@@ -36,10 +36,10 @@ func TestIL2PTXFEC(t *testing.T) {
 
 func TestIL2PRXMaxFEC(t *testing.T) {
 	// Only v0.4 reads the bit; the others know it is reserved.
-	assert.Equal(t, 0, RxMaxFEC(Version0_4, 0))
-	assert.Equal(t, 1, RxMaxFEC(Version0_4, 1))
-	assert.Equal(t, 1, RxMaxFEC(Version0_6, 0))
-	assert.Equal(t, 1, RxMaxFEC(Version0_6, 1))
-	assert.Equal(t, 1, RxMaxFEC(VersionCompat, 0))
-	assert.Equal(t, 1, RxMaxFEC(VersionCompat, 1))
+	assert.Equal(t, 0, rxMaxFEC(Version0_4, 0))
+	assert.Equal(t, 1, rxMaxFEC(Version0_4, 1))
+	assert.Equal(t, 1, rxMaxFEC(Version0_6, 0))
+	assert.Equal(t, 1, rxMaxFEC(Version0_6, 1))
+	assert.Equal(t, 1, rxMaxFEC(VersionCompat, 0))
+	assert.Equal(t, 1, rxMaxFEC(VersionCompat, 1))
 }

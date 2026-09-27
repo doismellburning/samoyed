@@ -14,7 +14,7 @@ import (
  *
  *--------------------------------------------------------------------------------*/
 
-type PayloadProperties struct {
+type payloadProperties struct {
 	PayloadByteCount      int // Total size, 0 thru 1023
 	payload_block_count   int
 	SmallBlockSize        int
@@ -42,8 +42,8 @@ type PayloadProperties struct {
  *
  *--------------------------------------------------------------------------------*/
 
-func PayloadCompute(payload_size int, max_fec int) (*PayloadProperties, int) {
-	var p = new(PayloadProperties)
+func payloadCompute(payload_size int, max_fec int) (*payloadProperties, int) {
+	var p = new(payloadProperties)
 
 	if payload_size < 0 || payload_size > maxPayloadSize {
 		return p, -1
@@ -130,7 +130,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 	// Determine number of blocks and sizes.
 
-	var ipp, e = PayloadCompute(payload_size, max_fec)
+	var ipp, e = payloadCompute(payload_size, max_fec)
 	if e <= 0 {
 		return nil, e
 	}
@@ -215,7 +215,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols_corrected *int) ([]byte, int) {
 	// Determine number of blocks and sizes.
-	var ipp, e = PayloadCompute(payload_size, max_fec)
+	var ipp, e = payloadCompute(payload_size, max_fec)
 	if e <= 0 {
 		return nil, e
 	}

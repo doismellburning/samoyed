@@ -22,7 +22,7 @@ func TestIL2PDecodeFrameHeaderFECFailureReturnsNil(t *testing.T) {
 	Init(0)
 	// Two symbol errors exceed the correction capacity of the 2-parity header (e < 0).
 	// il2p_decode_frame must return nil rather than proceeding with a corrupt header.
-	var twoErrors = make([]byte, HeaderSize+HeaderParity)
+	var twoErrors = make([]byte, headerSize+headerParity)
 	twoErrors[0] = 0x01
 	twoErrors[1] = 0x01
 	var pp = il2p_decode_frame(twoErrors, Version0_4)
@@ -44,7 +44,7 @@ func TestIL2PDecodeFrameTruncatedPayloadReturnsNil(t *testing.T) {
 	require.Positive(t, elen)
 
 	// Keep only the header bytes plus 1 byte of payload — far less than encoded_payload_size.
-	var truncated = encoded[:HeaderSize+HeaderParity+1]
+	var truncated = encoded[:headerSize+headerParity+1]
 	var pp2 = il2p_decode_frame(truncated, Version0_4)
 	assert.Nil(t, pp2)
 }

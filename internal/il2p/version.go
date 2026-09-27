@@ -103,7 +103,7 @@ func il2p_tx_fec(version Version, max_fec int) (int, int) {
 
 /*-------------------------------------------------------------
  *
- * Name:	RxMaxFEC
+ * Name:	rxMaxFEC
  *
  * Purpose:	Interpret the header bit which is the FEC Level in v0.4 and
  *		RESERVED in v0.6.
@@ -116,7 +116,7 @@ func il2p_tx_fec(version Version, max_fec int) (int, int) {
  *
  *--------------------------------------------------------------*/
 
-func RxMaxFEC(version Version, fec_level int) int {
+func rxMaxFEC(version Version, fec_level int) int {
 	if version == Version0_4 {
 		return fec_level
 	}

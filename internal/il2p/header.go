@@ -235,7 +235,7 @@ func decode_pid(pid int) int {
  *--------------------------------------------------------------------------------*/
 
 func il2p_type_1_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
-	var hdr = make([]byte, HeaderSize)
+	var hdr = make([]byte, headerSize)
 
 	if pp.NumAddr() != 2 {
 		// Only two addresses are allowed for type 1 header.
@@ -635,7 +635,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
  *--------------------------------------------------------------------------------*/
 
 func il2p_type_0_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
-	var hdr = make([]byte, HeaderSize)
+	var hdr = make([]byte, headerSize)
 
 	// Bit 7 has [FEC Level:1], [HDR Type:1], [Payload byte Count:10]
 
@@ -655,7 +655,7 @@ func il2p_type_0_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
 
 /***********************************************************************************
  *
- * Name:        HeaderAttributes
+ * Name:        headerAttributes
  *
  * Purpose:     Extract a few attributes from an IL2p header.
  *
@@ -670,13 +670,13 @@ func il2p_type_0_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
  *
  ***********************************************************************************/
 
-func HeaderAttributes(hdr []byte) (int, int, int) {
+func headerAttributes(hdr []byte) (int, int, int) {
 	return getHdrType(hdr), getFECLevel(hdr), getPayloadByteCount(hdr)
 }
 
 /***********************************************************************************
  *
- * Name:        ClarifyHeader
+ * Name:        clarifyHeader
  *
  * Purpose:     Convert received header to usable form.
  *		This involves RS FEC then descrambling.
@@ -692,8 +692,8 @@ func HeaderAttributes(hdr []byte) (int, int, int) {
  *
  ***********************************************************************************/
 
-func ClarifyHeader(rec_hdr []byte) ([]byte, int) {
-	var corrected, e = il2p_decode_rs(rec_hdr, HeaderParity)
+func clarifyHeader(rec_hdr []byte) ([]byte, int) {
+	var corrected, e = il2p_decode_rs(rec_hdr, headerParity)
 
 	var corrected_descrambled_hdr = il2p_descramble_block(corrected)
 

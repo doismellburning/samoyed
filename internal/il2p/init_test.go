@@ -31,17 +31,17 @@ func TestIL2PDecodeBeforeInit(t *testing.T) {
 		rsTab[i].rs = nil
 	}
 
-	var rs, err = il2p_find_rs(HeaderParity)
+	var rs, err = il2p_find_rs(headerParity)
 	require.Error(t, err)
 	assert.Nil(t, rs)
 
 	assert.NotPanics(t, func() {
-		var _, e = il2p_decode_rs(make([]byte, 15), HeaderParity)
+		var _, e = il2p_decode_rs(make([]byte, 15), headerParity)
 		assert.Equal(t, -1, e)
 
 		assert.Nil(t, il2p_decode_frame(make([]byte, 30), Version0_4))
 	})
 
-	var _, encodeErr = il2p_encode_rs(make([]byte, 13), HeaderParity)
+	var _, encodeErr = il2p_encode_rs(make([]byte, 13), headerParity)
 	require.Error(t, encodeErr)
 }

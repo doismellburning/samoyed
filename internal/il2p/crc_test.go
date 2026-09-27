@@ -74,11 +74,11 @@ func TestIL2PCRCCheck(t *testing.T) {
 	// Example 1: Verify CRC check passes.
 	var ex1AX25 = []byte{0x96, 0x82, 0x64, 0x88, 0x8A, 0xAE, 0xE4, 0x96, 0x96, 0x68, 0x90, 0x8A, 0x94, 0x6F, 0x81}
 	var ex1CRCBytes = []byte{0x7F, 0x00, 0x1D, 0x2B}
-	assert.True(t, CRCCheck(ex1AX25, ex1CRCBytes))
+	assert.True(t, crcCheck(ex1AX25, ex1CRCBytes))
 
 	// Wrong CRC bytes should fail.
 	var badCRCBytes = []byte{0x7F, 0x00, 0x1D, 0x00}
-	assert.False(t, CRCCheck(ex1AX25, badCRCBytes))
+	assert.False(t, crcCheck(ex1AX25, badCRCBytes))
 }
 
 func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {

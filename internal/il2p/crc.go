@@ -109,7 +109,7 @@ func il2p_crc_decode(encoded []byte) uint16 {
 
 /*-------------------------------------------------------------
  *
- * Name:	CRCCheck
+ * Name:	crcCheck
  *
  * Purpose:	Validate received Hamming-encoded CRC against AX.25 frame data.
  *
@@ -120,7 +120,7 @@ func il2p_crc_decode(encoded []byte) uint16 {
  *
  *--------------------------------------------------------------*/
 
-func CRCCheck(frame_data []byte, encoded_crc []byte) bool {
+func crcCheck(frame_data []byte, encoded_crc []byte) bool {
 	var expected = il2p_crc_calc(frame_data)
 	var received = il2p_crc_decode(encoded_crc)
 

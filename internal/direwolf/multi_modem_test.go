@@ -96,8 +96,8 @@ func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
 	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
 
 	var rx = hdlcReceiver.slicer[0][0][0].il2p
-	assert.Equal(t, il2p.Version0_4, rx.version)
-	assert.False(t, rx.crc)
+	assert.Equal(t, il2p.Version0_4, rx.Version())
+	assert.False(t, rx.CRC())
 }
 
 // Every slicer's FX.25 receiver reports at the debug level multi_modem_init

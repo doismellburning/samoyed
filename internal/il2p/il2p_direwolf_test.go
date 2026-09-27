@@ -143,11 +143,11 @@ func test_payload(t *testing.T) {
 	fmt.Println("Test payload functions...")
 
 	var e int
-	var ipp *PayloadProperties
+	var ipp *payloadProperties
 
 	// Examples in specification.
 
-	ipp, e = PayloadCompute(100, 0)
+	ipp, e = payloadCompute(100, 0)
 	assert.Equal(t, 100, ipp.SmallBlockSize)
 	assert.Equal(t, 101, ipp.LargeBlockSize)
 	assert.Equal(t, 0, ipp.LargeBlockCount)
@@ -155,7 +155,7 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, 4, ipp.ParitySymbolsPerBlock)
 	assert.GreaterOrEqual(t, e, 0)
 
-	ipp, e = PayloadCompute(236, 0)
+	ipp, e = payloadCompute(236, 0)
 	assert.Equal(t, 236, ipp.SmallBlockSize)
 	assert.Equal(t, 237, ipp.LargeBlockSize)
 	assert.Equal(t, 0, ipp.LargeBlockCount)
@@ -163,7 +163,7 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, 8, ipp.ParitySymbolsPerBlock)
 	assert.GreaterOrEqual(t, e, 0)
 
-	ipp, e = PayloadCompute(512, 0)
+	ipp, e = payloadCompute(512, 0)
 	assert.Equal(t, 170, ipp.SmallBlockSize)
 	assert.Equal(t, 171, ipp.LargeBlockSize)
 	assert.Equal(t, 2, ipp.LargeBlockCount)
@@ -171,7 +171,7 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, 6, ipp.ParitySymbolsPerBlock)
 	assert.GreaterOrEqual(t, e, 0)
 
-	ipp, e = PayloadCompute(1023, 0)
+	ipp, e = payloadCompute(1023, 0)
 	assert.Equal(t, 204, ipp.SmallBlockSize)
 	assert.Equal(t, 205, ipp.LargeBlockSize)
 	assert.Equal(t, 3, ipp.LargeBlockCount)
@@ -182,7 +182,7 @@ func test_payload(t *testing.T) {
 	// Now try all possible sizes for Baseline FEC Parity.
 
 	for n := 1; n <= maxPayloadSize; n++ {
-		ipp, e = PayloadCompute(n, 0)
+		ipp, e = payloadCompute(n, 0)
 		// dw_printf ("bytecount=%d, smallsize=%d, largesize=%d, largecount=%d, smallcount=%d\n", n,
 		//		ipp.small_block_size, ipp.large_block_size,
 		//		ipp.large_block_count, ipp.small_block_count);
@@ -207,7 +207,7 @@ func test_payload(t *testing.T) {
 	// All sizes for MAX FEC.
 
 	for n := 1; n <= maxPayloadSize; n++ {
-		ipp, e = PayloadCompute(n, 1) // 1 for max fec.
+		ipp, e = payloadCompute(n, 1) // 1 for max fec.
 		// dw_printf ("bytecount=%d, smallsize=%d, largesize=%d, largecount=%d, smallcount=%d\n", n,
 		//		ipp.small_block_size, ipp.large_block_size,
 		//		ipp.large_block_count, ipp.small_block_count);
@@ -241,7 +241,7 @@ func test_payload(t *testing.T) {
 			var encoded, k = il2p_encode_payload(original_payload[:payload_length], max_fec)
 
 			// dw_printf ("payload length %d %s -> %d\n", payload_length, max_fec ? "M" : "", k);
-			assert.True(t, k > payload_length && k <= MaxEncodedPayloadSize)
+			assert.True(t, k > payload_length && k <= maxEncodedPayloadSize)
 
 			// Now extract.
 

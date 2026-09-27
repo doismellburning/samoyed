@@ -81,7 +81,7 @@ func TestIL2PSpec(t *testing.T) {
 			// Verify the trailing CRC bytes are valid for the decoded frame.
 			var frameData = pp.FrameData()
 			var crcBytes = b[len(b)-CRCEncodedSize:]
-			assert.True(t, CRCCheck(frameData, crcBytes),
+			assert.True(t, crcCheck(frameData, crcBytes),
 				"Trailing CRC mismatch for %s", testDatum.expectedAddrs)
 
 			// The default version receives v0.6 too.
