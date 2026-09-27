@@ -153,6 +153,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/sirupsen/logrus"
@@ -517,7 +518,7 @@ func SET_VS(S *ax25_dlsm_t, n int) {
 		dw_printf("V(S) = %d at %s %d\n", S.vs, __func__, __LINE__)
 	}
 
-	Assert(S.vs >= 0 && S.vs < int(S.modulo))
+	dwutil.Assert(S.vs >= 0 && S.vs < int(S.modulo))
 }
 
 // If other guy acks reception of an I frame, we should never get an REJ or SREJ
@@ -535,7 +536,7 @@ func SET_VA(S *ax25_dlsm_t, n int) {
 		dw_printf("V(A) = %d at %s %d\n", S.va, __func__, __LINE__)
 	}
 
-	Assert(S.va >= 0 && S.va < int(S.modulo))
+	dwutil.Assert(S.va >= 0 && S.va < int(S.modulo))
 
 	var x = AX25MODULO(n-1, S.modulo)
 	for S.txdata_by_ns[x] != nil {
@@ -555,7 +556,7 @@ func SET_VR(S *ax25_dlsm_t, n int) {
 		dw_printf("V(R) = %d at %s %d\n", S.vr, __func__, __LINE__)
 	}
 
-	Assert(S.vr >= 0 && S.vr < int(S.modulo))
+	dwutil.Assert(S.vr >= 0 && S.vr < int(S.modulo))
 }
 
 func SET_RC(S *ax25_dlsm_t, n int) {
@@ -1792,9 +1793,9 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
  *------------------------------------------------------------------------------*/
 
 func lm_channel_busy(E *dlq_item_t) {
-	Assert(E._chan >= 0 && E._chan < MAX_TOTAL_CHANS)
-	Assert(E.activity == OCTYPE_PTT || E.activity == OCTYPE_DCD)
-	Assert(E.status == 1 || E.status == 0)
+	dwutil.Assert(E._chan >= 0 && E._chan < MAX_TOTAL_CHANS)
+	dwutil.Assert(E.activity == OCTYPE_PTT || E.activity == OCTYPE_DCD)
+	dwutil.Assert(E.status == 1 || E.status == 0)
 
 	switch E.activity {
 	case OCTYPE_DCD:
@@ -1860,7 +1861,7 @@ func lm_channel_busy(E *dlq_item_t) {
  *------------------------------------------------------------------------------*/
 
 func lm_seize_confirm(E *dlq_item_t) {
-	Assert(E._chan >= 0 && E._chan < MAX_TOTAL_CHANS)
+	dwutil.Assert(E._chan >= 0 && E._chan < MAX_TOTAL_CHANS)
 
 	for S := ax25Link.listHead; S != nil; S = S.next {
 		if E._chan == S.channel {
@@ -5842,7 +5843,7 @@ func enter_new_state(S *ax25_dlsm_t, new_state dlsm_state_e) {
 		dw_printf("\n")
 	}
 
-	Assert(new_state >= 0 && new_state <= 5)
+	dwutil.Assert(new_state >= 0 && new_state <= 5)
 
 	if (new_state == state_3_connected || new_state == state_4_timer_recovery) &&
 		S.state != state_3_connected && S.state != state_4_timer_recovery {

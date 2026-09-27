@@ -10,6 +10,8 @@ package direwolf
 
 import (
 	"math/bits"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 type IL2PState int
@@ -53,9 +55,9 @@ type il2pReceiver struct {
 }
 
 func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_version_t, crc bool) *il2pReceiver {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
-	Assert(slice >= 0 && slice < MAX_SLICERS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
+	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
 
 	var F = new(il2pReceiver)
 	F.channel = channel

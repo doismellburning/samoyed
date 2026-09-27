@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
@@ -312,7 +313,7 @@ func (f *layer2TxFlags) apply(achan *achan_param_s) error {
 
 	if *f.il2pNormal >= 0 {
 		achan.layer2_xmit = LAYER2_IL2P
-		achan.il2p_max_fec = IfThenElse(*f.il2pNormal > 0, 1, 0)
+		achan.il2p_max_fec = dwutil.IfThenElse(*f.il2pNormal > 0, 1, 0)
 		achan.il2p_invert_polarity = 0 // normal
 
 		if achan.il2p_max_fec == 0 {
@@ -322,7 +323,7 @@ func (f *layer2TxFlags) apply(achan *achan_param_s) error {
 
 	if *f.il2pInverted >= 0 {
 		achan.layer2_xmit = LAYER2_IL2P
-		achan.il2p_max_fec = IfThenElse(*f.il2pInverted > 0, 1, 0)
+		achan.il2p_max_fec = dwutil.IfThenElse(*f.il2pInverted > 0, 1, 0)
 		achan.il2p_invert_polarity = 1 // invert for transmit
 
 		if achan.il2p_max_fec == 0 {
@@ -339,7 +340,7 @@ func (f *layer2TxFlags) apply(achan *achan_param_s) error {
 			"fx25_check_bytes":     achan.fx25_strength,
 			"il2p_max_fec":         achan.il2p_max_fec,
 			"il2p_invert_polarity": achan.il2p_invert_polarity,
-		}).Info(IfThenElse(achan.layer2_xmit == LAYER2_FX25, "Transmitting FX.25", "Transmitting IL2P"))
+		}).Info(dwutil.IfThenElse(achan.layer2_xmit == LAYER2_FX25, "Transmitting FX.25", "Transmitting IL2P"))
 	}
 
 	return nil

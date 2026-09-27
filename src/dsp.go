@@ -8,6 +8,8 @@ package direwolf
 
 import (
 	"math"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 // Don't remove this.  It serves as a reminder that an experiment is underway.
@@ -92,7 +94,7 @@ func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_wind
 			dw_printf ("   j     shape   sinc   final\n");
 		#endif
 	*/
-	Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
+	dwutil.Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
 
 	for j := range filter_size {
 		var sinc float64
@@ -162,7 +164,7 @@ func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, 
 		#endif
 	*/
 
-	Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
+	dwutil.Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
 
 	for j := range filter_size {
 		var sinc float64

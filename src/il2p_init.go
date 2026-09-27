@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -50,7 +51,7 @@ func il2p_init(il2p_debug int) {
 	g_il2p_debug = il2p_debug
 
 	for i := range NTAB {
-		Assert(Tab[i].nroots <= MAX_NROOTS)
+		dwutil.Assert(Tab[i].nroots <= MAX_NROOTS)
 
 		Tab[i].rs = init_rs_char(Tab[i].symsize, Tab[i].genpoly, Tab[i].fcs, Tab[i].prim, Tab[i].nroots)
 		if Tab[i].rs == nil {
@@ -102,10 +103,10 @@ func il2p_find_rs(nparity int) (*rs_t, error) {
 func il2p_encode_rs(tx_data []byte, num_parity int) ([]byte, error) {
 	var data_size = len(tx_data)
 
-	Assert(data_size >= 1)
+	dwutil.Assert(data_size >= 1)
 
-	Assert(num_parity == 2 || num_parity == 4 || num_parity == 6 || num_parity == 8 || num_parity == 16)
-	Assert(data_size+num_parity <= 255)
+	dwutil.Assert(num_parity == 2 || num_parity == 4 || num_parity == 6 || num_parity == 8 || num_parity == 16)
+	dwutil.Assert(data_size+num_parity <= 255)
 
 	var rs, err = il2p_find_rs(num_parity)
 	if err != nil {

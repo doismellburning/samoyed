@@ -64,6 +64,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	direwolf "github.com/doismellburning/samoyed/src"
 )
 
@@ -142,7 +143,7 @@ func decodeAPRSLine(line string) {
 			var kiss_frame = bytes
 
 			fmt.Printf("--- KISS frame ---\n")
-			direwolf.HexDump(kiss_frame)
+			dwutil.HexDump(kiss_frame)
 
 			// Put FEND at end to keep KissUnwrap happy.
 			// Having one at the beginning is optional.

@@ -152,6 +152,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/sirupsen/logrus"
 )
@@ -421,7 +422,7 @@ func ax25_new() *packet_t {
  *------------------------------------------------------------------------------*/
 
 func AX25FromText(monitor string, strict bool) *packet_t {
-	return AX25FromTextWithStrictness(monitor, IfThenElse(strict, AddrStrict, AddrLenient))
+	return AX25FromTextWithStrictness(monitor, dwutil.IfThenElse(strict, AddrStrict, AddrLenient))
 }
 
 // MustAX25FromText is AX25FromText, strictly, for text known to be a valid
@@ -470,7 +471,7 @@ func AX25FromTextWithStrictness(monitor string, strictness AddrStrictness) *pack
 	this_p.frame_len = 7 + 7 + 1 + 1
 	this_p.num_addr = (-1)
 	ax25_get_num_addr(this_p) // when num_addr is -1, this sets it properly.
-	Assert(this_p.num_addr == 2)
+	dwutil.Assert(this_p.num_addr == 2)
 
 	/*
 	 * Separate the addresses from the rest.
@@ -829,7 +830,7 @@ func ax25_parse_addr(position int, in_addr string, strictness AddrStrictness) (s
 
 	// dw_printf ("ax25_parse_addr in: %s\n", in_addr);
 
-	var maxlen = IfThenElse(strictness.strict(), 6, (AX25_MAX_ADDR_LEN - 1))
+	var maxlen = dwutil.IfThenElse(strictness.strict(), 6, (AX25_MAX_ADDR_LEN - 1))
 
 	for i, p := range in_addr {
 		if p == '-' || p == '*' {
@@ -1051,7 +1052,7 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
  *------------------------------------------------------------------------------*/
 
 func ax25_set_addr(this_p *packet_t, n int, ad string) {
-	Assert(n >= 0 && n < AX25_MAX_ADDRS)
+	dwutil.Assert(n >= 0 && n < AX25_MAX_ADDRS)
 
 	//dw_printf ("ax25_set_addr (%d, %s) num_addr=%d\n", n, ad, this_p.num_addr);
 
@@ -1128,7 +1129,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
  *------------------------------------------------------------------------------*/
 
 func ax25_insert_addr(this_p *packet_t, n int, ad string) {
-	Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
+	dwutil.Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
 
 	//dw_printf ("ax25_insert_addr (%d, %s)\n", n, ad);
 
@@ -1204,7 +1205,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
  *------------------------------------------------------------------------------*/
 
 func ax25_remove_addr(this_p *packet_t, n int) {
-	Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
+	dwutil.Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
 
 	/* Shift those beyond to fill this position. */
 
@@ -1496,7 +1497,7 @@ func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_h(this_p *packet_t, n int) int {
-	Assert(n >= 0 && n < this_p.num_addr)
+	dwutil.Assert(n >= 0 && n < this_p.num_addr)
 
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_H_MASK) >> SSID_H_SHIFT)
@@ -1608,7 +1609,7 @@ func ax25_get_first_not_repeated(this_p *packet_t) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_rr(this_p *packet_t, n int) int {
-	Assert(n >= 0 && n < this_p.num_addr)
+	dwutil.Assert(n >= 0 && n < this_p.num_addr)
 
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_RR_MASK) >> SSID_RR_SHIFT)
@@ -1945,7 +1946,7 @@ func ax25_format_via_path(this_p *packet_t) string {
  *------------------------------------------------------------------*/
 
 func AX25Pack(this_p *packet_t) []byte {
-	Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
+	dwutil.Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
 
 	var result = make([]byte, this_p.frame_len)
 	copy(result, this_p.frame_data[:this_p.frame_len])
@@ -2300,24 +2301,24 @@ func AX25HexDump(this_p *packet_t) {
 	// Any non printable characters will be printed as "." here.
 
 	fmt.Printf(" dest    %c%c%c%c%c%c %2d c/r=%d res=%d last=%d\n",
-		IfThenElse(unicode.IsPrint(rune(fptr[0]>>1)), fptr[0]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[1]>>1)), fptr[1]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[2]>>1)), fptr[2]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[3]>>1)), fptr[3]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[4]>>1)), fptr[4]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[5]>>1)), fptr[5]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[0]>>1)), fptr[0]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[1]>>1)), fptr[1]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[2]>>1)), fptr[2]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[3]>>1)), fptr[3]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[4]>>1)), fptr[4]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[5]>>1)), fptr[5]>>1, '.'),
 		(fptr[6]&SSID_SSID_MASK)>>SSID_SSID_SHIFT,
 		(fptr[6]&SSID_H_MASK)>>SSID_H_SHIFT,
 		(fptr[6]&SSID_RR_MASK)>>SSID_RR_SHIFT,
 		fptr[6]&SSID_LAST_MASK)
 
 	fmt.Printf(" source  %c%c%c%c%c%c %2d c/r=%d res=%d last=%d\n",
-		IfThenElse(unicode.IsPrint(rune(fptr[7]>>1)), fptr[7]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[8]>>1)), fptr[8]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[9]>>1)), fptr[9]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[10]>>1)), fptr[10]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[11]>>1)), fptr[11]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[12]>>1)), fptr[12]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[7]>>1)), fptr[7]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[8]>>1)), fptr[8]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[9]>>1)), fptr[9]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[10]>>1)), fptr[10]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[11]>>1)), fptr[11]>>1, '.'),
+		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[12]>>1)), fptr[12]>>1, '.'),
 		(fptr[13]&SSID_SSID_MASK)>>SSID_SSID_SHIFT,
 		(fptr[13]&SSID_H_MASK)>>SSID_H_SHIFT,
 		(fptr[13]&SSID_RR_MASK)>>SSID_RR_SHIFT,
@@ -2326,19 +2327,19 @@ func AX25HexDump(this_p *packet_t) {
 	for n := 2; n < this_p.num_addr; n++ {
 		fmt.Printf(" digi %d  %c%c%c%c%c%c %2d   h=%d res=%d last=%d\n",
 			n-1,
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+0]>>1)), fptr[n*7+0]>>1, '.'),
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+1]>>1)), fptr[n*7+1]>>1, '.'),
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+2]>>1)), fptr[n*7+2]>>1, '.'),
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+3]>>1)), fptr[n*7+3]>>1, '.'),
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+4]>>1)), fptr[n*7+4]>>1, '.'),
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+5]>>1)), fptr[n*7+5]>>1, '.'),
+			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+0]>>1)), fptr[n*7+0]>>1, '.'),
+			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+1]>>1)), fptr[n*7+1]>>1, '.'),
+			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+2]>>1)), fptr[n*7+2]>>1, '.'),
+			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+3]>>1)), fptr[n*7+3]>>1, '.'),
+			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+4]>>1)), fptr[n*7+4]>>1, '.'),
+			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+5]>>1)), fptr[n*7+5]>>1, '.'),
 			(fptr[n*7+6]&SSID_SSID_MASK)>>SSID_SSID_SHIFT,
 			(fptr[n*7+6]&SSID_H_MASK)>>SSID_H_SHIFT,
 			(fptr[n*7+6]&SSID_RR_MASK)>>SSID_RR_SHIFT,
 			fptr[n*7+6]&SSID_LAST_MASK)
 	}
 
-	HexDump(fptr[:this_p.frame_len])
+	dwutil.HexDump(fptr[:this_p.frame_len])
 } /* end AX25HexDump */
 
 /*------------------------------------------------------------------
@@ -2531,7 +2532,7 @@ func ax25_get_pid(this_p *packet_t) int {
  *------------------------------------------------------------------*/
 
 func ax25_get_frame_len(this_p *packet_t) int {
-	Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
+	dwutil.Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
 
 	return (this_p.frame_len)
 } /* end ax25_get_frame_len */

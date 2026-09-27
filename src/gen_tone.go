@@ -13,6 +13,7 @@ import (
 	"math"
 	"os"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -330,8 +331,8 @@ func NewGenToneTestConfig(numChannels int, mediumRadio bool) *AudioConfig {
 func interpol8(oldv float64, newv float64, bc float64) float64 { //nolint:unused
 	// Step function.
 	//return (newv);				// 78 on 11/7
-	Assert(bc >= 0)
-	Assert(bc <= 1.1)
+	dwutil.Assert(bc >= 0)
+	dwutil.Assert(bc <= 1.1)
 
 	if bc < 0 {
 		return (oldv)
@@ -614,9 +615,9 @@ func (tg *ToneGenerator) PutSample(sam int) {
 	var audioConfig = tg.audioConfig
 	var a = tg.adevIndex
 
-	Assert(audioConfig.adev[a].num_channels == 1 || audioConfig.adev[a].num_channels == 2)
+	dwutil.Assert(audioConfig.adev[a].num_channels == 1 || audioConfig.adev[a].num_channels == 2)
 
-	Assert(audioConfig.adev[a].bits_per_sample == 16 || audioConfig.adev[a].bits_per_sample == 8)
+	dwutil.Assert(audioConfig.adev[a].bits_per_sample == 16 || audioConfig.adev[a].bits_per_sample == 8)
 
 	// Bad news if we are clipping and distorting the signal.
 	// We are using the full range.

@@ -14,6 +14,8 @@ package direwolf
 
 import (
 	"fmt"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 /*------------------------------------------------------------------
@@ -64,7 +66,7 @@ func DescribeAX25Frame(frame []byte) int {
 		 */
 		fmt.Printf("ERROR: The address field is malformed - the end of address bit does not mark out %d to %d addresses of 7 bytes each.\n",
 			AX25_MIN_ADDRS, AX25_MAX_ADDRS)
-		HexDump(frame)
+		dwutil.HexDump(frame)
 
 		return 1
 	}
@@ -73,7 +75,7 @@ func DescribeAX25Frame(frame []byte) int {
 
 	if ax25_get_control_offset(pp) >= frameLen {
 		fmt.Printf("ERROR: The frame ends after the address field - there is no control byte.\n")
-		HexDump(frame)
+		dwutil.HexDump(frame)
 
 		return 1
 	}
@@ -81,7 +83,7 @@ func DescribeAX25Frame(frame []byte) int {
 	if ax25_get_info_offset(pp) > frameLen {
 		fmt.Printf("ERROR: The frame is %d bytes, but the address, control and PID fields need %d - it ends before the information field.\n",
 			frameLen, ax25_get_info_offset(pp))
-		HexDump(frame)
+		dwutil.HexDump(frame)
 
 		return 1
 	}

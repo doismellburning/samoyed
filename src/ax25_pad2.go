@@ -118,6 +118,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -532,8 +533,8 @@ func ax25_i_frame(
  *------------------------------------------------------------------------------*/
 
 func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t) int {
-	Assert(pp.frame_len == 0)
-	Assert(cr == cr_cmd || cr == cr_res)
+	dwutil.Assert(pp.frame_len == 0)
+	dwutil.Assert(cr == cr_cmd || cr == cr_res)
 
 	if num_addr < AX25_MIN_ADDRS || num_addr > AX25_MAX_ADDRS {
 		logrus.WithField("num_addr", num_addr).Error("Internal error: set_addrs: bad number of addresses")

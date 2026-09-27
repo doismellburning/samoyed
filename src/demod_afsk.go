@@ -23,6 +23,8 @@ package direwolf
 import (
 	"math"
 	"os"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 var DCD_CONFIG_AFSK = GenericDCDConfig()
@@ -332,8 +334,8 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 	 * contents will be generated differently.  Later code does not care.
 	 */
 	if D.u.afsk.use_rrc != 0 {
-		Assert(D.u.afsk.rrc_width_sym >= 1 && D.u.afsk.rrc_width_sym <= 16)
-		Assert(D.u.afsk.rrc_rolloff >= 0. && D.u.afsk.rrc_rolloff <= 1.)
+		dwutil.Assert(D.u.afsk.rrc_width_sym >= 1 && D.u.afsk.rrc_width_sym <= 16)
+		dwutil.Assert(D.u.afsk.rrc_rolloff >= 0. && D.u.afsk.rrc_rolloff <= 1.)
 
 		D.lp_filter_taps = int((D.u.afsk.rrc_width_sym * float64(samples_per_sec) / float64(baud))) | 1 // odd works better
 
@@ -347,7 +349,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 			D.lp_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 
-		Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
+		dwutil.Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
 		gen_rrc_lowpass(D.lp_filter[:], D.lp_filter_taps, D.u.afsk.rrc_rolloff, samples_per_sec/baud)
 	} else {
 		D.lp_filter_taps = int(math.Round(float64(D.lp_filter_width_sym * samples_per_sec / baud)))
@@ -362,7 +364,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 			D.lp_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 
-		Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
+		dwutil.Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
 
 		var fc = float64(baud) * D.lpf_baud / samples_per_sec
 		gen_lowpass(fc, D.lp_filter[:], D.lp_filter_taps, D.lp_window)
@@ -466,8 +468,8 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			static int seq = 0;			// for log file name
 		#endif
 	*/
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 
 	/*
 	 * Filters use last 'filter_taps' samples.
@@ -754,7 +756,7 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 		*/
 
 		// #if 1
-		hdlcReceiver.RecBit(channel, subchannel, slice, IfThenElse(demod_out > 0, 1, 0), false, quality)
+		hdlcReceiver.RecBit(channel, subchannel, slice, dwutil.IfThenElse(demod_out > 0, 1, 0), false, quality)
 		/*
 			#else  // TODO: new feature to measure data speed error.
 			// Maybe hdlc_rec_bit could provide indication when frame starts.
@@ -784,5 +786,5 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 	/*
 	 * Remember demodulator output so we can compare next time.
 	 */
-	D.slicer[slice].prev_demod_data = IfThenElse(demod_data, 1, 0)
+	D.slicer[slice].prev_demod_data = dwutil.IfThenElse(demod_data, 1, 0)
 } /* end nudge_pll */

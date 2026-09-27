@@ -1,5 +1,7 @@
 package direwolf
 
+import "github.com/doismellburning/samoyed/internal/dwutil"
+
 /*--------------------------------------------------------------------------------
  *
  * Purpose:	Scramble / descramble data as specified in the IL2P protocol specification.
@@ -48,7 +50,7 @@ func descramble_bit(in int, state *int) int {
 func il2p_scramble_block(in []byte) []byte {
 	var tx_lfsr_state = INIT_TX_LFSR
 
-	Assert(len(in) >= 1)
+	dwutil.Assert(len(in) >= 1)
 
 	var out = make([]byte, len(in))
 
@@ -58,7 +60,7 @@ func il2p_scramble_block(in []byte) []byte {
 	var om byte = 0x80 // Output bit mask;
 	for ib := range in {
 		for im := byte(0x80); im != 0; im >>= 1 {
-			var s = scramble_bit(IfThenElse(((in[ib]&im) != 0), 1, 0), &tx_lfsr_state)
+			var s = scramble_bit(dwutil.IfThenElse(((in[ib]&im) != 0), 1, 0), &tx_lfsr_state)
 			if ib == 0 && im == 0x04 {
 				skipping = false
 			}
@@ -118,7 +120,7 @@ func il2p_descramble_block(in []byte) []byte {
 
 	for b := range in {
 		for m := byte(0x80); m != 0; m >>= 1 {
-			var d = descramble_bit(IfThenElse(((in[b]&m) != 0), 1, 0), &rx_lfsr_state)
+			var d = descramble_bit(dwutil.IfThenElse(((in[b]&m) != 0), 1, 0), &rx_lfsr_state)
 			if d != 0 {
 				out[b] |= m
 			}

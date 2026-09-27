@@ -9,6 +9,7 @@ package direwolf
 import (
 	"math/bits"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 )
 
@@ -39,9 +40,9 @@ type fx25Receiver struct {
 }
 
 func newFX25Receiver(channel int, subchannel int, slice int, sink fx25_frame_sink) *fx25Receiver {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
-	Assert(slice >= 0 && slice < MAX_SLICERS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
+	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
 
 	var F = new(fx25Receiver)
 	F.channel = channel
@@ -107,7 +108,7 @@ func (F *fx25Receiver) recBit(dbit int) {
 			F.k_data_radio = fx25_get_k_data_radio(F.ctag_num)
 			F.nroots = fx25_get_nroots(F.ctag_num)
 			F.coffs = fx25_get_k_data_rs(F.ctag_num)
-			Assert(F.coffs == FX25_BLOCK_SIZE-F.nroots)
+			dwutil.Assert(F.coffs == FX25_BLOCK_SIZE-F.nroots)
 
 			if fx25_get_debug() >= 2 {
 				text_color_set(DW_COLOR_INFO)
@@ -186,7 +187,7 @@ func (F *fx25Receiver) recBit(dbit int) {
  ***********************************************************************************/
 
 func (r *HDLCReceiver) fx25Busy(channel int) bool {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	if r == nil {
 		return false
@@ -250,7 +251,7 @@ func (F *fx25Receiver) processRSBlock() {
 		fx_hex_dump(F.block[:FX25_BLOCK_SIZE])
 	}
 
-	Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
+	dwutil.Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
 
 	var derrlocs [FX25_MAX_CHECK]int // Half would probably be OK.
 	var rs = fx25_get_rs(F.ctag_num)
@@ -363,7 +364,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 	var frame_buf []byte
 	for i := range ilen {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {
-			var dbit = byte(IfThenElse((pin[i]&imask) != 0, 1, 0))
+			var dbit = byte(dwutil.IfThenElse((pin[i]&imask) != 0, 1, 0))
 
 			pat_det >>= 1 // Shift the most recent eight bits thru the pattern detector.
 			pat_det |= dbit << 7

@@ -38,6 +38,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -272,7 +273,7 @@ func (d *Digipeater) Regen(from_chan int, pp *packet_t) {
 		packet_t result;
 	*/
 
-	Assert(from_chan >= 0 && from_chan < MAX_TOTAL_CHANS)
+	dwutil.Assert(from_chan >= 0 && from_chan < MAX_TOTAL_CHANS)
 
 	for to_chan := range MAX_TOTAL_CHANS {
 		if d.config.regen[from_chan][to_chan] {

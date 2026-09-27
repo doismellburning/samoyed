@@ -23,6 +23,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
@@ -187,8 +188,8 @@ func (f *PacketFilter) pfilter(from_chan int, to_chan int, filter string, pp *pa
 // stop once their arguments have been parsed, so an expression can be checked
 // against a synthetic packet - see pfilter_validate.
 func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool, syntax_only bool) (int, error) {
-	Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
-	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
+	dwutil.Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
+	dwutil.Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
 
 	if pp == nil {
 		return -1, errors.New("INTERNAL ERROR in pfilter: nil packet pointer, please report this")

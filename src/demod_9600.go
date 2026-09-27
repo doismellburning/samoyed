@@ -15,6 +15,7 @@ package direwolf
 import (
 	"math"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -371,8 +372,8 @@ func demod_9600_process_sample(channel int, sam int, upsample int, D *demodulato
 	*/
 	var subchan = 0
 
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 
 	/* Scale to nice number for convenience. */
 	/* Consistent with the AFSK demodulator, we'd like to use */
@@ -573,7 +574,7 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 
 	if D.slicer[slice].prev_d_c_pll > 1000000000 && D.slicer[slice].data_clock_pll < -1000000000 {
 		/* Overflow.  Was large positive, wrapped around, now large negative. */
-		hdlcReceiver.RecBitNew(channel, subchannel, slice, IfThenElse(demod_out_f > 0, 1, 0), D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
+		hdlcReceiver.RecBitNew(channel, subchannel, slice, dwutil.IfThenElse(demod_out_f > 0, 1, 0), D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
 			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		D.slicer[slice].pll_symbol_count++
 

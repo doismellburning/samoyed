@@ -149,6 +149,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -309,7 +310,7 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 								text_color_set(DW_COLOR_DEBUG)
 								dw_printf("\n")
 								dw_printf("Packet content before adding KISS framing and any escapes:\n")
-								HexDump(fbuf)
+								dwutil.HexDump(fbuf)
 							}
 
 							kiss_buff = KissEncapsulate(stemp)
@@ -482,7 +483,7 @@ func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, clie
 }
 
 func (kns *KissNetService) listenThread(ctx context.Context, kps *kissport_status_s, client int) {
-	Assert(client >= 0 && client < MAX_NET_CLIENTS)
+	dwutil.Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
 	logrus.WithFields(logrus.Fields{
 		"tcp_port": kps.tcp_port,

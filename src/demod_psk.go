@@ -62,6 +62,8 @@ import (
 	"math"
 	"os"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 var DCD_CONFIG_PSK = &DCDConfig{
@@ -214,7 +216,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		D.u.psk.boffs = int(math.Round(samples_per_sec / float64(correct_baud)))
 		D.u.psk.soffs = int(math.Round((13.0 / 12.0) * samples_per_sec / float64(correct_baud)))
 	} else if modem_type == MODEM_QPSK {
-		Assert(D.u.psk.v26_alt != V26_UNSPECIFIED)
+		dwutil.Assert(D.u.psk.v26_alt != V26_UNSPECIFIED)
 
 		correct_baud = bps / 2
 		carrier_freq = 1800
@@ -578,9 +580,9 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality []int) int {
 	// Number of different symbol states.
-	Assert(bits_per_symbol == 1 || bits_per_symbol == 2 || bits_per_symbol == 3)
+	dwutil.Assert(bits_per_symbol == 1 || bits_per_symbol == 2 || bits_per_symbol == 3)
 	var N = 1 << bits_per_symbol
-	Assert(N == 2 || N == 4 || N == 8)
+	dwutil.Assert(N == 2 || N == 4 || N == 8)
 
 	// Scale angle to 1 per symbol then separate into integer and fractional parts.
 	var a = phase_shift * float64(N) / (math.Pi * 2.0)
@@ -597,8 +599,8 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 		i = N - 1 // Should be < N. Watch out for possible roundoff errors.
 	}
 	var f = a - float64(i)
-	Assert(i >= 0 && i < N)
-	Assert(f >= -0.001 && f <= 1.001)
+	dwutil.Assert(i >= 0 && i < N)
+	dwutil.Assert(f >= -0.001 && f <= 1.001)
 
 	// Interpolate between the ideal angles to get a level of certainty.
 	var result = 0
@@ -681,8 +683,8 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulator_state_s) {
 	var slice = 0 // Would it make sense to have more than one?
 
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 
 	/* Scale to nice number for plotting during debug. */
 

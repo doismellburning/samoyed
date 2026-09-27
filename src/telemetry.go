@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 )
@@ -652,7 +653,7 @@ func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]m
 				pm.coeff[n][C_B]*raw +
 				pm.coeff[n][C_C]
 
-			var z = IfThenElse(pm.coeff_ndp[n][C_A] == 0, 0, pm.coeff_ndp[n][C_A]+ndp[n]+ndp[n])
+			var z = dwutil.IfThenElse(pm.coeff_ndp[n][C_A] == 0, 0, pm.coeff_ndp[n][C_A]+ndp[n]+ndp[n])
 			var fndp = max(z, max(pm.coeff_ndp[n][C_B]+ndp[n], pm.coeff_ndp[n][C_C]))
 
 			fmt.Fprintf(&output, "%.*f", fndp, fval)
@@ -673,7 +674,7 @@ func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]m
 
 			// Possible inverting for bit sense.
 
-			var dval = IfThenElse(pm.sense[n], raw, 1-raw)
+			var dval = dwutil.IfThenElse(pm.sense[n], raw, 1-raw)
 
 			output.WriteString(strconv.Itoa(dval))
 			if len(pm.unit[T_NUM_ANALOG+n]) > 0 {

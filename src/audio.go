@@ -34,6 +34,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/gordonklaus/portaudio"
 )
 
@@ -1702,12 +1703,12 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) int {
 			 * Finally allocate byte-level buffers for each direction.
 			 */
 			adev[a].inbuf = make([]byte, adev[a].inbufSizeInBytes)
-			Assert(adev[a].inbuf != nil)
+			dwutil.Assert(adev[a].inbuf != nil)
 			adev[a].inbufLen = 0
 			adev[a].inbufNext = 0
 
 			adev[a].outbuf = make([]byte, adev[a].outbufSizeInBytes)
-			Assert(adev[a].outbuf != nil)
+			dwutil.Assert(adev[a].outbuf != nil)
 			adev[a].outbufLen = 0
 		} /* end of audio device defined */
 	} /* end of for each audio device */
@@ -1744,7 +1745,7 @@ func (audioDeviceSource) GetByte(adev int) int {
 }
 
 func audio_get(a int) int {
-	Assert(adev[a].inbufSizeInBytes >= 100 && adev[a].inbufSizeInBytes <= 32768)
+	dwutil.Assert(adev[a].inbufSizeInBytes >= 100 && adev[a].inbufSizeInBytes <= 32768)
 
 	switch adev[a].g_audio_in_type {
 	/*
@@ -1753,7 +1754,7 @@ func audio_get(a int) int {
 	 * We just read one byte from it here.
 	 */
 	case AUDIO_IN_TYPE_SOUNDCARD:
-		Assert(adev[a].inputRingBuf != nil)
+		dwutil.Assert(adev[a].inputRingBuf != nil)
 
 		// Check for overflow (data was dropped in the callback)
 		if adev[a].inputRingBuf.checkOverflow() {
@@ -1800,7 +1801,7 @@ func audio_get(a int) int {
 
 	case AUDIO_IN_TYPE_SDR_UDP:
 		for adev[a].inbufNext >= adev[a].inbufLen {
-			Assert(adev[a].udp_sock != nil)
+			dwutil.Assert(adev[a].udp_sock != nil)
 
 			var n, _, readErr = adev[a].udp_sock.ReadFromUDP(adev[a].inbuf)
 			if readErr != nil {
@@ -1904,7 +1905,7 @@ func (AudioDeviceSink) Flush(adev int) int {
 
 func audio_put(a int, c uint8) int {
 	/* Should never be full at this point. */
-	Assert(adev[a].outbufLen < adev[a].outbufSizeInBytes)
+	dwutil.Assert(adev[a].outbufLen < adev[a].outbufSizeInBytes)
 
 	adev[a].outbuf[adev[a].outbufLen] = c
 	adev[a].outbufLen++

@@ -1,5 +1,7 @@
 package direwolf
 
+import "github.com/doismellburning/samoyed/internal/dwutil"
+
 /********************************************************************************
  *
  * Purpose:	Raw Received Bit Buffer.
@@ -92,7 +94,7 @@ func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram
  ***********************************************************************************/
 
 func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state int, prev_descram int) {
-	Assert(prev_descram == 0 || prev_descram == 1)
+	dwutil.Assert(prev_descram == 0 || prev_descram == 1)
 
 	b.nextp = nil
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"runtime"
 	"time"
 )
 
@@ -81,15 +80,6 @@ func closeOnDone(ctx context.Context, c io.Closer) func() {
 		if stop() && ctx.Err() != nil {
 			_ = c.Close()
 		}
-	}
-}
-
-// IfThenElse exists because sometimes it's really convenient to have C's ternary ?:.
-func IfThenElse[T any](x bool, a T, b T) T {
-	if x {
-		return a
-	} else {
-		return b
 	}
 }
 
@@ -172,12 +162,4 @@ func D2R(d float64) float64 {
 
 func R2D(r float64) float64 {
 	return r * 180 / math.Pi
-}
-
-// Assert can't be named "assert" because of conflicts with stretchr/testify/assert, but otherwise, it's compatible enough.
-func Assert(t bool) {
-	if !t {
-		_, file, line, _ := runtime.Caller(1)
-		panic(fmt.Sprintf("Assertion failed at %s:%d", file, line))
-	}
 }

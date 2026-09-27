@@ -34,6 +34,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
@@ -323,7 +324,7 @@ func NewTTGateway(audioConfig *AudioConfig, p *tt_config_s, debug int) *TTGatewa
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) Button(channel int, button rune) {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// if (button != '.') {
 	//   dw_printf ("aprs_tt_button (%d, '%c')\n", channel, button);
@@ -731,7 +732,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		dw_printf("APRStt parse callsign (starts with A then digit): \"%s\"\n", e)
 	}
 
-	Assert(e[0] == 'A')
+	dwutil.Assert(e[0] == 'A')
 
 	var length = len(e)
 
@@ -876,8 +877,8 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 		dw_printf("APRStt parse object name (starts with AA): \"%s\"\n", e)
 	}
 
-	Assert(e[0] == 'A')
-	Assert(e[1] == 'A')
+	dwutil.Assert(e[0] == 'A')
+	dwutil.Assert(e[1] == 'A')
 
 	var length = len(e)
 
@@ -950,8 +951,8 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 		dw_printf("APRStt parse symbol (starts with AB): \"%s\"\n", e)
 	}
 
-	Assert(e[0] == 'A')
-	Assert(e[1] == 'B')
+	dwutil.Assert(e[0] == 'A')
+	dwutil.Assert(e[1] == 'B')
 
 	var length = len(e)
 
@@ -1042,8 +1043,8 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
-	Assert(e[0] == 'A')
-	Assert(e[1] == 'C')
+	dwutil.Assert(e[0] == 'A')
+	dwutil.Assert(e[1] == 'C')
 
 	if g.debug > 0 {
 		text_color_set(DW_COLOR_DEBUG)
@@ -1145,7 +1146,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 		// TODO: more detail later...
 	}
 
-	Assert(e[0] == 'B')
+	dwutil.Assert(e[0] == 'B')
 
 	var xstr, ystr, _, bstr, dstr, ipat = g.findTTLocMatch(e)
 
@@ -1574,7 +1575,7 @@ func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, st
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) parseComment(state *ttParseState, e string) int {
-	Assert(e[0] == 'C')
+	dwutil.Assert(e[0] == 'C')
 
 	var length = len(e)
 
