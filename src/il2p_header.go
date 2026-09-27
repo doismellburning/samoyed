@@ -638,7 +638,7 @@ func il2p_type_0_header(pp *packet_t, fec_level int) ([]byte, int) {
 	SET_FEC_LEVEL(hdr, fec_level)
 	SET_HDR_TYPE(hdr, 0)
 
-	var frame_len = ax25_get_frame_len(pp)
+	var frame_len = pp.FrameLen()
 
 	if frame_len < 14 || frame_len > IL2P_MAX_PAYLOAD_SIZE {
 		return nil, -2

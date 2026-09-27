@@ -72,7 +72,7 @@ func DescribeAX25Frame(frame []byte) int {
 		return 1
 	}
 
-	var frameLen = ax25_get_frame_len(pp)
+	var frameLen = pp.FrameLen()
 
 	if ax25_get_control_offset(pp) >= frameLen {
 		fmt.Printf("ERROR: The frame ends after the address field - there is no control byte.\n")

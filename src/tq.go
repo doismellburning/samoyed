@@ -992,7 +992,7 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 
 			if count_it > 0 {
 				if bytes {
-					n += ax25_get_frame_len(pp)
+					n += pp.FrameLen()
 				} else {
 					n++
 				}
