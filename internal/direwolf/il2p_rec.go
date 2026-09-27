@@ -11,6 +11,7 @@ package direwolf
 import (
 	"math/bits"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -23,10 +24,25 @@ const IL2P_PAYLOAD IL2PState = 2
 const IL2P_DECODE IL2PState = 3
 const IL2P_CRC IL2PState = 4
 
+// il2p_packet_sink is handed each packet an il2pReceiver decodes, along with
+// the number of symbols the Reed-Solomon decoder had to correct.
+type il2p_packet_sink func(channel int, subchannel int, slice int, pp *ax25.Packet, corrected int)
+
+// il2p_deliver_packet is the sink used in normal operation, passing each
+// packet the IL2P receiver decodes on to the rest of the receive path.
+func il2p_deliver_packet(channel int, subchannel int, slice int, pp *ax25.Packet, corrected int) {
+	var alevel = demod_get_audio_level(channel, subchannel)
+
+	// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
+
+	multi_modem_process_rec_packet(channel, subchannel, slice, pp, alevel, BitFixLevel(corrected), fec_type_il2p)
+}
+
 // il2pReceiver is the IL2P receive state for one slicer of one demodulator
 // ("subchannel") of one channel.
 type il2pReceiver struct {
 	channel, subchannel, slice int
+	sink                       il2p_packet_sink // Where each decoded packet goes.
 
 	version il2p_version_t // IL2P protocol version spoken on this channel.
 	crc     bool           // true if frames carry a trailing CRC.
@@ -55,7 +71,7 @@ type il2pReceiver struct {
 	corrected int // Number of symbols corrected by RS FEC.
 }
 
-func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_version_t, crc bool) *il2pReceiver {
+func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_version_t, crc bool, sink il2p_packet_sink) *il2pReceiver {
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -66,6 +82,7 @@ func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_versio
 	F.slice = slice
 	F.version = version
 	F.crc = crc
+	F.sink = sink
 
 	return F
 }
@@ -79,7 +96,7 @@ func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_versio
  * Inputs:      dbit	- One bit from the received data stream.
  *
  * Description: This is called once for each received bit.
- *              For each valid packet, process_rec_frame() is called for further processing.
+ *              Each valid packet is handed to the receiver's sink.
  *		It can gather multiple candidates from different parallel demodulators
  *		("subchannels") and slicers, then decide which one is the best.
  *
@@ -271,13 +288,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 			}
 
 			if pp != nil {
-				var alevel = demod_get_audio_level(channel, subchannel)
-				var retries = BitFixLevel(F.corrected)
-				var fec_type = fec_type_il2p
-
-				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
-
-				multi_modem_process_rec_packet(channel, subchannel, slice, pp, alevel, retries, fec_type)
+				F.sink(channel, subchannel, slice, pp, F.corrected)
 			}
 		} // end block for local variables.
 
