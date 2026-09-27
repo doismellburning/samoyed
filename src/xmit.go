@@ -481,7 +481,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 				xs.xmit_speech(ctx, channel, pp)
 
 			case FLAVOR_MORSE:
-				var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
+				var ssid = pp.SSID(AX25_DESTINATION)
 
 				var wpm = MORSE_DEFAULT_WPM
 				if ssid > 0 {
@@ -502,7 +502,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 				xs.xmit_morse(channel, pp, wpm)
 
 			case FLAVOR_DTMF:
-				var speed = ax25_get_ssid(pp, AX25_DESTINATION)
+				var speed = pp.SSID(AX25_DESTINATION)
 				if speed == 0 {
 					speed = 5 // default half of maximum
 				}

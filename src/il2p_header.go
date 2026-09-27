@@ -246,10 +246,10 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 	// Destination and source addresses go into low bits 0-5 for bytes 0-11.
 
 	var dst_addr = pp.AddrNoSSID(AX25_DESTINATION)
-	var dst_ssid = ax25_get_ssid(pp, AX25_DESTINATION)
+	var dst_ssid = pp.SSID(AX25_DESTINATION)
 
 	var src_addr = pp.AddrNoSSID(AX25_SOURCE)
-	var src_ssid = ax25_get_ssid(pp, AX25_SOURCE)
+	var src_ssid = pp.SSID(AX25_SOURCE)
 
 	for i, b := range dst_addr {
 		if b < ' ' || b > '_' {

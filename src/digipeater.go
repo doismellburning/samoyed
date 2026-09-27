@@ -391,7 +391,7 @@ func (d *Digipeater) match(
 	}
 
 	var repeater = pp.AddrWithSSID(r)
-	var ssid = ax25_get_ssid(pp, r)
+	var ssid = pp.SSID(r)
 
 	logrus.WithFields(logrus.Fields{
 		"repeater": repeater,
