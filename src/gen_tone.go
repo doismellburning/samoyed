@@ -36,7 +36,7 @@ var toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 // sample data at a time, then a flush at the end of a transmission to push out
 // whatever is still waiting.  Both return -1 for any type of error.
 //
-// audioDeviceSink is the one a running Samoyed uses; samoyed-gen-packets writes
+// AudioDeviceSink is the one a running Samoyed uses; samoyed-gen-packets writes
 // a .WAV file instead.
 type AudioSink interface {
 	Put(adev int, c uint8) int
@@ -716,7 +716,7 @@ func GenToneMain() {
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
 
 	AudioOpen(context.Background(), &my_audio_config)
-	gen_tone_init(&my_audio_config, 100, audioDeviceSink{})
+	gen_tone_init(&my_audio_config, 100, AudioDeviceSink{})
 
 	for range 2 {
 		for range my_audio_config.achan[0].baud * 2 {
@@ -738,7 +738,7 @@ func GenToneMain() {
 	my_audio_config.adev[0].num_channels = 2
 
 	AudioOpen(context.Background(), &my_audio_config)
-	gen_tone_init(&my_audio_config, 100, audioDeviceSink{})
+	gen_tone_init(&my_audio_config, 100, AudioDeviceSink{})
 
 	for range 4 {
 		for range my_audio_config.achan[0].baud * 2 {

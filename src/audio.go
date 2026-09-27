@@ -1869,15 +1869,15 @@ func audio_get(a int) int {
 	return (n)
 } /* end audio_get */
 
-// audioDeviceSink is the AudioSink for the audio device that AudioOpen
+// AudioDeviceSink is the AudioSink for the audio device that AudioOpen
 // opened.
-type audioDeviceSink struct{}
+type AudioDeviceSink struct{}
 
-func (audioDeviceSink) Put(adev int, c uint8) int {
+func (AudioDeviceSink) Put(adev int, c uint8) int {
 	return audio_put(adev, c)
 }
 
-func (audioDeviceSink) Flush(adev int) int {
+func (AudioDeviceSink) Flush(adev int) int {
 	return audio_flush(adev)
 }
 
