@@ -46,10 +46,10 @@ func newRecvTestAudioConfig(numChannels int) *audio_s {
 func setupRecvTest(t *testing.T, audioConfig *audio_s, samples []byte) *readerSampleSource {
 	t.Helper()
 
-	var origAudioConfig, origPA = save_audio_config_p, save_pa
+	var origAudioConfig = save_audio_config_p
 
 	t.Cleanup(func() {
-		save_audio_config_p, save_pa = origAudioConfig, origPA
+		save_audio_config_p = origAudioConfig
 	})
 
 	multi_modem_init(audioConfig, new(radioSink))
@@ -128,8 +128,6 @@ func TestRecvAdevThreadStopsWhenCancelledWithoutReportingAFailure(t *testing.T) 
 	// Audio that never ends, so cancellation is the only way out.
 	var src = newReaderSampleSource(endlessAudio{}, math.MaxInt32)
 
-	save_pa = audioConfig
-
 	var ctx, cancel = context.WithCancel(t.Context())
 	defer cancel()
 
@@ -137,7 +135,7 @@ func TestRecvAdevThreadStopsWhenCancelledWithoutReportingAFailure(t *testing.T) 
 	var done = make(chan struct{})
 
 	go func() {
-		recv_adev_thread(ctx, 0, failed, src)
+		recv_adev_thread(ctx, audioConfig, 0, failed, src)
 		close(done)
 	}()
 
