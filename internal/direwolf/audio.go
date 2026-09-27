@@ -599,7 +599,7 @@ func newAudioRingBuffer(size int) *audioRingBuffer {
 // write adds data to the ring buffer. Called from PortAudio callback.
 // Returns true if all data was written, false if some was dropped (overflow).
 // Uses chunk copies (at most two) to minimise time holding the mutex.
-func (rb *audioRingBuffer) write(data []byte) bool { //nolint:unparam
+func (rb *audioRingBuffer) write(data []byte) bool {
 	rb.mu.Lock()
 	defer rb.mu.Unlock()
 
