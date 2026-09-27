@@ -145,8 +145,8 @@ func setupIGate(t *testing.T) net.Conn {
 
 	var server, client = connectedTCPPair(t)
 
-	igate.sock = client
-	igate.okToSend = true
+	igate.setConnection(client)
+	igate.loggedIn(client)
 
 	return server
 }
@@ -223,7 +223,8 @@ func TestIGateSendRecPacketReceiveOnly(t *testing.T) {
 func TestIGateSendRecPacketNotReady(t *testing.T) {
 	var server = setupIGate(t)
 
-	igate.okToSend = false
+	var conn, _ = igate.connection()
+	igate.setConnection(conn) // Connected, but not yet logged in.
 
 	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
@@ -232,8 +233,7 @@ func TestIGateSendRecPacketNotReady(t *testing.T) {
 
 	requireIGateSilent(t, server, "a packet was sent before the login completed")
 
-	igate.okToSend = true
-	igate.sock = nil
+	igate.dropConnection(conn)
 
 	assert.NotPanics(t, func() { igate.sendRecPacket(0, pp) })
 }
@@ -367,10 +367,16 @@ func TestIGateSendMsgWriteErrorClosesTheConnection(t *testing.T) {
 	require.NoError(t, server.Close())
 
 	assert.Eventually(t, func() bool {
-		igate.sendMsgToServer("test")
+		var conn, _ = igate.connection()
+		igate.sendMsgToServer(conn, "test")
 
-		return igate.sock == nil
+		conn, _ = igate.connection()
+
+		return conn == nil
 	}, 10*time.Second, 50*time.Millisecond, "the dead connection was never given up")
+
+	var _, okToSend = igate.connection()
+	assert.False(t, okToSend, "the dead connection's login outlived it")
 }
 
 // setupIGateToRadio adds what the IS>RF direction needs on top of setupIGate:
@@ -535,6 +541,85 @@ func TestIGToTxHistoryConcurrent(t *testing.T) {
 	<-done
 
 	testutils.CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(pp, 0)) })
+}
+
+// The connection and the counters are shared: the receive thread gives the
+// socket up when the server goes away, while the connect thread's heartbeats
+// and packets heard on the radio are written to it, and the statistics beacon
+// reads the counters those bump.  Run under -race.
+func TestIGateConnectionStateConcurrent(t *testing.T) {
+	var server = setupIGate(t)
+
+	var pp = ax25.FromText("Q2TEST>APWW10:>hello", true)
+	require.NotNil(t, pp)
+
+	testutils.CaptureOutput(t, func() {
+		var ctx, cancel = context.WithCancel(t.Context())
+
+		var recvDone = make(chan struct{})
+
+		go func() {
+			defer close(recvDone)
+
+			igate.recvThread(ctx)
+		}()
+
+		var sendDone = make(chan struct{})
+
+		// Keep sending until the connection has gone, so that the sending
+		// overlaps the receive thread giving it up.
+		go func() {
+			defer close(sendDone)
+
+			for {
+				var conn, _ = igate.connection()
+				if conn == nil {
+					return
+				}
+
+				igate.sendMsgToServer(conn, "#")
+				igate.sendRecPacket(0, pp)
+			}
+		}()
+
+		var countDone = make(chan struct{})
+
+		go func() {
+			defer close(countDone)
+
+			for {
+				igate.msgCount()
+				igate.pktCount()
+				igate.uplinkCount()
+				igate.downlinkCount()
+
+				select {
+				case <-sendDone:
+					return
+				default:
+				}
+			}
+		}()
+
+		var _, writeErr = server.Write([]byte("# heartbeat\r\n"))
+		assert.NoError(t, writeErr)
+		assert.NoError(t, server.Close())
+
+		select {
+		case <-sendDone:
+		case <-time.After(10 * time.Second):
+			assert.Fail(t, "the closed connection was never given up")
+			if conn, _ := igate.connection(); conn != nil {
+				igate.dropConnection(conn)
+			}
+			<-sendDone
+		}
+
+		<-countDone
+
+		cancel()
+		<-recvDone
+	})
 }
 
 // A repeated "message" is a retry that did not get an ack, so it is not

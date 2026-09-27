@@ -127,10 +127,10 @@ const MAX_SATGATE_DELAY = 30
 // them and two of them collided with same-named statics elsewhere.  See issue
 // #674.
 //
-// Synchronisation is as it was: dpMutex covers the SATgate delay queue and
-// nothing else.  sock, okToSend and the counters are still read and written by
-// the connect, receive and delay goroutines without a lock, which #674 also
-// has in its sights.
+// Its own connect, server-receive and SATgate delay goroutines share it with
+// the radio receive thread, which passes up what it hears, and the beacon,
+// which reads the counters.  dpMutex covers the SATgate delay queue, and mu the
+// connection and the counters.
 type IGate struct {
 	/*
 	 * What NewIGate was given.  These need to be kept around in case the
@@ -157,6 +157,8 @@ type IGate struct {
 
 	dpMutex     sync.Mutex /* Critical section for delayed packet queue. */
 	dpQueueHead *ax25.Packet
+
+	mu sync.Mutex // Covers sock, okToSend and stats.
 
 	sock net.Conn
 
@@ -247,24 +249,89 @@ func NewIGate(audioConfig *AudioConfig, igateConfig *igate_config_s, digiConfig 
 
 // msgCount is how many "messages" have gone out over the air.
 func (ig *IGate) msgCount() int {
+	ig.mu.Lock()
+	defer ig.mu.Unlock()
+
 	return ig.stats.msgCount
 }
 
 // pktCount is how many packets other than "messages" have gone out over the
 // air.
 func (ig *IGate) pktCount() int {
+	ig.mu.Lock()
+	defer ig.mu.Unlock()
+
 	return ig.stats.rfXmitPackets - ig.stats.msgCount
 }
 
 // uplinkCount is how many packets have been passed up to the server.
 func (ig *IGate) uplinkCount() int {
+	ig.mu.Lock()
+	defer ig.mu.Unlock()
+
 	return ig.stats.uplinkPackets
 }
 
 // downlinkCount is how many packets have come down from the server, whether or
 // not they were then transmitted.
 func (ig *IGate) downlinkCount() int {
+	ig.mu.Lock()
+	defer ig.mu.Unlock()
+
 	return ig.stats.downlinkPackets
+}
+
+// updateStats applies update to the counters under the lock.
+func (ig *IGate) updateStats(update func(*igateStats)) {
+	ig.mu.Lock()
+	defer ig.mu.Unlock()
+
+	update(&ig.stats)
+}
+
+// connection returns the socket to the server, nil if there is none, and
+// whether the login sequence has finished on it - together, so that the two
+// cannot come from either side of a reconnection.
+func (ig *IGate) connection() (net.Conn, bool) {
+	ig.mu.Lock()
+	defer ig.mu.Unlock()
+
+	return ig.sock, ig.okToSend
+}
+
+// setConnection makes conn the connection to the server, not yet logged in.
+func (ig *IGate) setConnection(conn net.Conn) {
+	ig.mu.Lock()
+	defer ig.mu.Unlock()
+
+	ig.okToSend = false
+	ig.sock = conn
+}
+
+// loggedIn marks the login sequence on conn finished, provided it is still the
+// connection to the server.
+func (ig *IGate) loggedIn(conn net.Conn) {
+	ig.mu.Lock()
+	defer ig.mu.Unlock()
+
+	if ig.sock == conn {
+		ig.okToSend = true
+	}
+}
+
+// dropConnection closes conn, and forgets it and its login if it is still the
+// connection to the server, so that the connect thread makes a new one.  A
+// connection that has already been replaced is left alone.
+func (ig *IGate) dropConnection(conn net.Conn) {
+	conn.Close()
+
+	ig.mu.Lock()
+	defer ig.mu.Unlock()
+
+	if ig.sock == conn {
+		ig.sock = nil
+		ig.okToSend = false
+	}
 }
 
 /*-------------------------------------------------------------------
@@ -374,9 +441,9 @@ func (ig *IGate) connectThread(ctx context.Context) {
 		/*
 		 * Connect to IGate server if not currently connected.
 		 */
-		if ig.sock == nil {
+		if current, _ := ig.connection(); current == nil {
 			var conn, connErr = igate_dial(ctx, server_name, ig.config.t2_server_port)
-			ig.stats.connectedAt = time.Now()
+			ig.updateStats(func(s *igateStats) { s.connectedAt = time.Now() })
 
 			if connErr != nil {
 				text_color_set(DW_COLOR_INFO)
@@ -397,8 +464,7 @@ func (ig *IGate) connectThread(ctx context.Context) {
 				 * But make the Rx -> Internet messages wait until after login.
 				 */
 
-				ig.okToSend = false
-				ig.sock = conn
+				ig.setConnection(conn)
 
 				/*
 				 * Send login message.
@@ -417,7 +483,7 @@ func (ig *IGate) connectThread(ctx context.Context) {
 					stemp += ig.config.t2_filter
 				}
 
-				ig.sendMsgToServer(stemp)
+				ig.sendMsgToServer(conn, stemp)
 
 				/* Delay until it is ok to start sending packets. */
 
@@ -425,7 +491,7 @@ func (ig *IGate) connectThread(ctx context.Context) {
 					return
 				}
 
-				ig.okToSend = true
+				ig.loggedIn(conn)
 			}
 		}
 
@@ -433,14 +499,14 @@ func (ig *IGate) connectThread(ctx context.Context) {
 		 * If connected to IGate server, send heartbeat periodically to keep connection active.
 		 */
 		for range 3 {
-			if ig.sock != nil && !sleepSecCtx(ctx, 10) {
+			if conn, _ := ig.connection(); conn != nil && !sleepSecCtx(ctx, 10) {
 				return
 			}
 		}
 
-		if ig.sock != nil {
+		if conn, _ := ig.connection(); conn != nil {
 			/* This will close the socket if any error. */
-			ig.sendMsgToServer("#")
+			ig.sendMsgToServer(conn, "#")
 		}
 	}
 } /* end connectThread */
@@ -475,11 +541,12 @@ const IGATE_MAX_MSG = 512 /* "All 'packets' sent to APRS-IS must be in the TNC2 
 /* including the CR/LF sequence." */
 
 func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
-	if ig.sock == nil {
+	var conn, okToSend = ig.connection()
+	if conn == nil {
 		return /* Silently discard if not connected. */
 	}
 
-	if !ig.okToSend {
+	if !okToSend {
 		return /* Login not complete. */
 	}
 
@@ -634,7 +701,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 		pp.NumRepeaters() > 0 {
 		ig.satgateDelayPacket(pp, channel)
 	} else {
-		ig.sendPacketToServer(pp, channel)
+		ig.sendPacketToServer(conn, pp, channel)
 	}
 } /* end sendRecPacket */
 
@@ -644,7 +711,9 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
  *
  * Purpose:     Convert to text and send to the IGate server.
  *
- * Inputs:	pp 	- Packet object.
+ * Inputs:	conn	- The connection to send it on, as for sendMsgToServer.
+ *
+ *		pp 	- Packet object.
  *
  *		channel	- Radio channel where it was received.
  *				This will be -1 if from a beacon with sendto=ig
@@ -655,7 +724,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
  *
  *--------------------------------------------------------------------*/
 
-func (ig *IGate) sendPacketToServer(pp *ax25.Packet, channel int) {
+func (ig *IGate) sendPacketToServer(conn net.Conn, pp *ax25.Packet, channel int) {
 	var pinfo = pp.Info()
 
 	/*
@@ -780,9 +849,9 @@ func (ig *IGate) sendPacketToServer(pp *ax25.Packet, channel int) {
 
 	// TODO KG Check against IGATE_MAX_MSG size?
 
-	ig.sendMsgToServer(msg)
+	ig.sendMsgToServer(conn, msg)
 
-	ig.stats.uplinkPackets++
+	ig.updateStats(func(s *igateStats) { s.uplinkPackets++ })
 	metrics.RecordUplink()
 
 	/*
@@ -799,7 +868,12 @@ func (ig *IGate) sendPacketToServer(pp *ax25.Packet, channel int) {
  *		This one function should be used for login, heartbeats,
  *		and packets.
  *
- * Inputs:	imsg	- Message.  We will add CR/LF here.
+ * Inputs:	conn	- The connection to send it on: the one the caller
+ *			  checked, so that a reconnection in between cannot
+ *			  send it on a socket that has not logged in yet.
+ *			  Nil if not connected.
+ *
+ *		imsg	- Message.  We will add CR/LF here.
  *
  *		imsg_len - Length of imsg in bytes.
  *			  It could contain nul characters so we can't
@@ -812,8 +886,8 @@ func (ig *IGate) sendPacketToServer(pp *ax25.Packet, channel int) {
  *
  *--------------------------------------------------------------------*/
 
-func (ig *IGate) sendMsgToServer(imsg string) {
-	if ig.sock == nil {
+func (ig *IGate) sendMsgToServer(conn net.Conn, imsg string) {
+	if conn == nil {
 		return /* Silently discard if not connected. */
 	}
 
@@ -835,14 +909,13 @@ func (ig *IGate) sendMsgToServer(imsg string) {
 
 	imsg += "\r\n"
 
-	ig.stats.uplinkBytes += len(imsg)
+	ig.updateStats(func(s *igateStats) { s.uplinkBytes += len(imsg) })
 
-	var _, err = ig.sock.Write([]byte(imsg)) // TODO KG Should imsg just be a []byte?
+	var _, err = conn.Write([]byte(imsg)) // TODO KG Should imsg just be a []byte?
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending to IGate server.  Closing connection.\n\n")
-		ig.sock.Close()
-		ig.sock = nil
+		ig.dropConnection(conn)
 	}
 } /* end sendMsgToServer */
 
@@ -865,20 +938,18 @@ func (ig *IGate) sendMsgToServer(imsg string) {
 // should stop.
 func (ig *IGate) get1ch(ctx context.Context) (byte, bool) {
 	for ctx.Err() == nil {
-		for ig.sock == nil {
+		var conn, _ = ig.connection()
+		if conn == nil {
 			if !sleepSecCtx(ctx, 5) { /* Not connected.  Try again later. */
 				return 0, false
 			}
+
+			continue
 		}
 
 		/* Just get one byte at a time. */
 		// TODO: might read complete packets and unpack from own buffer
 		// rather than using a system call for each byte.
-
-		var conn = ig.sock
-		if conn == nil {
-			continue // It went away between the check above and here.
-		}
 
 		// A server with nothing to say leaves the read below blocked, so
 		// closing the socket is what gets us back when we are asked to stop.
@@ -891,11 +962,7 @@ func (ig *IGate) get1ch(ctx context.Context) (byte, bool) {
 
 		if ctx.Err() != nil {
 			// Ours to close: nothing will read from it again.
-			conn.Close()
-
-			if ig.sock == conn {
-				ig.sock = nil
-			}
+			ig.dropConnection(conn)
 
 			return 0, false
 		}
@@ -910,11 +977,7 @@ func (ig *IGate) get1ch(ctx context.Context) (byte, bool) {
 
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError reading from IGate server.  Closing connection.\n\n")
-		conn.Close()
-
-		if ig.sock == conn {
-			ig.sock = nil
-		}
+		ig.dropConnection(conn)
 	}
 
 	return 0, false
@@ -944,7 +1007,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 				return // Cancelled.
 			}
 
-			ig.stats.downlinkBytes++
+			ig.updateStats(func(s *igateStats) { s.downlinkBytes++ })
 
 			// I never expected to see a nul character but it can happen.
 			// If found, change it to <0x00> and AX25FromText will change it back to a single byte.
@@ -1002,7 +1065,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 			 * That way we can see login confirmation but not
 			 * be bothered by the heart beat messages.
 			 */
-			if !ig.okToSend {
+			if _, okToSend := ig.connection(); !okToSend {
 				text_color_set(DW_COLOR_REC)
 				dw_printf("[ig] ")
 				ax25.SafePrint(message, false)
@@ -1037,7 +1100,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 			 */
 			mheardDB.SaveIS(string(message))
 
-			ig.stats.downlinkPackets++
+			ig.updateStats(func(s *igateStats) { s.downlinkPackets++ })
 			metrics.RecordDownlink()
 
 			/*
@@ -1209,7 +1272,8 @@ func (ig *IGate) satgateDelayThread(ctx context.Context) {
 				ig.dpMutex.Unlock()
 				pp.SetNext(nil)
 
-				ig.sendPacketToServer(pp, channel)
+				var conn, _ = ig.connection()
+				ig.sendPacketToServer(conn, pp, channel)
 			}
 		} /* if something in queue */
 	} /* until cancelled */
@@ -1488,13 +1552,22 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 		if pradio != nil {
 			/* This consumes packet so don't reference it again! */
 			transmitQueue.Append(to_chan, TQ_PRIO_1_LO, pradio)
-			ig.stats.rfXmitPackets++ // Any type of packet.
+			// Both counters in one go, so that pktCount never sees one
+			// without the other.
+			var isMessage = is_message_message(string(pinfo))
+
+			ig.updateStats(func(s *igateStats) {
+				s.rfXmitPackets++ // Any type of packet.
+
+				if isMessage {
+					s.msgCount++
+				}
+			})
 			metrics.RecordRFTransmitted()
 
-			if is_message_message(string(pinfo)) {
+			if isMessage {
 				// We transmitted a "message."  Telemetry metadata is excluded.
 				// Remember to pass along address of the sender later.
-				ig.stats.msgCount++ // Update statistics.
 
 				mheardDB.SetMSP(string(src), ig.config.igmsp)
 			}
