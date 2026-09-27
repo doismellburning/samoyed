@@ -524,10 +524,10 @@ func mon_desc(pp *packet_t) (byte, string) {
 	var pf_text string // P or F depending on whether command or response.
 
 	switch cr {
-	case cr_cmd:
+	case ax25.CRCmd:
 		// P only: I, SABME, SABM, DISC
 		pf_text = "P"
-	case cr_res:
+	case ax25.CRRes:
 		// F only: DM, UA, FRMR
 		// Either: RR, RNR, REJ, SREJ, UI, XID, TEST
 		pf_text = "F"

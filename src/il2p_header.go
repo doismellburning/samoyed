@@ -291,7 +291,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 		// PID is set to 0, meaning none, for S frames.
 		SET_UI(hdr, 0)
 		SET_PID(hdr, 0)
-		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|(((dwutil.IfThenElse((cr == cr_cmd), 1, 0))|(dwutil.IfThenElse((cr == cr_11), 1, 0)))<<2))
+		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|(((dwutil.IfThenElse((cr == ax25.CRCmd), 1, 0))|(dwutil.IfThenElse((cr == ax25.CR11), 1, 0)))<<2))
 
 		// This gets OR'ed into the above.
 		switch frame_type {
@@ -352,7 +352,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 		// same bits.  We see this in the second example in the protocol spec.
 		// The original UI frame has both C bits of 0 so it is received as a response.
 
-		SET_CONTROL(hdr, (pf<<6)|(((dwutil.IfThenElse((cr == cr_cmd), 1, 0))|(dwutil.IfThenElse((cr == cr_11), 1, 0)))<<2))
+		SET_CONTROL(hdr, (pf<<6)|(((dwutil.IfThenElse((cr == ax25.CRCmd), 1, 0))|(dwutil.IfThenElse((cr == ax25.CR11), 1, 0)))<<2))
 
 		// This gets OR'ed into the above.
 		switch frame_type {
@@ -529,7 +529,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// 'S' frame.
 		// The control field contains: P/F N(R) C S S
 		var control = GET_CONTROL(hdr)
-		var cr = dwutil.IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
+		var cr = dwutil.IfThenElse((control&0x04) != 0, ax25.CRCmd, ax25.CRRes)
 		var ftype ax25_frame_type_t
 
 		switch control & 0x03 {
@@ -552,7 +552,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// 'U' frame other than 'UI'.
 		// The control field contains: P/F OPCODE{3) C x x
 		var control = GET_CONTROL(hdr)
-		var cr = dwutil.IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
+		var cr = dwutil.IfThenElse((control&0x04) != 0, ax25.CRCmd, ax25.CRRes)
 		var axpid = 0 // unused for U other than UI.
 		var ftype ax25_frame_type_t
 
@@ -584,7 +584,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// 'UI' frame.
 		// The control field contains: P/F OPCODE{3) C x x
 		var control = GET_CONTROL(hdr)
-		var cr = dwutil.IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
+		var cr = dwutil.IfThenElse((control&0x04) != 0, ax25.CRCmd, ax25.CRRes)
 		var ftype = frame_type_U_UI
 		var pf = (control >> 6) & 0x01
 		var axpid = decode_pid(GET_PID(hdr))
@@ -595,7 +595,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// 'I' frame.
 		// The control field contains: P/F N(R) N(S)
 		var control = GET_CONTROL(hdr)
-		var cr = cr_cmd // Always command.
+		var cr = ax25.CRCmd // Always command.
 		var pf = (control >> 6) & 0x01
 		var nr = (control >> 3) & 0x7
 		var ns = (control & 0x7)

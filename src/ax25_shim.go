@@ -24,9 +24,6 @@ type ALevel = ax25.ALevel
 type AddrStrictness = ax25.AddrStrictness
 
 const (
-	cr_cmd                     = ax25.CRCmd
-	cr_res                     = ax25.CRRes
-	cr_11                      = ax25.CR11
 	modulo_unknown             = ax25.ModuloUnknown
 	modulo_8                   = ax25.Modulo8
 	modulo_128                 = ax25.Modulo128

@@ -233,7 +233,7 @@ func TestFrameFlavor(t *testing.T) {
 	addrs[ax25.Destination] = "Q1TEST"
 	addrs[ax25.Source] = "Q2TEST"
 
-	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_SABM, 0, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, frame_type_U_SABM, 0, 0, nil)
 	require.NotNil(t, pp)
 
 	assert.Equal(t, FLAVOR_OTHER, frame_flavor(pp))
@@ -360,7 +360,7 @@ func TestSendOneFrameNonAPRS(t *testing.T) {
 	addrs[ax25.Destination] = "Q1TEST"
 	addrs[ax25.Source] = "Q2TEST"
 
-	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_SABM, 0, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, frame_type_U_SABM, 0, 0, nil)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_0_HI, pp) })
@@ -376,13 +376,13 @@ func TestSendOneFrameXID(t *testing.T) {
 
 	var param xid_param_s
 
-	var info = xid_encode(&param, cr_cmd)
+	var info = xid_encode(&param, ax25.CRCmd)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Destination] = "Q1TEST"
 	addrs[ax25.Source] = "Q2TEST"
 
-	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_XID, 0, 0, info)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, frame_type_U_XID, 0, 0, info)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_0_HI, pp) })
@@ -514,7 +514,7 @@ func TestXmitAX25FramesTakesHighPriorityFirst(t *testing.T) {
 	addrs[ax25.Destination] = "Q1TEST"
 	addrs[ax25.Source] = "Q2TEST"
 
-	var high = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_SABM, 0, 0, nil)
+	var high = ax25.UFrame(addrs, 2, ax25.CRCmd, frame_type_U_SABM, 0, 0, nil)
 	require.NotNil(t, high)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, low)

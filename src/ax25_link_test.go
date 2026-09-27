@@ -238,8 +238,8 @@ func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 		cr    cmdres_t
 		apply func(S *ax25_dlsm_t, param *xid_param_s)
 	}{
-		{"command", cr_cmd, negotiation_response},
-		{"response", cr_res, complete_negotiation},
+		{"command", ax25.CRCmd, negotiation_response},
+		{"response", ax25.CRRes, complete_negotiation},
 	}
 
 	for _, path := range paths {
@@ -361,7 +361,7 @@ func TestIgnoredConnectRequestIsLogged(t *testing.T) {
 	addrs[ax25.Source] = THEIR_CALL
 	addrs[ax25.Destination] = MY_CALL
 
-	var pp = ax25.UFrame(addrs, 2, cr_cmd, frame_type_U_SABM, 1, 0, nil)
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, frame_type_U_SABM, 1, 0, nil)
 	require.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)

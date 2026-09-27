@@ -4,6 +4,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 )
@@ -84,7 +85,7 @@ func Test_XID(t *testing.T) {
 
 	/* encode and verify it comes out the same. */
 
-	var info = xid_encode(param, cr_cmd)
+	var info = xid_encode(param, ax25.CRCmd)
 	assert.Len(t, info, len(xid_example))
 
 	assert.Equal(t, info, xid_example, "n: %d, info: %v, xid_example[0]: %v", n, info, xid_example)
@@ -99,7 +100,7 @@ func Test_XID(t *testing.T) {
 	param.ack_timer = maybe.Just(1234)
 	param.retries = maybe.Just(12)
 
-	info = xid_encode(param, cr_cmd)
+	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -125,7 +126,7 @@ func Test_XID(t *testing.T) {
 	param.ack_timer = maybe.Just(5555)
 	param.retries = maybe.Just(9)
 
-	info = xid_encode(param, cr_cmd)
+	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -151,7 +152,7 @@ func Test_XID(t *testing.T) {
 	param.ack_timer = maybe.Just(5555)
 	param.retries = maybe.Just(9)
 
-	info = xid_encode(param, cr_cmd)
+	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -177,7 +178,7 @@ func Test_XID(t *testing.T) {
 	param.ack_timer = maybe.Just(999)
 	param.retries = maybe.Nothing[int]()
 
-	info = xid_encode(param, cr_cmd)
+	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
 	text_color_set(DW_COLOR_DEBUG)

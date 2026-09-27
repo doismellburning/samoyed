@@ -26,6 +26,7 @@ package direwolf
 import (
 	"fmt"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -475,7 +476,7 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 	//dw_printf ("******      XID temp hack - test no SREJ      ******\n");
 	// param.srej = srej_none;
 
-	if cr == cr_cmd {
+	if cr == ax25.CRCmd {
 		// offer a "menu" of acceptable choices.  i.e. 1, 2 or 3 bits set.
 		switch param.srej {
 		default: // Includes srej_none

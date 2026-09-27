@@ -646,9 +646,9 @@ func all_frame_types(t *testing.T) {
 			var modulo = modulo_8
 			var nr = int(modulo/2 + 1)
 
-			for cr := cmdres_t(0); cr <= cr_cmd; cr++ {
+			for cr := cmdres_t(0); cr <= ax25.CRCmd; cr++ {
 				// SREJ can only be response.
-				if ftype == frame_type_S_SREJ && cr != cr_res {
+				if ftype == frame_type_S_SREJ && cr != ax25.CRRes {
 					continue
 				}
 
@@ -663,9 +663,9 @@ func all_frame_types(t *testing.T) {
 			modulo = modulo_128
 			nr = int(modulo/2 + 1)
 
-			for cr := cmdres_t(0); cr <= cr_cmd; cr++ {
+			for cr := cmdres_t(0); cr <= ax25.CRCmd; cr++ {
 				// SREJ can only be response.
-				if ftype == frame_type_S_SREJ && cr != cr_res {
+				if ftype == frame_type_S_SREJ && cr != ax25.CRRes {
 					continue
 				}
 
@@ -688,7 +688,7 @@ func all_frame_types(t *testing.T) {
 	for pf := range 2 {
 		var modulo = modulo_128
 		var nr = 127
-		var cr = cr_res
+		var cr = ax25.CRRes
 
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 

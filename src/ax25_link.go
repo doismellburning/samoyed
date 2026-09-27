@@ -985,7 +985,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 		SET_RC(S, 0)
 		var p1 = 1
 		var nopid0 = 0
-		var pp15 = ax25.UFrame(S.addrs, S.num_addr, cr_cmd, frame_type_U_DISC, p1, nopid0, nil)
+		var pp15 = ax25.UFrame(S.addrs, S.num_addr, ax25.CRCmd, frame_type_U_DISC, p1, nopid0, nil)
 		transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp15)
 
 		STOP_T1(S) // started in establish_data_link.
@@ -1004,7 +1004,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 
 			// Erratum.  Flow chart simply says "DM (expedited)."
 			// This is the only place we have expedited.  Is this correct?
-			var cr = cr_res // DM can only be response.
+			var cr = ax25.CRRes // DM can only be response.
 			var p = 0
 			var nopid = 0 // PID applies only to I and UI frames.
 
@@ -1026,7 +1026,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 		discard_i_queue(S)
 		SET_RC(S, 0) // I think this should be 1 but I'm not that worried about it.
 
-		var cmd = cr_cmd
+		var cmd = ax25.CRCmd
 		var p = 1
 		var nopid = 0
 
@@ -2020,19 +2020,19 @@ func lm_data_indication(E *dlq_item_t) {
 
 	switch ftype {
 	case frame_type_I:
-		if cr != cr_cmd {
+		if cr != ax25.CRCmd {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error S: %s must be COMMAND.\n", S.stream_id, desc)
 		}
 
 	case frame_type_S_RR, frame_type_S_RNR, frame_type_S_REJ:
-		if cr != cr_cmd && cr != cr_res {
+		if cr != ax25.CRCmd && cr != ax25.CRRes {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error: %s must be COMMAND or RESPONSE.\n", S.stream_id, desc)
 		}
 
 	case frame_type_U_SABME, frame_type_U_SABM, frame_type_U_DISC:
-		if cr != cr_cmd {
+		if cr != ax25.CRCmd {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error: %s must be COMMAND.\n", S.stream_id, desc)
 		}
@@ -2041,13 +2041,13 @@ func lm_data_indication(E *dlq_item_t) {
 		// The underlying X.25 spec clearly says it is response only.  Let's go with that.
 
 	case frame_type_S_SREJ, frame_type_U_DM, frame_type_U_UA, frame_type_U_FRMR:
-		if cr != cr_res {
+		if cr != ax25.CRRes {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error: %s must be RESPONSE.\n", S.stream_id, desc)
 		}
 
 	case frame_type_U_XID, frame_type_U_TEST:
-		if cr != cr_cmd && cr != cr_res {
+		if cr != ax25.CRCmd && cr != ax25.CRRes {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error: %s must be COMMAND or RESPONSE.\n", S.stream_id, desc)
 		}
@@ -2209,8 +2209,8 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 	switch S.state {
 	case state_0_disconnected:
 		// Logic from flow chart for "all other commands."
-		if cr == cr_cmd {
-			var r = cr_res // DM response with F taken from P.
+		if cr == ax25.CRCmd {
+			var r = ax25.CRRes // DM response with F taken from P.
 			var f = p
 			var nopid = 0 // PID applies only for I and UI frames.
 
@@ -2224,8 +2224,8 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 
 	case state_2_awaiting_release:
 		// Logic from flow chart for "I, RR, RNR, REJ, SREJ commands."
-		if cr == cr_cmd && p == 1 {
-			var r = cr_res // DM response with F = 1.
+		if cr == ax25.CRCmd && p == 1 {
+			var r = ax25.CRRes // DM response with F = 1.
 			var f = 1
 			var nopid = 0 // PID applies only for I and UI frames.
 
@@ -2289,7 +2289,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 					// This should be unreachable because we currently don't have a way to set own_receiver_busy.
 					// But we might the capability someday so implement this while we are here.
 					if p == 1 {
-						var cr = cr_res // Erratum: The use of "F" in the flow chart implies that RNR is a response
+						var cr = ax25.CRRes // Erratum: The use of "F" in the flow chart implies that RNR is a response
 						// in this case, but I'm not confident about that.  The text says frame.
 						var f = 1
 						var nr = S.vr
@@ -2491,8 +2491,8 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			// The next response frame returned to an I frame with the P bit set to "1", received during the information
 			// transfer state, is an RR, RNR or REJ response with the F bit set to "1".
 			var f = 1
-			var nr = S.vr   // Next expected sequence number.
-			var cr = cr_res // response with F set to 1.
+			var nr = S.vr       // Next expected sequence number.
+			var cr = ax25.CRRes // response with F set to 1.
 
 			var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
@@ -2516,8 +2516,8 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		// Again, reference section 6.2.
 		if p > 0 {
 			var f = 1
-			var nr = S.vr   // Next expected sequence number.
-			var cr = cr_res // response with F set to 1.
+			var nr = S.vr       // Next expected sequence number.
+			var cr = ax25.CRRes // response with F set to 1.
 
 			var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
@@ -2532,8 +2532,8 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		// At one time, I had some doubts about when to use command or response for REJ.
 		// I now believe that response, as implied by setting F in the flow chart, is correct.
 		var f = p
-		var nr = S.vr   // Next expected sequence number.
-		var cr = cr_res // response with F copied from P in I frame.
+		var nr = S.vr       // Next expected sequence number.
+		var cr = ax25.CRRes // response with F copied from P in I frame.
 
 		S.reject_exception = true
 
@@ -2581,8 +2581,8 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 				var f = 1
 				enquiry_response(S, frame_type_I, f)
 			} else if S.own_receiver_busy {
-				var cr = cr_res // send RNR response
-				var f = 0       // we know p=0 here.
+				var cr = ax25.CRRes // send RNR response
+				var f = 0           // we know p=0 here.
 				var nr = S.vr
 
 				var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
@@ -2904,7 +2904,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 		dw_printf("\n")
 	}
 
-	var cr = cr_res // SREJ is always response.
+	var cr = ax25.CRRes // SREJ is always response.
 
 	// Multi-SREJ - Use info part for additional sequence number(s) instead of sending separate SREJ for each.
 
@@ -3037,8 +3037,8 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 	// dw_printf ("rr_rnr_frame (ready=%d, cr=%d, pf=%d, nr=%d) state=%d\n", ready, cr, pf, nr, S.state);
 	switch S.state {
 	case state_0_disconnected:
-		if cr == cr_cmd {
-			var r = cr_res // DM response with F taken from P.
+		if cr == ax25.CRCmd {
+			var r = ax25.CRRes // DM response with F taken from P.
 			var f = pf
 			var nopid = 0 // PID only for I and UI frames.
 			var pp = ax25.UFrame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
@@ -3051,8 +3051,8 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 
 	case state_2_awaiting_release:
 		// Logic from flow chart for "I, RR, RNR, REJ, SREJ commands."
-		if cr == cr_cmd && pf == 1 {
-			var r = cr_res // DM response with F = 1.
+		if cr == ax25.CRCmd && pf == 1 {
+			var r = ax25.CRRes // DM response with F = 1.
 			var f = 1
 			var nopid = 0 // PID applies only for I and UI frames.
 
@@ -3074,7 +3074,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 		// It might have been because we were reporting error A for response with F=1.
 		// Other than avoiding that error message, this is functionally equivalent.
 
-		if cr == cr_cmd && pf > 0 {
+		if cr == ax25.CRCmd && pf > 0 {
 			check_need_for_response(S, RR_OR_RNR(ready), cr, pf)
 		}
 
@@ -3094,7 +3094,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 	case state_4_timer_recovery:
 		S.peer_receiver_busy = !ready
 
-		if cr == cr_res && pf == 1 {
+		if cr == ax25.CRRes && pf == 1 {
 			// RR/RNR Response with F==1.
 			if ax25Link.debugRetry {
 				text_color_set(DW_COLOR_DEBUG)
@@ -3136,7 +3136,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 		} else {
 			// RR/RNR command, either P value.
 			// RR/RNR response, F==0
-			if cr == cr_cmd && pf == 1 {
+			if cr == ax25.CRCmd && pf == 1 {
 				var f = 1
 				enquiry_response(S, RR_OR_RNR(ready), f)
 			}
@@ -3153,7 +3153,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 
 				// Thought: Could we simply call check_i_frame_ackd, for consistency, rather than only setting V(A)?
 
-				if cr == cr_res && pf == 0 {
+				if cr == ax25.CRRes && pf == 0 {
 					if S.vs == S.va { // all caught up with ack from other guy.
 						STOP_T1(S)
 						select_t1_value(S)
@@ -3265,8 +3265,8 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 	switch S.state {
 	case state_0_disconnected:
 		// states 0 and 2 are very similar with one tiny little difference.
-		if cr == cr_cmd {
-			var r = cr_res // DM response with F taken from P.
+		if cr == ax25.CRCmd {
+			var r = ax25.CRRes // DM response with F taken from P.
 			var f = pf
 			var nopid = 0 // PID is only for I and UI.
 
@@ -3278,8 +3278,8 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 		// Do nothing.
 
 	case state_2_awaiting_release:
-		if cr == cr_cmd && pf == 1 {
-			var r = cr_res // DM response with F = 1.
+		if cr == ax25.CRCmd && pf == 1 {
+			var r = ax25.CRRes // DM response with F = 1.
 			var f = 1
 			var nopid = 0
 
@@ -3335,7 +3335,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 	case state_4_timer_recovery:
 		S.peer_receiver_busy = false
 
-		if cr == cr_res && pf == 1 {
+		if cr == ax25.CRRes && pf == 1 {
 			STOP_T1(S)
 			select_t1_value(S)
 
@@ -3361,7 +3361,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 				enter_new_state(S, SABME_or_SABM(S))
 			}
 		} else {
-			if cr == cr_cmd && pf == 1 {
+			if cr == ax25.CRCmd && pf == 1 {
 				var f = 1
 				enquiry_response(S, frame_type_S_REJ, f)
 			}
@@ -3664,7 +3664,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nol
  *------------------------------------------------------------------------------*/
 
 func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
-	var cr = cr_cmd
+	var cr = ax25.CRCmd
 	var i_frame_nr = S.vr
 	var i_frame_ns = nr
 	var p = 0
@@ -3780,7 +3780,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			set_version_2_0(S)
 		}
 
-		var res = cr_res
+		var res = ax25.CRRes
 		var f = p // I don't understand the purpose of "P" in SABM/SABME
 		// but we dutifully copy it into "F" for the UA response.
 		var nopid = 0 // PID is only for I and UI.
@@ -3816,7 +3816,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 	case state_1_awaiting_connection:
 		// Don't combine with state 5.  They are slightly different.
 		if extended { // SABME - respond with DM, enter state 5.
-			var res = cr_res
+			var res = ax25.CRRes
 			var f = p
 			var nopid = 0
 
@@ -3827,7 +3827,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			// Erratum!  2006 version shows SAMBE twice for state 1.
 			// First one should be SABM in last page of Figure C4.2
 			// Original appears to be correct.
-			var res = cr_res
+			var res = ax25.CRRes
 			var f = p
 			var nopid = 0
 
@@ -3838,7 +3838,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 
 	case state_5_awaiting_v22_connection:
 		if extended { // SABME - respond with UA
-			var res = cr_res
+			var res = ax25.CRRes
 			var f = p
 			var nopid = 0
 
@@ -3846,7 +3846,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 			// stay in state 5
 		} else { // SABM, respond with UA, enter state 1
-			var res = cr_res
+			var res = ax25.CRRes
 			var f = p
 			var nopid = 0
 
@@ -3859,7 +3859,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		// Erratum! Flow charts don't list SABME for state 2.
 		// Probably just want to treat it the same as SABM here.
 		{
-			var res = cr_res
+			var res = ax25.CRRes
 			var f = p
 			var nopid = 0
 
@@ -3870,7 +3870,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 
 	case state_3_connected, state_4_timer_recovery:
 		{
-			var res = cr_res
+			var res = ax25.CRRes
 			var f = p
 			var nopid = 0
 
@@ -3950,7 +3950,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 	switch S.state {
 	case state_0_disconnected, state_1_awaiting_connection, state_5_awaiting_v22_connection:
 		{
-			var res = cr_res
+			var res = ax25.CRRes
 			var f = p
 			var nopid = 0
 
@@ -3961,7 +3961,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 
 	case state_2_awaiting_release:
 		{
-			var res = cr_res
+			var res = ax25.CRRes
 			var f = p
 			var nopid = 0
 
@@ -3974,7 +3974,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 		{
 			discard_i_queue(S)
 
-			var res = cr_res
+			var res = ax25.CRRes
 			var f = p
 			var nopid = 0
 
@@ -4462,12 +4462,12 @@ func frmr_frame(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf int) {
-	if cr == cr_cmd && pf == 1 {
+	if cr == ax25.CRCmd && pf == 1 {
 		switch S.state {
 		case state_0_disconnected, state_1_awaiting_connection, state_2_awaiting_release, state_5_awaiting_v22_connection:
 			{
-				var r = cr_res // DM response with F taken from P.
-				var nopid = 0  // PID applies only for I and UI frames.
+				var r = ax25.CRRes // DM response with F taken from P.
+				var nopid = 0      // PID applies only for I and UI frames.
 
 				var pp = ax25.UFrame(S.addrs, S.num_addr, r, frame_type_U_DM, pf, nopid, nil)
 				transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
@@ -4534,7 +4534,7 @@ func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf int) {
 func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 	switch S.mdl_state {
 	case mdl_state_0_ready:
-		if cr == cr_cmd {
+		if cr == ax25.CRCmd {
 			if pf == 1 {
 				// Take parameters sent by other station.
 				// Generally we take minimum of what he wants and what I can do.
@@ -4544,7 +4544,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 				if ok > 0 {
 					negotiation_response(S, param)
 
-					var res = cr_res
+					var res = ax25.CRRes
 					var xinfo = xid_encode(param, res)
 
 					var nopid = 0
@@ -4562,7 +4562,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 		}
 
 	case mdl_state_1_negotiating:
-		if cr == cr_res {
+		if cr == ax25.CRRes {
 			if pf == 1 {
 				// Got expected response.  Copy into my working parameters.
 				var param, _, ok = xid_parse(info)
@@ -4637,11 +4637,11 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
  *------------------------------------------------------------------------------*/
 
 func test_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
-	var res = cr_res
+	var res = ax25.CRRes
 	var f = pf
 	var nopid = 0
 
-	if cr == cr_cmd {
+	if cr == ax25.CRCmd {
 		var pp = ax25.UFrame(S.addrs, S.num_addr, res, frame_type_U_TEST, f, nopid, info)
 		transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 	}
@@ -4752,7 +4752,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			agwServer.LinkTerminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], true)
 			enter_new_state(S, state_0_disconnected)
 		} else {
-			var cmd = cr_cmd
+			var cmd = ax25.CRCmd
 			var p = 1
 			var nopid = 0
 
@@ -4781,7 +4781,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			agwServer.LinkTerminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], false)
 			enter_new_state(S, state_0_disconnected)
 		} else {
-			var cmd = cr_cmd
+			var cmd = ax25.CRCmd
 			var p = 1
 			var nopid = 0
 
@@ -4836,8 +4836,8 @@ func t1_expiry(S *ax25_dlsm_t) {
 
 			discard_i_queue(S)
 
-			var cr = cr_res // DM can only be response.
-			var f = 0       // Erratum: Assuming F=0 because it is not response to P=1
+			var cr = ax25.CRRes // DM can only be response.
+			var f = 0           // Erratum: Assuming F=0 because it is not response to P=1
 			var nopid = 0
 
 			var pp = ax25.UFrame(S.addrs, S.num_addr, cr, frame_type_U_DM, f, nopid, nil)
@@ -4920,7 +4920,7 @@ func t3_expiry(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func tm201_expiry(S *ax25_dlsm_t) {
-	var cmd = cr_cmd
+	var cmd = ax25.CRCmd
 	var p = 1
 	var nopid = 0
 
@@ -5003,7 +5003,7 @@ func nr_error_recovery(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func establish_data_link(S *ax25_dlsm_t) {
-	var cmd = cr_cmd
+	var cmd = ax25.CRCmd
 	var p = 1
 	var nopid = 0
 
@@ -5101,7 +5101,7 @@ func clear_exception_conditions(S *ax25_dlsm_t) {
 func transmit_enquiry(S *ax25_dlsm_t) {
 	var p = 1
 	var nr = S.vr
-	var cmd = cr_cmd
+	var cmd = ax25.CRCmd
 
 	if ax25Link.debugRetry {
 		text_color_set(DW_COLOR_ERROR)
@@ -5164,7 +5164,7 @@ func transmit_enquiry(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
-	var cr = cr_res // Response, not command as seen in flow chart.
+	var cr = ax25.CRRes // Response, not command as seen in flow chart.
 	var nr = S.vr
 
 	if ax25Link.debugRetry {
@@ -5324,7 +5324,7 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 
 	for {
 		if S.txdata_by_ns[local_vs] != nil {
-			var cr = cr_cmd
+			var cr = ax25.CRCmd
 			var ns = local_vs
 			var nr = S.vr
 			var p = 0
@@ -5421,10 +5421,10 @@ func check_i_frame_ackd(S *ax25_dlsm_t, nr int) {
  *------------------------------------------------------------------------------*/
 
 func check_need_for_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, cr cmdres_t, pf int) {
-	if cr == cr_cmd && pf == 1 {
+	if cr == ax25.CRCmd && pf == 1 {
 		var f = 1
 		enquiry_response(S, frame_type, f)
-	} else if cr == cr_res && pf == 1 {
+	} else if cr == ax25.CRRes && pf == 1 {
 		if ax25Link.debugProtocolErrors {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error A: F=1 received but P=1 not outstanding.\n", S.stream_id)
@@ -5750,7 +5750,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 			S.i_frame_queue = txdata.next
 			txdata.next = nil
 
-			var cr = cr_cmd
+			var cr = ax25.CRCmd
 			var ns = S.vs
 			var nr = S.vr
 			var p = 0
@@ -5885,7 +5885,7 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 		var param xid_param_s
 		initiate_negotiation(S, &param)
 
-		var cmd = cr_cmd
+		var cmd = ax25.CRCmd
 		var xinfo = xid_encode(&param, cmd)
 
 		var p = 1
