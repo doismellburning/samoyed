@@ -2205,7 +2205,7 @@ func lm_data_indication(E *dlq_item_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info []byte) {
+func i_frame(S *ax25_dlsm_t, cr ax25.CmdRes, p int, nr int, ns int, pid int, info []byte) {
 	switch S.state {
 	case state_0_disconnected:
 		// Logic from flow chart for "all other commands."
@@ -3033,7 +3033,7 @@ func RR_OR_RNR(ready bool) ax25_frame_type_t {
 	return ft
 }
 
-func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
+func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr ax25.CmdRes, pf int, nr int) {
 	// dw_printf ("rr_rnr_frame (ready=%d, cr=%d, pf=%d, nr=%d) state=%d\n", ready, cr, pf, nr, S.state);
 	switch S.state {
 	case state_0_disconnected:
@@ -3261,7 +3261,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
  *
  *------------------------------------------------------------------------------*/
 
-func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
+func rej_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, nr int) {
 	switch S.state {
 	case state_0_disconnected:
 		// states 0 and 2 are very similar with one tiny little difference.
@@ -3494,7 +3494,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
  *
  *------------------------------------------------------------------------------*/
 
-func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nolint:unparam
+func srej_frame(S *ax25_dlsm_t, cr ax25.CmdRes, f int, nr int, info []byte) { //nolint:unparam
 	switch S.state {
 	case state_0_disconnected:
 
@@ -4461,7 +4461,7 @@ func frmr_frame(S *ax25_dlsm_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf int) {
+func ui_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int) {
 	if cr == ax25.CRCmd && pf == 1 {
 		switch S.state {
 		case state_0_disconnected, state_1_awaiting_connection, state_2_awaiting_release, state_5_awaiting_v22_connection:
@@ -4531,7 +4531,7 @@ func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf int) {
  *
  *------------------------------------------------------------------------------*/
 
-func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
+func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 	switch S.mdl_state {
 	case mdl_state_0_ready:
 		if cr == ax25.CRCmd {
@@ -4636,7 +4636,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
  *
  *------------------------------------------------------------------------------*/
 
-func test_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
+func test_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 	var res = ax25.CRRes
 	var f = pf
 	var nopid = 0
@@ -5420,7 +5420,7 @@ func check_i_frame_ackd(S *ax25_dlsm_t, nr int) {
  *
  *------------------------------------------------------------------------------*/
 
-func check_need_for_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, cr cmdres_t, pf int) {
+func check_need_for_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, cr ax25.CmdRes, pf int) {
 	if cr == ax25.CRCmd && pf == 1 {
 		var f = 1
 		enquiry_response(S, frame_type, f)

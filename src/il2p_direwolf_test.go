@@ -589,7 +589,7 @@ func all_frame_types(t *testing.T) {
 
 	for ftype := ax25.FrameTypeUSABME; ftype <= ax25.FrameTypeUTEST; ftype++ {
 		for pf := range 2 {
-			var cmin, cmax cmdres_t
+			var cmin, cmax ax25.CmdRes
 
 			switch ftype {
 			// 0 = response, 1 = command
@@ -646,7 +646,7 @@ func all_frame_types(t *testing.T) {
 			var modulo = ax25.Modulo8
 			var nr = int(modulo/2 + 1)
 
-			for cr := cmdres_t(0); cr <= ax25.CRCmd; cr++ {
+			for cr := ax25.CmdRes(0); cr <= ax25.CRCmd; cr++ {
 				// SREJ can only be response.
 				if ftype == ax25.FrameTypeSSREJ && cr != ax25.CRRes {
 					continue
@@ -663,7 +663,7 @@ func all_frame_types(t *testing.T) {
 			modulo = ax25.Modulo128
 			nr = int(modulo/2 + 1)
 
-			for cr := cmdres_t(0); cr <= ax25.CRCmd; cr++ {
+			for cr := ax25.CmdRes(0); cr <= ax25.CRCmd; cr++ {
 				// SREJ can only be response.
 				if ftype == ax25.FrameTypeSSREJ && cr != ax25.CRRes {
 					continue
@@ -709,7 +709,7 @@ func all_frame_types(t *testing.T) {
 		var nr = 0x55 & int(modulo-1)
 		var ns = 0xaa & int(modulo-1)
 
-		for cr := cmdres_t(1); cr <= 1; cr++ { // can only be command
+		for cr := ax25.CmdRes(1); cr <= 1; cr++ { // can only be command
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 			var pp = ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
@@ -722,7 +722,7 @@ func all_frame_types(t *testing.T) {
 		nr = 0x55 & int(modulo-1)
 		ns = 0xaa & int(modulo-1)
 
-		for cr := cmdres_t(1); cr <= 1; cr++ {
+		for cr := ax25.CmdRes(1); cr <= 1; cr++ {
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 			var pp = ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)

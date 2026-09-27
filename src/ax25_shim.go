@@ -17,7 +17,6 @@ import (
 )
 
 type packet_t = ax25.Packet
-type cmdres_t = ax25.CmdRes
 type ax25_modulo_t = ax25.Modulo
 type ax25_frame_type_t = ax25.FrameType
 type ALevel = ax25.ALevel

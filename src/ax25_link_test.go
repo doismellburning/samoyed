@@ -235,7 +235,7 @@ func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 	var paths = []struct {
 		name  string
-		cr    cmdres_t
+		cr    ax25.CmdRes
 		apply func(S *ax25_dlsm_t, param *xid_param_s)
 	}{
 		{"command", ax25.CRCmd, negotiation_response},

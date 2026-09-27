@@ -413,7 +413,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
  *
  *--------------------------------------------------------------------*/
 
-func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
+func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 	var info []byte
 
 	info = append(info, FI_Format_Indicator)
