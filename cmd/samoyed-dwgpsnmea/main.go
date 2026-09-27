@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/maybe"
-	direwolf "github.com/doismellburning/samoyed/src"
 )
 
 // show formats an optional GPS reading, so an absent one prints as "unknown"

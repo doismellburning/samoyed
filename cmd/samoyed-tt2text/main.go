@@ -11,7 +11,7 @@ import (
 	"os"
 	"strings"
 
-	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/doismellburning/samoyed/internal/direwolf"
 )
 
 func main() {

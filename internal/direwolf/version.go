@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-var SAMOYED_VERSION string //nolint:gochecknoglobals // Set at build time via `-ldflags "-X 'github.com/doismellburning/samoyed/src.SAMOYED_VERSION=X'"`
+var SAMOYED_VERSION string //nolint:gochecknoglobals // Set at build time via `-ldflags "-X 'github.com/doismellburning/samoyed/internal/direwolf.SAMOYED_VERSION=X'"`
 
 // MAJOR_VERSION and MINOR_VERSION exist because a bunch of things, both Dire Wolf and APRS,
 // seem to expect two-part single-digit versions.

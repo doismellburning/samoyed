@@ -76,8 +76,7 @@ var deviceIDData *DeviceIDData
 var search_locations = []string{
 	"tocalls.yaml",            // Current working directory
 	"data/tocalls.yaml",       // Windows with CMake
-	"../data/tocalls.yaml",    // Source tree, e.g. running tests from src/
-	"../../data/tocalls.yaml", // Source tree, e.g. running tests from cmd/<name>/
+	"../../data/tocalls.yaml", // Source tree, e.g. running tests from internal/direwolf/ or cmd/<name>/
 	"/usr/local/share/direwolf/tocalls.yaml",
 	"/usr/share/direwolf/tocalls.yaml",
 	// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458

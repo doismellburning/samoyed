@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/testutils"
-	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/stretchr/testify/require"
 )
 
