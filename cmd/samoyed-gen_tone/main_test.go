@@ -59,7 +59,8 @@ func Test_genTone(t *testing.T) {
 		genTone(sink)
 	})
 
-	assert.Contains(t, output, "Warning, known to fail")
+	// Every channel of the stereo run has a tone generator to put bits to.
+	assert.NotContains(t, output, "Invalid channel")
 
 	// The mono part comes first: 16 bit samples at the default rate, two
 	// seconds of each tone, twice.
