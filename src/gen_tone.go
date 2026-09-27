@@ -10,8 +10,6 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
-	"context"
-	"fmt"
 	"math"
 	"os"
 
@@ -264,6 +262,23 @@ func GenToneInit(audio_config_p *AudioConfig, amp int, sink AudioSink) int {
 
 	return (0)
 } /* end GenToneInit */
+
+// NewGenToneTestConfig returns an AudioConfig for the standalone gen_tone
+// test program, using the default audio device with numChannels sound card
+// channels, and marking radio channel 0 as MEDIUM_RADIO if mediumRadio is set.
+func NewGenToneTestConfig(numChannels int, mediumRadio bool) *AudioConfig {
+	var config = new(AudioConfig)
+
+	config.adev[0].adevice_in = DEFAULT_ADEVICE
+	config.adev[0].adevice_out = DEFAULT_ADEVICE
+	config.adev[0].num_channels = numChannels
+
+	if mediumRadio {
+		config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
+	}
+
+	return config
+}
 
 /*-------------------------------------------------------------------
  *
@@ -691,72 +706,4 @@ func (tg *ToneGenerator) PutQuietMs(timeMs int) {
 
 	// Avoid abrupt change when it starts up again.
 	tg.tonePhase = 0
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        main
- *
- * Purpose:     Quick test program for generating tones
- *
- *--------------------------------------------------------------------*/
-
-func GenToneMain() {
-	fmt.Println("Warning, known to fail with an assertion error, needs debugging and fixing.")
-
-	const chan1 = 0
-	const chan2 = 1
-
-	/* to sound card */
-	/* one channel.  2 times:  one second of each tone. */
-
-	var my_audio_config AudioConfig
-	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
-	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
-	my_audio_config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
-
-	AudioOpen(context.Background(), &my_audio_config)
-	GenToneInit(&my_audio_config, 100, AudioDeviceSink{})
-
-	for range 2 {
-		for range my_audio_config.achan[0].baud * 2 {
-			ToneGenPutBit(chan1, 1)
-		}
-
-		for range my_audio_config.achan[0].baud * 2 {
-			ToneGenPutBit(chan1, 0)
-		}
-	}
-
-	AudioClose()
-
-	/* Now try stereo. */
-
-	my_audio_config = AudioConfig{} //nolint:exhaustruct_v5
-	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
-	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
-	my_audio_config.adev[0].num_channels = 2
-
-	AudioOpen(context.Background(), &my_audio_config)
-	GenToneInit(&my_audio_config, 100, AudioDeviceSink{})
-
-	for range 4 {
-		for range my_audio_config.achan[0].baud * 2 {
-			ToneGenPutBit(chan1, 1)
-		}
-
-		for range my_audio_config.achan[0].baud * 2 {
-			ToneGenPutBit(chan1, 0)
-		}
-
-		for range my_audio_config.achan[1].baud * 2 {
-			ToneGenPutBit(chan2, 1)
-		}
-
-		for range my_audio_config.achan[1].baud * 2 {
-			ToneGenPutBit(chan2, 0)
-		}
-	}
-
-	AudioClose()
 }
