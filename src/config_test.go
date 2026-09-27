@@ -207,7 +207,7 @@ func Test_IsNoCall(t *testing.T) {
 // configs is the set of structures config_init fills in, along with what it
 // reported while doing so.
 type configs struct {
-	audio *audio_s
+	audio *AudioConfig
 	digi  *digi_config_s
 	cdigi *cdigi_config_s
 	tt    *tt_config_s
@@ -238,7 +238,7 @@ func parseConfig(t *testing.T, content string) configs {
 	require.NoError(t, tmpFile.Close())
 
 	var c = configs{
-		audio:  new(audio_s),
+		audio:  new(AudioConfig),
 		digi:   new(digi_config_s),
 		cdigi:  new(cdigi_config_s),
 		tt:     new(tt_config_s),
@@ -261,7 +261,7 @@ func parseConfig(t *testing.T, content string) configs {
 
 // configFromString runs config_init over content and returns the resulting
 // audio and misc config structs.
-func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
+func configFromString(t *testing.T, content string) (*AudioConfig, *misc_config_s) {
 	t.Helper()
 
 	var c = parseConfig(t, content)
@@ -362,7 +362,7 @@ func Test_config_init_beacon_unreadable_interval(t *testing.T) {
 	require.Equal(t, 1, misc.num_beacons)
 	assert.Equal(t, 600, misc.beacon[0].every)
 
-	var modem = new(audio_s)
+	var modem = new(AudioConfig)
 	modem.chan_medium[0] = MEDIUM_RADIO
 	modem.mycall[0] = "Q1TEST"
 
@@ -412,7 +412,7 @@ func Test_config_init_beacon_out_of_range_lat(t *testing.T) {
 
 	// With no position the beacon is dropped rather than transmitted from
 	// wherever the clamp lands.
-	var modem = new(audio_s)
+	var modem = new(AudioConfig)
 	modem.chan_medium[0] = MEDIUM_RADIO
 	modem.mycall[0] = "Q1TEST"
 
@@ -648,7 +648,7 @@ func Test_config_init_modem_directive(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, tmpFile.Close())
 
-			var audioConfig = new(audio_s)
+			var audioConfig = new(AudioConfig)
 			var digiConfig digi_config_s
 			var cdigiConfig cdigi_config_s
 			var ttConfig tt_config_s
@@ -697,7 +697,7 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, tmpFile.Close())
 
-			var audioConfig = new(audio_s)
+			var audioConfig = new(AudioConfig)
 			var digiConfig digi_config_s
 			var cdigiConfig cdigi_config_s
 			var ttConfig tt_config_s
@@ -742,7 +742,7 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, tmpFile.Close())
 
-			var audioConfig = new(audio_s)
+			var audioConfig = new(AudioConfig)
 			var digiConfig digi_config_s
 			var cdigiConfig cdigi_config_s
 			var ttConfig tt_config_s

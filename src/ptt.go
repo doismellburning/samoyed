@@ -195,7 +195,7 @@ type gpiodOutputLine interface {
 // Its methods are safe to call on a nil *PTT, which does nothing: DCD and the
 // connected indicator reach for it whether or not startup has got that far.
 type PTT struct {
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 	debugLevel  int
 
 	// gpioSysfsDir is a field rather than always defaultGPIOSysfsDir so that
@@ -276,13 +276,13 @@ type PTT struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewPTT(audio_config_p *audio_s, debug int) (*PTT, error) {
+func NewPTT(audio_config_p *AudioConfig, debug int) (*PTT, error) {
 	return newPTT(audio_config_p, debug, defaultGPIOSysfsDir)
 }
 
 // newPTT is NewPTT with the root of the sysfs GPIO interface given, so that a
 // test can supply a fake one.
-func newPTT(audio_config_p *audio_s, debug int, gpioSysfsDir string) (*PTT, error) {
+func newPTT(audio_config_p *AudioConfig, debug int, gpioSysfsDir string) (*PTT, error) {
 	var p = new(PTT)
 	p.audioConfig = audio_config_p
 	p.debugLevel = debug
@@ -1489,7 +1489,7 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
  */
 
 func PTTTestMain() error {
-	var my_audio_config audio_s
+	var my_audio_config AudioConfig
 
 	my_audio_config.adev[0].num_channels = 2
 
@@ -1575,7 +1575,7 @@ func PTTTestMain() error {
 
 	// #if __arm__
 
-	my_audio_config = audio_s{} //nolint:exhaustruct_v5
+	my_audio_config = AudioConfig{} //nolint:exhaustruct_v5
 	my_audio_config.adev[0].num_channels = 1
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO

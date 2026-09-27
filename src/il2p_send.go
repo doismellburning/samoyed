@@ -17,7 +17,7 @@ package direwolf
  *		polarity - 0 for normal.  1 to invert signal.
  *			   2 special case for testing - introduce some errors to test FEC.
  *
- * Outputs:	Bits are shipped out by calling tone_gen_put_bit().
+ * Outputs:	Bits are shipped out by calling ToneGenPutBit().
  *
  * Returns:	Number of bits sent including
  *		- Preamble   (01010101...)
@@ -32,7 +32,7 @@ package direwolf
  *
  * Assumptions:	It is assumed that the tone_gen module has been
  *		properly initialized so that bits sent with
- *		tone_gen_put_bit() are processed correctly.
+ *		ToneGenPutBit() are processed correctly.
  *
  * Errors:	Return -1 for error.  Probably frame too large.
  *

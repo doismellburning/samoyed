@@ -413,7 +413,7 @@ type achan_param_s struct {
 
 }
 
-type audio_s struct {
+type AudioConfig struct {
 
 	/* Previously we could handle only a single audio device. */
 	/* In version 1.2, we generalize this to handle multiple devices. */
@@ -770,12 +770,12 @@ var adev [MAX_ADEVS]*adev_s
 
 // save_audio_config_p is the audio configuration, shared by the subsystems
 // that have not yet been given their own copy.  In Dire Wolf each of those
-// files had a static of its own; audio_open sets it first, and the other
+// files had a static of its own; AudioOpen sets it first, and the other
 // init functions that still write it set it to the same config.
-var save_audio_config_p *audio_s
+var save_audio_config_p *AudioConfig
 
 // portaudioMu guards portaudioRefCount and ensures Initialize/Terminate are
-// correctly paired even if audio_open/audio_close are called concurrently.
+// correctly paired even if AudioOpen/AudioClose are called concurrently.
 var portaudioMu sync.Mutex
 var portaudioRefCount int
 
@@ -833,9 +833,9 @@ func printAudioBackendNoise() {
 // portaudioHeldByOpen records whether the audio devices now open took a
 // PortAudio reference: an all-stdin/UDP configuration, or one whose only
 // soundcard was an output we could do without, never initializes PortAudio,
-// and audio_close must not then release a reference it never took.  There is
-// one set of audio devices at a time - audio_open replaces the whole adev
-// table - so one flag describes the open that audio_close is paired with.
+// and AudioClose must not then release a reference it never took.  There is
+// one set of audio devices at a time - AudioOpen replaces the whole adev
+// table - so one flag describes the open that AudioClose is paired with.
 var portaudioHeldByOpen bool
 
 // audioNameIsStdin reports whether an audio device name means standard input.
@@ -866,7 +866,7 @@ const (
 // audio into, so report that there is no output device rather than trying,
 // and failing, to open one.
 //
-// Call this before audio_open rewrites the input name, so that the input and
+// Call this before AudioOpen rewrites the input name, so that the input and
 // output names can still be compared.
 func audioOutType(ad *adev_param_s) audio_out_type_e {
 	if audioNameIsStdin(ad.adevice_out) {
@@ -918,7 +918,7 @@ func applyCommandLineAudioSource(ad *adev_param_s, name string) {
 // send samples that go nowhere.
 //
 // Read it once the devices are open, and not from a goroutine racing
-// audio_open or audio_close: what it reports cannot change in between, as
+// AudioOpen or AudioClose: what it reports cannot change in between, as
 // nothing reopens an output device while running.
 func audio_transmit_available(a int) bool {
 	if a < 0 || a >= MAX_ADEVS || adev[a] == nil {
@@ -930,7 +930,7 @@ func audio_transmit_available(a int) bool {
 
 // anyInputRequiresPortAudio reports whether any configured audio device needs
 // PortAudio to receive (i.e. is a soundcard rather than stdin or UDP).
-func anyInputRequiresPortAudio(pa *audio_s) bool {
+func anyInputRequiresPortAudio(pa *AudioConfig) bool {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined == 0 {
 			continue
@@ -947,7 +947,7 @@ func anyInputRequiresPortAudio(pa *audio_s) bool {
 
 // anyOutputRequiresPortAudio reports whether any configured audio device needs
 // PortAudio to transmit.
-func anyOutputRequiresPortAudio(pa *audio_s) bool {
+func anyOutputRequiresPortAudio(pa *AudioConfig) bool {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined == 0 {
 			continue
@@ -965,7 +965,7 @@ func anyOutputRequiresPortAudio(pa *audio_s) bool {
 // PortAudio in either direction.  Used to skip portaudio.Initialize() when all
 // devices are stdin/UDP, so that samoyed can run on systems with no working
 // PortAudio host backend (issue #501).
-func anyDeviceRequiresPortAudio(pa *audio_s) bool {
+func anyDeviceRequiresPortAudio(pa *AudioConfig) bool {
 	return anyInputRequiresPortAudio(pa) || anyOutputRequiresPortAudio(pa)
 }
 
@@ -1186,7 +1186,7 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 	if dev == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not match audio device '%s' to any PortAudio device.\n", name)
-		// The noise is left for audio_open to print after its own message about
+		// The noise is left for AudioOpen to print after its own message about
 		// the device, so the explanation follows the failure rather than
 		// landing between the two.
 	}
@@ -1196,11 +1196,11 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 
 /*------------------------------------------------------------------
  *
- * Name:        audio_open
+ * Name:        AudioOpen
  *
  * Purpose:     Open the digital audio device.
  *
- * Inputs:      pa		- Address of structure of type audio_s.
+ * Inputs:      pa		- Address of structure of type AudioConfig.
  *
  *				Using a structure, rather than separate arguments
  *				seemed to make sense because we often pass around
@@ -1218,7 +1218,7 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
  *
  *----------------------------------------------------------------*/
 
-func audio_open(ctx context.Context, pa *audio_s) int {
+func AudioOpen(ctx context.Context, pa *AudioConfig) int {
 	save_audio_config_p = pa
 
 	// Initialize PortAudio only if at least one configured device needs a
@@ -1259,8 +1259,8 @@ func audio_open(ctx context.Context, pa *audio_s) int {
 		}
 	}
 
-	// If audio_open fails after this point, roll back the refcount increment
-	// so it stays correctly paired with audio_close calls.
+	// If AudioOpen fails after this point, roll back the refcount increment
+	// so it stays correctly paired with AudioClose calls.
 	var openSucceeded = false
 
 	defer func() {
@@ -1715,7 +1715,7 @@ func audio_open(ctx context.Context, pa *audio_s) int {
 	openSucceeded = true
 
 	return (0)
-} /* end audio_open */
+} /* end AudioOpen */
 
 /*------------------------------------------------------------------
  *
@@ -1735,7 +1735,7 @@ func audio_open(ctx context.Context, pa *audio_s) int {
  *
  *----------------------------------------------------------------*/
 
-// audioDeviceSource is the SampleSource for the audio device that audio_open
+// audioDeviceSource is the SampleSource for the audio device that AudioOpen
 // opened.
 type audioDeviceSource struct{}
 
@@ -1869,15 +1869,15 @@ func audio_get(a int) int {
 	return (n)
 } /* end audio_get */
 
-// audioDeviceSink is the AudioSink for the audio device that audio_open
+// AudioDeviceSink is the AudioSink for the audio device that AudioOpen
 // opened.
-type audioDeviceSink struct{}
+type AudioDeviceSink struct{}
 
-func (audioDeviceSink) Put(adev int, c uint8) int {
+func (AudioDeviceSink) Put(adev int, c uint8) int {
 	return audio_put(adev, c)
 }
 
-func (audioDeviceSink) Flush(adev int) int {
+func (AudioDeviceSink) Flush(adev int) int {
 	return audio_flush(adev)
 }
 
@@ -2062,7 +2062,7 @@ func audioUDPSilenceKeepalive(ctx context.Context, a int, stop chan struct{}) {
 	for {
 		select {
 		case <-ctx.Done():
-			// Shutting down.  audio_close closes stop as well, but it
+			// Shutting down.  AudioClose closes stop as well, but it
 			// only runs if somebody gets as far as calling it.
 			return
 		case <-stop:
@@ -2072,7 +2072,7 @@ func audioUDPSilenceKeepalive(ctx context.Context, a int, stop chan struct{}) {
 				continue
 			}
 
-			// audio_close tears down udp_out_sock under the same lock, so
+			// AudioClose tears down udp_out_sock under the same lock, so
 			// re-check for nil here rather than assuming it's still open.
 			if adev[a].udp_out_sock != nil {
 				_, _ = adev[a].udp_out_sock.Write(chunk)
@@ -2122,7 +2122,7 @@ func audio_wait(a int) {
 
 /*------------------------------------------------------------------
  *
- * Name:        audio_close
+ * Name:        AudioClose
  *
  * Purpose:     Close the audio device(s).
  *
@@ -2132,7 +2132,7 @@ func audio_wait(a int) {
  *
  *----------------------------------------------------------------*/
 
-func audio_close() int {
+func AudioClose() int {
 	var err = 0
 
 	for a := range MAX_ADEVS {
@@ -2219,6 +2219,6 @@ func audio_close() int {
 	portaudioMu.Unlock()
 
 	return (err)
-} /* end audio_close */
+} /* end AudioClose */
 
 /* end audio.go */

@@ -57,7 +57,7 @@ const audioLevelDecimation = 4410
  *
  * Purpose:     Initialize the demodulator(s) used for reception.
  *
- * Inputs:      pa		- Pointer to audio_s structure with
+ * Inputs:      pa		- Pointer to AudioConfig structure with
  *				  various parameters for the modem(s).
  *
  * Bugs:	This doesn't do much error checking so don't give it
@@ -87,7 +87,7 @@ func capProfiles(channel int, profiles string) string {
 	return profiles[:MAX_SUBCHANS]
 }
 
-func demod_init(pa *audio_s) {
+func demod_init(pa *AudioConfig) {
 	for channel := range MAX_RADIO_CHANS {
 		demodulators[channel] = nil
 

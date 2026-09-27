@@ -286,7 +286,7 @@ type TTGateway struct {
  *
  *----------------------------------------------------------------*/
 
-func NewTTGateway(audioConfig *audio_s, p *tt_config_s, debug int) *TTGateway {
+func NewTTGateway(audioConfig *AudioConfig, p *tt_config_s, debug int) *TTGateway {
 	var g = &TTGateway{debug: debug} //nolint:exhaustruct_v5
 
 	g.config = p

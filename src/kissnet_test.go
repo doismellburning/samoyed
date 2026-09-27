@@ -442,7 +442,7 @@ func setupKissNetTNC(t *testing.T) {
 		save_audio_config_p, xmitSvc, kissNetSvc = origAudio, origXmit, origKissNet
 	})
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 
 	kiss_frame_init(audioConfig)

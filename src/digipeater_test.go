@@ -37,7 +37,7 @@ func setupDigipeater(t *testing.T) (*Digipeater, *digi_config_s) {
 		}
 	})
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[digiFromChan] = MEDIUM_RADIO
 	audioConfig.chan_medium[digiToChan] = MEDIUM_RADIO
 	audioConfig.mycall[digiFromChan] = "Q1TEST"
@@ -201,7 +201,7 @@ func TestDigiRegenDisabled(t *testing.T) {
 }
 
 func TestNewDigipeater(t *testing.T) {
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	var digiConfig = new(digi_config_s)
 	digiConfig.dedupe_time = 30
 

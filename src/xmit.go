@@ -103,7 +103,7 @@ type XmitService struct {
 	 */
 	hdlcSenders [MAX_RADIO_CHANS]*HDLCSender
 
-	p_modem *audio_s
+	p_modem *AudioConfig
 }
 
 /*-------------------------------------------------------------------
@@ -129,7 +129,7 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(ctx context.Context, p_modem *audio_s, debug_xmit_packet bool) *XmitService {
+func NewXmitService(ctx context.Context, p_modem *AudioConfig, debug_xmit_packet bool) *XmitService {
 	logrus.Debug("xmit_init")
 	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem

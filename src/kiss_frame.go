@@ -272,11 +272,11 @@ func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *KISSFrame) {
  *
  * Purpose:     Save information about valid channels for later error checking.
  *
- * Inputs:      pa		- Address of structure of type audio_s.
+ * Inputs:      pa		- Address of structure of type AudioConfig.
  *
  *-----------------------------------------------------------------*/
 
-func kiss_frame_init(pa *audio_s) {
+func kiss_frame_init(pa *AudioConfig) {
 	save_audio_config_p = pa
 }
 

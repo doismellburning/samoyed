@@ -24,7 +24,7 @@ const (
 
 // captureBits collects the bits sent to the modulator while fn runs, handing
 // fn a new HDLCSender so the stream starts from a known place.
-func captureBits(t *testing.T, audioConfig *audio_s, fn func(s *HDLCSender)) []int {
+func captureBits(t *testing.T, audioConfig *AudioConfig, fn func(s *HDLCSender)) []int {
 	t.Helper()
 
 	var bits []int
@@ -131,8 +131,8 @@ func packMSBFirst(t *testing.T, bits []int) []byte {
 
 // newHDLCSendTestConfig is one 1200 baud AFSK channel sending the given layer
 // 2 protocol.
-func newHDLCSendTestConfig(layer2 layer2_t) *audio_s {
-	var audioConfig = new(audio_s)
+func newHDLCSendTestConfig(layer2 layer2_t) *AudioConfig {
+	var audioConfig = new(AudioConfig)
 
 	audioConfig.adev[0].defined = 1
 	audioConfig.adev[0].num_channels = 1
@@ -310,7 +310,7 @@ func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
 
 	t.Cleanup(func() { toneGenerators = origGenerators })
 
-	gen_tone_init(audioConfig, 100, sink)
+	GenToneInit(audioConfig, 100, sink)
 
 	var sent int
 
@@ -569,5 +569,5 @@ func setupEASSendTest(t *testing.T) {
 
 	t.Cleanup(func() { w.Close() })
 
-	gen_tone_init(audioConfig, 100, newWAVFileSink(w))
+	GenToneInit(audioConfig, 100, newWAVFileSink(w))
 }

@@ -57,7 +57,7 @@ type cdigi_config_s struct {
 // was started with, and a count of packets digipeated for each combination of
 // from/to channel.
 type ConnectedDigipeater struct {
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 	config      *cdigi_config_s
 	filter      *PacketFilter
 	count       [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
@@ -79,7 +79,7 @@ type ConnectedDigipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewConnectedDigipeater(p_audio_config *audio_s, p_cdigi_config *cdigi_config_s, filter *PacketFilter) *ConnectedDigipeater {
+func NewConnectedDigipeater(p_audio_config *AudioConfig, p_cdigi_config *cdigi_config_s, filter *PacketFilter) *ConnectedDigipeater {
 	var d = new(ConnectedDigipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_cdigi_config

@@ -21,7 +21,7 @@ func TestMorseSendWithoutSharedAudioConfig(t *testing.T) {
 
 	save_audio_config_p = nil
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.adev[0].num_channels = 1
 	audioConfig.adev[0].bits_per_sample = 16
 	audioConfig.adev[0].samples_per_sec = sampleRate
@@ -61,7 +61,7 @@ func TestMorseSampleCountsAt44100(t *testing.T) {
 	const channel = 0
 	const sampleRate = 44100
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.adev[0].num_channels = 1
 	audioConfig.adev[0].bits_per_sample = 16
 	audioConfig.adev[0].samples_per_sec = sampleRate

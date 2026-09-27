@@ -86,7 +86,7 @@ type HDLCReceiver struct {
 	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*hdlcState
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
 	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
-	audio         *audio_s
+	audio         *AudioConfig
 	sink          ReceiveSink
 
 	// Own copy of random number generator so we can get
@@ -132,7 +132,7 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
  *
  ***********************************************************************************/
 
-func NewHDLCReceiver(pa *audio_s, demods [MAX_RADIO_CHANS]*Demodulator, sink ReceiveSink) *HDLCReceiver {
+func NewHDLCReceiver(pa *AudioConfig, demods [MAX_RADIO_CHANS]*Demodulator, sink ReceiveSink) *HDLCReceiver {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("NewHDLCReceiver (%p) \n", pa);
 

@@ -34,7 +34,7 @@ var toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 // sample data at a time, then a flush at the end of a transmission to push out
 // whatever is still waiting.  Both return -1 for any type of error.
 //
-// audioDeviceSink is the one a running Samoyed uses; samoyed-gen-packets writes
+// AudioDeviceSink is the one a running Samoyed uses; samoyed-gen-packets writes
 // a .WAV file instead.
 type AudioSink interface {
 	Put(adev int, c uint8) int
@@ -46,7 +46,7 @@ type AudioSink interface {
 type ToneGenerator struct {
 	channel     int
 	adevIndex   int
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 	sink        AudioSink // Where the samples go.
 	amplitude   int       // 0 .. 100, for DTMF; the rest use sineTable.
 
@@ -111,7 +111,7 @@ type ToneGenerator struct {
  *
  *----------------------------------------------------------------*/
 
-func NewToneGenerator(channel int, audioConfig *audio_s, amp int, sink AudioSink) *ToneGenerator {
+func NewToneGenerator(channel int, audioConfig *AudioConfig, amp int, sink AudioSink) *ToneGenerator {
 	var tg = &ToneGenerator{ //nolint:exhaustruct_v5
 		channel:     channel,
 		adevIndex:   ACHAN2ADEV(channel),
@@ -220,7 +220,7 @@ func newSineTable(amp int) [256]int16 {
 
 /*------------------------------------------------------------------
  *
- * Name:        gen_tone_init
+ * Name:        GenToneInit
  *
  * Purpose:     Initialize for AFSK tone generation which might
  *		be used for RTTY or amateur packet radio.
@@ -251,7 +251,7 @@ func newSineTable(amp int) [256]int16 {
  *
  *----------------------------------------------------------------*/
 
-func gen_tone_init(audio_config_p *audio_s, amp int, sink AudioSink) int { //nolint:unparam
+func GenToneInit(audio_config_p *AudioConfig, amp int, sink AudioSink) int {
 	logrus.WithField("amp", amp).Debug("gen_tone_init")
 
 	for channel := range MAX_RADIO_CHANS {
@@ -261,11 +261,28 @@ func gen_tone_init(audio_config_p *audio_s, amp int, sink AudioSink) int { //nol
 	}
 
 	return (0)
-} /* end gen_tone_init */
+} /* end GenToneInit */
+
+// NewGenToneTestConfig returns an AudioConfig for the standalone gen_tone
+// test program, using the default audio device with numChannels sound card
+// channels, and marking radio channel 0 as MEDIUM_RADIO if mediumRadio is set.
+func NewGenToneTestConfig(numChannels int, mediumRadio bool) *AudioConfig {
+	var config = new(AudioConfig)
+
+	config.adev[0].adevice_in = DEFAULT_ADEVICE
+	config.adev[0].adevice_out = DEFAULT_ADEVICE
+	config.adev[0].num_channels = numChannels
+
+	if mediumRadio {
+		config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
+	}
+
+	return config
+}
 
 /*-------------------------------------------------------------------
  *
- * Name:        tone_gen_put_bit
+ * Name:        ToneGenPutBit
  *
  * Purpose:     Generate tone of proper duration for one data bit.
  *
@@ -370,7 +387,7 @@ func tone_gen_put_bit_real(channel int, dat int) {
 	}
 
 	toneGenerators[channel].PutBit(dat)
-} /* end tone_gen_put_bit */
+} /* end ToneGenPutBit */
 
 func (tg *ToneGenerator) PutBit(dat int) {
 	var audioConfig = tg.audioConfig

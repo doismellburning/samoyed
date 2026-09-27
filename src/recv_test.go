@@ -20,8 +20,8 @@ import (
 // newRecvTestAudioConfig describes a single 16 bit audio device carrying
 // numChannels 1200 baud AFSK channels - the shape recv_adev_thread walks when
 // it reads a device.
-func newRecvTestAudioConfig(numChannels int) *audio_s {
-	var audioConfig = new(audio_s)
+func newRecvTestAudioConfig(numChannels int) *AudioConfig {
+	var audioConfig = new(AudioConfig)
 
 	audioConfig.adev[0].defined = 1
 	audioConfig.adev[0].num_channels = numChannels
@@ -43,7 +43,7 @@ func newRecvTestAudioConfig(numChannels int) *audio_s {
 // setupRecvTest initialises the demodulators for audioConfig, and returns the
 // SampleSource that hands the receive thread the given samples.  The real one
 // asserts on a device that was never opened, so a test brings its own.
-func setupRecvTest(t *testing.T, audioConfig *audio_s, samples []byte) *readerSampleSource {
+func setupRecvTest(t *testing.T, audioConfig *AudioConfig, samples []byte) *readerSampleSource {
 	t.Helper()
 
 	var origAudioConfig = save_audio_config_p
@@ -191,7 +191,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 
 	t.Cleanup(func() { ttGateway = origGateway })
 
-	ttGateway = NewTTGateway(new(audio_s), new(tt_config_s), 0)
+	ttGateway = NewTTGateway(new(AudioConfig), new(tt_config_s), 0)
 
 	var failed = recv_init(t.Context(), audioConfig, src)
 
@@ -216,7 +216,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 
 	t.Cleanup(func() { ttGateway = origGateway })
 
-	ttGateway = NewTTGateway(new(audio_s), new(tt_config_s), 0)
+	ttGateway = NewTTGateway(new(AudioConfig), new(tt_config_s), 0)
 
 	var failed = recv_init(t.Context(), audioConfig, src)
 
@@ -265,7 +265,7 @@ func dtmfSamples(t *testing.T, button rune, ms int, samplesPerSec int) []byte {
 func setupRecvProcessTest(t *testing.T, frack int) {
 	t.Helper()
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 	// A received frame is taken to have arrived on the IGate virtual
 	// channel, so that printing it and passing it to the client

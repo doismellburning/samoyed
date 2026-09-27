@@ -11,7 +11,7 @@ import (
 // channel wants its own, and only one goroutine may drive it at a time.
 type HDLCSender struct {
 	channel     int
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 
 	bitsSent int // Count number of bits sent by SendFrame or SendPreamblePostamble.
 
@@ -24,7 +24,7 @@ type HDLCSender struct {
 
 // NewHDLCSender makes an HDLCSender for channel, sending the layer 2
 // protocol audioConfig says to use there.
-func NewHDLCSender(channel int, audioConfig *audio_s) *HDLCSender {
+func NewHDLCSender(channel int, audioConfig *AudioConfig) *HDLCSender {
 	var s = new(HDLCSender)
 	s.channel = channel
 	s.audioConfig = audioConfig
@@ -45,7 +45,7 @@ func NewHDLCSender(channel int, audioConfig *audio_s) *HDLCSender {
  *		badFCS	- Append an invalid FCS for testing purposes.
  *			  Applies only to regular AX.25.
  *
- * Outputs:	Bits are shipped out by calling tone_gen_put_bit().
+ * Outputs:	Bits are shipped out by calling ToneGenPutBit().
  *
  * Returns:	Number of bits sent including "flags" and the
  *		stuffing bits.
@@ -62,7 +62,7 @@ func NewHDLCSender(channel int, audioConfig *audio_s) *HDLCSender {
  *
  * Assumptions:	It is assumed that the tone_gen module has been
  *		properly initialized so that bits sent with
- *		tone_gen_put_bit() are processed correctly.
+ *		ToneGenPutBit() are processed correctly.
  *
  *--------------------------------------------------------------*/
 
@@ -109,7 +109,7 @@ func (s *HDLCSender) SendFrame(pp *packet_t, badFCS bool) int {
  *		finish	- True for end of transmission.
  *			  This causes the last audio buffer to be flushed.
  *
- * Outputs:	Bits are shipped out by calling tone_gen_put_bit().
+ * Outputs:	Bits are shipped out by calling ToneGenPutBit().
  *
  * Returns:	Number of bits sent.
  *		There is no bit-stuffing so we would expect this to
@@ -119,7 +119,7 @@ func (s *HDLCSender) SendFrame(pp *packet_t, badFCS bool) int {
  *
  * Assumptions:	It is assumed that the tone_gen module has been
  *		properly initialized so that bits sent with
- *		tone_gen_put_bit() are processed correctly.
+ *		ToneGenPutBit() are processed correctly.
  *
  *--------------------------------------------------------------*/
 
@@ -202,7 +202,7 @@ func (s *HDLCSender) sendByteMSBFirst(x int, polarity int) {
 			dbit = 1
 		}
 
-		tone_gen_put_bit(s.channel, (dbit^polarity)&1)
+		ToneGenPutBit(s.channel, (dbit^polarity)&1)
 
 		x <<= 1
 		s.bitsSent++
@@ -251,7 +251,7 @@ func (s *HDLCSender) sendBitNRZI(b bool) {
 		s.nrziOutput = 1 - s.nrziOutput
 	}
 
-	tone_gen_put_bit(s.channel, s.nrziOutput)
+	ToneGenPutBit(s.channel, s.nrziOutput)
 
 	s.bitsSent++
 }
@@ -286,7 +286,7 @@ func (s *HDLCSender) sendBitNRZI(b bool) {
 
 func eas_put_byte(channel int, b byte) {
 	for range 8 {
-		tone_gen_put_bit(channel, int(b&1))
+		ToneGenPutBit(channel, int(b&1))
 		b >>= 1
 	}
 }

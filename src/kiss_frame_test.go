@@ -99,7 +99,7 @@ func setupKissProcessMsg(t *testing.T) *XmitService {
 		}
 	})
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 	audioConfig.chan_medium[1] = MEDIUM_RADIO
 

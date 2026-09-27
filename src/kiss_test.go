@@ -316,7 +316,7 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 	const channel = 0
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
 	var origAudioConfig, origXmitSvc, origKissNetSvc = save_audio_config_p, xmitSvc, kissNetSvc

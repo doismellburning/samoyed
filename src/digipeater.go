@@ -93,7 +93,7 @@ type digi_config_s struct {
 // the duplicate suppression it shares with APRStt object reports, and a count
 // of packets digipeated for each combination of from/to channel.
 type Digipeater struct {
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 	config      *digi_config_s
 	filter      *PacketFilter
 	dedupe      *DedupeService
@@ -116,7 +116,7 @@ type Digipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(p_audio_config *audio_s, p_digi_config *digi_config_s, filter *PacketFilter) *Digipeater {
+func NewDigipeater(p_audio_config *AudioConfig, p_digi_config *digi_config_s, filter *PacketFilter) *Digipeater {
 	var d = new(Digipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_digi_config
