@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_remove_addr(this_p *packet_t, n int) {
-	this_p.RemoveAddr(n)
-}
-
 func ax25_get_num_addr(this_p *packet_t) int {
 	return this_p.NumAddr()
 }

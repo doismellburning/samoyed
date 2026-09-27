@@ -500,7 +500,7 @@ func (d *Digipeater) match(
 					dw_printf("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
 					for r2 > AX25_REPEATER_1 {
-						ax25_remove_addr(result, r2-1)
+						result.RemoveAddr(r2 - 1)
 						r2--
 					}
 				case PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
@@ -524,7 +524,7 @@ func (d *Digipeater) match(
 				// PREEMPT which is more descriptive?
 				default:
 					for r2 > AX25_REPEATER_1 && ax25_get_h(result, r2-1) == 0 {
-						ax25_remove_addr(result, r2-1)
+						result.RemoveAddr(r2 - 1)
 						r2--
 					}
 				}
@@ -560,7 +560,7 @@ func (d *Digipeater) match(
 				// First, remove any already used digipeaters.
 
 				for ax25_get_num_addr(result) >= 3 && ax25_get_h(result, AX25_REPEATER_1) == 1 {
-					ax25_remove_addr(result, AX25_REPEATER_1)
+					result.RemoveAddr(AX25_REPEATER_1)
 
 					r--
 				}
