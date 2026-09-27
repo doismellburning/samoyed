@@ -475,7 +475,7 @@ func TestPttInitGPIOInputThenGet(t *testing.T) {
 // TestPttNilBeforeStartup covers a stop signal that arrives while we are still
 // starting up: the shutdown path runs cleanup before there is a PTT to put
 // down, and the DCD and connected indicators can reach for it just as early.
-// Used to panic, when Term dereferenced an audio configuration that audio_open
+// Used to panic, when Term dereferenced an audio configuration that AudioOpen
 // had not installed yet.
 func TestPttNilBeforeStartup(t *testing.T) {
 	var p *PTT

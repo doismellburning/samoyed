@@ -466,7 +466,7 @@ x = Silence FX.25 information.`)
 		os.Exit(1)
 	}
 
-	var err = audio_open(ctx, audio_config)
+	var err = AudioOpen(ctx, audio_config)
 	stopIfCancelled(ctx)
 
 	if err < 0 {
