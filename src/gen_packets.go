@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/wavwrite"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -277,7 +278,7 @@ func (g *GenPackets) SendPacket(str string) error {
 		return nil
 	}
 
-	var pp = AX25FromText(str, true)
+	var pp = ax25.FromText(str, true)
 	if pp == nil {
 		return fmt.Errorf("%q is not valid TNC2 monitoring format", str)
 	}

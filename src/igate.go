@@ -34,6 +34,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/sirupsen/logrus"
@@ -1079,7 +1080,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 
 				var stemp = append([]byte("X>X:}"), message...)
 
-				var pp3 = AX25FromText(string(stemp), false)
+				var pp3 = ax25.FromText(string(stemp), false)
 				if pp3 != nil {
 					var alevel ALevel
 					alevel.Mark = -2 // FIXME: Do we want some other special case?
@@ -1307,7 +1308,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	 * Potential Bug:  Up to 8 digipeaters are allowed in radio format.
 	 * Is there a possibility of finding a larger number here?
 	 */
-	var pp3 = AX25FromText(string(message), false)
+	var pp3 = ax25.FromText(string(message), false)
 	if pp3 == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tx IGate: Could not parse message from server.\n")
@@ -1483,7 +1484,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 			ig.config.tx_via,
 			payload)
 
-		var pradio = AX25FromText(radio, true)
+		var pradio = ax25.FromText(radio, true)
 		if pradio != nil {
 			/* This consumes packet so don't reference it again! */
 			transmitQueue.Append(to_chan, TQ_PRIO_1_LO, pradio)

@@ -124,6 +124,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -1673,7 +1674,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Transmit '%s'\n", stemp);
 
-			var pp = AX25FromText(stemp.String(), true)
+			var pp = ax25.FromText(stemp.String(), true)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)
@@ -1957,7 +1958,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Transmit '%s'\n", stemp);
 
-			var pp = AX25FromText(stemp, true)
+			var pp = ax25.FromText(stemp, true)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)

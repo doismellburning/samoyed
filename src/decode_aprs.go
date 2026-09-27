@@ -28,6 +28,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -311,7 +312,7 @@ func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t
 
 		// e.g.  WR2X-2>APRS,WA1PLE-13*:}
 		//		K1BOS-B>APOSB,TCPIP,WR2X-2*:@122015z4221.42ND07111.93W&/A=000000SharkRF openSPOT3 MMDVM446.025 MA/SW
-		var pp_payload = AX25FromText(string(pinfo[1:]), false)
+		var pp_payload = ax25.FromText(string(pinfo[1:]), false)
 		if pp_payload != nil {
 			var payload_src = pinfo[1:]
 			payload_src, _, _ = bytes.Cut(payload_src, []byte{'>'})

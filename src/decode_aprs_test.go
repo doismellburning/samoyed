@@ -6,6 +6,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +16,7 @@ import (
 func Test_decode_aprs_empty_info(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = AX25FromText("Q1TEST>ID:", true)
+	var pp = ax25.FromText("Q1TEST>ID:", true)
 	assert.NotNil(t, pp)
 
 	// Must not panic, and must return a populated struct.
@@ -34,7 +35,7 @@ func Test_decode_aprs_empty_info(t *testing.T) {
 func Test_decode_aprs_dao_does_not_invent_a_position(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = AX25FromText("Q1TEST>APRS:!4237.14N/xxxxx.83W-Hi!W99!", true)
+	var pp = ax25.FromText("Q1TEST>APRS:!4237.14N/xxxxx.83W-Hi!W99!", true)
 	assert.NotNil(t, pp)
 
 	var A = DecodeAPRS(pp, true, "")
@@ -75,7 +76,7 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 		"!4903.50N/07201.75W_220/004g00",  // ends part way through a field
 		"!4903.50N/07201.75W_c220s004g005t077r000p000P000h50b099",
 	} {
-		var pp = AX25FromText("Q1TEST>APRS:"+info, true)
+		var pp = ax25.FromText("Q1TEST>APRS:"+info, true)
 		assert.NotNil(t, pp)
 
 		// Must not panic, and must still report the position.
@@ -87,7 +88,7 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 	}
 
 	// What did arrive before the truncation is still decoded.
-	var A = DecodeAPRS(AX25FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g005", true), true, "")
+	var A = DecodeAPRS(ax25.FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g005", true), true, "")
 	assert.Equal(t, `wind 4.6 mph, direction 220, gust 5, ""`, A.g_weather)
 }
 
@@ -99,8 +100,7 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 func Test_decode_aprs_positionless_weather(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var A = DecodeAPRS(AX25FromText(
-		"Q1TEST>APRS:_10090556c220s004g005t077r000p000P000h50b09900wRSW", true), true, "")
+	var A = DecodeAPRS(ax25.FromText("Q1TEST>APRS:_10090556c220s004g005t077r000p000P000h50b09900wRSW", true), true, "")
 
 	assert.Equal(t, "Positionless Weather Report", A.g_data_type_desc)
 	assert.Equal(t,
@@ -116,7 +116,7 @@ func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
 	for _, info := range []string{"_", "_1009", "_10090556", "_10090556c2"} {
-		var A = DecodeAPRS(AX25FromText("Q1TEST>APRS:"+info, true), true, "")
+		var A = DecodeAPRS(ax25.FromText("Q1TEST>APRS:"+info, true), true, "")
 		assert.Equal(t, "Positionless Weather Report", A.g_data_type_desc, "%s", info)
 	}
 }
@@ -127,8 +127,7 @@ func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
 func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var known = DecodeAPRS(AX25FromText(
-		"Q1TEST>APRS:!4903.50N/07201.75W_220/004g005t077r000p000P000h50b09900wRSW", true), true, "")
+	var known = DecodeAPRS(ax25.FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g005t077r000p000P000h50b09900wRSW", true), true, "")
 	assert.Equal(t,
 		`wind 4.6 mph, direction 220, gust 5, temperature 77, `+
 			`rain 0.00 in last hour, rain 0.00 in last 24 hours, rain 0.00 since midnight, `+
@@ -138,8 +137,7 @@ func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
 	// The same report with every optional field blanked out: the fields are
 	// still consumed - the station type is found at the end - but none of
 	// them is reported.
-	var unknown = DecodeAPRS(AX25FromText(
-		"Q1TEST>APRS:!4903.50N/07201.75W_220/004g...t...r...p...P...h..b.....wRSW", true), true, "")
+	var unknown = DecodeAPRS(ax25.FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g...t...r...p...P...h..b.....wRSW", true), true, "")
 	assert.Equal(t, `wind 4.6 mph, direction 220, "wRSW"`, unknown.g_weather)
 }
 
@@ -175,8 +173,7 @@ func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
 
 	// End to end: the blanked-out wind leaves no wind on the weather line,
 	// and the fields after it still decode.
-	var A = DecodeAPRS(AX25FromText(
-		"Q1TEST>APRS:!4903.50N/07201.75W_c...s...g005t077wRSW", true), true, "")
+	var A = DecodeAPRS(ax25.FromText("Q1TEST>APRS:!4903.50N/07201.75W_c...s...g005t077wRSW", true), true, "")
 	assert.Equal(t, `, gust 5, temperature 77, "wRSW"`, A.g_weather)
 }
 
@@ -186,7 +183,7 @@ func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
 func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = AX25FromText("Q1TEST>APDW17:)Zb00000Zb00001", true)
+	var pp = ax25.FromText("Q1TEST>APDW17:)Zb00000Zb00001", true)
 	assert.NotNil(t, pp)
 
 	// Must not panic.
@@ -201,7 +198,7 @@ func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
 func Test_decode_aprs_item_with_short_name(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = AX25FromText("Q1TEST>APDW17:)AB!4237.14N/07120.83W#", true)
+	var pp = ax25.FromText("Q1TEST>APDW17:)AB!4237.14N/07120.83W#", true)
 	assert.NotNil(t, pp)
 
 	// Must not panic, and the rest of the item still decodes.
@@ -216,7 +213,7 @@ func Test_decode_aprs_item_with_short_name(t *testing.T) {
 func Test_decode_aprs_item_without_position(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = AX25FromText("Q1TEST>APDW17:)ABCDE!", true)
+	var pp = ax25.FromText("Q1TEST>APDW17:)ABCDE!", true)
 	assert.NotNil(t, pp)
 
 	var A = DecodeAPRS(pp, true, "")
@@ -278,7 +275,7 @@ func Test_decode_aprs_user_defined_without_id(t *testing.T) {
 func Test_decode_aprs_general_query_footprint(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = AX25FromText("Q1TEST>APDW17:?APRS? 42.3714,-71.2083,0050", true)
+	var pp = ax25.FromText("Q1TEST>APDW17:?APRS? 42.3714,-71.2083,0050", true)
 	assert.NotNil(t, pp)
 
 	var A = DecodeAPRS(pp, true, "")
@@ -294,7 +291,7 @@ func Test_decode_aprs_general_query_footprint(t *testing.T) {
 func Test_decode_aprs_general_query_short_footprint(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = AX25FromText("Q1TEST>APDW17:?APRS?0", true)
+	var pp = ax25.FromText("Q1TEST>APDW17:?APRS?0", true)
 	assert.NotNil(t, pp)
 
 	var A = DecodeAPRS(pp, true, "")
@@ -316,7 +313,7 @@ func Test_decode_aprs_short_message(t *testing.T) {
 		{"Q1TEST>APDW17::Q2TEST   :", ""},
 		{"Q1TEST>APDW17::Q2TEST   :ab", "ab"},
 	} {
-		var pp = AX25FromText(tc.monitor, true)
+		var pp = ax25.FromText(tc.monitor, true)
 		assert.NotNil(t, pp)
 
 		var A = DecodeAPRS(pp, true, "")

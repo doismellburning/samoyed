@@ -23,6 +23,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -1470,7 +1471,7 @@ const pfilterDummyMonitorLine = "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120
  *--------------------------------------------------------------------*/
 
 func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) error {
-	var pp = AX25FromText(pfilterDummyMonitorLine, true)
+	var pp = ax25.FromText(pfilterDummyMonitorLine, true)
 	if pp == nil {
 		return fmt.Errorf("pfilter_validate: failed to construct synthetic packet from %q", pfilterDummyMonitorLine)
 	}

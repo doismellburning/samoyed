@@ -221,7 +221,7 @@ func TestFrameFlavor(t *testing.T) {
 		{"DTMF", "Q1TEST>DTMF:hello", FLAVOR_DTMF},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var pp = AX25FromText(c.text, true)
+			var pp = ax25.FromText(c.text, true)
 			require.NotNil(t, pp)
 
 			assert.Equal(t, c.want, frame_flavor(pp))
@@ -340,7 +340,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 func TestSendOneFrame(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var bits int
@@ -417,7 +417,7 @@ func TestSendOneFrameDeliberateBadFCS(t *testing.T) {
 
 	xs.p_modem.xmit_error_rate = 100
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
@@ -432,7 +432,7 @@ func TestSendOneFrameDebugHexDump(t *testing.T) {
 
 	xs.debugXmitPacket = true
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
@@ -445,10 +445,10 @@ func TestSendOneFrameDebugHexDump(t *testing.T) {
 func TestXmitAX25FramesBundles(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var first = AX25FromText("Q1TEST>Q2TEST:first", true)
+	var first = ax25.FromText("Q1TEST>Q2TEST:first", true)
 	require.NotNil(t, first)
 
-	var second = AX25FromText("Q1TEST>Q2TEST:second", true)
+	var second = ax25.FromText("Q1TEST>Q2TEST:second", true)
 	require.NotNil(t, second)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, second)
@@ -465,10 +465,10 @@ func TestXmitAX25FramesBundles(t *testing.T) {
 func TestXmitAX25FramesDoesNotBundleDigipeated(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var first = AX25FromText("Q1TEST>Q2TEST:first", true)
+	var first = ax25.FromText("Q1TEST>Q2TEST:first", true)
 	require.NotNil(t, first)
 
-	var digipeated = AX25FromText("Q1TEST>Q2TEST,Q3TEST*:repeated", true)
+	var digipeated = ax25.FromText("Q1TEST>Q2TEST,Q3TEST*:repeated", true)
 	require.NotNil(t, digipeated)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, digipeated)
@@ -485,10 +485,10 @@ func TestXmitAX25FramesDoesNotBundleDigipeated(t *testing.T) {
 func TestXmitAX25FramesRespectsMaxBundle(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var first = AX25FromText("Q1TEST>Q2TEST:first", true)
+	var first = ax25.FromText("Q1TEST>Q2TEST:first", true)
 	require.NotNil(t, first)
 
-	var second = AX25FromText("Q1TEST>Q2TEST:second", true)
+	var second = ax25.FromText("Q1TEST>Q2TEST:second", true)
 	require.NotNil(t, second)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, second)
@@ -504,10 +504,10 @@ func TestXmitAX25FramesRespectsMaxBundle(t *testing.T) {
 func TestXmitAX25FramesTakesHighPriorityFirst(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var first = AX25FromText("Q1TEST>Q2TEST:first", true)
+	var first = ax25.FromText("Q1TEST>Q2TEST:first", true)
 	require.NotNil(t, first)
 
-	var low = AX25FromText("Q1TEST>Q2TEST:low", true)
+	var low = ax25.FromText("Q1TEST>Q2TEST:low", true)
 	require.NotNil(t, low)
 
 	var addrs [AX25_MAX_ADDRS]string
@@ -540,7 +540,7 @@ func TestXmitSpeech(t *testing.T) {
 
 	xs.p_modem.tts_script = script
 
-	var pp = AX25FromText("Q1TEST>SPEECH:Hello there", true)
+	var pp = ax25.FromText("Q1TEST>SPEECH:Hello there", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_speech(t.Context(), 0, pp) })
@@ -557,7 +557,7 @@ func TestXmitSpeech(t *testing.T) {
 func TestXmitSpeechWithoutAScript(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var pp = AX25FromText("Q1TEST>SPEECH:Hello there", true)
+	var pp = ax25.FromText("Q1TEST>SPEECH:Hello there", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_speech(t.Context(), 0, pp) })
@@ -586,10 +586,10 @@ func TestXmitNextDoesNotBundleBehindADigipeatedFrame(t *testing.T) {
 
 	xs.fulldup[0] = true // Skip the channel-busy check and random wait.
 
-	var digipeated = AX25FromText("Q1TEST>Q2TEST,Q3TEST*:repeated", true)
+	var digipeated = ax25.FromText("Q1TEST>Q2TEST,Q3TEST*:repeated", true)
 	require.NotNil(t, digipeated)
 
-	var other = AX25FromText("Q1TEST>Q2TEST:other", true)
+	var other = ax25.FromText("Q1TEST>Q2TEST:other", true)
 	require.NotNil(t, other)
 
 	transmitQueue.Append(0, TQ_PRIO_0_HI, digipeated)
@@ -610,7 +610,7 @@ func TestXmitNextBundlesOrdinaryFrames(t *testing.T) {
 	xs.fulldup[0] = true
 
 	for _, text := range []string{"Q1TEST>Q2TEST:first", "Q1TEST>Q2TEST:second"} {
-		var pp = AX25FromText(text, true)
+		var pp = ax25.FromText(text, true)
 		require.NotNil(t, pp)
 
 		transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
@@ -631,7 +631,7 @@ func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 
 	xs.fulldup[0] = true
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
@@ -649,7 +649,7 @@ func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 func TestXmitMorse(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var pp = AX25FromText("Q1TEST>MORSE:HI", true)
+	var pp = ax25.FromText("Q1TEST>MORSE:HI", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_morse(0, pp, MORSE_DEFAULT_WPM) })
@@ -662,7 +662,7 @@ func TestXmitMorse(t *testing.T) {
 func TestXmitDTMF(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var pp = AX25FromText("Q1TEST>DTMF:12", true)
+	var pp = ax25.FromText("Q1TEST>DTMF:12", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_dtmf(0, pp, 10) })
@@ -679,7 +679,7 @@ func TestXmitDTMF(t *testing.T) {
 func timeXmitNext(t *testing.T, xs *XmitService, text string) (time.Duration, string) {
 	t.Helper()
 
-	var pp = AX25FromText(text, true)
+	var pp = ax25.FromText(text, true)
 	require.NotNil(t, pp)
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, pp)

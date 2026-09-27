@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/lestrrat-go/strftime"
@@ -1096,7 +1097,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	kissPT.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
-		var ao_pp = AX25FromText(ais_obj_packet, true)
+		var ao_pp = ax25.FromText(ais_obj_packet, true)
 		if ao_pp != nil {
 			var ao_fbuf = AX25Pack(ao_pp)
 

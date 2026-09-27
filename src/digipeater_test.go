@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,7 +69,7 @@ func TestDigipeaterSameChannel(t *testing.T) {
 
 	enableDigipeat(digiConfig, digiFromChan)
 
-	var pp = AX25FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
+	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
 	digi.Digipeat(digiFromChan, pp)
@@ -87,7 +88,7 @@ func TestDigipeaterCrossChannel(t *testing.T) {
 
 	enableDigipeat(digiConfig, digiToChan)
 
-	var pp = AX25FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
+	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
 	digi.Digipeat(digiFromChan, pp)
@@ -109,7 +110,7 @@ func TestDigipeaterRemembersWhatItRepeated(t *testing.T) {
 
 	enableDigipeat(digiConfig, digiFromChan)
 
-	var pp = AX25FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
+	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
 	digi.Digipeat(digiFromChan, pp)
@@ -125,7 +126,7 @@ func TestDigipeaterRemembersWhatItRepeated(t *testing.T) {
 func TestDigipeaterNotEnabled(t *testing.T) {
 	var digi, _ = setupDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
+	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
 	digi.Digipeat(digiFromChan, pp)
@@ -144,7 +145,7 @@ func TestDigipeaterNothingToDo(t *testing.T) {
 
 	enableDigipeat(digiConfig, digiFromChan)
 
-	var pp = AX25FromText("Q3TEST>APDW17:>hello", true)
+	var pp = ax25.FromText("Q3TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
 	digi.Digipeat(digiFromChan, pp)
@@ -158,7 +159,7 @@ func TestDigipeaterNothingToDo(t *testing.T) {
 func TestDigipeaterInvalidChannel(t *testing.T) {
 	var digi, _ = setupDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
+	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
 	for _, channel := range []int{-1, MAX_TOTAL_CHANS} {
@@ -175,7 +176,7 @@ func TestDigiRegen(t *testing.T) {
 
 	digiConfig.regen[digiFromChan][digiToChan] = true
 
-	var pp = AX25FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
+	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
 	digi.Regen(digiFromChan, pp)
@@ -190,7 +191,7 @@ func TestDigiRegen(t *testing.T) {
 func TestDigiRegenDisabled(t *testing.T) {
 	var digi, _ = setupDigipeater(t)
 
-	var pp = AX25FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
+	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
 	digi.Regen(digiFromChan, pp)
@@ -219,7 +220,7 @@ func TestNewDigipeater(t *testing.T) {
 // APRStt object reports reach for the digipeater whether or not startup has
 // got that far.
 func TestDigipeaterRememberNil(t *testing.T) {
-	var pp = AX25FromText("Q3TEST>APDW17:>hello", true)
+	var pp = ax25.FromText("Q3TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
 	var digi *Digipeater
@@ -233,7 +234,7 @@ func TestDigipeaterRemember(t *testing.T) {
 
 	enableDigipeat(digiConfig, digiFromChan)
 
-	var pp = AX25FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
+	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
 	digi.Remember(pp, digiFromChan)

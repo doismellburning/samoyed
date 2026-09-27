@@ -69,6 +69,7 @@ import (
 	"os"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -352,12 +353,12 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 		// if it happens to get onto RF somehow.
 
 		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_AIS, string(nmea))
-		pp = AX25FromText(monfmt, true)
+		pp = ax25.FromText(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	case MODEM_EAS:
 		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_EAS, string(fbuf))
-		pp = AX25FromText(monfmt, true)
+		pp = ax25.FromText(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	default:

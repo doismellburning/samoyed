@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -762,7 +763,7 @@ func test_serdes(t *testing.T) {
 		} else {
 			packet = fmt.Sprintf("%s:%s", addrs3, il2pTestText)
 		}
-		var pp = AX25FromText(packet, true)
+		var pp = ax25.FromText(packet, true)
 		assert.NotNil(t, pp)
 
 		var sender = NewHDLCSender(0, nil)

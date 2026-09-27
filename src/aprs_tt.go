@@ -34,6 +34,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -475,7 +476,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 
 	var audible_response = fmt.Sprintf("APRSTT>%s:%s", g.config.response[err].method, response)
 
-	var pp = AX25FromText(audible_response, false)
+	var pp = ax25.FromText(audible_response, false)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -1641,7 +1642,7 @@ func raw_tt_data_to_app(channel int, msg string) {
 	var dest = fmt.Sprintf("%s%d%d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
 	var raw_tt_msg = fmt.Sprintf("%s>%s:t%s", src, dest, msg)
 
-	var pp = AX25FromText(raw_tt_msg, true)
+	var pp = ax25.FromText(raw_tt_msg, true)
 
 	/*
 	 * Process like a normal received frame.

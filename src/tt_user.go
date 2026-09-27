@@ -24,6 +24,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
@@ -622,7 +623,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	/*
 	 * Convert text to packet.
 	 */
-	var pp = AX25FromText(stemp, true)
+	var pp = ax25.FromText(stemp, true)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)

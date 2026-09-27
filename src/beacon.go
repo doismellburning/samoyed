@@ -14,6 +14,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 )
@@ -892,7 +893,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *GPSInfo) {
 	}
 
 	var strict = true // Strict packet checking because they will go over air.
-	var pp = AX25FromText(beacon_text, strict)
+	var pp = ax25.FromText(beacon_text, strict)
 
 	if pp != nil {
 		/* Send to desired destination. */

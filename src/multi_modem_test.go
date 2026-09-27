@@ -6,6 +6,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +43,7 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 	multi_modem_init(audioConfig, first)
 	require.Equal(t, 2, demodulators[0].NumSubchan())
 
-	var pp = AX25FromText("Q1TEST>Q2TEST:left over", true)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:left over", true)
 	require.NotNil(t, pp)
 	var alevel ALevel
 	multi_modem_process_rec_packet_real(0, 0, 0, pp, alevel, RETRY_NONE, fec_type_none)

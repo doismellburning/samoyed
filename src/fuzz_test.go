@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,7 +44,7 @@ func FuzzAX25FromFrame(f *testing.F) {
 	fuzzQuietly(f)
 
 	// An ordinary APRS position report.
-	var pp = AX25FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
+	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
 	require.NotNil(f, pp)
 	f.Add(ax25_get_frame_data(pp))
 
@@ -155,7 +156,7 @@ func FuzzIL2PDecodeFrame(f *testing.F) {
 
 	il2p_init(0)
 
-	var pp = AX25FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
+	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
 	require.NotNil(f, pp)
 
 	for _, version := range []il2p_version_t{IL2P_VERSION_0_4, IL2P_VERSION_0_6} {
