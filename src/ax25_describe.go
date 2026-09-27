@@ -4,7 +4,7 @@ package direwolf
  *
  * Purpose:	Describe an AX.25 frame in human readable form.
  *
- * Description:	The pieces - ax25_hex_dump, AX25FormatAddrs, decode_aprs -
+ * Description:	The pieces - AX25HexDump, AX25FormatAddrs, decode_aprs -
  *		already exist.  This puts them together the way anything
  *		inspecting frames off the wire wants them, and says what is
  *		wrong with a frame too malformed for the next step, rather
@@ -51,7 +51,7 @@ func DescribeAX25Frame(frame []byte) int {
 
 	/*
 	 * Establish that the frame has the fields the description is about to read
-	 * before reading any of them.  ax25_hex_dump takes the control and PID
+	 * before reading any of them.  AX25HexDump takes the control and PID
 	 * octets on trust, so a frame that stops short of them would otherwise be
 	 * described in terms of the zero padding past its end.
 	 */
@@ -87,14 +87,14 @@ func DescribeAX25Frame(frame []byte) int {
 	}
 
 	fmt.Printf("--- AX.25 frame ---\n")
-	ax25_hex_dump(pp)
+	AX25HexDump(pp)
 	fmt.Printf("-------------------\n")
 
 	var problems = 0
 
 	fmt.Printf("%s\n", AX25FormatAddrs(pp))
 
-	if !ax25_check_addresses(pp, addrStrict) {
+	if !AX25CheckAddresses(pp, AddrStrict) {
 		problems++
 	}
 
@@ -105,9 +105,9 @@ func DescribeAX25Frame(frame []byte) int {
 		fmt.Printf("\n")
 		NoteSafePrintTruncation(len(info))
 
-		var A = decode_aprs(pp, false, "") // Extract information into structure.
+		var A = DecodeAPRS(pp, false, "") // Extract information into structure.
 
-		decode_aprs_print(A) // Now print it in human readable format.
+		DecodeAPRSPrint(A) // Now print it in human readable format.
 	} else {
 		/*
 		 * The control and PID octets are in the dump above, and either of them

@@ -637,13 +637,13 @@ func Test_KissRecByte_noise_without_sendfun(t *testing.T) {
 	assert.Equal(t, []byte{KISS_CMD_DATA_FRAME, 'h', 'i'}, got)
 }
 
-// kiss_unwrap takes the escapes and framing back out, complaining about
+// KissUnwrap takes the escapes and framing back out, complaining about
 // anything malformed but carrying on - a live TNC has to do something with
 // what it was given.
 
 func Test_kiss_unwrap_too_short(t *testing.T) {
 	var output = testutils.CaptureOutput(t, func() {
-		assert.Empty(t, kiss_unwrap([]byte{FEND}))
+		assert.Empty(t, KissUnwrap([]byte{FEND}))
 	})
 
 	assert.Contains(t, output, "less than minimum length")
@@ -653,7 +653,7 @@ func Test_kiss_unwrap_no_trailing_fend(t *testing.T) {
 	var unwrapped []byte
 
 	var output = testutils.CaptureOutput(t, func() {
-		unwrapped = kiss_unwrap([]byte{FEND, 0x00, 'h', 'i'})
+		unwrapped = KissUnwrap([]byte{FEND, 0x00, 'h', 'i'})
 	})
 
 	assert.Contains(t, output, "should end with FEND")
@@ -662,7 +662,7 @@ func Test_kiss_unwrap_no_trailing_fend(t *testing.T) {
 
 func Test_kiss_unwrap_fend_in_the_middle(t *testing.T) {
 	var output = testutils.CaptureOutput(t, func() {
-		kiss_unwrap([]byte{FEND, 0x00, FEND, 'h', FEND})
+		KissUnwrap([]byte{FEND, 0x00, FEND, 'h', FEND})
 	})
 
 	assert.Contains(t, output, "should not have FEND in the middle")
@@ -674,7 +674,7 @@ func Test_kiss_unwrap_bad_escape(t *testing.T) {
 	var unwrapped []byte
 
 	var output = testutils.CaptureOutput(t, func() {
-		unwrapped = kiss_unwrap([]byte{0x00, FESC, 'x', 'y', FEND})
+		unwrapped = KissUnwrap([]byte{0x00, FESC, 'x', 'y', FEND})
 	})
 
 	assert.Contains(t, output, "Found 0x78 after FESC")
@@ -683,7 +683,7 @@ func Test_kiss_unwrap_bad_escape(t *testing.T) {
 
 // The leading FEND is optional, so a frame without one unwraps the same way.
 func Test_kiss_unwrap_without_leading_fend(t *testing.T) {
-	assert.Equal(t, []byte{0x00, 'h', 'i'}, kiss_unwrap([]byte{0x00, 'h', 'i', FEND}))
+	assert.Equal(t, []byte{0x00, 'h', 'i'}, KissUnwrap([]byte{0x00, 'h', 'i', FEND}))
 }
 
 // The per-client bookkeeping for KISS over TCP: a client's connection and the

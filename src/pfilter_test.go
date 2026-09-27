@@ -111,7 +111,7 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 
 	var alevel ALevel
 
-	mheardDB.SaveRF(0, decode_aprs(heard, true, ""), heard, alevel, BitFixNone)
+	mheardDB.SaveRF(0, DecodeAPRS(heard, true, ""), heard, alevel, BitFixNone)
 
 	var message = AX25FromText("Q1TEST>APDW17::Q2TEST   :Happy Birthday{001", true)
 	require.NotNil(t, message)
@@ -149,7 +149,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 
 		var alevel ALevel
 
-		mheardDB.SaveRF(0, decode_aprs(pp, true, ""), pp, alevel, BitFixNone)
+		mheardDB.SaveRF(0, DecodeAPRS(pp, true, ""), pp, alevel, BitFixNone)
 	}
 
 	var testCases = []struct {

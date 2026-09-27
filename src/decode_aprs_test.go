@@ -19,7 +19,7 @@ func Test_decode_aprs_empty_info(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	// Must not panic, and must return a populated struct.
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 	assert.NotNil(t, A)
 	assert.Equal(t, "AX.25 UI frame with empty information field", A.g_data_type_desc)
 	assert.Equal(t, "Q1TEST", A.g_src)
@@ -37,7 +37,7 @@ func Test_decode_aprs_dao_does_not_invent_a_position(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>APRS:!4237.14N/xxxxx.83W-Hi!W99!", true)
 	assert.NotNil(t, pp)
 
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 
 	assert.True(t, A.g_lon.IsNothing(), "longitude should still be unknown, got %v", A.g_lon)
 
@@ -79,7 +79,7 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 		assert.NotNil(t, pp)
 
 		// Must not panic, and must still report the position.
-		var A = decode_aprs(pp, true, "")
+		var A = DecodeAPRS(pp, true, "")
 
 		var lat, ok = A.g_lat.Get()
 		assert.True(t, ok, "%s", info)
@@ -87,7 +87,7 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 	}
 
 	// What did arrive before the truncation is still decoded.
-	var A = decode_aprs(AX25FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g005", true), true, "")
+	var A = DecodeAPRS(AX25FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g005", true), true, "")
 	assert.Equal(t, `wind 4.6 mph, direction 220, gust 5, ""`, A.g_weather)
 }
 
@@ -99,7 +99,7 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 func Test_decode_aprs_positionless_weather(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var A = decode_aprs(AX25FromText(
+	var A = DecodeAPRS(AX25FromText(
 		"Q1TEST>APRS:_10090556c220s004g005t077r000p000P000h50b09900wRSW", true), true, "")
 
 	assert.Equal(t, "Positionless Weather Report", A.g_data_type_desc)
@@ -116,7 +116,7 @@ func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
 	for _, info := range []string{"_", "_1009", "_10090556", "_10090556c2"} {
-		var A = decode_aprs(AX25FromText("Q1TEST>APRS:"+info, true), true, "")
+		var A = DecodeAPRS(AX25FromText("Q1TEST>APRS:"+info, true), true, "")
 		assert.Equal(t, "Positionless Weather Report", A.g_data_type_desc, "%s", info)
 	}
 }
@@ -127,7 +127,7 @@ func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
 func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var known = decode_aprs(AX25FromText(
+	var known = DecodeAPRS(AX25FromText(
 		"Q1TEST>APRS:!4903.50N/07201.75W_220/004g005t077r000p000P000h50b09900wRSW", true), true, "")
 	assert.Equal(t,
 		`wind 4.6 mph, direction 220, gust 5, temperature 77, `+
@@ -138,7 +138,7 @@ func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
 	// The same report with every optional field blanked out: the fields are
 	// still consumed - the station type is found at the end - but none of
 	// them is reported.
-	var unknown = decode_aprs(AX25FromText(
+	var unknown = DecodeAPRS(AX25FromText(
 		"Q1TEST>APRS:!4903.50N/07201.75W_220/004g...t...r...p...P...h..b.....wRSW", true), true, "")
 	assert.Equal(t, `wind 4.6 mph, direction 220, "wRSW"`, unknown.g_weather)
 }
@@ -175,7 +175,7 @@ func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
 
 	// End to end: the blanked-out wind leaves no wind on the weather line,
 	// and the fields after it still decode.
-	var A = decode_aprs(AX25FromText(
+	var A = DecodeAPRS(AX25FromText(
 		"Q1TEST>APRS:!4903.50N/07201.75W_c...s...g005t077wRSW", true), true, "")
 	assert.Equal(t, `, gust 5, temperature 77, "wRSW"`, A.g_weather)
 }
@@ -190,7 +190,7 @@ func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	// Must not panic.
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "Item - name not ended by ! or _", A.g_data_type_desc)
 	assert.Equal(t, "Zb00000Zb00001", A.g_name)
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
@@ -205,7 +205,7 @@ func Test_decode_aprs_item_with_short_name(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	// Must not panic, and the rest of the item still decodes.
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "Item", A.g_data_type_desc)
 	assert.Equal(t, "AB", A.g_name)
 	assert.Equal(t, maybe.Just(42.619), A.g_lat)
@@ -219,7 +219,7 @@ func Test_decode_aprs_item_without_position(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>APDW17:)ABCDE!", true)
 	assert.NotNil(t, pp)
 
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "Item", A.g_data_type_desc)
 	assert.Equal(t, "ABCDE", A.g_name)
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
@@ -232,11 +232,11 @@ func Test_decode_aprs_item_without_position(t *testing.T) {
 func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = ax25_from_text("Q1TEST>0:'0000000000000000000", addrLenient)
+	var pp = AX25FromTextWithStrictness("Q1TEST>0:'0000000000000000000", AddrLenient)
 	assert.NotNil(t, pp)
 
 	// Must not panic, and must not claim a position it never read.
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "MIC-E", A.g_data_type_desc)
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
@@ -247,11 +247,11 @@ func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
 func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = ax25_from_text("Q1TEST>APDW17:!0000.00N/00000.00W/000/000", addrLenient)
+	var pp = AX25FromTextWithStrictness("Q1TEST>APDW17:!0000.00N/00000.00W/000/000", AddrLenient)
 	assert.NotNil(t, pp)
 
 	// Must not panic, and the course and speed still decode.
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, maybe.Just(0.0), A.g_course)
 	assert.Equal(t, maybe.Just(0.0), A.g_speed_mph)
 	assert.Empty(t, A.g_comment)
@@ -263,11 +263,11 @@ func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
 func Test_decode_aprs_user_defined_without_id(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = ax25_from_text("Q1TEST>APDW17:{", addrLenient)
+	var pp = AX25FromTextWithStrictness("Q1TEST>APDW17:{", AddrLenient)
 	assert.NotNil(t, pp)
 
 	// Must not panic.
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "User-Defined Data", A.g_data_type_desc)
 }
 
@@ -281,7 +281,7 @@ func Test_decode_aprs_general_query_footprint(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>APDW17:?APRS? 42.3714,-71.2083,0050", true)
 	assert.NotNil(t, pp)
 
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "General Query", A.g_data_type_desc)
 	assert.Equal(t, "APRS", A.g_query_type)
 	assert.Equal(t, maybe.Just(42.3714), A.g_footprint_lat)
@@ -297,7 +297,7 @@ func Test_decode_aprs_general_query_short_footprint(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>APDW17:?APRS?0", true)
 	assert.NotNil(t, pp)
 
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "General Query", A.g_data_type_desc)
 	assert.Equal(t, "APRS", A.g_query_type)
 	assert.Equal(t, maybe.Nothing[float64](), A.g_footprint_lat)
@@ -319,7 +319,7 @@ func Test_decode_aprs_short_message(t *testing.T) {
 		var pp = AX25FromText(tc.monitor, true)
 		assert.NotNil(t, pp)
 
-		var A = decode_aprs(pp, true, "")
+		var A = DecodeAPRS(pp, true, "")
 		assert.Equal(t, message_subtype_message, A.g_message_subtype)
 		assert.Equal(t, "Q2TEST", A.g_addressee)
 		assert.Equal(t, tc.comment, A.g_comment)

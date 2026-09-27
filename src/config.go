@@ -705,7 +705,7 @@ func check_via_path(via_path string) (int, error) {
 	for _, part := range parts {
 		num_digi++
 
-		var addr, ssid, _, ok = ax25_parse_addr(AX25_REPEATER_1-1+num_digi, part, addrStrictNoStar)
+		var addr, ssid, _, ok = ax25_parse_addr(AX25_REPEATER_1-1+num_digi, part, AddrStrictNoStar)
 
 		if !ok {
 			logrus.Debug("check_via_path bad address")
@@ -1901,7 +1901,7 @@ func handleMYCALL(ps *parseState) error {
 		/* Might change to warning someday. */
 		t = strings.ToUpper(t)
 
-		var _, _, _, ok = ax25_parse_addr(-1, t, addrStrictNoStar)
+		var _, _, _, ok = ax25_parse_addr(-1, t, AddrStrictNoStar)
 
 		if !ok {
 			return fmt.Errorf("config file: Invalid value for MYCALL command on line %d", ps.line)
@@ -4512,7 +4512,7 @@ func handleTTERR(ps *parseState) error {
 
 	t = strings.ToUpper(t)
 
-	var method, _, _, ok = ax25_parse_addr(-1, t, addrStrict)
+	var method, _, _, ok = ax25_parse_addr(-1, t, AddrStrict)
 	if !ok {
 		// ax25_parse_addr has already said what is wrong with it in detail; say
 		// which directive it came from, and count it, as MYCALL and V20 do.
@@ -5620,7 +5620,7 @@ func handleV20(ps *parseState) error {
 	}
 
 	for t != "" {
-		var _, _, _, ok = ax25_parse_addr(AX25_DESTINATION, t, addrStrictNoStar)
+		var _, _, _, ok = ax25_parse_addr(AX25_DESTINATION, t, AddrStrictNoStar)
 
 		if ok {
 			ps.misc.v20_addrs = append(ps.misc.v20_addrs, t)
@@ -5651,7 +5651,7 @@ func handleNOXID(ps *parseState) error {
 	}
 
 	for t != "" {
-		var _, _, _, ok = ax25_parse_addr(AX25_DESTINATION, t, addrStrictNoStar)
+		var _, _, _, ok = ax25_parse_addr(AX25_DESTINATION, t, AddrStrictNoStar)
 
 		if ok {
 			ps.misc.noxid_addrs = append(ps.misc.noxid_addrs, t)

@@ -225,7 +225,7 @@ func DecodeAPRSInit() {
  *
  *------------------------------------------------------------------*/
 
-func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t {
+func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t {
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
 	var pinfo = AX25GetInfo(pp)
 
@@ -314,7 +314,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 		if pp_payload != nil {
 			var payload_src = pinfo[1:]
 			payload_src, _, _ = bytes.Cut(payload_src, []byte{'>'})
-			A = decode_aprs(pp_payload, quiet, string(payload_src)) // 1 means used recursively
+			A = DecodeAPRS(pp_payload, quiet, string(payload_src)) // 1 means used recursively
 			A.g_has_thirdparty_header = true
 
 			return A
@@ -513,7 +513,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 	return A
 } /* end decode_aprs */
 
-func decode_aprs_print(A *decode_aprs_t) {
+func DecodeAPRSPrint(A *decode_aprs_t) {
 	/*
 	 * First line has:
 	 * - packet type

@@ -572,7 +572,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 	if s.hexDisplay {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
-		ax25_hex_dump(pp)
+		AX25HexDump(pp)
 		dw_printf("------\n")
 	}
 
