@@ -413,15 +413,17 @@ func TestGray2Phase(t *testing.T) {
 }
 
 func TestNewGenToneTestConfig(t *testing.T) {
-	var config = NewGenToneTestConfig(2, true)
+	var config = NewGenToneTestConfig(2)
 
 	assert.Equal(t, DEFAULT_ADEVICE, config.adev[0].adevice_in)
 	assert.Equal(t, DEFAULT_ADEVICE, config.adev[0].adevice_out)
 	assert.Equal(t, 2, config.adev[0].num_channels)
 	assert.Equal(t, MEDIUM_RADIO, config.chan_medium[0])
+	assert.Equal(t, MEDIUM_RADIO, config.chan_medium[1])
 
-	config = NewGenToneTestConfig(1, false)
-	assert.Equal(t, MEDIUM_NONE, config.chan_medium[0])
+	config = NewGenToneTestConfig(1)
+	assert.Equal(t, 1, config.adev[0].num_channels)
+	assert.Equal(t, MEDIUM_RADIO, config.chan_medium[0])
 }
 
 func TestGenToneInitAndChannelFunctions(t *testing.T) {

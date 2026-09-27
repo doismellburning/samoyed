@@ -8,7 +8,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/doismellburning/samoyed/internal/direwolf"
 )
@@ -16,7 +15,7 @@ import (
 const chan1 = 0
 const chan2 = 1
 
-// No baud rate is configured, so AudioOpen fills in the default.
+// NewGenToneTestConfig uses the default baud rate.
 const baud = direwolf.DEFAULT_BAUD
 
 func main() {
@@ -26,12 +25,10 @@ func main() {
 // genTone is main, but sending the samples to sink rather than necessarily
 // the audio device, so that a test can see what would have been played.
 func genTone(sink direwolf.AudioSink) {
-	fmt.Println("Warning, known to fail with an assertion error, needs debugging and fixing.")
-
 	/* to sound card */
 	/* one channel.  2 times:  one second of each tone. */
 
-	var config = direwolf.NewGenToneTestConfig(1, true)
+	var config = direwolf.NewGenToneTestConfig(1)
 
 	direwolf.AudioOpen(context.Background(), config)
 	direwolf.GenToneInit(config, 100, sink)
@@ -50,7 +47,7 @@ func genTone(sink direwolf.AudioSink) {
 
 	/* Now try stereo. */
 
-	config = direwolf.NewGenToneTestConfig(2, false)
+	config = direwolf.NewGenToneTestConfig(2)
 
 	direwolf.AudioOpen(context.Background(), config)
 	direwolf.GenToneInit(config, 100, sink)

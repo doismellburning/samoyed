@@ -265,17 +265,25 @@ func GenToneInit(audio_config_p *AudioConfig, amp int, sink AudioSink) int {
 } /* end GenToneInit */
 
 // NewGenToneTestConfig returns an AudioConfig for the standalone gen_tone
-// test program, using the default audio device with numChannels sound card
-// channels, and marking radio channel 0 as MEDIUM_RADIO if mediumRadio is set.
-func NewGenToneTestConfig(numChannels int, mediumRadio bool) *AudioConfig {
+// test program: the default audio device, defined so that AudioOpen sets it
+// up to transmit, with numChannels sound card channels, each of them a radio
+// channel with the default modem.
+func NewGenToneTestConfig(numChannels int) *AudioConfig {
 	var config = new(AudioConfig)
 
+	config.adev[0].defined = 1
 	config.adev[0].adevice_in = DEFAULT_ADEVICE
 	config.adev[0].adevice_out = DEFAULT_ADEVICE
 	config.adev[0].num_channels = numChannels
+	config.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
+	config.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
 
-	if mediumRadio {
-		config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
+	for channel := range numChannels {
+		config.chan_medium[channel] = MEDIUM_RADIO
+		config.achan[channel].modem_type = MODEM_AFSK
+		config.achan[channel].mark_freq = DEFAULT_MARK_FREQ
+		config.achan[channel].space_freq = DEFAULT_SPACE_FREQ
+		config.achan[channel].baud = DEFAULT_BAUD
 	}
 
 	return config
