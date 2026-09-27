@@ -111,6 +111,11 @@ type AXUDPBridge struct {
 
 	mu      sync.Mutex
 	clients []net.Conn
+
+	// How long RunKISSServer waits after a failed accept, and the most that
+	// wait doubles up to.
+	acceptBackoff    time.Duration
+	maxAcceptBackoff time.Duration
 }
 
 // NewAXUDPBridge creates a new AXUDPBridge routing AXUDP datagrams according to maps,
@@ -120,6 +125,8 @@ func NewAXUDPBridge(maps []AXUDPMapEntry, udpConn *net.UDPConn) *AXUDPBridge {
 	var b = new(AXUDPBridge)
 	b.maps = maps
 	b.udpConn = udpConn
+	b.acceptBackoff = axudpAcceptBackoff
+	b.maxAcceptBackoff = axudpMaxAcceptBackoff
 
 	return b
 }
@@ -193,8 +200,9 @@ func (b *AXUDPBridge) RunUDPListener(ctx context.Context) error {
 	return nil
 }
 
-// axudpAcceptBackoff is how long RunKISSServer waits after a failed accept
-// before trying again, doubling up to axudpMaxAcceptBackoff.  Accepting can
+// axudpAcceptBackoff is how long a bridge's RunKISSServer waits after a failed
+// accept before trying again, doubling up to axudpMaxAcceptBackoff, unless it
+// is told otherwise before it runs.  Accepting can
 // fail for reasons that pass — a client that goes away between the handshake
 // and the accept, or a momentarily exhausted file descriptor table — and
 // retrying immediately would spin the CPU and flood the log until it does.
@@ -217,7 +225,7 @@ const axudpMaxAcceptFailures = 10
 // backoff.  A cancellation is not a failure and returns nil.
 func (b *AXUDPBridge) RunKISSServer(ctx context.Context, ln net.Listener) error {
 	var failures int
-	var backoff = axudpAcceptBackoff
+	var backoff = b.acceptBackoff
 
 	// Accept blocks until a client turns up, so closing the listener is what
 	// gets us back when we are asked to stop.  The caller still owns it; this
@@ -246,13 +254,13 @@ func (b *AXUDPBridge) RunKISSServer(ctx context.Context, ln net.Listener) error 
 				return nil
 			}
 
-			backoff = min(backoff*2, axudpMaxAcceptBackoff)
+			backoff = min(backoff*2, b.maxAcceptBackoff)
 
 			continue
 		}
 
 		failures = 0
-		backoff = axudpAcceptBackoff
+		backoff = b.acceptBackoff
 
 		logrus.WithField("client", conn.RemoteAddr()).Info("New KISS client")
 		go b.handleKISSClient(ctx, conn)

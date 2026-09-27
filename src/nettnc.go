@@ -14,17 +14,28 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
 )
 
+// nettncReattachDelay is how long a NetTNC waits between attempts to
+// reattach to a TNC that has gone away, unless it is told otherwise before
+// it is started.
+const nettncReattachDelay = 5 * time.Second
+
 type NetTNC struct {
-	host  string
-	port  int
-	mu    sync.Mutex // Guards sock, since listenThread and sendPacket access it from different goroutines.
-	sock  net.Conn   // Socket handle or file descriptor. nil for invalid.
-	debug int
+	channel       int // NCHANNEL channel number frames from the TNC are received on.
+	host          string
+	port          int
+	mu            sync.Mutex    // Guards sock, since listenThread and sendPacket access it from different goroutines.
+	sock          net.Conn      // Socket handle or file descriptor. nil for invalid.
+	reattachDelay time.Duration // Between attempts to reattach.
+	started       atomic.Bool
+	debug         int
 }
 
 /*-------------------------------------------------------------------
@@ -68,6 +79,8 @@ func NewNetTNCs(ctx context.Context, pa *AudioConfig) [MAX_TOTAL_CHANS]*NetTNC {
 				os.Exit(1)
 			}
 
+			nt.Start(ctx)
+
 			tncs[i] = nt
 		}
 	}
@@ -96,10 +109,7 @@ func NewNetTNCs(ctx context.Context, pa *AudioConfig) [MAX_TOTAL_CHANS]*NetTNC {
  *
  * Returns:	The attached TNC, or the error connecting to it.
  *
- * Description:	This starts up a thread, for each socket, which listens to the socket and
- *		dispatches the messages to the corresponding callback functions.
- *		It will also attempt to re-establish communication with the
- *		TNC if it goes away.
+ * Description:	Nothing is read from the TNC until Start is called.
  *
  *--------------------------------------------------------------------*/
 
@@ -112,16 +122,11 @@ func NewNetTNC(ctx context.Context, channel int, host string, port int) (*NetTNC
 	}
 
 	var nt = new(NetTNC)
+	nt.channel = channel
 	nt.host = host
 	nt.port = port
+	nt.reattachDelay = nettncReattachDelay
 	nt.setSock(conn)
-
-	/*
-	 * Read frames from the network TNC.
-	 * If the TNC disappears, try to reestablish communication.
-	 */
-
-	go nt.listenThread(ctx, channel)
 
 	// TNC initialization if specified.
 
@@ -131,6 +136,24 @@ func NewNetTNC(ctx context.Context, channel int, host string, port int) (*NetTNC
 	//	}
 
 	return nt, nil
+}
+
+// Start reads frames from the TNC, and dispatches them to the received queue,
+// until ctx is cancelled, when it hangs up.  If the TNC goes away, it tries to
+// reattach to it.  Anything the listening goroutine reads must be set before
+// calling it.
+//
+// Starting it again would have two goroutines reading the one connection, each
+// getting part of what the TNC sends, so a second Start is complained about
+// and ignored.
+func (nt *NetTNC) Start(ctx context.Context) {
+	if !nt.started.CompareAndSwap(false, true) {
+		logrus.WithField("channel", nt.channel).Error("Network TNC started twice; ignoring the second start")
+
+		return
+	}
+
+	go nt.listenThread(ctx, nt.channel)
 }
 
 // getSock returns the current connection, or nil if not connected.
@@ -218,7 +241,7 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 				nt.setSock(newConn)
 
 				dw_printf("Successfully reattached to network TNC.\n")
-			} else if !sleepSecCtx(ctx, 5) {
+			} else if !sleepCtx(ctx, nt.reattachDelay) {
 				return
 			}
 		} else {
@@ -242,7 +265,7 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 				dw_printf("Lost communication with network TNC. Will try to reattach.\n")
 				nt.closeSockIfCurrent(conn)
 
-				if !sleepSecCtx(ctx, 5) {
+				if !sleepCtx(ctx, nt.reattachDelay) {
 					return
 				}
 

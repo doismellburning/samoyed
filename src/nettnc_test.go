@@ -18,6 +18,8 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,6 +86,12 @@ func attachTestNetTNC(ctx context.Context, t *testing.T) (*NetTNC, net.Conn, <-c
 	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port)
 	require.NoError(t, err)
 
+	// Reattaching after the TNC goes away waits between attempts; not the
+	// real five seconds, though, which would make that test the slowest here.
+	nt.reattachDelay = 10 * time.Millisecond
+
+	nt.Start(ctx)
+
 	return nt, nextTestNetTNCConn(t, conns), conns
 }
 
@@ -113,6 +121,33 @@ func TestNetTNCAttachRefused(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Nil(t, nt)
+}
+
+// Starting a TNC twice would have two goroutines splitting what it sends
+// between them, so the second start is refused, and says so.
+func TestNetTNCStartedTwiceComplains(t *testing.T) {
+	expectReceivedFrames(t)
+
+	var nt, tnc, _ = attachTestNetTNC(t.Context(), t)
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	nt.Start(t.Context())
+
+	var entry = hook.LastEntry()
+	require.NotNil(t, entry, "nothing was said about starting the TNC twice")
+	assert.Equal(t, logrus.ErrorLevel, entry.Level)
+	assert.Contains(t, entry.Message, "started twice")
+
+	// Still one reader, so a frame arrives whole.
+	var _, writeErr = tnc.Write(kissFrameFor(newTestPacket(t)))
+	require.NoError(t, writeErr)
+
+	require.Eventually(t, func() bool {
+		return dataLinkQueue.Remove() != nil
+	}, 10*time.Second, 10*time.Millisecond, "the frame from the network TNC never reached the received queue")
 }
 
 // A frame from the TNC is a frame off the air as far as the rest of the
@@ -212,8 +247,6 @@ func TestNetTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
 
 	require.NoError(t, tnc.Close())
 
-	// Reattaching waits five seconds between attempts, so this is the slow
-	// one.
 	var reattached = nextTestNetTNCConn(t, conns)
 
 	var pp = newTestPacket(t)

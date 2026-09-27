@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,7 +104,15 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	mc.kiss_port[0] = port
 	mc.kiss_chan[0] = channel
 
-	return NewKissNetService(t.Context(), mc, kissTestAudioConfig(), 0), port
+	var kns = NewKissNetService(mc, kissTestAudioConfig(), 0)
+
+	// A client's reader polls for it to attach; not every real second,
+	// though, which would cost each test here most of one.
+	kns.pollInterval = 10 * time.Millisecond
+
+	kns.Start(t.Context())
+
+	return kns, port
 }
 
 // dialKissNet attaches a client application to a running service, and hands
@@ -372,6 +381,33 @@ func TestKissNetDisabled(t *testing.T) {
 	var output = testutils.CaptureOutput(t, func() { kns.initOne(t.Context(), kps) })
 
 	assert.Contains(t, output, "Disabled KISS network client port")
+}
+
+// Starting the service twice would try to bind its ports again, so the second
+// start is refused, and says so rather than failing to bind.
+func TestKissNetStartedTwiceComplains(t *testing.T) {
+	var kns, port = startKissNet(t, -1)
+
+	waitUntilListening(t, port)
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	kns.Start(t.Context())
+
+	// Only the errors: the probe waitUntilListening made may still be being
+	// reported as a client attaching.
+	var errs []string
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Level <= logrus.ErrorLevel {
+			errs = append(errs, entry.Message)
+		}
+	}
+
+	require.Len(t, errs, 1, "starting the service twice should say so, and nothing else go wrong: %v", errs)
+	assert.Contains(t, errs[0], "started twice")
 }
 
 // Two things cannot have the same port, and the one that loses says so rather
