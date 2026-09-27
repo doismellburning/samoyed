@@ -116,6 +116,9 @@ package direwolf
 
 import (
 	"bytes"
+	"fmt"
+
+	"github.com/sirupsen/logrus"
 )
 
 /*------------------------------------------------------------------------------
@@ -164,8 +167,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 	this_p.modulo = 0
 
 	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_u_frame: Could not set addresses for U frame.\n")
+		logrus.Error("Internal error: ax25_u_frame: could not set addresses")
 
 		return (nil)
 	}
@@ -208,8 +210,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 		t = 2
 		i = true
 	default:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_u_frame: Invalid ftype %d for U frame.\n", ftype)
+		logrus.WithField("ftype", ftype).Error("Internal error: ax25_u_frame: invalid frame type for U frame")
 
 		return (nil)
 	}
@@ -220,8 +221,11 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 
 	if t != 2 {
 		if cr != t {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Internal error in ax25_u_frame: U frame, cr is %d but must be %d. ftype=%d\n", cr, t, ftype)
+			logrus.WithFields(logrus.Fields{
+				"cr":          cr,
+				"expected_cr": t,
+				"ftype":       ftype,
+			}).Error("Internal error: ax25_u_frame: wrong command/response for U frame")
 		}
 	}
 
@@ -232,8 +236,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 		// Definitely don't want pid value of 0 (not in valid list)
 		// or 0xff (which means more bytes follow).
 		if pid < 0 || pid == 0 || pid == 0xff {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Internal error in ax25_u_frame: U frame, Invalid pid value 0x%02x.\n", pid)
+			logrus.WithField("pid", fmt.Sprintf("0x%02x", pid)).Error("Internal error: ax25_u_frame: invalid PID for U frame")
 			pid = AX25_PID_NO_LAYER_3
 		}
 
@@ -244,8 +247,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 	if i {
 		if len(info) > 0 {
 			if len(info) > AX25_MAX_INFO_LEN {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Internal error in ax25_u_frame: U frame, Invalid information field length %d.\n", len(info))
+				logrus.WithField("length", len(info)).Error("Internal error: ax25_u_frame: invalid information field length for U frame")
 				info = info[:AX25_MAX_INFO_LEN]
 			}
 
@@ -254,8 +256,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 		}
 	} else {
 		if len(info) > 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Internal error in ax25_u_frame: Info part not allowed for U frame type.\n")
+			logrus.Error("Internal error: ax25_u_frame: info part not allowed for this U frame type")
 		}
 	}
 
@@ -310,23 +311,20 @@ func ax25_s_frame(
 	}
 
 	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_s_frame: Could not set addresses for S frame.\n")
+		logrus.Error("Internal error: ax25_s_frame: could not set addresses")
 
 		return (nil)
 	}
 
 	if modulo != 8 && modulo != 128 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_s_frame: Invalid modulo %d for S frame.\n", modulo)
+		logrus.WithField("modulo", modulo).Error("Internal error: ax25_s_frame: invalid modulo for S frame")
 		modulo = 8
 	}
 
 	this_p.modulo = modulo
 
 	if nr < 0 || nr >= int(modulo) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_s_frame: Invalid N(R) %d for S frame.\n", nr)
+		logrus.WithField("nr", nr).Error("Internal error: ax25_s_frame: invalid N(R) for S frame")
 		nr &= int(modulo - 1)
 	}
 
@@ -334,8 +332,7 @@ func ax25_s_frame(
 	// The underlying X.25 spec clearly says it is response only.  Let's go with that.
 
 	if ftype == frame_type_S_SREJ && cr != cr_res {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_s_frame: SREJ must be response.\n")
+		logrus.Error("Internal error: ax25_s_frame: SREJ must be response")
 	}
 
 	var ctrl int
@@ -350,8 +347,7 @@ func ax25_s_frame(
 	case frame_type_S_SREJ:
 		ctrl = 0x0d
 	default:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_s_frame: Invalid ftype %d for S frame.\n", ftype)
+		logrus.WithField("ftype", ftype).Error("Internal error: ax25_s_frame: invalid frame type for S frame")
 
 		return (nil)
 	}
@@ -377,8 +373,7 @@ func ax25_s_frame(
 	if ftype == frame_type_S_SREJ {
 		if len(info) > 0 {
 			if len(info) > AX25_MAX_INFO_LEN {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Internal error in ax25_s_frame: SREJ frame, Invalid information field length %d.\n", len(info))
+				logrus.WithField("length", len(info)).Error("Internal error: ax25_s_frame: invalid information field length for SREJ frame")
 				info = info[:AX25_MAX_INFO_LEN]
 			}
 
@@ -387,8 +382,7 @@ func ax25_s_frame(
 		}
 	} else {
 		if len(info) > 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Internal error in ax25_s_frame: Info part not allowed for RR, RNR, REJ frame.\n")
+			logrus.Error("Internal error: ax25_s_frame: info part not allowed for RR, RNR, REJ frame")
 		}
 	}
 
@@ -444,29 +438,25 @@ func ax25_i_frame(
 	}
 
 	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_i_frame: Could not set addresses for I frame.\n")
+		logrus.Error("Internal error: ax25_i_frame: could not set addresses")
 
 		return (nil)
 	}
 
 	if modulo != 8 && modulo != 128 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_i_frame: Invalid modulo %d for I frame.\n", modulo)
+		logrus.WithField("modulo", modulo).Error("Internal error: ax25_i_frame: invalid modulo for I frame")
 		modulo = 8
 	}
 
 	this_p.modulo = modulo
 
 	if nr < 0 || nr >= int(modulo) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_i_frame: Invalid N(R) %d for I frame.\n", nr)
+		logrus.WithField("nr", nr).Error("Internal error: ax25_i_frame: invalid N(R) for I frame")
 		nr &= int(modulo - 1)
 	}
 
 	if ns < 0 || ns >= int(modulo) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error in ax25_i_frame: Invalid N(S) %d for I frame.\n", ns)
+		logrus.WithField("ns", ns).Error("Internal error: ax25_i_frame: invalid N(S) for I frame")
 		ns &= int(modulo - 1)
 	}
 
@@ -497,8 +487,7 @@ func ax25_i_frame(
 	// or 0xff (which means more bytes follow).
 
 	if pid < 0 || pid == 0 || pid == 0xff {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Warning: Client application provided invalid PID value, 0x%02x, for I frame.\n", pid)
+		logrus.WithField("pid", fmt.Sprintf("0x%02x", pid)).Warn("Client application provided invalid PID for I frame")
 		pid = AX25_PID_NO_LAYER_3
 	}
 
@@ -507,8 +496,7 @@ func ax25_i_frame(
 
 	if len(info) > 0 {
 		if len(info) > AX25_MAX_INFO_LEN {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Internal error in ax25_i_frame: I frame, Invalid information field length %d.\n", len(info))
+			logrus.WithField("length", len(info)).Error("Internal error: ax25_i_frame: invalid information field length for I frame")
 			info = info[:AX25_MAX_INFO_LEN]
 		}
 
@@ -548,8 +536,7 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdr
 	Assert(cr == cr_cmd || cr == cr_res)
 
 	if num_addr < AX25_MIN_ADDRS || num_addr > AX25_MAX_ADDRS {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("INTERNAL ERROR: set_addrs, num_addr = %d\n", num_addr)
+		logrus.WithField("num_addr", num_addr).Error("Internal error: set_addrs: bad number of addresses")
 
 		return (0)
 	}
