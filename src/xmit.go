@@ -898,7 +898,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 		dw_printf("\n")
 	}
 
-	pp.CheckAddresses(AddrStrict)
+	pp.CheckAddresses(ax25.AddrStrict)
 
 	/* Optional hex dump of packet. */
 

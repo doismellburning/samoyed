@@ -385,7 +385,7 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 	addrs[OWNCALL] = "Q1TEST"
 	addrs[PEERCALL] = "Q2TEST"
 
-	var pp = ax25.FromTextWithStrictness("Q2TEST>Q1TEST:>Testing", AddrLenient)
+	var pp = ax25.FromTextWithStrictness("Q2TEST>Q1TEST:>Testing", ax25.AddrLenient)
 	require.NotNil(t, pp)
 
 	var alevel ALevel

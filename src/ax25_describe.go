@@ -97,7 +97,7 @@ func DescribeAX25Frame(frame []byte) int {
 
 	fmt.Printf("%s\n", pp.FormatAddrs())
 
-	if !pp.CheckAddresses(AddrStrict) {
+	if !pp.CheckAddresses(ax25.AddrStrict) {
 		problems++
 	}
 

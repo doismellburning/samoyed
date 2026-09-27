@@ -22,10 +22,3 @@ type ax25_modulo_t = ax25.Modulo
 type ax25_frame_type_t = ax25.FrameType
 type ALevel = ax25.ALevel
 type AddrStrictness = ax25.AddrStrictness
-
-const (
-	AddrLenient                = ax25.AddrLenient
-	AddrStrict                 = ax25.AddrStrict
-	AddrStrictNoStar           = ax25.AddrStrictNoStar
-	AddrStrictLowerCaseWarning = ax25.AddrStrictLowerCaseWarning
-)
