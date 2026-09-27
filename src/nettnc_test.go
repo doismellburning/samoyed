@@ -86,6 +86,10 @@ func attachTestNetTNC(ctx context.Context, t *testing.T) (*NetTNC, net.Conn, <-c
 	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port)
 	require.NoError(t, err)
 
+	// Reattaching after the TNC goes away waits between attempts; not the
+	// real five seconds, though, which would make that test the slowest here.
+	nt.reattachDelay = 10 * time.Millisecond
+
 	nt.Start(ctx)
 
 	return nt, nextTestNetTNCConn(t, conns), conns
@@ -243,8 +247,6 @@ func TestNetTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
 
 	require.NoError(t, tnc.Close())
 
-	// Reattaching waits five seconds between attempts, so this is the slow
-	// one.
 	var reattached = nextTestNetTNCConn(t, conns)
 
 	var pp = newTestPacket(t)

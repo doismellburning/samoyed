@@ -678,6 +678,11 @@ func TestRunKISSServerGivesUpOnPersistentAcceptFailure(t *testing.T) {
 	var ln = new(failingListener)
 	var b = NewAXUDPBridge(nil, nil)
 
+	// The real back-off adds up to a couple of seconds over the attempts;
+	// how many attempts there are is the point here, not how long they take.
+	b.acceptBackoff = time.Millisecond
+	b.maxAcceptBackoff = time.Millisecond
+
 	var errs = make(chan error, 1)
 	go func() { errs <- b.RunKISSServer(t.Context(), ln) }()
 

@@ -150,10 +150,16 @@ import (
 	"net"
 	"slices"
 	"sync/atomic"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
+
+// kissnetPollInterval is how often a KissNetService checks again for a client
+// to attach, or for a client slot to come free, unless it is told otherwise
+// before it is started.
+const kissnetPollInterval = time.Second
 
 // KissNetService manages KISS protocol TCP socket connections.
 // Each TCP port has its own status block in a linked list.
@@ -161,7 +167,8 @@ type KissNetService struct {
 	miscConfigP  *misc_config_s
 	audioConfigP *AudioConfig // Which channels a client may transmit on.
 	allPorts     *kissport_status_s
-	debug        int /* Print information flowing from and to client. */
+	debug        int           /* Print information flowing from and to client. */
+	pollInterval time.Duration // For a client to attach, or a slot to come free.
 	started      atomic.Bool
 }
 
@@ -192,6 +199,7 @@ func NewKissNetService(mc *misc_config_s, audioConfig *AudioConfig, debug int) *
 	kns.miscConfigP = mc
 	kns.audioConfigP = audioConfig
 	kns.debug = debug
+	kns.pollInterval = kissnetPollInterval
 
 	for i := range MAX_KISS_TCP_PORTS {
 		if mc.kiss_port[i] != 0 {
@@ -459,7 +467,7 @@ func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, clie
 	for ctx.Err() == nil {
 		var conn, frame = kps.connAndFrame(client)
 		for conn == nil {
-			if !sleepSecCtx(ctx, 1) { /* Not connected.  Try again later. */
+			if !sleepCtx(ctx, kns.pollInterval) { /* Not connected.  Try again later. */
 				return 0, nil, false
 			}
 
@@ -653,7 +661,7 @@ func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kisspor
 				"client":   client,
 				"channel":  kps.channel,
 			}).Info("Attached to KISS TCP client application")
-		} else if !sleepSecCtx(ctx, 1) { /* wait then check again if more clients allowed. */
+		} else if !sleepCtx(ctx, kns.pollInterval) { /* wait then check again if more clients allowed. */
 			return
 		}
 	}
