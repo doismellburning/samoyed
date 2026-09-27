@@ -80,9 +80,23 @@ func recordingSendfun() (*[]sentToClient, kiss_sendfun) {
 	}
 }
 
-// setupKissProcessMsg gives kiss_process_msg the things it reaches for: the
-// channel table it checks a transmit request against, the transmit settings it
+// kissTestAudioConfig is the channel table the KISS tests hand to
+// kiss_process_msg, or to the transport that calls it, to check a transmit
+// request against: channels 0 and 1 are radios, and nothing else is set up.
+func kissTestAudioConfig() *audio_s {
+	var audioConfig = new(audio_s)
+	audioConfig.chan_medium[0] = MEDIUM_RADIO
+	audioConfig.chan_medium[1] = MEDIUM_RADIO
+
+	return audioConfig
+}
+
+// setupKissProcessMsg gives kiss_process_msg the things it reaches for besides
+// the channel table, which each call is handed: the transmit settings it
 // applies parameters to, and the service that copies frames between clients.
+//
+// save_audio_config_p is cleared for the duration, so that a test passes only
+// if the channel check reads the table it was given.
 func setupKissProcessMsg(t *testing.T) *XmitService {
 	t.Helper()
 
@@ -99,14 +113,12 @@ func setupKissProcessMsg(t *testing.T) *XmitService {
 		}
 	})
 
-	var audioConfig = new(audio_s)
-	audioConfig.chan_medium[0] = MEDIUM_RADIO
-	audioConfig.chan_medium[1] = MEDIUM_RADIO
+	var audioConfig = kissTestAudioConfig()
 
-	kiss_frame_init(audioConfig)
+	save_audio_config_p = nil
 
 	xmitSvc = new(XmitService)
-	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s))
+	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s), audioConfig)
 
 	transmitQueue.Init(audioConfig)
 
@@ -124,7 +136,7 @@ func Test_kiss_process_msg_data_frame(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), 0, nil, -1, sendfun)
+	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), kissTestAudioConfig(), 0, nil, -1, sendfun)
 
 	assert.Equal(t, 1, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
 	assert.Equal(t, 0, transmitQueue.Count(0, TQ_PRIO_0_HI, "", "", false))
@@ -140,7 +152,7 @@ func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>Q2TEST,Q3TEST*:hello", true)
 	require.NotNil(t, pp)
 
-	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), 0, nil, -1, sendfun)
+	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), kissTestAudioConfig(), 0, nil, -1, sendfun)
 
 	assert.Equal(t, 1, transmitQueue.Count(0, TQ_PRIO_0_HI, "", "", false))
 }
@@ -157,7 +169,7 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg(append([]byte{0x80 | KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), 0, nil, -1, sendfun)
+		kiss_process_msg(append([]byte{0x80 | KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), kissTestAudioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, "Invalid transmit channel 8 from KISS client app")
@@ -178,7 +190,7 @@ func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), 0, kps, 0, sendfun)
+	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), kissTestAudioConfig(), 0, kps, 0, sendfun)
 
 	assert.Equal(t, 1, transmitQueue.Count(1, TQ_PRIO_1_LO, "", "", false), "the port's channel should have been used")
 	assert.Equal(t, 0, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
@@ -203,7 +215,7 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 
 	assert.NotPanics(t, func() {
 		output = testutils.CaptureOutput(t, func() {
-			kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), 0, kps, 0, sendfun)
+			kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), kissTestAudioConfig(), 0, kps, 0, sendfun)
 		})
 	})
 
@@ -218,7 +230,7 @@ func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 	var _, sendfun = recordingSendfun()
 
 	var output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg([]byte{KISS_CMD_DATA_FRAME, 'n', 'o'}, 0, nil, -1, sendfun)
+		kiss_process_msg([]byte{KISS_CMD_DATA_FRAME, 'n', 'o'}, kissTestAudioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, "Invalid KISS data frame from client app")
@@ -231,11 +243,11 @@ func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 
 	var _, sendfun = recordingSendfun()
 
-	kiss_process_msg([]byte{KISS_CMD_TXDELAY, 30}, 0, nil, -1, sendfun)
-	kiss_process_msg([]byte{KISS_CMD_PERSISTENCE, 63}, 0, nil, -1, sendfun)
-	kiss_process_msg([]byte{KISS_CMD_SLOTTIME, 10}, 0, nil, -1, sendfun)
-	kiss_process_msg([]byte{KISS_CMD_TXTAIL, 10}, 0, nil, -1, sendfun)
-	kiss_process_msg([]byte{KISS_CMD_FULLDUPLEX, 1}, 0, nil, -1, sendfun)
+	kiss_process_msg([]byte{KISS_CMD_TXDELAY, 30}, kissTestAudioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg([]byte{KISS_CMD_PERSISTENCE, 63}, kissTestAudioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg([]byte{KISS_CMD_SLOTTIME, 10}, kissTestAudioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg([]byte{KISS_CMD_TXTAIL, 10}, kissTestAudioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg([]byte{KISS_CMD_FULLDUPLEX, 1}, kissTestAudioConfig(), 0, nil, -1, sendfun)
 
 	assert.Equal(t, 30, xs.txdelay[0])
 	assert.Equal(t, 63, xs.persist[0])
@@ -261,7 +273,7 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 		{"TXTAIL", []byte{KISS_CMD_TXTAIL, 1}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() { kiss_process_msg(c.msg, 0, nil, -1, sendfun) })
+			var output = testutils.CaptureOutput(t, func() { kiss_process_msg(c.msg, kissTestAudioConfig(), 0, nil, -1, sendfun) })
 
 			assert.Contains(t, output, "Radio Channel - Transmit Timing")
 		})
@@ -290,7 +302,7 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 		{"SET HARDWARE", KISS_CMD_SET_HARDWARE},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() { kiss_process_msg([]byte{c.cmd}, 0, nil, -1, sendfun) })
+			var output = testutils.CaptureOutput(t, func() { kiss_process_msg([]byte{c.cmd}, kissTestAudioConfig(), 0, nil, -1, sendfun) })
 
 			assert.Contains(t, output, "KISS ERROR")
 		})
@@ -307,7 +319,7 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 	var _, sendfun = recordingSendfun()
 
 	var output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg([]byte{KISS_CMD_END_KISS}, 0, nil, -1, sendfun)
+		kiss_process_msg([]byte{KISS_CMD_END_KISS}, kissTestAudioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, "end KISS mode - Ignored")
@@ -322,7 +334,7 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	var _, sendfun = recordingSendfun()
 
 	var output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg([]byte{7}, 0, nil, -1, sendfun)
+		kiss_process_msg([]byte{7}, kissTestAudioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, "KISS Invalid command 7")
@@ -330,14 +342,14 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	assert.NotContains(t, output, "XKISS")
 
 	output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg([]byte{XKISS_CMD_DATA}, 0, nil, -1, sendfun)
+		kiss_process_msg([]byte{XKISS_CMD_DATA}, kissTestAudioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
 	assert.Contains(t, output, "Winlink Express")
 
 	output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg([]byte{XKISS_CMD_POLL}, 0, nil, -1, sendfun)
+		kiss_process_msg([]byte{XKISS_CMD_POLL}, kissTestAudioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
@@ -351,7 +363,7 @@ func Test_kiss_set_hardware_tnc_version(t *testing.T) {
 
 	var sent, sendfun = recordingSendfun()
 
-	kiss_process_msg(append([]byte{KISS_CMD_SET_HARDWARE}, []byte("TNC:")...), 0, nil, -1, sendfun)
+	kiss_process_msg(append([]byte{KISS_CMD_SET_HARDWARE}, []byte("TNC:")...), kissTestAudioConfig(), 0, nil, -1, sendfun)
 
 	require.Len(t, *sent, 1)
 	assert.Equal(t, KISS_CMD_SET_HARDWARE, (*sent)[0].cmd)
@@ -419,8 +431,10 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 func feedKissBytes(kf *KISSFrame, debug int, data []byte) *[]sentToClient {
 	var sent, sendfun = recordingSendfun()
 
+	var audioConfig = kissTestAudioConfig()
+
 	for _, b := range data {
-		KissRecByte(kf, b, debug, nil, -1, sendfun)
+		KissRecByte(kf, audioConfig, b, debug, nil, -1, sendfun)
 	}
 
 	return sent
@@ -615,7 +629,7 @@ func Test_KissRecByte_noise_without_sendfun(t *testing.T) {
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range data {
-			KissRecByte(kf, b, 1, nil, -1, nil)
+			KissRecByte(kf, nil, b, 1, nil, -1, nil)
 		}
 	})
 

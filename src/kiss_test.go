@@ -73,7 +73,7 @@ func rawTerminal(t *testing.T, f *os.File) {
 func startKissPTListener(ctx context.Context, t *testing.T, debug int) (*KissPT, *os.File, <-chan struct{}) {
 	t.Helper()
 
-	var kp = newKissPT(debug)
+	var kp = newKissPT(kissTestAudioConfig(), debug)
 
 	kp.openPT()
 
@@ -211,7 +211,7 @@ func readKissText(t *testing.T, client *os.File, want int) string {
 // A TNC nobody asked for should not be there: without -p there is no pseudo
 // terminal, and nothing for the sending path to write to.
 func TestKissPTNotEnabled(t *testing.T) {
-	var kp = NewKissPT(t.Context(), new(misc_config_s), 0)
+	var kp = NewKissPT(t.Context(), new(misc_config_s), nil, 0)
 
 	assert.Nil(t, kp.ptMaster(), "a pseudo terminal was opened although KISS pt was not enabled")
 	assert.NotNil(t, kp.kf, "the frame decoder state should be ready even with no terminal")
@@ -316,17 +316,15 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 	const channel = 0
 
-	var audioConfig = new(audio_s)
-	audioConfig.chan_medium[channel] = MEDIUM_RADIO
+	// Laid out like the channel table startKissPT gives the TNC.
+	var audioConfig = kissTestAudioConfig()
 
-	var origAudioConfig, origXmitSvc, origKissNetSvc = save_audio_config_p, xmitSvc, kissNetSvc
+	var origXmitSvc, origKissNetSvc = xmitSvc, kissNetSvc
 
-	t.Cleanup(func() { save_audio_config_p, xmitSvc, kissNetSvc = origAudioConfig, origXmitSvc, origKissNetSvc })
-
-	kiss_frame_init(audioConfig)
+	t.Cleanup(func() { xmitSvc, kissNetSvc = origXmitSvc, origKissNetSvc })
 
 	xmitSvc = new(XmitService)
-	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s))
+	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s), audioConfig)
 
 	transmitQueue.Init(audioConfig)
 
@@ -413,7 +411,7 @@ func TestKissPTStopsWhenCancelled(t *testing.T) {
 // goroutine has it registered twice over - so it has to cope with the terminal
 // already being gone.
 func TestKissPTCloseTwice(t *testing.T) {
-	var kp = newKissPT(0)
+	var kp = newKissPT(nil, 0)
 
 	t.Cleanup(kp.closePT)
 

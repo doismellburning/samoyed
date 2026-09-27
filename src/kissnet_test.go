@@ -103,7 +103,7 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	mc.kiss_port[0] = port
 	mc.kiss_chan[0] = channel
 
-	return NewKissNetService(t.Context(), mc), port
+	return NewKissNetService(t.Context(), mc, kissTestAudioConfig()), port
 }
 
 // dialKissNet attaches a client application to a running service, and hands
@@ -436,16 +436,11 @@ func TestKissNetListenFails(t *testing.T) {
 func setupKissNetTNC(t *testing.T) {
 	t.Helper()
 
-	var origAudio, origXmit, origKissNet = save_audio_config_p, xmitSvc, kissNetSvc
+	var origXmit, origKissNet = xmitSvc, kissNetSvc
 
 	t.Cleanup(func() {
-		save_audio_config_p, xmitSvc, kissNetSvc = origAudio, origXmit, origKissNet
+		xmitSvc, kissNetSvc = origXmit, origKissNet
 	})
-
-	var audioConfig = new(audio_s)
-	audioConfig.chan_medium[0] = MEDIUM_RADIO
-
-	kiss_frame_init(audioConfig)
 
 	xmitSvc = new(XmitService)
 }
@@ -471,6 +466,42 @@ func TestKissNetClientCommandIsAnswered(t *testing.T) {
 
 	assert.Equal(t, byte(KISS_CMD_SET_HARDWARE), unwrapped[0]&0xf)
 	assert.Contains(t, string(unwrapped[1:]), "DIREWOLF ")
+}
+
+// A client's data frame is checked against the channel table the service was
+// built with.  Here the port carries a channel that table does not have, so
+// the frame is turned away - before it gets near the transmit queue, which
+// setupKissNetTNC leaves alone - and the client is still answered afterwards.
+// A service that lost its table on the way to the check would panic in the
+// listening goroutine instead, and take the test binary down with it.
+func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
+	setupKissNetTNC(t)
+
+	const unconfigured = 5
+
+	var kns, port = startKissNet(t, unconfigured)
+
+	kissNetSvc = kns
+
+	require.Equal(t, MEDIUM_NONE, kns.audioConfigP.chan_medium[unconfigured])
+
+	var conn, _ = dialKissNet(t, kns, port)
+
+	var pp = newTestPacket(t)
+
+	// Channel 0 in the frame, which the port's own channel overrides.
+	var _, writeErr = conn.Write(KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...)))
+	require.NoError(t, writeErr)
+
+	// The client's bytes are handled in order, so an answer to this means the
+	// data frame before it has been dealt with.
+	_, writeErr = conn.Write(KissEncapsulate(append([]byte{KISS_CMD_SET_HARDWARE}, []byte("TNC:")...)))
+	require.NoError(t, writeErr)
+
+	var unwrapped = kiss_unwrap(readKissNetFrame(t, conn))
+	require.NotEmpty(t, unwrapped)
+
+	assert.Equal(t, byte(KISS_CMD_SET_HARDWARE), unwrapped[0]&0xf)
 }
 
 // An application that thinks it is driving an old command-mode TNC is

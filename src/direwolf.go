@@ -663,7 +663,7 @@ x = Silence FX.25 information.`)
 	 */
 	agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
 	metrics_init(ctx, misc_config)
-	kissNetSvc = NewKissNetService(ctx, misc_config)
+	kissNetSvc = NewKissNetService(ctx, misc_config, audio_config)
 	kissNetSvc.SetDebug(d_n_opt)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
@@ -677,9 +677,8 @@ x = Silence FX.25 information.`)
 	/*
 	 * Create a pseudo terminal and KISS TNC emulator.
 	 */
-	kissPT = NewKissPT(ctx, misc_config, d_k_opt)
-	kissSerial = NewKissSerial(ctx, misc_config, d_k_opt)
-	kiss_frame_init(audio_config)
+	kissPT = NewKissPT(ctx, misc_config, audio_config, d_k_opt)
+	kissSerial = NewKissSerial(ctx, misc_config, audio_config, d_k_opt)
 	stopIfCancelled(ctx)
 
 	/*
