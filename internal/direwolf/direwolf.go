@@ -663,7 +663,7 @@ x = Silence FX.25 information.`)
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
 	agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
-	metrics_init(ctx, misc_config)
+	metrics_init(ctx, audio_config, misc_config)
 	kissNetSvc = NewKissNetService(misc_config, audio_config, d_n_opt)
 	kissNetSvc.Start(ctx)
 

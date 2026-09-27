@@ -137,3 +137,28 @@ func TestRecordRadioFrameCountsFECFrameWithPassallCorrectionCount(t *testing.T) 
 	assert.InDelta(t, correctedBefore+float64(corrected), metricValue(t, "samoyed_corrected_symbols_total", correctedLabels), 0,
 		"and its corrected symbols are still counted")
 }
+
+// TestIsRadioChannelReadsTheConfigItIsHanded checks that isRadioChannel answers
+// from the configuration it is given, with the shared save_audio_config_p set
+// to say the opposite, so that metrics_init needs nothing from audio_open.
+func TestIsRadioChannelReadsTheConfigItIsHanded(t *testing.T) {
+	var origAudio = save_audio_config_p
+
+	t.Cleanup(func() { save_audio_config_p = origAudio })
+
+	var audio = new(AudioConfig)
+	audio.chan_medium[0] = MEDIUM_RADIO
+	audio.chan_medium[1] = MEDIUM_NETTNC
+
+	var elsewhere = new(AudioConfig)
+	elsewhere.chan_medium[1] = MEDIUM_RADIO
+	elsewhere.chan_medium[2] = MEDIUM_RADIO
+	save_audio_config_p = elsewhere
+
+	assert.True(t, isRadioChannel(audio, 0))
+	assert.False(t, isRadioChannel(audio, 1), "a network TNC is not a radio channel")
+	assert.False(t, isRadioChannel(audio, 2), "nor is one never configured")
+	assert.False(t, isRadioChannel(audio, -1))
+	assert.False(t, isRadioChannel(audio, MAX_RADIO_CHANS))
+	assert.False(t, isRadioChannel(nil, 0), "a nil config has no radio channels")
+}
