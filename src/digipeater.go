@@ -574,7 +574,7 @@ func (d *Digipeater) match(
 
 				// Insert own call at beginning and mark it used.
 
-				ax25_insert_addr(result, AX25_REPEATER_1, mycall_xmit)
+				result.InsertAddr(AX25_REPEATER_1, mycall_xmit)
 				ax25_set_h(result, AX25_REPEATER_1)
 
 				return (result)
@@ -606,7 +606,7 @@ func (d *Digipeater) match(
 			ax25_set_ssid(result, r, ssid-1) // should be at least 1
 
 			if ax25_get_num_repeaters(pp) < AX25_MAX_REPEATERS {
-				ax25_insert_addr(result, r, mycall_xmit)
+				result.InsertAddr(r, mycall_xmit)
 				ax25_set_h(result, r)
 			}
 
