@@ -825,7 +825,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 	// The HEARD line.
 
-	if !q_h_opt && alevel.rec >= 0 { /* suppress if "-q h" option */
+	if !q_h_opt && alevel.Rec >= 0 { /* suppress if "-q h" option */
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		if channel != audio_config.igate_vchannel { // suppress if from ICHANNEL
 			var logEntry = logrus.WithField("heard", heard)
@@ -886,14 +886,14 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	// TODO:  suppress this message if not using soundcard input.
 	// i.e. we have no control over the situation when using SDR.
 
-	if alevel.rec > 110 {
-		logrus.WithField("alevel", alevel.rec).
+	if alevel.Rec > 110 {
+		logrus.WithField("alevel", alevel.Rec).
 			Warn("Audio input level is too high. This may cause distortion and reduced decode performance. " +
 				"Solution is to decrease the audio input level. " +
 				"Setting audio input level so most stations are around 50 will provide good dynamic range.")
-	} else if alevel.rec < 5 && channel != audio_config.igate_vchannel && subchan != -3 {
+	} else if alevel.Rec < 5 && channel != audio_config.igate_vchannel && subchan != -3 {
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
-		logrus.WithField("alevel", alevel.rec).Warn("Audio input level is too low.  Increase so most stations are around 50.")
+		logrus.WithField("alevel", alevel.Rec).Warn("Audio input level is too low.  Increase so most stations are around 50.")
 	}
 
 	// Display non-APRS packets in a different color.

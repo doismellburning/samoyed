@@ -32,6 +32,7 @@ import (
 	"os"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	direwolf "github.com/doismellburning/samoyed/src"
 )
 
@@ -79,7 +80,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if mon_cmd.DataLen > direwolf.AX25_MAX_PACKET_LEN {
+		if mon_cmd.DataLen > ax25.MaxPacketLen {
 			fmt.Printf("Got invalid data length %d from server.\n", mon_cmd.DataLen)
 			os.Exit(1)
 		}
@@ -109,8 +110,8 @@ func main() {
 				continue
 			}
 
-			var alevel direwolf.ALevel
-			var pp = direwolf.AX25FromFrame(data[1:], alevel)
+			var alevel ax25.ALevel
+			var pp = ax25.FromFrame(data[1:], alevel)
 
 			if pp == nil {
 				fmt.Printf("[%d] Invalid AX.25 frame from server.\n", channel)
@@ -118,9 +119,9 @@ func main() {
 				continue
 			}
 
-			var result = direwolf.AX25FormatAddrs(pp)
+			var result = pp.FormatAddrs()
 
-			var pinfo = direwolf.AX25GetInfo(pp)
+			var pinfo = pp.Info()
 
 			fmt.Printf("[%d] %s%s\n", channel, result, string(pinfo))
 
@@ -144,7 +145,7 @@ func main() {
 				 * Notice that the special destination will cause it to be spoken.
 				 */
 				var reply_text = fmt.Sprintf("N0CALL>SPEECH:%d", n)
-				var reply_pp = direwolf.AX25FromText(reply_text, true)
+				var reply_pp = ax25.FromText(reply_text, true)
 
 				/*
 				 * Send it to the TNC.
@@ -156,7 +157,7 @@ func main() {
 				hdr.Portx = channel
 				hdr.DataKind = 'K'
 
-				var reply_bytes = direwolf.AX25Pack(reply_pp)
+				var reply_bytes = reply_pp.Pack()
 				hdr.DataLen = 1 + uint32(len(reply_bytes))
 
 				var replyWriteErr = binary.Write(server_sock, binary.LittleEndian, hdr)

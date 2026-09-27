@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +48,7 @@ func dumpCaptureOutput(t *testing.T, capture []byte, hexInput bool) (string, int
 func testCapture(t *testing.T, monitor string) []byte {
 	t.Helper()
 
-	return direwolf.KissEncapsulate(append([]byte{0x00}, direwolf.AX25Pack(direwolf.MustAX25FromText(monitor))...))
+	return direwolf.KissEncapsulate(append([]byte{0x00}, ax25.MustFromText(monitor).Pack()...))
 }
 
 func Test_APRS(t *testing.T) {
@@ -64,7 +65,7 @@ func Test_APRS(t *testing.T) {
 
 // The channel is in the upper nybble of the command byte.
 func Test_Port(t *testing.T) {
-	var frame = direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>APDW17:>Testing"))
+	var frame = ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()
 
 	var output, problems = dumpCaptureOutput(t, direwolf.KissEncapsulate(append([]byte{0x30}, frame...)), false)
 
@@ -74,7 +75,7 @@ func Test_Port(t *testing.T) {
 
 // Escaped bytes should come back as the bytes they stand for.
 func Test_Escapes(t *testing.T) {
-	var frame = direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>APDW17:>FEND <0xc0> and FESC <0xdb>"))
+	var frame = ax25.MustFromText("Q1TEST>APDW17:>FEND <0xc0> and FESC <0xdb>").Pack()
 
 	var capture = direwolf.KissEncapsulate(append([]byte{0x00}, frame...))
 
@@ -146,9 +147,9 @@ func Test_NoCommandByte(t *testing.T) {
 
 // The end of address bit has to mark out whole 7 byte addresses.
 func Test_MalformedAddresses(t *testing.T) {
-	var frame = direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>APDW17:>Testing"))
+	var frame = ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()
 
-	frame[13] &= ^byte(direwolf.SSID_LAST_MASK) // Clear the end of address bit.
+	frame[13] &= ^byte(ax25.SSIDLastMask) // Clear the end of address bit.
 
 	var output, problems = dumpCaptureOutput(t, direwolf.KissEncapsulate(append([]byte{0x00}, frame...)), false)
 
@@ -160,7 +161,7 @@ func Test_MalformedAddresses(t *testing.T) {
 // nothing should be said about one: the octets a control and PID would have
 // been are past the end of the frame.
 func Test_NoControlByte(t *testing.T) {
-	var frame = direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>Q2TEST,Q3TEST:>Testing"))
+	var frame = ax25.MustFromText("Q1TEST>Q2TEST,Q3TEST:>Testing").Pack()
 
 	var addressesOnly = frame[:21] // Three addresses of 7 bytes, and nothing else.
 
@@ -175,18 +176,18 @@ func Test_NoControlByte(t *testing.T) {
 // AX25SafePrint stops after MAXSAFE bytes, which has to be said out loud.
 func Test_SetHardwareTruncated(t *testing.T) {
 	var capture = []byte{direwolf.FEND, direwolf.KISS_CMD_SET_HARDWARE}
-	capture = append(capture, bytes.Repeat([]byte("x"), direwolf.MAXSAFE+100)...)
+	capture = append(capture, bytes.Repeat([]byte("x"), ax25.MaxSafe+100)...)
 	capture = append(capture, direwolf.FEND)
 
 	var output, problems = dumpCaptureOutput(t, capture, false)
 
 	assert.Equal(t, 0, problems)
-	assert.Contains(t, output, fmt.Sprintf("(Only the first %d of %d bytes are shown above.)", direwolf.MAXSAFE, direwolf.MAXSAFE+100))
+	assert.Contains(t, output, fmt.Sprintf("(Only the first %d of %d bytes are shown above.)", ax25.MaxSafe, ax25.MaxSafe+100))
 }
 
 // A UI frame whose PID octet was lost ends before the information field.
 func Test_NoPID(t *testing.T) {
-	var frame = direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>APDW17:>Testing"))
+	var frame = ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()
 
 	var output, problems = dumpCaptureOutput(t, direwolf.KissEncapsulate(append([]byte{0x00}, frame[:15]...)), false)
 
@@ -196,7 +197,7 @@ func Test_NoPID(t *testing.T) {
 
 // Connected mode frames are AX.25 but not APRS.
 func Test_NotAPRS(t *testing.T) {
-	var frame = direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>Q2TEST:>Testing"))
+	var frame = ax25.MustFromText("Q1TEST>Q2TEST:>Testing").Pack()
 
 	var sabm = append(frame[:14:14], 0x3f) // Addresses, then SABM with P=1.
 
@@ -210,7 +211,7 @@ func Test_NotAPRS(t *testing.T) {
 // A UI frame with a PID other than 0xf0 is not APRS either, and the control
 // byte is not the thing to blame for it.
 func Test_NotAPRSByPID(t *testing.T) {
-	var frame = direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>Q2TEST:>Testing"))
+	var frame = ax25.MustFromText("Q1TEST>Q2TEST:>Testing").Pack()
 
 	frame[15] = 0xcf // NET/ROM rather than no layer 3 protocol.
 

@@ -51,9 +51,9 @@ func digipeater_test(t *testing.T, in, out string) {
 	var frame = AX25Pack(pp)
 
 	var alevel ALevel
-	alevel.rec = 50
-	alevel.mark = 50
-	alevel.space = 50
+	alevel.Rec = 50
+	alevel.Mark = 50
+	alevel.Space = 50
 
 	pp = AX25FromFrame(frame, alevel)
 	assert.NotNil(t, pp)

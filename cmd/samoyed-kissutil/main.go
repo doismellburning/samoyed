@@ -29,6 +29,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/lestrrat-go/strftime"
@@ -305,9 +306,9 @@ func process_input(stuff string) {
 	 */
 	if unicode.IsUpper(rune(stuff[0])) || unicode.IsNumber(rune(stuff[0])) {
 		// Parse the "TNC2 monitor format" and convert to AX.25 frame.
-		var pp = direwolf.AX25FromText(stuff, true)
+		var pp = ax25.FromText(stuff, true)
 		if pp != nil {
-			var frame_data = direwolf.AX25Pack(pp)
+			var frame_data = pp.Pack()
 			send_to_kiss_tnc(channel, direwolf.KISS_CMD_DATA_FRAME, frame_data)
 		} else {
 			fmt.Printf("ERROR! Could not convert to AX.25 frame: %s\n", stuff)
@@ -368,9 +369,9 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 		cmd = 0
 	}
 
-	if len(data) > direwolf.AX25_MAX_PACKET_LEN-1 {
-		fmt.Printf("ERROR - Invalid data length %d - must be in range 0 to %d.\n", len(data), direwolf.AX25_MAX_PACKET_LEN-1)
-		data = data[:direwolf.AX25_MAX_PACKET_LEN-1]
+	if len(data) > ax25.MaxPacketLen-1 {
+		fmt.Printf("ERROR - Invalid data length %d - must be in range 0 to %d.\n", len(data), ax25.MaxPacketLen-1)
+		data = data[:ax25.MaxPacketLen-1]
 	}
 
 	var temp = []byte{byte((channel << 4) | cmd)}
@@ -544,14 +545,14 @@ func tnc_listen_serial(fd *term.Term) {
  *-----------------------------------------------------------------*/
 
 func kissutil_kiss_process_msg(kiss_msg []byte) {
-	var alevel direwolf.ALevel
+	var alevel ax25.ALevel
 
 	var channel = (kiss_msg[0] >> 4) & 0xf
 	var cmd = kiss_msg[0] & 0xf
 
 	switch cmd {
 	case direwolf.KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
-		var pp = direwolf.AX25FromFrame(kiss_msg[1:], alevel)
+		var pp = ax25.FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {
 			fmt.Printf("ERROR - Invalid KISS data frame from TNC.\n")
 		} else {
@@ -566,16 +567,16 @@ func kissutil_kiss_process_msg(kiss_msg []byte) {
 			}
 
 			// Like source>dest,digi,...,digi:
-			var addrs = direwolf.AX25FormatAddrs(pp)
+			var addrs = pp.FormatAddrs()
 
-			var pinfo = direwolf.AX25GetInfo(pp)
+			var pinfo = pp.Info()
 
 			fmt.Printf("%s %s", prefix, addrs) // [channel] Addresses followed by :
 
 			// Safe print will replace any unprintable characters with
 			// hexadecimal representation.
 
-			direwolf.AX25SafePrint(pinfo, false)
+			ax25.SafePrint(pinfo, false)
 			fmt.Printf("\n")
 
 			/*

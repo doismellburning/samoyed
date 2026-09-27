@@ -36,6 +36,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	direwolf "github.com/doismellburning/samoyed/src"
 )
 
@@ -230,7 +231,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 			os.Exit(1)
 		}
 
-		if mon_cmd.DataLen > direwolf.AX25_MAX_PACKET_LEN {
+		if mon_cmd.DataLen > ax25.MaxPacketLen {
 			fmt.Printf("Client %d got invalid data length %d from %s.\n", my_index, mon_cmd.DataLen, description)
 			os.Exit(1)
 		}
@@ -255,16 +256,16 @@ func client_thread_net(my_index int, hostname string, port string, description s
 		if mon_cmd.DataKind == 'K' && mon_cmd.DataLen > 0 && (use_chan == -1 || byte(use_chan) == mon_cmd.Portx) {
 			// printf ("server %d, portx = %d\n", my_index, mon_cmd.portx);
 			use_chan = int(mon_cmd.Portx)
-			var alevel direwolf.ALevel
-			var pp = direwolf.AX25FromFrame(data[1:mon_cmd.DataLen], alevel)
+			var alevel ax25.ALevel
+			var pp = ax25.FromFrame(data[1:mon_cmd.DataLen], alevel)
 			if pp == nil {
 				fmt.Printf("Client %d got invalid AX.25 frame from %s.\n", my_index, description)
 
 				continue
 			}
 
-			var result = direwolf.AX25FormatAddrs(pp)
-			var info = direwolf.AX25GetInfo(pp)
+			var result = pp.FormatAddrs()
+			var info = pp.Info()
 
 			var fullResult = result + string(info)
 			packetChan <- fullResult

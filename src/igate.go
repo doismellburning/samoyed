@@ -1082,8 +1082,8 @@ func (ig *IGate) recvThread(ctx context.Context) {
 				var pp3 = AX25FromText(string(stemp), false)
 				if pp3 != nil {
 					var alevel ALevel
-					alevel.mark = -2 // FIXME: Do we want some other special case?
-					alevel.space = -2
+					alevel.Mark = -2 // FIXME: Do we want some other special case?
+					alevel.Space = -2
 
 					var subchan = -2 // FIXME: -1 is special case for APRStt.
 					// See what happens with -2 and follow up on this.

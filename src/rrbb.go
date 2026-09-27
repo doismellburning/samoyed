@@ -98,9 +98,9 @@ func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state int, prev_descram in
 
 	b.nextp = nil
 
-	b.alevel.rec = 9999 // TODO: was there some reason for this instead of 0 or -1?
-	b.alevel.mark = 9999
-	b.alevel.space = 9999
+	b.alevel.Rec = 9999 // TODO: was there some reason for this instead of 0 or -1?
+	b.alevel.Mark = 9999
+	b.alevel.Space = 9999
 
 	b.length = 0
 

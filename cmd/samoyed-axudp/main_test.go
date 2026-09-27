@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/stretchr/testify/assert"
@@ -81,7 +82,7 @@ func Test_main_bridges(t *testing.T) {
 
 	// KISS to AXUDP: a frame for Q2TEST goes to the node mapped to it, with
 	// a checksum on the end.
-	var outbound = direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>Q2TEST:>Outbound"))
+	var outbound = ax25.MustFromText("Q1TEST>Q2TEST:>Outbound").Pack()
 
 	var _, writeErr = kiss.Write(direwolf.KissEncapsulate(append([]byte{0x00}, outbound...)))
 	require.NoError(t, writeErr)

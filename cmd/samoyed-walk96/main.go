@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/pkg/term"
@@ -131,7 +132,7 @@ func walk96(lat float64, lon float64, knots maybe.Maybe[float64], course maybe.M
 	 * Convert it into AX.25 frame.
 	 */
 
-	var pp = direwolf.AX25FromText(position_report, true)
+	var pp = ax25.FromText(position_report, true)
 
 	if pp == nil {
 		fmt.Printf("Unexpected error in AX25FromText.  Quitting.\n")
@@ -140,7 +141,7 @@ func walk96(lat float64, lon float64, knots maybe.Maybe[float64], course maybe.M
 
 	var ax25_frame = []byte{0} // Insert channel before KISS encapsulation.
 
-	ax25_frame = append(ax25_frame, direwolf.AX25Pack(pp)...)
+	ax25_frame = append(ax25_frame, pp.Pack()...)
 
 	/*
 	 * Encapsulate as KISS and send to TNC.

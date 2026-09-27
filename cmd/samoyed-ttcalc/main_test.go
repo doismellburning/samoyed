@@ -10,6 +10,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/stretchr/testify/assert"
@@ -72,7 +73,7 @@ func Test_connect_to_server(t *testing.T) {
 func sendMonitored(t *testing.T, conn net.Conn, channel byte, monitor string) {
 	t.Helper()
 
-	sendRaw(t, conn, channel, append([]byte{channel << 4}, direwolf.AX25Pack(direwolf.MustAX25FromText(monitor))...))
+	sendRaw(t, conn, channel, append([]byte{channel << 4}, ax25.MustFromText(monitor).Pack()...))
 }
 
 // sendRaw sends a TNC's report of hearing data, which ought to be a KISS
@@ -139,9 +140,9 @@ func Test_main(t *testing.T) {
 	var _, readErr = io.ReadFull(tnc, reply)
 	require.NoError(t, readErr)
 
-	var pp = direwolf.AX25FromFrame(reply[1:], direwolf.ALevel{})
+	var pp = ax25.FromFrame(reply[1:], ax25.ALevel{}) //nolint:exhaustruct_v5
 	require.NotNil(t, pp)
-	assert.Equal(t, "N0CALL>SPEECH:10", direwolf.AX25FormatAddrs(pp)+string(direwolf.AX25GetInfo(pp)))
+	assert.Equal(t, "N0CALL>SPEECH:10", pp.FormatAddrs()+string(pp.Info()))
 
 	// The TNC going away ends it.
 	require.NoError(t, tnc.Close())
