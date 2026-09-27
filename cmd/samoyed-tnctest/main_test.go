@@ -328,6 +328,7 @@ func Test_main_badArguments(t *testing.T) {
 		"too many":       {[]string{"1=a", "2=b", "3=c"}, "Specify minimum 2, maximum 2 TNCs on the command line."},
 		"no description": {[]string{"8000", "8001=two"}, "Internal error 1"},
 		"unreachable":    {[]string{gone + "=Gone", gone + "=Gone"}, "unable to connect to Gone"},
+		"no serial port": {[]string{"/nonexistent/tty0=Gone", "/nonexistent/tty1=Gone"}, "unable to connect to Gone on /nonexistent/tty"},
 	}
 
 	for name, tc := range testCases {
@@ -338,4 +339,194 @@ func Test_main_badArguments(t *testing.T) {
 			assert.Contains(t, result.Output(), tc.want)
 		})
 	}
+}
+
+// sendFrame has the TNC at the far end of conn send an AGW frame of the given
+// kind, carrying data.
+func sendFrame(t *testing.T, conn net.Conn, kind byte, from string, data string) {
+	t.Helper()
+
+	var header = new(direwolf.AGWPEHeader)
+	header.DataKind = kind
+	header.DataLen = uint32(len(data))
+	copy(header.CallFrom[:], from)
+
+	require.NoError(t, binary.Write(conn, binary.LittleEndian, header))
+	require.NoError(t, writeFull(conn, []byte(data)))
+}
+
+// readFrame reads an AGW frame, header and data, from conn.
+func readFrame(t *testing.T, conn net.Conn) (direwolf.AGWPEHeader, string) {
+	t.Helper()
+
+	var header = readHeader(t, conn)
+
+	var data = make([]byte, header.DataLen)
+
+	var _, err = io.ReadFull(conn, data)
+	require.NoError(t, err)
+
+	return header, string(data)
+}
+
+// startNet runs main against two fake AGW TNCs, the first given as host:port
+// and the second as a bare port, and hands them back once main has set both
+// up and asked the first to connect.
+func startNet(t *testing.T) (*testutils.Process, net.Conn, net.Conn) {
+	t.Helper()
+
+	var ln0, port0 = testutils.Listen(t)
+	var ln1, port1 = testutils.Listen(t)
+
+	var p = testutils.StartMain(t, "127.0.0.1:"+port0+"=Caller", port1+"=Answerer")
+
+	var tnc0 = testutils.Accept(t, ln0)
+	var tnc1 = testutils.Accept(t, ln1)
+
+	for _, tnc := range []net.Conn{tnc0, tnc1} {
+		readHeader(t, tnc) // Raw frames
+		readHeader(t, tnc) // Register callsign
+	}
+
+	p.WaitFor(t, "Andiamo!")
+
+	assert.Equal(t, byte('C'), readHeader(t, tnc0).DataKind)
+
+	return p, tnc0, tnc1
+}
+
+// The conversation main runs, from the TNCs' side, as far as the first
+// exchange, after which the calling TNC goes away.
+func Test_main_conversation(t *testing.T) {
+	t.Parallel()
+
+	var p, tnc0, tnc1 = startNet(t)
+
+	// Both ends report the connection, which lets main get on with it.
+	sendFrame(t, tnc0, 'C', "DW1", "")
+	p.WaitFor(t, "*** Connected to DW1 ***")
+	sendFrame(t, tnc1, 'C', "DW0", "")
+	p.WaitFor(t, "*** Connected to DW0 ***")
+
+	// The answering end replies to the first piece of data, and follows it
+	// with pieces of the alphabet of every length, to test segmentation.
+	sendFrame(t, tnc1, 'D', "DW0", "0001 send data\r")
+
+	var header, data = readFrame(t, tnc1)
+	assert.Equal(t, byte('D'), header.DataKind)
+	assert.Equal(t, "DW1", callsign(header.CallFrom))
+	assert.Equal(t, "DW0", callsign(header.CallTo))
+	assert.Equal(t, "0001 reply\r", data)
+
+	for j := 1; j <= 26; j++ {
+		_, data = readFrame(t, tnc1)
+		assert.Equal(t, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[:j]+"\r", data)
+	}
+
+	// The calling end takes the reply, and the pieces, in its stride.
+	sendFrame(t, tnc0, 'D', "DW1", "0001 reply\r")
+	sendFrame(t, tnc0, 'D', "DW1", "ABC\r")
+	sendFrame(t, tnc0, 'y', "", "")
+	sendFrame(t, tnc0, 'K', "", "ignored")
+	p.WaitFor(t, "*** Outstanding frames waiting")
+
+	sendFrame(t, tnc1, 'd', "DW0", "")
+	p.WaitFor(t, "*** Disconnected from DW0 ***")
+
+	require.NoError(t, tnc0.Close())
+
+	p.WaitFor(t, "TNC 0 connection closed.")
+	assert.Equal(t, 1, p.Wait())
+}
+
+// A TNC that goes away part way through a frame ends the test.
+func Test_main_brokenFrame(t *testing.T) {
+	t.Parallel()
+
+	var promised = new(direwolf.AGWPEHeader)
+	promised.DataKind = 'D'
+	promised.DataLen = 10
+
+	var frame, appendErr = binary.Append(nil, binary.LittleEndian, promised)
+	require.NoError(t, appendErr)
+
+	var testCases = map[string]struct {
+		send []byte
+		want string
+	}{
+		"header": {frame[:3], "Read error, TNC 1 got unexpected EOF."},
+		"data":   {append(frame, 'x'), "Read error, TNC 1 got unexpected EOF reading data."},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var p, _, tnc1 = startNet(t)
+
+			var _, err = tnc1.Write(tc.send)
+			require.NoError(t, err)
+			require.NoError(t, tnc1.Close())
+
+			p.WaitFor(t, tc.want)
+			assert.Equal(t, 1, p.Wait())
+		})
+	}
+}
+
+// A serial TNC is set up, then answers what the other sends it, and minds
+// its flow control, until it goes away.  Setting it up takes a few seconds.
+func Test_main_serial(t *testing.T) {
+	t.Parallel()
+
+	var master, slave, openErr = pty.Open()
+	require.NoError(t, openErr)
+
+	t.Cleanup(func() { master.Close() })
+
+	var ln0, port0 = testutils.Listen(t)
+
+	var p = testutils.StartMain(t, "127.0.0.1:"+port0+"=Caller", slave.Name()+"=Answerer")
+
+	testutils.Accept(t, ln0)
+
+	assert.Equal(t, "\003\rreset\recho on\rmycall TNC1\rflow off\recho off\r", readUntil(t, master, "echo off\r"))
+
+	p.WaitFor(t, "TNC 1 now available.  Answerer on "+slave.Name())
+
+	// The command has the port open now, so it goes on without ours.
+	require.NoError(t, slave.Close())
+
+	// XOFF and XON, a blank line, and something unprintable along with the
+	// data.
+	var _, writeErr = master.WriteString("\x13\x11\r\n0001 send data\x01\r")
+	require.NoError(t, writeErr)
+
+	p.WaitFor(t, "<XOFF>")
+	p.WaitFor(t, "<XON>")
+	p.WaitFor(t, "0001 send data<x01>")
+
+	assert.Equal(t, "0001 reply\r", readUntil(t, master, "\r"))
+
+	require.NoError(t, master.Close())
+
+	p.WaitFor(t, "TNC 1 fatal read error")
+	assert.Equal(t, 1, p.Wait())
+}
+
+// While the TNC says it is busy, data waits until it isn't.
+func Test_tnc_send_data_busy(t *testing.T) {
+	resetState(t)
+
+	var tnc = serialTNC(t, 0)
+
+	busy[0].Store(true)
+
+	go func() {
+		direwolf.SLEEP_MS(150)
+		busy[0].Store(false)
+	}()
+
+	tnc_send_data(0, 1, "0001 send data\r")
+	assert.Equal(t, "0001 send data\r", readUntil(t, tnc, "\r"))
 }
