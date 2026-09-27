@@ -621,7 +621,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* u - unproto (AX.25 destination) */
 		/* Probably want to exclude mic-e types */
 		/* because destination is used for part of location. */
-		if ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`' {
+		if pf.pp.DTI() != '\'' && pf.pp.DTI() != '`' {
 			var addr = pf.pp.AddrWithSSID(AX25_DESTINATION)
 			result, err = filt_bodgu(pf, addr)
 

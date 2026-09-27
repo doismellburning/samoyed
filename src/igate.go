@@ -529,7 +529,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	/*
 	 * Third party frames require special handling to unwrap payload.
 	 */
-	for ax25_get_dti(pp) == '}' {
+	for pp.DTI() == '}' {
 		for n := range pp.NumRepeaters() {
 			/* includes ssid. Do we want to ignore it? */
 			var via = pp.AddrWithSSID(n + AX25_REPEATER_1)
@@ -584,7 +584,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	 * Do not relay generic query.
 	 * TODO:  Should probably block in other direction too, in case rf>is gateway did not drop.
 	 */
-	if ax25_get_dti(pp) == '?' {
+	if pp.DTI() == '?' {
 		if ig.debugLevel >= 1 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Do not relay generic query.\n")

@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_dti(this_p *packet_t) byte {
-	return this_p.DTI()
-}
-
 func ax25_set_nextp(this_p *packet_t, next_p *packet_t) {
 	this_p.SetNext(next_p)
 }

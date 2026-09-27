@@ -254,7 +254,7 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
 
 		var sdti string
 		if pp != nil {
-			sdti = string(rune(ax25_get_dti(pp)))
+			sdti = string(rune(pp.DTI()))
 		}
 
 		var sname = A.g_src
