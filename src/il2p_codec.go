@@ -3,6 +3,7 @@ package direwolf
 import (
 	"bytes"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/sirupsen/logrus"
 )
 
@@ -281,7 +282,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_versi
 		// I think alevel gets filled in somewhere later making
 		// this redundant.
 
-		var pp = AX25FromFrame(extracted, alevel)
+		var pp = ax25.FromFrame(extracted, alevel)
 
 		return (pp)
 	}

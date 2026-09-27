@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
-	return ax25.FromFrame(data, alevel)
-}
-
 func ax25_dup(copy_from *packet_t) *packet_t {
 	return copy_from.Dup()
 }

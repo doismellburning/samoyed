@@ -1735,7 +1735,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			}
 
 			var alevel ALevel
-			var pp = AX25FromFrame(cmd.Data[1:cmd.Header.DataLen], alevel)
+			var pp = ax25.FromFrame(cmd.Data[1:cmd.Header.DataLen], alevel)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)

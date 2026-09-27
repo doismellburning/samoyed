@@ -53,7 +53,7 @@ func FuzzAX25FromFrame(f *testing.F) {
 	f.Add([]byte("000000000000010"))
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		var pp = AX25FromFrame(data, ALevel{Rec: 50, Mark: 50, Space: 50})
+		var pp = ax25.FromFrame(data, ALevel{Rec: 50, Mark: 50, Space: 50})
 		if pp == nil {
 			return
 		}

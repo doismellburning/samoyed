@@ -66,6 +66,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -826,7 +827,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 
 		alevel = ALevel{} //nolint:exhaustruct_v5
 
-		var pp = AX25FromFrame(kiss_msg[1:], alevel)
+		var pp = ax25.FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR - Invalid KISS data frame from client app.\n")

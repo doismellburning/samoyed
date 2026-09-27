@@ -15,6 +15,7 @@ package direwolf
 import (
 	"fmt"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -44,7 +45,7 @@ func DescribeAX25Frame(frame []byte) int {
 
 	var alevel ALevel
 
-	var pp = AX25FromFrame(frame, alevel)
+	var pp = ax25.FromFrame(frame, alevel)
 	if pp == nil {
 		fmt.Printf("ERROR: Could not construct an AX.25 frame from those %d bytes.\n", len(frame))
 

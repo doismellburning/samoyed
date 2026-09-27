@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -360,7 +361,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 			var subchan = -3
 			var slice = 0
 			var alevel ALevel
-			var pp = AX25FromFrame(unwrapped[1:], alevel)
+			var pp = ax25.FromFrame(unwrapped[1:], alevel)
 
 			if pp != nil {
 				var fec_type = fec_type_none

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -104,7 +105,7 @@ func TestIL2PSpecEncode(t *testing.T) {
 	for _, testDatum := range il2pSpecExamples {
 		t.Run(testDatum.name, func(t *testing.T) {
 			var alevel ALevel
-			var pp = AX25FromFrame(il2pDataStringToBytes(testDatum.ax25Data), alevel)
+			var pp = ax25.FromFrame(il2pDataStringToBytes(testDatum.ax25Data), alevel)
 			require.NotNil(t, pp)
 
 			var encoded, elen = il2p_encode_frame(pp, IL2P_VERSION_0_6, 0, true)
