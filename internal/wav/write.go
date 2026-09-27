@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// Package wav writes uncompressed PCM .WAV (RIFF) files.
+// Package wav reads and writes uncompressed PCM .WAV (RIFF) files.
+//
+// [ReadHeader] reads a file's format, leaving the reader at its sample data.
 //
 // A [Writer] writes a placeholder header when the file is created, buffers the
 // sample data subsequently written to it, and then seeks back to fill in the

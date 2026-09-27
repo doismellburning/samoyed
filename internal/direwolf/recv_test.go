@@ -55,7 +55,7 @@ func setupRecvTest(t *testing.T, audioConfig *AudioConfig, samples []byte) *read
 
 	multi_modem_init(audioConfig, new(radioSink))
 
-	return newReaderSampleSource(bytes.NewReader(samples), int32(len(samples)))
+	return newReaderSampleSource(bytes.NewReader(samples), len(samples))
 }
 
 // silence16 is nbytes of 16 bit samples at zero.
