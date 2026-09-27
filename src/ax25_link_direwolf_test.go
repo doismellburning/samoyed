@@ -1426,7 +1426,7 @@ func TestAX25LinkCommandFrameEncoding(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	// Verify it's recognized as a command
-	cr, _, _, _, _, _ := ax25_frame_type(pp) //nolint:dogsled
+	cr, _, _, _, _, _ := pp.FrameType() //nolint:dogsled
 	assert.Equal(t, cr_cmd, cr, "SABM should be a command")
 }
 
@@ -1443,7 +1443,7 @@ func TestAX25LinkResponseFrameEncoding(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	// Verify it's recognized as a response
-	cr, _, _, _, _, _ := ax25_frame_type(pp) //nolint:dogsled
+	cr, _, _, _, _, _ := pp.FrameType() //nolint:dogsled
 	assert.Equal(t, cr_res, cr, "UA should be a response")
 }
 
@@ -1458,7 +1458,7 @@ func TestAX25LinkIFrameAsCommand(t *testing.T) {
 	var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, 0, 0, AX25_PID_NO_LAYER_3, []byte("test"))
 	assert.NotNil(t, pp)
 
-	cr, _, _, _, _, ftype := ax25_frame_type(pp) //nolint:dogsled
+	cr, _, _, _, _, ftype := pp.FrameType() //nolint:dogsled
 	assert.Equal(t, cr_cmd, cr, "I-frame should be a command")
 	assert.Equal(t, frame_type_I, ftype)
 }
@@ -1475,7 +1475,7 @@ func TestAX25LinkSFrameCommandResponse(t *testing.T) {
 	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 1, nil)
 	assert.NotNil(t, pp)
 
-	cr, _, _, _, _, ftype := ax25_frame_type(pp) //nolint:dogsled
+	cr, _, _, _, _, ftype := pp.FrameType() //nolint:dogsled
 	assert.Equal(t, cr_cmd, cr, "RR should be command")
 	assert.Equal(t, frame_type_S_RR, ftype)
 
@@ -1483,7 +1483,7 @@ func TestAX25LinkSFrameCommandResponse(t *testing.T) {
 	pp = ax25_s_frame(addrs, 2, cr_res, frame_type_S_RR, 8, 0, 1, nil)
 	assert.NotNil(t, pp)
 
-	cr, _, _, _, _, ftype = ax25_frame_type(pp) //nolint:dogsled
+	cr, _, _, _, _, ftype = pp.FrameType() //nolint:dogsled
 	assert.Equal(t, cr_res, cr, "RR should be response")
 	assert.Equal(t, frame_type_S_RR, ftype)
 }
@@ -1827,7 +1827,7 @@ func TestAX25LinkFrameTypeParsing(t *testing.T) {
 			continue // Some combinations may not be valid
 		}
 
-		_, _, _, _, _, parsedType := ax25_frame_type(pp)
+		_, _, _, _, _, parsedType := pp.FrameType()
 		assert.Equal(t, ftype, parsedType, "Frame type should match for %v", ftype)
 	}
 }
@@ -1850,14 +1850,14 @@ func TestAX25LinkSFrameTypeParsing(t *testing.T) {
 		pp := ax25_s_frame(addrs, 2, cr_cmd, ftype, 8, 0, 0, nil)
 		assert.NotNil(t, pp)
 
-		_, _, _, _, _, parsedType := ax25_frame_type(pp)
+		_, _, _, _, _, parsedType := pp.FrameType()
 		assert.Equal(t, ftype, parsedType, "S-Frame type should match for %v", ftype)
 	}
 
 	// SREJ must be response
 	pp := ax25_s_frame(addrs, 2, cr_res, frame_type_S_SREJ, 8, 0, 0, nil)
 	assert.NotNil(t, pp)
-	_, _, _, _, _, parsedType := ax25_frame_type(pp) //nolint:dogsled
+	_, _, _, _, _, parsedType := pp.FrameType() //nolint:dogsled
 	assert.Equal(t, frame_type_S_SREJ, parsedType)
 }
 
@@ -1873,7 +1873,7 @@ func TestAX25LinkIFrameTypeParsing(t *testing.T) {
 	pp := ax25_i_frame(addrs, 2, cr_cmd, 8, 3, 2, 1, AX25_PID_NO_LAYER_3, []byte("test"))
 	assert.NotNil(t, pp)
 
-	cr, _, pf, nr, ns, ftype := ax25_frame_type(pp)
+	cr, _, pf, nr, ns, ftype := pp.FrameType()
 	assert.Equal(t, frame_type_I, ftype)
 	assert.Equal(t, cr_cmd, cr)
 	assert.Equal(t, 1, pf)
@@ -1884,7 +1884,7 @@ func TestAX25LinkIFrameTypeParsing(t *testing.T) {
 	pp = ax25_i_frame(addrs, 2, cr_cmd, 128, 100, 50, 1, AX25_PID_NO_LAYER_3, []byte("test"))
 	assert.NotNil(t, pp)
 
-	_, _, pf, nr, ns, ftype = ax25_frame_type(pp)
+	_, _, pf, nr, ns, ftype = pp.FrameType()
 	assert.Equal(t, frame_type_I, ftype)
 	assert.Equal(t, 1, pf)
 	assert.Equal(t, 100, nr)

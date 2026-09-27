@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int, ns int, frameType ax25_frame_type_t) {
-	return this_p.FrameType()
-}
-
 func AX25HexDump(this_p *packet_t) {
 	this_p.HexDump()
 }

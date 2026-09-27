@@ -272,7 +272,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 	// Byte 12 has DEST SSID in upper nybble and SRC SSID in lower nybble and
 	hdr[12] = byte((dst_ssid << 4) | src_ssid)
 
-	var cr, _, pf, nr, ns, frame_type = ax25_frame_type(pp)
+	var cr, _, pf, nr, ns, frame_type = pp.FrameType()
 
 	//dw_printf ("%s(): %s-%d>%s-%d: %s\n", __func__, src_addr, src_ssid, dst_addr, dst_ssid, description);
 

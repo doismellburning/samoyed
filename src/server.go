@@ -520,7 +520,7 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 //	'S' for supervisory and other unnumbered frames.
 
 func mon_desc(pp *packet_t) (byte, string) {
-	var cr, _, pf, nr, ns, ftype = ax25_frame_type(pp)
+	var cr, _, pf, nr, ns, ftype = pp.FrameType()
 	var pf_text string // P or F depending on whether command or response.
 
 	switch cr {

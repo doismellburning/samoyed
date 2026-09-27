@@ -944,7 +944,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	}
 
 	if !ax25_is_aprs(pp) {
-		var _, desc, _, _, _, ftype = ax25_frame_type(pp)
+		var _, desc, _, _, _, ftype = pp.FrameType()
 
 		/* Could change by 1, since earlier call, if we guess at modulo 128. */
 		pinfo = pp.Info()

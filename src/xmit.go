@@ -881,7 +881,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 	/* Demystify non-APRS.  Use same format for received frames in direwolf.c. */
 
 	if !ax25_is_aprs(pp) {
-		var _, desc, _, _, _, ftype = ax25_frame_type(pp)
+		var _, desc, _, _, _, ftype = pp.FrameType()
 
 		dw_printf("(%s)", desc)
 

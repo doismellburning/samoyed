@@ -61,7 +61,7 @@ func FuzzAX25FromFrame(f *testing.F) {
 		pp.FormatAddrs()
 		pp.Info()
 		pp.FormatViaPath()
-		ax25_frame_type(pp)
+		pp.FrameType()
 		ax25_is_aprs(pp)
 		ax25_dedupe_crc(pp)
 		pp.DTI()
@@ -86,7 +86,7 @@ func FuzzAX25FromText(f *testing.F) {
 
 		pp.FormatAddrs()
 		pp.Info()
-		ax25_frame_type(pp)
+		pp.FrameType()
 	})
 }
 

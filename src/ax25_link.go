@@ -2009,7 +2009,7 @@ func lm_data_indication(E *dlq_item_t) {
 	 * Now we need to use ax25_frame_type again because the previous results, for nr and ns, might be wrong.
 	 */
 
-	var cr, desc, pf, nr, ns, ftype = ax25_frame_type(E.pp)
+	var cr, desc, pf, nr, ns, ftype = E.pp.FrameType()
 
 	// Gather statistics useful for testing.
 
