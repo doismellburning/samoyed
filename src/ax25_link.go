@@ -2065,7 +2065,7 @@ func lm_data_indication(E *dlq_item_t) {
 	switch ftype {
 	case frame_type_I: // Information
 		{
-			var pid = ax25_get_pid(E.pp)
+			var pid = E.pp.PID()
 			var info = E.pp.Info()
 
 			i_frame(S, cr, pf, nr, ns, pid, info)

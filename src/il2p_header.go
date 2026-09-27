@@ -127,7 +127,7 @@ func GET_PAYLOAD_BYTE_COUNT(hdr []byte) int {
 // Return -1 if translation is not possible.  Fall back to type 0 header in this case.
 
 func encode_pid(pp *packet_t) int {
-	var pid = ax25_get_pid(pp)
+	var pid = pp.PID()
 
 	if (pid & 0x30) == 0x20 {
 		return (0x2) // AX.25 Layer 3

@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_pid(this_p *packet_t) int {
-	return this_p.PID()
-}
-
 func ax25_get_frame_len(this_p *packet_t) int {
 	return this_p.FrameLen()
 }

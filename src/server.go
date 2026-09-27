@@ -543,10 +543,10 @@ func mon_desc(pp *packet_t) (byte, string) {
 
 	switch ftype {
 	case frame_type_I:
-		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, ax25_get_pid(pp), len(pinfo), pf_text, pf)
+		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, pp.PID(), len(pinfo), pf_text, pf)
 
 	case frame_type_U_UI:
-		return 'U', fmt.Sprintf("<UI pid=%02X Len=%d %s=%d >", ax25_get_pid(pp), len(pinfo), pf_text, pf)
+		return 'U', fmt.Sprintf("<UI pid=%02X Len=%d %s=%d >", pp.PID(), len(pinfo), pf_text, pf)
 
 	case frame_type_S_RR:
 		return 'S', fmt.Sprintf("<RR R%d %s=%d >", nr, pf_text, pf)
