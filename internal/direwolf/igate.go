@@ -1253,31 +1253,33 @@ func (ig *IGate) satgateDelayThread(ctx context.Context) {
 	var channel = 0 // TODO:  get receive channel somehow.
 	// only matters if multi channel with different names.
 
-	for {
-		if !sleepSecCtx(ctx, 1) {
-			return
-		}
-
-		/* Don't need critical region just to peek */
-
-		if ig.dpQueueHead != nil {
-			var release_time = ig.dpQueueHead.ReleaseTime()
-
-			if time.Now().After(release_time) {
-				ig.dpMutex.Lock()
-
-				var pp = ig.dpQueueHead
-				ig.dpQueueHead = pp.Next()
-
-				ig.dpMutex.Unlock()
-				pp.SetNext(nil)
-
-				var conn, _ = ig.connection()
-				ig.sendPacketToServer(conn, pp, channel)
-			}
-		} /* if something in queue */
+	for sleepSecCtx(ctx, 1) {
+		ig.satgateReleaseDue(channel)
 	} /* until cancelled */
 } /* end satgateDelayThread */
+
+// satgateReleaseDue sends the packet at the head of the SATgate delay queue to
+// the server if its time has come.
+func (ig *IGate) satgateReleaseDue(channel int) {
+	// The radio receive thread adds to the queue, and sets its head when it
+	// is empty, so even a peek at the head needs the lock.
+	ig.dpMutex.Lock()
+
+	var pp = ig.dpQueueHead
+	if pp == nil || !time.Now().After(pp.ReleaseTime()) {
+		ig.dpMutex.Unlock()
+
+		return
+	}
+
+	ig.dpQueueHead = pp.Next()
+
+	ig.dpMutex.Unlock()
+	pp.SetNext(nil)
+
+	var conn, _ = ig.connection()
+	ig.sendPacketToServer(conn, pp, channel)
+}
 
 /*-------------------------------------------------------------------
  *

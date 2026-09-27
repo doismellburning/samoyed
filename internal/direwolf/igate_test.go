@@ -794,6 +794,50 @@ func TestIGateCounters(t *testing.T) {
 	assert.Equal(t, 9, igate.downlinkCount())
 }
 
+// The radio receive thread adds to the SATgate delay queue - setting its head
+// when it is empty - while the delay thread looks at the head to see whether
+// anything is due.  This drives the delay thread's check directly: its
+// once-a-second sleep hides the race from the detector.  Run under -race.
+func TestIGateSatgateQueueConcurrent(t *testing.T) {
+	setupIGate(t)
+
+	t.Cleanup(func() { igate.dpQueueHead = nil })
+
+	igate.config.satgate_delay = MAX_SATGATE_DELAY // Nothing comes due during the test.
+	igate.dpQueueHead = nil
+
+	testutils.CaptureOutput(t, func() {
+		var stop = make(chan struct{})
+
+		var done = make(chan struct{})
+
+		go func() {
+			defer close(done)
+
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					igate.satgateReleaseDue(0)
+				}
+			}
+		}()
+
+		for range 100 {
+			var pp = ax25.FromText("Q2TEST>APDW17,WIDE1-1:>hello", true)
+			require.NotNil(t, pp)
+
+			igate.satgateDelayPacket(pp, 0)
+		}
+
+		close(stop)
+		<-done
+	})
+
+	assert.NotNil(t, igate.dpQueueHead, "a packet was released before its time")
+}
+
 // SATgate mode holds back a packet heard directly from a satellite for a
 // while, so that a terrestrial digipeat of the same packet - which carries
 // more information about the path - gets to the server first.
