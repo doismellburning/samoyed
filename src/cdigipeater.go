@@ -250,7 +250,7 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec stri
 		/* If using multiple radio channels, they could have different calls. */
 
 		result.SetAddr(r, mycall_xmit)
-		ax25_set_h(result, r)
+		result.SetH(r)
 
 		return (result)
 	}
@@ -263,7 +263,7 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec stri
 			var result = pp.Dup()
 
 			result.SetAddr(r, mycall_xmit)
-			ax25_set_h(result, r)
+			result.SetH(r)
 
 			return (result)
 		}

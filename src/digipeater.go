@@ -414,7 +414,7 @@ func (d *Digipeater) match(
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
 		result.SetAddr(r, mycall_xmit)
-		ax25_set_h(result, r)
+		result.SetH(r)
 
 		return (result)
 	}
@@ -466,7 +466,7 @@ func (d *Digipeater) match(
 		var result = pp.Dup()
 
 		result.SetAddr(r, mycall_xmit)
-		ax25_set_h(result, r)
+		result.SetH(r)
 
 		return (result)
 	}
@@ -491,7 +491,7 @@ func (d *Digipeater) match(
 				var result = pp.Dup()
 
 				result.SetAddr(r2, mycall_xmit)
-				ax25_set_h(result, r2)
+				result.SetH(r2)
 
 				switch preempt {
 				case PREEMPT_DROP: /* remove all prior */
@@ -509,7 +509,7 @@ func (d *Digipeater) match(
 
 					r2--
 					for r2 >= AX25_REPEATER_1 && result.H(r2) == 0 {
-						ax25_set_h(result, r2)
+						result.SetH(r2)
 						r2--
 					}
 				/* 2025-07-29 KG Commenting out the PREEMPT_TRACE handling so it falls through to the default case,
@@ -569,13 +569,13 @@ func (d *Digipeater) match(
 				result.SetSSID(r, ssid) // could be zero.
 
 				if ssid == 0 {
-					ax25_set_h(result, r)
+					result.SetH(r)
 				}
 
 				// Insert own call at beginning and mark it used.
 
 				result.InsertAddr(AX25_REPEATER_1, mycall_xmit)
-				ax25_set_h(result, AX25_REPEATER_1)
+				result.SetH(AX25_REPEATER_1)
 
 				return (result)
 			}
@@ -595,7 +595,7 @@ func (d *Digipeater) match(
 			var result = pp.Dup()
 
 			result.SetAddr(r, mycall_xmit)
-			ax25_set_h(result, r)
+			result.SetH(r)
 
 			return (result)
 		}
@@ -607,7 +607,7 @@ func (d *Digipeater) match(
 
 			if pp.NumRepeaters() < AX25_MAX_REPEATERS {
 				result.InsertAddr(r, mycall_xmit)
-				ax25_set_h(result, r)
+				result.SetH(r)
 			}
 
 			return (result)
