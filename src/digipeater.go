@@ -566,7 +566,7 @@ func (d *Digipeater) match(
 				}
 
 				ssid--
-				ax25_set_ssid(result, r, ssid) // could be zero.
+				result.SetSSID(r, ssid) // could be zero.
 
 				if ssid == 0 {
 					ax25_set_h(result, r)
@@ -603,7 +603,7 @@ func (d *Digipeater) match(
 		if ssid >= 2 && ssid <= 7 {
 			var result = pp.Dup()
 
-			ax25_set_ssid(result, r, ssid-1) // should be at least 1
+			result.SetSSID(r, ssid-1) // should be at least 1
 
 			if pp.NumRepeaters() < AX25_MAX_REPEATERS {
 				result.InsertAddr(r, mycall_xmit)
