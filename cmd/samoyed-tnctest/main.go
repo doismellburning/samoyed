@@ -403,9 +403,10 @@ func process_rec_data(my_index int, data string) {
 			fmt.Printf("TEST FAILED!\n")
 			os.Exit(1)
 		}
-	} else {
-		panic("Unexpected data: " + data)
 	}
+
+	// Anything else - a serial TNC's prompt, its connection reports, its
+	// answers to our commands - isn't ours to check.
 }
 
 /*-------------------------------------------------------------------
@@ -656,35 +657,43 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 		if len(result) > 0 {
 			fmt.Printf("%*s[R %.3f] %s\n", my_index*column_width, "", time.Since(start_time).Seconds(), result)
 
-			if result == "*** CONNECTED" {
-				is_connected[my_index].Store(1)
-			}
-
-			if result == "*** DISCONNECTED" {
-				is_connected[my_index].Store(0)
-			}
-
-			if result == "Not while connected" {
-				// Not expecting this: we track the connection state from the
-				// TNC's own "*** CONNECTED" and "*** DISCONNECTED" lines, so
-				// the two have got out of step and the run is not testing what
-				// it thinks it is.
-				panic(fmt.Sprintf("TNC %d refused a command as \"Not while connected\", but we think it is %s",
-					my_index, map[int32]string{0: "disconnected", 1: "connected"}[is_connected[my_index].Load()]))
-			}
-
-			process_rec_data(my_index, result)
-
-			var before, after, _ = strings.Cut(result, " ")
-
-			if unicode.IsDigit(rune(before[0])) && unicode.IsDigit(rune(before[1])) && unicode.IsDigit(rune(before[2])) && unicode.IsDigit(rune(before[3])) &&
-				strings.HasPrefix(after, "send") {
-				// Expected message.   Make sure it is expected sequence and send reply.
-				var n, _ = strconv.Atoi(before)
-				var reply = fmt.Sprintf("%04d reply\r", n)
-				tnc_send_data(my_index, 1-my_index, reply)
-			}
+			tnc_serial_line(my_index, result)
 		}
+	}
+}
+
+// tnc_serial_line acts on one line read from serial TNC my_index: the test's
+// own data, the TNC's reports of the connection coming and going (which carry
+// the other station, as in "*** CONNECTED to Q2TEST"), and whatever else it
+// has to say, which passes by.
+func tnc_serial_line(my_index int, result string) {
+	if strings.HasPrefix(result, "*** CONNECTED") {
+		is_connected[my_index].Store(1)
+	}
+
+	if strings.HasPrefix(result, "*** DISCONNECTED") {
+		is_connected[my_index].Store(0)
+	}
+
+	if result == "Not while connected" {
+		// Not expecting this: we track the connection state from the
+		// TNC's own "*** CONNECTED" and "*** DISCONNECTED" lines, so
+		// the two have got out of step and the run is not testing what
+		// it thinks it is.
+		panic(fmt.Sprintf("TNC %d refused a command as \"Not while connected\", but we think it is %s",
+			my_index, map[int32]string{0: "disconnected", 1: "connected"}[is_connected[my_index].Load()]))
+	}
+
+	process_rec_data(my_index, result)
+
+	var before, after, _ = strings.Cut(result, " ")
+
+	if len(before) == 4 && unicode.IsDigit(rune(before[0])) && unicode.IsDigit(rune(before[1])) && unicode.IsDigit(rune(before[2])) && unicode.IsDigit(rune(before[3])) &&
+		strings.HasPrefix(after, "send") {
+		// Expected message.   Make sure it is expected sequence and send reply.
+		var n, _ = strconv.Atoi(before)
+		var reply = fmt.Sprintf("%04d reply\r", n)
+		tnc_send_data(my_index, 1-my_index, reply)
 	}
 }
 

@@ -114,8 +114,20 @@ func Test_process_rec_data(t *testing.T) {
 	// Pieces of the alphabet test segmentation, and don't count.
 	process_rec_data(0, "ABCDE\r")
 	assert.Equal(t, int64(1), last_rec_seq[0].Load())
+}
 
-	assert.Panics(t, func() { process_rec_data(0, "Something else") })
+// A serial TNC says more than the test's own data - its prompt, its
+// connection reports, its answers to our commands - and none of that is for
+// process_rec_data to count or to object to.
+func Test_process_rec_data_serialChatter(t *testing.T) {
+	resetState(t)
+
+	for _, line := range []string{"cmd:", "*** CONNECTED to Q2TEST", "*** DISCONNECTED", "MYCALL was Q1TEST", "1 retry"} {
+		for i := range MAX_TNC {
+			assert.NotPanics(t, func() { process_rec_data(i, line) }, "%q", line)
+			assert.Zero(t, last_rec_seq[i].Load(), "%q", line)
+		}
+	}
 }
 
 // agwConn points TNC from at one end of a TCP connection and hands back the
@@ -277,6 +289,34 @@ func Test_tnc_commands_serial(t *testing.T) {
 	// A reset always breaks into command mode first, prompt or no prompt.
 	tnc_reset(0, 1)
 	assert.Equal(t, ETX_BREAK+"\rreset\r", readUntil(t, tnc, "reset\r"))
+}
+
+// A serial TNC's prompt and connection reports pass through the line handling
+// without upsetting it, the reports keep track of the connection, and the
+// test's own data is still answered.
+func Test_tnc_serial_line_chatter(t *testing.T) {
+	resetState(t)
+
+	var saved = is_connected[1].Load()
+
+	t.Cleanup(func() { is_connected[1].Store(saved) })
+
+	is_connected[1].Store(0)
+
+	var tnc = serialTNC(t, 1)
+
+	tnc_serial_line(1, "cmd:")
+	tnc_serial_line(1, "1 retry")
+
+	tnc_serial_line(1, "*** CONNECTED to Q1TEST")
+	assert.Equal(t, int32(1), is_connected[1].Load())
+
+	tnc_serial_line(1, "0001 send data")
+	assert.Equal(t, "0001 reply\r", readUntil(t, tnc, "\r"))
+	assert.Equal(t, int64(1), last_rec_seq[1].Load())
+
+	tnc_serial_line(1, "*** DISCONNECTED")
+	assert.Equal(t, int32(0), is_connected[1].Load())
 }
 
 // main takes hours over a full run, and its TNC goroutines exit the process
