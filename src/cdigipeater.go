@@ -59,6 +59,7 @@ type cdigi_config_s struct {
 type ConnectedDigipeater struct {
 	audioConfig *audio_s
 	config      *cdigi_config_s
+	filter      *PacketFilter
 	count       [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
 }
 
@@ -72,14 +73,17 @@ type ConnectedDigipeater struct {
  *
  *		p_cdigi_config	- Connected Digipeater configuration details.
  *
+ *		filter		- What decides whether CFILTER lets a packet through.
+ *
  * Description:	Called once at application startup time.
  *
  *------------------------------------------------------------------------------*/
 
-func NewConnectedDigipeater(p_audio_config *audio_s, p_cdigi_config *cdigi_config_s) *ConnectedDigipeater {
+func NewConnectedDigipeater(p_audio_config *audio_s, p_cdigi_config *cdigi_config_s, filter *PacketFilter) *ConnectedDigipeater {
 	var d = new(ConnectedDigipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_cdigi_config
+	d.filter = filter
 
 	return d
 }
@@ -141,7 +145,7 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *packet_t) {
 // digipeatTo queues pp for transmission on to_chan if the from/to channel
 // pair's rules say it should be repeated.
 func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *packet_t) {
-	var result = cdigipeat_match(from_chan, pp, d.audioConfig.mycall[from_chan],
+	var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
 		d.audioConfig.mycall[to_chan],
 		d.config.has_alias[from_chan][to_chan],
 		d.config.alias[from_chan][to_chan], to_chan,
@@ -154,7 +158,7 @@ func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *packet_
 
 /*------------------------------------------------------------------------------
  *
- * Name:	cdigipeat_match
+ * Name:	match
  *
  * Purpose:	A simple digipeater for connected mode AX.25.
  *
@@ -194,7 +198,7 @@ func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *packet_
  *
  *------------------------------------------------------------------------------*/
 
-func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan int, cfilter_str string) *packet_t {
+func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan int, cfilter_str string) *packet_t {
 	/*
 	 * First check if filtering has been configured.
 	 * Note that we have three different config file filter commands:
@@ -211,7 +215,7 @@ func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit
 	 * But here we only have to do it once.
 	 */
 	if cfilter_str != "" {
-		var result, err = pfilter(from_chan, to_chan, cfilter_str, pp, false)
+		var result, err = d.filter.pfilter(from_chan, to_chan, cfilter_str, pp, false)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%s\n", err)

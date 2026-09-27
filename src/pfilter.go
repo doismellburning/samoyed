@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -28,46 +27,40 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
-/*
- * Global stuff (to this file)
- *
- * These are set by init function.
- */
-
-// pfilter_igate_config_p is the IGate configuration pfilter_init was given.
-// An "i" filter takes its default hop count from it.
+// PacketFilter evaluates the FILTER, CFILTER and IGate filter expressions from
+// the configuration file against packets.  The digipeaters and the IGate
+// each hold the one DirewolfMain builds, and consult it from their own
+// goroutines; it is not changed once built, so it needs no lock.
 //
-// This was a file-scope static in Dire Wolf, as igate.c's identically named
-// save_igate_config_p was; the port flattened both into a single package
-// variable that the two inits took turns assigning.  pfilter.go keeps its own
-// so that it holds what pfilter_init was handed and nothing else.  See issue
-// #674.
-//
-// Nothing guarantees it has been set: pfilter_validate runs while the config
-// file is still being read, before pfilter_init, so every read of it needs a
-// nil check and a sensible default.
-var pfilter_igate_config_p *igate_config_s
+// Its zero value, which checking a filter's syntax uses, has no debug output
+// and no IGate configuration.  So does a nil one.
+type PacketFilter struct {
+	// igateConfig is where an "i" filter takes its default maximum
+	// digipeater hop count from (IGTXVIA).  Nil when there is none.
+	//
+	// This was a file-scope static in Dire Wolf, pfilter.c's own
+	// save_igate_config_p, which the port first flattened into the same
+	// package variable as igate.c's and then gave a package variable of its
+	// own.  See issue #674.
+	igateConfig *igate_config_s
 
-var pfilter_debug = 0
+	// debug is how much to say about each decision:
+	//	0	no debug output.
+	//	1	single summary line with final result. Indent by 1.
+	//	2	details from each filter specification.  Indent by 3.
+	//	3	Logical operators.  Indent by 2.
+	debug int
+}
 
-/*-------------------------------------------------------------------
- *
- * Name:        pfilter_init
- *
- * Purpose:     One time initialization when main application starts up.
- *
- * Inputs:	p_igate_config	- IGate configuration.
- *
- *		debug_level	- 0	no debug output.
- *				  1	single summary line with final result. Indent by 1.
- *				  2	details from each filter specification.  Indent by 3.
- *				  3	Logical operators.  Indent by 2.
- *
- *--------------------------------------------------------------------*/
+// NewPacketFilter returns a PacketFilter that takes an "i" filter's default
+// hop count from igateConfig, which may be nil, and says as much about each
+// decision as debugLevel asks for.
+func NewPacketFilter(igateConfig *igate_config_s, debugLevel int) *PacketFilter {
+	var f = new(PacketFilter)
+	f.igateConfig = igateConfig
+	f.debug = debugLevel
 
-func pfilter_init(p_igate_config *igate_config_s, debug_level int) {
-	pfilter_debug = debug_level
-	pfilter_igate_config_p = p_igate_config
+	return f
 }
 
 type token_type_t int
@@ -116,6 +109,12 @@ type pfstate_t struct {
 	 * its arguments and reports a match.
 	 */
 	syntax_only bool
+
+	/*
+	 * What the PacketFilter doing the evaluating was built with.
+	 */
+	igate_config *igate_config_s // nil when there is no IGate configuration.
+	debug        int
 
 	/*
 	 * Packet split into separate parts if APRS.
@@ -179,15 +178,15 @@ func bool2text(val int) string {
  *
  *--------------------------------------------------------------------*/
 
-func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool) (int, error) {
-	return pfilter_eval(from_chan, to_chan, filter, pp, is_aprs, false)
+func (f *PacketFilter) pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool) (int, error) {
+	return f.eval(from_chan, to_chan, filter, pp, is_aprs, false)
 }
 
-// pfilter_eval is pfilter with the syntax_only switch exposed.  With
+// eval is pfilter with the syntax_only switch exposed.  With
 // syntax_only set, filter specs that would otherwise consult runtime state
 // stop once their arguments have been parsed, so an expression can be checked
 // against a synthetic packet - see pfilter_validate.
-func pfilter_eval(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool, syntax_only bool) (int, error) {
+func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool, syntax_only bool) (int, error) {
 	Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
 	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
 
@@ -217,6 +216,11 @@ func pfilter_eval(from_chan int, to_chan int, filter string, pp *packet_t, is_ap
 	pfstate.is_aprs = is_aprs
 	pfstate.syntax_only = syntax_only
 
+	if f != nil {
+		pfstate.igate_config = f.igateConfig
+		pfstate.debug = f.debug
+	}
+
 	if is_aprs {
 		pfstate.decoded = decode_aprs(pp, true, "")
 	}
@@ -241,7 +245,7 @@ func pfilter_eval(from_chan int, to_chan int, filter string, pp *packet_t, is_ap
 		}
 	}
 
-	if pfilter_debug >= 1 {
+	if pfstate.debug >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
 
 		if from_chan == MAX_TOTAL_CHANS {
@@ -383,7 +387,7 @@ func parse_or_expr(pf *pfstate_t) (int, error) {
 		next_token(pf)
 		var e, eerr = parse_and_expr(pf)
 
-		if pfilter_debug >= 3 {
+		if pf.debug >= 3 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("  %s | %s\n", bool2text(result), bool2text(e))
 		}
@@ -410,7 +414,7 @@ func parse_and_expr(pf *pfstate_t) (int, error) {
 		next_token(pf)
 		var e, eerr = parse_primary(pf)
 
-		if pfilter_debug >= 3 {
+		if pf.debug >= 3 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("  %s & %s\n", bool2text(result), bool2text(e))
 		}
@@ -448,7 +452,7 @@ func parse_primary(pf *pfstate_t) (int, error) {
 		next_token(pf)
 		var e, eerr = parse_primary(pf)
 
-		if pfilter_debug >= 3 {
+		if pf.debug >= 3 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("  ! %s\n", bool2text(e))
 		}
@@ -532,7 +536,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		var addr = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
 		result, err = filt_bodgu(pf, addr)
 
-		if pfilter_debug >= 2 {
+		if pf.debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr)
 		}
@@ -540,7 +544,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* o - object or item name */
 		result, err = filt_bodgu(pf, pf.decoded.g_name)
 
-		if pfilter_debug >= 2 {
+		if pf.debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_name)
 		}
@@ -556,7 +560,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 			}
 		}
 
-		if pfilter_debug >= 2 {
+		if pf.debug >= 2 {
 			var path = ax25_format_via_path(pf.pp)
 
 			if len(path) == 0 {
@@ -579,7 +583,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 			}
 		}
 
-		if pfilter_debug >= 2 {
+		if pf.debug >= 2 {
 			var path = ax25_format_via_path(pf.pp)
 
 			if len(path) == 0 {
@@ -599,14 +603,14 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 			pf.decoded.g_message_subtype == message_subtype_directed_query {
 			result, err = filt_bodgu(pf, pf.decoded.g_addressee)
 
-			if pfilter_debug >= 2 {
+			if pf.debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee)
 			}
 		} else {
 			result = 0
 
-			if pfilter_debug >= 2 {
+			if pf.debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), "not a message")
 			}
@@ -619,14 +623,14 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 			var addr = ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION)
 			result, err = filt_bodgu(pf, addr)
 
-			if pfilter_debug >= 2 {
+			if pf.debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr)
 			}
 		} else {
 			result = 0
 
-			if pfilter_debug >= 2 {
+			if pf.debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), "MIC-E packet type")
 			}
@@ -635,7 +639,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* t - packet type: position, weather, telemetry, etc. */
 		result, err = filt_t(pf)
 
-		if pfilter_debug >= 2 {
+		if pf.debug >= 2 {
 			var infop = AX25GetInfo(pf.pp)
 
 			if len(infop) > 0 {
@@ -652,7 +656,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		var sdist string
 		result, sdist, err = filt_r(pf)
 
-		if pfilter_debug >= 2 {
+		if pf.debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), sdist)
 		}
@@ -660,7 +664,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* s - symbol */
 		result, err = filt_s(pf)
 
-		if pfilter_debug >= 2 {
+		if pf.debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 
 			if pf.decoded.g_symbol_table == '/' { //nolint:staticcheck
@@ -676,7 +680,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* IGatge messaging */
 		result, err = filt_i(pf)
 
-		if pfilter_debug >= 2 {
+		if pf.debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 
 			if pf.decoded.g_packet_type == packet_type_message {
@@ -1239,8 +1243,8 @@ func filt_i(pf *pfstate_t) (int, error) {
 	// TODO KG: This was unused in the original C, but I think that was accidental given all the context here
 	var heardtime = 180 //nolint:ineffassign,wastedassign
 	var maxhops = 0     // from IGTXVIA config.
-	if pfilter_igate_config_p != nil {
-		maxhops = pfilter_igate_config_p.max_digi_hops
+	if pf.igate_config != nil {
+		maxhops = pf.igate_config.max_digi_hops
 	}
 	var dlat maybe.Maybe[float64]
 	var dlon maybe.Maybe[float64]
@@ -1470,7 +1474,10 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
 		return fmt.Errorf("pfilter_validate: failed to construct synthetic packet from %q", pfilterDummyMonitorLine)
 	}
 
-	var _, err = pfilter_eval(from_chan, to_chan, filter, pp, is_aprs, true)
+	// A zero PacketFilter says nothing about the synthetic packet, which is
+	// not something anybody asked about, and needs no IGate configuration,
+	// which the config file being checked may not have got to yet.
+	var _, err = new(PacketFilter).eval(from_chan, to_chan, filter, pp, is_aprs, true)
 
 	return err
 }
@@ -1479,11 +1486,13 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
  *
  * Name:   	PfilterStandaloneInit
  *
- * Purpose:     Set up the global state pfilter leans on, for a program that
- *		wants to run filters but is not the TNC.
+ * Purpose:     Set up what pfilter leans on, for a program that wants to run
+ *		filters but is not the TNC.
  *
- * Inputs:	debug_level	- As for pfilter_init: 0 for nothing, up to
- *				  PfilterMaxDebugLevel for the most detail.
+ * Inputs:	debug_level	- As for PacketFilter's debug: 0 for nothing, up
+ *				  to PfilterMaxDebugLevel for the most detail.
+ *
+ * Returns:	The PacketFilter to run them with.
  *
  * Description:	TNC startup would have put a few things in place that pfilter
  *		expects: the tables decode_aprs reads, which DecodeAPRSInit
@@ -1495,17 +1504,17 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
  *
  *--------------------------------------------------------------------*/
 
-func PfilterStandaloneInit(debug_level int) {
+func PfilterStandaloneInit(debug_level int) *PacketFilter {
 	TextColorInit(0)
 
 	DecodeAPRSInit()
 
 	mheardDB = NewMHeardDB(0)
 
-	pfilter_init(new(igate_config_s), debug_level)
+	return NewPacketFilter(new(igate_config_s), debug_level)
 }
 
-// PfilterMaxDebugLevel is the most verbose debug level pfilter_init has
+// PfilterMaxDebugLevel is the most verbose debug level a PacketFilter has
 // anything to say at.
 const PfilterMaxDebugLevel = 3
 
@@ -1550,20 +1559,12 @@ func PfilterValidate(from_chan int, to_chan int, filter string, is_aprs bool) er
 		return channelErr
 	}
 
-	// Validating runs the filter against a synthetic packet of its own, which
-	// is not something the caller asked about, so say nothing about it however
-	// much debug output was asked for.
-	var saved_pfilter_debug = pfilter_debug
-	pfilter_debug = 0
-
-	defer func() { pfilter_debug = saved_pfilter_debug }()
-
 	return pfilter_validate(from_chan, to_chan, filter, is_aprs)
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:   	PfilterMonitorLine
+ * Name:   	MonitorLine
  *
  * Purpose:     pfilter, for a program outside this package, against a packet
  *		written out in the usual monitoring format.
@@ -1579,7 +1580,7 @@ func PfilterValidate(from_chan int, to_chan int, filter string, is_aprs bool) er
  *
  *--------------------------------------------------------------------*/
 
-func PfilterMonitorLine(from_chan int, to_chan int, filter string, is_aprs bool, monitor_line string) (bool, error) {
+func (f *PacketFilter) MonitorLine(from_chan int, to_chan int, filter string, is_aprs bool, monitor_line string) (bool, error) {
 	var channelErr = pfilter_check_channels(from_chan, to_chan)
 	if channelErr != nil {
 		return false, channelErr
@@ -1593,7 +1594,7 @@ func PfilterMonitorLine(from_chan int, to_chan int, filter string, is_aprs bool,
 		return false, fmt.Errorf("could not parse monitoring format input: %q", monitor_line)
 	}
 
-	var result, err = pfilter(from_chan, to_chan, filter, pp, is_aprs)
+	var result, err = f.pfilter(from_chan, to_chan, filter, pp, is_aprs)
 	if err != nil {
 		return false, err
 	}

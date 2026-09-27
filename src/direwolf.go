@@ -646,12 +646,12 @@ x = Silence FX.25 information.`)
 	 * Initialize the digipeater and IGate functions.
 	 */
 	mheardDB = NewMHeardDB(d_m_opt)
-	aprsDigipeater = NewDigipeater(audio_config, &digi_config)
-	igate = NewIGate(audio_config, &igate_config, &digi_config, d_i_opt)
+	var packetFilter = NewPacketFilter(&igate_config, d_f_opt)
+	aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter)
+	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, d_i_opt)
 	igate.start(ctx)
 	stopIfCancelled(ctx)
-	connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config)
-	pfilter_init(&igate_config, d_f_opt)
+	connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
 	ax25_link_init(misc_config, d_c_opt)
 
 	/*
