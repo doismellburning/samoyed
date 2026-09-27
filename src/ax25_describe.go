@@ -81,9 +81,9 @@ func DescribeAX25Frame(frame []byte) int {
 		return 1
 	}
 
-	if ax25_get_info_offset(pp) > frameLen {
+	if pp.InfoOffset() > frameLen {
 		fmt.Printf("ERROR: The frame is %d bytes, but the address, control and PID fields need %d - it ends before the information field.\n",
-			frameLen, ax25_get_info_offset(pp))
+			frameLen, pp.InfoOffset())
 		dwutil.HexDump(frame)
 
 		return 1

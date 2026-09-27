@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_info_offset(this_p *packet_t) int {
-	return this_p.InfoOffset()
-}
-
 func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype ax25_frame_type_t, pf int, pid int, info []byte) *packet_t {
 	return ax25.UFrame(addrs, num_addr, cr, ftype, pf, pid, info)
 }
