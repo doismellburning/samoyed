@@ -95,6 +95,7 @@ type digi_config_s struct {
 type Digipeater struct {
 	audioConfig *audio_s
 	config      *digi_config_s
+	filter      *PacketFilter
 	dedupe      *DedupeService
 	count       [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
 }
@@ -109,14 +110,17 @@ type Digipeater struct {
  *
  *		p_digi_config	- Digipeater configuration details.
  *
+ *		filter		- What decides whether FILTER lets a packet through.
+ *
  * Description:	Called once at application startup time.
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(p_audio_config *audio_s, p_digi_config *digi_config_s) *Digipeater {
+func NewDigipeater(p_audio_config *audio_s, p_digi_config *digi_config_s, filter *PacketFilter) *Digipeater {
 	var d = new(Digipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_digi_config
+	d.filter = filter
 	d.dedupe = NewDedupeService(time.Duration(p_digi_config.dedupe_time) * time.Second)
 
 	return d
@@ -344,7 +348,7 @@ func (d *Digipeater) match(
 	 * First check if filtering has been configured.
 	 */
 	if filter_str != "" {
-		var result, err = pfilter(from_chan, to_chan, filter_str, pp, true)
+		var result, err = d.filter.pfilter(from_chan, to_chan, filter_str, pp, true)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%s\n", err)

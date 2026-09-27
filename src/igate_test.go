@@ -138,9 +138,7 @@ func setupIGate(t *testing.T) net.Conn {
 
 	var digiConfig = new(digi_config_s)
 
-	igate = NewIGate(audioConfig, igateConfig, digiConfig, 0)
-
-	pfilter_init(igateConfig, 0)
+	igate = NewIGate(audioConfig, igateConfig, digiConfig, NewPacketFilter(igateConfig, 0), 0)
 
 	mheardDB = NewMHeardDB(0)
 

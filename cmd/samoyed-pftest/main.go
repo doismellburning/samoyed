@@ -153,7 +153,7 @@ func usage() {
 // run is main once the command line has been dealt with, taking its streams as
 // arguments so it can be tested.  It returns the exit status.
 func run(opts options, in io.Reader, out io.Writer, errOut io.Writer) int {
-	direwolf.PfilterStandaloneInit(opts.debugLevel)
+	var packetFilter = direwolf.PfilterStandaloneInit(opts.debugLevel)
 
 	var filterErr = direwolf.PfilterValidate(opts.fromChannel, opts.toChannel, opts.filter, opts.isAPRS)
 	if filterErr != nil {
@@ -185,7 +185,7 @@ func run(opts options, in io.Reader, out io.Writer, errOut io.Writer) int {
 			continue
 		}
 
-		var pass, err = direwolf.PfilterMonitorLine(opts.fromChannel, opts.toChannel, opts.filter, opts.isAPRS, line)
+		var pass, err = packetFilter.MonitorLine(opts.fromChannel, opts.toChannel, opts.filter, opts.isAPRS, line)
 
 		var verdict string
 

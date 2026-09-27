@@ -45,19 +45,19 @@ func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *audio_s, *cdigi_conf
 
 	transmitQueue.Init(audioConfig)
 
-	return NewConnectedDigipeater(audioConfig, cdigiConfig), audioConfig, cdigiConfig
+	return NewConnectedDigipeater(audioConfig, cdigiConfig, new(PacketFilter)), audioConfig, cdigiConfig
 }
 
 // A station that named us as its next digipeater is repeated, with the
 // callsign of the channel we transmit on put in place of the one it asked for
 // and marked as used.
 func TestCDigipeatMatchExplicitCall(t *testing.T) {
-	setupCDigipeater(t)
+	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var result = cdigipeat_match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "")
+	var result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "")
 
 	require.NotNil(t, result, "a frame addressed to us was not repeated")
 	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", AX25FormatAddrs(result))
@@ -70,14 +70,14 @@ func TestCDigipeatMatchExplicitCall(t *testing.T) {
 // An alias is the other way of asking: a pattern the configuration gives for
 // names we also answer to.
 func TestCDigipeatMatchAlias(t *testing.T) {
-	setupCDigipeater(t)
+	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = AX25FromText("Q3TEST>Q4TEST,WIDE1-1:hello", true)
 	require.NotNil(t, pp)
 
 	var alias = regexp.MustCompile("^WIDE[1-7]-[1-7]$")
 
-	var result = cdigipeat_match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", true, alias, cdigiToChan, "")
+	var result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", true, alias, cdigiToChan, "")
 
 	require.NotNil(t, result, "a frame addressed to one of our aliases was not repeated")
 	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", AX25FormatAddrs(result))
@@ -85,80 +85,71 @@ func TestCDigipeatMatchAlias(t *testing.T) {
 
 // An alias that does not match is somebody else's business.
 func TestCDigipeatMatchAliasNoMatch(t *testing.T) {
-	setupCDigipeater(t)
+	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = AX25FromText("Q3TEST>Q4TEST,Q5TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var alias = regexp.MustCompile("^WIDE[1-7]-[1-7]$")
 
-	assert.Nil(t, cdigipeat_match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", true, alias, cdigiToChan, ""))
+	assert.Nil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", true, alias, cdigiToChan, ""))
 }
 
 // With no alias configured there is nothing to match against, and the alias
 // pattern must not be looked at at all - it will not have been set up.
 func TestCDigipeatMatchNoAlias(t *testing.T) {
-	setupCDigipeater(t)
+	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = AX25FromText("Q3TEST>Q4TEST,Q5TEST:hello", true)
 	require.NotNil(t, pp)
 
-	assert.Nil(t, cdigipeat_match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, ""))
+	assert.Nil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, ""))
 }
 
 // A frame with no digipeater path is not asking to be repeated by anyone.
 func TestCDigipeatMatchNoDigipeaters(t *testing.T) {
-	setupCDigipeater(t)
+	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = AX25FromText("Q3TEST>Q4TEST:hello", true)
 	require.NotNil(t, pp)
 
-	assert.Nil(t, cdigipeat_match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, ""))
+	assert.Nil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, ""))
 }
 
 // A path whose every entry has been used has been all the way round already.
 func TestCDigipeatMatchPathExhausted(t *testing.T) {
-	setupCDigipeater(t)
+	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST*:hello", true)
 	require.NotNil(t, pp)
 
-	assert.Nil(t, cdigipeat_match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, ""))
+	assert.Nil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, ""))
 }
 
 // CFILTER is how the configuration narrows what a channel pair will repeat,
 // and it is consulted before the address is even looked at.
 func TestCDigipeatMatchFilterRejects(t *testing.T) {
-	setupCDigipeater(t)
-
-	var igateConfig igate_config_s
-	pfilter_init(&igateConfig, 0)
+	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
-	assert.Nil(t, cdigipeat_match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "b/Q9TEST"))
+	assert.Nil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "b/Q9TEST"))
 }
 
 func TestCDigipeatMatchFilterAccepts(t *testing.T) {
-	setupCDigipeater(t)
-
-	var igateConfig igate_config_s
-	pfilter_init(&igateConfig, 0)
+	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
-	assert.NotNil(t, cdigipeat_match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "b/Q3TEST"))
+	assert.NotNil(t, cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "b/Q3TEST"))
 }
 
 // A filter that cannot be understood says so, and nothing is repeated through
 // it - a filter that silently passed everything would be worse than none.
 func TestCDigipeatMatchFilterError(t *testing.T) {
-	setupCDigipeater(t)
-
-	var igateConfig igate_config_s
-	pfilter_init(&igateConfig, 0)
+	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
@@ -166,7 +157,7 @@ func TestCDigipeatMatchFilterError(t *testing.T) {
 	var result *packet_t
 
 	var output = testutils.CaptureOutput(t, func() {
-		result = cdigipeat_match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "z/nonsense")
+		result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "z/nonsense")
 	})
 
 	assert.NotEmpty(t, output, "a filter that could not be understood was not reported")
@@ -272,8 +263,11 @@ func TestNewConnectedDigipeater(t *testing.T) {
 	var audioConfig = new(audio_s)
 	var cdigiConfig = new(cdigi_config_s)
 
-	var cdigi = NewConnectedDigipeater(audioConfig, cdigiConfig)
+	var filter = new(PacketFilter)
+
+	var cdigi = NewConnectedDigipeater(audioConfig, cdigiConfig, filter)
 
 	assert.Same(t, audioConfig, cdigi.audioConfig)
 	assert.Same(t, cdigiConfig, cdigi.config)
+	assert.Same(t, filter, cdigi.filter)
 }

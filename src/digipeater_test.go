@@ -48,7 +48,7 @@ func setupDigipeater(t *testing.T) (*Digipeater, *digi_config_s) {
 
 	transmitQueue.Init(audioConfig)
 
-	return NewDigipeater(audioConfig, digiConfig), digiConfig
+	return NewDigipeater(audioConfig, digiConfig, new(PacketFilter)), digiConfig
 }
 
 // enableDigipeat turns on digipeating from digiFromChan to the given channel,
@@ -205,10 +205,13 @@ func TestNewDigipeater(t *testing.T) {
 	var digiConfig = new(digi_config_s)
 	digiConfig.dedupe_time = 30
 
-	var digi = NewDigipeater(audioConfig, digiConfig)
+	var filter = new(PacketFilter)
+
+	var digi = NewDigipeater(audioConfig, digiConfig, filter)
 
 	assert.Same(t, audioConfig, digi.audioConfig)
 	assert.Same(t, digiConfig, digi.config)
+	assert.Same(t, filter, digi.filter)
 	require.NotNil(t, digi.dedupe, "the duplicate suppression the digipeater relies on was not set up")
 	assert.Equal(t, 30*time.Second, digi.dedupe.historyTime)
 }
