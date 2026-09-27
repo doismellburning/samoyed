@@ -155,9 +155,10 @@ import (
 // KissNetService manages KISS protocol TCP socket connections.
 // Each TCP port has its own status block in a linked list.
 type KissNetService struct {
-	miscConfigP *misc_config_s
-	allPorts    *kissport_status_s
-	debug       int /* Print information flowing from and to client. */
+	miscConfigP  *misc_config_s
+	audioConfigP *audio_s // Which channels a client may transmit on.
+	allPorts     *kissport_status_s
+	debug        int /* Print information flowing from and to client. */
 }
 
 /*-------------------------------------------------------------------
@@ -171,6 +172,13 @@ type KissNetService struct {
  * Inputs:	mc.kiss_port	- TCP port for server.
  *				  0 means disable.  New in version 1.2.
  *
+ *		audioConfig	- Which channels a client may transmit on.
+ *
+ *		debug		- Print information flowing from and to
+ *				  clients.  Taken here rather than set
+ *				  afterwards, because the listening
+ *				  goroutines read it from the start.
+ *
  * Outputs:
  *
  * Description:	This starts two threads:
@@ -180,9 +188,11 @@ type KissNetService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewKissNetService(ctx context.Context, mc *misc_config_s) *KissNetService {
+func NewKissNetService(ctx context.Context, mc *misc_config_s, audioConfig *audio_s, debug int) *KissNetService {
 	var kns = new(KissNetService)
 	kns.miscConfigP = mc
+	kns.audioConfigP = audioConfig
+	kns.debug = debug
 
 	for i := range MAX_KISS_TCP_PORTS {
 		if mc.kiss_port[i] != 0 {
@@ -200,10 +210,6 @@ func NewKissNetService(ctx context.Context, mc *misc_config_s) *KissNetService {
 	}
 
 	return kns
-}
-
-func (kns *KissNetService) SetDebug(n int) {
-	kns.debug = n
 }
 
 /*-------------------------------------------------------------------
@@ -500,7 +506,7 @@ func (kns *KissNetService) listenThread(ctx context.Context, kps *kissport_statu
 			return // Cancelled.
 		}
 
-		KissRecByte(frame, ch, kns.debug, kps, client, kns.SendRecPacket)
+		KissRecByte(frame, kns.audioConfigP, ch, kns.debug, kps, client, kns.SendRecPacket)
 	}
 } /* end listenThread */
 

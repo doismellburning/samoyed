@@ -106,7 +106,7 @@ func TestKissNetServiceStopsWhenCancelled(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	NewKissNetService(ctx, mc)
+	NewKissNetService(ctx, mc, new(audio_s), 0)
 
 	waitUntilListening(t, port)
 

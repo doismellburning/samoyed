@@ -62,7 +62,7 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*KissSerial, <-chan struct{}) {
 	t.Helper()
 
-	var ks = newKissSerial(mc, 0)
+	var ks = newKissSerial(mc, kissTestAudioConfig(), 0)
 
 	if mc.kiss_serial_poll == 0 {
 		ks.fd = SerialPortOpen(mc.kiss_serial_port, mc.kiss_serial_speed)
@@ -99,7 +99,7 @@ func openKissSerialPort(t *testing.T, debug int) (*KissSerial, *os.File) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var ks = newKissSerial(mc, debug)
+	var ks = newKissSerial(mc, kissTestAudioConfig(), debug)
 
 	t.Cleanup(ks.closePort)
 
@@ -160,7 +160,7 @@ func readSerialText(t *testing.T, client *os.File, want int) string {
 // Without KISSPORT in the configuration there is no serial TNC at all, and
 // nothing for the sending path to write to.
 func TestKissSerialNoPortConfigured(t *testing.T) {
-	var ks = NewKissSerial(t.Context(), new(misc_config_s), 0)
+	var ks = NewKissSerial(t.Context(), new(misc_config_s), nil, 0)
 
 	assert.Nil(t, ks.fd)
 	assert.NotNil(t, ks.kf, "the frame decoder state should be ready even with no port")
@@ -190,7 +190,7 @@ func TestKissSerialDeviceNotThere(t *testing.T) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = "/dev/there-is-no-such-serial-port"
 
-	var output = testutils.CaptureOutput(t, func() { ks = NewKissSerial(t.Context(), mc, 0) })
+	var output = testutils.CaptureOutput(t, func() { ks = NewKissSerial(t.Context(), mc, nil, 0) })
 
 	assert.Contains(t, output, "Could not open serial port /dev/there-is-no-such-serial-port")
 	assert.Nil(t, ks.fd)
@@ -283,17 +283,15 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	const channel = 0
 
-	var audioConfig = new(audio_s)
-	audioConfig.chan_medium[channel] = MEDIUM_RADIO
+	// Laid out like the channel table startKissSerial gives the TNC.
+	var audioConfig = kissTestAudioConfig()
 
-	var origAudioConfig, origXmitSvc, origKissNetSvc = save_audio_config_p, xmitSvc, kissNetSvc
+	var origXmitSvc, origKissNetSvc = xmitSvc, kissNetSvc
 
-	t.Cleanup(func() { save_audio_config_p, xmitSvc, kissNetSvc = origAudioConfig, origXmitSvc, origKissNetSvc })
-
-	kiss_frame_init(audioConfig)
+	t.Cleanup(func() { xmitSvc, kissNetSvc = origXmitSvc, origKissNetSvc })
 
 	xmitSvc = new(XmitService)
-	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s))
+	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s), audioConfig, 0)
 
 	transmitQueue.Init(audioConfig)
 

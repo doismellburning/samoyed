@@ -460,7 +460,9 @@ func tnc_listen_net(conn net.Conn) {
 				_verbose = 1
 			}
 
-			direwolf.KissRecByte(kstate, data[j], _verbose, nil, 0, nil)
+			// kstate.OnMessage takes each frame, so there is no channel
+			// check to hand an audio configuration to.
+			direwolf.KissRecByte(kstate, nil, data[j], _verbose, nil, 0, nil)
 		}
 	}
 } /* end tnc_listen_net */
@@ -520,7 +522,8 @@ func tnc_listen_serial(fd *term.Term) {
 			_verbose = 1
 		}
 
-		direwolf.KissRecByte(kstate, ch, _verbose, nil, 0, nil)
+		// As above, kstate.OnMessage takes each frame.
+		direwolf.KissRecByte(kstate, nil, ch, _verbose, nil, 0, nil)
 	}
 } /* end tnc_listen_serial */
 

@@ -268,20 +268,6 @@ func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *KISSFrame) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        kiss_frame_init
- *
- * Purpose:     Save information about valid channels for later error checking.
- *
- * Inputs:      pa		- Address of structure of type audio_s.
- *
- *-----------------------------------------------------------------*/
-
-func kiss_frame_init(pa *audio_s) {
-	save_audio_config_p = pa
-}
-
-/*-------------------------------------------------------------------
- *
  * Name:        KissEncapsulate
  *
  * Purpose:     Encapsulate a frame into KISS format.
@@ -541,6 +527,8 @@ func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
  * Purpose:     Process one byte from a KISS client app.
  *
  * Inputs:	kf	- Current state of building a frame.
+ *		audioConfig - Which channels are configured.  Only read
+ *			  when kf.OnMessage is nil, so may be nil otherwise.
  *		ch	- A byte from the input stream.
  *		debug	- Activates debug output.
  *		kps	- KISS TCP port status block.
@@ -581,7 +569,7 @@ func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
 
 type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
-func KissRecByte(kf *KISSFrame, ch byte, debug int,
+func KissRecByte(kf *KISSFrame, audioConfig *audio_s, ch byte, debug int,
 	kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
 	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
@@ -692,7 +680,7 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 			if kf.OnMessage != nil {
 				kf.OnMessage(unwrapped)
 			} else {
-				kiss_process_msg(unwrapped, debug, kps, client, sendfun)
+				kiss_process_msg(unwrapped, audioConfig, debug, kps, client, sendfun)
 			}
 
 			kf.state = KS_SEARCHING
@@ -723,6 +711,9 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
  *
  *		kiss_len	- Number of bytes including the command.
  *
+ *		audioConfig	- Which channels are configured, so that a
+ *				  frame for one that isn't can be rejected.
+ *
  *		debug		- Debug option is selected.
  *
  *		kps		- Used only for TCP KISS.
@@ -738,7 +729,7 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 
 // This is used only by the TNC side.
 
-func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
+func kiss_process_msg(kiss_msg []byte, audioConfig *audio_s, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
 	// New in 1.7:
 	// We can have KISS TCP ports which convey only a single radio channel.
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.
@@ -813,7 +804,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		// matter for an out-of-range channel - and indexed chan_medium with
 		// it to find out.  An in-range IGate channel is not MEDIUM_NONE.
 
-		if channel < 0 || channel >= MAX_TOTAL_CHANS || save_audio_config_p.chan_medium[channel] == MEDIUM_NONE {
+		if channel < 0 || channel >= MAX_TOTAL_CHANS || audioConfig.chan_medium[channel] == MEDIUM_NONE {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid transmit channel %d from KISS client app.\n", channel)
 			dw_printf("\n")
