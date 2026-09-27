@@ -212,8 +212,6 @@ const MAXX_THINGS = 60
  *------------------------------------------------------------------*/
 
 func CM108Inventory(max_things int) ([]*CM108Thing, error) {
-	var things []*CM108Thing
-
 	/*
 	 * First get a list of the USB audio devices.
 	 * This is based on the example in http://www.signal11.us/oss/udev/
@@ -227,32 +225,98 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 		return nil, fmt.Errorf("could not enumerate udev sound devices: %w", devicesErr)
 	}
 
+	/*
+	 * Then all of the USB HID.
+	 */
+	var e2 = u.NewEnumerate()
+	e2.AddMatchSubsystem("hidraw")
+
+	var hidDevices, hidDevicesErr = e2.Devices()
+	if hidDevicesErr != nil {
+		return nil, fmt.Errorf("could not enumerate udev hidraw devices: %w", hidDevicesErr)
+	}
+
+	return cm108_inventory_of(readUdevDevices(devices), readUdevDevices(hidDevices), max_things), nil
+} /* end CM108Inventory */
+
+// cm108Device is what the inventory needs to know of a udev device, read out
+// of udev up front so that the inventory can also be taken of devices that
+// are not really there.
+type cm108Device struct {
+	devnode string
+	devpath string
+	syspath string
+	id      string // Sound card name, from sysattr "id".
+	number  string // Sound card number, from sysattr "number".
+	usb     *cm108USBDevice
+}
+
+// cm108USBDevice is the "usb" "usb_device" ancestor of a cm108Device.
+type cm108USBDevice struct {
+	devnode   string
+	idVendor  string
+	idProduct string
+	product   string
+}
+
+func readUdevDevices(devices []*udev.Device) []cm108Device {
+	var read = make([]cm108Device, 0, len(devices))
+
+	for _, dev := range devices {
+		var d cm108Device
+
+		d.devnode = dev.Devnode()
+		d.devpath = dev.Devpath()
+		d.syspath = dev.Syspath()
+		d.id = dev.SysattrValue("id")
+		d.number = dev.SysattrValue("number")
+
+		var parentdev = dev.ParentWithSubsystemDevtype("usb", "usb_device")
+		if parentdev != nil {
+			d.usb = new(cm108USBDevice)
+			d.usb.devnode = parentdev.Devnode()
+			d.usb.idVendor = parentdev.SysattrValue("idVendor")
+			d.usb.idProduct = parentdev.SysattrValue("idProduct")
+			d.usb.product = parentdev.SysattrValue("product")
+		}
+
+		read = append(read, d)
+	}
+
+	return read
+}
+
+// cm108_inventory_of does the work of CM108Inventory on the devices of the
+// "sound" and "hidraw" subsystems, in udev's enumeration order.
+func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_things int) []*CM108Thing {
+	var things []*CM108Thing
+
 	var cardDevpath string
 	var pattrsID string
 	var pattrsNumber string
 
 	for _, dev := range devices {
-		var devnode = dev.Devnode()
+		var devnode = dev.devnode
 
 		if devnode == "" {
 			// I'm not happy with this but couldn't figure out how
 			// to get attributes from one level up from the pcmC?D?? node.
-			cardDevpath = dev.Syspath()
-			pattrsID = dev.SysattrValue("id")
-			pattrsNumber = dev.SysattrValue("number")
+			cardDevpath = dev.syspath
+			pattrsID = dev.id
+			pattrsNumber = dev.number
 		} else {
-			var parentdev = dev.ParentWithSubsystemDevtype("usb", "usb_device")
+			var parentdev = dev.usb
 			if parentdev != nil {
 				var vid int
 				var pid int
 
-				var p = parentdev.SysattrValue("idVendor")
+				var p = parentdev.idVendor
 				if p != "" {
 					var vid64, _ = strconv.ParseInt(p, 16, 0)
 					vid = int(vid64)
 				}
 
-				p = parentdev.SysattrValue("idProduct")
+				p = parentdev.idProduct
 				if p != "" {
 					var pid64, _ = strconv.ParseInt(p, 16, 0)
 					pid = int(pid64)
@@ -265,9 +329,9 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 					thing.PID = pid
 					thing.CardName = pattrsID
 					thing.CardNumber = pattrsNumber
-					thing.Product = parentdev.SysattrValue("product")
+					thing.Product = parentdev.product
 					thing.DevnodeSound = devnode
-					thing.DevnodeUSB = parentdev.Devnode()
+					thing.DevnodeUSB = parentdev.devnode
 					thing.Devpath = cardDevpath
 
 					things = append(things, thing)
@@ -279,35 +343,27 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 	/*
 	 * Now merge in all of the USB HID.
 	 */
-	var e2 = u.NewEnumerate()
-	e2.AddMatchSubsystem("hidraw")
-
-	var hidDevices, hidDevicesErr = e2.Devices()
-	if hidDevicesErr != nil {
-		return nil, fmt.Errorf("could not enumerate udev hidraw devices: %w", hidDevicesErr)
-	}
-
 	for _, dev := range hidDevices {
-		var devnode = dev.Devnode()
+		var devnode = dev.devnode
 		if devnode != "" {
-			var parentdev = dev.ParentWithSubsystemDevtype("usb", "usb_device")
+			var parentdev = dev.usb
 			if parentdev != nil {
 				var vid int
 				var pid int
 
-				var p = parentdev.SysattrValue("idVendor")
+				var p = parentdev.idVendor
 				if p != "" {
 					var vid64, _ = strconv.ParseInt(p, 16, 0)
 					vid = int(vid64)
 				}
 
-				p = parentdev.SysattrValue("idProduct")
+				p = parentdev.idProduct
 				if p != "" {
 					var pid64, _ = strconv.ParseInt(p, 16, 0)
 					pid = int(pid64)
 				}
 
-				var usb = parentdev.Devnode()
+				var usb = parentdev.devnode
 
 				// Add hidraw name to any matching existing.
 				var matched = false
@@ -325,10 +381,10 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 
 					thing.VID = vid
 					thing.PID = pid
-					thing.Product = parentdev.SysattrValue("product")
+					thing.Product = parentdev.product
 					thing.DevnodeHidraw = devnode
 					thing.DevnodeUSB = usb
-					thing.Devpath = dev.Devpath()
+					thing.Devpath = dev.devpath
 
 					things = append(things, thing)
 				}
@@ -357,8 +413,8 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 		}
 	}
 
-	return things, nil
-} /* end CM108Inventory */
+	return things
+} /* end cm108_inventory_of */
 
 /*-------------------------------------------------------------------
  *
@@ -396,6 +452,11 @@ func cm108_find_ptt(output_audio_device string) (string, error) {
 		return "", fmt.Errorf("could not take inventory of USB audio devices: %w", inventoryErr)
 	}
 
+	return cm108_find_ptt_in(things, output_audio_device)
+}
+
+// cm108_find_ptt_in does the work of cm108_find_ptt on an inventory already taken.
+func cm108_find_ptt_in(things []*CM108Thing, output_audio_device string) (string, error) {
 	var sound_re = regexp.MustCompile(".+:(CARD=)?([A-Za-z0-9_]+)(,.*)?")
 
 	var matches = sound_re.FindStringSubmatch(output_audio_device)
