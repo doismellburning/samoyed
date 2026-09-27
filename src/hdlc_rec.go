@@ -153,8 +153,6 @@ func NewHDLCReceiver(pa *audio_s, demods [MAX_RADIO_CHANS]*Demodulator, sink Rec
 		}
 	}
 
-	hdlc_rec2_init(pa)
-
 	return r
 }
 
@@ -575,7 +573,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 			var alevel = demod_get_audio_level(channel, subchannel)
 
 			rrbb_set_audio_level(s.rrbb, alevel)
-			hdlc_rec2_block(s.rrbb)
+			hdlc_rec2_block(s.rrbb, &s.receiver.audio.achan[channel])
 			/* Handed off to hdlc_rec2_block. */
 			s.rrbb = nil
 
