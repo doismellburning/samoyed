@@ -148,6 +148,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
+	"sync/atomic"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
@@ -160,6 +162,7 @@ type KissNetService struct {
 	audioConfigP *AudioConfig // Which channels a client may transmit on.
 	allPorts     *kissport_status_s
 	debug        int /* Print information flowing from and to client. */
+	started      atomic.Bool
 }
 
 /*-------------------------------------------------------------------
@@ -176,20 +179,15 @@ type KissNetService struct {
  *		audioConfig	- Which channels a client may transmit on.
  *
  *		debug		- Print information flowing from and to
- *				  clients.  Taken here rather than set
- *				  afterwards, because the listening
- *				  goroutines read it from the start.
+ *				  clients.
  *
  * Outputs:
  *
- * Description:	This starts two threads:
- *		  *  to listen for a connection from client app.
- *		  *  to listen for commands from client app.
- *		so the main application doesn't block while we wait for these.
+ * Description:	Nothing listens until Start is called.
  *
  *--------------------------------------------------------------------*/
 
-func NewKissNetService(ctx context.Context, mc *misc_config_s, audioConfig *AudioConfig, debug int) *KissNetService {
+func NewKissNetService(mc *misc_config_s, audioConfig *AudioConfig, debug int) *KissNetService {
 	var kns = new(KissNetService)
 	kns.miscConfigP = mc
 	kns.audioConfigP = audioConfig
@@ -205,12 +203,36 @@ func NewKissNetService(ctx context.Context, mc *misc_config_s, audioConfig *Audi
 			// Add to list.
 			kps.pnext = kns.allPorts
 			kns.allPorts = kps
-
-			kns.initOne(ctx, kps)
 		}
 	}
 
 	return kns
+}
+
+// Start listens on each configured port until ctx is cancelled.  For each it
+// starts goroutines to listen for a connection from a client application, and
+// for commands from each client, so the caller doesn't block while we wait for
+// these.  Anything the goroutines read, such as debug, must be set before
+// calling it.
+//
+// Starting it again would try to bind every port a second time, so a second
+// Start is complained about and ignored.
+func (kns *KissNetService) Start(ctx context.Context) {
+	if !kns.started.CompareAndSwap(false, true) {
+		logrus.Error("KISS TCP service started twice; ignoring the second start")
+
+		return
+	}
+
+	// The list is newest first; start them in the order they were configured.
+	var ports []*kissport_status_s
+	for kps := kns.allPorts; kps != nil; kps = kps.pnext {
+		ports = append(ports, kps)
+	}
+
+	for _, kps := range slices.Backward(ports) {
+		kns.initOne(ctx, kps)
+	}
 }
 
 /*-------------------------------------------------------------------

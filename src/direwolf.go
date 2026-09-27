@@ -664,7 +664,8 @@ x = Silence FX.25 information.`)
 	 */
 	agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
 	metrics_init(ctx, misc_config)
-	kissNetSvc = NewKissNetService(ctx, misc_config, audio_config, d_n_opt)
+	kissNetSvc = NewKissNetService(misc_config, audio_config, d_n_opt)
+	kissNetSvc.Start(ctx)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
 	// Let's just check [0] for now...

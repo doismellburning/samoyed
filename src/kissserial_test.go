@@ -292,7 +292,7 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	t.Cleanup(func() { xmitSvc, kissNetSvc = origXmitSvc, origKissNetSvc })
 
 	xmitSvc = new(XmitService)
-	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s), audioConfig, 0)
+	kissNetSvc = NewKissNetService(new(misc_config_s), audioConfig, 0)
 
 	transmitQueue.Init(audioConfig)
 
