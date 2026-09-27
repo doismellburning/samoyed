@@ -1145,7 +1145,7 @@ func (ig *IGate) satgateDelayPacket(pp *packet_t, channel int) { //nolint:unpara
 	dw_printf("Rx IGate: SATgate mode, delay packet heard directly.\n")
 	//}
 
-	ax25_set_release_time(pp, time.Now().Add(time.Duration(ig.config.satgate_delay)*time.Second))
+	pp.SetReleaseTime(time.Now().Add(time.Duration(ig.config.satgate_delay) * time.Second))
 	//TODO: save channel too.
 
 	ig.dpMutex.Lock()
