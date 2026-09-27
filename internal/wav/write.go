@@ -1,13 +1,15 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// Package wavwrite writes uncompressed PCM .WAV (RIFF) files.
+// Package wav reads and writes uncompressed PCM .WAV (RIFF) files.
+//
+// [ReadHeader] reads a file's format, leaving the reader at its sample data.
 //
 // A [Writer] writes a placeholder header when the file is created, buffers the
 // sample data subsequently written to it, and then seeks back to fill in the
 // lengths when it is closed - so a file is only valid once [Writer.Close] has
 // returned without error.
-package wavwrite
+package wav
 
 import (
 	"bufio"
@@ -42,7 +44,7 @@ const HeaderSize = 44
 
 // ErrClosed is returned by the methods of a [Writer] that has already been
 // closed.
-var ErrClosed = errors.New("wavwrite: writer is closed")
+var ErrClosed = errors.New("wav: writer is closed")
 
 // Format describes the sample format of the audio written to a file.
 type Format struct {
@@ -54,15 +56,15 @@ type Format struct {
 // Validate reports whether f describes a format we can write.
 func (f Format) Validate() error {
 	if f.NumChannels != 1 && f.NumChannels != 2 {
-		return fmt.Errorf("wavwrite: unsupported number of channels %d, must be 1 or 2", f.NumChannels)
+		return fmt.Errorf("wav: unsupported number of channels %d, must be 1 or 2", f.NumChannels)
 	}
 
 	if f.BitsPerSample != 8 && f.BitsPerSample != 16 {
-		return fmt.Errorf("wavwrite: unsupported bits per sample %d, must be 8 or 16", f.BitsPerSample)
+		return fmt.Errorf("wav: unsupported bits per sample %d, must be 8 or 16", f.BitsPerSample)
 	}
 
 	if f.SamplesPerSec <= 0 {
-		return fmt.Errorf("wavwrite: invalid sample rate %d, must be positive", f.SamplesPerSec)
+		return fmt.Errorf("wav: invalid sample rate %d, must be positive", f.SamplesPerSec)
 	}
 
 	// The header holds the sample rate, and the byte rate derived from it, as
@@ -70,7 +72,7 @@ func (f Format) Validate() error {
 	// than silently writing a header describing some other format.
 	var bytesPerFrame = f.BitsPerSample / 8 * f.NumChannels // 1 to 4, so never zero.
 	if f.SamplesPerSec > math.MaxInt32/bytesPerFrame {
-		return fmt.Errorf("wavwrite: sample rate %d is too high for %d channel(s) at %d bits per sample, maximum is %d",
+		return fmt.Errorf("wav: sample rate %d is too high for %d channel(s) at %d bits per sample, maximum is %d",
 			f.SamplesPerSec, f.NumChannels, f.BitsPerSample, math.MaxInt32/bytesPerFrame)
 	}
 
@@ -98,7 +100,7 @@ func Create(name string, format Format) (*Writer, error) {
 
 	file, err := os.Create(name) //nolint:gosec // We expect to write to a user-supplied file from the CLI
 	if err != nil {
-		return nil, fmt.Errorf("wavwrite: couldn't open %s for write: %w", name, err)
+		return nil, fmt.Errorf("wav: couldn't open %s for write: %w", name, err)
 	}
 
 	var w = new(Writer)
@@ -110,7 +112,7 @@ func Create(name string, format Format) (*Writer, error) {
 	if err != nil {
 		file.Close()
 
-		return nil, fmt.Errorf("wavwrite: couldn't write header to %s: %w", name, err)
+		return nil, fmt.Errorf("wav: couldn't write header to %s: %w", name, err)
 	}
 
 	return w, nil
@@ -149,7 +151,7 @@ func (w *Writer) Write(p []byte) (int, error) {
 	w.byteCount += n
 
 	if err != nil {
-		return n, fmt.Errorf("wavwrite: couldn't write audio data: %w", err)
+		return n, fmt.Errorf("wav: couldn't write audio data: %w", err)
 	}
 
 	return n, nil
@@ -192,7 +194,7 @@ func (w *Writer) Close() error {
 
 	err = file.Close()
 	if err != nil {
-		return fmt.Errorf("wavwrite: couldn't close audio file: %w", err)
+		return fmt.Errorf("wav: couldn't close audio file: %w", err)
 	}
 
 	return nil
@@ -204,7 +206,7 @@ func (w *Writer) Close() error {
 func (w *Writer) finish(file *os.File, buf *bufio.Writer) error {
 	var err = buf.Flush()
 	if err != nil {
-		return fmt.Errorf("wavwrite: couldn't flush audio file: %w", err)
+		return fmt.Errorf("wav: couldn't flush audio file: %w", err)
 	}
 
 	w.header.filesize = int32(w.byteCount + HeaderSize - 8)
@@ -212,12 +214,12 @@ func (w *Writer) finish(file *os.File, buf *bufio.Writer) error {
 
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
-		return fmt.Errorf("wavwrite: couldn't seek in audio file: %w", err)
+		return fmt.Errorf("wav: couldn't seek in audio file: %w", err)
 	}
 
 	err = w.writeHeader(file)
 	if err != nil {
-		return fmt.Errorf("wavwrite: couldn't write header to audio file: %w", err)
+		return fmt.Errorf("wav: couldn't write header to audio file: %w", err)
 	}
 
 	return nil

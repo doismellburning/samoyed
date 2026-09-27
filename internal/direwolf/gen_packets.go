@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/wavwrite"
+	"github.com/doismellburning/samoyed/internal/wav"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
@@ -383,13 +383,13 @@ func audio_file_open(fname string, pa *AudioConfig) (*wavFileSink, error) {
 	/*
 	 * Write the file header.  Don't know length yet.
 	 */
-	var format = wavwrite.Format{
+	var format = wav.Format{
 		NumChannels:   pa.adev[0].num_channels,
 		SamplesPerSec: pa.adev[0].samples_per_sec,
 		BitsPerSample: pa.adev[0].bits_per_sample,
 	}
 
-	var w, err = wavwrite.Create(fname, format)
+	var w, err = wav.Create(fname, format)
 	if err != nil {
 		return nil, err
 	}
@@ -416,7 +416,7 @@ func audio_file_close(sink *wavFileSink) error {
 // wavFileSink is the AudioSink for gen_packets: it writes the samples to the
 // .WAV file audio_file_open created, with noise added when asked for.
 type wavFileSink struct {
-	w *wavwrite.Writer
+	w *wav.Writer
 
 	// Noise is added to each sample when addNoise is set, at noiseLevel,
 	// drawing on rand.
@@ -430,7 +430,7 @@ type wavFileSink struct {
 	sample16Pending bool
 }
 
-func newWAVFileSink(w *wavwrite.Writer) *wavFileSink {
+func newWAVFileSink(w *wav.Writer) *wavFileSink {
 	var sink = new(wavFileSink)
 	sink.w = w
 

@@ -40,7 +40,6 @@ package direwolf
 
 import (
 	"bufio"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -48,37 +47,12 @@ import (
 	"os"
 	"strings"
 	"unicode"
-	"unsafe"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/wav"
 	"github.com/sirupsen/logrus"
 )
-
-type atest_header_t struct {
-	RIFF     [4]byte /* "RIFF" */
-	Filesize int32   /* file length - 8 */
-	WAVE     [4]byte /* "WAVE" */
-}
-
-type atest_chunk_t struct {
-	Id       [4]byte /* "LIST" or "fmt " */
-	Datasize int32
-}
-
-type atest_format_t struct {
-	Wformattag      int16 /* 1 for PCM. */
-	Nchannels       int16 /* 1 for mono, 2 for stereo. */
-	Nsamplespersec  int32 /* sampling freq, Hz. */
-	Navgbytespersec int32 /* = nblockalign*nsamplespersec. */
-	Nblockalign     int16 /* = wbitspersample/8 * nchannels. */
-	Wbitspersample  int16 /* 16 or 8. */
-}
-
-type atest_wav_data_t struct {
-	Data     [4]byte /* "data" */
-	Datasize int32
-}
 
 const EXPERIMENT_G = true
 const EXPERIMENT_H = true
@@ -232,115 +206,23 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 	var count [MAX_SUBCHANS]int // Experiments G and H
 	var space_gain [MAX_SUBCHANS]float64
 
-	var header atest_header_t
-	var chunk atest_chunk_t
-	var format atest_format_t
-	var wav_data atest_wav_data_t
-
-	/*
-	 * Read the file header.
-	 * Doesn't handle all possible cases but good enough for our purposes.
-	 */
-
-	var err = binary.Read(r, binary.LittleEndian, &header)
+	var format, dataSize, err = wav.ReadHeader(r)
 	if err != nil {
-		return AtestFileResult{}, fmt.Errorf("WAV file error: Could not read file header: %w", err)
+		return AtestFileResult{}, fmt.Errorf("WAV file error: %w", err)
 	}
 
-	if string(header.RIFF[:]) != "RIFF" || string(header.WAVE[:]) != "WAVE" {
-		return AtestFileResult{}, errors.New("this is not a .WAV format file")
-	}
-
-	err = binary.Read(r, binary.LittleEndian, &chunk)
-	if err != nil {
-		return AtestFileResult{}, fmt.Errorf("WAV file error: Could not read chunk header: %w", err)
-	}
-
-	for string(chunk.Id[:]) != "fmt " {
-		if chunk.Datasize < 0 {
-			return AtestFileResult{}, fmt.Errorf("WAV file error: Invalid chunk datasize %d", chunk.Datasize)
-		}
-
-		_, err = r.Seek(int64(chunk.Datasize)+int64(chunk.Datasize%2), io.SeekCurrent)
-		if err != nil {
-			return AtestFileResult{}, fmt.Errorf("WAV file error: Could not Seek: %w", err)
-		}
-
-		err = binary.Read(r, binary.LittleEndian, &chunk)
-		if err != nil {
-			return AtestFileResult{}, errors.New(`WAV file error: Could not find "fmt " chunk`)
-		}
-	}
-
-	if chunk.Datasize != 16 && chunk.Datasize != 18 {
-		return AtestFileResult{}, fmt.Errorf("WAV file error: Need fmt chunk datasize of 16 or 18.  Found %d", chunk.Datasize)
-	}
-
-	err = binary.Read(r, binary.LittleEndian, &format)
-	if err != nil {
-		return AtestFileResult{}, fmt.Errorf("WAV file error: Could not read fmt chunk: %w", err)
-	}
-
-	// KG If Datasize > sizeof(format), skip until the actual data
-	var formatSize = int32(unsafe.Sizeof(format))
-	if chunk.Datasize > formatSize {
-		var extra = chunk.Datasize - formatSize
-
-		_, err = r.Seek(int64(extra), io.SeekCurrent)
-		if err != nil {
-			return AtestFileResult{}, fmt.Errorf("WAV file error: Could not Seek: %w", err)
-		}
-	}
-
-	err = binary.Read(r, binary.LittleEndian, &wav_data)
-	if err != nil {
-		return AtestFileResult{}, fmt.Errorf("WAV file error: Could not read data chunk header: %w", err)
-	}
-
-	for string(wav_data.Data[:]) != "data" {
-		if wav_data.Datasize < 0 {
-			return AtestFileResult{}, fmt.Errorf("WAV file error: Invalid chunk datasize %d", wav_data.Datasize)
-		}
-
-		_, err = r.Seek(int64(wav_data.Datasize)+int64(wav_data.Datasize%2), io.SeekCurrent)
-		if err != nil {
-			return AtestFileResult{}, fmt.Errorf("WAV file error: Could not Seek: %w", err)
-		}
-
-		err = binary.Read(r, binary.LittleEndian, &wav_data)
-		if err != nil {
-			return AtestFileResult{}, errors.New(`WAV file error: Could not find "data" chunk`)
-		}
-	}
-
-	if wav_data.Datasize < 0 {
-		return AtestFileResult{}, fmt.Errorf("WAV file error: Invalid data chunk datasize %d", wav_data.Datasize)
-	}
-
-	if format.Wformattag != 1 {
-		return AtestFileResult{}, fmt.Errorf("sorry, I only understand audio format 1 (PCM).  This file has %d", format.Wformattag)
-	}
-
-	if format.Nchannels != 1 && format.Nchannels != 2 {
-		return AtestFileResult{}, fmt.Errorf("sorry, I only understand 1 or 2 channels.  This file has %d", format.Nchannels)
-	}
-
-	if format.Wbitspersample != 8 && format.Wbitspersample != 16 {
-		return AtestFileResult{}, fmt.Errorf("sorry, I only understand 8 or 16 bits per sample.  This file has %d", format.Wbitspersample)
-	}
-
-	if format.Nsamplespersec < MIN_SAMPLES_PER_SEC || format.Nsamplespersec > MAX_SAMPLES_PER_SEC {
-		return AtestFileResult{}, fmt.Errorf("sorry, I only understand sample rates from %d to %d.  This file has %d", MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC, format.Nsamplespersec)
+	if format.SamplesPerSec < MIN_SAMPLES_PER_SEC || format.SamplesPerSec > MAX_SAMPLES_PER_SEC {
+		return AtestFileResult{}, fmt.Errorf("sorry, I only understand sample rates from %d to %d.  This file has %d", MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC, format.SamplesPerSec)
 	}
 
 	var audio = a.audio
 
-	audio.adev[0].samples_per_sec = int(format.Nsamplespersec)
-	audio.adev[0].bits_per_sample = int(format.Wbitspersample)
-	audio.adev[0].num_channels = int(format.Nchannels)
+	audio.adev[0].samples_per_sec = format.SamplesPerSec
+	audio.adev[0].bits_per_sample = format.BitsPerSample
+	audio.adev[0].num_channels = format.NumChannels
 
 	audio.chan_medium[0] = MEDIUM_RADIO
-	if format.Nchannels == 2 {
+	if format.NumChannels == 2 {
 		audio.chan_medium[1] = MEDIUM_RADIO
 	}
 
@@ -350,11 +232,11 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 		audio.adev[0].bits_per_sample,
 		(audio.adev[0].num_channels))
 	// nnum_channels is known to be 1 or 2.
-	var one_filetime = float64(wav_data.Datasize) /
+	var one_filetime = float64(dataSize) /
 		float64((audio.adev[0].bits_per_sample/8)*(audio.adev[0].num_channels)*audio.adev[0].samples_per_sec)
 
 	fmt.Printf("%d audio bytes in file.  Duration = %.1f seconds.\n",
-		wav_data.Datasize,
+		dataSize,
 		one_filetime)
 	fmt.Printf("Fix Bits level = %d\n", audio.achan[0].fix_bits)
 
@@ -366,7 +248,7 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 
 	a.sink.packetsDecoded = 0
 
-	var src = newReaderSampleSource(r, wav_data.Datasize)
+	var src = newReaderSampleSource(r, dataSize)
 
 	var e_o_f = false
 	for !e_o_f {
@@ -430,10 +312,10 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 // claims therefore ends at whichever of the two comes first.
 type readerSampleSource struct {
 	r         *bufio.Reader
-	remaining int32
+	remaining int
 }
 
-func newReaderSampleSource(r io.Reader, nbytes int32) *readerSampleSource {
+func newReaderSampleSource(r io.Reader, nbytes int) *readerSampleSource {
 	var s = new(readerSampleSource)
 	s.r = bufio.NewReader(r)
 	s.remaining = nbytes
