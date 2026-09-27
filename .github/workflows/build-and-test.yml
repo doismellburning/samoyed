@@ -38,7 +38,8 @@ jobs:
     needs: [generate_version]
     strategy:
       matrix:
-        runner:
+        # Anchored so go_test runs on exactly the same runners
+        runner: &runners
           - "ubuntu-latest"
           - "ubuntu-24.04-arm"
           - "macos-latest"
@@ -56,9 +57,7 @@ jobs:
       run: "make setup"
     - run: "make stats"
     - run: "make cmds"
-    - run: "make test"
-    - run: "make race"
-    - run: "make coveragereport"
+    - run: "make test-scripts"
     - run: "make check"
     - name: "Ensure nothing got fixed (i.e. everything was already fine)"
       run: "git diff --quiet && git diff --cached --quiet"
@@ -86,6 +85,27 @@ jobs:
         path: "${{ env.DEB_NAME }}"
         if-no-files-found: "error"
         compression-level: 0
+
+  # The Go test suite, and the same again under the race detector, are the
+  # slowest part of a build and need none of the binaries build_and_test makes,
+  # so they get a job of their own per runner and run alongside it.
+  go_test:
+    strategy:
+      matrix:
+        runner: *runners
+    runs-on: "${{ matrix.runner }}"
+    steps:
+    - uses: "actions/checkout@v7"
+    - uses: "actions/setup-go@v7"
+      with:
+        go-version: "1.27"
+    - name: "Install dependencies"
+      run: "make setup"
+    - run: "make gotest"
+    - run: "make race"
+    - run: "make coveragereport"
+    - name: "Ensure the tests left the tree as they found it"
+      run: "git diff --quiet && git diff --cached --quiet"
 
   # Fuzzing is the same work whatever the runner, and it takes as long as it is
   # told to, so it gets a job of its own on one runner rather than adding its
@@ -118,7 +138,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.ref == 'refs/heads/main' && needs.should_release.outputs.result == 'true')
-    needs: [generate_version, build_and_test, fuzz, should_release]
+    needs: [generate_version, build_and_test, go_test, fuzz, should_release]
     runs-on: "ubuntu-latest"
     permissions:
       contents: "write"
