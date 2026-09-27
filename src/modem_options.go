@@ -9,7 +9,7 @@ package direwolf
 //
 // It is for once the configuration file and the command line have both had
 // their say.
-func settleModemOptions(pa *audio_s) {
+func settleModemOptions(pa *AudioConfig) {
 	for channel := range MAX_RADIO_CHANS {
 		if pa.chan_medium[channel] == MEDIUM_RADIO {
 			pa.achan[channel].settleModemOptions(channel)

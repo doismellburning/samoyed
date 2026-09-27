@@ -9,9 +9,9 @@ package direwolf
 // air without an audio device to send it to.
 var toneGenCapture func(channel int, data int)
 
-// tone_gen_put_bit hands one bit to whatever is standing in for the
+// ToneGenPutBit hands one bit to whatever is standing in for the
 // modulator.
-func tone_gen_put_bit(channel int, data int) {
+func ToneGenPutBit(channel int, data int) {
 	if toneGenCapture != nil {
 		toneGenCapture(channel, data)
 

@@ -875,7 +875,7 @@ type parseState struct {
 	unsplit string // what split has yet to take from the current line
 	keyword string // original (not uppercased) keyword token
 
-	audio *audio_s
+	audio *AudioConfig
 	digi  *digi_config_s
 	cdigi *cdigi_config_s
 	tt    *tt_config_s
@@ -1138,7 +1138,7 @@ var configHandlers = map[string]configHandler{
 // config_init reads the configuration file, applying defaults first so that the
 // file can override them.  It reports what the file drew, for a caller that
 // wants to act on it - see the --config-check option in DirewolfMain.
-func config_init(fname string, p_audio_config *audio_s,
+func config_init(fname string, p_audio_config *AudioConfig,
 	p_digi_config *digi_config_s,
 	p_cdigi_config *cdigi_config_s,
 	p_tt_config *tt_config_s,
@@ -5690,7 +5690,7 @@ func parse_beacon_number(keyword string, value string, line int) (float64, error
 // e.g.  IBEACON DELAY=1 EVERY=1 SENDTO=IG OVERLAY=R SYMBOL="igate" LAT=37^44.46N LONG=122^27.19W COMMENT="N1KOL-1 IGATE"
 // Just ignores overlay, symbol, lat, long, and comment.
 
-func beacon_options(b *beacon_s, ps *parseState, p_audio_config *audio_s) error {
+func beacon_options(b *beacon_s, ps *parseState, p_audio_config *AudioConfig) error {
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
 	b.delay = 60

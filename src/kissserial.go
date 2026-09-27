@@ -81,8 +81,8 @@ import (
 // the frame being decoded from it, and the configuration it was set up with.
 type KissSerial struct {
 	miscConfig  *misc_config_s
-	audioConfig *audio_s // Which channels the client may transmit on.
-	debug       int      /* Print information flowing from and to client. */
+	audioConfig *AudioConfig // Which channels the client may transmit on.
+	debug       int          /* Print information flowing from and to client. */
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
@@ -111,7 +111,7 @@ type KissSerial struct {
 }
 
 // newKissSerial builds a KissSerial for mc with nothing opened or started.
-func newKissSerial(mc *misc_config_s, audioConfig *audio_s, debug int) *KissSerial {
+func newKissSerial(mc *misc_config_s, audioConfig *AudioConfig, debug int) *KissSerial {
 	var ks = new(KissSerial)
 	ks.miscConfig = mc
 	ks.audioConfig = audioConfig
@@ -141,7 +141,7 @@ func newKissSerial(mc *misc_config_s, audioConfig *audio_s, debug int) *KissSeri
  *
  *--------------------------------------------------------------------*/
 
-func NewKissSerial(ctx context.Context, mc *misc_config_s, audioConfig *audio_s, debug int) *KissSerial {
+func NewKissSerial(ctx context.Context, mc *misc_config_s, audioConfig *AudioConfig, debug int) *KissSerial {
 	var ks = newKissSerial(mc, audioConfig, debug)
 
 	if mc.kiss_serial_port != "" {

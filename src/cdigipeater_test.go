@@ -23,7 +23,7 @@ const (
 
 // setupCDigipeater points a connected mode digipeater at two radio channels
 // with our callsign on each, and empties the transmit queues it fills.
-func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *audio_s, *cdigi_config_s) {
+func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *AudioConfig, *cdigi_config_s) {
 	t.Helper()
 
 	t.Cleanup(func() {
@@ -35,7 +35,7 @@ func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *audio_s, *cdigi_conf
 		}
 	})
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	audioConfig.chan_medium[cdigiFromChan] = MEDIUM_RADIO
 	audioConfig.chan_medium[cdigiToChan] = MEDIUM_RADIO
 	audioConfig.mycall[cdigiFromChan] = "Q1TEST"
@@ -260,7 +260,7 @@ func TestCDigipeaterNetworkTNCChannel(t *testing.T) {
 }
 
 func TestNewConnectedDigipeater(t *testing.T) {
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	var cdigiConfig = new(cdigi_config_s)
 
 	var filter = new(PacketFilter)

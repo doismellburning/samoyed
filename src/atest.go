@@ -136,7 +136,7 @@ type AtestOptions struct {
 // An Atest decodes .WAV files with the demodulators, reporting on each frame
 // it finds.
 type Atest struct {
-	audio      *audio_s
+	audio      *AudioConfig
 	decodeOnly int
 
 	// One sink for the whole run, so its DCD counts are of everything
@@ -600,7 +600,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 // DCD output line - where atest reports on it: the frame, and with "-d o", the
 // time the channel was busy for.
 type atestSink struct {
-	audio      *audio_s
+	audio      *AudioConfig
 	hexDisplay bool // -h
 	debugDCD   int  // -d o
 
@@ -645,8 +645,8 @@ func (s *atestSink) DCDChange(channel int, state int) {
 }
 
 // atestDefaultAudio is the audio configuration atest starts from, before its options.
-func atestDefaultAudio() *audio_s {
-	var audio = new(audio_s)
+func atestDefaultAudio() *AudioConfig {
+	var audio = new(AudioConfig)
 
 	/*
 	 * First apply defaults.

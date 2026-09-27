@@ -49,7 +49,7 @@ var q_d_opt bool /* "-q d" Quiet, suppress the printing of description of APRS p
 
 var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." */
 
-var audio_config *audio_s
+var audio_config *AudioConfig
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
 var aprsSymbolData *APRSSymbolData
@@ -300,7 +300,7 @@ x = Silence FX.25 information.`)
 
 	aprsSymbolData = NewAPRSSymbolData()
 
-	audio_config = new(audio_s)
+	audio_config = new(AudioConfig)
 	misc_config = new(misc_config_s)
 	var digi_config digi_config_s
 	var cdigi_config cdigi_config_s
@@ -466,7 +466,7 @@ x = Silence FX.25 information.`)
 		os.Exit(1)
 	}
 
-	var err = audio_open(ctx, audio_config)
+	var err = AudioOpen(ctx, audio_config)
 	stopIfCancelled(ctx)
 
 	if err < 0 {
@@ -503,7 +503,7 @@ x = Silence FX.25 information.`)
 	 * Note:  This is not the same as a volume control you would see on the screen.
 	 * It is the range of the digital sound representation.
 	 */
-	gen_tone_init(audio_config, audio_amplitude, audioDeviceSink{})
+	GenToneInit(audio_config, audio_amplitude, AudioDeviceSink{})
 
 	/*
 	 * Push to Talk (PTT) control.
@@ -601,7 +601,7 @@ x = Silence FX.25 information.`)
 						transmitCalibrationChannel)
 
 					for n > 0 && ctx.Err() == nil {
-						tone_gen_put_bit(transmitCalibrationChannel, n&1)
+						ToneGenPutBit(transmitCalibrationChannel, n&1)
 						n--
 					}
 				case 'm': // "Mark" tone: -x m
@@ -609,7 +609,7 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
 
 					for n > 0 && ctx.Err() == nil {
-						tone_gen_put_bit(transmitCalibrationChannel, 1)
+						ToneGenPutBit(transmitCalibrationChannel, 1)
 
 						n--
 					}
@@ -618,7 +618,7 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
 
 					for n > 0 && ctx.Err() == nil {
-						tone_gen_put_bit(transmitCalibrationChannel, 0)
+						ToneGenPutBit(transmitCalibrationChannel, 0)
 
 						n--
 					}

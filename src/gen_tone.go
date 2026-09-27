@@ -36,7 +36,7 @@ var toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 // sample data at a time, then a flush at the end of a transmission to push out
 // whatever is still waiting.  Both return -1 for any type of error.
 //
-// audioDeviceSink is the one a running Samoyed uses; samoyed-gen-packets writes
+// AudioDeviceSink is the one a running Samoyed uses; samoyed-gen-packets writes
 // a .WAV file instead.
 type AudioSink interface {
 	Put(adev int, c uint8) int
@@ -48,7 +48,7 @@ type AudioSink interface {
 type ToneGenerator struct {
 	channel     int
 	adevIndex   int
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 	sink        AudioSink // Where the samples go.
 	amplitude   int       // 0 .. 100, for DTMF; the rest use sineTable.
 
@@ -113,7 +113,7 @@ type ToneGenerator struct {
  *
  *----------------------------------------------------------------*/
 
-func NewToneGenerator(channel int, audioConfig *audio_s, amp int, sink AudioSink) *ToneGenerator {
+func NewToneGenerator(channel int, audioConfig *AudioConfig, amp int, sink AudioSink) *ToneGenerator {
 	var tg = &ToneGenerator{ //nolint:exhaustruct_v5
 		channel:     channel,
 		adevIndex:   ACHAN2ADEV(channel),
@@ -222,7 +222,7 @@ func newSineTable(amp int) [256]int16 {
 
 /*------------------------------------------------------------------
  *
- * Name:        gen_tone_init
+ * Name:        GenToneInit
  *
  * Purpose:     Initialize for AFSK tone generation which might
  *		be used for RTTY or amateur packet radio.
@@ -253,7 +253,7 @@ func newSineTable(amp int) [256]int16 {
  *
  *----------------------------------------------------------------*/
 
-func gen_tone_init(audio_config_p *audio_s, amp int, sink AudioSink) int { //nolint:unparam
+func GenToneInit(audio_config_p *AudioConfig, amp int, sink AudioSink) int {
 	logrus.WithField("amp", amp).Debug("gen_tone_init")
 
 	for channel := range MAX_RADIO_CHANS {
@@ -263,11 +263,11 @@ func gen_tone_init(audio_config_p *audio_s, amp int, sink AudioSink) int { //nol
 	}
 
 	return (0)
-} /* end gen_tone_init */
+} /* end GenToneInit */
 
 /*-------------------------------------------------------------------
  *
- * Name:        tone_gen_put_bit
+ * Name:        ToneGenPutBit
  *
  * Purpose:     Generate tone of proper duration for one data bit.
  *
@@ -372,7 +372,7 @@ func tone_gen_put_bit_real(channel int, dat int) {
 	}
 
 	toneGenerators[channel].PutBit(dat)
-} /* end tone_gen_put_bit */
+} /* end ToneGenPutBit */
 
 func (tg *ToneGenerator) PutBit(dat int) {
 	var audioConfig = tg.audioConfig
@@ -710,53 +710,53 @@ func GenToneMain() {
 	/* to sound card */
 	/* one channel.  2 times:  one second of each tone. */
 
-	var my_audio_config audio_s
+	var my_audio_config AudioConfig
 	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
 	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
 
-	audio_open(context.Background(), &my_audio_config)
-	gen_tone_init(&my_audio_config, 100, audioDeviceSink{})
+	AudioOpen(context.Background(), &my_audio_config)
+	GenToneInit(&my_audio_config, 100, AudioDeviceSink{})
 
 	for range 2 {
 		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 1)
+			ToneGenPutBit(chan1, 1)
 		}
 
 		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 0)
+			ToneGenPutBit(chan1, 0)
 		}
 	}
 
-	audio_close()
+	AudioClose()
 
 	/* Now try stereo. */
 
-	my_audio_config = audio_s{} //nolint:exhaustruct_v5
+	my_audio_config = AudioConfig{} //nolint:exhaustruct_v5
 	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
 	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
 	my_audio_config.adev[0].num_channels = 2
 
-	audio_open(context.Background(), &my_audio_config)
-	gen_tone_init(&my_audio_config, 100, audioDeviceSink{})
+	AudioOpen(context.Background(), &my_audio_config)
+	GenToneInit(&my_audio_config, 100, AudioDeviceSink{})
 
 	for range 4 {
 		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 1)
+			ToneGenPutBit(chan1, 1)
 		}
 
 		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 0)
+			ToneGenPutBit(chan1, 0)
 		}
 
 		for range my_audio_config.achan[1].baud * 2 {
-			tone_gen_put_bit(chan2, 1)
+			ToneGenPutBit(chan2, 1)
 		}
 
 		for range my_audio_config.achan[1].baud * 2 {
-			tone_gen_put_bit(chan2, 0)
+			ToneGenPutBit(chan2, 0)
 		}
 	}
 
-	audio_close()
+	AudioClose()
 }

@@ -244,8 +244,8 @@ func Test_audioFlushReal_UDP_sendsBytes(t *testing.T) {
 
 // --- anyDeviceRequiresPortAudio ---
 
-func makeAudioConfig(inName, outName string) *audio_s {
-	var pa = new(audio_s)
+func makeAudioConfig(inName, outName string) *AudioConfig {
+	var pa = new(AudioConfig)
 	pa.adev[0].defined = 1
 	pa.adev[0].adevice_in = inName
 	pa.adev[0].adevice_out = outName
@@ -256,12 +256,12 @@ func makeAudioConfig(inName, outName string) *audio_s {
 func Test_anyDeviceRequiresPortAudio(t *testing.T) {
 	tests := []struct {
 		name string
-		pa   *audio_s
+		pa   *AudioConfig
 		want bool
 	}{
 		{
 			name: "no devices defined",
-			pa:   new(audio_s),
+			pa:   new(AudioConfig),
 			want: false,
 		},
 		{
@@ -420,7 +420,7 @@ func Test_audioOutType(t *testing.T) {
 	}
 }
 
-// --- audio_open with no output device ---
+// --- AudioOpen with no output device ---
 
 // A receive-only configuration must open on a machine with no audio output
 // device at all, rather than refusing to start.  "ADEVICE stdin" - and the
@@ -431,7 +431,7 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
-		audio_close()
+		AudioClose()
 
 		adev = prevAdev
 		save_audio_config_p = prevConfig
@@ -440,7 +440,7 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 	var pa = makeAudioConfig("stdin", "stdin")
 	var refsBefore = portaudioRefCount
 
-	require.Equal(t, 0, audio_open(t.Context(), pa))
+	require.Equal(t, 0, AudioOpen(t.Context(), pa))
 
 	assert.Nil(t, adev[0].outputStream)
 	assert.Nil(t, adev[0].udp_out_sock)
@@ -456,7 +456,7 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 	assert.Equal(t, 0, adev[0].outbufLen)
 
 	// Closing must not release a PortAudio reference this open never took.
-	audio_close()
+	AudioClose()
 	assert.Equal(t, refsBefore, portaudioRefCount)
 }
 
@@ -467,7 +467,7 @@ func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
 	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
-		audio_close()
+		AudioClose()
 
 		adev = prevAdev
 		save_audio_config_p = prevConfig
@@ -475,7 +475,7 @@ func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
 
 	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
 
-	require.Equal(t, 0, audio_open(t.Context(), pa))
+	require.Equal(t, 0, AudioOpen(t.Context(), pa))
 
 	assert.Nil(t, adev[0].outputStream)
 }
@@ -488,7 +488,7 @@ func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
 	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
-		audio_close()
+		AudioClose()
 
 		adev = prevAdev
 		save_audio_config_p = prevConfig
@@ -497,7 +497,7 @@ func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
 	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
 	pa.adev[0].adevice_out_specified = true
 
-	assert.Equal(t, -1, audio_open(t.Context(), pa))
+	assert.Equal(t, -1, AudioOpen(t.Context(), pa))
 }
 
 // Naming standard input, or a UDP port to listen on, as the transmit device
@@ -507,7 +507,7 @@ func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
 	var prevConfig = save_audio_config_p
 
 	t.Cleanup(func() {
-		audio_close()
+		AudioClose()
 
 		adev = prevAdev
 		save_audio_config_p = prevConfig
@@ -516,7 +516,7 @@ func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
 	var pa = makeAudioConfig("stdin", "stdin")
 	pa.adev[0].adevice_out_specified = true
 
-	assert.Equal(t, -1, audio_open(t.Context(), pa))
+	assert.Equal(t, -1, AudioOpen(t.Context(), pa))
 }
 
 // --- applyCommandLineAudioSource ---

@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestAudioConfig(channel int, modemType modem_t, baud int, markFreq int, spaceFreq int, samplesPerSec int) *audio_s {
-	var audioConfig audio_s
+func newTestAudioConfig(channel int, modemType modem_t, baud int, markFreq int, spaceFreq int, samplesPerSec int) *AudioConfig {
+	var audioConfig AudioConfig
 
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 	audioConfig.achan[channel].modem_type = modemType

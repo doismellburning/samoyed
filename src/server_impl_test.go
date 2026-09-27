@@ -133,7 +133,7 @@ func TestHandleClientCommand_g_PortCapabilitiesReply(t *testing.T) {
 
 func TestHandleClientCommand_G_NoPorts(t *testing.T) {
 	var s = new(AGWServer)
-	s.audioConfigP = new(audio_s)
+	s.audioConfigP = new(AudioConfig)
 
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
@@ -151,7 +151,7 @@ func TestHandleClientCommand_G_NoPorts(t *testing.T) {
 func TestHandleClientCommand_G_RadioChannelMono(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.adev[0].num_channels = 1
 	s.audioConfigP = &cfg
@@ -191,7 +191,7 @@ func TestHandleClientCommand_y_EmptyQueueReturnsZero(t *testing.T) {
 
 func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
 	var s = new(AGWServer)
-	s.audioConfigP = new(audio_s)
+	s.audioConfigP = new(AudioConfig)
 
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
@@ -213,7 +213,7 @@ func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
 func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	s.audioConfigP = &cfg
 
@@ -257,11 +257,11 @@ func dlqAppended(f func()) *dlq_item_t {
 // and the digipeater slice could go out of bounds.
 func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 	var s = new(AGWServer)
-	s.audioConfigP = new(audio_s)
+	s.audioConfigP = new(AudioConfig)
 
 	// The 'V' handler queues the frame for transmission, and TransmitQueue.Append reads
 	// the audio configuration for itself.
-	save_audio_config_p = new(audio_s)
+	save_audio_config_p = new(AudioConfig)
 	t.Cleanup(func() { save_audio_config_p = nil })
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -280,10 +280,10 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 // when DataLen==0 or DataLen exceeded len(cmd.Data).
 func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 	var s = new(AGWServer)
-	s.audioConfigP = new(audio_s)
+	s.audioConfigP = new(AudioConfig)
 
 	// As above: a 'K' that survives the bounds checks is queued too.
-	save_audio_config_p = new(audio_s)
+	save_audio_config_p = new(AudioConfig)
 	t.Cleanup(func() { save_audio_config_p = nil })
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -439,7 +439,7 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 
 func TestConnectedModeAllowed_OutOfRange(t *testing.T) {
 	var s = new(AGWServer)
-	s.audioConfigP = new(audio_s)
+	s.audioConfigP = new(AudioConfig)
 
 	assert.False(t, s.connectedModeAllowed(MAX_TOTAL_CHANS))
 	assert.False(t, s.connectedModeAllowed(255))
@@ -469,7 +469,7 @@ func TestConnectedModeAllowed_NilServer(t *testing.T) {
 func TestConnectedModeAllowed_MediumRadio(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	s.audioConfigP = &cfg
 
@@ -479,7 +479,7 @@ func TestConnectedModeAllowed_MediumRadio(t *testing.T) {
 func TestConnectedModeAllowed_MediumNETTNC(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_NETTNC
 	s.audioConfigP = &cfg
 
@@ -489,7 +489,7 @@ func TestConnectedModeAllowed_MediumNETTNC(t *testing.T) {
 func TestConnectedModeAllowed_MediumIGate(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[0] = MEDIUM_IGATE
 	s.audioConfigP = &cfg
 
@@ -499,7 +499,7 @@ func TestConnectedModeAllowed_MediumIGate(t *testing.T) {
 func TestConnectedModeAllowed_MediumNone(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg audio_s
+	var cfg AudioConfig
 	// chan_medium[0] defaults to MEDIUM_NONE
 	s.audioConfigP = &cfg
 
@@ -509,7 +509,7 @@ func TestConnectedModeAllowed_MediumNone(t *testing.T) {
 func TestHandleClientCommand_X_NETTNCChannelReportsSuccess(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_NETTNC
 	s.audioConfigP = &cfg
 

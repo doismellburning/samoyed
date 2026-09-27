@@ -80,7 +80,7 @@ type GenPacketsOptions struct {
 
 // A GenPackets turns frames into audio, writing it to a .WAV file.
 type GenPackets struct {
-	audio     *audio_s
+	audio     *AudioConfig
 	amplitude int
 	morseWPM  int
 	rand      *genPacketsPRNG
@@ -151,7 +151,7 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 	g.rand = rand
 	g.sink = sink
 
-	gen_tone_init(audio, g.amplitude/2, sink)
+	GenToneInit(audio, g.amplitude/2, sink)
 
 	// The IL2P encoder reads the channel's version and CRC setting from here.
 	save_audio_config_p = audio
@@ -247,13 +247,13 @@ func (g *GenPackets) SendVariableSpeed(maxError float64, increment float64) erro
 	for speed_error := -maxError; speed_error <= maxError+0.001; speed_error += increment {
 		// Baud is int so we get some roundoff.  Make it real?
 		g.audio.achan[0].baud = int(float64(normal_speed) * (1. + speed_error/100.))
-		gen_tone_init(g.audio, g.amplitude/2, g.sink)
+		GenToneInit(g.audio, g.amplitude/2, g.sink)
 
 		g.mustSendPacket(fmt.Sprintf("WB2OSZ-15>TEST:, speed %+0.1f%%  The quick brown fox jumps over the lazy dog!", speed_error))
 	}
 
 	g.audio.achan[0].baud = normal_speed
-	gen_tone_init(g.audio, g.amplitude/2, g.sink)
+	GenToneInit(g.audio, g.amplitude/2, g.sink)
 
 	return nil
 }
@@ -354,7 +354,7 @@ func (g *GenPackets) SendPacket(str string) error {
  *
  * Inputs:      fname		- Name of .WAV file to create.
  *
- *		pa		- Address of structure of type audio_s.
+ *		pa		- Address of structure of type AudioConfig.
  *
  *				The fields that we care about are:
  *					num_channels
@@ -366,7 +366,7 @@ func (g *GenPackets) SendPacket(str string) error {
  *
  *----------------------------------------------------------------*/
 
-func audio_file_open(fname string, pa *audio_s) (*wavFileSink, error) {
+func audio_file_open(fname string, pa *AudioConfig) (*wavFileSink, error) {
 	/*
 	 * Fill in defaults for any missing values.
 	 */
@@ -588,8 +588,8 @@ func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
 }
 
 // genPacketsDefaultAudio is the audio configuration gen_packets starts from, before its options.
-func genPacketsDefaultAudio() *audio_s {
-	var audio = new(audio_s)
+func genPacketsDefaultAudio() *AudioConfig {
+	var audio = new(AudioConfig)
 
 	/*
 	 * Set up default values for the modem.

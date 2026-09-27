@@ -17,7 +17,7 @@ import "github.com/doismellburning/samoyed/internal/fcs"
  *			  but this is expected to be mostly for testing, not normal
  *			  operation.
  *
- * Outputs:	Bits are shipped out by calling tone_gen_put_bit().
+ * Outputs:	Bits are shipped out by calling ToneGenPutBit().
  *
  * Returns:	Number of bits sent including "flags" and the
  *		stuffing bits.
@@ -30,7 +30,7 @@ import "github.com/doismellburning/samoyed/internal/fcs"
  *
  * Assumptions:	It is assumed that the tone_gen module has been
  *		properly initialized so that bits sent with
- *		tone_gen_put_bit() are processed correctly.
+ *		ToneGenPutBit() are processed correctly.
  *
  * Errors:	If something goes wrong, return -1 and the caller should
  *		fallback to sending normal AX.25.

@@ -569,7 +569,7 @@ func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
 
 type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
-func KissRecByte(kf *KISSFrame, audioConfig *audio_s, ch byte, debug int,
+func KissRecByte(kf *KISSFrame, audioConfig *AudioConfig, ch byte, debug int,
 	kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
 	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
@@ -729,7 +729,7 @@ func KissRecByte(kf *KISSFrame, audioConfig *audio_s, ch byte, debug int,
 
 // This is used only by the TNC side.
 
-func kiss_process_msg(kiss_msg []byte, audioConfig *audio_s, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
+func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
 	// New in 1.7:
 	// We can have KISS TCP ports which convey only a single radio channel.
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.
