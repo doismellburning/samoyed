@@ -601,7 +601,7 @@ x = Silence FX.25 information.`)
 						transmitCalibrationChannel)
 
 					for n > 0 && ctx.Err() == nil {
-						tone_gen_put_bit(transmitCalibrationChannel, n&1)
+						ToneGenPutBit(transmitCalibrationChannel, n&1)
 						n--
 					}
 				case 'm': // "Mark" tone: -x m
@@ -609,7 +609,7 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
 
 					for n > 0 && ctx.Err() == nil {
-						tone_gen_put_bit(transmitCalibrationChannel, 1)
+						ToneGenPutBit(transmitCalibrationChannel, 1)
 
 						n--
 					}
@@ -618,7 +618,7 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
 
 					for n > 0 && ctx.Err() == nil {
-						tone_gen_put_bit(transmitCalibrationChannel, 0)
+						ToneGenPutBit(transmitCalibrationChannel, 0)
 
 						n--
 					}

@@ -267,7 +267,7 @@ func GenToneInit(audio_config_p *AudioConfig, amp int, sink AudioSink) int {
 
 /*-------------------------------------------------------------------
  *
- * Name:        tone_gen_put_bit
+ * Name:        ToneGenPutBit
  *
  * Purpose:     Generate tone of proper duration for one data bit.
  *
@@ -372,7 +372,7 @@ func tone_gen_put_bit_real(channel int, dat int) {
 	}
 
 	toneGenerators[channel].PutBit(dat)
-} /* end tone_gen_put_bit */
+} /* end ToneGenPutBit */
 
 func (tg *ToneGenerator) PutBit(dat int) {
 	var audioConfig = tg.audioConfig
@@ -720,11 +720,11 @@ func GenToneMain() {
 
 	for range 2 {
 		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 1)
+			ToneGenPutBit(chan1, 1)
 		}
 
 		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 0)
+			ToneGenPutBit(chan1, 0)
 		}
 	}
 
@@ -742,19 +742,19 @@ func GenToneMain() {
 
 	for range 4 {
 		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 1)
+			ToneGenPutBit(chan1, 1)
 		}
 
 		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 0)
+			ToneGenPutBit(chan1, 0)
 		}
 
 		for range my_audio_config.achan[1].baud * 2 {
-			tone_gen_put_bit(chan2, 1)
+			ToneGenPutBit(chan2, 1)
 		}
 
 		for range my_audio_config.achan[1].baud * 2 {
-			tone_gen_put_bit(chan2, 0)
+			ToneGenPutBit(chan2, 0)
 		}
 	}
 
