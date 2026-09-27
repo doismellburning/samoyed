@@ -763,6 +763,10 @@ type adev_s struct {
 	// audioUDPSilenceKeepalive.
 	silenceStopCh chan struct{}
 
+	// Closed once that goroutine has returned, so AudioClose can wait for
+	// it: it reads adev and xmitSvc without a lock.
+	silenceDoneCh chan struct{}
+
 	// Sample rate and error statistics, reported every statistics_interval.
 	stats AudioStats
 }
@@ -1592,9 +1596,17 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) int {
 
 				adev[a].udp_out_sock = udpOutConn
 				adev[a].outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
-				adev[a].silenceStopCh = make(chan struct{})
+				var stop = make(chan struct{})
+				var done = make(chan struct{})
 
-				go audioUDPSilenceKeepalive(ctx, a, adev[a].silenceStopCh)
+				adev[a].silenceStopCh = stop
+				adev[a].silenceDoneCh = done
+
+				go func() {
+					defer close(done)
+
+					audioUDPSilenceKeepalive(ctx, a, stop)
+				}()
 
 			case AUDIO_OUT_TYPE_SOUNDCARD:
 				/*
@@ -2175,6 +2187,18 @@ func AudioClose() int {
 				if adev[a].silenceStopCh != nil {
 					close(adev[a].silenceStopCh)
 					adev[a].silenceStopCh = nil
+
+					// Wait for it to go: it reads adev and xmitSvc
+					// unlocked, so returning while it is still running
+					// would leave it racing with whatever touches those
+					// next - a fresh AudioOpen, say.  It only ever
+					// TryLocks, so it can't be stuck on the lock below.
+					// With no done channel there is no goroutine to wait
+					// for, and a receive from nil would never return.
+					if adev[a].silenceDoneCh != nil {
+						<-adev[a].silenceDoneCh
+						adev[a].silenceDoneCh = nil
+					}
 				}
 
 				// Nil the socket under the same lock audioUDPSilenceKeepalive
