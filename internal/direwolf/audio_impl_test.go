@@ -133,15 +133,9 @@ func TestAudioImpl_ringBuffer_closeWakesBlockedReader(t *testing.T) {
 func setupSoundcardAdev0(t *testing.T) *adev_s {
 	t.Helper()
 
-	var prevConfig = save_audio_config_p
-
-	t.Cleanup(func() { save_audio_config_p = prevConfig })
-
-	save_audio_config_p = new(AudioConfig)
-	save_audio_config_p.adev[0].num_channels = 1
-	save_audio_config_p.adev[0].bits_per_sample = 16
-
 	var dev = setupAdev0(t)
+	dev.numChannels = 1
+	dev.bytesPerFrame = 2
 	dev.g_audio_in_type = AUDIO_IN_TYPE_SOUNDCARD
 	dev.inbufSizeInBytes = 256
 	dev.inbuf = make([]byte, dev.inbufSizeInBytes)

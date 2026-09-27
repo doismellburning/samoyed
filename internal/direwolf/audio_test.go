@@ -563,6 +563,59 @@ func Test_audioClose_waitsForUDPSilenceKeepalive(t *testing.T) {
 	adev[0] = nil
 }
 
+// --- audio_get ---
+
+// What audio_get reads is counted in samples by the device's own format, and
+// reported at the interval its configuration asked for - AudioOpen hands the
+// device both, and there is nothing else to ask.
+func Test_audioGet_recordsStatisticsFromTheDevicesOwnSettings(t *testing.T) {
+	var prevAdev = adev
+
+	t.Cleanup(func() {
+		AudioClose()
+
+		adev = prevAdev
+	})
+
+	var pa = makeAudioConfig("udp:0", "stdin")
+	pa.adev[0].num_channels = 2
+	pa.adev[0].bits_per_sample = 16
+	pa.statistics_interval = 100
+
+	require.Equal(t, 0, AudioOpen(t.Context(), pa))
+
+	var conn, err = new(net.Dialer).DialContext(t.Context(), "udp", adev[0].udp_sock.LocalAddr().String())
+	require.NoError(t, err)
+
+	defer conn.Close()
+
+	// 2 channels of 16 bits is 4 bytes a sample.
+	var datagram = make([]byte, 40)
+
+	// The first read only starts the statistics off.
+	_, err = conn.Write(datagram)
+	require.NoError(t, err)
+
+	for range datagram {
+		require.Equal(t, 0, audio_get(0))
+	}
+
+	assert.Equal(t, 100, adev[0].statisticsInterval)
+	assert.Equal(t, 0, adev[0].stats.sampleCount)
+
+	// The first report is due 3 seconds after that, and resets the count, so
+	// put it out of reach of a slow runner.
+	adev[0].stats.lastTime = time.Now().Add(time.Hour)
+
+	// The second is counted.
+	_, err = conn.Write(datagram)
+	require.NoError(t, err)
+	require.Equal(t, 0, audio_get(0))
+
+	assert.Equal(t, 10, adev[0].stats.sampleCount)
+	assert.Equal(t, 0, adev[0].stats.errorCount)
+}
+
 // --- applyCommandLineAudioSource ---
 
 func Test_applyCommandLineAudioSource(t *testing.T) {

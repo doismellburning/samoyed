@@ -767,8 +767,16 @@ type adev_s struct {
 	// it: it reads adev and xmitSvc without a lock.
 	silenceDoneCh chan struct{}
 
-	// Sample rate and error statistics, reported every statistics_interval.
-	stats AudioStats
+	// Sample rate and error statistics, reported every statisticsInterval
+	// seconds.
+	stats              AudioStats
+	statisticsInterval int
+}
+
+// recordRead adds a read of nbytes from device a to its statistics.  A read
+// of nothing counts as an error.
+func (d *adev_s) recordRead(a int, nbytes int) {
+	d.stats.record(a, d.numChannels, nbytes/d.bytesPerFrame, d.statisticsInterval)
 }
 
 var adev [MAX_ADEVS]*adev_s
@@ -1341,6 +1349,7 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) int {
 			adev[a].numChannels = pa.adev[a].num_channels
 			adev[a].bitsPerSample = pa.adev[a].bits_per_sample
 			adev[a].bytesPerFrame = pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
+			adev[a].statisticsInterval = pa.statistics_interval
 
 			/*
 			 * Determine the type of audio output, while the configured input
@@ -1775,10 +1784,7 @@ func audio_get(a int) int {
 			dw_printf("If receiving is fine and strange things happen when transmitting, it is probably RF energy\n")
 			dw_printf("getting into your audio or digital wiring.\n")
 
-			adev[a].stats.record(a,
-				save_audio_config_p.adev[a].num_channels,
-				0,
-				save_audio_config_p.statistics_interval)
+			adev[a].recordRead(a, 0)
 		}
 
 		// Drain the ring buffer into inbuf in a single bulk read when exhausted.
@@ -1795,10 +1801,7 @@ func audio_get(a int) int {
 				adev[a].inbufLen = n
 				adev[a].inbufNext = 0
 
-				adev[a].stats.record(a,
-					save_audio_config_p.adev[a].num_channels,
-					n/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
-					save_audio_config_p.statistics_interval)
+				adev[a].recordRead(a, n)
 			}
 		}
 
@@ -1823,10 +1826,7 @@ func audio_get(a int) int {
 				adev[a].inbufLen = 0
 				adev[a].inbufNext = 0
 
-				adev[a].stats.record(a,
-					save_audio_config_p.adev[a].num_channels,
-					0,
-					save_audio_config_p.statistics_interval)
+				adev[a].recordRead(a, 0)
 
 				return (-1)
 			}
@@ -1834,10 +1834,7 @@ func audio_get(a int) int {
 			adev[a].inbufLen = n
 			adev[a].inbufNext = 0
 
-			adev[a].stats.record(a,
-				save_audio_config_p.adev[a].num_channels,
-				n/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
-				save_audio_config_p.statistics_interval)
+			adev[a].recordRead(a, n)
 		}
 
 		/*
@@ -1859,10 +1856,7 @@ func audio_get(a int) int {
 				return -1
 			}
 
-			adev[a].stats.record(a,
-				save_audio_config_p.adev[a].num_channels,
-				n/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
-				save_audio_config_p.statistics_interval)
+			adev[a].recordRead(a, n)
 
 			adev[a].inbufLen = n
 			adev[a].inbufNext = 0
