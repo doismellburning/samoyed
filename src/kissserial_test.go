@@ -63,7 +63,7 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*KissSerial, <-chan struct{}) {
 	t.Helper()
 
-	var ks = newKissSerial(mc, kissTestAudioConfig(), 0)
+	var ks = newKissSerial(mc, kissTestAudioConfig(), nil, 0)
 
 	if mc.kiss_serial_poll == 0 {
 		ks.fd = SerialPortOpen(mc.kiss_serial_port, mc.kiss_serial_speed)
@@ -100,7 +100,7 @@ func openKissSerialPort(t *testing.T, debug int) (*KissSerial, *os.File) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var ks = newKissSerial(mc, kissTestAudioConfig(), debug)
+	var ks = newKissSerial(mc, kissTestAudioConfig(), nil, debug)
 
 	t.Cleanup(ks.closePort)
 
@@ -161,7 +161,7 @@ func readSerialText(t *testing.T, client *os.File, want int) string {
 // Without KISSPORT in the configuration there is no serial TNC at all, and
 // nothing for the sending path to write to.
 func TestKissSerialNoPortConfigured(t *testing.T) {
-	var ks = NewKissSerial(t.Context(), new(misc_config_s), nil, 0)
+	var ks = NewKissSerial(t.Context(), new(misc_config_s), nil, nil, 0)
 
 	assert.Nil(t, ks.fd)
 	assert.NotNil(t, ks.kf, "the frame decoder state should be ready even with no port")
@@ -191,7 +191,7 @@ func TestKissSerialDeviceNotThere(t *testing.T) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = "/dev/there-is-no-such-serial-port"
 
-	var output = testutils.CaptureOutput(t, func() { ks = NewKissSerial(t.Context(), mc, nil, 0) })
+	var output = testutils.CaptureOutput(t, func() { ks = NewKissSerial(t.Context(), mc, nil, nil, 0) })
 
 	assert.Contains(t, output, "Could not open serial port /dev/there-is-no-such-serial-port")
 	assert.Nil(t, ks.fd)
@@ -287,12 +287,11 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	// Laid out like the channel table startKissSerial gives the TNC.
 	var audioConfig = kissTestAudioConfig()
 
-	var origXmitSvc, origKissNetSvc = xmitSvc, kissNetSvc
+	var origXmitSvc = xmitSvc
 
-	t.Cleanup(func() { xmitSvc, kissNetSvc = origXmitSvc, origKissNetSvc })
+	t.Cleanup(func() { xmitSvc = origXmitSvc })
 
 	xmitSvc = new(XmitService)
-	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s), audioConfig, 0)
 
 	transmitQueue.Init(audioConfig)
 

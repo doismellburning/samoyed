@@ -84,6 +84,7 @@ import (
 type KissSerial struct {
 	miscConfig  *misc_config_s
 	audioConfig *AudioConfig // Which channels the client may transmit on.
+	copyfun     kissCopyFunc // Where the client's data frames are copied for KISSCOPY.  May be nil.
 	debug       int          /* Print information flowing from and to client. */
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
@@ -113,10 +114,11 @@ type KissSerial struct {
 }
 
 // newKissSerial builds a KissSerial for mc with nothing opened or started.
-func newKissSerial(mc *misc_config_s, audioConfig *AudioConfig, debug int) *KissSerial {
+func newKissSerial(mc *misc_config_s, audioConfig *AudioConfig, copyfun kissCopyFunc, debug int) *KissSerial {
 	var ks = new(KissSerial)
 	ks.miscConfig = mc
 	ks.audioConfig = audioConfig
+	ks.copyfun = copyfun
 	ks.debug = debug
 	ks.kf = new(KISSFrame)
 
@@ -135,6 +137,9 @@ func newKissSerial(mc *misc_config_s, audioConfig *AudioConfig, debug int) *Kiss
  *		    kiss_serial_poll	- When non-zero, poll each n seconds to see if
  *					  device has appeared.
  *
+ *		copyfun	- Where the client's data frames are copied for
+ *			  KISSCOPY.  nil to copy them nowhere.
+ *
  *		debug	- Print information flowing from and to client.
  *
  * Description:	(1) Open file descriptor for the device.
@@ -143,8 +148,8 @@ func newKissSerial(mc *misc_config_s, audioConfig *AudioConfig, debug int) *Kiss
  *
  *--------------------------------------------------------------------*/
 
-func NewKissSerial(ctx context.Context, mc *misc_config_s, audioConfig *AudioConfig, debug int) *KissSerial {
-	var ks = newKissSerial(mc, audioConfig, debug)
+func NewKissSerial(ctx context.Context, mc *misc_config_s, audioConfig *AudioConfig, copyfun kissCopyFunc, debug int) *KissSerial {
+	var ks = newKissSerial(mc, audioConfig, copyfun, debug)
 
 	if mc.kiss_serial_port != "" {
 		if mc.kiss_serial_poll == 0 {
@@ -501,6 +506,6 @@ func (ks *KissSerial) listenThread(ctx context.Context) {
 			return
 		}
 
-		KissRecByte(ks.kf, ks.audioConfig, ch, ks.debug, nil, -1, ks.SendRecPacket)
+		KissRecByte(ks.kf, ks.audioConfig, ch, ks.debug, ks.copyfun, nil, -1, ks.SendRecPacket)
 	}
 }

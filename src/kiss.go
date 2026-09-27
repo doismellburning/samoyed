@@ -76,6 +76,8 @@ type KissPT struct {
 
 	audioConfig *AudioConfig // Which channels the client may transmit on.
 
+	copyfun kissCopyFunc // Where the client's data frames are copied for KISSCOPY.  May be nil.
+
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
 	kf *KISSFrame
@@ -105,9 +107,10 @@ type KissPT struct {
 const TMP_KISSTNC_SYMLINK = "/tmp/kisstnc"
 
 // newKissPT builds a KissPT with nothing opened or started.
-func newKissPT(audioConfig *AudioConfig, debug int) *KissPT {
+func newKissPT(audioConfig *AudioConfig, copyfun kissCopyFunc, debug int) *KissPT {
 	var kp = new(KissPT)
 	kp.audioConfig = audioConfig
+	kp.copyfun = copyfun
 	kp.debug = debug
 	kp.kf = new(KISSFrame)
 
@@ -123,6 +126,9 @@ func newKissPT(audioConfig *AudioConfig, debug int) *KissPT {
  *
  * Inputs:	mc		- Configuration; enable_kiss_pt says whether to.
  *
+ *		copyfun		- Where the client's data frames are copied
+ *				  for KISSCOPY.  nil to copy them nowhere.
+ *
  *		debug		- Print information flowing from and to client.
  *
  * Outputs:
@@ -134,8 +140,8 @@ func newKissPT(audioConfig *AudioConfig, debug int) *KissPT {
  *
  *--------------------------------------------------------------------*/
 
-func NewKissPT(ctx context.Context, mc *misc_config_s, audioConfig *AudioConfig, debug int) *KissPT {
-	var kp = newKissPT(audioConfig, debug)
+func NewKissPT(ctx context.Context, mc *misc_config_s, audioConfig *AudioConfig, copyfun kissCopyFunc, debug int) *KissPT {
+	var kp = newKissPT(audioConfig, copyfun, debug)
 
 	if mc.enable_kiss_pt {
 		// Nothing else is running yet, so there is no lock to take.
@@ -555,6 +561,6 @@ func (kp *KissPT) listenThread(ctx context.Context) {
 		if err != nil {
 			return
 		}
-		KissRecByte(kp.kf, kp.audioConfig, ch, kp.debug, nil, -1, kp.SendRecPacket)
+		KissRecByte(kp.kf, kp.audioConfig, ch, kp.debug, kp.copyfun, nil, -1, kp.SendRecPacket)
 	}
 }

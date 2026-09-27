@@ -677,8 +677,9 @@ x = Silence FX.25 information.`)
 	/*
 	 * Create a pseudo terminal and KISS TNC emulator.
 	 */
-	kissPT = NewKissPT(ctx, misc_config, audio_config, d_k_opt)
-	kissSerial = NewKissSerial(ctx, misc_config, audio_config, d_k_opt)
+	// KISSCOPY passes what these clients send on to the KISS TCP clients.
+	kissPT = NewKissPT(ctx, misc_config, audio_config, kissNetSvc.Copy, d_k_opt)
+	kissSerial = NewKissSerial(ctx, misc_config, audio_config, kissNetSvc.Copy, d_k_opt)
 	stopIfCancelled(ctx)
 
 	/*

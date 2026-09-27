@@ -437,10 +437,10 @@ func TestKissNetListenFails(t *testing.T) {
 func setupKissNetTNC(t *testing.T) {
 	t.Helper()
 
-	var origXmit, origKissNet = xmitSvc, kissNetSvc
+	var origXmit = xmitSvc
 
 	t.Cleanup(func() {
-		xmitSvc, kissNetSvc = origXmit, origKissNet
+		xmitSvc = origXmit
 	})
 
 	xmitSvc = new(XmitService)
@@ -452,9 +452,6 @@ func TestKissNetClientCommandIsAnswered(t *testing.T) {
 	setupKissNetTNC(t)
 
 	var kns, port = startKissNet(t, -1)
-
-	kissNetSvc = kns
-
 	var conn, _ = dialKissNet(t, kns, port)
 
 	var _, writeErr = conn.Write(KissEncapsulate(append([]byte{KISS_CMD_SET_HARDWARE}, []byte("TNC:")...)))
@@ -481,9 +478,6 @@ func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
 	const unconfigured = 5
 
 	var kns, port = startKissNet(t, unconfigured)
-
-	kissNetSvc = kns
-
 	require.Equal(t, MEDIUM_NONE, kns.audioConfigP.chan_medium[unconfigured])
 
 	var conn, _ = dialKissNet(t, kns, port)
@@ -511,9 +505,6 @@ func TestKissNetAnswersCommandModeNoise(t *testing.T) {
 	setupKissNetTNC(t)
 
 	var kns, port = startKissNet(t, -1)
-
-	kissNetSvc = kns
-
 	var conn, _ = dialKissNet(t, kns, port)
 
 	var _, writeErr = conn.Write([]byte("KISS ON\r"))

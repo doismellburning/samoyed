@@ -507,7 +507,7 @@ func (kns *KissNetService) listenThread(ctx context.Context, kps *kissport_statu
 			return // Cancelled.
 		}
 
-		KissRecByte(frame, kns.audioConfigP, ch, kns.debug, kps, client, kns.SendRecPacket)
+		KissRecByte(frame, kns.audioConfigP, ch, kns.debug, kns.Copy, kps, client, kns.SendRecPacket)
 	}
 } /* end listenThread */
 

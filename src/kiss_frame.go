@@ -534,6 +534,8 @@ func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
  *			  when kf.OnMessage is nil, so may be nil otherwise.
  *		ch	- A byte from the input stream.
  *		debug	- Activates debug output.
+ *		copyfun	- Where a client's data frames are copied for
+ *			  KISSCOPY.  nil to copy them nowhere.
  *		kps	- KISS TCP port status block.
  *			  nil for pseudo terminal and serial port.
  *		client	- Client app number for TCP KISS.
@@ -572,8 +574,15 @@ func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
 
 type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
+// kissCopyFunc passes a client's data frame on to other client applications,
+// for KISSCOPY: the frame, the radio channel and KISS command it is for, and
+// the KISS TCP port and client it came from (nil and -1 when it did not come
+// over KISS TCP).  KissNetService.Copy is the only one; it copies to the KISS
+// TCP clients.
+type kissCopyFunc func(msg []byte, channel int, cmd int, fromKPS *kissport_status_s, fromClient int)
+
 func KissRecByte(kf *KISSFrame, audioConfig *AudioConfig, ch byte, debug int,
-	kps *kissport_status_s, client int,
+	copyfun kissCopyFunc, kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
 	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
 	switch kf.state {
@@ -683,7 +692,7 @@ func KissRecByte(kf *KISSFrame, audioConfig *AudioConfig, ch byte, debug int,
 			if kf.OnMessage != nil {
 				kf.OnMessage(unwrapped)
 			} else {
-				kiss_process_msg(unwrapped, audioConfig, debug, kps, client, sendfun)
+				kiss_process_msg(unwrapped, audioConfig, debug, copyfun, kps, client, sendfun)
 			}
 
 			kf.state = KS_SEARCHING
@@ -719,6 +728,10 @@ func KissRecByte(kf *KISSFrame, audioConfig *AudioConfig, ch byte, debug int,
  *
  *		debug		- Debug option is selected.
  *
+ *		copyfun		- Where a data frame is copied for KISSCOPY,
+ *				  before it is queued for transmission.  nil
+ *				  to copy it nowhere.
+ *
  *		kps		- Used only for TCP KISS.
  *				  Should be nil for pseudo terminal and serial port.
  *
@@ -732,7 +745,7 @@ func KissRecByte(kf *KISSFrame, audioConfig *AudioConfig, ch byte, debug int,
 
 // This is used only by the TNC side.
 
-func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
+func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, copyfun kissCopyFunc, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
 	// New in 1.7:
 	// We can have KISS TCP ports which convey only a single radio channel.
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.
@@ -751,9 +764,9 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 
 	switch cmd {
 	case KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
-		// kissnet_copy clobbers first byte but we don't care
-		// because we have already determined channel and command.
-		kissNetSvc.Copy(kiss_msg, channel, int(cmd), kps, client)
+		if copyfun != nil {
+			copyfun(kiss_msg, channel, int(cmd), kps, client)
+		}
 
 		/* Note July 2017: There is a variant of of KISS, called SMACK, that assumes */
 		/* a TNC can never have more than 8 channels.  http://symek.de/g/smack.html */
