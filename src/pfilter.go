@@ -563,7 +563,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		}
 
 		if pf.debug >= 2 {
-			var path = ax25_format_via_path(pf.pp)
+			var path = pf.pp.FormatViaPath()
 
 			if len(path) == 0 {
 				path = "no digipeater path"
@@ -586,7 +586,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		}
 
 		if pf.debug >= 2 {
-			var path = ax25_format_via_path(pf.pp)
+			var path = pf.pp.FormatViaPath()
 
 			if len(path) == 0 {
 				path = "no digipeater path"

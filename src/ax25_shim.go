@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_format_via_path(this_p *packet_t) string {
-	return this_p.FormatViaPath()
-}
-
 func AX25Pack(this_p *packet_t) []byte {
 	return this_p.Pack()
 }
