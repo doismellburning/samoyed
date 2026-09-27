@@ -79,8 +79,7 @@ func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properti
 			p.parity_symbols_per_block = 8
 		} else {
 			// Should not happen.  But just in case...
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("IL2P parity symbol per payload block error.  small_block_size = %d\n", p.small_block_size)
+			logrus.WithField("small_block_size", p.small_block_size).Error("IL2P parity symbol per payload block error")
 
 			return p, -1
 		}
@@ -240,8 +239,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		pout = append(pout, descrambled...)
 
 		if il2p_get_debug() >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Descrambled large payload block, %d bytes:\n", ipp.large_block_size)
+			logrus.WithField("bytes", ipp.large_block_size).Debug("Descrambled large payload block")
 			dwutil.HexDump(descrambled)
 		}
 
@@ -266,8 +264,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		pout = append(pout, descrambled...)
 
 		if il2p_get_debug() >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Descrambled small payload block, %d bytes:\n", ipp.small_block_size)
+			logrus.WithField("bytes", ipp.small_block_size).Debug("Descrambled small payload block")
 			dwutil.HexDump(descrambled)
 		}
 
@@ -281,8 +278,10 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 	}
 
 	if decoded_length != payload_size {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("IL2P Internal error: decoded_length = %d, payload_size = %d\n", decoded_length, payload_size)
+		logrus.WithFields(logrus.Fields{
+			"decoded_length": decoded_length,
+			"payload_size":   payload_size,
+		}).Error("IL2P internal error: Decoded payload is the wrong length")
 
 		return nil, -3
 	}

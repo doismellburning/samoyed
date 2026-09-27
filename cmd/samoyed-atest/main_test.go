@@ -37,13 +37,14 @@ func newAtest(t *testing.T) *direwolf.Atest {
 }
 
 // genPackets writes the packets Dire Wolf's gen_packets makes by default, as
-// in the examples from the original atest.c source.
-func genPackets(t *testing.T) string {
+// in the examples from the original atest.c source, with any extra
+// gen_packets arguments given.
+func genPackets(t *testing.T, args ...string) string {
 	t.Helper()
 
 	var f = filepath.Join(t.TempDir(), "test1.wav")
 
-	var cmd = exec.CommandContext(context.Background(), "gen_packets", "-o", f) //nolint:gosec
+	var cmd = exec.CommandContext(context.Background(), "gen_packets", append(args, "-o", f)...) //nolint:gosec
 	require.NoError(t, cmd.Run())
 
 	return f
@@ -100,6 +101,7 @@ func Test_run_reportsDCD(t *testing.T) {
 
 func Test_main_decodes(t *testing.T) {
 	var f = genPackets(t)
+	var il2p = genPackets(t, "-I", "1")
 
 	var testCases = map[string]struct {
 		args   []string
@@ -117,6 +119,7 @@ func Test_main_decodes(t *testing.T) {
 		"hex display":   {[]string{"-h", f}, 0, "  010:  2c 54 68 65 20 71 75 69 63 6b 20 62 72 6f 77 6e  ,The quick brown"},
 		"bit errors":    {[]string{"-e", "0.5", f}, 0, "0 packets decoded"}, // Half the bits wrong, at random.
 		"missing wav":   {[]string{f + ".missing"}, 1, "couldn't open file"},
+		"IL2P debug":    {[]string{"-d", "2", "-d", "2", il2p}, 0, "Descrambled small payload block"},
 	}
 
 	for name, tc := range testCases {

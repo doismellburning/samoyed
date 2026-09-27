@@ -146,9 +146,11 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 	copy(rs_block[len(rs_block)-n:], rec_block)
 
 	if il2p_get_debug() >= 3 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("==============================  il2p_decode_rs  ==============================\n")
-		dw_printf("%d filler zeros, %d data, %d parity\n", len(rs_block)-n, data_size, num_parity)
+		logrus.WithFields(logrus.Fields{
+			"filler": len(rs_block) - n,
+			"data":   data_size,
+			"parity": num_parity,
+		}).Debug("il2p_decode_rs")
 		dwutil.HexDump(rs_block[:])
 	}
 
@@ -170,14 +172,9 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 
 	if il2p_get_debug() >= 3 {
 		if derrors == 0 {
-			dw_printf("No errors reported for RS block.\n")
+			logrus.Debug("No errors reported for RS block")
 		} else if derrors > 0 {
-			dw_printf("%d errors fixed in positions:\n", derrors)
-
-			for j := range derrors {
-				dw_printf("        %3d  (0x%02x)\n", derrlocs[j], derrlocs[j])
-			}
-
+			logrus.WithField("positions", derrlocs).Debug("Errors fixed in RS block")
 			dwutil.HexDump(rs_block[:])
 		}
 	}
@@ -189,8 +186,10 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 	for i := 0; i < derrors; i++ {
 		if derrlocs[i] < len(rs_block)-n {
 			if il2p_get_debug() >= 3 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("RS DECODE ERROR!  Padding position %d should be 0 but it was set to %02x.\n", derrlocs[i], rs_block[derrlocs[i]])
+				logrus.WithFields(logrus.Fields{
+					"position": derrlocs[i],
+					"value":    fmt.Sprintf("%02x", rs_block[derrlocs[i]]),
+				}).Debug("RS decode error: Padding position should be 0")
 			}
 
 			derrors = -1
@@ -200,8 +199,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 	}
 
 	if il2p_get_debug() >= 3 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("==============================  il2p_decode_rs  returns %d  ==============================\n", derrors)
+		logrus.WithField("derrors", derrors).Debug("il2p_decode_rs returns")
 	}
 
 	return out, derrors

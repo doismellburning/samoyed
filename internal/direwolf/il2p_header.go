@@ -7,6 +7,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
 )
 
 /*--------------------------------------------------------------------------------
@@ -437,8 +438,7 @@ func il2p_type_1_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
 
 func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
 	if GET_HDR_TYPE(hdr) != 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("IL2P Internal error.  Should not be here: il2p_decode_header_type_1, when header type is 0.\n")
+		logrus.Error("IL2P internal error: Should not be here: il2p_decode_header_type_1, when header type is 0")
 
 		return (nil)
 	}
