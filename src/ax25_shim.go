@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_is_null_frame(this_p *packet_t) bool {
-	return this_p.IsNullFrame()
-}
-
 func ax25_set_pid(this_p *packet_t, pid byte) {
 	this_p.SetPID(pid)
 }

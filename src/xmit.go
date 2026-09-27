@@ -410,7 +410,7 @@ func (xs *XmitService) discard_untransmittable(channel int) {
 				break
 			}
 
-			if ax25_is_null_frame(pp) {
+			if pp.IsNullFrame() {
 				dataLinkQueue.SeizeConfirm(channel) // C4.2.  "This primitive indicates, to the
 				// Data-link State machine, that the transmission opportunity has arrived."
 
@@ -839,7 +839,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
  *--------------------------------------------------------------------*/
 
 func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
-	if ax25_is_null_frame(pp) {
+	if pp.IsNullFrame() {
 		// Issue 132 - We could end up in a situation where:
 		// Transmitter is already on.
 		// Application wants to send a frame.
