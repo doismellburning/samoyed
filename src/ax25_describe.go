@@ -90,7 +90,7 @@ func DescribeAX25Frame(frame []byte) int {
 	}
 
 	fmt.Printf("--- AX.25 frame ---\n")
-	AX25HexDump(pp)
+	pp.HexDump()
 	fmt.Printf("-------------------\n")
 
 	var problems = 0

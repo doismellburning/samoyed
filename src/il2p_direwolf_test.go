@@ -556,13 +556,13 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 
 		if len1 != len2 || !slices.Equal(data1, data2) {
 			dw_printf("\nEncode/Decode Error.  Original:\n")
-			AX25HexDump(pp1)
+			pp1.HexDump()
 
 			dw_printf("IL2P encoded as:\n")
 			fx_hex_dump(encoded)
 
 			dw_printf("Got turned into this:\n")
-			AX25HexDump(pp2)
+			pp2.HexDump()
 		}
 
 		assert.Equal(t, len1, len2)
@@ -628,7 +628,7 @@ func all_frame_types(t *testing.T) {
 				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo)
-				AX25HexDump(pp)
+				pp.HexDump()
 				enc_dec_compare(t, pp)
 			}
 		}
@@ -656,7 +656,7 @@ func all_frame_types(t *testing.T) {
 
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 
-				AX25HexDump(pp)
+				pp.HexDump()
 				enc_dec_compare(t, pp)
 			}
 
@@ -673,7 +673,7 @@ func all_frame_types(t *testing.T) {
 
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 
-				AX25HexDump(pp)
+				pp.HexDump()
 				enc_dec_compare(t, pp)
 			}
 		}
@@ -694,7 +694,7 @@ func all_frame_types(t *testing.T) {
 
 		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
 
-		AX25HexDump(pp)
+		pp.HexDump()
 		enc_dec_compare(t, pp)
 	}
 
@@ -714,7 +714,7 @@ func all_frame_types(t *testing.T) {
 
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
 
-			AX25HexDump(pp)
+			pp.HexDump()
 			enc_dec_compare(t, pp)
 		}
 
@@ -727,7 +727,7 @@ func all_frame_types(t *testing.T) {
 
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
 
-			AX25HexDump(pp)
+			pp.HexDump()
 			enc_dec_compare(t, pp)
 		}
 	}

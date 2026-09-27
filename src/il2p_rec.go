@@ -249,7 +249,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 
 			if il2p_get_debug() >= 1 {
 				if pp != nil {
-					AX25HexDump(pp)
+					pp.HexDump()
 				} else {
 					// Most likely too many FEC errors.
 					text_color_set(DW_COLOR_ERROR)

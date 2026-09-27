@@ -904,7 +904,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 	if xs.debugXmitPacket {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
-		AX25HexDump(pp)
+		pp.HexDump()
 		dw_printf("------\n")
 	}
 

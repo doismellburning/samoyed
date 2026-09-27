@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func AX25HexDump(this_p *packet_t) {
-	this_p.HexDump()
-}
-
 func ax25_is_aprs(this_p *packet_t) bool {
 	return this_p.IsAPRS()
 }

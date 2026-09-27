@@ -994,7 +994,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 	if d_p_opt {
 		logrus.Debug("--debug p hexdump below:")
-		AX25HexDump(pp)
+		pp.HexDump()
 	}
 
 	/*
