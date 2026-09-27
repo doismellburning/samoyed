@@ -490,7 +490,7 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	nettnc_init(ctx, audio_config)
+	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config))
 	stopIfCancelled(ctx)
 
 	/*
