@@ -404,7 +404,7 @@ func TestIGateTransmitFromServer(t *testing.T) {
 
 	var info = string(AX25GetInfo(sent))
 
-	assert.Equal(t, "Q1TEST", ax25_get_addr_with_ssid(sent, AX25_SOURCE))
+	assert.Equal(t, "Q1TEST", sent.AddrWithSSID(AX25_SOURCE))
 	assert.Equal(t, "}Q2TEST-1>APWW10,TCPIP,Q1TEST*:>hello", info)
 	assert.Equal(t, 1, igate.stats.rfXmitPackets)
 }

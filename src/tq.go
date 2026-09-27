@@ -971,7 +971,7 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 			var count_it = 1
 
 			if source != "" {
-				var frame_source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+				var frame_source = pp.AddrWithSSID(AX25_SOURCE)
 				if logrus.IsLevelEnabled(logrus.TraceLevel) {
 					logrus.WithField("frame_source", frame_source).Trace("tq_count: compare to frame source")
 				}
@@ -981,7 +981,7 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 			}
 
 			if count_it > 0 && dest != "" {
-				var frame_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+				var frame_dest = pp.AddrWithSSID(AX25_DESTINATION)
 				if logrus.IsLevelEnabled(logrus.TraceLevel) {
 					logrus.WithField("frame_dest", frame_dest).Trace("tq_count: compare to frame destination")
 				}

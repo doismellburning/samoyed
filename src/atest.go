@@ -490,7 +490,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 		h = -1
 	} else {
 		h = ax25_get_heard(pp)
-		heard = ax25_get_addr_with_ssid(pp, h)
+		heard = pp.AddrWithSSID(h)
 	}
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -519,7 +519,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 		strings.HasPrefix(heard, "WIDE") &&
 		unicode.IsDigit(rune(heard[4])) &&
 		len(heard) == 5 {
-		var probably_really = ax25_get_addr_with_ssid(pp, h-1)
+		var probably_really = pp.AddrWithSSID(h - 1)
 
 		heard += " (probably " + probably_really + ")"
 	}

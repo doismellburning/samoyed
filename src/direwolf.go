@@ -819,7 +819,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		h = -1
 	} else {
 		h = ax25_get_heard(pp)
-		heard = ax25_get_addr_with_ssid(pp, h)
+		heard = pp.AddrWithSSID(h)
 	}
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -854,7 +854,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 				len(heard) == 5 &&
 				strings.EqualFold(heard[:4], "WIDE") &&
 				unicode.IsDigit(rune(heard[4])) {
-				var probably_really = ax25_get_addr_with_ssid(pp, h-1)
+				var probably_really = pp.AddrWithSSID(h - 1)
 				logEntry = logEntry.WithField("probably_really", probably_really)
 
 				// audio level applies only for internal modem channels.

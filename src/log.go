@@ -239,14 +239,14 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
 				h = -1
 			} else {
 				h = ax25_get_heard(pp)
-				heard = ax25_get_addr_with_ssid(pp, h)
+				heard = pp.AddrWithSSID(h)
 			}
 
 			if h >= AX25_REPEATER_2 &&
 				len(heard) == 5 &&
 				heard[:4] == "WIDE" &&
 				unicode.IsDigit(rune(heard[4])) {
-				heard = ax25_get_addr_with_ssid(pp, h-1) + "?"
+				heard = pp.AddrWithSSID(h-1) + "?"
 			}
 		}
 
@@ -360,14 +360,14 @@ func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *packet_t) {
 			h = -1
 		} else {
 			h = ax25_get_heard(pp)
-			heard = ax25_get_addr_with_ssid(pp, h)
+			heard = pp.AddrWithSSID(h)
 		}
 
 		if h >= AX25_REPEATER_2 &&
 			len(heard) == 5 &&
 			heard[:4] == "WIDE" &&
 			unicode.IsDigit(rune(heard[4])) {
-			heard = ax25_get_addr_with_ssid(pp, h-1) + "?"
+			heard = pp.AddrWithSSID(h-1) + "?"
 		}
 
 		var src_c = ax25_get_h(pp, AX25_SOURCE)

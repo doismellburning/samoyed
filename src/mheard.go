@@ -150,7 +150,7 @@ func mheard_latlon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string 
 func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel ALevel, retries BitFixLevel) {
 	var now = time.Now()
 
-	var source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	var source = pp.AddrWithSSID(AX25_SOURCE)
 
 	/*
 	 * How many digipeaters has it gone thru before we hear it?

@@ -532,7 +532,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	for ax25_get_dti(pp) == '}' {
 		for n := range pp.NumRepeaters() {
 			/* includes ssid. Do we want to ignore it? */
-			var via = ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1)
+			var via = pp.AddrWithSSID(n + AX25_REPEATER_1)
 
 			if via == "TCPIP" ||
 				via == "TCPXX" ||
@@ -565,7 +565,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	 */
 	for n := range pp.NumRepeaters() {
 		/* includes ssid. Do we want to ignore it? */
-		var via = ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1)
+		var via = pp.AddrWithSSID(n + AX25_REPEATER_1)
 
 		if via == "TCPIP" ||
 			via == "TCPXX" ||
@@ -1331,7 +1331,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	 */
 	for n := range pp3.NumRepeaters() {
 		/* includes ssid. Do we want to ignore it? */
-		var via = ax25_get_addr_with_ssid(pp3, n+AX25_REPEATER_1)
+		var via = pp3.AddrWithSSID(n + AX25_REPEATER_1)
 
 		// "QAX" rather than "qAX": the addresses come back from the parser
 		// upper-cased, whatever case they arrived in, so the q construct
@@ -1459,7 +1459,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	 */
 
 	/* Destination field. */
-	var dest = ax25_get_addr_with_ssid(pp3, AX25_DESTINATION)
+	var dest = pp3.AddrWithSSID(AX25_DESTINATION)
 	var payload = fmt.Sprintf("%s>%s,TCPIP,%s*:%s", string(src), dest, ig.audioConfig.mycall[to_chan], pinfo)
 
 	logrus.WithField("payload", payload).Debug("Tx IGate")
@@ -1610,8 +1610,8 @@ func (ig *IGate) rxToIgRemember(pp *packet_t) {
 	ig.rx2ig.entries[ig.rx2ig.insertNext].checksum = int(ax25_dedupe_crc(pp))
 
 	if ig.debugLevel >= 3 {
-		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src = pp.AddrWithSSID(AX25_SOURCE)
+		var dest = pp.AddrWithSSID(AX25_DESTINATION)
 		var pinfo = AX25GetInfo(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
@@ -1633,8 +1633,8 @@ func (ig *IGate) rxToIgAllow(pp *packet_t) bool {
 	var now = time.Now()
 
 	if ig.debugLevel >= 2 {
-		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src = pp.AddrWithSSID(AX25_SOURCE)
+		var dest = pp.AddrWithSSID(AX25_DESTINATION)
 		var pinfo = AX25GetInfo(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
@@ -1919,8 +1919,8 @@ func (ig *IGate) igToTxRemember(pp *packet_t, channel int, bydigi int) {
 	defer ig.ig2tx.mu.Unlock()
 
 	if ig.debugLevel >= 3 {
-		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src = pp.AddrWithSSID(AX25_SOURCE)
+		var dest = pp.AddrWithSSID(AX25_DESTINATION)
 		var pinfo = AX25GetInfo(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
@@ -1949,8 +1949,8 @@ func (ig *IGate) igToTxAllow(pp *packet_t, channel int) bool {
 	var pinfo = AX25GetInfo(pp)
 
 	if ig.debugLevel >= 2 {
-		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src = pp.AddrWithSSID(AX25_SOURCE)
+		var dest = pp.AddrWithSSID(AX25_DESTINATION)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("ig_to_tx_allow? ch%d %d \"%s>%s:%s\"\n", channel, crc, src, dest, string(pinfo))

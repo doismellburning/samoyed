@@ -237,7 +237,7 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec stri
 		return (nil) // Nothing to do.
 	}
 
-	var repeater = ax25_get_addr_with_ssid(pp, r)
+	var repeater = pp.AddrWithSSID(r)
 
 	/*
 	 * First check for explicit use of my call.

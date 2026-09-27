@@ -535,7 +535,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* b - budlist */
 		/* Budlist - AX.25 source address */
 		/* Could be different than source encapsulated by 3rd party header. */
-		var addr = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
+		var addr = pf.pp.AddrWithSSID(AX25_SOURCE)
 		result, err = filt_bodgu(pf, addr)
 
 		if pf.debug >= 2 {
@@ -557,7 +557,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		for n := AX25_REPEATER_1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
 			// Consider only those with the H (has-been-used) bit set.
 			if ax25_get_h(pf.pp, n) > 0 {
-				var addr = ax25_get_addr_with_ssid(pf.pp, n)
+				var addr = pf.pp.AddrWithSSID(n)
 				result, err = filt_bodgu(pf, addr)
 			}
 		}
@@ -580,7 +580,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 			// This is different than the previous "d" filter.
 			// Consider only those where the the H (has-been-used) bit is NOT set.
 			if ax25_get_h(pf.pp, n) == 0 {
-				var addr = ax25_get_addr_with_ssid(pf.pp, n)
+				var addr = pf.pp.AddrWithSSID(n)
 				result, err = filt_bodgu(pf, addr)
 			}
 		}
@@ -622,7 +622,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		/* Probably want to exclude mic-e types */
 		/* because destination is used for part of location. */
 		if ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`' {
-			var addr = ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION)
+			var addr = pf.pp.AddrWithSSID(AX25_DESTINATION)
 			result, err = filt_bodgu(pf, addr)
 
 			if pf.debug >= 2 {

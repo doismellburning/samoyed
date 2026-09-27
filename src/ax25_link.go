@@ -1949,7 +1949,7 @@ func lm_data_indication(E *dlq_item_t) {
 	// Copy addresses from frame into event structure.
 
 	for n := range E.num_addr {
-		E.addrs[n] = ax25_get_addr_with_ssid(E.pp, n)
+		E.addrs[n] = E.pp.AddrWithSSID(n)
 	}
 
 	if ax25Link.debugRadio {

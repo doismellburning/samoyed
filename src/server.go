@@ -328,10 +328,10 @@ func (s *AGWServer) SendRecPacket(channel int, pp *packet_t, fbuf []byte) {
 
 			agwpe_msg.Header.DataKind = 'K'
 
-			var callFrom = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+			var callFrom = pp.AddrWithSSID(AX25_SOURCE)
 			copy(agwpe_msg.Header.CallFrom[:], []byte(callFrom))
 
-			var callTo = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+			var callTo = pp.AddrWithSSID(AX25_DESTINATION)
 			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
 			agwpe_msg.Header.DataLen = uint32(len(fbuf) + 1)
@@ -380,10 +380,10 @@ func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
 
 			agwpe_msg.Header.Portx = byte(channel) // datakind is added later.
 
-			var callFrom = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+			var callFrom = pp.AddrWithSSID(AX25_SOURCE)
 			copy(agwpe_msg.Header.CallFrom[:], []byte(callFrom))
 
-			var callTo = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+			var callTo = pp.AddrWithSSID(AX25_DESTINATION)
 			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
 			/* http://uz7ho.org.ua/includes/agwpeapi.htm#_Toc500723812 */
@@ -476,9 +476,9 @@ func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
 // rather than continuing to propagate historical inconsistencies.
 
 func mon_addrs(channel int, pp *packet_t) []byte {
-	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	var src = pp.AddrWithSSID(AX25_SOURCE)
 
-	var dst = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+	var dst = pp.AddrWithSSID(AX25_DESTINATION)
 
 	var num_digi = pp.NumRepeaters()
 
@@ -490,7 +490,7 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 				via.WriteString(",") // comma if not first address
 			}
 
-			var digiaddr = ax25_get_addr_with_ssid(pp, AX25_REPEATER_1+j)
+			var digiaddr = pp.AddrWithSSID(AX25_REPEATER_1 + j)
 			via.WriteString(digiaddr)
 			/*
 				#if 0  // Mark each used with * as seen in UZ7HO SoundModem.

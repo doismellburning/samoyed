@@ -390,7 +390,7 @@ func (d *Digipeater) match(
 		return (nil)
 	}
 
-	var repeater = ax25_get_addr_with_ssid(pp, r)
+	var repeater = pp.AddrWithSSID(r)
 	var ssid = ax25_get_ssid(pp, r)
 
 	logrus.WithFields(logrus.Fields{
@@ -424,7 +424,7 @@ func (d *Digipeater) match(
 	 * Alternatively we might feed everything transmitted into
 	 * dedupe_remember rather than only frames out of digipeater.
 	 */
-	var source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	var source = pp.AddrWithSSID(AX25_SOURCE)
 	if source == mycall_rec {
 		return (nil)
 	}
@@ -482,7 +482,7 @@ func (d *Digipeater) match(
 
 	if preempt != PREEMPT_OFF {
 		for r2 := r + 1; r2 < pp.NumAddr(); r2++ {
-			var repeater2 = ax25_get_addr_with_ssid(pp, r2)
+			var repeater2 = pp.AddrWithSSID(r2)
 
 			// text_color_set (DW_COLOR_DEBUG);
 			// dw_printf ("test match %d %s\n", r2, repeater2);

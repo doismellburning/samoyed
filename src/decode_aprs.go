@@ -249,10 +249,10 @@ func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t
 	if third_party_src != "" {
 		A.g_src = third_party_src
 	} else {
-		A.g_src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+		A.g_src = pp.AddrWithSSID(AX25_SOURCE)
 	}
 
-	A.g_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+	A.g_dest = pp.AddrWithSSID(AX25_DESTINATION)
 
 	if len(pinfo) == 0 {
 		A.g_data_type_desc = "AX.25 UI frame with empty information field"
@@ -1325,7 +1325,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	/* Destination is really latitude of form ddmmhh. */
 	/* Message codes are buried in the first 3 digits. */
 
-	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+	var dest = pp.AddrWithSSID(AX25_DESTINATION)
 
 	/* Trailing spaces are trimmed off the address, so a destination that is */
 	/* not really a latitude can be shorter than the six digits we read. */
