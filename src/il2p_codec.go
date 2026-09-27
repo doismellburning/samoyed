@@ -277,7 +277,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_versi
 			return (nil)
 		}
 
-		var alevel ALevel
+		var alevel ax25.ALevel
 		//alevel = demod_get_audio_level (chan, subchan); 	// What TODO? We don't know channel here.
 		// I think alevel gets filled in somewhere later making
 		// this redundant.

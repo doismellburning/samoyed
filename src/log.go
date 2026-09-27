@@ -128,7 +128,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, alevel ALevel, retries BitFixLevel) {
+func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, alevel ax25.ALevel, retries BitFixLevel) {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()
 

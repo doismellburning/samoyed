@@ -78,7 +78,7 @@ import (
 
 type candidate_t struct {
 	packet_p    *packet_t
-	alevel      ALevel
+	alevel      ax25.ALevel
 	speed_error float64     //nolint:unused
 	fec_type    fec_type_t  // Type of FEC: none(0), fx25, il2p
 	retries     BitFixLevel // For the old "fix bits" strategy, this is the
@@ -140,7 +140,7 @@ func newMultiModems() [MAX_RADIO_CHANS]*MultiModem {
 // than to act on it, has its own.
 type ReceiveSink interface {
 	// RecFrame hands over a frame that has been decoded successfully.
-	RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
+	RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
 
 	// DCDChange reports that the decoders for a channel have collectively
 	// started (state 1) or stopped (state 0) seeing data.
@@ -150,7 +150,7 @@ type ReceiveSink interface {
 // radioSink is the ReceiveSink for a channel with a radio on the end of it.
 type radioSink struct{}
 
-func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	dataLinkQueue.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
 }
 
@@ -324,7 +324,7 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
  *
  *--------------------------------------------------------------------*/
 
-func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
+func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -370,14 +370,14 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 
 // TODO: Eliminate function above and move code elsewhere?
 
-func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	multiModems[channel].processRecPacket(subchan, slice, pp, alevel, retries, fec_type)
 }
 
 // processRecPacket takes a frame one of the channel's decoders found: straight
 // on if there is only the one decoder, otherwise as a candidate for
 // pickBestCandidate.
-func (m *MultiModem) processRecPacket(subchan int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
+func (m *MultiModem) processRecPacket(subchan int, slice int, pp *packet_t, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	var channel = m.channel
 	var pa = m.audioConfig
 

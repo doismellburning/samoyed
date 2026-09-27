@@ -110,7 +110,7 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	var heard = ax25.FromText("Q1TEST>APDW17:!4237.14NS07120.83W#", true)
 	require.NotNil(t, heard)
 
-	var alevel ALevel
+	var alevel ax25.ALevel
 
 	mheardDB.SaveRF(0, DecodeAPRS(heard, true, ""), heard, alevel, BitFixNone)
 
@@ -148,7 +148,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 		var pp = ax25.FromText(monitor, true)
 		require.NotNil(t, pp)
 
-		var alevel ALevel
+		var alevel ax25.ALevel
 
 		mheardDB.SaveRF(0, DecodeAPRS(pp, true, ""), pp, alevel, BitFixNone)
 	}

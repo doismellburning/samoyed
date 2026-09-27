@@ -136,7 +136,7 @@ func TestMHeardDBCount(t *testing.T) {
 
 // --- SaveRF helpers ---
 
-var saveRFAlevel = ALevel{}                                       //nolint:exhaustruct_v5
+var saveRFAlevel = ax25.ALevel{}                                  //nolint:exhaustruct_v5
 var saveRFNoPos = &decode_aprs_t{g_packet_type: packet_type_none} //nolint:exhaustruct_v5
 var saveRFWithPos = &decode_aprs_t{                               //nolint:exhaustruct_v5
 	g_packet_type: packet_type_position,

@@ -1082,7 +1082,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 
 				var pp3 = ax25.FromText(string(stemp), false)
 				if pp3 != nil {
-					var alevel ALevel
+					var alevel ax25.ALevel
 					alevel.Mark = -2 // FIXME: Do we want some other special case?
 					alevel.Space = -2
 

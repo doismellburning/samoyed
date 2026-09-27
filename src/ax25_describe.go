@@ -43,7 +43,7 @@ func DescribeAX25Frame(frame []byte) int {
 		return 1
 	}
 
-	var alevel ALevel
+	var alevel ax25.ALevel
 
 	var pp = ax25.FromFrame(frame, alevel)
 	if pp == nil {

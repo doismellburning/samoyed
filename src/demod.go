@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/sirupsen/logrus"
@@ -1033,14 +1034,14 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 /* Cranking up the input level produces no more than 97 or 98. */
 /* We currently produce a message when this goes over 90. */
 
-func demod_get_audio_level(channel int, subchan int) ALevel {
+func demod_get_audio_level(channel int, subchan int) ax25.ALevel {
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// audio_stats asks after both of a stereo device's channels, whether or
 	// not demod_init set them up.
 	var d = demodulators[channel]
 	if d == nil {
-		var alevel ALevel
+		var alevel ax25.ALevel
 
 		return alevel
 	}
@@ -1050,7 +1051,7 @@ func demod_get_audio_level(channel int, subchan int) ALevel {
 
 // AudioLevel reports the received audio level the subchannel's demodulator
 // has seen, and for AFSK its mark and space amplitudes.
-func (d *Demodulator) AudioLevel(subchan int) ALevel {
+func (d *Demodulator) AudioLevel(subchan int) ax25.ALevel {
 	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 
 	/* We have to consider two different cases here. */
@@ -1062,7 +1063,7 @@ func (d *Demodulator) AudioLevel(subchan int) ALevel {
 	}
 
 	var D = &d.states[subchan]
-	var alevel ALevel
+	var alevel ax25.ALevel
 
 	// Take half of peak-to-peak for received audio level.
 

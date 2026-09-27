@@ -6,6 +6,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,7 +81,7 @@ func il2pLoopback(t *testing.T, version il2p_version_t) *il2pLoopbackRecorder {
 		recorder.rx.recBit(data)
 	}
 
-	multiModemRecCapture = func(_ int, _ int, _ int, pp *packet_t, _ ALevel, retries BitFixLevel, _ fec_type_t) {
+	multiModemRecCapture = func(_ int, _ int, _ int, pp *packet_t, _ ax25.ALevel, retries BitFixLevel, _ fec_type_t) {
 		recorder.frames = append(recorder.frames, il2pLoopbackFrame{info: pp.Info(), retries: retries})
 	}
 

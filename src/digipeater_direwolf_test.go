@@ -51,7 +51,7 @@ func digipeater_test(t *testing.T, in, out string) {
 
 	var frame = pp.Pack()
 
-	var alevel ALevel
+	var alevel ax25.ALevel
 	alevel.Rec = 50
 	alevel.Mark = 50
 	alevel.Space = 50

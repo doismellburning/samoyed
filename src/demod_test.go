@@ -6,6 +6,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -201,7 +202,7 @@ func TestDemodNilChannel(t *testing.T) {
 
 	demodulators = [MAX_RADIO_CHANS]*Demodulator{}
 
-	var zero ALevel
+	var zero ax25.ALevel
 
 	assert.Equal(t, zero, demod_get_audio_level(0, 0))
 	assert.NotPanics(t, func() { demod_mute_input(0, 1) })

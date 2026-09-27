@@ -1734,7 +1734,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			var alevel ALevel
+			var alevel ax25.ALevel
 			var pp = ax25.FromFrame(cmd.Data[1:cmd.Header.DataLen], alevel)
 
 			if pp == nil {

@@ -104,7 +104,7 @@ func TestIL2PSpecEncode(t *testing.T) {
 
 	for _, testDatum := range il2pSpecExamples {
 		t.Run(testDatum.name, func(t *testing.T) {
-			var alevel ALevel
+			var alevel ax25.ALevel
 			var pp = ax25.FromFrame(il2pDataStringToBytes(testDatum.ax25Data), alevel)
 			require.NotNil(t, pp)
 

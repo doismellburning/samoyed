@@ -746,7 +746,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 		channel = int(kiss_msg[0]>>4) & 0xf
 	}
 
-	var alevel ALevel
+	var alevel ax25.ALevel
 	var cmd = kiss_msg[0] & 0xf
 
 	switch cmd {
@@ -825,7 +825,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 			return
 		}
 
-		alevel = ALevel{} //nolint:exhaustruct_v5
+		alevel = ax25.ALevel{} //nolint:exhaustruct_v5
 
 		var pp = ax25.FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {

@@ -388,7 +388,7 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 	var pp = ax25.FromTextWithStrictness("Q2TEST>Q1TEST:>Testing", ax25.AddrLenient)
 	require.NotNil(t, pp)
 
-	var alevel ALevel
+	var alevel ax25.ALevel
 
 	dataLinkQueue.RecFrame(0, 0, 0, pp, alevel, fec_type_none, RETRY_NONE, "")
 	dataLinkQueue.RegisterCallsign("Q1TEST", 0, 0)

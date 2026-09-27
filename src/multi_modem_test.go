@@ -16,7 +16,7 @@ type recordingReceiveSink struct {
 	frames []*packet_t
 }
 
-func (s *recordingReceiveSink) RecFrame(_ int, _ int, _ int, pp *packet_t, _ ALevel, _ fec_type_t, _ BitFixLevel, _ string) {
+func (s *recordingReceiveSink) RecFrame(_ int, _ int, _ int, pp *packet_t, _ ax25.ALevel, _ fec_type_t, _ BitFixLevel, _ string) {
 	s.frames = append(s.frames, pp)
 }
 
@@ -45,7 +45,7 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:left over", true)
 	require.NotNil(t, pp)
-	var alevel ALevel
+	var alevel ax25.ALevel
 	multi_modem_process_rec_packet_real(0, 0, 0, pp, alevel, RETRY_NONE, fec_type_none)
 
 	var second = new(recordingReceiveSink)
