@@ -170,6 +170,12 @@ type KissNetService struct {
 	debug        int           /* Print information flowing from and to client. */
 	pollInterval time.Duration // For a client to attach, or a slot to come free.
 	started      atomic.Bool
+
+	// listenAddress, if set, says where a port configured as port is bound
+	// in place of every address on that port.  A test asks for any free
+	// loopback port, and reads back the one it got from the port's tcp_port
+	// once Start has returned.
+	listenAddress func(port int) string
 }
 
 /*-------------------------------------------------------------------
@@ -558,13 +564,34 @@ func (kns *KissNetService) initOne(ctx context.Context, kps *kissport_status_s) 
 		return
 	}
 
+	// Bound here rather than in connectListenThread, so that the port is
+	// taken, or known not to be, by the time Start returns.
+	var address = fmt.Sprintf(":%d", kps.tcp_port)
+	if kns.listenAddress != nil {
+		address = kns.listenAddress(kps.tcp_port)
+	}
+
+	logrus.WithField("tcp_port", kps.tcp_port).Debug("Binding to port")
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", address)
+	if listenErr != nil {
+		logrus.WithError(listenErr).WithField("tcp_port", kps.tcp_port).Error("initOne: Listen failed")
+
+		return
+	}
+
+	// The port asked for, unless that was any port at all; then it is the one
+	// we were given.  Written before any goroutine that reads it starts.
+	if addr, ok := listener.Addr().(*net.TCPAddr); ok {
+		kps.tcp_port = addr.Port
+	}
+
 	// Hang up on whoever is attached when we are asked to stop.
 	context.AfterFunc(ctx, kps.stop)
 
 	/*
 	 * This waits for a client to connect and sets client_sock[n].
 	 */
-	go kns.connectListenThread(ctx, kps)
+	go kns.connectListenThread(ctx, kps, listener)
 
 	/*
 	 * These read messages from client when client_sock[n] is valid.
@@ -582,7 +609,9 @@ func (kns *KissNetService) initOne(ctx context.Context, kps *kissport_status_s) 
  *
  * Purpose:     Wait for a connection request from an application.
  *
- * Inputs:	arg		- KISS port status block.
+ * Inputs:	kps		- KISS port status block.
+ *
+ *		listener	- Already bound to the port, by initOne.
  *
  * Outputs:	client_sock	- File descriptor for communicating with client app.
  *
@@ -593,15 +622,7 @@ func (kns *KissNetService) initOne(ctx context.Context, kps *kissport_status_s) 
  *
  *--------------------------------------------------------------------*/
 
-func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kissport_status_s) {
-	logrus.WithField("tcp_port", kps.tcp_port).Debug("Binding to port")
-	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", kps.tcp_port))
-	if listenErr != nil {
-		logrus.WithError(listenErr).WithField("tcp_port", kps.tcp_port).Error("connectListenThread: Listen failed")
-
-		return
-	}
-
+func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kissport_status_s, listener net.Listener) {
 	// As in server.go: Go's net package sets SO_REUSEADDR on a Unix TCP
 	// listener for us, and setting it through TCPListener.File puts the
 	// socket into blocking mode, after which Close can no longer interrupt a
