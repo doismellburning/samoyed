@@ -5395,12 +5395,9 @@ func handleXBEACON(ps *parseState) error {
 		/* Save line number because some errors will be reported later. */
 		ps.misc.beacon[ps.misc.num_beacons].lineno = ps.line
 
-		// Pass "" so beacon_options continues from the current split() position
-		// rather than reinitialising the tokenizer. The main parse loop already
-		// called split(ps.text, false) to extract the keyword, leaving any
-		// options as the remaining state; passing "" here reads those options
-		// correctly and also handles the case where there are none.
-		if beacon_options("", &(ps.misc.beacon[ps.misc.num_beacons]), ps, ps.audio) == nil {
+		// beacon_options reads the options from where the main parse loop's
+		// split left off, just after the keyword; there may be none.
+		if beacon_options(&(ps.misc.beacon[ps.misc.num_beacons]), ps, ps.audio) == nil {
 			ps.misc.num_beacons++
 		}
 	} else {
@@ -5696,7 +5693,7 @@ func parse_beacon_number(keyword string, value string, line int) (float64, error
 // e.g.  IBEACON DELAY=1 EVERY=1 SENDTO=IG OVERLAY=R SYMBOL="igate" LAT=37^44.46N LONG=122^27.19W COMMENT="N1KOL-1 IGATE"
 // Just ignores overlay, symbol, lat, long, and comment.
 
-func beacon_options(cmd string, b *beacon_s, ps *parseState, p_audio_config *audio_s) error { //nolint:unparam
+func beacon_options(b *beacon_s, ps *parseState, p_audio_config *audio_s) error {
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
 	b.delay = 60
