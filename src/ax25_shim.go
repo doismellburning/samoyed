@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_rr(this_p *packet_t, n int) int {
-	return this_p.RR(n)
-}
-
 func AX25GetInfo(this_p *packet_t) []byte {
 	return this_p.Info()
 }

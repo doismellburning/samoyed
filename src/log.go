@@ -372,8 +372,8 @@ func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *packet_t) {
 
 		var src_c = pp.H(AX25_SOURCE)
 		var dst_c = pp.H(AX25_DESTINATION)
-		var src_rr = ax25_get_rr(pp, AX25_SOURCE)
-		var dst_rr = ax25_get_rr(pp, AX25_DESTINATION)
+		var src_rr = pp.RR(AX25_SOURCE)
+		var dst_rr = pp.RR(AX25_DESTINATION)
 
 		// C RR	for source
 		// C RR	for destination
