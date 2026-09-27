@@ -654,7 +654,7 @@ func all_frame_types(t *testing.T) {
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
+				var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 
 				pp.HexDump()
 				enc_dec_compare(t, pp)
@@ -671,7 +671,7 @@ func all_frame_types(t *testing.T) {
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
+				var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 
 				pp.HexDump()
 				enc_dec_compare(t, pp)
@@ -692,7 +692,7 @@ func all_frame_types(t *testing.T) {
 
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
+		var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
 
 		pp.HexDump()
 		enc_dec_compare(t, pp)

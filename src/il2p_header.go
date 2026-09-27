@@ -547,7 +547,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		var pf = (control >> 6) & 0x01
 		var pinfo []byte // Any info for SREJ will be added later.
 
-		return (ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, pinfo))
+		return (ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, pinfo))
 	} else if pid == 1 {
 		// 'U' frame other than 'UI'.
 		// The control field contains: P/F OPCODE{3) C x x

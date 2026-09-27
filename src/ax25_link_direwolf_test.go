@@ -455,7 +455,7 @@ func TestAX25LinkRRResponse(t *testing.T) {
 	var addrs [AX25_MAX_ADDRS]string
 	addrs[AX25_DESTINATION] = MY_CALL
 	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 1, nil)
+	var pp = ax25.SFrame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 1, nil)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -480,7 +480,7 @@ func TestAX25LinkRNRFlowControl(t *testing.T) {
 	var addrs [AX25_MAX_ADDRS]string
 	addrs[AX25_DESTINATION] = MY_CALL
 	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RNR, 8, 0, 0, nil)
+	var pp = ax25.SFrame(addrs, 2, cr_cmd, frame_type_S_RNR, 8, 0, 0, nil)
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -489,7 +489,7 @@ func TestAX25LinkRNRFlowControl(t *testing.T) {
 	assert.True(t, S.peer_receiver_busy, "Peer receiver busy should be set")
 
 	// Now receive RR to clear busy condition
-	pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 0, nil)
+	pp = ax25.SFrame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Peer receiver busy should be cleared
@@ -518,7 +518,7 @@ func TestAX25LinkREJErrorRecovery(t *testing.T) {
 	var addrs [AX25_MAX_ADDRS]string
 	addrs[AX25_DESTINATION] = MY_CALL
 	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_REJ, 8, 0, 1, nil) // P=1
+	var pp = ax25.SFrame(addrs, 2, cr_cmd, frame_type_S_REJ, 8, 0, 1, nil) // P=1
 	assert.NotNil(t, pp)
 
 	receiveFrame(t, pp, CHANNEL)
@@ -860,7 +860,7 @@ func TestAX25LinkTimerRecoveryState(t *testing.T) {
 	var addrs [AX25_MAX_ADDRS]string
 	addrs[AX25_DESTINATION] = MY_CALL
 	addrs[AX25_SOURCE] = THEIR_CALL
-	var pp = ax25_s_frame(addrs, 2, cr_res, frame_type_S_RR, 8, 0, 1, nil) // F=1
+	var pp = ax25.SFrame(addrs, 2, cr_res, frame_type_S_RR, 8, 0, 1, nil) // F=1
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should return to connected state
@@ -900,7 +900,7 @@ func TestAX25LinkSREJFrame(t *testing.T) {
 	// Receive SREJ requesting retransmission of frame 2
 	addrs[AX25_DESTINATION] = MY_CALL
 	addrs[AX25_SOURCE] = THEIR_CALL
-	pp = ax25_s_frame(addrs, 2, cr_res, frame_type_S_SREJ, 128, 2, 1, nil)
+	pp = ax25.SFrame(addrs, 2, cr_res, frame_type_S_SREJ, 128, 2, 1, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should still be connected
@@ -1066,7 +1066,7 @@ func TestAX25LinkRRPoll(t *testing.T) {
 	addrs[AX25_SOURCE] = THEIR_CALL
 
 	// Receive RR with P=1
-	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 1, nil)
+	var pp = ax25.SFrame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 1, nil)
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should remain connected
@@ -1473,7 +1473,7 @@ func TestAX25LinkSFrameCommandResponse(t *testing.T) {
 	addrs[AX25_SOURCE] = "TEST1"
 
 	// RR as command
-	var pp = ax25_s_frame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 1, nil)
+	var pp = ax25.SFrame(addrs, 2, cr_cmd, frame_type_S_RR, 8, 0, 1, nil)
 	assert.NotNil(t, pp)
 
 	cr, _, _, _, _, ftype := pp.FrameType() //nolint:dogsled
@@ -1481,7 +1481,7 @@ func TestAX25LinkSFrameCommandResponse(t *testing.T) {
 	assert.Equal(t, frame_type_S_RR, ftype)
 
 	// RR as response
-	pp = ax25_s_frame(addrs, 2, cr_res, frame_type_S_RR, 8, 0, 1, nil)
+	pp = ax25.SFrame(addrs, 2, cr_res, frame_type_S_RR, 8, 0, 1, nil)
 	assert.NotNil(t, pp)
 
 	cr, _, _, _, _, ftype = pp.FrameType() //nolint:dogsled
@@ -1848,7 +1848,7 @@ func TestAX25LinkSFrameTypeParsing(t *testing.T) {
 	}
 
 	for _, ftype := range sFrameTypes {
-		pp := ax25_s_frame(addrs, 2, cr_cmd, ftype, 8, 0, 0, nil)
+		pp := ax25.SFrame(addrs, 2, cr_cmd, ftype, 8, 0, 0, nil)
 		assert.NotNil(t, pp)
 
 		_, _, _, _, _, parsedType := pp.FrameType()
@@ -1856,7 +1856,7 @@ func TestAX25LinkSFrameTypeParsing(t *testing.T) {
 	}
 
 	// SREJ must be response
-	pp := ax25_s_frame(addrs, 2, cr_res, frame_type_S_SREJ, 8, 0, 0, nil)
+	pp := ax25.SFrame(addrs, 2, cr_res, frame_type_S_SREJ, 8, 0, 0, nil)
 	assert.NotNil(t, pp)
 	_, _, _, _, _, parsedType := pp.FrameType() //nolint:dogsled
 	assert.Equal(t, frame_type_S_SREJ, parsedType)

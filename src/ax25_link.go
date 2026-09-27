@@ -2294,7 +2294,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 						var f = 1
 						var nr = S.vr
 
-						var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
+						var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
 
 						// I wonder if this difference is intentional or if only one place was
 						// was modified after a cut-n-paste of the flow chart segment.
@@ -2494,7 +2494,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			var nr = S.vr   // Next expected sequence number.
 			var cr = cr_res // response with F set to 1.
 
-			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
+			var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		} else if !S.acknowledge_pending {
@@ -2519,7 +2519,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			var nr = S.vr   // Next expected sequence number.
 			var cr = cr_res // response with F set to 1.
 
-			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
+			var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		}
@@ -2542,7 +2542,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			dw_printf("sending REJ, SREJ not enabled case, V(R)=%d", S.vr)
 		}
 
-		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_REJ, S.modulo, nr, f, nil)
+		var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_REJ, S.modulo, nr, f, nil)
 		transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
 		S.acknowledge_pending = false
@@ -2585,7 +2585,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 				var f = 0       // we know p=0 here.
 				var nr = S.vr
 
-				var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
+				var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
 				transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 			} else if S.rxdata_by_ns[AX25MODULO(ns-1, S.modulo)] == nil {
 				// Ask for missing frames when we don't have N(S)-1 in the receive buffer.
@@ -2953,7 +2953,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 			_f = 1
 		}
 
-		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, info)
+		var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, info)
 		transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
 		return
@@ -2985,7 +2985,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 			_f = 1
 		}
 
-		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, nil)
+		var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, nil)
 		transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 	}
 } /* end send_srej_frames */
@@ -5116,7 +5116,7 @@ func transmit_enquiry(S *ax25_dlsm_t) {
 	if S.own_receiver_busy {
 		ft = frame_type_S_RNR
 	}
-	var pp = ax25_s_frame(S.addrs, S.num_addr, cmd, ft, S.modulo, nr, p, nil)
+	var pp = ax25.SFrame(S.addrs, S.num_addr, cmd, ft, S.modulo, nr, p, nil)
 
 	transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
@@ -5181,7 +5181,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 	if f == 1 && (frame_type == frame_type_S_RR || frame_type == frame_type_S_RNR || frame_type == frame_type_I) {
 		if S.own_receiver_busy {
 			// I'm busy.
-			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
+			var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false // because we sent N(R) from V(R).
@@ -5225,7 +5225,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 				send_srej_frames(S, resend[:count], count, allow_f1)
 			} else {
 				// Not waiting for fill in of missing frames.		X.25 2.4.6.11 c)
-				var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
+				var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
 				transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
 				S.acknowledge_pending = false
@@ -5241,7 +5241,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 				dw_printf("\n****** ENQUIRY RESPONSE srej not enbled, sending RR resp F=%d ******\n\n", f)
 			}
 
-			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
+			var pp = ax25.SFrame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false
@@ -5253,7 +5253,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 		if S.own_receiver_busy {
 			_r = frame_type_S_RNR
 		}
-		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, _r, S.modulo, nr, f, nil)
+		var pp = ax25.SFrame(S.addrs, S.num_addr, cr, _r, S.modulo, nr, f, nil)
 		transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
 		S.acknowledge_pending = false
