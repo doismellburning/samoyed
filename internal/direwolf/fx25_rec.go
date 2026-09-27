@@ -253,10 +253,14 @@ func (F *fx25Receiver) processRSBlock() {
 
 	dwutil.Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
 
-	var derrlocs [FX25_MAX_CHECK]int // Half would probably be OK.
 	var rs = fx25_get_rs(F.ctag_num)
 
-	var derrors = decode_rs_char(rs, F.block[:FX25_BLOCK_SIZE], derrlocs[:], 0)
+	var derrlocs, decodeErr = rs.Decode(F.block[:FX25_BLOCK_SIZE], nil)
+
+	var derrors = len(derrlocs)
+	if decodeErr != nil {
+		derrors = -1
+	}
 
 	if derrors >= 0 { // -1 for failure.  >= 0 for success, number of bytes corrected.
 		if fx25_get_debug() >= 2 {
