@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_control_offset(this_p *packet_t) int {
-	return this_p.ControlOffset()
-}
-
 func ax25_get_info_offset(this_p *packet_t) int {
 	return this_p.InfoOffset()
 }
