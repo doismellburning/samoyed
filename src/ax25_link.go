@@ -1266,7 +1266,7 @@ func dl_data_request(E *dlq_item_t) {
 
 	var cdataData = []byte{first_segment.header, first_segment.original_pid}
 	cdataData = append(cdataData, first_segment.segdata[:seglen]...)
-	var new_txdata = dataLinkQueue.NewCData(AX25_PID_SEGMENTATION_FRAGMENT, cdataData)
+	var new_txdata = dataLinkQueue.NewCData(ax25.PIDSegmentationFragment, cdataData)
 
 	data_request_good_size(S, new_txdata)
 
@@ -1300,7 +1300,7 @@ func dl_data_request(E *dlq_item_t) {
 
 		cdataData = []byte{subsequent_segment.header}
 		cdataData = append(cdataData, subsequent_segment.segdata[:seglen]...)
-		new_txdata = dataLinkQueue.NewCData(AX25_PID_SEGMENTATION_FRAGMENT, cdataData)
+		new_txdata = dataLinkQueue.NewCData(ax25.PIDSegmentationFragment, cdataData)
 
 		data_request_good_size(S, new_txdata)
 
@@ -1717,7 +1717,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
 	// See example in dl_data_request.
 	if S.ra_buff == nil {
 		// Ready state.
-		if pid != AX25_PID_SEGMENTATION_FRAGMENT {
+		if pid != ax25.PIDSegmentationFragment {
 			agwServer.RecConnData(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], pid, dataBytes)
 
 			return
@@ -1731,7 +1731,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
 		}
 	} else {
 		// Reassembling data state
-		if pid != AX25_PID_SEGMENTATION_FRAGMENT {
+		if pid != ax25.PIDSegmentationFragment {
 			agwServer.RecConnData(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], pid, dataBytes)
 
 			text_color_set(DW_COLOR_ERROR)
