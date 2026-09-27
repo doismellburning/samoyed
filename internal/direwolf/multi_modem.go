@@ -402,9 +402,6 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, a
 		if pa.recv_error_rate != 0 {
 			var r = float64(rand.Int63n(1<<53)) / (1 << 53) // Random, 0.0 to 1.0
 
-			//text_color_set(DW_COLOR_INFO);
-			//dw_printf ("TEMP DEBUG.  recv error rate = %d\n", save_audio_config_p.recv_error_rate);
-
 			if float64(pa.recv_error_rate)/100.0 > r {
 				drop_it = true
 
@@ -455,12 +452,12 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, a
 /* Opposite order would be suitable for multi-frequency although */
 /* multiple slicers are of questionable value for HF SSB. */
 
-// #define subchan_from_n(x) ((x) % save_audio_config_p.achan[channel].num_subchan)
+// #define subchan_from_n(x) ((x) % num_subchan)
 func (m *MultiModem) subchanFromN(x int) int {
 	return x % m.demodulator.NumSubchan()
 }
 
-// #define slice_from_n(x)   ((x) / save_audio_config_p.achan[channel].num_subchan)
+// #define slice_from_n(x)   ((x) / num_subchan)
 func (m *MultiModem) sliceFromN(x int) int {
 	return x / m.demodulator.NumSubchan()
 }
@@ -619,9 +616,6 @@ func (m *MultiModem) pickBestCandidate() {
 
 	if pa.recv_error_rate != 0 {
 		var r = float64(rand.Int63n(1<<53)) / (1 << 53) // Random, 0.0 to 1.0
-
-		//text_color_set(DW_COLOR_INFO);
-		//dw_printf ("TEMP DEBUG.  recv error rate = %d\n", save_audio_config_p.recv_error_rate);
 
 		if float64(pa.recv_error_rate)/100.0 > r {
 			drop_it = true
