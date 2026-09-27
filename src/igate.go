@@ -1607,7 +1607,7 @@ func (ig *IGate) rxToIgRemember(pp *packet_t) {
 	}
 
 	ig.rx2ig.entries[ig.rx2ig.insertNext].timeStamp = time.Now()
-	ig.rx2ig.entries[ig.rx2ig.insertNext].checksum = int(ax25_dedupe_crc(pp))
+	ig.rx2ig.entries[ig.rx2ig.insertNext].checksum = int(pp.DedupeCRC())
 
 	if ig.debugLevel >= 3 {
 		var src = pp.AddrWithSSID(AX25_SOURCE)
@@ -1629,7 +1629,7 @@ func (ig *IGate) rxToIgRemember(pp *packet_t) {
 }
 
 func (ig *IGate) rxToIgAllow(pp *packet_t) bool {
-	var crc = ax25_dedupe_crc(pp)
+	var crc = pp.DedupeCRC()
 	var now = time.Now()
 
 	if ig.debugLevel >= 2 {
@@ -1913,7 +1913,7 @@ func (h *ig2txHistory) reset() {
 
 func (ig *IGate) igToTxRemember(pp *packet_t, channel int, bydigi int) {
 	var now = time.Now()
-	var crc = ax25_dedupe_crc(pp)
+	var crc = pp.DedupeCRC()
 
 	ig.ig2tx.mu.Lock()
 	defer ig.ig2tx.mu.Unlock()
@@ -1943,7 +1943,7 @@ func (ig *IGate) igToTxRemember(pp *packet_t, channel int, bydigi int) {
 }
 
 func (ig *IGate) igToTxAllow(pp *packet_t, channel int) bool {
-	var crc = ax25_dedupe_crc(pp)
+	var crc = pp.DedupeCRC()
 	var now = time.Now()
 
 	var pinfo = pp.Info()

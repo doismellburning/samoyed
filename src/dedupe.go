@@ -171,7 +171,7 @@ func NewDedupeService(ttl time.Duration) *DedupeService {
 func (ds *DedupeService) Remember(pp *packet_t, channel int) {
 	ds.mu.Lock()
 	ds.history[ds.insertNext].time_stamp = time.Now()
-	ds.history[ds.insertNext].checksum = ax25_dedupe_crc(pp)
+	ds.history[ds.insertNext].checksum = pp.DedupeCRC()
 	ds.history[ds.insertNext].xmit_channel = channel
 
 	ds.insertNext++
@@ -203,7 +203,7 @@ func (ds *DedupeService) Remember(pp *packet_t, channel int) {
  *------------------------------------------------------------------------------*/
 
 func (ds *DedupeService) Check(pp *packet_t, channel int) bool {
-	var crc = ax25_dedupe_crc(pp)
+	var crc = pp.DedupeCRC()
 	var now = time.Now()
 
 	ds.mu.Lock()

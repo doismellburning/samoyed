@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_dedupe_crc(pp *packet_t) uint16 {
-	return pp.DedupeCRC()
-}
-
 func ax25_m_m_crc(pp *packet_t) uint16 {
 	return pp.MultiModemCRC()
 }
