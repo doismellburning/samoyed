@@ -552,7 +552,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 			dw_printf("Rx IGate: Unwrap third party message.\n")
 		}
 
-		var inner_pp = ax25_unwrap_third_party(pp)
+		var inner_pp = pp.UnwrapThirdParty()
 		if inner_pp == nil {
 			return
 		}

@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
-	return from_pp.UnwrapThirdParty()
-}
-
 func ax25_set_addr(this_p *packet_t, n int, ad string) {
 	this_p.SetAddr(n, ad)
 }
