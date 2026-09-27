@@ -17,4 +17,3 @@ import (
 )
 
 type packet_t = ax25.Packet
-type AddrStrictness = ax25.AddrStrictness
