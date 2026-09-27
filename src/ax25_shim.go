@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_parse_addr(position int, in_addr string, strictness AddrStrictness) (string, int, bool, bool) {
-	return ax25.ParseAddr(position, in_addr, strictness)
-}
-
 func AX25CheckAddresses(pp *packet_t, strictness AddrStrictness) bool {
 	return pp.CheckAddresses(strictness)
 }
