@@ -310,7 +310,7 @@ func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
 
 	t.Cleanup(func() { toneGenerators = origGenerators })
 
-	gen_tone_init(audioConfig, 100, sink)
+	GenToneInit(audioConfig, 100, sink)
 
 	var sent int
 
@@ -569,5 +569,5 @@ func setupEASSendTest(t *testing.T) {
 
 	t.Cleanup(func() { w.Close() })
 
-	gen_tone_init(audioConfig, 100, newWAVFileSink(w))
+	GenToneInit(audioConfig, 100, newWAVFileSink(w))
 }

@@ -222,7 +222,7 @@ func newSineTable(amp int) [256]int16 {
 
 /*------------------------------------------------------------------
  *
- * Name:        gen_tone_init
+ * Name:        GenToneInit
  *
  * Purpose:     Initialize for AFSK tone generation which might
  *		be used for RTTY or amateur packet radio.
@@ -253,7 +253,7 @@ func newSineTable(amp int) [256]int16 {
  *
  *----------------------------------------------------------------*/
 
-func gen_tone_init(audio_config_p *AudioConfig, amp int, sink AudioSink) int { //nolint:unparam
+func GenToneInit(audio_config_p *AudioConfig, amp int, sink AudioSink) int {
 	logrus.WithField("amp", amp).Debug("gen_tone_init")
 
 	for channel := range MAX_RADIO_CHANS {
@@ -263,7 +263,7 @@ func gen_tone_init(audio_config_p *AudioConfig, amp int, sink AudioSink) int { /
 	}
 
 	return (0)
-} /* end gen_tone_init */
+} /* end GenToneInit */
 
 /*-------------------------------------------------------------------
  *
@@ -716,7 +716,7 @@ func GenToneMain() {
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
 
 	AudioOpen(context.Background(), &my_audio_config)
-	gen_tone_init(&my_audio_config, 100, AudioDeviceSink{})
+	GenToneInit(&my_audio_config, 100, AudioDeviceSink{})
 
 	for range 2 {
 		for range my_audio_config.achan[0].baud * 2 {
@@ -738,7 +738,7 @@ func GenToneMain() {
 	my_audio_config.adev[0].num_channels = 2
 
 	AudioOpen(context.Background(), &my_audio_config)
-	gen_tone_init(&my_audio_config, 100, AudioDeviceSink{})
+	GenToneInit(&my_audio_config, 100, AudioDeviceSink{})
 
 	for range 4 {
 		for range my_audio_config.achan[0].baud * 2 {

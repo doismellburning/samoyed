@@ -324,7 +324,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	adev[0].outbufSizeInBytes = 4096
 	adev[0].outbuf = make([]byte, adev[0].outbufSizeInBytes)
 
-	gen_tone_init(audioConfig, 100, AudioDeviceSink{})
+	GenToneInit(audioConfig, 100, AudioDeviceSink{})
 
 	var xs = new(XmitService)
 	xs.p_modem = audioConfig
