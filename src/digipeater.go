@@ -508,7 +508,7 @@ func (d *Digipeater) match(
 					dw_printf("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
 					r2--
-					for r2 >= AX25_REPEATER_1 && ax25_get_h(result, r2) == 0 {
+					for r2 >= AX25_REPEATER_1 && result.H(r2) == 0 {
 						ax25_set_h(result, r2)
 						r2--
 					}
@@ -523,7 +523,7 @@ func (d *Digipeater) match(
 				// with this option.  Should it be renamed as
 				// PREEMPT which is more descriptive?
 				default:
-					for r2 > AX25_REPEATER_1 && ax25_get_h(result, r2-1) == 0 {
+					for r2 > AX25_REPEATER_1 && result.H(r2-1) == 0 {
 						result.RemoveAddr(r2 - 1)
 						r2--
 					}
@@ -559,7 +559,7 @@ func (d *Digipeater) match(
 
 				// First, remove any already used digipeaters.
 
-				for result.NumAddr() >= 3 && ax25_get_h(result, AX25_REPEATER_1) == 1 {
+				for result.NumAddr() >= 3 && result.H(AX25_REPEATER_1) == 1 {
 					result.RemoveAddr(AX25_REPEATER_1)
 
 					r--

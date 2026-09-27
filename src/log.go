@@ -370,8 +370,8 @@ func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *packet_t) {
 			heard = pp.AddrWithSSID(h-1) + "?"
 		}
 
-		var src_c = ax25_get_h(pp, AX25_SOURCE)
-		var dst_c = ax25_get_h(pp, AX25_DESTINATION)
+		var src_c = pp.H(AX25_SOURCE)
+		var dst_c = pp.H(AX25_DESTINATION)
 		var src_rr = ax25_get_rr(pp, AX25_SOURCE)
 		var dst_rr = ax25_get_rr(pp, AX25_DESTINATION)
 

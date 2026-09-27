@@ -1932,7 +1932,7 @@ func lm_data_indication(E *dlq_item_t) {
 	var any_unused_digi = false
 
 	for n := AX25_REPEATER_1; n < E.num_addr; n++ {
-		if ax25_get_h(E.pp, n) == 0 {
+		if E.pp.H(n) == 0 {
 			any_unused_digi = true
 		}
 	}

@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_h(this_p *packet_t, n int) int {
-	return this_p.H(n)
-}
-
 func ax25_set_h(this_p *packet_t, n int) {
 	this_p.SetH(n)
 }

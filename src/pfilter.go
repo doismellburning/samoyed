@@ -556,7 +556,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		result = 0
 		for n := AX25_REPEATER_1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
 			// Consider only those with the H (has-been-used) bit set.
-			if ax25_get_h(pf.pp, n) > 0 {
+			if pf.pp.H(n) > 0 {
 				var addr = pf.pp.AddrWithSSID(n)
 				result, err = filt_bodgu(pf, addr)
 			}
@@ -579,7 +579,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		for n := AX25_REPEATER_1; result == 0 && err == nil && n < pf.pp.NumAddr(); n++ {
 			// This is different than the previous "d" filter.
 			// Consider only those where the the H (has-been-used) bit is NOT set.
-			if ax25_get_h(pf.pp, n) == 0 {
+			if pf.pp.H(n) == 0 {
 				var addr = pf.pp.AddrWithSSID(n)
 				result, err = filt_bodgu(pf, addr)
 			}

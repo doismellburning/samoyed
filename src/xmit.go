@@ -293,7 +293,7 @@ func frame_flavor(pp *packet_t) flavor_t {
 		/* Is there at least one digipeater AND has first one been used? */
 		/* I could be the first in the list or later.  Doesn't matter. */
 
-		if pp.NumRepeaters() >= 1 && ax25_get_h(pp, AX25_REPEATER_1) > 0 {
+		if pp.NumRepeaters() >= 1 && pp.H(AX25_REPEATER_1) > 0 {
 			return (FLAVOR_APRS_DIGI)
 		}
 

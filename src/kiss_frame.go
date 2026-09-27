@@ -838,7 +838,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 			/* the high priority queue. */
 			/* Otherwise, it is an original for the low priority queue. */
 			if pp.NumRepeaters() >= 1 &&
-				ax25_get_h(pp, AX25_REPEATER_1) > 0 {
+				pp.H(AX25_REPEATER_1) > 0 {
 				transmitQueue.Append(channel, TQ_PRIO_0_HI, pp)
 			} else {
 				transmitQueue.Append(channel, TQ_PRIO_1_LO, pp)
