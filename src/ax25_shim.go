@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_m_m_crc(pp *packet_t) uint16 {
-	return pp.MultiModemCRC()
-}
-
 func AX25SafePrint(info []byte, ascii_only bool) {
 	ax25.SafePrint(info, ascii_only)
 }

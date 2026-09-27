@@ -433,7 +433,7 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *packet_t, alev
 	c.fec_type = fec_type
 	c.retries = retries
 	c.age = 0
-	c.crc = ax25_m_m_crc(pp)
+	c.crc = pp.MultiModemCRC()
 }
 
 /*-------------------------------------------------------------------
