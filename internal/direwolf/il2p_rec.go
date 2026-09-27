@@ -13,6 +13,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/sirupsen/logrus"
 )
 
@@ -44,8 +45,8 @@ type il2pReceiver struct {
 	channel, subchannel, slice int
 	sink                       il2p_packet_sink // Where each decoded packet goes.
 
-	version il2p_version_t // IL2P protocol version spoken on this channel.
-	crc     bool           // true if frames carry a trailing CRC.
+	version il2p.Version // IL2P protocol version spoken on this channel.
+	crc     bool         // true if frames carry a trailing CRC.
 
 	state IL2PState
 
@@ -55,23 +56,23 @@ type il2pReceiver struct {
 
 	polarity bool // True if opposite of expected polarity.
 
-	shdr [IL2P_HEADER_SIZE + IL2P_HEADER_PARITY]byte // Scrambled header as received over the radio.  Includes parity.
-	hc   int                                         // Number if bytes placed in above.
+	shdr [il2p.HeaderSize + il2p.HeaderParity]byte // Scrambled header as received over the radio.  Includes parity.
+	hc   int                                       // Number if bytes placed in above.
 
-	uhdr [IL2P_HEADER_SIZE]byte // Header after FEC and unscrambling.
+	uhdr [il2p.HeaderSize]byte // Header after FEC and unscrambling.
 
 	eplen int // Encoded payload length.  This is not the number from the header but rather the number of encoded bytes to gather.
 
-	spayload [IL2P_MAX_ENCODED_PAYLOAD_SIZE]byte // Scrambled and encoded payload as received over the radio.
-	pc       int                                 // Number of bytes placed in above.
+	spayload [il2p.MaxEncodedPayloadSize]byte // Scrambled and encoded payload as received over the radio.
+	pc       int                              // Number of bytes placed in above.
 
-	scrc [IL2P_CRC_ENCODED_SIZE]byte // Received Hamming-encoded CRC.
-	cc   int                         // CRC byte counter.
+	scrc [il2p.CRCEncodedSize]byte // Received Hamming-encoded CRC.
+	cc   int                       // CRC byte counter.
 
 	corrected int // Number of symbols corrected by RS FEC.
 }
 
-func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_version_t, crc bool, sink il2p_packet_sink) *il2pReceiver {
+func newIL2PReceiver(channel int, subchannel int, slice int, version il2p.Version, crc bool, sink il2p_packet_sink) *il2pReceiver {
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -115,14 +116,14 @@ func (F *il2pReceiver) recBit(dbit int) {
 
 	switch F.state {
 	case IL2P_SEARCHING: // Searching for the sync word.
-		if bits.OnesCount(F.acc^IL2P_SYNC_WORD) <= 1 { // allow single bit mismatch
+		if bits.OnesCount(F.acc^il2p.SyncWord) <= 1 { // allow single bit mismatch
 			//text_color_set (DW_COLOR_INFO);
 			//dw_printf ("IL2P header has normal polarity\n");
 			F.polarity = false
 			F.state = IL2P_HEADER
 			F.bc = 0
 			F.hc = 0
-		} else if bits.OnesCount((^F.acc&0x00ffffff)^IL2P_SYNC_WORD) <= 1 {
+		} else if bits.OnesCount((^F.acc&0x00ffffff)^il2p.SyncWord) <= 1 {
 			// FIXME - this pops up occasionally with random noise.  Find better way to convey information.
 			// This also happens for each slicer - to noisy.
 			//dw_printf ("IL2P header has reverse polarity\n");
@@ -144,26 +145,26 @@ func (F *il2pReceiver) recBit(dbit int) {
 				F.hc++
 			}
 
-			if F.hc == IL2P_HEADER_SIZE+IL2P_HEADER_PARITY { // Have all of header
-				if il2p_get_debug() >= 1 {
+			if F.hc == il2p.HeaderSize+il2p.HeaderParity { // Have all of header
+				if il2p.Debug() >= 1 {
 					F.log().Debug("IL2P header as received")
 					dwutil.HexDump(F.shdr[:])
 				}
 
 				// Fix any errors and descramble.
-				var uhdr, corrected = il2p_clarify_header(F.shdr[:])
+				var uhdr, corrected = il2p.ClarifyHeader(F.shdr[:])
 				F.corrected = corrected
 				copy(F.uhdr[:], uhdr)
 
 				if F.corrected >= 0 { // Good header.
 					// How much payload is expected?
-					var hdr_type, fec_level, length = il2p_get_header_attributes(F.uhdr[:])
-					var max_fec = il2p_rx_max_fec(F.version, fec_level)
+					var hdr_type, fec_level, length = il2p.HeaderAttributes(F.uhdr[:])
+					var max_fec = il2p.RxMaxFEC(F.version, fec_level)
 
-					var plprop, eplen = il2p_payload_compute(length, max_fec)
+					var plprop, eplen = il2p.PayloadCompute(length, max_fec)
 					F.eplen = eplen
 
-					if il2p_get_debug() >= 1 {
+					if il2p.Debug() >= 1 {
 						F.log().WithField("corrected", F.corrected).Debug("IL2P header after correcting and unscrambling")
 						dwutil.HexDump(F.uhdr[:])
 						F.log().WithFields(logrus.Fields{
@@ -171,11 +172,11 @@ func (F *il2pReceiver) recBit(dbit int) {
 							"max_fec":                  max_fec,
 							"encoded_bytes":            F.eplen,
 							"payload_bytes":            length,
-							"small_block_count":        plprop.small_block_count,
-							"small_block_size":         plprop.small_block_size,
-							"large_block_count":        plprop.large_block_count,
-							"large_block_size":         plprop.large_block_size,
-							"parity_symbols_per_block": plprop.parity_symbols_per_block,
+							"small_block_count":        plprop.SmallBlockCount,
+							"small_block_size":         plprop.SmallBlockSize,
+							"large_block_count":        plprop.LargeBlockCount,
+							"large_block_size":         plprop.LargeBlockSize,
+							"parity_symbols_per_block": plprop.ParitySymbolsPerBlock,
 						}).Debug("IL2P payload to collect")
 					}
 
@@ -191,7 +192,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 							F.state = IL2P_DECODE
 						}
 					} else { // Error.
-						if il2p_get_debug() >= 1 {
+						if il2p.Debug() >= 1 {
 							F.log().Debug("IL2P header invalid")
 						}
 
@@ -240,7 +241,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 				F.scrc[F.cc] = byte(^F.acc) & 0xff
 				F.cc++
 			}
-			if F.cc == IL2P_CRC_ENCODED_SIZE {
+			if F.cc == il2p.CRCEncodedSize {
 				F.state = IL2P_DECODE
 			}
 		}
@@ -256,18 +257,18 @@ func (F *il2pReceiver) recBit(dbit int) {
 		{
 			// Compute encoded payload size (includes parity symbols).
 			var version = F.version
-			var _, fec_level, payload_len = il2p_get_header_attributes(F.uhdr[:])
-			var max_fec = il2p_rx_max_fec(version, fec_level)
-			var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
+			var _, fec_level, payload_len = il2p.HeaderAttributes(F.uhdr[:])
+			var max_fec = il2p.RxMaxFEC(version, fec_level)
+			var _, encoded_payload_size = il2p.PayloadCompute(payload_len, max_fec)
 
-			var pp = il2p_decode_header_payload(
+			var pp = il2p.DecodeHeaderPayload(
 				F.uhdr[:],
 				F.spayload[:encoded_payload_size],
 				version,
 				&F.corrected,
 			)
 
-			if il2p_get_debug() >= 1 {
+			if il2p.Debug() >= 1 {
 				if pp != nil {
 					pp.HexDump()
 				} else {
@@ -279,8 +280,8 @@ func (F *il2pReceiver) recBit(dbit int) {
 			// Validate trailing CRC if we collected one.
 			if pp != nil && F.crc {
 				var frame_data = pp.FrameData()
-				if !il2p_crc_check(frame_data, F.scrc[:]) {
-					if il2p_get_debug() >= 1 {
+				if !il2p.CRCCheck(frame_data, F.scrc[:]) {
+					if il2p.Debug() >= 1 {
 						F.log().Debug("IL2P trailing CRC mismatch")
 					}
 					pp = nil

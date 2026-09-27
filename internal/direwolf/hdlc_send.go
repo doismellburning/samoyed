@@ -3,6 +3,7 @@ package direwolf
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/sirupsen/logrus"
 )
 
@@ -145,7 +146,7 @@ func (s *HDLCSender) SendPreamblePostamble(nbytes int, finish bool) int {
 
 	for range nbytes {
 		if achan.layer2_xmit == LAYER2_IL2P {
-			s.sendByteMSBFirst(IL2P_PREAMBLE, achan.il2p_invert_polarity)
+			s.sendByteMSBFirst(il2p.Preamble, achan.il2p_invert_polarity)
 		} else {
 			s.sendControlNRZI(0x7e)
 		}

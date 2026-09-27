@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package il2p
 
 import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -11,23 +14,23 @@ import (
  *
  *--------------------------------------------------------------------------------*/
 
-type il2p_payload_properties_t struct {
-	payload_byte_count       int // Total size, 0 thru 1023
-	payload_block_count      int
-	small_block_size         int
-	large_block_size         int
-	large_block_count        int
-	small_block_count        int
-	parity_symbols_per_block int // 2, 4, 6, 8, 16
+type PayloadProperties struct {
+	PayloadByteCount      int // Total size, 0 thru 1023
+	payload_block_count   int
+	SmallBlockSize        int
+	LargeBlockSize        int
+	LargeBlockCount       int
+	SmallBlockCount       int
+	ParitySymbolsPerBlock int // 2, 4, 6, 8, 16
 }
 
 /*--------------------------------------------------------------------------------
  *
- * Function:	il2p_payload_compute
+ * Function:	PayloadCompute
  *
  * Purpose:	Compute number and sizes of data blocks based on total size.
  *
- * Inputs:	payload_size	0 to 1023.  (IL2P_MAX_PAYLOAD_SIZE)
+ * Inputs:	payload_size	0 to 1023.  (MaxPayloadSize)
  *		max_fec		true for 16 parity symbols, false for automatic.
  *
  * Outputs:	*p		Payload block sizes and counts.
@@ -39,10 +42,10 @@ type il2p_payload_properties_t struct {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properties_t, int) {
-	var p = new(il2p_payload_properties_t)
+func PayloadCompute(payload_size int, max_fec int) (*PayloadProperties, int) {
+	var p = new(PayloadProperties)
 
-	if payload_size < 0 || payload_size > IL2P_MAX_PAYLOAD_SIZE {
+	if payload_size < 0 || payload_size > maxPayloadSize {
 		return p, -1
 	}
 
@@ -51,35 +54,35 @@ func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properti
 	}
 
 	if max_fec != 0 {
-		p.payload_byte_count = payload_size
-		p.payload_block_count = (p.payload_byte_count + 238) / 239
-		p.small_block_size = p.payload_byte_count / p.payload_block_count
-		p.large_block_size = p.small_block_size + 1
-		p.large_block_count = p.payload_byte_count - (p.payload_block_count * p.small_block_size)
-		p.small_block_count = p.payload_block_count - p.large_block_count
-		p.parity_symbols_per_block = 16
+		p.PayloadByteCount = payload_size
+		p.payload_block_count = (p.PayloadByteCount + 238) / 239
+		p.SmallBlockSize = p.PayloadByteCount / p.payload_block_count
+		p.LargeBlockSize = p.SmallBlockSize + 1
+		p.LargeBlockCount = p.PayloadByteCount - (p.payload_block_count * p.SmallBlockSize)
+		p.SmallBlockCount = p.payload_block_count - p.LargeBlockCount
+		p.ParitySymbolsPerBlock = 16
 	} else {
-		p.payload_byte_count = payload_size
-		p.payload_block_count = (p.payload_byte_count + 246) / 247
-		p.small_block_size = p.payload_byte_count / p.payload_block_count
-		p.large_block_size = p.small_block_size + 1
-		p.large_block_count = p.payload_byte_count - (p.payload_block_count * p.small_block_size)
-		p.small_block_count = p.payload_block_count - p.large_block_count
+		p.PayloadByteCount = payload_size
+		p.payload_block_count = (p.PayloadByteCount + 246) / 247
+		p.SmallBlockSize = p.PayloadByteCount / p.payload_block_count
+		p.LargeBlockSize = p.SmallBlockSize + 1
+		p.LargeBlockCount = p.PayloadByteCount - (p.payload_block_count * p.SmallBlockSize)
+		p.SmallBlockCount = p.payload_block_count - p.LargeBlockCount
 		//p.parity_symbols_per_block = (p.small_block_size / 32) + 2;  // Looks like error in documentation
 
 		// It would work if the number of parity symbols was based on large block size.
 
-		if p.small_block_size <= 61 {
-			p.parity_symbols_per_block = 2
-		} else if p.small_block_size <= 123 {
-			p.parity_symbols_per_block = 4
-		} else if p.small_block_size <= 185 {
-			p.parity_symbols_per_block = 6
-		} else if p.small_block_size <= 247 {
-			p.parity_symbols_per_block = 8
+		if p.SmallBlockSize <= 61 {
+			p.ParitySymbolsPerBlock = 2
+		} else if p.SmallBlockSize <= 123 {
+			p.ParitySymbolsPerBlock = 4
+		} else if p.SmallBlockSize <= 185 {
+			p.ParitySymbolsPerBlock = 6
+		} else if p.SmallBlockSize <= 247 {
+			p.ParitySymbolsPerBlock = 8
 		} else {
 			// Should not happen.  But just in case...
-			logrus.WithField("small_block_size", p.small_block_size).Error("IL2P parity symbol per payload block error")
+			logrus.WithField("small_block_size", p.SmallBlockSize).Error("IL2P parity symbol per payload block error")
 
 			return p, -1
 		}
@@ -87,8 +90,8 @@ func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properti
 
 	// Return the total size for the encoded format.
 
-	return p, (p.small_block_count*(p.small_block_size+p.parity_symbols_per_block) +
-		p.large_block_count*(p.large_block_size+p.parity_symbols_per_block))
+	return p, (p.SmallBlockCount*(p.SmallBlockSize+p.ParitySymbolsPerBlock) +
+		p.LargeBlockCount*(p.LargeBlockSize+p.ParitySymbolsPerBlock))
 }
 
 /*--------------------------------------------------------------------------------
@@ -117,7 +120,7 @@ func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properti
 func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 	var payload_size = len(payload)
 
-	if payload_size > IL2P_MAX_PAYLOAD_SIZE {
+	if payload_size > maxPayloadSize {
 		return nil, -1
 	}
 
@@ -127,7 +130,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 	// Determine number of blocks and sizes.
 
-	var ipp, e = il2p_payload_compute(payload_size, max_fec)
+	var ipp, e = PayloadCompute(payload_size, max_fec)
 	if e <= 0 {
 		return nil, e
 	}
@@ -138,15 +141,15 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 	// First the large blocks.
 
-	for range ipp.large_block_count {
-		var scram = il2p_scramble_block(pin[:ipp.large_block_size])
+	for range ipp.LargeBlockCount {
+		var scram = il2p_scramble_block(pin[:ipp.LargeBlockSize])
 		pout = append(pout, scram...)
 
-		pin = pin[ipp.large_block_size:]
+		pin = pin[ipp.LargeBlockSize:]
 
-		encoded_length += ipp.large_block_size
+		encoded_length += ipp.LargeBlockSize
 
-		var parity, err = il2p_encode_rs(scram, ipp.parity_symbols_per_block)
+		var parity, err = il2p_encode_rs(scram, ipp.ParitySymbolsPerBlock)
 		if err != nil {
 			logrus.WithError(err).Error("Cannot encode an IL2P payload block")
 
@@ -155,19 +158,19 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 		pout = append(pout, parity...)
 
-		encoded_length += ipp.parity_symbols_per_block
+		encoded_length += ipp.ParitySymbolsPerBlock
 	}
 
 	// Then the small blocks.
 
-	for range ipp.small_block_count {
-		var scram = il2p_scramble_block(pin[:ipp.small_block_size])
+	for range ipp.SmallBlockCount {
+		var scram = il2p_scramble_block(pin[:ipp.SmallBlockSize])
 		pout = append(pout, scram...)
 
-		pin = pin[ipp.small_block_size:]
-		encoded_length += ipp.small_block_size
+		pin = pin[ipp.SmallBlockSize:]
+		encoded_length += ipp.SmallBlockSize
 
-		var parity, err = il2p_encode_rs(scram, ipp.parity_symbols_per_block)
+		var parity, err = il2p_encode_rs(scram, ipp.ParitySymbolsPerBlock)
 		if err != nil {
 			logrus.WithError(err).Error("Cannot encode an IL2P payload block")
 
@@ -176,7 +179,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 		pout = append(pout, parity...)
 
-		encoded_length += ipp.parity_symbols_per_block
+		encoded_length += ipp.ParitySymbolsPerBlock
 	}
 
 	return pout, encoded_length
@@ -190,7 +193,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
  *
  * Inputs:	received	Array of bytes.  Size is unknown but in practice it
  *				must not exceed IL2P_MAX_ENCODED_SIZE.
- *		payload_size	0 to 1023.  (IL2P_MAX_PAYLOAD_SIZE)
+ *		payload_size	0 to 1023.  (MaxPayloadSize)
  *				Expected result size based on header.
  *		max_fec		true for 16 parity symbols, false for automatic.
  *
@@ -212,7 +215,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols_corrected *int) ([]byte, int) {
 	// Determine number of blocks and sizes.
-	var ipp, e = il2p_payload_compute(payload_size, max_fec)
+	var ipp, e = PayloadCompute(payload_size, max_fec)
 	if e <= 0 {
 		return nil, e
 	}
@@ -224,8 +227,8 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 
 	// First the large blocks.
 
-	for range ipp.large_block_count {
-		var corrected_block, e = il2p_decode_rs(pin[:ipp.large_block_size+ipp.parity_symbols_per_block], ipp.parity_symbols_per_block)
+	for range ipp.LargeBlockCount {
+		var corrected_block, e = il2p_decode_rs(pin[:ipp.LargeBlockSize+ipp.ParitySymbolsPerBlock], ipp.ParitySymbolsPerBlock)
 
 		// dw_printf ("%s:%d: large block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
 
@@ -238,19 +241,19 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		var descrambled = il2p_descramble_block(corrected_block)
 		pout = append(pout, descrambled...)
 
-		if il2p_get_debug() >= 2 {
-			logrus.WithField("bytes", ipp.large_block_size).Debug("Descrambled large payload block")
+		if Debug() >= 2 {
+			logrus.WithField("bytes", ipp.LargeBlockSize).Debug("Descrambled large payload block")
 			dwutil.HexDump(descrambled)
 		}
 
-		pin = pin[ipp.large_block_size+ipp.parity_symbols_per_block:]
-		decoded_length += ipp.large_block_size
+		pin = pin[ipp.LargeBlockSize+ipp.ParitySymbolsPerBlock:]
+		decoded_length += ipp.LargeBlockSize
 	}
 
 	// Then the small blocks.
 
-	for range ipp.small_block_count {
-		var corrected_block, e = il2p_decode_rs(pin[:ipp.small_block_size+ipp.parity_symbols_per_block], ipp.parity_symbols_per_block)
+	for range ipp.SmallBlockCount {
+		var corrected_block, e = il2p_decode_rs(pin[:ipp.SmallBlockSize+ipp.ParitySymbolsPerBlock], ipp.ParitySymbolsPerBlock)
 
 		// dw_printf ("%s:%d: small block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
 
@@ -263,13 +266,13 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		var descrambled = il2p_descramble_block(corrected_block)
 		pout = append(pout, descrambled...)
 
-		if il2p_get_debug() >= 2 {
-			logrus.WithField("bytes", ipp.small_block_size).Debug("Descrambled small payload block")
+		if Debug() >= 2 {
+			logrus.WithField("bytes", ipp.SmallBlockSize).Debug("Descrambled small payload block")
 			dwutil.HexDump(descrambled)
 		}
 
-		pin = pin[ipp.small_block_size+ipp.parity_symbols_per_block:]
-		decoded_length += ipp.small_block_size
+		pin = pin[ipp.SmallBlockSize+ipp.ParitySymbolsPerBlock:]
+		decoded_length += ipp.SmallBlockSize
 	}
 
 	if failed {

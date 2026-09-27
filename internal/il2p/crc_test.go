@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package il2p
 
 import (
 	"testing"
@@ -40,7 +43,7 @@ func TestIL2PCRCHammingSingleBitCorrection(t *testing.T) {
 }
 
 func TestIL2PCRCCalcSpec(t *testing.T) {
-	il2p_init(0)
+	Init(0)
 
 	// Example 1: S-frame AX.25 data → CRC should decode to match encoded bytes.
 	var ex1AX25 = []byte{0x96, 0x82, 0x64, 0x88, 0x8A, 0xAE, 0xE4, 0x96, 0x96, 0x68, 0x90, 0x8A, 0x94, 0x6F, 0x81}
@@ -66,20 +69,20 @@ func TestIL2PCRCEncodeDecode(t *testing.T) {
 }
 
 func TestIL2PCRCCheck(t *testing.T) {
-	il2p_init(0)
+	Init(0)
 
 	// Example 1: Verify CRC check passes.
 	var ex1AX25 = []byte{0x96, 0x82, 0x64, 0x88, 0x8A, 0xAE, 0xE4, 0x96, 0x96, 0x68, 0x90, 0x8A, 0x94, 0x6F, 0x81}
 	var ex1CRCBytes = []byte{0x7F, 0x00, 0x1D, 0x2B}
-	assert.True(t, il2p_crc_check(ex1AX25, ex1CRCBytes))
+	assert.True(t, CRCCheck(ex1AX25, ex1CRCBytes))
 
 	// Wrong CRC bytes should fail.
 	var badCRCBytes = []byte{0x7F, 0x00, 0x1D, 0x00}
-	assert.False(t, il2p_crc_check(ex1AX25, badCRCBytes))
+	assert.False(t, CRCCheck(ex1AX25, badCRCBytes))
 }
 
 func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
-	il2p_init(0)
+	Init(0)
 
 	// Encode a frame with CRC, then decode it and verify round-trip.
 	var addrs [ax25.MaxAddrs]string
@@ -90,16 +93,16 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 	require.NotNil(t, pp)
 
 	for max_fec := range 2 {
-		var encoded, enc_len = il2p_encode_frame(pp, IL2P_VERSION_0_4, max_fec, true)
+		var encoded, enc_len = EncodeFrame(pp, Version0_4, max_fec, true)
 		assert.Positive(t, enc_len)
 
 		// Encoded should be 4 bytes longer than without CRC.
-		var encodedNoCRC, enc_len_no_crc = il2p_encode_frame(pp, IL2P_VERSION_0_4, max_fec)
-		assert.Equal(t, enc_len_no_crc+IL2P_CRC_ENCODED_SIZE, enc_len)
+		var encodedNoCRC, enc_len_no_crc = EncodeFrame(pp, Version0_4, max_fec)
+		assert.Equal(t, enc_len_no_crc+CRCEncodedSize, enc_len)
 		_ = encodedNoCRC
 
 		// Decode should succeed with CRC.
-		var pp2 = il2p_decode_frame(encoded, IL2P_VERSION_0_4)
+		var pp2 = il2p_decode_frame(encoded, Version0_4)
 		require.NotNil(t, pp2, "Failed to decode frame with CRC, max_fec=%d", max_fec)
 
 		assert.Equal(t, pp.FrameData(), pp2.FrameData())
@@ -107,7 +110,7 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 }
 
 func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
-	il2p_init(0)
+	Init(0)
 
 	// Verify that the spec example IL2P data (which includes trailing CRC)
 	// decodes correctly.
@@ -131,7 +134,7 @@ func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 	for _, td := range testData {
 		t.Run(td.name, func(t *testing.T) {
 			var b = il2pDataStringToBytes(td.inputData)
-			var pp = il2p_decode_frame(b, IL2P_VERSION_COMPAT)
+			var pp = il2p_decode_frame(b, VersionCompat)
 			require.NotNil(t, pp)
 
 			var frameData = pp.FrameData()
@@ -141,7 +144,7 @@ func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 			var crc = il2p_crc_calc(frameData)
 			var encodedCRC = il2p_crc_encode(crc)
 			// The last 4 bytes of inputData should be the CRC.
-			assert.Equal(t, encodedCRC[:], b[len(b)-IL2P_CRC_ENCODED_SIZE:])
+			assert.Equal(t, encodedCRC[:], b[len(b)-CRCEncodedSize:])
 		})
 	}
 }

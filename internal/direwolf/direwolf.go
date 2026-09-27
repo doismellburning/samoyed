@@ -17,6 +17,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -480,7 +481,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
 	multi_modem_init(audio_config, d_x_opt, new(radioSink))
-	il2p_init(d_2_opt)
+	il2p.Init(d_2_opt)
 
 	/*
 	 * New in 1.8 - Allow a channel to be mapped to a network TNC rather than

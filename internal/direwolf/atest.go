@@ -50,6 +50,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/wav"
 	"github.com/sirupsen/logrus"
 )
@@ -90,7 +91,7 @@ type AtestOptions struct {
 	FixBits int
 
 	// IL2PVersion is the version of IL2P to receive, as
-	// il2p_parse_version takes it.
+	// il2p.ParseVersion takes it.
 	IL2PVersion string
 
 	// DecodeOnly is which audio channel of the file to decode: 0 or 1, or 2
@@ -134,7 +135,7 @@ type AtestFileResult struct {
 func NewAtest(opts *AtestOptions) (*Atest, error) {
 	var audio = atestDefaultAudio()
 
-	var il2p_version, il2p_version_ok = il2p_parse_version(opts.IL2PVersion)
+	var il2p_version, il2p_version_ok = il2p.ParseVersion(opts.IL2PVersion)
 	if !il2p_version_ok {
 		return nil, fmt.Errorf("invalid IL2P version %s: expected 0.4, 0.6, or compat", opts.IL2PVersion)
 	}
@@ -169,7 +170,7 @@ func NewAtest(opts *AtestOptions) (*Atest, error) {
 
 	audio.achan[1] = audio.achan[0]
 
-	il2p_init(opts.DebugIL2P)
+	il2p.Init(opts.DebugIL2P)
 
 	var a = new(Atest)
 	a.audio = audio

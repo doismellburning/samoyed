@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package il2p
 
 import (
 	"fmt"
@@ -52,27 +55,27 @@ func set_il2p_field(hdr []byte, bit_num int, lsb_index int, width int, value int
 	dwutil.Assert(value == 0)
 }
 
-func SET_UI(hdr []byte, val int) {
+func setUI(hdr []byte, val int) {
 	set_il2p_field(hdr, 6, 0, 1, val)
 }
 
-func SET_PID(hdr []byte, val int) {
+func setPID(hdr []byte, val int) {
 	set_il2p_field(hdr, 6, 4, 4, val)
 }
 
-func SET_CONTROL(hdr []byte, val int) {
+func setControl(hdr []byte, val int) {
 	set_il2p_field(hdr, 6, 11, 7, val)
 }
 
-func SET_FEC_LEVEL(hdr []byte, val int) {
+func setFECLevel(hdr []byte, val int) {
 	set_il2p_field(hdr, 7, 0, 1, val)
 }
 
-func SET_HDR_TYPE(hdr []byte, val int) {
+func setHdrType(hdr []byte, val int) {
 	set_il2p_field(hdr, 7, 1, 1, val)
 }
 
-func SET_PAYLOAD_BYTE_COUNT(hdr []byte, val int) {
+func setPayloadByteCount(hdr []byte, val int) {
 	set_il2p_field(hdr, 7, 11, 10, val)
 }
 
@@ -99,27 +102,27 @@ func get_il2p_field(hdr []byte, bit_num int, lsb_index int, width int) int {
 	return (result)
 }
 
-func GET_UI(hdr []byte) int {
+func getUI(hdr []byte) int {
 	return get_il2p_field(hdr, 6, 0, 1)
 }
 
-func GET_PID(hdr []byte) int {
+func getPID(hdr []byte) int {
 	return get_il2p_field(hdr, 6, 4, 4)
 }
 
-func GET_CONTROL(hdr []byte) int {
+func getControl(hdr []byte) int {
 	return get_il2p_field(hdr, 6, 11, 7)
 }
 
-func GET_FEC_LEVEL(hdr []byte) int {
+func getFECLevel(hdr []byte) int {
 	return get_il2p_field(hdr, 7, 0, 1)
 }
 
-func GET_HDR_TYPE(hdr []byte) int {
+func getHdrType(hdr []byte) int {
 	return get_il2p_field(hdr, 7, 1, 1)
 }
 
-func GET_PAYLOAD_BYTE_COUNT(hdr []byte) int {
+func getPayloadByteCount(hdr []byte) int {
 	return get_il2p_field(hdr, 7, 11, 10)
 }
 
@@ -217,7 +220,7 @@ func decode_pid(pid int) int {
  *			  v0.4 and RESERVED in v0.6.  See il2p_tx_fec.
  *
  * Returns:	hdr	- IL2P header with no scrambling or parity symbols.
- *			  Must be large enough to hold IL2P_HEADER_SIZE unsigned bytes.
+ *			  Must be large enough to hold HeaderSize unsigned bytes.
  *
  * Returns:	Number of bytes for information part or -1 for failure.
  *		In case of failure, fall back to type 0 transparent encapsulation.
@@ -232,7 +235,7 @@ func decode_pid(pid int) int {
  *--------------------------------------------------------------------------------*/
 
 func il2p_type_1_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
-	var hdr = make([]byte, IL2P_HEADER_SIZE)
+	var hdr = make([]byte, HeaderSize)
 
 	if pp.NumAddr() != 2 {
 		// Only two addresses are allowed for type 1 header.
@@ -290,20 +293,20 @@ func il2p_type_1_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
 		// C is copied from the C bit in the destination addr.
 		// C from source is not used here.  Reception assumes it is the opposite.
 		// PID is set to 0, meaning none, for S frames.
-		SET_UI(hdr, 0)
-		SET_PID(hdr, 0)
-		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|(((dwutil.IfThenElse((cr == ax25.CRCmd), 1, 0))|(dwutil.IfThenElse((cr == ax25.CR11), 1, 0)))<<2))
+		setUI(hdr, 0)
+		setPID(hdr, 0)
+		setControl(hdr, (pf<<6)|(nr<<3)|(((dwutil.IfThenElse((cr == ax25.CRCmd), 1, 0))|(dwutil.IfThenElse((cr == ax25.CR11), 1, 0)))<<2))
 
 		// This gets OR'ed into the above.
 		switch frame_type {
 		case ax25.FrameTypeSRR:
-			SET_CONTROL(hdr, 0)
+			setControl(hdr, 0)
 		case ax25.FrameTypeSRNR:
-			SET_CONTROL(hdr, 1)
+			setControl(hdr, 1)
 		case ax25.FrameTypeSREJ:
-			SET_CONTROL(hdr, 2)
+			setControl(hdr, 2)
 		case ax25.FrameTypeSSREJ:
-			SET_CONTROL(hdr, 3)
+			setControl(hdr, 3)
 		default:
 		}
 
@@ -322,16 +325,16 @@ func il2p_type_1_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
 		// The header UI field must also be set for UI frames.
 		// PID is set to 1 for all U frames other than UI.
 		if frame_type == ax25.FrameTypeUUI {
-			SET_UI(hdr, 1) // I guess this is how we distinguish 'I' and 'UI'
+			setUI(hdr, 1) // I guess this is how we distinguish 'I' and 'UI'
 			// on the receiving end.
 			var pid = encode_pid(pp)
 			if pid < 0 {
 				return nil, -1
 			}
 
-			SET_PID(hdr, pid)
+			setPID(hdr, pid)
 		} else {
-			SET_PID(hdr, 1) // 1 for 'U' other than 'UI'.
+			setPID(hdr, 1) // 1 for 'U' other than 'UI'.
 		}
 
 		// Each of the destination and source addresses has a "C" bit.
@@ -353,42 +356,42 @@ func il2p_type_1_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
 		// same bits.  We see this in the second example in the protocol spec.
 		// The original UI frame has both C bits of 0 so it is received as a response.
 
-		SET_CONTROL(hdr, (pf<<6)|(((dwutil.IfThenElse((cr == ax25.CRCmd), 1, 0))|(dwutil.IfThenElse((cr == ax25.CR11), 1, 0)))<<2))
+		setControl(hdr, (pf<<6)|(((dwutil.IfThenElse((cr == ax25.CRCmd), 1, 0))|(dwutil.IfThenElse((cr == ax25.CR11), 1, 0)))<<2))
 
 		// This gets OR'ed into the above.
 		switch frame_type {
 		case ax25.FrameTypeUSABM:
-			SET_CONTROL(hdr, 0<<3)
+			setControl(hdr, 0<<3)
 		case ax25.FrameTypeUDISC:
-			SET_CONTROL(hdr, 1<<3)
+			setControl(hdr, 1<<3)
 		case ax25.FrameTypeUDM:
-			SET_CONTROL(hdr, 2<<3)
+			setControl(hdr, 2<<3)
 		case ax25.FrameTypeUUA:
-			SET_CONTROL(hdr, 3<<3)
+			setControl(hdr, 3<<3)
 		case ax25.FrameTypeUFRMR:
-			SET_CONTROL(hdr, 4<<3)
+			setControl(hdr, 4<<3)
 		case ax25.FrameTypeUUI:
-			SET_CONTROL(hdr, 5<<3)
+			setControl(hdr, 5<<3)
 		case ax25.FrameTypeUXID:
-			SET_CONTROL(hdr, 6<<3)
+			setControl(hdr, 6<<3)
 		case ax25.FrameTypeUTEST:
-			SET_CONTROL(hdr, 7<<3)
+			setControl(hdr, 7<<3)
 		default:
 		}
 
 	case ax25.FrameTypeI: // Information
 		// I frames (mod 8 only)
 		// encoded control: P/F N(R) N(S)
-		SET_UI(hdr, 0)
+		setUI(hdr, 0)
 
 		var pid2 = encode_pid(pp)
 		if pid2 < 0 {
 			return nil, -1
 		}
 
-		SET_PID(hdr, pid2)
+		setPID(hdr, pid2)
 
-		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|ns)
+		setControl(hdr, (pf<<6)|(nr<<3)|ns)
 
 	default:
 		// case frame_type_U_SABME:		// Set Async Balanced Mode, Extended
@@ -403,15 +406,15 @@ func il2p_type_1_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
 
 	// Bit 7 has [FEC Level:1], [HDR Type:1], [Payload byte Count:10]
 
-	SET_FEC_LEVEL(hdr, fec_level)
-	SET_HDR_TYPE(hdr, 1)
+	setFECLevel(hdr, fec_level)
+	setHdrType(hdr, 1)
 
 	var pinfo = pp.Info()
-	if len(pinfo) > IL2P_MAX_PAYLOAD_SIZE {
+	if len(pinfo) > maxPayloadSize {
 		return nil, -2
 	}
 
-	SET_PAYLOAD_BYTE_COUNT(hdr, len(pinfo))
+	setPayloadByteCount(hdr, len(pinfo))
 
 	return hdr, len(pinfo)
 }
@@ -437,7 +440,7 @@ func il2p_type_1_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
  *--------------------------------------------------------------------------------*/
 
 func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
-	if GET_HDR_TYPE(hdr) != 1 {
+	if getHdrType(hdr) != 1 {
 		logrus.Error("IL2P internal error: Should not be here: il2p_decode_header_type_1, when header type is 0")
 
 		return (nil)
@@ -522,13 +525,13 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
 	// 1 = 'U' frame other than UI.
 	// others are either 'UI' or 'I' depending on the UI field.
 
-	var pid = GET_PID(hdr)
-	var ui = GET_UI(hdr)
+	var pid = getPID(hdr)
+	var ui = getUI(hdr)
 
 	if pid == 0 {
 		// 'S' frame.
 		// The control field contains: P/F N(R) C S S
-		var control = GET_CONTROL(hdr)
+		var control = getControl(hdr)
 		var cr = dwutil.IfThenElse((control&0x04) != 0, ax25.CRCmd, ax25.CRRes)
 		var ftype ax25.FrameType
 
@@ -551,7 +554,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
 	} else if pid == 1 {
 		// 'U' frame other than 'UI'.
 		// The control field contains: P/F OPCODE{3) C x x
-		var control = GET_CONTROL(hdr)
+		var control = getControl(hdr)
 		var cr = dwutil.IfThenElse((control&0x04) != 0, ax25.CRCmd, ax25.CRRes)
 		var axpid = 0 // unused for U other than UI.
 		var ftype ax25.FrameType
@@ -583,24 +586,24 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
 	} else if ui != 0 {
 		// 'UI' frame.
 		// The control field contains: P/F OPCODE{3) C x x
-		var control = GET_CONTROL(hdr)
+		var control = getControl(hdr)
 		var cr = dwutil.IfThenElse((control&0x04) != 0, ax25.CRCmd, ax25.CRRes)
 		var ftype = ax25.FrameTypeUUI
 		var pf = (control >> 6) & 0x01
-		var axpid = decode_pid(GET_PID(hdr))
+		var axpid = decode_pid(getPID(hdr))
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
 
 		return (ax25.UFrame(addrs, num_addr, cr, ftype, pf, axpid, pinfo))
 	} else {
 		// 'I' frame.
 		// The control field contains: P/F N(R) N(S)
-		var control = GET_CONTROL(hdr)
+		var control = getControl(hdr)
 		var cr = ax25.CRCmd // Always command.
 		var pf = (control >> 6) & 0x01
 		var nr = (control >> 3) & 0x7
 		var ns = (control & 0x7)
 		var modulo = ax25.Modulo8
-		var axpid = decode_pid(GET_PID(hdr))
+		var axpid = decode_pid(getPID(hdr))
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
 
 		return (ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, axpid, pinfo))
@@ -619,7 +622,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
  *			  v0.4 and RESERVED in v0.6.  See il2p_tx_fec.
  *
  * Returns:	hdr	- IL2P header with no scrambling or parity symbols.
- *			  Must be large enough to hold IL2P_HEADER_SIZE unsigned bytes.
+ *			  Must be large enough to hold HeaderSize unsigned bytes.
  *
  * Returns:	Number of bytes for information part or -1 for failure.
  *		In case of failure, fall back to type 0 transparent encapsulation.
@@ -632,27 +635,27 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
  *--------------------------------------------------------------------------------*/
 
 func il2p_type_0_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
-	var hdr = make([]byte, IL2P_HEADER_SIZE)
+	var hdr = make([]byte, HeaderSize)
 
 	// Bit 7 has [FEC Level:1], [HDR Type:1], [Payload byte Count:10]
 
-	SET_FEC_LEVEL(hdr, fec_level)
-	SET_HDR_TYPE(hdr, 0)
+	setFECLevel(hdr, fec_level)
+	setHdrType(hdr, 0)
 
 	var frame_len = pp.FrameLen()
 
-	if frame_len < 14 || frame_len > IL2P_MAX_PAYLOAD_SIZE {
+	if frame_len < 14 || frame_len > maxPayloadSize {
 		return nil, -2
 	}
 
-	SET_PAYLOAD_BYTE_COUNT(hdr, frame_len)
+	setPayloadByteCount(hdr, frame_len)
 
 	return hdr, frame_len
 }
 
 /***********************************************************************************
  *
- * Name:        il2p_get_header_attributes
+ * Name:        HeaderAttributes
  *
  * Purpose:     Extract a few attributes from an IL2p header.
  *
@@ -661,19 +664,19 @@ func il2p_type_0_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
  * Returns:     hdr_type - 0 or 1.
  *
  *		fec_level - The header bit which is the FEC Level in v0.4 and
- *			  RESERVED in v0.6.  See il2p_rx_max_fec.
+ *			  RESERVED in v0.6.  See RxMaxFEC.
  *
  * Returns:	Payload byte count.   (actual payload size, not the larger encoded format)
  *
  ***********************************************************************************/
 
-func il2p_get_header_attributes(hdr []byte) (int, int, int) {
-	return GET_HDR_TYPE(hdr), GET_FEC_LEVEL(hdr), GET_PAYLOAD_BYTE_COUNT(hdr)
+func HeaderAttributes(hdr []byte) (int, int, int) {
+	return getHdrType(hdr), getFECLevel(hdr), getPayloadByteCount(hdr)
 }
 
 /***********************************************************************************
  *
- * Name:        il2p_clarify_header
+ * Name:        ClarifyHeader
  *
  * Purpose:     Convert received header to usable form.
  *		This involves RS FEC then descrambling.
@@ -689,8 +692,8 @@ func il2p_get_header_attributes(hdr []byte) (int, int, int) {
  *
  ***********************************************************************************/
 
-func il2p_clarify_header(rec_hdr []byte) ([]byte, int) {
-	var corrected, e = il2p_decode_rs(rec_hdr, IL2P_HEADER_PARITY)
+func ClarifyHeader(rec_hdr []byte) ([]byte, int) {
+	var corrected, e = il2p_decode_rs(rec_hdr, HeaderParity)
 
 	var corrected_descrambled_hdr = il2p_descramble_block(corrected)
 

@@ -1,0 +1,730 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package il2p
+
+import (
+	"fmt"
+	"slices"
+	"testing"
+
+	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+/*-------------------------------------------------------------
+ *
+ * Purpose:	Unit tests for IL2P protocol functions.
+ *
+ * Errors:	Die if anything goes wrong.
+ *
+ *--------------------------------------------------------------*/
+
+func Test_IL2P(t *testing.T) {
+	var enable_debug_out = 0
+	Init(enable_debug_out)
+
+	fmt.Println("Begin IL2P unit tests.")
+
+	// These start simple and later complex cases build upon earlier successes.
+
+	// Test scramble and descramble.
+
+	test_scramble(t)
+
+	// Test Reed Solomon error correction.
+
+	test_rs(t)
+
+	// Test payload functions.
+
+	test_payload(t)
+
+	// Try encoding the example headers in the protocol spec.
+
+	test_example_headers(t)
+
+	// Convert all of the AX.25 frame types to IL2P and back again.
+
+	all_frame_types(t)
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+//
+//	Test scrambling and descrambling.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+func test_scramble(t *testing.T) {
+	t.Helper()
+
+	fmt.Println("Test scrambling...")
+
+	// First an example from the protocol specification to make sure I'm compatible.
+
+	var scramin1 = []byte{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
+	var scramout1 = []byte{0x6a, 0xea, 0x9c, 0xc2, 0x01, 0x11, 0xfc, 0x14, 0x1f, 0xda, 0x6e, 0xf2, 0x53}
+
+	var scramout = il2p_scramble_block(scramin1)
+	assert.Equal(t, scramout1, scramout)
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+//
+//	Test Reed Solomon encode/decode examples found in the protocol spec.
+//	The data part is scrambled but that does not matter here because.
+//	We are only concerned abound adding the parity and verifying.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+func test_rs(t *testing.T) {
+	t.Helper()
+
+	fmt.Println("Test Reed Solomon functions...")
+
+	var example_s = []byte{0x26, 0x57, 0x4d, 0x57, 0xf1, 0x96, 0xcc, 0x85, 0x42, 0xe7, 0x24, 0xf7, 0x2e, 0x8a, 0x97}
+
+	var parity_out, err = il2p_encode_rs(example_s[:13], 2)
+	require.NoError(t, err)
+	// dw_printf ("DEBUG RS encode %02x %02x\n", parity_out[0], parity_out[1]);
+	assert.Equal(t, example_s[13], parity_out[0])
+	assert.Equal(t, example_s[14], parity_out[1])
+
+	var example_u = []byte{0x6a, 0xea, 0x9c, 0xc2, 0x01, 0x11, 0xfc, 0x14, 0x1f, 0xda, 0x6e, 0xf2, 0x53, 0x91, 0xbd}
+	parity_out, err = il2p_encode_rs(example_u[:13], 2)
+	require.NoError(t, err)
+	// dw_printf ("DEBUG RS encode %02x %02x\n", parity_out[0], parity_out[1]);
+	assert.Equal(t, example_u[13], parity_out[0])
+	assert.Equal(t, example_u[14], parity_out[1])
+
+	// See if we can go the other way.
+
+	var received = make([]byte, len(example_s))
+	var corrected []byte
+	var e int
+
+	corrected, e = il2p_decode_rs(example_s, 2)
+	assert.Zero(t, e)
+	assert.Equal(t, example_s[:13], corrected)
+
+	copy(received, example_s)
+	received[0] = '?'
+	corrected, e = il2p_decode_rs(received, 2)
+	assert.Equal(t, 1, e)
+	assert.Equal(t, example_s[:13], corrected)
+
+	corrected, e = il2p_decode_rs(example_u, 2)
+	assert.Zero(t, e)
+	assert.Equal(t, example_u[:13], corrected)
+
+	copy(received, example_u)
+	received[12] = '?'
+	corrected, e = il2p_decode_rs(received, 2)
+	assert.Equal(t, 1, e)
+	assert.Equal(t, example_u[:13], corrected)
+
+	received[1] = '?'
+	received[2] = '?'
+	_, e = il2p_decode_rs(received, 2)
+	assert.Equal(t, -1, e)
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+//
+//	Test payload functions.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+func test_payload(t *testing.T) {
+	t.Helper()
+
+	fmt.Println("Test payload functions...")
+
+	var e int
+	var ipp *PayloadProperties
+
+	// Examples in specification.
+
+	ipp, e = PayloadCompute(100, 0)
+	assert.Equal(t, 100, ipp.SmallBlockSize)
+	assert.Equal(t, 101, ipp.LargeBlockSize)
+	assert.Equal(t, 0, ipp.LargeBlockCount)
+	assert.Equal(t, 1, ipp.SmallBlockCount)
+	assert.Equal(t, 4, ipp.ParitySymbolsPerBlock)
+	assert.GreaterOrEqual(t, e, 0)
+
+	ipp, e = PayloadCompute(236, 0)
+	assert.Equal(t, 236, ipp.SmallBlockSize)
+	assert.Equal(t, 237, ipp.LargeBlockSize)
+	assert.Equal(t, 0, ipp.LargeBlockCount)
+	assert.Equal(t, 1, ipp.SmallBlockCount)
+	assert.Equal(t, 8, ipp.ParitySymbolsPerBlock)
+	assert.GreaterOrEqual(t, e, 0)
+
+	ipp, e = PayloadCompute(512, 0)
+	assert.Equal(t, 170, ipp.SmallBlockSize)
+	assert.Equal(t, 171, ipp.LargeBlockSize)
+	assert.Equal(t, 2, ipp.LargeBlockCount)
+	assert.Equal(t, 1, ipp.SmallBlockCount)
+	assert.Equal(t, 6, ipp.ParitySymbolsPerBlock)
+	assert.GreaterOrEqual(t, e, 0)
+
+	ipp, e = PayloadCompute(1023, 0)
+	assert.Equal(t, 204, ipp.SmallBlockSize)
+	assert.Equal(t, 205, ipp.LargeBlockSize)
+	assert.Equal(t, 3, ipp.LargeBlockCount)
+	assert.Equal(t, 2, ipp.SmallBlockCount)
+	assert.Equal(t, 8, ipp.ParitySymbolsPerBlock)
+	assert.GreaterOrEqual(t, e, 0)
+
+	// Now try all possible sizes for Baseline FEC Parity.
+
+	for n := 1; n <= maxPayloadSize; n++ {
+		ipp, e = PayloadCompute(n, 0)
+		// dw_printf ("bytecount=%d, smallsize=%d, largesize=%d, largecount=%d, smallcount=%d\n", n,
+		//		ipp.small_block_size, ipp.large_block_size,
+		//		ipp.large_block_count, ipp.small_block_count);
+		// fflush (stdout);
+
+		assert.GreaterOrEqual(t, e, 0)
+		assert.GreaterOrEqual(t, ipp.payload_block_count, 1)
+		assert.LessOrEqual(t, ipp.payload_block_count, maxPayloadBlocks)
+		assert.Equal(t, ipp.SmallBlockCount+ipp.LargeBlockCount, ipp.payload_block_count)
+		assert.Equal(t, n, ipp.SmallBlockCount*ipp.SmallBlockSize+ipp.LargeBlockCount*ipp.LargeBlockSize)
+		assert.True(t, ipp.ParitySymbolsPerBlock == 2 ||
+			ipp.ParitySymbolsPerBlock == 4 ||
+			ipp.ParitySymbolsPerBlock == 6 ||
+			ipp.ParitySymbolsPerBlock == 8)
+
+		// Data and parity must fit in RS block size of 255.
+		// Size test does not apply if block count is 0.
+		assert.True(t, ipp.SmallBlockCount == 0 || ipp.SmallBlockSize+ipp.ParitySymbolsPerBlock <= 255)
+		assert.True(t, ipp.LargeBlockCount == 0 || ipp.LargeBlockSize+ipp.ParitySymbolsPerBlock <= 255)
+	}
+
+	// All sizes for MAX FEC.
+
+	for n := 1; n <= maxPayloadSize; n++ {
+		ipp, e = PayloadCompute(n, 1) // 1 for max fec.
+		// dw_printf ("bytecount=%d, smallsize=%d, largesize=%d, largecount=%d, smallcount=%d\n", n,
+		//		ipp.small_block_size, ipp.large_block_size,
+		//		ipp.large_block_count, ipp.small_block_count);
+		// fflush (stdout);
+
+		assert.GreaterOrEqual(t, e, 0)
+		assert.GreaterOrEqual(t, ipp.payload_block_count, 1)
+		assert.LessOrEqual(t, ipp.payload_block_count, maxPayloadBlocks)
+		assert.Equal(t, ipp.SmallBlockCount+ipp.LargeBlockCount, ipp.payload_block_count)
+		assert.Equal(t, ipp.SmallBlockCount*ipp.SmallBlockSize+
+			ipp.LargeBlockCount*ipp.LargeBlockSize, n)
+		assert.Equal(t, 16, ipp.ParitySymbolsPerBlock)
+
+		// Data and parity must fit in RS block size of 255.
+		// Size test does not apply if block count is 0.
+		assert.True(t, ipp.SmallBlockCount == 0 || ipp.SmallBlockSize+ipp.ParitySymbolsPerBlock <= 255)
+		assert.True(t, ipp.LargeBlockCount == 0 || ipp.LargeBlockSize+ipp.ParitySymbolsPerBlock <= 255)
+	}
+
+	// Now let's try encoding payloads and extracting original again.
+	// This will also provide exercise for scrambling and Reed Solomon under more conditions.
+
+	var original_payload = make([]byte, maxPayloadSize)
+	for n := range maxPayloadSize {
+		original_payload[n] = byte(n & 0xff)
+	}
+
+	for max_fec := range 2 {
+		for payload_length := 1; payload_length <= maxPayloadSize; payload_length++ {
+			// dw_printf ("\n--------- max_fec = %d, payload_length = %d\n", max_fec, payload_length);
+			var encoded, k = il2p_encode_payload(original_payload[:payload_length], max_fec)
+
+			// dw_printf ("payload length %d %s -> %d\n", payload_length, max_fec ? "M" : "", k);
+			assert.True(t, k > payload_length && k <= MaxEncodedPayloadSize)
+
+			// Now extract.
+
+			var symbols_corrected = 0
+			var extracted, e = il2p_decode_payload(encoded, payload_length, max_fec, &symbols_corrected)
+			// dw_printf ("e = %d, payload_length = %d\n", e, payload_length);
+			assert.Equal(t, payload_length, e)
+
+			// if (memcmp (original_payload, extracted, payload_length) != 0) {
+			//  dw_printf ("********** Received message not as expected. **********\n");
+			//  fx_hex_dump(extracted, payload_length);
+			// }
+			assert.Equal(t, original_payload[:payload_length], extracted)
+		}
+	}
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+//
+//	Test header examples found in protocol specification.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+func test_example_headers(t *testing.T) {
+	t.Helper()
+
+	//----------- Example 1:  AX.25 S-Frame   --------------
+
+	//	This frame sample only includes a 15 byte header, without PID field.
+	//	Destination Callsign: ?KA2DEW-2
+	//	Source Callsign: ?KK4HEJ-7
+	//	N(R): 5
+	//	P/F: 1
+	//	C: 1
+	//	Control Opcode: 00 (Receive Ready)
+	//
+	//	AX.25 data:
+	//	96 82 64 88 8a ae e4 96 96 68 90 8a 94 6f b1
+	//
+	//	IL2P Data Prior to Scrambling and RS Encoding:
+	//	2b a1 12 24 25 77 6b 2b 54 68 25 2a 27
+	//
+	//	IL2P Data After Scrambling and RS Encoding:
+	//	26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e 8a 97
+
+	fmt.Printf("Example 1: AX.25 S-Frame...\n")
+
+	var example1 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x6f, 0xb1}
+	var header1 = []byte{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
+	var alevel ax25.ALevel
+
+	var pp = ax25.FromFrame(example1, alevel)
+	assert.NotNil(t, pp)
+	var header, e = il2p_type_1_header(pp, 0)
+	assert.Equal(t, 0, e)
+
+	// dw_printf ("Example 1 header:\n");
+	// for (int i = 0 ; i < sizeof(header); i++) {
+	//     dw_printf (" %02x", header[i]);
+	// }
+	// dw_printf ("\n");
+
+	assert.Equal(t, header1, header)
+
+	var scrambled = il2p_scramble_block(header)
+	//    dw_printf (" %02x", sresult[i]);
+	// }
+	// dw_printf ("\n");
+
+	var check, err = il2p_encode_rs(scrambled, 2)
+	require.NoError(t, err)
+
+	// dw_printf ("check = ");
+	// for (int i = 0 ; i < sizeof(check); i++) {
+	//     dw_printf (" %02x", check[i]);
+	// }
+	// dw_printf ("\n");
+	assert.Equal(t, byte(0x8a), check[0])
+	assert.Equal(t, byte(0x97), check[1])
+
+	// Can we go from IL2P back to AX.25?
+
+	pp = il2p_decode_header_type_1(header, 0)
+	assert.NotNil(t, pp)
+
+	/*
+		var dst_addr = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	*/
+
+	var frame_type = pp.FrameTypeOnly()
+	_ = frame_type // TODO Check this?
+
+	// TODO: compare binary.
+
+	fmt.Printf("Example 1 header OK\n")
+
+	// -------------- Example 2 - UI frame, no info part  ------------------
+
+	//	This is an AX.25 Unnumbered Information frame, such as APRS.
+	//	Destination Callsign: ?CQ    -0
+	//	Source Callsign: ?KK4HEJ-15
+	//	P/F: 0
+	//	C: 0
+	//	Control Opcode:  3 Unnumbered Information
+	//	PID: 0xF0 No L3
+	//
+	//	AX.25 Data:
+	//	86 a2 40 40 40 40 60 96 96 68 90 8a 94 7f 03 f0
+	//
+	//	IL2P Data Prior to Scrambling and RS Encoding:
+	//	63 f1 40 40 40 00 6b 2b 54 28 25 2a 0f
+	//
+	//	IL2P Data After Scrambling and RS Encoding:
+	//	6a ea 9c c2 01 11 fc 14 1f da 6e f2 53 91 bd
+
+	// dw_printf ("---------- example 2 ------------\n");
+	var example2 = []byte{0x86, 0xa2, 0x40, 0x40, 0x40, 0x40, 0x60, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x7f, 0x03, 0xf0}
+	var header2 = []byte{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
+	alevel = ax25.ALevel{} //nolint:exhaustruct_v5
+
+	pp = ax25.FromFrame(example2, alevel)
+	assert.NotNil(t, pp)
+	header, e = il2p_type_1_header(pp, 0)
+	assert.Equal(t, 0, e)
+
+	// dw_printf ("Example 2 header:\n");
+	// for (int i = 0 ; i < sizeof(header); i++) {
+	//     dw_printf (" %02x", header[i]);
+	// }
+	// dw_printf ("\n");
+
+	assert.Equal(t, header2, header)
+
+	scrambled = il2p_scramble_block(header)
+
+	// dw_printf ("Expect scrambled  6a ea 9c c2 01 11 fc 14 1f da 6e f2 53\n");
+	// for (int i = 0 ; i < sizeof(sresult); i++) {
+	//    dw_printf (" %02x", sresult[i]);
+	// }
+	// dw_printf ("\n");
+
+	check, err = il2p_encode_rs(scrambled, 2)
+	require.NoError(t, err)
+
+	// dw_printf ("expect checksum = 91 bd\n");
+	// dw_printf ("check = ");
+	// for (int i = 0 ; i < sizeof(check); i++) {
+	//     dw_printf (" %02x", check[i]);
+	// }
+	// dw_printf ("\n");
+	assert.Equal(t, byte(0x91), check[0])
+	assert.Equal(t, byte(0xbd), check[1])
+
+	// Can we go from IL2P back to AX.25?
+
+	pp = il2p_decode_header_type_1(header, 0)
+	assert.NotNil(t, pp)
+
+	/*
+		var dst_addr = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	*/
+
+	frame_type = pp.FrameTypeOnly()
+	_ = frame_type
+
+	// TODO: compare binary.
+
+	// TODO: more examples
+
+	fmt.Printf("Example 2 header OK\n")
+
+	// -------------- Example 3 - I Frame  ------------------
+
+	//	This is an AX.25 I-Frame with 9 bytes of information after the 16 byte header.
+	//
+	//	Destination Callsign: ?KA2DEW-2
+	//	Source Callsign: ?KK4HEJ-2
+	//	P/F: 1
+	//	C: 1
+	//	N(R): 5
+	//	N(S): 4
+	//	AX.25 PID: 0xCF TheNET
+	//	IL2P Payload Byte Count: 9
+	//
+	//	AX.25 Data:
+	//	96 82 64 88 8a ae e4 96 96 68 90 8a 94 65 b8 cf 30 31 32 33 34 35 36 37 38
+	//
+	//	IL2P Scrambled and Encoded Data:
+	//	26 13 6d 02 8c fe fb e8 aa 94 2d 6a 34 43 35 3c 69 9f 0c 75 5a 38 a1 7f f3 fc
+
+	// dw_printf ("---------- example 3 ------------\n");
+	var example3 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x65, 0xb8, 0xcf, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
+	var header3 = []byte{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
+	var complete3 = []byte{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
+	alevel = ax25.ALevel{} //nolint:exhaustruct_v5
+
+	pp = ax25.FromFrame(example3, alevel)
+	assert.NotNil(t, pp)
+	header, e = il2p_type_1_header(pp, 0)
+	assert.Equal(t, 9, e)
+
+	// dw_printf ("Example 3 header:\n");
+	// for (int i = 0 ; i < sizeof(header); i++) {
+	//     dw_printf (" %02x", header[i]);
+	// }
+	// dw_printf ("\n");
+
+	assert.Equal(t, header3, header)
+
+	scrambled = il2p_scramble_block(header)
+
+	// dw_printf ("Expect scrambled  26 13 6d 02 8c fe fb e8 aa 94 2d 6a 34\n");
+	// for (int i = 0 ; i < sizeof(sresult); i++) {
+	//    dw_printf (" %02x", sresult[i]);
+	// }
+	// dw_printf ("\n");
+
+	check, err = il2p_encode_rs(scrambled, 2)
+	require.NoError(t, err)
+
+	// dw_printf ("expect checksum = 43 35\n");
+	// dw_printf ("check = ");
+	// for (int i = 0 ; i < sizeof(check); i++) {
+	//     dw_printf (" %02x", check[i]);
+	// }
+	// dw_printf ("\n");
+
+	assert.Equal(t, byte(0x43), check[0])
+	assert.Equal(t, byte(0x35), check[1])
+
+	// That was only the header.  We will get to the info part in a later test.
+
+	// Can we go from IL2P back to AX.25?
+
+	pp = il2p_decode_header_type_1(header, 0)
+	assert.NotNil(t, pp)
+
+	/*
+		var dst_addr = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	*/
+
+	frame_type = pp.FrameTypeOnly()
+	_ = frame_type
+
+	// TODO: compare binary.
+
+	fmt.Printf("Example 3 header OK\n")
+
+	// Example 3 again, this time the Information part is included.
+
+	pp = ax25.FromFrame(example3, alevel)
+	assert.NotNil(t, pp)
+
+	var max_fec = 0
+	var iout, ioutLen = EncodeFrame(pp, Version0_4, max_fec)
+
+	// dw_printf ("expected for example 3:\n");
+	// fx_hex_dump(complete3, sizeof(complete3));
+	// dw_printf ("actual result for example 3:\n");
+	// fx_hex_dump(iout, e);
+	// Does it match the example in the protocol spec?
+	assert.Equal(t, len(complete3), ioutLen)
+	assert.Equal(t, complete3, iout)
+
+	fmt.Printf("Example 3 with info OK\n")
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+//
+//	Test all of the frame types.
+//
+//	Encode to IL2P format, decode, and verify that the result is the same as the original.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+func enc_dec_compare(t *testing.T, pp1 *ax25.Packet) {
+	t.Helper()
+
+	// Every version, and for v0.4 both FEC levels, should survive a round trip.
+	var cases = []struct {
+		version Version
+		max_fec int
+	}{
+		{Version0_4, 0},
+		{Version0_4, 1},
+		{Version0_6, 0},
+		{VersionCompat, 1}, // Compatibility transmits v0.4 but receives v0.6.
+
+	}
+
+	for _, c := range cases {
+		var encoded, enc_len = EncodeFrame(pp1, c.version, c.max_fec)
+		assert.GreaterOrEqual(t, enc_len, 0)
+
+		var pp2 = il2p_decode_frame(encoded, c.version)
+		assert.NotNil(t, pp2)
+
+		// Is it the same after encoding to IL2P and then decoding?
+
+		var len1 = pp1.FrameLen()
+		var data1 = pp1.FrameData()
+
+		var len2 = pp2.FrameLen()
+		var data2 = pp2.FrameData()
+
+		if len1 != len2 || !slices.Equal(data1, data2) {
+			fmt.Printf("\nEncode/Decode Error.  Original:\n")
+			pp1.HexDump()
+
+			fmt.Printf("IL2P encoded as:\n")
+			dwutil.HexDump(encoded)
+
+			fmt.Printf("Got turned into this:\n")
+			pp2.HexDump()
+		}
+
+		assert.Equal(t, len1, len2)
+		assert.Equal(t, data1, data2)
+	}
+}
+
+func all_frame_types(t *testing.T) {
+	t.Helper()
+
+	var addrs [ax25.MaxAddrs]string
+	var pinfo []byte
+	var pid = 0xf0
+
+	addrs[0] = "W2UB"
+	addrs[1] = "WB2OSZ-12"
+	var num_addr = 2
+
+	fmt.Printf("Testing all frame types.\n")
+
+	/* U frame */
+
+	fmt.Printf("\nU frames...\n")
+
+	for ftype := ax25.FrameTypeUSABME; ftype <= ax25.FrameTypeUTEST; ftype++ {
+		for pf := range 2 {
+			var cmin, cmax ax25.CmdRes
+
+			switch ftype {
+			// 0 = response, 1 = command
+			case ax25.FrameTypeUSABME:
+				cmin = 1
+				cmax = 1
+			case ax25.FrameTypeUSABM:
+				cmin = 1
+				cmax = 1
+			case ax25.FrameTypeUDISC:
+				cmin = 1
+				cmax = 1
+			case ax25.FrameTypeUDM:
+				cmin = 0
+				cmax = 0
+			case ax25.FrameTypeUUA:
+				cmin = 0
+				cmax = 0
+			case ax25.FrameTypeUFRMR:
+				cmin = 0
+				cmax = 0
+			case ax25.FrameTypeUUI:
+				cmin = 0
+				cmax = 1
+			case ax25.FrameTypeUXID:
+				cmin = 0
+				cmax = 1
+			case ax25.FrameTypeUTEST:
+				cmin = 0
+				cmax = 1
+			default:
+				panic(fmt.Sprintf("Surprising frame type found: %d", ftype))
+			}
+
+			for cr := cmin; cr <= cmax; cr++ {
+				fmt.Printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+
+				var pp = ax25.UFrame(addrs, num_addr, cr, ftype, pf, pid, pinfo)
+				pp.HexDump()
+				enc_dec_compare(t, pp)
+			}
+		}
+	}
+
+	/* S frame */
+
+	// strcpy (addrs[2], "DIGI1-1");
+	// num_addr = 3;
+
+	fmt.Printf("\nS frames...\n")
+
+	for ftype := ax25.FrameTypeSRR; ftype <= ax25.FrameTypeSSREJ; ftype++ {
+		for pf := range 2 {
+			var modulo = ax25.Modulo8
+			var nr = int(modulo/2 + 1)
+
+			for cr := ax25.CmdRes(0); cr <= ax25.CRCmd; cr++ {
+				// SREJ can only be response.
+				if ftype == ax25.FrameTypeSSREJ && cr != ax25.CRRes {
+					continue
+				}
+
+				fmt.Printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+
+				var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
+
+				pp.HexDump()
+				enc_dec_compare(t, pp)
+			}
+
+			modulo = ax25.Modulo128
+			nr = int(modulo/2 + 1)
+
+			for cr := ax25.CmdRes(0); cr <= ax25.CRCmd; cr++ {
+				// SREJ can only be response.
+				if ftype == ax25.FrameTypeSSREJ && cr != ax25.CRRes {
+					continue
+				}
+
+				fmt.Printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+
+				var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
+
+				pp.HexDump()
+				enc_dec_compare(t, pp)
+			}
+		}
+	}
+
+	/* SREJ is only S frame which can have information part. */
+
+	var srej_info = []byte{1 << 1, 2 << 1, 3 << 1, 4 << 1}
+
+	var ftype = ax25.FrameTypeSSREJ
+
+	for pf := range 2 {
+		var modulo = ax25.Modulo128
+		var nr = 127
+		var cr = ax25.CRRes
+
+		fmt.Printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+
+		var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
+
+		pp.HexDump()
+		enc_dec_compare(t, pp)
+	}
+
+	/* I frame */
+
+	fmt.Printf("\nI frames...\n")
+
+	pinfo = []byte("The rain in Spain stays mainly on the plain.")
+
+	for pf := range 2 {
+		var modulo = ax25.Modulo8
+		var nr = 0x55 & int(modulo-1)
+		var ns = 0xaa & int(modulo-1)
+
+		for cr := ax25.CmdRes(1); cr <= 1; cr++ { // can only be command
+			fmt.Printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+
+			var pp = ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
+
+			pp.HexDump()
+			enc_dec_compare(t, pp)
+		}
+
+		modulo = ax25.Modulo128
+		nr = 0x55 & int(modulo-1)
+		ns = 0xaa & int(modulo-1)
+
+		for cr := ax25.CmdRes(1); cr <= 1; cr++ {
+			fmt.Printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+
+			var pp = ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
+
+			pp.HexDump()
+			enc_dec_compare(t, pp)
+		}
+	}
+}

@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package il2p
 
 import "github.com/doismellburning/samoyed/internal/dwutil"
 
@@ -14,7 +17,7 @@ import "github.com/doismellburning/samoyed/internal/dwutil"
 // So we need to need to ignore the first 5 out and stick in
 // an extra 5 filler bits to flush at the end.
 
-const INIT_TX_LFSR int = 0x00f
+const initTxLFSR int = 0x00f
 
 func scramble_bit(in int, state *int) int {
 	var out = ((*state >> 4) ^ *state) & 1
@@ -25,7 +28,7 @@ func scramble_bit(in int, state *int) int {
 
 // Undo data scrambling for il2p receive.
 
-const INIT_RX_LFSR int = 0x1f0
+const initRxLFSR int = 0x1f0
 
 func descramble_bit(in int, state *int) int {
 	var out = (in ^ *state) & 1
@@ -48,7 +51,7 @@ func descramble_bit(in int, state *int) int {
  *--------------------------------------------------------------------------------*/
 
 func il2p_scramble_block(in []byte) []byte {
-	var tx_lfsr_state = INIT_TX_LFSR
+	var tx_lfsr_state = initTxLFSR
 
 	dwutil.Assert(len(in) >= 1)
 
@@ -114,7 +117,7 @@ func il2p_scramble_block(in []byte) []byte {
  *--------------------------------------------------------------------------------*/
 
 func il2p_descramble_block(in []byte) []byte {
-	var rx_lfsr_state = INIT_RX_LFSR
+	var rx_lfsr_state = initRxLFSR
 
 	var out = make([]byte, len(in))
 

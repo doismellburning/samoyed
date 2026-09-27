@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package il2p
 
 import (
 	"bytes"
@@ -17,7 +20,7 @@ import (
 
 /*-------------------------------------------------------------
  *
- * Name:	il2p_encode_frame
+ * Name:	EncodeFrame
  *
  * Purpose:	Convert AX.25 frame to IL2P encoding.
  *
@@ -28,10 +31,10 @@ import (
  *		version	- IL2P version to speak.
  *
  *		max_fec	- 1 to send maximum FEC size rather than automatic.
- *			  Only consulted for IL2P_VERSION_0_4.
+ *			  Only consulted for Version0_4.
  *
  * Outputs:	iout	- Encoded result, excluding the 3 byte sync word.
- *			  Caller should provide  IL2P_MAX_PACKET_SIZE  bytes.
+ *			  Caller should provide  MaxPacketSize  bytes.
  *
  * Returns:	Number of bytes for transmission.
  *		-1 is returned for failure.
@@ -47,7 +50,7 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_frame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc ...bool) ([]byte, int) {
+func EncodeFrame(pp *ax25.Packet, version Version, max_fec int, crc ...bool) ([]byte, int) {
 	var appendCRC = len(crc) > 0 && crc[0]
 
 	var fec_level, use_max_fec = il2p_tx_fec(version, max_fec)
@@ -61,7 +64,7 @@ func il2p_encode_frame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc
 		var scrambled = il2p_scramble_block(hdr)
 		outbuf.Write(scrambled)
 
-		var parity, err = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
+		var parity, err = il2p_encode_rs(scrambled, HeaderParity)
 		if err != nil {
 			logrus.WithError(err).Error("Cannot encode an IL2P header")
 
@@ -108,7 +111,7 @@ func il2p_encode_frame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc
 			var scrambled = il2p_scramble_block(hdr)
 			outbuf.Write(scrambled)
 
-			var parity, err = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
+			var parity, err = il2p_encode_rs(scrambled, HeaderParity)
 			if err != nil {
 				logrus.WithError(err).Error("Cannot encode an IL2P header")
 
@@ -167,41 +170,41 @@ func il2p_encode_frame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_frame(irec []byte, version il2p_version_t) *ax25.Packet {
-	if len(irec) < IL2P_HEADER_SIZE+IL2P_HEADER_PARITY {
+func il2p_decode_frame(irec []byte, version Version) *ax25.Packet {
+	if len(irec) < HeaderSize+HeaderParity {
 		return nil
 	}
 
-	var uhdr, e = il2p_clarify_header(irec[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY])
+	var uhdr, e = ClarifyHeader(irec[:HeaderSize+HeaderParity])
 	if e < 0 {
 		return nil
 	}
 
 	// TODO?: for symmetry we might want to clarify the payload before combining.
 
-	var payload = irec[IL2P_HEADER_SIZE+IL2P_HEADER_PARITY:]
+	var payload = irec[HeaderSize+HeaderParity:]
 
 	// Determine if trailing CRC is present by computing the encoded payload size
 	// and checking if there are extra bytes beyond it.
-	var _, fec_level, payload_len = il2p_get_header_attributes(uhdr)
-	var max_fec = il2p_rx_max_fec(version, fec_level)
-	var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
+	var _, fec_level, payload_len = HeaderAttributes(uhdr)
+	var max_fec = RxMaxFEC(version, fec_level)
+	var _, encoded_payload_size = PayloadCompute(payload_len, max_fec)
 
 	var crc_bytes []byte
-	if len(payload) == encoded_payload_size+IL2P_CRC_ENCODED_SIZE {
-		crc_bytes = payload[encoded_payload_size : encoded_payload_size+IL2P_CRC_ENCODED_SIZE]
+	if len(payload) == encoded_payload_size+CRCEncodedSize {
+		crc_bytes = payload[encoded_payload_size : encoded_payload_size+CRCEncodedSize]
 		payload = payload[:encoded_payload_size]
 	} else if len(payload) != encoded_payload_size {
 		return nil
 	}
 
-	var pp = il2p_decode_header_payload(uhdr, payload, version, &e)
+	var pp = DecodeHeaderPayload(uhdr, payload, version, &e)
 
 	// Validate CRC if present.
 	if pp != nil && crc_bytes != nil {
 		var frame_data = pp.FrameData()
-		if !il2p_crc_check(frame_data, crc_bytes) {
-			if il2p_get_debug() >= 1 {
+		if !CRCCheck(frame_data, crc_bytes) {
+			if Debug() >= 1 {
 				logrus.Debug("IL2P trailing CRC mismatch")
 			}
 
@@ -214,7 +217,7 @@ func il2p_decode_frame(irec []byte, version il2p_version_t) *ax25.Packet {
 
 /*-------------------------------------------------------------
  *
- * Name:	il2p_decode_header_payload
+ * Name:	DecodeHeaderPayload
  *
  * Purpose:	Convert IL2P encoding to AX.25 frame
  *
@@ -230,9 +233,9 @@ func il2p_decode_frame(irec []byte, version il2p_version_t) *ax25.Packet {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_version_t, symbols_corrected *int) *ax25.Packet {
-	var hdr_type, fec_level, payload_len = il2p_get_header_attributes(uhdr)
-	var max_fec = il2p_rx_max_fec(version, fec_level)
+func DecodeHeaderPayload(uhdr []byte, epayload []byte, version Version, symbols_corrected *int) *ax25.Packet {
+	var hdr_type, fec_level, payload_len = HeaderAttributes(uhdr)
+	var max_fec = RxMaxFEC(version, fec_level)
 
 	if hdr_type == 1 {
 		// Header type 1.  Any payload is the AX.25 Information part.
@@ -258,7 +261,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_versi
 					"max_fec":     max_fec,
 					"payload_len": payload_len,
 					"e":           e,
-				}).Error("IL2P internal error: il2p_decode_header_payload() decoded the wrong payload length")
+				}).Error("IL2P internal error: DecodeHeaderPayload() decoded the wrong payload length")
 			}
 
 			pp.SetInfo(extracted)
@@ -278,7 +281,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_versi
 				"hdr_type":    hdr_type,
 				"e":           e,
 				"payload_len": payload_len,
-			}).Error("IL2P internal error: il2p_decode_header_payload() decoded the wrong payload length")
+			}).Error("IL2P internal error: DecodeHeaderPayload() decoded the wrong payload length")
 
 			return (nil)
 		}

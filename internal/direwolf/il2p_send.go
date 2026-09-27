@@ -3,6 +3,7 @@ package direwolf
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/il2p"
 )
 
 /*-------------------------------------------------------------
@@ -17,7 +18,7 @@ import (
  *
  *		max_fec	- 1 to force 16 parity symbols for each payload block.
  *			  0 for automatic depending on block size.
- *			  Only consulted for IL2P_VERSION_0_4.
+ *			  Only consulted for il2p.Version0_4.
  *
  *		crc	- true to append the trailing CRC.
  *
@@ -48,14 +49,14 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc bool, polarity int) int {
+func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p.Version, max_fec int, crc bool, polarity int) int {
 	var syncWordBytes = []byte{
-		(IL2P_SYNC_WORD >> 16) & 0xff,
-		(IL2P_SYNC_WORD >> 8) & 0xff,
-		(IL2P_SYNC_WORD) & 0xff,
+		(il2p.SyncWord >> 16) & 0xff,
+		(il2p.SyncWord >> 8) & 0xff,
+		(il2p.SyncWord) & 0xff,
 	}
 
-	var encoded, elen = il2p_encode_frame(pp, version, max_fec, crc)
+	var encoded, elen = il2p.EncodeFrame(pp, version, max_fec, crc)
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
@@ -67,7 +68,7 @@ func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_
 
 	s.bitsSent = 0
 
-	if il2p_get_debug() >= 1 {
+	if il2p.Debug() >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("IL2P v%s frame, max_fec = %d, %d encoded bytes total\n", version.String(), max_fec, len(data))
 		dwutil.HexDump(data)
@@ -82,7 +83,7 @@ func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_
 
 	// Send bits to modulator.
 
-	s.sendByteMSBFirst(IL2P_PREAMBLE, polarity)
+	s.sendByteMSBFirst(il2p.Preamble, polarity)
 
 	for _, x := range data {
 		s.sendByteMSBFirst(int(x), polarity)

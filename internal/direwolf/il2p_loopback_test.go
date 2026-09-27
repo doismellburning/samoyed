@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/il2p"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,7 +58,7 @@ func (r *il2pLoopbackRecorder) flush() {
 //
 // The receiver speaks the given version and expects a trailing CRC.  The
 // transmitter adds one because its configuration asks for it.
-func il2pLoopback(t *testing.T, version il2p_version_t) *il2pLoopbackRecorder {
+func il2pLoopback(t *testing.T, version il2p.Version) *il2pLoopbackRecorder {
 	t.Helper()
 
 	var recorder = new(il2pLoopbackRecorder)
@@ -83,4 +85,65 @@ func il2pLoopback(t *testing.T, version il2p_version_t) *il2pLoopbackRecorder {
 	}
 
 	return recorder
+}
+
+// Send a frame over the fake modem and see whether the receiver, speaking the
+// version it was given, makes sense of it.
+func TestIL2POnAirVersions(t *testing.T) {
+	il2p.Init(0)
+
+	// Check the information part of whatever arrives against il2pTestText, so
+	// build the frame directly rather than from text: the IL2P header cannot
+	// represent every combination of the AX.25 address C bits, and a frame
+	// that changes shape in flight fails the trailing CRC check.
+	var addrs [ax25.MaxAddrs]string
+	addrs[0] = "Q1TEST"
+	addrs[1] = "Q2TEST"
+
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, []byte(il2pTestText))
+	require.NotNil(t, pp)
+
+	var testData = []struct {
+		name       string
+		tx_version il2p.Version
+		max_fec    int
+		rx_version il2p.Version
+		received   bool
+	}{
+		{"v0.4 automatic FEC to v0.4", il2p.Version0_4, 0, il2p.Version0_4, true},
+		{"v0.4 max FEC to v0.4", il2p.Version0_4, 1, il2p.Version0_4, true},
+		{"v0.6 to v0.6", il2p.Version0_6, 0, il2p.Version0_6, true},
+		{"v0.6 to compat", il2p.Version0_6, 0, il2p.VersionCompat, true},
+		// v0.4 max FEC has the same payload sizing as v0.6 and differs only in
+		// the header bit, which a v0.6 receiver ignores.
+		{"v0.4 max FEC to v0.6", il2p.Version0_4, 1, il2p.Version0_6, true},
+		{"v0.4 max FEC to compat", il2p.Version0_4, 1, il2p.VersionCompat, true},
+		// A compatibility frame with max FEC is understood by both.
+		{"compat to compat", il2p.VersionCompat, 1, il2p.VersionCompat, true},
+		{"compat to v0.4", il2p.VersionCompat, 1, il2p.Version0_4, true},
+		{"compat to v0.6", il2p.VersionCompat, 1, il2p.Version0_6, true},
+		// These are the mismatches the version setting exists for.
+		{"v0.6 to v0.4", il2p.Version0_6, 0, il2p.Version0_4, false},
+		{"v0.4 automatic FEC to v0.6", il2p.Version0_4, 0, il2p.Version0_6, false},
+		{"compat automatic FEC to compat", il2p.VersionCompat, 0, il2p.VersionCompat, false},
+	}
+
+	for _, testDatum := range testData {
+		t.Run(testDatum.name, func(t *testing.T) {
+			var recorder = il2pLoopback(t, testDatum.rx_version)
+
+			require.Positive(t, NewHDLCSender(0, nil, 0).sendIL2PFrame(pp, testDatum.tx_version, testDatum.max_fec, true, 0))
+
+			recorder.flush() // Extra bit to flush the state machine.
+
+			var received = recorder.take()
+
+			if testDatum.received {
+				require.Len(t, received, 1)
+				assert.Equal(t, il2pTestText, string(received[0].info))
+			} else {
+				assert.Empty(t, received)
+			}
+		})
+	}
 }

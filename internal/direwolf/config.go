@@ -31,6 +31,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
@@ -1194,7 +1195,7 @@ func config_init(fname string, p_audio_config *AudioConfig,
 
 		p_audio_config.achan[channel].layer2_xmit = LAYER2_AX25
 		p_audio_config.achan[channel].il2p_max_fec = 1
-		p_audio_config.achan[channel].il2p_version = IL2P_VERSION_0_6
+		p_audio_config.achan[channel].il2p_version = il2p.Version0_6
 		p_audio_config.achan[channel].il2p_invert_polarity = 0
 		p_audio_config.achan[channel].il2p_crc = true
 
@@ -3068,7 +3069,7 @@ func handleIL2PVERSION(ps *parseState) error {
 
 	var t = ps.split(false)
 
-	var version, ok = il2p_parse_version(t)
+	var version, ok = il2p.ParseVersion(t)
 	if !ok {
 		return fmt.Errorf("line %d: Invalid IL2P version '%s'.  Expected 0.4, 0.6, or COMPAT", ps.line, t)
 	}

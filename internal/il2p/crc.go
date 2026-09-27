@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package il2p
 
 import "github.com/doismellburning/samoyed/internal/fcs"
 
@@ -73,8 +76,8 @@ func il2p_crc_calc(data []byte) uint16 {
  *
  *--------------------------------------------------------------*/
 
-func il2p_crc_encode(crc uint16) [IL2P_CRC_ENCODED_SIZE]byte {
-	var encoded [IL2P_CRC_ENCODED_SIZE]byte
+func il2p_crc_encode(crc uint16) [CRCEncodedSize]byte {
+	var encoded [CRCEncodedSize]byte
 	encoded[0] = il2p_hamming_encode[(crc>>12)&0x0f]
 	encoded[1] = il2p_hamming_encode[(crc>>8)&0x0f]
 	encoded[2] = il2p_hamming_encode[(crc>>4)&0x0f]
@@ -106,7 +109,7 @@ func il2p_crc_decode(encoded []byte) uint16 {
 
 /*-------------------------------------------------------------
  *
- * Name:	il2p_crc_check
+ * Name:	CRCCheck
  *
  * Purpose:	Validate received Hamming-encoded CRC against AX.25 frame data.
  *
@@ -117,7 +120,7 @@ func il2p_crc_decode(encoded []byte) uint16 {
  *
  *--------------------------------------------------------------*/
 
-func il2p_crc_check(frame_data []byte, encoded_crc []byte) bool {
+func CRCCheck(frame_data []byte, encoded_crc []byte) bool {
 	var expected = il2p_crc_calc(frame_data)
 	var received = il2p_crc_decode(encoded_crc)
 
