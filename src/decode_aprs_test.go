@@ -232,7 +232,7 @@ func Test_decode_aprs_item_without_position(t *testing.T) {
 func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = ax25_from_text("Q1TEST>0:'0000000000000000000", addrLenient)
+	var pp = AX25FromTextWithStrictness("Q1TEST>0:'0000000000000000000", AddrLenient)
 	assert.NotNil(t, pp)
 
 	// Must not panic, and must not claim a position it never read.
@@ -247,7 +247,7 @@ func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
 func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = ax25_from_text("Q1TEST>APDW17:!0000.00N/00000.00W/000/000", addrLenient)
+	var pp = AX25FromTextWithStrictness("Q1TEST>APDW17:!0000.00N/00000.00W/000/000", AddrLenient)
 	assert.NotNil(t, pp)
 
 	// Must not panic, and the course and speed still decode.
@@ -263,7 +263,7 @@ func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
 func Test_decode_aprs_user_defined_without_id(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = ax25_from_text("Q1TEST>APDW17:{", addrLenient)
+	var pp = AX25FromTextWithStrictness("Q1TEST>APDW17:{", AddrLenient)
 	assert.NotNil(t, pp)
 
 	// Must not panic.

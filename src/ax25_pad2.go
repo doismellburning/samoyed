@@ -555,7 +555,7 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdr
 	}
 
 	for n := range num_addr {
-		var oaddr, ssid, _, ok = ax25_parse_addr(n, addrs[n], addrStrict)
+		var oaddr, ssid, _, ok = ax25_parse_addr(n, addrs[n], AddrStrict)
 
 		if !ok {
 			return (0)

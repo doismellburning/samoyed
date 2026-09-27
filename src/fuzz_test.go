@@ -64,7 +64,7 @@ func FuzzAX25FromFrame(f *testing.F) {
 		ax25_is_aprs(pp)
 		ax25_dedupe_crc(pp)
 		ax25_get_dti(pp)
-		ax25_check_addresses(pp, addrLenient)
+		ax25_check_addresses(pp, AddrLenient)
 	})
 }
 
@@ -78,7 +78,7 @@ func FuzzAX25FromText(f *testing.F) {
 	f.Add(">:")
 
 	f.Fuzz(func(t *testing.T, monitor string) {
-		var pp = ax25_from_text(monitor, addrLenient)
+		var pp = AX25FromTextWithStrictness(monitor, AddrLenient)
 		if pp == nil {
 			return
 		}
@@ -125,7 +125,7 @@ func FuzzDecodeAPRS(f *testing.F) {
 	f.Add("Q1TEST>APDW17:>IO91/#  ")
 
 	f.Fuzz(func(t *testing.T, monitor string) {
-		var pp = ax25_from_text(monitor, addrLenient)
+		var pp = AX25FromTextWithStrictness(monitor, AddrLenient)
 		if pp == nil {
 			return
 		}

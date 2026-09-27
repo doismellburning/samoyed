@@ -1017,7 +1017,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		 * Perform validity check on each address.
 		 * This should print an error message if any issues.
 		 */
-		ax25_check_addresses(pp, addrStrict)
+		ax25_check_addresses(pp, AddrStrict)
 
 		// Send to log file.
 

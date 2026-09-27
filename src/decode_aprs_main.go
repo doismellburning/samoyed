@@ -168,13 +168,13 @@ func DecodeAPRSLine(line string) {
 
 			decode_aprs_print(A) // Now print it in human readable format.
 
-			ax25_check_addresses(pp, addrStrictLowerCaseWarning) // Errors for invalid addresses.
+			ax25_check_addresses(pp, AddrStrictLowerCaseWarning) // Errors for invalid addresses.
 		} else {
 			fmt.Printf("Could not construct AX.25 frame from bytes supplied!\n\n")
 		}
 	} else {
 		// Normal monitoring format.
-		var pp = ax25_from_text(line, addrStrictLowerCaseWarning)
+		var pp = AX25FromTextWithStrictness(line, AddrStrictLowerCaseWarning)
 		if pp != nil {
 			var A = decode_aprs(pp, false, "") // Extract information into structure.
 
@@ -182,7 +182,7 @@ func DecodeAPRSLine(line string) {
 
 			// This seems to be redundant because we used strict option
 			// when parsing the monitoring format text.
-			// (void)ax25_check_addresses(pp, addrStrictLowerCaseWarning);	// Errors for invalid addresses.
+			// (void)ax25_check_addresses(pp, AddrStrictLowerCaseWarning);	// Errors for invalid addresses.
 
 			// Future?  Add -d option to include hex dump and maybe KISS?
 		} else {

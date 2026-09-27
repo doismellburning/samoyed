@@ -38,38 +38,38 @@ func Test_ax25_set_info(t *testing.T) {
 func Test_ax25_parse_addr_strictness(t *testing.T) {
 	// Lower case, a trailing "*" and an over-long address are each accepted
 	// or rejected depending on the strictness asked for.  The decode_aprs
-	// utility uses addrStrictLowerCaseWarning so that a packet captured from
+	// utility uses AddrStrictLowerCaseWarning so that a packet captured from
 	// somewhere such as aprs.fi still gets explained rather than discarded.
 	var testCases = []struct {
 		addr       string
-		strictness addrStrictness
+		strictness AddrStrictness
 		ok         bool
 	}{
-		{"Q1TEST-1", addrLenient, true},
-		{"Q1TEST-1", addrStrict, true},
-		{"Q1TEST-1", addrStrictNoStar, true},
-		{"Q1TEST-1", addrStrictLowerCaseWarning, true},
+		{"Q1TEST-1", AddrLenient, true},
+		{"Q1TEST-1", AddrStrict, true},
+		{"Q1TEST-1", AddrStrictNoStar, true},
+		{"Q1TEST-1", AddrStrictLowerCaseWarning, true},
 
 		// Lower case, as a q-construct or otherwise.
-		{"qAR", addrLenient, true},
-		{"qAR", addrStrict, false},
-		{"qAR", addrStrictNoStar, false},
-		{"qAR", addrStrictLowerCaseWarning, true},
-		{"q1test", addrLenient, true},
-		{"q1test", addrStrict, false},
-		{"q1test", addrStrictNoStar, false},
-		{"q1test", addrStrictLowerCaseWarning, true},
+		{"qAR", AddrLenient, true},
+		{"qAR", AddrStrict, false},
+		{"qAR", AddrStrictNoStar, false},
+		{"qAR", AddrStrictLowerCaseWarning, true},
+		{"q1test", AddrLenient, true},
+		{"q1test", AddrStrict, false},
+		{"q1test", AddrStrictNoStar, false},
+		{"q1test", AddrStrictLowerCaseWarning, true},
 
 		// "Has been repeated" flag.
-		{"Q1TEST-1*", addrStrict, true},
-		{"Q1TEST-1*", addrStrictNoStar, false},
-		{"Q1TEST-1*", addrStrictLowerCaseWarning, true},
+		{"Q1TEST-1*", AddrStrict, true},
+		{"Q1TEST-1*", AddrStrictNoStar, false},
+		{"Q1TEST-1*", AddrStrictLowerCaseWarning, true},
 
 		// Longer than 6 characters is for an APRS-IS server only.
-		{"Q1TESTLONG", addrLenient, true},
-		{"Q1TESTLONG", addrStrict, false},
-		{"Q1TESTLONG", addrStrictNoStar, false},
-		{"Q1TESTLONG", addrStrictLowerCaseWarning, false},
+		{"Q1TESTLONG", AddrLenient, true},
+		{"Q1TESTLONG", AddrStrict, false},
+		{"Q1TESTLONG", AddrStrictNoStar, false},
+		{"Q1TESTLONG", AddrStrictLowerCaseWarning, false},
 	}
 
 	for _, tc := range testCases {

@@ -1589,7 +1589,7 @@ func (f *PacketFilter) MonitorLine(from_chan int, to_chan int, filter string, is
 	// Lines pasted from an APRS-IS feed carry a lower case "q-construct" in
 	// the path, which is an error over the air but not on paper, so take the
 	// same view of one that samoyed-decode_aprs does.
-	var pp = ax25_from_text(monitor_line, addrStrictLowerCaseWarning)
+	var pp = AX25FromTextWithStrictness(monitor_line, AddrStrictLowerCaseWarning)
 	if pp == nil {
 		return false, fmt.Errorf("could not parse monitoring format input: %q", monitor_line)
 	}
