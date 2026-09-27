@@ -798,7 +798,7 @@ outerLoop:
 		case '"':
 			if in_quotes {
 				if parsedLen+1 < len(rest) && rest[parsedLen+1] == '"' {
-					token.WriteString(string(c))
+					token.WriteByte(c)
 					parsedLen++
 				} else {
 					in_quotes = false
@@ -808,12 +808,12 @@ outerLoop:
 			}
 		case ' ':
 			if in_quotes || rest_of_line {
-				token.WriteString(string(c))
+				token.WriteByte(c)
 			} else {
 				break outerLoop
 			}
 		default:
-			token.WriteString(string(c))
+			token.WriteByte(c)
 		}
 	}
 
