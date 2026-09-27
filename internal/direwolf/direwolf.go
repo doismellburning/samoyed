@@ -184,10 +184,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if *printUTF8Test {
-		fmt.Printf("\n  UTF-8 test string: ma%c%cana %c%c F%c%c%c%ce\n\n",
-			0xc3, 0xb1,
-			0xc2, 0xb0,
-			0xc3, 0xbc, 0xc3, 0x9f)
+		fmt.Print("\n  UTF-8 test string: mañana ° Füße\n\n")
 
 		os.Exit(0)
 	}

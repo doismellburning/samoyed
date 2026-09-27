@@ -33,6 +33,23 @@ KISSPORT 0
 // so a test that has seen it knows the signal handler is installed.
 const startupComplete = `Log file is`
 
+func TestMain(m *testing.M) {
+	testutils.RunMainIfAsked(main)
+
+	os.Exit(m.Run())
+}
+
+// TestPrintUTF8Test covers -u, which is there so an operator can see whether
+// their terminal shows UTF-8.  It used to hand the string's bytes to %c one at
+// a time, and Go formats each as a rune of its own, so it printed "maÃ±ana"
+// whatever the terminal could do.
+func TestPrintUTF8Test(t *testing.T) {
+	var result = testutils.RunMain(t, "", "-u")
+
+	require.Equal(t, 0, result.Status, "stderr: %s", result.Stderr)
+	require.Contains(t, result.Stdout, "UTF-8 test string: mañana ° Füße\n")
+}
+
 // startDirewolf starts the built command and waits for it to finish starting
 // up.  It returns the running process and a function that reads back whatever
 // it has printed so far.
