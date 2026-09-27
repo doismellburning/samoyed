@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_set_pid(this_p *packet_t, pid byte) {
-	this_p.SetPID(pid)
-}
-
 func ax25_get_pid(this_p *packet_t) int {
 	return this_p.PID()
 }

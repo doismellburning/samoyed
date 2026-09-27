@@ -1687,7 +1687,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			pp.SetInfo(data)
 
 			// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-			ax25_set_pid(pp, pid)
+			pp.SetPID(pid)
 
 			/* This goes into the low priority queue because it is an original. */
 
@@ -1969,7 +1969,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 
 			pp.SetInfo(cmd.Data)
 			// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-			ax25_set_pid(pp, pid)
+			pp.SetPID(pid)
 
 			transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
 		}
