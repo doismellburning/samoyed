@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_set_modulo(this_p *packet_t, modulo ax25_modulo_t) {
-	this_p.SetModulo(modulo)
-}
-
 func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
 	return this_p.Modulo()
 }

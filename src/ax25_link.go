@@ -2003,7 +2003,7 @@ func lm_data_indication(E *dlq_item_t) {
 	 * We can't do this until we get the link handle.
 	 */
 
-	ax25_set_modulo(E.pp, S.modulo)
+	E.pp.SetModulo(S.modulo)
 
 	/*
 	 * Now we need to use ax25_frame_type again because the previous results, for nr and ns, might be wrong.
