@@ -131,7 +131,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 				if il2p_get_debug() >= 1 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("IL2P header as received [%d.%d.%d]:\n", channel, subchannel, slice)
-					fx_hex_dump(F.shdr[:])
+					dwutil.HexDump(F.shdr[:])
 				}
 
 				// Fix any errors and descramble.
@@ -150,7 +150,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 					if il2p_get_debug() >= 1 {
 						text_color_set(DW_COLOR_DEBUG)
 						dw_printf("IL2P header after correcting %d symbols and unscrambling [%d.%d.%d]:\n", F.corrected, channel, subchannel, slice)
-						fx_hex_dump(F.uhdr[:])
+						dwutil.HexDump(F.uhdr[:])
 						dw_printf("Header type %d, max fec = %d\n", hdr_type, max_fec)
 						dw_printf("Need to collect %d encoded bytes for %d byte payload.\n", F.eplen, length)
 						dw_printf("%d small blocks of %d and %d large blocks of %d.  %d parity symbols per block\n",

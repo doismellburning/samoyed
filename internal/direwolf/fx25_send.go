@@ -85,7 +85,7 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
 		dw_printf("FX.25[%d] send frame: FX.25 mode = %d\n", channel, fx_mode)
-		fx_hex_dump(fbuf)
+		dwutil.HexDump(fbuf)
 	}
 
 	// Append the FCS.
@@ -135,9 +135,9 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 	if debug >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d]: transmit %d data bytes, ctag number 0x%02x\n", channel, k_data_radio, ctag_num)
-		fx_hex_dump(data[:k_data_radio])
+		dwutil.HexDump(data[:k_data_radio])
 		dw_printf("FX.25[%d]: transmit %d check bytes:\n", channel, nroots)
-		fx_hex_dump(check[:nroots])
+		dwutil.HexDump(check[:nroots])
 		dw_printf("------\n")
 	}
 

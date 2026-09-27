@@ -2,6 +2,7 @@ package direwolf
 
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 /*-------------------------------------------------------------
@@ -69,7 +70,7 @@ func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_
 	if il2p_get_debug() >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("IL2P v%s frame, max_fec = %d, %d encoded bytes total\n", version.String(), max_fec, len(data))
-		fx_hex_dump(data)
+		dwutil.HexDump(data)
 	}
 
 	// Clobber some bytes for testing.

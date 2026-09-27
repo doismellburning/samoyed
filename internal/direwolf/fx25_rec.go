@@ -250,7 +250,7 @@ func (F *fx25Receiver) processRSBlock() {
 	if F.debug >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
-		fx_hex_dump(F.block[:FX25_BLOCK_SIZE])
+		dwutil.HexDump(F.block[:FX25_BLOCK_SIZE])
 	}
 
 	dwutil.Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
@@ -292,7 +292,7 @@ func (F *fx25Receiver) processRSBlock() {
 				if F.debug >= 3 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("FX.25[%d.%d]: Extracted AX.25 frame:\n", channel, slice)
-					fx_hex_dump(frame_buf[:frame_len])
+					dwutil.HexDump(frame_buf[:frame_len])
 				}
 
 				F.sink(channel, subchannel, slice, frame_buf[:frame_len-2], derrors) /* len-2 to remove FCS. */
@@ -300,17 +300,17 @@ func (F *fx25Receiver) processRSBlock() {
 				// Most likely cause is defective sender software.
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("FX.25[%d.%d]: Bad FCS for AX.25 frame.\n", channel, slice)
-				fx_hex_dump(F.block[:F.dlen])
-				fx_hex_dump(frame_buf[:frame_len])
+				dwutil.HexDump(F.block[:F.dlen])
+				dwutil.HexDump(frame_buf[:frame_len])
 			}
 		} else {
 			// Most likely cause is defective sender software.
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("FX.25[%d.%d]: AX.25 frame is shorter than minimum length.\n", channel, slice)
-			fx_hex_dump(F.block[:F.dlen])
+			dwutil.HexDump(F.block[:F.dlen])
 
 			if frame_len > 0 {
-				fx_hex_dump(frame_buf[:frame_len])
+				dwutil.HexDump(frame_buf[:frame_len])
 			}
 		}
 	} else if F.debug >= 2 {
@@ -357,7 +357,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 	if pin[0] != 0x7e {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d.%d] error: Data section did not start with 0x7e.\n", channel, slice)
-		fx_hex_dump(pin[:ilen])
+		dwutil.HexDump(pin[:ilen])
 
 		return nil
 	}
@@ -378,7 +378,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 			if pat_det == 0xfe {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Seven '1' bits in a row.\n", channel, slice)
-				fx_hex_dump(pin[i:ilen])
+				dwutil.HexDump(pin[i:ilen])
 
 				return nil
 			}
@@ -393,7 +393,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Not a whole number of bytes.\n", channel, slice)
-						fx_hex_dump(pin[i:ilen])
+						dwutil.HexDump(pin[i:ilen])
 
 						return nil
 					}
@@ -415,7 +415,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Terminating flag not found.\n", channel, slice)
-	fx_hex_dump(pin[:ilen])
+	dwutil.HexDump(pin[:ilen])
 
 	return nil // Should never fall off the end.
 }

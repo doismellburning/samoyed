@@ -149,7 +149,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("==============================  il2p_decode_rs  ==============================\n")
 		dw_printf("%d filler zeros, %d data, %d parity\n", len(rs_block)-n, data_size, num_parity)
-		fx_hex_dump(rs_block[:])
+		dwutil.HexDump(rs_block[:])
 	}
 
 	var rs, err = il2p_find_rs(num_parity)
@@ -178,7 +178,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 				dw_printf("        %3d  (0x%02x)\n", derrlocs[j], derrlocs[j])
 			}
 
-			fx_hex_dump(rs_block[:])
+			dwutil.HexDump(rs_block[:])
 		}
 	}
 

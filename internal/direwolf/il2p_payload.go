@@ -1,6 +1,9 @@
 package direwolf
 
-import "github.com/sirupsen/logrus"
+import (
+	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
+)
 
 /*--------------------------------------------------------------------------------
  *
@@ -239,7 +242,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		if il2p_get_debug() >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Descrambled large payload block, %d bytes:\n", ipp.large_block_size)
-			fx_hex_dump(descrambled)
+			dwutil.HexDump(descrambled)
 		}
 
 		pin = pin[ipp.large_block_size+ipp.parity_symbols_per_block:]
@@ -265,7 +268,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		if il2p_get_debug() >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Descrambled small payload block, %d bytes:\n", ipp.small_block_size)
-			fx_hex_dump(descrambled)
+			dwutil.HexDump(descrambled)
 		}
 
 		pin = pin[ipp.small_block_size+ipp.parity_symbols_per_block:]

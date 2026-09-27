@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -559,7 +560,7 @@ func enc_dec_compare(t *testing.T, pp1 *ax25.Packet) {
 			pp1.HexDump()
 
 			dw_printf("IL2P encoded as:\n")
-			fx_hex_dump(encoded)
+			dwutil.HexDump(encoded)
 
 			dw_printf("Got turned into this:\n")
 			pp2.HexDump()
