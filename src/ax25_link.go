@@ -3023,7 +3023,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
  *
  *------------------------------------------------------------------------------*/
 
-func RR_OR_RNR(ready bool) ax25_frame_type_t {
+func RR_OR_RNR(ready bool) ax25.FrameType {
 	var ft = ax25.FrameTypeSRNR
 
 	if ready {
@@ -5163,7 +5163,7 @@ func transmit_enquiry(S *ax25_dlsm_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
+func enquiry_response(S *ax25_dlsm_t, frame_type ax25.FrameType, f int) {
 	var cr = ax25.CRRes // Response, not command as seen in flow chart.
 	var nr = S.vr
 
@@ -5420,7 +5420,7 @@ func check_i_frame_ackd(S *ax25_dlsm_t, nr int) {
  *
  *------------------------------------------------------------------------------*/
 
-func check_need_for_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, cr ax25.CmdRes, pf int) {
+func check_need_for_response(S *ax25_dlsm_t, frame_type ax25.FrameType, cr ax25.CmdRes, pf int) {
 	if cr == ax25.CRCmd && pf == 1 {
 		var f = 1
 		enquiry_response(S, frame_type, f)

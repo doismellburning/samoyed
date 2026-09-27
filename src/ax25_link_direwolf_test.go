@@ -1801,7 +1801,7 @@ func TestAX25LinkFrameTypeParsing(t *testing.T) {
 	addrs[ax25.Source] = "TEST1"
 
 	// Test all U-frame types
-	uFrameTypes := []ax25_frame_type_t{
+	uFrameTypes := []ax25.FrameType{
 		ax25.FrameTypeUSABM,
 		ax25.FrameTypeUSABME,
 		ax25.FrameTypeUDISC,
@@ -1841,7 +1841,7 @@ func TestAX25LinkSFrameTypeParsing(t *testing.T) {
 	addrs[ax25.Destination] = "TEST2"
 	addrs[ax25.Source] = "TEST1"
 
-	sFrameTypes := []ax25_frame_type_t{
+	sFrameTypes := []ax25.FrameType{
 		ax25.FrameTypeSRR,
 		ax25.FrameTypeSRNR,
 		ax25.FrameTypeSREJ,

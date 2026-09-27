@@ -530,7 +530,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// The control field contains: P/F N(R) C S S
 		var control = GET_CONTROL(hdr)
 		var cr = dwutil.IfThenElse((control&0x04) != 0, ax25.CRCmd, ax25.CRRes)
-		var ftype ax25_frame_type_t
+		var ftype ax25.FrameType
 
 		switch control & 0x03 {
 		case 0:
@@ -554,7 +554,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		var control = GET_CONTROL(hdr)
 		var cr = dwutil.IfThenElse((control&0x04) != 0, ax25.CRCmd, ax25.CRRes)
 		var axpid = 0 // unused for U other than UI.
-		var ftype ax25_frame_type_t
+		var ftype ax25.FrameType
 
 		switch (control >> 3) & 0x7 {
 		case 0:
