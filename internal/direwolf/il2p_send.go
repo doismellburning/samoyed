@@ -18,6 +18,8 @@ import (
  *			  0 for automatic depending on block size.
  *			  Only consulted for IL2P_VERSION_0_4.
  *
+ *		crc	- true to append the trailing CRC.
+ *
  *		polarity - 0 for normal.  1 to invert signal.
  *			   2 special case for testing - introduce some errors to test FEC.
  *
@@ -45,14 +47,14 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_fec int, polarity int) int {
+func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc bool, polarity int) int {
 	var syncWordBytes = []byte{
 		(IL2P_SYNC_WORD >> 16) & 0xff,
 		(IL2P_SYNC_WORD >> 8) & 0xff,
 		(IL2P_SYNC_WORD) & 0xff,
 	}
 
-	var encoded, elen = il2p_encode_frame(pp, version, max_fec, il2p_crc_enabled(s.channel))
+	var encoded, elen = il2p_encode_frame(pp, version, max_fec, crc)
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")

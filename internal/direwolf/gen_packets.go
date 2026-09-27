@@ -154,9 +154,6 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 
 	GenToneInit(audio, g.amplitude/2, sink)
 
-	// The IL2P encoder reads the channel's version and CRC setting from here.
-	save_audio_config_p = audio
-
 	g.hdlcSenders = make([]*HDLCSender, MAX_RADIO_CHANS)
 	for c := range g.hdlcSenders {
 		g.hdlcSenders[c] = NewHDLCSender(c, audio)
