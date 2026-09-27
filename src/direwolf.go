@@ -429,6 +429,10 @@ x = Silence FX.25 information.`)
 
 	audio_config.recv_ber = *bitErrorRate
 
+	// The configuration file and the command line have both had their say, so
+	// settle the modem options before anything is set up from them.
+	settleModemOptions(audio_config)
+
 	// Done parsing, let's start doing!
 
 	// TODO: control development/beta/release by version.h instead of changing here.

@@ -188,6 +188,7 @@ func NewAtest(opts *AtestOptions) (*Atest, error) {
 	}
 
 	atestSingleSlicer(&audio.achan[0])
+	audio.achan[0].settleModemOptions(0)
 
 	audio.achan[1] = audio.achan[0]
 

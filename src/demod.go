@@ -55,21 +55,6 @@ func newDemodulators() [MAX_RADIO_CHANS]*Demodulator {
 // received audio level to the metrics endpoint: ~10Hz at a 44.1kHz sample rate.
 const audioLevelDecimation = 4410
 
-/*
- * PSK is always demodulated at the full sample rate; the decimating path was
- * never implemented for it.  Complain, rather than silently ignoring, when the
- * configuration asked for decimation.
- */
-
-func demod_psk_force_no_decimation(channel int) {
-	if save_audio_config_p.achan[channel].decimate > 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Channel %d: Decimation is not supported for PSK - ignoring.\n", channel)
-	}
-
-	save_audio_config_p.achan[channel].decimate = 1
-}
-
 /*------------------------------------------------------------------
  *
  * Name:        demod_init
@@ -131,20 +116,6 @@ func demod_init(pa *audio_s) {
 			case MODEM_OFF:
 
 			case MODEM_AFSK, MODEM_EAS:
-				if save_audio_config_p.achan[channel].modem_type == MODEM_EAS {
-					if save_audio_config_p.achan[channel].fix_bits != RETRY_NONE {
-						text_color_set(DW_COLOR_INFO)
-						dw_printf("Channel %d: FIX_BITS option has been turned off for EAS.\n", channel)
-						save_audio_config_p.achan[channel].fix_bits = RETRY_NONE
-					}
-
-					if save_audio_config_p.achan[channel].passall {
-						text_color_set(DW_COLOR_INFO)
-						dw_printf("Channel %d: PASSALL option has been turned off for EAS.\n", channel)
-						save_audio_config_p.achan[channel].passall = false
-					}
-				}
-
 				/*
 				 * Tear apart the profile and put it back together in a normalized form:
 				 *	- At least one letter, supply suitable default if necessary.
@@ -484,25 +455,12 @@ func demod_init(pa *audio_s) {
 				}
 
 			case MODEM_QPSK: // New for 1.4
-				// In versions 1.4 and 1.5, V.26 "Alternative A" was used.
-				// years later, I discover that the MFJ-2400 used "Alternative B."
-				// It looks like the other two manufacturers use the same but we
-				// can't be sure until we find one for compatibility testing.
-				// In version 1.6 we add a choice for the user.
-				// If neither one was explicitly specified, print a message and take
-				// a default.  My current thinking is that we default to direwolf <= 1.5
-				// compatible for version 1.6 and MFJ compatible after that.
-				if save_audio_config_p.achan[channel].v26_alternative == V26_UNSPECIFIED {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Two incompatible versions of 2400 bps QPSK are now available.\n")
-					dw_printf("For compatibility with direwolf <= 1.5, use 'V26A' modem option in config file.\n")
-					dw_printf("For compatibility MFJ-2400 use 'V26B' modem option in config file.\n")
-					dw_printf("Command line options -j and -J can be used for channel 0.\n")
-					dw_printf("For more information, read the Dire Wolf User Guide and\n")
-					dw_printf("2400-4800-PSK-for-APRS-Packet-Radio.pdf.\n")
-					dw_printf("The default is now MFJ-2400 compatibility mode.\n")
-
-					save_audio_config_p.achan[channel].v26_alternative = V26_DEFAULT
+				// settleModemOptions has normally picked one already.  Without
+				// it, e.g. in a test, take the same default but leave the
+				// configuration alone.
+				var v26 = save_audio_config_p.achan[channel].v26_alternative
+				if v26 == V26_UNSPECIFIED {
+					v26 = V26_DEFAULT
 				}
 
 				// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
@@ -518,21 +476,15 @@ func demod_init(pa *audio_s) {
 				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
-				demod_psk_force_no_decimation(channel)
-
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, QPSK, %s, %d sample rate",
 					channel, save_audio_config_p.achan[channel].baud,
 					save_audio_config_p.achan[channel].profiles,
 					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
 
-				if save_audio_config_p.achan[channel].decimate != 1 {
-					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
-				}
-
 				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
 
-				if save_audio_config_p.achan[channel].v26_alternative == V26_B {
+				if v26 == V26_B {
 					dw_printf(", compatible with MFJ-2400")
 				} else {
 					dw_printf(", compatible with earlier direwolf")
@@ -554,8 +506,8 @@ func demod_init(pa *audio_s) {
 					//	save_audio_config_p.achan[channel].modem_type, profile);
 
 					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
-						save_audio_config_p.achan[channel].v26_alternative,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						v26,
+						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
 						save_audio_config_p.achan[channel].baud,
 						rune(profile),
 						D)
@@ -583,17 +535,11 @@ func demod_init(pa *audio_s) {
 				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
-				demod_psk_force_no_decimation(channel)
-
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, 8PSK, %s, %d sample rate",
 					channel, save_audio_config_p.achan[channel].baud,
 					save_audio_config_p.achan[channel].profiles,
 					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
-
-				if save_audio_config_p.achan[channel].decimate != 1 {
-					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
-				}
 
 				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
 
@@ -614,7 +560,7 @@ func demod_init(pa *audio_s) {
 
 					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
 						save_audio_config_p.achan[channel].v26_alternative,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
 						save_audio_config_p.achan[channel].baud,
 						rune(profile),
 						D)
@@ -637,17 +583,11 @@ func demod_init(pa *audio_s) {
 				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
-				demod_psk_force_no_decimation(channel)
-
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, BPSK, %s, %d sample rate",
 					channel, save_audio_config_p.achan[channel].baud,
 					save_audio_config_p.achan[channel].profiles,
 					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
-
-				if save_audio_config_p.achan[channel].decimate != 1 {
-					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
-				}
 
 				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
 
@@ -664,7 +604,7 @@ func demod_init(pa *audio_s) {
 
 					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
 						V26_UNSPECIFIED,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
 						save_audio_config_p.achan[channel].baud,
 						rune(profile),
 						D)
@@ -682,22 +622,6 @@ func demod_init(pa *audio_s) {
 				   case MODEM_AIS:
 				*/
 				{
-					// For AIS we will accept only a good CRC without any fixup attempts.
-					// Even with that, there are still a lot of CRC false matches with random noise.
-					if save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
-						if save_audio_config_p.achan[channel].fix_bits != RETRY_NONE {
-							text_color_set(DW_COLOR_INFO)
-							dw_printf("Channel %d: FIX_BITS option has been turned off for AIS.\n", channel)
-							save_audio_config_p.achan[channel].fix_bits = RETRY_NONE
-						}
-
-						if save_audio_config_p.achan[channel].passall {
-							text_color_set(DW_COLOR_INFO)
-							dw_printf("Channel %d: PASSALL option has been turned off for AIS.\n", channel)
-							save_audio_config_p.achan[channel].passall = false
-						}
-					}
-
 					if save_audio_config_p.achan[channel].profiles == "" {
 						/* Apply default if not set earlier. */
 						/* Not sure if it should be on for ARM too. */
@@ -1048,7 +972,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 
 	case MODEM_QPSK, MODEM_8PSK, MODEM_BPSK:
 		// Decimation would probably work but hasn't been thought about or
-		// tested yet, so demod_init has already ruled it out for PSK.
+		// tested yet, so PSK is always demodulated at the full sample rate.
 		demod_psk_process_sample(channel, subchan, sam, D)
 
 	default:

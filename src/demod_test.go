@@ -13,21 +13,50 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// PSK has no decimating path in demod_process_sample, so demod_init must rule
-// decimation out, and say so rather than doing it silently.
-func TestDemodInitRejectsPSKDecimation(t *testing.T) {
+// PSK has no decimating path, so a PSK channel configured to decimate is
+// demodulated at the full sample rate - and demod_init leaves the
+// configuration as it found it, settleModemOptions being where that is
+// reported and put right.
+func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
 	for _, modemType := range []modem_t{MODEM_QPSK, MODEM_8PSK, MODEM_BPSK} {
 		var channel = 0
 		var audioConfig = newTestAudioConfig(channel, modemType, 2400, 0, 0, 44100)
 		audioConfig.achan[channel].decimate = 3
 		audioConfig.achan[channel].num_freq = 1
 
-		testutils.AssertOutputContains(t, func() {
+		var output = testutils.CaptureOutput(t, func() {
 			demod_init(audioConfig)
-		}, "Decimation is not supported for PSK")
+		})
 
-		assert.Equal(t, 1, audioConfig.achan[channel].decimate)
+		assert.NotContains(t, output, "/ 3")
+		assert.Equal(t, 3, audioConfig.achan[channel].decimate)
 	}
+}
+
+// demod_init sets up the demodulators from the modem options without
+// changing them: the rules about which go together are settleModemOptions'.
+func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
+	var channel = 0
+
+	var eas = newTestAudioConfig(channel, MODEM_EAS, 521, 2083, 1563, 44100)
+	eas.achan[channel].num_freq = 1
+	eas.achan[channel].fix_bits = RETRY_INVERT_SINGLE
+	eas.achan[channel].passall = true
+
+	demod_init(eas)
+
+	assert.Equal(t, RETRY_INVERT_SINGLE, eas.achan[channel].fix_bits)
+	assert.True(t, eas.achan[channel].passall)
+
+	var qpsk = newTestAudioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
+	qpsk.achan[channel].num_freq = 1
+
+	var output = testutils.CaptureOutput(t, func() {
+		demod_init(qpsk)
+	})
+
+	assert.Contains(t, output, "compatible with MFJ-2400", "an unsettled V.26 alternative still gets the default")
+	assert.Equal(t, V26_UNSPECIFIED, qpsk.achan[channel].v26_alternative)
 }
 
 // AFSK, by contrast, does decimate.
