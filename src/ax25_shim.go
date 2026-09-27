@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_nextp(this_p *packet_t) *packet_t {
-	return this_p.Next()
-}
-
 func ax25_set_release_time(this_p *packet_t, release_time time.Time) {
 	this_p.SetReleaseTime(release_time)
 }

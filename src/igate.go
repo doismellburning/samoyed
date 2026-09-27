@@ -1157,7 +1157,7 @@ func (ig *IGate) satgateDelayPacket(pp *packet_t, channel int) { //nolint:unpara
 	} else {
 		plast = ig.dpQueueHead
 		for {
-			pnext = ax25_get_nextp(plast)
+			pnext = plast.Next()
 			if pnext == nil {
 				break
 			}
@@ -1204,7 +1204,7 @@ func (ig *IGate) satgateDelayThread(ctx context.Context) {
 				ig.dpMutex.Lock()
 
 				var pp = ig.dpQueueHead
-				ig.dpQueueHead = ax25_get_nextp(pp)
+				ig.dpQueueHead = pp.Next()
 
 				ig.dpMutex.Unlock()
 				pp.SetNext(nil)

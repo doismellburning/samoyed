@@ -763,7 +763,7 @@ func TestIGateSatgateQueueKeepsOrder(t *testing.T) {
 	require.NotNil(t, igate.dpQueueHead)
 	assert.Equal(t, ">first", string(igate.dpQueueHead.Info()))
 
-	var second = ax25_get_nextp(igate.dpQueueHead)
+	var second = igate.dpQueueHead.Next()
 	require.NotNil(t, second, "the second packet was not queued behind the first")
 	assert.Equal(t, ">second", string(second.Info()))
 }

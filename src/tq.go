@@ -346,7 +346,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 
 		var plast = tq.head[channel][prio]
 		for {
-			pnext = ax25_get_nextp(plast)
+			pnext = plast.Next()
 			if pnext == nil {
 				break
 			}
@@ -506,7 +506,7 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
 	} else {
 		var plast = tq.head[channel][prio]
 		for {
-			var pnext = ax25_get_nextp(plast)
+			var pnext = plast.Next()
 			if pnext == nil {
 				break
 			}
@@ -635,7 +635,7 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 	} else {
 		var plast = tq.head[channel][prio]
 		for {
-			var pnext = ax25_get_nextp(plast)
+			var pnext = plast.Next()
 			if pnext == nil {
 				break
 			}
@@ -756,7 +756,7 @@ func (tq *TransmitQueue) Remove(channel int, prio int) *packet_t {
 		result_p = nil
 	} else {
 		result_p = tq.head[channel][prio]
-		tq.head[channel][prio] = ax25_get_nextp(result_p)
+		tq.head[channel][prio] = result_p.Next()
 		result_p.SetNext(nil)
 
 		if tq_is_real_packet(result_p) {
@@ -999,7 +999,7 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 			}
 		}
 
-		pp = ax25_get_nextp(pp)
+		pp = pp.Next()
 	}
 
 	return (n)
