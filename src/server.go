@@ -1684,7 +1684,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			}
 
 			var data = cmd.Data[1+10*ndigi:]
-			ax25_set_info(pp, data)
+			pp.SetInfo(data)
 
 			// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
 			ax25_set_pid(pp, pid)
@@ -1967,7 +1967,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			ax25_set_info(pp, cmd.Data)
+			pp.SetInfo(cmd.Data)
 			// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
 			ax25_set_pid(pp, pid)
 

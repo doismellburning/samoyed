@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_set_info(this_p *packet_t, new_info []byte) {
-	this_p.SetInfo(new_info)
-}
-
 func ax25_cut_at_crlf(this_p *packet_t) int {
 	return this_p.CutAtCRLF()
 }

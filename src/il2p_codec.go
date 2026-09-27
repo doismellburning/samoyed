@@ -258,7 +258,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_versi
 				dw_printf("IL2P Internal Error: il2p_decode_header_payload(): hdr_type=%d, max_fec=%d, payload_len=%d, e=%d.\n", hdr_type, max_fec, payload_len, e)
 			}
 
-			ax25_set_info(pp, extracted)
+			pp.SetInfo(extracted)
 		}
 
 		return (pp)
