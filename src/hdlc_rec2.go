@@ -155,39 +155,6 @@ type hdlc_state2_s struct {
 
 /***********************************************************************************
  *
- * Name:	hdlc_rec2_init
- *
- * Purpose:	Initialization.
- *
- * Inputs:	p_audio_config	 - Pointer to configuration settings.
- *				   This is what we care about for each channel.
- *
- *	   			enum retry_e fix_bits;
- *					Level of effort to recover from
- *					a bad FCS on the frame.
- *					0 = no effort
- *					1 = try inverting a single bit
- *					2... = more techniques...
- *
- *	    			enum sanity_e sanity_test;
- *					Sanity test to apply when finding a good
- *					CRC after changing one or more bits.
- *					Must look like APRS, AX.25, or anything.
- *
- *	    			int passall;
- *					Allow thru even with bad CRC after exhausting
- *					all fixup attempts.
- *
- * Description:	Save pointer to configuration for later use.
- *
- ***********************************************************************************/
-
-func hdlc_rec2_init(p_audio_config *audio_s) {
-	save_audio_config_p = p_audio_config
-}
-
-/***********************************************************************************
- *
  * Name:	hdlc_rec2_block
  *
  * Purpose:	Extract HDLC frame from a stream of bits.
@@ -195,6 +162,25 @@ func hdlc_rec2_init(p_audio_config *audio_s) {
  * Inputs:	block 		- Handle for bit array.
  *				  Ownership passes to this function, so the
  *				  caller must not reuse it for the next frame.
+ *
+ *		achan		- Configuration for the channel it came from.
+ *				  This is what we care about:
+ *
+ *	   			BitFixLevel fix_bits;
+ *					Level of effort to recover from
+ *					a bad FCS on the frame.
+ *					0 = no effort
+ *					1 = try inverting a single bit
+ *					2... = more techniques...
+ *
+ *	    			sanity_t sanity_test;
+ *					Sanity test to apply when finding a good
+ *					CRC after changing one or more bits.
+ *					Must look like APRS, AX.25, or anything.
+ *
+ *	    			bool passall;
+ *					Allow thru even with bad CRC after exhausting
+ *					all fixup attempts.
  *
  * Description:	The other (original) hdlc decoder took one bit at a time
  *		right out of the demodulator.
@@ -209,13 +195,13 @@ func hdlc_rec2_init(p_audio_config *audio_s) {
  *
  ***********************************************************************************/
 
-func hdlc_rec2_block(block *rrbb_t) {
+func hdlc_rec2_block(block *rrbb_t, achan *achan_param_s) {
 	var channel = rrbb_get_chan(block)
 	var subchan = rrbb_get_subchan(block)
 	var slice = rrbb_get_slice(block)
 	var alevel = rrbb_get_audio_level(block)
-	var fix_bits = save_audio_config_p.achan[channel].fix_bits
-	var passall = save_audio_config_p.achan[channel].passall
+	var fix_bits = achan.fix_bits
+	var passall = achan.passall
 
 	logrus.Trace("--- try to decode ---")
 
@@ -233,7 +219,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 	retry_cfg.contig.nr_bits = 0
 	retry_cfg.contig.bit_idx = 0
 
-	var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == RETRY_NONE))
+	var ok = try_decode(block, achan, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == RETRY_NONE))
 	if ok {
 		logrus.Trace("Got it the first time.")
 
@@ -244,7 +230,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 	 * Not successful with frame in original form.
 	 * See if we can "fix" it.
 	 */
-	if try_to_fix_quick_now(block, channel, subchan, slice, alevel) {
+	if try_to_fix_quick_now(block, achan, channel, subchan, slice, alevel) {
 		return
 	}
 
@@ -252,7 +238,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 		/* Exhausted all desired fix up attempts. */
 		/* Let thru even with bad CRC.  Of course, it still */
 		/* needs to be a minimum number of whole octets. */
-		try_decode(block, channel, subchan, slice, alevel, retry_cfg, true)
+		try_decode(block, achan, channel, subchan, slice, alevel, retry_cfg, true)
 	}
 } /* end hdlc_rec2_block */
 
@@ -266,16 +252,12 @@ func hdlc_rec2_block(block *rrbb_t) {
  *		channel	- Radio channel from which it was received.
  *		subchan	- Which demodulator when more than one per channel.
  *		alevel	- Audio level for later reporting.
- *
- * Global In:	configuration fix_bits - Maximum level of fix up to attempt.
+ *		achan	- Configuration for that channel.  Uses fix_bits,
+ *			  the maximum level of fix up to attempt:
  *
  *				RETRY_NONE (0)	- Don't try any.
  *				RETRY_INVERT_SINGLE (1)  - Try inverting single bits.
  *				etc.
- *
- *		configuration passall - Let it thru with bad CRC after exhausting
- *				all fixup attempts.
- *
  *
  * Returns:	true for success.  "try_decode" has passed the result along to the
  *				processing step.
@@ -293,9 +275,8 @@ func hdlc_rec2_block(block *rrbb_t) {
  *
  ***********************************************************************************/
 
-func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, alevel ALevel) bool {
-	var fix_bits = save_audio_config_p.achan[channel].fix_bits
-	//int passall = save_audio_config_p.achan[channel].passall;
+func try_to_fix_quick_now(block *rrbb_t, achan *achan_param_s, channel int, subchan int, slice int, alevel ALevel) bool {
+	var fix_bits = achan.fix_bits
 
 	var length = rrbb_get_len(block)
 	/* Prepare the retry configuration */
@@ -320,7 +301,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 		/* Set the index of the bit to swap */
 		retry_cfg.contig.bit_idx = i
 
-		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
+		var ok = try_decode(block, achan, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
@@ -344,7 +325,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	for i := range length - 1 {
 		retry_cfg.contig.bit_idx = i
 
-		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
+		var ok = try_decode(block, achan, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
@@ -368,7 +349,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	for i := range length - 2 {
 		retry_cfg.contig.bit_idx = i
 
-		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
+		var ok = try_decode(block, achan, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
@@ -404,7 +385,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 		for j := i + 2; j < length; j++ {
 			retry_cfg.sep.bit_idx_b = j
 
-			ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
+			ok = try_decode(block, achan, channel, subchan, slice, alevel, retry_cfg, false)
 			if ok {
 				break
 			}
@@ -423,40 +404,6 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 
 	return false
 }
-
-// TODO:  Remove this.  but first figure out what to do in atest.c
-
-func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel int, subchan int, slice int, alevel ALevel) bool { //nolint:unused
-	//int len;
-	//BitFixLevel fix_bits = save_audio_config_p.achan[channel].fix_bits;
-	var passall = save_audio_config_p.achan[channel].passall
-	/* TODO KG
-	#if DEBUG_LATER
-		double tstart, tend;
-	#endif
-	*/
-
-	//len = rrbb_get_len(block);
-
-	/*
-	 * All fix up attempts have failed.
-	 * Should we pass it along anyhow with a bad CRC?
-	 * Note that we still need a minimum number of whole octets.
-	 */
-	if passall {
-		var retry_cfg = new(retry_conf_t)
-
-		retry_cfg._type = RETRY_TYPE_NONE
-		retry_cfg.mode = RETRY_MODE_CONTIGUOUS
-		retry_cfg.retry = RETRY_NONE
-		retry_cfg.contig.nr_bits = 0
-		retry_cfg.contig.bit_idx = 0
-
-		return try_decode(block, channel, subchan, slice, alevel, retry_cfg, passall)
-	}
-
-	return false
-} /* end hdlc_rec2_try_to_fix_later */
 
 /*
  * Check if the specified index of bit has been modified with the current type of configuration
@@ -497,6 +444,9 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  *
  * Inputs:	block		- Bit string that was collected between "flag" patterns.
  *
+ *		achan		- Configuration for that channel.  Uses
+ *				  modem_type and sanity_test.
+ *
  *		channel, subchan	- where it came from.
  *
  *		alevel		- audio level for later reporting.
@@ -532,7 +482,7 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  *
  ***********************************************************************************/
 
-func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALevel, retry_conf *retry_conf_t, passall bool) bool {
+func try_decode(block *rrbb_t, achan *achan_param_s, channel int, subchan int, slice int, alevel ALevel, retry_conf *retry_conf_t, passall bool) bool {
 	var retry_conf_mode = retry_conf.mode
 	var retry_conf_type = retry_conf._type
 	var retry_conf_retry = retry_conf.retry
@@ -701,7 +651,7 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 
 		fcs_ok = actual_fcs == expected_fcs
 
-		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
+		if actual_fcs == expected_fcs && achan.modem_type == MODEM_AIS {
 			// Sanity check for AIS.
 			if ais.CheckLength(int(H2.frame_buf[0]>>2)&0x3f, H2.frame_len-2) == 0 {
 				multi_modem_process_rec_frame(
@@ -719,7 +669,7 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 				return false /* did not pass sanity check */
 			}
 		} else if actual_fcs == expected_fcs &&
-			sanity_check(H2.frame_buf[:H2.frame_len-2], retry_conf.retry, save_audio_config_p.achan[channel].sanity_test) {
+			sanity_check(H2.frame_buf[:H2.frame_len-2], retry_conf.retry, achan.sanity_test) {
 			// TODO: Shouldn't be necessary to pass chan, subchan, alevel into
 			// try_decode because we can obtain them from block.
 			// Let's make sure that assumption is good...

@@ -750,9 +750,7 @@ func test_serdes(t *testing.T) {
 
 	// Frames are sent as v0.4, so the receiver has to read the header FEC
 	// Level bit rather than assume the v0.6 fixed size.
-	il2pTestChannelVersion(t, IL2P_VERSION_0_4)
-
-	var recorder = il2pLoopback(t)
+	var recorder = il2pLoopback(t, IL2P_VERSION_0_4)
 	var recCount = 0
 
 	// try combinations of header type, max_fec, polarity, errors.

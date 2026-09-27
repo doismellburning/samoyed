@@ -111,7 +111,7 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 	s.rrbb = rrbb_new(channel, subchannel, slice, scrambled, s.lfsr, s.prevDescram)
 
 	s.fx25 = newFX25Receiver(channel, subchannel, slice, fx25_deliver_frame)
-	s.il2p = newIL2PReceiver(channel, subchannel, slice)
+	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc)
 
 	return s
 }
@@ -152,8 +152,6 @@ func NewHDLCReceiver(pa *audio_s, demods [MAX_RADIO_CHANS]*Demodulator, sink Rec
 			}
 		}
 	}
-
-	hdlc_rec2_init(pa)
 
 	return r
 }
@@ -575,7 +573,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 			var alevel = demod_get_audio_level(channel, subchannel)
 
 			rrbb_set_audio_level(s.rrbb, alevel)
-			hdlc_rec2_block(s.rrbb)
+			hdlc_rec2_block(s.rrbb, &s.receiver.audio.achan[channel])
 			/* Handed off to hdlc_rec2_block. */
 			s.rrbb = nil
 

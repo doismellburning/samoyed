@@ -84,3 +84,27 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 	assert.Same(t, demodulators[0], multiModems[0].demodulator)
 	assert.Equal(t, 3, hdlcReceiver.numSubchannel[0])
 }
+
+// atest hands multi_modem_init a configuration of its own, carrying its
+// --il2p-version option, and never sets save_audio_config_p, so the IL2P
+// receivers have to take their settings from what they are given.
+func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
+	var origAudioConfig = save_audio_config_p
+
+	t.Cleanup(func() {
+		save_audio_config_p = origAudioConfig
+		multiModems = newMultiModems()
+	})
+
+	save_audio_config_p = nil
+
+	var audioConfig = newRecvTestAudioConfig(1)
+	audioConfig.achan[0].il2p_version = IL2P_VERSION_0_4
+	audioConfig.achan[0].il2p_crc = false
+
+	multi_modem_init(audioConfig, new(recordingReceiveSink))
+
+	var rx = hdlcReceiver.slicer[0][0][0].il2p
+	assert.Equal(t, IL2P_VERSION_0_4, rx.version)
+	assert.False(t, rx.crc)
+}

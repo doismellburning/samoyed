@@ -151,7 +151,7 @@ func recv_adev_thread(ctx context.Context, pa *audio_s, a int, failed chan<- int
 	var eof = false
 	for !eof && ctx.Err() == nil {
 		for c := range num_chan {
-			var audio_sample = demod_get_sample(a, src)
+			var audio_sample = demod_get_sample(a, pa.adev[a].bits_per_sample, src)
 
 			if audio_sample >= 256*256 {
 				eof = true
