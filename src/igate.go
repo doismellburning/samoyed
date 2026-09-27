@@ -600,7 +600,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	 * Starting in 1.4 we preserve any nul characters in the information part.
 	 */
 
-	if ax25_cut_at_crlf(pp) > 0 {
+	if pp.CutAtCRLF() > 0 {
 		if ig.debugLevel >= 1 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Truncated information part at CR.\n")
