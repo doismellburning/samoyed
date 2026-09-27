@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_first_not_repeated(this_p *packet_t) int {
-	return this_p.FirstNotRepeated()
-}
-
 func ax25_get_rr(this_p *packet_t, n int) int {
 	return this_p.RR(n)
 }

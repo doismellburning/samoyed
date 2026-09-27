@@ -384,7 +384,7 @@ func (d *Digipeater) match(
 	 *
 	 * r = index of the address position in the frame.
 	 */
-	var r = ax25_get_first_not_repeated(pp)
+	var r = pp.FirstNotRepeated()
 
 	if r < AX25_REPEATER_1 {
 		return (nil)
