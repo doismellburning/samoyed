@@ -956,7 +956,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 			logEntry.WithField("info", info2text).Info("Packet")
 		} else {
 			logEntry.Info("Packet ax25_safe_print below:")
-			AX25SafePrint(pinfo, asciiOnly)
+			ax25.SafePrint(pinfo, asciiOnly)
 			dw_printf("\n")
 		}
 	} else {
@@ -966,7 +966,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		// TODO: Might want to use d_u_opt for transmitted frames too.
 		logEntry.Info("Packet ax25_safe_print below:")
-		AX25SafePrint(pinfo, asciiOnly)
+		ax25.SafePrint(pinfo, asciiOnly)
 		dw_printf("\n")
 	}
 
@@ -985,7 +985,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		if hasNonPrintable {
 			logrus.Debug("--debug u hexdump below:")
-			AX25SafePrint(pinfo, true)
+			ax25.SafePrint(pinfo, true)
 			dw_printf("\n")
 		}
 	}

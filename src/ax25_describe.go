@@ -104,7 +104,7 @@ func DescribeAX25Frame(frame []byte) int {
 	var info = pp.Info()
 
 	if pp.IsAPRS() {
-		AX25SafePrint(info, true) // Display non-ASCII as hexadecimal.
+		ax25.SafePrint(info, true) // Display non-ASCII as hexadecimal.
 		fmt.Printf("\n")
 		NoteSafePrintTruncation(len(info))
 
@@ -119,7 +119,7 @@ func DescribeAX25Frame(frame []byte) int {
 		fmt.Printf("APRS travels in a UI frame with PID 0xf0.  This is not one, so its %d byte information field is not decoded as APRS.\n", len(info))
 
 		if len(info) > 0 {
-			AX25SafePrint(info, true)
+			ax25.SafePrint(info, true)
 			fmt.Printf("\n")
 			NoteSafePrintTruncation(len(info))
 		}

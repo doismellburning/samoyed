@@ -153,6 +153,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/metrics"
@@ -1094,7 +1095,7 @@ func dl_data_request(E *dlq_item_t) {
 	if ax25Link.debugClientApp {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_data_request (\"")
-		AX25SafePrint(E.txdata.data[:E.txdata.len], true)
+		ax25.SafePrint(E.txdata.data[:E.txdata.len], true)
 		dw_printf("\") state=%d\n", S.state)
 	}
 
@@ -2452,7 +2453,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		if ax25Link.debugClientApp {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, \"", ns, S.vr)
-			AX25SafePrint(info, true)
+			ax25.SafePrint(info, true)
 			dw_printf("\"\n")
 		}
 
@@ -2471,7 +2472,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			if ax25Link.debugClientApp {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, data=\"", ns, S.vr)
-				AX25SafePrint(S.rxdata_by_ns[S.vr].data[:S.rxdata_by_ns[S.vr].len], true)
+				ax25.SafePrint(S.rxdata_by_ns[S.vr].data[:S.rxdata_by_ns[S.vr].len], true)
 				dw_printf("\"\n")
 			}
 
@@ -2572,7 +2573,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 
 			if ax25Link.debugMisc {
 				dw_printf("save to rxdata_by_ns N(S)=%d, V(R)=%d, \"", ns, S.vr)
-				AX25SafePrint(info, true)
+				ax25.SafePrint(info, true)
 				dw_printf("\"\n")
 			}
 

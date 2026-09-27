@@ -829,7 +829,7 @@ func (ig *IGate) sendMsgToServer(imsg string) {
 	if ig.debugLevel >= 1 {
 		text_color_set(DW_COLOR_XMIT)
 		dw_printf("[rx>ig] ")
-		AX25SafePrint([]byte(imsg), false)
+		ax25.SafePrint([]byte(imsg), false)
 		dw_printf("\n")
 	}
 
@@ -1005,7 +1005,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 			if !ig.okToSend {
 				text_color_set(DW_COLOR_REC)
 				dw_printf("[ig] ")
-				AX25SafePrint(message, false)
+				ax25.SafePrint(message, false)
 				dw_printf("\n")
 			}
 		} else {
@@ -1018,7 +1018,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 			 */
 			text_color_set(DW_COLOR_REC)
 			dw_printf("\n[ig>tx] ") // formerly just [ig]
-			AX25SafePrint(message, false)
+			ax25.SafePrint(message, false)
 			dw_printf("\n")
 
 			if bytes.Contains(message, []byte{0}) {

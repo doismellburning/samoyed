@@ -748,19 +748,19 @@ func DecodeAPRSPrint(A *decode_aprs_t) {
 	A.g_weather = strings.TrimSpace(A.g_weather)
 
 	if len(A.g_weather) > 0 {
-		AX25SafePrint([]byte(A.g_weather), false)
+		ax25.SafePrint([]byte(A.g_weather), false)
 		dw_printf("\n")
 	}
 
 	if len(A.g_telemetry) > 0 {
-		AX25SafePrint([]byte(A.g_telemetry), false)
+		ax25.SafePrint([]byte(A.g_telemetry), false)
 		dw_printf("\n")
 	}
 
 	A.g_comment = strings.TrimSpace(A.g_comment)
 
 	if len(A.g_comment) > 0 {
-		AX25SafePrint([]byte(A.g_comment), false)
+		ax25.SafePrint([]byte(A.g_comment), false)
 		dw_printf("\n")
 
 		/*

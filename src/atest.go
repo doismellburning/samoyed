@@ -50,6 +50,7 @@ import (
 	"unicode"
 	"unsafe"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -563,7 +564,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 	}
 
 	dw_printf("%s", stemp) /* stations followed by : */
-	AX25SafePrint(info, false)
+	ax25.SafePrint(info, false)
 	dw_printf("\n")
 
 	/*

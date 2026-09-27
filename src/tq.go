@@ -272,14 +272,14 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 		if tq.audioConfig.chan_medium[channel] == MEDIUM_IGATE {
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !pp.IsAPRS())
+			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 
 			igate.sendRecPacket(channel, pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !pp.IsAPRS())
+			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 
 			tq.netTNCs[channel].sendPacket(channel, pp)

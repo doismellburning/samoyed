@@ -39,6 +39,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -541,7 +542,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 			dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !pp.IsAPRS())
+			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 		} /* wait for clear channel error. */
 	} /* Have pp */
@@ -889,11 +890,11 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {
-			AX25SafePrint(pinfo, !pp.IsAPRS())
+			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 		}
 	} else {
-		AX25SafePrint(pinfo, !pp.IsAPRS())
+		ax25.SafePrint(pinfo, !pp.IsAPRS())
 		dw_printf("\n")
 	}
 

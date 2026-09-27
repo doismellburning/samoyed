@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func AX25SafePrint(info []byte, ascii_only bool) {
-	ax25.SafePrint(info, ascii_only)
-}
-
 func NoteSafePrintTruncation(length int) {
 	ax25.NoteSafePrintTruncation(length)
 }
