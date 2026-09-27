@@ -543,6 +543,36 @@ func TestIGToTxHistoryConcurrent(t *testing.T) {
 	testutils.CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(pp, 0)) })
 }
 
+// The receive history is remembered into and consulted by everything that
+// passes packets up - the radio receive thread, beacons, client applications
+// and the SATgate delay thread.  Run under -race.
+func TestRxToIgHistoryConcurrent(t *testing.T) {
+	setupIGate(t)
+
+	igate.config.rx2ig_dedupe_time = 30
+
+	var pp = ax25.FromText("Q2TEST>APWW10:>hello", true)
+	require.NotNil(t, pp)
+
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for range 100 {
+			igate.rxToIgRemember(pp)
+		}
+	}()
+
+	for range 100 {
+		igate.rxToIgAllow(pp)
+	}
+
+	<-done
+
+	assert.False(t, igate.rxToIgAllow(pp))
+}
+
 // The connection and the counters are shared: the receive thread gives the
 // socket up when the server goes away, while the connect thread's heartbeats
 // and packets heard on the radio are written to it, and the statistics beacon

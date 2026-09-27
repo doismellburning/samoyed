@@ -130,7 +130,7 @@ const MAX_SATGATE_DELAY = 30
 // Its own connect, server-receive and SATgate delay goroutines share it with
 // the radio receive thread, which passes up what it hears, and the beacon,
 // which reads the counters.  dpMutex covers the SATgate delay queue, and mu the
-// connection and the counters.
+// connection and the counters; the history tables have locks of their own.
 type IGate struct {
 	/*
 	 * What NewIGate was given.  These need to be kept around in case the
@@ -1665,12 +1665,17 @@ type rx2igEntry struct {
 // rx2igHistory is a ring of the last RX2IG_HISTORY_MAX of those, oldest
 // overwritten first.
 type rx2igHistory struct {
+	mu         sync.Mutex
 	entries    [RX2IG_HISTORY_MAX]rx2igEntry
 	insertNext int
 }
 
 func (h *rx2igHistory) reset() {
-	*h = rx2igHistory{} //nolint:exhaustruct_v5
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.entries = [RX2IG_HISTORY_MAX]rx2igEntry{}
+	h.insertNext = 0
 }
 
 func (ig *IGate) rxToIgRemember(pp *ax25.Packet) {
@@ -1678,6 +1683,9 @@ func (ig *IGate) rxToIgRemember(pp *ax25.Packet) {
 	if ig.config.rx2ig_dedupe_time == 0 {
 		return
 	}
+
+	ig.rx2ig.mu.Lock()
+	defer ig.rx2ig.mu.Unlock()
 
 	ig.rx2ig.entries[ig.rx2ig.insertNext].timeStamp = time.Now()
 	ig.rx2ig.entries[ig.rx2ig.insertNext].checksum = int(pp.DedupeCRC())
@@ -1726,6 +1734,9 @@ func (ig *IGate) rxToIgAllow(pp *ax25.Packet) bool {
 	}
 
 	// Yes, check for duplicates within certain time.
+
+	ig.rx2ig.mu.Lock()
+	defer ig.rx2ig.mu.Unlock()
 
 	for j := range RX2IG_HISTORY_MAX {
 		if ig.rx2ig.entries[j].checksum == int(crc) && !ig.rx2ig.entries[j].timeStamp.Before(now.Add(-time.Duration(ig.config.rx2ig_dedupe_time)*time.Second)) {
