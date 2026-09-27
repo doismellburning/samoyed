@@ -524,7 +524,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	 * First make a copy of it because it might be modified in place.
 	 */
 
-	var pp = ax25_dup(recv_pp)
+	var pp = recv_pp.Dup()
 
 	/*
 	 * Third party frames require special handling to unwrap payload.

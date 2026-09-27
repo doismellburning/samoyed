@@ -277,7 +277,7 @@ func (d *Digipeater) Regen(from_chan int, pp *packet_t) {
 
 	for to_chan := range MAX_TOTAL_CHANS {
 		if d.config.regen[from_chan][to_chan] {
-			var result = ax25_dup(pp)
+			var result = pp.Dup()
 			if result != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
 				transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result)
@@ -409,7 +409,7 @@ func (d *Digipeater) match(
 	 */
 
 	if repeater == mycall_rec {
-		var result = ax25_dup(pp)
+		var result = pp.Dup()
 
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
@@ -463,7 +463,7 @@ func (d *Digipeater) match(
 	 */
 
 	if alias.MatchString(repeater) {
-		var result = ax25_dup(pp)
+		var result = pp.Dup()
 
 		ax25_set_addr(result, r, mycall_xmit)
 		ax25_set_h(result, r)
@@ -488,7 +488,7 @@ func (d *Digipeater) match(
 			// dw_printf ("test match %d %s\n", r2, repeater2);
 
 			if repeater2 == mycall_rec || alias.MatchString(repeater2) {
-				var result = ax25_dup(pp)
+				var result = pp.Dup()
 
 				ax25_set_addr(result, r2, mycall_xmit)
 				ax25_set_h(result, r2)
@@ -555,7 +555,7 @@ func (d *Digipeater) match(
 		// removed by the next digipeater.
 		if len(atgp) > 0 && strings.HasPrefix(strings.ToLower(repeater), strings.ToLower(atgp)) {
 			if ssid >= 1 && ssid <= 7 {
-				var result = ax25_dup(pp)
+				var result = pp.Dup()
 
 				// First, remove any already used digipeaters.
 
@@ -592,7 +592,7 @@ func (d *Digipeater) match(
 		 */
 
 		if ssid == 1 {
-			var result = ax25_dup(pp)
+			var result = pp.Dup()
 
 			ax25_set_addr(result, r, mycall_xmit)
 			ax25_set_h(result, r)
@@ -601,7 +601,7 @@ func (d *Digipeater) match(
 		}
 
 		if ssid >= 2 && ssid <= 7 {
-			var result = ax25_dup(pp)
+			var result = pp.Dup()
 
 			ax25_set_ssid(result, r, ssid-1) // should be at least 1
 

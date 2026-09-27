@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_dup(copy_from *packet_t) *packet_t {
-	return copy_from.Dup()
-}
-
 func ax25_parse_addr(position int, in_addr string, strictness AddrStrictness) (string, int, bool, bool) {
 	return ax25.ParseAddr(position, in_addr, strictness)
 }

@@ -245,7 +245,7 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec stri
 	 */
 
 	if repeater == mycall_rec {
-		var result = ax25_dup(pp)
+		var result = pp.Dup()
 
 		/* If using multiple radio channels, they could have different calls. */
 
@@ -260,7 +260,7 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *packet_t, mycall_rec stri
 	 */
 	if has_alias {
 		if alias.MatchString(repeater) {
-			var result = ax25_dup(pp)
+			var result = pp.Dup()
 
 			ax25_set_addr(result, r, mycall_xmit)
 			ax25_set_h(result, r)
