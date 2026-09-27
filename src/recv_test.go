@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -384,7 +385,7 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 	addrs[OWNCALL] = "Q1TEST"
 	addrs[PEERCALL] = "Q2TEST"
 
-	var pp = AX25FromTextWithStrictness("Q2TEST>Q1TEST:>Testing", AddrLenient)
+	var pp = ax25.FromTextWithStrictness("Q2TEST>Q1TEST:>Testing", AddrLenient)
 	require.NotNil(t, pp)
 
 	var alevel ALevel

@@ -79,7 +79,7 @@ func FuzzAX25FromText(f *testing.F) {
 	f.Add(">:")
 
 	f.Fuzz(func(t *testing.T, monitor string) {
-		var pp = AX25FromTextWithStrictness(monitor, AddrLenient)
+		var pp = ax25.FromTextWithStrictness(monitor, AddrLenient)
 		if pp == nil {
 			return
 		}
@@ -126,7 +126,7 @@ func FuzzDecodeAPRS(f *testing.F) {
 	f.Add("Q1TEST>APDW17:>IO91/#  ")
 
 	f.Fuzz(func(t *testing.T, monitor string) {
-		var pp = AX25FromTextWithStrictness(monitor, AddrLenient)
+		var pp = ax25.FromTextWithStrictness(monitor, AddrLenient)
 		if pp == nil {
 			return
 		}
