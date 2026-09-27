@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
@@ -613,7 +614,7 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 		return
 	}
 
-	var pp = ax25_new()
+	var pp = ax25.New()
 
 	/* TODO KG
 	#if AX25MEMDEBUG

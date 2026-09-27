@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,7 +87,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 
 	var xs = new(XmitService)
 
-	transmitQueue.Append(channel, TQ_PRIO_1_LO, ax25_new()) // What TransmitQueue.LMSeizeRequest queues.
+	transmitQueue.Append(channel, TQ_PRIO_1_LO, ax25.New()) // What TransmitQueue.LMSeizeRequest queues.
 	transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
 
 	xs.discard_untransmittable(channel)
@@ -396,7 +397,7 @@ func TestSendOneFrameXID(t *testing.T) {
 func TestSendOneFrameNullFrame(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	assert.Equal(t, 0, xs.send_one_frame(0, TQ_PRIO_1_LO, ax25_new()))
+	assert.Equal(t, 0, xs.send_one_frame(0, TQ_PRIO_1_LO, ax25.New()))
 
 	var confirmed = false
 

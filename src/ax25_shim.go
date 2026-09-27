@@ -66,10 +66,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_new() *packet_t {
-	return ax25.New()
-}
-
 func AX25FromText(monitor string, strict bool) *packet_t {
 	return ax25.FromText(monitor, strict)
 }
