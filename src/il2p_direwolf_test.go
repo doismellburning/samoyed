@@ -549,10 +549,10 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 		// Is it the same after encoding to IL2P and then decoding?
 
 		var len1 = pp1.FrameLen()
-		var data1 = ax25_get_frame_data(pp1)
+		var data1 = pp1.FrameData()
 
 		var len2 = pp2.FrameLen()
-		var data2 = ax25_get_frame_data(pp2)
+		var data2 = pp2.FrameData()
 
 		if len1 != len2 || !slices.Equal(data1, data2) {
 			dw_printf("\nEncode/Decode Error.  Original:\n")

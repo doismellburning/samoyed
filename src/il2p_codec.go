@@ -73,7 +73,7 @@ func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ..
 		if e == 0 {
 			// Success. No info part.
 			if appendCRC {
-				var crcBytes = il2p_crc_encode(il2p_crc_calc(ax25_get_frame_data(pp)))
+				var crcBytes = il2p_crc_encode(il2p_crc_calc(pp.FrameData()))
 				outbuf.Write(crcBytes[:])
 			}
 
@@ -88,7 +88,7 @@ func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ..
 			outbuf.Write(encodedPayload)
 
 			if appendCRC {
-				var crcBytes = il2p_crc_encode(il2p_crc_calc(ax25_get_frame_data(pp)))
+				var crcBytes = il2p_crc_encode(il2p_crc_calc(pp.FrameData()))
 				outbuf.Write(crcBytes[:])
 			}
 
@@ -119,7 +119,7 @@ func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ..
 
 			// Payload is entire AX.25 frame.
 
-			var frame_data = ax25_get_frame_data(pp)
+			var frame_data = pp.FrameData()
 
 			var encodedPayload, k = il2p_encode_payload(frame_data, use_max_fec)
 			if k > 0 {
@@ -199,7 +199,7 @@ func il2p_decode_frame(irec []byte, version il2p_version_t) *packet_t {
 
 	// Validate CRC if present.
 	if pp != nil && crc_bytes != nil {
-		var frame_data = ax25_get_frame_data(pp)
+		var frame_data = pp.FrameData()
 		if !il2p_crc_check(frame_data, crc_bytes) {
 			if il2p_get_debug() >= 1 {
 				text_color_set(DW_COLOR_ERROR)

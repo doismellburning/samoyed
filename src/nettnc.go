@@ -428,7 +428,7 @@ func (nt *NetTNC) sendPacket(channel int, pp *packet_t) {
 
 	// First, get the on-air frame format from packet object.
 	// Prepend 0 byte for KISS command and channel.
-	var fbuf = ax25_get_frame_data(pp)
+	var fbuf = pp.FrameData()
 
 	var frame_buff = []byte{0} // For now, set channel to 0.
 	frame_buff = append(frame_buff, fbuf...)

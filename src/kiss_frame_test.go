@@ -137,7 +137,7 @@ func Test_kiss_process_msg_data_frame(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), kissTestAudioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, pp.FrameData()...), kissTestAudioConfig(), 0, nil, -1, sendfun)
 
 	assert.Equal(t, 1, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
 	assert.Equal(t, 0, transmitQueue.Count(0, TQ_PRIO_0_HI, "", "", false))
@@ -153,7 +153,7 @@ func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST,Q3TEST*:hello", true)
 	require.NotNil(t, pp)
 
-	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), kissTestAudioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, pp.FrameData()...), kissTestAudioConfig(), 0, nil, -1, sendfun)
 
 	assert.Equal(t, 1, transmitQueue.Count(0, TQ_PRIO_0_HI, "", "", false))
 }
@@ -170,7 +170,7 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg(append([]byte{0x80 | KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), kissTestAudioConfig(), 0, nil, -1, sendfun)
+		kiss_process_msg(append([]byte{0x80 | KISS_CMD_DATA_FRAME}, pp.FrameData()...), kissTestAudioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, "Invalid transmit channel 8 from KISS client app")
@@ -191,7 +191,7 @@ func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), kissTestAudioConfig(), 0, kps, 0, sendfun)
+	kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, pp.FrameData()...), kissTestAudioConfig(), 0, kps, 0, sendfun)
 
 	assert.Equal(t, 1, transmitQueue.Count(1, TQ_PRIO_1_LO, "", "", false), "the port's channel should have been used")
 	assert.Equal(t, 0, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
@@ -216,7 +216,7 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 
 	assert.NotPanics(t, func() {
 		output = testutils.CaptureOutput(t, func() {
-			kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), kissTestAudioConfig(), 0, kps, 0, sendfun)
+			kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, pp.FrameData()...), kissTestAudioConfig(), 0, kps, 0, sendfun)
 		})
 	})
 
@@ -449,7 +449,7 @@ func Test_KissRecByte_whole_frame(t *testing.T) {
 
 	var kf = new(KISSFrame)
 
-	feedKissBytes(kf, 0, KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...)))
+	feedKissBytes(kf, 0, KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, pp.FrameData()...)))
 
 	assert.Equal(t, 1, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
 	assert.Equal(t, KS_SEARCHING, kf.state, "the collector should be ready for the next frame")
@@ -564,7 +564,7 @@ func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	feedKissBytes(kf, 0, KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...)))
+	feedKissBytes(kf, 0, KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, pp.FrameData()...)))
 
 	assert.Equal(t, 1, transmitQueue.Count(0, -1, "", "", false))
 }
@@ -580,7 +580,7 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 	var kf = new(KISSFrame)
 
 	var output = testutils.CaptureOutput(t, func() {
-		feedKissBytes(kf, 2, KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...)))
+		feedKissBytes(kf, 2, KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, pp.FrameData()...)))
 	})
 
 	assert.Contains(t, output, "<<< Data frame from KISS client application, channel 0")

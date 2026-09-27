@@ -46,7 +46,7 @@ func FuzzAX25FromFrame(f *testing.F) {
 	// An ordinary APRS position report.
 	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
 	require.NotNil(f, pp)
-	f.Add(ax25_get_frame_data(pp))
+	f.Add(pp.FrameData())
 
 	// Addresses and a control byte, with no PID and no information part:
 	// the shortest frame AX25FromFrame accepts (issue #670).

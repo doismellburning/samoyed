@@ -101,7 +101,7 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 		var pp2 = il2p_decode_frame(encoded, IL2P_VERSION_0_4)
 		require.NotNil(t, pp2, "Failed to decode frame with CRC, max_fec=%d", max_fec)
 
-		assert.Equal(t, ax25_get_frame_data(pp), ax25_get_frame_data(pp2))
+		assert.Equal(t, pp.FrameData(), pp2.FrameData())
 	}
 }
 
@@ -133,7 +133,7 @@ func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 			var pp = il2p_decode_frame(b, IL2P_VERSION_COMPAT)
 			require.NotNil(t, pp)
 
-			var frameData = ax25_get_frame_data(pp)
+			var frameData = pp.FrameData()
 			assert.Equal(t, td.ax25Data, frameData)
 
 			// Verify CRC matches.

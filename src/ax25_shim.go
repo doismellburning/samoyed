@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func ax25_get_frame_data(this_p *packet_t) []byte {
-	return this_p.FrameData()
-}
-
 func ax25_dedupe_crc(pp *packet_t) uint16 {
 	return pp.DedupeCRC()
 }

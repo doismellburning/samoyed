@@ -99,7 +99,7 @@ func expectReceivedFrames(t *testing.T) {
 // kissFrameFor wraps a packet's on-air bytes the way a KISS TNC would before
 // putting them on the wire.
 func kissFrameFor(pp *packet_t) []byte {
-	return KissEncapsulate(append([]byte{0}, ax25_get_frame_data(pp)...))
+	return KissEncapsulate(append([]byte{0}, pp.FrameData()...))
 }
 
 // A TNC that is not there cannot be attached to, and says so rather than
@@ -140,7 +140,7 @@ func TestNetTNCReceivedFrameReachesTheQueue(t *testing.T) {
 	assert.Equal(t, nettncTestChannel, item._chan)
 	assert.Equal(t, "Network TNC", item.spectrum)
 	require.NotNil(t, item.pp)
-	assert.Equal(t, ax25_get_frame_data(pp), ax25_get_frame_data(item.pp))
+	assert.Equal(t, pp.FrameData(), item.pp.FrameData())
 }
 
 // Transmitting on an NCHANNEL means handing the frame to the TNC as KISS, with
@@ -264,7 +264,7 @@ func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
 
 	var item = dataLinkQueue.Remove()
 	require.NotNil(t, item, "the frame after the noise was not decoded")
-	assert.Equal(t, ax25_get_frame_data(pp), ax25_get_frame_data(item.pp))
+	assert.Equal(t, pp.FrameData(), item.pp.FrameData())
 }
 
 // FENDs with nothing between them are how some TNCs idle, and are not frames.

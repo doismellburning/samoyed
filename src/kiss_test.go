@@ -338,7 +338,7 @@ func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 	var pp = newTestPacket(t)
 
 	var kissFrame = KissEncapsulate(append(
-		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, ax25_get_frame_data(pp)...))
+		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, pp.FrameData()...))
 
 	var _, writeErr = client.Write(kissFrame)
 	require.NoError(t, writeErr)

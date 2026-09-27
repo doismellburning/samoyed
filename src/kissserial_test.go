@@ -310,7 +310,7 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	var pp = newTestPacket(t)
 
 	var _, writeErr = client.Write(KissEncapsulate(append(
-		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, ax25_get_frame_data(pp)...)))
+		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, pp.FrameData()...)))
 	require.NoError(t, writeErr)
 
 	// TransmitQueue.Count rather than TransmitQueue.Peek: the queue is being filled by the
