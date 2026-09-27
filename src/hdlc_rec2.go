@@ -70,6 +70,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/sirupsen/logrus"
 )
@@ -673,8 +674,8 @@ func try_decode(block *rrbb_t, achan *achan_param_s, channel int, subchan int, s
 			// TODO: Shouldn't be necessary to pass chan, subchan, alevel into
 			// try_decode because we can obtain them from block.
 			// Let's make sure that assumption is good...
-			Assert(rrbb_get_chan(block) == channel)
-			Assert(rrbb_get_subchan(block) == subchan)
+			dwutil.Assert(rrbb_get_chan(block) == channel)
+			dwutil.Assert(rrbb_get_subchan(block) == subchan)
 			multi_modem_process_rec_frame(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
 
 			return true /* success */

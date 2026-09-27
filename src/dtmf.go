@@ -19,6 +19,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -100,7 +101,7 @@ func NewDTMFDecoder(channel int, sampleRate int) *DTMFDecoder {
 
 		d.coef[j] = 2.0 * math.Cos(2.0*math.Pi*k/float64(d.blockSize))
 
-		Assert(d.coef[j] > 0.0 && d.coef[j] < 2.0)
+		dwutil.Assert(d.coef[j] > 0.0 && d.coef[j] < 2.0)
 		logrus.WithFields(logrus.Fields{
 			"freq": tone,
 			"k":    k,

@@ -73,6 +73,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/pkg/term"
 	"github.com/sirupsen/logrus"
 )
@@ -250,7 +251,7 @@ func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("\n")
 			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			HexDump(fbuf)
+			dwutil.HexDump(fbuf)
 		}
 
 		kiss_buff = KissEncapsulate(stemp)

@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -213,7 +214,7 @@ func (tq *TransmitQueue) SetNetTNCs(netTNCs [MAX_TOTAL_CHANS]*NetTNC) {
  *--------------------------------------------------------------------*/
 
 func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
-	Assert(prio >= 0 && prio < TQ_NUM_PRIO)
+	dwutil.Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_DEBUG)
@@ -443,7 +444,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 // TODO: FIXME:  this is a copy of Append.  Need to fine tune and explain why.
 
 func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
-	Assert(prio >= 0 && prio < TQ_NUM_PRIO)
+	dwutil.Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_DEBUG)
@@ -676,7 +677,7 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
  *--------------------------------------------------------------------*/
 
 func (tq *TransmitQueue) WaitWhileEmpty(ctx context.Context, channel int) {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// Wake-ups latch, so one raised between this loop reading the queue and
 	// settling down to wait is still there to be received - which is what
@@ -933,10 +934,10 @@ func (tq *TransmitQueue) wakeLocked(channel int) {
  *--------------------------------------------------------------------*/
 
 func (tq *TransmitQueue) isEmptyLocked(channel int) bool {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	for p := range TQ_NUM_PRIO {
-		Assert(p >= 0 && p < TQ_NUM_PRIO)
+		dwutil.Assert(p >= 0 && p < TQ_NUM_PRIO)
 
 		if tq.head[channel][p] != nil {
 			return false

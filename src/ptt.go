@@ -128,6 +128,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	goHamlib "github.com/xylo04/goHamlib"
 	"golang.org/x/sys/unix"
 )
@@ -339,8 +340,8 @@ func (p *PTT) set(ot int, channel int, ptt_signal int) {
 	var ptt = ptt_signal
 	var ptt2 = ptt_signal
 
-	Assert(ot >= 0 && ot < NUM_OCTYPES)
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(ot >= 0 && ot < NUM_OCTYPES)
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	if channel >= MAX_RADIO_CHANS {
 		return // NCHANNEL: no physical PTT hardware to drive
@@ -351,7 +352,7 @@ func (p *PTT) set(ot int, channel int, ptt_signal int) {
 		dw_printf("%s %d = %d\n", octypeName(ot), channel, ptt_signal)
 	}
 
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	if p.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
@@ -590,8 +591,8 @@ func cm108_print_permission_advice(name string, err error) {
  * ------------------------------------------------------------------*/
 
 func (p *PTT) GetInput(it int, channel int) int {
-	Assert(it >= 0 && it < NUM_ICTYPES)
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(it >= 0 && it < NUM_ICTYPES)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	if p == nil {
 		return -1 /* Not set up, so no method. */
@@ -879,7 +880,7 @@ func (p *PTT) setup() error {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
 					var chip_name = audio_config_p.achan[ch].octrl[ot].out_gpio_name
 					var line_number = audio_config_p.achan[ch].octrl[ot].out_gpio_num
-					var initialState = IfThenElse(audio_config_p.achan[ch].octrl[ot].ptt_invert, 1, 0) // Using "invert" as initial state means we always start "off"
+					var initialState = dwutil.IfThenElse(audio_config_p.achan[ch].octrl[ot].ptt_invert, 1, 0) // Using "invert" as initial state means we always start "off"
 
 					var line, lineErr = RequestGPIODLine(chip_name, line_number, initialState)
 					if lineErr != nil {

@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/spf13/pflag"
 )
@@ -108,7 +109,7 @@ func dumpCapture(capture []byte, hexInput bool) int {
 		return 1
 	case first > 0:
 		fmt.Printf("ERROR: %s before the first FEND (0x%02x) not part of any frame.\n", plural(first, "byte"), direwolf.FEND)
-		direwolf.HexDump(capture[:first])
+		dwutil.HexDump(capture[:first])
 
 		problems++
 	}
@@ -199,7 +200,7 @@ func dumpFrame(number int, offset int, contents []byte, unterminated bool) int {
 	var problems = 0
 
 	fmt.Printf("\n--- KISS frame %d, %s at offset %d ---\n", number, plural(len(contents), "byte"), offset)
-	direwolf.HexDump(contents)
+	dwutil.HexDump(contents)
 
 	if unterminated {
 		fmt.Printf("ERROR: Frame is not terminated - the capture ends without a closing FEND (0x%02x).\n", direwolf.FEND)
@@ -223,7 +224,7 @@ func dumpFrame(number int, offset int, contents []byte, unterminated bool) int {
 
 	if len(frame) != len(contents) {
 		fmt.Printf("%s after removing the escapes:\n", plural(len(frame), "byte"))
-		direwolf.HexDump(frame)
+		dwutil.HexDump(frame)
 	}
 
 	var command = frame[0] & 0x0f
@@ -329,7 +330,7 @@ func dumpParameter(command byte, value byte) {
 	case direwolf.KISS_CMD_TXTAIL:
 		fmt.Printf("Transmit tail = %d, i.e. %d ms.\n", value, int(value)*10)
 	case direwolf.KISS_CMD_FULLDUPLEX:
-		fmt.Printf("Full duplex = %d, i.e. %s.\n", value, direwolf.IfThenElse(value == 0, "half duplex", "full duplex"))
+		fmt.Printf("Full duplex = %d, i.e. %s.\n", value, dwutil.IfThenElse(value == 0, "half duplex", "full duplex"))
 	}
 }
 

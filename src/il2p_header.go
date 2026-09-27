@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 /*--------------------------------------------------------------------------------
@@ -34,7 +36,7 @@ func sixbit_to_ascii(s byte) rune {
 
 func set_il2p_field(hdr []byte, bit_num int, lsb_index int, width int, value int) {
 	for width > 0 && value != 0 {
-		Assert(lsb_index >= 0 && lsb_index <= 11)
+		dwutil.Assert(lsb_index >= 0 && lsb_index <= 11)
 
 		if value&1 != 0 {
 			hdr[lsb_index] |= byte(1 << bit_num)
@@ -45,7 +47,7 @@ func set_il2p_field(hdr []byte, bit_num int, lsb_index int, width int, value int
 		width--
 	}
 
-	Assert(value == 0)
+	dwutil.Assert(value == 0)
 }
 
 func SET_UI(hdr []byte, val int) {
@@ -81,7 +83,7 @@ func get_il2p_field(hdr []byte, bit_num int, lsb_index int, width int) int {
 	for width > 0 {
 		result <<= 1
 
-		Assert(lsb_index >= 0 && lsb_index <= 11)
+		dwutil.Assert(lsb_index >= 0 && lsb_index <= 11)
 
 		var x = hdr[lsb_index]
 		if x&(1<<bit_num) != 0 {
@@ -196,7 +198,7 @@ func decode_pid(pid int) int {
 		0xf0, // No L3
 	}
 
-	Assert(pid >= 0 && pid <= 15)
+	dwutil.Assert(pid >= 0 && pid <= 15)
 
 	return (axpid[pid])
 }
@@ -288,7 +290,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 		// PID is set to 0, meaning none, for S frames.
 		SET_UI(hdr, 0)
 		SET_PID(hdr, 0)
-		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|(((IfThenElse((cr == cr_cmd), 1, 0))|(IfThenElse((cr == cr_11), 1, 0)))<<2))
+		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|(((dwutil.IfThenElse((cr == cr_cmd), 1, 0))|(dwutil.IfThenElse((cr == cr_11), 1, 0)))<<2))
 
 		// This gets OR'ed into the above.
 		switch frame_type {
@@ -349,7 +351,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 		// same bits.  We see this in the second example in the protocol spec.
 		// The original UI frame has both C bits of 0 so it is received as a response.
 
-		SET_CONTROL(hdr, (pf<<6)|(((IfThenElse((cr == cr_cmd), 1, 0))|(IfThenElse((cr == cr_11), 1, 0)))<<2))
+		SET_CONTROL(hdr, (pf<<6)|(((dwutil.IfThenElse((cr == cr_cmd), 1, 0))|(dwutil.IfThenElse((cr == cr_11), 1, 0)))<<2))
 
 		// This gets OR'ed into the above.
 		switch frame_type {
@@ -526,7 +528,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// 'S' frame.
 		// The control field contains: P/F N(R) C S S
 		var control = GET_CONTROL(hdr)
-		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
+		var cr = dwutil.IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
 		var ftype ax25_frame_type_t
 
 		switch control & 0x03 {
@@ -549,7 +551,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// 'U' frame other than 'UI'.
 		// The control field contains: P/F OPCODE{3) C x x
 		var control = GET_CONTROL(hdr)
-		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
+		var cr = dwutil.IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
 		var axpid = 0 // unused for U other than UI.
 		var ftype ax25_frame_type_t
 
@@ -581,7 +583,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// 'UI' frame.
 		// The control field contains: P/F OPCODE{3) C x x
 		var control = GET_CONTROL(hdr)
-		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
+		var cr = dwutil.IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
 		var ftype = frame_type_U_UI
 		var pf = (control >> 6) & 0x01
 		var axpid = decode_pid(GET_PID(hdr))

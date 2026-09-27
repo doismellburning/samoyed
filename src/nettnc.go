@@ -14,6 +14,8 @@ import (
 	"os"
 	"strconv"
 	"sync"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 type NetTNC struct {
@@ -101,7 +103,7 @@ func NewNetTNCs(ctx context.Context, pa *AudioConfig) [MAX_TOTAL_CHANS]*NetTNC {
  *--------------------------------------------------------------------*/
 
 func NewNetTNC(ctx context.Context, channel int, host string, port int) (*NetTNC, error) {
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	var conn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if connErr != nil {
@@ -193,7 +195,7 @@ func (nt *NetTNC) closeSockIfCurrent(conn net.Conn) {
  *--------------------------------------------------------------------*/
 
 func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	var kstate KISSFrame // State machine to gather a KISS frame.
 
@@ -349,7 +351,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 				dw_printf("Frame content after removing KISS framing and any escapes:\n")
 				/* Don't include the "type" indicator. */
 				/* It contains the radio channel and type should always be 0 here. */
-				HexDump(unwrapped[1:])
+				dwutil.HexDump(unwrapped[1:])
 			}
 
 			// Convert to packet object and send to received packet queue.

@@ -30,6 +30,8 @@ package direwolf
 
 import (
 	"time"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 /*------------------------------------------------------------------
@@ -71,7 +73,7 @@ func (s *AudioStats) record(adev int, nchan int, nsamp int, interval int) {
 		return
 	}
 
-	Assert(adev >= 0 && adev < MAX_ADEVS)
+	dwutil.Assert(adev >= 0 && adev < MAX_ADEVS)
 
 	/*
 	 * Print information about the sample rate as a troubleshooting aid.

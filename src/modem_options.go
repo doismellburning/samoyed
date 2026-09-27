@@ -3,6 +3,8 @@
 
 package direwolf
 
+import "github.com/doismellburning/samoyed/internal/dwutil"
+
 // settleModemOptions applies, to each radio channel, the rules about which
 // modem options go together, so that the configuration is final before any
 // modem - receive or transmit - is set up from it.
@@ -24,7 +26,7 @@ func (achan *achan_param_s) settleModemOptions(channel int) {
 	case MODEM_EAS, MODEM_AIS:
 		// For AIS we will accept only a good CRC without any fixup attempts.
 		// Even with that, there are still a lot of CRC false matches with random noise.
-		var name = IfThenElse(achan.modem_type == MODEM_EAS, "EAS", "AIS")
+		var name = dwutil.IfThenElse(achan.modem_type == MODEM_EAS, "EAS", "AIS")
 
 		if achan.fix_bits != RETRY_NONE {
 			text_color_set(DW_COLOR_INFO)

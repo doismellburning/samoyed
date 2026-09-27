@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -777,10 +778,10 @@ func ais_object_course_speed(A *decode_aprs_t) (maybe.Maybe[int], maybe.Maybe[in
 }
 
 func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
-	Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
-	Assert(slice >= 0 && slice < MAX_SLICERS)
-	Assert(pp != nil) // 1.1J+
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
+	dwutil.Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
+	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
+	dwutil.Assert(pp != nil) // 1.1J+
 
 	// Extra stuff before slice indicators.
 	// Can indicate FX.25/IL2P or fix_bits.
@@ -795,7 +796,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		// Possible fix_bits indication.  Only radio channels (< MAX_RADIO_CHANS) have achan entries;
 		// virtual channels such as NCHANNEL do not.
 		if channel < MAX_RADIO_CHANS && (audio_config.achan[channel].fix_bits != RETRY_NONE || audio_config.achan[channel].passall) {
-			Assert(retries >= RETRY_NONE && retries <= BitFixPassall)
+			dwutil.Assert(retries >= RETRY_NONE && retries <= BitFixPassall)
 			display_retries = fmt.Sprintf(" [%s] ", retries.String())
 		}
 	}

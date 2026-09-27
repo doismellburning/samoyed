@@ -34,6 +34,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/sirupsen/logrus"
 )
@@ -1284,7 +1285,7 @@ func is_message_message(infop string) bool {
 }
 
 func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
-	Assert(to_chan >= 0 && to_chan < MAX_TOTAL_CHANS)
+	dwutil.Assert(to_chan >= 0 && to_chan < MAX_TOTAL_CHANS)
 
 	/*
 	 * Try to parse it into a packet object; we need this for the packet filtering.
@@ -1355,7 +1356,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	 * filtering by stations along the way or the q construct.
 	 */
 
-	Assert(to_chan >= 0 && to_chan < MAX_TOTAL_CHANS)
+	dwutil.Assert(to_chan >= 0 && to_chan < MAX_TOTAL_CHANS)
 
 	/*
 	 * We have a rather strange special case here.

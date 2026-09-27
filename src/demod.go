@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/sirupsen/logrus"
 )
@@ -115,7 +116,7 @@ func demod_init(pa *AudioConfig) {
 // decimation and upsampling ratios - it keeps: achan is its own copy, and the
 // configuration is left as it was.
 func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodulator {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	var demodulator = new(Demodulator)
 	demodulator.channel = channel
@@ -180,7 +181,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 
 		var just_letters = justLettersBuilder.String()
 
-		Assert(num_letters == len(just_letters))
+		dwutil.Assert(num_letters == len(just_letters))
 
 		/*
 		 * Pick a good default demodulator if none specified.
@@ -239,7 +240,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		/*
 		 * Put it back together again.
 		 */
-		Assert(num_letters == len(just_letters))
+		dwutil.Assert(num_letters == len(just_letters))
 
 		/* At this point, have_plus can have 3 values: */
 		/* 	1 = turned on, either explicitly or by applied default */
@@ -252,7 +253,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 
 		achan.profiles = just_letters
 
-		Assert(len(achan.profiles) >= 1)
+		dwutil.Assert(len(achan.profiles) >= 1)
 
 		if have_plus != 0 {
 			achan.profiles += "+"
@@ -344,7 +345,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			}
 
 			for d := range numSubchan {
-				Assert(d >= 0 && d < MAX_SUBCHANS)
+				dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 
 				var D = &demodulator.states[d]
 
@@ -440,7 +441,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			numSubchan = achan.num_freq
 
 			for d := range achan.num_freq {
-				Assert(d >= 0 && d < MAX_SUBCHANS)
+				dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 
 				var D = &demodulator.states[d]
 
@@ -518,7 +519,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		dw_printf(".\n")
 
 		for d := range numSubchan {
-			Assert(d >= 0 && d < MAX_SUBCHANS)
+			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 			var D = &demodulator.states[d]
 			var profile = achan.profiles[d]
 
@@ -571,7 +572,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		dw_printf(".\n")
 
 		for d := range numSubchan {
-			Assert(d >= 0 && d < MAX_SUBCHANS)
+			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 			var D = &demodulator.states[d]
 			var profile = achan.profiles[d]
 
@@ -619,7 +620,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		dw_printf(".\n")
 
 		for d := range numSubchan {
-			Assert(d >= 0 && d < MAX_SUBCHANS)
+			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 			var D = &demodulator.states[d]
 			var profile = achan.profiles[d]
 
@@ -701,7 +702,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			dw_printf("Channel %d: %d baud, %s, %s, %d sample rate x %d",
 				channel,
 				achan.baud,
-				IfThenElse(achan.modem_type == MODEM_AIS, "AIS", "K9NG/G3RUH"),
+				dwutil.IfThenElse(achan.modem_type == MODEM_AIS, "AIS", "K9NG/G3RUH"),
 				achan.profiles,
 				samplesPerSec,
 				achan.upsample)
@@ -838,7 +839,7 @@ type SampleSource interface {
 }
 
 func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
-	Assert(bits_per_sample == 8 || bits_per_sample == 16)
+	dwutil.Assert(bits_per_sample == 8 || bits_per_sample == 16)
 
 	// TODO KG Originally this was a C signed short with the comment "short to force sign extension" - forcing via int16 seems to do the right thing...
 	var sam int16
@@ -849,7 +850,7 @@ func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
 			return (FSK_READ_ERR)
 		}
 
-		Assert(x1 >= 0 && x1 <= 255)
+		dwutil.Assert(x1 >= 0 && x1 <= 255)
 
 		/* Scale 0..255 into -32k..+32k */
 
@@ -865,8 +866,8 @@ func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
 			return (FSK_READ_ERR)
 		}
 
-		Assert(x1 >= 0 && x1 <= 255)
-		Assert(x2 >= 0 && x2 <= 255)
+		dwutil.Assert(x1 >= 0 && x1 <= 255)
+		dwutil.Assert(x2 >= 0 && x2 <= 255)
 
 		sam = int16(x2<<8) | int16(x1)
 	}
@@ -920,7 +921,7 @@ func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
 // This is called from PTT.Set for half duplex.
 
 func demod_mute_input(channel int, mute_during_xmit int) {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// Transmit calibration, for one, keys a channel that may not be listening.
 	var d = demodulators[channel]
@@ -939,7 +940,7 @@ func (d *Demodulator) Mute(mute bool) {
 // ProcessSample hands one audio sample, in the range -32768 to 32767, to the
 // subchannel's demodulator.
 func (d *Demodulator) ProcessSample(subchan int, sam int) {
-	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
+	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 
 	var channel = d.channel
 
@@ -1033,7 +1034,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 /* We currently produce a message when this goes over 90. */
 
 func demod_get_audio_level(channel int, subchan int) ALevel {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// audio_stats asks after both of a stereo device's channels, whether or
 	// not demod_init set them up.
@@ -1050,7 +1051,7 @@ func demod_get_audio_level(channel int, subchan int) ALevel {
 // AudioLevel reports the received audio level the subchannel's demodulator
 // has seen, and for AFSK its mark and space amplitudes.
 func (d *Demodulator) AudioLevel(subchan int) ALevel {
-	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
+	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 
 	/* We have to consider two different cases here. */
 	/* N demodulators, each with own slicer and HDLC decoder. */

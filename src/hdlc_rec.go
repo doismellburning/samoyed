@@ -9,6 +9,7 @@ package direwolf
 import (
 	"slices"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
@@ -417,7 +418,7 @@ func (r *HDLCReceiver) RecBitNew(channel int, subchannel int, slice int, _raw in
 	// EAS does not use HDLC.
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.recEasBit(IfThenElse(raw, 1, 0), not_used_remove)
+		s.recEasBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
 
 		return
 	}
@@ -441,7 +442,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 	var dbit bool /* Data bit after undoing NRZI. */
 
 	if is_scrambled {
-		var descram = descramble(IfThenElse(raw, 1, 0), &(s.lfsr))
+		var descram = descramble(dwutil.IfThenElse(raw, 1, 0), &(s.lfsr))
 
 		dbit = (descram == s.prevDescram)
 		s.prevDescram = descram
@@ -456,8 +457,8 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 	// Don't waste time on this if AIS.  EAS does not get this far.
 
 	if r.audio.achan[channel].modem_type != MODEM_AIS {
-		s.fx25.recBit(IfThenElse(dbit, 1, 0))
-		s.il2p.recBit(IfThenElse(raw, 1, 0)) // Note: skip NRZI.
+		s.fx25.recBit(dwutil.IfThenElse(dbit, 1, 0))
+		s.il2p.recBit(dwutil.IfThenElse(raw, 1, 0)) // Note: skip NRZI.
 	}
 
 	/*
@@ -474,7 +475,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.flag4Det |= 0x80000000
 	}
 
-	rrbb_append_bit(s.rrbb, byte(IfThenElse(raw, 1, 0)))
+	rrbb_append_bit(s.rrbb, byte(dwutil.IfThenElse(raw, 1, 0)))
 
 	if s.patDet == 0x7e {
 		rrbb_chop8(s.rrbb)
@@ -589,7 +590,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.olen = 0 /* Allow accumulation of octets. */
 		s.frameLen = 0
 
-		rrbb_append_bit(s.rrbb, byte(IfThenElse(s.prevRaw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
+		rrbb_append_bit(s.rrbb, byte(dwutil.IfThenElse(s.prevRaw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
 		/* Now that we are saving other initial state information, */
 		/* it would be sensible to do the same for this instead */
 		/* of lumping it in with the frame data bits. */

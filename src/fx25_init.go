@@ -40,6 +40,8 @@ package direwolf
 import (
 	"math/bits"
 	"os"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 const EXIT_FAILURE = 1
@@ -165,86 +167,86 @@ func FX25Init(debug_level int) {
 	for j := range 16 {
 		for k := range 16 {
 			if j == k {
-				Assert(bits.OnesCount64(tags[j].value^tags[k].value) == 0)
+				dwutil.Assert(bits.OnesCount64(tags[j].value^tags[k].value) == 0)
 			} else {
-				Assert(bits.OnesCount64(tags[j].value^tags[k].value) == 32)
+				dwutil.Assert(bits.OnesCount64(tags[j].value^tags[k].value) == 32)
 			}
 		}
 	}
 
 	for j := CTAG_MIN; j <= CTAG_MAX; j++ {
-		Assert(tags[j].n_block_radio-tags[j].k_data_radio == int(fx25Tab[tags[j].itab].nroots))
-		Assert(tags[j].n_block_rs-tags[j].k_data_rs == int(fx25Tab[tags[j].itab].nroots))
-		Assert(tags[j].n_block_rs == FX25_BLOCK_SIZE)
+		dwutil.Assert(tags[j].n_block_radio-tags[j].k_data_radio == int(fx25Tab[tags[j].itab].nroots))
+		dwutil.Assert(tags[j].n_block_rs-tags[j].k_data_rs == int(fx25Tab[tags[j].itab].nroots))
+		dwutil.Assert(tags[j].n_block_rs == FX25_BLOCK_SIZE)
 	}
 
-	Assert(fx25_pick_mode(100+1, 239) == 1)
-	Assert(fx25_pick_mode(100+1, 240) == -1)
+	dwutil.Assert(fx25_pick_mode(100+1, 239) == 1)
+	dwutil.Assert(fx25_pick_mode(100+1, 240) == -1)
 
-	Assert(fx25_pick_mode(100+5, 223) == 5)
-	Assert(fx25_pick_mode(100+5, 224) == -1)
+	dwutil.Assert(fx25_pick_mode(100+5, 223) == 5)
+	dwutil.Assert(fx25_pick_mode(100+5, 224) == -1)
 
-	Assert(fx25_pick_mode(100+9, 191) == 9)
-	Assert(fx25_pick_mode(100+9, 192) == -1)
+	dwutil.Assert(fx25_pick_mode(100+9, 191) == 9)
+	dwutil.Assert(fx25_pick_mode(100+9, 192) == -1)
 
-	Assert(fx25_pick_mode(16, 32) == 4)
-	Assert(fx25_pick_mode(16, 64) == 3)
-	Assert(fx25_pick_mode(16, 128) == 2)
-	Assert(fx25_pick_mode(16, 239) == 1)
-	Assert(fx25_pick_mode(16, 240) == -1)
+	dwutil.Assert(fx25_pick_mode(16, 32) == 4)
+	dwutil.Assert(fx25_pick_mode(16, 64) == 3)
+	dwutil.Assert(fx25_pick_mode(16, 128) == 2)
+	dwutil.Assert(fx25_pick_mode(16, 239) == 1)
+	dwutil.Assert(fx25_pick_mode(16, 240) == -1)
 
-	Assert(fx25_pick_mode(32, 32) == 8)
-	Assert(fx25_pick_mode(32, 64) == 7)
-	Assert(fx25_pick_mode(32, 128) == 6)
-	Assert(fx25_pick_mode(32, 223) == 5)
-	Assert(fx25_pick_mode(32, 234) == -1)
+	dwutil.Assert(fx25_pick_mode(32, 32) == 8)
+	dwutil.Assert(fx25_pick_mode(32, 64) == 7)
+	dwutil.Assert(fx25_pick_mode(32, 128) == 6)
+	dwutil.Assert(fx25_pick_mode(32, 223) == 5)
+	dwutil.Assert(fx25_pick_mode(32, 234) == -1)
 
-	Assert(fx25_pick_mode(64, 64) == 11)
-	Assert(fx25_pick_mode(64, 128) == 10)
-	Assert(fx25_pick_mode(64, 191) == 9)
-	Assert(fx25_pick_mode(64, 192) == -1)
+	dwutil.Assert(fx25_pick_mode(64, 64) == 11)
+	dwutil.Assert(fx25_pick_mode(64, 128) == 10)
+	dwutil.Assert(fx25_pick_mode(64, 191) == 9)
+	dwutil.Assert(fx25_pick_mode(64, 192) == -1)
 
-	Assert(fx25_pick_mode(1, 32) == 4)
-	Assert(fx25_pick_mode(1, 33) == 3)
-	Assert(fx25_pick_mode(1, 64) == 3)
-	Assert(fx25_pick_mode(1, 65) == 6)
-	Assert(fx25_pick_mode(1, 128) == 6)
-	Assert(fx25_pick_mode(1, 191) == 9)
-	Assert(fx25_pick_mode(1, 223) == 5)
-	Assert(fx25_pick_mode(1, 239) == 1)
-	Assert(fx25_pick_mode(1, 240) == -1)
+	dwutil.Assert(fx25_pick_mode(1, 32) == 4)
+	dwutil.Assert(fx25_pick_mode(1, 33) == 3)
+	dwutil.Assert(fx25_pick_mode(1, 64) == 3)
+	dwutil.Assert(fx25_pick_mode(1, 65) == 6)
+	dwutil.Assert(fx25_pick_mode(1, 128) == 6)
+	dwutil.Assert(fx25_pick_mode(1, 191) == 9)
+	dwutil.Assert(fx25_pick_mode(1, 223) == 5)
+	dwutil.Assert(fx25_pick_mode(1, 239) == 1)
+	dwutil.Assert(fx25_pick_mode(1, 240) == -1)
 }
 
 // Get properties of specified CTAG number.
 
 func fx25_get_rs(ctag_num int) *rs_t {
-	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
-	Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < FX25_NTAB)
-	Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
+	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+	dwutil.Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < FX25_NTAB)
+	dwutil.Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
 
 	return fx25Tab[tags[ctag_num].itab].rs
 }
 
 func fx25_get_ctag_value(ctag_num int) uint64 {
-	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 
 	return tags[ctag_num].value
 }
 
 func fx25_get_k_data_radio(ctag_num int) int {
-	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 
 	return tags[ctag_num].k_data_radio
 }
 
 func fx25_get_k_data_rs(ctag_num int) int {
-	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 
 	return tags[ctag_num].k_data_rs
 }
 
 func fx25_get_nroots(ctag_num int) int {
-	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 
 	return int(fx25Tab[tags[ctag_num].itab].nroots)
 }

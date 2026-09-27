@@ -24,6 +24,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -236,7 +237,7 @@ func (u *ttUsers) threeCharSuffixSearch(suffix string) (string, int) {
  *----------------------------------------------------------------*/
 
 func (u *ttUsers) clear(i int) {
-	Assert(i >= 0 && i < MAX_TT_USERS)
+	dwutil.Assert(i >= 0 && i < MAX_TT_USERS)
 
 	u.user[i] = tt_user_s{} //nolint:exhaustruct_v5
 } /* end clear */
@@ -408,7 +409,7 @@ func (u *ttUsers) record(callsign string, ssid int, overlay rune, symbol rune, l
 		 */
 		i = u.findAvail()
 
-		Assert(i >= 0 && i < MAX_TT_USERS)
+		dwutil.Assert(i >= 0 && i < MAX_TT_USERS)
 		u.user[i].callsign = callsign
 		u.user[i].count = 1
 		u.user[i].ssid = ssid
@@ -442,7 +443,7 @@ func (u *ttUsers) record(callsign string, ssid int, overlay rune, symbol rune, l
 		 * Known user.  Update with any new information.
 		 * Keep any old values where not being updated.
 		 */
-		Assert(i >= 0 && i < MAX_TT_USERS)
+		dwutil.Assert(i >= 0 && i < MAX_TT_USERS)
 
 		u.user[i].count++
 
@@ -543,7 +544,7 @@ func (u *ttUsers) dueReports(now time.Time) []string {
 	// dw_printf ("tt_user_background()  now = %d\n", (int)now);
 
 	for i := range MAX_TT_USERS {
-		Assert(i >= 0 && i < MAX_TT_USERS)
+		dwutil.Assert(i >= 0 && i < MAX_TT_USERS)
 
 		if u.user[i].callsign != "" {
 			if u.user[i].xmits < u.ttConfig.num_xmits && !u.user[i].next_xmit.After(now) {
@@ -684,7 +685,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
  *----------------------------------------------------------------*/
 
 func (u *ttUsers) objectReportText(i int, first_time bool) string {
-	Assert(i >= 0 && i < MAX_TT_USERS)
+	dwutil.Assert(i >= 0 && i < MAX_TT_USERS)
 
 	/*
 	 * Prepare the object name.
@@ -895,7 +896,7 @@ func phoneticDigits() [10]string {
  *----------------------------------------------------------------*/
 
 func (u *ttUsers) setenv(i int) {
-	Assert(i >= 0 && i < MAX_TT_USERS)
+	dwutil.Assert(i >= 0 && i < MAX_TT_USERS)
 
 	os.Setenv("TTCALL", u.user[i].callsign)
 

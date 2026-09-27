@@ -69,6 +69,7 @@ import (
 	"os"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -323,9 +324,9 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
  *--------------------------------------------------------------------*/
 
 func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
-	Assert(slice >= 0 && slice < MAX_SLICERS)
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
+	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
 
 	var pa = multiModems[channel].audioConfig
 
@@ -632,7 +633,7 @@ func (m *MultiModem) pickBestCandidate() {
 	if drop_it {
 		m.candidates[j][k].packet_p = nil
 	} else {
-		Assert(m.candidates[j][k].packet_p != nil)
+		dwutil.Assert(m.candidates[j][k].packet_p != nil)
 		recordRadioFrame(channel, m.candidates[j][k].fec_type, m.candidates[j][k].retries)
 		m.sink.RecFrame(channel, j, k,
 			m.candidates[j][k].packet_p,

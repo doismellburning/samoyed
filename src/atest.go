@@ -50,6 +50,7 @@ import (
 	"unicode"
 	"unsafe"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -534,7 +535,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 			// No fix_bits or passall specified.
 			dw_printf("%s audio level = %s     %s\n", heard, alevel_text, spectrum)
 		} else {
-			Assert(retries >= RETRY_NONE && retries <= BitFixPassall) // validate array index.
+			dwutil.Assert(retries >= RETRY_NONE && retries <= BitFixPassall) // validate array index.
 			dw_printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retries.String(), spectrum)
 		}
 	}

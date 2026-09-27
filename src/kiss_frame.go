@@ -65,6 +65,8 @@ import (
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 const KISS_CMD_DATA_FRAME = 0
@@ -503,7 +505,7 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 			len(pmsg))
 	}
 
-	HexDump(pmsg)
+	dwutil.HexDump(pmsg)
 }
 
 // kf_debug_print is kiss_debug_print for a byte collected by KissRecByte:
@@ -517,7 +519,7 @@ func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("From KISS TNC:\n")
-	HexDump(pmsg)
+	dwutil.HexDump(pmsg)
 }
 
 /*-------------------------------------------------------------------
@@ -674,7 +676,7 @@ func KissRecByte(kf *KISSFrame, audioConfig *AudioConfig, ch byte, debug int,
 				dw_printf("Packet content after removing KISS framing and any escapes:\n")
 				/* Don't include the "type" indicator. */
 				/* It contains the radio channel and type should always be 0 here. */
-				HexDump(unwrapped[1:])
+				dwutil.HexDump(unwrapped[1:])
 			}
 
 			if kf.OnMessage != nil {

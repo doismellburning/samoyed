@@ -29,6 +29,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
@@ -473,7 +474,7 @@ func parse_ll_maybe(str string, which parse_ll_which_e, line int) (maybe.Maybe[f
 		return maybe.Nothing[float64](), errors.Join(problems...)
 	}
 
-	var limit = float64(IfThenElse(which == LAT, 90, 180))
+	var limit = float64(dwutil.IfThenElse(which == LAT, 90, 180))
 	if degrees < -limit || degrees > limit {
 		problems = append(problems, fmt.Errorf("line %d: %s \"%s\" is out of range of +- %.0f degrees", line, coordinateName(which), str, limit))
 
@@ -493,7 +494,7 @@ func parse_ll_maybe(str string, which parse_ll_which_e, line int) (maybe.Maybe[f
 
 // coordinateName names a coordinate for an error message.
 func coordinateName(which parse_ll_which_e) string {
-	return IfThenElse(which == LAT, "latitude", "longitude")
+	return dwutil.IfThenElse(which == LAT, "latitude", "longitude")
 }
 
 // parse_ll is parse_ll_maybe for the callers that have nowhere to put the
@@ -1238,7 +1239,7 @@ func config_init(fname string, p_audio_config *AudioConfig,
 
 	p_tt_config.retain_time = 80 * 60
 	p_tt_config.num_xmits = 6
-	Assert(p_tt_config.num_xmits <= TT_MAX_XMITS)
+	dwutil.Assert(p_tt_config.num_xmits <= TT_MAX_XMITS)
 	p_tt_config.xmit_delay[0] = 3 /* Before initial transmission. */
 	p_tt_config.xmit_delay[1] = 16
 	p_tt_config.xmit_delay[2] = 32
@@ -2147,7 +2148,7 @@ func handleMODEM(ps *parseState) error {
 					return fmt.Errorf("line %d: %s option can only be used with 2400 bps PSK", ps.line, t)
 				}
 
-				ps.audio.achan[ps.channel].v26_alternative = IfThenElse((strings.EqualFold(t, "V26A")), V26_A, V26_B)
+				ps.audio.achan[ps.channel].v26_alternative = dwutil.IfThenElse((strings.EqualFold(t, "V26A")), V26_A, V26_B)
 			} else if t[0] == '/' { /* /div */
 				var n, _ = strconv.Atoi(t[1:])
 
@@ -4531,7 +4532,7 @@ func handleTTERR(ps *parseState) error {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("Line %d: TTERR debug %d %s-%d \"%s\"\n", line, msg_num, method, ssid, t);
 
-	Assert(msg_num >= 0 && msg_num < TT_ERROR_MAXP1)
+	dwutil.Assert(msg_num >= 0 && msg_num < TT_ERROR_MAXP1)
 
 	ps.tt.response[msg_num].method = method
 

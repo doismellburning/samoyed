@@ -124,6 +124,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -965,7 +966,7 @@ func (s *AGWServer) debugPrint(fromto fromto_t, client int, pmsg *AGWPEMessage) 
 	dw_printf("\tcall_from = \"%s\", call_to = \"%s\"\n", pmsg.Header.CallFrom, pmsg.Header.CallTo)
 	dw_printf("\tdata_len = %d, user_reserved = %d, data =\n", pmsg.Header.DataLen, pmsg.Header.UserReserved)
 
-	HexDump(pmsg.Data[:pmsg.Header.DataLen])
+	dwutil.HexDump(pmsg.Data[:pmsg.Header.DataLen])
 }
 
 // connectedModeAllowed reports whether AX.25 connected mode is allowed on portx.
@@ -1173,7 +1174,7 @@ func readCommandData(conn net.Conn, cmd *AGWPEMessage) (int, error) {
 }
 
 func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
-	Assert(client >= 0 && client < MAX_NET_CLIENTS)
+	dwutil.Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
 	for ctx.Err() == nil {
 		for s.clientConn(client) == nil {

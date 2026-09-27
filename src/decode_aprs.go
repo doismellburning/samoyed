@@ -28,6 +28,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
@@ -1549,7 +1550,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	var mcomment = info[sizeof_struct_aprs_mic_e_s:]
 
-	Assert(len(mcomment) > 0)
+	dwutil.Assert(len(mcomment) > 0)
 
 	if mcomment[len(mcomment)-1] == '\r' {
 		mcomment = mcomment[:len(mcomment)-1]
@@ -2049,7 +2050,7 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 	*/
 
 	// Chomp info
-	Assert(info[0] == ')')
+	dwutil.Assert(info[0] == ')')
 	info = info[1:] // Drop the DTI ')'
 
 	// Name is variable length, should be 3-9 bytes
@@ -2766,7 +2767,7 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
 // whether the field was there at all: a field of all spaces or all dots is
 // present but says the value is unknown, so it gives Nothing with found=true.
 func getwdata(wpp []byte, id rune, dlen int) (maybe.Maybe[float64], []byte, bool) {
-	Assert(dlen >= 2 && dlen <= 6)
+	dwutil.Assert(dlen >= 2 && dlen <= 6)
 
 	// The field is an id byte and dlen data bytes.  A report that ends
 	// before that does not have this field, rather than having a short one.

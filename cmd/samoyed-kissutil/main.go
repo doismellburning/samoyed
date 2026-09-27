@@ -29,6 +29,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/lestrrat-go/strftime"
 	"github.com/pkg/term"
@@ -380,7 +381,7 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 
 	if verbose {
 		fmt.Printf("Sending to KISS TNC:\n")
-		direwolf.HexDump(kissed)
+		dwutil.HexDump(kissed)
 	}
 
 	if using_tcp {

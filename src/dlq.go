@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -231,7 +232,7 @@ func (q *DataLinkQueue) Init() {
 
 func (q *DataLinkQueue) RecFrame(channel int, subchannel int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	logrus.WithField("channel", channel).Debug("dlq_rec_frame")
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL to include virtual channels.
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL to include virtual channels.
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -303,7 +304,7 @@ func (q *DataLinkQueue) ConnectRequest(addrs [AX25_MAX_ADDRS]string, num_addr in
 		"channel": channel,
 		"client":  client,
 	}).Debug("dlq_connect_request")
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
@@ -349,7 +350,7 @@ func (q *DataLinkQueue) DisconnectRequest(addrs [AX25_MAX_ADDRS]string, num_addr
 		"channel": channel,
 		"client":  client,
 	}).Debug("dlq_disconnect_request")
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
@@ -400,7 +401,7 @@ func (q *DataLinkQueue) OutstandingFramesRequest(addrs [AX25_MAX_ADDRS]string, n
 		"channel": channel,
 		"client":  client,
 	}).Debug("dlq_outstanding_frames_request")
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
@@ -455,7 +456,7 @@ func (q *DataLinkQueue) XmitDataRequest(addrs [AX25_MAX_ADDRS]string, num_addr i
 		"client":  client,
 		"pid":     pid,
 	}).Debug("dlq_xmit_data_request")
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
@@ -508,7 +509,7 @@ func (q *DataLinkQueue) RegisterCallsign(addr string, channel int, client int) {
 		"channel": channel,
 		"client":  client,
 	}).Debug("dlq_register_callsign")
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
@@ -531,7 +532,7 @@ func (q *DataLinkQueue) UnregisterCallsign(addr string, channel int, client int)
 		"channel": channel,
 		"client":  client,
 	}).Debug("dlq_unregister_callsign")
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 

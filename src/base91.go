@@ -1,6 +1,9 @@
 package direwolf
 
-import "github.com/doismellburning/samoyed/internal/maybe"
+import (
+	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/maybe"
+)
 
 /* Range of digits for Base 91 representation. */
 
@@ -14,7 +17,7 @@ func isdigit91(c byte) bool {
 func two_base91_to_i(first, second byte) maybe.Maybe[int] {
 	var result int
 
-	Assert(B91_MAX-B91_MIN == 90)
+	dwutil.Assert(B91_MAX-B91_MIN == 90)
 
 	if isdigit91(first) {
 		result = int(first-B91_MIN) * 91

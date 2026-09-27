@@ -1,6 +1,9 @@
 package direwolf
 
-import "github.com/doismellburning/samoyed/internal/fcs"
+import (
+	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/fcs"
+)
 
 /*-------------------------------------------------------------
  *
@@ -126,10 +129,10 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int) (int, []byte, []by
 	var rs = fx25_get_rs(ctag_num)
 	var nroots = int(rs.nroots)
 
-	Assert(k_data_rs+nroots == int(rs.nn))
+	dwutil.Assert(k_data_rs+nroots == int(rs.nn))
 
 	encode_rs_char(rs, data, check[:nroots])
-	Assert(check[FX25_MAX_CHECK] == fence)
+	dwutil.Assert(check[FX25_MAX_CHECK] == fence)
 
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
@@ -217,8 +220,8 @@ func bitStuff(in []byte, maxBytes int) ([]byte, int) {
 		outBits = append(outBits, v)
 	}
 
-	Assert(len(outBits) >= 16) // Start and end flags
-	Assert(len(outBits) >= 16+8*len(in))
+	dwutil.Assert(len(outBits) >= 16) // Start and end flags
+	dwutil.Assert(len(outBits) >= 16+8*len(in))
 
 	// Remember where meaningful data ends (before flag padding)
 	meaningfulBits := len(outBits)

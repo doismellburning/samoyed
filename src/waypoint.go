@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/pkg/term"
@@ -154,7 +155,7 @@ func (ws *WaypointSender) SetDebug(n int) {
  *--------------------------------------------------------------------*/
 
 func appendChecksum(sentence []byte) []byte {
-	Assert(sentence[0] == '$')
+	dwutil.Assert(sentence[0] == '$')
 
 	var cs = 0
 	for _, p := range sentence[1:] {
