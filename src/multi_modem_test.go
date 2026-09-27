@@ -40,7 +40,7 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 
 	var first = new(recordingReceiveSink)
 	multi_modem_init(audioConfig, first)
-	require.Equal(t, 2, audioConfig.achan[0].num_subchan)
+	require.Equal(t, 2, demodulators[0].NumSubchan())
 
 	var pp = AX25FromText("Q1TEST>Q2TEST:left over", true)
 	require.NotNil(t, pp)

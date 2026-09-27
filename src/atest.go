@@ -549,11 +549,13 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 		text_color_set(DW_COLOR_DEBUG)
 	}
 
-	if s.audio.achan[channel].num_subchan > 1 && s.audio.achan[channel].num_slicers == 1 {
+	var numSubchan, numSlicers = channelLayout(channel)
+
+	if numSubchan > 1 && numSlicers == 1 {
 		dw_printf("[%d.%d] ", channel, subchan)
-	} else if s.audio.achan[channel].num_subchan == 1 && s.audio.achan[channel].num_slicers > 1 {
+	} else if numSubchan == 1 && numSlicers > 1 {
 		dw_printf("[%d.%d] ", channel, slice)
-	} else if s.audio.achan[channel].num_subchan > 1 && s.audio.achan[channel].num_slicers > 1 {
+	} else if numSubchan > 1 && numSlicers > 1 {
 		dw_printf("[%d.%d.%d] ", channel, subchan, slice)
 	} else {
 		dw_printf("[%d] ", channel)

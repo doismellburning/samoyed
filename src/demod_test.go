@@ -187,10 +187,7 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 	assert.Equal(t, MAX_SLICERS, d.NumSlicers())
 	assert.Equal(t, 3, d.decimate, "300 baud at 48000 samples per second decimates")
 
-	var after = audioConfig.achan[channel]
-	after.num_subchan = before.num_subchan
-	after.num_slicers = before.num_slicers
-	assert.Equal(t, before, after)
+	assert.Equal(t, before, audioConfig.achan[channel])
 }
 
 // Only a radio channel gets a Demodulator, and until demod_init has run there
@@ -229,4 +226,31 @@ func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
 	require.NotNil(t, demodulators[0])
 	assert.Equal(t, 0, demodulators[0].channel)
 	assert.Nil(t, demodulators[1])
+}
+
+// A received frame's subchannel and slicer are shown only where the channel's
+// demodulator has more than one; a channel without one, whether not a radio
+// or out of range altogether, has one of each.
+func TestChannelLayout(t *testing.T) {
+	var saved = demodulators
+
+	t.Cleanup(func() {
+		demodulators = saved
+	})
+
+	var audioConfig = newTestAudioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].profiles = "AB+"
+
+	demod_init(audioConfig)
+
+	var numSubchan, numSlicers = channelLayout(0)
+	assert.Equal(t, 2, numSubchan)
+	assert.Equal(t, MAX_SLICERS, numSlicers)
+
+	for _, channel := range []int{1, MAX_RADIO_CHANS, -1} {
+		numSubchan, numSlicers = channelLayout(channel)
+		assert.Equal(t, 1, numSubchan, "channel %d", channel)
+		assert.Equal(t, 1, numSlicers, "channel %d", channel)
+	}
 }

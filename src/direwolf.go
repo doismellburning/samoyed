@@ -919,10 +919,12 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	case -3: // nettnc
 		logEntry = logEntry.WithField("subchan", "nettnc")
 	default:
-		if audio_config.achan[channel].num_subchan > 1 {
+		var numSubchan, numSlicers = channelLayout(channel)
+
+		if numSubchan > 1 {
 			logEntry = logEntry.WithField("subchan", subchan)
 		}
-		if audio_config.achan[channel].num_slicers > 1 {
+		if numSlicers > 1 {
 			logEntry = logEntry.WithField("slice", slice)
 		}
 

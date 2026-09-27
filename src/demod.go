@@ -92,13 +92,7 @@ func demod_init(pa *audio_s) {
 		demodulators[channel] = nil
 
 		if pa.chan_medium[channel] == MEDIUM_RADIO {
-			var d = NewDemodulator(channel, pa.achan[channel], pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
-			demodulators[channel] = d
-
-			// atest and the received frame display still read these from
-			// the configuration.
-			pa.achan[channel].num_subchan = d.NumSubchan()
-			pa.achan[channel].num_slicers = d.NumSlicers()
+			demodulators[channel] = NewDemodulator(channel, pa.achan[channel], pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
 		}
 
 		// FIXME dw_printf ("-------- end of loop for chn %d \n", channel);
@@ -791,6 +785,19 @@ func (d *Demodulator) NumSubchan() int {
 // NumSlicers is how many slicers each of the channel's demodulators has.
 func (d *Demodulator) NumSlicers() int {
 	return d.numSlicers
+}
+
+// channelLayout is how many subchannels, and slicers in each, a channel's
+// demodulator has - which is to say, whether a frame's subchannel and slicer
+// are worth showing.  A channel without a demodulator has one of each.
+func channelLayout(channel int) (int, int) {
+	if channel < 0 || channel >= MAX_RADIO_CHANS || demodulators[channel] == nil {
+		return 1, 1
+	}
+
+	var d = demodulators[channel]
+
+	return d.NumSubchan(), d.NumSlicers()
 }
 
 /*------------------------------------------------------------------
