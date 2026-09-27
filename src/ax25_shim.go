@@ -64,10 +64,6 @@ const (
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
 
-func NoteSafePrintTruncation(length int) {
-	ax25.NoteSafePrintTruncation(length)
-}
-
 func ax25_alevel_to_text(alevel ALevel) string {
 	return alevel.Text()
 }

@@ -106,7 +106,7 @@ func DescribeAX25Frame(frame []byte) int {
 	if pp.IsAPRS() {
 		ax25.SafePrint(info, true) // Display non-ASCII as hexadecimal.
 		fmt.Printf("\n")
-		NoteSafePrintTruncation(len(info))
+		ax25.NoteSafePrintTruncation(len(info))
 
 		var A = DecodeAPRS(pp, false, "") // Extract information into structure.
 
@@ -121,7 +121,7 @@ func DescribeAX25Frame(frame []byte) int {
 		if len(info) > 0 {
 			ax25.SafePrint(info, true)
 			fmt.Printf("\n")
-			NoteSafePrintTruncation(len(info))
+			ax25.NoteSafePrintTruncation(len(info))
 		}
 	}
 
