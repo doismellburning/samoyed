@@ -74,6 +74,10 @@ type TransmitQueue struct {
 	wake [MAX_RADIO_CHANS]chan struct{}
 
 	audioConfig *audio_s
+
+	// netTNCs is where a packet for an NCHANNEL channel goes instead of a
+	// queue.  A channel with no TNC here discards such packets.
+	netTNCs [MAX_TOTAL_CHANS]*NetTNC
 }
 
 // transmitQueue is the queue every producer - KISS, AGW, beacon, digipeater,
@@ -163,6 +167,13 @@ func (tq *TransmitQueue) Init(audio_config_p *audio_s) {
 
 	tq.mu.Unlock()
 } /* end Init */
+
+// SetNetTNCs hands the queue the network TNCs that packets for NCHANNEL
+// channels go to.  Like Init, it must be called before anything is queued: it
+// is read without a lock.
+func (tq *TransmitQueue) SetNetTNCs(netTNCs [MAX_TOTAL_CHANS]*NetTNC) {
+	tq.netTNCs = netTNCs
+}
 
 /*-------------------------------------------------------------------
  *
@@ -269,7 +280,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
 
-			nettnc_send_packet(channel, pp)
+			tq.netTNCs[channel].sendPacket(channel, pp)
 		}
 
 		return

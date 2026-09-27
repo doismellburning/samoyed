@@ -19,9 +19,115 @@ import (
 type NetTNC struct {
 	host  string
 	port  int
-	mu    sync.Mutex // Guards sock, since listenThread and nettnc_send_packet access it from different goroutines.
+	mu    sync.Mutex // Guards sock, since listenThread and sendPacket access it from different goroutines.
 	sock  net.Conn   // Socket handle or file descriptor. nil for invalid.
 	debug int
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        NewNetTNCs
+ *
+ * Purpose:      Attach to Network KISS TNC(s) for NCHANNEL config file item(s).
+ *
+ * Inputs:	ctx             - Stops the listening threads when cancelled.
+ *
+ *		pa              - Address of structure of type audio_s.
+ *
+ *		debug ? TBD
+ *
+ *
+ * Returns:	The TNC attached to each NCHANNEL channel, nil for every
+ *		other channel.  Exits if one cannot be reached; if
+ *		cancelled part way, returns those attached so far.
+ *
+ * Description:	Called once at direwolf application start up time.
+ *		Calls NewNetTNC for each NCHANNEL configuration item.
+ *
+ *--------------------------------------------------------------------*/
+
+func NewNetTNCs(ctx context.Context, pa *audio_s) [MAX_TOTAL_CHANS]*NetTNC {
+	var tncs [MAX_TOTAL_CHANS]*NetTNC
+
+	for i := range MAX_TOTAL_CHANS {
+		if pa.chan_medium[i] == MEDIUM_NETTNC {
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("Channel %d: Network TNC %s %d\n", i, pa.nettnc_addr[i], pa.nettnc_port[i])
+
+			var nt, err = NewNetTNC(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i])
+			if err != nil {
+				// A stop that cut the connection short is not a failure to
+				// connect: go back and let the caller tear down.
+				if ctx.Err() != nil {
+					return tncs
+				}
+
+				os.Exit(1)
+			}
+
+			tncs[i] = nt
+		}
+	}
+
+	return tncs
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        NewNetTNC
+ *
+ * Purpose:      Attach to one Network KISS TNC.
+ *
+ * Inputs:	channel	- channel number from NCHANNEL configuration.
+ *
+ *		host	- Host name or IP address.  Often "localhost".
+ *
+ *		port	- TCP port number.  Typically 8001.
+ *
+ *		init_func - Call this function after establishing communication //
+ *			with the TNC.  We put it here, so that it can be done//
+ *			again automatically if the TNC disappears and we//
+ *			reattach to it.//
+ *			It must return 0 for success.//
+ *			Can be nil if not needed.//
+ *
+ * Returns:	The attached TNC, or the error connecting to it.
+ *
+ * Description:	This starts up a thread, for each socket, which listens to the socket and
+ *		dispatches the messages to the corresponding callback functions.
+ *		It will also attempt to re-establish communication with the
+ *		TNC if it goes away.
+ *
+ *--------------------------------------------------------------------*/
+
+func NewNetTNC(ctx context.Context, channel int, host string, port int) (*NetTNC, error) {
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+
+	var conn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	if connErr != nil {
+		return nil, connErr
+	}
+
+	var nt = new(NetTNC)
+	nt.host = host
+	nt.port = port
+	nt.setSock(conn)
+
+	/*
+	 * Read frames from the network TNC.
+	 * If the TNC disappears, try to reestablish communication.
+	 */
+
+	go nt.listenThread(ctx, channel)
+
+	// TNC initialization if specified.
+
+	//	if (s_tnc_init_func != nil) {
+	//	  e = (*s_tnc_init_func)();
+	//	  return (e);
+	//	}
+
+	return nt, nil
 }
 
 // getSock returns the current connection, or nil if not connected.
@@ -69,108 +175,6 @@ func (nt *NetTNC) closeSockIfCurrent(conn net.Conn) {
 	}
 
 	conn.Close()
-}
-
-var s_net_tncs [MAX_TOTAL_CHANS]*NetTNC //nolint:gochecknoglobals
-
-/*-------------------------------------------------------------------
- *
- * Name:        nettnc_init
- *
- * Purpose:      Attach to Network KISS TNC(s) for NCHANNEL config file item(s).
- *
- * Inputs:	ctx             - Stops the listening threads when cancelled.
- *
- *		pa              - Address of structure of type audio_s.
- *
- *		debug ? TBD
- *
- *
- * Returns:	0 for success, -1 for failure.
- *
- * Description:	Called once at direwolf application start up time.
- *		Calls nettnc_attach for each NCHANNEL configuration item.
- *
- *--------------------------------------------------------------------*/
-
-func nettnc_init(ctx context.Context, pa *audio_s) {
-	for i := range MAX_TOTAL_CHANS {
-		if pa.chan_medium[i] == MEDIUM_NETTNC {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Channel %d: Network TNC %s %d\n", i, pa.nettnc_addr[i], pa.nettnc_port[i])
-
-			var e = nettnc_attach(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i])
-			if e < 0 {
-				// A stop that cut the connection short is not a failure to
-				// connect: go back and let the caller tear down.
-				if ctx.Err() != nil {
-					return
-				}
-
-				os.Exit(1)
-			}
-		}
-	}
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        nettnc_attach
- *
- * Purpose:      Attach to one Network KISS TNC.
- *
- * Inputs:	channel	- channel number from NCHANNEL configuration.
- *
- *		host	- Host name or IP address.  Often "localhost".
- *
- *		port	- TCP port number.  Typically 8001.
- *
- *		init_func - Call this function after establishing communication //
- *			with the TNC.  We put it here, so that it can be done//
- *			again automatically if the TNC disappears and we//
- *			reattach to it.//
- *			It must return 0 for success.//
- *			Can be nil if not needed.//
- *
- * Returns:	0 for success, -1 for failure.
- *
- * Description:	This starts up a thread, for each socket, which listens to the socket and
- *		dispatches the messages to the corresponding callback functions.
- *		It will also attempt to re-establish communication with the
- *		TNC if it goes away.
- *
- *--------------------------------------------------------------------*/
-
-func nettnc_attach(ctx context.Context, channel int, host string, port int) int {
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
-
-	var nt = new(NetTNC)
-	nt.host = host
-	nt.port = port
-	s_net_tncs[channel] = nt
-
-	var conn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
-	if connErr == nil {
-		nt.setSock(conn)
-	} else {
-		return -1
-	}
-
-	/*
-	 * Read frames from the network TNC.
-	 * If the TNC disappears, try to reestablish communication.
-	 */
-
-	go nt.listenThread(ctx, channel)
-
-	// TNC initialization if specified.
-
-	//	if (s_tnc_init_func != nil) {
-	//	  e = (*s_tnc_init_func)();
-	//	  return (e);
-	//	}
-
-	return (0)
 }
 
 /*-------------------------------------------------------------------
@@ -386,11 +390,12 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 
 /*-------------------------------------------------------------------
  *
- * Name:	nettnc_send_packet
+ * Name:	sendPacket
  *
  * Purpose:	Send packet to a KISS network TNC.
  *
- * Inputs:	channel	- Channel number from NCHANNEL configuration.
+ * Inputs:	nt	- Network TNC, or nil if the channel has none.
+ *		channel	- Channel number from NCHANNEL configuration.
  *		pp	- Packet object.
  *		b	- A byte from the input stream.
  *
@@ -402,8 +407,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
  *
  *-----------------------------------------------------------------*/
 
-func nettnc_send_packet(channel int, pp *packet_t) {
-	var nt = s_net_tncs[channel]
+func (nt *NetTNC) sendPacket(channel int, pp *packet_t) {
 	if nt == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Not connected to network TNC for channel %d. Discarding packet.\n", channel)
@@ -438,4 +442,4 @@ func nettnc_send_packet(channel int, pp *packet_t) {
 	}
 
 	// Do not free packet object;  caller will take care of it.
-} /* end nettnc_send_packet */
+} /* end sendPacket */

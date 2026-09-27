@@ -74,19 +74,16 @@ func nextTestNetTNCConn(t *testing.T, conns <-chan net.Conn) net.Conn {
 }
 
 // attachTestNetTNC attaches channel nettncTestChannel to a fake network TNC,
-// and hands back the TNC's end of the connection.
-func attachTestNetTNC(ctx context.Context, t *testing.T) (net.Conn, <-chan net.Conn) {
+// and hands back our end and the TNC's end of the connection.
+func attachTestNetTNC(ctx context.Context, t *testing.T) (*NetTNC, net.Conn, <-chan net.Conn) {
 	t.Helper()
 
 	var port, conns = newTestNetTNC(ctx, t)
 
-	var orig = s_net_tncs[nettncTestChannel]
+	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port)
+	require.NoError(t, err)
 
-	t.Cleanup(func() { s_net_tncs[nettncTestChannel] = orig })
-
-	require.Zero(t, nettnc_attach(ctx, nettncTestChannel, "127.0.0.1", port))
-
-	return nextTestNetTNCConn(t, conns), conns
+	return nt, nextTestNetTNCConn(t, conns), conns
 }
 
 // expectReceivedFrames empties the received queue, so that a test sees only the
@@ -108,14 +105,13 @@ func kissFrameFor(pp *packet_t) []byte {
 // A TNC that is not there cannot be attached to, and says so rather than
 // leaving a channel that looks connected.
 func TestNetTNCAttachRefused(t *testing.T) {
-	var orig = s_net_tncs[nettncTestChannel]
-
-	t.Cleanup(func() { s_net_tncs[nettncTestChannel] = orig })
-
 	// A port nothing is listening on: one taken and given straight back.
 	var port = freeTCPPort(t)
 
-	assert.Equal(t, -1, nettnc_attach(t.Context(), nettncTestChannel, "127.0.0.1", port))
+	var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port)
+
+	require.Error(t, err)
+	assert.Nil(t, nt)
 }
 
 // A frame from the TNC is a frame off the air as far as the rest of the
@@ -124,7 +120,7 @@ func TestNetTNCAttachRefused(t *testing.T) {
 func TestNetTNCReceivedFrameReachesTheQueue(t *testing.T) {
 	expectReceivedFrames(t)
 
-	var tnc, _ = attachTestNetTNC(t.Context(), t)
+	var _, tnc, _ = attachTestNetTNC(t.Context(), t)
 
 	var pp = newTestPacket(t)
 
@@ -150,18 +146,18 @@ func TestNetTNCReceivedFrameReachesTheQueue(t *testing.T) {
 // Transmitting on an NCHANNEL means handing the frame to the TNC as KISS, with
 // the KISS channel set to 0 - the TNC has only the one radio.
 func TestNetTNCSendPacket(t *testing.T) {
-	var tnc, _ = attachTestNetTNC(t.Context(), t)
+	var nt, tnc, _ = attachTestNetTNC(t.Context(), t)
 
 	var pp = newTestPacket(t)
 
-	nettnc_send_packet(nettncTestChannel, pp)
+	nt.sendPacket(nettncTestChannel, pp)
 
 	require.NoError(t, tnc.SetReadDeadline(time.Now().Add(10*time.Second)))
 
 	var want = kissFrameFor(pp)
 	var got = make([]byte, len(want))
 
-	var _, readErr = readFullFrom(tnc, got)
+	var readErr = readFullFrom(tnc, got)
 	require.NoError(t, readErr)
 
 	assert.Equal(t, want, got)
@@ -170,13 +166,9 @@ func TestNetTNCSendPacket(t *testing.T) {
 // A channel with no NCHANNEL configured has nowhere to send, and says so
 // rather than crashing on the nil that stands for "no TNC".
 func TestNetTNCSendPacketNoTNC(t *testing.T) {
-	var orig = s_net_tncs[nettncTestChannel]
+	var nt *NetTNC
 
-	t.Cleanup(func() { s_net_tncs[nettncTestChannel] = orig })
-
-	s_net_tncs[nettncTestChannel] = nil
-
-	var output = testutils.CaptureOutput(t, func() { nettnc_send_packet(nettncTestChannel, newTestPacket(t)) })
+	var output = testutils.CaptureOutput(t, func() { nt.sendPacket(nettncTestChannel, newTestPacket(t)) })
 
 	assert.Contains(t, output, "Not connected to network TNC for channel 3")
 }
@@ -184,15 +176,10 @@ func TestNetTNCSendPacketNoTNC(t *testing.T) {
 // A TNC that has gone away is not connected either, even though we attached to
 // it once.
 func TestNetTNCSendPacketNotConnected(t *testing.T) {
-	var orig = s_net_tncs[nettncTestChannel]
-
-	t.Cleanup(func() { s_net_tncs[nettncTestChannel] = orig })
-
 	var nt = new(NetTNC)
 	nt.host = "127.0.0.1"
-	s_net_tncs[nettncTestChannel] = nt
 
-	var output = testutils.CaptureOutput(t, func() { nettnc_send_packet(nettncTestChannel, newTestPacket(t)) })
+	var output = testutils.CaptureOutput(t, func() { nt.sendPacket(nettncTestChannel, newTestPacket(t)) })
 
 	assert.Contains(t, output, "Not connected to network TNC for channel 3")
 }
@@ -200,21 +187,16 @@ func TestNetTNCSendPacketNotConnected(t *testing.T) {
 // A write that fails means the connection is no use any more, so it is given
 // up and the listening goroutine left to reattach.
 func TestNetTNCSendPacketWriteErrorClosesTheConnection(t *testing.T) {
-	var orig = s_net_tncs[nettncTestChannel]
-
-	t.Cleanup(func() { s_net_tncs[nettncTestChannel] = orig })
-
-	// Straight to a NetTNC rather than through attach, so that there is no
+	// Straight to a NetTNC rather than through NewNetTNC, so that there is no
 	// listening goroutine to reattach behind the assertion below.
 	var here, there = net.Pipe()
 
 	var nt = new(NetTNC)
 	nt.setSock(here)
-	s_net_tncs[nettncTestChannel] = nt
 
 	require.NoError(t, there.Close())
 
-	var output = testutils.CaptureOutput(t, func() { nettnc_send_packet(nettncTestChannel, newTestPacket(t)) })
+	var output = testutils.CaptureOutput(t, func() { nt.sendPacket(nettncTestChannel, newTestPacket(t)) })
 
 	assert.Contains(t, output, "sending packet to KISS Network TNC for channel 3")
 	assert.Nil(t, nt.getSock(), "the connection was not given up after the write failed")
@@ -225,7 +207,7 @@ func TestNetTNCSendPacketWriteErrorClosesTheConnection(t *testing.T) {
 func TestNetTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
 	expectReceivedFrames(t)
 
-	var tnc, conns = attachTestNetTNC(t.Context(), t)
+	var _, tnc, conns = attachTestNetTNC(t.Context(), t)
 
 	require.NoError(t, tnc.Close())
 
@@ -249,7 +231,7 @@ func TestNetTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
 func TestNetTNCStopsWhenCancelled(t *testing.T) {
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	var tnc, _ = attachTestNetTNC(ctx, t)
+	var _, tnc, _ = attachTestNetTNC(ctx, t)
 
 	cancel()
 
@@ -385,10 +367,6 @@ func TestNetTNCDebugPrints(t *testing.T) {
 // NCHANNEL channels are attached to at start up, and the ones that are
 // something else are left alone.
 func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
-	var orig = s_net_tncs
-
-	t.Cleanup(func() { s_net_tncs = orig })
-
 	var port, conns = newTestNetTNC(t.Context(), t)
 
 	var audioConfig = new(audio_s)
@@ -397,24 +375,22 @@ func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 	audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
 	audioConfig.nettnc_port[nettncTestChannel] = port
 
-	var output = testutils.CaptureOutput(t, func() { nettnc_init(t.Context(), audioConfig) })
+	var tncs [MAX_TOTAL_CHANS]*NetTNC
+
+	var output = testutils.CaptureOutput(t, func() { tncs = NewNetTNCs(t.Context(), audioConfig) })
 
 	assert.Contains(t, output, fmt.Sprintf("Channel %d: Network TNC 127.0.0.1 %d", nettncTestChannel, port))
 
 	nextTestNetTNCConn(t, conns)
 
-	assert.NotNil(t, s_net_tncs[nettncTestChannel])
-	assert.Nil(t, s_net_tncs[0], "a radio channel should not have been attached to as a network TNC")
+	assert.NotNil(t, tncs[nettncTestChannel])
+	assert.Nil(t, tncs[0], "a radio channel should not have been attached to as a network TNC")
 }
 
 // A stop that arrives while a network TNC is being connected to cuts the
-// connection short, and nettnc_init goes back to its caller to tear down
+// connection short, and NewNetTNCs goes back to its caller to tear down
 // rather than exiting as though the TNC could not be reached.
 func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
-	var orig = s_net_tncs
-
-	t.Cleanup(func() { s_net_tncs = orig })
-
 	var ctx, cancel = context.WithCancel(t.Context())
 	cancel()
 
@@ -423,11 +399,15 @@ func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
 	audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
 	audioConfig.nettnc_port[nettncTestChannel] = freeTCPPort(t)
 
-	testutils.CaptureOutput(t, func() { nettnc_init(ctx, audioConfig) })
+	var tncs [MAX_TOTAL_CHANS]*NetTNC
+
+	testutils.CaptureOutput(t, func() { tncs = NewNetTNCs(ctx, audioConfig) })
+
+	assert.Nil(t, tncs[nettncTestChannel], "a connection cut short should not have been attached")
 }
 
 // readFullFrom fills buf from conn, which a single Read is not obliged to do.
-func readFullFrom(conn net.Conn, buf []byte) (int, error) {
+func readFullFrom(conn net.Conn, buf []byte) error {
 	var got int
 
 	for got < len(buf) {
@@ -436,9 +416,40 @@ func readFullFrom(conn net.Conn, buf []byte) (int, error) {
 		got += n
 
 		if err != nil {
-			return got, err
+			return err
 		}
 	}
 
-	return got, nil
+	return nil
+}
+
+// A packet queued for an NCHANNEL channel skips the radio queues and goes to
+// the network TNC the transmit queue was handed.
+func TestNetTNCTransmitQueueSendsToItsTNCs(t *testing.T) {
+	var nt, tnc, _ = attachTestNetTNC(t.Context(), t)
+
+	var audioConfig = new(audio_s)
+	audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
+
+	var tq = NewTransmitQueue()
+	tq.Init(audioConfig)
+	var tncs [MAX_TOTAL_CHANS]*NetTNC
+	tncs[nettncTestChannel] = nt
+
+	tq.SetNetTNCs(tncs)
+
+	var pp = newTestPacket(t)
+
+	testutils.CaptureOutput(t, func() { tq.Append(nettncTestChannel, TQ_PRIO_1_LO, pp) })
+
+	require.NoError(t, tnc.SetReadDeadline(time.Now().Add(10*time.Second)))
+
+	var want = kissFrameFor(pp)
+	var got = make([]byte, len(want))
+
+	var readErr = readFullFrom(tnc, got)
+	require.NoError(t, readErr)
+
+	assert.Equal(t, want, got)
+	assert.Nil(t, tq.Peek(nettncTestChannel, TQ_PRIO_1_LO), "the packet should not have been queued for a radio")
 }

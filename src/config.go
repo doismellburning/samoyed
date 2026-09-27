@@ -1878,7 +1878,7 @@ func handleNCHANNEL(ps *parseState) error {
 		return fmt.Errorf("line %d: Invalid TCP port number \"%s\" for NCHANNEL command. Must be in range %d to %d", ps.line, t, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
 	}
 
-	// Claim the channel only once the whole line has parsed: nettnc_init
+	// Claim the channel only once the whole line has parsed: NewNetTNCs
 	// attaches to every MEDIUM_NETTNC channel and exits if it cannot, so a
 	// half-read line would otherwise take the program down at startup.
 	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
