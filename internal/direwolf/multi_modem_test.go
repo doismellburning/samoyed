@@ -26,10 +26,7 @@ func (s *recordingReceiveSink) DCDChange(int, int) {}
 // decoding its next file - belongs to what came before, and must not turn up
 // in what comes after.
 func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
-	var origAudioConfig = save_audio_config_p
-
 	t.Cleanup(func() {
-		save_audio_config_p = origAudioConfig
 		multiModems = newMultiModems()
 	})
 
@@ -67,10 +64,7 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 // the demodulators ran three, which fails silently, and only on a
 // multi-decoder configuration.
 func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
-	var origAudioConfig = save_audio_config_p
-
 	t.Cleanup(func() {
-		save_audio_config_p = origAudioConfig
 		multiModems = newMultiModems()
 	})
 
@@ -87,17 +81,12 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 }
 
 // atest hands multi_modem_init a configuration of its own, carrying its
-// --il2p-version option, and never sets save_audio_config_p, so the IL2P
-// receivers have to take their settings from what they are given.
+// --il2p-version option, so the IL2P receivers have to take their settings
+// from what they are given.
 func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
-	var origAudioConfig = save_audio_config_p
-
 	t.Cleanup(func() {
-		save_audio_config_p = origAudioConfig
 		multiModems = newMultiModems()
 	})
-
-	save_audio_config_p = nil
 
 	var audioConfig = newRecvTestAudioConfig(1)
 	audioConfig.achan[0].il2p_version = IL2P_VERSION_0_4

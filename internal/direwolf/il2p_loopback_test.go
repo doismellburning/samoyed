@@ -55,20 +55,17 @@ func (r *il2pLoopbackRecorder) flush() {
 // for the audio hardware at one end and the data link queue at the other.
 //
 // The receiver speaks the given version and expects a trailing CRC.  The
-// transmitter adds one because it finds no configuration in
-// save_audio_config_p, which is cleared for the duration.
+// transmitter adds one because its configuration asks for it.
 func il2pLoopback(t *testing.T, version il2p_version_t) *il2pLoopbackRecorder {
 	t.Helper()
 
 	var recorder = new(il2pLoopbackRecorder)
 
-	var savedTone, savedRec, savedConfig = toneGenCapture, multiModemRecCapture, save_audio_config_p
+	var savedTone, savedRec = toneGenCapture, multiModemRecCapture
 
 	t.Cleanup(func() {
-		toneGenCapture, multiModemRecCapture, save_audio_config_p = savedTone, savedRec, savedConfig
+		toneGenCapture, multiModemRecCapture = savedTone, savedRec
 	})
-
-	save_audio_config_p = nil
 
 	// A receiver of its own, so this test neither inherits nor bequeaths a
 	// half-gathered frame.  A decoder left part way through gathering a payload

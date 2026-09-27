@@ -10,16 +10,14 @@ import (
 )
 
 // Morse goes through the channel's tone generator and its own audio config,
-// so it needs nothing from the shared save_audio_config_p (issue #761).
+// so it needs nothing another test left behind (issue #761).
 func TestMorseSendWithoutSharedAudioConfig(t *testing.T) {
 	const channel = 0
 	const sampleRate = 8000
 
-	var origAudio, origGenerators = save_audio_config_p, toneGenerators
+	var origGenerators = toneGenerators
 
-	t.Cleanup(func() { save_audio_config_p, toneGenerators = origAudio, origGenerators })
-
-	save_audio_config_p = nil
+	t.Cleanup(func() { toneGenerators = origGenerators })
 
 	var audioConfig = new(AudioConfig)
 	audioConfig.adev[0].num_channels = 1

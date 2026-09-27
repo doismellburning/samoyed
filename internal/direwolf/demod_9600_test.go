@@ -116,12 +116,10 @@ func generate9600(t *testing.T, audioConfig *AudioConfig, channel int, frames []
 func demodulate9600(t *testing.T, audioConfig *AudioConfig, channel int, samples []int) []*ax25.Packet {
 	t.Helper()
 
-	var origAudioConfig = save_audio_config_p
 	var origReceiver = hdlcReceiver
 	var origDemodulators = demodulators
 
 	t.Cleanup(func() {
-		save_audio_config_p = origAudioConfig
 		hdlcReceiver = origReceiver
 		demodulators = origDemodulators
 		multiModems = newMultiModems()

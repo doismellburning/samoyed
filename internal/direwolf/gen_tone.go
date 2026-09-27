@@ -444,7 +444,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 				  // values 0 .. 7.
 				  xmit_prev_octant[channel] = xmit_octant[channel];
 				  xmit_octant[channel] += symbol * 2;
-				  if (save_audio_config_p.achan[channel].v26_alternative == V26_B) {
+				  if (tg.audioConfig.achan[channel].v26_alternative == V26_B) {
 				    xmit_octant[channel] += 1;
 				  }
 				  xmit_octant[channel] &= 0x7;
