@@ -519,6 +519,50 @@ func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
 	assert.Equal(t, -1, AudioOpen(t.Context(), pa))
 }
 
+// AudioClose must not return while the UDP silence keepalive it started is
+// still running: that goroutine reads the adev table and xmitSvc without a
+// lock, so anything that touches them afterwards - a fresh AudioOpen, or a
+// test putting its globals back - would race with it.
+func Test_audioClose_waitsForUDPSilenceKeepalive(t *testing.T) {
+	var listener, err = new(net.ListenConfig).ListenPacket(t.Context(), "udp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	defer listener.Close()
+
+	var prevAdev = adev
+	var prevConfig = save_audio_config_p
+	var prevXmitSvc = xmitSvc
+
+	t.Cleanup(func() {
+		AudioClose()
+
+		adev = prevAdev
+		save_audio_config_p = prevConfig
+		xmitSvc = prevXmitSvc
+	})
+
+	// With no transmit service the keepalive reads xmitSvc on every tick and
+	// takes no lock at all, so nothing orders those reads before our writes
+	// below except AudioClose waiting for it.
+	xmitSvc = nil
+
+	var pa = makeAudioConfig("stdin", "udp:"+listener.LocalAddr().String())
+	pa.adev[0].adevice_out_specified = true
+
+	require.Equal(t, 0, AudioOpen(context.Background(), pa))
+	require.NotNil(t, adev[0].udp_out_sock)
+
+	// Let the keepalive tick a few times.
+	time.Sleep(5 * silenceKeepaliveInterval)
+
+	AudioClose()
+
+	// What a caller is entitled to do once AudioClose has returned; the race
+	// detector reports these writes if the keepalive can still be reading.
+	xmitSvc = nil
+	adev[0] = nil
+}
+
 // --- applyCommandLineAudioSource ---
 
 func Test_applyCommandLineAudioSource(t *testing.T) {
