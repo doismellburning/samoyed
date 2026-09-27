@@ -103,7 +103,8 @@ const PROCESS_AFTER_BITS = 3
 type MultiModem struct {
 	channel     int
 	audioConfig *audio_s
-	sink        ReceiveSink // Where the frames it picks go.
+	demodulator *Demodulator // nil for a channel that is not a radio.
+	sink        ReceiveSink  // Where the frames it picks go.
 
 	candidates [MAX_SUBCHANS][MAX_SLICERS]candidate_t
 
@@ -174,10 +175,11 @@ func (s *radioSink) DCDChange(channel int, state int) {
 
 func multi_modem_init(pa *audio_s, sink ReceiveSink) {
 	demod_init(pa)
-	hdlcReceiver = NewHDLCReceiver(pa, sink)
+	hdlcReceiver = NewHDLCReceiver(pa, demodulators, sink)
 
 	for channel, m := range multiModems {
 		m.audioConfig = pa
+		m.demodulator = demodulators[channel]
 		m.sink = sink
 
 		// Anything still waiting to be picked came from before, e.g. the
@@ -252,7 +254,6 @@ func multi_modem_process_sample(channel int, audio_sample int) {
 // enough for the others to catch up.
 func (m *MultiModem) ProcessSample(audio_sample int) {
 	var channel = m.channel
-	var pa = m.audioConfig
 
 	// Accumulate an average DC bias level.
 	// Shouldn't happen with a soundcard but could with mistuned SDR.
@@ -260,16 +261,15 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
 
 	// Issue 128.  Someone ran into this.
 
-	//assert (save_audio_config_p.achan[channel].num_subchan > 0 && save_audio_config_p.achan[channel].num_subchan <= MAX_SUBCHANS);
-	//assert (save_audio_config_p.achan[channel].num_slicers > 0 && save_audio_config_p.achan[channel].num_slicers <= MAX_SLICERS);
+	var numSubchan, numSlicers = m.layout()
 
-	if pa.achan[channel].num_subchan <= 0 || pa.achan[channel].num_subchan > MAX_SUBCHANS ||
-		pa.achan[channel].num_slicers <= 0 || pa.achan[channel].num_slicers > MAX_SLICERS {
+	if numSubchan <= 0 || numSubchan > MAX_SUBCHANS ||
+		numSlicers <= 0 || numSlicers > MAX_SLICERS {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR!  Something is seriously wrong in multi_modem_process_sample\n")
 		dw_printf("channel = %d, num_subchan = %d [max %d], num_slicers = %d [max %d]\n", channel,
-			pa.achan[channel].num_subchan, MAX_SUBCHANS,
-			pa.achan[channel].num_slicers, MAX_SLICERS)
+			numSubchan, MAX_SUBCHANS,
+			numSlicers, MAX_SLICERS)
 		dw_printf("Please report this message and include a copy of your configuration file.\n")
 		os.Exit(1)
 	}
@@ -278,12 +278,12 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
 	/* 1.2: We can feed one demodulator but end up with multiple outputs. */
 
 	/* Send same thing to all. */
-	for d := range pa.achan[channel].num_subchan {
-		demod_process_sample(channel, d, audio_sample)
+	for d := range numSubchan {
+		m.demodulator.ProcessSample(d, audio_sample)
 	}
 
-	for subchan := range pa.achan[channel].num_subchan {
-		for slice := range pa.achan[channel].num_slicers {
+	for subchan := range numSubchan {
+		for slice := range numSlicers {
 			var c = &m.candidates[subchan][slice]
 			if c.packet_p != nil {
 				c.age++
@@ -390,8 +390,10 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *packet_t, alev
 	 * If only one demodulator/slicer, and no FX.25 in progress,
 	 * push it thru and forget about all this foolishness.
 	 */
-	if pa.achan[channel].num_subchan == 1 &&
-		pa.achan[channel].num_slicers == 1 &&
+	var numSubchan, numSlicers = m.layout()
+
+	if numSubchan == 1 &&
+		numSlicers == 1 &&
 		!hdlcReceiver.fx25Busy(channel) {
 		var drop_it = false
 
@@ -453,22 +455,30 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *packet_t, alev
 
 // #define subchan_from_n(x) ((x) % save_audio_config_p.achan[channel].num_subchan)
 func (m *MultiModem) subchanFromN(x int) int {
-	return x % m.audioConfig.achan[m.channel].num_subchan
+	return x % m.demodulator.NumSubchan()
 }
 
 // #define slice_from_n(x)   ((x) / save_audio_config_p.achan[channel].num_subchan)
 func (m *MultiModem) sliceFromN(x int) int {
-	return x / m.audioConfig.achan[m.channel].num_subchan
+	return x / m.demodulator.NumSubchan()
+}
+
+// layout is how many subchannels, and slicers in each, the channel's
+// demodulator has: none for a channel without one.
+func (m *MultiModem) layout() (int, int) {
+	if m.demodulator == nil {
+		return 0, 0
+	}
+
+	return m.demodulator.NumSubchan(), m.demodulator.NumSlicers()
 }
 
 func (m *MultiModem) pickBestCandidate() {
 	var channel = m.channel
 	var pa = m.audioConfig
 
-	if pa.achan[channel].num_slicers < 1 {
-		pa.achan[channel].num_slicers = 1
-	}
-	var num_bars = pa.achan[channel].num_slicers * pa.achan[channel].num_subchan
+	var numSubchan, numSlicers = m.layout()
+	var num_bars = max(numSlicers, 1) * numSubchan
 
 	var spectrum [MAX_SUBCHANS*MAX_SLICERS + 1]byte
 

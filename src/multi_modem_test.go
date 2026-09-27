@@ -40,7 +40,7 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 
 	var first = new(recordingReceiveSink)
 	multi_modem_init(audioConfig, first)
-	require.Equal(t, 2, audioConfig.achan[0].num_subchan)
+	require.Equal(t, 2, demodulators[0].NumSubchan())
 
 	var pp = AX25FromText("Q1TEST>Q2TEST:left over", true)
 	require.NotNil(t, pp)
@@ -58,4 +58,29 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 
 	assert.Empty(t, first.frames)
 	assert.Empty(t, second.frames)
+}
+
+// The HDLC receiver needs decoders for as many subchannels as the
+// demodulators run.  Were it sized from anything but the Demodulator - a copy
+// of the configuration, say - it could have decoders for one subchannel while
+// the demodulators ran three, which fails silently, and only on a
+// multi-decoder configuration.
+func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
+	var origAudioConfig = save_audio_config_p
+
+	t.Cleanup(func() {
+		save_audio_config_p = origAudioConfig
+		multiModems = newMultiModems()
+	})
+
+	var audioConfig = newRecvTestAudioConfig(1)
+	audioConfig.achan[0].profiles = "ABA"
+	audioConfig.achan[0].num_freq = 1
+
+	multi_modem_init(audioConfig, new(recordingReceiveSink))
+
+	require.NotNil(t, demodulators[0])
+	assert.Equal(t, 3, demodulators[0].NumSubchan())
+	assert.Same(t, demodulators[0], multiModems[0].demodulator)
+	assert.Equal(t, 3, hdlcReceiver.numSubchannel[0])
 }

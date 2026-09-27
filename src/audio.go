@@ -298,12 +298,7 @@ type achan_param_s struct {
 
 	offset int /* Spacing between filter frequencies. */
 
-	num_slicers int /* Number of different threshold points to decide */
-	/* between mark or space. */
-
-	/* This is derived from above by demod_init. */
-
-	num_subchan int /* Total number of modems for each channel. */
+	/* How many demodulators and slicers these come to is the Demodulator's. */
 
 	/* These are for dealing with imperfect frames. */
 
@@ -1317,10 +1312,6 @@ func audio_open(ctx context.Context, pa *audio_s) int {
 
 			if pa.achan[channel].baud == 0 {
 				pa.achan[channel].baud = DEFAULT_BAUD
-			}
-
-			if pa.achan[channel].num_subchan == 0 {
-				pa.achan[channel].num_subchan = 1
 			}
 		}
 	}

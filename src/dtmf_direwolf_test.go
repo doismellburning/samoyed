@@ -19,7 +19,7 @@ func Test_dtmf(t *testing.T) {
 
 	t.Cleanup(func() { hdlcReceiver = origReceiver })
 
-	hdlcReceiver = NewHDLCReceiver(&my_audio_config, new(discardReceiveSink))
+	hdlcReceiver = NewHDLCReceiver(&my_audio_config, [MAX_RADIO_CHANS]*Demodulator{}, new(discardReceiveSink))
 
 	var decoder = NewDTMFDecoder(c, sampleRate)
 

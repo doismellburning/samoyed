@@ -20,55 +20,36 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Properties of the radio channels.
-
-// static struct audio_s          *save_audio_config_p;
-
 // A Demodulator is one radio channel's receive side: the state of each of its
 // subchannels' demodulators, and whether its input is muted while it transmits.
+//
+// NewDemodulator works out its layout - how many subchannels and slicers, and
+// at what sample rate - from a copy of the channel's settings, and keeps it,
+// rather than writing it back into the configuration.
 //
 // It is driven by its audio device's goroutine; the mute is the exception, set
 // by PTT.Set on the transmit thread, hence atomic.
 type Demodulator struct {
-	channel int
-	states  [MAX_SUBCHANS]demodulator_state_s // One per subchannel.
-	muted   atomic.Bool
+	channel   int
+	modemType modem_t
+
+	profiles   string // Normalised: one letter per demodulator, then any "+".
+	numSubchan int    // How many demodulators.
+	numSlicers int    // How many slicers each demodulator has.
+	decimate   int    // AFSK: how many samples are averaged into one.
+	upsample   int    // G3RUH and AIS: how many samples each is made into.
+
+	states [MAX_SUBCHANS]demodulator_state_s // One per subchannel.
+	muted  atomic.Bool
 }
 
-// demodulators holds every channel's Demodulator, built at package
-// initialisation so the receive paths that ask for audio levels never find
-// one nil.
-var demodulators = newDemodulators()
-
-func newDemodulators() [MAX_RADIO_CHANS]*Demodulator {
-	var d [MAX_RADIO_CHANS]*Demodulator
-
-	for channel := range d {
-		d[channel] = new(Demodulator)
-		d[channel].channel = channel
-	}
-
-	return d
-}
+// demodulators holds every radio channel's Demodulator.  demod_init builds
+// them, so until then, and for a channel that is not a radio, it is nil.
+var demodulators [MAX_RADIO_CHANS]*Demodulator
 
 // audioLevelDecimation is how many audio samples pass between pushes of the
 // received audio level to the metrics endpoint: ~10Hz at a 44.1kHz sample rate.
 const audioLevelDecimation = 4410
-
-/*
- * PSK is always demodulated at the full sample rate; the decimating path was
- * never implemented for it.  Complain, rather than silently ignoring, when the
- * configuration asked for decimation.
- */
-
-func demod_psk_force_no_decimation(channel int) {
-	if save_audio_config_p.achan[channel].decimate > 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Channel %d: Decimation is not supported for PSK - ignoring.\n", channel)
-	}
-
-	save_audio_config_p.achan[channel].decimate = 1
-}
 
 /*------------------------------------------------------------------
  *
@@ -107,720 +88,12 @@ func capProfiles(channel int, profiles string) string {
 }
 
 func demod_init(pa *audio_s) {
-	/*
-	 * Save audio configuration for later use.
-	 */
-	save_audio_config_p = pa
-
 	for channel := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-			/*
-			 * These are derived from config file parameters.
-			 *
-			 * num_subchan is number of demodulators.
-			 * This can be increased by:
-			 *	Multiple frequencies.
-			 *	Multiple letters (not sure if I will continue this).
-			 *
-			 * num_slicers is set to max by the "+" option.
-			 */
-			save_audio_config_p.achan[channel].num_subchan = 1
-			save_audio_config_p.achan[channel].num_slicers = 1
-
-			switch save_audio_config_p.achan[channel].modem_type {
-			case MODEM_OFF:
-
-			case MODEM_AFSK, MODEM_EAS:
-				if save_audio_config_p.achan[channel].modem_type == MODEM_EAS {
-					if save_audio_config_p.achan[channel].fix_bits != RETRY_NONE {
-						text_color_set(DW_COLOR_INFO)
-						dw_printf("Channel %d: FIX_BITS option has been turned off for EAS.\n", channel)
-						save_audio_config_p.achan[channel].fix_bits = RETRY_NONE
-					}
-
-					if save_audio_config_p.achan[channel].passall {
-						text_color_set(DW_COLOR_INFO)
-						dw_printf("Channel %d: PASSALL option has been turned off for EAS.\n", channel)
-						save_audio_config_p.achan[channel].passall = false
-					}
-				}
-
-				/*
-				 * Tear apart the profile and put it back together in a normalized form:
-				 *	- At least one letter, supply suitable default if necessary.
-				 *	- Upper case only.
-				 *	- Any plus will be at the end.
-				 */
-				var num_letters = 0
-				var justLettersBuilder strings.Builder
-				var have_plus = 0
-
-				var profileStr = save_audio_config_p.achan[channel].profiles
-				for i, p := range profileStr {
-					if unicode.IsLower(p) {
-						justLettersBuilder.WriteRune(unicode.ToUpper(p))
-						num_letters++
-					} else if unicode.IsUpper(p) {
-						justLettersBuilder.WriteRune(p)
-						num_letters++
-					} else if p == '+' {
-						have_plus = 1
-
-						if i+1 != len(profileStr) {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Channel %d: + option must appear at end of demodulator types \"%s\" \n",
-								channel, save_audio_config_p.achan[channel].profiles)
-						}
-					} else if p == '-' {
-						have_plus = -1
-
-						if i+1 != len(profileStr) {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Channel %d: - option must appear at end of demodulator types \"%s\" \n",
-								channel, save_audio_config_p.achan[channel].profiles)
-						}
-					} else {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Channel %d: Demodulator types \"%s\" can contain only letters and + - characters.\n",
-							channel, save_audio_config_p.achan[channel].profiles)
-					}
-				}
-
-				var just_letters = justLettersBuilder.String()
-
-				Assert(num_letters == len(just_letters))
-
-				/*
-				 * Pick a good default demodulator if none specified.
-				 * Previously, we had "D" optimized for 300 bps.
-				 * Gone in 1.7 so it is always "A+".
-				 */
-				if num_letters == 0 {
-					just_letters = "A"
-
-					if have_plus != -1 {
-						have_plus = 1 // Add as default for version 1.2
-						// If not explicitly turned off.
-					}
-				}
-
-				// The default above and the cap below both change just_letters,
-				// so take the count from it once they are both done rather than
-				// keeping the two in step by hand.
-				just_letters = capProfiles(channel, just_letters)
-				num_letters = len(just_letters)
-
-				/*
-				 * Special case for ARM.
-				 * The higher end ARM chips have loads of power but many people
-				 * are using a single core Pi Zero or similar.
-				 * (I'm still using a model 1 for my digipeater/IGate!)
-				 * Decreasing CPU requirement has a negligible impact on decoding performance.
-				 *
-				 * 	atest -PA- 01_Track_1.wav		--> 1002 packets decoded.
-				 * 	atest -PA- -D3 01_Track_1.wav		--> 997 packets decoded.
-				 *
-				 * Someone concerned about 1/2 of one percent difference can add "-D 1"
-				 */
-				/* TODO KG
-				#if __arm__
-					      if (save_audio_config_p.achan[channel].decimate == 0) {
-					        if (save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec > 40000) {
-					          save_audio_config_p.achan[channel].decimate = 3;
-					        }
-					      }
-				#endif
-				*/
-
-				/*
-				 * Number of filter taps is proportional to number of audio samples in a "symbol" duration.
-				 * These can get extremely large for low speeds, e.g. 300 baud.
-				 * In this case, increase the decimation ration.  Crude approximation. Could be improved.
-				 */
-				if save_audio_config_p.achan[channel].decimate == 0 &&
-					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec > 40000 &&
-					save_audio_config_p.achan[channel].baud < 600 {
-					// Avoid enormous number of filter taps.
-					save_audio_config_p.achan[channel].decimate = 3
-				}
-
-				/*
-				 * Put it back together again.
-				 */
-				Assert(num_letters == len(just_letters))
-
-				/* At this point, have_plus can have 3 values: */
-				/* 	1 = turned on, either explicitly or by applied default */
-				/*	-1 = explicitly turned off.  change to 0 here so it is false. */
-				/* 	0 = off by default. */
-
-				if have_plus == -1 {
-					have_plus = 0
-				}
-
-				save_audio_config_p.achan[channel].profiles = just_letters
-
-				Assert(len(save_audio_config_p.achan[channel].profiles) >= 1)
-
-				if have_plus != 0 {
-					save_audio_config_p.achan[channel].profiles += "+"
-				}
-
-				/* These can be increased later for the multi-frequency case. */
-
-				save_audio_config_p.achan[channel].num_subchan = num_letters
-				save_audio_config_p.achan[channel].num_slicers = 1
-
-				/*
-				 * Some error checking - Can use only one of these:
-				 *
-				 *	- Multiple letters.
-				 *	- New + multi-slicer.
-				 *	- Multiple frequencies.
-				 */
-
-				if have_plus != 0 && save_audio_config_p.achan[channel].num_freq > 1 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Channel %d: Demodulator + option can't be combined with multiple frequencies.\n", channel)
-					save_audio_config_p.achan[channel].num_subchan = 1 // Will be set higher later.
-					save_audio_config_p.achan[channel].num_freq = 1
-				}
-
-				if num_letters > 1 && save_audio_config_p.achan[channel].num_freq > 1 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Channel %d: Multiple demodulator types can't be combined with multiple frequencies.\n", channel)
-
-					save_audio_config_p.achan[channel].profiles = string(save_audio_config_p.achan[channel].profiles[0])
-					num_letters = 1
-				}
-
-				if save_audio_config_p.achan[channel].decimate == 0 {
-					save_audio_config_p.achan[channel].decimate = 1
-					if strings.Contains(just_letters, "B") && save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec > 40000 {
-						save_audio_config_p.achan[channel].decimate = 3
-					}
-				}
-
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Channel %d: %d baud, AFSK %d & %d Hz, %s, %d sample rate",
-					channel, save_audio_config_p.achan[channel].baud,
-					save_audio_config_p.achan[channel].mark_freq, save_audio_config_p.achan[channel].space_freq,
-					save_audio_config_p.achan[channel].profiles,
-					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
-
-				if save_audio_config_p.achan[channel].decimate != 1 {
-					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
-				}
-
-				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
-
-				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
-					dw_printf(", DTMF decoder enabled")
-				}
-
-				dw_printf(".\n")
-
-				/*
-				 * Initialize the demodulator(s).
-				 *
-				 * We have 3 cases to consider.
-				 */
-
-				// TODO1.3: revisit this logic now that it is less restrictive.
-
-				if num_letters > 1 {
-					/*
-					 * Multiple letters, usually for 1200 baud.
-					 * Each one corresponds to a demodulator and subchannel.
-					 *
-					 * An interesting experiment but probably not too useful.
-					 * Can't have multiple frequency pairs.
-					 * In version 1.3 this can be combined with the + option.
-					 */
-					save_audio_config_p.achan[channel].num_subchan = num_letters
-
-					if save_audio_config_p.achan[channel].num_subchan != num_letters {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, num_subchan(%d) != strlen(\"%s\")\n",
-							channel, save_audio_config_p.achan[channel].num_subchan, save_audio_config_p.achan[channel].profiles)
-					}
-
-					if save_audio_config_p.achan[channel].num_freq != 1 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1\n",
-							channel, save_audio_config_p.achan[channel].num_freq)
-					}
-
-					for d := range save_audio_config_p.achan[channel].num_subchan {
-						Assert(d >= 0 && d < MAX_SUBCHANS)
-
-						var D = &demodulators[channel].states[d]
-
-						var profile = save_audio_config_p.achan[channel].profiles[d]
-						var mark = save_audio_config_p.achan[channel].mark_freq
-						var space = save_audio_config_p.achan[channel].space_freq
-
-						if save_audio_config_p.achan[channel].num_subchan != 1 {
-							text_color_set(DW_COLOR_DEBUG)
-							dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
-						}
-
-						demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
-							save_audio_config_p.achan[channel].baud,
-							mark,
-							space,
-							rune(profile),
-							D)
-
-						if have_plus != 0 {
-							/* I'm not happy about putting this hack here. */
-							/* should pass in as a parameter rather than adding on later. */
-							save_audio_config_p.achan[channel].num_slicers = MAX_SLICERS
-							D.num_slicers = MAX_SLICERS
-						}
-
-						/* For signal level reporting, we want a longer term view. */
-						// TODO: Should probably move this into the init functions.
-
-						D.quick_attack = D.agc_fast_attack * 0.2
-						D.sluggish_decay = D.agc_slow_decay * 0.2
-					}
-				} else if have_plus != 0 {
-					/*
-					 * PLUS - which (formerly) implies we have only one letter and one frequency pair.
-					 *
-					 * One demodulator feeds multiple slicers, each a subchannel.
-					 */
-					if num_letters != 1 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1\n",
-							channel, just_letters)
-					}
-
-					if save_audio_config_p.achan[channel].num_freq != 1 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1\n",
-							channel, save_audio_config_p.achan[channel].num_freq)
-					}
-
-					if save_audio_config_p.achan[channel].num_freq != save_audio_config_p.achan[channel].num_subchan {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != num_subchan(%d)\n",
-							channel, save_audio_config_p.achan[channel].num_freq, save_audio_config_p.achan[channel].num_subchan)
-					}
-
-					var D = &demodulators[channel].states[0]
-
-					/* I'm not happy about putting this hack here. */
-					/* This belongs in demod_afsk_init but it doesn't have access to the audio config. */
-
-					save_audio_config_p.achan[channel].num_slicers = MAX_SLICERS
-
-					demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
-						save_audio_config_p.achan[channel].baud,
-						save_audio_config_p.achan[channel].mark_freq,
-						save_audio_config_p.achan[channel].space_freq,
-						rune(save_audio_config_p.achan[channel].profiles[0]),
-						D)
-
-					if have_plus != 0 {
-						/* I'm not happy about putting this hack here. */
-						/* should pass in as a parameter rather than adding on later. */
-						save_audio_config_p.achan[channel].num_slicers = MAX_SLICERS
-						D.num_slicers = MAX_SLICERS
-					}
-
-					/* For signal level reporting, we want a longer term view. */
-
-					D.quick_attack = D.agc_fast_attack * 0.2
-					D.sluggish_decay = D.agc_slow_decay * 0.2
-				} else {
-					/*
-					 * One letter.
-					 * Can be combined with multiple frequencies.
-					 */
-					if num_letters != 1 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1\n",
-							channel, save_audio_config_p.achan[channel].profiles)
-					}
-
-					save_audio_config_p.achan[channel].num_subchan = save_audio_config_p.achan[channel].num_freq
-
-					for d := range save_audio_config_p.achan[channel].num_freq {
-						Assert(d >= 0 && d < MAX_SUBCHANS)
-
-						var D = &demodulators[channel].states[d]
-
-						var profile = save_audio_config_p.achan[channel].profiles[0]
-
-						var k = d*save_audio_config_p.achan[channel].offset - ((save_audio_config_p.achan[channel].num_freq-1)*save_audio_config_p.achan[channel].offset)/2
-						var mark = save_audio_config_p.achan[channel].mark_freq + k
-						var space = save_audio_config_p.achan[channel].space_freq + k
-
-						if save_audio_config_p.achan[channel].num_freq != 1 {
-							text_color_set(DW_COLOR_DEBUG)
-							dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
-						}
-
-						demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
-							save_audio_config_p.achan[channel].baud,
-							mark, space,
-							rune(profile),
-							D)
-
-						if have_plus != 0 {
-							/* I'm not happy about putting this hack here. */
-							/* should pass in as a parameter rather than adding on later. */
-							save_audio_config_p.achan[channel].num_slicers = MAX_SLICERS
-							D.num_slicers = MAX_SLICERS
-						}
-
-						/* For signal level reporting, we want a longer term view. */
-
-						D.quick_attack = D.agc_fast_attack * 0.2
-						D.sluggish_decay = D.agc_slow_decay * 0.2
-					} /* for each freq pair */
-				}
-
-			case MODEM_QPSK: // New for 1.4
-				// In versions 1.4 and 1.5, V.26 "Alternative A" was used.
-				// years later, I discover that the MFJ-2400 used "Alternative B."
-				// It looks like the other two manufacturers use the same but we
-				// can't be sure until we find one for compatibility testing.
-				// In version 1.6 we add a choice for the user.
-				// If neither one was explicitly specified, print a message and take
-				// a default.  My current thinking is that we default to direwolf <= 1.5
-				// compatible for version 1.6 and MFJ compatible after that.
-				if save_audio_config_p.achan[channel].v26_alternative == V26_UNSPECIFIED {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Two incompatible versions of 2400 bps QPSK are now available.\n")
-					dw_printf("For compatibility with direwolf <= 1.5, use 'V26A' modem option in config file.\n")
-					dw_printf("For compatibility MFJ-2400 use 'V26B' modem option in config file.\n")
-					dw_printf("Command line options -j and -J can be used for channel 0.\n")
-					dw_printf("For more information, read the Dire Wolf User Guide and\n")
-					dw_printf("2400-4800-PSK-for-APRS-Packet-Radio.pdf.\n")
-					dw_printf("The default is now MFJ-2400 compatibility mode.\n")
-
-					save_audio_config_p.achan[channel].v26_alternative = V26_DEFAULT
-				}
-
-				// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
-
-				if save_audio_config_p.achan[channel].profiles == "" {
-					//#if __arm__
-					//	        strlcpy (save_audio_config_p.achan[channel].profiles, "R", sizeof(save_audio_config_p.achan[channel].profiles));
-					//#else
-					save_audio_config_p.achan[channel].profiles = "PQRS"
-					//#endif
-				}
-
-				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
-				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
-
-				demod_psk_force_no_decimation(channel)
-
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Channel %d: %d bps, QPSK, %s, %d sample rate",
-					channel, save_audio_config_p.achan[channel].baud,
-					save_audio_config_p.achan[channel].profiles,
-					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
-
-				if save_audio_config_p.achan[channel].decimate != 1 {
-					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
-				}
-
-				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
-
-				if save_audio_config_p.achan[channel].v26_alternative == V26_B {
-					dw_printf(", compatible with MFJ-2400")
-				} else {
-					dw_printf(", compatible with earlier direwolf")
-				}
-
-				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
-					dw_printf(", DTMF decoder enabled")
-				}
-
-				dw_printf(".\n")
-
-				for d := range save_audio_config_p.achan[channel].num_subchan {
-					Assert(d >= 0 && d < MAX_SUBCHANS)
-					var D = &demodulators[channel].states[d]
-					var profile = save_audio_config_p.achan[channel].profiles[d]
-
-					//text_color_set(DW_COLOR_DEBUG);
-					//dw_printf ("About to call demod_psk_init for Q-PSK case, modem_type=%d, profile='%c'\n",
-					//	save_audio_config_p.achan[channel].modem_type, profile);
-
-					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
-						save_audio_config_p.achan[channel].v26_alternative,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
-						save_audio_config_p.achan[channel].baud,
-						rune(profile),
-						D)
-
-					//text_color_set(DW_COLOR_DEBUG);
-					//dw_printf ("Returned from demod_psk_init\n");
-
-					/* For signal level reporting, we want a longer term view. */
-					/* Guesses based on 9600.  Maybe revisit someday. */
-
-					D.quick_attack = 0.080 * 0.2
-					D.sluggish_decay = 0.00012 * 0.2
-				}
-
-			case MODEM_8PSK: // New for 1.4
-				// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
-				if save_audio_config_p.achan[channel].profiles == "" {
-					//#if __arm__
-					//	        strlcpy (save_audio_config_p.achan[channel].profiles, "V", sizeof(save_audio_config_p.achan[channel].profiles));
-					//#else
-					save_audio_config_p.achan[channel].profiles = "TUVW"
-					//#endif
-				}
-
-				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
-				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
-
-				demod_psk_force_no_decimation(channel)
-
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Channel %d: %d bps, 8PSK, %s, %d sample rate",
-					channel, save_audio_config_p.achan[channel].baud,
-					save_audio_config_p.achan[channel].profiles,
-					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
-
-				if save_audio_config_p.achan[channel].decimate != 1 {
-					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
-				}
-
-				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
-
-				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
-					dw_printf(", DTMF decoder enabled")
-				}
-
-				dw_printf(".\n")
-
-				for d := range save_audio_config_p.achan[channel].num_subchan {
-					Assert(d >= 0 && d < MAX_SUBCHANS)
-					var D = &demodulators[channel].states[d]
-					var profile = save_audio_config_p.achan[channel].profiles[d]
-
-					//text_color_set(DW_COLOR_DEBUG);
-					//dw_printf ("About to call demod_psk_init for 8-PSK case, modem_type=%d, profile='%c'\n",
-					//	save_audio_config_p.achan[channel].modem_type, profile);
-
-					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
-						save_audio_config_p.achan[channel].v26_alternative,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
-						save_audio_config_p.achan[channel].baud,
-						rune(profile),
-						D)
-
-					//text_color_set(DW_COLOR_DEBUG);
-					//dw_printf ("Returned from demod_psk_init\n");
-
-					/* For signal level reporting, we want a longer term view. */
-					/* Guesses based on 9600.  Maybe revisit someday. */
-
-					D.quick_attack = 0.080 * 0.2
-					D.sluggish_decay = 0.00012 * 0.2
-				}
-
-			case MODEM_BPSK:
-				if save_audio_config_p.achan[channel].profiles == "" {
-					save_audio_config_p.achan[channel].profiles = "LMNO"
-				}
-
-				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
-				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
-
-				demod_psk_force_no_decimation(channel)
-
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Channel %d: %d bps, BPSK, %s, %d sample rate",
-					channel, save_audio_config_p.achan[channel].baud,
-					save_audio_config_p.achan[channel].profiles,
-					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
-
-				if save_audio_config_p.achan[channel].decimate != 1 {
-					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
-				}
-
-				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
-
-				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
-					dw_printf(", DTMF decoder enabled")
-				}
-
-				dw_printf(".\n")
-
-				for d := range save_audio_config_p.achan[channel].num_subchan {
-					Assert(d >= 0 && d < MAX_SUBCHANS)
-					var D = &demodulators[channel].states[d]
-					var profile = save_audio_config_p.achan[channel].profiles[d]
-
-					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
-						V26_UNSPECIFIED,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
-						save_audio_config_p.achan[channel].baud,
-						rune(profile),
-						D)
-
-					D.quick_attack = 0.080 * 0.2
-					D.sluggish_decay = 0.00012 * 0.2
-				}
-
-			//TODO: how about MODEM_OFF case?
-
-			default: /* Not AFSK */
-				/*
-				   case MODEM_BASEBAND:
-				   case MODEM_SCRAMBLE:
-				   case MODEM_AIS:
-				*/
-				{
-					// For AIS we will accept only a good CRC without any fixup attempts.
-					// Even with that, there are still a lot of CRC false matches with random noise.
-					if save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
-						if save_audio_config_p.achan[channel].fix_bits != RETRY_NONE {
-							text_color_set(DW_COLOR_INFO)
-							dw_printf("Channel %d: FIX_BITS option has been turned off for AIS.\n", channel)
-							save_audio_config_p.achan[channel].fix_bits = RETRY_NONE
-						}
-
-						if save_audio_config_p.achan[channel].passall {
-							text_color_set(DW_COLOR_INFO)
-							dw_printf("Channel %d: PASSALL option has been turned off for AIS.\n", channel)
-							save_audio_config_p.achan[channel].passall = false
-						}
-					}
-
-					if save_audio_config_p.achan[channel].profiles == "" {
-						/* Apply default if not set earlier. */
-						/* Not sure if it should be on for ARM too. */
-						/* Need to take a look at CPU usage and performance difference. */
-
-						/* Version 1.5:  Remove special case for ARM. */
-						/* We want higher performance to be the default. */
-						/* "MODEM 9600 -" can be used on very slow CPU if necessary. */
-						save_audio_config_p.achan[channel].profiles = "+"
-					}
-
-					/*
-					 * We need a minimum number of audio samples per bit time for good performance.
-					 * Easier to check here because demod_9600_init might have an adjusted sample rate.
-					 */
-
-					var ratio = float64(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec) / float64(save_audio_config_p.achan[channel].baud)
-
-					/*
-					 * Set reasonable upsample ratio if user did not override.
-					 */
-
-					if save_audio_config_p.achan[channel].upsample == 0 {
-						if ratio < 4 {
-							// This is extreme.
-							// No one should be using a sample rate this low but
-							// amazingly a recording with 22050 rate can be decoded.
-							// 3 and 4 are the same.  Need more tests.
-							save_audio_config_p.achan[channel].upsample = 4
-						} else if ratio < 5 {
-							// example: 44100 / 9600 is 4.59
-							// 3 is slightly better than 2 or 4.
-							save_audio_config_p.achan[channel].upsample = 3
-						} else if ratio < 10 {
-							// example: 48000 / 9600 = 5
-							// 3 is slightly better than 2 or 4.
-							save_audio_config_p.achan[channel].upsample = 3
-						} else if ratio < 15 {
-							// ... guessing
-							save_audio_config_p.achan[channel].upsample = 2
-						} else { // >= 15
-							//
-							// An example of this might be .....
-							// Probably no benefit.
-							save_audio_config_p.achan[channel].upsample = 1
-						}
-					}
-
-					/* TODO KG
-					#ifdef TUNE_UPSAMPLE
-						      save_audio_config_p.achan[channel].upsample = TUNE_UPSAMPLE;
-					#endif
-					*/
-
-					text_color_set(DW_COLOR_DEBUG)
-					dw_printf("Channel %d: %d baud, %s, %s, %d sample rate x %d",
-						channel,
-						save_audio_config_p.achan[channel].baud,
-						IfThenElse(save_audio_config_p.achan[channel].modem_type == MODEM_AIS, "AIS", "K9NG/G3RUH"),
-						save_audio_config_p.achan[channel].profiles,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
-						save_audio_config_p.achan[channel].upsample)
-					dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
-
-					if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
-						dw_printf(", DTMF decoder enabled")
-					}
-
-					dw_printf(".\n")
-
-					var D = &demodulators[channel].states[0] // first subchannel
-
-					save_audio_config_p.achan[channel].num_subchan = 1
-					save_audio_config_p.achan[channel].num_slicers = 1
-
-					if strings.Contains(save_audio_config_p.achan[channel].profiles, "+") {
-						/* I'm not happy about putting this hack here. */
-						/* This belongs in demod_9600_init but it doesn't have access to the audio config. */
-						save_audio_config_p.achan[channel].num_slicers = MAX_SLICERS
-					}
-
-					text_color_set(DW_COLOR_INFO)
-					dw_printf("The ratio of audio samples per sec (%d) to data rate in baud (%d) is %.1f\n",
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
-						save_audio_config_p.achan[channel].baud,
-						ratio)
-
-					if ratio < 3 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("There is little hope of success with such a low ratio.  Use a higher sample rate.\n")
-					} else if ratio < 5 {
-						dw_printf("This is on the low side for best performance.  Can you use a higher sample rate?\n")
-
-						if save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec == 44100 {
-							dw_printf("For example, can you use 48000 rather than 44100?\n")
-						}
-					} else if ratio < 6 {
-						dw_printf("Increasing the sample rate should improve decoder performance.\n")
-					} else if ratio > 15 {
-						dw_printf("Sample rate is more than adequate.  You might lower it if CPU load is a concern.\n")
-					} else {
-						dw_printf("This is a suitable ratio for good performance.\n")
-					}
-
-					demod_9600_init(save_audio_config_p.achan[channel].modem_type,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
-						save_audio_config_p.achan[channel].upsample,
-						save_audio_config_p.achan[channel].baud, D)
-
-					if strings.Contains(save_audio_config_p.achan[channel].profiles, "+") {
-						/* I'm not happy about putting this hack here. */
-						/* should pass in as a parameter rather than adding on later. */
-						save_audio_config_p.achan[channel].num_slicers = MAX_SLICERS
-						D.num_slicers = MAX_SLICERS
-					}
-
-					/* For signal level reporting, we want a longer term view. */
-
-					D.quick_attack = D.agc_fast_attack * 0.2
-					D.sluggish_decay = D.agc_slow_decay * 0.2
-				}
-			} /* switch on modulation type. */
-		} /* if channel medium is radio */
+		demodulators[channel] = nil
+
+		if pa.chan_medium[channel] == MEDIUM_RADIO {
+			demodulators[channel] = NewDemodulator(channel, pa.achan[channel], pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
+		}
 
 		// FIXME dw_printf ("-------- end of loop for chn %d \n", channel);
 	} /* for chan ... */
@@ -829,12 +102,703 @@ func demod_init(pa *audio_s) {
 
 	for channel := MAX_RADIO_CHANS; channel < MAX_TOTAL_CHANS; channel++ {
 		// FIXME dw_printf ("-------- virtual channel loop %d \n", channel);
-		if channel == save_audio_config_p.igate_vchannel {
+		if channel == pa.igate_vchannel {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Channel %d: IGate virtual channel.\n", channel)
 		}
 	}
 } /* end demod_init */
+
+// NewDemodulator sets up the demodulators for a radio channel, from achan, its
+// settings, and the sample rate of its audio device.  What it works out from
+// them - how many subchannels and slicers, the normalised profiles, the
+// decimation and upsampling ratios - it keeps: achan is its own copy, and the
+// configuration is left as it was.
+func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodulator {
+	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+
+	var demodulator = new(Demodulator)
+	demodulator.channel = channel
+
+	/*
+	 * These are derived from config file parameters.
+	 *
+	 * numSubchan is number of demodulators.
+	 * This can be increased by:
+	 *	Multiple frequencies.
+	 *	Multiple letters (not sure if I will continue this).
+	 *
+	 * numSlicers is set to max by the "+" option.
+	 */
+	var numSubchan = 1
+	var numSlicers = 1
+
+	switch achan.modem_type {
+	case MODEM_OFF:
+
+	case MODEM_AFSK, MODEM_EAS:
+		/*
+		 * Tear apart the profile and put it back together in a normalized form:
+		 *	- At least one letter, supply suitable default if necessary.
+		 *	- Upper case only.
+		 *	- Any plus will be at the end.
+		 */
+		var num_letters = 0
+		var justLettersBuilder strings.Builder
+		var have_plus = 0
+
+		var profileStr = achan.profiles
+		for i, p := range profileStr {
+			if unicode.IsLower(p) {
+				justLettersBuilder.WriteRune(unicode.ToUpper(p))
+				num_letters++
+			} else if unicode.IsUpper(p) {
+				justLettersBuilder.WriteRune(p)
+				num_letters++
+			} else if p == '+' {
+				have_plus = 1
+
+				if i+1 != len(profileStr) {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Channel %d: + option must appear at end of demodulator types \"%s\" \n",
+						channel, achan.profiles)
+				}
+			} else if p == '-' {
+				have_plus = -1
+
+				if i+1 != len(profileStr) {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Channel %d: - option must appear at end of demodulator types \"%s\" \n",
+						channel, achan.profiles)
+				}
+			} else {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Channel %d: Demodulator types \"%s\" can contain only letters and + - characters.\n",
+					channel, achan.profiles)
+			}
+		}
+
+		var just_letters = justLettersBuilder.String()
+
+		Assert(num_letters == len(just_letters))
+
+		/*
+		 * Pick a good default demodulator if none specified.
+		 * Previously, we had "D" optimized for 300 bps.
+		 * Gone in 1.7 so it is always "A+".
+		 */
+		if num_letters == 0 {
+			just_letters = "A"
+
+			if have_plus != -1 {
+				have_plus = 1 // Add as default for version 1.2
+				// If not explicitly turned off.
+			}
+		}
+
+		// The default above and the cap below both change just_letters,
+		// so take the count from it once they are both done rather than
+		// keeping the two in step by hand.
+		just_letters = capProfiles(channel, just_letters)
+		num_letters = len(just_letters)
+
+		/*
+		 * Special case for ARM.
+		 * The higher end ARM chips have loads of power but many people
+		 * are using a single core Pi Zero or similar.
+		 * (I'm still using a model 1 for my digipeater/IGate!)
+		 * Decreasing CPU requirement has a negligible impact on decoding performance.
+		 *
+		 * 	atest -PA- 01_Track_1.wav		--> 1002 packets decoded.
+		 * 	atest -PA- -D3 01_Track_1.wav		--> 997 packets decoded.
+		 *
+		 * Someone concerned about 1/2 of one percent difference can add "-D 1"
+		 */
+		/* TODO KG
+		#if __arm__
+			      if (achan.decimate == 0) {
+			        if (samplesPerSec > 40000) {
+			          achan.decimate = 3;
+			        }
+			      }
+		#endif
+		*/
+
+		/*
+		 * Number of filter taps is proportional to number of audio samples in a "symbol" duration.
+		 * These can get extremely large for low speeds, e.g. 300 baud.
+		 * In this case, increase the decimation ration.  Crude approximation. Could be improved.
+		 */
+		if achan.decimate == 0 &&
+			samplesPerSec > 40000 &&
+			achan.baud < 600 {
+			// Avoid enormous number of filter taps.
+			achan.decimate = 3
+		}
+
+		/*
+		 * Put it back together again.
+		 */
+		Assert(num_letters == len(just_letters))
+
+		/* At this point, have_plus can have 3 values: */
+		/* 	1 = turned on, either explicitly or by applied default */
+		/*	-1 = explicitly turned off.  change to 0 here so it is false. */
+		/* 	0 = off by default. */
+
+		if have_plus == -1 {
+			have_plus = 0
+		}
+
+		achan.profiles = just_letters
+
+		Assert(len(achan.profiles) >= 1)
+
+		if have_plus != 0 {
+			achan.profiles += "+"
+		}
+
+		/* These can be increased later for the multi-frequency case. */
+
+		numSubchan = num_letters
+		numSlicers = 1
+
+		/*
+		 * Some error checking - Can use only one of these:
+		 *
+		 *	- Multiple letters.
+		 *	- New + multi-slicer.
+		 *	- Multiple frequencies.
+		 */
+
+		if have_plus != 0 && achan.num_freq > 1 {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Channel %d: Demodulator + option can't be combined with multiple frequencies.\n", channel)
+			numSubchan = 1 // Will be set higher later.
+			achan.num_freq = 1
+		}
+
+		if num_letters > 1 && achan.num_freq > 1 {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Channel %d: Multiple demodulator types can't be combined with multiple frequencies.\n", channel)
+
+			achan.profiles = string(achan.profiles[0])
+			num_letters = 1
+		}
+
+		if achan.decimate == 0 {
+			achan.decimate = 1
+			if strings.Contains(just_letters, "B") && samplesPerSec > 40000 {
+				achan.decimate = 3
+			}
+		}
+
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("Channel %d: %d baud, AFSK %d & %d Hz, %s, %d sample rate",
+			channel, achan.baud,
+			achan.mark_freq, achan.space_freq,
+			achan.profiles,
+			samplesPerSec)
+
+		if achan.decimate != 1 {
+			dw_printf(" / %d", achan.decimate)
+		}
+
+		dw_printf(", Tx %s", achan.layer2_xmit)
+
+		if achan.dtmf_decode != DTMF_DECODE_OFF {
+			dw_printf(", DTMF decoder enabled")
+		}
+
+		dw_printf(".\n")
+
+		/*
+		 * Initialize the demodulator(s).
+		 *
+		 * We have 3 cases to consider.
+		 */
+
+		// TODO1.3: revisit this logic now that it is less restrictive.
+
+		if num_letters > 1 {
+			/*
+			 * Multiple letters, usually for 1200 baud.
+			 * Each one corresponds to a demodulator and subchannel.
+			 *
+			 * An interesting experiment but probably not too useful.
+			 * Can't have multiple frequency pairs.
+			 * In version 1.3 this can be combined with the + option.
+			 */
+			numSubchan = num_letters
+
+			if numSubchan != num_letters {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("INTERNAL ERROR, chan=%d, num_subchan(%d) != strlen(\"%s\")\n",
+					channel, numSubchan, achan.profiles)
+			}
+
+			if achan.num_freq != 1 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1\n",
+					channel, achan.num_freq)
+			}
+
+			for d := range numSubchan {
+				Assert(d >= 0 && d < MAX_SUBCHANS)
+
+				var D = &demodulator.states[d]
+
+				var profile = achan.profiles[d]
+				var mark = achan.mark_freq
+				var space = achan.space_freq
+
+				if numSubchan != 1 {
+					text_color_set(DW_COLOR_DEBUG)
+					dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
+				}
+
+				demod_afsk_init(samplesPerSec/achan.decimate,
+					achan.baud,
+					mark,
+					space,
+					rune(profile),
+					D)
+
+				if have_plus != 0 {
+					/* I'm not happy about putting this hack here. */
+					/* should pass in as a parameter rather than adding on later. */
+					numSlicers = MAX_SLICERS
+					D.num_slicers = MAX_SLICERS
+				}
+
+				/* For signal level reporting, we want a longer term view. */
+				// TODO: Should probably move this into the init functions.
+
+				D.quick_attack = D.agc_fast_attack * 0.2
+				D.sluggish_decay = D.agc_slow_decay * 0.2
+			}
+		} else if have_plus != 0 {
+			/*
+			 * PLUS - which (formerly) implies we have only one letter and one frequency pair.
+			 *
+			 * One demodulator feeds multiple slicers, each a subchannel.
+			 */
+			if num_letters != 1 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1\n",
+					channel, just_letters)
+			}
+
+			if achan.num_freq != 1 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1\n",
+					channel, achan.num_freq)
+			}
+
+			if achan.num_freq != numSubchan {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != num_subchan(%d)\n",
+					channel, achan.num_freq, numSubchan)
+			}
+
+			var D = &demodulator.states[0]
+
+			/* I'm not happy about putting this hack here. */
+			/* This belongs in demod_afsk_init but it doesn't have access to the audio config. */
+
+			numSlicers = MAX_SLICERS
+
+			demod_afsk_init(samplesPerSec/achan.decimate,
+				achan.baud,
+				achan.mark_freq,
+				achan.space_freq,
+				rune(achan.profiles[0]),
+				D)
+
+			if have_plus != 0 {
+				/* I'm not happy about putting this hack here. */
+				/* should pass in as a parameter rather than adding on later. */
+				numSlicers = MAX_SLICERS
+				D.num_slicers = MAX_SLICERS
+			}
+
+			/* For signal level reporting, we want a longer term view. */
+
+			D.quick_attack = D.agc_fast_attack * 0.2
+			D.sluggish_decay = D.agc_slow_decay * 0.2
+		} else {
+			/*
+			 * One letter.
+			 * Can be combined with multiple frequencies.
+			 */
+			if num_letters != 1 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1\n",
+					channel, achan.profiles)
+			}
+
+			numSubchan = achan.num_freq
+
+			for d := range achan.num_freq {
+				Assert(d >= 0 && d < MAX_SUBCHANS)
+
+				var D = &demodulator.states[d]
+
+				var profile = achan.profiles[0]
+
+				var k = d*achan.offset - ((achan.num_freq-1)*achan.offset)/2
+				var mark = achan.mark_freq + k
+				var space = achan.space_freq + k
+
+				if achan.num_freq != 1 {
+					text_color_set(DW_COLOR_DEBUG)
+					dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
+				}
+
+				demod_afsk_init(samplesPerSec/achan.decimate,
+					achan.baud,
+					mark, space,
+					rune(profile),
+					D)
+
+				if have_plus != 0 {
+					/* I'm not happy about putting this hack here. */
+					/* should pass in as a parameter rather than adding on later. */
+					numSlicers = MAX_SLICERS
+					D.num_slicers = MAX_SLICERS
+				}
+
+				/* For signal level reporting, we want a longer term view. */
+
+				D.quick_attack = D.agc_fast_attack * 0.2
+				D.sluggish_decay = D.agc_slow_decay * 0.2
+			} /* for each freq pair */
+		}
+
+	case MODEM_QPSK: // New for 1.4
+		// settleModemOptions has normally picked one already.  Without
+		// it, e.g. in a test, take the same default but leave the
+		// configuration alone.
+		var v26 = achan.v26_alternative
+		if v26 == V26_UNSPECIFIED {
+			v26 = V26_DEFAULT
+		}
+
+		// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
+
+		if achan.profiles == "" {
+			//#if __arm__
+			//	        strlcpy (achan.profiles, "R", sizeof(achan.profiles));
+			//#else
+			achan.profiles = "PQRS"
+			//#endif
+		}
+
+		achan.profiles = capProfiles(channel, achan.profiles)
+		numSubchan = len(achan.profiles)
+
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("Channel %d: %d bps, QPSK, %s, %d sample rate",
+			channel, achan.baud,
+			achan.profiles,
+			samplesPerSec)
+
+		dw_printf(", Tx %s", achan.layer2_xmit)
+
+		if v26 == V26_B {
+			dw_printf(", compatible with MFJ-2400")
+		} else {
+			dw_printf(", compatible with earlier direwolf")
+		}
+
+		if achan.dtmf_decode != DTMF_DECODE_OFF {
+			dw_printf(", DTMF decoder enabled")
+		}
+
+		dw_printf(".\n")
+
+		for d := range numSubchan {
+			Assert(d >= 0 && d < MAX_SUBCHANS)
+			var D = &demodulator.states[d]
+			var profile = achan.profiles[d]
+
+			//text_color_set(DW_COLOR_DEBUG);
+			//dw_printf ("About to call demod_psk_init for Q-PSK case, modem_type=%d, profile='%c'\n",
+			//	achan.modem_type, profile);
+
+			demod_psk_init(achan.modem_type,
+				v26,
+				samplesPerSec,
+				achan.baud,
+				rune(profile),
+				D)
+
+			//text_color_set(DW_COLOR_DEBUG);
+			//dw_printf ("Returned from demod_psk_init\n");
+
+			/* For signal level reporting, we want a longer term view. */
+			/* Guesses based on 9600.  Maybe revisit someday. */
+
+			D.quick_attack = 0.080 * 0.2
+			D.sluggish_decay = 0.00012 * 0.2
+		}
+
+	case MODEM_8PSK: // New for 1.4
+		// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
+		if achan.profiles == "" {
+			//#if __arm__
+			//	        strlcpy (achan.profiles, "V", sizeof(achan.profiles));
+			//#else
+			achan.profiles = "TUVW"
+			//#endif
+		}
+
+		achan.profiles = capProfiles(channel, achan.profiles)
+		numSubchan = len(achan.profiles)
+
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("Channel %d: %d bps, 8PSK, %s, %d sample rate",
+			channel, achan.baud,
+			achan.profiles,
+			samplesPerSec)
+
+		dw_printf(", Tx %s", achan.layer2_xmit)
+
+		if achan.dtmf_decode != DTMF_DECODE_OFF {
+			dw_printf(", DTMF decoder enabled")
+		}
+
+		dw_printf(".\n")
+
+		for d := range numSubchan {
+			Assert(d >= 0 && d < MAX_SUBCHANS)
+			var D = &demodulator.states[d]
+			var profile = achan.profiles[d]
+
+			//text_color_set(DW_COLOR_DEBUG);
+			//dw_printf ("About to call demod_psk_init for 8-PSK case, modem_type=%d, profile='%c'\n",
+			//	achan.modem_type, profile);
+
+			demod_psk_init(achan.modem_type,
+				achan.v26_alternative,
+				samplesPerSec,
+				achan.baud,
+				rune(profile),
+				D)
+
+			//text_color_set(DW_COLOR_DEBUG);
+			//dw_printf ("Returned from demod_psk_init\n");
+
+			/* For signal level reporting, we want a longer term view. */
+			/* Guesses based on 9600.  Maybe revisit someday. */
+
+			D.quick_attack = 0.080 * 0.2
+			D.sluggish_decay = 0.00012 * 0.2
+		}
+
+	case MODEM_BPSK:
+		if achan.profiles == "" {
+			achan.profiles = "LMNO"
+		}
+
+		achan.profiles = capProfiles(channel, achan.profiles)
+		numSubchan = len(achan.profiles)
+
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("Channel %d: %d bps, BPSK, %s, %d sample rate",
+			channel, achan.baud,
+			achan.profiles,
+			samplesPerSec)
+
+		dw_printf(", Tx %s", achan.layer2_xmit)
+
+		if achan.dtmf_decode != DTMF_DECODE_OFF {
+			dw_printf(", DTMF decoder enabled")
+		}
+
+		dw_printf(".\n")
+
+		for d := range numSubchan {
+			Assert(d >= 0 && d < MAX_SUBCHANS)
+			var D = &demodulator.states[d]
+			var profile = achan.profiles[d]
+
+			demod_psk_init(achan.modem_type,
+				V26_UNSPECIFIED,
+				samplesPerSec,
+				achan.baud,
+				rune(profile),
+				D)
+
+			D.quick_attack = 0.080 * 0.2
+			D.sluggish_decay = 0.00012 * 0.2
+		}
+
+	//TODO: how about MODEM_OFF case?
+
+	default: /* Not AFSK */
+		/*
+		   case MODEM_BASEBAND:
+		   case MODEM_SCRAMBLE:
+		   case MODEM_AIS:
+		*/
+		{
+			if achan.profiles == "" {
+				/* Apply default if not set earlier. */
+				/* Not sure if it should be on for ARM too. */
+				/* Need to take a look at CPU usage and performance difference. */
+
+				/* Version 1.5:  Remove special case for ARM. */
+				/* We want higher performance to be the default. */
+				/* "MODEM 9600 -" can be used on very slow CPU if necessary. */
+				achan.profiles = "+"
+			}
+
+			/*
+			 * We need a minimum number of audio samples per bit time for good performance.
+			 * Easier to check here because demod_9600_init might have an adjusted sample rate.
+			 */
+
+			var ratio = float64(samplesPerSec) / float64(achan.baud)
+
+			/*
+			 * Set reasonable upsample ratio if user did not override.
+			 */
+
+			if achan.upsample == 0 {
+				if ratio < 4 {
+					// This is extreme.
+					// No one should be using a sample rate this low but
+					// amazingly a recording with 22050 rate can be decoded.
+					// 3 and 4 are the same.  Need more tests.
+					achan.upsample = 4
+				} else if ratio < 5 {
+					// example: 44100 / 9600 is 4.59
+					// 3 is slightly better than 2 or 4.
+					achan.upsample = 3
+				} else if ratio < 10 {
+					// example: 48000 / 9600 = 5
+					// 3 is slightly better than 2 or 4.
+					achan.upsample = 3
+				} else if ratio < 15 {
+					// ... guessing
+					achan.upsample = 2
+				} else { // >= 15
+					//
+					// An example of this might be .....
+					// Probably no benefit.
+					achan.upsample = 1
+				}
+			}
+
+			/* TODO KG
+			#ifdef TUNE_UPSAMPLE
+				      achan.upsample = TUNE_UPSAMPLE;
+			#endif
+			*/
+
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("Channel %d: %d baud, %s, %s, %d sample rate x %d",
+				channel,
+				achan.baud,
+				IfThenElse(achan.modem_type == MODEM_AIS, "AIS", "K9NG/G3RUH"),
+				achan.profiles,
+				samplesPerSec,
+				achan.upsample)
+			dw_printf(", Tx %s", achan.layer2_xmit)
+
+			if achan.dtmf_decode != DTMF_DECODE_OFF {
+				dw_printf(", DTMF decoder enabled")
+			}
+
+			dw_printf(".\n")
+
+			var D = &demodulator.states[0] // first subchannel
+
+			numSubchan = 1
+			numSlicers = 1
+
+			if strings.Contains(achan.profiles, "+") {
+				/* I'm not happy about putting this hack here. */
+				/* This belongs in demod_9600_init but it doesn't have access to the audio config. */
+				numSlicers = MAX_SLICERS
+			}
+
+			text_color_set(DW_COLOR_INFO)
+			dw_printf("The ratio of audio samples per sec (%d) to data rate in baud (%d) is %.1f\n",
+				samplesPerSec,
+				achan.baud,
+				ratio)
+
+			if ratio < 3 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("There is little hope of success with such a low ratio.  Use a higher sample rate.\n")
+			} else if ratio < 5 {
+				dw_printf("This is on the low side for best performance.  Can you use a higher sample rate?\n")
+
+				if samplesPerSec == 44100 {
+					dw_printf("For example, can you use 48000 rather than 44100?\n")
+				}
+			} else if ratio < 6 {
+				dw_printf("Increasing the sample rate should improve decoder performance.\n")
+			} else if ratio > 15 {
+				dw_printf("Sample rate is more than adequate.  You might lower it if CPU load is a concern.\n")
+			} else {
+				dw_printf("This is a suitable ratio for good performance.\n")
+			}
+
+			demod_9600_init(achan.modem_type,
+				samplesPerSec,
+				achan.upsample,
+				achan.baud, D)
+
+			if strings.Contains(achan.profiles, "+") {
+				/* I'm not happy about putting this hack here. */
+				/* should pass in as a parameter rather than adding on later. */
+				numSlicers = MAX_SLICERS
+				D.num_slicers = MAX_SLICERS
+			}
+
+			/* For signal level reporting, we want a longer term view. */
+
+			D.quick_attack = D.agc_fast_attack * 0.2
+			D.sluggish_decay = D.agc_slow_decay * 0.2
+		}
+	} /* switch on modulation type. */
+
+	demodulator.modemType = achan.modem_type
+	demodulator.profiles = achan.profiles
+	demodulator.numSubchan = numSubchan
+	demodulator.numSlicers = numSlicers
+	demodulator.decimate = achan.decimate
+	demodulator.upsample = achan.upsample
+
+	return demodulator
+}
+
+// NumSubchan is how many demodulators the channel has, each with its own
+// subchannel.
+func (d *Demodulator) NumSubchan() int {
+	return d.numSubchan
+}
+
+// NumSlicers is how many slicers each of the channel's demodulators has.
+func (d *Demodulator) NumSlicers() int {
+	return d.numSlicers
+}
+
+// channelLayout is how many subchannels, and slicers in each, a channel's
+// demodulator has - which is to say, whether a frame's subchannel and slicer
+// are worth showing.  A channel without a demodulator has one of each.
+func channelLayout(channel int) (int, int) {
+	if channel < 0 || channel >= MAX_RADIO_CHANS || demodulators[channel] == nil {
+		return 1, 1
+	}
+
+	var d = demodulators[channel]
+
+	return d.NumSubchan(), d.NumSlicers()
+}
 
 /*------------------------------------------------------------------
  *
@@ -912,7 +876,7 @@ func demod_get_sample(a int, src SampleSource) int {
 
 /*-------------------------------------------------------------------
  *
- * Name:        demod_process_sample
+ * Name:        Demodulator.ProcessSample
  *
  * Purpose:     (1) Demodulate the AFSK signal.
  *		(2) Recover clock and data.
@@ -957,17 +921,19 @@ func demod_get_sample(a int, src SampleSource) int {
 
 func demod_mute_input(channel int, mute_during_xmit int) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	demodulators[channel].Mute(mute_during_xmit != 0)
+
+	// Transmit calibration, for one, keys a channel that may not be listening.
+	var d = demodulators[channel]
+	if d == nil {
+		return
+	}
+
+	d.Mute(mute_during_xmit != 0)
 }
 
 // Mute silences the channel's input, or stops silencing it.
 func (d *Demodulator) Mute(mute bool) {
 	d.muted.Store(mute)
-}
-
-func demod_process_sample(channel int, subchan int, sam int) {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	demodulators[channel].ProcessSample(subchan, sam)
 }
 
 // ProcessSample hands one audio sample, in the range -32768 to 32767, to the
@@ -1023,19 +989,19 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 	 * Select decoder based on modulation type.
 	 */
 
-	switch save_audio_config_p.achan[channel].modem_type {
+	switch d.modemType {
 	case MODEM_OFF:
 
 		// Might have channel only listening to DTMF for APRStt gateway.
 		// Don't waste CPU time running a demodulator here.
 
 	case MODEM_AFSK, MODEM_EAS:
-		if save_audio_config_p.achan[channel].decimate > 1 {
+		if d.decimate > 1 {
 			D.decimate_sum += sam
 
 			D.decimate_count++
-			if D.decimate_count >= save_audio_config_p.achan[channel].decimate {
-				var decimated = D.decimate_sum / save_audio_config_p.achan[channel].decimate
+			if D.decimate_count >= d.decimate {
+				var decimated = D.decimate_sum / d.decimate
 
 				D.decimate_sum = 0
 				D.decimate_count = 0
@@ -1048,7 +1014,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 
 	case MODEM_QPSK, MODEM_8PSK, MODEM_BPSK:
 		// Decimation would probably work but hasn't been thought about or
-		// tested yet, so demod_init has already ruled it out for PSK.
+		// tested yet, so PSK is always demodulated at the full sample rate.
 		demod_psk_process_sample(channel, subchan, sam, D)
 
 	default:
@@ -1057,7 +1023,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 		  case MODEM_SCRAMBLE:
 		  case MODEM_AIS:
 		*/
-		demod_9600_process_sample(channel, sam, save_audio_config_p.achan[channel].upsample, D)
+		demod_9600_process_sample(channel, sam, d.upsample, D)
 	} /* switch modem_type */
 } /* end ProcessSample */
 
@@ -1069,15 +1035,22 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 func demod_get_audio_level(channel int, subchan int) ALevel {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
-	return demodulators[channel].AudioLevel(subchan)
+	// audio_stats asks after both of a stereo device's channels, whether or
+	// not demod_init set them up.
+	var d = demodulators[channel]
+	if d == nil {
+		var alevel ALevel
+
+		return alevel
+	}
+
+	return d.AudioLevel(subchan)
 }
 
 // AudioLevel reports the received audio level the subchannel's demodulator
 // has seen, and for AFSK its mark and space amplitudes.
 func (d *Demodulator) AudioLevel(subchan int) ALevel {
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
-
-	var channel = d.channel
 
 	/* We have to consider two different cases here. */
 	/* N demodulators, each with own slicer and HDLC decoder. */
@@ -1094,7 +1067,7 @@ func (d *Demodulator) AudioLevel(subchan int) ALevel {
 
 	alevel.rec = int((D.alevel_rec_peak-D.alevel_rec_valley)*50.0 + 0.5)
 
-	switch save_audio_config_p.achan[channel].modem_type {
+	switch d.modemType {
 	case MODEM_AFSK, MODEM_EAS:
 		/* For AFSK, we have mark and space amplitudes. */
 		alevel.mark = (int)((D.alevel_mark_peak)*100.0 + 0.5)
