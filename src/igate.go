@@ -1198,7 +1198,7 @@ func (ig *IGate) satgateDelayThread(ctx context.Context) {
 		/* Don't need critical region just to peek */
 
 		if ig.dpQueueHead != nil {
-			var release_time = ax25_get_release_time(ig.dpQueueHead)
+			var release_time = ig.dpQueueHead.ReleaseTime()
 
 			if time.Now().After(release_time) {
 				ig.dpMutex.Lock()

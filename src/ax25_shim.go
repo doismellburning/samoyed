@@ -13,8 +13,6 @@ package direwolf
 // names (MustAX25FromText, AX25Pack, MAXSAFE, ...), now use internal/ax25.
 
 import (
-	"time"
-
 	"github.com/doismellburning/samoyed/internal/ax25"
 )
 
@@ -65,10 +63,6 @@ const (
 	AddrStrictNoStar               = ax25.AddrStrictNoStar
 	AddrStrictLowerCaseWarning     = ax25.AddrStrictLowerCaseWarning
 )
-
-func ax25_get_release_time(this_p *packet_t) time.Time {
-	return this_p.ReleaseTime()
-}
 
 func ax25_set_modulo(this_p *packet_t, modulo ax25_modulo_t) {
 	this_p.SetModulo(modulo)
