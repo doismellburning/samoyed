@@ -239,7 +239,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 
 	// Check does not apply for 'U' frames but put in one place rather than two.
 
-	if ax25_get_modulo(pp) == modulo_128 {
+	if pp.Modulo() == modulo_128 {
 		return nil, -1
 	}
 
