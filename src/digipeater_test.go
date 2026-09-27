@@ -76,7 +76,7 @@ func TestDigipeaterSameChannel(t *testing.T) {
 
 	var sent = transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
-	assert.Equal(t, "Q3TEST>APDW17,Q1TEST*,WIDE2-1:", AX25FormatAddrs(sent))
+	assert.Equal(t, "Q3TEST>APDW17,Q1TEST*,WIDE2-1:", sent.FormatAddrs())
 
 	assert.Equal(t, 1, digi.GetCount(digiFromChan, digiFromChan))
 }
@@ -97,7 +97,7 @@ func TestDigipeaterCrossChannel(t *testing.T) {
 
 	var sent = transmitQueue.Remove(digiToChan, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "the repeated frame was not queued for the other channel")
-	assert.Equal(t, "Q3TEST>APDW17,Q2TEST*,WIDE2-1:", AX25FormatAddrs(sent),
+	assert.Equal(t, "Q3TEST>APDW17,Q2TEST*,WIDE2-1:", sent.FormatAddrs(),
 		"the callsign of the channel it goes out on should have been used")
 
 	assert.Equal(t, 1, digi.GetCount(digiFromChan, digiToChan))
@@ -183,7 +183,7 @@ func TestDigiRegen(t *testing.T) {
 
 	var sent = transmitQueue.Remove(digiToChan, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "nothing was regenerated")
-	assert.Equal(t, "Q3TEST>APDW17,WIDE2-2:", AX25FormatAddrs(sent),
+	assert.Equal(t, "Q3TEST>APDW17,WIDE2-2:", sent.FormatAddrs(),
 		"a regenerated frame goes out exactly as it arrived")
 }
 

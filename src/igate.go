@@ -703,7 +703,7 @@ func (ig *IGate) sendPacketToServer(pp *packet_t, channel int) {
 	 *		IGate that only gates to RF messages for stations heard directly.
 	 */
 
-	var msg = AX25FormatAddrs(pp)
+	var msg = pp.FormatAddrs()
 
 	msg = strings.TrimRight(msg, ":") /* Remove trailing ":" */
 

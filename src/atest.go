@@ -471,7 +471,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 		s.dcdMissingErrors++
 	}
 
-	var stemp = AX25FormatAddrs(pp)
+	var stemp = pp.FormatAddrs()
 
 	var info = pp.Info()
 

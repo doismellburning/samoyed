@@ -533,7 +533,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Waited too long for clear channel.  Discarding packet below.\n")
 
-			var stemp = AX25FormatAddrs(pp)
+			var stemp = pp.FormatAddrs()
 
 			var pinfo = pp.Info()
 
@@ -861,7 +861,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 
 	var ts = xs.timestampPrefix()
 
-	var stemp = AX25FormatAddrs(pp)
+	var stemp = pp.FormatAddrs()
 
 	var pinfo = pp.Info()
 

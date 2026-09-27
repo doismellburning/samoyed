@@ -264,7 +264,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 		}
 
 		// Formated addresses.
-		var stemp = AX25FormatAddrs(pp)
+		var stemp = pp.FormatAddrs()
 		var pinfo = pp.Info()
 
 		text_color_set(DW_COLOR_XMIT)

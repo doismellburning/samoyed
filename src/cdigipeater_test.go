@@ -61,11 +61,11 @@ func TestCDigipeatMatchExplicitCall(t *testing.T) {
 	var result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "")
 
 	require.NotNil(t, result, "a frame addressed to us was not repeated")
-	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", AX25FormatAddrs(result))
+	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", result.FormatAddrs())
 
 	// The original is repeated to every enabled channel in turn, so it has
 	// to come back unchanged.
-	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST:", AX25FormatAddrs(pp))
+	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST:", pp.FormatAddrs())
 }
 
 // An alias is the other way of asking: a pattern the configuration gives for
@@ -81,7 +81,7 @@ func TestCDigipeatMatchAlias(t *testing.T) {
 	var result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", true, alias, cdigiToChan, "")
 
 	require.NotNil(t, result, "a frame addressed to one of our aliases was not repeated")
-	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", AX25FormatAddrs(result))
+	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", result.FormatAddrs())
 }
 
 // An alias that does not match is somebody else's business.
@@ -179,7 +179,7 @@ func TestCDigipeaterSameChannel(t *testing.T) {
 
 	var sent = transmitQueue.Remove(cdigiFromChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
-	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST*:", AX25FormatAddrs(sent))
+	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST*:", sent.FormatAddrs())
 
 	assert.Equal(t, 1, cdigi.GetCount(cdigiFromChan, cdigiFromChan))
 }
@@ -201,7 +201,7 @@ func TestCDigipeaterCrossChannel(t *testing.T) {
 
 	var sent = transmitQueue.Remove(cdigiToChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for the other channel")
-	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", AX25FormatAddrs(sent))
+	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", sent.FormatAddrs())
 
 	assert.Equal(t, 1, cdigi.GetCount(cdigiFromChan, cdigiToChan))
 }

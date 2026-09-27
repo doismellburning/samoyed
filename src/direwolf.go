@@ -802,7 +802,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		}
 	}
 
-	var stemp = AX25FormatAddrs(pp)
+	var stemp = pp.FormatAddrs()
 
 	var pinfo = pp.Info()
 
