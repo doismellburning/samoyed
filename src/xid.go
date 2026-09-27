@@ -111,7 +111,7 @@ type xid_param_s struct {
 
 	srej srej_e
 
-	modulo ax25_modulo_t
+	modulo ax25.Modulo
 
 	i_field_length_rx maybe.Maybe[int] /* In bytes.  XID has it in bits. */
 

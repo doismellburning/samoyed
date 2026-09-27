@@ -325,7 +325,7 @@ type ax25_dlsm_t struct {
 
 	state dlsm_state_e // Current state.
 
-	modulo ax25_modulo_t // 8 or 128.
+	modulo ax25.Modulo // 8 or 128.
 	// Determines whether we have one or two control
 	// octets.  128 allows a much larger window size.
 
@@ -571,7 +571,7 @@ func SET_RC(S *ax25_dlsm_t, n int) {
 	}
 }
 
-func AX25MODULO(n int, m ax25_modulo_t) int {
+func AX25MODULO(n int, m ax25.Modulo) int {
 	if m != 8 && m != 128 {
 		var pc, file, line, _ = runtime.Caller(1)
 		var _func = runtime.FuncForPC(pc).Name()
@@ -6102,7 +6102,7 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 // header, and another on the original PID in the first piece, so it needs
 // three before any data fits - and it divides by N1-1, which is zero for an
 // N1 of one.
-func smallestUsableN1(modulo ax25_modulo_t) int {
+func smallestUsableN1(modulo ax25.Modulo) int {
 	if modulo == ax25.Modulo8 {
 		return AX25_N1_PACLEN_MIN
 	}

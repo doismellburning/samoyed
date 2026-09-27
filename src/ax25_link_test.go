@@ -65,7 +65,7 @@ func TestNegotiationResponseFillsInDefaults(t *testing.T) {
 func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
 	var tests = []struct {
 		name       string
-		modulo     ax25_modulo_t
+		modulo     ax25.Modulo
 		wantWindow int
 	}{
 		{"modulo 8", ax25.Modulo8, AX25_K_MAXFRAME_BASIC_MAX},
@@ -166,10 +166,10 @@ func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 
 	var tests = []struct {
 		name       string
-		modulo     ax25_modulo_t
+		modulo     ax25.Modulo
 		length     int
 		window     int
-		wantModulo ax25_modulo_t
+		wantModulo ax25.Modulo
 		wantLength int
 		wantWindow int
 		parameter  string
@@ -453,7 +453,7 @@ func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
 
 	var testCases = []struct {
 		name     string
-		modulo   ax25_modulo_t
+		modulo   ax25.Modulo
 		n1Paclen int
 	}{
 		{"a v2.0 link with no room at all", ax25.Modulo8, 0},

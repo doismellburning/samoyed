@@ -276,7 +276,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	assert.Equal(t, 0, ax25Link.listHead.vs, "V(S) should be 0")
 	assert.Equal(t, 0, ax25Link.listHead.vr, "V(R) should be 0")
 	assert.Equal(t, 0, ax25Link.listHead.va, "V(A) should be 0")
-	assert.Equal(t, ax25_modulo_t(8), ax25Link.listHead.modulo, "Should be modulo 8")
+	assert.Equal(t, ax25.Modulo(8), ax25Link.listHead.modulo, "Should be modulo 8")
 }
 
 // SABME/UA Exchange (Modulo 128)
@@ -307,7 +307,7 @@ func TestAX25LinkSABMEConnection(t *testing.T) {
 
 	// Should now be connected with modulo 128
 	assert.Equal(t, state_3_connected, ax25Link.listHead.state)
-	assert.Equal(t, ax25_modulo_t(128), ax25Link.listHead.modulo, "Should be modulo 128 for v2.2")
+	assert.Equal(t, ax25.Modulo(128), ax25Link.listHead.modulo, "Should be modulo 128 for v2.2")
 }
 
 // Connection Rejected with DM
@@ -892,7 +892,7 @@ func TestAX25LinkSREJFrame(t *testing.T) {
 
 	var S = ax25Link.listHead
 	assert.Equal(t, state_3_connected, S.state)
-	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
 	// Simulate having sent frames by setting V(S)
 	S.vs = 5
@@ -968,7 +968,7 @@ func TestAX25LinkWindowSizeMod128(t *testing.T) {
 	receiveFrame(t, pp, CHANNEL)
 
 	var S = ax25Link.listHead
-	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
 	// Default k=32 for modulo 128
 	S.k_maxframe = 32
@@ -1016,7 +1016,7 @@ func TestAX25LinkFRMRResponse(t *testing.T) {
 	// Should fall back to v2.0 and retry with SABM
 	// State should be awaiting connection (v2.0)
 	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
-	assert.Equal(t, ax25_modulo_t(8), ax25Link.listHead.modulo, "Should fall back to modulo 8")
+	assert.Equal(t, ax25.Modulo(8), ax25Link.listHead.modulo, "Should fall back to modulo 8")
 }
 
 // ============================================================================
@@ -1534,7 +1534,7 @@ func TestAX25LinkModulo128WrapAround(t *testing.T) {
 	receiveFrame(t, pp, CHANNEL)
 
 	var S = ax25Link.listHead
-	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
 	// Test sequence wrap from 127 to 0
 	S.vs = 127
@@ -1634,7 +1634,7 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 
 	var S = ax25Link.listHead
 	assert.Equal(t, state_3_connected, S.state)
-	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
 	// Use a small n1_paclen to force segmentation with short data.
 	// With n1_paclen=4:
@@ -2029,7 +2029,7 @@ func TestAX25LinkSetVersion20(t *testing.T) {
 	set_version_2_0(S)
 
 	assert.Equal(t, srej_none, S.srej_enable)
-	assert.Equal(t, ax25_modulo_t(8), S.modulo)
+	assert.Equal(t, ax25.Modulo(8), S.modulo)
 }
 
 // Set version 2.2
@@ -2054,7 +2054,7 @@ func TestAX25LinkSetVersion22(t *testing.T) {
 
 	// Should be v2.2
 	assert.Equal(t, srej_single, S.srej_enable)
-	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+	assert.Equal(t, ax25.Modulo(128), S.modulo)
 }
 
 // ============================================================================
