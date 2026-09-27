@@ -741,13 +741,11 @@ func check_via_path(via_path string) (int, error) {
  *
  * Purpose:     Separate a line into command and parameters.
  *
- * Inputs:	string		- Complete command line to start process.
- *				  nil for subsequent calls.
- *
- *		rest_of_line	- Caller wants remainder of line, not just
+ * Inputs:	rest_of_line	- Caller wants remainder of line, not just
  *				  the next parameter.
  *
- * Returns:	Pointer to next part with any quoting removed.
+ * Returns:	The next part of the line startLine loaded, with any
+ *		quoting removed, or "" once there is nothing left.
  *
  * Description:	the configuration file started out very simple and strtok
  *		was used to split up the lines.  As more complicated options
@@ -761,35 +759,32 @@ func check_via_path(via_path string) (int, error) {
 
 const MAXCMDLEN = 1200
 
-var splitCmd string
+// startLine loads a line for split to take apart, dropping any CR or LF and
+// changing tabs to spaces so split need not check for them.
+func (ps *parseState) startLine(text string) {
+	var line strings.Builder
 
-func split(str string, rest_of_line bool) string {
-	/*
-	 * If string is provided, make a copy.
-	 * Drop any CRLF at the end.
-	 * Change any tabs to spaces so we don't have to check for it later.
-	 */
-	if str != "" {
-		splitCmd = ""
-
-		for _, c := range str {
-			switch c {
-			case '\t':
-				splitCmd += " "
-			case '\n', '\r':
-				// Nothing
-			default:
-				splitCmd += string(c)
-			}
+	for _, c := range text {
+		switch c {
+		case '\t':
+			line.WriteByte(' ')
+		case '\n', '\r':
+			// Nothing
+		default:
+			line.WriteRune(c)
 		}
 	}
 
+	ps.unsplit = line.String()
+}
+
+func (ps *parseState) split(rest_of_line bool) string {
 	/*
 	 * Get next part, separated by whitespace, keeping spaces within quotes.
 	 * Quotation marks inside need to be doubled.
 	 */
 
-	splitCmd = strings.TrimSpace(splitCmd)
+	var rest = strings.TrimSpace(ps.unsplit)
 
 	var token strings.Builder
 	var in_quotes = false
@@ -797,13 +792,13 @@ func split(str string, rest_of_line bool) string {
 	var parsedLen int
 
 outerLoop:
-	for parsedLen = 0; parsedLen < len(splitCmd); parsedLen++ {
-		var c = splitCmd[parsedLen]
+	for parsedLen = 0; parsedLen < len(rest); parsedLen++ {
+		var c = rest[parsedLen]
 		switch c {
 		case '"':
 			if in_quotes {
-				if parsedLen+1 < len(splitCmd) && splitCmd[parsedLen+1] == '"' {
-					token.WriteString(string(c))
+				if parsedLen+1 < len(rest) && rest[parsedLen+1] == '"' {
+					token.WriteByte(c)
 					parsedLen++
 				} else {
 					in_quotes = false
@@ -813,18 +808,16 @@ outerLoop:
 			}
 		case ' ':
 			if in_quotes || rest_of_line {
-				token.WriteString(string(c))
+				token.WriteByte(c)
 			} else {
 				break outerLoop
 			}
 		default:
-			token.WriteString(string(c))
+			token.WriteByte(c)
 		}
 	}
 
-	splitCmd = splitCmd[parsedLen:]
-
-	// dw_printf("split out: '%s'\n", token);
+	ps.unsplit = rest[parsedLen:]
 
 	return token.String()
 } /* end split */
@@ -879,6 +872,7 @@ type parseState struct {
 	adevice int
 	line    int
 	text    string // current raw scanner line
+	unsplit string // what split has yet to take from the current line
 	keyword string // original (not uppercased) keyword token
 
 	audio *audio_s
@@ -1349,6 +1343,7 @@ func config_init(fname string, p_audio_config *audio_s,
 		adevice: 0,
 		line:    0,
 		text:    "",
+		unsplit: "",
 		keyword: "",
 		audio:   p_audio_config,
 		digi:    p_digi_config,
@@ -1408,7 +1403,9 @@ func config_init(fname string, p_audio_config *audio_s,
 			continue
 		}
 
-		var t = split(ps.text, false)
+		ps.startLine(ps.text)
+
+		var t = ps.split(false)
 
 		if t == "" {
 			continue
@@ -1603,7 +1600,7 @@ func handleADEVICE(ps *parseState) error {
 		ps.adevice = i
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		// Reported here rather than returned, so that the pointer at the
 		// documentation still follows the complaint it belongs to.
@@ -1630,7 +1627,7 @@ func handleADEVICE(ps *parseState) error {
 	// New case for release 1.8.
 
 	if t == "=" {
-		t = split("", false)
+		t = ps.split(false)
 		if t == "" {
 			return fmt.Errorf("config file: ADEVICE%d mapping syntax requires a source device number on line %d", ps.adevice, ps.line)
 		}
@@ -1647,7 +1644,7 @@ func handleADEVICE(ps *parseState) error {
 	ps.audio.adev[ps.adevice].adevice_in = t
 	ps.audio.adev[ps.adevice].adevice_out = t
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		// Different audio devices for receive and transmit.
 		ps.audio.adev[ps.adevice].adevice_out = t
@@ -1672,7 +1669,7 @@ func handlePAIDEVICE(ps *parseState) error {
 		return nil
 	}
 
-	var t = split("", true)
+	var t = ps.split(true)
 	if t == "" {
 		return fmt.Errorf("config file: Missing name of audio device for PAIDEVICE command on line %d", ps.line)
 	}
@@ -1702,7 +1699,7 @@ func handlePAODEVICE(ps *parseState) error {
 		return nil
 	}
 
-	var t = split("", true)
+	var t = ps.split(true)
 	if t == "" {
 		return fmt.Errorf("config file: Missing name of audio device for PAODEVICE command on line %d", ps.line)
 	}
@@ -1723,7 +1720,7 @@ func handleARATE(ps *parseState) error {
 	/*
 	 * ARATE 		- Audio samples per second, 11025, 22050, 44100, etc.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing audio sample rate for ARATE command", ps.line)
 	}
@@ -1743,7 +1740,7 @@ func handleACHANNELS(ps *parseState) error {
 	/*
 	 * ACHANNELS 		- Number of audio channels for current device: 1 or 2
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing number of audio channels for ACHANNELS command", ps.line)
 	}
@@ -1777,7 +1774,7 @@ func handleCHANNEL(ps *parseState) error {
 
 	// TODO: allow full range so mycall can be set for network channels.
 	// Watch out for achan[] out of bounds.
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing channel number for CHANNEL command", ps.line)
 	}
@@ -1813,7 +1810,7 @@ func handleICHANNEL(ps *parseState) error {
 	 *	In the future there might be other typs of virtual channels.
 	 *	This does not change the current channel number used by MODEM, PTT, etc.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing virtual channel number for ICHANNEL command", ps.line)
 	}
@@ -1854,7 +1851,7 @@ func handleNCHANNEL(ps *parseState) error {
 	 *
 	 * FIXME: Can't set mycall for nchannel.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing virtual channel number for NCHANNEL command", ps.line)
 	}
@@ -1867,12 +1864,12 @@ func handleNCHANNEL(ps *parseState) error {
 		return fmt.Errorf("line %d: NCHANNEL can't use channel %d because it is already in use", ps.line, nchan)
 	}
 
-	var addr = split("", false)
+	var addr = ps.split(false)
 	if addr == "" {
 		return fmt.Errorf("line %d: Missing network TNC address for NCHANNEL command", ps.line)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing network TNC TCP port for NCHANNEL command", ps.line)
 	}
@@ -1896,7 +1893,7 @@ func handleMYCALL(ps *parseState) error {
 	/*
 	 * MYCALL station
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing value for MYCALL command on line %d", ps.line)
 	} else {
@@ -1957,7 +1954,7 @@ func handleMODEM(ps *parseState) error {
 		return fmt.Errorf("line %d: MODEM can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing data transmission speed for MODEM command", ps.line)
 	}
@@ -1975,7 +1972,7 @@ func handleMODEM(ps *parseState) error {
 
 	/* Get any options. */
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		/* all done. */
 		return nil
@@ -2001,7 +1998,7 @@ func handleMODEM(ps *parseState) error {
 
 		/* Get space frequency */
 
-		t = split("", false)
+		t = ps.split(false)
 		if t == "" {
 			return fmt.Errorf("line %d: Missing tone frequency for space", ps.line)
 		}
@@ -2031,7 +2028,7 @@ func handleMODEM(ps *parseState) error {
 
 		/* New feature in 0.9 - Optional filter profile(s). */
 
-		t = split("", false)
+		t = ps.split(false)
 		if t != "" {
 			/* Look for some combination of letter(s) and + */
 			if unicode.IsLetter(rune(t[0])) || t[0] == '+' {
@@ -2045,7 +2042,7 @@ func handleMODEM(ps *parseState) error {
 
 				ps.audio.achan[ps.channel].profiles = t
 
-				t = split("", false)
+				t = ps.split(false)
 				if len(ps.audio.achan[ps.channel].profiles) > 1 && t != "" {
 					return fmt.Errorf("line %d: Can't combine multiple demodulator types and multiple frequencies", ps.line)
 				}
@@ -2064,7 +2061,7 @@ func handleMODEM(ps *parseState) error {
 
 			ps.audio.achan[ps.channel].num_freq = n
 
-			t = split("", false)
+			t = ps.split(false)
 			if t != "" {
 				n, _ = strconv.Atoi(t)
 				if n < 5 || n > int(math.Abs(float64(ps.audio.achan[ps.channel].mark_freq-ps.audio.achan[ps.channel].space_freq))/2) {
@@ -2174,7 +2171,7 @@ func handleMODEM(ps *parseState) error {
 				ps.errorf("line %d: Unrecognized option for MODEM: %s", ps.line, t)
 			}
 
-			t = split("", false)
+			t = ps.split(false)
 		}
 
 		/* A later place catches disallowed combination of + and @. */
@@ -2217,7 +2214,7 @@ func handleFIX_BITS(ps *parseState) error {
 		return fmt.Errorf("line %d: FIX_BITS can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing value for FIX_BITS command", ps.line)
 	}
@@ -2244,7 +2241,7 @@ func handleFIX_BITS(ps *parseState) error {
 			ps.line, DEFAULT_FIX_BITS)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	for t != "" {
 		// If more than one sanity test, we silently take the last one.
 		if strings.EqualFold(t, "APRS") {
@@ -2267,7 +2264,7 @@ func handleFIX_BITS(ps *parseState) error {
 			ps.errorf("line %d: Invalid option '%s' for FIX_BITS", ps.line, t)
 		}
 
-		t = split("", false)
+		t = ps.split(false)
 	}
 
 	return nil
@@ -2315,7 +2312,7 @@ func handlePTTDCDCON(ps *parseState) error {
 	// rather than a mixture of the two.  NewPTT reads these fields together.
 	var octrl = ps.audio.achan[ps.channel].octrl[ot]
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file line %d: Missing output control device for %s command", ps.line, otname)
 	}
@@ -2329,7 +2326,7 @@ func handlePTTDCDCON(ps *parseState) error {
 		   	      dw_printf ("Config file line %d: %s with GPIO is only available on Linux.\n", ps.line, otname);
 		   #else
 		*/
-		t = split("", false)
+		t = ps.split(false)
 		if t == "" {
 			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, otname)
 		}
@@ -2356,7 +2353,7 @@ func handlePTTDCDCON(ps *parseState) error {
 			#else
 		*/
 		// #if defined(USE_GPIOD)
-		t = split("", false)
+		t = ps.split(false)
 		if t == "" {
 			return fmt.Errorf("config file line %d: Missing GPIO chip name for %s.\nUse the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines", ps.line, otname)
 		}
@@ -2376,7 +2373,7 @@ func handlePTTDCDCON(ps *parseState) error {
 			octrl.out_gpio_name = "/dev/" + t
 		}
 
-		t = split("", false)
+		t = ps.split(false)
 		if t == "" {
 			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, otname)
 		}
@@ -2407,7 +2404,7 @@ func handlePTTDCDCON(ps *parseState) error {
 		/* Parallel printer case, x86 Linux only. */
 
 		//#if  ( defined(__i386__) || defined(__x86_64__) ) && ( defined(__linux__) || defined(__unix__) )
-		t = split("", false)
+		t = ps.split(false)
 		if t == "" {
 			return fmt.Errorf("config file line %d: Missing LPT bit number for %s", ps.line, otname)
 		}
@@ -2433,7 +2430,7 @@ func handlePTTDCDCON(ps *parseState) error {
 		*/
 	} else if strings.EqualFold(t, "RIG") {
 		// TODO KG #ifdef USE_HAMLIB
-		t = split("", false)
+		t = ps.split(false)
 		if t == "" {
 			return fmt.Errorf("config file line %d: Missing model number for hamlib", ps.line)
 		}
@@ -2458,7 +2455,7 @@ func handlePTTDCDCON(ps *parseState) error {
 			octrl.ptt_model = n
 		}
 
-		t = split("", false)
+		t = ps.split(false)
 		if t == "" {
 			return fmt.Errorf("config file line %d: Missing port for hamlib", ps.line)
 		}
@@ -2467,7 +2464,7 @@ func handlePTTDCDCON(ps *parseState) error {
 
 		// Optional serial port rate for CAT control PTT.
 
-		t = split("", false)
+		t = ps.split(false)
 		if t != "" {
 			if !alldigits(t) {
 				return fmt.Errorf("config file line %d: An optional number is required here for CAT serial port speed: %s", ps.line, t)
@@ -2476,7 +2473,7 @@ func handlePTTDCDCON(ps *parseState) error {
 			octrl.ptt_rate = n
 		}
 
-		t = split("", false)
+		t = ps.split(false)
 		if t != "" {
 			ps.errorf("config file line %d: %s was not expected after model & port for hamlib", ps.line, t)
 		}
@@ -2521,7 +2518,7 @@ func handlePTTDCDCON(ps *parseState) error {
 		}
 
 		for {
-			t = split("", false)
+			t = ps.split(false)
 			if t == "" {
 				break
 			}
@@ -2575,7 +2572,7 @@ func handlePTTDCDCON(ps *parseState) error {
 		/* serial port case. */
 		octrl.ptt_device = t
 
-		t = split("", false)
+		t = ps.split(false)
 		if t == "" {
 			return fmt.Errorf("config file line %d: Missing RTS or DTR after %s device name", ps.line, otname)
 		}
@@ -2602,7 +2599,7 @@ func handlePTTDCDCON(ps *parseState) error {
 		/* Some interfaces want the two control lines driven with opposite polarity. */
 		/* e.g.   PTT COM1 RTS -DTR  */
 
-		t = split("", false)
+		t = ps.split(false)
 		if t != "" {
 			if strings.EqualFold(t, "rts") {
 				octrl.ptt_line2 = PTT_LINE_RTS
@@ -2648,7 +2645,7 @@ func handleTXINH(ps *parseState) error {
 	}
 	var itname = "TXINH"
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file line %d: Missing input type name for %s command", ps.line, itname)
 	}
@@ -2660,7 +2657,7 @@ func handleTXINH(ps *parseState) error {
 			      dw_printf ("Config file line %d: %s with GPIO is only available on Linux.\n", ps.line, itname);
 		#else
 		*/
-		t = split("", false)
+		t = ps.split(false)
 		if t == "" {
 			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, itname)
 		}
@@ -2698,7 +2695,7 @@ func handleDWAIT(ps *parseState) error {
 		return fmt.Errorf("line %d: DWAIT can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing delay time for DWAIT command", ps.line)
 	}
@@ -2727,7 +2724,7 @@ func handleSLOTTIME(ps *parseState) error {
 		return fmt.Errorf("line %d: SLOTTIME can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing delay time for SLOTTIME command", ps.line)
 	}
@@ -2763,7 +2760,7 @@ func handlePERSIST(ps *parseState) error {
 		return fmt.Errorf("line %d: PERSIST can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing probability for PERSIST command", ps.line)
 	}
@@ -2796,7 +2793,7 @@ func handleTXDELAY(ps *parseState) error {
 		return fmt.Errorf("line %d: TXDELAY can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing time for TXDELAY command", ps.line)
 	}
@@ -2838,7 +2835,7 @@ func handleTXTAIL(ps *parseState) error {
 		return fmt.Errorf("line %d: TXTAIL can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing time for TXTAIL command", ps.line)
 	}
@@ -2880,7 +2877,7 @@ func handleFULLDUP(ps *parseState) error {
 		return fmt.Errorf("line %d: FULLDUP can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing parameter for FULLDUP command.  Expecting ON or OFF", ps.line)
 	}
@@ -2909,7 +2906,7 @@ func handleSPEECH(ps *parseState) error {
 		return fmt.Errorf("line %d: SPEECH can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing script for Text-to-Speech function", ps.line)
 	}
@@ -2934,7 +2931,7 @@ func handleFX25TX(ps *parseState) error {
 		return fmt.Errorf("line %d: FX25TX can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing FEC mode for FX25TX command", ps.line)
 	}
@@ -2979,7 +2976,7 @@ func handleFX25AUTO(ps *parseState) error {
 		return fmt.Errorf("line %d: FX25AUTO can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing count for FX25AUTO command", ps.line)
 	}
@@ -3021,7 +3018,7 @@ func handleIL2PTX(ps *parseState) error {
 	ps.audio.achan[ps.channel].il2p_crc = true
 
 	for {
-		var t = split("", false)
+		var t = ps.split(false)
 		if t == "" {
 			break
 		}
@@ -3067,7 +3064,7 @@ func handleIL2PVERSION(ps *parseState) error {
 		return fmt.Errorf("line %d: IL2PVERSION can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = split("", false)
+	var t = ps.split(false)
 
 	var version, ok = il2p_parse_version(t)
 	if !ok {
@@ -3091,7 +3088,7 @@ func handleDIGIPEAT(ps *parseState) error {
 	 * ATGP is an ugly hack for the specific need of ATGP which needs more that 8 digipeaters.
 	 * DO NOT put this in the User Guide.  On a need to know basis.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing FROM-channel on line %d", ps.line)
 	}
@@ -3112,7 +3109,7 @@ func handleDIGIPEAT(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing TO-channel on line %d", ps.line)
 	}
@@ -3131,7 +3128,7 @@ func handleDIGIPEAT(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing alias pattern on line %d", ps.line)
 	}
@@ -3143,7 +3140,7 @@ func handleDIGIPEAT(ps *parseState) error {
 
 	ps.digi.alias[from_chan][to_chan] = r
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing wide pattern on line %d", ps.line)
 	}
@@ -3158,11 +3155,11 @@ func handleDIGIPEAT(ps *parseState) error {
 	ps.digi.enabled[from_chan][to_chan] = true
 	ps.digi.preempt[from_chan][to_chan] = PREEMPT_OFF
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		if strings.EqualFold(t, "OFF") {
 			ps.digi.preempt[from_chan][to_chan] = PREEMPT_OFF
-			t = split("", false)
+			t = ps.split(false)
 		} else if strings.EqualFold(t, "DROP") {
 			ps.errorf(
 				"Config file, line %d: Preemptive digipeating DROP option is discouraged.\nIt can create a via path which is misleading about the actual path taken.\nPREEMPT is the best choice for this feature.",
@@ -3170,7 +3167,7 @@ func handleDIGIPEAT(ps *parseState) error {
 			)
 
 			ps.digi.preempt[from_chan][to_chan] = PREEMPT_DROP
-			t = split("", false)
+			t = ps.split(false)
 		} else if strings.EqualFold(t, "MARK") {
 			ps.errorf(
 				"Config file, line %d: Preemptive digipeating MARK option is discouraged.\nIt can create a via path which is misleading about the actual path taken.\nPREEMPT is the best choice for this feature.",
@@ -3178,13 +3175,13 @@ func handleDIGIPEAT(ps *parseState) error {
 			)
 
 			ps.digi.preempt[from_chan][to_chan] = PREEMPT_MARK
-			t = split("", false)
+			t = ps.split(false)
 		} else if (strings.EqualFold(t, "TRACE")) || (strings.HasPrefix(strings.ToUpper(t), "PREEMPT")) {
 			ps.digi.preempt[from_chan][to_chan] = PREEMPT_TRACE
-			t = split("", false)
+			t = ps.split(false)
 		} else if strings.HasPrefix(strings.ToUpper(t), "ATGP=") {
 			ps.digi.atgp[from_chan][to_chan] = t[5:]
-			t = split("", false)
+			t = ps.split(false)
 		}
 	}
 
@@ -3200,7 +3197,7 @@ func handleDEDUPE(ps *parseState) error {
 	/*
 	 * DEDUPE 		- Time to suppress digipeating of duplicate APRS packets.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing time for DEDUPE command", ps.line)
 	}
@@ -3225,7 +3222,7 @@ func handleREGEN(ps *parseState) error {
 	/*
 	 * REGEN 		- Signal regeneration.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing FROM-channel on line %d", ps.line)
 	}
@@ -3245,7 +3242,7 @@ func handleREGEN(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing TO-channel on line %d", ps.line)
 	}
@@ -3277,7 +3274,7 @@ func handleCDIGIPEAT(ps *parseState) error {
 	/*
 	 * CDIGIPEAT  from-chan  to-chan [ alias-pattern ]
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing FROM-channel on line %d", ps.line)
 	}
@@ -3300,7 +3297,7 @@ func handleCDIGIPEAT(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid.\nOnly internal modems can be used for connected mode packet", ps.line, from_chan)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing TO-channel on line %d", ps.line)
 	}
@@ -3318,7 +3315,7 @@ func handleCDIGIPEAT(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: TO-channel %d is not valid.\nOnly internal modems can be used for connected mode packet", ps.line, to_chan)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		var r, err = regexp.Compile(t)
 		if err == nil {
@@ -3328,7 +3325,7 @@ func handleCDIGIPEAT(ps *parseState) error {
 			return fmt.Errorf("config file: Invalid alias matching pattern on line %d:\n%w", ps.line, err)
 		}
 
-		t = split("", false)
+		t = ps.split(false)
 	}
 
 	ps.cdigi.enabled[from_chan][to_chan] = true
@@ -3380,7 +3377,7 @@ func handleFILTER(ps *parseState) error {
 	var from_chan int
 	var to_chan int
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing FROM-channel on line %d", ps.line)
 	}
@@ -3414,7 +3411,7 @@ func handleFILTER(ps *parseState) error {
 		}
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing TO-channel on line %d", ps.line)
 	}
@@ -3448,7 +3445,7 @@ func handleFILTER(ps *parseState) error {
 		}
 	}
 
-	t = split("", true) /* Take rest of ps.line including spaces. */
+	t = ps.split(true) /* Take rest of ps.line including spaces. */
 
 	if t == "" {
 		t = " " /* Empty means permit nothing. */
@@ -3481,7 +3478,7 @@ func handleCFILTER(ps *parseState) error {
 	 * Why did I put this here?
 	 * What would be a useful use case?  Perhaps block by source or destination?
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing FROM-channel on line %d", ps.line)
 	}
@@ -3498,7 +3495,7 @@ func handleCFILTER(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing TO-channel on line %d", ps.line)
 	}
@@ -3512,7 +3509,7 @@ func handleCFILTER(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 	}
 
-	t = split("", true) /* Take rest of ps.line including spaces. */
+	t = ps.split(true) /* Take rest of ps.line including spaces. */
 
 	if t == "" {
 		t = " " /* Empty means permit nothing. */
@@ -3540,19 +3537,19 @@ func handleTTCORRAL(ps *parseState) error {
 	 * TTCORRAL  latitude  longitude  offset-or-ambiguity
 	 */
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing latitude for TTCORRAL command", ps.line)
 	}
 	ps.tt.corral_lat = ps.parseLL(t, LAT)
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing longitude for TTCORRAL command", ps.line)
 	}
 	ps.tt.corral_lon = ps.parseLL(t, LON)
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing offset-or-ambiguity for TTCORRAL command", ps.line)
 	}
@@ -3583,7 +3580,7 @@ func handleTTPOINT(ps *parseState) error {
 
 	// Pattern: B and digits
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTPOINT command", ps.line)
 	}
@@ -3601,7 +3598,7 @@ func handleTTPOINT(ps *parseState) error {
 
 	// Latitude
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing latitude for TTPOINT command", ps.line)
 	}
@@ -3609,7 +3606,7 @@ func handleTTPOINT(ps *parseState) error {
 
 	// Longitude
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing longitude for TTPOINT command", ps.line)
 	}
@@ -3637,7 +3634,7 @@ func handleTTVECTOR(ps *parseState) error {
 
 	// Pattern: B5bbbd...
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTVECTOR command", ps.line)
 	}
@@ -3657,7 +3654,7 @@ func handleTTVECTOR(ps *parseState) error {
 
 	// Latitude
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing latitude for TTVECTOR command", ps.line)
 	}
@@ -3665,7 +3662,7 @@ func handleTTVECTOR(ps *parseState) error {
 
 	// Longitude
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing longitude for TTVECTOR command", ps.line)
 	}
@@ -3673,7 +3670,7 @@ func handleTTVECTOR(ps *parseState) error {
 
 	// Longitude
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing scale for TTVECTOR command", ps.line)
 	}
@@ -3684,7 +3681,7 @@ func handleTTVECTOR(ps *parseState) error {
 
 	// Unit.
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing unit for TTVECTOR command", ps.line)
 	}
@@ -3719,7 +3716,7 @@ func handleTTGRID(ps *parseState) error {
 
 	// Pattern: B [digit] x... y...
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTGRID command", ps.line)
 	}
@@ -3736,7 +3733,7 @@ func handleTTGRID(ps *parseState) error {
 
 	// Minimum Latitude - all zeros in received data
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing minimum latitude for TTGRID command", ps.line)
 	}
@@ -3744,7 +3741,7 @@ func handleTTGRID(ps *parseState) error {
 
 	// Minimum Longitude - all zeros in received data
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing minimum longitude for TTGRID command", ps.line)
 	}
@@ -3752,7 +3749,7 @@ func handleTTGRID(ps *parseState) error {
 
 	// Maximum Latitude - all nines in received data
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing maximum latitude for TTGRID command", ps.line)
 	}
@@ -3760,7 +3757,7 @@ func handleTTGRID(ps *parseState) error {
 
 	// Maximum Longitude - all nines in received data
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing maximum longitude for TTGRID command", ps.line)
 	}
@@ -3785,7 +3782,7 @@ func handleTTUTM(ps *parseState) error {
 
 	// Pattern: B [digit] x... y...
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTUTM command", ps.line)
 	}
@@ -3803,7 +3800,7 @@ func handleTTUTM(ps *parseState) error {
 
 	// Zone 1 - 60 and optional latitudinal letter.
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing zone for TTUTM command", ps.line)
 	}
@@ -3812,7 +3809,7 @@ func handleTTUTM(ps *parseState) error {
 
 	// Optional scale.
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		var scaleVal, scaleErr = strconv.ParseFloat(t, 64)
 		if scaleErr != nil {
@@ -3823,7 +3820,7 @@ func handleTTUTM(ps *parseState) error {
 
 		// Optional x offset.
 
-		t = split("", false)
+		t = ps.split(false)
 		if t != "" {
 			var xOffset, xErr = strconv.ParseFloat(t, 64)
 			if xErr != nil {
@@ -3834,7 +3831,7 @@ func handleTTUTM(ps *parseState) error {
 
 			// Optional y offset.
 
-			t = split("", false)
+			t = ps.split(false)
 			if t != "" {
 				var yOffset, yErr = strconv.ParseFloat(t, 64)
 				if yErr != nil {
@@ -3885,7 +3882,7 @@ func handleTTUSNGMGRS(ps *parseState) error {
 
 	// Pattern: B [digit] x... y...
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTUSNG/TTMGRS command", ps.line)
 	}
@@ -3914,7 +3911,7 @@ func handleTTUSNGMGRS(ps *parseState) error {
 
 	// Zone 1 - 60 and optional latitudinal letter.
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing zone & square for TTUSNG/TTMGRS command", ps.line)
 	}
@@ -3929,7 +3926,7 @@ func handleTTUSNGMGRS(ps *parseState) error {
 
 	// Should be the end.
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		ps.errorf("line %d: Unexpected stuff at end ignored:  %s", ps.line, t)
 	}
@@ -3959,7 +3956,7 @@ func handleTTMHEAD(ps *parseState) error {
 
 	// Pattern: B, optional additional button, some number of xxxx... for matching
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTMHEAD command", ps.line)
 	}
@@ -3994,7 +3991,7 @@ func handleTTMHEAD(ps *parseState) error {
 
 	// optional prefix
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		tl.mhead.prefix = t
 
@@ -4038,7 +4035,7 @@ func handleTTSATSQ(ps *parseState) error {
 
 	// Pattern: B, optional additional button, exactly xxxx for matching
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTSATSQ command", ps.line)
 	}
@@ -4085,7 +4082,7 @@ func handleTTAMBIG(ps *parseState) error {
 
 	// Pattern: B, optional additional button, exactly x for matching
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTAMBIG command", ps.line)
 	}
@@ -4146,7 +4143,7 @@ func handleTTMACRO(ps *parseState) error {
 	// Also make note of which letters are used in pattern and definition.
 	// Version 1.2: also allow A,B,C,D in the pattern.
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTMACRO command", ps.line)
 	}
@@ -4174,7 +4171,7 @@ func handleTTMACRO(ps *parseState) error {
 	// Next we should find the definition.
 	// It can contain touch tone characters and lower case x, y, z for substitutions.
 
-	t = split("", true)
+	t = ps.split(true)
 	if t == "" {
 		ps.errorf("line %d: Missing definition for TTMACRO command", ps.line)
 		tl.macro.definition = "" // Don't die on null pointer later.
@@ -4361,7 +4358,7 @@ func handleTTOBJ(ps *parseState) error {
 	 *	whereto is any combination of transmit channel, APP, IG.
 	 */
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing DTMF receive channel for TTOBJ command", ps.line)
 	}
@@ -4378,7 +4375,7 @@ func handleTTOBJ(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: TTOBJ DTMF receive channel %d is not valid", ps.line, r)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing transmit channel for TTOBJ command", ps.line)
 	}
@@ -4468,7 +4465,7 @@ func handleTTOBJ(ps *parseState) error {
 	ps.tt.obj_send_to_app = app
 	ps.tt.obj_send_to_ig = ig
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		var hops, viaErr = check_via_path(t)
 		if hops >= 0 {
@@ -4489,7 +4486,7 @@ func handleTTERR(ps *parseState) error {
 	 * TTERR  msg_id  method  text...
 	 */
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing message identifier for TTERR command", ps.line)
 	}
@@ -4508,7 +4505,7 @@ func handleTTERR(ps *parseState) error {
 		return nil
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing method (SPEECH, MORSE) for TTERR command", ps.line)
 	}
@@ -4526,7 +4523,7 @@ func handleTTERR(ps *parseState) error {
 		return fmt.Errorf("line %d: Response method of %s must be SPEECH or MORSE for TTERR command", ps.line, method)
 	}
 
-	t = split("", true)
+	t = ps.split(true)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing response text for TTERR command", ps.line)
 	}
@@ -4553,7 +4550,7 @@ func handleTTSTATUS(ps *parseState) error {
 	 * TTSTATUS  status_id  text...
 	 */
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing status number for TTSTATUS command", ps.line)
 	}
@@ -4564,7 +4561,7 @@ func handleTTSTATUS(ps *parseState) error {
 		return fmt.Errorf("line %d: Status number for TTSTATUS command must be in range of 1 to 9", ps.line)
 	}
 
-	t = split("", true)
+	t = ps.split(true)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing status text for TTSTATUS command", ps.line)
 	}
@@ -4587,7 +4584,7 @@ func handleTTCMD(ps *parseState) error {
 	 *
 	 * TTCMD ...
 	 */
-	var t = split("", true)
+	var t = ps.split(true)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing command for TTCMD command", ps.line)
 	}
@@ -4610,7 +4607,7 @@ func handleIGSERVER(ps *parseState) error {
 	 *
 	 * IGSERVER  hostname:port				-- more in line with usual conventions.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing IGate server name for IGSERVER command", ps.line)
 	}
@@ -4643,7 +4640,7 @@ func handleIGSERVER(ps *parseState) error {
 
 	/* Alternatively, the port number could be separated by white space. */
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		var n, _ = strconv.Atoi(t)
 		if n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER {
@@ -4666,14 +4663,14 @@ func handleIGLOGIN(ps *parseState) error {
 	 *
 	 * IGLOGIN  callsign  passcode
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing login callsign for IGLOGIN command", ps.line)
 	}
 	// TODO: Wouldn't hurt to do validity checking of format.
 	ps.igate.t2_login = t
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing passcode for IGLOGIN command", ps.line)
 	}
@@ -4690,7 +4687,7 @@ func handleIGTXVIA(ps *parseState) error {
 	 *
 	 * IGTXVIA  channel  [ path ]
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing transmit channel for IGTXVIA command", ps.line)
 	}
@@ -4702,7 +4699,7 @@ func handleIGTXVIA(ps *parseState) error {
 
 	ps.igate.tx_chan = n
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		// TODO KG#if 1	// proper checking
 		var viaErr error
@@ -4742,7 +4739,7 @@ func handleIGFILTER(ps *parseState) error {
 	 *
 	 * IGFILTER  filter-spec ...
 	 */
-	var t = split("", true) /* Take rest of ps.line as one string. */
+	var t = ps.split(true) /* Take rest of ps.line as one string. */
 
 	if ps.igate.t2_filter != "" {
 		ps.warnf("line %d: Warning - IGFILTER already configured (%s), this one (%s) will be ignored", ps.line, ps.igate.t2_filter, t)
@@ -4773,7 +4770,7 @@ func handleIGTXLIMIT(ps *parseState) error {
 	 *
 	 * IGTXLIMIT  one-minute-limit  five-minute-limit
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing one minute limit for IGTXLIMIT command", ps.line)
 	}
@@ -4793,7 +4790,7 @@ func handleIGTXLIMIT(ps *parseState) error {
 		ps.errorf("line %d: One minute transmit limit has been reduced to %d.\nYou won't make friends by setting a limit this high", ps.line, ps.igate.tx_limit_1)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing five minute limit for IGTXLIMIT command", ps.line)
 	}
@@ -4822,7 +4819,7 @@ func handleIGMSP(ps *parseState) error {
 	 *
 	 * IGMSP  n
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t != "" {
 		var n, nErr = strconv.Atoi(t)
 		if nErr != nil {
@@ -4853,7 +4850,7 @@ func handleSATGATE(ps *parseState) error {
 	 */
 	ps.warnf("line %d: SATGATE is pretty useless and will be removed in a future version", ps.line)
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t != "" {
 		var n, _ = strconv.Atoi(t)
 		if n >= MIN_SATGATE_DELAY && n <= MAX_SATGATE_DELAY {
@@ -4881,7 +4878,7 @@ func handleAGWPORT(ps *parseState) error {
 	 *
 	 * In version 1.2 we allow 0 to disable listening.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing port number for AGWPORT command", ps.line)
 	}
@@ -4890,7 +4887,7 @@ func handleAGWPORT(ps *parseState) error {
 		return fmt.Errorf("line %d: Invalid port number \"%s\" for AGWPORT command", ps.line, t)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		return fmt.Errorf("line %d: Unexpected \"%s\" after the port number.\nPerhaps you were trying to use feature available only with KISSPORT", ps.line, t)
 	}
@@ -4919,12 +4916,12 @@ func handleAGWLOGIN(ps *parseState) error {
 	 *
 	 * May appear more than once; a client may use any one of the sets.
 	 */
-	var user = split("", false)
+	var user = ps.split(false)
 	if user == "" {
 		return fmt.Errorf("line %d: Missing user name for AGWLOGIN command", ps.line)
 	}
 
-	var password = split("", false)
+	var password = ps.split(false)
 	if password == "" {
 		return fmt.Errorf("line %d: Missing password for AGWLOGIN command", ps.line)
 	}
@@ -4953,7 +4950,7 @@ func handleMETRICSPORT(ps *parseState) error {
 	 *
 	 * 0 disables it.  Disabled by default.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing port number for METRICSPORT command", ps.line)
 	}
@@ -4963,7 +4960,7 @@ func handleMETRICSPORT(ps *parseState) error {
 		return fmt.Errorf("line %d: Invalid port number \"%s\" for METRICSPORT command", ps.line, t)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		return fmt.Errorf("line %d: Unexpected \"%s\" after the port number", ps.line, t)
 	}
@@ -5001,7 +4998,7 @@ func handleKISSPORT(ps *parseState) error {
 	//
 	//	KISSPORT 7001 1		# Only radio channel 1 for receive.  KISS channel set to 0.
 	//				# Transmit to radio channel 1, ignoring KISS channel.
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing TCP port number for KISSPORT command", ps.line)
 	}
@@ -5017,7 +5014,7 @@ func handleKISSPORT(ps *parseState) error {
 		return fmt.Errorf("line %d: Invalid TCP port number for KISS TCPIP Socket Interface.\nUse something in the range of %d to %d", ps.line, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	var kissChannel = -1 // optional.  default to all if not specified.
 
 	if t != "" {
@@ -5070,7 +5067,7 @@ func handleNULLMODEM(ps *parseState) error {
 	 * null modem cable on Windows only.  Now it is also available for Linux.
 	 * TODO1.5: In retrospect, this doesn't seem like such a good name.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing serial port name on line %d", ps.line)
 	}
@@ -5078,7 +5075,7 @@ func handleNULLMODEM(ps *parseState) error {
 	var port = t
 	var speed = 0
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		var n, nErr = strconv.Atoi(t)
 		if nErr != nil {
@@ -5108,7 +5105,7 @@ func handleSERIALKISSPOLL(ps *parseState) error {
 	 * SERIALKISSPOLL name		- Poll for serial port name that might come and go.
 	 *			  	  e.g. /dev/rfcomm0 for bluetooth.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing serial port name on line %d", ps.line)
 	} else {
@@ -5141,7 +5138,7 @@ func handleDNSSD(ps *parseState) error {
 	 * DNSSD 		- Enable or disable (1/0) dns-sd, DNS Service Discovery announcements
 	 * DNSSDNAME            - Set DNS-SD service name, defaults to "Dire Wolf on <hostname>"
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing integer value for DNSSD command", ps.line)
 	}
@@ -5160,7 +5157,7 @@ func handleDNSSD(ps *parseState) error {
 
 // handleDNSSDNAME handles the DNSSDNAME keyword.
 func handleDNSSDNAME(ps *parseState) error {
-	var t = split("", true)
+	var t = ps.split(true)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing service name for DNSSDNAME", ps.line)
 	} else {
@@ -5175,7 +5172,7 @@ func handleGPSNMEA(ps *parseState) error {
 	/*
 	 * GPSNMEA  serial-device  [ speed ]		- Direct connection to GPS receiver.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file, line %d: Missing serial port name for GPS receiver", ps.line)
 	}
@@ -5185,7 +5182,7 @@ func handleGPSNMEA(ps *parseState) error {
 	// The standard at one time, for a line that gives no speed.
 	var speed = 4800
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		var n, nErr = strconv.Atoi(t)
 		if nErr != nil {
@@ -5215,11 +5212,11 @@ func handleGPSD(ps *parseState) error {
 	ps.misc.gpsd_host = "localhost"
 	ps.misc.gpsd_port = DEFAULT_GPSD_PORT
 
-	var t = split("", false)
+	var t = ps.split(false)
 	if t != "" {
 		ps.misc.gpsd_host = t
 
-		t = split("", false)
+		t = ps.split(false)
 		if t != "" {
 			var n, nErr = strconv.Atoi(t)
 			if nErr != nil {
@@ -5247,7 +5244,7 @@ func handleWAYPOINT(ps *parseState) error {
 	 * WAYPOINT  host:udpport [ formats ]
 	 *
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing output device for WAYPOINT on line %d", ps.line)
 	}
@@ -5275,7 +5272,7 @@ func handleWAYPOINT(ps *parseState) error {
 
 	/* Anything remaining is the formats to enable. */
 
-	t = split("", true)
+	t = ps.split(true)
 	for _, c := range t {
 		switch unicode.ToUpper(c) {
 		case 'N':
@@ -5302,7 +5299,7 @@ func handleLOGDIR(ps *parseState) error {
 	/*
 	 * LOGDIR	- Directory name for automatically named daily log files.  Use "." for current working directory.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing directory name for LOGDIR on line %d", ps.line)
 	} else {
@@ -5314,7 +5311,7 @@ func handleLOGDIR(ps *parseState) error {
 		ps.misc.log_path = t
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		ps.errorf("config file: LOGDIR on line %d should have directory path and nothing more", ps.line)
 	}
@@ -5327,7 +5324,7 @@ func handleLOGFILE(ps *parseState) error {
 	/*
 	 * LOGFILE	- Log file name, including any directory part.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing file name for LOGFILE on line %d", ps.line)
 	} else {
@@ -5339,7 +5336,7 @@ func handleLOGFILE(ps *parseState) error {
 		ps.misc.log_path = t
 	}
 
-	t = split("", false)
+	t = ps.split(false)
 	if t != "" {
 		ps.errorf("config file: LOGFILE on line %d should have file name and nothing more", ps.line)
 	}
@@ -5395,12 +5392,9 @@ func handleXBEACON(ps *parseState) error {
 		/* Save line number because some errors will be reported later. */
 		ps.misc.beacon[ps.misc.num_beacons].lineno = ps.line
 
-		// Pass "" so beacon_options continues from the current split() position
-		// rather than reinitialising the tokenizer. The main parse loop already
-		// called split(ps.text, false) to extract the keyword, leaving any
-		// options as the remaining state; passing "" here reads those options
-		// correctly and also handles the case where there are none.
-		if beacon_options("", &(ps.misc.beacon[ps.misc.num_beacons]), ps, ps.audio) == nil {
+		// beacon_options reads the options from where the main parse loop's
+		// split left off, just after the keyword; there may be none.
+		if beacon_options(&(ps.misc.beacon[ps.misc.num_beacons]), ps, ps.audio) == nil {
 			ps.misc.num_beacons++
 		}
 	} else {
@@ -5421,7 +5415,7 @@ func handleSMARTBEACON(ps *parseState) error {
 
 	/* TODO KG
 	   #define SB_NUM(name,sbvar,minn,maxx,unit)  							\
-	   	var t = split("", false);									\
+	   	var t = ps.split(false);									\
 	   	    if (t == "") {									\
 	   	      if (strcmp(name, "fast speed") == 0) {						\
 	   	        ps.misc.sb_configured = 1;						\
@@ -5444,7 +5438,7 @@ func handleSMARTBEACON(ps *parseState) error {
 
 	/* TODO KG
 	   #define SB_TIME(name,sbvar,minn,maxx,unit)  							\
-	   	    t = split("", false);									\
+	   	    t = ps.split(false);									\
 	   	    if (t == "") {									\
 	   	      text_color_set(DW_COLOR_ERROR);							\
 	   	      dw_printf ("Line %d: Missing %s for SmartBeaconing.\n", ps.line, name);		\
@@ -5489,7 +5483,7 @@ func handleFRACK(ps *parseState) error {
 	/*
 	 * FRACK  n 		- Number of seconds to wait for ack to transmission.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing value for FRACK", ps.line)
 	}
@@ -5509,7 +5503,7 @@ func handleRETRY(ps *parseState) error {
 	/*
 	 * RETRY  n 		- Number of times to retry before giving up.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing value for RETRY", ps.line)
 	}
@@ -5529,7 +5523,7 @@ func handlePACLEN(ps *parseState) error {
 	/*
 	 * PACLEN  n 		- Maximum number of bytes in information part.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing value for PACLEN", ps.line)
 	}
@@ -5551,7 +5545,7 @@ func handleMAXFRAME(ps *parseState) error {
 	 *
 	 * Window size would make more sense but everyone else calls it MAXFRAME.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing value for MAXFRAME", ps.line)
 	}
@@ -5573,7 +5567,7 @@ func handleEMAXFRAME(ps *parseState) error {
 	/*
 	 * EMAXFRAME  n 		- Max frames to send before ACK.  mod 128 "Window" size.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing value for EMAXFRAME", ps.line)
 	}
@@ -5595,7 +5589,7 @@ func handleMAXV22(ps *parseState) error {
 	/*
 	 * MAXV22  n 		- Max number of SABME sent before trying SABM.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing value for MAXV22", ps.line)
 	}
@@ -5620,7 +5614,7 @@ func handleV20(ps *parseState) error {
 	 *					  When connecting to these, skip SABME and go right to SABM.
 	 *					  Possible to have multiple and they are cumulative.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing address(es) for V20", ps.line)
 	}
@@ -5637,7 +5631,7 @@ func handleV20(ps *parseState) error {
 			// continue processing any others following.
 		}
 
-		t = split("", false)
+		t = ps.split(false)
 	}
 
 	return nil
@@ -5651,7 +5645,7 @@ func handleNOXID(ps *parseState) error {
 	 *					  AX.25 for Linux is the one known case so far.
 	 *					  Possible to have multiple and they are cumulative.
 	 */
-	var t = split("", false)
+	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing address(es) for NOXID", ps.line)
 	}
@@ -5668,7 +5662,7 @@ func handleNOXID(ps *parseState) error {
 			// continue processing any others following.
 		}
 
-		t = split("", false)
+		t = ps.split(false)
 	}
 
 	return nil
@@ -5696,7 +5690,7 @@ func parse_beacon_number(keyword string, value string, line int) (float64, error
 // e.g.  IBEACON DELAY=1 EVERY=1 SENDTO=IG OVERLAY=R SYMBOL="igate" LAT=37^44.46N LONG=122^27.19W COMMENT="N1KOL-1 IGATE"
 // Just ignores overlay, symbol, lat, long, and comment.
 
-func beacon_options(cmd string, b *beacon_s, ps *parseState, p_audio_config *audio_s) error { //nolint:unparam
+func beacon_options(b *beacon_s, ps *parseState, p_audio_config *audio_s) error {
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
 	b.delay = 60
@@ -5715,7 +5709,7 @@ func beacon_options(cmd string, b *beacon_s, ps *parseState, p_audio_config *aud
 	var northing maybe.Maybe[float64]
 
 	for {
-		var t = split("", false)
+		var t = ps.split(false)
 		if t == "" {
 			break
 		}

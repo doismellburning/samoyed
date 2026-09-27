@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 //
@@ -89,8 +88,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
-
 /*------------------------------------------------------------------
  *
  * Name:        recv_init
@@ -112,15 +109,13 @@ var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
  *----------------------------------------------------------------*/
 
 func recv_init(ctx context.Context, pa *audio_s, src SampleSource) <-chan int {
-	save_pa = pa
-
 	// Buffered so that a failing device thread can report and finish even
 	// though nobody is listening any more.
 	var failed = make(chan int, MAX_ADEVS)
 
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined > 0 {
-			go recv_adev_thread(ctx, a, failed, src)
+			go recv_adev_thread(ctx, pa, a, failed, src)
 		}
 	}
 
@@ -135,18 +130,18 @@ func recv_init(ctx context.Context, pa *audio_s, src SampleSource) <-chan int {
 // that would mean tearing the device down underneath the demodulator.  A
 // device delivering samples at all therefore stops promptly; one that has gone
 // quiet without failing outright holds the goroutine until it says something.
-func recv_adev_thread(ctx context.Context, a int, failed chan<- int, src SampleSource) {
+func recv_adev_thread(ctx context.Context, pa *audio_s, a int, failed chan<- int, src SampleSource) {
 	/* This audio device can have one (mono) or two (stereo) channels. */
 	/* Find number of the first channel and number of channels. */
 	var first_chan = ADEVFIRSTCHAN(a)
-	var num_chan = save_pa.adev[a].num_channels
+	var num_chan = pa.adev[a].num_channels
 
 	// Only this goroutine drives its channels' touch tone decoders.
 	var dtmfDecoders = make([]*DTMFDecoder, num_chan)
 
 	for c := range num_chan {
-		if save_pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
-			dtmfDecoders[c] = NewDTMFDecoder(first_chan+c, save_pa.adev[a].samples_per_sec)
+		if pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
+			dtmfDecoders[c] = NewDTMFDecoder(first_chan+c, pa.adev[a].samples_per_sec)
 		}
 	}
 

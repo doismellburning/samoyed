@@ -160,11 +160,17 @@ func Test_split(t *testing.T) {
 		{"quoted token", `"hello world"`, false, "hello world"},
 		{"quoted token at end of string", `"hello"`, false, "hello"},
 		{"doubled quote inside quotes", `"say ""hi"""`, false, `say "hi"`},
+		{"non-ASCII token", "Zürich 1", false, "Zürich"},
+		{"non-ASCII quoted token", `"Café ""°C"""`, false, `Café "°C"`},
+		{"non-ASCII rest of line", "Zürich °C", true, "Zürich °C"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var result = split(tt.input, tt.restOfLine)
+			var ps = new(parseState)
+			ps.startLine(tt.input)
+
+			var result = ps.split(tt.restOfLine)
 			assert.Equal(t, tt.want, result)
 		})
 	}
@@ -979,6 +985,18 @@ func Test_config_init_beacon_rejected_line_does_not_leak(t *testing.T) {
 	require.Equal(t, 1, misc.num_beacons)
 	assert.Empty(t, misc.beacon[0].comment)
 	assert.Zero(t, misc.beacon[0].power)
+}
+
+// --- config_init non-ASCII text ---
+
+func Test_config_init_beacon_non_ascii_comment(t *testing.T) {
+	// Regression test: split turned each byte of a token into the character
+	// with that code, so a multi-byte UTF-8 character came out as several -
+	// "°" became "Â°".
+	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W COMMENT=\"Zürich 20°C\"\n")
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Equal(t, "Zürich 20°C", misc.beacon[0].comment)
 }
 
 // --- config_init PBEACON directive (no options) ---
