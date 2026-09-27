@@ -813,10 +813,10 @@ func channelLayout(channel int) (int, int) {
  *
  * Inputs:	a	- Audio device number.
  *
- *		src	- Where the sample data comes from.
+ *		bits_per_sample	- That device's, 8 or 16, so we know
+ *				  whether to read 1 or 2 bytes from audio stream.
  *
- * Global In:	save_audio_config_p.adev[ACHAN2ADEV(channel)].bits_per_sample - So we know whether to
- *			read 1 or 2 bytes from audio stream.
+ *		src	- Where the sample data comes from.
  *
  * Description:	Grab 1 or two bytes depending on data source.
  *
@@ -837,13 +837,13 @@ type SampleSource interface {
 	GetByte(adev int) int
 }
 
-func demod_get_sample(a int, src SampleSource) int {
-	Assert(save_audio_config_p.adev[a].bits_per_sample == 8 || save_audio_config_p.adev[a].bits_per_sample == 16)
+func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
+	Assert(bits_per_sample == 8 || bits_per_sample == 16)
 
 	// TODO KG Originally this was a C signed short with the comment "short to force sign extension" - forcing via int16 seems to do the right thing...
 	var sam int16
 
-	if save_audio_config_p.adev[a].bits_per_sample == 8 {
+	if bits_per_sample == 8 {
 		var x1 = src.GetByte(a)
 		if x1 < 0 {
 			return (FSK_READ_ERR)

@@ -371,7 +371,7 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 		for c := range audio.adev[0].num_channels {
 			/* This reads either 1 or 2 bytes depending on */
 			/* bits per sample.  */
-			var audio_sample = demod_get_sample(ACHAN2ADEV(c), src)
+			var audio_sample = demod_get_sample(ACHAN2ADEV(c), audio.adev[ACHAN2ADEV(c)].bits_per_sample, src)
 
 			if audio_sample >= 256*256 {
 				e_o_f = true
