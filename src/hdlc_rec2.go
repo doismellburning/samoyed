@@ -424,40 +424,6 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	return false
 }
 
-// TODO:  Remove this.  but first figure out what to do in atest.c
-
-func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel int, subchan int, slice int, alevel ALevel) bool { //nolint:unused
-	//int len;
-	//BitFixLevel fix_bits = save_audio_config_p.achan[channel].fix_bits;
-	var passall = save_audio_config_p.achan[channel].passall
-	/* TODO KG
-	#if DEBUG_LATER
-		double tstart, tend;
-	#endif
-	*/
-
-	//len = rrbb_get_len(block);
-
-	/*
-	 * All fix up attempts have failed.
-	 * Should we pass it along anyhow with a bad CRC?
-	 * Note that we still need a minimum number of whole octets.
-	 */
-	if passall {
-		var retry_cfg = new(retry_conf_t)
-
-		retry_cfg._type = RETRY_TYPE_NONE
-		retry_cfg.mode = RETRY_MODE_CONTIGUOUS
-		retry_cfg.retry = RETRY_NONE
-		retry_cfg.contig.nr_bits = 0
-		retry_cfg.contig.bit_idx = 0
-
-		return try_decode(block, channel, subchan, slice, alevel, retry_cfg, passall)
-	}
-
-	return false
-} /* end hdlc_rec2_try_to_fix_later */
-
 /*
  * Check if the specified index of bit has been modified with the current type of configuration
  * Provide a specific implementation for contiguous mode to optimize number of tests done in the loop
