@@ -497,7 +497,7 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 					    if (ax25_get_h(pp, AX25_REPEATER_1 + j)) {
 				#else */
 			// Mark only last used (i.e. the heard station) with * as in TNC-2 Monitoring format.
-			if AX25_REPEATER_1+j == ax25_get_heard(pp) {
+			if AX25_REPEATER_1+j == pp.Heard() {
 				// #endif
 				via.WriteString("*")
 			}

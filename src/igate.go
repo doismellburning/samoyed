@@ -630,7 +630,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 	 * (Digis are all unused if we are hearing it directly from source.)
 	 */
 	if ig.config.satgate_delay > 0 &&
-		ax25_get_heard(pp) == AX25_SOURCE &&
+		pp.Heard() == AX25_SOURCE &&
 		pp.NumRepeaters() > 0 {
 		ig.satgateDelayPacket(pp, channel)
 	} else {

@@ -162,7 +162,7 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 	 * situation.  Look for my rant in the User Guide.
 	 */
 
-	var hops = ax25_get_heard(pp) - AX25_SOURCE
+	var hops = pp.Heard() - AX25_SOURCE
 	/*
 	 *		Consider the following scenario:
 	 *

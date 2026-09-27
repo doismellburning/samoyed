@@ -818,7 +818,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		/* Not AX.25. No station to display below. */
 		h = -1
 	} else {
-		h = ax25_get_heard(pp)
+		h = pp.Heard()
 		heard = pp.AddrWithSSID(h)
 	}
 

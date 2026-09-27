@@ -238,7 +238,7 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
 				/* Not AX.25. No station to display below. */
 				h = -1
 			} else {
-				h = ax25_get_heard(pp)
+				h = pp.Heard()
 				heard = pp.AddrWithSSID(h)
 			}
 
@@ -359,7 +359,7 @@ func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *packet_t) {
 			/* Not AX.25. No station to display below. */
 			h = -1
 		} else {
-			h = ax25_get_heard(pp)
+			h = pp.Heard()
 			heard = pp.AddrWithSSID(h)
 		}
 
