@@ -39,22 +39,21 @@ package direwolf
 
 import (
 	"math/bits"
-	"os"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/reedsolomon"
+	"github.com/sirupsen/logrus"
 )
-
-const EXIT_FAILURE = 1
 
 const FX25_NTAB = 3
 
 var fx25Tab = [FX25_NTAB]struct {
-	symsize uint  // Symbol size, bits (1-8).  Always 8 for this application.
-	genpoly uint  // Field generator polynomial coefficients.
-	fcs     uint  // First root of RS code generator polynomial, index form.
-	prim    uint  // Primitive element to generate polynomial roots.
-	nroots  uint  // RS code generator polynomial degree (number of roots).
-	rs      *rs_t // Pointer to RS codec control block.  Filled in at init time.
+	symsize uint               // Symbol size, bits (1-8).  Always 8 for this application.
+	genpoly uint               // Field generator polynomial coefficients.
+	fcs     uint               // First root of RS code generator polynomial, index form.
+	prim    uint               // Primitive element to generate polynomial roots.
+	nroots  uint               // RS code generator polynomial degree (number of roots).
+	rs      *reedsolomon.Codec // RS codec control block.  Filled in at init time.
 }{
 	{8, 0x11d, 1, 1, 16, nil}, // RS(255,239)
 	{8, 0x11d, 1, 1, 32, nil}, // RS(255,223)
@@ -153,12 +152,12 @@ func FX25Init(debug_level int) {
 	g_debug_level = debug_level
 
 	for i := range FX25_NTAB {
-		fx25Tab[i].rs = init_rs_char(fx25Tab[i].symsize, fx25Tab[i].genpoly, fx25Tab[i].fcs, fx25Tab[i].prim, fx25Tab[i].nroots)
-		if fx25Tab[i].rs == nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("FX.25 internal error: init_rs_char failed!\n")
-			os.Exit(EXIT_FAILURE)
+		var rs, err = reedsolomon.New(fx25Tab[i].symsize, fx25Tab[i].genpoly, fx25Tab[i].fcs, fx25Tab[i].prim, fx25Tab[i].nroots)
+		if err != nil {
+			logrus.WithError(err).Fatal("FX.25 internal error: Could not set up Reed-Solomon codec")
 		}
+
+		fx25Tab[i].rs = rs
 	}
 
 	// Verify integrity of tables and assumptions.
@@ -219,7 +218,7 @@ func FX25Init(debug_level int) {
 
 // Get properties of specified CTAG number.
 
-func fx25_get_rs(ctag_num int) *rs_t {
+func fx25_get_rs(ctag_num int) *reedsolomon.Codec {
 	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	dwutil.Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < FX25_NTAB)
 	dwutil.Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
@@ -344,98 +343,6 @@ func fx25_pick_mode(fx_mode int, dlen int) int {
 	return -1
 
 	// TODO: revisit error messages, produced by caller, when this returns -1.
-}
-
-/* Initialize a Reed-Solomon codec
- *   symsize = symbol size, bits (1-8) - always 8 for this application.
- *   gfpoly = Field generator polynomial coefficients
- *   fcr = first root of RS code generator polynomial, index form
- *   prim = primitive element to generate polynomial roots
- *   nroots = RS code generator polynomial degree (number of roots)
- */
-
-func init_rs_char(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) *rs_t {
-	if symsize > 8 {
-		return nil // Need version with ints rather than chars
-	}
-
-	if fcr >= (1 << symsize) {
-		return nil
-	}
-
-	if prim == 0 || prim >= (1<<symsize) {
-		return nil
-	}
-
-	if nroots >= (1 << symsize) {
-		return nil // Can't have more roots than symbol values!
-	}
-
-	var rs = new(rs_t)
-
-	rs.mm = symsize
-	rs.nn = uint((1 << symsize) - 1)
-
-	rs.alpha_to = make([]byte, rs.nn+1)
-	rs.index_of = make([]byte, rs.nn+1)
-
-	// Generate Galois field lookup tables
-	rs.index_of[0] = byte(rs.nn) // log(zero) = -inf (A0)
-	rs.alpha_to[rs.nn] = 0       // alpha**-inf = 0
-
-	var sr = 1
-	for i := range rs.nn {
-		rs.index_of[sr] = byte(i)
-		rs.alpha_to[i] = byte(sr)
-
-		sr <<= 1
-		if sr&(1<<symsize) != 0 {
-			sr ^= int(gfpoly)
-		}
-
-		sr &= int(rs.nn)
-	}
-
-	if sr != 1 {
-		// field generator polynomial is not primitive!
-		return nil
-	}
-
-	// Form RS code generator polynomial from its roots
-	rs.genpoly = make([]byte, nroots+1)
-	rs.fcr = byte(fcr)
-	rs.prim = byte(prim)
-	rs.nroots = nroots
-
-	// Find prim-th root of 1, used in decoding
-	var iprim = 1
-	for (iprim % int(prim)) != 0 {
-		iprim += int(rs.nn)
-	}
-
-	rs.iprim = byte(iprim / int(prim))
-
-	rs.genpoly[0] = 1
-	for i, root := 0, int(fcr)*int(prim); i < int(nroots); i, root = i+1, root+int(prim) {
-		rs.genpoly[i+1] = 1
-
-		// Multiply rs->genpoly[] by  @**(root + x)
-		for j := i; j > 0; j-- {
-			if rs.genpoly[j] != 0 {
-				rs.genpoly[j] = rs.genpoly[j-1] ^ rs.alpha_to[modnn(rs, int(rs.index_of[rs.genpoly[j]])+root)]
-			} else {
-				rs.genpoly[j] = rs.genpoly[j-1]
-			}
-		}
-		// rs->genpoly[0] can never be zero
-		rs.genpoly[0] = rs.alpha_to[modnn(rs, int(rs.index_of[rs.genpoly[0]])+root)]
-	}
-	// convert rs->genpoly[] to index form for quicker encoding
-	for i := 0; i <= int(nroots); i++ {
-		rs.genpoly[i] = rs.index_of[rs.genpoly[i]]
-	}
-
-	return rs
 }
 
 // TEMPORARY!!!

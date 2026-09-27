@@ -123,16 +123,12 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int) (int, []byte, []by
 
 	// Compute the check bytes.
 
-	const fence byte = 0xaa
-	var check [FX25_MAX_CHECK + 1]byte
-	check[FX25_MAX_CHECK] = fence
 	var rs = fx25_get_rs(ctag_num)
-	var nroots = int(rs.nroots)
+	var nroots = rs.NRoots()
 
-	dwutil.Assert(k_data_rs+nroots == int(rs.nn))
+	dwutil.Assert(k_data_rs+nroots == rs.N())
 
-	encode_rs_char(rs, data, check[:nroots])
-	dwutil.Assert(check[FX25_MAX_CHECK] == fence)
+	var check = rs.Encode(data[:k_data_rs])
 
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)

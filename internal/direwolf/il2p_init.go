@@ -3,27 +3,23 @@ package direwolf
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/reedsolomon"
 	"github.com/sirupsen/logrus"
 )
-
-// Interesting related stuff:
-// https://www.kernel.org/doc/html/v4.15/core-api/librs.html
-// https://berthub.eu/articles/posts/reed-solomon-for-programmers/
 
 const MAX_NROOTS = 16
 
 const NTAB = 5
 
 type TabType struct {
-	symsize uint  // Symbol size, bits (1-8).  Always 8 for this application.
-	genpoly uint  // Field generator polynomial coefficients.
-	fcs     uint  // First root of RS code generator polynomial, index form. FX.25 uses 1 but IL2P uses 0.
-	prim    uint  // Primitive element to generate polynomial roots.
-	nroots  uint  // RS code generator polynomial degree (number of roots). Same as number of check bytes added.
-	rs      *rs_t // Pointer to RS codec control block.  Filled in at init time.
+	symsize uint               // Symbol size, bits (1-8).  Always 8 for this application.
+	genpoly uint               // Field generator polynomial coefficients.
+	fcs     uint               // First root of RS code generator polynomial, index form. FX.25 uses 1 but IL2P uses 0.
+	prim    uint               // Primitive element to generate polynomial roots.
+	nroots  uint               // RS code generator polynomial degree (number of roots). Same as number of check bytes added.
+	rs      *reedsolomon.Codec // RS codec control block.  Filled in at init time.
 }
 
 var Tab = [NTAB]TabType{
@@ -53,12 +49,12 @@ func il2p_init(il2p_debug int) {
 	for i := range NTAB {
 		dwutil.Assert(Tab[i].nroots <= MAX_NROOTS)
 
-		Tab[i].rs = init_rs_char(Tab[i].symsize, Tab[i].genpoly, Tab[i].fcs, Tab[i].prim, Tab[i].nroots)
-		if Tab[i].rs == nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("IL2P internal error: init_rs_char failed!\n")
-			os.Exit(1)
+		var rs, err = reedsolomon.New(Tab[i].symsize, Tab[i].genpoly, Tab[i].fcs, Tab[i].prim, Tab[i].nroots)
+		if err != nil {
+			logrus.WithError(err).Fatal("IL2P internal error: Could not set up Reed-Solomon codec")
 		}
+
+		Tab[i].rs = rs
 	}
 }
 
@@ -68,7 +64,7 @@ func il2p_get_debug() int {
 
 // Find RS codec control block for specified number of parity symbols.
 
-func il2p_find_rs(nparity int) (*rs_t, error) {
+func il2p_find_rs(nparity int) (*reedsolomon.Codec, error) {
 	for n := range NTAB {
 		if Tab[n].nroots == uint(nparity) {
 			if Tab[n].rs == nil {
@@ -116,10 +112,7 @@ func il2p_encode_rs(tx_data []byte, num_parity int) ([]byte, error) {
 	var rs_block [FX25_BLOCK_SIZE]byte
 	copy(rs_block[len(rs_block)-data_size-num_parity:], tx_data)
 
-	var parity_out = make([]byte, num_parity)
-	encode_rs_char(rs, rs_block[:], parity_out)
-
-	return parity_out, nil
+	return rs.Encode(rs_block[:len(rs_block)-num_parity]), nil
 }
 
 /*-------------------------------------------------------------
@@ -159,8 +152,6 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 		fx_hex_dump(rs_block[:])
 	}
 
-	var derrlocs [FX25_MAX_CHECK]int // Half would probably be OK.
-
 	var rs, err = il2p_find_rs(num_parity)
 	if err != nil {
 		logrus.WithError(err).Error("Cannot check an IL2P block")
@@ -168,7 +159,12 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 		return make([]byte, data_size), -1
 	}
 
-	var derrors = decode_rs_char(rs, rs_block[:], derrlocs[:], 0)
+	var derrlocs, decodeErr = rs.Decode(rs_block[:], nil)
+
+	var derrors = len(derrlocs)
+	if decodeErr != nil {
+		derrors = -1
+	}
 	var out = make([]byte, data_size)
 	copy(out, rs_block[len(rs_block)-n:len(rs_block)-n+data_size])
 

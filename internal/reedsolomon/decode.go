@@ -1,9 +1,15 @@
-package direwolf
-
 // SPDX-FileCopyrightText: 2002 Phil Karn, KA9Q
 // SPDX-FileCopyrightText: 2007 Jim McGuire KB3MPL
 // SPDX-FileCopyrightText: 2019 John Langner, WB2OSZ
 // SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package reedsolomon
+
+import (
+	"errors"
+	"fmt"
+)
 
 // -----------------------------------------------------------------------
 //
@@ -51,13 +57,52 @@ package direwolf
 
 // #define DEBUG 5
 
-func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
-	// Access rs struct members
-	var nn = int(rs.nn)
-	var nroots = int(rs.nroots)
-	var fcr = int(rs.fcr)
-	var prim = int(rs.prim)
-	var iprim = int(rs.iprim)
+// ErrUncorrectable is returned by Decode for a block with more errors than
+// its parity symbols can repair.
+var ErrUncorrectable = errors.New("too many errors to correct")
+
+// Decode checks a block of N() symbols - data followed by NRoots() parity
+// symbols - and corrects it in place where it can.
+//
+// erasures optionally gives the positions of symbols already known to be bad,
+// which costs half as much of the correcting power as an unknown error; it
+// may be nil, and must not be longer than NRoots().
+//
+// It returns the positions of the symbols it corrected, or ErrUncorrectable,
+// in which case data may have been left partly modified.
+func (c *Codec) Decode(data []byte, erasures []int) ([]int, error) {
+	if len(data) != c.N() {
+		return nil, fmt.Errorf("block is %d symbols, want %d", len(data), c.N())
+	}
+
+	if len(erasures) > c.NRoots() {
+		return nil, fmt.Errorf("%d erasures, but only %d parity symbols", len(erasures), c.NRoots())
+	}
+
+	for _, pos := range erasures {
+		if pos < 0 || pos >= c.N() {
+			return nil, fmt.Errorf("erasure position %d is outside the block", pos)
+		}
+	}
+
+	var errLocs = make([]int, c.NRoots())
+	copy(errLocs, erasures)
+
+	var count = c.decode(data, errLocs, len(erasures))
+	if count < 0 {
+		return nil, ErrUncorrectable
+	}
+
+	return errLocs[:count], nil
+}
+
+func (c *Codec) decode(data []byte, eras_pos []int, no_eras int) int {
+	// Access codec struct members
+	var nn = int(c.nn)
+	var nroots = int(c.nroots)
+	var fcr = int(c.fcr)
+	var prim = int(c.prim)
+	var iprim = int(c.iprim)
 	var A0 = nn // A0 is defined as NN
 
 	var degLambda, el, degOmega int
@@ -65,14 +110,14 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	var u, q, tmp, num1, num2, den, discrR byte
 
 	// Err+Eras Locator poly and syndrome poly
-	var lambda = make([]byte, FX25_MAX_CHECK+1)
-	var s = make([]byte, FX25_MAX_CHECK)
-	var b = make([]byte, FX25_MAX_CHECK+1)
-	var t = make([]byte, FX25_MAX_CHECK+1)
-	var omega = make([]byte, FX25_MAX_CHECK+1)
-	var root = make([]byte, FX25_MAX_CHECK)
-	var reg = make([]byte, FX25_MAX_CHECK+1)
-	var loc = make([]int, FX25_MAX_CHECK)
+	var lambda = make([]byte, nroots+1)
+	var s = make([]byte, nroots)
+	var b = make([]byte, nroots+1)
+	var t = make([]byte, nroots+1)
+	var omega = make([]byte, nroots+1)
+	var root = make([]byte, nroots)
+	var reg = make([]byte, nroots+1)
+	var loc = make([]int, nroots)
 
 	var synError int
 	var count int
@@ -87,7 +132,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 			if s[i] == 0 {
 				s[i] = data[j]
 			} else {
-				s[i] = data[j] ^ rs.alpha_to[modnn(rs, int(rs.index_of[s[i]])+(fcr+i)*prim)]
+				s[i] = data[j] ^ c.alpha_to[c.modnn(int(c.index_of[s[i]])+(fcr+i)*prim)]
 			}
 		}
 	}
@@ -96,7 +141,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	synError = 0
 	for i = range nroots {
 		synError |= int(s[i])
-		s[i] = rs.index_of[s[i]]
+		s[i] = c.index_of[s[i]]
 	}
 
 	// fprintf(stderr,"syn_error = %4x\n",syn_error);
@@ -117,13 +162,13 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 	if no_eras > 0 {
 		// Init lambda to be the erasure locator polynomial
-		lambda[1] = rs.alpha_to[modnn(rs, prim*(nn-1-eras_pos[0]))]
+		lambda[1] = c.alpha_to[c.modnn(prim*(nn-1-eras_pos[0]))]
 		for i = 1; i < no_eras; i++ {
-			u = byte(modnn(rs, prim*(nn-1-eras_pos[i])))
+			u = byte(c.modnn(prim * (nn - 1 - eras_pos[i])))
 			for j = i + 1; j > 0; j-- {
-				tmp = rs.index_of[lambda[j-1]]
+				tmp = c.index_of[lambda[j-1]]
 				if int(tmp) != A0 {
-					lambda[j] ^= rs.alpha_to[modnn(rs, int(u)+int(tmp))]
+					lambda[j] ^= c.alpha_to[c.modnn(int(u)+int(tmp))]
 				}
 			}
 		}
@@ -168,7 +213,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	// for(i=0;i<NROOTS+1;i++)
 	//   b[i] = INDEX_OF[lambda[i]];
 	for i = range nroots + 1 {
-		b[i] = rs.index_of[lambda[i]]
+		b[i] = c.index_of[lambda[i]]
 	}
 
 	// Begin Berlekamp-Massey algorithm to determine error+erasure
@@ -182,11 +227,11 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 		for i = range r {
 			if lambda[i] != 0 && int(s[r-i-1]) != A0 {
-				discrR ^= rs.alpha_to[modnn(rs, int(rs.index_of[lambda[i]])+int(s[r-i-1]))]
+				discrR ^= c.alpha_to[c.modnn(int(c.index_of[lambda[i]])+int(s[r-i-1]))]
 			}
 		}
 
-		discrR = rs.index_of[discrR] // Index form
+		discrR = c.index_of[discrR] // Index form
 		if int(discrR) == A0 {
 			// 2 lines below: B(x) <-- x*B(x)
 			// memmove(&b[1],b,NROOTS*sizeof(b[0]));
@@ -198,7 +243,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 			for i = range nroots {
 				if int(b[i]) != A0 {
-					t[i+1] = lambda[i+1] ^ rs.alpha_to[modnn(rs, int(discrR)+int(b[i]))]
+					t[i+1] = lambda[i+1] ^ c.alpha_to[c.modnn(int(discrR)+int(b[i]))]
 				} else {
 					t[i+1] = lambda[i+1]
 				}
@@ -211,7 +256,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 					if lambda[i] == 0 {
 						b[i] = byte(A0)
 					} else {
-						b[i] = byte(modnn(rs, int(rs.index_of[lambda[i]])-int(discrR)+nn))
+						b[i] = byte(c.modnn(int(c.index_of[lambda[i]]) - int(discrR) + nn))
 					}
 				}
 			} else {
@@ -229,7 +274,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	degLambda = 0
 
 	for i = range nroots + 1 {
-		lambda[i] = rs.index_of[lambda[i]]
+		lambda[i] = c.index_of[lambda[i]]
 		if int(lambda[i]) != A0 {
 			degLambda = i
 		}
@@ -240,13 +285,13 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 	count = 0 // Number of roots of lambda(x)
 
-	for i, k = 1, iprim-1; i <= nn; i, k = i+1, modnn(rs, k+iprim) {
+	for i, k = 1, iprim-1; i <= nn; i, k = i+1, c.modnn(k+iprim) {
 		q = 1 // lambda[0] is always 0
 
 		for j = degLambda; j > 0; j-- {
 			if int(reg[j]) != A0 {
-				reg[j] = byte(modnn(rs, int(reg[j])+j))
-				q ^= rs.alpha_to[reg[j]]
+				reg[j] = byte(c.modnn(int(reg[j]) + j))
+				q ^= c.alpha_to[reg[j]]
 			}
 		}
 
@@ -285,7 +330,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 		for ; j >= 0; j-- {
 			if int(s[i-j]) != A0 && int(lambda[j]) != A0 {
-				tmp ^= rs.alpha_to[modnn(rs, int(s[i-j])+int(lambda[j]))]
+				tmp ^= c.alpha_to[c.modnn(int(s[i-j])+int(lambda[j]))]
 			}
 		}
 
@@ -293,7 +338,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 			degOmega = i
 		}
 
-		omega[i] = rs.index_of[tmp]
+		omega[i] = c.index_of[tmp]
 	}
 
 	omega[nroots] = byte(A0)
@@ -305,11 +350,11 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 		for i = degOmega; i >= 0; i-- {
 			if int(omega[i]) != A0 {
-				num1 ^= rs.alpha_to[modnn(rs, int(omega[i])+i*int(root[j]))]
+				num1 ^= c.alpha_to[c.modnn(int(omega[i])+i*int(root[j]))]
 			}
 		}
 
-		num2 = rs.alpha_to[modnn(rs, int(root[j])*(fcr-1)+nn)]
+		num2 = c.alpha_to[c.modnn(int(root[j])*(fcr-1)+nn)]
 		den = 0
 
 		// lambda[i+1] for i even is the formal derivative lambda_pr of lambda[i]
@@ -317,7 +362,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 		for i = maxI & ^1; i >= 0; i -= 2 {
 			if int(lambda[i+1]) != A0 {
-				den ^= rs.alpha_to[modnn(rs, int(lambda[i+1])+i*int(root[j]))]
+				den ^= c.alpha_to[c.modnn(int(lambda[i+1])+i*int(root[j]))]
 			}
 		}
 
@@ -331,7 +376,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 		}
 		// Apply error to data
 		if num1 != 0 {
-			data[loc[j]] ^= rs.alpha_to[modnn(rs, int(rs.index_of[num1])+int(rs.index_of[num2])+nn-int(rs.index_of[den]))]
+			data[loc[j]] ^= c.alpha_to[c.modnn(int(c.index_of[num1])+int(c.index_of[num2])+nn-int(c.index_of[den]))]
 		}
 	}
 
@@ -344,5 +389,3 @@ finish:
 
 	return count
 }
-
-// end fx25_extract.go

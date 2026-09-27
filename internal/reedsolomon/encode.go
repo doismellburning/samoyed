@@ -1,8 +1,11 @@
-package direwolf
-
 // SPDX-FileCopyrightText: 2002 Phil Karn, KA9Q
 // SPDX-FileCopyrightText: 2007 Jim McGuire KB3MPL
 // SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package reedsolomon
+
+import "fmt"
 
 // Most of this is based on:
 //
@@ -33,9 +36,23 @@ package direwolf
  *
  */
 
-func encode_rs_char(rs *rs_t, data []byte, bb []byte) {
-	var nroots = int(rs.nroots)
-	var nn = int(rs.nn)
+// Encode computes the NRoots() parity symbols for a block of N()-NRoots() data
+// symbols. It panics if data is any other length, which is a programming
+// error rather than something a received signal can cause.
+func (c *Codec) Encode(data []byte) []byte {
+	if len(data) != c.N()-c.NRoots() {
+		panic(fmt.Sprintf("reedsolomon: Encode given %d data symbols, want %d", len(data), c.N()-c.NRoots()))
+	}
+
+	var parity = make([]byte, c.NRoots())
+	c.encode(data, parity)
+
+	return parity
+}
+
+func (c *Codec) encode(data []byte, bb []byte) {
+	var nroots = int(c.nroots)
+	var nn = int(c.nn)
 	var dataLen = nn - nroots
 
 	// Clear out the FEC data area
@@ -45,14 +62,14 @@ func encode_rs_char(rs *rs_t, data []byte, bb []byte) {
 
 	for i := range dataLen {
 		// feedback = INDEX_OF[data[i] ^ bb[0]]
-		var feedback = rs.index_of[data[i]^bb[0]]
+		var feedback = c.index_of[data[i]^bb[0]]
 
-		if uint(feedback) != rs.nn { // feedback term is non-zero
+		if uint(feedback) != c.nn { // feedback term is non-zero
 			for j := 1; j < nroots; j++ {
 				// bb[j] ^= ALPHA_TO[modnn(feedback + GENPOLY[NROOTS-j])]
-				var genpolyVal = rs.genpoly[nroots-j]
-				var modnnResult = modnn(rs, int(feedback)+int(genpolyVal))
-				bb[j] ^= rs.alpha_to[modnnResult]
+				var genpolyVal = c.genpoly[nroots-j]
+				var modnnResult = c.modnn(int(feedback) + int(genpolyVal))
+				bb[j] ^= c.alpha_to[modnnResult]
 			}
 		}
 
@@ -60,15 +77,13 @@ func encode_rs_char(rs *rs_t, data []byte, bb []byte) {
 		copy(bb, bb[1:])
 
 		// bb[NROOTS-1] = ...
-		if uint(feedback) != rs.nn {
+		if uint(feedback) != c.nn {
 			// ALPHA_TO[modnn(feedback + GENPOLY[0])]
-			var genpolyVal = rs.genpoly[0]
-			var modnnResult = modnn(rs, int(feedback)+int(genpolyVal))
-			bb[nroots-1] = rs.alpha_to[modnnResult]
+			var genpolyVal = c.genpoly[0]
+			var modnnResult = c.modnn(int(feedback) + int(genpolyVal))
+			bb[nroots-1] = c.alpha_to[modnnResult]
 		} else {
 			bb[nroots-1] = 0
 		}
 	}
 }
-
-// end fx25_encode.go
