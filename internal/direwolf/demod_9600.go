@@ -15,6 +15,7 @@ package direwolf
 import (
 	"math"
 
+	"github.com/doismellburning/samoyed/internal/dsp"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -155,7 +156,7 @@ func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int,
 	// Just round to nearest integer.
 	D.lp_filter_taps = int((float64(D.lp_filter_width_sym) * float64(original_sample_rate) / float64(baud)) + 0.5)
 
-	D.lp_window = BP_WINDOW_COSINE
+	D.lp_window = dsp.WindowCosine
 
 	D.lpf_baud = 1.00
 
@@ -216,9 +217,9 @@ func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int,
 
 	var fc = float64(baud) * D.lpf_baud / float64(original_sample_rate*upsample)
 
-	//dw_printf ("demod_9600_init: call gen_lowpass(fc=%.2f, , size=%d, )\n", fc, D.lp_filter_taps);
+	//dw_printf ("demod_9600_init: call dsp.Lowpass(fc=%.2f, , size=%d, )\n", fc, D.lp_filter_taps);
 
-	gen_lowpass(fc, D.u.bb.lp_filter[:], D.lp_filter_taps*upsample, D.lp_window)
+	dsp.Lowpass(fc, D.u.bb.lp_filter[:D.lp_filter_taps*upsample], D.lp_window)
 
 	// New in 1.7 -
 	// Use a polyphase filter to reduce the CPU load.
