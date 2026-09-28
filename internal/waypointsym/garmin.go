@@ -1,5 +1,10 @@
-//nolint:gochecknoglobals
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package waypointsym maps APRS symbols to the waypoint symbols and icons that
+// GPS receivers understand, for the $PGRMW (Garmin) and $PMGNWPL (Magellan)
+// NMEA sentences sent to them.
+package waypointsym
 
 /*
  * Symbol codes for use in $PGRMWPL sentence.
@@ -303,7 +308,7 @@ const (
 
 const sym_default = sym_diamond_grn
 
-var grm_primary_symtab = []symbol_type_t{
+var grm_primary_symtab = []symbol_type_t{ //nolint:gochecknoglobals // I yearn for const arrays
 	sym_default,        //     00  	 --no-symbol--
 	sym_cntct_ranger,   //  !  01  	 Police, Sheriff
 	sym_default,        //  "  02  	 reserved  (was rain)
@@ -401,7 +406,7 @@ var grm_primary_symtab = []symbol_type_t{
 	sym_default,        //  ~  94  	 TNC Stream Switch
 }
 
-var grm_alternate_symtab = []symbol_type_t{
+var grm_alternate_symtab = []symbol_type_t{ //nolint:gochecknoglobals // I yearn for const arrays
 	sym_default,       //     00  	 --no-symbol--
 	sym_default,       //  !  01  	 EMERGENCY (!)
 	sym_default,       //  "  02  	 reserved
