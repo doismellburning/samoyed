@@ -59,34 +59,62 @@ func ParseAXUDPConfig(path string) ([]AXUDPMapEntry, error) {
 
 	var entries = make([]AXUDPMapEntry, 0, len(cfg.Maps))
 	for i, m := range cfg.Maps {
-		// Normalise ax25addr: strip surrounding whitespace, uppercase, and
-		// remove a trailing "-0" (SSID 0 is represented without any suffix by
-		// axudpExtractDest, so "CALL-0" would never match without this step).
-		var ax25addr = strings.ToUpper(strings.TrimSpace(m.AX25Addr))
-		ax25addr = strings.TrimSuffix(ax25addr, "-0")
-		if ax25addr == "" {
-			return nil, fmt.Errorf("map entry %d: ax25addr is empty", i)
+		var entry, entryErr = NewAXUDPMapEntry(m.AX25Addr, m.Host, m.Port, m.Broadcast)
+		if entryErr != nil {
+			return nil, fmt.Errorf("map entry %d: %w", i, entryErr)
 		}
-		if m.Host == "" {
-			return nil, fmt.Errorf("map entry %d: host is empty", i)
-		}
-		if m.Port < 1 || m.Port > 65535 {
-			return nil, fmt.Errorf("map entry %d: port %d out of range (1-65535)", i, m.Port)
-		}
-		var addr = net.JoinHostPort(m.Host, strconv.Itoa(m.Port))
-		var udpAddr, resolveErr = net.ResolveUDPAddr("udp", addr)
-		if resolveErr != nil {
-			return nil, fmt.Errorf("map entry %d: resolving %s: %w", i, addr, resolveErr)
-		}
-		entries = append(entries, AXUDPMapEntry{
-			AX25Addr:  ax25addr,
-			Addr:      addr,
-			UDPAddr:   udpAddr,
-			Broadcast: m.Broadcast,
-		})
+
+		entries = append(entries, entry)
 	}
 
 	return entries, nil
+}
+
+// NewAXUDPMapEntry checks and normalises one MAP entry, resolving host there
+// and then so that sending to it later needs no lookup.
+func NewAXUDPMapEntry(ax25addr string, host string, port int, broadcast bool) (AXUDPMapEntry, error) {
+	// Normalise ax25addr: strip surrounding whitespace, uppercase, and
+	// remove a trailing "-0" (SSID 0 is represented without any suffix by
+	// axudpExtractDest, so "CALL-0" would never match without this step).
+	ax25addr = strings.ToUpper(strings.TrimSpace(ax25addr))
+	ax25addr = strings.TrimSuffix(ax25addr, "-0")
+	if ax25addr == "" {
+		return AXUDPMapEntry{}, errors.New("ax25addr is empty")
+	}
+	if host == "" {
+		return AXUDPMapEntry{}, errors.New("host is empty")
+	}
+	if port < 1 || port > 65535 {
+		return AXUDPMapEntry{}, fmt.Errorf("port %d out of range (1-65535)", port)
+	}
+	var addr = net.JoinHostPort(host, strconv.Itoa(port))
+	var udpAddr, resolveErr = net.ResolveUDPAddr("udp", addr)
+	if resolveErr != nil {
+		return AXUDPMapEntry{}, fmt.Errorf("resolving %s: %w", addr, resolveErr)
+	}
+
+	return AXUDPMapEntry{
+		AX25Addr:  ax25addr,
+		Addr:      addr,
+		UDPAddr:   udpAddr,
+		Broadcast: broadcast,
+	}, nil
+}
+
+// axudpFrame returns the AX.25 frame an AXUDP datagram carries.
+//
+// RFC 1226 specifies a 16-bit CRC-CCITT checksum for AXIP (TCP/IP); most
+// AXUDP implementations have copied this over even though UDP already
+// includes its own checksum.  There is no protocol negotiation and no way to
+// distinguish such a peer from one that does not append a checksum.  We
+// auto-detect by checking whether the trailing 2 bytes form a valid checksum;
+// if so we strip them.
+func axudpFrame(datagram []byte) []byte {
+	if stripped, ok := axudpStripCRC(datagram); ok {
+		return stripped
+	}
+
+	return datagram
 }
 
 // axudpExtractDest extracts the destination AX.25 address from a raw AX.25 frame.
@@ -179,20 +207,7 @@ func (b *AXUDPBridge) RunUDPListener(ctx context.Context) error {
 
 		// CRC stripping and broadcastKISS are synchronous below, so it is safe
 		// to slice the read buffer directly without an extra allocation.
-		var raw = buf[:n]
-
-		// RFC 1226 specifies a 16-bit CRC-CCITT checksum for AXIP (TCP/IP);
-		// most AXUDP implementations have copied this over even though UDP
-		// already includes its own checksum.  There is no protocol negotiation
-		// and no way to distinguish such a peer from one that does not append a
-		// checksum.  We auto-detect by checking whether the trailing 2 bytes
-		// form a valid checksum; if so we strip them.
-		var ax25frame []byte
-		if stripped, ok := axudpStripCRC(raw); ok {
-			ax25frame = stripped
-		} else {
-			ax25frame = raw
-		}
+		var ax25frame = axudpFrame(buf[:n])
 
 		if len(ax25frame) == 0 {
 			continue

@@ -1507,7 +1507,8 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			for j := range MAX_TOTAL_CHANS {
 				if cfg.chan_medium[j] == MEDIUM_RADIO ||
 					cfg.chan_medium[j] == MEDIUM_IGATE ||
-					cfg.chan_medium[j] == MEDIUM_NETTNC {
+					cfg.chan_medium[j] == MEDIUM_NETTNC ||
+					cfg.chan_medium[j] == MEDIUM_AXUDP {
 					count++
 				}
 			}
@@ -1540,6 +1541,9 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				case MEDIUM_NETTNC:
 					// could elaborate with hostname, etc.
 					fmt.Fprintf(&info, "Port%d Network TNC;", j+1)
+
+				case MEDIUM_AXUDP:
+					fmt.Fprintf(&info, "Port%d AXUDP;", j+1)
 
 				default:
 					// Only list valid channels.

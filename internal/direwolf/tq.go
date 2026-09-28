@@ -80,6 +80,8 @@ type TransmitQueue struct {
 	// netTNCs is where a packet for an NCHANNEL channel goes instead of a
 	// queue.  A channel with no TNC here discards such packets.
 	netTNCs [MAX_TOTAL_CHANS]*NetTNC
+
+	axudpChannels [MAX_TOTAL_CHANS]*AXUDPChannel
 }
 
 // transmitQueue is the queue every producer - KISS, AGW, beacon, digipeater,
@@ -177,6 +179,13 @@ func (tq *TransmitQueue) SetNetTNCs(netTNCs [MAX_TOTAL_CHANS]*NetTNC) {
 	tq.netTNCs = netTNCs
 }
 
+// SetAXUDPChannels hands the queue the sockets that packets for AXUDPCHANNEL
+// channels go to.  Like SetNetTNCs, it must be called before anything is
+// queued.
+func (tq *TransmitQueue) SetAXUDPChannels(axudpChannels [MAX_TOTAL_CHANS]*AXUDPChannel) {
+	tq.axudpChannels = axudpChannels
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        Append
@@ -255,7 +264,8 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 	// Send somewhere else, rather than the transmit queue.
 
 	if tq.audioConfig.chan_medium[channel] == MEDIUM_IGATE ||
-		tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC {
+		tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC ||
+		tq.audioConfig.chan_medium[channel] == MEDIUM_AXUDP {
 		var ts string // optional time stamp.
 
 		if tq.audioConfig.timestamp_format != "" {
@@ -269,14 +279,22 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 
 		text_color_set(DW_COLOR_XMIT)
 
-		if tq.audioConfig.chan_medium[channel] == MEDIUM_IGATE {
+		switch tq.audioConfig.chan_medium[channel] {
+		case MEDIUM_IGATE:
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
 			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")
 
 			igate.sendRecPacket(channel, pp)
-		} else { // network TNC
+		case MEDIUM_AXUDP:
+			dw_printf("[%d>ax%s] ", channel, ts)
+			dw_printf("%s", stemp) /* stations followed by : */
+			ax25.SafePrint(pinfo, !pp.IsAPRS())
+			dw_printf("\n")
+
+			tq.axudpChannels[channel].sendPacket(channel, pp)
+		default: // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
 			ax25.SafePrint(pinfo, !pp.IsAPRS())
@@ -472,8 +490,9 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *ax25.Packet) {
 	#endif
 	*/
 
-	if channel >= 0 && channel < MAX_TOTAL_CHANS && tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC {
-		// For NETTNC channels, just yeet out the packet and let the external TNC handle it - we don't have enough info to do much else
+	if channel >= 0 && channel < MAX_TOTAL_CHANS &&
+		(tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC || tq.audioConfig.chan_medium[channel] == MEDIUM_AXUDP) {
+		// For NETTNC and AXUDP channels, just yeet out the packet and let the far end handle it - we don't have enough info to do much else
 		tq.Append(channel, prio, pp)
 
 		return
@@ -482,7 +501,7 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *ax25.Packet) {
 	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
-		dw_printf("Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.\n")
+		dw_printf("Connected packet mode requires MEDIUM_RADIO, MEDIUM_NETTNC or MEDIUM_AXUDP.\n")
 
 		return
 	}
@@ -598,9 +617,10 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 
 	logrus.WithField("channel", channel).Debug("lm_seize_request")
 
-	if channel >= 0 && channel < MAX_TOTAL_CHANS && tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC {
-		// MEDIUM_NETTNC: no internal modem to seize; confirm the channel immediately.
-		// See LMDataRequest for the rationale for allowing MEDIUM_NETTNC.
+	if channel >= 0 && channel < MAX_TOTAL_CHANS &&
+		(tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC || tq.audioConfig.chan_medium[channel] == MEDIUM_AXUDP) {
+		// MEDIUM_NETTNC, MEDIUM_AXUDP: no internal modem to seize; confirm the channel immediately.
+		// See LMDataRequest for the rationale for allowing them.
 		dataLinkQueue.SeizeConfirm(channel)
 
 		return
@@ -609,7 +629,7 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
-		dw_printf("Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.\n")
+		dw_printf("Connected packet mode requires MEDIUM_RADIO, MEDIUM_NETTNC or MEDIUM_AXUDP.\n")
 
 		return
 	}

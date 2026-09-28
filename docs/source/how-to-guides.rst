@@ -465,3 +465,38 @@ attached over KISS, runs its own link layer: it sees the raw frames and sends
 its own UA, so connected mode there is configured in that software and never
 reaches the path described above.  Registering a callsign over the AGW port
 has no bearing on it.
+
+Link to other nodes over AXUDP
+------------------------------
+
+AXUDP carries AX.25 frames between packet nodes as UDP datagrams, one frame
+each, and is what BPQ32, XRouter, JNOS and friends use to link over the
+internet.  An ``AXUDPCHANNEL`` makes a virtual channel whose "radio" is a set
+of such peers, and ``AXUDPMAP`` lines say which peer each destination is at:
+
+.. code::
+
+    MYCALL Q1TEST
+    AXUDPCHANNEL 8 10093
+    AXUDPMAP 8 Q2TEST-1 192.0.2.2 10093
+    AXUDPMAP 8 Q3TEST   node.example.org 93 B
+
+The channel number must be outside the range for modems, as for ``NCHANNEL``.
+``10093`` is the UDP port to listen on, and to send from.  Frames heard on it
+are treated like frames off the air, so digipeating, connected mode and client
+applications all work over the channel as they would over a radio.
+
+A frame sent on the channel goes to the peer its destination is mapped to.  A
+map entry without an SSID stands for every SSID of that callsign; one with an
+SSID stands for that one only, and wins over one without.  A frame whose
+destination has no entry at all - a NET/ROM ``NODES`` broadcast, an ID, a
+beacon - goes to every peer marked ``B``, as with BPQ32's ``MAP ... B``, and
+is dropped if there are none.  A checksum is put on every datagram sent, and
+taken off one received if it has one.
+
+Datagrams are accepted from anywhere, not just the mapped peers, so put the
+port behind a firewall if you would rather strangers could not inject frames.
+
+``samoyed-axudp`` does the same job as a separate process, bridging AXUDP to
+an ``NCHANNEL`` over TCP KISS.  The built-in channel is the one to use unless
+something else needs to sit between the two.

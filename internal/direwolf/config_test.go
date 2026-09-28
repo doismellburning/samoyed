@@ -2863,6 +2863,114 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"AXUDPCHANNEL": {
+			{
+				name:   "a virtual channel and port are stored",
+				config: "AXUDPCHANNEL 7 93\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_AXUDP, c.audio.chan_medium[7])
+					a.Equal(93, c.audio.axudp_port[7])
+				},
+			},
+			{
+				name:   "a channel below the virtual range is rejected",
+				config: "AXUDPCHANNEL 5 93\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[5])
+					a.Zero(c.audio.axudp_port[5])
+				},
+			},
+			{
+				name:   "an unreadable channel number is rejected",
+				config: "AXUDPCHANNEL seven 93\n",
+				check: func(a *assert.Assertions, c configs) {
+					for channel := range MAX_TOTAL_CHANS {
+						a.Zero(c.audio.axudp_port[channel])
+					}
+				},
+			},
+			{
+				name:   "a channel already in use is left as it was",
+				config: "NCHANNEL 7 localhost 8001\nAXUDPCHANNEL 7 93\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("localhost", c.audio.nettnc_addr[7])
+					a.Zero(c.audio.axudp_port[7])
+				},
+			},
+			{
+				name:   "a missing port leaves the channel alone",
+				config: "AXUDPCHANNEL 7\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[7])
+					a.Contains(c.output, "Missing UDP port")
+				},
+			},
+			{
+				name:   "an out of range port leaves the channel alone",
+				config: "AXUDPCHANNEL 7 65536\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[7])
+					a.Contains(c.output, "Invalid UDP port")
+				},
+			},
+		},
+		"AXUDPMAP": {
+			{
+				name:   "peers are added to their channel in order",
+				config: "AXUDPCHANNEL 7 93\nAXUDPMAP 7 q1test-0 127.0.0.1 93\nAXUDPMAP 7 Q2TEST-1 127.0.0.1 10093 B\n",
+				check: func(a *assert.Assertions, c configs) {
+					var maps = c.audio.axudp_maps[7]
+					if a.Len(maps, 2) {
+						a.Equal("Q1TEST", maps[0].AX25Addr)
+						a.Equal("127.0.0.1:93", maps[0].Addr)
+						a.False(maps[0].Broadcast)
+						a.Equal("Q2TEST-1", maps[1].AX25Addr)
+						a.Equal(10093, maps[1].UDPAddr.Port)
+						a.True(maps[1].Broadcast)
+					}
+				},
+			},
+			{
+				name:   "a channel that is not an AXUDPCHANNEL is rejected",
+				config: "NCHANNEL 7 localhost 8001\nAXUDPMAP 7 Q1TEST 127.0.0.1 93\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.audio.axudp_maps[7])
+					a.Contains(c.output, "earlier AXUDPCHANNEL")
+				},
+			},
+			{
+				name:   "a peer before its AXUDPCHANNEL is rejected",
+				config: "AXUDPMAP 7 Q1TEST 127.0.0.1 93\nAXUDPCHANNEL 7 93\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.audio.axudp_maps[7])
+					a.Equal(93, c.audio.axudp_port[7])
+				},
+			},
+			{
+				name:   "a missing port is rejected",
+				config: "AXUDPCHANNEL 7 93\nAXUDPMAP 7 Q1TEST 127.0.0.1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.audio.axudp_maps[7])
+					a.Contains(c.output, "needs a channel, callsign, host and port")
+				},
+			},
+			{
+				name:   "an out of range port is rejected",
+				config: "AXUDPCHANNEL 7 93\nAXUDPMAP 7 Q1TEST 127.0.0.1 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.audio.axudp_maps[7])
+					a.Contains(c.output, "out of range")
+				},
+			},
+			{
+				name:   "an unknown option is rejected",
+				config: "AXUDPCHANNEL 7 93\nAXUDPMAP 7 Q1TEST 127.0.0.1 93 X\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.audio.axudp_maps[7])
+					a.Contains(c.output, "the only option is B")
+				},
+			},
+		},
 		"NCHANNEL": {
 			{
 				name:   "a virtual channel, address and port are stored",

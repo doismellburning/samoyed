@@ -1057,6 +1057,8 @@ var configHandlers = map[string]configHandler{
 	"CHANNEL":        handleCHANNEL,
 	"ICHANNEL":       handleICHANNEL,
 	"NCHANNEL":       handleNCHANNEL,
+	"AXUDPCHANNEL":   handleAXUDPCHANNEL,
+	"AXUDPMAP":       handleAXUDPMAP,
 	"MYCALL":         handleMYCALL,
 	"MODEM":          handleMODEM,
 	"DTMF":           handleDTMF,
@@ -1940,6 +1942,106 @@ func handleNCHANNEL(ps *parseState) error {
 	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
 	ps.audio.nettnc_addr[nchan] = addr
 	ps.audio.nettnc_port[nchan] = n
+
+	return nil
+}
+
+// handleAXUDPCHANNEL handles the AXUDPCHANNEL keyword.
+func handleAXUDPCHANNEL(ps *parseState) error {
+	/*
+	 * AXUDPCHANNEL chan port			- Define AXUDP virtual channel.
+	 *
+	 *	Links to other packet nodes by sending each AX.25 frame as a UDP
+	 *	datagram, using a channel number outside the normal range for
+	 *	modems, as NCHANNEL does.  AXUDPMAP lines say which peer each
+	 *	destination is at.
+	 *
+	 *	chan = direwolf channel.
+	 *	port = local UDP port to listen on, and send from.
+	 */
+	var t = ps.split(false)
+	if t == "" {
+		return fmt.Errorf("line %d: Missing virtual channel number for AXUDPCHANNEL command", ps.line)
+	}
+
+	var achan, achanErr = strconv.Atoi(t)
+	if achanErr != nil || achan < MAX_RADIO_CHANS || achan >= MAX_TOTAL_CHANS {
+		return fmt.Errorf("line %d: AXUDPCHANNEL number must be in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
+	}
+	if ps.audio.chan_medium[achan] != MEDIUM_NONE {
+		return fmt.Errorf("line %d: AXUDPCHANNEL can't use channel %d because it is already in use", ps.line, achan)
+	}
+
+	t = ps.split(false)
+	if t == "" {
+		return fmt.Errorf("line %d: Missing UDP port for AXUDPCHANNEL command", ps.line)
+	}
+	// AXUDP's customary port is 93, below the range NCHANNEL insists on.
+	var port, portErr = strconv.Atoi(t)
+	if portErr != nil || port < 1 || port > 65535 {
+		return fmt.Errorf("line %d: Invalid UDP port number \"%s\" for AXUDPCHANNEL command. Must be in range 1 to 65535", ps.line, t)
+	}
+
+	ps.audio.chan_medium[achan] = MEDIUM_AXUDP
+	ps.audio.axudp_port[achan] = port
+
+	return nil
+}
+
+// handleAXUDPMAP handles the AXUDPMAP keyword.
+func handleAXUDPMAP(ps *parseState) error {
+	/*
+	 * AXUDPMAP chan callsign host port [B]	- Add a peer to an AXUDP channel.
+	 *
+	 *	chan = AXUDPCHANNEL channel.
+	 *	callsign = destination this peer is for.  Without an SSID it
+	 *		matches any SSID; with one, only that SSID, which wins
+	 *		over a match without.
+	 *	host, port = where the peer listens for AXUDP.
+	 *	B = also send this peer every frame whose destination has no
+	 *		AXUDPMAP of its own, e.g. NET/ROM NODES broadcasts, as
+	 *		BPQ32's MAP "B" option does.
+	 */
+	var t = ps.split(false)
+	if t == "" {
+		return fmt.Errorf("line %d: Missing channel number for AXUDPMAP command", ps.line)
+	}
+
+	var achan, achanErr = strconv.Atoi(t)
+	if achanErr != nil || achan < 0 || achan >= MAX_TOTAL_CHANS || ps.audio.chan_medium[achan] != MEDIUM_AXUDP {
+		return fmt.Errorf("line %d: AXUDPMAP channel \"%s\" must be defined by an earlier AXUDPCHANNEL", ps.line, t)
+	}
+
+	var callsign = ps.split(false)
+	var host = ps.split(false)
+
+	t = ps.split(false)
+	if callsign == "" || host == "" || t == "" {
+		return fmt.Errorf("line %d: AXUDPMAP needs a channel, callsign, host and port", ps.line)
+	}
+
+	var port, portErr = strconv.Atoi(t)
+	if portErr != nil {
+		return fmt.Errorf("line %d: Invalid UDP port number \"%s\" for AXUDPMAP command", ps.line, t)
+	}
+
+	var broadcast = false
+
+	t = ps.split(false)
+	switch {
+	case t == "":
+	case strings.EqualFold(t, "B"):
+		broadcast = true
+	default:
+		return fmt.Errorf("line %d: Unexpected \"%s\" on AXUDPMAP line; the only option is B", ps.line, t)
+	}
+
+	var entry, entryErr = NewAXUDPMapEntry(callsign, host, port, broadcast)
+	if entryErr != nil {
+		return fmt.Errorf("line %d: AXUDPMAP: %w", ps.line, entryErr)
+	}
+
+	ps.audio.axudp_maps[achan] = append(ps.audio.axudp_maps[achan], entry)
 
 	return nil
 }

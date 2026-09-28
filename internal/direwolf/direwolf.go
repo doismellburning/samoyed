@@ -490,6 +490,10 @@ x = Silence FX.25 information.`)
 	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config))
 	stopIfCancelled(ctx)
 
+	// Likewise to other nodes over AXUDP.
+	transmitQueue.SetAXUDPChannels(NewAXUDPChannels(ctx, audio_config))
+	stopIfCancelled(ctx)
+
 	/*
 	 * Initialize the APRStt gateway.  Each audio device's receive thread
 	 * makes the touch tone decoders for its own channels.
@@ -747,7 +751,7 @@ x = Silence FX.25 information.`)
  *			  Special cases:
  *				-1 for DTMF decoder.
  *				-2 for channel mapped to APRS-IS.
- *				-3 for channel mapped to network TNC.
+ *				-3 for channel mapped to network TNC or AXUDP.
  *		slice	- Slicer which caught it.
  *		pp	- Packet handle.
  *		alevel	- Audio level, range of 0 - 100.

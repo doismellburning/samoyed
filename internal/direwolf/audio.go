@@ -79,6 +79,7 @@ const (
 	MEDIUM_RADIO                  // Internal modem for radio.
 	MEDIUM_IGATE                  // Access IGate as ordinary channel.
 	MEDIUM_NETTNC                 // Remote network TNC.  (new in 1.8)
+	MEDIUM_AXUDP                  // Other nodes over AXUDP.
 )
 
 // carriesAX25 reports whether AX.25 frames are sent and heard on a channel of
@@ -86,7 +87,7 @@ const (
 // from, beaconed on and used for connected mode.  The IGate channel cannot:
 // APRS-IS carries text, not frames.
 func (m medium_e) carriesAX25() bool {
-	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC
+	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC || m == MEDIUM_AXUDP
 }
 
 type sanity_t int
@@ -481,6 +482,7 @@ type AudioConfig struct {
 	// MEDIUM_RADIO for internal modem.  (only possibility earlier)
 	// MEDIUM_IGATE allows application access to IGate.
 	// MEDIUM_NETTNC for external TNC via TCP.
+	// MEDIUM_AXUDP for other nodes over AXUDP.
 
 	igate_vchannel int /* Virtual channel mapped to APRS-IS. */
 	/* -1 for none. */
@@ -492,6 +494,11 @@ type AudioConfig struct {
 	nettnc_addr [MAX_TOTAL_CHANS]string // Network TNC address:  hostname or IP addr.
 
 	nettnc_port [MAX_TOTAL_CHANS]int // Network TNC TCP port.
+
+	// Applies only to AXUDP channels.
+
+	axudp_port [MAX_TOTAL_CHANS]int             // Local UDP port.
+	axudp_maps [MAX_TOTAL_CHANS][]AXUDPMapEntry // Peers, from AXUDPMAP.
 
 	achan [MAX_RADIO_CHANS]achan_param_s
 
