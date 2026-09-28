@@ -3,6 +3,7 @@ package direwolf
 import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/sirupsen/logrus"
 )
 
@@ -45,13 +46,13 @@ import (
 
 func (s *HDLCSender) sendFX25Frame(fbuf []byte, fx_mode int) int {
 	var ctag_num, data, check = fx25_encode_frame(s.channel, fbuf, fx_mode, s.fx25Debug)
-	if ctag_num < CTAG_MIN {
+	if ctag_num < fx25.CTagMin {
 		return (-1)
 	}
 
 	s.bitsSent = 0
 
-	var ctag_value = fx25_get_ctag_value(ctag_num)
+	var ctag_value = fx25.TagValue(ctag_num)
 
 	for k := range 8 {
 		s.sendFX25Bytes([]byte{byte(ctag_value>>(k*8)) & 0xff})
@@ -94,15 +95,15 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 	fbuf = append(fbuf, byte(frameFCS>>8)&0xff)
 
 	// Add bit-stuffing, filling to FX25_MAX_DATA bytes with flag patterns
-	var stuffedBytes, meaningfulLen = bitStuff(fbuf, FX25_MAX_DATA)
+	var stuffedBytes, meaningfulLen = bitStuff(fbuf, fx25.MaxData)
 	var dlen = meaningfulLen // Use meaningful length, not total buffer size
 
 	// Pick suitable correlation tag depending on
 	// user's preference, for number of check bytes,
 	// and the data size.
-	var ctag_num = fx25_pick_mode(fx_mode, dlen)
+	var ctag_num = fx25.PickMode(fx_mode, dlen)
 
-	if ctag_num < CTAG_MIN || ctag_num > CTAG_MAX {
+	if ctag_num < fx25.CTagMin || ctag_num > fx25.CTagMax {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
 			"fx_mode": fx_mode,
@@ -112,13 +113,13 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 		return -1, nil, nil
 	}
 
-	var k_data_radio = fx25_get_k_data_radio(ctag_num)
-	var k_data_rs = fx25_get_k_data_rs(ctag_num)
+	var k_data_radio = fx25.KDataRadio(ctag_num)
+	var k_data_rs = fx25.KDataRS(ctag_num)
 
 	// Zero out part of data which won't be transmitted
-	var shorten_by = FX25_MAX_DATA - k_data_radio
+	var shorten_by = fx25.MaxData - k_data_radio
 	if shorten_by > 0 {
-		for i := k_data_radio; i < FX25_MAX_DATA; i++ {
+		for i := k_data_radio; i < fx25.MaxData; i++ {
 			stuffedBytes[i] = 0
 		}
 	}
@@ -127,7 +128,7 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 
 	// Compute the check bytes.
 
-	var rs = fx25_get_rs(ctag_num)
+	var rs = fx25.Codec(ctag_num)
 	var nroots = rs.NRoots()
 
 	dwutil.Assert(k_data_rs+nroots == rs.N())

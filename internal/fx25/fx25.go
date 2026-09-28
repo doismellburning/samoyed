@@ -1,9 +1,17 @@
-//nolint:gochecknoglobals
-package direwolf
-
 // SPDX-FileCopyrightText: 2002 Phil Karn, KA9Q
 // SPDX-FileCopyrightText: 2007 Jim McGuire KB3MPL
 // SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package fx25 holds the parts of FX.25 - forward error correction wrapped
+// around an unmodified AX.25 frame - that are not tied to the bit stream: the
+// correlation tags that mark the start of a codeblock, the Reed-Solomon codec
+// each tag calls for, and the choice of tag for a frame about to be sent.
+//
+// Reference: http://www.stensat.org/docs/FX-25_01_06.pdf
+//
+//nolint:gochecknoglobals
+package fx25
 
 // -----------------------------------------------------------------------
 //
@@ -45,7 +53,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const FX25_NTAB = 3
+const CTagMin = 0x01
+const CTagMax = 0x0B
+
+// Maximum sizes of "data" and "check" parts.
+
+const MaxData = 239   // i.e. RS(255,239)
+const maxCheck = 64   // e.g. RS(255, 191)
+const BlockSize = 255 // Block size always 255 for 8 bit symbols.
+
+const nTab = 3
 
 // fx25TabEntry is one of the Reed-Solomon codes FX.25 uses, and its codec.
 type fx25TabEntry struct {
@@ -59,7 +76,7 @@ type fx25TabEntry struct {
 
 // fx25Tab is built once, when the package is initialised, and only read after
 // that, so every FX.25 sender and receiver can share it without a lock.
-var fx25Tab = [FX25_NTAB]fx25TabEntry{
+var fx25Tab = [nTab]fx25TabEntry{
 	newFX25TabEntry(8, 0x11d, 1, 1, 16), // RS(255,239)
 	newFX25TabEntry(8, 0x11d, 1, 1, 32), // RS(255,223)
 	newFX25TabEntry(8, 0x11d, 1, 1, 64), // RS(255,191)
@@ -118,7 +135,7 @@ var tags = [16]correlation_tag_s{
 	/* Tag_0F */ {0x93210201E8F4C706, 0, 0, 0, 0, -1}, //  Undefined
 }
 
-const CLOSE_ENOUGH = 8 // How many bits can be wrong in tag yet consider it a match?
+const closeEnough = 8 // How many bits can be wrong in tag yet consider it a match?
 // Needs to be large enough to match with significant errors
 // but not so large to get frequent false matches.
 // Probably don't want >= 16 because the hamming distance between
@@ -131,12 +148,12 @@ const CLOSE_ENOUGH = 8 // How many bits can be wrong in tag yet consider it a ma
 // no false triggers were observed.  So 8 doesn't seem to be too
 // high for 1200 bps.  No study has been done for 9600 bps.
 
-// Given a 64 bit correlation tag value, find acceptable match in table.
+// FindTag finds an acceptable match in the table for a 64 bit correlation
+// tag value, allowing for up to closeEnough bits in error.
 // Return index into table or -1 for no match.
-
-func fx25_tag_find_match(t uint64) int {
-	for c := CTAG_MIN; c <= CTAG_MAX; c++ {
-		if bits.OnesCount64(t^tags[c].value) <= CLOSE_ENOUGH {
+func FindTag(t uint64) int {
+	for c := CTagMin; c <= CTagMax; c++ {
+		if bits.OnesCount64(t^tags[c].value) <= closeEnough {
 			return c
 		}
 	}
@@ -154,41 +171,47 @@ func fx25_tag_find_match(t uint64) int {
 
 // Get properties of specified CTAG number.
 
-func fx25_get_rs(ctag_num int) *reedsolomon.Codec {
-	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
-	dwutil.Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < FX25_NTAB)
+// Codec is the Reed-Solomon codec for a correlation tag.
+func Codec(ctag_num int) *reedsolomon.Codec {
+	dwutil.Assert(ctag_num >= CTagMin && ctag_num <= CTagMax)
+	dwutil.Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < nTab)
 	dwutil.Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
 
 	return fx25Tab[tags[ctag_num].itab].rs
 }
 
-func fx25_get_ctag_value(ctag_num int) uint64 {
-	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+// TagValue is the 64 bit correlation tag itself, sent LSB first.
+func TagValue(ctag_num int) uint64 {
+	dwutil.Assert(ctag_num >= CTagMin && ctag_num <= CTagMax)
 
 	return tags[ctag_num].value
 }
 
-func fx25_get_k_data_radio(ctag_num int) int {
-	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+// KDataRadio is the number of data bytes transmitted in a codeblock.
+func KDataRadio(ctag_num int) int {
+	dwutil.Assert(ctag_num >= CTagMin && ctag_num <= CTagMax)
 
 	return tags[ctag_num].k_data_radio
 }
 
-func fx25_get_k_data_rs(ctag_num int) int {
-	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+// KDataRS is the number of data bytes in the Reed-Solomon block, before
+// shortening to KDataRadio.
+func KDataRS(ctag_num int) int {
+	dwutil.Assert(ctag_num >= CTagMin && ctag_num <= CTagMax)
 
 	return tags[ctag_num].k_data_rs
 }
 
-func fx25_get_nroots(ctag_num int) int {
-	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+// NRoots is the number of check bytes in a codeblock.
+func NRoots(ctag_num int) int {
+	dwutil.Assert(ctag_num >= CTagMin && ctag_num <= CTagMax)
 
 	return int(fx25Tab[tags[ctag_num].itab].nroots)
 }
 
 /*-------------------------------------------------------------
  *
- * Name:	fx25_pick_mode
+ * Name:	PickMode
  *
  * Purpose:	Pick suitable transmission format based on user preference
  *		and size of data part required.
@@ -205,13 +228,13 @@ func fx25_get_nroots(ctag_num int) int {
  *			This includes the AX.25 frame with bit stuffing and a flag
  *			pattern on each end.
  *
- * Returns:	Correlation tag number in range of CTAG_MIN thru CTAG_MAX.
+ * Returns:	Correlation tag number in range of CTagMin thru CTagMax.
  *		-1 is returned for failure.
  *		The caller should fall back to using plain old AX.25.
  *
  *--------------------------------------------------------------*/
 
-func fx25_pick_mode(fx_mode int, dlen int) int {
+func PickMode(fx_mode int, dlen int) int {
 	if fx_mode <= 0 {
 		return -1
 	}
@@ -219,8 +242,8 @@ func fx25_pick_mode(fx_mode int, dlen int) int {
 	// Specify a specific tag by adding 100 to the number.
 	// Fails if data won't fit.
 
-	if fx_mode-100 >= CTAG_MIN && fx_mode-100 <= CTAG_MAX {
-		if dlen <= fx25_get_k_data_radio(fx_mode-100) {
+	if fx_mode-100 >= CTagMin && fx_mode-100 <= CTagMax {
+		if dlen <= KDataRadio(fx_mode-100) {
 			return fx_mode - 100
 		} else {
 			return -1 // Assuming caller prints failure message.
@@ -231,8 +254,8 @@ func fx25_pick_mode(fx_mode int, dlen int) int {
 	// Pick the shortest one that can handle the required data length.
 
 	if fx_mode == 16 || fx_mode == 32 || fx_mode == 64 {
-		for k := CTAG_MAX; k >= CTAG_MIN; k-- {
-			if fx_mode == fx25_get_nroots(k) && dlen <= fx25_get_k_data_radio(k) {
+		for k := CTagMax; k >= CTagMin; k-- {
+			if fx_mode == NRoots(k) && dlen <= KDataRadio(k) {
 				return k
 			}
 		}
@@ -267,7 +290,7 @@ func fx25_pick_mode(fx_mode int, dlen int) int {
 	var prefer = [6]int{0x04, 0x03, 0x06, 0x09, 0x05, 0x01}
 	for k := range 6 {
 		var m = prefer[k]
-		if dlen <= fx25_get_k_data_radio(m) {
+		if dlen <= KDataRadio(m) {
 			return m
 		}
 	}

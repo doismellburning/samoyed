@@ -11,6 +11,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,7 +39,7 @@ type fx25Receiver struct {
 	dlen         int    // Accumulated length in "data" below.
 	clen         int    // Accumulated length in "check" below.
 	imask        byte   // Mask for storing a bit.
-	block        [FX25_BLOCK_SIZE + 1]byte
+	block        [fx25.BlockSize + 1]byte
 }
 
 func newFX25Receiver(channel int, subchannel int, slice int, debug int, sink fx25_frame_sink) *fx25Receiver {
@@ -102,18 +103,18 @@ func (F *fx25Receiver) recBit(dbit int) {
 			F.accum |= 1 << 63
 		}
 
-		var c = fx25_tag_find_match(F.accum)
-		if c >= CTAG_MIN && c <= CTAG_MAX {
+		var c = fx25.FindTag(F.accum)
+		if c >= fx25.CTagMin && c <= fx25.CTagMax {
 			F.ctag_num = c
-			F.k_data_radio = fx25_get_k_data_radio(F.ctag_num)
-			F.nroots = fx25_get_nroots(F.ctag_num)
-			F.coffs = fx25_get_k_data_rs(F.ctag_num)
-			dwutil.Assert(F.coffs == FX25_BLOCK_SIZE-F.nroots)
+			F.k_data_radio = fx25.KDataRadio(F.ctag_num)
+			F.nroots = fx25.NRoots(F.ctag_num)
+			F.coffs = fx25.KDataRS(F.ctag_num)
+			dwutil.Assert(F.coffs == fx25.BlockSize-F.nroots)
 
 			if F.debug >= 2 {
 				F.log().WithFields(logrus.Fields{
 					"ctag":        c,
-					"bit_errors":  bits.OnesCount(uint(F.accum ^ fx25_get_ctag_value(c))),
+					"bit_errors":  bits.OnesCount(uint(F.accum ^ fx25.TagValue(c))),
 					"data_bytes":  F.k_data_radio,
 					"check_bytes": F.nroots,
 				}).Debug("FX.25: Matched correlation tag")
@@ -122,8 +123,8 @@ func (F *fx25Receiver) recBit(dbit int) {
 			F.imask = 0x01
 			F.dlen = 0
 			F.clen = 0
-			F.block = [FX25_BLOCK_SIZE + 1]byte{}
-			F.block[FX25_BLOCK_SIZE] = FENCE
+			F.block = [fx25.BlockSize + 1]byte{}
+			F.block[fx25.BlockSize] = FENCE
 			F.state = FX_DATA
 		}
 
@@ -247,14 +248,14 @@ func (F *fx25Receiver) processRSBlock() {
 
 	if F.debug >= 3 {
 		F.log().Debug("FX.25: Received RS codeblock")
-		dwutil.HexDump(F.block[:FX25_BLOCK_SIZE])
+		dwutil.HexDump(F.block[:fx25.BlockSize])
 	}
 
-	dwutil.Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
+	dwutil.Assert(F.block[fx25.BlockSize] == FENCE)
 
-	var rs = fx25_get_rs(F.ctag_num)
+	var rs = fx25.Codec(F.ctag_num)
 
-	var derrlocs, decodeErr = rs.Decode(F.block[:FX25_BLOCK_SIZE], nil)
+	var derrlocs, decodeErr = rs.Decode(F.block[:fx25.BlockSize], nil)
 
 	var derrors = len(derrlocs)
 	if decodeErr != nil {

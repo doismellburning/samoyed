@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+package fx25
 
 import (
 	"math/bits"
@@ -26,13 +26,13 @@ func TestFX25TablesAreConsistent(t *testing.T) {
 		}
 	}
 
-	for j := CTAG_MIN; j <= CTAG_MAX; j++ {
+	for j := CTagMin; j <= CTagMax; j++ {
 		assert.Equal(t, int(fx25Tab[tags[j].itab].nroots), tags[j].n_block_radio-tags[j].k_data_radio, "tag %d", j)
 		assert.Equal(t, int(fx25Tab[tags[j].itab].nroots), tags[j].n_block_rs-tags[j].k_data_rs, "tag %d", j)
-		assert.Equal(t, FX25_BLOCK_SIZE, tags[j].n_block_rs, "tag %d", j)
+		assert.Equal(t, BlockSize, tags[j].n_block_rs, "tag %d", j)
 	}
 
-	for i := range FX25_NTAB {
+	for i := range nTab {
 		assert.NotNil(t, fx25Tab[i].rs, "codec %d", i)
 	}
 }
@@ -79,6 +79,6 @@ func TestFX25PickMode(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		assert.Equal(t, c.want, fx25_pick_mode(c.fxMode, c.dlen), "fx_mode %d, %d data bytes", c.fxMode, c.dlen)
+		assert.Equal(t, c.want, PickMode(c.fxMode, c.dlen), "fx_mode %d, %d data bytes", c.fxMode, c.dlen)
 	}
 }

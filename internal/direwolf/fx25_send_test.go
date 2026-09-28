@@ -3,6 +3,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
@@ -40,7 +41,7 @@ func TestFX25FrameIsSentAsTagDataAndCheck(t *testing.T) {
 	var fbuf = []byte{'Q', '1', 'T', 'E', 'S', 'T'}
 
 	var ctagNum, data, check = fx25_encode_frame(hdlcSendTestChannel, append([]byte{}, fbuf...), 16, 0)
-	require.GreaterOrEqual(t, ctagNum, CTAG_MIN)
+	require.GreaterOrEqual(t, ctagNum, fx25.CTagMin)
 
 	var sent int
 
@@ -50,7 +51,7 @@ func TestFX25FrameIsSentAsTagDataAndCheck(t *testing.T) {
 
 	assert.Equal(t, len(bits), sent, "the count returned should be the bits actually sent")
 
-	var ctagValue = fx25_get_ctag_value(ctagNum)
+	var ctagValue = fx25.TagValue(ctagNum)
 
 	var expected []byte
 	for k := range 8 {
@@ -67,7 +68,7 @@ func TestFX25FrameIsSentAsTagDataAndCheck(t *testing.T) {
 // caller can fall back to AX.25.
 func TestFX25FrameTooLargeSendsNothing(t *testing.T) {
 	var bits = captureBits(t, nil, func(s *HDLCSender) {
-		assert.Equal(t, -1, s.sendFX25Frame(make([]byte, FX25_MAX_DATA), 16))
+		assert.Equal(t, -1, s.sendFX25Frame(make([]byte, fx25.MaxData), 16))
 	})
 
 	assert.Empty(t, bits)
@@ -84,7 +85,7 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 	var fbuf = []byte{'Q', '2', 'T', 'E', 'S', 'T'}
 
 	var ctagNum, data, check = fx25_encode_frame(hdlcSendTestChannel, append([]byte{}, fbuf...), 16, 0)
-	require.GreaterOrEqual(t, ctagNum, CTAG_MIN)
+	require.GreaterOrEqual(t, ctagNum, fx25.CTagMin)
 
 	var beforeLen int
 
@@ -95,7 +96,7 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 
 	require.Equal(t, 1, bits[beforeLen-1], "the frame before should leave the line at 1")
 
-	var ctagValue = fx25_get_ctag_value(ctagNum)
+	var ctagValue = fx25.TagValue(ctagNum)
 
 	var expected []byte
 	for k := range 8 {

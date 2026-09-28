@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +28,7 @@ var fxTestFrame = []byte{ //nolint:gochecknoglobals
 const fxTestCorruptBytes = 8
 
 func Test_FX25_round_trip(t *testing.T) {
-	for ctag := CTAG_MIN; ctag <= CTAG_MAX; ctag++ {
+	for ctag := fx25.CTagMin; ctag <= fx25.CTagMax; ctag++ {
 		t.Run(fmt.Sprintf("ctag_%02x", ctag), func(t *testing.T) {
 			var ctag_num, data, check = fx25_encode_frame(0, slices.Clone(fxTestFrame), 100+ctag, 1)
 			require.Equal(t, ctag, ctag_num, "Wrong correlation tag chosen")
@@ -53,7 +54,7 @@ func fxTestBlock(ctag_num int, data []byte, check []byte) []byte {
 
 	var block = slices.Clone(flags)
 
-	var ctag_value = fx25_get_ctag_value(ctag_num)
+	var ctag_value = fx25.TagValue(ctag_num)
 	for k := range 8 {
 		block = append(block, byte(ctag_value>>(k*8))&0xff) // Should be portable to big endian too.
 	}
