@@ -1,21 +1,11 @@
 package direwolf
 
+import "github.com/doismellburning/samoyed/internal/dsp"
+
 /*
  * Demodulator state.
  * Different copy is required for each channel & subchannel being processed concurrently.
  */
-
-// TODO1.2:  change prefix from BP_ to DSP_
-
-type bp_window_t int
-
-const (
-	BP_WINDOW_TRUNCATED bp_window_t = iota
-	BP_WINDOW_COSINE
-	BP_WINDOW_HAMMING
-	BP_WINDOW_BLACKMAN
-	BP_WINDOW_FLATTOP
-)
 
 const MAX_FILTER_SIZE = 480 /* 401 is needed for profile A, 300 baud & 44100. Revisit someday. */
 // Size comes out to 417 for 1200 bps with 48000 sample rate
@@ -41,7 +31,7 @@ type demodulator_state_s struct {
 	 * Window type for the various filters.
 	 */
 
-	lp_window bp_window_t
+	lp_window dsp.Window
 
 	lpf_baud float64 /* Cutoff frequency as fraction of baud. */
 	/* Intuitively we'd expect this to be somewhere */
@@ -95,7 +85,7 @@ type demodulator_state_s struct {
 	pre_filter_len_sym float64 // Length in number of symbol times.
 	// TODO KG #define pre_filter_len_bits pre_filter_len_sym 		// temp until all references changed.
 
-	pre_window bp_window_t // Window type for filter shaping.
+	pre_window dsp.Window // Window type for filter shaping.
 
 	pre_filter_taps int // Calculated number of filter taps.
 	// TODO KG #define pre_filter_size pre_filter_taps		// temp until all references changed.
@@ -346,7 +336,7 @@ type demodulator_state_s struct {
 
 			pre_filter_taps int /* Size of pre filter, in audio samples. */
 
-			pre_window bp_window_t
+			pre_window dsp.Window
 
 			audio_in   [MAX_FILTER_SIZE]float64
 			pre_filter [MAX_FILTER_SIZE]float64
@@ -389,7 +379,7 @@ type demodulator_state_s struct {
 
 			lp_filter_taps int /* Size of Low Pass filter, in audio samples (i.e. filter taps). */
 
-			lp_window bp_window_t
+			lp_window dsp.Window
 
 			lp_filter [MAX_FILTER_SIZE]float64
 		}

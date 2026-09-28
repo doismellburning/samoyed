@@ -63,6 +63,7 @@ import (
 	"os"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dsp"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -158,7 +159,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 			D.u.psk.lpf_baud = 0.60
 			D.u.psk.lp_filter_width_sym = 1.061
-			D.u.psk.lp_window = BP_WINDOW_COSINE
+			D.u.psk.lp_window = dsp.WindowCosine
 
 			D.pll_locked_inertia = 0.95
 			D.pll_searching_inertia = 0.50
@@ -167,11 +168,11 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
 			D.u.psk.prefilter_baud = 1.3
 			D.u.psk.pre_filter_width_sym = 1.497
-			D.u.psk.pre_window = BP_WINDOW_COSINE
+			D.u.psk.pre_window = dsp.WindowCosine
 
 			D.u.psk.lpf_baud = 0.60
 			D.u.psk.lp_filter_width_sym = 1.061
-			D.u.psk.lp_window = BP_WINDOW_COSINE
+			D.u.psk.lp_window = dsp.WindowCosine
 
 			D.pll_locked_inertia = 0.87
 			D.pll_searching_inertia = 0.50
@@ -189,7 +190,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 			D.u.psk.lpf_baud = 0.55 // tightened from 0.70; BPSK signal bandwidth is baud/2, 0.55 gives modest margin with less noise
 			D.u.psk.lp_filter_width_sym = 1.007
-			D.u.psk.lp_window = BP_WINDOW_TRUNCATED
+			D.u.psk.lp_window = dsp.WindowTruncated
 
 			D.pll_locked_inertia = 0.925
 			D.pll_searching_inertia = 0.50
@@ -200,11 +201,11 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.u.psk.use_prefilter = 1    /* Add a bandpass filter. */
 			D.u.psk.prefilter_baud = 1.0 // was 0.55 (copied from QPSK S profile where correct_baud=bps/2); BPSK main lobe spans ±baud, so ±0.55*baud caused ISI at 300 baud
 			D.u.psk.pre_filter_width_sym = 2.014
-			D.u.psk.pre_window = BP_WINDOW_FLATTOP
+			D.u.psk.pre_window = dsp.WindowFlattop
 
 			D.u.psk.lpf_baud = 0.60
 			D.u.psk.lp_filter_width_sym = 1.061
-			D.u.psk.lp_window = BP_WINDOW_COSINE
+			D.u.psk.lp_window = dsp.WindowCosine
 
 			D.pll_locked_inertia = 0.925
 			D.pll_searching_inertia = 0.50
@@ -234,7 +235,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 			D.u.psk.lpf_baud = 0.60
 			D.u.psk.lp_filter_width_sym = 1.061 // 39. * 1200. / 44100.;
-			D.u.psk.lp_window = BP_WINDOW_COSINE
+			D.u.psk.lp_window = dsp.WindowCosine
 
 			D.pll_locked_inertia = 0.95
 			D.pll_searching_inertia = 0.50
@@ -243,11 +244,11 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
 			D.u.psk.prefilter_baud = 1.3
 			D.u.psk.pre_filter_width_sym = 1.497 // 55. * 1200. / 44100.;
-			D.u.psk.pre_window = BP_WINDOW_COSINE
+			D.u.psk.pre_window = dsp.WindowCosine
 
 			D.u.psk.lpf_baud = 0.60
 			D.u.psk.lp_filter_width_sym = 1.061 // 39. * 1200. / 44100.;
-			D.u.psk.lp_window = BP_WINDOW_COSINE
+			D.u.psk.lp_window = dsp.WindowCosine
 
 			D.pll_locked_inertia = 0.87
 			D.pll_searching_inertia = 0.50
@@ -265,7 +266,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 			D.u.psk.lpf_baud = 0.70
 			D.u.psk.lp_filter_width_sym = 1.007 // 37. * 1200. / 44100.;
-			D.u.psk.lp_window = BP_WINDOW_TRUNCATED
+			D.u.psk.lp_window = dsp.WindowTruncated
 
 			D.pll_locked_inertia = 0.925
 			D.pll_searching_inertia = 0.50
@@ -276,11 +277,11 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
 			D.u.psk.prefilter_baud = 0.55
 			D.u.psk.pre_filter_width_sym = 2.014 // 74. * 1200. / 44100.;
-			D.u.psk.pre_window = BP_WINDOW_FLATTOP
+			D.u.psk.pre_window = dsp.WindowFlattop
 
 			D.u.psk.lpf_baud = 0.60
 			D.u.psk.lp_filter_width_sym = 1.061 // 39. * 1200. / 44100.;
-			D.u.psk.lp_window = BP_WINDOW_COSINE
+			D.u.psk.lp_window = dsp.WindowCosine
 
 			D.pll_locked_inertia = 0.925
 			D.pll_searching_inertia = 0.50
@@ -317,7 +318,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 			D.u.psk.lpf_baud = 1.15
 			D.u.psk.lp_filter_width_sym = 0.871 // 32. * 1200. / 44100.;
-			D.u.psk.lp_window = BP_WINDOW_COSINE
+			D.u.psk.lp_window = dsp.WindowCosine
 
 			D.pll_locked_inertia = 0.95
 			D.pll_searching_inertia = 0.50
@@ -326,11 +327,11 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
 			D.u.psk.prefilter_baud = 0.9
 			D.u.psk.pre_filter_width_sym = 0.571 // 21. * 1200. / 44100.;
-			D.u.psk.pre_window = BP_WINDOW_FLATTOP
+			D.u.psk.pre_window = dsp.WindowFlattop
 
 			D.u.psk.lpf_baud = 1.15
 			D.u.psk.lp_filter_width_sym = 0.871 // 32. * 1200. / 44100.;
-			D.u.psk.lp_window = BP_WINDOW_COSINE
+			D.u.psk.lp_window = dsp.WindowCosine
 
 			D.pll_locked_inertia = 0.87
 			D.pll_searching_inertia = 0.50
@@ -348,7 +349,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 			D.u.psk.lpf_baud = 0.85
 			D.u.psk.lp_filter_width_sym = 0.844 // 31. * 1200. / 44100.;
-			D.u.psk.lp_window = BP_WINDOW_COSINE
+			D.u.psk.lp_window = dsp.WindowCosine
 
 			D.pll_locked_inertia = 0.925
 			D.pll_searching_inertia = 0.50
@@ -359,11 +360,11 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
 			D.u.psk.prefilter_baud = 0.85
 			D.u.psk.pre_filter_width_sym = 0.844 // 31. * 1200. / 44100.;
-			D.u.psk.pre_window = BP_WINDOW_COSINE
+			D.u.psk.pre_window = dsp.WindowCosine
 
 			D.u.psk.lpf_baud = 0.85
 			D.u.psk.lp_filter_width_sym = 0.844 // 31. * 1200. / 44100.;
-			D.u.psk.lp_window = BP_WINDOW_COSINE
+			D.u.psk.lp_window = dsp.WindowCosine
 
 			D.pll_locked_inertia = 0.925
 			D.pll_searching_inertia = 0.50
@@ -498,7 +499,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		f1 /= float64(samples_per_sec)
 		f2 /= float64(samples_per_sec)
 
-		gen_bandpass(f1, f2, D.u.psk.pre_filter[:D.u.psk.pre_filter_taps], D.u.psk.pre_window)
+		dsp.Bandpass(f1, f2, D.u.psk.pre_filter[:D.u.psk.pre_filter_taps], D.u.psk.pre_window)
 	}
 
 	/*
@@ -506,7 +507,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 	 */
 
 	var fc = float64(correct_baud) * D.u.psk.lpf_baud / float64(samples_per_sec)
-	gen_lowpass(fc, D.u.psk.lp_filter[:D.u.psk.lp_filter_taps], D.u.psk.lp_window)
+	dsp.Lowpass(fc, D.u.psk.lp_filter[:D.u.psk.lp_filter_taps], D.u.psk.lp_window)
 
 	/*
 	 * No point in having multiple numbers for signal level.

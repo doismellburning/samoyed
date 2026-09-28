@@ -24,6 +24,7 @@ import (
 	"math"
 	"os"
 
+	"github.com/doismellburning/samoyed/internal/dsp"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -155,11 +156,11 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 			// It turns out that narrower is better.
 
 			D.pre_filter_len_sym = 383 * 1200. / 44100. // about 8 symbols
-			D.pre_window = BP_WINDOW_TRUNCATED
+			D.pre_window = dsp.WindowTruncated
 		} else {
 			D.prefilter_baud = 0.87 // TODO: fine tune
 			D.pre_filter_len_sym = 1.857
-			D.pre_window = BP_WINDOW_COSINE
+			D.pre_window = dsp.WindowCosine
 		}
 
 		// Local oscillators for Mark and Space tones.
@@ -179,7 +180,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		} else {
 			D.lpf_baud = 0.14
 			D.lp_filter_width_sym = 1.388
-			D.lp_window = BP_WINDOW_TRUNCATED
+			D.lp_window = dsp.WindowTruncated
 		}
 
 		D.agc_fast_attack = 0.70
@@ -211,11 +212,11 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 			// It turns out that narrower is better.
 
 			D.pre_filter_len_sym = 8.163 // Filter length in symbol times.
-			D.pre_window = BP_WINDOW_TRUNCATED
+			D.pre_window = dsp.WindowTruncated
 		} else {
 			D.prefilter_baud = 0.87 // TODO: fine tune
 			D.pre_filter_len_sym = 1.857
-			D.pre_window = BP_WINDOW_COSINE
+			D.pre_window = dsp.WindowCosine
 		}
 
 		// Local oscillator for Center frequency.
@@ -232,7 +233,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		} else {
 			D.lpf_baud = 0.5
 			D.lp_filter_width_sym = 1.714286 //  63 * 1200. / 44100.;
-			D.lp_window = BP_WINDOW_TRUNCATED
+			D.lp_window = dsp.WindowTruncated
 		}
 
 		// For scaling phase shift into normalized -1 to +1 range for mark and space.
@@ -323,7 +324,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		f1 /= float64(samples_per_sec)
 		f2 /= float64(samples_per_sec)
 
-		gen_bandpass(f1, f2, D.pre_filter[:D.pre_filter_taps], D.pre_window)
+		dsp.Bandpass(f1, f2, D.pre_filter[:D.pre_filter_taps], D.pre_window)
 	}
 
 	/*
@@ -350,7 +351,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		}
 
 		dwutil.Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
-		gen_rrc_lowpass(D.lp_filter[:D.lp_filter_taps], D.u.afsk.rrc_rolloff, samples_per_sec/baud)
+		dsp.RRCLowpass(D.lp_filter[:D.lp_filter_taps], D.u.afsk.rrc_rolloff, samples_per_sec/baud)
 	} else {
 		D.lp_filter_taps = int(math.Round(float64(D.lp_filter_width_sym * samples_per_sec / baud)))
 
@@ -367,7 +368,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		dwutil.Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
 
 		var fc = float64(baud) * D.lpf_baud / samples_per_sec
-		gen_lowpass(fc, D.lp_filter[:D.lp_filter_taps], D.lp_window)
+		dsp.Lowpass(fc, D.lp_filter[:D.lp_filter_taps], D.lp_window)
 	}
 
 	/*
