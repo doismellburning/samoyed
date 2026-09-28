@@ -54,3 +54,43 @@ type OutputControlSettings struct {
 	// do.  0 asks for hamlib's default.
 	Rate *int `yaml:"rate"`
 }
+
+// ModemSettings describes a channel's modem - MODEM.
+type ModemSettings struct {
+	// Speed is the data rate in bits per second, or AIS or EAS.
+	Speed string `yaml:"speed"`
+
+	// Type forces bpsk or g3ruh regardless of the default for Speed.
+	Type string `yaml:"type"`
+
+	// Tones are the AFSK tones.  Both 0 means G3RUH.
+	Tones *ModemTones `yaml:"tones"`
+
+	// Decoders runs several decoders on slightly different frequencies.
+	Decoders *ModemDecoders `yaml:"decoders"`
+
+	// V26 is the V.26 alternative for 2400 bps PSK: a for the original, b
+	// for compatibility with the MFJ-2400.
+	V26 string `yaml:"v26"`
+
+	// Divide is the sample rate division factor, 1 to 8.
+	Divide *int `yaml:"divide"`
+
+	// Upsample is the upsample ratio for G3RUH, 1 to 4.
+	Upsample *int `yaml:"upsample"`
+
+	// Profiles are the letters, plus and minus picking demodulator profiles.
+	Profiles string `yaml:"profiles"`
+}
+
+// ModemTones are an AFSK modem's mark and space tones, in Hz.
+type ModemTones struct {
+	Mark  int `yaml:"mark"`
+	Space int `yaml:"space"`
+}
+
+// ModemDecoders runs Count decoders, Offset Hz apart.
+type ModemDecoders struct {
+	Count  int `yaml:"count"`
+	Offset int `yaml:"offset"`
+}
