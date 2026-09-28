@@ -22,3 +22,35 @@ type AudioDeviceSettings struct {
 	// Input.
 	Output string `yaml:"output"`
 }
+
+// OutputControlSettings describes how a channel drives one of its output
+// controls - PTT, DCD or CON.
+type OutputControlSettings struct {
+	// Method is one of serial, gpio, gpiod, lpt, rig or cm108.
+	Method string `yaml:"method"`
+
+	// Device is the serial port for serial, the GPIO chip for gpiod, the
+	// port hamlib talks to the rig on for rig, and the HID device for cm108.
+	Device string `yaml:"device"`
+
+	// Line is the serial control line, rts or dtr, and Line2 an optional
+	// second one on the same port.
+	Line  string `yaml:"line"`
+	Line2 string `yaml:"line2"`
+
+	// Pin is the GPIO number for gpio, gpiod and cm108, and the bit number
+	// for lpt.  Left out for cm108, it is 3, which all known designs use.
+	Pin *int `yaml:"pin"`
+
+	// Invert drives Pin, or Line, low rather than high to transmit;
+	// Invert2 does the same for Line2.
+	Invert  bool `yaml:"invert"`
+	Invert2 bool `yaml:"invert2"`
+
+	// Model is the hamlib rig model number, or "auto", for rig.
+	Model string `yaml:"model"`
+
+	// Rate is the serial port speed for rig, when hamlib's default will not
+	// do.  0 asks for hamlib's default.
+	Rate *int `yaml:"rate"`
+}

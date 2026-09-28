@@ -2313,7 +2313,7 @@ func handleFIX_BITS(ps *parseState) error {
 	return nil
 }
 
-// handlePTTDCDCON handles the PTTDCDCON keyword.
+// handlePTTDCDCON handles the PTT, DCD and CON keywords.
 func handlePTTDCDCON(ps *parseState) error {
 	/*
 	 * PTT 		- Push To Talk signal line.
@@ -2322,6 +2322,7 @@ func handlePTTDCDCON(ps *parseState) error {
 	 *
 	 * xxx  serial-port [-]rts-or-dtr [ [-]rts-or-dtr ]
 	 * xxx  GPIO  [-]gpio-num
+	 * xxx  GPIOD  chip  [-]gpio-num
 	 * xxx  LPT  [-]bit-num
 	 * PTT  RIG  model  port [ rate ]
 	 * PTT  RIG  AUTO  port [ rate ]
@@ -2333,155 +2334,228 @@ func handlePTTDCDCON(ps *parseState) error {
 	 *
 	 * Applies to most recent CHANNEL command.
 	 */
+	var ot, otname = outputControlType(ps.keyword)
+
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		return fmt.Errorf("line %d: PTT can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
-	}
-	var ot int
-	var otname string
-
-	if strings.EqualFold(ps.keyword, "PTT") {
-		ot = OCTYPE_PTT
-		otname = "PTT"
-	} else if strings.EqualFold(ps.keyword, "DCD") {
-		ot = OCTYPE_DCD
-		otname = "DCD"
-	} else {
-		ot = OCTYPE_CON
-		otname = "CON"
+		return fmt.Errorf("line %d: %s can only be used with radio channel 0 - %d", ps.line, otname, MAX_RADIO_CHANS-1)
 	}
 
-	// Work on a copy of the control and commit it at the end, so that a line
-	// rejected part way through leaves whatever an earlier line configured
-	// rather than a mixture of the two.  NewPTT reads these fields together.
-	var octrl = ps.audio.achan[ps.channel].octrl[ot]
+	var settings, err = parseOutputControl(ps, otname)
+	if err != nil {
+		return err
+	}
+
+	return ps.applyOutputControl(ot, settings)
+}
+
+// outputControlType maps a PTT, DCD or CON keyword to the output control it
+// configures, and the name to use for it in messages.
+func outputControlType(keyword string) (int, string) {
+	switch {
+	case strings.EqualFold(keyword, "PTT"):
+		return OCTYPE_PTT, "PTT"
+	case strings.EqualFold(keyword, "DCD"):
+		return OCTYPE_DCD, "DCD"
+	default:
+		return OCTYPE_CON, "CON"
+	}
+}
+
+// signedPin reads a GPIO or LPT bit number, where a leading "-" asks for the
+// signal to be inverted.
+func signedPin(t string) (int, bool, error) {
+	var n, err = strconv.Atoi(t)
+	if err != nil {
+		return 0, false, err
+	}
+
+	if n < 0 {
+		return -n, true, nil
+	}
+
+	return n, false, nil
+}
+
+// controlLine reads an RTS or DTR serial control line, where a leading "-"
+// asks for the signal to be inverted.
+func controlLine(t string) (string, bool) {
+	if strings.HasPrefix(t, "-") {
+		return t[1:], true
+	}
+
+	return t, false
+}
+
+// parseOutputControl reads the rest of a PTT, DCD or CON line into the
+// settings it describes.
+func parseOutputControl(ps *parseState, otname string) (OutputControlSettings, error) {
+	var settings = new(OutputControlSettings)
 
 	var t = ps.split(false)
 	if t == "" {
-		return fmt.Errorf("config file line %d: Missing output control device for %s command", ps.line, otname)
+		return *settings, fmt.Errorf("config file line %d: Missing output control device for %s command", ps.line, otname)
 	}
 
-	if strings.EqualFold(t, "GPIO") {
-		/* GPIO case, Linux only. */
+	switch {
+	case strings.EqualFold(t, "GPIO"), strings.EqualFold(t, "GPIOD"), strings.EqualFold(t, "LPT"):
+		settings.Method = strings.ToLower(t)
 
-		/* TODO KG
-		   #if __WIN32__
-		   	      text_color_set(DW_COLOR_ERROR);
-		   	      dw_printf ("Config file line %d: %s with GPIO is only available on Linux.\n", ps.line, otname);
-		   #else
-		*/
+		var what = dwutil.IfThenElse(settings.Method == "lpt", "LPT bit", "GPIO")
+
+		if settings.Method == "gpiod" {
+			settings.Device = ps.split(false)
+			if settings.Device == "" {
+				return *settings, fmt.Errorf(
+					"config file line %d: Missing GPIO chip name for %s.\nUse the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines",
+					ps.line,
+					otname,
+				)
+			}
+		}
+
 		t = ps.split(false)
 		if t == "" {
+			return *settings, fmt.Errorf("config file line %d: Missing %s number for %s", ps.line, what, otname)
+		}
+
+		var pin, invert, pinErr = signedPin(t)
+		if pinErr != nil {
+			return *settings, fmt.Errorf("config file line %d: %s number must be numeric for %s", ps.line, what, otname)
+		}
+
+		settings.Pin = &pin
+		settings.Invert = invert
+	case strings.EqualFold(t, "RIG"):
+		settings.Method = "rig"
+		settings.Model = ps.split(false)
+		settings.Device = ps.split(false)
+
+		// Optional serial port rate for CAT control PTT.
+
+		t = ps.split(false)
+		if t != "" {
+			if !alldigits(t) {
+				return *settings, fmt.Errorf("config file line %d: An optional number is required here for CAT serial port speed: %s", ps.line, t)
+			}
+
+			var rate, _ = strconv.Atoi(t)
+			settings.Rate = &rate
+		}
+
+		t = ps.split(false)
+		if t != "" {
+			ps.errorf("config file line %d: %s was not expected after model & port for hamlib", ps.line, t)
+		}
+	case strings.EqualFold(t, "CM108"):
+		settings.Method = "cm108"
+
+		for {
+			t = ps.split(false)
+			if t == "" {
+				break
+			}
+
+			if t[0] == '-' || unicode.IsDigit(rune(t[0])) {
+				var pin, invert, _ = signedPin(t)
+				settings.Pin = &pin
+				settings.Invert = invert
+			} else if t[0] == '/' {
+				settings.Device = t
+			} else {
+				return *settings, fmt.Errorf("config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1", ps.line, t)
+			}
+		}
+	default:
+		/* serial port case. */
+		settings.Method = "serial"
+		settings.Device = t
+
+		t = ps.split(false)
+		if t != "" {
+			settings.Line, settings.Invert = controlLine(t)
+
+			/* In version 1.2, we allow a second one for same serial port. */
+			/* Some interfaces want the two control lines driven with opposite polarity. */
+			/* e.g.   PTT COM1 RTS -DTR  */
+
+			t = ps.split(false)
+			if t != "" {
+				settings.Line2, settings.Invert2 = controlLine(t)
+			}
+		}
+	}
+
+	return *settings, nil
+}
+
+// serialControlLine maps "rts" or "dtr" to the serial control line it names.
+func serialControlLine(name string) (ptt_line_t, bool) {
+	switch {
+	case strings.EqualFold(name, "rts"):
+		return PTT_LINE_RTS, true
+	case strings.EqualFold(name, "dtr"):
+		return PTT_LINE_DTR, true
+	default:
+		return PTT_LINE_NONE, false
+	}
+}
+
+// applyOutputControl sets up output control ot (PTT, DCD or CON) for the
+// current channel.
+func (ps *parseState) applyOutputControl(ot int, settings OutputControlSettings) error {
+	var otname = [NUM_OCTYPES]string{OCTYPE_PTT: "PTT", OCTYPE_DCD: "DCD", OCTYPE_CON: "CON"}[ot]
+
+	// Work on a copy of the control and commit it at the end, so that settings
+	// rejected part way through leave whatever was configured earlier rather
+	// than a mixture of the two.  NewPTT reads these fields together.
+	var octrl = ps.audio.achan[ps.channel].octrl[ot]
+
+	switch strings.ToLower(settings.Method) {
+	case "gpio", "gpiod":
+		if strings.EqualFold(settings.Method, "gpiod") {
+			// Issue 590.  Originally we used the chip name, like gpiochip3, and fed it into
+			// gpiod_chip_open_by_name.   This function has disappeared in Debian 13 Trixie.
+			// We must now specify the full device path, like /dev/gpiochip3, for the only
+			// remaining open function gpiod_chip_open.
+			// We will allow the user to specify either the name or full device path.
+			// While we are here, also allow only the number as used by the gpiod utilities.
+			switch {
+			case settings.Device == "":
+				return fmt.Errorf("config file line %d: Missing GPIO chip name for %s.\nUse the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines", ps.line, otname)
+			case settings.Device[0] == '/': // Looks like device path.  Use as given.
+				octrl.out_gpio_name = settings.Device
+			case unicode.IsDigit(rune(settings.Device[0])): // or if digit, prepend "/dev/gpiochip"
+				octrl.out_gpio_name = "/dev/gpiochip" + settings.Device
+			default: // otherwise, prepend "/dev/" to the name
+				octrl.out_gpio_name = "/dev/" + settings.Device
+			}
+		}
+
+		if settings.Pin == nil {
 			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, otname)
 		}
 
-		var gpio, gpioErr = strconv.Atoi(t)
-		if gpioErr != nil {
-			return fmt.Errorf("config file line %d: GPIO number must be numeric for %s", ps.line, otname)
-		}
-		if gpio < 0 {
-			octrl.out_gpio_num = -1 * gpio
-			octrl.ptt_invert = true
-		} else {
-			octrl.out_gpio_num = gpio
-			octrl.ptt_invert = false
-		}
-
-		octrl.ptt_method = PTT_METHOD_GPIO
-		// #endif
-	} else if strings.EqualFold(t, "GPIOD") {
-		/*
-			#if __WIN32__
-				      text_color_set(DW_COLOR_ERROR);
-				      dw_printf ("Config file line %d: %s with GPIOD is only available on Linux.\n", ps.line, otname);
-			#else
-		*/
-		// #if defined(USE_GPIOD)
-		t = ps.split(false)
-		if t == "" {
-			return fmt.Errorf("config file line %d: Missing GPIO chip name for %s.\nUse the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines", ps.line, otname)
-		}
-
-		// Issue 590.  Originally we used the chip name, like gpiochip3, and fed it into
-		// gpiod_chip_open_by_name.   This function has disappeared in Debian 13 Trixie.
-		// We must now specify the full device path, like /dev/gpiochip3, for the only
-		// remaining open function gpiod_chip_open.
-		// We will allow the user to specify either the name or full device path.
-		// While we are here, also allow only the number as used by the gpiod utilities.
-
-		if t[0] == '/' { // Looks like device path.  Use as given.
-			octrl.out_gpio_name = t
-		} else if unicode.IsDigit(rune(t[0])) { // or if digit, prepend "/dev/gpiochip"
-			octrl.out_gpio_name = "/dev/gpiochip" + t
-		} else { // otherwise, prepend "/dev/" to the name
-			octrl.out_gpio_name = "/dev/" + t
-		}
-
-		t = ps.split(false)
-		if t == "" {
-			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, otname)
-		}
-
-		var gpio, gpioErr = strconv.Atoi(t)
-		if gpioErr != nil {
-			return fmt.Errorf("config file line %d: GPIO number must be numeric for %s", ps.line, otname)
-		}
-
-		if gpio < 0 {
-			octrl.out_gpio_num = -1 * gpio
-			octrl.ptt_invert = true
-		} else {
-			octrl.out_gpio_num = gpio
-			octrl.ptt_invert = false
-		}
-
-		octrl.ptt_method = PTT_METHOD_GPIOD
-		/* TODO KG
-		#else
-			      text_color_set(DW_COLOR_ERROR);
-			      dw_printf ("Application was not built with optional support for GPIOD.\n");
-			      dw_printf ("Install packages gpiod and libgpiod-dev, remove 'build' subdirectory, then rebuild.\n");
-		#endif // USE_GPIOD
-		*/
-		//#endif /* __WIN32__ */
-	} else if strings.EqualFold(t, "LPT") {
+		octrl.out_gpio_num = *settings.Pin
+		octrl.ptt_invert = settings.Invert
+		octrl.ptt_method = dwutil.IfThenElse(strings.EqualFold(settings.Method, "gpiod"), PTT_METHOD_GPIOD, PTT_METHOD_GPIO)
+	case "lpt":
 		/* Parallel printer case, x86 Linux only. */
-
-		//#if  ( defined(__i386__) || defined(__x86_64__) ) && ( defined(__linux__) || defined(__unix__) )
-		t = ps.split(false)
-		if t == "" {
+		if settings.Pin == nil {
 			return fmt.Errorf("config file line %d: Missing LPT bit number for %s", ps.line, otname)
 		}
 
-		var lpt, lptErr = strconv.Atoi(t)
-		if lptErr != nil {
-			return fmt.Errorf("config file line %d: LPT bit number must be numeric for %s", ps.line, otname)
-		}
-		if lpt < 0 {
-			octrl.ptt_lpt_bit = -1 * lpt
-			octrl.ptt_invert = true
-		} else {
-			octrl.ptt_lpt_bit = lpt
-			octrl.ptt_invert = false
-		}
-
+		octrl.ptt_lpt_bit = *settings.Pin
+		octrl.ptt_invert = settings.Invert
 		octrl.ptt_method = PTT_METHOD_LPT
-		/*
-			#else
-				      text_color_set(DW_COLOR_ERROR);
-				      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", ps.line, otname);
-			#endif
-		*/
-	} else if strings.EqualFold(t, "RIG") {
-		// TODO KG #ifdef USE_HAMLIB
-		t = ps.split(false)
-		if t == "" {
+	case "rig":
+		if settings.Model == "" {
 			return fmt.Errorf("config file line %d: Missing model number for hamlib", ps.line)
 		}
 
-		if strings.EqualFold(t, "AUTO") {
+		if strings.EqualFold(settings.Model, "AUTO") {
 			octrl.ptt_model = -1
 		} else {
-			if !alldigits(t) {
+			if !alldigits(settings.Model) {
 				return fmt.Errorf(
 					"config file line %d: A rig number, not a name, is required here.\n"+
 						"For example, if you have a Yaesu FT-847, specify 101.\n"+
@@ -2490,7 +2564,7 @@ func handlePTTDCDCON(ps *parseState) error {
 				)
 			}
 
-			var n, _ = strconv.Atoi(t)
+			var n, _ = strconv.Atoi(settings.Model)
 			if n < 1 || n > 9999 {
 				return fmt.Errorf("config file line %d: Unreasonable model number %d for hamlib", ps.line, n)
 			}
@@ -2498,34 +2572,22 @@ func handlePTTDCDCON(ps *parseState) error {
 			octrl.ptt_model = n
 		}
 
-		t = ps.split(false)
-		if t == "" {
+		if settings.Device == "" {
 			return fmt.Errorf("config file line %d: Missing port for hamlib", ps.line)
 		}
 
-		octrl.ptt_device = t
+		octrl.ptt_device = settings.Device
 
-		// Optional serial port rate for CAT control PTT.
-
-		t = ps.split(false)
-		if t != "" {
-			if !alldigits(t) {
-				return fmt.Errorf("config file line %d: An optional number is required here for CAT serial port speed: %s", ps.line, t)
+		if settings.Rate != nil {
+			if *settings.Rate < 0 {
+				return fmt.Errorf("config file line %d: CAT serial port speed %d can't be negative", ps.line, *settings.Rate)
 			}
-			var n, _ = strconv.Atoi(t)
-			octrl.ptt_rate = n
-		}
 
-		t = ps.split(false)
-		if t != "" {
-			ps.errorf("config file line %d: %s was not expected after model & port for hamlib", ps.line, t)
+			octrl.ptt_rate = *settings.Rate
 		}
-
 		octrl.ptt_method = PTT_METHOD_HAMLIB
-	} else if strings.EqualFold(t, "CM108") {
+	case "cm108":
 		/* CM108 - GPIO of USB sound card. case, Linux and Windows only. */
-
-		// TODO KG #if USE_CM108
 		if ot != OCTYPE_PTT {
 			// Future project:  Allow DCD and CON via the same device.
 			// This gets more complicated because we can't selectively change a single GPIO bit.
@@ -2539,7 +2601,6 @@ func handlePTTDCDCON(ps *parseState) error {
 		octrl.out_gpio_num = 3 // All known designs use GPIO 3.
 		// User can override for special cases.
 		octrl.ptt_invert = false // High for transmit.
-		octrl.ptt_device = ""
 
 		// Try to find PTT device for audio output device.
 		// Simplifiying assumption is that we have one radio per USB Audio Adapter.
@@ -2560,25 +2621,13 @@ func handlePTTDCDCON(ps *parseState) error {
 			}
 		}
 
-		for {
-			t = ps.split(false)
-			if t == "" {
-				break
-			}
+		if settings.Pin != nil {
+			octrl.out_gpio_num = *settings.Pin
+			octrl.ptt_invert = settings.Invert
+		}
 
-			if t[0] == '-' {
-				var gpio, _ = strconv.Atoi(t[1:])
-				octrl.out_gpio_num = gpio
-				octrl.ptt_invert = true
-			} else if unicode.IsDigit(rune(t[0])) {
-				var gpio, _ = strconv.Atoi(t)
-				octrl.out_gpio_num = gpio
-				octrl.ptt_invert = false
-			} else if t[0] == '/' {
-				octrl.ptt_device = t
-			} else {
-				return fmt.Errorf("config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1", ps.line, t)
-			}
+		if settings.Device != "" {
+			octrl.ptt_device = settings.Device
 		}
 
 		if octrl.out_gpio_num < 1 || octrl.out_gpio_num > 8 {
@@ -2587,11 +2636,6 @@ func handlePTTDCDCON(ps *parseState) error {
 		}
 
 		if octrl.ptt_device == "" {
-			/* TODO KG
-			#if __WIN32__
-				        dw_printf ("You must explicitly mention a HID path.\n");
-			#else
-			*/
 			return fmt.Errorf("config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s\n"+
 				"You must explicitly mention a device name such as /dev/hidraw1.\n"+
 				"Run \"cm108\" utility to get a list.\n"+
@@ -2600,74 +2644,44 @@ func handlePTTDCDCON(ps *parseState) error {
 		}
 
 		octrl.ptt_method = PTT_METHOD_CM108
+	case "serial":
+		if settings.Device == "" {
+			return fmt.Errorf("config file line %d: Missing output control device for %s command", ps.line, otname)
+		}
 
-		/* TODO KG
-		#else
-			      text_color_set(DW_COLOR_ERROR);
-			      dw_printf ("Config file line %d: %s with CM108 is only available when USB Audio GPIO support is enabled.\n", ps.line, otname);
-			      dw_printf ("You must rebuild direwolf with CM108 Audio Adapter GPIO PTT support.\n");
-			      dw_printf ("See Interface Guide for details.\n");
-			      rtfm();
-			      exit (EXIT_FAILURE);
-		#endif
-		*/
-	} else {
-		/* serial port case. */
-		octrl.ptt_device = t
+		octrl.ptt_device = settings.Device
 
-		t = ps.split(false)
-		if t == "" {
+		if settings.Line == "" {
 			return fmt.Errorf("config file line %d: Missing RTS or DTR after %s device name", ps.line, otname)
 		}
 
-		if strings.EqualFold(t, "rts") {
-			octrl.ptt_line = PTT_LINE_RTS
-			octrl.ptt_invert = false
-		} else if strings.EqualFold(t, "dtr") {
-			octrl.ptt_line = PTT_LINE_DTR
-			octrl.ptt_invert = false
-		} else if strings.EqualFold(t, "-rts") {
-			octrl.ptt_line = PTT_LINE_RTS
-			octrl.ptt_invert = true
-		} else if strings.EqualFold(t, "-dtr") {
-			octrl.ptt_line = PTT_LINE_DTR
-			octrl.ptt_invert = true
-		} else {
+		var line, lineOK = serialControlLine(settings.Line)
+		if !lineOK {
 			return fmt.Errorf("config file line %d: Expected RTS or DTR after %s device name", ps.line, otname)
 		}
 
+		octrl.ptt_line = line
+		octrl.ptt_invert = settings.Invert
 		octrl.ptt_method = PTT_METHOD_SERIAL
 
-		/* In version 1.2, we allow a second one for same serial port. */
-		/* Some interfaces want the two control lines driven with opposite polarity. */
-		/* e.g.   PTT COM1 RTS -DTR  */
-
-		t = ps.split(false)
-		if t != "" {
-			if strings.EqualFold(t, "rts") {
-				octrl.ptt_line2 = PTT_LINE_RTS
-				octrl.ptt_invert2 = false
-			} else if strings.EqualFold(t, "dtr") {
-				octrl.ptt_line2 = PTT_LINE_DTR
-				octrl.ptt_invert2 = false
-			} else if strings.EqualFold(t, "-rts") {
-				octrl.ptt_line2 = PTT_LINE_RTS
-				octrl.ptt_invert2 = true
-			} else if strings.EqualFold(t, "-dtr") {
-				octrl.ptt_line2 = PTT_LINE_DTR
-				octrl.ptt_invert2 = true
-			} else {
+		if settings.Line2 != "" {
+			var line2, line2OK = serialControlLine(settings.Line2)
+			if !line2OK {
 				return fmt.Errorf("config file line %d: Expected RTS or DTR after first RTS or DTR", ps.line)
 			}
+
+			octrl.ptt_line2 = line2
+			octrl.ptt_invert2 = settings.Invert2
 
 			/* Would not make sense to specify the same one twice. */
 
 			if octrl.ptt_line == octrl.ptt_line2 {
 				ps.errorf("config file line %d: Doesn't make sense to specify the some control line twice", ps.line)
 			}
-		} /* end of second serial port control ps.line. */
-	} /* end of serial port case. */
-	/* end of PTT, DCD, CON */
+		}
+	default:
+		return fmt.Errorf("config file line %d: Unknown %s method \"%s\": expected serial, gpio, gpiod, lpt, rig or cm108", ps.line, otname, settings.Method)
+	}
 
 	ps.audio.achan[ps.channel].octrl[ot] = octrl
 

@@ -3334,6 +3334,13 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 			{
+				name:   "a CAT rate of 0 goes back to hamlib's default",
+				config: "PTT RIG 2 localhost:4532 4800\nPTT RIG 2 localhost:4532 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_rate)
+				},
+			},
+			{
 				name:   "AUTO asks hamlib to work the model out",
 				config: "PTT RIG AUTO /dev/ttyS0\n",
 				check: func(a *assert.Assertions, c configs) {
