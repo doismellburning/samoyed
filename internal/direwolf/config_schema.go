@@ -95,3 +95,16 @@ type ModemDecoders struct {
 	Count  int `yaml:"count"`
 	Offset int `yaml:"offset"`
 }
+
+// IL2PTXSettings describes a channel's IL2P transmission - IL2PTX.
+type IL2PTXSettings struct {
+	// Invert inverts the polarity.  Do not use it for 1200 bps.
+	Invert bool `yaml:"invert"`
+
+	// MaxFEC asks for the stronger FEC; false asks for the weaker one, which
+	// only IL2P v0.4 has.  Left out, it is true.
+	MaxFEC *bool `yaml:"maxfec"`
+
+	// CRC adds the trailing CRC.  Left out, it is true.
+	CRC *bool `yaml:"crc"`
+}
