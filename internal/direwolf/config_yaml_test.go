@@ -136,22 +136,109 @@ channels:
 `,
 		},
 		{
+			name:   "audio sample rate",
+			legacy: "ADEVICE plughw:1,0\nARATE 48000\n",
+			yaml:   "audioDevices:\n  - {input: \"plughw:1,0\", rate: 48000}\n",
+		},
+		{
+			name: "channel timing",
+			legacy: `
+ADEVICE hw
+ACHANNELS 2
+CHANNEL 0
+DWAIT 3
+SLOTTIME 20
+PERSIST 127
+TXTAIL 15
+FULLDUP ON
+CHANNEL 1
+FULLDUP OFF
+`,
+			yaml: `
+audioDevices:
+  - {input: hw, channels: 2}
+channels:
+  - {channel: 0, dwait: 3, slottime: 20, persist: 127, txtail: 15, fulldup: true}
+  - {channel: 1, fulldup: false}
+`,
+		},
+		{
+			name:   "unreasonable timing is corrected the same way",
+			legacy: "DWAIT 300\nSLOTTIME 100\nPERSIST 1\nTXTAIL 300\n",
+			yaml:   "channels:\n  - {channel: 0, dwait: 300, slottime: 100, persist: 1, txtail: 300}\n",
+		},
+		{
+			name:   "questionable timing is warned about the same way",
+			legacy: "TXTAIL 2\n",
+			yaml:   "channels:\n  - {channel: 0, txtail: 2}\n",
+		},
+		{
+			name:   "FX.25",
+			legacy: "FX25TX 16\n",
+			yaml:   "channels:\n  - {channel: 0, fx25tx: 16}\n",
+		},
+		{
+			name:   "FX.25 off",
+			legacy: "FX25TX 16\nFX25TX 0\n",
+			yaml:   "channels:\n  - {channel: 0, fx25tx: 0}\n",
+		},
+		{
+			name:   "unreasonable FX.25 is corrected the same way",
+			legacy: "FX25TX 999\n",
+			yaml:   "channels:\n  - {channel: 0, fx25tx: 999}\n",
+		},
+		{
+			name:   "IL2P with the defaults",
+			legacy: "IL2PTX\n",
+			yaml:   "channels:\n  - {channel: 0, il2ptx: {}}\n",
+		},
+		{
+			name:   "IL2P with everything changed",
+			legacy: "IL2PTX -0c\nIL2PVERSION 0.4\n",
+			yaml:   "channels:\n  - {channel: 0, il2ptx: {invert: true, maxfec: false, crc: false}, il2pversion: 0.4}\n",
+		},
+		{
+			name:   "IL2P compatibility",
+			legacy: "IL2PVERSION COMPAT\n",
+			yaml:   "channels:\n  - {channel: 0, il2pversion: compat}\n",
+		},
+		{
+			name:   "an unknown IL2P version is refused the same way",
+			legacy: "IL2PVERSION 0.5\n",
+			yaml:   "channels:\n  - {channel: 0, il2pversion: \"0.5\"}\n",
+		},
+		{
+			name:   "network ports",
+			legacy: "AGWPORT 8010\nKISSPORT 0\nKISSPORT 8011\nKISSPORT 8012 1\n",
+			yaml:   "agwPort: 8010\nkissPorts:\n  - port: 0\n  - port: 8011\n  - {port: 8012, channel: 1}\n",
+		},
+		{
+			name:   "AGW disabled",
+			legacy: "AGWPORT 0\n",
+			yaml:   "agwPort: 0\n",
+		},
+		{
+			name:   "unreasonable ports are refused the same way",
+			legacy: "AGWPORT 99\nKISSPORT 99\nKISSPORT 8011 99\n",
+			yaml:   "agwPort: 99\nkissPorts:\n  - port: 99\n  - {port: 8011, channel: 99}\n",
+		},
+		{
 			name:   "a missing PTT device is refused the same way",
 			legacy: "PTT RIG 101\n",
 			yaml:   "channels:\n  - {channel: 0, ptt: {method: rig, model: \"101\"}}\n",
 		},
 		{
 			name:   "directives without a YAML form yet go in the legacy block",
-			legacy: "MYCALL Q1TEST\nAGWPORT 8010\nKISSPORT 8011\nCHANNEL 0\nDWAIT 5\n",
+			legacy: "MYCALL Q1TEST\nDEDUPE 20\nMETRICSPORT 9100\nCHANNEL 0\nTXINH GPIO 5\n",
 			yaml: `
 channels:
   - {channel: 0, mycall: Q1TEST}
 legacy: |
-  AGWPORT 8010
+  DEDUPE 20
   # A comment, as in any other configuration file
-  KISSPORT 8011
+  METRICSPORT 9100
   CHANNEL 0
-  DWAIT 5
+  TXINH GPIO 5
 `,
 		},
 	}
@@ -306,6 +393,19 @@ func Test_config_yaml(t *testing.T) {
 			assert.Zero(t, got.errors, got.output)
 			assert.Equal(t, want.audio, got.audio, content)
 		}
+	})
+
+	t.Run("a port complaint points at the setting's line", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0}\nagwPort: 99\nkissPorts:\n  - port: 8011\n  - port: 99\n")
+		assert.Equal(t, 2, c.errors)
+		assert.Contains(t, c.output, "Line 3: Invalid port number for AGW")
+		assert.Contains(t, c.output, "Line 6: Invalid TCP port number for KISS")
+	})
+
+	t.Run("an IL2P setting of the wrong type is refused", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0, il2ptx: yes please}\n")
+		assert.True(t, c.fatal)
+		assert.Equal(t, LAYER2_AX25, c.audio.achan[0].layer2_xmit)
 	})
 
 	t.Run("an unknown PTT method is refused", func(t *testing.T) {

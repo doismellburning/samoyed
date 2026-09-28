@@ -1764,6 +1764,12 @@ func handleARATE(ps *parseState) error {
 	}
 
 	var n, _ = strconv.Atoi(t)
+
+	return ps.applyARATE(n)
+}
+
+// applyARATE sets the audio sample rate for the current device.
+func (ps *parseState) applyARATE(n int) error {
 	if n >= MIN_SAMPLES_PER_SEC && n <= MAX_SAMPLES_PER_SEC {
 		ps.audio.adev[ps.adevice].samples_per_sec = n
 	} else {
@@ -2845,6 +2851,13 @@ func handleDWAIT(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: Delay time must be numeric for DWAIT command. Keeping %d", ps.line, ps.audio.achan[ps.channel].dwait)
 	}
+
+	return ps.applyDWAIT(n)
+}
+
+// applyDWAIT sets the extra receiver squelch delay, in 10 ms units, for the
+// current channel.
+func (ps *parseState) applyDWAIT(n int) error {
 	if n >= 0 && n <= 255 {
 		ps.audio.achan[ps.channel].dwait = n
 	} else {
@@ -2871,6 +2884,12 @@ func handleSLOTTIME(ps *parseState) error {
 	}
 
 	var n, _ = strconv.Atoi(t)
+
+	return ps.applySLOTTIME(n)
+}
+
+// applySLOTTIME sets the slot time, in 10 ms units, for the current channel.
+func (ps *parseState) applySLOTTIME(n int) error {
 	if n >= 5 && n < 50 {
 		// 0 = User has no clue.  This would be no delay.
 		// 10 = Default.
@@ -2907,6 +2926,13 @@ func handlePERSIST(ps *parseState) error {
 	}
 
 	var n, _ = strconv.Atoi(t)
+
+	return ps.applyPERSIST(n)
+}
+
+// applyPERSIST sets the persistence, the chance out of 255 of transmitting in
+// a slot, for the current channel.
+func (ps *parseState) applyPERSIST(n int) error {
 	if n >= 5 && n <= 250 {
 		ps.audio.achan[ps.channel].persist = n
 	} else {
@@ -2991,6 +3017,12 @@ func handleTXTAIL(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: Time must be numeric for TXTAIL command. Keeping %d", ps.line, ps.audio.achan[ps.channel].txtail)
 	}
+
+	return ps.applyTXTAIL(n)
+}
+
+// applyTXTAIL sets the transmit tail, in 10 ms units, for the current channel.
+func (ps *parseState) applyTXTAIL(n int) error {
 	if n >= 0 && n <= 255 {
 		if n < 5 {
 			ps.warnf("line %d: Setting TXTAIL that small is a REALLY BAD idea if you want other stations to hear you.\n"+
@@ -3030,14 +3062,21 @@ func handleFULLDUP(ps *parseState) error {
 	}
 
 	if strings.EqualFold(t, "ON") {
-		ps.audio.achan[ps.channel].fulldup = true
+		return ps.applyFULLDUP(true)
 	} else if strings.EqualFold(t, "OFF") {
-		ps.audio.achan[ps.channel].fulldup = false
-	} else {
-		ps.audio.achan[ps.channel].fulldup = false
-
-		ps.errorf("line %d: Expected ON or OFF for FULLDUP", ps.line)
+		return ps.applyFULLDUP(false)
 	}
+
+	ps.audio.achan[ps.channel].fulldup = false
+
+	ps.errorf("line %d: Expected ON or OFF for FULLDUP", ps.line)
+
+	return nil
+}
+
+// applyFULLDUP sets whether the current channel is full duplex.
+func (ps *parseState) applyFULLDUP(on bool) error {
+	ps.audio.achan[ps.channel].fulldup = on
 
 	return nil
 }
@@ -3087,6 +3126,13 @@ func handleFX25TX(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: FEC mode must be numeric for FX25TX command. Keeping %d", ps.line, ps.audio.achan[ps.channel].fx25_strength)
 	}
+
+	return ps.applyFX25TX(n)
+}
+
+// applyFX25TX sets the FX.25 transmit mode for the current channel: 0 for
+// off, 1 for automatic, or else the number of parity bytes to ask for.
+func (ps *parseState) applyFX25TX(n int) error {
 	if n == 0 {
 		// 0 is off: -X 0 enables nothing either, though it cannot switch off
 		// what the config file turned on.  Leaving the channel on LAYER2_FX25
@@ -3159,10 +3205,8 @@ func handleIL2PTX(ps *parseState) error {
 		return fmt.Errorf("line %d: IL2PTX can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	ps.audio.achan[ps.channel].layer2_xmit = LAYER2_IL2P
-	ps.audio.achan[ps.channel].il2p_max_fec = 1
-	ps.audio.achan[ps.channel].il2p_invert_polarity = 0
-	ps.audio.achan[ps.channel].il2p_crc = true
+	var settings = new(IL2PTXSettings)
+	var maxFEC, crc = true, true
 
 	for {
 		var t = ps.split(false)
@@ -3173,17 +3217,17 @@ func handleIL2PTX(ps *parseState) error {
 		for _, c := range t {
 			switch c {
 			case '+':
-				ps.audio.achan[ps.channel].il2p_invert_polarity = 0
+				settings.Invert = false
 			case '-':
-				ps.audio.achan[ps.channel].il2p_invert_polarity = 1
+				settings.Invert = true
 			case '0':
-				ps.audio.achan[ps.channel].il2p_max_fec = 0
+				maxFEC = false
 			case '1':
-				ps.audio.achan[ps.channel].il2p_max_fec = 1
+				maxFEC = true
 			case 'C':
-				ps.audio.achan[ps.channel].il2p_crc = true
+				crc = true
 			case 'c':
-				ps.audio.achan[ps.channel].il2p_crc = false
+				crc = false
 			default:
 				ps.errorf("line %d: Invalid parameter '%c' for IL2PTX command", ps.line, c)
 
@@ -3191,6 +3235,30 @@ func handleIL2PTX(ps *parseState) error {
 			}
 		}
 	}
+
+	settings.MaxFEC = &maxFEC
+	settings.CRC = &crc
+
+	return ps.applyIL2PTX(*settings)
+}
+
+// applyIL2PTX makes the current channel transmit IL2P.
+func (ps *parseState) applyIL2PTX(settings IL2PTXSettings) error {
+	var achan = &ps.audio.achan[ps.channel]
+
+	achan.layer2_xmit = LAYER2_IL2P
+
+	achan.il2p_invert_polarity = 0
+	if settings.Invert {
+		achan.il2p_invert_polarity = 1
+	}
+
+	achan.il2p_max_fec = 1
+	if settings.MaxFEC != nil && !*settings.MaxFEC {
+		achan.il2p_max_fec = 0
+	}
+
+	achan.il2p_crc = settings.CRC == nil || *settings.CRC
 
 	return nil
 }
@@ -3211,8 +3279,11 @@ func handleIL2PVERSION(ps *parseState) error {
 		return fmt.Errorf("line %d: IL2PVERSION can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	var t = ps.split(false)
+	return ps.applyIL2PVERSION(ps.split(false))
+}
 
+// applyIL2PVERSION sets the IL2P protocol version for the current channel.
+func (ps *parseState) applyIL2PVERSION(t string) error {
 	var version, ok = il2p_parse_version(t)
 	if !ok {
 		return fmt.Errorf("line %d: Invalid IL2P version '%s'.  Expected 0.4, 0.6, or COMPAT", ps.line, t)
@@ -5039,6 +5110,12 @@ func handleAGWPORT(ps *parseState) error {
 		return fmt.Errorf("line %d: Unexpected \"%s\" after the port number.\nPerhaps you were trying to use feature available only with KISSPORT", ps.line, t)
 	}
 
+	return ps.applyAGWPORT(n)
+}
+
+// applyAGWPORT sets the port for the AGW TCPIP Socket Interface, or 0 for
+// none.
+func (ps *parseState) applyAGWPORT(n int) error {
 	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 		ps.misc.agwpe_port = n
 	} else {
@@ -5149,26 +5226,40 @@ func handleKISSPORT(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing TCP port number for KISSPORT command", ps.line)
 	}
-	var n, nErr = strconv.Atoi(t)
+	var settings = new(KISSPortSettings)
+
+	var nErr error
+
+	settings.Port, nErr = strconv.Atoi(t)
 	if nErr != nil {
 		return fmt.Errorf("line %d: Invalid TCP port number \"%s\" for KISSPORT command", ps.line, t)
 	}
 
-	var tcp_port int
-	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
-		tcp_port = n
-	} else {
+	t = ps.split(false)
+	if t != "" {
+		var kissChannel, channelErr = strconv.Atoi(t)
+		if channelErr != nil {
+			return fmt.Errorf("line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d", ps.line, kissChannel, MAX_TOTAL_CHANS-1)
+		}
+
+		settings.Channel = &kissChannel
+	}
+
+	return ps.applyKISSPORT(*settings)
+}
+
+// applyKISSPORT adds a KISS TCP port, or with port 0 removes the default one.
+func (ps *parseState) applyKISSPORT(settings KISSPortSettings) error {
+	var tcp_port = settings.Port
+	if (tcp_port < MIN_IP_PORT_NUMBER || tcp_port > MAX_IP_PORT_NUMBER) && tcp_port != 0 {
 		return fmt.Errorf("line %d: Invalid TCP port number for KISS TCPIP Socket Interface.\nUse something in the range of %d to %d", ps.line, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
 	}
 
-	t = ps.split(false)
 	var kissChannel = -1 // optional.  default to all if not specified.
 
-	if t != "" {
-		var channelErr error
-
-		kissChannel, channelErr = strconv.Atoi(t)
-		if kissChannel < 0 || kissChannel >= MAX_TOTAL_CHANS || channelErr != nil {
+	if settings.Channel != nil {
+		kissChannel = *settings.Channel
+		if kissChannel < 0 || kissChannel >= MAX_TOTAL_CHANS {
 			return fmt.Errorf("line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d", ps.line, kissChannel, MAX_TOTAL_CHANS-1)
 		}
 	}

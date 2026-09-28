@@ -26,6 +26,13 @@ type ConfigFile struct {
 	AudioDevices []AudioDeviceConfig `yaml:"audioDevices"`
 	Channels     []ChannelConfig     `yaml:"channels"`
 
+	// AGWPort is the port for the AGW TCPIP Socket Interface, or 0 for none.
+	AGWPort *int `yaml:"agwPort"`
+
+	// KISSPorts are the KISS TCP ports, taken in order as successive KISSPORT
+	// lines would be.
+	KISSPorts []KISSPortSettings `yaml:"kissPorts"`
+
 	// Legacy holds directives in the line-at-a-time format, read after
 	// everything else, for anything not yet given a YAML form.
 	Legacy string `yaml:"legacy"`
@@ -44,6 +51,9 @@ type AudioDeviceConfig struct {
 
 	// Channels is the number of audio channels, 1 for mono or 2 for stereo.
 	Channels *int `yaml:"channels"`
+
+	// Rate is the sample rate, in samples per second.
+	Rate *int `yaml:"rate"`
 }
 
 // ChannelConfig is a radio channel.
@@ -55,6 +65,16 @@ type ChannelConfig struct {
 	PTT     *OutputControlSettings `yaml:"ptt"`
 	DCD     *OutputControlSettings `yaml:"dcd"`
 	CON     *OutputControlSettings `yaml:"con"`
+
+	DWait    *int  `yaml:"dwait"`
+	SlotTime *int  `yaml:"slottime"`
+	Persist  *int  `yaml:"persist"`
+	TXTail   *int  `yaml:"txtail"`
+	FullDup  *bool `yaml:"fulldup"`
+
+	FX25TX      *int            `yaml:"fx25tx"`
+	IL2PTX      *IL2PTXSettings `yaml:"il2ptx"`
+	IL2PVersion *string         `yaml:"il2pversion"`
 }
 
 // isYAMLConfig says whether the configuration file at path is YAML, going by
@@ -133,6 +153,7 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 
 	ps.applyYAMLAudioDevices(file.AudioDevices, top["audioDevices"])
 	ps.applyYAMLChannels(file.Channels, top["channels"])
+	ps.applyYAMLPorts(file, top)
 
 	if file.Legacy != "" {
 		// Start the legacy block afresh, as though it were a file of its
@@ -180,6 +201,11 @@ func (ps *parseState) applyYAMLAudioDevices(devices []AudioDeviceConfig, node ya
 		if defined && device.Channels != nil {
 			ps.line = keys["channels"].line(item)
 			ps.reportIfError(ps.applyACHANNELS(*device.Channels))
+		}
+
+		if defined && device.Rate != nil {
+			ps.line = keys["rate"].line(item)
+			ps.reportIfError(ps.applyARATE(*device.Rate))
 		}
 	}
 }
@@ -235,6 +261,34 @@ func (ps *parseState) applyYAMLChannels(channels []ChannelConfig, node yamlEntry
 			at("txdelay", func() error { return ps.applyTXDELAY(*channel.TXDelay) })
 		}
 
+		for _, timing := range []struct {
+			key   string
+			value *int
+			apply func(int) error
+		}{
+			{"dwait", channel.DWait, ps.applyDWAIT},
+			{"slottime", channel.SlotTime, ps.applySLOTTIME},
+			{"persist", channel.Persist, ps.applyPERSIST},
+			{"txtail", channel.TXTail, ps.applyTXTAIL},
+			{"fx25tx", channel.FX25TX, ps.applyFX25TX},
+		} {
+			if timing.value != nil {
+				at(timing.key, func() error { return timing.apply(*timing.value) })
+			}
+		}
+
+		if channel.FullDup != nil {
+			at("fulldup", func() error { return ps.applyFULLDUP(*channel.FullDup) })
+		}
+
+		if channel.IL2PTX != nil {
+			at("il2ptx", func() error { return ps.applyIL2PTX(*channel.IL2PTX) })
+		}
+
+		if channel.IL2PVersion != nil {
+			at("il2pversion", func() error { return ps.applyIL2PVERSION(*channel.IL2PVersion) })
+		}
+
 		for _, control := range []struct {
 			key      string
 			ot       int
@@ -248,6 +302,19 @@ func (ps *parseState) applyYAMLChannels(channels []ChannelConfig, node yamlEntry
 				at(control.key, func() error { return ps.applyOutputControl(control.ot, *control.settings) })
 			}
 		}
+	}
+}
+
+// applyYAMLPorts applies the network ports, whose keys in the file are top.
+func (ps *parseState) applyYAMLPorts(file *ConfigFile, top map[string]yamlEntry) {
+	if file.AGWPort != nil {
+		ps.line = top["agwPort"].line(new(yaml.Node))
+		ps.reportIfError(ps.applyAGWPORT(*file.AGWPort))
+	}
+
+	for i, port := range file.KISSPorts {
+		ps.line = yamlItem(top["kissPorts"].value, i).Line
+		ps.reportIfError(ps.applyKISSPORT(port))
 	}
 }
 

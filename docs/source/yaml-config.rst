@@ -21,11 +21,13 @@ Example
       - input: plughw:1,0
         output: plughw:2,0
         channels: 2
+        rate: 48000
 
     channels:
       - channel: 0
         mycall: Q1TEST-1
         txdelay: 30
+        txtail: 15
         modem:
           speed: "1200"
           tones: {mark: 1200, space: 2200}
@@ -41,10 +43,14 @@ Example
         mycall: Q1TEST-2
         modem: {speed: "9600", type: g3ruh}
         ptt: {method: gpio, pin: 25, invert: true}
+        il2ptx: {}
+
+    agwPort: 8000
+    kissPorts:
+      - port: 8001
+      - {port: 8002, channel: 1}
 
     legacy: |
-      AGWPORT 8000
-      KISSPORT 8001
       DIGIPEAT 0 0 ^WIDE[3-7]-[1-7]$|^TEST$ ^WIDE[12]-[12]$
 
 That is the same configuration as:
@@ -53,10 +59,12 @@ That is the same configuration as:
 
     ADEVICE plughw:1,0 plughw:2,0
     ACHANNELS 2
+    ARATE 48000
 
     CHANNEL 0
     MYCALL Q1TEST-1
     TXDELAY 30
+    TXTAIL 15
     MODEM 1200 1200:2200 3@30
     PTT /dev/ttyUSB0 RTS -DTR
 
@@ -64,9 +72,11 @@ That is the same configuration as:
     MYCALL Q1TEST-2
     MODEM 9600 G3RUH
     PTT GPIO -25
+    IL2PTX
 
     AGWPORT 8000
     KISSPORT 8001
+    KISSPORT 8002 1
     DIGIPEAT 0 0 ^WIDE[3-7]-[1-7]$|^TEST$ ^WIDE[12]-[12]$
 
 Both are checked by the same code, so a setting means the same, and draws the
@@ -78,8 +88,9 @@ Reference
 ``audioDevices``
     A list of audio devices (``ADEVICE``, ``ACHANNELS``).  Each has ``input``,
     an optional ``output`` when transmitting goes somewhere else, and
-    ``channels``, 1 for mono (the default) or 2 for stereo.  A device's number
-    is its position in the list, unless it gives one with ``device``.
+    ``channels``, 1 for mono (the default) or 2 for stereo, and ``rate``, the
+    sample rate (``ARATE``).  A device's number is its position in the list,
+    unless it gives one with ``device``.
 
 ``channels``
     A list of radio channels.  Each needs ``channel``, its number, and may have:
@@ -88,8 +99,28 @@ Reference
         The station callsign (``MYCALL``).  As with ``MYCALL``, it is also used
         for any channel that does not set its own.
 
-    ``txdelay``
-        The transmit delay, in 10 ms units (``TXDELAY``).
+    ``txdelay``, ``txtail``, ``dwait``, ``slottime``
+        Transmit timing, in 10 ms units (``TXDELAY``, ``TXTAIL``, ``DWAIT``,
+        ``SLOTTIME``).
+
+    ``persist``
+        The chance, out of 255, of transmitting in a slot (``PERSIST``).
+
+    ``fulldup``
+        ``true`` for full duplex (``FULLDUP``).
+
+    ``fx25tx``
+        FX.25 transmission (``FX25TX``): 0 for off, 1 for automatic, or the
+        number of parity bytes (16, 32 or 64).
+
+    ``il2ptx``
+        IL2P transmission (``IL2PTX``), with ``invert`` (``-``) to invert the
+        polarity, ``maxfec: false`` (``0``) for the weaker FEC, and
+        ``crc: false`` (``c``) to leave out the CRC.  ``il2ptx: {}`` turns it
+        on with the defaults.  Given along with ``fx25tx``, IL2P wins.
+
+    ``il2pversion``
+        The IL2P version (``IL2PVERSION``): ``0.4``, ``0.6`` or ``compat``.
 
     ``modem``
         The modem (``MODEM``):
@@ -119,6 +150,15 @@ Reference
         ``invert`` drives the pin or line low to transmit, where Dire Wolf's
         format has a ``-`` in front of it; ``invert2`` does the same for
         ``line2``.
+
+``agwPort``
+    The port for the AGW TCPIP Socket Interface (``AGWPORT``), or 0 for none.
+
+``kissPorts``
+    KISS TCP ports (``KISSPORT``), each with ``port`` and optionally
+    ``channel``, to give that port just one radio channel.  They are taken in
+    order, like successive ``KISSPORT`` lines, so ``port: 0`` first drops the
+    default port 8001.
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as
