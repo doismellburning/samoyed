@@ -16,19 +16,19 @@ func test_text2tt(t *testing.T, text string, _expect_mp string, _expect_2k strin
 
 	var buttons string
 
-	buttons, _ = TTTextToMultipress(text, false)
+	buttons, _ = TextToMultipress(text, false)
 	assert.Equal(t, _expect_mp, buttons, "Unexpected multi-press value for text %s", text)
 
-	buttons, _ = TTTextToTwoKey(text, false)
+	buttons, _ = TextToTwoKey(text, false)
 	assert.Equal(t, _expect_2k, buttons, "Unexpected two-key value for text %s", text)
 
-	buttons, _ = TTTextToCall10(text, false)
+	buttons, _ = TextToCall10(text, false)
 	assert.Equal(t, _expect_c10, buttons, "Unexpected call10 value for text %s", text)
 
-	buttons, _ = TTTextToMhead(text, false)
+	buttons, _ = TextToMhead(text, false)
 	assert.Equal(t, _expect_loc, buttons, "Unexpected Maidenhead value for text %s", text)
 
-	buttons, _ = TTTextToSatsq(text, false)
+	buttons, _ = TextToSatsq(text, false)
 	assert.Equal(t, _expect_sat, buttons, "Unexpected SatSq value for text %s", text)
 }
 
@@ -39,19 +39,19 @@ func test_tt2text(t *testing.T, buttons string, _expect_mp string, _expect_2k st
 
 	var text string
 
-	text, _ = TTMultipressToText(buttons, false)
+	text, _ = MultipressToText(buttons, false)
 	assert.Equal(t, _expect_mp, text, "Unexpected multi-press value for buttons %s", buttons)
 
-	text, _ = TTTwoKeyToText(buttons, false)
+	text, _ = TwoKeyToText(buttons, false)
 	assert.Equal(t, _expect_2k, text, "Unexpected two-key value for buttons %s", buttons)
 
-	text, _ = TTCall10ToText(buttons, false)
+	text, _ = Call10ToText(buttons, false)
 	assert.Equal(t, _expect_c10, text, "Unexpected call10 value for buttons %s", buttons)
 
-	text, _ = TTMheadToText(buttons, false)
+	text, _ = MheadToText(buttons, false)
 	assert.Equal(t, _expect_loc, text, "Unexpected Maidenhead value for buttons %s", buttons)
 
-	text, _ = TTSatsqToText(buttons, false)
+	text, _ = SatsqToText(buttons, false)
 	assert.Equal(t, _expect_sat, text, "Unexpected SatSq value for buttons %s", buttons)
 }
 

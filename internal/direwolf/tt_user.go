@@ -325,7 +325,7 @@ func (u *ttUsers) corralSlot() int {
 func digit_suffix(callsign string) string {
 	var suffix = []byte{'0', '0', '0'}
 
-	var two_key, _ = touchtone.TTTextToTwoKey(callsign, false)
+	var two_key, _ = touchtone.TextToTwoKey(callsign, false)
 
 	for _, t := range two_key {
 		if unicode.IsDigit(t) {

@@ -29,13 +29,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TTEncoding is the touch-tone text encoding that a button sequence uses.
-type TTEncoding int
+// Encoding is the touch-tone text encoding that a button sequence uses.
+type Encoding int
 
 const (
-	TT_EITHER TTEncoding = iota
-	TT_MULTIPRESS
-	TT_TWO_KEY
+	Either Encoding = iota
+	Multipress
+	TwoKey
 )
 
 /*
@@ -170,7 +170,7 @@ func ttSatsqGrid() [10][10]string {
 
 /*------------------------------------------------------------------
  *
- * Name:        TTTextToMultipress
+ * Name:        TextToMultipress
  *
  * Purpose:     Convert text to the multi-press representation.
  *
@@ -186,8 +186,8 @@ func ttSatsqGrid() [10][10]string {
  *
  *----------------------------------------------------------------*/
 
-// TTTextToMultipress converts text to the multi-press representation.
-func TTTextToMultipress(text string, quiet bool) (string, int) {
+// TextToMultipress converts text to the multi-press representation.
+func TextToMultipress(text string, quiet bool) (string, int) {
 	var translate = ttTranslate()
 
 	var buttons strings.Builder
@@ -266,11 +266,11 @@ func TTTextToMultipress(text string, quiet bool) (string, int) {
 	}
 
 	return buttons.String(), errors
-} /* end TTTextToMultipress */
+} /* end TextToMultipress */
 
 /*------------------------------------------------------------------
  *
- * Name:        TTTextToTwoKey
+ * Name:        TextToTwoKey
  *
  * Purpose:     Convert text to the two-key representation.
  *
@@ -286,8 +286,8 @@ func TTTextToMultipress(text string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-// TTTextToTwoKey converts text to the two-key representation.
-func TTTextToTwoKey(text string, quiet bool) (string, int) {
+// TextToTwoKey converts text to the two-key representation.
+func TextToTwoKey(text string, quiet bool) (string, int) {
 	var translate = ttTranslate()
 
 	var buttons strings.Builder
@@ -335,11 +335,11 @@ func TTTextToTwoKey(text string, quiet bool) (string, int) {
 	}
 
 	return buttons.String(), errors
-} /* end TTTextToTwoKey */
+} /* end TextToTwoKey */
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_letter_to_two_digits
+ * Name:        letterToTwoDigits
  *
  * Purpose:     Convert one letter to 2 digit representation.
  *
@@ -359,7 +359,7 @@ func TTTextToTwoKey(text string, quiet bool) (string, int) {
 
 // TODO:  need to test this.
 
-func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
+func letterToTwoDigits(c rune, quiet bool) (string, int) {
 	var translate = ttTranslate()
 
 	var errors = 0
@@ -402,11 +402,11 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
 	}
 
 	return buttons, errors
-} /* end tt_letter_to_two_digits */
+} /* end letterToTwoDigits */
 
 /*------------------------------------------------------------------
  *
- * Name:        TTTextToCall10
+ * Name:        TextToCall10
  *
  * Purpose:     Convert text to the 10 character callsign format.
  *
@@ -422,8 +422,8 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-// TTTextToCall10 converts text to the 10 character callsign format.
-func TTTextToCall10(text string, quiet bool) (string, int) {
+// TextToCall10 converts text to the 10 character callsign format.
+func TextToCall10(text string, quiet bool) (string, int) {
 	var call10encoding = ttCall10Encoding()
 
 	var errors = 0
@@ -494,11 +494,11 @@ func TTTextToCall10(text string, quiet bool) (string, int) {
 	fmt.Fprintf(&buttons, "%04d", packed)
 
 	return buttons.String(), errors
-} /* end TTTextToCall10 */
+} /* end TextToCall10 */
 
 /*------------------------------------------------------------------
  *
- * Name:        TTTextToSatsq
+ * Name:        TextToSatsq
  *
  * Purpose:     Convert Special Satellite Gridsquare to 4 digit DTMF representation.
  *
@@ -517,8 +517,8 @@ func TTTextToCall10(text string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-// TTTextToSatsq converts a Special Satellite Gridsquare to the 4 digit DTMF representation.
-func TTTextToSatsq(text string, quiet bool) (string, int) {
+// TextToSatsq converts a Special Satellite Gridsquare to the 4 digit DTMF representation.
+func TextToSatsq(text string, quiet bool) (string, int) {
 	var grid = ttSatsqGrid()
 
 	var errors = 0
@@ -589,7 +589,7 @@ func TTTextToSatsq(text string, quiet bool) (string, int) {
 	}
 
 	return buttons, errors
-} /* end TTTextToSatsq */
+} /* end TextToSatsq */
 
 /*------------------------------------------------------------------
  *
@@ -645,7 +645,7 @@ func TextToASCII2D(text string, quiet bool) (string, int) {
 
 /*------------------------------------------------------------------
  *
- * Name:        TTMultipressToText
+ * Name:        MultipressToText
  *
  * Purpose:     Convert the multi-press representation to text.
  *
@@ -660,8 +660,8 @@ func TextToASCII2D(text string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-// TTMultipressToText converts the multi-press representation to text.
-func TTMultipressToText(buttons string, quiet bool) (string, int) {
+// MultipressToText converts the multi-press representation to text.
+func MultipressToText(buttons string, quiet bool) (string, int) {
 	var translate = ttTranslate()
 
 	var text strings.Builder
@@ -727,11 +727,11 @@ func TTMultipressToText(buttons string, quiet bool) (string, int) {
 	}
 
 	return text.String(), errors
-} /* end TTMultipressToText */
+} /* end MultipressToText */
 
 /*------------------------------------------------------------------
  *
- * Name:        TTTwoKeyToText
+ * Name:        TwoKeyToText
  *
  * Purpose:     Convert the two key representation to text.
  *
@@ -746,8 +746,8 @@ func TTMultipressToText(buttons string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-// TTTwoKeyToText converts the two-key representation to text.
-func TTTwoKeyToText(buttons string, quiet bool) (string, int) {
+// TwoKeyToText converts the two-key representation to text.
+func TwoKeyToText(buttons string, quiet bool) (string, int) {
 	var translate = ttTranslate()
 
 	var errors = 0
@@ -802,11 +802,11 @@ func TTTwoKeyToText(buttons string, quiet bool) (string, int) {
 	}
 
 	return text.String(), errors
-} /* end TTTwoKeyToText */
+} /* end TwoKeyToText */
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_two_digits_to_letter
+ * Name:        twoDigitsToLetter
  *
  * Purpose:     Convert the two digit representation to one letter.
  *
@@ -824,7 +824,7 @@ func TTTwoKeyToText(buttons string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
+func twoDigitsToLetter(buttons string, quiet bool) (string, int) {
 	var translate = ttTranslate()
 
 	var text string
@@ -866,11 +866,11 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
 	}
 
 	return text, errors
-} /* end tt_two_digits_to_letter */
+} /* end twoDigitsToLetter */
 
 /*------------------------------------------------------------------
  *
- * Name:        TTCall10ToText
+ * Name:        Call10ToText
  *
  * Purpose:     Convert the 10 digit callsign representation to text.
  *
@@ -885,8 +885,8 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-// TTCall10ToText converts the fixed length 10 digit callsign to text.
-func TTCall10ToText(buttons string, quiet bool) (string, int) {
+// Call10ToText converts the fixed length 10 digit callsign to text.
+func Call10ToText(buttons string, quiet bool) (string, int) {
 	var call10encoding = ttCall10Encoding()
 
 	var text strings.Builder
@@ -948,7 +948,7 @@ func TTCall10ToText(buttons string, quiet bool) (string, int) {
 	var trimmed = strings.TrimSpace(text.String())
 
 	return trimmed, errors
-} /* end TTCall10ToText */
+} /* end Call10ToText */
 
 /*------------------------------------------------------------------
  *
@@ -1035,7 +1035,7 @@ func Call5SuffixToText(buttons string, quiet bool) (string, int) {
 
 /*------------------------------------------------------------------
  *
- * Name:        TTMheadToText
+ * Name:        MheadToText
  *
  * Purpose:     Convert the DTMF representation of
  *		Maidenhead Grid Square Locator to normal text representation.
@@ -1073,8 +1073,8 @@ func ttMheadPairs() [MAXMHPAIRS]mhpairType {
 	}
 }
 
-// TTMheadToText converts the DTMF representation to a Maidenhead Grid Square Locator.
-func TTMheadToText(buttons string, quiet bool) (string, int) {
+// MheadToText converts the DTMF representation to a Maidenhead Grid Square Locator.
+func MheadToText(buttons string, quiet bool) (string, int) {
 	var text strings.Builder
 	var errors = 0
 
@@ -1114,12 +1114,12 @@ func TTMheadToText(buttons string, quiet bool) (string, int) {
 			var t2 string
 			var e2 int
 
-			t2, e2 = tt_two_digits_to_letter(buttons, quiet)
+			t2, e2 = twoDigitsToLetter(buttons, quiet)
 			text.WriteString(t2)
 			errors += e2
 			buttons = buttons[2:]
 
-			t2, e2 = tt_two_digits_to_letter(buttons, quiet)
+			t2, e2 = twoDigitsToLetter(buttons, quiet)
 			text.WriteString(t2)
 			errors += e2
 			buttons = buttons[2:]
@@ -1136,11 +1136,11 @@ func TTMheadToText(buttons string, quiet bool) (string, int) {
 	}
 
 	return text.String(), errors
-} /* end TTMheadToText */
+} /* end MheadToText */
 
 /*------------------------------------------------------------------
  *
- * Name:        TTTextToMhead
+ * Name:        TextToMhead
  *
  * Purpose:     Convert normal text Maidenhead Grid Square Locator to DTMF representation.
  *
@@ -1159,8 +1159,8 @@ func TTMheadToText(buttons string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-// TTTextToMhead converts a normal text Maidenhead Grid Square Locator to the DTMF representation.
-func TTTextToMhead(text string, quiet bool) (string, int) {
+// TextToMhead converts a normal text Maidenhead Grid Square Locator to the DTMF representation.
+func TextToMhead(text string, quiet bool) (string, int) {
 	var mhpair = ttMheadPairs()
 
 	var errors = 0
@@ -1210,11 +1210,11 @@ func TTTextToMhead(text string, quiet bool) (string, int) {
 		}
 
 		if mhpair[i].min_ch == 'A' { /* Should be letters */
-			var b3, _errors = tt_letter_to_two_digits(t0, quiet)
+			var b3, _errors = letterToTwoDigits(t0, quiet)
 			errors += _errors
 			buttons += b3
 
-			b3, _errors = tt_letter_to_two_digits(t1, quiet)
+			b3, _errors = letterToTwoDigits(t1, quiet)
 			errors += _errors
 			buttons += b3
 		} else { /* Should be digits */
@@ -1227,11 +1227,11 @@ func TTTextToMhead(text string, quiet bool) (string, int) {
 	}
 
 	return buttons, errors
-} /* TTTextToMhead */
+} /* TextToMhead */
 
 /*------------------------------------------------------------------
  *
- * Name:        TTSatsqToText
+ * Name:        SatsqToText
  *
  * Purpose:     Convert the 4 digit DTMF special Satellite gridsquare to normal 2 letters and 2 digits.
  *
@@ -1246,8 +1246,8 @@ func TTTextToMhead(text string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-// TTSatsqToText converts the DTMF representation to a satellite gridsquare.
-func TTSatsqToText(buttons string, quiet bool) (string, int) {
+// SatsqToText converts the DTMF representation to a satellite gridsquare.
+func SatsqToText(buttons string, quiet bool) (string, int) {
 	var grid = ttSatsqGrid()
 
 	var errors = 0
@@ -1282,7 +1282,7 @@ func TTSatsqToText(buttons string, quiet bool) (string, int) {
 	var text = grid[row][col] + buttons[2:]
 
 	return text, errors
-} /* end TTSatsqToText */
+} /* end SatsqToText */
 
 /*------------------------------------------------------------------
  *
@@ -1334,38 +1334,38 @@ func ASCII2DToText(buttons string, quiet bool) (string, int) {
 
 /*------------------------------------------------------------------
  *
- * Name:        TTGuessType
+ * Name:        GuessType
  *
  * Purpose:     Try to guess which encoding we have.
  *
  * Inputs:      buttons	- Input string.
  *			  Should contain only 0123456789ABCD.
  *
- * Returns:     TT_MULTIPRESS	- Looks like multipress.
- *		TT_TWO_KEY	- Looks like two key.
- *		TT_EITHER	- Could be either one.
+ * Returns:     Multipress	- Looks like multipress.
+ *		TwoKey	- Looks like two key.
+ *		Either	- Could be either one.
  *
  *----------------------------------------------------------------*/
 
-// TTGuessType tries to guess which encoding a button sequence uses.
-func TTGuessType(buttons string) TTEncoding {
+// GuessType tries to guess which encoding a button sequence uses.
+func GuessType(buttons string) Encoding {
 	/* If it contains B, C, or D, it can't be multipress. */
 	if strings.ContainsAny(buttons, "BCDbcd") {
-		return (TT_TWO_KEY)
+		return (TwoKey)
 	}
 
 	/* Try parsing quietly and see if one gets errors and the other doesn't. */
 
-	var _, err_mp = TTMultipressToText(buttons, true)
-	var _, err_tk = TTTwoKeyToText(buttons, true)
+	var _, err_mp = MultipressToText(buttons, true)
+	var _, err_tk = TwoKeyToText(buttons, true)
 
 	if err_mp == 0 && err_tk > 0 {
-		return (TT_MULTIPRESS)
+		return (Multipress)
 	} else if err_tk == 0 && err_mp > 0 {
-		return (TT_TWO_KEY)
+		return (TwoKey)
 	}
 
 	/* Could be either one. */
 
-	return (TT_EITHER)
-} /* end TTGuessType */
+	return (Either)
+} /* end GuessType */

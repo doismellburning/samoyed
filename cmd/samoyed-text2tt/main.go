@@ -49,29 +49,29 @@ func text2tt(args []string) {
 
 	fmt.Printf("Push buttons for multi-press method:\n")
 
-	buttons, _ = touchtone.TTTextToMultipress(text, false)
+	buttons, _ = touchtone.TextToMultipress(text, false)
 	cs = checksum(buttons)
 	fmt.Printf("\"%s\"    checksum for call = %d\n", buttons, cs)
 
 	fmt.Printf("Push buttons for two-key method:\n")
 
-	buttons, _ = touchtone.TTTextToTwoKey(text, false)
+	buttons, _ = touchtone.TextToTwoKey(text, false)
 	cs = checksum(buttons)
 	fmt.Printf("\"%s\"    checksum for call = %d\n", buttons, cs)
 
-	buttons, errs = touchtone.TTTextToCall10(text, true)
+	buttons, errs = touchtone.TextToCall10(text, true)
 	if errs == 0 {
 		fmt.Printf("Push buttons for fixed length 10 digit callsign:\n")
 		fmt.Printf("\"%s\"\n", buttons)
 	}
 
-	buttons, errs = touchtone.TTTextToMhead(text, true)
+	buttons, errs = touchtone.TextToMhead(text, true)
 	if errs == 0 {
 		fmt.Printf("Push buttons for Maidenhead Grid Square Locator:\n")
 		fmt.Printf("\"%s\"\n", buttons)
 	}
 
-	buttons, errs = touchtone.TTTextToSatsq(text, true)
+	buttons, errs = touchtone.TextToSatsq(text, true)
 	if errs == 0 {
 		fmt.Printf("Push buttons for satellite gridsquare:\n")
 		fmt.Printf("\"%s\"\n", buttons)
