@@ -105,7 +105,7 @@ func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug
 	 * Open serial port connection.
 	 */
 
-	var fd = serialport.SerialPortOpen(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
+	var fd = serialport.Open(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
 
 	if fd != nil {
 		gps.nmea.mu.Lock()
@@ -155,7 +155,7 @@ func (p *gpsnmeaPort) closeIfCurrent(fd *term.Term) {
 
 	p.mu.Unlock()
 
-	serialport.SerialPortClose(fd)
+	serialport.Close(fd)
 }
 
 /*-------------------------------------------------------------------
@@ -205,7 +205,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 	// goroutine back - and this port can be shared with the waypoint sender
 	// (see GPS.sharedNMEAPort), which closes it in its own teardown.
 	for ctx.Err() == nil {
-		var ch, err = serialport.SerialPortGet1(fd)
+		var ch, err = serialport.Get1(fd)
 		if err != nil {
 			if ctx.Err() != nil {
 				return // We closed it ourselves on the way out.
@@ -745,7 +745,7 @@ func dwgpsnmea_term() {
 	// Should probably kill reader thread before closing device to avoid
 	// message about read error.
 
-	// serialport.SerialPortClose (the port's fd);
+	// serialport.Close (the port's fd);
 
 } /* end dwgps_term */
 

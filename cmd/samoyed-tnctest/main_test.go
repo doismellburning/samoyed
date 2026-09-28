@@ -218,7 +218,7 @@ func serialTNC(t *testing.T, from int) *os.File {
 	var master, slave, openErr = pty.Open()
 	require.NoError(t, openErr)
 
-	var fd = serialport.SerialPortOpen(slave.Name(), 9600)
+	var fd = serialport.Open(slave.Name(), 9600)
 	require.NotNil(t, fd)
 
 	require.NoError(t, slave.Close())

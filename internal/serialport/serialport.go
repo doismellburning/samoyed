@@ -14,7 +14,7 @@ import (
 
 /*-------------------------------------------------------------------
  *
- * Name:	SerialPortOpen
+ * Name:	Open
  *
  * Purpose:	Open serial port.
  *
@@ -30,8 +30,8 @@ import (
  *
  *---------------------------------------------------------------*/
 
-func SerialPortOpen(devicename string, baud int) *term.Term {
-	logrus.WithField("devicename", devicename).Debug("SerialPortOpen")
+func Open(devicename string, baud int) *term.Term {
+	logrus.WithField("devicename", devicename).Debug("serialport.Open")
 
 	/* Translate Windows device name into Linux name. */
 	/* COM1 -> /dev/ttyS0, etc. */
@@ -67,7 +67,7 @@ func SerialPortOpen(devicename string, baud int) *term.Term {
 	case 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200:
 		fd.SetSpeed(baud)
 	default:
-		fmt.Printf("SerialPortOpen: Unsupported speed %d.  Using 4800.\n", baud)
+		fmt.Printf("serialport.Open: Unsupported speed %d.  Using 4800.\n", baud)
 		fd.SetSpeed(4800)
 	}
 
@@ -86,7 +86,7 @@ func SerialPortOpen(devicename string, baud int) *term.Term {
 
 /*-------------------------------------------------------------------
  *
- * Name:	SerialPortWrite
+ * Name:	Write
  *
  * Purpose:	Send characters to serial port.
  *
@@ -98,7 +98,7 @@ func SerialPortOpen(devicename string, baud int) *term.Term {
  *
  *---------------------------------------------------------------*/
 
-func SerialPortWrite(fd *term.Term, data []byte) int {
+func Write(fd *term.Term, data []byte) int {
 	if fd == nil {
 		return (-1)
 	}
@@ -113,11 +113,11 @@ func SerialPortWrite(fd *term.Term, data []byte) int {
 	}
 
 	return written
-} /* SerialPortWrite */
+} /* Write */
 
 /*-------------------------------------------------------------------
  *
- * Name:        SerialPortGet1
+ * Name:        Get1
  *
  * Purpose:     Get one byte from the serial port.  Wait if not ready.
  *
@@ -127,18 +127,18 @@ func SerialPortWrite(fd *term.Term, data []byte) int {
  *
  *--------------------------------------------------------------------*/
 
-func SerialPortGet1(fd *term.Term) (byte, error) {
+func Get1(fd *term.Term) (byte, error) {
 	var bytes = make([]byte, 1)
 	var n, err = fd.Read(bytes)
 
 	if n != 1 {
 		//text_color_set(DW_COLOR_DEBUG);
-		//dw_printf ("SerialPortGet1(%d) returns -1 for error.\n", fd);
+		//dw_printf ("Get1(%d) returns -1 for error.\n", fd);
 		return 0, err
 	}
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		logrus.WithField("ch", fmt.Sprintf("0x%02x", bytes[0])).Trace("SerialPortGet1")
+		logrus.WithField("ch", fmt.Sprintf("0x%02x", bytes[0])).Trace("serialport.Get1")
 	}
 
 	return bytes[0], nil
@@ -146,7 +146,7 @@ func SerialPortGet1(fd *term.Term) (byte, error) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        SerialPortClose
+ * Name:        Close
  *
  * Purpose:     Close the device.
  *
@@ -156,7 +156,7 @@ func SerialPortGet1(fd *term.Term) (byte, error) {
  *
  *--------------------------------------------------------------------*/
 
-func SerialPortClose(fd *term.Term) {
+func Close(fd *term.Term) {
 	if fd == nil {
 		return
 	}

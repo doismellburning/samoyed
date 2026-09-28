@@ -41,14 +41,14 @@ func main() {
 		gpsSerialPort = os.Args[3]
 	}
 
-	tnc = serialport.SerialPortOpen(tncSerialPort, 9600)
+	tnc = serialport.Open(tncSerialPort, 9600)
 	if tnc == nil {
 		fmt.Printf("Can't open serial port to KISS TNC.\n")
 		os.Exit(1)
 	}
 
 	var cmd = "\r\rhbaud 9600\rkiss on\rrestart\r"
-	serialport.SerialPortWrite(tnc, []byte(cmd))
+	serialport.Write(tnc, []byte(cmd))
 
 	// GPS reading runs in a goroutine of its own, which this stops when the
 	// user interrupts us.  Taking the signal this way also takes away the
@@ -93,7 +93,7 @@ func main() {
 
 	// Exit out of KISS mode.
 
-	serialport.SerialPortWrite(tnc, []byte("\xc0\xff\xc0"))
+	serialport.Write(tnc, []byte("\xc0\xff\xc0"))
 
 	direwolf.SLEEP_MS(100)
 }
@@ -152,5 +152,5 @@ func walk96(lat float64, lon float64, knots maybe.Maybe[float64], course maybe.M
 
 	// kiss_debug_print (1, NULL, kiss_frame, kiss_len);
 
-	serialport.SerialPortWrite(tnc, kiss_frame)
+	serialport.Write(tnc, kiss_frame)
 }

@@ -37,7 +37,7 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 
 	var name = slave.Name()
 
-	// serialport.SerialPortOpen opens the device by name, so the handle here is surplus;
+	// serialport.Open opens the device by name, so the handle here is surplus;
 	// the terminal lives on as long as the master is open.
 	require.NoError(t, slave.Close())
 
@@ -67,7 +67,7 @@ func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*Kis
 	var ks = newKissSerial(mc, kissTestAudioConfig(), 0)
 
 	if mc.kiss_serial_poll == 0 {
-		ks.fd = serialport.SerialPortOpen(mc.kiss_serial_port, mc.kiss_serial_speed)
+		ks.fd = serialport.Open(mc.kiss_serial_port, mc.kiss_serial_speed)
 		require.NotNil(t, ks.fd, "could not open %s", mc.kiss_serial_port)
 	}
 
@@ -105,7 +105,7 @@ func openKissSerialPort(t *testing.T, debug int) (*KissSerial, *os.File) {
 
 	t.Cleanup(ks.closePort)
 
-	ks.fd = serialport.SerialPortOpen(name, 0)
+	ks.fd = serialport.Open(name, 0)
 	require.NotNil(t, ks.fd, "could not open %s", name)
 
 	return ks, client

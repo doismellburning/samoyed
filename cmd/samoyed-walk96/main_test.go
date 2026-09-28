@@ -34,10 +34,10 @@ func fakeTNC(t *testing.T) *os.File {
 
 	var oldTNC = tnc
 
-	tnc = serialport.SerialPortOpen(slave.Name(), 9600)
+	tnc = serialport.Open(slave.Name(), 9600)
 	require.NotNil(t, tnc)
 
-	// serialport.SerialPortOpen opens the device by name, so this handle is surplus.
+	// serialport.Open opens the device by name, so this handle is surplus.
 	require.NoError(t, slave.Close())
 
 	t.Cleanup(func() {
