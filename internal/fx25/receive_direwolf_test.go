@@ -1,11 +1,13 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package fx25
 
 import (
 	"fmt"
 	"slices"
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,9 +30,9 @@ var fxTestFrame = []byte{ //nolint:gochecknoglobals
 const fxTestCorruptBytes = 8
 
 func Test_FX25_round_trip(t *testing.T) {
-	for ctag := fx25.CTagMin; ctag <= fx25.CTagMax; ctag++ {
+	for ctag := CTagMin; ctag <= CTagMax; ctag++ {
 		t.Run(fmt.Sprintf("ctag_%02x", ctag), func(t *testing.T) {
-			var ctag_num, data, check = fx25.EncodeFrame(0, slices.Clone(fxTestFrame), 100+ctag, 1)
+			var ctag_num, data, check = EncodeFrame(0, slices.Clone(fxTestFrame), 100+ctag, 1)
 			require.Equal(t, ctag, ctag_num, "Wrong correlation tag chosen")
 
 			// Give the FEC something to do.
@@ -54,7 +56,7 @@ func fxTestBlock(ctag_num int, data []byte, check []byte) []byte {
 
 	var block = slices.Clone(flags)
 
-	var ctag_value = fx25.TagValue(ctag_num)
+	var ctag_value = TagValue(ctag_num)
 	for k := range 8 {
 		block = append(block, byte(ctag_value>>(k*8))&0xff) // Should be portable to big endian too.
 	}
@@ -77,11 +79,11 @@ func fxTestReceive(block []byte) ([][]byte, []int) {
 		derrors = append(derrors, d)
 	}
 
-	var rx = newFX25Receiver(0, 0, 0, 1, collect)
+	var rx = NewReceiver(0, 0, 0, 1, collect)
 
 	for _, b := range block {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {
-			rx.recBit(int(b & imask))
+			rx.RecBit(int(b & imask))
 		}
 	}
 

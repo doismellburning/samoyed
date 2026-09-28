@@ -62,8 +62,8 @@ func EncodeFrame(channel int, fbuf []byte, fx_mode int, debug int) (int, []byte,
 		return -1, nil, nil
 	}
 
-	var k_data_radio = KDataRadio(ctag_num)
-	var k_data_rs = KDataRS(ctag_num)
+	var k_data_radio = kDataRadio(ctag_num)
+	var k_data_rs = kDataRS(ctag_num)
 
 	// Zero out part of data which won't be transmitted
 	var shorten_by = MaxData - k_data_radio
@@ -77,7 +77,7 @@ func EncodeFrame(channel int, fbuf []byte, fx_mode int, debug int) (int, []byte,
 
 	// Compute the check bytes.
 
-	var rs = Codec(ctag_num)
+	var rs = codecFor(ctag_num)
 	var nroots = rs.NRoots()
 
 	dwutil.Assert(k_data_rs+nroots == rs.N())

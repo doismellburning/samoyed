@@ -29,7 +29,7 @@ func TestFX25TablesAreConsistent(t *testing.T) {
 	for j := CTagMin; j <= CTagMax; j++ {
 		assert.Equal(t, int(fx25Tab[tags[j].itab].nroots), tags[j].n_block_radio-tags[j].k_data_radio, "tag %d", j)
 		assert.Equal(t, int(fx25Tab[tags[j].itab].nroots), tags[j].n_block_rs-tags[j].k_data_rs, "tag %d", j)
-		assert.Equal(t, BlockSize, tags[j].n_block_rs, "tag %d", j)
+		assert.Equal(t, blockSize, tags[j].n_block_rs, "tag %d", j)
 	}
 
 	for i := range nTab {

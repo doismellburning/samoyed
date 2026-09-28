@@ -5,9 +5,10 @@
 
 // Package fx25 is FX.25 - forward error correction wrapped around an
 // unmodified AX.25 frame: the correlation tags that mark the start of a
-// codeblock, the Reed-Solomon codec each tag calls for, and EncodeFrame,
-// which turns a frame into a codeblock.  Putting the bits on the air is left
-// to the caller, which is the HDLC transmit path in internal/direwolf.
+// codeblock, the Reed-Solomon codec each tag calls for, EncodeFrame, which
+// turns a frame into a codeblock, and Receiver, which picks codeblocks out of
+// the received bit stream.  Putting the bits on the air is left to the
+// caller, which is the HDLC transmit path in internal/direwolf.
 //
 // Reference: http://www.stensat.org/docs/FX-25_01_06.pdf
 //
@@ -61,7 +62,7 @@ const CTagMax = 0x0B
 
 const MaxData = 239   // i.e. RS(255,239)
 const maxCheck = 64   // e.g. RS(255, 191)
-const BlockSize = 255 // Block size always 255 for 8 bit symbols.
+const blockSize = 255 // Block size always 255 for 8 bit symbols.
 
 const nTab = 3
 
@@ -149,10 +150,10 @@ const closeEnough = 8 // How many bits can be wrong in tag yet consider it a mat
 // no false triggers were observed.  So 8 doesn't seem to be too
 // high for 1200 bps.  No study has been done for 9600 bps.
 
-// FindTag finds an acceptable match in the table for a 64 bit correlation
+// findTag finds an acceptable match in the table for a 64 bit correlation
 // tag value, allowing for up to closeEnough bits in error.
 // Return index into table or -1 for no match.
-func FindTag(t uint64) int {
+func findTag(t uint64) int {
 	for c := CTagMin; c <= CTagMax; c++ {
 		if bits.OnesCount64(t^tags[c].value) <= closeEnough {
 			return c
@@ -172,8 +173,8 @@ func FindTag(t uint64) int {
 
 // Get properties of specified CTAG number.
 
-// Codec is the Reed-Solomon codec for a correlation tag.
-func Codec(ctag_num int) *reedsolomon.Codec {
+// codecFor is the Reed-Solomon codec for a correlation tag.
+func codecFor(ctag_num int) *reedsolomon.Codec {
 	dwutil.Assert(ctag_num >= CTagMin && ctag_num <= CTagMax)
 	dwutil.Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < nTab)
 	dwutil.Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
@@ -188,23 +189,23 @@ func TagValue(ctag_num int) uint64 {
 	return tags[ctag_num].value
 }
 
-// KDataRadio is the number of data bytes transmitted in a codeblock.
-func KDataRadio(ctag_num int) int {
+// kDataRadio is the number of data bytes transmitted in a codeblock.
+func kDataRadio(ctag_num int) int {
 	dwutil.Assert(ctag_num >= CTagMin && ctag_num <= CTagMax)
 
 	return tags[ctag_num].k_data_radio
 }
 
-// KDataRS is the number of data bytes in the Reed-Solomon block, before
-// shortening to KDataRadio.
-func KDataRS(ctag_num int) int {
+// kDataRS is the number of data bytes in the Reed-Solomon block, before
+// shortening to kDataRadio.
+func kDataRS(ctag_num int) int {
 	dwutil.Assert(ctag_num >= CTagMin && ctag_num <= CTagMax)
 
 	return tags[ctag_num].k_data_rs
 }
 
-// NRoots is the number of check bytes in a codeblock.
-func NRoots(ctag_num int) int {
+// nRoots is the number of check bytes in a codeblock.
+func nRoots(ctag_num int) int {
 	dwutil.Assert(ctag_num >= CTagMin && ctag_num <= CTagMax)
 
 	return int(fx25Tab[tags[ctag_num].itab].nroots)
@@ -244,7 +245,7 @@ func pickMode(fx_mode int, dlen int) int {
 	// Fails if data won't fit.
 
 	if fx_mode-100 >= CTagMin && fx_mode-100 <= CTagMax {
-		if dlen <= KDataRadio(fx_mode-100) {
+		if dlen <= kDataRadio(fx_mode-100) {
 			return fx_mode - 100
 		} else {
 			return -1 // Assuming caller prints failure message.
@@ -256,7 +257,7 @@ func pickMode(fx_mode int, dlen int) int {
 
 	if fx_mode == 16 || fx_mode == 32 || fx_mode == 64 {
 		for k := CTagMax; k >= CTagMin; k-- {
-			if fx_mode == NRoots(k) && dlen <= KDataRadio(k) {
+			if fx_mode == nRoots(k) && dlen <= kDataRadio(k) {
 				return k
 			}
 		}
@@ -291,7 +292,7 @@ func pickMode(fx_mode int, dlen int) int {
 	var prefer = [6]int{0x04, 0x03, 0x06, 0x09, 0x05, 0x01}
 	for k := range 6 {
 		var m = prefer[k]
-		if dlen <= KDataRadio(m) {
+		if dlen <= kDataRadio(m) {
 			return m
 		}
 	}
