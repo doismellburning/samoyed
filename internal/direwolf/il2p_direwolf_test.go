@@ -766,7 +766,7 @@ func test_serdes(t *testing.T) {
 		var pp = ax25.FromText(packet, true)
 		assert.NotNil(t, pp)
 
-		var sender = NewHDLCSender(0, nil)
+		var sender = NewHDLCSender(0, nil, 0)
 
 		for max_fec := range 2 {
 			for polarity := range 3 { // 2 means throw in some errors.

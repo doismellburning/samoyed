@@ -47,7 +47,7 @@ func newRecvTestAudioConfig(numChannels int) *AudioConfig {
 func setupRecvTest(t *testing.T, audioConfig *AudioConfig, samples []byte) *readerSampleSource {
 	t.Helper()
 
-	multi_modem_init(audioConfig, new(radioSink))
+	multi_modem_init(audioConfig, 0, new(radioSink))
 
 	return newReaderSampleSource(bytes.NewReader(samples), len(samples))
 }

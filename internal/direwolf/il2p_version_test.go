@@ -88,7 +88,7 @@ func TestIL2POnAirVersions(t *testing.T) {
 		t.Run(testDatum.name, func(t *testing.T) {
 			var recorder = il2pLoopback(t, testDatum.rx_version)
 
-			require.Positive(t, NewHDLCSender(0, nil).sendIL2PFrame(pp, testDatum.tx_version, testDatum.max_fec, true, 0))
+			require.Positive(t, NewHDLCSender(0, nil, 0).sendIL2PFrame(pp, testDatum.tx_version, testDatum.max_fec, true, 0))
 
 			recorder.flush() // Extra bit to flush the state machine.
 

@@ -47,17 +47,34 @@ import (
 
 const FX25_NTAB = 3
 
-var fx25Tab = [FX25_NTAB]struct {
+// fx25TabEntry is one of the Reed-Solomon codes FX.25 uses, and its codec.
+type fx25TabEntry struct {
 	symsize uint               // Symbol size, bits (1-8).  Always 8 for this application.
 	genpoly uint               // Field generator polynomial coefficients.
 	fcs     uint               // First root of RS code generator polynomial, index form.
 	prim    uint               // Primitive element to generate polynomial roots.
 	nroots  uint               // RS code generator polynomial degree (number of roots).
-	rs      *reedsolomon.Codec // RS codec control block.  Filled in at init time.
-}{
-	{8, 0x11d, 1, 1, 16, nil}, // RS(255,239)
-	{8, 0x11d, 1, 1, 32, nil}, // RS(255,223)
-	{8, 0x11d, 1, 1, 64, nil}, // RS(255,191)
+	rs      *reedsolomon.Codec // RS codec control block.
+}
+
+// fx25Tab is built once, when the package is initialised, and only read after
+// that, so every FX.25 sender and receiver can share it without a lock.
+var fx25Tab = [FX25_NTAB]fx25TabEntry{
+	newFX25TabEntry(8, 0x11d, 1, 1, 16), // RS(255,239)
+	newFX25TabEntry(8, 0x11d, 1, 1, 32), // RS(255,223)
+	newFX25TabEntry(8, 0x11d, 1, 1, 64), // RS(255,191)
+}
+
+// newFX25TabEntry sets up the codec for one of FX.25's Reed-Solomon codes.
+// The parameters are all constants, so a failure is a bug, not something a
+// user can do anything about.
+func newFX25TabEntry(symsize uint, genpoly uint, fcs uint, prim uint, nroots uint) fx25TabEntry {
+	var rs, err = reedsolomon.New(symsize, genpoly, fcs, prim, nroots)
+	if err != nil {
+		logrus.WithError(err).Fatal("FX.25 internal error: Could not set up Reed-Solomon codec")
+	}
+
+	return fx25TabEntry{symsize: symsize, genpoly: genpoly, fcs: fcs, prim: prim, nroots: nroots, rs: rs}
 }
 
 /*
@@ -127,94 +144,13 @@ func fx25_tag_find_match(t uint64) int {
 	return -1
 }
 
-/*-------------------------------------------------------------
- *
- * Name:	FX25Init
- *
- * Purpose:	This must be called once before any of the other fx25 functions.
- *
- * Inputs:	debug_level - Controls level of informational / debug messages.
- *
- *			0		Only errors.
- *			1 (default)	Transmitting ctag. Currently no other way to know this.
- *			2 		Receive correlation tag detected.  FEC decode complete.
- *			3		Dump data going in and out.
- *
- *			Use command line -dx to increase level or -qx for quiet.
- *
- * Description:	Initialize 3 Reed-Solomon codecs, for 16, 32, and 64 check bytes.
- *
- *--------------------------------------------------------------*/
-
-var g_debug_level int
-
-func FX25Init(debug_level int) {
-	g_debug_level = debug_level
-
-	for i := range FX25_NTAB {
-		var rs, err = reedsolomon.New(fx25Tab[i].symsize, fx25Tab[i].genpoly, fx25Tab[i].fcs, fx25Tab[i].prim, fx25Tab[i].nroots)
-		if err != nil {
-			logrus.WithError(err).Fatal("FX.25 internal error: Could not set up Reed-Solomon codec")
-		}
-
-		fx25Tab[i].rs = rs
-	}
-
-	// Verify integrity of tables and assumptions.
-	// This also does a quick check for the popcount function.
-
-	for j := range 16 {
-		for k := range 16 {
-			if j == k {
-				dwutil.Assert(bits.OnesCount64(tags[j].value^tags[k].value) == 0)
-			} else {
-				dwutil.Assert(bits.OnesCount64(tags[j].value^tags[k].value) == 32)
-			}
-		}
-	}
-
-	for j := CTAG_MIN; j <= CTAG_MAX; j++ {
-		dwutil.Assert(tags[j].n_block_radio-tags[j].k_data_radio == int(fx25Tab[tags[j].itab].nroots))
-		dwutil.Assert(tags[j].n_block_rs-tags[j].k_data_rs == int(fx25Tab[tags[j].itab].nroots))
-		dwutil.Assert(tags[j].n_block_rs == FX25_BLOCK_SIZE)
-	}
-
-	dwutil.Assert(fx25_pick_mode(100+1, 239) == 1)
-	dwutil.Assert(fx25_pick_mode(100+1, 240) == -1)
-
-	dwutil.Assert(fx25_pick_mode(100+5, 223) == 5)
-	dwutil.Assert(fx25_pick_mode(100+5, 224) == -1)
-
-	dwutil.Assert(fx25_pick_mode(100+9, 191) == 9)
-	dwutil.Assert(fx25_pick_mode(100+9, 192) == -1)
-
-	dwutil.Assert(fx25_pick_mode(16, 32) == 4)
-	dwutil.Assert(fx25_pick_mode(16, 64) == 3)
-	dwutil.Assert(fx25_pick_mode(16, 128) == 2)
-	dwutil.Assert(fx25_pick_mode(16, 239) == 1)
-	dwutil.Assert(fx25_pick_mode(16, 240) == -1)
-
-	dwutil.Assert(fx25_pick_mode(32, 32) == 8)
-	dwutil.Assert(fx25_pick_mode(32, 64) == 7)
-	dwutil.Assert(fx25_pick_mode(32, 128) == 6)
-	dwutil.Assert(fx25_pick_mode(32, 223) == 5)
-	dwutil.Assert(fx25_pick_mode(32, 234) == -1)
-
-	dwutil.Assert(fx25_pick_mode(64, 64) == 11)
-	dwutil.Assert(fx25_pick_mode(64, 128) == 10)
-	dwutil.Assert(fx25_pick_mode(64, 191) == 9)
-	dwutil.Assert(fx25_pick_mode(64, 192) == -1)
-
-	dwutil.Assert(fx25_pick_mode(1, 32) == 4)
-	dwutil.Assert(fx25_pick_mode(1, 33) == 3)
-	dwutil.Assert(fx25_pick_mode(1, 64) == 3)
-	dwutil.Assert(fx25_pick_mode(1, 65) == 6)
-	dwutil.Assert(fx25_pick_mode(1, 128) == 6)
-	dwutil.Assert(fx25_pick_mode(1, 191) == 9)
-	dwutil.Assert(fx25_pick_mode(1, 223) == 5)
-	dwutil.Assert(fx25_pick_mode(1, 239) == 1)
-	dwutil.Assert(fx25_pick_mode(1, 240) == -1)
-}
+// FX.25's debug level, from the -dx and -qx options, is handed to each
+// sender and receiver when it is made:
+//
+//	0		Only errors.
+//	1 (default)	Transmitting ctag. Currently no other way to know this.
+//	2		Receive correlation tag detected.  FEC decode complete.
+//	3		Dump data going in and out.
 
 // Get properties of specified CTAG number.
 
@@ -248,10 +184,6 @@ func fx25_get_nroots(ctag_num int) int {
 	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 
 	return int(fx25Tab[tags[ctag_num].itab].nroots)
-}
-
-func fx25_get_debug() int {
-	return g_debug_level
 }
 
 /*-------------------------------------------------------------

@@ -104,7 +104,8 @@ type XmitService struct {
 	 */
 	hdlcSenders [MAX_RADIO_CHANS]*HDLCSender
 
-	p_modem *AudioConfig
+	p_modem   *AudioConfig
+	fx25Debug int
 }
 
 /*-------------------------------------------------------------------
@@ -114,6 +115,9 @@ type XmitService struct {
  * Purpose:     Initialize the transmit process.
  *
  * Inputs:	p_modem		- Structure with modem and timing parameters.
+ *
+ *		fx25Debug	- FX.25's debug level, for each channel's
+ *				  HDLCSender.
  *
  *
  * Outputs:	Returns a new XmitService with required information set up.
@@ -130,10 +134,11 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(ctx context.Context, p_modem *AudioConfig, debug_xmit_packet bool) *XmitService {
+func NewXmitService(ctx context.Context, p_modem *AudioConfig, debug_xmit_packet bool, fx25Debug int) *XmitService {
 	logrus.Debug("xmit_init")
 	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem
+	xs.fx25Debug = fx25Debug
 
 	xs.debugXmitPacket = debug_xmit_packet
 
@@ -236,7 +241,7 @@ func (xs *XmitService) SetFulldup(channel int, value bool) {
 // own xmit_thread asks for it, so there is nothing to lock.
 func (xs *XmitService) hdlcSender(channel int) *HDLCSender {
 	if xs.hdlcSenders[channel] == nil {
-		xs.hdlcSenders[channel] = NewHDLCSender(channel, xs.p_modem)
+		xs.hdlcSenders[channel] = NewHDLCSender(channel, xs.p_modem, xs.fx25Debug)
 	}
 
 	return xs.hdlcSenders[channel]

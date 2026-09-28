@@ -88,6 +88,7 @@ type HDLCReceiver struct {
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
 	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
 	audio         *AudioConfig
+	fx25Debug     int // FX.25's debug level, for every slicer's FX.25 receiver.
 	sink          ReceiveSink
 
 	// Own copy of random number generator so we can get
@@ -111,7 +112,7 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 
 	s.rrbb = rrbb_new(channel, subchannel, slice, scrambled, s.lfsr, s.prevDescram)
 
-	s.fx25 = newFX25Receiver(channel, subchannel, slice, fx25_deliver_frame)
+	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
 	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc)
 
 	return s
@@ -128,17 +129,21 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
  *		demods	- Each radio channel's demodulators, which say how
  *			  many subchannels it has; nil for any other channel.
  *
+ *		fx25Debug - FX.25's debug level, for every slicer's FX.25
+ *			  receiver.
+ *
  *		sink	- Where a change in the channel's data carrier detect
  *			  state is reported.
  *
  ***********************************************************************************/
 
-func NewHDLCReceiver(pa *AudioConfig, demods [MAX_RADIO_CHANS]*Demodulator, sink ReceiveSink) *HDLCReceiver {
+func NewHDLCReceiver(pa *AudioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, sink ReceiveSink) *HDLCReceiver {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("NewHDLCReceiver (%p) \n", pa);
 
 	var r = new(HDLCReceiver)
 	r.audio = pa
+	r.fx25Debug = fx25Debug
 	r.sink = sink
 	r.randSeed = 1
 

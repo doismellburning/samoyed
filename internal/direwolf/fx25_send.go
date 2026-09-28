@@ -43,7 +43,7 @@ import (
  *--------------------------------------------------------------*/
 
 func (s *HDLCSender) sendFX25Frame(fbuf []byte, fx_mode int) int {
-	var ctag_num, data, check = fx25_encode_frame(s.channel, fbuf, fx_mode)
+	var ctag_num, data, check = fx25_encode_frame(s.channel, fbuf, fx_mode, s.fx25Debug)
 	if ctag_num < CTAG_MIN {
 		return (-1)
 	}
@@ -70,6 +70,8 @@ func (s *HDLCSender) sendFX25Frame(fbuf []byte, fx_mode int) int {
  *
  * Inputs:	channel, fx_mode - As for sendFX25Frame.
  *
+ *		debug	- FX.25's debug level.
+ *
  *		fbuf	- Frame buffer, without the FCS.
  *
  * Returns:	The correlation tag number, the "data" part to be transmitted,
@@ -78,8 +80,8 @@ func (s *HDLCSender) sendFX25Frame(fbuf []byte, fx_mode int) int {
  *
  *--------------------------------------------------------------*/
 
-func fx25_encode_frame(channel int, fbuf []byte, fx_mode int) (int, []byte, []byte) {
-	if fx25_get_debug() >= 3 {
+func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, []byte, []byte) {
+	if debug >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
 		dw_printf("FX.25[%d] send frame: FX.25 mode = %d\n", channel, fx_mode)
@@ -130,7 +132,7 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int) (int, []byte, []by
 
 	var check = rs.Encode(data[:k_data_rs])
 
-	if fx25_get_debug() >= 3 {
+	if debug >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d]: transmit %d data bytes, ctag number 0x%02x\n", channel, k_data_radio, ctag_num)
 		fx_hex_dump(data[:k_data_radio])

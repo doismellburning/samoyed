@@ -167,6 +167,8 @@ func (s *radioSink) DCDChange(channel int, state int) {
  *
  * Input:	Modem properties structure as filled in from the configuration file.
  *
+ *		fx25Debug - FX.25's debug level, for the HDLC decoders.
+ *
  *		sink	- Where the decoders' output goes.
  *
  * Outputs:
@@ -175,9 +177,9 @@ func (s *radioSink) DCDChange(channel int, state int) {
  *
  *------------------------------------------------------------------------------*/
 
-func multi_modem_init(pa *AudioConfig, sink ReceiveSink) {
+func multi_modem_init(pa *AudioConfig, fx25Debug int, sink ReceiveSink) {
 	demod_init(pa)
-	hdlcReceiver = NewHDLCReceiver(pa, demodulators, sink)
+	hdlcReceiver = NewHDLCReceiver(pa, demodulators, fx25Debug, sink)
 
 	for channel, m := range multiModems {
 		m.audioConfig = pa
