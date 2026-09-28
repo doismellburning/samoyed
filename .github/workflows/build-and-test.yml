@@ -172,9 +172,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7  # The dependency graph comes from `go list`
+        with:
+          go-version: "1.27"
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+      - run: ./dev-setup.sh docs
+        working-directory: "."
       - run: make bootstrap
       - run: make check
       - run: make dirhtml
