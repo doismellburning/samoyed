@@ -883,6 +883,35 @@ func TestIGateSatgateDelaysDirectPackets(t *testing.T) {
 	}
 }
 
+// A delayed packet passed the login check when it was queued, not when it is
+// released.  If the connection was dropped and remade in between, releasing it
+// during the new connection's login would make it the first thing the server
+// sees, so it is dropped, as it would have been had it just been heard.
+func TestIGateSatgateWaitsForLogin(t *testing.T) {
+	setupIGate(t)
+
+	t.Cleanup(func() { igate.dpQueueHead = nil })
+
+	igate.config.satgate_delay = 1
+	igate.dpQueueHead = nil
+
+	var pp = ax25.FromText("Q2TEST>APDW17,WIDE1-1:>hello", true)
+	require.NotNil(t, pp)
+
+	testutils.CaptureOutput(t, func() { igate.satgateDelayPacket(pp, 0) })
+	pp.SetReleaseTime(time.Now().Add(-time.Second))
+
+	// Reconnected, but not logged in yet.
+	var server, client = connectedTCPPair(t)
+
+	igate.setConnection(client)
+
+	igate.satgateReleaseDue(0)
+
+	requireIGateSilent(t, server, "a delayed packet was sent before the login had finished")
+	assert.Nil(t, igate.dpQueueHead, "the packet was not taken off the queue")
+}
+
 // A packet that has already been through a digipeater was not heard directly,
 // so there is nothing to wait for.
 func TestIGateSatgateDoesNotDelayRepeatedPackets(t *testing.T) {

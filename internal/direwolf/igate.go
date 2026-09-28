@@ -1293,7 +1293,13 @@ func (ig *IGate) satgateReleaseDue(channel int) {
 	ig.dpMutex.Unlock()
 	pp.SetNext(nil)
 
-	var conn, _ = ig.connection()
+	// It passed the login check when it was queued, but the connection may
+	// have been remade since, so check again, as sendRecPacket does.
+	var conn, okToSend = ig.connection()
+	if conn == nil || !okToSend {
+		return /* Silently discard if not connected or login not complete. */
+	}
+
 	ig.sendPacketToServer(conn, pp, channel)
 }
 
