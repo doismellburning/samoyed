@@ -865,7 +865,9 @@ func (ig *IGate) sendPacketToServer(conn net.Conn, pp *ax25.Packet, channel int)
 
 	// TODO KG Check against IGATE_MAX_MSG size?
 
-	ig.sendMsgToServer(conn, msg)
+	if !ig.sendMsgToServer(conn, msg) {
+		return /* Not sent, so neither counted nor remembered. */
+	}
 
 	ig.updateStats(func(s *igateStats) { s.uplinkPackets++ })
 	metrics.RecordUplink()
@@ -895,6 +897,8 @@ func (ig *IGate) sendPacketToServer(conn net.Conn, pp *ax25.Packet, channel int)
  *			  It could contain nul characters so we can't
  *			  use the normal C string functions.
  *
+ * Returns:	Whether it was sent.
+ *
  * Description:	Send message to IGate Server if connected.
  *		Disconnect from server, and notify user, if any error.
  *		Should use a word other than message because that has
@@ -902,9 +906,9 @@ func (ig *IGate) sendPacketToServer(conn net.Conn, pp *ax25.Packet, channel int)
  *
  *--------------------------------------------------------------------*/
 
-func (ig *IGate) sendMsgToServer(conn net.Conn, imsg string) {
+func (ig *IGate) sendMsgToServer(conn net.Conn, imsg string) bool {
 	if conn == nil {
-		return /* Silently discard if not connected. */
+		return false /* Silently discard if not connected. */
 	}
 
 	// TODO KG Truncate if > IGATE_MAX_MSG?
@@ -925,14 +929,18 @@ func (ig *IGate) sendMsgToServer(conn net.Conn, imsg string) {
 
 	imsg += "\r\n"
 
-	ig.updateStats(func(s *igateStats) { s.uplinkBytes += len(imsg) })
-
 	var _, err = conn.Write([]byte(imsg)) // TODO KG Should imsg just be a []byte?
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending to IGate server.  Closing connection.\n\n")
 		ig.dropConnection(conn)
+
+		return false
 	}
+
+	ig.updateStats(func(s *igateStats) { s.uplinkBytes += len(imsg) })
+
+	return true
 } /* end sendMsgToServer */
 
 /*-------------------------------------------------------------------
