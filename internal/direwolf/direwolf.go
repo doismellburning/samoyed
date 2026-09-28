@@ -471,7 +471,7 @@ x = Silence FX.25 information.`)
 	if err < 0 {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
-		SLEEP_SEC(5)
+		time.Sleep(5 * time.Second)
 		pflag.Usage()
 		os.Exit(1)
 	}
@@ -1237,7 +1237,7 @@ func cleanup() {
 	// put their own resources down before the process goes away underneath
 	// them.  Well inside any supervisor's patience - systemd waits 90s by
 	// default - and a second signal now skips it entirely.
-	SLEEP_SEC(1)
+	time.Sleep(1 * time.Second)
 	os.Exit(0)
 }
 

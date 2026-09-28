@@ -1512,7 +1512,7 @@ func PTTTestMain() error {
 		return initErr
 	}
 
-	SLEEP_SEC(2)
+	time.Sleep(2 * time.Second)
 
 	/* flash each a few times. */
 	var channel int
@@ -1522,9 +1522,9 @@ func PTTTestMain() error {
 	channel = 0
 	for range 3 {
 		p.Set(OCTYPE_PTT, channel, 1)
-		SLEEP_SEC(1)
+		time.Sleep(1 * time.Second)
 		p.Set(OCTYPE_PTT, channel, 0)
-		SLEEP_SEC(1)
+		time.Sleep(1 * time.Second)
 	}
 
 	dw_printf("turn on DTR a few times...\n")
@@ -1532,9 +1532,9 @@ func PTTTestMain() error {
 	channel = 1
 	for range 3 {
 		p.Set(OCTYPE_PTT, channel, 1)
-		SLEEP_SEC(1)
+		time.Sleep(1 * time.Second)
 		p.Set(OCTYPE_PTT, channel, 0)
-		SLEEP_SEC(1)
+		time.Sleep(1 * time.Second)
 	}
 
 	p.Term()
@@ -1548,16 +1548,16 @@ func PTTTestMain() error {
 		return initErr
 	}
 
-	SLEEP_SEC(2)
+	time.Sleep(2 * time.Second)
 
 	dw_printf("INVERTED -  RTS a few times...\n")
 
 	channel = 0
 	for range 3 {
 		p.Set(OCTYPE_PTT, channel, 1)
-		SLEEP_SEC(1)
+		time.Sleep(1 * time.Second)
 		p.Set(OCTYPE_PTT, channel, 0)
-		SLEEP_SEC(1)
+		time.Sleep(1 * time.Second)
 	}
 
 	dw_printf("turn on DTR a few times...\n")
@@ -1565,9 +1565,9 @@ func PTTTestMain() error {
 	channel = 1
 	for range 3 {
 		p.Set(OCTYPE_PTT, channel, 1)
-		SLEEP_SEC(1)
+		time.Sleep(1 * time.Second)
 		p.Set(OCTYPE_PTT, channel, 0)
-		SLEEP_SEC(1)
+		time.Sleep(1 * time.Second)
 	}
 
 	p.Term()
@@ -1589,14 +1589,14 @@ func PTTTestMain() error {
 		return initErr
 	}
 
-	SLEEP_SEC(2)
+	time.Sleep(2 * time.Second)
 
 	channel = 0
 	for range 3 {
 		p.Set(OCTYPE_PTT, channel, 1)
-		SLEEP_SEC(1)
+		time.Sleep(1 * time.Second)
 		p.Set(OCTYPE_PTT, channel, 0)
-		SLEEP_SEC(1)
+		time.Sleep(1 * time.Second)
 	}
 
 	p.Term()

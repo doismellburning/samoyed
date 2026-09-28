@@ -25,7 +25,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/spf13/pflag"
 )
@@ -254,7 +253,7 @@ func main() {
 	// FIXME:  Need to do this again if we lose TNC and reattach to it.
 	///   should happen automatically now.   agwlib_G_ask_port_information ();
 	for {
-		direwolf.SLEEP_SEC(1) // other places based on 1 second assumption.
+		time.Sleep(1 * time.Second) // other places based on 1 second assumption.
 		srv.poll()
 	}
 } /* end main */
