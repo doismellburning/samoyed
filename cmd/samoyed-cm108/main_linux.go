@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/direwolf"
 )
@@ -90,7 +91,7 @@ func main() {
 				os.Exit(1)
 			}
 
-			direwolf.SLEEP_SEC(1)
+			time.Sleep(1 * time.Second)
 
 			state = 1 - state
 		}

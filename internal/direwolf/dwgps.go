@@ -130,7 +130,7 @@ func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
 
 	dwgpsd_init(ctx, g, pconfig, debug)
 
-	SLEEP_MS(500) /* So receive thread(s) can clear the */
+	_ = sleepCtx(ctx, 500*time.Millisecond) /* So receive thread(s) can clear the */
 	/* not init status before it gets checked. */
 
 	return g

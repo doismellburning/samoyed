@@ -564,7 +564,7 @@ func Test_tnc_send_data_busy(t *testing.T) {
 	busy[0].Store(true)
 
 	go func() {
-		direwolf.SLEEP_MS(150)
+		time.Sleep(150 * time.Millisecond)
 		busy[0].Store(false)
 	}()
 
