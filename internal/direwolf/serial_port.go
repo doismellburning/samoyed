@@ -55,8 +55,7 @@ func SerialPortOpen(devicename string, baud int) *term.Term {
 
 	var fd, err = term.Open(linuxname, term.RawMode)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Could not open serial port %s: %s.\n", linuxname, err)
+		fmt.Printf("ERROR - Could not open serial port %s: %s.\n", linuxname, err)
 
 		return nil
 	}
@@ -69,8 +68,7 @@ func SerialPortOpen(devicename string, baud int) *term.Term {
 	case 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200:
 		fd.SetSpeed(baud)
 	default:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("SerialPortOpen: Unsupported speed %d.  Using 4800.\n", baud)
+		fmt.Printf("SerialPortOpen: Unsupported speed %d.  Using 4800.\n", baud)
 		fd.SetSpeed(4800)
 	}
 
