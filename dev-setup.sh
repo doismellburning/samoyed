@@ -131,6 +131,16 @@ install_lint() {
 }
 
 install_docs() {
+    # graphviz renders the generated package dependency graph
+    case "$OS" in
+        Linux)
+            apt_install graphviz
+            ;;
+        Darwin)
+            brew_install graphviz
+            ;;
+    esac
+
     if command -v uv > /dev/null; then
         return
     fi

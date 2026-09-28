@@ -42,3 +42,9 @@ dev = [
     "ruff",
     "ty",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["source/_ext"]
+
+[tool.ty.environment]
+extra-paths = ["source/_ext"]
