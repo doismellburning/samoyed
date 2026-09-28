@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/sirupsen/logrus"
 )
 
 // TTEncoding is the touch-tone text encoding that a button sequence uses.
@@ -220,8 +222,7 @@ func TTTextToMultipress(text string, quiet bool) (string, int) {
 				errors++
 
 				if !quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Text to multi-press: Only letters, digits, and space allowed.\n")
+					logrus.WithField("text", text).Warn("Text to multi-press: only letters, digits, and space allowed")
 				}
 
 				c = ' '
@@ -254,8 +255,7 @@ func TTTextToMultipress(text string, quiet bool) (string, int) {
 			if !found {
 				errors++
 
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Text to multi-press: INTERNAL ERROR.  Should not be here.\n")
+				logrus.WithField("text", text).Error("Text to multi-press: internal error, should not be here")
 			}
 		}
 	}
@@ -301,8 +301,7 @@ func TTTextToTwoKey(text string, quiet bool) (string, int) {
 				errors++
 
 				if !quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Text to two key: Only letters, digits, and space allowed.\n")
+					logrus.WithField("text", text).Warn("Text to two-key: only letters, digits, and space allowed")
 				}
 
 				c = ' '
@@ -325,8 +324,7 @@ func TTTextToTwoKey(text string, quiet bool) (string, int) {
 			if !found {
 				errors++
 
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Text to two-key: INTERNAL ERROR.  Should not be here.\n")
+				logrus.WithField("text", text).Error("Text to two-key: internal error, should not be here")
 			}
 		}
 	}
@@ -371,8 +369,7 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
 		errors++
 
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Letter to two digits: \"%c\" found where a letter is required.\n", c)
+			logrus.WithField("char", string(c)).Warn("Letter to two digits: found a non-letter where a letter is required")
 		}
 
 		return "00", errors
@@ -394,8 +391,7 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
 	if !found {
 		errors++
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Letter to two digits: INTERNAL ERROR.  Should not be here.\n")
+		logrus.WithField("char", string(c)).Error("Letter to two digits: internal error, should not be here")
 
 		return "00", errors
 	}
@@ -431,8 +427,7 @@ func TTTextToCall10(text string, quiet bool) (string, int) {
 
 	if len(text) < 1 || len(text) > 6 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Text to callsign 6+4: Callsign \"%s\" not between 1 and 6 characters.\n", text)
+			logrus.WithField("callsign", text).Warn("Text to callsign 6+4: callsign not between 1 and 6 characters")
 		}
 
 		errors++
@@ -443,8 +438,7 @@ func TTTextToCall10(text string, quiet bool) (string, int) {
 	for _, t := range text {
 		if !unicode.IsLetter(t) && !unicode.IsDigit(t) {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Text to callsign 6+4: Callsign \"%s\" can contain only letters and digits.\n", text)
+				logrus.WithField("callsign", text).Warn("Text to callsign 6+4: callsign can contain only letters and digits")
 			}
 
 			errors++
@@ -486,8 +480,7 @@ func TTTextToCall10(text string, quiet bool) (string, int) {
 			/* Earlier check should have caught any character not in translation table. */
 			errors++
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Text to callsign 6+4: INTERNAL ERROR 0x%02x.  Should not be here.\n", c)
+			logrus.WithFields(logrus.Fields{"callsign": text, "char": string(c)}).Error("Text to callsign 6+4: internal error, should not be here")
 		}
 	}
 
@@ -529,8 +522,7 @@ func TTTextToSatsq(text string, quiet bool) (string, int) {
 
 	if len(text) != 4 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Satellite Gridsquare to DTMF: Gridsquare \"%s\" must be 4 characters.\n", text)
+			logrus.WithField("gridsquare", text).Warn("Satellite gridsquare to DTMF: gridsquare must be 4 characters")
 		}
 
 		errors++
@@ -544,8 +536,7 @@ func TTTextToSatsq(text string, quiet bool) (string, int) {
 
 	if uc[0] < 'A' || uc[0] > 'R' || uc[1] < 'A' || uc[1] > 'R' {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Satellite Gridsquare to DTMF: First two characters \"%s\" must be letters in range of A to R.\n", text)
+			logrus.WithField("gridsquare", text).Warn("Satellite gridsquare to DTMF: first two characters must be letters in range of A to R")
 		}
 
 		errors++
@@ -555,8 +546,7 @@ func TTTextToSatsq(text string, quiet bool) (string, int) {
 
 	if !unicode.IsDigit(rune(text[2])) || !unicode.IsDigit(rune(text[3])) {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Satellite Gridsquare to DTMF: Last two characters \"%s\" must be digits.\n", text)
+			logrus.WithField("gridsquare", text).Warn("Satellite gridsquare to DTMF: last two characters must be digits")
 		}
 
 		errors++
@@ -589,8 +579,7 @@ func TTTextToSatsq(text string, quiet bool) (string, int) {
 		errors++
 
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Satellite Gridsquare to DTMF: Sorry, your location can't be converted to DTMF.\n")
+			logrus.WithField("gridsquare", text).Warn("Satellite gridsquare to DTMF: location can't be converted to DTMF")
 		}
 	}
 
@@ -707,8 +696,7 @@ func TTMultipressToText(buttons string, quiet bool) (string, int) {
 				errors++
 
 				if !quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Multi-press to text: Maximum of %d \"%c\" can occur in a row.\n", maxspan, c)
+					logrus.WithFields(logrus.Fields{"buttons": buttons, "button": string(c), "max": maxspan}).Warn("Multi-press to text: too many of the same button in a row")
 				}
 				/* Treat like the maximum length. */
 				text.WriteRune(c)
@@ -719,8 +707,7 @@ func TTMultipressToText(buttons string, quiet bool) (string, int) {
 				errors++
 
 				if !quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Multi-press to text: \"A\" can occur only between two same digits.\n")
+					logrus.WithField("buttons", buttons).Warn("Multi-press to text: \"A\" can occur only between two same digits")
 				}
 			}
 		} else {
@@ -728,8 +715,7 @@ func TTMultipressToText(buttons string, quiet bool) (string, int) {
 			errors++
 
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Multi-press to text: \"%c\" not allowed.\n", c)
+				logrus.WithFields(logrus.Fields{"buttons": buttons, "button": string(c)}).Warn("Multi-press to text: button not allowed")
 			}
 		}
 	}
@@ -784,8 +770,7 @@ func TTTwoKeyToText(buttons string, quiet bool) (string, int) {
 					errors++
 
 					if !quiet {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Two key to text: Invalid combination \"%c%c\".\n", c, col+'A')
+						logrus.WithFields(logrus.Fields{"buttons": buttons, "combination": string([]rune{c, rune(col) + 'A'})}).Warn("Two-key to text: invalid combination")
 					}
 				}
 
@@ -798,16 +783,14 @@ func TTTwoKeyToText(buttons string, quiet bool) (string, int) {
 			errors++
 
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Two-key to text: A, B, C, or D in unexpected location.\n")
+				logrus.WithField("buttons", buttons).Warn("Two-key to text: A, B, C, or D in unexpected location")
 			}
 		} else {
 			/* Completely unexpected character. */
 			errors++
 
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Two-key to text: Invalid character \"%c\".\n", c)
+				logrus.WithFields(logrus.Fields{"buttons": buttons, "button": string(c)}).Warn("Two-key to text: invalid character")
 			}
 		}
 	}
@@ -856,8 +839,7 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
 				text = ""
 
 				if !quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Two digits to letter: Invalid combination \"%c%c\".\n", c1, c2)
+					logrus.WithField("buttons", buttons).Warn("Two digits to letter: invalid combination")
 				}
 			}
 		} else {
@@ -865,8 +847,7 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
 			text = ""
 
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Two digits to letter: Second character \"%c\" must be in range of 1 through 4.\n", c2)
+				logrus.WithField("buttons", buttons).Warn("Two digits to letter: second character must be in range of 1 through 4")
 			}
 		}
 	} else {
@@ -874,8 +855,7 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
 		text = ""
 
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Two digits to letter: First character \"%c\" must be in range of 2 through 9.\n", c1)
+			logrus.WithField("buttons", buttons).Warn("Two digits to letter: first character must be in range of 2 through 9")
 		}
 	}
 
@@ -910,8 +890,7 @@ func TTCall10ToText(buttons string, quiet bool) (string, int) {
 
 	if len(buttons) != 10 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Callsign 6+4 to text: Encoded Callsign \"%s\" must be exactly 10 digits.\n", buttons)
+			logrus.WithField("buttons", buttons).Warn("Callsign 6+4 to text: encoded callsign must be exactly 10 digits")
 		}
 
 		errors++
@@ -922,8 +901,7 @@ func TTCall10ToText(buttons string, quiet bool) (string, int) {
 	for _, b := range buttons {
 		if !unicode.IsDigit(b) {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Callsign 6+4 to text: Encoded Callsign \"%s\" can contain only digits.\n", buttons)
+				logrus.WithField("buttons", buttons).Warn("Callsign 6+4 to text: encoded callsign can contain only digits")
 			}
 
 			errors++
@@ -941,8 +919,7 @@ func TTCall10ToText(buttons string, quiet bool) (string, int) {
 		var col = (packed >> ((5 - k) * 2)) & 3
 
 		if row < 0 || row > 9 || col < 0 || col > 3 { //nolint:staticcheck
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Callsign 6+4 to text: INTERNAL ERROR %d %d.  Should not be here.\n", row, col)
+			logrus.WithFields(logrus.Fields{"buttons": buttons, "row": row, "col": col}).Error("Callsign 6+4 to text: internal error, should not be here")
 
 			errors++
 			row = 0
@@ -955,8 +932,7 @@ func TTCall10ToText(buttons string, quiet bool) (string, int) {
 			errors++
 
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Callsign 6+4 to text: Invalid combination: button %d, position %d.\n", row, col)
+				logrus.WithFields(logrus.Fields{"buttons": buttons, "button": row, "position": col}).Warn("Callsign 6+4 to text: invalid combination")
 			}
 		}
 	}
@@ -996,8 +972,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 
 	if len(buttons) != 5 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Callsign 3+2 suffix to text: Encoded Callsign \"%s\" must be exactly 5 digits.\n", buttons)
+			logrus.WithField("buttons", buttons).Warn("Callsign 3+2 suffix to text: encoded callsign must be exactly 5 digits")
 		}
 
 		errors++
@@ -1008,8 +983,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 	for _, b := range buttons {
 		if !unicode.IsDigit(b) {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Callsign 3+2 suffix to text: Encoded Callsign \"%s\" can contain only digits.\n", buttons)
+				logrus.WithField("buttons", buttons).Warn("Callsign 3+2 suffix to text: encoded callsign can contain only digits")
 			}
 
 			errors++
@@ -1027,8 +1001,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 		var col = (packed >> ((2 - k) * 2)) & 3
 
 		if row < 0 || row > 9 || col < 0 || col > 3 { //nolint:staticcheck
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Callsign 3+2 suffix to text: INTERNAL ERROR %d %d.  Should not be here.\n", row, col)
+			logrus.WithFields(logrus.Fields{"buttons": buttons, "row": row, "col": col}).Error("Callsign 3+2 suffix to text: internal error, should not be here")
 
 			errors++
 			row = 0
@@ -1041,8 +1014,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 			errors++
 
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Callsign 3+2 suffix to text: Invalid combination: button %d, position %d.\n", row, col)
+				logrus.WithFields(logrus.Fields{"buttons": buttons, "button": row, "position": col}).Warn("Callsign 3+2 suffix to text: invalid combination")
 			}
 		}
 	}
@@ -1105,8 +1077,7 @@ func TTMheadToText(buttons string, quiet bool) (string, int) {
 		len(buttons) != 10 && len(buttons) != 12 &&
 		len(buttons) != 16 && len(buttons) != 18 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("DTMF to Maidenhead Gridsquare Locator: Input \"%s\" must be exactly 4, 6, 10, or 12 digits.\n", buttons)
+			logrus.WithField("buttons", buttons).Warn("DTMF to Maidenhead locator: input must be exactly 4, 6, 10, or 12 digits")
 		}
 
 		errors++
@@ -1117,8 +1088,7 @@ func TTMheadToText(buttons string, quiet bool) (string, int) {
 	for _, b := range buttons {
 		if !unicode.IsDigit(b) {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("DTMF to Maidenhead Gridsquare Locator: Input \"%s\" can contain only digits.\n", buttons)
+				logrus.WithField("buttons", buttons).Warn("DTMF to Maidenhead locator: input can contain only digits")
 			}
 
 			errors++
@@ -1193,8 +1163,7 @@ func TTTextToMhead(text string, quiet bool) (string, int) {
 
 	if (len(text) % 2) != 0 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Maidenhead Gridsquare Locator to DTMF: Input \"%s\" must be even number of characters.\n", text)
+			logrus.WithField("locator", text).Warn("Maidenhead locator to DTMF: input must be an even number of characters")
 		}
 
 		errors++
@@ -1204,8 +1173,7 @@ func TTTextToMhead(text string, quiet bool) (string, int) {
 
 	if np < 1 || np > MAXMHPAIRS {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Maidenhead Gridsquare Locator to DTMF: Input \"%s\" must be 1 to %d pairs of characters.\n", text, np)
+			logrus.WithFields(logrus.Fields{"locator": text, "max_pairs": np}).Warn("Maidenhead locator to DTMF: input has too many pairs of characters")
 		}
 
 		errors++
@@ -1220,9 +1188,12 @@ func TTTextToMhead(text string, quiet bool) (string, int) {
 		if unicode.ToUpper(t0) < mhpair[i].min_ch || unicode.ToUpper(t0) > mhpair[i].max_ch ||
 			unicode.ToUpper(t1) < mhpair[i].min_ch || unicode.ToUpper(t1) > mhpair[i].max_ch {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("The %s pair of characters in Maidenhead locator \"%s\" must be in range of %c thru %c.\n",
-					mhpair[i].position, text, mhpair[i].min_ch, mhpair[i].max_ch)
+				logrus.WithFields(logrus.Fields{
+					"locator": text,
+					"pair":    mhpair[i].position,
+					"min":     string(mhpair[i].min_ch),
+					"max":     string(mhpair[i].max_ch),
+				}).Warn("Maidenhead locator to DTMF: pair of characters out of range")
 			}
 
 			buttons = ""
@@ -1278,8 +1249,7 @@ func TTSatsqToText(buttons string, quiet bool) (string, int) {
 
 	if len(buttons) != 4 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("DTMF to Satellite Gridsquare: Input \"%s\" must be exactly 4 digits.\n", buttons)
+			logrus.WithField("buttons", buttons).Warn("DTMF to satellite gridsquare: input must be exactly 4 digits")
 		}
 
 		errors++
@@ -1290,8 +1260,7 @@ func TTSatsqToText(buttons string, quiet bool) (string, int) {
 	for _, b := range buttons {
 		if !unicode.IsDigit(b) {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("DTMF to Satellite Gridsquare: Input \"%s\" can contain only digits.\n", buttons)
+				logrus.WithField("buttons", buttons).Warn("DTMF to satellite gridsquare: input can contain only digits")
 			}
 
 			errors++
@@ -1347,8 +1316,7 @@ func tt_ascii2d_to_text(buttons string, quiet bool) (string, int) {
 			errors++
 
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("ASCII2D to text: Invalid character pair \"%c%c\".\n", c1, c2)
+				logrus.WithFields(logrus.Fields{"buttons": buttons, "pair": string([]rune{c1, c2})}).Warn("ASCII2D to text: invalid character pair")
 			}
 		}
 	}
