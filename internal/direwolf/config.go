@@ -17,6 +17,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"os"
@@ -1137,6 +1138,66 @@ var configHandlers = map[string]configHandler{
 	"NOXID":          handleNOXID,
 }
 
+// readLegacy reads configuration directives in Dire Wolf's line-at-a-time
+// format from r, carrying on from line ps.line.  name says where they came
+// from, for messages.
+func (ps *parseState) readLegacy(r io.Reader, name string) {
+	var scanner = bufio.NewScanner(r)
+	for scanner.Scan() {
+		ps.text = scanner.Text()
+		ps.line++
+
+		if ps.text == "" || ps.text[0] == '#' || ps.text[0] == '*' {
+			continue
+		}
+
+		ps.startLine(ps.text)
+
+		var t = ps.split(false)
+
+		if t == "" {
+			continue
+		}
+
+		ps.keyword = t
+
+		var keyword = strings.ToUpper(t)
+
+		var err error
+		// Some config keywords actually incorporate a device number, e.g. ADEVICE0
+		switch {
+		case strings.HasPrefix(keyword, "ADEVICE"):
+			err = handleADEVICE(ps)
+		case strings.HasPrefix(keyword, "PAIDEVICE"):
+			err = handlePAIDEVICE(ps)
+		case strings.HasPrefix(keyword, "PAODEVICE"):
+			err = handlePAODEVICE(ps)
+		default:
+			if handler, ok := configHandlers[keyword]; ok {
+				err = handler(ps)
+			} else {
+				/*
+				 * Invalid command.
+				 */
+				err = fmt.Errorf("config file: Unrecognized command '%s' on line %d", t, ps.line)
+			}
+		}
+
+		if err != nil {
+			ps.report(err)
+		}
+	}
+
+	// Scan stops on a read failure, or on a line too long for the scanner's
+	// buffer, and says so only here.  The rest of the file went unread, so
+	// nothing below can be trusted - say so, rather than letting a file we only
+	// got halfway through look like one with nothing wrong with it.
+	var scanErr = scanner.Err()
+	if scanErr != nil {
+		ps.errorf("config file: Could not read %s past line %d: %v", name, ps.line, scanErr)
+	}
+}
+
 // config_init reads the configuration file, applying defaults first so that the
 // file can override them.  It reports what the file drew, for a caller that
 // wants to act on it - see the --config-check option in DirewolfMain.
@@ -1396,59 +1457,10 @@ func config_init(fname string, p_audio_config *AudioConfig,
 
 	dw_printf("\nReading config file %s\n", absFilePath)
 
-	var scanner = bufio.NewScanner(fp)
-	for scanner.Scan() {
-		ps.text = scanner.Text()
-		ps.line++
-
-		if ps.text == "" || ps.text[0] == '#' || ps.text[0] == '*' {
-			continue
-		}
-
-		ps.startLine(ps.text)
-
-		var t = ps.split(false)
-
-		if t == "" {
-			continue
-		}
-
-		ps.keyword = t
-
-		var keyword = strings.ToUpper(t)
-
-		var err error
-		// Some config keywords actually incorporate a device number, e.g. ADEVICE0
-		switch {
-		case strings.HasPrefix(keyword, "ADEVICE"):
-			err = handleADEVICE(ps)
-		case strings.HasPrefix(keyword, "PAIDEVICE"):
-			err = handlePAIDEVICE(ps)
-		case strings.HasPrefix(keyword, "PAODEVICE"):
-			err = handlePAODEVICE(ps)
-		default:
-			if handler, ok := configHandlers[keyword]; ok {
-				err = handler(ps)
-			} else {
-				/*
-				 * Invalid command.
-				 */
-				err = fmt.Errorf("config file: Unrecognized command '%s' on line %d", t, ps.line)
-			}
-		}
-
-		if err != nil {
-			ps.report(err)
-		}
-	}
-
-	// Scan stops on a read failure, or on a line too long for the scanner's
-	// buffer, and says so only here.  The rest of the file went unread, so
-	// nothing below can be trusted - say so, rather than letting a file we only
-	// got halfway through look like one with nothing wrong with it.
-	var scanErr = scanner.Err()
-	if scanErr != nil {
-		ps.errorf("config file: Could not read %s past line %d: %v", absFilePath, ps.line, scanErr)
+	if isYAMLConfig(absFilePath) {
+		ps.readYAML(fp, absFilePath)
+	} else {
+		ps.readLegacy(fp, absFilePath)
 	}
 
 	/*
@@ -1562,6 +1574,18 @@ func config_init(fname string, p_audio_config *AudioConfig,
 
 // handleADEVICE handles the ADEVICE[n] keyword.
 func handleADEVICE(ps *parseState) error {
+	var settings, err = parseADEVICE(ps)
+	if err != nil {
+		ps.adevice = 0
+
+		return err
+	}
+
+	return ps.applyADEVICE(settings)
+}
+
+// parseADEVICE reads an ADEVICE line into the settings it describes.
+func parseADEVICE(ps *parseState) (AudioDeviceSettings, error) {
 	/*
 	 * ADEVICE[n] 		- Name of input sound device, and optionally output, if different.
 	 *
@@ -1577,33 +1601,56 @@ func handleADEVICE(ps *parseState) error {
 	 */
 	/* Note that ALSA name can contain comma such as hw:1,0 */
 	/* "ADEVICE" is equivalent to "ADEVICE0". */
-	ps.adevice = 0
+	var settings = new(AudioDeviceSettings)
 
 	// ps.keyword holds the original token e.g. "ADEVICE" or "ADEVICE1".
 	if len(ps.keyword) >= 8 {
 		var i, iErr = strconv.Atoi(ps.keyword[7:])
 		if iErr != nil {
-			return fmt.Errorf("config file: Could not parse ADEVICE number on line %d: %w", ps.line, iErr)
+			return *settings, fmt.Errorf("config file: Could not parse ADEVICE number on line %d: %w", ps.line, iErr)
 		}
 
-		if i < 0 || i >= MAX_ADEVS {
-			ps.errorf(
-				"Config file: Device number %d out of range for ADEVICE command on line %d.\nIf you really need more than %d audio devices, increase MAX_ADEVS and recompile.",
-				i,
-				ps.line,
-				MAX_ADEVS,
-			)
-
-			ps.adevice = 0
-
-			return nil
-		}
-
-		ps.adevice = i
+		settings.Device = i
 	}
 
-	var t = ps.split(false)
-	if t == "" {
+	settings.Input = ps.split(false)
+
+	// New case for release 1.8.
+
+	if settings.Input == "=" {
+		var t = ps.split(false)
+		if t == "" {
+			return *settings, fmt.Errorf("config file: ADEVICE%d mapping syntax requires a source device number on line %d", settings.Device, ps.line)
+		}
+
+		return *settings, fmt.Errorf("config file: ADEVICE%d = %s mapping syntax is not implemented on line %d", settings.Device, t, ps.line)
+	}
+
+	// Different audio devices for receive and transmit, if there is another.
+	settings.Output = ps.split(false)
+
+	return *settings, nil
+}
+
+// applyADEVICE defines an audio device, and makes it the one that later
+// device settings apply to.
+func (ps *parseState) applyADEVICE(settings AudioDeviceSettings) error {
+	ps.adevice = 0
+
+	if settings.Device < 0 || settings.Device >= MAX_ADEVS {
+		ps.errorf(
+			"Config file: Device number %d out of range for ADEVICE command on line %d.\nIf you really need more than %d audio devices, increase MAX_ADEVS and recompile.",
+			settings.Device,
+			ps.line,
+			MAX_ADEVS,
+		)
+
+		return nil
+	}
+
+	ps.adevice = settings.Device
+
+	if settings.Input == "" {
 		// Reported here rather than returned, so that the pointer at the
 		// documentation still follows the complaint it belongs to.
 		ps.errorf("config file: Missing name of audio device for ADEVICE command on line %d", ps.line)
@@ -1626,30 +1673,18 @@ func handleADEVICE(ps *parseState) error {
 		return fmt.Errorf("config file: ADEVICE%d can't be defined more than once. Line %d", ps.adevice, ps.line)
 	}
 
-	// New case for release 1.8.
-
-	if t == "=" {
-		t = ps.split(false)
-		if t == "" {
-			return fmt.Errorf("config file: ADEVICE%d mapping syntax requires a source device number on line %d", ps.adevice, ps.line)
-		}
-
-		return fmt.Errorf("config file: ADEVICE%d = %s mapping syntax is not implemented on line %d", ps.adevice, t, ps.line)
-	}
-
 	ps.audio.adev[ps.adevice].defined = 1
 
 	/* First channel of device is valid. */
 	// This might be changed to UDP or STDIN when the device name is examined.
 	ps.audio.chan_medium[ADEVFIRSTCHAN(ps.adevice)] = MEDIUM_RADIO
 
-	ps.audio.adev[ps.adevice].adevice_in = t
-	ps.audio.adev[ps.adevice].adevice_out = t
+	ps.audio.adev[ps.adevice].adevice_in = settings.Input
+	ps.audio.adev[ps.adevice].adevice_out = settings.Input
 
-	t = ps.split(false)
-	if t != "" {
+	if settings.Output != "" {
 		// Different audio devices for receive and transmit.
-		ps.audio.adev[ps.adevice].adevice_out = t
+		ps.audio.adev[ps.adevice].adevice_out = settings.Output
 		ps.audio.adev[ps.adevice].adevice_out_specified = true
 	}
 
@@ -1748,6 +1783,12 @@ func handleACHANNELS(ps *parseState) error {
 	}
 
 	var n, _ = strconv.Atoi(t)
+
+	return ps.applyACHANNELS(n)
+}
+
+// applyACHANNELS sets the number of audio channels for the current device.
+func (ps *parseState) applyACHANNELS(n int) error {
 	if n == 1 || n == 2 {
 		ps.audio.adev[ps.adevice].num_channels = n
 
@@ -1785,6 +1826,12 @@ func handleCHANNEL(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: Channel number must be numeric for CHANNEL command", ps.line)
 	}
+
+	return ps.applyCHANNEL(n)
+}
+
+// applyCHANNEL makes n the radio channel that later channel settings apply to.
+func (ps *parseState) applyCHANNEL(n int) error {
 	if n >= 0 && n < MAX_RADIO_CHANS {
 		ps.channel = n
 
@@ -1898,24 +1945,30 @@ func handleMYCALL(ps *parseState) error {
 	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing value for MYCALL command on line %d", ps.line)
-	} else {
-		/* Silently force upper case. */
-		/* Might change to warning someday. */
-		t = strings.ToUpper(t)
+	}
 
-		var _, _, _, ok = ax25.ParseAddr(-1, t, ax25.AddrStrictNoStar)
+	return ps.applyMYCALL(t)
+}
 
-		if !ok {
-			return fmt.Errorf("config file: Invalid value for MYCALL command on line %d", ps.line)
-		}
+// applyMYCALL sets the station callsign for the current channel, and for any
+// other channel that does not have one yet.
+func (ps *parseState) applyMYCALL(call string) error {
+	/* Silently force upper case. */
+	/* Might change to warning someday. */
+	call = strings.ToUpper(call)
 
-		// Definitely set for current channel.
-		// Set for other channels which have not been set yet.
+	var _, _, _, ok = ax25.ParseAddr(-1, call, ax25.AddrStrictNoStar)
 
-		for c := range MAX_TOTAL_CHANS {
-			if c == ps.channel || IsNoCall(ps.audio.mycall[c]) {
-				ps.audio.mycall[c] = t
-			}
+	if !ok {
+		return fmt.Errorf("config file: Invalid value for MYCALL command on line %d", ps.line)
+	}
+
+	// Definitely set for current channel.
+	// Set for other channels which have not been set yet.
+
+	for c := range MAX_TOTAL_CHANS {
+		if c == ps.channel || IsNoCall(ps.audio.mycall[c]) {
+			ps.audio.mycall[c] = call
 		}
 	}
 
@@ -1956,230 +2009,286 @@ func handleMODEM(ps *parseState) error {
 		return fmt.Errorf("line %d: MODEM can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
+	var settings = new(ModemSettings)
+	settings.Speed = ps.split(false)
+
 	var t = ps.split(false)
-	if t == "" {
+	if alldigits(t) && t != "" {
+		// The old style has its own checks, and is on its way out, so it
+		// sets the channel up directly rather than being translated.
+		var err = ps.applyModem(*settings)
+		if err != nil {
+			return err
+		}
+
+		return ps.oldStyleModem(t)
+	}
+
+	parseModemOptions(ps, settings, t)
+
+	return ps.applyModem(*settings)
+}
+
+// parseModemOptions reads the new style (version 1.2) options of a MODEM line,
+// starting with t, into settings.  The options apply in the order written, so
+// where one undoes another - the modem type and the tones both choose the kind
+// of modem - the later one is kept and the earlier dropped.
+func parseModemOptions(ps *parseState, settings *ModemSettings, t string) {
+	for ; t != ""; t = ps.split(false) {
+		switch {
+		case strings.Contains(t, ":"): /* mark:space */
+			var markStr, spaceStr, _ = strings.Cut(t, ":")
+			var mark, _ = strconv.Atoi(markStr)
+			var space, _ = strconv.Atoi(spaceStr)
+
+			settings.Tones = &ModemTones{Mark: mark, Space: space}
+			settings.Type = ""
+		case strings.Contains(t, "@"): /* num@offset */
+			var numStr, offsetStr, _ = strings.Cut(t, "@")
+			var num, _ = strconv.Atoi(numStr)
+			var offset, _ = strconv.Atoi(offsetStr)
+
+			settings.Decoders = &ModemDecoders{Count: num, Offset: offset}
+		case strings.EqualFold(t, "BPSK"), strings.EqualFold(t, "G3RUH"):
+			settings.Type = strings.ToLower(t)
+			settings.Tones = nil
+		case strings.EqualFold(t, "V26A"), strings.EqualFold(t, "V26B"):
+			settings.V26 = strings.ToLower(t[3:])
+		case t[0] == '/': /* /div */
+			var n, _ = strconv.Atoi(t[1:])
+			settings.Divide = &n
+		case t[0] == '*': /* *upsample */
+			var n, _ = strconv.Atoi(t[1:])
+			settings.Upsample = &n
+		case alllettersorpm(t): /* profile of letter(s) + - */
+			// Will be validated later.
+			settings.Profiles = t
+		default:
+			ps.errorf("line %d: Unrecognized option for MODEM: %s", ps.line, t)
+		}
+	}
+}
+
+// applyModem sets up the modem for the current channel.
+func (ps *parseState) applyModem(settings ModemSettings) error {
+	var achan = &ps.audio.achan[ps.channel]
+
+	if settings.Speed == "" {
 		return fmt.Errorf("line %d: Missing data transmission speed for MODEM command", ps.line)
 	}
 
-	var modemErr = ps.audio.achan[ps.channel].setModem(t)
+	var modemErr = achan.setModem(settings.Speed)
 
-	var rate, rateErr = strconv.Atoi(t) // Not if it was AIS or EAS.
+	var rate, rateErr = strconv.Atoi(settings.Speed) // Not if it was AIS or EAS.
 	if modemErr != nil {
-		_ = ps.audio.achan[ps.channel].setModem(strconv.Itoa(DEFAULT_BAUD))
+		_ = achan.setModem(strconv.Itoa(DEFAULT_BAUD))
 
 		ps.errorf("line %d: Unreasonable data rate. Using %d bits per second", ps.line, DEFAULT_BAUD)
 	} else if rateErr == nil && !slices.Contains([]int{300, 1200, 2400, 4800, 9600, 19200}, rate) {
 		ps.warnf("line %d: Warning: Non-standard data rate of %d bits per second.  Are you sure?", ps.line, rate)
 	}
 
-	/* Get any options. */
+	switch strings.ToLower(settings.Type) {
+	case "":
+	case "bpsk": /* Force BPSK modem (1 bit/symbol, carrier 1800 Hz). */
+		achan.dropEASProfile()
+		achan.modem_type = MODEM_BPSK
+		achan.mark_freq = 0
+		achan.space_freq = 0
+	case "g3ruh": /* Force G3RUH modem regardless of default for speed. New in 1.6. */
+		achan.dropEASProfile()
+		achan.modem_type = MODEM_SCRAMBLE
+		achan.mark_freq = 0
+		achan.space_freq = 0
+	default:
+		ps.errorf("line %d: Unrecognized modem type for MODEM: %s", ps.line, settings.Type)
+	}
+
+	if settings.Tones != nil {
+		achan.mark_freq = settings.Tones.Mark
+		achan.space_freq = settings.Tones.Space
+
+		achan.dropEASProfile()
+
+		if achan.mark_freq == 0 && achan.space_freq == 0 {
+			achan.modem_type = MODEM_SCRAMBLE
+		} else {
+			achan.modem_type = MODEM_AFSK
+
+			if achan.mark_freq < 300 || achan.mark_freq > 5000 {
+				achan.mark_freq = DEFAULT_MARK_FREQ
+
+				ps.errorf("line %d: Unreasonable mark tone frequency. Using %d instead", ps.line, achan.mark_freq)
+			}
+
+			if achan.space_freq < 300 || achan.space_freq > 5000 {
+				achan.space_freq = DEFAULT_SPACE_FREQ
+
+				ps.errorf("line %d: Unreasonable space tone frequency. Using %d instead", ps.line, achan.space_freq)
+			}
+		}
+	}
+
+	if settings.Decoders != nil {
+		achan.num_freq = settings.Decoders.Count
+		achan.offset = settings.Decoders.Offset
+
+		if achan.num_freq < 1 || achan.num_freq > MAX_SUBCHANS {
+			ps.errorf("line %d: Number of demodulators is out of range. Using 3", ps.line)
+
+			achan.num_freq = 3
+		}
+
+		if achan.offset < 5 ||
+			float64(achan.offset) > math.Abs(float64(achan.mark_freq-achan.space_freq))/2 {
+			ps.errorf("line %d: Offset between demodulators is unreasonable. Using 50 Hz", ps.line)
+
+			achan.offset = 50
+		}
+	}
+
+	switch strings.ToLower(settings.V26) {
+	case "":
+	case "a", "b": /* a is compatible with direwolf versions <= 1.5, b with MFJ-2400.  New in 1.6. */
+		if achan.modem_type != MODEM_QPSK || achan.baud != 2400 {
+			return fmt.Errorf("line %d: V26%s option can only be used with 2400 bps PSK", ps.line, strings.ToUpper(settings.V26))
+		}
+
+		achan.v26_alternative = dwutil.IfThenElse(strings.EqualFold(settings.V26, "a"), V26_A, V26_B)
+	default:
+		return fmt.Errorf("line %d: V.26 alternative must be a or b, not %s", ps.line, settings.V26)
+	}
+
+	if settings.Divide != nil {
+		if *settings.Divide >= 1 && *settings.Divide <= 8 {
+			achan.decimate = *settings.Divide
+		} else {
+			ps.errorf("line %d: Ignoring unreasonable sample rate division factor of %d", ps.line, *settings.Divide)
+		}
+	}
+
+	if settings.Upsample != nil {
+		if *settings.Upsample >= 1 && *settings.Upsample <= 4 {
+			achan.upsample = *settings.Upsample
+		} else {
+			ps.errorf("line %d: Ignoring unreasonable upsample ratio of %d", ps.line, *settings.Upsample)
+		}
+	}
+
+	if settings.Profiles != "" {
+		// Will be validated later.
+		achan.profiles = settings.Profiles
+	}
+
+	/* A later place catches disallowed combination of + and @. */
+	/* A later place sets /n for 300 baud if not specified by user. */
+
+	return nil
+}
+
+// oldStyleModem reads the rest of a pre version 1.2 MODEM line, starting with
+// t, the mark frequency.
+func (ps *parseState) oldStyleModem(t string) error {
+	/* old style */
+	ps.errorf("line %d: Old style (pre version 1.2) format will no longer be supported in next version", ps.line)
+
+	var n, _ = strconv.Atoi(t)
+	/* Originally the upper limit was 3000. */
+	/* Version 1.0 increased to 5000 because someone */
+	/* wanted to use 2400/4800 Hz AFSK. */
+	/* Of course the MIC and SPKR connections won't */
+	/* have enough bandwidth so radios must be modified. */
+	if n >= 300 && n <= 5000 {
+		ps.audio.achan[ps.channel].mark_freq = n
+	} else {
+		ps.audio.achan[ps.channel].mark_freq = DEFAULT_MARK_FREQ
+
+		ps.errorf("line %d: Unreasonable mark tone frequency. Using %d", ps.line, ps.audio.achan[ps.channel].mark_freq)
+	}
+
+	/* Get space frequency */
 
 	t = ps.split(false)
 	if t == "" {
-		/* all done. */
-		return nil
+		return fmt.Errorf("line %d: Missing tone frequency for space", ps.line)
 	}
 
-	if alldigits(t) {
-		/* old style */
-		ps.errorf("line %d: Old style (pre version 1.2) format will no longer be supported in next version", ps.line)
+	n, _ = strconv.Atoi(t)
+	if n >= 300 && n <= 5000 {
+		ps.audio.achan[ps.channel].space_freq = n
+	} else {
+		ps.audio.achan[ps.channel].space_freq = DEFAULT_SPACE_FREQ
 
-		var n, _ = strconv.Atoi(t)
-		/* Originally the upper limit was 3000. */
-		/* Version 1.0 increased to 5000 because someone */
-		/* wanted to use 2400/4800 Hz AFSK. */
-		/* Of course the MIC and SPKR connections won't */
-		/* have enough bandwidth so radios must be modified. */
-		if n >= 300 && n <= 5000 {
-			ps.audio.achan[ps.channel].mark_freq = n
-		} else {
-			ps.audio.achan[ps.channel].mark_freq = DEFAULT_MARK_FREQ
+		ps.errorf("line %d: Unreasonable space tone frequency. Using %d", ps.line, ps.audio.achan[ps.channel].space_freq)
+	}
 
-			ps.errorf("line %d: Unreasonable mark tone frequency. Using %d", ps.line, ps.audio.achan[ps.channel].mark_freq)
-		}
+	/* Gently guide users toward new format. */
 
-		/* Get space frequency */
+	if ps.audio.achan[ps.channel].baud == 1200 &&
+		ps.audio.achan[ps.channel].mark_freq == 1200 &&
+		ps.audio.achan[ps.channel].space_freq == 2200 {
+		ps.errorf("line %d: The AFSK frequencies can be omitted when using the 1200 baud default 1200:2200", ps.line)
+	}
 
-		t = ps.split(false)
-		if t == "" {
-			return fmt.Errorf("line %d: Missing tone frequency for space", ps.line)
-		}
+	if ps.audio.achan[ps.channel].baud == 300 &&
+		ps.audio.achan[ps.channel].mark_freq == 1600 &&
+		ps.audio.achan[ps.channel].space_freq == 1800 {
+		ps.errorf("line %d: The AFSK frequencies can be omitted when using the 300 baud default 1600:1800", ps.line)
+	}
 
-		n, _ = strconv.Atoi(t)
-		if n >= 300 && n <= 5000 {
-			ps.audio.achan[ps.channel].space_freq = n
-		} else {
-			ps.audio.achan[ps.channel].space_freq = DEFAULT_SPACE_FREQ
+	/* New feature in 0.9 - Optional filter profile(s). */
 
-			ps.errorf("line %d: Unreasonable space tone frequency. Using %d", ps.line, ps.audio.achan[ps.channel].space_freq)
-		}
+	t = ps.split(false)
+	if t != "" {
+		/* Look for some combination of letter(s) and + */
+		if unicode.IsLetter(rune(t[0])) || t[0] == '+' {
+			/* Here we only catch something other than letters and + mixed in. */
+			/* Later, we check for valid letters and no more than one letter if + specified. */
+			if strings.ContainsFunc(t, func(r rune) bool {
+				return !unicode.IsLetter(r) && r != '+' && r != '-'
+			}) {
+				ps.errorf("line %d: Demodulator type can only contain letters and + character", ps.line)
+			}
 
-		/* Gently guide users toward new format. */
+			ps.audio.achan[ps.channel].profiles = t
 
-		if ps.audio.achan[ps.channel].baud == 1200 &&
-			ps.audio.achan[ps.channel].mark_freq == 1200 &&
-			ps.audio.achan[ps.channel].space_freq == 2200 {
-			ps.errorf("line %d: The AFSK frequencies can be omitted when using the 1200 baud default 1200:2200", ps.line)
-		}
-
-		if ps.audio.achan[ps.channel].baud == 300 &&
-			ps.audio.achan[ps.channel].mark_freq == 1600 &&
-			ps.audio.achan[ps.channel].space_freq == 1800 {
-			ps.errorf("line %d: The AFSK frequencies can be omitted when using the 300 baud default 1600:1800", ps.line)
-		}
-
-		/* New feature in 0.9 - Optional filter profile(s). */
-
-		t = ps.split(false)
-		if t != "" {
-			/* Look for some combination of letter(s) and + */
-			if unicode.IsLetter(rune(t[0])) || t[0] == '+' {
-				/* Here we only catch something other than letters and + mixed in. */
-				/* Later, we check for valid letters and no more than one letter if + specified. */
-				if strings.ContainsFunc(t, func(r rune) bool {
-					return !unicode.IsLetter(r) && r != '+' && r != '-'
-				}) {
-					ps.errorf("line %d: Demodulator type can only contain letters and + character", ps.line)
-				}
-
-				ps.audio.achan[ps.channel].profiles = t
-
-				t = ps.split(false)
-				if len(ps.audio.achan[ps.channel].profiles) > 1 && t != "" {
-					return fmt.Errorf("line %d: Can't combine multiple demodulator types and multiple frequencies", ps.line)
-				}
+			t = ps.split(false)
+			if len(ps.audio.achan[ps.channel].profiles) > 1 && t != "" {
+				return fmt.Errorf("line %d: Can't combine multiple demodulator types and multiple frequencies", ps.line)
 			}
 		}
+	}
 
-		/* New feature in 0.9 - optional number of decoders and frequency offset between. */
+	/* New feature in 0.9 - optional number of decoders and frequency offset between. */
 
+	if t != "" {
+		n, _ = strconv.Atoi(t)
+		if n < 1 || n > MAX_SUBCHANS {
+			ps.errorf("line %d: Number of demodulators is out of range. Using 3", ps.line)
+
+			n = 3
+		}
+
+		ps.audio.achan[ps.channel].num_freq = n
+
+		t = ps.split(false)
 		if t != "" {
 			n, _ = strconv.Atoi(t)
-			if n < 1 || n > MAX_SUBCHANS {
-				ps.errorf("line %d: Number of demodulators is out of range. Using 3", ps.line)
+			if n < 5 || n > int(math.Abs(float64(ps.audio.achan[ps.channel].mark_freq-ps.audio.achan[ps.channel].space_freq))/2) {
+				ps.errorf("line %d: Unreasonable value for offset between modems.  Using 50 Hz", ps.line)
 
-				n = 3
+				n = 50
 			}
 
-			ps.audio.achan[ps.channel].num_freq = n
+			ps.audio.achan[ps.channel].offset = n
 
-			t = ps.split(false)
-			if t != "" {
-				n, _ = strconv.Atoi(t)
-				if n < 5 || n > int(math.Abs(float64(ps.audio.achan[ps.channel].mark_freq-ps.audio.achan[ps.channel].space_freq))/2) {
-					ps.errorf("line %d: Unreasonable value for offset between modems.  Using 50 Hz", ps.line)
+			ps.errorf("line %d: New style for multiple demodulators is %d@%d", ps.line,
+				ps.audio.achan[ps.channel].num_freq, ps.audio.achan[ps.channel].offset)
+		} else {
+			ps.errorf("line %d: Missing frequency offset between modems.  Using 50 Hz", ps.line)
 
-					n = 50
-				}
-
-				ps.audio.achan[ps.channel].offset = n
-
-				ps.errorf("line %d: New style for multiple demodulators is %d@%d", ps.line,
-					ps.audio.achan[ps.channel].num_freq, ps.audio.achan[ps.channel].offset)
-			} else {
-				ps.errorf("line %d: Missing frequency offset between modems.  Using 50 Hz", ps.line)
-
-				ps.audio.achan[ps.channel].offset = 50
-			}
+			ps.audio.achan[ps.channel].offset = 50
 		}
-	} else {
-		/* New style in version 1.2. */
-		for t != "" {
-			if strings.Contains(t, ":") { /* mark:space */
-				var markStr, spaceStr, _ = strings.Cut(t, ":")
-				var mark, _ = strconv.Atoi(markStr)
-				var space, _ = strconv.Atoi(spaceStr)
-
-				ps.audio.achan[ps.channel].mark_freq = mark
-				ps.audio.achan[ps.channel].space_freq = space
-
-				if ps.audio.achan[ps.channel].mark_freq == 0 && ps.audio.achan[ps.channel].space_freq == 0 {
-					ps.audio.achan[ps.channel].dropEASProfile()
-					ps.audio.achan[ps.channel].modem_type = MODEM_SCRAMBLE
-				} else {
-					ps.audio.achan[ps.channel].dropEASProfile()
-					ps.audio.achan[ps.channel].modem_type = MODEM_AFSK
-
-					if ps.audio.achan[ps.channel].mark_freq < 300 || ps.audio.achan[ps.channel].mark_freq > 5000 {
-						ps.audio.achan[ps.channel].mark_freq = DEFAULT_MARK_FREQ
-
-						ps.errorf("line %d: Unreasonable mark tone frequency. Using %d instead", ps.line, ps.audio.achan[ps.channel].mark_freq)
-					}
-
-					if ps.audio.achan[ps.channel].space_freq < 300 || ps.audio.achan[ps.channel].space_freq > 5000 {
-						ps.audio.achan[ps.channel].space_freq = DEFAULT_SPACE_FREQ
-
-						ps.errorf("line %d: Unreasonable space tone frequency. Using %d instead", ps.line, ps.audio.achan[ps.channel].space_freq)
-					}
-				}
-			} else if strings.Contains(t, "@") { /* num@offset */
-				var numStr, offsetStr, _ = strings.Cut(t, "@")
-				var num, _ = strconv.Atoi(numStr)
-				var offset, _ = strconv.Atoi(offsetStr)
-
-				ps.audio.achan[ps.channel].num_freq = num
-				ps.audio.achan[ps.channel].offset = offset
-
-				if ps.audio.achan[ps.channel].num_freq < 1 || ps.audio.achan[ps.channel].num_freq > MAX_SUBCHANS {
-					ps.errorf("line %d: Number of demodulators is out of range. Using 3", ps.line)
-
-					ps.audio.achan[ps.channel].num_freq = 3
-				}
-
-				if ps.audio.achan[ps.channel].offset < 5 ||
-					float64(ps.audio.achan[ps.channel].offset) > math.Abs(float64(ps.audio.achan[ps.channel].mark_freq-ps.audio.achan[ps.channel].space_freq))/2 {
-					ps.errorf("line %d: Offset between demodulators is unreasonable. Using 50 Hz", ps.line)
-
-					ps.audio.achan[ps.channel].offset = 50
-				}
-			} else if strings.EqualFold(t, "BPSK") { /* Force BPSK modem (1 bit/symbol, carrier 1800 Hz). */
-				ps.audio.achan[ps.channel].dropEASProfile()
-				ps.audio.achan[ps.channel].modem_type = MODEM_BPSK
-				ps.audio.achan[ps.channel].mark_freq = 0
-				ps.audio.achan[ps.channel].space_freq = 0
-			} else if strings.EqualFold(t, "G3RUH") { /* Force G3RUH modem regardless of default for speed. New in 1.6. */
-				ps.audio.achan[ps.channel].dropEASProfile()
-				ps.audio.achan[ps.channel].modem_type = MODEM_SCRAMBLE
-				ps.audio.achan[ps.channel].mark_freq = 0
-				ps.audio.achan[ps.channel].space_freq = 0
-			} else if strings.EqualFold(t, "V26A") || /* Compatible with direwolf versions <= 1.5.  New in 1.6. */
-				strings.EqualFold(t, "V26B") { /* Compatible with MFJ-2400.  New in 1.6. */
-				if ps.audio.achan[ps.channel].modem_type != MODEM_QPSK ||
-					ps.audio.achan[ps.channel].baud != 2400 {
-					return fmt.Errorf("line %d: %s option can only be used with 2400 bps PSK", ps.line, t)
-				}
-
-				ps.audio.achan[ps.channel].v26_alternative = dwutil.IfThenElse((strings.EqualFold(t, "V26A")), V26_A, V26_B)
-			} else if t[0] == '/' { /* /div */
-				var n, _ = strconv.Atoi(t[1:])
-
-				if n >= 1 && n <= 8 {
-					ps.audio.achan[ps.channel].decimate = n
-				} else {
-					ps.errorf("line %d: Ignoring unreasonable sample rate division factor of %d", ps.line, n)
-				}
-			} else if t[0] == '*' { /* *upsample */
-				var n, _ = strconv.Atoi(t[1:])
-
-				if n >= 1 && n <= 4 {
-					ps.audio.achan[ps.channel].upsample = n
-				} else {
-					ps.errorf("line %d: Ignoring unreasonable upsample ratio of %d", ps.line, n)
-				}
-			} else if alllettersorpm(t) { /* profile of letter(s) + - */
-				// Will be validated later.
-				ps.audio.achan[ps.channel].profiles = t
-			} else {
-				ps.errorf("line %d: Unrecognized option for MODEM: %s", ps.line, t)
-			}
-
-			t = ps.split(false)
-		}
-
-		/* A later place catches disallowed combination of + and @. */
-		/* A later place sets /n for 300 baud if not specified by user. */
-
-		//dw_printf ("debug: div = %d\n", p_audio_config.achan[channel].decimate);
 	}
 
 	return nil
@@ -2272,7 +2381,7 @@ func handleFIX_BITS(ps *parseState) error {
 	return nil
 }
 
-// handlePTTDCDCON handles the PTTDCDCON keyword.
+// handlePTTDCDCON handles the PTT, DCD and CON keywords.
 func handlePTTDCDCON(ps *parseState) error {
 	/*
 	 * PTT 		- Push To Talk signal line.
@@ -2281,6 +2390,7 @@ func handlePTTDCDCON(ps *parseState) error {
 	 *
 	 * xxx  serial-port [-]rts-or-dtr [ [-]rts-or-dtr ]
 	 * xxx  GPIO  [-]gpio-num
+	 * xxx  GPIOD  chip  [-]gpio-num
 	 * xxx  LPT  [-]bit-num
 	 * PTT  RIG  model  port [ rate ]
 	 * PTT  RIG  AUTO  port [ rate ]
@@ -2292,155 +2402,240 @@ func handlePTTDCDCON(ps *parseState) error {
 	 *
 	 * Applies to most recent CHANNEL command.
 	 */
+	var ot, otname = outputControlType(ps.keyword)
+
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		return fmt.Errorf("line %d: PTT can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
-	}
-	var ot int
-	var otname string
-
-	if strings.EqualFold(ps.keyword, "PTT") {
-		ot = OCTYPE_PTT
-		otname = "PTT"
-	} else if strings.EqualFold(ps.keyword, "DCD") {
-		ot = OCTYPE_DCD
-		otname = "DCD"
-	} else {
-		ot = OCTYPE_CON
-		otname = "CON"
+		return fmt.Errorf("line %d: %s can only be used with radio channel 0 - %d", ps.line, otname, MAX_RADIO_CHANS-1)
 	}
 
-	// Work on a copy of the control and commit it at the end, so that a line
-	// rejected part way through leaves whatever an earlier line configured
-	// rather than a mixture of the two.  NewPTT reads these fields together.
-	var octrl = ps.audio.achan[ps.channel].octrl[ot]
+	var settings, err = parseOutputControl(ps, otname)
+	if err != nil {
+		return err
+	}
+
+	return ps.applyOutputControl(ot, settings)
+}
+
+// outputControlType maps a PTT, DCD or CON keyword to the output control it
+// configures, and the name to use for it in messages.
+func outputControlType(keyword string) (int, string) {
+	switch {
+	case strings.EqualFold(keyword, "PTT"):
+		return OCTYPE_PTT, "PTT"
+	case strings.EqualFold(keyword, "DCD"):
+		return OCTYPE_DCD, "DCD"
+	default:
+		return OCTYPE_CON, "CON"
+	}
+}
+
+// signedPin reads a GPIO or LPT bit number, where a leading "-" asks for the
+// signal to be inverted.
+func signedPin(t string) (int, bool, error) {
+	var n, err = strconv.Atoi(t)
+	if err != nil {
+		return 0, false, err
+	}
+
+	if n < 0 {
+		return -n, true, nil
+	}
+
+	return n, false, nil
+}
+
+// controlLine reads an RTS or DTR serial control line, where a leading "-"
+// asks for the signal to be inverted.
+func controlLine(t string) (string, bool) {
+	if strings.HasPrefix(t, "-") {
+		return t[1:], true
+	}
+
+	return t, false
+}
+
+// parseOutputControl reads the rest of a PTT, DCD or CON line into the
+// settings it describes.
+func parseOutputControl(ps *parseState, otname string) (OutputControlSettings, error) {
+	var settings = new(OutputControlSettings)
 
 	var t = ps.split(false)
 	if t == "" {
-		return fmt.Errorf("config file line %d: Missing output control device for %s command", ps.line, otname)
+		return *settings, fmt.Errorf("config file line %d: Missing output control device for %s command", ps.line, otname)
 	}
 
-	if strings.EqualFold(t, "GPIO") {
-		/* GPIO case, Linux only. */
+	switch {
+	case strings.EqualFold(t, "GPIO"), strings.EqualFold(t, "GPIOD"), strings.EqualFold(t, "LPT"):
+		settings.Method = strings.ToLower(t)
 
-		/* TODO KG
-		   #if __WIN32__
-		   	      text_color_set(DW_COLOR_ERROR);
-		   	      dw_printf ("Config file line %d: %s with GPIO is only available on Linux.\n", ps.line, otname);
-		   #else
-		*/
+		var what = dwutil.IfThenElse(settings.Method == "lpt", "LPT bit", "GPIO")
+
+		if settings.Method == "gpiod" {
+			settings.Device = ps.split(false)
+			if settings.Device == "" {
+				return *settings, fmt.Errorf(
+					"config file line %d: Missing GPIO chip name for %s.\nUse the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines",
+					ps.line,
+					otname,
+				)
+			}
+		}
+
 		t = ps.split(false)
 		if t == "" {
+			return *settings, fmt.Errorf("config file line %d: Missing %s number for %s", ps.line, what, otname)
+		}
+
+		var pin, invert, pinErr = signedPin(t)
+		if pinErr != nil {
+			return *settings, fmt.Errorf("config file line %d: %s number must be numeric for %s", ps.line, what, otname)
+		}
+
+		settings.Pin = &pin
+		settings.Invert = invert
+	case strings.EqualFold(t, "RIG"):
+		settings.Method = "rig"
+		settings.Model = ps.split(false)
+		settings.Device = ps.split(false)
+
+		// Optional serial port rate for CAT control PTT.
+
+		t = ps.split(false)
+		if t != "" {
+			if !alldigits(t) {
+				return *settings, fmt.Errorf("config file line %d: An optional number is required here for CAT serial port speed: %s", ps.line, t)
+			}
+
+			var rate, _ = strconv.Atoi(t)
+			settings.Rate = &rate
+		}
+
+		t = ps.split(false)
+		if t != "" {
+			ps.errorf("config file line %d: %s was not expected after model & port for hamlib", ps.line, t)
+		}
+	case strings.EqualFold(t, "CM108"):
+		settings.Method = "cm108"
+
+		for {
+			t = ps.split(false)
+			if t == "" {
+				break
+			}
+
+			if t[0] == '-' || unicode.IsDigit(rune(t[0])) {
+				var pin, invert, _ = signedPin(t)
+				settings.Pin = &pin
+				settings.Invert = invert
+			} else if t[0] == '/' {
+				settings.Device = t
+			} else {
+				return *settings, fmt.Errorf("config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1", ps.line, t)
+			}
+		}
+	default:
+		/* serial port case. */
+		settings.Method = "serial"
+		settings.Device = t
+
+		t = ps.split(false)
+		if t != "" {
+			settings.Line, settings.Invert = controlLine(t)
+
+			/* In version 1.2, we allow a second one for same serial port. */
+			/* Some interfaces want the two control lines driven with opposite polarity. */
+			/* e.g.   PTT COM1 RTS -DTR  */
+
+			t = ps.split(false)
+			if t != "" {
+				settings.Line2, settings.Invert2 = controlLine(t)
+			}
+		}
+	}
+
+	return *settings, nil
+}
+
+// serialControlLine maps "rts" or "dtr" to the serial control line it names.
+func serialControlLine(name string) (ptt_line_t, bool) {
+	switch {
+	case strings.EqualFold(name, "rts"):
+		return PTT_LINE_RTS, true
+	case strings.EqualFold(name, "dtr"):
+		return PTT_LINE_DTR, true
+	default:
+		return PTT_LINE_NONE, false
+	}
+}
+
+// applyOutputControl sets up output control ot (PTT, DCD or CON) for the
+// current channel.
+func (ps *parseState) applyOutputControl(ot int, settings OutputControlSettings) error {
+	var otname = [NUM_OCTYPES]string{OCTYPE_PTT: "PTT", OCTYPE_DCD: "DCD", OCTYPE_CON: "CON"}[ot]
+
+	// Work on a copy of the control and commit it at the end, so that settings
+	// rejected part way through leave whatever was configured earlier rather
+	// than a mixture of the two.  NewPTT reads these fields together.
+	var octrl = ps.audio.achan[ps.channel].octrl[ot]
+
+	switch strings.ToLower(settings.Method) {
+	case "gpio", "gpiod":
+		if strings.EqualFold(settings.Method, "gpiod") {
+			// Issue 590.  Originally we used the chip name, like gpiochip3, and fed it into
+			// gpiod_chip_open_by_name.   This function has disappeared in Debian 13 Trixie.
+			// We must now specify the full device path, like /dev/gpiochip3, for the only
+			// remaining open function gpiod_chip_open.
+			// We will allow the user to specify either the name or full device path.
+			// While we are here, also allow only the number as used by the gpiod utilities.
+			switch {
+			case settings.Device == "":
+				return fmt.Errorf("config file line %d: Missing GPIO chip name for %s.\nUse the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines", ps.line, otname)
+			case settings.Device[0] == '/': // Looks like device path.  Use as given.
+				octrl.out_gpio_name = settings.Device
+			case unicode.IsDigit(rune(settings.Device[0])): // or if digit, prepend "/dev/gpiochip"
+				octrl.out_gpio_name = "/dev/gpiochip" + settings.Device
+			default: // otherwise, prepend "/dev/" to the name
+				octrl.out_gpio_name = "/dev/" + settings.Device
+			}
+		}
+
+		if settings.Pin == nil {
 			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, otname)
 		}
 
-		var gpio, gpioErr = strconv.Atoi(t)
-		if gpioErr != nil {
-			return fmt.Errorf("config file line %d: GPIO number must be numeric for %s", ps.line, otname)
-		}
-		if gpio < 0 {
-			octrl.out_gpio_num = -1 * gpio
-			octrl.ptt_invert = true
-		} else {
-			octrl.out_gpio_num = gpio
-			octrl.ptt_invert = false
+		// A legacy line turns a leading "-" into Invert, but a YAML file
+		// can say -25 outright, and there is no GPIO line of that number.
+		if *settings.Pin < 0 {
+			return fmt.Errorf("config file line %d: GPIO number %d for %s can't be negative - use invert to invert the signal", ps.line, *settings.Pin, otname)
 		}
 
-		octrl.ptt_method = PTT_METHOD_GPIO
-		// #endif
-	} else if strings.EqualFold(t, "GPIOD") {
-		/*
-			#if __WIN32__
-				      text_color_set(DW_COLOR_ERROR);
-				      dw_printf ("Config file line %d: %s with GPIOD is only available on Linux.\n", ps.line, otname);
-			#else
-		*/
-		// #if defined(USE_GPIOD)
-		t = ps.split(false)
-		if t == "" {
-			return fmt.Errorf("config file line %d: Missing GPIO chip name for %s.\nUse the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines", ps.line, otname)
-		}
-
-		// Issue 590.  Originally we used the chip name, like gpiochip3, and fed it into
-		// gpiod_chip_open_by_name.   This function has disappeared in Debian 13 Trixie.
-		// We must now specify the full device path, like /dev/gpiochip3, for the only
-		// remaining open function gpiod_chip_open.
-		// We will allow the user to specify either the name or full device path.
-		// While we are here, also allow only the number as used by the gpiod utilities.
-
-		if t[0] == '/' { // Looks like device path.  Use as given.
-			octrl.out_gpio_name = t
-		} else if unicode.IsDigit(rune(t[0])) { // or if digit, prepend "/dev/gpiochip"
-			octrl.out_gpio_name = "/dev/gpiochip" + t
-		} else { // otherwise, prepend "/dev/" to the name
-			octrl.out_gpio_name = "/dev/" + t
-		}
-
-		t = ps.split(false)
-		if t == "" {
-			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, otname)
-		}
-
-		var gpio, gpioErr = strconv.Atoi(t)
-		if gpioErr != nil {
-			return fmt.Errorf("config file line %d: GPIO number must be numeric for %s", ps.line, otname)
-		}
-
-		if gpio < 0 {
-			octrl.out_gpio_num = -1 * gpio
-			octrl.ptt_invert = true
-		} else {
-			octrl.out_gpio_num = gpio
-			octrl.ptt_invert = false
-		}
-
-		octrl.ptt_method = PTT_METHOD_GPIOD
-		/* TODO KG
-		#else
-			      text_color_set(DW_COLOR_ERROR);
-			      dw_printf ("Application was not built with optional support for GPIOD.\n");
-			      dw_printf ("Install packages gpiod and libgpiod-dev, remove 'build' subdirectory, then rebuild.\n");
-		#endif // USE_GPIOD
-		*/
-		//#endif /* __WIN32__ */
-	} else if strings.EqualFold(t, "LPT") {
+		octrl.out_gpio_num = *settings.Pin
+		octrl.ptt_invert = settings.Invert
+		octrl.ptt_method = dwutil.IfThenElse(strings.EqualFold(settings.Method, "gpiod"), PTT_METHOD_GPIOD, PTT_METHOD_GPIO)
+	case "lpt":
 		/* Parallel printer case, x86 Linux only. */
-
-		//#if  ( defined(__i386__) || defined(__x86_64__) ) && ( defined(__linux__) || defined(__unix__) )
-		t = ps.split(false)
-		if t == "" {
+		if settings.Pin == nil {
 			return fmt.Errorf("config file line %d: Missing LPT bit number for %s", ps.line, otname)
 		}
 
-		var lpt, lptErr = strconv.Atoi(t)
-		if lptErr != nil {
-			return fmt.Errorf("config file line %d: LPT bit number must be numeric for %s", ps.line, otname)
-		}
-		if lpt < 0 {
-			octrl.ptt_lpt_bit = -1 * lpt
-			octrl.ptt_invert = true
-		} else {
-			octrl.ptt_lpt_bit = lpt
-			octrl.ptt_invert = false
+		// As for GPIO, only a YAML file can get a negative bit here, and
+		// PTT would shift by it.
+		if *settings.Pin < 0 {
+			return fmt.Errorf("config file line %d: LPT bit number %d for %s can't be negative - use invert to invert the signal", ps.line, *settings.Pin, otname)
 		}
 
+		octrl.ptt_lpt_bit = *settings.Pin
+		octrl.ptt_invert = settings.Invert
 		octrl.ptt_method = PTT_METHOD_LPT
-		/*
-			#else
-				      text_color_set(DW_COLOR_ERROR);
-				      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", ps.line, otname);
-			#endif
-		*/
-	} else if strings.EqualFold(t, "RIG") {
-		// TODO KG #ifdef USE_HAMLIB
-		t = ps.split(false)
-		if t == "" {
+	case "rig":
+		if settings.Model == "" {
 			return fmt.Errorf("config file line %d: Missing model number for hamlib", ps.line)
 		}
 
-		if strings.EqualFold(t, "AUTO") {
+		if strings.EqualFold(settings.Model, "AUTO") {
 			octrl.ptt_model = -1
 		} else {
-			if !alldigits(t) {
+			if !alldigits(settings.Model) {
 				return fmt.Errorf(
 					"config file line %d: A rig number, not a name, is required here.\n"+
 						"For example, if you have a Yaesu FT-847, specify 101.\n"+
@@ -2449,7 +2644,7 @@ func handlePTTDCDCON(ps *parseState) error {
 				)
 			}
 
-			var n, _ = strconv.Atoi(t)
+			var n, _ = strconv.Atoi(settings.Model)
 			if n < 1 || n > 9999 {
 				return fmt.Errorf("config file line %d: Unreasonable model number %d for hamlib", ps.line, n)
 			}
@@ -2457,34 +2652,22 @@ func handlePTTDCDCON(ps *parseState) error {
 			octrl.ptt_model = n
 		}
 
-		t = ps.split(false)
-		if t == "" {
+		if settings.Device == "" {
 			return fmt.Errorf("config file line %d: Missing port for hamlib", ps.line)
 		}
 
-		octrl.ptt_device = t
+		octrl.ptt_device = settings.Device
 
-		// Optional serial port rate for CAT control PTT.
-
-		t = ps.split(false)
-		if t != "" {
-			if !alldigits(t) {
-				return fmt.Errorf("config file line %d: An optional number is required here for CAT serial port speed: %s", ps.line, t)
+		if settings.Rate != nil {
+			if *settings.Rate < 0 {
+				return fmt.Errorf("config file line %d: CAT serial port speed %d can't be negative", ps.line, *settings.Rate)
 			}
-			var n, _ = strconv.Atoi(t)
-			octrl.ptt_rate = n
-		}
 
-		t = ps.split(false)
-		if t != "" {
-			ps.errorf("config file line %d: %s was not expected after model & port for hamlib", ps.line, t)
+			octrl.ptt_rate = *settings.Rate
 		}
-
 		octrl.ptt_method = PTT_METHOD_HAMLIB
-	} else if strings.EqualFold(t, "CM108") {
+	case "cm108":
 		/* CM108 - GPIO of USB sound card. case, Linux and Windows only. */
-
-		// TODO KG #if USE_CM108
 		if ot != OCTYPE_PTT {
 			// Future project:  Allow DCD and CON via the same device.
 			// This gets more complicated because we can't selectively change a single GPIO bit.
@@ -2498,7 +2681,6 @@ func handlePTTDCDCON(ps *parseState) error {
 		octrl.out_gpio_num = 3 // All known designs use GPIO 3.
 		// User can override for special cases.
 		octrl.ptt_invert = false // High for transmit.
-		octrl.ptt_device = ""
 
 		// Try to find PTT device for audio output device.
 		// Simplifiying assumption is that we have one radio per USB Audio Adapter.
@@ -2519,25 +2701,16 @@ func handlePTTDCDCON(ps *parseState) error {
 			}
 		}
 
-		for {
-			t = ps.split(false)
-			if t == "" {
-				break
-			}
+		if settings.Pin != nil {
+			octrl.out_gpio_num = *settings.Pin
+		}
 
-			if t[0] == '-' {
-				var gpio, _ = strconv.Atoi(t[1:])
-				octrl.out_gpio_num = -1 * gpio
-				octrl.ptt_invert = true
-			} else if unicode.IsDigit(rune(t[0])) {
-				var gpio, _ = strconv.Atoi(t)
-				octrl.out_gpio_num = gpio
-				octrl.ptt_invert = false
-			} else if t[0] == '/' {
-				octrl.ptt_device = t
-			} else {
-				return fmt.Errorf("config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1", ps.line, t)
-			}
+		// A legacy line only inverts along with a GPIO number, but YAML can
+		// ask to invert the default one.
+		octrl.ptt_invert = settings.Invert
+
+		if settings.Device != "" {
+			octrl.ptt_device = settings.Device
 		}
 
 		if octrl.out_gpio_num < 1 || octrl.out_gpio_num > 8 {
@@ -2546,11 +2719,6 @@ func handlePTTDCDCON(ps *parseState) error {
 		}
 
 		if octrl.ptt_device == "" {
-			/* TODO KG
-			#if __WIN32__
-				        dw_printf ("You must explicitly mention a HID path.\n");
-			#else
-			*/
 			return fmt.Errorf("config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s\n"+
 				"You must explicitly mention a device name such as /dev/hidraw1.\n"+
 				"Run \"cm108\" utility to get a list.\n"+
@@ -2559,74 +2727,44 @@ func handlePTTDCDCON(ps *parseState) error {
 		}
 
 		octrl.ptt_method = PTT_METHOD_CM108
+	case "serial":
+		if settings.Device == "" {
+			return fmt.Errorf("config file line %d: Missing output control device for %s command", ps.line, otname)
+		}
 
-		/* TODO KG
-		#else
-			      text_color_set(DW_COLOR_ERROR);
-			      dw_printf ("Config file line %d: %s with CM108 is only available when USB Audio GPIO support is enabled.\n", ps.line, otname);
-			      dw_printf ("You must rebuild direwolf with CM108 Audio Adapter GPIO PTT support.\n");
-			      dw_printf ("See Interface Guide for details.\n");
-			      rtfm();
-			      exit (EXIT_FAILURE);
-		#endif
-		*/
-	} else {
-		/* serial port case. */
-		octrl.ptt_device = t
+		octrl.ptt_device = settings.Device
 
-		t = ps.split(false)
-		if t == "" {
+		if settings.Line == "" {
 			return fmt.Errorf("config file line %d: Missing RTS or DTR after %s device name", ps.line, otname)
 		}
 
-		if strings.EqualFold(t, "rts") {
-			octrl.ptt_line = PTT_LINE_RTS
-			octrl.ptt_invert = false
-		} else if strings.EqualFold(t, "dtr") {
-			octrl.ptt_line = PTT_LINE_DTR
-			octrl.ptt_invert = false
-		} else if strings.EqualFold(t, "-rts") {
-			octrl.ptt_line = PTT_LINE_RTS
-			octrl.ptt_invert = true
-		} else if strings.EqualFold(t, "-dtr") {
-			octrl.ptt_line = PTT_LINE_DTR
-			octrl.ptt_invert = true
-		} else {
+		var line, lineOK = serialControlLine(settings.Line)
+		if !lineOK {
 			return fmt.Errorf("config file line %d: Expected RTS or DTR after %s device name", ps.line, otname)
 		}
 
+		octrl.ptt_line = line
+		octrl.ptt_invert = settings.Invert
 		octrl.ptt_method = PTT_METHOD_SERIAL
 
-		/* In version 1.2, we allow a second one for same serial port. */
-		/* Some interfaces want the two control lines driven with opposite polarity. */
-		/* e.g.   PTT COM1 RTS -DTR  */
-
-		t = ps.split(false)
-		if t != "" {
-			if strings.EqualFold(t, "rts") {
-				octrl.ptt_line2 = PTT_LINE_RTS
-				octrl.ptt_invert2 = false
-			} else if strings.EqualFold(t, "dtr") {
-				octrl.ptt_line2 = PTT_LINE_DTR
-				octrl.ptt_invert2 = false
-			} else if strings.EqualFold(t, "-rts") {
-				octrl.ptt_line2 = PTT_LINE_RTS
-				octrl.ptt_invert2 = true
-			} else if strings.EqualFold(t, "-dtr") {
-				octrl.ptt_line2 = PTT_LINE_DTR
-				octrl.ptt_invert2 = true
-			} else {
+		if settings.Line2 != "" {
+			var line2, line2OK = serialControlLine(settings.Line2)
+			if !line2OK {
 				return fmt.Errorf("config file line %d: Expected RTS or DTR after first RTS or DTR", ps.line)
 			}
+
+			octrl.ptt_line2 = line2
+			octrl.ptt_invert2 = settings.Invert2
 
 			/* Would not make sense to specify the same one twice. */
 
 			if octrl.ptt_line == octrl.ptt_line2 {
 				ps.errorf("config file line %d: Doesn't make sense to specify the some control line twice", ps.line)
 			}
-		} /* end of second serial port control ps.line. */
-	} /* end of serial port case. */
-	/* end of PTT, DCD, CON */
+		}
+	default:
+		return fmt.Errorf("config file line %d: Unknown %s method \"%s\": expected serial, gpio, gpiod, lpt, rig or cm108", ps.line, otname, settings.Method)
+	}
 
 	ps.audio.achan[ps.channel].octrl[ot] = octrl
 
@@ -2804,6 +2942,12 @@ func handleTXDELAY(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: Time must be numeric for TXDELAY command. Keeping %d", ps.line, ps.audio.achan[ps.channel].txdelay)
 	}
+
+	return ps.applyTXDELAY(n)
+}
+
+// applyTXDELAY sets the transmit delay, in 10 ms units, for the current channel.
+func (ps *parseState) applyTXDELAY(n int) error {
 	if n >= 0 && n <= 255 {
 		if n < 10 {
 			ps.warnf("line %d: Setting TXDELAY this small is a REALLY BAD idea if you want other stations to hear you.\n"+

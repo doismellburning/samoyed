@@ -232,7 +232,15 @@ type configs struct {
 func parseConfig(t *testing.T, content string) configs {
 	t.Helper()
 
-	var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
+	return parseConfigNamed(t, "direwolf*.conf", content)
+}
+
+// parseConfigNamed is parseConfig for a temp file named after pattern, as
+// os.CreateTemp names it, so that its extension can pick the format.
+func parseConfigNamed(t *testing.T, pattern string, content string) configs {
+	t.Helper()
+
+	var tmpFile, err = os.CreateTemp(t.TempDir(), pattern)
 	require.NoError(t, err)
 	_, err = tmpFile.WriteString(content)
 	require.NoError(t, err)
@@ -3334,6 +3342,13 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 			{
+				name:   "a CAT rate of 0 goes back to hamlib's default",
+				config: "PTT RIG 2 localhost:4532 4800\nPTT RIG 2 localhost:4532 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_rate)
+				},
+			},
+			{
 				name:   "AUTO asks hamlib to work the model out",
 				config: "PTT RIG AUTO /dev/ttyS0\n",
 				check: func(a *assert.Assertions, c configs) {
@@ -3380,6 +3395,19 @@ func directiveTests() map[string][]directiveCase {
 				check: func(a *assert.Assertions, c configs) {
 					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
 					a.Contains(c.output, "is not in range of 1 thru 8")
+				},
+			},
+			// Regression test: a leading "-" asks for the CM108 GPIO bit to be
+			// inverted, but the port stored the bit number negated as well, so
+			// "-3" came out as GPIO -3 and was rejected as out of range.
+			{
+				name:   "a CM108 GPIO bit with a minus is inverted",
+				config: "PTT CM108 -3 /dev/hidraw9\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_CM108, octrl.ptt_method)
+					a.Equal(3, octrl.out_gpio_num)
+					a.True(octrl.ptt_invert)
 				},
 			},
 			{

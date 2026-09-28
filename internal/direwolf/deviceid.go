@@ -18,7 +18,7 @@ import (
 	"slices"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // Structures to hold mapping from encoded form to vendor and model.
