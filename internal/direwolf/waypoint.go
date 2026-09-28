@@ -17,6 +17,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/waypointsym"
 	"github.com/pkg/term"
 	"github.com/sirupsen/logrus"
 )
@@ -300,18 +301,7 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 	 */
 
 	if ws.formats&WPL_FORMAT_GARMIN > 0 {
-		var i = int(symbol - ' ')
-		var grm_sym int /* Garmin symbol code. */
-
-		if i >= 0 && (i < len(grm_primary_symtab) || i < len(grm_alternate_symtab)) {
-			if symtab == '/' {
-				grm_sym = grm_primary_symtab[i]
-			} else {
-				grm_sym = grm_alternate_symtab[i]
-			}
-		} else {
-			grm_sym = sym_default
-		}
+		var grm_sym = waypointsym.Garmin(symtab, symbol) /* Garmin symbol code. */
 
 		var sentence = fmt.Sprintf("$PGRMW,%s,%s,%04X,%s", wname, salt, grm_sym, wcomment)
 		var full_sentence = appendChecksum([]byte(sentence))
@@ -345,18 +335,7 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 	 */
 
 	if ws.formats&WPL_FORMAT_MAGELLAN > 0 {
-		var i = int(symbol - ' ')
-		var sicon string /* Magellan icon string.  Currently 1 or 2 characters. */
-
-		if i >= 0 && (i < len(mgn_primary_symtab) || i < len(mgn_alternate_symtab)) {
-			if symtab == '/' {
-				sicon = mgn_primary_symtab[i]
-			} else {
-				sicon = mgn_alternate_symtab[i]
-			}
-		} else {
-			sicon = MGN_default
-		}
+		var sicon = waypointsym.Magellan(symtab, symbol) /* Magellan icon string.  Currently 1 or 2 characters. */
 
 		var sentence = fmt.Sprintf("$PMGNWPL,%s,%s,%s,%s,%s,M,%s,%s,%s", slat, slat_ns, slong, slong_ew, salt, wname, wcomment, sicon)
 		var full_sentence = appendChecksum([]byte(sentence))

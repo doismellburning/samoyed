@@ -1,5 +1,7 @@
-//nolint:gochecknoglobals
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package waypointsym
 
 /*
  * Waypoint icon codes for use in the $PMGNWPL sentence.
@@ -72,7 +74,7 @@ const MGN_default = MGN_crossed_square
 
 const SYMTAB_SIZE = 95
 
-var mgn_primary_symtab = []string{
+var mgn_primary_symtab = []string{ //nolint:gochecknoglobals // I yearn for const arrays
 	MGN_default,    //     00  	 --no-symbol--
 	MGN_default,    //  !  01  	 Police, Sheriff
 	MGN_default,    //  "  02  	 reserved  (was rain)
@@ -170,7 +172,7 @@ var mgn_primary_symtab = []string{
 	MGN_default,    //  ~  94  	 TNC Stream Switch
 }
 
-var mgn_alternate_symtab = []string{
+var mgn_alternate_symtab = []string{ //nolint:gochecknoglobals // I yearn for const arrays
 	MGN_default,      //     00  	 --no-symbol--
 	MGN_default,      //  !  01  	 EMERGENCY (!)
 	MGN_default,      //  "  02  	 reserved
