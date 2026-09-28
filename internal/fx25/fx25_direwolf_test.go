@@ -79,6 +79,6 @@ func TestFX25PickMode(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		assert.Equal(t, c.want, PickMode(c.fxMode, c.dlen), "fx_mode %d, %d data bytes", c.fxMode, c.dlen)
+		assert.Equal(t, c.want, pickMode(c.fxMode, c.dlen), "fx_mode %d, %d data bytes", c.fxMode, c.dlen)
 	}
 }

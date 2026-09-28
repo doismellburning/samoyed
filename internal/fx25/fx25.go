@@ -3,10 +3,11 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-// Package fx25 holds the parts of FX.25 - forward error correction wrapped
-// around an unmodified AX.25 frame - that are not tied to the bit stream: the
-// correlation tags that mark the start of a codeblock, the Reed-Solomon codec
-// each tag calls for, and the choice of tag for a frame about to be sent.
+// Package fx25 is FX.25 - forward error correction wrapped around an
+// unmodified AX.25 frame: the correlation tags that mark the start of a
+// codeblock, the Reed-Solomon codec each tag calls for, and EncodeFrame,
+// which turns a frame into a codeblock.  Putting the bits on the air is left
+// to the caller, which is the HDLC transmit path in internal/direwolf.
 //
 // Reference: http://www.stensat.org/docs/FX-25_01_06.pdf
 //
@@ -211,7 +212,7 @@ func NRoots(ctag_num int) int {
 
 /*-------------------------------------------------------------
  *
- * Name:	PickMode
+ * Name:	pickMode
  *
  * Purpose:	Pick suitable transmission format based on user preference
  *		and size of data part required.
@@ -234,7 +235,7 @@ func NRoots(ctag_num int) int {
  *
  *--------------------------------------------------------------*/
 
-func PickMode(fx_mode int, dlen int) int {
+func pickMode(fx_mode int, dlen int) int {
 	if fx_mode <= 0 {
 		return -1
 	}

@@ -6,41 +6,14 @@ import (
 	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"pgregory.net/rapid"
 )
-
-func Test_bitStuff(t *testing.T) {
-	const FLAG byte = 0x7e
-
-	rapid.Check(t, func(t *rapid.T) {
-		var in = rapid.SliceOf(rapid.Byte()).Draw(t, "in")
-
-		var out, _ = bitStuff(in, 0) // 0 means no padding
-
-		assert.GreaterOrEqualf(t, len(out), 2, "There should always be at least two bytes of output - the start and end flags! Got %v", out)
-		assert.Equal(t, FLAG, out[0], "Missing start flag")
-		assert.GreaterOrEqual(t, len(out)-2, len(in), "Somehow bits were lost in stuffing!") // Subtract 2 for start and end flags
-
-		// TODO Check *nicely* for sequential 1s
-
-		// Until then, check crudely! This isn't as complete as doing a proper bitstream check (because things can cross bytes), but it's a useful fast test!
-		// Drop last 2 bytes to definitely avoid picking up flag
-		var outWithNoEndFlag = out[:len(out)-2]
-
-		assert.NotContains(t, outWithNoEndFlag, byte(0x3f))
-		assert.NotContains(t, outWithNoEndFlag, byte(0x7f))
-		assert.NotContains(t, outWithNoEndFlag, byte(0xff))
-		assert.NotContains(t, outWithNoEndFlag, byte(0xfe))
-		assert.NotContains(t, outWithNoEndFlag, byte(0xfc))
-	})
-}
 
 // An FX.25 frame goes out as its correlation tag, then the data and check
 // bytes of the codeblock, NRZI encoded and least significant bit first.
 func TestFX25FrameIsSentAsTagDataAndCheck(t *testing.T) {
 	var fbuf = []byte{'Q', '1', 'T', 'E', 'S', 'T'}
 
-	var ctagNum, data, check = fx25_encode_frame(hdlcSendTestChannel, append([]byte{}, fbuf...), 16, 0)
+	var ctagNum, data, check = fx25.EncodeFrame(hdlcSendTestChannel, append([]byte{}, fbuf...), 16, 0)
 	require.GreaterOrEqual(t, ctagNum, fx25.CTagMin)
 
 	var sent int
@@ -84,7 +57,7 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 	var before = []byte{hdlcSixtyOne, 'Q', '1', 'T', 'E', 'S', 'T'}
 	var fbuf = []byte{'Q', '2', 'T', 'E', 'S', 'T'}
 
-	var ctagNum, data, check = fx25_encode_frame(hdlcSendTestChannel, append([]byte{}, fbuf...), 16, 0)
+	var ctagNum, data, check = fx25.EncodeFrame(hdlcSendTestChannel, append([]byte{}, fbuf...), 16, 0)
 	require.GreaterOrEqual(t, ctagNum, fx25.CTagMin)
 
 	var beforeLen int

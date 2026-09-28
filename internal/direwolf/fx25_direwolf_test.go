@@ -30,7 +30,7 @@ const fxTestCorruptBytes = 8
 func Test_FX25_round_trip(t *testing.T) {
 	for ctag := fx25.CTagMin; ctag <= fx25.CTagMax; ctag++ {
 		t.Run(fmt.Sprintf("ctag_%02x", ctag), func(t *testing.T) {
-			var ctag_num, data, check = fx25_encode_frame(0, slices.Clone(fxTestFrame), 100+ctag, 1)
+			var ctag_num, data, check = fx25.EncodeFrame(0, slices.Clone(fxTestFrame), 100+ctag, 1)
 			require.Equal(t, ctag, ctag_num, "Wrong correlation tag chosen")
 
 			// Give the FEC something to do.
