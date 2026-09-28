@@ -5110,6 +5110,12 @@ func handleAGWPORT(ps *parseState) error {
 		return fmt.Errorf("line %d: Unexpected \"%s\" after the port number.\nPerhaps you were trying to use feature available only with KISSPORT", ps.line, t)
 	}
 
+	return ps.applyAGWPORT(n)
+}
+
+// applyAGWPORT sets the port for the AGW TCPIP Socket Interface, or 0 for
+// none.
+func (ps *parseState) applyAGWPORT(n int) error {
 	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 		ps.misc.agwpe_port = n
 	} else {
@@ -5220,26 +5226,40 @@ func handleKISSPORT(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing TCP port number for KISSPORT command", ps.line)
 	}
-	var n, nErr = strconv.Atoi(t)
+	var settings = new(KISSPortSettings)
+
+	var nErr error
+
+	settings.Port, nErr = strconv.Atoi(t)
 	if nErr != nil {
 		return fmt.Errorf("line %d: Invalid TCP port number \"%s\" for KISSPORT command", ps.line, t)
 	}
 
-	var tcp_port int
-	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
-		tcp_port = n
-	} else {
+	t = ps.split(false)
+	if t != "" {
+		var kissChannel, channelErr = strconv.Atoi(t)
+		if channelErr != nil {
+			return fmt.Errorf("line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d", ps.line, kissChannel, MAX_TOTAL_CHANS-1)
+		}
+
+		settings.Channel = &kissChannel
+	}
+
+	return ps.applyKISSPORT(*settings)
+}
+
+// applyKISSPORT adds a KISS TCP port, or with port 0 removes the default one.
+func (ps *parseState) applyKISSPORT(settings KISSPortSettings) error {
+	var tcp_port = settings.Port
+	if (tcp_port < MIN_IP_PORT_NUMBER || tcp_port > MAX_IP_PORT_NUMBER) && tcp_port != 0 {
 		return fmt.Errorf("line %d: Invalid TCP port number for KISS TCPIP Socket Interface.\nUse something in the range of %d to %d", ps.line, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
 	}
 
-	t = ps.split(false)
 	var kissChannel = -1 // optional.  default to all if not specified.
 
-	if t != "" {
-		var channelErr error
-
-		kissChannel, channelErr = strconv.Atoi(t)
-		if kissChannel < 0 || kissChannel >= MAX_TOTAL_CHANS || channelErr != nil {
+	if settings.Channel != nil {
+		kissChannel = *settings.Channel
+		if kissChannel < 0 || kissChannel >= MAX_TOTAL_CHANS {
 			return fmt.Errorf("line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d", ps.line, kissChannel, MAX_TOTAL_CHANS-1)
 		}
 	}

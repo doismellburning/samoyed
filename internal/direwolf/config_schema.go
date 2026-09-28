@@ -108,3 +108,12 @@ type IL2PTXSettings struct {
 	// CRC adds the trailing CRC.  Left out, it is true.
 	CRC *bool `yaml:"crc"`
 }
+
+// KISSPortSettings describes a KISS TCP port - KISSPORT.
+type KISSPortSettings struct {
+	// Port is the TCP port number.  0 removes the default port.
+	Port int `yaml:"port"`
+
+	// Channel, when given, restricts the port to that one radio channel.
+	Channel *int `yaml:"channel"`
+}
