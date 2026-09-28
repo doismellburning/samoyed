@@ -471,7 +471,7 @@ x = Silence FX.25 information.`)
 	if err < 0 {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
-		time.Sleep(5 * time.Second)
+		_ = sleepSecCtx(ctx, 5)
 		pflag.Usage()
 		os.Exit(1)
 	}
