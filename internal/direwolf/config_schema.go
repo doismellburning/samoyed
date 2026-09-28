@@ -12,8 +12,9 @@ package direwolf
 
 // AudioDeviceSettings describes an audio device - ADEVICE.
 type AudioDeviceSettings struct {
-	// Device is the device number, 0 to MAX_ADEVS-1.
-	Device int `yaml:"device"`
+	// Device is the device number, 0 to MAX_ADEVS-1.  A YAML file gives it
+	// as AudioDeviceConfig.Device, where it can be left out.
+	Device int `yaml:"-"`
 
 	// Input names the device to receive from.
 	Input string `yaml:"input"`

@@ -17,6 +17,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
 	"os"
@@ -1137,6 +1138,66 @@ var configHandlers = map[string]configHandler{
 	"NOXID":          handleNOXID,
 }
 
+// readLegacy reads configuration directives in Dire Wolf's line-at-a-time
+// format from r, carrying on from line ps.line.  name says where they came
+// from, for messages.
+func (ps *parseState) readLegacy(r io.Reader, name string) {
+	var scanner = bufio.NewScanner(r)
+	for scanner.Scan() {
+		ps.text = scanner.Text()
+		ps.line++
+
+		if ps.text == "" || ps.text[0] == '#' || ps.text[0] == '*' {
+			continue
+		}
+
+		ps.startLine(ps.text)
+
+		var t = ps.split(false)
+
+		if t == "" {
+			continue
+		}
+
+		ps.keyword = t
+
+		var keyword = strings.ToUpper(t)
+
+		var err error
+		// Some config keywords actually incorporate a device number, e.g. ADEVICE0
+		switch {
+		case strings.HasPrefix(keyword, "ADEVICE"):
+			err = handleADEVICE(ps)
+		case strings.HasPrefix(keyword, "PAIDEVICE"):
+			err = handlePAIDEVICE(ps)
+		case strings.HasPrefix(keyword, "PAODEVICE"):
+			err = handlePAODEVICE(ps)
+		default:
+			if handler, ok := configHandlers[keyword]; ok {
+				err = handler(ps)
+			} else {
+				/*
+				 * Invalid command.
+				 */
+				err = fmt.Errorf("config file: Unrecognized command '%s' on line %d", t, ps.line)
+			}
+		}
+
+		if err != nil {
+			ps.report(err)
+		}
+	}
+
+	// Scan stops on a read failure, or on a line too long for the scanner's
+	// buffer, and says so only here.  The rest of the file went unread, so
+	// nothing below can be trusted - say so, rather than letting a file we only
+	// got halfway through look like one with nothing wrong with it.
+	var scanErr = scanner.Err()
+	if scanErr != nil {
+		ps.errorf("config file: Could not read %s past line %d: %v", name, ps.line, scanErr)
+	}
+}
+
 // config_init reads the configuration file, applying defaults first so that the
 // file can override them.  It reports what the file drew, for a caller that
 // wants to act on it - see the --config-check option in DirewolfMain.
@@ -1396,59 +1457,10 @@ func config_init(fname string, p_audio_config *AudioConfig,
 
 	dw_printf("\nReading config file %s\n", absFilePath)
 
-	var scanner = bufio.NewScanner(fp)
-	for scanner.Scan() {
-		ps.text = scanner.Text()
-		ps.line++
-
-		if ps.text == "" || ps.text[0] == '#' || ps.text[0] == '*' {
-			continue
-		}
-
-		ps.startLine(ps.text)
-
-		var t = ps.split(false)
-
-		if t == "" {
-			continue
-		}
-
-		ps.keyword = t
-
-		var keyword = strings.ToUpper(t)
-
-		var err error
-		// Some config keywords actually incorporate a device number, e.g. ADEVICE0
-		switch {
-		case strings.HasPrefix(keyword, "ADEVICE"):
-			err = handleADEVICE(ps)
-		case strings.HasPrefix(keyword, "PAIDEVICE"):
-			err = handlePAIDEVICE(ps)
-		case strings.HasPrefix(keyword, "PAODEVICE"):
-			err = handlePAODEVICE(ps)
-		default:
-			if handler, ok := configHandlers[keyword]; ok {
-				err = handler(ps)
-			} else {
-				/*
-				 * Invalid command.
-				 */
-				err = fmt.Errorf("config file: Unrecognized command '%s' on line %d", t, ps.line)
-			}
-		}
-
-		if err != nil {
-			ps.report(err)
-		}
-	}
-
-	// Scan stops on a read failure, or on a line too long for the scanner's
-	// buffer, and says so only here.  The rest of the file went unread, so
-	// nothing below can be trusted - say so, rather than letting a file we only
-	// got halfway through look like one with nothing wrong with it.
-	var scanErr = scanner.Err()
-	if scanErr != nil {
-		ps.errorf("config file: Could not read %s past line %d: %v", absFilePath, ps.line, scanErr)
+	if isYAMLConfig(absFilePath) {
+		ps.readYAML(fp, absFilePath)
+	} else {
+		ps.readLegacy(fp, absFilePath)
 	}
 
 	/*
@@ -2591,6 +2603,12 @@ func (ps *parseState) applyOutputControl(ot int, settings OutputControlSettings)
 			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, otname)
 		}
 
+		// A legacy line turns a leading "-" into Invert, but a YAML file
+		// can say -25 outright, and there is no GPIO line of that number.
+		if *settings.Pin < 0 {
+			return fmt.Errorf("config file line %d: GPIO number %d for %s can't be negative - use invert to invert the signal", ps.line, *settings.Pin, otname)
+		}
+
 		octrl.out_gpio_num = *settings.Pin
 		octrl.ptt_invert = settings.Invert
 		octrl.ptt_method = dwutil.IfThenElse(strings.EqualFold(settings.Method, "gpiod"), PTT_METHOD_GPIOD, PTT_METHOD_GPIO)
@@ -2598,6 +2616,12 @@ func (ps *parseState) applyOutputControl(ot int, settings OutputControlSettings)
 		/* Parallel printer case, x86 Linux only. */
 		if settings.Pin == nil {
 			return fmt.Errorf("config file line %d: Missing LPT bit number for %s", ps.line, otname)
+		}
+
+		// As for GPIO, only a YAML file can get a negative bit here, and
+		// PTT would shift by it.
+		if *settings.Pin < 0 {
+			return fmt.Errorf("config file line %d: LPT bit number %d for %s can't be negative - use invert to invert the signal", ps.line, *settings.Pin, otname)
 		}
 
 		octrl.ptt_lpt_bit = *settings.Pin
@@ -2679,8 +2703,11 @@ func (ps *parseState) applyOutputControl(ot int, settings OutputControlSettings)
 
 		if settings.Pin != nil {
 			octrl.out_gpio_num = *settings.Pin
-			octrl.ptt_invert = settings.Invert
 		}
+
+		// A legacy line only inverts along with a GPIO number, but YAML can
+		// ask to invert the default one.
+		octrl.ptt_invert = settings.Invert
 
 		if settings.Device != "" {
 			octrl.ptt_device = settings.Device

@@ -232,7 +232,15 @@ type configs struct {
 func parseConfig(t *testing.T, content string) configs {
 	t.Helper()
 
-	var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
+	return parseConfigNamed(t, "direwolf*.conf", content)
+}
+
+// parseConfigNamed is parseConfig for a temp file named after pattern, as
+// os.CreateTemp names it, so that its extension can pick the format.
+func parseConfigNamed(t *testing.T, pattern string, content string) configs {
+	t.Helper()
+
+	var tmpFile, err = os.CreateTemp(t.TempDir(), pattern)
 	require.NoError(t, err)
 	_, err = tmpFile.WriteString(content)
 	require.NoError(t, err)
