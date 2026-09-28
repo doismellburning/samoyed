@@ -1150,6 +1150,10 @@ func (s *AGWServer) detachClient(client int, conn net.Conn) {
 
 	if wasAttached {
 		dataLinkQueue.ClientCleanup(client)
+
+		if node := theNetromNode.Load(); node != nil {
+			node.agwClientGone(client)
+		}
 	}
 }
 
@@ -1773,7 +1777,14 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			if s.connectedModeAllowed(cmd.Header.Portx) {
 				ok = 1
 
-				dataLinkQueue.RegisterCallsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+				var call = ByteArrayToString(cmd.Header.CallFrom[:])
+
+				// The NET/ROM node's own callsign is registered with the
+				// NET/ROM node, to take its incoming circuits, rather than
+				// with the data link, where the node answers for it.
+				if node := theNetromNode.Load(); node == nil || !node.agwRegister(channel, client, call) {
+					dataLinkQueue.RegisterCallsign(call, channel, client)
+				}
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
@@ -1795,7 +1806,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 		var channel = int(cmd.Header.Portx)
 
 		if s.connectedModeAllowed(cmd.Header.Portx) {
-			dataLinkQueue.UnregisterCallsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+			var call = ByteArrayToString(cmd.Header.CallFrom[:])
+
+			if node := theNetromNode.Load(); node == nil || !node.agwUnregister(channel, client, call) {
+				dataLinkQueue.UnregisterCallsign(call, channel, client)
+			}
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
@@ -1870,6 +1885,13 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				}
 			}
 
+			// A connect with the NET/ROM PID on the NET/ROM node's channel is
+			// for a NET/ROM circuit, not an AX.25 link.
+			if node := theNetromNode.Load(); node != nil && num_calls == 2 &&
+				node.agwConnect(int(cmd.Header.Portx), client, callsigns[ax25.Source], callsigns[ax25.Destination], int(pid)) {
+				break
+			}
+
 			dataLinkQueue.ConnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
 		}
 
@@ -1895,6 +1917,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
 			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
 
+			if node := theNetromNode.Load(); node != nil &&
+				node.agwSend(int(cmd.Header.Portx), client, callsigns[ax25.Source], callsigns[ax25.Destination], cmd.Data[:cmd.Header.DataLen]) {
+				break
+			}
+
 			dataLinkQueue.XmitDataRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
 		}
 
@@ -1912,6 +1939,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 
 			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
 			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
+
+			if node := theNetromNode.Load(); node != nil &&
+				node.agwDisconnect(int(cmd.Header.Portx), client, callsigns[ax25.Source], callsigns[ax25.Destination]) {
+				break
+			}
 
 			dataLinkQueue.DisconnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}

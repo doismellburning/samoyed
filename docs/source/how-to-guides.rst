@@ -465,3 +465,93 @@ attached over KISS, runs its own link layer: it sees the raw frames and sends
 its own UA, so connected mode there is configured in that software and never
 reaches the path described above.  Registering a callsign over the AGW port
 has no bearing on it.
+
+Run a NET/ROM node
+-------------------
+
+NET/ROM is a network and transport layer carried over AX.25 (PID 0xCF).  A node
+advertises itself and the nodes it can reach in periodic ``NODES`` broadcasts,
+learns routes from the broadcasts it hears, and carries users' traffic over
+circuits that may cross several nodes.  :doc:`protocols` describes the protocol
+itself.
+
+Add a ``NETROM`` directive to run one:
+
+.. code::
+
+    NETROM <channel> <callsign> <alias> [TTL <n>] [NODES <seconds>] [QUALITY <n>] [MINQUAL <n>]
+
+For example:
+
+.. code::
+
+    MYCALL Q1TEST
+    NETROM 0 Q1TEST-7 QNODEA
+
+``callsign`` is the node's own AX.25 address, conventionally the station
+callsign with an SSID of its own, and ``alias`` the short name (up to six
+characters) other nodes know it by.  The options are:
+
+``TTL``
+    How many nodes a frame this node originates may cross.  Default 16.
+``NODES``
+    Seconds between ``NODES`` broadcasts.  Default 3600.
+``QUALITY``
+    The quality (0-255) this node gives a link to any neighbour it hears.  A
+    route through that neighbour is worth this much of what the neighbour
+    advertises for it.  Default 192.
+``MINQUAL``
+    Routes worth less than this are not kept.  Default 10.
+
+In a YAML configuration, put the directive in the ``legacy`` block for now.
+
+Only one node can be configured, on one channel.  Neighbouring nodes exchange
+NET/ROM traffic over ordinary connected-mode AX.25 links, which the node makes
+and answers for itself, so the node's callsign must not also be used for
+anything else.  Those links carry each NET/ROM frame in a single AX.25 frame,
+so leave ``PACLEN`` at its default of 256 or more; samoyed warns at startup if
+it is less.
+
+Applications use the node over the AGW port:
+
+* ``c`` (connect) with PID 0xCF, from the user's callsign to a node's callsign
+  or alias, opens a circuit to that node.  Data can be sent with ``D`` straight
+  away; it waits until the circuit is up.  If there is no route to the node, or
+  it will not take the circuit, the client gets ``d`` (disconnected) back.
+* ``D`` sends data on the circuit, and ``d`` closes it, naming the same two
+  callsigns.  Data arriving on the circuit comes to the client with ``D``.
+* A client that registers the node's own callsign with ``X`` takes the circuits
+  other nodes open to this one.  With no such client, they are refused.
+
+A circuit belongs to the client that opened or took it, and is closed if that
+client disconnects from the AGW port.  ``test-scripts/check-netrom-connect``
+starts two nodes on cross-wired UDP audio and drives a circuit between them in
+both directions, and doubles as a worked example of the AGW side.
+
+Running a node over a network link
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The channel need not be a radio channel.  It may be an ``NCHANNEL``, which is
+how a node reaches a link that is not RF at all - including an AXUDP tunnel,
+through the ``samoyed-axudp`` bridge:
+
+.. code::
+
+    NCHANNEL 6 localhost 8002
+    NETROM 6 Q1TEST-7 QNODEA
+
+An IGate channel is refused, being APRS-IS, where NET/ROM means nothing, and so
+is a channel that is not configured at all.
+
+Two caveats apply to AXUDP, because ``samoyed-axudp`` routes strictly by AX.25
+destination address:
+
+* ``NODES`` broadcasts are addressed to the pseudo-callsign ``NODES``, which
+  matches no ``MAP`` entry, so they are dropped.  AXUDP is point-to-point, so
+  even mapping ``NODES`` explicitly would reach only one peer, where a
+  broadcast is meant for every neighbour.  Until the bridge learns to copy
+  broadcasts to every peer, a node behind it cannot learn routes from them.
+* ``MAP`` entries are keyed on AX.25 callsigns, never on NET/ROM aliases, which
+  never appear in an AX.25 address.  The links between neighbours are addressed
+  to their node callsigns, so map the neighbour's node callsign (``Q2TEST-7``),
+  not its alias (``QNODEB``).

@@ -904,9 +904,14 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 
 		dw_printf("(%s)", desc)
 
+		var detail, decoded = netromMonitorText(pp)
 		if ftype == ax25.FrameTypeUXID {
-			var _, info2text, _ = xid_parse(pinfo)
-			dw_printf(" %s\n", info2text)
+			_, detail, _ = xid_parse(pinfo)
+			decoded = true
+		}
+
+		if decoded {
+			dw_printf(" %s\n", detail)
 		} else {
 			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			dw_printf("\n")

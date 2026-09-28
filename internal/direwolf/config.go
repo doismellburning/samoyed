@@ -158,6 +158,8 @@ type misc_config_s struct {
 	/* commands are honoured.  Empty (the default) means no login is required. */
 
 	metrics_port int /* TCP Port number for the Prometheus "/metrics" HTTP endpoint. */
+
+	netrom netromConfig /* The NETROM directive: a NET/ROM node, if one is wanted. */
 	/* 0 (default) disables it. */
 
 	// Previously we allowed only a single TCP port for KISS.
@@ -1137,6 +1139,7 @@ var configHandlers = map[string]configHandler{
 	"MAXV22":         handleMAXV22,
 	"V20":            handleV20,
 	"NOXID":          handleNOXID,
+	"NETROM":         handleNETROM,
 }
 
 // readLegacy reads configuration directives in Dire Wolf's line-at-a-time
@@ -1331,6 +1334,7 @@ func config_init(fname string, p_audio_config *AudioConfig,
 
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
 	p_misc_config.metrics_port = 0 // Disabled by default.
+	p_misc_config.netrom = defaultNetromConfig()
 
 	for i := range MAX_KISS_TCP_PORTS {
 		p_misc_config.kiss_port[i] = 0 // entry not used.
@@ -5871,6 +5875,85 @@ func handleV20(ps *parseState) error {
 
 		t = ps.split(false)
 	}
+
+	return nil
+}
+
+// handleNETROM handles the NETROM keyword, which sets up a NET/ROM node:
+//
+//	NETROM channel callsign alias [TTL n] [NODES seconds] [QUALITY n] [MINQUAL n]
+//
+// The channel is bounded here but not checked for being usable: that depends
+// on directives that may come later in the file, so netromInit checks it.
+func handleNETROM(ps *parseState) error {
+	if ps.misc.netrom.enabled {
+		return fmt.Errorf("line %d: Only one NETROM node can be configured", ps.line)
+	}
+
+	var cfg = defaultNetromConfig()
+
+	var t = ps.split(false)
+
+	var channel, channelErr = strconv.Atoi(t)
+	if t == "" || channelErr != nil || channel < 0 || channel >= MAX_TOTAL_CHANS {
+		return fmt.Errorf("line %d: NETROM needs a channel number from 0 to %d", ps.line, MAX_TOTAL_CHANS-1)
+	}
+
+	cfg.channel = channel
+
+	var callsign, callErr = normaliseNetromCallsign(ps.split(false))
+	if callErr != nil {
+		return fmt.Errorf("line %d: NETROM needs the node's callsign: %w", ps.line, callErr)
+	}
+
+	cfg.callsign = callsign
+
+	var alias = strings.ToUpper(ps.split(false))
+	if alias == "" || !validNetromAlias(alias) {
+		return fmt.Errorf("line %d: NETROM needs the node's alias, of up to %d letters and digits", ps.line, netromAliasLen)
+	}
+
+	cfg.alias = alias
+
+	for t = ps.split(false); t != ""; t = ps.split(false) {
+		var keyword = strings.ToUpper(t)
+
+		var value = ps.split(false)
+
+		var n, err = strconv.Atoi(value)
+
+		switch keyword {
+		case "TTL":
+			if err != nil || n < 1 || n > 255 {
+				return fmt.Errorf("line %d: NETROM TTL must be from 1 to 255", ps.line)
+			}
+
+			cfg.ttl = byte(n)
+		case "NODES":
+			if err != nil || n < 1 {
+				return fmt.Errorf("line %d: NETROM NODES must be a number of seconds", ps.line)
+			}
+
+			cfg.nodesInterval = time.Duration(n) * time.Second
+		case "QUALITY", "MINQUAL":
+			// 0 is a legitimate value for both, so a value that is not a
+			// number must not quietly become one.
+			if err != nil || n < 0 || n > 255 {
+				return fmt.Errorf("line %d: NETROM %s must be from 0 to 255", ps.line, keyword)
+			}
+
+			if keyword == "QUALITY" {
+				cfg.quality = byte(n)
+			} else {
+				cfg.minQuality = byte(n)
+			}
+		default:
+			return fmt.Errorf("line %d: Unknown NETROM option %q", ps.line, t)
+		}
+	}
+
+	cfg.enabled = true
+	ps.misc.netrom = cfg
 
 	return nil
 }

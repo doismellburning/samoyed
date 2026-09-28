@@ -265,7 +265,9 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 
 		// Formated addresses.
 		var stemp = pp.FormatAddrs()
-		var pinfo = pp.Info()
+		// The radio transmit path decodes NET/ROM for the monitor in
+		// xmit.go, which a frame for a virtual channel never reaches.
+		var pinfo = netromMonitorInfo(pp, pp.Info())
 
 		text_color_set(DW_COLOR_XMIT)
 
