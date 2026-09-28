@@ -38,6 +38,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/serialport"
 )
 
 /*------------------------------------------------------------------
@@ -286,7 +287,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
  *--------------------------------------------------------------------*/
 
 func client_thread_serial(my_index int, port string, description string, packetChan chan<- string) {
-	var fd = direwolf.SerialPortOpen(port, 9600)
+	var fd = serialport.Open(port, 9600)
 
 	if fd == nil {
 		fmt.Printf("Client %d unable to connect to %s on %s.\n", my_index, description, port)
@@ -310,7 +311,7 @@ func client_thread_serial(my_index int, port string, description string, packetC
 		var buffer []byte
 
 		for !done {
-			var b, err = direwolf.SerialPortGet1(fd)
+			var b, err = serialport.Get1(fd)
 			if err != nil {
 				fmt.Printf("Client %d fatal read error: %s.\n", my_index, err)
 				os.Exit(1)

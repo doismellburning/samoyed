@@ -17,6 +17,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/doismellburning/samoyed/internal/waypointsym"
 	"github.com/pkg/term"
 	"github.com/sirupsen/logrus"
@@ -95,7 +96,7 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *GPS) (*Waypo
 		ws.serialPortFd = gps.sharedNMEAPort(mc.waypoint_serial_port, 4800)
 
 		if ws.serialPortFd == nil {
-			ws.serialPortFd = SerialPortOpen(mc.waypoint_serial_port, 4800)
+			ws.serialPortFd = serialport.Open(mc.waypoint_serial_port, 4800)
 		} else {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Note: Sharing same port for GPS input and waypoint output.\n")
@@ -515,7 +516,7 @@ func (ws *WaypointSender) SendAIS(sentence []byte) {
 
 func (ws *WaypointSender) Close() {
 	if ws.serialPortFd != nil {
-		serial_port_close(ws.serialPortFd)
+		serialport.Close(ws.serialPortFd)
 		ws.serialPortFd = nil
 	}
 
@@ -542,7 +543,7 @@ func (ws *WaypointSender) send(sentence []byte) {
 	var final_len = len(final)
 
 	if ws.serialPortFd != nil {
-		SerialPortWrite(ws.serialPortFd, final)
+		serialport.Write(ws.serialPortFd, final)
 	}
 
 	if ws.udpSock != nil {

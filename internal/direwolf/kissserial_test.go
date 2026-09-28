@@ -8,7 +8,7 @@ package direwolf
 
 // KISS over a serial port is how a client application on another machine, or
 // over Bluetooth, talks to us.  A pseudo terminal stands in for the wire, as it
-// does in serial_port_test.go, so none of this needs any hardware.
+// does in internal/serialport, so none of this needs any hardware.
 
 import (
 	"bytes"
@@ -20,6 +20,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 
 	var name = slave.Name()
 
-	// SerialPortOpen opens the device by name, so the handle here is surplus;
+	// serialport.Open opens the device by name, so the handle here is surplus;
 	// the terminal lives on as long as the master is open.
 	require.NoError(t, slave.Close())
 
@@ -66,7 +67,7 @@ func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*Kis
 	var ks = newKissSerial(mc, kissTestAudioConfig(), 0)
 
 	if mc.kiss_serial_poll == 0 {
-		ks.fd = SerialPortOpen(mc.kiss_serial_port, mc.kiss_serial_speed)
+		ks.fd = serialport.Open(mc.kiss_serial_port, mc.kiss_serial_speed)
 		require.NotNil(t, ks.fd, "could not open %s", mc.kiss_serial_port)
 	}
 
@@ -104,7 +105,7 @@ func openKissSerialPort(t *testing.T, debug int) (*KissSerial, *os.File) {
 
 	t.Cleanup(ks.closePort)
 
-	ks.fd = SerialPortOpen(name, 0)
+	ks.fd = serialport.Open(name, 0)
 	require.NotNil(t, ks.fd, "could not open %s", name)
 
 	return ks, client

@@ -18,6 +18,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,10 +34,10 @@ func fakeTNC(t *testing.T) *os.File {
 
 	var oldTNC = tnc
 
-	tnc = direwolf.SerialPortOpen(slave.Name(), 9600)
+	tnc = serialport.Open(slave.Name(), 9600)
 	require.NotNil(t, tnc)
 
-	// SerialPortOpen opens the device by name, so this handle is surplus.
+	// serialport.Open opens the device by name, so this handle is surplus.
 	require.NoError(t, slave.Close())
 
 	t.Cleanup(func() {
