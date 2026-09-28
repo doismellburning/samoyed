@@ -654,6 +654,7 @@ x = Silence FX.25 information.`)
 	stopIfCancelled(ctx)
 	connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
 	ax25_link_init(misc_config, d_c_opt)
+	netromInit(ctx, audio_config, misc_config.netrom, misc_config.paclen)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
@@ -1170,6 +1171,17 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		if channel < MAX_RADIO_CHANS {
 			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
 				connectedDigipeater.Digipeat(channel, pp)
+			}
+		}
+
+		/*
+		 * NET/ROM routing broadcasts, on the same terms.  Everything else
+		 * NET/ROM reaches the node over connected-mode links, through the
+		 * data link.
+		 */
+		if node := theNetromNode.Load(); node != nil && pp.FrameTypeOnly() == ax25.FrameTypeUUI {
+			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
+				node.heardUI(channel, pp)
 			}
 		}
 	}

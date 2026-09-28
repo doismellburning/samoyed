@@ -2,10 +2,12 @@ package direwolf
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -2962,6 +2964,50 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"NETROM": {
+			{
+				name:   "a node with the defaults",
+				config: "NETROM 0 q1test-7 qnodea\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.errors)
+					a.True(c.misc.netrom.enabled)
+					a.Equal(0, c.misc.netrom.channel)
+					a.Equal("Q1TEST-7", c.misc.netrom.callsign)
+					a.Equal("QNODEA", c.misc.netrom.alias)
+					a.Equal(byte(netromDefaultTTL), c.misc.netrom.ttl)
+					a.Equal(netromDefaultNodesInterval, c.misc.netrom.nodesInterval)
+					a.Equal(byte(netromDefaultQuality), c.misc.netrom.quality)
+					a.Equal(byte(netromDefaultMinQuality), c.misc.netrom.minQuality)
+				},
+			},
+			{
+				name:   "every option",
+				config: "NETROM 1 Q1TEST-7 QNODEA TTL 7 NODES 600 QUALITY 0 MINQUAL 50\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.errors)
+					a.Equal(1, c.misc.netrom.channel)
+					a.Equal(byte(7), c.misc.netrom.ttl)
+					a.Equal(600*time.Second, c.misc.netrom.nodesInterval)
+					a.Equal(byte(0), c.misc.netrom.quality, "0 is a quality like any other")
+					a.Equal(byte(50), c.misc.netrom.minQuality)
+				},
+			},
+			{
+				name:   "a virtual channel is accepted here and checked at startup",
+				config: fmt.Sprintf("NETROM %d Q1TEST-7 QNODEA\n", MAX_TOTAL_CHANS-1),
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.errors)
+					a.Equal(MAX_TOTAL_CHANS-1, c.misc.netrom.channel)
+				},
+			},
+			{
+				name:   "no NETROM means no node",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.misc.netrom.enabled)
+				},
+			},
+		},
 		"NOXID": {
 			{
 				name:   "an address is stored",
@@ -4901,6 +4947,41 @@ func Test_config_directives(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A NETROM line that cannot be obeyed is reported, and leaves no node
+// configured rather than a node configured with something nobody asked for.
+func Test_config_init_netrom_rejects(t *testing.T) {
+	for _, line := range []string{
+		"NETROM",
+		"NETROM x Q1TEST-7 QNODEA",
+		"NETROM -1 Q1TEST-7 QNODEA",
+		fmt.Sprintf("NETROM %d Q1TEST-7 QNODEA", MAX_TOTAL_CHANS),
+		"NETROM 0",
+		"NETROM 0 Q1TEST-77 QNODEA",
+		"NETROM 0 Q1TEST-7",
+		"NETROM 0 Q1TEST-7 TOOLONGX",
+		"NETROM 0 Q1TEST-7 QNODEA TTL 0",
+		"NETROM 0 Q1TEST-7 QNODEA TTL 256",
+		"NETROM 0 Q1TEST-7 QNODEA NODES 0",
+		"NETROM 0 Q1TEST-7 QNODEA QUALITY high",
+		"NETROM 0 Q1TEST-7 QNODEA MINQUAL 300",
+		"NETROM 0 Q1TEST-7 QNODEA WINDOW 4",
+	} {
+		t.Run(line, func(t *testing.T) {
+			var c = parseConfig(t, line+"\n")
+
+			assert.Equal(t, 1, c.errors)
+			assert.False(t, c.misc.netrom.enabled)
+		})
+	}
+
+	t.Run("a second node", func(t *testing.T) {
+		var c = parseConfig(t, "NETROM 0 Q1TEST-7 QNODEA\nNETROM 1 Q1TEST-8 QNODEB\n")
+
+		assert.Equal(t, 1, c.errors)
+		assert.Equal(t, "Q1TEST-7", c.misc.netrom.callsign)
+	})
 }
 
 // directivesTestedSeparately names the keywords whose tests predate the table,
