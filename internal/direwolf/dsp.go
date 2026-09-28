@@ -211,63 +211,6 @@ func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, 
 
 /*------------------------------------------------------------------
  *
- * Name:        gen_ms
- *
- * Purpose:     Generate mark and space filters.
- *
- * Inputs:   	fc		- Tone frequency, i.e. mark or space.
- *		sps		- Samples per second.
- *		filter_size	- Number of filter taps.
- *		wtype		- Window type, BP_WINDOW_HAMMING, etc.
- *
- * Outputs:     bp_filter
- *
- * Reference:	http://www.labbookpages.co.uk/audio/firWindowing.html
- *
- *		Does it need to be an odd length?
- *
- *----------------------------------------------------------------*/
-
-func gen_ms(fc int, sps int, sin_table []float64, cos_table []float64, filter_size int, wtype bp_window_t) { //nolint:unused
-	var Gs float64 = 0
-	var Gc float64 = 0
-
-	for j := range filter_size {
-		var center = 0.5 * float64(filter_size-1)
-		var am = ((float64(j) - center) / (float64)(sps)) * (float64(fc)) * (2.0 * (math.Pi))
-
-		var shape = window(wtype, filter_size, j)
-
-		sin_table[j] = math.Sin(float64(am)) * shape
-		cos_table[j] = math.Cos(float64(am)) * shape
-
-		Gs += sin_table[j] * math.Sin(float64(am))
-		Gc += cos_table[j] * math.Cos(float64(am))
-
-		/*
-			#if DEBUG1
-				  dw_printf ("%6d  %6.2f  %6.2f  %6.2f\n", j, shape, sin_table[j], cos_table[j]) ;
-			#endif
-		*/
-	}
-
-	/* Normalize for unity gain */
-
-	/*
-	   #if DEBUG1
-
-	   	dw_printf ("Before normalizing, Gs = %.2f, Gc = %.2f\n", Gs, Gc) ;
-
-	   #endif
-	*/
-	for j := range filter_size {
-		sin_table[j] /= Gs
-		cos_table[j] /= Gc
-	}
-} /* end gen_ms */
-
-/*------------------------------------------------------------------
- *
  * Name:        rrc
  *
  * Purpose:     Root Raised Cosine function.
