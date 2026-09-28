@@ -144,31 +144,13 @@ func fx25_tag_find_match(t uint64) int {
 	return -1
 }
 
-/*-------------------------------------------------------------
- *
- * Name:	FX25Init
- *
- * Purpose:	Set the level of FX.25's informational / debug messages.
- *
- * Inputs:	debug_level - Controls level of informational / debug messages.
- *
- *			0		Only errors.
- *			1 (default)	Transmitting ctag. Currently no other way to know this.
- *			2 		Receive correlation tag detected.  FEC decode complete.
- *			3		Dump data going in and out.
- *
- *			Use command line -dx to increase level or -qx for quiet.
- *
- * Description:	The Reed-Solomon codecs, which Dire Wolf also set up
- *		here, are built when the package is initialised.
- *
- *--------------------------------------------------------------*/
-
-var g_debug_level int
-
-func FX25Init(debug_level int) {
-	g_debug_level = debug_level
-}
+// FX.25's debug level, from the -dx and -qx options, is handed to each
+// sender and receiver when it is made:
+//
+//	0		Only errors.
+//	1 (default)	Transmitting ctag. Currently no other way to know this.
+//	2		Receive correlation tag detected.  FEC decode complete.
+//	3		Dump data going in and out.
 
 // Get properties of specified CTAG number.
 
@@ -202,10 +184,6 @@ func fx25_get_nroots(ctag_num int) int {
 	dwutil.Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 
 	return int(fx25Tab[tags[ctag_num].itab].nroots)
-}
-
-func fx25_get_debug() int {
-	return g_debug_level
 }
 
 /*-------------------------------------------------------------

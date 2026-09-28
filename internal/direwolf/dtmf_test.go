@@ -44,7 +44,7 @@ func TestSendDTMFDecodesBack(t *testing.T) {
 
 	t.Cleanup(func() { hdlcReceiver = origReceiver })
 
-	hdlcReceiver = NewHDLCReceiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, new(discardReceiveSink))
+	hdlcReceiver = NewHDLCReceiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
 
 	var sink = new(byteSink)
 	var tg = NewToneGenerator(channel, audioConfig, 50, sink)

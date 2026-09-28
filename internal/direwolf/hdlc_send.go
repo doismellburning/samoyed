@@ -13,6 +13,7 @@ import (
 type HDLCSender struct {
 	channel     int
 	audioConfig *AudioConfig
+	fx25Debug   int // FX.25's debug level.
 
 	bitsSent int // Count number of bits sent by SendFrame or SendPreamblePostamble.
 
@@ -24,11 +25,13 @@ type HDLCSender struct {
 }
 
 // NewHDLCSender makes an HDLCSender for channel, sending the layer 2
-// protocol audioConfig says to use there.
-func NewHDLCSender(channel int, audioConfig *AudioConfig) *HDLCSender {
+// protocol audioConfig says to use there, with FX.25's debug level at
+// fx25Debug.
+func NewHDLCSender(channel int, audioConfig *AudioConfig, fx25Debug int) *HDLCSender {
 	var s = new(HDLCSender)
 	s.channel = channel
 	s.audioConfig = audioConfig
+	s.fx25Debug = fx25Debug
 
 	return s
 }

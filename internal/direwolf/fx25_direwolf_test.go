@@ -27,11 +27,9 @@ var fxTestFrame = []byte{ //nolint:gochecknoglobals
 const fxTestCorruptBytes = 8
 
 func Test_FX25_round_trip(t *testing.T) {
-	FX25Init(1)
-
 	for ctag := CTAG_MIN; ctag <= CTAG_MAX; ctag++ {
 		t.Run(fmt.Sprintf("ctag_%02x", ctag), func(t *testing.T) {
-			var ctag_num, data, check = fx25_encode_frame(0, slices.Clone(fxTestFrame), 100+ctag)
+			var ctag_num, data, check = fx25_encode_frame(0, slices.Clone(fxTestFrame), 100+ctag, 1)
 			require.Equal(t, ctag, ctag_num, "Wrong correlation tag chosen")
 
 			// Give the FEC something to do.
@@ -78,7 +76,7 @@ func fxTestReceive(block []byte) ([][]byte, []int) {
 		derrors = append(derrors, d)
 	}
 
-	var rx = newFX25Receiver(0, 0, 0, collect)
+	var rx = newFX25Receiver(0, 0, 0, 1, collect)
 
 	for _, b := range block {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {

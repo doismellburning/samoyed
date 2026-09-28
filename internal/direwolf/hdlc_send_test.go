@@ -38,7 +38,7 @@ func captureBits(t *testing.T, audioConfig *AudioConfig, fn func(s *HDLCSender))
 
 	t.Cleanup(func() { toneGenCapture = nil })
 
-	fn(NewHDLCSender(hdlcSendTestChannel, audioConfig))
+	fn(NewHDLCSender(hdlcSendTestChannel, audioConfig, 0))
 
 	toneGenCapture = nil
 
@@ -269,7 +269,7 @@ func TestNRZIInvertsOnAZeroOnly(t *testing.T) {
 // but each sender has its own: sending on one channel must not change what
 // the next bit on another looks like.
 func TestHDLCSendersKeepTheirOwnLineLevel(t *testing.T) {
-	var other = NewHDLCSender(1, nil)
+	var other = NewHDLCSender(1, nil, 0)
 
 	toneGenCapture = func(int, int) {}
 
@@ -463,8 +463,6 @@ func TestLayer2SendFrameSendsFX25WhenConfigured(t *testing.T) {
 	var audioConfig = newHDLCSendTestConfig(LAYER2_FX25)
 	audioConfig.achan[hdlcSendTestChannel].fx25_strength = 1
 
-	FX25Init(0)
-
 	var pp = newHDLCSendTestPacket(t, 16)
 
 	var sent int
@@ -488,8 +486,6 @@ func TestLayer2SendFrameSendsFX25WhenConfigured(t *testing.T) {
 func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T) {
 	var audioConfig = newHDLCSendTestConfig(LAYER2_FX25)
 	audioConfig.achan[hdlcSendTestChannel].fx25_strength = 1
-
-	FX25Init(0)
 
 	// Comfortably more than the largest FX.25 codeblock carries.
 	var pp = newHDLCSendTestPacket(t, FX25_MAX_DATA)
@@ -571,4 +567,10 @@ func setupEASSendTest(t *testing.T) {
 	t.Cleanup(func() { w.Close() })
 
 	GenToneInit(audioConfig, 100, newWAVFileSink(w))
+}
+
+// A sender reports on FX.25 at the debug level it was made with, so each
+// program that sends - samoyed-direwolf, samoyed-gen-packets - has its own.
+func TestHDLCSenderKeepsItsFX25DebugLevel(t *testing.T) {
+	assert.Equal(t, 3, NewHDLCSender(hdlcSendTestChannel, nil, 3).fx25Debug)
 }

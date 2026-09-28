@@ -25,6 +25,7 @@ const (
 // ("subchannel") of one channel.
 type fx25Receiver struct {
 	channel, subchannel, slice int
+	debug                      int             // FX.25's debug level.
 	sink                       fx25_frame_sink // Where each extracted frame goes.
 
 	state        FX25RecState
@@ -39,7 +40,7 @@ type fx25Receiver struct {
 	block        [FX25_BLOCK_SIZE + 1]byte
 }
 
-func newFX25Receiver(channel int, subchannel int, slice int, sink fx25_frame_sink) *fx25Receiver {
+func newFX25Receiver(channel int, subchannel int, slice int, debug int, sink fx25_frame_sink) *fx25Receiver {
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -48,6 +49,7 @@ func newFX25Receiver(channel int, subchannel int, slice int, sink fx25_frame_sin
 	F.channel = channel
 	F.subchannel = subchannel
 	F.slice = slice
+	F.debug = debug
 	F.sink = sink
 
 	return F
@@ -110,7 +112,7 @@ func (F *fx25Receiver) recBit(dbit int) {
 			F.coffs = fx25_get_k_data_rs(F.ctag_num)
 			dwutil.Assert(F.coffs == FX25_BLOCK_SIZE-F.nroots)
 
-			if fx25_get_debug() >= 2 {
+			if F.debug >= 2 {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("FX.25[%d.%d]: Matched correlation tag 0x%02x with %d bit errors.  Expecting %d data & %d check bytes.\n",
 					channel, slice, // ideally subchannel too only if applicable
@@ -245,7 +247,7 @@ func (F *fx25Receiver) processRSBlock() {
 	var subchannel = F.subchannel
 	var slice = F.slice
 
-	if fx25_get_debug() >= 3 {
+	if F.debug >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
 		fx_hex_dump(F.block[:FX25_BLOCK_SIZE])
@@ -263,7 +265,7 @@ func (F *fx25Receiver) processRSBlock() {
 	}
 
 	if derrors >= 0 { // -1 for failure.  >= 0 for success, number of bytes corrected.
-		if fx25_get_debug() >= 2 {
+		if F.debug >= 2 {
 			text_color_set(DW_COLOR_INFO)
 
 			if derrors == 0 {
@@ -287,7 +289,7 @@ func (F *fx25Receiver) processRSBlock() {
 
 			var expected_fcs = fcs.Calc(frame_buf[:frame_len-2])
 			if actual_fcs == expected_fcs {
-				if fx25_get_debug() >= 3 {
+				if F.debug >= 3 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("FX.25[%d.%d]: Extracted AX.25 frame:\n", channel, slice)
 					fx_hex_dump(frame_buf[:frame_len])
@@ -311,7 +313,7 @@ func (F *fx25Receiver) processRSBlock() {
 				fx_hex_dump(frame_buf[:frame_len])
 			}
 		}
-	} else if fx25_get_debug() >= 2 {
+	} else if F.debug >= 2 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d.%d]: FEC failed.  Too many errors.\n", channel, slice)
 	}

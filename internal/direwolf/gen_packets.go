@@ -154,15 +154,15 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 
 	GenToneInit(audio, g.amplitude/2, sink)
 
+	// We don't have -d or -q options here.
+	// Just use the default of minimal information for FX.25.
+	const fx25Debug = 1
+
 	g.hdlcSenders = make([]*HDLCSender, MAX_RADIO_CHANS)
 	for c := range g.hdlcSenders {
-		g.hdlcSenders[c] = NewHDLCSender(c, audio)
+		g.hdlcSenders[c] = NewHDLCSender(c, audio, fx25Debug)
 	}
 
-	// We don't have -d or -q options here.
-	// Just use the default of minimal information.
-
-	FX25Init(1)
 	il2p_init(0) // There are no "-d" options so far but it could be handy here.
 
 	return g, nil

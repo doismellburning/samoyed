@@ -37,7 +37,7 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 	audioConfig.achan[0].num_freq = 1
 
 	var first = new(recordingReceiveSink)
-	multi_modem_init(audioConfig, first)
+	multi_modem_init(audioConfig, 0, first)
 	require.Equal(t, 2, demodulators[0].NumSubchan())
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:left over", true)
@@ -46,7 +46,7 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 	multi_modem_process_rec_packet_real(0, 0, 0, pp, alevel, RETRY_NONE, fec_type_none)
 
 	var second = new(recordingReceiveSink)
-	multi_modem_init(audioConfig, second)
+	multi_modem_init(audioConfig, 0, second)
 
 	// Silence decodes to nothing, so long enough for any waiting frame to be
 	// picked should hand on nothing at all.
@@ -72,7 +72,7 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 	audioConfig.achan[0].profiles = "ABA"
 	audioConfig.achan[0].num_freq = 1
 
-	multi_modem_init(audioConfig, new(recordingReceiveSink))
+	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
 
 	require.NotNil(t, demodulators[0])
 	assert.Equal(t, 3, demodulators[0].NumSubchan())
@@ -92,9 +92,31 @@ func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
 	audioConfig.achan[0].il2p_version = IL2P_VERSION_0_4
 	audioConfig.achan[0].il2p_crc = false
 
-	multi_modem_init(audioConfig, new(recordingReceiveSink))
+	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
 
 	var rx = hdlcReceiver.slicer[0][0][0].il2p
 	assert.Equal(t, IL2P_VERSION_0_4, rx.version)
 	assert.False(t, rx.crc)
+}
+
+// Every slicer's FX.25 receiver reports at the debug level multi_modem_init
+// was handed - atest's -dx, say - rather than whatever an earlier caller
+// asked for.
+func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
+	t.Cleanup(func() {
+		multiModems = newMultiModems()
+	})
+
+	var audioConfig = newRecvTestAudioConfig(1)
+	audioConfig.achan[0].profiles = "AB"
+	audioConfig.achan[0].num_freq = 1
+
+	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
+	multi_modem_init(audioConfig, 3, new(recordingReceiveSink))
+
+	for sub := range hdlcReceiver.numSubchannel[0] {
+		for slice := range MAX_SLICERS {
+			assert.Equal(t, 3, hdlcReceiver.slicer[0][sub][slice].fx25.debug, "subchannel %d, slice %d", sub, slice)
+		}
+	}
 }

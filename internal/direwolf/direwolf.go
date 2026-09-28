@@ -479,8 +479,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
-	multi_modem_init(audio_config, new(radioSink))
-	FX25Init(d_x_opt)
+	multi_modem_init(audio_config, d_x_opt, new(radioSink))
 	il2p_init(d_2_opt)
 
 	/*
@@ -522,7 +521,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmitSvc = NewXmitService(ctx, audio_config, d_p_opt)
+	xmitSvc = NewXmitService(ctx, audio_config, d_p_opt, d_x_opt)
 	stopIfCancelled(ctx)
 
 	/*
