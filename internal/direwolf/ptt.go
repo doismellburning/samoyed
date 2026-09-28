@@ -1326,7 +1326,7 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 	}
 	/* Wait for udev to adjust permissions after enabling GPIO. */
 	/* https://github.com/wb2osz/direwolf/issues/176 */
-	SLEEP_MS(250)
+	time.Sleep(250 * time.Millisecond)
 	fd.Close()
 
 	/*

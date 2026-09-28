@@ -9,19 +9,15 @@ import (
 	"time"
 )
 
-func SLEEP_MS(ms int) {
-	time.Sleep(time.Duration(ms) * time.Millisecond)
-}
-
 func SLEEP_SEC(s int) {
-	SLEEP_MS(s * 1000)
+	time.Sleep(time.Duration(s) * time.Second)
 }
 
 // sleepCtx sleeps for d, or until ctx is cancelled, whichever comes first.
 //
 // It reports whether the whole of d elapsed, so a false return says the caller
 // is being shut down and should return rather than carry on with whatever it
-// woke up to do.  That makes it the replacement for a SLEEP_MS or SLEEP_SEC in
+// woke up to do.  That makes it the replacement for a time.Sleep or SLEEP_SEC in
 // a long-lived goroutine's loop: such a sleep is where the goroutine spends
 // most of its life, and nothing else in the loop can notice a cancellation
 // until it finishes.

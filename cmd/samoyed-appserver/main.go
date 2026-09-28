@@ -282,7 +282,7 @@ func (s *session) poll() {
 	// The answer comes back as a 'Y' frame on the listener goroutine and lands
 	// in s.txQueueLen; give it a moment to arrive.
 	agwlib_Y_outstanding_frames_for_station(s.channel, s.localCall, s.addr)
-	direwolf.SLEEP_MS(10)
+	time.Sleep(10 * time.Millisecond)
 
 	if timingTest {
 		s.pollTimingTest()

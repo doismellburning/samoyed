@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
@@ -95,7 +96,7 @@ func main() {
 
 	serialport.Write(tnc, []byte("\xc0\xff\xc0"))
 
-	direwolf.SLEEP_MS(100)
+	time.Sleep(100 * time.Millisecond)
 }
 
 var sequence = 0

@@ -136,7 +136,7 @@ func main() {
 	 * Print results from clients.
 	 */
 	for {
-		direwolf.SLEEP_MS(100)
+		time.Sleep(100 * time.Millisecond)
 
 		var something = false
 

@@ -426,7 +426,7 @@ func (xs *XmitService) discard_untransmittable(channel int) {
 	}
 
 	if confirmed {
-		SLEEP_MS(10) // As send_one_frame does after the same confirmation: give the
+		time.Sleep(10 * time.Millisecond) // As send_one_frame does after the same confirmation: give the
 		// data link state machine time to queue its response, so the caller sees it
 		// on its next look at the queue rather than going back to sleep first.
 	}
@@ -502,7 +502,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 				if prio == TQ_PRIO_0_HI {
 					//text_color_set(DW_COLOR_DEBUG);
 					//dw_printf ("APRStt morse xmit delay hack...\n");
-					SLEEP_MS(700)
+					time.Sleep(700 * time.Millisecond)
 				}
 
 				xs.xmit_morse(channel, pp, wpm)
@@ -672,7 +672,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 
 	var presleep = time.Now()
 
-	SLEEP_MS(10) // Give data link state machine a chance to
+	time.Sleep(10 * time.Millisecond) // Give data link state machine a chance to
 	// to stuff more frames into the transmit queue,
 	// in response to dataLinkQueue.SeizeConfirm, so
 	// we don't run off the end too soon.
@@ -801,7 +801,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	}).Debug("xmit_thread: transmission duration")
 
 	if wait_more > 0 {
-		SLEEP_MS(int(wait_more.Milliseconds()))
+		time.Sleep(wait_more)
 	} else if wait_more < -100*time.Millisecond {
 		/* If we run over by 10 mSec or so, it's nothing to worry about. */
 		/* However, if PTT is still on about 1/10 sec after audio */
@@ -857,7 +857,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 		dataLinkQueue.SeizeConfirm(c) // C4.2.  "This primitive indicates, to the Data-link State
 		// machine, that the transmission opportunity has arrived."
 
-		SLEEP_MS(10) // Give data link state machine a chance to
+		time.Sleep(10 * time.Millisecond) // Give data link state machine a chance to
 		// to stuff more frames into the transmit queue,
 		// in response to dataLinkQueue.SeizeConfirm, so
 		// we don't run off the end too soon.
@@ -1079,7 +1079,7 @@ func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 
 	var timeToWait = time.Until(wait_until)
 	if timeToWait.Milliseconds() > 0 {
-		SLEEP_MS(int(timeToWait.Milliseconds()))
+		time.Sleep(timeToWait)
 	}
 
 	pttControl.Set(OCTYPE_PTT, c, 0)
@@ -1129,7 +1129,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 
 	var timeToWait = time.Until(wait_until)
 	if timeToWait.Milliseconds() > 0 {
-		SLEEP_MS(int(timeToWait.Milliseconds()))
+		time.Sleep(timeToWait)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Oops.  CPU too slow to keep up with DTMF generation.\n")
@@ -1209,7 +1209,7 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 	start_over_again:
 
 		for hdlcReceiver.DataDetectAny(channel) > 0 {
-			SLEEP_MS(WAIT_CHECK_EVERY_MS)
+			time.Sleep(WAIT_CHECK_EVERY_MS * time.Millisecond)
 
 			n++
 			if n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS) {
@@ -1225,7 +1225,7 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 		 */
 
 		if xs.p_modem.achan[channel].dwait > 0 {
-			SLEEP_MS(xs.p_modem.achan[channel].dwait * 10)
+			time.Sleep(time.Duration(xs.p_modem.achan[channel].dwait) * 10 * time.Millisecond)
 		}
 
 		if hdlcReceiver.DataDetectAny(channel) > 0 {
@@ -1237,7 +1237,7 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 		 * Proceed to transmit sooner if anything shows up in high priority queue.
 		 */
 		for transmitQueue.Peek(channel, TQ_PRIO_0_HI) == nil {
-			SLEEP_MS(slottime * 10)
+			time.Sleep(time.Duration(slottime) * 10 * time.Millisecond)
 
 			if hdlcReceiver.DataDetectAny(channel) > 0 {
 				goto start_over_again
@@ -1262,7 +1262,7 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 	// TODO: review this.
 
 	for !xs.audioOutDevMutex[ACHAN2ADEV(channel)].TryLock() {
-		SLEEP_MS(WAIT_CHECK_EVERY_MS)
+		time.Sleep(WAIT_CHECK_EVERY_MS * time.Millisecond)
 
 		n++
 		if n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS) {
