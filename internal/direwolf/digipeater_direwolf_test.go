@@ -1,11 +1,6 @@
 //nolint:gochecknoglobals
 package direwolf
 
-/*
-Can't use cgo directly in test code, *can* use go code that uses cgo though, so here we are!
-https://github.com/golang/go/issues/4030
-*/
-
 import (
 	"regexp"
 	"testing"
