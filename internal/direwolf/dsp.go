@@ -75,17 +75,18 @@ func window(windowType bp_window_t, _size int, _j int) float64 {
  * Purpose:     Generate low pass filter kernel.
  *
  * Inputs:   	fc		- Cutoff frequency as fraction of sampling frequency.
- *		filter_size	- Number of filter taps.
  *		wtype		- Window type, BP_WINDOW_HAMMING, etc.
  *		lp_delay_fract	- Fudge factor for the delay value.
  *
- * Outputs:     lp_filter
+ * Outputs:     lp_filter	- Its length is the number of filter taps.
  *
  * Returns:	Signal delay thru the filter in number of audio samples.
  *
  *----------------------------------------------------------------*/
 
-func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_window_t) {
+func gen_lowpass(fc float64, lp_filter []float64, wtype bp_window_t) {
+	var filter_size = len(lp_filter)
+
 	/*
 		#if DEBUG1
 			text_color_set(DW_COLOR_DEBUG);
@@ -94,7 +95,7 @@ func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_wind
 			dw_printf ("   j     shape   sinc   final\n");
 		#endif
 	*/
-	dwutil.Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
+	dwutil.Assert(filter_size >= 3)
 
 	for j := range filter_size {
 		var sinc float64
@@ -141,10 +142,9 @@ func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_wind
  *
  * Inputs:   	f1		- Lower cutoff frequency as fraction of sampling frequency.
  *		f2		- Upper cutoff frequency...
- *		filter_size	- Number of filter taps.
  *		wtype		- Window type, BP_WINDOW_HAMMING, etc.
  *
- * Outputs:     bp_filter
+ * Outputs:     bp_filter	- Its length is the number of filter taps.
  *
  * Reference:	http://www.labbookpages.co.uk/audio/firWindowing.html
  *
@@ -152,7 +152,9 @@ func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_wind
  *
  *----------------------------------------------------------------*/
 
-func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, wtype bp_window_t) {
+func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, wtype bp_window_t) {
+	var filter_size = len(bp_filter)
+
 	var center = 0.5 * float64(filter_size-1)
 
 	/*
@@ -164,7 +166,7 @@ func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, 
 		#endif
 	*/
 
-	dwutil.Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
+	dwutil.Assert(filter_size >= 3)
 
 	for j := range filter_size {
 		var sinc float64
@@ -268,7 +270,9 @@ func rrc(t float64, a float64) float64 {
 
 // The Root Raised Cosine (RRC) low pass filter is suppposed to minimize Intersymbol Interference (ISI).
 
-func gen_rrc_lowpass(pfilter []float64, filter_taps int, rolloff float64, samples_per_symbol float64) {
+func gen_rrc_lowpass(pfilter []float64, rolloff float64, samples_per_symbol float64) {
+	var filter_taps = len(pfilter)
+
 	var t float64
 
 	for k := range filter_taps {

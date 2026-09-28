@@ -323,7 +323,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		f1 /= float64(samples_per_sec)
 		f2 /= float64(samples_per_sec)
 
-		gen_bandpass(f1, f2, D.pre_filter[:], D.pre_filter_taps, D.pre_window)
+		gen_bandpass(f1, f2, D.pre_filter[:D.pre_filter_taps], D.pre_window)
 	}
 
 	/*
@@ -350,7 +350,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		}
 
 		dwutil.Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
-		gen_rrc_lowpass(D.lp_filter[:], D.lp_filter_taps, D.u.afsk.rrc_rolloff, samples_per_sec/baud)
+		gen_rrc_lowpass(D.lp_filter[:D.lp_filter_taps], D.u.afsk.rrc_rolloff, samples_per_sec/baud)
 	} else {
 		D.lp_filter_taps = int(math.Round(float64(D.lp_filter_width_sym * samples_per_sec / baud)))
 
@@ -367,7 +367,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		dwutil.Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
 
 		var fc = float64(baud) * D.lpf_baud / samples_per_sec
-		gen_lowpass(fc, D.lp_filter[:], D.lp_filter_taps, D.lp_window)
+		gen_lowpass(fc, D.lp_filter[:D.lp_filter_taps], D.lp_window)
 	}
 
 	/*
