@@ -16,7 +16,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // AXUDPMapEntry holds one MAP line from the config.
