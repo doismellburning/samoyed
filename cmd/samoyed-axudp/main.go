@@ -32,6 +32,7 @@ import (
 //	  - ax25addr: Q2TEST
 //	    host: 192.0.2.2
 //	    port: 93
+//	    broadcast: true   # also gets frames for unmapped destinations, e.g. NODES
 
 func main() {
 	pflag.Usage = func() {
@@ -53,6 +54,8 @@ Example config file (axudp.yaml):
     - ax25addr: Q1TEST-1
       host: 192.0.2.1
       port: 93
+      broadcast: true   # optional: also send frames whose destination
+                        # has no entry (NET/ROM NODES, ID, beacons) here
 
 Example samoyed-direwolf config to connect via samoyed-axudp:
   CHANNEL 2

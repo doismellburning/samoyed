@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/fcs"
 )
 
@@ -259,8 +260,8 @@ func TestAXUDPParseConfigBadYAML(t *testing.T) {
 func TestAXUDPLookupMap(t *testing.T) {
 	var b = new(AXUDPBridge)
 	b.maps = []AXUDPMapEntry{
-		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},   // no SSID — should match all SSIDs
-		{AX25Addr: "Q2TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil}, // with SSID — exact match only
+		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},   // no SSID — should match all SSIDs
+		{AX25Addr: "Q2TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil, Broadcast: false}, // with SSID — exact match only
 	}
 
 	var cases = []struct {
@@ -300,8 +301,8 @@ func TestAXUDPLookupMapExactBeforeWildcard(t *testing.T) {
 	// A lookup for Q1TEST-7 must return the specific entry, not the wildcard.
 	var b = new(AXUDPBridge)
 	b.maps = []AXUDPMapEntry{
-		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},   // wildcard — listed first
-		{AX25Addr: "Q1TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil}, // specific SSID-7 — listed second
+		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},   // wildcard — listed first
+		{AX25Addr: "Q1TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil, Broadcast: false}, // specific SSID-7 — listed second
 	}
 
 	var entry, ok = b.lookupMap("Q1TEST-7")
@@ -336,7 +337,7 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 	// accidental call to sendAXUDP panics immediately.
 	var b = new(AXUDPBridge)
 	b.maps = []AXUDPMapEntry{
-		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},
+		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},
 	}
 
 	// The KISS DATA frame payload is: type byte (0x00) followed by an AX.25
@@ -521,7 +522,7 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 	// Set up a bridge with a MAP entry routing Q1TEST to dstPkt.
 	var b = new(AXUDPBridge)
 	b.maps = []AXUDPMapEntry{
-		{AX25Addr: "Q1TEST", Addr: dstAddr.String(), UDPAddr: dstAddr},
+		{AX25Addr: "Q1TEST", Addr: dstAddr.String(), UDPAddr: dstAddr, Broadcast: false},
 	}
 	b.udpConn = srcUDP
 
@@ -757,5 +758,136 @@ func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
 	var want = KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, ax25frame...))
 	if string(rxBuf[:n]) != string(want) {
 		t.Errorf("client received %x, want %x", rxBuf[:n], want)
+	}
+}
+
+// axudpTestPeer opens a UDP socket on loopback for a test to send from or
+// receive on, closed when the test ends.
+func axudpTestPeer(t *testing.T) (*net.UDPConn, *net.UDPAddr) {
+	t.Helper()
+
+	var pc, err = new(net.ListenConfig).ListenPacket(t.Context(), "udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pc.Close() })
+
+	var conn, connOK = pc.(*net.UDPConn)
+	if !connOK {
+		t.Fatal("not a *net.UDPConn")
+	}
+
+	var addr, addrOK = conn.LocalAddr().(*net.UDPAddr)
+	if !addrOK {
+		t.Fatal("not a *net.UDPAddr")
+	}
+
+	return conn, addr
+}
+
+// axudpTestReceive returns the next datagram conn gets, or nil if none
+// arrives within wait.
+func axudpTestReceive(t *testing.T, conn *net.UDPConn, wait time.Duration) []byte {
+	t.Helper()
+
+	var deadlineErr = conn.SetReadDeadline(time.Now().Add(wait))
+	if deadlineErr != nil {
+		t.Fatal(deadlineErr)
+	}
+
+	var buf = make([]byte, maxUDPPayload)
+	var n, _, err = conn.ReadFromUDP(buf)
+	if err != nil {
+		return nil
+	}
+
+	return buf[:n]
+}
+
+// axudpTestFrame is a minimal AX.25 UI frame from Q2TEST to dest.
+func axudpTestFrame(t *testing.T, dest string) []byte {
+	t.Helper()
+
+	var pp = ax25.FromText("Q2TEST>"+dest+":hello", true)
+	if pp == nil {
+		t.Fatalf("could not build frame for %s", dest)
+	}
+
+	return pp.FrameData()
+}
+
+func TestAXUDPRoute(t *testing.T) {
+	var src, _ = axudpTestPeer(t)
+	var mapped, mappedAddr = axudpTestPeer(t)
+	var bcast1, bcast1Addr = axudpTestPeer(t)
+	var bcast2, bcast2Addr = axudpTestPeer(t)
+
+	var r = axudpRouter{
+		udpConn: src,
+		maps: []AXUDPMapEntry{
+			{AX25Addr: "Q1TEST", Addr: mappedAddr.String(), UDPAddr: mappedAddr, Broadcast: false},
+			{AX25Addr: "Q3TEST", Addr: bcast1Addr.String(), UDPAddr: bcast1Addr, Broadcast: true},
+			{AX25Addr: "Q4TEST", Addr: bcast2Addr.String(), UDPAddr: bcast2Addr, Broadcast: true},
+		},
+	}
+
+	const quiet = 100 * time.Millisecond
+
+	t.Run("mapped destination goes to its peer only", func(t *testing.T) {
+		var frame = axudpTestFrame(t, "Q1TEST-3")
+		r.route(frame)
+
+		var got = axudpTestReceive(t, mapped, time.Second)
+		if want := axudpAddCRC(frame); string(got) != string(want) {
+			t.Errorf("mapped peer got %x, want %x", got, want)
+		}
+		if got := axudpTestReceive(t, bcast1, quiet); got != nil {
+			t.Errorf("broadcast peer got a mapped frame: %x", got)
+		}
+	})
+
+	t.Run("unmapped destination goes to every broadcast peer", func(t *testing.T) {
+		var frame = axudpTestFrame(t, "NODES")
+		r.route(frame)
+
+		var want = axudpAddCRC(frame)
+		for name, conn := range map[string]*net.UDPConn{"first": bcast1, "second": bcast2} {
+			if got := axudpTestReceive(t, conn, time.Second); string(got) != string(want) {
+				t.Errorf("%s broadcast peer got %x, want %x", name, got, want)
+			}
+		}
+		if got := axudpTestReceive(t, mapped, quiet); got != nil {
+			t.Errorf("non-broadcast peer got an unmapped frame: %x", got)
+		}
+	})
+
+	t.Run("unmapped destination without broadcast peers is dropped", func(t *testing.T) {
+		var solo = axudpRouter{udpConn: src, maps: r.maps[:1]}
+		solo.route(axudpTestFrame(t, "NODES"))
+
+		if got := axudpTestReceive(t, mapped, quiet); got != nil {
+			t.Errorf("non-broadcast peer got an unmapped frame: %x", got)
+		}
+	})
+}
+
+func TestAXUDPParseConfigBroadcast(t *testing.T) {
+	var path = filepath.Join(t.TempDir(), "axudp.yaml")
+	var yaml = "maps:\n" +
+		"  - ax25addr: Q1TEST\n    host: 127.0.0.1\n    port: 93\n" +
+		"  - ax25addr: Q2TEST\n    host: 127.0.0.1\n    port: 94\n    broadcast: true\n"
+
+	var writeErr = os.WriteFile(path, []byte(yaml), 0o600)
+	if writeErr != nil {
+		t.Fatal(writeErr)
+	}
+
+	var entries, err = ParseAXUDPConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) != 2 || entries[0].Broadcast || !entries[1].Broadcast {
+		t.Errorf("got %+v, want only Q2TEST flagged broadcast", entries)
 	}
 }

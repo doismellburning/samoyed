@@ -24,6 +24,11 @@ type AXUDPMapEntry struct {
 	AX25Addr string       // AX.25 address, i.e. callsign and optional SSID, e.g. "Q1TEST" or "Q1TEST-1"
 	Addr     string       // UDP address string for display/logging, e.g. "192.0.2.1:20093"
 	UDPAddr  *net.UDPAddr // pre-resolved UDP address for sending
+
+	// Broadcast marks a peer that also gets every frame whose destination
+	// has no MAP entry of its own - a NET/ROM NODES broadcast, an ID, a
+	// beacon - as BPQ32's MAP "B" option does.
+	Broadcast bool
 }
 
 // axudpYAMLConfig is the top-level structure of the axudp.yaml config file.
@@ -33,9 +38,10 @@ type axudpYAMLConfig struct {
 
 // axudpYAMLMapEntry represents one entry under the "maps" key.
 type axudpYAMLMapEntry struct {
-	AX25Addr string `yaml:"ax25addr"`
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
+	AX25Addr  string `yaml:"ax25addr"`
+	Host      string `yaml:"host"`
+	Port      int    `yaml:"port"`
+	Broadcast bool   `yaml:"broadcast"`
 }
 
 // ParseAXUDPConfig reads a YAML config file from path and returns the map entries.
@@ -73,9 +79,10 @@ func ParseAXUDPConfig(path string) ([]AXUDPMapEntry, error) {
 			return nil, fmt.Errorf("map entry %d: resolving %s: %w", i, addr, resolveErr)
 		}
 		entries = append(entries, AXUDPMapEntry{
-			AX25Addr: ax25addr,
-			Addr:     addr,
-			UDPAddr:  udpAddr,
+			AX25Addr:  ax25addr,
+			Addr:      addr,
+			UDPAddr:   udpAddr,
+			Broadcast: m.Broadcast,
 		})
 	}
 
@@ -427,8 +434,9 @@ func (r *axudpRouter) sendAXUDP(ax25frame []byte, entry AXUDPMapEntry) {
 	}
 }
 
-// route sends a raw AX.25 frame to the peer mapped to its destination, or
-// drops it with a warning if there is none.
+// route sends a raw AX.25 frame to the peer mapped to its destination.  A
+// frame whose destination has no MAP entry goes to every broadcast peer
+// instead, and is dropped with a warning if there are none.
 func (r *axudpRouter) route(ax25frame []byte) {
 	var dest = axudpExtractDest(ax25frame)
 	if dest == "" {
@@ -443,7 +451,18 @@ func (r *axudpRouter) route(ax25frame []byte) {
 		return
 	}
 
-	logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
+	var sent = false
+	for _, e := range r.maps {
+		if e.Broadcast {
+			r.sendAXUDP(ax25frame, e)
+
+			sent = true
+		}
+	}
+
+	if !sent {
+		logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
+	}
 }
 
 // handleKISSClient reads KISS frames from one TCP client and routes them as
