@@ -33,6 +33,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
 )
@@ -4145,7 +4146,7 @@ func handleTTMHEAD(ps *parseState) error {
 			return fmt.Errorf("line %d: TTMHEAD prefix must be 4, 6, or 10 digits", ps.line)
 		}
 
-		var _, mhErrors = TTMheadToText(t, false)
+		var _, mhErrors = touchtone.TTMheadToText(t, false)
 		if mhErrors != 0 {
 			return fmt.Errorf("line %d: TTMHEAD prefix not a valid DTMF sequence", ps.line)
 		}
@@ -4343,7 +4344,7 @@ func handleTTMACRO(ps *parseState) error {
 				tmp = tmp[1:]
 			}
 			if len(tmp) > 0 && tmp[0] == '}' {
-				var ttemp, errs = TTTextToCall10(stemp.String(), false)
+				var ttemp, errs = touchtone.TTTextToCall10(stemp.String(), false)
 				if errs == 0 {
 					//text_color_set(DW_COLOR_DEBUG);
 					//dw_printf ("DEBUG Line %d: AC{%s} -> AC%s\n", line, stemp, ttemp);
@@ -4372,7 +4373,7 @@ func handleTTMACRO(ps *parseState) error {
 					ps.errorf("line %d: Object name %s has been truncated to 9 characters", ps.line, stemp)
 					stemp = stemp[:9]
 				}
-				var ttemp, errs = TTTextToTwoKey(stemp, false)
+				var ttemp, errs = touchtone.TTTextToTwoKey(stemp, false)
 				if errs == 0 {
 					//text_color_set(DW_COLOR_DEBUG);
 					//dw_printf ("DEBUG Line %d: AA{%s} -> AA%s\n", line, stemp, ttemp);
@@ -4429,7 +4430,7 @@ func handleTTMACRO(ps *parseState) error {
 				tmp = tmp[1:]
 			}
 			if len(tmp) > 0 && tmp[0] == '}' {
-				var ttemp, errs = tt_text_to_ascii2d(stemp.String(), false)
+				var ttemp, errs = touchtone.TextToASCII2D(stemp.String(), false)
 				if errs == 0 {
 					//text_color_set(DW_COLOR_DEBUG);
 					//dw_printf ("DEBUG Line %d: CA{%s} -> CA%s\n", line, stemp, ttemp);

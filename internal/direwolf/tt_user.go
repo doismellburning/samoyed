@@ -27,6 +27,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/touchtone"
 )
 
 /*
@@ -324,7 +325,7 @@ func (u *ttUsers) corralSlot() int {
 func digit_suffix(callsign string) string {
 	var suffix = []byte{'0', '0', '0'}
 
-	var two_key, _ = TTTextToTwoKey(callsign, false)
+	var two_key, _ = touchtone.TTTextToTwoKey(callsign, false)
 
 	for _, t := range two_key {
 		if unicode.IsDigit(t) {

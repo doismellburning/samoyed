@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/touchtone"
 )
 
 func checksum(tt string) int {
@@ -49,29 +49,29 @@ func text2tt(args []string) {
 
 	fmt.Printf("Push buttons for multi-press method:\n")
 
-	buttons, _ = direwolf.TTTextToMultipress(text, false)
+	buttons, _ = touchtone.TTTextToMultipress(text, false)
 	cs = checksum(buttons)
 	fmt.Printf("\"%s\"    checksum for call = %d\n", buttons, cs)
 
 	fmt.Printf("Push buttons for two-key method:\n")
 
-	buttons, _ = direwolf.TTTextToTwoKey(text, false)
+	buttons, _ = touchtone.TTTextToTwoKey(text, false)
 	cs = checksum(buttons)
 	fmt.Printf("\"%s\"    checksum for call = %d\n", buttons, cs)
 
-	buttons, errs = direwolf.TTTextToCall10(text, true)
+	buttons, errs = touchtone.TTTextToCall10(text, true)
 	if errs == 0 {
 		fmt.Printf("Push buttons for fixed length 10 digit callsign:\n")
 		fmt.Printf("\"%s\"\n", buttons)
 	}
 
-	buttons, errs = direwolf.TTTextToMhead(text, true)
+	buttons, errs = touchtone.TTTextToMhead(text, true)
 	if errs == 0 {
 		fmt.Printf("Push buttons for Maidenhead Grid Square Locator:\n")
 		fmt.Printf("\"%s\"\n", buttons)
 	}
 
-	buttons, errs = direwolf.TTTextToSatsq(text, true)
+	buttons, errs = touchtone.TTTextToSatsq(text, true)
 	if errs == 0 {
 		fmt.Printf("Push buttons for satellite gridsquare:\n")
 		fmt.Printf("\"%s\"\n", buttons)

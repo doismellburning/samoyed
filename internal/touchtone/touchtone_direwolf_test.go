@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package touchtone
 
 import (
 	"testing"
@@ -9,7 +12,7 @@ import (
 func test_text2tt(t *testing.T, text string, _expect_mp string, _expect_2k string, _expect_c10 string, _expect_loc string, _expect_sat string) {
 	t.Helper()
 
-	dw_printf("\nConvert from text \"%s\" to tone sequence.\n", text)
+	t.Logf("Convert from text \"%s\" to tone sequence.", text)
 
 	var buttons string
 
@@ -32,7 +35,7 @@ func test_text2tt(t *testing.T, text string, _expect_mp string, _expect_2k strin
 func test_tt2text(t *testing.T, buttons string, _expect_mp string, _expect_2k string, _expect_c10 string, _expect_loc string, _expect_sat string) {
 	t.Helper()
 
-	dw_printf("\nConvert tone sequence \"%s\" to text.\n", buttons)
+	t.Logf("Convert tone sequence \"%s\" to text.", buttons)
 
 	var text string
 
@@ -53,8 +56,8 @@ func test_tt2text(t *testing.T, buttons string, _expect_mp string, _expect_2k st
 }
 
 func Test_TTText(t *testing.T) {
-	dw_printf("Test conversions between normal text and DTMF representation.\n")
-	dw_printf("Some error messages are normal.  Just look for number of errors at end.\n")
+	t.Log("Test conversions between normal text and DTMF representation.")
+	t.Log("Some error messages are normal.  Just look for number of errors at end.")
 
 	/* original text   multipress                         two-key                 call10        mhead         satsq */
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/latlong"
+	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +29,7 @@ func TestParseLocationRejectsOutOfRangeMaidenhead(t *testing.T) {
 	gw.runningTests = true
 
 	// Confirm the premise: the locator converts cleanly but is out of range.
-	var mh, errs = TTMheadToText("7474", true)
+	var mh, errs = touchtone.TTMheadToText("7474", true)
 	require.Equal(t, 0, errs, "DTMF should convert without complaint")
 	require.Equal(t, "SS", mh)
 

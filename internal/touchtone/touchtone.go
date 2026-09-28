@@ -1,4 +1,9 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package touchtone translates between text and the APRStt touch-tone
+// (DTMF) button sequences that represent it.
+package touchtone
 
 /*------------------------------------------------------------------
  *
@@ -588,7 +593,7 @@ func TTTextToSatsq(text string, quiet bool) (string, int) {
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_text_to_ascii2d
+ * Name:        TextToASCII2D
  *
  * Purpose:     Convert text to the two digit per ascii character representation.
  *
@@ -618,7 +623,8 @@ func TTTextToSatsq(text string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unparam
+// TextToASCII2D converts text to the two-digits-per-character ASCII representation.
+func TextToASCII2D(text string, quiet bool) (string, int) {
 	var errors = 0
 	var buttons strings.Builder
 
@@ -635,7 +641,7 @@ func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unpara
 	}
 
 	return buttons.String(), errors
-} /* end tt_text_to_ascii2d */
+} /* end TextToASCII2D */
 
 /*------------------------------------------------------------------
  *
@@ -946,7 +952,7 @@ func TTCall10ToText(buttons string, quiet bool) (string, int) {
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_call5_suffix_to_text
+ * Name:        Call5SuffixToText
  *
  * Purpose:     Convert the 5 digit APRStt 3 style callsign suffix
  *		representation to text.
@@ -962,7 +968,8 @@ func TTCall10ToText(buttons string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
+// Call5SuffixToText converts a 5-digit callsign suffix encoding back to text.
+func Call5SuffixToText(buttons string, quiet bool) (string, int) {
 	var call10encoding = ttCall10Encoding()
 
 	var text strings.Builder
@@ -1024,7 +1031,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 	}
 
 	return text.String(), errors
-} /* end tt_call5_suffix_to_text */
+} /* end Call5SuffixToText */
 
 /*------------------------------------------------------------------
  *
@@ -1279,7 +1286,7 @@ func TTSatsqToText(buttons string, quiet bool) (string, int) {
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_ascii2d_to_text
+ * Name:        ASCII2DToText
  *
  * Purpose:     Convert the two digit ascii representation back to normal text.
  *
@@ -1294,7 +1301,8 @@ func TTSatsqToText(buttons string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_ascii2d_to_text(buttons string, quiet bool) (string, int) {
+// ASCII2DToText converts the two-digits-per-character ASCII representation back to text.
+func ASCII2DToText(buttons string, quiet bool) (string, int) {
 	var text strings.Builder
 	var errors = 0
 
@@ -1322,7 +1330,7 @@ func tt_ascii2d_to_text(buttons string, quiet bool) (string, int) {
 	}
 
 	return text.String(), errors
-} /* end tt_ascii2d_to_text */
+} /* end ASCII2DToText */
 
 /*------------------------------------------------------------------
  *
