@@ -83,8 +83,7 @@ func NewBeaconService(pmodem *AudioConfig, pconfig *misc_config_s, pigate *igate
 			channel = 0 // For ICHANNEL, use channel 0 call.
 		}
 
-		if bs.modemConfig.chan_medium[channel] == MEDIUM_RADIO ||
-			bs.modemConfig.chan_medium[channel] == MEDIUM_NETTNC {
+		if bs.modemConfig.chan_medium[channel].carriesAX25() {
 			if !IsNoCall(bs.modemConfig.mycall[channel]) {
 				switch bs.miscConfig.beacon[j].btype {
 				case BEACON_OBJECT:

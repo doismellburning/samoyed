@@ -971,7 +971,7 @@ func (s *AGWServer) debugPrint(fromto fromto_t, client int, pmsg *AGWPEMessage) 
 }
 
 // connectedModeAllowed reports whether AX.25 connected mode is allowed on portx.
-// Connected mode is supported for MEDIUM_RADIO channels and MEDIUM_NETTNC channels.
+// Connected mode is supported for any channel that carriesAX25.
 // When there is no audio configuration to consult (e.g. in unit tests), only
 // channels < MAX_RADIO_CHANS are permitted, preserving the previous behaviour.
 func (s *AGWServer) connectedModeAllowed(portx byte) bool {
@@ -985,7 +985,7 @@ func (s *AGWServer) connectedModeAllowed(portx byte) bool {
 
 	var m = s.audioConfigP.chan_medium[portx]
 
-	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC
+	return m.carriesAX25()
 }
 
 /*-------------------------------------------------------------------

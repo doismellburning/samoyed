@@ -162,8 +162,7 @@ func (d *Digipeater) Remember(pp *ax25.Packet, channel int) {
 func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Network TNC is OK for UI frames where we don't care about timing.
 	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
-		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
-			d.audioConfig.chan_medium[from_chan] != MEDIUM_NETTNC) {
+		!d.audioConfig.chan_medium[from_chan].carriesAX25() {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("APRS digipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
 

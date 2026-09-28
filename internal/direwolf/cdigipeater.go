@@ -112,8 +112,7 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Connected mode is allowed only for channels with internal modem.
 	// It probably wouldn't matter for digipeating but let's keep that rule simple and consistent.
 	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS ||
-		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
-			d.audioConfig.chan_medium[from_chan] != MEDIUM_NETTNC) {
+		!d.audioConfig.chan_medium[from_chan].carriesAX25() {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("cdigipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
 

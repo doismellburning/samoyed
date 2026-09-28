@@ -81,6 +81,14 @@ const (
 	MEDIUM_NETTNC                 // Remote network TNC.  (new in 1.8)
 )
 
+// carriesAX25 reports whether AX.25 frames are sent and heard on a channel of
+// this medium as they would be on a radio - so it can be digipeated to and
+// from, beaconed on and used for connected mode.  The IGate channel cannot:
+// APRS-IS carries text, not frames.
+func (m medium_e) carriesAX25() bool {
+	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC
+}
+
 type sanity_t int
 
 const (
