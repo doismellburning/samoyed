@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/latlong"
+	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // A DTMF sequence can decode to a well-formed pair of letters that is still not
 // a legal Maidenhead locator: the first pair has to be A through R, but "74"
-// keys 'S'.  TTMheadToText is happy with it, so the rejection only comes from
+// keys 'S'.  MheadToText is happy with it, so the rejection only comes from
 // latlong.FromGridSquare, and that used to be dropped on the floor - the position
 // silently stayed at wherever it already was and the caller was told the
 // sequence had parsed.
@@ -28,7 +29,7 @@ func TestParseLocationRejectsOutOfRangeMaidenhead(t *testing.T) {
 	gw.runningTests = true
 
 	// Confirm the premise: the locator converts cleanly but is out of range.
-	var mh, errs = TTMheadToText("7474", true)
+	var mh, errs = touchtone.MheadToText("7474", true)
 	require.Equal(t, 0, errs, "DTMF should convert without complaint")
 	require.Equal(t, "SS", mh)
 

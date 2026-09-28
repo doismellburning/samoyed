@@ -11,7 +11,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/touchtone"
 )
 
 func main() {
@@ -26,10 +26,10 @@ func main() {
 }
 
 func tt2text(buttons string) {
-	switch direwolf.TTGuessType(buttons) {
-	case direwolf.TT_MULTIPRESS:
+	switch touchtone.GuessType(buttons) {
+	case touchtone.Multipress:
 		fmt.Printf("Looks like multi-press encoding.\n")
-	case direwolf.TT_TWO_KEY:
+	case touchtone.TwoKey:
 		fmt.Printf("Looks like two-key encoding.\n")
 	default:
 		fmt.Printf("Could be either type of encoding.\n")
@@ -40,27 +40,27 @@ func tt2text(buttons string) {
 
 	fmt.Printf("Decoded text from multi-press method:\n")
 
-	text, _ = direwolf.TTMultipressToText(buttons, false)
+	text, _ = touchtone.MultipressToText(buttons, false)
 	fmt.Printf("\"%s\"\n", text)
 
 	fmt.Printf("Decoded text from two-key method:\n")
 
-	text, _ = direwolf.TTTwoKeyToText(buttons, false)
+	text, _ = touchtone.TwoKeyToText(buttons, false)
 	fmt.Printf("\"%s\"\n", text)
 
-	text, errs = direwolf.TTCall10ToText(buttons, true)
+	text, errs = touchtone.Call10ToText(buttons, true)
 	if errs == 0 {
 		fmt.Printf("Decoded callsign from 10 digit method:\n")
 		fmt.Printf("\"%s\"\n", text)
 	}
 
-	text, errs = direwolf.TTMheadToText(buttons, true)
+	text, errs = touchtone.MheadToText(buttons, true)
 	if errs == 0 {
 		fmt.Printf("Decoded Maidenhead Locator from DTMF digits:\n")
 		fmt.Printf("\"%s\"\n", text)
 	}
 
-	text, errs = direwolf.TTSatsqToText(buttons, true)
+	text, errs = touchtone.SatsqToText(buttons, true)
 	if errs == 0 {
 		fmt.Printf("Decoded satellite gridsquare from 4 DTMF digits:\n")
 		fmt.Printf("\"%s\"\n", text)

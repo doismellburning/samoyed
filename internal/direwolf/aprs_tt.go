@@ -38,6 +38,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
 )
@@ -772,7 +773,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		if length == 7 {
 			var tttemp = string(e[length-3]) + string(e[length-2])
 
-			var stemp, errs = TTTwoKeyToText(tttemp, false)
+			var stemp, errs = touchtone.TwoKeyToText(tttemp, false)
 			if errs != 0 {
 				stemp = "\000"
 			}
@@ -813,10 +814,10 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		if unicode.IsUpper(rune(e[length-2])) {
 			var tttemp = e[1 : length-3]
 
-			state.callsign, _ = TTTwoKeyToText(tttemp, false)
+			state.callsign, _ = touchtone.TwoKeyToText(tttemp, false)
 
 			tttemp = string(e[length-3]) + string(e[length-2])
-			var stemp, _ = TTTwoKeyToText(tttemp, false)
+			var stemp, _ = touchtone.TwoKeyToText(tttemp, false)
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
 			state.symtabOrOverlay = rune(stemp[0])
@@ -828,7 +829,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			}
 		} else {
 			var tttemp = e[1 : length-2]
-			state.callsign, _ = TTTwoKeyToText(tttemp, false)
+			state.callsign, _ = touchtone.TwoKeyToText(tttemp, false)
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
 			state.symtabOrOverlay = rune(e[length-2])
@@ -888,7 +889,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 	 */
 
 	if length >= 2+1 && length <= 30 {
-		var _callsign, errors = TTTwoKeyToText(e[2:], false)
+		var _callsign, errors = touchtone.TwoKeyToText(e[2:], false)
 		if errors == 0 {
 			state.callsign = _callsign
 			if len(state.callsign) > 9 {
@@ -995,7 +996,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 
 		case '0':
 			if length >= 6 {
-				var stemp, errors = TTTwoKeyToText(e[5:], false)
+				var stemp, errors = touchtone.TwoKeyToText(e[5:], false)
 				if errors == 0 {
 					state.symbolCode = rune(32 + nn)
 					state.symtabOrOverlay = rune(stemp[0])
@@ -1053,7 +1054,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 	}
 
 	if len(e) == 2+10 {
-		var call, errors = TTCall10ToText(e[2:], true)
+		var call, errors = touchtone.Call10ToText(e[2:], true)
 
 		if errors == 0 {
 			state.callsign = call
@@ -1061,7 +1062,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
 		}
 	} else if len(e) == 2+5 {
-		var suffix, errs = tt_call5_suffix_to_text(e[2:], true)
+		var suffix, errs = touchtone.Call5SuffixToText(e[2:], true)
 		if errs == 0 {
 			if g.runningTests {
 				/* For unit test, use suffix rather than trying lookup. */
@@ -1367,7 +1368,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			// text_color_set(DW_COLOR_DEBUG);
 			// dw_printf ("Case MHEAD: Convert to text \"%s\".\n", stemp);
 
-			var mh, errs = TTMheadToText(stemp, false)
+			var mh, errs = touchtone.MheadToText(stemp, false)
 			if errs == 0 {
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("Case MHEAD: Resulting text \"%s\".\n", mh);
@@ -1398,7 +1399,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 			/* Convert 4 digits to usual AA99 form, then to location. */
 
-			var mh, errs = TTSatsqToText(xstr, false)
+			var mh, errs = touchtone.SatsqToText(xstr, false)
 			if errs == 0 {
 				state.locText = mh
 
@@ -1581,7 +1582,7 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
 	var length = len(e)
 
 	if e[1] == 'A' {
-		state.comment, _ = tt_ascii2d_to_text(e[2:], false)
+		state.comment, _ = touchtone.ASCII2DToText(e[2:], false)
 
 		return (0)
 	}
@@ -1605,7 +1606,7 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
 		return (0)
 	}
 
-	state.comment, _ = TTMultipressToText(e[1:], false)
+	state.comment, _ = touchtone.MultipressToText(e[1:], false)
 
 	return (0)
 }

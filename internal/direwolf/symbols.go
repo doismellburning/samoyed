@@ -14,6 +14,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/sirupsen/logrus"
 )
 
@@ -867,7 +868,7 @@ func (sd *APRSSymbolData) symbols_to_tones(symtab byte, symbol byte) string {
 	if symtab == '/' {
 		return fmt.Sprintf("AB1%02d", symbol-' ')
 	} else if unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab)) {
-		var tt, _ = TTTextToTwoKey(string(symtab), false)
+		var tt, _ = touchtone.TextToTwoKey(string(symtab), false)
 
 		return fmt.Sprintf("AB0%02d%s", symbol-' ', tt)
 	} else {
