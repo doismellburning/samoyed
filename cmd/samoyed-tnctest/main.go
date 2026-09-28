@@ -194,7 +194,7 @@ func main() {
 	 */
 
 	for ready := false; !ready; {
-		direwolf.SLEEP_MS(100)
+		time.Sleep(100 * time.Millisecond)
 
 		ready = true
 
@@ -218,7 +218,7 @@ func main() {
 
 	var timeout = 600
 	for ready := false; !ready && timeout > 0; {
-		direwolf.SLEEP_MS(100)
+		time.Sleep(100 * time.Millisecond)
 
 		timeout--
 		ready = true
@@ -233,7 +233,7 @@ func main() {
 	if timeout == 0 {
 		fmt.Printf("ERROR: Gave up waiting for connect!\n")
 		tnc_disconnect(1, 0) // Tell other TNC.
-		direwolf.SLEEP_MS(5000)
+		time.Sleep(5000 * time.Millisecond)
 		fmt.Printf("TEST FAILED!\n")
 		os.Exit(1)
 	}
@@ -242,8 +242,8 @@ func main() {
 	 * Send data.
 	 */
 
-	direwolf.SLEEP_MS(2000)
-	direwolf.SLEEP_MS(2000)
+	time.Sleep(2000 * time.Millisecond)
+	time.Sleep(2000 * time.Millisecond)
 
 	fmt.Printf("Send data...\n")
 
@@ -257,10 +257,10 @@ func main() {
 			tnc_send_data(0, 1, data)
 		}
 
-		direwolf.SLEEP_MS(3000 + 1000*burst_size)
-		// SLEEP_MS(3000 + 500 * burst_size);		// OK for low error rate
-		// SLEEP_MS(3000 + 3000 * burst_size);
-		// SLEEP_MS(3000);
+		time.Sleep(time.Duration(3000+1000*burst_size) * time.Millisecond)
+		// time.Sleep(time.Duration(3000+500*burst_size) * time.Millisecond) // OK for low error rate
+		// time.Sleep(time.Duration(3000+3000*burst_size) * time.Millisecond)
+		// time.Sleep(3000 * time.Millisecond)
 
 		burst_size++
 	}
@@ -275,7 +275,7 @@ func main() {
 	var INACTIVE_TIMEOUT = 120
 
 	for int(last_rec_seq[0].Load()) != max_count && no_activity < INACTIVE_TIMEOUT {
-		direwolf.SLEEP_MS(1000)
+		time.Sleep(1000 * time.Millisecond)
 
 		no_activity++
 
@@ -317,7 +317,7 @@ func main() {
 
 	timeout = 200 // 20 sec should be generous.
 	for ready := false; !ready && timeout > 0; {
-		direwolf.SLEEP_MS(100)
+		time.Sleep(100 * time.Millisecond)
 
 		timeout--
 		ready = true
@@ -332,7 +332,7 @@ func main() {
 	if timeout == 0 {
 		fmt.Printf("ERROR: Gave up waiting for disconnect!\n")
 		tnc_reset(1, 0) // Don't leave TNC in bad state for next time.
-		direwolf.SLEEP_MS(10000)
+		time.Sleep(10000 * time.Millisecond)
 
 		errors++
 	}
@@ -380,7 +380,7 @@ func process_rec_data(my_index int, data string) {
 			var n, _ = strconv.Atoi(before)
 			if n != expected {
 				fmt.Printf("%*s%s: Received %d when %d was expected (%s).\n", my_index*column_width, "", tnc_address[my_index], n, expected, data)
-				direwolf.SLEEP_MS(10000)
+				time.Sleep(10000 * time.Millisecond)
 				fmt.Printf("TEST FAILED!\n")
 				os.Exit(1)
 			}
@@ -392,7 +392,7 @@ func process_rec_data(my_index int, data string) {
 			var n, _ = strconv.Atoi(before)
 			if n != expected {
 				fmt.Printf("%*s%s: Received %d when %d was expected.\n", my_index*column_width, "", tnc_address[my_index], n, expected)
-				direwolf.SLEEP_MS(10000)
+				time.Sleep(10000 * time.Millisecond)
 				fmt.Printf("TEST FAILED!\n")
 				os.Exit(1)
 			}
@@ -400,7 +400,7 @@ func process_rec_data(my_index int, data string) {
 	} else if strings.HasPrefix(data, "A") {
 		if !strings.HasPrefix("ABCDEFGHIJKLMNOPQRSTUVWXYZ", data) { //nolint:gocritic
 			fmt.Printf("%*s%s: Segmentation is broken.\n", my_index*column_width, "", tnc_address[my_index])
-			direwolf.SLEEP_MS(10000)
+			time.Sleep(10000 * time.Millisecond)
 			fmt.Printf("TEST FAILED!\n")
 			os.Exit(1)
 		}
@@ -590,17 +590,17 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 
 	cmd = "\003\rreset\r"
 	serialport.Write(tnctest_serial_fd[my_index], []byte(cmd))
-	direwolf.SLEEP_MS(3000)
+	time.Sleep(3000 * time.Millisecond)
 
 	cmd = "echo on\r"
 	serialport.Write(tnctest_serial_fd[my_index], []byte(cmd))
-	direwolf.SLEEP_MS(200)
+	time.Sleep(200 * time.Millisecond)
 
 	// do any necessary set up here. such as setting mycall
 
 	cmd = fmt.Sprintf("mycall %s\r", tnc_address)
 	serialport.Write(tnctest_serial_fd[my_index], []byte(cmd))
-	direwolf.SLEEP_MS(200)
+	time.Sleep(200 * time.Millisecond)
 
 	// Don't want to stop tty output when typing begins.
 
@@ -713,15 +713,15 @@ func tnc_connect(from int, to int) {
 		if !have_cmd_prompt[from].Load() {
 			var cmd string
 
-			direwolf.SLEEP_MS(1500)
+			time.Sleep(1500 * time.Millisecond)
 
 			cmd = ETX_BREAK
 			serialport.Write(tnctest_serial_fd[from], []byte(cmd))
-			direwolf.SLEEP_MS(1500)
+			time.Sleep(1500 * time.Millisecond)
 
 			cmd = "\r"
 			serialport.Write(tnctest_serial_fd[from], []byte(cmd))
-			direwolf.SLEEP_MS(200)
+			time.Sleep(200 * time.Millisecond)
 		}
 
 		var cmd = fmt.Sprintf("connect %s\r", tnc_address[to])
@@ -744,15 +744,15 @@ func tnc_disconnect(from int, to int) {
 		if !have_cmd_prompt[from].Load() {
 			var cmd string
 
-			direwolf.SLEEP_MS(1500)
+			time.Sleep(1500 * time.Millisecond)
 
 			cmd = ETX_BREAK
 			serialport.Write(tnctest_serial_fd[from], []byte(cmd))
-			direwolf.SLEEP_MS(1500)
+			time.Sleep(1500 * time.Millisecond)
 
 			cmd = "\r"
 			serialport.Write(tnctest_serial_fd[from], []byte(cmd))
-			direwolf.SLEEP_MS(200)
+			time.Sleep(200 * time.Millisecond)
 		}
 
 		var cmd = "disconnect\r"
@@ -769,15 +769,15 @@ func tnc_reset(from int, to int) {
 	} else {
 		var cmd string
 
-		direwolf.SLEEP_MS(1500)
+		time.Sleep(1500 * time.Millisecond)
 
 		cmd = ETX_BREAK
 		serialport.Write(tnctest_serial_fd[from], []byte(cmd))
-		direwolf.SLEEP_MS(1500)
+		time.Sleep(1500 * time.Millisecond)
 
 		cmd = "\r"
 		serialport.Write(tnctest_serial_fd[from], []byte(cmd))
-		direwolf.SLEEP_MS(200)
+		time.Sleep(200 * time.Millisecond)
 
 		cmd = "reset\r"
 		serialport.Write(tnctest_serial_fd[from], []byte(cmd))
@@ -818,7 +818,7 @@ func tnc_send_data(from int, to int, data string) {
 		// The data should be terminated by carriage return.
 		var timeout = 600 // 60 sec.  I've seen it take more than 20.
 		for timeout > 0 && busy[from].Load() {
-			direwolf.SLEEP_MS(100)
+			time.Sleep(100 * time.Millisecond)
 
 			timeout--
 		}
@@ -826,7 +826,7 @@ func tnc_send_data(from int, to int, data string) {
 		if timeout == 0 {
 			fmt.Printf("ERROR: Gave up waiting while TNC busy.\n")
 			tnc_disconnect(0, 1)
-			direwolf.SLEEP_MS(5000)
+			time.Sleep(5000 * time.Millisecond)
 			fmt.Printf("TEST FAILED!\n")
 			os.Exit(1)
 		} else {

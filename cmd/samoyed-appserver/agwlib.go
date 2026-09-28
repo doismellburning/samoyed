@@ -65,6 +65,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/direwolf"
 )
@@ -197,7 +198,7 @@ func tnc_listen_thread() {
 				}
 			}
 
-			direwolf.SLEEP_SEC(5)
+			time.Sleep(5 * time.Second)
 		} else {
 			var header = new(AGWPEHeader)
 
