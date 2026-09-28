@@ -17,6 +17,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/pkg/term"
 	"github.com/stretchr/testify/assert"
@@ -217,7 +218,7 @@ func serialTNC(t *testing.T, from int) *os.File {
 	var master, slave, openErr = pty.Open()
 	require.NoError(t, openErr)
 
-	var fd = direwolf.SerialPortOpen(slave.Name(), 9600)
+	var fd = serialport.SerialPortOpen(slave.Name(), 9600)
 	require.NotNil(t, fd)
 
 	require.NoError(t, slave.Close())

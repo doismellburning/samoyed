@@ -1,6 +1,9 @@
 //go:build unix
 
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package serialport
 
 import (
 	"os"
@@ -30,7 +33,7 @@ func openTestSerialPort(t *testing.T, baud int) (*term.Term, *os.File) {
 	var fd = SerialPortOpen(slave.Name(), baud)
 	require.NotNil(t, fd, "SerialPortOpen(%s)", slave.Name())
 
-	t.Cleanup(func() { serial_port_close(fd) })
+	t.Cleanup(func() { SerialPortClose(fd) })
 
 	return fd, master
 }
@@ -101,7 +104,7 @@ func TestSerialPortWriteNilHandle(t *testing.T) {
 func TestSerialPortWriteAfterClose(t *testing.T) {
 	var fd, _ = openTestSerialPort(t, 9600)
 
-	serial_port_close(fd)
+	SerialPortClose(fd)
 
 	assert.Equal(t, -1, SerialPortWrite(fd, []byte("Q1TEST")))
 }
@@ -134,5 +137,5 @@ func TestSerialPortGet1AfterFarEndCloses(t *testing.T) {
 }
 
 func TestSerialPortCloseNilHandle(t *testing.T) {
-	assert.NotPanics(t, func() { serial_port_close(nil) })
+	assert.NotPanics(t, func() { SerialPortClose(nil) })
 }

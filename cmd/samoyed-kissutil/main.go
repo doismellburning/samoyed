@@ -32,6 +32,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/lestrrat-go/strftime"
 	"github.com/pkg/term"
 	"github.com/spf13/pflag"
@@ -388,7 +389,7 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 	if using_tcp {
 		server_sock.Write(kissed)
 	} else {
-		var rc = direwolf.SerialPortWrite(serial_fd, kissed)
+		var rc = serialport.SerialPortWrite(serial_fd, kissed)
 		if rc != klen {
 			fmt.Printf("ERROR writing KISS frame to serial port.\n")
 			// fmt.Printf ("DEBUG wanted %d, got %d\n", klen, rc);
@@ -483,7 +484,7 @@ func tnc_listen_net(conn net.Conn) {
  *--------------------------------------------------------------------*/
 
 func tnc_open_serial() *term.Term {
-	var fd = direwolf.SerialPortOpen(port, serial_speed)
+	var fd = serialport.SerialPortOpen(port, serial_speed)
 
 	if fd == nil {
 		fmt.Printf("Unable to connect to KISS TNC serial port %s.\n", port)
@@ -510,7 +511,7 @@ func tnc_listen_serial(fd *term.Term) {
 	kstate.OnMessage = kissutil_kiss_process_msg
 
 	for {
-		var ch, err = direwolf.SerialPortGet1(fd)
+		var ch, err = serialport.SerialPortGet1(fd)
 		if err != nil {
 			fmt.Printf("Read error from serial port KISS TNC: %s.\n", err)
 			os.Exit(1)

@@ -1,10 +1,9 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-/*------------------------------------------------------------------
- *
- * Purpose:   	Interface to serial port, hiding operating system differences.
- *
- *---------------------------------------------------------------*/
+// Package serialport is the interface to a serial port, hiding operating
+// system differences.
+package serialport
 
 import (
 	"fmt"
@@ -147,7 +146,7 @@ func SerialPortGet1(fd *term.Term) (byte, error) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        serial_port_close
+ * Name:        SerialPortClose
  *
  * Purpose:     Close the device.
  *
@@ -157,7 +156,7 @@ func SerialPortGet1(fd *term.Term) (byte, error) {
  *
  *--------------------------------------------------------------------*/
 
-func serial_port_close(fd *term.Term) {
+func SerialPortClose(fd *term.Term) {
 	if fd == nil {
 		return
 	}

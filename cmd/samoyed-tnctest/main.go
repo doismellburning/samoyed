@@ -53,6 +53,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
 )
 
@@ -574,7 +575,7 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
  *--------------------------------------------------------------------*/
 
 func tnc_thread_serial(my_index int, port string, description string, tnc_address string) {
-	tnctest_serial_fd[my_index] = direwolf.SerialPortOpen(port, 9600)
+	tnctest_serial_fd[my_index] = serialport.SerialPortOpen(port, 9600)
 
 	if tnctest_serial_fd[my_index] == nil {
 		fmt.Printf("TNC %d unable to connect to %s on %s.\n", my_index, description, port)
@@ -588,26 +589,26 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 	var cmd string
 
 	cmd = "\003\rreset\r"
-	direwolf.SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
+	serialport.SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
 	direwolf.SLEEP_MS(3000)
 
 	cmd = "echo on\r"
-	direwolf.SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
+	serialport.SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
 	direwolf.SLEEP_MS(200)
 
 	// do any necessary set up here. such as setting mycall
 
 	cmd = fmt.Sprintf("mycall %s\r", tnc_address)
-	direwolf.SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
+	serialport.SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
 	direwolf.SLEEP_MS(200)
 
 	// Don't want to stop tty output when typing begins.
 
 	cmd = "flow off\r"
-	direwolf.SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
+	serialport.SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
 
 	cmd = "echo off\r"
-	direwolf.SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
+	serialport.SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
 
 	/* Success. */
 
@@ -623,7 +624,7 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 
 		var done = false
 		for !done {
-			var b, err = direwolf.SerialPortGet1(tnctest_serial_fd[my_index])
+			var b, err = serialport.SerialPortGet1(tnctest_serial_fd[my_index])
 			if err != nil {
 				fmt.Printf("TNC %d fatal read error: %s.\n", my_index, err)
 				os.Exit(1)
@@ -715,16 +716,16 @@ func tnc_connect(from int, to int) {
 			direwolf.SLEEP_MS(1500)
 
 			cmd = ETX_BREAK
-			direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
+			serialport.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 			direwolf.SLEEP_MS(1500)
 
 			cmd = "\r"
-			direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
+			serialport.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 			direwolf.SLEEP_MS(200)
 		}
 
 		var cmd = fmt.Sprintf("connect %s\r", tnc_address[to])
-		direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
+		serialport.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 	}
 }
 
@@ -746,16 +747,16 @@ func tnc_disconnect(from int, to int) {
 			direwolf.SLEEP_MS(1500)
 
 			cmd = ETX_BREAK
-			direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
+			serialport.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 			direwolf.SLEEP_MS(1500)
 
 			cmd = "\r"
-			direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
+			serialport.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 			direwolf.SLEEP_MS(200)
 		}
 
 		var cmd = "disconnect\r"
-		direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
+		serialport.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 	}
 }
 
@@ -771,15 +772,15 @@ func tnc_reset(from int, to int) {
 		direwolf.SLEEP_MS(1500)
 
 		cmd = ETX_BREAK
-		direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
+		serialport.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 		direwolf.SLEEP_MS(1500)
 
 		cmd = "\r"
-		direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
+		serialport.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 		direwolf.SLEEP_MS(200)
 
 		cmd = "reset\r"
-		direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
+		serialport.SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 	}
 }
 
@@ -829,7 +830,7 @@ func tnc_send_data(from int, to int, data string) {
 			fmt.Printf("TEST FAILED!\n")
 			os.Exit(1)
 		} else {
-			direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(data))
+			serialport.SerialPortWrite(tnctest_serial_fd[from], []byte(data))
 		}
 	}
 }

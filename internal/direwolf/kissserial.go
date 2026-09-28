@@ -75,6 +75,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
 	"github.com/sirupsen/logrus"
 )
@@ -150,7 +151,7 @@ func NewKissSerial(ctx context.Context, mc *misc_config_s, audioConfig *AudioCon
 		if mc.kiss_serial_poll == 0 {
 			// Normal case, try to open the serial port at start up time.
 			// Nothing else is running yet, so there is no lock to take.
-			ks.fd = SerialPortOpen(mc.kiss_serial_port, mc.kiss_serial_speed)
+			ks.fd = serialport.SerialPortOpen(mc.kiss_serial_port, mc.kiss_serial_speed)
 
 			if ks.fd != nil {
 				text_color_set(DW_COLOR_INFO)
@@ -297,7 +298,7 @@ func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen
 		return
 	}
 
-	var n = SerialPortWrite(ks.fd, kiss_buff)
+	var n = serialport.SerialPortWrite(ks.fd, kiss_buff)
 
 	if n != kiss_len {
 		text_color_set(DW_COLOR_ERROR)
@@ -355,7 +356,7 @@ func (ks *KissSerial) closePort() {
 		return
 	}
 
-	serial_port_close(ks.fd)
+	serialport.SerialPortClose(ks.fd)
 
 	ks.fd = nil
 	ks.failed = false
@@ -401,7 +402,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 			return 0, os.ErrClosed
 		}
 
-		var ch, err = SerialPortGet1(fd)
+		var ch, err = serialport.SerialPortGet1(fd)
 
 		if ctx.Err() != nil {
 			return 0, ctx.Err()
@@ -432,7 +433,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 
 		if fd != nil {
 			// Open, try to read.
-			var ch, err = SerialPortGet1(fd)
+			var ch, err = serialport.SerialPortGet1(fd)
 
 			if ctx.Err() != nil {
 				return 0, ctx.Err()
@@ -454,7 +455,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 			var _, statErr = os.Stat(ks.miscConfig.kiss_serial_port)
 			if statErr == nil {
 				// It's there now.  Try to open.
-				var fd = SerialPortOpen(ks.miscConfig.kiss_serial_port, ks.miscConfig.kiss_serial_speed)
+				var fd = serialport.SerialPortOpen(ks.miscConfig.kiss_serial_port, ks.miscConfig.kiss_serial_speed)
 
 				if fd != nil {
 					text_color_set(DW_COLOR_INFO)

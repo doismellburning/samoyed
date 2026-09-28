@@ -17,6 +17,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
 )
 
@@ -40,14 +41,14 @@ func main() {
 		gpsSerialPort = os.Args[3]
 	}
 
-	tnc = direwolf.SerialPortOpen(tncSerialPort, 9600)
+	tnc = serialport.SerialPortOpen(tncSerialPort, 9600)
 	if tnc == nil {
 		fmt.Printf("Can't open serial port to KISS TNC.\n")
 		os.Exit(1)
 	}
 
 	var cmd = "\r\rhbaud 9600\rkiss on\rrestart\r"
-	direwolf.SerialPortWrite(tnc, []byte(cmd))
+	serialport.SerialPortWrite(tnc, []byte(cmd))
 
 	// GPS reading runs in a goroutine of its own, which this stops when the
 	// user interrupts us.  Taking the signal this way also takes away the
@@ -92,7 +93,7 @@ func main() {
 
 	// Exit out of KISS mode.
 
-	direwolf.SerialPortWrite(tnc, []byte("\xc0\xff\xc0"))
+	serialport.SerialPortWrite(tnc, []byte("\xc0\xff\xc0"))
 
 	direwolf.SLEEP_MS(100)
 }
@@ -151,5 +152,5 @@ func walk96(lat float64, lon float64, knots maybe.Maybe[float64], course maybe.M
 
 	// kiss_debug_print (1, NULL, kiss_frame, kiss_len);
 
-	direwolf.SerialPortWrite(tnc, kiss_frame)
+	serialport.SerialPortWrite(tnc, kiss_frame)
 }
