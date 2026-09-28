@@ -155,6 +155,10 @@ type IGate struct {
 	 */
 	debugLevel int
 
+	// retryInterval is how long to wait after failing to connect to the
+	// server before trying again.
+	retryInterval time.Duration
+
 	dpMutex     sync.Mutex /* Critical section for delayed packet queue. */
 	dpQueueHead *ax25.Packet
 
@@ -225,11 +229,12 @@ var igate = NewIGate(nil, nil, nil, nil, 0)
 // doing it.  start connects to the server and sets the goroutines going.
 func NewIGate(audioConfig *AudioConfig, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *PacketFilter, debugLevel int) *IGate {
 	var ig = &IGate{ //nolint:exhaustruct_v5
-		audioConfig: audioConfig,
-		config:      igateConfig,
-		digiConfig:  digiConfig,
-		filter:      filter,
-		debugLevel:  debugLevel,
+		audioConfig:   audioConfig,
+		config:        igateConfig,
+		digiConfig:    digiConfig,
+		filter:        filter,
+		debugLevel:    debugLevel,
+		retryInterval: IGATE_RETRY_INTERVAL,
 	}
 
 	ig.rx2ig.reset()
@@ -410,6 +415,11 @@ func (ig *IGate) start(ctx context.Context) {
 
 const MAX_HOSTS = 50
 
+// IGATE_RETRY_INTERVAL is how long the connect thread waits after a failed
+// connection attempt before trying again, so that a server that is down is not
+// redialled in a tight loop.
+const IGATE_RETRY_INTERVAL = 10 * time.Second
+
 // igate_dial makes a single connection attempt to an APRS-IS server, recording
 // the outcome.  Exactly one of the connect/failed-connect metrics moves per
 // attempt: samoyed_igate_connects_total counts connections that were actually
@@ -448,6 +458,12 @@ func (ig *IGate) connectThread(ctx context.Context) {
 			if connErr != nil {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Connect to IGate server %s failed.\n\n", server_name)
+
+				if !sleepCtx(ctx, ig.retryInterval) {
+					return
+				}
+
+				continue
 			} else {
 				/* Success. */
 				text_color_set(DW_COLOR_INFO)

@@ -7,7 +7,9 @@ import (
 	"context"
 	"net"
 	"testing"
+	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,4 +74,34 @@ func freeTCPPort(t *testing.T) int {
 	require.NoError(t, l.Close())
 
 	return port
+}
+
+// TestIGateConnectThreadWaitsBeforeRedialling is a regression test: the
+// connect thread only slept while it had a connection, so a server refusing
+// connections was redialled in a tight loop, each attempt bumping the
+// failed-connect counter.
+func TestIGateConnectThreadWaitsBeforeRedialling(t *testing.T) {
+	const failed = "samoyed_igate_failed_connects_total"
+
+	setupIGate(t)
+
+	var conn, _ = igate.connection()
+	igate.dropConnection(conn)
+
+	igate.config.t2_server_name = "127.0.0.1"
+	igate.config.t2_server_port = freeTCPPort(t)
+	igate.retryInterval = 200 * time.Millisecond
+
+	var failedBefore = metricValue(t, failed, map[string]string{})
+
+	testutils.CaptureOutput(t, func() {
+		var ctx, cancel = context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+
+		igate.connectThread(ctx)
+	})
+
+	var attempts = metricValue(t, failed, map[string]string{}) - failedBefore
+	assert.GreaterOrEqual(t, attempts, 1.0, "the connect thread never tried to connect")
+	assert.LessOrEqual(t, attempts, 6.0, "the connect thread redialled without waiting in between")
 }
