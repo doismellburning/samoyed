@@ -2568,7 +2568,7 @@ func handlePTTDCDCON(ps *parseState) error {
 
 			if t[0] == '-' {
 				var gpio, _ = strconv.Atoi(t[1:])
-				octrl.out_gpio_num = -1 * gpio
+				octrl.out_gpio_num = gpio
 				octrl.ptt_invert = true
 			} else if unicode.IsDigit(rune(t[0])) {
 				var gpio, _ = strconv.Atoi(t)

@@ -3382,6 +3382,19 @@ func directiveTests() map[string][]directiveCase {
 					a.Contains(c.output, "is not in range of 1 thru 8")
 				},
 			},
+			// Regression test: a leading "-" asks for the CM108 GPIO bit to be
+			// inverted, but the port stored the bit number negated as well, so
+			// "-3" came out as GPIO -3 and was rejected as out of range.
+			{
+				name:   "a CM108 GPIO bit with a minus is inverted",
+				config: "PTT CM108 -3 /dev/hidraw9\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_CM108, octrl.ptt_method)
+					a.Equal(3, octrl.out_gpio_num)
+					a.True(octrl.ptt_invert)
+				},
+			},
 			{
 				name:   "it applies to the current channel only",
 				config: "ACHANNELS 2\nCHANNEL 1\nPTT GPIO 25\n",
