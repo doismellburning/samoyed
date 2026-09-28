@@ -623,6 +623,78 @@ func TestXmitNextBundlesOrdinaryFrames(t *testing.T) {
 	assert.Nil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO))
 }
 
+// Shutting down while waiting for a clear channel is not a timeout: the wait
+// stops straight away, and the frame is left on the queue rather than
+// discarded as though the channel had been busy for a minute.  Nor may the
+// loop around it go straight back for the same frame again.
+func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
+	var xs = setupXmitTransmission(t)
+
+	var origReceiver = hdlcReceiver
+
+	t.Cleanup(func() { hdlcReceiver = origReceiver })
+
+	hdlcReceiver = NewHDLCReceiver(xs.p_modem, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
+
+	xs.slottime[0] = 100 // A second per slot,
+	xs.persist[0] = -1   // and never our turn.
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
+	transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
+
+	var ctx, cancel = context.WithCancel(t.Context())
+	defer cancel()
+
+	var output string
+
+	var stopped = make(chan struct{})
+
+	go func() {
+		defer close(stopped)
+
+		output = testutils.CaptureOutput(t, func() { xs.xmit_until_empty(ctx, 0) })
+	}()
+
+	// Give it time to get into the first slot's wait, so that the
+	// cancellation below has to cut that short rather than just being noticed
+	// on the way in.
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+
+	select {
+	case <-stopped:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("xmit_until_empty did not return after its context was cancelled")
+	}
+
+	assert.NotContains(t, output, "Waited too long")
+	assert.NotNil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO), "the frame should still be queued")
+}
+
+// The APRStt morse delay comes after the frame has left the queue, so
+// shutting down during it must not abandon the frame: it would be neither
+// sent nor left queued.
+func TestXmitNextSendsAPRSttMorseWhenCancelled(t *testing.T) {
+	var xs = setupXmitTransmission(t)
+
+	xs.fulldup[0] = true
+
+	var pp = ax25.FromText("Q1TEST>MORSE:HI", true)
+	require.NotNil(t, pp)
+
+	transmitQueue.Append(0, TQ_PRIO_0_HI, pp)
+
+	var ctx, cancel = context.WithCancel(t.Context())
+	cancel()
+
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_next(ctx, 0) })
+
+	assert.Contains(t, output, `[0.morse] "HI"`)
+}
+
 // The audio output device is locked for the duration of a transmission, so
 // that two channels sharing a stereo device cannot talk over each other, and
 // released however the transmission ends.

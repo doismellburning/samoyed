@@ -355,9 +355,10 @@ func frame_flavor(pp *ax25.Packet) flavor_t {
  *
  *--------------------------------------------------------------------*/
 
-// xmit_thread runs until ctx is cancelled.  Anything already queued when that
-// happens still goes out: the packets are on the air or about to be, and
-// dropping them mid-transmission would be worse than a slightly later exit.
+// xmit_thread runs until ctx is cancelled.  A transmission already under way
+// when that happens is finished: dropping PTT part way through a frame would
+// be worse than a slightly later exit.  Frames still waiting for a clear
+// channel are left on the queue.
 func (xs *XmitService) xmit_thread(ctx context.Context, channel int) {
 	for ctx.Err() == nil {
 		transmitQueue.WaitWhileEmpty(ctx, channel)
@@ -376,6 +377,12 @@ func (xs *XmitService) xmit_thread(ctx context.Context, channel int) {
 // itself never returns.
 func (xs *XmitService) xmit_until_empty(ctx context.Context, channel int) {
 	for transmitQueue.Peek(channel, TQ_PRIO_0_HI) != nil || transmitQueue.Peek(channel, TQ_PRIO_1_LO) != nil {
+		// xmit_next leaves the queue alone once ctx is cancelled, so without
+		// this we would go straight round again, and forever.
+		if ctx.Err() != nil {
+			return
+		}
+
 		if !xs.audioOutAvailable[ACHAN2ADEV(channel)] {
 			xs.discard_untransmittable(channel)
 
@@ -447,7 +454,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 	 * If there is something in the high priority queue, begin transmitting immediately.
 	 * Otherwise, wait a random amount of time, in hopes of minimizing collisions.
 	 */
-	var ok = xs.wait_for_clear_channel(channel, xs.slottime[channel], xs.persist[channel], xs.fulldup[channel])
+	var ok = xs.wait_for_clear_channel(ctx, channel, xs.slottime[channel], xs.persist[channel], xs.fulldup[channel])
 
 	if ok {
 		// Corresponding lock is in wait_for_clear_channel.  Releasing it with
@@ -455,6 +462,10 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 		// is released however we leave this function - notably when the
 		// packet we were about to send has disappeared from the queue.
 		defer xs.audioOutDevMutex[ACHAN2ADEV(channel)].Unlock()
+	} else if ctx.Err() != nil {
+		// Not a timeout: we are being shut down, so leave the queue as it is
+		// rather than discarding a packet as though the channel were busy.
+		return
 	}
 
 	var prio = TQ_PRIO_1_LO
@@ -502,6 +513,8 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 				if prio == TQ_PRIO_0_HI {
 					//text_color_set(DW_COLOR_DEBUG);
 					//dw_printf ("APRStt morse xmit delay hack...\n");
+					// Not sleepCtx: pp is already off the queue, so giving up
+					// here would lose it rather than leave it for later.
 					time.Sleep(700 * time.Millisecond)
 				}
 
@@ -1154,7 +1167,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
  *
  *		fulldup -	Full duplex.  Just start sending immediately.
  *
- * Returns:	True for OK.  False for timeout.
+ * Returns:	True for OK.  False for timeout, or if ctx is cancelled.
  *
  * Description:	New in version 1.2: also obtain a lock on audio out device.
  *
@@ -1197,7 +1210,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 const WAIT_TIMEOUT_MS = 60 * 1000
 const WAIT_CHECK_EVERY_MS = 10
 
-func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool) bool {
+func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, slottime int, persist int, fulldup bool) bool {
 	/*
 	 * For full duplex we skip the channel busy check and random wait.
 	 * We still need to wait if operating in stereo and the other audio
@@ -1209,7 +1222,9 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 	start_over_again:
 
 		for hdlcReceiver.DataDetectAny(channel) > 0 {
-			time.Sleep(WAIT_CHECK_EVERY_MS * time.Millisecond)
+			if !sleepCtx(ctx, WAIT_CHECK_EVERY_MS*time.Millisecond) {
+				return false
+			}
 
 			n++
 			if n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS) {
@@ -1225,7 +1240,9 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 		 */
 
 		if xs.p_modem.achan[channel].dwait > 0 {
-			time.Sleep(time.Duration(xs.p_modem.achan[channel].dwait) * 10 * time.Millisecond)
+			if !sleepCtx(ctx, time.Duration(xs.p_modem.achan[channel].dwait)*10*time.Millisecond) {
+				return false
+			}
 		}
 
 		if hdlcReceiver.DataDetectAny(channel) > 0 {
@@ -1237,7 +1254,9 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 		 * Proceed to transmit sooner if anything shows up in high priority queue.
 		 */
 		for transmitQueue.Peek(channel, TQ_PRIO_0_HI) == nil {
-			time.Sleep(time.Duration(slottime) * 10 * time.Millisecond)
+			if !sleepCtx(ctx, time.Duration(slottime)*10*time.Millisecond) {
+				return false
+			}
 
 			if hdlcReceiver.DataDetectAny(channel) > 0 {
 				goto start_over_again
@@ -1262,7 +1281,9 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 	// TODO: review this.
 
 	for !xs.audioOutDevMutex[ACHAN2ADEV(channel)].TryLock() {
-		time.Sleep(WAIT_CHECK_EVERY_MS * time.Millisecond)
+		if !sleepCtx(ctx, WAIT_CHECK_EVERY_MS*time.Millisecond) {
+			return false
+		}
 
 		n++
 		if n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS) {
