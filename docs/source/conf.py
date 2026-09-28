@@ -3,6 +3,11 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent / "_ext"))
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
@@ -17,12 +22,16 @@ language = "en"
 extensions = [
     "sphinx.ext.autosectionlabel",
     "sphinx.ext.extlinks",
+    "sphinx.ext.graphviz",
+    "godeps",
 ]
+
+graphviz_output_format = "png"
 
 pygments_style = "default"
 
 templates_path = ["_templates"]
-exclude_patterns = []
+exclude_patterns = ["_ext", "_generated"]
 
 
 # -- Options for HTML output -------------------------------------------------

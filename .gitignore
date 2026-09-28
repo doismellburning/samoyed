@@ -107,3 +107,6 @@ $RECYCLE.BIN/
 # cmake
 build*/
 tmp/
+
+# Generated during the docs build
+/docs/source/_generated/
