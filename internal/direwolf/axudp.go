@@ -104,10 +104,17 @@ func axudpExtractDest(frame []byte) string {
 	return callstr
 }
 
-// AXUDPBridge is the live state of the bridge.
-type AXUDPBridge struct {
+// axudpRouter sends AX.25 frames to AXUDP peers, choosing the peer by each
+// frame's destination address.  Both the samoyed-axudp bridge and the
+// daemon's own ACHANNEL channels route through one.
+type axudpRouter struct {
 	maps    []AXUDPMapEntry
 	udpConn *net.UDPConn
+}
+
+// AXUDPBridge is the live state of the bridge.
+type AXUDPBridge struct {
+	axudpRouter
 
 	mu      sync.Mutex
 	clients []net.Conn
@@ -362,15 +369,15 @@ func ax25AddrBase(cs string) string {
 // a MAP entry with an SSID matches only that exact address-SSID pair.
 // Exact matches always take priority over wildcard (no-SSID) matches,
 // regardless of the order entries appear in the config file.
-func (b *AXUDPBridge) lookupMap(dest string) (AXUDPMapEntry, bool) {
+func (r *axudpRouter) lookupMap(dest string) (AXUDPMapEntry, bool) {
 	// First pass: exact match (callsign + SSID must match precisely).
-	for _, e := range b.maps {
+	for _, e := range r.maps {
 		if e.AX25Addr == dest {
 			return e, true
 		}
 	}
 	// Second pass: base-call wildcard (entry has no SSID, matches any SSID).
-	for _, e := range b.maps {
+	for _, e := range r.maps {
 		if !strings.ContainsRune(e.AX25Addr, '-') && ax25AddrBase(dest) == e.AX25Addr {
 			return e, true
 		}
@@ -407,9 +414,9 @@ func axudpStripCRC(pkt []byte) ([]byte, bool) {
 
 // sendAXUDP sends a raw AX.25 frame to the given UDP address.
 // A CRC-CCITT checksum is always appended (per RFC 1226 / AXUDP convention).
-func (b *AXUDPBridge) sendAXUDP(ax25frame []byte, entry AXUDPMapEntry) {
+func (r *axudpRouter) sendAXUDP(ax25frame []byte, entry AXUDPMapEntry) {
 	var pkt = axudpAddCRC(ax25frame)
-	var n, writeErr = b.udpConn.WriteTo(pkt, entry.UDPAddr)
+	var n, writeErr = r.udpConn.WriteTo(pkt, entry.UDPAddr)
 	if writeErr != nil {
 		logrus.WithField("dest", entry.Addr).WithError(writeErr).Error("Could not send AXUDP datagram")
 	} else if logrus.IsLevelEnabled(logrus.TraceLevel) {
@@ -418,6 +425,25 @@ func (b *AXUDPBridge) sendAXUDP(ax25frame []byte, entry AXUDPMapEntry) {
 			"dest":  entry.Addr,
 		}).Trace("Sent AXUDP datagram")
 	}
+}
+
+// route sends a raw AX.25 frame to the peer mapped to its destination, or
+// drops it with a warning if there is none.
+func (r *axudpRouter) route(ax25frame []byte) {
+	var dest = axudpExtractDest(ax25frame)
+	if dest == "" {
+		logrus.Warn("Dropping AX.25 frame too short to extract a destination from")
+
+		return
+	}
+
+	if entry, ok := r.lookupMap(dest); ok {
+		r.sendAXUDP(ax25frame, entry)
+
+		return
+	}
+
+	logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
 }
 
 // handleKISSClient reads KISS frames from one TCP client and routes them as
@@ -527,20 +553,13 @@ func my_kiss_rec_byte_axudp(kf *KISSFrame, overflow *bool, b byte, b2 *AXUDPBrid
 		}
 		if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == KISS_CMD_DATA_FRAME {
 			var ax25frame = unwrapped[1:]
-			var dest = axudpExtractDest(ax25frame)
 			if logrus.IsLevelEnabled(logrus.TraceLevel) {
 				logrus.WithFields(logrus.Fields{
-					"dest":  dest,
+					"dest":  axudpExtractDest(ax25frame),
 					"bytes": len(ax25frame),
 				}).Trace("Forwarding AX.25 frame via AXUDP")
 			}
-			if dest == "" {
-				logrus.Warn("Dropping AX.25 frame too short to extract a destination from")
-			} else if entry, ok := b2.lookupMap(dest); ok {
-				b2.sendAXUDP(ax25frame, entry)
-			} else {
-				logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
-			}
+			b2.route(ax25frame)
 		} else if len(unwrapped) >= 1 && logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithField("command", fmt.Sprintf("0x%02x", unwrapped[0]&0x0F)).Trace("Ignoring non-data KISS command")
 		}
