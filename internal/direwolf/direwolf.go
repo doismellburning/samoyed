@@ -949,9 +949,14 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		logEntry = logEntry.WithField("desc", desc)
 
+		var detail, decoded = netromMonitorText(pp)
 		if ftype == ax25.FrameTypeUXID {
-			var _, info2text, _ = xid_parse(pinfo)
-			logEntry.WithField("info", info2text).Info("Packet")
+			_, detail, _ = xid_parse(pinfo)
+			decoded = true
+		}
+
+		if decoded {
+			logEntry.WithField("info", detail).Info("Packet")
 		} else {
 			logEntry.Info("Packet ax25_safe_print below:")
 			ax25.SafePrint(pinfo, asciiOnly)
