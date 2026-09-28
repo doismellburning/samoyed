@@ -1562,6 +1562,18 @@ func config_init(fname string, p_audio_config *AudioConfig,
 
 // handleADEVICE handles the ADEVICE[n] keyword.
 func handleADEVICE(ps *parseState) error {
+	var settings, err = parseADEVICE(ps)
+	if err != nil {
+		ps.adevice = 0
+
+		return err
+	}
+
+	return ps.applyADEVICE(settings)
+}
+
+// parseADEVICE reads an ADEVICE line into the settings it describes.
+func parseADEVICE(ps *parseState) (AudioDeviceSettings, error) {
 	/*
 	 * ADEVICE[n] 		- Name of input sound device, and optionally output, if different.
 	 *
@@ -1577,33 +1589,56 @@ func handleADEVICE(ps *parseState) error {
 	 */
 	/* Note that ALSA name can contain comma such as hw:1,0 */
 	/* "ADEVICE" is equivalent to "ADEVICE0". */
-	ps.adevice = 0
+	var settings = new(AudioDeviceSettings)
 
 	// ps.keyword holds the original token e.g. "ADEVICE" or "ADEVICE1".
 	if len(ps.keyword) >= 8 {
 		var i, iErr = strconv.Atoi(ps.keyword[7:])
 		if iErr != nil {
-			return fmt.Errorf("config file: Could not parse ADEVICE number on line %d: %w", ps.line, iErr)
+			return *settings, fmt.Errorf("config file: Could not parse ADEVICE number on line %d: %w", ps.line, iErr)
 		}
 
-		if i < 0 || i >= MAX_ADEVS {
-			ps.errorf(
-				"Config file: Device number %d out of range for ADEVICE command on line %d.\nIf you really need more than %d audio devices, increase MAX_ADEVS and recompile.",
-				i,
-				ps.line,
-				MAX_ADEVS,
-			)
-
-			ps.adevice = 0
-
-			return nil
-		}
-
-		ps.adevice = i
+		settings.Device = i
 	}
 
-	var t = ps.split(false)
-	if t == "" {
+	settings.Input = ps.split(false)
+
+	// New case for release 1.8.
+
+	if settings.Input == "=" {
+		var t = ps.split(false)
+		if t == "" {
+			return *settings, fmt.Errorf("config file: ADEVICE%d mapping syntax requires a source device number on line %d", settings.Device, ps.line)
+		}
+
+		return *settings, fmt.Errorf("config file: ADEVICE%d = %s mapping syntax is not implemented on line %d", settings.Device, t, ps.line)
+	}
+
+	// Different audio devices for receive and transmit, if there is another.
+	settings.Output = ps.split(false)
+
+	return *settings, nil
+}
+
+// applyADEVICE defines an audio device, and makes it the one that later
+// device settings apply to.
+func (ps *parseState) applyADEVICE(settings AudioDeviceSettings) error {
+	ps.adevice = 0
+
+	if settings.Device < 0 || settings.Device >= MAX_ADEVS {
+		ps.errorf(
+			"Config file: Device number %d out of range for ADEVICE command on line %d.\nIf you really need more than %d audio devices, increase MAX_ADEVS and recompile.",
+			settings.Device,
+			ps.line,
+			MAX_ADEVS,
+		)
+
+		return nil
+	}
+
+	ps.adevice = settings.Device
+
+	if settings.Input == "" {
 		// Reported here rather than returned, so that the pointer at the
 		// documentation still follows the complaint it belongs to.
 		ps.errorf("config file: Missing name of audio device for ADEVICE command on line %d", ps.line)
@@ -1626,30 +1661,18 @@ func handleADEVICE(ps *parseState) error {
 		return fmt.Errorf("config file: ADEVICE%d can't be defined more than once. Line %d", ps.adevice, ps.line)
 	}
 
-	// New case for release 1.8.
-
-	if t == "=" {
-		t = ps.split(false)
-		if t == "" {
-			return fmt.Errorf("config file: ADEVICE%d mapping syntax requires a source device number on line %d", ps.adevice, ps.line)
-		}
-
-		return fmt.Errorf("config file: ADEVICE%d = %s mapping syntax is not implemented on line %d", ps.adevice, t, ps.line)
-	}
-
 	ps.audio.adev[ps.adevice].defined = 1
 
 	/* First channel of device is valid. */
 	// This might be changed to UDP or STDIN when the device name is examined.
 	ps.audio.chan_medium[ADEVFIRSTCHAN(ps.adevice)] = MEDIUM_RADIO
 
-	ps.audio.adev[ps.adevice].adevice_in = t
-	ps.audio.adev[ps.adevice].adevice_out = t
+	ps.audio.adev[ps.adevice].adevice_in = settings.Input
+	ps.audio.adev[ps.adevice].adevice_out = settings.Input
 
-	t = ps.split(false)
-	if t != "" {
+	if settings.Output != "" {
 		// Different audio devices for receive and transmit.
-		ps.audio.adev[ps.adevice].adevice_out = t
+		ps.audio.adev[ps.adevice].adevice_out = settings.Output
 		ps.audio.adev[ps.adevice].adevice_out_specified = true
 	}
 
@@ -1748,6 +1771,12 @@ func handleACHANNELS(ps *parseState) error {
 	}
 
 	var n, _ = strconv.Atoi(t)
+
+	return ps.applyACHANNELS(n)
+}
+
+// applyACHANNELS sets the number of audio channels for the current device.
+func (ps *parseState) applyACHANNELS(n int) error {
 	if n == 1 || n == 2 {
 		ps.audio.adev[ps.adevice].num_channels = n
 
@@ -1785,6 +1814,12 @@ func handleCHANNEL(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: Channel number must be numeric for CHANNEL command", ps.line)
 	}
+
+	return ps.applyCHANNEL(n)
+}
+
+// applyCHANNEL makes n the radio channel that later channel settings apply to.
+func (ps *parseState) applyCHANNEL(n int) error {
 	if n >= 0 && n < MAX_RADIO_CHANS {
 		ps.channel = n
 
@@ -1898,24 +1933,30 @@ func handleMYCALL(ps *parseState) error {
 	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("config file: Missing value for MYCALL command on line %d", ps.line)
-	} else {
-		/* Silently force upper case. */
-		/* Might change to warning someday. */
-		t = strings.ToUpper(t)
+	}
 
-		var _, _, _, ok = ax25.ParseAddr(-1, t, ax25.AddrStrictNoStar)
+	return ps.applyMYCALL(t)
+}
 
-		if !ok {
-			return fmt.Errorf("config file: Invalid value for MYCALL command on line %d", ps.line)
-		}
+// applyMYCALL sets the station callsign for the current channel, and for any
+// other channel that does not have one yet.
+func (ps *parseState) applyMYCALL(call string) error {
+	/* Silently force upper case. */
+	/* Might change to warning someday. */
+	call = strings.ToUpper(call)
 
-		// Definitely set for current channel.
-		// Set for other channels which have not been set yet.
+	var _, _, _, ok = ax25.ParseAddr(-1, call, ax25.AddrStrictNoStar)
 
-		for c := range MAX_TOTAL_CHANS {
-			if c == ps.channel || IsNoCall(ps.audio.mycall[c]) {
-				ps.audio.mycall[c] = t
-			}
+	if !ok {
+		return fmt.Errorf("config file: Invalid value for MYCALL command on line %d", ps.line)
+	}
+
+	// Definitely set for current channel.
+	// Set for other channels which have not been set yet.
+
+	for c := range MAX_TOTAL_CHANS {
+		if c == ps.channel || IsNoCall(ps.audio.mycall[c]) {
+			ps.audio.mycall[c] = call
 		}
 	}
 
@@ -2804,6 +2845,12 @@ func handleTXDELAY(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: Time must be numeric for TXDELAY command. Keeping %d", ps.line, ps.audio.achan[ps.channel].txdelay)
 	}
+
+	return ps.applyTXDELAY(n)
+}
+
+// applyTXDELAY sets the transmit delay, in 10 ms units, for the current channel.
+func (ps *parseState) applyTXDELAY(n int) error {
 	if n >= 0 && n <= 255 {
 		if n < 10 {
 			ps.warnf("line %d: Setting TXDELAY this small is a REALLY BAD idea if you want other stations to hear you.\n"+
