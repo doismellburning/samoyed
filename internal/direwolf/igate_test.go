@@ -379,6 +379,43 @@ func TestIGateSendMsgWriteErrorClosesTheConnection(t *testing.T) {
 	assert.False(t, okToSend, "the dead connection's login outlived it")
 }
 
+// A packet that never reached the server - there was no connection, or the
+// write failed - is neither counted as an uplink nor remembered for duplicate
+// checking, which would otherwise drop a later retransmission that might get
+// through.
+func TestIGateUplinkCountsOnlyWhatWasSent(t *testing.T) {
+	const uplinks = "samoyed_igate_uplink_packets_total"
+
+	setupIGate(t)
+
+	igate.config.rx2ig_dedupe_time = 30
+
+	var conn, _ = igate.connection()
+	require.NoError(t, conn.Close())
+
+	var uplinksBefore = metricValue(t, uplinks, map[string]string{})
+
+	for _, tc := range []struct {
+		name string
+		conn net.Conn
+	}{
+		{name: "not connected", conn: nil},
+		{name: "write failed", conn: conn},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
+			require.NotNil(t, pp)
+
+			testutils.CaptureOutput(t, func() { igate.sendPacketToServer(tc.conn, pp, 0) })
+
+			assert.Equal(t, 0, igate.uplinkCount())
+			assert.Equal(t, 0, igate.stats.uplinkBytes)
+			assert.InDelta(t, uplinksBefore, metricValue(t, uplinks, map[string]string{}), 0)
+			assert.True(t, igate.rxToIgAllow(pp), "a packet that was not sent was remembered as a duplicate")
+		})
+	}
+}
+
 // setupIGateToRadio adds what the IS>RF direction needs on top of setupIGate:
 // a transmit queue for the frames it decides to send.
 func setupIGateToRadio(t *testing.T) {
@@ -881,6 +918,35 @@ func TestIGateSatgateDelaysDirectPackets(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("satgateDelayThread did not finish after its context was cancelled")
 	}
+}
+
+// A delayed packet passed the login check when it was queued, not when it is
+// released.  If the connection was dropped and remade in between, releasing it
+// during the new connection's login would make it the first thing the server
+// sees, so it is dropped, as it would have been had it just been heard.
+func TestIGateSatgateWaitsForLogin(t *testing.T) {
+	setupIGate(t)
+
+	t.Cleanup(func() { igate.dpQueueHead = nil })
+
+	igate.config.satgate_delay = 1
+	igate.dpQueueHead = nil
+
+	var pp = ax25.FromText("Q2TEST>APDW17,WIDE1-1:>hello", true)
+	require.NotNil(t, pp)
+
+	testutils.CaptureOutput(t, func() { igate.satgateDelayPacket(pp, 0) })
+	pp.SetReleaseTime(time.Now().Add(-time.Second))
+
+	// Reconnected, but not logged in yet.
+	var server, client = connectedTCPPair(t)
+
+	igate.setConnection(client)
+
+	igate.satgateReleaseDue(0)
+
+	requireIGateSilent(t, server, "a delayed packet was sent before the login had finished")
+	assert.Nil(t, igate.dpQueueHead, "the packet was not taken off the queue")
 }
 
 // A packet that has already been through a digipeater was not heard directly,

@@ -155,6 +155,10 @@ type IGate struct {
 	 */
 	debugLevel int
 
+	// retryInterval is how long to wait after failing to connect to the
+	// server before trying again.
+	retryInterval time.Duration
+
 	dpMutex     sync.Mutex /* Critical section for delayed packet queue. */
 	dpQueueHead *ax25.Packet
 
@@ -225,11 +229,12 @@ var igate = NewIGate(nil, nil, nil, nil, 0)
 // doing it.  start connects to the server and sets the goroutines going.
 func NewIGate(audioConfig *AudioConfig, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *PacketFilter, debugLevel int) *IGate {
 	var ig = &IGate{ //nolint:exhaustruct_v5
-		audioConfig: audioConfig,
-		config:      igateConfig,
-		digiConfig:  digiConfig,
-		filter:      filter,
-		debugLevel:  debugLevel,
+		audioConfig:   audioConfig,
+		config:        igateConfig,
+		digiConfig:    digiConfig,
+		filter:        filter,
+		debugLevel:    debugLevel,
+		retryInterval: IGATE_RETRY_INTERVAL,
 	}
 
 	ig.rx2ig.reset()
@@ -410,6 +415,11 @@ func (ig *IGate) start(ctx context.Context) {
 
 const MAX_HOSTS = 50
 
+// IGATE_RETRY_INTERVAL is how long the connect thread waits after a failed
+// connection attempt before trying again, so that a server that is down is not
+// redialled in a tight loop.
+const IGATE_RETRY_INTERVAL = 10 * time.Second
+
 // igate_dial makes a single connection attempt to an APRS-IS server, recording
 // the outcome.  Exactly one of the connect/failed-connect metrics moves per
 // attempt: samoyed_igate_connects_total counts connections that were actually
@@ -448,6 +458,12 @@ func (ig *IGate) connectThread(ctx context.Context) {
 			if connErr != nil {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Connect to IGate server %s failed.\n\n", server_name)
+
+				if !sleepCtx(ctx, ig.retryInterval) {
+					return
+				}
+
+				continue
 			} else {
 				/* Success. */
 				text_color_set(DW_COLOR_INFO)
@@ -849,7 +865,9 @@ func (ig *IGate) sendPacketToServer(conn net.Conn, pp *ax25.Packet, channel int)
 
 	// TODO KG Check against IGATE_MAX_MSG size?
 
-	ig.sendMsgToServer(conn, msg)
+	if !ig.sendMsgToServer(conn, msg) {
+		return /* Not sent, so neither counted nor remembered. */
+	}
 
 	ig.updateStats(func(s *igateStats) { s.uplinkPackets++ })
 	metrics.RecordUplink()
@@ -879,6 +897,8 @@ func (ig *IGate) sendPacketToServer(conn net.Conn, pp *ax25.Packet, channel int)
  *			  It could contain nul characters so we can't
  *			  use the normal C string functions.
  *
+ * Returns:	Whether it was sent.
+ *
  * Description:	Send message to IGate Server if connected.
  *		Disconnect from server, and notify user, if any error.
  *		Should use a word other than message because that has
@@ -886,9 +906,9 @@ func (ig *IGate) sendPacketToServer(conn net.Conn, pp *ax25.Packet, channel int)
  *
  *--------------------------------------------------------------------*/
 
-func (ig *IGate) sendMsgToServer(conn net.Conn, imsg string) {
+func (ig *IGate) sendMsgToServer(conn net.Conn, imsg string) bool {
 	if conn == nil {
-		return /* Silently discard if not connected. */
+		return false /* Silently discard if not connected. */
 	}
 
 	// TODO KG Truncate if > IGATE_MAX_MSG?
@@ -909,14 +929,18 @@ func (ig *IGate) sendMsgToServer(conn net.Conn, imsg string) {
 
 	imsg += "\r\n"
 
-	ig.updateStats(func(s *igateStats) { s.uplinkBytes += len(imsg) })
-
 	var _, err = conn.Write([]byte(imsg)) // TODO KG Should imsg just be a []byte?
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending to IGate server.  Closing connection.\n\n")
 		ig.dropConnection(conn)
+
+		return false
 	}
+
+	ig.updateStats(func(s *igateStats) { s.uplinkBytes += len(imsg) })
+
+	return true
 } /* end sendMsgToServer */
 
 /*-------------------------------------------------------------------
@@ -1277,7 +1301,13 @@ func (ig *IGate) satgateReleaseDue(channel int) {
 	ig.dpMutex.Unlock()
 	pp.SetNext(nil)
 
-	var conn, _ = ig.connection()
+	// It passed the login check when it was queued, but the connection may
+	// have been remade since, so check again, as sendRecPacket does.
+	var conn, okToSend = ig.connection()
+	if conn == nil || !okToSend {
+		return /* Silently discard if not connected or login not complete. */
+	}
+
 	ig.sendPacketToServer(conn, pp, channel)
 }
 
