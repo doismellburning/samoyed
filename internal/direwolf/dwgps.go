@@ -32,7 +32,6 @@ package direwolf
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -192,17 +191,10 @@ func dwgps_print(msg string, gpsinfo *GPSInfo) {
 	dw_printf("%stime=%s fix=%d lat=%s lon=%s trk=%s spd=%s alt=%s\n",
 		msg,
 		gpsinfo.Timestamp.Format(time.RFC3339), gpsinfo.Fix,
-		formatMaybeFloat("%.6f", gpsinfo.Lat), formatMaybeFloat("%.6f", gpsinfo.Lon),
-		formatMaybeFloat("%.0f", gpsinfo.Track), formatMaybeFloat("%.1f", gpsinfo.SpeedKnots),
-		formatMaybeFloat("%.0f", gpsinfo.Altitude))
+		maybe.Format("%.6f", "unknown", gpsinfo.Lat), maybe.Format("%.6f", "unknown", gpsinfo.Lon),
+		maybe.Format("%.0f", "unknown", gpsinfo.Track), maybe.Format("%.1f", "unknown", gpsinfo.SpeedKnots),
+		maybe.Format("%.0f", "unknown", gpsinfo.Altitude))
 } /* end dwgps_print */
-
-// formatMaybeFloat renders m with the given verb, or as "unknown" for Nothing.
-func formatMaybeFloat(format string, m maybe.Maybe[float64]) string {
-	return maybe.Fold("unknown", func(value float64) string {
-		return fmt.Sprintf(format, value)
-	}, m)
-}
 
 /*-------------------------------------------------------------------
  *

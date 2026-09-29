@@ -400,13 +400,13 @@ func (bs *BeaconService) thread(ctx context.Context) {
 				switch fix {
 				case DWFIX_3D:
 					dw_printf("%s  3D, %s, %s, %s mph, %s\xc2\xb0, %s m\n", hms,
-						formatMaybeFloat("%.6f", gpsinfo.Lat), formatMaybeFloat("%.6f", gpsinfo.Lon),
-						formatMaybeFloat("%.1f", my_speed_mph), formatMaybeFloat("%.0f", gpsinfo.Track),
-						formatMaybeFloat("%.1f", gpsinfo.Altitude))
+						maybe.Format("%.6f", "unknown", gpsinfo.Lat), maybe.Format("%.6f", "unknown", gpsinfo.Lon),
+						maybe.Format("%.1f", "unknown", my_speed_mph), maybe.Format("%.0f", "unknown", gpsinfo.Track),
+						maybe.Format("%.1f", "unknown", gpsinfo.Altitude))
 				case DWFIX_2D:
 					dw_printf("%s  2D, %s, %s, %s mph, %s\xc2\xb0\n", hms,
-						formatMaybeFloat("%.6f", gpsinfo.Lat), formatMaybeFloat("%.6f", gpsinfo.Lon),
-						formatMaybeFloat("%.1f", my_speed_mph), formatMaybeFloat("%.0f", gpsinfo.Track))
+						maybe.Format("%.6f", "unknown", gpsinfo.Lat), maybe.Format("%.6f", "unknown", gpsinfo.Lon),
+						maybe.Format("%.1f", "unknown", my_speed_mph), maybe.Format("%.0f", "unknown", gpsinfo.Track))
 				default:
 					dw_printf("%s  No GPS fix\n", hms)
 				}
@@ -582,7 +582,7 @@ func (bs *BeaconService) sbCalculateNextTime(
 
 	if bs.trackerDebugLevel >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("SmartBeaconing: Beacon Rate = %d seconds for %s MPH\n", beacon_rate, formatMaybeFloat("%.1f", current_speed_mph))
+		dw_printf("SmartBeaconing: Beacon Rate = %d seconds for %s MPH\n", beacon_rate, maybe.Format("%.1f", "unknown", current_speed_mph))
 	}
 
 	var next_time = last_xmit_time.Add(time.Duration(beacon_rate) * time.Second)

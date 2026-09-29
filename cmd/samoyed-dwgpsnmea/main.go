@@ -13,14 +13,6 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
-// show formats an optional GPS reading, so an absent one prints as "unknown"
-// rather than as a plausible-looking number.
-func show(format string, m maybe.Maybe[float64]) string {
-	return maybe.Fold("unknown", func(value float64) string {
-		return fmt.Sprintf(format, value)
-	}, m)
-}
-
 func main() {
 	// GPS reading runs in a goroutine of its own, which this stops when the
 	// user interrupts us.  Taking the signal this way also takes away the
@@ -50,11 +42,11 @@ func run(ctx context.Context, args []string, out io.Writer) int {
 
 		switch info.Fix {
 		case direwolf.DWFIX_2D, direwolf.DWFIX_3D:
-			fmt.Fprintf(out, "%s  %s", show("%.6f", info.Lat), show("%.6f", info.Lon))
-			fmt.Fprintf(out, "  %s knots  %s degrees", show("%.1f", info.SpeedKnots), show("%.0f", info.Track))
+			fmt.Fprintf(out, "%s  %s", maybe.Format("%.6f", "unknown", info.Lat), maybe.Format("%.6f", "unknown", info.Lon))
+			fmt.Fprintf(out, "  %s knots  %s degrees", maybe.Format("%.1f", "unknown", info.SpeedKnots), maybe.Format("%.0f", "unknown", info.Track))
 
 			if info.Fix == direwolf.DWFIX_3D {
-				fmt.Fprintf(out, "  altitude = %s meters", show("%.1f", info.Altitude))
+				fmt.Fprintf(out, "  altitude = %s meters", maybe.Format("%.1f", "unknown", info.Altitude))
 			}
 
 			fmt.Fprintf(out, "\n")
