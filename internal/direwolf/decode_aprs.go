@@ -3177,8 +3177,7 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
 		A.g_lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in compressed latitude.  Must be in range of '!' to '{'.\n")
+			logrus.WithField("latitude", string(pcpos.Y[:])).Warn("Invalid character in compressed latitude: must be in range '!' to '{'")
 		}
 
 		A.g_lat = maybe.Nothing[float64]()
@@ -3188,8 +3187,7 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
 		A.g_lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in compressed longitude.  Must be in range of '!' to '{'.\n")
+			logrus.WithField("longitude", string(pcpos.X[:])).Warn("Invalid character in compressed longitude: must be in range '!' to '{'")
 		}
 
 		A.g_lon = maybe.Nothing[float64]()
@@ -3204,8 +3202,7 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
 		A.g_symbol_table = pcpos.SymTableId - 'a' + '0'
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid symbol table id for compressed position.\n")
+			logrus.WithField("symbol_table", string(rune(pcpos.SymTableId))).Warn("Invalid symbol table id for compressed position")
 		}
 
 		A.g_symbol_table = '/'
@@ -3276,8 +3273,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 		result += float64(plat.Deg[0]-'0') * 10
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for tens of degrees.\n", plat.Deg[0])
+			logrus.WithField("found", string(rune(plat.Deg[0]))).Warn("Invalid character in latitude: expecting 0-9 for tens of degrees")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3287,8 +3283,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 		result += float64(plat.Deg[1]-'0') * 1
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for degrees.\n", plat.Deg[1])
+			logrus.WithField("found", string(rune(plat.Deg[1]))).Warn("Invalid character in latitude: expecting 0-9 for degrees")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3300,8 +3295,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-5 for tens of minutes.\n", plat.Minn[0])
+			logrus.WithField("found", string(rune(plat.Minn[0]))).Warn("Invalid character in latitude: expecting 0-5 for tens of minutes")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3313,8 +3307,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for minutes.\n", plat.Minn[1])
+			logrus.WithField("found", string(rune(plat.Minn[1]))).Warn("Invalid character in latitude: expecting 0-9 for minutes")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3322,8 +3315,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 
 	if plat.Dot != '.' {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Unexpected character \"%c\" found where period expected in latitude.\n", plat.Dot)
+			logrus.WithField("found", string(rune(plat.Dot))).Warn("Unexpected character where period expected in latitude")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3335,8 +3327,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for tenths of minutes.\n", plat.HMin[0])
+			logrus.WithField("found", string(rune(plat.HMin[0]))).Warn("Invalid character in latitude: expecting 0-9 for tenths of minutes")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3348,8 +3339,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for hundredths of minutes.\n", plat.HMin[1])
+			logrus.WithField("found", string(rune(plat.HMin[1]))).Warn("Invalid character in latitude: expecting 0-9 for hundredths of minutes")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3362,8 +3352,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 		return maybe.Just(result)
 	case 'n':
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Warning: Lower case n found for latitude hemisphere.  Specification requires upper case N or S.\n")
+			logrus.Warn("Lower case n found for latitude hemisphere: specification requires upper case N or S")
 		}
 
 		return maybe.Just(result)
@@ -3371,15 +3360,13 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 		return maybe.Just(-result)
 	case 's':
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Warning: Lower case s found for latitude hemisphere.  Specification requires upper case N or S.\n")
+			logrus.Warn("Lower case s found for latitude hemisphere: specification requires upper case N or S")
 		}
 
 		return maybe.Just(-result)
 	default:
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error: '%c' found for latitude hemisphere.  Specification requires upper case N or S.\n", plat.NS)
+			logrus.WithField("found", string(rune(plat.NS))).Warn("Invalid latitude hemisphere: specification requires upper case N or S")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3434,8 +3421,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		result += float64((plon.Deg[0])-'0') * 100
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0 or 1 for hundreds of degrees.\n", plon.Deg[0])
+			logrus.WithField("found", string(rune(plon.Deg[0]))).Warn("Invalid character in longitude: expecting 0 or 1 for hundreds of degrees")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3445,8 +3431,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		result += float64((plon.Deg[1])-'0') * 10
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for tens of degrees.\n", plon.Deg[1])
+			logrus.WithField("found", string(rune(plon.Deg[1]))).Warn("Invalid character in longitude: expecting 0-9 for tens of degrees")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3456,8 +3441,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		result += float64((plon.Deg[2])-'0') * 1
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for degrees.\n", plon.Deg[2])
+			logrus.WithField("found", string(rune(plon.Deg[2]))).Warn("Invalid character in longitude: expecting 0-9 for degrees")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3468,8 +3452,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 	} else if plon.Minn[0] == ' ' {
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-5 for tens of minutes.\n", plon.Minn[0])
+			logrus.WithField("found", string(rune(plon.Minn[0]))).Warn("Invalid character in longitude: expecting 0-5 for tens of minutes")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3481,8 +3464,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for minutes.\n", plon.Minn[1])
+			logrus.WithField("found", string(rune(plon.Minn[1]))).Warn("Invalid character in longitude: expecting 0-9 for minutes")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3490,8 +3472,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 
 	if plon.Dot != '.' {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Unexpected character \"%c\" found where period expected in longitude.\n", plon.Dot)
+			logrus.WithField("found", string(rune(plon.Dot))).Warn("Unexpected character where period expected in longitude")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3503,8 +3484,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for tenths of minutes.\n", plon.HMin[0])
+			logrus.WithField("found", string(rune(plon.HMin[0]))).Warn("Invalid character in longitude: expecting 0-9 for tenths of minutes")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3516,8 +3496,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for hundredths of minutes.\n", plon.HMin[1])
+			logrus.WithField("found", string(rune(plon.HMin[1]))).Warn("Invalid character in longitude: expecting 0-9 for hundredths of minutes")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3530,8 +3509,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		return maybe.Just(result)
 	case 'e':
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Warning: Lower case e found for longitude hemisphere.  Specification requires upper case E or W.\n")
+			logrus.Warn("Lower case e found for longitude hemisphere: specification requires upper case E or W")
 		}
 
 		return maybe.Just(result)
@@ -3539,15 +3517,13 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		return maybe.Just(-result)
 	case 'w':
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Warning: Lower case w found for longitude hemisphere.  Specification requires upper case E or W.\n")
+			logrus.Warn("Lower case w found for longitude hemisphere: specification requires upper case E or W")
 		}
 
 		return maybe.Just(-result)
 	default:
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error: '%c' found for longitude hemisphere.  Specification requires upper case E or W.\n", plon.EW)
+			logrus.WithField("found", string(rune(plon.EW))).Warn("Invalid longitude hemisphere: specification requires upper case E or W")
 		}
 
 		return maybe.Nothing[float64]()
@@ -3641,8 +3617,7 @@ func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam // 
 		!unicode.IsDigit(rune(p[5])) ||
 		(p[6] != 'z' && p[6] != '/' && p[6] != 'h') {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Timestamp must be 6 digits followed by z, h, or /.\n")
+			logrus.WithField("timestamp", string(p[:])).Warn("Timestamp must be 6 digits followed by z, h, or /")
 		}
 
 		return time.Time{}

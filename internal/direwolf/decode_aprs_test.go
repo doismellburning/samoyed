@@ -8,6 +8,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -331,8 +332,14 @@ func Test_decode_aprs_quiet_bad_timestamp(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>APDW17:@09234Xz4903.50N/07201.75W-", true)
 	assert.NotNil(t, pp)
 
-	var out = captureStdout(t, func() {
-		DecodeAPRS(pp, true, "")
-	})
-	assert.NotContains(t, out, "Timestamp must be")
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	DecodeAPRS(pp, true, "")
+	assert.Empty(t, hook.AllEntries())
+
+	// And a decode that isn't quiet does complain, so the hook would see it.
+	DecodeAPRS(pp, false, "")
+	assert.Contains(t, hook.LastEntry().Message, "Timestamp must be")
 }
