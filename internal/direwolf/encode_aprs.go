@@ -177,7 +177,7 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 
 		presult.C = byte(c + '!')
 
-		var s = math.Round(math.Log(float64(knots)+1.0) / math.Log(1.08))
+		var s = min(math.Round(math.Log(float64(knots)+1.0)/math.Log(1.08)), 93)
 		presult.S = byte(s + '!')
 
 		presult.T = 0x26 + '!' /* current, other tracker. */

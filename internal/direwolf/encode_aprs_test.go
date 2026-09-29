@@ -114,3 +114,13 @@ func Test_encode_object_timestamp_is_24_hour_utc(t *testing.T) {
 
 	assert.Equal(t, ";Q1TEST   *261730z", info[:18])
 }
+
+// The compressed speed byte is 1.08^(s-33) - 1 knots.  An unrealistically fast
+// speed must still come out as printable, as the radio range beside it does,
+// rather than running past '~' into bytes that aren't ASCII.
+func Test_compressed_position_speed_is_printable(t *testing.T) {
+	var none = maybe.Nothing[int]()
+
+	var c = compressed_position('/', '>', 0, 0, none, none, none, maybe.Just(90), maybe.Just(1000000))
+	assert.Equal(t, byte('~'), c.S)
+}
