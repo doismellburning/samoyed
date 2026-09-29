@@ -124,3 +124,19 @@ func Test_compressed_position_speed_is_printable(t *testing.T) {
 	var c = compressed_position('/', '>', 0, 0, none, none, none, maybe.Just(90), maybe.Just(1000000))
 	assert.Equal(t, byte('~'), c.S)
 }
+
+// The compressed course wraps however many turns it is given, as the
+// uncompressed course/speed extension's does.  Wrapping only once let 720
+// degrees through as '{', which marks the byte after it as radio range instead
+// of speed.
+func Test_compressed_position_course_wraps(t *testing.T) {
+	var none = maybe.Nothing[int]()
+
+	for _, degrees := range []int{0, 360, 720, -360, -720} {
+		var c = compressed_position('/', '>', 0, 0, none, none, none, maybe.Just(degrees), maybe.Just(10))
+		assert.Equal(t, byte('!'), c.C, degrees)
+	}
+
+	var c = compressed_position('/', '>', 0, 0, none, none, none, maybe.Just(-90), maybe.Just(10))
+	assert.Equal(t, byte('!'+68), c.C, "-90, as 270 rounds to 272")
+}

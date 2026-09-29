@@ -124,14 +124,8 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 		var c int
 
 		if degrees, known := course.Get(); known {
-			c = (degrees + 2) / 4
-			if c < 0 {
-				c += 90
-			}
-
-			if c >= 90 {
-				c -= 90
-			}
+			// Into 0 - 359 first, as Go's division truncates toward zero.
+			c = (((degrees%360)+360)%360 + 2) / 4 % 90
 		}
 
 		pos.C = byte(c + '!')
