@@ -19,6 +19,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -66,7 +67,7 @@ var kissNetSvc *KissNetService
 var kissPT *KissPT
 var kissSerial *KissSerial
 var agwServer *AGWServer
-var mheardDB *MHeardDB
+var mheardDB *mheard.DB
 var aprsDigipeater *Digipeater
 var connectedDigipeater *ConnectedDigipeater
 var pttControl *PTT
@@ -649,7 +650,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the digipeater and IGate functions.
 	 */
-	mheardDB = NewMHeardDB(d_m_opt)
+	mheardDB = mheard.New(d_m_opt)
 	var packetFilter = NewPacketFilter(&igate_config, d_f_opt)
 	aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter)
 	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, d_i_opt)
@@ -1036,7 +1037,8 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		// Add to list of stations heard over the radio.
 
-		mheardDB.SaveRF(channel, A, pp, alevel, retries)
+		var lat, lon = mheardPosition(A)
+		mheardDB.SaveRF(channel, pp, lat, lon)
 
 		// For AIS, we have an option to convert the NMEA format, in User Defined data,
 		// into an APRS "Object Report" and send that to the clients as well.
@@ -1270,4 +1272,18 @@ func countOf(n int, noun string) string {
 	}
 
 	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// mheardPosition is the position the stations-heard list should record for a
+// decoded packet: its location if it is a position report, and nothing otherwise.
+func mheardPosition(A *decode_aprs_t) (maybe.Maybe[float64], maybe.Maybe[float64]) {
+	// Issue 545.  This was not thought out well.
+	// There was a case where a station sent a position report and the location was stored.
+	// Later, the same station sent an object report and the stations's location was overwritten
+	// by the object location.  Solution: Save location only if position report.
+	if A.g_packet_type != packet_type_position {
+		return maybe.Nothing[float64](), maybe.Nothing[float64]()
+	}
+
+	return A.g_lat, A.g_lon
 }

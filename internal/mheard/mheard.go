@@ -1,26 +1,28 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-/*------------------------------------------------------------------
- *
- * Purpose:	Maintain a list of all stations heard.
- *
- * Description: This was added for IGate statistics and checking if a user is local
- *		but would also be useful for the AGW network protocol 'H' request.
- *
- *		This application has no GUI and is not interactive so
- *		I'm not sure what else we might do with the information.
- *
- *		Why mheard instead of just heard?  The KPC-3+ has an MHEARD command
- *		to list stations heard.  I guess that stuck in my mind.
- *		It should be noted that here "heard" refers to the AX.25 source station.
- *		Before printing the received packet, the "heard" line refers to who
- *		we heard over the radio.  This would be the digipeater with "*" after
- *		its name.
- *
- * Future Ideas: Someone suggested using SQLite to store the information
- *		so other applications could access it.
- *
- *------------------------------------------------------------------*/
+// Package mheard maintains a list of all stations heard, over the radio or
+// from an Internet Server, for IGate statistics and for checking whether a
+// station is local.
+//
+// From Dire Wolf's mheard.c:
+//
+//	This was added for IGate statistics and checking if a user is local
+//	but would also be useful for the AGW network protocol 'H' request.
+//
+//	This application has no GUI and is not interactive so
+//	I'm not sure what else we might do with the information.
+//
+//	Why mheard instead of just heard?  The KPC-3+ has an MHEARD command
+//	to list stations heard.  I guess that stuck in my mind.
+//	It should be noted that here "heard" refers to the AX.25 source station.
+//	Before printing the received packet, the "heard" line refers to who
+//	we heard over the radio.  This would be the digipeater with "*" after
+//	its name.
+//
+//	Future Ideas: Someone suggested using SQLite to store the information
+//	so other applications could access it.
+package mheard
 
 import (
 	"fmt"
@@ -34,13 +36,14 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 /*
  * Information for each station heard over the radio or from Internet Server.
  */
 
-type mheard_t struct {
+type station struct {
 	callsign string // Callsign from the AX.25 source field.
 
 	count int // Number of times heard.
@@ -49,12 +52,12 @@ type mheard_t struct {
 
 	channel int // Most recent channel where heard.
 
-	num_digi_hops int // Number of digipeater hops before we heard it.
+	numDigiHops int // Number of digipeater hops before we heard it.
 	// over radio.  Zero when heard directly.
 
-	last_heard_rf time.Time // Timestamp when last heard over the radio.
+	lastHeardRF time.Time // Timestamp when last heard over the radio.
 
-	last_heard_is time.Time // Timestamp when last heard from Internet Server.
+	lastHeardIS time.Time // Timestamp when last heard from Internet Server.
 
 	dlat, dlon maybe.Maybe[float64] // Last position.
 
@@ -67,18 +70,18 @@ type mheard_t struct {
 	// first heard in addition to last heard.
 }
 
-// MHeardDB maintains a list of all stations heard over the radio or from an
+// DB maintains a list of all stations heard over the radio or from an
 // Internet Server.  It is getting updated from two different threads so we
 // need a critical region for adding new nodes.
-type MHeardDB struct {
+type DB struct {
 	mu    sync.RWMutex
-	db    map[string]*mheard_t
+	db    map[string]*station
 	debug int
 }
 
 /*------------------------------------------------------------------
  *
- * Function:	NewMHeardDB
+ * Function:	New
  *
  * Purpose:	Initialization at start of application.
  *
@@ -86,43 +89,43 @@ type MHeardDB struct {
  *
  *------------------------------------------------------------------*/
 
-func NewMHeardDB(debug int) *MHeardDB {
-	var mdb = new(MHeardDB)
+func New(debug int) *DB {
+	var mdb = new(DB)
 
-	mdb.db = make(map[string]*mheard_t)
+	mdb.db = make(map[string]*station)
 	mdb.debug = debug
 
 	return mdb
-} /* end NewMHeardDB */
+} /* end New */
 
 /*------------------------------------------------------------------
  *
  * Function:	dump
  *
- * Purpose:	Print list of stations heard for debugging.
+ * Purpose:	Log list of stations heard for debugging.
  *
  *------------------------------------------------------------------*/
 
-/* convert some time in past to hours:minutes text format. */
+/* convert some time in past to hours:minutes text format, or - if never. */
 
-func mheard_age(now, t time.Time) string {
+func age(now, t time.Time) string {
 	if t.IsZero() {
-		return "-  "
+		return "-"
 	}
 
 	var d = now.Sub(t)
 
-	return fmt.Sprintf("%4d:%02d", int(d.Hours()), int(d.Minutes())%60)
+	return fmt.Sprintf("%d:%02d", int(d.Hours()), int(d.Minutes())%60)
 }
 
 /* Convert latitude, longitude to text or - if not defined. */
 
-func mheard_latlon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string {
+func latLon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string {
 	var text = maybe.LiftA2(func(lat float64, lon float64) string {
-		return fmt.Sprintf("%6.2f %7.2f", lat, lon)
+		return fmt.Sprintf("%.2f %.2f", lat, lon)
 	}, dlat, dlon)
 
-	return maybe.FromMaybe("   -       -  ", text)
+	return maybe.FromMaybe("-", text)
 }
 
 /*------------------------------------------------------------------
@@ -133,22 +136,14 @@ func mheard_latlon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string 
  *
  * Inputs:	channel	- Radio channel where heard.
  *
- *		A	- Exploded information from APRS packet.
- *
  *		pp	- Received packet object.
  *
- * 		alevel	- audio level.
- *
- *		retries	- Amount of effort to get a good CRC.
- *
- * Description:	Calling sequence was copied from "PacketLogger.Write."
- *		It has a lot more than what we currently keep but the
- *		hooks are there so it will be easy to capture additional
- *		information when the need arises.
+ *		lat, lon - Position it reported, if any.  Recorded only
+ *			  when both are present.
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel) {
+func (mdb *DB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float64], lon maybe.Maybe[float64]) {
 	var now = time.Now()
 
 	var source = pp.AddrWithSSID(ax25.Source)
@@ -217,16 +212,18 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *ax25.Packet, alev
 		 * Not heard before.  Add it.
 		 */
 		if mdb.debug > 0 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("mheard SaveRF: %s %d - added new\n", source, hops)
+			logrus.WithFields(logrus.Fields{
+				"callsign": source,
+				"hops":     hops,
+			}).Debug("mheard SaveRF: added new station")
 		}
 
-		mptr = new(mheard_t)
+		mptr = new(station)
 		mptr.callsign = source
 		mptr.count = 1
 		mptr.channel = channel
-		mptr.num_digi_hops = hops
-		mptr.last_heard_rf = now
+		mptr.numDigiHops = hops
+		mptr.lastHeardRF = now
 		// Why did I not save the location for a position report here?
 
 		mdb.db[source] = mptr
@@ -237,37 +234,35 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *ax25.Packet, alev
 		 * several times.  First direct, then thru various digipeater paths.
 		 * We are interested in the shortest path if heard very recently.
 		 */
-		if hops > mptr.num_digi_hops && now.Sub(mptr.last_heard_rf).Seconds() < 15 {
+		if hops > mptr.numDigiHops && now.Sub(mptr.lastHeardRF).Seconds() < 15 {
 			if mdb.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("mheard SaveRF: %s %d - skip because hops was %d %d seconds ago.\n", source, hops, mptr.num_digi_hops, int(now.Sub(mptr.last_heard_rf).Seconds()))
+				logrus.WithFields(logrus.Fields{
+					"callsign":      source,
+					"hops":          hops,
+					"previous_hops": mptr.numDigiHops,
+					"seconds_ago":   int(now.Sub(mptr.lastHeardRF).Seconds()),
+				}).Debug("mheard SaveRF: skipped, heard with fewer hops just before")
 			}
 		} else {
 			if mdb.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("mheard SaveRF: %s %d - update time, was %d hops %d seconds ago.\n", source, hops, mptr.num_digi_hops, int(now.Sub(mptr.last_heard_rf).Seconds()))
+				logrus.WithFields(logrus.Fields{
+					"callsign":      source,
+					"hops":          hops,
+					"previous_hops": mptr.numDigiHops,
+					"seconds_ago":   int(now.Sub(mptr.lastHeardRF).Seconds()),
+				}).Debug("mheard SaveRF: updated station")
 			}
 
 			mptr.count++
 			mptr.channel = channel
-			mptr.num_digi_hops = hops
-			mptr.last_heard_rf = now
+			mptr.numDigiHops = hops
+			mptr.lastHeardRF = now
 		}
 	}
 
-	// Issue 545.  This was not thought out well.
-	// There was a case where a station sent a position report and the location was stored.
-	// Later, the same station sent an object report and the stations's location was overwritten
-	// by the object location.  Solution: Save location only if position report.
-
-	if A.g_packet_type == packet_type_position {
-		var lat, haveLat = A.g_lat.Get()
-		var lon, haveLon = A.g_lon.Get()
-
-		if haveLat && haveLon {
-			mptr.dlat = maybe.Just(lat)
-			mptr.dlon = maybe.Just(lon)
-		}
+	if lat.IsJust() && lon.IsJust() {
+		mptr.dlat = lat
+		mptr.dlon = lon
 	}
 
 	mdb.mu.Unlock()
@@ -275,8 +270,12 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *ax25.Packet, alev
 	if mdb.debug >= 2 {
 		var limit = 10 // normally 30 or 60.  more frequent when debugging.
 
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("mheard debug, %d min, DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d\n", limit, mdb.Count(0, limit), mdb.Count(2, limit), mdb.Count(8, limit))
+		logrus.WithFields(logrus.Fields{
+			"minutes": limit,
+			"DIR_CNT": mdb.Count(0, limit),
+			"LOC_CNT": mdb.Count(2, limit),
+			"RF_CNT":  mdb.Count(8, limit),
+		}).Debug("mheard station counts")
 	}
 
 	if mdb.debug > 0 {
@@ -315,7 +314,7 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *ax25.Packet, alev
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SaveIS(ptext string) {
+func (mdb *DB) SaveIS(ptext string) {
 	var now = time.Now()
 
 	// It is possible that source won't adhere to the AX.25 restrictions.
@@ -350,25 +349,26 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 		 * An earlier example has an APRSdroid station reporting location without using [ham] RF.
 		 */
 		if mdb.debug > 0 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("mheard SaveIS: %s - added new\n", source)
+			logrus.WithField("callsign", source).Debug("mheard SaveIS: added new station")
 		}
 
-		mptr = new(mheard_t)
+		mptr = new(station)
 		mptr.callsign = source
 		mptr.count = 1
-		mptr.last_heard_is = now
+		mptr.lastHeardIS = now
 
 		mdb.db[source] = mptr
 	} else {
 		/* Already there.  Update last heard from IS time. */
 		if mdb.debug > 0 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("mheard SaveIS: %s - update time, was %d seconds ago.\n", source, int(now.Sub(mptr.last_heard_is).Seconds()))
+			logrus.WithFields(logrus.Fields{
+				"callsign":    source,
+				"seconds_ago": int(now.Sub(mptr.lastHeardIS).Seconds()),
+			}).Debug("mheard SaveIS: updated station")
 		}
 
 		mptr.count++
-		mptr.last_heard_is = now
+		mptr.lastHeardIS = now
 	}
 
 	mdb.mu.Unlock()
@@ -383,8 +383,12 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 	if mdb.debug >= 2 {
 		var limit = 10 // normally 30 or 60
 
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("mheard debug, %d min, DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d\n", limit, mdb.Count(0, limit), mdb.Count(2, limit), mdb.Count(8, limit))
+		logrus.WithFields(logrus.Fields{
+			"minutes": limit,
+			"DIR_CNT": mdb.Count(0, limit),
+			"LOC_CNT": mdb.Count(2, limit),
+			"RF_CNT":  mdb.Count(8, limit),
+		}).Debug("mheard station counts")
 	}
 
 	if mdb.debug > 0 {
@@ -400,7 +404,7 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
  *
  *			<IGATE,MSG_CNT=1,LOC_CNT=25
  *
- * Inputs:	max_hops	- Include only stations heard with this number of
+ * Inputs:	maxHops	- Include only stations heard with this number of
  *				  digipeater hops or less.  For reporting, we might use:
  *
  *					0 for DIR_CNT (heard directly)
@@ -408,7 +412,7 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
  *						e.g. 3 for WIDE1-1,WIDE2-2
  *					8 for RF_CNT.
  *
- *		time_limit	- Include only stations heard within this many minutes.
+ *		timeLimit	- Include only stations heard within this many minutes.
  *				  Typically 180.
  *
  * Returns:	Number to be used in the statistics report.
@@ -449,23 +453,26 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
-	var limit = time.Duration(time_limit) * time.Minute
+func (mdb *DB) Count(maxHops int, timeLimit int) int {
+	var limit = time.Duration(timeLimit) * time.Minute
 	var since = time.Now().Add(-limit)
 
 	var count = 0
 
 	mdb.mu.RLock()
 	for _, p := range mdb.db {
-		if !p.last_heard_rf.Before(since) && p.num_digi_hops <= max_hops {
+		if !p.lastHeardRF.Before(since) && p.numDigiHops <= maxHops {
 			count++
 		}
 	}
 	mdb.mu.RUnlock()
 
 	if mdb.debug == 1 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("mheard Count(<= %d digi hops, last %d minutes) returns %d\n", max_hops, int(limit.Minutes()), count)
+		logrus.WithFields(logrus.Fields{
+			"max_hops": maxHops,
+			"minutes":  int(limit.Minutes()),
+			"count":    count,
+		}).Debug("mheard Count")
 	}
 
 	return (count)
@@ -482,10 +489,10 @@ func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
  *
  *		callsign	- Callsign for station.
  *
- *		time_limit	- Include only stations heard within this many minutes.
+ *		timeLimit	- Include only stations heard within this many minutes.
  *				  Typically 180.
  *
- *		max_hops	- Include only stations heard with this number of
+ *		maxHops	- Include only stations heard with this number of
  *				  digipeater hops or less.  For reporting, we might use:
  *
  *		dlat, dlon, km	- Include only stations within distance of location.
@@ -495,8 +502,8 @@ func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit int, max_hops int, dlat maybe.Maybe[float64], dlon maybe.Maybe[float64], km maybe.Maybe[float64]) bool {
-	var time_limit = time.Duration(_time_limit) * time.Minute
+func (mdb *DB) WasRecentlyNearby(role string, callsign string, timeLimitMinutes int, maxHops int, dlat maybe.Maybe[float64], dlon maybe.Maybe[float64], km maybe.Maybe[float64]) bool {
+	var timeLimit = time.Duration(timeLimitMinutes) * time.Minute
 
 	// The distance check needs a complete location to measure from, and a
 	// distance to compare against; without all three it is not applied.
@@ -508,52 +515,57 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
 	mdb.mu.RLock()
 	defer mdb.mu.RUnlock()
 
+	var log = logrus.WithFields(logrus.Fields{
+		"role":     role,
+		"callsign": callsign,
+	})
+
 	if role != "" {
-		text_color_set(DW_COLOR_INFO)
+		var question = log.WithFields(logrus.Fields{
+			"minutes":  int(timeLimit.Minutes()),
+			"max_hops": maxHops,
+		})
 
 		if haveTarget {
-			dw_printf(
-				"Was message %s %s heard in the past %d minutes, with %d or fewer digipeater hops, and within %.1f km of %.2f %.2f?\n",
-				role,
-				callsign,
-				int(time_limit.Minutes()),
-				max_hops,
-				limitKm,
-				targetLat,
-				targetLon,
-			)
-		} else {
-			dw_printf("Was message %s %s heard in the past %d minutes, with %d or fewer digipeater hops?\n", role, callsign, int(time_limit.Minutes()), max_hops)
+			question = question.WithFields(logrus.Fields{
+				"km":  limitKm,
+				"lat": targetLat,
+				"lon": targetLon,
+			})
 		}
+
+		question.Info("Was the station heard recently nearby?")
 	}
 
 	var mptr = mdb.db[callsign]
 
-	if mptr == nil || mptr.last_heard_rf.IsZero() {
+	if mptr == nil || mptr.lastHeardRF.IsZero() {
 		if role != "" {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("No, we have not heard %s over the radio.\n", callsign)
+			log.Info("No, it has not been heard over the radio")
 		}
 
 		return false
 	}
 
 	var now = time.Now()
-	var heard_ago = now.Sub(mptr.last_heard_rf)
+	var heardAgo = now.Sub(mptr.lastHeardRF)
 
-	if heard_ago > time_limit {
+	log = log.WithFields(logrus.Fields{
+		"minutes_ago": int(heardAgo.Minutes()),
+		"hops":        mptr.numDigiHops,
+	})
+
+	if heardAgo > timeLimit {
 		if role != "" {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("No, %s was last heard over the radio %d minutes ago with %d digipeater hops.\n", callsign, int(heard_ago.Minutes()), mptr.num_digi_hops)
+			log.Info("No, it was not heard over the radio recently enough")
 		}
 
 		return false
 	}
 
-	if mptr.num_digi_hops > max_hops {
+	if mptr.numDigiHops > maxHops {
 		if role != "" {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("No, %s was last heard over the radio with %d digipeater hops %d minutes ago.\n", callsign, mptr.num_digi_hops, int(heard_ago.Minutes()))
+			log.Info("No, it was heard over the radio through too many digipeaters")
 		}
 
 		return false
@@ -569,15 +581,13 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
 
 		if dist > limitKm {
 			if role != "" {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("No, %s was %.1f km away although it was %d digipeater hops %d minutes ago.\n", callsign, dist, mptr.num_digi_hops, int(heard_ago.Minutes()))
+				log.WithField("km", dist).Info("No, it was too far away")
 			}
 
 			return false
 		} else {
 			if role != "" {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("Yes, %s last heard over radio %d minutes ago, %d digipeater hops.  Last location %.1f km away.\n", callsign, int(heard_ago.Minutes()), mptr.num_digi_hops, dist)
+				log.WithField("km", dist).Info("Yes, it was heard recently nearby")
 			}
 
 			return true
@@ -587,8 +597,7 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
 	// Passed all the tests.
 
 	if role != "" {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Yes, %s last heard over radio %d minutes ago, %d digipeater hops.\n", callsign, int(heard_ago.Minutes()), mptr.num_digi_hops)
+		log.Info("Yes, it was heard recently nearby")
 	}
 
 	return true
@@ -606,7 +615,7 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SetMSP(callsign string, num int) {
+func (mdb *DB) SetMSP(callsign string, num int) {
 	mdb.mu.Lock()
 	defer mdb.mu.Unlock()
 
@@ -616,12 +625,13 @@ func (mdb *MHeardDB) SetMSP(callsign string, num int) {
 		mptr.msp = num
 
 		if mdb.debug > 0 {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("MSP for %s set to %d\n", callsign, num)
+			logrus.WithFields(logrus.Fields{
+				"callsign": callsign,
+				"msp":      num,
+			}).Debug("mheard MSP set")
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error: Can't find %s to set MSP.\n", callsign)
+		logrus.WithField("callsign", callsign).Error("Internal error: can't find station to set MSP")
 	}
 } /* end SetMSP */
 
@@ -638,7 +648,7 @@ func (mdb *MHeardDB) SetMSP(callsign string, num int) {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) GetMSP(callsign string) int {
+func (mdb *DB) GetMSP(callsign string) int {
 	mdb.mu.RLock()
 	defer mdb.mu.RUnlock()
 
@@ -646,8 +656,10 @@ func (mdb *MHeardDB) GetMSP(callsign string) int {
 
 	if mptr != nil {
 		if mdb.debug > 0 {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("MSP for %s is %d\n", callsign, mptr.msp)
+			logrus.WithFields(logrus.Fields{
+				"callsign": callsign,
+				"msp":      mptr.msp,
+			}).Debug("mheard MSP")
 		}
 
 		return (mptr.msp) // Should we have a time limit?
@@ -656,7 +668,7 @@ func (mdb *MHeardDB) GetMSP(callsign string) int {
 	return (0)
 } /* end GetMSP */
 
-func (mdb *MHeardDB) dump() {
+func (mdb *DB) dump() {
 	mdb.mu.RLock()
 	defer mdb.mu.RUnlock()
 
@@ -664,15 +676,15 @@ func (mdb *MHeardDB) dump() {
 	var stations = slices.Collect(maps.Values(mdb.db))
 
 	/* Sort most recently heard to the top then print. */
-	slices.SortFunc(stations, func(ma, mb *mheard_t) int {
-		var ta = ma.last_heard_rf
-		if ma.last_heard_is.After(ta) {
-			ta = ma.last_heard_is
+	slices.SortFunc(stations, func(ma, mb *station) int {
+		var ta = ma.lastHeardRF
+		if ma.lastHeardIS.After(ta) {
+			ta = ma.lastHeardIS
 		}
 
-		var tb = mb.last_heard_rf
-		if mb.last_heard_is.After(tb) {
-			tb = mb.last_heard_is
+		var tb = mb.lastHeardRF
+		if mb.lastHeardIS.After(tb) {
+			tb = mb.lastHeardIS
 		}
 
 		if ta.Before(tb) {
@@ -684,18 +696,19 @@ func (mdb *MHeardDB) dump() {
 		}
 	})
 
-	text_color_set(DW_COLOR_DEBUG)
-
-	dw_printf("callsign  cnt chan hops    RF      IS    lat     long  msp\n")
+	var now = time.Now()
 
 	for _, mptr := range stations {
-		var now = time.Now()
-		var rf = mheard_age(now, mptr.last_heard_rf)
-		var is = mheard_age(now, mptr.last_heard_is)
-		var position = mheard_latlon(mptr.dlat, mptr.dlon)
-
-		dw_printf("%-9s %3d   %d   %d  %7s %7s  %s  %d\n",
-			mptr.callsign, mptr.count, mptr.channel, mptr.num_digi_hops, rf, is, position, mptr.msp)
+		logrus.WithFields(logrus.Fields{
+			"callsign": mptr.callsign,
+			"count":    mptr.count,
+			"channel":  mptr.channel,
+			"hops":     mptr.numDigiHops,
+			"rf_ago":   age(now, mptr.lastHeardRF),
+			"is_ago":   age(now, mptr.lastHeardIS),
+			"position": latLon(mptr.dlat, mptr.dlon),
+			"msp":      mptr.msp,
+		}).Debug("mheard station")
 	}
 } /* end dump */
 

@@ -143,3 +143,20 @@ func Test_reportConfigCheck(t *testing.T) {
 		})
 	}
 }
+
+// TestMheardPosition checks that only a position report's location reaches the
+// stations-heard list, so an object report can't overwrite where its sender is
+// (Dire Wolf issue 545).
+func TestMheardPosition(t *testing.T) {
+	var position = DecodeAPRS(ax25.FromText("Q1TEST>APDW17:!4237.14N/07120.83W#", true), true, "")
+	var lat, lon = mheardPosition(position)
+	assert.True(t, lat.IsJust())
+	assert.True(t, lon.IsJust())
+
+	var object = DecodeAPRS(ax25.FromText("Q1TEST>APDW17:;OBJECT   *111111z4237.14N/07120.83W#", true), true, "")
+	require.True(t, object.g_lat.IsJust(), "the object report should carry a location to ignore")
+
+	lat, lon = mheardPosition(object)
+	assert.Equal(t, maybe.Nothing[float64](), lat)
+	assert.Equal(t, maybe.Nothing[float64](), lon)
+}

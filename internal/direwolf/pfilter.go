@@ -27,6 +27,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/mheard"
 )
 
 // PacketFilter evaluates the FILTER, CFILTER and IGate filter expressions from
@@ -1511,7 +1512,7 @@ func PfilterStandaloneInit(debug_level int) *PacketFilter {
 
 	DecodeAPRSInit()
 
-	mheardDB = NewMHeardDB(0)
+	mheardDB = mheard.New(0)
 
 	return NewPacketFilter(new(igate_config_s), debug_level)
 }

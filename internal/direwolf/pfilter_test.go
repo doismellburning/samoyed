@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -100,7 +102,7 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	var packetFilter = NewPacketFilter(&p_igate_config, 0)
 
 	var saved_mheardDB = mheardDB
-	mheardDB = NewMHeardDB(0)
+	mheardDB = mheard.New(0)
 
 	defer func() { mheardDB = saved_mheardDB }()
 
@@ -110,9 +112,8 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	var heard = ax25.FromText("Q1TEST>APDW17:!4237.14NS07120.83W#", true)
 	require.NotNil(t, heard)
 
-	var alevel ax25.ALevel
-
-	mheardDB.SaveRF(0, DecodeAPRS(heard, true, ""), heard, alevel, BitFixNone)
+	var lat, lon = mheardPosition(DecodeAPRS(heard, true, ""))
+	mheardDB.SaveRF(0, heard, lat, lon)
 
 	var message = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Happy Birthday{001", true)
 	require.NotNil(t, message)
@@ -148,9 +149,8 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 		var pp = ax25.FromText(monitor, true)
 		require.NotNil(t, pp)
 
-		var alevel ax25.ALevel
-
-		mheardDB.SaveRF(0, DecodeAPRS(pp, true, ""), pp, alevel, BitFixNone)
+		var lat, lon = mheardPosition(DecodeAPRS(pp, true, ""))
+		mheardDB.SaveRF(0, pp, lat, lon)
 	}
 
 	var testCases = []struct {
@@ -206,7 +206,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var saved_mheardDB = mheardDB
-			mheardDB = NewMHeardDB(0)
+			mheardDB = mheard.New(0)
 
 			defer func() { mheardDB = saved_mheardDB }()
 
@@ -367,7 +367,11 @@ func Test_PacketFilterMonitorLine_igateFilterWithNothingHeard(t *testing.T) {
 
 	var verdicts []bool
 
-	var output = testutils.CaptureOutput(t, func() {
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	testutils.CaptureOutput(t, func() {
 		verdicts = pfilterMonitorLines(t, packetFilter, MAX_TOTAL_CHANS, 0, "i/60/0/51.5/-0.1/50", true, packets)
 	})
 
@@ -376,7 +380,10 @@ func Test_PacketFilterMonitorLine_igateFilterWithNothingHeard(t *testing.T) {
 	// The lookup explains itself as it goes, and saying so is how this test
 	// knows it got that far rather than stopping at filt_i's syntax-only
 	// shortcut, which passes a message without asking anything.
-	assert.Contains(t, output, "we have not heard Q2TEST over the radio")
+	var entry = hook.LastEntry()
+	require.NotNil(t, entry)
+	assert.Equal(t, "No, it has not been heard over the radio", entry.Message)
+	assert.Equal(t, "Q2TEST", entry.Data["callsign"])
 }
 
 func Test_PfilterValidate(t *testing.T) {
