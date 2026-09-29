@@ -2244,7 +2244,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 		// 	process_comment() not applicable here because it
 		//	extracts information found in certain formats.
 		A.g_comment = string(info[ptBytes:])
-	} else if get_maidenhead(A, pm6.Mhead6[:]) == 6 {
+	} else if get_maidenhead(pm6.Mhead6[:]) == 6 {
 		/*
 		 * Do we have format with 6 character Maidenhead locator?
 		 */
@@ -2273,7 +2273,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 		//	extracts information found in certain formats.
 
 		A.g_comment = string(info[pm6Bytes:])
-	} else if get_maidenhead(A, pm4.Mhead4[:]) == 4 {
+	} else if get_maidenhead(pm4.Mhead4[:]) == 4 {
 		/*
 		 * Do we have format with 4 character Maidenhead locator?
 		 */
@@ -3731,7 +3731,7 @@ func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam
  *
  *------------------------------------------------------------------*/
 
-func get_maidenhead(A *decode_aprs_t, p []byte) int { //nolint:unparam
+func get_maidenhead(p []byte) int {
 	/* Callers pass whatever field they have, which can be shorter than a */
 	/* locator - the 4 character form is handed exactly 4 bytes. */
 	if len(p) < 4 {
