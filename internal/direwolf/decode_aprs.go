@@ -3670,7 +3670,7 @@ func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam
 		!unicode.IsDigit(rune(p[3])) ||
 		!unicode.IsDigit(rune(p[4])) ||
 		!unicode.IsDigit(rune(p[5])) ||
-		(p[6] != 'z' && p[6] != '/' && p[6] != 'h') { //nolnit:staticcheck
+		(p[6] != 'z' && p[6] != '/' && p[6] != 'h') {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Timestamp must be 6 digits followed by z, h, or /.\n")
 
@@ -3684,26 +3684,14 @@ func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam
 
 	if pdhm.TIC == 'z' || pdhm.TIC == '/' { /* Wrong! */
 		var day = int(pdhm.Day[0]-'0')*10 + int(pdhm.Day[1]-'0')
-		//text_color_set(DW_COLOR_DECODED);
-		//dw_printf("Changing day from %d to %d\n", ptm.tm_mday, j);
-
 		var hour = int(pdhm.Hours[0]-'0')*10 + int(pdhm.Hours[1]-'0')
-		//dw_printf("Changing hours from %d to %d\n", ptm.tm_hour, j);
-
 		var minute = int(pdhm.Minutes[0]-'0')*10 + int(pdhm.Minutes[1]-'0')
-		//dw_printf("Changing minutes from %d to %d\n", ptm.tm_min, j);
 
 		return time.Date(now.Year(), now.Month(), day, hour, minute, 0, 0, time.UTC)
 	} else if phms.TIC == 'h' {
 		var hour = int(phms.Hours[0]-'0')*10 + int(phms.Hours[1]-'0')
-		//text_color_set(DW_COLOR_DECODED);
-		//dw_printf("Changing hours from %d to %d\n", ptm.tm_hour, j);
-
 		var minute = int(phms.Minutes[0]-'0')*10 + int(phms.Minutes[1]-'0')
-		//dw_printf("Changing minutes from %d to %d\n", ptm.tm_min, j);
-
 		var second = int(phms.Seconds[0]-'0')*10 + int(phms.Seconds[1]-'0')
-		//dw_printf("%sChanging seconds from %d to %d\n", ptm.tm_sec, j);
 
 		return time.Date(now.Year(), now.Month(), now.Day(), hour, minute, second, 0, time.UTC)
 	}
