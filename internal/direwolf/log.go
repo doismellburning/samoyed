@@ -32,6 +32,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
 )
 
 type PacketLogger struct {
@@ -76,9 +77,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
 				// Specified directory exists.
 				pl.logPath = path
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Log file location \"%s\" is not a directory.\n", path)
-				dw_printf("Using current working directory \".\" instead.\n")
+				logrus.WithField("path", path).Warn("APRS log location is not a directory, using current working directory instead")
 
 				pl.logPath = "."
 			}
@@ -89,14 +88,10 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
 			var mkdirErr = os.Mkdir(path, 0750)
 			if mkdirErr == nil {
 				// Success.
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("Log file location \"%s\" has been created.\n", path)
+				logrus.WithField("path", path).Info("Created APRS log location")
 				pl.logPath = path
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Failed to create log file location \"%s\".\n", path)
-				dw_printf("%s\n", mkdirErr)
-				dw_printf("Using current working directory \".\" instead.\n")
+				logrus.WithError(mkdirErr).WithField("path", path).Warn("Failed to create APRS log location, using current working directory instead")
 
 				pl.logPath = "."
 			}
@@ -104,8 +99,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
 	} else {
 		// Added in version 1.5.  Single file.
 		// Typically logrotate would be used to keep size under control.
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Log file is \"%s\"\n", path)
+		logrus.WithField("path", path).Info("APRS log file")
 		pl.logPath = path
 	}
 
@@ -167,17 +161,14 @@ func (pl *PacketLogger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, ale
 			var _, statErr = os.Stat(full_path)
 			var already_there = statErr == nil
 
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Opening log file \"%s\".\n", fname)
+			logrus.WithField("path", full_path).Info("Opening APRS log file")
 
 			var f, openErr = os.OpenFile(full_path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec // Happy to trust config-provided log file
 			if openErr == nil {
 				pl.logFp = f
 				pl.openFname = fname
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't open log file \"%s\" for write.\n", full_path)
-				dw_printf("%s\n", openErr)
+				logrus.WithError(openErr).WithField("path", full_path).Error("Can't open APRS log file for write")
 
 				pl.openFname = ""
 
@@ -201,16 +192,13 @@ func (pl *PacketLogger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, ale
 			var _, statErr = os.Stat(pl.logPath)
 			var already_there = statErr == nil
 
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Opening log file \"%s\"\n", pl.logPath)
+			logrus.WithField("path", pl.logPath).Info("Opening APRS log file")
 
 			var f, openErr = os.OpenFile(pl.logPath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec // Happy to trust config-provided log file
 			if openErr == nil {
 				pl.logFp = f
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't open log file \"%s\" for write.\n", pl.logPath)
-				dw_printf("%s\n", openErr)
+				logrus.WithError(openErr).WithField("path", pl.logPath).Error("Can't open APRS log file for write")
 
 				pl.logPath = ""
 
@@ -330,7 +318,7 @@ func (pl *PacketLogger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, ale
 
 		var writeError = w.Error()
 		if writeError != nil {
-			dw_printf("CSV write error: %s", writeError)
+			logrus.WithError(writeError).Error("Can't write to APRS log file")
 		}
 	}
 } /* end Write */
@@ -385,12 +373,15 @@ func (pl *PacketLogger) RRBits(A *aprs.Decoded, pp *ax25.Packet) {
 		// source
 		// station heard
 
-		text_color_set(DW_COLOR_INFO)
-
-		dw_printf("%d %d%d  %d %d%d,%s,%s,%s\n",
-			src_c, (src_rr>>1)&1, src_rr&1,
-			dst_c, (dst_rr>>1)&1, dst_rr&1,
-			smfr, A.Src, heard)
+		logrus.WithFields(logrus.Fields{
+			"src_c":  src_c,
+			"src_rr": fmt.Sprintf("%d%d", (src_rr>>1)&1, src_rr&1),
+			"dst_c":  dst_c,
+			"dst_rr": fmt.Sprintf("%d%d", (dst_rr>>1)&1, dst_rr&1),
+			"system": smfr,
+			"source": A.Src,
+			"heard":  heard,
+		}).Info("C and RR bits")
 	}
 } /* end RRBits */
 
@@ -413,13 +404,7 @@ func (pl *PacketLogger) Close() {
 // closeLocked does the work of Close, assuming pl.mu is already held.
 func (pl *PacketLogger) closeLocked() {
 	if pl.logFp != nil {
-		text_color_set(DW_COLOR_INFO)
-
-		if pl.dailyNames {
-			dw_printf("Closing log file \"%s\".\n", pl.openFname)
-		} else {
-			dw_printf("Closing log file \"%s\".\n", pl.logPath)
-		}
+		logrus.WithField("path", pl.logFp.Name()).Info("Closing APRS log file")
 
 		pl.logFp.Close()
 
