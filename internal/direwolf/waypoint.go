@@ -93,7 +93,7 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *GPS) (*Waypo
 	 * If that fails, do own serial port open.
 	 */
 	if serialRequested {
-		ws.serialPortFd = gps.sharedNMEAPort(mc.waypoint_serial_port, 4800)
+		ws.serialPortFd = gps.SharedNMEAPort(mc.waypoint_serial_port, 4800)
 
 		if ws.serialPortFd == nil {
 			ws.serialPortFd = serialport.Open(mc.waypoint_serial_port, 4800)

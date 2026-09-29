@@ -954,7 +954,7 @@ func Test_BeaconThread_fixed_rate_tracker(t *testing.T) {
 	gpsinfo.SpeedKnots = maybe.Just(10.0)
 
 	bs.gps = new(GPS)
-	bs.gps.setData(gpsinfo)
+	bs.gps.SetData(gpsinfo)
 
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_TRACKER
@@ -980,7 +980,7 @@ func Test_BeaconThread_fixed_rate_tracker_without_position_keeps_schedule(t *tes
 	gpsinfo.Fix = DWFIX_NO_FIX
 
 	bs.gps = new(GPS)
-	bs.gps.setData(gpsinfo)
+	bs.gps.SetData(gpsinfo)
 
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_TRACKER
@@ -1016,7 +1016,7 @@ func Test_BeaconThread_smartbeaconing_tracker(t *testing.T) {
 	gpsinfo.SpeedKnots = maybe.Just(100.0) // Faster than sb_fast_speed.
 
 	bs.gps = new(GPS)
-	bs.gps.setData(gpsinfo)
+	bs.gps.SetData(gpsinfo)
 
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_TRACKER
@@ -1044,7 +1044,7 @@ func Test_BeaconThread_smartbeaconing_tracker_without_position_retries_soon(t *t
 	gpsinfo.Fix = DWFIX_2D // A mode, but never a position.
 
 	bs.gps = new(GPS)
-	bs.gps.setData(gpsinfo)
+	bs.gps.SetData(gpsinfo)
 
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_TRACKER
@@ -1103,7 +1103,7 @@ func Test_NewBeaconService_tbeacon_with_gps_not_ignored(t *testing.T) {
 	var gps = new(GPS)
 	var gpsinfo = new(GPSInfo)
 	gpsinfo.Fix = DWFIX_NO_FIX
-	gps.setData(gpsinfo)
+	gps.SetData(gpsinfo)
 
 	var cfg = new(misc_config_s)
 	cfg.num_beacons = 1
@@ -1118,7 +1118,7 @@ func Test_NewBeaconService_info_on_non_custom_beacons_is_only_complained_about(t
 	var gps = new(GPS)
 	var gpsinfo = new(GPSInfo)
 	gpsinfo.Fix = DWFIX_NO_FIX
-	gps.setData(gpsinfo)
+	gps.SetData(gpsinfo)
 
 	var cfg = new(misc_config_s)
 	cfg.num_beacons = 2

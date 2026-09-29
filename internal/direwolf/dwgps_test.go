@@ -58,7 +58,7 @@ func TestDWGPSReadReturnsWhatWasSet(t *testing.T) {
 	report.Lon = maybe.Just(-71.3)
 	report.Altitude = maybe.Just(33.5)
 
-	gps.setData(report)
+	gps.SetData(report)
 
 	assert.Equal(t, *report, gps.Read())
 }
@@ -76,7 +76,7 @@ func TestDWGPSConcurrentSetAndRead(t *testing.T) {
 			report.Lat = maybe.Just(float64(i))
 			report.Lon = maybe.Just(float64(i))
 
-			gps.setData(report)
+			gps.SetData(report)
 		}
 	})
 

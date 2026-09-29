@@ -111,7 +111,7 @@ func (c *gpsdClient) closeAndClear() {
  *		- Enable streaming of JSON reports.
  *		- Start up thread to process incoming data.
  *		  It reads from the daemon and deposits into
- *		  shared region via GPS.setData.
+ *		  shared region via GPS.SetData.
  *
  * 		The application calls GPS.Read to get the most
  *		recent information.
@@ -190,7 +190,7 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 		dwgps_print("GPSD", info)
 	}
 
-	gps.setData(info)
+	gps.SetData(info)
 
 	// Scan blocks until gpsd says something, which it need not ever do, so
 	// closing the connection is what gets this goroutine back when we are
@@ -214,7 +214,7 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 			dwgps_print("GPSD", info)
 		}
 
-		gps.setData(info)
+		gps.SetData(info)
 	}
 
 	if ctx.Err() != nil {
@@ -231,7 +231,7 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 		dwgps_print("GPSD", info)
 	}
 
-	gps.setData(info)
+	gps.SetData(info)
 
 	gps.gpsd.clearConnIfCurrent(conn)
 

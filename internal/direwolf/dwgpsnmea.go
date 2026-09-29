@@ -41,7 +41,7 @@ import (
 )
 
 // gpsnmeaPort is the serial port a GPS receiver is read from, as opened by
-// dwgpsnmea_init.  The waypoint sender can share it (see GPS.sharedNMEAPort),
+// dwgpsnmea_init.  The waypoint sender can share it (see GPS.SharedNMEAPort),
 // and the reader goroutine closes it and clears fd if the receiver goes away,
 // so fd is guarded by mu.
 //
@@ -69,7 +69,7 @@ type gpsnmeaPort struct {
  *
  *			  If >= 2, location updates are also printed.
  *				(In this file.)
- *				Why not do it in GPS.setData() ?
+ *				Why not do it in GPS.SetData() ?
  *				Here, we can prefix it with GPSNMEA to
  *				distinguish it from GPSD.
  *
@@ -126,10 +126,10 @@ func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug
 	return (1)
 } /* end dwgpsnmea_init */
 
-// sharedNMEAPort returns the GPS receiver's serial port, for the waypoint
+// SharedNMEAPort returns the GPS receiver's serial port, for the waypoint
 // sender to share, if it is the one named, at the same speed, and still open.
 // Otherwise, or for a nil GPS, it returns nil.
-func (g *GPS) sharedNMEAPort(name string, speed int) *term.Term {
+func (g *GPS) SharedNMEAPort(name string, speed int) *term.Term {
 	if g == nil {
 		return nil
 	}
@@ -192,7 +192,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 		dwgps_print("GPSNMEA", info)
 	}
 
-	gps.setData(info)
+	gps.SetData(info)
 
 	var gps_msg string
 
@@ -200,7 +200,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 	// rather than during one: the port is read directly rather than through
 	// something the runtime can interrupt, so closing it would not get this
 	// goroutine back - and this port can be shared with the waypoint sender
-	// (see GPS.sharedNMEAPort), which closes it in its own teardown.
+	// (see GPS.SharedNMEAPort), which closes it in its own teardown.
 	for ctx.Err() == nil {
 		var ch, err = serialport.Get1(fd)
 		if err != nil {
@@ -223,7 +223,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 				dwgps_print("GPSNMEA", info)
 			}
 
-			gps.setData(info)
+			gps.SetData(info)
 
 			// TODO: If the open() was in this thread, we could wait a while and
 			// try to open again.  That would allow recovery if the USB GPS device
@@ -287,7 +287,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 							dwgps_print("GPSNMEA", info)
 						}
 
-						gps.setData(info)
+						gps.SetData(info)
 					}
 				}
 			}

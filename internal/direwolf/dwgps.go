@@ -25,7 +25,7 @@ package direwolf
  *		GPS.Term	Shutdown on exit.
  *
  *
- * from below:	GPS.setData	Called from other two implementations to
+ * from below:	GPS.SetData	Called from other two implementations to
  *				save data until it is needed.
  *
  *---------------------------------------------------------------*/
@@ -79,7 +79,7 @@ type GPSInfo struct {
 }
 
 // GPS holds the most recent position report from whichever GPS receivers
-// NewGPS started.  The reader goroutines deposit it with setData as it
+// NewGPS started.  The reader goroutines deposit it with SetData as it
 // arrives and Read hands a copy to the application; mu keeps the fields of
 // one report together.
 //
@@ -222,15 +222,17 @@ func (g *GPS) Term() {
 
 /*-------------------------------------------------------------------
  *
- * Name:        setData
+ * Name:        SetData
  *
  * Purpose:     Called by the GPS interfaces when new data is available.
+ *		Also for tests elsewhere that need a GPS reporting a
+ *		given location.
  *
  * Inputs:	gpsinfo		- Structure with latitude, longitude, etc.
  *
  *--------------------------------------------------------------------*/
 
-func (g *GPS) setData(gpsinfo *GPSInfo) {
+func (g *GPS) SetData(gpsinfo *GPSInfo) {
 	/* Debug print is handled by the two callers so */
 	/* we can distinguish the source. */
 	g.mu.Lock()
@@ -238,6 +240,6 @@ func (g *GPS) setData(gpsinfo *GPSInfo) {
 	g.info = *gpsinfo
 
 	g.mu.Unlock()
-} /* end setData */
+} /* end SetData */
 
 /* end dwgps.c */
