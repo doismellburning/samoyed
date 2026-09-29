@@ -15,45 +15,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// --- mheard_age ---
+// --- age ---
 
-func TestMheardAge(t *testing.T) {
+func TestAge(t *testing.T) {
 	var now = time.Now()
 
 	t.Run("zero time returns placeholder", func(t *testing.T) {
-		assert.Equal(t, "-", mheard_age(now, time.Time{}))
+		assert.Equal(t, "-", age(now, time.Time{}))
 	})
 
 	t.Run("90 minutes ago", func(t *testing.T) {
-		assert.Equal(t, "1:30", mheard_age(now, now.Add(-90*time.Minute)))
+		assert.Equal(t, "1:30", age(now, now.Add(-90*time.Minute)))
 	})
 
 	t.Run("5 minutes ago", func(t *testing.T) {
-		assert.Equal(t, "0:05", mheard_age(now, now.Add(-5*time.Minute)))
+		assert.Equal(t, "0:05", age(now, now.Add(-5*time.Minute)))
 	})
 
 	t.Run("same moment", func(t *testing.T) {
-		assert.Equal(t, "0:00", mheard_age(now, now))
+		assert.Equal(t, "0:00", age(now, now))
 	})
 }
 
-// --- mheard_latlon ---
+// --- latLon ---
 
-func TestMheardLatlon(t *testing.T) {
+func TestLatLon(t *testing.T) {
 	t.Run("both unknown", func(t *testing.T) {
-		assert.Equal(t, "-", mheard_latlon(maybe.Nothing[float64](), maybe.Nothing[float64]()))
+		assert.Equal(t, "-", latLon(maybe.Nothing[float64](), maybe.Nothing[float64]()))
 	})
 
 	t.Run("lat unknown lon known", func(t *testing.T) {
-		assert.Equal(t, "-", mheard_latlon(maybe.Nothing[float64](), maybe.Just(-71.0)))
+		assert.Equal(t, "-", latLon(maybe.Nothing[float64](), maybe.Just(-71.0)))
 	})
 
 	t.Run("lat known lon unknown", func(t *testing.T) {
-		assert.Equal(t, "-", mheard_latlon(maybe.Just(42.0), maybe.Nothing[float64]()))
+		assert.Equal(t, "-", latLon(maybe.Just(42.0), maybe.Nothing[float64]()))
 	})
 
 	t.Run("both known", func(t *testing.T) {
-		assert.Equal(t, "42.36 -71.06", mheard_latlon(maybe.Just(42.36), maybe.Just(-71.06)))
+		assert.Equal(t, "42.36 -71.06", latLon(maybe.Just(42.36), maybe.Just(-71.06)))
 	})
 }
 
@@ -79,55 +79,55 @@ func TestMHeardDBCount(t *testing.T) {
 
 	t.Run("station heard directly counted", func(t *testing.T) {
 		var mdb = NewMHeardDB(0)
-		mdb.db["W1AW"] = &mheard_t{ //nolint:exhaustruct_v5
-			callsign:      "W1AW",
-			last_heard_rf: now.Add(-10 * time.Minute),
-			num_digi_hops: 0,
+		mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
+			callsign:    "W1AW",
+			lastHeardRF: now.Add(-10 * time.Minute),
+			numDigiHops: 0,
 		}
 		assert.Equal(t, 1, mdb.Count(0, 60))
 	})
 
 	t.Run("station excluded by max hops", func(t *testing.T) {
 		var mdb = NewMHeardDB(0)
-		mdb.db["W2AW"] = &mheard_t{ //nolint:exhaustruct_v5
-			callsign:      "W2AW",
-			last_heard_rf: now.Add(-5 * time.Minute),
-			num_digi_hops: 3,
+		mdb.db["W2AW"] = &station{ //nolint:exhaustruct_v5
+			callsign:    "W2AW",
+			lastHeardRF: now.Add(-5 * time.Minute),
+			numDigiHops: 3,
 		}
 		assert.Equal(t, 0, mdb.Count(2, 60))
 	})
 
 	t.Run("IS-only station not counted", func(t *testing.T) {
 		var mdb = NewMHeardDB(0)
-		mdb.db["IS1"] = &mheard_t{ //nolint:exhaustruct_v5
-			callsign:      "IS1",
-			last_heard_is: now.Add(-5 * time.Minute),
+		mdb.db["IS1"] = &station{ //nolint:exhaustruct_v5
+			callsign:    "IS1",
+			lastHeardIS: now.Add(-5 * time.Minute),
 		}
 		assert.Equal(t, 0, mdb.Count(8, 60))
 	})
 
 	t.Run("old RF station excluded by time limit", func(t *testing.T) {
 		var mdb = NewMHeardDB(0)
-		mdb.db["OLD"] = &mheard_t{ //nolint:exhaustruct_v5
-			callsign:      "OLD",
-			last_heard_rf: now.Add(-120 * time.Minute),
-			num_digi_hops: 0,
+		mdb.db["OLD"] = &station{ //nolint:exhaustruct_v5
+			callsign:    "OLD",
+			lastHeardRF: now.Add(-120 * time.Minute),
+			numDigiHops: 0,
 		}
 		assert.Equal(t, 0, mdb.Count(0, 60))
 	})
 
 	t.Run("multiple stations counted correctly", func(t *testing.T) {
 		var mdb = NewMHeardDB(0)
-		mdb.db["A"] = &mheard_t{last_heard_rf: now.Add(-5 * time.Minute), num_digi_hops: 0}  //nolint:exhaustruct_v5
-		mdb.db["B"] = &mheard_t{last_heard_rf: now.Add(-10 * time.Minute), num_digi_hops: 1} //nolint:exhaustruct_v5
-		mdb.db["C"] = &mheard_t{last_heard_rf: now.Add(-10 * time.Minute), num_digi_hops: 3} //nolint:exhaustruct_v5
-		mdb.db["D"] = &mheard_t{last_heard_is: now.Add(-5 * time.Minute)}                    //nolint:exhaustruct_v5
+		mdb.db["A"] = &station{lastHeardRF: now.Add(-5 * time.Minute), numDigiHops: 0}  //nolint:exhaustruct_v5
+		mdb.db["B"] = &station{lastHeardRF: now.Add(-10 * time.Minute), numDigiHops: 1} //nolint:exhaustruct_v5
+		mdb.db["C"] = &station{lastHeardRF: now.Add(-10 * time.Minute), numDigiHops: 3} //nolint:exhaustruct_v5
+		mdb.db["D"] = &station{lastHeardIS: now.Add(-5 * time.Minute)}                  //nolint:exhaustruct_v5
 		assert.Equal(t, 2, mdb.Count(2, 60))
 	})
 
 	t.Run("debug mode prints message", func(t *testing.T) {
 		var mdb = NewMHeardDB(1)
-		mdb.db["X"] = &mheard_t{last_heard_rf: now.Add(-5 * time.Minute), num_digi_hops: 0} //nolint:exhaustruct_v5
+		mdb.db["X"] = &station{lastHeardRF: now.Add(-5 * time.Minute), numDigiHops: 0} //nolint:exhaustruct_v5
 		assert.Equal(t, 1, mdb.Count(0, 60))
 	})
 }
@@ -146,7 +146,7 @@ func TestMHeardDBSaveRFNewStation(t *testing.T) {
 
 	require.Contains(t, mdb.db, "W1AW")
 	assert.Equal(t, 1, mdb.db["W1AW"].count)
-	assert.Equal(t, 0, mdb.db["W1AW"].num_digi_hops)
+	assert.Equal(t, 0, mdb.db["W1AW"].numDigiHops)
 	assert.Equal(t, 0, mdb.db["W1AW"].channel)
 	assert.Equal(t, maybe.Nothing[float64](), mdb.db["W1AW"].dlat)
 	assert.Equal(t, maybe.Nothing[float64](), mdb.db["W1AW"].dlon)
@@ -187,7 +187,7 @@ func TestMHeardDBSaveRFExistingStationUpdated(t *testing.T) {
 
 	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 	// Push the last-heard time back so the 15-second same-transmission guard doesn't fire.
-	mdb.db["W1AW"].last_heard_rf = time.Now().Add(-30 * time.Second)
+	mdb.db["W1AW"].lastHeardRF = time.Now().Add(-30 * time.Second)
 	mdb.SaveRF(1, pp, saveRFNoLat, saveRFNoLon)
 
 	assert.Equal(t, 2, mdb.db["W1AW"].count)
@@ -200,7 +200,7 @@ func TestMHeardDBSaveRFHigherHopSkippedWithin15s(t *testing.T) {
 	// First: heard directly (0 hops).
 	var ppDirect = ax25.FromText("W1AW>APRS:test", true)
 	mdb.SaveRF(0, ppDirect, saveRFNoLat, saveRFNoLon)
-	assert.Equal(t, 0, mdb.db["W1AW"].num_digi_hops)
+	assert.Equal(t, 0, mdb.db["W1AW"].numDigiHops)
 
 	// Second: heard via one digipeater, but within 15 seconds of the first.
 	var ppVia = ax25.FromText("W1AW>APRS,RELAY*:test", true)
@@ -208,7 +208,7 @@ func TestMHeardDBSaveRFHigherHopSkippedWithin15s(t *testing.T) {
 
 	// Should stay at 1 count and 0 hops (the higher-hop copy is ignored).
 	assert.Equal(t, 1, mdb.db["W1AW"].count)
-	assert.Equal(t, 0, mdb.db["W1AW"].num_digi_hops)
+	assert.Equal(t, 0, mdb.db["W1AW"].numDigiHops)
 }
 
 func TestMHeardDBSaveRFWideHopHackReducesCount(t *testing.T) {
@@ -219,7 +219,7 @@ func TestMHeardDBSaveRFWideHopHackReducesCount(t *testing.T) {
 
 	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 
-	assert.Equal(t, 1, mdb.db["W1AW"].num_digi_hops)
+	assert.Equal(t, 1, mdb.db["W1AW"].numDigiHops)
 }
 
 func TestMHeardDBSaveRFWideHackIgnoresNonZeroSsid(t *testing.T) {
@@ -230,7 +230,7 @@ func TestMHeardDBSaveRFWideHackIgnoresNonZeroSsid(t *testing.T) {
 
 	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 
-	assert.Equal(t, 2, mdb.db["W1AW"].num_digi_hops)
+	assert.Equal(t, 2, mdb.db["W1AW"].numDigiHops)
 }
 
 func TestMHeardDBSaveRFDebug1SkipBranch(t *testing.T) {
@@ -248,7 +248,7 @@ func TestMHeardDBSaveRFDebug1UpdateBranch(t *testing.T) {
 	var mdb = NewMHeardDB(1)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
-	mdb.db["W1AW"].last_heard_rf = time.Now().Add(-30 * time.Second)
+	mdb.db["W1AW"].lastHeardRF = time.Now().Add(-30 * time.Second)
 	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 }
 
@@ -270,16 +270,16 @@ func TestMHeardDBSaveRFDebug2PrintsCountAndDump(t *testing.T) {
 
 // TestMHeardDBDumpSortIsAfterRf calls dump directly with stations whose IS
 // timestamp is newer than their RF timestamp, guaranteeing the
-// "ta = ma.last_heard_is" branch inside the sort comparator is reached.
+// "ta = ma.lastHeardIS" branch inside the sort comparator is reached.
 func TestMHeardDBDumpSortIsAfterRf(t *testing.T) {
 	var mdb = NewMHeardDB(0)
 	var now = time.Now()
 
 	for i, key := range []string{"AA", "BB", "CC", "DD", "EE"} {
-		mdb.db[key] = &mheard_t{ //nolint:exhaustruct_v5
-			callsign:      key,
-			last_heard_rf: now.Add(-time.Duration(60-i*10) * time.Minute),
-			last_heard_is: now.Add(-time.Duration(i*5) * time.Minute),
+		mdb.db[key] = &station{ //nolint:exhaustruct_v5
+			callsign:    key,
+			lastHeardRF: now.Add(-time.Duration(60-i*10) * time.Minute),
+			lastHeardIS: now.Add(-time.Duration(i*5) * time.Minute),
 		}
 	}
 
@@ -295,25 +295,25 @@ func TestMHeardDBDumpSort(t *testing.T) {
 	var sameTime = now.Add(-20 * time.Minute)
 
 	// Two stations with identical effective time → equal comparison (return 0).
-	mdb.db["EQ1"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "EQ1",
-		last_heard_rf: sameTime,
+	mdb.db["EQ1"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "EQ1",
+		lastHeardRF: sameTime,
 	}
-	mdb.db["EQ2"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "EQ2",
-		last_heard_rf: sameTime,
+	mdb.db["EQ2"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "EQ2",
+		lastHeardRF: sameTime,
 	}
 	// A station whose IS time is more recent than its RF time, exercising the
 	// "use IS time" branch inside the comparator.
-	mdb.db["ISLATE"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "ISLATE",
-		last_heard_rf: now.Add(-30 * time.Minute),
-		last_heard_is: now.Add(-5 * time.Minute),
+	mdb.db["ISLATE"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "ISLATE",
+		lastHeardRF: now.Add(-30 * time.Minute),
+		lastHeardIS: now.Add(-5 * time.Minute),
 	}
 	// An older station to ensure at least one before/after comparison.
-	mdb.db["OLD"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "OLD",
-		last_heard_rf: now.Add(-60 * time.Minute),
+	mdb.db["OLD"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "OLD",
+		lastHeardRF: now.Add(-60 * time.Minute),
 	}
 
 	// Trigger dump via SaveRF.
@@ -330,7 +330,7 @@ func TestMHeardDBSaveISNewStation(t *testing.T) {
 
 	require.Contains(t, mdb.db, "W1AW")
 	assert.Equal(t, 1, mdb.db["W1AW"].count)
-	assert.False(t, mdb.db["W1AW"].last_heard_is.IsZero())
+	assert.False(t, mdb.db["W1AW"].lastHeardIS.IsZero())
 }
 
 func TestMHeardDBSaveISExistingStationUpdated(t *testing.T) {
@@ -363,51 +363,51 @@ func TestMHeardDBWasRecentlyNearbyUnknownStation(t *testing.T) {
 
 func TestMHeardDBWasRecentlyNearbyISOnlyStation(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	mdb.db["W1AW"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "W1AW",
-		last_heard_is: time.Now(),
+	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "W1AW",
+		lastHeardIS: time.Now(),
 	}
 	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestMHeardDBWasRecentlyNearbyTooLongAgo(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	mdb.db["W1AW"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "W1AW",
-		last_heard_rf: time.Now().Add(-120 * time.Minute),
-		num_digi_hops: 0,
+	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "W1AW",
+		lastHeardRF: time.Now().Add(-120 * time.Minute),
+		numDigiHops: 0,
 	}
 	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestMHeardDBWasRecentlyNearbyTooManyHops(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	mdb.db["W1AW"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "W1AW",
-		last_heard_rf: time.Now().Add(-10 * time.Minute),
-		num_digi_hops: 3,
+	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "W1AW",
+		lastHeardRF: time.Now().Add(-10 * time.Minute),
+		numDigiHops: 3,
 	}
 	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestMHeardDBWasRecentlyNearbyTrue(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	mdb.db["W1AW"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "W1AW",
-		last_heard_rf: time.Now().Add(-10 * time.Minute),
-		num_digi_hops: 1,
+	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "W1AW",
+		lastHeardRF: time.Now().Add(-10 * time.Minute),
+		numDigiHops: 1,
 	}
 	assert.True(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestMHeardDBWasRecentlyNearbyWithinDistance(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	mdb.db["W1AW"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "W1AW",
-		last_heard_rf: time.Now().Add(-10 * time.Minute),
-		num_digi_hops: 0,
-		dlat:          maybe.Just(42.36),
-		dlon:          maybe.Just(-71.06),
+	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "W1AW",
+		lastHeardRF: time.Now().Add(-10 * time.Minute),
+		numDigiHops: 0,
+		dlat:        maybe.Just(42.36),
+		dlon:        maybe.Just(-71.06),
 	}
 	// Filter at same location → 0 km apart, well within 50 km.
 	assert.True(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Just(42.36), maybe.Just(-71.06), maybe.Just(50.0)))
@@ -415,12 +415,12 @@ func TestMHeardDBWasRecentlyNearbyWithinDistance(t *testing.T) {
 
 func TestMHeardDBWasRecentlyNearbyTooFar(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	mdb.db["W1AW"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "W1AW",
-		last_heard_rf: time.Now().Add(-10 * time.Minute),
-		num_digi_hops: 0,
-		dlat:          maybe.Just(42.36), // Boston
-		dlon:          maybe.Just(-71.06),
+	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "W1AW",
+		lastHeardRF: time.Now().Add(-10 * time.Minute),
+		numDigiHops: 0,
+		dlat:        maybe.Just(42.36), // Boston
+		dlon:        maybe.Just(-71.06),
 	}
 	// Filter at Los Angeles, ~4200 km away.
 	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Just(34.05), maybe.Just(-118.24), maybe.Just(50.0)))
@@ -428,12 +428,12 @@ func TestMHeardDBWasRecentlyNearbyTooFar(t *testing.T) {
 
 func TestMHeardDBWasRecentlyNearbyUnknownStationLocationSkipsDistanceCheck(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	mdb.db["W1AW"] = &mheard_t{ //nolint:exhaustruct_v5
-		callsign:      "W1AW",
-		last_heard_rf: time.Now().Add(-10 * time.Minute),
-		num_digi_hops: 0,
-		dlat:          maybe.Nothing[float64](),
-		dlon:          maybe.Nothing[float64](),
+	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
+		callsign:    "W1AW",
+		lastHeardRF: time.Now().Add(-10 * time.Minute),
+		numDigiHops: 0,
+		dlat:        maybe.Nothing[float64](),
+		dlon:        maybe.Nothing[float64](),
 	}
 	// Distance filter requested but station location unknown → distance check skipped → true.
 	assert.True(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Just(42.36), maybe.Just(-71.06), maybe.Just(50.0)))
@@ -464,20 +464,20 @@ func TestMHeardDBSetMSPUnknownStationDoesNotPanic(t *testing.T) {
 
 func TestMHeardDBSetThenGetMSP(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	mdb.db["W1AW"] = &mheard_t{callsign: "W1AW"} //nolint:exhaustruct_v5
+	mdb.db["W1AW"] = &station{callsign: "W1AW"} //nolint:exhaustruct_v5
 	mdb.SetMSP("W1AW", 5)
 	assert.Equal(t, 5, mdb.GetMSP("W1AW"))
 }
 
 func TestMHeardDBSetMSPDebugPrintsMessage(t *testing.T) {
 	var mdb = NewMHeardDB(1)
-	mdb.db["W1AW"] = &mheard_t{callsign: "W1AW"} //nolint:exhaustruct_v5
+	mdb.db["W1AW"] = &station{callsign: "W1AW"} //nolint:exhaustruct_v5
 	mdb.SetMSP("W1AW", 3)
 	assert.Equal(t, 3, mdb.db["W1AW"].msp)
 }
 
 func TestMHeardDBGetMSPDebugPrintsMessage(t *testing.T) {
 	var mdb = NewMHeardDB(1)
-	mdb.db["W1AW"] = &mheard_t{callsign: "W1AW", msp: 7} //nolint:exhaustruct_v5
+	mdb.db["W1AW"] = &station{callsign: "W1AW", msp: 7} //nolint:exhaustruct_v5
 	assert.Equal(t, 7, mdb.GetMSP("W1AW"))
 }

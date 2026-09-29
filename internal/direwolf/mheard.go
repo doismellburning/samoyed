@@ -41,7 +41,7 @@ import (
  * Information for each station heard over the radio or from Internet Server.
  */
 
-type mheard_t struct {
+type station struct {
 	callsign string // Callsign from the AX.25 source field.
 
 	count int // Number of times heard.
@@ -50,12 +50,12 @@ type mheard_t struct {
 
 	channel int // Most recent channel where heard.
 
-	num_digi_hops int // Number of digipeater hops before we heard it.
+	numDigiHops int // Number of digipeater hops before we heard it.
 	// over radio.  Zero when heard directly.
 
-	last_heard_rf time.Time // Timestamp when last heard over the radio.
+	lastHeardRF time.Time // Timestamp when last heard over the radio.
 
-	last_heard_is time.Time // Timestamp when last heard from Internet Server.
+	lastHeardIS time.Time // Timestamp when last heard from Internet Server.
 
 	dlat, dlon maybe.Maybe[float64] // Last position.
 
@@ -73,7 +73,7 @@ type mheard_t struct {
 // need a critical region for adding new nodes.
 type MHeardDB struct {
 	mu    sync.RWMutex
-	db    map[string]*mheard_t
+	db    map[string]*station
 	debug int
 }
 
@@ -90,7 +90,7 @@ type MHeardDB struct {
 func NewMHeardDB(debug int) *MHeardDB {
 	var mdb = new(MHeardDB)
 
-	mdb.db = make(map[string]*mheard_t)
+	mdb.db = make(map[string]*station)
 	mdb.debug = debug
 
 	return mdb
@@ -106,7 +106,7 @@ func NewMHeardDB(debug int) *MHeardDB {
 
 /* convert some time in past to hours:minutes text format, or - if never. */
 
-func mheard_age(now, t time.Time) string {
+func age(now, t time.Time) string {
 	if t.IsZero() {
 		return "-"
 	}
@@ -118,7 +118,7 @@ func mheard_age(now, t time.Time) string {
 
 /* Convert latitude, longitude to text or - if not defined. */
 
-func mheard_latlon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string {
+func latLon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string {
 	var text = maybe.LiftA2(func(lat float64, lon float64) string {
 		return fmt.Sprintf("%.2f %.2f", lat, lon)
 	}, dlat, dlon)
@@ -216,12 +216,12 @@ func (mdb *MHeardDB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float6
 			}).Debug("mheard SaveRF: added new station")
 		}
 
-		mptr = new(mheard_t)
+		mptr = new(station)
 		mptr.callsign = source
 		mptr.count = 1
 		mptr.channel = channel
-		mptr.num_digi_hops = hops
-		mptr.last_heard_rf = now
+		mptr.numDigiHops = hops
+		mptr.lastHeardRF = now
 		// Why did I not save the location for a position report here?
 
 		mdb.db[source] = mptr
@@ -232,13 +232,13 @@ func (mdb *MHeardDB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float6
 		 * several times.  First direct, then thru various digipeater paths.
 		 * We are interested in the shortest path if heard very recently.
 		 */
-		if hops > mptr.num_digi_hops && now.Sub(mptr.last_heard_rf).Seconds() < 15 {
+		if hops > mptr.numDigiHops && now.Sub(mptr.lastHeardRF).Seconds() < 15 {
 			if mdb.debug > 0 {
 				logrus.WithFields(logrus.Fields{
 					"callsign":      source,
 					"hops":          hops,
-					"previous_hops": mptr.num_digi_hops,
-					"seconds_ago":   int(now.Sub(mptr.last_heard_rf).Seconds()),
+					"previous_hops": mptr.numDigiHops,
+					"seconds_ago":   int(now.Sub(mptr.lastHeardRF).Seconds()),
 				}).Debug("mheard SaveRF: skipped, heard with fewer hops just before")
 			}
 		} else {
@@ -246,15 +246,15 @@ func (mdb *MHeardDB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float6
 				logrus.WithFields(logrus.Fields{
 					"callsign":      source,
 					"hops":          hops,
-					"previous_hops": mptr.num_digi_hops,
-					"seconds_ago":   int(now.Sub(mptr.last_heard_rf).Seconds()),
+					"previous_hops": mptr.numDigiHops,
+					"seconds_ago":   int(now.Sub(mptr.lastHeardRF).Seconds()),
 				}).Debug("mheard SaveRF: updated station")
 			}
 
 			mptr.count++
 			mptr.channel = channel
-			mptr.num_digi_hops = hops
-			mptr.last_heard_rf = now
+			mptr.numDigiHops = hops
+			mptr.lastHeardRF = now
 		}
 	}
 
@@ -350,10 +350,10 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 			logrus.WithField("callsign", source).Debug("mheard SaveIS: added new station")
 		}
 
-		mptr = new(mheard_t)
+		mptr = new(station)
 		mptr.callsign = source
 		mptr.count = 1
-		mptr.last_heard_is = now
+		mptr.lastHeardIS = now
 
 		mdb.db[source] = mptr
 	} else {
@@ -361,12 +361,12 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 		if mdb.debug > 0 {
 			logrus.WithFields(logrus.Fields{
 				"callsign":    source,
-				"seconds_ago": int(now.Sub(mptr.last_heard_is).Seconds()),
+				"seconds_ago": int(now.Sub(mptr.lastHeardIS).Seconds()),
 			}).Debug("mheard SaveIS: updated station")
 		}
 
 		mptr.count++
-		mptr.last_heard_is = now
+		mptr.lastHeardIS = now
 	}
 
 	mdb.mu.Unlock()
@@ -402,7 +402,7 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
  *
  *			<IGATE,MSG_CNT=1,LOC_CNT=25
  *
- * Inputs:	max_hops	- Include only stations heard with this number of
+ * Inputs:	maxHops	- Include only stations heard with this number of
  *				  digipeater hops or less.  For reporting, we might use:
  *
  *					0 for DIR_CNT (heard directly)
@@ -410,7 +410,7 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
  *						e.g. 3 for WIDE1-1,WIDE2-2
  *					8 for RF_CNT.
  *
- *		time_limit	- Include only stations heard within this many minutes.
+ *		timeLimit	- Include only stations heard within this many minutes.
  *				  Typically 180.
  *
  * Returns:	Number to be used in the statistics report.
@@ -451,15 +451,15 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
-	var limit = time.Duration(time_limit) * time.Minute
+func (mdb *MHeardDB) Count(maxHops int, timeLimit int) int {
+	var limit = time.Duration(timeLimit) * time.Minute
 	var since = time.Now().Add(-limit)
 
 	var count = 0
 
 	mdb.mu.RLock()
 	for _, p := range mdb.db {
-		if !p.last_heard_rf.Before(since) && p.num_digi_hops <= max_hops {
+		if !p.lastHeardRF.Before(since) && p.numDigiHops <= maxHops {
 			count++
 		}
 	}
@@ -467,7 +467,7 @@ func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
 
 	if mdb.debug == 1 {
 		logrus.WithFields(logrus.Fields{
-			"max_hops": max_hops,
+			"max_hops": maxHops,
 			"minutes":  int(limit.Minutes()),
 			"count":    count,
 		}).Debug("mheard Count")
@@ -487,10 +487,10 @@ func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
  *
  *		callsign	- Callsign for station.
  *
- *		time_limit	- Include only stations heard within this many minutes.
+ *		timeLimit	- Include only stations heard within this many minutes.
  *				  Typically 180.
  *
- *		max_hops	- Include only stations heard with this number of
+ *		maxHops	- Include only stations heard with this number of
  *				  digipeater hops or less.  For reporting, we might use:
  *
  *		dlat, dlon, km	- Include only stations within distance of location.
@@ -500,8 +500,8 @@ func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit int, max_hops int, dlat maybe.Maybe[float64], dlon maybe.Maybe[float64], km maybe.Maybe[float64]) bool {
-	var time_limit = time.Duration(_time_limit) * time.Minute
+func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, timeLimitMinutes int, maxHops int, dlat maybe.Maybe[float64], dlon maybe.Maybe[float64], km maybe.Maybe[float64]) bool {
+	var timeLimit = time.Duration(timeLimitMinutes) * time.Minute
 
 	// The distance check needs a complete location to measure from, and a
 	// distance to compare against; without all three it is not applied.
@@ -520,8 +520,8 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
 
 	if role != "" {
 		var question = log.WithFields(logrus.Fields{
-			"minutes":  int(time_limit.Minutes()),
-			"max_hops": max_hops,
+			"minutes":  int(timeLimit.Minutes()),
+			"max_hops": maxHops,
 		})
 
 		if haveTarget {
@@ -537,7 +537,7 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
 
 	var mptr = mdb.db[callsign]
 
-	if mptr == nil || mptr.last_heard_rf.IsZero() {
+	if mptr == nil || mptr.lastHeardRF.IsZero() {
 		if role != "" {
 			log.Info("No, it has not been heard over the radio")
 		}
@@ -546,14 +546,14 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
 	}
 
 	var now = time.Now()
-	var heard_ago = now.Sub(mptr.last_heard_rf)
+	var heardAgo = now.Sub(mptr.lastHeardRF)
 
 	log = log.WithFields(logrus.Fields{
-		"minutes_ago": int(heard_ago.Minutes()),
-		"hops":        mptr.num_digi_hops,
+		"minutes_ago": int(heardAgo.Minutes()),
+		"hops":        mptr.numDigiHops,
 	})
 
-	if heard_ago > time_limit {
+	if heardAgo > timeLimit {
 		if role != "" {
 			log.Info("No, it was not heard over the radio recently enough")
 		}
@@ -561,7 +561,7 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
 		return false
 	}
 
-	if mptr.num_digi_hops > max_hops {
+	if mptr.numDigiHops > maxHops {
 		if role != "" {
 			log.Info("No, it was heard over the radio through too many digipeaters")
 		}
@@ -674,15 +674,15 @@ func (mdb *MHeardDB) dump() {
 	var stations = slices.Collect(maps.Values(mdb.db))
 
 	/* Sort most recently heard to the top then print. */
-	slices.SortFunc(stations, func(ma, mb *mheard_t) int {
-		var ta = ma.last_heard_rf
-		if ma.last_heard_is.After(ta) {
-			ta = ma.last_heard_is
+	slices.SortFunc(stations, func(ma, mb *station) int {
+		var ta = ma.lastHeardRF
+		if ma.lastHeardIS.After(ta) {
+			ta = ma.lastHeardIS
 		}
 
-		var tb = mb.last_heard_rf
-		if mb.last_heard_is.After(tb) {
-			tb = mb.last_heard_is
+		var tb = mb.lastHeardRF
+		if mb.lastHeardIS.After(tb) {
+			tb = mb.lastHeardIS
 		}
 
 		if ta.Before(tb) {
@@ -701,10 +701,10 @@ func (mdb *MHeardDB) dump() {
 			"callsign": mptr.callsign,
 			"count":    mptr.count,
 			"channel":  mptr.channel,
-			"hops":     mptr.num_digi_hops,
-			"rf_ago":   mheard_age(now, mptr.last_heard_rf),
-			"is_ago":   mheard_age(now, mptr.last_heard_is),
-			"position": mheard_latlon(mptr.dlat, mptr.dlon),
+			"hops":     mptr.numDigiHops,
+			"rf_ago":   age(now, mptr.lastHeardRF),
+			"is_ago":   age(now, mptr.lastHeardIS),
+			"position": latLon(mptr.dlat, mptr.dlon),
 			"msp":      mptr.msp,
 		}).Debug("mheard station")
 	}
