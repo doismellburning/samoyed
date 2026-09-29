@@ -29,6 +29,36 @@ func Test_phg_data_extension_partially_specified(t *testing.T) {
 	assert.Equal(t, "PHG0008", phg_data_extension(none, none, none, "N"), "direction only")
 }
 
+// Gain is a single digit, so anything above 9 dB goes out as 9, as power
+// does.  Dire Wolf sent it as 0, claiming no gain at all.
+func Test_phg_data_extension_high_gain(t *testing.T) {
+	var none = maybe.Nothing[int]()
+
+	assert.Equal(t, "PHG0090", phg_data_extension(none, none, maybe.Just(9), ""))
+	assert.Equal(t, "PHG0090", phg_data_extension(none, none, maybe.Just(12), ""))
+}
+
+func Test_phg_data_extension_directivity(t *testing.T) {
+	var none = maybe.Nothing[int]()
+
+	for dir, want := range map[string]string{
+		"":     "PHG0000",
+		"omni": "PHG0000",
+		"NE":   "PHG0001",
+		"E":    "PHG0002",
+		"SE":   "PHG0003",
+		"S":    "PHG0004",
+		"SW":   "PHG0005",
+		"W":    "PHG0006",
+		"NW":   "PHG0007",
+		"N":    "PHG0008",
+		"nw":   "PHG0007",
+		"Se":   "PHG0003",
+	} {
+		assert.Equal(t, want, phg_data_extension(none, none, none, dir), dir)
+	}
+}
+
 func Test_EncodePosition_partially_specified_phg(t *testing.T) {
 	var none = maybe.Nothing[int]()
 	var some = maybe.Just[int]
@@ -83,4 +113,30 @@ func Test_encode_object_timestamp_is_24_hour_utc(t *testing.T) {
 		maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
 
 	assert.Equal(t, ";Q1TEST   *261730z", info[:18])
+}
+
+// The compressed speed byte is 1.08^(s-33) - 1 knots.  An unrealistically fast
+// speed must still come out as printable, as the radio range beside it does,
+// rather than running past '~' into bytes that aren't ASCII.
+func Test_compressed_position_speed_is_printable(t *testing.T) {
+	var none = maybe.Nothing[int]()
+
+	var c = compressed_position('/', '>', 0, 0, none, none, none, maybe.Just(90), maybe.Just(1000000))
+	assert.Equal(t, byte('~'), c.S)
+}
+
+// The compressed course wraps however many turns it is given, as the
+// uncompressed course/speed extension's does.  Wrapping only once let 720
+// degrees through as '{', which marks the byte after it as radio range instead
+// of speed.
+func Test_compressed_position_course_wraps(t *testing.T) {
+	var none = maybe.Nothing[int]()
+
+	for _, degrees := range []int{0, 360, 720, -360, -720} {
+		var c = compressed_position('/', '>', 0, 0, none, none, none, maybe.Just(degrees), maybe.Just(10))
+		assert.Equal(t, byte('!'), c.C, degrees)
+	}
+
+	var c = compressed_position('/', '>', 0, 0, none, none, none, maybe.Just(-90), maybe.Just(10))
+	assert.Equal(t, byte('!'+68), c.C, "-90, as 270 rounds to 272")
 }
