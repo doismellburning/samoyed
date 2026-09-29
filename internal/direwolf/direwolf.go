@@ -1036,7 +1036,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		// Add to list of stations heard over the radio.
 
-		mheardDB.SaveRF(channel, A, pp, alevel, retries)
+		mheardDB.SaveRF(channel, A, pp)
 
 		// For AIS, we have an option to convert the NMEA format, in User Defined data,
 		// into an APRS "Object Report" and send that to the clients as well.

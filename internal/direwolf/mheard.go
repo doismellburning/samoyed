@@ -137,18 +137,9 @@ func mheard_latlon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string 
  *
  *		pp	- Received packet object.
  *
- * 		alevel	- audio level.
- *
- *		retries	- Amount of effort to get a good CRC.
- *
- * Description:	Calling sequence was copied from "PacketLogger.Write."
- *		It has a lot more than what we currently keep but the
- *		hooks are there so it will be easy to capture additional
- *		information when the need arises.
- *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel) {
+func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *ax25.Packet) {
 	var now = time.Now()
 
 	var source = pp.AddrWithSSID(ax25.Source)
