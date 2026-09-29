@@ -271,9 +271,10 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 
 	if !quiet {
 		if atemp == "RFONLY" || atemp == "NOGATE" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("RFONLY and NOGATE must not appear in the destination address field.\n")
-			dw_printf("They should appear only at the end of the digi via path.\n")
+			logrus.WithFields(logrus.Fields{
+				"destination": A.g_dest,
+				"hint":        "They should appear only at the end of the digi via path",
+			}).Warn("RFONLY and NOGATE must not appear in the destination address field")
 		}
 	}
 
@@ -283,9 +284,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 		atemp = pp.AddrNoSSID(ax25.Repeater1 + i)
 		if !quiet {
 			if atemp == "RELAY" || atemp == "WIDE" || atemp == "TRACE" {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("RELAY, TRACE, and WIDE (not WIDEn) are obsolete.\n")
-				dw_printf("Modern digipeaters will not recoginize these.\n")
+				logrus.WithField("hint", "Modern digipeaters will not recognize these").Warn("RELAY, TRACE, and WIDE (not WIDEn) are obsolete")
 			}
 		}
 	}
@@ -337,13 +336,15 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 	 */
 
 	if !A.g_quiet && bytes.Contains(pinfo, []byte{0}) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("'nul' character found in Information part.  This should never happen with APRS.\n")
-		dw_printf("If this is meant to be APRS, %s is transmitting with defective software.\n", A.g_src)
-
+		var hint = "If this is meant to be APRS, the source is transmitting with defective software"
 		if bytes.HasPrefix(pinfo, []byte("4P")) {
-			dw_printf("The TM-D710 will do this intermittently.  A firmware upgrade is needed to fix it.\n")
+			hint = "The TM-D710 will do this intermittently.  A firmware upgrade is needed to fix it"
 		}
+
+		logrus.WithFields(logrus.Fields{
+			"source": A.g_src,
+			"hint":   hint,
+		}).Warn("'nul' character found in Information part.  This should never happen with APRS")
 	}
 
 	/*
@@ -2024,8 +2025,7 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 		// The name ran to the end of the information field, so there is no
 		// live/killed indicator and nowhere for a position to be.
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Item name is not followed by the ! or _ that should end it.\n")
+			logrus.WithField("name", string(name)).Warn("Item name is not followed by the ! or _ that should end it")
 		}
 
 		A.g_data_type_desc = "Item - name not ended by ! or _"
@@ -2035,8 +2035,7 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 
 	if len(name) < 3 || len(name) > 9 {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Item name \"%s\" is %d characters, not the 3 to 9 required.\n", name, len(name))
+			logrus.WithField("name", string(name)).Warn("Item name is not the 3 to 9 characters required")
 		}
 	}
 
@@ -2050,8 +2049,7 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 		A.g_data_type_desc = "Killed Item"
 	default:
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Item name not followed by ! or _.\n")
+			logrus.WithField("name", string(name)).Warn("Item name not followed by ! or _")
 		}
 
 		A.g_data_type_desc = "Object - invalid live/killed"
@@ -2080,8 +2078,7 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 		process_comment(A, info[compressedPositionBytes:])
 	default:
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Item has only %d bytes after the live/killed indicator, too few for a position.\n", len(info))
+			logrus.WithField("length", len(info)).Warn("Item has too few bytes after the live/killed indicator for a position")
 		}
 	}
 }
@@ -2217,8 +2214,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 
 		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid symbol table code '%c' not one of / \\ A-Z 0-9\n", A.g_symbol_table)
+				logrus.WithField("symbol_table", string(rune(A.g_symbol_table))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 			}
 
 			A.g_symbol_table = '/'
@@ -2226,8 +2222,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 
 		if pm6.Space != ' ' && pm6.Space != 0 {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Error: Found '%c' instead of space required after symbol code.\n", pm6.Space)
+				logrus.WithField("found", string(rune(pm6.Space))).Warn("Found something other than the space required after symbol code")
 			}
 		}
 
@@ -2246,8 +2241,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 
 		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid symbol table code '%c' not one of / \\ A-Z 0-9\n", A.g_symbol_table)
+				logrus.WithField("symbol_table", string(rune(A.g_symbol_table))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 			}
 
 			A.g_symbol_table = '/'
@@ -2255,8 +2249,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 
 		if pm4.Space != ' ' && pm4.Space != 0 {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Error: Found '%c' instead of space required after symbol code.\n", pm4.Space)
+				logrus.WithField("found", string(rune(pm4.Space))).Warn("Found something other than the space required after symbol code")
 			}
 		}
 
@@ -2358,8 +2351,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte) {
 	var before, after, found = bytes.Cut(info[1:], []byte{'?'})
 	if !found {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("General Query must have ? after the query type.\n")
+			logrus.Warn("General Query must have ? after the query type")
 		}
 
 		return
@@ -2386,8 +2378,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte) {
 
 		if latErr != nil || lat < -90 || lat > 90 {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid latitude for General Query footprint.\n")
+				logrus.WithField("latitude", string(parts[0])).Warn("Invalid latitude for General Query footprint")
 			}
 
 			return
@@ -2397,8 +2388,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte) {
 
 		if lonErr != nil || lon < -180 || lon > 180 {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid longitude for General Query footprint.\n")
+				logrus.WithField("longitude", string(parts[1])).Warn("Invalid longitude for General Query footprint")
 			}
 
 			return
@@ -2408,8 +2398,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte) {
 
 		if radiusErr != nil || radius <= 0 || radius > 9999 {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid radius for General Query footprint.\n")
+				logrus.WithField("radius", string(parts[2])).Warn("Invalid radius for General Query footprint")
 			}
 
 			return
@@ -2425,8 +2414,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte) {
 		A.g_footprint_radius = maybe.Just(radius)
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't parse latitude,longitude,radius for General Query footprint.\n")
+			logrus.WithField("footprint", string(after)).Warn("Can't parse latitude,longitude,radius for General Query footprint")
 		}
 
 		return
@@ -2550,8 +2538,7 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 		var aisData, aisErr = ais.Parse(string(info[3:]))
 		if aisErr != nil {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("%v\n", aisErr)
+				logrus.WithError(aisErr).Warn("Invalid AIS data")
 			}
 
 			if aisData == nil {
@@ -2657,8 +2644,7 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
 
 	if len(info) <= positionlessWeatherHeaderBytes {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Positionless weather report is too short to hold any weather data.\n")
+			logrus.WithField("length", len(info)).Warn("Positionless weather report is too short to hold any weather data")
 		}
 
 		return
@@ -2770,16 +2756,14 @@ func weather_data(A *decode_aprs_t, wdata []byte) {
 		A.g_course, wp, found = getwdata(wp, 'c', 3)
 		if !found {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Didn't find wind direction in form c999.\n")
+				logrus.Warn("Didn't find wind direction in form c999")
 			}
 		}
 
 		A.g_speed_mph, wp, found = getwdata(wp, 's', 3) /* MPH here */
 		if !found {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Didn't find wind speed in form s999.\n")
+				logrus.Warn("Didn't find wind speed in form s999")
 			}
 		}
 	}
@@ -2813,8 +2797,7 @@ func weather_data(A *decode_aprs_t, wdata []byte) {
 		}
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Didn't find wind gust in form g999.\n")
+			logrus.Warn("Didn't find wind gust in form g999")
 		}
 	}
 
@@ -2825,8 +2808,7 @@ func weather_data(A *decode_aprs_t, wdata []byte) {
 		}
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Didn't find temperature in form t999.\n")
+			logrus.Warn("Didn't find temperature in form t999")
 		}
 	}
 
@@ -4011,9 +3993,10 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 	if clen > len(A.g_comment)-1 {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Comment is extremely long, %d characters.\n", clen)
-			dw_printf("Please report this, along with surrounding lines, so we can find the cause.\n")
+			logrus.WithFields(logrus.Fields{
+				"length": clen,
+				"hint":   "Please report this, along with surrounding lines, so we can find the cause",
+			}).Warn("Comment is extremely long")
 		}
 	}
 
@@ -4069,9 +4052,10 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 		if bytes.HasPrefix(smtemp, []byte("MHz")) {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Warning: \"%s\" has non-standard capitalization and might not be recognized by some systems.\n", smtemp)
-				dw_printf("For best compatibility, it should be exactly like this: \"MHz\"  (upper,upper,lower case)\n")
+				logrus.WithFields(logrus.Fields{
+					"found": string(smtemp),
+					"hint":  "For best compatibility, it should be exactly like this: \"MHz\" (upper, upper, lower case)",
+				}).Warn("Non-standard capitalization might not be recognized by some systems")
 			}
 		}
 
@@ -4115,15 +4099,13 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 			if A.g_tone.IsNothing() {
 				if !A.g_quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Bad CTCSS/PL specification: \"%s\"\n", sttemp)
-					dw_printf("Integer does not correspond to standard tone.\n")
+					logrus.WithField("found", string(sttemp)).Warn("Bad CTCSS/PL specification: integer does not correspond to standard tone")
 				}
 			}
 
 			commentData = cutBytes(commentData, match[0], match[1])
 		} else if match := std_toff_re.FindSubmatchIndex(commentData); match != nil {
-			dw_printf("NO tone\n")
+			logrus.Debug("Comment says there is no CTCSS tone")
 
 			A.g_tone = maybe.Just(0.0)
 
@@ -4322,9 +4304,10 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			if !A.g_quiet {
 				var good = fmt.Sprintf("%07.3fMHz", x)
 
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("\"%s\" in comment looks like a frequency in non-standard format.\n", bad)
-				dw_printf("For most systems to recognize it, use exactly this form \"%s\" at beginning of comment.\n", good)
+				logrus.WithFields(logrus.Fields{
+					"found": string(bad),
+					"hint":  "For most systems to recognize it, use exactly this form at beginning of comment: " + good,
+				}).Warn("Comment looks like it has a frequency in non-standard format")
 			}
 
 			if A.g_freq.IsNothing() {
@@ -4359,9 +4342,10 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 				if !A.g_quiet {
 					var good = fmt.Sprintf("T%03d", i_ctcss[i])
 
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("\"%s\" in comment looks like it might be a CTCSS tone in non-standard format.\n", bad1)
-					dw_printf("For most systems to recognize it, use exactly this form \"%s\" at near beginning of comment, after any frequency.\n", good)
+					logrus.WithFields(logrus.Fields{
+						"found": string(bad1),
+						"hint":  "For most systems to recognize it, use exactly this form near beginning of comment, after any frequency: " + good,
+					}).Warn("Comment looks like it might have a CTCSS tone in non-standard format")
 				}
 
 				if A.g_tone.IsNothing() {
@@ -4379,9 +4363,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 	if (offset == 6000 || offset == -6000) && freq >= 144 && freq <= 148 {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("A transmit offset of 6 MHz on the 2 meter band doesn't seem right.\n")
-			dw_printf("Each unit is 10 kHz so you should probably be using \"-060\" or \"+060\"\n")
+			logrus.WithField("hint", "Each unit is 10 kHz so you should probably be using \"-060\" or \"+060\"").Warn("A transmit offset of 6 MHz on the 2 meter band doesn't seem right")
 		}
 	}
 
