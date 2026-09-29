@@ -1,26 +1,23 @@
 // SPDX-FileCopyrightText: 2025 The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
-
-//#define DEBUG1 1		/* Parsing of original human readable format. */
-//#define DEBUG2 1		/* Parsing of base 91 compressed format. */
-//#define DEBUG3 1		/* Parsing of special messages. */
-//#define DEBUG4 1		/* Resulting display form. */
-
-/*------------------------------------------------------------------
- *
- * Purpose:   	Decode telemetry information.
- *		Point out where it violates the protocol spec and
- *		other applications might not interpret it properly.
- *
- * References:	APRS Protocol, chapter 13.
- *		http://www.aprs.org/doc/APRS101.PDF
- *
- *		Base 91 compressed format
- *		http://he.fi/doc/aprs-base91-comment-telemetry.txt
- *
- *---------------------------------------------------------------*/
+// Package aprstelemetry decodes APRS telemetry: data in the original "T#"
+// format and in the base 91 compressed comment format, and the PARM, UNIT,
+// EQNS and BITS metadata messages that name, label, scale and set the
+// polarity of each station's channels.
+//
+// From Dire Wolf's telemetry.c:
+//
+//	Purpose:	Decode telemetry information.
+//			Point out where it violates the protocol spec and
+//			other applications might not interpret it properly.
+//
+//	References:	APRS Protocol, chapter 13.
+//			http://www.aprs.org/doc/APRS101.PDF
+//
+//			Base 91 compressed format
+//			http://he.fi/doc/aprs-base91-comment-telemetry.txt
+package aprstelemetry
 
 import (
 	"fmt"
@@ -60,12 +57,16 @@ const coeffA = 0 /* Scaling coefficient positions. */
 const coeffB = 1
 const coeffC = 2
 
-type TelemetryState struct {
+// State holds the telemetry metadata - channel names, units, scaling and
+// bit sense - each station has sent, for decoding its later data.
+type State struct {
 	mdListHead *stationMetadata
 }
 
-func NewTelemetryState() *TelemetryState {
-	return new(TelemetryState)
+// New returns a State that has heard no metadata, so every station starts
+// with the defaults.
+func New() *State {
+	return new(State)
 }
 
 /*-------------------------------------------------------------------
@@ -81,7 +82,7 @@ func NewTelemetryState() *TelemetryState {
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) getMetadata(station string) *stationMetadata {
+func (ts *State) getMetadata(station string) *stationMetadata {
 	logrus.WithField("station", station).Debug("getMetadata")
 	for p := ts.mdListHead; p != nil; p = p.next {
 		if station == p.station {
@@ -149,7 +150,7 @@ func decimalPlaces(str string) int {
 
 /*-------------------------------------------------------------------
  *
- * Name:        dataOriginal
+ * Name:        DataOriginal
  *
  * Purpose:     Interpret telemetry data in the original format.
  *
@@ -182,8 +183,8 @@ func decimalPlaces(str string) int {
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) dataOriginal(station string, info string, quiet bool) (string, string) {
-	logrus.WithField("info", info).Debug("dataOriginal")
+func (ts *State) DataOriginal(station string, info string, quiet bool) (string, string) {
+	logrus.WithField("info", info).Debug("DataOriginal")
 	var pm = ts.getMetadata(station)
 
 	// The zero value of a Maybe is Nothing, so an unreported channel needs no
@@ -311,14 +312,14 @@ func (ts *TelemetryState) dataOriginal(station string, info string, quiet bool) 
 		"araw":    araw,
 		"draw":    draw,
 		"comment": comment,
-	}).Debug("dataOriginal: raw data")
+	}).Debug("DataOriginal: raw data")
 
 	return formatData(pm, seq, araw, ndp, draw), comment
-} /* end dataOriginal */
+} /* end DataOriginal */
 
 /*-------------------------------------------------------------------
  *
- * Name:        dataBase91
+ * Name:        DataBase91
  *
  * Purpose:     Interpret telemetry data in the base 91 compressed format.
  *
@@ -334,8 +335,8 @@ func (ts *TelemetryState) dataOriginal(station string, info string, quiet bool) 
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) dataBase91(station string, cdata string) string {
-	logrus.WithField("cdata", cdata).Debug("dataBase91")
+func (ts *State) DataBase91(station string, cdata string) string {
+	logrus.WithField("cdata", cdata).Debug("DataBase91")
 	var pm = ts.getMetadata(station)
 
 	// The zero value of a Maybe is Nothing, so an unreported channel needs no
@@ -356,14 +357,14 @@ func (ts *TelemetryState) dataBase91(station string, cdata string) string {
 		return ""
 	}
 
-	var seq = two_base91_to_i(cdata[0], cdata[1])
+	var seq = base91Pair(cdata[0], cdata[1])
 	cdata = cdata[2:]
 
 	for n := 0; n < numAnalog+1 && 2*n < len(cdata); n++ {
 		// An invalid base 91 character leaves this value unknown; taking an
 		// absent value apart would invent telemetry readings.
 
-		var v, ok = two_base91_to_i(cdata[2*n], cdata[2*n+1]).Get()
+		var v, ok = base91Pair(cdata[2*n], cdata[2*n+1]).Get()
 		if !ok {
 			continue
 		}
@@ -386,14 +387,14 @@ func (ts *TelemetryState) dataBase91(station string, cdata string) string {
 		"seq":  seq,
 		"araw": araw,
 		"draw": draw,
-	}).Debug("dataBase91: raw data")
+	}).Debug("DataBase91: raw data")
 
 	return formatData(pm, seq, araw, ndp, draw)
-} /* end dataBase91 */
+} /* end DataBase91 */
 
 /*-------------------------------------------------------------------
  *
- * Name:        nameMessage
+ * Name:        NameMessage
  *
  * Purpose:     Interpret message with names for analog and digital channels.
  *
@@ -415,8 +416,8 @@ func (ts *TelemetryState) dataBase91(station string, cdata string) string {
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) nameMessage(station string, msg string) {
-	logrus.WithField("msg", msg).Debug("nameMessage")
+func (ts *State) NameMessage(station string, msg string) {
+	logrus.WithField("msg", msg).Debug("NameMessage")
 	msg = strings.TrimSpace(msg)
 
 	var pm = ts.getMetadata(station)
@@ -431,11 +432,11 @@ func (ts *TelemetryState) nameMessage(station string, msg string) {
 	}
 
 	logrus.WithField("name", pm.name).Debug("names")
-} /* end nameMessage */
+} /* end NameMessage */
 
 /*-------------------------------------------------------------------
  *
- * Name:        unitLabelMessage
+ * Name:        UnitLabelMessage
  *
  * Purpose:     Interpret message with units/labels for analog and digital channels.
  *
@@ -454,8 +455,8 @@ func (ts *TelemetryState) nameMessage(station string, msg string) {
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) unitLabelMessage(station string, msg string) {
-	logrus.WithField("msg", msg).Debug("unitLabelMessage")
+func (ts *State) UnitLabelMessage(station string, msg string) {
+	logrus.WithField("msg", msg).Debug("UnitLabelMessage")
 
 	/*
 	 * Make a copy of the input string because this will alter it.
@@ -473,11 +474,11 @@ func (ts *TelemetryState) unitLabelMessage(station string, msg string) {
 	}
 
 	logrus.WithField("unit", pm.unit).Debug("units/labels")
-} /* end unitLabelMessage */
+} /* end UnitLabelMessage */
 
 /*-------------------------------------------------------------------
  *
- * Name:        coefficientsMessage
+ * Name:        CoefficientsMessage
  *
  * Purpose:     Interpret message with scaling coefficients for analog channels.
  *
@@ -497,8 +498,8 @@ func (ts *TelemetryState) unitLabelMessage(station string, msg string) {
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) coefficientsMessage(station string, msg string, quiet bool) {
-	logrus.WithField("msg", msg).Debug("coefficientsMessage")
+func (ts *State) CoefficientsMessage(station string, msg string, quiet bool) {
+	logrus.WithField("msg", msg).Debug("CoefficientsMessage")
 
 	/*
 	 * Make a copy of the input string because this will alter it.
@@ -543,11 +544,11 @@ func (ts *TelemetryState) coefficientsMessage(station string, msg string, quiet 
 		"coeff":    pm.coeff,
 		"coeffNDP": pm.coeffNDP,
 	}).Debug("coeff")
-} /* end coefficientsMessage */
+} /* end CoefficientsMessage */
 
 /*-------------------------------------------------------------------
  *
- * Name:        bitSenseMessage
+ * Name:        BitSenseMessage
  *
  * Purpose:     Interpret message with scaling coefficients for analog channels.
  *
@@ -565,8 +566,8 @@ func (ts *TelemetryState) coefficientsMessage(station string, msg string, quiet 
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) bitSenseMessage(station string, msg string, quiet bool) {
-	logrus.WithField("msg", msg).Debug("bitSenseMessage")
+func (ts *State) BitSenseMessage(station string, msg string, quiet bool) {
+	logrus.WithField("msg", msg).Debug("BitSenseMessage")
 	var pm = ts.getMetadata(station)
 
 	if len(msg) < 8 {
@@ -617,7 +618,7 @@ func (ts *TelemetryState) bitSenseMessage(station string, msg string, quiet bool
 		"sense":   pm.sense,
 		"project": pm.project,
 	}).Debug("bit sense, project")
-} /* end bitSenseMessage */
+} /* end BitSenseMessage */
 
 /*-------------------------------------------------------------------
  *

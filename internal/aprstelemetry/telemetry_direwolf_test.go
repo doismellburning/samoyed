@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package aprstelemetry
 
 import (
 	"testing"
@@ -10,86 +13,86 @@ func Test_telemetry(t *testing.T) {
 	var result string
 	var comment string
 
-	var ts = NewTelemetryState()
+	var ts = New()
 
 	// From protocol spec.
 
-	result, comment = ts.dataOriginal("WB2OSZ", "T#005,199,000,255,073,123,01101001", false)
+	result, comment = ts.DataOriginal("WB2OSZ", "T#005,199,000,255,073,123,01101001", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", result, "test 101")
 	assert.Empty(t, comment, "test 101")
 
 	// Try adding a comment.
 
-	result, comment = ts.dataOriginal("WB2OSZ", "T#005,199,000,255,073,123,01101001Comment,with,commas", false)
+	result, comment = ts.DataOriginal("WB2OSZ", "T#005,199,000,255,073,123,01101001Comment,with,commas", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", result, "test 102")
 	assert.Equal(t, "Comment,with,commas", comment, "test 102")
 
 	// Error handling - Try shortening or omitting parts.
 
-	result, comment = ts.dataOriginal("WB2OSZ", "T005,199,000,255,073,123,0110", false)
+	result, comment = ts.DataOriginal("WB2OSZ", "T005,199,000,255,073,123,0110", false)
 
 	assert.Empty(t, result, "test 103")
 	assert.Empty(t, comment, "test 103")
 
-	result, comment = ts.dataOriginal("WB2OSZ", "T#005,199,000,255,073,123,0110", false)
+	result, comment = ts.DataOriginal("WB2OSZ", "T#005,199,000,255,073,123,0110", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0", result, "test 104")
 	assert.Empty(t, comment, "test 104")
 
-	result, comment = ts.dataOriginal("WB2OSZ", "T#005,199,000,255,073,123", false)
+	result, comment = ts.DataOriginal("WB2OSZ", "T#005,199,000,255,073,123", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123", result, "test 105")
 	assert.Empty(t, comment, "test 105")
 
-	result, comment = ts.dataOriginal("WB2OSZ", "T#005,199,000,255,,123,01101001", false)
+	result, comment = ts.DataOriginal("WB2OSZ", "T#005,199,000,255,,123,01101001", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", result, "test 106")
 	assert.Empty(t, comment, "test 106")
 
-	result, comment = ts.dataOriginal("WB2OSZ", "T#005,199,000,255,073,123,01101009", false)
+	result, comment = ts.DataOriginal("WB2OSZ", "T#005,199,000,255,073,123,01101009", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0", result, "test 107")
 	assert.Empty(t, comment, "test 107")
 
 	// Local observation.
 
-	result, comment = ts.dataOriginal("WB2OSZ", "T#491,4.9,0.3,25.0,0.0,1.0,00000000", false)
+	result, comment = ts.DataOriginal("WB2OSZ", "T#491,4.9,0.3,25.0,0.0,1.0,00000000", false)
 
 	assert.Equal(t, "Seq=491, A1=4.9, A2=0.3, A3=25.0, A4=0.0, A5=1.0, D1=0, D2=0, D3=0, D4=0, D5=0, D6=0, D7=0, D8=0", result, "test 108")
 	assert.Empty(t, comment, "test 108")
 
 	// From protocol spec.
 
-	result = ts.dataBase91("WB2OSZ", "ss11")
+	result = ts.DataBase91("WB2OSZ", "ss11")
 
 	assert.Equal(t, "Seq=7544, A1=1472", result, "test 201")
 
-	result = ts.dataBase91("WB2OSZ", "ss11223344{{!\"")
+	result = ts.DataBase91("WB2OSZ", "ss11223344{{!\"")
 
 	assert.Equal(t, "Seq=7544, A1=1472, A2=1564, A3=1656, A4=1748, A5=8280, D1=1, D2=0, D3=0, D4=0, D5=0, D6=0, D7=0, D8=0", result, "test 202")
 
 	// Error cases.  Should not happen in practice because function
 	// should be called only with valid data that matches the pattern.
 
-	result = ts.dataBase91("WB2OSZ", "ss11223344{{!\"x")
+	result = ts.DataBase91("WB2OSZ", "ss11223344{{!\"x")
 
 	assert.Empty(t, result, "test 203")
 
-	result = ts.dataBase91("WB2OSZ", "ss1")
+	result = ts.DataBase91("WB2OSZ", "ss1")
 
 	assert.Empty(t, result, "test 204")
 
-	result = ts.dataBase91("WB2OSZ", "ss11223344{{!")
+	result = ts.DataBase91("WB2OSZ", "ss11223344{{!")
 
 	assert.Empty(t, result, "test 205")
 
-	result = ts.dataBase91("WB2OSZ", "s |1")
+	result = ts.DataBase91("WB2OSZ", "s |1")
 
 	assert.Equal(t, "Seq=?", result, "test 206")
 
-	ts.nameMessage("N0QBF-11", "Battery,Btemp,ATemp,Pres,Alt,Camra,Chut,Sun,10m,ATV")
+	ts.NameMessage("N0QBF-11", "Battery,Btemp,ATemp,Pres,Alt,Camra,Chut,Sun,10m,ATV")
 
 	var pm = ts.getMetadata("N0QBF-11")
 
@@ -107,7 +110,7 @@ func Test_telemetry(t *testing.T) {
 	assert.Equal(t, "D7", pm.name[11], "test 301")
 	assert.Equal(t, "D8", pm.name[12], "test 301")
 
-	ts.unitLabelMessage("N0QBF-11", "v/100,deg.F,deg.F,Mbar,Kft,Click,OPEN,on,on,hi")
+	ts.UnitLabelMessage("N0QBF-11", "v/100,deg.F,deg.F,Mbar,Kft,Click,OPEN,on,on,hi")
 
 	pm = ts.getMetadata("N0QBF-11")
 
@@ -125,7 +128,7 @@ func Test_telemetry(t *testing.T) {
 	assert.Empty(t, pm.unit[11], "test 302")
 	assert.Empty(t, pm.unit[12], "test 302")
 
-	ts.coefficientsMessage("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2,3", false)
+	ts.CoefficientsMessage("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2,3", false)
 
 	pm = ts.getMetadata("N0QBF-11")
 
@@ -148,7 +151,7 @@ func Test_telemetry(t *testing.T) {
 	// Error if less than 15 or empty field.
 	// Notice that we keep the previous value in this case.
 
-	ts.coefficientsMessage("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2", false)
+	ts.CoefficientsMessage("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2", false)
 
 	pm = ts.getMetadata("N0QBF-11")
 
@@ -168,7 +171,7 @@ func Test_telemetry(t *testing.T) {
 		assert.Fail(t, "Wrong result, test 304n\n")
 	}
 
-	ts.coefficientsMessage("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,,3", false)
+	ts.CoefficientsMessage("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,,3", false)
 
 	pm = ts.getMetadata("N0QBF-11")
 
@@ -188,7 +191,7 @@ func Test_telemetry(t *testing.T) {
 		assert.Fail(t, "Wrong result, test 305n\n")
 	}
 
-	ts.bitSenseMessage("N0QBF-11", "10110000,N0QBF's Big Balloon", false)
+	ts.BitSenseMessage("N0QBF-11", "10110000,N0QBF's Big Balloon", false)
 
 	pm = ts.getMetadata("N0QBF-11")
 	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
@@ -199,7 +202,7 @@ func Test_telemetry(t *testing.T) {
 	assert.Equal(t, "N0QBF's Big Balloon", pm.project, "test 306")
 
 	// Too few and invalid digits.
-	ts.bitSenseMessage("N0QBF-11", "1011000", false)
+	ts.BitSenseMessage("N0QBF-11", "1011000", false)
 
 	pm = ts.getMetadata("N0QBF-11")
 	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
@@ -209,7 +212,7 @@ func Test_telemetry(t *testing.T) {
 
 	assert.Empty(t, pm.project, "test 307")
 
-	ts.bitSenseMessage("N0QBF-11", "10110008", false)
+	ts.BitSenseMessage("N0QBF-11", "10110008", false)
 
 	pm = ts.getMetadata("N0QBF-11")
 	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
@@ -219,27 +222,27 @@ func Test_telemetry(t *testing.T) {
 
 	assert.Empty(t, pm.project, "test 308")
 
-	ts.coefficientsMessage("M0XER-3", "0,0.001,0,0,0.001,0,0,0.1,-273.2,0,1,0,0,1,0", false)
-	ts.bitSenseMessage("M0XER-3", "11111111,10mW research balloon", false)
-	ts.nameMessage("M0XER-3", "Vbat,Vsolar,Temp,Sat")
-	ts.unitLabelMessage("M0XER-3", "V,V,C,,m")
+	ts.CoefficientsMessage("M0XER-3", "0,0.001,0,0,0.001,0,0,0.1,-273.2,0,1,0,0,1,0", false)
+	ts.BitSenseMessage("M0XER-3", "11111111,10mW research balloon", false)
+	ts.NameMessage("M0XER-3", "Vbat,Vsolar,Temp,Sat")
+	ts.UnitLabelMessage("M0XER-3", "V,V,C,,m")
 
-	result = ts.dataBase91("M0XER-3", "DyR.&^<A!.")
+	result = ts.DataBase91("M0XER-3", "DyR.&^<A!.")
 
 	assert.Equal(t, "10mW research balloon: Seq=3273, Vbat=4.472 V, Vsolar=0.516 V, Temp=-24.3 C, Sat=13", result, "test 401")
 	assert.Empty(t, comment, "test 401")
 
-	result = ts.dataBase91("M0XER-3", "cNOv'C?=!-")
+	result = ts.DataBase91("M0XER-3", "cNOv'C?=!-")
 
 	assert.Equal(t, "10mW research balloon: Seq=6051, Vbat=4.271 V, Vsolar=0.580 V, Temp=2.6 C, Sat=12", result, "test 402")
 	assert.Empty(t, comment, "test 402")
 
-	result = ts.dataBase91("M0XER-3", "n0RS(:>b!+")
+	result = ts.DataBase91("M0XER-3", "n0RS(:>b!+")
 
 	assert.Equal(t, "10mW research balloon: Seq=7022, Vbat=4.509 V, Vsolar=0.662 V, Temp=-2.8 C, Sat=10", result, "test 403")
 	assert.Empty(t, comment, "test 403")
 
-	result = ts.dataBase91("M0XER-3", "x&G=!(8s!,")
+	result = ts.DataBase91("M0XER-3", "x&G=!(8s!,")
 
 	assert.Equal(t, "10mW research balloon: Seq=7922, Vbat=3.486 V, Vsolar=0.007 V, Temp=-55.7 C, Sat=11", result, "test 404")
 	assert.Empty(t, comment, "test 404")
