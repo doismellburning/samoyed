@@ -2351,9 +2351,9 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
  *
  * Outputs:	A	- Decoded packet structure
  *				A.g_query_type
- *				A.g_query_lat		(optional)
- *				A.g_query_lon		(optional)
- *				A.g_query_radius	(optional)
+ *				A.g_footprint_lat	(optional)
+ *				A.g_footprint_lon	(optional)
+ *				A.g_footprint_radius	(optional)
  *
  * Description:	Formats are:
  *
