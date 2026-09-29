@@ -1,6 +1,9 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 //go:build !linux
 
-package direwolf
+package cm108
 
 import "errors"
 

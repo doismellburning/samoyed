@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 }
 
 func Test_cm108_print_inventory(t *testing.T) {
-	var adapter = new(direwolf.CM108Thing)
+	var adapter = new(cm108.CM108Thing)
 	adapter.VID = 0x0d8c
 	adapter.PID = 0x000c
 	adapter.Product = "C-Media USB Audio Device"
@@ -36,11 +36,11 @@ func Test_cm108_print_inventory(t *testing.T) {
 
 	// The same adapter's other sound device shares its devpath, so is only
 	// suggested a name once.
-	var playback = new(direwolf.CM108Thing)
+	var playback = new(cm108.CM108Thing)
 	*playback = *adapter
 	playback.DevnodeSound = "/dev/snd/pcmC1D0p"
 
-	var other = new(direwolf.CM108Thing)
+	var other = new(cm108.CM108Thing)
 	other.VID = 0x1234
 	other.PID = 0x5678
 	other.Product = "Something Else"
@@ -48,7 +48,7 @@ func Test_cm108_print_inventory(t *testing.T) {
 	other.DevnodeUSB = "/dev/bus/usb/001/003"
 
 	var output = testutils.CaptureOutput(t, func() {
-		cm108_print_inventory([]*direwolf.CM108Thing{adapter, playback, other})
+		cm108_print_inventory([]*cm108.CM108Thing{adapter, playback, other})
 	})
 
 	assert.Contains(t, output, "**  0d8c 000c  C-Media USB Audio Device /dev/snd/pcmC1D0c")
