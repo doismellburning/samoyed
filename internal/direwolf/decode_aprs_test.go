@@ -55,7 +55,7 @@ func Test_decode_aprs_dao_does_not_invent_a_position(t *testing.T) {
 // anywhere other than decode_aprs (beacon.go does this) does not start out
 // claiming a position off the coast of Africa.
 func Test_decode_aprs_zero_value_has_no_position(t *testing.T) {
-	var A decode_aprs_t
+	var A decodedAPRS
 
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
@@ -319,7 +319,7 @@ func Test_decode_aprs_short_message(t *testing.T) {
 		assert.NotNil(t, pp)
 
 		var A = DecodeAPRS(pp, true, "")
-		assert.Equal(t, message_subtype_message, A.g_message_subtype)
+		assert.Equal(t, messageSubtypeMessage, A.g_message_subtype)
 		assert.Equal(t, "Q2TEST", A.g_addressee)
 		assert.Equal(t, tc.comment, A.g_comment)
 	}

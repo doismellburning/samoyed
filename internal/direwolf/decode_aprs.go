@@ -37,40 +37,40 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type packet_type_e int
+type packetType int
 
 const (
-	packet_type_none packet_type_e = iota
-	packet_type_position
-	packet_type_weather
-	packet_type_object
-	packet_type_item
-	packet_type_message
-	packet_type_query
-	packet_type_capabilities
-	packet_type_status
-	packet_type_telemetry
-	packet_type_userdefined
-	packet_type_nws
+	packetTypeNone packetType = iota
+	packetTypePosition
+	packetTypeWeather
+	packetTypeObject
+	packetTypeItem
+	packetTypeMessage
+	packetTypeQuery
+	packetTypeCapabilities
+	packetTypeStatus
+	packetTypeTelemetry
+	packetTypeUserDefined
+	packetTypeNWS
 )
 
-type message_subtype_e int
+type messageSubtype int
 
 const (
-	message_subtype_invalid message_subtype_e = iota
-	message_subtype_message
-	message_subtype_ack
-	message_subtype_rej
-	message_subtype_bulletin
-	message_subtype_nws
-	message_subtype_telem_parm
-	message_subtype_telem_unit
-	message_subtype_telem_eqns
-	message_subtype_telem_bits
-	message_subtype_directed_query
+	messageSubtypeInvalid messageSubtype = iota
+	messageSubtypeMessage
+	messageSubtypeAck
+	messageSubtypeRej
+	messageSubtypeBulletin
+	messageSubtypeNWS
+	messageSubtypeTelemParm
+	messageSubtypeTelemUnit
+	messageSubtypeTelemEqns
+	messageSubtypeTelemBits
+	messageSubtypeDirectedQuery
 )
 
-type decode_aprs_t struct {
+type decodedAPRS struct {
 	g_quiet bool /* Suppress error messages when decoding. */
 
 	g_src string // In the case of a packet encapsulated by a 3rd party
@@ -119,9 +119,9 @@ type decode_aprs_t struct {
 	// This is so pfilter.c:filt_t does not need to duplicate the same work.
 
 	g_has_thirdparty_header bool
-	g_packet_type           packet_type_e
+	g_packet_type           packetType
 
-	g_message_subtype message_subtype_e /* Various cases of the overloaded "message." */
+	g_message_subtype messageSubtype /* Various cases of the overloaded "message." */
 
 	g_message_number string /* Message number.  Should be 1 - 5 alphanumeric characters if used. */
 	/* Addendum 1.1 has new format {mm} or {mm}aa with only two */
@@ -226,10 +226,10 @@ func DecodeAPRSInit() {
  *
  *------------------------------------------------------------------*/
 
-func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_aprs_t {
+func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPRS {
 	var pinfo = pp.Info()
 
-	var A = new(decode_aprs_t)
+	var A = new(decodedAPRS)
 
 	A.g_quiet = quiet
 
@@ -373,7 +373,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 			aprs_ll_pos(A, pinfo)
 		}
 
-		A.g_packet_type = packet_type_position
+		A.g_packet_type = packetTypePosition
 
 	//case '#':		/* Peet Bros U-II Weather station */		// TODO: produce obsolete error.
 	//case '*':		/* Peet Bros U-II Weather station */
@@ -382,27 +382,27 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 	case '$': /* Raw GPS data or Ultimeter 2000 */
 		if bytes.HasPrefix(pinfo, []byte("$ULTW")) {
 			aprs_ultimeter(A, pinfo) // TODO: produce obsolete error.
-			A.g_packet_type = packet_type_weather
+			A.g_packet_type = packetTypeWeather
 		} else {
 			aprs_raw_nmea(A, pinfo)
-			A.g_packet_type = packet_type_position
+			A.g_packet_type = packetTypePosition
 		}
 
 	case '\'': /* Old Mic-E Data (but Current data for TM-D700) */
 		fallthrough
 	case '`': /* Current Mic-E Data (not used in TM-D700) */
 		aprs_mic_e(A, pp, pinfo)
-		A.g_packet_type = packet_type_position
+		A.g_packet_type = packetTypePosition
 
 	case ')': /* Item. */
 		aprs_item(A, pinfo)
-		A.g_packet_type = packet_type_item
+		A.g_packet_type = packetTypeItem
 
 	case '/': /* Position with timestamp (no APRS messaging) */
 		fallthrough
 	case '@': /* Position with timestamp (with APRS messaging) */
 		aprs_ll_pos_time(A, pinfo)
-		A.g_packet_type = packet_type_position
+		A.g_packet_type = packetTypePosition
 
 	case ':': /* "Message" (special APRS meaning): for one person, a group, or a bulletin. */
 		/* Directed Station Query */
@@ -410,45 +410,45 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 		aprs_message(A, pinfo, quiet)
 
 		switch A.g_message_subtype {
-		case message_subtype_message, message_subtype_ack, message_subtype_rej:
-			A.g_packet_type = packet_type_message
-		case message_subtype_nws:
-			A.g_packet_type = packet_type_nws
-		case message_subtype_telem_parm, message_subtype_telem_unit, message_subtype_telem_eqns, message_subtype_telem_bits:
-			A.g_packet_type = packet_type_telemetry
-		case message_subtype_directed_query:
-			A.g_packet_type = packet_type_query
+		case messageSubtypeMessage, messageSubtypeAck, messageSubtypeRej:
+			A.g_packet_type = packetTypeMessage
+		case messageSubtypeNWS:
+			A.g_packet_type = packetTypeNWS
+		case messageSubtypeTelemParm, messageSubtypeTelemUnit, messageSubtypeTelemEqns, messageSubtypeTelemBits:
+			A.g_packet_type = packetTypeTelemetry
+		case messageSubtypeDirectedQuery:
+			A.g_packet_type = packetTypeQuery
 		default:
-			// Also case message_subtype_bulletin:
+			// Also case messageSubtypeBulletin:
 		}
 
 	case ';': /* Object */
 		aprs_object(A, pinfo)
-		A.g_packet_type = packet_type_object
+		A.g_packet_type = packetTypeObject
 
 	case '<': /* Station Capabilities */
 		aprs_station_capabilities(A, pinfo)
-		A.g_packet_type = packet_type_capabilities
+		A.g_packet_type = packetTypeCapabilities
 
 	case '>': /* Status Report */
 		aprs_status_report(A, pinfo)
-		A.g_packet_type = packet_type_status
+		A.g_packet_type = packetTypeStatus
 
 	case '?': /* General Query */
 		aprs_general_query(A, pinfo)
-		A.g_packet_type = packet_type_query
+		A.g_packet_type = packetTypeQuery
 
 	case 'T': /* Telemetry */
 		aprs_telemetry(A, pinfo, quiet)
-		A.g_packet_type = packet_type_telemetry
+		A.g_packet_type = packetTypeTelemetry
 
 	case '_': /* Positionless Weather Report */
 		aprs_positionless_weather_report(A, pinfo)
-		A.g_packet_type = packet_type_weather
+		A.g_packet_type = packetTypeWeather
 
 	case '{': /* user defined data */
 		aprs_user_defined(A, pinfo)
-		A.g_packet_type = packet_type_userdefined
+		A.g_packet_type = packetTypeUserDefined
 
 	case 't': /* Raw touch tone data - NOT PART OF STANDARD */
 		/* Used to convey raw touch tone sequences to */
@@ -505,7 +505,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 	return A
 } /* end decode_aprs */
 
-func DecodeAPRSPrint(A *decode_aprs_t) {
+func DecodeAPRSPrint(A *decodedAPRS) {
 	/*
 	 * First line has:
 	 * - packet type
@@ -817,7 +817,7 @@ func DecodeAPRSPrint(A *decode_aprs_t) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_ll_pos(A *decode_aprs_t, info []byte) {
+func aprs_ll_pos(A *decodedAPRS, info []byte) {
 	type aprs_ll_pos_s struct {
 		DTI byte /* ! or = */
 		Pos position_t
@@ -924,7 +924,7 @@ func aprs_ll_pos(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
+func aprs_ll_pos_time(A *decodedAPRS, info []byte) {
 	type aprs_ll_pos_time_s struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
@@ -1006,7 +1006,7 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_raw_nmea(A *decode_aprs_t, info []byte) {
+func aprs_raw_nmea(A *decodedAPRS, info []byte) {
 	if bytes.HasPrefix(info, []byte("$GPRMC,")) ||
 		bytes.HasPrefix(info, []byte("$GNRMC,")) {
 		var result = dwgps.ParseGPRMC(string(info), A.g_quiet)
@@ -1224,7 +1224,7 @@ MIC-E, JEEP, In Service
 
 */
 
-func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int) int {
+func mic_e_digit(A *decodedAPRS, c byte, mask int, std_msg *int, cust_msg *int) int {
 	if c >= '0' && c <= '9' {
 		return int(c - '0')
 	}
@@ -1268,7 +1268,7 @@ func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int
 	return (0)
 }
 
-func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
+func aprs_mic_e(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 	type aprs_mic_e_s struct {
 		DTI         byte    /* ' or ` */
 		Lon         [3]byte /* "d+28", "m+28", "h+28" */
@@ -1615,7 +1615,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
+func aprs_message(A *decodedAPRS, info []byte, quiet bool) {
 	type aprs_message_s struct {
 		DTI       byte /* : */
 		Addressee [9]byte
@@ -1635,14 +1635,14 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 	var message = info[headerBytes:]
 
 	A.g_data_type_desc = "APRS Message"
-	A.g_message_subtype = message_subtype_message /* until found otherwise */
+	A.g_message_subtype = messageSubtypeMessage /* until found otherwise */
 
 	if len(info) < 11 {
 		if !quiet {
 			logrus.WithField("length", len(info)).Warn("APRS Message must have a minimum of 11 characters for : 9 character addressee :")
 		}
 
-		A.g_message_subtype = message_subtype_invalid
+		A.g_message_subtype = messageSubtypeInvalid
 
 		return
 	}
@@ -1652,7 +1652,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 			logrus.WithField("hint", "Spaces must be added to shorter addressee to make 9 characters").Warn("APRS Message must begin with ':' 9 character addressee ':'")
 		}
 
-		A.g_message_subtype = message_subtype_invalid
+		A.g_message_subtype = messageSubtypeInvalid
 
 		return
 	}
@@ -1706,7 +1706,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 			A.g_data_type_desc = fmt.Sprintf("Bulletin with identifier \"%s\"", addressee[3:])
 		}
 
-		A.g_message_subtype = message_subtype_bulletin
+		A.g_message_subtype = messageSubtypeBulletin
 		A.g_comment = string(message)
 	} else if len(addressee) >= 3 && bytes.HasPrefix(addressee, []byte("NWS")) {
 		// Weather bulletins have addressee starting with NWS, SKY, CWA, or BOM.
@@ -1722,12 +1722,12 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 			A.g_data_type_desc = fmt.Sprintf("Weather bulletin is missing - or _ after %.3s", addressee)
 		}
 
-		A.g_message_subtype = message_subtype_nws
+		A.g_message_subtype = messageSubtypeNWS
 		A.g_comment = string(message)
 	} else if len(addressee) >= 3 && (bytes.HasPrefix(addressee, []byte("SKY")) || bytes.HasPrefix(addressee, []byte("CWA")) || bytes.HasPrefix(addressee, []byte("BOM"))) {
 		// SKY... or CWA...   https://www.aprs-is.net/WX/
 		A.g_data_type_desc = fmt.Sprintf("Weather bulletin with identifier \"%s\"", addressee[4:])
-		A.g_message_subtype = message_subtype_nws
+		A.g_message_subtype = messageSubtypeNWS
 		A.g_comment = string(message)
 	} else if bytes.HasPrefix(message, []byte("PARM.")) {
 		/*
@@ -1741,22 +1741,22 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		 * Why not use other characters after the "T" for metadata?
 		 */
 		A.g_data_type_desc = fmt.Sprintf("Telemetry Parameter Name for \"%s\"", addressee)
-		A.g_message_subtype = message_subtype_telem_parm
+		A.g_message_subtype = messageSubtypeTelemParm
 
 		telemetryState.telemetry_name_message(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("UNIT.")) {
 		A.g_data_type_desc = fmt.Sprintf("Telemetry Unit/Label for \"%s\"", addressee)
-		A.g_message_subtype = message_subtype_telem_unit
+		A.g_message_subtype = messageSubtypeTelemUnit
 
 		telemetryState.telemetry_unit_label_message(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("EQNS.")) {
 		A.g_data_type_desc = fmt.Sprintf("Telemetry Equation Coefficients for \"%s\"", addressee)
-		A.g_message_subtype = message_subtype_telem_eqns
+		A.g_message_subtype = messageSubtypeTelemEqns
 
 		telemetryState.telemetry_coefficents_message(string(addressee), string(message[5:]), quiet)
 	} else if bytes.HasPrefix(message, []byte("BITS.")) {
 		A.g_data_type_desc = fmt.Sprintf("Telemetry Bit Sense/Project Name for \"%s\"", addressee)
-		A.g_message_subtype = message_subtype_telem_bits
+		A.g_message_subtype = messageSubtypeTelemBits
 
 		telemetryState.telemetry_bit_sense_message(string(addressee), string(message[5:]), quiet)
 	} else if len(message) > 0 && message[0] == '?' {
@@ -1764,7 +1764,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		 * If first character of message is "?" it is a query directed toward a specific station.
 		 */
 		A.g_data_type_desc = "Directed Station Query"
-		A.g_message_subtype = message_subtype_directed_query
+		A.g_message_subtype = messageSubtypeDirectedQuery
 
 		aprs_directed_station_query(A, addressee, message[1:], quiet)
 	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("ack")) {
@@ -1791,7 +1791,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		}
 
 		A.g_data_type_desc = fmt.Sprintf("\"%s\" ACKnowledged message number \"%s\" from \"%s\"", A.g_src, A.g_message_number, addressee)
-		A.g_message_subtype = message_subtype_ack
+		A.g_message_subtype = messageSubtypeAck
 	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("rej")) {
 		if !bytes.HasPrefix(message, []byte("rej")) {
 			logrus.WithField("message", string(message)).Warn("rej must be lower case")
@@ -1815,7 +1815,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		}
 
 		A.g_data_type_desc = fmt.Sprintf("\"%s\" REJected message number \"%s\" from \"%s\"", A.g_src, A.g_message_number, addressee)
-		A.g_message_subtype = message_subtype_ack
+		A.g_message_subtype = messageSubtypeAck
 	} else {
 		// Message to a particular station or a bulletin.
 		// message number is optional here.
@@ -1871,7 +1871,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 			A.g_data_type_desc = fmt.Sprintf("APRS Message, with no number, from \"%s\" to \"%s\"", A.g_src, addressee)
 		}
 
-		A.g_message_subtype = message_subtype_message
+		A.g_message_subtype = messageSubtypeMessage
 
 		/* No location so don't use  process_comment () */
 
@@ -1905,7 +1905,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_object(A *decode_aprs_t, info []byte) {
+func aprs_object(A *decodedAPRS, info []byte) {
 	type aprs_object_s struct {
 		DTI          byte /* ; */
 		Name         [9]byte
@@ -1993,7 +1993,7 @@ func aprs_object(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_item(A *decode_aprs_t, info []byte) {
+func aprs_item(A *decodedAPRS, info []byte) {
 	/*
 		Structure:
 
@@ -2102,7 +2102,7 @@ func aprs_item(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_station_capabilities(A *decode_aprs_t, info []byte) {
+func aprs_station_capabilities(A *decodedAPRS, info []byte) {
 	A.g_data_type_desc = "Station Capabilities"
 
 	// 	process_comment() not applicable here because it
@@ -2153,7 +2153,7 @@ func aprs_station_capabilities(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_status_report(A *decode_aprs_t, info []byte) {
+func aprs_status_report(A *decodedAPRS, info []byte) {
 	type aprs_status_time_s struct {
 		DTI   byte    /* > */
 		ZTime [7]byte /* Time stamp ddhhmmz */
@@ -2342,7 +2342,7 @@ Assuming query responding is enabled, the following broadcast queries should be 
 
 */
 
-func aprs_general_query(A *decode_aprs_t, info []byte) {
+func aprs_general_query(A *decodedAPRS, info []byte) {
 	A.g_data_type_desc = "General Query"
 
 	/*
@@ -2475,7 +2475,7 @@ Andrew, KA2DDO
 author of YAAC
 */
 
-func aprs_directed_station_query(A *decode_aprs_t, addressee []byte, query []byte, quiet bool) {
+func aprs_directed_station_query(A *decodedAPRS, addressee []byte, query []byte, quiet bool) {
 	//char query_type[20];		/* Does the query type always need to be exactly 5 characters? */
 	/* If not, how would we know where the extra optional information starts? */
 
@@ -2506,7 +2506,7 @@ func aprs_directed_station_query(A *decode_aprs_t, addressee []byte, query []byt
  *
  *------------------------------------------------------------------*/
 
-func aprs_telemetry(A *decode_aprs_t, info []byte, quiet bool) {
+func aprs_telemetry(A *decodedAPRS, info []byte, quiet bool) {
 	A.g_data_type_desc = "Telemetry"
 
 	var telemetry, comment = telemetryState.telemetry_data_original(A.g_src, string(info), quiet)
@@ -2527,7 +2527,7 @@ func aprs_telemetry(A *decode_aprs_t, info []byte, quiet bool) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_user_defined(A *decode_aprs_t, info []byte) {
+func aprs_user_defined(A *decodedAPRS, info []byte) {
 	if bytes.HasPrefix(info, []byte("{tt")) || // Historical.
 		bytes.HasPrefix(info, []byte("{DT")) { // Official after registering {D*
 		aprs_raw_touch_tone(A, info)
@@ -2582,7 +2582,7 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_raw_touch_tone(A *decode_aprs_t, info []byte) {
+func aprs_raw_touch_tone(A *decodedAPRS, info []byte) {
 	A.g_data_type_desc = "Raw Touch Tone Data"
 
 	/* Just copy the info field without the message type. */
@@ -2607,7 +2607,7 @@ func aprs_raw_touch_tone(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_morse_code(A *decode_aprs_t, info []byte) {
+func aprs_morse_code(A *decodedAPRS, info []byte) {
 	A.g_data_type_desc = "Morse Code Data"
 
 	/* Just copy the info field without the message type. */
@@ -2633,7 +2633,7 @@ func aprs_morse_code(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
+func aprs_positionless_weather_report(A *decodedAPRS, info []byte) {
 	// The data type indicator '_', then an MDHM timestamp, then the weather.
 	const positionlessWeatherHeaderBytes = 1 + 8
 
@@ -2726,7 +2726,7 @@ func getwdata(wpp []byte, id rune, dlen int) (maybe.Maybe[float64], []byte, bool
 	return maybe.Just(f), wpp[dlen+1:], true
 }
 
-func weather_data(A *decode_aprs_t, wdata []byte) {
+func weather_data(A *decodedAPRS, wdata []byte) {
 	var wp = wdata
 	var found bool
 
@@ -2984,7 +2984,7 @@ func weather_data(A *decode_aprs_t, wdata []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprs_ultimeter(A *decode_aprs_t, info []byte) {
+func aprs_ultimeter(A *decodedAPRS, info []byte) {
 	// Header = $ULTW
 	// Data Fields
 	var h_windpeak uint16  // 1. Wind Speed Peak over last 5 min. (0.1 kph)
@@ -3095,7 +3095,7 @@ func aprs_ultimeter(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func decode_position(A *decode_aprs_t, ppos *position_t) {
+func decode_position(A *decodedAPRS, ppos *position_t) {
 	A.g_lat = get_latitude_8(ppos.Lat, A.g_quiet)
 	A.g_lon = get_longitude_9(ppos.Lon, A.g_quiet)
 
@@ -3140,7 +3140,7 @@ func decode_position(A *decode_aprs_t, ppos *position_t) {
  *
  *------------------------------------------------------------------*/
 
-func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) {
+func decode_compressed_position(A *decodedAPRS, pcpos *compressed_position_t) {
 	if isdigit91(pcpos.Y[0]) && isdigit91(pcpos.Y[1]) && isdigit91(pcpos.Y[2]) && isdigit91(pcpos.Y[3]) {
 		A.g_lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
 	} else {
@@ -3557,7 +3557,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
  *
  *------------------------------------------------------------------*/
 
-func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam // Nothing reads the time yet; callers only want the check.
+func get_timestamp(A *decodedAPRS, p [7]byte) time.Time { //nolint:unparam // Nothing reads the time yet; callers only want the check.
 	type dhm_s struct {
 		Day     [2]byte
 		Hours   [2]byte
@@ -3714,7 +3714,7 @@ func directivityString(d int) (string, error) {
 	return dirs[d], nil
 }
 
-func data_extension_comment(A *decode_aprs_t, pdext []byte) {
+func data_extension_comment(A *decodedAPRS, pdext []byte) {
 	if len(pdext) < 7 {
 		A.g_comment = string(pdext)
 
@@ -3951,7 +3951,7 @@ func aprsSign(x float64) float64 {
 	}
 }
 
-func process_comment(A *decode_aprs_t, commentData []byte) {
+func process_comment(A *decodedAPRS, commentData []byte) {
 	/*
 	 * Frequency must be at the at the beginning.
 	 * Others can be anywhere in the comment.

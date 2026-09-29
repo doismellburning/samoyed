@@ -777,7 +777,7 @@ x = Silence FX.25 information.`)
 // ais_object_course_speed rounds a decoded course and speed into the integer
 // degrees and knots encode_object takes, leaving an unknown one absent.
 // Should encode_object take floating point here?
-func ais_object_course_speed(A *decode_aprs_t) (maybe.Maybe[int], maybe.Maybe[int]) {
+func ais_object_course_speed(A *decodedAPRS) (maybe.Maybe[int], maybe.Maybe[int]) {
 	var course = maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.g_course)
 	var speed = maybe.Fmap(func(mph float64) int { return int(DW_MPH_TO_KNOTS(mph) + 0.5) }, A.g_speed_mph)
 
@@ -1275,12 +1275,12 @@ func countOf(n int, noun string) string {
 
 // mheardPosition is the position the stations-heard list should record for a
 // decoded packet: its location if it is a position report, and nothing otherwise.
-func mheardPosition(A *decode_aprs_t) (maybe.Maybe[float64], maybe.Maybe[float64]) {
+func mheardPosition(A *decodedAPRS) (maybe.Maybe[float64], maybe.Maybe[float64]) {
 	// Issue 545.  This was not thought out well.
 	// There was a case where a station sent a position report and the location was stored.
 	// Later, the same station sent an object report and the stations's location was overwritten
 	// by the object location.  Solution: Save location only if position report.
-	if A.g_packet_type != packet_type_position {
+	if A.g_packet_type != packetTypePosition {
 		return maybe.Nothing[float64](), maybe.Nothing[float64]()
 	}
 
