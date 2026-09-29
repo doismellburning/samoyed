@@ -81,6 +81,10 @@ type State struct {
 	// *stationMetadata, most recently used at the front.
 	stations map[string]*list.Element
 	recency  *list.List
+
+	// defaults is what a station that has sent no metadata decodes with.  It
+	// is shared by all such stations, so nothing may change it.
+	defaults *stationMetadata
 }
 
 // New returns a State that has heard no metadata, so every station starts
@@ -91,23 +95,15 @@ func New() *State {
 	ts.capacity = maxStations
 	ts.stations = make(map[string]*list.Element)
 	ts.recency = list.New()
+	ts.defaults = newStationMetadata("")
 
 	return ts
 }
 
-// getMetadata returns the metadata for station, a station name with optional
-// SSID, first allocating one with the defaults if the station has sent none.
-// Either way the station becomes the most recently used, and allocating one
-// drops the least recently used station if the State is full.
-func (ts *State) getMetadata(station string) *stationMetadata {
-	logrus.WithField("station", station).Debug("getMetadata")
-
-	if e, ok := ts.stations[station]; ok {
-		ts.recency.MoveToFront(e)
-
-		return e.Value.(*stationMetadata) //nolint:forcetypeassert // recency holds nothing else
-	}
-
+// newStationMetadata returns metadata for station with the defaults: channels
+// named A1-A5 and D1-D8 with no units, analog values unscaled, and every bit
+// active high.
+func newStationMetadata(station string) *stationMetadata {
 	var p = new(stationMetadata)
 
 	p.station = station
@@ -132,6 +128,47 @@ func (ts *State) getMetadata(station string) *stationMetadata {
 	for n := range numDigital {
 		p.sense[n] = true
 	}
+
+	return p
+}
+
+// stored returns the metadata kept for station, if any, making the station
+// the most recently used.
+func (ts *State) stored(station string) (*stationMetadata, bool) {
+	var e, ok = ts.stations[station]
+	if !ok {
+		return nil, false
+	}
+
+	ts.recency.MoveToFront(e)
+
+	return e.Value.(*stationMetadata), true //nolint:forcetypeassert // recency holds nothing else
+}
+
+// lookup returns the metadata for decoding station's data: what it has sent,
+// or the shared defaults, which must not be changed, if it has sent none.  Unlike
+// getMetadata it keeps nothing, so data alone takes up no room.
+func (ts *State) lookup(station string) *stationMetadata {
+	if p, ok := ts.stored(station); ok {
+		return p
+	}
+
+	return ts.defaults
+}
+
+// getMetadata returns the metadata for station, a station name with optional
+// SSID, for a metadata message to change, first allocating one with the
+// defaults if the station has sent none.  Either way the station becomes the
+// most recently used, and allocating one drops the least recently used station
+// if the State is full.
+func (ts *State) getMetadata(station string) *stationMetadata {
+	logrus.WithField("station", station).Debug("getMetadata")
+
+	if p, ok := ts.stored(station); ok {
+		return p
+	}
+
+	var p = newStationMetadata(station)
 
 	if ts.recency.Len() >= ts.capacity {
 		var oldest = ts.recency.Back()
@@ -190,7 +227,7 @@ func (ts *State) DataOriginal(station string, info string, quiet bool) (string, 
 	defer ts.mu.Unlock()
 
 	logrus.WithField("info", info).Debug("DataOriginal")
-	var pm = ts.getMetadata(station)
+	var pm = ts.lookup(station)
 
 	// The zero value of a Maybe is Nothing, so an unreported channel needs no
 	// initialisation to say so.
@@ -329,7 +366,7 @@ func (ts *State) DataBase91(station string, cdata string) string {
 	defer ts.mu.Unlock()
 
 	logrus.WithField("cdata", cdata).Debug("DataBase91")
-	var pm = ts.getMetadata(station)
+	var pm = ts.lookup(station)
 
 	// The zero value of a Maybe is Nothing, so an unreported channel needs no
 	// initialisation to say so.

@@ -123,7 +123,6 @@ func Test_State_drops_least_recently_used(t *testing.T) {
 
 	assert.Len(t, ts.stations, 2)
 
-	// Q2TEST last, as decoding its data stores it afresh, dropping another.
 	for _, c := range []struct{ station, want string }{
 		{"Q1TEST", "Seq=1, One=1"},
 		{"Q3TEST", "Seq=1, Three=1"},
@@ -132,4 +131,20 @@ func Test_State_drops_least_recently_used(t *testing.T) {
 		var result, _ = ts.DataOriginal(c.station, "T#1,1", true)
 		assert.Equal(t, c.want, result, c.station)
 	}
+}
+
+// Data from a station that has sent no metadata decodes with the defaults,
+// and there is nothing of the station's to keep, so nothing is kept.
+
+func Test_State_keeps_nothing_for_data_alone(t *testing.T) {
+	var ts = New()
+
+	var result, _ = ts.DataOriginal("Q1TEST", "T#005,199,000,255,073,123,01101001", true)
+	assert.Equal(t,
+		"Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1",
+		result)
+
+	assert.Equal(t, "Seq=7544, A1=1472", ts.DataBase91("Q2TEST", "ss11"))
+
+	assert.Empty(t, ts.stations)
 }
