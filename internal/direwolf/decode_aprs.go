@@ -171,10 +171,6 @@ type decode_aprs_t struct {
 	g_footprint_lon    maybe.Maybe[float64] /* All Nothing if not used. */
 	g_footprint_radius maybe.Maybe[float64] /* Radius in miles. */
 
-	g_query_callsign string //nolint:unused
-	/* Directed query may contain callsign.  */
-	/* e.g. tell me all objects from that callsign. */
-
 	g_weather string /* Weather */
 
 	g_telemetry string /* Telemetry data */
@@ -2499,7 +2495,6 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
  *
  * Outputs:	A	- Decoded packet structure
  *				A.g_query_type
- *				A.g_query_callsign	(optional)
  *
  * Description:	The caller has already removed the :addressee:? part so we are left
  *		with a query type of exactly 5 characters and optional "callsign
