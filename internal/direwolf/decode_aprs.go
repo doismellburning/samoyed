@@ -1261,8 +1261,7 @@ func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int
 	}
 
 	if !A.g_quiet {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid character \"%c\" in MIC-E destination/latitude.\n", c)
+		logrus.WithField("found", string(rune(c))).Warn("Invalid character in MIC-E destination/latitude")
 	}
 
 	return (0)
@@ -1282,8 +1281,10 @@ func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 	var sizeof_struct_aprs_mic_e_s = 9
 	if len(info) < sizeof_struct_aprs_mic_e_s {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("MIC-E format must have at least %d characters in the information part.\n", sizeof_struct_aprs_mic_e_s)
+			logrus.WithFields(logrus.Fields{
+				"length":  len(info),
+				"minimum": sizeof_struct_aprs_mic_e_s,
+			}).Warn("MIC-E information part is too short")
 		}
 
 		return
@@ -1303,8 +1304,10 @@ func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 	const mic_e_dest_len = 6
 	if len(dest) < mic_e_dest_len {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("MIC-E destination \"%s\" must have %d characters to hold a latitude.\n", dest, mic_e_dest_len)
+			logrus.WithFields(logrus.Fields{
+				"destination": dest,
+				"minimum":     mic_e_dest_len,
+			}).Warn("MIC-E destination is too short to hold a latitude")
 		}
 
 		return
@@ -1328,8 +1331,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 		/* North */
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid MIC-E N/S encoding in 4th character of destination.\n")
+			logrus.WithField("destination", dest).Warn("Invalid MIC-E N/S encoding in 4th character of destination")
 		}
 	}
 
@@ -1347,8 +1349,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 		offset = false
 
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid MIC-E Longitude Offset in 5th character of destination.\n")
+			logrus.WithField("destination", dest).Warn("Invalid MIC-E longitude offset in 5th character of destination")
 		}
 	}
 
@@ -1372,8 +1373,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 		lon = maybe.Just(float64(ch-38) + 110) /* 110 - 179 degrees */
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character 0x%02x for MIC-E Longitude Degrees.\n", ch)
+			logrus.WithField("found", fmt.Sprintf("0x%02x", ch)).Warn("Invalid character for MIC-E longitude degrees")
 		}
 	}
 
@@ -1404,8 +1404,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 		} else {
 			lon = maybe.Nothing[float64]()
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid character 0x%02x for MIC-E Longitude Minutes.\n", ch)
+				logrus.WithField("found", fmt.Sprintf("0x%02x", ch)).Warn("Invalid character for MIC-E longitude minutes")
 			}
 		}
 
@@ -1421,8 +1420,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 			} else {
 				lon = maybe.Nothing[float64]()
 				if !A.g_quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Invalid character 0x%02x for MIC-E Longitude hundredths of Minutes.\n", ch)
+					logrus.WithField("found", fmt.Sprintf("0x%02x", ch)).Warn("Invalid character for MIC-E longitude hundredths of minutes")
 				}
 			}
 		}
@@ -1446,8 +1444,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 		lon = maybe.Fmap(func(degrees float64) float64 { return -degrees }, lon)
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid MIC-E E/W encoding in 6th character of destination.\n")
+			logrus.WithField("destination", dest).Warn("Invalid MIC-E E/W encoding in 6th character of destination")
 		}
 	}
 
@@ -1460,8 +1457,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *ax25.Packet, info []byte) {
 
 	if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid symbol table code not one of / \\ A-Z 0-9\n")
+			logrus.WithField("symbol_table", string(rune(A.g_symbol_table))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 		}
 
 		A.g_symbol_table = '/'
