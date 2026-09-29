@@ -197,9 +197,9 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 		}
 
 		// from protocol reference page 29.
-		var _range = math.Sqrt(2.0 * float64(h) * math.Sqrt((float64(p)/10.0)*(float64(g)/2.0)))
+		var rangeMiles = math.Sqrt(2.0 * float64(h) * math.Sqrt((float64(p)/10.0)*(float64(g)/2.0)))
 
-		var s = min(max(math.Round(math.Log(_range/2.)/math.Log(1.08)), 0), 93)
+		var s = min(max(math.Round(math.Log(rangeMiles/2.)/math.Log(1.08)), 0), 93)
 
 		presult.S = byte(s + '!')
 
