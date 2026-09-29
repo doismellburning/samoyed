@@ -379,6 +379,29 @@ func frequency_spec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset
 	return result
 }
 
+// encodeLocation returns the part of the info that position reports and
+// objects share: the position, compressed or not, then the optional data
+// extension (which only an uncompressed position has room for) and the
+// optional frequency spec.
+func encodeLocation(compressed bool, lat float64, lon float64, ambiguity int,
+	symtab byte, symbol byte,
+	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
+	course maybe.Maybe[int], speed maybe.Maybe[int],
+	freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset maybe.Maybe[float64]) string {
+	var result string
+
+	if compressed {
+		result = compressed_position_string(compressed_position(symtab, symbol, lat, lon,
+			power, height, gain,
+			course, speed))
+	} else {
+		result = normal_position_string(normal_position(symtab, symbol, lat, lon, ambiguity)) +
+			dataExtension(power, height, gain, dir, course, speed)
+	}
+
+	return result + frequency_spec(freq, tone, offset)
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        EncodePosition
@@ -434,31 +457,15 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 		dti = '='
 	}
 
-	var result = string(dti)
-
-	if compressed {
-		// Thought:
-		// https://groups.io/g/direwolf/topic/92718535#6886
-		// When speed is zero, we could put the altitude in the compressed
-		// position rather than having /A=999999.
-		// However, the resolution would be decreased and that could be important
-		// when hiking in hilly terrain.  It would also be confusing to
-		// flip back and forth between two different representations.
-		var c = compressed_position(symtab, symbol, lat, lon,
-			power, height, gain,
-			course, speed)
-
-		result += compressed_position_string(c)
-	} else {
-		var n = normal_position(symtab, symbol, lat, lon, ambiguity)
-		result += normal_position_string(n)
-
-		result += dataExtension(power, height, gain, dir, course, speed)
-	}
-
-	/* Optional frequency spec. */
-
-	result += frequency_spec(freq, tone, offset)
+	// Thought:
+	// https://groups.io/g/direwolf/topic/92718535#6886
+	// When speed is zero, we could put the altitude in the compressed
+	// position rather than having /A=999999.
+	// However, the resolution would be decreased and that could be important
+	// when hiking in hilly terrain.  It would also be confusing to
+	// flip back and forth between two different representations.
+	var result = string(dti) + encodeLocation(compressed, lat, lon, ambiguity, symtab, symbol,
+		power, height, gain, dir, course, speed, freq, tone, offset)
 
 	/* Altitude.  Can be anywhere in comment. */
 	// Officially, altitude must be six digits.
@@ -531,26 +538,10 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 		timestamp = "111111z"
 	}
 
-	var result = fmt.Sprintf("%c%-9.9s%c%-7.7s", dti, name, liveKilled, timestamp)
-
-	if compressed {
-		result += compressed_position_string(compressed_position(symtab, symbol, lat, lon,
-			power, height, gain,
-			course, speed))
-	} else {
-		result += normal_position_string(normal_position(symtab, symbol, lat, lon, ambiguity))
-
-		result += dataExtension(power, height, gain, dir, course, speed)
-	}
-
-	/* Optional frequency spec. */
-
-	result += frequency_spec(freq, tone, offset)
-
-	/* Finally, comment text. */
-	result += comment
-
-	return result
+	return fmt.Sprintf("%c%-9.9s%c%-7.7s", dti, name, liveKilled, timestamp) +
+		encodeLocation(compressed, lat, lon, ambiguity, symtab, symbol,
+			power, height, gain, dir, course, speed, freq, tone, offset) +
+		comment
 }
 
 /*------------------------------------------------------------------
