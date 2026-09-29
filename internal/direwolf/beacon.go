@@ -830,7 +830,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 				/* what the zero value of each of those fields already means. */
 				var A decodedAPRS
 
-				A.g_src = mycall
+				A.src = mycall
 				A.symbolTable = bp.symtab
 				A.symbolCode = bp.symbol
 				A.lat = gpsinfo.Lat

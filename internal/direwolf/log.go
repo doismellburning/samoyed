@@ -259,17 +259,17 @@ func (pl *PacketLogger) Write(channel int, A *decodedAPRS, pp *ax25.Packet, alev
 			sdti = string(rune(pp.DTI()))
 		}
 
-		var sname = A.g_src
-		if len(A.g_name) > 0 {
-			sname = A.g_name
+		var sname = A.src
+		if len(A.name) > 0 {
+			sname = A.name
 		}
 
 		var ssymbol = string(rune(A.symbolTable)) + string(rune(A.symbolCode))
 
-		var smfr = A.g_mfr
-		var sstatus = A.g_mic_e_status
-		var stelemetry = A.g_telemetry
-		var scomment = A.g_comment
+		var smfr = A.mfr
+		var sstatus = A.micEStatus
+		var stelemetry = A.telemetry
+		var scomment = A.comment
 
 		var slat = ""
 		if lat, ok := A.lat.Get(); ok {
@@ -297,28 +297,28 @@ func (pl *PacketLogger) Write(channel int, A *decodedAPRS, pp *ax25.Packet, alev
 		}
 
 		var sfreq = ""
-		if freq, ok := A.g_freq.Get(); ok {
+		if freq, ok := A.freq.Get(); ok {
 			sfreq = fmt.Sprintf("%.3f", freq)
 		}
 
 		var soffs = ""
-		if offset, ok := A.g_offset.Get(); ok {
+		if offset, ok := A.offset.Get(); ok {
 			soffs = fmt.Sprintf("%+d", offset)
 		}
 
 		var stone = ""
-		if tone, ok := A.g_tone.Get(); ok {
+		if tone, ok := A.tone.Get(); ok {
 			stone = fmt.Sprintf("%.1f", tone)
 		}
 
-		if dcs, ok := A.g_dcs.Get(); ok {
+		if dcs, ok := A.dcs.Get(); ok {
 			stone = fmt.Sprintf("D%03o", dcs)
 		}
 
 		var w = csv.NewWriter(pl.logFp)
 		w.Write([]string{
 			strconv.Itoa(channel), strconv.Itoa(int(now.Unix())), itime,
-			A.g_src, heard, alevel_text, strconv.Itoa(int(retries)), sdti,
+			A.src, heard, alevel_text, strconv.Itoa(int(retries)), sdti,
 			sname, ssymbol,
 			slat, slon, sspd, scse, salt,
 			sfreq, soffs, stone,
@@ -348,7 +348,7 @@ func (pl *PacketLogger) Write(channel int, A *decodedAPRS, pp *ax25.Packet, alev
 
 func (pl *PacketLogger) RRBits(A *decodedAPRS, pp *ax25.Packet) {
 	// Sanitize system type (manufacturer) changing any comma to period.
-	var smfr = strings.ReplaceAll(A.g_mfr, ",", ".")
+	var smfr = strings.ReplaceAll(A.mfr, ",", ".")
 
 	/* Who are we hearing?   Original station or digipeater? */
 	/* Similar code in direwolf.c.  Combine into one function? */
@@ -388,7 +388,7 @@ func (pl *PacketLogger) RRBits(A *decodedAPRS, pp *ax25.Packet) {
 		dw_printf("%d %d%d  %d %d%d,%s,%s,%s\n",
 			src_c, (src_rr>>1)&1, src_rr&1,
 			dst_c, (dst_rr>>1)&1, dst_rr&1,
-			smfr, A.g_src, heard)
+			smfr, A.src, heard)
 	}
 } /* end RRBits */
 

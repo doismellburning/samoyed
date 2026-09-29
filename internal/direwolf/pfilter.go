@@ -126,8 +126,8 @@ type pfstate_t struct {
 	 *		symbolTable	- / \ or overlay
 	 *		symbolCode
 	 *		lat, lon	- Location
-	 *		g_name		- for object or item
-	 *		g_comment
+	 *		name		- for object or item
+	 *		comment
 	 */
 	decoded *decodedAPRS
 
@@ -545,11 +545,11 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		}
 	} else if pf.token_str[0] == 'o' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* o - object or item name */
-		result, err = filt_bodgu(pf, pf.decoded.g_name)
+		result, err = filt_bodgu(pf, pf.decoded.name)
 
 		if pf.debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_name)
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.name)
 		}
 	} else if pf.token_str[0] == 'd' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* d - was digipeated by */
@@ -598,17 +598,17 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		}
 	} else if pf.token_str[0] == 'g' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* g - Addressee of message. e.g. "BLN*" for bulletins. */
-		if pf.decoded.g_message_subtype == messageSubtypeMessage ||
-			pf.decoded.g_message_subtype == messageSubtypeAck ||
-			pf.decoded.g_message_subtype == messageSubtypeRej ||
-			pf.decoded.g_message_subtype == messageSubtypeBulletin ||
-			pf.decoded.g_message_subtype == messageSubtypeNWS ||
-			pf.decoded.g_message_subtype == messageSubtypeDirectedQuery {
-			result, err = filt_bodgu(pf, pf.decoded.g_addressee)
+		if pf.decoded.messageSubtype == messageSubtypeMessage ||
+			pf.decoded.messageSubtype == messageSubtypeAck ||
+			pf.decoded.messageSubtype == messageSubtypeRej ||
+			pf.decoded.messageSubtype == messageSubtypeBulletin ||
+			pf.decoded.messageSubtype == messageSubtypeNWS ||
+			pf.decoded.messageSubtype == messageSubtypeDirectedQuery {
+			result, err = filt_bodgu(pf, pf.decoded.addressee)
 
 			if pf.debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee)
+				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.addressee)
 			}
 		} else {
 			result = 0
@@ -686,8 +686,8 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		if pf.debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 
-			if pf.decoded.g_packet_type == packetTypeMessage {
-				dw_printf("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee)
+			if pf.decoded.packetType == packetTypeMessage {
+				dw_printf("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), pf.decoded.addressee)
 			} else {
 				dw_printf("   %s returns %s for not an APRS 'message'\n", pf.token_str, bool2text(result))
 			}
@@ -777,7 +777,7 @@ func filt_bodgu(pf *pfstate_t, arg string) (int, error) {
  * Description:	The filter is loosely based the type filtering described here:
  *		http://www.aprs-is.net/javAPRSFilter.aspx
  *
- *		Mostly use g_packet_type and g_message_subtype from decode_aprs.
+ *		Mostly use packetType and messageSubtype from decode_aprs.
  *
  * References:
  *		http://www.aprs-is.net/WX/
@@ -799,58 +799,58 @@ func filt_t(pf *pfstate_t) (int, error) {
 	for _, f := range pf.token_str[2:] {
 		switch f {
 		case 'p': /* Position */
-			if pf.decoded.g_packet_type == packetTypePosition {
+			if pf.decoded.packetType == packetTypePosition {
 				return 1, nil
 			}
 
 		case 'o': /* Object */
-			if pf.decoded.g_packet_type == packetTypeObject {
+			if pf.decoded.packetType == packetTypeObject {
 				return 1, nil
 			}
 
 		case 'i': /* Item */
-			if pf.decoded.g_packet_type == packetTypeItem {
+			if pf.decoded.packetType == packetTypeItem {
 				return 1, nil
 			}
 
 		case 'm': // Any "message."
-			if pf.decoded.g_packet_type == packetTypeMessage {
+			if pf.decoded.packetType == packetTypeMessage {
 				return 1, nil
 			}
 
 		case 'q': /* Query */
-			if pf.decoded.g_packet_type == packetTypeQuery {
+			if pf.decoded.packetType == packetTypeQuery {
 				return 1, nil
 			}
 
 		case 'c': /* station Capabilities - my extension */
 			/* Most often used for IGate statistics. */
-			if pf.decoded.g_packet_type == packetTypeCapabilities {
+			if pf.decoded.packetType == packetTypeCapabilities {
 				return 1, nil
 			}
 
 		case 's': /* Status */
-			if pf.decoded.g_packet_type == packetTypeStatus {
+			if pf.decoded.packetType == packetTypeStatus {
 				return 1, nil
 			}
 
 		case 't': /* Telemetry data or metadata */
-			if pf.decoded.g_packet_type == packetTypeTelemetry {
+			if pf.decoded.packetType == packetTypeTelemetry {
 				return 1, nil
 			}
 
 		case 'u': /* User-defined */
-			if pf.decoded.g_packet_type == packetTypeUserDefined {
+			if pf.decoded.packetType == packetTypeUserDefined {
 				return 1, nil
 			}
 
 		case 'h': /* has third party Header - my extension */
-			if pf.decoded.g_has_thirdparty_header {
+			if pf.decoded.hasThirdPartyHeader {
 				return 1, nil
 			}
 
 		case 'w': /* Weather */
-			if pf.decoded.g_packet_type == packetTypeWeather {
+			if pf.decoded.packetType == packetTypeWeather {
 				return 1, nil
 			}
 
@@ -858,13 +858,13 @@ func filt_t(pf *pfstate_t) (int, error) {
 			/* Object with _ symbol is also weather.  APRS protocol spec page 66. */
 			// Can't use *infop because it would not work with 3rd party header.
 
-			if (pf.decoded.g_packet_type == packetTypePosition ||
-				pf.decoded.g_packet_type == packetTypeObject) && pf.decoded.symbolCode == '_' {
+			if (pf.decoded.packetType == packetTypePosition ||
+				pf.decoded.packetType == packetTypeObject) && pf.decoded.symbolCode == '_' {
 				return 1, nil
 			}
 
 		case 'n': /* NWS format */
-			if pf.decoded.g_packet_type == packetTypeNWS {
+			if pf.decoded.packetType == packetTypeNWS {
 				return 1, nil
 			}
 
@@ -1331,9 +1331,9 @@ func filt_i(pf *pfstate_t) (int, error) {
 
 	/*
 	 * Get source address and info part.
-	 * Addressee has already been extracted into pf.decoded.g_addressee.
+	 * Addressee has already been extracted into pf.decoded.addressee.
 	 */
-	if pf.decoded.g_packet_type != packetTypeMessage {
+	if pf.decoded.packetType != packetTypeMessage {
 		return 0, nil
 	}
 
@@ -1372,7 +1372,7 @@ func filt_i(pf *pfstate_t) (int, error) {
 		return 0, nil
 	}
 
-	var was_heard = mheardDB.WasRecentlyNearby("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km)
+	var was_heard = mheardDB.WasRecentlyNearby("addressee", pf.decoded.addressee, heardtime, maxhops, dlat, dlon, km)
 
 	if !was_heard {
 		return 0, nil
@@ -1395,7 +1395,7 @@ func filt_i(pf *pfstate_t) (int, error) {
 	 * the past minute, rather than the usual 180 minutes for the addressee.
 	 */
 
-	was_heard = mheardDB.WasRecentlyNearby("source", pf.decoded.g_src, 1, 0,
+	was_heard = mheardDB.WasRecentlyNearby("source", pf.decoded.src, 1, 0,
 		maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]())
 
 	if was_heard {

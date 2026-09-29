@@ -1055,16 +1055,16 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 			if A_opt_ais_to_obj && haveLat && haveLon {
 				var course, speed = ais_object_course_speed(A)
 
-				var ais_obj_info = encode_object(A.g_name, false, time.Now(),
+				var ais_obj_info = encode_object(A.name, false, time.Now(),
 					lat, lon, 0, // no ambiguity
 					A.symbolTable, A.symbolCode,
 					maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // power, height, gain, direction.
 					course, speed,
 					maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), // freq, tone, offset
-					A.g_comment)
+					A.comment)
 
 				// TODO Bodge
-				ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.g_src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)
+				ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)
 
 				logrus.WithFields(logrus.Fields{
 					"channel":        channel,
@@ -1079,15 +1079,15 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		if lat, haveLat := A.lat.Get(); haveLat {
 			if lon, haveLon := A.lon.Get(); haveLon {
-				var nameIn = A.g_src
-				if len(A.g_name) > 0 {
-					nameIn = A.g_name
+				var nameIn = A.src
+				if len(A.name) > 0 {
+					nameIn = A.name
 				}
 
 				waypointSender.SendSentence(nameIn,
 					lat, lon, rune(A.symbolTable), A.symbolCode,
 					maybe.Fmap(DW_FEET_TO_METERS, A.altitudeFt), A.course, maybe.Fmap(DW_MPH_TO_KNOTS, A.speedMPH),
-					A.g_comment)
+					A.comment)
 			}
 		}
 	}
@@ -1280,7 +1280,7 @@ func mheardPosition(A *decodedAPRS) (maybe.Maybe[float64], maybe.Maybe[float64])
 	// There was a case where a station sent a position report and the location was stored.
 	// Later, the same station sent an object report and the stations's location was overwritten
 	// by the object location.  Solution: Save location only if position report.
-	if A.g_packet_type != packetTypePosition {
+	if A.packetType != packetTypePosition {
 		return maybe.Nothing[float64](), maybe.Nothing[float64]()
 	}
 

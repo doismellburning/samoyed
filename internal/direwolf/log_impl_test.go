@@ -59,8 +59,8 @@ func readLogRecords(t *testing.T, path string) [][]string {
 
 func fullLogAprs() *decodedAPRS {
 	var A = new(decodedAPRS)
-	A.g_src = "Q1TEST"
-	A.g_name = "OBJNAME"
+	A.src = "Q1TEST"
+	A.name = "OBJNAME"
 	A.symbolTable = '/'
 	A.symbolCode = '>'
 	A.lat = maybe.Just(51.5)
@@ -68,13 +68,13 @@ func fullLogAprs() *decodedAPRS {
 	A.speedMPH = maybe.Just(11.5078)
 	A.course = maybe.Just(90.0)
 	A.altitudeFt = maybe.Just(1000.0)
-	A.g_freq = maybe.Just(146.52)
-	A.g_offset = maybe.Just(-600)
-	A.g_tone = maybe.Just(100.0)
-	A.g_mfr = "Maker, Inc"
-	A.g_mic_e_status = "En Route"
-	A.g_telemetry = "T#001"
-	A.g_comment = "hello, \"world\""
+	A.freq = maybe.Just(146.52)
+	A.offset = maybe.Just(-600)
+	A.tone = maybe.Just(100.0)
+	A.mfr = "Maker, Inc"
+	A.micEStatus = "En Route"
+	A.telemetry = "T#001"
+	A.comment = "hello, \"world\""
 
 	return A
 }
@@ -190,7 +190,7 @@ func TestLogWriteSingleFileAppendsWithoutSecondHeader(t *testing.T) {
 	var path = filepath.Join(t.TempDir(), "packets.log")
 
 	var A = new(decodedAPRS)
-	A.g_src = "Q1TEST"
+	A.src = "Q1TEST"
 
 	var pl = NewPacketLogger(false, path)
 	pl.Write(0, A, nil, logNoLevel(), 0)
@@ -226,9 +226,9 @@ func TestLogWriteDCSOverridesTone(t *testing.T) {
 	var path = filepath.Join(t.TempDir(), "packets.log")
 
 	var A = new(decodedAPRS)
-	A.g_src = "Q1TEST"
-	A.g_tone = maybe.Just(100.0)
-	A.g_dcs = maybe.Just(0o23)
+	A.src = "Q1TEST"
+	A.tone = maybe.Just(100.0)
+	A.dcs = maybe.Just(0o23)
 
 	var pp = ax25.FromText("Q1TEST>APRS:>status", true)
 	require.NotNil(t, pp)
@@ -269,7 +269,7 @@ func TestLogWriteDailyNames(t *testing.T) {
 	var pl = NewPacketLogger(true, dir)
 
 	var A = new(decodedAPRS)
-	A.g_src = "Q1TEST"
+	A.src = "Q1TEST"
 
 	pl.Write(0, A, nil, logNoLevel(), 0)
 	require.NotNil(t, pl.logFp)
@@ -332,8 +332,8 @@ func TestLogRRBits(t *testing.T) {
 	var pl = NewPacketLogger(false, "")
 
 	var A = new(decodedAPRS)
-	A.g_src = "Q1TEST"
-	A.g_mfr = "Maker, Inc"
+	A.src = "Q1TEST"
+	A.mfr = "Maker, Inc"
 
 	for _, text := range []string{
 		"Q1TEST>APRS:>status",
