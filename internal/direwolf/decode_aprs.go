@@ -440,7 +440,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 		A.g_packet_type = packet_type_status
 
 	case '?': /* General Query */
-		aprs_general_query(A, pinfo, quiet)
+		aprs_general_query(A, pinfo)
 		A.g_packet_type = packet_type_query
 
 	case 'T': /* Telemetry */
@@ -2348,7 +2348,6 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
  * Purpose:	Decode "General Query" for all stations.
  *
  * Inputs:	info 	- Information field.  First character should be "?".
- *		quiet	- suppress error messages.
  *
  * Outputs:	A	- Decoded packet structure
  *				A.g_query_type
@@ -2387,7 +2386,7 @@ Assuming query responding is enabled, the following broadcast queries should be 
 
 */
 
-func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:unparam
+func aprs_general_query(A *decode_aprs_t, info []byte) {
 	A.g_data_type_desc = "General Query"
 
 	/*
