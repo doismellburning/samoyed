@@ -3763,8 +3763,6 @@ func get_maidenhead(p []byte) int {
  *
  * Inputs:	pdext	- Pointer to optional data extension and comment.
  *
- * Returns:	true if a data extension was found.
- *
  * Outputs:	One or more of the following, depending the data found:
  *
  *			A.g_course
@@ -3794,11 +3792,11 @@ func directivityString(d int) (string, error) {
 	return dirs[d], nil
 }
 
-func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unparam
+func data_extension_comment(A *decode_aprs_t, pdext []byte) {
 	if len(pdext) < 7 {
 		A.g_comment = string(pdext)
 
-		return false
+		return
 	}
 
 	/* Tyy/Cxx - Area object descriptor. */
@@ -3809,7 +3807,7 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 		/* not decoded at this time */
 		process_comment(A, pdext[7:])
 
-		return true
+		return
 	}
 
 	/* CSE/SPD */
@@ -3841,7 +3839,7 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 			process_comment(A, pdext[7:])
 		}
 
-		return true
+		return
 	}
 
 	/* check for Station power, height, gain. */
@@ -3860,7 +3858,7 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 
 		process_comment(A, pdext[7:])
 
-		return true
+		return
 	}
 
 	/* check for precalculated radio range. */
@@ -3875,7 +3873,7 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 
 		process_comment(A, pdext[7:])
 
-		return true
+		return
 	}
 
 	/* DF signal strength,  */
@@ -3891,12 +3889,10 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 
 		process_comment(A, pdext[7:])
 
-		return true
+		return
 	}
 
 	process_comment(A, pdext)
-
-	return false
 }
 
 /*------------------------------------------------------------------
