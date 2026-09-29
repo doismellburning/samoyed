@@ -340,6 +340,22 @@ func cse_spd_data_extension(course maybe.Maybe[int], speed maybe.Maybe[int]) str
 	return fmt.Sprintf("%03d/%03d", cse, spd)
 }
 
+// dataExtension returns the optional data extension (singular) that may follow
+// an uncompressed position, or "" for none.  Can't have both course/speed and
+// PHG; the former gets priority.
+func dataExtension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
+	course maybe.Maybe[int], speed maybe.Maybe[int]) string {
+	if course.IsJust() || maybe.FromMaybe(0, speed) > 0 {
+		return cse_spd_data_extension(course, speed)
+	}
+
+	if maybe.FromMaybe(0, power) > 0 || maybe.FromMaybe(0, height) > 0 || maybe.FromMaybe(0, gain) > 0 {
+		return phg_data_extension(power, height, gain, dir)
+	}
+
+	return ""
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        frequency_spec
@@ -472,16 +488,7 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 		var n = normal_position(symtab, symbol, lat, lon, ambiguity)
 		result += normal_position_string(n)
 
-		/* Optional data extension. (singular) */
-		/* Can't have both course/speed and PHG.  Former gets priority. */
-
-		if course.IsJust() || maybe.FromMaybe(0, speed) > 0 {
-			var cse = cse_spd_data_extension(course, speed)
-			result += cse
-		} else if maybe.FromMaybe(0, power) > 0 || maybe.FromMaybe(0, height) > 0 || maybe.FromMaybe(0, gain) > 0 {
-			var phg = phg_data_extension(power, height, gain, dir)
-			result += phg
-		}
+		result += dataExtension(power, height, gain, dir, course, speed)
 	}
 
 	/* Optional frequency spec. */
@@ -579,14 +586,7 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 	} else {
 		result += normal_position_string(normal_position(symtab, symbol, lat, lon, ambiguity))
 
-		/* Optional data extension. (singular) */
-		/* Can't have both course/speed and PHG.  Former gets priority. */
-
-		if course.IsJust() || maybe.FromMaybe(0, speed) > 0 {
-			result += cse_spd_data_extension(course, speed)
-		} else if maybe.FromMaybe(0, power) > 0 || maybe.FromMaybe(0, height) > 0 || maybe.FromMaybe(0, gain) > 0 {
-			result += phg_data_extension(power, height, gain, dir)
-		}
+		result += dataExtension(power, height, gain, dir, course, speed)
 	}
 
 	/* Optional frequency spec. */
