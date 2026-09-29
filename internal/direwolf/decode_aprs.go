@@ -866,7 +866,7 @@ func aprs_ll_pos(A *decode_aprs_t, info []byte) {
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
 			A.g_data_type_desc = "Weather Report"
-			weather_data(A, info[ll_bytes:], true)
+			weather_data(A, info[ll_bytes:])
 			/*
 			   Here is an interesting case.
 			   The protocol spec states that a position report with symbol _ is a special case
@@ -905,7 +905,7 @@ func aprs_ll_pos(A *decode_aprs_t, info []byte) {
 			/* compressed data so we don't expect a 7 byte "data */
 			/* extension" for them. */
 			A.g_data_type_desc = "Weather Report"
-			weather_data(A, info[compressed_bytes:], false)
+			weather_data(A, info[compressed_bytes:])
 		} else {
 			/* Regular position report. */
 			process_comment(A, info[compressed_bytes:])
@@ -977,7 +977,7 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
 			A.g_data_type_desc = "Weather Report"
-			weather_data(A, info[llBytes:], true)
+			weather_data(A, info[llBytes:])
 		} else {
 			/* Regular position report. */
 			data_extension_comment(A, info[llBytes:])
@@ -991,7 +991,7 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
 			/* compressed data so we don't expect a 7 byte "data */
 			/* extension" for them. */
 			A.g_data_type_desc = "Weather Report"
-			weather_data(A, info[compressedBytes:], false)
+			weather_data(A, info[compressedBytes:])
 		} else {
 			/* Regular position report. */
 			process_comment(A, info[compressedBytes:])
@@ -1988,7 +1988,7 @@ func aprs_object(A *decode_aprs_t, info []byte) {
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
 			A.g_data_type_desc = "Weather Report with Object"
-			weather_data(A, info[objectPosBytes:], true)
+			weather_data(A, info[objectPosBytes:])
 		} else {
 			/* Regular object. */
 			data_extension_comment(A, info[objectPosBytes:])
@@ -2002,7 +2002,7 @@ func aprs_object(A *decode_aprs_t, info []byte) {
 			/* of weather report and object with compressed */
 			/* position. */
 			A.g_data_type_desc = "Weather Report with Object"
-			weather_data(A, info[objectCompressedPosBytes:], false)
+			weather_data(A, info[objectCompressedPosBytes:])
 		} else {
 			/* Regular position report. */
 			process_comment(A, info[objectCompressedPosBytes:])
@@ -2702,7 +2702,7 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
 		return
 	}
 
-	weather_data(A, info[positionlessWeatherHeaderBytes:], false)
+	weather_data(A, info[positionlessWeatherHeaderBytes:])
 }
 
 /*------------------------------------------------------------------
@@ -2713,12 +2713,6 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
  *
  * Inputs:	info 	- Pointer to first byte after location
  *			  and symbol code.
- *
- *		wind_prefix 	- Expecting leading wind info
- *				  for human-readable location.
- *				  (Currently ignored.  We are very
- *				  forgiving in what is accepted.)
- * TODO: call this context instead and have 3 enumerated values.
  *
  * Global In:	A.g_course	- Wind info for compressed location.
  *		A.g_speed_mph
@@ -2784,7 +2778,7 @@ func getwdata(wpp []byte, id rune, dlen int) (maybe.Maybe[float64], []byte, bool
 	return maybe.Just(f), wpp[dlen+1:], true
 }
 
-func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:unparam
+func weather_data(A *decode_aprs_t, wdata []byte) {
 	var wp = wdata
 	var found bool
 
