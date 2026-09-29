@@ -480,10 +480,10 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.flag4Det |= 0x80000000
 	}
 
-	rrbb_append_bit(s.rrbb, byte(dwutil.IfThenElse(raw, 1, 0)))
+	s.rrbb.AppendBit(byte(dwutil.IfThenElse(raw, 1, 0)))
 
 	if s.patDet == 0x7e {
-		rrbb_chop8(s.rrbb)
+		s.rrbb.Chop8()
 
 		/*
 		 * The special pattern 01111110 indicates beginning and ending of a frame.
@@ -552,10 +552,10 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		/*
 			#if TEST
 				  text_color_set(DW_COLOR_DEBUG);
-				  dw_printf ("\nfound flag, channel %d.%d, %d bits in frame\n", channel, subchannel, rrbb_get_len(H.rrbb) - 1);
+				  dw_printf ("\nfound flag, channel %d.%d, %d bits in frame\n", channel, subchannel, H.rrbb.Len() - 1);
 			#endif
 		*/
-		if rrbb_get_len(s.rrbb) >= MIN_FRAME_LEN*8 {
+		if s.rrbb.Len() >= MIN_FRAME_LEN*8 {
 			//JWL - end of frame
 			var speed_error float64    // in percentage.
 			if *pll_symbol_count > 0 { // avoid divde by 0.
@@ -574,11 +574,11 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 				speed_error = 0
 			}
 
-			rrbb_set_speed_error(s.rrbb, speed_error)
+			s.rrbb.SetSpeedError(speed_error)
 
 			var alevel = demod_get_audio_level(channel, subchannel)
 
-			rrbb_set_audio_level(s.rrbb, alevel)
+			s.rrbb.SetAudioLevel(alevel)
 			hdlc_rec2_block(s.rrbb, &s.receiver.audio.achan[channel])
 			/* Handed off to hdlc_rec2_block. */
 			s.rrbb = nil
@@ -589,13 +589,13 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 			*pll_nudge_total = 0
 			*pll_symbol_count = -1 // comes out better than using 0.
 
-			rrbb_clear(s.rrbb, is_scrambled, s.lfsr, s.prevDescram)
+			s.rrbb.Clear(is_scrambled, s.lfsr, s.prevDescram)
 		}
 
 		s.olen = 0 /* Allow accumulation of octets. */
 		s.frameLen = 0
 
-		rrbb_append_bit(s.rrbb, byte(dwutil.IfThenElse(s.prevRaw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
+		s.rrbb.AppendBit(byte(dwutil.IfThenElse(s.prevRaw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
 		/* Now that we are saving other initial state information, */
 		/* it would be sensible to do the same for this instead */
 		/* of lumping it in with the frame data bits. */
@@ -638,7 +638,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.olen = -1    /* Stop accumulating octets. */
 		s.frameLen = 0 /* Discard anything in progress. */
 
-		rrbb_clear(s.rrbb, is_scrambled, s.lfsr, s.prevDescram)
+		s.rrbb.Clear(is_scrambled, s.lfsr, s.prevDescram)
 	} else if (s.patDet & 0xfc) == 0x7c {
 
 		/*

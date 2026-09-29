@@ -42,30 +42,8 @@ type rrbb_t struct {
 	fdata [MAX_NUM_BITS]byte
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_new
- *
- * Purpose:	Allocate space for an array of samples.
- *
- * Inputs:	channel	- Radio channel from whence it came.
- *
- *		subchannel	- Which demodulator of the channel.
- *
- *		slice	- multiple thresholds per demodulator.
- *
- *		is_scrambled - Is data scrambled? (true, false)
- *
- *		descram_state - State of data descrambler.
- *
- *		prev_descram - Previous descrambled bit.
- *
- * Returns:	Handle to be used by other functions.
- *
- * Description:
- *
- ***********************************************************************************/
-
+// rrbb_new allocates a bit buffer for frames heard on the given radio
+// channel, demodulator (subchannel) and slicer, and clears it as Clear does.
 func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram_state int, prev_descram int) *rrbb_t {
 	var result = new(rrbb_t)
 
@@ -73,28 +51,15 @@ func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram
 	result.subchannel = subchannel
 	result.slice = slice
 
-	rrbb_clear(result, is_scrambled, descram_state, prev_descram)
+	result.Clear(is_scrambled, descram_state, prev_descram)
 
 	return (result)
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_clear
- *
- * Purpose:	Clear by setting length to zero, etc.
- *
- * Inputs:	b 		-Handle for sample array.
- *
- *		is_scrambled 	- Is data scrambled? (true, false)
- *
- *		descram_state 	- State of data descrambler.
- *
- *		prev_descram 	- Previous descrambled bit.
- *
- ***********************************************************************************/
-
-func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state int, prev_descram int) {
+// Clear empties the buffer and records the state of the data descrambler, and
+// the previous descrambled bit (0 or 1), before the first data bit of the frame.
+// is_scrambled says whether the data is scrambled G3RUH / K9NG style.
+func (b *rrbb_t) Clear(is_scrambled bool, descram_state int, prev_descram int) {
 	dwutil.Assert(prev_descram == 0 || prev_descram == 1)
 
 	b.alevel.Rec = 9999 // TODO: was there some reason for this instead of 0 or -1?
@@ -108,18 +73,9 @@ func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state int, prev_descram in
 	b.prev_descram = prev_descram
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_append_bit
- *
- * Purpose:	Append another bit to the end.
- *
- * Inputs:	Handle for sample array.
- *		Value for the sample.
- *
- ***********************************************************************************/
-
-func rrbb_append_bit(b *rrbb_t, val byte) {
+// AppendBit appends another bit to the end, silently discarding it if the
+// buffer is full.
+func (b *rrbb_t) AppendBit(val byte) {
 	if b.length >= MAX_NUM_BITS {
 		return /* Silently discard if full. */
 	}
@@ -128,196 +84,74 @@ func rrbb_append_bit(b *rrbb_t, val byte) {
 	b.length++
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_chop8
- *
- * Purpose:	Remove 8 from the length.
- *
- * Inputs:	Handle for bit array.
- *
- * Description:	Back up after appending the flag sequence.
- *
- ***********************************************************************************/
-
-func rrbb_chop8(b *rrbb_t) {
+// Chop8 removes 8 bits from the end, to back up after appending the flag
+// sequence.
+func (b *rrbb_t) Chop8() {
 	if b.length >= 8 {
 		b.length -= 8
 	}
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_get_len
- *
- * Purpose:	Get number of bits in the array.
- *
- * Inputs:	Handle for bit array.
- *
- ***********************************************************************************/
-
-func rrbb_get_len(b *rrbb_t) int {
+// Len returns the number of bits in the buffer.
+func (b *rrbb_t) Len() int {
 	return b.length
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_get_bit
- *
- * Purpose:	Get value of bit in specified position.
- *
- * Inputs:	Handle for sample array.
- *		Index into array.
- *
- ***********************************************************************************/
-
-func rrbb_get_bit(b *rrbb_t, ind int) byte {
+// Bit returns the value of the bit at index ind.
+func (b *rrbb_t) Bit(ind int) byte {
 	return b.fdata[ind]
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_get_chan
- *
- * Purpose:	Get channel from which bit buffer was received.
- *
- * Inputs:	b	Handle for bit array.
- *
- ***********************************************************************************/
-
-func rrbb_get_chan(b *rrbb_t) int {
+// Channel returns the radio channel the bits were received on.
+func (b *rrbb_t) Channel() int {
 	return (b.channel)
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_get_subchan
- *
- * Purpose:	Get subchannel from which bit buffer was received.
- *
- * Inputs:	b	Handle for bit array.
- *
- ***********************************************************************************/
-
-func rrbb_get_subchan(b *rrbb_t) int {
+// Subchannel returns the demodulator the bits were received by.
+func (b *rrbb_t) Subchannel() int {
 	return (b.subchannel)
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_get_slice
- *
- * Purpose:	Get slice number from which bit buffer was received.
- *
- * Inputs:	b	Handle for bit array.
- *
- ***********************************************************************************/
-
-func rrbb_get_slice(b *rrbb_t) int {
+// Slice returns the slicer the bits were received by.
+func (b *rrbb_t) Slice() int {
 	return (b.slice)
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_set_audio_level
- *
- * Purpose:	Set audio level at time the frame was received.
- *
- * Inputs:	b	Handle for bit array.
- *		alevel	Audio level.
- *
- ***********************************************************************************/
-
-func rrbb_set_audio_level(b *rrbb_t, alevel ax25.ALevel) {
+// SetAudioLevel sets the audio level at the time the frame was received.
+func (b *rrbb_t) SetAudioLevel(alevel ax25.ALevel) {
 	b.alevel = alevel
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_get_audio_level
- *
- * Purpose:	Get audio level at time the frame was received.
- *
- * Inputs:	b	Handle for bit array.
- *
- ***********************************************************************************/
-
-func rrbb_get_audio_level(b *rrbb_t) ax25.ALevel {
+// AudioLevel returns the audio level at the time the frame was received.
+func (b *rrbb_t) AudioLevel() ax25.ALevel {
 	return (b.alevel)
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_set_speed_error
- *
- * Purpose:	Set speed error of the received frame.
- *
- * Inputs:	b		Handle for bit array.
- *		speed_error	In percentage.
- *
- ***********************************************************************************/
-
-func rrbb_set_speed_error(b *rrbb_t, speed_error float64) {
+// SetSpeedError sets the speed error of the received frame, as a percentage.
+func (b *rrbb_t) SetSpeedError(speed_error float64) {
 	b.speed_error = speed_error
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_get_speed_error
- *
- * Purpose:	Get speed error of the received frame.
- *
- * Inputs:	b	Handle for bit array.
- *
- * Returns:	speed error in percentage.
- *
- ***********************************************************************************/
-
-func rrbb_get_speed_error(b *rrbb_t) float64 { //nolint:unused
+// SpeedError returns the speed error of the received frame, as a percentage.
+func (b *rrbb_t) SpeedError() float64 {
 	return (b.speed_error)
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_get_is_scrambled
- *
- * Purpose:	Find out if using scrambled data.
- *
- * Inputs:	b	Handle for bit array.
- *
- * Returns:	True (for 9600 baud) or false (for slower AFSK).
- *
- ***********************************************************************************/
-
-func rrbb_get_is_scrambled(b *rrbb_t) bool {
+// IsScrambled reports whether the data is scrambled: true for 9600 baud,
+// false for slower AFSK.
+func (b *rrbb_t) IsScrambled() bool {
 	return (b.is_scrambled)
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_get_descram_state
- *
- * Purpose:	Get data descrambler state before first data bit of frame.
- *
- * Inputs:	b	Handle for bit array.
- *
- ***********************************************************************************/
-
-func rrbb_get_descram_state(b *rrbb_t) int {
+// DescramState returns the data descrambler state before the first data bit
+// of the frame.
+func (b *rrbb_t) DescramState() int {
 	return (b.descram_state)
 }
 
-/***********************************************************************************
- *
- * Name:	rrbb_get_prev_descram
- *
- * Purpose:	Get previous descrambled bit before first data bit of frame.
- *
- * Inputs:	b	Handle for bit array.
- *
- ***********************************************************************************/
-
-func rrbb_get_prev_descram(b *rrbb_t) int {
+// PrevDescram returns the previous descrambled bit before the first data bit
+// of the frame.
+func (b *rrbb_t) PrevDescram() int {
 	return (b.prev_descram)
 }
 

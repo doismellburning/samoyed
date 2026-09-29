@@ -198,10 +198,10 @@ type hdlc_state2_s struct {
  ***********************************************************************************/
 
 func hdlc_rec2_block(block *rrbb_t, achan *achan_param_s) {
-	var channel = rrbb_get_chan(block)
-	var subchan = rrbb_get_subchan(block)
-	var slice = rrbb_get_slice(block)
-	var alevel = rrbb_get_audio_level(block)
+	var channel = block.Channel()
+	var subchan = block.Subchannel()
+	var slice = block.Slice()
+	var alevel = block.AudioLevel()
 	var fix_bits = achan.fix_bits
 	var passall = achan.passall
 
@@ -280,7 +280,7 @@ func hdlc_rec2_block(block *rrbb_t, achan *achan_param_s) {
 func try_to_fix_quick_now(block *rrbb_t, achan *achan_param_s, channel int, subchan int, slice int, alevel ax25.ALevel) bool {
 	var fix_bits = achan.fix_bits
 
-	var length = rrbb_get_len(block)
+	var length = block.Len()
 	/* Prepare the retry configuration */
 
 	var retry_cfg = new(retry_conf_t)
@@ -378,7 +378,7 @@ func try_to_fix_quick_now(block *rrbb_t, achan *achan_param_s, channel int, subc
 	retry_cfg.sep.bit_idx_c = -1
 
 	logrus.WithField("len", length).Trace("Try flipping TWO SEPARATED BITS")
-	length = rrbb_get_len(block)
+	length = block.Len()
 	for i := range length - 2 {
 		retry_cfg.sep.bit_idx_a = i
 
@@ -495,10 +495,10 @@ func try_decode(block *rrbb_t, achan *achan_param_s, channel int, subchan int, s
 	// a frame that sanity_check rejects gets here with a perfectly good FCS.
 	var fcs_ok = false
 
-	H2.is_scrambled = rrbb_get_is_scrambled(block)
-	H2.prev_descram = rrbb_get_prev_descram(block)
-	H2.lfsr = rrbb_get_descram_state(block)
-	H2.prev_raw = rrbb_get_bit(block, 0) > 0 /* Actually last bit of the */
+	H2.is_scrambled = block.IsScrambled()
+	H2.prev_descram = block.PrevDescram()
+	H2.lfsr = block.DescramState()
+	H2.prev_raw = block.Bit(0) > 0 /* Actually last bit of the */
 	/* opening flag so we can derive the */
 	/* first data bit.  */
 
@@ -517,14 +517,14 @@ func try_decode(block *rrbb_t, achan *achan_param_s, channel int, subchan int, s
 	H2.olen = 0
 	H2.frame_len = 0
 
-	var blen = rrbb_get_len(block)
+	var blen = block.Len()
 
 	if retry_conf_type == RETRY_TYPE_NONE {
 		logrus.WithField("blen", blen).Trace("try_decode")
 	}
 	for i := 1; i < blen; i++ {
 		/* Get the value for the current bit */
-		var raw = rrbb_get_bit(block, i) > 0
+		var raw = block.Bit(i) > 0
 		/* If swap two sep mode , swap the bit if needed */
 		if retry_conf_retry == RETRY_INVERT_TWO_SEP {
 			if is_sep_bit_modified(i, retry_conf) {
@@ -675,8 +675,8 @@ func try_decode(block *rrbb_t, achan *achan_param_s, channel int, subchan int, s
 			// TODO: Shouldn't be necessary to pass chan, subchan, alevel into
 			// try_decode because we can obtain them from block.
 			// Let's make sure that assumption is good...
-			dwutil.Assert(rrbb_get_chan(block) == channel)
-			dwutil.Assert(rrbb_get_subchan(block) == subchan)
+			dwutil.Assert(block.Channel() == channel)
+			dwutil.Assert(block.Subchannel() == subchan)
 			multi_modem_process_rec_frame(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
 
 			return true /* success */
