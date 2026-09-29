@@ -12,10 +12,6 @@ func Test_telemetry(t *testing.T) {
 
 	var ts = NewTelemetryState()
 
-	dw_printf("Unit test for telemetry decoding functions...\n")
-
-	dw_printf("part 1\n")
-
 	// From protocol spec.
 
 	result, comment = ts.telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101001", false)
@@ -64,8 +60,6 @@ func Test_telemetry(t *testing.T) {
 	assert.Equal(t, "Seq=491, A1=4.9, A2=0.3, A3=25.0, A4=0.0, A5=1.0, D1=0, D2=0, D3=0, D4=0, D5=0, D6=0, D7=0, D8=0", result, "test 108")
 	assert.Empty(t, comment, "test 108")
 
-	dw_printf("part 2\n")
-
 	// From protocol spec.
 
 	result = ts.telemetry_data_base91("WB2OSZ", "ss11")
@@ -94,8 +88,6 @@ func Test_telemetry(t *testing.T) {
 	result = ts.telemetry_data_base91("WB2OSZ", "s |1")
 
 	assert.Equal(t, "Seq=?", result, "test 206")
-
-	dw_printf("part 3\n")
 
 	ts.telemetry_name_message("N0QBF-11", "Battery,Btemp,ATemp,Pres,Alt,Camra,Chut,Sun,10m,ATV")
 
@@ -227,8 +219,6 @@ func Test_telemetry(t *testing.T) {
 
 	assert.Empty(t, pm.project, "test 308")
 
-	dw_printf("part 4\n")
-
 	ts.telemetry_coefficents_message("M0XER-3", "0,0.001,0,0,0.001,0,0,0.1,-273.2,0,1,0,0,1,0", false)
 	ts.telemetry_bit_sense_message("M0XER-3", "11111111,10mW research balloon", false)
 	ts.telemetry_name_message("M0XER-3", "Vbat,Vsolar,Temp,Sat")
@@ -253,10 +243,6 @@ func Test_telemetry(t *testing.T) {
 
 	assert.Equal(t, "10mW research balloon: Seq=7922, Vbat=3.486 V, Vsolar=0.007 V, Temp=-55.7 C, Sat=11", result, "test 404")
 	assert.Empty(t, comment, "test 404")
-
-	/* final score. */
-
-	dw_printf("\nTEST WAS SUCCESSFUL.\n")
 }
 
 /*

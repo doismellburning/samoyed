@@ -3,6 +3,7 @@ package direwolf
 import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 /* Range of digits for Base 91 representation. */
@@ -22,8 +23,7 @@ func two_base91_to_i(first, second byte) maybe.Maybe[int] {
 	if isdigit91(first) {
 		result = int(first-B91_MIN) * 91
 	} else {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("\"%c\" is not a valid character for base 91 telemetry data.\n", first)
+		logrus.WithField("character", string(first)).Debug("Not a valid character for base 91 telemetry data")
 
 		return maybe.Nothing[int]()
 	}
@@ -31,8 +31,7 @@ func two_base91_to_i(first, second byte) maybe.Maybe[int] {
 	if isdigit91(second) {
 		result += int(second - B91_MIN)
 	} else {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("\"%c\" is not a valid character for base 91 telemetry data.\n", second)
+		logrus.WithField("character", string(second)).Debug("Not a valid character for base 91 telemetry data")
 
 		return maybe.Nothing[int]()
 	}

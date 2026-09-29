@@ -197,8 +197,10 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 
 	if !strings.HasPrefix(info, "T#") {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error: Information part of telemetry packet must begin with \"T#\"\n")
+			logrus.WithFields(logrus.Fields{
+				"station": station,
+				"info":    info,
+			}).Warn("Information part of telemetry packet must begin with \"T#\"")
 		}
 
 		return "", ""
@@ -216,8 +218,7 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 
 	if !found {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Nothing after \"T#\" for telemetry data.\n")
+			logrus.WithField("station", station).Warn("Nothing after \"T#\" for telemetry data")
 		}
 
 		return "", ""
@@ -264,8 +265,10 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 			/* Anything left over is a comment. */
 			if len(p) < 8 {
 				if !quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Expected to find 8 binary digits after \"%s\" for the digital values.\n", p)
+					logrus.WithFields(logrus.Fields{
+						"station": station,
+						"digital": p,
+					}).Warn("Expected to find 8 binary digits for the digital values")
 				}
 			}
 
@@ -282,8 +285,11 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 					draw[k] = maybe.Just(1)
 				default:
 					if !quiet {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Found \"%c\" when expecting 0 or 1 for digital value %d.\n", v, k+1)
+						logrus.WithFields(logrus.Fields{
+							"station":  station,
+							"value":    string(v),
+							"position": k + 1,
+						}).Warn("Expected 0 or 1 for a digital value")
 					}
 				}
 			}
@@ -292,8 +298,7 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 
 	if len(parts) < T_NUM_ANALOG+1 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Found fewer than expected number of telemetry data values.\n")
+			logrus.WithField("station", station).Warn("Found fewer than expected number of telemetry data values")
 		}
 	}
 
@@ -343,8 +348,10 @@ func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) st
 	var draw [T_NUM_DIGITAL]maybe.Maybe[int]
 
 	if len(cdata) < 4 || len(cdata) > 14 || (len(cdata)%2 == 1) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error: Expected even number of 2 to 14 characters but got \"%s\"\n", cdata)
+		logrus.WithFields(logrus.Fields{
+			"station": station,
+			"cdata":   cdata,
+		}).Error("Internal error: Expected even number of 2 to 14 characters of base 91 telemetry")
 
 		return ""
 	}
@@ -491,13 +498,7 @@ func (ts *TelemetryState) telemetry_unit_label_message(station string, msg strin
  *--------------------------------------------------------------------*/
 
 func (ts *TelemetryState) telemetry_coefficents_message(station string, msg string, quiet bool) {
-	/* TODO
-	#if DEBUG3
-		text_color_set(DW_COLOR_DEBUG);
-
-		dw_printf ("\n%s\n\n", msg);
-	#endif
-	*/
+	logrus.WithField("msg", msg).Debug("telemetry_coefficents_message")
 
 	/*
 	 * Make a copy of the input string because this will alter it.
@@ -516,9 +517,11 @@ func (ts *TelemetryState) telemetry_coefficents_message(station string, msg stri
 				pm.coeff_ndp[n/3][n%3] = t_ndp(p)
 			} else {
 				if !quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Equation coefficient position A%d%c is empty.\n", n/3+1, n%3+'a')
-					dw_printf("Some applications might not handle this correctly.\n")
+					logrus.WithFields(logrus.Fields{
+						"station":  station,
+						"position": fmt.Sprintf("A%d%c", n/3+1, n%3+'a'),
+						"hint":     "Some applications might not handle this correctly",
+					}).Warn("Equation coefficient is empty")
 				}
 			}
 		}
@@ -528,9 +531,11 @@ func (ts *TelemetryState) telemetry_coefficents_message(station string, msg stri
 
 	if n != T_NUM_ANALOG*3 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Found %d equation coefficients when 15 were expected.\n", n)
-			dw_printf("Some applications might not handle this correctly.\n")
+			logrus.WithFields(logrus.Fields{
+				"station": station,
+				"found":   n,
+				"hint":    "Some applications might not handle this correctly",
+			}).Warn("Expected 15 equation coefficients")
 		}
 	}
 
@@ -566,8 +571,10 @@ func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string
 
 	if len(msg) < 8 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("The telemetry bit sense message should have at least 8 characters.\n")
+			logrus.WithFields(logrus.Fields{
+				"station": station,
+				"msg":     msg,
+			}).Warn("The telemetry bit sense message should have at least 8 characters")
 		}
 	}
 
@@ -580,8 +587,11 @@ func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string
 			pm.sense[n] = false
 		default:
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Bit position %d sense value was \"%c\" when 0 or 1 was expected.\n", n+1, msg[n])
+				logrus.WithFields(logrus.Fields{
+					"station":  station,
+					"value":    string(msg[n]),
+					"position": n + 1,
+				}).Warn("Expected 0 or 1 for a bit sense value")
 			}
 		}
 	}
