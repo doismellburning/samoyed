@@ -84,16 +84,14 @@ func makeDevice(name string, maxIn, maxOut int) *portaudio.DeviceInfo {
 	}
 }
 
-// setFakeALSACards writes a fake /proc/asound/cards to a temp file, points
-// alsaCardsPath at it for the duration of the test, and restores the original
-// path via t.Cleanup.
-func setFakeALSACards(t *testing.T, content string) {
+// fakeALSACards writes a fake /proc/asound/cards to a temp file and returns
+// its path.
+func fakeALSACards(t *testing.T, content string) string {
 	t.Helper()
 	var tmp = filepath.Join(t.TempDir(), "cards")
 	require.NoError(t, os.WriteFile(tmp, []byte(content), 0o600))
-	var orig = alsaCardsPath
-	alsaCardsPath = tmp
-	t.Cleanup(func() { alsaCardsPath = orig })
+
+	return tmp
 }
 
 // Test the udev card ID scenario from doismellburning/samoyed#468:
@@ -114,15 +112,13 @@ func Test_matchPortAudioDeviceByName_udevCardID(t *testing.T) {
  3 [FT991A         ]: USB Audio - USB Audio CODEC`
 
 	t.Run("FTDX10 resolves via card ID", func(t *testing.T) {
-		setFakeALSACards(t, cardsContent)
-		var dev = matchPortAudioDeviceByName("plughw:FTDX10,0", true, devices)
+		var dev = matchPortAudioDeviceByName("plughw:FTDX10,0", true, devices, fakeALSACards(t, cardsContent))
 		assert.NotNil(t, dev)
 		assert.Equal(t, "USB AUDIO  CODEC: USB Audio (hw:2,0)", dev.Name)
 	})
 
 	t.Run("FT991A resolves via card ID", func(t *testing.T) {
-		setFakeALSACards(t, cardsContent)
-		var dev = matchPortAudioDeviceByName("plughw:FT991A,0", true, devices)
+		var dev = matchPortAudioDeviceByName("plughw:FT991A,0", true, devices, fakeALSACards(t, cardsContent))
 		assert.NotNil(t, dev)
 		assert.Equal(t, "USB Audio CODEC: USB Audio (hw:3,0)", dev.Name)
 	})
@@ -134,7 +130,7 @@ func Test_matchPortAudioDeviceByName_exactMatch(t *testing.T) {
 		makeDevice("USB AUDIO  CODEC: USB Audio (hw:2,0)", 2, 2),
 	}
 
-	var dev = matchPortAudioDeviceByName("USB AUDIO  CODEC: USB Audio (hw:2,0)", true, devices)
+	var dev = matchPortAudioDeviceByName("USB AUDIO  CODEC: USB Audio (hw:2,0)", true, devices, alsaCardsPath)
 	assert.NotNil(t, dev)
 	assert.Equal(t, "USB AUDIO  CODEC: USB Audio (hw:2,0)", dev.Name)
 }
@@ -146,7 +142,7 @@ func Test_matchPortAudioDeviceByName_substrMatch(t *testing.T) {
 	}
 
 	// "Loopback" substring should match the first device that contains it.
-	var dev = matchPortAudioDeviceByName("Loopback", true, devices)
+	var dev = matchPortAudioDeviceByName("Loopback", true, devices, alsaCardsPath)
 	assert.NotNil(t, dev)
 }
 
@@ -157,36 +153,36 @@ func Test_matchPortAudioDeviceByName_alsaStyleLoopback(t *testing.T) {
 	}
 
 	// plughw:Loopback,1 should match the device with (hw:0,1).
-	var dev = matchPortAudioDeviceByName("plughw:Loopback,1", true, devices)
+	var dev = matchPortAudioDeviceByName("plughw:Loopback,1", true, devices, alsaCardsPath)
 	assert.NotNil(t, dev)
 	assert.Equal(t, "Loopback: PCM (hw:0,1)", dev.Name)
 }
 
 func Test_matchPortAudioDeviceByName_noMatch(t *testing.T) {
-	setFakeALSACards(t, "")
+	var cards = fakeALSACards(t, "")
 	var devices = []*portaudio.DeviceInfo{
 		makeDevice("HDA Intel PCH: ALC3234 Analog (hw:0,0)", 2, 2),
 	}
 
-	var dev = matchPortAudioDeviceByName("plughw:NonExistent,0", true, devices)
+	var dev = matchPortAudioDeviceByName("plughw:NonExistent,0", true, devices, cards)
 	assert.Nil(t, dev)
 }
 
 func Test_matchPortAudioDeviceByName_directionFilter(t *testing.T) {
 	// Two devices for the same ALSA card ID: one input-only, one output-only.
 	// This can happen with some USB audio interfaces.
-	setFakeALSACards(t, " 2 [MYCARD         ]: USB-Audio - My Audio Device")
+	var cards = fakeALSACards(t, " 2 [MYCARD         ]: USB-Audio - My Audio Device")
 	var devices = []*portaudio.DeviceInfo{
 		makeDevice("My Audio Device: USB Audio (hw:2,0)", 0, 2), // output only
 		makeDevice("My Audio Device: USB Audio (hw:2,1)", 2, 0), // input only
 	}
 
 	// Input search should not return an output-only device.
-	var dev = matchPortAudioDeviceByName("plughw:MYCARD,0", true, devices)
+	var dev = matchPortAudioDeviceByName("plughw:MYCARD,0", true, devices, cards)
 	assert.Nil(t, dev)
 
 	// Output search should not return an input-only device.
-	dev = matchPortAudioDeviceByName("plughw:MYCARD,1", false, devices)
+	dev = matchPortAudioDeviceByName("plughw:MYCARD,1", false, devices, cards)
 	assert.Nil(t, dev)
 }
 

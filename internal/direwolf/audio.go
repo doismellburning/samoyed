@@ -1050,15 +1050,14 @@ func parseALSACardsProc(content string) map[string]int {
 	return result
 }
 
-// alsaCardsPath is the path used by resolveALSACardNumber to read the ALSA
-// card list. It is a variable so tests can substitute a temporary file.
-var alsaCardsPath = "/proc/asound/cards"
+// alsaCardsPath is where Linux lists the ALSA sound cards.
+const alsaCardsPath = "/proc/asound/cards"
 
 // resolveALSACardNumber resolves an ALSA card ID (e.g. "FTDX10", as used in
-// plughw:FTDX10,0) to its numeric card index by reading /proc/asound/cards.
-// Returns (0, false) if the card ID cannot be resolved.
-func resolveALSACardNumber(cardID string) (int, bool) {
-	var content, err = os.ReadFile(alsaCardsPath)
+// plughw:FTDX10,0) to its numeric card index by reading cardsPath, normally
+// alsaCardsPath.  Returns (0, false) if the card ID cannot be resolved.
+func resolveALSACardNumber(cardID string, cardsPath string) (int, bool) {
+	var content, err = os.ReadFile(cardsPath) //nolint:gosec // alsaCardsPath, or a test's own file.
 	if err != nil {
 		return 0, false
 	}
@@ -1071,8 +1070,8 @@ func resolveALSACardNumber(cardID string) (int, bool) {
 // matchPortAudioDeviceByName searches devices for one matching name using
 // several strategies: exact match, substring match, and ALSA-style name
 // matching (including resolution of udev-assigned card IDs via
-// /proc/asound/cards). Returns nil if no match is found.
-func matchPortAudioDeviceByName(name string, forInput bool, devices []*portaudio.DeviceInfo) *portaudio.DeviceInfo {
+// cardsPath, normally alsaCardsPath). Returns nil if no match is found.
+func matchPortAudioDeviceByName(name string, forInput bool, devices []*portaudio.DeviceInfo, cardsPath string) *portaudio.DeviceInfo {
 	var devMatchesDirection = func(dev *portaudio.DeviceInfo) bool {
 		if forInput {
 			return dev.MaxInputChannels > 0
@@ -1130,7 +1129,7 @@ func matchPortAudioDeviceByName(name string, forInput bool, devices []*portaudio
 		// The card name may be a udev-assigned ALSA card ID that differs from
 		// the hardware description PortAudio uses. Resolve it to a numeric card
 		// index via /proc/asound/cards (Linux) and match by (hw:N,M).
-		if cardNum, ok := resolveALSACardNumber(cardName); ok {
+		if cardNum, ok := resolveALSACardNumber(cardName, cardsPath); ok {
 			for _, dev := range devices {
 				if !devMatchesDirection(dev) {
 					continue
@@ -1189,7 +1188,7 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 		return nil
 	}
 
-	var dev = matchPortAudioDeviceByName(name, forInput, devices)
+	var dev = matchPortAudioDeviceByName(name, forInput, devices, alsaCardsPath)
 	if dev == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not match audio device '%s' to any PortAudio device.\n", name)
