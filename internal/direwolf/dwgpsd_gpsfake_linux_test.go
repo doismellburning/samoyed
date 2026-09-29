@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,7 +85,8 @@ func startGpsfake(t *testing.T, port int) {
 }
 
 func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
-	var port = freeTCPPort(t)
+	var port, portErr = strconv.Atoi(testutils.UnusedPort(t))
+	require.NoError(t, portErr)
 
 	startGpsfake(t, port)
 
