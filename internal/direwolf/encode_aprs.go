@@ -40,19 +40,19 @@ func normal_position_string(p *position_t) string {
 // symtab is the symbol table id or overlay, symbol the symbol id, and
 // ambiguity the number of least significant digits to blank out.
 func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *position_t {
-	var presult = new(position_t)
+	var pos = new(position_t)
 
 	checkSymbol(symtab, symbol)
 
-	copy(presult.Lat[:], latlong.LatitudeToString(dlat, ambiguity))
+	copy(pos.Lat[:], latlong.LatitudeToString(dlat, ambiguity))
 
-	presult.SymTableId = symtab
+	pos.SymTableId = symtab
 
-	copy(presult.Lon[:], latlong.LongitudeToString(dlong, ambiguity))
+	copy(pos.Lon[:], latlong.LongitudeToString(dlong, ambiguity))
 
-	presult.SymbolCode = symbol
+	pos.SymbolCode = symbol
 
-	return presult
+	return pos
 }
 
 // compressed_position_string renders a position from compressed_position.
@@ -77,7 +77,7 @@ func compressed_position_string(p *compressed_position_t) string {
 func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int],
 	course maybe.Maybe[int], speed maybe.Maybe[int]) *compressed_position_t {
-	var presult = new(compressed_position_t)
+	var pos = new(compressed_position_t)
 
 	checkSymbol(symtab, symbol)
 
@@ -87,12 +87,12 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 		symtab = symtab - '0' + 'a'
 	}
 
-	presult.SymTableId = symtab
+	pos.SymTableId = symtab
 
-	copy(presult.Y[:], latlong.LatitudeToCompressedString(dlat))
-	copy(presult.X[:], latlong.LongitudeToCompressedString(dlong))
+	copy(pos.Y[:], latlong.LatitudeToCompressedString(dlat))
+	copy(pos.X[:], latlong.LongitudeToCompressedString(dlong))
 
-	presult.SymbolCode = symbol
+	pos.SymbolCode = symbol
 
 	// The cst field is complicated.
 	//
@@ -134,14 +134,14 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 			}
 		}
 
-		presult.C = byte(c + '!')
+		pos.C = byte(c + '!')
 
 		var s = min(math.Round(math.Log(float64(knots)+1.0)/math.Log(1.08)), 93)
-		presult.S = byte(s + '!')
+		pos.S = byte(s + '!')
 
-		presult.T = 0x26 + '!' // current, other tracker.
+		pos.T = 0x26 + '!' // current, other tracker.
 	} else if p > 0 || h > 0 || g > 0 {
-		presult.C = '{' // radio range.
+		pos.C = '{' // radio range.
 
 		if p == 0 {
 			p = 10
@@ -160,16 +160,16 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 
 		var s = min(max(math.Round(math.Log(rangeMiles/2.)/math.Log(1.08)), 0), 93)
 
-		presult.S = byte(s + '!')
+		pos.S = byte(s + '!')
 
-		presult.T = 0x26 + '!' // current, other tracker.
+		pos.T = 0x26 + '!' // current, other tracker.
 	} else {
-		presult.C = ' ' // cst field not used.
-		presult.S = ' '
-		presult.T = '!' // avoid space.
+		pos.C = ' ' // cst field not used.
+		pos.S = ' '
+		pos.T = '!' // avoid space.
 	}
 
-	return presult
+	return pos
 }
 
 // phg_data_extension returns the power/height/gain data extension.
@@ -333,14 +333,14 @@ func encodeLocation(compressed bool, lat float64, lon float64, ambiguity int,
 //
 // messaging determines whether the data type indicator is '!' (false) or '='
 // (true).  ambiguity is the number of digits to omit from the location,
-// alt_ft the altitude in feet, symtab the symbol table id or overlay and
+// altFeet the altitude in feet, symtab the symbol table id or overlay and
 // symbol the symbol id.  The rest are as for encodeLocation, then any
 // additional comment text.
 //
 // There can be a single optional "data extension" following the position, so
 // there is a choice between power/height/gain/directivity and course/speed.
 // After that come the optional frequency spec, altitude and comment.
-func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, alt_ft maybe.Maybe[int],
+func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, altFeet maybe.Maybe[int],
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
 	course maybe.Maybe[int], speed maybe.Maybe[int],
@@ -370,7 +370,7 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 	// Most modern applications recognize the form /A=-12345 with minus and five digits.
 	// This maintains the same total field width and the range is more than adequate.
 
-	if feet, known := alt_ft.Get(); known {
+	if feet, known := altFeet.Get(); known {
 		// Not clear if altitude can be negative.
 		// Be sure it will be converted to 6 digits.
 		result += fmt.Sprintf("/A=%06d", min(max(feet, -99999), 999999)) // /A=123456 or /A=-12345
@@ -386,9 +386,9 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 // characters of fixed part, 7 for optional extended data, ~20 for freq, etc.,
 // then the comment, which could be very long.
 //
-// name is up to 9 characters, and thyme the time stamp, or the zero time for
+// name is up to 9 characters.  when is the time stamp, or the zero time for
 // none.  The rest are as for EncodePosition.
-func encode_object(name string, compressed bool, thyme time.Time, lat float64, lon float64, ambiguity int,
+func encode_object(name string, compressed bool, when time.Time, lat float64, lon float64, ambiguity int,
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
 	course maybe.Maybe[int], speed maybe.Maybe[int],
@@ -397,8 +397,8 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 	var liveKilled = '*'
 
 	var timestamp string
-	if !thyme.IsZero() {
-		timestamp = thyme.UTC().Format("021504z")
+	if !when.IsZero() {
+		timestamp = when.UTC().Format("021504z")
 	} else {
 		timestamp = "111111z"
 	}
@@ -414,7 +414,7 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 func encode_message(addressee string, text string, id string) string {
 	var result = fmt.Sprintf(":%-9.9s:%s", addressee, text)
 
-	if len(id) > 0 {
+	if id != "" {
 		result += "{" + id
 	}
 
