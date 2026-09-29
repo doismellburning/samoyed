@@ -26,57 +26,57 @@ func notAHID(t *testing.T) string {
 	return name
 }
 
-func TestCM108CheckDeviceIoctlFailureIsReported(t *testing.T) {
+func TestCheckDeviceIoctlFailureIsReported(t *testing.T) {
 	// This replaces the coverage TestCM108WriteReportsIoctlFailure gave while
 	// the check lived in cm108_write and printed rather than returning.
-	var err = CM108CheckDevice(notAHID(t))
+	var err = CheckDevice(notAHID(t))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "HIDIOCGRAWINFO")
-	assert.NotErrorIs(t, err, ErrUnknownCM108Device)
+	assert.NotErrorIs(t, err, ErrUnknownDevice)
 }
 
-func TestCM108CheckDeviceMissing(t *testing.T) {
-	var err = CM108CheckDevice(filepath.Join(t.TempDir(), "nonexistent"))
+func TestCheckDeviceMissing(t *testing.T) {
+	var err = CheckDevice(filepath.Join(t.TempDir(), "nonexistent"))
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, fs.ErrNotExist)
 }
 
-func TestCM108SetGPIOPinRejectsBadArguments(t *testing.T) {
+func TestSetGPIOPinRejectsBadArguments(t *testing.T) {
 	// Note there is no device here at all - these should be rejected before we
 	// go anywhere near one.
-	require.Error(t, CM108SetGPIOPin("/dev/hidraw0", 0, 1))
-	require.Error(t, CM108SetGPIOPin("/dev/hidraw0", 9, 1))
-	require.Error(t, CM108SetGPIOPin("/dev/hidraw0", 3, 2))
-	require.Error(t, CM108SetGPIOPin("/dev/hidraw0", 3, -1))
+	require.Error(t, SetGPIOPin("/dev/hidraw0", 0, 1))
+	require.Error(t, SetGPIOPin("/dev/hidraw0", 9, 1))
+	require.Error(t, SetGPIOPin("/dev/hidraw0", 3, 2))
+	require.Error(t, SetGPIOPin("/dev/hidraw0", 3, -1))
 }
 
-func TestCM108SetGPIOPinWrites(t *testing.T) {
+func TestSetGPIOPinWrites(t *testing.T) {
 	var name = notAHID(t)
 
-	require.NoError(t, CM108SetGPIOPin(name, 3, 1))
+	require.NoError(t, SetGPIOPin(name, 3, 1))
 
 	var written, err = os.ReadFile(name) //nolint:gosec // Test file we just created.
 	require.NoError(t, err)
 	assert.Equal(t, []byte{0, 0, 0x04, 0x04, 0}, written)
 
-	require.NoError(t, CM108SetGPIOPin(name, 3, 0))
+	require.NoError(t, SetGPIOPin(name, 3, 0))
 
 	written, err = os.ReadFile(name) //nolint:gosec // Test file we just created.
 	require.NoError(t, err)
 	assert.Equal(t, []byte{0, 0, 0x00, 0x04, 0}, written)
 }
 
-func TestCM108SetGPIOPinMissingDevice(t *testing.T) {
-	var err = CM108SetGPIOPin(filepath.Join(t.TempDir(), "nonexistent"), 3, 1)
+func TestSetGPIOPinMissingDevice(t *testing.T) {
+	var err = SetGPIOPin(filepath.Join(t.TempDir(), "nonexistent"), 3, 1)
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, fs.ErrNotExist)
 }
 
-func TestCM108PermissionAdviceNamesDevice(t *testing.T) {
-	var advice = strings.Join(CM108PermissionAdvice("/dev/hidraw7"), "\n")
+func TestPermissionAdviceNamesDevice(t *testing.T) {
+	var advice = strings.Join(PermissionAdvice("/dev/hidraw7"), "\n")
 
 	assert.Contains(t, advice, "/dev/hidraw7")
 	assert.Contains(t, advice, "99-direwolf-cmedia.rules")

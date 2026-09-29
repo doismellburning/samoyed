@@ -7,16 +7,16 @@ package cm108
 
 import "errors"
 
-var errCM108NotSupported = errors.New("CM108 GPIO PTT is only supported on Linux")
+var errNotSupported = errors.New("CM108 GPIO PTT is only supported on Linux")
 
-func CM108FindPTT(_ string) (string, error) {
-	return "", errCM108NotSupported
+func FindPTT(_ string) (string, error) {
+	return "", errNotSupported
 }
 
-func CM108CheckDevice(_ string) error {
-	return errCM108NotSupported
+func CheckDevice(_ string) error {
+	return errNotSupported
 }
 
-func CM108SetGPIOPin(_ string, _ int, _ int) error {
-	return errCM108NotSupported
+func SetGPIOPin(_ string, _ int, _ int) error {
+	return errNotSupported
 }

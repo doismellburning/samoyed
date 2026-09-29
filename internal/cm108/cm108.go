@@ -16,15 +16,15 @@ package cm108
 
 import "errors"
 
-// ErrUnknownCM108Device reports that a HID is not one of the USB audio adapters
+// ErrUnknownDevice reports that a HID is not one of the USB audio adapters
 // known to work for GPIO PTT.  It is advisory rather than fatal - an
 // unrecognised device may well work - so callers should warn and carry on.
-var ErrUnknownCM108Device = errors.New("not a device known to work with GPIO PTT")
+var ErrUnknownDevice = errors.New("not a device known to work with GPIO PTT")
 
-// CM108PermissionAdvice returns advice, one line per element, for a user who
+// PermissionAdvice returns advice, one line per element, for a user who
 // cannot open a CM108 HID because of the file permissions on it.  Callers
 // print it however suits them, for errors that wrap fs.ErrPermission.
-func CM108PermissionAdvice(name string) []string {
+func PermissionAdvice(name string) []string {
 	return []string{
 		"Type \"ls -l " + name + "\" and verify that it has audio group rw similar to this:",
 		"    crw-rw---- 1 root audio 247, 0 Oct  6 19:24 " + name,

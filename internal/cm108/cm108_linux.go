@@ -169,7 +169,7 @@ const MAXX_HIDRAW_NAME_LEN = 150
  * Result of taking inventory of USB soundcards and USB HIDs.
  */
 
-type CM108Thing struct {
+type Thing struct {
 	VID          int    // vendor id, displayed as four hexadecimal digits.
 	PID          int    // product id, displayed as four hexadecimal digits.
 	CardNumber   string // "Card" Number.  e.g.  2 for plughw:2,0
@@ -200,7 +200,7 @@ const MAXX_THINGS = 60
 
 /*-------------------------------------------------------------------
  *
- * Name:	CM108Inventory
+ * Name:	Inventory
  *
  * Purpose:	Take inventory of USB audio and HID.
  *
@@ -214,7 +214,7 @@ const MAXX_THINGS = 60
  *
  *------------------------------------------------------------------*/
 
-func CM108Inventory(max_things int) ([]*CM108Thing, error) {
+func Inventory(max_things int) ([]*Thing, error) {
 	/*
 	 * First get a list of the USB audio devices.
 	 * This is based on the example in http://www.signal11.us/oss/udev/
@@ -240,7 +240,7 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 	}
 
 	return cm108_inventory_of(readUdevDevices(devices), readUdevDevices(hidDevices), max_things), nil
-} /* end CM108Inventory */
+} /* end Inventory */
 
 // cm108Device is what the inventory needs to know of a udev device, read out
 // of udev up front so that the inventory can also be taken of devices that
@@ -289,10 +289,10 @@ func readUdevDevices(devices []*udev.Device) []cm108Device {
 	return read
 }
 
-// cm108_inventory_of does the work of CM108Inventory on the devices of the
+// cm108_inventory_of does the work of Inventory on the devices of the
 // "sound" and "hidraw" subsystems, in udev's enumeration order.
-func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_things int) []*CM108Thing {
-	var things []*CM108Thing
+func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_things int) []*Thing {
+	var things []*Thing
 
 	var cardDevpath string
 	var pattrsID string
@@ -326,7 +326,7 @@ func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_thi
 				}
 
 				if len(things) < max_things {
-					var thing = new(CM108Thing)
+					var thing = new(Thing)
 
 					thing.VID = vid
 					thing.PID = pid
@@ -380,7 +380,7 @@ func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_thi
 
 				// If it did not match to existing, add new entry.
 				if !matched && len(things) < max_things {
-					var thing = new(CM108Thing)
+					var thing = new(Thing)
 
 					thing.VID = vid
 					thing.PID = pid
@@ -421,7 +421,7 @@ func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_thi
 
 /*-------------------------------------------------------------------
  *
- * Name:	CM108FindPTT
+ * Name:	FindPTT
  *
  * Purpose:	Try to find /dev/hidraw corresponding to a USB audio "card."
  *
@@ -441,16 +441,16 @@ func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_thi
  *				  out, or if the device found is not one known
  *				  to work for GPIO PTT.  In the latter case the
  *				  device name is returned as well and the error
- *				  wraps ErrUnknownCM108Device, so a caller can
+ *				  wraps ErrUnknownDevice, so a caller can
  *				  warn and carry on.
  *
  *------------------------------------------------------------------*/
 
-func CM108FindPTT(output_audio_device string) (string, error) {
-	//dw_printf ("DEBUG: CM108FindPTT('%s')\n", output_audio_device);
+func FindPTT(output_audio_device string) (string, error) {
+	//dw_printf ("DEBUG: FindPTT('%s')\n", output_audio_device);
 
 	// Possible improvement: Skip if inventory already taken.
-	var things, inventoryErr = CM108Inventory(MAXX_THINGS)
+	var things, inventoryErr = Inventory(MAXX_THINGS)
 	if inventoryErr != nil {
 		return "", fmt.Errorf("could not take inventory of USB audio devices: %w", inventoryErr)
 	}
@@ -458,8 +458,8 @@ func CM108FindPTT(output_audio_device string) (string, error) {
 	return cm108_find_ptt_in(things, output_audio_device)
 }
 
-// cm108_find_ptt_in does the work of CM108FindPTT on an inventory already taken.
-func cm108_find_ptt_in(things []*CM108Thing, output_audio_device string) (string, error) {
+// cm108_find_ptt_in does the work of FindPTT on an inventory already taken.
+func cm108_find_ptt_in(things []*Thing, output_audio_device string) (string, error) {
 	var sound_re = regexp.MustCompile(".+:(CARD=)?([A-Za-z0-9_]+)(,.*)?")
 
 	var matches = sound_re.FindStringSubmatch(output_audio_device)
@@ -480,7 +480,7 @@ func cm108_find_ptt_in(things []*CM108Thing, output_audio_device string) (string
 			//dw_printf ("DEBUG: success! returning '%s'\n", things[i].DevnodeHidraw);
 			if !GOOD_DEVICE(thing.VID, thing.PID) {
 				return thing.DevnodeHidraw, fmt.Errorf("USB audio card %s (%s) is %w",
-					thing.CardNumber, thing.CardName, ErrUnknownCM108Device)
+					thing.CardNumber, thing.CardName, ErrUnknownDevice)
 			}
 
 			return thing.DevnodeHidraw, nil
@@ -492,7 +492,7 @@ func cm108_find_ptt_in(things []*CM108Thing, output_audio_device string) (string
 
 /*-------------------------------------------------------------------
  *
- * Name:	CM108SetGPIOPin
+ * Name:	SetGPIOPin
  *
  * Purpose:	Set one GPIO pin of the CM108 or similar.
  *
@@ -516,7 +516,7 @@ func cm108_find_ptt_in(things []*CM108Thing, output_audio_device string) (string
  *
  *------------------------------------------------------------------*/
 
-func CM108SetGPIOPin(name string, num int, state int) error {
+func SetGPIOPin(name string, num int, state int) error {
 	if num < 1 || num > 8 {
 		return fmt.Errorf("%s CM108 GPIO number %d must be in range of 1 thru 8", name, num)
 	}
@@ -529,11 +529,11 @@ func CM108SetGPIOPin(name string, num int, state int) error {
 	var iodata = state << (num - 1) // 0=low, 1=high
 
 	return cm108_write(name, iomask, iodata)
-} /* end CM108SetGPIOPin */
+} /* end SetGPIOPin */
 
 /*-------------------------------------------------------------------
  *
- * Name:	CM108CheckDevice
+ * Name:	CheckDevice
  *
  * Purpose:	Check that a HID is one of the USB audio adapters known to
  *		work for GPIO PTT.
@@ -542,19 +542,19 @@ func CM108SetGPIOPin(name string, num int, state int) error {
  *
  * Returns:	nil if the device reports a known good vendor and product id.
  *
- *		Otherwise an error, which wraps ErrUnknownCM108Device when the
+ *		Otherwise an error, which wraps ErrUnknownDevice when the
  *		device could be interrogated but is an unfamiliar type.  That
  *		is advisory - such a device may still work - so a caller will
  *		generally want to warn rather than give up.  A permission
  *		problem wraps fs.ErrPermission, for which
- *		CM108PermissionAdvice has something to say.
+ *		PermissionAdvice has something to say.
  *
  * Description:	This is worth doing once, when setting up, rather than on
  *		every write, which would be one warning per transmission.
  *
  *------------------------------------------------------------------*/
 
-func CM108CheckDevice(name string) error {
+func CheckDevice(name string) error {
 	var fd, err = os.OpenFile(name, os.O_RDWR, 0000) //nolint:gosec // This comes from user-supplied config, all we can really do is trust it
 	if err != nil {
 		return fmt.Errorf("could not open %s: %w", name, err)
@@ -567,11 +567,11 @@ func CM108CheckDevice(name string) error {
 	}
 
 	if !GOOD_DEVICE(int(info.Vendor), int(info.Product)) {
-		return fmt.Errorf("%s (vid=%04x pid=%04x) is %w", name, info.Vendor, info.Product, ErrUnknownCM108Device)
+		return fmt.Errorf("%s (vid=%04x pid=%04x) is %w", name, info.Vendor, info.Product, ErrUnknownDevice)
 	}
 
 	return nil
-} /* end CM108CheckDevice */
+} /* end CheckDevice */
 
 /*-------------------------------------------------------------------
  *
@@ -589,11 +589,11 @@ func CM108CheckDevice(name string) error {
  *
  * Returns:	nil for success, otherwise an error describing the problem.
  *		It is for the caller to report it.  A permission problem wraps
- *		fs.ErrPermission, for which CM108PermissionAdvice has
+ *		fs.ErrPermission, for which PermissionAdvice has
  *		something to say.
  *
  * Description:	This is the lowest level function.
- *		An application probably wants to use CM108SetGPIOPin.
+ *		An application probably wants to use SetGPIOPin.
  *
  *------------------------------------------------------------------*/
 

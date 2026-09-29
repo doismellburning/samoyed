@@ -542,7 +542,7 @@ func (p *PTT) set(ot int, channel int, ptt_signal int) {
 	 */
 
 	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_CM108 {
-		var err = cm108.CM108SetGPIOPin(p.audioConfig.achan[channel].octrl[ot].ptt_device,
+		var err = cm108.SetGPIOPin(p.audioConfig.achan[channel].octrl[ot].ptt_device,
 			p.audioConfig.achan[channel].octrl[ot].out_gpio_num, ptt)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
@@ -573,7 +573,7 @@ func cm108_print_permission_advice(name string, err error) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	for _, line := range cm108.CM108PermissionAdvice(name) {
+	for _, line := range cm108.PermissionAdvice(name) {
 		dw_printf("%s\n", line)
 	}
 }
@@ -1116,7 +1116,7 @@ func (p *PTT) setup() error {
 
 					// Check it now rather than discovering the hard way at the
 					// first transmission.  An unfamiliar device may still work.
-					var checkErr = cm108.CM108CheckDevice(device)
+					var checkErr = cm108.CheckDevice(device)
 					if checkErr != nil {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Warning: %v.  Proceed at your own risk.\n", checkErr)
