@@ -227,10 +227,7 @@ func DecodeAPRSInit() {
  *------------------------------------------------------------------*/
 
 func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_aprs_t {
-	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
 	var pinfo = pp.Info()
-
-	//dw_printf ("DEBUG decode_aprs info=\"%s\"\n", pinfo);
 
 	var A = new(decode_aprs_t)
 
@@ -302,8 +299,6 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 	// If third-party header, try to decode just the payload.
 
 	if pinfo[0] == '}' {
-		//dw_printf ("DEBUG decode_aprs recursively process third party header\n");
-
 		// This must not be strict because the addresses in third party payload doesn't
 		// need to adhere to the AX.25 address format (i.e. 6 upper case alphanumeric.)
 		// SSID can be 2 alphanumeric characters.
@@ -323,8 +318,6 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 			A.g_data_type_desc = "Third Party Header: Unable to parse payload."
 		}
 	}
-
-	//dw_printf ("DEBUG decode_aprs source=%s, dest=%s\n", A.g_src, A.g_dest);
 
 	/*
 	 * Report error if the information part contains a nul character.
@@ -497,7 +490,6 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 		// Third party too.  Set from the payload.
 		// Maybe eliminate for a couple others.
 
-		//dw_printf ("DEBUG decode_aprs@end1 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);
 		if pinfo[0] != ':' && pinfo[0] != '}' {
 			if aprsSymbolData != nil { // TODO KG Consider some sort of debug message on an else?
 				var symtab, symbol, ok = aprsSymbolData.FromDestOrSrc(pinfo[0], A.g_src, A.g_dest)
@@ -507,8 +499,6 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 				}
 			}
 		}
-
-		//dw_printf ("DEBUG decode_aprs@end2 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);
 	}
 
 	return A
@@ -526,30 +516,20 @@ func DecodeAPRSPrint(A *decode_aprs_t) {
 	 */
 	var stemp = A.g_data_type_desc
 
-	//dw_printf ("DEBUG decode_aprs_print stemp1=%s\n", stemp);
-
 	if len(A.g_name) > 0 {
 		stemp += ", \""
 		stemp += A.g_name
 		stemp += "\""
 	}
 
-	//dw_printf ("DEBUG decode_aprs_print stemp2=%s\n", stemp);
-
-	//dw_printf ("DEBUG decode_aprs_print symbol_code=%c=0x%02x\n", A.g_symbol_code, A.g_symbol_code);
-
 	if A.g_symbol_code != ' ' {
 		if aprsSymbolData != nil {
 			var symbol_description = aprsSymbolData.Description(A.g_symbol_table, A.g_symbol_code)
-
-			//dw_printf ("DEBUG decode_aprs_print symbol_description_description=%s\n", symbol_description);
 
 			stemp += ", "
 			stemp += symbol_description
 		} // TODO KG Else warn?
 	}
-
-	//dw_printf ("DEBUG decode_aprs_print stemp3=%s mfr=%s\n", stemp, A.g_mfr);
 
 	if len(A.g_mfr) > 0 {
 		if A.g_dest == "APRS" || A.g_dest == "BEACON" || A.g_dest == "ID" {
@@ -567,14 +547,10 @@ func DecodeAPRSPrint(A *decode_aprs_t) {
 		}
 	}
 
-	//dw_printf ("DEBUG decode_aprs_print stemp4=%s\n", stemp);
-
 	if len(A.g_mic_e_status) > 0 {
 		stemp += ", "
 		stemp += A.g_mic_e_status
 	}
-
-	//dw_printf ("DEBUG decode_aprs_print stemp5=%s\n", stemp);
 
 	if power, ok := A.g_power.Get(); ok && power > 0 {
 		/* Protocol spec doesn't mention whether this is dBd or dBi.  */
@@ -4095,10 +4071,6 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 		var sftemp = commentData[match[2]:match[3]]
 		var smtemp = commentData[match[4]:match[5]]
 
-		//dw_printf("matches= %d - %d, %d - %d, %d - %d\n", (int)(match[0].rm_so), (int)(match[0].rm_eo),
-		//						    (int)(match[1].rm_so), (int)(match[1].rm_eo),
-		//						    (int)(match[2].rm_so), (int)(match[2].rm_eo) );
-
 		switch sftemp[0] {
 		case 'A':
 			A.g_freq = maybe.Just(1200 + atof(sftemp[1:]))
@@ -4235,10 +4207,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 	 */
 
 	if match := base91_tel_re.FindSubmatchIndex(commentData); match != nil {
-		//dw_printf("compressed telemetry start=%d, end=%d\n", (int)(match[0].rm_so), (int)(match[0].rm_eo));
 		var tdata = commentData[match[2]:match[3]] /* Should be even number of 4 to 14 characters. */
-
-		//dw_printf("compressed telemetry data = \"%s\"\n", tdata);
 
 		var telemetry = telemetryState.telemetry_data_base91(A.g_src, string(tdata))
 		A.g_telemetry = telemetry
@@ -4263,8 +4232,6 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 		var d = commentData[match[0]+1]
 		var a = commentData[match[0]+2]
 		var o = commentData[match[0]+3]
-
-		//dw_printf("DAO start=%d, end=%d\n", (int)(match[0].rm_so), (int)(match[0].rm_eo));
 
 		/*
 		 * Private extension for APRStt
@@ -4368,7 +4335,6 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 	 */
 
 	if match := alt_re.FindSubmatchIndex(commentData); match != nil {
-		//dw_printf("start=%d, end=%d\n", (int)(match[0].rm_so), (int)(match[0].rm_eo));
 		var temp = commentData[match[0]:match[1]]
 
 		var altitude, _ = strconv.Atoi(string(temp[3:]))
@@ -4376,8 +4342,6 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 		commentData = cutBytes(commentData, match[0], match[1])
 	}
-
-	//dw_printf("Final comment='%s'\n", A.g_comment);
 
 	/*
 	 * Finally look for something that looks like frequency or CTCSS tone
