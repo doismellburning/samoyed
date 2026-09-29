@@ -1742,22 +1742,22 @@ func aprsMessage(A *decodedAPRS, info []byte, quiet bool) {
 		A.dataTypeDesc = fmt.Sprintf("Telemetry Parameter Name for \"%s\"", addressee)
 		A.messageSubtype = messageSubtypeTelemParm
 
-		telemetryState.telemetry_name_message(string(addressee), string(message[5:]))
+		telemetryState.NameMessage(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("UNIT.")) {
 		A.dataTypeDesc = fmt.Sprintf("Telemetry Unit/Label for \"%s\"", addressee)
 		A.messageSubtype = messageSubtypeTelemUnit
 
-		telemetryState.telemetry_unit_label_message(string(addressee), string(message[5:]))
+		telemetryState.UnitLabelMessage(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("EQNS.")) {
 		A.dataTypeDesc = fmt.Sprintf("Telemetry Equation Coefficients for \"%s\"", addressee)
 		A.messageSubtype = messageSubtypeTelemEqns
 
-		telemetryState.telemetry_coefficents_message(string(addressee), string(message[5:]), quiet)
+		telemetryState.CoefficientsMessage(string(addressee), string(message[5:]), quiet)
 	} else if bytes.HasPrefix(message, []byte("BITS.")) {
 		A.dataTypeDesc = fmt.Sprintf("Telemetry Bit Sense/Project Name for \"%s\"", addressee)
 		A.messageSubtype = messageSubtypeTelemBits
 
-		telemetryState.telemetry_bit_sense_message(string(addressee), string(message[5:]), quiet)
+		telemetryState.BitSenseMessage(string(addressee), string(message[5:]), quiet)
 	} else if len(message) > 0 && message[0] == '?' {
 		/*
 		 * If first character of message is "?" it is a query directed toward a specific station.
@@ -2508,7 +2508,7 @@ func aprsDirectedStationQuery(A *decodedAPRS, addressee []byte, query []byte, qu
 func aprsTelemetry(A *decodedAPRS, info []byte, quiet bool) {
 	A.dataTypeDesc = "Telemetry"
 
-	var telemetry, comment = telemetryState.telemetry_data_original(A.src, string(info), quiet)
+	var telemetry, comment = telemetryState.DataOriginal(A.src, string(info), quiet)
 	A.telemetry = telemetry
 	A.comment = comment
 } /* end aprsTelemetry */
@@ -4154,7 +4154,7 @@ func processComment(A *decodedAPRS, commentData []byte) {
 	if match := base91_tel_re.FindSubmatchIndex(commentData); match != nil {
 		var tdata = commentData[match[2]:match[3]] /* Should be even number of 4 to 14 characters. */
 
-		var telemetry = telemetryState.telemetry_data_base91(A.src, string(tdata))
+		var telemetry = telemetryState.DataBase91(A.src, string(tdata))
 		A.telemetry = telemetry
 
 		commentData = cutBytes(commentData, match[0], match[1])

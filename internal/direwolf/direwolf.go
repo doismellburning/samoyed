@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/aprstelemetry"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -60,7 +61,7 @@ var misc_config *misc_config_s
 var aprsSymbolData *symbols.Data
 var waypointSender *WaypointSender
 var packetLogger *PacketLogger
-var telemetryState = NewTelemetryState()
+var telemetryState = aprstelemetry.New()
 var beaconService *BeaconService
 var gpsReceiver *dwgps.GPS
 var kissNetSvc *KissNetService
