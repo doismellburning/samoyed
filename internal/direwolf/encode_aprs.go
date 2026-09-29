@@ -22,7 +22,20 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
+
+// checkSymbol complains about a symbol table identifier or symbol code that
+// isn't valid APRS.  The position is still encoded, as Dire Wolf always did.
+func checkSymbol(symtab byte, symbol byte) {
+	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
+		logrus.WithField("symtab", string(symtab)).Error("Symbol table identifier is not one of / \\ 0-9 A-Z")
+	}
+
+	if symbol < '!' || symbol > '~' {
+		logrus.WithField("symbol", string(symbol)).Error("Symbol code is not in range of ! to ~")
+	}
+}
 
 /*------------------------------------------------------------------
  *
@@ -50,21 +63,13 @@ func normal_position_string(p *position_t) string {
 func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *position_t {
 	var presult = new(position_t)
 
-	copy(presult.Lat[:], latlong.LatitudeToString(dlat, ambiguity))
+	checkSymbol(symtab, symbol)
 
-	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Symbol table identifier is not one of / \\ 0-9 A-Z\n")
-	}
+	copy(presult.Lat[:], latlong.LatitudeToString(dlat, ambiguity))
 
 	presult.SymTableId = symtab
 
 	copy(presult.Lon[:], latlong.LongitudeToString(dlong, ambiguity))
-
-	if symbol < '!' || symbol > '~' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Symbol code is not in range of ! to ~\n")
-	}
 
 	presult.SymbolCode = symbol
 
@@ -115,10 +120,7 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	course maybe.Maybe[int], speed maybe.Maybe[int]) *compressed_position_t {
 	var presult = new(compressed_position_t)
 
-	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Symbol table identifier is not one of / \\ 0-9 A-Z\n")
-	}
+	checkSymbol(symtab, symbol)
 
 	/*
 	 * In compressed format, the characters a-j are used for a numeric overlay.
@@ -132,11 +134,6 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 
 	copy(presult.Y[:], latlong.LatitudeToCompressedString(dlat))
 	copy(presult.X[:], latlong.LongitudeToCompressedString(dlong))
-
-	if symbol < '!' || symbol > '~' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Symbol code is not in range of ! to ~\n")
-	}
 
 	presult.SymbolCode = symbol
 
