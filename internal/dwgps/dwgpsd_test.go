@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dwgps
 
 import (
 	"bufio"
@@ -183,7 +186,7 @@ func Test_apply_gpsd_tpv_absent_fields_are_nothing(t *testing.T) {
 // fakeGpsd listens as a gpsd would, returning a configuration pointing at it
 // and a channel that hands over the connection once the client has asked to
 // WATCH, so the test can send it reports.
-func fakeGpsd(t *testing.T) (*GPSConfig, <-chan net.Conn) {
+func fakeGpsd(t *testing.T) (*Config, <-chan net.Conn) {
 	t.Helper()
 
 	var listener, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
@@ -206,7 +209,7 @@ func fakeGpsd(t *testing.T) (*GPSConfig, <-chan net.Conn) {
 		conns <- conn
 	}()
 
-	var config = new(GPSConfig)
+	var config = new(Config)
 	config.GPSDHost = "127.0.0.1"
 	config.GPSDPort = listener.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert // A TCP listener has a TCP address.
 

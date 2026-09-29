@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+package dwgps
 
 import (
 	"context"
@@ -25,7 +25,7 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 
 	for name, port := range testCases {
 		t.Run(name, func(t *testing.T) {
-			var config = new(GPSConfig)
+			var config = new(Config)
 			config.NMEAPort = port
 
 			var gps = NewGPS(context.Background(), config, 0)

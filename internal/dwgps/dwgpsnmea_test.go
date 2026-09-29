@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dwgps
 
 import (
 	"os"
@@ -284,7 +287,7 @@ func openTestGPSNMEA(t *testing.T) (*GPS, string, *os.File) {
 
 	t.Cleanup(func() { master.Close() })
 
-	var config = new(GPSConfig)
+	var config = new(Config)
 	config.NMEAPort = slave.Name()
 	config.NMEASpeed = 4800
 

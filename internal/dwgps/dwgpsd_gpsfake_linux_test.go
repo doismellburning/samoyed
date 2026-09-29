@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dwgps
 
 // Integration test against a real gpsd, driven by gpsfake (from the gpsd-clients
 // package) replaying a canned NMEA log. Linux only, since gpsfake feeds gpsd
@@ -90,7 +93,7 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 
 	startGpsfake(t, port)
 
-	var config = new(GPSConfig)
+	var config = new(Config)
 	config.GPSDHost = "127.0.0.1"
 	config.GPSDPort = port
 

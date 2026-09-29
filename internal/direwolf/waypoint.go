@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -62,7 +63,7 @@ type WaypointSender struct {
  *
  *---------------------------------------------------------------*/
 
-func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *GPS) (*WaypointSender, error) {
+func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *dwgps.GPS) (*WaypointSender, error) {
 	logrus.WithFields(logrus.Fields{
 		"serial_device": mc.waypoint_serial_port,
 		"formats":       mc.waypoint_formats,

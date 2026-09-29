@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dwgps
 
 /*------------------------------------------------------------------
  *
@@ -118,7 +121,7 @@ func (c *gpsdClient) closeAndClear() {
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *GPSConfig, debug int) int {
+func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *Config, debug int) int {
 	if debug >= 2 {
 		logrus.Debug("dwgpsd_init")
 	}

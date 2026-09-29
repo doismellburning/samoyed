@@ -16,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -60,7 +61,7 @@ var waypointSender *WaypointSender
 var packetLogger *PacketLogger
 var telemetryState = NewTelemetryState()
 var beaconService *BeaconService
-var gpsReceiver *GPS
+var gpsReceiver *dwgps.GPS
 var kissNetSvc *KissNetService
 var kissPT *KissPT
 var kissSerial *KissSerial
@@ -683,13 +684,13 @@ x = Silence FX.25 information.`)
 	/*
 	 * Open port for communication with GPS.
 	 */
-	var gpsConfig = new(GPSConfig)
+	var gpsConfig = new(dwgps.Config)
 	gpsConfig.NMEAPort = misc_config.gpsnmea_port
 	gpsConfig.NMEASpeed = misc_config.gpsnmea_speed
 	gpsConfig.GPSDHost = misc_config.gpsd_host
 	gpsConfig.GPSDPort = misc_config.gpsd_port
 
-	gpsReceiver = NewGPS(ctx, gpsConfig, d_g_opt)
+	gpsReceiver = dwgps.NewGPS(ctx, gpsConfig, d_g_opt)
 
 	var waypointErr error
 	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config, gpsReceiver)

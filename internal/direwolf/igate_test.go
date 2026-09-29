@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1096,7 +1097,7 @@ func TestNewGPSLeavesTheIGateDebugLevelAlone(t *testing.T) {
 	igate.config.rx2ig_dedupe_time = 30
 
 	// No receiver configured, so this starts nothing.
-	NewGPS(t.Context(), new(GPSConfig), 0).Term()
+	dwgps.NewGPS(t.Context(), new(dwgps.Config), 0).Term()
 
 	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)

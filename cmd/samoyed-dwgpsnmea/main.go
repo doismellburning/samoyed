@@ -8,7 +8,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
@@ -41,24 +41,24 @@ func run(ctx context.Context, args []string, out io.Writer) int {
 		gpsPort = args[0]
 	}
 
-	var gps = direwolf.NewGPSNMEA(ctx, gpsPort, 3)
+	var gps = dwgps.NewGPSNMEA(ctx, gpsPort, 3)
 
 	for ctx.Err() == nil {
 		var info = gps.Read()
 
 		switch info.Fix {
-		case direwolf.DWFIX_2D, direwolf.DWFIX_3D:
+		case dwgps.DWFIX_2D, dwgps.DWFIX_3D:
 			fmt.Fprintf(out, "%s  %s", maybe.Format("%.6f", "unknown", info.Lat), maybe.Format("%.6f", "unknown", info.Lon))
 			fmt.Fprintf(out, "  %s knots  %s degrees", maybe.Format("%.1f", "unknown", info.SpeedKnots), maybe.Format("%.0f", "unknown", info.Track))
 
-			if info.Fix == direwolf.DWFIX_3D {
+			if info.Fix == dwgps.DWFIX_3D {
 				fmt.Fprintf(out, "  altitude = %s meters", maybe.Format("%.1f", "unknown", info.Altitude))
 			}
 
 			fmt.Fprintf(out, "\n")
-		case direwolf.DWFIX_NOT_SEEN, direwolf.DWFIX_NO_FIX:
+		case dwgps.DWFIX_NOT_SEEN, dwgps.DWFIX_NO_FIX:
 			fmt.Fprintf(out, "Location currently not available.\n")
-		case direwolf.DWFIX_NOT_INIT:
+		case dwgps.DWFIX_NOT_INIT:
 			fmt.Fprintf(out, "GPS Init failed.\n")
 
 			return 1

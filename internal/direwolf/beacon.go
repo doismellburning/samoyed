@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
@@ -24,7 +25,7 @@ type BeaconService struct {
 	modemConfig       *AudioConfig
 	miscConfig        *misc_config_s
 	igateConfig       *igate_config_s
-	gps               *GPS
+	gps               *dwgps.GPS
 	trackerDebugLevel int
 }
 
@@ -53,7 +54,7 @@ type BeaconService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewBeaconService(pmodem *AudioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *GPS) *BeaconService {
+func NewBeaconService(pmodem *AudioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *dwgps.GPS) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct_v5
 		modemConfig: pmodem,
 		miscConfig:  pconfig,
@@ -125,7 +126,7 @@ func NewBeaconService(pmodem *AudioConfig, pconfig *misc_config_s, pigate *igate
 				case BEACON_TRACKER:
 					{
 						var fix = bs.gps.Read().Fix
-						if fix == DWFIX_NOT_INIT {
+						if fix == dwgps.DWFIX_NOT_INIT {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Config file, line %d: GPS must be configured to use TBEACON.\n", bs.miscConfig.beacon[j].lineno)
 							bs.miscConfig.beacon[j].btype = BEACON_IGNORE
@@ -385,7 +386,7 @@ func (bs *BeaconService) thread(ctx context.Context) {
 		 * This needs to be done before the next scheduled tracker
 		 * beacon because corner pegging make it sooner.
 		 */
-		var gpsinfo GPSInfo
+		var gpsinfo dwgps.GPSInfo
 
 		if number_of_tbeacons > 0 {
 			gpsinfo = bs.gps.Read()
@@ -398,12 +399,12 @@ func (bs *BeaconService) thread(ctx context.Context) {
 				text_color_set(DW_COLOR_DEBUG)
 
 				switch fix {
-				case DWFIX_3D:
+				case dwgps.DWFIX_3D:
 					dw_printf("%s  3D, %s, %s, %s mph, %s\xc2\xb0, %s m\n", hms,
 						maybe.Format("%.6f", "unknown", gpsinfo.Lat), maybe.Format("%.6f", "unknown", gpsinfo.Lon),
 						maybe.Format("%.1f", "unknown", my_speed_mph), maybe.Format("%.0f", "unknown", gpsinfo.Track),
 						maybe.Format("%.1f", "unknown", gpsinfo.Altitude))
-				case DWFIX_2D:
+				case dwgps.DWFIX_2D:
 					dw_printf("%s  2D, %s, %s, %s mph, %s\xc2\xb0\n", hms,
 						maybe.Format("%.6f", "unknown", gpsinfo.Lat), maybe.Format("%.6f", "unknown", gpsinfo.Lon),
 						maybe.Format("%.1f", "unknown", my_speed_mph), maybe.Format("%.0f", "unknown", gpsinfo.Track))
@@ -418,7 +419,7 @@ func (bs *BeaconService) thread(ctx context.Context) {
 			/*
 			 * Run SmartBeaconing calculation if configured and GPS data available.
 			 */
-			if bs.miscConfig.sb_configured && fix >= DWFIX_2D {
+			if bs.miscConfig.sb_configured && fix >= dwgps.DWFIX_2D {
 				var tnext = bs.sbCalculateNextTime(now,
 					my_speed_mph, gpsinfo.Track,
 					sb_prev_time, sb_prev_course)
@@ -613,11 +614,11 @@ func (bs *BeaconService) sbCalculateNextTime(
 // having reported a latitude and longitude.  The scheduler asks the same
 // question as send does, so a beacon that was skipped is not scheduled for as
 // though it had gone out.
-func trackerPosition(gpsinfo *GPSInfo) (float64, float64, bool) {
+func trackerPosition(gpsinfo *dwgps.GPSInfo) (float64, float64, bool) {
 	var dlat, haveLat = gpsinfo.Lat.Get()
 	var dlon, haveLon = gpsinfo.Lon.Get()
 
-	return dlat, dlon, gpsinfo.Fix >= DWFIX_2D && haveLat && haveLon
+	return dlat, dlon, gpsinfo.Fix >= dwgps.DWFIX_2D && haveLat && haveLon
 }
 
 // beaconPosition is the position a fixed beacon was configured with.
@@ -673,7 +674,7 @@ func beaconAltitudeFeet(alt_m maybe.Maybe[float64]) maybe.Maybe[int] {
  *
  *--------------------------------------------------------------------*/
 
-func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *GPSInfo) {
+func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo) {
 	var bp = &(bs.miscConfig.beacon[j])
 
 	if bp.sendto_chan < 0 {
@@ -801,7 +802,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *GPSInfo) {
 			/* A positive altitude in the config file enables */
 			/* transmission of altitude from GPS. */
 			var my_alt_ft maybe.Maybe[int]
-			if gpsinfo.Fix >= DWFIX_3D && maybe.FromMaybe(0, bp.alt_m) > 0 {
+			if gpsinfo.Fix >= dwgps.DWFIX_3D && maybe.FromMaybe(0, bp.alt_m) > 0 {
 				my_alt_ft = maybe.Fmap(func(meters float64) int {
 					return int(math.Round(DW_METERS_TO_FEET(meters)))
 				}, gpsinfo.Altitude)
