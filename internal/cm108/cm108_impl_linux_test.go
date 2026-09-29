@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+package cm108
 
 import (
 	"os"
@@ -49,8 +49,8 @@ func TestCM108GoodDevice(t *testing.T) {
 
 // The inventory comes from the host's udev, which in CI has no USB audio at
 // all, so all we can say about it is that it is internally consistent.
-func TestCM108InventoryIsConsistent(t *testing.T) {
-	var things, err = CM108Inventory(MAXX_THINGS)
+func TestInventoryIsConsistent(t *testing.T) {
+	var things, err = Inventory(MAXX_THINGS)
 	if err != nil {
 		t.Skipf("udev enumeration unavailable here: %v", err)
 	}
@@ -68,8 +68,8 @@ func TestCM108InventoryIsConsistent(t *testing.T) {
 	}
 }
 
-func TestCM108InventoryRespectsMaximum(t *testing.T) {
-	var things, err = CM108Inventory(0)
+func TestInventoryRespectsMaximum(t *testing.T) {
+	var things, err = Inventory(0)
 	if err != nil {
 		t.Skipf("udev enumeration unavailable here: %v", err)
 	}
@@ -77,10 +77,10 @@ func TestCM108InventoryRespectsMaximum(t *testing.T) {
 	assert.Empty(t, things)
 }
 
-func TestCM108FindPTTRejectsUnparseableDevice(t *testing.T) {
+func TestFindPTTRejectsUnparseableDevice(t *testing.T) {
 	for _, device := range []string{"", "plughw", "default", ":2,0", "plughw:,0"} {
 		t.Run(device, func(t *testing.T) {
-			var ptt, err = cm108_find_ptt(device)
+			var ptt, err = FindPTT(device)
 
 			require.Error(t, err)
 			assert.Empty(t, ptt)
@@ -88,7 +88,7 @@ func TestCM108FindPTTRejectsUnparseableDevice(t *testing.T) {
 	}
 }
 
-func TestCM108FindPTTNoSuchCard(t *testing.T) {
+func TestFindPTTNoSuchCard(t *testing.T) {
 	// No machine has this many sound cards, nor one with this name.
 	for _, device := range []string{
 		"plughw:987654,0",
@@ -97,7 +97,7 @@ func TestCM108FindPTTNoSuchCard(t *testing.T) {
 		"surround41:Q1TESTnonexistent",
 	} {
 		t.Run(device, func(t *testing.T) {
-			var ptt, err = cm108_find_ptt(device)
+			var ptt, err = FindPTT(device)
 
 			require.NoError(t, err)
 			assert.Empty(t, ptt)
@@ -113,7 +113,7 @@ func TestCM108WriteReportsWriteFailure(t *testing.T) {
 		t.Skipf("no /dev/full here: %v", statErr)
 	}
 
-	var err = CM108SetGPIOPin("/dev/full", 3, 1)
+	var err = SetGPIOPin("/dev/full", 3, 1)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "write to /dev/full failed")
@@ -182,7 +182,7 @@ func fakeCM108Devices() ([]cm108Device, []cm108Device) {
 	return sound, hid
 }
 
-func TestCM108InventoryOfFakeDevices(t *testing.T) {
+func TestInventoryOfFakeDevices(t *testing.T) {
 	var sound, hid = fakeCM108Devices()
 
 	var things = cm108_inventory_of(sound, hid, MAXX_THINGS)
@@ -232,7 +232,7 @@ func TestCM108InventoryOfFakeDevices(t *testing.T) {
 	assert.Empty(t, keyboard.Plughw)
 }
 
-func TestCM108InventoryOfLimitsItems(t *testing.T) {
+func TestInventoryOfLimitsItems(t *testing.T) {
 	var sound, hid = fakeCM108Devices()
 
 	// The first card's nodes use up the space, so its HID can still merge
@@ -249,11 +249,11 @@ func TestCM108InventoryOfLimitsItems(t *testing.T) {
 	assert.Empty(t, cm108_inventory_of(sound, hid, 0))
 }
 
-func TestCM108InventoryOfNothing(t *testing.T) {
+func TestInventoryOfNothing(t *testing.T) {
 	assert.Empty(t, cm108_inventory_of(nil, nil, MAXX_THINGS))
 }
 
-func TestCM108InventoryOfMissingIDs(t *testing.T) {
+func TestInventoryOfMissingIDs(t *testing.T) {
 	// Without a vendor or product id, or a USB device node, there is nothing
 	// to merge a HID into a sound card by.
 	var anonymous = fakeUSB("", "", "", "")
@@ -277,7 +277,7 @@ func TestCM108InventoryOfMissingIDs(t *testing.T) {
 	assert.Equal(t, "/dev/hidraw5", things[3].DevnodeHidraw)
 }
 
-func TestCM108FindPTTIn(t *testing.T) {
+func TestFindPTTIn(t *testing.T) {
 	var sound, hid = fakeCM108Devices()
 	var things = cm108_inventory_of(sound, hid, MAXX_THINGS)
 
@@ -299,7 +299,7 @@ func TestCM108FindPTTIn(t *testing.T) {
 	t.Run("unknown device", func(t *testing.T) {
 		var ptt, err = cm108_find_ptt_in(things, "plughw:CODEC,0")
 
-		require.ErrorIs(t, err, ErrUnknownCM108Device)
+		require.ErrorIs(t, err, ErrUnknownDevice)
 		assert.Contains(t, err.Error(), "USB audio card 2 (CODEC)")
 		assert.Equal(t, "/dev/hidraw2", ptt, "the device is still returned")
 	})

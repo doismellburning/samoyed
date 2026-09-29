@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/direwolf"
 )
 
@@ -49,7 +50,7 @@ func cm108_print_permission_advice(name string, err error) {
 		return
 	}
 
-	for _, line := range direwolf.CM108PermissionAdvice(name) {
+	for _, line := range cm108.PermissionAdvice(name) {
 		fmt.Printf("%s\n", line)
 	}
 }
@@ -73,7 +74,7 @@ func main() {
 
 		// Telling people whether a device is usable is this tool's job, so
 		// check once here before we start toggling the pin.
-		var checkErr = direwolf.CM108CheckDevice(path)
+		var checkErr = cm108.CheckDevice(path)
 		if checkErr != nil {
 			fmt.Printf("Warning: %v.  Proceed at your own risk.\n", checkErr)
 			cm108_print_permission_advice(path, checkErr)
@@ -83,7 +84,7 @@ func main() {
 		for {
 			fmt.Printf("%d", state)
 
-			var err = direwolf.CM108SetGPIOPin(path, gpio, state)
+			var err = cm108.SetGPIOPin(path, gpio, state)
 			if err != nil {
 				fmt.Printf("\nWRITE ERROR for USB Audio Adapter GPIO: %v\n", err)
 				cm108_print_permission_advice(path, err)
@@ -99,7 +100,7 @@ func main() {
 
 	// Take inventory of USB Audio adapters and other HID devices.
 
-	var things, inventoryErr = direwolf.CM108Inventory(direwolf.MAXX_THINGS)
+	var things, inventoryErr = cm108.Inventory(cm108.MAXX_THINGS)
 	if inventoryErr != nil {
 		fmt.Printf("%v\n", inventoryErr)
 		os.Exit(1)
@@ -117,7 +118,7 @@ func main() {
 // cm108_print_inventory lists the USB audio adapters and other HID devices
 // found, marking those whose GPIO can be used for PTT, and suggests udev rules
 // to give the adapters stable names.  There must be at least one.
-func cm108_print_inventory(things []*direwolf.CM108Thing) {
+func cm108_print_inventory(things []*cm108.Thing) {
 	/////////////////////////////////////////////
 	//                Linux
 	/////////////////////////////////////////////
@@ -136,7 +137,7 @@ func cm108_print_inventory(things []*direwolf.CM108Thing) {
 
 	for i := range things {
 		var good = "  "
-		if direwolf.GOOD_DEVICE(things[i].VID, things[i].PID) {
+		if cm108.GOOD_DEVICE(things[i].VID, things[i].PID) {
 			good = "**"
 		}
 

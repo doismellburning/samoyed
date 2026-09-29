@@ -31,6 +31,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/touchtone"
@@ -2694,14 +2695,14 @@ func (ps *parseState) applyOutputControl(ot int, settings OutputControlSettings)
 		// Failure at this point is not an error.
 		// See if config file sets it explicitly before complaining.
 
-		var found_ptt, find_ptt_err = cm108_find_ptt(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
+		var found_ptt, find_ptt_err = cm108.FindPTT(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
 
 		octrl.ptt_device = found_ptt
 
 		if find_ptt_err != nil {
 			// A device we don't recognise may still be the right one, so that
 			// is advice; anything else means there is no PTT to be had here.
-			if errors.Is(find_ptt_err, ErrUnknownCM108Device) {
+			if errors.Is(find_ptt_err, cm108.ErrUnknownDevice) {
 				ps.warnf("warning: %v", find_ptt_err)
 			} else {
 				ps.errorf("can't automatically find matching HID for PTT: %v", find_ptt_err)
