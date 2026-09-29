@@ -90,7 +90,7 @@ type KissSerial struct {
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
-	kf *KISSFrame
+	kf *kiss.Collector
 
 	// mu guards fd and failed, which listenThread (reading, and in the
 	// polling case reopening) and SendRecPacket (writing from the receive
@@ -120,7 +120,7 @@ func newKissSerial(mc *misc_config_s, audioConfig *AudioConfig, debug int) *Kiss
 	ks.miscConfig = mc
 	ks.audioConfig = audioConfig
 	ks.debug = debug
-	ks.kf = new(KISSFrame)
+	ks.kf = new(kiss.Collector)
 
 	return ks
 }
@@ -462,7 +462,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("\nOpened %s for serial port KISS.\n\n", ks.miscConfig.kiss_serial_port)
 
-					ks.kf = new(KISSFrame) // Start with clean state.
+					ks.kf = new(kiss.Collector) // Start with clean state.
 
 					ks.setPort(fd)
 				} else { //nolint:staticcheck

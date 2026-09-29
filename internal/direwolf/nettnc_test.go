@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -291,10 +292,10 @@ func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
 
 	var pp = newTestPacket(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	for _, b := range append([]byte("cmd:\r\n"), kissFrameFor(pp)...) {
-		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
+		nettncRecByte(kf, b, 0, nettncTestChannel)
 	}
 
 	var item = dataLinkQueue.Remove()
@@ -306,10 +307,10 @@ func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
 func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 	expectReceivedFrames(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	for _, b := range []byte{kiss.FEND, kiss.FEND, kiss.FEND, kiss.FEND} {
-		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
+		nettncRecByte(kf, b, 0, nettncTestChannel)
 	}
 
 	assert.Nil(t, dataLinkQueue.Remove(), "an empty KISS frame was taken for a received frame")
@@ -320,11 +321,11 @@ func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 	expectReceivedFrames(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range kiss.Encapsulate([]byte{0, 'n', 'o', 't', ' ', 'a', 'x', '2', '5'}) {
-			my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
+			nettncRecByte(kf, b, 0, nettncTestChannel)
 		}
 	})
 
@@ -333,20 +334,20 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 }
 
 // A TNC that never sends a FEND would otherwise fill the frame buffer without
-// limit, so the collecting stops at the maximum and says so.
+// limit, so the collecting stops at the maximum and says so - once, not once
+// for every byte past it.
 func TestNetTNCOverlongFrameIsReported(t *testing.T) {
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
-		my_kiss_rec_byte(kf, kiss.FEND, 0, nettncTestChannel)
+		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel)
 
-		for range MAX_KISS_LEN + 10 {
-			my_kiss_rec_byte(kf, 'x', 0, nettncTestChannel)
+		for range kiss.MaxFrameLen + 10 {
+			nettncRecByte(kf, 'x', 0, nettncTestChannel)
 		}
 	})
 
-	assert.Contains(t, output, "KISS frame from network TNC exceeded maximum length")
-	assert.Equal(t, MAX_KISS_LEN, kf.kiss_len)
+	assert.Equal(t, 1, strings.Count(output, "KISS frame from network TNC exceeded maximum length"))
 }
 
 // The TNC does eventually send its closing FEND, and the byte it used to be
@@ -356,26 +357,24 @@ func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 	expectReceivedFrames(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
-		my_kiss_rec_byte(kf, kiss.FEND, 0, nettncTestChannel)
+		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel)
 
-		for range MAX_KISS_LEN + 10 {
-			my_kiss_rec_byte(kf, 'x', 0, nettncTestChannel)
+		for range kiss.MaxFrameLen + 10 {
+			nettncRecByte(kf, 'x', 0, nettncTestChannel)
 		}
 
-		my_kiss_rec_byte(kf, kiss.FEND, 0, nettncTestChannel)
+		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel)
 	})
 
 	assert.Contains(t, output, "KISS frame from network TNC exceeded maximum length.  Discarding it.")
-	assert.Equal(t, 0, kf.kiss_len)
-	assert.Equal(t, KS_SEARCHING, kf.state)
 	assert.Nil(t, dataLinkQueue.Remove(), "a fragment of the overlong frame was acted on")
 
 	// And a well formed frame after it still gets through.
 	for _, b := range kissFrameFor(newTestPacket(t)) {
-		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
+		nettncRecByte(kf, b, 0, nettncTestChannel)
 	}
 
 	assert.NotNil(t, dataLinkQueue.Remove())
@@ -387,11 +386,11 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 func TestNetTNCDebugPrints(t *testing.T) {
 	expectReceivedFrames(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range kissFrameFor(newTestPacket(t)) {
-			my_kiss_rec_byte(kf, b, 2, nettncTestChannel)
+			nettncRecByte(kf, b, 2, nettncTestChannel)
 		}
 	})
 

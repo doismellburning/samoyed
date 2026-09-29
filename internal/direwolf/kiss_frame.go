@@ -16,37 +16,6 @@ import (
 	"github.com/doismellburning/samoyed/internal/kiss"
 )
 
-type kiss_state_e int
-
-const (
-	KS_SEARCHING  kiss_state_e = 0 /* Looking for FEND to start KISS frame. Must be 0 so we can simply zero whole structure to initialize. */
-	KS_COLLECTING kiss_state_e = 1 /* In process of collecting KISS frame. */
-)
-
-const MAX_KISS_LEN = 2048 /* Spec calls for at least 1024. */
-/* Might want to make it longer to accommodate */
-/* maximum packet length. */
-
-const MAX_NOISE_LEN = 100
-
-type KISSFrame struct {
-	state kiss_state_e
-
-	kiss_msg [MAX_KISS_LEN]byte
-	/* Leading FEND is optional. */
-	/* Contains escapes and ending FEND. */
-	kiss_len int
-
-	noise     [MAX_NOISE_LEN]byte
-	noise_len int
-
-	// OnMessage, when set, takes each complete message (FEND and escapes
-	// removed, first byte the channel and command) in place of the TNC's
-	// own handling.  cmd/samoyed-kissutil, a client rather than a TNC, uses
-	// it to print what the TNC sends.
-	OnMessage func(kiss_msg []byte)
-}
-
 type fromto_t int
 
 const (
@@ -86,7 +55,7 @@ type kissport_status_s struct {
 
 	client_sock [MAX_NET_CLIENTS]net.Conn
 
-	kf [MAX_NET_CLIENTS]*KISSFrame
+	kf [MAX_NET_CLIENTS]*kiss.Collector
 	/* Accumulated KISS frame and state of decoder. */
 
 	// Set by stop, and guarded by mu along with everything above, so that a
@@ -122,7 +91,7 @@ func (kps *kissport_status_s) attachClient(client int, conn net.Conn) bool {
 		return false
 	}
 
-	kps.kf[client] = new(KISSFrame)
+	kps.kf[client] = new(kiss.Collector)
 	kps.client_sock[client] = conn
 
 	return true
@@ -187,8 +156,8 @@ func (kps *kissport_status_s) stop() {
 // need to pair a connection with its decoder state (e.g. before reading a
 // byte from it) must use this rather than clientConn/frame separately: two
 // independently-locked calls could observe an attachClient in between them,
-// pairing a conn with a *KISSFrame that belongs to a different connection.
-func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *KISSFrame) {
+// pairing a conn with a *kiss.Collector that belongs to a different connection.
+func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *kiss.Collector) {
 	kps.mu.Lock()
 	defer kps.mu.Unlock()
 
@@ -239,20 +208,6 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 	dwutil.HexDump(pmsg)
 }
 
-// kf_debug_print is kiss_debug_print for a byte collected by KissRecByte:
-// when kf belongs to kissutil, what arrives is from the TNC, not a client.
-func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
-	if kf.OnMessage == nil {
-		kiss_debug_print(FROM_CLIENT, special, pmsg)
-
-		return
-	}
-
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("From KISS TNC:\n")
-	dwutil.HexDump(pmsg)
-}
-
 /*-------------------------------------------------------------------
  *
  * Name:        KissRecByte
@@ -260,8 +215,7 @@ func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
  * Purpose:     Process one byte from a KISS client app.
  *
  * Inputs:	kf	- Current state of building a frame.
- *		audioConfig - Which channels are configured.  Only read
- *			  when kf.OnMessage is nil, so may be nil otherwise.
+ *		audioConfig - Which channels are configured.
  *		ch	- A byte from the input stream.
  *		debug	- Activates debug output.
  *		kps	- KISS TCP port status block.
@@ -302,134 +256,51 @@ func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
 
 type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
-func KissRecByte(kf *KISSFrame, audioConfig *AudioConfig, ch byte, debug int,
+func KissRecByte(kf *kiss.Collector, audioConfig *AudioConfig, ch byte, debug int,
 	kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
-	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
-	switch kf.state {
-	case KS_SEARCHING: /* Searching for starting FEND. */
-		// TODO KG Also default: ?
-		if ch == kiss.FEND {
-			/* Start of frame.  But first print any collected noise for debugging. */
-			if kf.noise_len > 0 {
-				if debug > 0 {
-					kf_debug_print(kf, "Rejected Noise", kf.noise[:kf.noise_len])
-				}
+	var chunk = kf.Add(ch)
 
-				kf.noise_len = 0
-			}
-
-			kf.kiss_len = 1
-			kf.kiss_msg[0] = ch
-			kf.state = KS_COLLECTING
-
-			return
+	switch {
+	case chunk.Noise != nil:
+		if debug > 0 {
+			kiss_debug_print(FROM_CLIENT, "Rejected Noise", chunk.Noise)
 		}
 
-		/* Noise to be rejected. */
-
-		if kf.noise_len < MAX_NOISE_LEN {
-			kf.noise[kf.noise_len] = ch
-			kf.noise_len++
-		}
-
-		if ch == '\r' {
-			if debug > 0 {
-				kf_debug_print(kf, "Rejected Noise", kf.noise[:kf.noise_len])
-			}
-
-			/* Try to appease client app by sending something back. */
-			// A caller with nothing to send with - cmd/samoyed-kissutil, a
-			// client hearing a TNC's banner - is no TNC to answer as.
-			if sendfun != nil {
-				if strings.EqualFold("restart\r", string(kf.noise[:kf.noise_len])) ||
-					strings.EqualFold("reset\r", string(kf.noise[:kf.noise_len])) {
-					// first 2 parameters don't matter when length is -1 indicating text.
-					sendfun(0, 0, []byte("\xc0\xc0"), -1, kps, client)
-				} else {
-					sendfun(0, 0, []byte("\r\ncmd:"), -1, kps, client)
-				}
-			}
-
-			kf.noise_len = 0
-		}
-
-		return
-
-	case KS_COLLECTING: /* Frame collection in progress. */
-		if ch == kiss.FEND {
-			/* End of frame. */
-			if kf.kiss_len == 0 {
-				/* Empty frame.  Starting a new one. */
-				kf.kiss_msg[kf.kiss_len] = ch
-				kf.kiss_len++
-
-				return
-			}
-
-			if kf.kiss_len == 1 && kf.kiss_msg[0] == kiss.FEND {
-				/* Empty frame.  Just go on collecting. */
-				return
-			}
-
-			if kf.kiss_len >= MAX_KISS_LEN {
-				/*
-				 * The frame ran past the end of the buffer, so the closing FEND
-				 * has nowhere to go and what we did collect is only the first
-				 * MAX_KISS_LEN bytes of something longer.  Throw it away and go
-				 * back to looking for the next frame, rather than acting on a
-				 * fragment - or writing one past the end of kiss_msg, which is
-				 * what used to happen here.
-				 */
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS message exceeded maximum length.  Discarding it.\n")
-
-				kf.kiss_len = 0
-				kf.state = KS_SEARCHING
-
-				return
-			}
-
-			kf.kiss_msg[kf.kiss_len] = ch
-
-			kf.kiss_len++
-			if debug > 0 {
-				/* As received over the wire from client app. */
-				kf_debug_print(kf, "", kf.kiss_msg[:kf.kiss_len])
-			}
-
-			var unwrapped = kiss.Unwrap(kf.kiss_msg[:kf.kiss_len])
-
-			if debug >= 2 {
-				/* Append CRC to this and it goes out over the radio. */
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("\n")
-				dw_printf("Packet content after removing KISS framing and any escapes:\n")
-				/* Don't include the "type" indicator. */
-				/* It contains the radio channel and type should always be 0 here. */
-				dwutil.HexDump(unwrapped[1:])
-			}
-
-			if kf.OnMessage != nil {
-				kf.OnMessage(unwrapped)
+		/* Try to appease client app by sending something back. */
+		if chunk.EndOfLine {
+			if strings.EqualFold("restart\r", string(chunk.Noise)) ||
+				strings.EqualFold("reset\r", string(chunk.Noise)) {
+				// first 2 parameters don't matter when length is -1 indicating text.
+				sendfun(0, 0, []byte("\xc0\xc0"), -1, kps, client)
 			} else {
-				kiss_process_msg(unwrapped, audioConfig, debug, kps, client, sendfun)
+				sendfun(0, 0, []byte("\r\ncmd:"), -1, kps, client)
 			}
-
-			kf.state = KS_SEARCHING
-
-			return
 		}
 
-		if kf.kiss_len < MAX_KISS_LEN {
-			kf.kiss_msg[kf.kiss_len] = ch
-			kf.kiss_len++
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS message exceeded maximum length.\n")
+	case chunk.Err != nil:
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("KISS message exceeded maximum length.  Discarding it.\n")
+
+	case chunk.Frame != nil:
+		if debug > 0 {
+			/* As received over the wire from client app. */
+			kiss_debug_print(FROM_CLIENT, "", chunk.Frame)
 		}
 
-		return
+		var unwrapped = kiss.Unwrap(chunk.Frame)
+
+		if debug >= 2 {
+			/* Append CRC to this and it goes out over the radio. */
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("\n")
+			dw_printf("Packet content after removing KISS framing and any escapes:\n")
+			/* Don't include the "type" indicator. */
+			/* It contains the radio channel and type should always be 0 here. */
+			dwutil.HexDump(unwrapped[1:])
+		}
+
+		kiss_process_msg(unwrapped, audioConfig, debug, kps, client, sendfun)
 	}
 } /* end KissRecByte */
 

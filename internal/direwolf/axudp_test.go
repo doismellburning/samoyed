@@ -16,6 +16,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/sirupsen/logrus/hooks/test"
 )
 
 func TestAXUDPAddCRC(t *testing.T) {
@@ -324,8 +325,8 @@ func TestAXUDPLookupMapExactBeforeWildcard(t *testing.T) {
 }
 
 // TestKISSExactlyFullBufferDiscarded verifies that a KISS frame that fills the
-// accumulator buffer exactly (kf.kiss_len == MAX_KISS_LEN when the closing FEND
-// arrives, so no room to append the closing FEND) is treated as overflow and
+// collector's buffer exactly (so no room to append the closing FEND) is
+// treated as overflow and
 // discarded rather than forwarded as a truncated/unterminated frame.
 //
 // The frame is constructed so that, if forwarded, sendAXUDP would be called on a
@@ -343,17 +344,17 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 	// The KISS DATA frame payload is: type byte (0x00) followed by an AX.25
 	// frame whose first 7 bytes are the encoded destination "Q1TEST\x00" (SSID
 	// 0, end-of-address bit set → 0xE0).  We pad the rest to reach exactly
-	// MAX_KISS_LEN - 1 content bytes so that together with the opening FEND
-	// the accumulator holds exactly MAX_KISS_LEN bytes when the closing FEND
-	// arrives (kf.kiss_len == MAX_KISS_LEN, *overflow == false).
+	// kiss.MaxFrameLen - 1 content bytes so that together with the opening
+	// FEND the collector holds exactly kiss.MaxFrameLen bytes when the closing
+	// FEND arrives.
 	//
 	// AX.25 address encoding: each character shifted left one bit.
 	// Q=0x51<<1=0xA2, 1=0x31<<1=0x62, T=0x54<<1=0xA8, E=0x45<<1=0x8A, S=0x53<<1=0xA6, T=0x54<<1=0xA8
 	// SSID byte: 0xE0 (no SSID, end-of-address-field set for destination)
 	var ax25Dest = []byte{0xA2, 0x62, 0xA8, 0x8A, 0xA6, 0xA8, 0xE0}
 
-	// Total content bytes = 1 (type) + len(ax25Dest) + padding = MAX_KISS_LEN - 1
-	var padLen = MAX_KISS_LEN - 1 - 1 - len(ax25Dest)
+	// Total content bytes = 1 (type) + len(ax25Dest) + padding = kiss.MaxFrameLen - 1
+	var padLen = kiss.MaxFrameLen - 1 - 1 - len(ax25Dest)
 	var content []byte
 	content = append(content, kiss.CmdDataFrame) // type byte
 	content = append(content, ax25Dest...)
@@ -361,9 +362,7 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 		content = append(content, 0x41)
 	}
 
-	// Build stream: FEND + content (MAX_KISS_LEN-1 bytes) + FEND.
-	// Opening FEND → kf.kiss_len = 1; content → kf.kiss_len = MAX_KISS_LEN;
-	// closing FEND arrives with kf.kiss_len == MAX_KISS_LEN, *overflow == false.
+	// Build stream: FEND + content (kiss.MaxFrameLen-1 bytes) + FEND.
 	var buf []byte
 	buf = append(buf, kiss.FEND)
 	buf = append(buf, content...)
@@ -377,58 +376,49 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 		}
 	}()
 
-	var kf KISSFrame
-	var overflow bool
+	var kc kiss.Collector
 	for _, by := range buf {
-		my_kiss_rec_byte_axudp(&kf, &overflow, by, b)
-	}
-
-	// After the closing FEND the state machine must reset cleanly.
-	if overflow {
-		t.Error("overflow flag should be cleared after discarding exactly-full frame")
-	}
-	if kf.state != KS_SEARCHING {
-		t.Error("state != searching after exactly-full frame, want searching")
-	}
-	if kf.kiss_len != 0 {
-		t.Errorf("kiss_len = %d after exactly-full frame, want 0", kf.kiss_len)
+		axudpRecByte(&kc, by, b)
 	}
 }
 
 // TestKISSOverflowDiscarded verifies that a frame whose raw KISS bytes exceed
-// MAX_KISS_LEN is discarded on the closing FEND rather than forwarded in
-// truncated form.  It checks that the state machine resets cleanly.
+// kiss.MaxFrameLen is discarded on the closing FEND rather than forwarded in
+// truncated form, and is complained about once.
 func TestKISSOverflowDiscarded(t *testing.T) {
 	// Empty bridge — no maps, so even an accidentally forwarded frame would
 	// just log to stderr rather than panic.
 	var b = new(AXUDPBridge)
 
-	// Build a KISS input: FEND + type byte + MAX_KISS_LEN data bytes + FEND.
-	// MAX_KISS_LEN data bytes is enough to trigger the overflow condition.
+	// Build a KISS input: FEND + type byte + kiss.MaxFrameLen data bytes + FEND.
+	// kiss.MaxFrameLen data bytes is enough to trigger the overflow condition.
 	var buf []byte
 	buf = append(buf, kiss.FEND)
 	buf = append(buf, kiss.CmdDataFrame)
-	for range MAX_KISS_LEN {
+	for range kiss.MaxFrameLen {
 		buf = append(buf, 0x41)
 	}
 	buf = append(buf, kiss.FEND)
 
-	var kf KISSFrame
-	var overflow bool
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	var kc kiss.Collector
 	for _, by := range buf {
-		my_kiss_rec_byte_axudp(&kf, &overflow, by, b)
+		axudpRecByte(&kc, by, b)
 	}
 
-	// After the closing FEND the overflow flag should be cleared and the state
-	// machine should be back in searching with kiss_len reset.
-	if overflow {
-		t.Error("overflow flag should be cleared after discarding frame")
+	var discards = 0
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Message == "Discarding KISS frame that exceeded the maximum length" {
+			discards++
+		}
 	}
-	if kf.state != KS_SEARCHING {
-		t.Error("state != searching after overflow frame, want searching")
-	}
-	if kf.kiss_len != 0 {
-		t.Errorf("kiss_len = %d after overflow frame, want 0", kf.kiss_len)
+
+	if discards != 1 {
+		t.Errorf("overlong frame complained about %d times, want once", discards)
 	}
 }
 
@@ -559,18 +549,18 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 
 // TestBroadcastKISSDropsOversizedFrame verifies that broadcastKISS does not
 // write a KISS-encoded frame to clients when the on-wire length would exceed
-// MAX_KISS_LEN.  Oversized frames would be silently truncated by the nettnc.go
+// kiss.MaxFrameLen.  Oversized frames would be silently truncated by the nettnc.go
 // KISS reader, producing corrupt AX.25 data.
 func TestBroadcastKISSDropsOversizedFrame(t *testing.T) {
 	var b = new(AXUDPBridge)
 	var fc = new(fakeConn)
 	b.clients = []net.Conn{fc}
 
-	// An AX.25 frame large enough that kiss.Encapsulate produces > MAX_KISS_LEN
+	// An AX.25 frame large enough that kiss.Encapsulate produces > kiss.MaxFrameLen
 	// bytes: payload = 1 type byte + ax25frame, encapsulated with 2 FENDs.
 	// With no bytes needing escaping, output = len(payload) + 2 bytes.
-	// We need len(payload) > MAX_KISS_LEN - 2, so len(ax25frame) >= MAX_KISS_LEN - 2.
-	var ax25frame = make([]byte, MAX_KISS_LEN)
+	// We need len(payload) > kiss.MaxFrameLen - 2, so len(ax25frame) >= kiss.MaxFrameLen - 2.
+	var ax25frame = make([]byte, kiss.MaxFrameLen)
 	b.broadcastKISS(ax25frame)
 
 	fc.mu.Lock()

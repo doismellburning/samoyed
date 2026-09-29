@@ -79,7 +79,7 @@ type KissPT struct {
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
-	kf *KISSFrame
+	kf *kiss.Collector
 
 	// mu guards master, which listenThread (reading, and giving the terminal
 	// up on a read error or on the way out) and SendRecPacket (writing from
@@ -110,7 +110,7 @@ func newKissPT(audioConfig *AudioConfig, debug int) *KissPT {
 	var kp = new(KissPT)
 	kp.audioConfig = audioConfig
 	kp.debug = debug
-	kp.kf = new(KISSFrame)
+	kp.kf = new(kiss.Collector)
 
 	return kp
 }

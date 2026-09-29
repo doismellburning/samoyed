@@ -432,8 +432,7 @@ func tnc_listen_net(conn net.Conn) {
 	/*
 	 * Print what we get from TNC.
 	 */
-	var kstate = new(direwolf.KISSFrame)
-	kstate.OnMessage = kissutil_kiss_process_msg
+	var kstate = new(kiss.Collector)
 
 	for {
 		var data = make([]byte, 4096)
@@ -445,25 +444,7 @@ func tnc_listen_net(conn net.Conn) {
 		}
 
 		for j := range length {
-			// Feed in one byte at a time.
-			// kissutil_kiss_process_msg is called when a complete frame has been accumulated.
-
-			// When verbose is specified, we get debug output like this:
-			//
-			// <<< Data frame from KISS client application, port 0, total length = 46
-			// 000:  c0 00 82 a0 88 ae 62 6a e0 ae 84 64 9e a6 b4 ff  ......bj...d....
-			// ...
-			// It says "from KISS client application" because it was written
-			// on the assumption it was being used in only one direction.
-			// Not worried enough about it to do anything at this time.
-			var _verbose = 0
-			if verbose {
-				_verbose = 1
-			}
-
-			// kstate.OnMessage takes each frame, so there is no channel
-			// check to hand an audio configuration to.
-			direwolf.KissRecByte(kstate, nil, data[j], _verbose, nil, 0, nil)
+			kissutilRecByte(kstate, data[j])
 		}
 	}
 } /* end tnc_listen_net */
@@ -505,8 +486,7 @@ func tnc_listen_serial(fd *term.Term) {
 	/*
 	 * Read and print.
 	 */
-	var kstate = new(direwolf.KISSFrame)
-	kstate.OnMessage = kissutil_kiss_process_msg
+	var kstate = new(kiss.Collector)
 
 	for {
 		var ch, err = serialport.Get1(fd)
@@ -515,18 +495,36 @@ func tnc_listen_serial(fd *term.Term) {
 			os.Exit(1)
 		}
 
-		// Feed in one byte at a time.
-		// kissutil_kiss_process_msg is called when a complete frame has been accumulated.
-
-		var _verbose = 0
-		if verbose {
-			_verbose = 1
-		}
-
-		// As above, kstate.OnMessage takes each frame.
-		direwolf.KissRecByte(kstate, nil, ch, _verbose, nil, 0, nil)
+		kissutilRecByte(kstate, ch)
 	}
 } /* end tnc_listen_serial */
+
+// kissutilRecByte takes one byte from the KISS TNC, and prints each frame it
+// completes.  With -v, the frames are also shown as they arrived, along with
+// anything the TNC sent outside a frame - a banner, say, or the prompt of one
+// still in command mode.
+func kissutilRecByte(kc *kiss.Collector, b byte) {
+	var chunk = kc.Add(b)
+
+	switch {
+	case chunk.Noise != nil:
+		if verbose {
+			fmt.Printf("\nFrom KISS TNC, outside any frame:\n")
+			dwutil.HexDump(chunk.Noise)
+		}
+
+	case chunk.Err != nil:
+		fmt.Printf("KISS frame from TNC exceeded maximum length.  Discarding it.\n")
+
+	case chunk.Frame != nil:
+		if verbose {
+			fmt.Printf("\nFrom KISS TNC:\n")
+			dwutil.HexDump(chunk.Frame)
+		}
+
+		kissutil_kiss_process_msg(kiss.Unwrap(chunk.Frame))
+	}
+}
 
 /*-------------------------------------------------------------------
  *

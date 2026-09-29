@@ -229,6 +229,62 @@ func Test_kissutil_kiss_process_msg(t *testing.T) {
 	})
 }
 
+// feedKISS hands a stream from the TNC to kissutilRecByte a byte at a time,
+// as tnc_listen_net and tnc_listen_serial do, and returns what was printed.
+func feedKISS(t *testing.T, data []byte) string {
+	t.Helper()
+
+	var kc = new(kiss.Collector)
+
+	return testutils.CaptureOutput(t, func() {
+		for _, b := range data {
+			kissutilRecByte(kc, b)
+		}
+	})
+}
+
+func Test_kissutilRecByte(t *testing.T) {
+	var frame = kiss.Encapsulate(append([]byte{0x30}, ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()...))
+
+	t.Run("frame", func(t *testing.T) {
+		assert.Equal(t, "[3] Q1TEST>APDW17:>Testing\n", feedKISS(t, frame))
+	})
+
+	// A TNC's banner, or one still in command mode, puts lines of text
+	// outside any frame.  They're a TNC's to send, not ours to answer, and
+	// the frame after them still arrives.
+	t.Run("noise", func(t *testing.T) {
+		var output = feedKISS(t, append([]byte("cmd:\rRESTART\r"), frame...))
+
+		assert.Equal(t, "[3] Q1TEST>APDW17:>Testing\n", output)
+	})
+
+	// What arrives came from the TNC, so -v says so.
+	t.Run("verbose", func(t *testing.T) {
+		var old = verbose
+
+		t.Cleanup(func() { verbose = old })
+
+		verbose = true
+
+		var output = feedKISS(t, append([]byte("cmd:\rRESTART\r"), frame...))
+
+		assert.Contains(t, output, "From KISS TNC:")
+		assert.Contains(t, output, "From KISS TNC, outside any frame:")
+		assert.Contains(t, output, "RESTART.", "the noise is shown")
+		assert.NotContains(t, output, "KISS client application")
+		assert.Contains(t, output, "[3] Q1TEST>APDW17:>Testing\n")
+	})
+
+	t.Run("overlong", func(t *testing.T) {
+		var overlong = append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen+10)...)
+
+		var output = feedKISS(t, append(append(overlong, kiss.FEND), frame...))
+
+		assert.Equal(t, "KISS frame from TNC exceeded maximum length.  Discarding it.\n[3] Q1TEST>APDW17:>Testing\n", output)
+	})
+}
+
 func Test_timestamp_filename(t *testing.T) {
 	assert.Regexp(t, `^\d{8}-\d{6}-\d{3}$`, timestamp_filename())
 }

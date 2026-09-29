@@ -464,7 +464,7 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 // get returns the next byte from a client, and the frame decoder state it
 // belongs to.  It reports false instead if ctx was cancelled, in which case
 // there is no byte and the caller should stop.
-func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, client int) (byte, *KISSFrame, bool) {
+func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, client int) (byte, *kiss.Collector, bool) {
 	for ctx.Err() == nil {
 		var conn, frame = kps.connAndFrame(client)
 		for conn == nil {
@@ -549,7 +549,7 @@ func (kns *KissNetService) initOne(ctx context.Context, kps *kissport_status_s) 
 	}).Debug("kissnet_init")
 	for client := range MAX_NET_CLIENTS {
 		kps.client_sock[client] = nil
-		kps.kf[client] = new(KISSFrame)
+		kps.kf[client] = new(kiss.Collector)
 	}
 
 	if kps.tcp_port == 0 {
@@ -642,7 +642,7 @@ func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kisspor
 			// separate, unsynchronized steps: client_sock was published
 			// before kf was reset, so a fast sender's bytes could reach
 			// listenThread's read loop and start building a frame in the
-			// old *KISSFrame before this goroutine swapped it out from
+			// old *kiss.Collector before this goroutine swapped it out from
 			// under it, silently corrupting the frame. And the reset
 			// touched every client's slot rather than just the one that
 			// (re)connected, which could just as easily clobber a frame

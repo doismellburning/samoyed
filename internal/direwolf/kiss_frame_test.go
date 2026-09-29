@@ -3,6 +3,7 @@ package direwolf
 import (
 	"bytes"
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -374,12 +375,12 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 	assert.Len(t, *sent, 2)
 }
 
-// KissRecByte is the frame collector: it is fed the client's byte stream one
-// byte at a time and acts on each whole frame it finds.
+// KissRecByte is fed the client's byte stream one byte at a time, and acts on
+// each whole frame kiss.Collector finds in it, and on the text around them.
 
 // feedKissBytes hands the bytes to the collector one at a time, as a
 // transport does, and returns whatever was sent back to the client.
-func feedKissBytes(kf *KISSFrame, debug int, data []byte) *[]sentToClient {
+func feedKissBytes(kf *kiss.Collector, debug int, data []byte) *[]sentToClient {
 	var sent, sendfun = recordingSendfun()
 
 	var audioConfig = kissTestAudioConfig()
@@ -397,12 +398,11 @@ func Test_KissRecByte_whole_frame(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	feedKissBytes(kf, 0, kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)))
 
 	assert.Equal(t, 1, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
-	assert.Equal(t, KS_SEARCHING, kf.state, "the collector should be ready for the next frame")
 }
 
 // An application that thinks it is talking to an old command-mode TNC sends
@@ -411,7 +411,7 @@ func Test_KissRecByte_whole_frame(t *testing.T) {
 func Test_KissRecByte_command_prompt(t *testing.T) {
 	setupKissProcessMsg(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var sent = feedKissBytes(kf, 0, []byte("XFLOW OFF\r"))
 
@@ -427,7 +427,7 @@ func Test_KissRecByte_restart(t *testing.T) {
 
 	for _, word := range []string{"RESTART\r", "reset\r"} {
 		t.Run(word, func(t *testing.T) {
-			var kf = new(KISSFrame)
+			var kf = new(kiss.Collector)
 
 			var sent = feedKissBytes(kf, 0, []byte(word))
 
@@ -437,24 +437,12 @@ func Test_KissRecByte_restart(t *testing.T) {
 	}
 }
 
-// Noise is kept for the debug output, but only so much of it: a client
-// spraying bytes must not be able to make the collector grow without limit.
-func Test_KissRecByte_noise_is_bounded(t *testing.T) {
-	setupKissProcessMsg(t)
-
-	var kf = new(KISSFrame)
-
-	feedKissBytes(kf, 0, bytes.Repeat([]byte{'x'}, MAX_NOISE_LEN*2))
-
-	assert.Equal(t, MAX_NOISE_LEN, kf.noise_len)
-}
-
 // With the debug option on, the noise before a frame is shown, so that a
 // client that is not being understood can be looked at.
 func Test_KissRecByte_noise_is_printed(t *testing.T) {
 	setupKissProcessMsg(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
 		feedKissBytes(kf, 1, append([]byte("junk"), kiss.FEND))
@@ -468,26 +456,25 @@ func Test_KissRecByte_noise_is_printed(t *testing.T) {
 func Test_KissRecByte_empty_frames(t *testing.T) {
 	setupKissProcessMsg(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	feedKissBytes(kf, 0, []byte{kiss.FEND, kiss.FEND, kiss.FEND, kiss.FEND})
 
 	assert.Equal(t, 0, transmitQueue.Count(0, -1, "", "", false))
 }
 
-// A client that never sends a closing FEND would otherwise fill the frame
-// buffer without limit.
+// A client that never sends a closing FEND is told about once, not once for
+// every byte past the limit.
 func Test_KissRecByte_overlong_frame(t *testing.T) {
 	setupKissProcessMsg(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
-		feedKissBytes(kf, 0, append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, MAX_KISS_LEN+10)...))
+		feedKissBytes(kf, 0, append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen+10)...))
 	})
 
-	assert.Contains(t, output, "KISS message exceeded maximum length")
-	assert.Equal(t, MAX_KISS_LEN, kf.kiss_len)
+	assert.Equal(t, 1, strings.Count(output, "KISS message exceeded maximum length"))
 }
 
 // The client does eventually send its closing FEND, and the byte it used to be
@@ -497,17 +484,15 @@ func Test_KissRecByte_overlong_frame(t *testing.T) {
 func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 	setupKissProcessMsg(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
-	var overlong = append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, MAX_KISS_LEN+10)...)
+	var overlong = append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen+10)...)
 
 	var output = testutils.CaptureOutput(t, func() {
 		feedKissBytes(kf, 0, append(overlong, kiss.FEND))
 	})
 
 	assert.Contains(t, output, "KISS message exceeded maximum length.  Discarding it.")
-	assert.Equal(t, 0, kf.kiss_len)
-	assert.Equal(t, KS_SEARCHING, kf.state)
 	assert.Equal(t, 0, transmitQueue.Count(0, -1, "", "", false), "a fragment of the overlong frame was acted on")
 
 	// And a well formed frame after it still gets through.
@@ -527,7 +512,7 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
 		feedKissBytes(kf, 2, kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)))
@@ -535,57 +520,6 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 
 	assert.Contains(t, output, "<<< Data frame from KISS client application, channel 0")
 	assert.Contains(t, output, "Packet content after removing KISS framing")
-}
-
-// kissutil is a client, not a TNC, so a collector with OnMessage hands each
-// message over rather than trying to transmit it.
-func Test_KissRecByte_OnMessage(t *testing.T) {
-	setupKissProcessMsg(t)
-
-	var got []byte
-
-	var kf = new(KISSFrame)
-	kf.OnMessage = func(msg []byte) { got = msg }
-
-	feedKissBytes(kf, 0, kiss.Encapsulate([]byte{kiss.CmdDataFrame, 'h', 'i'}))
-
-	assert.Equal(t, []byte{kiss.CmdDataFrame, 'h', 'i'}, got)
-	assert.Equal(t, 0, transmitQueue.Count(0, -1, "", "", false), "kissutil should not be transmitting")
-}
-
-// What kissutil collects came from the TNC, so its debug output says so.
-func Test_KissRecByte_OnMessage_debug(t *testing.T) {
-	var kf = new(KISSFrame)
-	kf.OnMessage = func([]byte) {}
-
-	var output = testutils.CaptureOutput(t, func() {
-		feedKissBytes(kf, 1, kiss.Encapsulate([]byte{kiss.CmdDataFrame, 'h', 'i'}))
-	})
-
-	assert.Contains(t, output, "From KISS TNC:")
-	assert.NotContains(t, output, "KISS client application")
-}
-
-// kissutil has nothing to send with, and a TNC's banner, or one still in
-// command mode, puts lines of text outside any frame.  The command prompt a
-// TNC would answer with is not a client's to give, so the text is only
-// noise, and the frame after it still arrives.
-func Test_KissRecByte_noise_without_sendfun(t *testing.T) {
-	var got []byte
-
-	var kf = new(KISSFrame)
-	kf.OnMessage = func(msg []byte) { got = msg }
-
-	var data = append([]byte("cmd:\rRESTART\r"), kiss.Encapsulate([]byte{kiss.CmdDataFrame, 'h', 'i'})...)
-
-	var output = testutils.CaptureOutput(t, func() {
-		for _, b := range data {
-			KissRecByte(kf, nil, b, 1, nil, -1, nil)
-		}
-	})
-
-	assert.Contains(t, output, "RESTART.", "the noise is still shown under -v")
-	assert.Equal(t, []byte{kiss.CmdDataFrame, 'h', 'i'}, got)
 }
 
 // The per-client bookkeeping for KISS over TCP: a client's connection and the
