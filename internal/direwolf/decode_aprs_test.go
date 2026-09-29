@@ -42,11 +42,11 @@ func Test_decode_aprs_dao_does_not_invent_a_position(t *testing.T) {
 
 	var A = DecodeAPRS(pp, true, "")
 
-	assert.True(t, A.g_lon.IsNothing(), "longitude should still be unknown, got %v", A.g_lon)
+	assert.True(t, A.lon.IsNothing(), "longitude should still be unknown, got %v", A.lon)
 
 	// The latitude, which did decode, still gets its extra DAO digit:
 	// 42 degrees 37.14 minutes, plus 9 ten-thousandths of a minute.
-	var lat, ok = A.g_lat.Get()
+	var lat, ok = A.lat.Get()
 	assert.True(t, ok)
 	assert.InDelta(t, 42.619+9.0/60000.0, lat, 0.0000001)
 }
@@ -57,9 +57,9 @@ func Test_decode_aprs_dao_does_not_invent_a_position(t *testing.T) {
 func Test_decode_aprs_zero_value_has_no_position(t *testing.T) {
 	var A decodedAPRS
 
-	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
-	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
-	assert.Equal(t, maybe.Nothing[float64](), A.g_speed_mph)
+	assert.Equal(t, maybe.Nothing[float64](), A.lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.lon)
+	assert.Equal(t, maybe.Nothing[float64](), A.speedMPH)
 	assert.Equal(t, maybe.Nothing[int](), A.g_power)
 }
 
@@ -84,7 +84,7 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 		// Must not panic, and must still report the position.
 		var A = DecodeAPRS(pp, true, "")
 
-		var lat, ok = A.g_lat.Get()
+		var lat, ok = A.lat.Get()
 		assert.True(t, ok, "%s", info)
 		assert.InDelta(t, 49.0583333, lat, 0.0000001, "%s", info)
 	}
@@ -144,8 +144,8 @@ func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
 }
 
 // The wind direction and speed of a c000s000-form report are unknown, not
-// zero, when their fields are blanked out.  weather_data clears g_course and
-// g_speed_mph before it returns - the wind belongs on the weather line, not on
+// zero, when their fields are blanked out.  weather_data clears course and
+// speedMPH before it returns - the wind belongs on the weather line, not on
 // the location line - so the distinction has to be checked at getwdata.
 func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
@@ -192,7 +192,7 @@ func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
 	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "Item - name not ended by ! or _", A.g_data_type_desc)
 	assert.Equal(t, "Zb00000Zb00001", A.g_name)
-	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.lat)
 }
 
 // The name is meant to be 3 to 9 characters.  One that isn't was an assertion
@@ -207,7 +207,7 @@ func Test_decode_aprs_item_with_short_name(t *testing.T) {
 	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "Item", A.g_data_type_desc)
 	assert.Equal(t, "AB", A.g_name)
-	assert.Equal(t, maybe.Just(42.619), A.g_lat)
+	assert.Equal(t, maybe.Just(42.619), A.lat)
 }
 
 // An item that stops before its position has no position, rather than the
@@ -221,8 +221,8 @@ func Test_decode_aprs_item_without_position(t *testing.T) {
 	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "Item", A.g_data_type_desc)
 	assert.Equal(t, "ABCDE", A.g_name)
-	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
-	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
+	assert.Equal(t, maybe.Nothing[float64](), A.lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.lon)
 }
 
 // A Mic-E destination is really a latitude of six digits, but a lenient parse
@@ -237,8 +237,8 @@ func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
 	// Must not panic, and must not claim a position it never read.
 	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "MIC-E", A.g_data_type_desc)
-	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
-	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
+	assert.Equal(t, maybe.Nothing[float64](), A.lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.lon)
 }
 
 // A course and speed extension can be the whole of the information field,
@@ -251,8 +251,8 @@ func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
 
 	// Must not panic, and the course and speed still decode.
 	var A = DecodeAPRS(pp, true, "")
-	assert.Equal(t, maybe.Just(0.0), A.g_course)
-	assert.Equal(t, maybe.Just(0.0), A.g_speed_mph)
+	assert.Equal(t, maybe.Just(0.0), A.course)
+	assert.Equal(t, maybe.Just(0.0), A.speedMPH)
 	assert.Empty(t, A.g_comment)
 }
 
@@ -283,9 +283,9 @@ func Test_decode_aprs_general_query_footprint(t *testing.T) {
 	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "General Query", A.g_data_type_desc)
 	assert.Equal(t, "APRS", A.g_query_type)
-	assert.Equal(t, maybe.Just(42.3714), A.g_footprint_lat)
-	assert.Equal(t, maybe.Just(-71.2083), A.g_footprint_lon)
-	assert.Equal(t, maybe.Just(50.0), A.g_footprint_radius)
+	assert.Equal(t, maybe.Just(42.3714), A.footprintLat)
+	assert.Equal(t, maybe.Just(-71.2083), A.footprintLon)
+	assert.Equal(t, maybe.Just(50.0), A.footprintRadius)
 }
 
 // A general query whose footprint is not three comma-separated fields is
@@ -299,9 +299,9 @@ func Test_decode_aprs_general_query_short_footprint(t *testing.T) {
 	var A = DecodeAPRS(pp, true, "")
 	assert.Equal(t, "General Query", A.g_data_type_desc)
 	assert.Equal(t, "APRS", A.g_query_type)
-	assert.Equal(t, maybe.Nothing[float64](), A.g_footprint_lat)
-	assert.Equal(t, maybe.Nothing[float64](), A.g_footprint_lon)
-	assert.Equal(t, maybe.Nothing[float64](), A.g_footprint_radius)
+	assert.Equal(t, maybe.Nothing[float64](), A.footprintLat)
+	assert.Equal(t, maybe.Nothing[float64](), A.footprintLon)
+	assert.Equal(t, maybe.Nothing[float64](), A.footprintRadius)
 }
 
 // The APRS message branches used to index the message text without checking

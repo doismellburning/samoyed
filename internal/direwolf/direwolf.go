@@ -778,8 +778,8 @@ x = Silence FX.25 information.`)
 // degrees and knots encode_object takes, leaving an unknown one absent.
 // Should encode_object take floating point here?
 func ais_object_course_speed(A *decodedAPRS) (maybe.Maybe[int], maybe.Maybe[int]) {
-	var course = maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.g_course)
-	var speed = maybe.Fmap(func(mph float64) int { return int(DW_MPH_TO_KNOTS(mph) + 0.5) }, A.g_speed_mph)
+	var course = maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.course)
+	var speed = maybe.Fmap(func(mph float64) int { return int(DW_MPH_TO_KNOTS(mph) + 0.5) }, A.speedMPH)
 
 	return course, speed
 }
@@ -1049,15 +1049,15 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		if strings.HasPrefix(string(pinfo), user_def_da) {
 			waypointSender.SendAIS(pinfo[3:])
 
-			var lat, haveLat = A.g_lat.Get()
-			var lon, haveLon = A.g_lon.Get()
+			var lat, haveLat = A.lat.Get()
+			var lon, haveLon = A.lon.Get()
 
 			if A_opt_ais_to_obj && haveLat && haveLon {
 				var course, speed = ais_object_course_speed(A)
 
 				var ais_obj_info = encode_object(A.g_name, false, time.Now(),
 					lat, lon, 0, // no ambiguity
-					A.g_symbol_table, A.g_symbol_code,
+					A.symbolTable, A.symbolCode,
 					maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // power, height, gain, direction.
 					course, speed,
 					maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), // freq, tone, offset
@@ -1077,16 +1077,16 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		// Convert to NMEA waypoint sentence if we have a location.
 
-		if lat, haveLat := A.g_lat.Get(); haveLat {
-			if lon, haveLon := A.g_lon.Get(); haveLon {
+		if lat, haveLat := A.lat.Get(); haveLat {
+			if lon, haveLon := A.lon.Get(); haveLon {
 				var nameIn = A.g_src
 				if len(A.g_name) > 0 {
 					nameIn = A.g_name
 				}
 
 				waypointSender.SendSentence(nameIn,
-					lat, lon, rune(A.g_symbol_table), A.g_symbol_code,
-					maybe.Fmap(DW_FEET_TO_METERS, A.g_altitude_ft), A.g_course, maybe.Fmap(DW_MPH_TO_KNOTS, A.g_speed_mph),
+					lat, lon, rune(A.symbolTable), A.symbolCode,
+					maybe.Fmap(DW_FEET_TO_METERS, A.altitudeFt), A.course, maybe.Fmap(DW_MPH_TO_KNOTS, A.speedMPH),
 					A.g_comment)
 			}
 		}
@@ -1284,5 +1284,5 @@ func mheardPosition(A *decodedAPRS) (maybe.Maybe[float64], maybe.Maybe[float64])
 		return maybe.Nothing[float64](), maybe.Nothing[float64]()
 	}
 
-	return A.g_lat, A.g_lon
+	return A.lat, A.lon
 }

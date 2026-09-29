@@ -51,9 +51,9 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 
 	var A = DecodeAPRS(pp, true, "")
 
-	require.True(t, A.g_lat.IsJust(), "position should have decoded")
-	assert.True(t, A.g_course.IsNothing(), "course should be unknown, got %v", A.g_course)
-	assert.True(t, A.g_speed_mph.IsNothing(), "speed should be unknown, got %v", A.g_speed_mph)
+	require.True(t, A.lat.IsJust(), "position should have decoded")
+	assert.True(t, A.course.IsNothing(), "course should be unknown, got %v", A.course)
+	assert.True(t, A.speedMPH.IsNothing(), "speed should be unknown, got %v", A.speedMPH)
 
 	var course, speed = ais_object_course_speed(A)
 	assert.True(t, course.IsNothing(), "course should be unknown, got %v", course)
@@ -154,7 +154,7 @@ func TestMheardPosition(t *testing.T) {
 	assert.True(t, lon.IsJust())
 
 	var object = DecodeAPRS(ax25.FromText("Q1TEST>APDW17:;OBJECT   *111111z4237.14N/07120.83W#", true), true, "")
-	require.True(t, object.g_lat.IsJust(), "the object report should carry a location to ignore")
+	require.True(t, object.lat.IsJust(), "the object report should carry a location to ignore")
 
 	lat, lon = mheardPosition(object)
 	assert.Equal(t, maybe.Nothing[float64](), lat)

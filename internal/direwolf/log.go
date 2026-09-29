@@ -264,7 +264,7 @@ func (pl *PacketLogger) Write(channel int, A *decodedAPRS, pp *ax25.Packet, alev
 			sname = A.g_name
 		}
 
-		var ssymbol = string(rune(A.g_symbol_table)) + string(rune(A.g_symbol_code))
+		var ssymbol = string(rune(A.symbolTable)) + string(rune(A.symbolCode))
 
 		var smfr = A.g_mfr
 		var sstatus = A.g_mic_e_status
@@ -272,27 +272,27 @@ func (pl *PacketLogger) Write(channel int, A *decodedAPRS, pp *ax25.Packet, alev
 		var scomment = A.g_comment
 
 		var slat = ""
-		if lat, ok := A.g_lat.Get(); ok {
+		if lat, ok := A.lat.Get(); ok {
 			slat = fmt.Sprintf("%.6f", lat)
 		}
 
 		var slon = ""
-		if lon, ok := A.g_lon.Get(); ok {
+		if lon, ok := A.lon.Get(); ok {
 			slon = fmt.Sprintf("%.6f", lon)
 		}
 
 		var sspd = ""
-		if speed_mph, ok := A.g_speed_mph.Get(); ok {
+		if speed_mph, ok := A.speedMPH.Get(); ok {
 			sspd = fmt.Sprintf("%.1f", DW_MPH_TO_KNOTS(speed_mph))
 		}
 
 		var scse = ""
-		if course, ok := A.g_course.Get(); ok {
+		if course, ok := A.course.Get(); ok {
 			scse = fmt.Sprintf("%.1f", course)
 		}
 
 		var salt = ""
-		if altitude_ft, ok := A.g_altitude_ft.Get(); ok {
+		if altitude_ft, ok := A.altitudeFt.Get(); ok {
 			salt = fmt.Sprintf("%.1f", DW_FEET_TO_METERS(altitude_ft))
 		}
 

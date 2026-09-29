@@ -123,9 +123,9 @@ type pfstate_t struct {
 	 * Packet split into separate parts if APRS.
 	 * Most interesting fields are:
 	 *
-	 *		g_symbol_table	- / \ or overlay
-	 *		g_symbol_code
-	 *		g_lat, g_lon	- Location
+	 *		symbolTable	- / \ or overlay
+	 *		symbolCode
+	 *		lat, lon	- Location
 	 *		g_name		- for object or item
 	 *		g_comment
 	 */
@@ -670,12 +670,12 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		if pf.debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 
-			if pf.decoded.g_symbol_table == '/' { //nolint:staticcheck
-				dw_printf("   %s returns %s for symbol %c in primary table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code)
-			} else if pf.decoded.g_symbol_table == '\\' {
-				dw_printf("   %s returns %s for symbol %c in alternate table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code)
+			if pf.decoded.symbolTable == '/' { //nolint:staticcheck
+				dw_printf("   %s returns %s for symbol %c in primary table\n", pf.token_str, bool2text(result), pf.decoded.symbolCode)
+			} else if pf.decoded.symbolTable == '\\' {
+				dw_printf("   %s returns %s for symbol %c in alternate table\n", pf.token_str, bool2text(result), pf.decoded.symbolCode)
 			} else {
-				dw_printf("   %s returns %s for symbol %c with overlay %c\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code, pf.decoded.g_symbol_table)
+				dw_printf("   %s returns %s for symbol %c with overlay %c\n", pf.token_str, bool2text(result), pf.decoded.symbolCode, pf.decoded.symbolTable)
 			}
 		}
 	} else if pf.token_str[0] == 'i' && unicode.IsPunct(rune(pf.token_str[1])) {
@@ -859,7 +859,7 @@ func filt_t(pf *pfstate_t) (int, error) {
 			// Can't use *infop because it would not work with 3rd party header.
 
 			if (pf.decoded.g_packet_type == packetTypePosition ||
-				pf.decoded.g_packet_type == packetTypeObject) && pf.decoded.g_symbol_code == '_' {
+				pf.decoded.g_packet_type == packetTypeObject) && pf.decoded.symbolCode == '_' {
 				return 1, nil
 			}
 
@@ -889,7 +889,7 @@ func filt_t(pf *pfstate_t) (int, error) {
  *
  *			  We also need to know the location (if any) from the packet.
  *
- *				decoded.g_lat & decoded.g_lon
+ *				decoded.lat & decoded.lon
  *
  * Returns:	 1 = yes
  *		 0 = no
@@ -903,8 +903,8 @@ func filt_t(pf *pfstate_t) (int, error) {
  *------------------------------------------------------------------------------*/
 
 func filt_r(pf *pfstate_t) (int, string, error) {
-	var dlat_decoded, haveLat = pf.decoded.g_lat.Get()
-	var dlon_decoded, haveLon = pf.decoded.g_lon.Get()
+	var dlat_decoded, haveLat = pf.decoded.lat.Get()
+	var dlon_decoded, haveLon = pf.decoded.lon.Get()
 
 	if !haveLat || !haveLon {
 		return 0, "", nil
@@ -1086,15 +1086,15 @@ func filt_s(pf *pfstate_t) (int, error) {
 	// This applies only for Position, Object, Item.
 	// DecodeAPRS() should set symbol code to space to mean undefined.
 
-	if pf.decoded.g_symbol_code == ' ' {
+	if pf.decoded.symbolCode == ' ' {
 		return 0, nil
 	}
 
 	// Look for Primary symbols.
 
-	if pf.decoded.g_symbol_table == '/' {
+	if pf.decoded.symbolTable == '/' {
 		if len(pri) > 0 {
-			if strings.Contains(pri, string(rune(pf.decoded.g_symbol_code))) {
+			if strings.Contains(pri, string(rune(pf.decoded.symbolCode))) {
 				return 1, nil
 			} else {
 				return 0, nil
@@ -1106,18 +1106,18 @@ func filt_s(pf *pfstate_t) (int, error) {
 		return 0, nil
 	}
 
-	//printf ("alt=\"%s\"  sym='%c'\n", alt, pf.decoded.g_symbol_code);
+	//printf ("alt=\"%s\"  sym='%c'\n", alt, pf.decoded.symbolCode);
 
 	// Look for Alternate symbols.
 
-	if strings.Contains(alt, string(rune(pf.decoded.g_symbol_code))) {
+	if strings.Contains(alt, string(rune(pf.decoded.symbolCode))) {
 		// We have a match but that might not be enough.
 		// We must see if there was an overlay part specified.
 		if len(parts) > 2 {
 			if len(over) > 0 {
 				// Non-zero length overlay part was specified.
 				// Need to match one of them.
-				if strings.Contains(over, string(rune(pf.decoded.g_symbol_table))) {
+				if strings.Contains(over, string(rune(pf.decoded.symbolTable))) {
 					return 1, nil
 				} else {
 					return 0, nil
@@ -1125,7 +1125,7 @@ func filt_s(pf *pfstate_t) (int, error) {
 			} else {
 				// Zero length overlay part was specified.
 				// We must have no overlay, i.e.  table is \.
-				if pf.decoded.g_symbol_table == '\\' {
+				if pf.decoded.symbolTable == '\\' {
 					return 1, nil
 				} else {
 					return 0, nil
@@ -1133,7 +1133,7 @@ func filt_s(pf *pfstate_t) (int, error) {
 			}
 		} else {
 			// No check of overlay part.  Just make sure it is not primary table.
-			if pf.decoded.g_symbol_table != '/' {
+			if pf.decoded.symbolTable != '/' {
 				return 1, nil
 			} else {
 				return 0, nil

@@ -80,7 +80,7 @@ type decodedAPRS struct {
 
 	g_data_type_desc string /* APRS data type description.  Telemetry descriptions get pretty long. */
 
-	g_symbol_table byte /* The Symbol Table Identifier character selects one */
+	symbolTable byte /* The Symbol Table Identifier character selects one */
 	/* of the two Symbol Tables, or it may be used as */
 	/* single-character (alpha or numeric) overlay, as follows: */
 
@@ -97,18 +97,18 @@ type decodedAPRS struct {
 
 	/*	A-Z	Alpha overlay. Symbol from Alternate Symbol Table */
 
-	g_symbol_code byte /* Where the Symbol Table Identifier is 0-9 or A-Z (or a-j */
+	symbolCode byte /* Where the Symbol Table Identifier is 0-9 or A-Z (or a-j */
 	/* with compressed position data only), the symbol comes from */
 	/* the Alternate Symbol Table, and is overlaid with the */
 	/* identifier (as a single digit or a capital letter). */
 
-	g_aprstt_loc string /* APRStt location from !DAO! */
+	aprsttLoc string /* APRStt location from !DAO! */
 
-	g_lat maybe.Maybe[float64]
-	g_lon maybe.Maybe[float64] /* Location, degrees.  Negative for South or West. */
+	lat maybe.Maybe[float64]
+	lon maybe.Maybe[float64] /* Location, degrees.  Negative for South or West. */
 	/* Nothing if missing or error. */
 
-	g_maidenhead string /* 4 or 6 (or 8?) character maidenhead locator. */
+	maidenhead string /* 4 or 6 (or 8?) character maidenhead locator. */
 
 	g_name string /* Object or item name. Max. 9 characters. */
 
@@ -127,11 +127,11 @@ type decodedAPRS struct {
 	/* Addendum 1.1 has new format {mm} or {mm}aa with only two */
 	/* characters for message number and an ack riding piggyback. */
 
-	g_speed_mph maybe.Maybe[float64] /* Speed in MPH.  */
+	speedMPH maybe.Maybe[float64] /* Speed in MPH.  */
 	/* The APRS transmission uses knots so watch out for */
 	/* conversions when sending and receiving APRS packets. */
 
-	g_course maybe.Maybe[float64] /* 0 = North, 90 = East, etc. */
+	course maybe.Maybe[float64] /* 0 = North, 90 = East, etc. */
 
 	g_power maybe.Maybe[int] /* Transmitter power in watts. */
 
@@ -144,7 +144,7 @@ type decodedAPRS struct {
 
 	g_range maybe.Maybe[float64] /* Precomputed radio range in miles. */
 
-	g_altitude_ft maybe.Maybe[float64] /* Feet above median sea level.  */
+	altitudeFt maybe.Maybe[float64] /* Feet above median sea level.  */
 	/* I used feet here because the APRS specification */
 	/* has units of feet for altitude.  Meters would be */
 	/* more natural to the other 96% of the world. */
@@ -168,9 +168,9 @@ type decodedAPRS struct {
 	/* APRSD, APRST, PING?, ... */
 	/* Addressee is set. */
 
-	g_footprint_lat    maybe.Maybe[float64] /* A general query may contain a foot print. */
-	g_footprint_lon    maybe.Maybe[float64] /* All Nothing if not used. */
-	g_footprint_radius maybe.Maybe[float64] /* Radius in miles. */
+	footprintLat    maybe.Maybe[float64] /* A general query may contain a foot print. */
+	footprintLon    maybe.Maybe[float64] /* All Nothing if not used. */
+	footprintRadius maybe.Maybe[float64] /* Radius in miles. */
 
 	g_weather string /* Weather */
 
@@ -215,9 +215,9 @@ func DecodeAPRSInit() {
  *			that came via APRS-IS.
  *			nil when not third party payload.
  *
- * Outputs:	A.	g_symbol_table, g_symbol_code,
- *			g_lat, g_lon,
- *			g_speed_mph, g_course, g_altitude_ft,
+ * Outputs:	A.	symbolTable, symbolCode,
+ *			lat, lon,
+ *			speedMPH, course, altitudeFt,
  *			g_comment
  *			... and many others...
  *
@@ -233,8 +233,8 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPR
 
 	A.g_quiet = quiet
 
-	A.g_symbol_table = '/' /* Default to primary table. */
-	A.g_symbol_code = ' '  /* What should we have for default symbol? */
+	A.symbolTable = '/' /* Default to primary table. */
+	A.symbolCode = ' '  /* What should we have for default symbol? */
 
 	/* Everything optional - position, speed, course, power, ... - starts out */
 	/* as Nothing, which is the zero value, so there is nothing to clear here. */
@@ -486,7 +486,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPR
 	 *		protocol spec, end of Chapter 20.
 	 */
 
-	if A.g_symbol_table == ' ' || A.g_symbol_code == ' ' {
+	if A.symbolTable == ' ' || A.symbolCode == ' ' {
 		// A symbol on a "message" makes no sense and confuses people.
 		// Third party too.  Set from the payload.
 		// Maybe eliminate for a couple others.
@@ -495,8 +495,8 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPR
 			if aprsSymbolData != nil { // TODO KG Consider some sort of debug message on an else?
 				var symtab, symbol, ok = aprsSymbolData.FromDestOrSrc(pinfo[0], A.g_src, A.g_dest)
 				if ok {
-					A.g_symbol_table = symtab
-					A.g_symbol_code = symbol
+					A.symbolTable = symtab
+					A.symbolCode = symbol
 				}
 			}
 		}
@@ -523,9 +523,9 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 		stemp += "\""
 	}
 
-	if A.g_symbol_code != ' ' {
+	if A.symbolCode != ' ' {
 		if aprsSymbolData != nil {
-			var symbol_description = aprsSymbolData.Description(A.g_symbol_table, A.g_symbol_code)
+			var symbol_description = aprsSymbolData.Description(A.symbolTable, A.symbolCode)
 
 			stemp += ", "
 			stemp += symbol_description
@@ -591,28 +591,28 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 	 * http://www.amsat.org/cgi-bin/gridconv
 	 */
 
-	if len(A.g_maidenhead) > 0 {
-		if A.g_lat.IsNothing() && A.g_lon.IsNothing() {
-			var lat, lon, err = latlong.FromGridSquare(A.g_maidenhead)
+	if len(A.maidenhead) > 0 {
+		if A.lat.IsNothing() && A.lon.IsNothing() {
+			var lat, lon, err = latlong.FromGridSquare(A.maidenhead)
 			if err == nil {
-				A.g_lat = maybe.Just(lat)
-				A.g_lon = maybe.Just(lon)
+				A.lat = maybe.Just(lat)
+				A.lon = maybe.Just(lon)
 			} else if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%v\n", err)
 			}
 		}
 
-		dw_printf("Grid square = %s, ", A.g_maidenhead)
+		dw_printf("Grid square = %s, ", A.maidenhead)
 	}
 
 	stemp = ""
 
-	if A.g_lat.IsJust() || A.g_lon.IsJust() {
+	if A.lat.IsJust() || A.lon.IsJust() {
 		var s_lat, s_lon string
 		// Have location but it is possible one part is invalid.
 
-		if lat, ok := A.g_lat.Get(); ok {
+		if lat, ok := A.lat.Get(); ok {
 			var absll float64
 			var news rune
 
@@ -630,7 +630,7 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 			s_lat = "Invalid Latitude"
 		}
 
-		if lon, ok := A.g_lon.Get(); ok {
+		if lon, ok := A.lon.Get(); ok {
 			var absll float64
 			var news rune
 
@@ -651,15 +651,15 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 		stemp = fmt.Sprintf("%s, %s", s_lat, s_lon)
 	}
 
-	if len(A.g_aprstt_loc) > 0 {
+	if len(A.aprsttLoc) > 0 {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
 
-		stemp += A.g_aprstt_loc
+		stemp += A.aprsttLoc
 	}
 
-	if speed_mph, ok := A.g_speed_mph.Get(); ok {
+	if speed_mph, ok := A.speedMPH.Get(); ok {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
@@ -667,7 +667,7 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 		stemp += fmt.Sprintf("%.0f km/h (%.0f MPH)", DW_MILES_TO_KM(speed_mph), speed_mph)
 	}
 
-	if course, ok := A.g_course.Get(); ok {
+	if course, ok := A.course.Get(); ok {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
@@ -675,7 +675,7 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 		stemp += fmt.Sprintf("course %.0f", course)
 	}
 
-	if altitude_ft, ok := A.g_altitude_ft.Get(); ok {
+	if altitude_ft, ok := A.altitudeFt.Get(); ok {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
@@ -798,7 +798,7 @@ func DecodeAPRSPrint(A *decodedAPRS) {
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.g_lat, A.g_lon, A.g_symbol_table, A.g_symbol_code, A.g_speed_mph, A.g_course, A.g_altitude_ft.
+ * Outputs:	A.lat, A.lon, A.symbolTable, A.symbolCode, A.speedMPH, A.course, A.altitudeFt.
  *
  * Description:	Type identifier '=' has APRS messaging.
  *		Type identifier '!' does not have APRS messaging.
@@ -838,7 +838,7 @@ func aprs_ll_pos(A *decodedAPRS, info []byte) {
 	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
 		decode_position(A, &(p.Pos))
 
-		if A.g_symbol_code == '_' {
+		if A.symbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
@@ -876,7 +876,7 @@ func aprs_ll_pos(A *decodedAPRS, info []byte) {
 	} else { /* Compressed location. */
 		decode_compressed_position(A, &(q.CPos))
 
-		if A.g_symbol_code == '_' {
+		if A.symbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* In this case, the wind direction and speed are in the */
 			/* compressed data so we don't expect a 7 byte "data */
@@ -902,7 +902,7 @@ func aprs_ll_pos(A *decodedAPRS, info []byte) {
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.g_lat, A.g_lon, A.g_symbol_table, A.g_symbol_code, A.g_speed_mph, A.g_course, A.g_altitude_ft.
+ * Outputs:	A.lat, A.lon, A.symbolTable, A.symbolCode, A.speedMPH, A.course, A.altitudeFt.
  *
  * Description:	Type identifier '@' has APRS messaging.
  *		Type identifier '/' does not have APRS messaging.
@@ -949,7 +949,7 @@ func aprs_ll_pos_time(A *decodedAPRS, info []byte) {
 	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
 		decode_position(A, &(p.Pos))
 
-		if A.g_symbol_code == '_' {
+		if A.symbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
@@ -962,7 +962,7 @@ func aprs_ll_pos_time(A *decodedAPRS, info []byte) {
 	} else { /* Compressed location. */
 		decode_compressed_position(A, &(q.CPos))
 
-		if A.g_symbol_code == '_' {
+		if A.symbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* In this case, the wind direction and speed are in the */
 			/* compressed data so we don't expect a 7 byte "data */
@@ -1011,18 +1011,18 @@ func aprs_raw_nmea(A *decodedAPRS, info []byte) {
 		bytes.HasPrefix(info, []byte("$GNRMC,")) {
 		var result = dwgps.ParseGPRMC(string(info), A.g_quiet)
 
-		A.g_lat = result.Lat
-		A.g_lon = result.Lon
-		A.g_course = result.Course
-		A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, result.Knots)
+		A.lat = result.Lat
+		A.lon = result.Lon
+		A.course = result.Course
+		A.speedMPH = maybe.Fmap(DW_KNOTS_TO_MPH, result.Knots)
 		A.g_data_type_desc = "Raw GPS data"
 	} else if bytes.HasPrefix(info, []byte("$GPGGA,")) ||
 		bytes.HasPrefix(info, []byte("$GNGGA,")) {
 		var result = dwgps.ParseGPGGA(string(info), A.g_quiet)
 
-		A.g_lat = result.Lat
-		A.g_lon = result.Lon
-		A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, result.Alt)
+		A.lat = result.Lat
+		A.lon = result.Lon
+		A.altitudeFt = maybe.Fmap(DW_METERS_TO_FEET, result.Alt)
 		A.g_data_type_desc = "Raw GPS data"
 	}
 
@@ -1336,7 +1336,7 @@ func aprs_mic_e(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		}
 	}
 
-	A.g_lat = maybe.Just(lat)
+	A.lat = maybe.Just(lat)
 
 	/* Longitude is mostly packed into 3 bytes of message but */
 	/* has a couple bits of information in the destination. */
@@ -1449,19 +1449,19 @@ func aprs_mic_e(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		}
 	}
 
-	A.g_lon = lon
+	A.lon = lon
 
 	/* Symbol table and codes like everyone else. */
 
-	A.g_symbol_table = p.SymTableId
-	A.g_symbol_code = p.SymbolCode
+	A.symbolTable = p.SymTableId
+	A.symbolCode = p.SymbolCode
 
-	if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
+	if A.symbolTable != '/' && A.symbolTable != '\\' && !unicode.IsUpper(rune(A.symbolTable)) && !unicode.IsDigit(rune(A.symbolTable)) {
 		if !A.g_quiet {
-			logrus.WithField("symbol_table", string(rune(A.g_symbol_table))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
+			logrus.WithField("symbol_table", string(rune(A.symbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 		}
 
-		A.g_symbol_table = '/'
+		A.symbolTable = '/'
 	}
 
 	/* Message type from two 3-bit codes. */
@@ -1486,7 +1486,7 @@ func aprs_mic_e(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		n -= 800
 	}
 
-	A.g_speed_mph = maybe.Just(DW_KNOTS_TO_MPH(float64(n)))
+	A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(float64(n)))
 
 	n = int((p.SpeedCourse[1]-28)%10)*100 + int(p.SpeedCourse[2]-28)
 	if n >= 400 {
@@ -1498,11 +1498,11 @@ func aprs_mic_e(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 
 	switch n {
 	case 0:
-		A.g_course = maybe.Nothing[float64]()
+		A.course = maybe.Nothing[float64]()
 	case 360:
-		A.g_course = maybe.Just(0.0)
+		A.course = maybe.Just(0.0)
 	default:
-		A.g_course = maybe.Just(float64(n))
+		A.course = maybe.Just(float64(n))
 	}
 
 	// The rest is a comment which can have other information cryptically embedded.
@@ -1545,7 +1545,7 @@ func aprs_mic_e(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		isdigit91(trimmed[1]) &&
 		isdigit91(trimmed[2]) &&
 		trimmed[3] == '}' {
-		A.g_altitude_ft = maybe.Just(DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
+		A.altitudeFt = maybe.Just(DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
 
 		process_comment(A, []byte(trimmed)[4:])
 
@@ -1890,7 +1890,7 @@ func aprs_message(A *decodedAPRS, info []byte, quiet bool) {
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.g_object_name, A.g_lat, A.g_lon, A.g_symbol_table, A.g_symbol_code, A.g_speed_mph, A.g_course, A.g_altitude_ft.
+ * Outputs:	A.g_object_name, A.lat, A.lon, A.symbolTable, A.symbolCode, A.speedMPH, A.course, A.altitudeFt.
  *
  * Description:	Message has a 9 character object name which could be quite different than
  *		the source station.
@@ -1946,7 +1946,7 @@ func aprs_object(A *decodedAPRS, info []byte) {
 	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
 		decode_position(A, &(p.Pos))
 
-		if A.g_symbol_code == '_' {
+		if A.symbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
@@ -1959,7 +1959,7 @@ func aprs_object(A *decodedAPRS, info []byte) {
 	} else { /* Compressed location. */
 		decode_compressed_position(A, &(q.CPos))
 
-		if A.g_symbol_code == '_' {
+		if A.symbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* The spec doesn't explicitly mention the combination */
 			/* of weather report and object with compressed */
@@ -1981,7 +1981,7 @@ func aprs_object(A *decodedAPRS, info []byte) {
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.g_object_name, A.g_lat, A.g_lon, A.g_symbol_table, A.g_symbol_code, A.g_speed_mph, A.g_course, A.g_altitude_ft.
+ * Outputs:	A.g_object_name, A.lat, A.lon, A.symbolTable, A.symbolCode, A.speedMPH, A.course, A.altitudeFt.
  *
  * Description:	An "item" is very much like an "object" except
  *
@@ -2207,17 +2207,17 @@ func aprs_status_report(A *decodedAPRS, info []byte) {
 		/*
 		 * Do we have format with 6 character Maidenhead locator?
 		 */
-		A.g_maidenhead = string(pm6.Mhead6[:])
+		A.maidenhead = string(pm6.Mhead6[:])
 
-		A.g_symbol_table = pm6.SymTableId
-		A.g_symbol_code = pm6.SymbolCode
+		A.symbolTable = pm6.SymTableId
+		A.symbolCode = pm6.SymbolCode
 
-		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
+		if A.symbolTable != '/' && A.symbolTable != '\\' && !unicode.IsUpper(rune(A.symbolTable)) && !unicode.IsDigit(rune(A.symbolTable)) {
 			if !A.g_quiet {
-				logrus.WithField("symbol_table", string(rune(A.g_symbol_table))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
+				logrus.WithField("symbol_table", string(rune(A.symbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 			}
 
-			A.g_symbol_table = '/'
+			A.symbolTable = '/'
 		}
 
 		if pm6.Space != ' ' && pm6.Space != 0 {
@@ -2234,17 +2234,17 @@ func aprs_status_report(A *decodedAPRS, info []byte) {
 		/*
 		 * Do we have format with 4 character Maidenhead locator?
 		 */
-		A.g_maidenhead = string(pm4.Mhead4[:])
+		A.maidenhead = string(pm4.Mhead4[:])
 
-		A.g_symbol_table = pm4.SymTableId
-		A.g_symbol_code = pm4.SymbolCode
+		A.symbolTable = pm4.SymTableId
+		A.symbolCode = pm4.SymbolCode
 
-		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
+		if A.symbolTable != '/' && A.symbolTable != '\\' && !unicode.IsUpper(rune(A.symbolTable)) && !unicode.IsDigit(rune(A.symbolTable)) {
 			if !A.g_quiet {
-				logrus.WithField("symbol_table", string(rune(A.g_symbol_table))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
+				logrus.WithField("symbol_table", string(rune(A.symbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 			}
 
-			A.g_symbol_table = '/'
+			A.symbolTable = '/'
 		}
 
 		if pm4.Space != ' ' && pm4.Space != 0 {
@@ -2307,9 +2307,9 @@ func aprs_status_report(A *decodedAPRS, info []byte) {
  *
  * Outputs:	A	- Decoded packet structure
  *				A.g_query_type
- *				A.g_footprint_lat	(optional)
- *				A.g_footprint_lon	(optional)
- *				A.g_footprint_radius	(optional)
+ *				A.footprintLat	(optional)
+ *				A.footprintLon	(optional)
+ *				A.footprintRadius	(optional)
  *
  * Description:	Formats are:
  *
@@ -2409,9 +2409,9 @@ func aprs_general_query(A *decodedAPRS, info []byte) {
 			"radius": radius,
 		}).Debug("General Query footprint")
 
-		A.g_footprint_lat = maybe.Just(lat)
-		A.g_footprint_lon = maybe.Just(lon)
-		A.g_footprint_radius = maybe.Just(radius)
+		A.footprintLat = maybe.Just(lat)
+		A.footprintLon = maybe.Just(lon)
+		A.footprintRadius = maybe.Just(radius)
 	} else {
 		if !A.g_quiet {
 			logrus.WithField("footprint", string(after)).Warn("Can't parse latitude,longitude,radius for General Query footprint")
@@ -2550,13 +2550,13 @@ func aprs_user_defined(A *decodedAPRS, info []byte) {
 
 		A.g_data_type_desc = aisData.Description
 		A.g_name = aisData.MMSI
-		A.g_lat = aisData.Lat
-		A.g_lon = aisData.Lon
-		A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, aisData.Knots)
-		A.g_course = aisData.Course
-		A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, aisData.AltM)
-		A.g_symbol_table = aisData.Symtab
-		A.g_symbol_code = aisData.Symbol
+		A.lat = aisData.Lat
+		A.lon = aisData.Lon
+		A.speedMPH = maybe.Fmap(DW_KNOTS_TO_MPH, aisData.Knots)
+		A.course = aisData.Course
+		A.altitudeFt = maybe.Fmap(DW_METERS_TO_FEET, aisData.AltM)
+		A.symbolTable = aisData.Symtab
+		A.symbolCode = aisData.Symbol
 		A.g_comment = aisData.Comment
 
 		A.g_mfr = ""
@@ -2627,7 +2627,7 @@ func aprs_morse_code(A *decodedAPRS, info []byte) {
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.g_symbol_table, A.g_symbol_code.
+ * Outputs:	A.symbolTable, A.symbolCode.
  *
  * Description:	Type identifier '_' is a weather report without a position.
  *
@@ -2662,8 +2662,8 @@ func aprs_positionless_weather_report(A *decodedAPRS, info []byte) {
  * Inputs:	info 	- Pointer to first byte after location
  *			  and symbol code.
  *
- * Global In:	A.g_course	- Wind info for compressed location.
- *		A.g_speed_mph
+ * Global In:	A.course	- Wind info for compressed location.
+ *		A.speedMPH
  *
  * Outputs:	A.g_weather
  *
@@ -2672,7 +2672,7 @@ func aprs_positionless_weather_report(A *decodedAPRS, info []byte) {
  *		For human-readable locations, we expect wind direction
  *		and speed in a format like this:  999/999.
  *		For compressed location, this has already been
- * 		processed and put in A.g_course and A.g_speed_mph.
+ * 		processed and put in A.course and A.speedMPH.
  *		Otherwise, for positionless weather data, the
  *		wind is in the form c999s999.
  *
@@ -2743,24 +2743,24 @@ func weather_data(A *decodedAPRS, wdata []byte) {
 			// Fine point:  Officially, should be values of 001-360.
 			// "000" or "..." or "   " means unknown.
 			// In practice we see do see "000" here.
-			A.g_course = maybe.Just(float64(n))
+			A.course = maybe.Just(float64(n))
 		}
 
 		count, _ = fmt.Sscanf(string(wp[4:7]), "%3d", &n)
 		if count > 0 {
-			A.g_speed_mph = maybe.Just(DW_KNOTS_TO_MPH(float64(n))) /* yes, in knots */
+			A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(float64(n))) /* yes, in knots */
 		}
 
 		wp = wp[7:]
-	} else if A.g_speed_mph.IsNothing() {
-		A.g_course, wp, found = getwdata(wp, 'c', 3)
+	} else if A.speedMPH.IsNothing() {
+		A.course, wp, found = getwdata(wp, 'c', 3)
 		if !found {
 			if !A.g_quiet {
 				logrus.Warn("Didn't find wind direction in form c999")
 			}
 		}
 
-		A.g_speed_mph, wp, found = getwdata(wp, 's', 3) /* MPH here */
+		A.speedMPH, wp, found = getwdata(wp, 's', 3) /* MPH here */
 		if !found {
 			if !A.g_quiet {
 				logrus.Warn("Didn't find wind speed in form s999")
@@ -2771,16 +2771,16 @@ func weather_data(A *decodedAPRS, wdata []byte) {
 	// At this point, we should have the wind direction and speed
 	// from one of three methods.
 
-	if speed_mph, ok := A.g_speed_mph.Get(); ok {
+	if speed_mph, ok := A.speedMPH.Get(); ok {
 		A.g_weather = fmt.Sprintf("wind %.1f mph", speed_mph)
-		if course, ok := A.g_course.Get(); ok {
+		if course, ok := A.course.Get(); ok {
 			A.g_weather += fmt.Sprintf(", direction %.0f", course)
 		}
 	}
 
 	/* We don't want this to show up on the location line. */
-	A.g_speed_mph = maybe.Nothing[float64]()
-	A.g_course = maybe.Nothing[float64]()
+	A.speedMPH = maybe.Nothing[float64]()
+	A.course = maybe.Nothing[float64]()
 
 	/*
 	 * After the mandatory wind direction and speed (in 1 of 3 formats), the
@@ -3085,10 +3085,10 @@ func aprs_ultimeter(A *decodedAPRS, info []byte) {
  *
  * Inputs:	ppos 	- Pointer to position & symbol fields.
  *
- * Returns:	A.g_lat
- *		A.g_lon
- *		A.g_symbol_table
- *		A.g_symbol_code
+ * Returns:	A.lat
+ *		A.lon
+ *		A.symbolTable
+ *		A.symbolCode
  *
  * Description:	This provides resolution of about 60 feet.
  *		This can be improved by using !DAO! in the comment.
@@ -3096,11 +3096,11 @@ func aprs_ultimeter(A *decodedAPRS, info []byte) {
  *------------------------------------------------------------------*/
 
 func decode_position(A *decodedAPRS, ppos *position_t) {
-	A.g_lat = get_latitude_8(ppos.Lat, A.g_quiet)
-	A.g_lon = get_longitude_9(ppos.Lon, A.g_quiet)
+	A.lat = get_latitude_8(ppos.Lat, A.g_quiet)
+	A.lon = get_longitude_9(ppos.Lon, A.g_quiet)
 
-	A.g_symbol_table = ppos.SymTableId
-	A.g_symbol_code = ppos.SymbolCode
+	A.symbolTable = ppos.SymTableId
+	A.symbolCode = ppos.SymbolCode
 }
 
 /*------------------------------------------------------------------
@@ -3111,14 +3111,14 @@ func decode_position(A *decodedAPRS, ppos *position_t) {
  *
  * Inputs:	ppos 	- Pointer to compressed position & symbol fields.
  *
- * Returns:	A.g_lat
- *		A.g_lon
- *		A.g_symbol_table
- *		A.g_symbol_code
+ * Returns:	A.lat
+ *		A.lon
+ *		A.symbolTable
+ *		A.symbolCode
  *
  *		One of the following:
- *			A.g_course & A.g_speeed
- *			A.g_altitude_ft
+ *			A.course & A.g_speeed
+ *			A.altitudeFt
  *			A.g_range
  *
  * Description:	The compressed position provides resolution of around ???
@@ -3142,52 +3142,52 @@ func decode_position(A *decodedAPRS, ppos *position_t) {
 
 func decode_compressed_position(A *decodedAPRS, pcpos *compressed_position_t) {
 	if isdigit91(pcpos.Y[0]) && isdigit91(pcpos.Y[1]) && isdigit91(pcpos.Y[2]) && isdigit91(pcpos.Y[3]) {
-		A.g_lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
+		A.lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
 	} else {
 		if !A.g_quiet {
 			logrus.WithField("latitude", string(pcpos.Y[:])).Warn("Invalid character in compressed latitude: must be in range '!' to '{'")
 		}
 
-		A.g_lat = maybe.Nothing[float64]()
+		A.lat = maybe.Nothing[float64]()
 	}
 
 	if isdigit91(pcpos.X[0]) && isdigit91(pcpos.X[1]) && isdigit91(pcpos.X[2]) && isdigit91(pcpos.X[3]) {
-		A.g_lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
+		A.lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
 	} else {
 		if !A.g_quiet {
 			logrus.WithField("longitude", string(pcpos.X[:])).Warn("Invalid character in compressed longitude: must be in range '!' to '{'")
 		}
 
-		A.g_lon = maybe.Nothing[float64]()
+		A.lon = maybe.Nothing[float64]()
 	}
 
 	if pcpos.SymTableId == '/' || pcpos.SymTableId == '\\' || unicode.IsUpper(rune(pcpos.SymTableId)) {
 		/* primary or alternate or alternate with upper case overlay. */
-		A.g_symbol_table = pcpos.SymTableId
+		A.symbolTable = pcpos.SymTableId
 	} else if pcpos.SymTableId >= 'a' && pcpos.SymTableId <= 'j' {
 		/* Lower case a-j are used to represent overlay characters 0-9 */
 		/* because a digit here would mean normal (non-compressed) location. */
-		A.g_symbol_table = pcpos.SymTableId - 'a' + '0'
+		A.symbolTable = pcpos.SymTableId - 'a' + '0'
 	} else {
 		if !A.g_quiet {
 			logrus.WithField("symbol_table", string(rune(pcpos.SymTableId))).Warn("Invalid symbol table id for compressed position")
 		}
 
-		A.g_symbol_table = '/'
+		A.symbolTable = '/'
 	}
 
-	A.g_symbol_code = pcpos.SymbolCode
+	A.symbolCode = pcpos.SymbolCode
 
 	if pcpos.C == ' ' {
 		/* ignore other two bytes */
 	} else if ((pcpos.T - 33) & 0x18) == 0x10 {
-		A.g_altitude_ft = maybe.Just(math.Pow(1.002, float64(pcpos.C-33)*91+float64(pcpos.S-33)))
+		A.altitudeFt = maybe.Just(math.Pow(1.002, float64(pcpos.C-33)*91+float64(pcpos.S-33)))
 	} else if pcpos.C == '{' {
 		A.g_range = maybe.Just(2.0 * math.Pow(1.08, float64(pcpos.S-33)))
 	} else if pcpos.C >= '!' && pcpos.C <= 'z' {
 		/* For a weather station, this is wind information. */
-		A.g_course = maybe.Just(float64(pcpos.C-33) * 4)
-		A.g_speed_mph = maybe.Just(DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
+		A.course = maybe.Just(float64(pcpos.C-33) * 4)
+		A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
 	}
 }
 
@@ -3687,8 +3687,8 @@ func get_maidenhead(p []byte) int {
  *
  * Outputs:	One or more of the following, depending the data found:
  *
- *			A.g_course
- *			A.g_speed_mph
+ *			A.course
+ *			A.speedMPH
  *			A.g_power
  *			A.g_height
  *			A.g_gain
@@ -3741,12 +3741,12 @@ func data_extension_comment(A *decodedAPRS, pdext []byte) {
 
 		var count, _ = fmt.Sscanf(string(pdext), "%3d", &n)
 		if count > 0 {
-			A.g_course = maybe.Just(float64(n))
+			A.course = maybe.Just(float64(n))
 		}
 
 		count, _ = fmt.Sscanf(string(pdext[4:]), "%3d", &n)
 		if count > 0 {
-			A.g_speed_mph = maybe.Just(DW_KNOTS_TO_MPH(float64(n)))
+			A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(float64(n)))
 		}
 
 		/* Bearing and Number/Range/Quality? */
@@ -3828,10 +3828,10 @@ func data_extension_comment(A *decodedAPRS, pdext []byte) {
  *		clen		- Length of comment or -1 to take it all.
  *
  * Outputs:	A.g_telemetry	- Base 91 telemetry |ss1122|
- *		A.g_altitude_ft - from /A=123456 or /A=-12345
- *		A.g_lat	- Might be adjusted from !DAO!
- *		A.g_lon	- Might be adjusted from !DAO!
- *		A.g_aprstt_loc	- Private extension to !DAO!
+ *		A.altitudeFt - from /A=123456 or /A=-12345
+ *		A.lat	- Might be adjusted from !DAO!
+ *		A.lon	- Might be adjusted from !DAO!
+ *		A.aprsttLoc	- Private extension to !DAO!
  *		A.g_freq
  *		A.g_tone
  *		A.g_offset
@@ -4185,13 +4185,13 @@ func process_comment(A *decodedAPRS, commentData []byte) {
 
 		if d == 'T' {
 			if a == ' ' && o == ' ' {
-				A.g_aprstt_loc = "APRStt corral location"
+				A.aprsttLoc = "APRStt corral location"
 			} else if unicode.IsDigit(rune(a)) && o == ' ' {
-				A.g_aprstt_loc = fmt.Sprintf("APRStt location %c of 10", a)
+				A.aprsttLoc = fmt.Sprintf("APRStt location %c of 10", a)
 			} else if unicode.IsDigit(rune(a)) && unicode.IsDigit(rune(o)) {
-				A.g_aprstt_loc = fmt.Sprintf("APRStt location %c%c of 100", a, o)
+				A.aprsttLoc = fmt.Sprintf("APRStt location %c%c of 100", a, o)
 			} else if a == 'B' && unicode.IsDigit(rune(o)) {
-				A.g_aprstt_loc = fmt.Sprintf("APRStt location %c%c...", a, o)
+				A.aprsttLoc = fmt.Sprintf("APRStt location %c%c...", a, o)
 			}
 		} else if unicode.IsUpper(rune(d)) {
 			/*
@@ -4201,15 +4201,15 @@ func process_comment(A *decodedAPRS, commentData []byte) {
 			 *		Lon:	DDD HH.HHo
 			 */
 			if unicode.IsDigit(rune(a)) {
-				A.g_lat = maybe.Fmap(func(lat float64) float64 {
+				A.lat = maybe.Fmap(func(lat float64) float64 {
 					return lat + float64(a-'0')/60000.0*aprsSign(lat)
-				}, A.g_lat)
+				}, A.lat)
 			}
 
 			if unicode.IsDigit(rune(o)) {
-				A.g_lon = maybe.Fmap(func(lon float64) float64 {
+				A.lon = maybe.Fmap(func(lon float64) float64 {
 					return lon + float64(o-'0')/60000.0*aprsSign(lon)
-				}, A.g_lon)
+				}, A.lon)
 			}
 		} else if unicode.IsLower(rune(d)) {
 			/*
@@ -4261,15 +4261,15 @@ func process_comment(A *decodedAPRS, commentData []byte) {
 			 * The spec appears to be wrong.  It says '}' is the maximum value when it should be '{'.
 			 */
 			if isdigit91(a) {
-				A.g_lat = maybe.Fmap(func(lat float64) float64 {
+				A.lat = maybe.Fmap(func(lat float64) float64 {
 					return lat + float64(a-B91_MIN)*1.1/600000.0*aprsSign(lat)
-				}, A.g_lat)
+				}, A.lat)
 			}
 
 			if isdigit91(o) {
-				A.g_lon = maybe.Fmap(func(lon float64) float64 {
+				A.lon = maybe.Fmap(func(lon float64) float64 {
 					return lon + float64(o-B91_MIN)*1.1/600000.0*aprsSign(lon)
-				}, A.g_lon)
+				}, A.lon)
 			}
 		}
 
@@ -4284,7 +4284,7 @@ func process_comment(A *decodedAPRS, commentData []byte) {
 		var temp = commentData[match[0]:match[1]]
 
 		var altitude, _ = strconv.Atoi(string(temp[3:]))
-		A.g_altitude_ft = maybe.Just(float64(altitude))
+		A.altitudeFt = maybe.Just(float64(altitude))
 
 		commentData = cutBytes(commentData, match[0], match[1])
 	}
