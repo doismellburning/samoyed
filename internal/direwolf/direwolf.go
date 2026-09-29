@@ -16,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -60,7 +61,7 @@ var waypointSender *WaypointSender
 var packetLogger *PacketLogger
 var telemetryState = NewTelemetryState()
 var beaconService *BeaconService
-var gpsReceiver *GPS
+var gpsReceiver *dwgps.GPS
 var kissNetSvc *KissNetService
 var kissPT *KissPT
 var kissSerial *KissSerial
@@ -473,7 +474,7 @@ x = Silence FX.25 information.`)
 		logrus.WithError(err).Debug("AudioOpen failed")
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
-		_ = sleepSecCtx(ctx, 5)
+		_ = dwutil.SleepSecCtx(ctx, 5)
 		pflag.Usage()
 		os.Exit(1)
 	}
@@ -624,7 +625,7 @@ x = Silence FX.25 information.`)
 					}
 				case 'p': // Silence - set PTT only: -x p
 					fmt.Printf("\nSending silence (Set PTT only) on channel %d.\nPress control-C to terminate.\n", transmitCalibrationChannel)
-					sleepSecCtx(ctx, max_duration)
+					dwutil.SleepSecCtx(ctx, max_duration)
 				}
 
 				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 0)
@@ -683,7 +684,13 @@ x = Silence FX.25 information.`)
 	/*
 	 * Open port for communication with GPS.
 	 */
-	gpsReceiver = NewGPS(ctx, misc_config, d_g_opt)
+	var gpsConfig = new(dwgps.Config)
+	gpsConfig.NMEAPort = misc_config.gpsnmea_port
+	gpsConfig.NMEASpeed = misc_config.gpsnmea_speed
+	gpsConfig.GPSDHost = misc_config.gpsd_host
+	gpsConfig.GPSDPort = misc_config.gpsd_port
+
+	gpsReceiver = dwgps.NewGPS(ctx, gpsConfig, d_g_opt)
 
 	var waypointErr error
 	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config, gpsReceiver)

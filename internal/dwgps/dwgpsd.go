@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dwgps
 
 /*------------------------------------------------------------------
  *
@@ -22,7 +25,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 /* Knots per meter/second. */
@@ -109,34 +114,31 @@ func (c *gpsdClient) closeAndClear() {
  *		- Enable streaming of JSON reports.
  *		- Start up thread to process incoming data.
  *		  It reads from the daemon and deposits into
- *		  shared region via GPS.setData.
+ *		  shared region via GPS.SetData.
  *
  * 		The application calls GPS.Read to get the most
  *		recent information.
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug int) int {
+func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *Config, debug int) int {
 	if debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("dwgpsd_init()\n")
+		logrus.Debug("dwgpsd_init")
 	}
 
-	if pconfig.gpsd_host == "" {
+	if pconfig.GPSDHost == "" {
 		/* Nothing to do.  Leave initial fix value for not init. */
 		return 0
 	}
 
-	var addr = net.JoinHostPort(pconfig.gpsd_host, strconv.Itoa(pconfig.gpsd_port))
+	var addr = net.JoinHostPort(pconfig.GPSDHost, strconv.Itoa(pconfig.GPSDPort))
 
 	var dialCtx, cancelDial = context.WithTimeout(ctx, GPSD_CONNECT_TIMEOUT)
 	defer cancelDial()
 
 	var conn, connErr = new(net.Dialer).DialContext(dialCtx, "tcp", addr)
 	if connErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to connect to GPSD stream at %s.\n", addr)
-		dw_printf("%v\n", connErr)
+		logrus.WithError(connErr).WithField("address", addr).Error("Unable to connect to GPSD stream")
 
 		return -1
 	}
@@ -145,9 +147,7 @@ func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug in
 
 	var _, writeErr = conn.Write([]byte("?WATCH={\"enable\":true,\"json\":true}\n"))
 	if writeErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to start GPSD watch at %s.\n", addr)
-		dw_printf("%v\n", writeErr)
+		logrus.WithError(writeErr).WithField("address", addr).Error("Unable to start GPSD watch")
 
 		conn.Close()
 
@@ -184,23 +184,21 @@ func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug in
 
 func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 	if debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("read_gpsd_thread (%+v)\n", conn)
+		logrus.WithField("remote", conn.RemoteAddr()).Debug("read_gpsd_thread")
 	}
 
 	var info = new(GPSInfo) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
 
 	if debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("GPSD: ", info)
+		dwgps_print("GPSD", info)
 	}
 
-	gps.setData(info)
+	gps.SetData(info)
 
 	// Scan blocks until gpsd says something, which it need not ever do, so
 	// closing the connection is what gets this goroutine back when we are
 	// asked to stop.
-	defer closeOnDone(ctx, conn)()
+	defer dwutil.CloseOnDone(ctx, conn)()
 
 	var scanner = bufio.NewScanner(conn)
 	scanner.Buffer(make([]byte, 0, 4096), 1<<20)
@@ -216,11 +214,10 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 		info.Timestamp = time.Now()
 
 		if debug >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-			dwgps_print("GPSD: ", info)
+			dwgps_print("GPSD", info)
 		}
 
-		gps.setData(info)
+		gps.SetData(info)
 	}
 
 	if ctx.Err() != nil {
@@ -229,19 +226,15 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 
 	/* Lost connection to gpsd, e.g. it was stopped or the network dropped. */
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("------------------------------------------\n")
-	dw_printf("GPSD: Lost communication with gpsd server.\n")
-	dw_printf("------------------------------------------\n")
+	logrus.Error("GPSD: Lost communication with gpsd server")
 
 	info.Fix = DWFIX_ERROR
 
 	if debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("GPSD: ", info)
+		dwgps_print("GPSD", info)
 	}
 
-	gps.setData(info)
+	gps.SetData(info)
 
 	gps.gpsd.clearConnIfCurrent(conn)
 
@@ -311,15 +304,13 @@ func apply_gpsd_tpv(info *GPSInfo, report *gpsdTPV) {
 	}
 
 	if newFix != info.Fix {
-		text_color_set(DW_COLOR_INFO)
-
 		switch newFix {
 		case DWFIX_NO_FIX:
-			dw_printf("GPSD: Location fix has been lost.\n")
+			logrus.Info("GPSD: Location fix has been lost")
 		case DWFIX_2D:
-			dw_printf("GPSD: Location fix is now 2D.\n")
+			logrus.Info("GPSD: Location fix is now 2D")
 		case DWFIX_3D:
-			dw_printf("GPSD: Location fix is now 3D.\n")
+			logrus.Info("GPSD: Location fix is now 3D")
 		default:
 		}
 	}

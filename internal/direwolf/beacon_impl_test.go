@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -563,7 +564,7 @@ func Test_BeaconSend_position(t *testing.T) {
 	bp.gain = 3
 	bp.comment = "Q1TEST beacon"
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	var got = sentBeacon(t)
 	assert.True(t, strings.HasPrefix(got, "Q1TEST>"+beaconDefaultDest()+":!4230.00N/07115.00W-"), got)
@@ -583,7 +584,7 @@ func Test_BeaconSend_position_with_explicit_addresses(t *testing.T) {
 	bp.via = "WIDE1-1,WIDE2-1"
 	bp.messaging = true
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assert.Equal(t, "Q2TEST-5>APZQ1T,WIDE1-1,WIDE2-1:=4230.00N/07115.00W-", sentBeacon(t))
 }
@@ -593,7 +594,7 @@ func Test_BeaconSend_position_without_a_position_sends_nothing(t *testing.T) {
 	var bs = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_POSITION
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
 }
@@ -606,7 +607,7 @@ func Test_BeaconSend_object(t *testing.T) {
 	bp.lat = maybe.Just(42.5)
 	bp.lon = maybe.Just(-71.25)
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	var got = sentBeacon(t)
 	assert.True(t, strings.HasPrefix(got, "Q1TEST>"+beaconDefaultDest()+":;Q1OBJ    *"), got)
@@ -618,7 +619,7 @@ func Test_BeaconSend_object_without_a_position_sends_nothing(t *testing.T) {
 	bs.miscConfig.beacon[0].btype = BEACON_OBJECT
 	bs.miscConfig.beacon[0].objname = "Q1OBJ"
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
 }
@@ -628,7 +629,7 @@ func Test_BeaconSend_custom_info(t *testing.T) {
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_info = ">Hello from Q1TEST"
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+":>Hello from Q1TEST", sentBeacon(t))
 }
@@ -637,7 +638,7 @@ func Test_BeaconSend_custom_without_info_sends_nothing(t *testing.T) {
 	var bs = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
 }
@@ -647,7 +648,7 @@ func Test_BeaconSend_custom_infocmd_failure_sends_nothing(t *testing.T) {
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_infocmd = "/nonexistent/q1test-infocmd"
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
 }
@@ -664,7 +665,7 @@ func Test_BeaconSend_custom_infocmd_output_is_the_info(t *testing.T) {
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_infocmd = truePath
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+":", sentBeacon(t))
 }
@@ -678,7 +679,7 @@ func Test_BeaconSend_commentcmd_failure_keeps_fixed_comment(t *testing.T) {
 	bp.comment = "fixed"
 	bp.commentcmd = "/nonexistent/q1test-commentcmd"
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assert.True(t, strings.HasSuffix(sentBeacon(t), "-fixed"))
 }
@@ -697,7 +698,7 @@ func Test_BeaconSend_commentcmd_output_is_appended(t *testing.T) {
 	bp.comment = "fixed"
 	bp.commentcmd = truePath
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assert.True(t, strings.HasSuffix(sentBeacon(t), "-fixed"))
 }
@@ -712,7 +713,7 @@ func Test_BeaconSend_igate_status(t *testing.T) {
 	var bs = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_IGATE
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+
 		":<IGATE,MSG_CNT=0,PKT_CNT=0,DIR_CNT=0,LOC_CNT=0,RF_CNT=0,UPL_CNT=0,DNL_CNT=0",
@@ -734,8 +735,8 @@ func Test_BeaconSend_tracker_with_a_3D_fix(t *testing.T) {
 	bp.symbol = '>'
 	bp.alt_m = maybe.Just(1.0) // Any positive altitude asks for the GPS one.
 
-	var gpsinfo = new(GPSInfo)
-	gpsinfo.Fix = DWFIX_3D
+	var gpsinfo = new(dwgps.GPSInfo)
+	gpsinfo.Fix = dwgps.DWFIX_3D
 	gpsinfo.Lat = maybe.Just(42.5)
 	gpsinfo.Lon = maybe.Just(-71.25)
 	gpsinfo.Altitude = maybe.Just(100.0)
@@ -757,8 +758,8 @@ func Test_BeaconSend_tracker_with_a_2D_fix_has_no_altitude(t *testing.T) {
 	bp.symbol = '>'
 	bp.alt_m = maybe.Just(1.0)
 
-	var gpsinfo = new(GPSInfo)
-	gpsinfo.Fix = DWFIX_2D
+	var gpsinfo = new(dwgps.GPSInfo)
+	gpsinfo.Fix = dwgps.DWFIX_2D
 	gpsinfo.Lat = maybe.Just(42.5)
 	gpsinfo.Lon = maybe.Just(-71.25)
 	gpsinfo.Altitude = maybe.Just(100.0)
@@ -776,7 +777,7 @@ func Test_BeaconSend_no_channel_sends_nothing(t *testing.T) {
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
 	bs.miscConfig.beacon[0].sendto_chan = -1
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
 }
@@ -787,7 +788,7 @@ func Test_BeaconSend_no_mycall_sends_nothing(t *testing.T) {
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
 }
@@ -798,7 +799,7 @@ func Test_BeaconSend_unparseable_packet_sends_nothing(t *testing.T) {
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
 	bs.miscConfig.beacon[0].dest = "NOT A VALID CALL"
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
 }
@@ -813,7 +814,7 @@ func Test_BeaconSend_ichannel_uses_channel_0_call(t *testing.T) {
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
 	bs.miscConfig.beacon[0].sendto_chan = 1
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
 	assert.Nil(t, transmitQueue.Remove(1, TQ_PRIO_1_LO))
@@ -825,7 +826,7 @@ func Test_BeaconSend_to_igate_bypasses_transmit_queue(t *testing.T) {
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
 	bs.miscConfig.beacon[0].sendto_type = SENDTO_IGATE
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
 }
@@ -839,7 +840,7 @@ func Test_BeaconSend_to_recv_is_simulated_reception(t *testing.T) {
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
 	bs.miscConfig.beacon[0].sendto_type = SENDTO_RECV
 
-	bs.send(t.Context(), 0, new(GPSInfo))
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
 
@@ -945,16 +946,16 @@ func Test_BeaconThread_fixed_rate_tracker(t *testing.T) {
 	var bs = newSendTestBeaconService(t)
 	bs.SetDebug(1)
 
-	var gpsinfo = new(GPSInfo)
-	gpsinfo.Fix = DWFIX_3D
+	var gpsinfo = new(dwgps.GPSInfo)
+	gpsinfo.Fix = dwgps.DWFIX_3D
 	gpsinfo.Lat = maybe.Just(42.5)
 	gpsinfo.Lon = maybe.Just(-71.25)
 	gpsinfo.Altitude = maybe.Just(100.0)
 	gpsinfo.Track = maybe.Just(90.0)
 	gpsinfo.SpeedKnots = maybe.Just(10.0)
 
-	bs.gps = new(GPS)
-	bs.gps.setData(gpsinfo)
+	bs.gps = new(dwgps.GPS)
+	bs.gps.SetData(gpsinfo)
 
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_TRACKER
@@ -976,11 +977,11 @@ func Test_BeaconThread_fixed_rate_tracker_without_position_keeps_schedule(t *tes
 	var bs = newSendTestBeaconService(t)
 	bs.SetDebug(1)
 
-	var gpsinfo = new(GPSInfo)
-	gpsinfo.Fix = DWFIX_NO_FIX
+	var gpsinfo = new(dwgps.GPSInfo)
+	gpsinfo.Fix = dwgps.DWFIX_NO_FIX
 
-	bs.gps = new(GPS)
-	bs.gps.setData(gpsinfo)
+	bs.gps = new(dwgps.GPS)
+	bs.gps.SetData(gpsinfo)
 
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_TRACKER
@@ -1008,15 +1009,15 @@ func Test_BeaconThread_smartbeaconing_tracker(t *testing.T) {
 	bs.miscConfig.sb_turn_angle = sb.sb_turn_angle
 	bs.miscConfig.sb_turn_slope = sb.sb_turn_slope
 
-	var gpsinfo = new(GPSInfo)
-	gpsinfo.Fix = DWFIX_2D
+	var gpsinfo = new(dwgps.GPSInfo)
+	gpsinfo.Fix = dwgps.DWFIX_2D
 	gpsinfo.Lat = maybe.Just(42.5)
 	gpsinfo.Lon = maybe.Just(-71.25)
 	gpsinfo.Track = maybe.Just(180.0)
 	gpsinfo.SpeedKnots = maybe.Just(100.0) // Faster than sb_fast_speed.
 
-	bs.gps = new(GPS)
-	bs.gps.setData(gpsinfo)
+	bs.gps = new(dwgps.GPS)
+	bs.gps.SetData(gpsinfo)
 
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_TRACKER
@@ -1040,11 +1041,11 @@ func Test_BeaconThread_smartbeaconing_tracker_without_position_retries_soon(t *t
 	bs.miscConfig.sb_fast_rate = 30
 	bs.miscConfig.sb_turn_time = 15
 
-	var gpsinfo = new(GPSInfo)
-	gpsinfo.Fix = DWFIX_2D // A mode, but never a position.
+	var gpsinfo = new(dwgps.GPSInfo)
+	gpsinfo.Fix = dwgps.DWFIX_2D // A mode, but never a position.
 
-	bs.gps = new(GPS)
-	bs.gps.setData(gpsinfo)
+	bs.gps = new(dwgps.GPS)
+	bs.gps.SetData(gpsinfo)
 
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_TRACKER
@@ -1100,10 +1101,10 @@ func Test_NewBeaconService_tbeacon_without_gps_is_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_tbeacon_with_gps_not_ignored(t *testing.T) {
-	var gps = new(GPS)
-	var gpsinfo = new(GPSInfo)
-	gpsinfo.Fix = DWFIX_NO_FIX
-	gps.setData(gpsinfo)
+	var gps = new(dwgps.GPS)
+	var gpsinfo = new(dwgps.GPSInfo)
+	gpsinfo.Fix = dwgps.DWFIX_NO_FIX
+	gps.SetData(gpsinfo)
 
 	var cfg = new(misc_config_s)
 	cfg.num_beacons = 1
@@ -1115,10 +1116,10 @@ func Test_NewBeaconService_tbeacon_with_gps_not_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_info_on_non_custom_beacons_is_only_complained_about(t *testing.T) {
-	var gps = new(GPS)
-	var gpsinfo = new(GPSInfo)
-	gpsinfo.Fix = DWFIX_NO_FIX
-	gps.setData(gpsinfo)
+	var gps = new(dwgps.GPS)
+	var gpsinfo = new(dwgps.GPSInfo)
+	gpsinfo.Fix = dwgps.DWFIX_NO_FIX
+	gps.SetData(gpsinfo)
 
 	var cfg = new(misc_config_s)
 	cfg.num_beacons = 2

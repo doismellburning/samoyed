@@ -39,6 +39,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -515,7 +516,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 				if prio == TQ_PRIO_0_HI {
 					//text_color_set(DW_COLOR_DEBUG);
 					//dw_printf ("APRStt morse xmit delay hack...\n");
-					// Not sleepCtx: pp is already off the queue, so giving up
+					// Not dwutil.SleepCtx: pp is already off the queue, so giving up
 					// here would lose it rather than leave it for later.
 					time.Sleep(700 * time.Millisecond)
 				}
@@ -1224,7 +1225,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 	start_over_again:
 
 		for hdlcReceiver.DataDetectAny(channel) > 0 {
-			if !sleepCtx(ctx, WAIT_CHECK_EVERY_MS*time.Millisecond) {
+			if !dwutil.SleepCtx(ctx, WAIT_CHECK_EVERY_MS*time.Millisecond) {
 				return false
 			}
 
@@ -1242,7 +1243,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 		 */
 
 		if xs.p_modem.achan[channel].dwait > 0 {
-			if !sleepCtx(ctx, time.Duration(xs.p_modem.achan[channel].dwait)*10*time.Millisecond) {
+			if !dwutil.SleepCtx(ctx, time.Duration(xs.p_modem.achan[channel].dwait)*10*time.Millisecond) {
 				return false
 			}
 		}
@@ -1256,7 +1257,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 		 * Proceed to transmit sooner if anything shows up in high priority queue.
 		 */
 		for transmitQueue.Peek(channel, TQ_PRIO_0_HI) == nil {
-			if !sleepCtx(ctx, time.Duration(slottime)*10*time.Millisecond) {
+			if !dwutil.SleepCtx(ctx, time.Duration(slottime)*10*time.Millisecond) {
 				return false
 			}
 
@@ -1283,7 +1284,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 	// TODO: review this.
 
 	for !xs.audio.outputMu[ACHAN2ADEV(channel)].TryLock() {
-		if !sleepCtx(ctx, WAIT_CHECK_EVERY_MS*time.Millisecond) {
+		if !dwutil.SleepCtx(ctx, WAIT_CHECK_EVERY_MS*time.Millisecond) {
 			return false
 		}
 

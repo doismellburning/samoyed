@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dwgps
 
 // Integration test against a real gpsd, driven by gpsfake (from the gpsd-clients
 // package) replaying a canned NMEA log. Linux only, since gpsfake feeds gpsd
@@ -16,6 +19,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,13 +88,14 @@ func startGpsfake(t *testing.T, port int) {
 }
 
 func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
-	var port = freeTCPPort(t)
+	var port, portErr = strconv.Atoi(testutils.UnusedPort(t))
+	require.NoError(t, portErr)
 
 	startGpsfake(t, port)
 
-	var config = new(misc_config_s)
-	config.gpsd_host = "127.0.0.1"
-	config.gpsd_port = port
+	var config = new(Config)
+	config.GPSDHost = "127.0.0.1"
+	config.GPSDPort = port
 
 	var gps = new(GPS)
 

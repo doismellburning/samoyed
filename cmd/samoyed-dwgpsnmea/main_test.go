@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/creack/pty"
-	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -60,11 +59,6 @@ func fakeGPS(t *testing.T) string {
 	})
 
 	return name
-}
-
-func Test_show(t *testing.T) {
-	assert.Equal(t, "1.50", show("%.2f", maybe.Just(1.5)))
-	assert.Equal(t, "unknown", show("%.2f", maybe.Nothing[float64]()))
 }
 
 func Test_run_reportsAFix(t *testing.T) {

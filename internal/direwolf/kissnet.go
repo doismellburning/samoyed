@@ -467,7 +467,7 @@ func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, clie
 	for ctx.Err() == nil {
 		var conn, frame = kps.connAndFrame(client)
 		for conn == nil {
-			if !sleepCtx(ctx, kns.pollInterval) { /* Not connected.  Try again later. */
+			if !dwutil.SleepCtx(ctx, kns.pollInterval) { /* Not connected.  Try again later. */
 				return 0, nil, false
 			}
 
@@ -613,7 +613,7 @@ func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kisspor
 	// closing the listener is what gets us back when we are asked to stop -
 	// and it gives the port up there and then, rather than holding it until
 	// the process exits.
-	defer closeOnDone(ctx, listener)()
+	defer dwutil.CloseOnDone(ctx, listener)()
 
 	for ctx.Err() == nil {
 		var client = kps.findFreeClient()
@@ -661,7 +661,7 @@ func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kisspor
 				"client":   client,
 				"channel":  kps.channel,
 			}).Info("Attached to KISS TCP client application")
-		} else if !sleepCtx(ctx, kns.pollInterval) { /* wait then check again if more clients allowed. */
+		} else if !dwutil.SleepCtx(ctx, kns.pollInterval) { /* wait then check again if more clients allowed. */
 			return
 		}
 	}

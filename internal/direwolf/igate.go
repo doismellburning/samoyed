@@ -459,7 +459,7 @@ func (ig *IGate) connectThread(ctx context.Context) {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Connect to IGate server %s failed.\n\n", server_name)
 
-				if !sleepCtx(ctx, ig.retryInterval) {
+				if !dwutil.SleepCtx(ctx, ig.retryInterval) {
 					return
 				}
 
@@ -487,7 +487,7 @@ func (ig *IGate) connectThread(ctx context.Context) {
 				 * Software name and version must not contain spaces.
 				 */
 
-				if !sleepSecCtx(ctx, 3) {
+				if !dwutil.SleepSecCtx(ctx, 3) {
 					return
 				}
 
@@ -503,7 +503,7 @@ func (ig *IGate) connectThread(ctx context.Context) {
 
 				/* Delay until it is ok to start sending packets. */
 
-				if !sleepSecCtx(ctx, 7) {
+				if !dwutil.SleepSecCtx(ctx, 7) {
 					return
 				}
 
@@ -515,7 +515,7 @@ func (ig *IGate) connectThread(ctx context.Context) {
 		 * If connected to IGate server, send heartbeat periodically to keep connection active.
 		 */
 		for range 3 {
-			if conn, _ := ig.connection(); conn != nil && !sleepSecCtx(ctx, 10) {
+			if conn, _ := ig.connection(); conn != nil && !dwutil.SleepSecCtx(ctx, 10) {
 				return
 			}
 		}
@@ -964,7 +964,7 @@ func (ig *IGate) get1ch(ctx context.Context) (byte, bool) {
 	for ctx.Err() == nil {
 		var conn, _ = ig.connection()
 		if conn == nil {
-			if !sleepSecCtx(ctx, 5) { /* Not connected.  Try again later. */
+			if !dwutil.SleepSecCtx(ctx, 5) { /* Not connected.  Try again later. */
 				return 0, false
 			}
 
@@ -977,7 +977,7 @@ func (ig *IGate) get1ch(ctx context.Context) (byte, bool) {
 
 		// A server with nothing to say leaves the read below blocked, so
 		// closing the socket is what gets us back when we are asked to stop.
-		var stopClose = closeOnDone(ctx, conn)
+		var stopClose = dwutil.CloseOnDone(ctx, conn)
 
 		var ch = make([]byte, 1)
 		var n, _ = conn.Read(ch)
@@ -1277,7 +1277,7 @@ func (ig *IGate) satgateDelayThread(ctx context.Context) {
 	var channel = 0 // TODO:  get receive channel somehow.
 	// only matters if multi channel with different names.
 
-	for sleepSecCtx(ctx, 1) {
+	for dwutil.SleepSecCtx(ctx, 1) {
 		ig.satgateReleaseDue(channel)
 	} /* until cancelled */
 } /* end satgateDelayThread */

@@ -241,7 +241,7 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 				nt.setSock(newConn)
 
 				dw_printf("Successfully reattached to network TNC.\n")
-			} else if !sleepCtx(ctx, nt.reattachDelay) {
+			} else if !dwutil.SleepCtx(ctx, nt.reattachDelay) {
 				return
 			}
 		} else {
@@ -251,7 +251,7 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 			// The read below blocks until the TNC says something, which
 			// could be never, so closing the socket is the only thing that
 			// gets this goroutine back when we are asked to stop.
-			var stopClose = closeOnDone(ctx, conn)
+			var stopClose = dwutil.CloseOnDone(ctx, conn)
 			var n, readErr = conn.Read(buf)
 
 			stopClose()
@@ -265,7 +265,7 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 				dw_printf("Lost communication with network TNC. Will try to reattach.\n")
 				nt.closeSockIfCurrent(conn)
 
-				if !sleepCtx(ctx, nt.reattachDelay) {
+				if !dwutil.SleepCtx(ctx, nt.reattachDelay) {
 					return
 				}
 

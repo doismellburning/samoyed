@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dwgps
 
 /*------------------------------------------------------------------
  *
@@ -37,10 +40,11 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
+	"github.com/sirupsen/logrus"
 )
 
 // gpsnmeaPort is the serial port a GPS receiver is read from, as opened by
-// dwgpsnmea_init.  The waypoint sender can share it (see GPS.sharedNMEAPort),
+// dwgpsnmea_init.  The waypoint sender can share it (see GPS.SharedNMEAPort),
 // and the reader goroutine closes it and clears fd if the receiver goes away,
 // so fd is guarded by mu.
 //
@@ -68,7 +72,7 @@ type gpsnmeaPort struct {
  *
  *			  If >= 2, location updates are also printed.
  *				(In this file.)
- *				Why not do it in GPS.setData() ?
+ *				Why not do it in GPS.SetData() ?
  *				Here, we can prefix it with GPSNMEA to
  *				distinguish it from GPSD.
  *
@@ -90,13 +94,12 @@ type gpsnmeaPort struct {
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug int) int {
+func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *Config, debug int) int {
 	if debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("dwgpsnmea_init()\n")
+		logrus.Debug("dwgpsnmea_init")
 	}
 
-	if pconfig.gpsnmea_port == "" {
+	if pconfig.NMEAPort == "" {
 		/* Nothing to do.  Leave initial fix value for not init. */
 		return (0)
 	}
@@ -105,19 +108,18 @@ func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug
 	 * Open serial port connection.
 	 */
 
-	var fd = serialport.Open(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
+	var fd = serialport.Open(pconfig.NMEAPort, pconfig.NMEASpeed)
 
 	if fd != nil {
 		gps.nmea.mu.Lock()
-		gps.nmea.name = pconfig.gpsnmea_port
-		gps.nmea.speed = pconfig.gpsnmea_speed
+		gps.nmea.name = pconfig.NMEAPort
+		gps.nmea.speed = pconfig.NMEASpeed
 		gps.nmea.fd = fd
 		gps.nmea.mu.Unlock()
 
 		go read_gpsnmea_thread(ctx, gps, fd, debug)
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open serial port %s for GPS receiver.\n", pconfig.gpsnmea_port)
+		logrus.WithField("port", pconfig.NMEAPort).Error("Could not open serial port for GPS receiver")
 
 		return (-1)
 	}
@@ -127,10 +129,10 @@ func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug
 	return (1)
 } /* end dwgpsnmea_init */
 
-// sharedNMEAPort returns the GPS receiver's serial port, for the waypoint
+// SharedNMEAPort returns the GPS receiver's serial port, for the waypoint
 // sender to share, if it is the one named, at the same speed, and still open.
 // Otherwise, or for a nil GPS, it returns nil.
-func (g *GPS) sharedNMEAPort(name string, speed int) *term.Term {
+func (g *GPS) SharedNMEAPort(name string, speed int) *term.Term {
 	if g == nil {
 		return nil
 	}
@@ -184,18 +186,16 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 	const NMEA_MAX_LEN = 160
 
 	if debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("read_gpsnmea_thread (%+v)\n", fd)
+		logrus.Debug("read_gpsnmea_thread")
 	}
 
 	var info = new(GPSInfo) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
 
 	if debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("GPSNMEA: ", info)
+		dwgps_print("GPSNMEA", info)
 	}
 
-	gps.setData(info)
+	gps.SetData(info)
 
 	var gps_msg string
 
@@ -203,7 +203,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 	// rather than during one: the port is read directly rather than through
 	// something the runtime can interrupt, so closing it would not get this
 	// goroutine back - and this port can be shared with the waypoint sender
-	// (see GPS.sharedNMEAPort), which closes it in its own teardown.
+	// (see GPS.SharedNMEAPort), which closes it in its own teardown.
 	for ctx.Err() == nil {
 		var ch, err = serialport.Get1(fd)
 		if err != nil {
@@ -214,10 +214,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 			/* This might happen if a USB  device is unplugged. */
 			/* I can't imagine anything that would cause it with */
 			/* a normal serial port. */
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("----------------------------------------------\n")
-			dw_printf("GPSNMEA: Lost communication with GPS receiver.\n")
-			dw_printf("----------------------------------------------\n")
+			logrus.Error("GPSNMEA: Lost communication with GPS receiver")
 
 			// Close the port before reporting the error, so that nobody
 			// who has seen DWFIX_ERROR can still be handed it to share.
@@ -226,11 +223,10 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 			info.Fix = DWFIX_ERROR
 
 			if debug >= 2 {
-				text_color_set(DW_COLOR_DEBUG)
-				dwgps_print("GPSNMEA: ", info)
+				dwgps_print("GPSNMEA", info)
 			}
 
-			gps.setData(info)
+			gps.SetData(info)
 
 			// TODO: If the open() was in this thread, we could wait a while and
 			// try to open again.  That would allow recovery if the USB GPS device
@@ -245,8 +241,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 		case '\r', '\n':
 			if len(gps_msg) >= 6 && gps_msg[0] == '$' {
 				if debug >= 3 {
-					text_color_set(DW_COLOR_DEBUG)
-					dw_printf("%s\n", gps_msg)
+					logrus.WithField("sentence", gps_msg).Trace("GPSNMEA: Sentence")
 				}
 
 				/* Process sentence. */
@@ -255,40 +250,34 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 				if strings.HasPrefix(gps_msg, "$GPRMC") || strings.HasPrefix(gps_msg, "$GNRMC") {
 					// Here we just tuck away the course and speed.
 					// Fix and location will be updated by GxGGA.
-					var f = dwgpsnmea_gprmc(gps_msg, false)
+					var f = ParseGPRMC(gps_msg, false)
 
 					if f.Fix == DWFIX_ERROR {
 						/* Parse error.  Shouldn't happen.  Better luck next time. */
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("GPSNMEA: Error parsing $GPRMC sentence.\n")
-						dw_printf("%s\n", gps_msg)
+						logrus.WithField("sentence", gps_msg).Warn("GPSNMEA: Error parsing $GPRMC sentence")
 					} else {
 						info.SpeedKnots = f.Knots.Or(info.SpeedKnots)
 						info.Track = f.Course.Or(info.Track)
 					}
 				} else if strings.HasPrefix(gps_msg, "$GPGGA") || strings.HasPrefix(gps_msg, "$GNGGA") {
-					var f = dwgpsnmea_gpgga(gps_msg, false)
+					var f = ParseGPGGA(gps_msg, false)
 
 					if f.Fix == DWFIX_ERROR {
 						/* Parse error.  Shouldn't happen.  Better luck next time. */
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("GPSNMEA: Error parsing $GPGGA sentence.\n")
-						dw_printf("%s\n", gps_msg)
+						logrus.WithField("sentence", gps_msg).Warn("GPSNMEA: Error parsing $GPGGA sentence")
 					} else {
 						info.Lat = f.Lat.Or(info.Lat)
 						info.Lon = f.Lon.Or(info.Lon)
 						info.Altitude = f.Alt.Or(info.Altitude)
 
 						if f.Fix != info.Fix { // Print change in location fix.
-							text_color_set(DW_COLOR_INFO)
-
 							switch f.Fix {
 							case DWFIX_NO_FIX:
-								dw_printf("GPSNMEA: Location fix has been lost.\n")
+								logrus.Info("GPSNMEA: Location fix has been lost")
 							case DWFIX_2D:
-								dw_printf("GPSNMEA: Location fix is now 2D.\n")
+								logrus.Info("GPSNMEA: Location fix is now 2D")
 							case DWFIX_3D:
-								dw_printf("GPSNMEA: Location fix is now 3D.\n")
+								logrus.Info("GPSNMEA: Location fix is now 3D")
 							default:
 							}
 
@@ -298,11 +287,10 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 						info.Timestamp = time.Now()
 
 						if debug >= 2 {
-							text_color_set(DW_COLOR_DEBUG)
-							dwgps_print("GPSNMEA: ", info)
+							dwgps_print("GPSNMEA", info)
 						}
 
-						gps.setData(info)
+						gps.SetData(info)
 					}
 				}
 			}
@@ -336,8 +324,7 @@ func remove_checksum(sent string, quiet bool) (string, error) {
 	var msg, checksumStr, found = strings.Cut(sent, "*")
 	if !found {
 		if !quiet {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Missing GPS checksum.\n")
+			logrus.WithField("sentence", sent).Warn("Missing GPS checksum")
 		}
 
 		return "", errors.New("missing GPS checksum")
@@ -354,8 +341,7 @@ func remove_checksum(sent string, quiet bool) (string, error) {
 		var errorMsg = fmt.Sprintf("GPS checksum error. Expected %02x but found %s", calculatedChecksum, checksumStr)
 
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s.\n", errorMsg)
+			logrus.WithField("sentence", sent).Warn(errorMsg)
 		}
 
 		return "", errors.New(errorMsg)
@@ -366,7 +352,7 @@ func remove_checksum(sent string, quiet bool) (string, error) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgpsnmea_gprmc
+ * Name:        ParseGPRMC
  *
  * Purpose:    	Parse $GPRMC sentence and extract interesting parts.
  *
@@ -402,7 +388,7 @@ type GPRMCResult struct {
 	Fix    GPSFix
 }
 
-func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
+func ParseGPRMC(sentence string, quiet bool) *GPRMCResult {
 	var result = new(GPRMCResult)
 
 	// TODO Default to Error, because that's what most returns are? On the other hand it's good to be explicit...
@@ -445,8 +431,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		}
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("No status in GPRMC sentence.\n")
+			logrus.WithField("sentence", sentence).Warn("No status in GPRMC sentence")
 		}
 
 		result.Fix = DWFIX_ERROR
@@ -458,8 +443,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		var lat, latErr = latlong.LatitudeFromNMEA(plat, pns[0])
 		if latErr != nil {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't get latitude from GPRMC sentence: %v\n", latErr)
+				logrus.WithError(latErr).WithField("sentence", sentence).Warn("Can't get latitude from GPRMC sentence")
 			}
 
 			result.Fix = DWFIX_ERROR
@@ -470,8 +454,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		result.Lat = maybe.Just(lat)
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get latitude from GPRMC sentence.\n")
+			logrus.WithField("sentence", sentence).Warn("Can't get latitude from GPRMC sentence")
 		}
 
 		result.Fix = DWFIX_ERROR
@@ -483,8 +466,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		var lon, lonErr = latlong.LongitudeFromNMEA(plon, pew[0])
 		if lonErr != nil {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't get longitude from GPRMC sentence: %v\n", lonErr)
+				logrus.WithError(lonErr).WithField("sentence", sentence).Warn("Can't get longitude from GPRMC sentence")
 			}
 
 			result.Fix = DWFIX_ERROR
@@ -495,8 +477,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		result.Lon = maybe.Just(lon)
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get longitude from GPRMC sentence.\n")
+			logrus.WithField("sentence", sentence).Warn("Can't get longitude from GPRMC sentence")
 		}
 
 		result.Fix = DWFIX_ERROR
@@ -512,8 +493,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		result.Knots = maybe.Just(knots)
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get speed from GPRMC sentence: %s\n", pknots)
+			logrus.WithField("speed", pknots).Warn("Can't get speed from GPRMC sentence")
 		}
 
 		result.Fix = DWFIX_ERROR
@@ -535,11 +515,11 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	result.Fix = DWFIX_2D
 
 	return result
-} /* end dwgpsnmea_gprmc */
+} /* end ParseGPRMC */
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgpsnmea_gpgga
+ * Name:        ParseGPGGA
  *
  * Purpose:    	Parse $GPGGA sentence and extract interesting parts.
  *
@@ -577,7 +557,7 @@ type GPGGAResult struct {
 	Fix GPSFix
 }
 
-func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
+func ParseGPGGA(sentence string, quiet bool) *GPGGAResult {
 	var result = new(GPGGAResult)
 
 	result.Fix = DWFIX_NO_FIX
@@ -627,8 +607,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 		}
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("No fix in GPGGA sentence.\n")
+			logrus.WithField("sentence", sentence).Warn("No fix in GPGGA sentence")
 		}
 
 		result.Fix = DWFIX_ERROR
@@ -640,8 +619,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 		var lat, latErr = latlong.LatitudeFromNMEA(plat, pns[0])
 		if latErr != nil {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't get latitude from GPGGA sentence: %v\n", latErr)
+				logrus.WithError(latErr).WithField("sentence", sentence).Warn("Can't get latitude from GPGGA sentence")
 			}
 
 			result.Fix = DWFIX_ERROR
@@ -652,8 +630,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 		result.Lat = maybe.Just(lat)
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get latitude from GPGGA sentence.\n")
+			logrus.WithField("sentence", sentence).Warn("Can't get latitude from GPGGA sentence")
 		}
 
 		result.Fix = DWFIX_ERROR
@@ -665,8 +642,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 		var lon, lonErr = latlong.LongitudeFromNMEA(plon, pew[0])
 		if lonErr != nil {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't get longitude from GPGGA sentence: %v\n", lonErr)
+				logrus.WithError(lonErr).WithField("sentence", sentence).Warn("Can't get longitude from GPGGA sentence")
 			}
 
 			result.Fix = DWFIX_ERROR
@@ -677,8 +653,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 		result.Lon = maybe.Just(lon)
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get longitude from GPGGA sentence.\n")
+			logrus.WithField("sentence", sentence).Warn("Can't get longitude from GPGGA sentence")
 		}
 
 		result.Fix = DWFIX_ERROR
@@ -703,8 +678,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 				result.Fix = DWFIX_3D
 			} else {
 				if !quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Can't get altitude from GPGGA sentence: %s\n", paltitude)
+					logrus.WithField("altitude", paltitude).Warn("Can't get altitude from GPGGA sentence")
 				}
 
 				result.Fix = DWFIX_ERROR
@@ -718,15 +692,14 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 		return result
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get altitude from GPGGA sentence.\n")
+			logrus.WithField("sentence", sentence).Warn("Can't get altitude from GPGGA sentence")
 		}
 
 		result.Fix = DWFIX_ERROR
 
 		return result
 	}
-} /* end dwgpsnmea_gpgga */
+} /* end ParseGPGGA */
 
 /*-------------------------------------------------------------------
  *

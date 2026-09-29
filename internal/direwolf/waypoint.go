@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -62,7 +63,7 @@ type WaypointSender struct {
  *
  *---------------------------------------------------------------*/
 
-func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *GPS) (*WaypointSender, error) {
+func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *dwgps.GPS) (*WaypointSender, error) {
 	logrus.WithFields(logrus.Fields{
 		"serial_device": mc.waypoint_serial_port,
 		"formats":       mc.waypoint_formats,
@@ -93,7 +94,7 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *GPS) (*Waypo
 	 * If that fails, do own serial port open.
 	 */
 	if serialRequested {
-		ws.serialPortFd = gps.sharedNMEAPort(mc.waypoint_serial_port, 4800)
+		ws.serialPortFd = gps.SharedNMEAPort(mc.waypoint_serial_port, 4800)
 
 		if ws.serialPortFd == nil {
 			ws.serialPortFd = serialport.Open(mc.waypoint_serial_port, 4800)

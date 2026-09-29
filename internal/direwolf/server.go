@@ -1032,7 +1032,7 @@ func (s *AGWServer) connectListenThread(ctx context.Context, server_port int) {
 	// closing the listener is what gets us back when we are asked to stop.
 	// It also gives the port up rather than holding it until the process
 	// exits, which is what lets a test start a server and then stop it.
-	defer closeOnDone(ctx, listener)()
+	defer dwutil.CloseOnDone(ctx, listener)()
 
 	for ctx.Err() == nil {
 		var client = s.findFreeClient()
@@ -1066,7 +1066,7 @@ func (s *AGWServer) connectListenThread(ctx context.Context, server_port int) {
 
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nAttached to AGW client application %d...\n\n", client)
-		} else if !sleepSecCtx(ctx, 1) { /* wait then check again if more clients allowed. */
+		} else if !dwutil.SleepSecCtx(ctx, 1) { /* wait then check again if more clients allowed. */
 			return
 		}
 	}
@@ -1179,7 +1179,7 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 
 	for ctx.Err() == nil {
 		for s.clientConn(client) == nil {
-			if !sleepSecCtx(ctx, 1) { /* Not connected.  Try again later. */
+			if !dwutil.SleepSecCtx(ctx, 1) { /* Not connected.  Try again later. */
 				return
 			}
 		}
@@ -1196,7 +1196,7 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 		// indefinitely, so closing its socket is what gets us back.  It stays
 		// armed until the whole message has been read, since either read can
 		// be the one that never returns.
-		var stopClose = closeOnDone(ctx, conn)
+		var stopClose = dwutil.CloseOnDone(ctx, conn)
 
 		var readErr = binary.Read(conn, binary.LittleEndian, &cmd.Header)
 

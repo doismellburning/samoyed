@@ -448,7 +448,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 			ks.closePort()
 		} else {
 			// Not open.  Wait for it to appear and try opening.
-			if !sleepSecCtx(ctx, ks.miscConfig.kiss_serial_poll) {
+			if !dwutil.SleepSecCtx(ctx, ks.miscConfig.kiss_serial_poll) {
 				return 0, ctx.Err()
 			}
 

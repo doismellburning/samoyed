@@ -1,4 +1,9 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package dwgps reads the station's location from a GPS receiver, over a
+// serial port or from gpsd.
+package dwgps
 
 /*------------------------------------------------------------------
  *
@@ -25,18 +30,19 @@ package direwolf
  *		GPS.Term	Shutdown on exit.
  *
  *
- * from below:	GPS.setData	Called from other two implementations to
+ * from below:	GPS.SetData	Called from other two implementations to
  *				save data until it is needed.
  *
  *---------------------------------------------------------------*/
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -77,8 +83,17 @@ type GPSInfo struct {
 	Altitude   maybe.Maybe[float64] /* meters above mean sea level. Valid if fix == 3. */
 }
 
+// Config says where NewGPS finds its GPS receivers.  Leave a receiver's
+// fields at their zero values to not use it.
+type Config struct {
+	NMEAPort  string /* Serial port name for reading NMEA sentences from GPS. e.g. COM22, /dev/ttyACM0 */
+	NMEASpeed int    /* Speed for above, baud.  0 leaves the port's speed as it is. */
+	GPSDHost  string /* Host for gpsd server. e.g. localhost, 192.168.1.2 */
+	GPSDPort  int    /* Port number for gpsd server. */
+}
+
 // GPS holds the most recent position report from whichever GPS receivers
-// NewGPS started.  The reader goroutines deposit it with setData as it
+// NewGPS started.  The reader goroutines deposit it with SetData as it
 // arrives and Read hands a copy to the application; mu keeps the fields of
 // one report together.
 //
@@ -121,7 +136,7 @@ type GPS struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
+func NewGPS(ctx context.Context, pconfig *Config, debug int) *GPS {
 	var g = new(GPS)
 	g.debug = debug
 	g.info.Fix = DWFIX_NOT_INIT // The reader goroutines replace it with DWFIX_NOT_SEEN once they are running.
@@ -130,7 +145,7 @@ func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
 
 	dwgpsd_init(ctx, g, pconfig, debug)
 
-	_ = sleepCtx(ctx, 500*time.Millisecond) /* So receive thread(s) can clear the */
+	_ = dwutil.SleepCtx(ctx, 500*time.Millisecond) /* So receive thread(s) can clear the */
 	/* not init status before it gets checked. */
 
 	return g
@@ -140,8 +155,8 @@ func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
 // serial port named port, leaving its speed as it is and not using gpsd.  It
 // is NewGPS for a standalone tool with nothing else to configure.
 func NewGPSNMEA(ctx context.Context, port string, debug int) *GPS {
-	var config misc_config_s
-	config.gpsnmea_port = port
+	var config Config
+	config.NMEAPort = port
 
 	return NewGPS(ctx, &config, debug)
 }
@@ -164,8 +179,7 @@ func (g *GPS) Read() GPSInfo {
 	g.mu.Unlock()
 
 	if g.debug >= 1 {
-		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("gps_read: ", &gpsinfo)
+		dwgps_print("gps_read", &gpsinfo)
 	}
 
 	// TODO: Should we check timestamp and complain if very stale?
@@ -178,30 +192,25 @@ func (g *GPS) Read() GPSInfo {
  *
  * Name:        dwgps_print
  *
- * Purpose:     Print gps information for debugging.
+ * Purpose:     Log gps information for debugging.
  *
- * Inputs:	msg		- Message for prefix on line.
+ * Inputs:	source		- Where it came from, for the log entry.
  *		gpsinfo		- Structure with latitude, longitude, etc.
- *
- * Description:	Caller is responsible for setting text color.
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_print(msg string, gpsinfo *GPSInfo) {
-	dw_printf("%stime=%s fix=%d lat=%s lon=%s trk=%s spd=%s alt=%s\n",
-		msg,
-		gpsinfo.Timestamp.Format(time.RFC3339), gpsinfo.Fix,
-		formatMaybeFloat("%.6f", gpsinfo.Lat), formatMaybeFloat("%.6f", gpsinfo.Lon),
-		formatMaybeFloat("%.0f", gpsinfo.Track), formatMaybeFloat("%.1f", gpsinfo.SpeedKnots),
-		formatMaybeFloat("%.0f", gpsinfo.Altitude))
+func dwgps_print(source string, gpsinfo *GPSInfo) {
+	logrus.WithFields(logrus.Fields{
+		"source": source,
+		"time":   gpsinfo.Timestamp.Format(time.RFC3339),
+		"fix":    gpsinfo.Fix,
+		"lat":    maybe.Format("%.6f", "unknown", gpsinfo.Lat),
+		"lon":    maybe.Format("%.6f", "unknown", gpsinfo.Lon),
+		"trk":    maybe.Format("%.0f", "unknown", gpsinfo.Track),
+		"spd":    maybe.Format("%.1f", "unknown", gpsinfo.SpeedKnots),
+		"alt":    maybe.Format("%.0f", "unknown", gpsinfo.Altitude),
+	}).Debug("GPS location")
 } /* end dwgps_print */
-
-// formatMaybeFloat renders m with the given verb, or as "unknown" for Nothing.
-func formatMaybeFloat(format string, m maybe.Maybe[float64]) string {
-	return maybe.Fold("unknown", func(value float64) string {
-		return fmt.Sprintf(format, value)
-	}, m)
-}
 
 /*-------------------------------------------------------------------
  *
@@ -227,15 +236,17 @@ func (g *GPS) Term() {
 
 /*-------------------------------------------------------------------
  *
- * Name:        setData
+ * Name:        SetData
  *
  * Purpose:     Called by the GPS interfaces when new data is available.
+ *		Also for tests elsewhere that need a GPS reporting a
+ *		given location.
  *
  * Inputs:	gpsinfo		- Structure with latitude, longitude, etc.
  *
  *--------------------------------------------------------------------*/
 
-func (g *GPS) setData(gpsinfo *GPSInfo) {
+func (g *GPS) SetData(gpsinfo *GPSInfo) {
 	/* Debug print is handled by the two callers so */
 	/* we can distinguish the source. */
 	g.mu.Lock()
@@ -243,6 +254,6 @@ func (g *GPS) setData(gpsinfo *GPSInfo) {
 	g.info = *gpsinfo
 
 	g.mu.Unlock()
-} /* end setData */
+} /* end SetData */
 
 /* end dwgps.c */

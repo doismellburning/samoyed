@@ -8,17 +8,11 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/dwgps"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
-
-// show formats an optional GPS reading, so an absent one prints as "unknown"
-// rather than as a plausible-looking number.
-func show(format string, m maybe.Maybe[float64]) string {
-	return maybe.Fold("unknown", func(value float64) string {
-		return fmt.Sprintf(format, value)
-	}, m)
-}
 
 func main() {
 	// GPS reading runs in a goroutine of its own, which this stops when the
@@ -26,6 +20,11 @@ func main() {
 	// default "an interrupt ends the process", so the loop in run has to end
 	// on it too.
 	var ctx, stop = signal.NotifyContext(context.Background(), os.Interrupt)
+
+	// The GPS code logs what it reads, down to each NMEA sentence at the
+	// debug level run asks for, alongside the report printed here.
+	logrus.SetOutput(os.Stdout)
+	logrus.SetLevel(logrus.TraceLevel)
 
 	var status = run(ctx, os.Args[1:], os.Stdout)
 
@@ -42,24 +41,24 @@ func run(ctx context.Context, args []string, out io.Writer) int {
 		gpsPort = args[0]
 	}
 
-	var gps = direwolf.NewGPSNMEA(ctx, gpsPort, 3)
+	var gps = dwgps.NewGPSNMEA(ctx, gpsPort, 3)
 
 	for ctx.Err() == nil {
 		var info = gps.Read()
 
 		switch info.Fix {
-		case direwolf.DWFIX_2D, direwolf.DWFIX_3D:
-			fmt.Fprintf(out, "%s  %s", show("%.6f", info.Lat), show("%.6f", info.Lon))
-			fmt.Fprintf(out, "  %s knots  %s degrees", show("%.1f", info.SpeedKnots), show("%.0f", info.Track))
+		case dwgps.DWFIX_2D, dwgps.DWFIX_3D:
+			fmt.Fprintf(out, "%s  %s", maybe.Format("%.6f", "unknown", info.Lat), maybe.Format("%.6f", "unknown", info.Lon))
+			fmt.Fprintf(out, "  %s knots  %s degrees", maybe.Format("%.1f", "unknown", info.SpeedKnots), maybe.Format("%.0f", "unknown", info.Track))
 
-			if info.Fix == direwolf.DWFIX_3D {
-				fmt.Fprintf(out, "  altitude = %s meters", show("%.1f", info.Altitude))
+			if info.Fix == dwgps.DWFIX_3D {
+				fmt.Fprintf(out, "  altitude = %s meters", maybe.Format("%.1f", "unknown", info.Altitude))
 			}
 
 			fmt.Fprintf(out, "\n")
-		case direwolf.DWFIX_NOT_SEEN, direwolf.DWFIX_NO_FIX:
+		case dwgps.DWFIX_NOT_SEEN, dwgps.DWFIX_NO_FIX:
 			fmt.Fprintf(out, "Location currently not available.\n")
-		case direwolf.DWFIX_NOT_INIT:
+		case dwgps.DWFIX_NOT_INIT:
 			fmt.Fprintf(out, "GPS Init failed.\n")
 
 			return 1
@@ -67,7 +66,7 @@ func run(ctx context.Context, args []string, out io.Writer) int {
 			fmt.Fprintf(out, "ERROR getting GPS information.\n")
 		}
 
-		if !direwolf.SleepSecCtx(ctx, 3) {
+		if !dwutil.SleepSecCtx(ctx, 3) {
 			break
 		}
 	}

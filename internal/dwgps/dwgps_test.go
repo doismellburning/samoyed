@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+package dwgps
 
 import (
 	"context"
@@ -25,8 +25,8 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 
 	for name, port := range testCases {
 		t.Run(name, func(t *testing.T) {
-			var config = new(misc_config_s)
-			config.gpsnmea_port = port
+			var config = new(Config)
+			config.NMEAPort = port
 
 			var gps = NewGPS(context.Background(), config, 0)
 
@@ -58,7 +58,7 @@ func TestDWGPSReadReturnsWhatWasSet(t *testing.T) {
 	report.Lon = maybe.Just(-71.3)
 	report.Altitude = maybe.Just(33.5)
 
-	gps.setData(report)
+	gps.SetData(report)
 
 	assert.Equal(t, *report, gps.Read())
 }
@@ -76,7 +76,7 @@ func TestDWGPSConcurrentSetAndRead(t *testing.T) {
 			report.Lat = maybe.Just(float64(i))
 			report.Lon = maybe.Just(float64(i))
 
-			gps.setData(report)
+			gps.SetData(report)
 		}
 	})
 

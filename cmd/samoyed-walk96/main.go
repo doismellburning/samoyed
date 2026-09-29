@@ -17,6 +17,8 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/dwgps"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
@@ -59,12 +61,12 @@ func main() {
 	defer stop()
 
 	var debug_gps = 0
-	var gps = direwolf.NewGPSNMEA(ctx, gpsSerialPort, debug_gps)
+	var gps = dwgps.NewGPSNMEA(ctx, gpsSerialPort, debug_gps)
 
 	// Wait for sample before reading.  An interrupt cuts the wait short, and
 	// the loop below then does nothing, so we carry on to leaving KISS mode
 	// rather than returning and abandoning the TNC in it.
-	_ = direwolf.SleepSecCtx(ctx, 1)
+	_ = dwutil.SleepSecCtx(ctx, 1)
 
 	for range HOWLONG {
 		if ctx.Err() != nil {
@@ -78,7 +80,7 @@ func main() {
 		var latitude, haveLat = info.Lat.Get()
 		var longitude, haveLon = info.Lon.Get()
 
-		if info.Fix > direwolf.DWFIX_2D && haveLat && haveLon {
+		if info.Fix > dwgps.DWFIX_2D && haveLat && haveLon {
 			walk96(latitude, longitude, info.SpeedKnots, info.Track, info.Altitude)
 		} else if info.Fix < 0 {
 			fmt.Printf("Can't communicate with GPS receiver.\n")
@@ -87,7 +89,7 @@ func main() {
 			fmt.Printf("GPS fix not available.\n")
 		}
 
-		if !direwolf.SleepSecCtx(ctx, 1) {
+		if !dwutil.SleepSecCtx(ctx, 1) {
 			break
 		}
 	}

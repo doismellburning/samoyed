@@ -543,7 +543,7 @@ func (kp *KissPT) listenThread(ctx context.Context) {
 	// otherwise never return.  Armed once here rather than around each read:
 	// this goroutine reads one byte at a time, and the pseudo terminal is
 	// never reopened underneath it.
-	defer closeOnDone(ctx, kp.ptMaster())()
+	defer dwutil.CloseOnDone(ctx, kp.ptMaster())()
 
 	// Nothing else tears the pseudo terminal down - cleanup has no teardown
 	// for it - so it is ours to close whenever we stop, including when a
