@@ -34,6 +34,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/symbols"
+	"github.com/sirupsen/logrus"
 )
 
 type packet_type_e int
@@ -2404,10 +2405,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte) {
 
 	A.g_query_type = string(before)
 
-	// TODO: remove debug
-
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("DEBUG: General Query type = \"%s\"\n", A.g_query_type)
+	logrus.WithField("query_type", A.g_query_type).Debug("General Query")
 
 	if len(after) == 0 {
 		return
@@ -2454,10 +2452,11 @@ func aprs_general_query(A *decode_aprs_t, info []byte) {
 
 			return
 		}
-		// TODO: remove debug
-
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("DEBUG: General Query footprint = %.6f %.6f %.2f\n", lat, lon, radius)
+		logrus.WithFields(logrus.Fields{
+			"lat":    lat,
+			"lon":    lon,
+			"radius": radius,
+		}).Debug("General Query footprint")
 
 		A.g_footprint_lat = maybe.Just(lat)
 		A.g_footprint_lon = maybe.Just(lon)
