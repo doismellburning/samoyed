@@ -9,6 +9,7 @@ import (
 	"os/signal"
 
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -67,7 +68,7 @@ func run(ctx context.Context, args []string, out io.Writer) int {
 			fmt.Fprintf(out, "ERROR getting GPS information.\n")
 		}
 
-		if !direwolf.SleepSecCtx(ctx, 3) {
+		if !dwutil.SleepSecCtx(ctx, 3) {
 			break
 		}
 	}

@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -200,7 +201,7 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 	// Scan blocks until gpsd says something, which it need not ever do, so
 	// closing the connection is what gets this goroutine back when we are
 	// asked to stop.
-	defer closeOnDone(ctx, conn)()
+	defer dwutil.CloseOnDone(ctx, conn)()
 
 	var scanner = bufio.NewScanner(conn)
 	scanner.Buffer(make([]byte, 0, 4096), 1<<20)

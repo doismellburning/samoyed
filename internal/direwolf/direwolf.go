@@ -473,7 +473,7 @@ x = Silence FX.25 information.`)
 		logrus.WithError(err).Debug("AudioOpen failed")
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
-		_ = sleepSecCtx(ctx, 5)
+		_ = dwutil.SleepSecCtx(ctx, 5)
 		pflag.Usage()
 		os.Exit(1)
 	}
@@ -624,7 +624,7 @@ x = Silence FX.25 information.`)
 					}
 				case 'p': // Silence - set PTT only: -x p
 					fmt.Printf("\nSending silence (Set PTT only) on channel %d.\nPress control-C to terminate.\n", transmitCalibrationChannel)
-					sleepSecCtx(ctx, max_duration)
+					dwutil.SleepSecCtx(ctx, max_duration)
 				}
 
 				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 0)

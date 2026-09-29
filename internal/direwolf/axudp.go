@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v3"
@@ -146,7 +147,7 @@ const maxUDPPayload = 65535
 func (b *AXUDPBridge) RunUDPListener(ctx context.Context) error {
 	// The read below blocks until a datagram turns up, which may be never, so
 	// closing the socket is what gets us back when we are asked to stop.
-	defer closeOnDone(ctx, b.udpConn)()
+	defer dwutil.CloseOnDone(ctx, b.udpConn)()
 
 	var buf = make([]byte, maxUDPPayload)
 	for ctx.Err() == nil {
@@ -230,7 +231,7 @@ func (b *AXUDPBridge) RunKISSServer(ctx context.Context, ln net.Listener) error 
 	// Accept blocks until a client turns up, so closing the listener is what
 	// gets us back when we are asked to stop.  The caller still owns it; this
 	// only brings its close forward to the cancellation.
-	defer closeOnDone(ctx, ln)()
+	defer dwutil.CloseOnDone(ctx, ln)()
 
 	for ctx.Err() == nil {
 		var conn, acceptErr = ln.Accept()
@@ -250,7 +251,7 @@ func (b *AXUDPBridge) RunKISSServer(ctx context.Context, ln net.Listener) error 
 
 			logrus.WithError(acceptErr).Error("Could not accept KISS client")
 
-			if !sleepCtx(ctx, backoff) {
+			if !dwutil.SleepCtx(ctx, backoff) {
 				return nil
 			}
 
@@ -430,7 +431,7 @@ func (b *AXUDPBridge) handleKISSClient(ctx context.Context, conn net.Conn) {
 
 	// A client that connects and then says nothing leaves the read below
 	// blocked indefinitely, so closing its socket is what gets us back.
-	defer closeOnDone(ctx, conn)()
+	defer dwutil.CloseOnDone(ctx, conn)()
 
 	var kf KISSFrame
 	var overflow bool

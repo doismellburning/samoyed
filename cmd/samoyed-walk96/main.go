@@ -17,6 +17,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
@@ -64,7 +65,7 @@ func main() {
 	// Wait for sample before reading.  An interrupt cuts the wait short, and
 	// the loop below then does nothing, so we carry on to leaving KISS mode
 	// rather than returning and abandoning the TNC in it.
-	_ = direwolf.SleepSecCtx(ctx, 1)
+	_ = dwutil.SleepSecCtx(ctx, 1)
 
 	for range HOWLONG {
 		if ctx.Err() != nil {
@@ -87,7 +88,7 @@ func main() {
 			fmt.Printf("GPS fix not available.\n")
 		}
 
-		if !direwolf.SleepSecCtx(ctx, 1) {
+		if !dwutil.SleepSecCtx(ctx, 1) {
 			break
 		}
 	}

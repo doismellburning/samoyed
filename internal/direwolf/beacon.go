@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 )
@@ -369,7 +370,7 @@ func (bs *BeaconService) thread(ctx context.Context) {
 		if earliest.After(now) {
 			// Almost all of a beacon thread's life is spent here, so this
 			// is where a cancellation has to reach it.
-			if !sleepCtx(ctx, earliest.Sub(now)) {
+			if !dwutil.SleepCtx(ctx, earliest.Sub(now)) {
 				return
 			}
 		}
