@@ -27,8 +27,6 @@ import (
 const MAX_NUM_BITS = (MAX_FRAME_LEN * 8 * 6 / 5)
 
 type rrbb_t struct {
-	nextp *rrbb_t /* Next pointer to maintain a queue. */
-
 	channel    int /* Radio channel from which it was received. */
 	subchannel int /* Which modem when more than one per channel. */
 	slice      int /* Which slicer. */
@@ -98,8 +96,6 @@ func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram
 
 func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state int, prev_descram int) {
 	dwutil.Assert(prev_descram == 0 || prev_descram == 1)
-
-	b.nextp = nil
 
 	b.alevel.Rec = 9999 // TODO: was there some reason for this instead of 0 or -1?
 	b.alevel.Mark = 9999
@@ -177,58 +173,6 @@ func rrbb_get_len(b *rrbb_t) int {
 
 func rrbb_get_bit(b *rrbb_t, ind int) byte {
 	return b.fdata[ind]
-}
-
-/***********************************************************************************
- *
- * Name:	rrbb_flip_bit
- *
- * Purpose:	Complement the value of bit in specified position.
- *
- * Inputs:	Handle for bit array.
- *		Index into array.
- *
- ***********************************************************************************/
-
-//void rrbb_flip_bit (*rrbb_t b, unsigned int ind)
-//{
-//	unsigned int di, mi;
-//
-//	Assert (ind < b.len);
-//
-//	di = ind / SOI;
-//	mi = ind % SOI;
-//
-//	b.data[di] ^= masks[mi];
-//}
-
-/***********************************************************************************
- *
- * Name:	rrbb_set_netxp
- *
- * Purpose:	Set the nextp field, used to maintain a queue.
- *
- * Inputs:	b	Handle for bit array.
- *		np	New value for nextp.
- *
- ***********************************************************************************/
-
-func rrbb_set_nextp(b *rrbb_t, np *rrbb_t) { //nolint:unused
-	b.nextp = np
-}
-
-/***********************************************************************************
- *
- * Name:	rrbb_get_netxp
- *
- * Purpose:	Get value of nextp field.
- *
- * Inputs:	b	Handle for bit array.
- *
- ***********************************************************************************/
-
-func rrbb_get_nextp(b *rrbb_t) *rrbb_t { //nolint:unused
-	return (b.nextp)
 }
 
 /***********************************************************************************
