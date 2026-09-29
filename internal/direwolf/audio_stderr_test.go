@@ -219,6 +219,8 @@ func TestCaptureStderrFDRestoresStderrAfterPanic(t *testing.T) {
 }
 
 func TestQuietPortAudioHoldsBackNoiseUntilSomethingIsReported(t *testing.T) {
+	var d = new(AudioDevices)
+
 	var noisy = func() error {
 		var _, err = unix.Write(unix.Stderr, []byte(alsaNoise))
 
@@ -227,7 +229,7 @@ func TestQuietPortAudioHoldsBackNoiseUntilSomethingIsReported(t *testing.T) {
 
 	// The noise itself goes nowhere, whether the call worked...
 	var out = captureStdout(t, func() {
-		require.NoError(t, quietPortAudio(noisy))
+		require.NoError(t, d.quietPortAudio(noisy))
 	})
 
 	assert.NotContains(t, out, "cannot find card")
@@ -235,7 +237,7 @@ func TestQuietPortAudioHoldsBackNoiseUntilSomethingIsReported(t *testing.T) {
 	// ...or not: printing is the caller's, after its own error message, so the
 	// explanation follows the failure rather than preceding it.
 	out = captureStdout(t, func() {
-		require.Error(t, quietPortAudio(func() error {
+		require.Error(t, d.quietPortAudio(func() error {
 			_ = noisy()
 
 			return assert.AnError
@@ -245,12 +247,12 @@ func TestQuietPortAudioHoldsBackNoiseUntilSomethingIsReported(t *testing.T) {
 	assert.NotContains(t, out, "cannot find card")
 
 	// What was kept is there for that caller...
-	out = captureStdout(t, printAudioBackendNoise)
+	out = captureStdout(t, d.printAudioBackendNoise)
 
 	assert.Contains(t, out, "cannot find card")
 
 	// ...but only once, so a later unrelated failure doesn't repeat it.
-	out = captureStdout(t, printAudioBackendNoise)
+	out = captureStdout(t, d.printAudioBackendNoise)
 
 	assert.NotContains(t, out, "cannot find card")
 }
@@ -259,15 +261,17 @@ func TestQuietPortAudioKeepsTheMostRecentNoise(t *testing.T) {
 	// Each call captures and remembers under one lock, so the noise left for
 	// printing is the latest, rather than whichever call happened to finish
 	// publishing last.
+	var d = new(AudioDevices)
+
 	for _, message := range []string{"first\n", "second\n"} {
-		require.NoError(t, quietPortAudio(func() error {
+		require.NoError(t, d.quietPortAudio(func() error {
 			var _, err = unix.Write(unix.Stderr, []byte(message))
 
 			return err
 		}))
 	}
 
-	var out = captureStdout(t, printAudioBackendNoise)
+	var out = captureStdout(t, d.printAudioBackendNoise)
 
 	assert.Contains(t, out, "second")
 	assert.NotContains(t, out, "first")

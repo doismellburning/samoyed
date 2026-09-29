@@ -56,7 +56,9 @@ func Test_genTone(t *testing.T) {
 	var sink = new(recordingSink)
 
 	var output = testutils.CaptureOutput(t, func() {
-		genTone(sink)
+		genTone(func(*direwolf.AudioConfig) (direwolf.AudioSink, func()) {
+			return sink, func() {}
+		})
 	})
 
 	// Every channel of the stereo run has a tone generator to put bits to.

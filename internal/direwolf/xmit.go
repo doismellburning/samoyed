@@ -36,7 +36,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -81,12 +80,12 @@ type XmitService struct {
 	debugXmitPacket bool /* print packet in hexadecimal form for debugging. */
 
 	/*
-	 * When an audio device is in stereo mode, we can have two
-	 * different channels that want to transmit at the same time.
-	 * We are not clever enough to multiplex them so use this
-	 * so only one is active at the same time.
+	 * The audio devices we transmit through.  When an audio device is in
+	 * stereo mode, we can have two different channels that want to transmit
+	 * at the same time.  We are not clever enough to multiplex them so hold
+	 * the device's outputMu so only one is active at the same time.
 	 */
-	audioOutDevMutex [MAX_ADEVS]sync.Mutex
+	audio *AudioDevices
 
 	/*
 	 * Whether each audio device can transmit at all, sampled once the devices
@@ -116,6 +115,8 @@ type XmitService struct {
  *
  * Inputs:	p_modem		- Structure with modem and timing parameters.
  *
+ *		audio		- The audio devices to transmit through.
+ *
  *		fx25Debug	- FX.25's debug level, for each channel's
  *				  HDLCSender.
  *
@@ -134,10 +135,11 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(ctx context.Context, p_modem *AudioConfig, debug_xmit_packet bool, fx25Debug int) *XmitService {
+func NewXmitService(ctx context.Context, p_modem *AudioConfig, audio *AudioDevices, debug_xmit_packet bool, fx25Debug int) *XmitService {
 	logrus.Debug("xmit_init")
 	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem
+	xs.audio = audio
 	xs.fx25Debug = fx25Debug
 
 	xs.debugXmitPacket = debug_xmit_packet
@@ -148,7 +150,7 @@ func NewXmitService(ctx context.Context, p_modem *AudioConfig, debug_xmit_packet
 	 */
 
 	for a := range MAX_ADEVS {
-		xs.audioOutAvailable[a] = audio_transmit_available(a)
+		xs.audioOutAvailable[a] = audio.transmitAvailable(a)
 	}
 
 	for j := range MAX_RADIO_CHANS {
@@ -461,7 +463,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 		// defer, rather than at the end of the transmit path below, means it
 		// is released however we leave this function - notably when the
 		// packet we were about to send has disappeared from the queue.
-		defer xs.audioOutDevMutex[ACHAN2ADEV(channel)].Unlock()
+		defer xs.audio.outputMu[ACHAN2ADEV(channel)].Unlock()
 	} else if ctx.Err() != nil {
 		// Not a timeout: we are being shut down, so leave the queue as it is
 		// rather than discarding a packet as though the channel were busy.
@@ -787,11 +789,11 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	 * about 40 mS of elapsed real time.
 	 */
 
-	audio_wait(ACHAN2ADEV(channel))
+	xs.audio.wait(ACHAN2ADEV(channel))
 
 	/*
 	 * Ideally we should be here just about the time when the audio is ending.
-	 * However, the innards of "audio_wait" are not satisfactory in all cases.
+	 * However, the innards of "wait" are not satisfactory in all cases.
 	 *
 	 * Calculate how long the frame(s) should take in milliseconds.
 	 */
@@ -1280,7 +1282,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 
 	// TODO: review this.
 
-	for !xs.audioOutDevMutex[ACHAN2ADEV(channel)].TryLock() {
+	for !xs.audio.outputMu[ACHAN2ADEV(channel)].TryLock() {
 		if !sleepCtx(ctx, WAIT_CHECK_EVERY_MS*time.Millisecond) {
 			return false
 		}

@@ -466,10 +466,11 @@ x = Silence FX.25 information.`)
 		os.Exit(1)
 	}
 
-	var err = AudioOpen(ctx, audio_config)
+	var audioDevices, err = AudioOpen(ctx, audio_config)
 	stopIfCancelled(ctx)
 
-	if err < 0 {
+	if err != nil {
+		logrus.WithError(err).Debug("AudioOpen failed")
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
 		_ = sleepSecCtx(ctx, 5)
@@ -502,7 +503,7 @@ x = Silence FX.25 information.`)
 	 * Note:  This is not the same as a volume control you would see on the screen.
 	 * It is the range of the digital sound representation.
 	 */
-	GenToneInit(audio_config, audio_amplitude, AudioDeviceSink{})
+	GenToneInit(audio_config, audio_amplitude, audioDevices)
 
 	/*
 	 * Push to Talk (PTT) control.
@@ -522,7 +523,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmitSvc = NewXmitService(ctx, audio_config, d_p_opt, d_x_opt)
+	xmitSvc = NewXmitService(ctx, audio_config, audioDevices, d_p_opt, d_x_opt)
 	stopIfCancelled(ctx)
 
 	/*
@@ -577,7 +578,7 @@ x = Silence FX.25 information.`)
 				// exactly that carrier deliberately, and plays no audio, so it
 				// is still the PTT test a receive-only station wants.
 				if transmitCalibrationType != 'p' &&
-					!audio_transmit_available(ACHAN2ADEV(transmitCalibrationChannel)) {
+					!audioDevices.transmitAvailable(ACHAN2ADEV(transmitCalibrationChannel)) {
 					text_color_set(DW_COLOR_ERROR)
 					fmt.Printf("Channel %d has no audio output device, so calibration tones cannot be sent.\n", transmitCalibrationChannel)
 					fmt.Printf("Use -x p to key PTT without audio.\n")
@@ -712,7 +713,7 @@ x = Silence FX.25 information.`)
 	 * Use hot attribute for all functions called for every audio sample.
 	 */
 
-	var adev_failed = recv_init(ctx, audio_config, audioDeviceSource{})
+	var adev_failed = recv_init(ctx, audio_config, audioDevices)
 
 	go recv_process(ctx)
 
