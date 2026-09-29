@@ -133,13 +133,14 @@ func mheard_latlon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string 
  *
  * Inputs:	channel	- Radio channel where heard.
  *
- *		A	- Exploded information from APRS packet.
- *
  *		pp	- Received packet object.
+ *
+ *		lat, lon - Position it reported, if any.  Recorded only
+ *			  when both are present.
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *ax25.Packet) {
+func (mdb *MHeardDB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float64], lon maybe.Maybe[float64]) {
 	var now = time.Now()
 
 	var source = pp.AddrWithSSID(ax25.Source)
@@ -246,19 +247,9 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *ax25.Packet) {
 		}
 	}
 
-	// Issue 545.  This was not thought out well.
-	// There was a case where a station sent a position report and the location was stored.
-	// Later, the same station sent an object report and the stations's location was overwritten
-	// by the object location.  Solution: Save location only if position report.
-
-	if A.g_packet_type == packet_type_position {
-		var lat, haveLat = A.g_lat.Get()
-		var lon, haveLon = A.g_lon.Get()
-
-		if haveLat && haveLon {
-			mptr.dlat = maybe.Just(lat)
-			mptr.dlon = maybe.Just(lon)
-		}
+	if lat.IsJust() && lon.IsJust() {
+		mptr.dlat = lat
+		mptr.dlon = lon
 	}
 
 	mdb.mu.Unlock()

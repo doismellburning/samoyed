@@ -136,17 +136,7 @@ func TestMHeardDBCount(t *testing.T) {
 
 // --- SaveRF helpers ---
 
-var saveRFNoPos = &decode_aprs_t{g_packet_type: packet_type_none} //nolint:exhaustruct_v5
-var saveRFWithPos = &decode_aprs_t{                               //nolint:exhaustruct_v5
-	g_packet_type: packet_type_position,
-	g_lat:         maybe.Just(42.36),
-	g_lon:         maybe.Just(-71.06),
-}
-var saveRFWithPosUnknown = &decode_aprs_t{ //nolint:exhaustruct_v5
-	g_packet_type: packet_type_position,
-	g_lat:         maybe.Nothing[float64](),
-	g_lon:         maybe.Nothing[float64](),
-}
+var saveRFNoLat, saveRFNoLon = maybe.Nothing[float64](), maybe.Nothing[float64]()
 
 // --- SaveRF ---
 
@@ -154,7 +144,7 @@ func TestMHeardDBSaveRFNewStation(t *testing.T) {
 	var mdb = NewMHeardDB(0)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 
-	mdb.SaveRF(0, saveRFNoPos, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 
 	require.Contains(t, mdb.db, "W1AW")
 	assert.Equal(t, 1, mdb.db["W1AW"].count)
@@ -168,7 +158,7 @@ func TestMHeardDBSaveRFPositionSaved(t *testing.T) {
 	var mdb = NewMHeardDB(0)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 
-	mdb.SaveRF(0, saveRFWithPos, pp)
+	mdb.SaveRF(0, pp, maybe.Just(42.36), maybe.Just(-71.06))
 
 	require.Contains(t, mdb.db, "W1AW")
 	assert.Equal(t, maybe.Just(42.36), mdb.db["W1AW"].dlat)
@@ -179,7 +169,7 @@ func TestMHeardDBSaveRFPositionNotSavedForNonPositionPacket(t *testing.T) {
 	var mdb = NewMHeardDB(0)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 
-	mdb.SaveRF(0, saveRFNoPos, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 
 	assert.Equal(t, maybe.Nothing[float64](), mdb.db["W1AW"].dlat)
 }
@@ -188,7 +178,7 @@ func TestMHeardDBSaveRFUnknownPositionNotSaved(t *testing.T) {
 	var mdb = NewMHeardDB(0)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 
-	mdb.SaveRF(0, saveRFWithPosUnknown, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 
 	assert.Equal(t, maybe.Nothing[float64](), mdb.db["W1AW"].dlat)
 }
@@ -197,10 +187,10 @@ func TestMHeardDBSaveRFExistingStationUpdated(t *testing.T) {
 	var mdb = NewMHeardDB(0)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 
-	mdb.SaveRF(0, saveRFNoPos, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 	// Push the last-heard time back so the 15-second same-transmission guard doesn't fire.
 	mdb.db["W1AW"].last_heard_rf = time.Now().Add(-30 * time.Second)
-	mdb.SaveRF(1, saveRFNoPos, pp)
+	mdb.SaveRF(1, pp, saveRFNoLat, saveRFNoLon)
 
 	assert.Equal(t, 2, mdb.db["W1AW"].count)
 	assert.Equal(t, 1, mdb.db["W1AW"].channel)
@@ -211,12 +201,12 @@ func TestMHeardDBSaveRFHigherHopSkippedWithin15s(t *testing.T) {
 
 	// First: heard directly (0 hops).
 	var ppDirect = ax25.FromText("W1AW>APRS:test", true)
-	mdb.SaveRF(0, saveRFNoPos, ppDirect)
+	mdb.SaveRF(0, ppDirect, saveRFNoLat, saveRFNoLon)
 	assert.Equal(t, 0, mdb.db["W1AW"].num_digi_hops)
 
 	// Second: heard via one digipeater, but within 15 seconds of the first.
 	var ppVia = ax25.FromText("W1AW>APRS,RELAY*:test", true)
-	mdb.SaveRF(0, saveRFNoPos, ppVia)
+	mdb.SaveRF(0, ppVia, saveRFNoLat, saveRFNoLon)
 
 	// Should stay at 1 count and 0 hops (the higher-hop copy is ignored).
 	assert.Equal(t, 1, mdb.db["W1AW"].count)
@@ -229,7 +219,7 @@ func TestMHeardDBSaveRFWideHopHackReducesCount(t *testing.T) {
 	// Raw hops = 2, hack reduces by one → hops = 1.
 	var pp = ax25.FromText("W1AW>APRS,W3AW*,WIDE2*:test", true)
 
-	mdb.SaveRF(0, saveRFNoPos, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 
 	assert.Equal(t, 1, mdb.db["W1AW"].num_digi_hops)
 }
@@ -240,7 +230,7 @@ func TestMHeardDBSaveRFWideHackIgnoresNonZeroSsid(t *testing.T) {
 	// Raw hops = 2 and nothing should be reduced.
 	var pp = ax25.FromText("W1AW>APRS,W3AW*,WIDE1-1*:test", true)
 
-	mdb.SaveRF(0, saveRFNoPos, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 
 	assert.Equal(t, 2, mdb.db["W1AW"].num_digi_hops)
 }
@@ -249,33 +239,33 @@ func TestMHeardDBSaveRFDebug1SkipBranch(t *testing.T) {
 	// debug=1 + higher-hop copy within 15 s → exercises the "skip" debug message.
 	var mdb = NewMHeardDB(1)
 	var ppDirect = ax25.FromText("W1AW>APRS:test", true)
-	mdb.SaveRF(0, saveRFNoPos, ppDirect)
+	mdb.SaveRF(0, ppDirect, saveRFNoLat, saveRFNoLon)
 
 	var ppVia = ax25.FromText("W1AW>APRS,RELAY*:test", true)
-	mdb.SaveRF(0, saveRFNoPos, ppVia)
+	mdb.SaveRF(0, ppVia, saveRFNoLat, saveRFNoLon)
 }
 
 func TestMHeardDBSaveRFDebug1UpdateBranch(t *testing.T) {
 	// debug=1 + update after >15 s → exercises the "update time" debug message.
 	var mdb = NewMHeardDB(1)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
-	mdb.SaveRF(0, saveRFNoPos, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 	mdb.db["W1AW"].last_heard_rf = time.Now().Add(-30 * time.Second)
-	mdb.SaveRF(0, saveRFNoPos, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 }
 
 func TestMHeardDBSaveRFDebug1TriggersDump(t *testing.T) {
 	var mdb = NewMHeardDB(1)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 	// Must not panic; dump is triggered by debug > 0.
-	mdb.SaveRF(0, saveRFNoPos, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 }
 
 func TestMHeardDBSaveRFDebug2PrintsCountAndDump(t *testing.T) {
 	var mdb = NewMHeardDB(2)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 	// Must not panic; both the count debug line and dump are triggered.
-	mdb.SaveRF(0, saveRFNoPos, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 }
 
 // --- dump sort coverage ---
@@ -330,7 +320,7 @@ func TestMHeardDBDumpSort(t *testing.T) {
 
 	// Trigger dump via SaveRF.
 	var pp = ax25.FromText("W1AW>APRS:test", true)
-	mdb.SaveRF(0, saveRFNoPos, pp)
+	mdb.SaveRF(0, pp, saveRFNoLat, saveRFNoLon)
 }
 
 // --- SaveIS ---
