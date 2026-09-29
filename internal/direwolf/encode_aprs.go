@@ -244,12 +244,7 @@ func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain ma
 	var h = max(math.Round(math.Log2(float64(feet)/10.0))+'0', '0')
 	/* Result can go beyond '9'. */
 
-	var g = float64(dBi + '0')
-	if g < '0' {
-		g = '0'
-	} else if g > '9' {
-		g = '0'
-	}
+	var g = min(max(dBi, 0), 9) + '0'
 
 	// Anything else, e.g. omni, is 0.
 	var d = '0'

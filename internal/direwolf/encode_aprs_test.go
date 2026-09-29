@@ -29,6 +29,15 @@ func Test_phg_data_extension_partially_specified(t *testing.T) {
 	assert.Equal(t, "PHG0008", phg_data_extension(none, none, none, "N"), "direction only")
 }
 
+// Gain is a single digit, so anything above 9 dB goes out as 9, as power
+// does.  Dire Wolf sent it as 0, claiming no gain at all.
+func Test_phg_data_extension_high_gain(t *testing.T) {
+	var none = maybe.Nothing[int]()
+
+	assert.Equal(t, "PHG0090", phg_data_extension(none, none, maybe.Just(9), ""))
+	assert.Equal(t, "PHG0090", phg_data_extension(none, none, maybe.Just(12), ""))
+}
+
 func Test_phg_data_extension_directivity(t *testing.T) {
 	var none = maybe.Nothing[int]()
 
