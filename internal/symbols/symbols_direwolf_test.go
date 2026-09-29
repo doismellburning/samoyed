@@ -12,7 +12,7 @@ import (
 /* Quick, incomplete, unit test. */
 
 func Test_Symbols(t *testing.T) {
-	var sd = NewAPRSSymbolData()
+	var sd = New()
 
 	var symtab, symbol byte
 
@@ -63,13 +63,13 @@ func Test_Symbols(t *testing.T) {
 
 	var dest string
 
-	dest, _ = sd.symbols_into_dest('/', 'K')
+	dest, _ = sd.IntoDest('/', 'K')
 	assert.Equal(t, "GPSC43", dest, "ERROR 2-1")
 
-	dest, _ = sd.symbols_into_dest(byte('\\'), 'w')
+	dest, _ = sd.IntoDest(byte('\\'), 'w')
 	assert.Equal(t, "GPSE87", dest, "ERROR 2-2")
 
-	dest, _ = sd.symbols_into_dest(byte('3'), 'A')
+	dest, _ = sd.IntoDest(byte('3'), 'A')
 	assert.Equal(t, "GPSAA3", dest, "ERROR 2-3")
 
 	// Expect to see this:
@@ -78,11 +78,11 @@ func Test_Symbols(t *testing.T) {
 
 	var ok bool
 
-	dest, ok = sd.symbols_into_dest(' ', 'A')
+	dest, ok = sd.IntoDest(' ', 'A')
 	assert.Equal(t, "GPS???", dest, "ERROR 2-4")
 	assert.False(t, ok)
 
-	dest, ok = sd.symbols_into_dest('/', ' ')
+	dest, ok = sd.IntoDest('/', ' ')
 	assert.Equal(t, "GPS???", dest, "ERROR 2-5")
 	assert.False(t, ok)
 

@@ -198,7 +198,7 @@ type decode_aprs_t struct {
 
 func DecodeAPRSInit() {
 	deviceIDData = NewDeviceIDData()
-	aprsSymbolData = symbols.NewAPRSSymbolData()
+	aprsSymbolData = symbols.New()
 }
 
 /*------------------------------------------------------------------

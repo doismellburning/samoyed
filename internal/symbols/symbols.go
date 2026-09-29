@@ -35,13 +35,13 @@ import (
  * Primary symbol table.
  */
 
-type SymbolEntry struct {
+type entry struct {
 	xy          string
 	description string
 }
 
-func primarySymtab() []SymbolEntry {
-	return []SymbolEntry{
+func primarySymtab() []entry {
+	return []entry{
 
 		/*     00  */ {"~~", "--no-symbol--"},
 		/*  !  01  */ {"BB", "Police, Sheriff"},
@@ -145,8 +145,8 @@ func primarySymtab() []SymbolEntry {
  * Alternate symbol table.
  */
 
-func alternateSymtab() []SymbolEntry {
-	return []SymbolEntry{
+func alternateSymtab() []entry {
+	return []entry{
 
 		/*     00  */ {"~~", "--no-symbol--"},
 		/*  !  01  */ {"OB", "EMERGENCY (!)"},
@@ -248,9 +248,9 @@ func alternateSymtab() []SymbolEntry {
 
 /*------------------------------------------------------------------
  *
- * Function:	NewAPRSSymbolData
+ * Function:	New
  *
- * Purpose:	Initialise and return a new APRSSymbolData.
+ * Purpose:	Initialise and return a new Data.
  *
  * Description:	The primary and alternate symbol tables are constant
  *		so they are hardcoded.
@@ -270,20 +270,17 @@ func alternateSymtab() []SymbolEntry {
  *
  *------------------------------------------------------------------*/
 
-const NEW_SYM_INIT_SIZE = 20
-const NEW_SYM_DESC_LEN = 29
-
-type new_sym_t struct {
+type newSymbol struct {
 	overlay     byte
 	symbol      byte
 	description string
 }
 
-type APRSSymbolData struct {
-	newSymbols []*new_sym_t
+type Data struct {
+	newSymbols []*newSymbol
 }
 
-func NewAPRSSymbolData() *APRSSymbolData {
+func New() *Data {
 	/*
 	 * We only care about lines with this format:
 	 *
@@ -320,7 +317,7 @@ func NewAPRSSymbolData() *APRSSymbolData {
 			x[COL6_DESC] != ' ')
 	}
 
-	var sd = new(APRSSymbolData)
+	var sd = new(Data)
 
 	// If search strategy changes, be sure to keep decode_tocall in sync.
 
@@ -365,12 +362,12 @@ func NewAPRSSymbolData() *APRSSymbolData {
 			continue
 		}
 
-		var newSymbol = new(new_sym_t)
-		newSymbol.overlay = line[COL1_OVERLAY]
-		newSymbol.symbol = line[COL2_SYMBOL]
-		newSymbol.description = strings.TrimSpace(line[COL6_DESC:])
+		var ns = new(newSymbol)
+		ns.overlay = line[COL1_OVERLAY]
+		ns.symbol = line[COL2_SYMBOL]
+		ns.description = strings.TrimSpace(line[COL6_DESC:])
 
-		sd.newSymbols = append(sd.newSymbols, newSymbol)
+		sd.newSymbols = append(sd.newSymbols, ns)
 	}
 
 	/*
@@ -382,7 +379,7 @@ func NewAPRSSymbolData() *APRSSymbolData {
 		#endif
 	*/
 	return sd
-} /* end NewAPRSSymbolData */
+} /* end New */
 
 /*------------------------------------------------------------------
  *
@@ -394,7 +391,7 @@ func NewAPRSSymbolData() *APRSSymbolData {
  *
  *------------------------------------------------------------------*/
 
-func (sd *APRSSymbolData) List() {
+func (sd *Data) List() {
 	// This is a report the user has explicitly asked for rather than logging, and
 	// its value is in the columns lining up, so it goes to stdout as-is. A logrus
 	// entry per row would prefix each one with a timestamp and level and leave the
@@ -548,7 +545,7 @@ func ssidToSym() [16]byte {
 	}
 }
 
-func (sd *APRSSymbolData) FromDestOrSrc(dti byte, src string, dest string) (byte, byte, bool) {
+func (sd *Data) FromDestOrSrc(dti byte, src string, dest string) (byte, byte, bool) {
 	/*
 	 * This part does not apply to MIC-E format because the destination
 	 * is used to encode latitude and other information.
@@ -660,7 +657,7 @@ func (sd *APRSSymbolData) FromDestOrSrc(dti byte, src string, dest string) (byte
 
 /*------------------------------------------------------------------
  *
- * Function:	symbols_into_dest
+ * Function:	IntoDest
  *
  * Purpose:	Encode symbol for destination field.
  *
@@ -676,7 +673,7 @@ func (sd *APRSSymbolData) FromDestOrSrc(dti byte, src string, dest string) (byte
  *
  *------------------------------------------------------------------*/
 
-func (sd *APRSSymbolData) symbols_into_dest(symtab byte, symbol byte) (string, bool) {
+func (sd *Data) IntoDest(symtab byte, symbol byte) (string, bool) {
 	if symbol >= '!' && symbol <= '~' && symtab == '/' {
 		/* Primary Symbol table. */
 		return fmt.Sprintf("GPSC%02d", symbol-' '), true
@@ -719,7 +716,7 @@ func (sd *APRSSymbolData) symbols_into_dest(symtab byte, symbol byte) (string, b
  *
  *------------------------------------------------------------------*/
 
-func (sd *APRSSymbolData) Description(symtab byte, symbol byte) string {
+func (sd *Data) Description(symtab byte, symbol byte) string {
 	// The symbol table identifier should be
 	//	/	for symbol from primary table
 	//	\	for symbol from alternate table
@@ -794,7 +791,7 @@ func (sd *APRSSymbolData) Description(symtab byte, symbol byte) string {
  *
  *------------------------------------------------------------------*/
 
-func (sd *APRSSymbolData) CodeFromDescription(overlay byte, description string) (byte, byte, bool) {
+func (sd *Data) CodeFromDescription(overlay byte, description string) (byte, byte, bool) {
 	/*
 	 * If user specified a particular overlay (i.e. for config file BEACON),
 	 * first try the alternate symbol table.
@@ -870,7 +867,7 @@ func (sd *APRSSymbolData) CodeFromDescription(overlay byte, description string) 
  *
  *------------------------------------------------------------------*/
 
-func (sd *APRSSymbolData) ToTones(symtab byte, symbol byte) string {
+func (sd *Data) ToTones(symtab byte, symbol byte) string {
 	if symtab == '/' {
 		return fmt.Sprintf("AB1%02d", symbol-' ')
 	} else if unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab)) {
