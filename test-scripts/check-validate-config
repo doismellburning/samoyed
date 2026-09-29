@@ -63,7 +63,7 @@ function status_of() {
 	shift
 
 	local status=0
-	${limit[@]+"${limit[@]}"} "$DIREWOLF" -c "$conf" -t 0 "$@" > "$conf.out" 2>&1 || status=$?
+	${limit[@]+"${limit[@]}"} "$DIREWOLF" -c "$conf" "$@" > "$conf.out" 2>&1 || status=$?
 
 	echo "$status"
 }

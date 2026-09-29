@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 // A lightweight reimplementation of Dire Wolf's textcolor.c
@@ -14,16 +13,4 @@ const (
 	DW_COLOR_DEBUG                     /* dark_green */
 )
 
-var _text_color_level int
-
-func TextColorInit(level int) {
-	_text_color_level = level
-}
-
-func text_color_set(_ dw_color_e) {
-	if _text_color_level == 0 {
-		return
-	}
-
-	// TODO KG
-}
+func text_color_set(_ dw_color_e) {}

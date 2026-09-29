@@ -32,8 +32,8 @@ $ cat dw2.conf
 ADEVICE plughw:Loopback,0,0 plughw:Loopback,1,1
 AGWPORT 5002
 
-$ direwolf -t 0 -d k -c dw1.conf &
-$ direwolf -t 0 -d k -c dw2.conf &
+$ direwolf -d k -c dw1.conf &
+$ direwolf -d k -c dw2.conf &
 
 $ ./tnctest localhost:5001=dw1 localhost:5002=dw2
 */

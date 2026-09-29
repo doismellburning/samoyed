@@ -20,9 +20,6 @@ import (
  *--------------------------------------------------------------*/
 
 func Test_IL2P(t *testing.T) {
-	var enable_color = 1
-	TextColorInit(enable_color)
-
 	var enable_debug_out = 0
 	il2p_init(enable_debug_out)
 

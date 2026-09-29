@@ -1508,8 +1508,6 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
  *--------------------------------------------------------------------*/
 
 func PfilterStandaloneInit(debug_level int) *PacketFilter {
-	TextColorInit(0)
-
 	DecodeAPRSInit()
 
 	mheardDB = mheard.New(0)
