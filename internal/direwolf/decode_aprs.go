@@ -1638,8 +1638,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 
 	if len(info) < 11 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("APRS Message must have a minimum of 11 characters for : 9 character addressee :\n")
+			logrus.WithField("length", len(info)).Warn("APRS Message must have a minimum of 11 characters for : 9 character addressee :")
 		}
 
 		A.g_message_subtype = message_subtype_invalid
@@ -1649,9 +1648,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 
 	if p.Colon != ':' {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("APRS Message must begin with ':' 9 character addressee ':'\n")
-			dw_printf("Spaces must be added to shorter addressee to make 9 characters.\n")
+			logrus.WithField("hint", "Spaces must be added to shorter addressee to make 9 characters").Warn("APRS Message must begin with ':' 9 character addressee ':'")
 		}
 
 		A.g_message_subtype = message_subtype_invalid
@@ -1679,9 +1676,10 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 	var bad_addressee_re = regexp.MustCompile("[A-Z0-9]+ +-[0-9]")
 
 	if bad_addressee_re.Match(addressee) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Malformed addressee with space between station name and SSID.\n")
-		dw_printf("Please tell message sender this is invalid.\n")
+		logrus.WithFields(logrus.Fields{
+			"addressee": string(addressee),
+			"hint":      "Please tell message sender this is invalid",
+		}).Warn("Malformed addressee with space between station name and SSID")
 	}
 
 	A.g_addressee = string(addressee)
@@ -1771,21 +1769,18 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("ack")) {
 		/* ack or rej?  Message number is required for these. */
 		if !bytes.HasPrefix(message, []byte("ack")) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ERROR: \"%s\" must be lower case \"ack\"\n", message)
+			logrus.WithField("message", string(message)).Warn("ack must be lower case")
 		} else {
 			A.g_message_number = string(message[3:])
 			if len(A.g_message_number) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("ERROR: Message number is missing after \"ack\".\n")
+				logrus.Warn("Message number is missing after ack")
 			}
 		}
 
 		// Xastir puts a carriage return on the end.
 		if strings.Contains(A.g_message_number, "\r") {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
-			dw_printf("message id.  Adding CR might prevent proper interoperability with with other applications.\n")
+			logrus.WithField("hint", "Adding CR might prevent proper interoperability with other applications").
+				Warn("The APRS protocol specification says nothing about a possible carriage return after the message id")
 
 			A.g_message_number = strings.ReplaceAll(A.g_message_number, "\r", "")
 		}
@@ -1798,21 +1793,18 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		A.g_message_subtype = message_subtype_ack
 	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("rej")) {
 		if !bytes.HasPrefix(message, []byte("rej")) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ERROR: \"%s\" must be lower case \"rej\"\n", message)
+			logrus.WithField("message", string(message)).Warn("rej must be lower case")
 		} else {
 			A.g_message_number = string(message[3:])
 			if len(A.g_message_number) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("ERROR: Message number is missing after \"rej\".\n")
+				logrus.Warn("Message number is missing after rej")
 			}
 		}
 
 		// Xastir puts a carriage return on the end.
 		if strings.Contains(A.g_message_number, "\r") {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
-			dw_printf("message id.  Adding CR might prevent proper interoperability with with other applications.\n")
+			logrus.WithField("hint", "Adding CR might prevent proper interoperability with other applications").
+				Warn("The APRS protocol specification says nothing about a possible carriage return after the message id")
 
 			A.g_message_number = strings.ReplaceAll(A.g_message_number, "\r", "")
 		}
@@ -1845,17 +1837,15 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 
 			// Xastir puts a carriage return on the end.
 			if strings.Contains(A.g_message_number, "\r") {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
-				dw_printf("message id.  Adding CR might prevent proper interoperability with with other applications.\n")
+				logrus.WithField("hint", "Adding CR might prevent proper interoperability with other applications").
+					Warn("The APRS protocol specification says nothing about a possible carriage return after the message id")
 
 				A.g_message_number = strings.ReplaceAll(A.g_message_number, "\r", "")
 			}
 
 			var mlen = len(A.g_message_number)
 			if mlen < 1 || mlen > 5 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Message number \"%s\" has length outside range of 1 to 5.\n", A.g_message_number)
+				logrus.WithField("message_number", A.g_message_number).Warn("Message number has length outside range of 1 to 5")
 			}
 
 			// TODO: Complain if not alphanumeric.
