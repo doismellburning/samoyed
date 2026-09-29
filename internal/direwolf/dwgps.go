@@ -37,6 +37,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -164,8 +165,7 @@ func (g *GPS) Read() GPSInfo {
 	g.mu.Unlock()
 
 	if g.debug >= 1 {
-		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("gps_read: ", &gpsinfo)
+		dwgps_print("gps_read", &gpsinfo)
 	}
 
 	// TODO: Should we check timestamp and complain if very stale?
@@ -178,22 +178,24 @@ func (g *GPS) Read() GPSInfo {
  *
  * Name:        dwgps_print
  *
- * Purpose:     Print gps information for debugging.
+ * Purpose:     Log gps information for debugging.
  *
- * Inputs:	msg		- Message for prefix on line.
+ * Inputs:	source		- Where it came from, for the log entry.
  *		gpsinfo		- Structure with latitude, longitude, etc.
- *
- * Description:	Caller is responsible for setting text color.
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_print(msg string, gpsinfo *GPSInfo) {
-	dw_printf("%stime=%s fix=%d lat=%s lon=%s trk=%s spd=%s alt=%s\n",
-		msg,
-		gpsinfo.Timestamp.Format(time.RFC3339), gpsinfo.Fix,
-		maybe.Format("%.6f", "unknown", gpsinfo.Lat), maybe.Format("%.6f", "unknown", gpsinfo.Lon),
-		maybe.Format("%.0f", "unknown", gpsinfo.Track), maybe.Format("%.1f", "unknown", gpsinfo.SpeedKnots),
-		maybe.Format("%.0f", "unknown", gpsinfo.Altitude))
+func dwgps_print(source string, gpsinfo *GPSInfo) {
+	logrus.WithFields(logrus.Fields{
+		"source": source,
+		"time":   gpsinfo.Timestamp.Format(time.RFC3339),
+		"fix":    gpsinfo.Fix,
+		"lat":    maybe.Format("%.6f", "unknown", gpsinfo.Lat),
+		"lon":    maybe.Format("%.6f", "unknown", gpsinfo.Lon),
+		"trk":    maybe.Format("%.0f", "unknown", gpsinfo.Track),
+		"spd":    maybe.Format("%.1f", "unknown", gpsinfo.SpeedKnots),
+		"alt":    maybe.Format("%.0f", "unknown", gpsinfo.Altitude),
+	}).Debug("GPS location")
 } /* end dwgps_print */
 
 /*-------------------------------------------------------------------

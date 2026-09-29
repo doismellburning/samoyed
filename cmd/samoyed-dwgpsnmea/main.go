@@ -11,6 +11,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
@@ -19,6 +20,11 @@ func main() {
 	// default "an interrupt ends the process", so the loop in run has to end
 	// on it too.
 	var ctx, stop = signal.NotifyContext(context.Background(), os.Interrupt)
+
+	// The GPS code logs what it reads, down to each NMEA sentence at the
+	// debug level run asks for, alongside the report printed here.
+	logrus.SetOutput(os.Stdout)
+	logrus.SetLevel(logrus.TraceLevel)
 
 	var status = run(ctx, os.Args[1:], os.Stdout)
 
