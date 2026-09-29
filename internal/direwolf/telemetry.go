@@ -32,36 +32,36 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const T_NUM_ANALOG = 5  /* Number of analog channels. */
-const T_NUM_DIGITAL = 8 /* Number of digital channels. */
+const numAnalog = 5  /* Number of analog channels. */
+const numDigital = 8 /* Number of digital channels. */
 
-type t_metadata_s struct {
-	pnext *t_metadata_s /* Next in linked list. */
+type stationMetadata struct {
+	next *stationMetadata /* Next in linked list. */
 
 	station string /* Station name with optional SSID. */
 
 	project string /* Description for data. */
 	/* "Project Name" or "project title" in the spec. */
 
-	name [T_NUM_ANALOG + T_NUM_DIGITAL]string
+	name [numAnalog + numDigital]string
 	/* Names for channels.  e.g. Battery, Temperature */
 
-	unit [T_NUM_ANALOG + T_NUM_DIGITAL]string
+	unit [numAnalog + numDigital]string
 	/* Units for channels.  e.g. Volts, Deg.C */
 
-	coeff [T_NUM_ANALOG][3]float64 /* a, b, c coefficients for scaling. */
+	coeff [numAnalog][3]float64 /* a, b, c coefficients for scaling. */
 
-	coeff_ndp [T_NUM_ANALOG][3]int /* Number of decimal places for above. */
+	coeffNDP [numAnalog][3]int /* Number of decimal places for above. */
 
-	sense [T_NUM_DIGITAL]bool /* Polarity for digital channels. */
+	sense [numDigital]bool /* Polarity for digital channels. */
 }
 
-const C_A = 0 /* Scaling coefficient positions. */
-const C_B = 1
-const C_C = 2
+const coeffA = 0 /* Scaling coefficient positions. */
+const coeffB = 1
+const coeffC = 2
 
 type TelemetryState struct {
-	mdListHead *t_metadata_s
+	mdListHead *stationMetadata
 }
 
 func NewTelemetryState() *TelemetryState {
@@ -70,7 +70,7 @@ func NewTelemetryState() *TelemetryState {
 
 /*-------------------------------------------------------------------
  *
- * Name:        t_get_metadata
+ * Name:        getMetadata
  *
  * Purpose:     Obtain pointer to metadata for specified station.
  *		If not found, allocate a fresh one and initialize with defaults.
@@ -81,48 +81,48 @@ func NewTelemetryState() *TelemetryState {
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) t_get_metadata(station string) *t_metadata_s {
-	logrus.WithField("station", station).Debug("t_get_metadata")
-	for p := ts.mdListHead; p != nil; p = p.pnext {
+func (ts *TelemetryState) getMetadata(station string) *stationMetadata {
+	logrus.WithField("station", station).Debug("getMetadata")
+	for p := ts.mdListHead; p != nil; p = p.next {
 		if station == p.station {
 			return (p)
 		}
 	}
 
-	var p = new(t_metadata_s)
+	var p = new(stationMetadata)
 
 	p.station = station
 
-	for n := range T_NUM_ANALOG {
+	for n := range numAnalog {
 		p.name[n] = fmt.Sprintf("A%d", n+1)
 	}
 
-	for n := range T_NUM_DIGITAL {
-		p.name[T_NUM_ANALOG+n] = fmt.Sprintf("D%d", n+1)
+	for n := range numDigital {
+		p.name[numAnalog+n] = fmt.Sprintf("D%d", n+1)
 	}
 
-	for n := range T_NUM_ANALOG {
-		p.coeff[n][C_A] = 0.
-		p.coeff[n][C_B] = 1.
-		p.coeff[n][C_C] = 0.
-		p.coeff_ndp[n][C_A] = 0
-		p.coeff_ndp[n][C_B] = 0
-		p.coeff_ndp[n][C_C] = 0
+	for n := range numAnalog {
+		p.coeff[n][coeffA] = 0.
+		p.coeff[n][coeffB] = 1.
+		p.coeff[n][coeffC] = 0.
+		p.coeffNDP[n][coeffA] = 0
+		p.coeffNDP[n][coeffB] = 0
+		p.coeffNDP[n][coeffC] = 0
 	}
 
-	for n := range T_NUM_DIGITAL {
+	for n := range numDigital {
 		p.sense[n] = true
 	}
 
-	p.pnext = ts.mdListHead
+	p.next = ts.mdListHead
 	ts.mdListHead = p
 
 	return (p)
-} /* end t_get_metadata */
+} /* end getMetadata */
 
 /*-------------------------------------------------------------------
  *
- * Name:        t_ndp
+ * Name:        decimalPlaces
  *
  * Purpose:     Count number of digits after any decimal point.
  *
@@ -138,7 +138,7 @@ func (ts *TelemetryState) t_get_metadata(station string) *t_metadata_s {
  *
  *--------------------------------------------------------------------*/
 
-func t_ndp(str string) int {
+func decimalPlaces(str string) int {
 	var p = strings.Index(str, ".")
 	if p == -1 {
 		return (0)
@@ -149,7 +149,7 @@ func t_ndp(str string) int {
 
 /*-------------------------------------------------------------------
  *
- * Name:        telemetry_data_original
+ * Name:        dataOriginal
  *
  * Purpose:     Interpret telemetry data in the original format.
  *
@@ -182,18 +182,18 @@ func t_ndp(str string) int {
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) telemetry_data_original(station string, info string, quiet bool) (string, string) {
-	logrus.WithField("info", info).Debug("telemetry_data_original")
-	var pm = ts.t_get_metadata(station)
+func (ts *TelemetryState) dataOriginal(station string, info string, quiet bool) (string, string) {
+	logrus.WithField("info", info).Debug("dataOriginal")
+	var pm = ts.getMetadata(station)
 
 	// The zero value of a Maybe is Nothing, so an unreported channel needs no
 	// initialisation to say so.
 
-	var araw [T_NUM_ANALOG]maybe.Maybe[float64]
+	var araw [numAnalog]maybe.Maybe[float64]
 
-	var ndp [T_NUM_ANALOG]int
+	var ndp [numAnalog]int
 
-	var draw [T_NUM_DIGITAL]maybe.Maybe[int]
+	var draw [numDigital]maybe.Maybe[int]
 
 	if !strings.HasPrefix(info, "T#") {
 		if !quiet {
@@ -236,16 +236,16 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 		seq = maybe.Just(seqNum)
 	}
 
-	var parts = strings.SplitN(rest, ",", T_NUM_ANALOG+1)
+	var parts = strings.SplitN(rest, ",", numAnalog+1)
 	for n, p := range parts {
-		if n < T_NUM_ANALOG {
+		if n < numAnalog {
 			if len(p) > 0 {
 				// Likewise an analog value that will not parse.
 
 				var f, err = strconv.ParseFloat(p, 64)
 				if err == nil {
 					araw[n] = maybe.Just(f)
-					ndp[n] = t_ndp(p)
+					ndp[n] = decimalPlaces(p)
 				}
 			}
 			// Version 1.3: Suppress this message.
@@ -260,7 +260,7 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 			//}
 		}
 
-		if n == T_NUM_ANALOG {
+		if n == numAnalog {
 			/* We expect to have 8 digits of 0 and 1. */
 			/* Anything left over is a comment. */
 			if len(p) < 8 {
@@ -296,7 +296,7 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 		}
 	}
 
-	if len(parts) < T_NUM_ANALOG+1 {
+	if len(parts) < numAnalog+1 {
 		if !quiet {
 			logrus.WithField("station", station).Warn("Found fewer than expected number of telemetry data values")
 		}
@@ -311,14 +311,14 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 		"araw":    araw,
 		"draw":    draw,
 		"comment": comment,
-	}).Debug("telemetry_data_original: raw data")
+	}).Debug("dataOriginal: raw data")
 
-	return t_data_process(pm, seq, araw, ndp, draw), comment
-} /* end telemtry_data_original */
+	return formatData(pm, seq, araw, ndp, draw), comment
+} /* end dataOriginal */
 
 /*-------------------------------------------------------------------
  *
- * Name:        telemetry_data_base91
+ * Name:        dataBase91
  *
  * Purpose:     Interpret telemetry data in the base 91 compressed format.
  *
@@ -334,18 +334,18 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) string {
-	logrus.WithField("cdata", cdata).Debug("telemetry_data_base91")
-	var pm = ts.t_get_metadata(station)
+func (ts *TelemetryState) dataBase91(station string, cdata string) string {
+	logrus.WithField("cdata", cdata).Debug("dataBase91")
+	var pm = ts.getMetadata(station)
 
 	// The zero value of a Maybe is Nothing, so an unreported channel needs no
 	// initialisation to say so.
 
-	var araw [T_NUM_ANALOG]maybe.Maybe[float64]
+	var araw [numAnalog]maybe.Maybe[float64]
 
-	var ndp [T_NUM_ANALOG]int
+	var ndp [numAnalog]int
 
-	var draw [T_NUM_DIGITAL]maybe.Maybe[int]
+	var draw [numDigital]maybe.Maybe[int]
 
 	if len(cdata) < 4 || len(cdata) > 14 || (len(cdata)%2 == 1) {
 		logrus.WithFields(logrus.Fields{
@@ -359,7 +359,7 @@ func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) st
 	var seq = two_base91_to_i(cdata[0], cdata[1])
 	cdata = cdata[2:]
 
-	for n := 0; n < T_NUM_ANALOG+1 && 2*n < len(cdata); n++ {
+	for n := 0; n < numAnalog+1 && 2*n < len(cdata); n++ {
 		// An invalid base 91 character leaves this value unknown; taking an
 		// absent value apart would invent telemetry readings.
 
@@ -368,10 +368,10 @@ func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) st
 			continue
 		}
 
-		if n < T_NUM_ANALOG {
+		if n < numAnalog {
 			araw[n] = maybe.Just(float64(v))
 		} else {
-			for k := range T_NUM_DIGITAL {
+			for k := range numDigital {
 				draw[k] = maybe.Just(v & 1)
 				v >>= 1
 			}
@@ -386,14 +386,14 @@ func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) st
 		"seq":  seq,
 		"araw": araw,
 		"draw": draw,
-	}).Debug("telemetry_data_base91: raw data")
+	}).Debug("dataBase91: raw data")
 
-	return t_data_process(pm, seq, araw, ndp, draw)
-} /* end telemtry_data_base91 */
+	return formatData(pm, seq, araw, ndp, draw)
+} /* end dataBase91 */
 
 /*-------------------------------------------------------------------
  *
- * Name:        telemetry_name_message
+ * Name:        nameMessage
  *
  * Purpose:     Interpret message with names for analog and digital channels.
  *
@@ -415,15 +415,15 @@ func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) st
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) telemetry_name_message(station string, msg string) {
-	logrus.WithField("msg", msg).Debug("telemetry_name_message")
+func (ts *TelemetryState) nameMessage(station string, msg string) {
+	logrus.WithField("msg", msg).Debug("nameMessage")
 	msg = strings.TrimSpace(msg)
 
-	var pm = ts.t_get_metadata(station)
+	var pm = ts.getMetadata(station)
 
 	var parts = strings.Split(msg, ",")
 	for n, p := range parts {
-		if n < T_NUM_ANALOG+T_NUM_DIGITAL {
+		if n < numAnalog+numDigital {
 			if p != "-" {
 				pm.name[n] = p
 			}
@@ -431,11 +431,11 @@ func (ts *TelemetryState) telemetry_name_message(station string, msg string) {
 	}
 
 	logrus.WithField("name", pm.name).Debug("names")
-} /* end telemetry_name_message */
+} /* end nameMessage */
 
 /*-------------------------------------------------------------------
  *
- * Name:        telemetry_unit_label_message
+ * Name:        unitLabelMessage
  *
  * Purpose:     Interpret message with units/labels for analog and digital channels.
  *
@@ -454,8 +454,8 @@ func (ts *TelemetryState) telemetry_name_message(station string, msg string) {
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) telemetry_unit_label_message(station string, msg string) {
-	logrus.WithField("msg", msg).Debug("telemetry_unit_label_message")
+func (ts *TelemetryState) unitLabelMessage(station string, msg string) {
+	logrus.WithField("msg", msg).Debug("unitLabelMessage")
 
 	/*
 	 * Make a copy of the input string because this will alter it.
@@ -463,21 +463,21 @@ func (ts *TelemetryState) telemetry_unit_label_message(station string, msg strin
 	 */
 	var stemp = strings.TrimSpace(msg)
 
-	var pm = ts.t_get_metadata(station)
+	var pm = ts.getMetadata(station)
 
 	var parts = strings.Split(stemp, ",")
 	for n, p := range parts {
-		if n < T_NUM_ANALOG+T_NUM_DIGITAL {
+		if n < numAnalog+numDigital {
 			pm.unit[n] = p
 		}
 	}
 
 	logrus.WithField("unit", pm.unit).Debug("units/labels")
-} /* end telemetry_unit_label_message */
+} /* end unitLabelMessage */
 
 /*-------------------------------------------------------------------
  *
- * Name:        telemetry_coefficents_message
+ * Name:        coefficientsMessage
  *
  * Purpose:     Interpret message with scaling coefficients for analog channels.
  *
@@ -497,8 +497,8 @@ func (ts *TelemetryState) telemetry_unit_label_message(station string, msg strin
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) telemetry_coefficents_message(station string, msg string, quiet bool) {
-	logrus.WithField("msg", msg).Debug("telemetry_coefficents_message")
+func (ts *TelemetryState) coefficientsMessage(station string, msg string, quiet bool) {
+	logrus.WithField("msg", msg).Debug("coefficientsMessage")
 
 	/*
 	 * Make a copy of the input string because this will alter it.
@@ -506,15 +506,15 @@ func (ts *TelemetryState) telemetry_coefficents_message(station string, msg stri
 	 */
 	var stemp = strings.TrimSpace(msg)
 
-	var pm = ts.t_get_metadata(station)
+	var pm = ts.getMetadata(station)
 
 	var n = 0
 	for p := range strings.SplitSeq(stemp, ",") {
-		if n < T_NUM_ANALOG*3 {
+		if n < numAnalog*3 {
 			// Keep default (or earlier value) for an empty field.
 			if len(p) > 0 {
 				pm.coeff[n/3][n%3], _ = strconv.ParseFloat(p, 64)
-				pm.coeff_ndp[n/3][n%3] = t_ndp(p)
+				pm.coeffNDP[n/3][n%3] = decimalPlaces(p)
 			} else {
 				if !quiet {
 					logrus.WithFields(logrus.Fields{
@@ -529,7 +529,7 @@ func (ts *TelemetryState) telemetry_coefficents_message(station string, msg stri
 		n++
 	}
 
-	if n != T_NUM_ANALOG*3 {
+	if n != numAnalog*3 {
 		if !quiet {
 			logrus.WithFields(logrus.Fields{
 				"station": station,
@@ -540,14 +540,14 @@ func (ts *TelemetryState) telemetry_coefficents_message(station string, msg stri
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"coeff":     pm.coeff,
-		"coeff_ndp": pm.coeff_ndp,
+		"coeff":    pm.coeff,
+		"coeffNDP": pm.coeffNDP,
 	}).Debug("coeff")
-} /* end telemetry_coefficents_message */
+} /* end coefficientsMessage */
 
 /*-------------------------------------------------------------------
  *
- * Name:        telemetry_bit_sense_message
+ * Name:        bitSenseMessage
  *
  * Purpose:     Interpret message with scaling coefficients for analog channels.
  *
@@ -565,9 +565,9 @@ func (ts *TelemetryState) telemetry_coefficents_message(station string, msg stri
  *
  *--------------------------------------------------------------------*/
 
-func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string, quiet bool) {
-	logrus.WithField("msg", msg).Debug("telemetry_bit_sense_message")
-	var pm = ts.t_get_metadata(station)
+func (ts *TelemetryState) bitSenseMessage(station string, msg string, quiet bool) {
+	logrus.WithField("msg", msg).Debug("bitSenseMessage")
+	var pm = ts.getMetadata(station)
 
 	if len(msg) < 8 {
 		if !quiet {
@@ -579,7 +579,7 @@ func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string
 	}
 
 	var n int
-	for n = 0; n < T_NUM_DIGITAL && n < len(msg); n++ {
+	for n = 0; n < numDigital && n < len(msg); n++ {
 		switch msg[n] {
 		case '1':
 			pm.sense[n] = true
@@ -617,11 +617,11 @@ func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string
 		"sense":   pm.sense,
 		"project": pm.project,
 	}).Debug("bit sense, project")
-} /* end telemetry_bit_sense_message */
+} /* end bitSenseMessage */
 
 /*-------------------------------------------------------------------
  *
- * Name:        t_data_process
+ * Name:        formatData
  *
  * Purpose:     Interpret telemetry data in the original format.
  *
@@ -638,7 +638,7 @@ func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string
  *
  *--------------------------------------------------------------------*/
 
-func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]maybe.Maybe[float64], ndp [T_NUM_ANALOG]int, draw [T_NUM_DIGITAL]maybe.Maybe[int]) string {
+func formatData(pm *stationMetadata, seq maybe.Maybe[int], araw [numAnalog]maybe.Maybe[float64], ndp [numAnalog]int, draw [numDigital]maybe.Maybe[int]) string {
 	var output strings.Builder
 
 	if len(pm.project) > 0 {
@@ -649,7 +649,7 @@ func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]m
 	output.WriteString("Seq=")
 	output.WriteString(maybe.Fold("?", strconv.Itoa, seq))
 
-	for n := range T_NUM_ANALOG {
+	for n := range numAnalog {
 		// Display all or only defined values?  Only defined for now.
 		var raw, known = araw[n].Get()
 		if known {
@@ -659,12 +659,12 @@ func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]m
 
 			// Scaling and suitable number of decimal places for display.
 
-			var fval = pm.coeff[n][C_A]*raw*raw +
-				pm.coeff[n][C_B]*raw +
-				pm.coeff[n][C_C]
+			var fval = pm.coeff[n][coeffA]*raw*raw +
+				pm.coeff[n][coeffB]*raw +
+				pm.coeff[n][coeffC]
 
-			var z = dwutil.IfThenElse(pm.coeff_ndp[n][C_A] == 0, 0, pm.coeff_ndp[n][C_A]+ndp[n]+ndp[n])
-			var fndp = max(z, max(pm.coeff_ndp[n][C_B]+ndp[n], pm.coeff_ndp[n][C_C]))
+			var z = dwutil.IfThenElse(pm.coeffNDP[n][coeffA] == 0, 0, pm.coeffNDP[n][coeffA]+ndp[n]+ndp[n])
+			var fndp = max(z, max(pm.coeffNDP[n][coeffB]+ndp[n], pm.coeffNDP[n][coeffC]))
 
 			fmt.Fprintf(&output, "%.*f", fndp, fval)
 			if len(pm.unit[n]) > 0 {
@@ -674,12 +674,12 @@ func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]m
 		}
 	}
 
-	for n := range T_NUM_DIGITAL {
+	for n := range numDigital {
 		// Display all or only defined values?  Only defined for now.
 		var raw, known = draw[n].Get()
 		if known {
 			output.WriteString(", ")
-			output.WriteString(pm.name[T_NUM_ANALOG+n])
+			output.WriteString(pm.name[numAnalog+n])
 			output.WriteString("=")
 
 			// Possible inverting for bit sense.
@@ -687,9 +687,9 @@ func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]m
 			var dval = dwutil.IfThenElse(pm.sense[n], raw, 1-raw)
 
 			output.WriteString(strconv.Itoa(dval))
-			if len(pm.unit[T_NUM_ANALOG+n]) > 0 {
+			if len(pm.unit[numAnalog+n]) > 0 {
 				output.WriteString(" ")
-				output.WriteString(pm.unit[T_NUM_ANALOG+n])
+				output.WriteString(pm.unit[numAnalog+n])
 			}
 		}
 	}
@@ -697,8 +697,8 @@ func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]m
 	var result = output.String()
 
 	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		logrus.WithField("output", result).Debug("t_data_process")
+		logrus.WithField("output", result).Debug("formatData")
 	}
 
 	return result
-} /* end t_data_process */
+} /* end formatData */
