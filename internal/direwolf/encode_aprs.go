@@ -270,26 +270,26 @@ func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain ma
 		g = '0'
 	}
 
+	// Anything else, e.g. omni, is 0.
 	var d = '0'
 
-	if dir != "" {
-		if strings.EqualFold(dir, "NE") {
-			d = '1'
-		} else if strings.EqualFold(dir, "E") {
-			d = '2'
-		} else if strings.EqualFold(dir, "SE") {
-			d = '3'
-		} else if strings.EqualFold(dir, "S") {
-			d = '4'
-		} else if strings.EqualFold(dir, "SW") {
-			d = '5'
-		} else if strings.EqualFold(dir, "W") {
-			d = '6'
-		} else if strings.EqualFold(dir, "NW") {
-			d = '7'
-		} else if strings.EqualFold(dir, "N") {
-			d = '8'
-		}
+	switch strings.ToUpper(dir) {
+	case "NE":
+		d = '1'
+	case "E":
+		d = '2'
+	case "SE":
+		d = '3'
+	case "S":
+		d = '4'
+	case "SW":
+		d = '5'
+	case "W":
+		d = '6'
+	case "NW":
+		d = '7'
+	case "N":
+		d = '8'
 	}
 
 	return fmt.Sprintf("PHG%c%c%c%c", byte(p), byte(h), byte(g), d)

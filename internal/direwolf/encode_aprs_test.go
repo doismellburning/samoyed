@@ -29,6 +29,27 @@ func Test_phg_data_extension_partially_specified(t *testing.T) {
 	assert.Equal(t, "PHG0008", phg_data_extension(none, none, none, "N"), "direction only")
 }
 
+func Test_phg_data_extension_directivity(t *testing.T) {
+	var none = maybe.Nothing[int]()
+
+	for dir, want := range map[string]string{
+		"":     "PHG0000",
+		"omni": "PHG0000",
+		"NE":   "PHG0001",
+		"E":    "PHG0002",
+		"SE":   "PHG0003",
+		"S":    "PHG0004",
+		"SW":   "PHG0005",
+		"W":    "PHG0006",
+		"NW":   "PHG0007",
+		"N":    "PHG0008",
+		"nw":   "PHG0007",
+		"Se":   "PHG0003",
+	} {
+		assert.Equal(t, want, phg_data_extension(none, none, none, dir), dir)
+	}
+}
+
 func Test_EncodePosition_partially_specified_phg(t *testing.T) {
 	var none = maybe.Nothing[int]()
 	var some = maybe.Just[int]
