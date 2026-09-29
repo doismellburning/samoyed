@@ -247,7 +247,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 				if strings.HasPrefix(gps_msg, "$GPRMC") || strings.HasPrefix(gps_msg, "$GNRMC") {
 					// Here we just tuck away the course and speed.
 					// Fix and location will be updated by GxGGA.
-					var f = dwgpsnmea_gprmc(gps_msg, false)
+					var f = ParseGPRMC(gps_msg, false)
 
 					if f.Fix == DWFIX_ERROR {
 						/* Parse error.  Shouldn't happen.  Better luck next time. */
@@ -257,7 +257,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 						info.Track = f.Course.Or(info.Track)
 					}
 				} else if strings.HasPrefix(gps_msg, "$GPGGA") || strings.HasPrefix(gps_msg, "$GNGGA") {
-					var f = dwgpsnmea_gpgga(gps_msg, false)
+					var f = ParseGPGGA(gps_msg, false)
 
 					if f.Fix == DWFIX_ERROR {
 						/* Parse error.  Shouldn't happen.  Better luck next time. */
@@ -349,7 +349,7 @@ func remove_checksum(sent string, quiet bool) (string, error) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgpsnmea_gprmc
+ * Name:        ParseGPRMC
  *
  * Purpose:    	Parse $GPRMC sentence and extract interesting parts.
  *
@@ -385,7 +385,7 @@ type GPRMCResult struct {
 	Fix    GPSFix
 }
 
-func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
+func ParseGPRMC(sentence string, quiet bool) *GPRMCResult {
 	var result = new(GPRMCResult)
 
 	// TODO Default to Error, because that's what most returns are? On the other hand it's good to be explicit...
@@ -512,11 +512,11 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	result.Fix = DWFIX_2D
 
 	return result
-} /* end dwgpsnmea_gprmc */
+} /* end ParseGPRMC */
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgpsnmea_gpgga
+ * Name:        ParseGPGGA
  *
  * Purpose:    	Parse $GPGGA sentence and extract interesting parts.
  *
@@ -554,7 +554,7 @@ type GPGGAResult struct {
 	Fix GPSFix
 }
 
-func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
+func ParseGPGGA(sentence string, quiet bool) *GPGGAResult {
 	var result = new(GPGGAResult)
 
 	result.Fix = DWFIX_NO_FIX
@@ -696,7 +696,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 
 		return result
 	}
-} /* end dwgpsnmea_gpgga */
+} /* end ParseGPGGA */
 
 /*-------------------------------------------------------------------
  *

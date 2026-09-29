@@ -1039,7 +1039,7 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
 func aprs_raw_nmea(A *decode_aprs_t, info []byte) {
 	if bytes.HasPrefix(info, []byte("$GPRMC,")) ||
 		bytes.HasPrefix(info, []byte("$GNRMC,")) {
-		var result = dwgpsnmea_gprmc(string(info), A.g_quiet)
+		var result = ParseGPRMC(string(info), A.g_quiet)
 
 		A.g_lat = result.Lat
 		A.g_lon = result.Lon
@@ -1048,7 +1048,7 @@ func aprs_raw_nmea(A *decode_aprs_t, info []byte) {
 		A.g_data_type_desc = "Raw GPS data"
 	} else if bytes.HasPrefix(info, []byte("$GPGGA,")) ||
 		bytes.HasPrefix(info, []byte("$GNGGA,")) {
-		var result = dwgpsnmea_gpgga(string(info), A.g_quiet)
+		var result = ParseGPGGA(string(info), A.g_quiet)
 
 		A.g_lat = result.Lat
 		A.g_lon = result.Lon
