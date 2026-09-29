@@ -32,8 +32,6 @@ type expected struct {
 }
 
 func main() {
-	direwolf.TextColorInit(1)
-
 	var modemFlags = direwolf.AddModemFlags(pflag.CommandLine, true)
 	var fixBits = pflag.IntP("fix-bits", "F", 0, fmt.Sprintf(`Amount of effort to try fixing frames with an invalid CRC.
 0 (default) = consider only correct frames.

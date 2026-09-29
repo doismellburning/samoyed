@@ -73,7 +73,6 @@ import (
 var hexLineRegexp = regexp.MustCompile(`^[[:xdigit:]]{2}( ?[[:xdigit:]]{2})*$`)
 
 func main() {
-	direwolf.TextColorInit(0)
 	direwolf.DecodeAPRSInit()
 
 	var scanner = bufio.NewScanner(os.Stdin)

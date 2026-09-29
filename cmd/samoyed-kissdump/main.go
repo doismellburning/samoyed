@@ -56,7 +56,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	direwolf.TextColorInit(0)
 	direwolf.DecodeAPRSInit()
 
 	var capture, readErr = io.ReadAll(os.Stdin)

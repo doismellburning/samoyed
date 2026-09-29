@@ -82,7 +82,7 @@ func startDirewolf(t *testing.T, binary string) (*exec.Cmd, func() string) {
 
 	t.Cleanup(func() { audio.Close(); audioWriter.Close() })
 
-	var cmd = exec.CommandContext(t.Context(), binary, "-c", configName, "-t", "0", "-L", filepath.Join(dir, "packets.log"), "-") //nolint:gosec
+	var cmd = exec.CommandContext(t.Context(), binary, "-c", configName, "-L", filepath.Join(dir, "packets.log"), "-") //nolint:gosec
 	cmd.Stdin = audio
 	cmd.Stdout = output
 	cmd.Stderr = output
@@ -146,7 +146,7 @@ func TestSignalDuringStartupStopsStartup(t *testing.T) {
 
 			t.Cleanup(func() { audio.Close(); audioWriter.Close() })
 
-			var cmd = exec.CommandContext(t.Context(), binary, "-c", configName, "-t", "0", "-L", filepath.Join(dir, "packets.log"), "-") //nolint:gosec
+			var cmd = exec.CommandContext(t.Context(), binary, "-c", configName, "-L", filepath.Join(dir, "packets.log"), "-") //nolint:gosec
 			cmd.Stdin = audio
 
 			// Read the output as it comes, rather than polling a file for it,

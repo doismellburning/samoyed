@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/cm108"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 )
 
 /*-------------------------------------------------------------------
@@ -56,8 +55,6 @@ func cm108_print_permission_advice(name string, err error) {
 }
 
 func main() {
-	direwolf.TextColorInit(0) // Turn off text color.
-
 	if len(os.Args) >= 2 {
 		var path = os.Args[1]
 

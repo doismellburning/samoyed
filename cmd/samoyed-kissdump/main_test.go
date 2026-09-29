@@ -18,7 +18,6 @@ import (
 func dumpCaptureOutput(t *testing.T, capture []byte, hexInput bool) (string, int) {
 	t.Helper()
 
-	direwolf.TextColorInit(0)
 	direwolf.DecodeAPRSInit()
 
 	var tmp, createErr = os.CreateTemp(t.TempDir(), "kissdump")

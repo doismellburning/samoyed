@@ -147,7 +147,8 @@ x = FX.25 increase verbose level.`)
 h = Heard line with the audio level.
 d = Description of APRS packets.
 x = Silence FX.25 information.`)
-	var textColor = pflag.IntP("text-color", "t", 0, `Text colors.  0=disabled. 1=default.  2,3,4,... alternatives. Use 9 to test compatibility with your terminal.`)
+	pflag.IntP("text-color", "t", 0, "Ignored; text colors are not supported.")
+	_ = pflag.CommandLine.MarkDeprecated("text-color", "it has no effect")
 	var printUTF8Test = pflag.BoolP("print-utf8-test", "u", false, "Print UTF-8 test string and exit.")
 	var logDir = pflag.StringP("log-dir", "l", "", "Directory name for log files.")
 	var logFile = pflag.StringP("log-file", "L", "", "File name for logging.")
@@ -181,7 +182,6 @@ x = Silence FX.25 information.`)
 	}
 
 	if *showVersion {
-		TextColorInit(*textColor)
 		printVersion(true)
 		os.Exit(0)
 	}
@@ -442,7 +442,6 @@ x = Silence FX.25 information.`)
 	// Might want to print OS version here.   For Windows, see:
 	// https://msdn.microsoft.com/en-us/library/ms724451(v=VS.85).aspx
 
-	TextColorInit(*textColor)
 	printVersion(false)
 
 	go resetSignalsOnCancel(ctx)

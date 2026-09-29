@@ -92,9 +92,6 @@ var timestamp_format = "" /* -T option */
  *---------------------------------------------------------------*/
 
 func main() {
-	direwolf.TextColorInit(0) // Turn off text color.
-	// It could interfere with trying to pipe stdout to some other application.
-
 	/*
 	 * Extract command line args.
 	 */
