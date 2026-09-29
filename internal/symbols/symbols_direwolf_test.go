@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package symbols
 
 import (
 	"testing"
@@ -9,27 +12,27 @@ import (
 /* Quick, incomplete, unit test. */
 
 func Test_Symbols(t *testing.T) {
-	var sd = NewAPRSSymbolData()
+	var sd = New()
 
 	var symtab, symbol byte
 
-	symtab, symbol, _ = sd.symbols_from_dest_or_src('T', "W1ABC", "GPSC43")
+	symtab, symbol, _ = sd.FromDestOrSrc('T', "W1ABC", "GPSC43")
 	assert.Equal(t, byte('/'), symtab, "ERROR 1-1")
 	assert.Equal(t, byte('K'), symbol, "ERROR 1-1")
 
-	symtab, symbol, _ = sd.symbols_from_dest_or_src('T', "W1ABC", "GPSE87")
+	symtab, symbol, _ = sd.FromDestOrSrc('T', "W1ABC", "GPSE87")
 	assert.Equal(t, byte('\\'), symtab, "ERROR 1-2")
 	assert.Equal(t, byte('w'), symbol, "ERROR 1-2")
 
-	symtab, symbol, _ = sd.symbols_from_dest_or_src('T', "W1ABC", "SPCBL")
+	symtab, symbol, _ = sd.FromDestOrSrc('T', "W1ABC", "SPCBL")
 	assert.Equal(t, byte('/'), symtab, "ERROR 1-3")
 	assert.Equal(t, byte('+'), symbol, "ERROR 1-3")
 
-	symtab, symbol, _ = sd.symbols_from_dest_or_src('T', "W1ABC", "SYMST")
+	symtab, symbol, _ = sd.FromDestOrSrc('T', "W1ABC", "SYMST")
 	assert.Equal(t, byte('\\'), symtab, "ERROR 1-4")
 	assert.Equal(t, byte('t'), symbol, "ERROR 1-4")
 
-	symtab, symbol, _ = sd.symbols_from_dest_or_src('T', "W1ABC", "GPSOD9")
+	symtab, symbol, _ = sd.FromDestOrSrc('T', "W1ABC", "GPSOD9")
 	assert.Equal(t, byte('9'), symtab, "ERROR 1-5")
 	assert.Equal(t, byte('#'), symbol, "ERROR 1-5")
 
@@ -41,18 +44,18 @@ func Test_Symbols(t *testing.T) {
 		It looks like this might have bitrotted slightly.
 
 		89021dd50c83a3b12b2d18b8ff8c502c3080232f ("Cleanups") changes the behaviour
-		of symbols_from_dest_or_src in a way that breaks the below (instead
+		of FromDestOrSrc in a way that breaks the below (instead
 		treating it as another case where the outputs are left alone, so 9# per
 		previous), but I'm not entirely clear which behaviour is actually correct.
 		Deferring to what's actually implemented seems the most sensible though.
 
 		--
 
-		symbols_from_dest_or_src('T', "W1ABC-14", "XXXXXX", &symtab, &symbol)
+		FromDestOrSrc('T', "W1ABC-14", "XXXXXX", &symtab, &symbol)
 		assert.Equal(t, C.char('/'), symtab, "ERROR 1-6")
 		assert.Equal(t, C.char('k'), symbol, "ERROR 1-6")
 
-		symbols_from_dest_or_src('T', "W1ABC", "GPS???", &symtab, &symbol)
+		FromDestOrSrc('T', "W1ABC", "GPS???", &symtab, &symbol)
 		// Outputs are left alone if symbol can't be determined.
 		assert.Equal(t, C.char('/'), symtab, "ERROR 1-7")
 		assert.Equal(t, C.char('k'), symbol, "ERROR 1-7")
@@ -60,13 +63,13 @@ func Test_Symbols(t *testing.T) {
 
 	var dest string
 
-	dest, _ = sd.symbols_into_dest('/', 'K')
+	dest, _ = sd.IntoDest('/', 'K')
 	assert.Equal(t, "GPSC43", dest, "ERROR 2-1")
 
-	dest, _ = sd.symbols_into_dest(byte('\\'), 'w')
+	dest, _ = sd.IntoDest(byte('\\'), 'w')
 	assert.Equal(t, "GPSE87", dest, "ERROR 2-2")
 
-	dest, _ = sd.symbols_into_dest(byte('3'), 'A')
+	dest, _ = sd.IntoDest(byte('3'), 'A')
 	assert.Equal(t, "GPSAA3", dest, "ERROR 2-3")
 
 	// Expect to see this:
@@ -75,62 +78,62 @@ func Test_Symbols(t *testing.T) {
 
 	var ok bool
 
-	dest, ok = sd.symbols_into_dest(' ', 'A')
+	dest, ok = sd.IntoDest(' ', 'A')
 	assert.Equal(t, "GPS???", dest, "ERROR 2-4")
 	assert.False(t, ok)
 
-	dest, ok = sd.symbols_into_dest('/', ' ')
+	dest, ok = sd.IntoDest('/', ' ')
 	assert.Equal(t, "GPS???", dest, "ERROR 2-5")
 	assert.False(t, ok)
 
 	var description string
 
-	description = sd.symbols_get_description('J', 's')
+	description = sd.Description('J', 's')
 	assert.Equal(t, "Jet Ski", description, "ERROR 3-1")
 
-	description = sd.symbols_get_description('/', 'O')
+	description = sd.Description('/', 'O')
 	assert.Equal(t, "Original Balloon (think Ham balloon)", description, "ERROR 3-2")
 
-	description = sd.symbols_get_description('\\', 'T')
+	description = sd.Description('\\', 'T')
 	assert.Equal(t, "Thunderstorm", description, "ERROR 3-3")
 
-	description = sd.symbols_get_description('5', 'T')
+	description = sd.Description('5', 'T')
 	assert.Equal(t, "Thunderstorm w/overlay 5", description, "ERROR 3-4")
 
 	// Expect to see this:
 	//   Symbol table identifier is not '/' (primary), '\' (alternate), or valid overlay character.
 
-	description = sd.symbols_get_description(' ', 'T')
+	description = sd.Description(' ', 'T')
 	assert.Equal(t, "--no-symbol--", description, "ERROR 3-5")
 
-	description = sd.symbols_get_description('/', ' ')
+	description = sd.Description('/', ' ')
 	assert.Equal(t, "--no-symbol--", description, "ERROR 3-6")
 
-	symtab, symbol, _ = sd.symbols_code_from_description('5', "girl scouts")
+	symtab, symbol, _ = sd.CodeFromDescription('5', "girl scouts")
 	assert.Equal(t, byte('5'), symtab, "ERROR 4-1")
 	assert.Equal(t, byte(','), symbol, "ERROR 4-1")
 
-	symtab, symbol, _ = sd.symbols_code_from_description(' ', "scouts")
+	symtab, symbol, _ = sd.CodeFromDescription(' ', "scouts")
 	assert.Equal(t, byte('/'), symtab, "ERROR 4-2")
 	assert.Equal(t, byte(','), symbol, "ERROR 4-2")
 
-	symtab, symbol, _ = sd.symbols_code_from_description(' ', "girl scouts")
+	symtab, symbol, _ = sd.CodeFromDescription(' ', "girl scouts")
 	assert.Equal(t, byte('\\'), symtab, "ERROR 4-3")
 	assert.Equal(t, byte(','), symbol, "ERROR 4-3")
 
-	symtab, symbol, _ = sd.symbols_code_from_description(' ', "jet ski")
+	symtab, symbol, _ = sd.CodeFromDescription(' ', "jet ski")
 	assert.Equal(t, byte('J'), symtab, "ERROR 4-4")
 	assert.Equal(t, byte('s'), symbol, "ERROR 4-4")
 
-	symtab, symbol, _ = sd.symbols_code_from_description(' ', "girl scouts")
+	symtab, symbol, _ = sd.CodeFromDescription(' ', "girl scouts")
 	assert.Equal(t, byte('\\'), symtab, "ERROR 4-5")
 	assert.Equal(t, byte(','), symbol, "ERROR 4-5")
 
-	symtab, symbol, _ = sd.symbols_code_from_description(' ', "yen")
+	symtab, symbol, _ = sd.CodeFromDescription(' ', "yen")
 	assert.Equal(t, byte('Y'), symtab, "ERROR 4-6")
 	assert.Equal(t, byte('$'), symbol, "ERROR 4-6")
 
-	symtab, symbol, _ = sd.symbols_code_from_description(' ', "taco bell")
+	symtab, symbol, _ = sd.CodeFromDescription(' ', "taco bell")
 	assert.Equal(t, byte('T'), symtab, "ERROR 4-7")
 	assert.Equal(t, byte('R'), symbol, "ERROR 4-7")
 }
