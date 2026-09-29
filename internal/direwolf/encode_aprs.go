@@ -448,7 +448,12 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 	course maybe.Maybe[int], speed maybe.Maybe[int],
 	freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset maybe.Maybe[float64],
 	comment string) string {
-	var result string
+	var dti = '!'
+	if messaging {
+		dti = '='
+	}
+
+	var result = string(dti)
 
 	if compressed {
 		// Thought:
@@ -458,22 +463,14 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 		// However, the resolution would be decreased and that could be important
 		// when hiking in hilly terrain.  It would also be confusing to
 		// flip back and forth between two different representations.
-		var dti = '!'
-		if messaging {
-			dti = '='
-		}
 		var c = compressed_position(symtab, symbol, lat, lon,
 			power, height, gain,
 			course, speed)
 
-		result = string(dti) + compressed_position_string(c)
+		result += compressed_position_string(c)
 	} else {
-		var dti = '!'
-		if messaging {
-			dti = '='
-		}
 		var n = normal_position(symtab, symbol, lat, lon, ambiguity)
-		result = string(dti) + normal_position_string(n)
+		result += normal_position_string(n)
 
 		/* Optional data extension. (singular) */
 		/* Can't have both course/speed and PHG.  Former gets priority. */
