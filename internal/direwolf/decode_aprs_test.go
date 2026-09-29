@@ -144,31 +144,31 @@ func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
 }
 
 // The wind direction and speed of a c000s000-form report are unknown, not
-// zero, when their fields are blanked out.  weather_data clears course and
+// zero, when their fields are blanked out.  weatherData clears course and
 // speedMPH before it returns - the wind belongs on the weather line, not on
-// the location line - so the distinction has to be checked at getwdata.
+// the location line - so the distinction has to be checked at getWeatherData.
 func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
 	// The field is there; it just has no value in it.
-	var blank, rest, found = getwdata([]byte("c...s...g005"), 'c', 3)
+	var blank, rest, found = getWeatherData([]byte("c...s...g005"), 'c', 3)
 	assert.True(t, found)
 	assert.Equal(t, maybe.Nothing[float64](), blank)
 	assert.Equal(t, "s...g005", string(rest))
 
 	// An all-spaces field says the same thing as an all-dots one.  The two
 	// are separate branches of an ||, so one can regress without the other.
-	var spaces, afterSpaces, spacesFound = getwdata([]byte("c   s004"), 'c', 3)
+	var spaces, afterSpaces, spacesFound = getWeatherData([]byte("c   s004"), 'c', 3)
 	assert.True(t, spacesFound)
 	assert.Equal(t, maybe.Nothing[float64](), spaces)
 	assert.Equal(t, "s004", string(afterSpaces))
 
 	// A field of zeroes is a reading of zero, which is not the same thing.
-	var zero, _, _ = getwdata([]byte("c000s000"), 'c', 3)
+	var zero, _, _ = getWeatherData([]byte("c000s000"), 'c', 3)
 	assert.Equal(t, maybe.Just(0.0), zero)
 
 	// A field that is not there at all is not found, and consumes nothing.
-	var missing, untouched, present = getwdata([]byte("g005t077"), 'c', 3)
+	var missing, untouched, present = getWeatherData([]byte("g005t077"), 'c', 3)
 	assert.False(t, present)
 	assert.Equal(t, maybe.Nothing[float64](), missing)
 	assert.Equal(t, "g005t077", string(untouched))
@@ -180,7 +180,7 @@ func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
 }
 
 // An item report whose name runs to the end of the information field has no
-// live/killed indicator.  aprs_item used to walk off the end looking for one,
+// live/killed indicator.  aprsItem used to walk off the end looking for one,
 // bringing the program down on a packet that arrived off the air.
 func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
