@@ -322,3 +322,17 @@ func Test_decode_aprs_short_message(t *testing.T) {
 		assert.Equal(t, tc.comment, A.g_comment)
 	}
 }
+
+// A quiet decode keeps its complaints to itself, but a malformed timestamp
+// used to be reported regardless.
+func Test_decode_aprs_quiet_bad_timestamp(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = ax25.FromText("Q1TEST>APDW17:@09234Xz4903.50N/07201.75W-", true)
+	assert.NotNil(t, pp)
+
+	var out = captureStdout(t, func() {
+		DecodeAPRS(pp, true, "")
+	})
+	assert.NotContains(t, out, "Timestamp must be")
+}

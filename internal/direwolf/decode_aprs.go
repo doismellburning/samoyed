@@ -3586,7 +3586,8 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
  *
  * Inputs:	p 	- Pointer to first byte.
  *
- * Returns:	time_t data type. (UTC)  Zero if error.
+ * Returns:	time.Time (UTC).  Zero if error.
+ *		No caller uses the time yet, only the check.
  *
  * Description:
  *
@@ -3636,7 +3637,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
  *
  *------------------------------------------------------------------*/
 
-func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam
+func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam // Nothing reads the time yet; callers only want the check.
 	type dhm_s struct {
 		Day     [2]byte
 		Hours   [2]byte
@@ -3663,8 +3664,10 @@ func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam
 		!unicode.IsDigit(rune(p[4])) ||
 		!unicode.IsDigit(rune(p[5])) ||
 		(p[6] != 'z' && p[6] != '/' && p[6] != 'h') {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Timestamp must be 6 digits followed by z, h, or /.\n")
+		if !A.g_quiet {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Timestamp must be 6 digits followed by z, h, or /.\n")
+		}
 
 		return time.Time{}
 	}
