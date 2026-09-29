@@ -418,7 +418,7 @@ func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_thi
 
 /*-------------------------------------------------------------------
  *
- * Name:	cm108_find_ptt
+ * Name:	CM108FindPTT
  *
  * Purpose:	Try to find /dev/hidraw corresponding to a USB audio "card."
  *
@@ -443,8 +443,8 @@ func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_thi
  *
  *------------------------------------------------------------------*/
 
-func cm108_find_ptt(output_audio_device string) (string, error) {
-	//dw_printf ("DEBUG: cm108_find_ptt('%s')\n", output_audio_device);
+func CM108FindPTT(output_audio_device string) (string, error) {
+	//dw_printf ("DEBUG: CM108FindPTT('%s')\n", output_audio_device);
 
 	// Possible improvement: Skip if inventory already taken.
 	var things, inventoryErr = CM108Inventory(MAXX_THINGS)
@@ -455,7 +455,7 @@ func cm108_find_ptt(output_audio_device string) (string, error) {
 	return cm108_find_ptt_in(things, output_audio_device)
 }
 
-// cm108_find_ptt_in does the work of cm108_find_ptt on an inventory already taken.
+// cm108_find_ptt_in does the work of CM108FindPTT on an inventory already taken.
 func cm108_find_ptt_in(things []*CM108Thing, output_audio_device string) (string, error) {
 	var sound_re = regexp.MustCompile(".+:(CARD=)?([A-Za-z0-9_]+)(,.*)?")
 

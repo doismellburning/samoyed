@@ -2694,7 +2694,7 @@ func (ps *parseState) applyOutputControl(ot int, settings OutputControlSettings)
 		// Failure at this point is not an error.
 		// See if config file sets it explicitly before complaining.
 
-		var found_ptt, find_ptt_err = cm108_find_ptt(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
+		var found_ptt, find_ptt_err = CM108FindPTT(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
 
 		octrl.ptt_device = found_ptt
 

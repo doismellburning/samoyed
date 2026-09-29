@@ -6,7 +6,7 @@ import "errors"
 
 var errCM108NotSupported = errors.New("CM108 GPIO PTT is only supported on Linux")
 
-func cm108_find_ptt(_ string) (string, error) {
+func CM108FindPTT(_ string) (string, error) {
 	return "", errCM108NotSupported
 }
 

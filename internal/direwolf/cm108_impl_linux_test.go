@@ -80,7 +80,7 @@ func TestCM108InventoryRespectsMaximum(t *testing.T) {
 func TestCM108FindPTTRejectsUnparseableDevice(t *testing.T) {
 	for _, device := range []string{"", "plughw", "default", ":2,0", "plughw:,0"} {
 		t.Run(device, func(t *testing.T) {
-			var ptt, err = cm108_find_ptt(device)
+			var ptt, err = CM108FindPTT(device)
 
 			require.Error(t, err)
 			assert.Empty(t, ptt)
@@ -97,7 +97,7 @@ func TestCM108FindPTTNoSuchCard(t *testing.T) {
 		"surround41:Q1TESTnonexistent",
 	} {
 		t.Run(device, func(t *testing.T) {
-			var ptt, err = cm108_find_ptt(device)
+			var ptt, err = CM108FindPTT(device)
 
 			require.NoError(t, err)
 			assert.Empty(t, ptt)
