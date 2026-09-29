@@ -441,14 +441,12 @@ func TestAudioImpl_audioOpen_missingInputDevice_isFatal(t *testing.T) {
 		adev = prevAdev
 	})
 
-	var refsBefore = portaudioRefCount
-
 	var pa = makeAudioConfig(noSuchAudioDevice, noSuchAudioDevice)
 
 	assert.Equal(t, -1, AudioOpen(t.Context(), pa))
 
-	// The failed open gives back the PortAudio reference it took.
-	assert.Equal(t, refsBefore, portaudioRefCount)
+	// The failed open gives back the PortAudio initialization it took.
+	assert.False(t, portaudioHeldByOpen)
 }
 
 // AudioClose with nothing open has nothing to do.

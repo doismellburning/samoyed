@@ -781,15 +781,15 @@ func (d *adev_s) recordRead(a int, nbytes int) {
 
 var adev [MAX_ADEVS]*adev_s
 
-// portaudioMu guards portaudioRefCount and ensures Initialize/Terminate are
-// correctly paired even if AudioOpen/AudioClose are called concurrently.
+// portaudioMu serialises calls into PortAudio that aren't on a stream -
+// Initialize, Terminate, device lookup, opening a stream - as PortAudio's own
+// bookkeeping for those isn't thread-safe.  It is held by quietPortAudio, which
+// all of those go through, and also guards audioBackendNoise.
 var portaudioMu sync.Mutex
-var portaudioRefCount int
 
 // audioBackendNoise holds what the native audio libraries most recently wrote
 // to stderr from underneath PortAudio, until something goes wrong that it might
 // explain.
-var audioBackendNoiseMu sync.Mutex
 var audioBackendNoise string
 
 // quietPortAudio runs fn - a call into PortAudio - with whatever the native
@@ -803,8 +803,8 @@ var audioBackendNoise string
 // before another call can capture anything of its own, rather than two
 // overlapping opens each ending up with the other's diagnostics.
 func quietPortAudio(fn func() error) error {
-	audioBackendNoiseMu.Lock()
-	defer audioBackendNoiseMu.Unlock()
+	portaudioMu.Lock()
+	defer portaudioMu.Unlock()
 
 	var err error
 
@@ -822,12 +822,12 @@ func quietPortAudio(fn func() error) error {
 // after a message about audio not working: the complaints that were noise a
 // moment ago are usually the explanation.
 func printAudioBackendNoise() {
-	audioBackendNoiseMu.Lock()
+	portaudioMu.Lock()
 
 	var noise = audioBackendNoise
 	audioBackendNoise = ""
 
-	audioBackendNoiseMu.Unlock()
+	portaudioMu.Unlock()
 
 	if noise == "" {
 		return
@@ -837,13 +837,29 @@ func printAudioBackendNoise() {
 	dw_printf("Messages from the audio backend, which may explain this:\n%s", noise)
 }
 
-// portaudioHeldByOpen records whether the audio devices now open took a
-// PortAudio reference: an all-stdin/UDP configuration, or one whose only
-// soundcard was an output we could do without, never initializes PortAudio,
-// and AudioClose must not then release a reference it never took.  There is
-// one set of audio devices at a time - AudioOpen replaces the whole adev
-// table - so one flag describes the open that AudioClose is paired with.
+// portaudioHeldByOpen records whether the audio devices now open initialized
+// PortAudio: an all-stdin/UDP configuration, or one whose only soundcard was
+// an output we could do without, never does, and AudioClose must not then
+// terminate it.  Initialize and Terminate are reference counted by PortAudio
+// itself, so each open that initializes it needs exactly one Terminate.
+// There is one set of audio devices at a time - AudioOpen replaces the whole
+// adev table - so one flag describes the open that AudioClose is paired with.
 var portaudioHeldByOpen bool
+
+// releasePortAudio undoes the PortAudio initialization that opening the
+// audio devices took, if it took one.
+func releasePortAudio() {
+	if !portaudioHeldByOpen {
+		return
+	}
+
+	portaudioHeldByOpen = false
+
+	// Not quietPortAudio: nothing Terminate says will explain a later failure.
+	portaudioMu.Lock()
+	captureStderrFD(func() { _ = portaudio.Terminate() })
+	portaudioMu.Unlock()
+}
 
 // audioNameIsStdin reports whether an audio device name means standard input.
 func audioNameIsStdin(name string) bool {
@@ -1228,28 +1244,15 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) int {
 	// Initialize PortAudio only if at least one configured device needs a
 	// soundcard.  Pure stdin/UDP configurations must work on systems with no
 	// working PortAudio host backend (issue #501).
-	var portaudioAcquired = false
 	var portaudioReady = false
 	var inputNeedsPortAudio = anyInputRequiresPortAudio(pa)
 
 	if inputNeedsPortAudio || anyOutputRequiresPortAudio(pa) {
-		portaudioMu.Lock()
-
-		var err error
-		if portaudioRefCount == 0 {
-			err = quietPortAudio(portaudio.Initialize)
-		}
-
+		var err = quietPortAudio(portaudio.Initialize)
 		if err == nil {
-			portaudioRefCount++
 			portaudioHeldByOpen = true
-			portaudioAcquired = true
 			portaudioReady = true
-		}
-
-		portaudioMu.Unlock()
-
-		if err != nil {
+		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("PortAudio initialization failed: %v\n", err)
 			printAudioBackendNoise()
@@ -1263,22 +1266,13 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) int {
 		}
 	}
 
-	// If AudioOpen fails after this point, roll back the refcount increment
-	// so it stays correctly paired with AudioClose calls.
+	// If AudioOpen fails after this point, give back the PortAudio
+	// initialization so it stays correctly paired with Terminate.
 	var openSucceeded = false
 
 	defer func() {
-		if portaudioAcquired && !openSucceeded {
-			portaudioMu.Lock()
-
-			portaudioRefCount--
-			portaudioHeldByOpen = false
-
-			if portaudioRefCount == 0 {
-				captureStderrFD(func() { _ = portaudio.Terminate() })
-			}
-
-			portaudioMu.Unlock()
+		if !openSucceeded {
+			releasePortAudio()
 		}
 	}()
 
@@ -2213,20 +2207,8 @@ func AudioClose() int {
 		}
 	}
 
-	// Terminate PortAudio when the last audio device is closed, and only if
-	// opening those devices took a reference in the first place.
-	portaudioMu.Lock()
-
-	if portaudioHeldByOpen && portaudioRefCount > 0 {
-		portaudioRefCount--
-		portaudioHeldByOpen = false
-
-		if portaudioRefCount == 0 {
-			captureStderrFD(func() { _ = portaudio.Terminate() })
-		}
-	}
-
-	portaudioMu.Unlock()
+	// Terminate PortAudio, if opening these devices initialized it.
+	releasePortAudio()
 
 	return (err)
 } /* end AudioClose */

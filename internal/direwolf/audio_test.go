@@ -432,8 +432,6 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 	})
 
 	var pa = makeAudioConfig("stdin", "stdin")
-	var refsBefore = portaudioRefCount
-
 	require.Equal(t, 0, AudioOpen(t.Context(), pa))
 
 	assert.Nil(t, adev[0].outputStream)
@@ -441,7 +439,7 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 
 	// The point of issue #501: nothing here needs a soundcard, so PortAudio
 	// is never initialized.
-	assert.Equal(t, refsBefore, portaudioRefCount)
+	assert.False(t, portaudioHeldByOpen)
 
 	// Whatever the transmit path produces on the open device is discarded,
 	// not written anywhere, and does not upset the buffer bookkeeping.
@@ -449,9 +447,9 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 	assert.Equal(t, -1, audio_flush(0))
 	assert.Equal(t, 0, adev[0].outbufLen)
 
-	// Closing must not release a PortAudio reference this open never took.
+	// Closing must not terminate a PortAudio this open never initialized.
 	AudioClose()
-	assert.Equal(t, refsBefore, portaudioRefCount)
+	assert.False(t, portaudioHeldByOpen)
 }
 
 // An output device we only defaulted to, and which turns out not to exist,
