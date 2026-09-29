@@ -3989,9 +3989,12 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 	 * KG6AZZ reports that there is a local digipeater that seems to
 	 * malfunction occasionally.  It corrupts the packet, as it is
 	 * digipeated, causing the comment to be hundreds of characters long.
+	 * Dire Wolf's comment buffer held 255 characters; there's no buffer to
+	 * overflow here, but anything longer is still suspicious.
 	 */
+	const longComment = 255
 
-	if clen > len(A.g_comment)-1 {
+	if clen > longComment {
 		if !A.g_quiet {
 			logrus.WithFields(logrus.Fields{
 				"length": clen,

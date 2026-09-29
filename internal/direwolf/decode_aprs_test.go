@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -342,4 +343,30 @@ func Test_decode_aprs_quiet_bad_timestamp(t *testing.T) {
 	// And a decode that isn't quiet does complain, so the hook would see it.
 	DecodeAPRS(pp, false, "")
 	assert.Contains(t, hook.LastEntry().Message, "Timestamp must be")
+}
+
+// Dire Wolf warned about a comment too long for its 256 byte buffer, but the
+// port measured against the still-empty comment string, so it warned about
+// every comment at all.
+func Test_decode_aprs_comment_length_warning(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	var pp = ax25.FromText("Q1TEST>APDW17:!4903.50N/07201.75W-A short comment", true)
+	assert.NotNil(t, pp)
+
+	DecodeAPRS(pp, false, "")
+
+	for _, entry := range hook.AllEntries() {
+		assert.NotEqual(t, "Comment is extremely long", entry.Message)
+	}
+
+	pp = ax25.FromText("Q1TEST>APDW17:!4903.50N/07201.75W-"+strings.Repeat("x", 256), true)
+	assert.NotNil(t, pp)
+
+	DecodeAPRS(pp, false, "")
+	assert.Equal(t, "Comment is extremely long", hook.LastEntry().Message)
 }
