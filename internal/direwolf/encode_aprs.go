@@ -1,17 +1,9 @@
 package direwolf
 
-/*------------------------------------------------------------------
- *
- * Purpose:   	Construct APRS packets from components.
- *
- * Description:
- *
- * References:	APRS Protocol Reference.
- *
- *		Frequency spec.
- *		http://www.aprs.org/info/freqspec.txt
- *
- *---------------------------------------------------------------*/
+// Construct APRS packets from components.
+//
+// References: APRS Protocol Reference, and the frequency spec at
+// http://www.aprs.org/info/freqspec.txt
 
 import (
 	"fmt"
@@ -37,27 +29,16 @@ func checkSymbol(symtab byte, symbol byte) {
 	}
 }
 
-/*------------------------------------------------------------------
- *
- * Name:        normal_position
- *
- * Purpose:     Fill in the human-readable latitude, longitude,
- * 		symbol part which is common to multiple data formats.
- *
- * Inputs: 	symtab	- Symbol table id or overlay.
- *		symbol	- Symbol id.
- *    		dlat	- Latitude.
- *		dlong	- Longitude.
- *		ambiguity - Blank out least significant digits.
- *
- * Returns:	The position; normal_position_string renders it.
- *
- *----------------------------------------------------------------*/
-
+// normal_position_string renders a position from normal_position.
 func normal_position_string(p *position_t) string {
 	return fmt.Sprintf("%s%c%s%c", string(p.Lat[:]), p.SymTableId, string(p.Lon[:]), p.SymbolCode)
 }
 
+// normal_position fills in the human-readable latitude, longitude and symbol
+// part which is common to multiple data formats.
+//
+// symtab is the symbol table id or overlay, symbol the symbol id, and
+// ambiguity the number of least significant digits to blank out.
 func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *position_t {
 	var presult = new(position_t)
 
@@ -74,43 +55,25 @@ func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambi
 	return presult
 }
 
-/*------------------------------------------------------------------
- *
- * Name:        compressed_position
- *
- * Purpose:     Fill in the compressed latitude, longitude,
- *		symbol part which is common to multiple data formats.
- *
- * Inputs: 	symtab	- Symbol table id or overlay.
- *		symbol	- Symbol id.
- *    		dlat	- Latitude.
- *		dlong	- Longitude.
- *
- * 	 	power	- Watts.
- *		height	- Feet.
- *		gain	- dBi.
- *
- * 		course	- Degrees, 0 - 360 (360 equiv. to 0).
- *		speed	- knots.
- *
- *
- * Returns:	The position; compressed_position_string renders it.
- *
- * Description:	The cst field can have only one of
- *
- *		course/speed	- takes priority (this implementation)
- *		radio range	- calculated from PHG
- *		altitude	- not implemented yet.
- *
- *		Some conversion must be performed for course from
- *		the API definition to what is sent over the air.
- *
- *----------------------------------------------------------------*/
-
+// compressed_position_string renders a position from compressed_position.
 func compressed_position_string(p *compressed_position_t) string {
 	return fmt.Sprintf("%c%s%s%c%c%c%c", p.SymTableId, string(p.Y[:]), string(p.X[:]), p.SymbolCode, p.C, p.S, p.T)
 }
 
+// compressed_position fills in the compressed latitude, longitude and symbol
+// part which is common to multiple data formats.
+//
+// power is in watts, height in feet, gain in dBi, course in degrees (0 - 360,
+// 360 equivalent to 0) and speed in knots.
+//
+// The cst field can have only one of
+//
+//   - course/speed - takes priority (this implementation)
+//   - radio range - calculated from PHG
+//   - altitude - not implemented yet.
+//
+// Some conversion must be performed for course from the API definition to
+// what is sent over the air.
 func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int],
 	course maybe.Maybe[int], speed maybe.Maybe[int]) *compressed_position_t {
@@ -118,10 +81,8 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 
 	checkSymbol(symtab, symbol)
 
-	/*
-	 * In compressed format, the characters a-j are used for a numeric overlay.
-	 * This allows the receiver to distinguish between compressed and normal formats.
-	 */
+	// In compressed format, the characters a-j are used for a numeric overlay.
+	// This allows the receiver to distinguish between compressed and normal formats.
 	if unicode.IsDigit(rune(symtab)) {
 		symtab = symtab - '0' + 'a'
 	}
@@ -133,25 +94,23 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 
 	presult.SymbolCode = symbol
 
-	/*
-	 * The cst field is complicated.
-	 *
-	 * When c is ' ', the cst field is not used.
-	 *
-	 * When the t byte has a certain pattern, c & s represent altitude.
-	 *
-	 * Otherwise, c & s can be either course/speed or radio range.
-	 *
-	 * When c is in range of '!' to 'z',
-	 *
-	 * 	('!' - 33) * 4 = 0 degrees.
-	 *	...
-	 *	('z' - 33) * 4 = 356 degrees.
-	 *
-	 * In this case, s represents speed ...
-	 *
-	 * When c is '{', s is range ...
-	 */
+	// The cst field is complicated.
+	//
+	// When c is ' ', the cst field is not used.
+	//
+	// When the t byte has a certain pattern, c & s represent altitude.
+	//
+	// Otherwise, c & s can be either course/speed or radio range.
+	//
+	// When c is in range of '!' to 'z',
+	//
+	//	('!' - 33) * 4 = 0 degrees.
+	//	...
+	//	('z' - 33) * 4 = 356 degrees.
+	//
+	// In this case, s represents speed ...
+	//
+	// When c is '{', s is range ...
 
 	// Only one of power, height and gain needs to have been given.  An absent
 	// one counts as zero, which the radio range calculation below replaces
@@ -180,9 +139,9 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 		var s = min(math.Round(math.Log(float64(knots)+1.0)/math.Log(1.08)), 93)
 		presult.S = byte(s + '!')
 
-		presult.T = 0x26 + '!' /* current, other tracker. */
+		presult.T = 0x26 + '!' // current, other tracker.
 	} else if p > 0 || h > 0 || g > 0 {
-		presult.C = '{' /* radio range. */
+		presult.C = '{' // radio range.
 
 		if p == 0 {
 			p = 10
@@ -203,34 +162,23 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 
 		presult.S = byte(s + '!')
 
-		presult.T = 0x26 + '!' /* current, other tracker. */
+		presult.T = 0x26 + '!' // current, other tracker.
 	} else {
-		presult.C = ' ' /* cst field not used. */
+		presult.C = ' ' // cst field not used.
 		presult.S = ' '
-		presult.T = '!' /* avoid space. */
+		presult.T = '!' // avoid space.
 	}
 
 	return presult
 }
 
-/*------------------------------------------------------------------
- *
- * Name:        phg_data_extension
- *
- * Purpose:     Fill in parts of the power/height/gain data extension.
- *
- * Inputs: 	power	- Watts.
- *		height	- Feet.
- *		gain	- dB.  Protocol spec doesn't mention whether it is dBi or dBd.
- *				This says dBi:
- *				http://www.tapr.org/pipermail/aprssig/2008-September/027034.html
- *
- *		dir	- Directivity: N, NE, etc., omni.
- *
- * Returns:	The data extension.
- *
- *----------------------------------------------------------------*/
-
+// phg_data_extension returns the power/height/gain data extension.
+//
+// power is in watts and height in feet.  gain is in dB: the protocol spec
+// doesn't mention whether it is dBi or dBd, but this says dBi:
+// http://www.tapr.org/pipermail/aprssig/2008-September/027034.html
+//
+// dir is the directivity: N, NE, etc., or omni.
 func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string) string {
 	// The callers only check that at least one of the three was specified, so
 	// the others can still be absent.  Treat those as unspecified, which is
@@ -242,7 +190,7 @@ func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain ma
 	var p = min(max(math.Round(math.Sqrt(float64(watts)))+'0', '0'), '9')
 
 	var h = max(math.Round(math.Log2(float64(feet)/10.0))+'0', '0')
-	/* Result can go beyond '9'. */
+	// Result can go beyond '9'.
 
 	var g = min(max(dBi, 0), 9) + '0'
 
@@ -271,24 +219,11 @@ func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain ma
 	return fmt.Sprintf("PHG%c%c%c%c", byte(p), byte(h), byte(g), d)
 }
 
-/*------------------------------------------------------------------
- *
- * Name:        cse_spd_data_extension
- *
- * Purpose:     Fill in parts of the course & speed data extension.
- *
- * Inputs: 	course	- Degrees, 0 - 360 (360 equiv. to 0).
- *
- *		speed	- knots.
- *
- * Returns:	The data extension.
- *
- * Description: Over the air we use:
- *			0 	for unknown or not relevant.
- *			1 - 360	for valid course.  (360 for north)
- *
- *----------------------------------------------------------------*/
-
+// cse_spd_data_extension returns the course & speed data extension.
+//
+// course is in degrees, 0 - 360 (360 equivalent to 0), and speed in knots.
+// Over the air we use 0 for an unknown or irrelevant course, and 1 - 360 for
+// a valid one (360 for north).
 func cse_spd_data_extension(course maybe.Maybe[int], speed maybe.Maybe[int]) string {
 	var cse int
 	if degrees, known := course.Get(); known {
@@ -300,8 +235,8 @@ func cse_spd_data_extension(course maybe.Maybe[int], speed maybe.Maybe[int]) str
 		for cse > 360 {
 			cse -= 360
 		}
-		// Should now be in range of 1 - 360. */
-		// Original value of 0 for north is transmitted as 360. */
+		// Should now be in range of 1 - 360.
+		// Original value of 0 for north is transmitted as 360.
 	}
 
 	var spd = min(max(maybe.FromMaybe(0, speed), 0), 999)
@@ -325,42 +260,28 @@ func dataExtension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.M
 	return ""
 }
 
-/*------------------------------------------------------------------
- *
- * Name:        frequency_spec
- *
- * Purpose:     Put frequency specification in beginning of comment field.
- *
- * Inputs: 	freq	- MHz.
- *		tone	- Hz.
- *		offset	- MHz.
- *
- * Returns:     The frequency spec, or "" if nothing was given.
- *
- * Description:	There are several valid variations.
- *
- *		The frequency could be missing here if it is in the
- *		object name.  In this case we could have tone & offset.
- *
- *		Offset must always be preceded by tone.
- *
- *		Resulting formats are all fixed width and have a trailing space:
- *
- *			"999.999MHz "
- *			"T999 "
- *			"+999 "			(10 kHz units)
- *
- * Reference:	http://www.aprs.org/info/freqspec.txt
- *
- *----------------------------------------------------------------*/
-
+// frequency_spec returns the frequency specification for the beginning of the
+// comment field, or "" if nothing was given.  freq is in MHz, tone in Hz and
+// offset in MHz.
+//
+// There are several valid variations.  The frequency could be missing here if
+// it is in the object name.  In this case we could have tone & offset.  Offset
+// must always be preceded by tone.
+//
+// Resulting formats are all fixed width and have a trailing space:
+//
+//	"999.999MHz "
+//	"T999 "
+//	"+999 "		(10 kHz units)
+//
+// Reference: http://www.aprs.org/info/freqspec.txt
 func frequency_spec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset maybe.Maybe[float64]) string {
 	var result string
 
 	var megahertz = maybe.FromMaybe(0, freq)
 	if megahertz > 0 {
-		/* TODO: Should use letters for > 999.999. */
-		/* For now, just be sure we have proper field width. */
+		// TODO: Should use letters for > 999.999.
+		// For now, just be sure we have proper field width.
 		result += fmt.Sprintf("%07.3fMHz ", min(megahertz, 999.999))
 	}
 
@@ -383,6 +304,11 @@ func frequency_spec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset
 // objects share: the position, compressed or not, then the optional data
 // extension (which only an uncompressed position has room for) and the
 // optional frequency spec.
+//
+// power is in watts, height in feet, gain in dB (not clear if it is dBi or
+// dBd) and dir the directivity: N, NE, etc., or omni.  course is in degrees,
+// 0 - 360 (360 equivalent to 0), and speed in knots.  freq is in MHz, tone in
+// Hz and offset in MHz.
 func encodeLocation(compressed bool, lat float64, lon float64, ambiguity int,
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
@@ -402,50 +328,18 @@ func encodeLocation(compressed bool, lat float64, lon float64, ambiguity int,
 	return result + frequency_spec(freq, tone, offset)
 }
 
-/*------------------------------------------------------------------
- *
- * Name:        EncodePosition
- *
- * Purpose:     Construct info part for position report format.
- *
- * Inputs:      messaging - This determines whether the data type indicator
- *			   is set to '!' (false) or '=' (true).
- *		compressed - Send in compressed form?
- *		lat	- Latitude.
- *		lon	- Longitude.
- *		ambiguity - Number of digits to omit from location.
- *		alt_ft	- Altitude in feet.
- *		symtab	- Symbol table id or overlay.
- *		symbol	- Symbol id.
- *
- * 	 	power	- Watts.
- *		height	- Feet.
- *		gain	- dB.  Not clear if it is dBi or dBd.
- *		dir	- Directivity: N, NE, etc., omni.
- *
- *		course	- Degrees, 0 - 360 (360 equiv. to 0).
- *		speed	- knots.
- *
- * 	 	freq	- MHz.
- *		tone	- Hz.
- *		offset	- MHz.
- *
- *		comment	- Additional comment text.
- *
- * Returns:	The info part.  Could get into hundreds of characters
- *		because it includes the comment.
- *
- * Description:	There can be a single optional "data extension"
- *		following the position so there is a choice
- *		between:
- *			Power/height/gain/directivity or
- *			Course/speed.
- *
- *		After that come the optional frequency spec, altitude and
- *		comment.
- *
- *----------------------------------------------------------------*/
-
+// EncodePosition returns the info part for the position report format.  It
+// could get into hundreds of characters because it includes the comment.
+//
+// messaging determines whether the data type indicator is '!' (false) or '='
+// (true).  ambiguity is the number of digits to omit from the location,
+// alt_ft the altitude in feet, symtab the symbol table id or overlay and
+// symbol the symbol id.  The rest are as for encodeLocation, then any
+// additional comment text.
+//
+// There can be a single optional "data extension" following the position, so
+// there is a choice between power/height/gain/directivity and course/speed.
+// After that come the optional frequency spec, altitude and comment.
 func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, alt_ft maybe.Maybe[int],
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
@@ -467,7 +361,7 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 	var result = string(dti) + encodeLocation(compressed, lat, lon, ambiguity, symtab, symbol,
 		power, height, gain, dir, course, speed, freq, tone, offset)
 
-	/* Altitude.  Can be anywhere in comment. */
+	// Altitude.  Can be anywhere in comment.
 	// Officially, altitude must be six digits.
 	// What about all the places on the earth's surface that are below sea level?
 	// https://en.wikipedia.org/wiki/List_of_places_on_land_with_elevations_below_sea_level
@@ -477,52 +371,23 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 	// This maintains the same total field width and the range is more than adequate.
 
 	if feet, known := alt_ft.Get(); known {
-		/* Not clear if altitude can be negative. */
-		/* Be sure it will be converted to 6 digits. */
+		// Not clear if altitude can be negative.
+		// Be sure it will be converted to 6 digits.
 		result += fmt.Sprintf("/A=%06d", min(max(feet, -99999), 999999)) // /A=123456 or /A=-12345
 	}
 
-	/* Finally, comment text. */
+	// Finally, comment text.
 	result += comment
 
 	return result
 }
 
-/*------------------------------------------------------------------
- *
- * Name:        encode_object
- *
- * Purpose:     Construct info part for object report format.
- *
- * Inputs:      name	- Name, up to 9 characters.
- *		compressed - Send in compressed form?
- *		thyme	- Time stamp, or the zero time for none.
- *		lat	- Latitude.
- *		lon	- Longitude.
- *		ambiguity - Number of digits to omit from location.
- *		symtab	- Symbol table id or overlay.
- *		symbol	- Symbol id.
- *
- * 	 	power	- Watts.
- *		height	- Feet.
- *		gain	- dB.  Not clear if it is dBi or dBd.
- *		dir	- Direction: N, NE, etc., omni.
- *
- *		course	- Degrees, 0 - 360 (360 equiv. to 0).
- *		speed	- knots.
- *
- * 	 	freq	- MHz.
- *		tone	- Hz.
- *		offset	- MHz.
- *
- *		comment	- Additional comment text.
- *
- * Returns:	The info part: 36 characters of fixed part,
- *		7 for optional extended data, ~20 for freq, etc.,
- *		then the comment, which could be very long.
- *
- *----------------------------------------------------------------*/
-
+// encode_object returns the info part for the object report format: 36
+// characters of fixed part, 7 for optional extended data, ~20 for freq, etc.,
+// then the comment, which could be very long.
+//
+// name is up to 9 characters, and thyme the time stamp, or the zero time for
+// none.  The rest are as for EncodePosition.
 func encode_object(name string, compressed bool, thyme time.Time, lat float64, lon float64, ambiguity int,
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
@@ -544,20 +409,8 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 		comment
 }
 
-/*------------------------------------------------------------------
- *
- * Name:        encode_message
- *
- * Purpose:     Construct info part for APRS "message" format.
- *
- * Inputs:      addressee	- Addressed to, up to 9 characters.
- *		text		- Text part of the message.
- *		id		- Identifier, 0 to 5 characters.
- *
- * Returns:	The info part.
- *
- *----------------------------------------------------------------*/
-
+// encode_message returns the info part for the APRS "message" format.
+// addressee is up to 9 characters, and id, the identifier, 0 to 5.
 func encode_message(addressee string, text string, id string) string {
 	var result = fmt.Sprintf(":%-9.9s:%s", addressee, text)
 
