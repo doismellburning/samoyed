@@ -817,17 +817,17 @@ func DecodeAPRSPrint(A *decodedAPRS) {
  *------------------------------------------------------------------*/
 
 func aprsLLPos(A *decodedAPRS, info []byte) {
-	type aprs_ll_pos_s struct {
+	type llPos struct {
 		DTI byte /* ! or = */
 		Pos position_t
 	}
-	var p aprs_ll_pos_s
+	var p llPos
 
-	type aprs_compressed_pos_s struct {
+	type compressedPos struct {
 		DTI  byte /* ! or = */
 		CPos compressed_position_t
 	}
-	var q aprs_compressed_pos_s
+	var q compressedPos
 
 	A.dataTypeDesc = "Position"
 
@@ -924,19 +924,19 @@ func aprsLLPos(A *decodedAPRS, info []byte) {
  *------------------------------------------------------------------*/
 
 func aprsLLPosTime(A *decodedAPRS, info []byte) {
-	type aprs_ll_pos_time_s struct {
+	type llPosTime struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
 		Pos       position_t
 	}
-	var p aprs_ll_pos_time_s
+	var p llPosTime
 
-	type aprs_compressed_pos_time_s struct {
+	type compressedPosTime struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
 		CPos      compressed_position_t
 	}
-	var q aprs_compressed_pos_time_s
+	var q compressedPosTime
 
 	A.dataTypeDesc = "Position with time"
 
@@ -1268,7 +1268,7 @@ func micEDigit(A *decodedAPRS, c byte, mask int, std_msg *int, cust_msg *int) in
 }
 
 func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
-	type aprs_mic_e_s struct {
+	type micEInfo struct {
 		DTI         byte    /* ' or ` */
 		Lon         [3]byte /* "d+28", "m+28", "h+28" */
 		SpeedCourse [3]byte
@@ -1290,7 +1290,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		return
 	}
 
-	var p aprs_mic_e_s
+	var p micEInfo
 	binary.Decode(info, binary.NativeEndian, &p)
 
 	/* Destination is really latitude of form ddmmhh. */
@@ -1615,7 +1615,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
  *------------------------------------------------------------------*/
 
 func aprsMessage(A *decodedAPRS, info []byte, quiet bool) {
-	type aprs_message_s struct {
+	type messageInfo struct {
 		DTI       byte /* : */
 		Addressee [9]byte
 		Colon     byte /* : */
@@ -1629,7 +1629,7 @@ func aprsMessage(A *decodedAPRS, info []byte, quiet bool) {
 		/* If the first character is '?' it is a Directed Station Query. */
 	}
 
-	var p aprs_message_s
+	var p messageInfo
 	var headerBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
 	var message = info[headerBytes:]
 
@@ -1905,23 +1905,23 @@ func aprsMessage(A *decodedAPRS, info []byte, quiet bool) {
  *------------------------------------------------------------------*/
 
 func aprsObject(A *decodedAPRS, info []byte) {
-	type aprs_object_s struct {
+	type objectInfo struct {
 		DTI          byte /* ; */
 		Name         [9]byte
 		LiveOrKilled byte /* * for live or _ for killed */
 		Timestamp    [7]byte
 		Pos          position_t
 	}
-	var p aprs_object_s
+	var p objectInfo
 
-	type aprs_compressed_object_s struct {
+	type compressedObjectInfo struct {
 		DTI          byte /* ; */
 		Name         [9]byte
 		LiveOrKilled byte /* * for live or _ for killed */
 		Timestamp    [7]byte
 		CPos         compressed_position_t
 	}
-	var q aprs_compressed_object_s
+	var q compressedObjectInfo
 
 	var objectPosBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
 	var objectCompressedPosBytes, _ = binary.Decode(info, binary.NativeEndian, &q)
@@ -2153,34 +2153,34 @@ func aprsStationCapabilities(A *decodedAPRS, info []byte) {
  *------------------------------------------------------------------*/
 
 func aprsStatusReport(A *decodedAPRS, info []byte) {
-	type aprs_status_time_s struct {
+	type statusTime struct {
 		DTI   byte    /* > */
 		ZTime [7]byte /* Time stamp ddhhmmz */
 	}
-	var pt aprs_status_time_s
+	var pt statusTime
 
-	type aprs_status_m4_s struct {
+	type statusM4 struct {
 		DTI        byte    /* > */
 		Mhead4     [4]byte /* 4 character Maidenhead locator. */
 		SymTableId byte
 		SymbolCode byte
 		Space      byte /* Should be space after symbol code. */
 	}
-	var pm4 aprs_status_m4_s
+	var pm4 statusM4
 
-	type aprs_status_m6_s struct {
+	type statusM6 struct {
 		DTI        byte    /* > */
 		Mhead6     [6]byte /* 6 character Maidenhead locator. */
 		SymTableId byte
 		SymbolCode byte
 		Space      byte /* Should be space after symbol code. */
 	}
-	var pm6 aprs_status_m6_s
+	var pm6 statusM6
 
-	type aprs_status_s struct {
+	type statusInfo struct {
 		DTI byte /* > */
 	}
-	var ps aprs_status_s
+	var ps statusInfo
 
 	A.dataTypeDesc = "Status Report"
 
@@ -3223,7 +3223,7 @@ func decodeCompressedPosition(A *decodedAPRS, pcpos *compressed_position_t) {
  *------------------------------------------------------------------*/
 
 func getLatitude8(p [8]byte, quiet bool) maybe.Maybe[float64] {
-	type lat_s struct {
+	type latField struct {
 		Deg  [2]byte
 		Minn [2]byte
 		Dot  byte
@@ -3231,7 +3231,7 @@ func getLatitude8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 		NS   byte
 	}
 
-	var plat lat_s
+	var plat latField
 	binary.Decode(p[:], binary.NativeEndian, &plat)
 
 	var result float64
@@ -3371,7 +3371,7 @@ func getLatitude8(p [8]byte, quiet bool) maybe.Maybe[float64] {
  *------------------------------------------------------------------*/
 
 func getLongitude9(p [9]byte, quiet bool) maybe.Maybe[float64] {
-	type lon_s struct {
+	type lonField struct {
 		Deg  [3]byte
 		Minn [2]byte
 		Dot  byte
@@ -3379,7 +3379,7 @@ func getLongitude9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		EW   byte
 	}
 
-	var plon lon_s
+	var plon lonField
 	binary.Decode(p[:], binary.NativeEndian, &plon)
 
 	var result float64 = 0
