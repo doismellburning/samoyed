@@ -828,16 +828,16 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			if bs.trackerDebugLevel >= 3 {
 				/* Frequency, offset, tone and DCS are unknown here, which is */
 				/* what the zero value of each of those fields already means. */
-				var A decode_aprs_t
+				var A decodedAPRS
 
-				A.g_src = mycall
-				A.g_symbol_table = bp.symtab
-				A.g_symbol_code = bp.symbol
-				A.g_lat = gpsinfo.Lat
-				A.g_lon = gpsinfo.Lon
-				A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
-				A.g_course = maybe.Fmap(func(degrees int) float64 { return float64(degrees) }, coarse)
-				A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, gpsinfo.Altitude)
+				A.src = mycall
+				A.symbolTable = bp.symtab
+				A.symbolCode = bp.symbol
+				A.lat = gpsinfo.Lat
+				A.lon = gpsinfo.Lon
+				A.speedMPH = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
+				A.course = maybe.Fmap(func(degrees int) float64 { return float64(degrees) }, coarse)
+				A.altitudeFt = maybe.Fmap(DW_METERS_TO_FEET, gpsinfo.Altitude)
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel ax25.ALevel
