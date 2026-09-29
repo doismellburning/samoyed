@@ -276,6 +276,14 @@ func Test_kissutilRecByte(t *testing.T) {
 		assert.Contains(t, output, "[3] Q1TEST>APDW17:>Testing\n")
 	})
 
+	// FEND FESC FEND escapes nothing, so there is no type byte once it is
+	// unescaped, which used to crash kissutil looking for one.
+	t.Run("empty once unescaped", func(t *testing.T) {
+		var output = feedKISS(t, append([]byte{kiss.FEND, kiss.FESC, kiss.FEND}, frame...))
+
+		assert.Equal(t, "KISS frame from TNC has nothing in it once unescaped.  Ignoring it.\n[3] Q1TEST>APDW17:>Testing\n", output)
+	})
+
 	t.Run("overlong", func(t *testing.T) {
 		var overlong = append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen+10)...)
 

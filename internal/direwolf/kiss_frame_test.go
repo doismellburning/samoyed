@@ -607,3 +607,19 @@ func Test_kissport_status_stop(t *testing.T) {
 
 	assert.False(t, kps.attachClient(0, late), "a stopped port should not take on a new client")
 }
+
+// FEND FESC FEND is a frame, but escapes nothing, so there is no type byte
+// once it is unescaped.  Three bytes from any KISS client used to take the
+// whole program down, looking for one.
+func Test_KissRecByte_frame_empty_once_unescaped(t *testing.T) {
+	setupKissProcessMsg(t)
+
+	var kf = new(kiss.Collector)
+
+	var output = testutils.CaptureOutput(t, func() {
+		feedKissBytes(kf, 2, []byte{kiss.FEND, kiss.FESC, kiss.FEND})
+	})
+
+	assert.Contains(t, output, "nothing in it")
+	assert.Equal(t, 0, transmitQueue.Count(0, -1, "", "", false))
+}

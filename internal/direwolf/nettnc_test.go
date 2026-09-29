@@ -333,6 +333,24 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 	assert.Nil(t, dataLinkQueue.Remove())
 }
 
+// FEND FESC FEND is a frame, but escapes nothing, so there is no type byte
+// once it is unescaped.  Three bytes from the far end of the network
+// connection used to take the whole program down, looking for one.
+func TestNetTNCFrameEmptyOnceUnescapedIsReported(t *testing.T) {
+	expectReceivedFrames(t)
+
+	var kf = new(kiss.Collector)
+
+	var output = testutils.CaptureOutput(t, func() {
+		for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.FEND} {
+			nettncRecByte(kf, b, 2, nettncTestChannel)
+		}
+	})
+
+	assert.Contains(t, output, "nothing in it")
+	assert.Nil(t, dataLinkQueue.Remove())
+}
+
 // A TNC that never sends a FEND would otherwise fill the frame buffer without
 // limit, so the collecting stops at the maximum and says so - once, not once
 // for every byte past it.

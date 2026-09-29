@@ -522,7 +522,15 @@ func kissutilRecByte(kc *kiss.Collector, b byte) {
 			dwutil.HexDump(chunk.Frame)
 		}
 
-		kissutil_kiss_process_msg(kiss.Unwrap(chunk.Frame))
+		var msg = kiss.Unwrap(chunk.Frame)
+		if len(msg) == 0 {
+			// FEND FESC FEND, say: no type byte, so nothing to print.
+			fmt.Printf("KISS frame from TNC has nothing in it once unescaped.  Ignoring it.\n")
+
+			return
+		}
+
+		kissutil_kiss_process_msg(msg)
 	}
 }
 

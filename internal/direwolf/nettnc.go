@@ -310,6 +310,14 @@ func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int) {
 
 	var unwrapped = kiss.Unwrap(chunk.Frame)
 
+	if len(unwrapped) == 0 {
+		// FEND FESC FEND, say: no type byte, so nothing to pass on.
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("KISS frame from network TNC has nothing in it once unescaped.  Ignoring it.\n")
+
+		return
+	}
+
 	if debug >= 2 {
 		/* Append CRC to this and it goes out over the radio. */
 		text_color_set(DW_COLOR_DEBUG)
