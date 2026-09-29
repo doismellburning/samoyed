@@ -20,6 +20,7 @@
 package aprstelemetry
 
 import (
+	"container/list"
 	"fmt"
 	"strconv"
 	"strings"
@@ -30,12 +31,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// maxStations is how many stations' metadata a State keeps.  Metadata can
+// come from anyone on frequency or on APRS-IS, so without a limit a stream
+// of stations would grow it for ever.
+const maxStations = 1000
+
 const numAnalog = 5  // Number of analog channels.
 const numDigital = 8 // Number of digital channels.
 
 type stationMetadata struct {
-	next *stationMetadata // Next in linked list.
-
 	station string // Station name with optional SSID.
 
 	// Description for data.
@@ -60,30 +64,48 @@ const coeffB = 1
 const coeffC = 2
 
 // State holds the telemetry metadata - channel names, units, scaling and
-// bit sense - each station has sent, for decoding its later data.  It is safe
-// for use by more than one goroutine.
+// bit sense - each station has sent, for decoding its later data.  It keeps
+// the most recently used stations' metadata, up to maxStations of them; a
+// station whose metadata has been dropped to make room is back to the
+// defaults until it sends more.  It is safe for use by more than one
+// goroutine.
 type State struct {
 	// mu guards everything below, and is held for the whole of each exported
 	// method, since decoding data reads the metadata it looks up.
 	mu sync.Mutex
 
-	mdListHead *stationMetadata
+	// capacity is how many stations to keep: maxStations, bar in tests.
+	capacity int
+
+	// stations finds a station's element in recency, whose values are
+	// *stationMetadata, most recently used at the front.
+	stations map[string]*list.Element
+	recency  *list.List
 }
 
 // New returns a State that has heard no metadata, so every station starts
 // with the defaults.
 func New() *State {
-	return new(State)
+	var ts = new(State)
+
+	ts.capacity = maxStations
+	ts.stations = make(map[string]*list.Element)
+	ts.recency = list.New()
+
+	return ts
 }
 
 // getMetadata returns the metadata for station, a station name with optional
 // SSID, first allocating one with the defaults if the station has sent none.
+// Either way the station becomes the most recently used, and allocating one
+// drops the least recently used station if the State is full.
 func (ts *State) getMetadata(station string) *stationMetadata {
 	logrus.WithField("station", station).Debug("getMetadata")
-	for p := ts.mdListHead; p != nil; p = p.next {
-		if station == p.station {
-			return (p)
-		}
+
+	if e, ok := ts.stations[station]; ok {
+		ts.recency.MoveToFront(e)
+
+		return e.Value.(*stationMetadata) //nolint:forcetypeassert // recency holds nothing else
 	}
 
 	var p = new(stationMetadata)
@@ -111,8 +133,15 @@ func (ts *State) getMetadata(station string) *stationMetadata {
 		p.sense[n] = true
 	}
 
-	p.next = ts.mdListHead
-	ts.mdListHead = p
+	if ts.recency.Len() >= ts.capacity {
+		var oldest = ts.recency.Back()
+		var dropped = ts.recency.Remove(oldest).(*stationMetadata) //nolint:forcetypeassert // recency holds nothing else
+
+		delete(ts.stations, dropped.station)
+		logrus.WithField("station", dropped.station).Debug("Dropped least recently used telemetry metadata")
+	}
+
+	ts.stations[station] = ts.recency.PushFront(p)
 
 	return (p)
 }

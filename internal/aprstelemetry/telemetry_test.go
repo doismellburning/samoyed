@@ -104,3 +104,32 @@ func Test_State_concurrent(t *testing.T) {
 		"Seq=5, Vbat=0.199, Vsolar=0.000, Temp=-247.7, Sat=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1",
 		result)
 }
+
+// Metadata can come from any number of stations, so only the most recently
+// used are kept.  One dropped to make room decodes with the defaults again.
+
+func Test_State_drops_least_recently_used(t *testing.T) {
+	var ts = New()
+	ts.capacity = 2
+
+	ts.NameMessage("Q1TEST", "One")
+	ts.NameMessage("Q2TEST", "Two")
+
+	// Decoding Q1TEST's data makes Q2TEST the least recently used...
+	ts.DataOriginal("Q1TEST", "T#1,1", true)
+
+	// ...so Q3TEST takes its place.
+	ts.NameMessage("Q3TEST", "Three")
+
+	assert.Len(t, ts.stations, 2)
+
+	// Q2TEST last, as decoding its data stores it afresh, dropping another.
+	for _, c := range []struct{ station, want string }{
+		{"Q1TEST", "Seq=1, One=1"},
+		{"Q3TEST", "Seq=1, Three=1"},
+		{"Q2TEST", "Seq=1, A1=1"},
+	} {
+		var result, _ = ts.DataOriginal(c.station, "T#1,1", true)
+		assert.Equal(t, c.want, result, c.station)
+	}
+}
