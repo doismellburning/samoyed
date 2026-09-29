@@ -13,6 +13,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -108,7 +109,7 @@ func Test_process_input(t *testing.T) {
 
 			testutils.CaptureOutput(t, func() { process_input(tc.in) })
 
-			var want = direwolf.KissEncapsulate(tc.want)
+			var want = kiss.Encapsulate(tc.want)
 
 			assert.Equal(t, want, readKISS(t, tnc, len(want)))
 		})
@@ -120,7 +121,7 @@ func Test_process_input_frame(t *testing.T) {
 
 	testutils.CaptureOutput(t, func() { process_input("[2] Q1TEST>APDW17:>Testing\r\n") })
 
-	var want = direwolf.KissEncapsulate(append([]byte{0x20}, ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()...))
+	var want = kiss.Encapsulate(append([]byte{0x20}, ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()...))
 
 	assert.Equal(t, want, readKISS(t, tnc, len(want)))
 }
@@ -162,7 +163,7 @@ func Test_send_to_kiss_tnc_clamps(t *testing.T) {
 	assert.Contains(t, output, "Invalid command 16")
 	assert.Contains(t, output, "Invalid data length")
 
-	var want = direwolf.KissEncapsulate(append([]byte{0x00}, bytes.Repeat([]byte{'x'}, ax25.MaxPacketLen-1)...))
+	var want = kiss.Encapsulate(append([]byte{0x00}, bytes.Repeat([]byte{'x'}, ax25.MaxPacketLen-1)...))
 
 	assert.Equal(t, want, readKISS(t, tnc, len(want)))
 }
@@ -244,11 +245,11 @@ func Test_main_endToEnd(t *testing.T) {
 	var _, writeErr = p.Stdin.WriteString("Q1TEST>APDW17:>Outbound\n")
 	require.NoError(t, writeErr)
 
-	var want = direwolf.KissEncapsulate(append([]byte{0x00}, ax25.MustFromText("Q1TEST>APDW17:>Outbound").Pack()...))
+	var want = kiss.Encapsulate(append([]byte{0x00}, ax25.MustFromText("Q1TEST>APDW17:>Outbound").Pack()...))
 
 	assert.Equal(t, want, readKISS(t, tnc, len(want)))
 
-	var _, replyErr = tnc.Write(direwolf.KissEncapsulate(append([]byte{0x10}, ax25.MustFromText("Q2TEST>APDW17:>Inbound").Pack()...)))
+	var _, replyErr = tnc.Write(kiss.Encapsulate(append([]byte{0x10}, ax25.MustFromText("Q2TEST>APDW17:>Inbound").Pack()...)))
 	require.NoError(t, replyErr)
 
 	p.WaitFor(t, "[1] Q2TEST>APDW17:>Inbound")

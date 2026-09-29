@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -108,7 +109,7 @@ func expectReceivedFrames(t *testing.T) {
 // kissFrameFor wraps a packet's on-air bytes the way a KISS TNC would before
 // putting them on the wire.
 func kissFrameFor(pp *ax25.Packet) []byte {
-	return KissEncapsulate(append([]byte{0}, pp.FrameData()...))
+	return kiss.Encapsulate(append([]byte{0}, pp.FrameData()...))
 }
 
 // A TNC that is not there cannot be attached to, and says so rather than
@@ -307,7 +308,7 @@ func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 
 	var kf = new(KISSFrame)
 
-	for _, b := range []byte{FEND, FEND, FEND, FEND} {
+	for _, b := range []byte{kiss.FEND, kiss.FEND, kiss.FEND, kiss.FEND} {
 		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
 	}
 
@@ -322,7 +323,7 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 	var kf = new(KISSFrame)
 
 	var output = testutils.CaptureOutput(t, func() {
-		for _, b := range KissEncapsulate([]byte{0, 'n', 'o', 't', ' ', 'a', 'x', '2', '5'}) {
+		for _, b := range kiss.Encapsulate([]byte{0, 'n', 'o', 't', ' ', 'a', 'x', '2', '5'}) {
 			my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
 		}
 	})
@@ -337,7 +338,7 @@ func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 	var kf = new(KISSFrame)
 
 	var output = testutils.CaptureOutput(t, func() {
-		my_kiss_rec_byte(kf, FEND, 0, nettncTestChannel)
+		my_kiss_rec_byte(kf, kiss.FEND, 0, nettncTestChannel)
 
 		for range MAX_KISS_LEN + 10 {
 			my_kiss_rec_byte(kf, 'x', 0, nettncTestChannel)
@@ -358,13 +359,13 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 	var kf = new(KISSFrame)
 
 	var output = testutils.CaptureOutput(t, func() {
-		my_kiss_rec_byte(kf, FEND, 0, nettncTestChannel)
+		my_kiss_rec_byte(kf, kiss.FEND, 0, nettncTestChannel)
 
 		for range MAX_KISS_LEN + 10 {
 			my_kiss_rec_byte(kf, 'x', 0, nettncTestChannel)
 		}
 
-		my_kiss_rec_byte(kf, FEND, 0, nettncTestChannel)
+		my_kiss_rec_byte(kf, kiss.FEND, 0, nettncTestChannel)
 	})
 
 	assert.Contains(t, output, "KISS frame from network TNC exceeded maximum length.  Discarding it.")

@@ -32,6 +32,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/lestrrat-go/strftime"
 	"github.com/pkg/term"
@@ -307,7 +308,7 @@ func process_input(stuff string) {
 		var pp = ax25.FromText(stuff, true)
 		if pp != nil {
 			var frame_data = pp.Pack()
-			send_to_kiss_tnc(channel, direwolf.KISS_CMD_DATA_FRAME, frame_data)
+			send_to_kiss_tnc(channel, kiss.CmdDataFrame, frame_data)
 		} else {
 			fmt.Printf("ERROR! Could not convert to AX.25 frame: %s\n", stuff)
 		}
@@ -315,22 +316,22 @@ func process_input(stuff string) {
 		switch stuff[0] {
 		case 'd': // txDelay, 10ms units
 			var value = parse_number(stuff[1:], direwolf.DEFAULT_TXDELAY)
-			send_to_kiss_tnc(channel, direwolf.KISS_CMD_TXDELAY, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdTxDelay, []byte{byte(value)})
 		case 'p': // Persistence
 			var value = parse_number(stuff[1:], direwolf.DEFAULT_PERSIST)
-			send_to_kiss_tnc(channel, direwolf.KISS_CMD_PERSISTENCE, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdPersistence, []byte{byte(value)})
 		case 's': // Slot time, 10ms units
 			var value = parse_number(stuff[1:], direwolf.DEFAULT_SLOTTIME)
-			send_to_kiss_tnc(channel, direwolf.KISS_CMD_SLOTTIME, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdSlotTime, []byte{byte(value)})
 		case 't': // txTail, 10ms units
 			var value = parse_number(stuff[1:], direwolf.DEFAULT_TXTAIL)
-			send_to_kiss_tnc(channel, direwolf.KISS_CMD_TXTAIL, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdTxTail, []byte{byte(value)})
 		case 'f': // Full duplex
 			var value = parse_number(stuff[1:], 0)
-			send_to_kiss_tnc(channel, direwolf.KISS_CMD_FULLDUPLEX, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdFullDuplex, []byte{byte(value)})
 		case 'h': // set Hardware
 			var p = strings.TrimSpace(stuff[1:])
-			send_to_kiss_tnc(channel, direwolf.KISS_CMD_SET_HARDWARE, []byte(p))
+			send_to_kiss_tnc(channel, kiss.CmdSetHardware, []byte(p))
 		default:
 			fmt.Printf("Invalid command. Must be one of d p s t f h.\n")
 			usage2()
@@ -348,7 +349,7 @@ func process_input(stuff string) {
  *
  * Inputs:	channel	- channel number.
  *
- *		cmd	- KISS_CMD_DATA_FRAME, KISS_CMD_SET_HARDWARE, etc.
+ *		cmd	- kiss.CmdDataFrame, kiss.CmdSetHardware, etc.
  *
  *		data	- Information for KISS frame.
  *
@@ -375,7 +376,7 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 	var temp = []byte{byte((channel << 4) | cmd)}
 	temp = append(temp, data...)
 
-	var kissed = direwolf.KissEncapsulate(temp)
+	var kissed = kiss.Encapsulate(temp)
 	var klen = len(kissed)
 
 	if verbose {
@@ -549,7 +550,7 @@ func kissutil_kiss_process_msg(kiss_msg []byte) {
 	var cmd = kiss_msg[0] & 0xf
 
 	switch cmd {
-	case direwolf.KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
+	case kiss.CmdDataFrame: /* 0 = Data Frame */
 		var pp = ax25.FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {
 			fmt.Printf("ERROR - Invalid KISS data frame from TNC.\n")
@@ -599,7 +600,7 @@ func kissutil_kiss_process_msg(kiss_msg []byte) {
 			}
 		}
 
-	case direwolf.KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
+	case kiss.CmdSetHardware: /* 6 = TNC specific */
 		// Display as "h ..." for in/out symmetry.
 		// Use safe print here?
 		fmt.Printf("[%d] h %s\n", channel, string(kiss_msg[1:]))

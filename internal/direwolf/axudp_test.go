@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/kiss"
 )
 
 func TestAXUDPAddCRC(t *testing.T) {
@@ -354,7 +355,7 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 	// Total content bytes = 1 (type) + len(ax25Dest) + padding = MAX_KISS_LEN - 1
 	var padLen = MAX_KISS_LEN - 1 - 1 - len(ax25Dest)
 	var content []byte
-	content = append(content, KISS_CMD_DATA_FRAME) // type byte
+	content = append(content, kiss.CmdDataFrame) // type byte
 	content = append(content, ax25Dest...)
 	for range padLen {
 		content = append(content, 0x41)
@@ -364,9 +365,9 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 	// Opening FEND → kf.kiss_len = 1; content → kf.kiss_len = MAX_KISS_LEN;
 	// closing FEND arrives with kf.kiss_len == MAX_KISS_LEN, *overflow == false.
 	var buf []byte
-	buf = append(buf, FEND)
+	buf = append(buf, kiss.FEND)
 	buf = append(buf, content...)
-	buf = append(buf, FEND)
+	buf = append(buf, kiss.FEND)
 
 	// If the frame is forwarded despite being unterminated, sendAXUDP will
 	// dereference the nil udpConn and panic — recover it as a test failure.
@@ -405,12 +406,12 @@ func TestKISSOverflowDiscarded(t *testing.T) {
 	// Build a KISS input: FEND + type byte + MAX_KISS_LEN data bytes + FEND.
 	// MAX_KISS_LEN data bytes is enough to trigger the overflow condition.
 	var buf []byte
-	buf = append(buf, FEND)
-	buf = append(buf, KISS_CMD_DATA_FRAME)
+	buf = append(buf, kiss.FEND)
+	buf = append(buf, kiss.CmdDataFrame)
 	for range MAX_KISS_LEN {
 		buf = append(buf, 0x41)
 	}
-	buf = append(buf, FEND)
+	buf = append(buf, kiss.FEND)
 
 	var kf KISSFrame
 	var overflow bool
@@ -515,8 +516,8 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 	// Arbitrary source address with end-of-address bit set.
 	var ax25Src = []byte{0xA4, 0x64, 0xAA, 0x8C, 0xA8, 0xAA, 0x61}
 	var ax25frame = append(ax25Dest, ax25Src...)
-	var payload = append([]byte{KISS_CMD_DATA_FRAME}, ax25frame...)
-	var kissframe = KissEncapsulate(payload)
+	var payload = append([]byte{kiss.CmdDataFrame}, ax25frame...)
+	var kissframe = kiss.Encapsulate(payload)
 
 	// Set up a bridge with a MAP entry routing Q1TEST to dstPkt.
 	var b = new(AXUDPBridge)
@@ -565,7 +566,7 @@ func TestBroadcastKISSDropsOversizedFrame(t *testing.T) {
 	var fc = new(fakeConn)
 	b.clients = []net.Conn{fc}
 
-	// An AX.25 frame large enough that KissEncapsulate produces > MAX_KISS_LEN
+	// An AX.25 frame large enough that kiss.Encapsulate produces > MAX_KISS_LEN
 	// bytes: payload = 1 type byte + ax25frame, encapsulated with 2 FENDs.
 	// With no bytes needing escaping, output = len(payload) + 2 bytes.
 	// We need len(payload) > MAX_KISS_LEN - 2, so len(ax25frame) >= MAX_KISS_LEN - 2.
@@ -754,7 +755,7 @@ func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
 	if rxErr != nil {
 		t.Fatalf("accepted client received no broadcast: %v", rxErr)
 	}
-	var want = KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, ax25frame...))
+	var want = kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, ax25frame...))
 	if string(rxBuf[:n]) != string(want) {
 		t.Errorf("client received %x, want %x", rxBuf[:n], want)
 	}

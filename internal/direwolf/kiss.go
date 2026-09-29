@@ -65,6 +65,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -192,8 +193,8 @@ func pollable(f *os.File) (*os.File, error) {
  * Inputs:	chan		- Channel number where packet was received.
  *				  0 = first, 1 = second if any.
  *
- *		kiss_cmd	- Usually KISS_CMD_DATA_FRAME but we can also have
- *				  KISS_CMD_SET_HARDWARE when responding to a query.
+ *		kiss_cmd	- Usually kiss.CmdDataFrame but we can also have
+ *				  kiss.CmdSetHardware when responding to a query.
  *
  *		pp		- Identifier for packet object.
  *
@@ -255,7 +256,7 @@ func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen int
 			dwutil.HexDump(fbuf)
 		}
 
-		kiss_buff = KissEncapsulate(stemp)
+		kiss_buff = kiss.Encapsulate(stemp)
 
 		/* This has KISS framing and escapes for sending to client app. */
 

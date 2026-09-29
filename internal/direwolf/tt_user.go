@@ -26,6 +26,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 )
@@ -651,9 +652,9 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 		var fbuf = pp.Pack()
 
 		agwServer.SendRecPacket(u.ttConfig.obj_recv_chan, pp, fbuf)
-		kissNetSvc.SendRecPacket(u.ttConfig.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
-		kissSerial.SendRecPacket(u.ttConfig.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
-		kissPT.SendRecPacket(u.ttConfig.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
+		kissNetSvc.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1)
+		kissSerial.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1)
+		kissPT.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1)
 	}
 
 	if first_time && u.ttConfig.obj_send_to_ig > 0 {

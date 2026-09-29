@@ -16,6 +16,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v3"
 )
@@ -309,8 +310,8 @@ func (b *AXUDPBridge) broadcastKISS(ax25frame []byte) {
 	}
 
 	// Prepend type byte 0x00 (channel 0, DATA_FRAME) before KISS-encoding.
-	var payload = append([]byte{KISS_CMD_DATA_FRAME}, ax25frame...)
-	var kissframe = KissEncapsulate(payload)
+	var payload = append([]byte{kiss.CmdDataFrame}, ax25frame...)
+	var kissframe = kiss.Encapsulate(payload)
 
 	// The nettnc.go KISS reader uses a fixed [MAX_KISS_LEN] accumulator: bytes
 	// beyond that limit are dropped with an error message, and when the closing
@@ -470,7 +471,7 @@ func (b *AXUDPBridge) handleKISSClient(ctx context.Context, conn net.Conn) {
 // cleared when collection resets, so the truncated frame is discarded.
 func my_kiss_rec_byte_axudp(kf *KISSFrame, overflow *bool, b byte, b2 *AXUDPBridge) {
 	if kf.state == KS_SEARCHING {
-		if b == FEND {
+		if b == kiss.FEND {
 			*overflow = false
 			kf.kiss_len = 0
 			kf.kiss_msg[kf.kiss_len] = b
@@ -482,7 +483,7 @@ func my_kiss_rec_byte_axudp(kf *KISSFrame, overflow *bool, b byte, b2 *AXUDPBrid
 	}
 
 	// Collecting.
-	if b == FEND {
+	if b == kiss.FEND {
 		if kf.kiss_len <= 1 {
 			// Empty or double-FEND — restart.
 			*overflow = false
@@ -510,7 +511,7 @@ func my_kiss_rec_byte_axudp(kf *KISSFrame, overflow *bool, b byte, b2 *AXUDPBrid
 			kf.kiss_len++
 		}
 
-		var unwrapped = KissUnwrap(kf.kiss_msg[:kf.kiss_len])
+		var unwrapped = kiss.Unwrap(kf.kiss_msg[:kf.kiss_len])
 
 		// unwrapped[0] is the type byte (channel << 4 | cmd).
 		// We only care about DATA_FRAME commands (lower nibble == 0).
@@ -526,7 +527,7 @@ func my_kiss_rec_byte_axudp(kf *KISSFrame, overflow *bool, b byte, b2 *AXUDPBrid
 				"type_byte": fmt.Sprintf("0x%02x", typeByte),
 			}).Trace("KISS frame complete")
 		}
-		if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == KISS_CMD_DATA_FRAME {
+		if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == kiss.CmdDataFrame {
 			var ax25frame = unwrapped[1:]
 			var dest = axudpExtractDest(ax25frame)
 			if logrus.IsLevelEnabled(logrus.TraceLevel) {

@@ -153,6 +153,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
 )
 
@@ -256,8 +257,8 @@ func (kns *KissNetService) Start(ctx context.Context) {
  *
  *		fbuf		- Raw received frame buffer
  *
- *		kiss_cmd	- Usually KISS_CMD_DATA_FRAME but we can also have
- *				  KISS_CMD_SET_HARDWARE when responding to a query.
+ *		kiss_cmd	- Usually kiss.CmdDataFrame but we can also have
+ *				  kiss.CmdSetHardware when responding to a query.
  *
  *		flen		- Number of bytes for AX.25 frame.
  *				  When called from KissRecByte, flen will be -1
@@ -343,7 +344,7 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 								dwutil.HexDump(fbuf)
 							}
 
-							kiss_buff = KissEncapsulate(stemp)
+							kiss_buff = kiss.Encapsulate(stemp)
 
 							/* This has the escapes and the surrounding FENDs. */
 
@@ -419,7 +420,7 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 								msg[0] = byte(0 | cmd) // set channel to zero.
 							}
 
-							var kiss_buff = KissEncapsulate(msg)
+							var kiss_buff = kiss.Encapsulate(msg)
 
 							/* This has the escapes and the surrounding FENDs. */
 

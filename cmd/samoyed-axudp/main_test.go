@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,16 +75,16 @@ func Test_main_bridges(t *testing.T) {
 	assert.Contains(t, output, "WARNING: this is beta software")
 	assert.Contains(t, output, fmt.Sprintf("Q2TEST -> 127.0.0.1:%d", remotePort))
 
-	var kiss, dialErr = new(net.Dialer).DialContext(t.Context(), "tcp", net.JoinHostPort("127.0.0.1", kissPort))
+	var kissConn, dialErr = new(net.Dialer).DialContext(t.Context(), "tcp", net.JoinHostPort("127.0.0.1", kissPort))
 	require.NoError(t, dialErr)
 
-	defer kiss.Close()
+	defer kissConn.Close()
 
 	// KISS to AXUDP: a frame for Q2TEST goes to the node mapped to it, with
 	// a checksum on the end.
 	var outbound = ax25.MustFromText("Q1TEST>Q2TEST:>Outbound").Pack()
 
-	var _, writeErr = kiss.Write(direwolf.KissEncapsulate(append([]byte{0x00}, outbound...)))
+	var _, writeErr = kissConn.Write(kiss.Encapsulate(append([]byte{0x00}, outbound...)))
 	require.NoError(t, writeErr)
 
 	require.NoError(t, remote.SetReadDeadline(time.Now().Add(5*time.Second)))
@@ -105,13 +105,13 @@ func Test_main_bridges(t *testing.T) {
 	var _, sendErr = remote.WriteTo(datagram, from)
 	require.NoError(t, sendErr)
 
-	var want = direwolf.KissEncapsulate(append([]byte{0x00}, outbound...))
+	var want = kiss.Encapsulate(append([]byte{0x00}, outbound...))
 
-	require.NoError(t, kiss.SetReadDeadline(time.Now().Add(5*time.Second)))
+	require.NoError(t, kissConn.SetReadDeadline(time.Now().Add(5*time.Second)))
 
 	var got = make([]byte, len(want))
 
-	var _, kissReadErr = io.ReadFull(kiss, got)
+	var _, kissReadErr = io.ReadFull(kissConn, got)
 	require.NoError(t, kissReadErr)
 
 	assert.Equal(t, want, got)

@@ -19,6 +19,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
 )
 
@@ -310,7 +311,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 	switch kf.state {
 	/* Searching for starting FEND. */
 	default: // Includes KS_SEARCHING
-		if b == FEND {
+		if b == kiss.FEND {
 			/* Start of frame.  */
 			kf.kiss_len = 0
 			kf.kiss_msg[kf.kiss_len] = b
@@ -323,7 +324,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 		return
 
 	case KS_COLLECTING: /* Frame collection in progress. */
-		if b == FEND {
+		if b == kiss.FEND {
 			/* End of frame. */
 			if kf.kiss_len == 0 {
 				/* Empty frame.  Starting a new one. */
@@ -333,7 +334,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 				return
 			}
 
-			if kf.kiss_len == 1 && kf.kiss_msg[0] == FEND {
+			if kf.kiss_len == 1 && kf.kiss_msg[0] == kiss.FEND {
 				/* Empty frame.  Just go on collecting. */
 				return
 			}
@@ -366,7 +367,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 				kiss_debug_print(FROM_CLIENT, "", kf.kiss_msg[0:kf.kiss_len])
 			}
 
-			var unwrapped = KissUnwrap(kf.kiss_msg[:kf.kiss_len])
+			var unwrapped = kiss.Unwrap(kf.kiss_msg[:kf.kiss_len])
 
 			if debug >= 2 {
 				/* Append CRC to this and it goes out over the radio. */
@@ -458,7 +459,7 @@ func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) {
 
 	// Next, encapsulate into KISS frame with surrounding FENDs and any escapes.
 
-	var kiss_buff = KissEncapsulate(frame_buff)
+	var kiss_buff = kiss.Encapsulate(frame_buff)
 
 	var _, err = conn.Write(kiss_buff)
 	if err != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -1099,10 +1100,10 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 	var fbuf = pp.Pack()
 
-	agwServer.SendRecPacket(channel, pp, fbuf)                                       // AGW net protocol
-	kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS TCP
-	kissSerial.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS serial port
-	kissPT.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
+	agwServer.SendRecPacket(channel, pp, fbuf)                                     // AGW net protocol
+	kissNetSvc.SendRecPacket(channel, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1) // KISS TCP
+	kissSerial.SendRecPacket(channel, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1) // KISS serial port
+	kissPT.SendRecPacket(channel, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
 		var ao_pp = ax25.FromText(ais_obj_packet, true)
@@ -1110,9 +1111,9 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 			var ao_fbuf = ao_pp.Pack()
 
 			agwServer.SendRecPacket(channel, ao_pp, ao_fbuf)
-			kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
-			kissSerial.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
-			kissPT.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
+			kissNetSvc.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf, len(ao_fbuf), nil, -1)
+			kissSerial.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf, len(ao_fbuf), nil, -1)
+			kissPT.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf, len(ao_fbuf), nil, -1)
 		}
 	}
 

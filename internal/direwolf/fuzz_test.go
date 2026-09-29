@@ -135,20 +135,6 @@ func FuzzDecodeAPRS(f *testing.F) {
 	})
 }
 
-// FuzzKISSUnwrap covers the KISS framing, which any client on the KISS TCP
-// port or the serial KISS device can feed.
-func FuzzKISSUnwrap(f *testing.F) {
-	fuzzQuietly(f)
-
-	f.Add([]byte{0x00, 'h', 'e', 'l', 'l', 'o', FEND})
-	f.Add([]byte{0x00, FESC, TFEND, FESC, TFESC, FEND})
-	f.Add([]byte{FEND})
-
-	f.Fuzz(func(t *testing.T, in []byte) {
-		KissUnwrap(in)
-	})
-}
-
 // FuzzIL2PDecodeFrame covers the IL2P receive path: header FEC, descrambling
 // and the payload blocks.
 func FuzzIL2PDecodeFrame(f *testing.F) {

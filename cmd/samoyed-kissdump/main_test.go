@@ -8,6 +8,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,7 +48,7 @@ func dumpCaptureOutput(t *testing.T, capture []byte, hexInput bool) (string, int
 func testCapture(t *testing.T, monitor string) []byte {
 	t.Helper()
 
-	return direwolf.KissEncapsulate(append([]byte{0x00}, ax25.MustFromText(monitor).Pack()...))
+	return kiss.Encapsulate(append([]byte{0x00}, ax25.MustFromText(monitor).Pack()...))
 }
 
 func Test_APRS(t *testing.T) {
@@ -66,7 +67,7 @@ func Test_APRS(t *testing.T) {
 func Test_Port(t *testing.T) {
 	var frame = ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()
 
-	var output, problems = dumpCaptureOutput(t, direwolf.KissEncapsulate(append([]byte{0x30}, frame...)), false)
+	var output, problems = dumpCaptureOutput(t, kiss.Encapsulate(append([]byte{0x30}, frame...)), false)
 
 	assert.Equal(t, 0, problems)
 	assert.Contains(t, output, "command 0 (Data frame), port 3")
@@ -76,7 +77,7 @@ func Test_Port(t *testing.T) {
 func Test_Escapes(t *testing.T) {
 	var frame = ax25.MustFromText("Q1TEST>APDW17:>FEND <0xc0> and FESC <0xdb>").Pack()
 
-	var capture = direwolf.KissEncapsulate(append([]byte{0x00}, frame...))
+	var capture = kiss.Encapsulate(append([]byte{0x00}, frame...))
 
 	// The escaping should have made the frame longer than its contents.
 	require.Greater(t, len(capture), len(frame)+3)
@@ -90,9 +91,9 @@ func Test_Escapes(t *testing.T) {
 
 // Extra FENDs are padding, not empty frames.
 func Test_Padding(t *testing.T) {
-	var capture = []byte{direwolf.FEND, direwolf.FEND}
+	var capture = []byte{kiss.FEND, kiss.FEND}
 	capture = append(capture, testCapture(t, "Q1TEST>APDW17:>Testing")...)
-	capture = append(capture, direwolf.FEND, direwolf.FEND)
+	capture = append(capture, kiss.FEND, kiss.FEND)
 
 	var output, problems = dumpCaptureOutput(t, capture, false)
 
@@ -115,7 +116,7 @@ func Test_BadEscape(t *testing.T) {
 	var capture = testCapture(t, "Q1TEST>APDW17:>Testing")
 
 	// 0x41 is neither TFEND nor TFESC.
-	capture = append(capture[:len(capture)-1], direwolf.FESC, 0x41, direwolf.FEND)
+	capture = append(capture[:len(capture)-1], kiss.FESC, 0x41, kiss.FEND)
 
 	var output, problems = dumpCaptureOutput(t, capture, false)
 
@@ -124,21 +125,21 @@ func Test_BadEscape(t *testing.T) {
 }
 
 func Test_TruncatedEscape(t *testing.T) {
-	var output, problems = dumpCaptureOutput(t, []byte{direwolf.FEND, 0x00, direwolf.FESC, direwolf.FEND}, false)
+	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, 0x00, kiss.FESC, kiss.FEND}, false)
 
 	assert.Equal(t, 2, problems) // Truncated escape, and then too short for AX.25.
 	assert.Contains(t, output, "the escaped byte is missing")
 }
 
 func Test_ShortFrame(t *testing.T) {
-	var output, problems = dumpCaptureOutput(t, []byte{direwolf.FEND, 0x00, 0x82, 0xa0, direwolf.FEND}, false)
+	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, 0x00, 0x82, 0xa0, kiss.FEND}, false)
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "too short for an AX.25 header of at least 15")
 }
 
 func Test_NoCommandByte(t *testing.T) {
-	var output, problems = dumpCaptureOutput(t, []byte{direwolf.FEND, direwolf.FESC, direwolf.FEND}, false)
+	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.FESC, kiss.FEND}, false)
 
 	assert.Equal(t, 2, problems) // Truncated escape, and then nothing left.
 	assert.Contains(t, output, "there is no command byte")
@@ -150,7 +151,7 @@ func Test_MalformedAddresses(t *testing.T) {
 
 	frame[13] &= ^byte(ax25.SSIDLastMask) // Clear the end of address bit.
 
-	var output, problems = dumpCaptureOutput(t, direwolf.KissEncapsulate(append([]byte{0x00}, frame...)), false)
+	var output, problems = dumpCaptureOutput(t, kiss.Encapsulate(append([]byte{0x00}, frame...)), false)
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "The address field is malformed")
@@ -164,7 +165,7 @@ func Test_NoControlByte(t *testing.T) {
 
 	var addressesOnly = frame[:21] // Three addresses of 7 bytes, and nothing else.
 
-	var output, problems = dumpCaptureOutput(t, direwolf.KissEncapsulate(append([]byte{0x00}, addressesOnly...)), false)
+	var output, problems = dumpCaptureOutput(t, kiss.Encapsulate(append([]byte{0x00}, addressesOnly...)), false)
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "there is no control byte")
@@ -174,9 +175,9 @@ func Test_NoControlByte(t *testing.T) {
 
 // AX25SafePrint stops after MAXSAFE bytes, which has to be said out loud.
 func Test_SetHardwareTruncated(t *testing.T) {
-	var capture = []byte{direwolf.FEND, direwolf.KISS_CMD_SET_HARDWARE}
+	var capture = []byte{kiss.FEND, kiss.CmdSetHardware}
 	capture = append(capture, bytes.Repeat([]byte("x"), ax25.MaxSafe+100)...)
-	capture = append(capture, direwolf.FEND)
+	capture = append(capture, kiss.FEND)
 
 	var output, problems = dumpCaptureOutput(t, capture, false)
 
@@ -188,7 +189,7 @@ func Test_SetHardwareTruncated(t *testing.T) {
 func Test_NoPID(t *testing.T) {
 	var frame = ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()
 
-	var output, problems = dumpCaptureOutput(t, direwolf.KissEncapsulate(append([]byte{0x00}, frame[:15]...)), false)
+	var output, problems = dumpCaptureOutput(t, kiss.Encapsulate(append([]byte{0x00}, frame[:15]...)), false)
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "it ends before the information field")
@@ -200,7 +201,7 @@ func Test_NotAPRS(t *testing.T) {
 
 	var sabm = append(frame[:14:14], 0x3f) // Addresses, then SABM with P=1.
 
-	var output, problems = dumpCaptureOutput(t, direwolf.KissEncapsulate(append([]byte{0x00}, sabm...)), false)
+	var output, problems = dumpCaptureOutput(t, kiss.Encapsulate(append([]byte{0x00}, sabm...)), false)
 
 	assert.Equal(t, 0, problems)
 	assert.Contains(t, output, "U frame SABM")
@@ -214,7 +215,7 @@ func Test_NotAPRSByPID(t *testing.T) {
 
 	frame[15] = 0xcf // NET/ROM rather than no layer 3 protocol.
 
-	var output, problems = dumpCaptureOutput(t, direwolf.KissEncapsulate(append([]byte{0x00}, frame...)), false)
+	var output, problems = dumpCaptureOutput(t, kiss.Encapsulate(append([]byte{0x00}, frame...)), false)
 
 	assert.Equal(t, 0, problems)
 	assert.Contains(t, output, "U frame UI")
@@ -225,12 +226,12 @@ func Test_NotAPRSByPID(t *testing.T) {
 
 func Test_Parameters(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{
-		direwolf.FEND, direwolf.KISS_CMD_TXDELAY, 30, direwolf.FEND,
-		direwolf.KISS_CMD_PERSISTENCE, 63, direwolf.FEND,
-		direwolf.KISS_CMD_SLOTTIME, 10, direwolf.FEND,
-		direwolf.KISS_CMD_TXTAIL, 5, direwolf.FEND,
-		direwolf.KISS_CMD_FULLDUPLEX, 0, direwolf.FEND,
-		direwolf.KISS_CMD_END_KISS, direwolf.FEND,
+		kiss.FEND, kiss.CmdTxDelay, 30, kiss.FEND,
+		kiss.CmdPersistence, 63, kiss.FEND,
+		kiss.CmdSlotTime, 10, kiss.FEND,
+		kiss.CmdTxTail, 5, kiss.FEND,
+		kiss.CmdFullDuplex, 0, kiss.FEND,
+		kiss.CmdEndKiss, kiss.FEND,
 	}, false)
 
 	assert.Equal(t, 0, problems)
@@ -244,16 +245,16 @@ func Test_Parameters(t *testing.T) {
 }
 
 func Test_ParameterWrongLength(t *testing.T) {
-	var output, problems = dumpCaptureOutput(t, []byte{direwolf.FEND, direwolf.KISS_CMD_SLOTTIME, 10, 10, direwolf.FEND}, false)
+	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.CmdSlotTime, 10, 10, kiss.FEND}, false)
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "SlotTime takes exactly one parameter byte, not 2")
 }
 
 func Test_SetHardware(t *testing.T) {
-	var capture = []byte{direwolf.FEND, direwolf.KISS_CMD_SET_HARDWARE}
+	var capture = []byte{kiss.FEND, kiss.CmdSetHardware}
 	capture = append(capture, []byte("TXBUF:1")...)
-	capture = append(capture, direwolf.FEND)
+	capture = append(capture, kiss.FEND)
 
 	var output, problems = dumpCaptureOutput(t, capture, false)
 
@@ -262,14 +263,14 @@ func Test_SetHardware(t *testing.T) {
 }
 
 func Test_XKISS(t *testing.T) {
-	var output, problems = dumpCaptureOutput(t, []byte{direwolf.FEND, direwolf.XKISS_CMD_POLL, direwolf.FEND}, false)
+	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.CmdXKissPoll, kiss.FEND}, false)
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "is an XKISS extension, which is not supported")
 }
 
 func Test_InvalidCommand(t *testing.T) {
-	var output, problems = dumpCaptureOutput(t, []byte{direwolf.FEND, 0x07, direwolf.FEND}, false)
+	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, 0x07, kiss.FEND}, false)
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "Command 7 is not part of the KISS protocol")
@@ -293,7 +294,7 @@ func Test_NoFEND(t *testing.T) {
 
 // Padding and nothing else is not a capture anyone can learn anything from.
 func Test_OnlyPadding(t *testing.T) {
-	var output, problems = dumpCaptureOutput(t, []byte{direwolf.FEND, direwolf.FEND, direwolf.FEND}, false)
+	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.FEND, kiss.FEND}, false)
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "No frames in the capture")
@@ -363,7 +364,7 @@ func Test_HexEmpty(t *testing.T) {
 
 // Test_XKISS covers polling; data is the other XKISS command.
 func Test_XKISSData(t *testing.T) {
-	var output, problems = dumpCaptureOutput(t, []byte{direwolf.FEND, direwolf.XKISS_CMD_DATA, direwolf.FEND}, false)
+	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.CmdXKissData, kiss.FEND}, false)
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "Command 12 (XKISS data) is an XKISS extension, which is not supported.")
@@ -398,7 +399,7 @@ func Test_main(t *testing.T) {
 	})
 
 	t.Run("problems", func(t *testing.T) {
-		var result = testutils.RunMain(t, string(direwolf.KissEncapsulate([]byte{0x07})))
+		var result = testutils.RunMain(t, string(kiss.Encapsulate([]byte{0x07})))
 		var out, status = result.Output(), result.Status
 
 		assert.Equal(t, 1, status)
