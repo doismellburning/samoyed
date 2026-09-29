@@ -90,9 +90,9 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 
 	startGpsfake(t, port)
 
-	var config = new(misc_config_s)
-	config.gpsd_host = "127.0.0.1"
-	config.gpsd_port = port
+	var config = new(GPSConfig)
+	config.GPSDHost = "127.0.0.1"
+	config.GPSDPort = port
 
 	var gps = new(GPS)
 

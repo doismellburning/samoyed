@@ -78,6 +78,15 @@ type GPSInfo struct {
 	Altitude   maybe.Maybe[float64] /* meters above mean sea level. Valid if fix == 3. */
 }
 
+// GPSConfig says where NewGPS finds its GPS receivers.  Leave a receiver's
+// fields at their zero values to not use it.
+type GPSConfig struct {
+	NMEAPort  string /* Serial port name for reading NMEA sentences from GPS. e.g. COM22, /dev/ttyACM0 */
+	NMEASpeed int    /* Speed for above, baud.  0 leaves the port's speed as it is. */
+	GPSDHost  string /* Host for gpsd server. e.g. localhost, 192.168.1.2 */
+	GPSDPort  int    /* Port number for gpsd server. */
+}
+
 // GPS holds the most recent position report from whichever GPS receivers
 // NewGPS started.  The reader goroutines deposit it with SetData as it
 // arrives and Read hands a copy to the application; mu keeps the fields of
@@ -122,7 +131,7 @@ type GPS struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
+func NewGPS(ctx context.Context, pconfig *GPSConfig, debug int) *GPS {
 	var g = new(GPS)
 	g.debug = debug
 	g.info.Fix = DWFIX_NOT_INIT // The reader goroutines replace it with DWFIX_NOT_SEEN once they are running.
@@ -141,8 +150,8 @@ func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
 // serial port named port, leaving its speed as it is and not using gpsd.  It
 // is NewGPS for a standalone tool with nothing else to configure.
 func NewGPSNMEA(ctx context.Context, port string, debug int) *GPS {
-	var config misc_config_s
-	config.gpsnmea_port = port
+	var config GPSConfig
+	config.NMEAPort = port
 
 	return NewGPS(ctx, &config, debug)
 }

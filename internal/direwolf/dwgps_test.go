@@ -25,8 +25,8 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 
 	for name, port := range testCases {
 		t.Run(name, func(t *testing.T) {
-			var config = new(misc_config_s)
-			config.gpsnmea_port = port
+			var config = new(GPSConfig)
+			config.NMEAPort = port
 
 			var gps = NewGPS(context.Background(), config, 0)
 

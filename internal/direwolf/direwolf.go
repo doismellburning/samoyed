@@ -683,7 +683,13 @@ x = Silence FX.25 information.`)
 	/*
 	 * Open port for communication with GPS.
 	 */
-	gpsReceiver = NewGPS(ctx, misc_config, d_g_opt)
+	var gpsConfig = new(GPSConfig)
+	gpsConfig.NMEAPort = misc_config.gpsnmea_port
+	gpsConfig.NMEASpeed = misc_config.gpsnmea_speed
+	gpsConfig.GPSDHost = misc_config.gpsd_host
+	gpsConfig.GPSDPort = misc_config.gpsd_port
+
+	gpsReceiver = NewGPS(ctx, gpsConfig, d_g_opt)
 
 	var waypointErr error
 	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config, gpsReceiver)

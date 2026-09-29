@@ -284,9 +284,9 @@ func openTestGPSNMEA(t *testing.T) (*GPS, string, *os.File) {
 
 	t.Cleanup(func() { master.Close() })
 
-	var config = new(misc_config_s)
-	config.gpsnmea_port = slave.Name()
-	config.gpsnmea_speed = 4800
+	var config = new(GPSConfig)
+	config.NMEAPort = slave.Name()
+	config.NMEASpeed = 4800
 
 	var gps = new(GPS)
 

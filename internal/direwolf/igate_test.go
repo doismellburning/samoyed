@@ -1096,7 +1096,7 @@ func TestNewGPSLeavesTheIGateDebugLevelAlone(t *testing.T) {
 	igate.config.rx2ig_dedupe_time = 30
 
 	// No receiver configured, so this starts nothing.
-	NewGPS(t.Context(), new(misc_config_s), 0).Term()
+	NewGPS(t.Context(), new(GPSConfig), 0).Term()
 
 	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)

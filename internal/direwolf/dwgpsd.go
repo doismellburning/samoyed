@@ -118,17 +118,17 @@ func (c *gpsdClient) closeAndClear() {
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug int) int {
+func dwgpsd_init(ctx context.Context, gps *GPS, pconfig *GPSConfig, debug int) int {
 	if debug >= 2 {
 		logrus.Debug("dwgpsd_init")
 	}
 
-	if pconfig.gpsd_host == "" {
+	if pconfig.GPSDHost == "" {
 		/* Nothing to do.  Leave initial fix value for not init. */
 		return 0
 	}
 
-	var addr = net.JoinHostPort(pconfig.gpsd_host, strconv.Itoa(pconfig.gpsd_port))
+	var addr = net.JoinHostPort(pconfig.GPSDHost, strconv.Itoa(pconfig.GPSDPort))
 
 	var dialCtx, cancelDial = context.WithTimeout(ctx, GPSD_CONNECT_TIMEOUT)
 	defer cancelDial()

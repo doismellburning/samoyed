@@ -91,12 +91,12 @@ type gpsnmeaPort struct {
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug int) int {
+func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *GPSConfig, debug int) int {
 	if debug >= 2 {
 		logrus.Debug("dwgpsnmea_init")
 	}
 
-	if pconfig.gpsnmea_port == "" {
+	if pconfig.NMEAPort == "" {
 		/* Nothing to do.  Leave initial fix value for not init. */
 		return (0)
 	}
@@ -105,18 +105,18 @@ func dwgpsnmea_init(ctx context.Context, gps *GPS, pconfig *misc_config_s, debug
 	 * Open serial port connection.
 	 */
 
-	var fd = serialport.Open(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
+	var fd = serialport.Open(pconfig.NMEAPort, pconfig.NMEASpeed)
 
 	if fd != nil {
 		gps.nmea.mu.Lock()
-		gps.nmea.name = pconfig.gpsnmea_port
-		gps.nmea.speed = pconfig.gpsnmea_speed
+		gps.nmea.name = pconfig.NMEAPort
+		gps.nmea.speed = pconfig.NMEASpeed
 		gps.nmea.fd = fd
 		gps.nmea.mu.Unlock()
 
 		go read_gpsnmea_thread(ctx, gps, fd, debug)
 	} else {
-		logrus.WithField("port", pconfig.gpsnmea_port).Error("Could not open serial port for GPS receiver")
+		logrus.WithField("port", pconfig.NMEAPort).Error("Could not open serial port for GPS receiver")
 
 		return (-1)
 	}
