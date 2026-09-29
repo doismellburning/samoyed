@@ -203,14 +203,7 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 		// from protocol reference page 29.
 		var _range = math.Sqrt(2.0 * float64(h) * math.Sqrt((float64(p)/10.0)*(float64(g)/2.0)))
 
-		var s = math.Round(math.Log(_range/2.) / math.Log(1.08))
-		if s < 0 {
-			s = 0
-		}
-
-		if s > 93 {
-			s = 93
-		}
+		var s = min(max(math.Round(math.Log(_range/2.)/math.Log(1.08)), 0), 93)
 
 		presult.S = byte(s + '!')
 
@@ -250,17 +243,9 @@ func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain ma
 	var feet = maybe.FromMaybe(0, height)
 	var dBi = maybe.FromMaybe(0, gain)
 
-	var p = math.Round(math.Sqrt(float64(watts))) + '0'
-	if p < '0' {
-		p = '0'
-	} else if p > '9' {
-		p = '9'
-	}
+	var p = min(max(math.Round(math.Sqrt(float64(watts)))+'0', '0'), '9')
 
-	var h = math.Round(math.Log2(float64(feet)/10.0)) + '0'
-	if h < '0' {
-		h = '0'
-	}
+	var h = max(math.Round(math.Log2(float64(feet)/10.0))+'0', '0')
 	/* Result can go beyond '9'. */
 
 	var g = float64(dBi + '0')
@@ -328,14 +313,7 @@ func cse_spd_data_extension(course maybe.Maybe[int], speed maybe.Maybe[int]) str
 		// Original value of 0 for north is transmitted as 360. */
 	}
 
-	var spd = maybe.FromMaybe(0, speed)
-	if spd < 0 {
-		spd = 0
-	}
-
-	if spd > 999 {
-		spd = 999
-	}
+	var spd = min(max(maybe.FromMaybe(0, speed), 0), 999)
 
 	return fmt.Sprintf("%03d/%03d", cse, spd)
 }
@@ -392,11 +370,7 @@ func frequency_spec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset
 	if megahertz > 0 {
 		/* TODO: Should use letters for > 999.999. */
 		/* For now, just be sure we have proper field width. */
-		if megahertz > 999.999 {
-			megahertz = 999.999
-		}
-
-		result += fmt.Sprintf("%07.3fMHz ", megahertz)
+		result += fmt.Sprintf("%07.3fMHz ", min(megahertz, 999.999))
 	}
 
 	if hertz, known := tone.Get(); known {
@@ -507,16 +481,7 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 	if feet, known := alt_ft.Get(); known {
 		/* Not clear if altitude can be negative. */
 		/* Be sure it will be converted to 6 digits. */
-		// if (feet < 0) feet = 0;
-		if feet < -99999 {
-			feet = -99999
-		}
-
-		if feet > 999999 {
-			feet = 999999
-		}
-
-		result += fmt.Sprintf("/A=%06d", feet) // /A=123456 ot /A=-12345
+		result += fmt.Sprintf("/A=%06d", min(max(feet, -99999), 999999)) // /A=123456 or /A=-12345
 	}
 
 	/* Finally, comment text. */
