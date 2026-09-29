@@ -963,13 +963,12 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
 
 	A.g_data_type_desc = "Position with time"
 
-	var ts time.Time
-
 	var llBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
 	var compressedBytes, _ = binary.Decode(info, binary.NativeEndian, &q)
 
+	get_timestamp(A, p.Timestamp) // Only checked, not kept.
+
 	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
-		ts = get_timestamp(A, p.Timestamp)
 		decode_position(A, &(p.Pos))
 
 		if A.g_symbol_code == '_' {
@@ -983,8 +982,6 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
 			data_extension_comment(A, info[llBytes:])
 		}
 	} else { /* Compressed location. */
-		ts = get_timestamp(A, p.Timestamp)
-
 		decode_compressed_position(A, &(q.CPos))
 
 		if A.g_symbol_code == '_' {
@@ -999,8 +996,6 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
 			process_comment(A, info[compressedBytes:])
 		}
 	}
-
-	_ = ts // suppress 'set but not used' warning. // TODO KG Why is this not used though??
 }
 
 /*------------------------------------------------------------------
@@ -1982,8 +1977,7 @@ func aprs_object(A *decode_aprs_t, info []byte) {
 		A.g_data_type_desc = "Object - invalid live/killed"
 	}
 
-	var ts = get_timestamp(A, p.Timestamp)
-	_ = ts // TODO KG Why is ts unused??
+	get_timestamp(A, p.Timestamp) // Only checked, not kept.
 
 	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
 		decode_position(A, &(p.Pos))
