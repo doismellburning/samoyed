@@ -13,6 +13,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
@@ -706,7 +707,7 @@ func Test_BeaconSend_commentcmd_output_is_appended(t *testing.T) {
 func Test_BeaconSend_igate_status(t *testing.T) {
 	var savedMheard = mheardDB
 
-	mheardDB = NewMHeardDB(0)
+	mheardDB = mheard.New(0)
 
 	t.Cleanup(func() { mheardDB = savedMheard })
 

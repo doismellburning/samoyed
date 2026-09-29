@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -278,7 +279,7 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 	// A received frame is logged and remembered on its way through, so
 	// both need to be there even with no log file to write to.
 	packetLogger = NewPacketLogger(false, "")
-	mheardDB = NewMHeardDB(0)
+	mheardDB = mheard.New(0)
 
 	usePTT(t, audioConfig)
 	transmitQueue.Init(audioConfig)

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -101,7 +102,7 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	var packetFilter = NewPacketFilter(&p_igate_config, 0)
 
 	var saved_mheardDB = mheardDB
-	mheardDB = NewMHeardDB(0)
+	mheardDB = mheard.New(0)
 
 	defer func() { mheardDB = saved_mheardDB }()
 
@@ -205,7 +206,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var saved_mheardDB = mheardDB
-			mheardDB = NewMHeardDB(0)
+			mheardDB = mheard.New(0)
 
 			defer func() { mheardDB = saved_mheardDB }()
 

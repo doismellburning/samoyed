@@ -19,6 +19,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -66,7 +67,7 @@ var kissNetSvc *KissNetService
 var kissPT *KissPT
 var kissSerial *KissSerial
 var agwServer *AGWServer
-var mheardDB *MHeardDB
+var mheardDB *mheard.DB
 var aprsDigipeater *Digipeater
 var connectedDigipeater *ConnectedDigipeater
 var pttControl *PTT
@@ -649,7 +650,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the digipeater and IGate functions.
 	 */
-	mheardDB = NewMHeardDB(d_m_opt)
+	mheardDB = mheard.New(d_m_opt)
 	var packetFilter = NewPacketFilter(&igate_config, d_f_opt)
 	aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter)
 	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, d_i_opt)

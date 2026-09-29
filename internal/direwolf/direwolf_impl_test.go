@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -128,7 +129,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	deviceIDData = NewDeviceIDData()
 	packetLogger = NewPacketLogger(false, "")
-	mheardDB = NewMHeardDB(0)
+	mheardDB = mheard.New(0)
 
 	// Waypoints go to a UDP socket of our own, so a position that reaches
 	// them can be seen to have done so.

@@ -1,26 +1,28 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-/*------------------------------------------------------------------
- *
- * Purpose:	Maintain a list of all stations heard.
- *
- * Description: This was added for IGate statistics and checking if a user is local
- *		but would also be useful for the AGW network protocol 'H' request.
- *
- *		This application has no GUI and is not interactive so
- *		I'm not sure what else we might do with the information.
- *
- *		Why mheard instead of just heard?  The KPC-3+ has an MHEARD command
- *		to list stations heard.  I guess that stuck in my mind.
- *		It should be noted that here "heard" refers to the AX.25 source station.
- *		Before printing the received packet, the "heard" line refers to who
- *		we heard over the radio.  This would be the digipeater with "*" after
- *		its name.
- *
- * Future Ideas: Someone suggested using SQLite to store the information
- *		so other applications could access it.
- *
- *------------------------------------------------------------------*/
+// Package mheard maintains a list of all stations heard, over the radio or
+// from an Internet Server, for IGate statistics and for checking whether a
+// station is local.
+//
+// From Dire Wolf's mheard.c:
+//
+//	This was added for IGate statistics and checking if a user is local
+//	but would also be useful for the AGW network protocol 'H' request.
+//
+//	This application has no GUI and is not interactive so
+//	I'm not sure what else we might do with the information.
+//
+//	Why mheard instead of just heard?  The KPC-3+ has an MHEARD command
+//	to list stations heard.  I guess that stuck in my mind.
+//	It should be noted that here "heard" refers to the AX.25 source station.
+//	Before printing the received packet, the "heard" line refers to who
+//	we heard over the radio.  This would be the digipeater with "*" after
+//	its name.
+//
+//	Future Ideas: Someone suggested using SQLite to store the information
+//	so other applications could access it.
+package mheard
 
 import (
 	"fmt"
@@ -68,10 +70,10 @@ type station struct {
 	// first heard in addition to last heard.
 }
 
-// MHeardDB maintains a list of all stations heard over the radio or from an
+// DB maintains a list of all stations heard over the radio or from an
 // Internet Server.  It is getting updated from two different threads so we
 // need a critical region for adding new nodes.
-type MHeardDB struct {
+type DB struct {
 	mu    sync.RWMutex
 	db    map[string]*station
 	debug int
@@ -79,7 +81,7 @@ type MHeardDB struct {
 
 /*------------------------------------------------------------------
  *
- * Function:	NewMHeardDB
+ * Function:	New
  *
  * Purpose:	Initialization at start of application.
  *
@@ -87,14 +89,14 @@ type MHeardDB struct {
  *
  *------------------------------------------------------------------*/
 
-func NewMHeardDB(debug int) *MHeardDB {
-	var mdb = new(MHeardDB)
+func New(debug int) *DB {
+	var mdb = new(DB)
 
 	mdb.db = make(map[string]*station)
 	mdb.debug = debug
 
 	return mdb
-} /* end NewMHeardDB */
+} /* end New */
 
 /*------------------------------------------------------------------
  *
@@ -141,7 +143,7 @@ func latLon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float64], lon maybe.Maybe[float64]) {
+func (mdb *DB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float64], lon maybe.Maybe[float64]) {
 	var now = time.Now()
 
 	var source = pp.AddrWithSSID(ax25.Source)
@@ -312,7 +314,7 @@ func (mdb *MHeardDB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float6
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SaveIS(ptext string) {
+func (mdb *DB) SaveIS(ptext string) {
 	var now = time.Now()
 
 	// It is possible that source won't adhere to the AX.25 restrictions.
@@ -451,7 +453,7 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) Count(maxHops int, timeLimit int) int {
+func (mdb *DB) Count(maxHops int, timeLimit int) int {
 	var limit = time.Duration(timeLimit) * time.Minute
 	var since = time.Now().Add(-limit)
 
@@ -500,7 +502,7 @@ func (mdb *MHeardDB) Count(maxHops int, timeLimit int) int {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, timeLimitMinutes int, maxHops int, dlat maybe.Maybe[float64], dlon maybe.Maybe[float64], km maybe.Maybe[float64]) bool {
+func (mdb *DB) WasRecentlyNearby(role string, callsign string, timeLimitMinutes int, maxHops int, dlat maybe.Maybe[float64], dlon maybe.Maybe[float64], km maybe.Maybe[float64]) bool {
 	var timeLimit = time.Duration(timeLimitMinutes) * time.Minute
 
 	// The distance check needs a complete location to measure from, and a
@@ -613,7 +615,7 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, timeLimitMi
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SetMSP(callsign string, num int) {
+func (mdb *DB) SetMSP(callsign string, num int) {
 	mdb.mu.Lock()
 	defer mdb.mu.Unlock()
 
@@ -646,7 +648,7 @@ func (mdb *MHeardDB) SetMSP(callsign string, num int) {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) GetMSP(callsign string) int {
+func (mdb *DB) GetMSP(callsign string) int {
 	mdb.mu.RLock()
 	defer mdb.mu.RUnlock()
 
@@ -666,7 +668,7 @@ func (mdb *MHeardDB) GetMSP(callsign string) int {
 	return (0)
 } /* end GetMSP */
 
-func (mdb *MHeardDB) dump() {
+func (mdb *DB) dump() {
 	mdb.mu.RLock()
 	defer mdb.mu.RUnlock()
 
