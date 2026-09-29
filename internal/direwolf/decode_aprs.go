@@ -3460,7 +3460,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
  *------------------------------------------------------------------*/
 
 func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
-	type lat_s struct {
+	type lon_s struct {
 		Deg  [3]byte
 		Minn [2]byte
 		Dot  byte
@@ -3468,7 +3468,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		EW   byte
 	}
 
-	var plon lat_s // TODO KG lon_s, no?
+	var plon lon_s
 	binary.Decode(p[:], binary.NativeEndian, &plon)
 
 	var result float64 = 0
