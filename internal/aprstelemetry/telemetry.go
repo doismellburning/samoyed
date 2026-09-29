@@ -29,31 +29,32 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const numAnalog = 5  /* Number of analog channels. */
-const numDigital = 8 /* Number of digital channels. */
+const numAnalog = 5  // Number of analog channels.
+const numDigital = 8 // Number of digital channels.
 
 type stationMetadata struct {
-	next *stationMetadata /* Next in linked list. */
+	next *stationMetadata // Next in linked list.
 
-	station string /* Station name with optional SSID. */
+	station string // Station name with optional SSID.
 
-	project string /* Description for data. */
-	/* "Project Name" or "project title" in the spec. */
+	// Description for data.
+	// "Project Name" or "project title" in the spec.
+	project string
 
+	// Names for channels.  e.g. Battery, Temperature
 	name [numAnalog + numDigital]string
-	/* Names for channels.  e.g. Battery, Temperature */
 
+	// Units for channels.  e.g. Volts, Deg.C
 	unit [numAnalog + numDigital]string
-	/* Units for channels.  e.g. Volts, Deg.C */
 
-	coeff [numAnalog][3]float64 /* a, b, c coefficients for scaling. */
+	coeff [numAnalog][3]float64 // a, b, c coefficients for scaling.
 
-	coeffNDP [numAnalog][3]int /* Number of decimal places for above. */
+	coeffNDP [numAnalog][3]int // Number of decimal places for above.
 
-	sense [numDigital]bool /* Polarity for digital channels. */
+	sense [numDigital]bool // Polarity for digital channels.
 }
 
-const coeffA = 0 /* Scaling coefficient positions. */
+const coeffA = 0 // Scaling coefficient positions.
 const coeffB = 1
 const coeffC = 2
 
@@ -69,19 +70,8 @@ func New() *State {
 	return new(State)
 }
 
-/*-------------------------------------------------------------------
- *
- * Name:        getMetadata
- *
- * Purpose:     Obtain pointer to metadata for specified station.
- *		If not found, allocate a fresh one and initialize with defaults.
- *
- * Inputs:	station		- Station name with optional SSID.
- *
- * Returns:	Pointer to metadata.
- *
- *--------------------------------------------------------------------*/
-
+// getMetadata returns the metadata for station, a station name with optional
+// SSID, first allocating one with the defaults if the station has sent none.
 func (ts *State) getMetadata(station string) *stationMetadata {
 	logrus.WithField("station", station).Debug("getMetadata")
 	for p := ts.mdListHead; p != nil; p = p.next {
@@ -119,26 +109,15 @@ func (ts *State) getMetadata(station string) *stationMetadata {
 	ts.mdListHead = p
 
 	return (p)
-} /* end getMetadata */
+}
 
-/*-------------------------------------------------------------------
- *
- * Name:        decimalPlaces
- *
- * Purpose:     Count number of digits after any decimal point.
- *
- * Inputs:	str	- Number in text format.
- *
- * Returns:	Number digits after decimal point.  Examples, in -. out.
- *
- *			1	--> 0
- *			1.	--> 0
- *			1.2	--> 1
- *			1.23	--> 2
- *			etc.
- *
- *--------------------------------------------------------------------*/
-
+// decimalPlaces counts the digits after any decimal point in str, a number in
+// text form:
+//
+//	1	--> 0
+//	1.	--> 0
+//	1.2	--> 1
+//	1.23	--> 2
 func decimalPlaces(str string) int {
 	var p = strings.Index(str, ".")
 	if p == -1 {
@@ -148,41 +127,29 @@ func decimalPlaces(str string) int {
 	}
 }
 
-/*-------------------------------------------------------------------
- *
- * Name:        DataOriginal
- *
- * Purpose:     Interpret telemetry data in the original format.
- *
- * Inputs:	station	- Name of station reporting telemetry.
- *		info 	- Pointer to packet Information field.
- *		quiet	- suppress error messages.
- *
- * Returns:	output	- Decoded telemetry in human readable format.
- *		comment	- Any comment after the data.
- *
- * Description:	The first character, after the "T" data type indicator, must be "#"
- *		followed by a sequence number.  Up to 5 analog and 8 digital channel
- *		values are specified as in this example from the protocol spec.
- *
- *			T#005,199,000,255,073,123,01101001
- *
- *		The analog values are supposed to be 3 digit integers in the
- *		range of 000 to 255 in fixed columns.  After reading the discussion
- *		groups it seems that few adhere to those restrictions.  When I
- *		started to look for some local signals, this was the first one
- *		to appear:
- *
- *			KB1GKN-10>APRX27,UNCAN,WIDE1*:T#491,4.9,0.3,25.0,0.0,1.0,00000000
- *
- *		Not integers.  Not fixed width fields.
- *
- *		Originally I printed a warning if values were not in range of 000 to 255
- *		but later took it out because no one pays attention to that original
- *		restriction anymore.
- *
- *--------------------------------------------------------------------*/
-
+// DataOriginal decodes telemetry data in the original format, from the
+// Information field info of a packet from station.  It returns the telemetry
+// in human readable form, and any comment after the data.  quiet suppresses
+// the complaints about data that breaks the spec.
+//
+// The first character, after the "T" data type indicator, must be "#"
+// followed by a sequence number.  Up to 5 analog and 8 digital channel values
+// are specified as in this example from the protocol spec.
+//
+//	T#005,199,000,255,073,123,01101001
+//
+// The analog values are supposed to be 3 digit integers in the range of 000
+// to 255 in fixed columns.  After reading the discussion groups it seems that
+// few adhere to those restrictions.  When I started to look for some local
+// signals, this was the first one to appear:
+//
+//	KB1GKN-10>APRX27,UNCAN,WIDE1*:T#491,4.9,0.3,25.0,0.0,1.0,00000000
+//
+// Not integers.  Not fixed width fields.
+//
+// Originally I printed a warning if values were not in range of 000 to 255
+// but later took it out because no one pays attention to that original
+// restriction anymore.
 func (ts *State) DataOriginal(station string, info string, quiet bool) (string, string) {
 	logrus.WithField("info", info).Debug("DataOriginal")
 	var pm = ts.getMetadata(station)
@@ -207,10 +174,7 @@ func (ts *State) DataOriginal(station string, info string, quiet bool) (string, 
 		return "", ""
 	}
 
-	/*
-	 * Make a copy of the input string (excluding T#) because this will alter it.
-	 * Remove any trailing CR/LF.
-	 */
+	// Everything after the T#, less any trailing CR/LF.
 
 	var stemp = info[2:]
 	stemp = strings.TrimSpace(stemp)
@@ -262,8 +226,8 @@ func (ts *State) DataOriginal(station string, info string, quiet bool) (string, 
 		}
 
 		if n == numAnalog {
-			/* We expect to have 8 digits of 0 and 1. */
-			/* Anything left over is a comment. */
+			// We expect to have 8 digits of 0 and 1.
+			// Anything left over is a comment.
 			if len(p) < 8 {
 				if !quiet {
 					logrus.WithFields(logrus.Fields{
@@ -303,9 +267,7 @@ func (ts *State) DataOriginal(station string, info string, quiet bool) (string, 
 		}
 	}
 
-	/*
-	 * Now process the raw data with any metadata available.
-	 */
+	// Now process the raw data with any metadata available.
 
 	logrus.WithFields(logrus.Fields{
 		"seq":     seq,
@@ -315,26 +277,15 @@ func (ts *State) DataOriginal(station string, info string, quiet bool) (string, 
 	}).Debug("DataOriginal: raw data")
 
 	return formatData(pm, seq, araw, ndp, draw), comment
-} /* end DataOriginal */
+}
 
-/*-------------------------------------------------------------------
- *
- * Name:        DataBase91
- *
- * Purpose:     Interpret telemetry data in the base 91 compressed format.
- *
- * Inputs:	station	- Name of station reporting telemetry.
- *		cdata 	- Compressed data as character string.
- *
- * Returns:	output	- Telemetry in human readable form.
- *
- * Description:	We are expecting from 2 to 7 pairs of base 91 digits.
- *		The first pair is the sequence number.
- *		Next we have 1 to 5 analog values.
- *		If digital values are present, all 5 analog values must be present.
- *
- *--------------------------------------------------------------------*/
-
+// DataBase91 decodes telemetry data from station in the base 91 compressed
+// format, cdata being the characters between the | delimiters, and returns it
+// in human readable form.
+//
+// We are expecting from 2 to 7 pairs of base 91 digits.  The first pair is
+// the sequence number.  Next we have 1 to 5 analog values.  If digital values
+// are present, all 5 analog values must be present.
 func (ts *State) DataBase91(station string, cdata string) string {
 	logrus.WithField("cdata", cdata).Debug("DataBase91")
 	var pm = ts.getMetadata(station)
@@ -379,9 +330,7 @@ func (ts *State) DataBase91(station string, cdata string) string {
 		}
 	}
 
-	/*
-	 * Now process the raw data with any metadata available.
-	 */
+	// Now process the raw data with any metadata available.
 
 	logrus.WithFields(logrus.Fields{
 		"seq":  seq,
@@ -390,32 +339,19 @@ func (ts *State) DataBase91(station string, cdata string) string {
 	}).Debug("DataBase91: raw data")
 
 	return formatData(pm, seq, araw, ndp, draw)
-} /* end DataBase91 */
+}
 
-/*-------------------------------------------------------------------
- *
- * Name:        NameMessage
- *
- * Purpose:     Interpret message with names for analog and digital channels.
- *
- * Inputs:	station	- Name of station reporting telemetry.
- *			  In this case it is the destination for the message,
- *			  not the sender.
- *		msg 	- Rest of message after "PARM."
- *
- * Outputs:	Stored for future use when data values are received.
- *
- * Description:	The first 5 characters of the message are "PARM." and the
- *		rest is a variable length list of comma separated names.
- *
- *		The original spec has different maximum lengths for different
- *		fields which we will ignore.
- *
- * TBD:		What should we do if some, but not all, names are specified?
- *		Clear the others or keep the defaults?
- *
- *--------------------------------------------------------------------*/
-
+// NameMessage stores the names for station's analog and digital channels,
+// for use when its data values are received.  station is the message's
+// addressee, not its sender, and msg is the rest of the message after
+// "PARM.": a variable length list of comma separated names, "-" keeping a
+// channel's existing name.
+//
+// The original spec has different maximum lengths for different fields which
+// we will ignore.
+//
+// TBD: What should we do if some, but not all, names are specified?  Clear the
+// others or keep the defaults?
 func (ts *State) NameMessage(station string, msg string) {
 	logrus.WithField("msg", msg).Debug("NameMessage")
 	msg = strings.TrimSpace(msg)
@@ -432,36 +368,19 @@ func (ts *State) NameMessage(station string, msg string) {
 	}
 
 	logrus.WithField("name", pm.name).Debug("names")
-} /* end NameMessage */
+}
 
-/*-------------------------------------------------------------------
- *
- * Name:        UnitLabelMessage
- *
- * Purpose:     Interpret message with units/labels for analog and digital channels.
- *
- * Inputs:	station	- Name of station reporting telemetry.
- *			  In this case it is the destination for the message,
- *			  not the sender.
- *		msg 	- Rest of message after "UNIT."
- *
- * Outputs:	Stored for future use when data values are received.
- *
- * Description:	The first 5 characters of the message are "UNIT." and the
- *		rest is a variable length list of comma separated units/labels.
- *
- *		The original spec has different maximum lengths for different
- *		fields which we will ignore.
- *
- *--------------------------------------------------------------------*/
-
+// UnitLabelMessage stores the units/labels for station's analog and digital
+// channels, for use when its data values are received.  station is the
+// message's addressee, not its sender, and msg is the rest of the message
+// after "UNIT.": a variable length list of comma separated units/labels.
+//
+// The original spec has different maximum lengths for different fields which
+// we will ignore.
 func (ts *State) UnitLabelMessage(station string, msg string) {
 	logrus.WithField("msg", msg).Debug("UnitLabelMessage")
 
-	/*
-	 * Make a copy of the input string because this will alter it.
-	 * Remove any trailing CR LF.
-	 */
+	// Remove any trailing CR LF.
 	var stemp = strings.TrimSpace(msg)
 
 	var pm = ts.getMetadata(station)
@@ -474,37 +393,20 @@ func (ts *State) UnitLabelMessage(station string, msg string) {
 	}
 
 	logrus.WithField("unit", pm.unit).Debug("units/labels")
-} /* end UnitLabelMessage */
+}
 
-/*-------------------------------------------------------------------
- *
- * Name:        CoefficientsMessage
- *
- * Purpose:     Interpret message with scaling coefficients for analog channels.
- *
- * Inputs:	station	- Name of station reporting telemetry.
- *			  In this case it is the destination for the message,
- *			  not the sender.
- *		msg 	- Rest of message after "EQNS."
- *		quiet	- suppress error messages.
- *
- * Outputs:	Stored for future use when data values are received.
- *
- * Description:	The first 5 characters of the message are "EQNS." and the
- *		rest is a comma separated list of 15 floating point values.
- *
- *		The spec appears to require all 15 so we will issue an
- *		error if fewer found.
- *
- *--------------------------------------------------------------------*/
-
+// CoefficientsMessage stores the scaling coefficients for station's analog
+// channels, for use when its data values are received.  station is the
+// message's addressee, not its sender, and msg is the rest of the message
+// after "EQNS.": a comma separated list of 15 floating point values, a, b and
+// c for each channel in turn.  quiet suppresses the complaints about a message
+// that breaks the spec.
+//
+// The spec appears to require all 15 so we complain if fewer are found.
 func (ts *State) CoefficientsMessage(station string, msg string, quiet bool) {
 	logrus.WithField("msg", msg).Debug("CoefficientsMessage")
 
-	/*
-	 * Make a copy of the input string because this will alter it.
-	 * Remove any trailing CR LF.
-	 */
+	// Remove any trailing CR LF.
 	var stemp = strings.TrimSpace(msg)
 
 	var pm = ts.getMetadata(station)
@@ -544,28 +446,14 @@ func (ts *State) CoefficientsMessage(station string, msg string, quiet bool) {
 		"coeff":    pm.coeff,
 		"coeffNDP": pm.coeffNDP,
 	}).Debug("coeff")
-} /* end CoefficientsMessage */
+}
 
-/*-------------------------------------------------------------------
- *
- * Name:        BitSenseMessage
- *
- * Purpose:     Interpret message with scaling coefficients for analog channels.
- *
- * Inputs:	station	- Name of station reporting telemetry.
- *			  In this case it is the destination for the message,
- *			  not the sender.
- *		msg 	- Rest of message after "BITS."
- *		quiet	- suppress error messages.
- *
- * Outputs:	Stored for future use when data values are received.
- *
- * Description:	The first 5 characters of the message are "BITS."
- *		It should contain eight binary digits for the digital active states.
- *		Anything left over is the project name or title.
- *
- *--------------------------------------------------------------------*/
-
+// BitSenseMessage stores the polarity of station's digital channels, and its
+// project name or title, for use when its data values are received.  station
+// is the message's addressee, not its sender, and msg is the rest of the
+// message after "BITS.": eight binary digits for the digital active states,
+// with anything left over the project name or title.  quiet suppresses the
+// complaints about a message that breaks the spec.
 func (ts *State) BitSenseMessage(station string, msg string, quiet bool) {
 	logrus.WithField("msg", msg).Debug("BitSenseMessage")
 	var pm = ts.getMetadata(station)
@@ -597,16 +485,14 @@ func (ts *State) BitSenseMessage(station string, msg string, quiet bool) {
 		}
 	}
 
-	/*
-	 * Skip comma if first character of comment field.
-	 *
-	 * The protocol spec is inconsistent here.
-	 * The definition shows the Project Title immediately after a fixed width field of 8 binary digits.
-	 * The example has a comma in there.
-	 *
-	 * The toolkit telem-bits.pl script does insert the comma because it seems more sensible.
-	 * Here we accept it either way.  i.e. Discard first character after data values if it is comma.
-	 */
+	// Skip comma if first character of comment field.
+	//
+	// The protocol spec is inconsistent here.
+	// The definition shows the Project Title immediately after a fixed width field of 8 binary digits.
+	// The example has a comma in there.
+	//
+	// The toolkit telem-bits.pl script does insert the comma because it seems more sensible.
+	// Here we accept it either way.  i.e. Discard first character after data values if it is comma.
 
 	if n < len(msg) && msg[n] == ',' {
 		n++
@@ -618,27 +504,13 @@ func (ts *State) BitSenseMessage(station string, msg string, quiet bool) {
 		"sense":   pm.sense,
 		"project": pm.project,
 	}).Debug("bit sense, project")
-} /* end BitSenseMessage */
+}
 
-/*-------------------------------------------------------------------
- *
- * Name:        formatData
- *
- * Purpose:     Interpret telemetry data in the original format.
- *
- * Inputs:	pm	- Pointer to metadata.
- *		seq	- Sequence number.
- *		araw	- 5 analog raw values.
- *		ndp	- Number of decimal points for each.
- *		draw	- 8 digital raw vales.
- *
- * Outputs:	output	- Decoded telemetry in human readable format.
- *
- * Description:	Process raw data according to any metadata available
- *		and put into human readable form.
- *
- *--------------------------------------------------------------------*/
-
+// formatData puts a sequence number seq, 5 raw analog values araw, each with
+// ndp decimal places, and 8 raw digital values draw into human readable form,
+// scaled, named and labelled according to the station metadata pm.  An
+// unknown sequence number shows as "?", and an unknown channel value is left
+// out.
 func formatData(pm *stationMetadata, seq maybe.Maybe[int], araw [numAnalog]maybe.Maybe[float64], ndp [numAnalog]int, draw [numDigital]maybe.Maybe[int]) string {
 	var output strings.Builder
 
@@ -702,4 +574,4 @@ func formatData(pm *stationMetadata, seq maybe.Maybe[int], araw [numAnalog]maybe
 	}
 
 	return result
-} /* end formatData */
+}
