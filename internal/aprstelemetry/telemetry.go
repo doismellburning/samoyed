@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -59,8 +60,13 @@ const coeffB = 1
 const coeffC = 2
 
 // State holds the telemetry metadata - channel names, units, scaling and
-// bit sense - each station has sent, for decoding its later data.
+// bit sense - each station has sent, for decoding its later data.  It is safe
+// for use by more than one goroutine.
 type State struct {
+	// mu guards everything below, and is held for the whole of each exported
+	// method, since decoding data reads the metadata it looks up.
+	mu sync.Mutex
+
 	mdListHead *stationMetadata
 }
 
@@ -151,6 +157,9 @@ func decimalPlaces(str string) int {
 // but later took it out because no one pays attention to that original
 // restriction anymore.
 func (ts *State) DataOriginal(station string, info string, quiet bool) (string, string) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("info", info).Debug("DataOriginal")
 	var pm = ts.getMetadata(station)
 
@@ -287,6 +296,9 @@ func (ts *State) DataOriginal(station string, info string, quiet bool) (string, 
 // the sequence number.  Next we have 1 to 5 analog values.  If digital values
 // are present, all 5 analog values must be present.
 func (ts *State) DataBase91(station string, cdata string) string {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("cdata", cdata).Debug("DataBase91")
 	var pm = ts.getMetadata(station)
 
@@ -353,6 +365,9 @@ func (ts *State) DataBase91(station string, cdata string) string {
 // TBD: What should we do if some, but not all, names are specified?  Clear the
 // others or keep the defaults?
 func (ts *State) NameMessage(station string, msg string) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("msg", msg).Debug("NameMessage")
 	msg = strings.TrimSpace(msg)
 
@@ -378,6 +393,9 @@ func (ts *State) NameMessage(station string, msg string) {
 // The original spec has different maximum lengths for different fields which
 // we will ignore.
 func (ts *State) UnitLabelMessage(station string, msg string) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("msg", msg).Debug("UnitLabelMessage")
 
 	// Remove any trailing CR LF.
@@ -404,6 +422,9 @@ func (ts *State) UnitLabelMessage(station string, msg string) {
 //
 // The spec appears to require all 15 so we complain if fewer are found.
 func (ts *State) CoefficientsMessage(station string, msg string, quiet bool) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("msg", msg).Debug("CoefficientsMessage")
 
 	// Remove any trailing CR LF.
@@ -455,6 +476,9 @@ func (ts *State) CoefficientsMessage(station string, msg string, quiet bool) {
 // with anything left over the project name or title.  quiet suppresses the
 // complaints about a message that breaks the spec.
 func (ts *State) BitSenseMessage(station string, msg string, quiet bool) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("msg", msg).Debug("BitSenseMessage")
 	var pm = ts.getMetadata(station)
 

@@ -4,6 +4,8 @@
 package aprstelemetry
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -65,4 +67,40 @@ func Test_telemetry_data_original_unparseable_value(t *testing.T) {
 		"Seq=5, A1=199, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1",
 		result,
 		"unparseable analog value")
+}
+
+// Samoyed decodes APRS on more than one goroutine - the receive path for RF,
+// the IGate's for packets from APRS-IS it might send to RF - and they share one
+// State, so metadata arriving on one mustn't race data decoding on the other.
+// This only fails under the race detector, which CI runs with "make race".
+
+func Test_State_concurrent(t *testing.T) {
+	var ts = New()
+
+	var wg sync.WaitGroup
+
+	for n := range 4 {
+		var station = fmt.Sprintf("Q%dTEST", n+1)
+
+		wg.Go(func() {
+			for range 100 {
+				ts.NameMessage(station, "Vbat,Vsolar,Temp,Sat")
+				ts.CoefficientsMessage(station, "0,0.001,0,0,0.001,0,0,0.1,-273.2,0,1,0,0,1,0", true)
+			}
+		})
+
+		wg.Go(func() {
+			for range 100 {
+				ts.DataOriginal(station, "T#005,199,000,255,073,123,01101001", true)
+				ts.DataBase91(station, "ss1122334455!$")
+			}
+		})
+	}
+
+	wg.Wait()
+
+	var result, _ = ts.DataOriginal("Q1TEST", "T#005,199,000,255,073,123,01101001", true)
+	assert.Equal(t,
+		"Seq=5, Vbat=0.199, Vsolar=0.000, Temp=-247.7, Sat=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1",
+		result)
 }
