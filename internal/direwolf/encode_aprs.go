@@ -245,18 +245,6 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
  *
  *----------------------------------------------------------------*/
 
-/*
-type phg_t struct {
-	P byte
-	H byte
-	G byte
-	p byte
-	h byte
-	g byte
-	d byte
-}
-*/
-
 func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string) string {
 	// The callers only check that at least one of the three was specified, so
 	// the others can still be absent.  Treat those as unspecified, which is
@@ -457,22 +445,6 @@ func frequency_spec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset
  *
  *----------------------------------------------------------------*/
 
-/*
-type aprs_ll_pos_t struct {
-	dti byte // ! or =
-	pos position_t
-	// Comment up to 43 characters.
-	// Start of comment could be data extension(s).
-}
-
-type aprs_compressed_pos_t struct {
-	dti  byte // ! or =
-	cpos compressed_position_t
-	// Comment up to 40 characters.
-	// No data extension allowed for compressed location.
-}
-*/
-
 func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, alt_ft maybe.Maybe[int],
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
@@ -588,21 +560,6 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
  *				comment could be very long...
  *
  *----------------------------------------------------------------*/
-
-/*
-type aprs_object_t struct {
-	o struct {
-		dti         rune // ;
-		name        [9]rune
-		live_killed rune // * for live or _ for killed
-		time_stamp  [7]rune
-	}
-	u union {
-		pos  position_t            // Up to 43 char comment.  First 7 bytes could be data extension.
-		cpos compressed_position_t // Up to 40 char comment.  No PHG data extension in this case.
-	}
-}
-*/
 
 func encode_object(name string, compressed bool, thyme time.Time, lat float64, lon float64, ambiguity int,
 	symtab byte, symbol byte,
