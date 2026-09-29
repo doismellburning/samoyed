@@ -32,6 +32,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/symbols"
 )
 
 type packet_type_e int
@@ -197,7 +198,7 @@ type decode_aprs_t struct {
 
 func DecodeAPRSInit() {
 	deviceIDData = NewDeviceIDData()
-	aprsSymbolData = NewAPRSSymbolData()
+	aprsSymbolData = symbols.NewAPRSSymbolData()
 }
 
 /*------------------------------------------------------------------
@@ -501,7 +502,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decode_apr
 		//dw_printf ("DEBUG decode_aprs@end1 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);
 		if pinfo[0] != ':' && pinfo[0] != '}' {
 			if aprsSymbolData != nil { // TODO KG Consider some sort of debug message on an else?
-				var symtab, symbol, ok = aprsSymbolData.symbols_from_dest_or_src(pinfo[0], A.g_src, A.g_dest)
+				var symtab, symbol, ok = aprsSymbolData.FromDestOrSrc(pinfo[0], A.g_src, A.g_dest)
 				if ok {
 					A.g_symbol_table = symtab
 					A.g_symbol_code = symbol
@@ -541,7 +542,7 @@ func DecodeAPRSPrint(A *decode_aprs_t) {
 
 	if A.g_symbol_code != ' ' {
 		if aprsSymbolData != nil {
-			var symbol_description = aprsSymbolData.symbols_get_description(A.g_symbol_table, A.g_symbol_code)
+			var symbol_description = aprsSymbolData.Description(A.g_symbol_table, A.g_symbol_code)
 
 			//dw_printf ("DEBUG decode_aprs_print symbol_description_description=%s\n", symbol_description);
 

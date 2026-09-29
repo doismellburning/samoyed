@@ -18,6 +18,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -54,7 +55,7 @@ var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." 
 var audio_config *AudioConfig
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
-var aprsSymbolData *APRSSymbolData
+var aprsSymbolData *symbols.APRSSymbolData
 var waypointSender *WaypointSender
 var packetLogger *PacketLogger
 var telemetryState = NewTelemetryState()
@@ -190,8 +191,8 @@ x = Silence FX.25 information.`)
 	}
 
 	if *symbolDump {
-		aprsSymbolData = NewAPRSSymbolData()
-		aprsSymbolData.symbols_list()
+		aprsSymbolData = symbols.NewAPRSSymbolData()
+		aprsSymbolData.List()
 		os.Exit(0)
 	}
 
@@ -297,7 +298,7 @@ x = Silence FX.25 information.`)
 
 	goHamlib.SetDebugLevel(goHamlib.DebugLevel(d_h_opt))
 
-	aprsSymbolData = NewAPRSSymbolData()
+	aprsSymbolData = symbols.NewAPRSSymbolData()
 
 	audio_config = new(AudioConfig)
 	misc_config = new(misc_config_s)

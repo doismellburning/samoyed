@@ -1,4 +1,10 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package symbols holds the APRS symbol tables and translates between
+// symbols, their descriptions, and the destination-address and touch-tone
+// forms that encode them.
+package symbols
 
 /*------------------------------------------------------------------
  *
@@ -380,7 +386,7 @@ func NewAPRSSymbolData() *APRSSymbolData {
 
 /*------------------------------------------------------------------
  *
- * Function:	symbols_list
+ * Function:	List
  *
  * Purpose:	Print a list of all the symbols.
  *
@@ -388,7 +394,7 @@ func NewAPRSSymbolData() *APRSSymbolData {
  *
  *------------------------------------------------------------------*/
 
-func (sd *APRSSymbolData) symbols_list() {
+func (sd *APRSSymbolData) List() {
 	// This is a report the user has explicitly asked for rather than logging, and
 	// its value is in the columns lining up, so it goes to stdout as-is. A logrus
 	// entry per row would prefix each one with a timestamp and level and leave the
@@ -442,7 +448,7 @@ func (sd *APRSSymbolData) symbols_list() {
 		var symbol = s.symbol
 		var index = int(symbol - ' ')
 
-		var tones = sd.symbols_to_tones(overlay, symbol)
+		var tones = sd.ToTones(overlay, symbol)
 
 		if overlay == '/' {
 			if index >= len(pt) {
@@ -482,11 +488,11 @@ func (sd *APRSSymbolData) symbols_list() {
 
 	fmt.Print("\n")
 	fmt.Print("More information here: http://www.aprs.org/symbols.html\n")
-} /* end symbols_list */
+} /* end List */
 
 /*------------------------------------------------------------------
  *
- * Function:	symbols_from_dest_or_src
+ * Function:	FromDestOrSrc
  *
  * Purpose:	Extract symbol from destination or source.
  *
@@ -542,7 +548,7 @@ func ssidToSym() [16]byte {
 	}
 }
 
-func (sd *APRSSymbolData) symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bool) {
+func (sd *APRSSymbolData) FromDestOrSrc(dti byte, src string, dest string) (byte, byte, bool) {
 	/*
 	 * This part does not apply to MIC-E format because the destination
 	 * is used to encode latitude and other information.
@@ -650,7 +656,7 @@ func (sd *APRSSymbolData) symbols_from_dest_or_src(dti byte, src string, dest st
 	}
 
 	return 0, 0, false
-} /* symbols_from_dest_or_src */
+} /* FromDestOrSrc */
 
 /*------------------------------------------------------------------
  *
@@ -694,7 +700,7 @@ func (sd *APRSSymbolData) symbols_into_dest(symtab byte, symbol byte) (string, b
 
 /*------------------------------------------------------------------
  *
- * Function:	symbols_get_description
+ * Function:	Description
  *
  * Purpose:	Get description for given symbol table/code/overlay.
  *
@@ -713,7 +719,7 @@ func (sd *APRSSymbolData) symbols_into_dest(symtab byte, symbol byte) (string, b
  *
  *------------------------------------------------------------------*/
 
-func (sd *APRSSymbolData) symbols_get_description(symtab byte, symbol byte) string {
+func (sd *APRSSymbolData) Description(symtab byte, symbol byte) string {
 	// The symbol table identifier should be
 	//	/	for symbol from primary table
 	//	\	for symbol from alternate table
@@ -770,11 +776,11 @@ func (sd *APRSSymbolData) symbols_get_description(symtab byte, symbol byte) stri
 
 		return description
 	}
-} /* end symbols_get_description */
+} /* end Description */
 
 /*------------------------------------------------------------------
  *
- * Function:	symbols_code_from_description
+ * Function:	CodeFromDescription
  *
  * Purpose:	Find a suitable table/symbol based on given description.
  *
@@ -788,7 +794,7 @@ func (sd *APRSSymbolData) symbols_get_description(symtab byte, symbol byte) stri
  *
  *------------------------------------------------------------------*/
 
-func (sd *APRSSymbolData) symbols_code_from_description(overlay byte, description string) (byte, byte, bool) {
+func (sd *APRSSymbolData) CodeFromDescription(overlay byte, description string) (byte, byte, bool) {
 	/*
 	 * If user specified a particular overlay (i.e. for config file BEACON),
 	 * first try the alternate symbol table.
@@ -841,11 +847,11 @@ func (sd *APRSSymbolData) symbols_code_from_description(overlay byte, descriptio
 	 * Caller is responsible for issuing error message.
 	 */
 	return '/', '-', false
-} /* end symbols_code_from_description */
+} /* end CodeFromDescription */
 
 /*------------------------------------------------------------------
  *
- * Function:	symbols_to_tones
+ * Function:	ToTones
  *
  * Purpose:	Convert symbol to APRStt tone sequence.
  *
@@ -864,7 +870,7 @@ func (sd *APRSSymbolData) symbols_code_from_description(overlay byte, descriptio
  *
  *------------------------------------------------------------------*/
 
-func (sd *APRSSymbolData) symbols_to_tones(symtab byte, symbol byte) string {
+func (sd *APRSSymbolData) ToTones(symtab byte, symbol byte) string {
 	if symtab == '/' {
 		return fmt.Sprintf("AB1%02d", symbol-' ')
 	} else if unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab)) {
@@ -874,4 +880,4 @@ func (sd *APRSSymbolData) symbols_to_tones(symtab byte, symbol byte) string {
 	} else {
 		return fmt.Sprintf("AB2%02d", symbol-' ')
 	}
-} /* end symbols_to_tones */
+} /* end ToTones */
