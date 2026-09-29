@@ -1084,3 +1084,26 @@ func TestIGateSendRecPacketDebugOutput(t *testing.T) {
 
 	assert.Contains(t, output, "was rejected by filter")
 }
+
+// The GPS reader's debug level and the IGate's were separate file-scope
+// statics in Dire Wolf.  The port merged them into one package variable, and
+// because DirewolfMain starts the GPS after the IGate, the GPS's debug level
+// quietly became the IGate's too: "-di1 -dg0" left the IGate saying nothing.
+func TestNewGPSLeavesTheIGateDebugLevelAlone(t *testing.T) {
+	var server = setupIGate(t)
+
+	igate.debugLevel = 3
+	igate.config.rx2ig_dedupe_time = 30
+
+	// No receiver configured, so this starts nothing.
+	NewGPS(t.Context(), new(misc_config_s), 0).Term()
+
+	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
+	require.NotNil(t, pp)
+
+	var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
+
+	assert.Contains(t, output, "rx_to_ig_allow? YES", "the IGate stopped reporting at its own debug level")
+
+	readFromIGate(t, server)
+}

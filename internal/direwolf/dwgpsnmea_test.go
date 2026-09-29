@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
-	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
-	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -271,30 +269,6 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, DWFIX_ERROR, result.Fix)
 	})
-}
-
-// The GPS reader's debug level and the IGate's were separate file-scope
-// statics in Dire Wolf.  The port merged them into one package variable, and
-// because DirewolfMain starts the GPS after the IGate, dwgpsnmea_init's
-// argument quietly became the IGate's debug level too: "-di1 -dg0" left the
-// IGate saying nothing.
-func TestDWGPSNMEAInitLeavesTheIGateDebugLevelAlone(t *testing.T) {
-	var server = setupIGate(t)
-
-	igate.debugLevel = 3
-	igate.config.rx2ig_dedupe_time = 30
-
-	// No serial port configured, so this does nothing.
-	require.Equal(t, 0, dwgpsnmea_init(t.Context(), new(GPS), new(misc_config_s), 0))
-
-	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
-	require.NotNil(t, pp)
-
-	var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
-
-	assert.Contains(t, output, "rx_to_ig_allow? YES", "the IGate stopped reporting at its own debug level")
-
-	readFromIGate(t, server)
 }
 
 // openTestGPSNMEA starts a GPSNMEA reader on a pseudo-terminal, returning the
