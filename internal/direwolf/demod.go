@@ -833,7 +833,7 @@ const FSK_READ_ERR = (256 * 256)
 // A SampleSource is where the audio the demodulators work on comes from: one
 // byte of sample data at a time, or -1 when there is no more.
 //
-// audioDeviceSource is the one a running Samoyed uses; samoyed-atest reads a
+// AudioDevices is the one a running Samoyed uses; samoyed-atest reads a
 // .WAV file instead, and a test hands over bytes of its own.
 type SampleSource interface {
 	GetByte(adev int) int

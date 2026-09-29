@@ -26,6 +26,7 @@ func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
 	var channel = 0
 
 	var xs = new(XmitService)
+	xs.audio = new(AudioDevices)
 	xs.fulldup[channel] = true // Skip the channel-busy check and random wait.
 
 	// The transmit queues are package globals shared with every other test
@@ -38,11 +39,11 @@ func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
 
 	xs.xmit_next(t.Context(), channel)
 
-	if !xs.audioOutDevMutex[ACHAN2ADEV(channel)].TryLock() {
+	if !xs.audio.outputMu[ACHAN2ADEV(channel)].TryLock() {
 		t.Fatal("Audio output device is still locked after xmit_next found nothing to send")
 	}
 
-	xs.audioOutDevMutex[ACHAN2ADEV(channel)].Unlock()
+	xs.audio.outputMu[ACHAN2ADEV(channel)].Unlock()
 }
 
 // A channel whose audio device has no output must not transmit at all: keying
@@ -119,6 +120,7 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 	transmitQueue.Init(audioConfig)
 
 	var xs = new(XmitService)
+	xs.audio = new(AudioDevices)
 	xs.audioOutAvailable[ACHAN2ADEV(channel)] = false
 
 	transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
@@ -132,11 +134,11 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 
 	// The audio output device is never seized on the way, so nothing is left
 	// holding its lock.
-	if !xs.audioOutDevMutex[ACHAN2ADEV(channel)].TryLock() {
+	if !xs.audio.outputMu[ACHAN2ADEV(channel)].TryLock() {
 		t.Fatal("Audio output device was locked by a channel that cannot transmit")
 	}
 
-	xs.audioOutDevMutex[ACHAN2ADEV(channel)].Unlock()
+	xs.audio.outputMu[ACHAN2ADEV(channel)].Unlock()
 }
 
 // A transmit thread with an empty queue is parked in a condition variable
@@ -283,10 +285,10 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 
 	const channel = 0
 
-	var origToneGen, origGenerators, origADev = toneGenCapture, toneGenerators, adev[0]
+	var origToneGen, origGenerators = toneGenCapture, toneGenerators
 
 	t.Cleanup(func() {
-		toneGenCapture, toneGenerators, adev[0] = origToneGen, origGenerators, origADev
+		toneGenCapture, toneGenerators = origToneGen, origGenerators
 
 		for p := range TQ_NUM_PRIO {
 			for transmitQueue.Remove(channel, p) != nil { //revive:disable-line:empty-block
@@ -321,14 +323,16 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	// lands in that buffer is discarded rather than played.
 	toneGenCapture = func(int, int) {}
 
-	adev[0] = new(adev_s)
-	adev[0].outbufSizeInBytes = 4096
-	adev[0].outbuf = make([]byte, adev[0].outbufSizeInBytes)
+	var audio = new(AudioDevices)
+	audio.dev[0] = new(adev_s)
+	audio.dev[0].outbufSizeInBytes = 4096
+	audio.dev[0].outbuf = make([]byte, audio.dev[0].outbufSizeInBytes)
 
-	GenToneInit(audioConfig, 100, AudioDeviceSink{})
+	GenToneInit(audioConfig, 100, audio)
 
 	var xs = new(XmitService)
 	xs.p_modem = audioConfig
+	xs.audio = audio
 	xs.bits_per_sec[channel] = 1200
 	xs.audioOutAvailable[0] = true
 
@@ -710,10 +714,10 @@ func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 
 	testutils.CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
 
-	require.True(t, xs.audioOutDevMutex[ACHAN2ADEV(0)].TryLock(),
+	require.True(t, xs.audio.outputMu[ACHAN2ADEV(0)].TryLock(),
 		"the audio output device is still locked after the transmission")
 
-	xs.audioOutDevMutex[ACHAN2ADEV(0)].Unlock()
+	xs.audio.outputMu[ACHAN2ADEV(0)].Unlock()
 }
 
 // A frame addressed to MORSE is keyed rather than modulated, for a repeater

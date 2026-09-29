@@ -35,7 +35,7 @@ var toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 // sample data at a time, then a flush at the end of a transmission to push out
 // whatever is still waiting.  Both return -1 for any type of error.
 //
-// AudioDeviceSink is the one a running Samoyed uses; samoyed-gen-packets writes
+// AudioDevices is the one a running Samoyed uses; samoyed-gen-packets writes
 // a .WAV file instead.
 type AudioSink interface {
 	Put(adev int, c uint8) int

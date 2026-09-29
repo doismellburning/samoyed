@@ -8,6 +8,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/doismellburning/samoyed/internal/direwolf"
 )
@@ -19,18 +21,32 @@ const chan2 = 1
 const baud = direwolf.DEFAULT_BAUD
 
 func main() {
-	genTone(direwolf.AudioDeviceSink{})
+	// Play the samples through the audio device.
+	genTone(func(config *direwolf.AudioConfig) (direwolf.AudioSink, func()) {
+		var devices, err = direwolf.AudioOpen(context.Background(), config)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Could not open the audio device: %v\n", err)
+			os.Exit(1)
+		}
+
+		return devices, devices.Close
+	})
 }
 
-// genTone is main, but sending the samples to sink rather than necessarily
-// the audio device, so that a test can see what would have been played.
-func genTone(sink direwolf.AudioSink) {
+// openSink opens somewhere to send the samples for config, returning it and
+// what closes it again.
+type openSink func(config *direwolf.AudioConfig) (direwolf.AudioSink, func())
+
+// genTone is main, but sending the samples wherever open says rather than
+// necessarily the audio device, so that a test can see what would have been
+// played.
+func genTone(open openSink) {
 	/* to sound card */
 	/* one channel.  2 times:  one second of each tone. */
 
 	var config = direwolf.NewGenToneTestConfig(1)
 
-	direwolf.AudioOpen(context.Background(), config)
+	var sink, closeSink = open(config)
 	direwolf.GenToneInit(config, 100, sink)
 
 	for range 2 {
@@ -43,13 +59,13 @@ func genTone(sink direwolf.AudioSink) {
 		}
 	}
 
-	direwolf.AudioClose()
+	closeSink()
 
 	/* Now try stereo. */
 
 	config = direwolf.NewGenToneTestConfig(2)
 
-	direwolf.AudioOpen(context.Background(), config)
+	sink, closeSink = open(config)
 	direwolf.GenToneInit(config, 100, sink)
 
 	for range 4 {
@@ -70,5 +86,5 @@ func genTone(sink direwolf.AudioSink) {
 		}
 	}
 
-	direwolf.AudioClose()
+	closeSink()
 }

@@ -188,20 +188,29 @@ func Test_matchPortAudioDeviceByName_directionFilter(t *testing.T) {
 
 // --- UDP audio output ---
 
-// setupAdev0 installs a fresh adev_s at index 0 and restores the original on
-// test cleanup.  Using index 0 is safe because audio tests are sequential.
-func setupAdev0(t *testing.T) *adev_s {
-	t.Helper()
+// setupAdev0 returns audio devices with a fresh adev_s, and nothing open, at
+// index 0.
+func setupAdev0() (*AudioDevices, *adev_s) {
+	var d = new(AudioDevices)
+	d.dev[0] = new(adev_s)
 
-	var prev = adev[0]
-	t.Cleanup(func() { adev[0] = prev })
-
-	adev[0] = new(adev_s)
-
-	return adev[0]
+	return d, d.dev[0]
 }
 
-func Test_audioFlushReal_UDP_sendsBytes(t *testing.T) {
+// openAudio opens the audio devices pa describes, which must work, and closes
+// them again when the test is done.
+func openAudio(t *testing.T, pa *AudioConfig) *AudioDevices {
+	t.Helper()
+
+	var d, err = AudioOpen(t.Context(), pa)
+	require.NoError(t, err)
+
+	t.Cleanup(d.Close)
+
+	return d
+}
+
+func Test_Flush_UDP_sendsBytes(t *testing.T) {
 	// Start a UDP listener to receive the audio output.
 	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -215,7 +224,7 @@ func Test_audioFlushReal_UDP_sendsBytes(t *testing.T) {
 
 	defer conn.Close()
 
-	var dev = setupAdev0(t)
+	var d, dev = setupAdev0()
 	dev.udp_out_sock = conn
 	dev.outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
 	dev.outbuf = make([]byte, UDP_AUDIO_OUT_BUF_MAXLEN)
@@ -224,7 +233,7 @@ func Test_audioFlushReal_UDP_sendsBytes(t *testing.T) {
 	copy(dev.outbuf, testData)
 	dev.outbufLen = len(testData)
 
-	var result = audio_flush(0)
+	var result = d.Flush(0)
 	assert.Equal(t, 0, result)
 	assert.Equal(t, 0, dev.outbufLen, "output buffer should be cleared after flush")
 
@@ -314,18 +323,18 @@ func Test_anyDeviceRequiresPortAudio(t *testing.T) {
 	}
 }
 
-func Test_audioFlushReal_UDP_emptyBuffer_isNoop(t *testing.T) {
-	var dev = setupAdev0(t)
+func Test_Flush_UDP_emptyBuffer_isNoop(t *testing.T) {
+	var d, dev = setupAdev0()
 	dev.udp_out_sock = &net.UDPConn{} // non-nil socket; must not be written to
 	dev.outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
 	dev.outbuf = make([]byte, UDP_AUDIO_OUT_BUF_MAXLEN)
 	dev.outbufLen = 0
 
 	// Should return 0 without attempting a write.
-	assert.Equal(t, 0, audio_flush(0))
+	assert.Equal(t, 0, d.Flush(0))
 }
 
-func Test_audioUDPSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
+func Test_udpSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
 	// Start a UDP listener to receive the keepalive silence.
 	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -338,22 +347,18 @@ func Test_audioUDPSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
 
 	defer conn.Close()
 
-	var dev = setupAdev0(t)
+	var d, dev = setupAdev0()
 	dev.udp_out_sock = conn
 	dev.bitsPerSample = 16
 	dev.bytesPerFrame = 2  // mono, 16-bit
 	dev.sampleRate = 44100 // 20ms of samples at this rate exceeds UDP_AUDIO_OUT_BUF_MAXLEN, so the chunk must be capped
-
-	var prevXmitSvc = xmitSvc
-	t.Cleanup(func() { xmitSvc = prevXmitSvc })
-	xmitSvc = &XmitService{} //nolint:exhaustruct_v5
 
 	var stop = make(chan struct{})
 	var done = make(chan struct{})
 
 	go func() {
 		defer close(done)
-		audioUDPSilenceKeepalive(t.Context(), 0, stop)
+		d.udpSilenceKeepalive(t.Context(), 0, stop)
 	}()
 
 	// Receive a chunk and verify it's frame-aligned and capped. The buffer
@@ -376,7 +381,7 @@ func Test_audioUDPSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(time.Second):
-		t.Fatal("audioUDPSilenceKeepalive did not stop after stop was closed")
+		t.Fatal("udpSilenceKeepalive did not stop after stop was closed")
 	}
 }
 
@@ -423,152 +428,97 @@ func Test_audioOutType(t *testing.T) {
 // "-" command line argument - is exactly that: it leaves "stdin" as the
 // output device name too, which is nothing we can transmit through.
 func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
-	var prevAdev = adev
-
-	t.Cleanup(func() {
-		AudioClose()
-
-		adev = prevAdev
-	})
-
 	var pa = makeAudioConfig("stdin", "stdin")
-	require.Equal(t, 0, AudioOpen(t.Context(), pa))
+	var d = openAudio(t, pa)
 
-	assert.Nil(t, adev[0].outputStream)
-	assert.Nil(t, adev[0].udp_out_sock)
+	assert.Nil(t, d.dev[0].outputStream)
+	assert.Nil(t, d.dev[0].udp_out_sock)
 
 	// The point of issue #501: nothing here needs a soundcard, so PortAudio
 	// is never initialized.
-	assert.False(t, portaudioHeldByOpen)
+	assert.False(t, d.portaudioHeld)
 
 	// Whatever the transmit path produces on the open device is discarded,
 	// not written anywhere, and does not upset the buffer bookkeeping.
-	require.Equal(t, 0, audio_put(0, 42))
-	assert.Equal(t, -1, audio_flush(0))
-	assert.Equal(t, 0, adev[0].outbufLen)
+	require.Equal(t, 0, d.Put(0, 42))
+	assert.Equal(t, -1, d.Flush(0))
+	assert.Equal(t, 0, d.dev[0].outbufLen)
 
 	// Closing must not terminate a PortAudio this open never initialized.
-	AudioClose()
-	assert.False(t, portaudioHeldByOpen)
+	d.Close()
+	assert.False(t, d.portaudioHeld)
 }
 
 // An output device we only defaulted to, and which turns out not to exist,
 // leaves the station receive-only rather than stopping it.
 func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
-	var prevAdev = adev
-
-	t.Cleanup(func() {
-		AudioClose()
-
-		adev = prevAdev
-	})
-
 	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
 
-	require.Equal(t, 0, AudioOpen(t.Context(), pa))
+	var d = openAudio(t, pa)
 
-	assert.Nil(t, adev[0].outputStream)
+	assert.Nil(t, d.dev[0].outputStream)
 }
 
 // An output device named for transmit in the configuration is asked for
 // specifically, so not finding it is a configuration error, not a reason to
 // quietly transmit nothing.
 func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
-	var prevAdev = adev
-
-	t.Cleanup(func() {
-		AudioClose()
-
-		adev = prevAdev
-	})
-
 	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
 	pa.adev[0].adevice_out_specified = true
 
-	assert.Equal(t, -1, AudioOpen(t.Context(), pa))
+	var _, openErr = AudioOpen(t.Context(), pa)
+	assert.Error(t, openErr)
 }
 
 // Naming standard input, or a UDP port to listen on, as the transmit device
 // is a configuration error too - neither can transmit.
 func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
-	var prevAdev = adev
-
-	t.Cleanup(func() {
-		AudioClose()
-
-		adev = prevAdev
-	})
-
 	var pa = makeAudioConfig("stdin", "stdin")
 	pa.adev[0].adevice_out_specified = true
 
-	assert.Equal(t, -1, AudioOpen(t.Context(), pa))
+	var _, openErr = AudioOpen(t.Context(), pa)
+	assert.Error(t, openErr)
 }
 
-// AudioClose must not return while the UDP silence keepalive it started is
-// still running: that goroutine reads the adev table and xmitSvc without a
-// lock, so anything that touches them afterwards - a fresh AudioOpen, or a
-// test putting its globals back - would race with it.
+// Close must not return while the UDP silence keepalive AudioOpen started is
+// still running: that goroutine reads the device without a lock, so anything
+// that touches it afterwards would race with it.
 func Test_audioClose_waitsForUDPSilenceKeepalive(t *testing.T) {
 	var listener, err = new(net.ListenConfig).ListenPacket(t.Context(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	defer listener.Close()
 
-	var prevAdev = adev
-	var prevXmitSvc = xmitSvc
-
-	t.Cleanup(func() {
-		AudioClose()
-
-		adev = prevAdev
-		xmitSvc = prevXmitSvc
-	})
-
-	// With no transmit service the keepalive reads xmitSvc on every tick and
-	// takes no lock at all, so nothing orders those reads before our writes
-	// below except AudioClose waiting for it.
-	xmitSvc = nil
-
 	var pa = makeAudioConfig("stdin", "udp:"+listener.LocalAddr().String())
 	pa.adev[0].adevice_out_specified = true
 
-	require.Equal(t, 0, AudioOpen(context.Background(), pa))
-	require.NotNil(t, adev[0].udp_out_sock)
+	var d = openAudio(t, pa)
+	require.NotNil(t, d.dev[0].udp_out_sock)
 
 	// Let the keepalive tick a few times.
 	time.Sleep(5 * silenceKeepaliveInterval)
 
-	AudioClose()
+	d.Close()
 
-	// What a caller is entitled to do once AudioClose has returned; the race
-	// detector reports these writes if the keepalive can still be reading.
-	xmitSvc = nil
-	adev[0] = nil
+	// What a caller is entitled to do once Close has returned; the race
+	// detector reports this write if the keepalive can still be reading.
+	d.dev[0] = nil
 }
 
-// --- audio_get ---
+// --- GetByte ---
 
-// What audio_get reads is counted in samples by the device's own format, and
+// What GetByte reads is counted in samples by the device's own format, and
 // reported at the interval its configuration asked for - AudioOpen hands the
 // device both, and there is nothing else to ask.
-func Test_audioGet_recordsStatisticsFromTheDevicesOwnSettings(t *testing.T) {
-	var prevAdev = adev
-
-	t.Cleanup(func() {
-		AudioClose()
-
-		adev = prevAdev
-	})
-
+func Test_GetByte_recordsStatisticsFromTheDevicesOwnSettings(t *testing.T) {
 	var pa = makeAudioConfig("udp:0", "stdin")
 	pa.adev[0].num_channels = 2
 	pa.adev[0].bits_per_sample = 16
 	pa.statistics_interval = 100
 
-	require.Equal(t, 0, AudioOpen(t.Context(), pa))
+	var d = openAudio(t, pa)
 
-	var conn, err = new(net.Dialer).DialContext(t.Context(), "udp", adev[0].udp_sock.LocalAddr().String())
+	var conn, err = new(net.Dialer).DialContext(t.Context(), "udp", d.dev[0].udp_sock.LocalAddr().String())
 	require.NoError(t, err)
 
 	defer conn.Close()
@@ -581,23 +531,23 @@ func Test_audioGet_recordsStatisticsFromTheDevicesOwnSettings(t *testing.T) {
 	require.NoError(t, err)
 
 	for range datagram {
-		require.Equal(t, 0, audio_get(0))
+		require.Equal(t, 0, d.GetByte(0))
 	}
 
-	assert.Equal(t, 100, adev[0].statisticsInterval)
-	assert.Equal(t, 0, adev[0].stats.sampleCount)
+	assert.Equal(t, 100, d.dev[0].statisticsInterval)
+	assert.Equal(t, 0, d.dev[0].stats.sampleCount)
 
 	// The first report is due 3 seconds after that, and resets the count, so
 	// put it out of reach of a slow runner.
-	adev[0].stats.lastTime = time.Now().Add(time.Hour)
+	d.dev[0].stats.lastTime = time.Now().Add(time.Hour)
 
 	// The second is counted.
 	_, err = conn.Write(datagram)
 	require.NoError(t, err)
-	require.Equal(t, 0, audio_get(0))
+	require.Equal(t, 0, d.GetByte(0))
 
-	assert.Equal(t, 10, adev[0].stats.sampleCount)
-	assert.Equal(t, 0, adev[0].stats.errorCount)
+	assert.Equal(t, 10, d.dev[0].stats.sampleCount)
+	assert.Equal(t, 0, d.dev[0].stats.errorCount)
 }
 
 // --- applyCommandLineAudioSource ---
@@ -628,34 +578,38 @@ func Test_applyCommandLineAudioSource(t *testing.T) {
 	}
 }
 
-// --- audio_transmit_available ---
+// --- transmitAvailable ---
 
-func Test_audio_transmit_available(t *testing.T) {
+func Test_transmitAvailable(t *testing.T) {
+	t.Run("no audio devices", func(t *testing.T) {
+		var d *AudioDevices
+
+		assert.False(t, d.transmitAvailable(0))
+	})
+
 	t.Run("device that was never opened", func(t *testing.T) {
-		var prev = adev[0]
+		var d = new(AudioDevices)
 
-		t.Cleanup(func() { adev[0] = prev })
-
-		adev[0] = nil
-
-		assert.False(t, audio_transmit_available(0))
+		assert.False(t, d.transmitAvailable(0))
 	})
 
 	t.Run("device open with no output", func(t *testing.T) {
-		setupAdev0(t)
-		assert.False(t, audio_transmit_available(0))
+		var d, _ = setupAdev0()
+		assert.False(t, d.transmitAvailable(0))
 	})
 
 	t.Run("device with UDP output", func(t *testing.T) {
-		var dev = setupAdev0(t)
+		var d, dev = setupAdev0()
 		dev.udp_out_sock = &net.UDPConn{}
 
-		assert.True(t, audio_transmit_available(0))
+		assert.True(t, d.transmitAvailable(0))
 	})
 
 	t.Run("device number out of range", func(t *testing.T) {
-		assert.False(t, audio_transmit_available(-1))
-		assert.False(t, audio_transmit_available(MAX_ADEVS))
+		var d, _ = setupAdev0()
+
+		assert.False(t, d.transmitAvailable(-1))
+		assert.False(t, d.transmitAvailable(MAX_ADEVS))
 	})
 }
 
