@@ -11,6 +11,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/rrbb"
 )
 
 /* Undo data scrambling for 9600 baud. */
@@ -66,7 +67,7 @@ type hdlcState struct {
 	frameLen int /* Number of octets in frameBuf. */
 	/* Should be in range of 0 .. MAX_FRAME_LEN. */
 
-	rrbb *rrbb_t /* Handle for bit array for raw received bits. */
+	rawBits *rrbb.Buffer /* Handle for bit array for raw received bits. */
 
 	easAcc uint64 /* Accumulate most recent 64 bits received for EAS. */
 
@@ -110,7 +111,7 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 	// TODO: FIX13 wasteful if not needed.
 	// Should loop on number of slicers, not max.
 
-	s.rrbb = rrbb_new(channel, subchannel, slice, scrambled, s.lfsr, s.prevDescram)
+	s.rawBits = rrbb.New(channel, subchannel, slice, scrambled, s.lfsr, s.prevDescram)
 
 	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
 	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc)
@@ -480,10 +481,10 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.flag4Det |= 0x80000000
 	}
 
-	s.rrbb.AppendBit(byte(dwutil.IfThenElse(raw, 1, 0)))
+	s.rawBits.AppendBit(byte(dwutil.IfThenElse(raw, 1, 0)))
 
 	if s.patDet == 0x7e {
-		s.rrbb.Chop8()
+		s.rawBits.Chop8()
 
 		/*
 		 * The special pattern 01111110 indicates beginning and ending of a frame.
@@ -552,10 +553,10 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		/*
 			#if TEST
 				  text_color_set(DW_COLOR_DEBUG);
-				  dw_printf ("\nfound flag, channel %d.%d, %d bits in frame\n", channel, subchannel, H.rrbb.Len() - 1);
+				  dw_printf ("\nfound flag, channel %d.%d, %d bits in frame\n", channel, subchannel, H.rawBits.Len() - 1);
 			#endif
 		*/
-		if s.rrbb.Len() >= MIN_FRAME_LEN*8 {
+		if s.rawBits.Len() >= MIN_FRAME_LEN*8 {
 			//JWL - end of frame
 			var speed_error float64    // in percentage.
 			if *pll_symbol_count > 0 { // avoid divde by 0.
@@ -574,28 +575,28 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 				speed_error = 0
 			}
 
-			s.rrbb.SetSpeedError(speed_error)
+			s.rawBits.SetSpeedError(speed_error)
 
 			var alevel = demod_get_audio_level(channel, subchannel)
 
-			s.rrbb.SetAudioLevel(alevel)
-			hdlc_rec2_block(s.rrbb, &s.receiver.audio.achan[channel])
+			s.rawBits.SetAudioLevel(alevel)
+			hdlc_rec2_block(s.rawBits, &s.receiver.audio.achan[channel])
 			/* Handed off to hdlc_rec2_block. */
-			s.rrbb = nil
+			s.rawBits = nil
 
-			s.rrbb = rrbb_new(channel, subchannel, slice, is_scrambled, s.lfsr, s.prevDescram) /* Allocate a new one. */
+			s.rawBits = rrbb.New(channel, subchannel, slice, is_scrambled, s.lfsr, s.prevDescram) /* Allocate a new one. */
 		} else {
 			//JWL - start of frame
 			*pll_nudge_total = 0
 			*pll_symbol_count = -1 // comes out better than using 0.
 
-			s.rrbb.Clear(is_scrambled, s.lfsr, s.prevDescram)
+			s.rawBits.Clear(is_scrambled, s.lfsr, s.prevDescram)
 		}
 
 		s.olen = 0 /* Allow accumulation of octets. */
 		s.frameLen = 0
 
-		s.rrbb.AppendBit(byte(dwutil.IfThenElse(s.prevRaw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
+		s.rawBits.AppendBit(byte(dwutil.IfThenElse(s.prevRaw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
 		/* Now that we are saving other initial state information, */
 		/* it would be sensible to do the same for this instead */
 		/* of lumping it in with the frame data bits. */
@@ -638,7 +639,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.olen = -1    /* Stop accumulating octets. */
 		s.frameLen = 0 /* Discard anything in progress. */
 
-		s.rrbb.Clear(is_scrambled, s.lfsr, s.prevDescram)
+		s.rawBits.Clear(is_scrambled, s.lfsr, s.prevDescram)
 	} else if (s.patDet & 0xfc) == 0x7c {
 
 		/*

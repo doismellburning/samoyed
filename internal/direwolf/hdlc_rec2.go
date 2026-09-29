@@ -73,6 +73,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/rrbb"
 	"github.com/sirupsen/logrus"
 )
 
@@ -197,7 +198,7 @@ type hdlc_state2_s struct {
  *
  ***********************************************************************************/
 
-func hdlc_rec2_block(block *rrbb_t, achan *achan_param_s) {
+func hdlc_rec2_block(block *rrbb.Buffer, achan *achan_param_s) {
 	var channel = block.Channel()
 	var subchan = block.Subchannel()
 	var slice = block.Slice()
@@ -277,7 +278,7 @@ func hdlc_rec2_block(block *rrbb_t, achan *achan_param_s) {
  *
  ***********************************************************************************/
 
-func try_to_fix_quick_now(block *rrbb_t, achan *achan_param_s, channel int, subchan int, slice int, alevel ax25.ALevel) bool {
+func try_to_fix_quick_now(block *rrbb.Buffer, achan *achan_param_s, channel int, subchan int, slice int, alevel ax25.ALevel) bool {
 	var fix_bits = achan.fix_bits
 
 	var length = block.Len()
@@ -484,7 +485,7 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  *
  ***********************************************************************************/
 
-func try_decode(block *rrbb_t, achan *achan_param_s, channel int, subchan int, slice int, alevel ax25.ALevel, retry_conf *retry_conf_t, passall bool) bool {
+func try_decode(block *rrbb.Buffer, achan *achan_param_s, channel int, subchan int, slice int, alevel ax25.ALevel, retry_conf *retry_conf_t, passall bool) bool {
 	var retry_conf_mode = retry_conf.mode
 	var retry_conf_type = retry_conf._type
 	var retry_conf_retry = retry_conf.retry
