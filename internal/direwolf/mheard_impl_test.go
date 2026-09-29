@@ -6,7 +6,6 @@ package direwolf
 // A failing test may thus be a problem with the test itself rather than any future changes...
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -22,19 +21,19 @@ func TestMheardAge(t *testing.T) {
 	var now = time.Now()
 
 	t.Run("zero time returns placeholder", func(t *testing.T) {
-		assert.Equal(t, "-  ", mheard_age(now, time.Time{}))
+		assert.Equal(t, "-", mheard_age(now, time.Time{}))
 	})
 
 	t.Run("90 minutes ago", func(t *testing.T) {
-		assert.Equal(t, "   1:30", mheard_age(now, now.Add(-90*time.Minute)))
+		assert.Equal(t, "1:30", mheard_age(now, now.Add(-90*time.Minute)))
 	})
 
 	t.Run("5 minutes ago", func(t *testing.T) {
-		assert.Equal(t, "   0:05", mheard_age(now, now.Add(-5*time.Minute)))
+		assert.Equal(t, "0:05", mheard_age(now, now.Add(-5*time.Minute)))
 	})
 
 	t.Run("same moment", func(t *testing.T) {
-		assert.Equal(t, "   0:00", mheard_age(now, now))
+		assert.Equal(t, "0:00", mheard_age(now, now))
 	})
 }
 
@@ -42,20 +41,19 @@ func TestMheardAge(t *testing.T) {
 
 func TestMheardLatlon(t *testing.T) {
 	t.Run("both unknown", func(t *testing.T) {
-		assert.Equal(t, "   -       -  ", mheard_latlon(maybe.Nothing[float64](), maybe.Nothing[float64]()))
+		assert.Equal(t, "-", mheard_latlon(maybe.Nothing[float64](), maybe.Nothing[float64]()))
 	})
 
 	t.Run("lat unknown lon known", func(t *testing.T) {
-		assert.Equal(t, "   -       -  ", mheard_latlon(maybe.Nothing[float64](), maybe.Just(-71.0)))
+		assert.Equal(t, "-", mheard_latlon(maybe.Nothing[float64](), maybe.Just(-71.0)))
 	})
 
 	t.Run("lat known lon unknown", func(t *testing.T) {
-		assert.Equal(t, "   -       -  ", mheard_latlon(maybe.Just(42.0), maybe.Nothing[float64]()))
+		assert.Equal(t, "-", mheard_latlon(maybe.Just(42.0), maybe.Nothing[float64]()))
 	})
 
 	t.Run("both known", func(t *testing.T) {
-		var expected = fmt.Sprintf("%6.2f %7.2f", 42.36, -71.06)
-		assert.Equal(t, expected, mheard_latlon(maybe.Just(42.36), maybe.Just(-71.06)))
+		assert.Equal(t, "42.36 -71.06", mheard_latlon(maybe.Just(42.36), maybe.Just(-71.06)))
 	})
 }
 
