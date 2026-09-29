@@ -39,7 +39,7 @@ func checkSymbol(symtab byte, symbol byte) {
 
 /*------------------------------------------------------------------
  *
- * Name:        norm_position
+ * Name:        normal_position
  *
  * Purpose:     Fill in the human-readable latitude, longitude,
  * 		symbol part which is common to multiple data formats.
@@ -50,11 +50,9 @@ func checkSymbol(symtab byte, symbol byte) {
  *		dlong	- Longitude.
  *		ambiguity - Blank out least significant digits.
  *
- * Returns:	presult	- Stored here.
+ * Returns:	The position; normal_position_string renders it.
  *
  *----------------------------------------------------------------*/
-
-/* Position & symbol fields common to several message formats. */
 
 func normal_position_string(p *position_t) string {
 	return fmt.Sprintf("%s%c%s%c", string(p.Lat[:]), p.SymTableId, string(p.Lon[:]), p.SymbolCode)
@@ -96,7 +94,7 @@ func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambi
  *		speed	- knots.
  *
  *
- * Returns:	presult	- Stored here.
+ * Returns:	The position; compressed_position_string renders it.
  *
  * Description:	The cst field can have only one of
  *
@@ -108,8 +106,6 @@ func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambi
  *		the API definition to what is sent over the air.
  *
  *----------------------------------------------------------------*/
-
-/* Compressed position & symbol fields common to several message formats. */
 
 func compressed_position_string(p *compressed_position_t) string {
 	return fmt.Sprintf("%c%s%s%c%c%c%c", p.SymTableId, string(p.Y[:]), string(p.X[:]), p.SymbolCode, p.C, p.S, p.T)
@@ -228,10 +224,10 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
  *		gain	- dB.  Protocol spec doesn't mention whether it is dBi or dBd.
  *				This says dBi:
  *				http://www.tapr.org/pipermail/aprssig/2008-September/027034.html
-
+ *
  *		dir	- Directivity: N, NE, etc., omni.
  *
- * Returns:	presult	- Stored here.
+ * Returns:	The data extension.
  *
  *----------------------------------------------------------------*/
 
@@ -290,7 +286,7 @@ func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain ma
  *
  *		speed	- knots.
  *
- * Returns:	presult	- Stored here.
+ * Returns:	The data extension.
  *
  * Description: Over the air we use:
  *			0 	for unknown or not relevant.
@@ -344,7 +340,7 @@ func dataExtension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.M
  *		tone	- Hz.
  *		offset	- MHz.
  *
- * Returns:     Result
+ * Returns:     The frequency spec, or "" if nothing was given.
  *
  * Description:	There are several valid variations.
  *
@@ -418,9 +414,8 @@ func frequency_spec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset
  *
  *		comment	- Additional comment text.
  *
- * Returns:	result	- Should be at least ??? bytes.
- *				Could get into hundreds of characters
- *				because it includes the comment.
+ * Returns:	The info part.  Could get into hundreds of characters
+ *		because it includes the comment.
  *
  * Description:	There can be a single optional "data extension"
  *		following the position so there is a choice
@@ -428,7 +423,8 @@ func frequency_spec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset
  *			Power/height/gain/directivity or
  *			Course/speed.
  *
- *		After that,
+ *		After that come the optional frequency spec, altitude and
+ *		comment.
  *
  *----------------------------------------------------------------*/
 
@@ -488,7 +484,7 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 	result += comment
 
 	return result
-} /* end EncodePosition */
+}
 
 /*------------------------------------------------------------------
  *
@@ -498,7 +494,7 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
  *
  * Inputs:      name	- Name, up to 9 characters.
  *		compressed - Send in compressed form?
- *		thyme	- Time stamp or 0 for none.
+ *		thyme	- Time stamp, or the zero time for none.
  *		lat	- Latitude.
  *		lon	- Longitude.
  *		ambiguity - Number of digits to omit from location.
@@ -519,11 +515,9 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
  *
  *		comment	- Additional comment text.
  *
- * Returns:	result	- Should be at least ??? characters.
- *				36 for fixed part,
- *				7 for optional extended data,
- *				~20 for freq, etc.,
- *				comment could be very long...
+ * Returns:	The info part: 36 characters of fixed part,
+ *		7 for optional extended data, ~20 for freq, etc.,
+ *		then the comment, which could be very long.
  *
  *----------------------------------------------------------------*/
 
@@ -562,7 +556,7 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 	result += comment
 
 	return result
-} /* end encode_object */
+}
 
 /*------------------------------------------------------------------
  *
@@ -574,9 +568,7 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
  *		text		- Text part of the message.
  *		id		- Identifier, 0 to 5 characters.
  *
- * Returns:	presult	- Stored here.
- *
- * Description:
+ * Returns:	The info part.
  *
  *----------------------------------------------------------------*/
 
