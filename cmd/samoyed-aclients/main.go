@@ -36,8 +36,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/serialport"
 )
 
@@ -205,7 +205,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 	 * It also discards the via path.
 	 */
 
-	var mon_cmd = new(direwolf.AGWPEHeader)
+	var mon_cmd = new(agwpe.Header)
 	mon_cmd.DataKind = 'k'
 
 	var writeErr = binary.Write(conn, binary.LittleEndian, mon_cmd)

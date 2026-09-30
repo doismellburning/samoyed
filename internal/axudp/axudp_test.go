@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+package axudp
 
 import (
 	"context"
@@ -19,24 +19,24 @@ import (
 	"github.com/sirupsen/logrus/hooks/test"
 )
 
-func TestAXUDPAddCRC(t *testing.T) {
+func TestAddCRC(t *testing.T) {
 	// A minimal AX.25 frame (14 bytes: dest + src address fields).
 	var frame = []byte{
 		0x82, 0xA0, 0x6E, 0x98, 0x9C, 0x40, 0xE0, // dest
 		0x82, 0xA0, 0x6E, 0x98, 0x9C, 0x42, 0x61, // src
 	}
 
-	var got = axudpAddCRC(frame)
+	var got = addCRC(frame)
 
 	// Must be 2 bytes longer.
 	if len(got) != len(frame)+2 {
-		t.Fatalf("axudpAddCRC: want len %d, got %d", len(frame)+2, len(got))
+		t.Fatalf("addCRC: want len %d, got %d", len(frame)+2, len(got))
 	}
 
 	// Frame bytes must be unchanged at the start.
 	for i, b := range frame {
 		if got[i] != b {
-			t.Fatalf("axudpAddCRC: frame byte %d changed: want 0x%02x got 0x%02x", i, b, got[i])
+			t.Fatalf("addCRC: frame byte %d changed: want 0x%02x got 0x%02x", i, b, got[i])
 		}
 	}
 
@@ -44,44 +44,44 @@ func TestAXUDPAddCRC(t *testing.T) {
 	var want = fcs.Calc(frame)
 	var crc = uint16(got[len(frame)]) | uint16(got[len(frame)+1])<<8
 	if crc != want {
-		t.Errorf("axudpAddCRC: crc=0x%04x want 0x%04x", crc, want)
+		t.Errorf("addCRC: crc=0x%04x want 0x%04x", crc, want)
 	}
 }
 
-func TestAXUDPStripCRC(t *testing.T) {
+func TestStripCRC(t *testing.T) {
 	var frame = []byte{0xAA, 0xBB, 0xCC, 0xDD}
-	var withCRC = axudpAddCRC(frame)
+	var withCRC = addCRC(frame)
 
-	var got, ok = axudpStripCRC(withCRC)
+	var got, ok = stripCRC(withCRC)
 	if !ok {
-		t.Fatal("axudpStripCRC: reported invalid checksum for a packet we just built")
+		t.Fatal("stripCRC: reported invalid checksum for a packet we just built")
 	}
 
 	if len(got) != len(frame) {
-		t.Fatalf("axudpStripCRC: want len %d, got %d", len(frame), len(got))
+		t.Fatalf("stripCRC: want len %d, got %d", len(frame), len(got))
 	}
 
 	for i, b := range frame {
 		if got[i] != b {
-			t.Fatalf("axudpStripCRC: byte %d: want 0x%02x got 0x%02x", i, b, got[i])
+			t.Fatalf("stripCRC: byte %d: want 0x%02x got 0x%02x", i, b, got[i])
 		}
 	}
 }
 
-func TestAXUDPStripCRCBadChecksum(t *testing.T) {
+func TestStripCRCBadChecksum(t *testing.T) {
 	// A bare AX.25 frame with no CRC appended — should be rejected.
 	var raw = []byte{
 		0x82, 0xA0, 0x6E, 0x98, 0x9C, 0x40, 0xE0,
 		0x82, 0xA0, 0x6E, 0x98, 0x9C, 0x42, 0x61,
 	}
 
-	var _, ok = axudpStripCRC(raw)
+	var _, ok = stripCRC(raw)
 	if ok {
-		t.Error("axudpStripCRC: accepted a frame with no CRC appended (should have failed)")
+		t.Error("stripCRC: accepted a frame with no CRC appended (should have failed)")
 	}
 }
 
-func TestAXUDPParseConfig(t *testing.T) {
+func TestParseConfig(t *testing.T) {
 	var dir = t.TempDir()
 	var p = filepath.Join(dir, "axudp.yaml")
 	var content = `maps:
@@ -97,12 +97,12 @@ func TestAXUDPParseConfig(t *testing.T) {
 		t.Fatal(writeErr)
 	}
 
-	var entries, err = ParseAXUDPConfig(p)
+	var entries, err = ParseConfig(p)
 	if err != nil {
-		t.Fatalf("ParseAXUDPConfig: unexpected error: %v", err)
+		t.Fatalf("ParseConfig: unexpected error: %v", err)
 	}
 	if len(entries) != 2 {
-		t.Fatalf("ParseAXUDPConfig: want 2 entries, got %d", len(entries))
+		t.Fatalf("ParseConfig: want 2 entries, got %d", len(entries))
 	}
 	if entries[0].AX25Addr != "Q1TEST" {
 		t.Errorf("entries[0].AX25Addr = %q, want %q", entries[0].AX25Addr, "Q1TEST")
@@ -118,7 +118,7 @@ func TestAXUDPParseConfig(t *testing.T) {
 	}
 }
 
-func TestAXUDPParseConfigNormalisesAX25Addr(t *testing.T) {
+func TestParseConfigNormalisesAX25Addr(t *testing.T) {
 	var cases = []struct {
 		name     string
 		ax25addr string
@@ -139,9 +139,9 @@ func TestAXUDPParseConfigNormalisesAX25Addr(t *testing.T) {
 			if writeErr != nil {
 				t.Fatal(writeErr)
 			}
-			var entries, err = ParseAXUDPConfig(p)
+			var entries, err = ParseConfig(p)
 			if err != nil {
-				t.Fatalf("ParseAXUDPConfig: unexpected error: %v", err)
+				t.Fatalf("ParseConfig: unexpected error: %v", err)
 			}
 			if entries[0].AX25Addr != tc.wantNorm {
 				t.Errorf("AX25Addr = %q, want %q", entries[0].AX25Addr, tc.wantNorm)
@@ -150,7 +150,7 @@ func TestAXUDPParseConfigNormalisesAX25Addr(t *testing.T) {
 	}
 }
 
-func TestAXUDPParseConfigResolvesUDPAddr(t *testing.T) {
+func TestParseConfigResolvesUDPAddr(t *testing.T) {
 	var dir = t.TempDir()
 	var p = filepath.Join(dir, "axudp.yaml")
 	var content = `maps:
@@ -163,26 +163,26 @@ func TestAXUDPParseConfigResolvesUDPAddr(t *testing.T) {
 		t.Fatal(writeErr)
 	}
 
-	var entries, err = ParseAXUDPConfig(p)
+	var entries, err = ParseConfig(p)
 	if err != nil {
-		t.Fatalf("ParseAXUDPConfig: unexpected error: %v", err)
+		t.Fatalf("ParseConfig: unexpected error: %v", err)
 	}
 	if entries[0].UDPAddr == nil {
-		t.Fatal("ParseAXUDPConfig: UDPAddr is nil, expected resolved address")
+		t.Fatal("ParseConfig: UDPAddr is nil, expected resolved address")
 	}
 	if entries[0].UDPAddr.String() != "192.0.2.1:93" {
 		t.Errorf("UDPAddr = %q, want %q", entries[0].UDPAddr.String(), "192.0.2.1:93")
 	}
 }
 
-func TestAXUDPParseConfigFileNotFound(t *testing.T) {
-	var _, err = ParseAXUDPConfig("/nonexistent/axudp.yaml")
+func TestParseConfigFileNotFound(t *testing.T) {
+	var _, err = ParseConfig("/nonexistent/axudp.yaml")
 	if err == nil {
-		t.Error("ParseAXUDPConfig: expected error for missing file, got nil")
+		t.Error("ParseConfig: expected error for missing file, got nil")
 	}
 }
 
-func TestAXUDPParseConfigValidation(t *testing.T) {
+func TestParseConfigValidation(t *testing.T) {
 	var cases = []struct {
 		name    string
 		content string
@@ -237,30 +237,30 @@ func TestAXUDPParseConfigValidation(t *testing.T) {
 			if writeErr != nil {
 				t.Fatal(writeErr)
 			}
-			var _, err = ParseAXUDPConfig(p)
+			var _, err = ParseConfig(p)
 			if err == nil {
-				t.Errorf("ParseAXUDPConfig: expected error for %s, got nil", tc.name)
+				t.Errorf("ParseConfig: expected error for %s, got nil", tc.name)
 			}
 		})
 	}
 }
 
-func TestAXUDPParseConfigBadYAML(t *testing.T) {
+func TestParseConfigBadYAML(t *testing.T) {
 	var dir = t.TempDir()
 	var p = filepath.Join(dir, "axudp.yaml")
 	var writeErr = os.WriteFile(p, []byte("{ not valid yaml: ["), 0600)
 	if writeErr != nil {
 		t.Fatal(writeErr)
 	}
-	var _, err = ParseAXUDPConfig(p)
+	var _, err = ParseConfig(p)
 	if err == nil {
-		t.Error("ParseAXUDPConfig: expected error for malformed YAML, got nil")
+		t.Error("ParseConfig: expected error for malformed YAML, got nil")
 	}
 }
 
-func TestAXUDPLookupMap(t *testing.T) {
-	var b = new(AXUDPBridge)
-	b.maps = []AXUDPMapEntry{
+func TestLookupMap(t *testing.T) {
+	var b = new(Bridge)
+	b.maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},   // no SSID — should match all SSIDs
 		{AX25Addr: "Q2TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil}, // with SSID — exact match only
 	}
@@ -295,13 +295,13 @@ func TestAXUDPLookupMap(t *testing.T) {
 	}
 }
 
-// TestAXUDPLookupMapExactBeforeWildcard verifies that an exact SSID match takes
+// TestLookupMapExactBeforeWildcard verifies that an exact SSID match takes
 // priority over a no-SSID (wildcard) entry regardless of YAML order.
-func TestAXUDPLookupMapExactBeforeWildcard(t *testing.T) {
+func TestLookupMapExactBeforeWildcard(t *testing.T) {
 	// Wildcard entry is listed first; specific SSID entry is listed second.
 	// A lookup for Q1TEST-7 must return the specific entry, not the wildcard.
-	var b = new(AXUDPBridge)
-	b.maps = []AXUDPMapEntry{
+	var b = new(Bridge)
+	b.maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},   // wildcard — listed first
 		{AX25Addr: "Q1TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil}, // specific SSID-7 — listed second
 	}
@@ -336,8 +336,8 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 	// Build a bridge with a map entry that matches the destination encoded in
 	// the test frame below.  The udpConn is intentionally left nil so that any
 	// accidental call to sendAXUDP panics immediately.
-	var b = new(AXUDPBridge)
-	b.maps = []AXUDPMapEntry{
+	var b = new(Bridge)
+	b.maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},
 	}
 
@@ -378,7 +378,7 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 
 	var kc kiss.Collector
 	for _, by := range buf {
-		axudpRecByte(&kc, by, b)
+		recByte(&kc, by, b)
 	}
 }
 
@@ -388,7 +388,7 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 func TestKISSOverflowDiscarded(t *testing.T) {
 	// Empty bridge — no maps, so even an accidentally forwarded frame would
 	// just log to stderr rather than panic.
-	var b = new(AXUDPBridge)
+	var b = new(Bridge)
 
 	// Build a KISS input: FEND + type byte + kiss.MaxFrameLen data bytes + FEND.
 	// kiss.MaxFrameLen data bytes is enough to trigger the overflow condition.
@@ -406,7 +406,7 @@ func TestKISSOverflowDiscarded(t *testing.T) {
 
 	var kc kiss.Collector
 	for _, by := range buf {
-		axudpRecByte(&kc, by, b)
+		recByte(&kc, by, b)
 	}
 
 	var discards = 0
@@ -510,8 +510,8 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 	var kissframe = kiss.Encapsulate(payload)
 
 	// Set up a bridge with a MAP entry routing Q1TEST to dstPkt.
-	var b = new(AXUDPBridge)
-	b.maps = []AXUDPMapEntry{
+	var b = new(Bridge)
+	b.maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: dstAddr.String(), UDPAddr: dstAddr},
 	}
 	b.udpConn = srcUDP
@@ -552,7 +552,7 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 // kiss.MaxFrameLen.  Oversized frames would be silently truncated by the nettnc.go
 // KISS reader, producing corrupt AX.25 data.
 func TestBroadcastKISSDropsOversizedFrame(t *testing.T) {
-	var b = new(AXUDPBridge)
+	var b = new(Bridge)
 	var fc = new(fakeConn)
 	b.clients = []net.Conn{fc}
 
@@ -586,7 +586,7 @@ func TestRunUDPListenerReturnsOnReadError(t *testing.T) {
 		t.Fatal("pkt is not a *net.UDPConn")
 	}
 
-	var b = NewAXUDPBridge(nil, udpConn)
+	var b = NewBridge(nil, udpConn)
 
 	var errs = make(chan error, 1)
 	go func() { errs <- b.RunUDPListener(t.Context()) }()
@@ -619,7 +619,7 @@ func TestRunKISSServerReturnsOnListenerClose(t *testing.T) {
 		t.Fatal(listenErr)
 	}
 
-	var b = NewAXUDPBridge(nil, nil)
+	var b = NewBridge(nil, nil)
 
 	var errs = make(chan error, 1)
 	go func() { errs <- b.RunKISSServer(t.Context(), ln) }()
@@ -667,7 +667,7 @@ func (l *failingListener) Addr() net.Addr { return &net.TCPAddr{IP: net.IPv4zero
 // spins the CPU and floods the log.
 func TestRunKISSServerGivesUpOnPersistentAcceptFailure(t *testing.T) {
 	var ln = new(failingListener)
-	var b = NewAXUDPBridge(nil, nil)
+	var b = NewBridge(nil, nil)
 
 	// The real back-off adds up to a couple of seconds over the attempts;
 	// how many attempts there are is the point here, not how long they take.
@@ -692,8 +692,8 @@ func TestRunKISSServerGivesUpOnPersistentAcceptFailure(t *testing.T) {
 	var attempts = ln.attempts
 	ln.mu.Unlock()
 
-	if attempts != axudpMaxAcceptFailures {
-		t.Errorf("accept was attempted %d times, want %d", attempts, axudpMaxAcceptFailures)
+	if attempts != maxAcceptFailures {
+		t.Errorf("accept was attempted %d times, want %d", attempts, maxAcceptFailures)
 	}
 }
 
@@ -707,7 +707,7 @@ func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
 	}
 	defer ln.Close()
 
-	var b = NewAXUDPBridge(nil, nil)
+	var b = NewBridge(nil, nil)
 
 	go b.RunKISSServer(t.Context(), ln) //nolint:errcheck // the error is the teardown path, covered above
 

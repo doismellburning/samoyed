@@ -32,8 +32,8 @@ import (
 	"os"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 )
 
 func main() {
@@ -55,7 +55,7 @@ func main() {
 	 * Note: Monitor format is only for UI frames.
 	 */
 
-	var mon_cmd direwolf.AGWPEHeader
+	var mon_cmd agwpe.Header
 	mon_cmd.DataKind = 'k'
 
 	var writeErr = binary.Write(server_sock, binary.LittleEndian, mon_cmd)
@@ -153,7 +153,7 @@ func main() {
 				 * where the tones were heard.  We could also send AX.25 frames to
 				 * other radio channels.
 				 */
-				var hdr direwolf.AGWPEHeader
+				var hdr agwpe.Header
 				hdr.Portx = channel
 				hdr.DataKind = 'K'
 

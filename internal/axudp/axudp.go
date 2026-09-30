@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+// Package axudp bridges KISS-over-TCP clients and remote nodes speaking
+// AXUDP - raw AX.25 frames in UDP datagrams, per RFC 1226.
+package axudp
 
 import (
 	"context"
@@ -21,43 +23,43 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// AXUDPMapEntry holds one MAP line from the config.
-type AXUDPMapEntry struct {
+// MapEntry holds one MAP line from the config.
+type MapEntry struct {
 	AX25Addr string       // AX.25 address, i.e. callsign and optional SSID, e.g. "Q1TEST" or "Q1TEST-1"
 	Addr     string       // UDP address string for display/logging, e.g. "192.0.2.1:20093"
 	UDPAddr  *net.UDPAddr // pre-resolved UDP address for sending
 }
 
-// axudpYAMLConfig is the top-level structure of the axudp.yaml config file.
-type axudpYAMLConfig struct {
-	Maps []axudpYAMLMapEntry `yaml:"maps"`
+// yamlConfig is the top-level structure of the axudp.yaml config file.
+type yamlConfig struct {
+	Maps []yamlMapEntry `yaml:"maps"`
 }
 
-// axudpYAMLMapEntry represents one entry under the "maps" key.
-type axudpYAMLMapEntry struct {
+// yamlMapEntry represents one entry under the "maps" key.
+type yamlMapEntry struct {
 	AX25Addr string `yaml:"ax25addr"`
 	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
 }
 
-// ParseAXUDPConfig reads a YAML config file from path and returns the map entries.
-func ParseAXUDPConfig(path string) ([]AXUDPMapEntry, error) {
+// ParseConfig reads a YAML config file from path and returns the map entries.
+func ParseConfig(path string) ([]MapEntry, error) {
 	var data, err = os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return nil, err
 	}
 
-	var cfg axudpYAMLConfig
+	var cfg yamlConfig
 	var unmarshalErr = yaml.Unmarshal(data, &cfg)
 	if unmarshalErr != nil {
 		return nil, fmt.Errorf("parsing YAML config: %w", unmarshalErr)
 	}
 
-	var entries = make([]AXUDPMapEntry, 0, len(cfg.Maps))
+	var entries = make([]MapEntry, 0, len(cfg.Maps))
 	for i, m := range cfg.Maps {
 		// Normalise ax25addr: strip surrounding whitespace, uppercase, and
 		// remove a trailing "-0" (SSID 0 is represented without any suffix by
-		// axudpExtractDest, so "CALL-0" would never match without this step).
+		// extractDest, so "CALL-0" would never match without this step).
 		var ax25addr = strings.ToUpper(strings.TrimSpace(m.AX25Addr))
 		ax25addr = strings.TrimSuffix(ax25addr, "-0")
 		if ax25addr == "" {
@@ -74,7 +76,7 @@ func ParseAXUDPConfig(path string) ([]AXUDPMapEntry, error) {
 		if resolveErr != nil {
 			return nil, fmt.Errorf("map entry %d: resolving %s: %w", i, addr, resolveErr)
 		}
-		entries = append(entries, AXUDPMapEntry{
+		entries = append(entries, MapEntry{
 			AX25Addr: ax25addr,
 			Addr:     addr,
 			UDPAddr:  udpAddr,
@@ -84,9 +86,9 @@ func ParseAXUDPConfig(path string) ([]AXUDPMapEntry, error) {
 	return entries, nil
 }
 
-// axudpExtractDest extracts the destination AX.25 address from a raw AX.25 frame.
+// extractDest extracts the destination AX.25 address from a raw AX.25 frame.
 // Returns "" if the frame is too short.
-func axudpExtractDest(frame []byte) string {
+func extractDest(frame []byte) string {
 	if len(frame) < 7 {
 		return ""
 	}
@@ -106,9 +108,9 @@ func axudpExtractDest(frame []byte) string {
 	return callstr
 }
 
-// AXUDPBridge is the live state of the bridge.
-type AXUDPBridge struct {
-	maps    []AXUDPMapEntry
+// Bridge is the live state of the bridge.
+type Bridge struct {
+	maps    []MapEntry
 	udpConn *net.UDPConn
 
 	mu      sync.Mutex
@@ -120,15 +122,15 @@ type AXUDPBridge struct {
 	maxAcceptBackoff time.Duration
 }
 
-// NewAXUDPBridge creates a new AXUDPBridge routing AXUDP datagrams according to maps,
+// NewBridge creates a new Bridge routing AXUDP datagrams according to maps,
 // sending/receiving on udpConn.  Per-packet logging is emitted at logrus Trace
 // level, so enabling that level is what makes the bridge verbose.
-func NewAXUDPBridge(maps []AXUDPMapEntry, udpConn *net.UDPConn) *AXUDPBridge {
-	var b = new(AXUDPBridge)
+func NewBridge(maps []MapEntry, udpConn *net.UDPConn) *Bridge {
+	var b = new(Bridge)
 	b.maps = maps
 	b.udpConn = udpConn
-	b.acceptBackoff = axudpAcceptBackoff
-	b.maxAcceptBackoff = axudpMaxAcceptBackoff
+	b.acceptBackoff = defaultAcceptBackoff
+	b.maxAcceptBackoff = defaultMaxAcceptBackoff
 
 	return b
 }
@@ -145,7 +147,7 @@ const maxUDPPayload = 65535
 // now dead: the caller should report the error and terminate so the process
 // can be restarted, rather than continuing silently with no incoming traffic.
 // A cancellation is not such a failure and returns nil.
-func (b *AXUDPBridge) RunUDPListener(ctx context.Context) error {
+func (b *Bridge) RunUDPListener(ctx context.Context) error {
 	// The read below blocks until a datagram turns up, which may be never, so
 	// closing the socket is what gets us back when we are asked to stop.
 	defer dwutil.CloseOnDone(ctx, b.udpConn)()
@@ -176,7 +178,7 @@ func (b *AXUDPBridge) RunUDPListener(ctx context.Context) error {
 		// checksum.  We auto-detect by checking whether the trailing 2 bytes
 		// form a valid checksum; if so we strip them.
 		var ax25frame []byte
-		if stripped, ok := axudpStripCRC(raw); ok {
+		if stripped, ok := stripCRC(raw); ok {
 			ax25frame = stripped
 		} else {
 			ax25frame = raw
@@ -186,14 +188,14 @@ func (b *AXUDPBridge) RunUDPListener(ctx context.Context) error {
 			continue
 		}
 
-		// This fires once per datagram and axudpExtractDest allocates a string
+		// This fires once per datagram and extractDest allocates a string
 		// nothing else here needs, so do not pay for it unless it will print.
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			// The first 7 bytes of an AX.25 frame are the destination address —
 			// for an incoming AXUDP datagram this is typically our local callsign.
 			logrus.WithFields(logrus.Fields{
 				"bytes": n,
-				"dest":  axudpExtractDest(ax25frame),
+				"dest":  extractDest(ax25frame),
 			}).Trace("Received AXUDP datagram")
 		}
 		b.broadcastKISS(ax25frame)
@@ -202,30 +204,30 @@ func (b *AXUDPBridge) RunUDPListener(ctx context.Context) error {
 	return nil
 }
 
-// axudpAcceptBackoff is how long a bridge's RunKISSServer waits after a failed
-// accept before trying again, doubling up to axudpMaxAcceptBackoff, unless it
+// defaultAcceptBackoff is how long a bridge's RunKISSServer waits after a failed
+// accept before trying again, doubling up to defaultMaxAcceptBackoff, unless it
 // is told otherwise before it runs.  Accepting can
 // fail for reasons that pass — a client that goes away between the handshake
 // and the accept, or a momentarily exhausted file descriptor table — and
 // retrying immediately would spin the CPU and flood the log until it does.
-const axudpAcceptBackoff = 5 * time.Millisecond
+const defaultAcceptBackoff = 5 * time.Millisecond
 
-// axudpMaxAcceptBackoff caps that wait.
-const axudpMaxAcceptBackoff = time.Second
+// defaultMaxAcceptBackoff caps that wait.
+const defaultMaxAcceptBackoff = time.Second
 
-// axudpMaxAcceptFailures is how many accepts may fail in a row before
+// maxAcceptFailures is how many accepts may fail in a row before
 // RunKISSServer gives up.  Something that has not passed after this many tries
 // is not the transient the backoff is there for.
-const axudpMaxAcceptFailures = 10
+const maxAcceptFailures = 10
 
 // RunKISSServer accepts TCP connections from KISS clients on ln, until ctx is
 // cancelled.  The caller owns ln and is responsible for closing it.  It
 // returns once ln is closed, or once accepting has failed
-// axudpMaxAcceptFailures times in a row; neither can be recovered from, so the
+// maxAcceptFailures times in a row; neither can be recovered from, so the
 // caller should report the error and terminate rather than spinning on a
 // broken socket.  An isolated accept failure is reported and retried after a
 // backoff.  A cancellation is not a failure and returns nil.
-func (b *AXUDPBridge) RunKISSServer(ctx context.Context, ln net.Listener) error {
+func (b *Bridge) RunKISSServer(ctx context.Context, ln net.Listener) error {
 	var failures int
 	var backoff = b.acceptBackoff
 
@@ -246,7 +248,7 @@ func (b *AXUDPBridge) RunKISSServer(ctx context.Context, ln net.Listener) error 
 			}
 
 			failures++
-			if failures >= axudpMaxAcceptFailures {
+			if failures >= maxAcceptFailures {
 				return fmt.Errorf("KISS server accept failed %d times in a row, last: %w", failures, acceptErr)
 			}
 
@@ -271,13 +273,13 @@ func (b *AXUDPBridge) RunKISSServer(ctx context.Context, ln net.Listener) error 
 	return nil
 }
 
-func (b *AXUDPBridge) addClient(c net.Conn) {
+func (b *Bridge) addClient(c net.Conn) {
 	b.mu.Lock()
 	b.clients = append(b.clients, c)
 	b.mu.Unlock()
 }
 
-func (b *AXUDPBridge) removeClient(c net.Conn) {
+func (b *Bridge) removeClient(c net.Conn) {
 	b.mu.Lock()
 	var next []net.Conn
 	for _, cl := range b.clients {
@@ -289,13 +291,13 @@ func (b *AXUDPBridge) removeClient(c net.Conn) {
 	b.mu.Unlock()
 }
 
-// axudpBroadcastWriteTimeout is the per-write deadline applied when forwarding
+// broadcastWriteTimeout is the per-write deadline applied when forwarding
 // KISS frames to TCP clients.  A stalled client is disconnected after this
 // duration so it cannot block delivery to other clients.
-const axudpBroadcastWriteTimeout = 5 * time.Second
+const broadcastWriteTimeout = 5 * time.Second
 
 // broadcastKISS sends a KISS-wrapped AX.25 frame to all KISS TCP clients.
-func (b *AXUDPBridge) broadcastKISS(ax25frame []byte) {
+func (b *Bridge) broadcastKISS(ax25frame []byte) {
 	// Pre-check: minimum on-wire KISS overhead is 3 bytes (opening FEND +
 	// type byte + closing FEND), so even with zero escaping the encoded
 	// frame can never be shorter than len(ax25frame)+3. If that best case
@@ -330,7 +332,7 @@ func (b *AXUDPBridge) broadcastKISS(ax25frame []byte) {
 	b.mu.Unlock()
 
 	for _, c := range snapshot {
-		var deadlineErr = c.SetWriteDeadline(time.Now().Add(axudpBroadcastWriteTimeout))
+		var deadlineErr = c.SetWriteDeadline(time.Now().Add(broadcastWriteTimeout))
 		if deadlineErr != nil {
 			// Cannot set a deadline — treat as a broken connection and close it
 			// to unblock the read goroutine in handleKISSClient.
@@ -362,7 +364,7 @@ func ax25AddrBase(cs string) string {
 // a MAP entry with an SSID matches only that exact address-SSID pair.
 // Exact matches always take priority over wildcard (no-SSID) matches,
 // regardless of the order entries appear in the config file.
-func (b *AXUDPBridge) lookupMap(dest string) (AXUDPMapEntry, bool) {
+func (b *Bridge) lookupMap(dest string) (MapEntry, bool) {
 	// First pass: exact match (callsign + SSID must match precisely).
 	for _, e := range b.maps {
 		if e.AX25Addr == dest {
@@ -376,22 +378,22 @@ func (b *AXUDPBridge) lookupMap(dest string) (AXUDPMapEntry, bool) {
 		}
 	}
 
-	return AXUDPMapEntry{}, false //nolint: exhaustruct_v5
+	return MapEntry{}, false //nolint: exhaustruct_v5
 }
 
-// axudpAddCRC appends the 2-byte AXUDP checksum to frame and returns the
+// addCRC appends the 2-byte AXUDP checksum to frame and returns the
 // result.  The checksum is CRC-CCITT (poly 0x1021, seed 0xFFFF, final XOR
 // 0xFFFF) over the frame bytes, appended little-endian.
-func axudpAddCRC(frame []byte) []byte {
+func addCRC(frame []byte) []byte {
 	var crc = fcs.Calc(frame)
 
 	return append(append([]byte(nil), frame...), byte(crc), byte(crc>>8))
 }
 
-// axudpStripCRC validates and strips the 2-byte AXUDP checksum from the
+// stripCRC validates and strips the 2-byte AXUDP checksum from the
 // end of pkt.  Returns the AX.25 frame and true if valid, or nil and false if
 // the checksum is wrong or the packet is too short.
-func axudpStripCRC(pkt []byte) ([]byte, bool) {
+func stripCRC(pkt []byte) ([]byte, bool) {
 	if len(pkt) < 2 {
 		return nil, false
 	}
@@ -407,8 +409,8 @@ func axudpStripCRC(pkt []byte) ([]byte, bool) {
 
 // sendAXUDP sends a raw AX.25 frame to the given UDP address.
 // A CRC-CCITT checksum is always appended (per RFC 1226 / AXUDP convention).
-func (b *AXUDPBridge) sendAXUDP(ax25frame []byte, entry AXUDPMapEntry) {
-	var pkt = axudpAddCRC(ax25frame)
+func (b *Bridge) sendAXUDP(ax25frame []byte, entry MapEntry) {
+	var pkt = addCRC(ax25frame)
 	var n, writeErr = b.udpConn.WriteTo(pkt, entry.UDPAddr)
 	if writeErr != nil {
 		logrus.WithField("dest", entry.Addr).WithError(writeErr).Error("Could not send AXUDP datagram")
@@ -422,7 +424,7 @@ func (b *AXUDPBridge) sendAXUDP(ax25frame []byte, entry AXUDPMapEntry) {
 
 // handleKISSClient reads KISS frames from one TCP client and routes them as
 // AXUDP, until the client goes away or ctx is cancelled.
-func (b *AXUDPBridge) handleKISSClient(ctx context.Context, conn net.Conn) {
+func (b *Bridge) handleKISSClient(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 	defer b.removeClient(conn)
 
@@ -449,7 +451,7 @@ func (b *AXUDPBridge) handleKISSClient(ctx context.Context, conn net.Conn) {
 		}
 
 		for _, byt := range buf[:n] {
-			axudpRecByte(&kc, byt, b)
+			recByte(&kc, byt, b)
 		}
 
 		if readErr != nil {
@@ -460,10 +462,10 @@ func (b *AXUDPBridge) handleKISSClient(ctx context.Context, conn net.Conn) {
 	}
 }
 
-// axudpRecByte takes one byte from a KISS client.  When it completes a data
+// recByte takes one byte from a KISS client.  When it completes a data
 // frame, the AX.25 payload is extracted and forwarded to the appropriate
 // AXUDP destination.
-func axudpRecByte(kc *kiss.Collector, b byte, b2 *AXUDPBridge) {
+func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 	var chunk = kc.Add(b)
 
 	if chunk.Err != nil {
@@ -494,7 +496,7 @@ func axudpRecByte(kc *kiss.Collector, b byte, b2 *AXUDPBridge) {
 	}
 	if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == kiss.CmdDataFrame {
 		var ax25frame = unwrapped[1:]
-		var dest = axudpExtractDest(ax25frame)
+		var dest = extractDest(ax25frame)
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithFields(logrus.Fields{
 				"dest":  dest,

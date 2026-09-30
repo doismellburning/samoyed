@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -100,7 +99,7 @@ func Test_process_input(t *testing.T) {
 		"full duplex": {"f 1", []byte{0x05, 1}},
 		"hardware":    {"h TNC:", []byte{0x06, 'T', 'N', 'C', ':'}},
 		"channel":     {"[9] p 63", []byte{0x92, 63}},
-		"default":     {"d", []byte{0x01, byte(direwolf.DEFAULT_TXDELAY)}},
+		"default":     {"d", []byte{0x01, byte(defaultTXDelay)}},
 	}
 
 	for name, tc := range testCases {

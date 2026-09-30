@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+package agwpe
 
 import (
 	"bytes"
@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestAGWPEHeaderBinaryRead is a regression test for a bug where binary.Read
-// was called with a non-pointer AGWPEHeader value, causing it to fail with
+// TestHeaderBinaryRead is a regression test for a bug where binary.Read
+// was called with a non-pointer Header value, causing it to fail with
 // "invalid type direwolf.AGWPEHeader" and drop incoming connections.
-func TestAGWPEHeaderBinaryRead(t *testing.T) {
-	var original = new(AGWPEHeader)
+func TestHeaderBinaryRead(t *testing.T) {
+	var original = new(Header)
 	original.Portx = 1
 	original.DataKind = 'C'
 	original.PID = 0xF0
@@ -28,16 +28,16 @@ func TestAGWPEHeaderBinaryRead(t *testing.T) {
 	var buf bytes.Buffer
 	require.NoError(t, binary.Write(&buf, binary.LittleEndian, original))
 
-	var got = new(AGWPEHeader)
+	var got = new(Header)
 	var readErr = binary.Read(&buf, binary.LittleEndian, got)
 	require.NoError(t, readErr)
 
 	assert.Equal(t, original, got)
 }
 
-func TestAGWPEMessageWriteRoundTrip(t *testing.T) {
+func TestMessageWriteRoundTrip(t *testing.T) {
 	var payload = []byte("hello world")
-	var msg = new(AGWPEMessage)
+	var msg = new(Message)
 	msg.Header.DataKind = 'T'
 	msg.Header.PID = 0xF0
 	msg.Header.DataLen = uint32(len(payload))
@@ -47,7 +47,7 @@ func TestAGWPEMessageWriteRoundTrip(t *testing.T) {
 	_, err := msg.Write(&buf, binary.LittleEndian)
 	require.NoError(t, err)
 
-	var gotHeader = new(AGWPEHeader)
+	var gotHeader = new(Header)
 	require.NoError(t, binary.Read(&buf, binary.LittleEndian, gotHeader))
 	assert.Equal(t, msg.Header, *gotHeader)
 
@@ -58,8 +58,8 @@ func TestAGWPEMessageWriteRoundTrip(t *testing.T) {
 }
 
 // A callsign formats without the NUL padding of its fixed-width field.
-func TestAGWPECallsignString(t *testing.T) {
-	var c AGWPECallsign
+func TestCallsignString(t *testing.T) {
+	var c Callsign
 	copy(c[:], "Q1TEST-1")
 
 	assert.Equal(t, "Q1TEST-1", c.String())

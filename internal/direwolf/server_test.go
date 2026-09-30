@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,12 +21,12 @@ import (
 
 // loginFrame builds an AGW 'P' (Application Login) message the way a client
 // does: two fixed size NUL padded fields.
-func loginFrame(user string, password string) *AGWPEMessage {
+func loginFrame(user string, password string) *agwpe.Message {
 	var data = make([]byte, 2*AGW_LOGIN_FIELD_LEN)
 	copy(data[:AGW_LOGIN_FIELD_LEN], user)
 	copy(data[AGW_LOGIN_FIELD_LEN:], password)
 
-	var cmd = new(AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'P'
 	cmd.Header.DataLen = uint32(len(data))
 	cmd.Data = data
@@ -208,7 +209,7 @@ func TestHandleClientCommand_P_MalformedFrameAfterSuccessLogsOut(t *testing.T) {
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
 	require.True(t, s.isLoggedIn(0))
 
-	var cmd = new(AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'P'
 	cmd.Data = []byte("Q1TEST\x00hunter2")
 	cmd.Header.DataLen = uint32(len(cmd.Data))
@@ -222,7 +223,7 @@ func TestHandleClientCommand_P_MalformedFrameDoesNotLogIn(t *testing.T) {
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	// Shorter than the two fixed size fields, so there is nothing to compare.
-	var cmd = new(AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'P'
 	cmd.Data = []byte("Q1TEST\x00hunter2")
 	cmd.Header.DataLen = uint32(len(cmd.Data))
@@ -248,7 +249,7 @@ func TestHandleClientCommand_CommandsIgnoredUntilLoggedIn(t *testing.T) {
 	var replyCh = asyncReply(client)
 
 	// 'R' always gets a version reply - unless we have not logged in.
-	var version = new(AGWPEMessage)
+	var version = new(agwpe.Message)
 	version.Header.DataKind = 'R'
 	s.handleClientCommand(0, version)
 
@@ -275,7 +276,7 @@ func TestHandleClientCommand_NoLoginConfiguredCommandsWork(t *testing.T) {
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
-	var version = new(AGWPEMessage)
+	var version = new(agwpe.Message)
 	version.Header.DataKind = 'R'
 	s.handleClientCommand(0, version)
 
@@ -387,7 +388,7 @@ func TestClientAccepted_LocalClientNeedsNoLogin(t *testing.T) {
 	s.clientAccepted(0, server)
 	assert.True(t, s.isLoggedIn(0))
 
-	var version = new(AGWPEMessage)
+	var version = new(agwpe.Message)
 	version.Header.DataKind = 'R'
 	s.handleClientCommand(0, version)
 
@@ -425,7 +426,7 @@ func TestClientAccepted_LocalClientSurvivesAFailedLogin(t *testing.T) {
 	s.handleClientCommand(0, loginFrame("Q1TEST", "wrong"))
 	assert.True(t, s.isLoggedIn(0), "wrong credentials")
 
-	var malformed = new(AGWPEMessage)
+	var malformed = new(agwpe.Message)
 	malformed.Header.DataKind = 'P'
 	malformed.Data = []byte("Q1TEST\x00hunter2")
 	malformed.Header.DataLen = uint32(len(malformed.Data))
@@ -529,10 +530,10 @@ func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
 	var conn = new(nullConn)
 	conn.addr = tcpAddr(t, "192.168.1.10")
 
-	var rawToggle = new(AGWPEMessage)
+	var rawToggle = new(agwpe.Message)
 	rawToggle.Header.DataKind = 'k'
 
-	var monitorToggle = new(AGWPEMessage)
+	var monitorToggle = new(agwpe.Message)
 	monitorToggle.Header.DataKind = 'm'
 
 	var done = make(chan struct{})
@@ -625,7 +626,7 @@ func TestSendToClient_WriteErrorDetachesTheClient(t *testing.T) {
 	s.clientAccepted(0, server)
 	require.NotNil(t, s.clientConn(0), "nothing attached to detach")
 
-	var version = new(AGWPEMessage)
+	var version = new(agwpe.Message)
 	version.Header.DataKind = 'R'
 
 	var item = dlqAppended(func() { s.handleClientCommand(0, version) })
@@ -704,11 +705,11 @@ func TestAGWServer_ConcurrentWritesToAClientKeepTheirFraming(t *testing.T) {
 
 	s.clientAccepted(0, conn)
 
-	var monitorToggle = new(AGWPEMessage)
+	var monitorToggle = new(agwpe.Message)
 	monitorToggle.Header.DataKind = 'm'
 	s.handleClientCommand(0, monitorToggle)
 
-	var version = new(AGWPEMessage)
+	var version = new(agwpe.Message)
 	version.Header.DataKind = 'R'
 
 	var wg sync.WaitGroup
@@ -737,7 +738,7 @@ func TestAGWServer_ConcurrentWritesToAClientKeepTheirFraming(t *testing.T) {
 	var kinds []byte
 
 	for stream.Len() > 0 {
-		var msg = new(AGWPEMessage)
+		var msg = new(agwpe.Message)
 		require.NoError(t, binary.Read(stream, binary.LittleEndian, &msg.Header), "stream ends partway through a header")
 
 		msg.Data = make([]byte, msg.Header.DataLen)

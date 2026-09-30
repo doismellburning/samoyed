@@ -10,8 +10,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,7 +81,7 @@ func sendMonitored(t *testing.T, conn net.Conn, channel byte, monitor string) {
 func sendRaw(t *testing.T, conn net.Conn, channel byte, data []byte) {
 	t.Helper()
 
-	var header = new(direwolf.AGWPEHeader)
+	var header = new(agwpe.Header)
 	header.Portx = channel
 	header.DataKind = 'K'
 	header.DataLen = uint32(len(data))
@@ -108,7 +108,7 @@ func Test_main(t *testing.T) {
 
 	p.WaitFor(t, "Client app now connected to localhost, port 8000")
 
-	var header direwolf.AGWPEHeader
+	var header agwpe.Header
 
 	require.NoError(t, binary.Read(tnc, binary.LittleEndian, &header))
 	assert.Equal(t, byte('k'), header.DataKind, "should ask for raw frames")

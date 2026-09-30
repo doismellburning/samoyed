@@ -7,7 +7,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/coordconvutil"
 	"github.com/golang/geo/s1"
 	"github.com/golang/geo/s2"
 	"github.com/tzneal/coordconv"
@@ -46,7 +46,7 @@ func main() {
 	// UTM
 	var utmCoord, utmErr = coordconv.DefaultUTMConverter.ConvertFromGeodetic(latlng, 0)
 	if utmErr == nil {
-		fmt.Printf("UTM zone = %d, hemisphere = %c, easting = %.0f, northing = %.0f\n", utmCoord.Zone, direwolf.HemisphereToRune(utmCoord.Hemisphere), utmCoord.Easting, utmCoord.Northing)
+		fmt.Printf("UTM zone = %d, hemisphere = %c, easting = %.0f, northing = %.0f\n", utmCoord.Zone, coordconvutil.HemisphereToRune(utmCoord.Hemisphere), utmCoord.Easting, utmCoord.Northing)
 	} else {
 		fmt.Printf("Conversion to UTM failed:\n%s\n\n", utmErr)
 

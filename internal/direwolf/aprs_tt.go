@@ -35,6 +35,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/coordconvutil"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -1290,7 +1291,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				state.locText = fmt.Sprintf("%d %.0f %.0f", g.config.ttlocs[ipat].utm.lzone, easting, northing)
 			}
 
-			var hemi = HemisphereRuneToCoordconvHemisphere(g.config.ttlocs[ipat].utm.hemi)
+			var hemi = coordconvutil.HemisphereFromRune(g.config.ttlocs[ipat].utm.hemi)
 
 			var utm = coordconv.UTMCoord{
 				Zone:       g.config.ttlocs[ipat].utm.lzone,
