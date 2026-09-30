@@ -1013,7 +1013,7 @@ func aprsRawNMEA(A *decodedAPRS, info []byte) {
 		A.lat = result.Lat
 		A.lon = result.Lon
 		A.course = result.Course
-		A.speedMPH = maybe.Fmap(DW_KNOTS_TO_MPH, result.Knots)
+		A.speedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, result.Knots)
 		A.dataTypeDesc = "Raw GPS data"
 	} else if bytes.HasPrefix(info, []byte("$GPGGA,")) ||
 		bytes.HasPrefix(info, []byte("$GNGGA,")) {
@@ -1485,7 +1485,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		n -= 800
 	}
 
-	A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(float64(n)))
+	A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n)))
 
 	n = int((p.SpeedCourse[1]-28)%10)*100 + int(p.SpeedCourse[2]-28)
 	if n >= 400 {
@@ -2551,7 +2551,7 @@ func aprsUserDefined(A *decodedAPRS, info []byte) {
 		A.name = aisData.MMSI
 		A.lat = aisData.Lat
 		A.lon = aisData.Lon
-		A.speedMPH = maybe.Fmap(DW_KNOTS_TO_MPH, aisData.Knots)
+		A.speedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, aisData.Knots)
 		A.course = aisData.Course
 		A.altitudeFt = maybe.Fmap(DW_METERS_TO_FEET, aisData.AltM)
 		A.symbolTable = aisData.Symtab
@@ -2747,7 +2747,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 
 		count, _ = fmt.Sscanf(string(wp[4:7]), "%3d", &n)
 		if count > 0 {
-			A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(float64(n))) /* yes, in knots */
+			A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n))) /* yes, in knots */
 		}
 
 		wp = wp[7:]
@@ -3186,7 +3186,7 @@ func decodeCompressedPosition(A *decodedAPRS, pcpos *compressed_position_t) {
 	} else if pcpos.C >= '!' && pcpos.C <= 'z' {
 		/* For a weather station, this is wind information. */
 		A.course = maybe.Just(float64(pcpos.C-33) * 4)
-		A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
+		A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
 	}
 }
 
@@ -3745,7 +3745,7 @@ func dataExtensionComment(A *decodedAPRS, pdext []byte) {
 
 		count, _ = fmt.Sscanf(string(pdext[4:]), "%3d", &n)
 		if count > 0 {
-			A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(float64(n)))
+			A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n)))
 		}
 
 		/* Bearing and Number/Range/Quality? */

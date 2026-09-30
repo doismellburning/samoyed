@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // Package dwutil holds small helpers that code ported from Dire Wolf's C leans
-// on - in place of C idioms Go lacks, such as assert and the ?: operator, and
-// for letting a long-lived goroutine's waits be cut short by cancellation - so
-// that packages split out of internal/direwolf can share them.
+// on - in place of C idioms Go lacks, such as assert and the ?: operator, the
+// unit and angle conversions Dire Wolf defined as macros, and for letting a
+// long-lived goroutine's waits be cut short by cancellation - so that packages
+// split out of internal/direwolf can share them.
 package dwutil
 
 import (

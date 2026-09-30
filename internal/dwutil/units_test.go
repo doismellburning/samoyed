@@ -1,0 +1,19 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dwutil
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+// The unit conversions are plain multiplications now that absence is carried
+// by maybe.Maybe rather than by a sentinel the conversion had to recognise.
+func Test_unit_conversions(t *testing.T) {
+	assert.InDelta(t, 11.5077945, DW_KNOTS_TO_MPH(10), 0.0000001)
+
+	// Zero is a real reading, not an absent one, and converts as such.
+	assert.InDelta(t, 0.0, DW_KNOTS_TO_MPH(0), 0.0000001)
+}

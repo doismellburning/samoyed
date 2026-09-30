@@ -391,7 +391,7 @@ func (bs *BeaconService) thread(ctx context.Context) {
 		if number_of_tbeacons > 0 {
 			gpsinfo = bs.gps.Read()
 			var fix = gpsinfo.Fix
-			var my_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
+			var my_speed_mph = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
 
 			if bs.trackerDebugLevel >= 1 {
 				var hms = now.Format("15:04:05")
@@ -472,7 +472,7 @@ func (bs *BeaconService) thread(ctx context.Context) {
 						sb_prev_course = gpsinfo.Track
 
 						bp.next = bs.sbCalculateNextTime(now,
-							maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots), gpsinfo.Track,
+							maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots), gpsinfo.Track,
 							sb_prev_time, sb_prev_course)
 					} else {
 						/* Tracker beacon, fixed spacing. */
@@ -835,7 +835,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 				A.symbolCode = bp.symbol
 				A.lat = gpsinfo.Lat
 				A.lon = gpsinfo.Lon
-				A.speedMPH = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
+				A.speedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
 				A.course = maybe.Fmap(func(degrees int) float64 { return float64(degrees) }, coarse)
 				A.altitudeFt = maybe.Fmap(DW_METERS_TO_FEET, gpsinfo.Altitude)
 
