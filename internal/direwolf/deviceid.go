@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -103,21 +104,15 @@ func NewDeviceIDData() *DeviceIDData {
 	}
 
 	if fp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open any of these file locations:\n")
-
-		for _, location := range search_locations {
-			dw_printf("    %s\n", location)
-		}
-
-		dw_printf("It won't be possible to extract device identifiers from packets.\n")
+		logrus.WithField("searched", search_locations).
+			Error("Could not open 'tocalls.yaml' - it won't be possible to extract device identifiers from packets.")
 
 		return d
 	}
 
 	var data, readErr = io.ReadAll(fp)
 	if readErr != nil {
-		dw_printf("Error reading deviceid file %s: %s\n", fp.Name(), readErr)
+		logrus.WithField("file", fp.Name()).WithError(readErr).Error("Error reading deviceid file")
 
 		return d
 	}
@@ -129,7 +124,7 @@ func NewDeviceIDData() *DeviceIDData {
 
 	var unmarshallErr = yaml.Unmarshal(data, &deviceidConfig)
 	if unmarshallErr != nil {
-		dw_printf("Error parsing deviceid file %s: %s\n", fp.Name(), unmarshallErr)
+		logrus.WithField("file", fp.Name()).WithError(unmarshallErr).Error("Error parsing deviceid file")
 
 		return d
 	}
@@ -226,8 +221,7 @@ func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
 	var device = "UNKNOWN vendor/model"
 
 	if d == nil || len(d.ptocalls) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("deviceid_decode_dest called without any deviceid data.\n")
+		logrus.Error("deviceid_decode_dest called without any deviceid data.")
 
 		return device
 	}
@@ -307,8 +301,7 @@ func (d *DeviceIDData) deviceid_decode_mice(comment string) (string, string) {
 	}
 
 	if d == nil || len(d.ptocalls) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("deviceid_decode_mice called without any deviceid data.\n")
+		logrus.Error("deviceid_decode_mice called without any deviceid data.")
 
 		return trimmed, device
 	}
