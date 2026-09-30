@@ -17,6 +17,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/aprstelemetry"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
@@ -59,6 +60,7 @@ var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." 
 var audio_config *AudioConfig
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
+var deviceIDData *deviceid.Data
 var aprsSymbolData *symbols.Data
 var waypointSender *WaypointSender
 var packetLogger *PacketLogger
@@ -461,7 +463,7 @@ x = Silence FX.25 information.`)
 	 * Files not supported at this time.
 	 * Can always "cat" the file and pipe it into stdin.
 	 */
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var adevErr = audio_config.adev[0].validate()
 	if adevErr != nil {

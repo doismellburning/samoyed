@@ -1,5 +1,12 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package deviceid identifies the vendor and model of the device that sent
+// an APRS packet, from its destination address or MIC-E comment, using the
+// tocalls.yaml tables from https://github.com/aprsorg/aprs-deviceid .
+//
 //nolint:gochecknoglobals
-package direwolf
+package deviceid
 
 /*------------------------------------------------------------------
  *
@@ -47,37 +54,35 @@ type tocalls struct {
 	model  string
 }
 
-// DeviceIDData holds the loaded device identification tables.
-type DeviceIDData struct {
+// Data holds the loaded device identification tables.
+type Data struct {
 	pmice    []*mice
 	ptocalls []*tocalls
 }
 
-var deviceIDData *DeviceIDData
-
 /*------------------------------------------------------------------
  *
- * Function:	NewDeviceIDData
+ * Function:	New
  *
  * Purpose:	Called once at startup to read the tocalls.yaml file which was obtained from
  *		https://github.com/aprsorg/aprs-deviceid .
  *
  * Inputs:	tocalls.yaml with OS specific directory search list.
  *
- * Returns:	Populated DeviceIDData, or empty struct if file not found.
+ * Returns:	Populated Data, or empty struct if file not found.
  *
  * Description:	For maximum flexibility, we will read the
  *		data file at run time rather than compiling it in.
  *
  *------------------------------------------------------------------*/
 
-// If search order is changed, do the same in symbols.c for consistency.
+// If search order is changed, do the same in internal/symbols for consistency.
 // fopen is perfectly happy with / in file path when running on Windows.
 
 var search_locations = []string{
 	"tocalls.yaml",            // Current working directory
 	"data/tocalls.yaml",       // Windows with CMake
-	"../../data/tocalls.yaml", // Source tree, e.g. running tests from internal/direwolf/ or cmd/<name>/
+	"../../data/tocalls.yaml", // Source tree, e.g. running tests from internal/<pkg>/ or cmd/<name>/
 	"/usr/local/share/direwolf/tocalls.yaml",
 	"/usr/share/direwolf/tocalls.yaml",
 	// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458
@@ -87,8 +92,8 @@ var search_locations = []string{
 	"/opt/local/share/direwolf/tocalls.yaml",
 }
 
-func NewDeviceIDData() *DeviceIDData {
-	var d = new(DeviceIDData)
+func New() *Data {
+	var d = new(Data)
 
 	var fp *os.File
 
@@ -217,7 +222,7 @@ func NewDeviceIDData() *DeviceIDData {
  *
  *------------------------------------------------------------------*/
 
-func (d *DeviceIDData) FromDest(dest string) string {
+func (d *Data) FromDest(dest string) string {
 	var device = "UNKNOWN vendor/model"
 
 	if d == nil || len(d.ptocalls) == 0 {
@@ -292,7 +297,7 @@ func (d *DeviceIDData) FromDest(dest string) string {
  *			Understanding APRS Packets
  *------------------------------------------------------------------*/
 
-func (d *DeviceIDData) FromMicE(comment string) (string, string) {
+func (d *Data) FromMicE(comment string) (string, string) {
 	var device = "UNKNOWN vendor/model"
 	var trimmed = comment
 

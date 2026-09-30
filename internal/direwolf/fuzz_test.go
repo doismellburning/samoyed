@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -103,7 +104,7 @@ func FuzzAX25FromText(f *testing.F) {
 func FuzzDecodeAPRS(f *testing.F) {
 	fuzzQuietly(f)
 
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	f.Add("Q1TEST>APDW17:!4237.14N/07120.83W#")
 	f.Add("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W#")

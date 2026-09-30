@@ -10,6 +10,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -43,7 +44,7 @@ func aisPositionReport(t *testing.T, rawSpeed int, rawCourse int) string {
 // transmitted as 82 degrees - a heading nobody reported.  Absence must
 // survive all the way into encode_object.
 func Test_ais_to_object_without_course_or_speed(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var sentence = aisPositionReport(t, 1023, 3600)
 	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
@@ -74,7 +75,7 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 // The same report with a course and speed still gets its data extension, so
 // the test above is not passing for want of anything to encode.
 func Test_ais_to_object_with_course_and_speed(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var sentence = aisPositionReport(t, 208, 900) // 20.8 knots, 90 degrees
 	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)

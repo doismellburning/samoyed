@@ -29,6 +29,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
@@ -194,7 +195,7 @@ type decodedAPRS struct {
  *------------------------------------------------------------------*/
 
 func DecodeAPRSInit() {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 	aprsSymbolData = symbols.New()
 }
 
