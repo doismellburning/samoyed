@@ -25,13 +25,19 @@ import (
 //
 // Config file (axudp.yaml):
 //
+//	broadcast: [NODES]
 //	maps:
 //	  - ax25addr: Q1TEST
 //	    host: 192.0.2.1
 //	    port: 20093
+//	    broadcast: true
 //	  - ax25addr: Q2TEST
 //	    host: 192.0.2.2
 //	    port: 93
+//
+// A frame for one of the broadcast addresses, such as NET/ROM's NODES, goes
+// to every map entry with broadcast: true, like BPQ's BROADCAST lines and
+// MAP ... B.
 
 func main() {
 	pflag.Usage = func() {
@@ -49,10 +55,15 @@ Usage:
   samoyed-axudp [--config <file>] [--udpport <n>] [--kissport <n>]
 
 Example config file (axudp.yaml):
+  broadcast: [NODES]
   maps:
     - ax25addr: Q1TEST-1
       host: 192.0.2.1
       port: 93
+      broadcast: true
+
+A frame for a broadcast address, such as NET/ROM's NODES, goes to every
+map entry with broadcast: true.
 
 Example samoyed-direwolf config to connect via samoyed-axudp:
   CHANNEL 2

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,6 +29,10 @@ type MapEntry struct {
 	AX25Addr string       // AX.25 address, i.e. callsign and optional SSID, e.g. "Q1TEST" or "Q1TEST-1"
 	Addr     string       // UDP address string for display/logging, e.g. "192.0.2.1:20093"
 	UDPAddr  *net.UDPAddr // pre-resolved UDP address for sending
+
+	// Broadcast is whether frames for a broadcast address go here too, like
+	// the B flag on a BPQ AXIP MAP line.
+	Broadcast bool
 }
 
 // MapSettings is one MAP entry as written in a config file: frames for
@@ -36,16 +41,25 @@ type MapSettings struct {
 	AX25Addr string `yaml:"ax25addr"`
 	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
+
+	// Broadcast sends this peer frames for the broadcast addresses too.
+	Broadcast bool `yaml:"broadcast"`
 }
 
 // Routes says where an AX.25 frame sent over AXUDP goes.
 type Routes struct {
 	Maps []MapEntry
+
+	// Broadcast holds the destination addresses, such as NET/ROM's NODES,
+	// whose frames go to every map entry marked Broadcast rather than to the
+	// one entry for that address, like BPQ's AXIP BROADCAST lines.
+	Broadcast []string
 }
 
 // yamlConfig is the top-level structure of the axudp.yaml config file.
 type yamlConfig struct {
-	Maps []MapSettings `yaml:"maps"`
+	Broadcast []string      `yaml:"broadcast"`
+	Maps      []MapSettings `yaml:"maps"`
 }
 
 // ParseConfig reads a YAML config file from path and returns the routes it
@@ -64,13 +78,24 @@ func ParseConfig(path string) (Routes, error) {
 		return none, fmt.Errorf("parsing YAML config: %w", unmarshalErr)
 	}
 
-	return NewRoutes(cfg.Maps)
+	return NewRoutes(cfg.Broadcast, cfg.Maps)
 }
 
-// NewRoutes checks and normalises maps, resolving each host, and returns the
-// routes they describe.
-func NewRoutes(maps []MapSettings) (Routes, error) {
+// NewRoutes checks and normalises the broadcast addresses and maps, resolving
+// each host, and returns the routes they describe.
+func NewRoutes(broadcast []string, maps []MapSettings) (Routes, error) {
 	var none, routes Routes
+
+	routes.Broadcast = make([]string, 0, len(broadcast))
+	for i, b := range broadcast {
+		var addr = normaliseAX25Addr(b)
+		if addr == "" {
+			return none, fmt.Errorf("broadcast address %d is empty", i)
+		}
+
+		routes.Broadcast = append(routes.Broadcast, addr)
+	}
+
 	routes.Maps = make([]MapEntry, 0, len(maps))
 
 	for i, m := range maps {
@@ -114,9 +139,10 @@ func newMapEntry(m MapSettings) (MapEntry, error) {
 	}
 
 	return MapEntry{
-		AX25Addr: ax25addr,
-		Addr:     addr,
-		UDPAddr:  udpAddr,
+		AX25Addr:  ax25addr,
+		Addr:      addr,
+		UDPAddr:   udpAddr,
+		Broadcast: m.Broadcast,
 	}, nil
 }
 
@@ -393,6 +419,28 @@ func ax25AddrBase(cs string) string {
 	return cs
 }
 
+// Route returns the MAP entries a frame for dest goes to: every entry marked
+// Broadcast if dest is a broadcast address, otherwise the one lookupMap finds,
+// if any.
+func (r *Routes) Route(dest string) []MapEntry {
+	if slices.Contains(r.Broadcast, dest) {
+		var entries []MapEntry
+		for _, e := range r.Maps {
+			if e.Broadcast {
+				entries = append(entries, e)
+			}
+		}
+
+		return entries
+	}
+
+	if entry, ok := r.lookupMap(dest); ok {
+		return []MapEntry{entry}
+	}
+
+	return nil
+}
+
 // lookupMap finds the MAP entry for the given destination AX.25 address.
 // A MAP entry with no SSID matches any SSID of that base address;
 // a MAP entry with an SSID matches only that exact address-SSID pair.
@@ -539,8 +587,10 @@ func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 		}
 		if dest == "" {
 			logrus.Warn("Dropping AX.25 frame too short to extract a destination from")
-		} else if entry, ok := b2.routes.lookupMap(dest); ok {
-			b2.sendAXUDP(ax25frame, entry)
+		} else if entries := b2.routes.Route(dest); len(entries) > 0 {
+			for _, entry := range entries {
+				b2.sendAXUDP(ax25frame, entry)
+			}
 		} else {
 			logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
 		}

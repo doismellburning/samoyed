@@ -14,9 +14,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // noRoutes routes nowhere, for a bridge whose test sends nothing.
@@ -269,8 +272,8 @@ func TestParseConfigBadYAML(t *testing.T) {
 func TestLookupMap(t *testing.T) {
 	var b = new(Bridge)
 	b.routes.Maps = []MapEntry{
-		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},   // no SSID — should match all SSIDs
-		{AX25Addr: "Q2TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil}, // with SSID — exact match only
+		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},   // no SSID — should match all SSIDs
+		{AX25Addr: "Q2TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil, Broadcast: false}, // with SSID — exact match only
 	}
 
 	var cases = []struct {
@@ -310,8 +313,8 @@ func TestLookupMapExactBeforeWildcard(t *testing.T) {
 	// A lookup for Q1TEST-7 must return the specific entry, not the wildcard.
 	var b = new(Bridge)
 	b.routes.Maps = []MapEntry{
-		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},   // wildcard — listed first
-		{AX25Addr: "Q1TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil}, // specific SSID-7 — listed second
+		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},   // wildcard — listed first
+		{AX25Addr: "Q1TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil, Broadcast: false}, // specific SSID-7 — listed second
 	}
 
 	var entry, ok = b.routes.lookupMap("Q1TEST-7")
@@ -346,7 +349,7 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 	// accidental call to sendAXUDP panics immediately.
 	var b = new(Bridge)
 	b.routes.Maps = []MapEntry{
-		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},
+		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},
 	}
 
 	// The KISS DATA frame payload is: type byte (0x00) followed by an AX.25
@@ -520,7 +523,7 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 	// Set up a bridge with a MAP entry routing Q1TEST to dstPkt.
 	var b = new(Bridge)
 	b.routes.Maps = []MapEntry{
-		{AX25Addr: "Q1TEST", Addr: dstAddr.String(), UDPAddr: dstAddr},
+		{AX25Addr: "Q1TEST", Addr: dstAddr.String(), UDPAddr: dstAddr, Broadcast: false},
 	}
 	b.udpConn = srcUDP
 
@@ -756,5 +759,131 @@ func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
 	var want = kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, ax25frame...))
 	if string(rxBuf[:n]) != string(want) {
 		t.Errorf("client received %x, want %x", rxBuf[:n], want)
+	}
+}
+
+func TestParseConfigBroadcast(t *testing.T) {
+	var p = filepath.Join(t.TempDir(), "axudp.yaml")
+	var content = `broadcast: [nodes, " ID-0 "]
+maps:
+  - ax25addr: Q1TEST
+    host: 192.0.2.1
+    port: 93
+    broadcast: true
+  - ax25addr: Q2TEST
+    host: 192.0.2.2
+    port: 93
+`
+	require.NoError(t, os.WriteFile(p, []byte(content), 0600))
+
+	var routes, err = ParseConfig(p)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"NODES", "ID"}, routes.Broadcast)
+	require.Len(t, routes.Maps, 2)
+	assert.True(t, routes.Maps[0].Broadcast)
+	assert.False(t, routes.Maps[1].Broadcast)
+}
+
+func TestParseConfigEmptyBroadcastAddress(t *testing.T) {
+	var p = filepath.Join(t.TempDir(), "axudp.yaml")
+	require.NoError(t, os.WriteFile(p, []byte("broadcast: [NODES, \" \"]\nmaps: []\n"), 0600))
+
+	var _, err = ParseConfig(p)
+	assert.ErrorContains(t, err, "broadcast address 1 is empty")
+}
+
+func TestRoute(t *testing.T) {
+	var routes = Routes{
+		Broadcast: []string{"NODES"},
+		Maps: []MapEntry{
+			{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: true},
+			{AX25Addr: "Q2TEST", Addr: "192.0.2.2:93", UDPAddr: nil, Broadcast: false},
+			{AX25Addr: "Q3TEST-1", Addr: "192.0.2.3:93", UDPAddr: nil, Broadcast: true},
+		},
+	}
+
+	var addrs = func(entries []MapEntry) []string {
+		var out []string
+		for _, e := range entries {
+			out = append(out, e.Addr)
+		}
+
+		return out
+	}
+
+	// A broadcast goes to every peer marked for broadcasts, and only those.
+	assert.Equal(t, []string{"192.0.2.1:93", "192.0.2.3:93"}, addrs(routes.Route("NODES")))
+
+	// Anything else goes to the one peer for its destination, marked or not.
+	assert.Equal(t, []string{"192.0.2.2:93"}, addrs(routes.Route("Q2TEST-5")))
+	assert.Equal(t, []string{"192.0.2.3:93"}, addrs(routes.Route("Q3TEST-1")))
+
+	// Somewhere nobody is mapped to goes nowhere.
+	assert.Empty(t, routes.Route("Q4TEST"))
+
+	// A broadcast address is matched exactly, SSID and all.
+	assert.Empty(t, routes.Route("NODES-1"))
+}
+
+func TestRouteBroadcastWithNoBroadcastPeers(t *testing.T) {
+	var routes = Routes{
+		Broadcast: []string{"NODES"},
+		Maps: []MapEntry{
+			// Mapped by name, but not marked for broadcasts: a broadcast is
+			// not sent to it just because the address matches.
+			{AX25Addr: "NODES", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},
+		},
+	}
+
+	assert.Empty(t, routes.Route("NODES"))
+}
+
+// TestKISSBroadcastFansOut checks that a frame from a KISS client for a
+// broadcast address reaches every peer marked for broadcasts.
+func TestKISSBroadcastFansOut(t *testing.T) {
+	var listen = func() *net.UDPConn {
+		var pkt, err = new(net.ListenConfig).ListenPacket(t.Context(), "udp", "127.0.0.1:0")
+		require.NoError(t, err)
+		t.Cleanup(func() { pkt.Close() })
+
+		var conn, ok = pkt.(*net.UDPConn)
+		require.True(t, ok)
+
+		return conn
+	}
+
+	var src = listen()
+	var peers = []*net.UDPConn{listen(), listen()}
+
+	var b = new(Bridge)
+	b.udpConn = src
+	b.routes.Broadcast = []string{"NODES"}
+	for _, p := range peers {
+		var addr, ok = p.LocalAddr().(*net.UDPAddr)
+		require.True(t, ok)
+		b.routes.Maps = append(b.routes.Maps, MapEntry{AX25Addr: "Q1TEST", Addr: addr.String(), UDPAddr: addr, Broadcast: true})
+	}
+
+	var pp = ax25.FromText("Q1TEST>NODES:hello", true)
+	require.NotNil(t, pp)
+
+	var frame = pp.FrameData()
+
+	var kc kiss.Collector
+	for _, byt := range kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, frame...)) {
+		recByte(&kc, byt, b)
+	}
+
+	for i, p := range peers {
+		require.NoError(t, p.SetReadDeadline(time.Now().Add(time.Second)))
+
+		var buf = make([]byte, 4096)
+		var n, _, err = p.ReadFromUDP(buf)
+		require.NoError(t, err, "peer %d got nothing", i)
+
+		var got, ok = stripCRC(buf[:n])
+		require.True(t, ok, "peer %d: bad CRC", i)
+		assert.Equal(t, frame, got, "peer %d", i)
 	}
 }
