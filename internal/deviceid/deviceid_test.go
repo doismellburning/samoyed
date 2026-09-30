@@ -6,6 +6,7 @@ package deviceid
 import (
 	"testing"
 
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,4 +24,22 @@ func TestFromMicEWithoutTocalls(t *testing.T) {
 	var trimmed, device = d.FromMicE(">Comment")
 	assert.Equal(t, "Comment", trimmed)
 	assert.Equal(t, "Kenwood TH-D7A", device)
+}
+
+// New reports a missing tocalls.yaml once; the lookups, which run for every
+// packet heard, must not report it again each time.
+func TestLookupsWithoutTablesDoNotLogPerPacket(t *testing.T) {
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	var d = new(Data)
+
+	assert.Equal(t, "UNKNOWN vendor/model", d.FromDest("APDW18"))
+
+	var trimmed, device = d.FromMicE(">Comment")
+	assert.Equal(t, ">Comment", trimmed)
+	assert.Equal(t, "UNKNOWN vendor/model", device)
+
+	assert.Empty(t, hook.AllEntries())
 }

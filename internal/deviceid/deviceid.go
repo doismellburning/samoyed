@@ -198,7 +198,7 @@ func (d *Data) FromDest(dest string) string {
 	var device = "UNKNOWN vendor/model"
 
 	if d == nil || len(d.ptocalls) == 0 {
-		logrus.Error("FromDest called without any deviceid data.")
+		logrus.Trace("FromDest called without any deviceid data.")
 
 		return device
 	}
@@ -278,7 +278,7 @@ func (d *Data) FromMicE(comment string) (string, string) {
 	}
 
 	if d == nil || len(d.pmice) == 0 {
-		logrus.Error("FromMicE called without any deviceid data.")
+		logrus.Trace("FromMicE called without any deviceid data.")
 
 		return trimmed, device
 	}
