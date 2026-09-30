@@ -16,6 +16,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v3"
 )
@@ -299,27 +300,25 @@ func (b *AXUDPBridge) broadcastKISS(ax25frame []byte) {
 	// type byte + closing FEND), so even with zero escaping the encoded
 	// frame can never be shorter than len(ax25frame)+3. If that best case
 	// already exceeds the limit, skip the expensive encoding step entirely.
-	if len(ax25frame) > MAX_KISS_LEN-3 {
+	if len(ax25frame) > kiss.MaxFrameLen-3 {
 		logrus.WithFields(logrus.Fields{
 			"bytes": len(ax25frame),
-			"max":   MAX_KISS_LEN,
+			"max":   kiss.MaxFrameLen,
 		}).Warn("Dropping AX.25 frame too large to KISS-encode within the maximum")
 
 		return
 	}
 
 	// Prepend type byte 0x00 (channel 0, DATA_FRAME) before KISS-encoding.
-	var payload = append([]byte{KISS_CMD_DATA_FRAME}, ax25frame...)
-	var kissframe = KissEncapsulate(payload)
+	var payload = append([]byte{kiss.CmdDataFrame}, ax25frame...)
+	var kissframe = kiss.Encapsulate(payload)
 
-	// The nettnc.go KISS reader uses a fixed [MAX_KISS_LEN] accumulator: bytes
-	// beyond that limit are dropped with an error message, and when the closing
-	// FEND then arrives it writes at index MAX_KISS_LEN causing an out-of-bounds
-	// panic.  Drop the frame before writing to clients to prevent this.
-	if len(kissframe) > MAX_KISS_LEN {
+	// A KISS reader collecting into a fixed buffer, as kiss.Collector does,
+	// throws away a frame longer than that, so don't bother sending it.
+	if len(kissframe) > kiss.MaxFrameLen {
 		logrus.WithFields(logrus.Fields{
 			"bytes": len(kissframe),
-			"max":   MAX_KISS_LEN,
+			"max":   kiss.MaxFrameLen,
 		}).Warn("Dropping oversized KISS frame, AX.25 frame too large after encoding")
 
 		return
@@ -433,8 +432,7 @@ func (b *AXUDPBridge) handleKISSClient(ctx context.Context, conn net.Conn) {
 	// blocked indefinitely, so closing its socket is what gets us back.
 	defer dwutil.CloseOnDone(ctx, conn)()
 
-	var kf KISSFrame
-	var overflow bool
+	var kc kiss.Collector
 
 	var buf = make([]byte, 2048)
 	for ctx.Err() == nil {
@@ -451,7 +449,7 @@ func (b *AXUDPBridge) handleKISSClient(ctx context.Context, conn net.Conn) {
 		}
 
 		for _, byt := range buf[:n] {
-			my_kiss_rec_byte_axudp(&kf, &overflow, byt, b)
+			axudpRecByte(&kc, byt, b)
 		}
 
 		if readErr != nil {
@@ -462,100 +460,55 @@ func (b *AXUDPBridge) handleKISSClient(ctx context.Context, conn net.Conn) {
 	}
 }
 
-// my_kiss_rec_byte_axudp accumulates one KISS byte.
-// When a complete frame is collected, the AX.25 payload is extracted
-// and forwarded to the appropriate AXUDP destination.
-// overflow must point to a caller-owned bool that persists across calls for the
-// same connection; it is set to true when a frame exceeds MAX_KISS_LEN and
-// cleared when collection resets, so the truncated frame is discarded.
-func my_kiss_rec_byte_axudp(kf *KISSFrame, overflow *bool, b byte, b2 *AXUDPBridge) {
-	if kf.state == KS_SEARCHING {
-		if b == FEND {
-			*overflow = false
-			kf.kiss_len = 0
-			kf.kiss_msg[kf.kiss_len] = b
-			kf.kiss_len++
-			kf.state = KS_COLLECTING
-		}
+// axudpRecByte takes one byte from a KISS client.  When it completes a data
+// frame, the AX.25 payload is extracted and forwarded to the appropriate
+// AXUDP destination.
+func axudpRecByte(kc *kiss.Collector, b byte, b2 *AXUDPBridge) {
+	var chunk = kc.Add(b)
+
+	if chunk.Err != nil {
+		logrus.WithField("max", kiss.MaxFrameLen).Warn("Discarding KISS frame that exceeded the maximum length")
 
 		return
 	}
 
-	// Collecting.
-	if b == FEND {
-		if kf.kiss_len <= 1 {
-			// Empty or double-FEND — restart.
-			*overflow = false
-			kf.kiss_len = 0
-			kf.kiss_msg[kf.kiss_len] = b
-			kf.kiss_len++
-			kf.state = KS_COLLECTING
+	if chunk.Frame == nil {
+		return
+	}
 
-			return
+	var unwrapped = kiss.Unwrap(chunk.Frame)
+
+	// unwrapped[0] is the type byte (channel << 4 | cmd).
+	// We only care about DATA_FRAME commands (lower nibble == 0).
+	// Once per frame, and the type byte needs a Sprintf to render as hex,
+	// so do not build the entry unless it will print.
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		var typeByte byte
+		if len(unwrapped) > 0 {
+			typeByte = unwrapped[0]
 		}
-
-		if *overflow || kf.kiss_len >= MAX_KISS_LEN {
-			// Frame exceeded MAX_KISS_LEN, or filled the buffer exactly
-			// leaving no room for the closing FEND — discard it entirely.
-			logrus.WithField("max", MAX_KISS_LEN).Warn("Discarding KISS frame that exceeded the maximum length")
-			*overflow = false
-			kf.kiss_len = 0
-			kf.state = KS_SEARCHING
-
-			return
-		}
-
-		if kf.kiss_len < MAX_KISS_LEN {
-			kf.kiss_msg[kf.kiss_len] = b
-			kf.kiss_len++
-		}
-
-		var unwrapped = KissUnwrap(kf.kiss_msg[:kf.kiss_len])
-
-		// unwrapped[0] is the type byte (channel << 4 | cmd).
-		// We only care about DATA_FRAME commands (lower nibble == 0).
-		// Once per frame, and the type byte needs a Sprintf to render as hex,
-		// so do not build the entry unless it will print.
+		logrus.WithFields(logrus.Fields{
+			"bytes":     len(unwrapped),
+			"type_byte": fmt.Sprintf("0x%02x", typeByte),
+		}).Trace("KISS frame complete")
+	}
+	if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == kiss.CmdDataFrame {
+		var ax25frame = unwrapped[1:]
+		var dest = axudpExtractDest(ax25frame)
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
-			var typeByte byte
-			if len(unwrapped) > 0 {
-				typeByte = unwrapped[0]
-			}
 			logrus.WithFields(logrus.Fields{
-				"bytes":     len(unwrapped),
-				"type_byte": fmt.Sprintf("0x%02x", typeByte),
-			}).Trace("KISS frame complete")
+				"dest":  dest,
+				"bytes": len(ax25frame),
+			}).Trace("Forwarding AX.25 frame via AXUDP")
 		}
-		if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == KISS_CMD_DATA_FRAME {
-			var ax25frame = unwrapped[1:]
-			var dest = axudpExtractDest(ax25frame)
-			if logrus.IsLevelEnabled(logrus.TraceLevel) {
-				logrus.WithFields(logrus.Fields{
-					"dest":  dest,
-					"bytes": len(ax25frame),
-				}).Trace("Forwarding AX.25 frame via AXUDP")
-			}
-			if dest == "" {
-				logrus.Warn("Dropping AX.25 frame too short to extract a destination from")
-			} else if entry, ok := b2.lookupMap(dest); ok {
-				b2.sendAXUDP(ax25frame, entry)
-			} else {
-				logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
-			}
-		} else if len(unwrapped) >= 1 && logrus.IsLevelEnabled(logrus.TraceLevel) {
-			logrus.WithField("command", fmt.Sprintf("0x%02x", unwrapped[0]&0x0F)).Trace("Ignoring non-data KISS command")
+		if dest == "" {
+			logrus.Warn("Dropping AX.25 frame too short to extract a destination from")
+		} else if entry, ok := b2.lookupMap(dest); ok {
+			b2.sendAXUDP(ax25frame, entry)
+		} else {
+			logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
 		}
-
-		kf.kiss_len = 0
-		kf.state = KS_SEARCHING
-
-		return
-	}
-
-	if kf.kiss_len < MAX_KISS_LEN {
-		kf.kiss_msg[kf.kiss_len] = b
-		kf.kiss_len++
-	} else {
-		*overflow = true
+	} else if len(unwrapped) >= 1 && logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithField("command", fmt.Sprintf("0x%02x", unwrapped[0]&0x0F)).Trace("Ignoring non-data KISS command")
 	}
 }

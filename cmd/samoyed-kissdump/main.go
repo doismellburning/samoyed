@@ -23,6 +23,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/spf13/pflag"
 )
 
@@ -100,15 +101,15 @@ func dumpCapture(capture []byte, hexInput bool) int {
 	 * FENDs, so anything empty between two of them is skipped without comment.
 	 */
 
-	var first = bytes.IndexByte(capture, direwolf.FEND)
+	var first = bytes.IndexByte(capture, kiss.FEND)
 
 	switch {
 	case first < 0:
-		fmt.Printf("ERROR: No FEND (0x%02x) in %d bytes - this does not look like a KISS capture.\n", direwolf.FEND, len(capture))
+		fmt.Printf("ERROR: No FEND (0x%02x) in %d bytes - this does not look like a KISS capture.\n", kiss.FEND, len(capture))
 
 		return 1
 	case first > 0:
-		fmt.Printf("ERROR: %s before the first FEND (0x%02x) not part of any frame.\n", plural(first, "byte"), direwolf.FEND)
+		fmt.Printf("ERROR: %s before the first FEND (0x%02x) not part of any frame.\n", plural(first, "byte"), kiss.FEND)
 		dwutil.HexDump(capture[:first])
 
 		problems++
@@ -117,7 +118,7 @@ func dumpCapture(capture []byte, hexInput bool) int {
 	var number = 0
 
 	for pos := first; pos < len(capture); {
-		var end = bytes.IndexByte(capture[pos+1:], direwolf.FEND)
+		var end = bytes.IndexByte(capture[pos+1:], kiss.FEND)
 		var unterminated = end < 0
 		var contents []byte
 
@@ -140,7 +141,7 @@ func dumpCapture(capture []byte, hexInput bool) int {
 		 * All FENDs and nothing between them.  A TNC pads with those, but a
 		 * capture made only of padding is not one anybody wanted to look at.
 		 */
-		fmt.Printf("ERROR: No frames in the capture - %s of FEND (0x%02x) padding and nothing else.\n", plural(len(capture), "byte"), direwolf.FEND)
+		fmt.Printf("ERROR: No frames in the capture - %s of FEND (0x%02x) padding and nothing else.\n", plural(len(capture), "byte"), kiss.FEND)
 
 		problems++
 	}
@@ -203,12 +204,12 @@ func dumpFrame(number int, offset int, contents []byte, unterminated bool) int {
 	dwutil.HexDump(contents)
 
 	if unterminated {
-		fmt.Printf("ERROR: Frame is not terminated - the capture ends without a closing FEND (0x%02x).\n", direwolf.FEND)
+		fmt.Printf("ERROR: Frame is not terminated - the capture ends without a closing FEND (0x%02x).\n", kiss.FEND)
 
 		problems++
 	}
 
-	var frame, escapeProblems = direwolf.KissUnescape(contents)
+	var frame, escapeProblems = kiss.Unescape(contents)
 
 	for _, problem := range escapeProblems {
 		fmt.Printf("ERROR: %s.\n", problem)
@@ -239,25 +240,25 @@ func dumpFrame(number int, offset int, contents []byte, unterminated bool) int {
 
 func commandName(command byte) string {
 	switch command {
-	case direwolf.KISS_CMD_DATA_FRAME:
+	case kiss.CmdDataFrame:
 		return "Data frame"
-	case direwolf.KISS_CMD_TXDELAY:
+	case kiss.CmdTxDelay:
 		return "TXDELAY"
-	case direwolf.KISS_CMD_PERSISTENCE:
+	case kiss.CmdPersistence:
 		return "Persistence"
-	case direwolf.KISS_CMD_SLOTTIME:
+	case kiss.CmdSlotTime:
 		return "SlotTime"
-	case direwolf.KISS_CMD_TXTAIL:
+	case kiss.CmdTxTail:
 		return "TXtail"
-	case direwolf.KISS_CMD_FULLDUPLEX:
+	case kiss.CmdFullDuplex:
 		return "FullDuplex"
-	case direwolf.KISS_CMD_SET_HARDWARE:
+	case kiss.CmdSetHardware:
 		return "SetHardware"
-	case direwolf.XKISS_CMD_DATA:
+	case kiss.CmdXKissData:
 		return "XKISS data"
-	case direwolf.XKISS_CMD_POLL:
+	case kiss.CmdXKissPoll:
 		return "XKISS poll"
-	case direwolf.KISS_CMD_END_KISS:
+	case kiss.CmdEndKiss:
 		return "Return - exit KISS mode"
 	default:
 		return "invalid"
@@ -268,10 +269,10 @@ func commandName(command byte) string {
 
 func dumpCommand(command byte, payload []byte) int {
 	switch command {
-	case direwolf.KISS_CMD_DATA_FRAME:
+	case kiss.CmdDataFrame:
 		return direwolf.DescribeAX25Frame(payload)
 
-	case direwolf.KISS_CMD_TXDELAY, direwolf.KISS_CMD_PERSISTENCE, direwolf.KISS_CMD_SLOTTIME, direwolf.KISS_CMD_TXTAIL, direwolf.KISS_CMD_FULLDUPLEX:
+	case kiss.CmdTxDelay, kiss.CmdPersistence, kiss.CmdSlotTime, kiss.CmdTxTail, kiss.CmdFullDuplex:
 		if len(payload) != 1 {
 			fmt.Printf("ERROR: %s takes exactly one parameter byte, not %d.\n", commandName(command), len(payload))
 
@@ -282,7 +283,7 @@ func dumpCommand(command byte, payload []byte) int {
 
 		return 0
 
-	case direwolf.KISS_CMD_SET_HARDWARE:
+	case kiss.CmdSetHardware:
 		if len(payload) == 0 {
 			fmt.Printf("ERROR: SetHardware has no payload - there is nothing to set.\n")
 
@@ -296,7 +297,7 @@ func dumpCommand(command byte, payload []byte) int {
 
 		return 0
 
-	case direwolf.KISS_CMD_END_KISS:
+	case kiss.CmdEndKiss:
 		if len(payload) != 0 {
 			fmt.Printf("ERROR: Return takes no parameters, but %s follows the command byte.\n", plural(len(payload), "byte"))
 
@@ -305,7 +306,7 @@ func dumpCommand(command byte, payload []byte) int {
 
 		return 0
 
-	case direwolf.XKISS_CMD_DATA, direwolf.XKISS_CMD_POLL:
+	case kiss.CmdXKissData, kiss.CmdXKissPoll:
 		fmt.Printf("ERROR: Command %d (%s) is an XKISS extension, which is not supported.\n", command, commandName(command))
 
 		return 1
@@ -321,15 +322,15 @@ func dumpCommand(command byte, payload []byte) int {
 
 func dumpParameter(command byte, value byte) {
 	switch command {
-	case direwolf.KISS_CMD_TXDELAY:
+	case kiss.CmdTxDelay:
 		fmt.Printf("Transmit delay = %d, i.e. %d ms.\n", value, int(value)*10)
-	case direwolf.KISS_CMD_PERSISTENCE:
+	case kiss.CmdPersistence:
 		fmt.Printf("Persistence = %d, i.e. p = %.3f.\n", value, float64(int(value)+1)/256)
-	case direwolf.KISS_CMD_SLOTTIME:
+	case kiss.CmdSlotTime:
 		fmt.Printf("Slot time = %d, i.e. %d ms.\n", value, int(value)*10)
-	case direwolf.KISS_CMD_TXTAIL:
+	case kiss.CmdTxTail:
 		fmt.Printf("Transmit tail = %d, i.e. %d ms.\n", value, int(value)*10)
-	case direwolf.KISS_CMD_FULLDUPLEX:
+	case kiss.CmdFullDuplex:
 		fmt.Printf("Full duplex = %d, i.e. %s.\n", value, dwutil.IfThenElse(value == 0, "half duplex", "full duplex"))
 	}
 }

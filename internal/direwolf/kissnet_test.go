@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -181,7 +182,7 @@ func readKissNetFrame(t *testing.T, conn net.Conn) []byte {
 
 		frame = append(frame, buf[0])
 
-		if buf[0] == FEND && len(frame) > 1 {
+		if buf[0] == kiss.FEND && len(frame) > 1 {
 			return frame
 		}
 	}
@@ -205,12 +206,12 @@ func TestKissNetSendRecPacket(t *testing.T) {
 
 	const channel = 2
 
-	var frame = []byte{'h', 'i', FEND}
+	var frame = []byte{'h', 'i', kiss.FEND}
 
-	kns.SendRecPacket(channel, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+	kns.SendRecPacket(channel, kiss.CmdDataFrame, frame, len(frame), nil, -1)
 
 	assert.Equal(t,
-		[]byte{FEND, channel << 4, 'h', 'i', FESC, TFEND, FEND},
+		[]byte{kiss.FEND, channel << 4, 'h', 'i', kiss.FESC, kiss.TFEND, kiss.FEND},
 		readKissNetFrame(t, clients[0]))
 }
 
@@ -224,10 +225,10 @@ func TestKissNetSendRecPacketSingleChannelPort(t *testing.T) {
 
 	// A frame from a channel this port does not carry is not passed on, so
 	// the one after it is what turns up.
-	kns.SendRecPacket(channel+1, KISS_CMD_DATA_FRAME, []byte("other"), 5, nil, -1)
-	kns.SendRecPacket(channel, KISS_CMD_DATA_FRAME, []byte("mine"), 4, nil, -1)
+	kns.SendRecPacket(channel+1, kiss.CmdDataFrame, []byte("other"), 5, nil, -1)
+	kns.SendRecPacket(channel, kiss.CmdDataFrame, []byte("mine"), 4, nil, -1)
 
-	assert.Equal(t, []byte{FEND, 0x00, 'm', 'i', 'n', 'e', FEND}, readKissNetFrame(t, clients[0]))
+	assert.Equal(t, []byte{kiss.FEND, 0x00, 'm', 'i', 'n', 'e', kiss.FEND}, readKissNetFrame(t, clients[0]))
 }
 
 // A response to a command from one client goes to that client only, not to
@@ -235,10 +236,10 @@ func TestKissNetSendRecPacketSingleChannelPort(t *testing.T) {
 func TestKissNetSendRecPacketToOneClient(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 2)
 
-	kns.SendRecPacket(0, KISS_CMD_SET_HARDWARE, []byte("TXBUF:0"), 7, kns.allPorts, 1)
+	kns.SendRecPacket(0, kiss.CmdSetHardware, []byte("TXBUF:0"), 7, kns.allPorts, 1)
 
 	assert.Equal(t,
-		KissEncapsulate(append([]byte{KISS_CMD_SET_HARDWARE}, []byte("TXBUF:0")...)),
+		kiss.Encapsulate(append([]byte{kiss.CmdSetHardware}, []byte("TXBUF:0")...)),
 		readKissNetFrame(t, clients[1]))
 
 	requireNothingToRead(t, clients[0], "the answer went to a client that did not ask")
@@ -274,7 +275,7 @@ func TestKissNetSendRecPacketWriteErrorDetachesTheClient(t *testing.T) {
 	// go into the kernel's buffer and the reset comes back afterwards - so
 	// what matters is that it does not stay attached forever.
 	assert.Eventually(t, func() bool {
-		kns.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		kns.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
 
 		return kns.allPorts.clientConn(0) == nil
 	}, 10*time.Second, 50*time.Millisecond, "a client that had gone away was never detached")
@@ -287,10 +288,10 @@ func TestKissNetCopyBetweenClients(t *testing.T) {
 
 	const channel = 1
 
-	kns.Copy([]byte{0x00, 'h', 'i'}, channel, KISS_CMD_DATA_FRAME, kns.allPorts, 0)
+	kns.Copy([]byte{0x00, 'h', 'i'}, channel, kiss.CmdDataFrame, kns.allPorts, 0)
 
 	assert.Equal(t,
-		[]byte{FEND, channel << 4, 'h', 'i', FEND},
+		[]byte{kiss.FEND, channel << 4, 'h', 'i', kiss.FEND},
 		readKissNetFrame(t, clients[1]),
 		"the frame should carry the radio channel it was transmitted on")
 
@@ -304,17 +305,17 @@ func TestKissNetCopySingleChannelPort(t *testing.T) {
 
 	var kns, clients = newAttachedKissNet(t, channel, true, 2)
 
-	kns.Copy([]byte{0x00, 'n', 'o'}, channel+1, KISS_CMD_DATA_FRAME, kns.allPorts, 0)
-	kns.Copy([]byte{0x00, 'h', 'i'}, channel, KISS_CMD_DATA_FRAME, kns.allPorts, 0)
+	kns.Copy([]byte{0x00, 'n', 'o'}, channel+1, kiss.CmdDataFrame, kns.allPorts, 0)
+	kns.Copy([]byte{0x00, 'h', 'i'}, channel, kiss.CmdDataFrame, kns.allPorts, 0)
 
-	assert.Equal(t, []byte{FEND, 0x00, 'h', 'i', FEND}, readKissNetFrame(t, clients[1]))
+	assert.Equal(t, []byte{kiss.FEND, 0x00, 'h', 'i', kiss.FEND}, readKissNetFrame(t, clients[1]))
 }
 
 // Without KISSCOPY nothing is passed between clients at all.
 func TestKissNetCopyDisabled(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 2)
 
-	kns.Copy([]byte{0x00, 'h', 'i'}, 0, KISS_CMD_DATA_FRAME, kns.allPorts, 0)
+	kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kns.allPorts, 0)
 
 	requireNothingToRead(t, clients[1], "a frame was copied with KISSCOPY disabled")
 }
@@ -326,7 +327,7 @@ func TestKissNetCopyWriteErrorDetachesTheClient(t *testing.T) {
 	require.NoError(t, clients[1].Close())
 
 	assert.Eventually(t, func() bool {
-		kns.Copy([]byte{0x00, 'h', 'i'}, 0, KISS_CMD_DATA_FRAME, kns.allPorts, 0)
+		kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kns.allPorts, 0)
 
 		return kns.allPorts.clientConn(1) == nil
 	}, 10*time.Second, 50*time.Millisecond, "a client that had gone away was never detached")
@@ -339,7 +340,7 @@ func TestKissNetCopyDoesNotModifyTheCallersFrame(t *testing.T) {
 
 	var msg = []byte{0x00, 'h', 'i'}
 
-	kns.Copy(msg, 2, KISS_CMD_DATA_FRAME, kns.allPorts, 0)
+	kns.Copy(msg, 2, kiss.CmdDataFrame, kns.allPorts, 0)
 
 	assert.Equal(t, []byte{0x00, 'h', 'i'}, msg)
 }
@@ -353,7 +354,7 @@ func TestKissNetDebugPrints(t *testing.T) {
 	kns.debug = 2
 
 	var output = testutils.CaptureOutput(t, func() {
-		kns.SendRecPacket(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		kns.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
 
 		readKissNetFrame(t, clients[0])
 	})
@@ -493,15 +494,15 @@ func TestKissNetClientCommandIsAnswered(t *testing.T) {
 
 	var conn, _ = dialKissNet(t, kns, port)
 
-	var _, writeErr = conn.Write(KissEncapsulate(append([]byte{KISS_CMD_SET_HARDWARE}, []byte("TNC:")...)))
+	var _, writeErr = conn.Write(kiss.Encapsulate(append([]byte{kiss.CmdSetHardware}, []byte("TNC:")...)))
 	require.NoError(t, writeErr)
 
 	var answer = readKissNetFrame(t, conn)
 
-	var unwrapped = KissUnwrap(answer)
+	var unwrapped = kiss.Unwrap(answer)
 	require.NotEmpty(t, unwrapped)
 
-	assert.Equal(t, byte(KISS_CMD_SET_HARDWARE), unwrapped[0]&0xf)
+	assert.Equal(t, byte(kiss.CmdSetHardware), unwrapped[0]&0xf)
 	assert.Contains(t, string(unwrapped[1:]), "DIREWOLF ")
 }
 
@@ -527,18 +528,18 @@ func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
 	var pp = newTestPacket(t)
 
 	// Channel 0 in the frame, which the port's own channel overrides.
-	var _, writeErr = conn.Write(KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, pp.FrameData()...)))
+	var _, writeErr = conn.Write(kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)))
 	require.NoError(t, writeErr)
 
 	// The client's bytes are handled in order, so an answer to this means the
 	// data frame before it has been dealt with.
-	_, writeErr = conn.Write(KissEncapsulate(append([]byte{KISS_CMD_SET_HARDWARE}, []byte("TNC:")...)))
+	_, writeErr = conn.Write(kiss.Encapsulate(append([]byte{kiss.CmdSetHardware}, []byte("TNC:")...)))
 	require.NoError(t, writeErr)
 
-	var unwrapped = KissUnwrap(readKissNetFrame(t, conn))
+	var unwrapped = kiss.Unwrap(readKissNetFrame(t, conn))
 	require.NotEmpty(t, unwrapped)
 
-	assert.Equal(t, byte(KISS_CMD_SET_HARDWARE), unwrapped[0]&0xf)
+	assert.Equal(t, byte(kiss.CmdSetHardware), unwrapped[0]&0xf)
 }
 
 // An application that thinks it is driving an old command-mode TNC is

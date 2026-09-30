@@ -4,10 +4,14 @@
 package direwolf
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +25,7 @@ import (
 // Fuzzing proper is "go test ./internal/direwolf/ -run XXX -fuzz FuzzSomething".
 
 // The decoders narrate a malformed packet at length, and a fuzzing run has
-// nobody to read it, so point stdout at the bin for the duration.
+// nobody to read it, so point stdout, and logrus, at the bin for the duration.
 func fuzzQuietly(tb testing.TB) {
 	tb.Helper()
 
@@ -31,8 +35,12 @@ func fuzzQuietly(tb testing.TB) {
 	var saved = os.Stdout
 	os.Stdout = devNull
 
+	var savedLog = logrus.StandardLogger().Out
+	logrus.SetOutput(io.Discard)
+
 	tb.Cleanup(func() {
 		os.Stdout = saved
+		logrus.SetOutput(savedLog)
 		devNull.Close()
 	})
 }
@@ -135,20 +143,6 @@ func FuzzDecodeAPRS(f *testing.F) {
 	})
 }
 
-// FuzzKISSUnwrap covers the KISS framing, which any client on the KISS TCP
-// port or the serial KISS device can feed.
-func FuzzKISSUnwrap(f *testing.F) {
-	fuzzQuietly(f)
-
-	f.Add([]byte{0x00, 'h', 'e', 'l', 'l', 'o', FEND})
-	f.Add([]byte{0x00, FESC, TFEND, FESC, TFESC, FEND})
-	f.Add([]byte{FEND})
-
-	f.Fuzz(func(t *testing.T, in []byte) {
-		KissUnwrap(in)
-	})
-}
-
 // FuzzIL2PDecodeFrame covers the IL2P receive path: header FEC, descrambling
 // and the payload blocks.
 func FuzzIL2PDecodeFrame(f *testing.F) {
@@ -169,5 +163,83 @@ func FuzzIL2PDecodeFrame(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, irec []byte, version int) {
 		il2p_decode_frame(irec, il2p_version_t(version))
+	})
+}
+
+// kissFuzzMaxStream bounds the streams the KISS targets try.  Room for an
+// overlong frame and a few hundred short ones is all the collector needs, and
+// the queues they land on are only drained by threads a fuzzing run doesn't
+// have, so a much longer stream spends its time walking them, not finding
+// anything.
+const kissFuzzMaxStream = 4 * kiss.MaxFrameLen
+
+// kissFuzzSeeds are streams a KISS peer might send, well formed or not, for
+// the targets that take one.
+func kissFuzzSeeds(f *testing.F) {
+	f.Helper()
+
+	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
+	require.NotNil(f, pp)
+
+	var frame = kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...))
+
+	for _, seed := range [][]byte{
+		frame,
+		append([]byte("XFLOW OFF\rKISS ON\rRESTART\r"), frame...),
+		{kiss.FEND, kiss.FESC, kiss.FEND}, // Nothing in it once unescaped - used to crash.
+		{kiss.FEND, kiss.CmdTxDelay, 30, kiss.FEND, kiss.FEND, kiss.CmdPersistence, kiss.FEND},
+		kiss.Encapsulate([]byte("\x06TNC:")),
+		kiss.Encapsulate([]byte("\x06TXBUF:")),
+		{kiss.FEND, 0xff, kiss.FEND},
+		append(append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen)...), kiss.FEND),
+	} {
+		for debug := range byte(3) {
+			f.Add(seed, debug)
+		}
+	}
+}
+
+// FuzzKissRecByte covers what a KISS client application sends the TNC, over
+// the TCP port, the serial port or the pseudo terminal: anyone who can reach
+// one of those reaches this, frame collection and command handling both.
+func FuzzKissRecByte(f *testing.F) {
+	fuzzQuietly(f)
+	kissFuzzSeeds(f)
+
+	f.Fuzz(func(t *testing.T, stream []byte, debug byte) {
+		if len(stream) > kissFuzzMaxStream {
+			t.Skip()
+		}
+
+		setupKissProcessMsg(t)
+
+		var audioConfig = kissTestAudioConfig()
+		var _, sendfun = recordingSendfun()
+		var kc kiss.Collector
+
+		for _, b := range stream {
+			KissRecByte(&kc, audioConfig, b, int(debug%3), nil, -1, sendfun)
+		}
+	})
+}
+
+// FuzzNetTNCRecByte covers what a network TNC sends us, for the channel it is
+// attached to - it is at the far end of a TCP connection, and may not be ours.
+func FuzzNetTNCRecByte(f *testing.F) {
+	fuzzQuietly(f)
+	kissFuzzSeeds(f)
+
+	f.Fuzz(func(t *testing.T, stream []byte, debug byte) {
+		if len(stream) > kissFuzzMaxStream {
+			t.Skip()
+		}
+
+		expectReceivedFrames(t)
+
+		var kc kiss.Collector
+
+		for _, b := range stream {
+			nettncRecByte(&kc, b, int(debug%3), nettncTestChannel)
+		}
 	})
 }

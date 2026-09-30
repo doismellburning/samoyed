@@ -1,63 +1,8 @@
 //nolint:gochecknoglobals
 package direwolf
 
-/*------------------------------------------------------------------
- *
- * Purpose:   	Common code used by Serial port and network versions of KISS protocol.
- *
- * Description: The KISS TNC protocol is described in http://www.ka9q.net/papers/kiss.html
- *
- *		( An extended form, to handle multiple TNCs on a single serial port.
- *		  Not applicable for our situation.  http://he.fi/pub/oh7lzb/bpq/multi-kiss.pdf )
- *
- * 		Briefly, a frame is composed of
- *
- *			* FEND (0xC0)
- *			* Contents - with special escape sequences so a 0xc0
- *				byte in the data is not taken as end of frame.
- *				as part of the data.
- *			* FEND
- *
- *		The first byte of the frame contains:
- *
- *			* radio channel in upper nybble.
- *				(KISS doc uses "port" but I don't like that because it has too many meanings.)
- *			* command in lower nybble.
- *
- *
- *		Commands from application tp TNC:
- *
- *			_0	Data Frame	AX.25 frame in raw format.
- *
- *			_1	TXDELAY		See explanation in xmit.c.
- *
- *			_2	Persistence	"	"
- *
- *			_3 	SlotTime	"	"
- *
- *			_4	TXtail		"	"
- *						Spec says it is obsolete but Xastir
- *						sends it and we respect it.
- *
- *			_5	FullDuplex	Full Duplex.  Transmit immediately without
- *						waiting for channel to be clear.
- *
- *			_6	SetHardware	TNC specific.
- *
- *			_C	XKISS extension - not supported.
- *			_E	XKISS extension - not supported.
- *
- *			FF	Return		Exit KISS mode.  Ignored.
- *
- *
- *		Messages sent to client application:
- *
- *			_0	Data Frame	Received AX.25 frame in raw format.
- *
- *			_6	SetHardware	TNC specific.
- *						Usually a response to a query.
- *
- *---------------------------------------------------------------*/
+// The TNC side of the KISS protocol - collecting frames from a client
+// application and acting on them.  The framing itself is in internal/kiss.
 
 import (
 	"bytes"
@@ -68,58 +13,8 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 )
-
-const KISS_CMD_DATA_FRAME = 0
-const KISS_CMD_TXDELAY = 1
-const KISS_CMD_PERSISTENCE = 2
-const KISS_CMD_SLOTTIME = 3
-const KISS_CMD_TXTAIL = 4
-const KISS_CMD_FULLDUPLEX = 5
-const KISS_CMD_SET_HARDWARE = 6
-const XKISS_CMD_DATA = 12 // Not supported. http://he.fi/pub/oh7lzb/bpq/multi-kiss.pdf
-const XKISS_CMD_POLL = 14 // Not supported.
-const KISS_CMD_END_KISS = 15
-
-/*
- * Special characters used by SLIP protocol.
- */
-
-const FEND = 0xC0
-const FESC = 0xDB
-const TFEND = 0xDC
-const TFESC = 0xDD
-
-type kiss_state_e int
-
-const (
-	KS_SEARCHING  kiss_state_e = 0 /* Looking for FEND to start KISS frame. Must be 0 so we can simply zero whole structure to initialize. */
-	KS_COLLECTING kiss_state_e = 1 /* In process of collecting KISS frame. */
-)
-
-const MAX_KISS_LEN = 2048 /* Spec calls for at least 1024. */
-/* Might want to make it longer to accommodate */
-/* maximum packet length. */
-
-const MAX_NOISE_LEN = 100
-
-type KISSFrame struct {
-	state kiss_state_e
-
-	kiss_msg [MAX_KISS_LEN]byte
-	/* Leading FEND is optional. */
-	/* Contains escapes and ending FEND. */
-	kiss_len int
-
-	noise     [MAX_NOISE_LEN]byte
-	noise_len int
-
-	// OnMessage, when set, takes each complete message (FEND and escapes
-	// removed, first byte the channel and command) in place of the TNC's
-	// own handling.  cmd/samoyed-kissutil, a client rather than a TNC, uses
-	// it to print what the TNC sends.
-	OnMessage func(kiss_msg []byte)
-}
 
 type fromto_t int
 
@@ -160,7 +55,7 @@ type kissport_status_s struct {
 
 	client_sock [MAX_NET_CLIENTS]net.Conn
 
-	kf [MAX_NET_CLIENTS]*KISSFrame
+	kf [MAX_NET_CLIENTS]*kiss.Collector
 	/* Accumulated KISS frame and state of decoder. */
 
 	// Set by stop, and guarded by mu along with everything above, so that a
@@ -196,7 +91,7 @@ func (kps *kissport_status_s) attachClient(client int, conn net.Conn) bool {
 		return false
 	}
 
-	kps.kf[client] = new(KISSFrame)
+	kps.kf[client] = new(kiss.Collector)
 	kps.client_sock[client] = conn
 
 	return true
@@ -261,209 +156,13 @@ func (kps *kissport_status_s) stop() {
 // need to pair a connection with its decoder state (e.g. before reading a
 // byte from it) must use this rather than clientConn/frame separately: two
 // independently-locked calls could observe an attachClient in between them,
-// pairing a conn with a *KISSFrame that belongs to a different connection.
-func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *KISSFrame) {
+// pairing a conn with a *kiss.Collector that belongs to a different connection.
+func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *kiss.Collector) {
 	kps.mu.Lock()
 	defer kps.mu.Unlock()
 
 	return kps.client_sock[client], kps.kf[client]
 }
-
-/*-------------------------------------------------------------------
- *
- * Name:        KissEncapsulate
- *
- * Purpose:     Encapsulate a frame into KISS format.
- *
- * Inputs:	in	- Address of input block.
- *			  First byte is the "type indicator" with type and
- *			  channel but we don't care about that here.
- *			  If it happens to be FEND or FESC, it is escaped, like any other byte.
- *
- *			  This seems cumbersome and confusing to have this
- *			  one byte offset when encapsulating an AX.25 frame.
- *			  Maybe the type/channel byte should be passed in
- *			  as a separate argument.
- *
- *			  Note that this is "binary" data and can contain
- *			  nul (0x00) values.   Don't treat it like a text string!
- *
- *		ilen	- Number of bytes in input block.
- *
- * Outputs:	out	- Address where to place the KISS encoded representation.
- *			  The sequence is:
- *				FEND		- Magic frame separator.
- *				data		- with certain byte values replaced so
- *						  FEND will never occur here.
- *				FEND		- Magic frame separator.
- *
- * Returns:	Number of bytes in the output.
- *		Absolute max length (extremely unlikely) will be twice input plus 2.
- *
- *-----------------------------------------------------------------*/
-
-func KissEncapsulate(in []byte) []byte {
-	var buf bytes.Buffer
-
-	buf.WriteByte(FEND)
-
-	for _, b := range in {
-		switch b {
-		case FEND:
-			buf.WriteByte(FESC)
-			buf.WriteByte(TFEND)
-		case FESC:
-			buf.WriteByte(FESC)
-			buf.WriteByte(TFESC)
-		default:
-			buf.WriteByte(b)
-		}
-	}
-
-	buf.WriteByte(FEND)
-
-	return buf.Bytes()
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        KissUnwrap
- *
- * Purpose:     Extract original data from a KISS frame.
- *
- * Inputs:	in	- Address of the received the KISS encoded representation.
- *			  The sequence is:
- *				FEND		- Magic frame separator, optional.
- *				data		- with certain byte values replaced so
- *						  FEND will never occur here.
- *				FEND		- Magic frame separator.
- *		ilen	- Number of bytes in input block.
- *
- * Inputs:	out	- Where to put the resulting frame without
- *			  the escapes or FEND.
- *			  First byte is the "type indicator" with type and
- *			  channel but we don't care about that here.
- *			  We treat it like any other byte with special handling
- *			  if it happens to be FESC.
- *			  Note that this is "binary" data and can contain
- *			  nul (0x00) values.   Don't treat it like a text string!
- *
- * Returns:	Number of bytes in the output.
- *
- *-----------------------------------------------------------------*/
-
-func KissUnwrap(in []byte) []byte {
-	if len(in) < 2 {
-		/* Need at least the "type indicator" byte and FEND. */
-		/* Probably more. */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS message less than minimum length.\n")
-
-		return []byte{}
-	}
-
-	if in[len(in)-1] == FEND {
-		in = in[:len(in)-1] // Ignore last FEND
-	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS frame should end with FEND.\n")
-	}
-
-	if in[0] == FEND {
-		in = in[1:] // Skip over optional leading FEND
-	}
-
-	var escapedMode = false
-	var buf bytes.Buffer
-
-	for _, b := range in {
-		if b == FEND {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS frame should not have FEND in the middle.\n")
-		}
-
-		if escapedMode {
-			switch b {
-			case TFESC:
-				buf.WriteByte(FESC)
-			case TFEND:
-				buf.WriteByte(FEND)
-			default:
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS protocol error.  Found 0x%02x after FESC.\n", b)
-			}
-
-			escapedMode = false
-		} else if b == FESC {
-			escapedMode = true
-		} else {
-			buf.WriteByte(b)
-		}
-	}
-
-	return buf.Bytes()
-} /* end KissUnwrap */
-
-/*-------------------------------------------------------------------
- *
- * Name:        KissUnescape
- *
- * Purpose:     Undo the KISS transposition of FEND and FESC, saying what was
- *		wrong with anything malformed.
- *
- * Inputs:	in	- The contents of one frame, without the surrounding
- *			  FENDs.  This is "binary" data and can contain nul
- *			  (0x00) values, so don't treat it like a text string.
- *
- * Returns:	The original bytes, and everything wrong with the escaping.
- *
- * Description:	KissUnwrap does this for a live TNC, where carrying on with a
- *		complaint is the right thing to do.  Something inspecting a
- *		capture instead wants to know exactly where a bad escape
- *		sequence is, and to decide for itself how to report it, so the
- *		problems are returned rather than printed.
- *
- *		Recovery differs too: KissUnwrap drops an unexpected byte after
- *		FESC, where this keeps it, so that what is described accounts for
- *		every byte of the capture.
- *
- *-----------------------------------------------------------------*/
-
-func KissUnescape(in []byte) ([]byte, []error) {
-	var out bytes.Buffer
-
-	var problems []error
-
-	for i := 0; i < len(in); i++ {
-		if in[i] != FESC {
-			out.WriteByte(in[i])
-
-			continue
-		}
-
-		if i == len(in)-1 {
-			problems = append(problems, fmt.Errorf("frame ends with FESC (0x%02x) at offset %d - the escaped byte is missing", FESC, i))
-
-			break
-		}
-
-		i++
-
-		switch in[i] {
-		case TFEND:
-			out.WriteByte(FEND)
-		case TFESC:
-			out.WriteByte(FESC)
-		default:
-			problems = append(problems, fmt.Errorf("FESC (0x%02x) at offset %d is followed by 0x%02x, not TFEND (0x%02x) or TFESC (0x%02x) - taking it literally",
-				FESC, i-1, in[i], TFEND, TFESC))
-
-			out.WriteByte(in[i])
-		}
-	}
-
-	return out.Bytes(), problems
-} /* end KissUnescape */
 
 /*-------------------------------------------------------------------
  *
@@ -492,7 +191,7 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 	dw_printf("\n")
 
 	if special == "" {
-		if pmsg[0] == FEND {
+		if pmsg[0] == kiss.FEND {
 			/* Skip over FEND if present. */
 			pmsg = pmsg[1:]
 		}
@@ -509,20 +208,6 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 	dwutil.HexDump(pmsg)
 }
 
-// kf_debug_print is kiss_debug_print for a byte collected by KissRecByte:
-// when kf belongs to kissutil, what arrives is from the TNC, not a client.
-func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
-	if kf.OnMessage == nil {
-		kiss_debug_print(FROM_CLIENT, special, pmsg)
-
-		return
-	}
-
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("From KISS TNC:\n")
-	dwutil.HexDump(pmsg)
-}
-
 /*-------------------------------------------------------------------
  *
  * Name:        KissRecByte
@@ -530,8 +215,7 @@ func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
  * Purpose:     Process one byte from a KISS client app.
  *
  * Inputs:	kf	- Current state of building a frame.
- *		audioConfig - Which channels are configured.  Only read
- *			  when kf.OnMessage is nil, so may be nil otherwise.
+ *		audioConfig - Which channels are configured.
  *		ch	- A byte from the input stream.
  *		debug	- Activates debug output.
  *		kps	- KISS TCP port status block.
@@ -572,134 +256,59 @@ func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
 
 type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
-func KissRecByte(kf *KISSFrame, audioConfig *AudioConfig, ch byte, debug int,
+func KissRecByte(kf *kiss.Collector, audioConfig *AudioConfig, ch byte, debug int,
 	kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
-	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
-	switch kf.state {
-	case KS_SEARCHING: /* Searching for starting FEND. */
-		// TODO KG Also default: ?
-		if ch == FEND {
-			/* Start of frame.  But first print any collected noise for debugging. */
-			if kf.noise_len > 0 {
-				if debug > 0 {
-					kf_debug_print(kf, "Rejected Noise", kf.noise[:kf.noise_len])
-				}
+	var chunk = kf.Add(ch)
 
-				kf.noise_len = 0
-			}
-
-			kf.kiss_len = 1
-			kf.kiss_msg[0] = ch
-			kf.state = KS_COLLECTING
-
-			return
+	switch {
+	case chunk.Noise != nil:
+		if debug > 0 {
+			kiss_debug_print(FROM_CLIENT, "Rejected Noise", chunk.Noise)
 		}
 
-		/* Noise to be rejected. */
-
-		if kf.noise_len < MAX_NOISE_LEN {
-			kf.noise[kf.noise_len] = ch
-			kf.noise_len++
-		}
-
-		if ch == '\r' {
-			if debug > 0 {
-				kf_debug_print(kf, "Rejected Noise", kf.noise[:kf.noise_len])
-			}
-
-			/* Try to appease client app by sending something back. */
-			// A caller with nothing to send with - cmd/samoyed-kissutil, a
-			// client hearing a TNC's banner - is no TNC to answer as.
-			if sendfun != nil {
-				if strings.EqualFold("restart\r", string(kf.noise[:kf.noise_len])) ||
-					strings.EqualFold("reset\r", string(kf.noise[:kf.noise_len])) {
-					// first 2 parameters don't matter when length is -1 indicating text.
-					sendfun(0, 0, []byte("\xc0\xc0"), -1, kps, client)
-				} else {
-					sendfun(0, 0, []byte("\r\ncmd:"), -1, kps, client)
-				}
-			}
-
-			kf.noise_len = 0
-		}
-
-		return
-
-	case KS_COLLECTING: /* Frame collection in progress. */
-		if ch == FEND {
-			/* End of frame. */
-			if kf.kiss_len == 0 {
-				/* Empty frame.  Starting a new one. */
-				kf.kiss_msg[kf.kiss_len] = ch
-				kf.kiss_len++
-
-				return
-			}
-
-			if kf.kiss_len == 1 && kf.kiss_msg[0] == FEND {
-				/* Empty frame.  Just go on collecting. */
-				return
-			}
-
-			if kf.kiss_len >= MAX_KISS_LEN {
-				/*
-				 * The frame ran past the end of the buffer, so the closing FEND
-				 * has nowhere to go and what we did collect is only the first
-				 * MAX_KISS_LEN bytes of something longer.  Throw it away and go
-				 * back to looking for the next frame, rather than acting on a
-				 * fragment - or writing one past the end of kiss_msg, which is
-				 * what used to happen here.
-				 */
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS message exceeded maximum length.  Discarding it.\n")
-
-				kf.kiss_len = 0
-				kf.state = KS_SEARCHING
-
-				return
-			}
-
-			kf.kiss_msg[kf.kiss_len] = ch
-
-			kf.kiss_len++
-			if debug > 0 {
-				/* As received over the wire from client app. */
-				kf_debug_print(kf, "", kf.kiss_msg[:kf.kiss_len])
-			}
-
-			var unwrapped = KissUnwrap(kf.kiss_msg[:kf.kiss_len])
-
-			if debug >= 2 {
-				/* Append CRC to this and it goes out over the radio. */
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("\n")
-				dw_printf("Packet content after removing KISS framing and any escapes:\n")
-				/* Don't include the "type" indicator. */
-				/* It contains the radio channel and type should always be 0 here. */
-				dwutil.HexDump(unwrapped[1:])
-			}
-
-			if kf.OnMessage != nil {
-				kf.OnMessage(unwrapped)
+		/* Try to appease client app by sending something back. */
+		if chunk.EndOfLine {
+			if strings.EqualFold("restart\r", string(chunk.Noise)) ||
+				strings.EqualFold("reset\r", string(chunk.Noise)) {
+				// first 2 parameters don't matter when length is -1 indicating text.
+				sendfun(0, 0, []byte("\xc0\xc0"), -1, kps, client)
 			} else {
-				kiss_process_msg(unwrapped, audioConfig, debug, kps, client, sendfun)
+				sendfun(0, 0, []byte("\r\ncmd:"), -1, kps, client)
 			}
+		}
 
-			kf.state = KS_SEARCHING
+	case chunk.Err != nil:
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("KISS message exceeded maximum length.  Discarding it.\n")
+
+	case chunk.Frame != nil:
+		if debug > 0 {
+			/* As received over the wire from client app. */
+			kiss_debug_print(FROM_CLIENT, "", chunk.Frame)
+		}
+
+		var unwrapped = kiss.Unwrap(chunk.Frame)
+
+		if len(unwrapped) == 0 {
+			// FEND FESC FEND, say: no type byte, so nothing to act on.
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("KISS frame from client application has nothing in it once unescaped.  Ignoring it.\n")
 
 			return
 		}
 
-		if kf.kiss_len < MAX_KISS_LEN {
-			kf.kiss_msg[kf.kiss_len] = ch
-			kf.kiss_len++
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS message exceeded maximum length.\n")
+		if debug >= 2 {
+			/* Append CRC to this and it goes out over the radio. */
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("\n")
+			dw_printf("Packet content after removing KISS framing and any escapes:\n")
+			/* Don't include the "type" indicator. */
+			/* It contains the radio channel and type should always be 0 here. */
+			dwutil.HexDump(unwrapped[1:])
 		}
 
-		return
+		kiss_process_msg(unwrapped, audioConfig, debug, kps, client, sendfun)
 	}
 } /* end KissRecByte */
 
@@ -750,7 +359,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 	var cmd = kiss_msg[0] & 0xf
 
 	switch cmd {
-	case KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
+	case kiss.CmdDataFrame: /* 0 = Data Frame */
 		// kissnet_copy clobbers first byte but we don't care
 		// because we have already determined channel and command.
 		kissNetSvc.Copy(kiss_msg, channel, int(cmd), kps, client)
@@ -845,7 +454,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 			}
 		}
 
-	case KISS_CMD_TXDELAY: /* 1 = TXDELAY */
+	case kiss.CmdTxDelay: /* 1 = TXDELAY */
 		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for TXDELAY command.\n")
@@ -865,7 +474,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 
 		xmitSvc.SetTxdelay(channel, int(kiss_msg[1]))
 
-	case KISS_CMD_PERSISTENCE: /* 2 = Persistence */
+	case kiss.CmdPersistence: /* 2 = Persistence */
 		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for PERSISTENCE command.\n")
@@ -885,7 +494,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 
 		xmitSvc.SetPersist(channel, int(kiss_msg[1]))
 
-	case KISS_CMD_SLOTTIME: /* 3 = SlotTime */
+	case kiss.CmdSlotTime: /* 3 = SlotTime */
 		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for SLOTTIME command.\n")
@@ -905,7 +514,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 
 		xmitSvc.SetSlottime(channel, int(kiss_msg[1]))
 
-	case KISS_CMD_TXTAIL: /* 4 = TXtail */
+	case kiss.CmdTxTail: /* 4 = TXtail */
 		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for TXTAIL command.\n")
@@ -925,7 +534,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 
 		xmitSvc.SetTxtail(channel, int(kiss_msg[1]))
 
-	case KISS_CMD_FULLDUPLEX: /* 5 = FullDuplex */
+	case kiss.CmdFullDuplex: /* 5 = FullDuplex */
 		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for FULLDUPLEX command.\n")
@@ -938,7 +547,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 		dw_printf("KISS protocol set FullDuplex = %t, channel %d\n", val, channel)
 		xmitSvc.SetFulldup(channel, val)
 
-	case KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
+	case kiss.CmdSetHardware: /* 6 = TNC specific */
 		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for SET HARDWARE command.\n")
@@ -950,7 +559,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 		dw_printf("KISS protocol set hardware \"%s\", channel %d\n", kiss_msg[1:], channel)
 		kiss_set_hardware(channel, kiss_msg[1:], debug, kps, client, sendfun)
 
-	case KISS_CMD_END_KISS: /* 15 = End KISS mode, channel should be 15. */
+	case kiss.CmdEndKiss: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol end KISS mode - Ignored.\n")
@@ -965,7 +574,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps 
 		dw_printf("Use \"-d kn\" option on direwolf command line to observe\n")
 		dw_printf("all communication with the client application.\n")
 
-		if cmd == XKISS_CMD_DATA || cmd == XKISS_CMD_POLL {
+		if cmd == kiss.CmdXKissData || cmd == kiss.CmdXKissPoll {
 			dw_printf("\n")
 			dw_printf("It looks like you are trying to use the \"XKISS\" protocol which is not supported.\n")
 			dw_printf("Change your application settings to use standard \"KISS\" rather than some other variant.\n")
@@ -1073,7 +682,7 @@ func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_sta
 			}
 
 			var response = fmt.Sprintf("DIREWOLF %d.%d", MAJOR_VERSION, MINOR_VERSION)
-			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), len(response), kps, client)
+			sendfun(channel, kiss.CmdSetHardware, []byte(response), len(response), kps, client)
 		} else if bytes.Equal(cmd, []byte("TXBUF")) { /* TXBUF - Number of bytes in transmit queue. */
 			if len(value) > 0 {
 				text_color_set(DW_COLOR_ERROR)
@@ -1082,7 +691,7 @@ func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_sta
 
 			var n = transmitQueue.Count(channel, -1, "", "", true)
 			var response = fmt.Sprintf("TXBUF:%d", n)
-			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), len(response), kps, client)
+			sendfun(channel, kiss.CmdSetHardware, []byte(response), len(response), kps, client)
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS Set Hardware unrecognized command: %s.\n", cmd)

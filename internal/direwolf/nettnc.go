@@ -19,6 +19,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
 )
 
@@ -221,7 +222,7 @@ func (nt *NetTNC) closeSockIfCurrent(conn net.Conn) {
 func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
-	var kstate KISSFrame // State machine to gather a KISS frame.
+	var kstate kiss.Collector // State machine to gather a KISS frame.
 
 	defer nt.closeSock()
 
@@ -275,144 +276,77 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 			for j := range n {
 				// Separate the byte stream into KISS frame(s) and make it
 				// look like this came from a radio channel.
-				my_kiss_rec_byte(&kstate, buf[j], nt.debug, channel)
+				nettncRecByte(&kstate, buf[j], nt.debug, channel)
 			}
 		} // nt.sock != nil
 	} // until cancelled
 }
 
-/*-------------------------------------------------------------------
- *
- * Name:        my_kiss_rec_byte
- *
- * Purpose:     Process one byte from a KISS network TNC.
- *
- * Inputs:	kf	- Current state of building a frame.
- *		b	- A byte from the input stream.
- *		debug	- Activates debug output.
- *		channel_overide - Set incoming channel number to the NCHANNEL
- *				number rather than the channel in the KISS frame.
- *
- * Outputs:	kf	- Current state is updated.
- *
- * Returns:	none.
- *
- * Description:	This is a simplified version of KissRecByte used
- *		for talking to KISS client applications.  It already has
- *		too many special cases and I don't want to make it worse.
- *		This also needs to make the packet look like it came from
- *		a radio channel, not from a client app.
- *
- *-----------------------------------------------------------------*/
+// nettncRecByte takes one byte from a KISS network TNC, and passes each frame
+// it completes to the received packet queue - as though it came from a radio
+// channel, the one the network TNC is attached to, whatever channel the frame
+// itself names.  Anything outside a frame is not ours to answer, so it's
+// ignored.
+func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int) {
+	var chunk = kc.Add(b)
 
-func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
-	//dw_printf ("my_kiss_rec_byte ( %c %02x ) \n", b, b);
-	switch kf.state {
-	/* Searching for starting FEND. */
-	default: // Includes KS_SEARCHING
-		if b == FEND {
-			/* Start of frame.  */
-			kf.kiss_len = 0
-			kf.kiss_msg[kf.kiss_len] = b
-			kf.kiss_len++
-			kf.state = KS_COLLECTING
-
-			return
-		}
-
-		return
-
-	case KS_COLLECTING: /* Frame collection in progress. */
-		if b == FEND {
-			/* End of frame. */
-			if kf.kiss_len == 0 {
-				/* Empty frame.  Starting a new one. */
-				kf.kiss_msg[kf.kiss_len] = b
-				kf.kiss_len++
-
-				return
-			}
-
-			if kf.kiss_len == 1 && kf.kiss_msg[0] == FEND {
-				/* Empty frame.  Just go on collecting. */
-				return
-			}
-
-			if kf.kiss_len >= MAX_KISS_LEN {
-				/*
-				 * The frame ran past the end of the buffer, so the closing FEND
-				 * has nowhere to go and what we did collect is only the first
-				 * MAX_KISS_LEN bytes of something longer.  Throw it away and go
-				 * back to looking for the next frame, rather than acting on a
-				 * fragment - or writing one past the end of kiss_msg, which is
-				 * what used to happen here.
-				 */
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS frame from network TNC exceeded maximum length.  Discarding it.\n")
-
-				kf.kiss_len = 0
-				kf.state = KS_SEARCHING
-
-				return
-			}
-
-			kf.kiss_msg[kf.kiss_len] = b
-
-			kf.kiss_len++
-			if debug > 0 {
-				/* As received over the wire from network TNC. */
-				// May include escapted characters.  What about FEND?
-				// FIXME: make it say Network TNC.
-				kiss_debug_print(FROM_CLIENT, "", kf.kiss_msg[0:kf.kiss_len])
-			}
-
-			var unwrapped = KissUnwrap(kf.kiss_msg[:kf.kiss_len])
-
-			if debug >= 2 {
-				/* Append CRC to this and it goes out over the radio. */
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("\n")
-				dw_printf("Frame content after removing KISS framing and any escapes:\n")
-				/* Don't include the "type" indicator. */
-				/* It contains the radio channel and type should always be 0 here. */
-				dwutil.HexDump(unwrapped[1:])
-			}
-
-			// Convert to packet object and send to received packet queue.
-			// Note that we use channel associated with the network TNC, not channel in KISS frame.
-
-			var subchan = -3
-			var slice = 0
-			var alevel ax25.ALevel
-			var pp = ax25.FromFrame(unwrapped[1:], alevel)
-
-			if pp != nil {
-				var fec_type = fec_type_none
-				var retries BitFixLevel
-
-				var spectrum = "Network TNC"
-				dataLinkQueue.RecFrame(channel_override, subchan, slice, pp, alevel, fec_type, retries, spectrum)
-			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Failed to create packet object for KISS frame from channel %d network TNC.\n", channel_override)
-			}
-
-			kf.state = KS_SEARCHING
-
-			return
-		}
-
-		if kf.kiss_len < MAX_KISS_LEN {
-			kf.kiss_msg[kf.kiss_len] = b
-			kf.kiss_len++
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS frame from network TNC exceeded maximum length.\n")
-		}
+	if chunk.Err != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("KISS frame from network TNC exceeded maximum length.  Discarding it.\n")
 
 		return
 	}
-} /* end my_kiss_rec_byte */
+
+	if chunk.Frame == nil {
+		return
+	}
+
+	if debug > 0 {
+		/* As received over the wire from network TNC. */
+		// May include escapted characters.  What about FEND?
+		// FIXME: make it say Network TNC.
+		kiss_debug_print(FROM_CLIENT, "", chunk.Frame)
+	}
+
+	var unwrapped = kiss.Unwrap(chunk.Frame)
+
+	if len(unwrapped) == 0 {
+		// FEND FESC FEND, say: no type byte, so nothing to pass on.
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("KISS frame from network TNC has nothing in it once unescaped.  Ignoring it.\n")
+
+		return
+	}
+
+	if debug >= 2 {
+		/* Append CRC to this and it goes out over the radio. */
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("\n")
+		dw_printf("Frame content after removing KISS framing and any escapes:\n")
+		/* Don't include the "type" indicator. */
+		/* It contains the radio channel and type should always be 0 here. */
+		dwutil.HexDump(unwrapped[1:])
+	}
+
+	// Convert to packet object and send to received packet queue.
+	// Note that we use channel associated with the network TNC, not channel in KISS frame.
+
+	var subchan = -3
+	var slice = 0
+	var alevel ax25.ALevel
+	var pp = ax25.FromFrame(unwrapped[1:], alevel)
+
+	if pp != nil {
+		var fec_type = fec_type_none
+		var retries BitFixLevel
+
+		var spectrum = "Network TNC"
+		dataLinkQueue.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+	} else {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Failed to create packet object for KISS frame from channel %d network TNC.\n", channel)
+	}
+}
 
 /*-------------------------------------------------------------------
  *
@@ -458,7 +392,7 @@ func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) {
 
 	// Next, encapsulate into KISS frame with surrounding FENDs and any escapes.
 
-	var kiss_buff = KissEncapsulate(frame_buff)
+	var kiss_buff = kiss.Encapsulate(frame_buff)
 
 	var _, err = conn.Write(kiss_buff)
 	if err != nil {

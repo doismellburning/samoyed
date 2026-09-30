@@ -19,6 +19,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
@@ -151,7 +152,7 @@ func walk96(lat float64, lon float64, knots maybe.Maybe[float64], course maybe.M
 	 * Encapsulate as KISS and send to TNC.
 	 */
 
-	var kiss_frame = direwolf.KissEncapsulate(ax25_frame)
+	var kiss_frame = kiss.Encapsulate(ax25_frame)
 
 	// kiss_debug_print (1, NULL, kiss_frame, kiss_len);
 

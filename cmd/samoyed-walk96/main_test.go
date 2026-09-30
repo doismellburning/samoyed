@@ -16,7 +16,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -104,7 +104,7 @@ func Test_walk96(t *testing.T) {
 	var pp = ax25.FromText(report, true)
 	require.NotNil(t, pp)
 
-	var want = direwolf.KissEncapsulate(append([]byte{0}, pp.Pack()...))
+	var want = kiss.Encapsulate(append([]byte{0}, pp.Pack()...))
 
 	assert.Equal(t, want, readN(t, master, len(want)))
 
@@ -290,7 +290,7 @@ func Test_main_fix(t *testing.T) {
 	var pp = ax25.FromText(report, true)
 	require.NotNil(t, pp)
 
-	var frame = string(direwolf.KissEncapsulate(append([]byte{0}, pp.Pack()...)))
+	var frame = string(kiss.Encapsulate(append([]byte{0}, pp.Pack()...)))
 
 	require.Eventually(t, func() bool { return tncPort.sawBytes("\xc0\xff\xc0") },
 		5*time.Second, 10*time.Millisecond)

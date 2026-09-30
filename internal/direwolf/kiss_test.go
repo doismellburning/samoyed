@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -139,7 +140,7 @@ func readKissFrame(t *testing.T, client *os.File) []byte {
 
 		// The leading FEND does not end anything, so only count one that
 		// has something in front of it.
-		if buf[0] == FEND && len(frame) > 1 {
+		if buf[0] == kiss.FEND && len(frame) > 1 {
 			return frame
 		}
 	}
@@ -177,7 +178,7 @@ func drainKissFrame(t *testing.T, client *os.File) <-chan []byte {
 
 			// The leading FEND does not end anything, so only stop on one
 			// with something in front of it.
-			if err != nil || (len(got) > 1 && got[len(got)-1] == FEND) {
+			if err != nil || (len(got) > 1 && got[len(got)-1] == kiss.FEND) {
 				break
 			}
 		}
@@ -219,7 +220,7 @@ func TestKissPTNotEnabled(t *testing.T) {
 
 	// With no terminal, sending to the client is a no-op rather than a crash.
 	assert.NotPanics(t, func() {
-		kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("nowhere to go"), 13, nil, -1)
+		kp.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"), 13, nil, -1)
 	})
 }
 
@@ -229,7 +230,7 @@ func TestKissPTNilSendRecPacket(t *testing.T) {
 	var kp *KissPT
 
 	assert.NotPanics(t, func() {
-		kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("nowhere to go"), 13, nil, -1)
+		kp.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"), 13, nil, -1)
 	})
 }
 
@@ -255,9 +256,9 @@ func TestKissPTSendRecPacket(t *testing.T) {
 
 	var frame = []byte("some received frame")
 
-	kp.SendRecPacket(channel, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+	kp.SendRecPacket(channel, kiss.CmdDataFrame, frame, len(frame), nil, -1)
 
-	var want = KissEncapsulate(append([]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, frame...))
+	var want = kiss.Encapsulate(append([]byte{byte(channel<<4 | kiss.CmdDataFrame)}, frame...))
 
 	assert.Equal(t, want, readKissFrame(t, client))
 }
@@ -267,12 +268,12 @@ func TestKissPTSendRecPacket(t *testing.T) {
 func TestKissPTSendRecPacketEscapes(t *testing.T) {
 	var kp, client = startKissPT(t, 0)
 
-	var frame = []byte{FEND, 'a', FESC, 'b'}
+	var frame = []byte{kiss.FEND, 'a', kiss.FESC, 'b'}
 
-	kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+	kp.SendRecPacket(0, kiss.CmdDataFrame, frame, len(frame), nil, -1)
 
 	assert.Equal(t,
-		[]byte{FEND, 0x00, FESC, TFEND, 'a', FESC, TFESC, 'b', FEND},
+		[]byte{kiss.FEND, 0x00, kiss.FESC, kiss.TFEND, 'a', kiss.FESC, kiss.TFESC, 'b', kiss.FEND},
 		readKissFrame(t, client))
 }
 
@@ -302,7 +303,7 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 	var got = drainKissFrame(t, client)
 
 	var output = testutils.CaptureOutput(t, func() {
-		kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+		kp.SendRecPacket(0, kiss.CmdDataFrame, frame, len(frame), nil, -1)
 	})
 
 	assert.Contains(t, output, "Truncated")
@@ -338,8 +339,8 @@ func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 
 	var pp = newTestPacket(t)
 
-	var kissFrame = KissEncapsulate(append(
-		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, pp.FrameData()...))
+	var kissFrame = kiss.Encapsulate(append(
+		[]byte{byte(channel<<4 | kiss.CmdDataFrame)}, pp.FrameData()...))
 
 	var _, writeErr = client.Write(kissFrame)
 	require.NoError(t, writeErr)
@@ -458,7 +459,7 @@ func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	var kp, client = startKissPT(t, 2)
 
 	var output = testutils.CaptureOutput(t, func() {
-		kp.SendRecPacket(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		kp.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
 
 		readKissFrame(t, client)
 	})
@@ -495,7 +496,7 @@ func TestKissPTSendWhileListening(t *testing.T) {
 			default:
 			}
 
-			kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+			kp.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
 		}
 	}()
 

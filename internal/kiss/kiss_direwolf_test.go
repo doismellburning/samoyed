@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package kiss
 
 import (
 	"testing"
@@ -19,16 +22,14 @@ func Test_KISS(t *testing.T) {
 		}
 	}
 
-	var kissed = KissEncapsulate(din)
+	var kissed = Encapsulate(din)
 	assert.Len(t, kissed, (512 + 6))
 
-	var dout = KissUnwrap(kissed)
+	var dout = Unwrap(kissed)
 	assert.Len(t, dout, 512)
 	assert.Equal(t, din, dout)
 
-	dout = KissUnwrap(kissed[1:])
+	dout = Unwrap(kissed[1:])
 	assert.Len(t, dout, 512)
 	assert.Equal(t, din, dout)
-
-	dw_printf("Quick KISS test passed OK.\n")
 }

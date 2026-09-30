@@ -13,6 +13,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -108,7 +109,7 @@ func Test_process_input(t *testing.T) {
 
 			testutils.CaptureOutput(t, func() { process_input(tc.in) })
 
-			var want = direwolf.KissEncapsulate(tc.want)
+			var want = kiss.Encapsulate(tc.want)
 
 			assert.Equal(t, want, readKISS(t, tnc, len(want)))
 		})
@@ -120,7 +121,7 @@ func Test_process_input_frame(t *testing.T) {
 
 	testutils.CaptureOutput(t, func() { process_input("[2] Q1TEST>APDW17:>Testing\r\n") })
 
-	var want = direwolf.KissEncapsulate(append([]byte{0x20}, ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()...))
+	var want = kiss.Encapsulate(append([]byte{0x20}, ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()...))
 
 	assert.Equal(t, want, readKISS(t, tnc, len(want)))
 }
@@ -162,7 +163,7 @@ func Test_send_to_kiss_tnc_clamps(t *testing.T) {
 	assert.Contains(t, output, "Invalid command 16")
 	assert.Contains(t, output, "Invalid data length")
 
-	var want = direwolf.KissEncapsulate(append([]byte{0x00}, bytes.Repeat([]byte{'x'}, ax25.MaxPacketLen-1)...))
+	var want = kiss.Encapsulate(append([]byte{0x00}, bytes.Repeat([]byte{'x'}, ax25.MaxPacketLen-1)...))
 
 	assert.Equal(t, want, readKISS(t, tnc, len(want)))
 }
@@ -228,6 +229,70 @@ func Test_kissutil_kiss_process_msg(t *testing.T) {
 	})
 }
 
+// feedKISS hands a stream from the TNC to kissutilRecByte a byte at a time,
+// as tnc_listen_net and tnc_listen_serial do, and returns what was printed.
+func feedKISS(t *testing.T, data []byte) string {
+	t.Helper()
+
+	var kc = new(kiss.Collector)
+
+	return testutils.CaptureOutput(t, func() {
+		for _, b := range data {
+			kissutilRecByte(kc, b)
+		}
+	})
+}
+
+func Test_kissutilRecByte(t *testing.T) {
+	var frame = kiss.Encapsulate(append([]byte{0x30}, ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()...))
+
+	t.Run("frame", func(t *testing.T) {
+		assert.Equal(t, "[3] Q1TEST>APDW17:>Testing\n", feedKISS(t, frame))
+	})
+
+	// A TNC's banner, or one still in command mode, puts lines of text
+	// outside any frame.  They're a TNC's to send, not ours to answer, and
+	// the frame after them still arrives.
+	t.Run("noise", func(t *testing.T) {
+		var output = feedKISS(t, append([]byte("cmd:\rRESTART\r"), frame...))
+
+		assert.Equal(t, "[3] Q1TEST>APDW17:>Testing\n", output)
+	})
+
+	// What arrives came from the TNC, so -v says so.
+	t.Run("verbose", func(t *testing.T) {
+		var old = verbose
+
+		t.Cleanup(func() { verbose = old })
+
+		verbose = true
+
+		var output = feedKISS(t, append([]byte("cmd:\rRESTART\r"), frame...))
+
+		assert.Contains(t, output, "From KISS TNC:")
+		assert.Contains(t, output, "From KISS TNC, outside any frame:")
+		assert.Contains(t, output, "RESTART.", "the noise is shown")
+		assert.NotContains(t, output, "KISS client application")
+		assert.Contains(t, output, "[3] Q1TEST>APDW17:>Testing\n")
+	})
+
+	// FEND FESC FEND escapes nothing, so there is no type byte once it is
+	// unescaped, which used to crash kissutil looking for one.
+	t.Run("empty once unescaped", func(t *testing.T) {
+		var output = feedKISS(t, append([]byte{kiss.FEND, kiss.FESC, kiss.FEND}, frame...))
+
+		assert.Equal(t, "KISS frame from TNC has nothing in it once unescaped.  Ignoring it.\n[3] Q1TEST>APDW17:>Testing\n", output)
+	})
+
+	t.Run("overlong", func(t *testing.T) {
+		var overlong = append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen+10)...)
+
+		var output = feedKISS(t, append(append(overlong, kiss.FEND), frame...))
+
+		assert.Equal(t, "KISS frame from TNC exceeded maximum length.  Discarding it.\n[3] Q1TEST>APDW17:>Testing\n", output)
+	})
+}
+
 func Test_timestamp_filename(t *testing.T) {
 	assert.Regexp(t, `^\d{8}-\d{6}-\d{3}$`, timestamp_filename())
 }
@@ -244,11 +309,11 @@ func Test_main_endToEnd(t *testing.T) {
 	var _, writeErr = p.Stdin.WriteString("Q1TEST>APDW17:>Outbound\n")
 	require.NoError(t, writeErr)
 
-	var want = direwolf.KissEncapsulate(append([]byte{0x00}, ax25.MustFromText("Q1TEST>APDW17:>Outbound").Pack()...))
+	var want = kiss.Encapsulate(append([]byte{0x00}, ax25.MustFromText("Q1TEST>APDW17:>Outbound").Pack()...))
 
 	assert.Equal(t, want, readKISS(t, tnc, len(want)))
 
-	var _, replyErr = tnc.Write(direwolf.KissEncapsulate(append([]byte{0x10}, ax25.MustFromText("Q2TEST>APDW17:>Inbound").Pack()...)))
+	var _, replyErr = tnc.Write(kiss.Encapsulate(append([]byte{0x10}, ax25.MustFromText("Q2TEST>APDW17:>Inbound").Pack()...)))
 	require.NoError(t, replyErr)
 
 	p.WaitFor(t, "[1] Q2TEST>APDW17:>Inbound")

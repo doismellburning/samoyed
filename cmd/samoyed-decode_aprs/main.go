@@ -67,6 +67,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 )
 
 // hexLineRegexp matches a line of raw AX.25 or KISS bytes, e.g. "DE AD BE EF" or "DEADBEEF".
@@ -120,14 +121,14 @@ func decodeAPRSLine(line string) {
 
 		// If we have 0xC0 at start, remove it and expect same at end.
 
-		if bytes[0] == direwolf.FEND {
+		if bytes[0] == kiss.FEND {
 			if len(bytes) < 2 || bytes[1] != 0 {
 				fmt.Printf("Was expecting to find 00 after the initial C0.\n")
 
 				return
 			}
 
-			if bytes[len(bytes)-1] == direwolf.FEND {
+			if bytes[len(bytes)-1] == kiss.FEND {
 				fmt.Printf("Removing KISS FEND characters at beginning and end.\n")
 
 				bytes = bytes[1 : len(bytes)-1]
@@ -145,17 +146,17 @@ func decodeAPRSLine(line string) {
 			fmt.Printf("--- KISS frame ---\n")
 			dwutil.HexDump(kiss_frame)
 
-			// Put FEND at end to keep KissUnwrap happy.
+			// Put FEND at end to keep kiss.Unwrap happy.
 			// Having one at the beginning is optional.
 
-			kiss_frame = append(kiss_frame, direwolf.FEND)
+			kiss_frame = append(kiss_frame, kiss.FEND)
 
 			// In the more general case, we would need to include
 			// the command byte because it could be escaped.
 			// Here we know it is 0, so we take a short cut and
 			// remove it before, rather than after, the conversion.
 
-			bytes = direwolf.KissUnwrap(kiss_frame[1:])
+			bytes = kiss.Unwrap(kiss_frame[1:])
 		}
 
 		// Treat as AX.25.

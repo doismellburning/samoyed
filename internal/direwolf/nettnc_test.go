@@ -13,10 +13,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -108,7 +110,7 @@ func expectReceivedFrames(t *testing.T) {
 // kissFrameFor wraps a packet's on-air bytes the way a KISS TNC would before
 // putting them on the wire.
 func kissFrameFor(pp *ax25.Packet) []byte {
-	return KissEncapsulate(append([]byte{0}, pp.FrameData()...))
+	return kiss.Encapsulate(append([]byte{0}, pp.FrameData()...))
 }
 
 // A TNC that is not there cannot be attached to, and says so rather than
@@ -290,10 +292,10 @@ func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
 
 	var pp = newTestPacket(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	for _, b := range append([]byte("cmd:\r\n"), kissFrameFor(pp)...) {
-		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
+		nettncRecByte(kf, b, 0, nettncTestChannel)
 	}
 
 	var item = dataLinkQueue.Remove()
@@ -305,10 +307,10 @@ func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
 func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 	expectReceivedFrames(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
-	for _, b := range []byte{FEND, FEND, FEND, FEND} {
-		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
+	for _, b := range []byte{kiss.FEND, kiss.FEND, kiss.FEND, kiss.FEND} {
+		nettncRecByte(kf, b, 0, nettncTestChannel)
 	}
 
 	assert.Nil(t, dataLinkQueue.Remove(), "an empty KISS frame was taken for a received frame")
@@ -319,11 +321,11 @@ func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 	expectReceivedFrames(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
-		for _, b := range KissEncapsulate([]byte{0, 'n', 'o', 't', ' ', 'a', 'x', '2', '5'}) {
-			my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
+		for _, b := range kiss.Encapsulate([]byte{0, 'n', 'o', 't', ' ', 'a', 'x', '2', '5'}) {
+			nettncRecByte(kf, b, 0, nettncTestChannel)
 		}
 	})
 
@@ -331,21 +333,39 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 	assert.Nil(t, dataLinkQueue.Remove())
 }
 
-// A TNC that never sends a FEND would otherwise fill the frame buffer without
-// limit, so the collecting stops at the maximum and says so.
-func TestNetTNCOverlongFrameIsReported(t *testing.T) {
-	var kf = new(KISSFrame)
+// FEND FESC FEND is a frame, but escapes nothing, so there is no type byte
+// once it is unescaped.  Three bytes from the far end of the network
+// connection used to take the whole program down, looking for one.
+func TestNetTNCFrameEmptyOnceUnescapedIsReported(t *testing.T) {
+	expectReceivedFrames(t)
+
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
-		my_kiss_rec_byte(kf, FEND, 0, nettncTestChannel)
-
-		for range MAX_KISS_LEN + 10 {
-			my_kiss_rec_byte(kf, 'x', 0, nettncTestChannel)
+		for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.FEND} {
+			nettncRecByte(kf, b, 2, nettncTestChannel)
 		}
 	})
 
-	assert.Contains(t, output, "KISS frame from network TNC exceeded maximum length")
-	assert.Equal(t, MAX_KISS_LEN, kf.kiss_len)
+	assert.Contains(t, output, "nothing in it")
+	assert.Nil(t, dataLinkQueue.Remove())
+}
+
+// A TNC that never sends a FEND would otherwise fill the frame buffer without
+// limit, so the collecting stops at the maximum and says so - once, not once
+// for every byte past it.
+func TestNetTNCOverlongFrameIsReported(t *testing.T) {
+	var kf = new(kiss.Collector)
+
+	var output = testutils.CaptureOutput(t, func() {
+		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel)
+
+		for range kiss.MaxFrameLen + 10 {
+			nettncRecByte(kf, 'x', 0, nettncTestChannel)
+		}
+	})
+
+	assert.Equal(t, 1, strings.Count(output, "KISS frame from network TNC exceeded maximum length"))
 }
 
 // The TNC does eventually send its closing FEND, and the byte it used to be
@@ -355,26 +375,24 @@ func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 	expectReceivedFrames(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
-		my_kiss_rec_byte(kf, FEND, 0, nettncTestChannel)
+		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel)
 
-		for range MAX_KISS_LEN + 10 {
-			my_kiss_rec_byte(kf, 'x', 0, nettncTestChannel)
+		for range kiss.MaxFrameLen + 10 {
+			nettncRecByte(kf, 'x', 0, nettncTestChannel)
 		}
 
-		my_kiss_rec_byte(kf, FEND, 0, nettncTestChannel)
+		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel)
 	})
 
 	assert.Contains(t, output, "KISS frame from network TNC exceeded maximum length.  Discarding it.")
-	assert.Equal(t, 0, kf.kiss_len)
-	assert.Equal(t, KS_SEARCHING, kf.state)
 	assert.Nil(t, dataLinkQueue.Remove(), "a fragment of the overlong frame was acted on")
 
 	// And a well formed frame after it still gets through.
 	for _, b := range kissFrameFor(newTestPacket(t)) {
-		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
+		nettncRecByte(kf, b, 0, nettncTestChannel)
 	}
 
 	assert.NotNil(t, dataLinkQueue.Remove())
@@ -386,11 +404,11 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 func TestNetTNCDebugPrints(t *testing.T) {
 	expectReceivedFrames(t)
 
-	var kf = new(KISSFrame)
+	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range kissFrameFor(newTestPacket(t)) {
-			my_kiss_rec_byte(kf, b, 2, nettncTestChannel)
+			nettncRecByte(kf, b, 2, nettncTestChannel)
 		}
 	})
 

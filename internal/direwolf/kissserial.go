@@ -75,6 +75,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
 	"github.com/sirupsen/logrus"
@@ -89,7 +90,7 @@ type KissSerial struct {
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
-	kf *KISSFrame
+	kf *kiss.Collector
 
 	// mu guards fd and failed, which listenThread (reading, and in the
 	// polling case reopening) and SendRecPacket (writing from the receive
@@ -119,7 +120,7 @@ func newKissSerial(mc *misc_config_s, audioConfig *AudioConfig, debug int) *Kiss
 	ks.miscConfig = mc
 	ks.audioConfig = audioConfig
 	ks.debug = debug
-	ks.kf = new(KISSFrame)
+	ks.kf = new(kiss.Collector)
 
 	return ks
 }
@@ -189,8 +190,8 @@ func NewKissSerial(ctx context.Context, mc *misc_config_s, audioConfig *AudioCon
  * Inputs:	chan		- Channel number where packet was received.
  *				  0 = first, 1 = second if any.
  *
- *		kiss_cmd	- Usually KISS_CMD_DATA_FRAME but we can also have
- *				  KISS_CMD_SET_HARDWARE when responding to a query.
+ *		kiss_cmd	- Usually kiss.CmdDataFrame but we can also have
+ *				  kiss.CmdSetHardware when responding to a query.
  *
  *		pp		- Identifier for packet object.
  *
@@ -256,7 +257,7 @@ func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen
 			dwutil.HexDump(fbuf)
 		}
 
-		kiss_buff = KissEncapsulate(stemp)
+		kiss_buff = kiss.Encapsulate(stemp)
 
 		/* This has KISS framing and escapes for sending to client app. */
 
@@ -461,7 +462,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("\nOpened %s for serial port KISS.\n\n", ks.miscConfig.kiss_serial_port)
 
-					ks.kf = new(KISSFrame) // Start with clean state.
+					ks.kf = new(kiss.Collector) // Start with clean state.
 
 					ks.setPort(fd)
 				} else { //nolint:staticcheck

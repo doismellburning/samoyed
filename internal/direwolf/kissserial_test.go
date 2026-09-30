@@ -20,6 +20,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -132,7 +133,7 @@ func readSerialKissFrame(t *testing.T, client *os.File) []byte {
 
 		frame = append(frame, buf[0])
 
-		if buf[0] == FEND && len(frame) > 1 {
+		if buf[0] == kiss.FEND && len(frame) > 1 {
 			return frame
 		}
 	}
@@ -169,7 +170,7 @@ func TestKissSerialNoPortConfigured(t *testing.T) {
 
 	// With no port, sending to the client is a no-op rather than a crash.
 	assert.NotPanics(t, func() {
-		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("nowhere to go"), 13, nil, -1)
+		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"), 13, nil, -1)
 	})
 }
 
@@ -180,7 +181,7 @@ func TestKissSerialNilSendRecPacket(t *testing.T) {
 	var ks *KissSerial
 
 	assert.NotPanics(t, func() {
-		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("nowhere to go"), 13, nil, -1)
+		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"), 13, nil, -1)
 	})
 }
 
@@ -205,12 +206,12 @@ func TestKissSerialSendRecPacket(t *testing.T) {
 
 	const channel = 2
 
-	var frame = []byte{'h', 'i', FEND, FESC}
+	var frame = []byte{'h', 'i', kiss.FEND, kiss.FESC}
 
-	ks.SendRecPacket(channel, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+	ks.SendRecPacket(channel, kiss.CmdDataFrame, frame, len(frame), nil, -1)
 
 	assert.Equal(t,
-		[]byte{FEND, channel << 4, 'h', 'i', FESC, TFEND, FESC, TFESC, FEND},
+		[]byte{kiss.FEND, channel << 4, 'h', 'i', kiss.FESC, kiss.TFEND, kiss.FESC, kiss.TFESC, kiss.FEND},
 		readSerialKissFrame(t, client))
 }
 
@@ -223,14 +224,14 @@ func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 	require.NoError(t, client.Close())
 
 	var output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
 	})
 
 	assert.Contains(t, output, "Error sending KISS message to client application thru serial port")
 	assert.True(t, ks.failed, "the serial port was not given up after the write error")
 
 	output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
 	})
 
 	assert.Empty(t, output, "the serial port was written to again after the write error")
@@ -270,7 +271,7 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	var got = drainKissFrame(t, client)
 
 	var output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+		ks.SendRecPacket(0, kiss.CmdDataFrame, frame, len(frame), nil, -1)
 	})
 
 	assert.Contains(t, output, "Truncated")
@@ -311,8 +312,8 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 
 	var pp = newTestPacket(t)
 
-	var _, writeErr = client.Write(KissEncapsulate(append(
-		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, pp.FrameData()...)))
+	var _, writeErr = client.Write(kiss.Encapsulate(append(
+		[]byte{byte(channel<<4 | kiss.CmdDataFrame)}, pp.FrameData()...)))
 	require.NoError(t, writeErr)
 
 	// TransmitQueue.Count rather than TransmitQueue.Peek: the queue is being filled by the
@@ -450,7 +451,7 @@ func TestKissSerialDebugPrints(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 2)
 
 	var output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		ks.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
 
 		readSerialKissFrame(t, client)
 	})
@@ -490,7 +491,7 @@ func TestKissSerialSendWhileListening(t *testing.T) {
 			default:
 			}
 
-			ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+			ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
 		}
 	}()
 
