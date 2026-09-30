@@ -1,4 +1,4 @@
-name: "Conventional Commits"
+name: "PR Hygiene"
 
 on:
   pull_request:
@@ -34,3 +34,24 @@ jobs:
       run: |
         mapfile -t subjects < <(git log --no-merges --format="%s" "$BASE_SHA..$HEAD_SHA")
         ./check-conventional-commits.sh "$PR_TITLE" "${subjects[@]}"
+
+  no_merge_commits:
+    runs-on: "ubuntu-latest"
+    steps:
+    # As above: fetch everything and ask about the real range, which a
+    # retargeted pull request changes - hence this running on "edited" too.
+    - uses: "actions/checkout@v7"
+      with:
+        fetch-depth: 0
+    - name: "Check the pull request carries no merge commits"
+      env:
+        BASE_SHA: "${{ github.event.pull_request.base.sha }}"
+        HEAD_SHA: "${{ github.event.pull_request.head.sha }}"
+      run: |
+        merges="$(git log --merges --format="%h %s" "$BASE_SHA..$HEAD_SHA")"
+        if [ -n "$merges" ]; then
+          echo "::error::Merge commits found - rebase onto main rather than merging it in (see the Git and PRs section of AGENTS.md):"
+          echo "$merges"
+          exit 1
+        fi
+        echo "No merge commits"
