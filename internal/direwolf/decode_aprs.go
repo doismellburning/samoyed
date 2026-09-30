@@ -663,7 +663,7 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 			stemp += ", "
 		}
 
-		stemp += fmt.Sprintf("%.0f km/h (%.0f MPH)", DW_MILES_TO_KM(speed_mph), speed_mph)
+		stemp += fmt.Sprintf("%.0f km/h (%.0f MPH)", dwutil.DW_MILES_TO_KM(speed_mph), speed_mph)
 	}
 
 	if course, ok := A.course.Get(); ok {

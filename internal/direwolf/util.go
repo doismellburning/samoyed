@@ -32,11 +32,6 @@ func ADEVFIRSTCHAN(n int) int {
 	return n * 2
 }
 
-// DW_MILES_TO_KM converts miles to kilometres.
-func DW_MILES_TO_KM(x float64) float64 {
-	return x * 1.609344
-}
-
 // DW_MBAR_TO_INHG converts millibars to inches of mercury.
 func DW_MBAR_TO_INHG(x float64) float64 {
 	return x * 0.0295333727
