@@ -36,3 +36,8 @@ func DW_MILES_TO_KM(x float64) float64 {
 func DW_MBAR_TO_INHG(x float64) float64 {
 	return x * 0.0295333727
 }
+
+// DW_KM_TO_MILES converts kilometres to miles.
+func DW_KM_TO_MILES(x float64) float64 {
+	return x * 0.621371192
+}

@@ -3026,7 +3026,7 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
 		if n >= 11 && n <= 13 {
 			var windpeak, wdir, otemp, baro, ohumid float64
 
-			windpeak = DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
+			windpeak = dwutil.DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
 			wdir = float64(h_wdir&0xff) * 360. / 256.
 			otemp = float64(h_otemp) * 0.1
 			baro = float64(dwutil.DW_MBAR_TO_INHG(float64(h_baro) * 0.1))
@@ -3066,7 +3066,7 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
 		if n == 4 {
 			var windpeak, wdir, otemp float64
 
-			windpeak = DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
+			windpeak = dwutil.DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
 			wdir = float64(h_wdir&0xff) * 360. / 256.
 			otemp = float64(h_otemp) * 0.1
 
@@ -4137,7 +4137,7 @@ func processComment(A *decodedAPRS, commentData []byte) {
 			if string(sutemp) == "m" {
 				A.radioRange = maybe.Just(float64(r))
 			} else {
-				A.radioRange = maybe.Just(DW_KM_TO_MILES(float64(r)))
+				A.radioRange = maybe.Just(dwutil.DW_KM_TO_MILES(float64(r)))
 			}
 
 			commentData = cutBytes(commentData, match[0], match[1])

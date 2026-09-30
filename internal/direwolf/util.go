@@ -32,11 +32,6 @@ func ADEVFIRSTCHAN(n int) int {
 	return n * 2
 }
 
-// DW_KM_TO_MILES converts kilometres to miles.
-func DW_KM_TO_MILES(x float64) float64 {
-	return x * 0.621371192
-}
-
 func D2R(d float64) float64 {
 	return d * math.Pi / 180
 }
