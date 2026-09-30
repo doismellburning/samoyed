@@ -32,6 +32,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/cm108"
+	"github.com/doismellburning/samoyed/internal/coordconvutil"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/touchtone"
@@ -4066,7 +4067,7 @@ func handleTTUTM(ps *parseState) error {
 
 	var utm = coordconv.UTMCoord{
 		Zone:       tl.utm.lzone,
-		Hemisphere: HemisphereRuneToCoordconvHemisphere(tl.utm.hemi),
+		Hemisphere: coordconvutil.HemisphereRuneToCoordconvHemisphere(tl.utm.hemi),
 		Easting:    tl.utm.x_offset + 5*tl.utm.scale,
 		Northing:   tl.utm.y_offset + 5*tl.utm.scale,
 	}
@@ -6289,7 +6290,7 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *AudioConfig) er
 		if len(zone) > 0 && eastKnown && northKnown {
 			var _, _hemi, lzone = ps.parseUTMZone(zone)
 
-			var hemi = HemisphereRuneToCoordconvHemisphere(_hemi)
+			var hemi = coordconvutil.HemisphereRuneToCoordconvHemisphere(_hemi)
 
 			var utm = coordconv.UTMCoord{
 				Zone:       lzone,

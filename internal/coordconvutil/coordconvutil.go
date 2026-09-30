@@ -1,6 +1,9 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-// Utilities for working with https://github.com/tzneal/coordconv
+// Package coordconvutil holds utilities for working with
+// https://github.com/tzneal/coordconv
+package coordconvutil
 
 import (
 	"github.com/tzneal/coordconv"
