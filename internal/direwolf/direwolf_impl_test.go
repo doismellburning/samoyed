@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
@@ -127,7 +128,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	dw_tt_config = noTouchTones
 
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 	packetLogger = NewPacketLogger(false, "")
 	mheardDB = mheard.New(0)
 

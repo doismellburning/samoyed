@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -17,7 +18,7 @@ func Test_pfilter_empty_info(t *testing.T) {
 	var p_igate_config igate_config_s
 	var packetFilter = NewPacketFilter(&p_igate_config, 0)
 
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromText("Q1TEST>ID:", true)
 	require.NotNil(t, pp)
@@ -36,7 +37,7 @@ func Test_pfilter_igate_without_a_heard_database(t *testing.T) {
 	var p_igate_config igate_config_s
 	var packetFilter = NewPacketFilter(&p_igate_config, 0)
 
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var saved_mheardDB = mheardDB
 	mheardDB = nil

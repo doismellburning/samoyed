@@ -15,11 +15,11 @@ package symbols
 import (
 	"bufio"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/sirupsen/logrus"
 )
@@ -319,35 +319,10 @@ func New() *Data {
 
 	var sd = new(Data)
 
-	// If search strategy changes, be sure to keep decode_tocall in sync.
-
-	var fp *os.File
-
-	var SymbolsSearchLocations = []string{
-		"symbols-new.txt",            // CWD
-		"data/symbols-new.txt",       // Windows with Cmake
-		"../../data/symbols-new.txt", // Source tree, e.g. running tests from internal/direwolf/ or cmd/<name>/
-		"/usr/local/share/direwolf/symbols-new.txt",
-		"/usr/share/direwolf/symbols-new.txt",
-		// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458
-		// Adding the /opt/local tree since macports typically installs there.  Users might want their
-		// INSTALLDIR (see Makefile.macosx) to mirror that.  If so, then we need to search the /opt/local
-		// path as well.
-		"/opt/local/share/direwolf/symbols-new.txt",
-	}
-
-	for _, l := range SymbolsSearchLocations {
-		var openErr error
-
-		fp, openErr = os.Open(l) //nolint:gosec // We're supplying the locations, we can trust them
-		if openErr == nil {
-			break
-		}
-	}
-
-	if fp == nil {
-		logrus.WithField("searched", SymbolsSearchLocations).
-			Warn("Could not open 'symbols-new.txt' - the \"new\" OVERLAID character information will not be available.")
+	var fp, openErr = dwutil.OpenDataFile("symbols-new.txt")
+	if openErr != nil {
+		logrus.WithError(openErr).
+			Warn("The \"new\" OVERLAID character information will not be available.")
 
 		return sd
 	}

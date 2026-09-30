@@ -1,5 +1,10 @@
-//nolint:gochecknoglobals
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package deviceid identifies the vendor and model of the device that sent
+// an APRS packet, from its destination address or MIC-E comment, using the
+// tocalls.yaml tables from https://github.com/aprsorg/aprs-deviceid .
+package deviceid
 
 /*------------------------------------------------------------------
  *
@@ -14,10 +19,12 @@ package direwolf
 import (
 	"cmp"
 	"io"
-	"os"
 	"slices"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -46,78 +53,44 @@ type tocalls struct {
 	model  string
 }
 
-// DeviceIDData holds the loaded device identification tables.
-type DeviceIDData struct {
+// Data holds the loaded device identification tables.
+type Data struct {
 	pmice    []*mice
 	ptocalls []*tocalls
 }
 
-var deviceIDData *DeviceIDData
-
 /*------------------------------------------------------------------
  *
- * Function:	NewDeviceIDData
+ * Function:	New
  *
  * Purpose:	Called once at startup to read the tocalls.yaml file which was obtained from
  *		https://github.com/aprsorg/aprs-deviceid .
  *
  * Inputs:	tocalls.yaml with OS specific directory search list.
  *
- * Returns:	Populated DeviceIDData, or empty struct if file not found.
+ * Returns:	Populated Data, or empty struct if file not found.
  *
  * Description:	For maximum flexibility, we will read the
  *		data file at run time rather than compiling it in.
  *
  *------------------------------------------------------------------*/
 
-// If search order is changed, do the same in symbols.c for consistency.
-// fopen is perfectly happy with / in file path when running on Windows.
+func New() *Data {
+	var d = new(Data)
 
-var search_locations = []string{
-	"tocalls.yaml",            // Current working directory
-	"data/tocalls.yaml",       // Windows with CMake
-	"../../data/tocalls.yaml", // Source tree, e.g. running tests from internal/direwolf/ or cmd/<name>/
-	"/usr/local/share/direwolf/tocalls.yaml",
-	"/usr/share/direwolf/tocalls.yaml",
-	// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458
-	// Adding the /opt/local tree since macports typically installs there.  Users might want their
-	// INSTALLDIR (see Makefile.macosx) to mirror that.  If so, then we need to search the /opt/local
-	// path as well.
-	"/opt/local/share/direwolf/tocalls.yaml",
-}
-
-func NewDeviceIDData() *DeviceIDData {
-	var d = new(DeviceIDData)
-
-	var fp *os.File
-
-	for _, location := range search_locations {
-		var err error
-
-		fp, err = os.Open(location) //nolint:gosec // G304: location comes from hardcoded search_locations (allowlisted search paths), not user input
-		if err == nil {
-			defer fp.Close()
-
-			break
-		}
-	}
-
-	if fp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open any of these file locations:\n")
-
-		for _, location := range search_locations {
-			dw_printf("    %s\n", location)
-		}
-
-		dw_printf("It won't be possible to extract device identifiers from packets.\n")
+	var fp, openErr = dwutil.OpenDataFile("tocalls.yaml")
+	if openErr != nil {
+		logrus.WithError(openErr).
+			Error("It won't be possible to extract device identifiers from packets.")
 
 		return d
 	}
 
+	defer fp.Close()
+
 	var data, readErr = io.ReadAll(fp)
 	if readErr != nil {
-		dw_printf("Error reading deviceid file %s: %s\n", fp.Name(), readErr)
+		logrus.WithField("file", fp.Name()).WithError(readErr).Error("Error reading deviceid file")
 
 		return d
 	}
@@ -129,7 +102,7 @@ func NewDeviceIDData() *DeviceIDData {
 
 	var unmarshallErr = yaml.Unmarshal(data, &deviceidConfig)
 	if unmarshallErr != nil {
-		dw_printf("Error parsing deviceid file %s: %s\n", fp.Name(), unmarshallErr)
+		logrus.WithField("file", fp.Name()).WithError(unmarshallErr).Error("Error parsing deviceid file")
 
 		return d
 	}
@@ -202,15 +175,13 @@ func NewDeviceIDData() *DeviceIDData {
 
 /*------------------------------------------------------------------
  *
- * Function:	deviceid_decode_dest
+ * Function:	FromDest
  *
  * Purpose:	Find vendor/model for destination address of form APxxxx.
  *
  * Inputs:	dest	- Destination address.  No SSID.
  *
- *		device_size - Amount of space available for result to avoid buffer overflow.
- *
- * Outputs:	device	- Vendor and model.
+ * Returns:	Vendor and model, or Nothing if they can't be identified.
  *
  * Description:	With the exception of MIC-E format, we expect to find the vendor/model in the
  *		AX.25 destination field.   The form should be APxxxx.
@@ -222,45 +193,26 @@ func NewDeviceIDData() *DeviceIDData {
  *
  *------------------------------------------------------------------*/
 
-func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
-	var device = "UNKNOWN vendor/model"
-
+func (d *Data) FromDest(dest string) maybe.Maybe[string] {
 	if d == nil || len(d.ptocalls) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("deviceid_decode_dest called without any deviceid data.\n")
+		logrus.Trace("FromDest called without any deviceid data.")
 
-		return device
+		return maybe.Nothing[string]()
 	}
 
 	for _, t := range d.ptocalls {
 		if strings.HasPrefix(dest, t.tocall) {
-			if t.vendor != "" {
-				device = t.vendor
-			}
-
-			if t.vendor != "" && t.model != "" {
-				device += " "
-			}
-
-			if t.vendor == "" && t.model != "" {
-				device = ""
-			}
-
-			if t.model != "" {
-				device += t.model
-			}
-
-			return device
+			return describe(t.vendor, t.model)
 		}
 	}
 
 	// Not found in table.
-	return "UNKNOWN vendor/model"
+	return maybe.Nothing[string]()
 }
 
 /*------------------------------------------------------------------
  *
- * Function:	deviceid_decode_mice
+ * Function:	FromMicE
  *
  * Purpose:	Find vendor/model for MIC-E comment.
  *
@@ -268,14 +220,10 @@ func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
  *			a prefix and/or suffix.
  *			Any trailing CR has already been removed.
  *
- *		trimmed_size - Amount of space available for result to avoid buffer overflow.
- *
- *		device_size - Amount of space available for result to avoid buffer overflow.
- *
- * Outputs:	trimmed - Final comment with device vendor/model removed.
+ * Returns:	trimmed - Final comment with device vendor/model removed.
  *				This would include any altitude.
  *
- *		device	- Vendor and model.
+ *		device	- Vendor and model, or Nothing if they can't be identified.
  *
  * Description:	MIC-E device identification has a tortured history.
  *
@@ -298,19 +246,15 @@ func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
  *			Understanding APRS Packets
  *------------------------------------------------------------------*/
 
-func (d *DeviceIDData) deviceid_decode_mice(comment string) (string, string) {
-	var device = "UNKNOWN vendor/model"
-	var trimmed = comment
-
+func (d *Data) FromMicE(comment string) (string, maybe.Maybe[string]) {
 	if len(comment) < 1 {
-		return trimmed, device
+		return comment, maybe.Nothing[string]()
 	}
 
-	if d == nil || len(d.ptocalls) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("deviceid_decode_mice called without any deviceid data.\n")
+	if d == nil || len(d.pmice) == 0 {
+		logrus.Trace("FromMicE called without any deviceid data.")
 
-		return trimmed, device
+		return comment, maybe.Nothing[string]()
 	}
 
 	// The Legacy format has an explicit prefix in the table.
@@ -324,28 +268,29 @@ func (d *DeviceIDData) deviceid_decode_mice(comment string) (string, string) {
 			(len(m.prefix) == 0 && // Later
 				(comment[0] == '`' || comment[0] == '\'') && // prefix ` or '
 				strings.HasSuffix(comment, m.suffix)) { // suffix
-			if m.vendor != "" {
-				device = m.vendor
-			}
-
-			if m.vendor != "" && m.model != "" {
-				device += " "
-			}
-
-			if m.model != "" {
-				device += m.model
-			}
-
 			// Remove any prefix/suffix and return what remains.
 
-			trimmed = comment[1:]
+			var trimmed = comment[1:]
 			trimmed = trimmed[:len(trimmed)-len(m.suffix)]
 
-			return trimmed, device
+			return trimmed, describe(m.vendor, m.model)
 		}
 	}
 
 	// Not found.
 
-	return comment, "UNKNOWN vendor/model"
+	return comment, maybe.Nothing[string]()
+}
+
+// describe joins a table entry's vendor and model, either of which may be
+// missing. An entry with neither doesn't identify anything.
+func describe(vendor, model string) maybe.Maybe[string] {
+	switch {
+	case vendor != "" && model != "":
+		return maybe.Just(vendor + " " + model)
+	case vendor != "" || model != "":
+		return maybe.Just(vendor + model)
+	default:
+		return maybe.Nothing[string]()
+	}
 }

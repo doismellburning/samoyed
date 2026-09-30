@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ import (
 // Test that decode_aprs does not panic on an AX.25 UI frame with an empty
 // information field, as sent by linbpq ID broadcasts (issue #504).
 func Test_decode_aprs_empty_info(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromText("Q1TEST>ID:", true)
 	assert.NotNil(t, pp)
@@ -35,7 +36,7 @@ func Test_decode_aprs_empty_info(t *testing.T) {
 // and so was taken for a real position by everything downstream.  An unknown
 // longitude must stay unknown.
 func Test_decode_aprs_dao_does_not_invent_a_position(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromText("Q1TEST>APRS:!4237.14N/xxxxx.83W-Hi!W99!", true)
 	assert.NotNil(t, pp)
@@ -68,7 +69,7 @@ func Test_decode_aprs_zero_value_has_no_position(t *testing.T) {
 // program down with it - from a received packet, so anyone within earshot
 // could do it.  Each of these is truncated at a different point.
 func Test_decode_aprs_truncated_weather(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	for _, info := range []string{
 		"!4903.50N/07201.75W_",            // nothing at all after the symbol
@@ -100,7 +101,7 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 // struct zeroed, so the weather was thrown away and the station type came out
 // as a hundred NUL bytes.
 func Test_decode_aprs_positionless_weather(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var A = DecodeAPRS(ax25.FromText("Q1TEST>APRS:_10090556c220s004g005t077r000p000P000h50b09900wRSW", true), true, "")
 
@@ -115,7 +116,7 @@ func Test_decode_aprs_positionless_weather(t *testing.T) {
 // A positionless weather report with nothing after its timestamp has no
 // weather data to decode, and must say so rather than read off the end.
 func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	for _, info := range []string{"_", "_1009", "_10090556", "_10090556c2"} {
 		var A = DecodeAPRS(ax25.FromText("Q1TEST>APRS:"+info, true), true, "")
@@ -127,7 +128,7 @@ func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
 // unknown, and must not be reported as a reading.  It used to come back as the
 // G_UNKNOWN sentinel, which every caller had to remember to test for.
 func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var known = DecodeAPRS(ax25.FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g005t077r000p000P000h50b09900wRSW", true), true, "")
 	assert.Equal(t,
@@ -148,7 +149,7 @@ func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
 // speedMPH before it returns - the wind belongs on the weather line, not on
 // the location line - so the distinction has to be checked at getWeatherData.
 func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	// The field is there; it just has no value in it.
 	var blank, rest, found = getWeatherData([]byte("c...s...g005"), 'c', 3)
@@ -183,7 +184,7 @@ func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
 // live/killed indicator.  aprsItem used to walk off the end looking for one,
 // bringing the program down on a packet that arrived off the air.
 func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:)Zb00000Zb00001", true)
 	assert.NotNil(t, pp)
@@ -198,7 +199,7 @@ func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
 // The name is meant to be 3 to 9 characters.  One that isn't was an assertion
 // failure, which is to say a crash, rather than something to report.
 func Test_decode_aprs_item_with_short_name(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:)AB!4237.14N/07120.83W#", true)
 	assert.NotNil(t, pp)
@@ -213,7 +214,7 @@ func Test_decode_aprs_item_with_short_name(t *testing.T) {
 // An item that stops before its position has no position, rather than the
 // zeroed one binary.Decode leaves behind.
 func Test_decode_aprs_item_without_position(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:)ABCDE!", true)
 	assert.NotNil(t, pp)
@@ -229,7 +230,7 @@ func Test_decode_aprs_item_without_position(t *testing.T) {
 // - what the APRS-IS input and samoyed-decode_aprs both use - will accept a
 // shorter one, which used to be read off the end of the address.
 func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromTextWithStrictness("Q1TEST>0:'0000000000000000000", ax25.AddrLenient)
 	assert.NotNil(t, pp)
@@ -244,7 +245,7 @@ func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
 // A course and speed extension can be the whole of the information field,
 // with nothing after it - and then there is no bearing and no NRQ to look at.
 func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromTextWithStrictness("Q1TEST>APDW17:!0000.00N/00000.00W/000/000", ax25.AddrLenient)
 	assert.NotNil(t, pp)
@@ -260,7 +261,7 @@ func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
 // field that stops before them is user-defined data we know nothing about
 // rather than something to read off the end of.
 func Test_decode_aprs_user_defined_without_id(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromTextWithStrictness("Q1TEST>APDW17:{", ax25.AddrLenient)
 	assert.NotNil(t, pp)
@@ -275,7 +276,7 @@ func Test_decode_aprs_user_defined_without_id(t *testing.T) {
 // number of fields, reading off the end of a shorter one (and never decoding a
 // well-formed footprint at all).
 func Test_decode_aprs_general_query_footprint(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:?APRS? 42.3714,-71.2083,0050", true)
 	assert.NotNil(t, pp)
@@ -291,7 +292,7 @@ func Test_decode_aprs_general_query_footprint(t *testing.T) {
 // A general query whose footprint is not three comma-separated fields is
 // rejected rather than read off the end (found by fuzzing).
 func Test_decode_aprs_general_query_short_footprint(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:?APRS?0", true)
 	assert.NotNil(t, pp)
@@ -309,7 +310,7 @@ func Test_decode_aprs_general_query_short_footprint(t *testing.T) {
 // than the "ack"/"rej" they compare against - read off the end (found by
 // fuzzing).
 func Test_decode_aprs_short_message(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	for _, tc := range []struct{ monitor, comment string }{
 		{"Q1TEST>APDW17::Q2TEST   :", ""},
@@ -328,7 +329,7 @@ func Test_decode_aprs_short_message(t *testing.T) {
 // A quiet decode keeps its complaints to itself, but a malformed timestamp
 // used to be reported regardless.
 func Test_decode_aprs_quiet_bad_timestamp(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:@09234Xz4903.50N/07201.75W-", true)
 	assert.NotNil(t, pp)
@@ -349,7 +350,7 @@ func Test_decode_aprs_quiet_bad_timestamp(t *testing.T) {
 // port measured against the still-empty comment string, so it warned about
 // every comment at all.
 func Test_decode_aprs_comment_length_warning(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 
 	var hook = test.NewGlobal()
 

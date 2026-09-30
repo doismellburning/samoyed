@@ -29,6 +29,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
@@ -179,6 +180,9 @@ type decodedAPRS struct {
 
 }
 
+// unknownDevice is what mfr holds when the sending device can't be identified.
+const unknownDevice = "UNKNOWN vendor/model"
+
 /*------------------------------------------------------------------
  *
  * Function:	DecodeAPRSInit
@@ -194,7 +198,7 @@ type decodedAPRS struct {
  *------------------------------------------------------------------*/
 
 func DecodeAPRSInit() {
-	deviceIDData = NewDeviceIDData()
+	deviceIDData = deviceid.New()
 	aprsSymbolData = symbols.New()
 }
 
@@ -357,7 +361,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPR
 	case '`': /* Current Mic-E Data */
 
 	default:
-		A.mfr = deviceIDData.deviceid_decode_dest(A.dest)
+		A.mfr = maybe.FromMaybe(unknownDevice, deviceIDData.FromDest(A.dest))
 	}
 
 	switch pinfo[0] { /* "DTI" data type identifier. */
@@ -1510,7 +1514,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 
 	if len(info) <= sizeof_struct_aprs_mic_e_s {
 		// Too short for a comment.  We are finished.
-		A.mfr = "UNKNOWN vendor/model"
+		A.mfr = unknownDevice
 
 		return
 	}
@@ -1523,7 +1527,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		mcomment = mcomment[:len(mcomment)-1]
 		if len(mcomment) == 0 {
 			// Nothing left after removing trailing CR.
-			A.mfr = "UNKNOWN vendor/model"
+			A.mfr = unknownDevice
 
 			return
 		}
@@ -1533,8 +1537,8 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 	/* The telemetry field, in the original spec, is no longer used. */
 
 	// Comment with vendor/model removed.
-	var trimmed, device = deviceIDData.deviceid_decode_mice(string(mcomment))
-	A.mfr = device
+	var trimmed, device = deviceIDData.FromMicE(string(mcomment))
+	A.mfr = maybe.FromMaybe(unknownDevice, device)
 
 	// Possible altitude at beginning of remaining comment.
 	// Three base 91 characters followed by }
