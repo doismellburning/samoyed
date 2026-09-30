@@ -2865,7 +2865,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 			/* b = barometric presure (tenths millibars / tenths of hPascal)  */
 			/* Here, display as inches of mercury. */
 			if fval, ok := wval.Get(); ok {
-				fval = DW_MBAR_TO_INHG(fval * 0.1)
+				fval = dwutil.DW_MBAR_TO_INHG(fval * 0.1)
 				A.weather += fmt.Sprintf(", barometer %.2f", fval)
 			}
 
@@ -3029,7 +3029,7 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
 			windpeak = DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
 			wdir = float64(h_wdir&0xff) * 360. / 256.
 			otemp = float64(h_otemp) * 0.1
-			baro = float64(DW_MBAR_TO_INHG(float64(h_baro) * 0.1))
+			baro = float64(dwutil.DW_MBAR_TO_INHG(float64(h_baro) * 0.1))
 			ohumid = float64(h_ohumid) * 0.1
 
 			A.weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f, barometer %.2f, humidity %.0f",
