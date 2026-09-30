@@ -1,20 +1,12 @@
 package direwolf
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 )
 
 // MAX_NET_CLIENTS is used for both KISS and AGWPE
 const MAX_NET_CLIENTS = 3
-
-// ByteArrayToString handles the several places where we deal with fixed-width byte arrays containing a string.
-// For C this was fine, because strings are null-terminated; for Go we want to explicitly drop trailing nulls.
-// This takes a slice because I didn't know how to make it take an arbitrary sized array, and didn't see the value.
-func ByteArrayToString(b []byte) string {
-	return string(bytes.TrimRight(b, "\x00"))
-}
 
 // dw_printf writes program output, as Dire Wolf's C function of the same name did.
 //

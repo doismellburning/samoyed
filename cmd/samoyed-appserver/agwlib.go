@@ -67,7 +67,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 const AX25_MAX_INFO_LEN = 2048 // Duplicated from C to avoid cgo
@@ -78,7 +78,7 @@ type Callsign [10]byte
 // String implements fmt.Stringer so a Callsign is printed as text (trimming
 // the trailing NUL padding) rather than as a raw byte array.
 func (c Callsign) String() string {
-	return direwolf.ByteArrayToString(c[:])
+	return dwutil.ByteArrayToString(c[:])
 }
 
 type AGWPEHeader struct {

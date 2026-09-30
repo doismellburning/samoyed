@@ -47,7 +47,7 @@
 * Prefer to use `new(Foo)` over `&Foo{}` - the latter makes the exhaustruct linter grumble
 * As this started as a port from C (Dire Wolf) there are a lot of things that aren't idiomatic Go yet. New code follows Go style even beside ported code: `MixedCaps` names (`decodePacket`, not `decode_packet`), no C-style `_t`/`_s` type suffixes, errors returned rather than signalled through sentinel return codes. Don't rename or restyle existing identifiers just to match - that churns diffs and makes upstream harder to track - unless you're already reworking that code
 * A value that might not be there is `maybe.Maybe[T]` (`internal/maybe`, modelled on Haskell's `Maybe`) - don't reintroduce a sentinel like Dire Wolf's old `G_UNKNOWN`. Its zero value is Nothing, and `maybe.Fmap`/`LiftA2`/`Bind` keep the absence from leaking into arithmetic. A function that cannot represent an absence - the fixed-width conversions in `internal/latlong`, say - takes a plain value instead, and its caller unwraps and decides what an absent one means
-* Fixed-size byte-array types that hold text (e.g. `Callsign [10]byte`) don't format as text with `%s` - they print as `%!s(main.Callsign=...)`. Give such types a `String()` method (e.g. via `direwolf.ByteArrayToString`, which trims trailing NULs) so `fmt` renders them correctly everywhere, rather than converting at each call site
+* Fixed-size byte-array types that hold text (e.g. `Callsign [10]byte`) don't format as text with `%s` - they print as `%!s(main.Callsign=...)`. Give such types a `String()` method (e.g. via `dwutil.ByteArrayToString`, which trims trailing NULs) so `fmt` renders them correctly everywhere, rather than converting at each call site
 
 ### Logging
 

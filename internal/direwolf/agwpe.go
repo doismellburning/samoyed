@@ -3,6 +3,8 @@ package direwolf
 import (
 	"encoding/binary"
 	"io"
+
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 // AGWPECallsign is a callsign as an AGWPE header carries it, padded out with
@@ -10,7 +12,7 @@ import (
 type AGWPECallsign [10]byte
 
 func (c AGWPECallsign) String() string {
-	return ByteArrayToString(c[:])
+	return dwutil.ByteArrayToString(c[:])
 }
 
 type AGWPEHeader struct {

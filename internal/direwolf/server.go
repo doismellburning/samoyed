@@ -1638,9 +1638,9 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			//	data part of message.
 			var pid = cmd.Header.PID
 			var stemp strings.Builder
-			stemp.WriteString(ByteArrayToString(cmd.Header.CallFrom[:]))
+			stemp.WriteString(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]))
 			stemp.WriteString(">")
-			stemp.WriteString(ByteArrayToString(cmd.Header.CallTo[:]))
+			stemp.WriteString(dwutil.ByteArrayToString(cmd.Header.CallTo[:]))
 
 			if len(cmd.Data) < 1 {
 				text_color_set(DW_COLOR_ERROR)
@@ -1773,7 +1773,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			if s.connectedModeAllowed(cmd.Header.Portx) {
 				ok = 1
 
-				dataLinkQueue.RegisterCallsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+				dataLinkQueue.RegisterCallsign(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
@@ -1795,7 +1795,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 		var channel = int(cmd.Header.Portx)
 
 		if s.connectedModeAllowed(cmd.Header.Portx) {
-			dataLinkQueue.UnregisterCallsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+			dataLinkQueue.UnregisterCallsign(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
@@ -1820,8 +1820,8 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				        }
 			*/
 			var callsigns [ax25.MaxAddrs]string
-			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
+			callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
 
 			var pid byte = 0xf0 /* normal for AX.25 I frames. */
 			if cmd.Header.DataKind == 'c' {
@@ -1858,7 +1858,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 					}
 
 					for j := range numDigi {
-						callsigns[ax25.Repeater1+j] = ByteArrayToString(cmd.Data[1+10*j : 1+10*j+10])
+						callsigns[ax25.Repeater1+j] = dwutil.ByteArrayToString(cmd.Data[1+10*j : 1+10*j+10])
 						num_calls++
 					}
 				} else {
@@ -1892,8 +1892,8 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			var callsigns [ax25.MaxAddrs]string
 			const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
 
-			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
+			callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
 
 			dataLinkQueue.XmitDataRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
 		}
@@ -1910,8 +1910,8 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			var callsigns [ax25.MaxAddrs]string
 			const num_calls = 2 // only first 2 used.
 
-			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
+			callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
 
 			dataLinkQueue.DisconnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}
@@ -1948,7 +1948,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 		*/
 		{
 			var pid = cmd.Header.PID
-			var stemp = ByteArrayToString(cmd.Header.CallFrom[:]) + ">" + ByteArrayToString(cmd.Header.CallTo[:]) + ": "
+			var stemp = dwutil.ByteArrayToString(cmd.Header.CallFrom[:]) + ">" + dwutil.ByteArrayToString(cmd.Header.CallTo[:]) + ": "
 
 			// Issue 527: NET/ROM routing broadcasts are binary info so we can't treat as string.
 			// Originally, I just appended the information part as a text string.
@@ -2048,8 +2048,8 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			var callsigns [ax25.MaxAddrs]string
 			const num_calls = 2 // only first 2 used.
 
-			callsigns[ax25.Source] = ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[ax25.Destination] = ByteArrayToString(cmd.Header.CallTo[:])
+			callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
 
 			dataLinkQueue.OutstandingFramesRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}
