@@ -4,8 +4,6 @@
 // Package deviceid identifies the vendor and model of the device that sent
 // an APRS packet, from its destination address or MIC-E comment, using the
 // tocalls.yaml tables from https://github.com/aprsorg/aprs-deviceid .
-//
-//nolint:gochecknoglobals
 package deviceid
 
 /*------------------------------------------------------------------
@@ -21,10 +19,10 @@ package deviceid
 import (
 	"cmp"
 	"io"
-	"os"
 	"slices"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v3"
 )
@@ -76,44 +74,18 @@ type Data struct {
  *
  *------------------------------------------------------------------*/
 
-// If search order is changed, do the same in internal/symbols for consistency.
-// fopen is perfectly happy with / in file path when running on Windows.
-
-var search_locations = []string{
-	"tocalls.yaml",            // Current working directory
-	"data/tocalls.yaml",       // Windows with CMake
-	"../../data/tocalls.yaml", // Source tree, e.g. running tests from internal/<pkg>/ or cmd/<name>/
-	"/usr/local/share/direwolf/tocalls.yaml",
-	"/usr/share/direwolf/tocalls.yaml",
-	// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458
-	// Adding the /opt/local tree since macports typically installs there.  Users might want their
-	// INSTALLDIR (see Makefile.macosx) to mirror that.  If so, then we need to search the /opt/local
-	// path as well.
-	"/opt/local/share/direwolf/tocalls.yaml",
-}
-
 func New() *Data {
 	var d = new(Data)
 
-	var fp *os.File
-
-	for _, location := range search_locations {
-		var err error
-
-		fp, err = os.Open(location) //nolint:gosec // G304: location comes from hardcoded search_locations (allowlisted search paths), not user input
-		if err == nil {
-			defer fp.Close()
-
-			break
-		}
-	}
-
-	if fp == nil {
-		logrus.WithField("searched", search_locations).
-			Error("Could not open 'tocalls.yaml' - it won't be possible to extract device identifiers from packets.")
+	var fp, openErr = dwutil.OpenDataFile("tocalls.yaml")
+	if openErr != nil {
+		logrus.WithError(openErr).
+			Error("It won't be possible to extract device identifiers from packets.")
 
 		return d
 	}
+
+	defer fp.Close()
 
 	var data, readErr = io.ReadAll(fp)
 	if readErr != nil {
