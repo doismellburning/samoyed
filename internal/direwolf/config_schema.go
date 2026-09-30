@@ -10,6 +10,8 @@ package direwolf
 // step is where all the validation lives, so that another way of writing the
 // same settings down can share it rather than repeat it.
 
+import "github.com/doismellburning/samoyed/internal/axudp"
+
 // AudioDeviceSettings describes an audio device - ADEVICE.
 type AudioDeviceSettings struct {
 	// Device is the device number, 0 to MAX_ADEVS-1.  A YAML file gives it
@@ -107,6 +109,23 @@ type IL2PTXSettings struct {
 
 	// CRC adds the trailing CRC.  Left out, it is true.
 	CRC *bool `yaml:"crc"`
+}
+
+// AXUDPPortSettings describes an AXUDP port: a virtual channel whose frames
+// go to and come from other nodes as UDP datagrams.
+type AXUDPPortSettings struct {
+	// Port is the local UDP port, both listened on and sent from.
+	Port int `yaml:"port"`
+
+	// Channel is the virtual channel, like NCHANNEL's.
+	Channel *int `yaml:"channel"`
+
+	// Broadcast lists the destination addresses, such as NODES, that go to
+	// every map marked Broadcast.
+	Broadcast []string `yaml:"broadcast"`
+
+	// Maps say which node gets frames for which address.
+	Maps []axudp.MapSettings `yaml:"maps"`
 }
 
 // KISSPortSettings describes a KISS TCP port - KISSPORT.

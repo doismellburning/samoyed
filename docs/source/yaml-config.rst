@@ -160,6 +160,46 @@ Reference
     order, like successive ``KISSPORT`` lines, so ``port: 0`` first drops the
     default port 8001.
 
+``axudpPorts``
+    AXUDP ports: AX.25 frames to and from other nodes (BPQ, XRouter, another
+    Samoyed, ...) as UDP datagrams, each port a virtual channel of its own, as
+    ``NCHANNEL`` makes one for a network TNC.  These have no equivalent in Dire
+    Wolf's format.  Each has:
+
+    ``port``
+        The local UDP port, listened on and sent from.
+
+    ``channel``
+        The virtual channel, outside the radio channels' range, and not
+        otherwise in use.
+
+    ``maps``
+        Where frames go, each with ``ax25addr``, the destination, and ``host``
+        and ``port``, the node to send it to.  An address with no SSID matches
+        any SSID of that callsign, unless another entry names the SSID itself.
+        ``broadcast: true`` also sends the node frames for the broadcast
+        addresses, like the ``B`` on a BPQ ``MAP`` line.
+
+    ``broadcast``
+        The destinations, such as NET/ROM's ``NODES``, whose frames go to every
+        map with ``broadcast: true`` rather than to one node, like BPQ's
+        ``BROADCAST`` lines.
+
+    Frames are sent with the RFC 1226 checksum appended; one on a received
+    datagram is recognised and removed.  Datagrams are accepted from anyone,
+    not only the nodes in ``maps``, so the port should not be open to the
+    internet at large.
+
+    .. code:: yaml
+
+        axudpPorts:
+          - port: 10093
+            channel: 10
+            broadcast: [NODES]
+            maps:
+              - {ax25addr: Q1TEST-2, host: node.example.org, port: 10093, broadcast: true}
+              - {ax25addr: Q2TEST, host: 192.0.2.2, port: 93}
+
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as
     though they were a file of their own - so a channel setting there needs its

@@ -36,17 +36,17 @@ func TestAddCRC(t *testing.T) {
 		0x82, 0xA0, 0x6E, 0x98, 0x9C, 0x42, 0x61, // src
 	}
 
-	var got = addCRC(frame)
+	var got = AddCRC(frame)
 
 	// Must be 2 bytes longer.
 	if len(got) != len(frame)+2 {
-		t.Fatalf("addCRC: want len %d, got %d", len(frame)+2, len(got))
+		t.Fatalf("AddCRC: want len %d, got %d", len(frame)+2, len(got))
 	}
 
 	// Frame bytes must be unchanged at the start.
 	for i, b := range frame {
 		if got[i] != b {
-			t.Fatalf("addCRC: frame byte %d changed: want 0x%02x got 0x%02x", i, b, got[i])
+			t.Fatalf("AddCRC: frame byte %d changed: want 0x%02x got 0x%02x", i, b, got[i])
 		}
 	}
 
@@ -54,26 +54,26 @@ func TestAddCRC(t *testing.T) {
 	var want = fcs.Calc(frame)
 	var crc = uint16(got[len(frame)]) | uint16(got[len(frame)+1])<<8
 	if crc != want {
-		t.Errorf("addCRC: crc=0x%04x want 0x%04x", crc, want)
+		t.Errorf("AddCRC: crc=0x%04x want 0x%04x", crc, want)
 	}
 }
 
 func TestStripCRC(t *testing.T) {
 	var frame = []byte{0xAA, 0xBB, 0xCC, 0xDD}
-	var withCRC = addCRC(frame)
+	var withCRC = AddCRC(frame)
 
-	var got, ok = stripCRC(withCRC)
+	var got, ok = StripCRC(withCRC)
 	if !ok {
-		t.Fatal("stripCRC: reported invalid checksum for a packet we just built")
+		t.Fatal("StripCRC: reported invalid checksum for a packet we just built")
 	}
 
 	if len(got) != len(frame) {
-		t.Fatalf("stripCRC: want len %d, got %d", len(frame), len(got))
+		t.Fatalf("StripCRC: want len %d, got %d", len(frame), len(got))
 	}
 
 	for i, b := range frame {
 		if got[i] != b {
-			t.Fatalf("stripCRC: byte %d: want 0x%02x got 0x%02x", i, b, got[i])
+			t.Fatalf("StripCRC: byte %d: want 0x%02x got 0x%02x", i, b, got[i])
 		}
 	}
 }
@@ -85,9 +85,9 @@ func TestStripCRCBadChecksum(t *testing.T) {
 		0x82, 0xA0, 0x6E, 0x98, 0x9C, 0x42, 0x61,
 	}
 
-	var _, ok = stripCRC(raw)
+	var _, ok = StripCRC(raw)
 	if ok {
-		t.Error("stripCRC: accepted a frame with no CRC appended (should have failed)")
+		t.Error("StripCRC: accepted a frame with no CRC appended (should have failed)")
 	}
 }
 
@@ -882,7 +882,7 @@ func TestKISSBroadcastFansOut(t *testing.T) {
 		var n, _, err = p.ReadFromUDP(buf)
 		require.NoError(t, err, "peer %d got nothing", i)
 
-		var got, ok = stripCRC(buf[:n])
+		var got, ok = StripCRC(buf[:n])
 		require.True(t, ok, "peer %d: bad CRC", i)
 		assert.Equal(t, frame, got, "peer %d", i)
 	}

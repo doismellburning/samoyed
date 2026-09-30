@@ -111,7 +111,7 @@ func NewRoutes(broadcast []string, maps []MapSettings) (Routes, error) {
 }
 
 // normaliseAX25Addr strips surrounding whitespace, uppercases, and removes a
-// trailing "-0": SSID 0 is represented without any suffix by extractDest, so
+// trailing "-0": SSID 0 is represented without any suffix by ExtractDest, so
 // "CALL-0" would never match without this step.
 func normaliseAX25Addr(addr string) string {
 	return strings.TrimSuffix(strings.ToUpper(strings.TrimSpace(addr)), "-0")
@@ -146,9 +146,9 @@ func newMapEntry(m MapSettings) (MapEntry, error) {
 	}, nil
 }
 
-// extractDest extracts the destination AX.25 address from a raw AX.25 frame.
+// ExtractDest extracts the destination AX.25 address from a raw AX.25 frame.
 // Returns "" if the frame is too short.
-func extractDest(frame []byte) string {
+func ExtractDest(frame []byte) string {
 	if len(frame) < 7 {
 		return ""
 	}
@@ -195,11 +195,11 @@ func NewBridge(routes Routes, udpConn *net.UDPConn) *Bridge {
 	return b
 }
 
-// maxUDPPayload is the maximum value of the UDP length field (which covers the
+// MaxUDPPayload is the maximum value of the UDP length field (which covers the
 // 8-byte UDP header plus payload, so actual payload is up to 8 bytes less).
 // Using this as a read buffer size guarantees ReadFromUDP never truncates a
 // datagram regardless of payload length.
-const maxUDPPayload = 65535
+const MaxUDPPayload = 65535
 
 // RunUDPListener reads incoming AXUDP datagrams and forwards them as KISS to
 // all clients, until ctx is cancelled.  It returns an error only on a read
@@ -212,7 +212,7 @@ func (b *Bridge) RunUDPListener(ctx context.Context) error {
 	// closing the socket is what gets us back when we are asked to stop.
 	defer dwutil.CloseOnDone(ctx, b.udpConn)()
 
-	var buf = make([]byte, maxUDPPayload)
+	var buf = make([]byte, MaxUDPPayload)
 	for ctx.Err() == nil {
 		var n, _, readErr = b.udpConn.ReadFromUDP(buf)
 		if readErr != nil {
@@ -238,7 +238,7 @@ func (b *Bridge) RunUDPListener(ctx context.Context) error {
 		// checksum.  We auto-detect by checking whether the trailing 2 bytes
 		// form a valid checksum; if so we strip them.
 		var ax25frame []byte
-		if stripped, ok := stripCRC(raw); ok {
+		if stripped, ok := StripCRC(raw); ok {
 			ax25frame = stripped
 		} else {
 			ax25frame = raw
@@ -248,14 +248,14 @@ func (b *Bridge) RunUDPListener(ctx context.Context) error {
 			continue
 		}
 
-		// This fires once per datagram and extractDest allocates a string
+		// This fires once per datagram and ExtractDest allocates a string
 		// nothing else here needs, so do not pay for it unless it will print.
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			// The first 7 bytes of an AX.25 frame are the destination address —
 			// for an incoming AXUDP datagram this is typically our local callsign.
 			logrus.WithFields(logrus.Fields{
 				"bytes": n,
-				"dest":  extractDest(ax25frame),
+				"dest":  ExtractDest(ax25frame),
 			}).Trace("Received AXUDP datagram")
 		}
 		b.broadcastKISS(ax25frame)
@@ -463,19 +463,19 @@ func (r *Routes) lookupMap(dest string) (MapEntry, bool) {
 	return MapEntry{}, false //nolint: exhaustruct_v5
 }
 
-// addCRC appends the 2-byte AXUDP checksum to frame and returns the
+// AddCRC appends the 2-byte AXUDP checksum to frame and returns the
 // result.  The checksum is CRC-CCITT (poly 0x1021, seed 0xFFFF, final XOR
 // 0xFFFF) over the frame bytes, appended little-endian.
-func addCRC(frame []byte) []byte {
+func AddCRC(frame []byte) []byte {
 	var crc = fcs.Calc(frame)
 
 	return append(append([]byte(nil), frame...), byte(crc), byte(crc>>8))
 }
 
-// stripCRC validates and strips the 2-byte AXUDP checksum from the
+// StripCRC validates and strips the 2-byte AXUDP checksum from the
 // end of pkt.  Returns the AX.25 frame and true if valid, or nil and false if
 // the checksum is wrong or the packet is too short.
-func stripCRC(pkt []byte) ([]byte, bool) {
+func StripCRC(pkt []byte) ([]byte, bool) {
 	if len(pkt) < 2 {
 		return nil, false
 	}
@@ -492,7 +492,7 @@ func stripCRC(pkt []byte) ([]byte, bool) {
 // sendAXUDP sends a raw AX.25 frame to the given UDP address.
 // A CRC-CCITT checksum is always appended (per RFC 1226 / AXUDP convention).
 func (b *Bridge) sendAXUDP(ax25frame []byte, entry MapEntry) {
-	var pkt = addCRC(ax25frame)
+	var pkt = AddCRC(ax25frame)
 	var n, writeErr = b.udpConn.WriteTo(pkt, entry.UDPAddr)
 	if writeErr != nil {
 		logrus.WithField("dest", entry.Addr).WithError(writeErr).Error("Could not send AXUDP datagram")
@@ -578,7 +578,7 @@ func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 	}
 	if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == kiss.CmdDataFrame {
 		var ax25frame = unwrapped[1:]
-		var dest = extractDest(ax25frame)
+		var dest = ExtractDest(ax25frame)
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithFields(logrus.Fields{
 				"dest":  dest,

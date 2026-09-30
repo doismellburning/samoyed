@@ -310,6 +310,27 @@ func Test_NewBeaconService_invalid_channel_medium_is_ignored(t *testing.T) {
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
+// A beacon can go out on an AXUDP channel, as on a network TNC's.
+func Test_NewBeaconService_axudp_channel_not_ignored(t *testing.T) {
+	var modem = new(RadioConfig)
+	modem.chan_medium[MAX_RADIO_CHANS] = MEDIUM_AXUDP
+	modem.mycall[MAX_RADIO_CHANS] = "Q1TEST"
+
+	var cfg = new(misc_config_s)
+	var igate = new(igate_config_s)
+
+	cfg.num_beacons = 1
+	cfg.beacon[0].btype = BEACON_POSITION
+	cfg.beacon[0].sendto_chan = MAX_RADIO_CHANS
+	cfg.beacon[0].delay = 60
+	cfg.beacon[0].every = 600
+	cfg.beacon[0].lat = maybe.Just(42.0)
+	cfg.beacon[0].lon = maybe.Just(-71.0)
+
+	var bs = NewBeaconService(modem, cfg, igate, nil)
+	assert.Equal(t, BEACON_POSITION, bs.miscConfig.beacon[0].btype)
+}
+
 func Test_NewBeaconService_sets_next_time_from_delay(t *testing.T) {
 	var modem = makeBeaconModemConfig()
 	var cfg = new(misc_config_s)

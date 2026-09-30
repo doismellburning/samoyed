@@ -258,6 +258,85 @@ legacy: |
 }
 
 func Test_config_yaml(t *testing.T) {
+	t.Run("an AXUDP port makes its channel an AXUDP one", func(t *testing.T) {
+		var c = parseYAMLConfig(t, `
+axudpPorts:
+  - port: 20093
+    channel: 10
+    broadcast: [nodes]
+    maps:
+      - {ax25addr: q1test-1, host: 192.0.2.1, port: 93, broadcast: true}
+      - {ax25addr: Q2TEST, host: 192.0.2.2, port: 10093}
+`)
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, MEDIUM_AXUDP, c.audio.chan_medium[10])
+		assert.Equal(t, 20093, c.audio.axudp_port[10])
+
+		var routes = c.audio.axudp_routes[10]
+		assert.Equal(t, []string{"NODES"}, routes.Broadcast)
+		if assert.Len(t, routes.Maps, 2) {
+			assert.Equal(t, "Q1TEST-1", routes.Maps[0].AX25Addr)
+			assert.Equal(t, "192.0.2.1:93", routes.Maps[0].Addr)
+			assert.True(t, routes.Maps[0].Broadcast)
+			assert.Equal(t, "Q2TEST", routes.Maps[1].AX25Addr)
+			assert.False(t, routes.Maps[1].Broadcast)
+		}
+	})
+
+	t.Run("a bad AXUDP port is refused and claims no channel", func(t *testing.T) {
+		for _, tc := range []struct {
+			name, entry, want string
+		}{
+			{"no port", "{channel: 10}", "Invalid UDP port number 0"},
+			{"port out of range", "{port: 70000, channel: 10}", "Invalid UDP port number 70000"},
+			{"no channel", "{port: 20093}", "Missing channel number"},
+			{"radio channel", "{port: 20093, channel: 0}", "must be in range"},
+			{"channel out of range", "{port: 20093, channel: 99}", "must be in range"},
+			{"map with no address", "{port: 20093, channel: 10, maps: [{host: 192.0.2.1, port: 93}]}", "ax25addr is empty"},
+			{"map with no host", "{port: 20093, channel: 10, maps: [{ax25addr: Q1TEST, port: 93}]}", "host is empty"},
+			{"map with bad port", "{port: 20093, channel: 10, maps: [{ax25addr: Q1TEST, host: 192.0.2.1}]}", "port 0 out of range"},
+			{"empty broadcast address", "{port: 20093, channel: 10, broadcast: ['']}", "broadcast address 0 is empty"},
+		} {
+			var c = parseYAMLConfig(t, "axudpPorts:\n  - "+tc.entry+"\n")
+			assert.Equal(t, 1, c.errors, tc.name)
+			assert.Contains(t, c.output, "Line 2", tc.name)
+			assert.Contains(t, c.output, tc.want, tc.name)
+			assert.NotContains(t, c.audio.chan_medium, MEDIUM_AXUDP, tc.name)
+		}
+	})
+
+	t.Run("an AXUDP port can't take a channel already in use", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "axudpPorts:\n  - {port: 20093, channel: 10}\n  - {port: 20094, channel: 10}\n")
+		assert.Equal(t, 1, c.errors)
+		assert.Contains(t, c.output, "Line 3")
+		assert.Contains(t, c.output, "already in use")
+		assert.Equal(t, 20093, c.audio.axudp_port[10])
+	})
+
+	t.Run("an AXUDP channel can be digipeated and filtered like a network TNC", func(t *testing.T) {
+		var c = parseYAMLConfig(t, `
+channels:
+  - {channel: 0, mycall: Q1TEST}
+axudpPorts:
+  - {port: 20093, channel: 10}
+legacy: |
+  DIGIPEAT 10 0 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$
+  DIGIPEAT 0 10 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$
+  FILTER 10 0 t/m
+  FILTER 0 10 t/m
+`)
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, "t/m", c.digi.filter_str[10][0])
+		assert.Equal(t, "t/m", c.digi.filter_str[0][10])
+	})
+
+	t.Run("two AXUDP ports can't share a UDP port", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "axudpPorts:\n  - {port: 20093, channel: 10}\n  - {port: 20093, channel: 11}\n")
+		assert.Equal(t, 1, c.errors)
+		assert.Contains(t, c.output, "already used by the AXUDP port for channel 10")
+		assert.Equal(t, MEDIUM_NONE, c.audio.chan_medium[11])
+	})
+
 	t.Run("a .yml file is YAML too", func(t *testing.T) {
 		var c = parseConfigNamed(t, "samoyed*.yml", "channels:\n  - {channel: 0, mycall: Q1TEST}\n")
 		assert.Equal(t, "Q1TEST", c.audio.mycall[0])

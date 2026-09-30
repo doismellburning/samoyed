@@ -51,6 +51,9 @@ nodes that speak AXUDP (raw AX.25 frames in UDP datagrams, per RFC 1226).
 samoyed-direwolf connects to samoyed-axudp using an
 NCHANNEL directive in its config file.
 
+samoyed-direwolf can also speak AXUDP itself, without this bridge: see
+axudpPorts in its YAML configuration.
+
 Usage:
   samoyed-axudp [--config <file>] [--udpport <n>] [--kissport <n>]
 
