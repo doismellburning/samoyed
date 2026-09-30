@@ -1,0 +1,39 @@
+name: "No Merge Commits"
+
+on:
+  pull_request:
+    types:
+    - "opened"
+    # Retargeting a pull request changes its base, and so the range to check.
+    - "edited"
+    - "reopened"
+    - "synchronize"
+
+permissions:
+  contents: "read"
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  no_merge_commits:
+    runs-on: "ubuntu-latest"
+    steps:
+    # The merge commit GitHub builds for a pull request is not itself in the
+    # history being merged, so fetch everything and ask about the real range.
+    - uses: "actions/checkout@v7"
+      with:
+        fetch-depth: 0
+    - name: "Check the pull request carries no merge commits"
+      env:
+        BASE_SHA: "${{ github.event.pull_request.base.sha }}"
+        HEAD_SHA: "${{ github.event.pull_request.head.sha }}"
+      run: |
+        merges="$(git log --merges --format="%h %s" "$BASE_SHA..$HEAD_SHA")"
+        if [ -n "$merges" ]; then
+          echo "::error::Merge commits found - rebase onto main rather than merging it in (see the Git and PRs section of AGENTS.md):"
+          echo "$merges"
+          exit 1
+        fi
+        echo "No merge commits"
