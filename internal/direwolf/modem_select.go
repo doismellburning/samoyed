@@ -15,35 +15,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func (m modem_t) String() string {
-	switch m {
-	case MODEM_AFSK:
-		return "AFSK"
-	case MODEM_BASEBAND:
-		return "BASEBAND"
-	case MODEM_SCRAMBLE:
-		return "SCRAMBLE"
-	case MODEM_QPSK:
-		return "QPSK"
-	case MODEM_8PSK:
-		return "8PSK"
-	case MODEM_OFF:
-		return "OFF"
-	case MODEM_16_QAM:
-		return "16QAM"
-	case MODEM_64_QAM:
-		return "64QAM"
-	case MODEM_AIS:
-		return "AIS"
-	case MODEM_EAS:
-		return "EAS"
-	case MODEM_BPSK:
-		return "BPSK"
-	default:
-		return fmt.Sprintf("modem_t(%d)", int(m))
-	}
-}
-
 // setModem sets up achan for a -B option or a MODEM line's speed: a bit rate,
 // which brings the usual modem for that rate, or AIS or EAS, which name one.
 // The modem's tones go with it, and so does the demodulator profile, unless
