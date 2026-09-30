@@ -781,7 +781,7 @@ x = Silence FX.25 information.`)
 // Should encode_object take floating point here?
 func ais_object_course_speed(A *decodedAPRS) (maybe.Maybe[int], maybe.Maybe[int]) {
 	var course = maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.course)
-	var speed = maybe.Fmap(func(mph float64) int { return int(DW_MPH_TO_KNOTS(mph) + 0.5) }, A.speedMPH)
+	var speed = maybe.Fmap(func(mph float64) int { return int(dwutil.DW_MPH_TO_KNOTS(mph) + 0.5) }, A.speedMPH)
 
 	return course, speed
 }
@@ -1088,7 +1088,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 				waypointSender.SendSentence(nameIn,
 					lat, lon, rune(A.symbolTable), A.symbolCode,
-					maybe.Fmap(DW_FEET_TO_METERS, A.altitudeFt), A.course, maybe.Fmap(DW_MPH_TO_KNOTS, A.speedMPH),
+					maybe.Fmap(DW_FEET_TO_METERS, A.altitudeFt), A.course, maybe.Fmap(dwutil.DW_MPH_TO_KNOTS, A.speedMPH),
 					A.comment)
 			}
 		}

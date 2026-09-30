@@ -11,3 +11,8 @@ package dwutil
 func DW_KNOTS_TO_MPH(x float64) float64 {
 	return x * 1.15077945
 }
+
+// DW_MPH_TO_KNOTS converts miles per hour to knots.
+func DW_MPH_TO_KNOTS(x float64) float64 {
+	return x * 0.868976
+}

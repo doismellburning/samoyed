@@ -32,11 +32,6 @@ func ADEVFIRSTCHAN(n int) int {
 	return n * 2
 }
 
-// DW_MPH_TO_KNOTS converts miles per hour to knots.
-func DW_MPH_TO_KNOTS(x float64) float64 {
-	return x * 0.868976
-}
-
 // DW_METERS_TO_FEET converts metres to feet.
 func DW_METERS_TO_FEET(x float64) float64 {
 	return x * 3.2808399
