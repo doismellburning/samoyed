@@ -1,4 +1,9 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package agwpe holds the wire format of the AGWPE TCP API, which Dire Wolf's
+// network server speaks and the AGWPE client tools use to talk to it.
+package agwpe
 
 import (
 	"encoding/binary"

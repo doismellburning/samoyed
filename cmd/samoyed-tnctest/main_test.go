@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/pkg/term"
@@ -151,16 +151,16 @@ func agwConn(t *testing.T, from int) net.Conn {
 	return tnc
 }
 
-func readHeader(t *testing.T, r io.Reader) direwolf.AGWPEHeader {
+func readHeader(t *testing.T, r io.Reader) agwpe.AGWPEHeader {
 	t.Helper()
 
-	var header direwolf.AGWPEHeader
+	var header agwpe.AGWPEHeader
 	require.NoError(t, binary.Read(r, binary.LittleEndian, &header))
 
 	return header
 }
 
-func callsign(c direwolf.AGWPECallsign) string {
+func callsign(c agwpe.AGWPECallsign) string {
 	return c.String()
 }
 
@@ -349,7 +349,7 @@ func Test_main_connects(t *testing.T) {
 	assert.Equal(t, "DW1", callsign(connect.CallTo))
 
 	// The first end reports the connection.
-	var connected = new(direwolf.AGWPEHeader)
+	var connected = new(agwpe.AGWPEHeader)
 	connected.DataKind = 'C'
 	copy(connected.CallFrom[:], "DW1")
 
@@ -387,7 +387,7 @@ func Test_main_badArguments(t *testing.T) {
 func sendFrame(t *testing.T, conn net.Conn, kind byte, from string, data string) {
 	t.Helper()
 
-	var header = new(direwolf.AGWPEHeader)
+	var header = new(agwpe.AGWPEHeader)
 	header.DataKind = kind
 	header.DataLen = uint32(len(data))
 	copy(header.CallFrom[:], from)
@@ -397,7 +397,7 @@ func sendFrame(t *testing.T, conn net.Conn, kind byte, from string, data string)
 }
 
 // readFrame reads an AGW frame, header and data, from conn.
-func readFrame(t *testing.T, conn net.Conn) (direwolf.AGWPEHeader, string) {
+func readFrame(t *testing.T, conn net.Conn) (agwpe.AGWPEHeader, string) {
 	t.Helper()
 
 	var header = readHeader(t, conn)
@@ -484,7 +484,7 @@ func Test_main_conversation(t *testing.T) {
 func Test_main_brokenFrame(t *testing.T) {
 	t.Parallel()
 
-	var promised = new(direwolf.AGWPEHeader)
+	var promised = new(agwpe.AGWPEHeader)
 	promised.DataKind = 'D'
 	promised.DataLen = 10
 

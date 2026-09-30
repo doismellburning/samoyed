@@ -17,8 +17,8 @@ import (
 	"testing"
 
 	"github.com/creack/pty"
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +37,7 @@ func acceptMonitor(t *testing.T, ln net.Listener) net.Conn {
 
 	var conn = testutils.Accept(t, ln)
 
-	var header direwolf.AGWPEHeader
+	var header agwpe.AGWPEHeader
 	require.NoError(t, binary.Read(conn, binary.LittleEndian, &header))
 	require.Equal(t, byte('k'), header.DataKind, "should ask for raw frames")
 
@@ -50,7 +50,7 @@ func sendMonitored(t *testing.T, conn net.Conn, portx byte, frame []byte) {
 
 	var data = append([]byte{portx << 4}, frame...)
 
-	var header = new(direwolf.AGWPEHeader)
+	var header = new(agwpe.AGWPEHeader)
 	header.Portx = portx
 	header.DataKind = 'K'
 	header.DataLen = uint32(len(data))
