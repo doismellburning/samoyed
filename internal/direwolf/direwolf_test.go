@@ -10,7 +10,6 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -44,13 +43,13 @@ func aisPositionReport(t *testing.T, rawSpeed int, rawCourse int) string {
 // transmitted as 82 degrees - a heading nobody reported.  Absence must
 // survive all the way into encode_object.
 func Test_ais_to_object_without_course_or_speed(t *testing.T) {
-	deviceIDData = deviceid.New()
+	var aprsDecoder = NewAPRSDecoderFromDataFiles()
 
 	var sentence = aisPositionReport(t, 1023, 3600)
 	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
 	require.NotNil(t, pp)
 
-	var A = DecodeAPRS(pp, true, "")
+	var A = aprsDecoder.Decode(pp, true)
 
 	require.True(t, A.lat.IsJust(), "position should have decoded")
 	assert.True(t, A.course.IsNothing(), "course should be unknown, got %v", A.course)
@@ -75,13 +74,13 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 // The same report with a course and speed still gets its data extension, so
 // the test above is not passing for want of anything to encode.
 func Test_ais_to_object_with_course_and_speed(t *testing.T) {
-	deviceIDData = deviceid.New()
+	var aprsDecoder = NewAPRSDecoderFromDataFiles()
 
 	var sentence = aisPositionReport(t, 208, 900) // 20.8 knots, 90 degrees
 	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
 	require.NotNil(t, pp)
 
-	var A = DecodeAPRS(pp, true, "")
+	var A = aprsDecoder.Decode(pp, true)
 
 	var course, speed = ais_object_course_speed(A)
 	assert.Equal(t, maybe.Just(90), course)
@@ -149,12 +148,12 @@ func Test_reportConfigCheck(t *testing.T) {
 // stations-heard list, so an object report can't overwrite where its sender is
 // (Dire Wolf issue 545).
 func TestMheardPosition(t *testing.T) {
-	var position = DecodeAPRS(ax25.FromText("Q1TEST>APDW17:!4237.14N/07120.83W#", true), true, "")
+	var position = new(APRSDecoder).Decode(ax25.FromText("Q1TEST>APDW17:!4237.14N/07120.83W#", true), true)
 	var lat, lon = mheardPosition(position)
 	assert.True(t, lat.IsJust())
 	assert.True(t, lon.IsJust())
 
-	var object = DecodeAPRS(ax25.FromText("Q1TEST>APDW17:;OBJECT   *111111z4237.14N/07120.83W#", true), true, "")
+	var object = new(APRSDecoder).Decode(ax25.FromText("Q1TEST>APDW17:;OBJECT   *111111z4237.14N/07120.83W#", true), true)
 	require.True(t, object.lat.IsJust(), "the object report should carry a location to ignore")
 
 	lat, lon = mheardPosition(object)

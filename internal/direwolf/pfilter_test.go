@@ -108,7 +108,7 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	var heard = ax25.FromText("Q1TEST>APDW17:!4237.14NS07120.83W#", true)
 	require.NotNil(t, heard)
 
-	var lat, lon = mheardPosition(DecodeAPRS(heard, true, ""))
+	var lat, lon = mheardPosition(new(APRSDecoder).Decode(heard, true))
 	mheardDB.SaveRF(0, heard, lat, lon)
 
 	var message = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Happy Birthday{001", true)
@@ -145,7 +145,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 		var pp = ax25.FromText(monitor, true)
 		require.NotNil(t, pp)
 
-		var lat, lon = mheardPosition(DecodeAPRS(pp, true, ""))
+		var lat, lon = mheardPosition(new(APRSDecoder).Decode(pp, true))
 		mheardDB.SaveRF(0, pp, lat, lon)
 	}
 

@@ -60,7 +60,6 @@ var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." 
 var audio_config *AudioConfig
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
-var deviceIDData *deviceid.Data
 var aprsSymbolData *symbols.Data
 var waypointSender *WaypointSender
 var packetLogger *PacketLogger

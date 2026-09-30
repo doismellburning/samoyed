@@ -212,16 +212,6 @@ func NewAPRSDecoderFromDataFiles() *APRSDecoder {
 	return NewAPRSDecoder(deviceid.New(), symbols.New())
 }
 
-// DecodeAPRS decodes pp with the package's own tables.
-func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPRS {
-	return NewAPRSDecoder(deviceIDData, aprsSymbolData).decode(pp, quiet, third_party_src)
-}
-
-// DecodeAPRSPrint prints A with the package's own tables.
-func DecodeAPRSPrint(A *decodedAPRS) {
-	NewAPRSDecoder(deviceIDData, aprsSymbolData).Print(A)
-}
-
 // Decode splits an APRS packet into the separate properties it contains.
 // With quiet set, it keeps its complaints about a malformed packet to
 // itself.
