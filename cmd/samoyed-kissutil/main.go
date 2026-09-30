@@ -30,13 +30,21 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/lestrrat-go/strftime"
 	"github.com/pkg/term"
 	"github.com/spf13/pflag"
+)
+
+// What d, p, s and t send when given no number: Dire Wolf's defaults for a
+// VHF channel, rather than whatever the TNC at the other end happens to use.
+const (
+	defaultTXDelay  = 30 // *10mS = 300mS
+	defaultPersist  = 63
+	defaultSlotTime = 10 // *10mS = 100mS
+	defaultTXTail   = 10 // *10mS = 100mS
 )
 
 /* Obtained from the command line. */
@@ -315,16 +323,16 @@ func process_input(stuff string) {
 	} else if unicode.IsLower(rune(stuff[0])) {
 		switch stuff[0] {
 		case 'd': // txDelay, 10ms units
-			var value = parse_number(stuff[1:], direwolf.DEFAULT_TXDELAY)
+			var value = parse_number(stuff[1:], defaultTXDelay)
 			send_to_kiss_tnc(channel, kiss.CmdTxDelay, []byte{byte(value)})
 		case 'p': // Persistence
-			var value = parse_number(stuff[1:], direwolf.DEFAULT_PERSIST)
+			var value = parse_number(stuff[1:], defaultPersist)
 			send_to_kiss_tnc(channel, kiss.CmdPersistence, []byte{byte(value)})
 		case 's': // Slot time, 10ms units
-			var value = parse_number(stuff[1:], direwolf.DEFAULT_SLOTTIME)
+			var value = parse_number(stuff[1:], defaultSlotTime)
 			send_to_kiss_tnc(channel, kiss.CmdSlotTime, []byte{byte(value)})
 		case 't': // txTail, 10ms units
-			var value = parse_number(stuff[1:], direwolf.DEFAULT_TXTAIL)
+			var value = parse_number(stuff[1:], defaultTXTail)
 			send_to_kiss_tnc(channel, kiss.CmdTxTail, []byte{byte(value)})
 		case 'f': // Full duplex
 			var value = parse_number(stuff[1:], 0)
