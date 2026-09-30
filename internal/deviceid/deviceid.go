@@ -305,7 +305,7 @@ func (d *Data) FromMicE(comment string) (string, string) {
 		return trimmed, device
 	}
 
-	if d == nil || len(d.ptocalls) == 0 {
+	if d == nil || len(d.pmice) == 0 {
 		logrus.Error("FromMicE called without any deviceid data.")
 
 		return trimmed, device
