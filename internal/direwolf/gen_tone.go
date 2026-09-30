@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -28,8 +27,6 @@ import (
 const PHASE_SHIFT_180 = (uint(128) << 24)
 const PHASE_SHIFT_90 = (uint(64) << 24)
 const PHASE_SHIFT_45 = (uint(32) << 24)
-
-var toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 
 // An AudioSink is where the samples the tone generator makes go: one byte of
 // sample data at a time, then a flush at the end of a transmission to push out
@@ -221,10 +218,11 @@ func newSineTable(amp int) [256]int16 {
 
 /*------------------------------------------------------------------
  *
- * Name:        GenToneInit
+ * Name:        NewToneGenerators (gen_tone_init in Dire Wolf)
  *
- * Purpose:     Initialize for AFSK tone generation which might
- *		be used for RTTY or amateur packet radio.
+ * Purpose:     Make a tone generator for each radio channel, for AFSK
+ *		tone generation which might be used for RTTY or amateur
+ *		packet radio.
  *
  * Inputs:      audio_config_p		- Pointer to modem parameter structure, modem_s.
  *
@@ -244,16 +242,17 @@ func newSineTable(amp int) [256]int16 {
  *				  for the "direwolf" application, a .WAV file for
  *				  the "gen_packets" utility.
  *
- * Returns:     0 for success.
- *              -1 for failure.
+ * Returns:     A tone generator for each radio channel, nil for the rest.
  *
  * Description:	 Calculate various constants for use by the direct digital synthesis
  * 		audio tone generation.
  *
  *----------------------------------------------------------------*/
 
-func GenToneInit(audio_config_p *AudioConfig, amp int, sink AudioSink) int {
+func NewToneGenerators(audio_config_p *AudioConfig, amp int, sink AudioSink) [MAX_RADIO_CHANS]*ToneGenerator {
 	logrus.WithField("amp", amp).Debug("gen_tone_init")
+
+	var toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 
 	for channel := range MAX_RADIO_CHANS {
 		if audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
@@ -261,8 +260,8 @@ func GenToneInit(audio_config_p *AudioConfig, amp int, sink AudioSink) int {
 		}
 	}
 
-	return (0)
-} /* end GenToneInit */
+	return toneGenerators
+} /* end NewToneGenerators */
 
 // NewGenToneTestConfig returns an AudioConfig for the standalone gen_tone
 // test program: the default audio device, defined so that AudioOpen sets it
@@ -291,13 +290,11 @@ func NewGenToneTestConfig(numChannels int) *AudioConfig {
 
 /*-------------------------------------------------------------------
  *
- * Name:        ToneGenPutBit
+ * Name:        PutBit (tone_gen_put_bit in Dire Wolf)
  *
  * Purpose:     Generate tone of proper duration for one data bit.
  *
- * Inputs:      channel	- Audio channel, 0 = first.
- *
- *		dat	- 0 for f1, 1 for f2.
+ * Inputs:      dat	- 0 for f1, 1 for f2.
  *
  * 			  	-1 inserts half bit to test data
  *				recovery PLL.
@@ -386,18 +383,6 @@ static const float ci[8] = { 1,	.7071,	0,	-.7071,	-1,	-.7071,	0,	.7071	};
 static const float sq[8] = { 0,	.7071,	1,	.7071,	0,	-.7071,	-1,	-.7071	};
 #endif
 */
-
-// ToneGenPutBit sends one bit on channel's tone generator.
-func ToneGenPutBit(channel int, dat int) {
-	if toneGenerators[channel] == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for tone generation.\n", channel)
-
-		return
-	}
-
-	toneGenerators[channel].PutBit(dat)
-} /* end ToneGenPutBit */
 
 func (tg *ToneGenerator) PutBit(dat int) {
 	var audioConfig = tg.audioConfig
@@ -604,17 +589,6 @@ func (tg *ToneGenerator) PutBit(dat int) {
 	tg.bitLenAcc -= tg.ticksPerBit
 
 	tg.prevDat = dat // Only needed for G3RUH baseband/scrambled.
-}
-
-func gen_tone_put_sample(channel int, a int, sam int) { //nolint:unparam
-	if toneGenerators[channel] == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for tone generation.\n", channel)
-
-		return
-	}
-
-	toneGenerators[channel].PutSample(sam)
 }
 
 func (tg *ToneGenerator) PutSample(sam int) {

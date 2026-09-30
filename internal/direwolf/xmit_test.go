@@ -285,10 +285,10 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 
 	const channel = 0
 
-	var origToneGen, origGenerators = toneGenCapture, toneGenerators
+	var origToneGen = toneGenCapture
 
 	t.Cleanup(func() {
-		toneGenCapture, toneGenerators = origToneGen, origGenerators
+		toneGenCapture = origToneGen
 
 		for p := range TQ_NUM_PRIO {
 			for transmitQueue.Remove(channel, p) != nil { //revive:disable-line:empty-block
@@ -328,11 +328,10 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	audio.dev[0].outbufSizeInBytes = 4096
 	audio.dev[0].outbuf = make([]byte, audio.dev[0].outbufSizeInBytes)
 
-	GenToneInit(audioConfig, 100, audio)
-
 	var xs = new(XmitService)
 	xs.p_modem = audioConfig
 	xs.audio = audio
+	xs.toneGenerators = NewToneGenerators(audioConfig, 100, audio)
 	xs.bits_per_sec[channel] = 1200
 	xs.audioOutAvailable[0] = true
 
@@ -780,8 +779,8 @@ func TestXmitNextMorseSpeedFromSSID(t *testing.T) {
 	// depend on how morse timing is worked out.
 	const message = "OS" // Long enough for the speed to dominate the padding.
 
-	var atDefault = morse_send(toneGenerators[0], 0, message, MORSE_DEFAULT_WPM, 300, 250)
-	var atDouble = morse_send(toneGenerators[0], 0, message, MORSE_DEFAULT_WPM*2, 300, 250)
+	var atDefault = morse_send(xs.toneGenerators[0], 0, message, MORSE_DEFAULT_WPM, 300, 250)
+	var atDouble = morse_send(xs.toneGenerators[0], 0, message, MORSE_DEFAULT_WPM*2, 300, 250)
 
 	require.Less(t, atDouble, atDefault/2+atDefault/4,
 		"the two speeds are too close together for this to show anything")
@@ -821,9 +820,9 @@ func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 	// dtmf_send generates the sound and says how long it is, without waiting
 	// for it, so asking it costs nothing - and comparing against its own
 	// answers means this does not depend on how DTMF timing is worked out.
-	var atDefault = dtmf_send(toneGenerators[0], 0, message, defaultSpeed, 300, 250)
-	var atMaximum = dtmf_send(toneGenerators[0], 0, message, maximumSpeed, 300, 250)
-	var atAskedFor = dtmf_send(toneGenerators[0], 0, message, askedFor, 300, 250)
+	var atDefault = dtmf_send(xs.toneGenerators[0], 0, message, defaultSpeed, 300, 250)
+	var atMaximum = dtmf_send(xs.toneGenerators[0], 0, message, maximumSpeed, 300, 250)
+	var atAskedFor = dtmf_send(xs.toneGenerators[0], 0, message, askedFor, 300, 250)
 
 	require.Less(t, atMaximum, atDefault-400,
 		"the default and maximum speeds are too close together for this to show anything")

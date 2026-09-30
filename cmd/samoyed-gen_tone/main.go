@@ -47,15 +47,15 @@ func genTone(open openSink) {
 	var config = direwolf.NewGenToneTestConfig(1)
 
 	var sink, closeSink = open(config)
-	direwolf.GenToneInit(config, 100, sink)
+	var toneGenerators = direwolf.NewToneGenerators(config, 100, sink)
 
 	for range 2 {
 		for range baud * 2 {
-			direwolf.ToneGenPutBit(chan1, 1)
+			toneGenerators[chan1].PutBit(1)
 		}
 
 		for range baud * 2 {
-			direwolf.ToneGenPutBit(chan1, 0)
+			toneGenerators[chan1].PutBit(0)
 		}
 	}
 
@@ -66,23 +66,23 @@ func genTone(open openSink) {
 	config = direwolf.NewGenToneTestConfig(2)
 
 	sink, closeSink = open(config)
-	direwolf.GenToneInit(config, 100, sink)
+	toneGenerators = direwolf.NewToneGenerators(config, 100, sink)
 
 	for range 4 {
 		for range baud * 2 {
-			direwolf.ToneGenPutBit(chan1, 1)
+			toneGenerators[chan1].PutBit(1)
 		}
 
 		for range baud * 2 {
-			direwolf.ToneGenPutBit(chan1, 0)
+			toneGenerators[chan1].PutBit(0)
 		}
 
 		for range baud * 2 {
-			direwolf.ToneGenPutBit(chan2, 1)
+			toneGenerators[chan2].PutBit(1)
 		}
 
 		for range baud * 2 {
-			direwolf.ToneGenPutBit(chan2, 0)
+			toneGenerators[chan2].PutBit(0)
 		}
 	}
 

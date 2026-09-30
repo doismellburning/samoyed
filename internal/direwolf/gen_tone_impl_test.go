@@ -426,15 +426,11 @@ func TestNewGenToneTestConfig(t *testing.T) {
 	assert.Equal(t, MEDIUM_RADIO, config.chan_medium[0])
 }
 
-func TestGenToneInitAndChannelFunctions(t *testing.T) {
-	var saved = toneGenerators
-
-	t.Cleanup(func() { toneGenerators = saved })
-
+func TestNewToneGeneratorsAndSenderFunctions(t *testing.T) {
 	var audioConfig = newTestAudioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 12000)
 	var sink = new(byteSink)
 
-	assert.Zero(t, GenToneInit(audioConfig, 100, sink))
+	var toneGenerators = NewToneGenerators(audioConfig, 100, sink)
 	require.NotNil(t, toneGenerators[0])
 	assert.Nil(t, toneGenerators[1], "only radio channels get a tone generator")
 
@@ -443,7 +439,7 @@ func TestGenToneInitAndChannelFunctions(t *testing.T) {
 	sender.putBit(1)
 	assert.Len(t, sink.data, 20)
 
-	gen_tone_put_sample(0, 0, 0x0102)
+	toneGenerators[0].PutSample(0x0102)
 	assert.Equal(t, []byte{0x02, 0x01}, sink.data[20:])
 
 	sender.putQuietMs(1) // 12 samples.
@@ -452,11 +448,9 @@ func TestGenToneInitAndChannelFunctions(t *testing.T) {
 	sender.flush()
 	assert.Equal(t, 1, sink.flushes)
 
-	// A channel without a tone generator is reported and ignored.
+	// A sender without a tone generator reports and ignores it.
 	var noTone = NewHDLCSender(1, audioConfig, toneGenerators[1], 0)
 
-	ToneGenPutBit(1, 1)
-	gen_tone_put_sample(1, 0, 0)
 	noTone.putBit(1)
 	noTone.putQuietMs(10)
 	noTone.flush()

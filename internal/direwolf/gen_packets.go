@@ -81,11 +81,12 @@ type GenPacketsOptions struct {
 
 // A GenPackets turns frames into audio, writing it to a .WAV file.
 type GenPackets struct {
-	audio     *AudioConfig
-	amplitude int
-	morseWPM  int
-	rand      *genPacketsPRNG
-	sink      *wavFileSink
+	audio          *AudioConfig
+	amplitude      int
+	morseWPM       int
+	rand           *genPacketsPRNG
+	sink           *wavFileSink
+	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 
 	// One per channel, kept for the whole run, so the NRZI line level carries
 	// over from one packet to the next as it does on the air.
@@ -171,10 +172,10 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 // setTones makes the tone generators afresh from the current settings, and
 // hands each channel's to its HDLCSender, which keeps its line level.
 func (g *GenPackets) setTones() {
-	GenToneInit(g.audio, g.amplitude/2, g.sink)
+	g.toneGenerators = NewToneGenerators(g.audio, g.amplitude/2, g.sink)
 
 	for c, s := range g.hdlcSenders {
-		s.toneGenerator = toneGenerators[c]
+		s.toneGenerator = g.toneGenerators[c]
 	}
 }
 
@@ -280,7 +281,7 @@ func (g *GenPackets) SendPacket(str string) error {
 	if g.morseWPM > 0 {
 		// Why not use the destination field instead of command line option?
 		// For one thing, this is not in TNC-2 monitor format.
-		morse_send(toneGenerators[0], 0, str, g.morseWPM, 100, 100)
+		morse_send(g.toneGenerators[0], 0, str, g.morseWPM, 100, 100)
 
 		return nil
 	}
@@ -343,7 +344,7 @@ func (g *GenPackets) SendPacket(str string) error {
 		var n = int(float64(samples_per_symbol) * (32 + float64(g.rand.next())/float64(MY_RAND_MAX)))
 
 		for range n {
-			gen_tone_put_sample(c, 0, 0)
+			g.toneGenerators[c].PutSample(0)
 		}
 
 		g.hdlcSenders[c].SendPreamblePostamble(32, false)

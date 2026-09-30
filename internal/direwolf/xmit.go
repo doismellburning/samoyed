@@ -104,6 +104,12 @@ type XmitService struct {
 	 */
 	hdlcSenders [MAX_RADIO_CHANS]*HDLCSender
 
+	/*
+	 * Each radio channel's tone generator.  Only that channel's
+	 * xmit_thread drives it.
+	 */
+	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
+
 	p_modem   *AudioConfig
 	fx25Debug int
 }
@@ -117,6 +123,8 @@ type XmitService struct {
  * Inputs:	p_modem		- Structure with modem and timing parameters.
  *
  *		audio		- The audio devices to transmit through.
+ *
+ *		toneGenerators	- Each radio channel's tone generator.
  *
  *		fx25Debug	- FX.25's debug level, for each channel's
  *				  HDLCSender.
@@ -136,11 +144,12 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(ctx context.Context, p_modem *AudioConfig, audio *AudioDevices, debug_xmit_packet bool, fx25Debug int) *XmitService {
+func NewXmitService(ctx context.Context, p_modem *AudioConfig, audio *AudioDevices, toneGenerators [MAX_RADIO_CHANS]*ToneGenerator, debug_xmit_packet bool, fx25Debug int) *XmitService {
 	logrus.Debug("xmit_init")
 	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem
 	xs.audio = audio
+	xs.toneGenerators = toneGenerators
 	xs.fx25Debug = fx25Debug
 
 	xs.debugXmitPacket = debug_xmit_packet
@@ -244,7 +253,7 @@ func (xs *XmitService) SetFulldup(channel int, value bool) {
 // own xmit_thread asks for it, so there is nothing to lock.
 func (xs *XmitService) hdlcSender(channel int) *HDLCSender {
 	if xs.hdlcSenders[channel] == nil {
-		xs.hdlcSenders[channel] = NewHDLCSender(channel, xs.p_modem, toneGenerators[channel], xs.fx25Debug)
+		xs.hdlcSenders[channel] = NewHDLCSender(channel, xs.p_modem, xs.toneGenerators[channel], xs.fx25Debug)
 	}
 
 	return xs.hdlcSenders[channel]
@@ -1086,7 +1095,7 @@ func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = morse_send(toneGenerators[c], c, string(pinfo), wpm, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
+	var _length_ms = morse_send(xs.toneGenerators[c], c, string(pinfo), wpm, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.
@@ -1136,7 +1145,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = dtmf_send(toneGenerators[c], c, string(pinfo), speed, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
+	var _length_ms = dtmf_send(xs.toneGenerators[c], c, string(pinfo), speed, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.
