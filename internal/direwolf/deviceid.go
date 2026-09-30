@@ -197,7 +197,7 @@ func NewDeviceIDData() *DeviceIDData {
 
 /*------------------------------------------------------------------
  *
- * Function:	deviceid_decode_dest
+ * Function:	FromDest
  *
  * Purpose:	Find vendor/model for destination address of form APxxxx.
  *
@@ -217,11 +217,11 @@ func NewDeviceIDData() *DeviceIDData {
  *
  *------------------------------------------------------------------*/
 
-func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
+func (d *DeviceIDData) FromDest(dest string) string {
 	var device = "UNKNOWN vendor/model"
 
 	if d == nil || len(d.ptocalls) == 0 {
-		logrus.Error("deviceid_decode_dest called without any deviceid data.")
+		logrus.Error("FromDest called without any deviceid data.")
 
 		return device
 	}
@@ -254,7 +254,7 @@ func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
 
 /*------------------------------------------------------------------
  *
- * Function:	deviceid_decode_mice
+ * Function:	FromMicE
  *
  * Purpose:	Find vendor/model for MIC-E comment.
  *
@@ -292,7 +292,7 @@ func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
  *			Understanding APRS Packets
  *------------------------------------------------------------------*/
 
-func (d *DeviceIDData) deviceid_decode_mice(comment string) (string, string) {
+func (d *DeviceIDData) FromMicE(comment string) (string, string) {
 	var device = "UNKNOWN vendor/model"
 	var trimmed = comment
 
@@ -301,7 +301,7 @@ func (d *DeviceIDData) deviceid_decode_mice(comment string) (string, string) {
 	}
 
 	if d == nil || len(d.ptocalls) == 0 {
-		logrus.Error("deviceid_decode_mice called without any deviceid data.")
+		logrus.Error("FromMicE called without any deviceid data.")
 
 		return trimmed, device
 	}
