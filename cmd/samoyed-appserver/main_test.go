@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -56,8 +57,8 @@ func (f *fakeTNC) SetWriteDeadline(_ time.Time) error { return nil }
 type tncFrame struct {
 	kind     byte
 	channel  byte
-	callFrom Callsign
-	callTo   Callsign
+	callFrom agwpe.Callsign
+	callTo   agwpe.Callsign
 	data     string
 }
 
@@ -68,7 +69,7 @@ func (f *fakeTNC) frames(t *testing.T) []tncFrame {
 	var frames []tncFrame
 
 	for {
-		var h = new(AGWPEHeader)
+		var h = new(agwpe.Header)
 
 		var readErr = binary.Read(f, binary.LittleEndian, h)
 		if errors.Is(readErr, io.EOF) {
@@ -123,8 +124,8 @@ func hasDisconnect(frames []tncFrame) bool {
 	return false
 }
 
-func testCallsign(call string) Callsign {
-	var c Callsign
+func testCallsign(call string) agwpe.Callsign {
+	var c agwpe.Callsign
 
 	copy(c[:], call)
 
@@ -569,14 +570,14 @@ func TestMainRegistersOnEachPort(t *testing.T) {
 
 	var tnc = testutils.Accept(t, ln)
 
-	var h = new(AGWPEHeader)
+	var h = new(agwpe.Header)
 
 	require.NoError(t, binary.Read(tnc, binary.LittleEndian, h))
 	assert.Equal(t, byte('G'), h.DataKind)
 
 	var ports = "2;Port1 first;Port2 second;"
 
-	var reply = new(AGWPEHeader)
+	var reply = new(agwpe.Header)
 	reply.DataKind = 'G'
 	reply.DataLen = uint32(len(ports))
 

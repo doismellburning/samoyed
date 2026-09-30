@@ -67,37 +67,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/agwpe"
 )
 
 const AX25_MAX_INFO_LEN = 2048 // Duplicated from C to avoid cgo
 const MAX_TOTAL_CHANS = 16     // Duplicated from C to avoid cgo
 
-type Callsign [10]byte
-
-// String implements fmt.Stringer so a Callsign is printed as text (trimming
-// the trailing NUL padding) rather than as a raw byte array.
-func (c Callsign) String() string {
-	return dwutil.ByteArrayToString(c[:])
-}
-
-type AGWPEHeader struct {
-	Portx        byte
-	Reserved1    byte
-	Reserved2    byte
-	Reserved3    byte
-	DataKind     byte
-	Reserved4    byte
-	PID          byte
-	Reserved5    byte
-	CallFrom     Callsign
-	CallTo       Callsign
-	DataLen      uint32
-	UserReserved [4]byte
-}
-
 type AGWPECommand struct {
-	Header *AGWPEHeader
+	Header *agwpe.Header
 	Data   []byte
 }
 
@@ -200,7 +177,7 @@ func tnc_listen_thread() {
 
 			time.Sleep(5 * time.Second)
 		} else {
-			var header = new(AGWPEHeader)
+			var header = new(agwpe.Header)
 
 			var readErr = binary.Read(s_tnc_sock, binary.LittleEndian, header)
 			if readErr != nil {
@@ -330,8 +307,8 @@ func process_from_tnc(cmd *AGWPECommand) {
  *
  *--------------------------------------------------------------------*/
 
-func agwlib_X_register_callsign(channel byte, call_from Callsign) error {
-	var h = new(AGWPEHeader)
+func agwlib_X_register_callsign(channel byte, call_from agwpe.Callsign) error {
+	var h = new(agwpe.Header)
 
 	h.Portx = channel
 	h.DataKind = 'X'
@@ -354,8 +331,8 @@ func agwlib_X_register_callsign(channel byte, call_from Callsign) error {
  *
  *--------------------------------------------------------------------*/
 
-func agwlib_x_unregister_callsign(channel byte, call_from Callsign) error {
-	var h = new(AGWPEHeader)
+func agwlib_x_unregister_callsign(channel byte, call_from agwpe.Callsign) error {
+	var h = new(agwpe.Header)
 
 	h.Portx = channel
 	h.DataKind = 'x'
@@ -375,7 +352,7 @@ func agwlib_x_unregister_callsign(channel byte, call_from Callsign) error {
  *--------------------------------------------------------------------*/
 
 func agwlib_G_ask_port_information() error {
-	var h = new(AGWPEHeader)
+	var h = new(agwpe.Header)
 
 	h.DataKind = 'G'
 
@@ -399,8 +376,8 @@ func agwlib_G_ask_port_information() error {
  *
  *--------------------------------------------------------------------*/
 
-func agwlib_C_connect(channel byte, call_from Callsign, call_to Callsign) error {
-	var h = new(AGWPEHeader)
+func agwlib_C_connect(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign) error {
+	var h = new(agwpe.Header)
 
 	h.Portx = channel
 	h.DataKind = 'C'
@@ -428,8 +405,8 @@ func agwlib_C_connect(channel byte, call_from Callsign, call_to Callsign) error 
  *
  *--------------------------------------------------------------------*/
 
-func agwlib_d_disconnect(channel byte, call_from Callsign, call_to Callsign) error {
-	var h = new(AGWPEHeader)
+func agwlib_d_disconnect(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign) error {
+	var h = new(agwpe.Header)
 
 	h.Portx = channel
 	h.DataKind = 'd'
@@ -460,8 +437,8 @@ func agwlib_d_disconnect(channel byte, call_from Callsign, call_to Callsign) err
  *
  *--------------------------------------------------------------------*/
 
-func agwlib_D_send_connected_data(channel byte, pid byte, call_from Callsign, call_to Callsign, data []byte) error { //nolint:unparam
-	var h = new(AGWPEHeader)
+func agwlib_D_send_connected_data(channel byte, pid byte, call_from agwpe.Callsign, call_to agwpe.Callsign, data []byte) error { //nolint:unparam
+	var h = new(agwpe.Header)
 
 	h.Portx = channel
 	h.DataKind = 'D'
@@ -511,8 +488,8 @@ func agwlib_D_send_connected_data(channel byte, pid byte, call_from Callsign, ca
  *
  *--------------------------------------------------------------------*/
 
-func agwlib_Y_outstanding_frames_for_station(channel byte, call_from Callsign, call_to Callsign) error {
-	var h = new(AGWPEHeader)
+func agwlib_Y_outstanding_frames_for_station(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign) error {
+	var h = new(agwpe.Header)
 
 	h.Portx = channel
 	h.DataKind = 'Y'

@@ -6,6 +6,7 @@ package main
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,16 +21,16 @@ func TestAgwlibCommands(t *testing.T) {
 	require.NoError(t, agwlib_C_connect(2, testMyCall, testTheirCall))
 
 	assert.Equal(t, []tncFrame{
-		{kind: 'X', channel: 1, callFrom: testMyCall, callTo: Callsign{}, data: ""},
-		{kind: 'x', channel: 1, callFrom: testMyCall, callTo: Callsign{}, data: ""},
-		{kind: 'G', channel: 0, callFrom: Callsign{}, callTo: Callsign{}, data: ""},
+		{kind: 'X', channel: 1, callFrom: testMyCall, callTo: agwpe.Callsign{}, data: ""},
+		{kind: 'x', channel: 1, callFrom: testMyCall, callTo: agwpe.Callsign{}, data: ""},
+		{kind: 'G', channel: 0, callFrom: agwpe.Callsign{}, callTo: agwpe.Callsign{}, data: ""},
 		{kind: 'C', channel: 2, callFrom: testMyCall, callTo: testTheirCall, data: ""},
 	}, tnc.frames(t))
 }
 
 // fromTNC builds a command as tnc_listen_thread would hand it on.
-func fromTNC(kind byte, channel byte, callFrom Callsign, callTo Callsign, data string) *AGWPECommand {
-	var h = new(AGWPEHeader)
+func fromTNC(kind byte, channel byte, callFrom agwpe.Callsign, callTo agwpe.Callsign, data string) *AGWPECommand {
+	var h = new(agwpe.Header)
 
 	h.DataKind = kind
 	h.Portx = channel
@@ -98,11 +99,11 @@ func TestProcessFromTNCOutgoingConnection(t *testing.T) {
 func TestProcessFromTNCPortInformation(t *testing.T) {
 	var tnc = newTestServer(t)
 
-	process_from_tnc(fromTNC('G', 0, Callsign{}, Callsign{}, "2;Port1 first soundcard mono;Port3 second soundcard mono;"))
+	process_from_tnc(fromTNC('G', 0, agwpe.Callsign{}, agwpe.Callsign{}, "2;Port1 first soundcard mono;Port3 second soundcard mono;"))
 
 	assert.Equal(t, []tncFrame{
-		{kind: 'X', channel: 0, callFrom: testMyCall, callTo: Callsign{}, data: ""},
-		{kind: 'X', channel: 2, callFrom: testMyCall, callTo: Callsign{}, data: ""},
+		{kind: 'X', channel: 0, callFrom: testMyCall, callTo: agwpe.Callsign{}, data: ""},
+		{kind: 'X', channel: 2, callFrom: testMyCall, callTo: agwpe.Callsign{}, data: ""},
 	}, tnc.frames(t))
 }
 
@@ -117,8 +118,8 @@ func TestPortInformationRejectsBadDescriptions(t *testing.T) {
 	})
 
 	assert.Equal(t, []tncFrame{
-		{kind: 'X', channel: 1, callFrom: testMyCall, callTo: Callsign{}, data: ""},
-		{kind: 'X', channel: 15, callFrom: testMyCall, callTo: Callsign{}, data: ""},
+		{kind: 'X', channel: 1, callFrom: testMyCall, callTo: agwpe.Callsign{}, data: ""},
+		{kind: 'X', channel: 15, callFrom: testMyCall, callTo: agwpe.Callsign{}, data: ""},
 	}, tnc.frames(t))
 }
 
@@ -127,7 +128,7 @@ func TestProcessFromTNCEmptyPortInformation(t *testing.T) {
 	var tnc = newTestServer(t)
 
 	for _, data := range []string{"0;", "", ";;;"} {
-		process_from_tnc(fromTNC('G', 0, Callsign{}, Callsign{}, data))
+		process_from_tnc(fromTNC('G', 0, agwpe.Callsign{}, agwpe.Callsign{}, data))
 	}
 
 	assert.Empty(t, tnc.frames(t))

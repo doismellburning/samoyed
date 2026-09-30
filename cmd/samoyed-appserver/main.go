@@ -25,11 +25,12 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/spf13/pflag"
 )
 
-var mycall Callsign /* Callsign, with SSID, for the application. */
+var mycall agwpe.Callsign /* Callsign, with SSID, for the application. */
 /* Future?  Could have multiple applications, on the same */
 /* radio channel, each with its own SSID. */
 
@@ -52,13 +53,13 @@ var tnc_port = "8000" /* a TCP port number  */
 
 type sessionKey struct {
 	channel byte
-	addr    Callsign
+	addr    agwpe.Callsign
 }
 
 type session struct {
 	sessionKey // Radio channel & callsign of other station.
 
-	localCall Callsign // Callsign of ours the other station connected to.  Might be an alias.
+	localCall agwpe.Callsign // Callsign of ours the other station connected to.  Might be an alias.
 
 	loginTime time.Time // Time when connection established.
 
@@ -112,7 +113,7 @@ func newAppServer() *appServer {
 var srv = newAppServer()
 
 // findSession looks up an existing session, returning nil if there isn't one.
-func (srv *appServer) findSession(channel byte, addr Callsign) *session {
+func (srv *appServer) findSession(channel byte, addr agwpe.Callsign) *session {
 	srv.mu.RLock()
 	defer srv.mu.RUnlock()
 
@@ -121,7 +122,7 @@ func (srv *appServer) findSession(channel byte, addr Callsign) *session {
 
 // getOrCreateSession returns the existing session for channel/addr, creating one if necessary.
 // localCall is the callsign of ours that the other station connected to.
-func (srv *appServer) getOrCreateSession(channel byte, addr Callsign, localCall Callsign) *session {
+func (srv *appServer) getOrCreateSession(channel byte, addr agwpe.Callsign, localCall agwpe.Callsign) *session {
 	var key = sessionKey{channel: channel, addr: addr}
 
 	srv.mu.Lock()
@@ -142,7 +143,7 @@ func (srv *appServer) getOrCreateSession(channel byte, addr Callsign, localCall 
 	return s
 }
 
-func (srv *appServer) removeSession(channel byte, addr Callsign) {
+func (srv *appServer) removeSession(channel byte, addr agwpe.Callsign) {
 	srv.mu.Lock()
 	defer srv.mu.Unlock()
 
@@ -473,7 +474,7 @@ func timingTestFrame(seq int, length int) []byte {
  *--------------------------------------------------------------------*/
 
 // old void agw_cb_C_connection_received (int chan, char *call_from, char *call_to, int data_len, char *data)
-func on_C_connection_received(channel byte, call_from Callsign, call_to Callsign, incoming bool, data []byte) { //nolint:unparam
+func on_C_connection_received(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign, incoming bool, data []byte) { //nolint:unparam
 	srv.getOrCreateSession(channel, call_from, call_to)
 
 	fmt.Printf("Begin session %d,%s: %s\n", channel, call_from, data)
@@ -507,7 +508,7 @@ func on_C_connection_received(channel byte, call_from Callsign, call_to Callsign
  *
  *--------------------------------------------------------------------*/
 
-func agw_cb_d_disconnected(channel byte, call_from Callsign, call_to Callsign, data []byte) { //nolint:unparam
+func agw_cb_d_disconnected(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign, data []byte) { //nolint:unparam
 	var dataStr = strings.TrimSpace(string(data))
 
 	fmt.Printf("End session %d,%s: %s\n", channel, call_from, dataStr)
@@ -534,7 +535,7 @@ func agw_cb_d_disconnected(channel byte, call_from Callsign, call_to Callsign, d
  *--------------------------------------------------------------------*/
 
 // commandHandler implements one connected-mode user command (e.g. "who", "bye").
-type commandHandler func(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte)
+type commandHandler func(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, rest []byte)
 
 // command is one user command, along with what "?" and "HELP" say about it.
 type command struct {
@@ -617,7 +618,7 @@ func lookupCommand(name string) *command {
 	return nil
 }
 
-func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign, data []byte) {
+func agw_cb_D_connected_data(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign, data []byte) {
 	var s = srv.findSession(channel, call_from)
 
 	var dataStr = strings.TrimSpace(string(data))
@@ -663,7 +664,7 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 
 // sendLines sends one connected-mode frame per line, each ending with the
 // carriage return AX.25 terminals expect.
-func sendLines(channel byte, call_to Callsign, call_from Callsign, lines []string) {
+func sendLines(channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, lines []string) {
 	for _, line := range lines {
 		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(line+"\r"))
 	}
@@ -675,7 +676,7 @@ func sendLines(channel byte, call_to Callsign, call_from Callsign, lines []strin
 const loginTimeFormat = "2006-01-02 15:04:05Z"
 
 // cmd_who lists people currently logged in.
-func cmd_who(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
+func cmd_who(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, rest []byte) {
 	var lines = []string{fmt.Sprintf("%-7s %-7s %-9s %s", "Session", "Channel", "User", "Since")}
 
 	for n, other := range srv.sortedSessions() {
@@ -693,7 +694,7 @@ func cmd_who(s *session, channel byte, call_to Callsign, call_from Callsign, res
 const maxTestCount = 1000
 
 // cmd_test runs a timing test: send the specified number of frames with optional length.
-func cmd_test(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
+func cmd_test(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, rest []byte) {
 	var _pcount, rest2, _ = BytesCut(rest, ' ')
 
 	var pcount = string(_pcount)
@@ -755,7 +756,7 @@ func cmd_test(s *session, channel byte, call_to Callsign, call_from Callsign, re
 // for the outgoing queue to drain before pulling the link down.  We are on the
 // listener goroutine here, and every session on every channel shares it, so
 // waiting for anything at all would freeze the lot of them.
-func cmd_bye(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
+func cmd_bye(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, rest []byte) {
 	var farewell = "Thank you folks for kindly droppin' in.  Y'all come on back now, ya hear?\r"
 
 	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(farewell))
@@ -767,7 +768,7 @@ func cmd_bye(s *session, channel byte, call_to Callsign, call_from Callsign, res
 }
 
 // cmd_help lists the commands, or describes the one named.
-func cmd_help(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
+func cmd_help(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, rest []byte) {
 	var _topic, _, _ = BytesCut(bytes.TrimSpace(rest), ' ')
 
 	var topic = strings.ToLower(string(_topic))
@@ -875,7 +876,7 @@ func agw_cb_G_port_information(num_chan_avail int, chan_descriptions []string) {
  *
  *--------------------------------------------------------------------*/
 
-func agw_cb_Y_outstanding_frames_for_station(channel byte, call_from Callsign, call_to Callsign, frame_count int) { //nolint:unparam
+func agw_cb_Y_outstanding_frames_for_station(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign, frame_count int) { //nolint:unparam
 	var s = srv.findSession(channel, call_to)
 
 	if s == nil {
