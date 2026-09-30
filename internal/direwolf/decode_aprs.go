@@ -183,23 +183,56 @@ type decodedAPRS struct {
 // unknownDevice is what mfr holds when the sending device can't be identified.
 const unknownDevice = "UNKNOWN vendor/model"
 
-/*------------------------------------------------------------------
- *
- * Function:	DecodeAPRSInit
- *
- * Purpose:	Prepare the tables that decoding and printing an APRS packet
- *		need, for a program that does nothing else.
- *
- * Description:	The full application sets these up as part of its own startup;
- *		this is for the standalone tools, which would otherwise be a
- *		nil pointer away from a crash the first time they decoded
- *		anything.
- *
- *------------------------------------------------------------------*/
+// APRSDecoder decodes APRS packets and prints what it finds, using the
+// tables that identify a packet's sending device and describe its symbol.
+//
+// The zero value decodes without either, so it identifies no device and
+// describes no symbol - which is all that checking a filter's syntax needs.
+// The tables are only read once loaded, so one APRSDecoder can be shared
+// between goroutines.
+type APRSDecoder struct {
+	deviceIDs *deviceid.Data
+	symbols   *symbols.Data
+}
 
+// NewAPRSDecoder returns an APRSDecoder that identifies devices from
+// deviceIDs and describes symbols from symbolData.  Either may be nil.
+func NewAPRSDecoder(deviceIDs *deviceid.Data, symbolData *symbols.Data) *APRSDecoder {
+	var d = new(APRSDecoder)
+	d.deviceIDs = deviceIDs
+	d.symbols = symbolData
+
+	return d
+}
+
+// NewAPRSDecoderFromDataFiles returns an APRSDecoder with its tables read
+// from the tocalls.yaml and symbols-new.txt data files, for a program that
+// has no other use for them.
+func NewAPRSDecoderFromDataFiles() *APRSDecoder {
+	return NewAPRSDecoder(deviceid.New(), symbols.New())
+}
+
+// DecodeAPRSInit loads the tables that DecodeAPRS and DecodeAPRSPrint use.
 func DecodeAPRSInit() {
 	deviceIDData = deviceid.New()
 	aprsSymbolData = symbols.New()
+}
+
+// DecodeAPRS decodes pp with the package's own tables.
+func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPRS {
+	return NewAPRSDecoder(deviceIDData, aprsSymbolData).decode(pp, quiet, third_party_src)
+}
+
+// DecodeAPRSPrint prints A with the package's own tables.
+func DecodeAPRSPrint(A *decodedAPRS) {
+	NewAPRSDecoder(deviceIDData, aprsSymbolData).Print(A)
+}
+
+// Decode splits an APRS packet into the separate properties it contains.
+// With quiet set, it keeps its complaints about a malformed packet to
+// itself.
+func (d *APRSDecoder) Decode(pp *ax25.Packet, quiet bool) *decodedAPRS {
+	return d.decode(pp, quiet, "")
 }
 
 /*------------------------------------------------------------------
@@ -229,7 +262,7 @@ func DecodeAPRSInit() {
  *
  *------------------------------------------------------------------*/
 
-func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPRS {
+func (d *APRSDecoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPRS {
 	var pinfo = pp.Info()
 
 	var A = new(decodedAPRS)
@@ -312,7 +345,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPR
 		if pp_payload != nil {
 			var payload_src = pinfo[1:]
 			payload_src, _, _ = bytes.Cut(payload_src, []byte{'>'})
-			A = DecodeAPRS(pp_payload, quiet, string(payload_src)) // 1 means used recursively
+			A = d.decode(pp_payload, quiet, string(payload_src)) // 1 means used recursively
 			A.hasThirdPartyHeader = true
 
 			return A
@@ -361,7 +394,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPR
 	case '`': /* Current Mic-E Data */
 
 	default:
-		A.mfr = maybe.FromMaybe(unknownDevice, deviceIDData.FromDest(A.dest))
+		A.mfr = maybe.FromMaybe(unknownDevice, d.deviceIDs.FromDest(A.dest))
 	}
 
 	switch pinfo[0] { /* "DTI" data type identifier. */
@@ -394,7 +427,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPR
 	case '\'': /* Old Mic-E Data (but Current data for TM-D700) */
 		fallthrough
 	case '`': /* Current Mic-E Data (not used in TM-D700) */
-		aprsMicE(A, pp, pinfo)
+		aprsMicE(A, d.deviceIDs, pp, pinfo)
 		A.packetType = packetTypePosition
 
 	case ')': /* Item. */
@@ -495,8 +528,8 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPR
 		// Maybe eliminate for a couple others.
 
 		if pinfo[0] != ':' && pinfo[0] != '}' {
-			if aprsSymbolData != nil { // TODO KG Consider some sort of debug message on an else?
-				var symtab, symbol, ok = aprsSymbolData.FromDestOrSrc(pinfo[0], A.src, A.dest)
+			if d.symbols != nil { // TODO KG Consider some sort of debug message on an else?
+				var symtab, symbol, ok = d.symbols.FromDestOrSrc(pinfo[0], A.src, A.dest)
 				if ok {
 					A.symbolTable = symtab
 					A.symbolCode = symbol
@@ -508,7 +541,8 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPR
 	return A
 } /* end decode_aprs */
 
-func DecodeAPRSPrint(A *decodedAPRS) {
+// Print writes out what Decode found, in human readable form.
+func (d *APRSDecoder) Print(A *decodedAPRS) {
 	/*
 	 * First line has:
 	 * - packet type
@@ -527,8 +561,8 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 	}
 
 	if A.symbolCode != ' ' {
-		if aprsSymbolData != nil {
-			var symbol_description = aprsSymbolData.Description(A.symbolTable, A.symbolCode)
+		if d.symbols != nil {
+			var symbol_description = d.symbols.Description(A.symbolTable, A.symbolCode)
 
 			stemp += ", "
 			stemp += symbol_description
@@ -1271,7 +1305,7 @@ func micEDigit(A *decodedAPRS, c byte, mask int, std_msg *int, cust_msg *int) in
 	return (0)
 }
 
-func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
+func aprsMicE(A *decodedAPRS, deviceIDs *deviceid.Data, pp *ax25.Packet, info []byte) {
 	type micEInfo struct {
 		DTI         byte    /* ' or ` */
 		Lon         [3]byte /* "d+28", "m+28", "h+28" */
@@ -1537,7 +1571,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 	/* The telemetry field, in the original spec, is no longer used. */
 
 	// Comment with vendor/model removed.
-	var trimmed, device = deviceIDData.FromMicE(string(mcomment))
+	var trimmed, device = deviceIDs.FromMicE(string(mcomment))
 	A.mfr = maybe.FromMaybe(unknownDevice, device)
 
 	// Possible altitude at beginning of remaining comment.
