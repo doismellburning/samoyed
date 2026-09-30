@@ -1,4 +1,4 @@
-name: "Conventional Commits"
+name: "PR Hygiene"
 
 on:
   pull_request:
