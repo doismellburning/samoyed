@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -16,9 +15,7 @@ import (
 // (issue #504), used to trip an assertion in the type filter.
 func Test_pfilter_empty_info(t *testing.T) {
 	var p_igate_config igate_config_s
-	var packetFilter = NewPacketFilter(&p_igate_config, 0)
-
-	deviceIDData = deviceid.New()
+	var packetFilter = NewPacketFilter(&p_igate_config, NewAPRSDecoderFromDataFiles(), 0)
 
 	var pp = ax25.FromText("Q1TEST>ID:", true)
 	require.NotNil(t, pp)
@@ -35,9 +32,7 @@ func Test_pfilter_empty_info(t *testing.T) {
 // answers as an empty one does rather than bringing the program down.
 func Test_pfilter_igate_without_a_heard_database(t *testing.T) {
 	var p_igate_config igate_config_s
-	var packetFilter = NewPacketFilter(&p_igate_config, 0)
-
-	deviceIDData = deviceid.New()
+	var packetFilter = NewPacketFilter(&p_igate_config, NewAPRSDecoderFromDataFiles(), 0)
 
 	var saved_mheardDB = mheardDB
 	mheardDB = nil
@@ -100,7 +95,7 @@ func Test_pfilter_validate(t *testing.T) {
 func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	var p_igate_config igate_config_s
 	p_igate_config.max_digi_hops = 2
-	var packetFilter = NewPacketFilter(&p_igate_config, 0)
+	var packetFilter = NewPacketFilter(&p_igate_config, nil, 0)
 
 	var saved_mheardDB = mheardDB
 	mheardDB = mheard.New(0)
@@ -113,7 +108,7 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	var heard = ax25.FromText("Q1TEST>APDW17:!4237.14NS07120.83W#", true)
 	require.NotNil(t, heard)
 
-	var lat, lon = mheardPosition(DecodeAPRS(heard, true, ""))
+	var lat, lon = mheardPosition(new(APRSDecoder).Decode(heard, true))
 	mheardDB.SaveRF(0, heard, lat, lon)
 
 	var message = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Happy Birthday{001", true)
@@ -137,7 +132,7 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 	var p_igate_config igate_config_s
 	p_igate_config.max_digi_hops = 2
-	var packetFilter = NewPacketFilter(&p_igate_config, 0)
+	var packetFilter = NewPacketFilter(&p_igate_config, nil, 0)
 
 	// Q2TEST is about 4 km from 42.6 -71.3.
 	const q2testPosition = "Q2TEST>APDW17:!4237.14NS07120.83W#"
@@ -150,7 +145,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 		var pp = ax25.FromText(monitor, true)
 		require.NotNil(t, pp)
 
-		var lat, lon = mheardPosition(DecodeAPRS(pp, true, ""))
+		var lat, lon = mheardPosition(new(APRSDecoder).Decode(pp, true))
 		mheardDB.SaveRF(0, pp, lat, lon)
 	}
 

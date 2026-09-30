@@ -27,16 +27,16 @@ import (
  *		digipeater path, the control and PID fields, and the
  *		information field decoded as APRS where the frame is APRS.
  *
- * Inputs:	frame	- The frame, as it appeared on the air, without the
+ * Inputs:	aprsDecoder - What to decode and print an APRS frame with.
+ *
+ *		frame	- The frame, as it appeared on the air, without the
  *			  FCS and without any KISS framing.
  *
  * Returns:	The number of problems found with the frame.
  *
- * Assumption:	DecodeAPRSInit has been called.
- *
  *------------------------------------------------------------------*/
 
-func DescribeAX25Frame(frame []byte) int {
+func DescribeAX25Frame(aprsDecoder *APRSDecoder, frame []byte) int {
 	if len(frame) < ax25.MinPacketLen {
 		fmt.Printf("ERROR: The frame is %d bytes, too short for an AX.25 header of at least %d.\n", len(frame), ax25.MinPacketLen)
 
@@ -108,9 +108,9 @@ func DescribeAX25Frame(frame []byte) int {
 		fmt.Printf("\n")
 		ax25.NoteSafePrintTruncation(len(info))
 
-		var A = DecodeAPRS(pp, false, "") // Extract information into structure.
+		var A = aprsDecoder.Decode(pp, false) // Extract information into structure.
 
-		DecodeAPRSPrint(A) // Now print it in human readable format.
+		aprsDecoder.Print(A) // Now print it in human readable format.
 	} else {
 		/*
 		 * The control and PID octets are in the dump above, and either of them

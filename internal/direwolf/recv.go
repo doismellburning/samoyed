@@ -207,7 +207,7 @@ func recv_adev_thread(ctx context.Context, pa *AudioConfig, a int, failed chan<-
 }
 
 // recv_process drains the received data queue until ctx is cancelled.
-func recv_process(ctx context.Context) {
+func recv_process(ctx context.Context, aprsDecoder *APRSDecoder) {
 	for ctx.Err() == nil {
 		var timeout_value = ax25_link_get_next_timer_expiry()
 
@@ -238,7 +238,7 @@ func recv_process(ctx context.Context) {
 					 *	- Send to Igate.
 					 *	- Digipeater.
 					 */
-					app_process_rec_packet(ctx, pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
+					app_process_rec_packet(ctx, aprsDecoder, pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
 
 					/*
 					 * Link processing.

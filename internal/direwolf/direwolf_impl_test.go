@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
@@ -93,7 +92,6 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 		origDigi        = aprsDigipeater
 		origCDigi       = connectedDigipeater
 		origTT          = ttGateway
-		origDeviceID    = deviceIDData
 		origLogOut      = logrus.StandardLogger().Out
 		origOpts        = [...]bool{d_u_opt, d_p_opt, q_h_opt, q_d_opt, A_opt_ais_to_obj}
 	)
@@ -112,7 +110,6 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 		aprsDigipeater = origDigi
 		connectedDigipeater = origCDigi
 		ttGateway = origTT
-		deviceIDData = origDeviceID
 		logrus.SetOutput(origLogOut)
 		d_u_opt, d_p_opt, q_h_opt, q_d_opt, A_opt_ais_to_obj = origOpts[0], origOpts[1], origOpts[2], origOpts[3], origOpts[4]
 	})
@@ -128,7 +125,6 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	dw_tt_config = noTouchTones
 
-	deviceIDData = deviceid.New()
 	packetLogger = NewPacketLogger(false, "")
 	mheardDB = mheard.New(0)
 
@@ -157,7 +153,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	var igateConfig = new(igate_config_s)
 	var digiConfig = new(digi_config_s)
-	var filter = NewPacketFilter(igateConfig, 0)
+	var filter = NewPacketFilter(igateConfig, NewAPRSDecoderFromDataFiles(), 0)
 
 	igate = NewIGate(audioConfig, igateConfig, digiConfig, filter, 0)
 	aprsDigipeater = NewDigipeater(audioConfig, digiConfig, filter)
@@ -176,7 +172,7 @@ func processRecPacket(t *testing.T, subchan int, slice int, pp *ax25.Packet, ale
 
 	return testutils.CaptureOutput(t, func() {
 		logrus.SetOutput(os.Stdout)
-		app_process_rec_packet(t.Context(), 0, subchan, slice, pp, alevel, fecType, retries, spectrum)
+		app_process_rec_packet(t.Context(), NewAPRSDecoderFromDataFiles(), 0, subchan, slice, pp, alevel, fecType, retries, spectrum)
 	})
 }
 

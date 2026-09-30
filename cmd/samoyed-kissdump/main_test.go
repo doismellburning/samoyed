@@ -19,8 +19,6 @@ import (
 func dumpCaptureOutput(t *testing.T, capture []byte, hexInput bool) (string, int) {
 	t.Helper()
 
-	direwolf.DecodeAPRSInit()
-
 	var tmp, createErr = os.CreateTemp(t.TempDir(), "kissdump")
 	require.NoError(t, createErr)
 
@@ -32,7 +30,7 @@ func dumpCaptureOutput(t *testing.T, capture []byte, hexInput bool) (string, int
 
 	os.Stdout = tmp
 
-	var problems = dumpCapture(capture, hexInput)
+	var problems = dumpCapture(direwolf.NewAPRSDecoderFromDataFiles(), capture, hexInput)
 
 	os.Stdout = oldStdout
 
