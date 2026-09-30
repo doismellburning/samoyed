@@ -74,7 +74,7 @@ import (
 var hexLineRegexp = regexp.MustCompile(`^[[:xdigit:]]{2}( ?[[:xdigit:]]{2})*$`)
 
 func main() {
-	direwolf.DecodeAPRSInit()
+	var aprsDecoder = direwolf.NewAPRSDecoderFromDataFiles()
 
 	var scanner = bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
@@ -86,7 +86,7 @@ func main() {
 			continue
 		}
 
-		decodeAPRSLine(line)
+		decodeAPRSLine(aprsDecoder, line)
 	}
 
 	var err = scanner.Err()
@@ -96,7 +96,7 @@ func main() {
 	}
 }
 
-func decodeAPRSLine(line string) {
+func decodeAPRSLine(aprsDecoder *direwolf.APRSDecoder, line string) {
 	/* Try to process it. */
 	fmt.Printf("\n")
 	ax25.SafePrint([]byte(line), false)
@@ -176,9 +176,9 @@ func decodeAPRSLine(line string) {
 			ax25.SafePrint(info, true) // Display non-ASCII to hexadecimal.
 			fmt.Printf("\n")
 
-			var A = direwolf.DecodeAPRS(pp, false, "") // Extract information into structure.
+			var A = aprsDecoder.Decode(pp, false) // Extract information into structure.
 
-			direwolf.DecodeAPRSPrint(A) // Now print it in human readable format.
+			aprsDecoder.Print(A) // Now print it in human readable format.
 
 			pp.CheckAddresses(ax25.AddrStrictLowerCaseWarning) // Errors for invalid addresses.
 		} else {
@@ -188,9 +188,9 @@ func decodeAPRSLine(line string) {
 		// Normal monitoring format.
 		var pp = ax25.FromTextWithStrictness(line, ax25.AddrStrictLowerCaseWarning)
 		if pp != nil {
-			var A = direwolf.DecodeAPRS(pp, false, "") // Extract information into structure.
+			var A = aprsDecoder.Decode(pp, false) // Extract information into structure.
 
-			direwolf.DecodeAPRSPrint(A) // Now print it in human readable format.
+			aprsDecoder.Print(A) // Now print it in human readable format.
 
 			// This seems to be redundant because we used strict option
 			// when parsing the monitoring format text.

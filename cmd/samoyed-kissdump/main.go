@@ -57,15 +57,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	direwolf.DecodeAPRSInit()
-
 	var capture, readErr = io.ReadAll(os.Stdin)
 	if readErr != nil {
 		fmt.Fprintf(os.Stderr, "Could not read the capture from stdin: %s\n", readErr)
 		os.Exit(1)
 	}
 
-	if dumpCapture(capture, *hexInput) > 0 {
+	if dumpCapture(direwolf.NewAPRSDecoderFromDataFiles(), capture, *hexInput) > 0 {
 		os.Exit(1)
 	}
 }
@@ -75,7 +73,7 @@ func main() {
  * caller can exit non-zero when it contained something malformed.
  */
 
-func dumpCapture(capture []byte, hexInput bool) int {
+func dumpCapture(aprsDecoder *direwolf.APRSDecoder, capture []byte, hexInput bool) int {
 	if hexInput {
 		var decoded, err = fromHex(capture)
 		if err != nil {
@@ -130,7 +128,7 @@ func dumpCapture(capture []byte, hexInput bool) int {
 
 		if len(contents) > 0 {
 			number++
-			problems += dumpFrame(number, pos, contents, unterminated)
+			problems += dumpFrame(aprsDecoder, number, pos, contents, unterminated)
 		}
 
 		pos += 1 + len(contents)
@@ -197,7 +195,7 @@ func isHexDigit(b byte) bool {
  * unterminated says the capture ended without a closing one.
  */
 
-func dumpFrame(number int, offset int, contents []byte, unterminated bool) int {
+func dumpFrame(aprsDecoder *direwolf.APRSDecoder, number int, offset int, contents []byte, unterminated bool) int {
 	var problems = 0
 
 	fmt.Printf("\n--- KISS frame %d, %s at offset %d ---\n", number, plural(len(contents), "byte"), offset)
@@ -233,7 +231,7 @@ func dumpFrame(number int, offset int, contents []byte, unterminated bool) int {
 
 	fmt.Printf("KISS command byte 0x%02x: command %d (%s), port %d\n", frame[0], command, commandName(command), port)
 
-	return problems + dumpCommand(command, frame[1:])
+	return problems + dumpCommand(aprsDecoder, command, frame[1:])
 }
 
 /* Text description of the command in the lower nybble of the command byte. */
@@ -267,10 +265,10 @@ func commandName(command byte) string {
 
 /* Describe everything after the command byte. */
 
-func dumpCommand(command byte, payload []byte) int {
+func dumpCommand(aprsDecoder *direwolf.APRSDecoder, command byte, payload []byte) int {
 	switch command {
 	case kiss.CmdDataFrame:
-		return direwolf.DescribeAX25Frame(payload)
+		return direwolf.DescribeAX25Frame(aprsDecoder, payload)
 
 	case kiss.CmdTxDelay, kiss.CmdPersistence, kiss.CmdSlotTime, kiss.CmdTxTail, kiss.CmdFullDuplex:
 		if len(payload) != 1 {
