@@ -323,7 +323,7 @@ func (s *AGWServer) SendRecPacket(channel int, pp *ax25.Packet, fbuf []byte) {
 	for client := range MAX_NET_CLIENTS {
 		var conn = s.clientWantingRaw(client)
 		if conn != nil {
-			var agwpe_msg = new(agwpe.AGWPEMessage)
+			var agwpe_msg = new(agwpe.Message)
 
 			agwpe_msg.Header.Portx = byte(channel)
 
@@ -377,7 +377,7 @@ func (s *AGWServer) SendMonitored(channel int, pp *ax25.Packet, own_xmit int) {
 	for client := range MAX_NET_CLIENTS {
 		var conn = s.clientWantingMonitor(client)
 		if conn != nil {
-			var agwpe_msg = new(agwpe.AGWPEMessage)
+			var agwpe_msg = new(agwpe.Message)
 
 			agwpe_msg.Header.Portx = byte(channel) // datakind is added later.
 
@@ -618,7 +618,7 @@ func (s *AGWServer) LinkEstablished(channel int, client int, remote_call string,
 		return
 	}
 
-	var reply = new(agwpe.AGWPEMessage)
+	var reply = new(agwpe.Message)
 
 	reply.Header.Portx = byte(channel)
 	reply.Header.DataKind = 'C'
@@ -671,7 +671,7 @@ func (s *AGWServer) LinkTerminated(channel int, client int, remote_call string, 
 		return
 	}
 
-	var reply = new(agwpe.AGWPEMessage)
+	var reply = new(agwpe.Message)
 
 	reply.Header.Portx = byte(channel)
 	reply.Header.DataKind = 'd'
@@ -719,7 +719,7 @@ func (s *AGWServer) RecConnData(channel int, client int, remote_call string, own
 		return
 	}
 
-	var reply = new(agwpe.AGWPEMessage)
+	var reply = new(agwpe.Message)
 
 	reply.Header.Portx = byte(channel)
 	reply.Header.DataKind = 'D'
@@ -765,7 +765,7 @@ func (s *AGWServer) OutstandingFramesReply(channel int, client int, own_call str
 		return
 	}
 
-	var reply = new(agwpe.AGWPEMessage)
+	var reply = new(agwpe.Message)
 
 	reply.Header.Portx = byte(channel)
 	reply.Header.DataKind = 'Y'
@@ -867,7 +867,7 @@ func (s *AGWServer) setLoggedIn(client int) {
 	s.clients[client].loggedIn = true
 }
 
-func (s *AGWServer) debugPrint(fromto fromto_t, client int, pmsg *agwpe.AGWPEMessage) {
+func (s *AGWServer) debugPrint(fromto fromto_t, client int, pmsg *agwpe.Message) {
 	var direction, datakind string
 
 	switch fromto {
@@ -1089,7 +1089,7 @@ func (s *AGWServer) connectListenThread(ctx context.Context, server_port int) {
  *
  *--------------------------------------------------------------------*/
 
-func (s *AGWServer) sendToClient(client int, reply_p *agwpe.AGWPEMessage) {
+func (s *AGWServer) sendToClient(client int, reply_p *agwpe.Message) {
 	var conn = s.clientConn(client)
 	if conn == nil {
 		return
@@ -1117,7 +1117,7 @@ func (s *AGWServer) sendToClient(client int, reply_p *agwpe.AGWPEMessage) {
 
 // writeToClient sends msg, header and data, to conn, the socket attached to
 // client, with no other message to that client able to come between the two.
-func (s *AGWServer) writeToClient(client int, conn net.Conn, msg *agwpe.AGWPEMessage) error {
+func (s *AGWServer) writeToClient(client int, conn net.Conn, msg *agwpe.Message) error {
 	s.writeMu[client].Lock()
 	defer s.writeMu[client].Unlock()
 
@@ -1158,7 +1158,7 @@ func (s *AGWServer) detachClient(client int, conn net.Conn) {
 // cmd.Data.  It returns how many bytes it read, so a caller can tell a short
 // read from a complete one, and reads nothing at all for a message whose
 // header says it has no data.
-func readCommandData(conn net.Conn, cmd *agwpe.AGWPEMessage) (int, error) {
+func readCommandData(conn net.Conn, cmd *agwpe.Message) (int, error) {
 	if cmd.Header.DataLen == 0 {
 		return 0, nil
 	}
@@ -1185,7 +1185,7 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 			}
 		}
 
-		var cmd = new(agwpe.AGWPEMessage)
+		var cmd = new(agwpe.Message)
 
 		var conn = s.clientConn(client)
 		if conn == nil {
@@ -1413,7 +1413,7 @@ func agwLoginField(field []byte) string {
 // credentials were wrong or the frame was not one we could read, so a client
 // that has logged in cannot pass the socket on to one that cannot.  A client on
 // this machine, which never had to log in, keeps its exemption either way.
-func (s *AGWServer) handleClientLogin(client int, cmd *agwpe.AGWPEMessage) {
+func (s *AGWServer) handleClientLogin(client int, cmd *agwpe.Message) {
 	if !s.loginRequired() {
 		return /* Nothing to check it against. */
 	}
@@ -1444,7 +1444,7 @@ func (s *AGWServer) handleClientLogin(client int, cmd *agwpe.AGWPEMessage) {
 	dw_printf("AGW client application %d logged in as \"%s\".\n", client, matched)
 }
 
-func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.AGWPEMessage) {
+func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.Message) {
 	if cmd.Header.DataKind == 'P' { /* Application Login */
 		s.handleClientLogin(client, cmd)
 
@@ -1462,7 +1462,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.AGWPEMessage) {
 	switch cmd.Header.DataKind {
 	case 'R': /* Request for version number */
 		{
-			var reply = new(agwpe.AGWPEMessage)
+			var reply = new(agwpe.Message)
 
 			reply.Header.DataKind = 'R'
 			reply.Header.DataLen = 8
@@ -1480,7 +1480,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.AGWPEMessage) {
 
 	case 'G': /* Ask about radio ports */
 		{
-			var reply = new(agwpe.AGWPEMessage)
+			var reply = new(agwpe.Message)
 
 			reply.Header.DataKind = 'G'
 
@@ -1568,7 +1568,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.AGWPEMessage) {
 				  int how_many_bytes_NETLE;
 				} reply;
 		*/
-		var reply = new(agwpe.AGWPEMessage)
+		var reply = new(agwpe.Message)
 
 		reply.Header.Portx = cmd.Header.Portx /* Reply with same port number ! */
 		reply.Header.DataKind = 'g'
@@ -1782,7 +1782,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.AGWPEMessage) {
 				ok = 0
 			}
 
-			var reply = new(agwpe.AGWPEMessage)
+			var reply = new(agwpe.Message)
 			reply.Header.DataKind = 'X'
 			reply.Header.Portx = cmd.Header.Portx
 			copy(reply.Header.CallFrom[:], cmd.Header.CallFrom[:])
@@ -1984,7 +1984,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.AGWPEMessage) {
 				  int data_NETLE;			// Little endian order.
 				} reply;
 			*/
-			var reply = new(agwpe.AGWPEMessage)
+			var reply = new(agwpe.Message)
 
 			reply.Header.Portx = cmd.Header.Portx /* Reply with same port number */
 			reply.Header.DataKind = 'y'

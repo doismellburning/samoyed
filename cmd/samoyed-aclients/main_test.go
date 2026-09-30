@@ -37,7 +37,7 @@ func acceptMonitor(t *testing.T, ln net.Listener) net.Conn {
 
 	var conn = testutils.Accept(t, ln)
 
-	var header agwpe.AGWPEHeader
+	var header agwpe.Header
 	require.NoError(t, binary.Read(conn, binary.LittleEndian, &header))
 	require.Equal(t, byte('k'), header.DataKind, "should ask for raw frames")
 
@@ -50,7 +50,7 @@ func sendMonitored(t *testing.T, conn net.Conn, portx byte, frame []byte) {
 
 	var data = append([]byte{portx << 4}, frame...)
 
-	var header = new(agwpe.AGWPEHeader)
+	var header = new(agwpe.Header)
 	header.Portx = portx
 	header.DataKind = 'K'
 	header.DataLen = uint32(len(data))

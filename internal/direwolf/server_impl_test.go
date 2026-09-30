@@ -14,14 +14,14 @@ import (
 	"pgregory.net/rapid"
 )
 
-// readReplyFrom reads one agwpe.AGWPEMessage (header + data) from conn.
-func readReplyFrom(conn net.Conn) (*agwpe.AGWPEMessage, error) {
-	var hdr agwpe.AGWPEHeader
+// readReplyFrom reads one agwpe.Message (header + data) from conn.
+func readReplyFrom(conn net.Conn) (*agwpe.Message, error) {
+	var hdr agwpe.Header
 	err := binary.Read(conn, binary.LittleEndian, &hdr)
 	if err != nil {
 		return nil, err
 	}
-	var msg = &agwpe.AGWPEMessage{Header: hdr, Data: nil}
+	var msg = &agwpe.Message{Header: hdr, Data: nil}
 	if hdr.DataLen > 0 {
 		msg.Data = make([]byte, hdr.DataLen)
 		_, err = io.ReadFull(conn, msg.Data)
@@ -50,8 +50,8 @@ func setupClientPipe(t *testing.T, s *AGWServer) net.Conn {
 // asyncReply starts reading one reply from conn in a goroutine and returns
 // a channel that delivers the result. Used to avoid deadlocking on
 // net.Pipe's unbuffered writes.
-func asyncReply(conn net.Conn) <-chan *agwpe.AGWPEMessage {
-	var ch = make(chan *agwpe.AGWPEMessage, 1)
+func asyncReply(conn net.Conn) <-chan *agwpe.Message {
+	var ch = make(chan *agwpe.Message, 1)
 	go func() {
 		msg, _ := readReplyFrom(conn)
 		ch <- msg
@@ -66,7 +66,7 @@ func TestHandleClientCommand_R_VersionReply(t *testing.T) {
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'R'
 	s.handleClientCommand(0, cmd)
 
@@ -82,7 +82,7 @@ func TestHandleClientCommand_R_VersionReply(t *testing.T) {
 func TestHandleClientCommand_k_TogglesRawFrames(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'k'
 
 	assert.False(t, s.clients[0].sendRaw)
@@ -95,7 +95,7 @@ func TestHandleClientCommand_k_TogglesRawFrames(t *testing.T) {
 func TestHandleClientCommand_m_TogglesMonitorFrames(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'm'
 
 	assert.False(t, s.clients[0].sendMonitor)
@@ -111,7 +111,7 @@ func TestHandleClientCommand_g_PortCapabilitiesReply(t *testing.T) {
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'g'
 	cmd.Header.Portx = 2
 	s.handleClientCommand(0, cmd)
@@ -140,7 +140,7 @@ func TestHandleClientCommand_G_NoPorts(t *testing.T) {
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'G'
 	s.handleClientCommand(0, cmd)
 
@@ -161,7 +161,7 @@ func TestHandleClientCommand_G_RadioChannelMono(t *testing.T) {
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'G'
 	s.handleClientCommand(0, cmd)
 
@@ -177,7 +177,7 @@ func TestHandleClientCommand_y_EmptyQueueReturnsZero(t *testing.T) {
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'y'
 	cmd.Header.Portx = 0
 	s.handleClientCommand(0, cmd)
@@ -198,7 +198,7 @@ func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'X'
 	cmd.Header.Portx = MAX_RADIO_CHANS // out of range
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
@@ -222,7 +222,7 @@ func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'X'
 	cmd.Header.Portx = 0
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
@@ -262,7 +262,7 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 	s.audioConfigP = new(AudioConfig)
 
 	rapid.Check(t, func(t *rapid.T) {
-		var cmd = new(agwpe.AGWPEMessage)
+		var cmd = new(agwpe.Message)
 		cmd.Header.DataKind = 'V'
 		copy(cmd.Header.CallFrom[:], "Q1TEST")
 		copy(cmd.Header.CallTo[:], "Q2TEST")
@@ -280,7 +280,7 @@ func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 	s.audioConfigP = new(AudioConfig)
 
 	rapid.Check(t, func(t *rapid.T) {
-		var cmd = new(agwpe.AGWPEMessage)
+		var cmd = new(agwpe.Message)
 		cmd.Header.DataKind = 'K'
 		cmd.Data = rapid.SliceOf(rapid.Byte()).Draw(t, "data")
 		cmd.Header.DataLen = rapid.Uint32().Draw(t, "dataLen")
@@ -304,7 +304,7 @@ func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
 		var data = make([]byte, 1+10*7+1)
 		data[0] = numDigi
 
-		var cmd = new(agwpe.AGWPEMessage)
+		var cmd = new(agwpe.Message)
 		cmd.Header.DataKind = 'v'
 		cmd.Header.Portx = 0 // valid radio port
 		copy(cmd.Header.CallFrom[:], "Q1TEST")
@@ -329,7 +329,7 @@ func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T
 		var dataKind = rapid.SampledFrom([]byte{'C', 'v', 'c', 'D', 'd', 'Y'}).Draw(t, "dataKind")
 		var portx = rapid.ByteRange(MAX_RADIO_CHANS, 255).Draw(t, "portx")
 
-		var cmd = new(agwpe.AGWPEMessage)
+		var cmd = new(agwpe.Message)
 		cmd.Header.DataKind = dataKind
 		cmd.Header.Portx = portx
 		copy(cmd.Header.CallFrom[:], "Q1TEST")
@@ -356,7 +356,7 @@ func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 	// reflects only the real payload.
 	var data = make([]byte, len(payload)+1)
 	copy(data, payload)
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'D'
 	cmd.Header.Portx = 0
 	cmd.Header.PID = 0xF0
@@ -381,7 +381,7 @@ func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'D'
 	cmd.Header.Portx = 0
 	cmd.Header.PID = 0xF0
@@ -411,7 +411,7 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	var buf bytes.Buffer
 	require.NoError(t, binary.Write(&buf, binary.LittleEndian, via))
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'v'
 	cmd.Header.Portx = 0
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
@@ -509,7 +509,7 @@ func TestHandleClientCommand_X_NETTNCChannelReportsSuccess(t *testing.T) {
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'X'
 	cmd.Header.Portx = MAX_RADIO_CHANS
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
@@ -532,7 +532,7 @@ func TestHandleClientCommand_G_NilAudioConfig(t *testing.T) {
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
-	var cmd = new(agwpe.AGWPEMessage)
+	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'G'
 	s.handleClientCommand(0, cmd)
 

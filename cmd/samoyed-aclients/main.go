@@ -205,7 +205,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 	 * It also discards the via path.
 	 */
 
-	var mon_cmd = new(agwpe.AGWPEHeader)
+	var mon_cmd = new(agwpe.Header)
 	mon_cmd.DataKind = 'k'
 
 	var writeErr = binary.Write(conn, binary.LittleEndian, mon_cmd)

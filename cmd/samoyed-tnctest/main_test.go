@@ -151,16 +151,16 @@ func agwConn(t *testing.T, from int) net.Conn {
 	return tnc
 }
 
-func readHeader(t *testing.T, r io.Reader) agwpe.AGWPEHeader {
+func readHeader(t *testing.T, r io.Reader) agwpe.Header {
 	t.Helper()
 
-	var header agwpe.AGWPEHeader
+	var header agwpe.Header
 	require.NoError(t, binary.Read(r, binary.LittleEndian, &header))
 
 	return header
 }
 
-func callsign(c agwpe.AGWPECallsign) string {
+func callsign(c agwpe.Callsign) string {
 	return c.String()
 }
 
@@ -349,7 +349,7 @@ func Test_main_connects(t *testing.T) {
 	assert.Equal(t, "DW1", callsign(connect.CallTo))
 
 	// The first end reports the connection.
-	var connected = new(agwpe.AGWPEHeader)
+	var connected = new(agwpe.Header)
 	connected.DataKind = 'C'
 	copy(connected.CallFrom[:], "DW1")
 
@@ -387,7 +387,7 @@ func Test_main_badArguments(t *testing.T) {
 func sendFrame(t *testing.T, conn net.Conn, kind byte, from string, data string) {
 	t.Helper()
 
-	var header = new(agwpe.AGWPEHeader)
+	var header = new(agwpe.Header)
 	header.DataKind = kind
 	header.DataLen = uint32(len(data))
 	copy(header.CallFrom[:], from)
@@ -397,7 +397,7 @@ func sendFrame(t *testing.T, conn net.Conn, kind byte, from string, data string)
 }
 
 // readFrame reads an AGW frame, header and data, from conn.
-func readFrame(t *testing.T, conn net.Conn) (agwpe.AGWPEHeader, string) {
+func readFrame(t *testing.T, conn net.Conn) (agwpe.Header, string) {
 	t.Helper()
 
 	var header = readHeader(t, conn)
@@ -484,7 +484,7 @@ func Test_main_conversation(t *testing.T) {
 func Test_main_brokenFrame(t *testing.T) {
 	t.Parallel()
 
-	var promised = new(agwpe.AGWPEHeader)
+	var promised = new(agwpe.Header)
 	promised.DataKind = 'D'
 	promised.DataLen = 10
 
