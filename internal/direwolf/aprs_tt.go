@@ -1202,11 +1202,11 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			/* http://movable-type.co.uk/scripts/latlong.html */
 			/* This should probably be a function in latlong.c in case we have another use for it someday. */
 
-			var latitude = R2D(math.Asin(math.Sin(lat0)*math.Cos(dist/R_M) + math.Cos(lat0)*math.Sin(dist/R_M)*math.Cos(bearing)))
+			var latitude = dwutil.R2D(math.Asin(math.Sin(lat0)*math.Cos(dist/R_M) + math.Cos(lat0)*math.Sin(dist/R_M)*math.Cos(bearing)))
 
 			state.latitude = maybe.Just(latitude)
 
-			state.longitude = maybe.Just(R2D(lon0 + math.Atan2(math.Sin(bearing)*math.Sin(dist/R_M)*math.Cos(lat0),
+			state.longitude = maybe.Just(dwutil.R2D(lon0 + math.Atan2(math.Sin(bearing)*math.Sin(dist/R_M)*math.Cos(lat0),
 				math.Cos(dist/R_M)-math.Sin(lat0)*math.Sin(dwutil.D2R(latitude)))))
 
 			state.dao[2] = e[0]
@@ -1302,8 +1302,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 			if geoErr == nil {
-				state.latitude = maybe.Just(R2D(float64(geo.Lat)))
-				state.longitude = maybe.Just(R2D(float64(geo.Lng)))
+				state.latitude = maybe.Just(dwutil.R2D(float64(geo.Lat)))
+				state.longitude = maybe.Just(dwutil.R2D(float64(geo.Lng)))
 
 				// dw_printf ("DEBUG: from UTM, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
 			} else {
@@ -1341,8 +1341,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			// Apparently also does USNG!
 			var geo, convertErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(loc)
 			if convertErr == nil {
-				state.latitude = maybe.Just(R2D(float64(geo.Lat)))
-				state.longitude = maybe.Just(R2D(float64(geo.Lng)))
+				state.latitude = maybe.Just(dwutil.R2D(float64(geo.Lat)))
+				state.longitude = maybe.Just(dwutil.R2D(float64(geo.Lng)))
 
 				// dw_printf ("DEBUG: from MGRS/USNG, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
 			} else {

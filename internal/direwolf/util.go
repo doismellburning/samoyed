@@ -2,7 +2,6 @@ package direwolf
 
 import (
 	"fmt"
-	"math"
 )
 
 // MAX_NET_CLIENTS is used for both KISS and AGWPE
@@ -30,8 +29,4 @@ func ACHAN2ADEV(n int) int {
 
 func ADEVFIRSTCHAN(n int) int {
 	return n * 2
-}
-
-func R2D(r float64) float64 {
-	return r * 180 / math.Pi
 }

@@ -48,3 +48,8 @@ func DW_KM_TO_MILES(x float64) float64 {
 func D2R(d float64) float64 {
 	return d * math.Pi / 180
 }
+
+// R2D converts radians to degrees.
+func R2D(r float64) float64 {
+	return r * 180 / math.Pi
+}

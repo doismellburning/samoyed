@@ -27,4 +27,6 @@ func Test_unit_conversions(t *testing.T) {
 
 func TestAngleConversions(t *testing.T) {
 	assert.InDelta(t, math.Pi, D2R(180), 0.0000001)
+	assert.InDelta(t, 90.0, R2D(math.Pi/2), 0.0000001)
+	assert.InDelta(t, 51.5, R2D(D2R(51.5)), 0.0000001)
 }

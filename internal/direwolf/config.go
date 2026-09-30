@@ -6301,8 +6301,8 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *AudioConfig) er
 
 			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 			if geoErr == nil {
-				b.lat = maybe.Just(R2D(float64(geo.Lat)))
-				b.lon = maybe.Just(R2D(float64(geo.Lng)))
+				b.lat = maybe.Just(dwutil.R2D(float64(geo.Lat)))
+				b.lon = maybe.Just(dwutil.R2D(float64(geo.Lng)))
 			} else {
 				ps.errorf("line %d: Invalid UTM location: \n%v", ps.line, geoErr)
 			}
