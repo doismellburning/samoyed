@@ -23,7 +23,7 @@ import (
  *		polarity - 0 for normal.  1 to invert signal.
  *			   2 special case for testing - introduce some errors to test FEC.
  *
- * Outputs:	Bits are shipped out by calling ToneGenPutBit().
+ * Outputs:	Bits are shipped out to the sender's tone generator.
  *
  * Returns:	Number of bits sent including
  *		- Preamble   (01010101...)
@@ -38,7 +38,7 @@ import (
  *
  * Assumptions:	It is assumed that the tone_gen module has been
  *		properly initialized so that bits sent with
- *		ToneGenPutBit() are processed correctly.
+ *		the tone generator are processed correctly.
  *
  * Errors:	Return -1 for error.  Probably frame too large.
  *

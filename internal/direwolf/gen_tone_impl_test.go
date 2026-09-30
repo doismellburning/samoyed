@@ -438,23 +438,28 @@ func TestGenToneInitAndChannelFunctions(t *testing.T) {
 	require.NotNil(t, toneGenerators[0])
 	assert.Nil(t, toneGenerators[1], "only radio channels get a tone generator")
 
-	tone_gen_put_bit_real(0, 1)
+	var sender = NewHDLCSender(0, audioConfig, toneGenerators[0], 0)
+
+	sender.putBit(1)
 	assert.Len(t, sink.data, 20)
 
 	gen_tone_put_sample(0, 0, 0x0102)
 	assert.Equal(t, []byte{0x02, 0x01}, sink.data[20:])
 
-	gen_tone_put_quiet_ms(0, 1) // 12 samples.
+	sender.putQuietMs(1) // 12 samples.
 	assert.Len(t, sink.data, 22+24)
 
-	gen_tone_flush(0)
+	sender.flush()
 	assert.Equal(t, 1, sink.flushes)
 
 	// A channel without a tone generator is reported and ignored.
-	tone_gen_put_bit_real(1, 1)
+	var noTone = NewHDLCSender(1, audioConfig, toneGenerators[1], 0)
+
+	ToneGenPutBit(1, 1)
 	gen_tone_put_sample(1, 0, 0)
-	gen_tone_put_quiet_ms(1, 10)
-	gen_tone_flush(1)
+	noTone.putBit(1)
+	noTone.putQuietMs(10)
+	noTone.flush()
 
 	assert.Len(t, sink.data, 46)
 	assert.Equal(t, 1, sink.flushes)

@@ -80,16 +80,9 @@ func BenchmarkConvolve(b *testing.B) {
 func generate9600(t *testing.T, audioConfig *AudioConfig, channel int, frames []*ax25.Packet) []int {
 	t.Helper()
 
-	var origGenerators = toneGenerators
-
-	t.Cleanup(func() { toneGenerators = origGenerators })
-
 	var sink = new(byteSink)
 
-	toneGenerators = [MAX_RADIO_CHANS]*ToneGenerator{}
-	toneGenerators[channel] = NewToneGenerator(channel, audioConfig, 50, sink)
-
-	var sender = NewHDLCSender(channel, audioConfig, 0)
+	var sender = NewHDLCSender(channel, audioConfig, NewToneGenerator(channel, audioConfig, 50, sink), 0)
 
 	sender.SendPreamblePostamble(32, false)
 

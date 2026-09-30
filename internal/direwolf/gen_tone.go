@@ -387,7 +387,8 @@ static const float sq[8] = { 0,	.7071,	1,	.7071,	0,	-.7071,	-1,	-.7071	};
 #endif
 */
 
-func tone_gen_put_bit_real(channel int, dat int) {
+// ToneGenPutBit sends one bit on channel's tone generator.
+func ToneGenPutBit(channel int, dat int) {
 	if toneGenerators[channel] == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid channel %d for tone generation.\n", channel)
@@ -679,31 +680,8 @@ func (tg *ToneGenerator) PutSample(sam int) {
 	}
 }
 
-// gen_tone_flush pushes out whatever the channel's samples are waiting in.
-func gen_tone_flush(channel int) {
-	if toneGenerators[channel] == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for tone generation.\n", channel)
-
-		return
-	}
-
-	toneGenerators[channel].Flush()
-}
-
 func (tg *ToneGenerator) Flush() {
 	tg.sink.Flush(tg.adevIndex)
-}
-
-func gen_tone_put_quiet_ms(channel int, time_ms int) {
-	if toneGenerators[channel] == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for tone generation.\n", channel)
-
-		return
-	}
-
-	toneGenerators[channel].PutQuietMs(time_ms)
 }
 
 func (tg *ToneGenerator) PutQuietMs(timeMs int) {

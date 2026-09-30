@@ -244,7 +244,7 @@ func (xs *XmitService) SetFulldup(channel int, value bool) {
 // own xmit_thread asks for it, so there is nothing to lock.
 func (xs *XmitService) hdlcSender(channel int) *HDLCSender {
 	if xs.hdlcSenders[channel] == nil {
-		xs.hdlcSenders[channel] = NewHDLCSender(channel, xs.p_modem, xs.fx25Debug)
+		xs.hdlcSenders[channel] = NewHDLCSender(channel, xs.p_modem, toneGenerators[channel], xs.fx25Debug)
 	}
 
 	return xs.hdlcSenders[channel]

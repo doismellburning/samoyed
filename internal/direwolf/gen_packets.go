@@ -152,20 +152,30 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 	g.rand = rand
 	g.sink = sink
 
-	GenToneInit(audio, g.amplitude/2, sink)
-
 	// We don't have -d or -q options here.
 	// Just use the default of minimal information for FX.25.
 	const fx25Debug = 1
 
 	g.hdlcSenders = make([]*HDLCSender, MAX_RADIO_CHANS)
 	for c := range g.hdlcSenders {
-		g.hdlcSenders[c] = NewHDLCSender(c, audio, fx25Debug)
+		g.hdlcSenders[c] = NewHDLCSender(c, audio, nil, fx25Debug)
 	}
+
+	g.setTones()
 
 	il2p_init(0) // There are no "-d" options so far but it could be handy here.
 
 	return g, nil
+}
+
+// setTones makes the tone generators afresh from the current settings, and
+// hands each channel's to its HDLCSender, which keeps its line level.
+func (g *GenPackets) setTones() {
+	GenToneInit(g.audio, g.amplitude/2, g.sink)
+
+	for c, s := range g.hdlcSenders {
+		s.toneGenerator = toneGenerators[c]
+	}
 }
 
 // Close finishes the .WAV file, filling in the lengths in its header.
@@ -245,13 +255,13 @@ func (g *GenPackets) SendVariableSpeed(maxError float64, increment float64) erro
 	for speed_error := -maxError; speed_error <= maxError+0.001; speed_error += increment {
 		// Baud is int so we get some roundoff.  Make it real?
 		g.audio.achan[0].baud = int(float64(normal_speed) * (1. + speed_error/100.))
-		GenToneInit(g.audio, g.amplitude/2, g.sink)
+		g.setTones()
 
 		g.mustSendPacket(fmt.Sprintf("WB2OSZ-15>TEST:, speed %+0.1f%%  The quick brown fox jumps over the lazy dog!", speed_error))
 	}
 
 	g.audio.achan[0].baud = normal_speed
-	GenToneInit(g.audio, g.amplitude/2, g.sink)
+	g.setTones()
 
 	return nil
 }
@@ -303,7 +313,7 @@ func (g *GenPackets) SendPacket(str string) error {
 			repeat = 1
 		}
 
-		eas_send(0, pinfo, repeat, 500, 500)
+		g.hdlcSenders[0].sendEAS(pinfo, repeat, 500, 500)
 
 		return nil
 	}
