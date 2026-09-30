@@ -45,7 +45,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 
 	var amplitude = 100
 	GenToneInit(&modem, amplitude, sink)
-	morse_send(0, message, morseWPM, 100, 100)
+	morse_send(toneGenerators[0], 0, message, morseWPM, 100, 100)
 	require.NoError(t, audio_file_close(sink)) // I just realised this all works on globals :s
 }
 

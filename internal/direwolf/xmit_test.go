@@ -780,8 +780,8 @@ func TestXmitNextMorseSpeedFromSSID(t *testing.T) {
 	// depend on how morse timing is worked out.
 	const message = "OS" // Long enough for the speed to dominate the padding.
 
-	var atDefault = morse_send(0, message, MORSE_DEFAULT_WPM, 300, 250)
-	var atDouble = morse_send(0, message, MORSE_DEFAULT_WPM*2, 300, 250)
+	var atDefault = morse_send(toneGenerators[0], 0, message, MORSE_DEFAULT_WPM, 300, 250)
+	var atDouble = morse_send(toneGenerators[0], 0, message, MORSE_DEFAULT_WPM*2, 300, 250)
 
 	require.Less(t, atDouble, atDefault/2+atDefault/4,
 		"the two speeds are too close together for this to show anything")
@@ -821,9 +821,9 @@ func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 	// dtmf_send generates the sound and says how long it is, without waiting
 	// for it, so asking it costs nothing - and comparing against its own
 	// answers means this does not depend on how DTMF timing is worked out.
-	var atDefault = dtmf_send(0, message, defaultSpeed, 300, 250)
-	var atMaximum = dtmf_send(0, message, maximumSpeed, 300, 250)
-	var atAskedFor = dtmf_send(0, message, askedFor, 300, 250)
+	var atDefault = dtmf_send(toneGenerators[0], 0, message, defaultSpeed, 300, 250)
+	var atMaximum = dtmf_send(toneGenerators[0], 0, message, maximumSpeed, 300, 250)
+	var atAskedFor = dtmf_send(toneGenerators[0], 0, message, askedFor, 300, 250)
 
 	require.Less(t, atMaximum, atDefault-400,
 		"the default and maximum speeds are too close together for this to show anything")

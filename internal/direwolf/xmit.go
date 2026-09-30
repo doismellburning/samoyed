@@ -1086,7 +1086,7 @@ func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = morse_send(c, string(pinfo), wpm, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
+	var _length_ms = morse_send(toneGenerators[c], c, string(pinfo), wpm, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.
@@ -1136,7 +1136,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = dtmf_send(c, string(pinfo), speed, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
+	var _length_ms = dtmf_send(toneGenerators[c], c, string(pinfo), speed, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.

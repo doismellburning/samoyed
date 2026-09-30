@@ -270,7 +270,7 @@ func (g *GenPackets) SendPacket(str string) error {
 	if g.morseWPM > 0 {
 		// Why not use the destination field instead of command line option?
 		// For one thing, this is not in TNC-2 monitor format.
-		morse_send(0, str, g.morseWPM, 100, 100)
+		morse_send(toneGenerators[0], 0, str, g.morseWPM, 100, 100)
 
 		return nil
 	}
