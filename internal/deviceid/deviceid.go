@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 	"go.yaml.in/yaml/v3"
 )
@@ -180,9 +181,7 @@ func New() *Data {
  *
  * Inputs:	dest	- Destination address.  No SSID.
  *
- *		device_size - Amount of space available for result to avoid buffer overflow.
- *
- * Outputs:	device	- Vendor and model.
+ * Returns:	Vendor and model, or Nothing if they can't be identified.
  *
  * Description:	With the exception of MIC-E format, we expect to find the vendor/model in the
  *		AX.25 destination field.   The form should be APxxxx.
@@ -194,39 +193,21 @@ func New() *Data {
  *
  *------------------------------------------------------------------*/
 
-func (d *Data) FromDest(dest string) string {
-	var device = "UNKNOWN vendor/model"
-
+func (d *Data) FromDest(dest string) maybe.Maybe[string] {
 	if d == nil || len(d.ptocalls) == 0 {
 		logrus.Trace("FromDest called without any deviceid data.")
 
-		return device
+		return maybe.Nothing[string]()
 	}
 
 	for _, t := range d.ptocalls {
 		if strings.HasPrefix(dest, t.tocall) {
-			if t.vendor != "" {
-				device = t.vendor
-			}
-
-			if t.vendor != "" && t.model != "" {
-				device += " "
-			}
-
-			if t.vendor == "" && t.model != "" {
-				device = ""
-			}
-
-			if t.model != "" {
-				device += t.model
-			}
-
-			return device
+			return describe(t.vendor, t.model)
 		}
 	}
 
 	// Not found in table.
-	return "UNKNOWN vendor/model"
+	return maybe.Nothing[string]()
 }
 
 /*------------------------------------------------------------------
@@ -239,14 +220,10 @@ func (d *Data) FromDest(dest string) string {
  *			a prefix and/or suffix.
  *			Any trailing CR has already been removed.
  *
- *		trimmed_size - Amount of space available for result to avoid buffer overflow.
- *
- *		device_size - Amount of space available for result to avoid buffer overflow.
- *
- * Outputs:	trimmed - Final comment with device vendor/model removed.
+ * Returns:	trimmed - Final comment with device vendor/model removed.
  *				This would include any altitude.
  *
- *		device	- Vendor and model.
+ *		device	- Vendor and model, or Nothing if they can't be identified.
  *
  * Description:	MIC-E device identification has a tortured history.
  *
@@ -269,18 +246,15 @@ func (d *Data) FromDest(dest string) string {
  *			Understanding APRS Packets
  *------------------------------------------------------------------*/
 
-func (d *Data) FromMicE(comment string) (string, string) {
-	var device = "UNKNOWN vendor/model"
-	var trimmed = comment
-
+func (d *Data) FromMicE(comment string) (string, maybe.Maybe[string]) {
 	if len(comment) < 1 {
-		return trimmed, device
+		return comment, maybe.Nothing[string]()
 	}
 
 	if d == nil || len(d.pmice) == 0 {
 		logrus.Trace("FromMicE called without any deviceid data.")
 
-		return trimmed, device
+		return comment, maybe.Nothing[string]()
 	}
 
 	// The Legacy format has an explicit prefix in the table.
@@ -294,28 +268,29 @@ func (d *Data) FromMicE(comment string) (string, string) {
 			(len(m.prefix) == 0 && // Later
 				(comment[0] == '`' || comment[0] == '\'') && // prefix ` or '
 				strings.HasSuffix(comment, m.suffix)) { // suffix
-			if m.vendor != "" {
-				device = m.vendor
-			}
-
-			if m.vendor != "" && m.model != "" {
-				device += " "
-			}
-
-			if m.model != "" {
-				device += m.model
-			}
-
 			// Remove any prefix/suffix and return what remains.
 
-			trimmed = comment[1:]
+			var trimmed = comment[1:]
 			trimmed = trimmed[:len(trimmed)-len(m.suffix)]
 
-			return trimmed, device
+			return trimmed, describe(m.vendor, m.model)
 		}
 	}
 
 	// Not found.
 
-	return comment, "UNKNOWN vendor/model"
+	return comment, maybe.Nothing[string]()
+}
+
+// describe joins a table entry's vendor and model, either of which may be
+// missing. An entry with neither doesn't identify anything.
+func describe(vendor, model string) maybe.Maybe[string] {
+	switch {
+	case vendor != "" && model != "":
+		return maybe.Just(vendor + " " + model)
+	case vendor != "" || model != "":
+		return maybe.Just(vendor + model)
+	default:
+		return maybe.Nothing[string]()
+	}
 }

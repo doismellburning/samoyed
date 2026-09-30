@@ -180,6 +180,9 @@ type decodedAPRS struct {
 
 }
 
+// unknownDevice is what mfr holds when the sending device can't be identified.
+const unknownDevice = "UNKNOWN vendor/model"
+
 /*------------------------------------------------------------------
  *
  * Function:	DecodeAPRSInit
@@ -358,7 +361,7 @@ func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPR
 	case '`': /* Current Mic-E Data */
 
 	default:
-		A.mfr = deviceIDData.FromDest(A.dest)
+		A.mfr = maybe.FromMaybe(unknownDevice, deviceIDData.FromDest(A.dest))
 	}
 
 	switch pinfo[0] { /* "DTI" data type identifier. */
@@ -1511,7 +1514,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 
 	if len(info) <= sizeof_struct_aprs_mic_e_s {
 		// Too short for a comment.  We are finished.
-		A.mfr = "UNKNOWN vendor/model"
+		A.mfr = unknownDevice
 
 		return
 	}
@@ -1524,7 +1527,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		mcomment = mcomment[:len(mcomment)-1]
 		if len(mcomment) == 0 {
 			// Nothing left after removing trailing CR.
-			A.mfr = "UNKNOWN vendor/model"
+			A.mfr = unknownDevice
 
 			return
 		}
@@ -1535,7 +1538,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 
 	// Comment with vendor/model removed.
 	var trimmed, device = deviceIDData.FromMicE(string(mcomment))
-	A.mfr = device
+	A.mfr = maybe.FromMaybe(unknownDevice, device)
 
 	// Possible altitude at beginning of remaining comment.
 	// Three base 91 characters followed by }

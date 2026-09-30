@@ -6,6 +6,7 @@ package deviceid
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,7 +24,7 @@ func TestFromMicEWithoutTocalls(t *testing.T) {
 
 	var trimmed, device = d.FromMicE(">Comment")
 	assert.Equal(t, "Comment", trimmed)
-	assert.Equal(t, "Kenwood TH-D7A", device)
+	assert.Equal(t, maybe.Just("Kenwood TH-D7A"), device)
 }
 
 // New reports a missing tocalls.yaml once; the lookups, which run for every
@@ -35,11 +36,11 @@ func TestLookupsWithoutTablesDoNotLogPerPacket(t *testing.T) {
 
 	var d = new(Data)
 
-	assert.Equal(t, "UNKNOWN vendor/model", d.FromDest("APDW18"))
+	assert.Equal(t, maybe.Nothing[string](), d.FromDest("APDW18"))
 
 	var trimmed, device = d.FromMicE(">Comment")
 	assert.Equal(t, ">Comment", trimmed)
-	assert.Equal(t, "UNKNOWN vendor/model", device)
+	assert.Equal(t, maybe.Nothing[string](), device)
 
 	assert.Empty(t, hook.AllEntries())
 }
