@@ -4,6 +4,7 @@
 package dwutil
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,4 +23,8 @@ func Test_unit_conversions(t *testing.T) {
 
 	// Zero is a real reading, not an absent one, and converts as such.
 	assert.InDelta(t, 0.0, DW_KNOTS_TO_MPH(0), 0.0000001)
+}
+
+func TestAngleConversions(t *testing.T) {
+	assert.InDelta(t, math.Pi, D2R(180), 0.0000001)
 }

@@ -32,10 +32,6 @@ func ADEVFIRSTCHAN(n int) int {
 	return n * 2
 }
 
-func D2R(d float64) float64 {
-	return d * math.Pi / 180
-}
-
 func R2D(r float64) float64 {
 	return r * 180 / math.Pi
 }

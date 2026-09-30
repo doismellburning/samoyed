@@ -3,6 +3,8 @@
 
 package dwutil
 
+import "math"
+
 // The unit conversions below are the Dire Wolf macros of the same names, less
 // their `(x) == G_UNKNOWN ? G_UNKNOWN :` guard: a value that might not be there
 // is a maybe.Maybe, and maybe.Fmap keeps its absence out of the arithmetic.
@@ -40,4 +42,9 @@ func DW_MBAR_TO_INHG(x float64) float64 {
 // DW_KM_TO_MILES converts kilometres to miles.
 func DW_KM_TO_MILES(x float64) float64 {
 	return x * 0.621371192
+}
+
+// D2R converts degrees to radians.
+func D2R(d float64) float64 {
+	return d * math.Pi / 180
 }
