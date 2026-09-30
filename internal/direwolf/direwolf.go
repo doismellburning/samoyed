@@ -16,7 +16,6 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
-	"github.com/doismellburning/samoyed/internal/aprstelemetry"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/dwgps"
@@ -64,7 +63,6 @@ var misc_config *misc_config_s
 var aprsSymbolData *symbols.Data
 var waypointSender *WaypointSender
 var packetLogger *PacketLogger
-var telemetryState = aprstelemetry.New()
 var beaconService *BeaconService
 var gpsReceiver *dwgps.GPS
 var kissNetSvc *KissNetService

@@ -370,3 +370,18 @@ func Test_decode_aprs_comment_length_warning(t *testing.T) {
 	aprsDecoder.Decode(pp, false)
 	assert.Equal(t, "Comment is extremely long", hook.LastEntry().Message)
 }
+
+// Telemetry metadata a station sends is kept by the APRSDecoder that
+// decoded it, for decoding that station's later telemetry data, and not by
+// any other APRSDecoder.
+func Test_decode_aprs_telemetry_metadata_per_decoder(t *testing.T) {
+	var parm = ax25.FromText("Q1TEST>APRS::Q1TEST   :PARM.Volts", true)
+	var data = ax25.FromText("Q1TEST>APRS:T#005,199,000,255,073,123,01101001", true)
+
+	var heard = NewAPRSDecoder(nil, nil)
+	heard.Decode(parm, true)
+	assert.Contains(t, heard.Decode(data, true).telemetry, "Volts=199")
+
+	var other = NewAPRSDecoder(nil, nil)
+	assert.NotContains(t, other.Decode(data, true).telemetry, "Volts")
+}

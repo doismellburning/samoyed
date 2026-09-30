@@ -29,6 +29,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/aprstelemetry"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/dwgps"
@@ -189,11 +190,19 @@ const unknownDevice = "UNKNOWN vendor/model"
 //
 // The zero value decodes without either, so it identifies no device and
 // describes no symbol - which is all that checking a filter's syntax needs.
+// Nor does it remember the telemetry metadata stations send between one
+// packet and the next.
+//
 // The tables are only read once loaded, so one APRSDecoder can be shared
 // between goroutines.
 type APRSDecoder struct {
 	deviceIDs *deviceid.Data
 	symbols   *symbols.Data
+
+	// telemetry is the telemetry metadata - channel names, units, scaling
+	// and bit sense - that stations have sent, for decoding their later
+	// telemetry data.  It is safe for use by more than one goroutine.
+	telemetry *aprstelemetry.State
 }
 
 // NewAPRSDecoder returns an APRSDecoder that identifies devices from
@@ -202,6 +211,7 @@ func NewAPRSDecoder(deviceIDs *deviceid.Data, symbolData *symbols.Data) *APRSDec
 	var d = new(APRSDecoder)
 	d.deviceIDs = deviceIDs
 	d.symbols = symbolData
+	d.telemetry = aprstelemetry.New()
 
 	return d
 }
@@ -211,6 +221,17 @@ func NewAPRSDecoder(deviceIDs *deviceid.Data, symbolData *symbols.Data) *APRSDec
 // has no other use for them.
 func NewAPRSDecoderFromDataFiles() *APRSDecoder {
 	return NewAPRSDecoder(deviceid.New(), symbols.New())
+}
+
+// telemetryMetadata is where d keeps the telemetry metadata stations send.  The
+// zero value has nowhere to keep it, so each packet it decodes starts afresh
+// and telemetry data decodes with the defaults.
+func (d *APRSDecoder) telemetryMetadata() *aprstelemetry.State {
+	if d.telemetry == nil {
+		return aprstelemetry.New()
+	}
+
+	return d.telemetry
 }
 
 // Decode splits an APRS packet into the separate properties it contains.
@@ -251,6 +272,7 @@ func (d *APRSDecoder) decode(pp *ax25.Packet, quiet bool, third_party_src string
 	var pinfo = pp.Info()
 
 	var A = new(decodedAPRS)
+	var telemetryState = d.telemetryMetadata()
 
 	A.quiet = quiet
 
@@ -391,7 +413,7 @@ func (d *APRSDecoder) decode(pp *ax25.Packet, quiet bool, third_party_src string
 		if bytes.HasPrefix(pinfo, []byte("!!")) {
 			aprsUltimeter(A, pinfo) // TODO: produce obsolete error.
 		} else {
-			aprsLLPos(A, pinfo)
+			aprsLLPos(A, telemetryState, pinfo)
 		}
 
 		A.packetType = packetTypePosition
@@ -412,23 +434,23 @@ func (d *APRSDecoder) decode(pp *ax25.Packet, quiet bool, third_party_src string
 	case '\'': /* Old Mic-E Data (but Current data for TM-D700) */
 		fallthrough
 	case '`': /* Current Mic-E Data (not used in TM-D700) */
-		aprsMicE(A, d.deviceIDs, pp, pinfo)
+		aprsMicE(A, telemetryState, d.deviceIDs, pp, pinfo)
 		A.packetType = packetTypePosition
 
 	case ')': /* Item. */
-		aprsItem(A, pinfo)
+		aprsItem(A, telemetryState, pinfo)
 		A.packetType = packetTypeItem
 
 	case '/': /* Position with timestamp (no APRS messaging) */
 		fallthrough
 	case '@': /* Position with timestamp (with APRS messaging) */
-		aprsLLPosTime(A, pinfo)
+		aprsLLPosTime(A, telemetryState, pinfo)
 		A.packetType = packetTypePosition
 
 	case ':': /* "Message" (special APRS meaning): for one person, a group, or a bulletin. */
 		/* Directed Station Query */
 		/* Telemetry metadata. */
-		aprsMessage(A, pinfo, quiet)
+		aprsMessage(A, telemetryState, pinfo, quiet)
 
 		switch A.messageSubtype {
 		case messageSubtypeMessage, messageSubtypeAck, messageSubtypeRej:
@@ -444,7 +466,7 @@ func (d *APRSDecoder) decode(pp *ax25.Packet, quiet bool, third_party_src string
 		}
 
 	case ';': /* Object */
-		aprsObject(A, pinfo)
+		aprsObject(A, telemetryState, pinfo)
 		A.packetType = packetTypeObject
 
 	case '<': /* Station Capabilities */
@@ -460,7 +482,7 @@ func (d *APRSDecoder) decode(pp *ax25.Packet, quiet bool, third_party_src string
 		A.packetType = packetTypeQuery
 
 	case 'T': /* Telemetry */
-		aprsTelemetry(A, pinfo, quiet)
+		aprsTelemetry(A, telemetryState, pinfo, quiet)
 		A.packetType = packetTypeTelemetry
 
 	case '_': /* Positionless Weather Report */
@@ -839,7 +861,7 @@ func (d *APRSDecoder) Print(A *decodedAPRS) {
  *
  *------------------------------------------------------------------*/
 
-func aprsLLPos(A *decodedAPRS, info []byte) {
+func aprsLLPos(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) {
 	type llPos struct {
 		DTI byte /* ! or = */
 		Pos aprs.Position
@@ -893,7 +915,7 @@ func aprsLLPos(A *decodedAPRS, info []byte) {
 			*/
 		} else {
 			/* Regular position report. */
-			dataExtensionComment(A, info[ll_bytes:])
+			dataExtensionComment(A, telemetryState, info[ll_bytes:])
 		}
 	} else { /* Compressed location. */
 		decodeCompressedPosition(A, &(q.CPos))
@@ -907,7 +929,7 @@ func aprsLLPos(A *decodedAPRS, info []byte) {
 			weatherData(A, info[compressed_bytes:])
 		} else {
 			/* Regular position report. */
-			processComment(A, info[compressed_bytes:])
+			processComment(A, telemetryState, info[compressed_bytes:])
 		}
 	}
 }
@@ -946,7 +968,7 @@ func aprsLLPos(A *decodedAPRS, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprsLLPosTime(A *decodedAPRS, info []byte) {
+func aprsLLPosTime(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) {
 	type llPosTime struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
@@ -979,7 +1001,7 @@ func aprsLLPosTime(A *decodedAPRS, info []byte) {
 			weatherData(A, info[llBytes:])
 		} else {
 			/* Regular position report. */
-			dataExtensionComment(A, info[llBytes:])
+			dataExtensionComment(A, telemetryState, info[llBytes:])
 		}
 	} else { /* Compressed location. */
 		decodeCompressedPosition(A, &(q.CPos))
@@ -993,7 +1015,7 @@ func aprsLLPosTime(A *decodedAPRS, info []byte) {
 			weatherData(A, info[compressedBytes:])
 		} else {
 			/* Regular position report. */
-			processComment(A, info[compressedBytes:])
+			processComment(A, telemetryState, info[compressedBytes:])
 		}
 	}
 }
@@ -1290,7 +1312,7 @@ func micEDigit(A *decodedAPRS, c byte, mask int, std_msg *int, cust_msg *int) in
 	return (0)
 }
 
-func aprsMicE(A *decodedAPRS, deviceIDs *deviceid.Data, pp *ax25.Packet, info []byte) {
+func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *deviceid.Data, pp *ax25.Packet, info []byte) {
 	type micEInfo struct {
 		DTI         byte    /* ' or ` */
 		Lon         [3]byte /* "d+28", "m+28", "h+28" */
@@ -1569,12 +1591,12 @@ func aprsMicE(A *decodedAPRS, deviceIDs *deviceid.Data, pp *ax25.Packet, info []
 		trimmed[3] == '}' {
 		A.altitudeFt = maybe.Just(dwutil.DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
 
-		processComment(A, []byte(trimmed)[4:])
+		processComment(A, telemetryState, []byte(trimmed)[4:])
 
 		return
 	}
 
-	processComment(A, []byte(trimmed))
+	processComment(A, telemetryState, []byte(trimmed))
 }
 
 /*------------------------------------------------------------------
@@ -1637,7 +1659,7 @@ func aprsMicE(A *decodedAPRS, deviceIDs *deviceid.Data, pp *ax25.Packet, info []
  *
  *------------------------------------------------------------------*/
 
-func aprsMessage(A *decodedAPRS, info []byte, quiet bool) {
+func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte, quiet bool) {
 	type messageInfo struct {
 		DTI       byte /* : */
 		Addressee [9]byte
@@ -1927,7 +1949,7 @@ func aprsMessage(A *decodedAPRS, info []byte, quiet bool) {
  *
  *------------------------------------------------------------------*/
 
-func aprsObject(A *decodedAPRS, info []byte) {
+func aprsObject(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) {
 	type objectInfo struct {
 		DTI          byte /* ; */
 		Name         [9]byte
@@ -1976,7 +1998,7 @@ func aprsObject(A *decodedAPRS, info []byte) {
 			weatherData(A, info[objectPosBytes:])
 		} else {
 			/* Regular object. */
-			dataExtensionComment(A, info[objectPosBytes:])
+			dataExtensionComment(A, telemetryState, info[objectPosBytes:])
 		}
 	} else { /* Compressed location. */
 		decodeCompressedPosition(A, &(q.CPos))
@@ -1990,7 +2012,7 @@ func aprsObject(A *decodedAPRS, info []byte) {
 			weatherData(A, info[objectCompressedPosBytes:])
 		} else {
 			/* Regular position report. */
-			processComment(A, info[objectCompressedPosBytes:])
+			processComment(A, telemetryState, info[objectCompressedPosBytes:])
 		}
 	}
 } /* end aprsObject */
@@ -2015,7 +2037,7 @@ func aprsObject(A *decodedAPRS, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprsItem(A *decodedAPRS, info []byte) {
+func aprsItem(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) {
 	/*
 		Structure:
 
@@ -2093,11 +2115,11 @@ func aprsItem(A *decodedAPRS, info []byte) {
 	case positionErr == nil && unicode.IsDigit(rune(p.Lat[0])): // Human-readable location.
 		decodePosition(A, &p)
 
-		dataExtensionComment(A, info[positionBytes:])
+		dataExtensionComment(A, telemetryState, info[positionBytes:])
 	case compressedPositionErr == nil: // Compressed location.
 		decodeCompressedPosition(A, &q)
 
-		processComment(A, info[compressedPositionBytes:])
+		processComment(A, telemetryState, info[compressedPositionBytes:])
 	default:
 		if !A.quiet {
 			logrus.WithField("length", len(info)).Warn("Item has too few bytes after the live/killed indicator for a position")
@@ -2528,7 +2550,7 @@ func aprsDirectedStationQuery(A *decodedAPRS, addressee []byte, query []byte, qu
  *
  *------------------------------------------------------------------*/
 
-func aprsTelemetry(A *decodedAPRS, info []byte, quiet bool) {
+func aprsTelemetry(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte, quiet bool) {
 	A.dataTypeDesc = "Telemetry"
 
 	var telemetry, comment = telemetryState.DataOriginal(A.src, string(info), quiet)
@@ -3736,7 +3758,7 @@ func directivityString(d int) (string, error) {
 	return dirs[d], nil
 }
 
-func dataExtensionComment(A *decodedAPRS, pdext []byte) {
+func dataExtensionComment(A *decodedAPRS, telemetryState *aprstelemetry.State, pdext []byte) {
 	if len(pdext) < 7 {
 		A.comment = string(pdext)
 
@@ -3749,7 +3771,7 @@ func dataExtensionComment(A *decodedAPRS, pdext []byte) {
 		pdext[3] == '/' &&
 		pdext[4] == 'C' {
 		/* not decoded at this time */
-		processComment(A, pdext[7:])
+		processComment(A, telemetryState, pdext[7:])
 
 		return
 	}
@@ -3778,9 +3800,9 @@ func dataExtensionComment(A *decodedAPRS, pdext []byte) {
 
 		const bearing_nrq_len = 7 + 8
 		if len(pdext) >= bearing_nrq_len && pdext[7] == '/' && pdext[11] == '/' {
-			processComment(A, pdext[bearing_nrq_len:])
+			processComment(A, telemetryState, pdext[bearing_nrq_len:])
 		} else {
-			processComment(A, pdext[7:])
+			processComment(A, telemetryState, pdext[7:])
 		}
 
 		return
@@ -3800,7 +3822,7 @@ func dataExtensionComment(A *decodedAPRS, pdext []byte) {
 		// TODO: look for another 0-9 A-Z followed by a /
 		// http://www.aprs.org/aprs12/probes.txt
 
-		processComment(A, pdext[7:])
+		processComment(A, telemetryState, pdext[7:])
 
 		return
 	}
@@ -3815,7 +3837,7 @@ func dataExtensionComment(A *decodedAPRS, pdext []byte) {
 			A.radioRange = maybe.Just(float64(n))
 		}
 
-		processComment(A, pdext[7:])
+		processComment(A, telemetryState, pdext[7:])
 
 		return
 	}
@@ -3831,12 +3853,12 @@ func dataExtensionComment(A *decodedAPRS, pdext []byte) {
 			A.directivity, _ = directivityString(int(pdext[6] - '0'))
 		}
 
-		processComment(A, pdext[7:])
+		processComment(A, telemetryState, pdext[7:])
 
 		return
 	}
 
-	processComment(A, pdext)
+	processComment(A, telemetryState, pdext)
 }
 
 /*------------------------------------------------------------------
@@ -3973,7 +3995,7 @@ func aprsSign(x float64) float64 {
 	}
 }
 
-func processComment(A *decodedAPRS, commentData []byte) {
+func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, commentData []byte) {
 	/*
 	 * Frequency must be at the at the beginning.
 	 * Others can be anywhere in the comment.
