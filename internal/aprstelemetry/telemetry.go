@@ -20,21 +20,26 @@
 package aprstelemetry
 
 import (
+	"container/list"
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 )
 
+// maxStations is how many stations' metadata a State keeps.  Metadata can
+// come from anyone on frequency or on APRS-IS, so without a limit a stream
+// of stations would grow it for ever.
+const maxStations = 1000
+
 const numAnalog = 5  // Number of analog channels.
 const numDigital = 8 // Number of digital channels.
 
 type stationMetadata struct {
-	next *stationMetadata // Next in linked list.
-
 	station string // Station name with optional SSID.
 
 	// Description for data.
@@ -59,27 +64,46 @@ const coeffB = 1
 const coeffC = 2
 
 // State holds the telemetry metadata - channel names, units, scaling and
-// bit sense - each station has sent, for decoding its later data.
+// bit sense - each station has sent, for decoding its later data.  It keeps
+// the most recently used stations' metadata, up to maxStations of them; a
+// station whose metadata has been dropped to make room is back to the
+// defaults until it sends more.  It is safe for use by more than one
+// goroutine.
 type State struct {
-	mdListHead *stationMetadata
+	// mu guards everything below, and is held for the whole of each exported
+	// method, since decoding data reads the metadata it looks up.
+	mu sync.Mutex
+
+	// capacity is how many stations to keep: maxStations, bar in tests.
+	capacity int
+
+	// stations finds a station's element in recency, whose values are
+	// *stationMetadata, most recently used at the front.
+	stations map[string]*list.Element
+	recency  *list.List
+
+	// defaults is what a station that has sent no metadata decodes with.  It
+	// is shared by all such stations, so nothing may change it.
+	defaults *stationMetadata
 }
 
 // New returns a State that has heard no metadata, so every station starts
 // with the defaults.
 func New() *State {
-	return new(State)
+	var ts = new(State)
+
+	ts.capacity = maxStations
+	ts.stations = make(map[string]*list.Element)
+	ts.recency = list.New()
+	ts.defaults = newStationMetadata("")
+
+	return ts
 }
 
-// getMetadata returns the metadata for station, a station name with optional
-// SSID, first allocating one with the defaults if the station has sent none.
-func (ts *State) getMetadata(station string) *stationMetadata {
-	logrus.WithField("station", station).Debug("getMetadata")
-	for p := ts.mdListHead; p != nil; p = p.next {
-		if station == p.station {
-			return (p)
-		}
-	}
-
+// newStationMetadata returns metadata for station with the defaults: channels
+// named A1-A5 and D1-D8 with no units, analog values unscaled, and every bit
+// active high.
+func newStationMetadata(station string) *stationMetadata {
 	var p = new(stationMetadata)
 
 	p.station = station
@@ -105,8 +129,56 @@ func (ts *State) getMetadata(station string) *stationMetadata {
 		p.sense[n] = true
 	}
 
-	p.next = ts.mdListHead
-	ts.mdListHead = p
+	return p
+}
+
+// stored returns the metadata kept for station, if any, making the station
+// the most recently used.
+func (ts *State) stored(station string) (*stationMetadata, bool) {
+	var e, ok = ts.stations[station]
+	if !ok {
+		return nil, false
+	}
+
+	ts.recency.MoveToFront(e)
+
+	return e.Value.(*stationMetadata), true //nolint:forcetypeassert // recency holds nothing else
+}
+
+// lookup returns the metadata for decoding station's data: what it has sent,
+// or the shared defaults, which must not be changed, if it has sent none.  Unlike
+// getMetadata it keeps nothing, so data alone takes up no room.
+func (ts *State) lookup(station string) *stationMetadata {
+	if p, ok := ts.stored(station); ok {
+		return p
+	}
+
+	return ts.defaults
+}
+
+// getMetadata returns the metadata for station, a station name with optional
+// SSID, for a metadata message to change, first allocating one with the
+// defaults if the station has sent none.  Either way the station becomes the
+// most recently used, and allocating one drops the least recently used station
+// if the State is full.
+func (ts *State) getMetadata(station string) *stationMetadata {
+	logrus.WithField("station", station).Debug("getMetadata")
+
+	if p, ok := ts.stored(station); ok {
+		return p
+	}
+
+	var p = newStationMetadata(station)
+
+	if ts.recency.Len() >= ts.capacity {
+		var oldest = ts.recency.Back()
+		var dropped = ts.recency.Remove(oldest).(*stationMetadata) //nolint:forcetypeassert // recency holds nothing else
+
+		delete(ts.stations, dropped.station)
+		logrus.WithField("station", dropped.station).Debug("Dropped least recently used telemetry metadata")
+	}
+
+	ts.stations[station] = ts.recency.PushFront(p)
 
 	return (p)
 }
@@ -151,8 +223,11 @@ func decimalPlaces(str string) int {
 // but later took it out because no one pays attention to that original
 // restriction anymore.
 func (ts *State) DataOriginal(station string, info string, quiet bool) (string, string) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("info", info).Debug("DataOriginal")
-	var pm = ts.getMetadata(station)
+	var pm = ts.lookup(station)
 
 	// The zero value of a Maybe is Nothing, so an unreported channel needs no
 	// initialisation to say so.
@@ -287,8 +362,11 @@ func (ts *State) DataOriginal(station string, info string, quiet bool) (string, 
 // the sequence number.  Next we have 1 to 5 analog values.  If digital values
 // are present, all 5 analog values must be present.
 func (ts *State) DataBase91(station string, cdata string) string {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("cdata", cdata).Debug("DataBase91")
-	var pm = ts.getMetadata(station)
+	var pm = ts.lookup(station)
 
 	// The zero value of a Maybe is Nothing, so an unreported channel needs no
 	// initialisation to say so.
@@ -353,6 +431,9 @@ func (ts *State) DataBase91(station string, cdata string) string {
 // TBD: What should we do if some, but not all, names are specified?  Clear the
 // others or keep the defaults?
 func (ts *State) NameMessage(station string, msg string) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("msg", msg).Debug("NameMessage")
 	msg = strings.TrimSpace(msg)
 
@@ -378,6 +459,9 @@ func (ts *State) NameMessage(station string, msg string) {
 // The original spec has different maximum lengths for different fields which
 // we will ignore.
 func (ts *State) UnitLabelMessage(station string, msg string) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("msg", msg).Debug("UnitLabelMessage")
 
 	// Remove any trailing CR LF.
@@ -404,6 +488,9 @@ func (ts *State) UnitLabelMessage(station string, msg string) {
 //
 // The spec appears to require all 15 so we complain if fewer are found.
 func (ts *State) CoefficientsMessage(station string, msg string, quiet bool) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("msg", msg).Debug("CoefficientsMessage")
 
 	// Remove any trailing CR LF.
@@ -455,6 +542,9 @@ func (ts *State) CoefficientsMessage(station string, msg string, quiet bool) {
 // with anything left over the project name or title.  quiet suppresses the
 // complaints about a message that breaks the spec.
 func (ts *State) BitSenseMessage(station string, msg string, quiet bool) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
 	logrus.WithField("msg", msg).Debug("BitSenseMessage")
 	var pm = ts.getMetadata(station)
 
