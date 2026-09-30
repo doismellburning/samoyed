@@ -82,7 +82,7 @@ Flags:
 		os.Exit(0)
 	}
 
-	var maps, parseErr = axudp.ParseConfig(*configFile)
+	var routes, parseErr = axudp.ParseConfig(*configFile)
 	if parseErr != nil {
 		fmt.Fprintf(os.Stderr, "samoyed-axudp: reading config: %v\n", parseErr)
 		os.Exit(1)
@@ -90,7 +90,7 @@ Flags:
 
 	fmt.Printf("samoyed-axudp: WARNING: this is beta software; behaviour may change in future releases\n")
 	fmt.Printf("samoyed-axudp: MAP table:\n")
-	for _, e := range maps {
+	for _, e := range routes.Maps {
 		fmt.Printf("  %s -> %s\n", e.AX25Addr, e.Addr)
 	}
 
@@ -114,7 +114,7 @@ Flags:
 	}
 	fmt.Printf("samoyed-axudp: KISS TCP server listening on port %d\n", *kissPort)
 
-	var b = axudp.NewBridge(maps, udpConn)
+	var b = axudp.NewBridge(routes, udpConn)
 
 	// Both halves run until the user interrupts us, at which point they give
 	// their sockets up rather than being cut off mid-flight.  Not deferred:

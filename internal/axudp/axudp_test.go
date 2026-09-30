@@ -19,6 +19,13 @@ import (
 	"github.com/sirupsen/logrus/hooks/test"
 )
 
+// noRoutes routes nowhere, for a bridge whose test sends nothing.
+func noRoutes() Routes {
+	var routes Routes
+
+	return routes
+}
+
 func TestAddCRC(t *testing.T) {
 	// A minimal AX.25 frame (14 bytes: dest + src address fields).
 	var frame = []byte{
@@ -97,10 +104,11 @@ func TestParseConfig(t *testing.T) {
 		t.Fatal(writeErr)
 	}
 
-	var entries, err = ParseConfig(p)
+	var routes, err = ParseConfig(p)
 	if err != nil {
 		t.Fatalf("ParseConfig: unexpected error: %v", err)
 	}
+	var entries = routes.Maps
 	if len(entries) != 2 {
 		t.Fatalf("ParseConfig: want 2 entries, got %d", len(entries))
 	}
@@ -143,8 +151,8 @@ func TestParseConfigNormalisesAX25Addr(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ParseConfig: unexpected error: %v", err)
 			}
-			if entries[0].AX25Addr != tc.wantNorm {
-				t.Errorf("AX25Addr = %q, want %q", entries[0].AX25Addr, tc.wantNorm)
+			if entries.Maps[0].AX25Addr != tc.wantNorm {
+				t.Errorf("AX25Addr = %q, want %q", entries.Maps[0].AX25Addr, tc.wantNorm)
 			}
 		})
 	}
@@ -167,11 +175,11 @@ func TestParseConfigResolvesUDPAddr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseConfig: unexpected error: %v", err)
 	}
-	if entries[0].UDPAddr == nil {
+	if entries.Maps[0].UDPAddr == nil {
 		t.Fatal("ParseConfig: UDPAddr is nil, expected resolved address")
 	}
-	if entries[0].UDPAddr.String() != "192.0.2.1:93" {
-		t.Errorf("UDPAddr = %q, want %q", entries[0].UDPAddr.String(), "192.0.2.1:93")
+	if entries.Maps[0].UDPAddr.String() != "192.0.2.1:93" {
+		t.Errorf("UDPAddr = %q, want %q", entries.Maps[0].UDPAddr.String(), "192.0.2.1:93")
 	}
 }
 
@@ -260,7 +268,7 @@ func TestParseConfigBadYAML(t *testing.T) {
 
 func TestLookupMap(t *testing.T) {
 	var b = new(Bridge)
-	b.maps = []MapEntry{
+	b.routes.Maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},   // no SSID — should match all SSIDs
 		{AX25Addr: "Q2TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil}, // with SSID — exact match only
 	}
@@ -283,7 +291,7 @@ func TestLookupMap(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		var entry, ok = b.lookupMap(tc.dest)
+		var entry, ok = b.routes.lookupMap(tc.dest)
 		if ok != tc.wantFound {
 			t.Errorf("lookupMap(%q): found=%v want %v", tc.dest, ok, tc.wantFound)
 
@@ -301,12 +309,12 @@ func TestLookupMapExactBeforeWildcard(t *testing.T) {
 	// Wildcard entry is listed first; specific SSID entry is listed second.
 	// A lookup for Q1TEST-7 must return the specific entry, not the wildcard.
 	var b = new(Bridge)
-	b.maps = []MapEntry{
+	b.routes.Maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},   // wildcard — listed first
 		{AX25Addr: "Q1TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil}, // specific SSID-7 — listed second
 	}
 
-	var entry, ok = b.lookupMap("Q1TEST-7")
+	var entry, ok = b.routes.lookupMap("Q1TEST-7")
 	if !ok {
 		t.Fatal("lookupMap(Q1TEST-7): not found")
 	}
@@ -315,7 +323,7 @@ func TestLookupMapExactBeforeWildcard(t *testing.T) {
 	}
 
 	// Wildcard should still match when no exact entry exists.
-	var entry2, ok2 = b.lookupMap("Q1TEST-3")
+	var entry2, ok2 = b.routes.lookupMap("Q1TEST-3")
 	if !ok2 {
 		t.Fatal("lookupMap(Q1TEST-3): not found via wildcard")
 	}
@@ -337,7 +345,7 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 	// the test frame below.  The udpConn is intentionally left nil so that any
 	// accidental call to sendAXUDP panics immediately.
 	var b = new(Bridge)
-	b.maps = []MapEntry{
+	b.routes.Maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},
 	}
 
@@ -511,7 +519,7 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 
 	// Set up a bridge with a MAP entry routing Q1TEST to dstPkt.
 	var b = new(Bridge)
-	b.maps = []MapEntry{
+	b.routes.Maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: dstAddr.String(), UDPAddr: dstAddr},
 	}
 	b.udpConn = srcUDP
@@ -586,7 +594,7 @@ func TestRunUDPListenerReturnsOnReadError(t *testing.T) {
 		t.Fatal("pkt is not a *net.UDPConn")
 	}
 
-	var b = NewBridge(nil, udpConn)
+	var b = NewBridge(noRoutes(), udpConn)
 
 	var errs = make(chan error, 1)
 	go func() { errs <- b.RunUDPListener(t.Context()) }()
@@ -619,7 +627,7 @@ func TestRunKISSServerReturnsOnListenerClose(t *testing.T) {
 		t.Fatal(listenErr)
 	}
 
-	var b = NewBridge(nil, nil)
+	var b = NewBridge(noRoutes(), nil)
 
 	var errs = make(chan error, 1)
 	go func() { errs <- b.RunKISSServer(t.Context(), ln) }()
@@ -667,7 +675,7 @@ func (l *failingListener) Addr() net.Addr { return &net.TCPAddr{IP: net.IPv4zero
 // spins the CPU and floods the log.
 func TestRunKISSServerGivesUpOnPersistentAcceptFailure(t *testing.T) {
 	var ln = new(failingListener)
-	var b = NewBridge(nil, nil)
+	var b = NewBridge(noRoutes(), nil)
 
 	// The real back-off adds up to a couple of seconds over the attempts;
 	// how many attempts there are is the point here, not how long they take.
@@ -707,7 +715,7 @@ func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
 	}
 	defer ln.Close()
 
-	var b = NewBridge(nil, nil)
+	var b = NewBridge(noRoutes(), nil)
 
 	go b.RunKISSServer(t.Context(), ln) //nolint:errcheck // the error is the teardown path, covered above
 

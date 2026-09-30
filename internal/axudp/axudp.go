@@ -30,60 +30,94 @@ type MapEntry struct {
 	UDPAddr  *net.UDPAddr // pre-resolved UDP address for sending
 }
 
-// yamlConfig is the top-level structure of the axudp.yaml config file.
-type yamlConfig struct {
-	Maps []yamlMapEntry `yaml:"maps"`
-}
-
-// yamlMapEntry represents one entry under the "maps" key.
-type yamlMapEntry struct {
+// MapSettings is one MAP entry as written in a config file: frames for
+// AX25Addr go to Host:Port.
+type MapSettings struct {
 	AX25Addr string `yaml:"ax25addr"`
 	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
 }
 
-// ParseConfig reads a YAML config file from path and returns the map entries.
-func ParseConfig(path string) ([]MapEntry, error) {
+// Routes says where an AX.25 frame sent over AXUDP goes.
+type Routes struct {
+	Maps []MapEntry
+}
+
+// yamlConfig is the top-level structure of the axudp.yaml config file.
+type yamlConfig struct {
+	Maps []MapSettings `yaml:"maps"`
+}
+
+// ParseConfig reads a YAML config file from path and returns the routes it
+// describes.
+func ParseConfig(path string) (Routes, error) {
+	var none Routes
+
 	var data, err = os.ReadFile(path) //nolint:gosec
 	if err != nil {
-		return nil, err
+		return none, err
 	}
 
 	var cfg yamlConfig
 	var unmarshalErr = yaml.Unmarshal(data, &cfg)
 	if unmarshalErr != nil {
-		return nil, fmt.Errorf("parsing YAML config: %w", unmarshalErr)
+		return none, fmt.Errorf("parsing YAML config: %w", unmarshalErr)
 	}
 
-	var entries = make([]MapEntry, 0, len(cfg.Maps))
-	for i, m := range cfg.Maps {
-		// Normalise ax25addr: strip surrounding whitespace, uppercase, and
-		// remove a trailing "-0" (SSID 0 is represented without any suffix by
-		// extractDest, so "CALL-0" would never match without this step).
-		var ax25addr = strings.ToUpper(strings.TrimSpace(m.AX25Addr))
-		ax25addr = strings.TrimSuffix(ax25addr, "-0")
-		if ax25addr == "" {
-			return nil, fmt.Errorf("map entry %d: ax25addr is empty", i)
+	return NewRoutes(cfg.Maps)
+}
+
+// NewRoutes checks and normalises maps, resolving each host, and returns the
+// routes they describe.
+func NewRoutes(maps []MapSettings) (Routes, error) {
+	var none, routes Routes
+	routes.Maps = make([]MapEntry, 0, len(maps))
+
+	for i, m := range maps {
+		var entry, err = newMapEntry(m)
+		if err != nil {
+			return none, fmt.Errorf("map entry %d: %w", i, err)
 		}
-		if m.Host == "" {
-			return nil, fmt.Errorf("map entry %d: host is empty", i)
-		}
-		if m.Port < 1 || m.Port > 65535 {
-			return nil, fmt.Errorf("map entry %d: port %d out of range (1-65535)", i, m.Port)
-		}
-		var addr = net.JoinHostPort(m.Host, strconv.Itoa(m.Port))
-		var udpAddr, resolveErr = net.ResolveUDPAddr("udp", addr)
-		if resolveErr != nil {
-			return nil, fmt.Errorf("map entry %d: resolving %s: %w", i, addr, resolveErr)
-		}
-		entries = append(entries, MapEntry{
-			AX25Addr: ax25addr,
-			Addr:     addr,
-			UDPAddr:  udpAddr,
-		})
+
+		routes.Maps = append(routes.Maps, entry)
 	}
 
-	return entries, nil
+	return routes, nil
+}
+
+// normaliseAX25Addr strips surrounding whitespace, uppercases, and removes a
+// trailing "-0": SSID 0 is represented without any suffix by extractDest, so
+// "CALL-0" would never match without this step.
+func normaliseAX25Addr(addr string) string {
+	return strings.TrimSuffix(strings.ToUpper(strings.TrimSpace(addr)), "-0")
+}
+
+// newMapEntry checks and normalises m, resolving its host.
+func newMapEntry(m MapSettings) (MapEntry, error) {
+	var none MapEntry
+
+	var ax25addr = normaliseAX25Addr(m.AX25Addr)
+	if ax25addr == "" {
+		return none, errors.New("ax25addr is empty")
+	}
+	if m.Host == "" {
+		return none, errors.New("host is empty")
+	}
+	if m.Port < 1 || m.Port > 65535 {
+		return none, fmt.Errorf("port %d out of range (1-65535)", m.Port)
+	}
+
+	var addr = net.JoinHostPort(m.Host, strconv.Itoa(m.Port))
+	var udpAddr, resolveErr = net.ResolveUDPAddr("udp", addr)
+	if resolveErr != nil {
+		return none, fmt.Errorf("resolving %s: %w", addr, resolveErr)
+	}
+
+	return MapEntry{
+		AX25Addr: ax25addr,
+		Addr:     addr,
+		UDPAddr:  udpAddr,
+	}, nil
 }
 
 // extractDest extracts the destination AX.25 address from a raw AX.25 frame.
@@ -110,7 +144,7 @@ func extractDest(frame []byte) string {
 
 // Bridge is the live state of the bridge.
 type Bridge struct {
-	maps    []MapEntry
+	routes  Routes
 	udpConn *net.UDPConn
 
 	mu      sync.Mutex
@@ -122,12 +156,12 @@ type Bridge struct {
 	maxAcceptBackoff time.Duration
 }
 
-// NewBridge creates a new Bridge routing AXUDP datagrams according to maps,
+// NewBridge creates a new Bridge routing AXUDP datagrams according to routes,
 // sending/receiving on udpConn.  Per-packet logging is emitted at logrus Trace
 // level, so enabling that level is what makes the bridge verbose.
-func NewBridge(maps []MapEntry, udpConn *net.UDPConn) *Bridge {
+func NewBridge(routes Routes, udpConn *net.UDPConn) *Bridge {
 	var b = new(Bridge)
-	b.maps = maps
+	b.routes = routes
 	b.udpConn = udpConn
 	b.acceptBackoff = defaultAcceptBackoff
 	b.maxAcceptBackoff = defaultMaxAcceptBackoff
@@ -364,15 +398,15 @@ func ax25AddrBase(cs string) string {
 // a MAP entry with an SSID matches only that exact address-SSID pair.
 // Exact matches always take priority over wildcard (no-SSID) matches,
 // regardless of the order entries appear in the config file.
-func (b *Bridge) lookupMap(dest string) (MapEntry, bool) {
+func (r *Routes) lookupMap(dest string) (MapEntry, bool) {
 	// First pass: exact match (callsign + SSID must match precisely).
-	for _, e := range b.maps {
+	for _, e := range r.Maps {
 		if e.AX25Addr == dest {
 			return e, true
 		}
 	}
 	// Second pass: base-call wildcard (entry has no SSID, matches any SSID).
-	for _, e := range b.maps {
+	for _, e := range r.Maps {
 		if !strings.ContainsRune(e.AX25Addr, '-') && ax25AddrBase(dest) == e.AX25Addr {
 			return e, true
 		}
@@ -505,7 +539,7 @@ func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 		}
 		if dest == "" {
 			logrus.Warn("Dropping AX.25 frame too short to extract a destination from")
-		} else if entry, ok := b2.lookupMap(dest); ok {
+		} else if entry, ok := b2.routes.lookupMap(dest); ok {
 			b2.sendAXUDP(ax25frame, entry)
 		} else {
 			logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
