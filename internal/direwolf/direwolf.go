@@ -305,6 +305,7 @@ x = Silence FX.25 information.`)
 	goHamlib.SetDebugLevel(goHamlib.DebugLevel(d_h_opt))
 
 	aprsSymbolData = symbols.New()
+	var aprsDecoder = NewAPRSDecoder(deviceid.New(), aprsSymbolData)
 
 	audio_config = new(AudioConfig)
 	misc_config = new(misc_config_s)
@@ -463,8 +464,6 @@ x = Silence FX.25 information.`)
 	 * Files not supported at this time.
 	 * Can always "cat" the file and pipe it into stdin.
 	 */
-	deviceIDData = deviceid.New()
-
 	var adevErr = audio_config.adev[0].validate()
 	if adevErr != nil {
 		logrus.WithError(adevErr).Error("Unusable audio device configuration")
@@ -654,7 +653,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the digipeater and IGate functions.
 	 */
 	mheardDB = mheard.New(d_m_opt)
-	var packetFilter = NewPacketFilter(&igate_config, NewAPRSDecoder(deviceIDData, aprsSymbolData), d_f_opt)
+	var packetFilter = NewPacketFilter(&igate_config, aprsDecoder, d_f_opt)
 	aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter)
 	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, d_i_opt)
 	igate.start(ctx)
@@ -726,7 +725,7 @@ x = Silence FX.25 information.`)
 
 	var adev_failed = recv_init(ctx, audio_config, audioDevices)
 
-	go recv_process(ctx)
+	go recv_process(ctx, aprsDecoder)
 
 	// Startup is done, so we sit here until we are asked to stop or an audio
 	// device input fails.  There is no point in going on without audio.
@@ -788,7 +787,18 @@ func ais_object_course_speed(A *decodedAPRS) (maybe.Maybe[int], maybe.Maybe[int]
 	return course, speed
 }
 
-func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func app_process_rec_packet(
+	ctx context.Context,
+	aprsDecoder *APRSDecoder,
+	channel int,
+	subchan int,
+	slice int,
+	pp *ax25.Packet,
+	alevel ax25.ALevel,
+	fec_type fec_type_t,
+	retries BitFixLevel,
+	spectrum string,
+) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
 	dwutil.Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -1018,11 +1028,11 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	if pp.IsAPRS() {
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
-		var A = DecodeAPRS(pp, q_d_opt, "")
+		var A = aprsDecoder.Decode(pp, q_d_opt)
 
 		if !q_d_opt {
 			// Print it all out in human readable format unless "-q d" option used.
-			DecodeAPRSPrint(A)
+			aprsDecoder.Print(A)
 		}
 
 		/*
