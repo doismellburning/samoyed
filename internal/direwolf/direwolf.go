@@ -1088,7 +1088,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 				waypointSender.SendSentence(nameIn,
 					lat, lon, rune(A.symbolTable), A.symbolCode,
-					maybe.Fmap(DW_FEET_TO_METERS, A.altitudeFt), A.course, maybe.Fmap(dwutil.DW_MPH_TO_KNOTS, A.speedMPH),
+					maybe.Fmap(dwutil.DW_FEET_TO_METERS, A.altitudeFt), A.course, maybe.Fmap(dwutil.DW_MPH_TO_KNOTS, A.speedMPH),
 					A.comment)
 			}
 		}

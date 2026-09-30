@@ -558,7 +558,7 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 		/* http://eng.usna.navy.mil/~bruninga/aprs/aprs11.html */
 		/* "The Antenna Gain in the PHG format on page 28 is in dBi." */
 		var height = maybe.FromMaybe(0, A.heightFt)
-		stemp += fmt.Sprintf(", %d W height(HAAT)=%dft=%.0fm %ddBi %s", power, height, DW_FEET_TO_METERS(float64(height)), maybe.FromMaybe(0, A.gain), A.directivity)
+		stemp += fmt.Sprintf(", %d W height(HAAT)=%dft=%.0fm %ddBi %s", power, height, dwutil.DW_FEET_TO_METERS(float64(height)), maybe.FromMaybe(0, A.gain), A.directivity)
 	}
 
 	if _range, ok := A.radioRange.Get(); ok && _range > 0 {
@@ -679,7 +679,7 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 			stemp += ", "
 		}
 
-		stemp += fmt.Sprintf("alt %.0f m (%.0f ft)", DW_FEET_TO_METERS(altitude_ft), altitude_ft)
+		stemp += fmt.Sprintf("alt %.0f m (%.0f ft)", dwutil.DW_FEET_TO_METERS(altitude_ft), altitude_ft)
 	}
 
 	if freq, ok := A.freq.Get(); ok {

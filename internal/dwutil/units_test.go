@@ -15,6 +15,7 @@ func Test_unit_conversions(t *testing.T) {
 	assert.InDelta(t, 11.5077945, DW_KNOTS_TO_MPH(10), 0.0000001)
 	assert.InDelta(t, 8.68976, DW_MPH_TO_KNOTS(10), 0.0000001)
 	assert.InDelta(t, 32.808399, DW_METERS_TO_FEET(10), 0.0000001)
+	assert.InDelta(t, 3.048, DW_FEET_TO_METERS(10), 0.0000001)
 
 	// Zero is a real reading, not an absent one, and converts as such.
 	assert.InDelta(t, 0.0, DW_KNOTS_TO_MPH(0), 0.0000001)

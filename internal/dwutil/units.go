@@ -21,3 +21,8 @@ func DW_MPH_TO_KNOTS(x float64) float64 {
 func DW_METERS_TO_FEET(x float64) float64 {
 	return x * 3.2808399
 }
+
+// DW_FEET_TO_METERS converts feet to metres.
+func DW_FEET_TO_METERS(x float64) float64 {
+	return x * 0.3048
+}
