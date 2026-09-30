@@ -157,7 +157,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	var igateConfig = new(igate_config_s)
 	var digiConfig = new(digi_config_s)
-	var filter = NewPacketFilter(igateConfig, 0)
+	var filter = NewPacketFilter(igateConfig, NewAPRSDecoderFromDataFiles(), 0)
 
 	igate = NewIGate(audioConfig, igateConfig, digiConfig, filter, 0)
 	aprsDigipeater = NewDigipeater(audioConfig, digiConfig, filter)

@@ -212,12 +212,6 @@ func NewAPRSDecoderFromDataFiles() *APRSDecoder {
 	return NewAPRSDecoder(deviceid.New(), symbols.New())
 }
 
-// DecodeAPRSInit loads the tables that DecodeAPRS and DecodeAPRSPrint use.
-func DecodeAPRSInit() {
-	deviceIDData = deviceid.New()
-	aprsSymbolData = symbols.New()
-}
-
 // DecodeAPRS decodes pp with the package's own tables.
 func DecodeAPRS(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPRS {
 	return NewAPRSDecoder(deviceIDData, aprsSymbolData).decode(pp, quiet, third_party_src)

@@ -47,6 +47,11 @@ type PacketFilter struct {
 	// own.  See issue #674.
 	igateConfig *igate_config_s
 
+	// aprsDecoder decodes the packets an APRS filter is asked about.  Nil
+	// decodes without identifying devices or describing symbols, which is
+	// all a syntax check needs.
+	aprsDecoder *APRSDecoder
+
 	// debug is how much to say about each decision:
 	//	0	no debug output.
 	//	1	single summary line with final result. Indent by 1.
@@ -56,11 +61,13 @@ type PacketFilter struct {
 }
 
 // NewPacketFilter returns a PacketFilter that takes an "i" filter's default
-// hop count from igateConfig, which may be nil, and says as much about each
-// decision as debugLevel asks for.
-func NewPacketFilter(igateConfig *igate_config_s, debugLevel int) *PacketFilter {
+// hop count from igateConfig, which may be nil, decodes APRS packets with
+// aprsDecoder, which may also be nil, and says as much about each decision
+// as debugLevel asks for.
+func NewPacketFilter(igateConfig *igate_config_s, aprsDecoder *APRSDecoder, debugLevel int) *PacketFilter {
 	var f = new(PacketFilter)
 	f.igateConfig = igateConfig
+	f.aprsDecoder = aprsDecoder
 	f.debug = debugLevel
 
 	return f
@@ -219,13 +226,19 @@ func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.
 	pfstate.is_aprs = is_aprs
 	pfstate.syntax_only = syntax_only
 
+	var aprsDecoder = new(APRSDecoder)
+
 	if f != nil {
 		pfstate.igate_config = f.igateConfig
 		pfstate.debug = f.debug
+
+		if f.aprsDecoder != nil {
+			aprsDecoder = f.aprsDecoder
+		}
 	}
 
 	if is_aprs {
-		pfstate.decoded = DecodeAPRS(pp, true, "")
+		pfstate.decoded = aprsDecoder.Decode(pp, true)
 	}
 
 	next_token(&pfstate)
@@ -1084,7 +1097,7 @@ func filt_s(pf *pfstate_t) (int, error) {
 	}
 
 	// This applies only for Position, Object, Item.
-	// DecodeAPRS() should set symbol code to space to mean undefined.
+	// APRSDecoder.Decode should set symbol code to space to mean undefined.
 
 	if pf.decoded.symbolCode == ' ' {
 		return 0, nil
@@ -1498,8 +1511,8 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
  * Returns:	The PacketFilter to run them with.
  *
  * Description:	TNC startup would have put a few things in place that pfilter
- *		expects: the tables decode_aprs reads, which DecodeAPRSInit
- *		names, the list of stations heard recently that an "i" filter
+ *		expects: an APRSDecoder with its tables loaded, the list of
+ *		stations heard recently that an "i" filter
  *		consults, and an IGate configuration to take a default hop
  *		count from.  The last two are empty here, so an "i" filter
  *		finds that nothing has been heard and that no IGTXVIA was
@@ -1508,11 +1521,9 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
  *--------------------------------------------------------------------*/
 
 func PfilterStandaloneInit(debug_level int) *PacketFilter {
-	DecodeAPRSInit()
-
 	mheardDB = mheard.New(0)
 
-	return NewPacketFilter(new(igate_config_s), debug_level)
+	return NewPacketFilter(new(igate_config_s), NewAPRSDecoderFromDataFiles(), debug_level)
 }
 
 // PfilterMaxDebugLevel is the most verbose debug level a PacketFilter has

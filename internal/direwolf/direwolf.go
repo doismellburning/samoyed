@@ -654,7 +654,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the digipeater and IGate functions.
 	 */
 	mheardDB = mheard.New(d_m_opt)
-	var packetFilter = NewPacketFilter(&igate_config, d_f_opt)
+	var packetFilter = NewPacketFilter(&igate_config, NewAPRSDecoder(deviceIDData, aprsSymbolData), d_f_opt)
 	aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter)
 	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, d_i_opt)
 	igate.start(ctx)
