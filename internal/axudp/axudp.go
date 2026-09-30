@@ -1,7 +1,9 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+// Package axudp bridges KISS-over-TCP clients and remote nodes speaking
+// AXUDP - raw AX.25 frames in UDP datagrams, per RFC 1226.
+package axudp
 
 import (
 	"context"

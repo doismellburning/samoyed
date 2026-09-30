@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
@@ -82,7 +82,7 @@ Flags:
 		os.Exit(0)
 	}
 
-	var maps, parseErr = direwolf.ParseAXUDPConfig(*configFile)
+	var maps, parseErr = axudp.ParseAXUDPConfig(*configFile)
 	if parseErr != nil {
 		fmt.Fprintf(os.Stderr, "samoyed-axudp: reading config: %v\n", parseErr)
 		os.Exit(1)
@@ -114,7 +114,7 @@ Flags:
 	}
 	fmt.Printf("samoyed-axudp: KISS TCP server listening on port %d\n", *kissPort)
 
-	var b = direwolf.NewAXUDPBridge(maps, udpConn)
+	var b = axudp.NewAXUDPBridge(maps, udpConn)
 
 	// Both halves run until the user interrupts us, at which point they give
 	// their sockets up rather than being cut off mid-flight.  Not deferred:
