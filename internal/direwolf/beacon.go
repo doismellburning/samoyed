@@ -647,7 +647,7 @@ func beaconPHG(value float64) maybe.Maybe[int] {
 // feet EncodePosition wants, or Nothing if no altitude was configured.
 func beaconAltitudeFeet(alt_m maybe.Maybe[float64]) maybe.Maybe[int] {
 	return maybe.Fmap(func(meters float64) int {
-		return int(math.Round(DW_METERS_TO_FEET(meters)))
+		return int(math.Round(dwutil.DW_METERS_TO_FEET(meters)))
 	}, alt_m)
 }
 
@@ -804,7 +804,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			var my_alt_ft maybe.Maybe[int]
 			if gpsinfo.Fix >= dwgps.DWFIX_3D && maybe.FromMaybe(0, bp.alt_m) > 0 {
 				my_alt_ft = maybe.Fmap(func(meters float64) int {
-					return int(math.Round(DW_METERS_TO_FEET(meters)))
+					return int(math.Round(dwutil.DW_METERS_TO_FEET(meters)))
 				}, gpsinfo.Altitude)
 			}
 
@@ -837,7 +837,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 				A.lon = gpsinfo.Lon
 				A.speedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
 				A.course = maybe.Fmap(func(degrees int) float64 { return float64(degrees) }, coarse)
-				A.altitudeFt = maybe.Fmap(DW_METERS_TO_FEET, gpsinfo.Altitude)
+				A.altitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, gpsinfo.Altitude)
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel ax25.ALevel

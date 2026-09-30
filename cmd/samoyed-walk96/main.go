@@ -121,7 +121,7 @@ func walk96(lat float64, lon float64, knots maybe.Maybe[float64], course maybe.M
 
 	var info = direwolf.EncodePosition(messaging, compressed,
 		lat, lon, 0,
-		maybe.Fmap(func(meters float64) int { return int(direwolf.DW_METERS_TO_FEET(meters)) }, alt),
+		maybe.Fmap(func(meters float64) int { return int(dwutil.DW_METERS_TO_FEET(meters)) }, alt),
 		'/', '=',
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // PHGd not specified
 		maybe.Fmap(func(degrees float64) int { return int(degrees) }, course),

@@ -1021,7 +1021,7 @@ func aprsRawNMEA(A *decodedAPRS, info []byte) {
 
 		A.lat = result.Lat
 		A.lon = result.Lon
-		A.altitudeFt = maybe.Fmap(DW_METERS_TO_FEET, result.Alt)
+		A.altitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, result.Alt)
 		A.dataTypeDesc = "Raw GPS data"
 	}
 
@@ -1544,7 +1544,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		isdigit91(trimmed[1]) &&
 		isdigit91(trimmed[2]) &&
 		trimmed[3] == '}' {
-		A.altitudeFt = maybe.Just(DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
+		A.altitudeFt = maybe.Just(dwutil.DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
 
 		processComment(A, []byte(trimmed)[4:])
 
@@ -2553,7 +2553,7 @@ func aprsUserDefined(A *decodedAPRS, info []byte) {
 		A.lon = aisData.Lon
 		A.speedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, aisData.Knots)
 		A.course = aisData.Course
-		A.altitudeFt = maybe.Fmap(DW_METERS_TO_FEET, aisData.AltM)
+		A.altitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, aisData.AltM)
 		A.symbolTable = aisData.Symtab
 		A.symbolCode = aisData.Symbol
 		A.comment = aisData.Comment
