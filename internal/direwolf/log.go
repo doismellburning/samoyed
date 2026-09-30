@@ -30,6 +30,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
 type PacketLogger struct {
@@ -283,7 +284,7 @@ func (pl *PacketLogger) Write(channel int, A *decodedAPRS, pp *ax25.Packet, alev
 
 		var sspd = ""
 		if speed_mph, ok := A.speedMPH.Get(); ok {
-			sspd = fmt.Sprintf("%.1f", DW_MPH_TO_KNOTS(speed_mph))
+			sspd = fmt.Sprintf("%.1f", dwutil.DW_MPH_TO_KNOTS(speed_mph))
 		}
 
 		var scse = ""
@@ -293,7 +294,7 @@ func (pl *PacketLogger) Write(channel int, A *decodedAPRS, pp *ax25.Packet, alev
 
 		var salt = ""
 		if altitude_ft, ok := A.altitudeFt.Get(); ok {
-			salt = fmt.Sprintf("%.1f", DW_FEET_TO_METERS(altitude_ft))
+			salt = fmt.Sprintf("%.1f", dwutil.DW_FEET_TO_METERS(altitude_ft))
 		}
 
 		var sfreq = ""

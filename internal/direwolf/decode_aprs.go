@@ -558,7 +558,7 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 		/* http://eng.usna.navy.mil/~bruninga/aprs/aprs11.html */
 		/* "The Antenna Gain in the PHG format on page 28 is in dBi." */
 		var height = maybe.FromMaybe(0, A.heightFt)
-		stemp += fmt.Sprintf(", %d W height(HAAT)=%dft=%.0fm %ddBi %s", power, height, DW_FEET_TO_METERS(float64(height)), maybe.FromMaybe(0, A.gain), A.directivity)
+		stemp += fmt.Sprintf(", %d W height(HAAT)=%dft=%.0fm %ddBi %s", power, height, dwutil.DW_FEET_TO_METERS(float64(height)), maybe.FromMaybe(0, A.gain), A.directivity)
 	}
 
 	if _range, ok := A.radioRange.Get(); ok && _range > 0 {
@@ -663,7 +663,7 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 			stemp += ", "
 		}
 
-		stemp += fmt.Sprintf("%.0f km/h (%.0f MPH)", DW_MILES_TO_KM(speed_mph), speed_mph)
+		stemp += fmt.Sprintf("%.0f km/h (%.0f MPH)", dwutil.DW_MILES_TO_KM(speed_mph), speed_mph)
 	}
 
 	if course, ok := A.course.Get(); ok {
@@ -679,7 +679,7 @@ func DecodeAPRSPrint(A *decodedAPRS) {
 			stemp += ", "
 		}
 
-		stemp += fmt.Sprintf("alt %.0f m (%.0f ft)", DW_FEET_TO_METERS(altitude_ft), altitude_ft)
+		stemp += fmt.Sprintf("alt %.0f m (%.0f ft)", dwutil.DW_FEET_TO_METERS(altitude_ft), altitude_ft)
 	}
 
 	if freq, ok := A.freq.Get(); ok {
@@ -1013,7 +1013,7 @@ func aprsRawNMEA(A *decodedAPRS, info []byte) {
 		A.lat = result.Lat
 		A.lon = result.Lon
 		A.course = result.Course
-		A.speedMPH = maybe.Fmap(DW_KNOTS_TO_MPH, result.Knots)
+		A.speedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, result.Knots)
 		A.dataTypeDesc = "Raw GPS data"
 	} else if bytes.HasPrefix(info, []byte("$GPGGA,")) ||
 		bytes.HasPrefix(info, []byte("$GNGGA,")) {
@@ -1021,7 +1021,7 @@ func aprsRawNMEA(A *decodedAPRS, info []byte) {
 
 		A.lat = result.Lat
 		A.lon = result.Lon
-		A.altitudeFt = maybe.Fmap(DW_METERS_TO_FEET, result.Alt)
+		A.altitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, result.Alt)
 		A.dataTypeDesc = "Raw GPS data"
 	}
 
@@ -1485,7 +1485,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		n -= 800
 	}
 
-	A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(float64(n)))
+	A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n)))
 
 	n = int((p.SpeedCourse[1]-28)%10)*100 + int(p.SpeedCourse[2]-28)
 	if n >= 400 {
@@ -1544,7 +1544,7 @@ func aprsMicE(A *decodedAPRS, pp *ax25.Packet, info []byte) {
 		isdigit91(trimmed[1]) &&
 		isdigit91(trimmed[2]) &&
 		trimmed[3] == '}' {
-		A.altitudeFt = maybe.Just(DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
+		A.altitudeFt = maybe.Just(dwutil.DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
 
 		processComment(A, []byte(trimmed)[4:])
 
@@ -2551,9 +2551,9 @@ func aprsUserDefined(A *decodedAPRS, info []byte) {
 		A.name = aisData.MMSI
 		A.lat = aisData.Lat
 		A.lon = aisData.Lon
-		A.speedMPH = maybe.Fmap(DW_KNOTS_TO_MPH, aisData.Knots)
+		A.speedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, aisData.Knots)
 		A.course = aisData.Course
-		A.altitudeFt = maybe.Fmap(DW_METERS_TO_FEET, aisData.AltM)
+		A.altitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, aisData.AltM)
 		A.symbolTable = aisData.Symtab
 		A.symbolCode = aisData.Symbol
 		A.comment = aisData.Comment
@@ -2747,7 +2747,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 
 		count, _ = fmt.Sscanf(string(wp[4:7]), "%3d", &n)
 		if count > 0 {
-			A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(float64(n))) /* yes, in knots */
+			A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n))) /* yes, in knots */
 		}
 
 		wp = wp[7:]
@@ -2865,7 +2865,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 			/* b = barometric presure (tenths millibars / tenths of hPascal)  */
 			/* Here, display as inches of mercury. */
 			if fval, ok := wval.Get(); ok {
-				fval = DW_MBAR_TO_INHG(fval * 0.1)
+				fval = dwutil.DW_MBAR_TO_INHG(fval * 0.1)
 				A.weather += fmt.Sprintf(", barometer %.2f", fval)
 			}
 
@@ -3026,10 +3026,10 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
 		if n >= 11 && n <= 13 {
 			var windpeak, wdir, otemp, baro, ohumid float64
 
-			windpeak = DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
+			windpeak = dwutil.DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
 			wdir = float64(h_wdir&0xff) * 360. / 256.
 			otemp = float64(h_otemp) * 0.1
-			baro = float64(DW_MBAR_TO_INHG(float64(h_baro) * 0.1))
+			baro = float64(dwutil.DW_MBAR_TO_INHG(float64(h_baro) * 0.1))
 			ohumid = float64(h_ohumid) * 0.1
 
 			A.weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f, barometer %.2f, humidity %.0f",
@@ -3066,7 +3066,7 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
 		if n == 4 {
 			var windpeak, wdir, otemp float64
 
-			windpeak = DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
+			windpeak = dwutil.DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
 			wdir = float64(h_wdir&0xff) * 360. / 256.
 			otemp = float64(h_otemp) * 0.1
 
@@ -3186,7 +3186,7 @@ func decodeCompressedPosition(A *decodedAPRS, pcpos *compressed_position_t) {
 	} else if pcpos.C >= '!' && pcpos.C <= 'z' {
 		/* For a weather station, this is wind information. */
 		A.course = maybe.Just(float64(pcpos.C-33) * 4)
-		A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
+		A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
 	}
 }
 
@@ -3745,7 +3745,7 @@ func dataExtensionComment(A *decodedAPRS, pdext []byte) {
 
 		count, _ = fmt.Sscanf(string(pdext[4:]), "%3d", &n)
 		if count > 0 {
-			A.speedMPH = maybe.Just(DW_KNOTS_TO_MPH(float64(n)))
+			A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n)))
 		}
 
 		/* Bearing and Number/Range/Quality? */
@@ -4137,7 +4137,7 @@ func processComment(A *decodedAPRS, commentData []byte) {
 			if string(sutemp) == "m" {
 				A.radioRange = maybe.Just(float64(r))
 			} else {
-				A.radioRange = maybe.Just(DW_KM_TO_MILES(float64(r)))
+				A.radioRange = maybe.Just(dwutil.DW_KM_TO_MILES(float64(r)))
 			}
 
 			commentData = cutBytes(commentData, match[0], match[1])

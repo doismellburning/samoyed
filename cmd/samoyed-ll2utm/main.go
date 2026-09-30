@@ -3,19 +3,15 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"strconv"
 
 	"github.com/doismellburning/samoyed/internal/coordconvutil"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/golang/geo/s1"
 	"github.com/golang/geo/s2"
 	"github.com/tzneal/coordconv"
 )
-
-func D2R(degrees float64) float64 {
-	return degrees * math.Pi / 180
-}
 
 func main() {
 	if len(os.Args) != 3 {
@@ -39,8 +35,8 @@ func main() {
 	}
 
 	var latlng = s2.LatLng{
-		Lat: s1.Angle(D2R(lat)),
-		Lng: s1.Angle(D2R(lon)),
+		Lat: s1.Angle(dwutil.D2R(lat)),
+		Lng: s1.Angle(dwutil.D2R(lon)),
 	}
 
 	// UTM

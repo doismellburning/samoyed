@@ -3,18 +3,14 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"strconv"
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/tzneal/coordconv"
 )
-
-func R2D(radians float64) float64 {
-	return radians * 180 / math.Pi
-}
 
 func main() {
 	if len(os.Args) == 4 {
@@ -74,8 +70,8 @@ func main() {
 
 		var latlng, utmErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utmCoord)
 		if utmErr == nil {
-			var lat = R2D(float64(latlng.Lat))
-			var lon = R2D(float64(latlng.Lng))
+			var lat = dwutil.R2D(float64(latlng.Lat))
+			var lon = dwutil.R2D(float64(latlng.Lng))
 
 			fmt.Printf("from UTM, latitude = %.6f, longitude = %.6f\n", lat, lon)
 		} else {
@@ -85,8 +81,8 @@ func main() {
 		// One command line argument, MGRS.
 		var mgrsLatlng, mgrsErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(os.Args[1])
 		if mgrsErr == nil {
-			var lat = R2D(float64(mgrsLatlng.Lat))
-			var lon = R2D(float64(mgrsLatlng.Lng))
+			var lat = dwutil.R2D(float64(mgrsLatlng.Lat))
+			var lon = dwutil.R2D(float64(mgrsLatlng.Lng))
 			fmt.Printf("from MGRS, latitude = %.6f, longitude = %.6f\n", lat, lon)
 		} else {
 			fmt.Printf("Conversion from MGRS failed:\n%s\n\n", mgrsErr)

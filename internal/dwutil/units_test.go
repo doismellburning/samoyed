@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+package dwutil
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,4 +23,10 @@ func Test_unit_conversions(t *testing.T) {
 
 	// Zero is a real reading, not an absent one, and converts as such.
 	assert.InDelta(t, 0.0, DW_KNOTS_TO_MPH(0), 0.0000001)
+}
+
+func TestAngleConversions(t *testing.T) {
+	assert.InDelta(t, math.Pi, D2R(180), 0.0000001)
+	assert.InDelta(t, 90.0, R2D(math.Pi/2), 0.0000001)
+	assert.InDelta(t, 51.5, R2D(D2R(51.5)), 0.0000001)
 }
