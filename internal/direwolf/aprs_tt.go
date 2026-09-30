@@ -1291,7 +1291,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				state.locText = fmt.Sprintf("%d %.0f %.0f", g.config.ttlocs[ipat].utm.lzone, easting, northing)
 			}
 
-			var hemi = coordconvutil.HemisphereRuneToCoordconvHemisphere(g.config.ttlocs[ipat].utm.hemi)
+			var hemi = coordconvutil.HemisphereFromRune(g.config.ttlocs[ipat].utm.hemi)
 
 			var utm = coordconv.UTMCoord{
 				Zone:       g.config.ttlocs[ipat].utm.lzone,

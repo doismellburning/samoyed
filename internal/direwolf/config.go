@@ -4067,7 +4067,7 @@ func handleTTUTM(ps *parseState) error {
 
 	var utm = coordconv.UTMCoord{
 		Zone:       tl.utm.lzone,
-		Hemisphere: coordconvutil.HemisphereRuneToCoordconvHemisphere(tl.utm.hemi),
+		Hemisphere: coordconvutil.HemisphereFromRune(tl.utm.hemi),
 		Easting:    tl.utm.x_offset + 5*tl.utm.scale,
 		Northing:   tl.utm.y_offset + 5*tl.utm.scale,
 	}
@@ -6290,7 +6290,7 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *AudioConfig) er
 		if len(zone) > 0 && eastKnown && northKnown {
 			var _, _hemi, lzone = ps.parseUTMZone(zone)
 
-			var hemi = coordconvutil.HemisphereRuneToCoordconvHemisphere(_hemi)
+			var hemi = coordconvutil.HemisphereFromRune(_hemi)
 
 			var utm = coordconv.UTMCoord{
 				Zone:       lzone,

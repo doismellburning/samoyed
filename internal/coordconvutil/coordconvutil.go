@@ -9,7 +9,9 @@ import (
 	"github.com/tzneal/coordconv"
 )
 
-func HemisphereRuneToCoordconvHemisphere(_hemi rune) coordconv.Hemisphere {
+// HemisphereFromRune turns Dire Wolf's N or S into a coordconv.Hemisphere, and
+// anything else into coordconv.HemisphereInvalid.
+func HemisphereFromRune(_hemi rune) coordconv.Hemisphere {
 	switch _hemi {
 	case 'N':
 		return coordconv.HemisphereNorth
@@ -20,6 +22,8 @@ func HemisphereRuneToCoordconvHemisphere(_hemi rune) coordconv.Hemisphere {
 	}
 }
 
+// HemisphereToRune turns a coordconv.Hemisphere into N or S, or ! for
+// coordconv.HemisphereInvalid and ? for anything else.
 func HemisphereToRune(h coordconv.Hemisphere) rune {
 	switch h {
 	case coordconv.HemisphereNorth:
