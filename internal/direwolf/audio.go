@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/gordonklaus/portaudio"
 )
 
@@ -81,12 +82,12 @@ const (
 	MEDIUM_NETTNC                 // Remote network TNC.  (new in 1.8)
 )
 
-type sanity_t int
+type sanity_t = phy.Sanity
 
 const (
-	SANITY_APRS sanity_t = iota
-	SANITY_AX25
-	SANITY_NONE
+	SANITY_APRS = phy.SanityAPRS
+	SANITY_AX25 = phy.SanityAX25
+	SANITY_NONE = phy.SanityNone
 )
 
 type adev_param_s struct {
@@ -141,43 +142,29 @@ func (adev *adev_param_s) validate() error {
 	return nil
 }
 
-type modem_t int
+type modem_t = phy.Modem
 
 const (
-	MODEM_AFSK modem_t = iota
-	MODEM_BASEBAND
-	MODEM_SCRAMBLE
-	MODEM_QPSK
-	MODEM_8PSK
-	MODEM_OFF
-	MODEM_16_QAM
-	MODEM_64_QAM
-	MODEM_AIS
-	MODEM_EAS
-	MODEM_BPSK
+	MODEM_AFSK     = phy.AFSK
+	MODEM_BASEBAND = phy.Baseband
+	MODEM_SCRAMBLE = phy.Scramble
+	MODEM_QPSK     = phy.QPSK
+	MODEM_8PSK     = phy.PSK8
+	MODEM_OFF      = phy.Off
+	MODEM_16_QAM   = phy.QAM16
+	MODEM_64_QAM   = phy.QAM64
+	MODEM_AIS      = phy.AIS
+	MODEM_EAS      = phy.EAS
+	MODEM_BPSK     = phy.BPSK
 )
 
-type layer2_t int
+type layer2_t = phy.Layer2
 
 const (
-	LAYER2_AX25 layer2_t = iota
-	LAYER2_FX25
-	LAYER2_IL2P
+	LAYER2_AX25 = phy.Layer2AX25
+	LAYER2_FX25 = phy.Layer2FX25
+	LAYER2_IL2P = phy.Layer2IL2P
 )
-
-// String names the layer 2 protocol as the channel summary at startup shows it.
-func (l layer2_t) String() string {
-	switch l {
-	case LAYER2_AX25:
-		return "AX.25"
-	case LAYER2_FX25:
-		return "FX.25"
-	case LAYER2_IL2P:
-		return "IL2P"
-	default:
-		return fmt.Sprintf("layer2_t(%d)", int(l))
-	}
-}
 
 type v26_e int
 

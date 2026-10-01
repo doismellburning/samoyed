@@ -25,6 +25,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -61,12 +62,12 @@ const (
 	DLQ_CLIENT_CLEANUP
 )
 
-type fec_type_t int
+type fec_type_t = phy.FECType
 
 const (
-	fec_type_none fec_type_t = 0
-	fec_type_fx25 fec_type_t = 1
-	fec_type_il2p fec_type_t = 2
+	fec_type_none = phy.FECNone
+	fec_type_fx25 = phy.FECFX25
+	fec_type_il2p = phy.FECIL2P
 )
 
 /* A queue item. */

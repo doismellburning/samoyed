@@ -1,31 +1,23 @@
 package direwolf
 
 import (
-	"fmt"
+	"github.com/doismellburning/samoyed/internal/phy"
 )
 
-// BitFixLevel represents the level of bit-error correction applied when
-// recovering a frame with a bad CRC. It is used both as a configuration
-// (how hard to try) and as a result (which technique succeeded).
-type BitFixLevel int
+// BitFixLevel and its levels now live in internal/phy; these names are kept
+// so call sites, and the diff against Dire Wolf, stay small.
+type BitFixLevel = phy.BitFixLevel
 
 const (
-	BitFixNone   BitFixLevel = 0
-	BitFixSingle BitFixLevel = 1 // invert one bit
-	BitFixDouble BitFixLevel = 2 // invert two adjacent bits
-	BitFixTriple BitFixLevel = 3 // invert three adjacent bits
-	BitFixTwoSep BitFixLevel = 4 // invert two separate bits
-
-	// BitFixPassall is not a level of effort and is never a valid fix_bits
-	// setting.  It appears only as a result, marking a frame that the PASSALL
-	// option forwarded after the FCS check failed and every configured fix up
-	// had been exhausted.
-	BitFixPassall BitFixLevel = 5
+	BitFixNone    = phy.BitFixNone
+	BitFixSingle  = phy.BitFixSingle
+	BitFixDouble  = phy.BitFixDouble
+	BitFixTriple  = phy.BitFixTriple
+	BitFixTwoSep  = phy.BitFixTwoSep
+	BitFixPassall = phy.BitFixPassall
 )
 
-// BitFixLevelHighest is the most effort that can be asked for, i.e. the
-// largest valid fix_bits setting.
-const BitFixLevelHighest = BitFixTwoSep
+const BitFixLevelHighest = phy.BitFixLevelHighest
 
 // Legacy names kept for compatibility while callers are updated.
 const (
@@ -35,22 +27,3 @@ const (
 	RETRY_INVERT_TRIPLE  = BitFixTriple
 	RETRY_INVERT_TWO_SEP = BitFixTwoSep
 )
-
-func (bfl BitFixLevel) String() string {
-	switch bfl {
-	case BitFixNone:
-		return "NONE"
-	case BitFixSingle:
-		return "SINGLE"
-	case BitFixDouble:
-		return "DOUBLE"
-	case BitFixTriple:
-		return "TRIPLE"
-	case BitFixTwoSep:
-		return "TWO_SEP"
-	case BitFixPassall:
-		return "PASSALL"
-	}
-
-	return fmt.Sprintf("(Unknown BitFixLevel %d)", bfl)
-}
