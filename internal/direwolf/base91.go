@@ -1,10 +1,10 @@
 package direwolf
 
-/* Range of digits for Base 91 representation. */
+// Base91Min and Base91Max are the range of digits for base 91 representation.
+const Base91Min = '!'
+const Base91Max = '{'
 
-const B91_MIN = '!'
-const B91_MAX = '{'
-
-func isdigit91(c byte) bool {
-	return ((c) >= B91_MIN && (c) <= B91_MAX)
+// IsBase91Digit reports whether c is a base 91 digit.
+func IsBase91Digit(c byte) bool {
+	return ((c) >= Base91Min && (c) <= Base91Max)
 }

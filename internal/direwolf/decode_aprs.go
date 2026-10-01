@@ -1562,9 +1562,9 @@ func aprsMicE(A *decodedAPRS, deviceIDs *deviceid.Data, pp *ax25.Packet, info []
 	// Three base 91 characters followed by }
 
 	if len(trimmed) >= 4 &&
-		isdigit91(trimmed[0]) &&
-		isdigit91(trimmed[1]) &&
-		isdigit91(trimmed[2]) &&
+		IsBase91Digit(trimmed[0]) &&
+		IsBase91Digit(trimmed[1]) &&
+		IsBase91Digit(trimmed[2]) &&
 		trimmed[3] == '}' {
 		A.altitudeFt = maybe.Just(dwutil.DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
 
@@ -3162,7 +3162,7 @@ func decodePosition(A *decodedAPRS, ppos *Position) {
  *------------------------------------------------------------------*/
 
 func decodeCompressedPosition(A *decodedAPRS, pcpos *CompressedPosition) {
-	if isdigit91(pcpos.Y[0]) && isdigit91(pcpos.Y[1]) && isdigit91(pcpos.Y[2]) && isdigit91(pcpos.Y[3]) {
+	if IsBase91Digit(pcpos.Y[0]) && IsBase91Digit(pcpos.Y[1]) && IsBase91Digit(pcpos.Y[2]) && IsBase91Digit(pcpos.Y[3]) {
 		A.lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
 	} else {
 		if !A.quiet {
@@ -3172,7 +3172,7 @@ func decodeCompressedPosition(A *decodedAPRS, pcpos *CompressedPosition) {
 		A.lat = maybe.Nothing[float64]()
 	}
 
-	if isdigit91(pcpos.X[0]) && isdigit91(pcpos.X[1]) && isdigit91(pcpos.X[2]) && isdigit91(pcpos.X[3]) {
+	if IsBase91Digit(pcpos.X[0]) && IsBase91Digit(pcpos.X[1]) && IsBase91Digit(pcpos.X[2]) && IsBase91Digit(pcpos.X[3]) {
 		A.lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
 	} else {
 		if !A.quiet {
@@ -4281,15 +4281,15 @@ func processComment(A *decodedAPRS, commentData []byte) {
 			/*
 			 * The spec appears to be wrong.  It says '}' is the maximum value when it should be '{'.
 			 */
-			if isdigit91(a) {
+			if IsBase91Digit(a) {
 				A.lat = maybe.Fmap(func(lat float64) float64 {
-					return lat + float64(a-B91_MIN)*1.1/600000.0*aprsSign(lat)
+					return lat + float64(a-Base91Min)*1.1/600000.0*aprsSign(lat)
 				}, A.lat)
 			}
 
-			if isdigit91(o) {
+			if IsBase91Digit(o) {
 				A.lon = maybe.Fmap(func(lon float64) float64 {
-					return lon + float64(o-B91_MIN)*1.1/600000.0*aprsSign(lon)
+					return lon + float64(o-Base91Min)*1.1/600000.0*aprsSign(lon)
 				}, A.lon)
 			}
 		}
