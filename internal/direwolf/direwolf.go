@@ -1056,7 +1056,7 @@ func app_process_rec_packet(
 
 		// FIXME: partial implementation.
 
-		var user_def_da = "{" + string(USER_DEF_USER_ID) + string(USER_DEF_TYPE_AIS)
+		var user_def_da = "{" + string(UserDefUserID) + string(UserDefTypeAIS)
 
 		if strings.HasPrefix(string(pinfo), user_def_da) {
 			waypointSender.SendAIS(pinfo[3:])

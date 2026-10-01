@@ -431,7 +431,7 @@ func Test_app_process_rec_packet_ais_to_object(t *testing.T) {
 	A_opt_ais_to_obj = true
 
 	var sentence = aisPositionReport(t, 208, 900)
-	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
+	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", UserDefUserID, UserDefTypeAIS, sentence), true)
 
 	var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 

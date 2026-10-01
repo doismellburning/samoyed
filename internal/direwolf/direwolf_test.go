@@ -47,7 +47,7 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var sentence = aisPositionReport(t, 1023, 3600)
-	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
+	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", UserDefUserID, UserDefTypeAIS, sentence), true)
 	require.NotNil(t, pp)
 
 	var A = aprsDecoder.Decode(pp, true)
@@ -78,7 +78,7 @@ func Test_ais_to_object_with_course_and_speed(t *testing.T) {
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var sentence = aisPositionReport(t, 208, 900) // 20.8 knots, 90 degrees
-	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
+	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", UserDefUserID, UserDefTypeAIS, sentence), true)
 	require.NotNil(t, pp)
 
 	var A = aprsDecoder.Decode(pp, true)
