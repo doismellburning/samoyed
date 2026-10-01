@@ -24,6 +24,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
@@ -809,7 +810,7 @@ func (u *ttUsers) objectReportText(i int, first_time bool) string {
 	}
 
 	// info part of Object Report packet
-	stemp += EncodeObject(object_name, false, u.user[i].last_heard, olat, olong, oambig,
+	stemp += aprs.EncodeObject(object_name, false, u.user[i].last_heard, olat, olong, oambig,
 		byte(u.user[i].overlay), byte(u.user[i].symbol),
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", /* PHGD */
 		maybe.Nothing[int](), maybe.Nothing[int](), /* Course/Speed */

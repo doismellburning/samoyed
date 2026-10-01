@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
@@ -417,7 +418,7 @@ func Test_config_init_beacon_non_finite_numbers(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].offset)
 	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].alt_m)
 
-	assert.Empty(t, FrequencySpec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
+	assert.Empty(t, aprs.FrequencySpec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
 }
 
 func Test_config_init_beacon_out_of_range_lat(t *testing.T) {
@@ -973,7 +974,7 @@ func Test_config_init_beacon_unparseable_numbers(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].offset)
 	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].alt_m)
 
-	assert.Empty(t, FrequencySpec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
+	assert.Empty(t, aprs.FrequencySpec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
 }
 
 func Test_config_init_beacon_numbers_with_units(t *testing.T) {

@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/aprstelemetry"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/deviceid"
@@ -1068,7 +1069,7 @@ func app_process_rec_packet(
 			if A_opt_ais_to_obj && haveLat && haveLon {
 				var course, speed = ais_object_course_speed(A)
 
-				var ais_obj_info = EncodeObject(A.name, false, time.Now(),
+				var ais_obj_info = aprs.EncodeObject(A.name, false, time.Now(),
 					lat, lon, 0, // no ambiguity
 					A.symbolTable, A.symbolCode,
 					maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // power, height, gain, direction.

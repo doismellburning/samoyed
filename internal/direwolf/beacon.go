@@ -14,6 +14,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -773,7 +774,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			return
 		}
 
-		beacon_text += EncodePosition(bp.messaging, bp.compress,
+		beacon_text += aprs.EncodePosition(bp.messaging, bp.compress,
 			dlat, dlon, bp.ambiguity,
 			beaconAltitudeFeet(bp.alt_m),
 			bp.symtab, bp.symbol,
@@ -788,7 +789,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			return
 		}
 
-		beacon_text += EncodeObject(bp.objname, bp.compress, time.Now(), dlat, dlon, bp.ambiguity,
+		beacon_text += aprs.EncodeObject(bp.objname, bp.compress, time.Now(), dlat, dlon, bp.ambiguity,
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
@@ -812,7 +813,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			var coarse = maybe.Fmap(func(degrees float64) int { return int(math.Round(degrees)) }, gpsinfo.Track)
 			var knots = maybe.Fmap(func(speed float64) int { return int(math.Round(speed)) }, gpsinfo.SpeedKnots)
 
-			beacon_text += EncodePosition(bp.messaging, bp.compress,
+			beacon_text += aprs.EncodePosition(bp.messaging, bp.compress,
 				dlat, dlon, bp.ambiguity, my_alt_ft,
 				bp.symtab, bp.symbol,
 				beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,

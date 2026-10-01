@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -59,7 +60,7 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 	assert.True(t, course.IsNothing(), "course should be unknown, got %v", course)
 	assert.True(t, speed.IsNothing(), "speed should be unknown, got %v", speed)
 
-	var info = EncodeObject("366730000", false, time.Time{},
+	var info = aprs.EncodeObject("366730000", false, time.Time{},
 		42.36, -71.06, 0,
 		'/', 's',
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
@@ -86,7 +87,7 @@ func Test_ais_to_object_with_course_and_speed(t *testing.T) {
 	assert.Equal(t, maybe.Just(90), course)
 	assert.Equal(t, maybe.Just(21), speed)
 
-	var info = EncodeObject("366730000", false, time.Time{},
+	var info = aprs.EncodeObject("366730000", false, time.Time{},
 		42.36, -71.06, 0,
 		'/', 's',
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",

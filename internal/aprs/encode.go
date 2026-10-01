@@ -1,9 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-// Construct APRS packets from components.
-//
-// References: APRS Protocol Reference, and the frequency spec at
-// http://www.aprs.org/info/freqspec.txt
+package aprs
 
 import (
 	"fmt"
@@ -12,7 +10,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
@@ -31,7 +28,7 @@ func checkSymbol(symtab byte, symbol byte) {
 }
 
 // normalPositionString renders a position from normalPosition.
-func normalPositionString(p *aprs.Position) string {
+func normalPositionString(p *Position) string {
 	return fmt.Sprintf("%s%c%s%c", string(p.Lat[:]), p.SymTableId, string(p.Lon[:]), p.SymbolCode)
 }
 
@@ -40,8 +37,8 @@ func normalPositionString(p *aprs.Position) string {
 //
 // symtab is the symbol table id or overlay, symbol the symbol id, and
 // ambiguity the number of least significant digits to blank out.
-func normalPosition(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *aprs.Position {
-	var pos = new(aprs.Position)
+func normalPosition(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *Position {
+	var pos = new(Position)
 
 	checkSymbol(symtab, symbol)
 
@@ -57,7 +54,7 @@ func normalPosition(symtab byte, symbol byte, dlat float64, dlong float64, ambig
 }
 
 // compressedPositionString renders a position from compressedPosition.
-func compressedPositionString(p *aprs.CompressedPosition) string {
+func compressedPositionString(p *CompressedPosition) string {
 	return fmt.Sprintf("%c%s%s%c%c%c%c", p.SymTableId, string(p.Y[:]), string(p.X[:]), p.SymbolCode, p.C, p.S, p.T)
 }
 
@@ -77,8 +74,8 @@ func compressedPositionString(p *aprs.CompressedPosition) string {
 // what is sent over the air.
 func compressedPosition(symtab byte, symbol byte, dlat float64, dlong float64,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int],
-	course maybe.Maybe[int], speed maybe.Maybe[int]) *aprs.CompressedPosition {
-	var pos = new(aprs.CompressedPosition)
+	course maybe.Maybe[int], speed maybe.Maybe[int]) *CompressedPosition {
+	var pos = new(CompressedPosition)
 
 	checkSymbol(symtab, symbol)
 
