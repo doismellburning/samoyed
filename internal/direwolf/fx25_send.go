@@ -3,6 +3,7 @@ package direwolf
 import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/sirupsen/logrus"
 )
 
 /*-------------------------------------------------------------
@@ -81,11 +82,11 @@ func (s *HDLCSender) sendFX25Frame(fbuf []byte, fx_mode int) int {
  *--------------------------------------------------------------*/
 
 func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, []byte, []byte) {
+	var logEntry = logrus.WithField("channel", channel)
+
 	if debug >= 3 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("------\n")
-		dw_printf("FX.25[%d] send frame: FX.25 mode = %d\n", channel, fx_mode)
-		fx_hex_dump(fbuf)
+		logEntry.WithField("fx_mode", fx_mode).Debug("FX.25: send frame")
+		dwutil.LogHexDump(logEntry, logrus.DebugLevel, fbuf)
 	}
 
 	// Append the FCS.
@@ -104,8 +105,10 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 	var ctag_num = fx25_pick_mode(fx_mode, dlen)
 
 	if ctag_num < CTAG_MIN || ctag_num > CTAG_MAX {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FX.25[%d]: Could not find suitable format for requested %d and data length %d.\n", channel, fx_mode, dlen)
+		logEntry.WithFields(logrus.Fields{
+			"fx_mode": fx_mode,
+			"dlen":    dlen,
+		}).Warn("FX.25: Could not find suitable format for requested mode and data length")
 
 		return -1, nil, nil
 	}
@@ -133,12 +136,13 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 	var check = rs.Encode(data[:k_data_rs])
 
 	if debug >= 3 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("FX.25[%d]: transmit %d data bytes, ctag number 0x%02x\n", channel, k_data_radio, ctag_num)
-		fx_hex_dump(data[:k_data_radio])
-		dw_printf("FX.25[%d]: transmit %d check bytes:\n", channel, nroots)
-		fx_hex_dump(check[:nroots])
-		dw_printf("------\n")
+		logEntry.WithFields(logrus.Fields{
+			"data_bytes": k_data_radio,
+			"ctag":       ctag_num,
+		}).Debug("FX.25: transmit data bytes")
+		dwutil.LogHexDump(logEntry, logrus.DebugLevel, data[:k_data_radio])
+		logEntry.WithField("check_bytes", nroots).Debug("FX.25: transmit check bytes")
+		dwutil.LogHexDump(logEntry, logrus.DebugLevel, check[:nroots])
 	}
 
 	return ctag_num, data[:k_data_radio], check[:nroots]
