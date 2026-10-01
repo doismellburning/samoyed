@@ -1072,7 +1072,7 @@ func app_process_rec_packet(
 					A.SymbolTable, A.SymbolCode,
 					maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // power, height, gain, direction.
 					course, speed,
-					maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), // freq, toneGenerator, offset
+					maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), // freq, tone, offset
 					A.Comment)
 
 				// TODO Bodge
