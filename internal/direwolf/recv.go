@@ -142,7 +142,18 @@ func recv_adev_thread(ctx context.Context, pa *AudioConfig, a int, failed chan<-
 
 	for c := range num_chan {
 		if pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
-			dtmfDecoders[c] = NewDTMFDecoder(first_chan+c, pa.adev[a].samples_per_sec)
+			var channel = first_chan + c
+
+			logrus.WithField("channel", channel).Debug("Starting DTMF decoder")
+
+			dtmfDecoders[c] = NewDTMFDecoder(pa.adev[a].samples_per_sec, func(on bool) {
+				var state = 0
+				if on {
+					state = 1
+				}
+
+				hdlcReceiver.DCDChange(channel, MAX_SUBCHANS, 0, state)
+			})
 		}
 	}
 

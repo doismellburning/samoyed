@@ -40,12 +40,6 @@ func TestSendDTMFDecodesBack(t *testing.T) {
 	audioConfig.adev[0].bits_per_sample = 16
 	audioConfig.adev[0].samples_per_sec = sampleRate
 
-	var origReceiver = hdlcReceiver
-
-	t.Cleanup(func() { hdlcReceiver = origReceiver })
-
-	hdlcReceiver = NewHDLCReceiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
-
 	var sink = new(byteSink)
 	var tg = NewToneGenerator(channel, audioConfig, 50, sink)
 
@@ -54,7 +48,7 @@ func TestSendDTMFDecodesBack(t *testing.T) {
 	assert.Equal(t, 1, sink.flushes, "the tones should be flushed out once, at the end")
 	require.Zero(t, len(sink.data)%2, "16 bit samples come in pairs of bytes")
 
-	var decoder = NewDTMFDecoder(channel, sampleRate)
+	var decoder = NewDTMFDecoder(sampleRate, nil)
 
 	var heard strings.Builder
 
@@ -74,4 +68,27 @@ func TestSendDTMFDecodesBack(t *testing.T) {
 // have been, as xmit_thread holds the PTT for that long.
 func TestDTMFSendWithoutToneGenerator(t *testing.T) {
 	assert.Equal(t, 300+400+250, dtmf_send(nil, 0, "1234", 10, 300, 250))
+}
+
+// The DCD callback hears a button come on while it is held, and go off again
+// once it is released.
+func TestDTMFDecoderReportsDCD(t *testing.T) {
+	const sampleRate = 8000
+
+	var states []bool
+
+	var decoder = NewDTMFDecoder(sampleRate, func(on bool) {
+		// Only the changes are interesting here.
+		if len(states) == 0 || states[len(states)-1] != on {
+			states = append(states, on)
+		}
+	})
+
+	for _, button := range []rune{' ', '5', ' '} {
+		for sample := range dtmfButtonSamples(button, 100, sampleRate) {
+			decoder.Sample(sample)
+		}
+	}
+
+	assert.Equal(t, []bool{false, true, false}, states)
 }

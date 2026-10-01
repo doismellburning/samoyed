@@ -43,7 +43,7 @@ func dtmfTones() [NUM_TONES]int {
 // Only the receive goroutine for the channel's audio device drives it, so it
 // needs no lock.
 type DTMFDecoder struct {
-	channel int
+	dcd func(on bool)
 
 	sampleRate int /* Samples per sec.  Typ. 44100, 8000, etc. */
 	blockSize  int /* Number of samples to process in one block. */
@@ -64,23 +64,26 @@ type DTMFDecoder struct {
  *
  * Purpose:     Initialize the DTMF decoder for one radio channel.
  *
- * Inputs:      channel		- Radio channel number, for the DCD indicator.
- *
- *		sampleRate	- Audio sample frequency, typically
+ * Inputs:	sampleRate	- Audio sample frequency, typically
  *				  44100, 22050, 8000, etc.
  *
  *				  This is associated with the soundcard.
  *				  In version 1.2, we can have multiple soundcards
  *				  with potentially different sample rates.
  *
+ *		dcd		- Told, after each block of samples that
+ *				  agrees with the one before, whether a
+ *				  button is being held: the Data Carrier
+ *				  Detect indicator.  May be nil.
+ *
  *----------------------------------------------------------------*/
 
-func NewDTMFDecoder(channel int, sampleRate int) *DTMFDecoder {
-	logrus.WithField("channel", channel).Debug("NewDTMFDecoder")
+func NewDTMFDecoder(sampleRate int, dcd func(on bool)) *DTMFDecoder {
+	logrus.WithField("sampleRate", sampleRate).Debug("NewDTMFDecoder")
 
 	var d = new(DTMFDecoder)
 
-	d.channel = channel
+	d.dcd = dcd
 	d.sampleRate = sampleRate
 	d.prevDec = ' '
 	d.debounced = ' '
@@ -214,12 +217,9 @@ func (d *DTMFDecoder) Sample(input float64) rune {
 		d.debounced = decoded
 
 		// Update Data Carrier Detect Indicator.
-		var _tmpIntBool = 0
-		if decoded != ' ' {
-			_tmpIntBool = 1
+		if d.dcd != nil {
+			d.dcd(decoded != ' ')
 		}
-
-		hdlcReceiver.DCDChange(d.channel, MAX_SUBCHANS, 0, _tmpIntBool)
 
 		/* Reset timeout timer. */
 		if decoded != ' ' {

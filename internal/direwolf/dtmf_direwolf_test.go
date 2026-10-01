@@ -11,17 +11,7 @@ func Test_dtmf(t *testing.T) {
 	const c = 0 // radio channel.
 	const sampleRate = 44100
 
-	var my_audio_config AudioConfig
-
-	// A decoded button raises the channel's DCD, which goes to the HDLC
-	// receiver; nothing here wants to hear about it.
-	var origReceiver = hdlcReceiver
-
-	t.Cleanup(func() { hdlcReceiver = origReceiver })
-
-	hdlcReceiver = NewHDLCReceiver(&my_audio_config, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
-
-	var decoder = NewDTMFDecoder(c, sampleRate)
+	var decoder = NewDTMFDecoder(sampleRate, nil)
 
 	var result strings.Builder
 

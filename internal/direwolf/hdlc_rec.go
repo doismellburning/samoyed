@@ -701,7 +701,8 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
  *		are active.  Update the DCD indicator.
  *
  * version 1.3:	Add DTMF detection into the final result.
- *		This is now called from dtmf.c too.
+ *		The DTMF decoder's DCD callback, which
+ *		recv_adev_thread sets up, calls this too.
  *
  *--------------------------------------------------------------------*/
 
