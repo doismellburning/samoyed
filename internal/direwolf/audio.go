@@ -637,6 +637,128 @@ func (d *AudioDevices) findPortAudioDevice(name string, forInput bool) *portaudi
 	return dev
 }
 
+// openSoundcardInput opens soundcard name to record from for audio device a,
+// and starts it recording into the device's input ring buffer.
+func (d *AudioDevices) openSoundcardInput(a int, pa *AudioConfig, name string, framesPerBuffer int, bufSizeInBytes int) error {
+	var inputDev = d.findPortAudioDevice(name, true)
+	if inputDev == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not find audio input device: %s\n", name)
+		d.printAudioBackendNoise()
+
+		return fmt.Errorf("no audio input device %s", name)
+	}
+
+	// Create ring buffer for audio data.
+	// Size it to hold ~1 second of audio for plenty of headroom.
+	// This accommodates Go scheduler delays and processing latency.
+	var ringBufSize = pa.adev[a].samples_per_sec * pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
+	d.dev[a].inputRingBuf = newAudioRingBuffer(ringBufSize)
+
+	// Create input stream parameters
+	var inputParams = portaudio.StreamParameters{
+		Input: portaudio.StreamDeviceParameters{
+			Device:   inputDev,
+			Channels: pa.adev[a].num_channels,
+			Latency:  inputDev.DefaultHighInputLatency,
+		},
+		Output:          portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
+		SampleRate:      float64(pa.adev[a].samples_per_sec),
+		FramesPerBuffer: framesPerBuffer,
+		Flags:           portaudio.NoFlag,
+	}
+
+	// Open input stream with callback.
+	// The callback receives audio data and writes it to the ring buffer.
+	// IMPORTANT: Capture the ring buffer pointer now, not in the closure,
+	// to avoid the classic Go closure-over-loop-variable bug.
+	var inRingBuf = d.dev[a].inputRingBuf
+	var err error
+
+	if pa.adev[a].bits_per_sample == 16 {
+		// Pre-allocate a scratch buffer sized for one full callback invocation
+		// so the callback performs zero heap allocations at runtime.
+		d.dev[a].inputScratchBuf = make([]byte, framesPerBuffer*pa.adev[a].num_channels*2)
+		var inScratchBuf = d.dev[a].inputScratchBuf
+		err = d.quietPortAudio(func() error {
+			var e error
+			d.dev[a].inputStream, e = portaudio.OpenStream(
+				inputParams,
+				func(in []int16) {
+					// Reuse the pre-allocated scratch buffer; slice to actual length.
+					var scratch = inScratchBuf[:len(in)*2]
+					for i, sample := range in {
+						binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample))
+					}
+
+					inRingBuf.write(scratch)
+				},
+			)
+
+			return e
+		})
+	} else {
+		err = d.quietPortAudio(func() error {
+			var e error
+			d.dev[a].inputStream, e = portaudio.OpenStream(
+				inputParams,
+				func(in []uint8) {
+					// Write uint8 samples directly to ring buffer
+					inRingBuf.write(in)
+				},
+			)
+
+			return e
+		})
+	}
+
+	if err != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not open audio device %s for input: %v\n", name, err)
+		d.printAudioBackendNoise()
+
+		return fmt.Errorf("opening audio device %s for input: %w", name, err)
+	}
+
+	err = d.dev[a].inputStream.Start()
+	if err != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not start audio input stream: %v\n", err)
+
+		return fmt.Errorf("starting audio input stream: %w", err)
+	}
+
+	d.dev[a].inbufSizeInBytes = bufSizeInBytes
+
+	return nil
+}
+
+// openUDPInput opens the UDP port that name, "udp:port", gives for audio
+// device a to receive audio on.
+func (d *AudioDevices) openUDPInput(a int, name string) error {
+	var udpAddr, addrErr = net.ResolveUDPAddr("udp", name[3:]) // Capture the colon onwards from "udp:$PORT"
+	if addrErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Error with UDP address: %s\n", addrErr)
+
+		return fmt.Errorf("UDP address %s: %w", name, addrErr)
+	}
+
+	var udpErr error
+
+	d.dev[a].udp_sock, udpErr = net.ListenUDP("udp", udpAddr) // Capture the colon onwards from `udp:$PORT`
+	if udpErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Couldn't create listening socket: %s\n", udpErr)
+
+		return fmt.Errorf("listening on %s: %w", name, udpErr)
+	}
+
+	d.dev[a].inbufSizeInBytes = SDR_UDP_BUF_MAXLEN
+
+	return nil
+}
+
 // fillAudioDefaults fills in any audio device and modem settings that the
 // configuration left unset.
 func fillAudioDefaults(pa *AudioConfig) {
@@ -851,119 +973,19 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) (*AudioDevices, error) {
 			 * guarantees than Go goroutines.
 			 */
 			case AUDIO_IN_TYPE_SOUNDCARD:
-				var inputDev = d.findPortAudioDevice(audio_in_name, true)
-				if inputDev == nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not find audio input device: %s\n", audio_in_name)
-					d.printAudioBackendNoise()
-
-					return nil, fmt.Errorf("no audio input device %s", audio_in_name)
-				}
-
-				// Create ring buffer for audio data.
-				// Size it to hold ~1 second of audio for plenty of headroom.
-				// This accommodates Go scheduler delays and processing latency.
-				var ringBufSize = pa.adev[a].samples_per_sec * pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
-				d.dev[a].inputRingBuf = newAudioRingBuffer(ringBufSize)
-
-				// Create input stream parameters
-				var inputParams = portaudio.StreamParameters{
-					Input: portaudio.StreamDeviceParameters{
-						Device:   inputDev,
-						Channels: pa.adev[a].num_channels,
-						Latency:  inputDev.DefaultHighInputLatency,
-					},
-					Output:          portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
-					SampleRate:      float64(pa.adev[a].samples_per_sec),
-					FramesPerBuffer: framesPerBuffer,
-					Flags:           portaudio.NoFlag,
-				}
-
-				// Open input stream with callback.
-				// The callback receives audio data and writes it to the ring buffer.
-				// IMPORTANT: Capture the ring buffer pointer now, not in the closure,
-				// to avoid the classic Go closure-over-loop-variable bug.
-				var inRingBuf = d.dev[a].inputRingBuf
-				var err error
-
-				if pa.adev[a].bits_per_sample == 16 {
-					// Pre-allocate a scratch buffer sized for one full callback invocation
-					// so the callback performs zero heap allocations at runtime.
-					d.dev[a].inputScratchBuf = make([]byte, framesPerBuffer*pa.adev[a].num_channels*2)
-					var inScratchBuf = d.dev[a].inputScratchBuf
-					err = d.quietPortAudio(func() error {
-						var e error
-						d.dev[a].inputStream, e = portaudio.OpenStream(
-							inputParams,
-							func(in []int16) {
-								// Reuse the pre-allocated scratch buffer; slice to actual length.
-								var scratch = inScratchBuf[:len(in)*2]
-								for i, sample := range in {
-									binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample))
-								}
-
-								inRingBuf.write(scratch)
-							},
-						)
-
-						return e
-					})
-				} else {
-					err = d.quietPortAudio(func() error {
-						var e error
-						d.dev[a].inputStream, e = portaudio.OpenStream(
-							inputParams,
-							func(in []uint8) {
-								// Write uint8 samples directly to ring buffer
-								inRingBuf.write(in)
-							},
-						)
-
-						return e
-					})
-				}
-
+				var err = d.openSoundcardInput(a, pa, audio_in_name, framesPerBuffer, bufSizeInBytes)
 				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not open audio device %s for input: %v\n", audio_in_name, err)
-					d.printAudioBackendNoise()
-
-					return nil, fmt.Errorf("opening audio device %s for input: %w", audio_in_name, err)
+					return nil, err
 				}
-
-				err = d.dev[a].inputStream.Start()
-				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not start audio input stream: %v\n", err)
-
-					return nil, fmt.Errorf("starting audio input stream: %w", err)
-				}
-
-				d.dev[a].inbufSizeInBytes = bufSizeInBytes
 
 			/*
 			 * UDP.
 			 */
 			case AUDIO_IN_TYPE_SDR_UDP:
-				var udpAddr, addrErr = net.ResolveUDPAddr("udp", audio_in_name[3:]) // Capture the colon onwards from "udp:$PORT"
-				if addrErr != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Error with UDP address: %s\n", addrErr)
-
-					return nil, fmt.Errorf("UDP address %s: %w", audio_in_name, addrErr)
+				var err = d.openUDPInput(a, audio_in_name)
+				if err != nil {
+					return nil, err
 				}
-
-				var udpErr error
-
-				d.dev[a].udp_sock, udpErr = net.ListenUDP("udp", udpAddr) // Capture the colon onwards from `udp:$PORT`
-				if udpErr != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Couldn't create listening socket: %s\n", udpErr)
-
-					return nil, fmt.Errorf("listening on %s: %w", audio_in_name, udpErr)
-				}
-
-				d.dev[a].inbufSizeInBytes = SDR_UDP_BUF_MAXLEN
 
 				/*
 				 * stdin.
