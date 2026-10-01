@@ -30,7 +30,7 @@ func dumpCaptureOutput(t *testing.T, capture []byte, hexInput bool) (string, int
 
 	os.Stdout = tmp
 
-	var problems = dumpCapture(direwolf.NewAPRSDecoderFromDataFiles(), capture, hexInput)
+	var problems = dumpCapture(direwolf.NewDecoderFromDataFiles(), capture, hexInput)
 
 	os.Stdout = oldStdout
 

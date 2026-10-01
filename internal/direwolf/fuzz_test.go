@@ -103,7 +103,7 @@ func FuzzAX25FromText(f *testing.F) {
 func FuzzDecodeAPRS(f *testing.F) {
 	fuzzQuietly(f)
 
-	var aprsDecoder = NewAPRSDecoderFromDataFiles()
+	var aprsDecoder = NewDecoderFromDataFiles()
 
 	f.Add("Q1TEST>APDW17:!4237.14N/07120.83W#")
 	f.Add("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W#")

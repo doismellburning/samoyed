@@ -74,7 +74,7 @@ import (
 var hexLineRegexp = regexp.MustCompile(`^[[:xdigit:]]{2}( ?[[:xdigit:]]{2})*$`)
 
 func main() {
-	var aprsDecoder = direwolf.NewAPRSDecoderFromDataFiles()
+	var aprsDecoder = direwolf.NewDecoderFromDataFiles()
 
 	var scanner = bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
@@ -96,7 +96,7 @@ func main() {
 	}
 }
 
-func decodeAPRSLine(aprsDecoder *direwolf.APRSDecoder, line string) {
+func decodeAPRSLine(aprsDecoder *direwolf.Decoder, line string) {
 	/* Try to process it. */
 	fmt.Printf("\n")
 	ax25.SafePrint([]byte(line), false)

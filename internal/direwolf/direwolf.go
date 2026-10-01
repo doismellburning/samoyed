@@ -303,7 +303,7 @@ x = Silence FX.25 information.`)
 	goHamlib.SetDebugLevel(goHamlib.DebugLevel(d_h_opt))
 
 	aprsSymbolData = symbols.New()
-	var aprsDecoder = NewAPRSDecoder(deviceid.New(), aprsSymbolData)
+	var aprsDecoder = NewDecoder(deviceid.New(), aprsSymbolData)
 
 	audio_config = new(AudioConfig)
 	misc_config = new(misc_config_s)
@@ -787,7 +787,7 @@ func ais_object_course_speed(A *decodedAPRS) (maybe.Maybe[int], maybe.Maybe[int]
 
 func app_process_rec_packet(
 	ctx context.Context,
-	aprsDecoder *APRSDecoder,
+	aprsDecoder *Decoder,
 	channel int,
 	subchan int,
 	slice int,

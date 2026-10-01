@@ -185,7 +185,7 @@ type decodedAPRS struct {
 // unknownDevice is what mfr holds when the sending device can't be identified.
 const unknownDevice = "UNKNOWN vendor/model"
 
-// APRSDecoder decodes APRS packets and prints what it finds, using the
+// Decoder decodes APRS packets and prints what it finds, using the
 // tables that identify a packet's sending device and describe its symbol.
 //
 // The zero value decodes without either, so it identifies no device and
@@ -193,9 +193,9 @@ const unknownDevice = "UNKNOWN vendor/model"
 // Nor does it remember the telemetry metadata stations send between one
 // packet and the next.
 //
-// The tables are only read once loaded, so one APRSDecoder can be shared
+// The tables are only read once loaded, so one Decoder can be shared
 // between goroutines.
-type APRSDecoder struct {
+type Decoder struct {
 	deviceIDs *deviceid.Data
 	symbols   *symbols.Data
 
@@ -205,10 +205,10 @@ type APRSDecoder struct {
 	telemetry *aprstelemetry.State
 }
 
-// NewAPRSDecoder returns an APRSDecoder that identifies devices from
+// NewDecoder returns a Decoder that identifies devices from
 // deviceIDs and describes symbols from symbolData.  Either may be nil.
-func NewAPRSDecoder(deviceIDs *deviceid.Data, symbolData *symbols.Data) *APRSDecoder {
-	var d = new(APRSDecoder)
+func NewDecoder(deviceIDs *deviceid.Data, symbolData *symbols.Data) *Decoder {
+	var d = new(Decoder)
 	d.deviceIDs = deviceIDs
 	d.symbols = symbolData
 	d.telemetry = aprstelemetry.New()
@@ -216,17 +216,17 @@ func NewAPRSDecoder(deviceIDs *deviceid.Data, symbolData *symbols.Data) *APRSDec
 	return d
 }
 
-// NewAPRSDecoderFromDataFiles returns an APRSDecoder with its tables read
+// NewDecoderFromDataFiles returns a Decoder with its tables read
 // from the tocalls.yaml and symbols-new.txt data files, for a program that
 // has no other use for them.
-func NewAPRSDecoderFromDataFiles() *APRSDecoder {
-	return NewAPRSDecoder(deviceid.New(), symbols.New())
+func NewDecoderFromDataFiles() *Decoder {
+	return NewDecoder(deviceid.New(), symbols.New())
 }
 
 // telemetryMetadata is where d keeps the telemetry metadata stations send.  The
 // zero value has nowhere to keep it, so each packet it decodes starts afresh
 // and telemetry data decodes with the defaults.
-func (d *APRSDecoder) telemetryMetadata() *aprstelemetry.State {
+func (d *Decoder) telemetryMetadata() *aprstelemetry.State {
 	if d.telemetry == nil {
 		return aprstelemetry.New()
 	}
@@ -237,7 +237,7 @@ func (d *APRSDecoder) telemetryMetadata() *aprstelemetry.State {
 // Decode splits an APRS packet into the separate properties it contains.
 // With quiet set, it keeps its complaints about a malformed packet to
 // itself.
-func (d *APRSDecoder) Decode(pp *ax25.Packet, quiet bool) *decodedAPRS {
+func (d *Decoder) Decode(pp *ax25.Packet, quiet bool) *decodedAPRS {
 	return d.decode(pp, quiet, "")
 }
 
@@ -268,7 +268,7 @@ func (d *APRSDecoder) Decode(pp *ax25.Packet, quiet bool) *decodedAPRS {
  *
  *------------------------------------------------------------------*/
 
-func (d *APRSDecoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPRS {
+func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPRS {
 	var pinfo = pp.Info()
 
 	var A = new(decodedAPRS)
@@ -549,7 +549,7 @@ func (d *APRSDecoder) decode(pp *ax25.Packet, quiet bool, third_party_src string
 } /* end decode_aprs */
 
 // Print writes out what Decode found, in human readable form.
-func (d *APRSDecoder) Print(A *decodedAPRS) {
+func (d *Decoder) Print(A *decodedAPRS) {
 	/*
 	 * First line has:
 	 * - packet type

@@ -50,7 +50,7 @@ type PacketFilter struct {
 	// aprsDecoder decodes the packets an APRS filter is asked about.  Nil
 	// decodes without identifying devices or describing symbols, which is
 	// all a syntax check needs.
-	aprsDecoder *APRSDecoder
+	aprsDecoder *Decoder
 
 	// debug is how much to say about each decision:
 	//	0	no debug output.
@@ -64,7 +64,7 @@ type PacketFilter struct {
 // hop count from igateConfig, which may be nil, decodes APRS packets with
 // aprsDecoder, which may also be nil, and says as much about each decision
 // as debugLevel asks for.
-func NewPacketFilter(igateConfig *igate_config_s, aprsDecoder *APRSDecoder, debugLevel int) *PacketFilter {
+func NewPacketFilter(igateConfig *igate_config_s, aprsDecoder *Decoder, debugLevel int) *PacketFilter {
 	var f = new(PacketFilter)
 	f.igateConfig = igateConfig
 	f.aprsDecoder = aprsDecoder
@@ -226,7 +226,7 @@ func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.
 	pfstate.is_aprs = is_aprs
 	pfstate.syntax_only = syntax_only
 
-	var aprsDecoder = new(APRSDecoder)
+	var aprsDecoder = new(Decoder)
 
 	if f != nil {
 		pfstate.igate_config = f.igateConfig
@@ -1097,7 +1097,7 @@ func filt_s(pf *pfstate_t) (int, error) {
 	}
 
 	// This applies only for Position, Object, Item.
-	// APRSDecoder.Decode should set symbol code to space to mean undefined.
+	// Decoder.Decode should set symbol code to space to mean undefined.
 
 	if pf.decoded.symbolCode == ' ' {
 		return 0, nil
@@ -1511,7 +1511,7 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
  * Returns:	The PacketFilter to run them with.
  *
  * Description:	TNC startup would have put a few things in place that pfilter
- *		expects: an APRSDecoder with its tables loaded, the list of
+ *		expects: an Decoder with its tables loaded, the list of
  *		stations heard recently that an "i" filter
  *		consults, and an IGate configuration to take a default hop
  *		count from.  The last two are empty here, so an "i" filter
@@ -1523,7 +1523,7 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
 func PfilterStandaloneInit(debug_level int) *PacketFilter {
 	mheardDB = mheard.New(0)
 
-	return NewPacketFilter(new(igate_config_s), NewAPRSDecoderFromDataFiles(), debug_level)
+	return NewPacketFilter(new(igate_config_s), NewDecoderFromDataFiles(), debug_level)
 }
 
 // PfilterMaxDebugLevel is the most verbose debug level a PacketFilter has
