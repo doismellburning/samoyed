@@ -14,7 +14,10 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Assert panics, naming the caller's file and line, when t is false - C's
@@ -46,37 +49,56 @@ func ByteArrayToString(b []byte) string {
 // HexDump prints p to stdout, 16 bytes to a line: the offset, the bytes in
 // hexadecimal, and those that are printable ASCII as themselves.
 func HexDump(p []byte) {
-	var offset = 0
-	var length = len(p)
+	for _, line := range HexDumpLines(p) {
+		fmt.Println(line)
+	}
+}
 
-	for length > 0 {
-		var n = min(length, 16)
+// HexDumpLines formats p as HexDump prints it, one string per line and without
+// the newlines, for a caller that sends each line somewhere else - a log entry,
+// say.
+func HexDumpLines(p []byte) []string {
+	var lines []string
 
-		fmt.Printf("  %03x: ", offset)
+	for offset := 0; offset < len(p); offset += 16 {
+		var chunk = p[offset:min(offset+16, len(p))]
 
-		for i := range n {
-			fmt.Printf(" %02x", p[i])
+		var line strings.Builder
+
+		fmt.Fprintf(&line, "  %03x: ", offset)
+
+		for _, b := range chunk {
+			fmt.Fprintf(&line, " %02x", b)
 		}
 
-		for i := n; i < 16; i++ {
-			fmt.Print("   ")
-		}
+		line.WriteString(strings.Repeat("   ", 16-len(chunk)))
+		line.WriteString("  ")
 
-		fmt.Print("  ")
-
-		for i := range n {
-			if p[i] >= 0x20 && p[i] <= 0x7E {
-				fmt.Printf("%c", p[i])
+		for _, b := range chunk {
+			if b >= 0x20 && b <= 0x7E {
+				line.WriteByte(b)
 			} else {
-				fmt.Print(".")
+				line.WriteByte('.')
 			}
 		}
 
-		fmt.Println()
+		lines = append(lines, line.String())
+	}
 
-		p = p[n:]
-		offset += n
-		length -= n
+	return lines
+}
+
+// LogHexDump logs p through entry at level, one entry per line of
+// HexDumpLines in a "dump" field, so a dump sits beside the entry describing
+// it rather than going to stdout on its own.  It formats nothing unless level
+// is enabled.
+func LogHexDump(entry *logrus.Entry, level logrus.Level, p []byte) {
+	if !entry.Logger.IsLevelEnabled(level) {
+		return
+	}
+
+	for _, line := range HexDumpLines(p) {
+		entry.WithField("dump", line).Log(level)
 	}
 }
 
