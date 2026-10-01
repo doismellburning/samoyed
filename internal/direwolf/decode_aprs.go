@@ -28,6 +28,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/dwgps"
@@ -841,13 +842,13 @@ func (d *APRSDecoder) Print(A *decodedAPRS) {
 func aprsLLPos(A *decodedAPRS, info []byte) {
 	type llPos struct {
 		DTI byte /* ! or = */
-		Pos Position
+		Pos aprs.Position
 	}
 	var p llPos
 
 	type compressedPos struct {
 		DTI  byte /* ! or = */
-		CPos CompressedPosition
+		CPos aprs.CompressedPosition
 	}
 	var q compressedPos
 
@@ -949,14 +950,14 @@ func aprsLLPosTime(A *decodedAPRS, info []byte) {
 	type llPosTime struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
-		Pos       Position
+		Pos       aprs.Position
 	}
 	var p llPosTime
 
 	type compressedPosTime struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
-		CPos      CompressedPosition
+		CPos      aprs.CompressedPosition
 	}
 	var q compressedPosTime
 
@@ -1562,9 +1563,9 @@ func aprsMicE(A *decodedAPRS, deviceIDs *deviceid.Data, pp *ax25.Packet, info []
 	// Three base 91 characters followed by }
 
 	if len(trimmed) >= 4 &&
-		IsBase91Digit(trimmed[0]) &&
-		IsBase91Digit(trimmed[1]) &&
-		IsBase91Digit(trimmed[2]) &&
+		aprs.IsBase91Digit(trimmed[0]) &&
+		aprs.IsBase91Digit(trimmed[1]) &&
+		aprs.IsBase91Digit(trimmed[2]) &&
 		trimmed[3] == '}' {
 		A.altitudeFt = maybe.Just(dwutil.DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
 
@@ -1932,7 +1933,7 @@ func aprsObject(A *decodedAPRS, info []byte) {
 		Name         [9]byte
 		LiveOrKilled byte /* * for live or _ for killed */
 		Timestamp    [7]byte
-		Pos          Position
+		Pos          aprs.Position
 	}
 	var p objectInfo
 
@@ -1941,7 +1942,7 @@ func aprsObject(A *decodedAPRS, info []byte) {
 		Name         [9]byte
 		LiveOrKilled byte /* * for live or _ for killed */
 		Timestamp    [7]byte
-		CPos         CompressedPosition
+		CPos         aprs.CompressedPosition
 	}
 	var q compressedObjectInfo
 
@@ -2076,8 +2077,8 @@ func aprsItem(A *decodedAPRS, info []byte) {
 		A.dataTypeDesc = "Object - invalid live/killed"
 	}
 
-	var p Position
-	var q CompressedPosition
+	var p aprs.Position
+	var q aprs.CompressedPosition
 
 	/*
 	 * A position that isn't all there is not a position: binary.Decode leaves
@@ -3116,7 +3117,7 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func decodePosition(A *decodedAPRS, ppos *Position) {
+func decodePosition(A *decodedAPRS, ppos *aprs.Position) {
 	A.lat = getLatitude8(ppos.Lat, A.quiet)
 	A.lon = getLongitude9(ppos.Lon, A.quiet)
 
@@ -3161,8 +3162,8 @@ func decodePosition(A *decodedAPRS, ppos *Position) {
  *
  *------------------------------------------------------------------*/
 
-func decodeCompressedPosition(A *decodedAPRS, pcpos *CompressedPosition) {
-	if IsBase91Digit(pcpos.Y[0]) && IsBase91Digit(pcpos.Y[1]) && IsBase91Digit(pcpos.Y[2]) && IsBase91Digit(pcpos.Y[3]) {
+func decodeCompressedPosition(A *decodedAPRS, pcpos *aprs.CompressedPosition) {
+	if aprs.IsBase91Digit(pcpos.Y[0]) && aprs.IsBase91Digit(pcpos.Y[1]) && aprs.IsBase91Digit(pcpos.Y[2]) && aprs.IsBase91Digit(pcpos.Y[3]) {
 		A.lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
 	} else {
 		if !A.quiet {
@@ -3172,7 +3173,7 @@ func decodeCompressedPosition(A *decodedAPRS, pcpos *CompressedPosition) {
 		A.lat = maybe.Nothing[float64]()
 	}
 
-	if IsBase91Digit(pcpos.X[0]) && IsBase91Digit(pcpos.X[1]) && IsBase91Digit(pcpos.X[2]) && IsBase91Digit(pcpos.X[3]) {
+	if aprs.IsBase91Digit(pcpos.X[0]) && aprs.IsBase91Digit(pcpos.X[1]) && aprs.IsBase91Digit(pcpos.X[2]) && aprs.IsBase91Digit(pcpos.X[3]) {
 		A.lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
 	} else {
 		if !A.quiet {
@@ -4281,15 +4282,15 @@ func processComment(A *decodedAPRS, commentData []byte) {
 			/*
 			 * The spec appears to be wrong.  It says '}' is the maximum value when it should be '{'.
 			 */
-			if IsBase91Digit(a) {
+			if aprs.IsBase91Digit(a) {
 				A.lat = maybe.Fmap(func(lat float64) float64 {
-					return lat + float64(a-Base91Min)*1.1/600000.0*aprsSign(lat)
+					return lat + float64(a-aprs.Base91Min)*1.1/600000.0*aprsSign(lat)
 				}, A.lat)
 			}
 
-			if IsBase91Digit(o) {
+			if aprs.IsBase91Digit(o) {
 				A.lon = maybe.Fmap(func(lon float64) float64 {
-					return lon + float64(o-Base91Min)*1.1/600000.0*aprsSign(lon)
+					return lon + float64(o-aprs.Base91Min)*1.1/600000.0*aprsSign(lon)
 				}, A.lon)
 			}
 		}

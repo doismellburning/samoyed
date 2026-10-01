@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package aprs
 
 // Position is the uncompressed latitude, longitude and symbol of an APRS
 // position report, laid out as it is on the air.

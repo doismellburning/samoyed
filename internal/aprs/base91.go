@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package aprs
 
 // Base91Min and Base91Max are the range of digits for base 91 representation.
 const Base91Min = '!'
