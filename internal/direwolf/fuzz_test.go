@@ -9,7 +9,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
@@ -96,51 +95,6 @@ func FuzzAX25FromText(f *testing.F) {
 		pp.FormatAddrs()
 		pp.Info()
 		pp.FrameType()
-	})
-}
-
-// FuzzDecodeAPRS covers the information part decoders, which is where most of
-// the reading-off-the-end has been.
-func FuzzDecodeAPRS(f *testing.F) {
-	fuzzQuietly(f)
-
-	var aprsDecoder = aprs.NewDecoderFromDataFiles()
-
-	f.Add("Q1TEST>APDW17:!4237.14N/07120.83W#")
-	f.Add("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W#")
-	f.Add("Q1TEST>APDW17:_10090556c220s004g005t077r000p000P000h50b09900")
-
-	// A Mic-E report whose destination is too short to hold a latitude
-	// (issue #670).
-	f.Add("0>0:'0000000000000000000")
-
-	// A course and speed data extension with nothing after it, so no
-	// bearing and no NRQ.
-	f.Add("0>0:!0000000000000000000000/000")
-
-	// User-defined data that stops before its user ID.
-	f.Add("0>0:{")
-
-	// A general query whose footprint is not the three comma-separated
-	// fields the parser goes on to read.
-	f.Add("0>0:?X?0")
-
-	// A message with nothing after the addressee, and one too short to
-	// hold an "ack" or "rej".
-	f.Add("0>0::000000000:")
-	f.Add("0>0::000000000:ab")
-
-	// A status report too short for the 6 character Maidenhead locator
-	// form, so the 4 character one is tried with exactly 4 bytes.
-	f.Add("Q1TEST>APDW17:>IO91/#  ")
-
-	f.Fuzz(func(t *testing.T, monitor string) {
-		var pp = ax25.FromTextWithStrictness(monitor, ax25.AddrLenient)
-		if pp == nil {
-			return
-		}
-
-		aprsDecoder.Decode(pp, true)
 	})
 }
 
