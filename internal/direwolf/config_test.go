@@ -1099,6 +1099,40 @@ func Test_config_init_metricsport(t *testing.T) {
 	})
 }
 
+// --- config_init WEBPORT directive ---
+
+func Test_config_init_webport(t *testing.T) {
+	t.Run("valid value stored", func(t *testing.T) {
+		var _, misc = configFromString(t, "WEBPORT 8080\n")
+		assert.Equal(t, 8080, misc.web_port)
+	})
+
+	t.Run("zero disables", func(t *testing.T) {
+		var _, misc = configFromString(t, "WEBPORT 0\n")
+		assert.Equal(t, 0, misc.web_port)
+	})
+
+	t.Run("disabled by default", func(t *testing.T) {
+		var _, misc = configFromString(t, "")
+		assert.Equal(t, 0, misc.web_port)
+	})
+
+	t.Run("out-of-range value disables", func(t *testing.T) {
+		var _, misc = configFromString(t, "WEBPORT 99999\n")
+		assert.Equal(t, 0, misc.web_port)
+	})
+
+	t.Run("non-numeric value is rejected", func(t *testing.T) {
+		var _, misc = configFromString(t, "WEBPORT eighty\n")
+		assert.Equal(t, 0, misc.web_port)
+	})
+
+	t.Run("trailing token is rejected", func(t *testing.T) {
+		var _, misc = configFromString(t, "WEBPORT 8080 junk\n")
+		assert.Equal(t, 0, misc.web_port)
+	})
+}
+
 // --- config_init FIX_BITS directive ---
 
 func Test_config_init_fix_bits(t *testing.T) {
@@ -4924,6 +4958,7 @@ func directivesTestedSeparately() map[string]string {
 		"PBEACON":     "Test_config_init_pbeacon_no_options",
 		"SLOTTIME":    "Test_config_init_slottime",
 		"TXDELAY":     "Test_config_init_txdelay",
+		"WEBPORT":     "Test_config_init_webport",
 	}
 }
 
