@@ -39,11 +39,37 @@ def _short(import_path: str) -> str:
     return import_path.removeprefix(MODULE + "/")
 
 
+def transitive_reduction(graph: dict[str, set[str]]) -> dict[str, set[str]]:
+    """Drop each edge that a longer path already implies.
+
+    If ``a`` imports both ``b`` and ``c``, and ``b`` depends on ``c``, then
+    ``a -> c`` says nothing the graph doesn't already show, so it goes. Go
+    forbids import cycles, so the graph is acyclic and the reduction unique.
+    """
+    reachable: dict[str, set[str]] = {}
+
+    def descendants(node: str) -> set[str]:
+        if node not in reachable:
+            found: set[str] = set()
+            for dep in graph.get(node, ()):
+                found.add(dep)
+                found |= descendants(dep)
+            reachable[node] = found
+        return reachable[node]
+
+    return {
+        node: {dep for dep in deps if not any(dep in descendants(other) for other in deps - {dep})}
+        for node, deps in graph.items()
+    }
+
+
 def packages_to_dot(packages: Iterable[dict[str, Any]]) -> str:
     """Render the module's packages and their in-module imports as DOT.
 
     ``Imports`` excludes test-only imports, so test helpers don't appear as
-    dependencies.
+    dependencies. Imports already implied by another path are left out, as
+    are clusters for ``cmd`` and ``internal``: both pull edges into long
+    detours around the cluster boxes, and the node shapes tell the two apart.
     """
     prefix = MODULE + "/"
     nodes: dict[str, set[str]] = {}
@@ -52,6 +78,7 @@ def packages_to_dot(packages: Iterable[dict[str, Any]]) -> str:
         if not path.startswith(prefix):
             continue
         nodes[_short(path)] = {_short(i) for i in package.get("Imports", []) if i.startswith(prefix)}
+    nodes = transitive_reduction(nodes)
 
     lines = [
         "digraph samoyed {",
@@ -60,14 +87,11 @@ def packages_to_dot(packages: Iterable[dict[str, Any]]) -> str:
         "    edge [color=gray40];",
     ]
     for group, shape in (("cmd", "box"), ("internal", "ellipse")):
-        members = sorted(n for n in nodes if n.startswith(group + "/"))
-        if not members:
-            continue
-        lines.append(f"    subgraph cluster_{group} {{")
-        lines.append(f'        label="{group}";')
-        lines.append("        style=dashed;")
-        lines.extend(f'        "{n}" [label="{n.removeprefix(group + "/")}", shape={shape}];' for n in members)
-        lines.append("    }")
+        lines.extend(
+            f'    "{n}" [label="{n.removeprefix(group + "/")}", shape={shape}];'
+            for n in sorted(nodes)
+            if n.startswith(group + "/")
+        )
     for node in sorted(nodes):
         lines.extend(f'    "{node}" -> "{dep}";' for dep in sorted(nodes[node]))
     lines.append("}")

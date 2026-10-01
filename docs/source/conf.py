@@ -26,7 +26,7 @@ extensions = [
     "godeps",
 ]
 
-graphviz_output_format = "png"
+graphviz_output_format = "svg"
 
 pygments_style = "default"
 
