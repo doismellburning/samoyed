@@ -103,8 +103,7 @@ func (s *HDLCSender) SendFrame(pp *ax25.Packet, badFCS bool) int {
 			return n
 		}
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to send IL2p frame.  Falling back to regular AX.25.\n")
+		logrus.WithField("channel", s.channel).Warn("Unable to send IL2P frame.  Falling back to regular AX.25.")
 		// Not sure if we should fall back to AX.25 or not here.
 	} else if achan.layer2_xmit == LAYER2_FX25 {
 		var fbuf = pp.Pack()
@@ -114,8 +113,7 @@ func (s *HDLCSender) SendFrame(pp *ax25.Packet, badFCS bool) int {
 			return n
 		}
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to send FX.25.  Falling back to regular AX.25.\n")
+		logrus.WithField("channel", s.channel).Warn("Unable to send FX.25.  Falling back to regular AX.25.")
 		// Definitely need to fall back to AX.25 here because
 		// the FX.25 frame length is so limited.
 	}
