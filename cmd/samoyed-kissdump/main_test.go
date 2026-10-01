@@ -6,8 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +30,7 @@ func dumpCaptureOutput(t *testing.T, capture []byte, hexInput bool) (string, int
 
 	os.Stdout = tmp
 
-	var problems = dumpCapture(direwolf.NewAPRSDecoderFromDataFiles(), capture, hexInput)
+	var problems = dumpCapture(aprs.NewDecoderFromDataFiles(), capture, hexInput)
 
 	os.Stdout = oldStdout
 

@@ -69,6 +69,7 @@ import (
 	"os"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
@@ -354,12 +355,12 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 		// TODO: Use station callsign, rather than "AIS," so we know where it is coming from,
 		// if it happens to get onto RF somehow.
 
-		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_AIS, string(nmea))
+		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, aprs.UserDefUserID, aprs.UserDefTypeAIS, string(nmea))
 		pp = ax25.FromText(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	case MODEM_EAS:
-		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_EAS, string(fbuf))
+		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, aprs.UserDefUserID, aprs.UserDefTypeEAS, string(fbuf))
 		pp = ax25.FromText(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.

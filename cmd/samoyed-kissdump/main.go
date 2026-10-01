@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -63,7 +64,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if dumpCapture(direwolf.NewAPRSDecoderFromDataFiles(), capture, *hexInput) > 0 {
+	if dumpCapture(aprs.NewDecoderFromDataFiles(), capture, *hexInput) > 0 {
 		os.Exit(1)
 	}
 }
@@ -73,7 +74,7 @@ func main() {
  * caller can exit non-zero when it contained something malformed.
  */
 
-func dumpCapture(aprsDecoder *direwolf.APRSDecoder, capture []byte, hexInput bool) int {
+func dumpCapture(aprsDecoder *aprs.Decoder, capture []byte, hexInput bool) int {
 	if hexInput {
 		var decoded, err = fromHex(capture)
 		if err != nil {
@@ -195,7 +196,7 @@ func isHexDigit(b byte) bool {
  * unterminated says the capture ended without a closing one.
  */
 
-func dumpFrame(aprsDecoder *direwolf.APRSDecoder, number int, offset int, contents []byte, unterminated bool) int {
+func dumpFrame(aprsDecoder *aprs.Decoder, number int, offset int, contents []byte, unterminated bool) int {
 	var problems = 0
 
 	fmt.Printf("\n--- KISS frame %d, %s at offset %d ---\n", number, plural(len(contents), "byte"), offset)
@@ -265,7 +266,7 @@ func commandName(command byte) string {
 
 /* Describe everything after the command byte. */
 
-func dumpCommand(aprsDecoder *direwolf.APRSDecoder, command byte, payload []byte) int {
+func dumpCommand(aprsDecoder *aprs.Decoder, command byte, payload []byte) int {
 	switch command {
 	case kiss.CmdDataFrame:
 		return direwolf.DescribeAX25Frame(aprsDecoder, payload)

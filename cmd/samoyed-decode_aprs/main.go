@@ -64,8 +64,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
 )
@@ -74,7 +74,7 @@ import (
 var hexLineRegexp = regexp.MustCompile(`^[[:xdigit:]]{2}( ?[[:xdigit:]]{2})*$`)
 
 func main() {
-	var aprsDecoder = direwolf.NewAPRSDecoderFromDataFiles()
+	var aprsDecoder = aprs.NewDecoderFromDataFiles()
 
 	var scanner = bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
@@ -96,7 +96,7 @@ func main() {
 	}
 }
 
-func decodeAPRSLine(aprsDecoder *direwolf.APRSDecoder, line string) {
+func decodeAPRSLine(aprsDecoder *aprs.Decoder, line string) {
 	/* Try to process it. */
 	fmt.Printf("\n")
 	ax25.SafePrint([]byte(line), false)

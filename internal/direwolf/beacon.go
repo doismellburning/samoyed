@@ -14,6 +14,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -773,7 +774,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			return
 		}
 
-		beacon_text += EncodePosition(bp.messaging, bp.compress,
+		beacon_text += aprs.EncodePosition(bp.messaging, bp.compress,
 			dlat, dlon, bp.ambiguity,
 			beaconAltitudeFeet(bp.alt_m),
 			bp.symtab, bp.symbol,
@@ -788,7 +789,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			return
 		}
 
-		beacon_text += encode_object(bp.objname, bp.compress, time.Now(), dlat, dlon, bp.ambiguity,
+		beacon_text += aprs.EncodeObject(bp.objname, bp.compress, time.Now(), dlat, dlon, bp.ambiguity,
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
@@ -812,7 +813,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			var coarse = maybe.Fmap(func(degrees float64) int { return int(math.Round(degrees)) }, gpsinfo.Track)
 			var knots = maybe.Fmap(func(speed float64) int { return int(math.Round(speed)) }, gpsinfo.SpeedKnots)
 
-			beacon_text += EncodePosition(bp.messaging, bp.compress,
+			beacon_text += aprs.EncodePosition(bp.messaging, bp.compress,
 				dlat, dlon, bp.ambiguity, my_alt_ft,
 				bp.symtab, bp.symbol,
 				beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
@@ -828,16 +829,16 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			if bs.trackerDebugLevel >= 3 {
 				/* Frequency, offset, tone and DCS are unknown here, which is */
 				/* what the zero value of each of those fields already means. */
-				var A decodedAPRS
+				var A aprs.Decoded
 
-				A.src = mycall
-				A.symbolTable = bp.symtab
-				A.symbolCode = bp.symbol
-				A.lat = gpsinfo.Lat
-				A.lon = gpsinfo.Lon
-				A.speedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
-				A.course = maybe.Fmap(func(degrees int) float64 { return float64(degrees) }, coarse)
-				A.altitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, gpsinfo.Altitude)
+				A.Src = mycall
+				A.SymbolTable = bp.symtab
+				A.SymbolCode = bp.symbol
+				A.Lat = gpsinfo.Lat
+				A.Lon = gpsinfo.Lon
+				A.SpeedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
+				A.Course = maybe.Fmap(func(degrees int) float64 { return float64(degrees) }, coarse)
+				A.AltitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, gpsinfo.Altitude)
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel ax25.ALevel

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -153,7 +154,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	var igateConfig = new(igate_config_s)
 	var digiConfig = new(digi_config_s)
-	var filter = NewPacketFilter(igateConfig, NewAPRSDecoderFromDataFiles(), 0)
+	var filter = NewPacketFilter(igateConfig, aprs.NewDecoderFromDataFiles(), 0)
 
 	igate = NewIGate(audioConfig, igateConfig, digiConfig, filter, 0)
 	aprsDigipeater = NewDigipeater(audioConfig, digiConfig, filter)
@@ -172,7 +173,7 @@ func processRecPacket(t *testing.T, subchan int, slice int, pp *ax25.Packet, ale
 
 	return testutils.CaptureOutput(t, func() {
 		logrus.SetOutput(os.Stdout)
-		app_process_rec_packet(t.Context(), NewAPRSDecoderFromDataFiles(), 0, subchan, slice, pp, alevel, fecType, retries, spectrum)
+		app_process_rec_packet(t.Context(), aprs.NewDecoderFromDataFiles(), 0, subchan, slice, pp, alevel, fecType, retries, spectrum)
 	})
 }
 
@@ -431,7 +432,7 @@ func Test_app_process_rec_packet_ais_to_object(t *testing.T) {
 	A_opt_ais_to_obj = true
 
 	var sentence = aisPositionReport(t, 208, 900)
-	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
+	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", aprs.UserDefUserID, aprs.UserDefTypeAIS, sentence), true)
 
 	var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 

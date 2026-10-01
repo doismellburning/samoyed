@@ -1,9 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-// Construct APRS packets from components.
-//
-// References: APRS Protocol Reference, and the frequency spec at
-// http://www.aprs.org/info/freqspec.txt
+package aprs
 
 import (
 	"fmt"
@@ -29,18 +27,18 @@ func checkSymbol(symtab byte, symbol byte) {
 	}
 }
 
-// normal_position_string renders a position from normal_position.
-func normal_position_string(p *position_t) string {
+// normalPositionString renders a position from normalPosition.
+func normalPositionString(p *latLongPosition) string {
 	return fmt.Sprintf("%s%c%s%c", string(p.Lat[:]), p.SymTableId, string(p.Lon[:]), p.SymbolCode)
 }
 
-// normal_position fills in the human-readable latitude, longitude and symbol
+// normalPosition fills in the human-readable latitude, longitude and symbol
 // part which is common to multiple data formats.
 //
 // symtab is the symbol table id or overlay, symbol the symbol id, and
 // ambiguity the number of least significant digits to blank out.
-func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *position_t {
-	var pos = new(position_t)
+func normalPosition(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *latLongPosition {
+	var pos = new(latLongPosition)
 
 	checkSymbol(symtab, symbol)
 
@@ -55,12 +53,12 @@ func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambi
 	return pos
 }
 
-// compressed_position_string renders a position from compressed_position.
-func compressed_position_string(p *compressed_position_t) string {
+// compressedPositionString renders a position from compressedPosition.
+func compressedPositionString(p *compressedPositionData) string {
 	return fmt.Sprintf("%c%s%s%c%c%c%c", p.SymTableId, string(p.Y[:]), string(p.X[:]), p.SymbolCode, p.C, p.S, p.T)
 }
 
-// compressed_position fills in the compressed latitude, longitude and symbol
+// compressedPosition fills in the compressed latitude, longitude and symbol
 // part which is common to multiple data formats.
 //
 // power is in watts, height in feet, gain in dBi, course in degrees (0 - 360,
@@ -74,10 +72,10 @@ func compressed_position_string(p *compressed_position_t) string {
 //
 // Some conversion must be performed for course from the API definition to
 // what is sent over the air.
-func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
+func compressedPosition(symtab byte, symbol byte, dlat float64, dlong float64,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int],
-	course maybe.Maybe[int], speed maybe.Maybe[int]) *compressed_position_t {
-	var pos = new(compressed_position_t)
+	course maybe.Maybe[int], speed maybe.Maybe[int]) *compressedPositionData {
+	var pos = new(compressedPositionData)
 
 	checkSymbol(symtab, symbol)
 
@@ -166,14 +164,14 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	return pos
 }
 
-// phg_data_extension returns the power/height/gain data extension.
+// phgDataExtension returns the power/height/gain data extension.
 //
 // power is in watts and height in feet.  gain is in dB: the protocol spec
 // doesn't mention whether it is dBi or dBd, but this says dBi:
 // http://www.tapr.org/pipermail/aprssig/2008-September/027034.html
 //
 // dir is the directivity: N, NE, etc., or omni.
-func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string) string {
+func phgDataExtension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string) string {
 	// The callers only check that at least one of the three was specified, so
 	// the others can still be absent.  Treat those as unspecified, which is
 	// what the zero the callers originally checked for meant.
@@ -213,12 +211,12 @@ func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain ma
 	return fmt.Sprintf("PHG%c%c%c%c", byte(p), byte(h), byte(g), d)
 }
 
-// cse_spd_data_extension returns the course & speed data extension.
+// cseSpdDataExtension returns the course & speed data extension.
 //
 // course is in degrees, 0 - 360 (360 equivalent to 0), and speed in knots.
 // Over the air we use 0 for an unknown or irrelevant course, and 1 - 360 for
 // a valid one (360 for north).
-func cse_spd_data_extension(course maybe.Maybe[int], speed maybe.Maybe[int]) string {
+func cseSpdDataExtension(course maybe.Maybe[int], speed maybe.Maybe[int]) string {
 	var cse int
 	if degrees, known := course.Get(); known {
 		cse = degrees
@@ -244,17 +242,17 @@ func cse_spd_data_extension(course maybe.Maybe[int], speed maybe.Maybe[int]) str
 func dataExtension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
 	course maybe.Maybe[int], speed maybe.Maybe[int]) string {
 	if course.IsJust() || maybe.FromMaybe(0, speed) > 0 {
-		return cse_spd_data_extension(course, speed)
+		return cseSpdDataExtension(course, speed)
 	}
 
 	if maybe.FromMaybe(0, power) > 0 || maybe.FromMaybe(0, height) > 0 || maybe.FromMaybe(0, gain) > 0 {
-		return phg_data_extension(power, height, gain, dir)
+		return phgDataExtension(power, height, gain, dir)
 	}
 
 	return ""
 }
 
-// frequency_spec returns the frequency specification for the beginning of the
+// FrequencySpec returns the frequency specification for the beginning of the
 // comment field, or "" if nothing was given.  freq is in MHz, tone in Hz and
 // offset in MHz.
 //
@@ -269,7 +267,7 @@ func dataExtension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.M
 //	"+999 "		(10 kHz units)
 //
 // Reference: http://www.aprs.org/info/freqspec.txt
-func frequency_spec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset maybe.Maybe[float64]) string {
+func FrequencySpec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset maybe.Maybe[float64]) string {
 	var result string
 
 	var megahertz = maybe.FromMaybe(0, freq)
@@ -311,15 +309,15 @@ func encodeLocation(compressed bool, lat float64, lon float64, ambiguity int,
 	var result string
 
 	if compressed {
-		result = compressed_position_string(compressed_position(symtab, symbol, lat, lon,
+		result = compressedPositionString(compressedPosition(symtab, symbol, lat, lon,
 			power, height, gain,
 			course, speed))
 	} else {
-		result = normal_position_string(normal_position(symtab, symbol, lat, lon, ambiguity)) +
+		result = normalPositionString(normalPosition(symtab, symbol, lat, lon, ambiguity)) +
 			dataExtension(power, height, gain, dir, course, speed)
 	}
 
-	return result + frequency_spec(freq, tone, offset)
+	return result + FrequencySpec(freq, tone, offset)
 }
 
 // EncodePosition returns the info part for the position report format.  It
@@ -376,13 +374,13 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 	return result
 }
 
-// encode_object returns the info part for the object report format: 36
+// EncodeObject returns the info part for the object report format: 36
 // characters of fixed part, 7 for optional extended data, ~20 for freq, etc.,
 // then the comment, which could be very long.
 //
 // name is up to 9 characters.  when is the time stamp, or the zero time for
 // none.  The rest are as for EncodePosition.
-func encode_object(name string, compressed bool, when time.Time, lat float64, lon float64, ambiguity int,
+func EncodeObject(name string, compressed bool, when time.Time, lat float64, lon float64, ambiguity int,
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
 	course maybe.Maybe[int], speed maybe.Maybe[int],
@@ -403,9 +401,9 @@ func encode_object(name string, compressed bool, when time.Time, lat float64, lo
 		comment
 }
 
-// encode_message returns the info part for the APRS "message" format.
+// EncodeMessage returns the info part for the APRS "message" format.
 // addressee is up to 9 characters, and id, the identifier, 0 to 5.
-func encode_message(addressee string, text string, id string) string {
+func EncodeMessage(addressee string, text string, id string) string {
 	var result = fmt.Sprintf(":%-9.9s:%s", addressee, text)
 
 	if id != "" {

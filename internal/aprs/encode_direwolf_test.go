@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package aprs
 
 import (
 	"testing"
@@ -89,7 +92,7 @@ func Test_encode_aprs(t *testing.T) {
 
 	/*********** Object. ***********/
 
-	result = encode_object("WB1GOF-C", false, time.Time{}, 42+34.61/60, -(71 + 26.47/60), 0, 'D', '&',
+	result = EncodeObject("WB1GOF-C", false, time.Time{}, 42+34.61/60, -(71 + 26.47/60), 0, 'D', '&',
 		noInt, noInt, noInt, "", noInt, anInt(0), noFloat, noFloat, noFloat, "")
 	assert.Equal(t, ";WB1GOF-C *111111z4234.61ND07126.47W&", result)
 
@@ -97,14 +100,12 @@ func Test_encode_aprs(t *testing.T) {
 
 	/*********** Message. ***********/
 
-	result = encode_message("N2GH", "some stuff", "")
+	result = EncodeMessage("N2GH", "some stuff", "")
 	assert.Equal(t, ":N2GH     :some stuff", result)
 
-	result = encode_message("N2GH", "other stuff", "12345")
+	result = EncodeMessage("N2GH", "other stuff", "12345")
 	assert.Equal(t, ":N2GH     :other stuff{12345", result)
 
-	result = encode_message("WB2OSZ-123", "other stuff", "12345")
+	result = EncodeMessage("WB2OSZ-123", "other stuff", "12345")
 	assert.Equal(t, ":WB2OSZ-12:other stuff{12345", result)
-
-	dw_printf("Encode APRS test PASSED with no errors.\n")
 } /* end main */

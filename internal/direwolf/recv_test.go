@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/sirupsen/logrus"
@@ -334,7 +335,7 @@ func startRecvProcess(t *testing.T) {
 	var done = make(chan struct{})
 
 	go func() {
-		recv_process(ctx, NewAPRSDecoderFromDataFiles())
+		recv_process(ctx, aprs.NewDecoderFromDataFiles())
 		close(done)
 	}()
 

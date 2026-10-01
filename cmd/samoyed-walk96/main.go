@@ -15,8 +15,8 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
@@ -119,7 +119,7 @@ func walk96(lat float64, lon float64, knots maybe.Maybe[float64], course maybe.M
 	var messaging = false
 	var compressed = false
 
-	var info = direwolf.EncodePosition(messaging, compressed,
+	var info = aprs.EncodePosition(messaging, compressed,
 		lat, lon, 0,
 		maybe.Fmap(func(meters float64) int { return int(dwutil.DW_METERS_TO_FEET(meters)) }, alt),
 		'/', '=',
