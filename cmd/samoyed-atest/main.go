@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -71,6 +72,13 @@ o = DCD output control
 	opts.IL2PVersion = *il2pVersion
 	opts.BitErrorRate = *bitErrorRate
 	opts.HexDisplay = *hexDisplay
+
+	if len(*debugFlags) > 0 {
+		// As in samoyed-direwolf: a -d option of any sort is a request for
+		// debug output, and logrus defaults to Info, so the entries the
+		// options gate would be dropped.
+		logrus.SetLevel(logrus.DebugLevel)
+	}
 
 	for _, debugFlag := range *debugFlags {
 		switch debugFlag {
