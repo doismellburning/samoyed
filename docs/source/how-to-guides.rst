@@ -288,6 +288,41 @@ quantities and are not summed together.
 
 A starter Grafana dashboard is provided at ``conf/grafana-dashboard.json``.
 
+
+Watch a station in a web browser
+--------------------------------
+
+Add ``WEBPORT`` to your config file to serve a live dashboard and APRS map
+(disabled by default):
+
+.. code::
+
+    WEBPORT 8080
+
+Then open ``http://<station>:8080/``.
+The **Dashboard** tab shows each channel's received and transmitted packet counts,
+the stations heard in the last two hours,
+and packets as they arrive, with a filter and a pause button.
+The **Map** tab plots every station and APRS object that has sent a position;
+select one for its latest comment.
+Selecting a station in the dashboard opens it on the map.
+
+Unlike the metrics counts, this shows everything the station receives,
+APRS-IS, network TNC and AX.UDP packets included,
+each labelled with where it came from.
+Objects and items appear under their own names,
+so they don't move the station that sent them.
+
+The page and its map library are built into ``samoyed-direwolf``,
+so it works without access to a CDN,
+but the map tiles come from `OpenStreetMap <https://www.openstreetmap.org/>`_,
+so the map needs internet access from the browser.
+
+The interface is read-only, as it can't transmit or change any settings,
+but it has no login and listens on every interface.
+Anyone who can reach the port can see what your station hears,
+so firewall it or put it behind a reverse proxy if that matters to you.
+
 Talk IL2P to v0.4 and v0.6 stations
 ------------------------------------
 
