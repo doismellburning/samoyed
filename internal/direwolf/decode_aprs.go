@@ -610,13 +610,7 @@ func (d *APRSDecoder) Print(A *decodedAPRS) {
 		stemp += fmt.Sprintf(", range=%.1f", _range)
 	}
 
-	if strings.HasPrefix(stemp, "ERROR") {
-		text_color_set(DW_COLOR_ERROR)
-	} else {
-		text_color_set(DW_COLOR_DECODED)
-	}
-
-	dw_printf("%s\n", stemp)
+	fmt.Println(stemp)
 
 	/*
 	 * Second line has:
@@ -642,12 +636,11 @@ func (d *APRSDecoder) Print(A *decodedAPRS) {
 				A.lat = maybe.Just(lat)
 				A.lon = maybe.Just(lon)
 			} else if !A.quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("%v\n", err)
+				fmt.Println(err)
 			}
 		}
 
-		dw_printf("Grid square = %s, ", A.maidenhead)
+		fmt.Printf("Grid square = %s, ", A.maidenhead)
 	}
 
 	stemp = ""
@@ -752,8 +745,7 @@ func (d *APRSDecoder) Print(A *decodedAPRS) {
 	}
 
 	if len(stemp) > 0 {
-		text_color_set(DW_COLOR_DECODED)
-		dw_printf("%s\n", stemp)
+		fmt.Println(stemp)
 	}
 
 	/*
@@ -769,19 +761,19 @@ func (d *APRSDecoder) Print(A *decodedAPRS) {
 
 	if len(A.weather) > 0 {
 		ax25.SafePrint([]byte(A.weather), false)
-		dw_printf("\n")
+		fmt.Println()
 	}
 
 	if len(A.telemetry) > 0 {
 		ax25.SafePrint([]byte(A.telemetry), false)
-		dw_printf("\n")
+		fmt.Println()
 	}
 
 	A.comment = strings.TrimSpace(A.comment)
 
 	if len(A.comment) > 0 {
 		ax25.SafePrint([]byte(A.comment), false)
-		dw_printf("\n")
+		fmt.Println()
 
 		/*
 		 * Point out incorrect attempts a degree symbol.
@@ -815,17 +807,15 @@ func (d *APRSDecoder) Print(A *decodedAPRS) {
 			var n = len(A.comment)
 			for j := range n {
 				if A.comment[j] == 0xb0 && (j == 0 || (A.comment[j-1])&0x80 == 0) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Character code 0xb0 is probably an attempt at a degree symbol.\n")
-					dw_printf("The correct encoding is 0xc2 0xb0 in UTF-8.\n")
+					fmt.Println("Character code 0xb0 is probably an attempt at a degree symbol.")
+					fmt.Println("The correct encoding is 0xc2 0xb0 in UTF-8.")
 				}
 			}
 
 			for j := range n {
 				if A.comment[j] == 0xf8 && (j == n-1 || (A.comment[j+1]&0xc0) != 0xc0) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Character code 0xf8 is probably an attempt at a degree symbol.\n")
-					dw_printf("The correct encoding is 0xc2 0xb0 in UTF-8.\n")
+					fmt.Println("Character code 0xf8 is probably an attempt at a degree symbol.")
+					fmt.Println("The correct encoding is 0xc2 0xb0 in UTF-8.")
 				}
 			}
 		}
