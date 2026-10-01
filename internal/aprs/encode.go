@@ -28,7 +28,7 @@ func checkSymbol(symtab byte, symbol byte) {
 }
 
 // normalPositionString renders a position from normalPosition.
-func normalPositionString(p *Position) string {
+func normalPositionString(p *latLongPosition) string {
 	return fmt.Sprintf("%s%c%s%c", string(p.Lat[:]), p.SymTableId, string(p.Lon[:]), p.SymbolCode)
 }
 
@@ -37,8 +37,8 @@ func normalPositionString(p *Position) string {
 //
 // symtab is the symbol table id or overlay, symbol the symbol id, and
 // ambiguity the number of least significant digits to blank out.
-func normalPosition(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *Position {
-	var pos = new(Position)
+func normalPosition(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *latLongPosition {
+	var pos = new(latLongPosition)
 
 	checkSymbol(symtab, symbol)
 
@@ -54,7 +54,7 @@ func normalPosition(symtab byte, symbol byte, dlat float64, dlong float64, ambig
 }
 
 // compressedPositionString renders a position from compressedPosition.
-func compressedPositionString(p *CompressedPosition) string {
+func compressedPositionString(p *compressedPositionData) string {
 	return fmt.Sprintf("%c%s%s%c%c%c%c", p.SymTableId, string(p.Y[:]), string(p.X[:]), p.SymbolCode, p.C, p.S, p.T)
 }
 
@@ -74,8 +74,8 @@ func compressedPositionString(p *CompressedPosition) string {
 // what is sent over the air.
 func compressedPosition(symtab byte, symbol byte, dlat float64, dlong float64,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int],
-	course maybe.Maybe[int], speed maybe.Maybe[int]) *CompressedPosition {
-	var pos = new(CompressedPosition)
+	course maybe.Maybe[int], speed maybe.Maybe[int]) *compressedPositionData {
+	var pos = new(compressedPositionData)
 
 	checkSymbol(symtab, symbol)
 

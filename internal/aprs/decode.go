@@ -857,13 +857,13 @@ func (d *Decoder) Print(A *Decoded) {
 func aprsLLPos(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 	type llPos struct {
 		DTI byte /* ! or = */
-		Pos Position
+		Pos latLongPosition
 	}
 	var p llPos
 
 	type compressedPos struct {
 		DTI  byte /* ! or = */
-		CPos CompressedPosition
+		CPos compressedPositionData
 	}
 	var q compressedPos
 
@@ -965,14 +965,14 @@ func aprsLLPosTime(A *Decoded, telemetryState *aprstelemetry.State, info []byte)
 	type llPosTime struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
-		Pos       Position
+		Pos       latLongPosition
 	}
 	var p llPosTime
 
 	type compressedPosTime struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
-		CPos      CompressedPosition
+		CPos      compressedPositionData
 	}
 	var q compressedPosTime
 
@@ -1578,9 +1578,9 @@ func aprsMicE(A *Decoded, telemetryState *aprstelemetry.State, deviceIDs *device
 	// Three base 91 characters followed by }
 
 	if len(trimmed) >= 4 &&
-		IsBase91Digit(trimmed[0]) &&
-		IsBase91Digit(trimmed[1]) &&
-		IsBase91Digit(trimmed[2]) &&
+		isBase91Digit(trimmed[0]) &&
+		isBase91Digit(trimmed[1]) &&
+		isBase91Digit(trimmed[2]) &&
 		trimmed[3] == '}' {
 		A.AltitudeFt = maybe.Just(dwutil.DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
 
@@ -1948,7 +1948,7 @@ func aprsObject(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 		Name         [9]byte
 		LiveOrKilled byte /* * for live or _ for killed */
 		Timestamp    [7]byte
-		Pos          Position
+		Pos          latLongPosition
 	}
 	var p objectInfo
 
@@ -1957,7 +1957,7 @@ func aprsObject(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 		Name         [9]byte
 		LiveOrKilled byte /* * for live or _ for killed */
 		Timestamp    [7]byte
-		CPos         CompressedPosition
+		CPos         compressedPositionData
 	}
 	var q compressedObjectInfo
 
@@ -2038,7 +2038,7 @@ func aprsItem(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 			DTI byte
 			Name []byte // Can't decode into this because variable length
 			LiveOrKilled byte
-			Pos Position | CompressedPosition
+			Pos latLongPosition | compressedPositionData
 			Comment []byte
 		}
 	*/
@@ -2092,8 +2092,8 @@ func aprsItem(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 		A.DataTypeDesc = "Object - invalid live/killed"
 	}
 
-	var p Position
-	var q CompressedPosition
+	var p latLongPosition
+	var q compressedPositionData
 
 	/*
 	 * A position that isn't all there is not a position: binary.Decode leaves
@@ -3132,7 +3132,7 @@ func aprsUltimeter(A *Decoded, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func decodePosition(A *Decoded, ppos *Position) {
+func decodePosition(A *Decoded, ppos *latLongPosition) {
 	A.Lat = getLatitude8(ppos.Lat, A.quiet)
 	A.Lon = getLongitude9(ppos.Lon, A.quiet)
 
@@ -3177,8 +3177,8 @@ func decodePosition(A *Decoded, ppos *Position) {
  *
  *------------------------------------------------------------------*/
 
-func decodeCompressedPosition(A *Decoded, pcpos *CompressedPosition) {
-	if IsBase91Digit(pcpos.Y[0]) && IsBase91Digit(pcpos.Y[1]) && IsBase91Digit(pcpos.Y[2]) && IsBase91Digit(pcpos.Y[3]) {
+func decodeCompressedPosition(A *Decoded, pcpos *compressedPositionData) {
+	if isBase91Digit(pcpos.Y[0]) && isBase91Digit(pcpos.Y[1]) && isBase91Digit(pcpos.Y[2]) && isBase91Digit(pcpos.Y[3]) {
 		A.Lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
 	} else {
 		if !A.quiet {
@@ -3188,7 +3188,7 @@ func decodeCompressedPosition(A *Decoded, pcpos *CompressedPosition) {
 		A.Lat = maybe.Nothing[float64]()
 	}
 
-	if IsBase91Digit(pcpos.X[0]) && IsBase91Digit(pcpos.X[1]) && IsBase91Digit(pcpos.X[2]) && IsBase91Digit(pcpos.X[3]) {
+	if isBase91Digit(pcpos.X[0]) && isBase91Digit(pcpos.X[1]) && isBase91Digit(pcpos.X[2]) && isBase91Digit(pcpos.X[3]) {
 		A.Lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
 	} else {
 		if !A.quiet {
@@ -4297,15 +4297,15 @@ func processComment(A *Decoded, telemetryState *aprstelemetry.State, commentData
 			/*
 			 * The spec appears to be wrong.  It says '}' is the maximum value when it should be '{'.
 			 */
-			if IsBase91Digit(a) {
+			if isBase91Digit(a) {
 				A.Lat = maybe.Fmap(func(lat float64) float64 {
-					return lat + float64(a-Base91Min)*1.1/600000.0*aprsSign(lat)
+					return lat + float64(a-base91Min)*1.1/600000.0*aprsSign(lat)
 				}, A.Lat)
 			}
 
-			if IsBase91Digit(o) {
+			if isBase91Digit(o) {
 				A.Lon = maybe.Fmap(func(lon float64) float64 {
-					return lon + float64(o-Base91Min)*1.1/600000.0*aprsSign(lon)
+					return lon + float64(o-base91Min)*1.1/600000.0*aprsSign(lon)
 				}, A.Lon)
 			}
 		}

@@ -3,18 +3,18 @@
 
 package aprs
 
-// Position is the uncompressed latitude, longitude and symbol of an APRS
+// latLongPosition is the uncompressed latitude, longitude and symbol of an APRS
 // position report, laid out as it is on the air.
-type Position struct {
+type latLongPosition struct {
 	Lat        [8]byte
 	SymTableId byte /* / \ 0-9 A-Z */
 	Lon        [9]byte
 	SymbolCode byte
 }
 
-// CompressedPosition is the base 91 compressed form of Position, with the
+// compressedPositionData is the base 91 compressed form of latLongPosition, with the
 // optional course/speed, radio range or altitude that goes with it.
-type CompressedPosition struct {
+type compressedPositionData struct {
 	SymTableId byte /* / \ a-j A-Z */
 	/* "The presence of the leading Symbol Table Identifier */
 	/* instead of a digit indicates that this is a compressed */
