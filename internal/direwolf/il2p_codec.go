@@ -202,8 +202,7 @@ func il2p_decode_frame(irec []byte, version il2p_version_t) *ax25.Packet {
 		var frame_data = pp.FrameData()
 		if !il2p_crc_check(frame_data, crc_bytes) {
 			if il2p_get_debug() >= 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("IL2P trailing CRC mismatch.\n")
+				logrus.Debug("IL2P trailing CRC mismatch")
 			}
 
 			return nil
@@ -254,8 +253,12 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_versi
 			}
 
 			if e != payload_len {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("IL2P Internal Error: il2p_decode_header_payload(): hdr_type=%d, max_fec=%d, payload_len=%d, e=%d.\n", hdr_type, max_fec, payload_len, e)
+				logrus.WithFields(logrus.Fields{
+					"hdr_type":    hdr_type,
+					"max_fec":     max_fec,
+					"payload_len": payload_len,
+					"e":           e,
+				}).Error("IL2P internal error: il2p_decode_header_payload decoded the wrong length")
 			}
 
 			pp.SetInfo(extracted)
@@ -271,8 +274,11 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_versi
 		}
 
 		if e != payload_len {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("IL2P Internal Error: il2p_decode_header_payload(): hdr_type=%d, e=%d, payload_len=%d\n", hdr_type, e, payload_len)
+			logrus.WithFields(logrus.Fields{
+				"hdr_type":    hdr_type,
+				"payload_len": payload_len,
+				"e":           e,
+			}).Error("IL2P internal error: il2p_decode_header_payload decoded the wrong length")
 
 			return (nil)
 		}
