@@ -24,6 +24,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/symbols"
+	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -68,6 +69,7 @@ var gpsReceiver *dwgps.GPS
 var agwServer *AGWServer
 var clientApplications *clientApps
 var mheardDB *mheard.DB
+var webHub *webui.Hub // Nil, and so a no-op, unless WEBPORT is set.
 var aprsDigipeater *Digipeater
 var connectedDigipeater *ConnectedDigipeater
 var pttControl *PTT
@@ -516,6 +518,13 @@ x = Silence FX.25 information.`)
 		logrus.WithError(pttErr).Error("Could not set up PTT")
 		os.Exit(1)
 	}
+
+	/*
+	 * Start the web interface before anything that can send or receive a
+	 * frame, as those goroutines read webHub without a lock.
+	 */
+
+	webui_init(ctx, audio_config, misc_config)
 
 	/*
 	 * Initialize the transmit queue.
@@ -1040,10 +1049,13 @@ func app_process_rec_packet(
 	 */
 	var ais_obj_packet string
 
+	var decoded *aprs.Decoded // For the web interface; nil unless it is APRS.
+
 	if pp.IsAPRS() {
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
 		var A = aprsDecoder.Decode(pp, q_d_opt)
+		decoded = A
 
 		if !q_d_opt {
 			// Print it all out in human readable format unless "-q d" option used.
@@ -1123,6 +1135,7 @@ func app_process_rec_packet(
 
 	/* Send to another application if connected. */
 	clientApplications.SendRecPacket(channel, pp)
+	webPublishReceived(channel, subchan, pp, decoded, alevel)
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
 		var ao_pp = ax25.FromText(ais_obj_packet, true)
