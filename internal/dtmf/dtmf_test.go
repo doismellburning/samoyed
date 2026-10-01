@@ -66,9 +66,9 @@ func TestSenderDecodesBack(t *testing.T) {
 	var heard strings.Builder
 
 	for _, level := range output.levels {
-		var x = decoder.Sample(level)
-		if x != ' ' && x != '.' {
-			heard.WriteRune(x)
+		var event, button = decoder.Sample(level)
+		if event == Pressed {
+			heard.WriteRune(button)
 		}
 	}
 

@@ -308,68 +308,66 @@ func NewTTGateway(audioConfig *AudioConfig, p *tt_config_s, debug int) *TTGatewa
  * Inputs:      channel		- Audio channel it came from.
  *
  *		button		0123456789ABCD*#	- Received button press.
- *				$			- No activity timeout.
- *				space			- Quiet time filler.
  *
  * Returns:     None
  *
  * Description:	Individual key presses are accumulated here until
  *		the # message terminator is found.
  *		The complete message is then processed.
- *		The touch tone decoder sends $ if no activity
- *		for some amount of time, perhaps 5 seconds.
  *		A partially accumulated message is discarded if
- *		there is a long gap.
- *
- *		'.' means no activity during processing period.
- *		space, between blocks, shouldn't get here.
+ *		there is a long gap: see Timeout.
  *
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) Button(channel int, button rune) {
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
-	// if (button != '.') {
-	//   dw_printf ("aprs_tt_button (%d, '%c')\n", channel, button);
-	// }
+	if len(g.msgStr[channel]) < MAX_MSG_LEN {
+		g.msgStr[channel] += string(button)
+	}
+
+	if button == '#' {
+		/*
+		 * Put into the receive queue like any other packet.
+		 * This way they are all processed by the common receive thread
+		 * rather than the thread associated with the particular audio device.
+		 */
+		raw_tt_data_to_app(channel, g.msgStr[channel])
+
+		g.msgStr[channel] = ""
+	}
+} /* end Button */
+
+// Timeout discards the partially accumulated message on channel: the touch
+// tone decoder calls it after dtmf.TimeoutSec with no button.
+func (g *TTGateway) Timeout(channel int) {
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// TODO:  Might make more sense to put timeout here rather in the dtmf decoder.
 
-	if button == '$' {
-		/* Timeout reset. */
-		g.msgStr[channel] = ""
-	} else if button != '.' && button != ' ' {
-		if len(g.msgStr[channel]) < MAX_MSG_LEN {
-			g.msgStr[channel] += string(button)
-		}
+	g.msgStr[channel] = ""
+}
 
-		if button == '#' {
-			/*
-			 * Put into the receive queue like any other packet.
-			 * This way they are all processed by the common receive thread
-			 * rather than the thread associated with the particular audio device.
-			 */
-			raw_tt_data_to_app(channel, g.msgStr[channel])
+// Idle is the touch tone decoder hearing no new button on channel for one
+// processing period.
+func (g *TTGateway) Idle(channel int) {
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
-			g.msgStr[channel] = ""
-		}
-	} else {
-		/*
-		 * Idle time. Poll occasionally for processing.
-		 * Timing would be off we we are listening to more than
-		 * one channel so do this only for the one specified
-		 * in the TTOBJ command.
-		 */
-		if channel == g.config.obj_recv_chan {
-			g.pollPeriod++
-			if g.pollPeriod >= 39 {
-				g.pollPeriod = 0
+	/*
+	 * Idle time. Poll occasionally for processing.
+	 * Timing would be off we we are listening to more than
+	 * one channel so do this only for the one specified
+	 * in the TTOBJ command.
+	 */
+	if channel == g.config.obj_recv_chan {
+		g.pollPeriod++
+		if g.pollPeriod >= 39 {
+			g.pollPeriod = 0
 
-				g.users.background()
-			}
+			g.users.background()
 		}
 	}
-} /* end Button */
+}
 
 /*------------------------------------------------------------------
  *

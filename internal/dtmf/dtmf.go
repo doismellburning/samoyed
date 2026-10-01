@@ -21,6 +21,7 @@ package dtmf
 import (
 	"iter"
 	"math"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -34,6 +35,38 @@ import (
 const TimeoutSec = 5 /* for normal operation. */
 
 const numTones = 8
+
+// An Event is what a Decoder makes of one sample.
+type Event int
+
+const (
+	// NoEvent is a sample part way through a block: nothing to say yet.
+	NoEvent Event = iota
+
+	// Idle is a block that ended with no new button.
+	Idle
+
+	// Pressed is a block that ended with a new button press.
+	Pressed
+
+	// TimedOut is TimeoutSec of Idle after the last button.
+	TimedOut
+)
+
+func (e Event) String() string {
+	switch e {
+	case NoEvent:
+		return "NoEvent"
+	case Idle:
+		return "Idle"
+	case Pressed:
+		return "Pressed"
+	case TimedOut:
+		return "TimedOut"
+	}
+
+	return "Event(" + strconv.Itoa(int(e)) + ")"
+}
 
 // keys is the keypad, a row at a time: the button at row r and column c
 // is keys[r*4+c].
@@ -130,15 +163,12 @@ func NewDecoder(sampleRate int, dcd func(on bool)) *Decoder {
  *
  * Inputs:	input	- Audio sample.
  *
- * Returns:     0123456789ABCD*# for a button push.
- *		. for nothing happening during sample interval.
- *		$ after several seconds of inactivity.
- *		space between sample intervals.
- *
+ * Returns:     The Event, and for Pressed the button: one of
+ *		0123456789ABCD*#.
  *
  *----------------------------------------------------------------*/
 
-func (d *Decoder) Sample(input float64) rune {
+func (d *Decoder) Sample(input float64) (Event, rune) {
 	for i := range numTones {
 		var q0 = input + d.q1[i]*d.coef[i] - d.q2[i]
 		d.q2[i] = d.q1[i]
@@ -150,7 +180,7 @@ func (d *Decoder) Sample(input float64) rune {
 	 */
 	d.n++
 	if d.n != d.blockSize {
-		return ' '
+		return NoEvent, 0
 	}
 
 	var output [numTones]float64
@@ -239,19 +269,22 @@ func (d *Decoder) Sample(input float64) rune {
 	// Return only new button pushes.
 	// Also report timeout after period of inactivity.
 
-	var ret = '.'
+	var event = Idle
+
+	var button rune
 
 	if d.debounced != d.prevDebounced {
 		if d.debounced != ' ' {
-			ret = d.debounced
+			event = Pressed
+			button = d.debounced
 		}
 	}
 
-	if ret == '.' {
+	if event == Idle {
 		if d.timeout > 0 {
 			d.timeout--
 			if d.timeout == 0 {
-				ret = '$'
+				event = TimedOut
 			}
 		}
 	}
@@ -262,12 +295,13 @@ func (d *Decoder) Sample(input float64) rune {
 		logrus.WithFields(logrus.Fields{
 			"dec":     string(decoded),
 			"deb":     string(d.debounced),
-			"ret":     string(ret),
+			"event":   event,
+			"button":  string(button),
 			"timeout": d.timeout,
 		}).Trace("dtmf.Decoder.Sample")
 	}
 
-	return ret
+	return event, button
 }
 
 // buttonSamples is ms milliseconds of audio at sampleRate for button: the

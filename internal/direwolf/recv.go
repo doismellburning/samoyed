@@ -194,9 +194,15 @@ func recv_adev_thread(ctx context.Context, pa *AudioConfig, a int, failed chan<-
 			/* sequences arriving at the same instant. */
 
 			if dtmfDecoders[c] != nil {
-				var tt = dtmfDecoders[c].Sample(float64(audio_sample) / 16384.)
-				if tt != ' ' {
-					ttGateway.Button(first_chan+c, tt)
+				switch event, button := dtmfDecoders[c].Sample(float64(audio_sample) / 16384.); event {
+				case dtmf.Pressed:
+					ttGateway.Button(first_chan+c, button)
+				case dtmf.TimedOut:
+					ttGateway.Timeout(first_chan + c)
+				case dtmf.Idle:
+					ttGateway.Idle(first_chan + c)
+				case dtmf.NoEvent:
+					// Part way through a block.
 				}
 			}
 		} // for c is just 0 or 0 then 1

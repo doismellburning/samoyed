@@ -22,12 +22,17 @@ func Test_dtmf(t *testing.T) {
 		for dtmf := range buttonSamples(button, ms, sampleRate) {
 			/* Make sure it is insensitive to signal amplitude. */
 			/* (Uncomment each of below when testing.) */
-			var x = decoder.Sample(dtmf)
-			//x = decoder.Sample (dtmf * 1000);
-			//x = decoder.Sample (dtmf * 0.001);
+			var event, button = decoder.Sample(dtmf)
+			//event, button = decoder.Sample (dtmf * 1000);
+			//event, button = decoder.Sample (dtmf * 0.001);
 
-			if x != ' ' && x != '.' {
-				result.WriteRune(x)
+			switch event {
+			case Pressed:
+				result.WriteRune(button)
+			case TimedOut:
+				result.WriteRune('$')
+			default:
+				// Nothing to record.
 			}
 		}
 	}

@@ -92,9 +92,9 @@ func TestToneGeneratorDTMFDecodesBack(t *testing.T) {
 	for i := 0; i < len(sink.data); i += 2 {
 		var sam = int16(binary.LittleEndian.Uint16(sink.data[i:]))
 
-		var x = decoder.Sample(float64(sam) / 16384.)
-		if x != ' ' && x != '.' {
-			heard.WriteRune(x)
+		var event, button = decoder.Sample(float64(sam) / 16384.)
+		if event == dtmf.Pressed {
+			heard.WriteRune(button)
 		}
 	}
 

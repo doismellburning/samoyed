@@ -96,7 +96,7 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 		defer close(done)
 
 		for range 100 * 39 {
-			gw.Button(0, '.')
+			gw.Idle(0)
 		}
 	}()
 
