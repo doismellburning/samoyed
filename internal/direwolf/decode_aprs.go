@@ -2569,7 +2569,7 @@ func aprsUserDefined(A *Decoded, info []byte) {
 	} else if bytes.HasPrefix(info, []byte("{mc")) || // Historical.
 		bytes.HasPrefix(info, []byte("{DM")) { // Official after registering {D*
 		aprsMorseCode(A, info)
-	} else if len(info) >= 3 && info[0] == '{' && info[1] == UserDefUserID && info[2] == UserDefTypeAIS {
+	} else if len(info) >= 3 && info[0] == '{' && info[1] == aprs.UserDefUserID && info[2] == aprs.UserDefTypeAIS {
 		var aisData, aisErr = ais.Parse(string(info[3:]))
 		if aisErr != nil {
 			if !A.quiet {

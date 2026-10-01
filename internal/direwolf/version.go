@@ -20,18 +20,6 @@ const MINOR_VERSION = 0
 // KG 2026-01-19: Nobody has assigned SMYD, but I figured it was better to differentiate sooner rather than later.
 const APP_TOCALL = "SMYD"
 
-// For user-defined data format.
-// APRS protocol spec Chapter 18 and http://www.aprs.org/aprs11/expfmts.txt
-
-// UserDefUserID : KG 2026-01-19: Dire Wolf has D reserved per
-// https://www.aprs.org/aprs11/expfmts.txt and there seems a lot less space for
-// me to comfortably just DIY like with APP_TOCALL (and S is already assigned).
-// So I'll stick with D for now as it seems the least-worst option.
-const UserDefUserID = 'D'
-
-const UserDefTypeAIS = 'A' // data type A for AIS NMEA sentence
-const UserDefTypeEAS = 'E' // data type E for EAS broadcasts
-
 func getBuildSettingOrDefault(bi *debug.BuildInfo, key string, defaultValue string) string {
 	for _, bs := range bi.Settings {
 		if bs.Key == key {
