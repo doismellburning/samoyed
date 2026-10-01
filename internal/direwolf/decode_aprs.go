@@ -841,13 +841,13 @@ func (d *APRSDecoder) Print(A *decodedAPRS) {
 func aprsLLPos(A *decodedAPRS, info []byte) {
 	type llPos struct {
 		DTI byte /* ! or = */
-		Pos position_t
+		Pos Position
 	}
 	var p llPos
 
 	type compressedPos struct {
 		DTI  byte /* ! or = */
-		CPos compressed_position_t
+		CPos CompressedPosition
 	}
 	var q compressedPos
 
@@ -949,14 +949,14 @@ func aprsLLPosTime(A *decodedAPRS, info []byte) {
 	type llPosTime struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
-		Pos       position_t
+		Pos       Position
 	}
 	var p llPosTime
 
 	type compressedPosTime struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
-		CPos      compressed_position_t
+		CPos      CompressedPosition
 	}
 	var q compressedPosTime
 
@@ -1932,7 +1932,7 @@ func aprsObject(A *decodedAPRS, info []byte) {
 		Name         [9]byte
 		LiveOrKilled byte /* * for live or _ for killed */
 		Timestamp    [7]byte
-		Pos          position_t
+		Pos          Position
 	}
 	var p objectInfo
 
@@ -1941,7 +1941,7 @@ func aprsObject(A *decodedAPRS, info []byte) {
 		Name         [9]byte
 		LiveOrKilled byte /* * for live or _ for killed */
 		Timestamp    [7]byte
-		CPos         compressed_position_t
+		CPos         CompressedPosition
 	}
 	var q compressedObjectInfo
 
@@ -2022,7 +2022,7 @@ func aprsItem(A *decodedAPRS, info []byte) {
 			DTI byte
 			Name []byte // Can't decode into this because variable length
 			LiveOrKilled byte
-			Pos position_t | compressed_position_t
+			Pos Position | CompressedPosition
 			Comment []byte
 		}
 	*/
@@ -2076,8 +2076,8 @@ func aprsItem(A *decodedAPRS, info []byte) {
 		A.dataTypeDesc = "Object - invalid live/killed"
 	}
 
-	var p position_t
-	var q compressed_position_t
+	var p Position
+	var q CompressedPosition
 
 	/*
 	 * A position that isn't all there is not a position: binary.Decode leaves
@@ -3116,7 +3116,7 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func decodePosition(A *decodedAPRS, ppos *position_t) {
+func decodePosition(A *decodedAPRS, ppos *Position) {
 	A.lat = getLatitude8(ppos.Lat, A.quiet)
 	A.lon = getLongitude9(ppos.Lon, A.quiet)
 
@@ -3161,7 +3161,7 @@ func decodePosition(A *decodedAPRS, ppos *position_t) {
  *
  *------------------------------------------------------------------*/
 
-func decodeCompressedPosition(A *decodedAPRS, pcpos *compressed_position_t) {
+func decodeCompressedPosition(A *decodedAPRS, pcpos *CompressedPosition) {
 	if isdigit91(pcpos.Y[0]) && isdigit91(pcpos.Y[1]) && isdigit91(pcpos.Y[2]) && isdigit91(pcpos.Y[3]) {
 		A.lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
 	} else {
