@@ -637,6 +637,38 @@ func (d *AudioDevices) findPortAudioDevice(name string, forInput bool) *portaudi
 	return dev
 }
 
+// fillAudioDefaults fills in any audio device and modem settings that the
+// configuration left unset.
+func fillAudioDefaults(pa *AudioConfig) {
+	for a := range MAX_ADEVS {
+		if pa.adev[a].num_channels == 0 {
+			pa.adev[a].num_channels = DEFAULT_NUM_CHANNELS
+		}
+
+		if pa.adev[a].samples_per_sec == 0 {
+			pa.adev[a].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
+		}
+
+		if pa.adev[a].bits_per_sample == 0 {
+			pa.adev[a].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
+		}
+
+		for channel := range MAX_RADIO_CHANS {
+			if pa.achan[channel].mark_freq == 0 {
+				pa.achan[channel].mark_freq = DEFAULT_MARK_FREQ
+			}
+
+			if pa.achan[channel].space_freq == 0 {
+				pa.achan[channel].space_freq = DEFAULT_SPACE_FREQ
+			}
+
+			if pa.achan[channel].baud == 0 {
+				pa.achan[channel].baud = DEFAULT_BAUD
+			}
+		}
+	}
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        AudioOpen
@@ -707,37 +739,7 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) (*AudioDevices, error) {
 		d.dev[a].outputStream = nil
 	}
 
-	/*
-	 * Fill in defaults for any missing values.
-	 */
-
-	for a := range MAX_ADEVS {
-		if pa.adev[a].num_channels == 0 {
-			pa.adev[a].num_channels = DEFAULT_NUM_CHANNELS
-		}
-
-		if pa.adev[a].samples_per_sec == 0 {
-			pa.adev[a].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
-		}
-
-		if pa.adev[a].bits_per_sample == 0 {
-			pa.adev[a].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
-		}
-
-		for channel := range MAX_RADIO_CHANS {
-			if pa.achan[channel].mark_freq == 0 {
-				pa.achan[channel].mark_freq = DEFAULT_MARK_FREQ
-			}
-
-			if pa.achan[channel].space_freq == 0 {
-				pa.achan[channel].space_freq = DEFAULT_SPACE_FREQ
-			}
-
-			if pa.achan[channel].baud == 0 {
-				pa.achan[channel].baud = DEFAULT_BAUD
-			}
-		}
-	}
+	fillAudioDefaults(pa)
 
 	/*
 	 * Open audio device(s).
