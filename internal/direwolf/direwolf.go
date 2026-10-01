@@ -777,8 +777,8 @@ x = Silence FX.25 information.`)
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
 // ais_object_course_speed rounds a decoded course and speed into the integer
-// degrees and knots encode_object takes, leaving an unknown one absent.
-// Should encode_object take floating point here?
+// degrees and knots encodeObject takes, leaving an unknown one absent.
+// Should encodeObject take floating point here?
 func ais_object_course_speed(A *decodedAPRS) (maybe.Maybe[int], maybe.Maybe[int]) {
 	var course = maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.course)
 	var speed = maybe.Fmap(func(mph float64) int { return int(dwutil.DW_MPH_TO_KNOTS(mph) + 0.5) }, A.speedMPH)
@@ -1068,7 +1068,7 @@ func app_process_rec_packet(
 			if A_opt_ais_to_obj && haveLat && haveLon {
 				var course, speed = ais_object_course_speed(A)
 
-				var ais_obj_info = encode_object(A.name, false, time.Now(),
+				var ais_obj_info = encodeObject(A.name, false, time.Now(),
 					lat, lon, 0, // no ambiguity
 					A.symbolTable, A.symbolCode,
 					maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // power, height, gain, direction.

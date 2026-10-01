@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// The callers of phg_data_extension and compressed_position only check that at
+// The callers of phgDataExtension and compressedPosition only check that at
 // least one of power, height and gain was specified, so the others arrive
 // absent.  That used to be the G_UNKNOWN sentinel, which reached Sqrt/Log2, and
 // the resulting NaN converted to a NUL byte in the middle of the transmitted
@@ -21,12 +21,12 @@ func Test_phg_data_extension_partially_specified(t *testing.T) {
 	var none = maybe.Nothing[int]()
 	var some = maybe.Just[int]
 
-	assert.Equal(t, "PHG7368", phg_data_extension(some(50), some(100), some(6), "N"), "all specified")
+	assert.Equal(t, "PHG7368", phgDataExtension(some(50), some(100), some(6), "N"), "all specified")
 
-	assert.Equal(t, "PHG7000", phg_data_extension(some(50), none, none, ""), "power only")
-	assert.Equal(t, "PHG0100", phg_data_extension(none, some(20), none, ""), "height only")
-	assert.Equal(t, "PHG0060", phg_data_extension(none, none, some(6), ""), "gain only")
-	assert.Equal(t, "PHG0008", phg_data_extension(none, none, none, "N"), "direction only")
+	assert.Equal(t, "PHG7000", phgDataExtension(some(50), none, none, ""), "power only")
+	assert.Equal(t, "PHG0100", phgDataExtension(none, some(20), none, ""), "height only")
+	assert.Equal(t, "PHG0060", phgDataExtension(none, none, some(6), ""), "gain only")
+	assert.Equal(t, "PHG0008", phgDataExtension(none, none, none, "N"), "direction only")
 }
 
 // Gain is a single digit, so anything above 9 dB goes out as 9, as power
@@ -34,8 +34,8 @@ func Test_phg_data_extension_partially_specified(t *testing.T) {
 func Test_phg_data_extension_high_gain(t *testing.T) {
 	var none = maybe.Nothing[int]()
 
-	assert.Equal(t, "PHG0090", phg_data_extension(none, none, maybe.Just(9), ""))
-	assert.Equal(t, "PHG0090", phg_data_extension(none, none, maybe.Just(12), ""))
+	assert.Equal(t, "PHG0090", phgDataExtension(none, none, maybe.Just(9), ""))
+	assert.Equal(t, "PHG0090", phgDataExtension(none, none, maybe.Just(12), ""))
 }
 
 func Test_phg_data_extension_directivity(t *testing.T) {
@@ -55,7 +55,7 @@ func Test_phg_data_extension_directivity(t *testing.T) {
 		"nw":   "PHG0007",
 		"Se":   "PHG0003",
 	} {
-		assert.Equal(t, want, phg_data_extension(none, none, none, dir), dir)
+		assert.Equal(t, want, phgDataExtension(none, none, none, dir), dir)
 	}
 }
 
@@ -106,7 +106,7 @@ func Test_EncodePosition_explicit_zero_frequency_spec(t *testing.T) {
 func Test_encode_object_timestamp_is_24_hour_utc(t *testing.T) {
 	var eastOfGreenwich = time.FixedZone("UTC+1", 60*60)
 
-	var info = encode_object("Q1TEST", false, time.Date(2026, 9, 26, 18, 30, 0, 0, eastOfGreenwich),
+	var info = encodeObject("Q1TEST", false, time.Date(2026, 9, 26, 18, 30, 0, 0, eastOfGreenwich),
 		42.5, -71.5, 0, '/', '-',
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
 		maybe.Nothing[int](), maybe.Nothing[int](),
@@ -121,7 +121,7 @@ func Test_encode_object_timestamp_is_24_hour_utc(t *testing.T) {
 func Test_compressed_position_speed_is_printable(t *testing.T) {
 	var none = maybe.Nothing[int]()
 
-	var c = compressed_position('/', '>', 0, 0, none, none, none, maybe.Just(90), maybe.Just(1000000))
+	var c = compressedPosition('/', '>', 0, 0, none, none, none, maybe.Just(90), maybe.Just(1000000))
 	assert.Equal(t, byte('~'), c.S)
 }
 
@@ -133,10 +133,10 @@ func Test_compressed_position_course_wraps(t *testing.T) {
 	var none = maybe.Nothing[int]()
 
 	for _, degrees := range []int{0, 360, 720, -360, -720} {
-		var c = compressed_position('/', '>', 0, 0, none, none, none, maybe.Just(degrees), maybe.Just(10))
+		var c = compressedPosition('/', '>', 0, 0, none, none, none, maybe.Just(degrees), maybe.Just(10))
 		assert.Equal(t, byte('!'), c.C, degrees)
 	}
 
-	var c = compressed_position('/', '>', 0, 0, none, none, none, maybe.Just(-90), maybe.Just(10))
+	var c = compressedPosition('/', '>', 0, 0, none, none, none, maybe.Just(-90), maybe.Just(10))
 	assert.Equal(t, byte('!'+68), c.C, "-90, as 270 rounds to 272")
 }

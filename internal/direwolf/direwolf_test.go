@@ -38,10 +38,10 @@ func aisPositionReport(t *testing.T, rawSpeed int, rawCourse int) string {
 }
 
 // An AIS station may report neither speed nor course.  Converting such a
-// report to an APRS object used to hand encode_object int(G_UNKNOWN + 0.5),
+// report to an APRS object used to hand encodeObject int(G_UNKNOWN + 0.5),
 // which is not G_UNKNOWN, so the course was folded back into range and
 // transmitted as 82 degrees - a heading nobody reported.  Absence must
-// survive all the way into encode_object.
+// survive all the way into encodeObject.
 func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 	var aprsDecoder = NewAPRSDecoderFromDataFiles()
 
@@ -59,7 +59,7 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 	assert.True(t, course.IsNothing(), "course should be unknown, got %v", course)
 	assert.True(t, speed.IsNothing(), "speed should be unknown, got %v", speed)
 
-	var info = encode_object("366730000", false, time.Time{},
+	var info = encodeObject("366730000", false, time.Time{},
 		42.36, -71.06, 0,
 		'/', 's',
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
@@ -86,7 +86,7 @@ func Test_ais_to_object_with_course_and_speed(t *testing.T) {
 	assert.Equal(t, maybe.Just(90), course)
 	assert.Equal(t, maybe.Just(21), speed)
 
-	var info = encode_object("366730000", false, time.Time{},
+	var info = encodeObject("366730000", false, time.Time{},
 		42.36, -71.06, 0,
 		'/', 's',
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
