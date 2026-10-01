@@ -86,6 +86,7 @@ import (
 	"context"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/dtmf"
 	"github.com/sirupsen/logrus"
 )
 
@@ -138,7 +139,7 @@ func recv_adev_thread(ctx context.Context, pa *AudioConfig, a int, failed chan<-
 	var num_chan = pa.adev[a].num_channels
 
 	// Only this goroutine drives its channels' touch tone decoders.
-	var dtmfDecoders = make([]*DTMFDecoder, num_chan)
+	var dtmfDecoders = make([]*dtmf.Decoder, num_chan)
 
 	for c := range num_chan {
 		if pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
@@ -146,7 +147,7 @@ func recv_adev_thread(ctx context.Context, pa *AudioConfig, a int, failed chan<-
 
 			logrus.WithField("channel", channel).Debug("Starting DTMF decoder")
 
-			dtmfDecoders[c] = NewDTMFDecoder(pa.adev[a].samples_per_sec, func(on bool) {
+			dtmfDecoders[c] = dtmf.NewDecoder(pa.adev[a].samples_per_sec, func(on bool) {
 				var state = 0
 				if on {
 					state = 1
