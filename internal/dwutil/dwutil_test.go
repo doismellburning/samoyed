@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,4 +43,41 @@ func TestHexDump(t *testing.T) {
 
 func TestHexDumpEmpty(t *testing.T) {
 	assert.Empty(t, testutils.CaptureOutput(t, func() { HexDump(nil) }))
+}
+
+func TestHexDumpLines(t *testing.T) {
+	assert.Equal(t,
+		[]string{
+			"  000:  51 31 54 45 53 54 3e 51 32 54 45 53 54 3a 00 68  Q1TEST>Q2TEST:.h",
+			"  010:  65 6c 6c 6f 20 77 6f 72 6c 64 7f 21              ello world.!",
+		},
+		HexDumpLines([]byte("Q1TEST>Q2TEST:\x00hello world\x7f!")))
+}
+
+func TestHexDumpLinesEmpty(t *testing.T) {
+	assert.Empty(t, HexDumpLines(nil))
+}
+
+func TestLogHexDump(t *testing.T) {
+	var logger, hook = test.NewNullLogger()
+
+	LogHexDump(logrus.NewEntry(logger).WithField("channel", 1), logrus.WarnLevel,
+		[]byte("Q1TEST>Q2TEST:\x00hello world\x7f!"))
+
+	var entries = hook.AllEntries()
+	assert.Len(t, entries, 2)
+
+	for i, want := range HexDumpLines([]byte("Q1TEST>Q2TEST:\x00hello world\x7f!")) {
+		assert.Equal(t, logrus.WarnLevel, entries[i].Level)
+		assert.Equal(t, want, entries[i].Data["dump"])
+		assert.Equal(t, 1, entries[i].Data["channel"])
+	}
+}
+
+func TestLogHexDumpBelowLevel(t *testing.T) {
+	var logger, hook = test.NewNullLogger()
+
+	LogHexDump(logrus.NewEntry(logger), logrus.DebugLevel, []byte("Q1TEST"))
+
+	assert.Empty(t, hook.AllEntries())
 }

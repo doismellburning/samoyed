@@ -2,6 +2,8 @@ package direwolf
 
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
 )
 
 /*-------------------------------------------------------------
@@ -56,8 +58,7 @@ func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_
 
 	var encoded, elen = il2p_encode_frame(pp, version, max_fec, crc)
 	if elen <= 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
+		logrus.WithField("channel", s.channel).Warn("IL2P: Unable to encode frame into IL2P")
 
 		return (-1)
 	}
@@ -67,9 +68,14 @@ func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_
 	s.bitsSent = 0
 
 	if il2p_get_debug() >= 1 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("IL2P v%s frame, max_fec = %d, %d encoded bytes total\n", version.String(), max_fec, len(data))
-		fx_hex_dump(data)
+		var logEntry = logrus.WithFields(logrus.Fields{
+			"channel": s.channel,
+			"version": version.String(),
+			"max_fec": max_fec,
+			"bytes":   len(data),
+		})
+		logEntry.Debug("IL2P: Sending frame")
+		dwutil.LogHexDump(logEntry, logrus.DebugLevel, data)
 	}
 
 	// Clobber some bytes for testing.

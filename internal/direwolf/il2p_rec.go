@@ -12,6 +12,7 @@ import (
 	"math/bits"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
 )
 
 type IL2PState int
@@ -69,6 +70,14 @@ func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_versio
 	return F
 }
 
+func (F *il2pReceiver) logEntry() *logrus.Entry {
+	return logrus.WithFields(logrus.Fields{
+		"channel":    F.channel,
+		"subchannel": F.subchannel,
+		"slice":      F.slice,
+	})
+}
+
 /***********************************************************************************
  *
  * Name:        il2pReceiver.recBit
@@ -105,7 +114,6 @@ func (F *il2pReceiver) recBit(dbit int) {
 			F.bc = 0
 			F.hc = 0
 		} else if bits.OnesCount((^F.acc&0x00ffffff)^IL2P_SYNC_WORD) <= 1 {
-			text_color_set(DW_COLOR_INFO)
 			// FIXME - this pops up occasionally with random noise.  Find better way to convey information.
 			// This also happens for each slicer - to noisy.
 			//dw_printf ("IL2P header has reverse polarity\n");
@@ -129,9 +137,8 @@ func (F *il2pReceiver) recBit(dbit int) {
 
 			if F.hc == IL2P_HEADER_SIZE+IL2P_HEADER_PARITY { // Have all of header
 				if il2p_get_debug() >= 1 {
-					text_color_set(DW_COLOR_DEBUG)
-					dw_printf("IL2P header as received [%d.%d.%d]:\n", channel, subchannel, slice)
-					fx_hex_dump(F.shdr[:])
+					F.logEntry().Debug("IL2P header as received")
+					dwutil.LogHexDump(F.logEntry(), logrus.DebugLevel, F.shdr[:])
 				}
 
 				// Fix any errors and descramble.
@@ -148,14 +155,20 @@ func (F *il2pReceiver) recBit(dbit int) {
 					F.eplen = eplen
 
 					if il2p_get_debug() >= 1 {
-						text_color_set(DW_COLOR_DEBUG)
-						dw_printf("IL2P header after correcting %d symbols and unscrambling [%d.%d.%d]:\n", F.corrected, channel, subchannel, slice)
-						fx_hex_dump(F.uhdr[:])
-						dw_printf("Header type %d, max fec = %d\n", hdr_type, max_fec)
-						dw_printf("Need to collect %d encoded bytes for %d byte payload.\n", F.eplen, length)
-						dw_printf("%d small blocks of %d and %d large blocks of %d.  %d parity symbols per block\n",
-							plprop.small_block_count, plprop.small_block_size,
-							plprop.large_block_count, plprop.large_block_size, plprop.parity_symbols_per_block)
+						var logEntry = F.logEntry().WithField("corrected", F.corrected)
+						logEntry.Debug("IL2P header after correcting symbols and unscrambling")
+						dwutil.LogHexDump(logEntry, logrus.DebugLevel, F.uhdr[:])
+						logEntry.WithFields(logrus.Fields{
+							"hdr_type":          hdr_type,
+							"max_fec":           max_fec,
+							"encoded_bytes":     F.eplen,
+							"payload_bytes":     length,
+							"small_block_count": plprop.small_block_count,
+							"small_block_size":  plprop.small_block_size,
+							"large_block_count": plprop.large_block_count,
+							"large_block_size":  plprop.large_block_size,
+							"parity_per_block":  plprop.parity_symbols_per_block,
+						}).Debug("IL2P payload to collect")
 					}
 
 					if F.eplen >= 1 { // Need to gather payload.
@@ -171,8 +184,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 						}
 					} else { // Error.
 						if il2p_get_debug() >= 1 {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("IL2P header INVALID.\n")
+							F.logEntry().Debug("IL2P header INVALID")
 						}
 
 						F.state = IL2P_SEARCHING
@@ -252,8 +264,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 					pp.HexDump()
 				} else {
 					// Most likely too many FEC errors.
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("FAILED to construct frame in il2pReceiver.recBit.\n")
+					F.logEntry().Debug("IL2P: FAILED to construct frame")
 				}
 			}
 
@@ -262,8 +273,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 				var frame_data = pp.FrameData()
 				if !il2p_crc_check(frame_data, F.scrc[:]) {
 					if il2p_get_debug() >= 1 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("IL2P trailing CRC mismatch.\n")
+						F.logEntry().Debug("IL2P trailing CRC mismatch")
 					}
 					pp = nil
 				}
@@ -279,11 +289,6 @@ func (F *il2pReceiver) recBit(dbit int) {
 				multi_modem_process_rec_packet(channel, subchannel, slice, pp, alevel, retries, fec_type)
 			}
 		} // end block for local variables.
-
-		if il2p_get_debug() >= 1 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("-----\n")
-		}
 
 		F.state = IL2P_SEARCHING
 	} // end of switch

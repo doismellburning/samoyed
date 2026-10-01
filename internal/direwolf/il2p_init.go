@@ -146,10 +146,13 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 	copy(rs_block[len(rs_block)-n:], rec_block)
 
 	if il2p_get_debug() >= 3 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("==============================  il2p_decode_rs  ==============================\n")
-		dw_printf("%d filler zeros, %d data, %d parity\n", len(rs_block)-n, data_size, num_parity)
-		fx_hex_dump(rs_block[:])
+		var logEntry = logrus.WithFields(logrus.Fields{
+			"filler": len(rs_block) - n,
+			"data":   data_size,
+			"parity": num_parity,
+		})
+		logEntry.Debug("il2p_decode_rs")
+		dwutil.LogHexDump(logEntry, logrus.DebugLevel, rs_block[:])
 	}
 
 	var rs, err = il2p_find_rs(num_parity)
@@ -168,17 +171,15 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 	var out = make([]byte, data_size)
 	copy(out, rs_block[len(rs_block)-n:len(rs_block)-n+data_size])
 
-	if il2p_get_debug() >= 3 {
-		if derrors == 0 {
-			dw_printf("No errors reported for RS block.\n")
-		} else if derrors > 0 {
-			dw_printf("%d errors fixed in positions:\n", derrors)
+	if il2p_get_debug() >= 3 && derrors >= 0 {
+		var logEntry = logrus.WithFields(logrus.Fields{
+			"errors":    derrors,
+			"positions": derrlocs,
+		})
+		logEntry.Debug("il2p_decode_rs: RS block errors fixed")
 
-			for j := range derrors {
-				dw_printf("        %3d  (0x%02x)\n", derrlocs[j], derrlocs[j])
-			}
-
-			fx_hex_dump(rs_block[:])
+		if derrors > 0 {
+			dwutil.LogHexDump(logEntry, logrus.DebugLevel, rs_block[:])
 		}
 	}
 
@@ -189,8 +190,10 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 	for i := 0; i < derrors; i++ {
 		if derrlocs[i] < len(rs_block)-n {
 			if il2p_get_debug() >= 3 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("RS DECODE ERROR!  Padding position %d should be 0 but it was set to %02x.\n", derrlocs[i], rs_block[derrlocs[i]])
+				logrus.WithFields(logrus.Fields{
+					"position": derrlocs[i],
+					"value":    fmt.Sprintf("0x%02x", rs_block[derrlocs[i]]),
+				}).Debug("il2p_decode_rs: RS DECODE ERROR!  Padding position should be 0")
 			}
 
 			derrors = -1
@@ -200,8 +203,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 	}
 
 	if il2p_get_debug() >= 3 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("==============================  il2p_decode_rs  returns %d  ==============================\n", derrors)
+		logrus.WithField("derrors", derrors).Debug("il2p_decode_rs returns")
 	}
 
 	return out, derrors

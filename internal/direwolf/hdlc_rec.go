@@ -565,8 +565,6 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 				// Also initialized the symbol counter to -1.
 				speed_error = float64(*pll_nudge_total)*100./(256.*256.*256.*256.)/float64(*pll_symbol_count) + 0.02
 
-				text_color_set(DW_COLOR_DEBUG)
-
 				// std	      dw_printf ("DEBUG: total %lld, count %d\n", *pll_nudge_total, *pll_symbol_count);
 				// mingw
 				//	      dw_printf ("DEBUG: total %I64d, count %d\n", *pll_nudge_total, *pll_symbol_count);

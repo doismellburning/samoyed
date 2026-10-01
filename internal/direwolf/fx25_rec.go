@@ -11,6 +11,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/sirupsen/logrus"
 )
 
 type FX25RecState int
@@ -55,6 +56,14 @@ func newFX25Receiver(channel int, subchannel int, slice int, debug int, sink fx2
 	return F
 }
 
+func (F *fx25Receiver) logEntry() *logrus.Entry {
+	return logrus.WithFields(logrus.Fields{
+		"channel":    F.channel,
+		"subchannel": F.subchannel,
+		"slice":      F.slice,
+	})
+}
+
 /***********************************************************************************
  *
  * Name:        fx25Receiver.recBit
@@ -92,9 +101,6 @@ func fx25_deliver_frame(channel int, subchannel int, slice int, frame []byte, de
 // Note that the sink is called before the state machine is reset, so that
 // HDLCReceiver.fx25Busy still reports reception in progress during delivery.
 func (F *fx25Receiver) recBit(dbit int) {
-	var channel = F.channel
-	var slice = F.slice
-
 	// State machine to identify correlation tag then gather appropriate number of data and check bytes.
 
 	switch F.state {
@@ -113,12 +119,12 @@ func (F *fx25Receiver) recBit(dbit int) {
 			dwutil.Assert(F.coffs == FX25_BLOCK_SIZE-F.nroots)
 
 			if F.debug >= 2 {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("FX.25[%d.%d]: Matched correlation tag 0x%02x with %d bit errors.  Expecting %d data & %d check bytes.\n",
-					channel, slice, // ideally subchannel too only if applicable
-					c,
-					bits.OnesCount(uint(F.accum^fx25_get_ctag_value(c))),
-					F.k_data_radio, F.nroots)
+				F.logEntry().WithFields(logrus.Fields{
+					"ctag":        c,
+					"bit_errors":  bits.OnesCount(uint(F.accum ^ fx25_get_ctag_value(c))),
+					"data_bytes":  F.k_data_radio,
+					"check_bytes": F.nroots,
+				}).Debug("FX.25: Matched correlation tag")
 			}
 
 			F.imask = 0x01
@@ -248,9 +254,8 @@ func (F *fx25Receiver) processRSBlock() {
 	var slice = F.slice
 
 	if F.debug >= 3 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
-		fx_hex_dump(F.block[:FX25_BLOCK_SIZE])
+		F.logEntry().Debug("FX.25: Received RS codeblock")
+		dwutil.LogHexDump(F.logEntry(), logrus.DebugLevel, F.block[:FX25_BLOCK_SIZE])
 	}
 
 	dwutil.Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
@@ -266,19 +271,10 @@ func (F *fx25Receiver) processRSBlock() {
 
 	if derrors >= 0 { // -1 for failure.  >= 0 for success, number of bytes corrected.
 		if F.debug >= 2 {
-			text_color_set(DW_COLOR_INFO)
-
-			if derrors == 0 {
-				dw_printf("FX.25[%d.%d]: FEC complete with no errors.\n", channel, slice)
-			} else {
-				dw_printf("FX.25[%d.%d]: FEC complete, fixed %2d errors in byte positions:", channel, slice, derrors)
-
-				for k := range derrors {
-					dw_printf(" %d", derrlocs[k])
-				}
-
-				dw_printf("\n")
-			}
+			F.logEntry().WithFields(logrus.Fields{
+				"errors":    derrors,
+				"positions": derrlocs,
+			}).Debug("FX.25: FEC complete")
 		}
 
 		var frame_buf = my_unstuff(channel, subchannel, slice, F.block[:], F.dlen)
@@ -290,32 +286,25 @@ func (F *fx25Receiver) processRSBlock() {
 			var expected_fcs = fcs.Calc(frame_buf[:frame_len-2])
 			if actual_fcs == expected_fcs {
 				if F.debug >= 3 {
-					text_color_set(DW_COLOR_DEBUG)
-					dw_printf("FX.25[%d.%d]: Extracted AX.25 frame:\n", channel, slice)
-					fx_hex_dump(frame_buf[:frame_len])
+					F.logEntry().Debug("FX.25: Extracted AX.25 frame")
+					dwutil.LogHexDump(F.logEntry(), logrus.DebugLevel, frame_buf[:frame_len])
 				}
 
 				F.sink(channel, subchannel, slice, frame_buf[:frame_len-2], derrors) /* len-2 to remove FCS. */
 			} else {
 				// Most likely cause is defective sender software.
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("FX.25[%d.%d]: Bad FCS for AX.25 frame.\n", channel, slice)
-				fx_hex_dump(F.block[:F.dlen])
-				fx_hex_dump(frame_buf[:frame_len])
+				F.logEntry().Warn("FX.25: Bad FCS for AX.25 frame")
+				dwutil.LogHexDump(F.logEntry(), logrus.WarnLevel, F.block[:F.dlen])
+				dwutil.LogHexDump(F.logEntry(), logrus.WarnLevel, frame_buf[:frame_len])
 			}
 		} else {
 			// Most likely cause is defective sender software.
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("FX.25[%d.%d]: AX.25 frame is shorter than minimum length.\n", channel, slice)
-			fx_hex_dump(F.block[:F.dlen])
-
-			if frame_len > 0 {
-				fx_hex_dump(frame_buf[:frame_len])
-			}
+			F.logEntry().Warn("FX.25: AX.25 frame is shorter than minimum length")
+			dwutil.LogHexDump(F.logEntry(), logrus.WarnLevel, F.block[:F.dlen])
+			dwutil.LogHexDump(F.logEntry(), logrus.WarnLevel, frame_buf)
 		}
 	} else if F.debug >= 2 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FX.25[%d.%d]: FEC failed.  Too many errors.\n", channel, slice)
+		F.logEntry().Debug("FX.25: FEC failed.  Too many errors.")
 	}
 }
 
@@ -349,15 +338,20 @@ func (F *fx25Receiver) processRSBlock() {
  *
  ***********************************************************************************/
 
-func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []byte { //nolint:unparam
+func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []byte {
+	var logEntry = logrus.WithFields(logrus.Fields{
+		"channel":    channel,
+		"subchannel": subchannel,
+		"slice":      slice,
+	})
+
 	var pat_det byte = 0 // Pattern detector.
 	var oacc byte = 0    // Accumulator for a byte out.
 	var olen = 0         // Number of good bits in oacc.
 
 	if pin[0] != 0x7e {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FX.25[%d.%d] error: Data section did not start with 0x7e.\n", channel, slice)
-		fx_hex_dump(pin[:ilen])
+		logEntry.Warn("FX.25: Data section did not start with 0x7e")
+		dwutil.LogHexDump(logEntry, logrus.WarnLevel, pin[:ilen])
 
 		return nil
 	}
@@ -376,9 +370,8 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 			pat_det |= dbit << 7
 
 			if pat_det == 0xfe {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Seven '1' bits in a row.\n", channel, slice)
-				fx_hex_dump(pin[i:ilen])
+				logEntry.Warn("FX.25: Invalid AX.25 frame - Seven '1' bits in a row")
+				dwutil.LogHexDump(logEntry, logrus.WarnLevel, pin[i:ilen])
 
 				return nil
 			}
@@ -391,9 +384,8 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 					if olen == 7 {
 						return frame_buf // Whole number of bytes in result including CRC
 					} else {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Not a whole number of bytes.\n", channel, slice)
-						fx_hex_dump(pin[i:ilen])
+						logEntry.Warn("FX.25: Invalid AX.25 frame - Not a whole number of bytes")
+						dwutil.LogHexDump(logEntry, logrus.WarnLevel, pin[i:ilen])
 
 						return nil
 					}
@@ -413,9 +405,8 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 		}
 	} /* end of loop on all bits in block */
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Terminating flag not found.\n", channel, slice)
-	fx_hex_dump(pin[:ilen])
+	logEntry.Warn("FX.25: Invalid AX.25 frame - Terminating flag not found")
+	dwutil.LogHexDump(logEntry, logrus.WarnLevel, pin[:ilen])
 
 	return nil // Should never fall off the end.
 }

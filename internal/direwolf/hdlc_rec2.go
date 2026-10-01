@@ -689,9 +689,11 @@ func try_decode(block *rrbb.Buffer, achan *achan_param_s, channel int, subchan i
 
 				return true /* success */
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("try_decode: internal error passall = %t, retry_conf_retry = %d, retry_conf_type = %d\n",
-					passall, retry_conf_retry, retry_conf_type)
+				logrus.WithFields(logrus.Fields{
+					"passall":          passall,
+					"retry_conf_retry": retry_conf_retry,
+					"retry_conf_type":  retry_conf_type,
+				}).Error("try_decode: internal error")
 			}
 		} else {
 			goto failure

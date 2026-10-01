@@ -130,6 +130,33 @@ func Test_main_decodes(t *testing.T) {
 	}
 }
 
+// Test_main_debugsFEC checks that -d x and -d 2 show the FX.25 and IL2P
+// receivers' debug output, which they log at Debug.
+func Test_main_debugsFEC(t *testing.T) {
+	var testCases = map[string]struct {
+		genArgs []string
+		args    []string
+		want    string
+	}{
+		"FX.25": {[]string{"-X", "16"}, []string{"-d", "x", "-d", "x"}, "Matched correlation tag"},
+		"IL2P":  {[]string{"-I", "1"}, []string{"-d", "2"}, "IL2P header as received"},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var f = filepath.Join(t.TempDir(), "fec.wav")
+
+			var cmd = exec.CommandContext(t.Context(), "gen_packets", append(tc.genArgs, "-n", "1", "-o", f)...) //nolint:gosec
+			require.NoError(t, cmd.Run())
+
+			var result = testutils.RunMain(t, "", append(tc.args, f)...)
+
+			assert.Equal(t, 0, result.Status, result.Output())
+			assert.Contains(t, result.Output(), tc.want)
+		})
+	}
+}
+
 func Test_main_badArguments(t *testing.T) {
 	var testCases = map[string]struct {
 		args []string
