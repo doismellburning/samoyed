@@ -24,9 +24,9 @@ func Test_decode_aprs_empty_info(t *testing.T) {
 	// Must not panic, and must return a populated struct.
 	var A = aprsDecoder.Decode(pp, true)
 	assert.NotNil(t, A)
-	assert.Equal(t, "AX.25 UI frame with empty information field", A.dataTypeDesc)
-	assert.Equal(t, "Q1TEST", A.src)
-	assert.Equal(t, "ID", A.dest)
+	assert.Equal(t, "AX.25 UI frame with empty information field", A.DataTypeDesc)
+	assert.Equal(t, "Q1TEST", A.Src)
+	assert.Equal(t, "ID", A.Dest)
 }
 
 // !DAO! adds a digit of resolution to a position that has already been
@@ -42,11 +42,11 @@ func Test_decode_aprs_dao_does_not_invent_a_position(t *testing.T) {
 
 	var A = aprsDecoder.Decode(pp, true)
 
-	assert.True(t, A.lon.IsNothing(), "longitude should still be unknown, got %v", A.lon)
+	assert.True(t, A.Lon.IsNothing(), "longitude should still be unknown, got %v", A.Lon)
 
 	// The latitude, which did decode, still gets its extra DAO digit:
 	// 42 degrees 37.14 minutes, plus 9 ten-thousandths of a minute.
-	var lat, ok = A.lat.Get()
+	var lat, ok = A.Lat.Get()
 	assert.True(t, ok)
 	assert.InDelta(t, 42.619+9.0/60000.0, lat, 0.0000001)
 }
@@ -55,12 +55,12 @@ func Test_decode_aprs_dao_does_not_invent_a_position(t *testing.T) {
 // anywhere other than decode_aprs (beacon.go does this) does not start out
 // claiming a position off the coast of Africa.
 func Test_decode_aprs_zero_value_has_no_position(t *testing.T) {
-	var A decodedAPRS
+	var A Decoded
 
-	assert.Equal(t, maybe.Nothing[float64](), A.lat)
-	assert.Equal(t, maybe.Nothing[float64](), A.lon)
-	assert.Equal(t, maybe.Nothing[float64](), A.speedMPH)
-	assert.Equal(t, maybe.Nothing[int](), A.power)
+	assert.Equal(t, maybe.Nothing[float64](), A.Lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.Lon)
+	assert.Equal(t, maybe.Nothing[float64](), A.SpeedMPH)
+	assert.Equal(t, maybe.Nothing[int](), A.Power)
 }
 
 // A weather report that stops in the middle of its fields used to run the
@@ -84,14 +84,14 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 		// Must not panic, and must still report the position.
 		var A = aprsDecoder.Decode(pp, true)
 
-		var lat, ok = A.lat.Get()
+		var lat, ok = A.Lat.Get()
 		assert.True(t, ok, "%s", info)
 		assert.InDelta(t, 49.0583333, lat, 0.0000001, "%s", info)
 	}
 
 	// What did arrive before the truncation is still decoded.
 	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g005", true), true)
-	assert.Equal(t, `wind 4.6 mph, direction 220, gust 5, ""`, A.weather)
+	assert.Equal(t, `wind 4.6 mph, direction 220, gust 5, ""`, A.Weather)
 }
 
 // A positionless weather report was decoded by binary.Decode into a struct
@@ -104,12 +104,12 @@ func Test_decode_aprs_positionless_weather(t *testing.T) {
 
 	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APRS:_10090556c220s004g005t077r000p000P000h50b09900wRSW", true), true)
 
-	assert.Equal(t, "Positionless Weather Report", A.dataTypeDesc)
+	assert.Equal(t, "Positionless Weather Report", A.DataTypeDesc)
 	assert.Equal(t,
 		`wind 4.0 mph, direction 220, gust 5, temperature 77, `+
 			`rain 0.00 in last hour, rain 0.00 in last 24 hours, rain 0.00 since midnight, `+
 			`humidity 50, barometer 29.24, "wRSW"`,
-		A.weather)
+		A.Weather)
 }
 
 // A positionless weather report with nothing after its timestamp has no
@@ -119,7 +119,7 @@ func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
 
 	for _, info := range []string{"_", "_1009", "_10090556", "_10090556c2"} {
 		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APRS:"+info, true), true)
-		assert.Equal(t, "Positionless Weather Report", A.dataTypeDesc, "%s", info)
+		assert.Equal(t, "Positionless Weather Report", A.DataTypeDesc, "%s", info)
 	}
 }
 
@@ -134,13 +134,13 @@ func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
 		`wind 4.6 mph, direction 220, gust 5, temperature 77, `+
 			`rain 0.00 in last hour, rain 0.00 in last 24 hours, rain 0.00 since midnight, `+
 			`humidity 50, barometer 29.24, "wRSW"`,
-		known.weather)
+		known.Weather)
 
 	// The same report with every optional field blanked out: the fields are
 	// still consumed - the station type is found at the end - but none of
 	// them is reported.
 	var unknown = aprsDecoder.Decode(ax25.FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g...t...r...p...P...h..b.....wRSW", true), true)
-	assert.Equal(t, `wind 4.6 mph, direction 220, "wRSW"`, unknown.weather)
+	assert.Equal(t, `wind 4.6 mph, direction 220, "wRSW"`, unknown.Weather)
 }
 
 // The wind direction and speed of a c000s000-form report are unknown, not
@@ -176,7 +176,7 @@ func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
 	// End to end: the blanked-out wind leaves no wind on the weather line,
 	// and the fields after it still decode.
 	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APRS:!4903.50N/07201.75W_c...s...g005t077wRSW", true), true)
-	assert.Equal(t, `, gust 5, temperature 77, "wRSW"`, A.weather)
+	assert.Equal(t, `, gust 5, temperature 77, "wRSW"`, A.Weather)
 }
 
 // An item report whose name runs to the end of the information field has no
@@ -190,9 +190,9 @@ func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
 
 	// Must not panic.
 	var A = aprsDecoder.Decode(pp, true)
-	assert.Equal(t, "Item - name not ended by ! or _", A.dataTypeDesc)
-	assert.Equal(t, "Zb00000Zb00001", A.name)
-	assert.Equal(t, maybe.Nothing[float64](), A.lat)
+	assert.Equal(t, "Item - name not ended by ! or _", A.DataTypeDesc)
+	assert.Equal(t, "Zb00000Zb00001", A.Name)
+	assert.Equal(t, maybe.Nothing[float64](), A.Lat)
 }
 
 // The name is meant to be 3 to 9 characters.  One that isn't was an assertion
@@ -205,9 +205,9 @@ func Test_decode_aprs_item_with_short_name(t *testing.T) {
 
 	// Must not panic, and the rest of the item still decodes.
 	var A = aprsDecoder.Decode(pp, true)
-	assert.Equal(t, "Item", A.dataTypeDesc)
-	assert.Equal(t, "AB", A.name)
-	assert.Equal(t, maybe.Just(42.619), A.lat)
+	assert.Equal(t, "Item", A.DataTypeDesc)
+	assert.Equal(t, "AB", A.Name)
+	assert.Equal(t, maybe.Just(42.619), A.Lat)
 }
 
 // An item that stops before its position has no position, rather than the
@@ -219,10 +219,10 @@ func Test_decode_aprs_item_without_position(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	var A = aprsDecoder.Decode(pp, true)
-	assert.Equal(t, "Item", A.dataTypeDesc)
-	assert.Equal(t, "ABCDE", A.name)
-	assert.Equal(t, maybe.Nothing[float64](), A.lat)
-	assert.Equal(t, maybe.Nothing[float64](), A.lon)
+	assert.Equal(t, "Item", A.DataTypeDesc)
+	assert.Equal(t, "ABCDE", A.Name)
+	assert.Equal(t, maybe.Nothing[float64](), A.Lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.Lon)
 }
 
 // A Mic-E destination is really a latitude of six digits, but a lenient parse
@@ -236,9 +236,9 @@ func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
 
 	// Must not panic, and must not claim a position it never read.
 	var A = aprsDecoder.Decode(pp, true)
-	assert.Equal(t, "MIC-E", A.dataTypeDesc)
-	assert.Equal(t, maybe.Nothing[float64](), A.lat)
-	assert.Equal(t, maybe.Nothing[float64](), A.lon)
+	assert.Equal(t, "MIC-E", A.DataTypeDesc)
+	assert.Equal(t, maybe.Nothing[float64](), A.Lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.Lon)
 }
 
 // A course and speed extension can be the whole of the information field,
@@ -251,9 +251,9 @@ func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
 
 	// Must not panic, and the course and speed still decode.
 	var A = aprsDecoder.Decode(pp, true)
-	assert.Equal(t, maybe.Just(0.0), A.course)
-	assert.Equal(t, maybe.Just(0.0), A.speedMPH)
-	assert.Empty(t, A.comment)
+	assert.Equal(t, maybe.Just(0.0), A.Course)
+	assert.Equal(t, maybe.Just(0.0), A.SpeedMPH)
+	assert.Empty(t, A.Comment)
 }
 
 // User-defined data is a user ID and a type after the "{", and an information
@@ -267,7 +267,7 @@ func Test_decode_aprs_user_defined_without_id(t *testing.T) {
 
 	// Must not panic.
 	var A = aprsDecoder.Decode(pp, true)
-	assert.Equal(t, "User-Defined Data", A.dataTypeDesc)
+	assert.Equal(t, "User-Defined Data", A.DataTypeDesc)
 }
 
 // A general query may carry a "footprint" of latitude, longitude and radius.
@@ -281,11 +281,11 @@ func Test_decode_aprs_general_query_footprint(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	var A = aprsDecoder.Decode(pp, true)
-	assert.Equal(t, "General Query", A.dataTypeDesc)
-	assert.Equal(t, "APRS", A.queryType)
-	assert.Equal(t, maybe.Just(42.3714), A.footprintLat)
-	assert.Equal(t, maybe.Just(-71.2083), A.footprintLon)
-	assert.Equal(t, maybe.Just(50.0), A.footprintRadius)
+	assert.Equal(t, "General Query", A.DataTypeDesc)
+	assert.Equal(t, "APRS", A.QueryType)
+	assert.Equal(t, maybe.Just(42.3714), A.FootprintLat)
+	assert.Equal(t, maybe.Just(-71.2083), A.FootprintLon)
+	assert.Equal(t, maybe.Just(50.0), A.FootprintRadius)
 }
 
 // A general query whose footprint is not three comma-separated fields is
@@ -297,11 +297,11 @@ func Test_decode_aprs_general_query_short_footprint(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	var A = aprsDecoder.Decode(pp, true)
-	assert.Equal(t, "General Query", A.dataTypeDesc)
-	assert.Equal(t, "APRS", A.queryType)
-	assert.Equal(t, maybe.Nothing[float64](), A.footprintLat)
-	assert.Equal(t, maybe.Nothing[float64](), A.footprintLon)
-	assert.Equal(t, maybe.Nothing[float64](), A.footprintRadius)
+	assert.Equal(t, "General Query", A.DataTypeDesc)
+	assert.Equal(t, "APRS", A.QueryType)
+	assert.Equal(t, maybe.Nothing[float64](), A.FootprintLat)
+	assert.Equal(t, maybe.Nothing[float64](), A.FootprintLon)
+	assert.Equal(t, maybe.Nothing[float64](), A.FootprintRadius)
 }
 
 // The APRS message branches used to index the message text without checking
@@ -319,9 +319,9 @@ func Test_decode_aprs_short_message(t *testing.T) {
 		assert.NotNil(t, pp)
 
 		var A = aprsDecoder.Decode(pp, true)
-		assert.Equal(t, messageSubtypeMessage, A.messageSubtype)
-		assert.Equal(t, "Q2TEST", A.addressee)
-		assert.Equal(t, tc.comment, A.comment)
+		assert.Equal(t, messageSubtypeMessage, A.MessageSubtype)
+		assert.Equal(t, "Q2TEST", A.Addressee)
+		assert.Equal(t, tc.comment, A.Comment)
 	}
 }
 
@@ -380,8 +380,8 @@ func Test_decode_aprs_telemetry_metadata_per_decoder(t *testing.T) {
 
 	var heard = NewDecoder(nil, nil)
 	heard.Decode(parm, true)
-	assert.Contains(t, heard.Decode(data, true).telemetry, "Volts=199")
+	assert.Contains(t, heard.Decode(data, true).Telemetry, "Volts=199")
 
 	var other = NewDecoder(nil, nil)
-	assert.NotContains(t, other.Decode(data, true).telemetry, "Volts")
+	assert.NotContains(t, other.Decode(data, true).Telemetry, "Volts")
 }

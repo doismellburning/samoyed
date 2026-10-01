@@ -33,7 +33,7 @@ func TestLogRRBitsShortHeardDoesNotPanic(t *testing.T) {
 		t.Fatal("test packet did not set up heard station at or beyond AX25_REPEATER_2")
 	}
 
-	var A decodedAPRS
+	var A Decoded
 
 	var pl = NewPacketLogger(false, "")
 	pl.RRBits(&A, pp)
@@ -57,24 +57,24 @@ func readLogRecords(t *testing.T, path string) [][]string {
 	return records
 }
 
-func fullLogAprs() *decodedAPRS {
-	var A = new(decodedAPRS)
-	A.src = "Q1TEST"
-	A.name = "OBJNAME"
-	A.symbolTable = '/'
-	A.symbolCode = '>'
-	A.lat = maybe.Just(51.5)
-	A.lon = maybe.Just(-0.125)
-	A.speedMPH = maybe.Just(11.5078)
-	A.course = maybe.Just(90.0)
-	A.altitudeFt = maybe.Just(1000.0)
-	A.freq = maybe.Just(146.52)
-	A.offset = maybe.Just(-600)
-	A.tone = maybe.Just(100.0)
-	A.mfr = "Maker, Inc"
-	A.micEStatus = "En Route"
-	A.telemetry = "T#001"
-	A.comment = "hello, \"world\""
+func fullLogAprs() *Decoded {
+	var A = new(Decoded)
+	A.Src = "Q1TEST"
+	A.Name = "OBJNAME"
+	A.SymbolTable = '/'
+	A.SymbolCode = '>'
+	A.Lat = maybe.Just(51.5)
+	A.Lon = maybe.Just(-0.125)
+	A.SpeedMPH = maybe.Just(11.5078)
+	A.Course = maybe.Just(90.0)
+	A.AltitudeFt = maybe.Just(1000.0)
+	A.Freq = maybe.Just(146.52)
+	A.Offset = maybe.Just(-600)
+	A.Tone = maybe.Just(100.0)
+	A.Mfr = "Maker, Inc"
+	A.MicEStatus = "En Route"
+	A.Telemetry = "T#001"
+	A.Comment = "hello, \"world\""
 
 	return A
 }
@@ -86,7 +86,7 @@ func TestLogNewPacketLoggerEmptyPathDisabled(t *testing.T) {
 	assert.Empty(t, pl.logPath)
 
 	// Nothing should happen, and nothing should panic.
-	pl.Write(0, new(decodedAPRS), nil, logNoLevel(), 0)
+	pl.Write(0, new(Decoded), nil, logNoLevel(), 0)
 	assert.Nil(t, pl.logFp)
 	pl.Close()
 }
@@ -189,8 +189,8 @@ func TestLogWriteSingleFileAppendsWithoutSecondHeader(t *testing.T) {
 
 	var path = filepath.Join(t.TempDir(), "packets.log")
 
-	var A = new(decodedAPRS)
-	A.src = "Q1TEST"
+	var A = new(Decoded)
+	A.Src = "Q1TEST"
 
 	var pl = NewPacketLogger(false, path)
 	pl.Write(0, A, nil, logNoLevel(), 0)
@@ -225,10 +225,10 @@ func TestLogWriteDCSOverridesTone(t *testing.T) {
 
 	var path = filepath.Join(t.TempDir(), "packets.log")
 
-	var A = new(decodedAPRS)
-	A.src = "Q1TEST"
-	A.tone = maybe.Just(100.0)
-	A.dcs = maybe.Just(0o23)
+	var A = new(Decoded)
+	A.Src = "Q1TEST"
+	A.Tone = maybe.Just(100.0)
+	A.DCS = maybe.Just(0o23)
 
 	var pp = ax25.FromText("Q1TEST>APRS:>status", true)
 	require.NotNil(t, pp)
@@ -251,14 +251,14 @@ func TestLogWriteSingleFileOpenFails(t *testing.T) {
 	var path = filepath.Join(t.TempDir(), "missing", "packets.log")
 	var pl = NewPacketLogger(false, path)
 
-	pl.Write(0, new(decodedAPRS), nil, logNoLevel(), 0)
+	pl.Write(0, new(Decoded), nil, logNoLevel(), 0)
 
 	assert.Nil(t, pl.logFp)
 	assert.Empty(t, pl.logPath, "logging is disabled after a failed open")
 	assert.NoFileExists(t, path)
 
 	// Subsequent writes are no-ops.
-	pl.Write(0, new(decodedAPRS), nil, logNoLevel(), 0)
+	pl.Write(0, new(Decoded), nil, logNoLevel(), 0)
 	assert.Nil(t, pl.logFp)
 }
 
@@ -268,8 +268,8 @@ func TestLogWriteDailyNames(t *testing.T) {
 	var dir = t.TempDir()
 	var pl = NewPacketLogger(true, dir)
 
-	var A = new(decodedAPRS)
-	A.src = "Q1TEST"
+	var A = new(Decoded)
+	A.Src = "Q1TEST"
 
 	pl.Write(0, A, nil, logNoLevel(), 0)
 	require.NotNil(t, pl.logFp)
@@ -319,7 +319,7 @@ func TestLogWriteDailyOpenFails(t *testing.T) {
 	}
 
 	var pl = NewPacketLogger(true, dir)
-	pl.Write(0, new(decodedAPRS), nil, logNoLevel(), 0)
+	pl.Write(0, new(Decoded), nil, logNoLevel(), 0)
 
 	assert.Nil(t, pl.logFp)
 	assert.Empty(t, pl.openFname)
@@ -331,9 +331,9 @@ func TestLogRRBits(t *testing.T) {
 
 	var pl = NewPacketLogger(false, "")
 
-	var A = new(decodedAPRS)
-	A.src = "Q1TEST"
-	A.mfr = "Maker, Inc"
+	var A = new(Decoded)
+	A.Src = "Q1TEST"
+	A.Mfr = "Maker, Inc"
 
 	for _, text := range []string{
 		"Q1TEST>APRS:>status",

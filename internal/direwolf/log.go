@@ -129,7 +129,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) Write(channel int, A *decodedAPRS, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel) {
+func (pl *PacketLogger) Write(channel int, A *Decoded, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel) {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()
 
@@ -260,66 +260,66 @@ func (pl *PacketLogger) Write(channel int, A *decodedAPRS, pp *ax25.Packet, alev
 			sdti = string(rune(pp.DTI()))
 		}
 
-		var sname = A.src
-		if len(A.name) > 0 {
-			sname = A.name
+		var sname = A.Src
+		if len(A.Name) > 0 {
+			sname = A.Name
 		}
 
-		var ssymbol = string(rune(A.symbolTable)) + string(rune(A.symbolCode))
+		var ssymbol = string(rune(A.SymbolTable)) + string(rune(A.SymbolCode))
 
-		var smfr = A.mfr
-		var sstatus = A.micEStatus
-		var stelemetry = A.telemetry
-		var scomment = A.comment
+		var smfr = A.Mfr
+		var sstatus = A.MicEStatus
+		var stelemetry = A.Telemetry
+		var scomment = A.Comment
 
 		var slat = ""
-		if lat, ok := A.lat.Get(); ok {
+		if lat, ok := A.Lat.Get(); ok {
 			slat = fmt.Sprintf("%.6f", lat)
 		}
 
 		var slon = ""
-		if lon, ok := A.lon.Get(); ok {
+		if lon, ok := A.Lon.Get(); ok {
 			slon = fmt.Sprintf("%.6f", lon)
 		}
 
 		var sspd = ""
-		if speed_mph, ok := A.speedMPH.Get(); ok {
+		if speed_mph, ok := A.SpeedMPH.Get(); ok {
 			sspd = fmt.Sprintf("%.1f", dwutil.DW_MPH_TO_KNOTS(speed_mph))
 		}
 
 		var scse = ""
-		if course, ok := A.course.Get(); ok {
+		if course, ok := A.Course.Get(); ok {
 			scse = fmt.Sprintf("%.1f", course)
 		}
 
 		var salt = ""
-		if altitude_ft, ok := A.altitudeFt.Get(); ok {
+		if altitude_ft, ok := A.AltitudeFt.Get(); ok {
 			salt = fmt.Sprintf("%.1f", dwutil.DW_FEET_TO_METERS(altitude_ft))
 		}
 
 		var sfreq = ""
-		if freq, ok := A.freq.Get(); ok {
+		if freq, ok := A.Freq.Get(); ok {
 			sfreq = fmt.Sprintf("%.3f", freq)
 		}
 
 		var soffs = ""
-		if offset, ok := A.offset.Get(); ok {
+		if offset, ok := A.Offset.Get(); ok {
 			soffs = fmt.Sprintf("%+d", offset)
 		}
 
 		var stone = ""
-		if tone, ok := A.tone.Get(); ok {
+		if tone, ok := A.Tone.Get(); ok {
 			stone = fmt.Sprintf("%.1f", tone)
 		}
 
-		if dcs, ok := A.dcs.Get(); ok {
+		if dcs, ok := A.DCS.Get(); ok {
 			stone = fmt.Sprintf("D%03o", dcs)
 		}
 
 		var w = csv.NewWriter(pl.logFp)
 		w.Write([]string{
 			strconv.Itoa(channel), strconv.Itoa(int(now.Unix())), itime,
-			A.src, heard, alevel_text, strconv.Itoa(int(retries)), sdti,
+			A.Src, heard, alevel_text, strconv.Itoa(int(retries)), sdti,
 			sname, ssymbol,
 			slat, slon, sspd, scse, salt,
 			sfreq, soffs, stone,
@@ -347,9 +347,9 @@ func (pl *PacketLogger) Write(channel int, A *decodedAPRS, pp *ax25.Packet, alev
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) RRBits(A *decodedAPRS, pp *ax25.Packet) {
+func (pl *PacketLogger) RRBits(A *Decoded, pp *ax25.Packet) {
 	// Sanitize system type (manufacturer) changing any comma to period.
-	var smfr = strings.ReplaceAll(A.mfr, ",", ".")
+	var smfr = strings.ReplaceAll(A.Mfr, ",", ".")
 
 	/* Who are we hearing?   Original station or digipeater? */
 	/* Similar code in direwolf.c.  Combine into one function? */
@@ -389,7 +389,7 @@ func (pl *PacketLogger) RRBits(A *decodedAPRS, pp *ax25.Packet) {
 		dw_printf("%d %d%d  %d %d%d,%s,%s,%s\n",
 			src_c, (src_rr>>1)&1, src_rr&1,
 			dst_c, (dst_rr>>1)&1, dst_rr&1,
-			smfr, A.src, heard)
+			smfr, A.Src, heard)
 	}
 } /* end RRBits */
 

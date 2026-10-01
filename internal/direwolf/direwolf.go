@@ -778,9 +778,9 @@ x = Silence FX.25 information.`)
 // ais_object_course_speed rounds a decoded course and speed into the integer
 // degrees and knots EncodeObject takes, leaving an unknown one absent.
 // Should EncodeObject take floating point here?
-func ais_object_course_speed(A *decodedAPRS) (maybe.Maybe[int], maybe.Maybe[int]) {
-	var course = maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.course)
-	var speed = maybe.Fmap(func(mph float64) int { return int(dwutil.DW_MPH_TO_KNOTS(mph) + 0.5) }, A.speedMPH)
+func ais_object_course_speed(A *Decoded) (maybe.Maybe[int], maybe.Maybe[int]) {
+	var course = maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.Course)
+	var speed = maybe.Fmap(func(mph float64) int { return int(dwutil.DW_MPH_TO_KNOTS(mph) + 0.5) }, A.SpeedMPH)
 
 	return course, speed
 }
@@ -1061,22 +1061,22 @@ func app_process_rec_packet(
 		if strings.HasPrefix(string(pinfo), user_def_da) {
 			waypointSender.SendAIS(pinfo[3:])
 
-			var lat, haveLat = A.lat.Get()
-			var lon, haveLon = A.lon.Get()
+			var lat, haveLat = A.Lat.Get()
+			var lon, haveLon = A.Lon.Get()
 
 			if A_opt_ais_to_obj && haveLat && haveLon {
 				var course, speed = ais_object_course_speed(A)
 
-				var ais_obj_info = aprs.EncodeObject(A.name, false, time.Now(),
+				var ais_obj_info = aprs.EncodeObject(A.Name, false, time.Now(),
 					lat, lon, 0, // no ambiguity
-					A.symbolTable, A.symbolCode,
+					A.SymbolTable, A.SymbolCode,
 					maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // power, height, gain, direction.
 					course, speed,
 					maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), // freq, toneGenerator, offset
-					A.comment)
+					A.Comment)
 
 				// TODO Bodge
-				ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)
+				ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.Src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)
 
 				logrus.WithFields(logrus.Fields{
 					"channel":        channel,
@@ -1089,17 +1089,17 @@ func app_process_rec_packet(
 
 		// Convert to NMEA waypoint sentence if we have a location.
 
-		if lat, haveLat := A.lat.Get(); haveLat {
-			if lon, haveLon := A.lon.Get(); haveLon {
-				var nameIn = A.src
-				if len(A.name) > 0 {
-					nameIn = A.name
+		if lat, haveLat := A.Lat.Get(); haveLat {
+			if lon, haveLon := A.Lon.Get(); haveLon {
+				var nameIn = A.Src
+				if len(A.Name) > 0 {
+					nameIn = A.Name
 				}
 
 				waypointSender.SendSentence(nameIn,
-					lat, lon, rune(A.symbolTable), A.symbolCode,
-					maybe.Fmap(dwutil.DW_FEET_TO_METERS, A.altitudeFt), A.course, maybe.Fmap(dwutil.DW_MPH_TO_KNOTS, A.speedMPH),
-					A.comment)
+					lat, lon, rune(A.SymbolTable), A.SymbolCode,
+					maybe.Fmap(dwutil.DW_FEET_TO_METERS, A.AltitudeFt), A.Course, maybe.Fmap(dwutil.DW_MPH_TO_KNOTS, A.SpeedMPH),
+					A.Comment)
 			}
 		}
 	}
@@ -1287,14 +1287,14 @@ func countOf(n int, noun string) string {
 
 // mheardPosition is the position the stations-heard list should record for a
 // decoded packet: its location if it is a position report, and nothing otherwise.
-func mheardPosition(A *decodedAPRS) (maybe.Maybe[float64], maybe.Maybe[float64]) {
+func mheardPosition(A *Decoded) (maybe.Maybe[float64], maybe.Maybe[float64]) {
 	// Issue 545.  This was not thought out well.
 	// There was a case where a station sent a position report and the location was stored.
 	// Later, the same station sent an object report and the stations's location was overwritten
 	// by the object location.  Solution: Save location only if position report.
-	if A.packetType != packetTypePosition {
+	if A.PacketType != packetTypePosition {
 		return maybe.Nothing[float64](), maybe.Nothing[float64]()
 	}
 
-	return A.lat, A.lon
+	return A.Lat, A.Lon
 }

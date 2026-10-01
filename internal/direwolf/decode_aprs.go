@@ -73,17 +73,18 @@ const (
 	messageSubtypeDirectedQuery
 )
 
-type decodedAPRS struct {
+// Decoded is what Decoder.Decode found in an APRS packet.
+type Decoded struct {
 	quiet bool /* Suppress error messages when decoding. */
 
-	src string // In the case of a packet encapsulated by a 3rd party
+	Src string // In the case of a packet encapsulated by a 3rd party
 	// header, this is the encapsulated source.
 
-	dest string
+	Dest string
 
-	dataTypeDesc string /* APRS data type description.  Telemetry descriptions get pretty long. */
+	DataTypeDesc string /* APRS data type description.  Telemetry descriptions get pretty long. */
 
-	symbolTable byte /* The Symbol Table Identifier character selects one */
+	SymbolTable byte /* The Symbol Table Identifier character selects one */
 	/* of the two Symbol Tables, or it may be used as */
 	/* single-character (alpha or numeric) overlay, as follows: */
 
@@ -100,85 +101,85 @@ type decodedAPRS struct {
 
 	/*	A-Z	Alpha overlay. Symbol from Alternate Symbol Table */
 
-	symbolCode byte /* Where the Symbol Table Identifier is 0-9 or A-Z (or a-j */
+	SymbolCode byte /* Where the Symbol Table Identifier is 0-9 or A-Z (or a-j */
 	/* with compressed position data only), the symbol comes from */
 	/* the Alternate Symbol Table, and is overlaid with the */
 	/* identifier (as a single digit or a capital letter). */
 
-	aprsttLoc string /* APRStt location from !DAO! */
+	APRSttLoc string /* APRStt location from !DAO! */
 
-	lat maybe.Maybe[float64]
-	lon maybe.Maybe[float64] /* Location, degrees.  Negative for South or West. */
+	Lat maybe.Maybe[float64]
+	Lon maybe.Maybe[float64] /* Location, degrees.  Negative for South or West. */
 	/* Nothing if missing or error. */
 
-	maidenhead string /* 4 or 6 (or 8?) character maidenhead locator. */
+	Maidenhead string /* 4 or 6 (or 8?) character maidenhead locator. */
 
-	name string /* Object or item name. Max. 9 characters. */
+	Name string /* Object or item name. Max. 9 characters. */
 
-	addressee string /* Addressee for a "message."  Max. 9 characters. */
+	Addressee string /* Addressee for a "message."  Max. 9 characters. */
 	/* Also for Directed Station Query which is a */
 	/* special case of message. */
 
 	// This is so pfilter.c:filt_t does not need to duplicate the same work.
 
-	hasThirdPartyHeader bool
-	packetType          packetType
+	HasThirdPartyHeader bool
+	PacketType          packetType
 
-	messageSubtype messageSubtype /* Various cases of the overloaded "message." */
+	MessageSubtype messageSubtype /* Various cases of the overloaded "message." */
 
-	messageNumber string /* Message number.  Should be 1 - 5 alphanumeric characters if used. */
+	MessageNumber string /* Message number.  Should be 1 - 5 alphanumeric characters if used. */
 	/* Addendum 1.1 has new format {mm} or {mm}aa with only two */
 	/* characters for message number and an ack riding piggyback. */
 
-	speedMPH maybe.Maybe[float64] /* Speed in MPH.  */
+	SpeedMPH maybe.Maybe[float64] /* Speed in MPH.  */
 	/* The APRS transmission uses knots so watch out for */
 	/* conversions when sending and receiving APRS packets. */
 
-	course maybe.Maybe[float64] /* 0 = North, 90 = East, etc. */
+	Course maybe.Maybe[float64] /* 0 = North, 90 = East, etc. */
 
-	power maybe.Maybe[int] /* Transmitter power in watts. */
+	Power maybe.Maybe[int] /* Transmitter power in watts. */
 
-	heightFt maybe.Maybe[int] /* Antenna height above average terrain, feet. */
+	HeightFt maybe.Maybe[int] /* Antenna height above average terrain, feet. */
 
-	gain maybe.Maybe[int] /* Antenna gain in dBi. */
+	Gain maybe.Maybe[int] /* Antenna gain in dBi. */
 
-	directivity string /* Direction of max signal strength */
+	Directivity string /* Direction of max signal strength */
 
-	radioRange maybe.Maybe[float64] /* Precomputed radio range in miles. */
+	RadioRange maybe.Maybe[float64] /* Precomputed radio range in miles. */
 
-	altitudeFt maybe.Maybe[float64] /* Feet above median sea level.  */
+	AltitudeFt maybe.Maybe[float64] /* Feet above median sea level.  */
 	/* I used feet here because the APRS specification */
 	/* has units of feet for altitude.  Meters would be */
 	/* more natural to the other 96% of the world. */
 
-	mfr string /* Manufacturer or application. */
+	Mfr string /* Manufacturer or application. */
 
-	micEStatus string /* MIC-E message. */
+	MicEStatus string /* MIC-E message. */
 
-	freq maybe.Maybe[float64] /* Frequency, MHz */
+	Freq maybe.Maybe[float64] /* Frequency, MHz */
 
-	tone maybe.Maybe[float64] /* CTCSS tone, Hz, one fractional digit */
+	Tone maybe.Maybe[float64] /* CTCSS tone, Hz, one fractional digit */
 
-	dcs maybe.Maybe[int] /* Digital coded squelch, print as 3 octal digits. */
+	DCS maybe.Maybe[int] /* Digital coded squelch, print as 3 octal digits. */
 
-	offset maybe.Maybe[int] /* Transmit offset, kHz */
+	Offset maybe.Maybe[int] /* Transmit offset, kHz */
 
-	queryType string /* General Query: APRS, IGATE, WX, ... */
+	QueryType string /* General Query: APRS, IGATE, WX, ... */
 	/* Addressee is NOT set. */
 
 	/* Directed Station Query: exactly 5 characters. */
 	/* APRSD, APRST, PING?, ... */
 	/* Addressee is set. */
 
-	footprintLat    maybe.Maybe[float64] /* A general query may contain a foot print. */
-	footprintLon    maybe.Maybe[float64] /* All Nothing if not used. */
-	footprintRadius maybe.Maybe[float64] /* Radius in miles. */
+	FootprintLat    maybe.Maybe[float64] /* A general query may contain a foot print. */
+	FootprintLon    maybe.Maybe[float64] /* All Nothing if not used. */
+	FootprintRadius maybe.Maybe[float64] /* Radius in miles. */
 
-	weather string /* Weather */
+	Weather string /* Weather */
 
-	telemetry string /* Telemetry data */
+	Telemetry string /* Telemetry data */
 
-	comment string /* Comment. */
+	Comment string /* Comment. */
 
 }
 
@@ -237,7 +238,7 @@ func (d *Decoder) telemetryMetadata() *aprstelemetry.State {
 // Decode splits an APRS packet into the separate properties it contains.
 // With quiet set, it keeps its complaints about a malformed packet to
 // itself.
-func (d *Decoder) Decode(pp *ax25.Packet, quiet bool) *decodedAPRS {
+func (d *Decoder) Decode(pp *ax25.Packet, quiet bool) *Decoded {
 	return d.decode(pp, quiet, "")
 }
 
@@ -257,10 +258,10 @@ func (d *Decoder) Decode(pp *ax25.Packet, quiet bool) *decodedAPRS {
  *			that came via APRS-IS.
  *			nil when not third party payload.
  *
- * Outputs:	A.	symbolTable, symbolCode,
- *			lat, lon,
- *			speedMPH, course, altitudeFt,
- *			comment
+ * Outputs:	A.	SymbolTable, SymbolCode,
+ *			Lat, Lon,
+ *			SpeedMPH, Course, AltitudeFt,
+ *			Comment
  *			... and many others...
  *
  * Major Revisions: 1.1	Reorganized so parts are returned in a structure.
@@ -268,16 +269,16 @@ func (d *Decoder) Decode(pp *ax25.Packet, quiet bool) *decodedAPRS {
  *
  *------------------------------------------------------------------*/
 
-func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *decodedAPRS {
+func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *Decoded {
 	var pinfo = pp.Info()
 
-	var A = new(decodedAPRS)
+	var A = new(Decoded)
 	var telemetryState = d.telemetryMetadata()
 
 	A.quiet = quiet
 
-	A.symbolTable = '/' /* Default to primary table. */
-	A.symbolCode = ' '  /* What should we have for default symbol? */
+	A.SymbolTable = '/' /* Default to primary table. */
+	A.SymbolCode = ' '  /* What should we have for default symbol? */
 
 	/* Everything optional - position, speed, course, power, ... - starts out */
 	/* as Nothing, which is the zero value, so there is nothing to clear here. */
@@ -286,23 +287,23 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *d
 	 * Extract source and destination including the SSID.
 	 */
 	if third_party_src != "" {
-		A.src = third_party_src
+		A.Src = third_party_src
 	} else {
-		A.src = pp.AddrWithSSID(ax25.Source)
+		A.Src = pp.AddrWithSSID(ax25.Source)
 	}
 
-	A.dest = pp.AddrWithSSID(ax25.Destination)
+	A.Dest = pp.AddrWithSSID(ax25.Destination)
 
 	if len(pinfo) == 0 {
-		A.dataTypeDesc = "AX.25 UI frame with empty information field"
+		A.DataTypeDesc = "AX.25 UI frame with empty information field"
 
 		return A
 	}
 
 	if unicode.IsPrint(rune(pinfo[0])) {
-		A.dataTypeDesc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator \"%c\"", pinfo[0])
+		A.DataTypeDesc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator \"%c\"", pinfo[0])
 	} else {
-		A.dataTypeDesc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator: unprintable 0x%02x", pinfo[0])
+		A.DataTypeDesc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator: unprintable 0x%02x", pinfo[0])
 	}
 
 	// Check for RFONLY or NOGATE in the destination field.
@@ -315,7 +316,7 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *d
 	if !quiet {
 		if atemp == "RFONLY" || atemp == "NOGATE" {
 			logrus.WithFields(logrus.Fields{
-				"destination": A.dest,
+				"destination": A.Dest,
 				"hint":        "They should appear only at the end of the digi via path",
 			}).Warn("RFONLY and NOGATE must not appear in the destination address field")
 		}
@@ -353,11 +354,11 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *d
 			var payload_src = pinfo[1:]
 			payload_src, _, _ = bytes.Cut(payload_src, []byte{'>'})
 			A = d.decode(pp_payload, quiet, string(payload_src)) // 1 means used recursively
-			A.hasThirdPartyHeader = true
+			A.HasThirdPartyHeader = true
 
 			return A
 		} else {
-			A.dataTypeDesc = "Third Party Header: Unable to parse payload."
+			A.DataTypeDesc = "Third Party Header: Unable to parse payload."
 		}
 	}
 
@@ -385,7 +386,7 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *d
 		}
 
 		logrus.WithFields(logrus.Fields{
-			"source": A.src,
+			"source": A.Src,
 			"hint":   hint,
 		}).Warn("'nul' character found in Information part.  This should never happen with APRS")
 	}
@@ -401,7 +402,7 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *d
 	case '`': /* Current Mic-E Data */
 
 	default:
-		A.mfr = maybe.FromMaybe(unknownDevice, d.deviceIDs.FromDest(A.dest))
+		A.Mfr = maybe.FromMaybe(unknownDevice, d.deviceIDs.FromDest(A.Dest))
 	}
 
 	switch pinfo[0] { /* "DTI" data type identifier. */
@@ -416,7 +417,7 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *d
 			aprsLLPos(A, telemetryState, pinfo)
 		}
 
-		A.packetType = packetTypePosition
+		A.PacketType = packetTypePosition
 
 	//case '#':		/* Peet Bros U-II Weather station */		// TODO: produce obsolete error.
 	//case '*':		/* Peet Bros U-II Weather station */
@@ -425,73 +426,73 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *d
 	case '$': /* Raw GPS data or Ultimeter 2000 */
 		if bytes.HasPrefix(pinfo, []byte("$ULTW")) {
 			aprsUltimeter(A, pinfo) // TODO: produce obsolete error.
-			A.packetType = packetTypeWeather
+			A.PacketType = packetTypeWeather
 		} else {
 			aprsRawNMEA(A, pinfo)
-			A.packetType = packetTypePosition
+			A.PacketType = packetTypePosition
 		}
 
 	case '\'': /* Old Mic-E Data (but Current data for TM-D700) */
 		fallthrough
 	case '`': /* Current Mic-E Data (not used in TM-D700) */
 		aprsMicE(A, telemetryState, d.deviceIDs, pp, pinfo)
-		A.packetType = packetTypePosition
+		A.PacketType = packetTypePosition
 
 	case ')': /* Item. */
 		aprsItem(A, telemetryState, pinfo)
-		A.packetType = packetTypeItem
+		A.PacketType = packetTypeItem
 
 	case '/': /* Position with timestamp (no APRS messaging) */
 		fallthrough
 	case '@': /* Position with timestamp (with APRS messaging) */
 		aprsLLPosTime(A, telemetryState, pinfo)
-		A.packetType = packetTypePosition
+		A.PacketType = packetTypePosition
 
 	case ':': /* "Message" (special APRS meaning): for one person, a group, or a bulletin. */
 		/* Directed Station Query */
 		/* Telemetry metadata. */
 		aprsMessage(A, telemetryState, pinfo, quiet)
 
-		switch A.messageSubtype {
+		switch A.MessageSubtype {
 		case messageSubtypeMessage, messageSubtypeAck, messageSubtypeRej:
-			A.packetType = packetTypeMessage
+			A.PacketType = packetTypeMessage
 		case messageSubtypeNWS:
-			A.packetType = packetTypeNWS
+			A.PacketType = packetTypeNWS
 		case messageSubtypeTelemParm, messageSubtypeTelemUnit, messageSubtypeTelemEqns, messageSubtypeTelemBits:
-			A.packetType = packetTypeTelemetry
+			A.PacketType = packetTypeTelemetry
 		case messageSubtypeDirectedQuery:
-			A.packetType = packetTypeQuery
+			A.PacketType = packetTypeQuery
 		default:
 			// Also case messageSubtypeBulletin:
 		}
 
 	case ';': /* Object */
 		aprsObject(A, telemetryState, pinfo)
-		A.packetType = packetTypeObject
+		A.PacketType = packetTypeObject
 
 	case '<': /* Station Capabilities */
 		aprsStationCapabilities(A, pinfo)
-		A.packetType = packetTypeCapabilities
+		A.PacketType = packetTypeCapabilities
 
 	case '>': /* Status Report */
 		aprsStatusReport(A, pinfo)
-		A.packetType = packetTypeStatus
+		A.PacketType = packetTypeStatus
 
 	case '?': /* General Query */
 		aprsGeneralQuery(A, pinfo)
-		A.packetType = packetTypeQuery
+		A.PacketType = packetTypeQuery
 
 	case 'T': /* Telemetry */
 		aprsTelemetry(A, telemetryState, pinfo, quiet)
-		A.packetType = packetTypeTelemetry
+		A.PacketType = packetTypeTelemetry
 
 	case '_': /* Positionless Weather Report */
 		aprsPositionlessWeatherReport(A, pinfo)
-		A.packetType = packetTypeWeather
+		A.PacketType = packetTypeWeather
 
 	case '{': /* user defined data */
 		aprsUserDefined(A, pinfo)
-		A.packetType = packetTypeUserDefined
+		A.PacketType = packetTypeUserDefined
 
 	case 't': /* Raw touch tone data - NOT PART OF STANDARD */
 		/* Used to convey raw touch tone sequences to */
@@ -529,17 +530,17 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *d
 	 *		protocol spec, end of Chapter 20.
 	 */
 
-	if A.symbolTable == ' ' || A.symbolCode == ' ' {
+	if A.SymbolTable == ' ' || A.SymbolCode == ' ' {
 		// A symbol on a "message" makes no sense and confuses people.
 		// Third party too.  Set from the payload.
 		// Maybe eliminate for a couple others.
 
 		if pinfo[0] != ':' && pinfo[0] != '}' {
 			if d.symbols != nil { // TODO KG Consider some sort of debug message on an else?
-				var symtab, symbol, ok = d.symbols.FromDestOrSrc(pinfo[0], A.src, A.dest)
+				var symtab, symbol, ok = d.symbols.FromDestOrSrc(pinfo[0], A.Src, A.Dest)
 				if ok {
-					A.symbolTable = symtab
-					A.symbolCode = symbol
+					A.SymbolTable = symtab
+					A.SymbolCode = symbol
 				}
 			}
 		}
@@ -549,7 +550,7 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *d
 } /* end decode_aprs */
 
 // Print writes out what Decode found, in human readable form.
-func (d *Decoder) Print(A *decodedAPRS) {
+func (d *Decoder) Print(A *Decoded) {
 	/*
 	 * First line has:
 	 * - packet type
@@ -559,54 +560,54 @@ func (d *Decoder) Print(A *decodedAPRS) {
 	 * - mic-e status
 	 * - power/height/gain, range
 	 */
-	var stemp = A.dataTypeDesc
+	var stemp = A.DataTypeDesc
 
-	if len(A.name) > 0 {
+	if len(A.Name) > 0 {
 		stemp += ", \""
-		stemp += A.name
+		stemp += A.Name
 		stemp += "\""
 	}
 
-	if A.symbolCode != ' ' {
+	if A.SymbolCode != ' ' {
 		if d.symbols != nil {
-			var symbol_description = d.symbols.Description(A.symbolTable, A.symbolCode)
+			var symbol_description = d.symbols.Description(A.SymbolTable, A.SymbolCode)
 
 			stemp += ", "
 			stemp += symbol_description
 		} // TODO KG Else warn?
 	}
 
-	if len(A.mfr) > 0 {
-		if A.dest == "APRS" || A.dest == "BEACON" || A.dest == "ID" {
+	if len(A.Mfr) > 0 {
+		if A.Dest == "APRS" || A.Dest == "BEACON" || A.Dest == "ID" {
 			stemp += "\nUse of \""
-			stemp += A.dest
+			stemp += A.Dest
 			stemp += "\" in the destination field is obsolete."
 			stemp += "  You can help to improve the quality of APRS signals."
 			stemp += "\nTell the sender ("
-			stemp += A.src
+			stemp += A.Src
 			stemp += ") to use the proper product identifier from"
 			stemp += " https://github.com/aprsorg/aprs-deviceid "
 		} else {
 			stemp += ", "
-			stemp += A.mfr
+			stemp += A.Mfr
 		}
 	}
 
-	if len(A.micEStatus) > 0 {
+	if len(A.MicEStatus) > 0 {
 		stemp += ", "
-		stemp += A.micEStatus
+		stemp += A.MicEStatus
 	}
 
-	if power, ok := A.power.Get(); ok && power > 0 {
+	if power, ok := A.Power.Get(); ok && power > 0 {
 		/* Protocol spec doesn't mention whether this is dBd or dBi.  */
 		/* Clarified later. */
 		/* http://eng.usna.navy.mil/~bruninga/aprs/aprs11.html */
 		/* "The Antenna Gain in the PHG format on page 28 is in dBi." */
-		var height = maybe.FromMaybe(0, A.heightFt)
-		stemp += fmt.Sprintf(", %d W height(HAAT)=%dft=%.0fm %ddBi %s", power, height, dwutil.DW_FEET_TO_METERS(float64(height)), maybe.FromMaybe(0, A.gain), A.directivity)
+		var height = maybe.FromMaybe(0, A.HeightFt)
+		stemp += fmt.Sprintf(", %d W height(HAAT)=%dft=%.0fm %ddBi %s", power, height, dwutil.DW_FEET_TO_METERS(float64(height)), maybe.FromMaybe(0, A.Gain), A.Directivity)
 	}
 
-	if _range, ok := A.radioRange.Get(); ok && _range > 0 {
+	if _range, ok := A.RadioRange.Get(); ok && _range > 0 {
 		stemp += fmt.Sprintf(", range=%.1f", _range)
 	}
 
@@ -629,27 +630,27 @@ func (d *Decoder) Print(A *decodedAPRS) {
 	 * http://www.amsat.org/cgi-bin/gridconv
 	 */
 
-	if len(A.maidenhead) > 0 {
-		if A.lat.IsNothing() && A.lon.IsNothing() {
-			var lat, lon, err = latlong.FromGridSquare(A.maidenhead)
+	if len(A.Maidenhead) > 0 {
+		if A.Lat.IsNothing() && A.Lon.IsNothing() {
+			var lat, lon, err = latlong.FromGridSquare(A.Maidenhead)
 			if err == nil {
-				A.lat = maybe.Just(lat)
-				A.lon = maybe.Just(lon)
+				A.Lat = maybe.Just(lat)
+				A.Lon = maybe.Just(lon)
 			} else if !A.quiet {
-				logrus.WithError(err).WithField("maidenhead", A.maidenhead).Warn("Grid square is not valid")
+				logrus.WithError(err).WithField("maidenhead", A.Maidenhead).Warn("Grid square is not valid")
 			}
 		}
 
-		fmt.Printf("Grid square = %s, ", A.maidenhead)
+		fmt.Printf("Grid square = %s, ", A.Maidenhead)
 	}
 
 	stemp = ""
 
-	if A.lat.IsJust() || A.lon.IsJust() {
+	if A.Lat.IsJust() || A.Lon.IsJust() {
 		var s_lat, s_lon string
 		// Have location but it is possible one part is invalid.
 
-		if lat, ok := A.lat.Get(); ok {
+		if lat, ok := A.Lat.Get(); ok {
 			var absll float64
 			var news rune
 
@@ -667,7 +668,7 @@ func (d *Decoder) Print(A *decodedAPRS) {
 			s_lat = "Invalid Latitude"
 		}
 
-		if lon, ok := A.lon.Get(); ok {
+		if lon, ok := A.Lon.Get(); ok {
 			var absll float64
 			var news rune
 
@@ -688,15 +689,15 @@ func (d *Decoder) Print(A *decodedAPRS) {
 		stemp = fmt.Sprintf("%s, %s", s_lat, s_lon)
 	}
 
-	if len(A.aprsttLoc) > 0 {
+	if len(A.APRSttLoc) > 0 {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
 
-		stemp += A.aprsttLoc
+		stemp += A.APRSttLoc
 	}
 
-	if speed_mph, ok := A.speedMPH.Get(); ok {
+	if speed_mph, ok := A.SpeedMPH.Get(); ok {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
@@ -704,7 +705,7 @@ func (d *Decoder) Print(A *decodedAPRS) {
 		stemp += fmt.Sprintf("%.0f km/h (%.0f MPH)", dwutil.DW_MILES_TO_KM(speed_mph), speed_mph)
 	}
 
-	if course, ok := A.course.Get(); ok {
+	if course, ok := A.Course.Get(); ok {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
@@ -712,7 +713,7 @@ func (d *Decoder) Print(A *decodedAPRS) {
 		stemp += fmt.Sprintf("course %.0f", course)
 	}
 
-	if altitude_ft, ok := A.altitudeFt.Get(); ok {
+	if altitude_ft, ok := A.AltitudeFt.Get(); ok {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
@@ -720,11 +721,11 @@ func (d *Decoder) Print(A *decodedAPRS) {
 		stemp += fmt.Sprintf("alt %.0f m (%.0f ft)", dwutil.DW_FEET_TO_METERS(altitude_ft), altitude_ft)
 	}
 
-	if freq, ok := A.freq.Get(); ok {
+	if freq, ok := A.Freq.Get(); ok {
 		stemp += fmt.Sprintf(", %.3f MHz", freq)
 	}
 
-	if offset, ok := A.offset.Get(); ok {
+	if offset, ok := A.Offset.Get(); ok {
 		if offset%1000 == 0 {
 			stemp += fmt.Sprintf(", %+dM", offset/1000)
 		} else {
@@ -732,7 +733,7 @@ func (d *Decoder) Print(A *decodedAPRS) {
 		}
 	}
 
-	if tone, ok := A.tone.Get(); ok {
+	if tone, ok := A.Tone.Get(); ok {
 		if tone == 0 {
 			stemp += ", no PL"
 		} else {
@@ -740,7 +741,7 @@ func (d *Decoder) Print(A *decodedAPRS) {
 		}
 	}
 
-	if dcs, ok := A.dcs.Get(); ok {
+	if dcs, ok := A.DCS.Get(); ok {
 		stemp += fmt.Sprintf(", DCS %03o", dcs)
 	}
 
@@ -757,22 +758,22 @@ func (d *Decoder) Print(A *decodedAPRS) {
 	 * Drop annoying trailing CR LF.  Anyone who cares can see it in the raw datA->
 	 */
 
-	A.weather = strings.TrimSpace(A.weather)
+	A.Weather = strings.TrimSpace(A.Weather)
 
-	if len(A.weather) > 0 {
-		ax25.SafePrint([]byte(A.weather), false)
+	if len(A.Weather) > 0 {
+		ax25.SafePrint([]byte(A.Weather), false)
 		fmt.Println()
 	}
 
-	if len(A.telemetry) > 0 {
-		ax25.SafePrint([]byte(A.telemetry), false)
+	if len(A.Telemetry) > 0 {
+		ax25.SafePrint([]byte(A.Telemetry), false)
 		fmt.Println()
 	}
 
-	A.comment = strings.TrimSpace(A.comment)
+	A.Comment = strings.TrimSpace(A.Comment)
 
-	if len(A.comment) > 0 {
-		ax25.SafePrint([]byte(A.comment), false)
+	if len(A.Comment) > 0 {
+		ax25.SafePrint([]byte(A.Comment), false)
 		fmt.Println()
 
 		/*
@@ -804,15 +805,15 @@ func (d *Decoder) Print(A *decodedAPRS) {
 		// Reference:   https://www.fileformat.info/info/unicode/utf8test.htm
 
 		if !A.quiet {
-			var n = len(A.comment)
+			var n = len(A.Comment)
 			for j := range n {
-				if A.comment[j] == 0xb0 && (j == 0 || (A.comment[j-1])&0x80 == 0) {
+				if A.Comment[j] == 0xb0 && (j == 0 || (A.Comment[j-1])&0x80 == 0) {
 					logrus.Warn("Character code 0xb0 is probably an attempt at a degree symbol. The correct encoding is 0xc2 0xb0 in UTF-8.")
 				}
 			}
 
 			for j := range n {
-				if A.comment[j] == 0xf8 && (j == n-1 || (A.comment[j+1]&0xc0) != 0xc0) {
+				if A.Comment[j] == 0xf8 && (j == n-1 || (A.Comment[j+1]&0xc0) != 0xc0) {
 					logrus.Warn("Character code 0xf8 is probably an attempt at a degree symbol. The correct encoding is 0xc2 0xb0 in UTF-8.")
 				}
 			}
@@ -830,7 +831,7 @@ func (d *Decoder) Print(A *decodedAPRS) {
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.lat, A.lon, A.symbolTable, A.symbolCode, A.speedMPH, A.course, A.altitudeFt.
+ * Outputs:	A.Lat, A.Lon, A.SymbolTable, A.SymbolCode, A.SpeedMPH, A.Course, A.AltitudeFt.
  *
  * Description:	Type identifier '=' has APRS messaging.
  *		Type identifier '!' does not have APRS messaging.
@@ -849,7 +850,7 @@ func (d *Decoder) Print(A *decodedAPRS) {
  *
  *------------------------------------------------------------------*/
 
-func aprsLLPos(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) {
+func aprsLLPos(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 	type llPos struct {
 		DTI byte /* ! or = */
 		Pos aprs.Position
@@ -862,7 +863,7 @@ func aprsLLPos(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte)
 	}
 	var q compressedPos
 
-	A.dataTypeDesc = "Position"
+	A.DataTypeDesc = "Position"
 
 	var ll_bytes, _ = binary.Decode(info, binary.NativeEndian, &p)
 	var compressed_bytes, _ = binary.Decode(info, binary.NativeEndian, &q)
@@ -870,11 +871,11 @@ func aprsLLPos(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte)
 	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
 		decodePosition(A, &(p.Pos))
 
-		if A.symbolCode == '_' {
+		if A.SymbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
-			A.dataTypeDesc = "Weather Report"
+			A.DataTypeDesc = "Weather Report"
 			weatherData(A, info[ll_bytes:])
 			/*
 			   Here is an interesting case.
@@ -908,12 +909,12 @@ func aprsLLPos(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte)
 	} else { /* Compressed location. */
 		decodeCompressedPosition(A, &(q.CPos))
 
-		if A.symbolCode == '_' {
+		if A.SymbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* In this case, the wind direction and speed are in the */
 			/* compressed data so we don't expect a 7 byte "data */
 			/* extension" for them. */
-			A.dataTypeDesc = "Weather Report"
+			A.DataTypeDesc = "Weather Report"
 			weatherData(A, info[compressed_bytes:])
 		} else {
 			/* Regular position report. */
@@ -934,7 +935,7 @@ func aprsLLPos(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte)
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.lat, A.lon, A.symbolTable, A.symbolCode, A.speedMPH, A.course, A.altitudeFt.
+ * Outputs:	A.Lat, A.Lon, A.SymbolTable, A.SymbolCode, A.SpeedMPH, A.Course, A.AltitudeFt.
  *
  * Description:	Type identifier '@' has APRS messaging.
  *		Type identifier '/' does not have APRS messaging.
@@ -956,7 +957,7 @@ func aprsLLPos(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte)
  *
  *------------------------------------------------------------------*/
 
-func aprsLLPosTime(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) {
+func aprsLLPosTime(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 	type llPosTime struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
@@ -971,7 +972,7 @@ func aprsLLPosTime(A *decodedAPRS, telemetryState *aprstelemetry.State, info []b
 	}
 	var q compressedPosTime
 
-	A.dataTypeDesc = "Position with time"
+	A.DataTypeDesc = "Position with time"
 
 	var llBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
 	var compressedBytes, _ = binary.Decode(info, binary.NativeEndian, &q)
@@ -981,11 +982,11 @@ func aprsLLPosTime(A *decodedAPRS, telemetryState *aprstelemetry.State, info []b
 	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
 		decodePosition(A, &(p.Pos))
 
-		if A.symbolCode == '_' {
+		if A.SymbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
-			A.dataTypeDesc = "Weather Report"
+			A.DataTypeDesc = "Weather Report"
 			weatherData(A, info[llBytes:])
 		} else {
 			/* Regular position report. */
@@ -994,12 +995,12 @@ func aprsLLPosTime(A *decodedAPRS, telemetryState *aprstelemetry.State, info []b
 	} else { /* Compressed location. */
 		decodeCompressedPosition(A, &(q.CPos))
 
-		if A.symbolCode == '_' {
+		if A.SymbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* In this case, the wind direction and speed are in the */
 			/* compressed data so we don't expect a 7 byte "data */
 			/* extension" for them. */
-			A.dataTypeDesc = "Weather Report"
+			A.DataTypeDesc = "Weather Report"
 			weatherData(A, info[compressedBytes:])
 		} else {
 			/* Regular position report. */
@@ -1038,24 +1039,24 @@ func aprsLLPosTime(A *decodedAPRS, telemetryState *aprstelemetry.State, info []b
  *
  *------------------------------------------------------------------*/
 
-func aprsRawNMEA(A *decodedAPRS, info []byte) {
+func aprsRawNMEA(A *Decoded, info []byte) {
 	if bytes.HasPrefix(info, []byte("$GPRMC,")) ||
 		bytes.HasPrefix(info, []byte("$GNRMC,")) {
 		var result = dwgps.ParseGPRMC(string(info), A.quiet)
 
-		A.lat = result.Lat
-		A.lon = result.Lon
-		A.course = result.Course
-		A.speedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, result.Knots)
-		A.dataTypeDesc = "Raw GPS data"
+		A.Lat = result.Lat
+		A.Lon = result.Lon
+		A.Course = result.Course
+		A.SpeedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, result.Knots)
+		A.DataTypeDesc = "Raw GPS data"
 	} else if bytes.HasPrefix(info, []byte("$GPGGA,")) ||
 		bytes.HasPrefix(info, []byte("$GNGGA,")) {
 		var result = dwgps.ParseGPGGA(string(info), A.quiet)
 
-		A.lat = result.Lat
-		A.lon = result.Lon
-		A.altitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, result.Alt)
-		A.dataTypeDesc = "Raw GPS data"
+		A.Lat = result.Lat
+		A.Lon = result.Lon
+		A.AltitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, result.Alt)
+		A.DataTypeDesc = "Raw GPS data"
 	}
 
 	// TODO (low): add a few other sentence types.
@@ -1256,7 +1257,7 @@ MIC-E, JEEP, In Service
 
 */
 
-func micEDigit(A *decodedAPRS, c byte, mask int, std_msg *int, cust_msg *int) int {
+func micEDigit(A *Decoded, c byte, mask int, std_msg *int, cust_msg *int) int {
 	if c >= '0' && c <= '9' {
 		return int(c - '0')
 	}
@@ -1300,7 +1301,7 @@ func micEDigit(A *decodedAPRS, c byte, mask int, std_msg *int, cust_msg *int) in
 	return (0)
 }
 
-func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *deviceid.Data, pp *ax25.Packet, info []byte) {
+func aprsMicE(A *Decoded, telemetryState *aprstelemetry.State, deviceIDs *deviceid.Data, pp *ax25.Packet, info []byte) {
 	type micEInfo struct {
 		DTI         byte    /* ' or ` */
 		Lon         [3]byte /* "d+28", "m+28", "h+28" */
@@ -1309,7 +1310,7 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
 		SymTableId  byte
 	}
 
-	A.dataTypeDesc = "MIC-E"
+	A.DataTypeDesc = "MIC-E"
 
 	var sizeof_struct_aprs_mic_e_s = 9
 	if len(info) < sizeof_struct_aprs_mic_e_s {
@@ -1368,7 +1369,7 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
 		}
 	}
 
-	A.lat = maybe.Just(lat)
+	A.Lat = maybe.Just(lat)
 
 	/* Longitude is mostly packed into 3 bytes of message but */
 	/* has a couple bits of information in the destination. */
@@ -1481,19 +1482,19 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
 		}
 	}
 
-	A.lon = lon
+	A.Lon = lon
 
 	/* Symbol table and codes like everyone else. */
 
-	A.symbolTable = p.SymTableId
-	A.symbolCode = p.SymbolCode
+	A.SymbolTable = p.SymTableId
+	A.SymbolCode = p.SymbolCode
 
-	if A.symbolTable != '/' && A.symbolTable != '\\' && !unicode.IsUpper(rune(A.symbolTable)) && !unicode.IsDigit(rune(A.symbolTable)) {
+	if A.SymbolTable != '/' && A.SymbolTable != '\\' && !unicode.IsUpper(rune(A.SymbolTable)) && !unicode.IsDigit(rune(A.SymbolTable)) {
 		if !A.quiet {
-			logrus.WithField("symbol_table", string(rune(A.symbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
+			logrus.WithField("symbol_table", string(rune(A.SymbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 		}
 
-		A.symbolTable = '/'
+		A.SymbolTable = '/'
 	}
 
 	/* Message type from two 3-bit codes. */
@@ -1502,13 +1503,13 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
 	var cust_text = []string{"Emergency", "Custom-6", "Custom-5", "Custom-4", "Custom-3", "Custom-2", "Custom-1", "Custom-0"}
 
 	if std_msg == 0 && cust_msg == 0 {
-		A.micEStatus = "Emergency"
+		A.MicEStatus = "Emergency"
 	} else if std_msg == 0 && cust_msg != 0 {
-		A.micEStatus = cust_text[cust_msg]
+		A.MicEStatus = cust_text[cust_msg]
 	} else if std_msg != 0 && cust_msg == 0 {
-		A.micEStatus = std_text[std_msg]
+		A.MicEStatus = std_text[std_msg]
 	} else {
-		A.micEStatus = "Unknown MIC-E Message Type"
+		A.MicEStatus = "Unknown MIC-E Message Type"
 	}
 
 	/* Speed and course from next 3 bytes. */
@@ -1518,7 +1519,7 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
 		n -= 800
 	}
 
-	A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n)))
+	A.SpeedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n)))
 
 	n = int((p.SpeedCourse[1]-28)%10)*100 + int(p.SpeedCourse[2]-28)
 	if n >= 400 {
@@ -1530,11 +1531,11 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
 
 	switch n {
 	case 0:
-		A.course = maybe.Nothing[float64]()
+		A.Course = maybe.Nothing[float64]()
 	case 360:
-		A.course = maybe.Just(0.0)
+		A.Course = maybe.Just(0.0)
 	default:
-		A.course = maybe.Just(float64(n))
+		A.Course = maybe.Just(float64(n))
 	}
 
 	// The rest is a comment which can have other information cryptically embedded.
@@ -1543,7 +1544,7 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
 
 	if len(info) <= sizeof_struct_aprs_mic_e_s {
 		// Too short for a comment.  We are finished.
-		A.mfr = unknownDevice
+		A.Mfr = unknownDevice
 
 		return
 	}
@@ -1556,7 +1557,7 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
 		mcomment = mcomment[:len(mcomment)-1]
 		if len(mcomment) == 0 {
 			// Nothing left after removing trailing CR.
-			A.mfr = unknownDevice
+			A.Mfr = unknownDevice
 
 			return
 		}
@@ -1567,7 +1568,7 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
 
 	// Comment with vendor/model removed.
 	var trimmed, device = deviceIDs.FromMicE(string(mcomment))
-	A.mfr = maybe.FromMaybe(unknownDevice, device)
+	A.Mfr = maybe.FromMaybe(unknownDevice, device)
 
 	// Possible altitude at beginning of remaining comment.
 	// Three base 91 characters followed by }
@@ -1577,7 +1578,7 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
 		aprs.IsBase91Digit(trimmed[1]) &&
 		aprs.IsBase91Digit(trimmed[2]) &&
 		trimmed[3] == '}' {
-		A.altitudeFt = maybe.Just(dwutil.DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
+		A.AltitudeFt = maybe.Just(dwutil.DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
 
 		processComment(A, telemetryState, []byte(trimmed)[4:])
 
@@ -1597,17 +1598,17 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
  * Inputs:	info 	- Information field.  Be careful not to modify it here!
  *		quiet	- suppress error messages.
  *
- * Outputs:	A.dataTypeDesc		Text description for screen display.
+ * Outputs:	A.DataTypeDesc		Text description for screen display.
  *
- *		A.addressee		To whom is it addressed.
+ *		A.Addressee		To whom is it addressed.
  *					Could be a specific station, alias, bulletin, etc.
  *					For telemetry metadata is is about this station,
  *					not being sent to it.
  *
- *		A.messageSubtype	Subtype so caller might avoid replicating
+ *		A.MessageSubtype	Subtype so caller might avoid replicating
  *					all the code to distinguish them.
  *
- *		A.messageNumber	Message number if any.  Required for ack/rej.
+ *		A.MessageNumber	Message number if any.  Required for ack/rej.
  *
  * Description:	An APRS message is a text string with a specified addressee.
  *
@@ -1647,7 +1648,7 @@ func aprsMicE(A *decodedAPRS, telemetryState *aprstelemetry.State, deviceIDs *de
  *
  *------------------------------------------------------------------*/
 
-func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte, quiet bool) {
+func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, quiet bool) {
 	type messageInfo struct {
 		DTI       byte /* : */
 		Addressee [9]byte
@@ -1666,15 +1667,15 @@ func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byt
 	var headerBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
 	var message = info[headerBytes:]
 
-	A.dataTypeDesc = "APRS Message"
-	A.messageSubtype = messageSubtypeMessage /* until found otherwise */
+	A.DataTypeDesc = "APRS Message"
+	A.MessageSubtype = messageSubtypeMessage /* until found otherwise */
 
 	if len(info) < 11 {
 		if !quiet {
 			logrus.WithField("length", len(info)).Warn("APRS Message must have a minimum of 11 characters for : 9 character addressee :")
 		}
 
-		A.messageSubtype = messageSubtypeInvalid
+		A.MessageSubtype = messageSubtypeInvalid
 
 		return
 	}
@@ -1684,7 +1685,7 @@ func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byt
 			logrus.WithField("hint", "Spaces must be added to shorter addressee to make 9 characters").Warn("APRS Message must begin with ':' 9 character addressee ':'")
 		}
 
-		A.messageSubtype = messageSubtypeInvalid
+		A.MessageSubtype = messageSubtypeInvalid
 
 		return
 	}
@@ -1715,7 +1716,7 @@ func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byt
 		}).Warn("Malformed addressee with space between station name and SSID")
 	}
 
-	A.addressee = string(addressee)
+	A.Addressee = string(addressee)
 
 	/*
 	 * Addressee starting with BLN or NWS is a bulletin.
@@ -1726,20 +1727,20 @@ func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byt
 		// BLNX	"announcement" has a single uppercase letter.
 		// BLN9xxxxx	"group bulletin" has single digit group id and group name up to 5 characters.
 		if len(addressee) == 4 && unicode.IsDigit(rune(addressee[3])) {
-			A.dataTypeDesc = fmt.Sprintf("General Bulletin with identifier \"%s\"", addressee[3:])
+			A.DataTypeDesc = fmt.Sprintf("General Bulletin with identifier \"%s\"", addressee[3:])
 		} else if len(addressee) == 4 && unicode.IsUpper(rune(addressee[3])) {
-			A.dataTypeDesc = fmt.Sprintf("Announcement with identifier \"%s\"", addressee[3:])
+			A.DataTypeDesc = fmt.Sprintf("Announcement with identifier \"%s\"", addressee[3:])
 		}
 
 		if len(addressee) >= 5 && unicode.IsDigit(rune(addressee[3])) {
-			A.dataTypeDesc = fmt.Sprintf("Group Bulletin with identifier \"%c\", group name \"%s\"", addressee[3], addressee[4:])
+			A.DataTypeDesc = fmt.Sprintf("Group Bulletin with identifier \"%c\", group name \"%s\"", addressee[3], addressee[4:])
 		} else {
 			// Not one of the official formats.
-			A.dataTypeDesc = fmt.Sprintf("Bulletin with identifier \"%s\"", addressee[3:])
+			A.DataTypeDesc = fmt.Sprintf("Bulletin with identifier \"%s\"", addressee[3:])
 		}
 
-		A.messageSubtype = messageSubtypeBulletin
-		A.comment = string(message)
+		A.MessageSubtype = messageSubtypeBulletin
+		A.Comment = string(message)
 	} else if len(addressee) >= 3 && bytes.HasPrefix(addressee, []byte("NWS")) {
 		// Weather bulletins have addressee starting with NWS, SKY, CWA, or BOM.
 		// The protocol spec and http://www.aprs.org/APRS-docs/WX.TXT state that
@@ -1747,20 +1748,20 @@ func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byt
 		// However, https://www.aprs-is.net/WX/ also lists the underscore
 		// alternative for the compressed format.  Xastir implements this.
 		if len(addressee) >= 4 && addressee[3] == '-' {
-			A.dataTypeDesc = fmt.Sprintf("Weather bulletin with identifier \"%s\"", addressee[4:])
+			A.DataTypeDesc = fmt.Sprintf("Weather bulletin with identifier \"%s\"", addressee[4:])
 		} else if len(addressee) >= 4 && addressee[3] == '_' {
-			A.dataTypeDesc = fmt.Sprintf("Compressed Weather bulletin with identifier \"%s\"", addressee[4:])
+			A.DataTypeDesc = fmt.Sprintf("Compressed Weather bulletin with identifier \"%s\"", addressee[4:])
 		} else {
-			A.dataTypeDesc = fmt.Sprintf("Weather bulletin is missing - or _ after %.3s", addressee)
+			A.DataTypeDesc = fmt.Sprintf("Weather bulletin is missing - or _ after %.3s", addressee)
 		}
 
-		A.messageSubtype = messageSubtypeNWS
-		A.comment = string(message)
+		A.MessageSubtype = messageSubtypeNWS
+		A.Comment = string(message)
 	} else if len(addressee) >= 3 && (bytes.HasPrefix(addressee, []byte("SKY")) || bytes.HasPrefix(addressee, []byte("CWA")) || bytes.HasPrefix(addressee, []byte("BOM"))) {
 		// SKY... or CWA...   https://www.aprs-is.net/WX/
-		A.dataTypeDesc = fmt.Sprintf("Weather bulletin with identifier \"%s\"", addressee[4:])
-		A.messageSubtype = messageSubtypeNWS
-		A.comment = string(message)
+		A.DataTypeDesc = fmt.Sprintf("Weather bulletin with identifier \"%s\"", addressee[4:])
+		A.MessageSubtype = messageSubtypeNWS
+		A.Comment = string(message)
 	} else if bytes.HasPrefix(message, []byte("PARM.")) {
 		/*
 		 * Special message formats contain telemetry metadata.
@@ -1772,31 +1773,31 @@ func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byt
 		 * Telemetry data always starts with "#" after the "T" data type indicator.
 		 * Why not use other characters after the "T" for metadata?
 		 */
-		A.dataTypeDesc = fmt.Sprintf("Telemetry Parameter Name for \"%s\"", addressee)
-		A.messageSubtype = messageSubtypeTelemParm
+		A.DataTypeDesc = fmt.Sprintf("Telemetry Parameter Name for \"%s\"", addressee)
+		A.MessageSubtype = messageSubtypeTelemParm
 
 		telemetryState.NameMessage(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("UNIT.")) {
-		A.dataTypeDesc = fmt.Sprintf("Telemetry Unit/Label for \"%s\"", addressee)
-		A.messageSubtype = messageSubtypeTelemUnit
+		A.DataTypeDesc = fmt.Sprintf("Telemetry Unit/Label for \"%s\"", addressee)
+		A.MessageSubtype = messageSubtypeTelemUnit
 
 		telemetryState.UnitLabelMessage(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("EQNS.")) {
-		A.dataTypeDesc = fmt.Sprintf("Telemetry Equation Coefficients for \"%s\"", addressee)
-		A.messageSubtype = messageSubtypeTelemEqns
+		A.DataTypeDesc = fmt.Sprintf("Telemetry Equation Coefficients for \"%s\"", addressee)
+		A.MessageSubtype = messageSubtypeTelemEqns
 
 		telemetryState.CoefficientsMessage(string(addressee), string(message[5:]), quiet)
 	} else if bytes.HasPrefix(message, []byte("BITS.")) {
-		A.dataTypeDesc = fmt.Sprintf("Telemetry Bit Sense/Project Name for \"%s\"", addressee)
-		A.messageSubtype = messageSubtypeTelemBits
+		A.DataTypeDesc = fmt.Sprintf("Telemetry Bit Sense/Project Name for \"%s\"", addressee)
+		A.MessageSubtype = messageSubtypeTelemBits
 
 		telemetryState.BitSenseMessage(string(addressee), string(message[5:]), quiet)
 	} else if len(message) > 0 && message[0] == '?' {
 		/*
 		 * If first character of message is "?" it is a query directed toward a specific station.
 		 */
-		A.dataTypeDesc = "Directed Station Query"
-		A.messageSubtype = messageSubtypeDirectedQuery
+		A.DataTypeDesc = "Directed Station Query"
+		A.MessageSubtype = messageSubtypeDirectedQuery
 
 		aprsDirectedStationQuery(A, addressee, message[1:], quiet)
 	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("ack")) {
@@ -1804,50 +1805,50 @@ func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byt
 		if !bytes.HasPrefix(message, []byte("ack")) {
 			logrus.WithField("message", string(message)).Warn("ack must be lower case")
 		} else {
-			A.messageNumber = string(message[3:])
-			if len(A.messageNumber) == 0 {
+			A.MessageNumber = string(message[3:])
+			if len(A.MessageNumber) == 0 {
 				logrus.Warn("Message number is missing after ack")
 			}
 		}
 
 		// Xastir puts a carriage return on the end.
-		if strings.Contains(A.messageNumber, "\r") {
+		if strings.Contains(A.MessageNumber, "\r") {
 			logrus.WithField("hint", "Adding CR might prevent proper interoperability with other applications").
 				Warn("The APRS protocol specification says nothing about a possible carriage return after the message id")
 
-			A.messageNumber = strings.ReplaceAll(A.messageNumber, "\r", "")
+			A.MessageNumber = strings.ReplaceAll(A.MessageNumber, "\r", "")
 		}
 
-		if len(A.messageNumber) >= 3 && A.messageNumber[2] == '}' {
-			A.messageNumber = A.messageNumber[:2]
+		if len(A.MessageNumber) >= 3 && A.MessageNumber[2] == '}' {
+			A.MessageNumber = A.MessageNumber[:2]
 		}
 
-		A.dataTypeDesc = fmt.Sprintf("\"%s\" ACKnowledged message number \"%s\" from \"%s\"", A.src, A.messageNumber, addressee)
-		A.messageSubtype = messageSubtypeAck
+		A.DataTypeDesc = fmt.Sprintf("\"%s\" ACKnowledged message number \"%s\" from \"%s\"", A.Src, A.MessageNumber, addressee)
+		A.MessageSubtype = messageSubtypeAck
 	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("rej")) {
 		if !bytes.HasPrefix(message, []byte("rej")) {
 			logrus.WithField("message", string(message)).Warn("rej must be lower case")
 		} else {
-			A.messageNumber = string(message[3:])
-			if len(A.messageNumber) == 0 {
+			A.MessageNumber = string(message[3:])
+			if len(A.MessageNumber) == 0 {
 				logrus.Warn("Message number is missing after rej")
 			}
 		}
 
 		// Xastir puts a carriage return on the end.
-		if strings.Contains(A.messageNumber, "\r") {
+		if strings.Contains(A.MessageNumber, "\r") {
 			logrus.WithField("hint", "Adding CR might prevent proper interoperability with other applications").
 				Warn("The APRS protocol specification says nothing about a possible carriage return after the message id")
 
-			A.messageNumber = strings.ReplaceAll(A.messageNumber, "\r", "")
+			A.MessageNumber = strings.ReplaceAll(A.MessageNumber, "\r", "")
 		}
 
-		if len(A.messageNumber) >= 3 && A.messageNumber[2] == '}' {
-			A.messageNumber = A.messageNumber[:2]
+		if len(A.MessageNumber) >= 3 && A.MessageNumber[2] == '}' {
+			A.MessageNumber = A.MessageNumber[:2]
 		}
 
-		A.dataTypeDesc = fmt.Sprintf("\"%s\" REJected message number \"%s\" from \"%s\"", A.src, A.messageNumber, addressee)
-		A.messageSubtype = messageSubtypeAck
+		A.DataTypeDesc = fmt.Sprintf("\"%s\" REJected message number \"%s\" from \"%s\"", A.Src, A.MessageNumber, addressee)
+		A.MessageSubtype = messageSubtypeAck
 	} else {
 		// Message to a particular station or a bulletin.
 		// message number is optional here.
@@ -1866,51 +1867,51 @@ func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byt
 		// Normal messaage case.  Look for message number.
 		var _, after, found = bytes.Cut(message, []byte{'{'})
 		if found {
-			A.messageNumber = string(after)
+			A.MessageNumber = string(after)
 
 			// Xastir puts a carriage return on the end.
-			if strings.Contains(A.messageNumber, "\r") {
+			if strings.Contains(A.MessageNumber, "\r") {
 				logrus.WithField("hint", "Adding CR might prevent proper interoperability with other applications").
 					Warn("The APRS protocol specification says nothing about a possible carriage return after the message id")
 
-				A.messageNumber = strings.ReplaceAll(A.messageNumber, "\r", "")
+				A.MessageNumber = strings.ReplaceAll(A.MessageNumber, "\r", "")
 			}
 
-			var mlen = len(A.messageNumber)
+			var mlen = len(A.MessageNumber)
 			if mlen < 1 || mlen > 5 {
-				logrus.WithField("message_number", A.messageNumber).Warn("Message number has length outside range of 1 to 5")
+				logrus.WithField("message_number", A.MessageNumber).Warn("Message number has length outside range of 1 to 5")
 			}
 
 			// TODO: Complain if not alphanumeric.
 
 			var ack string
 
-			if mlen >= 3 && A.messageNumber[2] == '}' {
+			if mlen >= 3 && A.MessageNumber[2] == '}' {
 				//  New (1999) style.
-				ack = A.messageNumber[3:]
-				A.messageNumber = A.messageNumber[:2]
+				ack = A.MessageNumber[3:]
+				A.MessageNumber = A.MessageNumber[:2]
 			}
 
 			if len(ack) > 0 {
 				// With ACK.  Message number should be 2 characters.
-				A.dataTypeDesc = fmt.Sprintf("APRS Message, number \"%s\", from \"%s\" to \"%s\", with ACK for \"%s\"", A.messageNumber, A.src, addressee, ack)
+				A.DataTypeDesc = fmt.Sprintf("APRS Message, number \"%s\", from \"%s\" to \"%s\", with ACK for \"%s\"", A.MessageNumber, A.Src, addressee, ack)
 			} else {
 				// Message number can be 1-5 characters.
-				A.dataTypeDesc = fmt.Sprintf("APRS Message, number \"%s\", from \"%s\" to \"%s\"", A.messageNumber, A.src, addressee)
+				A.DataTypeDesc = fmt.Sprintf("APRS Message, number \"%s\", from \"%s\" to \"%s\"", A.MessageNumber, A.Src, addressee)
 			}
 		} else {
 			// No message number.
-			A.dataTypeDesc = fmt.Sprintf("APRS Message, with no number, from \"%s\" to \"%s\"", A.src, addressee)
+			A.DataTypeDesc = fmt.Sprintf("APRS Message, with no number, from \"%s\" to \"%s\"", A.Src, addressee)
 		}
 
-		A.messageSubtype = messageSubtypeMessage
+		A.MessageSubtype = messageSubtypeMessage
 
 		/* No location so don't use processComment() */
 
-		A.comment = string(message)
+		A.Comment = string(message)
 
 		// Remove message number when displaying message text.
-		A.comment, _, _ = strings.Cut(A.comment, "{")
+		A.Comment, _, _ = strings.Cut(A.Comment, "{")
 	}
 }
 
@@ -1922,7 +1923,7 @@ func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byt
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.name, A.lat, A.lon, A.symbolTable, A.symbolCode, A.speedMPH, A.course, A.altitudeFt.
+ * Outputs:	A.Name, A.Lat, A.Lon, A.SymbolTable, A.SymbolCode, A.SpeedMPH, A.Course, A.AltitudeFt.
  *
  * Description:	Message has a 9 character object name which could be quite different than
  *		the source station.
@@ -1937,7 +1938,7 @@ func aprsMessage(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byt
  *
  *------------------------------------------------------------------*/
 
-func aprsObject(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) {
+func aprsObject(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 	type objectInfo struct {
 		DTI          byte /* ; */
 		Name         [9]byte
@@ -1959,18 +1960,18 @@ func aprsObject(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte
 	var objectPosBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
 	var objectCompressedPosBytes, _ = binary.Decode(info, binary.NativeEndian, &q)
 
-	//Assert (sizeof(A.name) > sizeof(p.name));
+	//Assert (sizeof(A.Name) > sizeof(p.name));
 
-	A.name = string(p.Name[:])
-	A.name = strings.TrimSpace(A.name)
+	A.Name = string(p.Name[:])
+	A.Name = strings.TrimSpace(A.Name)
 
 	switch p.LiveOrKilled {
 	case '*':
-		A.dataTypeDesc = "Object"
+		A.DataTypeDesc = "Object"
 	case '_':
-		A.dataTypeDesc = "Killed Object"
+		A.DataTypeDesc = "Killed Object"
 	default:
-		A.dataTypeDesc = "Object - invalid live/killed"
+		A.DataTypeDesc = "Object - invalid live/killed"
 	}
 
 	getTimestamp(A, p.Timestamp) // Only checked, not kept.
@@ -1978,11 +1979,11 @@ func aprsObject(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte
 	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
 		decodePosition(A, &(p.Pos))
 
-		if A.symbolCode == '_' {
+		if A.SymbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
-			A.dataTypeDesc = "Weather Report with Object"
+			A.DataTypeDesc = "Weather Report with Object"
 			weatherData(A, info[objectPosBytes:])
 		} else {
 			/* Regular object. */
@@ -1991,12 +1992,12 @@ func aprsObject(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte
 	} else { /* Compressed location. */
 		decodeCompressedPosition(A, &(q.CPos))
 
-		if A.symbolCode == '_' {
+		if A.SymbolCode == '_' {
 			/* Symbol code indidates it is a weather report. */
 			/* The spec doesn't explicitly mention the combination */
 			/* of weather report and object with compressed */
 			/* position. */
-			A.dataTypeDesc = "Weather Report with Object"
+			A.DataTypeDesc = "Weather Report with Object"
 			weatherData(A, info[objectCompressedPosBytes:])
 		} else {
 			/* Regular position report. */
@@ -2013,7 +2014,7 @@ func aprsObject(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.name, A.lat, A.lon, A.symbolTable, A.symbolCode, A.speedMPH, A.course, A.altitudeFt.
+ * Outputs:	A.Name, A.Lat, A.Lon, A.SymbolTable, A.SymbolCode, A.SpeedMPH, A.Course, A.AltitudeFt.
  *
  * Description:	An "item" is very much like an "object" except
  *
@@ -2025,7 +2026,7 @@ func aprsObject(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte
  *
  *------------------------------------------------------------------*/
 
-func aprsItem(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) {
+func aprsItem(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 	/*
 		Structure:
 
@@ -2051,7 +2052,7 @@ func aprsItem(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) 
 		info = info[1:]
 	}
 
-	A.name = string(name)
+	A.Name = string(name)
 
 	if len(info) == 0 {
 		// The name ran to the end of the information field, so there is no
@@ -2060,7 +2061,7 @@ func aprsItem(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) 
 			logrus.WithField("name", string(name)).Warn("Item name is not followed by the ! or _ that should end it")
 		}
 
-		A.dataTypeDesc = "Item - name not ended by ! or _"
+		A.DataTypeDesc = "Item - name not ended by ! or _"
 
 		return
 	}
@@ -2076,15 +2077,15 @@ func aprsItem(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) 
 
 	switch liveOrKilled {
 	case '!':
-		A.dataTypeDesc = "Item"
+		A.DataTypeDesc = "Item"
 	case '_':
-		A.dataTypeDesc = "Killed Item"
+		A.DataTypeDesc = "Killed Item"
 	default:
 		if !A.quiet {
 			logrus.WithField("name", string(name)).Warn("Item name not followed by ! or _")
 		}
 
-		A.dataTypeDesc = "Object - invalid live/killed"
+		A.DataTypeDesc = "Object - invalid live/killed"
 	}
 
 	var p aprs.Position
@@ -2134,13 +2135,13 @@ func aprsItem(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte) 
  *
  *------------------------------------------------------------------*/
 
-func aprsStationCapabilities(A *decodedAPRS, info []byte) {
-	A.dataTypeDesc = "Station Capabilities"
+func aprsStationCapabilities(A *Decoded, info []byte) {
+	A.DataTypeDesc = "Station Capabilities"
 
 	// 	processComment() not applicable here because it
 	//	extracts information found in certain formats.
 
-	A.comment = string(info[1:])
+	A.Comment = string(info[1:])
 } /* end aprsStationCapabilities */
 
 /*------------------------------------------------------------------
@@ -2185,7 +2186,7 @@ func aprsStationCapabilities(A *decodedAPRS, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprsStatusReport(A *decodedAPRS, info []byte) {
+func aprsStatusReport(A *Decoded, info []byte) {
 	type statusTime struct {
 		DTI   byte    /* > */
 		ZTime [7]byte /* Time stamp ddhhmmz */
@@ -2215,7 +2216,7 @@ func aprsStatusReport(A *decodedAPRS, info []byte) {
 	}
 	var ps statusInfo
 
-	A.dataTypeDesc = "Status Report"
+	A.DataTypeDesc = "Status Report"
 
 	var ptBytes, _ = binary.Decode(info, binary.NativeEndian, &pt)
 	var pm4Bytes, _ = binary.Decode(info, binary.NativeEndian, &pm4)
@@ -2234,22 +2235,22 @@ func aprsStatusReport(A *decodedAPRS, info []byte) {
 		pt.ZTime[6] == 'z' {
 		// 	processComment() not applicable here because it
 		//	extracts information found in certain formats.
-		A.comment = string(info[ptBytes:])
+		A.Comment = string(info[ptBytes:])
 	} else if getMaidenhead(pm6.Mhead6[:]) == 6 {
 		/*
 		 * Do we have format with 6 character Maidenhead locator?
 		 */
-		A.maidenhead = string(pm6.Mhead6[:])
+		A.Maidenhead = string(pm6.Mhead6[:])
 
-		A.symbolTable = pm6.SymTableId
-		A.symbolCode = pm6.SymbolCode
+		A.SymbolTable = pm6.SymTableId
+		A.SymbolCode = pm6.SymbolCode
 
-		if A.symbolTable != '/' && A.symbolTable != '\\' && !unicode.IsUpper(rune(A.symbolTable)) && !unicode.IsDigit(rune(A.symbolTable)) {
+		if A.SymbolTable != '/' && A.SymbolTable != '\\' && !unicode.IsUpper(rune(A.SymbolTable)) && !unicode.IsDigit(rune(A.SymbolTable)) {
 			if !A.quiet {
-				logrus.WithField("symbol_table", string(rune(A.symbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
+				logrus.WithField("symbol_table", string(rune(A.SymbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 			}
 
-			A.symbolTable = '/'
+			A.SymbolTable = '/'
 		}
 
 		if pm6.Space != ' ' && pm6.Space != 0 {
@@ -2261,22 +2262,22 @@ func aprsStatusReport(A *decodedAPRS, info []byte) {
 		// 	processComment() not applicable here because it
 		//	extracts information found in certain formats.
 
-		A.comment = string(info[pm6Bytes:])
+		A.Comment = string(info[pm6Bytes:])
 	} else if getMaidenhead(pm4.Mhead4[:]) == 4 {
 		/*
 		 * Do we have format with 4 character Maidenhead locator?
 		 */
-		A.maidenhead = string(pm4.Mhead4[:])
+		A.Maidenhead = string(pm4.Mhead4[:])
 
-		A.symbolTable = pm4.SymTableId
-		A.symbolCode = pm4.SymbolCode
+		A.SymbolTable = pm4.SymTableId
+		A.SymbolCode = pm4.SymbolCode
 
-		if A.symbolTable != '/' && A.symbolTable != '\\' && !unicode.IsUpper(rune(A.symbolTable)) && !unicode.IsDigit(rune(A.symbolTable)) {
+		if A.SymbolTable != '/' && A.SymbolTable != '\\' && !unicode.IsUpper(rune(A.SymbolTable)) && !unicode.IsDigit(rune(A.SymbolTable)) {
 			if !A.quiet {
-				logrus.WithField("symbol_table", string(rune(A.symbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
+				logrus.WithField("symbol_table", string(rune(A.SymbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 			}
 
-			A.symbolTable = '/'
+			A.SymbolTable = '/'
 		}
 
 		if pm4.Space != ' ' && pm4.Space != 0 {
@@ -2288,20 +2289,20 @@ func aprsStatusReport(A *decodedAPRS, info []byte) {
 		// 	processComment() not applicable here because it
 		//	extracts information found in certain formats.
 
-		A.comment = string(info[pm4Bytes:])
+		A.Comment = string(info[pm4Bytes:])
 	} else {
 		/*
 		 * Whole thing is status text.
 		 */
-		A.comment = string(info[psBytes:])
+		A.Comment = string(info[psBytes:])
 	}
 
 	/*
 	 * Last 3 characters can represent beam heading and ERP.
 	 */
 
-	if len(A.comment) >= 3 {
-		var hp = A.comment[len(A.comment)-3:]
+	if len(A.Comment) >= 3 {
+		var hp = A.Comment[len(A.Comment)-3:]
 
 		if hp[0] == '^' {
 			var h = hp[1]
@@ -2320,9 +2321,9 @@ func aprsStatusReport(A *decodedAPRS, info []byte) {
 			}
 
 			// TODO (low):  put result somewhere.
-			// could use A.directivity and need new variable for erp.
+			// could use A.Directivity and need new variable for erp.
 
-			A.comment = A.comment[:len(A.comment)-3]
+			A.Comment = A.Comment[:len(A.Comment)-3]
 			_ = beam
 			_ = erp
 		}
@@ -2338,10 +2339,10 @@ func aprsStatusReport(A *decodedAPRS, info []byte) {
  * Inputs:	info 	- Information field.  First character should be "?".
  *
  * Outputs:	A	- Decoded packet structure
- *				A.queryType
- *				A.footprintLat	(optional)
- *				A.footprintLon	(optional)
- *				A.footprintRadius	(optional)
+ *				A.QueryType
+ *				A.FootprintLat	(optional)
+ *				A.FootprintLon	(optional)
+ *				A.FootprintRadius	(optional)
  *
  * Description:	Formats are:
  *
@@ -2374,8 +2375,8 @@ Assuming query responding is enabled, the following broadcast queries should be 
 
 */
 
-func aprsGeneralQuery(A *decodedAPRS, info []byte) {
-	A.dataTypeDesc = "General Query"
+func aprsGeneralQuery(A *Decoded, info []byte) {
+	A.DataTypeDesc = "General Query"
 
 	/*
 	 * There should be another "?" after the query type.
@@ -2389,9 +2390,9 @@ func aprsGeneralQuery(A *decodedAPRS, info []byte) {
 		return
 	}
 
-	A.queryType = string(before)
+	A.QueryType = string(before)
 
-	logrus.WithField("query_type", A.queryType).Debug("General Query")
+	logrus.WithField("query_type", A.QueryType).Debug("General Query")
 
 	if len(after) == 0 {
 		return
@@ -2441,9 +2442,9 @@ func aprsGeneralQuery(A *decodedAPRS, info []byte) {
 			"radius": radius,
 		}).Debug("General Query footprint")
 
-		A.footprintLat = maybe.Just(lat)
-		A.footprintLon = maybe.Just(lon)
-		A.footprintRadius = maybe.Just(radius)
+		A.FootprintLat = maybe.Just(lat)
+		A.FootprintLon = maybe.Just(lon)
+		A.FootprintRadius = maybe.Just(radius)
 	} else {
 		if !A.quiet {
 			logrus.WithField("footprint", string(after)).Warn("Can't parse latitude,longitude,radius for General Query footprint")
@@ -2461,14 +2462,14 @@ func aprsGeneralQuery(A *decodedAPRS, info []byte) {
  *		This is actually a special format of the more general "message."
  *
  * Inputs:	addressee	- To whom it is directed.
- *				  Redundant because it is already in A.addressee.
+ *				  Redundant because it is already in A.Addressee.
  *
  *		query	 	- What's left over after ":addressee:?" in info part.
  *
  *		quiet		- suppress error messages.
  *
  * Outputs:	A	- Decoded packet structure
- *				A.queryType
+ *				A.QueryType
  *
  * Description:	The caller has already removed the :addressee:? part so we are left
  *		with a query type of exactly 5 characters and optional "callsign
@@ -2507,7 +2508,7 @@ Andrew, KA2DDO
 author of YAAC
 */
 
-func aprsDirectedStationQuery(A *decodedAPRS, addressee []byte, query []byte, quiet bool) {
+func aprsDirectedStationQuery(A *Decoded, addressee []byte, query []byte, quiet bool) {
 	//char query_type[20];		/* Does the query type always need to be exactly 5 characters? */
 	/* If not, how would we know where the extra optional information starts? */
 
@@ -2526,8 +2527,8 @@ func aprsDirectedStationQuery(A *decodedAPRS, addressee []byte, query []byte, qu
  * Inputs:	info 	- Information field.
  *		quiet	- suppress error messages.
  *
- * Outputs:	A.telemetry
- *		A.comment
+ * Outputs:	A.Telemetry
+ *		A.Comment
  *
  * Description:	TBD.
  *
@@ -2538,12 +2539,12 @@ func aprsDirectedStationQuery(A *decodedAPRS, addressee []byte, query []byte, qu
  *
  *------------------------------------------------------------------*/
 
-func aprsTelemetry(A *decodedAPRS, telemetryState *aprstelemetry.State, info []byte, quiet bool) {
-	A.dataTypeDesc = "Telemetry"
+func aprsTelemetry(A *Decoded, telemetryState *aprstelemetry.State, info []byte, quiet bool) {
+	A.DataTypeDesc = "Telemetry"
 
-	var telemetry, comment = telemetryState.DataOriginal(A.src, string(info), quiet)
-	A.telemetry = telemetry
-	A.comment = comment
+	var telemetry, comment = telemetryState.DataOriginal(A.Src, string(info), quiet)
+	A.Telemetry = telemetry
+	A.Comment = comment
 } /* end aprsTelemetry */
 
 /*------------------------------------------------------------------
@@ -2559,7 +2560,7 @@ func aprsTelemetry(A *decodedAPRS, telemetryState *aprstelemetry.State, info []b
  *
  *------------------------------------------------------------------*/
 
-func aprsUserDefined(A *decodedAPRS, info []byte) {
+func aprsUserDefined(A *Decoded, info []byte) {
 	if bytes.HasPrefix(info, []byte("{tt")) || // Historical.
 		bytes.HasPrefix(info, []byte("{DT")) { // Official after registering {D*
 		aprsRawTouchTone(A, info)
@@ -2574,28 +2575,28 @@ func aprsUserDefined(A *decodedAPRS, info []byte) {
 			}
 
 			if aisData == nil {
-				A.dataTypeDesc = "AIS"
+				A.DataTypeDesc = "AIS"
 
 				return
 			}
 		}
 
-		A.dataTypeDesc = aisData.Description
-		A.name = aisData.MMSI
-		A.lat = aisData.Lat
-		A.lon = aisData.Lon
-		A.speedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, aisData.Knots)
-		A.course = aisData.Course
-		A.altitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, aisData.AltM)
-		A.symbolTable = aisData.Symtab
-		A.symbolCode = aisData.Symbol
-		A.comment = aisData.Comment
+		A.DataTypeDesc = aisData.Description
+		A.Name = aisData.MMSI
+		A.Lat = aisData.Lat
+		A.Lon = aisData.Lon
+		A.SpeedMPH = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, aisData.Knots)
+		A.Course = aisData.Course
+		A.AltitudeFt = maybe.Fmap(dwutil.DW_METERS_TO_FEET, aisData.AltM)
+		A.SymbolTable = aisData.Symtab
+		A.SymbolCode = aisData.Symbol
+		A.Comment = aisData.Comment
 
-		A.mfr = ""
+		A.Mfr = ""
 	} else if bytes.HasPrefix(info, []byte("{{")) {
-		A.dataTypeDesc = "User-Defined Experimental"
+		A.DataTypeDesc = "User-Defined Experimental"
 	} else {
-		A.dataTypeDesc = "User-Defined Data"
+		A.DataTypeDesc = "User-Defined Data"
 	}
 } /* end aprsUserDefined */
 
@@ -2614,15 +2615,15 @@ func aprsUserDefined(A *decodedAPRS, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprsRawTouchTone(A *decodedAPRS, info []byte) {
-	A.dataTypeDesc = "Raw Touch Tone Data"
+func aprsRawTouchTone(A *Decoded, info []byte) {
+	A.DataTypeDesc = "Raw Touch Tone Data"
 
 	/* Just copy the info field without the message type. */
 
 	if info[0] == '{' {
-		A.comment = string(info[3:])
+		A.Comment = string(info[3:])
 	} else {
-		A.comment = string(info[1:])
+		A.Comment = string(info[1:])
 	}
 } /* end aprsRawTouchTone */
 
@@ -2639,15 +2640,15 @@ func aprsRawTouchTone(A *decodedAPRS, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprsMorseCode(A *decodedAPRS, info []byte) {
-	A.dataTypeDesc = "Morse Code Data"
+func aprsMorseCode(A *Decoded, info []byte) {
+	A.DataTypeDesc = "Morse Code Data"
 
 	/* Just copy the info field without the message type. */
 
 	if info[0] == '{' {
-		A.comment = string(info[3:])
+		A.Comment = string(info[3:])
 	} else {
-		A.comment = string(info[1:])
+		A.Comment = string(info[1:])
 	}
 } /* end aprsMorseCode */
 
@@ -2659,17 +2660,17 @@ func aprsMorseCode(A *decodedAPRS, info []byte) {
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.symbolTable, A.symbolCode.
+ * Outputs:	A.SymbolTable, A.SymbolCode.
  *
  * Description:	Type identifier '_' is a weather report without a position.
  *
  *------------------------------------------------------------------*/
 
-func aprsPositionlessWeatherReport(A *decodedAPRS, info []byte) {
+func aprsPositionlessWeatherReport(A *Decoded, info []byte) {
 	// The data type indicator '_', then an MDHM timestamp, then the weather.
 	const positionlessWeatherHeaderBytes = 1 + 8
 
-	A.dataTypeDesc = "Positionless Weather Report"
+	A.DataTypeDesc = "Positionless Weather Report"
 
 	//time_t ts = 0;
 	// not yet implemented for 8 character format // ts = getTimestamp(A, info[1:9])
@@ -2694,17 +2695,17 @@ func aprsPositionlessWeatherReport(A *decodedAPRS, info []byte) {
  * Inputs:	info 	- Pointer to first byte after location
  *			  and symbol code.
  *
- * Global In:	A.course	- Wind info for compressed location.
- *		A.speedMPH
+ * Global In:	A.Course	- Wind info for compressed location.
+ *		A.SpeedMPH
  *
- * Outputs:	A.weather
+ * Outputs:	A.Weather
  *
  * Description:	Extract weather details and format into a comment.
  *
  *		For human-readable locations, we expect wind direction
  *		and speed in a format like this:  999/999.
  *		For compressed location, this has already been
- * 		processed and put in A.course and A.speedMPH.
+ * 		processed and put in A.Course and A.SpeedMPH.
  *		Otherwise, for positionless weather data, the
  *		wind is in the form c999s999.
  *
@@ -2758,7 +2759,7 @@ func getWeatherData(wpp []byte, id rune, dlen int) (maybe.Maybe[float64], []byte
 	return maybe.Just(f), wpp[dlen+1:], true
 }
 
-func weatherData(A *decodedAPRS, wdata []byte) {
+func weatherData(A *Decoded, wdata []byte) {
 	var wp = wdata
 	var found bool
 
@@ -2775,24 +2776,24 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 			// Fine point:  Officially, should be values of 001-360.
 			// "000" or "..." or "   " means unknown.
 			// In practice we see do see "000" here.
-			A.course = maybe.Just(float64(n))
+			A.Course = maybe.Just(float64(n))
 		}
 
 		count, _ = fmt.Sscanf(string(wp[4:7]), "%3d", &n)
 		if count > 0 {
-			A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n))) /* yes, in knots */
+			A.SpeedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n))) /* yes, in knots */
 		}
 
 		wp = wp[7:]
-	} else if A.speedMPH.IsNothing() {
-		A.course, wp, found = getWeatherData(wp, 'c', 3)
+	} else if A.SpeedMPH.IsNothing() {
+		A.Course, wp, found = getWeatherData(wp, 'c', 3)
 		if !found {
 			if !A.quiet {
 				logrus.Warn("Didn't find wind direction in form c999")
 			}
 		}
 
-		A.speedMPH, wp, found = getWeatherData(wp, 's', 3) /* MPH here */
+		A.SpeedMPH, wp, found = getWeatherData(wp, 's', 3) /* MPH here */
 		if !found {
 			if !A.quiet {
 				logrus.Warn("Didn't find wind speed in form s999")
@@ -2803,16 +2804,16 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 	// At this point, we should have the wind direction and speed
 	// from one of three methods.
 
-	if speed_mph, ok := A.speedMPH.Get(); ok {
-		A.weather = fmt.Sprintf("wind %.1f mph", speed_mph)
-		if course, ok := A.course.Get(); ok {
-			A.weather += fmt.Sprintf(", direction %.0f", course)
+	if speed_mph, ok := A.SpeedMPH.Get(); ok {
+		A.Weather = fmt.Sprintf("wind %.1f mph", speed_mph)
+		if course, ok := A.Course.Get(); ok {
+			A.Weather += fmt.Sprintf(", direction %.0f", course)
 		}
 	}
 
 	/* We don't want this to show up on the location line. */
-	A.speedMPH = maybe.Nothing[float64]()
-	A.course = maybe.Nothing[float64]()
+	A.SpeedMPH = maybe.Nothing[float64]()
+	A.Course = maybe.Nothing[float64]()
 
 	/*
 	 * After the mandatory wind direction and speed (in 1 of 3 formats), the
@@ -2825,7 +2826,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 	wval, wp, found = getWeatherData(wp, 'g', 3)
 	if found {
 		if fval, ok := wval.Get(); ok {
-			A.weather += fmt.Sprintf(", gust %.0f", fval)
+			A.Weather += fmt.Sprintf(", gust %.0f", fval)
 		}
 	} else {
 		if !A.quiet {
@@ -2836,7 +2837,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 	wval, wp, found = getWeatherData(wp, 't', 3)
 	if found {
 		if fval, ok := wval.Get(); ok {
-			A.weather += fmt.Sprintf(", temperature %.0f", fval)
+			A.Weather += fmt.Sprintf(", temperature %.0f", fval)
 		}
 	} else {
 		if !A.quiet {
@@ -2853,7 +2854,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 		if found {
 			/* r = rainfall, 1/100 inch, last hour */
 			if fval, ok := wval.Get(); ok {
-				A.weather += fmt.Sprintf(", rain %.2f in last hour", fval/100.)
+				A.Weather += fmt.Sprintf(", rain %.2f in last hour", fval/100.)
 			}
 
 			continue
@@ -2863,7 +2864,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 		if found {
 			/* p = rainfall, 1/100 inch, last 24 hours */
 			if fval, ok := wval.Get(); ok {
-				A.weather += fmt.Sprintf(", rain %.2f in last 24 hours", fval/100.)
+				A.Weather += fmt.Sprintf(", rain %.2f in last 24 hours", fval/100.)
 			}
 
 			continue
@@ -2873,7 +2874,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 		if found {
 			/* P = rainfall, 1/100 inch, since midnight */
 			if fval, ok := wval.Get(); ok {
-				A.weather += fmt.Sprintf(", rain %.2f since midnight", fval/100.)
+				A.Weather += fmt.Sprintf(", rain %.2f since midnight", fval/100.)
 			}
 
 			continue
@@ -2887,7 +2888,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 					fval = 100
 				}
 
-				A.weather += fmt.Sprintf(", humidity %.0f", fval)
+				A.Weather += fmt.Sprintf(", humidity %.0f", fval)
 			}
 
 			continue
@@ -2899,7 +2900,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 			/* Here, display as inches of mercury. */
 			if fval, ok := wval.Get(); ok {
 				fval = dwutil.DW_MBAR_TO_INHG(fval * 0.1)
-				A.weather += fmt.Sprintf(", barometer %.2f", fval)
+				A.Weather += fmt.Sprintf(", barometer %.2f", fval)
 			}
 
 			continue
@@ -2909,7 +2910,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 		if found {
 			/* L = Luminosity, watts/ sq meter, 000-999  */
 			if fval, ok := wval.Get(); ok {
-				A.weather += fmt.Sprintf(", %.0f watts/m^2", fval)
+				A.Weather += fmt.Sprintf(", %.0f watts/m^2", fval)
 			}
 
 			continue
@@ -2919,7 +2920,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 		if found {
 			/* l = Luminosity, watts/ sq meter, 1000-1999  */
 			if fval, ok := wval.Get(); ok {
-				A.weather += fmt.Sprintf(", %.0f watts/m^2", fval+1000)
+				A.Weather += fmt.Sprintf(", %.0f watts/m^2", fval+1000)
 			}
 
 			continue
@@ -2932,7 +2933,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 			/* 's' is also used by wind speed but that must be in a fixed */
 			/* position in the message so there is no confusion. */
 			if fval, ok := wval.Get(); ok {
-				A.weather += fmt.Sprintf(", %.1f snow in 24 hours", fval)
+				A.Weather += fmt.Sprintf(", %.1f snow in 24 hours", fval)
 			}
 
 			continue
@@ -2942,7 +2943,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 		if found {
 			/* # = Raw rain counter  */
 			if fval, ok := wval.Get(); ok {
-				A.weather += fmt.Sprintf(", raw rain counter %.f", fval)
+				A.Weather += fmt.Sprintf(", raw rain counter %.f", fval)
 			}
 
 			continue
@@ -2956,7 +2957,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 
 			// TODO: decode this properly
 			if fval, ok := wval.Get(); ok {
-				A.weather += fmt.Sprintf(", nuclear Radiation %.f", fval)
+				A.Weather += fmt.Sprintf(", nuclear Radiation %.f", fval)
 			}
 
 			continue
@@ -2977,14 +2978,14 @@ func weatherData(A *decodedAPRS, wdata []byte) {
 	 *  / {UIV32N}
 	 */
 
-	A.weather += ", \""
-	A.weather += string(wp)
+	A.Weather += ", \""
+	A.Weather += string(wp)
 	/*
 	 * Drop any CR / LF character at the end.
 	 */
-	A.weather = strings.TrimSpace(A.weather)
+	A.Weather = strings.TrimSpace(A.Weather)
 
-	A.weather += "\""
+	A.Weather += "\""
 } /* end weatherData */
 
 /*------------------------------------------------------------------
@@ -2995,7 +2996,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
  *
  * Inputs:	info 	- Information field.
  *
- * Outputs:	A.weather
+ * Outputs:	A.Weather
  *
  * Description:	http://www.peetbros.com/shop/custom.aspx?recid=7
  *
@@ -3016,7 +3017,7 @@ func weatherData(A *decodedAPRS, wdata []byte) {
  *
  *------------------------------------------------------------------*/
 
-func aprsUltimeter(A *decodedAPRS, info []byte) {
+func aprsUltimeter(A *Decoded, info []byte) {
 	// Header = $ULTW
 	// Data Fields
 	var h_windpeak uint16  // 1. Wind Speed Peak over last 5 min. (0.1 kph)
@@ -3038,7 +3039,7 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
 	// Total size: 44, 48 or 52 characters (hex digits) +
 	// header, carriage return and line feed.
 
-	A.dataTypeDesc = "Ultimeter"
+	A.DataTypeDesc = "Ultimeter"
 
 	if info[0] == '$' {
 		var n, _ = fmt.Sscanf(string(info[5:]), "%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx",
@@ -3065,7 +3066,7 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
 			baro = float64(dwutil.DW_MBAR_TO_INHG(float64(h_baro) * 0.1))
 			ohumid = float64(h_ohumid) * 0.1
 
-			A.weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f, barometer %.2f, humidity %.0f",
+			A.Weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f, barometer %.2f, humidity %.0f",
 				windpeak, wdir, otemp, baro, ohumid)
 		}
 	}
@@ -3103,7 +3104,7 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
 			wdir = float64(h_wdir&0xff) * 360. / 256.
 			otemp = float64(h_otemp) * 0.1
 
-			A.weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f\n",
+			A.Weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f\n",
 				windpeak, wdir, otemp)
 		}
 	}
@@ -3117,22 +3118,22 @@ func aprsUltimeter(A *decodedAPRS, info []byte) {
  *
  * Inputs:	ppos 	- Pointer to position & symbol fields.
  *
- * Returns:	A.lat
- *		A.lon
- *		A.symbolTable
- *		A.symbolCode
+ * Returns:	A.Lat
+ *		A.Lon
+ *		A.SymbolTable
+ *		A.SymbolCode
  *
  * Description:	This provides resolution of about 60 feet.
  *		This can be improved by using !DAO! in the comment.
  *
  *------------------------------------------------------------------*/
 
-func decodePosition(A *decodedAPRS, ppos *aprs.Position) {
-	A.lat = getLatitude8(ppos.Lat, A.quiet)
-	A.lon = getLongitude9(ppos.Lon, A.quiet)
+func decodePosition(A *Decoded, ppos *aprs.Position) {
+	A.Lat = getLatitude8(ppos.Lat, A.quiet)
+	A.Lon = getLongitude9(ppos.Lon, A.quiet)
 
-	A.symbolTable = ppos.SymTableId
-	A.symbolCode = ppos.SymbolCode
+	A.SymbolTable = ppos.SymTableId
+	A.SymbolCode = ppos.SymbolCode
 }
 
 /*------------------------------------------------------------------
@@ -3143,15 +3144,15 @@ func decodePosition(A *decodedAPRS, ppos *aprs.Position) {
  *
  * Inputs:	ppos 	- Pointer to compressed position & symbol fields.
  *
- * Returns:	A.lat
- *		A.lon
- *		A.symbolTable
- *		A.symbolCode
+ * Returns:	A.Lat
+ *		A.Lon
+ *		A.SymbolTable
+ *		A.SymbolCode
  *
  *		One of the following:
- *			A.course & A.speedMPH
- *			A.altitudeFt
- *			A.radioRange
+ *			A.Course & A.SpeedMPH
+ *			A.AltitudeFt
+ *			A.RadioRange
  *
  * Description:	The compressed position provides resolution of around ???
  *		This also includes course/speed or altitude.
@@ -3172,54 +3173,54 @@ func decodePosition(A *decodedAPRS, ppos *aprs.Position) {
  *
  *------------------------------------------------------------------*/
 
-func decodeCompressedPosition(A *decodedAPRS, pcpos *aprs.CompressedPosition) {
+func decodeCompressedPosition(A *Decoded, pcpos *aprs.CompressedPosition) {
 	if aprs.IsBase91Digit(pcpos.Y[0]) && aprs.IsBase91Digit(pcpos.Y[1]) && aprs.IsBase91Digit(pcpos.Y[2]) && aprs.IsBase91Digit(pcpos.Y[3]) {
-		A.lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
+		A.Lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
 	} else {
 		if !A.quiet {
 			logrus.WithField("latitude", string(pcpos.Y[:])).Warn("Invalid character in compressed latitude: must be in range '!' to '{'")
 		}
 
-		A.lat = maybe.Nothing[float64]()
+		A.Lat = maybe.Nothing[float64]()
 	}
 
 	if aprs.IsBase91Digit(pcpos.X[0]) && aprs.IsBase91Digit(pcpos.X[1]) && aprs.IsBase91Digit(pcpos.X[2]) && aprs.IsBase91Digit(pcpos.X[3]) {
-		A.lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
+		A.Lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
 	} else {
 		if !A.quiet {
 			logrus.WithField("longitude", string(pcpos.X[:])).Warn("Invalid character in compressed longitude: must be in range '!' to '{'")
 		}
 
-		A.lon = maybe.Nothing[float64]()
+		A.Lon = maybe.Nothing[float64]()
 	}
 
 	if pcpos.SymTableId == '/' || pcpos.SymTableId == '\\' || unicode.IsUpper(rune(pcpos.SymTableId)) {
 		/* primary or alternate or alternate with upper case overlay. */
-		A.symbolTable = pcpos.SymTableId
+		A.SymbolTable = pcpos.SymTableId
 	} else if pcpos.SymTableId >= 'a' && pcpos.SymTableId <= 'j' {
 		/* Lower case a-j are used to represent overlay characters 0-9 */
 		/* because a digit here would mean normal (non-compressed) location. */
-		A.symbolTable = pcpos.SymTableId - 'a' + '0'
+		A.SymbolTable = pcpos.SymTableId - 'a' + '0'
 	} else {
 		if !A.quiet {
 			logrus.WithField("symbol_table", string(rune(pcpos.SymTableId))).Warn("Invalid symbol table id for compressed position")
 		}
 
-		A.symbolTable = '/'
+		A.SymbolTable = '/'
 	}
 
-	A.symbolCode = pcpos.SymbolCode
+	A.SymbolCode = pcpos.SymbolCode
 
 	if pcpos.C == ' ' {
 		/* ignore other two bytes */
 	} else if ((pcpos.T - 33) & 0x18) == 0x10 {
-		A.altitudeFt = maybe.Just(math.Pow(1.002, float64(pcpos.C-33)*91+float64(pcpos.S-33)))
+		A.AltitudeFt = maybe.Just(math.Pow(1.002, float64(pcpos.C-33)*91+float64(pcpos.S-33)))
 	} else if pcpos.C == '{' {
-		A.radioRange = maybe.Just(2.0 * math.Pow(1.08, float64(pcpos.S-33)))
+		A.RadioRange = maybe.Just(2.0 * math.Pow(1.08, float64(pcpos.S-33)))
 	} else if pcpos.C >= '!' && pcpos.C <= 'z' {
 		/* For a weather station, this is wind information. */
-		A.course = maybe.Just(float64(pcpos.C-33) * 4)
-		A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
+		A.Course = maybe.Just(float64(pcpos.C-33) * 4)
+		A.SpeedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
 	}
 }
 
@@ -3589,7 +3590,7 @@ func getLongitude9(p [9]byte, quiet bool) maybe.Maybe[float64] {
  *
  *------------------------------------------------------------------*/
 
-func getTimestamp(A *decodedAPRS, p [7]byte) time.Time { //nolint:unparam // Nothing reads the time yet; callers only want the check.
+func getTimestamp(A *Decoded, p [7]byte) time.Time { //nolint:unparam // Nothing reads the time yet; callers only want the check.
 	type dhm_s struct {
 		Day     [2]byte
 		Hours   [2]byte
@@ -3719,17 +3720,17 @@ func getMaidenhead(p []byte) int {
  *
  * Outputs:	One or more of the following, depending the data found:
  *
- *			A.course
- *			A.speedMPH
- *			A.power
- *			A.heightFt
- *			A.gain
- *			A.directivity
- *			A.radioRange
+ *			A.Course
+ *			A.SpeedMPH
+ *			A.Power
+ *			A.HeightFt
+ *			A.Gain
+ *			A.Directivity
+ *			A.RadioRange
  *
  *		Anything left over will be put in
  *
- *			A.comment
+ *			A.Comment
  *
  * Description:
  *
@@ -3746,9 +3747,9 @@ func directivityString(d int) (string, error) {
 	return dirs[d], nil
 }
 
-func dataExtensionComment(A *decodedAPRS, telemetryState *aprstelemetry.State, pdext []byte) {
+func dataExtensionComment(A *Decoded, telemetryState *aprstelemetry.State, pdext []byte) {
 	if len(pdext) < 7 {
-		A.comment = string(pdext)
+		A.Comment = string(pdext)
 
 		return
 	}
@@ -3773,12 +3774,12 @@ func dataExtensionComment(A *decodedAPRS, telemetryState *aprstelemetry.State, p
 
 		var count, _ = fmt.Sscanf(string(pdext), "%3d", &n)
 		if count > 0 {
-			A.course = maybe.Just(float64(n))
+			A.Course = maybe.Just(float64(n))
 		}
 
 		count, _ = fmt.Sscanf(string(pdext[4:]), "%3d", &n)
 		if count > 0 {
-			A.speedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n)))
+			A.SpeedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n)))
 		}
 
 		/* Bearing and Number/Range/Quality? */
@@ -3799,12 +3800,12 @@ func dataExtensionComment(A *decodedAPRS, telemetryState *aprstelemetry.State, p
 	/* check for Station power, height, gain. */
 
 	if bytes.HasPrefix(pdext, []byte("PHG")) {
-		A.power = maybe.Just(int(pdext[3]-'0') * int(pdext[3]-'0'))
-		A.heightFt = maybe.Just(int(1<<(pdext[4]-'0')) * 10)
+		A.Power = maybe.Just(int(pdext[3]-'0') * int(pdext[3]-'0'))
+		A.HeightFt = maybe.Just(int(1<<(pdext[4]-'0')) * 10)
 
-		A.gain = maybe.Just(int(pdext[5] - '0'))
+		A.Gain = maybe.Just(int(pdext[5] - '0'))
 		if pdext[6] >= '0' && pdext[6] <= '8' {
-			A.directivity, _ = directivityString(int(pdext[6] - '0'))
+			A.Directivity, _ = directivityString(int(pdext[6] - '0'))
 		}
 
 		// TODO: look for another 0-9 A-Z followed by a /
@@ -3822,7 +3823,7 @@ func dataExtensionComment(A *decodedAPRS, telemetryState *aprstelemetry.State, p
 
 		var count, _ = fmt.Sscanf(string(pdext[3:]), "%4d", &n)
 		if count > 0 {
-			A.radioRange = maybe.Just(float64(n))
+			A.RadioRange = maybe.Just(float64(n))
 		}
 
 		processComment(A, telemetryState, pdext[7:])
@@ -3834,11 +3835,11 @@ func dataExtensionComment(A *decodedAPRS, telemetryState *aprstelemetry.State, p
 
 	if bytes.HasPrefix(pdext, []byte("DFS")) {
 		//A.g_strength = pdext[3] - '0';
-		A.heightFt = maybe.Just(int(1<<(pdext[4]-'0')) * 10)
+		A.HeightFt = maybe.Just(int(1<<(pdext[4]-'0')) * 10)
 
-		A.gain = maybe.Just(int(pdext[5] - '0'))
+		A.Gain = maybe.Just(int(pdext[5] - '0'))
 		if pdext[6] >= '0' && pdext[6] <= '8' {
-			A.directivity, _ = directivityString(int(pdext[6] - '0'))
+			A.Directivity, _ = directivityString(int(pdext[6] - '0'))
 		}
 
 		processComment(A, telemetryState, pdext[7:])
@@ -3859,15 +3860,15 @@ func dataExtensionComment(A *decodedAPRS, telemetryState *aprstelemetry.State, p
  *
  *		clen		- Length of comment or -1 to take it all.
  *
- * Outputs:	A.telemetry	- Base 91 telemetry |ss1122|
- *		A.altitudeFt - from /A=123456 or /A=-12345
- *		A.lat	- Might be adjusted from !DAO!
- *		A.lon	- Might be adjusted from !DAO!
- *		A.aprsttLoc	- Private extension to !DAO!
- *		A.freq
- *		A.tone
- *		A.offset
- *		A.comment	- Anything left over after extracting above.
+ * Outputs:	A.Telemetry	- Base 91 telemetry |ss1122|
+ *		A.AltitudeFt - from /A=123456 or /A=-12345
+ *		A.Lat	- Might be adjusted from !DAO!
+ *		A.Lon	- Might be adjusted from !DAO!
+ *		A.APRSttLoc	- Private extension to !DAO!
+ *		A.Freq
+ *		A.Tone
+ *		A.Offset
+ *		A.Comment	- Anything left over after extracting above.
  *
  * Description:	After processing fixed and possible optional parts
  *		of the message, everything left over is a comment.
@@ -3877,7 +3878,7 @@ func dataExtensionComment(A *decodedAPRS, telemetryState *aprstelemetry.State, p
  *		There are could be some other pieces of data, with
  *		particular formats, buried in there.
  *		Pull out those special items and put everything
- *		else into A.comment.
+ *		else into A.Comment.
  *
  * References:	http://www.aprs.org/info/freqspec.txt
  *
@@ -3983,7 +3984,7 @@ func aprsSign(x float64) float64 {
 	}
 }
 
-func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, commentData []byte) {
+func processComment(A *Decoded, telemetryState *aprstelemetry.State, commentData []byte) {
 	/*
 	 * Frequency must be at the at the beginning.
 	 * Others can be anywhere in the comment.
@@ -4052,37 +4053,37 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 
 		switch sftemp[0] {
 		case 'A':
-			A.freq = maybe.Just(1200 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(1200 + atof(sftemp[1:]))
 		case 'B':
-			A.freq = maybe.Just(2300 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(2300 + atof(sftemp[1:]))
 		case 'C':
-			A.freq = maybe.Just(2400 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(2400 + atof(sftemp[1:]))
 		case 'D':
-			A.freq = maybe.Just(3400 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(3400 + atof(sftemp[1:]))
 		case 'E':
-			A.freq = maybe.Just(5600 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(5600 + atof(sftemp[1:]))
 		case 'F':
-			A.freq = maybe.Just(5700 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(5700 + atof(sftemp[1:]))
 		case 'G':
-			A.freq = maybe.Just(5800 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(5800 + atof(sftemp[1:]))
 		case 'H':
-			A.freq = maybe.Just(10100 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(10100 + atof(sftemp[1:]))
 		case 'I':
-			A.freq = maybe.Just(10200 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(10200 + atof(sftemp[1:]))
 		case 'J':
-			A.freq = maybe.Just(10300 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(10300 + atof(sftemp[1:]))
 		case 'K':
-			A.freq = maybe.Just(10400 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(10400 + atof(sftemp[1:]))
 		case 'L':
-			A.freq = maybe.Just(10500 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(10500 + atof(sftemp[1:]))
 		case 'M':
-			A.freq = maybe.Just(24000 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(24000 + atof(sftemp[1:]))
 		case 'N':
-			A.freq = maybe.Just(24100 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(24100 + atof(sftemp[1:]))
 		case 'O':
-			A.freq = maybe.Just(24200 + atof(sftemp[1:]))
+			A.Freq = maybe.Just(24200 + atof(sftemp[1:]))
 		default:
-			A.freq = maybe.Just(atof(sftemp))
+			A.Freq = maybe.Just(atof(sftemp))
 		}
 
 		if bytes.HasPrefix(smtemp, []byte("MHz")) {
@@ -4095,15 +4096,15 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 		}
 
 		commentData = cutBytes(commentData, match[0], match[1])
-	} else if len(A.name) > 0 {
+	} else if len(A.Name) > 0 {
 		// Try to extract sensible number from object/item name.
-		var x = atof([]byte(A.name))
+		var x = atof([]byte(A.Name))
 
 		if (x >= 144 && x <= 148) ||
 			(x >= 222 && x <= 225) ||
 			(x >= 420 && x <= 450) ||
 			(x >= 902 && x <= 928) {
-			A.freq = maybe.Just(x)
+			A.Freq = maybe.Just(x)
 		}
 	}
 
@@ -4126,13 +4127,13 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 			var f, _ = strconv.Atoi(string(sttemp[1:]))
 			for i := range NUM_CTCSS {
 				if f == i_ctcss[i] {
-					A.tone = maybe.Just(f_ctcss[i])
+					A.Tone = maybe.Just(f_ctcss[i])
 
 					break
 				}
 			}
 
-			if A.tone.IsNothing() {
+			if A.Tone.IsNothing() {
 				if !A.quiet {
 					logrus.WithField("found", string(sttemp)).Warn("Bad CTCSS/PL specification: integer does not correspond to standard tone")
 				}
@@ -4142,7 +4143,7 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 		} else if match := std_toff_re.FindSubmatchIndex(commentData); match != nil {
 			logrus.Debug("Comment says there is no CTCSS tone")
 
-			A.tone = maybe.Just(0.0)
+			A.Tone = maybe.Just(0.0)
 
 			commentData = cutBytes(commentData, match[0], match[1])
 		} else if match := std_dcs_re.FindSubmatchIndex(commentData); match != nil {
@@ -4150,7 +4151,7 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 
 			var offset, _ = strconv.ParseUint(string(sttemp), 8, 64)
 
-			A.dcs = maybe.Just(int(offset))
+			A.DCS = maybe.Just(int(offset))
 
 			commentData = cutBytes(commentData, match[0], match[1])
 		} else if match := std_offset_re.FindSubmatchIndex(commentData); match != nil {
@@ -4158,7 +4159,7 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 
 			var offset, _ = strconv.Atoi(string(sttemp))
 
-			A.offset = maybe.Just(10 * offset)
+			A.Offset = maybe.Just(10 * offset)
 
 			commentData = cutBytes(commentData, match[0], match[1])
 		} else if match := std_range_re.FindSubmatchIndex(commentData); match != nil {
@@ -4168,9 +4169,9 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 			var r, _ = strconv.Atoi(string(sttemp))
 
 			if string(sutemp) == "m" {
-				A.radioRange = maybe.Just(float64(r))
+				A.RadioRange = maybe.Just(float64(r))
 			} else {
-				A.radioRange = maybe.Just(dwutil.DW_KM_TO_MILES(float64(r)))
+				A.RadioRange = maybe.Just(dwutil.DW_KM_TO_MILES(float64(r)))
 			}
 
 			commentData = cutBytes(commentData, match[0], match[1])
@@ -4187,8 +4188,8 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 	if match := base91_tel_re.FindSubmatchIndex(commentData); match != nil {
 		var tdata = commentData[match[2]:match[3]] /* Should be even number of 4 to 14 characters. */
 
-		var telemetry = telemetryState.DataBase91(A.src, string(tdata))
-		A.telemetry = telemetry
+		var telemetry = telemetryState.DataBase91(A.Src, string(tdata))
+		A.Telemetry = telemetry
 
 		commentData = cutBytes(commentData, match[0], match[1])
 	}
@@ -4217,13 +4218,13 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 
 		if d == 'T' {
 			if a == ' ' && o == ' ' {
-				A.aprsttLoc = "APRStt corral location"
+				A.APRSttLoc = "APRStt corral location"
 			} else if unicode.IsDigit(rune(a)) && o == ' ' {
-				A.aprsttLoc = fmt.Sprintf("APRStt location %c of 10", a)
+				A.APRSttLoc = fmt.Sprintf("APRStt location %c of 10", a)
 			} else if unicode.IsDigit(rune(a)) && unicode.IsDigit(rune(o)) {
-				A.aprsttLoc = fmt.Sprintf("APRStt location %c%c of 100", a, o)
+				A.APRSttLoc = fmt.Sprintf("APRStt location %c%c of 100", a, o)
 			} else if a == 'B' && unicode.IsDigit(rune(o)) {
-				A.aprsttLoc = fmt.Sprintf("APRStt location %c%c...", a, o)
+				A.APRSttLoc = fmt.Sprintf("APRStt location %c%c...", a, o)
 			}
 		} else if unicode.IsUpper(rune(d)) {
 			/*
@@ -4233,15 +4234,15 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 			 *		Lon:	DDD HH.HHo
 			 */
 			if unicode.IsDigit(rune(a)) {
-				A.lat = maybe.Fmap(func(lat float64) float64 {
+				A.Lat = maybe.Fmap(func(lat float64) float64 {
 					return lat + float64(a-'0')/60000.0*aprsSign(lat)
-				}, A.lat)
+				}, A.Lat)
 			}
 
 			if unicode.IsDigit(rune(o)) {
-				A.lon = maybe.Fmap(func(lon float64) float64 {
+				A.Lon = maybe.Fmap(func(lon float64) float64 {
 					return lon + float64(o-'0')/60000.0*aprsSign(lon)
-				}, A.lon)
+				}, A.Lon)
 			}
 		} else if unicode.IsLower(rune(d)) {
 			/*
@@ -4293,15 +4294,15 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 			 * The spec appears to be wrong.  It says '}' is the maximum value when it should be '{'.
 			 */
 			if aprs.IsBase91Digit(a) {
-				A.lat = maybe.Fmap(func(lat float64) float64 {
+				A.Lat = maybe.Fmap(func(lat float64) float64 {
 					return lat + float64(a-aprs.Base91Min)*1.1/600000.0*aprsSign(lat)
-				}, A.lat)
+				}, A.Lat)
 			}
 
 			if aprs.IsBase91Digit(o) {
-				A.lon = maybe.Fmap(func(lon float64) float64 {
+				A.Lon = maybe.Fmap(func(lon float64) float64 {
 					return lon + float64(o-aprs.Base91Min)*1.1/600000.0*aprsSign(lon)
-				}, A.lon)
+				}, A.Lon)
 			}
 		}
 
@@ -4316,7 +4317,7 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 		var temp = commentData[match[0]:match[1]]
 
 		var altitude, _ = strconv.Atoi(string(temp[3:]))
-		A.altitudeFt = maybe.Just(float64(altitude))
+		A.AltitudeFt = maybe.Just(float64(altitude))
 
 		commentData = cutBytes(commentData, match[0], match[1])
 	}
@@ -4327,7 +4328,7 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 	 * standardized format.
 	 * Don't complain if we have already found a valid value.
 	 */
-	if match := bad_freq_re.FindSubmatchIndex(commentData); match != nil && A.freq.IsNothing() {
+	if match := bad_freq_re.FindSubmatchIndex(commentData); match != nil && A.Freq.IsNothing() {
 		var bad = commentData[match[0]:match[1]]
 
 		var x, _ = strconv.ParseFloat(string(bad), 64)
@@ -4345,13 +4346,13 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 				}).Warn("Comment looks like it has a frequency in non-standard format")
 			}
 
-			if A.freq.IsNothing() {
-				A.freq = maybe.Just(x)
+			if A.Freq.IsNothing() {
+				A.Freq = maybe.Just(x)
 			}
 		}
 	}
 
-	if match := bad_tone_re.FindSubmatchIndex(commentData); match != nil && A.tone.IsNothing() {
+	if match := bad_tone_re.FindSubmatchIndex(commentData); match != nil && A.Tone.IsNothing() {
 		var bad1 = commentData[match[4]:match[5]] /* original 99.9 or 999.9 format or one of 67 77 100 123 */
 
 		var bad2 = string(bad1) /* 99.9 or 999.9 format.  ".0" appended for special cases. */
@@ -4383,9 +4384,9 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 					}).Warn("Comment looks like it might have a CTCSS tone in non-standard format")
 				}
 
-				if A.tone.IsNothing() {
+				if A.Tone.IsNothing() {
 					var tone, _ = strconv.ParseFloat(bad2, 64)
-					A.tone = maybe.Just(tone)
+					A.Tone = maybe.Just(tone)
 				}
 
 				break
@@ -4393,8 +4394,8 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 		}
 	}
 
-	var offset = maybe.FromMaybe(0, A.offset)
-	var freq = maybe.FromMaybe(0, A.freq)
+	var offset = maybe.FromMaybe(0, A.Offset)
+	var freq = maybe.FromMaybe(0, A.Freq)
 
 	if (offset == 6000 || offset == -6000) && freq >= 144 && freq <= 148 {
 		if !A.quiet {
@@ -4407,7 +4408,7 @@ func processComment(A *decodedAPRS, telemetryState *aprstelemetry.State, comment
 	 */
 
 	// Finally copy what's left of commentData into comment
-	A.comment = string(commentData)
+	A.Comment = string(commentData)
 }
 
 /* end processComment */
