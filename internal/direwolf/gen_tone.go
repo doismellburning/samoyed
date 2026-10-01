@@ -12,6 +12,7 @@ import (
 	"math"
 	"os"
 
+	"github.com/doismellburning/samoyed/internal/dtmf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -46,7 +47,7 @@ type ToneGenerator struct {
 	adevIndex   int
 	audioConfig *AudioConfig
 	sink        AudioSink // Where the samples go.
-	amplitude   int       // 0 .. 100, for DTMF; the rest use sineTable.
+	amplitude   int       // 0 .. 100, for PutLevel; the rest use sineTable.
 
 	sineTable [256]int16 // One cycle, scaled to the amplitude asked for.
 
@@ -667,4 +668,20 @@ func (tg *ToneGenerator) PutQuietMs(timeMs int) {
 
 	// Avoid abrupt change when it starts up again.
 	tg.tonePhase = 0
+}
+
+// SampleRate is how many audio samples a second the generator's channel
+// plays.
+func (tg *ToneGenerator) SampleRate() int {
+	return tg.audioConfig.adev[tg.adevIndex].samples_per_sec
+}
+
+// A ToneGenerator is where DTMF goes out.
+var _ dtmf.Output = (*ToneGenerator)(nil)
+
+// PutLevel puts out one sample, in the range +-1.0, scaled by the generator's
+// amplitude.
+func (tg *ToneGenerator) PutLevel(level float64) {
+	// Amplitude of 100 would use full +-32k range.
+	tg.PutSample(int(level * 32767.0 * float64(tg.amplitude) / 100.0))
 }

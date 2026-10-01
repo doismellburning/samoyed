@@ -23,6 +23,7 @@ import (
 	"math"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
@@ -269,10 +270,10 @@ func (d *Decoder) Sample(input float64) rune {
 	return ret
 }
 
-// ButtonSamples is ms milliseconds of audio at sampleRate for button: the
-// sum of its two sine waves, so in the range +-2.0, or silence for anything
+// buttonSamples is ms milliseconds of audio at sampleRate for button: the
+// mean of its two sine waves, so in the range +-1.0, or silence for anything
 // that isn't a button.
-func ButtonSamples(button rune, ms int, sampleRate int) iter.Seq[float64] {
+func buttonSamples(button rune, ms int, sampleRate int) iter.Seq[float64] {
 	return func(yield func(float64) bool) {
 		var fa, fb int
 
@@ -291,10 +292,10 @@ func ButtonSamples(button rune, ms int, sampleRate int) iter.Seq[float64] {
 			// but I'm not that worried about it.
 			// With a Raspberry Pi, model 2, default 1200 receiving takes about 14% of one CPU core.
 			// When transmitting tones, it briefly shoots up to about 33%.
-			var dtmf float64 // Audio.  Sum of two sine waves.
+			var dtmf float64 // Audio.  Mean of two sine waves.
 
 			if fa > 0 && fb > 0 {
-				dtmf = math.Sin(phasea) + math.Sin(phaseb)
+				dtmf = (math.Sin(phasea) + math.Sin(phaseb)) / 2
 				phasea += 2.0 * math.Pi * float64(fa) / float64(sampleRate)
 				phaseb += 2.0 * math.Pi * float64(fb) / float64(sampleRate)
 			}
@@ -304,4 +305,95 @@ func ButtonSamples(button rune, ms int, sampleRate int) iter.Seq[float64] {
 			}
 		}
 	}
+}
+
+// An Output is where a Sender puts its tones: in samoyed-direwolf, the
+// channel's tone generator.
+type Output interface {
+	// SampleRate is how many audio samples a second the output plays.
+	SampleRate() int
+
+	// PutLevel puts out one sample, in the range +-1.0, scaled to the
+	// output's own amplitude.
+	PutLevel(level float64)
+
+	// Flush sends on whatever the output has buffered.
+	Flush()
+}
+
+// A Sender turns text into DTMF tones on an Output.
+type Sender struct {
+	output Output
+}
+
+// NewSender returns a Sender that puts its tones on output.
+func NewSender(output Output) *Sender {
+	var s = new(Sender)
+
+	s.output = output
+
+	return s
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        Send
+ *
+ * Purpose:    	Generate DTMF tones from text string.
+ *
+ * Inputs:	str	- Character string to send.  0-9, A-D, *, #
+ *		speed	- Number of tones per second.  Range 1 to 10.
+ *		txdelay	- Delay (ms) from PTT to start.
+ *		txtail	- Delay (ms) from end to PTT off.
+ *
+ * Outputs:	txdelay of silence, each button followed by a gap as
+ *		long as it, then txtail of silence, flushed out once
+ *		at the end.  Duration says how long that lasts.
+ *
+ *--------------------------------------------------------------------*/
+
+func (s *Sender) Send(str string, speed int, txdelay int, txtail int) {
+	for level := range samples(str, speed, txdelay, txtail, s.output.SampleRate()) {
+		s.output.PutLevel(level)
+	}
+
+	s.output.Flush()
+}
+
+// samples is the whole transmission Send makes, as buttonSamples describes.
+func samples(str string, speed int, txdelay int, txtail int, sampleRate int) iter.Seq[float64] {
+	return func(yield func(float64) bool) {
+		// Length of tone or gap between.
+		var lenMs = int((500.0 / float64(speed)) + 0.5)
+
+		var push = func(button rune, ms int) bool {
+			for sample := range buttonSamples(button, ms, sampleRate) {
+				if !yield(sample) {
+					return false
+				}
+			}
+
+			return true
+		}
+
+		if !push(' ', txdelay) {
+			return
+		}
+
+		for _, p := range str {
+			if !push(p, lenMs) || !push(' ', lenMs) {
+				return
+			}
+		}
+
+		push(' ', txtail)
+	}
+}
+
+// Duration is how long, in milliseconds, the transmission Send makes of the
+// same arguments lasts: how long to hold the PTT for it.
+func Duration(str string, speed int, txdelay int, txtail int) int {
+	return (txdelay +
+		int(1000.0*float64(utf8.RuneCountInString(str))/float64(speed)+0.5) +
+		txtail)
 }

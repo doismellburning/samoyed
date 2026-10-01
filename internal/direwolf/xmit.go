@@ -39,6 +39,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dtmf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
@@ -1144,8 +1145,20 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
+	var txdelay = max(xs.txdelay[c]*10, 300)
+	var txtail = max(xs.txtail[c]*10, 250)
 
-	var _length_ms = dtmf_send(xs.toneGenerators[c], c, string(pinfo), speed, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
+	var tg = xs.toneGenerators[c]
+	if tg == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Invalid channel %d for tone generation.\n", c)
+	} else {
+		dtmf.NewSender(tg).Send(string(pinfo), speed, txdelay, txtail)
+	}
+
+	// Hold the PTT for as long as the tones take, whether or not they could
+	// be generated.
+	var _length_ms = dtmf.Duration(string(pinfo), speed, txdelay, txtail)
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.

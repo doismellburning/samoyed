@@ -4,9 +4,12 @@
 package direwolf
 
 import (
+	"encoding/binary"
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/dtmf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,4 +46,57 @@ func TestGenToneTestConfigGeneratesEveryChannel(t *testing.T) {
 			}
 		})
 	}
+}
+
+// byteSink is an AudioSink that keeps what it is given, and counts flushes.
+type byteSink struct {
+	data    []byte
+	flushes int
+}
+
+func (s *byteSink) Put(_ int, c uint8) int {
+	s.data = append(s.data, c)
+
+	return 0
+}
+
+func (s *byteSink) Flush(int) int {
+	s.flushes++
+
+	return 0
+}
+
+// What a DTMF sender puts on the air through a tone generator, a decoder on
+// the same channel reads back.
+func TestToneGeneratorDTMFDecodesBack(t *testing.T) {
+	const channel = 0
+	const sampleRate = 8000
+
+	var audioConfig = new(AudioConfig)
+	audioConfig.adev[0].num_channels = 1
+	audioConfig.adev[0].bits_per_sample = 16
+	audioConfig.adev[0].samples_per_sec = sampleRate
+
+	var sink = new(byteSink)
+	var tg = NewToneGenerator(channel, audioConfig, 50, sink)
+
+	dtmf.NewSender(tg).Send("159D*#", 10, 300, 250)
+
+	assert.Equal(t, 1, sink.flushes, "the tones should be flushed out once, at the end")
+	require.Zero(t, len(sink.data)%2, "16 bit samples come in pairs of bytes")
+
+	var decoder = dtmf.NewDecoder(sampleRate, nil)
+
+	var heard strings.Builder
+
+	for i := 0; i < len(sink.data); i += 2 {
+		var sam = int16(binary.LittleEndian.Uint16(sink.data[i:]))
+
+		var x = decoder.Sample(float64(sam) / 16384.)
+		if x != ' ' && x != '.' {
+			heard.WriteRune(x)
+		}
+	}
+
+	assert.Equal(t, "159D*#", heard.String())
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dtmf"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -817,12 +818,11 @@ func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 		askedFor     = 15 // More than we will go.
 	)
 
-	// dtmf_send generates the sound and says how long it is, without waiting
-	// for it, so asking it costs nothing - and comparing against its own
-	// answers means this does not depend on how DTMF timing is worked out.
-	var atDefault = dtmf_send(xs.toneGenerators[0], 0, message, defaultSpeed, 300, 250)
-	var atMaximum = dtmf_send(xs.toneGenerators[0], 0, message, maximumSpeed, 300, 250)
-	var atAskedFor = dtmf_send(xs.toneGenerators[0], 0, message, askedFor, 300, 250)
+	// Comparing against dtmf.Duration's own answers means this does not
+	// depend on how DTMF timing is worked out.
+	var atDefault = dtmf.Duration(message, defaultSpeed, 300, 250)
+	var atMaximum = dtmf.Duration(message, maximumSpeed, 300, 250)
+	var atAskedFor = dtmf.Duration(message, askedFor, 300, 250)
 
 	require.Less(t, atMaximum, atDefault-400,
 		"the default and maximum speeds are too close together for this to show anything")
@@ -856,3 +856,24 @@ func (discardReceiveSink) RecFrame(int, int, int, *ax25.Packet, ax25.ALevel, fec
 }
 
 func (discardReceiveSink) DCDChange(int, int) {}
+
+// A channel with no tone generator still holds the PTT for as long as the
+// tones would have taken.
+func TestXmitDTMFWithoutToneGenerator(t *testing.T) {
+	var xs = setupXmitTransmission(t)
+
+	xs.toneGenerators[0] = nil
+
+	var pp = ax25.FromText("Q1TEST>DTMF:1234", true)
+	require.NotNil(t, pp)
+
+	var started = time.Now()
+
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_dtmf(0, pp, 10) })
+
+	assert.Contains(t, output, "Invalid channel 0 for tone generation.")
+
+	// One-sided: a transmission can overrun, on a busy machine, but it
+	// cannot finish early.
+	assert.GreaterOrEqual(t, time.Since(started).Milliseconds(), int64(dtmf.Duration("1234", 10, 300, 250))-100)
+}

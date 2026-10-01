@@ -19,7 +19,7 @@ func Test_dtmf(t *testing.T) {
 	var result strings.Builder
 
 	var push_button_test = func(_ int, button rune, ms int) {
-		for dtmf := range ButtonSamples(button, ms, sampleRate) {
+		for dtmf := range buttonSamples(button, ms, sampleRate) {
 			/* Make sure it is insensitive to signal amplitude. */
 			/* (Uncomment each of below when testing.) */
 			var x = decoder.Sample(dtmf)
