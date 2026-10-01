@@ -319,7 +319,7 @@ func Test_decode_aprs_short_message(t *testing.T) {
 		assert.NotNil(t, pp)
 
 		var A = aprsDecoder.Decode(pp, true)
-		assert.Equal(t, messageSubtypeMessage, A.MessageSubtype)
+		assert.Equal(t, MessageSubtypeMessage, A.MessageSubtype)
 		assert.Equal(t, "Q2TEST", A.Addressee)
 		assert.Equal(t, tc.comment, A.Comment)
 	}

@@ -1292,7 +1292,7 @@ func mheardPosition(A *Decoded) (maybe.Maybe[float64], maybe.Maybe[float64]) {
 	// There was a case where a station sent a position report and the location was stored.
 	// Later, the same station sent an object report and the stations's location was overwritten
 	// by the object location.  Solution: Save location only if position report.
-	if A.PacketType != packetTypePosition {
+	if A.PacketType != PacketTypePosition {
 		return maybe.Nothing[float64](), maybe.Nothing[float64]()
 	}
 

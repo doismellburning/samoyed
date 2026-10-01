@@ -40,37 +40,39 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type packetType int
+// PacketType is the kind of APRS report a packet carries.
+type PacketType int
 
 const (
-	packetTypeNone packetType = iota
-	packetTypePosition
-	packetTypeWeather
-	packetTypeObject
-	packetTypeItem
-	packetTypeMessage
-	packetTypeQuery
-	packetTypeCapabilities
-	packetTypeStatus
-	packetTypeTelemetry
-	packetTypeUserDefined
-	packetTypeNWS
+	PacketTypeNone PacketType = iota
+	PacketTypePosition
+	PacketTypeWeather
+	PacketTypeObject
+	PacketTypeItem
+	PacketTypeMessage
+	PacketTypeQuery
+	PacketTypeCapabilities
+	PacketTypeStatus
+	PacketTypeTelemetry
+	PacketTypeUserDefined
+	PacketTypeNWS
 )
 
-type messageSubtype int
+// MessageSubtype is the kind of APRS message a PacketTypeMessage packet carries.
+type MessageSubtype int
 
 const (
-	messageSubtypeInvalid messageSubtype = iota
-	messageSubtypeMessage
-	messageSubtypeAck
-	messageSubtypeRej
-	messageSubtypeBulletin
-	messageSubtypeNWS
-	messageSubtypeTelemParm
-	messageSubtypeTelemUnit
-	messageSubtypeTelemEqns
-	messageSubtypeTelemBits
-	messageSubtypeDirectedQuery
+	MessageSubtypeInvalid MessageSubtype = iota
+	MessageSubtypeMessage
+	MessageSubtypeAck
+	MessageSubtypeRej
+	MessageSubtypeBulletin
+	MessageSubtypeNWS
+	MessageSubtypeTelemParm
+	MessageSubtypeTelemUnit
+	MessageSubtypeTelemEqns
+	MessageSubtypeTelemBits
+	MessageSubtypeDirectedQuery
 )
 
 // Decoded is what Decoder.Decode found in an APRS packet.
@@ -123,9 +125,9 @@ type Decoded struct {
 	// This is so pfilter.c:filt_t does not need to duplicate the same work.
 
 	HasThirdPartyHeader bool
-	PacketType          packetType
+	PacketType          PacketType
 
-	MessageSubtype messageSubtype /* Various cases of the overloaded "message." */
+	MessageSubtype MessageSubtype /* Various cases of the overloaded "message." */
 
 	MessageNumber string /* Message number.  Should be 1 - 5 alphanumeric characters if used. */
 	/* Addendum 1.1 has new format {mm} or {mm}aa with only two */
@@ -417,7 +419,7 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *D
 			aprsLLPos(A, telemetryState, pinfo)
 		}
 
-		A.PacketType = packetTypePosition
+		A.PacketType = PacketTypePosition
 
 	//case '#':		/* Peet Bros U-II Weather station */		// TODO: produce obsolete error.
 	//case '*':		/* Peet Bros U-II Weather station */
@@ -426,27 +428,27 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *D
 	case '$': /* Raw GPS data or Ultimeter 2000 */
 		if bytes.HasPrefix(pinfo, []byte("$ULTW")) {
 			aprsUltimeter(A, pinfo) // TODO: produce obsolete error.
-			A.PacketType = packetTypeWeather
+			A.PacketType = PacketTypeWeather
 		} else {
 			aprsRawNMEA(A, pinfo)
-			A.PacketType = packetTypePosition
+			A.PacketType = PacketTypePosition
 		}
 
 	case '\'': /* Old Mic-E Data (but Current data for TM-D700) */
 		fallthrough
 	case '`': /* Current Mic-E Data (not used in TM-D700) */
 		aprsMicE(A, telemetryState, d.deviceIDs, pp, pinfo)
-		A.PacketType = packetTypePosition
+		A.PacketType = PacketTypePosition
 
 	case ')': /* Item. */
 		aprsItem(A, telemetryState, pinfo)
-		A.PacketType = packetTypeItem
+		A.PacketType = PacketTypeItem
 
 	case '/': /* Position with timestamp (no APRS messaging) */
 		fallthrough
 	case '@': /* Position with timestamp (with APRS messaging) */
 		aprsLLPosTime(A, telemetryState, pinfo)
-		A.PacketType = packetTypePosition
+		A.PacketType = PacketTypePosition
 
 	case ':': /* "Message" (special APRS meaning): for one person, a group, or a bulletin. */
 		/* Directed Station Query */
@@ -454,45 +456,45 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *D
 		aprsMessage(A, telemetryState, pinfo, quiet)
 
 		switch A.MessageSubtype {
-		case messageSubtypeMessage, messageSubtypeAck, messageSubtypeRej:
-			A.PacketType = packetTypeMessage
-		case messageSubtypeNWS:
-			A.PacketType = packetTypeNWS
-		case messageSubtypeTelemParm, messageSubtypeTelemUnit, messageSubtypeTelemEqns, messageSubtypeTelemBits:
-			A.PacketType = packetTypeTelemetry
-		case messageSubtypeDirectedQuery:
-			A.PacketType = packetTypeQuery
+		case MessageSubtypeMessage, MessageSubtypeAck, MessageSubtypeRej:
+			A.PacketType = PacketTypeMessage
+		case MessageSubtypeNWS:
+			A.PacketType = PacketTypeNWS
+		case MessageSubtypeTelemParm, MessageSubtypeTelemUnit, MessageSubtypeTelemEqns, MessageSubtypeTelemBits:
+			A.PacketType = PacketTypeTelemetry
+		case MessageSubtypeDirectedQuery:
+			A.PacketType = PacketTypeQuery
 		default:
-			// Also case messageSubtypeBulletin:
+			// Also case MessageSubtypeBulletin:
 		}
 
 	case ';': /* Object */
 		aprsObject(A, telemetryState, pinfo)
-		A.PacketType = packetTypeObject
+		A.PacketType = PacketTypeObject
 
 	case '<': /* Station Capabilities */
 		aprsStationCapabilities(A, pinfo)
-		A.PacketType = packetTypeCapabilities
+		A.PacketType = PacketTypeCapabilities
 
 	case '>': /* Status Report */
 		aprsStatusReport(A, pinfo)
-		A.PacketType = packetTypeStatus
+		A.PacketType = PacketTypeStatus
 
 	case '?': /* General Query */
 		aprsGeneralQuery(A, pinfo)
-		A.PacketType = packetTypeQuery
+		A.PacketType = PacketTypeQuery
 
 	case 'T': /* Telemetry */
 		aprsTelemetry(A, telemetryState, pinfo, quiet)
-		A.PacketType = packetTypeTelemetry
+		A.PacketType = PacketTypeTelemetry
 
 	case '_': /* Positionless Weather Report */
 		aprsPositionlessWeatherReport(A, pinfo)
-		A.PacketType = packetTypeWeather
+		A.PacketType = PacketTypeWeather
 
 	case '{': /* user defined data */
 		aprsUserDefined(A, pinfo)
-		A.PacketType = packetTypeUserDefined
+		A.PacketType = PacketTypeUserDefined
 
 	case 't': /* Raw touch tone data - NOT PART OF STANDARD */
 		/* Used to convey raw touch tone sequences to */
@@ -1668,14 +1670,14 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 	var message = info[headerBytes:]
 
 	A.DataTypeDesc = "APRS Message"
-	A.MessageSubtype = messageSubtypeMessage /* until found otherwise */
+	A.MessageSubtype = MessageSubtypeMessage /* until found otherwise */
 
 	if len(info) < 11 {
 		if !quiet {
 			logrus.WithField("length", len(info)).Warn("APRS Message must have a minimum of 11 characters for : 9 character addressee :")
 		}
 
-		A.MessageSubtype = messageSubtypeInvalid
+		A.MessageSubtype = MessageSubtypeInvalid
 
 		return
 	}
@@ -1685,7 +1687,7 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 			logrus.WithField("hint", "Spaces must be added to shorter addressee to make 9 characters").Warn("APRS Message must begin with ':' 9 character addressee ':'")
 		}
 
-		A.MessageSubtype = messageSubtypeInvalid
+		A.MessageSubtype = MessageSubtypeInvalid
 
 		return
 	}
@@ -1739,7 +1741,7 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 			A.DataTypeDesc = fmt.Sprintf("Bulletin with identifier \"%s\"", addressee[3:])
 		}
 
-		A.MessageSubtype = messageSubtypeBulletin
+		A.MessageSubtype = MessageSubtypeBulletin
 		A.Comment = string(message)
 	} else if len(addressee) >= 3 && bytes.HasPrefix(addressee, []byte("NWS")) {
 		// Weather bulletins have addressee starting with NWS, SKY, CWA, or BOM.
@@ -1755,12 +1757,12 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 			A.DataTypeDesc = fmt.Sprintf("Weather bulletin is missing - or _ after %.3s", addressee)
 		}
 
-		A.MessageSubtype = messageSubtypeNWS
+		A.MessageSubtype = MessageSubtypeNWS
 		A.Comment = string(message)
 	} else if len(addressee) >= 3 && (bytes.HasPrefix(addressee, []byte("SKY")) || bytes.HasPrefix(addressee, []byte("CWA")) || bytes.HasPrefix(addressee, []byte("BOM"))) {
 		// SKY... or CWA...   https://www.aprs-is.net/WX/
 		A.DataTypeDesc = fmt.Sprintf("Weather bulletin with identifier \"%s\"", addressee[4:])
-		A.MessageSubtype = messageSubtypeNWS
+		A.MessageSubtype = MessageSubtypeNWS
 		A.Comment = string(message)
 	} else if bytes.HasPrefix(message, []byte("PARM.")) {
 		/*
@@ -1774,22 +1776,22 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 		 * Why not use other characters after the "T" for metadata?
 		 */
 		A.DataTypeDesc = fmt.Sprintf("Telemetry Parameter Name for \"%s\"", addressee)
-		A.MessageSubtype = messageSubtypeTelemParm
+		A.MessageSubtype = MessageSubtypeTelemParm
 
 		telemetryState.NameMessage(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("UNIT.")) {
 		A.DataTypeDesc = fmt.Sprintf("Telemetry Unit/Label for \"%s\"", addressee)
-		A.MessageSubtype = messageSubtypeTelemUnit
+		A.MessageSubtype = MessageSubtypeTelemUnit
 
 		telemetryState.UnitLabelMessage(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("EQNS.")) {
 		A.DataTypeDesc = fmt.Sprintf("Telemetry Equation Coefficients for \"%s\"", addressee)
-		A.MessageSubtype = messageSubtypeTelemEqns
+		A.MessageSubtype = MessageSubtypeTelemEqns
 
 		telemetryState.CoefficientsMessage(string(addressee), string(message[5:]), quiet)
 	} else if bytes.HasPrefix(message, []byte("BITS.")) {
 		A.DataTypeDesc = fmt.Sprintf("Telemetry Bit Sense/Project Name for \"%s\"", addressee)
-		A.MessageSubtype = messageSubtypeTelemBits
+		A.MessageSubtype = MessageSubtypeTelemBits
 
 		telemetryState.BitSenseMessage(string(addressee), string(message[5:]), quiet)
 	} else if len(message) > 0 && message[0] == '?' {
@@ -1797,7 +1799,7 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 		 * If first character of message is "?" it is a query directed toward a specific station.
 		 */
 		A.DataTypeDesc = "Directed Station Query"
-		A.MessageSubtype = messageSubtypeDirectedQuery
+		A.MessageSubtype = MessageSubtypeDirectedQuery
 
 		aprsDirectedStationQuery(A, addressee, message[1:], quiet)
 	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("ack")) {
@@ -1824,7 +1826,7 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 		}
 
 		A.DataTypeDesc = fmt.Sprintf("\"%s\" ACKnowledged message number \"%s\" from \"%s\"", A.Src, A.MessageNumber, addressee)
-		A.MessageSubtype = messageSubtypeAck
+		A.MessageSubtype = MessageSubtypeAck
 	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("rej")) {
 		if !bytes.HasPrefix(message, []byte("rej")) {
 			logrus.WithField("message", string(message)).Warn("rej must be lower case")
@@ -1848,7 +1850,7 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 		}
 
 		A.DataTypeDesc = fmt.Sprintf("\"%s\" REJected message number \"%s\" from \"%s\"", A.Src, A.MessageNumber, addressee)
-		A.MessageSubtype = messageSubtypeAck
+		A.MessageSubtype = MessageSubtypeAck
 	} else {
 		// Message to a particular station or a bulletin.
 		// message number is optional here.
@@ -1904,7 +1906,7 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 			A.DataTypeDesc = fmt.Sprintf("APRS Message, with no number, from \"%s\" to \"%s\"", A.Src, addressee)
 		}
 
-		A.MessageSubtype = messageSubtypeMessage
+		A.MessageSubtype = MessageSubtypeMessage
 
 		/* No location so don't use processComment() */
 
