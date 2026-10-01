@@ -788,7 +788,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			return
 		}
 
-		beacon_text += encodeObject(bp.objname, bp.compress, time.Now(), dlat, dlon, bp.ambiguity,
+		beacon_text += EncodeObject(bp.objname, bp.compress, time.Now(), dlat, dlon, bp.ambiguity,
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */

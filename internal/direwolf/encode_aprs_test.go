@@ -106,7 +106,7 @@ func Test_EncodePosition_explicit_zero_frequency_spec(t *testing.T) {
 func Test_encode_object_timestamp_is_24_hour_utc(t *testing.T) {
 	var eastOfGreenwich = time.FixedZone("UTC+1", 60*60)
 
-	var info = encodeObject("Q1TEST", false, time.Date(2026, 9, 26, 18, 30, 0, 0, eastOfGreenwich),
+	var info = EncodeObject("Q1TEST", false, time.Date(2026, 9, 26, 18, 30, 0, 0, eastOfGreenwich),
 		42.5, -71.5, 0, '/', '-',
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
 		maybe.Nothing[int](), maybe.Nothing[int](),

@@ -254,7 +254,7 @@ func dataExtension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.M
 	return ""
 }
 
-// frequencySpec returns the frequency specification for the beginning of the
+// FrequencySpec returns the frequency specification for the beginning of the
 // comment field, or "" if nothing was given.  freq is in MHz, tone in Hz and
 // offset in MHz.
 //
@@ -269,7 +269,7 @@ func dataExtension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.M
 //	"+999 "		(10 kHz units)
 //
 // Reference: http://www.aprs.org/info/freqspec.txt
-func frequencySpec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset maybe.Maybe[float64]) string {
+func FrequencySpec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset maybe.Maybe[float64]) string {
 	var result string
 
 	var megahertz = maybe.FromMaybe(0, freq)
@@ -319,7 +319,7 @@ func encodeLocation(compressed bool, lat float64, lon float64, ambiguity int,
 			dataExtension(power, height, gain, dir, course, speed)
 	}
 
-	return result + frequencySpec(freq, tone, offset)
+	return result + FrequencySpec(freq, tone, offset)
 }
 
 // EncodePosition returns the info part for the position report format.  It
@@ -376,13 +376,13 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 	return result
 }
 
-// encodeObject returns the info part for the object report format: 36
+// EncodeObject returns the info part for the object report format: 36
 // characters of fixed part, 7 for optional extended data, ~20 for freq, etc.,
 // then the comment, which could be very long.
 //
 // name is up to 9 characters.  when is the time stamp, or the zero time for
 // none.  The rest are as for EncodePosition.
-func encodeObject(name string, compressed bool, when time.Time, lat float64, lon float64, ambiguity int,
+func EncodeObject(name string, compressed bool, when time.Time, lat float64, lon float64, ambiguity int,
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
 	course maybe.Maybe[int], speed maybe.Maybe[int],
@@ -403,9 +403,9 @@ func encodeObject(name string, compressed bool, when time.Time, lat float64, lon
 		comment
 }
 
-// encodeMessage returns the info part for the APRS "message" format.
+// EncodeMessage returns the info part for the APRS "message" format.
 // addressee is up to 9 characters, and id, the identifier, 0 to 5.
-func encodeMessage(addressee string, text string, id string) string {
+func EncodeMessage(addressee string, text string, id string) string {
 	var result = fmt.Sprintf(":%-9.9s:%s", addressee, text)
 
 	if id != "" {
