@@ -98,15 +98,13 @@ func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
 }
 
 func TestKissNetServiceStopsWhenCancelled(t *testing.T) {
-	var port = freeTCPPort(t)
-
-	var mc = new(misc_config_s)
-	mc.kiss_port[0] = port
-	mc.kiss_chan[0] = -1
+	var kns = newLoopbackKissNet(-1, new(AudioConfig))
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	NewKissNetService(mc, new(AudioConfig), 0).Start(ctx)
+	kns.Start(ctx)
+
+	var port = kns.allPorts.tcp_port
 
 	waitUntilListening(t, port)
 

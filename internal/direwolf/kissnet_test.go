@@ -13,7 +13,6 @@ package direwolf
 // wait on - so a test of the sending path keeps clear of them.
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"testing"
@@ -94,18 +93,31 @@ func newAttachedKissNet(t *testing.T, channel int, copyBetweenClients bool, numC
 	return kns, clients
 }
 
+// newLoopbackKissNet is NewKissNetService with one port, carrying the given
+// radio channel (-1 for all), that binds whichever loopback port is free when
+// it is started.  Choosing a port that was free a moment earlier and handing
+// that over instead leaves a gap in which something else can take it - on
+// macOS, whose ephemeral range those ports come from, an outgoing connection
+// from another test readily does.
+func newLoopbackKissNet(channel int, audioConfig *AudioConfig) *KissNetService {
+	var mc = new(misc_config_s)
+	mc.kiss_port[0] = 1 // Any port but 0, which would disable it; listenAddress overrides it.
+	mc.kiss_chan[0] = channel
+
+	var kns = NewKissNetService(mc, audioConfig, 0)
+
+	kns.listenAddress = func(int) string { return "127.0.0.1:0" }
+
+	return kns
+}
+
 // startKissNet brings up a real KISS TCP service, with its listening
-// goroutines, carrying the given radio channel (-1 for all).
+// goroutines, carrying the given radio channel (-1 for all), and hands back
+// the port it is listening on.
 func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	t.Helper()
 
-	var port = freeTCPPort(t)
-
-	var mc = new(misc_config_s)
-	mc.kiss_port[0] = port
-	mc.kiss_chan[0] = channel
-
-	var kns = NewKissNetService(mc, kissTestAudioConfig(), 0)
+	var kns = newLoopbackKissNet(channel, kissTestAudioConfig())
 
 	// A client's reader polls for it to attach; not every real second,
 	// though, which would cost each test here most of one.
@@ -113,7 +125,24 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 
 	kns.Start(t.Context())
 
-	return kns, port
+	return kns, kns.allPorts.tcp_port
+}
+
+// The port is bound by the time Start returns, and the one the service
+// reports is the one it got, so a client can connect straight away rather
+// than having to retry until the service gets round to binding it.
+func TestKissNetStartBindsBeforeReturning(t *testing.T) {
+	var kns, port = startKissNet(t, -1)
+
+	assert.NotEqual(t, 1, port, "the port asked for, not the one bound")
+
+	var conn, dialErr = new(net.Dialer).DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	require.NoError(t, dialErr)
+
+	t.Cleanup(func() { conn.Close() })
+
+	require.Eventually(t, func() bool { return kns.allPorts.clientConn(0) != nil },
+		5*time.Second, 10*time.Millisecond, "the client never attached")
 }
 
 // dialKissNet attaches a client application to a running service, and hands
@@ -435,26 +464,9 @@ func TestKissNetListenFails(t *testing.T) {
 
 	t.Cleanup(hook.Reset)
 
-	// In a goroutine, so that a bind which somehow succeeds fails this test
-	// rather than leaving it in the accept loop until the whole run times
-	// out, which is how the loopback address above showed up.
-	var ctx, cancel = context.WithCancel(t.Context())
-
-	defer cancel()
-
-	var done = make(chan struct{})
-
-	go func() {
-		defer close(done)
-
-		kns.connectListenThread(ctx, kps)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-		t.Fatal("connectListenThread did not give up although the port was taken")
-	}
+	// Whether or not the bind succeeds, initOne comes back, and anything it
+	// started goes with the test's context.
+	kns.initOne(t.Context(), kps)
 
 	var entry = hook.LastEntry()
 	require.NotNil(t, entry, "nothing was said about the port that could not be bound")
