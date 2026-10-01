@@ -1,0 +1,116 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package direwolf
+
+import (
+	"context"
+	"errors"
+	"net/http"
+
+	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/webui"
+	"github.com/sirupsen/logrus"
+)
+
+// webui_init starts the web dashboard and map if a port was configured with
+// WEBPORT.  A port of 0 (the default) disables it.
+func webui_init(ctx context.Context, audio *AudioConfig, mc *misc_config_s) {
+	if mc.web_port == 0 {
+		logrus.Debug("Web interface disabled")
+
+		return
+	}
+
+	var hub = webui.NewHub()
+
+	for channel := range MAX_TOTAL_CHANS {
+		if description, ok := channelDescription(audio, channel).Get(); ok {
+			hub.AddChannel(channel, description)
+		}
+	}
+
+	var errCh, startErr = webui.Start(ctx, mc.web_port, hub)
+	if startErr != nil {
+		logrus.WithError(startErr).WithField("port", mc.web_port).Error("Unable to start web interface")
+
+		return
+	}
+
+	webHub = hub
+
+	go func() {
+		var err = <-errCh
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logrus.WithError(err).WithField("port", mc.web_port).Error("Web interface stopped")
+		}
+	}()
+
+	logrus.WithField("port", mc.web_port).Info("Web interface listening")
+}
+
+// channelDescription names what a configured channel is connected to, or
+// Nothing for one that isn't configured.
+func channelDescription(audio *AudioConfig, channel int) maybe.Maybe[string] {
+	if audio == nil || channel < 0 || channel >= MAX_TOTAL_CHANS {
+		return maybe.Nothing[string]()
+	}
+
+	switch audio.chan_medium[channel] {
+	case MEDIUM_RADIO:
+		return maybe.Just("radio")
+	case MEDIUM_IGATE:
+		return maybe.Just("aprs-is")
+	case MEDIUM_NETTNC:
+		return maybe.Just("network")
+	case MEDIUM_NONE:
+	}
+
+	return maybe.Nothing[string]()
+}
+
+// subchanVia names where app_process_rec_packet's subchan says a frame came
+// from.
+func subchanVia(subchan int) string {
+	switch subchan {
+	case -1:
+		return "dtmf"
+	case -2:
+		return "aprs-is"
+	case -3:
+		return "network"
+	}
+
+	return "radio"
+}
+
+// webPublishReceived hands a received frame to the web interface.
+func webPublishReceived(channel int, subchan int, pp *ax25.Packet, A *aprs.Decoded, alevel ax25.ALevel) {
+	if webHub == nil {
+		return
+	}
+
+	var p = webui.NewPacket(pp, A, webui.Received)
+	p.Channel = channel
+	p.Via = subchanVia(subchan)
+
+	if alevel.Rec >= 0 && subchan >= 0 {
+		p.AudioLevel = maybe.Just(alevel.Rec)
+	}
+
+	webHub.Publish(p)
+}
+
+// webPublishTransmitted hands a transmitted frame to the web interface.
+func webPublishTransmitted(channel int, pp *ax25.Packet) {
+	if webHub == nil {
+		return
+	}
+
+	var p = webui.NewPacket(pp, nil, webui.Transmitted)
+	p.Channel = channel
+
+	webHub.Publish(p)
+}
