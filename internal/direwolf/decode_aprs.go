@@ -636,7 +636,7 @@ func (d *APRSDecoder) Print(A *decodedAPRS) {
 				A.lat = maybe.Just(lat)
 				A.lon = maybe.Just(lon)
 			} else if !A.quiet {
-				fmt.Println(err)
+				logrus.WithError(err).WithField("maidenhead", A.maidenhead).Warn("Grid square is not valid")
 			}
 		}
 
@@ -807,15 +807,13 @@ func (d *APRSDecoder) Print(A *decodedAPRS) {
 			var n = len(A.comment)
 			for j := range n {
 				if A.comment[j] == 0xb0 && (j == 0 || (A.comment[j-1])&0x80 == 0) {
-					fmt.Println("Character code 0xb0 is probably an attempt at a degree symbol.")
-					fmt.Println("The correct encoding is 0xc2 0xb0 in UTF-8.")
+					logrus.Warn("Character code 0xb0 is probably an attempt at a degree symbol. The correct encoding is 0xc2 0xb0 in UTF-8.")
 				}
 			}
 
 			for j := range n {
 				if A.comment[j] == 0xf8 && (j == n-1 || (A.comment[j+1]&0xc0) != 0xc0) {
-					fmt.Println("Character code 0xf8 is probably an attempt at a degree symbol.")
-					fmt.Println("The correct encoding is 0xc2 0xb0 in UTF-8.")
+					logrus.Warn("Character code 0xf8 is probably an attempt at a degree symbol. The correct encoding is 0xc2 0xb0 in UTF-8.")
 				}
 			}
 		}
