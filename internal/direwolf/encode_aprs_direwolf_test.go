@@ -105,6 +105,4 @@ func Test_encode_aprs(t *testing.T) {
 
 	result = EncodeMessage("WB2OSZ-123", "other stuff", "12345")
 	assert.Equal(t, ":WB2OSZ-12:other stuff{12345", result)
-
-	dw_printf("Encode APRS test PASSED with no errors.\n")
 } /* end main */
