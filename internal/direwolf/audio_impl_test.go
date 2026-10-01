@@ -396,3 +396,165 @@ func TestAudioImpl_audioOpen_missingInputDevice_isFatal(t *testing.T) {
 func TestAudioImpl_audioClose_nothingOpen(t *testing.T) {
 	assert.NotPanics(t, new(AudioDevices).Close)
 }
+
+// --- Soundcard, on ALSA null devices ---
+
+func TestAudioImpl_audioOpen_soundcard(t *testing.T) {
+	var tests = []struct {
+		name     string
+		bits     int
+		channels int
+	}{
+		{"16-bit mono", 16, 1},
+		{"8-bit mono", 8, 1},
+		{"16-bit stereo", 16, 2},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nullSoundcards(t, nullSoundcard)
+
+			var pa = makeAudioConfig(nullSoundcard, nullSoundcard)
+			pa.adev[0].bits_per_sample = tt.bits
+			pa.adev[0].num_channels = tt.channels
+
+			var d = openAudio(t, pa)
+			var dev = d.dev[0]
+
+			var bufSize = calcbufsize(DEFAULT_SAMPLES_PER_SEC, tt.channels, tt.bits)
+			var frames = bufSize / (tt.channels * tt.bits / 8)
+
+			assert.Equal(t, AUDIO_IN_TYPE_SOUNDCARD, dev.g_audio_in_type)
+			assert.Equal(t, frames, dev.framesPerBuffer)
+			assert.Equal(t, bufSize, dev.inbufSizeInBytes)
+			assert.Equal(t, bufSize, dev.outbufSizeInBytes)
+			assert.NotNil(t, dev.inputStream)
+			assert.NotNil(t, dev.inputRingBuf)
+			assert.NotNil(t, dev.outputStream)
+			assert.False(t, dev.outputStarted, "the output stream starts on the first Flush, not on open")
+			assert.True(t, d.transmitAvailable(0))
+
+			if tt.bits == 16 {
+				assert.Len(t, dev.inputScratchBuf, frames*tt.channels*2)
+				assert.Len(t, dev.outputBuf16, frames*tt.channels)
+				assert.Nil(t, dev.outputBuf8)
+			} else {
+				assert.Nil(t, dev.inputScratchBuf)
+				assert.Len(t, dev.outputBuf8, frames*tt.channels)
+				assert.Nil(t, dev.outputBuf16)
+			}
+
+			// Recorded audio reaches GetByte.  What the null device records
+			// isn't reliably silence, so only that there is some.
+			for range 4 {
+				var b = d.GetByte(0)
+				assert.GreaterOrEqual(t, b, 0)
+				assert.LessOrEqual(t, b, 255)
+			}
+
+			// A full buffer flushes itself, starting the output stream.
+			for i := range dev.outbufSizeInBytes - 1 {
+				assert.Equal(t, 0, d.Put(0, uint8(i)))
+			}
+
+			assert.False(t, dev.outputStarted)
+			assert.Equal(t, 0, d.Put(0, 0))
+			assert.True(t, dev.outputStarted)
+			assert.Zero(t, dev.outbufLen)
+
+			// A partial buffer goes out with wait, which then stops the stream.
+			assert.Equal(t, 0, d.Put(0, 0))
+			d.wait(0)
+			assert.Zero(t, dev.outbufLen)
+			assert.False(t, dev.outputStarted)
+		})
+	}
+}
+
+func TestAudioImpl_audioOpen_soundcard_separateInputAndOutput(t *testing.T) {
+	nullSoundcards(t, "samoyed_null_in", "samoyed_null_out")
+
+	var pa = makeAudioConfig("samoyed_null_in", "samoyed_null_out")
+	pa.adev[0].adevice_out_specified = true
+
+	var d = openAudio(t, pa)
+
+	assert.NotNil(t, d.dev[0].inputStream)
+	assert.NotNil(t, d.dev[0].outputStream)
+	assert.True(t, d.transmitAvailable(0))
+}
+
+// With a soundcard to receive from, an output device that isn't there costs
+// only the ability to transmit - unless it was named for transmit.
+func TestAudioImpl_audioOpen_soundcard_missingOutputDevice(t *testing.T) {
+	for _, specified := range []bool{false, true} {
+		t.Run(map[bool]string{false: "defaulted", true: "specified"}[specified], func(t *testing.T) {
+			nullSoundcards(t, nullSoundcard)
+
+			var pa = makeAudioConfig(nullSoundcard, noSuchAudioDevice)
+			pa.adev[0].adevice_out_specified = specified
+
+			if specified {
+				var _, openErr = AudioOpen(t.Context(), pa)
+				assert.Error(t, openErr)
+
+				return
+			}
+
+			var d = openAudio(t, pa)
+			assert.NotNil(t, d.dev[0].inputStream)
+			assert.Nil(t, d.dev[0].outputStream)
+			assert.False(t, d.transmitAvailable(0))
+		})
+	}
+}
+
+// --- AudioOpen's other bookkeeping ---
+
+func TestAudioImpl_audioOpen_fillsInDefaults(t *testing.T) {
+	var pa = makeAudioConfig("stdin", "stdin")
+
+	openAudio(t, pa)
+
+	assert.Equal(t, DEFAULT_NUM_CHANNELS, pa.adev[0].num_channels)
+	assert.Equal(t, DEFAULT_SAMPLES_PER_SEC, pa.adev[0].samples_per_sec)
+	assert.Equal(t, DEFAULT_BITS_PER_SAMPLE, pa.adev[0].bits_per_sample)
+
+	// Every radio channel's modem defaults are filled in, not just those of
+	// the devices that are defined.
+	for channel := range MAX_RADIO_CHANS {
+		assert.Equal(t, DEFAULT_MARK_FREQ, pa.achan[channel].mark_freq)
+		assert.Equal(t, DEFAULT_SPACE_FREQ, pa.achan[channel].space_freq)
+		assert.Equal(t, DEFAULT_BAUD, pa.achan[channel].baud)
+	}
+}
+
+func TestAudioImpl_audioOpen_stdinDash(t *testing.T) {
+	var pa = makeAudioConfig("-", "-")
+
+	var d = openAudio(t, pa)
+
+	assert.Equal(t, AUDIO_IN_TYPE_STDIN, d.dev[0].g_audio_in_type)
+	assert.Equal(t, "stdin", pa.adev[0].adevice_in)
+}
+
+func TestAudioImpl_audioOpen_udpInput_defaultPort(t *testing.T) {
+	// The default port is a fixed one, which something else may hold.
+	var probe, probeErr = new(net.ListenConfig).ListenPacket(t.Context(), "udp", ":"+strconv.Itoa(DEFAULT_UDP_AUDIO_PORT))
+	if probeErr != nil {
+		t.Skipf("UDP port %d is unavailable: %v", DEFAULT_UDP_AUDIO_PORT, probeErr)
+	}
+
+	require.NoError(t, probe.Close())
+
+	var pa = makeAudioConfig("udp:", "stdin")
+
+	var d = openAudio(t, pa)
+
+	assert.Equal(t, "udp:"+strconv.Itoa(DEFAULT_UDP_AUDIO_PORT), pa.adev[0].adevice_in)
+	require.NotNil(t, d.dev[0].udp_sock)
+
+	var addr, isUDP = d.dev[0].udp_sock.LocalAddr().(*net.UDPAddr)
+	require.True(t, isUDP)
+	assert.Equal(t, DEFAULT_UDP_AUDIO_PORT, addr.Port)
+}
