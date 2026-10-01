@@ -44,7 +44,7 @@ func aisPositionReport(t *testing.T, rawSpeed int, rawCourse int) string {
 // transmitted as 82 degrees - a heading nobody reported.  Absence must
 // survive all the way into EncodeObject.
 func Test_ais_to_object_without_course_or_speed(t *testing.T) {
-	var aprsDecoder = NewDecoderFromDataFiles()
+	var aprsDecoder = aprs.NewDecoderFromDataFiles()
 
 	var sentence = aisPositionReport(t, 1023, 3600)
 	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", aprs.UserDefUserID, aprs.UserDefTypeAIS, sentence), true)
@@ -75,7 +75,7 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 // The same report with a course and speed still gets its data extension, so
 // the test above is not passing for want of anything to encode.
 func Test_ais_to_object_with_course_and_speed(t *testing.T) {
-	var aprsDecoder = NewDecoderFromDataFiles()
+	var aprsDecoder = aprs.NewDecoderFromDataFiles()
 
 	var sentence = aisPositionReport(t, 208, 900) // 20.8 knots, 90 degrees
 	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", aprs.UserDefUserID, aprs.UserDefTypeAIS, sentence), true)
@@ -149,12 +149,12 @@ func Test_reportConfigCheck(t *testing.T) {
 // stations-heard list, so an object report can't overwrite where its sender is
 // (Dire Wolf issue 545).
 func TestMheardPosition(t *testing.T) {
-	var position = new(Decoder).Decode(ax25.FromText("Q1TEST>APDW17:!4237.14N/07120.83W#", true), true)
+	var position = new(aprs.Decoder).Decode(ax25.FromText("Q1TEST>APDW17:!4237.14N/07120.83W#", true), true)
 	var lat, lon = mheardPosition(position)
 	assert.True(t, lat.IsJust())
 	assert.True(t, lon.IsJust())
 
-	var object = new(Decoder).Decode(ax25.FromText("Q1TEST>APDW17:;OBJECT   *111111z4237.14N/07120.83W#", true), true)
+	var object = new(aprs.Decoder).Decode(ax25.FromText("Q1TEST>APDW17:;OBJECT   *111111z4237.14N/07120.83W#", true), true)
 	require.True(t, object.Lat.IsJust(), "the object report should carry a location to ignore")
 
 	lat, lon = mheardPosition(object)

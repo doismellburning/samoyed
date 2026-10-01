@@ -85,6 +85,7 @@ package direwolf
 import (
 	"context"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/sirupsen/logrus"
 )
 
@@ -207,7 +208,7 @@ func recv_adev_thread(ctx context.Context, pa *AudioConfig, a int, failed chan<-
 }
 
 // recv_process drains the received data queue until ctx is cancelled.
-func recv_process(ctx context.Context, aprsDecoder *Decoder) {
+func recv_process(ctx context.Context, aprsDecoder *aprs.Decoder) {
 	for ctx.Err() == nil {
 		var timeout_value = ax25_link_get_next_timer_expiry()
 

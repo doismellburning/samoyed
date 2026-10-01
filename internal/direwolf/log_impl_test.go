@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,7 @@ func TestLogRRBitsShortHeardDoesNotPanic(t *testing.T) {
 		t.Fatal("test packet did not set up heard station at or beyond AX25_REPEATER_2")
 	}
 
-	var A Decoded
+	var A aprs.Decoded
 
 	var pl = NewPacketLogger(false, "")
 	pl.RRBits(&A, pp)
@@ -57,8 +58,8 @@ func readLogRecords(t *testing.T, path string) [][]string {
 	return records
 }
 
-func fullLogAprs() *Decoded {
-	var A = new(Decoded)
+func fullLogAprs() *aprs.Decoded {
+	var A = new(aprs.Decoded)
 	A.Src = "Q1TEST"
 	A.Name = "OBJNAME"
 	A.SymbolTable = '/'
@@ -86,7 +87,7 @@ func TestLogNewPacketLoggerEmptyPathDisabled(t *testing.T) {
 	assert.Empty(t, pl.logPath)
 
 	// Nothing should happen, and nothing should panic.
-	pl.Write(0, new(Decoded), nil, logNoLevel(), 0)
+	pl.Write(0, new(aprs.Decoded), nil, logNoLevel(), 0)
 	assert.Nil(t, pl.logFp)
 	pl.Close()
 }
@@ -189,7 +190,7 @@ func TestLogWriteSingleFileAppendsWithoutSecondHeader(t *testing.T) {
 
 	var path = filepath.Join(t.TempDir(), "packets.log")
 
-	var A = new(Decoded)
+	var A = new(aprs.Decoded)
 	A.Src = "Q1TEST"
 
 	var pl = NewPacketLogger(false, path)
@@ -225,7 +226,7 @@ func TestLogWriteDCSOverridesTone(t *testing.T) {
 
 	var path = filepath.Join(t.TempDir(), "packets.log")
 
-	var A = new(Decoded)
+	var A = new(aprs.Decoded)
 	A.Src = "Q1TEST"
 	A.Tone = maybe.Just(100.0)
 	A.DCS = maybe.Just(0o23)
@@ -251,14 +252,14 @@ func TestLogWriteSingleFileOpenFails(t *testing.T) {
 	var path = filepath.Join(t.TempDir(), "missing", "packets.log")
 	var pl = NewPacketLogger(false, path)
 
-	pl.Write(0, new(Decoded), nil, logNoLevel(), 0)
+	pl.Write(0, new(aprs.Decoded), nil, logNoLevel(), 0)
 
 	assert.Nil(t, pl.logFp)
 	assert.Empty(t, pl.logPath, "logging is disabled after a failed open")
 	assert.NoFileExists(t, path)
 
 	// Subsequent writes are no-ops.
-	pl.Write(0, new(Decoded), nil, logNoLevel(), 0)
+	pl.Write(0, new(aprs.Decoded), nil, logNoLevel(), 0)
 	assert.Nil(t, pl.logFp)
 }
 
@@ -268,7 +269,7 @@ func TestLogWriteDailyNames(t *testing.T) {
 	var dir = t.TempDir()
 	var pl = NewPacketLogger(true, dir)
 
-	var A = new(Decoded)
+	var A = new(aprs.Decoded)
 	A.Src = "Q1TEST"
 
 	pl.Write(0, A, nil, logNoLevel(), 0)
@@ -319,7 +320,7 @@ func TestLogWriteDailyOpenFails(t *testing.T) {
 	}
 
 	var pl = NewPacketLogger(true, dir)
-	pl.Write(0, new(Decoded), nil, logNoLevel(), 0)
+	pl.Write(0, new(aprs.Decoded), nil, logNoLevel(), 0)
 
 	assert.Nil(t, pl.logFp)
 	assert.Empty(t, pl.openFname)
@@ -331,7 +332,7 @@ func TestLogRRBits(t *testing.T) {
 
 	var pl = NewPacketLogger(false, "")
 
-	var A = new(Decoded)
+	var A = new(aprs.Decoded)
 	A.Src = "Q1TEST"
 	A.Mfr = "Maker, Inc"
 

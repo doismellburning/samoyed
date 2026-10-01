@@ -15,6 +15,7 @@ package direwolf
 import (
 	"fmt"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
@@ -36,7 +37,7 @@ import (
  *
  *------------------------------------------------------------------*/
 
-func DescribeAX25Frame(aprsDecoder *Decoder, frame []byte) int {
+func DescribeAX25Frame(aprsDecoder *aprs.Decoder, frame []byte) int {
 	if len(frame) < ax25.MinPacketLen {
 		fmt.Printf("ERROR: The frame is %d bytes, too short for an AX.25 header of at least %d.\n", len(frame), ax25.MinPacketLen)
 

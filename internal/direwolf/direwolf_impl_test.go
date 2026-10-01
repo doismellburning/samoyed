@@ -154,7 +154,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	var igateConfig = new(igate_config_s)
 	var digiConfig = new(digi_config_s)
-	var filter = NewPacketFilter(igateConfig, NewDecoderFromDataFiles(), 0)
+	var filter = NewPacketFilter(igateConfig, aprs.NewDecoderFromDataFiles(), 0)
 
 	igate = NewIGate(audioConfig, igateConfig, digiConfig, filter, 0)
 	aprsDigipeater = NewDigipeater(audioConfig, digiConfig, filter)
@@ -173,7 +173,7 @@ func processRecPacket(t *testing.T, subchan int, slice int, pp *ax25.Packet, ale
 
 	return testutils.CaptureOutput(t, func() {
 		logrus.SetOutput(os.Stdout)
-		app_process_rec_packet(t.Context(), NewDecoderFromDataFiles(), 0, subchan, slice, pp, alevel, fecType, retries, spectrum)
+		app_process_rec_packet(t.Context(), aprs.NewDecoderFromDataFiles(), 0, subchan, slice, pp, alevel, fecType, retries, spectrum)
 	})
 }
 

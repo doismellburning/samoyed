@@ -303,7 +303,7 @@ x = Silence FX.25 information.`)
 	goHamlib.SetDebugLevel(goHamlib.DebugLevel(d_h_opt))
 
 	aprsSymbolData = symbols.New()
-	var aprsDecoder = NewDecoder(deviceid.New(), aprsSymbolData)
+	var aprsDecoder = aprs.NewDecoder(deviceid.New(), aprsSymbolData)
 
 	audio_config = new(AudioConfig)
 	misc_config = new(misc_config_s)
@@ -778,7 +778,7 @@ x = Silence FX.25 information.`)
 // ais_object_course_speed rounds a decoded course and speed into the integer
 // degrees and knots EncodeObject takes, leaving an unknown one absent.
 // Should EncodeObject take floating point here?
-func ais_object_course_speed(A *Decoded) (maybe.Maybe[int], maybe.Maybe[int]) {
+func ais_object_course_speed(A *aprs.Decoded) (maybe.Maybe[int], maybe.Maybe[int]) {
 	var course = maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.Course)
 	var speed = maybe.Fmap(func(mph float64) int { return int(dwutil.DW_MPH_TO_KNOTS(mph) + 0.5) }, A.SpeedMPH)
 
@@ -787,7 +787,7 @@ func ais_object_course_speed(A *Decoded) (maybe.Maybe[int], maybe.Maybe[int]) {
 
 func app_process_rec_packet(
 	ctx context.Context,
-	aprsDecoder *Decoder,
+	aprsDecoder *aprs.Decoder,
 	channel int,
 	subchan int,
 	slice int,
@@ -1287,12 +1287,12 @@ func countOf(n int, noun string) string {
 
 // mheardPosition is the position the stations-heard list should record for a
 // decoded packet: its location if it is a position report, and nothing otherwise.
-func mheardPosition(A *Decoded) (maybe.Maybe[float64], maybe.Maybe[float64]) {
+func mheardPosition(A *aprs.Decoded) (maybe.Maybe[float64], maybe.Maybe[float64]) {
 	// Issue 545.  This was not thought out well.
 	// There was a case where a station sent a position report and the location was stored.
 	// Later, the same station sent an object report and the stations's location was overwritten
 	// by the object location.  Solution: Save location only if position report.
-	if A.PacketType != PacketTypePosition {
+	if A.PacketType != aprs.PacketTypePosition {
 		return maybe.Nothing[float64](), maybe.Nothing[float64]()
 	}
 

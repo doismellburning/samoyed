@@ -23,6 +23,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
@@ -50,7 +51,7 @@ type PacketFilter struct {
 	// aprsDecoder decodes the packets an APRS filter is asked about.  Nil
 	// decodes without identifying devices or describing symbols, which is
 	// all a syntax check needs.
-	aprsDecoder *Decoder
+	aprsDecoder *aprs.Decoder
 
 	// debug is how much to say about each decision:
 	//	0	no debug output.
@@ -64,7 +65,7 @@ type PacketFilter struct {
 // hop count from igateConfig, which may be nil, decodes APRS packets with
 // aprsDecoder, which may also be nil, and says as much about each decision
 // as debugLevel asks for.
-func NewPacketFilter(igateConfig *igate_config_s, aprsDecoder *Decoder, debugLevel int) *PacketFilter {
+func NewPacketFilter(igateConfig *igate_config_s, aprsDecoder *aprs.Decoder, debugLevel int) *PacketFilter {
 	var f = new(PacketFilter)
 	f.igateConfig = igateConfig
 	f.aprsDecoder = aprsDecoder
@@ -136,7 +137,7 @@ type pfstate_t struct {
 	 *		name		- for object or item
 	 *		comment
 	 */
-	decoded *Decoded
+	decoded *aprs.Decoded
 
 	/*
 	 * These are set by next_token.
@@ -226,7 +227,7 @@ func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.
 	pfstate.is_aprs = is_aprs
 	pfstate.syntax_only = syntax_only
 
-	var aprsDecoder = new(Decoder)
+	var aprsDecoder = new(aprs.Decoder)
 
 	if f != nil {
 		pfstate.igate_config = f.igateConfig
@@ -611,12 +612,12 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		}
 	} else if pf.token_str[0] == 'g' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* g - Addressee of message. e.g. "BLN*" for bulletins. */
-		if pf.decoded.MessageSubtype == MessageSubtypeMessage ||
-			pf.decoded.MessageSubtype == MessageSubtypeAck ||
-			pf.decoded.MessageSubtype == MessageSubtypeRej ||
-			pf.decoded.MessageSubtype == MessageSubtypeBulletin ||
-			pf.decoded.MessageSubtype == MessageSubtypeNWS ||
-			pf.decoded.MessageSubtype == MessageSubtypeDirectedQuery {
+		if pf.decoded.MessageSubtype == aprs.MessageSubtypeMessage ||
+			pf.decoded.MessageSubtype == aprs.MessageSubtypeAck ||
+			pf.decoded.MessageSubtype == aprs.MessageSubtypeRej ||
+			pf.decoded.MessageSubtype == aprs.MessageSubtypeBulletin ||
+			pf.decoded.MessageSubtype == aprs.MessageSubtypeNWS ||
+			pf.decoded.MessageSubtype == aprs.MessageSubtypeDirectedQuery {
 			result, err = filt_bodgu(pf, pf.decoded.Addressee)
 
 			if pf.debug >= 2 {
@@ -699,7 +700,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		if pf.debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 
-			if pf.decoded.PacketType == PacketTypeMessage {
+			if pf.decoded.PacketType == aprs.PacketTypeMessage {
 				dw_printf("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), pf.decoded.Addressee)
 			} else {
 				dw_printf("   %s returns %s for not an APRS 'message'\n", pf.token_str, bool2text(result))
@@ -812,48 +813,48 @@ func filt_t(pf *pfstate_t) (int, error) {
 	for _, f := range pf.token_str[2:] {
 		switch f {
 		case 'p': /* Position */
-			if pf.decoded.PacketType == PacketTypePosition {
+			if pf.decoded.PacketType == aprs.PacketTypePosition {
 				return 1, nil
 			}
 
 		case 'o': /* Object */
-			if pf.decoded.PacketType == PacketTypeObject {
+			if pf.decoded.PacketType == aprs.PacketTypeObject {
 				return 1, nil
 			}
 
 		case 'i': /* Item */
-			if pf.decoded.PacketType == PacketTypeItem {
+			if pf.decoded.PacketType == aprs.PacketTypeItem {
 				return 1, nil
 			}
 
 		case 'm': // Any "message."
-			if pf.decoded.PacketType == PacketTypeMessage {
+			if pf.decoded.PacketType == aprs.PacketTypeMessage {
 				return 1, nil
 			}
 
 		case 'q': /* Query */
-			if pf.decoded.PacketType == PacketTypeQuery {
+			if pf.decoded.PacketType == aprs.PacketTypeQuery {
 				return 1, nil
 			}
 
 		case 'c': /* station Capabilities - my extension */
 			/* Most often used for IGate statistics. */
-			if pf.decoded.PacketType == PacketTypeCapabilities {
+			if pf.decoded.PacketType == aprs.PacketTypeCapabilities {
 				return 1, nil
 			}
 
 		case 's': /* Status */
-			if pf.decoded.PacketType == PacketTypeStatus {
+			if pf.decoded.PacketType == aprs.PacketTypeStatus {
 				return 1, nil
 			}
 
 		case 't': /* Telemetry data or metadata */
-			if pf.decoded.PacketType == PacketTypeTelemetry {
+			if pf.decoded.PacketType == aprs.PacketTypeTelemetry {
 				return 1, nil
 			}
 
 		case 'u': /* User-defined */
-			if pf.decoded.PacketType == PacketTypeUserDefined {
+			if pf.decoded.PacketType == aprs.PacketTypeUserDefined {
 				return 1, nil
 			}
 
@@ -863,7 +864,7 @@ func filt_t(pf *pfstate_t) (int, error) {
 			}
 
 		case 'w': /* Weather */
-			if pf.decoded.PacketType == PacketTypeWeather {
+			if pf.decoded.PacketType == aprs.PacketTypeWeather {
 				return 1, nil
 			}
 
@@ -871,13 +872,13 @@ func filt_t(pf *pfstate_t) (int, error) {
 			/* Object with _ symbol is also weather.  APRS protocol spec page 66. */
 			// Can't use *infop because it would not work with 3rd party header.
 
-			if (pf.decoded.PacketType == PacketTypePosition ||
-				pf.decoded.PacketType == PacketTypeObject) && pf.decoded.SymbolCode == '_' {
+			if (pf.decoded.PacketType == aprs.PacketTypePosition ||
+				pf.decoded.PacketType == aprs.PacketTypeObject) && pf.decoded.SymbolCode == '_' {
 				return 1, nil
 			}
 
 		case 'n': /* NWS format */
-			if pf.decoded.PacketType == PacketTypeNWS {
+			if pf.decoded.PacketType == aprs.PacketTypeNWS {
 				return 1, nil
 			}
 
@@ -1346,7 +1347,7 @@ func filt_i(pf *pfstate_t) (int, error) {
 	 * Get source address and info part.
 	 * Addressee has already been extracted into pf.decoded.addressee.
 	 */
-	if pf.decoded.PacketType != PacketTypeMessage {
+	if pf.decoded.PacketType != aprs.PacketTypeMessage {
 		return 0, nil
 	}
 
@@ -1523,7 +1524,7 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
 func PfilterStandaloneInit(debug_level int) *PacketFilter {
 	mheardDB = mheard.New(0)
 
-	return NewPacketFilter(new(igate_config_s), NewDecoderFromDataFiles(), debug_level)
+	return NewPacketFilter(new(igate_config_s), aprs.NewDecoderFromDataFiles(), debug_level)
 }
 
 // PfilterMaxDebugLevel is the most verbose debug level a PacketFilter has

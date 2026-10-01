@@ -29,6 +29,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
@@ -129,7 +130,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) Write(channel int, A *Decoded, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel) {
+func (pl *PacketLogger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel) {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()
 
@@ -347,7 +348,7 @@ func (pl *PacketLogger) Write(channel int, A *Decoded, pp *ax25.Packet, alevel a
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) RRBits(A *Decoded, pp *ax25.Packet) {
+func (pl *PacketLogger) RRBits(A *aprs.Decoded, pp *ax25.Packet) {
 	// Sanitize system type (manufacturer) changing any comma to period.
 	var smfr = strings.ReplaceAll(A.Mfr, ",", ".")
 

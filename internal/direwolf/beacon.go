@@ -829,7 +829,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			if bs.trackerDebugLevel >= 3 {
 				/* Frequency, offset, tone and DCS are unknown here, which is */
 				/* what the zero value of each of those fields already means. */
-				var A Decoded
+				var A aprs.Decoded
 
 				A.Src = mycall
 				A.SymbolTable = bp.symtab
