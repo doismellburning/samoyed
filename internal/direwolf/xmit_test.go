@@ -848,3 +848,11 @@ func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 	assert.Less(t, elapsed.Milliseconds(), int64(atDefault)-400,
 		"the SSID was ignored and the default speed used")
 }
+
+// discardReceiveSink is a ReceiveSink that ignores whatever it is told.
+type discardReceiveSink struct{}
+
+func (discardReceiveSink) RecFrame(int, int, int, *ax25.Packet, ax25.ALevel, fec_type_t, BitFixLevel, string) {
+}
+
+func (discardReceiveSink) DCDChange(int, int) {}
