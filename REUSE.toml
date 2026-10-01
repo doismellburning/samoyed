@@ -32,3 +32,11 @@ SPDX-License-Identifier = "GPL-2.0-or-later"
 path = "debian/**"
 SPDX-FileCopyrightText = "(C) 2014 Iain R. Learmonth <irl@fsfe.org>"
 SPDX-License-Identifier = "GPL-2.0-or-later"
+
+[[annotations]]
+path = "internal/webui/static/vendor/leaflet/**"
+SPDX-FileCopyrightText = [
+	"2010-2023 Volodymyr Agafonkin",
+	"2010-2011 CloudMade",
+]
+SPDX-License-Identifier = "BSD-2-Clause"

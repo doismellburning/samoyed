@@ -1,0 +1,65 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: The Samoyed Authors
+SPDX-License-Identifier: GPL-2.0-or-later
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Samoyed</title>
+<link rel="stylesheet" href="static/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="static/app.css">
+<script src="static/vendor/leaflet/leaflet.js" defer></script>
+<script src="static/app.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>Samoyed</h1>
+  <nav role="tablist">
+    <button role="tab" id="tab-dashboard" aria-controls="view-dashboard" aria-selected="true">Dashboard</button>
+    <button role="tab" id="tab-map" aria-controls="view-map" aria-selected="false">Map</button>
+  </nav>
+  <span id="status" class="status" data-state="connecting">Connecting…</span>
+</header>
+
+<main>
+  <section id="view-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
+    <div id="channels" class="channels" aria-label="Channels"></div>
+
+    <div class="panels">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Heard stations <span id="station-count" class="count"></span></h2>
+        </div>
+        <div class="scroll">
+          <table id="stations">
+            <thead>
+              <tr><th></th><th>Station</th><th>Ch</th><th>Via</th><th>Last heard</th><th class="num">Pkts</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <p id="stations-empty" class="empty">Nothing heard yet.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Packets</h2>
+          <input id="filter" type="search" placeholder="Filter" aria-label="Filter packets">
+          <button id="pause" type="button" aria-pressed="false">Pause</button>
+        </div>
+        <div class="scroll">
+          <ol id="packets" class="packets"></ol>
+          <p id="packets-empty" class="empty">No packets yet.</p>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  <section id="view-map" role="tabpanel" aria-labelledby="tab-map" hidden>
+    <div id="map"></div>
+  </section>
+</main>
+</body>
+</html>

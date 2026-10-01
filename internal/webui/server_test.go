@@ -69,6 +69,22 @@ func TestAPIHandlers(t *testing.T) {
 		assert.Equal(t, "nosniff", w.Header().Get("X-Content-Type-Options"))
 	})
 
+	t.Run("page", func(t *testing.T) {
+		var w = get(t, h, "/")
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Contains(t, w.Body.String(), "<title>Samoyed</title>")
+	})
+
+	t.Run("assets", func(t *testing.T) {
+		for _, path := range []string{"/static/app.js", "/static/app.css", "/static/vendor/leaflet/leaflet.js"} {
+			assert.Equal(t, http.StatusOK, get(t, h, path).Code, path)
+		}
+	})
+
+	t.Run("unknown path", func(t *testing.T) {
+		assert.Equal(t, http.StatusNotFound, get(t, h, "/nope").Code)
+	})
+
 	t.Run("no writes", func(t *testing.T) {
 		var w = httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/packets", nil))
