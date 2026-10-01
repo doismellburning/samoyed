@@ -5,6 +5,7 @@ package webui
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -26,9 +27,21 @@ const (
 	keepaliveInterval = 15 * time.Second
 )
 
+// The page and everything it loads, Leaflet included, are built in, so the
+// interface works on a station with no route to a CDN.  Only the map tiles
+// come from outside.
+//
+//go:embed static
+var staticFiles embed.FS
+
 // Handler returns the web interface's routes, reading from hub.
 func Handler(hub *Hub) http.Handler {
 	var mux = http.NewServeMux()
+
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, staticFiles, "static/index.html")
+	})
+	mux.Handle("GET /static/", http.FileServerFS(staticFiles))
 
 	mux.HandleFunc("GET /api/packets", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, hub.Packets())
