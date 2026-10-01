@@ -81,11 +81,12 @@ type GenPacketsOptions struct {
 
 // A GenPackets turns frames into audio, writing it to a .WAV file.
 type GenPackets struct {
-	audio     *AudioConfig
-	amplitude int
-	morseWPM  int
-	rand      *genPacketsPRNG
-	sink      *wavFileSink
+	audio          *AudioConfig
+	amplitude      int
+	morseWPM       int
+	rand           *genPacketsPRNG
+	sink           *wavFileSink
+	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 
 	// One per channel, kept for the whole run, so the NRZI line level carries
 	// over from one packet to the next as it does on the air.
@@ -152,20 +153,30 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 	g.rand = rand
 	g.sink = sink
 
-	GenToneInit(audio, g.amplitude/2, sink)
-
 	// We don't have -d or -q options here.
 	// Just use the default of minimal information for FX.25.
 	const fx25Debug = 1
 
 	g.hdlcSenders = make([]*HDLCSender, MAX_RADIO_CHANS)
 	for c := range g.hdlcSenders {
-		g.hdlcSenders[c] = NewHDLCSender(c, audio, fx25Debug)
+		g.hdlcSenders[c] = NewHDLCSender(c, audio, nil, fx25Debug)
 	}
+
+	g.setTones()
 
 	il2p_init(0) // There are no "-d" options so far but it could be handy here.
 
 	return g, nil
+}
+
+// setTones makes the tone generators afresh from the current settings, and
+// hands each channel's to its HDLCSender, which keeps its line level.
+func (g *GenPackets) setTones() {
+	g.toneGenerators = NewToneGenerators(g.audio, g.amplitude/2, g.sink)
+
+	for c, s := range g.hdlcSenders {
+		s.toneGenerator = g.toneGenerators[c]
+	}
 }
 
 // Close finishes the .WAV file, filling in the lengths in its header.
@@ -245,13 +256,13 @@ func (g *GenPackets) SendVariableSpeed(maxError float64, increment float64) erro
 	for speed_error := -maxError; speed_error <= maxError+0.001; speed_error += increment {
 		// Baud is int so we get some roundoff.  Make it real?
 		g.audio.achan[0].baud = int(float64(normal_speed) * (1. + speed_error/100.))
-		GenToneInit(g.audio, g.amplitude/2, g.sink)
+		g.setTones()
 
 		g.mustSendPacket(fmt.Sprintf("WB2OSZ-15>TEST:, speed %+0.1f%%  The quick brown fox jumps over the lazy dog!", speed_error))
 	}
 
 	g.audio.achan[0].baud = normal_speed
-	GenToneInit(g.audio, g.amplitude/2, g.sink)
+	g.setTones()
 
 	return nil
 }
@@ -270,7 +281,7 @@ func (g *GenPackets) SendPacket(str string) error {
 	if g.morseWPM > 0 {
 		// Why not use the destination field instead of command line option?
 		// For one thing, this is not in TNC-2 monitor format.
-		morse_send(0, str, g.morseWPM, 100, 100)
+		morse_send(g.toneGenerators[0], 0, str, g.morseWPM, 100, 100)
 
 		return nil
 	}
@@ -303,7 +314,7 @@ func (g *GenPackets) SendPacket(str string) error {
 			repeat = 1
 		}
 
-		eas_send(0, pinfo, repeat, 500, 500)
+		g.hdlcSenders[0].sendEAS(pinfo, repeat, 500, 500)
 
 		return nil
 	}
@@ -333,7 +344,7 @@ func (g *GenPackets) SendPacket(str string) error {
 		var n = int(float64(samples_per_symbol) * (32 + float64(g.rand.next())/float64(MY_RAND_MAX)))
 
 		for range n {
-			gen_tone_put_sample(c, 0, 0)
+			g.toneGenerators[c].PutSample(0)
 		}
 
 		g.hdlcSenders[c].SendPreamblePostamble(32, false)

@@ -95,7 +95,9 @@ const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
  * Purpose:    	Given a string, generate appropriate lengths of
  *		tone and silence.
  *
- * Inputs:	chan	- Radio channel number.
+ * Inputs:	toneGenerator	- The channel's tone generator.
+ *
+ *		channel	- Radio channel number.
  *		str	- Character string to send.
  *		wpm	- Speed in words per minute.
  *		txdelay	- Delay (ms) from PTT to first character.
@@ -112,12 +114,12 @@ const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
  *
  *--------------------------------------------------------------------*/
 
-func morse_send(channel int, str string, wpm int, txdelay int, txtail int) int {
-	if toneGenerators[channel] == nil {
+func morse_send(toneGenerator *ToneGenerator, channel int, str string, wpm int, txdelay int, txtail int) int {
+	if toneGenerator == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid channel %d for sending Morse Code.\n", channel)
 	} else {
-		toneGenerators[channel].SendMorse(str, wpm, txdelay, txtail)
+		toneGenerator.SendMorse(str, wpm, txdelay, txtail)
 	}
 
 	return (txdelay + int(TIME_UNITS_TO_MS(morse_units_str(str), wpm)+0.5) + txtail)

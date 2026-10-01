@@ -28,6 +28,15 @@ const (
 func captureBits(t *testing.T, audioConfig *AudioConfig, fn func(s *HDLCSender)) []int {
 	t.Helper()
 
+	return captureBitsWithToneGenerator(t, audioConfig, nil, fn)
+}
+
+// captureBitsWithToneGenerator is captureBits for a sender that sends to
+// toneGenerator, for what goes to it other than bits: the quiet periods, and
+// the flush.
+func captureBitsWithToneGenerator(t *testing.T, audioConfig *AudioConfig, toneGenerator *ToneGenerator, fn func(s *HDLCSender)) []int {
+	t.Helper()
+
 	var bits []int
 
 	toneGenCapture = func(channel int, data int) {
@@ -38,7 +47,7 @@ func captureBits(t *testing.T, audioConfig *AudioConfig, fn func(s *HDLCSender))
 
 	t.Cleanup(func() { toneGenCapture = nil })
 
-	fn(NewHDLCSender(hdlcSendTestChannel, audioConfig, 0))
+	fn(NewHDLCSender(hdlcSendTestChannel, audioConfig, toneGenerator, 0))
 
 	toneGenCapture = nil
 
@@ -269,7 +278,7 @@ func TestNRZIInvertsOnAZeroOnly(t *testing.T) {
 // but each sender has its own: sending on one channel must not change what
 // the next bit on another looks like.
 func TestHDLCSendersKeepTheirOwnLineLevel(t *testing.T) {
-	var other = NewHDLCSender(1, nil, 0)
+	var other = NewHDLCSender(1, nil, nil, 0)
 
 	toneGenCapture = func(int, int) {}
 
@@ -307,15 +316,11 @@ func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
 
 	var sink = new(flushCountingSink)
 
-	var origGenerators = toneGenerators
-
-	t.Cleanup(func() { toneGenerators = origGenerators })
-
-	GenToneInit(audioConfig, 100, sink)
+	var toneGenerator = NewToneGenerator(hdlcSendTestChannel, audioConfig, 100, sink)
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var bits = captureBitsWithToneGenerator(t, audioConfig, toneGenerator, func(s *HDLCSender) {
 		sent = s.SendPreamblePostamble(2, true)
 	})
 
@@ -504,7 +509,7 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 // The EAS SAME serializer is not HDLC at all: bytes go out as they are, with
 // quiet periods around and between the repeats.
 func TestEASSendRepeatsTheMessageWithItsPreamble(t *testing.T) {
-	setupEASSendTest(t)
+	var toneGenerator = setupEASSendTest(t)
 
 	const (
 		repeat  = 2
@@ -517,8 +522,8 @@ func TestEASSendRepeatsTheMessageWithItsPreamble(t *testing.T) {
 
 	var elapsed int
 
-	var bits = captureBits(t, nil, func(*HDLCSender) {
-		elapsed = eas_send(hdlcSendTestChannel, message, repeat, txdelay, txtail)
+	var bits = captureBitsWithToneGenerator(t, nil, toneGenerator, func(s *HDLCSender) {
+		elapsed = s.sendEAS(message, repeat, txdelay, txtail)
 	})
 
 	var preamble = make([]byte, 16)
@@ -544,17 +549,14 @@ func TestEASSendRepeatsTheMessageWithItsPreamble(t *testing.T) {
 	assert.Equal(t, expectedElapsed, elapsed)
 }
 
-// setupEASSendTest gives the channel somewhere to put the quiet periods that
-// surround an EAS message, which do not go through the bit capture.
-func setupEASSendTest(t *testing.T) {
+// setupEASSendTest gives the channel a tone generator, somewhere to put the
+// quiet periods that surround an EAS message, which do not go through the bit
+// capture.
+func setupEASSendTest(t *testing.T) *ToneGenerator {
 	t.Helper()
 
 	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
 	audioConfig.achan[hdlcSendTestChannel].modem_type = MODEM_EAS
-
-	var origGenerators = toneGenerators
-
-	t.Cleanup(func() { toneGenerators = origGenerators })
 
 	// Samples go to a file rather than to an audio device.
 	var w, err = wav.Create(filepath.Join(t.TempDir(), "eas.wav"), wav.Format{
@@ -566,11 +568,11 @@ func setupEASSendTest(t *testing.T) {
 
 	t.Cleanup(func() { w.Close() })
 
-	GenToneInit(audioConfig, 100, newWAVFileSink(w))
+	return NewToneGenerator(hdlcSendTestChannel, audioConfig, 100, newWAVFileSink(w))
 }
 
 // A sender reports on FX.25 at the debug level it was made with, so each
 // program that sends - samoyed-direwolf, samoyed-gen-packets - has its own.
 func TestHDLCSenderKeepsItsFX25DebugLevel(t *testing.T) {
-	assert.Equal(t, 3, NewHDLCSender(hdlcSendTestChannel, nil, 3).fx25Debug)
+	assert.Equal(t, 3, NewHDLCSender(hdlcSendTestChannel, nil, nil, 3).fx25Debug)
 }

@@ -20,7 +20,7 @@ import (
  *			  but this is expected to be mostly for testing, not normal
  *			  operation.
  *
- * Outputs:	Bits are shipped out by calling ToneGenPutBit().
+ * Outputs:	Bits are shipped out to the sender's tone generator.
  *
  * Returns:	Number of bits sent including "flags" and the
  *		stuffing bits.
@@ -33,7 +33,7 @@ import (
  *
  * Assumptions:	It is assumed that the tone_gen module has been
  *		properly initialized so that bits sent with
- *		ToneGenPutBit() are processed correctly.
+ *		the tone generator are processed correctly.
  *
  * Errors:	If something goes wrong, return -1 and the caller should
  *		fallback to sending normal AX.25.

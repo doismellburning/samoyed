@@ -506,7 +506,7 @@ x = Silence FX.25 information.`)
 	 * Note:  This is not the same as a volume control you would see on the screen.
 	 * It is the range of the digital sound representation.
 	 */
-	GenToneInit(audio_config, audio_amplitude, audioDevices)
+	var toneGenerators = NewToneGenerators(audio_config, audio_amplitude, audioDevices)
 
 	/*
 	 * Push to Talk (PTT) control.
@@ -526,7 +526,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmitSvc = NewXmitService(ctx, audio_config, audioDevices, d_p_opt, d_x_opt)
+	xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, d_p_opt, d_x_opt)
 	stopIfCancelled(ctx)
 
 	/*
@@ -604,7 +604,7 @@ x = Silence FX.25 information.`)
 						transmitCalibrationChannel)
 
 					for n > 0 && ctx.Err() == nil {
-						ToneGenPutBit(transmitCalibrationChannel, n&1)
+						toneGenerators[transmitCalibrationChannel].PutBit(n & 1)
 						n--
 					}
 				case 'm': // "Mark" tone: -x m
@@ -612,7 +612,7 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
 
 					for n > 0 && ctx.Err() == nil {
-						ToneGenPutBit(transmitCalibrationChannel, 1)
+						toneGenerators[transmitCalibrationChannel].PutBit(1)
 
 						n--
 					}
@@ -621,7 +621,7 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
 
 					for n > 0 && ctx.Err() == nil {
-						ToneGenPutBit(transmitCalibrationChannel, 0)
+						toneGenerators[transmitCalibrationChannel].PutBit(0)
 
 						n--
 					}
@@ -1073,7 +1073,7 @@ func app_process_rec_packet(
 					A.symbolTable, A.symbolCode,
 					maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // power, height, gain, direction.
 					course, speed,
-					maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), // freq, tone, offset
+					maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), // freq, toneGenerator, offset
 					A.comment)
 
 				// TODO Bodge

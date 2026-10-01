@@ -4,19 +4,27 @@
 //nolint:gochecknoglobals
 package direwolf
 
+import "github.com/sirupsen/logrus"
+
 // toneGenCapture, when set, is given the bits a frame serializes to instead of
 // the tone generator.  It is how a test sees what would have gone out over the
 // air without an audio device to send it to.
 var toneGenCapture func(channel int, data int)
 
-// ToneGenPutBit hands one bit to whatever is standing in for the
-// modulator.
-func ToneGenPutBit(channel int, data int) {
+// putBit hands one bit to whatever is standing in for the modulator: the
+// capture if a test has set one, the sender's tone generator otherwise.
+func (s *HDLCSender) putBit(data int) {
 	if toneGenCapture != nil {
-		toneGenCapture(channel, data)
+		toneGenCapture(s.channel, data)
 
 		return
 	}
 
-	tone_gen_put_bit_real(channel, data)
+	if s.toneGenerator == nil {
+		logrus.WithField("channel", s.channel).Error("Invalid channel for tone generation")
+
+		return
+	}
+
+	s.toneGenerator.PutBit(data)
 }

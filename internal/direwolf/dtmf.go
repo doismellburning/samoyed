@@ -269,7 +269,9 @@ func (d *DTMFDecoder) Sample(input float64) rune {
  *
  * Purpose:    	Generate DTMF tones from text string.
  *
- * Inputs:	channel	- Radio channel number.
+ * Inputs:	toneGenerator	- The channel's tone generator.
+ *
+ *		channel	- Radio channel number.
  *		str	- Character string to send.  0-9, A-D, *, #
  *		speed	- Number of tones per second.  Range 1 to 10.
  *		txdelay	- Delay (ms) from PTT to start.
@@ -284,12 +286,12 @@ func (d *DTMFDecoder) Sample(input float64) rune {
  *
  *--------------------------------------------------------------------*/
 
-func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int {
-	if toneGenerators[channel] == nil {
+func dtmf_send(toneGenerator *ToneGenerator, channel int, str string, speed int, txdelay int, txtail int) int {
+	if toneGenerator == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid channel %d for tone generation.\n", channel)
 	} else {
-		toneGenerators[channel].SendDTMF(str, speed, txdelay, txtail)
+		toneGenerator.SendDTMF(str, speed, txdelay, txtail)
 	}
 
 	return (txdelay +
