@@ -1109,3 +1109,114 @@ func TestNewGPSLeavesTheIGateDebugLevelAlone(t *testing.T) {
 
 	readFromIGate(t, server)
 }
+
+// feedLines passes data to r a byte at a time, as recvThread does, and
+// returns the lines it completed.
+func feedLines(r *igateLineReader, data []byte) []string {
+	var lines []string
+
+	for _, ch := range data {
+		if line, complete := r.add(ch); complete {
+			lines = append(lines, string(line))
+		}
+	}
+
+	return lines
+}
+
+// A server that never sends a LF used to have the IGate buffer what it sent
+// without end (issue #866).  The reader now gives up on a line once it is
+// too long to be real, and picks up again after the next LF.
+func TestIGateLineReaderDiscardsAnOverlongLine(t *testing.T) {
+	var r = new(igateLineReader)
+
+	for range 100 * igateMaxLineLen {
+		var _, complete = r.add('A')
+		require.False(t, complete)
+		require.LessOrEqual(t, len(r.line), igateMaxLineLen)
+	}
+
+	assert.LessOrEqual(t, cap(r.line), 2*igateMaxLineLen, "the line buffer kept growing")
+
+	var lines = feedLines(r, []byte("tail of the junk\r\nQ2TEST>APWW10,TCPIP*,qAC,T2TEST:>hello\r\n"))
+
+	assert.Equal(t, []string{"Q2TEST>APWW10,TCPIP*,qAC,T2TEST:>hello\r\n"}, lines)
+}
+
+// The limit counts the CR LF that ends a line.
+func TestIGateLineReaderLimit(t *testing.T) {
+	var fits = append(bytes.Repeat([]byte("A"), igateMaxLineLen-2), '\r', '\n')
+	var tooLong = append(bytes.Repeat([]byte("A"), igateMaxLineLen-1), '\r', '\n')
+
+	assert.Equal(t, []string{string(fits)}, feedLines(new(igateLineReader), fits))
+	assert.Empty(t, feedLines(new(igateLineReader), tooLong))
+
+	// The line after one that was discarded comes through as usual.
+	assert.Equal(t, []string{"#ok\n"}, feedLines(new(igateLineReader), append(tooLong, []byte("#ok\n")...)))
+}
+
+// A NUL becomes "<0x00>" in the line, and counts towards the limit as such.
+func TestIGateLineReaderNulCountsExpanded(t *testing.T) {
+	assert.Equal(t, []string{"a<0x00>b\n"}, feedLines(new(igateLineReader), []byte("a\x00b\n")))
+
+	// A couple of hundred bytes off the wire, but over the limit once expanded.
+	var nuls = append(bytes.Repeat([]byte{0}, igateMaxLineLen/len(igateNulText)+1), '\n')
+	assert.Empty(t, feedLines(new(igateLineReader), nuls))
+}
+
+// A packet from the server is counted and queued for transmission; a server
+// comment or an empty line is neither.
+func TestIGateProcessServerLine(t *testing.T) {
+	setupIGateToRadio(t)
+
+	igate.audioConfig.igate_vchannel = -1
+
+	igate.processServerLine([]byte("# aprsc 2.1.19\r\n"))
+	igate.processServerLine([]byte("\r\n"))
+
+	assert.Equal(t, 0, igate.downlinkCount())
+	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
+
+	igate.processServerLine([]byte("Q2TEST-1>APWW10,TCPIP*,qAC,T2TEST:>hello\r\n"))
+
+	assert.Equal(t, 1, igate.downlinkCount())
+
+	var sent = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+	require.NotNil(t, sent, "nothing was queued for transmission")
+	assert.Equal(t, "}Q2TEST-1>APWW10,TCPIP,Q1TEST*:>hello", string(sent.Info()))
+}
+
+// End to end: after an over-long line from the server, the receive thread
+// still handles the next one.
+func TestIGateRecvThreadSurvivesAnOverlongLine(t *testing.T) {
+	setupIGateToRadio(t)
+
+	igate.audioConfig.igate_vchannel = -1
+
+	var server, client = connectedTCPPair(t)
+
+	igate.setConnection(client)
+	igate.loggedIn(client)
+
+	var ctx, cancel = context.WithCancel(t.Context())
+
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		igate.recvThread(ctx)
+	}()
+
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+
+	var data = append(bytes.Repeat([]byte("A"), 10*igateMaxLineLen), []byte("\r\nQ2TEST-1>APWW10,TCPIP*,qAC,T2TEST:>hello\r\n")...)
+
+	var _, err = server.Write(data)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool { return igate.downlinkCount() == 1 }, 10*time.Second, 10*time.Millisecond)
+}
