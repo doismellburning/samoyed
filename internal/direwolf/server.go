@@ -119,6 +119,7 @@ import (
 	"crypto/subtle"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -1179,7 +1180,9 @@ func readCommandData(conn net.Conn, cmd *agwpe.Message) (int, error) {
 
 	var b = make([]byte, cmd.Header.DataLen)
 
-	var n, readErr = conn.Read(b)
+	// One Read returns whatever has arrived so far, which for a TCP stream
+	// need not be all of it.
+	var n, readErr = io.ReadFull(conn, b)
 	if readErr != nil {
 		return n, readErr
 	}
