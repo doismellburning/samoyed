@@ -256,7 +256,7 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 
 type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
-func KissRecByte(kf *kiss.Collector, audioConfig *AudioConfig, ch byte, debug int,
+func KissRecByte(kf *kiss.Collector, audioConfig *RadioConfig, ch byte, debug int,
 	kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
 	var chunk = kf.Add(ch)
@@ -341,7 +341,7 @@ func KissRecByte(kf *kiss.Collector, audioConfig *AudioConfig, ch byte, debug in
 
 // This is used only by the TNC side.
 
-func kiss_process_msg(kiss_msg []byte, audioConfig *AudioConfig, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
+func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
 	// New in 1.7:
 	// We can have KISS TCP ports which convey only a single radio channel.
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.

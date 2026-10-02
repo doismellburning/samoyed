@@ -110,7 +110,7 @@ type XmitService struct {
 	 */
 	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 
-	p_modem   *AudioConfig
+	p_modem   *RadioConfig
 	fx25Debug int
 }
 
@@ -144,7 +144,7 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(ctx context.Context, p_modem *AudioConfig, audio *AudioDevices, toneGenerators [MAX_RADIO_CHANS]*ToneGenerator, debug_xmit_packet bool, fx25Debug int) *XmitService {
+func NewXmitService(ctx context.Context, p_modem *RadioConfig, audio *AudioDevices, toneGenerators [MAX_RADIO_CHANS]*ToneGenerator, debug_xmit_packet bool, fx25Debug int) *XmitService {
 	logrus.Debug("xmit_init")
 	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem

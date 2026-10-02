@@ -30,7 +30,7 @@ func setupAdev0() (*AudioDevices, *adev_s) {
 
 // openAudio opens the audio devices pa describes, which must work, and closes
 // them again when the test is done.
-func openAudio(t *testing.T, pa *AudioConfig) *AudioDevices {
+func openAudio(t *testing.T, pa *RadioConfig) *AudioDevices {
 	t.Helper()
 
 	var d, err = AudioOpen(t.Context(), pa)
@@ -80,8 +80,8 @@ func Test_Flush_UDP_sendsBytes(t *testing.T) {
 
 // --- anyDeviceRequiresPortAudio ---
 
-func makeAudioConfig(inName, outName string) *AudioConfig {
-	var pa = new(AudioConfig)
+func makeRadioConfig(inName, outName string) *RadioConfig {
+	var pa = new(RadioConfig)
 	pa.adev[0].defined = 1
 	pa.adev[0].adevice_in = inName
 	pa.adev[0].adevice_out = outName
@@ -92,57 +92,57 @@ func makeAudioConfig(inName, outName string) *AudioConfig {
 func Test_anyDeviceRequiresPortAudio(t *testing.T) {
 	tests := []struct {
 		name string
-		pa   *AudioConfig
+		pa   *RadioConfig
 		want bool
 	}{
 		{
 			name: "no devices defined",
-			pa:   new(AudioConfig),
+			pa:   new(RadioConfig),
 			want: false,
 		},
 		{
 			name: "stdin in, udp out",
-			pa:   makeAudioConfig("stdin", "udp:127.0.0.1:1234"),
+			pa:   makeRadioConfig("stdin", "udp:127.0.0.1:1234"),
 			want: false,
 		},
 		{
 			name: "dash in, udp out",
-			pa:   makeAudioConfig("-", "udp:127.0.0.1:1234"),
+			pa:   makeRadioConfig("-", "udp:127.0.0.1:1234"),
 			want: false,
 		},
 		{
 			name: "udp in (uppercase), udp out",
-			pa:   makeAudioConfig("UDP:7355", "udp:127.0.0.1:1234"),
+			pa:   makeRadioConfig("UDP:7355", "udp:127.0.0.1:1234"),
 			want: false,
 		},
 		{
 			name: "stdin in, soundcard out",
-			pa:   makeAudioConfig("stdin", "default"),
+			pa:   makeRadioConfig("stdin", "default"),
 			want: true,
 		},
 		{
 			name: "soundcard in, udp out",
-			pa:   makeAudioConfig("default", "udp:127.0.0.1:1234"),
+			pa:   makeRadioConfig("default", "udp:127.0.0.1:1234"),
 			want: true,
 		},
 		{
 			name: "soundcard in, soundcard out",
-			pa:   makeAudioConfig("default", "default"),
+			pa:   makeRadioConfig("default", "default"),
 			want: true,
 		},
 		{
 			name: "stdin in and out, as a single-name ADEVICE gives",
-			pa:   makeAudioConfig("stdin", "stdin"),
+			pa:   makeRadioConfig("stdin", "stdin"),
 			want: false,
 		},
 		{
 			name: "dash in and out",
-			pa:   makeAudioConfig("-", "-"),
+			pa:   makeRadioConfig("-", "-"),
 			want: false,
 		},
 		{
 			name: "udp in and out, as a single-name ADEVICE gives",
-			pa:   makeAudioConfig("udp:7355", "udp:7355"),
+			pa:   makeRadioConfig("udp:7355", "udp:7355"),
 			want: false,
 		},
 	}
@@ -281,7 +281,7 @@ func Test_audioOutType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var pa = makeAudioConfig(tt.inName, tt.ouName)
+			var pa = makeRadioConfig(tt.inName, tt.ouName)
 			pa.adev[0].adevice_out_specified = tt.specified
 
 			assert.Equal(t, tt.want, audioOutType(&pa.adev[0]))
@@ -296,7 +296,7 @@ func Test_audioOutType(t *testing.T) {
 // "-" command line argument - is exactly that: it leaves "stdin" as the
 // output device name too, which is nothing we can transmit through.
 func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
-	var pa = makeAudioConfig("stdin", "stdin")
+	var pa = makeRadioConfig("stdin", "stdin")
 	var d = openAudio(t, pa)
 
 	assert.Nil(t, d.dev[0].outputStream)
@@ -320,7 +320,7 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 // An output device we only defaulted to, and which turns out not to exist,
 // leaves the station receive-only rather than stopping it.
 func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
-	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
+	var pa = makeRadioConfig("stdin", noSuchAudioDevice)
 
 	var d = openAudio(t, pa)
 
@@ -331,7 +331,7 @@ func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
 // specifically, so not finding it is a configuration error, not a reason to
 // quietly transmit nothing.
 func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
-	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
+	var pa = makeRadioConfig("stdin", noSuchAudioDevice)
 	pa.adev[0].adevice_out_specified = true
 
 	var _, openErr = AudioOpen(t.Context(), pa)
@@ -341,7 +341,7 @@ func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
 // Naming standard input, or a UDP port to listen on, as the transmit device
 // is a configuration error too - neither can transmit.
 func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
-	var pa = makeAudioConfig("stdin", "stdin")
+	var pa = makeRadioConfig("stdin", "stdin")
 	pa.adev[0].adevice_out_specified = true
 
 	var _, openErr = AudioOpen(t.Context(), pa)
@@ -357,7 +357,7 @@ func Test_audioClose_waitsForUDPSilenceKeepalive(t *testing.T) {
 
 	defer listener.Close()
 
-	var pa = makeAudioConfig("stdin", "udp:"+listener.LocalAddr().String())
+	var pa = makeRadioConfig("stdin", "udp:"+listener.LocalAddr().String())
 	pa.adev[0].adevice_out_specified = true
 
 	var d = openAudio(t, pa)
@@ -379,7 +379,7 @@ func Test_audioClose_waitsForUDPSilenceKeepalive(t *testing.T) {
 // reported at the interval its configuration asked for - AudioOpen hands the
 // device both, and there is nothing else to ask.
 func Test_GetByte_recordsStatisticsFromTheDevicesOwnSettings(t *testing.T) {
-	var pa = makeAudioConfig("udp:0", "stdin")
+	var pa = makeRadioConfig("udp:0", "stdin")
 	pa.adev[0].num_channels = 2
 	pa.adev[0].bits_per_sample = 16
 	pa.statistics_interval = 100
@@ -435,7 +435,7 @@ func Test_applyCommandLineAudioSource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var pa = makeAudioConfig("plughw:1,0", tt.ouName)
+			var pa = makeRadioConfig("plughw:1,0", tt.ouName)
 			pa.adev[0].adevice_out_specified = tt.specified
 
 			applyCommandLineAudioSource(&pa.adev[0], "stdin")

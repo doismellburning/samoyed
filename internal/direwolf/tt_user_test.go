@@ -19,7 +19,7 @@ import (
 // at 0, a perfectly real value meaning "omit no digits", so the guard never
 // fired and every ambiguity-less message silently reset it.
 func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
-	var my_audio_config AudioConfig
+	var my_audio_config RadioConfig
 
 	my_audio_config.mycall[0] = "Q1TEST-15"
 
@@ -52,7 +52,7 @@ func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 // be a number, so it failed, the error was ignored, and the object report
 // carried no frequency at all.
 func TestObjectReportCarriesFrequency(t *testing.T) {
-	var my_audio_config AudioConfig
+	var my_audio_config RadioConfig
 
 	my_audio_config.mycall[0] = "Q1TEST-15"
 
@@ -78,7 +78,7 @@ func TestObjectReportCarriesFrequency(t *testing.T) {
 // table, through Button's idle ticks, to send the object reports it has
 // scheduled.  Nothing ordered the two, so they raced on the table.
 func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
-	var my_audio_config AudioConfig
+	var my_audio_config RadioConfig
 
 	my_audio_config.mycall[0] = "Q1TEST-15"
 

@@ -22,7 +22,7 @@ const baud = direwolf.DEFAULT_BAUD
 
 func main() {
 	// Play the samples through the audio device.
-	genTone(func(config *direwolf.AudioConfig) (direwolf.AudioSink, func()) {
+	genTone(func(config *direwolf.RadioConfig) (direwolf.AudioSink, func()) {
 		var devices, err = direwolf.AudioOpen(context.Background(), config)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Could not open the audio device: %v\n", err)
@@ -35,7 +35,7 @@ func main() {
 
 // openSink opens somewhere to send the samples for config, returning it and
 // what closes it again.
-type openSink func(config *direwolf.AudioConfig) (direwolf.AudioSink, func())
+type openSink func(config *direwolf.RadioConfig) (direwolf.AudioSink, func())
 
 // genTone is main, but sending the samples wherever open says rather than
 // necessarily the audio device, so that a test can see what would have been

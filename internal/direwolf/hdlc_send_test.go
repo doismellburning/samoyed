@@ -25,7 +25,7 @@ const (
 
 // captureBits collects the bits sent to the modulator while fn runs, handing
 // fn a new HDLCSender so the stream starts from a known place.
-func captureBits(t *testing.T, audioConfig *AudioConfig, fn func(s *HDLCSender)) []int {
+func captureBits(t *testing.T, audioConfig *RadioConfig, fn func(s *HDLCSender)) []int {
 	t.Helper()
 
 	return captureBitsWithToneGenerator(t, audioConfig, nil, fn)
@@ -34,7 +34,7 @@ func captureBits(t *testing.T, audioConfig *AudioConfig, fn func(s *HDLCSender))
 // captureBitsWithToneGenerator is captureBits for a sender that sends to
 // toneGenerator, for what goes to it other than bits: the quiet periods, and
 // the flush.
-func captureBitsWithToneGenerator(t *testing.T, audioConfig *AudioConfig, toneGenerator *ToneGenerator, fn func(s *HDLCSender)) []int {
+func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fn func(s *HDLCSender)) []int {
 	t.Helper()
 
 	var bits []int
@@ -141,8 +141,8 @@ func packMSBFirst(t *testing.T, bits []int) []byte {
 
 // newHDLCSendTestConfig is one 1200 baud AFSK channel sending the given layer
 // 2 protocol.
-func newHDLCSendTestConfig(layer2 layer2_t) *AudioConfig {
-	var audioConfig = new(AudioConfig)
+func newHDLCSendTestConfig(layer2 layer2_t) *RadioConfig {
+	var audioConfig = new(RadioConfig)
 
 	audioConfig.adev[0].defined = 1
 	audioConfig.adev[0].num_channels = 1

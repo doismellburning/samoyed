@@ -56,7 +56,7 @@ func Test_genTone(t *testing.T) {
 	var sink = new(recordingSink)
 
 	var output = testutils.CaptureOutput(t, func() {
-		genTone(func(*direwolf.AudioConfig) (direwolf.AudioSink, func()) {
+		genTone(func(*direwolf.RadioConfig) (direwolf.AudioSink, func()) {
 			return sink, func() {}
 		})
 	})

@@ -57,7 +57,7 @@ var q_d_opt bool /* "-q d" Quiet, suppress the printing of description of APRS p
 
 var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." */
 
-var audio_config *AudioConfig
+var audio_config *RadioConfig
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
 var aprsSymbolData *symbols.Data
@@ -305,7 +305,7 @@ x = Silence FX.25 information.`)
 	aprsSymbolData = symbols.New()
 	var aprsDecoder = aprs.NewDecoder(deviceid.New(), aprsSymbolData)
 
-	audio_config = new(AudioConfig)
+	audio_config = new(RadioConfig)
 	misc_config = new(misc_config_s)
 	var digi_config digi_config_s
 	var cdigi_config cdigi_config_s

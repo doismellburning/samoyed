@@ -98,7 +98,7 @@ import (
  *
  * Inputs:      ctx		- Stops the device threads when cancelled.
  *
- *		pa		- Address of structure of type AudioConfig.
+ *		pa		- Address of structure of type RadioConfig.
  *
  *		src		- Where the audio samples come from.
  *
@@ -109,7 +109,7 @@ import (
  *
  *----------------------------------------------------------------*/
 
-func recv_init(ctx context.Context, pa *AudioConfig, src SampleSource) <-chan int {
+func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource) <-chan int {
 	// Buffered so that a failing device thread can report and finish even
 	// though nobody is listening any more.
 	var failed = make(chan int, MAX_ADEVS)
@@ -131,7 +131,7 @@ func recv_init(ctx context.Context, pa *AudioConfig, src SampleSource) <-chan in
 // that would mean tearing the device down underneath the demodulator.  A
 // device delivering samples at all therefore stops promptly; one that has gone
 // quiet without failing outright holds the goroutine until it says something.
-func recv_adev_thread(ctx context.Context, pa *AudioConfig, a int, failed chan<- int, src SampleSource) {
+func recv_adev_thread(ctx context.Context, pa *RadioConfig, a int, failed chan<- int, src SampleSource) {
 	/* This audio device can have one (mono) or two (stereo) channels. */
 	/* Find number of the first channel and number of channels. */
 	var first_chan = ADEVFIRSTCHAN(a)

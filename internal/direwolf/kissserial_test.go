@@ -65,7 +65,7 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*KissSerial, <-chan struct{}) {
 	t.Helper()
 
-	var ks = newKissSerial(mc, kissTestAudioConfig(), 0)
+	var ks = newKissSerial(mc, kissTestRadioConfig(), 0)
 
 	if mc.kiss_serial_poll == 0 {
 		ks.fd = serialport.Open(mc.kiss_serial_port, mc.kiss_serial_speed)
@@ -102,7 +102,7 @@ func openKissSerialPort(t *testing.T, debug int) (*KissSerial, *os.File) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var ks = newKissSerial(mc, kissTestAudioConfig(), debug)
+	var ks = newKissSerial(mc, kissTestRadioConfig(), debug)
 
 	t.Cleanup(ks.closePort)
 
@@ -287,7 +287,7 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	const channel = 0
 
 	// Laid out like the channel table startKissSerial gives the TNC.
-	var audioConfig = kissTestAudioConfig()
+	var audioConfig = kissTestRadioConfig()
 
 	var origXmitSvc, origKissNetSvc = xmitSvc, kissNetSvc
 

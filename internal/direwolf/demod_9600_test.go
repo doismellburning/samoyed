@@ -77,7 +77,7 @@ func BenchmarkConvolve(b *testing.B) {
 // generate9600 has the tone generator send each of frames as G3RUH (scrambled
 // baseband) at baud, sampled at sampleRate, and returns the 16 bit samples it
 // makes.
-func generate9600(t *testing.T, audioConfig *AudioConfig, channel int, frames []*ax25.Packet) []int {
+func generate9600(t *testing.T, audioConfig *RadioConfig, channel int, frames []*ax25.Packet) []int {
 	t.Helper()
 
 	var sink = new(byteSink)
@@ -106,7 +106,7 @@ func generate9600(t *testing.T, audioConfig *AudioConfig, channel int, frames []
 
 // demodulate9600 runs samples through the demodulators set up for
 // audioConfig, and returns the frames they hand on.
-func demodulate9600(t *testing.T, audioConfig *AudioConfig, channel int, samples []int) []*ax25.Packet {
+func demodulate9600(t *testing.T, audioConfig *RadioConfig, channel int, samples []int) []*ax25.Packet {
 	t.Helper()
 
 	var origReceiver = hdlcReceiver
@@ -135,8 +135,8 @@ func demodulate9600(t *testing.T, audioConfig *AudioConfig, channel int, samples
 	return sink.frames
 }
 
-func new9600TestAudioConfig(sampleRate int, profiles string, upsample int) *AudioConfig {
-	var audioConfig = newTestAudioConfig(0, MODEM_SCRAMBLE, 9600, 0, 0, sampleRate)
+func new9600TestRadioConfig(sampleRate int, profiles string, upsample int) *RadioConfig {
+	var audioConfig = newTestRadioConfig(0, MODEM_SCRAMBLE, 9600, 0, 0, sampleRate)
 	audioConfig.adev[0].defined = 1
 	audioConfig.achan[0].num_freq = 1
 	audioConfig.achan[0].profiles = profiles
@@ -177,9 +177,9 @@ func TestDemod9600RoundTrip(t *testing.T) {
 				frames = append(frames, pp)
 			}
 
-			var samples = generate9600(t, new9600TestAudioConfig(tc.sampleRate, tc.profiles, tc.upsample), 0, frames)
+			var samples = generate9600(t, new9600TestRadioConfig(tc.sampleRate, tc.profiles, tc.upsample), 0, frames)
 
-			var audioConfig = new9600TestAudioConfig(tc.sampleRate, tc.profiles, tc.upsample)
+			var audioConfig = new9600TestRadioConfig(tc.sampleRate, tc.profiles, tc.upsample)
 			var got = demodulate9600(t, audioConfig, 0, samples)
 
 			require.Len(t, got, len(texts))
@@ -206,7 +206,7 @@ func TestDemod9600RoundTrip(t *testing.T) {
 
 // Silence decodes to nothing.
 func TestDemod9600Silence(t *testing.T) {
-	var audioConfig = new9600TestAudioConfig(48000, "-", 0)
+	var audioConfig = new9600TestRadioConfig(48000, "-", 0)
 
 	var got = demodulate9600(t, audioConfig, 0, make([]int, 48000/10))
 

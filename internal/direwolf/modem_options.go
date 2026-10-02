@@ -11,7 +11,7 @@ import "github.com/doismellburning/samoyed/internal/dwutil"
 //
 // It is for once the configuration file and the command line have both had
 // their say.
-func settleModemOptions(pa *AudioConfig) {
+func settleModemOptions(pa *RadioConfig) {
 	for channel := range MAX_RADIO_CHANS {
 		if pa.chan_medium[channel] == MEDIUM_RADIO {
 			pa.achan[channel].settleModemOptions(channel)

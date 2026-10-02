@@ -47,7 +47,7 @@ type NetTNC struct {
  *
  * Inputs:	ctx             - Stops the listening threads when cancelled.
  *
- *		pa              - Address of structure of type AudioConfig.
+ *		pa              - Address of structure of type RadioConfig.
  *
  *		debug ? TBD
  *
@@ -61,7 +61,7 @@ type NetTNC struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewNetTNCs(ctx context.Context, pa *AudioConfig) [MAX_TOTAL_CHANS]*NetTNC {
+func NewNetTNCs(ctx context.Context, pa *RadioConfig) [MAX_TOTAL_CHANS]*NetTNC {
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
 	for i := range MAX_TOTAL_CHANS {

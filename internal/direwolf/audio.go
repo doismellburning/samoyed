@@ -134,8 +134,6 @@ const MAX_SAMPLES_PER_SEC = 192000 /* The cheap USB-audio adapters (e.g. CM108) 
 
 const DEFAULT_BITS_PER_SAMPLE = 16
 
-/* Audio configuration. */
-
 // audioRingBuffer is a thread-safe ring buffer for audio data.
 // The PortAudio callback writes to this buffer, and the main
 // processing thread reads from it.
@@ -528,7 +526,7 @@ func (d *AudioDevices) transmitAvailable(a int) bool {
 
 // anyInputRequiresPortAudio reports whether any configured audio device needs
 // PortAudio to receive (i.e. is a soundcard rather than stdin or UDP).
-func anyInputRequiresPortAudio(pa *AudioConfig) bool {
+func anyInputRequiresPortAudio(pa *RadioConfig) bool {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined == 0 {
 			continue
@@ -545,7 +543,7 @@ func anyInputRequiresPortAudio(pa *AudioConfig) bool {
 
 // anyOutputRequiresPortAudio reports whether any configured audio device needs
 // PortAudio to transmit.
-func anyOutputRequiresPortAudio(pa *AudioConfig) bool {
+func anyOutputRequiresPortAudio(pa *RadioConfig) bool {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined == 0 {
 			continue
@@ -563,7 +561,7 @@ func anyOutputRequiresPortAudio(pa *AudioConfig) bool {
 // PortAudio in either direction.  Used to skip portaudio.Initialize() when all
 // devices are stdin/UDP, so that samoyed can run on systems with no working
 // PortAudio host backend (issue #501).
-func anyDeviceRequiresPortAudio(pa *AudioConfig) bool {
+func anyDeviceRequiresPortAudio(pa *RadioConfig) bool {
 	return anyInputRequiresPortAudio(pa) || anyOutputRequiresPortAudio(pa)
 }
 
@@ -639,7 +637,7 @@ func (d *AudioDevices) findPortAudioDevice(name string, forInput bool) *portaudi
 
 // openSoundcardInput opens soundcard name to record from for audio device a,
 // and starts it recording into the device's input ring buffer.
-func (d *AudioDevices) openSoundcardInput(a int, pa *AudioConfig, name string, framesPerBuffer int, bufSizeInBytes int) error {
+func (d *AudioDevices) openSoundcardInput(a int, pa *RadioConfig, name string, framesPerBuffer int, bufSizeInBytes int) error {
 	var inputDev = d.findPortAudioDevice(name, true)
 	if inputDev == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -763,7 +761,7 @@ func (d *AudioDevices) openUDPInput(a int, name string) error {
 // "udp:host:port", gives to send its audio to, and starts the silence that
 // keeps the stream flowing between transmissions.  Failing to connect is only
 // an error if name was given for transmit; otherwise it costs transmitting.
-func (d *AudioDevices) openUDPOutput(ctx context.Context, a int, pa *AudioConfig, name string) error {
+func (d *AudioDevices) openUDPOutput(ctx context.Context, a int, pa *RadioConfig, name string) error {
 	/*
 	 * UDP output - dial to the specified host:port and send audio packets.
 	 */
@@ -802,7 +800,7 @@ func (d *AudioDevices) openUDPOutput(ctx context.Context, a int, pa *AudioConfig
 // openSoundcardOutput opens soundcard name to play audio device a's output
 // through.  Failing to is only an error if name was given for transmit;
 // otherwise it costs transmitting.
-func (d *AudioDevices) openSoundcardOutput(a int, pa *AudioConfig, name string, framesPerBuffer int, portaudioReady bool) error {
+func (d *AudioDevices) openSoundcardOutput(a int, pa *RadioConfig, name string, framesPerBuffer int, portaudioReady bool) error {
 	/*
 	 * Soundcard - blocking write mode.
 	 * Flush fills the typed output buffer and calls Write() to
@@ -899,7 +897,7 @@ func (d *AudioDevices) openSoundcardOutput(a int, pa *AudioConfig, name string, 
 
 // openDevice opens audio device a, as pa describes it, for receiving and,
 // where it can, transmitting.
-func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *AudioConfig, portaudioReady bool) error {
+func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, portaudioReady bool) error {
 	d.dev[a].inbufSizeInBytes = 0
 	d.dev[a].inbuf = nil
 	d.dev[a].inbufLen = 0
@@ -1089,7 +1087,7 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *AudioConfig, p
 
 // fillAudioDefaults fills in any audio device and modem settings that the
 // configuration left unset.
-func fillAudioDefaults(pa *AudioConfig) {
+func fillAudioDefaults(pa *RadioConfig) {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].num_channels == 0 {
 			pa.adev[a].num_channels = DEFAULT_NUM_CHANNELS
@@ -1125,7 +1123,7 @@ func fillAudioDefaults(pa *AudioConfig) {
  *
  * Purpose:     Open the digital audio device.
  *
- * Inputs:      pa		- Address of structure of type AudioConfig.
+ * Inputs:      pa		- Address of structure of type RadioConfig.
  *
  *				Using a structure, rather than separate arguments
  *				seemed to make sense because we often pass around
@@ -1144,7 +1142,7 @@ func fillAudioDefaults(pa *AudioConfig) {
  *
  *----------------------------------------------------------------*/
 
-func AudioOpen(ctx context.Context, pa *AudioConfig) (*AudioDevices, error) {
+func AudioOpen(ctx context.Context, pa *RadioConfig) (*AudioDevices, error) {
 	var d = new(AudioDevices)
 
 	// If AudioOpen fails, close whatever it had opened so far, and give back

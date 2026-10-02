@@ -421,7 +421,7 @@ func TestNetTNCDebugPrints(t *testing.T) {
 func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 	var port, conns = newTestNetTNC(t.Context(), t)
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 	audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
 	audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
@@ -446,7 +446,7 @@ func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
 	var ctx, cancel = context.WithCancel(t.Context())
 	cancel()
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
 	audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
 	audioConfig.nettnc_port[nettncTestChannel] = freeTCPPort(t)
@@ -480,7 +480,7 @@ func readFullFrom(conn net.Conn, buf []byte) error {
 func TestNetTNCTransmitQueueSendsToItsTNCs(t *testing.T) {
 	var nt, tnc, _ = attachTestNetTNC(t.Context(), t)
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
 
 	var tq = NewTransmitQueue()

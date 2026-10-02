@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestAudioConfig(channel int, modemType modem_t, baud int, markFreq int, spaceFreq int, samplesPerSec int) *AudioConfig {
-	var audioConfig AudioConfig
+func newTestRadioConfig(channel int, modemType modem_t, baud int, markFreq int, spaceFreq int, samplesPerSec int) *RadioConfig {
+	var audioConfig RadioConfig
 
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 	audioConfig.achan[channel].modem_type = modemType
@@ -33,7 +33,7 @@ func TestNewToneGeneratorAFSK(t *testing.T) {
 	var markFreq = 1200
 	var spaceFreq = 2200
 	var samplesPerSec = 44100
-	var audioConfig = newTestAudioConfig(channel, MODEM_AFSK, baud, markFreq, spaceFreq, samplesPerSec)
+	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, baud, markFreq, spaceFreq, samplesPerSec)
 
 	var tg = NewToneGenerator(channel, audioConfig, 100, nil)
 
@@ -49,7 +49,7 @@ func TestNewToneGeneratorAFSK(t *testing.T) {
 
 func TestNewToneGeneratorBPSK(t *testing.T) {
 	var channel = 0
-	var audioConfig = newTestAudioConfig(channel, MODEM_BPSK, 2400, 0, 0, 44100)
+	var audioConfig = newTestRadioConfig(channel, MODEM_BPSK, 2400, 0, 0, 44100)
 
 	var tg = NewToneGenerator(channel, audioConfig, 100, nil)
 
@@ -64,7 +64,7 @@ func TestNewToneGeneratorBPSK(t *testing.T) {
 func TestToneGeneratorsAreIndependentPerChannel(t *testing.T) {
 	var chan0 = 0
 	var chan1 = 1
-	var audioConfig = newTestAudioConfig(chan0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	var audioConfig = newTestRadioConfig(chan0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.chan_medium[chan1] = MEDIUM_RADIO
 	audioConfig.achan[chan1].modem_type = MODEM_AFSK
 	audioConfig.achan[chan1].baud = 9600
@@ -85,7 +85,7 @@ func TestToneGeneratorsAreIndependentPerChannel(t *testing.T) {
 }
 
 func TestToneGeneratorSineTableFollowsAmplitude(t *testing.T) {
-	var audioConfig = newTestAudioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 
 	var full = NewToneGenerator(0, audioConfig, 100, nil)
 	var half = NewToneGenerator(0, audioConfig, 50, nil)
@@ -99,8 +99,8 @@ func TestToneGeneratorSineTableFollowsAmplitude(t *testing.T) {
 
 // newCapturingToneGenerator makes a mono, 16 bit tone generator for channel 0
 // whose samples land in the returned byteSink.
-func newCapturingToneGenerator(modemType modem_t, baud int, samplesPerSec int) (*ToneGenerator, *byteSink, *AudioConfig) {
-	var audioConfig = newTestAudioConfig(0, modemType, baud, 1200, 2200, samplesPerSec)
+func newCapturingToneGenerator(modemType modem_t, baud int, samplesPerSec int) (*ToneGenerator, *byteSink, *RadioConfig) {
+	var audioConfig = newTestRadioConfig(0, modemType, baud, 1200, 2200, samplesPerSec)
 	var sink = new(byteSink)
 
 	return NewToneGenerator(0, audioConfig, 100, sink), sink, audioConfig
@@ -359,7 +359,7 @@ func TestToneGeneratorPutSampleFormats(t *testing.T) {
 		{"clipped low", 1, 16, 0, -40000, []byte{0x01, 0x80}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var audioConfig = newTestAudioConfig(tc.channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
+			var audioConfig = newTestRadioConfig(tc.channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
 			audioConfig.adev[0].num_channels = tc.channels
 			audioConfig.adev[0].bits_per_sample = tc.bits
 
@@ -427,7 +427,7 @@ func TestNewGenToneTestConfig(t *testing.T) {
 }
 
 func TestNewToneGeneratorsAndSenderFunctions(t *testing.T) {
-	var audioConfig = newTestAudioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 12000)
+	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 12000)
 	var sink = new(byteSink)
 
 	var toneGenerators = NewToneGenerators(audioConfig, 100, sink)

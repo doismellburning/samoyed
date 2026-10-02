@@ -141,7 +141,7 @@ func TestRecordRadioFrameCountsFECFrameWithPassallCorrectionCount(t *testing.T) 
 // TestIsRadioChannelReadsTheConfigItIsHanded checks that isRadioChannel answers
 // from the configuration it is given.
 func TestIsRadioChannelReadsTheConfigItIsHanded(t *testing.T) {
-	var audio = new(AudioConfig)
+	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
 	audio.chan_medium[1] = MEDIUM_NETTNC
 

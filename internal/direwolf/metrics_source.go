@@ -35,7 +35,7 @@ func fecTypeLabel(fecType fec_type_t) string {
 // never configured at all.  Metrics that describe the radio - received frames,
 // DCD, audio level - are confined to these, and they are the channels
 // metrics_init marks up and seeds.  A nil audio has no radio channels.
-func isRadioChannel(audio *AudioConfig, channel int) bool {
+func isRadioChannel(audio *RadioConfig, channel int) bool {
 	return channel >= 0 && channel < MAX_RADIO_CHANS &&
 		audio != nil &&
 		audio.chan_medium[channel] == MEDIUM_RADIO
@@ -72,7 +72,7 @@ func recordRadioFrame(channel int, fecType fec_type_t, retries BitFixLevel) {
 // state from audio, seeding the rest of that channel's series at
 // zero (everything else pushes from its own subsystem as events happen).
 // A port of 0 (the default) disables it.
-func metrics_init(ctx context.Context, audio *AudioConfig, mc *misc_config_s) {
+func metrics_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
 	if mc.metrics_port == 0 {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Disabled Prometheus metrics endpoint.\n")

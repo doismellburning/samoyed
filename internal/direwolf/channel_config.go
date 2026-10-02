@@ -267,7 +267,10 @@ type achan_param_s struct {
 
 }
 
-type AudioConfig struct {
+// RadioConfig is the configuration of the radio channels: the sound devices
+// behind them, each channel's modem, PTT and transmit timing, and what sits on
+// each channel.  It was Dire Wolf's struct audio_s.
+type RadioConfig struct {
 
 	/* Previously we could handle only a single audio device. */
 	/* In version 1.2, we generalize this to handle multiple devices. */

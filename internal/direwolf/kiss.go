@@ -75,7 +75,7 @@ import (
 type KissPT struct {
 	debug int /* Print information flowing from and to client. */
 
-	audioConfig *AudioConfig // Which channels the client may transmit on.
+	audioConfig *RadioConfig // Which channels the client may transmit on.
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
@@ -106,7 +106,7 @@ type KissPT struct {
 const TMP_KISSTNC_SYMLINK = "/tmp/kisstnc"
 
 // newKissPT builds a KissPT with nothing opened or started.
-func newKissPT(audioConfig *AudioConfig, debug int) *KissPT {
+func newKissPT(audioConfig *RadioConfig, debug int) *KissPT {
 	var kp = new(KissPT)
 	kp.audioConfig = audioConfig
 	kp.debug = debug
@@ -135,7 +135,7 @@ func newKissPT(audioConfig *AudioConfig, debug int) *KissPT {
  *
  *--------------------------------------------------------------------*/
 
-func NewKissPT(ctx context.Context, mc *misc_config_s, audioConfig *AudioConfig, debug int) *KissPT {
+func NewKissPT(ctx context.Context, mc *misc_config_s, audioConfig *RadioConfig, debug int) *KissPT {
 	var kp = newKissPT(audioConfig, debug)
 
 	if mc.enable_kiss_pt {

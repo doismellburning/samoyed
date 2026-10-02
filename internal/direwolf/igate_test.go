@@ -126,7 +126,7 @@ func setupIGate(t *testing.T) net.Conn {
 		igate, mheardDB = origIGate, origMheard
 	})
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 	audioConfig.mycall[0] = "Q1TEST"
 
