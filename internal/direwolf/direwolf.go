@@ -16,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/dwgps"
@@ -62,7 +63,7 @@ var dw_tt_config tt_config_s
 var misc_config *misc_config_s
 var aprsSymbolData *symbols.Data
 var waypointSender *WaypointSender
-var packetLogger *PacketLogger
+var aprsLogger *aprslog.Logger
 var beaconService *BeaconService
 var gpsReceiver *dwgps.GPS
 var kissNetSvc *KissNetService
@@ -710,7 +711,7 @@ x = Silence FX.25 information.`)
 	 * log the tracker beacon transmissions with fake channel 999.
 	 */
 
-	packetLogger = NewPacketLogger(misc_config.log_daily_names, misc_config.log_path)
+	aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
 	beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
@@ -1041,10 +1042,10 @@ func app_process_rec_packet(
 
 		// Send to log file.
 
-		packetLogger.Write(channel, A, pp, alevel, int(retries))
+		aprsLogger.Write(channel, A, pp, alevel, int(retries))
 
 		// temp experiment.
-		// packetLogger.RRBits (&A, pp);
+		// aprsLogger.RRBits(A, pp)
 
 		// Add to list of stations heard over the radio.
 
@@ -1235,8 +1236,8 @@ func teardown() {
 	teardownOnce.Do(func() {
 		text_color_set(DW_COLOR_INFO)
 		logrus.Info("QRT")
-		if packetLogger != nil {
-			packetLogger.Close()
+		if aprsLogger != nil {
+			aprsLogger.Close()
 		}
 		pttControl.Term()
 		gpsReceiver.Term()

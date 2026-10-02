@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/sirupsen/logrus"
@@ -270,16 +271,16 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 	// need configuration that has nothing to do with the receive thread.
 	audioConfig.igate_vchannel = 0
 
-	var origAudioConfig, origLogger, origMheard = audio_config, packetLogger, mheardDB
+	var origAudioConfig, origLogger, origMheard = audio_config, aprsLogger, mheardDB
 
 	t.Cleanup(func() {
-		audio_config, packetLogger, mheardDB = origAudioConfig, origLogger, origMheard
+		audio_config, aprsLogger, mheardDB = origAudioConfig, origLogger, origMheard
 	})
 
 	audio_config = audioConfig
 	// A received frame is logged and remembered on its way through, so
 	// both need to be there even with no log file to write to.
-	packetLogger = NewPacketLogger(false, "")
+	aprsLogger = aprslog.New(false, "")
 	mheardDB = mheard.New(0)
 
 	usePTT(t, audioConfig)

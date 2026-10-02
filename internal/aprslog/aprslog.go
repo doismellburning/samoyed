@@ -1,22 +1,22 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-/*------------------------------------------------------------------
- *
- * Purpose:	Save received packets to a log file.
- *
- * Description: Rather than saving the raw, sometimes rather cryptic and
- *		unreadable, format, write separated properties into
- *		CSV format for easy reading and later processing.
- *
- *		There are two alternatives here.
- *
- *		-L logfile		Specify full file path.
- *
- *		-l logdir		Daily names will be created here.
- *
- *		Use one or the other but not both.
- *
- *------------------------------------------------------------------*/
+// Package aprslog saves received APRS packets to a log file.
+//
+// From Dire Wolf's log.c:
+//
+//	Rather than saving the raw, sometimes rather cryptic and
+//	unreadable, format, write separated properties into
+//	CSV format for easy reading and later processing.
+//
+//	There are two alternatives here.
+//
+//	-L logfile		Specify full file path.
+//
+//	-l logdir		Daily names will be created here.
+//
+//	Use one or the other but not both.
+package aprslog
 
 import (
 	"encoding/csv"
@@ -35,7 +35,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type PacketLogger struct {
+// Logger writes received packets to a CSV log file, or to one a day.
+type Logger struct {
 	mu         sync.Mutex // Guards the fields below, since Write/Close may be called from multiple goroutines (e.g. beacon and main receive loop).
 	dailyNames bool       // True if daily names should be generated. In this case path is a directory.
 	logPath    string     // Save directory or full name here for later use.
@@ -45,9 +46,9 @@ type PacketLogger struct {
 
 /*-------------------------------------------------------------------
  *
- * Name:	NewPacketLogger
+ * Name:	New
  *
- * Purpose:	Initialise and return a new PacketLogger.
+ * Purpose:	Initialise and return a new Logger.
  *
  * Inputs:	daily_names	- True if daily names should be generated.
  *				  In this case path is a directory.
@@ -59,8 +60,8 @@ type PacketLogger struct {
  *
  *---------------------------------------------------------------*/
 
-func NewPacketLogger(daily_names bool, path string) *PacketLogger {
-	var pl = &PacketLogger{ //nolint:exhaustruct_v5
+func New(daily_names bool, path string) *Logger {
+	var pl = &Logger{ //nolint:exhaustruct_v5
 		dailyNames: daily_names,
 	}
 
@@ -104,7 +105,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
 	}
 
 	return pl
-} /* end NewPacketLogger */
+} /* end New */
 
 /*-------------------------------------------------------------------
  *
@@ -124,7 +125,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, alevel ax25.ALevel, retries int) {
+func (pl *Logger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, alevel ax25.ALevel, retries int) {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()
 
@@ -336,7 +337,7 @@ func (pl *PacketLogger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, ale
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) RRBits(A *aprs.Decoded, pp *ax25.Packet) {
+func (pl *Logger) RRBits(A *aprs.Decoded, pp *ax25.Packet) {
 	// Sanitize system type (manufacturer) changing any comma to period.
 	var smfr = strings.ReplaceAll(A.Mfr, ",", ".")
 
@@ -394,7 +395,7 @@ func (pl *PacketLogger) RRBits(A *aprs.Decoded, pp *ax25.Packet) {
  *
  *------------------------------------------------------------------*/
 
-func (pl *PacketLogger) Close() {
+func (pl *Logger) Close() {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()
 
@@ -402,7 +403,7 @@ func (pl *PacketLogger) Close() {
 } /* end Close */
 
 // closeLocked does the work of Close, assuming pl.mu is already held.
-func (pl *PacketLogger) closeLocked() {
+func (pl *Logger) closeLocked() {
 	if pl.logFp != nil {
 		logrus.WithField("path", pl.logFp.Name()).Info("Closing APRS log file")
 
