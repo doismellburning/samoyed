@@ -1041,7 +1041,7 @@ func app_process_rec_packet(
 
 		// Send to log file.
 
-		packetLogger.Write(channel, A, pp, alevel, retries)
+		packetLogger.Write(channel, A, pp, alevel, int(retries))
 
 		// temp experiment.
 		// packetLogger.RRBits (&A, pp);

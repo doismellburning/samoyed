@@ -124,7 +124,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
  *
  *--------------------------------------------------------------------*/
 
-func (pl *PacketLogger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel) {
+func (pl *PacketLogger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, alevel ax25.ALevel, retries int) {
 	pl.mu.Lock()
 	defer pl.mu.Unlock()
 
@@ -308,7 +308,7 @@ func (pl *PacketLogger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, ale
 		var w = csv.NewWriter(pl.logFp)
 		w.Write([]string{
 			strconv.Itoa(channel), strconv.Itoa(int(now.Unix())), itime,
-			A.Src, heard, alevel_text, strconv.Itoa(int(retries)), sdti,
+			A.Src, heard, alevel_text, strconv.Itoa(retries), sdti,
 			sname, ssymbol,
 			slat, slon, sspd, scse, salt,
 			sfreq, soffs, stone,
