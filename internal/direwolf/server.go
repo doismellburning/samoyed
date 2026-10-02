@@ -134,6 +134,11 @@ import (
 // password, in the data of an "Application Login" frame.  Both are NUL padded.
 const AGW_LOGIN_FIELD_LEN = 255
 
+// agwMaxDataLen is the most data a client may send after a header.  Nothing a
+// client sends us carries more than an AX.25 frame, and Dire Wolf reads it into
+// a buffer of that size, keeping a byte back.
+const agwMaxDataLen = ax25.MaxPacketLen - 1
+
 // AGWServer provides the "AGW TCPIP Socket Interface" to client applications.
 //
 // The main program makes one of these, and everything the interface remembers
@@ -1158,9 +1163,18 @@ func (s *AGWServer) detachClient(client int, conn net.Conn) {
 // cmd.Data.  It returns how many bytes it read, so a caller can tell a short
 // read from a complete one, and reads nothing at all for a message whose
 // header says it has no data.
+//
+// The length comes from the client, so one claiming more than any command
+// needs is refused before anything is allocated for it, as Dire Wolf does;
+// there is no telling where its next header starts, so the caller can only
+// hang up.
 func readCommandData(conn net.Conn, cmd *agwpe.Message) (int, error) {
 	if cmd.Header.DataLen == 0 {
 		return 0, nil
+	}
+
+	if cmd.Header.DataLen > agwMaxDataLen {
+		return 0, fmt.Errorf("data length %d is out of range (maximum %d)", cmd.Header.DataLen, agwMaxDataLen)
 	}
 
 	var b = make([]byte, cmd.Header.DataLen)
