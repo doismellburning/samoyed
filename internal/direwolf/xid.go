@@ -28,6 +28,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 const FI_Format_Indicator = 0x82
@@ -167,12 +168,24 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 		return result, desc, 1
 	}
 
+	// The info field comes off the air, so nothing in it - not even that
+	// there is a whole header - can be taken on trust.
+
 	var i = 0
 
 	if info[i] != FI_Format_Indicator {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("XID error: First byte of info field should be Format Indicator, %02x.\n", FI_Format_Indicator)
-		dw_printf("XID info part: %02x %02x %02x %02x %02x ... length=%d\n", info[0], info[1], info[2], info[3], info[4], len(info))
+		dw_printf("XID info part: % x ... length=%d\n", info[:min(len(info), 5)], len(info))
+
+		return result, desc, 0
+	}
+
+	// Format Indicator, Group Identifier and a two byte group length.
+	const headerLen = 4
+
+	if len(info) < headerLen {
+		logrus.WithField("length", len(info)).Error("XID error: Info field too short for its header")
 
 		return result, desc, 0
 	}
@@ -194,18 +207,35 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	group_len = (group_len << 8) + int(info[i])
 	i++
 
-	for i < 4+group_len {
+	for i < headerLen+group_len {
+		// The group length is the sender's word, and can claim more than
+		// the frame holds.  Keep what was whole, as for a bad length below.
+		if i+2 > len(info) {
+			logrus.WithField("group_len", group_len).Error("XID error: Group length runs past the end of the info field")
+
+			return result, desc, 1 // got this far.
+		}
+
 		var pind = info[i]
 
 		i++
 
-		var plen = info[i] // should have sanity checking
+		var plen = info[i]
 
 		i++
 
 		if plen < 1 || plen > 4 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("XID error: Length ?????   TODO   ????  %d.\n", plen)
+
+			return result, desc, 1 // got this far.
+		}
+
+		if i+int(plen) > len(info) {
+			logrus.WithFields(logrus.Fields{
+				"parameter": pind,
+				"length":    plen,
+			}).Error("XID error: Parameter runs past the end of the info field")
 
 			return result, desc, 1 // got this far.
 		}
