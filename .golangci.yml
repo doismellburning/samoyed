@@ -56,10 +56,8 @@ linters:
       disabled-checks:
         - captLocal  # I agree, but I want to stay semi-consistent with upstream for now
         - commentFormatting  # Yes but later
-        - dupSubExpr  # Too many false positives on cgo code
         - elseif  # I agree, but I'll fix it later
         - ifElseChain  # Reasonable but effort
-        - underef  # Too many false positives on cgo code
     gocyclo:
       min-complexity: 60  # I sure wish this could be lower
     ireturn:
