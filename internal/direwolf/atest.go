@@ -112,7 +112,7 @@ type AtestOptions struct {
 // An Atest decodes .WAV files with the demodulators, reporting on each frame
 // it finds.
 type Atest struct {
-	audio      *AudioConfig
+	audio      *RadioConfig
 	fx25Debug  int
 	decodeOnly int
 
@@ -485,7 +485,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packe
 // DCD output line - where atest reports on it: the frame, and with "-d o", the
 // time the channel was busy for.
 type atestSink struct {
-	audio      *AudioConfig
+	audio      *RadioConfig
 	hexDisplay bool // -h
 	debugDCD   int  // -d o
 
@@ -530,8 +530,8 @@ func (s *atestSink) DCDChange(channel int, state int) {
 }
 
 // atestDefaultAudio is the audio configuration atest starts from, before its options.
-func atestDefaultAudio() *AudioConfig {
-	var audio = new(AudioConfig)
+func atestDefaultAudio() *RadioConfig {
+	var audio = new(RadioConfig)
 
 	/*
 	 * First apply defaults.

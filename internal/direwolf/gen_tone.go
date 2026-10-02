@@ -44,7 +44,7 @@ type AudioSink interface {
 type ToneGenerator struct {
 	channel     int
 	adevIndex   int
-	audioConfig *AudioConfig
+	audioConfig *RadioConfig
 	sink        AudioSink // Where the samples go.
 	amplitude   int       // 0 .. 100, for DTMF; the rest use sineTable.
 
@@ -109,7 +109,7 @@ type ToneGenerator struct {
  *
  *----------------------------------------------------------------*/
 
-func NewToneGenerator(channel int, audioConfig *AudioConfig, amp int, sink AudioSink) *ToneGenerator {
+func NewToneGenerator(channel int, audioConfig *RadioConfig, amp int, sink AudioSink) *ToneGenerator {
 	var tg = &ToneGenerator{ //nolint:exhaustruct_v5
 		channel:     channel,
 		adevIndex:   ACHAN2ADEV(channel),
@@ -249,7 +249,7 @@ func newSineTable(amp int) [256]int16 {
  *
  *----------------------------------------------------------------*/
 
-func NewToneGenerators(audio_config_p *AudioConfig, amp int, sink AudioSink) [MAX_RADIO_CHANS]*ToneGenerator {
+func NewToneGenerators(audio_config_p *RadioConfig, amp int, sink AudioSink) [MAX_RADIO_CHANS]*ToneGenerator {
 	logrus.WithField("amp", amp).Debug("gen_tone_init")
 
 	var toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
@@ -263,12 +263,12 @@ func NewToneGenerators(audio_config_p *AudioConfig, amp int, sink AudioSink) [MA
 	return toneGenerators
 } /* end NewToneGenerators */
 
-// NewGenToneTestConfig returns an AudioConfig for the standalone gen_tone
+// NewGenToneTestConfig returns an RadioConfig for the standalone gen_tone
 // test program: the default audio device, defined so that AudioOpen sets it
 // up to transmit, with numChannels sound card channels, each of them a radio
 // channel with the default modem.
-func NewGenToneTestConfig(numChannels int) *AudioConfig {
-	var config = new(AudioConfig)
+func NewGenToneTestConfig(numChannels int) *RadioConfig {
+	var config = new(RadioConfig)
 
 	config.adev[0].defined = 1
 	config.adev[0].adevice_in = DEFAULT_ADEVICE

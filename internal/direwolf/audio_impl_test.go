@@ -199,7 +199,7 @@ func setStdin(t *testing.T) (*os.File, *os.File) {
 func TestAudioImpl_audioOpen_stdin_audioGet(t *testing.T) {
 	var r, w = setStdin(t)
 
-	var pa = makeAudioConfig("-", "-")
+	var pa = makeRadioConfig("-", "-")
 	pa.adev[0].num_channels = 2
 
 	var d = openAudio(t, pa)
@@ -230,7 +230,7 @@ func TestAudioImpl_audioOpen_stdin_audioGet(t *testing.T) {
 func TestAudioImpl_audioOpen_udpInput_audioGet(t *testing.T) {
 	// Port 0: let the system pick a free one.  The same name on the output
 	// side is the listening port copied over, not somewhere to transmit.
-	var pa = makeAudioConfig("udp:0", "udp:0")
+	var pa = makeRadioConfig("udp:0", "udp:0")
 
 	var d = openAudio(t, pa)
 	require.NotNil(t, d.dev[0].udp_sock)
@@ -269,7 +269,7 @@ func TestAudioImpl_audioOpen_udpInput_audioGet(t *testing.T) {
 }
 
 func TestAudioImpl_audioOpen_udpInput_badAddress(t *testing.T) {
-	var pa = makeAudioConfig("udp:Q1TEST", "stdin")
+	var pa = makeRadioConfig("udp:Q1TEST", "stdin")
 
 	var _, openErr = AudioOpen(t.Context(), pa)
 	assert.Error(t, openErr)
@@ -286,7 +286,7 @@ func TestAudioImpl_audioOpen_udpInput_portInUse(t *testing.T) {
 
 	var port = addr.Port
 
-	var pa = makeAudioConfig("udp:"+strconv.Itoa(port), "stdin")
+	var pa = makeRadioConfig("udp:"+strconv.Itoa(port), "stdin")
 
 	var _, openErr = AudioOpen(t.Context(), pa)
 	assert.Error(t, openErr)
@@ -365,7 +365,7 @@ func TestAudioImpl_audioOpen_udpOutput_dialFails(t *testing.T) {
 	for _, specified := range []bool{false, true} {
 		t.Run(map[bool]string{false: "defaulted", true: "specified"}[specified], func(t *testing.T) {
 			// No port, so there is nothing to dial.
-			var pa = makeAudioConfig("stdin", "udp:Q1TEST")
+			var pa = makeRadioConfig("stdin", "udp:Q1TEST")
 			pa.adev[0].adevice_out_specified = specified
 
 			if specified {
@@ -385,7 +385,7 @@ func TestAudioImpl_audioOpen_udpOutput_dialFails(t *testing.T) {
 // A soundcard input that doesn't exist - or no PortAudio to find it with -
 // is fatal, as there is then nothing to receive from.
 func TestAudioImpl_audioOpen_missingInputDevice_isFatal(t *testing.T) {
-	var pa = makeAudioConfig(noSuchAudioDevice, noSuchAudioDevice)
+	var pa = makeRadioConfig(noSuchAudioDevice, noSuchAudioDevice)
 
 	var d, err = AudioOpen(t.Context(), pa)
 	require.Error(t, err)
@@ -414,7 +414,7 @@ func TestAudioImpl_audioOpen_soundcard(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			nullSoundcards(t, nullSoundcard)
 
-			var pa = makeAudioConfig(nullSoundcard, nullSoundcard)
+			var pa = makeRadioConfig(nullSoundcard, nullSoundcard)
 			pa.adev[0].bits_per_sample = tt.bits
 			pa.adev[0].num_channels = tt.channels
 
@@ -474,7 +474,7 @@ func TestAudioImpl_audioOpen_soundcard(t *testing.T) {
 func TestAudioImpl_audioOpen_soundcard_separateInputAndOutput(t *testing.T) {
 	nullSoundcards(t, "samoyed_null_in", "samoyed_null_out")
 
-	var pa = makeAudioConfig("samoyed_null_in", "samoyed_null_out")
+	var pa = makeRadioConfig("samoyed_null_in", "samoyed_null_out")
 	pa.adev[0].adevice_out_specified = true
 
 	var d = openAudio(t, pa)
@@ -491,7 +491,7 @@ func TestAudioImpl_audioOpen_soundcard_missingOutputDevice(t *testing.T) {
 		t.Run(map[bool]string{false: "defaulted", true: "specified"}[specified], func(t *testing.T) {
 			nullSoundcards(t, nullSoundcard)
 
-			var pa = makeAudioConfig(nullSoundcard, noSuchAudioDevice)
+			var pa = makeRadioConfig(nullSoundcard, noSuchAudioDevice)
 			pa.adev[0].adevice_out_specified = specified
 
 			if specified {
@@ -512,7 +512,7 @@ func TestAudioImpl_audioOpen_soundcard_missingOutputDevice(t *testing.T) {
 // --- AudioOpen's other bookkeeping ---
 
 func TestAudioImpl_audioOpen_fillsInDefaults(t *testing.T) {
-	var pa = makeAudioConfig("stdin", "stdin")
+	var pa = makeRadioConfig("stdin", "stdin")
 
 	openAudio(t, pa)
 
@@ -530,7 +530,7 @@ func TestAudioImpl_audioOpen_fillsInDefaults(t *testing.T) {
 }
 
 func TestAudioImpl_audioOpen_stdinDash(t *testing.T) {
-	var pa = makeAudioConfig("-", "-")
+	var pa = makeRadioConfig("-", "-")
 
 	var d = openAudio(t, pa)
 
@@ -547,7 +547,7 @@ func TestAudioImpl_audioOpen_udpInput_defaultPort(t *testing.T) {
 
 	require.NoError(t, probe.Close())
 
-	var pa = makeAudioConfig("udp:", "stdin")
+	var pa = makeRadioConfig("udp:", "stdin")
 
 	var d = openAudio(t, pa)
 

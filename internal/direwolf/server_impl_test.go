@@ -135,7 +135,7 @@ func TestHandleClientCommand_g_PortCapabilitiesReply(t *testing.T) {
 
 func TestHandleClientCommand_G_NoPorts(t *testing.T) {
 	var s = new(AGWServer)
-	s.audioConfigP = new(AudioConfig)
+	s.audioConfigP = new(RadioConfig)
 
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
@@ -153,7 +153,7 @@ func TestHandleClientCommand_G_NoPorts(t *testing.T) {
 func TestHandleClientCommand_G_RadioChannelMono(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg AudioConfig
+	var cfg RadioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.adev[0].num_channels = 1
 	s.audioConfigP = &cfg
@@ -193,7 +193,7 @@ func TestHandleClientCommand_y_EmptyQueueReturnsZero(t *testing.T) {
 
 func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
 	var s = new(AGWServer)
-	s.audioConfigP = new(AudioConfig)
+	s.audioConfigP = new(RadioConfig)
 
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
@@ -215,7 +215,7 @@ func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
 func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg AudioConfig
+	var cfg RadioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	s.audioConfigP = &cfg
 
@@ -259,7 +259,7 @@ func dlqAppended(f func()) *dlq_item_t {
 // and the digipeater slice could go out of bounds.
 func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 	var s = new(AGWServer)
-	s.audioConfigP = new(AudioConfig)
+	s.audioConfigP = new(RadioConfig)
 
 	rapid.Check(t, func(t *rapid.T) {
 		var cmd = new(agwpe.Message)
@@ -277,7 +277,7 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 // when DataLen==0 or DataLen exceeded len(cmd.Data).
 func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 	var s = new(AGWServer)
-	s.audioConfigP = new(AudioConfig)
+	s.audioConfigP = new(RadioConfig)
 
 	rapid.Check(t, func(t *rapid.T) {
 		var cmd = new(agwpe.Message)
@@ -432,7 +432,7 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 
 func TestConnectedModeAllowed_OutOfRange(t *testing.T) {
 	var s = new(AGWServer)
-	s.audioConfigP = new(AudioConfig)
+	s.audioConfigP = new(RadioConfig)
 
 	assert.False(t, s.connectedModeAllowed(MAX_TOTAL_CHANS))
 	assert.False(t, s.connectedModeAllowed(255))
@@ -462,7 +462,7 @@ func TestConnectedModeAllowed_NilServer(t *testing.T) {
 func TestConnectedModeAllowed_MediumRadio(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg AudioConfig
+	var cfg RadioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	s.audioConfigP = &cfg
 
@@ -472,7 +472,7 @@ func TestConnectedModeAllowed_MediumRadio(t *testing.T) {
 func TestConnectedModeAllowed_MediumNETTNC(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg AudioConfig
+	var cfg RadioConfig
 	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_NETTNC
 	s.audioConfigP = &cfg
 
@@ -482,7 +482,7 @@ func TestConnectedModeAllowed_MediumNETTNC(t *testing.T) {
 func TestConnectedModeAllowed_MediumIGate(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg AudioConfig
+	var cfg RadioConfig
 	cfg.chan_medium[0] = MEDIUM_IGATE
 	s.audioConfigP = &cfg
 
@@ -492,7 +492,7 @@ func TestConnectedModeAllowed_MediumIGate(t *testing.T) {
 func TestConnectedModeAllowed_MediumNone(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg AudioConfig
+	var cfg RadioConfig
 	// chan_medium[0] defaults to MEDIUM_NONE
 	s.audioConfigP = &cfg
 
@@ -502,7 +502,7 @@ func TestConnectedModeAllowed_MediumNone(t *testing.T) {
 func TestHandleClientCommand_X_NETTNCChannelReportsSuccess(t *testing.T) {
 	var s = new(AGWServer)
 
-	var cfg AudioConfig
+	var cfg RadioConfig
 	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_NETTNC
 	s.audioConfigP = &cfg
 
@@ -525,7 +525,7 @@ func TestHandleClientCommand_X_NETTNCChannelReportsSuccess(t *testing.T) {
 // A server with no audio configuration has nothing to describe, so 'G' reports
 // no ports.  The struct allows a nil configuration and connectedModeAllowed
 // honours that, so this must not be the one place that falls over on it.
-func TestHandleClientCommand_G_NilAudioConfig(t *testing.T) {
+func TestHandleClientCommand_G_NilRadioConfig(t *testing.T) {
 	var s = new(AGWServer)
 	require.Nil(t, s.audioConfigP, "this test is about the nil case")
 

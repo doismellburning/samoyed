@@ -20,7 +20,7 @@ import (
 func TestMetricsInitImplDisabledStartsNothing(t *testing.T) {
 	var port = freeTCPPort(t)
 
-	var audio = new(AudioConfig)
+	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
 
 	// Port 0 is "disabled": no endpoint, and nothing is pushed.
@@ -41,7 +41,7 @@ func TestMetricsInitImplDisabledStartsNothing(t *testing.T) {
 }
 
 func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
-	var audio = new(AudioConfig)
+	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
 	audio.chan_medium[1] = MEDIUM_NETTNC
 
@@ -108,7 +108,7 @@ func TestMetricsInitImplPortInUse(t *testing.T) {
 	var addr, ok = listener.Addr().(*net.TCPAddr)
 	require.True(t, ok)
 
-	var audio = new(AudioConfig)
+	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
 
 	var mc = new(misc_config_s)

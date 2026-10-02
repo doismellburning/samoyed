@@ -12,7 +12,7 @@ import (
 // channel wants its own, and only one goroutine may drive it at a time.
 type HDLCSender struct {
 	channel       int
-	audioConfig   *AudioConfig
+	audioConfig   *RadioConfig
 	toneGenerator *ToneGenerator // Where the bits go; nil for a channel with no radio.
 	fx25Debug     int            // FX.25's debug level.
 
@@ -28,7 +28,7 @@ type HDLCSender struct {
 // NewHDLCSender makes an HDLCSender for channel, sending the layer 2
 // protocol audioConfig says to use there to toneGenerator, with FX.25's
 // debug level at fx25Debug.
-func NewHDLCSender(channel int, audioConfig *AudioConfig, toneGenerator *ToneGenerator, fx25Debug int) *HDLCSender {
+func NewHDLCSender(channel int, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fx25Debug int) *HDLCSender {
 	var s = new(HDLCSender)
 	s.channel = channel
 	s.audioConfig = audioConfig

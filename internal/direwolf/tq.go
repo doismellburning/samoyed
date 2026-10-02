@@ -75,7 +75,7 @@ type TransmitQueue struct {
 	// and would sit there for good.
 	wake [MAX_RADIO_CHANS]chan struct{}
 
-	audioConfig *AudioConfig
+	audioConfig *RadioConfig
 
 	// netTNCs is where a packet for an NCHANNEL channel goes instead of a
 	// queue.  A channel with no TNC here discards such packets.
@@ -139,7 +139,7 @@ func tq_is_real_packet(pp *ax25.Packet) bool {
  *
  *--------------------------------------------------------------------*/
 
-func (tq *TransmitQueue) Init(audio_config_p *AudioConfig) {
+func (tq *TransmitQueue) Init(audio_config_p *RadioConfig) {
 	logrus.Debug("tq_init")
 	tq.audioConfig = audio_config_p
 

@@ -21,8 +21,8 @@ import (
 
 // Helpers
 
-func makeBeaconModemConfig() *AudioConfig {
-	var cfg = new(AudioConfig)
+func makeBeaconModemConfig() *RadioConfig {
+	var cfg = new(RadioConfig)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.mycall[0] = "Q1TEST"
 
@@ -270,7 +270,7 @@ func Test_NewBeaconService_ibeacon_with_igate_config_not_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_missing_mycall_is_ignored(t *testing.T) {
-	var modem = new(AudioConfig)
+	var modem = new(RadioConfig)
 	modem.chan_medium[0] = MEDIUM_RADIO
 	// mycall[0] intentionally empty
 
@@ -290,7 +290,7 @@ func Test_NewBeaconService_missing_mycall_is_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_invalid_channel_medium_is_ignored(t *testing.T) {
-	var modem = new(AudioConfig)
+	var modem = new(RadioConfig)
 	modem.chan_medium[0] = MEDIUM_NONE // not RADIO or NETTNC
 	modem.mycall[0] = "Q1TEST"
 
@@ -482,7 +482,7 @@ func Test_sbCalculateNextTime_result_within_rate_bounds(t *testing.T) {
 
 // setupBeaconTransmitQueue points the transmit queue at the given modem
 // configuration and empties it again once the test is done.
-func setupBeaconTransmitQueue(t *testing.T, modem *AudioConfig) {
+func setupBeaconTransmitQueue(t *testing.T, modem *RadioConfig) {
 	t.Helper()
 
 	var drain = func() {

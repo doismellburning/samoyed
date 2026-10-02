@@ -21,7 +21,7 @@ import (
 func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
 	for _, modemType := range []modem_t{MODEM_QPSK, MODEM_8PSK, MODEM_BPSK} {
 		var channel = 0
-		var audioConfig = newTestAudioConfig(channel, modemType, 2400, 0, 0, 44100)
+		var audioConfig = newTestRadioConfig(channel, modemType, 2400, 0, 0, 44100)
 		audioConfig.achan[channel].decimate = 3
 		audioConfig.achan[channel].num_freq = 1
 
@@ -39,7 +39,7 @@ func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
 func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 	var channel = 0
 
-	var eas = newTestAudioConfig(channel, MODEM_EAS, 521, 2083, 1563, 44100)
+	var eas = newTestRadioConfig(channel, MODEM_EAS, 521, 2083, 1563, 44100)
 	eas.achan[channel].num_freq = 1
 	eas.achan[channel].fix_bits = RETRY_INVERT_SINGLE
 	eas.achan[channel].passall = true
@@ -49,7 +49,7 @@ func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 	assert.Equal(t, RETRY_INVERT_SINGLE, eas.achan[channel].fix_bits)
 	assert.True(t, eas.achan[channel].passall)
 
-	var qpsk = newTestAudioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
+	var qpsk = newTestRadioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
 	qpsk.achan[channel].num_freq = 1
 
 	var output = testutils.CaptureOutput(t, func() {
@@ -63,7 +63,7 @@ func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 // AFSK, by contrast, does decimate.
 func TestDemodInitKeepsAFSKDecimation(t *testing.T) {
 	var channel = 1
-	var audioConfig = newTestAudioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 48000)
+	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 48000)
 	audioConfig.achan[channel].decimate = 3
 	audioConfig.achan[channel].num_freq = 1
 
@@ -77,7 +77,7 @@ func TestDemodInitKeepsAFSKDecimation(t *testing.T) {
 // list used to walk off the end of it and hit an assert during startup.
 func TestDemodInitCapsProfileLetters(t *testing.T) {
 	var channel = 0
-	var audioConfig = newTestAudioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[channel].num_freq = 1
 	audioConfig.achan[channel].profiles = "ABDEABDEABDE"
 	require.Greater(t, len(audioConfig.achan[channel].profiles), MAX_SUBCHANS)
@@ -115,7 +115,7 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 		{MODEM_BPSK, "QQQQQQQQQQQQ", "QQQQQQQQQ"},
 	} {
 		var channel = 0
-		var audioConfig = newTestAudioConfig(channel, tc.modemType, 2400, 0, 0, 44100)
+		var audioConfig = newTestRadioConfig(channel, tc.modemType, 2400, 0, 0, 44100)
 		audioConfig.achan[channel].num_freq = 1
 		audioConfig.achan[channel].profiles = tc.profiles
 		require.Greater(t, len(tc.profiles), MAX_SUBCHANS)
@@ -142,7 +142,7 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 // safe to share between them.  Run under -race.
 func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 	var channel = 0
-	var audioConfig = newTestAudioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
+	var audioConfig = newTestRadioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
 	var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
 
 	var done = make(chan struct{})
@@ -172,7 +172,7 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 	})
 
 	var channel = 0
-	var audioConfig = newTestAudioConfig(channel, MODEM_AFSK, 300, 1600, 1800, 48000)
+	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 300, 1600, 1800, 48000)
 	audioConfig.achan[channel].num_freq = 3
 	audioConfig.achan[channel].offset = 30
 	audioConfig.achan[channel].profiles = "ab+"
@@ -219,7 +219,7 @@ func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
 
 	demodulators[1] = new(Demodulator)
 
-	var audioConfig = newTestAudioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[0].num_freq = 1
 
 	demod_init(audioConfig)
@@ -239,7 +239,7 @@ func TestChannelLayout(t *testing.T) {
 		demodulators = saved
 	})
 
-	var audioConfig = newTestAudioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[0].num_freq = 1
 	audioConfig.achan[0].profiles = "AB+"
 

@@ -37,11 +37,11 @@ func recordingSendfun() (*[]sentToClient, kiss_sendfun) {
 	}
 }
 
-// kissTestAudioConfig is the channel table the KISS tests hand to
+// kissTestRadioConfig is the channel table the KISS tests hand to
 // kiss_process_msg, or to the transport that calls it, to check a transmit
 // request against: channels 0 and 1 are radios, and nothing else is set up.
-func kissTestAudioConfig() *AudioConfig {
-	var audioConfig = new(AudioConfig)
+func kissTestRadioConfig() *RadioConfig {
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 	audioConfig.chan_medium[1] = MEDIUM_RADIO
 
@@ -67,7 +67,7 @@ func setupKissProcessMsg(t *testing.T) *XmitService {
 		}
 	})
 
-	var audioConfig = kissTestAudioConfig()
+	var audioConfig = kissTestRadioConfig()
 
 	xmitSvc = new(XmitService)
 	kissNetSvc = NewKissNetService(new(misc_config_s), audioConfig, 0)
@@ -88,7 +88,7 @@ func Test_kiss_process_msg_data_frame(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	kiss_process_msg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissTestAudioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissTestRadioConfig(), 0, nil, -1, sendfun)
 
 	assert.Equal(t, 1, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
 	assert.Equal(t, 0, transmitQueue.Count(0, TQ_PRIO_0_HI, "", "", false))
@@ -104,7 +104,7 @@ func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST,Q3TEST*:hello", true)
 	require.NotNil(t, pp)
 
-	kiss_process_msg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissTestAudioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissTestRadioConfig(), 0, nil, -1, sendfun)
 
 	assert.Equal(t, 1, transmitQueue.Count(0, TQ_PRIO_0_HI, "", "", false))
 }
@@ -121,7 +121,7 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg(append([]byte{0x80 | kiss.CmdDataFrame}, pp.FrameData()...), kissTestAudioConfig(), 0, nil, -1, sendfun)
+		kiss_process_msg(append([]byte{0x80 | kiss.CmdDataFrame}, pp.FrameData()...), kissTestRadioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, "Invalid transmit channel 8 from KISS client app")
@@ -142,7 +142,7 @@ func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	kiss_process_msg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissTestAudioConfig(), 0, kps, 0, sendfun)
+	kiss_process_msg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissTestRadioConfig(), 0, kps, 0, sendfun)
 
 	assert.Equal(t, 1, transmitQueue.Count(1, TQ_PRIO_1_LO, "", "", false), "the port's channel should have been used")
 	assert.Equal(t, 0, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
@@ -167,7 +167,7 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 
 	assert.NotPanics(t, func() {
 		output = testutils.CaptureOutput(t, func() {
-			kiss_process_msg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissTestAudioConfig(), 0, kps, 0, sendfun)
+			kiss_process_msg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissTestRadioConfig(), 0, kps, 0, sendfun)
 		})
 	})
 
@@ -182,7 +182,7 @@ func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 	var _, sendfun = recordingSendfun()
 
 	var output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg([]byte{kiss.CmdDataFrame, 'n', 'o'}, kissTestAudioConfig(), 0, nil, -1, sendfun)
+		kiss_process_msg([]byte{kiss.CmdDataFrame, 'n', 'o'}, kissTestRadioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, "Invalid KISS data frame from client app")
@@ -195,11 +195,11 @@ func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 
 	var _, sendfun = recordingSendfun()
 
-	kiss_process_msg([]byte{kiss.CmdTxDelay, 30}, kissTestAudioConfig(), 0, nil, -1, sendfun)
-	kiss_process_msg([]byte{kiss.CmdPersistence, 63}, kissTestAudioConfig(), 0, nil, -1, sendfun)
-	kiss_process_msg([]byte{kiss.CmdSlotTime, 10}, kissTestAudioConfig(), 0, nil, -1, sendfun)
-	kiss_process_msg([]byte{kiss.CmdTxTail, 10}, kissTestAudioConfig(), 0, nil, -1, sendfun)
-	kiss_process_msg([]byte{kiss.CmdFullDuplex, 1}, kissTestAudioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg([]byte{kiss.CmdTxDelay, 30}, kissTestRadioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg([]byte{kiss.CmdPersistence, 63}, kissTestRadioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg([]byte{kiss.CmdSlotTime, 10}, kissTestRadioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg([]byte{kiss.CmdTxTail, 10}, kissTestRadioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg([]byte{kiss.CmdFullDuplex, 1}, kissTestRadioConfig(), 0, nil, -1, sendfun)
 
 	assert.Equal(t, 30, xs.txdelay[0])
 	assert.Equal(t, 63, xs.persist[0])
@@ -225,7 +225,7 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 		{"TXTAIL", []byte{kiss.CmdTxTail, 1}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() { kiss_process_msg(c.msg, kissTestAudioConfig(), 0, nil, -1, sendfun) })
+			var output = testutils.CaptureOutput(t, func() { kiss_process_msg(c.msg, kissTestRadioConfig(), 0, nil, -1, sendfun) })
 
 			assert.Contains(t, output, "Radio Channel - Transmit Timing")
 		})
@@ -254,7 +254,7 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 		{"SET HARDWARE", kiss.CmdSetHardware},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() { kiss_process_msg([]byte{c.cmd}, kissTestAudioConfig(), 0, nil, -1, sendfun) })
+			var output = testutils.CaptureOutput(t, func() { kiss_process_msg([]byte{c.cmd}, kissTestRadioConfig(), 0, nil, -1, sendfun) })
 
 			assert.Contains(t, output, "KISS ERROR")
 		})
@@ -271,7 +271,7 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 	var _, sendfun = recordingSendfun()
 
 	var output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg([]byte{kiss.CmdEndKiss}, kissTestAudioConfig(), 0, nil, -1, sendfun)
+		kiss_process_msg([]byte{kiss.CmdEndKiss}, kissTestRadioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, "end KISS mode - Ignored")
@@ -286,7 +286,7 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	var _, sendfun = recordingSendfun()
 
 	var output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg([]byte{7}, kissTestAudioConfig(), 0, nil, -1, sendfun)
+		kiss_process_msg([]byte{7}, kissTestRadioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, "KISS Invalid command 7")
@@ -294,14 +294,14 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	assert.NotContains(t, output, "XKISS")
 
 	output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg([]byte{kiss.CmdXKissData}, kissTestAudioConfig(), 0, nil, -1, sendfun)
+		kiss_process_msg([]byte{kiss.CmdXKissData}, kissTestRadioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
 	assert.Contains(t, output, "Winlink Express")
 
 	output = testutils.CaptureOutput(t, func() {
-		kiss_process_msg([]byte{kiss.CmdXKissPoll}, kissTestAudioConfig(), 0, nil, -1, sendfun)
+		kiss_process_msg([]byte{kiss.CmdXKissPoll}, kissTestRadioConfig(), 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
@@ -315,7 +315,7 @@ func Test_kiss_set_hardware_tnc_version(t *testing.T) {
 
 	var sent, sendfun = recordingSendfun()
 
-	kiss_process_msg(append([]byte{kiss.CmdSetHardware}, []byte("TNC:")...), kissTestAudioConfig(), 0, nil, -1, sendfun)
+	kiss_process_msg(append([]byte{kiss.CmdSetHardware}, []byte("TNC:")...), kissTestRadioConfig(), 0, nil, -1, sendfun)
 
 	require.Len(t, *sent, 1)
 	assert.Equal(t, kiss.CmdSetHardware, (*sent)[0].cmd)
@@ -383,7 +383,7 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 func feedKissBytes(kf *kiss.Collector, debug int, data []byte) *[]sentToClient {
 	var sent, sendfun = recordingSendfun()
 
-	var audioConfig = kissTestAudioConfig()
+	var audioConfig = kissTestRadioConfig()
 
 	for _, b := range data {
 		KissRecByte(kf, audioConfig, b, debug, nil, -1, sendfun)

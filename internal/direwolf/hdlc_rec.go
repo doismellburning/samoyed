@@ -88,7 +88,7 @@ type HDLCReceiver struct {
 	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*hdlcState
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
 	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
-	audio         *AudioConfig
+	audio         *RadioConfig
 	fx25Debug     int // FX.25's debug level, for every slicer's FX.25 receiver.
 	sink          ReceiveSink
 
@@ -138,7 +138,7 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
  *
  ***********************************************************************************/
 
-func NewHDLCReceiver(pa *AudioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, sink ReceiveSink) *HDLCReceiver {
+func NewHDLCReceiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, sink ReceiveSink) *HDLCReceiver {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("NewHDLCReceiver (%p) \n", pa);
 

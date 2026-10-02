@@ -138,7 +138,7 @@ func Test_AX25_Link(t *testing.T) {
 func setupTestEnv(t *testing.T) {
 	t.Helper()
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	usePTT(t, audioConfig)
 	transmitQueue.Init(audioConfig)
 
@@ -161,7 +161,7 @@ func setupTestEnv(t *testing.T) {
 func setupTestEnvV22(t *testing.T) {
 	t.Helper()
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	usePTT(t, audioConfig)
 	transmitQueue.Init(audioConfig)
 

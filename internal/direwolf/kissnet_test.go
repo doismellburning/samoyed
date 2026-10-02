@@ -105,7 +105,7 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	mc.kiss_port[0] = port
 	mc.kiss_chan[0] = channel
 
-	var kns = NewKissNetService(mc, kissTestAudioConfig(), 0)
+	var kns = NewKissNetService(mc, kissTestRadioConfig(), 0)
 
 	// A client's reader polls for it to attach; not every real second,
 	// though, which would cost each test here most of one.

@@ -32,7 +32,7 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 
 	// Two demodulators, so a frame waits to be compared rather than going
 	// straight through.
-	var audioConfig = newRecvTestAudioConfig(1)
+	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "AB"
 	audioConfig.achan[0].num_freq = 1
 
@@ -68,7 +68,7 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 		multiModems = newMultiModems()
 	})
 
-	var audioConfig = newRecvTestAudioConfig(1)
+	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "ABA"
 	audioConfig.achan[0].num_freq = 1
 
@@ -88,7 +88,7 @@ func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
 		multiModems = newMultiModems()
 	})
 
-	var audioConfig = newRecvTestAudioConfig(1)
+	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].il2p_version = IL2P_VERSION_0_4
 	audioConfig.achan[0].il2p_crc = false
 
@@ -107,7 +107,7 @@ func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
 		multiModems = newMultiModems()
 	})
 
-	var audioConfig = newRecvTestAudioConfig(1)
+	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "AB"
 	audioConfig.achan[0].num_freq = 1
 

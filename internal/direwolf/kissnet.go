@@ -166,7 +166,7 @@ const kissnetPollInterval = time.Second
 // Each TCP port has its own status block in a linked list.
 type KissNetService struct {
 	miscConfigP  *misc_config_s
-	audioConfigP *AudioConfig // Which channels a client may transmit on.
+	audioConfigP *RadioConfig // Which channels a client may transmit on.
 	allPorts     *kissport_status_s
 	debug        int           /* Print information flowing from and to client. */
 	pollInterval time.Duration // For a client to attach, or a slot to come free.
@@ -195,7 +195,7 @@ type KissNetService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewKissNetService(mc *misc_config_s, audioConfig *AudioConfig, debug int) *KissNetService {
+func NewKissNetService(mc *misc_config_s, audioConfig *RadioConfig, debug int) *KissNetService {
 	var kns = new(KissNetService)
 	kns.miscConfigP = mc
 	kns.audioConfigP = audioConfig

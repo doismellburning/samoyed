@@ -15,7 +15,7 @@ import (
 func TestSettleModemOptionsRejectsPSKDecimation(t *testing.T) {
 	for _, modemType := range []modem_t{MODEM_QPSK, MODEM_8PSK, MODEM_BPSK} {
 		var channel = 0
-		var audioConfig = newTestAudioConfig(channel, modemType, 2400, 0, 0, 44100)
+		var audioConfig = newTestRadioConfig(channel, modemType, 2400, 0, 0, 44100)
 		audioConfig.achan[channel].decimate = 3
 
 		testutils.AssertOutputContains(t, func() {
@@ -29,7 +29,7 @@ func TestSettleModemOptionsRejectsPSKDecimation(t *testing.T) {
 // AFSK, by contrast, does decimate.
 func TestSettleModemOptionsKeepsAFSKDecimation(t *testing.T) {
 	var channel = 1
-	var audioConfig = newTestAudioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 48000)
+	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 48000)
 	audioConfig.achan[channel].decimate = 3
 
 	settleModemOptions(audioConfig)
@@ -47,7 +47,7 @@ func TestSettleModemOptionsTurnsOffFixBitsForEASAndAIS(t *testing.T) {
 		{MODEM_AIS, "AIS"},
 	} {
 		var channel = 0
-		var audioConfig = newTestAudioConfig(channel, tc.modemType, 1200, 0, 0, 44100)
+		var audioConfig = newTestRadioConfig(channel, tc.modemType, 1200, 0, 0, 44100)
 		audioConfig.achan[channel].fix_bits = RETRY_INVERT_SINGLE
 		audioConfig.achan[channel].passall = true
 
@@ -65,7 +65,7 @@ func TestSettleModemOptionsTurnsOffFixBitsForEASAndAIS(t *testing.T) {
 // Other modems keep their bit fixing.
 func TestSettleModemOptionsKeepsFixBitsForAFSK(t *testing.T) {
 	var channel = 0
-	var audioConfig = newTestAudioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[channel].fix_bits = RETRY_INVERT_SINGLE
 	audioConfig.achan[channel].passall = true
 
@@ -79,7 +79,7 @@ func TestSettleModemOptionsKeepsFixBitsForAFSK(t *testing.T) {
 // is settled here, before either is set up, rather than by the demodulator.
 func TestSettleModemOptionsDefaultsV26Alternative(t *testing.T) {
 	var channel = 0
-	var audioConfig = newTestAudioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
+	var audioConfig = newTestRadioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
 
 	testutils.AssertOutputContains(t, func() {
 		settleModemOptions(audioConfig)
@@ -97,7 +97,7 @@ func TestSettleModemOptionsDefaultsV26Alternative(t *testing.T) {
 
 // A channel with no radio on it has no modem options to settle.
 func TestSettleModemOptionsSkipsNonRadioChannels(t *testing.T) {
-	var audioConfig = newTestAudioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[1].modem_type = MODEM_QPSK
 
 	settleModemOptions(audioConfig)

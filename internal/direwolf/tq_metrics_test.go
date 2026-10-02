@@ -55,7 +55,7 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 		NUM_PKTS  = NUM_SEND * PER_SENDR
 	)
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)
@@ -146,7 +146,7 @@ func TestTxQueueDepthTracksDrain(t *testing.T) {
 		NUM_PKTS = 8
 	)
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)
@@ -193,7 +193,7 @@ func TestTxQueueDepthIgnoresSeizeMarker(t *testing.T) {
 		PRIO    = TQ_PRIO_1_LO
 	)
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)
@@ -235,7 +235,7 @@ func TestTxQueueDepthResetOnInit(t *testing.T) {
 		PRIO    = TQ_PRIO_1_LO
 	)
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)

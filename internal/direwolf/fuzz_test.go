@@ -168,7 +168,7 @@ func FuzzKissRecByte(f *testing.F) {
 
 		setupKissProcessMsg(t)
 
-		var audioConfig = kissTestAudioConfig()
+		var audioConfig = kissTestRadioConfig()
 		var _, sendfun = recordingSendfun()
 		var kc kiss.Collector
 

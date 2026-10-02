@@ -20,11 +20,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newRecvTestAudioConfig describes a single 16 bit audio device carrying
+// newRecvTestRadioConfig describes a single 16 bit audio device carrying
 // numChannels 1200 baud AFSK channels - the shape recv_adev_thread walks when
 // it reads a device.
-func newRecvTestAudioConfig(numChannels int) *AudioConfig {
-	var audioConfig = new(AudioConfig)
+func newRecvTestRadioConfig(numChannels int) *RadioConfig {
+	var audioConfig = new(RadioConfig)
 
 	audioConfig.adev[0].defined = 1
 	audioConfig.adev[0].num_channels = numChannels
@@ -46,7 +46,7 @@ func newRecvTestAudioConfig(numChannels int) *AudioConfig {
 // setupRecvTest initialises the demodulators for audioConfig, and returns the
 // SampleSource that hands the receive thread the given samples.  The real one
 // asserts on a device that was never opened, so a test brings its own.
-func setupRecvTest(t *testing.T, audioConfig *AudioConfig, samples []byte) *readerSampleSource {
+func setupRecvTest(t *testing.T, audioConfig *RadioConfig, samples []byte) *readerSampleSource {
 	t.Helper()
 
 	multi_modem_init(audioConfig, 0, new(radioSink))
@@ -85,7 +85,7 @@ func samples16(samples []int16) []byte {
 // receiving, so the number of the device that failed has to reach whoever
 // started it.
 func TestRecvInitReportsTheDeviceWhoseInputFailed(t *testing.T) {
-	var audioConfig = newRecvTestAudioConfig(1)
+	var audioConfig = newRecvTestRadioConfig(1)
 
 	var src = setupRecvTest(t, audioConfig, silence16(2000))
 
@@ -102,7 +102,7 @@ func TestRecvInitReportsTheDeviceWhoseInputFailed(t *testing.T) {
 // Only devices the configuration defines get a thread; anything else would be
 // reading a device that was never opened.
 func TestRecvInitStartsNothingForAnUndefinedDevice(t *testing.T) {
-	var audioConfig = newRecvTestAudioConfig(1)
+	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.adev[0].defined = 0
 
 	var src = setupRecvTest(t, audioConfig, silence16(2000))
@@ -119,7 +119,7 @@ func TestRecvInitStartsNothingForAnUndefinedDevice(t *testing.T) {
 // Shutting down is not an audio failure, so a cancelled thread finishes
 // without reporting one.
 func TestRecvAdevThreadStopsWhenCancelledWithoutReportingAFailure(t *testing.T) {
-	var audioConfig = newRecvTestAudioConfig(1)
+	var audioConfig = newRecvTestRadioConfig(1)
 
 	setupRecvTest(t, audioConfig, nil)
 	// Audio that never ends, so cancellation is the only way out.
@@ -150,7 +150,7 @@ func TestRecvAdevThreadStopsWhenCancelledWithoutReportingAFailure(t *testing.T) 
 // A stereo device carries two radio channels, and each one has to get its own
 // side of the audio rather than both getting the same samples.
 func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
-	var audioConfig = newRecvTestAudioConfig(2)
+	var audioConfig = newRecvTestRadioConfig(2)
 
 	// Left and right differ in sign, so the running average of each channel
 	// says which side reached it.
@@ -179,7 +179,7 @@ func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
 // Touch tones are decoded only where the APRStt gateway is configured for the
 // channel.
 func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
-	var audioConfig = newRecvTestAudioConfig(1)
+	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_ON
 
 	var src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
@@ -188,7 +188,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 
 	t.Cleanup(func() { ttGateway = origGateway })
 
-	ttGateway = NewTTGateway(new(AudioConfig), new(tt_config_s), 0)
+	ttGateway = NewTTGateway(new(RadioConfig), new(tt_config_s), 0)
 
 	var failed = recv_init(t.Context(), audioConfig, src)
 
@@ -204,7 +204,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 // And not otherwise: DTMF decoding off means nothing reaches the gateway, no
 // matter what is on the air.
 func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
-	var audioConfig = newRecvTestAudioConfig(1)
+	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_OFF
 
 	var src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
@@ -213,7 +213,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 
 	t.Cleanup(func() { ttGateway = origGateway })
 
-	ttGateway = NewTTGateway(new(AudioConfig), new(tt_config_s), 0)
+	ttGateway = NewTTGateway(new(RadioConfig), new(tt_config_s), 0)
 
 	var failed = recv_init(t.Context(), audioConfig, src)
 
@@ -262,7 +262,7 @@ func dtmfSamples(t *testing.T, button rune, ms int, samplesPerSec int) []byte {
 func setupRecvProcessTest(t *testing.T, frack int) {
 	t.Helper()
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 	// A received frame is taken to have arrived on the IGate virtual
 	// channel, so that printing it and passing it to the client
@@ -301,7 +301,7 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 
 	t.Cleanup(func() { kissNetSvc = origKissNetSvc })
 
-	kissNetSvc = NewKissNetService(miscConfig, new(AudioConfig), 0)
+	kissNetSvc = NewKissNetService(miscConfig, new(RadioConfig), 0)
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil

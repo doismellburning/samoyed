@@ -68,7 +68,7 @@ func newMultiModemImplTest(t *testing.T, numSubchan int, numSlicers int) (*Multi
 
 	var m = new(MultiModem)
 	m.channel = 0
-	m.audioConfig = new(AudioConfig)
+	m.audioConfig = new(RadioConfig)
 	m.demodulator = d
 	m.sink = sink
 
@@ -251,7 +251,7 @@ func TestMultiModemImplProcessSamplePicksAfterAge(t *testing.T) {
 		multiModems = newMultiModems()
 	})
 
-	var audioConfig = newRecvTestAudioConfig(1)
+	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "AB"
 	audioConfig.achan[0].num_freq = 1
 
@@ -301,7 +301,7 @@ func TestMultiModemImplInitProcessAgeInSymbols(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			var audioConfig = newRecvTestAudioConfig(1)
+			var audioConfig = newRecvTestRadioConfig(1)
 			audioConfig.achan[0].modem_type = tc.modemType
 			audioConfig.achan[0].baud = tc.baud
 			audioConfig.achan[0].mark_freq = 1800
@@ -326,7 +326,7 @@ func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.
 		multiModems = newMultiModems()
 	})
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.achan[0].modem_type = modemType
 	multiModems[0].audioConfig = audioConfig
 

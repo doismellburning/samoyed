@@ -23,7 +23,7 @@ import (
 )
 
 type BeaconService struct {
-	modemConfig       *AudioConfig
+	modemConfig       *RadioConfig
 	miscConfig        *misc_config_s
 	igateConfig       *igate_config_s
 	gps               *dwgps.GPS
@@ -55,7 +55,7 @@ type BeaconService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewBeaconService(pmodem *AudioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *dwgps.GPS) *BeaconService {
+func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *dwgps.GPS) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct_v5
 		modemConfig: pmodem,
 		miscConfig:  pconfig,

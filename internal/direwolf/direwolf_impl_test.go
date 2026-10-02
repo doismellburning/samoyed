@@ -69,7 +69,7 @@ func Test_teardown_closes_what_startup_opened(t *testing.T) {
 
 // recPacketTest is what app_process_rec_packet reaches out to, set up afresh.
 type recPacketTest struct {
-	audioConfig *AudioConfig
+	audioConfig *RadioConfig
 	waypoints   net.PacketConn
 }
 
@@ -117,7 +117,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	d_u_opt, d_p_opt, q_h_opt, q_d_opt, A_opt_ais_to_obj = false, false, false, false, false
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 	audioConfig.igate_vchannel = -1
 	audio_config = audioConfig

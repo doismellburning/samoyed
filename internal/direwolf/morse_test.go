@@ -11,11 +11,11 @@ import (
 
 // Morse goes through the channel's tone generator and its own audio config,
 // so it needs nothing another test left behind (issue #761).
-func TestMorseSendWithoutSharedAudioConfig(t *testing.T) {
+func TestMorseSendWithoutSharedRadioConfig(t *testing.T) {
 	const channel = 0
 	const sampleRate = 8000
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.adev[0].num_channels = 1
 	audioConfig.adev[0].bits_per_sample = 16
 	audioConfig.adev[0].samples_per_sec = sampleRate
@@ -48,7 +48,7 @@ func TestMorseSampleCountsAt44100(t *testing.T) {
 	const channel = 0
 	const sampleRate = 44100
 
-	var audioConfig = new(AudioConfig)
+	var audioConfig = new(RadioConfig)
 	audioConfig.adev[0].num_channels = 1
 	audioConfig.adev[0].bits_per_sample = 16
 	audioConfig.adev[0].samples_per_sec = sampleRate

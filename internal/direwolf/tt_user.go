@@ -120,7 +120,7 @@ type tt_user_s struct {
 // table to send the object reports it has scheduled, so mu guards user.
 // The reports are sent with it released.
 type ttUsers struct {
-	audioConfig *AudioConfig
+	audioConfig *RadioConfig
 	ttConfig    *tt_config_s
 
 	mu   sync.Mutex
@@ -129,7 +129,7 @@ type ttUsers struct {
 
 // newTTUsers makes an empty user table.  audioConfig supplies the mycall
 // object reports are sent from, and ttConfig when and where they are sent.
-func newTTUsers(audioConfig *AudioConfig, ttConfig *tt_config_s) *ttUsers {
+func newTTUsers(audioConfig *RadioConfig, ttConfig *tt_config_s) *ttUsers {
 	var u = new(ttUsers)
 
 	u.audioConfig = audioConfig
