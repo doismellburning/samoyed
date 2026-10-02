@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
@@ -722,11 +723,11 @@ func Test_BeaconSend_igate_status(t *testing.T) {
 }
 
 func Test_BeaconSend_tracker_with_a_3D_fix(t *testing.T) {
-	var savedLogger = packetLogger
+	var savedLogger = aprsLogger
 
-	packetLogger = new(PacketLogger) // No path, so it writes nothing.
+	aprsLogger = new(aprslog.Logger) // No path, so it writes nothing.
 
-	t.Cleanup(func() { packetLogger = savedLogger })
+	t.Cleanup(func() { aprsLogger = savedLogger })
 
 	var bs = newSendTestBeaconService(t)
 	bs.SetDebug(3)

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -32,20 +33,20 @@ func Test_stopIfCancelled_carries_on_while_running(t *testing.T) {
 
 // --- teardown ---
 
-// The teardown closes the packet log and the waypoint output when startup got
+// The teardown closes the APRS log and the waypoint output when startup got
 // as far as opening them, and does it only once however often it is asked.
 func Test_teardown_closes_what_startup_opened(t *testing.T) {
-	var origLogger, origWaypoint, origPTT, origGPS = packetLogger, waypointSender, pttControl, gpsReceiver
+	var origLogger, origWaypoint, origPTT, origGPS = aprsLogger, waypointSender, pttControl, gpsReceiver
 
 	t.Cleanup(func() {
-		packetLogger, waypointSender, pttControl, gpsReceiver = origLogger, origWaypoint, origPTT, origGPS
+		aprsLogger, waypointSender, pttControl, gpsReceiver = origLogger, origWaypoint, origPTT, origGPS
 		teardownOnce = sync.Once{}
 	})
 
 	teardownOnce = sync.Once{}
 	pttControl = nil
 	gpsReceiver = nil
-	packetLogger = NewPacketLogger(false, t.TempDir())
+	aprsLogger = aprslog.New(false, t.TempDir())
 
 	var ws, wsErr = NewWaypointSender(t.Context(), new(misc_config_s), nil)
 	require.NoError(t, wsErr)
@@ -82,7 +83,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	var (
 		origAudioConfig = audio_config
 		origTTConfig    = dw_tt_config
-		origLogger      = packetLogger
+		origLogger      = aprsLogger
 		origMheard      = mheardDB
 		origWaypoint    = waypointSender
 		origAGW         = agwServer
@@ -100,7 +101,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	t.Cleanup(func() {
 		audio_config = origAudioConfig
 		dw_tt_config = origTTConfig
-		packetLogger = origLogger
+		aprsLogger = origLogger
 		mheardDB = origMheard
 		waypointSender = origWaypoint
 		agwServer = origAGW
@@ -126,7 +127,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	dw_tt_config = noTouchTones
 
-	packetLogger = NewPacketLogger(false, "")
+	aprsLogger = aprslog.New(false, "")
 	mheardDB = mheard.New(0)
 
 	// Waypoints go to a UDP socket of our own, so a position that reaches

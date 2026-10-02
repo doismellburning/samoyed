@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+package aprslog
 
 import (
 	"encoding/csv"
@@ -36,7 +36,7 @@ func TestLogRRBitsShortHeardDoesNotPanic(t *testing.T) {
 
 	var A aprs.Decoded
 
-	var pl = NewPacketLogger(false, "")
+	var pl = New(false, "")
 	pl.RRBits(&A, pp)
 }
 
@@ -80,10 +80,10 @@ func fullLogAprs() *aprs.Decoded {
 	return A
 }
 
-func TestLogNewPacketLoggerEmptyPathDisabled(t *testing.T) {
+func TestNewEmptyPathDisabled(t *testing.T) {
 	t.Parallel()
 
-	var pl = NewPacketLogger(true, "")
+	var pl = New(true, "")
 	assert.Empty(t, pl.logPath)
 
 	// Nothing should happen, and nothing should panic.
@@ -92,20 +92,20 @@ func TestLogNewPacketLoggerEmptyPathDisabled(t *testing.T) {
 	pl.Close()
 }
 
-func TestLogNewPacketLoggerDailyExistingDir(t *testing.T) {
+func TestNewDailyExistingDir(t *testing.T) {
 	t.Parallel()
 
 	var dir = t.TempDir()
-	var pl = NewPacketLogger(true, dir)
+	var pl = New(true, dir)
 	assert.Equal(t, dir, pl.logPath)
 	assert.True(t, pl.dailyNames)
 }
 
-func TestLogNewPacketLoggerDailyCreatesDir(t *testing.T) {
+func TestNewDailyCreatesDir(t *testing.T) {
 	t.Parallel()
 
 	var dir = filepath.Join(t.TempDir(), "logs")
-	var pl = NewPacketLogger(true, dir)
+	var pl = New(true, dir)
 	assert.Equal(t, dir, pl.logPath)
 
 	var stat, err = os.Stat(dir)
@@ -113,22 +113,22 @@ func TestLogNewPacketLoggerDailyCreatesDir(t *testing.T) {
 	assert.True(t, stat.IsDir())
 }
 
-func TestLogNewPacketLoggerDailyNotADirFallsBack(t *testing.T) {
+func TestNewDailyNotADirFallsBack(t *testing.T) {
 	t.Parallel()
 
 	var file = filepath.Join(t.TempDir(), "afile")
 	require.NoError(t, os.WriteFile(file, []byte("x"), 0600))
 
-	var pl = NewPacketLogger(true, file)
+	var pl = New(true, file)
 	assert.Equal(t, ".", pl.logPath)
 }
 
-func TestLogNewPacketLoggerDailyMkdirFailsFallsBack(t *testing.T) {
+func TestNewDailyMkdirFailsFallsBack(t *testing.T) {
 	t.Parallel()
 
 	// Parent doesn't exist, and we don't mkdir -p.
 	var dir = filepath.Join(t.TempDir(), "missing", "logs")
-	var pl = NewPacketLogger(true, dir)
+	var pl = New(true, dir)
 	assert.Equal(t, ".", pl.logPath)
 }
 
@@ -136,7 +136,7 @@ func TestLogWriteSingleFileAllFields(t *testing.T) {
 	t.Parallel()
 
 	var path = filepath.Join(t.TempDir(), "packets.log")
-	var pl = NewPacketLogger(false, path)
+	var pl = New(false, path)
 	assert.Equal(t, path, pl.logPath)
 
 	var pp = ax25.FromText("Q1TEST>APRS,Q2TEST*,WIDE2*:!5130.00N/00007.50W>hello", true)
@@ -193,13 +193,13 @@ func TestLogWriteSingleFileAppendsWithoutSecondHeader(t *testing.T) {
 	var A = new(aprs.Decoded)
 	A.Src = "Q1TEST"
 
-	var pl = NewPacketLogger(false, path)
+	var pl = New(false, path)
 	pl.Write(0, A, nil, logNoLevel(), 0)
 	pl.Write(1, A, nil, logNoLevel(), 0)
 	pl.Close()
 
 	// A new logger on an existing file must not write the header again.
-	var pl2 = NewPacketLogger(false, path)
+	var pl2 = New(false, path)
 	pl2.Write(2, A, nil, logNoLevel(), 0)
 	pl2.Close()
 
@@ -234,7 +234,7 @@ func TestLogWriteDCSOverridesTone(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>APRS:>status", true)
 	require.NotNil(t, pp)
 
-	var pl = NewPacketLogger(false, path)
+	var pl = New(false, path)
 	pl.Write(0, A, pp, ax25.ALevel{Rec: 10, Mark: -1, Space: -1}, 0)
 	pl.Close()
 
@@ -250,7 +250,7 @@ func TestLogWriteSingleFileOpenFails(t *testing.T) {
 	t.Parallel()
 
 	var path = filepath.Join(t.TempDir(), "missing", "packets.log")
-	var pl = NewPacketLogger(false, path)
+	var pl = New(false, path)
 
 	pl.Write(0, new(aprs.Decoded), nil, logNoLevel(), 0)
 
@@ -267,7 +267,7 @@ func TestLogWriteDailyNames(t *testing.T) {
 	t.Parallel()
 
 	var dir = t.TempDir()
-	var pl = NewPacketLogger(true, dir)
+	var pl = New(true, dir)
 
 	var A = new(aprs.Decoded)
 	A.Src = "Q1TEST"
@@ -319,7 +319,7 @@ func TestLogWriteDailyOpenFails(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, d.Format("2006-01-02.log")), 0750))
 	}
 
-	var pl = NewPacketLogger(true, dir)
+	var pl = New(true, dir)
 	pl.Write(0, new(aprs.Decoded), nil, logNoLevel(), 0)
 
 	assert.Nil(t, pl.logFp)
@@ -330,7 +330,7 @@ func TestLogWriteDailyOpenFails(t *testing.T) {
 func TestLogRRBits(t *testing.T) {
 	t.Parallel()
 
-	var pl = NewPacketLogger(false, "")
+	var pl = New(false, "")
 
 	var A = new(aprs.Decoded)
 	A.Src = "Q1TEST"

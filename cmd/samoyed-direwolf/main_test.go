@@ -31,7 +31,7 @@ KISSPORT 0
 
 // startupComplete is the last thing printed before the receive loop takes over,
 // so a test that has seen it knows the signal handler is installed.
-const startupComplete = `Log file is`
+const startupComplete = `msg="APRS log file"`
 
 func TestMain(m *testing.M) {
 	testutils.RunMainIfAsked(main)

@@ -842,7 +842,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel ax25.ALevel
-				packetLogger.Write(999, &A, nil, alevel, 0)
+				aprsLogger.Write(999, &A, nil, alevel, 0)
 			}
 		} else {
 			return /* No position.  Skip this time. */
