@@ -1022,173 +1022,228 @@ func (ig *IGate) get1ch(ctx context.Context) (byte, bool) {
 func (ig *IGate) recvThread(ctx context.Context) {
 	logrus.Debug("igate recvThread")
 
+	var lines = new(igateLineReader)
+
 	for ctx.Err() == nil {
-		var message []byte
-
-		for {
-			var ch, ok = ig.get1ch(ctx)
-			if !ok {
-				return // Cancelled.
-			}
-
-			ig.updateStats(func(s *igateStats) { s.downlinkBytes++ })
-
-			// I never expected to see a nul character but it can happen.
-			// If found, change it to <0x00> and AX25FromText will change it back to a single byte.
-			// Along the way we can use the normal C string handling.
-
-			if ch == 0 {
-				message = append(message, []byte("<0x00>")...)
-			} else {
-				message = append(message, ch)
-			}
-
-			if ch == '\n' {
-				break
-			}
+		var ch, ok = ig.get1ch(ctx)
+		if !ok {
+			return // Cancelled.
 		}
 
-		/*
-		 * We have a complete message terminated by LF.
-		 *
-		 * Remove CR LF from end.
-		 * This is a record separator for the protocol, not part of the data.
-		 * Should probably have an error if we don't have this.
-		 */
-		message = bytes.TrimRight(message, "\n\r")
+		ig.updateStats(func(s *igateStats) { s.downlinkBytes++ })
 
-		/*
-		 * I've seen a case where the original RF packet had a trailing CR but
-		 * after someone else sent it to the server and it came back to me, that
-		 * CR was now a trailing space.
-		 *
-		 * At first I was tempted to trim a trailing space as well.
-		 * By fixing this one case it might corrupt the data in other cases.
-		 * We compensate for this by ignoring trailing spaces when performing
-		 * the duplicate detection and removal.
-		 *
-		 * We need to transmit exactly as we get it.
-		 */
+		if message, complete := lines.add(ch); complete {
+			ig.processServerLine(message)
+		}
+	}
+} /* end recvThread */
 
-		/*
-		 * I've also seen a multiple trailing spaces like this.
-		 * Notice how safe_print shows a trailing space in hexadecimal to make it obvious.
-		 *
-		 * W1CLA-1>APVR30,TCPIP*,qAC,T2TOKYO3:;IRLP-4942*141503z4218.46NI07108.24W0446325-146IDLE    <0x20>
-		 */
+// igateMaxLineLen is the most we will hold of one line from the APRS-IS
+// server, counting the CR LF that ends it and with any NUL already expanded
+// to "<0x00>".  The protocol keeps a line to around 500 bytes; Dire Wolf read
+// into a 1000 byte buffer, and so do we.
+const igateMaxLineLen = 1000
 
-		if len(message) == 0 {
-			/*
-			 * Discard if zero length.
-			 */
-		} else if message[0] == '#' {
-			/*
-			 * Heartbeat or other control message.
-			 *
-			 * Print only if within seconds of logging in.
-			 * That way we can see login confirmation but not
-			 * be bothered by the heart beat messages.
-			 */
-			if _, okToSend := ig.connection(); !okToSend {
-				text_color_set(DW_COLOR_REC)
-				dw_printf("[ig] ")
-				ax25.SafePrint(message, false)
-				dw_printf("\n")
-			}
-		} else {
-			/*
-			 * Convert to third party packet and transmit.
-			 *
-			 * Future: might have ability to configure multiple transmit
-			 * channels, each with own client side filtering and via path.
-			 * If so, loop here over all configured channels.
-			 */
+// igateNulText is what a NUL from the server becomes in the line.
+const igateNulText = "<0x00>"
+
+// igateLineReader gathers the bytes from the APRS-IS server into lines.  It
+// holds no more than igateMaxLineLen of a line: one that runs longer is
+// thrown away, and the reader picks up again after the next LF, so that a
+// server that never sends one cannot have us buffer without end.
+type igateLineReader struct {
+	line       []byte
+	discarding bool // The line being read has already overflowed.
+}
+
+// add takes the next byte from the server.  When that byte completes a line
+// it returns the line, LF and all, and true.
+func (r *igateLineReader) add(ch byte) ([]byte, bool) {
+	if r.discarding {
+		if ch == '\n' {
+			r.discarding = false
+		}
+
+		return nil, false
+	}
+
+	// I never expected to see a nul character but it can happen.
+	// If found, change it to <0x00> and AX25FromText will change it back to a single byte.
+	// Along the way we can use the normal C string handling.
+	var piece = 1
+	if ch == 0 {
+		piece = len(igateNulText)
+	}
+
+	if len(r.line)+piece > igateMaxLineLen {
+		logrus.WithField("limit", igateMaxLineLen).Warn("Discarding over-long line from APRS-IS server")
+
+		r.line = r.line[:0]
+		r.discarding = ch != '\n'
+
+		return nil, false
+	}
+
+	if ch == 0 {
+		r.line = append(r.line, igateNulText...)
+	} else {
+		r.line = append(r.line, ch)
+	}
+
+	if ch == '\n' {
+		var line = r.line
+		r.line = nil
+
+		return line, true
+	}
+
+	return nil, false
+}
+
+// processServerLine acts on one line from the APRS-IS server, as
+// igateLineReader hands it over: a server comment to show, or a packet to
+// remember, count and perhaps pass on to the radio or a client application.
+func (ig *IGate) processServerLine(message []byte) {
+	/*
+	 * We have a complete message terminated by LF.
+	 *
+	 * Remove CR LF from end.
+	 * This is a record separator for the protocol, not part of the data.
+	 * Should probably have an error if we don't have this.
+	 */
+	message = bytes.TrimRight(message, "\n\r")
+
+	/*
+	 * I've seen a case where the original RF packet had a trailing CR but
+	 * after someone else sent it to the server and it came back to me, that
+	 * CR was now a trailing space.
+	 *
+	 * At first I was tempted to trim a trailing space as well.
+	 * By fixing this one case it might corrupt the data in other cases.
+	 * We compensate for this by ignoring trailing spaces when performing
+	 * the duplicate detection and removal.
+	 *
+	 * We need to transmit exactly as we get it.
+	 */
+
+	/*
+	 * I've also seen a multiple trailing spaces like this.
+	 * Notice how safe_print shows a trailing space in hexadecimal to make it obvious.
+	 *
+	 * W1CLA-1>APVR30,TCPIP*,qAC,T2TOKYO3:;IRLP-4942*141503z4218.46NI07108.24W0446325-146IDLE    <0x20>
+	 */
+
+	if len(message) == 0 {
+		/*
+		 * Discard if zero length.
+		 */
+	} else if message[0] == '#' {
+		/*
+		 * Heartbeat or other control message.
+		 *
+		 * Print only if within seconds of logging in.
+		 * That way we can see login confirmation but not
+		 * be bothered by the heart beat messages.
+		 */
+		if _, okToSend := ig.connection(); !okToSend {
 			text_color_set(DW_COLOR_REC)
-			dw_printf("\n[ig>tx] ") // formerly just [ig]
+			dw_printf("[ig] ")
 			ax25.SafePrint(message, false)
 			dw_printf("\n")
-
-			if bytes.Contains(message, []byte{0}) {
-				// Invalid.  Either drop it or pass it along as-is.  Don't change.
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("'nul' character found in packet from IS.  This should never happen.\n")
-				dw_printf("The source station is probably transmitting with defective software.\n")
-
-				//if (strcmp((char*)pinfo, "4P") == 0) {
-				//  dw_printf("The TM-D710 will do this intermittently.  A firmware upgrade is needed to fix it.\n");
-				//}
-			}
-
-			/*
-			 * Record that we heard from the source address.
-			 */
-			mheardDB.SaveIS(string(message))
-
-			ig.updateStats(func(s *igateStats) { s.downlinkPackets++ })
-			metrics.RecordDownlink()
-
-			/*
-			 * Possibly transmit if so configured.
-			 */
-			var to_chan = ig.config.tx_chan
-
-			if to_chan >= 0 {
-				ig.maybeXmitPacketFromIGate(message, to_chan)
-			}
-
-			/*
-			 * New in 1.7:  If ICHANNEL was specified, send packet to client app as specified channel.
-			 */
-			if ig.audioConfig.igate_vchannel >= 0 {
-				var ichan = ig.audioConfig.igate_vchannel
-
-				// My original poorly thoughtout idea was to parse it into a packet object,
-				// using the non-strict option, and send to the client app.
-				//
-				// A lot of things can go wrong with that approach.
-
-				// (1)  Up to 8 digipeaters are allowed in radio format.
-				//      There is a potential of finding a larger number here.
-				//
-				// (2)  The via path can have names that are not valid in the radio format.
-				//      e.g.  qAC, T2HAKATA, N5JXS-F1.
-				//      Non-strict parsing would force uppercase, truncate names too long,
-				//      and drop unacceptable SSIDs.
-				//
-				// (3) The source address could be invalid for the RF address format.
-				//     e.g.  WHO-IS>APJIW4,TCPIP*,qAC,AE5PL-JF::ZL1JSH-9 :Charles Beadfield/New Zealand{583
-				//     That is essential information that we absolutely need to preserve.
-				//
-				// I think the only correct solution is to apply a third party header
-				// wrapper so the original contents are preserved.  This will be a little
-				// more work for the application developer.  Search for ":}" and use only
-				// the part after that.  At this point, I don't see any value in encoding
-				// information in the source/destination so I will just use "X>X:}" as a prefix
-
-				var stemp = append([]byte("X>X:}"), message...)
-
-				var pp3 = ax25.FromText(string(stemp), false)
-				if pp3 != nil {
-					var alevel ax25.ALevel
-					alevel.Mark = -2 // FIXME: Do we want some other special case?
-					alevel.Space = -2
-
-					var subchan = -2 // FIXME: -1 is special case for APRStt.
-					// See what happens with -2 and follow up on this.
-					// Do we need something else here?
-					var slice = 0
-					var fec_type = fec_type_none
-					var spectrum = "APRS-IS"
-					dataLinkQueue.RecFrame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
-				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("ICHANNEL %d: Could not parse message from APRS-IS server.\n", ichan)
-					dw_printf("%s\n", message)
-				}
-			} // end ICHANNEL option
 		}
-	} /* while (1) */
-} /* end recvThread */
+	} else {
+		/*
+		 * Convert to third party packet and transmit.
+		 *
+		 * Future: might have ability to configure multiple transmit
+		 * channels, each with own client side filtering and via path.
+		 * If so, loop here over all configured channels.
+		 */
+		text_color_set(DW_COLOR_REC)
+		dw_printf("\n[ig>tx] ") // formerly just [ig]
+		ax25.SafePrint(message, false)
+		dw_printf("\n")
+
+		if bytes.Contains(message, []byte{0}) {
+			// Invalid.  Either drop it or pass it along as-is.  Don't change.
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("'nul' character found in packet from IS.  This should never happen.\n")
+			dw_printf("The source station is probably transmitting with defective software.\n")
+
+			//if (strcmp((char*)pinfo, "4P") == 0) {
+			//  dw_printf("The TM-D710 will do this intermittently.  A firmware upgrade is needed to fix it.\n");
+			//}
+		}
+
+		/*
+		 * Record that we heard from the source address.
+		 */
+		mheardDB.SaveIS(string(message))
+
+		ig.updateStats(func(s *igateStats) { s.downlinkPackets++ })
+		metrics.RecordDownlink()
+
+		/*
+		 * Possibly transmit if so configured.
+		 */
+		var to_chan = ig.config.tx_chan
+
+		if to_chan >= 0 {
+			ig.maybeXmitPacketFromIGate(message, to_chan)
+		}
+
+		/*
+		 * New in 1.7:  If ICHANNEL was specified, send packet to client app as specified channel.
+		 */
+		if ig.audioConfig.igate_vchannel >= 0 {
+			var ichan = ig.audioConfig.igate_vchannel
+
+			// My original poorly thoughtout idea was to parse it into a packet object,
+			// using the non-strict option, and send to the client app.
+			//
+			// A lot of things can go wrong with that approach.
+
+			// (1)  Up to 8 digipeaters are allowed in radio format.
+			//      There is a potential of finding a larger number here.
+			//
+			// (2)  The via path can have names that are not valid in the radio format.
+			//      e.g.  qAC, T2HAKATA, N5JXS-F1.
+			//      Non-strict parsing would force uppercase, truncate names too long,
+			//      and drop unacceptable SSIDs.
+			//
+			// (3) The source address could be invalid for the RF address format.
+			//     e.g.  WHO-IS>APJIW4,TCPIP*,qAC,AE5PL-JF::ZL1JSH-9 :Charles Beadfield/New Zealand{583
+			//     That is essential information that we absolutely need to preserve.
+			//
+			// I think the only correct solution is to apply a third party header
+			// wrapper so the original contents are preserved.  This will be a little
+			// more work for the application developer.  Search for ":}" and use only
+			// the part after that.  At this point, I don't see any value in encoding
+			// information in the source/destination so I will just use "X>X:}" as a prefix
+
+			var stemp = append([]byte("X>X:}"), message...)
+
+			var pp3 = ax25.FromText(string(stemp), false)
+			if pp3 != nil {
+				var alevel ax25.ALevel
+				alevel.Mark = -2 // FIXME: Do we want some other special case?
+				alevel.Space = -2
+
+				var subchan = -2 // FIXME: -1 is special case for APRStt.
+				// See what happens with -2 and follow up on this.
+				// Do we need something else here?
+				var slice = 0
+				var fec_type = fec_type_none
+				var spectrum = "APRS-IS"
+				dataLinkQueue.RecFrame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
+			} else {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("ICHANNEL %d: Could not parse message from APRS-IS server.\n", ichan)
+				dw_printf("%s\n", message)
+			}
+		} // end ICHANNEL option
+	}
+}
 
 /*-------------------------------------------------------------------
  *
