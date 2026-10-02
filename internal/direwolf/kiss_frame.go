@@ -14,6 +14,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/sirupsen/logrus"
 )
 
 type fromto_t int
@@ -191,9 +192,17 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 	dw_printf("\n")
 
 	if special == "" {
-		if pmsg[0] == kiss.FEND {
+		if len(pmsg) > 0 && pmsg[0] == kiss.FEND {
 			/* Skip over FEND if present. */
 			pmsg = pmsg[1:]
+		}
+
+		// What is left can be nothing at all - a message that was only an
+		// escaped FEND, say - and then there is no command byte to describe.
+		if len(pmsg) == 0 {
+			logrus.WithField("direction", direction[fromto]).Warn("Empty message for KISS client application")
+
+			return
 		}
 
 		dw_printf("%s %s %s KISS client application, channel %d, total length = %d\n",

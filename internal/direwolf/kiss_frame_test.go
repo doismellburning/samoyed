@@ -9,6 +9,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -127,6 +128,40 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	assert.Contains(t, output, "Invalid transmit channel 8 from KISS client app")
 	assert.Contains(t, output, "kissparms -c 1 -p radio")
 	assert.Equal(t, 0, transmitQueue.Count(8, -1, "", "", false))
+}
+
+// A frame whose only content is an escaped FEND reads as a request for channel
+// 12, and the hex dump that goes with the explanation had nothing left to show
+// once it skipped what it took for a leading FEND - it indexed past the end.
+// Any client of the KISS ports could send it.
+func Test_kiss_process_msg_invalid_channel_escaped_fend_only(t *testing.T) {
+	setupKissProcessMsg(t)
+
+	var audioConfig = kissTestRadioConfig()
+	var _, sendfun = recordingSendfun()
+	var kc kiss.Collector
+
+	var output = testutils.CaptureOutput(t, func() {
+		for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.TFEND, kiss.FEND} {
+			KissRecByte(&kc, audioConfig, b, 0, nil, -1, sendfun)
+		}
+	})
+
+	assert.Contains(t, output, "Invalid transmit channel 12 from KISS client app")
+}
+
+// The debug print of a message has something to say even when there is nothing
+// of the message to print.
+func Test_kiss_debug_print_empty(t *testing.T) {
+	for _, msg := range [][]byte{nil, {kiss.FEND}} {
+		var hook = test.NewGlobal()
+		t.Cleanup(hook.Reset)
+
+		kiss_debug_print(FROM_CLIENT, "", msg)
+
+		require.NotNil(t, hook.LastEntry(), "message %v", msg)
+		assert.Equal(t, "Empty message for KISS client application", hook.LastEntry().Message)
+	}
 }
 
 // A KISS TCP port carrying a single radio channel ignores the channel in the
