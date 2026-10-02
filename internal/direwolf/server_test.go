@@ -806,3 +806,50 @@ func TestReadCommandData_AcceptsTheLargestDataLength(t *testing.T) {
 	assert.Equal(t, agwMaxDataLen, n)
 	assert.Equal(t, payload, cmd.Data)
 }
+
+// tricklingConn hands over what it has to read a few bytes at a time, as a TCP
+// stream is free to when data spans segments.
+type tricklingConn struct {
+	net.Conn
+
+	r io.Reader
+}
+
+func (c *tricklingConn) Read(b []byte) (int, error) {
+	return c.r.Read(b[:min(len(b), 3)])
+}
+
+// Data that arrives in pieces is read in full, rather than taken for a client
+// that stopped halfway through.
+func TestReadCommandData_ReadsDataThatArrivesInPieces(t *testing.T) {
+	var payload = []byte("Q1TEST>Q2TEST:hello")
+
+	var conn = new(tricklingConn)
+	conn.r = bytes.NewReader(payload)
+
+	var cmd = new(agwpe.Message)
+	cmd.Header.DataKind = 'K'
+	cmd.Header.DataLen = uint32(len(payload))
+
+	var n, err = readCommandData(conn, cmd)
+
+	require.NoError(t, err)
+	assert.Equal(t, len(payload), n)
+	assert.Equal(t, payload, cmd.Data)
+}
+
+// A client that goes away partway through its data is still reported, along
+// with how much did arrive.
+func TestReadCommandData_ReportsDataCutShort(t *testing.T) {
+	var conn = new(tricklingConn)
+	conn.r = bytes.NewReader([]byte("Q1TEST"))
+
+	var cmd = new(agwpe.Message)
+	cmd.Header.DataKind = 'K'
+	cmd.Header.DataLen = 20
+
+	var n, err = readCommandData(conn, cmd)
+
+	require.Error(t, err)
+	assert.Equal(t, 6, n)
+}
