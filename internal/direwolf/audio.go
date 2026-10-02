@@ -637,6 +637,488 @@ func (d *AudioDevices) findPortAudioDevice(name string, forInput bool) *portaudi
 	return dev
 }
 
+// openSoundcardInput opens soundcard name to record from for audio device a,
+// and starts it recording into the device's input ring buffer.
+func (d *AudioDevices) openSoundcardInput(a int, pa *AudioConfig, name string, framesPerBuffer int, bufSizeInBytes int) error {
+	var inputDev = d.findPortAudioDevice(name, true)
+	if inputDev == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not find audio input device: %s\n", name)
+		d.printAudioBackendNoise()
+
+		return fmt.Errorf("no audio input device %s", name)
+	}
+
+	// Create ring buffer for audio data.
+	// Size it to hold ~1 second of audio for plenty of headroom.
+	// This accommodates Go scheduler delays and processing latency.
+	var ringBufSize = pa.adev[a].samples_per_sec * pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
+	d.dev[a].inputRingBuf = newAudioRingBuffer(ringBufSize)
+
+	// Create input stream parameters
+	var inputParams = portaudio.StreamParameters{
+		Input: portaudio.StreamDeviceParameters{
+			Device:   inputDev,
+			Channels: pa.adev[a].num_channels,
+			Latency:  inputDev.DefaultHighInputLatency,
+		},
+		Output:          portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
+		SampleRate:      float64(pa.adev[a].samples_per_sec),
+		FramesPerBuffer: framesPerBuffer,
+		Flags:           portaudio.NoFlag,
+	}
+
+	// Open input stream with callback.
+	// The callback receives audio data and writes it to the ring buffer.
+	// IMPORTANT: Capture the ring buffer pointer now, not in the closure,
+	// to avoid the classic Go closure-over-loop-variable bug.
+	var inRingBuf = d.dev[a].inputRingBuf
+	var err error
+
+	if pa.adev[a].bits_per_sample == 16 {
+		// Pre-allocate a scratch buffer sized for one full callback invocation
+		// so the callback performs zero heap allocations at runtime.
+		d.dev[a].inputScratchBuf = make([]byte, framesPerBuffer*pa.adev[a].num_channels*2)
+		var inScratchBuf = d.dev[a].inputScratchBuf
+		err = d.quietPortAudio(func() error {
+			var e error
+			d.dev[a].inputStream, e = portaudio.OpenStream(
+				inputParams,
+				func(in []int16) {
+					// Reuse the pre-allocated scratch buffer; slice to actual length.
+					var scratch = inScratchBuf[:len(in)*2]
+					for i, sample := range in {
+						binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample))
+					}
+
+					inRingBuf.write(scratch)
+				},
+			)
+
+			return e
+		})
+	} else {
+		err = d.quietPortAudio(func() error {
+			var e error
+			d.dev[a].inputStream, e = portaudio.OpenStream(
+				inputParams,
+				func(in []uint8) {
+					// Write uint8 samples directly to ring buffer
+					inRingBuf.write(in)
+				},
+			)
+
+			return e
+		})
+	}
+
+	if err != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not open audio device %s for input: %v\n", name, err)
+		d.printAudioBackendNoise()
+
+		return fmt.Errorf("opening audio device %s for input: %w", name, err)
+	}
+
+	err = d.dev[a].inputStream.Start()
+	if err != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not start audio input stream: %v\n", err)
+
+		return fmt.Errorf("starting audio input stream: %w", err)
+	}
+
+	d.dev[a].inbufSizeInBytes = bufSizeInBytes
+
+	return nil
+}
+
+// openUDPInput opens the UDP port that name, "udp:port", gives for audio
+// device a to receive audio on.
+func (d *AudioDevices) openUDPInput(a int, name string) error {
+	var udpAddr, addrErr = net.ResolveUDPAddr("udp", name[3:]) // Capture the colon onwards from "udp:$PORT"
+	if addrErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Error with UDP address: %s\n", addrErr)
+
+		return fmt.Errorf("UDP address %s: %w", name, addrErr)
+	}
+
+	var udpErr error
+
+	d.dev[a].udp_sock, udpErr = net.ListenUDP("udp", udpAddr) // Capture the colon onwards from `udp:$PORT`
+	if udpErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Couldn't create listening socket: %s\n", udpErr)
+
+		return fmt.Errorf("listening on %s: %w", name, udpErr)
+	}
+
+	d.dev[a].inbufSizeInBytes = SDR_UDP_BUF_MAXLEN
+
+	return nil
+}
+
+// openUDPOutput connects audio device a to the UDP destination that name,
+// "udp:host:port", gives to send its audio to, and starts the silence that
+// keeps the stream flowing between transmissions.  Failing to connect is only
+// an error if name was given for transmit; otherwise it costs transmitting.
+func (d *AudioDevices) openUDPOutput(ctx context.Context, a int, pa *AudioConfig, name string) error {
+	/*
+	 * UDP output - dial to the specified host:port and send audio packets.
+	 */
+	var outAddr = name[4:] // skip "udp:"
+	var udpOutConn, dialErr = new(net.Dialer).DialContext(ctx, "udp", outAddr)
+	if dialErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not connect to UDP output address %s: %v\n", outAddr, dialErr)
+
+		if audioOutputRequired(&pa.adev[a]) {
+			return fmt.Errorf("connecting to UDP output address %s: %w", outAddr, dialErr)
+		}
+
+		dw_printf("Transmitting will not be possible.\n")
+
+		return nil
+	}
+
+	d.dev[a].udp_out_sock = udpOutConn
+	d.dev[a].outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
+	var stop = make(chan struct{})
+	var done = make(chan struct{})
+
+	d.dev[a].silenceStopCh = stop
+	d.dev[a].silenceDoneCh = done
+
+	go func() {
+		defer close(done)
+
+		d.udpSilenceKeepalive(ctx, a, stop)
+	}()
+
+	return nil
+}
+
+// openSoundcardOutput opens soundcard name to play audio device a's output
+// through.  Failing to is only an error if name was given for transmit;
+// otherwise it costs transmitting.
+func (d *AudioDevices) openSoundcardOutput(a int, pa *AudioConfig, name string, framesPerBuffer int, portaudioReady bool) error {
+	/*
+	 * Soundcard - blocking write mode.
+	 * Flush fills the typed output buffer and calls Write() to
+	 * send it to PortAudio. The stream is started lazily on first write
+	 * and stopped in wait to avoid underflows during idle periods.
+	 */
+
+	if !portaudioReady {
+		// PortAudio would not initialize, which we reported above.
+		if audioOutputRequired(&pa.adev[a]) {
+			return fmt.Errorf("no PortAudio for audio output device %s", name)
+		}
+
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Transmitting will not be possible.\n")
+
+		return nil
+	}
+
+	var outputDev = d.findPortAudioDevice(name, false)
+	if outputDev == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not find audio output device: %s\n", name)
+		d.printAudioBackendNoise()
+
+		if audioOutputRequired(&pa.adev[a]) {
+			return fmt.Errorf("no audio output device %s", name)
+		}
+
+		dw_printf("Transmitting will not be possible.\n")
+
+		return nil
+	}
+
+	// Create output stream parameters
+	var outputParams = portaudio.StreamParameters{
+		Input: portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
+		Output: portaudio.StreamDeviceParameters{
+			Device:   outputDev,
+			Channels: pa.adev[a].num_channels,
+			Latency:  outputDev.DefaultHighOutputLatency,
+		},
+		SampleRate:      float64(pa.adev[a].samples_per_sec),
+		FramesPerBuffer: framesPerBuffer,
+		Flags:           portaudio.NoFlag,
+	}
+
+	// Open output stream in blocking write mode.
+	// Pass a pointer to a typed buffer; Write() will send buffer contents to PortAudio.
+	var err error
+
+	if pa.adev[a].bits_per_sample == 16 {
+		d.dev[a].outputBuf16 = make([]int16, framesPerBuffer*pa.adev[a].num_channels)
+		err = d.quietPortAudio(func() error {
+			var e error
+			d.dev[a].outputStream, e = portaudio.OpenStream(outputParams, &d.dev[a].outputBuf16)
+
+			return e
+		})
+	} else {
+		d.dev[a].outputBuf8 = make([]uint8, framesPerBuffer*pa.adev[a].num_channels)
+		err = d.quietPortAudio(func() error {
+			var e error
+			d.dev[a].outputStream, e = portaudio.OpenStream(outputParams, &d.dev[a].outputBuf8)
+
+			return e
+		})
+	}
+
+	if err != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not open audio device %s for output: %v\n", name, err)
+		d.printAudioBackendNoise()
+
+		if audioOutputRequired(&pa.adev[a]) {
+			return fmt.Errorf("opening audio device %s for output: %w", name, err)
+		}
+
+		dw_printf("Transmitting will not be possible.\n")
+
+		d.dev[a].outputBuf16 = nil
+		d.dev[a].outputBuf8 = nil
+		d.dev[a].outputStream = nil
+
+		return nil
+	}
+
+	// Output stream is opened but NOT started here.
+	// It will be started lazily on first write in Flush
+	// and stopped in wait, to avoid underflows during idle periods.
+
+	return nil
+}
+
+// openDevice opens audio device a, as pa describes it, for receiving and,
+// where it can, transmitting.
+func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *AudioConfig, portaudioReady bool) error {
+	d.dev[a].inbufSizeInBytes = 0
+	d.dev[a].inbuf = nil
+	d.dev[a].inbufLen = 0
+	d.dev[a].inbufNext = 0
+
+	d.dev[a].outbufSizeInBytes = 0
+	d.dev[a].outbuf = nil
+	d.dev[a].outbufLen = 0
+
+	// Store audio format
+	d.dev[a].sampleRate = pa.adev[a].samples_per_sec
+	d.dev[a].numChannels = pa.adev[a].num_channels
+	d.dev[a].bitsPerSample = pa.adev[a].bits_per_sample
+	d.dev[a].bytesPerFrame = pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
+	d.dev[a].statisticsInterval = pa.statistics_interval
+
+	/*
+	 * Determine the type of audio output, while the configured input
+	 * and output names can still be compared.
+	 */
+
+	var outType = audioOutType(&pa.adev[a])
+
+	if outType == AUDIO_OUT_TYPE_NONE && audioOutputRequired(&pa.adev[a]) {
+		// Named for transmit, but not a transmit device: standard
+		// input, or a UDP port to listen on rather than send to.
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Audio device %s cannot transmit.\n", pa.adev[a].adevice_out)
+		dw_printf("A transmit device is a soundcard, or udp:host:port.\n")
+
+		return fmt.Errorf("audio device %s cannot transmit", pa.adev[a].adevice_out)
+	}
+
+	/*
+	 * Determine the type of audio input.
+	 */
+
+	d.dev[a].g_audio_in_type = AUDIO_IN_TYPE_SOUNDCARD
+
+	if strings.EqualFold(pa.adev[a].adevice_in, "stdin") || pa.adev[a].adevice_in == "-" {
+		d.dev[a].g_audio_in_type = AUDIO_IN_TYPE_STDIN
+		/* Change "-" to stdin for readability. */
+		pa.adev[a].adevice_in = "stdin"
+	}
+
+	if strings.HasPrefix(strings.ToLower(pa.adev[a].adevice_in), "udp:") {
+		d.dev[a].g_audio_in_type = AUDIO_IN_TYPE_SDR_UDP
+		/* Supply default port if none specified. */
+		if strings.EqualFold(pa.adev[a].adevice_in, "udp") ||
+			strings.EqualFold(pa.adev[a].adevice_in, "udp:") {
+			pa.adev[a].adevice_in = fmt.Sprintf("udp:%d", DEFAULT_UDP_AUDIO_PORT)
+		}
+	}
+
+	/* Let user know what is going on. */
+
+	/* If not specified, the device names should be "default". */
+
+	var audio_in_name = pa.adev[a].adevice_in
+	var audio_out_name = pa.adev[a].adevice_out
+
+	var ctemp string
+
+	if pa.adev[a].num_channels == 2 {
+		ctemp = fmt.Sprintf(" (channels %d & %d)", ADEVFIRSTCHAN(a), ADEVFIRSTCHAN(a)+1)
+	} else {
+		ctemp = fmt.Sprintf(" (channel %d)", ADEVFIRSTCHAN(a))
+	}
+
+	text_color_set(DW_COLOR_INFO)
+
+	switch {
+	case outType == AUDIO_OUT_TYPE_NONE:
+		dw_printf("Audio input device for receive: %s %s\n", audio_in_name, ctemp)
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("No audio output device, so transmitting is not possible.\n")
+	case audio_in_name == audio_out_name:
+		dw_printf("Audio device for both receive and transmit: %s %s\n", audio_in_name, ctemp)
+	default:
+		dw_printf("Audio input device for receive: %s %s\n", audio_in_name, ctemp)
+		dw_printf("Audio out device for transmit: %s %s\n", audio_out_name, ctemp)
+	}
+
+	// Calculate buffer size
+	var bufSizeInBytes = calcbufsize(pa.adev[a].samples_per_sec, pa.adev[a].num_channels, pa.adev[a].bits_per_sample)
+	var framesPerBuffer = bufSizeInBytes / d.dev[a].bytesPerFrame
+	d.dev[a].framesPerBuffer = framesPerBuffer
+
+	/*
+	 * Now attempt actual opens.
+	 */
+
+	/*
+	 * Input device.
+	 */
+
+	switch d.dev[a].g_audio_in_type {
+	/*
+	 * Soundcard - PortAudio with callback mode.
+	 * Callback mode is more reliable than blocking read because the
+	 * callback runs on a dedicated audio thread with better timing
+	 * guarantees than Go goroutines.
+	 */
+	case AUDIO_IN_TYPE_SOUNDCARD:
+		var err = d.openSoundcardInput(a, pa, audio_in_name, framesPerBuffer, bufSizeInBytes)
+		if err != nil {
+			return err
+		}
+
+	/*
+	 * UDP.
+	 */
+	case AUDIO_IN_TYPE_SDR_UDP:
+		var err = d.openUDPInput(a, audio_in_name)
+		if err != nil {
+			return err
+		}
+
+		/*
+		 * stdin.
+		 */
+	case AUDIO_IN_TYPE_STDIN:
+		/* Do we need to adjust any properties of stdin? */
+		d.dev[a].inbufSizeInBytes = 1024
+
+	default:
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Internal error, invalid audio_in_type\n")
+
+		return fmt.Errorf("invalid audio input type %d", d.dev[a].g_audio_in_type)
+	}
+
+	/*
+	 * Output device.
+	 */
+
+	// An output device that can't be opened costs us the ability to
+	// transmit, but receiving is still useful and is all that some
+	// setups - a receive-only IGate, a machine with a capture device
+	// but nothing to play through - ever wanted.  Warn and carry on
+	// rather than refusing to start.  Flush discards
+	// anything the transmit path produces while outputStream and
+	// udp_out_sock are both nil.
+	d.dev[a].outbufSizeInBytes = bufSizeInBytes
+
+	switch outType {
+	case AUDIO_OUT_TYPE_NONE:
+		// Nothing to open; already reported above.
+
+	case AUDIO_OUT_TYPE_UDP:
+		var err = d.openUDPOutput(ctx, a, pa, audio_out_name)
+		if err != nil {
+			return err
+		}
+
+	case AUDIO_OUT_TYPE_SOUNDCARD:
+		var err = d.openSoundcardOutput(a, pa, audio_out_name, framesPerBuffer, portaudioReady)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Version 1.3 - after a report of this situation for Mac OSX version.
+	if d.dev[a].inbufSizeInBytes < 256 || d.dev[a].inbufSizeInBytes > 32768 {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Audio buffer has unexpected extreme size of %d bytes.\n", d.dev[a].inbufSizeInBytes)
+		dw_printf("This might be caused by unusual audio device configuration values.\n")
+
+		d.dev[a].inbufSizeInBytes = 2048
+		dw_printf("Using %d to attempt recovery.\n", d.dev[a].inbufSizeInBytes)
+	}
+
+	/*
+	 * Finally allocate byte-level buffers for each direction.
+	 */
+	d.dev[a].inbuf = make([]byte, d.dev[a].inbufSizeInBytes)
+	dwutil.Assert(d.dev[a].inbuf != nil)
+	d.dev[a].inbufLen = 0
+	d.dev[a].inbufNext = 0
+
+	d.dev[a].outbuf = make([]byte, d.dev[a].outbufSizeInBytes)
+	dwutil.Assert(d.dev[a].outbuf != nil)
+	d.dev[a].outbufLen = 0
+
+	return nil
+}
+
+// fillAudioDefaults fills in any audio device and modem settings that the
+// configuration left unset.
+func fillAudioDefaults(pa *AudioConfig) {
+	for a := range MAX_ADEVS {
+		if pa.adev[a].num_channels == 0 {
+			pa.adev[a].num_channels = DEFAULT_NUM_CHANNELS
+		}
+
+		if pa.adev[a].samples_per_sec == 0 {
+			pa.adev[a].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
+		}
+
+		if pa.adev[a].bits_per_sample == 0 {
+			pa.adev[a].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
+		}
+
+		for channel := range MAX_RADIO_CHANS {
+			if pa.achan[channel].mark_freq == 0 {
+				pa.achan[channel].mark_freq = DEFAULT_MARK_FREQ
+			}
+
+			if pa.achan[channel].space_freq == 0 {
+				pa.achan[channel].space_freq = DEFAULT_SPACE_FREQ
+			}
+
+			if pa.achan[channel].baud == 0 {
+				pa.achan[channel].baud = DEFAULT_BAUD
+			}
+		}
+	}
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        AudioOpen
@@ -694,7 +1176,7 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) (*AudioDevices, error) {
 
 			// Without a soundcard we can't receive, so there is nothing left
 			// to do.  Needing one only to transmit is survivable: carry on
-			// receive-only, which the output section below reports.
+			// receive-only, which openSoundcardOutput reports.
 			if inputNeedsPortAudio {
 				return nil, fmt.Errorf("initializing PortAudio: %w", err)
 			}
@@ -707,37 +1189,7 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) (*AudioDevices, error) {
 		d.dev[a].outputStream = nil
 	}
 
-	/*
-	 * Fill in defaults for any missing values.
-	 */
-
-	for a := range MAX_ADEVS {
-		if pa.adev[a].num_channels == 0 {
-			pa.adev[a].num_channels = DEFAULT_NUM_CHANNELS
-		}
-
-		if pa.adev[a].samples_per_sec == 0 {
-			pa.adev[a].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
-		}
-
-		if pa.adev[a].bits_per_sample == 0 {
-			pa.adev[a].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
-		}
-
-		for channel := range MAX_RADIO_CHANS {
-			if pa.achan[channel].mark_freq == 0 {
-				pa.achan[channel].mark_freq = DEFAULT_MARK_FREQ
-			}
-
-			if pa.achan[channel].space_freq == 0 {
-				pa.achan[channel].space_freq = DEFAULT_SPACE_FREQ
-			}
-
-			if pa.achan[channel].baud == 0 {
-				pa.achan[channel].baud = DEFAULT_BAUD
-			}
-		}
-	}
+	fillAudioDefaults(pa)
 
 	/*
 	 * Open audio device(s).
@@ -745,404 +1197,12 @@ func AudioOpen(ctx context.Context, pa *AudioConfig) (*AudioDevices, error) {
 
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined != 0 {
-			d.dev[a].inbufSizeInBytes = 0
-			d.dev[a].inbuf = nil
-			d.dev[a].inbufLen = 0
-			d.dev[a].inbufNext = 0
-
-			d.dev[a].outbufSizeInBytes = 0
-			d.dev[a].outbuf = nil
-			d.dev[a].outbufLen = 0
-
-			// Store audio format
-			d.dev[a].sampleRate = pa.adev[a].samples_per_sec
-			d.dev[a].numChannels = pa.adev[a].num_channels
-			d.dev[a].bitsPerSample = pa.adev[a].bits_per_sample
-			d.dev[a].bytesPerFrame = pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
-			d.dev[a].statisticsInterval = pa.statistics_interval
-
-			/*
-			 * Determine the type of audio output, while the configured input
-			 * and output names can still be compared.
-			 */
-
-			var outType = audioOutType(&pa.adev[a])
-
-			if outType == AUDIO_OUT_TYPE_NONE && audioOutputRequired(&pa.adev[a]) {
-				// Named for transmit, but not a transmit device: standard
-				// input, or a UDP port to listen on rather than send to.
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Audio device %s cannot transmit.\n", pa.adev[a].adevice_out)
-				dw_printf("A transmit device is a soundcard, or udp:host:port.\n")
-
-				return nil, fmt.Errorf("audio device %s cannot transmit", pa.adev[a].adevice_out)
+			var err = d.openDevice(ctx, a, pa, portaudioReady)
+			if err != nil {
+				return nil, err
 			}
-
-			/*
-			 * Determine the type of audio input.
-			 */
-
-			d.dev[a].g_audio_in_type = AUDIO_IN_TYPE_SOUNDCARD
-
-			if strings.EqualFold(pa.adev[a].adevice_in, "stdin") || pa.adev[a].adevice_in == "-" {
-				d.dev[a].g_audio_in_type = AUDIO_IN_TYPE_STDIN
-				/* Change "-" to stdin for readability. */
-				pa.adev[a].adevice_in = "stdin"
-			}
-
-			if strings.HasPrefix(strings.ToLower(pa.adev[a].adevice_in), "udp:") {
-				d.dev[a].g_audio_in_type = AUDIO_IN_TYPE_SDR_UDP
-				/* Supply default port if none specified. */
-				if strings.EqualFold(pa.adev[a].adevice_in, "udp") ||
-					strings.EqualFold(pa.adev[a].adevice_in, "udp:") {
-					pa.adev[a].adevice_in = fmt.Sprintf("udp:%d", DEFAULT_UDP_AUDIO_PORT)
-				}
-			}
-
-			/* Let user know what is going on. */
-
-			/* If not specified, the device names should be "default". */
-
-			var audio_in_name = pa.adev[a].adevice_in
-			var audio_out_name = pa.adev[a].adevice_out
-
-			var ctemp string
-
-			if pa.adev[a].num_channels == 2 {
-				ctemp = fmt.Sprintf(" (channels %d & %d)", ADEVFIRSTCHAN(a), ADEVFIRSTCHAN(a)+1)
-			} else {
-				ctemp = fmt.Sprintf(" (channel %d)", ADEVFIRSTCHAN(a))
-			}
-
-			text_color_set(DW_COLOR_INFO)
-
-			switch {
-			case outType == AUDIO_OUT_TYPE_NONE:
-				dw_printf("Audio input device for receive: %s %s\n", audio_in_name, ctemp)
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("No audio output device, so transmitting is not possible.\n")
-			case audio_in_name == audio_out_name:
-				dw_printf("Audio device for both receive and transmit: %s %s\n", audio_in_name, ctemp)
-			default:
-				dw_printf("Audio input device for receive: %s %s\n", audio_in_name, ctemp)
-				dw_printf("Audio out device for transmit: %s %s\n", audio_out_name, ctemp)
-			}
-
-			// Calculate buffer size
-			var bufSizeInBytes = calcbufsize(pa.adev[a].samples_per_sec, pa.adev[a].num_channels, pa.adev[a].bits_per_sample)
-			var framesPerBuffer = bufSizeInBytes / d.dev[a].bytesPerFrame
-			d.dev[a].framesPerBuffer = framesPerBuffer
-
-			/*
-			 * Now attempt actual opens.
-			 */
-
-			/*
-			 * Input device.
-			 */
-
-			switch d.dev[a].g_audio_in_type {
-			/*
-			 * Soundcard - PortAudio with callback mode.
-			 * Callback mode is more reliable than blocking read because the
-			 * callback runs on a dedicated audio thread with better timing
-			 * guarantees than Go goroutines.
-			 */
-			case AUDIO_IN_TYPE_SOUNDCARD:
-				var inputDev = d.findPortAudioDevice(audio_in_name, true)
-				if inputDev == nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not find audio input device: %s\n", audio_in_name)
-					d.printAudioBackendNoise()
-
-					return nil, fmt.Errorf("no audio input device %s", audio_in_name)
-				}
-
-				// Create ring buffer for audio data.
-				// Size it to hold ~1 second of audio for plenty of headroom.
-				// This accommodates Go scheduler delays and processing latency.
-				var ringBufSize = pa.adev[a].samples_per_sec * pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
-				d.dev[a].inputRingBuf = newAudioRingBuffer(ringBufSize)
-
-				// Create input stream parameters
-				var inputParams = portaudio.StreamParameters{
-					Input: portaudio.StreamDeviceParameters{
-						Device:   inputDev,
-						Channels: pa.adev[a].num_channels,
-						Latency:  inputDev.DefaultHighInputLatency,
-					},
-					Output:          portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
-					SampleRate:      float64(pa.adev[a].samples_per_sec),
-					FramesPerBuffer: framesPerBuffer,
-					Flags:           portaudio.NoFlag,
-				}
-
-				// Open input stream with callback.
-				// The callback receives audio data and writes it to the ring buffer.
-				// IMPORTANT: Capture the ring buffer pointer now, not in the closure,
-				// to avoid the classic Go closure-over-loop-variable bug.
-				var inRingBuf = d.dev[a].inputRingBuf
-				var err error
-
-				if pa.adev[a].bits_per_sample == 16 {
-					// Pre-allocate a scratch buffer sized for one full callback invocation
-					// so the callback performs zero heap allocations at runtime.
-					d.dev[a].inputScratchBuf = make([]byte, framesPerBuffer*pa.adev[a].num_channels*2)
-					var inScratchBuf = d.dev[a].inputScratchBuf
-					err = d.quietPortAudio(func() error {
-						var e error
-						d.dev[a].inputStream, e = portaudio.OpenStream(
-							inputParams,
-							func(in []int16) {
-								// Reuse the pre-allocated scratch buffer; slice to actual length.
-								var scratch = inScratchBuf[:len(in)*2]
-								for i, sample := range in {
-									binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample))
-								}
-
-								inRingBuf.write(scratch)
-							},
-						)
-
-						return e
-					})
-				} else {
-					err = d.quietPortAudio(func() error {
-						var e error
-						d.dev[a].inputStream, e = portaudio.OpenStream(
-							inputParams,
-							func(in []uint8) {
-								// Write uint8 samples directly to ring buffer
-								inRingBuf.write(in)
-							},
-						)
-
-						return e
-					})
-				}
-
-				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not open audio device %s for input: %v\n", audio_in_name, err)
-					d.printAudioBackendNoise()
-
-					return nil, fmt.Errorf("opening audio device %s for input: %w", audio_in_name, err)
-				}
-
-				err = d.dev[a].inputStream.Start()
-				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not start audio input stream: %v\n", err)
-
-					return nil, fmt.Errorf("starting audio input stream: %w", err)
-				}
-
-				d.dev[a].inbufSizeInBytes = bufSizeInBytes
-
-			/*
-			 * UDP.
-			 */
-			case AUDIO_IN_TYPE_SDR_UDP:
-				var udpAddr, addrErr = net.ResolveUDPAddr("udp", audio_in_name[3:]) // Capture the colon onwards from "udp:$PORT"
-				if addrErr != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Error with UDP address: %s\n", addrErr)
-
-					return nil, fmt.Errorf("UDP address %s: %w", audio_in_name, addrErr)
-				}
-
-				var udpErr error
-
-				d.dev[a].udp_sock, udpErr = net.ListenUDP("udp", udpAddr) // Capture the colon onwards from `udp:$PORT`
-				if udpErr != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Couldn't create listening socket: %s\n", udpErr)
-
-					return nil, fmt.Errorf("listening on %s: %w", audio_in_name, udpErr)
-				}
-
-				d.dev[a].inbufSizeInBytes = SDR_UDP_BUF_MAXLEN
-
-				/*
-				 * stdin.
-				 */
-			case AUDIO_IN_TYPE_STDIN:
-				/* Do we need to adjust any properties of stdin? */
-				d.dev[a].inbufSizeInBytes = 1024
-
-			default:
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Internal error, invalid audio_in_type\n")
-
-				return nil, fmt.Errorf("invalid audio input type %d", d.dev[a].g_audio_in_type)
-			}
-
-			/*
-			 * Output device.
-			 */
-
-			// An output device that can't be opened costs us the ability to
-			// transmit, but receiving is still useful and is all that some
-			// setups - a receive-only IGate, a machine with a capture device
-			// but nothing to play through - ever wanted.  Warn and carry on
-			// rather than refusing to start.  Flush discards
-			// anything the transmit path produces while outputStream and
-			// udp_out_sock are both nil.
-			d.dev[a].outbufSizeInBytes = bufSizeInBytes
-
-			switch outType {
-			case AUDIO_OUT_TYPE_NONE:
-				// Nothing to open; already reported above.
-
-			case AUDIO_OUT_TYPE_UDP:
-				/*
-				 * UDP output - dial to the specified host:port and send audio packets.
-				 */
-				var outAddr = audio_out_name[4:] // skip "udp:"
-				var udpOutConn, dialErr = new(net.Dialer).DialContext(ctx, "udp", outAddr)
-				if dialErr != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not connect to UDP output address %s: %v\n", outAddr, dialErr)
-
-					if audioOutputRequired(&pa.adev[a]) {
-						return nil, fmt.Errorf("connecting to UDP output address %s: %w", outAddr, dialErr)
-					}
-
-					dw_printf("Transmitting will not be possible.\n")
-
-					break
-				}
-
-				d.dev[a].udp_out_sock = udpOutConn
-				d.dev[a].outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
-				var stop = make(chan struct{})
-				var done = make(chan struct{})
-
-				d.dev[a].silenceStopCh = stop
-				d.dev[a].silenceDoneCh = done
-
-				go func() {
-					defer close(done)
-
-					d.udpSilenceKeepalive(ctx, a, stop)
-				}()
-
-			case AUDIO_OUT_TYPE_SOUNDCARD:
-				/*
-				 * Soundcard - blocking write mode.
-				 * Flush fills the typed output buffer and calls Write() to
-				 * send it to PortAudio. The stream is started lazily on first write
-				 * and stopped in wait to avoid underflows during idle periods.
-				 */
-
-				if !portaudioReady {
-					// PortAudio would not initialize, which we reported above.
-					if audioOutputRequired(&pa.adev[a]) {
-						return nil, fmt.Errorf("no PortAudio for audio output device %s", audio_out_name)
-					}
-
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Transmitting will not be possible.\n")
-
-					break
-				}
-
-				var outputDev = d.findPortAudioDevice(audio_out_name, false)
-				if outputDev == nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not find audio output device: %s\n", audio_out_name)
-					d.printAudioBackendNoise()
-
-					if audioOutputRequired(&pa.adev[a]) {
-						return nil, fmt.Errorf("no audio output device %s", audio_out_name)
-					}
-
-					dw_printf("Transmitting will not be possible.\n")
-
-					break
-				}
-
-				// Create output stream parameters
-				var outputParams = portaudio.StreamParameters{
-					Input: portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
-					Output: portaudio.StreamDeviceParameters{
-						Device:   outputDev,
-						Channels: pa.adev[a].num_channels,
-						Latency:  outputDev.DefaultHighOutputLatency,
-					},
-					SampleRate:      float64(pa.adev[a].samples_per_sec),
-					FramesPerBuffer: framesPerBuffer,
-					Flags:           portaudio.NoFlag,
-				}
-
-				// Open output stream in blocking write mode.
-				// Pass a pointer to a typed buffer; Write() will send buffer contents to PortAudio.
-				var err error
-
-				if pa.adev[a].bits_per_sample == 16 {
-					d.dev[a].outputBuf16 = make([]int16, framesPerBuffer*pa.adev[a].num_channels)
-					err = d.quietPortAudio(func() error {
-						var e error
-						d.dev[a].outputStream, e = portaudio.OpenStream(outputParams, &d.dev[a].outputBuf16)
-
-						return e
-					})
-				} else {
-					d.dev[a].outputBuf8 = make([]uint8, framesPerBuffer*pa.adev[a].num_channels)
-					err = d.quietPortAudio(func() error {
-						var e error
-						d.dev[a].outputStream, e = portaudio.OpenStream(outputParams, &d.dev[a].outputBuf8)
-
-						return e
-					})
-				}
-
-				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not open audio device %s for output: %v\n", audio_out_name, err)
-					d.printAudioBackendNoise()
-
-					if audioOutputRequired(&pa.adev[a]) {
-						return nil, fmt.Errorf("opening audio device %s for output: %w", audio_out_name, err)
-					}
-
-					dw_printf("Transmitting will not be possible.\n")
-
-					d.dev[a].outputBuf16 = nil
-					d.dev[a].outputBuf8 = nil
-					d.dev[a].outputStream = nil
-
-					break
-				}
-
-				// Output stream is opened but NOT started here.
-				// It will be started lazily on first write in Flush
-				// and stopped in wait, to avoid underflows during idle periods.
-			}
-
-			// Version 1.3 - after a report of this situation for Mac OSX version.
-			if d.dev[a].inbufSizeInBytes < 256 || d.dev[a].inbufSizeInBytes > 32768 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Audio buffer has unexpected extreme size of %d bytes.\n", d.dev[a].inbufSizeInBytes)
-				dw_printf("This might be caused by unusual audio device configuration values.\n")
-
-				d.dev[a].inbufSizeInBytes = 2048
-				dw_printf("Using %d to attempt recovery.\n", d.dev[a].inbufSizeInBytes)
-			}
-
-			/*
-			 * Finally allocate byte-level buffers for each direction.
-			 */
-			d.dev[a].inbuf = make([]byte, d.dev[a].inbufSizeInBytes)
-			dwutil.Assert(d.dev[a].inbuf != nil)
-			d.dev[a].inbufLen = 0
-			d.dev[a].inbufNext = 0
-
-			d.dev[a].outbuf = make([]byte, d.dev[a].outbufSizeInBytes)
-			dwutil.Assert(d.dev[a].outbuf != nil)
-			d.dev[a].outbufLen = 0
-		} /* end of audio device defined */
-	} /* end of for each audio device */
+		}
+	}
 
 	openSucceeded = true
 

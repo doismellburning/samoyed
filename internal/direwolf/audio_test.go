@@ -6,6 +6,10 @@ package direwolf
 import (
 	"context"
 	"net"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -215,6 +219,43 @@ func Test_udpSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
 // noSuchAudioDevice is a device name no soundcard will match, for testing what
 // happens when an output device turns out not to be there.
 const noSuchAudioDevice = "Q1TEST no such audio device"
+
+// nullSoundcard is the name nullSoundcards gives the device it declares when
+// a test needs only the one.
+const nullSoundcard = "samoyed_null"
+
+// nullSoundcards gives PortAudio soundcards to open where there is no sound
+// hardware - a container, a CI runner - by declaring ALSA "null" devices,
+// which swallow whatever is played and record silence, in an .asoundrc that
+// HOME points at for the rest of the test.  ALSA is Linux only, so elsewhere
+// the test is skipped.
+func nullSoundcards(t *testing.T, names ...string) {
+	t.Helper()
+
+	if runtime.GOOS != "linux" {
+		t.Skip("ALSA null devices are Linux only")
+	}
+
+	// github.com/gordonklaus/portaudio hands its stream id to C as
+	// unsafe.Pointer(id), which checkptr - on under the race detector - can
+	// take for a bad pointer and abort the whole test binary over.
+	if raceEnabled {
+		t.Skip("the PortAudio binding trips checkptr under the race detector")
+	}
+
+	var asoundrc strings.Builder
+
+	for _, name := range names {
+		asoundrc.WriteString("pcm." + name + " {\n\ttype null\n\thint { show on description \"Samoyed test\" }\n}\n")
+	}
+
+	var home = t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".asoundrc"), []byte(asoundrc.String()), 0o600))
+
+	// alsa-lib reads HOME through the C environment, which Setenv reaches
+	// under cgo.
+	t.Setenv("HOME", home)
+}
 
 // --- audioOutType ---
 
