@@ -1504,165 +1504,22 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.Message) {
 		s.handleTransmitRawRequest(cmd)
 
 	case 'X': /* Register CallSign  */
-		{
-			/*
-				struct {
-				  struct agwpe_s Header;
-				  char data;			// 1 = success, 0 = failure
-				} reply;
-			*/
-			var ok byte
-
-			// The protocol spec says it is an error to register the same one more than once.
-			// Too much trouble.  Report success if the channel is valid.
-
-			var channel = int(cmd.Header.Portx)
-
-			if s.connectedModeAllowed(cmd.Header.Portx) {
-				ok = 1
-
-				dataLinkQueue.RegisterCallsign(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
-			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
-
-				ok = 0
-			}
-
-			var reply = new(agwpe.Message)
-			reply.Header.DataKind = 'X'
-			reply.Header.Portx = cmd.Header.Portx
-			copy(reply.Header.CallFrom[:], cmd.Header.CallFrom[:])
-			reply.Header.DataLen = 1
-			reply.Data = []byte{ok}
-
-			s.sendToClient(client, reply)
-		}
+		s.handleRegisterCallsignRequest(client, cmd)
 
 	case 'x': /* Unregister CallSign  */
-		var channel = int(cmd.Header.Portx)
-
-		if s.connectedModeAllowed(cmd.Header.Portx) {
-			dataLinkQueue.UnregisterCallsign(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
-		}
-	/* No response is expected. */
+		s.handleUnregisterCallsignRequest(client, cmd)
 
 	case 'C', 'v', 'c':
 		/* C: Connect, Start an AX.25 Connection  */
 		/* v: Connect VIA, Start an AX.25 circuit thru digipeaters */
 		/* c: Connection with non-standard PID */
-		{
-			if !s.connectedModeAllowed(cmd.Header.Portx) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW connect command on unsupported channel %d ignored.\n", cmd.Header.Portx)
-
-				break
-			}
-			/*
-				        struct via_info {
-				          unsigned char num_digi;	// Expect to be in range 1 to 7.  Why not up to 8?
-					  char dcall[7][10];
-				        }
-			*/
-			var callsigns [ax25.MaxAddrs]string
-			callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
-
-			var pid byte = 0xf0 /* normal for AX.25 I frames. */
-			if cmd.Header.DataKind == 'c' {
-				pid = cmd.Header.PID /* non standard for NETROM, TCP/IP, etc. */
-			}
-
-			var num_calls = 2 /* 2 plus any digipeaters. */
-
-			if cmd.Header.DataKind == 'v' {
-				if len(cmd.Data) < 1 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("\n")
-					dw_printf("AGW client, connect via, has invalid payload: too short\n")
-
-					break
-				}
-
-				var numDigi = int(cmd.Data[0])
-
-				if numDigi >= 1 && numDigi <= 7 {
-					var expectedLen = uint32(numDigi)*10 + 1
-					if cmd.Header.DataLen != expectedLen && cmd.Header.DataLen != expectedLen+1 {
-						// I'm getting 1 more than expected from AGWterminal.
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("AGW client, connect via, has data len, %d when %d expected.\n", cmd.Header.DataLen, expectedLen)
-					}
-
-					if len(cmd.Data) < 1+10*numDigi {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("\n")
-						dw_printf("AGW client, connect via, payload too short for %d digipeaters.\n", numDigi)
-
-						break
-					}
-
-					for j := range numDigi {
-						callsigns[ax25.Repeater1+j] = dwutil.ByteArrayToString(cmd.Data[1+10*j : 1+10*j+10])
-						num_calls++
-					}
-				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("\n")
-					dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", numDigi)
-
-					break
-				}
-			}
-
-			dataLinkQueue.ConnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
-		}
+		s.handleConnectRequest(client, cmd)
 
 	case 'D': /* Send Connected Data */
-		{
-			if !s.connectedModeAllowed(cmd.Header.Portx) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'D' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
-
-				break
-			}
-
-			if int(cmd.Header.DataLen) > len(cmd.Data) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'D' message has invalid data length %d.\n", cmd.Header.DataLen)
-
-				break
-			}
-
-			var callsigns [ax25.MaxAddrs]string
-			const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
-
-			callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
-
-			dataLinkQueue.XmitDataRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
-		}
+		s.handleConnectedDataRequest(client, cmd)
 
 	case 'd': /* Disconnect, Terminate an AX.25 Connection */
-		{
-			if !s.connectedModeAllowed(cmd.Header.Portx) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'd' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
-
-				break
-			}
-
-			var callsigns [ax25.MaxAddrs]string
-			const num_calls = 2 // only first 2 used.
-
-			callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
-
-			dataLinkQueue.DisconnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
-		}
+		s.handleDisconnectRequest(client, cmd)
 
 	case 'M': /* Send UNPROTO Information (no digipeater path) */
 		s.handleTransmitUnprotoRequest(cmd)
@@ -1671,57 +1528,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.Message) {
 		s.handlePortOutstandingFramesRequest(client, cmd)
 
 	case 'Y': /* How Many Outstanding frames wait for tx for a particular station  */
-		// This is different than the above 'y' because this refers to a specific
-		// link in connected mode.
-
-		// This would be useful for a couple different purposes.
-
-		// When sending bulk data, we want to keep a fair amount queued up to take
-		// advantage of large window sizes (MAXFRAME, EMAXFRAME).  On the other
-		// hand we don't want to get TOO far ahead when transferring a large file.
-
-		// Before disconnecting from another station, it would be good to know
-		// that it actually received the last message we sent.  For this reason,
-		// I think it would be good for this to include information frames that were
-		// transmitted but not yet acknowledged.
-		// You could say that a particular frame is still waiting to be sent even
-		// if was already sent because it could be sent again if lost previously.
-
-		// The documentation is inconsistent about the address order.
-		// One place says "callfrom" is my callsign and "callto" is the other guy.
-		// That would make sense.  We are asking about frames going to the other guy.
-
-		// But another place says it depends on who initiated the connection.
-		//
-		//	"If we started the connection CallFrom=US and CallTo=THEM
-		//	If the other end started the connection CallFrom=THEM and CallTo=US"
-		//
-		// The response description says nothing about the order; it just mentions two addresses.
-		// If you are writing a client or server application, the order would
-		// be clear but right here it could be either case.
-		//
-		// Another version of the documentation mentioned the source address being optional.
-		//
-
-		// The only way to get this information is from inside the data link state machine.
-		// We will send a request to it and the result coming out will be used to
-		// send the reply back to the client application.
-		{
-			if !s.connectedModeAllowed(cmd.Header.Portx) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'Y' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
-
-				break
-			}
-
-			var callsigns [ax25.MaxAddrs]string
-			const num_calls = 2 // only first 2 used.
-
-			callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
-			callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
-
-			dataLinkQueue.OutstandingFramesRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
-		}
+		s.handleLinkOutstandingFramesRequest(client, cmd)
 
 	default:
 		text_color_set(DW_COLOR_ERROR)
@@ -2026,6 +1833,170 @@ func (*AGWServer) handleTransmitRawRequest(cmd *agwpe.Message) {
 	}
 }
 
+// handleRegisterCallsignRequest handles 'X', which registers a callsign for
+// connected mode, and tells the client whether that worked.
+func (s *AGWServer) handleRegisterCallsignRequest(client int, cmd *agwpe.Message) {
+	/*
+		struct {
+		  struct agwpe_s Header;
+		  char data;			// 1 = success, 0 = failure
+		} reply;
+	*/
+	var ok byte
+
+	// The protocol spec says it is an error to register the same one more than once.
+	// Too much trouble.  Report success if the channel is valid.
+
+	var channel = int(cmd.Header.Portx)
+
+	if s.connectedModeAllowed(cmd.Header.Portx) {
+		ok = 1
+
+		dataLinkQueue.RegisterCallsign(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+	} else {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
+
+		ok = 0
+	}
+
+	var reply = new(agwpe.Message)
+	reply.Header.DataKind = 'X'
+	reply.Header.Portx = cmd.Header.Portx
+	copy(reply.Header.CallFrom[:], cmd.Header.CallFrom[:])
+	reply.Header.DataLen = 1
+	reply.Data = []byte{ok}
+
+	s.sendToClient(client, reply)
+}
+
+// handleUnregisterCallsignRequest handles 'x', which unregisters a callsign
+// registered with 'X'.
+func (s *AGWServer) handleUnregisterCallsignRequest(client int, cmd *agwpe.Message) {
+	var channel = int(cmd.Header.Portx)
+
+	if s.connectedModeAllowed(cmd.Header.Portx) {
+		dataLinkQueue.UnregisterCallsign(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+	} else {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
+	}
+	/* No response is expected. */
+}
+
+// handleConnectRequest handles 'C', 'v' and 'c', which start an AX.25
+// connection: directly, through digipeaters, or with a non-standard PID.
+func (s *AGWServer) handleConnectRequest(client int, cmd *agwpe.Message) {
+	if !s.connectedModeAllowed(cmd.Header.Portx) {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW connect command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+
+		return
+	}
+	/*
+		        struct via_info {
+		          unsigned char num_digi;	// Expect to be in range 1 to 7.  Why not up to 8?
+			  char dcall[7][10];
+		        }
+	*/
+	var callsigns [ax25.MaxAddrs]string
+	callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
+	callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
+
+	var pid byte = 0xf0 /* normal for AX.25 I frames. */
+	if cmd.Header.DataKind == 'c' {
+		pid = cmd.Header.PID /* non standard for NETROM, TCP/IP, etc. */
+	}
+
+	var num_calls = 2 /* 2 plus any digipeaters. */
+
+	if cmd.Header.DataKind == 'v' {
+		if len(cmd.Data) < 1 {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("\n")
+			dw_printf("AGW client, connect via, has invalid payload: too short\n")
+
+			return
+		}
+
+		var numDigi = int(cmd.Data[0])
+
+		if numDigi >= 1 && numDigi <= 7 {
+			var expectedLen = uint32(numDigi)*10 + 1
+			if cmd.Header.DataLen != expectedLen && cmd.Header.DataLen != expectedLen+1 {
+				// I'm getting 1 more than expected from AGWterminal.
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("AGW client, connect via, has data len, %d when %d expected.\n", cmd.Header.DataLen, expectedLen)
+			}
+
+			if len(cmd.Data) < 1+10*numDigi {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("\n")
+				dw_printf("AGW client, connect via, payload too short for %d digipeaters.\n", numDigi)
+
+				return
+			}
+
+			for j := range numDigi {
+				callsigns[ax25.Repeater1+j] = dwutil.ByteArrayToString(cmd.Data[1+10*j : 1+10*j+10])
+				num_calls++
+			}
+		} else {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("\n")
+			dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", numDigi)
+
+			return
+		}
+	}
+
+	dataLinkQueue.ConnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
+}
+
+// handleConnectedDataRequest handles 'D', which sends data over an established
+// connection.
+func (s *AGWServer) handleConnectedDataRequest(client int, cmd *agwpe.Message) {
+	if !s.connectedModeAllowed(cmd.Header.Portx) {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW 'D' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+
+		return
+	}
+
+	if int(cmd.Header.DataLen) > len(cmd.Data) {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW 'D' message has invalid data length %d.\n", cmd.Header.DataLen)
+
+		return
+	}
+
+	var callsigns [ax25.MaxAddrs]string
+	const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
+
+	callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
+	callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
+
+	dataLinkQueue.XmitDataRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
+}
+
+// handleDisconnectRequest handles 'd', which terminates an AX.25 connection.
+func (s *AGWServer) handleDisconnectRequest(client int, cmd *agwpe.Message) {
+	if !s.connectedModeAllowed(cmd.Header.Portx) {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW 'd' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+
+		return
+	}
+
+	var callsigns [ax25.MaxAddrs]string
+	const num_calls = 2 // only first 2 used.
+
+	callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
+	callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
+
+	dataLinkQueue.DisconnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
+}
+
 // handleTransmitUnprotoRequest handles 'M', which asks for UNPROTO information
 // to be transmitted, with no digipeater path.
 func (*AGWServer) handleTransmitUnprotoRequest(cmd *agwpe.Message) {
@@ -2111,4 +2082,59 @@ func (s *AGWServer) handlePortOutstandingFramesRequest(client int, cmd *agwpe.Me
 	binary.LittleEndian.PutUint32(reply.Data, uint32(n))
 
 	s.sendToClient(client, reply)
+}
+
+// handleLinkOutstandingFramesRequest handles 'Y', which asks how many frames
+// are waiting to go to a particular station over a connection.  The answer
+// comes back from the data link state machine, through OutstandingFramesReply.
+func (s *AGWServer) handleLinkOutstandingFramesRequest(client int, cmd *agwpe.Message) {
+	// This is different than the above 'y' because this refers to a specific
+	// link in connected mode.
+
+	// This would be useful for a couple different purposes.
+
+	// When sending bulk data, we want to keep a fair amount queued up to take
+	// advantage of large window sizes (MAXFRAME, EMAXFRAME).  On the other
+	// hand we don't want to get TOO far ahead when transferring a large file.
+
+	// Before disconnecting from another station, it would be good to know
+	// that it actually received the last message we sent.  For this reason,
+	// I think it would be good for this to include information frames that were
+	// transmitted but not yet acknowledged.
+	// You could say that a particular frame is still waiting to be sent even
+	// if was already sent because it could be sent again if lost previously.
+
+	// The documentation is inconsistent about the address order.
+	// One place says "callfrom" is my callsign and "callto" is the other guy.
+	// That would make sense.  We are asking about frames going to the other guy.
+
+	// But another place says it depends on who initiated the connection.
+	//
+	//	"If we started the connection CallFrom=US and CallTo=THEM
+	//	If the other end started the connection CallFrom=THEM and CallTo=US"
+	//
+	// The response description says nothing about the order; it just mentions two addresses.
+	// If you are writing a client or server application, the order would
+	// be clear but right here it could be either case.
+	//
+	// Another version of the documentation mentioned the source address being optional.
+	//
+
+	// The only way to get this information is from inside the data link state machine.
+	// We will send a request to it and the result coming out will be used to
+	// send the reply back to the client application.
+	if !s.connectedModeAllowed(cmd.Header.Portx) {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW 'Y' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+
+		return
+	}
+
+	var callsigns [ax25.MaxAddrs]string
+	const num_calls = 2 // only first 2 used.
+
+	callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
+	callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
+
+	dataLinkQueue.OutstandingFramesRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
 }
