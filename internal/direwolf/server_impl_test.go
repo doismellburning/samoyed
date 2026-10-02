@@ -262,6 +262,7 @@ func dlqAppended(f func()) *dlq_item_t {
 func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 	var s = new(AGWServer)
 	s.audioConfigP = new(RadioConfig)
+	setupAGWTransmitQueue(t, s.audioConfigP)
 
 	rapid.Check(t, func(t *rapid.T) {
 		var cmd = new(agwpe.Message)
@@ -280,6 +281,7 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 	var s = new(AGWServer)
 	s.audioConfigP = new(RadioConfig)
+	setupAGWTransmitQueue(t, s.audioConfigP)
 
 	rapid.Check(t, func(t *rapid.T) {
 		var cmd = new(agwpe.Message)
