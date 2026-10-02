@@ -1478,167 +1478,16 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.Message) {
 
 	switch cmd.Header.DataKind {
 	case 'R': /* Request for version number */
-		{
-			var reply = new(agwpe.Message)
-
-			reply.Header.DataKind = 'R'
-			reply.Header.DataLen = 8
-			reply.Data = make([]byte, 8)
-
-			// Xastir only prints this and doesn't care otherwise.
-			// APRSIS32 doesn't seem to care.
-			// UI-View32 wants on 2000.15 or later.
-
-			binary.LittleEndian.PutUint32(reply.Data[0:4], 2005) // Major version
-			binary.LittleEndian.PutUint32(reply.Data[4:8], 127)  // Minor version
-
-			s.sendToClient(client, reply)
-		}
+		s.handleVersionRequest(client)
 
 	case 'G': /* Ask about radio ports */
-		{
-			var reply = new(agwpe.Message)
-
-			reply.Header.DataKind = 'G'
-
-			// Xastir only prints this and doesn't care otherwise.
-			// YAAC uses this to identify available channels.
-
-			// The interface manual wants the first to be "Port1"
-			// so channel 0 corresponds to "Port1."
-			// We can have gaps in the numbering.
-			// I wonder what applications will think about that.
-
-			// No other place cares about total number.
-
-			// A server with no audio configuration - one in a test that did
-			// not set one up - has nothing to describe.  Standing in an empty
-			// configuration reports no ports, which is the truth of it, where
-			// reaching through the nil pointer would take the program out.
-			var cfg = s.audioConfigP
-			if cfg == nil {
-				cfg = new(RadioConfig)
-			}
-
-			var count = 0
-
-			for j := range MAX_TOTAL_CHANS {
-				if cfg.chan_medium[j] == MEDIUM_RADIO ||
-					cfg.chan_medium[j] == MEDIUM_IGATE ||
-					cfg.chan_medium[j] == MEDIUM_NETTNC {
-					count++
-				}
-			}
-
-			var info strings.Builder
-			fmt.Fprintf(&info, "%d;", count)
-
-			for j := range MAX_TOTAL_CHANS {
-				switch cfg.chan_medium[j] {
-				case MEDIUM_RADIO:
-					// Misleading if using stdin or udp.
-					var a = ACHAN2ADEV(j)
-					// If I was really ambitious, some description could be provided.
-					var names = []string{"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"}
-
-					if cfg.adev[a].num_channels == 1 {
-						fmt.Fprintf(&info, "Port%d %s soundcard mono;", j+1, names[a])
-					} else {
-						var lr = "left"
-						if j&1 > 0 {
-							lr = "right"
-						}
-
-						fmt.Fprintf(&info, "Port%d %s soundcard %s;", j+1, names[a], lr)
-					}
-
-				case MEDIUM_IGATE:
-					fmt.Fprintf(&info, "Port%d Internet Gateway;", j+1)
-
-				case MEDIUM_NETTNC:
-					// could elaborate with hostname, etc.
-					fmt.Fprintf(&info, "Port%d Network TNC;", j+1)
-
-				default:
-					// Only list valid channels.
-				} // switch
-			} // for each channel
-
-			reply.Data = []byte(info.String())
-			reply.Header.DataLen = uint32(len(reply.Data))
-
-			s.sendToClient(client, reply)
-		}
+		s.handleRadioPortsRequest(client)
 
 	case 'g': /* Ask about capabilities of a port. */
-		/*
-				struct {
-				  struct agwpe_s Header;
-			 	  unsigned char on_air_baud_rate; 	// 0=1200, 1=2400, 2=4800, 3=9600, ...
-				  unsigned char traffic_level;		// 0xff if not in autoupdate mode
-				  unsigned char tx_delay;
-				  unsigned char tx_tail;
-				  unsigned char persist;
-				  unsigned char slottime;
-				  unsigned char maxframe;
-				  unsigned char active_connections;
-				  int how_many_bytes_NETLE;
-				} reply;
-		*/
-		var reply = new(agwpe.Message)
-
-		reply.Header.Portx = cmd.Header.Portx /* Reply with same port number ! */
-		reply.Header.DataKind = 'g'
-		reply.Header.DataLen = 12
-
-		// YAAC asks for this.
-		// Fake it to keep application happy.
-		// TODO:  Supply real values instead of just faking it.
-
-		reply.Data = make([]byte, 12)
-		reply.Data[0] = 0                                  // on_air_baud_rate
-		reply.Data[1] = 1                                  // traffic_level
-		reply.Data[2] = 0x19                               // tx_delay
-		reply.Data[3] = 4                                  // tx_tail
-		reply.Data[4] = 0xc8                               // persist
-		reply.Data[5] = 4                                  // slottime
-		reply.Data[6] = 7                                  // maxframe
-		reply.Data[7] = 0                                  // active_connections
-		binary.LittleEndian.PutUint32(reply.Data[8:12], 1) // how_many_bytes
-
-		s.sendToClient(client, reply)
+		s.handlePortCapabilitiesRequest(client, cmd)
 
 	case 'H': /* Ask about recently heard stations on given port. */
-		/* This should send back 20 'H' frames for the most recently heard stations. */
-		/* If there are less available, empty frames are sent to make a total of 20. */
-		/* Each contains the first and last heard times. */
-		{
-			/*
-				#if 0						// Currently, this information is not being collected.
-						struct {
-						  struct agwpe_s Header;
-					 	  char info[100];
-						} reply;
-
-
-					        memset (&reply.Header, 0, sizeof(reply.Header));
-					        reply.Header.DataKind = 'H';
-
-						// TODO:  Implement properly.
-
-					        reply.Header.Portx = cmd.Header.Portx
-
-					        strlcpy (reply.Header.call_from, "WB2OSZ-15 Mon,01Jan2000 01:02:03  Tue,31Dec2099 23:45:56", sizeof(reply.Header.call_from));
-						// or                                                  00:00:00                00:00:00
-
-					        strlcpy (agwpe_msg.data, ..., sizeof(agwpe_msg.data));
-
-					        reply.Header.data_len_NETLE = host2netle(strlen(reply.info));
-
-					        send_to_client (client, &reply);
-				#endif
-			*/
-		}
+		s.handleHeardStationsRequest()
 
 	case 'k': /* Ask to start receiving RAW AX25 frames */
 		// Actually it is a toggle so we must be sure to clear it for a new connection.
@@ -1993,31 +1842,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.Message) {
 		}
 
 	case 'y': /* Ask Outstanding frames waiting on a Port  */
-		/* Number of frames sitting in transmit queue for specified channel. */
-		{
-			/*
-				struct {
-				  struct agwpe_s Header;
-				  int data_NETLE;			// Little endian order.
-				} reply;
-			*/
-			var reply = new(agwpe.Message)
-
-			reply.Header.Portx = cmd.Header.Portx /* Reply with same port number */
-			reply.Header.DataKind = 'y'
-			reply.Header.DataLen = 4
-
-			var n = 0
-			if cmd.Header.Portx < MAX_RADIO_CHANS {
-				// Count both normal and expedited in transmit queue for given channel.
-				n = transmitQueue.Count(int(cmd.Header.Portx), -1, "", "", false)
-			}
-
-			reply.Data = make([]byte, 4)
-			binary.LittleEndian.PutUint32(reply.Data, uint32(n))
-
-			s.sendToClient(client, reply)
-		}
+		s.handlePortOutstandingFramesRequest(client, cmd)
 
 	case 'Y': /* How Many Outstanding frames wait for tx for a particular station  */
 		// This is different than the above 'y' because this refers to a specific
@@ -2078,3 +1903,200 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.Message) {
 		s.debugPrint(FROM_CLIENT, client, cmd)
 	}
 } /* end handleClientCommand */
+
+// handleVersionRequest answers 'R', a request for our version number.
+func (s *AGWServer) handleVersionRequest(client int) {
+	var reply = new(agwpe.Message)
+
+	reply.Header.DataKind = 'R'
+	reply.Header.DataLen = 8
+	reply.Data = make([]byte, 8)
+
+	// Xastir only prints this and doesn't care otherwise.
+	// APRSIS32 doesn't seem to care.
+	// UI-View32 wants on 2000.15 or later.
+
+	binary.LittleEndian.PutUint32(reply.Data[0:4], 2005) // Major version
+	binary.LittleEndian.PutUint32(reply.Data[4:8], 127)  // Minor version
+
+	s.sendToClient(client, reply)
+}
+
+// handleRadioPortsRequest answers 'G', which asks about the radio ports.
+func (s *AGWServer) handleRadioPortsRequest(client int) {
+	var reply = new(agwpe.Message)
+
+	reply.Header.DataKind = 'G'
+
+	// Xastir only prints this and doesn't care otherwise.
+	// YAAC uses this to identify available channels.
+
+	// The interface manual wants the first to be "Port1"
+	// so channel 0 corresponds to "Port1."
+	// We can have gaps in the numbering.
+	// I wonder what applications will think about that.
+
+	// No other place cares about total number.
+
+	// A server with no audio configuration - one in a test that did
+	// not set one up - has nothing to describe.  Standing in an empty
+	// configuration reports no ports, which is the truth of it, where
+	// reaching through the nil pointer would take the program out.
+	var cfg = s.audioConfigP
+	if cfg == nil {
+		cfg = new(RadioConfig)
+	}
+
+	var count = 0
+
+	for j := range MAX_TOTAL_CHANS {
+		if cfg.chan_medium[j] == MEDIUM_RADIO ||
+			cfg.chan_medium[j] == MEDIUM_IGATE ||
+			cfg.chan_medium[j] == MEDIUM_NETTNC {
+			count++
+		}
+	}
+
+	var info strings.Builder
+	fmt.Fprintf(&info, "%d;", count)
+
+	for j := range MAX_TOTAL_CHANS {
+		switch cfg.chan_medium[j] {
+		case MEDIUM_RADIO:
+			// Misleading if using stdin or udp.
+			var a = ACHAN2ADEV(j)
+			// If I was really ambitious, some description could be provided.
+			var names = []string{"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"}
+
+			if cfg.adev[a].num_channels == 1 {
+				fmt.Fprintf(&info, "Port%d %s soundcard mono;", j+1, names[a])
+			} else {
+				var lr = "left"
+				if j&1 > 0 {
+					lr = "right"
+				}
+
+				fmt.Fprintf(&info, "Port%d %s soundcard %s;", j+1, names[a], lr)
+			}
+
+		case MEDIUM_IGATE:
+			fmt.Fprintf(&info, "Port%d Internet Gateway;", j+1)
+
+		case MEDIUM_NETTNC:
+			// could elaborate with hostname, etc.
+			fmt.Fprintf(&info, "Port%d Network TNC;", j+1)
+
+		default:
+			// Only list valid channels.
+		} // switch
+	} // for each channel
+
+	reply.Data = []byte(info.String())
+	reply.Header.DataLen = uint32(len(reply.Data))
+
+	s.sendToClient(client, reply)
+}
+
+// handlePortCapabilitiesRequest answers 'g', which asks about the capabilities
+// of a port.
+func (s *AGWServer) handlePortCapabilitiesRequest(client int, cmd *agwpe.Message) {
+	/*
+			struct {
+			  struct agwpe_s Header;
+		 	  unsigned char on_air_baud_rate; 	// 0=1200, 1=2400, 2=4800, 3=9600, ...
+			  unsigned char traffic_level;		// 0xff if not in autoupdate mode
+			  unsigned char tx_delay;
+			  unsigned char tx_tail;
+			  unsigned char persist;
+			  unsigned char slottime;
+			  unsigned char maxframe;
+			  unsigned char active_connections;
+			  int how_many_bytes_NETLE;
+			} reply;
+	*/
+	var reply = new(agwpe.Message)
+
+	reply.Header.Portx = cmd.Header.Portx /* Reply with same port number ! */
+	reply.Header.DataKind = 'g'
+	reply.Header.DataLen = 12
+
+	// YAAC asks for this.
+	// Fake it to keep application happy.
+	// TODO:  Supply real values instead of just faking it.
+
+	reply.Data = make([]byte, 12)
+	reply.Data[0] = 0                                  // on_air_baud_rate
+	reply.Data[1] = 1                                  // traffic_level
+	reply.Data[2] = 0x19                               // tx_delay
+	reply.Data[3] = 4                                  // tx_tail
+	reply.Data[4] = 0xc8                               // persist
+	reply.Data[5] = 4                                  // slottime
+	reply.Data[6] = 7                                  // maxframe
+	reply.Data[7] = 0                                  // active_connections
+	binary.LittleEndian.PutUint32(reply.Data[8:12], 1) // how_many_bytes
+
+	s.sendToClient(client, reply)
+}
+
+// handleHeardStationsRequest would answer 'H', which asks about recently heard
+// stations on a port, but that information is not collected, so it does
+// nothing.
+func (*AGWServer) handleHeardStationsRequest() {
+	/* This should send back 20 'H' frames for the most recently heard stations. */
+	/* If there are less available, empty frames are sent to make a total of 20. */
+	/* Each contains the first and last heard times. */
+
+	/*
+		#if 0						// Currently, this information is not being collected.
+				struct {
+				  struct agwpe_s Header;
+			 	  char info[100];
+				} reply;
+
+
+			        memset (&reply.Header, 0, sizeof(reply.Header));
+			        reply.Header.DataKind = 'H';
+
+				// TODO:  Implement properly.
+
+			        reply.Header.Portx = cmd.Header.Portx
+
+			        strlcpy (reply.Header.call_from, "WB2OSZ-15 Mon,01Jan2000 01:02:03  Tue,31Dec2099 23:45:56", sizeof(reply.Header.call_from));
+				// or                                                  00:00:00                00:00:00
+
+			        strlcpy (agwpe_msg.data, ..., sizeof(agwpe_msg.data));
+
+			        reply.Header.data_len_NETLE = host2netle(strlen(reply.info));
+
+			        send_to_client (client, &reply);
+		#endif
+	*/
+}
+
+// handlePortOutstandingFramesRequest answers 'y', which asks how many frames
+// are sitting in the transmit queue for a port.
+func (s *AGWServer) handlePortOutstandingFramesRequest(client int, cmd *agwpe.Message) {
+	/* Number of frames sitting in transmit queue for specified channel. */
+	/*
+		struct {
+		  struct agwpe_s Header;
+		  int data_NETLE;			// Little endian order.
+		} reply;
+	*/
+	var reply = new(agwpe.Message)
+
+	reply.Header.Portx = cmd.Header.Portx /* Reply with same port number */
+	reply.Header.DataKind = 'y'
+	reply.Header.DataLen = 4
+
+	var n = 0
+	if cmd.Header.Portx < MAX_RADIO_CHANS {
+		// Count both normal and expedited in transmit queue for given channel.
+		n = transmitQueue.Count(int(cmd.Header.Portx), -1, "", "", false)
+	}
+
+	reply.Data = make([]byte, 4)
+	binary.LittleEndian.PutUint32(reply.Data, uint32(n))
+
+	s.sendToClient(client, reply)
+}
