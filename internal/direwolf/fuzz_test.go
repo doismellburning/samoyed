@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -196,5 +198,85 @@ func FuzzNetTNCRecByte(f *testing.F) {
 		for _, b := range stream {
 			nettncRecByte(&kc, b, int(debug%3), nettncTestChannel)
 		}
+	})
+}
+
+// igateFuzzMaxStream bounds what FuzzIGateServerLines feeds the IGate.  A few
+// lines' worth, including one over the limit, is all the reader has to get
+// right.
+const igateFuzzMaxStream = 4 * igateMaxLineLen
+
+// FuzzIGateServerLines covers what the APRS-IS server sends the IGate: lines
+// gathered from its byte stream, then each one shown, remembered, or turned
+// into a frame for the radio and for a client application.  The server is
+// across the internet, and anything sent to it by anyone comes back out.
+func FuzzIGateServerLines(f *testing.F) {
+	fuzzQuietly(f)
+
+	for _, seed := range []string{
+		"# aprsc 2.1.19-g730c5c0\r\n# logresp Q1TEST verified, server T2TEST\r\n",
+		"Q2TEST-1>APWW10,TCPIP*,qAC,T2TEST:>hello\r\n",
+		"Q2TEST>APDW17,WIDE1-1,qAR,Q3TEST:!4237.14N/07120.83W#\r\n",
+		"WHO-IS>APJIW4,TCPIP*,qAC,AE5PL-JF::Q2TEST   :Hello there{583\r\n",
+		"Q2TEST>APWW10,TCPIP*,qAC,T2TEST:}Q3TEST>APDW17,TCPIP,Q2TEST*:>third party\r\n",
+		"Q2TEST>APWW10,TCPIP*,qAC,T2TEST:>nul\x00inside\r\n",
+		"Q2TEST>APWW10,NOGATE,qAC,T2TEST:>not for RF\r\n",
+		"\r\n\n\r\n",
+		strings.Repeat("A", igateMaxLineLen) + "\r\nQ2TEST>APWW10,TCPIP*,qAC,T2TEST:>after\r\n",
+	} {
+		f.Add([]byte(seed))
+	}
+
+	f.Fuzz(func(t *testing.T, stream []byte) {
+		if len(stream) > igateFuzzMaxStream {
+			t.Skip()
+		}
+
+		setupIGateFromServer(t)
+
+		var lines = new(igateLineReader)
+
+		for _, b := range stream {
+			if line, complete := lines.add(b); complete {
+				igate.processServerLine(line)
+			}
+		}
+	})
+}
+
+// setupIGateFromServer gives FuzzIGateServerLines an IGate that will pass
+// what it hears from the server both to the radio and to ICHANNEL, with
+// nothing connected - processServerLine doesn't need the socket.
+func setupIGateFromServer(t *testing.T) {
+	t.Helper()
+
+	var origIGate, origMheard = igate, mheardDB
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[0] = MEDIUM_RADIO
+	audioConfig.mycall[0] = "Q1TEST"
+	audioConfig.igate_vchannel = 1
+
+	var igateConfig = new(igate_config_s)
+	igateConfig.tx_chan = 0
+	igateConfig.tx_limit_1 = IGATE_TX_LIMIT_1_DEFAULT
+	igateConfig.tx_limit_5 = IGATE_TX_LIMIT_5_DEFAULT
+	igateConfig.igmsp = 1
+
+	igate = NewIGate(audioConfig, igateConfig, new(digi_config_s), NewPacketFilter(igateConfig, nil, 0), 0)
+	mheardDB = mheard.New(0)
+
+	transmitQueue.Init(audioConfig)
+	dataLinkQueue.Init()
+
+	t.Cleanup(func() {
+		igate, mheardDB = origIGate, origMheard
+
+		for p := range TQ_NUM_PRIO {
+			for transmitQueue.Remove(0, p) != nil { //revive:disable-line:empty-block
+			}
+		}
+
+		dataLinkQueue.Init()
 	})
 }
