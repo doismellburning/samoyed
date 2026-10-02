@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"bytes"
+	"encoding/binary"
 	"io"
 	"net"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -724,6 +726,170 @@ func FuzzAX25Link(f *testing.F) {
 				dataLinkQueue.OutstandingFramesRequest(addrs, 2, 0, 0)
 			}
 
+			fuzzLinkDrain()
+		}
+	})
+}
+
+// agwFuzzMaxStream bounds the AGW target's stream of messages: room for a
+// login, which is over 500 bytes on its own, and a good many commands after it.
+const agwFuzzMaxStream = 8192
+
+// agwFuzzMessage is an AGW message as a client sends it.
+func agwFuzzMessage(tb testing.TB, kind byte, port byte, from string, to string, data []byte) []byte {
+	tb.Helper()
+
+	var msg = new(agwpe.Message)
+	msg.Header.DataKind = kind
+	msg.Header.Portx = port
+	msg.Header.PID = 0xf0
+	copy(msg.Header.CallFrom[:], from)
+	copy(msg.Header.CallTo[:], to)
+	msg.Header.DataLen = uint32(len(data))
+	msg.Data = data
+
+	var buf bytes.Buffer
+
+	var _, err = msg.Write(&buf, binary.LittleEndian)
+	require.NoError(tb, err)
+
+	return buf.Bytes()
+}
+
+// agwFuzzDigis is the digipeater part of a 'V' or 'v' message's data.
+func agwFuzzDigis(digis ...string) []byte {
+	var data = []byte{byte(len(digis))}
+
+	for _, digi := range digis {
+		var field [10]byte
+		copy(field[:], digi)
+		data = append(data, field[:]...)
+	}
+
+	return data
+}
+
+// FuzzAGWHandleClientCommand covers what an AGW client application sends the
+// TNC over the network: the login that is all a stranger can reach, when the
+// port wants one, and every command after it, including the connected-mode
+// requests it hands the data link.  The stream is cut into messages as
+// cmdListenThread cuts the socket, with the last one's data stopping where the
+// stream does.
+func FuzzAGWHandleClientCommand(f *testing.F) {
+	fuzzQuietly(f)
+	fuzzLinkKeep(f)
+
+	var s = fuzzAGWServer(f)
+	var conn = s.clients[0].conn
+
+	var cfg = fuzzLinkConfig()
+	s.audioConfigP = cfg
+
+	var login = new(agwpe_login_s)
+	login.user = "Q1TEST"
+	login.password = "secret"
+	s.logins = append(s.logins, *login)
+
+	var msg = func(kind byte, from string, to string, data []byte) []byte {
+		return agwFuzzMessage(f, kind, 0, from, to, data)
+	}
+
+	var logIn = msg('P', "", "", loginFrame("Q1TEST", "secret").Data)
+
+	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1*:!4237.14N/07120.83W#", true)
+	require.NotNil(f, pp)
+
+	for _, stream := range [][]byte{
+		// Not logged in, so all of this is ignored.
+		msg('R', "", "", nil),
+
+		// The wrong password, then a malformed login.
+		slices.Concat(
+			msg('P', "", "", loginFrame("Q1TEST", "wrong").Data),
+			msg('P', "", "", []byte("Q1TEST")),
+			msg('G', "", "", nil),
+		),
+
+		// What a monitoring application asks.
+		slices.Concat(
+			logIn,
+			msg('R', "", "", nil),
+			msg('G', "", "", nil),
+			msg('g', "", "", nil),
+			msg('k', "", "", nil),
+			msg('m', "", "", nil),
+			msg('H', "", "", nil),
+			msg('y', "", "", nil),
+		),
+
+		// What an APRS application sends.
+		slices.Concat(
+			logIn,
+			msg('M', "Q1TEST", "APDW17", []byte("!4237.14N/07120.83W#")),
+			msg('V', "Q1TEST", "APDW17", append(agwFuzzDigis("WIDE1-1", "WIDE2-1"), "!4237.14N/07120.83W#"...)),
+			msg('K', "", "", append([]byte{0}, pp.FrameData()...)),
+			msg('y', "", "", nil),
+		),
+
+		// A connected-mode session.
+		slices.Concat(
+			logIn,
+			msg('X', "Q1TEST", "", nil),
+			msg('C', "Q1TEST", "Q2TEST", nil),
+			msg('D', "Q1TEST", "Q2TEST", []byte("Hello")),
+			msg('D', "Q1TEST", "Q2TEST", []byte(strings.Repeat("Long enough to be split. ", 8))),
+			msg('Y', "Q1TEST", "Q2TEST", nil),
+			msg('d', "Q1TEST", "Q2TEST", nil),
+			msg('x', "Q1TEST", "", nil),
+		),
+
+		// Connecting by way of digipeaters, and with an unusual PID.
+		slices.Concat(
+			logIn,
+			msg('v', "Q1TEST", "Q2TEST", agwFuzzDigis("Q3TEST", "Q4TEST")),
+			msg('c', "Q1TEST", "Q3TEST", nil),
+			msg('Z', "", "", nil),
+		),
+	} {
+		f.Add(stream)
+	}
+
+	f.Fuzz(func(t *testing.T, stream []byte) {
+		if len(stream) > agwFuzzMaxStream {
+			t.Skip()
+		}
+
+		fuzzLinkReset(cfg, true)
+
+		// A newly connected client, which has not logged in.
+		var fresh agwClient
+		fresh.conn = conn
+		s.clients[0] = fresh
+
+		var r = bytes.NewReader(stream)
+
+		for {
+			var cmd = new(agwpe.Message)
+
+			if binary.Read(r, binary.LittleEndian, &cmd.Header) != nil {
+				break
+			}
+
+			// The precautions cmdListenThread takes.
+			if cmd.Header.Portx >= MAX_TOTAL_CHANS {
+				cmd.Header.Portx = 0
+			}
+
+			cmd.Header.CallFrom[len(cmd.Header.CallFrom)-1] = 0
+			cmd.Header.CallTo[len(cmd.Header.CallTo)-1] = 0
+
+			cmd.Header.DataLen = uint32(min(int(cmd.Header.DataLen), r.Len()))
+			if cmd.Header.DataLen > 0 {
+				cmd.Data = make([]byte, cmd.Header.DataLen)
+				io.ReadFull(r, cmd.Data) //nolint:errcheck // Sized to what is there.
+			}
+
+			s.handleClientCommand(0, cmd)
 			fuzzLinkDrain()
 		}
 	})
