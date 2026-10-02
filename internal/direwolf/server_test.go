@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"math"
 	"net"
 	"strings"
 	"sync"
@@ -749,4 +750,59 @@ func TestAGWServer_ConcurrentWritesToAClientKeepTheirFraming(t *testing.T) {
 	}
 
 	assert.ElementsMatch(t, []byte{'T', 'R'}, kinds, "the messages read back are not the ones that were sent")
+}
+
+// --- Reading a command's data ---
+
+// unreadableConn fails the test if anything tries to read from it.
+type unreadableConn struct {
+	net.Conn
+
+	t *testing.T
+}
+
+func (c *unreadableConn) Read(_ []byte) (int, error) {
+	c.t.Error("read from a client whose header should have been refused")
+
+	return 0, io.EOF
+}
+
+// The data length is the client's to choose, up to four gigabytes, so one that
+// is out of range is refused before anything is allocated or read for it.
+func TestReadCommandData_RefusesAnOversizedDataLength(t *testing.T) {
+	for _, dataLen := range []uint32{agwMaxDataLen + 1, math.MaxUint32} {
+		var cmd = new(agwpe.Message)
+		cmd.Header.DataKind = 'K'
+		cmd.Header.DataLen = dataLen
+
+		var conn = new(unreadableConn)
+		conn.t = t
+
+		var n, err = readCommandData(conn, cmd)
+
+		require.Error(t, err, "data length %d", dataLen)
+		assert.Zero(t, n)
+		assert.Nil(t, cmd.Data)
+	}
+}
+
+// The largest data length allowed is still read in full.
+func TestReadCommandData_AcceptsTheLargestDataLength(t *testing.T) {
+	var server, client = loopbackConns(t)
+
+	// Small enough to sit in the socket buffer whole, so it can be written
+	// before anything reads it.
+	var payload = bytes.Repeat([]byte{0x55}, agwMaxDataLen)
+	var _, writeErr = client.Write(payload)
+	require.NoError(t, writeErr)
+
+	var cmd = new(agwpe.Message)
+	cmd.Header.DataKind = 'K'
+	cmd.Header.DataLen = agwMaxDataLen
+
+	var n, err = readCommandData(server, cmd)
+
+	require.NoError(t, err)
+	assert.Equal(t, agwMaxDataLen, n)
+	assert.Equal(t, payload, cmd.Data)
 }
