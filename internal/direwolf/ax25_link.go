@@ -1714,6 +1714,30 @@ func dl_client_cleanup(E *dlq_item_t) {
 func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
 	// Now it gets more interesting. We need to combine segments before passing it along.
 
+	// A segment comes off the air, so its header can't be taken on trust: it
+	// needs the byte saying how many follow, and a first segment the PID of
+	// what they make up, before any of it can be read.
+	if pid == ax25.PIDSegmentationFragment {
+		var need = 1
+		if len(dataBytes) > 0 && dataBytes[0]&0x80 > 0 {
+			need = 2
+		}
+
+		if len(dataBytes) < need {
+			logrus.WithFields(logrus.Fields{
+				"stream": S.stream_id,
+				"length": len(dataBytes),
+			}).Error("AX.25 Reassembler Protocol Error Z: Segment too short for its header")
+
+			if S.ra_buff != nil {
+				dataLinkQueue.DeleteCData(S.ra_buff)
+				S.ra_buff = nil
+			}
+
+			return
+		}
+	}
+
 	// See example in dl_data_request.
 	if S.ra_buff == nil {
 		// Ready state.

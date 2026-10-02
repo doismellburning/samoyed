@@ -479,3 +479,40 @@ func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
 		})
 	}
 }
+
+// A segment's header is the sender's to get wrong: a fragment with nothing in
+// it, or a first segment with no room for the PID it carries, is a protocol
+// error to report and throw away rather than read past the end of.
+func TestDLDataIndicationShortSegments(t *testing.T) {
+	var firstSegment = []byte{0x82, 0xF0, 'H', 'i'}
+
+	for _, tc := range []struct {
+		name         string
+		reassembling bool
+		segment      []byte
+	}{
+		{"empty fragment, ready", false, nil},
+		{"first segment with no PID", false, []byte{0x82}},
+		{"empty fragment, reassembling", true, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupTestEnv(t)
+
+			var S = establishConnection(t, "Q1TEST", "Q2TEST", 0)
+
+			if tc.reassembling {
+				dl_data_indication(S, ax25.PIDSegmentationFragment, firstSegment)
+				require.NotNil(t, S.ra_buff)
+			}
+
+			var hook = test.NewGlobal()
+			t.Cleanup(hook.Reset)
+
+			dl_data_indication(S, ax25.PIDSegmentationFragment, tc.segment)
+
+			assert.Nil(t, S.ra_buff, "a bad segment abandons any reassembly")
+			require.NotNil(t, hook.LastEntry())
+			assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
+		})
+	}
+}
