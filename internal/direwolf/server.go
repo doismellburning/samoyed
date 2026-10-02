@@ -1498,129 +1498,10 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.Message) {
 		s.toggleSendMonitor(client)
 
 	case 'V': /* Transmit UI data frame (with digipeater path) */
-		{
-			// Data format is:
-			//	1 byte for number of digipeaters.
-			//	10 bytes for each digipeater.
-			//	data part of message.
-			var pid = cmd.Header.PID
-			var stemp strings.Builder
-			stemp.WriteString(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]))
-			stemp.WriteString(">")
-			stemp.WriteString(dwutil.ByteArrayToString(cmd.Header.CallTo[:]))
-
-			if len(cmd.Data) < 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'V' message too short to contain digipeater count.\n")
-
-				break
-			}
-
-			var ndigi = int(cmd.Data[0])
-
-			if len(cmd.Data) < 1+10*ndigi {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'V' message too short for %d digipeaters.\n", ndigi)
-
-				break
-			}
-
-			for k := range ndigi {
-				var offset = 1 + 10*k
-				stemp.WriteString("," + string(cmd.Data[offset:offset+10]))
-			}
-			// At this point, p now points to info part after digipeaters.
-
-			// Issue 527: NET/ROM routing broadcasts are binary info so we can't treat as string.
-			// Originally, I just appended the information part.
-			// That was fine until NET/ROM, with binary data, came along.
-			// Now we set the information field after creating the packet object.
-
-			stemp.WriteString(": ")
-
-			//text_color_set(DW_COLOR_DEBUG);
-			//dw_printf ("Transmit '%s'\n", stemp);
-
-			var pp = ax25.FromText(stemp.String(), true)
-
-			if pp == nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Failed to create frame from AGW 'V' message.\n")
-
-				break
-			}
-
-			var data = cmd.Data[1+10*ndigi:]
-			pp.SetInfo(data)
-
-			// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-			pp.SetPID(pid)
-
-			/* This goes into the low priority queue because it is an original. */
-
-			/* Note that the protocol has no way to set the "has been used" */
-			/* bits in the digipeater fields. */
-
-			/* This explains why the digipeating option is grayed out in */
-			/* xastir when using the AGW interface.  */
-			/* The current version uses only the 'V' message, not 'K' for transmitting. */
-
-			transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
-		}
+		s.handleTransmitUIViaRequest(cmd)
 
 	case 'K': /* Transmit raw AX.25 frame */
-		{
-			// Message contains:
-			//	port number for transmission.
-			//	data length
-			//	data which is raw ax.25 frame.
-			//
-
-			// Bug fix in version 1.1:
-			//
-			// The first byte of data is described as:
-			//
-			// 		the "TNC" to use
-			//		00=Port 1
-			//		16=Port 2
-			//
-			// The seems to be redundant; we already a port number in the header.
-			// Anyhow, the original code here added one to cmd.data to get the
-			// first byte of the frame.  Unfortunately, it did not subtract one from
-			// cmd.Header.data_len so we ended up sending an extra byte.
-
-			// TODO: Right now I just use the port (channel) number in the header.
-			// What if the second one is inconsistent?
-			// - Continue to ignore port number at beginning of data?
-			// - Use second one instead?
-			// - Error message if a mismatch?
-			if cmd.Header.DataLen < 1 || int(cmd.Header.DataLen) > len(cmd.Data) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'K' message has invalid data length %d.\n", cmd.Header.DataLen)
-
-				break
-			}
-
-			var alevel ax25.ALevel
-			var pp = ax25.FromFrame(cmd.Data[1:cmd.Header.DataLen], alevel)
-
-			if pp == nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Failed to create frame from AGW 'K' message.\n")
-			} else {
-				/* How can we determine if it is an original or repeated message? */
-				/* If there is at least one digipeater in the frame, AND */
-				/* that digipeater has been used, it should go out quickly thru */
-				/* the high priority queue. */
-				/* Otherwise, it is an original for the low priority queue. */
-				if pp.NumRepeaters() >= 1 &&
-					pp.H(ax25.Repeater1) > 0 {
-					transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
-				} else {
-					transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
-				}
-			}
-		}
+		s.handleTransmitRawRequest(cmd)
 
 	case 'X': /* Register CallSign  */
 		{
@@ -1784,62 +1665,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *agwpe.Message) {
 		}
 
 	case 'M': /* Send UNPROTO Information (no digipeater path) */
-		/*
-					Added in version 1.3.
-					This is the same as 'V' except there is no provision for digipeaters.
-					TODO: combine 'V' and 'M' into one case.
-					AGWterminal sends this for beacon or ask QRA.
-
-					<<< Send UNPROTO Information from AGWPE client application 0, total length = 253
-					        portx = 0, datakind = 'M', pid = 0x00
-					        call_from = "WB2OSZ-15", call_to = "BEACON"
-					        data_len = 217, user_reserved = 556, data =
-					  000:  54 68 69 73 20 76 65 72 73 69 6f 6e 20 75 73 65  This version use
-					   ...
-
-					<<< Send UNPROTO Information from AGWPE client application 0, total length = 37
-					        portx = 0, datakind = 'M', pid = 0x00
-					        call_from = "WB2OSZ-15", call_to = "QRA"
-					        data_len = 1, user_reserved = 31759424, data =
-					  000:  0d                                               .
-			                                          .
-
-					There is also a report of it coming from UISS.
-
-					<<< Send UNPROTO Information from AGWPE client application 0, total length = 50
-						portx = 0, port_hi_reserved = 0
-						datakind = 77 = 'M', kind_hi = 0
-						call_from = "JH4XSY", call_to = "APRS"
-						data_len = 14, user_reserved = 0, data =
-					  000:  21 22 3c 43 2e 74 71 6c 48 72 71 21 21 5f        !"<C.tqlHrq!!_
-		*/
-		{
-			var pid = cmd.Header.PID
-			var stemp = dwutil.ByteArrayToString(cmd.Header.CallFrom[:]) + ">" + dwutil.ByteArrayToString(cmd.Header.CallTo[:]) + ": "
-
-			// Issue 527: NET/ROM routing broadcasts are binary info so we can't treat as string.
-			// Originally, I just appended the information part as a text string.
-			// That was fine until NET/ROM, with binary data, came along.
-			// Now we set the information field after creating the packet object.
-
-			//text_color_set(DW_COLOR_DEBUG);
-			//dw_printf ("Transmit '%s'\n", stemp);
-
-			var pp = ax25.FromText(stemp, true)
-
-			if pp == nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Failed to create frame from AGW 'M' message.\n")
-
-				break
-			}
-
-			pp.SetInfo(cmd.Data)
-			// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-			pp.SetPID(pid)
-
-			transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
-		}
+		s.handleTransmitUnprotoRequest(cmd)
 
 	case 'y': /* Ask Outstanding frames waiting on a Port  */
 		s.handlePortOutstandingFramesRequest(client, cmd)
@@ -2071,6 +1897,192 @@ func (*AGWServer) handleHeardStationsRequest() {
 			        send_to_client (client, &reply);
 		#endif
 	*/
+}
+
+// handleTransmitUIViaRequest handles 'V', which asks for a UI frame to be
+// transmitted along a digipeater path.
+func (*AGWServer) handleTransmitUIViaRequest(cmd *agwpe.Message) {
+	// Data format is:
+	//	1 byte for number of digipeaters.
+	//	10 bytes for each digipeater.
+	//	data part of message.
+	var pid = cmd.Header.PID
+	var stemp strings.Builder
+	stemp.WriteString(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]))
+	stemp.WriteString(">")
+	stemp.WriteString(dwutil.ByteArrayToString(cmd.Header.CallTo[:]))
+
+	if len(cmd.Data) < 1 {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW 'V' message too short to contain digipeater count.\n")
+
+		return
+	}
+
+	var ndigi = int(cmd.Data[0])
+
+	if len(cmd.Data) < 1+10*ndigi {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW 'V' message too short for %d digipeaters.\n", ndigi)
+
+		return
+	}
+
+	for k := range ndigi {
+		var offset = 1 + 10*k
+		stemp.WriteString("," + string(cmd.Data[offset:offset+10]))
+	}
+	// At this point, p now points to info part after digipeaters.
+
+	// Issue 527: NET/ROM routing broadcasts are binary info so we can't treat as string.
+	// Originally, I just appended the information part.
+	// That was fine until NET/ROM, with binary data, came along.
+	// Now we set the information field after creating the packet object.
+
+	stemp.WriteString(": ")
+
+	//text_color_set(DW_COLOR_DEBUG);
+	//dw_printf ("Transmit '%s'\n", stemp);
+
+	var pp = ax25.FromText(stemp.String(), true)
+
+	if pp == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Failed to create frame from AGW 'V' message.\n")
+
+		return
+	}
+
+	var data = cmd.Data[1+10*ndigi:]
+	pp.SetInfo(data)
+
+	// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
+	pp.SetPID(pid)
+
+	/* This goes into the low priority queue because it is an original. */
+
+	/* Note that the protocol has no way to set the "has been used" */
+	/* bits in the digipeater fields. */
+
+	/* This explains why the digipeating option is grayed out in */
+	/* xastir when using the AGW interface.  */
+	/* The current version uses only the 'V' message, not 'K' for transmitting. */
+
+	transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+}
+
+// handleTransmitRawRequest handles 'K', which asks for a raw AX.25 frame to be
+// transmitted.
+func (*AGWServer) handleTransmitRawRequest(cmd *agwpe.Message) {
+	// Message contains:
+	//	port number for transmission.
+	//	data length
+	//	data which is raw ax.25 frame.
+	//
+
+	// Bug fix in version 1.1:
+	//
+	// The first byte of data is described as:
+	//
+	// 		the "TNC" to use
+	//		00=Port 1
+	//		16=Port 2
+	//
+	// The seems to be redundant; we already a port number in the header.
+	// Anyhow, the original code here added one to cmd.data to get the
+	// first byte of the frame.  Unfortunately, it did not subtract one from
+	// cmd.Header.data_len so we ended up sending an extra byte.
+
+	// TODO: Right now I just use the port (channel) number in the header.
+	// What if the second one is inconsistent?
+	// - Continue to ignore port number at beginning of data?
+	// - Use second one instead?
+	// - Error message if a mismatch?
+	if cmd.Header.DataLen < 1 || int(cmd.Header.DataLen) > len(cmd.Data) {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW 'K' message has invalid data length %d.\n", cmd.Header.DataLen)
+
+		return
+	}
+
+	var alevel ax25.ALevel
+	var pp = ax25.FromFrame(cmd.Data[1:cmd.Header.DataLen], alevel)
+
+	if pp == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Failed to create frame from AGW 'K' message.\n")
+	} else {
+		/* How can we determine if it is an original or repeated message? */
+		/* If there is at least one digipeater in the frame, AND */
+		/* that digipeater has been used, it should go out quickly thru */
+		/* the high priority queue. */
+		/* Otherwise, it is an original for the low priority queue. */
+		if pp.NumRepeaters() >= 1 &&
+			pp.H(ax25.Repeater1) > 0 {
+			transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
+		} else {
+			transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+		}
+	}
+}
+
+// handleTransmitUnprotoRequest handles 'M', which asks for UNPROTO information
+// to be transmitted, with no digipeater path.
+func (*AGWServer) handleTransmitUnprotoRequest(cmd *agwpe.Message) {
+	/*
+				Added in version 1.3.
+				This is the same as 'V' except there is no provision for digipeaters.
+				TODO: combine 'V' and 'M' into one case.
+				AGWterminal sends this for beacon or ask QRA.
+
+				<<< Send UNPROTO Information from AGWPE client application 0, total length = 253
+				        portx = 0, datakind = 'M', pid = 0x00
+				        call_from = "WB2OSZ-15", call_to = "BEACON"
+				        data_len = 217, user_reserved = 556, data =
+				  000:  54 68 69 73 20 76 65 72 73 69 6f 6e 20 75 73 65  This version use
+				   ...
+
+				<<< Send UNPROTO Information from AGWPE client application 0, total length = 37
+				        portx = 0, datakind = 'M', pid = 0x00
+				        call_from = "WB2OSZ-15", call_to = "QRA"
+				        data_len = 1, user_reserved = 31759424, data =
+				  000:  0d                                               .
+		                                          .
+
+				There is also a report of it coming from UISS.
+
+				<<< Send UNPROTO Information from AGWPE client application 0, total length = 50
+					portx = 0, port_hi_reserved = 0
+					datakind = 77 = 'M', kind_hi = 0
+					call_from = "JH4XSY", call_to = "APRS"
+					data_len = 14, user_reserved = 0, data =
+				  000:  21 22 3c 43 2e 74 71 6c 48 72 71 21 21 5f        !"<C.tqlHrq!!_
+	*/
+	var pid = cmd.Header.PID
+	var stemp = dwutil.ByteArrayToString(cmd.Header.CallFrom[:]) + ">" + dwutil.ByteArrayToString(cmd.Header.CallTo[:]) + ": "
+
+	// Issue 527: NET/ROM routing broadcasts are binary info so we can't treat as string.
+	// Originally, I just appended the information part as a text string.
+	// That was fine until NET/ROM, with binary data, came along.
+	// Now we set the information field after creating the packet object.
+
+	//text_color_set(DW_COLOR_DEBUG);
+	//dw_printf ("Transmit '%s'\n", stemp);
+
+	var pp = ax25.FromText(stemp, true)
+
+	if pp == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Failed to create frame from AGW 'M' message.\n")
+
+		return
+	}
+
+	pp.SetInfo(cmd.Data)
+	// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
+	pp.SetPID(pid)
+
+	transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
 }
 
 // handlePortOutstandingFramesRequest answers 'y', which asks how many frames
