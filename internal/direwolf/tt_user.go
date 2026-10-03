@@ -27,7 +27,6 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
-	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 )
@@ -122,6 +121,7 @@ type tt_user_s struct {
 type ttUsers struct {
 	audioConfig *RadioConfig
 	ttConfig    *tt_config_s
+	apps        *clientApps // Where object reports go to client applications, or nil.
 
 	mu   sync.Mutex
 	user [MAX_TT_USERS]tt_user_s
@@ -648,14 +648,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	 */
 
 	if first_time && u.ttConfig.obj_send_to_app > 0 {
-		// TODO1.3:  Put a wrapper around this so we only call one function to send by all methods.
-		// We see the same sequence in direwolf.c.
-		var fbuf = pp.Pack()
-
-		agwServer.SendRecPacket(u.ttConfig.obj_recv_chan, pp, fbuf)
-		kissNetSvc.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf)
-		kissSerial.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf)
-		kissPT.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf)
+		u.apps.SendRecPacket(u.ttConfig.obj_recv_chan, pp)
 	}
 
 	if first_time && u.ttConfig.obj_send_to_ig > 0 {

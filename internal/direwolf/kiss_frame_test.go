@@ -91,20 +91,13 @@ func setupKissProcessMsg(t *testing.T) *KissHandler {
 
 // With KISSCOPY, a data frame a client sends is shown to the TCP clients the
 // handler was given, whichever transport it came by - here, one with no TCP
-// port of its own, such as the serial port.  It goes to those, not to whatever
-// the package-level service happens to be.
+// port of its own, such as the serial port.
 func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
 	var peers, clients = newAttachedKissNet(t, -1, true, 1)
 
 	h.peers = peers
-
-	var origKissNet = kissNetSvc
-
-	t.Cleanup(func() { kissNetSvc = origKissNet })
-
-	kissNetSvc = nil
 
 	var pp = newTestPacket(t)
 	var _, from = recordingKissClient()

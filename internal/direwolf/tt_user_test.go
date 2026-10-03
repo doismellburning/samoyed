@@ -88,7 +88,7 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	my_tt_config.num_xmits = 1
 	my_tt_config.obj_xmit_chan = -1 // Keep the reports off the transmit queue.
 
-	var gw = NewTTGateway(&my_audio_config, &my_tt_config, 0)
+	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, 0)
 
 	var done = make(chan struct{})
 

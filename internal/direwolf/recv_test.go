@@ -189,7 +189,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 
 	t.Cleanup(func() { ttGateway = origGateway })
 
-	ttGateway = NewTTGateway(new(RadioConfig), new(tt_config_s), 0)
+	ttGateway = NewTTGateway(new(RadioConfig), new(tt_config_s), nil, 0)
 
 	var failed = recv_init(t.Context(), audioConfig, src)
 
@@ -214,7 +214,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 
 	t.Cleanup(func() { ttGateway = origGateway })
 
-	ttGateway = NewTTGateway(new(RadioConfig), new(tt_config_s), 0)
+	ttGateway = NewTTGateway(new(RadioConfig), new(tt_config_s), nil, 0)
 
 	var failed = recv_init(t.Context(), audioConfig, src)
 
@@ -295,14 +295,13 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 
 	ax25_link_init(miscConfig, 1)
 
-	// A received frame goes out to the attached client applications; with
-	// no KISS TCP ports configured there are none, but the service still
-	// has to be there to say so.
-	var origKissNetSvc = kissNetSvc
+	// A received frame goes out to the attached client applications, of
+	// which there are none.
+	var origApps = clientApplications
 
-	t.Cleanup(func() { kissNetSvc = origKissNetSvc })
+	t.Cleanup(func() { clientApplications = origApps })
 
-	kissNetSvc = NewKissNetService(miscConfig, 0)
+	clientApplications = nil
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil

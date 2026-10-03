@@ -263,9 +263,15 @@ func (kns *KissNetService) Start(ctx context.Context, handler *KissHandler) {
  *		that client alone, through its kissNetClient, instead.
  *		Disconnect from client, and notify user, if any error.
  *
+ *		Safe on a nil receiver, as the other transports' are.
+ *
  *--------------------------------------------------------------------*/
 
 func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, frame []byte) {
+	if kns == nil {
+		return
+	}
+
 	for kps := kns.allPorts; kps != nil; kps = kps.pnext {
 		for client := range MAX_NET_CLIENTS {
 			kns.sendTo(kps, client, channel, kiss_cmd, frame)

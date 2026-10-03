@@ -281,6 +281,8 @@ type TTGateway struct {
  *
  * Inputs:      audioConfig	- Audio configuration, for the mycall of object reports.
  *		p	- Pointer to configuration options gathered by config.c.
+ *		apps	- The client applications object reports go to, when
+ *			  configured to; nil for none.
  *		debug	- Debug printing control.
  *
  * Returns:     Pointer to new TTGateway.
@@ -290,11 +292,12 @@ type TTGateway struct {
  *
  *----------------------------------------------------------------*/
 
-func NewTTGateway(audioConfig *RadioConfig, p *tt_config_s, debug int) *TTGateway {
+func NewTTGateway(audioConfig *RadioConfig, p *tt_config_s, apps *clientApps, debug int) *TTGateway {
 	var g = &TTGateway{debug: debug} //nolint:exhaustruct_v5
 
 	g.config = p
 	g.users = newTTUsers(audioConfig, p)
+	g.users.apps = apps
 
 	return g
 }
