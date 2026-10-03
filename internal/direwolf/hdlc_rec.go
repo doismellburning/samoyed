@@ -481,7 +481,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.flag4Det |= 0x80000000
 	}
 
-	s.rawBits.AppendBit(byte(dwutil.IfThenElse(raw, 1, 0)))
+	s.rawBits.AppendBit(dwutil.IfThenElse[byte](raw, 1, 0))
 
 	if s.patDet == 0x7e {
 		s.rawBits.Chop8()
@@ -594,7 +594,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.olen = 0 /* Allow accumulation of octets. */
 		s.frameLen = 0
 
-		s.rawBits.AppendBit(byte(dwutil.IfThenElse(s.prevRaw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
+		s.rawBits.AppendBit(dwutil.IfThenElse[byte](s.prevRaw, 1, 0)) /* Last bit of flag.  Needed to get first data bit. */
 		/* Now that we are saving other initial state information, */
 		/* it would be sensible to do the same for this instead */
 		/* of lumping it in with the frame data bits. */

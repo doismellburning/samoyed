@@ -486,8 +486,8 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 		x |= PV_Classes_Procedures_Half_Duplex
 	}
 
-	info = append(info, byte(x>>8)&0xff)
-	info = append(info, byte(x)&0xff)
+	info = append(info, byte((x>>8)&0xff))
+	info = append(info, byte(x&0xff))
 
 	// "HDLC Optional Functions" contains REJ/SREJ & modulo 8/128.
 
@@ -537,9 +537,9 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 		x |= PV_HDLC_Optional_Functions_Modulo_8
 	}
 
-	info = append(info, byte(x>>16)&0xff)
-	info = append(info, byte(x>>8)&0xff)
-	info = append(info, byte(x)&0xff)
+	info = append(info, byte((x>>16)&0xff))
+	info = append(info, byte((x>>8)&0xff))
+	info = append(info, byte(x&0xff))
 
 	// The rest are skipped if undefined values.
 
@@ -552,8 +552,8 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 
 		var x = length * 8
 
-		info = append(info, byte(x>>8)&0xff)
-		info = append(info, byte(x)&0xff)
+		info = append(info, byte((x>>8)&0xff))
+		info = append(info, byte(x&0xff))
 	}
 
 	// "Window Size Rx"
@@ -561,7 +561,7 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 	if window, ok := param.window_size_rx.Get(); ok {
 		info = append(info, byte(PI_Window_Size_Rx))
 		info = append(info, 1)
-		info = append(info, byte(window))
+		info = append(info, byte(window&0xff))
 	}
 
 	// "Ack Timer" milliseconds.  We could handle up to 65535 here.
@@ -569,8 +569,8 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 	if timer, ok := param.ack_timer.Get(); ok {
 		info = append(info, byte(PI_Ack_Timer))
 		info = append(info, 2)
-		info = append(info, byte(timer>>8)&0xff)
-		info = append(info, byte(timer)&0xff)
+		info = append(info, byte((timer>>8)&0xff))
+		info = append(info, byte(timer&0xff))
 	}
 
 	// "Retries."
@@ -578,7 +578,7 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 	if retries, ok := param.retries.Get(); ok {
 		info = append(info, byte(PI_Retries))
 		info = append(info, 1)
-		info = append(info, byte(retries))
+		info = append(info, byte(retries&0xff))
 	}
 
 	return info

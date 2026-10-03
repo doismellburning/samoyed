@@ -54,7 +54,7 @@ func (s *HDLCSender) sendFX25Frame(fbuf []byte, fx_mode int) int {
 	var ctag_value = fx25_get_ctag_value(ctag_num)
 
 	for k := range 8 {
-		s.sendFX25Bytes([]byte{byte(ctag_value>>(k*8)) & 0xff})
+		s.sendFX25Bytes([]byte{byte((ctag_value >> (k * 8)) & 0xff)})
 	}
 
 	s.sendFX25Bytes(data)
@@ -92,8 +92,8 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 	// Append the FCS.
 
 	var frameFCS = fcs.Calc(fbuf)
-	fbuf = append(fbuf, byte(frameFCS)&0xff)
-	fbuf = append(fbuf, byte(frameFCS>>8)&0xff)
+	fbuf = append(fbuf, byte(frameFCS&0xff))
+	fbuf = append(fbuf, byte((frameFCS>>8)&0xff))
 
 	// Add bit-stuffing, filling to FX25_MAX_DATA bytes with flag patterns
 	var stuffedBytes, meaningfulLen = bitStuff(fbuf, FX25_MAX_DATA)

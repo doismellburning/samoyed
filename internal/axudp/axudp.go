@@ -469,7 +469,7 @@ func (r *Routes) lookupMap(dest string) (MapEntry, bool) {
 func AddCRC(frame []byte) []byte {
 	var crc = fcs.Calc(frame)
 
-	return append(append([]byte(nil), frame...), byte(crc), byte(crc>>8))
+	return append(append([]byte(nil), frame...), byte(crc&0xff), byte(crc>>8))
 }
 
 // StripCRC validates and strips the 2-byte AXUDP checksum from the
