@@ -87,10 +87,36 @@ jobs:
         compression-level: 0
 
   # Fuzzing is the same work whatever the runner, and it takes as long as it is
-  # told to, so it gets a job of its own on one runner rather than adding its
-  # time to each of build_and_test's three.
-  fuzz:
+  # told to, so it gets jobs of its own on one OS rather than adding its time to
+  # each of build_and_test's three. Go fuzzes one target at a time and each
+  # target already has a runner's cores to itself, so running them one after
+  # another on a single runner took FUZZTIME times the number of targets - give
+  # each target its own runner instead.
+  fuzz_targets:
     runs-on: "ubuntu-latest"
+    outputs:
+      targets: "${{ steps.list.outputs.targets }}"
+    steps:
+    - uses: "actions/checkout@v7"
+    # Found by grepping rather than `go test -list`, which would need `make
+    # setup` first; one that Go wouldn't fuzz fails its job rather than
+    # vanishing quietly.
+    - name: "List the fuzz targets"
+      id: "list"
+      run: |
+        targets=$(git grep -oE '^func Fuzz[A-Za-z0-9_]+' -- '*_test.go' \
+          | sed -E 's|^(.*)/[^/]*:func (Fuzz[A-Za-z0-9_]+)$|{"pkg":"./\1","target":"\2"}|' \
+          | jq -sc .)
+        echo "targets=$targets" >> "$GITHUB_OUTPUT"
+
+  fuzz_target:
+    needs: ["fuzz_targets"]
+    runs-on: "ubuntu-latest"
+    strategy:
+      fail-fast: false
+      matrix:
+        include: "${{ fromJSON(needs.fuzz_targets.outputs.targets) }}"
+    name: "fuzz (${{ matrix.target }})"
     steps:
     - uses: "actions/checkout@v7"
     - uses: "actions/setup-go@v7"
@@ -98,8 +124,20 @@ jobs:
         go-version: "1.27"
     - name: "Install dependencies"
       run: "make setup"
-    - name: "Fuzz the packet decoders"
-      run: "make fuzz"
+    - name: "Fuzz ${{ matrix.target }}"
+      run: "make fuzz FUZZ_PKGS=${{ matrix.pkg }} FUZZ_TARGET=${{ matrix.target }}"
+
+  # One check that stands for all of fuzz_target's, whatever targets there are
+  # this time, so branch protection can require it by name. `always()` makes it
+  # run - and fail - when a target failed, rather than being skipped, which
+  # branch protection would count as passing.
+  fuzz:
+    if: "always()"
+    needs: ["fuzz_target"]
+    runs-on: "ubuntu-latest"
+    steps:
+    - name: "Check every target passed"
+      run: "test '${{ needs.fuzz_target.result }}' = 'success'"
 
   # The race detector judges goroutine ordering by Go's memory model, which is
   # the same whatever the runner, and the little OS-specific code we have isn't
