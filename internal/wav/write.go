@@ -19,6 +19,8 @@ import (
 	"io"
 	"math"
 	"os"
+
+	"github.com/ccoveille/go-safecast/v2"
 )
 
 // header is the 44-byte canonical .WAV file header.
@@ -98,6 +100,11 @@ func Create(name string, format Format) (*Writer, error) {
 		return nil, err
 	}
 
+	h, err := newHeader(format)
+	if err != nil {
+		return nil, err
+	}
+
 	file, err := os.Create(name) //nolint:gosec // We expect to write to a user-supplied file from the CLI
 	if err != nil {
 		return nil, fmt.Errorf("wav: couldn't open %s for write: %w", name, err)
@@ -106,7 +113,7 @@ func Create(name string, format Format) (*Writer, error) {
 	var w = new(Writer)
 	w.file = file
 	w.buf = bufio.NewWriter(file)
-	w.header = newHeader(format)
+	w.header = h
 
 	err = w.writeHeader(file)
 	if err != nil {
@@ -118,7 +125,22 @@ func Create(name string, format Format) (*Writer, error) {
 	return w, nil
 }
 
-func newHeader(format Format) header {
+func newHeader(format Format) (header, error) {
+	nchannels, err := safecast.Convert[int16](format.NumChannels)
+	if err != nil {
+		return header{}, fmt.Errorf("wav: number of channels %d doesn't fit the header: %w", format.NumChannels, err)
+	}
+
+	nsamplespersec, err := safecast.Convert[int32](format.SamplesPerSec)
+	if err != nil {
+		return header{}, fmt.Errorf("wav: sample rate %d doesn't fit the header: %w", format.SamplesPerSec, err)
+	}
+
+	wbitspersample, err := safecast.Convert[int16](format.BitsPerSample)
+	if err != nil {
+		return header{}, fmt.Errorf("wav: bits per sample %d doesn't fit the header: %w", format.BitsPerSample, err)
+	}
+
 	var h = new(header)
 
 	copy(h.riff[:], "RIFF")
@@ -126,17 +148,17 @@ func newHeader(format Format) header {
 	copy(h.fmt[:], "fmt ")
 	copy(h.data[:], "data")
 
-	h.filesize = 0                                 // Filled in on close.
-	h.fmtsize = 16                                 // Always 16.
-	h.wformattag = 1                               // 1 for PCM.
-	h.nchannels = int16(format.NumChannels)        //nolint:gosec // G115: unchecked narrowing conversion, see #294
-	h.nsamplespersec = int32(format.SamplesPerSec) //nolint:gosec // G115: unchecked narrowing conversion, see #294
-	h.wbitspersample = int16(format.BitsPerSample) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	h.filesize = 0   // Filled in on close.
+	h.fmtsize = 16   // Always 16.
+	h.wformattag = 1 // 1 for PCM.
+	h.nchannels = nchannels
+	h.nsamplespersec = nsamplespersec
+	h.wbitspersample = wbitspersample
 	h.nblockalign = h.wbitspersample / 8 * h.nchannels
 	h.navgbytespersec = int32(h.nblockalign) * h.nsamplespersec
 	h.datasize = 0 // Filled in on close.
 
-	return *h
+	return *h, nil
 }
 
 // Write writes sample data to the file. The caller is responsible for the
@@ -209,8 +231,20 @@ func (w *Writer) finish(file *os.File, buf *bufio.Writer) error {
 		return fmt.Errorf("wav: couldn't flush audio file: %w", err)
 	}
 
-	w.header.filesize = int32(w.byteCount + HeaderSize - 8) //nolint:gosec // G115: unchecked narrowing conversion, see #294
-	w.header.datasize = int32(w.byteCount)                  //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	// The header's lengths are int32s, so past 2GiB we can't describe what we
+	// wrote - say so, rather than leave a header with wrapped lengths.
+	filesize, err := safecast.Convert[int32](w.byteCount + HeaderSize - 8)
+	if err != nil {
+		return fmt.Errorf("wav: %d bytes of audio data is too much for a .WAV header: %w", w.byteCount, err)
+	}
+
+	datasize, err := safecast.Convert[int32](w.byteCount)
+	if err != nil {
+		return fmt.Errorf("wav: %d bytes of audio data is too much for a .WAV header: %w", w.byteCount, err)
+	}
+
+	w.header.filesize = filesize
+	w.header.datasize = datasize
 
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {

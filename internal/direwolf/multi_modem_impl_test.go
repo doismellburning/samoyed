@@ -161,6 +161,21 @@ func TestMultiModemImplPickBestCandidatePrefersFEC(t *testing.T) {
 	assert.Equal(t, [MAX_SUBCHANS][MAX_SLICERS]candidate_t{}, m.candidates, "candidates cleared for next time")
 }
 
+// The spectrum shows an FEC decoder's correction count as a digit only for
+// 0..9 - anything else is "+", rather than wrapping into some other character.
+func TestMultiModemImplSpectrumNegativeCorrections(t *testing.T) {
+	var m, sink = newMultiModemImplTest(t, 2, 2)
+
+	var alevel ax25.ALevel
+
+	m.processRecPacket(0, 0, multiModemImplPacket(t, "fx25 negative"), alevel, BitFixLevel(-1), fec_type_fx25)
+
+	m.pickBestCandidate()
+
+	require.Len(t, sink.frames, 1)
+	assert.Equal(t, "+___", sink.frames[0].spectrum)
+}
+
 func TestMultiModemImplPickBestCandidatePrefersNoRetries(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 3, 1)
 

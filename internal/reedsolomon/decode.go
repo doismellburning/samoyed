@@ -164,7 +164,7 @@ func (c *Codec) decode(data []byte, eras_pos []int, no_eras int) int {
 		// Init lambda to be the erasure locator polynomial
 		lambda[1] = c.alpha_to[c.modnn(prim*(nn-1-eras_pos[0]))]
 		for i = 1; i < no_eras; i++ {
-			u = byte(c.modnn(prim * (nn - 1 - eras_pos[i]))) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+			u = c.modnnByte(prim * (nn - 1 - eras_pos[i]))
 			for j = i + 1; j > 0; j-- {
 				tmp = c.index_of[lambda[j-1]]
 				if int(tmp) != A0 {
@@ -236,7 +236,7 @@ func (c *Codec) decode(data []byte, eras_pos []int, no_eras int) int {
 			// 2 lines below: B(x) <-- x*B(x)
 			// memmove(&b[1],b,NROOTS*sizeof(b[0]));
 			copy(b[1:nroots+1], b[0:nroots])
-			b[0] = byte(A0) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+			b[0] = c.a0
 		} else {
 			// 7 lines below: T(x) <-- lambda(x) - discr_r*x*b(x)
 			t[0] = lambda[0]
@@ -254,16 +254,16 @@ func (c *Codec) decode(data []byte, eras_pos []int, no_eras int) int {
 				// 2 lines below: B(x) <-- inv(discr_r) * lambda(x)
 				for i = range nroots + 1 {
 					if lambda[i] == 0 {
-						b[i] = byte(A0) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+						b[i] = c.a0
 					} else {
-						b[i] = byte(c.modnn(int(c.index_of[lambda[i]]) - int(discrR) + nn)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+						b[i] = c.modnnByte(int(c.index_of[lambda[i]]) - int(discrR) + nn)
 					}
 				}
 			} else {
 				// 2 lines below: B(x) <-- x*B(x)
 				// memmove(&b[1],b,NROOTS*sizeof(b[0]));
 				copy(b[1:nroots+1], b[0:nroots])
-				b[0] = byte(A0) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+				b[0] = c.a0
 			}
 			// memcpy(lambda,t,(NROOTS+1)*sizeof(t[0]));
 			copy(lambda, t[:nroots+1])
@@ -290,7 +290,7 @@ func (c *Codec) decode(data []byte, eras_pos []int, no_eras int) int {
 
 		for j = degLambda; j > 0; j-- {
 			if int(reg[j]) != A0 {
-				reg[j] = byte(c.modnn(int(reg[j]) + j)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+				reg[j] = c.modnnByte(int(reg[j]) + j)
 				q ^= c.alpha_to[reg[j]]
 			}
 		}
@@ -341,7 +341,7 @@ func (c *Codec) decode(data []byte, eras_pos []int, no_eras int) int {
 		omega[i] = c.index_of[tmp]
 	}
 
-	omega[nroots] = byte(A0) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	omega[nroots] = c.a0
 
 	// Compute error values in poly-form. num1 = omega(inv(X(l))), num2 =
 	// inv(X(l))**(FCR-1) and den = lambda_pr(inv(X(l))) all in poly-form

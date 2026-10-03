@@ -43,7 +43,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math"
 	"net"
 	"os"
 	"strconv"
@@ -52,6 +51,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
@@ -796,11 +796,13 @@ func tnc_send_data(from int, to int, data string) {
 		copy(header.CallFrom[:], tnc_address[from])
 		copy(header.CallTo[:], tnc_address[to])
 
-		if len(data) > math.MaxUint32 {
-			panic("len(data) exceeds uint32 maximum!")
+		var dataLen, lenErr = safecast.Convert[uint32](len(data))
+		if lenErr != nil {
+			fmt.Printf("TNC %d can't send %d bytes in one AGW message: %s\n", from, len(data), lenErr)
+			os.Exit(1)
 		}
 
-		header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+		header.DataLen = dataLen
 
 		var writeErr = binary.Write(tnctest_server_sock[from], binary.LittleEndian, header)
 		if writeErr != nil {

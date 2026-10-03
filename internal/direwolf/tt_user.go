@@ -330,10 +330,10 @@ func digit_suffix(callsign string) string {
 	var two_key, _ = touchtone.TextToTwoKey(callsign, false)
 
 	for _, t := range two_key {
-		if unicode.IsDigit(t) {
+		if t >= '0' && t <= '9' {
 			suffix[0] = suffix[1]
 			suffix[1] = suffix[2]
-			suffix[2] = byte(t) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+			suffix[2] = byte(t)
 		}
 	}
 

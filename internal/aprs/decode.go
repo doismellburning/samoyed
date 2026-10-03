@@ -4153,9 +4153,9 @@ func processComment(A *Decoded, telemetryState *aprstelemetry.State, commentData
 		} else if match := std_dcs_re.FindSubmatchIndex(commentData); match != nil {
 			var sttemp = commentData[match[2]:match[3]]
 
-			var offset, _ = strconv.ParseUint(string(sttemp), 8, 64)
+			var offset, _ = strconv.ParseUint(string(sttemp), 8, 16) // Three octal digits.
 
-			A.DCS = maybe.Just(int(offset)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+			A.DCS = maybe.Just(int(offset))
 
 			commentData = cutBytes(commentData, match[0], match[1])
 		} else if match := std_offset_re.FindSubmatchIndex(commentData); match != nil {

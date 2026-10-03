@@ -67,6 +67,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/agwpe"
 )
 
@@ -208,7 +209,7 @@ func tnc_listen_thread() {
 				var data = make([]byte, header.DataLen)
 
 				var n, err = io.ReadFull(s_tnc_sock, data)
-				if uint32(n) != header.DataLen || err != nil { //nolint:gosec // G115: unchecked narrowing conversion, see #294
+				if n != len(data) || err != nil {
 					fmt.Printf("Error getting message data from network TNC: %s\n", err)
 					fmt.Printf("Tried to read %d bytes but got only %d.\n", header.DataLen, n)
 					fmt.Printf("Closing socket to network TNC.\n\n")
@@ -445,7 +446,12 @@ func agwlib_D_send_connected_data(channel byte, pid byte, call_from agwpe.Callsi
 	h.PID = pid // Normally 0xF0 but other special cases are possible.
 	h.CallFrom = call_from
 	h.CallTo = call_to
-	h.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	var dataLen, lenErr = safecast.Convert[uint32](len(data))
+	if lenErr != nil {
+		return fmt.Errorf("%d bytes of data is too long for an AGW message: %w", len(data), lenErr)
+	}
+
+	h.DataLen = dataLen
 
 	var headerErr = binary.Write(s_tnc_sock, binary.LittleEndian, h)
 	if headerErr != nil {

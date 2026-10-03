@@ -41,6 +41,12 @@ func Test_calculator_unterminated(t *testing.T) {
 	assert.Equal(t, 0, calculator("#"))
 }
 
+// A digit that isn't ASCII is not one the keypad sends, and is ignored -
+// rather than narrowed to a byte and taken for some other character.
+func Test_calculator_ignores_non_ascii_digits(t *testing.T) {
+	assert.Equal(t, 46, calculator("12a3\u06644#")) // ARABIC-INDIC DIGIT FOUR
+}
+
 // Subtraction and division have no key to call them yet, but are there for
 // whoever adds one.
 func Test_do_lastop(t *testing.T) {
