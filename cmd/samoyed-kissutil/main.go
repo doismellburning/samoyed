@@ -381,7 +381,7 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 		data = data[:ax25.MaxPacketLen-1]
 	}
 
-	var temp = []byte{byte((channel << 4) | cmd)} //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	var temp = []byte{byte(channel&0xf)<<4 | byte(cmd&0xf)}
 	temp = append(temp, data...)
 
 	var kissed = kiss.Encapsulate(temp)
