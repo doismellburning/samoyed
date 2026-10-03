@@ -19,6 +19,8 @@ import (
 	"io"
 	"math"
 	"os"
+
+	"github.com/ccoveille/go-safecast/v2"
 )
 
 // header is the 44-byte canonical .WAV file header.
@@ -129,9 +131,10 @@ func newHeader(format Format) header {
 	h.filesize = 0   // Filled in on close.
 	h.fmtsize = 16   // Always 16.
 	h.wformattag = 1 // 1 for PCM.
-	h.nchannels = int16(format.NumChannels)
-	h.nsamplespersec = int32(format.SamplesPerSec)
-	h.wbitspersample = int16(format.BitsPerSample)
+	// Validate has already checked these fit.
+	h.nchannels = safecast.MustConvert[int16](format.NumChannels)
+	h.nsamplespersec = safecast.MustConvert[int32](format.SamplesPerSec)
+	h.wbitspersample = safecast.MustConvert[int16](format.BitsPerSample)
 	h.nblockalign = h.wbitspersample / 8 * h.nchannels
 	h.navgbytespersec = int32(h.nblockalign) * h.nsamplespersec
 	h.datasize = 0 // Filled in on close.
