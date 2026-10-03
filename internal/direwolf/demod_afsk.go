@@ -721,8 +721,9 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D *demodulator_state_s, amplitude float64) {
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
-	// Perform the add as unsigned to avoid signed overflow error.
-	D.slicer[slice].data_clock_pll = (int32)((uint32)(D.slicer[slice].data_clock_pll) + (uint32)(D.pll_step_per_sample))
+	// Wraps on overflow, as the PLL relies on.  (C does the add as unsigned because
+	// signed overflow is undefined there; in Go it is defined to wrap.)
+	D.slicer[slice].data_clock_pll += D.pll_step_per_sample
 
 	//text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("prev = %lx, new data clock pll = %lx\n" D.prev_d_c_pll, D.data_clock_pll);

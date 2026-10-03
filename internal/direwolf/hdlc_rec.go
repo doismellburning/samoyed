@@ -774,7 +774,7 @@ func (r *HDLCReceiver) DataDetectAny(channel int) int {
 } /* end DataDetectAny */
 
 func (r *HDLCReceiver) rand() int32 {
-	r.randSeed = int32((uint32(r.randSeed)*1103515245)+12345) & hdlcRecRandMax
+	r.randSeed = (r.randSeed*1103515245 + 12345) & hdlcRecRandMax // Wraps on overflow, as intended.
 
 	return r.randSeed
 }
