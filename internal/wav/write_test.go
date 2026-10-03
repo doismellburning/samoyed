@@ -127,6 +127,19 @@ func TestEmptyFile(t *testing.T) {
 	assert.Equal(t, uint16(1), binary.LittleEndian.Uint16(contents[32:34])) // Block align
 }
 
+func TestCloseRejectsOversizeData(t *testing.T) {
+	var path = filepath.Join(t.TempDir(), "huge.wav")
+
+	var w, err = Create(path, Format{NumChannels: 1, SamplesPerSec: 8000, BitsPerSample: 8})
+	require.NoError(t, err)
+
+	// Rather than write 2GiB, pretend we have: the header's lengths are
+	// int32s, and the RIFF one also counts the rest of the header.
+	w.byteCount = math.MaxInt32 - (HeaderSize - 8) + 1
+
+	require.Error(t, w.Close())
+}
+
 func TestUseAfterClose(t *testing.T) {
 	var path = filepath.Join(t.TempDir(), "closed.wav")
 

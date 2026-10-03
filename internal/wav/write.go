@@ -212,8 +212,20 @@ func (w *Writer) finish(file *os.File, buf *bufio.Writer) error {
 		return fmt.Errorf("wav: couldn't flush audio file: %w", err)
 	}
 
-	w.header.filesize = int32(w.byteCount + HeaderSize - 8)
-	w.header.datasize = int32(w.byteCount)
+	// The header's lengths are int32s, so past 2GiB we can't describe what we
+	// wrote - say so, rather than leave a header with wrapped lengths.
+	filesize, err := safecast.Convert[int32](w.byteCount + HeaderSize - 8)
+	if err != nil {
+		return fmt.Errorf("wav: %d bytes of audio data is too much for a .WAV header: %w", w.byteCount, err)
+	}
+
+	datasize, err := safecast.Convert[int32](w.byteCount)
+	if err != nil {
+		return fmt.Errorf("wav: %d bytes of audio data is too much for a .WAV header: %w", w.byteCount, err)
+	}
+
+	w.header.filesize = filesize
+	w.header.datasize = datasize
 
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {
