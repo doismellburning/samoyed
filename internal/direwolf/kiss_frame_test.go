@@ -658,3 +658,42 @@ func Test_KissRecByte_frame_empty_once_unescaped(t *testing.T) {
 	assert.Contains(t, output, "nothing in it")
 	assert.Equal(t, 0, transmitQueue.Count(0, -1, "", "", false))
 }
+
+// What goes to a client is the type byte - channel in the top nybble, command
+// in the bottom - then the frame, with KISS framing and escapes added.
+func Test_kissClientFrame(t *testing.T) {
+	var cases = []struct {
+		name    string
+		channel int
+		cmd     int
+		frame   []byte
+		want    []byte
+	}{
+		{"data frame", 0, kiss.CmdDataFrame, []byte("abc"), []byte{kiss.FEND, 0x00, 'a', 'b', 'c', kiss.FEND}},
+		{"channel and command", 3, kiss.CmdSetHardware, []byte("TNC:"), []byte{kiss.FEND, 0x36, 'T', 'N', 'C', ':', kiss.FEND}},
+		{"escapes", 0, kiss.CmdDataFrame, []byte{kiss.FEND, kiss.FESC}, []byte{kiss.FEND, 0x00, kiss.FESC, kiss.TFEND, kiss.FESC, kiss.TFESC, kiss.FEND}},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.want, kissClientFrame(c.channel, c.cmd, c.frame, 0, "Test"))
+		})
+	}
+}
+
+// A frame longer than AX.25 allows is cut to length before it is framed, so
+// the client is sent what it was told it would get, and the user hears why.
+func Test_kissClientFrame_truncates(t *testing.T) {
+	var frame = bytes.Repeat([]byte{'x'}, ax25.MaxPacketLen+10)
+
+	var got []byte
+
+	var output = testutils.CaptureOutput(t, func() {
+		got = kissClientFrame(0, kiss.CmdDataFrame, frame, 0, "Test")
+	})
+
+	assert.Contains(t, output, "Test KISS buffer too small.  Truncated.")
+
+	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
+	assert.Len(t, got, ax25.MaxPacketLen+3)
+}

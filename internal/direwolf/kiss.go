@@ -63,7 +63,6 @@ import (
 	"sync"
 
 	"github.com/creack/pty"
-	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
@@ -236,33 +235,7 @@ func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen int
 
 		kiss_buff = fbuf
 	} else {
-		var stemp []byte
-
-		if flen > ax25.MaxPacketLen {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nPseudo Terminal KISS buffer too small.  Truncated.\n\n")
-
-			fbuf = fbuf[:ax25.MaxPacketLen]
-		}
-
-		stemp = []byte{byte((channel << 4) | kiss_cmd)}
-		stemp = append(stemp, fbuf...)
-
-		if kp.debug >= 2 {
-			/* AX.25 frame with the CRC removed. */
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("\n")
-			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			dwutil.HexDump(fbuf)
-		}
-
-		kiss_buff = kiss.Encapsulate(stemp)
-
-		/* This has KISS framing and escapes for sending to client app. */
-
-		if kp.debug > 0 {
-			kiss_debug_print(TO_CLIENT, "", kiss_buff)
-		}
+		kiss_buff = kissClientFrame(channel, kiss_cmd, fbuf, kp.debug, "Pseudo Terminal")
 	}
 
 	var n, err = master.Write(kiss_buff)

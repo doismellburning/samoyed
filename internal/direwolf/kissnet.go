@@ -316,41 +316,25 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 
 							kiss_buff = fbuf
 						} else {
-							var stemp []byte
-
 							// New in 1.7.
 							// Previously all channels were sent to everyone.
 							// We now have tcp ports which carry only a single radio channel.
 							// The application will see KISS channel 0 regardless of the radio channel.
 
+							var portChannel int
+
 							if kps.channel == -1 { //nolint:staticcheck
 								// Normal case, all channels.
-								stemp = []byte{byte((channel << 4) | kiss_cmd)}
+								portChannel = channel
 							} else if kps.channel == channel {
 								// Single radio channel for this port.  Application sees 0.
-								stemp = []byte{byte((0 << 4) | kiss_cmd)}
+								portChannel = 0
 							} else {
 								// Skip it.
 								continue
 							}
 
-							stemp = append(stemp, fbuf...)
-
-							if kns.debug >= 2 {
-								/* AX.25 frame with the CRC removed. */
-								text_color_set(DW_COLOR_DEBUG)
-								dw_printf("\n")
-								dw_printf("Packet content before adding KISS framing and any escapes:\n")
-								dwutil.HexDump(fbuf)
-							}
-
-							kiss_buff = kiss.Encapsulate(stemp)
-
-							/* This has the escapes and the surrounding FENDs. */
-
-							if kns.debug > 0 {
-								kiss_debug_print(TO_CLIENT, "", kiss_buff)
-							}
+							kiss_buff = kissClientFrame(portChannel, kiss_cmd, fbuf, kns.debug, "TCP")
 						}
 
 						var _, err = conn.Write(kiss_buff)
@@ -398,11 +382,7 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
  *
  *--------------------------------------------------------------------*/
 
-func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kissport_status_s, from_client int) {
-	// Copy before mutating
-	var msg = make([]byte, len(_msg))
-	copy(msg, _msg)
-
+func (kns *KissNetService) Copy(msg []byte, channel int, cmd int, from_kps *kissport_status_s, from_client int) {
 	if kns.miscConfigP.kiss_copy {
 		for kps := kns.allPorts; kps != nil; kps = kps.pnext {
 			for client := range MAX_NET_CLIENTS {
@@ -414,19 +394,13 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 							// Two different cases here:
 							//  - The TCP port allows all channels, or
 							//  - The TCP port allows only one channel.  In this case set KISS channel to 0.
-							if kps.channel == -1 {
-								msg[0] = byte((channel << 4) | cmd)
-							} else {
-								msg[0] = byte(0 | cmd) // set channel to zero.
+							var portChannel = channel
+							if kps.channel != -1 {
+								portChannel = 0
 							}
 
-							var kiss_buff = kiss.Encapsulate(msg)
-
-							/* This has the escapes and the surrounding FENDs. */
-
-							if kns.debug > 0 {
-								kiss_debug_print(TO_CLIENT, "", kiss_buff)
-							}
+							// msg[0] is the channel and command it came with; ours replace it.
+							var kiss_buff = kissClientFrame(portChannel, cmd, msg[1:], kns.debug, "TCP")
 
 							var _, err = conn.Write(kiss_buff)
 							if err != nil {

@@ -73,7 +73,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/serialport"
@@ -235,35 +234,7 @@ func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen
 
 		kiss_buff = fbuf
 	} else {
-		// Truncating before the frame is assembled, rather than after: the
-		// slicing below used to happen once fbuf had already been copied into
-		// stemp, so the client was told the frame had been truncated and then
-		// handed the whole of it anyway.
-		if flen > ax25.MaxPacketLen {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nSerial Port KISS buffer too small.  Truncated.\n\n")
-
-			fbuf = fbuf[:ax25.MaxPacketLen]
-		}
-
-		var leader = byte((channel << 4) | kiss_cmd)
-		var stemp = append([]byte{leader}, fbuf...)
-
-		if ks.debug >= 2 {
-			/* AX.25 frame with the CRC removed. */
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("\n")
-			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			dwutil.HexDump(fbuf)
-		}
-
-		kiss_buff = kiss.Encapsulate(stemp)
-
-		/* This has KISS framing and escapes for sending to client app. */
-
-		if ks.debug > 0 {
-			kiss_debug_print(TO_CLIENT, "", kiss_buff)
-		}
+		kiss_buff = kissClientFrame(channel, kiss_cmd, fbuf, ks.debug, "Serial Port")
 	}
 
 	var kiss_len = len(kiss_buff)

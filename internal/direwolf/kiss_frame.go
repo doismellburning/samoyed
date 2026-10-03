@@ -217,6 +217,40 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 	dwutil.HexDump(pmsg)
 }
 
+// kissClientFrame is what goes to a client application for frame, heard on
+// channel or answering one of the client's commands: the type byte, made of
+// channel and cmd, then the frame, with the KISS framing and escapes added.
+// transport names the kind of connection, for the complaint about a frame too
+// long to send whole.
+func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport string) []byte {
+	if len(frame) > ax25.MaxPacketLen {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("\n%s KISS buffer too small.  Truncated.\n\n", transport)
+
+		frame = frame[:ax25.MaxPacketLen]
+	}
+
+	var stemp = append([]byte{byte((channel << 4) | cmd)}, frame...)
+
+	if debug >= 2 {
+		/* AX.25 frame with the CRC removed. */
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("\n")
+		dw_printf("Packet content before adding KISS framing and any escapes:\n")
+		dwutil.HexDump(frame)
+	}
+
+	var buf = kiss.Encapsulate(stemp)
+
+	/* This has KISS framing and escapes for sending to client app. */
+
+	if debug > 0 {
+		kiss_debug_print(TO_CLIENT, "", buf)
+	}
+
+	return buf
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        KissRecByte
@@ -369,8 +403,8 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps 
 
 	switch cmd {
 	case kiss.CmdDataFrame: /* 0 = Data Frame */
-		// kissnet_copy clobbers first byte but we don't care
-		// because we have already determined channel and command.
+		// The copies carry the channel and command we have already
+		// determined, rather than the first byte as it came.
 		kissNetSvc.Copy(kiss_msg, channel, int(cmd), kps, client)
 
 		/* Note July 2017: There is a variant of of KISS, called SMACK, that assumes */
