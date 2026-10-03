@@ -372,7 +372,10 @@ that do not:
     Dire Wolf 1.7 sends no trailing CRC either - see below.
 
 ``samoyed-gen_packets`` and ``samoyed-atest`` take the same choice as
-``--il2p-version``, for generating and decoding test audio.
+``--il2p-version``, for generating and decoding test audio,
+and the CRC setting below as ``--il2p-crc``.
+They leave the CRC out unless given ``--il2p-crc``,
+so they can stand in for Dire Wolf's ``gen_packets`` and ``atest``.
 
 Send and receive the IL2P trailing CRC
 --------------------------------------
