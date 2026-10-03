@@ -15,6 +15,7 @@ package symbols
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"unicode"
@@ -283,6 +284,23 @@ type Data struct {
 }
 
 func New() *Data {
+	var fp, openErr = dwutil.OpenDataFile("symbols-new.txt")
+	if openErr != nil {
+		logrus.WithError(openErr).
+			Warn("The \"new\" OVERLAID character information will not be available.")
+
+		return new(Data)
+	}
+
+	defer fp.Close()
+
+	return FromReader(fp)
+} /* end New */
+
+// FromReader returns the symbol tables with the "new" overlaid symbols read
+// from r, the contents of a symbols-new.txt file, for a program that has them
+// from somewhere other than a data file.
+func FromReader(r io.Reader) *Data {
 	/*
 	 * We only care about lines with this format:
 	 *
@@ -321,17 +339,7 @@ func New() *Data {
 
 	var sd = new(Data)
 
-	var fp, openErr = dwutil.OpenDataFile("symbols-new.txt")
-	if openErr != nil {
-		logrus.WithError(openErr).
-			Warn("The \"new\" OVERLAID character information will not be available.")
-
-		return sd
-	}
-
-	defer fp.Close()
-
-	var scanner = bufio.NewScanner(fp)
+	var scanner = bufio.NewScanner(r)
 	for scanner.Scan() {
 		var line = scanner.Text()
 
@@ -356,7 +364,7 @@ func New() *Data {
 		#endif
 	*/
 	return sd
-} /* end New */
+} /* end FromReader */
 
 /*------------------------------------------------------------------
  *
