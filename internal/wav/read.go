@@ -62,7 +62,7 @@ func ReadHeader(r io.ReadSeeker) (Format, int, error) {
 
 	var format fmtChunk
 
-	var formatSize = int32(binary.Size(format))
+	var formatSize = int32(binary.Size(format)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	if chunk.Datasize != formatSize && chunk.Datasize != formatSize+2 {
 		return Format{}, 0, fmt.Errorf("wav: need fmt chunk datasize of %d or %d, found %d", formatSize, formatSize+2, chunk.Datasize)
 	}

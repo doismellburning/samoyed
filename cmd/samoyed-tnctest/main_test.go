@@ -389,7 +389,7 @@ func sendFrame(t *testing.T, conn net.Conn, kind byte, from string, data string)
 
 	var header = new(agwpe.Header)
 	header.DataKind = kind
-	header.DataLen = uint32(len(data))
+	header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	copy(header.CallFrom[:], from)
 
 	require.NoError(t, binary.Write(conn, binary.LittleEndian, header))

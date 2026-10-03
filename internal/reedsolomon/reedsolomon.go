@@ -83,7 +83,7 @@ func New(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) (*Codec, e
 	rs.index_of = make([]byte, rs.nn+1)
 
 	// Generate Galois field lookup tables
-	rs.index_of[0] = byte(rs.nn) // log(zero) = -inf (A0)
+	rs.index_of[0] = byte(rs.nn) //nolint:gosec // G115: unchecked narrowing conversion, see #294. log(zero) = -inf (A0)
 	rs.alpha_to[rs.nn] = 0       // alpha**-inf = 0
 
 	var sr = 1
@@ -106,8 +106,8 @@ func New(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) (*Codec, e
 
 	// Form RS code generator polynomial from its roots
 	rs.genpoly = make([]byte, nroots+1)
-	rs.fcr = byte(fcr)
-	rs.prim = byte(prim)
+	rs.fcr = byte(fcr)   //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	rs.prim = byte(prim) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	rs.nroots = nroots
 
 	// Find prim-th root of 1, used in decoding
@@ -116,7 +116,7 @@ func New(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) (*Codec, e
 		iprim += int(rs.nn)
 	}
 
-	rs.iprim = byte(iprim / int(prim))
+	rs.iprim = byte(iprim / int(prim)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	rs.genpoly[0] = 1
 	for i, root := 0, int(fcr)*int(prim); i < int(nroots); i, root = i+1, root+int(prim) {

@@ -800,7 +800,7 @@ func tnc_send_data(from int, to int, data string) {
 			panic("len(data) exceeds uint32 maximum!")
 		}
 
-		header.DataLen = uint32(len(data))
+		header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 		var writeErr = binary.Write(tnctest_server_sock[from], binary.LittleEndian, header)
 		if writeErr != nil {

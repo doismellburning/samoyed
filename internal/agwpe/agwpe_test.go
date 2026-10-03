@@ -40,7 +40,7 @@ func TestMessageWriteRoundTrip(t *testing.T) {
 	var msg = new(Message)
 	msg.Header.DataKind = 'T'
 	msg.Header.PID = 0xF0
-	msg.Header.DataLen = uint32(len(payload))
+	msg.Header.DataLen = uint32(len(payload)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	msg.Data = payload
 
 	var buf bytes.Buffer

@@ -333,7 +333,7 @@ func digit_suffix(callsign string) string {
 		if unicode.IsDigit(t) {
 			suffix[0] = suffix[1]
 			suffix[1] = suffix[2]
-			suffix[2] = byte(t)
+			suffix[2] = byte(t) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		}
 	}
 
@@ -804,7 +804,7 @@ func (u *ttUsers) objectReportText(i int, first_time bool) string {
 
 	// info part of Object Report packet
 	stemp += aprs.EncodeObject(object_name, false, u.user[i].last_heard, olat, olong, oambig,
-		byte(u.user[i].overlay), byte(u.user[i].symbol),
+		byte(u.user[i].overlay), byte(u.user[i].symbol), //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", /* PHGD */
 		maybe.Nothing[int](), maybe.Nothing[int](), /* Course/Speed */
 		freq,

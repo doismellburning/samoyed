@@ -126,12 +126,12 @@ func newHeader(format Format) header {
 	copy(h.fmt[:], "fmt ")
 	copy(h.data[:], "data")
 
-	h.filesize = 0   // Filled in on close.
-	h.fmtsize = 16   // Always 16.
-	h.wformattag = 1 // 1 for PCM.
-	h.nchannels = int16(format.NumChannels)
-	h.nsamplespersec = int32(format.SamplesPerSec)
-	h.wbitspersample = int16(format.BitsPerSample)
+	h.filesize = 0                                 // Filled in on close.
+	h.fmtsize = 16                                 // Always 16.
+	h.wformattag = 1                               // 1 for PCM.
+	h.nchannels = int16(format.NumChannels)        //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	h.nsamplespersec = int32(format.SamplesPerSec) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	h.wbitspersample = int16(format.BitsPerSample) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	h.nblockalign = h.wbitspersample / 8 * h.nchannels
 	h.navgbytespersec = int32(h.nblockalign) * h.nsamplespersec
 	h.datasize = 0 // Filled in on close.
@@ -209,8 +209,8 @@ func (w *Writer) finish(file *os.File, buf *bufio.Writer) error {
 		return fmt.Errorf("wav: couldn't flush audio file: %w", err)
 	}
 
-	w.header.filesize = int32(w.byteCount + HeaderSize - 8)
-	w.header.datasize = int32(w.byteCount)
+	w.header.filesize = int32(w.byteCount + HeaderSize - 8) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	w.header.datasize = int32(w.byteCount)                  //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	_, err = file.Seek(0, io.SeekStart)
 	if err != nil {

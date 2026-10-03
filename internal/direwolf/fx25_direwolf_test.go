@@ -55,7 +55,7 @@ func fxTestBlock(ctag_num int, data []byte, check []byte) []byte {
 
 	var ctag_value = fx25_get_ctag_value(ctag_num)
 	for k := range 8 {
-		block = append(block, byte(ctag_value>>(k*8))&0xff) // Should be portable to big endian too.
+		block = append(block, byte(ctag_value>>(k*8))&0xff) //nolint:gosec // G115: unchecked narrowing conversion, see #294. Should be portable to big endian too.
 	}
 
 	block = append(block, data...)

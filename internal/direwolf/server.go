@@ -331,7 +331,7 @@ func (s *AGWServer) SendRecPacket(channel int, pp *ax25.Packet, fbuf []byte) {
 		if conn != nil {
 			var agwpe_msg = new(agwpe.Message)
 
-			agwpe_msg.Header.Portx = byte(channel)
+			agwpe_msg.Header.Portx = byte(channel) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 			agwpe_msg.Header.DataKind = 'K'
 
@@ -341,12 +341,12 @@ func (s *AGWServer) SendRecPacket(channel int, pp *ax25.Packet, fbuf []byte) {
 			var callTo = pp.AddrWithSSID(ax25.Destination)
 			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
-			agwpe_msg.Header.DataLen = uint32(len(fbuf) + 1)
+			agwpe_msg.Header.DataLen = uint32(len(fbuf) + 1) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 			agwpe_msg.Data = make([]byte, len(fbuf)+1)
 
 			/* Stick in extra byte for the "TNC" to use. */
 
-			agwpe_msg.Data[0] = byte(channel) << 4 // Was 0.  Fixed in 1.8.
+			agwpe_msg.Data[0] = byte(channel) << 4 //nolint:gosec // G115: unchecked narrowing conversion, see #294. Was 0.  Fixed in 1.8.
 
 			copy(agwpe_msg.Data[1:], fbuf)
 
@@ -385,7 +385,7 @@ func (s *AGWServer) SendMonitored(channel int, pp *ax25.Packet, own_xmit int) {
 		if conn != nil {
 			var agwpe_msg = new(agwpe.Message)
 
-			agwpe_msg.Header.Portx = byte(channel) // datakind is added later.
+			agwpe_msg.Header.Portx = byte(channel) //nolint:gosec // G115: unchecked narrowing conversion, see #294. datakind is added later.
 
 			var callFrom = pp.AddrWithSSID(ax25.Source)
 			copy(agwpe_msg.Header.CallFrom[:], []byte(callFrom))
@@ -454,7 +454,7 @@ func (s *AGWServer) SendMonitored(channel int, pp *ax25.Packet, own_xmit int) {
 
 			agwpe_msg.Data = append(agwpe_msg.Data, 0) // add nul at end, included in length.
 			msg_data_len++
-			agwpe_msg.Header.DataLen = uint32(msg_data_len) // TODO KG Just len(Data)
+			agwpe_msg.Header.DataLen = uint32(msg_data_len) //nolint:gosec // G115: unchecked narrowing conversion, see #294. TODO KG Just len(Data)
 
 			if s.debug > 0 {
 				s.debugPrint(TO_CLIENT, client, agwpe_msg)
@@ -626,7 +626,7 @@ func (s *AGWServer) LinkEstablished(channel int, client int, remote_call string,
 
 	var reply = new(agwpe.Message)
 
-	reply.Header.Portx = byte(channel)
+	reply.Header.Portx = byte(channel) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	reply.Header.DataKind = 'C'
 
 	copy(reply.Header.CallFrom[:], []byte(remote_call))
@@ -643,7 +643,7 @@ func (s *AGWServer) LinkEstablished(channel int, client int, remote_call string,
 	}
 
 	reply.Data = append(reply.Data, 0)
-	reply.Header.DataLen = uint32(len(reply.Data))
+	reply.Header.DataLen = uint32(len(reply.Data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	s.sendToClient(client, reply)
 } /* end LinkEstablished */
@@ -679,7 +679,7 @@ func (s *AGWServer) LinkTerminated(channel int, client int, remote_call string, 
 
 	var reply = new(agwpe.Message)
 
-	reply.Header.Portx = byte(channel)
+	reply.Header.Portx = byte(channel) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	reply.Header.DataKind = 'd'
 	copy(reply.Header.CallFrom[:], []byte(remote_call))
 	copy(reply.Header.CallTo[:], []byte(own_call))
@@ -691,7 +691,7 @@ func (s *AGWServer) LinkTerminated(channel int, client int, remote_call string, 
 	}
 
 	reply.Data = append(reply.Data, 0)
-	reply.Header.DataLen = uint32(len(reply.Data))
+	reply.Header.DataLen = uint32(len(reply.Data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	s.sendToClient(client, reply)
 } /* end LinkTerminated */
@@ -727,9 +727,9 @@ func (s *AGWServer) RecConnData(channel int, client int, remote_call string, own
 
 	var reply = new(agwpe.Message)
 
-	reply.Header.Portx = byte(channel)
+	reply.Header.Portx = byte(channel) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	reply.Header.DataKind = 'D'
-	reply.Header.PID = byte(pid)
+	reply.Header.PID = byte(pid) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	copy(reply.Header.CallFrom[:], []byte(remote_call))
 	copy(reply.Header.CallTo[:], []byte(own_call))
@@ -742,7 +742,7 @@ func (s *AGWServer) RecConnData(channel int, client int, remote_call string, own
 
 	reply.Data = make([]byte, len(data))
 	copy(reply.Data, data)
-	reply.Header.DataLen = uint32(len(data))
+	reply.Header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	s.sendToClient(client, reply)
 } /* end RecConnData */
@@ -773,7 +773,7 @@ func (s *AGWServer) OutstandingFramesReply(channel int, client int, own_call str
 
 	var reply = new(agwpe.Message)
 
-	reply.Header.Portx = byte(channel)
+	reply.Header.Portx = byte(channel) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	reply.Header.DataKind = 'Y'
 
 	copy(reply.Header.CallFrom[:], []byte(own_call))
@@ -781,7 +781,7 @@ func (s *AGWServer) OutstandingFramesReply(channel int, client int, own_call str
 
 	reply.Header.DataLen = 4
 	reply.Data = make([]byte, 4)
-	binary.LittleEndian.PutUint32(reply.Data, uint32(count))
+	binary.LittleEndian.PutUint32(reply.Data, uint32(count)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	s.sendToClient(client, reply)
 } /* end OutstandingFramesReply */
@@ -1629,7 +1629,7 @@ func (s *AGWServer) handleRadioPortsRequest(client int) {
 	} // for each channel
 
 	reply.Data = []byte(info.String())
-	reply.Header.DataLen = uint32(len(reply.Data))
+	reply.Header.DataLen = uint32(len(reply.Data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	s.sendToClient(client, reply)
 }

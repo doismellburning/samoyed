@@ -495,7 +495,7 @@ func (m *MultiModem) pickBestCandidate() {
 		} else if m.candidates[j][k].fec_type != fec_type_none { // FX.25 or IL2P
 			// FIXME: using retries both as an enum and later int too.
 			if (int)(m.candidates[j][k].retries) <= 9 {
-				spectrum[n] = '0' + byte(m.candidates[j][k].retries)
+				spectrum[n] = '0' + byte(m.candidates[j][k].retries) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 			} else {
 				spectrum[n] = '+'
 			}

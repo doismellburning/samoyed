@@ -571,7 +571,7 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
 	// Perform the add as unsigned to avoid signed overflow error.
-	D.slicer[slice].data_clock_pll = (int32)((uint32)(D.slicer[slice].data_clock_pll) + (uint32)(D.pll_step_per_sample))
+	D.slicer[slice].data_clock_pll = (int32)((uint32)(D.slicer[slice].data_clock_pll) + (uint32)(D.pll_step_per_sample)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	if D.slicer[slice].prev_d_c_pll > 1000000000 && D.slicer[slice].data_clock_pll < -1000000000 {
 		/* Overflow.  Was large positive, wrapped around, now large negative. */

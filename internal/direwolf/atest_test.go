@@ -23,7 +23,7 @@ func buildWAVWithExtraChunks(t *testing.T) []byte {
 
 	writeChunk := func(id string, payload []byte) {
 		body.WriteString(id)
-		binary.Write(&body, binary.LittleEndian, int32(len(payload))) //nolint:errcheck
+		binary.Write(&body, binary.LittleEndian, int32(len(payload))) //nolint:errcheck,gosec // G115: unchecked narrowing conversion, see #294
 		body.Write(payload)
 
 		if len(payload)%2 != 0 {
@@ -53,7 +53,7 @@ func buildWAVWithExtraChunks(t *testing.T) []byte {
 
 	var wav bytes.Buffer
 	wav.WriteString("RIFF")
-	binary.Write(&wav, binary.LittleEndian, int32(4+body.Len())) //nolint:errcheck
+	binary.Write(&wav, binary.LittleEndian, int32(4+body.Len())) //nolint:errcheck,gosec // G115: unchecked narrowing conversion, see #294
 	wav.WriteString("WAVE")
 	wav.Write(body.Bytes())
 
@@ -164,7 +164,7 @@ const (
 // withInt32At returns a copy of wav with v written at offset.
 func withInt32At(wav []byte, offset int, v int32) []byte {
 	var out = bytes.Clone(wav)
-	binary.LittleEndian.PutUint32(out[offset:], uint32(v))
+	binary.LittleEndian.PutUint32(out[offset:], uint32(v)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	return out
 }

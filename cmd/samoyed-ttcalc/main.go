@@ -158,7 +158,7 @@ func main() {
 				hdr.DataKind = 'K'
 
 				var reply_bytes = reply_pp.Pack()
-				hdr.DataLen = 1 + uint32(len(reply_bytes))
+				hdr.DataLen = 1 + uint32(len(reply_bytes)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 				var replyWriteErr = binary.Write(server_sock, binary.LittleEndian, hdr)
 				if replyWriteErr == nil {
@@ -234,7 +234,7 @@ func calculator(str string) int {
 
 	for _, p := range str {
 		if unicode.IsDigit(p) {
-			num = num*10 + int(byte(p)-byte('0'))
+			num = num*10 + int(byte(p)-byte('0')) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		} else if p == '*' {
 			result = do_lastop(lastop, result, num)
 			num = 0

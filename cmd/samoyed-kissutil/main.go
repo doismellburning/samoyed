@@ -324,19 +324,19 @@ func process_input(stuff string) {
 		switch stuff[0] {
 		case 'd': // txDelay, 10ms units
 			var value = parse_number(stuff[1:], defaultTXDelay)
-			send_to_kiss_tnc(channel, kiss.CmdTxDelay, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdTxDelay, []byte{byte(value)}) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		case 'p': // Persistence
 			var value = parse_number(stuff[1:], defaultPersist)
-			send_to_kiss_tnc(channel, kiss.CmdPersistence, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdPersistence, []byte{byte(value)}) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		case 's': // Slot time, 10ms units
 			var value = parse_number(stuff[1:], defaultSlotTime)
-			send_to_kiss_tnc(channel, kiss.CmdSlotTime, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdSlotTime, []byte{byte(value)}) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		case 't': // txTail, 10ms units
 			var value = parse_number(stuff[1:], defaultTXTail)
-			send_to_kiss_tnc(channel, kiss.CmdTxTail, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdTxTail, []byte{byte(value)}) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		case 'f': // Full duplex
 			var value = parse_number(stuff[1:], 0)
-			send_to_kiss_tnc(channel, kiss.CmdFullDuplex, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdFullDuplex, []byte{byte(value)}) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		case 'h': // set Hardware
 			var p = strings.TrimSpace(stuff[1:])
 			send_to_kiss_tnc(channel, kiss.CmdSetHardware, []byte(p))
@@ -381,7 +381,7 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 		data = data[:ax25.MaxPacketLen-1]
 	}
 
-	var temp = []byte{byte((channel << 4) | cmd)}
+	var temp = []byte{byte((channel << 4) | cmd)} //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	temp = append(temp, data...)
 
 	var kissed = kiss.Encapsulate(temp)

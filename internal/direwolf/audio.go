@@ -686,7 +686,7 @@ func (d *AudioDevices) openSoundcardInput(a int, pa *RadioConfig, name string, f
 					// Reuse the pre-allocated scratch buffer; slice to actual length.
 					var scratch = inScratchBuf[:len(in)*2]
 					for i, sample := range in {
-						binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample))
+						binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 					}
 
 					inRingBuf.write(scratch)
@@ -1425,7 +1425,7 @@ func (d *AudioDevices) Flush(a int) int {
 		for i := range nSamples {
 			var lo = d.dev[a].outbuf[i*2]
 			var hi = d.dev[a].outbuf[i*2+1]
-			d.dev[a].outputBuf16[i] = int16(uint16(lo) | uint16(hi)<<8)
+			d.dev[a].outputBuf16[i] = int16(uint16(lo) | uint16(hi)<<8) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		}
 
 		for i := nSamples; i < len(d.dev[a].outputBuf16); i++ {

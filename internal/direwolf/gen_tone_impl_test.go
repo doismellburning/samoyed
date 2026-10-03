@@ -117,7 +117,7 @@ func decodeMono16(data []byte) []int16 {
 	var out = make([]int16, 0, len(data)/2)
 
 	for i := 0; i+1 < len(data); i += 2 {
-		out = append(out, int16(uint16(data[i])|uint16(data[i+1])<<8))
+		out = append(out, int16(uint16(data[i])|uint16(data[i+1])<<8)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	}
 
 	return out

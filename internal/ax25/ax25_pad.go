@@ -562,7 +562,7 @@ func FromTextWithStrictness(monitor string, strictness AddrStrictness) *Packet {
 
 		if !strictness.strict() && len(pa) >= 3 && pa[0] == 'q' && pa[1] == 'A' {
 			pa[0] = 'Q'
-			pa[2] = byte(unicode.ToUpper(rune(pa[2])))
+			pa[2] = byte(unicode.ToUpper(rune(pa[2]))) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		}
 
 		var heardTemp bool
@@ -631,7 +631,7 @@ func FromTextWithStrictness(monitor string, strictness AddrStrictness) *Packet {
 			isxdigit(pinfo[4]) &&
 			pinfo[5] == '>' {
 			var hexVal, _ = strconv.ParseInt(string(pinfo[3:5]), 16, 64)
-			info_part = append(info_part, byte(hexVal))
+			info_part = append(info_part, byte(hexVal)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 			pinfo = pinfo[6:]
 		} else {
 			info_part = append(info_part, pinfo[0])
@@ -1085,7 +1085,7 @@ func (this_p *Packet) SetAddr(n int, ad string) {
 				break
 			}
 
-			this_p.frame_data[n*7+i] = byte(c << 1)
+			this_p.frame_data[n*7+i] = byte(c << 1) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		}
 
 		this_p.SetSSID(n, ssidTemp)
@@ -1174,7 +1174,7 @@ func (this_p *Packet) InsertAddr(n int, ad string) {
 			break
 		}
 
-		this_p.frame_data[n*7+i] = byte(c << 1)
+		this_p.frame_data[n*7+i] = byte(c << 1) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	}
 
 	this_p.SetSSID(n, ssidTemp)
