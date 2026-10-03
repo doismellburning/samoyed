@@ -199,3 +199,46 @@ func TestIL2PCRCKeepsExactType1Header(t *testing.T) {
 	require.GreaterOrEqual(t, e, 0)
 	assert.Equal(t, 1, GET_HDR_TYPE(uhdr))
 }
+
+// Whether a receiver expects a trailing CRC is its own setting: nothing in the
+// frame says whether one follows, so one that expects it hears only stations
+// that send it, and one that doesn't hears everyone, without the check.
+func TestIL2PCRCReceiveSetting(t *testing.T) {
+	il2p_init(0)
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello world", true)
+	require.NotNil(t, pp)
+
+	var testData = []struct {
+		name     string
+		txCRC    bool
+		rxCRC    bool
+		received bool
+	}{
+		{"CRC to CRC", true, true, true},
+		{"CRC to no CRC", true, false, true},
+		{"no CRC to no CRC", false, false, true},
+		{"no CRC to CRC", false, true, false},
+	}
+
+	for _, testDatum := range testData {
+		t.Run(testDatum.name, func(t *testing.T) {
+			var recorder = il2pLoopback(t, IL2P_VERSION_0_6)
+			recorder.rx = newIL2PReceiver(0, 0, 0, IL2P_VERSION_0_6, testDatum.rxCRC)
+
+			require.Positive(t, NewHDLCSender(0, nil, nil, 0).sendIL2PFrame(pp, IL2P_VERSION_0_6, 1, testDatum.txCRC, 0))
+
+			// Whatever follows the frame on the air, which a receiver expecting
+			// a CRC takes for one.
+			for range 64 {
+				recorder.rx.recBit(0)
+			}
+
+			if testDatum.received {
+				assert.Len(t, recorder.take(), 1)
+			} else {
+				assert.Empty(t, recorder.take())
+			}
+		})
+	}
+}

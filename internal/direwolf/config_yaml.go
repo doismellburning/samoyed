@@ -78,6 +78,7 @@ type ChannelConfig struct {
 	FX25TX      *int            `yaml:"fx25tx"`
 	IL2PTX      *IL2PTXSettings `yaml:"il2ptx"`
 	IL2PVersion *string         `yaml:"il2pversion"`
+	IL2PRXCRC   *bool           `yaml:"il2prxcrc"`
 }
 
 // isYAMLConfig says whether the configuration file at path is YAML, going by
@@ -290,6 +291,10 @@ func (ps *parseState) applyYAMLChannels(channels []ChannelConfig, node yamlEntry
 
 		if channel.IL2PVersion != nil {
 			at("il2pversion", func() error { return ps.applyIL2PVERSION(*channel.IL2PVersion) })
+		}
+
+		if channel.IL2PRXCRC != nil {
+			at("il2prxcrc", func() error { return ps.applyIL2PRXCRC(*channel.IL2PRXCRC) })
 		}
 
 		for _, control := range []struct {

@@ -112,7 +112,8 @@ type achan_param_s struct {
 
 	il2p_invert_polarity int // 1 means invert on transmit.  Receive handles either automatically.
 
-	il2p_crc bool // true to append trailing CRC after IL2P frame.  Default true.
+	il2p_crc    bool // true to append trailing CRC after IL2P frame.  Default true.
+	il2p_rx_crc bool // true to expect, and check, a trailing CRC on received IL2P frames.  Default true.
 
 	v26_alternative v26_e
 
