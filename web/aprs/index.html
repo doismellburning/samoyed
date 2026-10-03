@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<!--
+SPDX-FileCopyrightText: The Samoyed Authors
+SPDX-License-Identifier: GPL-2.0-or-later
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Samoyed APRS Tool</title>
+<meta name="description" content="Decode and encode APRS packets in your browser, using Samoyed compiled to WebAssembly.">
+<link rel="stylesheet" href="style.css">
+<script src="wasm_exec.js"></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>Samoyed APRS Tool</h1>
+  <p>Decode and encode <a href="https://www.aprs.org/">APRS</a> packets with
+  <a href="https://github.com/doismellburning/samoyed">Samoyed</a>'s own code, compiled to WebAssembly.
+  It all runs in your browser; nothing you type is sent anywhere.
+  <a href="../">Documentation</a>.</p>
+  <p id="status" role="status">Loading…</p>
+</header>
+
+<main>
+<section id="decode-section" aria-labelledby="decode-heading">
+  <h2 id="decode-heading">Decode</h2>
+  <form id="decode-form">
+    <label for="decode-input">Packets, one per line: monitoring format as a TNC, findu.com or aprs.fi shows it,
+      or hexadecimal bytes of a raw AX.25 or KISS frame.</label>
+    <textarea id="decode-input" rows="6" spellcheck="false" autocomplete="off">WB2OSZ-1>APN383,qAR,N1EDU-2:!4237.14NS07120.83W#PHG7130Chelmsford, MA
+N1EDF-9>T2QT8Y,W1CLA-1,WIDE1*,WIDE2-2,00000:`bSbl!Mv/`"4%}_ &lt;0x0d&gt;</textarea>
+    <div class="buttons">
+      <button type="submit" disabled>Decode</button>
+      <button type="button" id="decode-clear" class="secondary">Clear</button>
+    </div>
+  </form>
+  <pre id="decode-output" aria-live="polite" tabindex="0"></pre>
+</section>
+
+<section id="encode-section" aria-labelledby="encode-heading">
+  <h2 id="encode-heading">Encode</h2>
+  <form id="encode-form">
+    <fieldset class="type">
+      <legend>Packet type</legend>
+      <label><input type="radio" name="type" value="position" checked> Position</label>
+      <label><input type="radio" name="type" value="object"> Object</label>
+      <label><input type="radio" name="type" value="message"> Message</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Addresses</legend>
+      <div class="grid">
+        <label>Source <input name="source" value="Q1TEST-9" required spellcheck="false"></label>
+        <label>Destination <input name="destination" value="APDW18" required spellcheck="false"></label>
+        <label class="wide">Path <input name="path" value="WIDE1-1,WIDE2-1" spellcheck="false"></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="only-object">
+      <legend>Object</legend>
+      <div class="grid">
+        <label>Name <input name="name" maxlength="9" value="Q2TEST"></label>
+        <label>Timestamp <input name="timestamp" type="datetime-local"></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="only-located">
+      <legend>Location</legend>
+      <div class="grid">
+        <label>Latitude <input name="lat" type="number" step="any" min="-90" max="90" value="42.619" required></label>
+        <label>Longitude <input name="lon" type="number" step="any" min="-180" max="180" value="-71.34717" required></label>
+        <label>Ambiguity
+          <select name="ambiguity">
+            <option value="0">None</option>
+            <option value="1">1 digit</option>
+            <option value="2">2 digits</option>
+            <option value="3">3 digits</option>
+            <option value="4">4 digits</option>
+          </select>
+        </label>
+        <label>Altitude (ft) <input name="altitudeFt" type="number" step="1"></label>
+      </div>
+      <div class="grid">
+        <label>Symbol
+          <select id="symbol-preset">
+            <option value="/&gt;">Car</option>
+            <option value="/-">House</option>
+            <option value="/[">Person</option>
+            <option value="/b">Bicycle</option>
+            <option value="/k">Truck</option>
+            <option value="/s">Boat</option>
+            <option value="/'">Aircraft</option>
+            <option value="/O">Balloon</option>
+            <option value="/_">Weather station</option>
+            <option value="/#">Digipeater</option>
+            <option value="/&amp;">Gateway</option>
+            <option value="/r">Repeater</option>
+            <option value="">Other…</option>
+          </select>
+        </label>
+        <label>Table <input name="symbolTable" value="/" maxlength="1" required spellcheck="false"></label>
+        <label>Code <input name="symbol" value="&gt;" maxlength="1" required spellcheck="false"></label>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" name="compressed"> Compressed</label>
+        <label class="only-position"><input type="checkbox" name="messaging"> Can receive messages</label>
+      </div>
+    </fieldset>
+
+    <fieldset class="only-located">
+      <legend>Extras <span class="hint">(all optional; course &amp; speed take priority over PHG)</span></legend>
+      <div class="grid">
+        <label>Course (°) <input name="course" type="number" min="0" max="360" step="1"></label>
+        <label>Speed (knots) <input name="speedKnots" type="number" min="0" step="1"></label>
+        <label>Power (W) <input name="power" type="number" min="0" step="1"></label>
+        <label>Height (ft) <input name="height" type="number" min="0" step="1"></label>
+        <label>Gain (dBi) <input name="gain" type="number" min="0" step="1"></label>
+        <label>Directivity
+          <select name="directivity">
+            <option value="">Omni</option>
+            <option>NE</option><option>E</option><option>SE</option><option>S</option>
+            <option>SW</option><option>W</option><option>NW</option><option>N</option>
+          </select>
+        </label>
+        <label>Frequency (MHz) <input name="freq" type="number" step="any" min="0"></label>
+        <label>Tone (Hz) <input name="tone" type="number" step="any" min="0"></label>
+        <label>Offset (kHz) <input name="offset" type="number" step="any"></label>
+      </div>
+      <label class="block">Comment <input name="comment" value="Hello from the Samoyed APRS tool"></label>
+    </fieldset>
+
+    <fieldset class="only-message">
+      <legend>Message</legend>
+      <div class="grid">
+        <label>Addressee <input name="addressee" maxlength="9" value="Q2TEST" spellcheck="false"></label>
+        <label>Message number <input name="messageId" maxlength="5" value="1" spellcheck="false"></label>
+      </div>
+      <label class="block">Text <input name="text" value="Hello"></label>
+    </fieldset>
+
+    <div class="buttons">
+      <button type="submit" disabled>Encode</button>
+    </div>
+  </form>
+
+  <div id="encode-result" hidden>
+    <output id="encode-output" for="encode-form"></output>
+    <div class="buttons">
+      <button type="button" id="encode-copy" class="secondary">Copy</button>
+      <button type="button" id="encode-decode" class="secondary">Decode this</button>
+    </div>
+  </div>
+  <pre id="encode-log" hidden></pre>
+</section>
+</main>
+</body>
+</html>

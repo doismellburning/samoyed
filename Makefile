@@ -3,7 +3,7 @@ DEB_STAGING = .deb-staging
 C_FILES = $(shell find * -name \*.c)
 GO_FILES = $(shell find * -name \*.go)
 SHELL_FILES = $(shell grep -rIl '^\#!.*sh' * .claude)
-SRC_DIRS = ./cmd/... ./internal/...
+SRC_DIRS = ./cmd/... ./data/... ./internal/... ./web/...
 CMDS = $(notdir $(wildcard ./cmd/*))
 COVERAGE_FILE = cover.out
 GOLANGCI_LINT_VERSION = v2.13.2
@@ -32,6 +32,27 @@ $(DIST_DIR)/%: $(DIST_DIR) $(C_FILES) $(GO_FILES) ./cmd/%
 
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
+
+# The in-browser APRS encoder/decoder: a static site, published with the docs
+# (see docs/source/conf.py) or servable from $(WEB_DIR)/.. as it is.
+WEB_DIR = $(DIST_DIR)/web/aprs
+WEB_STATIC = web/aprs/index.html web/aprs/app.js web/aprs/style.css
+
+.PHONY: web
+web: $(WEB_DIR)/samoyed.wasm $(addprefix $(WEB_DIR)/,$(notdir $(WEB_STATIC))) $(WEB_DIR)/wasm_exec.js
+
+$(WEB_DIR)/samoyed.wasm: $(GO_FILES) $(wildcard data/*)
+	mkdir -p $(WEB_DIR)
+	GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" -o $@ ./web/aprs
+
+$(WEB_DIR)/%: web/aprs/%
+	mkdir -p $(WEB_DIR)
+	install -m 644 $< $@
+
+# The glue matching the Go that built samoyed.wasm - the two must agree.
+$(WEB_DIR)/wasm_exec.js: $(GO_FILES)
+	mkdir -p $(WEB_DIR)
+	install -m 644 "$$(go env GOROOT)/lib/wasm/wasm_exec.js" $@
 
 .PHONY: deb
 deb: cmds
@@ -110,6 +131,8 @@ shellcheck:
 .PHONY: vet
 vet:
 	go vet $(SRC_DIRS)
+	# What the in-browser tool builds on has to keep building for the browser.
+	GOOS=js GOARCH=wasm go vet ./web/... ./internal/aprs/...
 
 # Depending on the Makefile means a GOLANGCI_LINT_VERSION bump reinstalls the binary
 # rather than leaving a stale one in place.

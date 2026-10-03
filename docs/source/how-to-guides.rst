@@ -19,6 +19,23 @@ Decode packet data from audio
     $ samoyed-atest --bitrate 300 data.wav
 
 
+Decode or encode an APRS packet
+-------------------------------
+
+``samoyed-decode_aprs`` explains each packet it reads, one per line, in the
+monitoring format a TNC or aprs.fi shows, or as hexadecimal bytes of a raw AX.25
+or KISS frame:
+
+.. code::
+
+    $ echo 'Q1TEST-9>APDW18,WIDE1-1:!4237.14N/07120.83W>Testing' | samoyed-decode_aprs
+
+The same decoder, and an encoder for position, object and message packets, run
+`in your browser <../aprs/>`__ - Samoyed's own code compiled to WebAssembly, so
+nothing you type leaves your machine.  ``make web`` builds it into
+``dist/web/aprs/`` for serving yourself.
+
+
 Pick a modem on the command line
 --------------------------------
 
