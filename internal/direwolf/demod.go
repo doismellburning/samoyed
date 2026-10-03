@@ -855,7 +855,7 @@ func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
 
 		/* Scale 0..255 into -32k..+32k */
 
-		sam = int16(x1-128) * 256 //nolint:gosec // G115: unchecked narrowing conversion, see #294
+		sam = (int16(byte(x1&0xff)) - 128) * 256
 	} else {
 		var x1 = src.GetByte(a) /* lower byte first */
 		if x1 < 0 {
@@ -870,7 +870,7 @@ func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
 		dwutil.Assert(x1 >= 0 && x1 <= 255)
 		dwutil.Assert(x2 >= 0 && x2 <= 255)
 
-		sam = int16(x2<<8) | int16(x1) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+		sam = int16(byte(x2&0xff))<<8 | int16(byte(x1&0xff))
 	}
 
 	return int(sam)

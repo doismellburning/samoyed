@@ -49,7 +49,7 @@ func newGenPacketsPRNG() *genPacketsPRNG {
 }
 
 func (r *genPacketsPRNG) next() int32 {
-	r.seed = int32((uint32(r.seed)*1103515245 + 12345) & MY_RAND_MAX) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	r.seed = (r.seed*1103515245 + 12345) & MY_RAND_MAX // Wraps on overflow, as intended.
 
 	return r.seed
 }
