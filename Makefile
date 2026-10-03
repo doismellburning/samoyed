@@ -62,12 +62,16 @@ race:
 # Go fuzzes one target at a time, so each gets its own invocation, and
 # FUZZTIME is therefore per target rather than for the run as a whole.
 # The seed corpus of every target runs under `make test` regardless.
+# FUZZ_PKGS and FUZZ_TARGET narrow the run, which is how CI spreads the
+# targets across runners: `make fuzz FUZZ_PKGS=./internal/kiss FUZZ_TARGET=FuzzUnwrap`.
 FUZZTIME = 30s
+FUZZ_PKGS = $(SRC_DIRS)
+FUZZ_TARGET = Fuzz.*
 
 .PHONY: fuzz
 fuzz:
-	@for pkg in $$(go list $(SRC_DIRS)); do \
-		for target in $$(go test -list '^Fuzz' $$pkg | grep '^Fuzz'); do \
+	@for pkg in $$(go list $(FUZZ_PKGS)); do \
+		for target in $$(go test -list '^$(FUZZ_TARGET)$$' $$pkg | grep '^Fuzz'); do \
 			echo "Fuzzing $$target in $$pkg for $(FUZZTIME)..."; \
 			go test -run '^$$$$' -fuzz "^$$target\$$$$" -fuzztime $(FUZZTIME) $$pkg || exit 1; \
 		done; \
