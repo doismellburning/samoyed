@@ -525,8 +525,12 @@ func SetGPIOPin(name string, num int, state int) error {
 		return fmt.Errorf("%s CM108 GPIO state %d must be 0 or 1", name, state)
 	}
 
-	var iomask = 1 << (num - 1)     // 0=input, 1=output
-	var iodata = state << (num - 1) // 0=low, 1=high
+	var iomask = byte(1) << (num - 1) // 0=input, 1=output
+
+	var iodata byte // 0=low, 1=high
+	if state == 1 {
+		iodata = iomask
+	}
 
 	return cm108_write(name, iomask, iodata)
 } /* end SetGPIOPin */
@@ -597,7 +601,7 @@ func CheckDevice(name string) error {
  *
  *------------------------------------------------------------------*/
 
-func cm108_write(name string, iomask int, iodata int) error {
+func cm108_write(name string, iomask byte, iodata byte) error {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("TEMP DEBUG cm108_write:  %s %d %d\n", name, iomask, iodata);
 
@@ -641,7 +645,7 @@ func cm108_write(name string, iomask int, iodata int) error {
 
 	// To make a long story short, I think we need 0 for the first two bytes.
 
-	var data = []byte{0, 0, byte(iodata), byte(iomask), 0} //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	var data = []byte{0, 0, iodata, iomask, 0}
 
 	// Writing 4 bytes fails with errno 32, EPIPE, "broken pipe."
 	// Hamlib writes 5 bytes which I don't understand.
