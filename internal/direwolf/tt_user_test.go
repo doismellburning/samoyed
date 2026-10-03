@@ -73,6 +73,12 @@ func TestObjectReportCarriesFrequency(t *testing.T) {
 	assert.Contains(t, users.objectReportText(i, true), "146.955MHz T074 ")
 }
 
+// TextToTwoKey passes any Unicode digit through, but only ASCII ones belong in
+// the suffix - another used to be narrowed to a byte and taken for a letter.
+func TestDigitSuffixIgnoresNonASCIIDigits(t *testing.T) {
+	assert.Equal(t, digit_suffix("Q1TEST"), digit_suffix("Q1TE\u0663ST")) // ARABIC-INDIC DIGIT THREE
+}
+
 // The receive processing goroutine records users as their tone sequences
 // arrive, while the TTOBJ receive channel's audio goroutine polls the same
 // table, through Button's idle ticks, to send the object reports it has
