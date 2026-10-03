@@ -853,3 +853,36 @@ func TestReadCommandData_ReportsDataCutShort(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, 6, n)
 }
+
+// --- Transmitting a UI frame via digipeaters ---
+
+// 'V' carries each digipeater in a 10 byte NUL padded field, as the header
+// carries the source and destination, so the padding is not part of the
+// address.
+func TestHandleClientCommand_V_QueuesFrameViaDigipeaters(t *testing.T) {
+	var s = new(AGWServer)
+	setupAGWTransmitQueue(t, radioChannelZero())
+
+	var data = []byte{2}
+	for _, digi := range []string{"Q3TEST", "WIDE2-1"} {
+		var field [10]byte
+		copy(field[:], digi)
+		data = append(data, field[:]...)
+	}
+	data = append(data, "hello"...)
+
+	var cmd = new(agwpe.Message)
+	cmd.Header.DataKind = 'V'
+	cmd.Header.PID = ax25.PIDNoLayer3
+	copy(cmd.Header.CallFrom[:], "Q1TEST")
+	copy(cmd.Header.CallTo[:], "Q2TEST")
+	cmd.Data = data
+	cmd.Header.DataLen = uint32(len(data))
+
+	s.handleClientCommand(0, cmd)
+
+	var pp = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+	require.NotNil(t, pp, "frame via digipeaters not queued")
+	assert.Equal(t, "Q1TEST>Q2TEST,Q3TEST,WIDE2-1:", pp.FormatAddrs())
+	assert.Equal(t, []byte("hello"), pp.Info())
+}

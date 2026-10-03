@@ -1737,7 +1737,7 @@ func (*AGWServer) handleTransmitUIViaRequest(cmd *agwpe.Message) {
 
 	for k := range ndigi {
 		var offset = 1 + 10*k
-		stemp.WriteString("," + string(cmd.Data[offset:offset+10]))
+		stemp.WriteString("," + dwutil.ByteArrayToString(cmd.Data[offset:offset+10]))
 	}
 	// At this point, p now points to info part after digipeaters.
 
