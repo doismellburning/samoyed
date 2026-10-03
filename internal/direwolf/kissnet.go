@@ -279,14 +279,20 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, frame []byte
 	}
 } /* end SendRecPacket */
 
-// sendTo sends frame, of type cmd for radio channel, to one client, if it
-// is attached and its port carries that channel.
+// sendTo sends frame, of type cmd for radio channel, to whichever client is
+// attached in a slot, if any, and its port carries that channel.
 func (kns *KissNetService) sendTo(kps *kissport_status_s, client int, channel int, cmd int, frame []byte) {
 	var conn = kps.clientConn(client)
 	if conn == nil {
 		return
 	}
 
+	kns.sendOn(kps, client, conn, channel, cmd, frame)
+}
+
+// sendOn sends frame, of type cmd for radio channel, to the client attached in
+// a slot over conn, if its port carries that channel.
+func (kns *KissNetService) sendOn(kps *kissport_status_s, client int, conn net.Conn, channel int, cmd int, frame []byte) {
 	// New in 1.7.
 	// Previously all channels were sent to everyone.
 	// We now have tcp ports which carry only a single radio channel.
@@ -323,19 +329,32 @@ func (kns *KissNetService) write(kps *kissport_status_s, client int, conn net.Co
 // kissNetClient is one client application attached to a KISS TCP port: what
 // it sends is for the port's radio channel, if the port has just one, and an
 // answer goes to it alone, not to everyone attached.
+//
+// It is the connection, not just the slot: a client can go away while what it
+// sent is still being acted on, and another take its slot, which must not be
+// handed answers to questions it never asked.
 type kissNetClient struct {
 	kns    *KissNetService
 	kps    *kissport_status_s
 	client int
+	conn   net.Conn
+}
+
+// attached reports whether the client is still attached, in its slot.
+func (c kissNetClient) attached() bool {
+	return c.conn != nil && c.kps.clientConn(c.client) == c.conn
 }
 
 func (c kissNetClient) reply(channel int, cmd int, frame []byte) {
-	c.kns.sendTo(c.kps, c.client, channel, cmd, frame)
+	if !c.attached() {
+		return
+	}
+
+	c.kns.sendOn(c.kps, c.client, c.conn, channel, cmd, frame)
 }
 
 func (c kissNetClient) prompt(text []byte) {
-	var conn = c.kps.clientConn(c.client)
-	if conn == nil {
+	if !c.attached() {
 		return
 	}
 
@@ -354,7 +373,7 @@ func (c kissNetClient) prompt(text []byte) {
 		kiss_debug_print(TO_CLIENT, "Fake command prompt", text)
 	}
 
-	c.kns.write(c.kps, c.client, conn, text)
+	c.kns.write(c.kps, c.client, c.conn, text)
 }
 
 func (c kissNetClient) radioChannel(frameChannel int) int {
@@ -406,11 +425,13 @@ func (kns *KissNetService) Copy(msg []byte, channel int, cmd int, from kissClien
 
 	for kps := kns.allPorts; kps != nil; kps = kps.pnext {
 		for client := range MAX_NET_CLIENTS {
+			var conn = kps.clientConn(client)
+
 			// To all but origin.
-			if from != kissClient(kissNetClient{kns: kns, kps: kps, client: client}) {
-				// msg[0] is the channel and command it came with; sendTo
+			if conn != nil && from != kissClient(kissNetClient{kns: kns, kps: kps, client: client, conn: conn}) {
+				// msg[0] is the channel and command it came with; sendOn
 				// works out what this client's port shows instead.
-				kns.sendTo(kps, client, channel, cmd, msg[1:])
+				kns.sendOn(kps, client, conn, channel, cmd, msg[1:])
 			}
 		}
 	}
@@ -434,15 +455,15 @@ func (kns *KissNetService) Copy(msg []byte, channel int, cmd int, from kissClien
 
 /* Return one byte (value 0 - 255) */
 
-// get returns the next byte from a client, and the frame decoder state it
-// belongs to.  It reports false instead if ctx was cancelled, in which case
+// get returns the next byte from a client, and the connection it came over
+// and the frame decoder state it belongs to.  It reports false instead if ctx was cancelled, in which case
 // there is no byte and the caller should stop.
-func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, client int) (byte, *kiss.Collector, bool) {
+func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, client int) (byte, net.Conn, *kiss.Collector, bool) {
 	for ctx.Err() == nil {
 		var conn, frame = kps.connAndFrame(client)
 		for conn == nil {
 			if !dwutil.SleepCtx(ctx, kns.pollInterval) { /* Not connected.  Try again later. */
-				return 0, nil, false
+				return 0, nil, nil, false
 			}
 
 			conn, frame = kps.connAndFrame(client)
@@ -458,7 +479,7 @@ func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, clie
 		var n, _ = conn.Read(ch)
 
 		if ctx.Err() != nil {
-			return 0, nil, false
+			return 0, nil, nil, false
 		}
 
 		if n == 1 {
@@ -466,7 +487,7 @@ func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, clie
 				logrus.WithField("ch", fmt.Sprintf("%02x", ch[0])).Trace("kissnet get")
 			}
 
-			return ch[0], frame, true
+			return ch[0], conn, frame, true
 		}
 
 		conn.Close()
@@ -483,7 +504,7 @@ func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, clie
 		}
 	}
 
-	return 0, nil, false
+	return 0, nil, nil, false
 }
 
 func (kns *KissNetService) listenThread(ctx context.Context, kps *kissport_status_s, client int) {
@@ -503,13 +524,20 @@ func (kns *KissNetService) listenThread(ctx context.Context, kps *kissport_statu
 	// client this is, and answers that one.   Actually, we should be providing
 	// only "Simply KISS" as some call it.
 
-	// Built once, rather than for every byte.
-	var from kissClient = kissNetClient{kns: kns, kps: kps, client: client}
+	// Built once per connection, rather than for every byte.
+	var lastConn net.Conn
+
+	var from kissClient
 
 	for {
-		var ch, frame, ok = kns.get(ctx, kps, client)
+		var ch, conn, frame, ok = kns.get(ctx, kps, client)
 		if !ok {
 			return // Cancelled.
+		}
+
+		if conn != lastConn {
+			lastConn = conn
+			from = kissNetClient{kns: kns, kps: kps, client: client, conn: conn}
 		}
 
 		kns.handler.RecByte(frame, ch, kns.debug, from)

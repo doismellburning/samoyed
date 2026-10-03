@@ -206,7 +206,7 @@ func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0})
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
 
 	assert.Equal(t, 1, transmitQueue.Count(1, TQ_PRIO_1_LO, "", "", false), "the port's channel should have been used")
 	assert.Equal(t, 0, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
@@ -229,7 +229,7 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 
 	assert.NotPanics(t, func() {
 		output = testutils.CaptureOutput(t, func() {
-			h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0})
+			h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
 		})
 	})
 

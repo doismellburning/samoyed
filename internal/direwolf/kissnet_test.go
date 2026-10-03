@@ -236,7 +236,7 @@ func TestKissNetSendRecPacketSingleChannelPort(t *testing.T) {
 func TestKissNetSendRecPacketToOneClient(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 2)
 
-	kissNetClient{kns: kns, kps: kns.allPorts, client: 1}.reply(0, kiss.CmdSetHardware, []byte("TXBUF:0"))
+	kissNetClient{kns: kns, kps: kns.allPorts, client: 1, conn: kns.allPorts.clientConn(1)}.reply(0, kiss.CmdSetHardware, []byte("TXBUF:0"))
 
 	assert.Equal(t,
 		kiss.Encapsulate(append([]byte{kiss.CmdSetHardware}, []byte("TXBUF:0")...)),
@@ -245,13 +245,37 @@ func TestKissNetSendRecPacketToOneClient(t *testing.T) {
 	requireNothingToRead(t, clients[0], "the answer went to a client that did not ask")
 }
 
+// An answer goes to the client that asked, over the connection it asked on.
+// If that client has gone and another has since taken its slot, the answer -
+// or the command prompt - is dropped rather than handed to the newcomer, who
+// never asked for it.
+func TestKissNetReplyNotToTheNextClientInTheSlot(t *testing.T) {
+	var kns, clients = newAttachedKissNet(t, -1, false, 1)
+	var kps = kns.allPorts
+
+	var askerConn = kps.clientConn(0)
+	var asker = kissNetClient{kns: kns, kps: kps, client: 0, conn: askerConn}
+
+	askerConn.Close()
+	kps.detachClientIfCurrent(0, askerConn)
+	clients[0].Close()
+
+	var server, newcomer = connectedTCPPair(t)
+	require.True(t, kps.attachClient(0, server))
+
+	asker.reply(0, kiss.CmdSetHardware, []byte("TNC:DIREWOLF"))
+	asker.prompt([]byte("\r\ncmd:"))
+
+	requireNothingToRead(t, newcomer, "the newcomer was sent an answer to a question it never asked")
+}
+
 // The fake command prompt goes out as it is - and says why, because it means
 // the application is treating us as an old TNC.
 func TestKissNetPrompt(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
 	var output = testutils.CaptureOutput(t, func() {
-		kissNetClient{kns: kns, kps: kns.allPorts, client: 0}.prompt([]byte("\r\ncmd:"))
+		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
 	})
 
 	assert.Contains(t, output, "Is client app treating this like an old TNC with command mode?")
@@ -288,7 +312,7 @@ func TestKissNetCopyBetweenClients(t *testing.T) {
 
 	const channel = 1
 
-	kns.Copy([]byte{0x00, 'h', 'i'}, channel, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0})
+	kns.Copy([]byte{0x00, 'h', 'i'}, channel, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
 
 	assert.Equal(t,
 		[]byte{kiss.FEND, channel << 4, 'h', 'i', kiss.FEND},
@@ -305,8 +329,8 @@ func TestKissNetCopySingleChannelPort(t *testing.T) {
 
 	var kns, clients = newAttachedKissNet(t, channel, true, 2)
 
-	kns.Copy([]byte{0x00, 'n', 'o'}, channel+1, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0})
-	kns.Copy([]byte{0x00, 'h', 'i'}, channel, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0})
+	kns.Copy([]byte{0x00, 'n', 'o'}, channel+1, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
+	kns.Copy([]byte{0x00, 'h', 'i'}, channel, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
 
 	assert.Equal(t, []byte{kiss.FEND, 0x00, 'h', 'i', kiss.FEND}, readKissNetFrame(t, clients[1]))
 }
@@ -315,7 +339,7 @@ func TestKissNetCopySingleChannelPort(t *testing.T) {
 func TestKissNetCopyDisabled(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 2)
 
-	kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0})
+	kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
 
 	requireNothingToRead(t, clients[1], "a frame was copied with KISSCOPY disabled")
 }
@@ -327,7 +351,7 @@ func TestKissNetCopyWriteErrorDetachesTheClient(t *testing.T) {
 	require.NoError(t, clients[1].Close())
 
 	assert.Eventually(t, func() bool {
-		kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0})
+		kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
 
 		return kns.allPorts.clientConn(1) == nil
 	}, 10*time.Second, 50*time.Millisecond, "a client that had gone away was never detached")
@@ -340,7 +364,7 @@ func TestKissNetCopyDoesNotModifyTheCallersFrame(t *testing.T) {
 
 	var msg = []byte{0x00, 'h', 'i'}
 
-	kns.Copy(msg, 2, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0})
+	kns.Copy(msg, 2, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
 
 	assert.Equal(t, []byte{0x00, 'h', 'i'}, msg)
 }
@@ -364,7 +388,7 @@ func TestKissNetDebugPrints(t *testing.T) {
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
 	output = testutils.CaptureOutput(t, func() {
-		kissNetClient{kns: kns, kps: kns.allPorts, client: 0}.prompt([]byte("\r\ncmd:"))
+		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
 	})
 
 	assert.Contains(t, output, "Fake command prompt")
