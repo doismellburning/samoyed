@@ -354,7 +354,8 @@ that do not:
     Wolf sends no trailing CRC either - see below.
 
 ``samoyed-gen_packets`` and ``samoyed-atest`` take the same choice as
-``--il2p-version``, for generating and decoding test audio.
+``--il2p-version``, for generating and decoding test audio, and the CRC
+setting below as ``--il2p-crc``.
 
 Send and receive the IL2P trailing CRC
 --------------------------------------

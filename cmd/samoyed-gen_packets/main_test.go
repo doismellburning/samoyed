@@ -26,6 +26,7 @@ func decode(t *testing.T, name string) int {
 
 	var opts = new(direwolf.AtestOptions)
 	opts.IL2PVersion = "0.6"
+	opts.IL2PCRC = true
 
 	var atest, atestErr = direwolf.NewAtest(opts)
 	require.NoError(t, atestErr)
@@ -62,6 +63,7 @@ func Test_main_generates(t *testing.T) {
 		"options":        {"", []string{"-a", "100", "-r", "22050", "-2"}, "2 channels of sound rather than 1.", 4},
 		"8 bit":          {"", []string{"-8"}, "8 bits per audio sample rather than 16.", 4},
 		"Morse":          {"", []string{"-M", "40"}, "Morse code speed set to 40 WPM.", 0}, // Not AX.25 at all.
+		"IL2P":           {"", []string{"-I", "1", messages}, "Reading from " + messages, 2},
 	}
 
 	for name, tc := range testCases {

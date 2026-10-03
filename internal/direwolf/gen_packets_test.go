@@ -18,6 +18,7 @@ func genPacketsDecode(t *testing.T, name string) int {
 
 	var opts = new(AtestOptions)
 	opts.IL2PVersion = "0.6"
+	opts.IL2PCRC = true
 
 	var atest, err = NewAtest(opts)
 	require.NoError(t, err)
