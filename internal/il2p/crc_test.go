@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -265,4 +267,53 @@ func TestIL2PCRCKeepsExactType1Header(t *testing.T) {
 	var uhdr, e = il2p_clarify_header(encoded[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY], 0)
 	require.GreaterOrEqual(t, e, 0)
 	assert.Equal(t, 1, GET_HDR_TYPE(uhdr))
+}
+
+// Whether a receiver expects a trailing CRC is its own setting: nothing in the
+// frame says whether one follows, so one that expects it hears only stations
+// that send it, and one that doesn't hears everyone, without the check.
+func TestIL2PCRCReceiveSetting(t *testing.T) {
+	t.Parallel()
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello world", true)
+	require.NotNil(t, pp)
+
+	var testData = []struct {
+		name     string
+		txCRC    bool
+		rxCRC    bool
+		received bool
+	}{
+		{"CRC to CRC", true, true, true},
+		{"CRC to no CRC", true, false, true},
+		{"no CRC to no CRC", false, false, true},
+		{"no CRC to CRC", false, true, false},
+	}
+
+	for _, testDatum := range testData {
+		t.Run(testDatum.name, func(t *testing.T) {
+			t.Parallel()
+
+			var received int
+
+			var rx = NewReceiver(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, Version06, testDatum.rxCRC, 0,
+				func(int, int) ax25.ALevel { return ax25.ALevel{Rec: 0, Mark: 0, Space: 0} },
+				func(dwcore.SlicerID, *ax25.Packet, dwcore.RxInfo) { received++ })
+
+			var sender = NewSender(linecode.NewEncoder(rx.RecBit), 0, 0)
+			require.Positive(t, sender.SendFrame(pp, Version06, 1, testDatum.txCRC, 0))
+
+			// Whatever follows the frame on the air, which a receiver expecting
+			// a CRC takes for one.
+			for range 64 {
+				rx.RecBit(0)
+			}
+
+			if testDatum.received {
+				assert.Equal(t, 1, received)
+			} else {
+				assert.Zero(t, received)
+			}
+		})
+	}
 }

@@ -1202,6 +1202,42 @@ func Test_config_init_il2pversion(t *testing.T) {
 	})
 }
 
+// --- config_init IL2PRXCRC directive ---
+
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
+func Test_config_init_il2prxcrc(t *testing.T) {
+	t.Run("on by default", func(t *testing.T) {
+		var audio, _ = configFromString(t, "")
+		assert.True(t, audio.achan[0].il2p_rx_crc)
+	})
+
+	t.Run("off", func(t *testing.T) {
+		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PRXCRC OFF\n")
+		assert.False(t, audio.achan[0].il2p_rx_crc)
+	})
+
+	t.Run("on", func(t *testing.T) {
+		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PRXCRC off\nIL2PRXCRC on\n")
+		assert.True(t, audio.achan[0].il2p_rx_crc)
+	})
+
+	t.Run("independent of IL2PTX", func(t *testing.T) {
+		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PTX c\n")
+		assert.False(t, audio.achan[0].il2p_crc)
+		assert.True(t, audio.achan[0].il2p_rx_crc)
+	})
+
+	t.Run("unrecognised value leaves the default", func(t *testing.T) {
+		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PRXCRC maybe\n")
+		assert.True(t, audio.achan[0].il2p_rx_crc)
+	})
+
+	t.Run("missing value leaves the default", func(t *testing.T) {
+		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PRXCRC\n")
+		assert.True(t, audio.achan[0].il2p_rx_crc)
+	})
+}
+
 // --- config_init METRICSPORT directive ---
 
 //nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
@@ -5211,6 +5247,7 @@ func directivesTestedSeparately() map[string]string {
 		"FIX_BITS":    "Test_config_init_fix_bits",
 		"FRACK":       "Test_config_init_frack",
 		"IL2PVERSION": "Test_config_init_il2pversion",
+		"IL2PRXCRC":   "Test_config_init_il2prxcrc",
 		"KISSPORT":    "Test_config_init_kissport",
 		"METRICSPORT": "Test_config_init_metricsport",
 		"MODEM":       "Test_config_init_modem_directive",

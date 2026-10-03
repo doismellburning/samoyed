@@ -369,9 +369,33 @@ that do not:
     header bit, which v0.6 stations ignore - so transmissions are readable by
     everyone.  Use this on a channel shared with Dire Wolf stations, which
     implement v0.4 and cannot read our v0.6 transmissions otherwise.
+    Dire Wolf 1.7 sends no trailing CRC either - see below.
 
 ``samoyed-gen_packets`` and ``samoyed-atest`` take the same choice as
 ``--il2p-version``, for generating and decoding test audio.
+
+Send and receive the IL2P trailing CRC
+--------------------------------------
+
+The `IL2P v0.6 specification <https://tarpn.net/t/il2p/il2p-specification_draft_v0-6.pdf>`_
+lets each frame be followed by a CRC of the AX.25 frame it carries,
+which catches the rare frame that Reed-Solomon decoding gets wrong without noticing.
+Samoyed sends one, and requires one on what it receives, by default.
+
+Nothing in a frame says whether a CRC follows it,
+so a receiver expecting one drops every frame from a station that sends none -
+Dire Wolf 1.7 among them.
+The two directions are set separately, per channel:
+
+.. code::
+
+    IL2PTX c         # Transmit IL2P without the CRC.
+    IL2PRXCRC OFF    # Receive IL2P without expecting a CRC.
+
+``IL2PTX c`` changes only what is transmitted:
+a channel that should also hear stations sending no CRC needs ``IL2PRXCRC OFF`` as well.
+With ``IL2PRXCRC OFF`` a CRC that is sent is ignored,
+so frames from either kind of station get through - unchecked.
 
 Put a password on the AGW port
 --------------------------------------------
