@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +24,7 @@ func buildWAVWithExtraChunks(t *testing.T) []byte {
 
 	writeChunk := func(id string, payload []byte) {
 		body.WriteString(id)
-		binary.Write(&body, binary.LittleEndian, int32(len(payload))) //nolint:errcheck
+		binary.Write(&body, binary.LittleEndian, safecast.RequireConvert[int32](t, len(payload))) //nolint:errcheck
 		body.Write(payload)
 
 		if len(payload)%2 != 0 {
@@ -53,7 +54,7 @@ func buildWAVWithExtraChunks(t *testing.T) []byte {
 
 	var wav bytes.Buffer
 	wav.WriteString("RIFF")
-	binary.Write(&wav, binary.LittleEndian, int32(4+body.Len())) //nolint:errcheck
+	binary.Write(&wav, binary.LittleEndian, safecast.RequireConvert[int32](t, 4+body.Len())) //nolint:errcheck
 	wav.WriteString("WAVE")
 	wav.Write(body.Bytes())
 
@@ -164,7 +165,7 @@ const (
 // withInt32At returns a copy of wav with v written at offset.
 func withInt32At(wav []byte, offset int, v int32) []byte {
 	var out = bytes.Clone(wav)
-	binary.LittleEndian.PutUint32(out[offset:], uint32(v))
+	binary.Encode(out[offset:], binary.LittleEndian, v) //nolint:errcheck // out has room.
 
 	return out
 }

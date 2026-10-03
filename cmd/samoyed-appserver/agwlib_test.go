@@ -36,7 +36,7 @@ func fromTNC(kind byte, channel byte, callFrom agwpe.Callsign, callTo agwpe.Call
 	h.Portx = channel
 	h.CallFrom = callFrom
 	h.CallTo = callTo
-	h.DataLen = uint32(len(data))
+	h.DataLen = agwpe.DataLen(data)
 
 	return &AGWPECommand{Header: h, Data: []byte(data)}
 }

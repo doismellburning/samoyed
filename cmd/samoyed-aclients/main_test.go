@@ -53,7 +53,7 @@ func sendMonitored(t *testing.T, conn net.Conn, portx byte, frame []byte) {
 	var header = new(agwpe.Header)
 	header.Portx = portx
 	header.DataKind = 'K'
-	header.DataLen = uint32(len(data))
+	header.DataLen = agwpe.DataLen(data)
 
 	require.NoError(t, binary.Write(conn, binary.LittleEndian, header))
 

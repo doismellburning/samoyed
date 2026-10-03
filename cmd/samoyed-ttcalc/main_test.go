@@ -84,7 +84,7 @@ func sendRaw(t *testing.T, conn net.Conn, channel byte, data []byte) {
 	var header = new(agwpe.Header)
 	header.Portx = channel
 	header.DataKind = 'K'
-	header.DataLen = uint32(len(data))
+	header.DataLen = agwpe.DataLen(data)
 
 	require.NoError(t, binary.Write(conn, binary.LittleEndian, header))
 

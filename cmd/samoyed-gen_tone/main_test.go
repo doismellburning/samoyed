@@ -4,7 +4,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/direwolf"
@@ -37,10 +36,10 @@ func (s *recordingSink) Flush(int) int {
 func risingZeroCrossings(data []byte) int {
 	var crossings = 0
 
-	var previous = int16(binary.LittleEndian.Uint16(data))
+	var previous = int16(data[1])<<8 | int16(data[0])
 
 	for i := 2; i+1 < len(data); i += 2 {
-		var sample = int16(binary.LittleEndian.Uint16(data[i:]))
+		var sample = int16(data[i+1])<<8 | int16(data[i])
 
 		if previous < 0 && sample >= 0 {
 			crossings++

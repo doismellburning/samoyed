@@ -4,7 +4,6 @@
 package direwolf
 
 import (
-	"encoding/binary"
 	"math"
 	"math/rand/v2"
 	"testing"
@@ -98,7 +97,7 @@ func generate9600(t *testing.T, audioConfig *RadioConfig, channel int, frames []
 
 	var samples = make([]int, 0, len(sink.data)/2)
 	for i := 0; i < len(sink.data); i += 2 {
-		samples = append(samples, int(int16(binary.LittleEndian.Uint16(sink.data[i:]))))
+		samples = append(samples, int(int16(sink.data[i+1])<<8|int16(sink.data[i])))
 	}
 
 	return samples

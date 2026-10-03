@@ -270,7 +270,7 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 		copy(cmd.Header.CallFrom[:], "Q1TEST")
 		copy(cmd.Header.CallTo[:], "Q2TEST")
 		cmd.Data = rapid.SliceOf(rapid.Byte()).Draw(t, "data")
-		cmd.Header.DataLen = uint32(len(cmd.Data))
+		cmd.Header.DataLen = agwpe.DataLen(cmd.Data)
 		s.handleClientCommand(0, cmd)
 	})
 }
@@ -314,7 +314,7 @@ func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
 		copy(cmd.Header.CallFrom[:], "Q1TEST")
 		copy(cmd.Header.CallTo[:], "Q2TEST")
 		cmd.Data = data
-		cmd.Header.DataLen = uint32(len(data))
+		cmd.Header.DataLen = agwpe.DataLen(data)
 
 		var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
 		if item != nil {
@@ -364,7 +364,7 @@ func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 	cmd.Header.DataKind = 'D'
 	cmd.Header.Portx = 0
 	cmd.Header.PID = 0xF0
-	cmd.Header.DataLen = uint32(len(payload))
+	cmd.Header.DataLen = agwpe.DataLen(payload)
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 	cmd.Data = data
@@ -390,7 +390,7 @@ func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
 	cmd.Header.Portx = 0
 	cmd.Header.PID = 0xF0
 	cmd.Data = []byte("hi")
-	cmd.Header.DataLen = uint32(len(cmd.Data)) + 1
+	cmd.Header.DataLen = agwpe.DataLen(cmd.Data) + 1
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 
@@ -611,7 +611,7 @@ func TestHandleClientCommand_G_RadioChannelsStereo(t *testing.T) {
 	var reply = <-replyCh
 	require.NotNil(t, reply)
 	assert.Equal(t, "2;Port1 first soundcard left;Port2 first soundcard right;", string(reply.Data))
-	assert.Equal(t, uint32(len(reply.Data)), reply.Header.DataLen)
+	assert.Equal(t, agwpe.DataLen(reply.Data), reply.Header.DataLen)
 }
 
 func TestHandleClientCommand_G_IGateAndNetTNC(t *testing.T) {
@@ -711,7 +711,7 @@ func TestHandleClientCommand_V_QueuesFrameWithPID(t *testing.T) {
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 	cmd.Data = data
-	cmd.Header.DataLen = uint32(len(data))
+	cmd.Header.DataLen = agwpe.DataLen(data)
 
 	s.handleClientCommand(0, cmd)
 
@@ -732,7 +732,7 @@ func TestHandleClientCommand_V_TooShortForDigipeatersQueuesNothing(t *testing.T)
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 	cmd.Data = []byte{2, 'Q'}
-	cmd.Header.DataLen = uint32(len(cmd.Data))
+	cmd.Header.DataLen = agwpe.DataLen(cmd.Data)
 
 	s.handleClientCommand(0, cmd)
 
@@ -766,7 +766,7 @@ func TestHandleClientCommand_M_QueuesFrameWithPID(t *testing.T) {
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 	cmd.Data = []byte("hello")
-	cmd.Header.DataLen = uint32(len(cmd.Data))
+	cmd.Header.DataLen = agwpe.DataLen(cmd.Data)
 
 	s.handleClientCommand(0, cmd)
 
@@ -786,7 +786,7 @@ func TestHandleClientCommand_M_BadAddressQueuesNothing(t *testing.T) {
 	copy(cmd.Header.CallFrom[:], "not a callsign")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 	cmd.Data = []byte("hello")
-	cmd.Header.DataLen = uint32(len(cmd.Data))
+	cmd.Header.DataLen = agwpe.DataLen(cmd.Data)
 
 	s.handleClientCommand(0, cmd)
 
@@ -805,7 +805,7 @@ func rawAGWFrame(t *testing.T, monitor string) *agwpe.Message {
 	cmd.Header.DataKind = 'K'
 	cmd.Header.Portx = 0
 	cmd.Data = append([]byte{0}, pp.Pack()...)
-	cmd.Header.DataLen = uint32(len(cmd.Data))
+	cmd.Header.DataLen = agwpe.DataLen(cmd.Data)
 
 	return cmd
 }
@@ -847,7 +847,7 @@ func TestHandleClientCommand_K_UndecodableFrameQueuesNothing(t *testing.T) {
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'K'
 	cmd.Data = []byte{0, 1, 2, 3}
-	cmd.Header.DataLen = uint32(len(cmd.Data))
+	cmd.Header.DataLen = agwpe.DataLen(cmd.Data)
 
 	s.handleClientCommand(0, cmd)
 
@@ -1026,7 +1026,7 @@ func TestHandleClientCommand_v_UnexpectedDataLenStillConnects(t *testing.T) {
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 	cmd.Data = data
-	cmd.Header.DataLen = uint32(len(data))
+	cmd.Header.DataLen = agwpe.DataLen(data)
 
 	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
 

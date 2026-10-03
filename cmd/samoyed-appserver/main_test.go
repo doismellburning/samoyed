@@ -579,7 +579,7 @@ func TestMainRegistersOnEachPort(t *testing.T) {
 
 	var reply = new(agwpe.Header)
 	reply.DataKind = 'G'
-	reply.DataLen = uint32(len(ports))
+	reply.DataLen = agwpe.DataLen(ports)
 
 	require.NoError(t, binary.Write(tnc, binary.LittleEndian, reply))
 

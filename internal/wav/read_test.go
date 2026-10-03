@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +25,7 @@ type testChunk struct {
 
 // chunk is a testChunk whose datasize is the length of its payload.
 func chunk(id string, payload []byte) testChunk {
-	return testChunk{id: id, size: int32(len(payload)), payload: payload}
+	return testChunk{id: id, size: safecast.MustConvert[int32](len(payload)), payload: payload}
 }
 
 // fmtPayload is the contents of a PCM "fmt " chunk.
@@ -60,7 +61,7 @@ func buildWAV(chunks ...testChunk) []byte {
 
 	var wav bytes.Buffer
 	wav.WriteString("RIFF")
-	binary.Write(&wav, binary.LittleEndian, int32(4+body.Len())) //nolint:errcheck // Writing to a bytes.Buffer cannot fail.
+	binary.Write(&wav, binary.LittleEndian, safecast.MustConvert[int32](4+body.Len())) //nolint:errcheck // Writing to a bytes.Buffer cannot fail.
 	wav.WriteString("WAVE")
 	wav.Write(body.Bytes())
 

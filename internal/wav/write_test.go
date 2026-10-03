@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -94,7 +95,7 @@ func TestWriteAndClose(t *testing.T) {
 	require.Len(t, contents, HeaderSize+len(data))
 
 	assert.Equal(t, "RIFF", string(contents[0:4]))
-	assert.Equal(t, uint32(HeaderSize+len(data)-8), binary.LittleEndian.Uint32(contents[4:8]))
+	assert.Equal(t, safecast.RequireConvert[uint32](t, HeaderSize+len(data)-8), binary.LittleEndian.Uint32(contents[4:8]))
 	assert.Equal(t, "WAVE", string(contents[8:12]))
 	assert.Equal(t, "fmt ", string(contents[12:16]))
 	assert.Equal(t, uint32(16), binary.LittleEndian.Uint32(contents[16:20]))
@@ -105,7 +106,7 @@ func TestWriteAndClose(t *testing.T) {
 	assert.Equal(t, uint16(4), binary.LittleEndian.Uint16(contents[32:34]))       // Block align
 	assert.Equal(t, uint16(16), binary.LittleEndian.Uint16(contents[34:36]))      // Bits per sample
 	assert.Equal(t, "data", string(contents[36:40]))
-	assert.Equal(t, uint32(len(data)), binary.LittleEndian.Uint32(contents[40:44]))
+	assert.Equal(t, safecast.RequireConvert[uint32](t, len(data)), binary.LittleEndian.Uint32(contents[40:44]))
 	assert.Equal(t, data, contents[HeaderSize:])
 }
 
