@@ -10,7 +10,11 @@
 // FX.25 encoder and Dire Wolf.
 package reedsolomon
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/ccoveille/go-safecast/v2"
+)
 
 // Interesting related stuff:
 // https://www.kernel.org/doc/html/v4.15/core-api/librs.html
@@ -50,6 +54,13 @@ func (c *Codec) modnn(_x int) int {
 	return int(x)
 }
 
+// modnnByte is modnn for a result headed for a byte, which it always fits:
+// it is less than nn, which New keeps to at most 255.  Masking rather than
+// safecast keeps the decoder's inner loops cheap.
+func (c *Codec) modnnByte(x int) byte {
+	return byte(c.modnn(x) & 0xff)
+}
+
 // New initializes a Reed-Solomon codec.
 //
 //	symsize = symbol size, bits (1-8) - always 8 for FX.25 and IL2P.
@@ -83,8 +94,8 @@ func New(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) (*Codec, e
 	rs.index_of = make([]byte, rs.nn+1)
 
 	// Generate Galois field lookup tables
-	rs.index_of[0] = byte(rs.nn) // log(zero) = -inf (A0)
-	rs.alpha_to[rs.nn] = 0       // alpha**-inf = 0
+	rs.index_of[0] = safecast.MustConvert[byte](rs.nn) // log(zero) = -inf (A0)
+	rs.alpha_to[rs.nn] = 0                             // alpha**-inf = 0
 
 	var sr = 1
 	for i := range rs.nn {
@@ -106,8 +117,8 @@ func New(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) (*Codec, e
 
 	// Form RS code generator polynomial from its roots
 	rs.genpoly = make([]byte, nroots+1)
-	rs.fcr = byte(fcr)
-	rs.prim = byte(prim)
+	rs.fcr = safecast.MustConvert[byte](fcr)
+	rs.prim = safecast.MustConvert[byte](prim)
 	rs.nroots = nroots
 
 	// Find prim-th root of 1, used in decoding
@@ -116,7 +127,7 @@ func New(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) (*Codec, e
 		iprim += int(rs.nn)
 	}
 
-	rs.iprim = byte(iprim / int(prim))
+	rs.iprim = safecast.MustConvert[byte](iprim / int(prim))
 
 	rs.genpoly[0] = 1
 	for i, root := 0, int(fcr)*int(prim); i < int(nroots); i, root = i+1, root+int(prim) {
