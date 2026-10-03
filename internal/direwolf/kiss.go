@@ -187,7 +187,7 @@ func pollable(f *os.File) (*os.File, error) {
  *
  * Name:        SendRecPacket
  *
- * Purpose:     Send a received packet or text string to the client app.
+ * Purpose:     Send a received packet to the client app.
  *
  * Inputs:	chan		- Channel number where packet was received.
  *				  0 = first, 1 = second if any.
@@ -195,17 +195,7 @@ func pollable(f *os.File) (*os.File, error) {
  *		kiss_cmd	- Usually kiss.CmdDataFrame but we can also have
  *				  kiss.CmdSetHardware when responding to a query.
  *
- *		pp		- Identifier for packet object.
- *
- *		fbuf		- Address of raw received frame buffer
- *				  or a text string.
- *
- *		flen		- Length of raw received frame not including the FCS
- *				  or -1 for a text string.
- *
- *		kps, client	- Not used for pseudo terminal.
- *				  Here so that 3 related functions all have
- *				  the same parameter list.
+ *		frame		- Raw received frame, not including the FCS.
  *
  * Description:	Send message to client.
  *		We really don't care if anyone is listening or not.
@@ -216,7 +206,7 @@ func pollable(f *os.File) (*os.File, error) {
  *
  *--------------------------------------------------------------------*/
 
-func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen int, kps *kissport_status_s, client int) {
+func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, frame []byte) {
 	if kp == nil {
 		return
 	}
@@ -226,30 +216,48 @@ func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen int
 		return
 	}
 
-	var kiss_buff []byte
+	kp.write(master, kissClientFrame(channel, kiss_cmd, frame, kp.debug, "Pseudo Terminal"))
+} /* SendRecPacket */
 
-	if flen < 0 {
-		if kp.debug > 0 {
-			kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
-		}
+// The pseudo terminal has one client at the far end, which is where an answer
+// to anything it sends goes.
 
-		kiss_buff = fbuf
-	} else {
-		kiss_buff = kissClientFrame(channel, kiss_cmd, fbuf, kp.debug, "Pseudo Terminal")
+func (kp *KissPT) reply(channel int, cmd int, frame []byte) {
+	kp.SendRecPacket(channel, cmd, frame)
+}
+
+func (kp *KissPT) prompt(text []byte) {
+	var master = kp.ptMaster()
+	if master == nil {
+		return
 	}
 
-	var n, err = master.Write(kiss_buff)
+	if kp.debug > 0 {
+		kiss_debug_print(TO_CLIENT, "Fake command prompt", text)
+	}
 
-	if n != len(kiss_buff) {
+	kp.write(master, text)
+}
+
+func (kp *KissPT) radioChannel(frameChannel int) int {
+	return frameChannel
+}
+
+// write sends buf, already framed or the fake command prompt, to the
+// client through master.
+func (kp *KissPT) write(master *os.File, buf []byte) {
+	var n, err = master.Write(buf)
+
+	if n != len(buf) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%s, len=%d, write returned %d, err = %s\n\n",
-			master.Name(), len(kiss_buff), n, err)
+			master.Name(), len(buf), n, err)
 	} else if err != nil /* TODO KG Need to test real behaviour here: && errno == EWOULDBLOCK */ {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS SEND - Discarding message because no one is listening.\n")
 		dw_printf("This happens when you use the -p option and don't read from the pseudo terminal.\n")
 	}
-} /* SendRecPacket */
+}
 
 // openPT opens the pseudo terminal and points the symlink at it.  It is for
 // before the listening goroutine starts, so it takes no lock.
@@ -473,7 +481,7 @@ func (kp *KissPT) get(ctx context.Context) (byte, error) {
  * Purpose:     Read messages from pseudo terminal KISS client application.
  *
  * Description:	Reads bytes from the KISS client app and
- *		sends them to KissRecByte for processing.
+ *		sends them to the KissHandler for processing.
  *
  *--------------------------------------------------------------------*/
 
@@ -529,6 +537,6 @@ func (kp *KissPT) listenThread(ctx context.Context) {
 		if err != nil {
 			return
 		}
-		kp.handler.RecByte(kp.kf, ch, kp.debug, nil, -1, kp.SendRecPacket)
+		kp.handler.RecByte(kp.kf, ch, kp.debug, kp)
 	}
 }

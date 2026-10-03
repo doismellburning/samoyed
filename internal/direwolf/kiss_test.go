@@ -220,7 +220,7 @@ func TestKissPTNotEnabled(t *testing.T) {
 
 	// With no terminal, sending to the client is a no-op rather than a crash.
 	assert.NotPanics(t, func() {
-		kp.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"), 13, nil, -1)
+		kp.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"))
 	})
 }
 
@@ -230,7 +230,7 @@ func TestKissPTNilSendRecPacket(t *testing.T) {
 	var kp *KissPT
 
 	assert.NotPanics(t, func() {
-		kp.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"), 13, nil, -1)
+		kp.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"))
 	})
 }
 
@@ -256,7 +256,7 @@ func TestKissPTSendRecPacket(t *testing.T) {
 
 	var frame = []byte("some received frame")
 
-	kp.SendRecPacket(channel, kiss.CmdDataFrame, frame, len(frame), nil, -1)
+	kp.SendRecPacket(channel, kiss.CmdDataFrame, frame)
 
 	var want = kiss.Encapsulate(append([]byte{byte(channel<<4 | kiss.CmdDataFrame)}, frame...))
 
@@ -270,19 +270,19 @@ func TestKissPTSendRecPacketEscapes(t *testing.T) {
 
 	var frame = []byte{kiss.FEND, 'a', kiss.FESC, 'b'}
 
-	kp.SendRecPacket(0, kiss.CmdDataFrame, frame, len(frame), nil, -1)
+	kp.SendRecPacket(0, kiss.CmdDataFrame, frame)
 
 	assert.Equal(t,
 		[]byte{kiss.FEND, 0x00, kiss.FESC, kiss.TFEND, 'a', kiss.FESC, kiss.TFESC, 'b', kiss.FEND},
 		readKissFrame(t, client))
 }
 
-// A length of -1 says the caller has built the bytes itself - the fake command
-// prompt - and they go out as they are, with no framing or escaping added.
-func TestKissPTSendRecPacketText(t *testing.T) {
+// The fake command prompt is text, not a KISS frame, so it goes out as it is,
+// with no framing or escaping added.
+func TestKissPTPrompt(t *testing.T) {
 	var kp, client = startKissPT(t, 0)
 
-	kp.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
+	kp.prompt([]byte("\r\ncmd:"))
 
 	assert.Equal(t, "\r\ncmd:", readKissText(t, client, len("\r\ncmd:")))
 }
@@ -303,7 +303,7 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 	var got = drainKissFrame(t, client)
 
 	var output = testutils.CaptureOutput(t, func() {
-		kp.SendRecPacket(0, kiss.CmdDataFrame, frame, len(frame), nil, -1)
+		kp.SendRecPacket(0, kiss.CmdDataFrame, frame)
 	})
 
 	assert.Contains(t, output, "Truncated")
@@ -452,7 +452,7 @@ func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	var kp, client = startKissPT(t, 2)
 
 	var output = testutils.CaptureOutput(t, func() {
-		kp.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
+		kp.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readKissFrame(t, client)
 	})
@@ -462,7 +462,7 @@ func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
 	output = testutils.CaptureOutput(t, func() {
-		kp.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
+		kp.prompt([]byte("\r\ncmd:"))
 
 		readKissText(t, client, len("\r\ncmd:"))
 	})
@@ -489,7 +489,7 @@ func TestKissPTSendWhileListening(t *testing.T) {
 			default:
 			}
 
-			kp.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
+			kp.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 		}
 	}()
 

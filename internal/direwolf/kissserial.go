@@ -184,7 +184,7 @@ func NewKissSerial(ctx context.Context, mc *misc_config_s, handler *KissHandler,
  *
  * Name:        SendRecPacket
  *
- * Purpose:     Send a received packet or text string to the client app.
+ * Purpose:     Send a received packet to the client app.
  *
  * Inputs:	chan		- Channel number where packet was received.
  *				  0 = first, 1 = second if any.
@@ -192,18 +192,7 @@ func NewKissSerial(ctx context.Context, mc *misc_config_s, handler *KissHandler,
  *		kiss_cmd	- Usually kiss.CmdDataFrame but we can also have
  *				  kiss.CmdSetHardware when responding to a query.
  *
- *		pp		- Identifier for packet object.
- *
- *		fbuf		- Address of raw received frame buffer
- *				  or a text string.
- *
- *		flen		- Length of raw received frame not including the FCS
- *				  or -1 for a text string.
- *
- *		kps
- *		client		- Not used for serial port version.
- *				  Here so that 3 related functions all have
- *				  the same parameter list.
+ *		frame		- Raw received frame, not including the FCS.
  *
  * Description:	Send message to client.
  *		We really don't care if anyone is listening or not.
@@ -211,8 +200,7 @@ func NewKissSerial(ctx context.Context, mc *misc_config_s, handler *KissHandler,
  *
  *--------------------------------------------------------------------*/
 
-func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen int,
-	notused1 *kissport_status_s, notused2 int) {
+func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, frame []byte) {
 	/*
 	 * Quietly discard if we don't have open connection.
 	 */
@@ -225,20 +213,36 @@ func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen
 		return
 	}
 
-	var kiss_buff []byte
+	ks.write(kissClientFrame(channel, kiss_cmd, frame, ks.debug, "Serial Port"))
+} /* SendRecPacket */
 
-	if flen < 0 {
-		if ks.debug > 0 {
-			kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
-		}
+// The serial port has one client at the far end, which is where an answer to
+// anything it sends goes.
 
-		kiss_buff = fbuf
-	} else {
-		kiss_buff = kissClientFrame(channel, kiss_cmd, fbuf, ks.debug, "Serial Port")
+func (ks *KissSerial) reply(channel int, cmd int, frame []byte) {
+	ks.SendRecPacket(channel, cmd, frame)
+}
+
+func (ks *KissSerial) prompt(text []byte) {
+	var fd, failed = ks.port()
+	if fd == nil || failed {
+		return
 	}
 
-	var kiss_len = len(kiss_buff)
+	if ks.debug > 0 {
+		kiss_debug_print(TO_CLIENT, "Fake command prompt", text)
+	}
 
+	ks.write(text)
+}
+
+func (ks *KissSerial) radioChannel(frameChannel int) int {
+	return frameChannel
+}
+
+// write sends buf, already framed or the fake command prompt, to the
+// client, unless the port has gone or failed.
+func (ks *KissSerial) write(buf []byte) {
 	/*
 	 * This write can block on Windows if using the virtual null modem
 	 * and nothing is connected to the other end.
@@ -265,21 +269,21 @@ func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen
 	defer ks.mu.Unlock()
 
 	// Looked at again now we hold the lock: the listening goroutine may have
-	// given the port up since the check above.
+	// given the port up since the caller looked.
 	if ks.fd == nil || ks.failed {
 		return
 	}
 
-	var n = serialport.Write(ks.fd, kiss_buff)
+	var n = serialport.Write(ks.fd, buf)
 
-	if n != kiss_len {
+	if n != len(buf) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending KISS message to client application thru serial port.\n\n")
 
 		// Not closed here: see KissSerial.failed.
 		ks.failed = true
 	}
-} /* SendRecPacket */
+}
 
 /*-------------------------------------------------------------------
  *
@@ -474,6 +478,6 @@ func (ks *KissSerial) listenThread(ctx context.Context) {
 			return
 		}
 
-		ks.handler.RecByte(ks.kf, ch, ks.debug, nil, -1, ks.SendRecPacket)
+		ks.handler.RecByte(ks.kf, ch, ks.debug, ks)
 	}
 }

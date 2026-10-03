@@ -653,9 +653,9 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 		var fbuf = pp.Pack()
 
 		agwServer.SendRecPacket(u.ttConfig.obj_recv_chan, pp, fbuf)
-		kissNetSvc.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1)
-		kissSerial.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1)
-		kissPT.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1)
+		kissNetSvc.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf)
+		kissSerial.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf)
+		kissPT.SendRecPacket(u.ttConfig.obj_recv_chan, kiss.CmdDataFrame, fbuf)
 	}
 
 	if first_time && u.ttConfig.obj_send_to_ig > 0 {

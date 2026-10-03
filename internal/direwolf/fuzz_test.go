@@ -176,11 +176,11 @@ func FuzzKissRecByte(f *testing.F) {
 
 		var h = setupKissProcessMsg(t)
 
-		var _, sendfun = recordingSendfun()
+		var _, from = recordingKissClient()
 		var kc kiss.Collector
 
 		for _, b := range stream {
-			h.RecByte(&kc, b, int(debug%3), nil, -1, sendfun)
+			h.RecByte(&kc, b, int(debug%3), from)
 		}
 	})
 }

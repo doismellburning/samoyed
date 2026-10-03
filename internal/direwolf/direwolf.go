@@ -1116,10 +1116,10 @@ func app_process_rec_packet(
 
 	var fbuf = pp.Pack()
 
-	agwServer.SendRecPacket(channel, pp, fbuf)                                     // AGW net protocol
-	kissNetSvc.SendRecPacket(channel, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1) // KISS TCP
-	kissSerial.SendRecPacket(channel, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1) // KISS serial port
-	kissPT.SendRecPacket(channel, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
+	agwServer.SendRecPacket(channel, pp, fbuf)                 // AGW net protocol
+	kissNetSvc.SendRecPacket(channel, kiss.CmdDataFrame, fbuf) // KISS TCP
+	kissSerial.SendRecPacket(channel, kiss.CmdDataFrame, fbuf) // KISS serial port
+	kissPT.SendRecPacket(channel, kiss.CmdDataFrame, fbuf)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
 		var ao_pp = ax25.FromText(ais_obj_packet, true)
@@ -1127,9 +1127,9 @@ func app_process_rec_packet(
 			var ao_fbuf = ao_pp.Pack()
 
 			agwServer.SendRecPacket(channel, ao_pp, ao_fbuf)
-			kissNetSvc.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf, len(ao_fbuf), nil, -1)
-			kissSerial.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf, len(ao_fbuf), nil, -1)
-			kissPT.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf, len(ao_fbuf), nil, -1)
+			kissNetSvc.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf)
+			kissSerial.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf)
+			kissPT.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf)
 		}
 	}
 

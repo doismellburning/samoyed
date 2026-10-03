@@ -20,22 +20,40 @@ import (
 // acted on, so it can be driven directly, with a recording stand-in for the
 // function that answers the client.
 
-// sentToClient is one message the TNC sent back to the client application.
+// sentToClient is one message the TNC sent back to the client application:
+// a frame, or the fake command prompt, which is text and has no channel or
+// command.
 type sentToClient struct {
 	channel int
 	cmd     int
 	body    []byte
-	length  int
+	prompt  bool
 }
 
-// recordingSendfun hands back a kiss_sendfun that appends to the slice it
-// returns, so a test can see what the TNC would have answered.
-func recordingSendfun() (*[]sentToClient, kiss_sendfun) {
+// recordingClient is a kissClient that keeps what it is sent, so a test can
+// see what the TNC would have answered.
+type recordingClient struct {
+	sent *[]sentToClient
+}
+
+func (c recordingClient) reply(channel int, cmd int, frame []byte) {
+	*c.sent = append(*c.sent, sentToClient{channel: channel, cmd: cmd, body: frame, prompt: false})
+}
+
+func (c recordingClient) prompt(text []byte) {
+	*c.sent = append(*c.sent, sentToClient{channel: 0, cmd: 0, body: text, prompt: true})
+}
+
+func (c recordingClient) radioChannel(frameChannel int) int {
+	return frameChannel
+}
+
+// recordingKissClient hands back a client that appends what it is sent to
+// the slice it also returns.
+func recordingKissClient() (*[]sentToClient, recordingClient) {
 	var sent = new([]sentToClient)
 
-	return sent, func(channel int, cmd int, body []byte, length int, _ *kissport_status_s, _ int) {
-		*sent = append(*sent, sentToClient{channel: channel, cmd: cmd, body: body, length: length})
-	}
+	return sent, recordingClient{sent: sent}
 }
 
 // kissTestRadioConfig is the channel table the KISS tests hand to
@@ -89,9 +107,9 @@ func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 	kissNetSvc = nil
 
 	var pp = newTestPacket(t)
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), 0, nil, -1, sendfun)
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
 
 	assert.Equal(t,
 		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
@@ -105,12 +123,12 @@ func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 func Test_kiss_process_msg_data_frame(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), 0, nil, -1, sendfun)
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
 
 	assert.Equal(t, 1, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
 	assert.Equal(t, 0, transmitQueue.Count(0, TQ_PRIO_0_HI, "", "", false))
@@ -121,12 +139,12 @@ func Test_kiss_process_msg_data_frame(t *testing.T) {
 func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST,Q3TEST*:hello", true)
 	require.NotNil(t, pp)
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), 0, nil, -1, sendfun)
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
 
 	assert.Equal(t, 1, transmitQueue.Count(0, TQ_PRIO_0_HI, "", "", false))
 }
@@ -137,13 +155,13 @@ func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
 func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
 	var output = testutils.CaptureOutput(t, func() {
-		h.processMsg(append([]byte{0x80 | kiss.CmdDataFrame}, pp.FrameData()...), 0, nil, -1, sendfun)
+		h.processMsg(append([]byte{0x80 | kiss.CmdDataFrame}, pp.FrameData()...), from)
 	})
 
 	assert.Contains(t, output, "Invalid transmit channel 8 from KISS client app")
@@ -158,12 +176,12 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 func Test_kiss_process_msg_invalid_channel_escaped_fend_only(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 	var kc kiss.Collector
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.TFEND, kiss.FEND} {
-			h.RecByte(&kc, b, 0, nil, -1, sendfun)
+			h.RecByte(&kc, b, 0, from)
 		}
 	})
 
@@ -189,15 +207,13 @@ func Test_kiss_debug_print_empty(t *testing.T) {
 func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
-	var _, sendfun = recordingSendfun()
-
 	var kps = new(kissport_status_s)
 	kps.channel = 1
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), 0, kps, 0, sendfun)
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0})
 
 	assert.Equal(t, 1, transmitQueue.Count(1, TQ_PRIO_1_LO, "", "", false), "the port's channel should have been used")
 	assert.Equal(t, 0, transmitQueue.Count(0, TQ_PRIO_1_LO, "", "", false))
@@ -210,8 +226,6 @@ func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
 func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
-	var _, sendfun = recordingSendfun()
-
 	var kps = new(kissport_status_s)
 	kps.channel = MAX_TOTAL_CHANS
 
@@ -222,7 +236,7 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 
 	assert.NotPanics(t, func() {
 		output = testutils.CaptureOutput(t, func() {
-			h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), 0, kps, 0, sendfun)
+			h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0})
 		})
 	})
 
@@ -234,10 +248,10 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 
 	var output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{kiss.CmdDataFrame, 'n', 'o'}, 0, nil, -1, sendfun)
+		h.processMsg([]byte{kiss.CmdDataFrame, 'n', 'o'}, from)
 	})
 
 	assert.Contains(t, output, "Invalid KISS data frame from client app")
@@ -249,13 +263,13 @@ func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 	var xs = h.xmit
 
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 
-	h.processMsg([]byte{kiss.CmdTxDelay, 30}, 0, nil, -1, sendfun)
-	h.processMsg([]byte{kiss.CmdPersistence, 63}, 0, nil, -1, sendfun)
-	h.processMsg([]byte{kiss.CmdSlotTime, 10}, 0, nil, -1, sendfun)
-	h.processMsg([]byte{kiss.CmdTxTail, 10}, 0, nil, -1, sendfun)
-	h.processMsg([]byte{kiss.CmdFullDuplex, 1}, 0, nil, -1, sendfun)
+	h.processMsg([]byte{kiss.CmdTxDelay, 30}, from)
+	h.processMsg([]byte{kiss.CmdPersistence, 63}, from)
+	h.processMsg([]byte{kiss.CmdSlotTime, 10}, from)
+	h.processMsg([]byte{kiss.CmdTxTail, 10}, from)
+	h.processMsg([]byte{kiss.CmdFullDuplex, 1}, from)
 
 	assert.Equal(t, 30, xs.timing[0].txdelay)
 	assert.Equal(t, 63, xs.timing[0].persist)
@@ -270,7 +284,7 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 	var xs = h.xmit
 
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 
 	for _, c := range []struct {
 		name string
@@ -282,7 +296,7 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 		{"TXTAIL", []byte{kiss.CmdTxTail, 1}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() { h.processMsg(c.msg, 0, nil, -1, sendfun) })
+			var output = testutils.CaptureOutput(t, func() { h.processMsg(c.msg, from) })
 
 			assert.Contains(t, output, "Radio Channel - Transmit Timing")
 		})
@@ -298,7 +312,7 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 	var xs = h.xmit
 
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 
 	for _, c := range []struct {
 		name string
@@ -312,7 +326,7 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 		{"SET HARDWARE", kiss.CmdSetHardware},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() { h.processMsg([]byte{c.cmd}, 0, nil, -1, sendfun) })
+			var output = testutils.CaptureOutput(t, func() { h.processMsg([]byte{c.cmd}, from) })
 
 			assert.Contains(t, output, "KISS ERROR")
 		})
@@ -326,10 +340,10 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 func Test_kiss_process_msg_end_kiss(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 
 	var output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{kiss.CmdEndKiss}, 0, nil, -1, sendfun)
+		h.processMsg([]byte{kiss.CmdEndKiss}, from)
 	})
 
 	assert.Contains(t, output, "end KISS mode - Ignored")
@@ -341,10 +355,10 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
-	var _, sendfun = recordingSendfun()
+	var _, from = recordingKissClient()
 
 	var output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{7}, 0, nil, -1, sendfun)
+		h.processMsg([]byte{7}, from)
 	})
 
 	assert.Contains(t, output, "KISS Invalid command 7")
@@ -352,14 +366,14 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	assert.NotContains(t, output, "XKISS")
 
 	output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{kiss.CmdXKissData}, 0, nil, -1, sendfun)
+		h.processMsg([]byte{kiss.CmdXKissData}, from)
 	})
 
 	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
 	assert.Contains(t, output, "Winlink Express")
 
 	output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{kiss.CmdXKissPoll}, 0, nil, -1, sendfun)
+		h.processMsg([]byte{kiss.CmdXKissPoll}, from)
 	})
 
 	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
@@ -371,9 +385,9 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 func Test_kiss_set_hardware_tnc_version(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
-	var sent, sendfun = recordingSendfun()
+	var sent, from = recordingKissClient()
 
-	h.processMsg(append([]byte{kiss.CmdSetHardware}, []byte("TNC:")...), 0, nil, -1, sendfun)
+	h.processMsg(append([]byte{kiss.CmdSetHardware}, []byte("TNC:")...), from)
 
 	require.Len(t, *sent, 1)
 	assert.Equal(t, kiss.CmdSetHardware, (*sent)[0].cmd)
@@ -385,9 +399,9 @@ func Test_kiss_set_hardware_tnc_version(t *testing.T) {
 func Test_kiss_set_hardware_txbuf(t *testing.T) {
 	setupKissProcessMsg(t)
 
-	var sent, sendfun = recordingSendfun()
+	var sent, from = recordingKissClient()
 
-	kiss_set_hardware(0, []byte("TXBUF:"), 0, nil, -1, sendfun)
+	kiss_set_hardware(0, []byte("TXBUF:"), from)
 
 	require.Len(t, *sent, 1)
 	assert.Equal(t, "TXBUF:0", string((*sent)[0].body))
@@ -397,7 +411,7 @@ func Test_kiss_set_hardware_txbuf(t *testing.T) {
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
 
-	kiss_set_hardware(0, []byte("TXBUF:"), 0, nil, -1, sendfun)
+	kiss_set_hardware(0, []byte("TXBUF:"), from)
 
 	require.Len(t, *sent, 2)
 	assert.NotEqual(t, "TXBUF:0", string((*sent)[1].body), "a queued frame should count towards TXBUF")
@@ -409,7 +423,7 @@ func Test_kiss_set_hardware_txbuf(t *testing.T) {
 func Test_kiss_set_hardware_malformed(t *testing.T) {
 	setupKissProcessMsg(t)
 
-	var sent, sendfun = recordingSendfun()
+	var sent, from = recordingKissClient()
 
 	for _, c := range []struct {
 		command string
@@ -422,7 +436,7 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 	} {
 		t.Run(c.command, func(t *testing.T) {
 			var output = testutils.CaptureOutput(t, func() {
-				kiss_set_hardware(0, []byte(c.command), 0, nil, -1, sendfun)
+				kiss_set_hardware(0, []byte(c.command), from)
 			})
 
 			assert.Contains(t, output, c.expect)
@@ -439,10 +453,10 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 // feedKissBytes hands the bytes to the collector one at a time, as a
 // transport does, and returns whatever was sent back to the client.
 func feedKissBytes(h *KissHandler, kf *kiss.Collector, debug int, data []byte) *[]sentToClient {
-	var sent, sendfun = recordingSendfun()
+	var sent, from = recordingKissClient()
 
 	for _, b := range data {
-		h.RecByte(kf, b, debug, nil, -1, sendfun)
+		h.RecByte(kf, b, debug, from)
 	}
 
 	return sent
@@ -473,7 +487,7 @@ func Test_KissRecByte_command_prompt(t *testing.T) {
 
 	require.Len(t, *sent, 1)
 	assert.Equal(t, "\r\ncmd:", string((*sent)[0].body))
-	assert.Equal(t, -1, (*sent)[0].length, "a text reply is not a frame")
+	assert.True(t, (*sent)[0].prompt, "a text reply is not a frame")
 }
 
 // "RESTART" and "RESET" get an empty KISS frame instead, which is what the

@@ -281,11 +281,7 @@ func NewKissHandler(audioConfig *RadioConfig, xmit *XmitService, peers *KissNetS
  * Inputs:	kf	- Current state of building a frame.
  *		ch	- A byte from the input stream.
  *		debug	- Activates debug output.
- *		kps	- KISS TCP port status block.
- *			  nil for pseudo terminal and serial port.
- *		client	- Client app number for TCP KISS.
- *		          Ignored for pseudo termal and serial port.
- *		sendfun	- Function to send something to the client application.
+ *		from	- The client application it came from.
  *
  * Outputs:	kf	- Current state is updated.
  *
@@ -317,11 +313,23 @@ func NewKissHandler(audioConfig *RadioConfig, xmit *XmitService, peers *KissNetS
  * Let's try to keep it happy by sending back a command prompt.
  */
 
-type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
+// kissClient is the client application a message came from, by whichever
+// transport, and where any answer to it goes.
+type kissClient interface {
+	// reply sends frame, of type cmd for radio channel, to this client alone.
+	reply(channel int, cmd int, frame []byte)
+
+	// prompt sends text as it is, not as a KISS frame, to appease a client
+	// that thinks it is driving a traditional TNC in command mode.
+	prompt(text []byte)
+
+	// radioChannel is the radio channel a message from this client is for,
+	// given the one its KISS type byte names.
+	radioChannel(frameChannel int) int
+}
 
 func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
-	kps *kissport_status_s, client int,
-	sendfun kiss_sendfun) {
+	from kissClient) {
 	var chunk = kf.Add(ch)
 
 	switch {
@@ -334,10 +342,9 @@ func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
 		if chunk.EndOfLine {
 			if strings.EqualFold("restart\r", string(chunk.Noise)) ||
 				strings.EqualFold("reset\r", string(chunk.Noise)) {
-				// first 2 parameters don't matter when length is -1 indicating text.
-				sendfun(0, 0, []byte("\xc0\xc0"), -1, kps, client)
+				from.prompt([]byte("\xc0\xc0"))
 			} else {
-				sendfun(0, 0, []byte("\r\ncmd:"), -1, kps, client)
+				from.prompt([]byte("\r\ncmd:"))
 			}
 		}
 
@@ -371,7 +378,7 @@ func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
 			dwutil.HexDump(unwrapped[1:])
 		}
 
-		h.processMsg(unwrapped, debug, kps, client, sendfun)
+		h.processMsg(unwrapped, from)
 	}
 } /* end RecByte */
 
@@ -386,34 +393,19 @@ func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
  *
  *		kiss_len	- Number of bytes including the command.
  *
- *		debug		- Debug option is selected.
- *
- *		kps		- Used only for TCP KISS.
- *				  Should be nil for pseudo terminal and serial port.
- *
- *		client		- Client app number for TCP KISS.
- *				  Should be -1 for pseudo termal and serial port.
- *
- *		sendfun		- Function to send something to the client application.
- *				  "Set Hardware" can send a response.
+ *		from		- The client application it came from.
+ *				  "Set Hardware" can send it a response.
  *
  *-----------------------------------------------------------------*/
 
 // This is used only by the TNC side.
 
-func (h *KissHandler) processMsg(kiss_msg []byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
+func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 	// New in 1.7:
 	// We can have KISS TCP ports which convey only a single radio channel.
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.
-
-	var channel int
-	if kps != nil && kps.channel != -1 {
-		// Ignore channel from KISS and substitute radio channel for that KISS TCP port.
-		channel = kps.channel
-	} else {
-		// Normal case of getting radio channel from the KISS frame.
-		channel = int(kiss_msg[0]>>4) & 0xf
-	}
+	// Normally, though, the radio channel is the one the KISS frame names.
+	var channel = from.radioChannel(int(kiss_msg[0]>>4) & 0xf)
 
 	var alevel ax25.ALevel
 	var cmd = kiss_msg[0] & 0xf
@@ -422,7 +414,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, debug int, kps *kissport_statu
 	case kiss.CmdDataFrame: /* 0 = Data Frame */
 		// The copies carry the channel and command we have already
 		// determined, rather than the first byte as it came.
-		h.peers.Copy(kiss_msg, channel, int(cmd), kps, client)
+		h.peers.Copy(kiss_msg, channel, int(cmd), from)
 
 		/* Note July 2017: There is a variant of of KISS, called SMACK, that assumes */
 		/* a TNC can never have more than 8 channels.  http://symek.de/g/smack.html */
@@ -617,7 +609,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, debug int, kps *kissport_statu
 
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol set hardware \"%s\", channel %d\n", kiss_msg[1:], channel)
-		kiss_set_hardware(channel, kiss_msg[1:], debug, kps, client, sendfun)
+		kiss_set_hardware(channel, kiss_msg[1:], from)
 
 	case kiss.CmdEndKiss: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
@@ -658,20 +650,12 @@ func (h *KissHandler) processMsg(kiss_msg []byte, debug int, kps *kissport_statu
  *				  Case sensitive.
  *				  Will be modified so be sure caller doesn't care.
  *
- *		debug		- debug level.
- *
- *		client		- Client app number for TCP KISS.
- *				  Needed so we can send any response to the right client app.
- *				  Ignored for pseudo terminal and serial port.
- *
- *		sendfun		- Function to send something to the client application.
+ *		from		- The client application it came from.
  *
  *				  This is the tricky part.  We can have any combination of
  *				  serial port, pseudo terminal, and multiple TCP clients.
  *				  We need to send the response to same place where query came
- *				  from.  The function is different for each class of device
- *				  and we need a client number for the TCP case because we
- *				  can have multiple TCP KISS clients at the same time.
+ *				  from, which is what from's reply does.
  *
  *
  * Description:	This is new in version 1.5.  "Set hardware" was previously ignored.
@@ -731,7 +715,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, debug int, kps *kissport_statu
  *
  *--------------------------------------------------------------------*/
 
-func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) { //nolint:unparam
+func kiss_set_hardware(channel int, command []byte, from kissClient) {
 	var cmd, value, found = bytes.Cut(command, []byte{':'})
 
 	if found {
@@ -742,7 +726,7 @@ func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_sta
 			}
 
 			var response = fmt.Sprintf("DIREWOLF %d.%d", MAJOR_VERSION, MINOR_VERSION)
-			sendfun(channel, kiss.CmdSetHardware, []byte(response), len(response), kps, client)
+			from.reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else if bytes.Equal(cmd, []byte("TXBUF")) { /* TXBUF - Number of bytes in transmit queue. */
 			if len(value) > 0 {
 				text_color_set(DW_COLOR_ERROR)
@@ -751,7 +735,7 @@ func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_sta
 
 			var n = transmitQueue.Count(channel, -1, "", "", true)
 			var response = fmt.Sprintf("TXBUF:%d", n)
-			sendfun(channel, kiss.CmdSetHardware, []byte(response), len(response), kps, client)
+			from.reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS Set Hardware unrecognized command: %s.\n", cmd)
