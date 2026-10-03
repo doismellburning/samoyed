@@ -236,11 +236,11 @@ func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 	kiss_process_msg([]byte{kiss.CmdTxTail, 10}, kissTestRadioConfig(), 0, nil, -1, sendfun)
 	kiss_process_msg([]byte{kiss.CmdFullDuplex, 1}, kissTestRadioConfig(), 0, nil, -1, sendfun)
 
-	assert.Equal(t, 30, xs.txdelay[0])
-	assert.Equal(t, 63, xs.persist[0])
-	assert.Equal(t, 10, xs.slottime[0])
-	assert.Equal(t, 10, xs.txtail[0])
-	assert.True(t, xs.fulldup[0])
+	assert.Equal(t, 30, xs.timing[0].txdelay)
+	assert.Equal(t, 63, xs.timing[0].persist)
+	assert.Equal(t, 10, xs.timing[0].slottime)
+	assert.Equal(t, 10, xs.timing[0].txtail)
+	assert.True(t, xs.timing[0].fulldup)
 }
 
 // A value nobody would want on purpose is applied, because the client asked,
@@ -267,7 +267,7 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 	}
 
 	// Applied all the same.
-	assert.Equal(t, 200, xs.txdelay[0])
+	assert.Equal(t, 200, xs.timing[0].txdelay)
 }
 
 // A parameter command with no parameter is a protocol error, and leaves the
@@ -295,7 +295,7 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 		})
 	}
 
-	assert.Equal(t, 0, xs.txdelay[0])
+	assert.Equal(t, 0, xs.timing[0].txdelay)
 }
 
 // Leaving KISS mode is for a TNC that has another mode to go back to.  We
