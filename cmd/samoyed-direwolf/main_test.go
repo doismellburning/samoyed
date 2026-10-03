@@ -4,14 +4,11 @@
 package main
 
 import (
-	"bufio"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
-	"time"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/require"
@@ -50,10 +47,11 @@ func TestPrintUTF8Test(t *testing.T) {
 	require.Contains(t, result.Stdout, "UTF-8 test string: mañana ° Füße\n")
 }
 
-// startDirewolf starts the built command and waits for it to finish starting
-// up.  It returns the running process and a function that reads back whatever
-// it has printed so far.
-func startDirewolf(t *testing.T, binary string) (*exec.Cmd, func() string) {
+// startDirewolf starts the command's main with a configuration that needs no
+// hardware.  Audio comes from its standard input, which nothing writes to, so
+// the receive loop has something to block on and the process stays up until it
+// is signalled.
+func startDirewolf(t *testing.T) *testutils.Process {
 	t.Helper()
 
 	var dir = t.TempDir()
@@ -61,39 +59,7 @@ func startDirewolf(t *testing.T, binary string) (*exec.Cmd, func() string) {
 	var configName = filepath.Join(dir, "direwolf.conf")
 	require.NoError(t, os.WriteFile(configName, []byte(shutdownTestConfig), 0o600))
 
-	var outputName = filepath.Join(dir, "output.txt")
-
-	var output, createErr = os.Create(outputName) //nolint:gosec
-	require.NoError(t, createErr)
-
-	t.Cleanup(func() { output.Close() })
-
-	var printed = func() string {
-		var content, readErr = os.ReadFile(outputName) //nolint:gosec
-		require.NoError(t, readErr)
-
-		return string(content)
-	}
-
-	// Audio comes from a pipe nothing ever writes to, so the receive loop has
-	// something to block on and the process stays up until it is signalled.
-	var audio, audioWriter, pipeErr = os.Pipe()
-	require.NoError(t, pipeErr)
-
-	t.Cleanup(func() { audio.Close(); audioWriter.Close() })
-
-	var cmd = exec.CommandContext(t.Context(), binary, "-c", configName, "-L", filepath.Join(dir, "packets.log"), "-") //nolint:gosec
-	cmd.Stdin = audio
-	cmd.Stdout = output
-	cmd.Stderr = output
-
-	require.NoError(t, cmd.Start())
-
-	require.Eventually(t, func() bool {
-		return strings.Contains(printed(), startupComplete)
-	}, 30*time.Second, 50*time.Millisecond, "Never finished starting up: %s", printed())
-
-	return cmd, printed
+	return testutils.StartMain(t, "-c", configName, "-L", filepath.Join(dir, "packets.log"), "-")
 }
 
 // TestSignalShutsDownCleanly covers the supervised stop: a .deb install is
@@ -102,25 +68,15 @@ func startDirewolf(t *testing.T, binary string) (*exec.Cmd, func() string) {
 // disposition, so the process was killed outright and cleanup - which is what
 // unkeys a CM108 or hamlib PTT - never ran.
 func TestSignalShutsDownCleanly(t *testing.T) {
-	var binary = testutils.BuildCommand(t)
-
 	for _, signal := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
 		t.Run(signal.String(), func(t *testing.T) {
-			var cmd, printed = startDirewolf(t, binary)
+			var p = startDirewolf(t)
 
-			require.NoError(t, cmd.Process.Signal(signal))
+			p.WaitFor(t, startupComplete)
+			p.Signal(t, signal)
 
-			var waited = make(chan error, 1)
-			go func() { waited <- cmd.Wait() }()
-
-			select {
-			case err := <-waited:
-				require.NoError(t, err, "%s did not shut the process down cleanly: %s", signal, printed())
-			case <-time.After(30 * time.Second):
-				t.Fatalf("%s did not shut the process down at all: %s", signal, printed())
-			}
-
-			require.Contains(t, printed(), "QRT", "%s ended the process without running cleanup", signal)
+			require.Equal(t, 0, p.Wait(), "%s did not shut the process down cleanly: %s", signal, p.Output())
+			require.Contains(t, p.Output(), "QRT", "%s ended the process without running cleanup", signal)
 		})
 	}
 }
@@ -132,55 +88,20 @@ func TestSignalShutsDownCleanly(t *testing.T) {
 // it.  Startup has to stop at the signal and the teardown has to come after
 // it: nothing startup does may appear once the teardown has begun.
 func TestSignalDuringStartupStopsStartup(t *testing.T) {
-	var binary = testutils.BuildCommand(t)
-
 	for _, signal := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
 		t.Run(signal.String(), func(t *testing.T) {
-			var dir = t.TempDir()
+			var p = startDirewolf(t)
 
-			var configName = filepath.Join(dir, "direwolf.conf")
-			require.NoError(t, os.WriteFile(configName, []byte(shutdownTestConfig), 0o600))
+			// The output is read as it comes, so the signal lands while
+			// startup is still under way.  The configuration file is read
+			// after the signal handler is installed and before anything is
+			// acquired.
+			p.WaitFor(t, "Reading config file")
+			p.Signal(t, signal)
 
-			var audio, audioWriter, pipeErr = os.Pipe()
-			require.NoError(t, pipeErr)
+			require.Equal(t, 0, p.Wait(), "%s did not shut the process down cleanly: %s", signal, p.Output())
 
-			t.Cleanup(func() { audio.Close(); audioWriter.Close() })
-
-			var cmd = exec.CommandContext(t.Context(), binary, "-c", configName, "-L", filepath.Join(dir, "packets.log"), "-") //nolint:gosec
-			cmd.Stdin = audio
-
-			// Read the output as it comes, rather than polling a file for it,
-			// so that the signal lands while startup is still under way.
-			var stdout, stdoutErr = cmd.StdoutPipe()
-			require.NoError(t, stdoutErr)
-
-			cmd.Stderr = cmd.Stdout
-
-			require.NoError(t, cmd.Start())
-
-			var output strings.Builder
-
-			var scanner = bufio.NewScanner(stdout)
-
-			// The configuration file is read after the signal handler is
-			// installed and before anything is acquired.
-			for scanner.Scan() {
-				output.WriteString(scanner.Text() + "\n")
-
-				if strings.HasPrefix(scanner.Text(), "Reading config file") {
-					break
-				}
-			}
-
-			require.NoError(t, cmd.Process.Signal(signal))
-
-			for scanner.Scan() {
-				output.WriteString(scanner.Text() + "\n")
-			}
-
-			require.NoError(t, cmd.Wait(), "%s did not shut the process down cleanly: %s", signal, output.String())
-
-			var printed = output.String()
+			var printed = p.Output()
 
 			var _, afterTeardown, tornDown = strings.Cut(printed, "QRT")
 			require.True(t, tornDown, "%s ended the process without running cleanup: %s", signal, printed)

@@ -33,25 +33,6 @@ const raceWarning = "WARNING: DATA RACE"
 //nolint:gochecknoglobals // A variable so that these helpers' own tests can see one time out.
 var ProcessTimeout = 30 * time.Second
 
-// BuildCommand builds the command whose tests are running - the package in the
-// current directory - and returns the path to the binary.  Tests that need the
-// real thing, such as what a signal does to the process, run that.
-func BuildCommand(t *testing.T) string {
-	t.Helper()
-
-	var wd, wdErr = os.Getwd()
-	require.NoError(t, wdErr)
-
-	var binary = filepath.Join(t.TempDir(), filepath.Base(wd))
-
-	var build = exec.CommandContext(t.Context(), "go", "build", "-o", binary, ".") //nolint:gosec // Building ourselves.
-
-	var out, err = build.CombinedOutput()
-	require.NoError(t, err, "Building the command failed: %s", out)
-
-	return binary
-}
-
 // runMainEnv, when set, has a test binary that calls RunMainIfAsked run main
 // with the arguments it holds, JSON-encoded, instead of its tests.
 const runMainEnv = "SAMOYED_TESTUTILS_RUN_MAIN"
@@ -287,9 +268,20 @@ func (p *Process) Signal(t *testing.T, sig os.Signal) {
 	require.NoError(t, p.cmd.Process.Signal(sig))
 }
 
+// Output is everything the command has printed so far, stdout and stderr
+// interleaved, whether or not WaitFor has read it.  Once Wait has returned,
+// that is everything it printed.
+func (p *Process) Output() string {
+	p.outputMu.Lock()
+	defer p.outputMu.Unlock()
+
+	return p.output.String()
+}
+
 // Wait waits for the command to exit, and returns its exit status.  Whatever
-// it printed that WaitFor hadn't read is discarded.  A command killed for
-// taking longer than ProcessTimeout fails the test once it is over.
+// it printed that WaitFor hadn't read is gone from WaitFor, though Output still
+// has it.  A command killed for taking longer than ProcessTimeout fails the
+// test once it is over.
 func (p *Process) Wait() int {
 	p.once.Do(func() {
 		for range p.lines { // Drain what's left so Wait can finish.

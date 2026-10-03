@@ -95,6 +95,16 @@ func TestStartMain(t *testing.T) {
 	assert.Equal(t, 0, p.Wait(), "waiting again gives the same answer")
 }
 
+func TestOutput(t *testing.T) {
+	var p = StartMain(t, "lines", "one", "two", "three")
+
+	p.WaitFor(t, "one")
+	require.NoError(t, p.Stdin.Close())
+	assert.Equal(t, 0, p.Wait())
+
+	assert.Equal(t, "one\ntwo\nthree\nstdin closed\n", p.Output(), "including what WaitFor never read")
+}
+
 func TestSignal(t *testing.T) {
 	// It carries on until stdin closes, which here it never does.
 	var p = StartMain(t, "lines", "started")
