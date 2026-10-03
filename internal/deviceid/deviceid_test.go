@@ -9,6 +9,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // FromMicE needs only the MIC-E table, so a Data whose tocalls section is
@@ -43,4 +44,31 @@ func TestLookupsWithoutTablesDoNotLogPerPacket(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[string](), device)
 
 	assert.Empty(t, hook.AllEntries())
+}
+
+func TestFromYAML(t *testing.T) {
+	var d, err = FromYAML([]byte(`
+tocalls:
+ - tocall: APQ1??
+   vendor: Q1TEST
+   model: Widget
+mice:
+ - suffix: "_Q"
+   vendor: Q1TEST
+   model: Gadget
+`))
+
+	require.NoError(t, err)
+	assert.Equal(t, maybe.Just("Q1TEST Widget"), d.FromDest("APQ123"))
+
+	var trimmed, device = d.FromMicE("`Comment_Q")
+	assert.Equal(t, "Comment", trimmed)
+	assert.Equal(t, maybe.Just("Q1TEST Gadget"), device)
+}
+
+func TestFromYAMLMalformed(t *testing.T) {
+	var d, err = FromYAML([]byte("tocalls: [unterminated"))
+
+	require.Error(t, err)
+	assert.Equal(t, maybe.Nothing[string](), d.FromDest("APQ123"), "a malformed file gives empty tables, not nil")
 }
