@@ -30,6 +30,10 @@ import (
  *		max_fec	- 1 to send maximum FEC size rather than automatic.
  *			  Only consulted for IL2P_VERSION_0_4.
  *
+ *		crc	- true to append the trailing CRC.  A frame that a
+ *			  type 1 header would not rebuild exactly then gets
+ *			  a type 0 header, so the CRC still matches.
+ *
  * Outputs:	iout	- Encoded result, excluding the 3 byte sync word.
  *			  Caller should provide  IL2P_MAX_PACKET_SIZE  bytes.
  *
@@ -54,6 +58,12 @@ func il2p_encode_frame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc
 
 	// Can a type 1 header be used?
 	var hdr, e = il2p_type_1_header(pp, fec_level)
+
+	// The receiver checks the CRC against the frame it rebuilds from the
+	// header, so only use a type 1 header that rebuilds this frame exactly.
+	if e >= 0 && appendCRC && !il2pType1RoundTrips(pp, hdr) {
+		e = -1
+	}
 
 	if e >= 0 {
 		var outbuf = new(bytes.Buffer)
@@ -146,6 +156,22 @@ func il2p_encode_frame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc
 
 	// AX.25 Information part is too large.
 	return nil, -1
+}
+
+// il2pType1RoundTrips reports whether hdr, a type 1 header made from pp,
+// rebuilds pp exactly.  It cannot always: AX.25 v1 C bits (both set or both
+// clear) come back as a command or response, for instance.
+func il2pType1RoundTrips(pp *ax25.Packet, hdr []byte) bool {
+	var rebuilt = il2p_decode_header_type_1(hdr, 0)
+	if rebuilt == nil {
+		return false
+	}
+
+	if len(pp.Info()) > 0 {
+		rebuilt.SetInfo(pp.Info())
+	}
+
+	return bytes.Equal(rebuilt.FrameData(), pp.FrameData())
 }
 
 /*-------------------------------------------------------------

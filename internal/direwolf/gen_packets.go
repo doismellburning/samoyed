@@ -522,6 +522,7 @@ type GenPacketsModemFlags struct {
 	mark            *int
 	space           *int
 	il2pVersion     *string
+	il2pCRC         *bool
 }
 
 // AddGenPacketsModemFlags registers the modulator options on fs.
@@ -536,6 +537,7 @@ func AddGenPacketsModemFlags(fs *pflag.FlagSet) *GenPacketsModemFlags {
     0.6     - 16 parity symbols per payload block, that bit reserved.  (default)
     0.4     - The header FEC Level bit says which FEC level is in use.
     compat  - Same as 0.4.`)
+	f.il2pCRC = fs.Bool("il2p-crc", true, "Append a trailing CRC to IL2P frames.  --il2p-crc=false to leave it out.")
 
 	return f
 }
@@ -592,6 +594,7 @@ func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
 	}
 
 	achan.il2p_version = il2p_version
+	achan.il2p_crc = *f.il2pCRC
 
 	return f.layer2.apply(achan)
 }

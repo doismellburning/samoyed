@@ -29,6 +29,7 @@ func newAtest(t *testing.T) *direwolf.Atest {
 
 	var opts = new(direwolf.AtestOptions)
 	opts.IL2PVersion = "0.6"
+	opts.IL2PCRC = true
 
 	var atest, err = direwolf.NewAtest(opts)
 	require.NoError(t, err)
@@ -149,6 +150,32 @@ func Test_main_debugsFEC(t *testing.T) {
 			var cmd = exec.CommandContext(t.Context(), "gen_packets", append(tc.genArgs, "-n", "1", "-o", f)...) //nolint:gosec
 			require.NoError(t, cmd.Run())
 
+			var result = testutils.RunMain(t, "", append(tc.args, f)...)
+
+			assert.Equal(t, 0, result.Status, result.Output())
+			assert.Contains(t, result.Output(), tc.want)
+		})
+	}
+}
+
+// Test_main_il2pCRC checks --il2p-crc against Dire Wolf's IL2P, which carries
+// no trailing CRC: expecting one, nothing gets through.
+func Test_main_il2pCRC(t *testing.T) {
+	var f = filepath.Join(t.TempDir(), "il2p.wav")
+
+	var cmd = exec.CommandContext(t.Context(), "gen_packets", "-I", "1", "-o", f) //nolint:gosec
+	require.NoError(t, cmd.Run())
+
+	var testCases = map[string]struct {
+		args []string
+		want string
+	}{
+		"CRC expected":     {nil, "0 packets decoded"},
+		"CRC not expected": {[]string{"--il2p-crc=false"}, "4 packets decoded"},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
 			var result = testutils.RunMain(t, "", append(tc.args, f)...)
 
 			assert.Equal(t, 0, result.Status, result.Output())
