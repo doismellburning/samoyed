@@ -803,8 +803,9 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 	 */
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
-	// Perform the add as unsigned to avoid signed overflow error.
-	D.slicer[slice].data_clock_pll = (int32)((uint32)(D.slicer[slice].data_clock_pll) + (uint32)(D.pll_step_per_sample)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	// Wraps on overflow, as the PLL relies on.  (C does the add as unsigned because
+	// signed overflow is undefined there; in Go it is defined to wrap.)
+	D.slicer[slice].data_clock_pll += D.pll_step_per_sample
 
 	if D.slicer[slice].data_clock_pll < 0 && D.slicer[slice].prev_d_c_pll >= 0 {
 		/* Overflow of PLL counter. */
