@@ -27,7 +27,7 @@ func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
 
 	var xs = new(XmitService)
 	xs.audio = new(AudioDevices)
-	xs.fulldup[channel] = true // Skip the channel-busy check and random wait.
+	xs.timing[channel].fulldup = true // Skip the channel-busy check and random wait.
 
 	// The transmit queues are package globals shared with every other test
 	// here, some of which leave entries behind, so empty this channel's rather
@@ -44,6 +44,43 @@ func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
 	}
 
 	xs.audio.outputMu[ACHAN2ADEV(channel)].Unlock()
+}
+
+// A KISS client sets a channel's transmit timing from its own listening
+// goroutine, while the channel's xmit_thread reads it on its way to every
+// transmission.  Run under -race, this reports the two touching the timing at
+// once unless something orders them.
+func TestXmitTimingSetWhileTransmitting(t *testing.T) {
+	var channel = 0
+
+	var xs = new(XmitService)
+	xs.audio = new(AudioDevices)
+	xs.SetFulldup(channel, true) // Skip the channel-busy check and random wait.
+
+	for _, prio := range []int{TQ_PRIO_0_HI, TQ_PRIO_1_LO} {
+		for transmitQueue.Remove(channel, prio) != nil {
+		}
+	}
+
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for i := range 100 {
+			xs.SetTxdelay(channel, i)
+			xs.SetPersist(channel, i)
+			xs.SetSlottime(channel, i)
+			xs.SetTxtail(channel, i)
+			xs.SetFulldup(channel, true)
+		}
+	}()
+
+	for range 100 {
+		xs.xmit_next(t.Context(), channel)
+	}
+
+	<-done
 }
 
 // A channel whose audio device has no output must not transmit at all: keying
@@ -587,7 +624,7 @@ func TestXmitSpeakItScriptFails(t *testing.T) {
 func TestXmitNextDoesNotBundleBehindADigipeatedFrame(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	xs.fulldup[0] = true // Skip the channel-busy check and random wait.
+	xs.timing[0].fulldup = true // Skip the channel-busy check and random wait.
 
 	var digipeated = ax25.FromText("Q1TEST>Q2TEST,Q3TEST*:repeated", true)
 	require.NotNil(t, digipeated)
@@ -610,7 +647,7 @@ func TestXmitNextDoesNotBundleBehindADigipeatedFrame(t *testing.T) {
 func TestXmitNextBundlesOrdinaryFrames(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	xs.fulldup[0] = true
+	xs.timing[0].fulldup = true
 
 	for _, text := range []string{"Q1TEST>Q2TEST:first", "Q1TEST>Q2TEST:second"} {
 		var pp = ax25.FromText(text, true)
@@ -639,8 +676,8 @@ func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
 
 	hdlcReceiver = NewHDLCReceiver(xs.p_modem, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
 
-	xs.slottime[0] = 100 // A second per slot,
-	xs.persist[0] = -1   // and never our turn.
+	xs.timing[0].slottime = 100 // A second per slot,
+	xs.timing[0].persist = -1   // and never our turn.
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
@@ -683,7 +720,7 @@ func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
 func TestXmitNextSendsAPRSttMorseWhenCancelled(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	xs.fulldup[0] = true
+	xs.timing[0].fulldup = true
 
 	var pp = ax25.FromText("Q1TEST>MORSE:HI", true)
 	require.NotNil(t, pp)
@@ -704,7 +741,7 @@ func TestXmitNextSendsAPRSttMorseWhenCancelled(t *testing.T) {
 func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	xs.fulldup[0] = true
+	xs.timing[0].fulldup = true
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
@@ -771,7 +808,7 @@ func timeXmitNext(t *testing.T, xs *XmitService, text string) (time.Duration, st
 func TestXmitNextMorseSpeedFromSSID(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	xs.fulldup[0] = true
+	xs.timing[0].fulldup = true
 
 	// What the two speeds would take.  morse_send generates the sound and
 	// says how long it is, without waiting for it, so asking it costs
@@ -804,7 +841,7 @@ func TestXmitNextMorseSpeedFromSSID(t *testing.T) {
 func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	xs.fulldup[0] = true
+	xs.timing[0].fulldup = true
 
 	// Long enough that the speed, rather than the fixed padding either side,
 	// decides how long the transmission takes, and that the speeds are far

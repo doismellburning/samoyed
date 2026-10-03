@@ -174,14 +174,13 @@ func FuzzKissRecByte(f *testing.F) {
 			t.Skip()
 		}
 
-		setupKissProcessMsg(t)
+		var h = setupKissProcessMsg(t)
 
-		var audioConfig = kissTestRadioConfig()
-		var _, sendfun = recordingSendfun()
+		var _, from = recordingKissClient()
 		var kc kiss.Collector
 
 		for _, b := range stream {
-			KissRecByte(&kc, audioConfig, b, int(debug%3), nil, -1, sendfun)
+			h.RecByte(&kc, b, int(debug%3), from)
 		}
 	})
 }

@@ -21,7 +21,6 @@ import (
 	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
-	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -66,10 +65,8 @@ var waypointSender *WaypointSender
 var aprsLogger *aprslog.Logger
 var beaconService *BeaconService
 var gpsReceiver *dwgps.GPS
-var kissNetSvc *KissNetService
-var kissPT *KissPT
-var kissSerial *KissSerial
 var agwServer *AGWServer
+var clientApplications *clientApps
 var mheardDB *mheard.DB
 var aprsDigipeater *Digipeater
 var connectedDigipeater *ConnectedDigipeater
@@ -496,12 +493,6 @@ x = Silence FX.25 information.`)
 	stopIfCancelled(ctx)
 
 	/*
-	 * Initialize the APRStt gateway.  Each audio device's receive thread
-	 * makes the touch tone decoders for its own channels.
-	 */
-	ttGateway = NewTTGateway(audio_config, &dw_tt_config, aprstt_debug)
-
-	/*
 	 * Should there be an option for audio output level?
 	 * Note:  This is not the same as a volume control you would see on the screen.
 	 * It is the range of the digital sound representation.
@@ -665,8 +656,13 @@ x = Silence FX.25 information.`)
 	 */
 	agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
 	metrics_init(ctx, audio_config, misc_config)
-	kissNetSvc = NewKissNetService(misc_config, audio_config, d_n_opt)
-	kissNetSvc.Start(ctx)
+	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
+
+	// All three KISS transports hand what their clients send to the same
+	// handler, which copies data frames to the TCP clients with KISSCOPY.
+	var kissHandler = NewKissHandler(audio_config, xmitSvc, kissNetSvc)
+
+	kissNetSvc.Start(ctx, kissHandler)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
 	// Let's just check [0] for now...
@@ -679,9 +675,23 @@ x = Silence FX.25 information.`)
 	/*
 	 * Create a pseudo terminal and KISS TNC emulator.
 	 */
-	kissPT = NewKissPT(ctx, misc_config, audio_config, d_k_opt)
-	kissSerial = NewKissSerial(ctx, misc_config, audio_config, d_k_opt)
+	var kissPT = NewKissPT(ctx, misc_config, kissHandler, d_k_opt)
+	var kissSerial = NewKissSerial(ctx, misc_config, kissHandler, d_k_opt)
 	stopIfCancelled(ctx)
+
+	// What we hear goes to each of these.
+	clientApplications = new(clientApps)
+	clientApplications.agw = agwServer
+	clientApplications.kissNet = kissNetSvc
+	clientApplications.kissSerial = kissSerial
+	clientApplications.kissPT = kissPT
+
+	/*
+	 * Initialize the APRStt gateway, which sends its object reports to the
+	 * client applications too.  Each audio device's receive thread makes the
+	 * touch tone decoders for its own channels, once receiving starts below.
+	 */
+	ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprstt_debug)
 
 	/*
 	 * Open port for communication with GPS.
@@ -1106,25 +1116,12 @@ func app_process_rec_packet(
 	}
 
 	/* Send to another application if connected. */
-	// TODO:  Put a wrapper around this so we only call one function to send by all methods.
-	// We see the same sequence in tt_user.c.
-
-	var fbuf = pp.Pack()
-
-	agwServer.SendRecPacket(channel, pp, fbuf)                                     // AGW net protocol
-	kissNetSvc.SendRecPacket(channel, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1) // KISS TCP
-	kissSerial.SendRecPacket(channel, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1) // KISS serial port
-	kissPT.SendRecPacket(channel, kiss.CmdDataFrame, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
+	clientApplications.SendRecPacket(channel, pp)
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
 		var ao_pp = ax25.FromText(ais_obj_packet, true)
 		if ao_pp != nil {
-			var ao_fbuf = ao_pp.Pack()
-
-			agwServer.SendRecPacket(channel, ao_pp, ao_fbuf)
-			kissNetSvc.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf, len(ao_fbuf), nil, -1)
-			kissSerial.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf, len(ao_fbuf), nil, -1)
-			kissPT.SendRecPacket(channel, kiss.CmdDataFrame, ao_fbuf, len(ao_fbuf), nil, -1)
+			clientApplications.SendRecPacket(channel, ao_pp)
 		}
 	}
 

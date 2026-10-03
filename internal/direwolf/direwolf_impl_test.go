@@ -87,9 +87,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 		origMheard      = mheardDB
 		origWaypoint    = waypointSender
 		origAGW         = agwServer
-		origKissNet     = kissNetSvc
-		origKissSerial  = kissSerial
-		origKissPT      = kissPT
+		origApps        = clientApplications
 		origIGate       = igate
 		origDigi        = aprsDigipeater
 		origCDigi       = connectedDigipeater
@@ -105,9 +103,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 		mheardDB = origMheard
 		waypointSender = origWaypoint
 		agwServer = origAGW
-		kissNetSvc = origKissNet
-		kissSerial = origKissSerial
-		kissPT = origKissPT
+		clientApplications = origApps
 		igate = origIGate
 		aprsDigipeater = origDigi
 		connectedDigipeater = origCDigi
@@ -149,9 +145,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	waypointSender = ws
 
 	agwServer = nil
-	kissNetSvc = NewKissNetService(new(misc_config_s), audioConfig, 0)
-	kissSerial = nil
-	kissPT = nil
+	clientApplications = nil
 
 	var igateConfig = new(igate_config_s)
 	var digiConfig = new(digi_config_s)
@@ -160,7 +154,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	igate = NewIGate(audioConfig, igateConfig, digiConfig, filter, 0)
 	aprsDigipeater = NewDigipeater(audioConfig, digiConfig, filter)
 	connectedDigipeater = NewConnectedDigipeater(audioConfig, new(cdigi_config_s), filter)
-	ttGateway = NewTTGateway(audioConfig, &dw_tt_config, 0)
+	ttGateway = NewTTGateway(audioConfig, &dw_tt_config, nil, 0)
 
 	return &recPacketTest{audioConfig: audioConfig, waypoints: waypoints}
 }

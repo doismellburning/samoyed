@@ -105,13 +105,13 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	mc.kiss_port[0] = port
 	mc.kiss_chan[0] = channel
 
-	var kns = NewKissNetService(mc, kissTestRadioConfig(), 0)
+	var kns = NewKissNetService(mc, 0)
 
 	// A client's reader polls for it to attach; not every real second,
 	// though, which would cost each test here most of one.
 	kns.pollInterval = 10 * time.Millisecond
 
-	kns.Start(t.Context())
+	kns.Start(t.Context(), NewKissHandler(kissTestRadioConfig(), new(XmitService), kns))
 
 	return kns, port
 }
@@ -208,7 +208,7 @@ func TestKissNetSendRecPacket(t *testing.T) {
 
 	var frame = []byte{'h', 'i', kiss.FEND}
 
-	kns.SendRecPacket(channel, kiss.CmdDataFrame, frame, len(frame), nil, -1)
+	kns.SendRecPacket(channel, kiss.CmdDataFrame, frame)
 
 	assert.Equal(t,
 		[]byte{kiss.FEND, channel << 4, 'h', 'i', kiss.FESC, kiss.TFEND, kiss.FEND},
@@ -225,8 +225,8 @@ func TestKissNetSendRecPacketSingleChannelPort(t *testing.T) {
 
 	// A frame from a channel this port does not carry is not passed on, so
 	// the one after it is what turns up.
-	kns.SendRecPacket(channel+1, kiss.CmdDataFrame, []byte("other"), 5, nil, -1)
-	kns.SendRecPacket(channel, kiss.CmdDataFrame, []byte("mine"), 4, nil, -1)
+	kns.SendRecPacket(channel+1, kiss.CmdDataFrame, []byte("other"))
+	kns.SendRecPacket(channel, kiss.CmdDataFrame, []byte("mine"))
 
 	assert.Equal(t, []byte{kiss.FEND, 0x00, 'm', 'i', 'n', 'e', kiss.FEND}, readKissNetFrame(t, clients[0]))
 }
@@ -236,7 +236,7 @@ func TestKissNetSendRecPacketSingleChannelPort(t *testing.T) {
 func TestKissNetSendRecPacketToOneClient(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 2)
 
-	kns.SendRecPacket(0, kiss.CmdSetHardware, []byte("TXBUF:0"), 7, kns.allPorts, 1)
+	kissNetClient{kns: kns, kps: kns.allPorts, client: 1, conn: kns.allPorts.clientConn(1)}.reply(0, kiss.CmdSetHardware, []byte("TXBUF:0"))
 
 	assert.Equal(t,
 		kiss.Encapsulate(append([]byte{kiss.CmdSetHardware}, []byte("TXBUF:0")...)),
@@ -245,13 +245,37 @@ func TestKissNetSendRecPacketToOneClient(t *testing.T) {
 	requireNothingToRead(t, clients[0], "the answer went to a client that did not ask")
 }
 
-// A length of -1 is the fake command prompt, which goes out as it is - and
-// says why, because it means the application is treating us as an old TNC.
-func TestKissNetSendRecPacketText(t *testing.T) {
+// An answer goes to the client that asked, over the connection it asked on.
+// If that client has gone and another has since taken its slot, the answer -
+// or the command prompt - is dropped rather than handed to the newcomer, who
+// never asked for it.
+func TestKissNetReplyNotToTheNextClientInTheSlot(t *testing.T) {
+	var kns, clients = newAttachedKissNet(t, -1, false, 1)
+	var kps = kns.allPorts
+
+	var askerConn = kps.clientConn(0)
+	var asker = kissNetClient{kns: kns, kps: kps, client: 0, conn: askerConn}
+
+	askerConn.Close()
+	kps.detachClientIfCurrent(0, askerConn)
+	clients[0].Close()
+
+	var server, newcomer = connectedTCPPair(t)
+	require.True(t, kps.attachClient(0, server))
+
+	asker.reply(0, kiss.CmdSetHardware, []byte("TNC:DIREWOLF"))
+	asker.prompt([]byte("\r\ncmd:"))
+
+	requireNothingToRead(t, newcomer, "the newcomer was sent an answer to a question it never asked")
+}
+
+// The fake command prompt goes out as it is - and says why, because it means
+// the application is treating us as an old TNC.
+func TestKissNetPrompt(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
 	var output = testutils.CaptureOutput(t, func() {
-		kns.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
+		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
 	})
 
 	assert.Contains(t, output, "Is client app treating this like an old TNC with command mode?")
@@ -275,7 +299,7 @@ func TestKissNetSendRecPacketWriteErrorDetachesTheClient(t *testing.T) {
 	// go into the kernel's buffer and the reset comes back afterwards - so
 	// what matters is that it does not stay attached forever.
 	assert.Eventually(t, func() bool {
-		kns.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
+		kns.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 
 		return kns.allPorts.clientConn(0) == nil
 	}, 10*time.Second, 50*time.Millisecond, "a client that had gone away was never detached")
@@ -288,7 +312,7 @@ func TestKissNetCopyBetweenClients(t *testing.T) {
 
 	const channel = 1
 
-	kns.Copy([]byte{0x00, 'h', 'i'}, channel, kiss.CmdDataFrame, kns.allPorts, 0)
+	kns.Copy([]byte{0x00, 'h', 'i'}, channel, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
 
 	assert.Equal(t,
 		[]byte{kiss.FEND, channel << 4, 'h', 'i', kiss.FEND},
@@ -305,8 +329,8 @@ func TestKissNetCopySingleChannelPort(t *testing.T) {
 
 	var kns, clients = newAttachedKissNet(t, channel, true, 2)
 
-	kns.Copy([]byte{0x00, 'n', 'o'}, channel+1, kiss.CmdDataFrame, kns.allPorts, 0)
-	kns.Copy([]byte{0x00, 'h', 'i'}, channel, kiss.CmdDataFrame, kns.allPorts, 0)
+	kns.Copy([]byte{0x00, 'n', 'o'}, channel+1, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
+	kns.Copy([]byte{0x00, 'h', 'i'}, channel, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
 
 	assert.Equal(t, []byte{kiss.FEND, 0x00, 'h', 'i', kiss.FEND}, readKissNetFrame(t, clients[1]))
 }
@@ -315,7 +339,7 @@ func TestKissNetCopySingleChannelPort(t *testing.T) {
 func TestKissNetCopyDisabled(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 2)
 
-	kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kns.allPorts, 0)
+	kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
 
 	requireNothingToRead(t, clients[1], "a frame was copied with KISSCOPY disabled")
 }
@@ -327,7 +351,7 @@ func TestKissNetCopyWriteErrorDetachesTheClient(t *testing.T) {
 	require.NoError(t, clients[1].Close())
 
 	assert.Eventually(t, func() bool {
-		kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kns.allPorts, 0)
+		kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
 
 		return kns.allPorts.clientConn(1) == nil
 	}, 10*time.Second, 50*time.Millisecond, "a client that had gone away was never detached")
@@ -340,7 +364,7 @@ func TestKissNetCopyDoesNotModifyTheCallersFrame(t *testing.T) {
 
 	var msg = []byte{0x00, 'h', 'i'}
 
-	kns.Copy(msg, 2, kiss.CmdDataFrame, kns.allPorts, 0)
+	kns.Copy(msg, 2, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
 
 	assert.Equal(t, []byte{0x00, 'h', 'i'}, msg)
 }
@@ -354,7 +378,7 @@ func TestKissNetDebugPrints(t *testing.T) {
 	kns.debug = 2
 
 	var output = testutils.CaptureOutput(t, func() {
-		kns.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
+		kns.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readKissNetFrame(t, clients[0])
 	})
@@ -364,7 +388,7 @@ func TestKissNetDebugPrints(t *testing.T) {
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
 	output = testutils.CaptureOutput(t, func() {
-		kns.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
+		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
 	})
 
 	assert.Contains(t, output, "Fake command prompt")
@@ -395,7 +419,7 @@ func TestKissNetStartedTwiceComplains(t *testing.T) {
 
 	t.Cleanup(hook.Reset)
 
-	kns.Start(t.Context())
+	kns.Start(t.Context(), kns.handler)
 
 	// Only the errors: the probe waitUntilListening made may still be being
 	// reported as a client attaching.
@@ -461,36 +485,19 @@ func TestKissNetListenFails(t *testing.T) {
 	assert.Contains(t, entry.Message, "Listen failed")
 }
 
-// setupKissNetTNC gives the KISS command handling what it reaches for, but
-// deliberately not the transmit queue.
-//
-// A service's listening goroutines outlive the test that started them - there
-// is nothing to wait on - and TransmitQueue.Init writes the queue's fields without
-// holding its lock, so a later test initialising the queue would race with
-// anything one of these goroutines had put on it.  Hence the end-to-end tests
-// here exercise commands that are answered rather than transmitted; a client's
-// data frame reaching the queue is covered against the transports whose
-// goroutine a test can wait for, in kiss_test.go and kissserial_test.go.
-func setupKissNetTNC(t *testing.T) {
-	t.Helper()
-
-	var origXmit, origKissNet = xmitSvc, kissNetSvc
-
-	t.Cleanup(func() {
-		xmitSvc, kissNetSvc = origXmit, origKissNet
-	})
-
-	xmitSvc = new(XmitService)
-}
+// The end-to-end tests below exercise commands that are answered rather than
+// transmitted, and leave the transmit queue alone.  A service's listening
+// goroutines outlive the test that started them - there is nothing to wait on
+// - and TransmitQueue.Init writes the queue's fields without holding its lock,
+// so a later test initialising the queue would race with anything one of
+// these goroutines had put on it.  A client's data frame reaching the queue is
+// covered against the transports whose goroutine a test can wait for, in
+// kiss_test.go and kissserial_test.go.
 
 // The round trip: a client's command is collected from the socket, acted on,
 // and the answer written back to that same client.
 func TestKissNetClientCommandIsAnswered(t *testing.T) {
-	setupKissNetTNC(t)
-
 	var kns, port = startKissNet(t, -1)
-
-	kissNetSvc = kns
 
 	var conn, _ = dialKissNet(t, kns, port)
 
@@ -509,19 +516,15 @@ func TestKissNetClientCommandIsAnswered(t *testing.T) {
 // A client's data frame is checked against the channel table the service was
 // built with.  Here the port carries a channel that table does not have, so
 // the frame is turned away - before it gets near the transmit queue, which
-// setupKissNetTNC leaves alone - and the client is still answered afterwards.
+// these tests leave alone - and the client is still answered afterwards.
 // A service that lost its table on the way to the check would panic in the
 // listening goroutine instead, and take the test binary down with it.
 func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
-	setupKissNetTNC(t)
-
 	const unconfigured = 5
 
 	var kns, port = startKissNet(t, unconfigured)
 
-	kissNetSvc = kns
-
-	require.Equal(t, MEDIUM_NONE, kns.audioConfigP.chan_medium[unconfigured])
+	require.Equal(t, MEDIUM_NONE, kns.handler.audioConfig.chan_medium[unconfigured])
 
 	var conn, _ = dialKissNet(t, kns, port)
 
@@ -545,11 +548,7 @@ func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
 // An application that thinks it is driving an old command-mode TNC is
 // answered with a command prompt, which is what stops it asking.
 func TestKissNetAnswersCommandModeNoise(t *testing.T) {
-	setupKissNetTNC(t)
-
 	var kns, port = startKissNet(t, -1)
-
-	kissNetSvc = kns
 
 	var conn, _ = dialKissNet(t, kns, port)
 

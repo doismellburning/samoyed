@@ -36,6 +36,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -47,6 +48,27 @@ import (
 
 const MORSE_DEFAULT_WPM = 10
 
+// xmitTiming is one channel's transmit timing: what the configuration file
+// set, unless a client application has since changed it.
+type xmitTiming struct {
+	slottime int /* Slot time in 10 mS units for persistence algorithm. */
+
+	persist int /* Sets probability for transmitting after each */
+	/* slot time delay.  Transmit if a random number */
+	/* in range of 0 - 255 <= persist value.  */
+	/* Otherwise wait another slot time and try again. */
+
+	txdelay int /* After turning on the transmitter, */
+	/* send "flags" for txdelay * 10 mS. */
+
+	txtail int /* Amount of time to keep transmitting after we */
+	/* are done sending the data.  This is to avoid */
+	/* dropping PTT too soon and chopping off the end */
+	/* of the frame.  Again 10 mS units. */
+
+	fulldup bool /* Full duplex if true. */
+}
+
 /*
  * XmitService holds all transmit state.
  * Each channel can have different timing values.
@@ -56,22 +78,13 @@ const MORSE_DEFAULT_WPM = 10
  */
 
 type XmitService struct {
-	slottime [MAX_RADIO_CHANS]int /* Slot time in 10 mS units for persistence algorithm. */
+	// timingMu guards timing, which a client application can change - KISS
+	// has a command for each of its fields - from its listening goroutine,
+	// while the channel's xmit_thread reads it.  Go through the Set methods and
+	// channelTiming rather than touching it directly.
+	timingMu sync.Mutex
 
-	persist [MAX_RADIO_CHANS]int /* Sets probability for transmitting after each */
-	/* slot time delay.  Transmit if a random number */
-	/* in range of 0 - 255 <= persist value.  */
-	/* Otherwise wait another slot time and try again. */
-
-	txdelay [MAX_RADIO_CHANS]int /* After turning on the transmitter, */
-	/* send "flags" for txdelay * 10 mS. */
-
-	txtail [MAX_RADIO_CHANS]int /* Amount of time to keep transmitting after we */
-	/* are done sending the data.  This is to avoid */
-	/* dropping PTT too soon and chopping off the end */
-	/* of the frame.  Again 10 mS units. */
-
-	fulldup [MAX_RADIO_CHANS]bool /* Full duplex if true. */
+	timing [MAX_RADIO_CHANS]xmitTiming
 
 	bits_per_sec [MAX_RADIO_CHANS]int /* Data transmission rate. */
 	/* Often called baud rate which is equivalent for */
@@ -165,11 +178,13 @@ func NewXmitService(ctx context.Context, p_modem *RadioConfig, audio *AudioDevic
 
 	for j := range MAX_RADIO_CHANS {
 		xs.bits_per_sec[j] = p_modem.achan[j].baud
-		xs.slottime[j] = p_modem.achan[j].slottime
-		xs.persist[j] = p_modem.achan[j].persist
-		xs.txdelay[j] = p_modem.achan[j].txdelay
-		xs.txtail[j] = p_modem.achan[j].txtail
-		xs.fulldup[j] = p_modem.achan[j].fulldup
+		xs.timing[j] = xmitTiming{
+			slottime: p_modem.achan[j].slottime,
+			persist:  p_modem.achan[j].persist,
+			txdelay:  p_modem.achan[j].txdelay,
+			txtail:   p_modem.achan[j].txtail,
+			fulldup:  p_modem.achan[j].fulldup,
+		}
 	}
 
 	logrus.Debug("xmit_init: about to call tq_init")
@@ -221,32 +236,52 @@ func NewXmitService(ctx context.Context, p_modem *RadioConfig, audio *AudioDevic
 
 func (xs *XmitService) SetTxdelay(channel, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
-		xs.txdelay[channel] = value
+		xs.timingMu.Lock()
+		xs.timing[channel].txdelay = value
+		xs.timingMu.Unlock()
 	}
 }
 
 func (xs *XmitService) SetPersist(channel, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
-		xs.persist[channel] = value
+		xs.timingMu.Lock()
+		xs.timing[channel].persist = value
+		xs.timingMu.Unlock()
 	}
 }
 
 func (xs *XmitService) SetSlottime(channel, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
-		xs.slottime[channel] = value
+		xs.timingMu.Lock()
+		xs.timing[channel].slottime = value
+		xs.timingMu.Unlock()
 	}
 }
 
 func (xs *XmitService) SetTxtail(channel, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
-		xs.txtail[channel] = value
+		xs.timingMu.Lock()
+		xs.timing[channel].txtail = value
+		xs.timingMu.Unlock()
 	}
 }
 
 func (xs *XmitService) SetFulldup(channel int, value bool) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
-		xs.fulldup[channel] = value
+		xs.timingMu.Lock()
+		xs.timing[channel].fulldup = value
+		xs.timingMu.Unlock()
 	}
+}
+
+// channelTiming returns channel's transmit timing as it stands, all of it
+// under the one lock, so that a client application changing it part way
+// through can't hand back a mixture that never coexisted.
+func (xs *XmitService) channelTiming(channel int) xmitTiming {
+	xs.timingMu.Lock()
+	defer xs.timingMu.Unlock()
+
+	return xs.timing[channel]
 }
 
 // hdlcSender is channel's HDLCSender, made on first use.  Only the channel's
@@ -466,7 +501,8 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 	 * If there is something in the high priority queue, begin transmitting immediately.
 	 * Otherwise, wait a random amount of time, in hopes of minimizing collisions.
 	 */
-	var ok = xs.wait_for_clear_channel(ctx, channel, xs.slottime[channel], xs.persist[channel], xs.fulldup[channel])
+	var timing = xs.channelTiming(channel)
+	var ok = xs.wait_for_clear_channel(ctx, channel, timing.slottime, timing.persist, timing.fulldup)
 
 	if ok {
 		// Corresponding lock is in wait_for_clear_channel.  Releasing it with
@@ -683,14 +719,16 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	dataLinkQueue.SeizeConfirm(channel) // C4.2.  "This primitive indicates, to the Data-link State
 	// machine, that the transmission opportunity has arrived."
 
-	var pre_flags = xs.msToBits(xs.txdelay[channel]*10, channel) / 8
+	var timing = xs.channelTiming(channel)
+
+	var pre_flags = xs.msToBits(timing.txdelay*10, channel) / 8
 
 	/* Total number of bits in transmission including all flags and bit stuffing. */
 	var num_bits = xs.hdlcSender(channel).SendPreamblePostamble(pre_flags, false)
 
 	logrus.WithFields(logrus.Fields{
 		"t":         time.Since(time_ptt),
-		"txdelay":   xs.txdelay[channel],
+		"txdelay":   timing.txdelay,
 		"pre_flags": pre_flags,
 		"num_bits":  num_bits,
 	}).Debug("xmit_thread: preamble")
@@ -781,12 +819,12 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	 * Need TXTAIL because we don't know exactly when the sound is done.
 	 */
 
-	var post_flags = xs.msToBits(xs.txtail[channel]*10, channel) / 8
+	var post_flags = xs.msToBits(timing.txtail*10, channel) / 8
 	nb = xs.hdlcSender(channel).SendPreamblePostamble(post_flags, true)
 	num_bits += nb
 	logrus.WithFields(logrus.Fields{
 		"t":          time.Since(time_ptt),
-		"txtail":     xs.txtail[channel],
+		"txtail":     timing.txtail,
 		"post_flags": post_flags,
 		"nb":         nb,
 		"num_bits":   num_bits,
@@ -1095,7 +1133,8 @@ func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = morse_send(xs.toneGenerators[c], c, string(pinfo), wpm, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
+	var timing = xs.channelTiming(c)
+	var _length_ms = morse_send(xs.toneGenerators[c], c, string(pinfo), wpm, max(timing.txdelay*10, 300), max(timing.txtail*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.
@@ -1145,7 +1184,8 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = dtmf_send(xs.toneGenerators[c], c, string(pinfo), speed, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
+	var timing = xs.channelTiming(c)
+	var _length_ms = dtmf_send(xs.toneGenerators[c], c, string(pinfo), speed, max(timing.txdelay*10, 300), max(timing.txtail*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.

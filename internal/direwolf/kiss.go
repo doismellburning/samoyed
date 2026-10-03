@@ -63,7 +63,6 @@ import (
 	"sync"
 
 	"github.com/creack/pty"
-	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
@@ -75,7 +74,7 @@ import (
 type KissPT struct {
 	debug int /* Print information flowing from and to client. */
 
-	audioConfig *RadioConfig // Which channels the client may transmit on.
+	handler *KissHandler // Acts on what the client sends.
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
@@ -106,9 +105,9 @@ type KissPT struct {
 const TMP_KISSTNC_SYMLINK = "/tmp/kisstnc"
 
 // newKissPT builds a KissPT with nothing opened or started.
-func newKissPT(audioConfig *RadioConfig, debug int) *KissPT {
+func newKissPT(handler *KissHandler, debug int) *KissPT {
 	var kp = new(KissPT)
-	kp.audioConfig = audioConfig
+	kp.handler = handler
 	kp.debug = debug
 	kp.kf = new(kiss.Collector)
 
@@ -135,8 +134,8 @@ func newKissPT(audioConfig *RadioConfig, debug int) *KissPT {
  *
  *--------------------------------------------------------------------*/
 
-func NewKissPT(ctx context.Context, mc *misc_config_s, audioConfig *RadioConfig, debug int) *KissPT {
-	var kp = newKissPT(audioConfig, debug)
+func NewKissPT(ctx context.Context, mc *misc_config_s, handler *KissHandler, debug int) *KissPT {
+	var kp = newKissPT(handler, debug)
 
 	if mc.enable_kiss_pt {
 		// Nothing else is running yet, so there is no lock to take.
@@ -188,7 +187,7 @@ func pollable(f *os.File) (*os.File, error) {
  *
  * Name:        SendRecPacket
  *
- * Purpose:     Send a received packet or text string to the client app.
+ * Purpose:     Send a received packet to the client app.
  *
  * Inputs:	chan		- Channel number where packet was received.
  *				  0 = first, 1 = second if any.
@@ -196,17 +195,7 @@ func pollable(f *os.File) (*os.File, error) {
  *		kiss_cmd	- Usually kiss.CmdDataFrame but we can also have
  *				  kiss.CmdSetHardware when responding to a query.
  *
- *		pp		- Identifier for packet object.
- *
- *		fbuf		- Address of raw received frame buffer
- *				  or a text string.
- *
- *		flen		- Length of raw received frame not including the FCS
- *				  or -1 for a text string.
- *
- *		kps, client	- Not used for pseudo terminal.
- *				  Here so that 3 related functions all have
- *				  the same parameter list.
+ *		frame		- Raw received frame, not including the FCS.
  *
  * Description:	Send message to client.
  *		We really don't care if anyone is listening or not.
@@ -217,7 +206,7 @@ func pollable(f *os.File) (*os.File, error) {
  *
  *--------------------------------------------------------------------*/
 
-func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen int, kps *kissport_status_s, client int) {
+func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, frame []byte) {
 	if kp == nil {
 		return
 	}
@@ -227,56 +216,48 @@ func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen int
 		return
 	}
 
-	var kiss_buff []byte
+	kp.write(master, kissClientFrame(channel, kiss_cmd, frame, kp.debug, "Pseudo Terminal"))
+} /* SendRecPacket */
 
-	if flen < 0 {
-		if kp.debug > 0 {
-			kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
-		}
+// The pseudo terminal has one client at the far end, which is where an answer
+// to anything it sends goes.
 
-		kiss_buff = fbuf
-	} else {
-		var stemp []byte
+func (kp *KissPT) reply(channel int, cmd int, frame []byte) {
+	kp.SendRecPacket(channel, cmd, frame)
+}
 
-		if flen > ax25.MaxPacketLen {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nPseudo Terminal KISS buffer too small.  Truncated.\n\n")
-
-			fbuf = fbuf[:ax25.MaxPacketLen]
-		}
-
-		stemp = []byte{byte((channel << 4) | kiss_cmd)}
-		stemp = append(stemp, fbuf...)
-
-		if kp.debug >= 2 {
-			/* AX.25 frame with the CRC removed. */
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("\n")
-			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			dwutil.HexDump(fbuf)
-		}
-
-		kiss_buff = kiss.Encapsulate(stemp)
-
-		/* This has KISS framing and escapes for sending to client app. */
-
-		if kp.debug > 0 {
-			kiss_debug_print(TO_CLIENT, "", kiss_buff)
-		}
+func (kp *KissPT) prompt(text []byte) {
+	var master = kp.ptMaster()
+	if master == nil {
+		return
 	}
 
-	var n, err = master.Write(kiss_buff)
+	if kp.debug > 0 {
+		kiss_debug_print(TO_CLIENT, "Fake command prompt", text)
+	}
 
-	if n != len(kiss_buff) {
+	kp.write(master, text)
+}
+
+func (kp *KissPT) radioChannel(frameChannel int) int {
+	return frameChannel
+}
+
+// write sends buf, already framed or the fake command prompt, to the
+// client through master.
+func (kp *KissPT) write(master *os.File, buf []byte) {
+	var n, err = master.Write(buf)
+
+	if n != len(buf) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%s, len=%d, write returned %d, err = %s\n\n",
-			master.Name(), len(kiss_buff), n, err)
+			master.Name(), len(buf), n, err)
 	} else if err != nil /* TODO KG Need to test real behaviour here: && errno == EWOULDBLOCK */ {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS SEND - Discarding message because no one is listening.\n")
 		dw_printf("This happens when you use the -p option and don't read from the pseudo terminal.\n")
 	}
-} /* SendRecPacket */
+}
 
 // openPT opens the pseudo terminal and points the symlink at it.  It is for
 // before the listening goroutine starts, so it takes no lock.
@@ -500,7 +481,7 @@ func (kp *KissPT) get(ctx context.Context) (byte, error) {
  * Purpose:     Read messages from pseudo terminal KISS client application.
  *
  * Description:	Reads bytes from the KISS client app and
- *		sends them to KissRecByte for processing.
+ *		sends them to the KissHandler for processing.
  *
  *--------------------------------------------------------------------*/
 
@@ -556,6 +537,6 @@ func (kp *KissPT) listenThread(ctx context.Context) {
 		if err != nil {
 			return
 		}
-		KissRecByte(kp.kf, kp.audioConfig, ch, kp.debug, nil, -1, kp.SendRecPacket)
+		kp.handler.RecByte(kp.kf, ch, kp.debug, kp)
 	}
 }

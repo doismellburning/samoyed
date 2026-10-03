@@ -65,7 +65,7 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*KissSerial, <-chan struct{}) {
 	t.Helper()
 
-	var ks = newKissSerial(mc, kissTestRadioConfig(), 0)
+	var ks = newKissSerial(mc, NewKissHandler(kissTestRadioConfig(), new(XmitService), nil), 0)
 
 	if mc.kiss_serial_poll == 0 {
 		ks.fd = serialport.Open(mc.kiss_serial_port, mc.kiss_serial_speed)
@@ -102,7 +102,7 @@ func openKissSerialPort(t *testing.T, debug int) (*KissSerial, *os.File) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var ks = newKissSerial(mc, kissTestRadioConfig(), debug)
+	var ks = newKissSerial(mc, NewKissHandler(kissTestRadioConfig(), new(XmitService), nil), debug)
 
 	t.Cleanup(ks.closePort)
 
@@ -170,7 +170,7 @@ func TestKissSerialNoPortConfigured(t *testing.T) {
 
 	// With no port, sending to the client is a no-op rather than a crash.
 	assert.NotPanics(t, func() {
-		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"), 13, nil, -1)
+		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"))
 	})
 }
 
@@ -181,7 +181,7 @@ func TestKissSerialNilSendRecPacket(t *testing.T) {
 	var ks *KissSerial
 
 	assert.NotPanics(t, func() {
-		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"), 13, nil, -1)
+		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("nowhere to go"))
 	})
 }
 
@@ -208,7 +208,7 @@ func TestKissSerialSendRecPacket(t *testing.T) {
 
 	var frame = []byte{'h', 'i', kiss.FEND, kiss.FESC}
 
-	ks.SendRecPacket(channel, kiss.CmdDataFrame, frame, len(frame), nil, -1)
+	ks.SendRecPacket(channel, kiss.CmdDataFrame, frame)
 
 	assert.Equal(t,
 		[]byte{kiss.FEND, channel << 4, 'h', 'i', kiss.FESC, kiss.TFEND, kiss.FESC, kiss.TFESC, kiss.FEND},
@@ -224,14 +224,14 @@ func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 	require.NoError(t, client.Close())
 
 	var output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
+		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 	})
 
 	assert.Contains(t, output, "Error sending KISS message to client application thru serial port")
 	assert.True(t, ks.failed, "the serial port was not given up after the write error")
 
 	output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
+		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 	})
 
 	assert.Empty(t, output, "the serial port was written to again after the write error")
@@ -245,12 +245,12 @@ func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 	assert.False(t, ks.failed)
 }
 
-// A length of -1 says the caller has built the bytes itself - the fake command
-// prompt - and they go out as they are, with no framing or escaping added.
-func TestKissSerialSendRecPacketText(t *testing.T) {
+// The fake command prompt is text, not a KISS frame, so it goes out as it is,
+// with no framing or escaping added.
+func TestKissSerialPrompt(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 0)
 
-	ks.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
+	ks.prompt([]byte("\r\ncmd:"))
 
 	assert.Equal(t, "\r\ncmd:", readSerialText(t, client, len("\r\ncmd:")))
 }
@@ -271,7 +271,7 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	var got = drainKissFrame(t, client)
 
 	var output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(0, kiss.CmdDataFrame, frame, len(frame), nil, -1)
+		ks.SendRecPacket(0, kiss.CmdDataFrame, frame)
 	})
 
 	assert.Contains(t, output, "Truncated")
@@ -288,13 +288,6 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 
 	// Laid out like the channel table startKissSerial gives the TNC.
 	var audioConfig = kissTestRadioConfig()
-
-	var origXmitSvc, origKissNetSvc = xmitSvc, kissNetSvc
-
-	t.Cleanup(func() { xmitSvc, kissNetSvc = origXmitSvc, origKissNetSvc })
-
-	xmitSvc = new(XmitService)
-	kissNetSvc = NewKissNetService(new(misc_config_s), audioConfig, 0)
 
 	transmitQueue.Init(audioConfig)
 
@@ -451,7 +444,7 @@ func TestKissSerialDebugPrints(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 2)
 
 	var output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
+		ks.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readSerialKissFrame(t, client)
 	})
@@ -460,7 +453,7 @@ func TestKissSerialDebugPrints(t *testing.T) {
 	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
 
 	output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
+		ks.prompt([]byte("\r\ncmd:"))
 	})
 
 	assert.Contains(t, output, "Fake command prompt")
@@ -491,7 +484,7 @@ func TestKissSerialSendWhileListening(t *testing.T) {
 			default:
 			}
 
-			ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"), 5, nil, -1)
+			ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 		}
 	}()
 
