@@ -182,6 +182,8 @@ jobs:
         working-directory: "."
       - run: make bootstrap
       - run: make check
+      - run: make web  # The in-browser APRS tool, published with the docs
+        working-directory: "."
       - run: make dirhtml
         id: docs-build
       - run: make test
