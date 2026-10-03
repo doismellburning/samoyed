@@ -29,8 +29,8 @@ func ascii_to_sixbit(a rune) byte {
 	return (31) // '?' for any invalid.
 }
 
-func sixbit_to_ascii(s byte) rune {
-	return rune(s + ' ')
+func sixbit_to_ascii(s byte) byte {
+	return s + ' '
 }
 
 // Functions for setting the various header fields.
@@ -272,7 +272,7 @@ func il2p_type_1_header(pp *ax25.Packet, fec_level int) ([]byte, int) {
 	}
 
 	// Byte 12 has DEST SSID in upper nybble and SRC SSID in lower nybble and
-	hdr[12] = byte((dst_ssid << 4) | src_ssid) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	hdr[12] = byte(dst_ssid&0xf)<<4 | byte(src_ssid&0xf)
 
 	var cr, _, pf, nr, ns, frame_type = pp.FrameType()
 
@@ -473,7 +473,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
 
 	var byteBuf []byte
 	for i := range 6 {
-		byteBuf = append(byteBuf, byte(sixbit_to_ascii(hdr[i]&0x3f))) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+		byteBuf = append(byteBuf, sixbit_to_ascii(hdr[i]&0x3f))
 	}
 
 	addrs[ax25.Destination] = strings.TrimSpace(string(byteBuf))
@@ -496,7 +496,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *ax25.Packet {
 
 	byteBuf = []byte{}
 	for i := range 6 {
-		byteBuf = append(byteBuf, byte(sixbit_to_ascii(hdr[i+6]&0x3f))) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+		byteBuf = append(byteBuf, sixbit_to_ascii(hdr[i+6]&0x3f))
 	}
 
 	addrs[ax25.Source] = strings.TrimSpace(string(byteBuf))
