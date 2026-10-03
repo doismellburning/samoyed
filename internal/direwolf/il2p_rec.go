@@ -131,7 +131,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 				F.shdr[F.hc] = byte(F.acc & 0xff)
 				F.hc++
 			} else {
-				F.shdr[F.hc] = byte(^F.acc) & 0xff //nolint:gosec // G115: unchecked narrowing conversion, see #294
+				F.shdr[F.hc] = byte(^F.acc & 0xff)
 				F.hc++
 			}
 
@@ -204,7 +204,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 				F.spayload[F.pc] = byte(F.acc & 0xff)
 				F.pc++
 			} else {
-				F.spayload[F.pc] = byte(^F.acc) & 0xff //nolint:gosec // G115: unchecked narrowing conversion, see #294
+				F.spayload[F.pc] = byte(^F.acc & 0xff)
 				F.pc++
 			}
 
@@ -229,7 +229,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 				F.scrc[F.cc] = byte(F.acc & 0xff)
 				F.cc++
 			} else {
-				F.scrc[F.cc] = byte(^F.acc) & 0xff //nolint:gosec // G115: unchecked narrowing conversion, see #294
+				F.scrc[F.cc] = byte(^F.acc & 0xff)
 				F.cc++
 			}
 			if F.cc == IL2P_CRC_ENCODED_SIZE {
