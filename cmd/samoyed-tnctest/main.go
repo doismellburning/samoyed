@@ -43,7 +43,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math"
 	"net"
 	"os"
 	"strconv"
@@ -796,11 +795,7 @@ func tnc_send_data(from int, to int, data string) {
 		copy(header.CallFrom[:], tnc_address[from])
 		copy(header.CallTo[:], tnc_address[to])
 
-		if len(data) > math.MaxUint32 {
-			panic("len(data) exceeds uint32 maximum!")
-		}
-
-		header.DataLen = uint32(len(data))
+		header.DataLen = agwpe.DataLen(data)
 
 		var writeErr = binary.Write(tnctest_server_sock[from], binary.LittleEndian, header)
 		if writeErr != nil {

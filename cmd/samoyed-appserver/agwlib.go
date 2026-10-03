@@ -208,7 +208,7 @@ func tnc_listen_thread() {
 				var data = make([]byte, header.DataLen)
 
 				var n, err = io.ReadFull(s_tnc_sock, data)
-				if uint32(n) != header.DataLen || err != nil {
+				if n != len(data) || err != nil {
 					fmt.Printf("Error getting message data from network TNC: %s\n", err)
 					fmt.Printf("Tried to read %d bytes but got only %d.\n", header.DataLen, n)
 					fmt.Printf("Closing socket to network TNC.\n\n")
@@ -445,7 +445,7 @@ func agwlib_D_send_connected_data(channel byte, pid byte, call_from agwpe.Callsi
 	h.PID = pid // Normally 0xF0 but other special cases are possible.
 	h.CallFrom = call_from
 	h.CallTo = call_to
-	h.DataLen = uint32(len(data))
+	h.DataLen = agwpe.DataLen(data)
 
 	var headerErr = binary.Write(s_tnc_sock, binary.LittleEndian, h)
 	if headerErr != nil {

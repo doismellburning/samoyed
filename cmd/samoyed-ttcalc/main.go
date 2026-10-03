@@ -158,7 +158,7 @@ func main() {
 				hdr.DataKind = 'K'
 
 				var reply_bytes = reply_pp.Pack()
-				hdr.DataLen = 1 + uint32(len(reply_bytes))
+				hdr.DataLen = 1 + agwpe.DataLen(reply_bytes)
 
 				var replyWriteErr = binary.Write(server_sock, binary.LittleEndian, hdr)
 				if replyWriteErr == nil {

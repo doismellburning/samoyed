@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"io"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -33,6 +34,13 @@ type Header struct {
 	CallTo       Callsign
 	DataLen      uint32
 	UserReserved [4]byte
+}
+
+// DataLen returns len(data) for a Header's DataLen.  Nothing the AGWPE API
+// carries comes anywhere near 4GiB, so data that doesn't fit is a bug, and
+// panics rather than going out with a wrapped length.
+func DataLen[T ~[]byte | ~string](data T) uint32 {
+	return safecast.MustConvert[uint32](len(data))
 }
 
 type Message struct {
