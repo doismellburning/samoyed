@@ -98,7 +98,7 @@ func generate9600(t *testing.T, audioConfig *RadioConfig, channel int, frames []
 
 	var samples = make([]int, 0, len(sink.data)/2)
 	for i := 0; i < len(sink.data); i += 2 {
-		samples = append(samples, int(int16(binary.LittleEndian.Uint16(sink.data[i:]))))
+		samples = append(samples, int(int16(binary.LittleEndian.Uint16(sink.data[i:])))) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 	}
 
 	return samples

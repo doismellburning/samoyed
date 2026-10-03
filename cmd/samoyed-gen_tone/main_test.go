@@ -37,10 +37,10 @@ func (s *recordingSink) Flush(int) int {
 func risingZeroCrossings(data []byte) int {
 	var crossings = 0
 
-	var previous = int16(binary.LittleEndian.Uint16(data))
+	var previous = int16(binary.LittleEndian.Uint16(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	for i := 2; i+1 < len(data); i += 2 {
-		var sample = int16(binary.LittleEndian.Uint16(data[i:]))
+		var sample = int16(binary.LittleEndian.Uint16(data[i:])) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 		if previous < 0 && sample >= 0 {
 			crossings++

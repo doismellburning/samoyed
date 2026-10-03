@@ -481,7 +481,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.flag4Det |= 0x80000000
 	}
 
-	s.rawBits.AppendBit(byte(dwutil.IfThenElse(raw, 1, 0)))
+	s.rawBits.AppendBit(byte(dwutil.IfThenElse(raw, 1, 0))) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	if s.patDet == 0x7e {
 		s.rawBits.Chop8()
@@ -594,7 +594,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.olen = 0 /* Allow accumulation of octets. */
 		s.frameLen = 0
 
-		s.rawBits.AppendBit(byte(dwutil.IfThenElse(s.prevRaw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
+		s.rawBits.AppendBit(byte(dwutil.IfThenElse(s.prevRaw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */ //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		/* Now that we are saving other initial state information, */
 		/* it would be sensible to do the same for this instead */
 		/* of lumping it in with the frame data bits. */
@@ -774,7 +774,7 @@ func (r *HDLCReceiver) DataDetectAny(channel int) int {
 } /* end DataDetectAny */
 
 func (r *HDLCReceiver) rand() int32 {
-	r.randSeed = int32((uint32(r.randSeed)*1103515245)+12345) & hdlcRecRandMax
+	r.randSeed = int32((uint32(r.randSeed)*1103515245)+12345) & hdlcRecRandMax //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 	return r.randSeed
 }

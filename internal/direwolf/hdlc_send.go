@@ -202,10 +202,10 @@ func (s *HDLCSender) sendAX25Frame(fbuf []byte, badFCS bool) int {
 
 	if badFCS {
 		/* For testing only - Simulate a frame getting corrupted along the way. */
-		s.sendDataNRZI(byte(^frameFCS) & 0xff)
+		s.sendDataNRZI(byte(^frameFCS) & 0xff) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		s.sendDataNRZI(byte((^frameFCS)>>8) & 0xff)
 	} else {
-		s.sendDataNRZI(byte(frameFCS) & 0xff)
+		s.sendDataNRZI(byte(frameFCS) & 0xff) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		s.sendDataNRZI(byte(frameFCS>>8) & 0xff)
 	}
 

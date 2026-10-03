@@ -59,7 +59,7 @@ func TestSendDTMFDecodesBack(t *testing.T) {
 	var heard strings.Builder
 
 	for i := 0; i < len(sink.data); i += 2 {
-		var sam = int16(binary.LittleEndian.Uint16(sink.data[i:]))
+		var sam = int16(binary.LittleEndian.Uint16(sink.data[i:])) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 		var x = decoder.Sample(float64(sam) / 16384.)
 		if x != ' ' && x != '.' {

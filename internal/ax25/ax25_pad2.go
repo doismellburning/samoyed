@@ -362,7 +362,7 @@ func SFrame(
 		}
 
 		ctrl |= nr << 5
-		this_p.frame_data[this_p.frame_len] = byte(ctrl)
+		this_p.frame_data[this_p.frame_len] = byte(ctrl) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		this_p.frame_len++
 	} else {
 		this_p.frame_data[this_p.frame_len] = byte(ctrl)
@@ -370,7 +370,7 @@ func SFrame(
 
 		ctrl = pf & 1
 		ctrl |= nr << 1
-		this_p.frame_data[this_p.frame_len] = byte(ctrl)
+		this_p.frame_data[this_p.frame_len] = byte(ctrl) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		this_p.frame_len++
 	}
 
@@ -471,11 +471,11 @@ func IFrame(
 			ctrl |= 0x10
 		}
 
-		this_p.frame_data[this_p.frame_len] = byte(ctrl)
+		this_p.frame_data[this_p.frame_len] = byte(ctrl) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		this_p.frame_len++
 	} else {
 		ctrl = ns << 1
-		this_p.frame_data[this_p.frame_len] = byte(ctrl)
+		this_p.frame_data[this_p.frame_len] = byte(ctrl) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		this_p.frame_len++
 
 		ctrl = nr << 1
@@ -483,7 +483,7 @@ func IFrame(
 			ctrl |= 0x01
 		}
 
-		this_p.frame_data[this_p.frame_len] = byte(ctrl)
+		this_p.frame_data[this_p.frame_len] = byte(ctrl) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		this_p.frame_len++
 	}
 
@@ -557,12 +557,12 @@ func (this_p *Packet) setAddrs(addrs [MaxAddrs]string, num_addr int, cr CmdRes) 
 		copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 
 		for i, c := range oaddr {
-			this_p.frame_data[n*7+i] = byte(c << 1)
+			this_p.frame_data[n*7+i] = byte(c << 1) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		}
 
 		// Fill in SSID.
 
-		this_p.frame_data[n*7+6] = byte(0x60 | ((ssid & 0xf) << 1))
+		this_p.frame_data[n*7+6] = byte(0x60 | ((ssid & 0xf) << 1)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
 		// Command / response flag.
 
