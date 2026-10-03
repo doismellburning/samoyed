@@ -10,7 +10,11 @@
 // FX.25 encoder and Dire Wolf.
 package reedsolomon
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/ccoveille/go-safecast/v2"
+)
 
 // Interesting related stuff:
 // https://www.kernel.org/doc/html/v4.15/core-api/librs.html
@@ -27,6 +31,7 @@ type Codec struct {
 	fcr      byte   /* First consecutive root, index form */
 	prim     byte   /* Primitive element, index form */
 	iprim    byte   /* prim-th root of 1, index form */
+	a0       byte   /* nn as a byte: log(zero) = -inf, index form */
 }
 
 // N is the number of symbols in a block, data and parity together.
@@ -48,6 +53,13 @@ func (c *Codec) modnn(_x int) int {
 	}
 
 	return int(x)
+}
+
+// modnnByte is modnn for a result headed for a byte, which it always fits:
+// it is less than nn, which New keeps to a byte.  It masks rather than
+// checking, as it sits in the decoder's inner loops.
+func (c *Codec) modnnByte(x int) byte {
+	return byte(c.modnn(x) & 0xff)
 }
 
 // New initializes a Reed-Solomon codec.
@@ -83,8 +95,14 @@ func New(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) (*Codec, e
 	rs.index_of = make([]byte, rs.nn+1)
 
 	// Generate Galois field lookup tables
-	rs.index_of[0] = byte(rs.nn) //nolint:gosec // G115: unchecked narrowing conversion, see #294. log(zero) = -inf (A0)
-	rs.alpha_to[rs.nn] = 0       // alpha**-inf = 0
+	var a0, a0Err = safecast.Convert[byte](rs.nn)
+	if a0Err != nil {
+		return nil, fmt.Errorf("%d symbols per block is more than fit in a byte: %w", rs.nn, a0Err)
+	}
+
+	rs.a0 = a0
+	rs.index_of[0] = a0    // log(zero) = -inf (A0)
+	rs.alpha_to[rs.nn] = 0 // alpha**-inf = 0
 
 	var sr = 1
 	for i := range rs.nn {
@@ -106,8 +124,19 @@ func New(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) (*Codec, e
 
 	// Form RS code generator polynomial from its roots
 	rs.genpoly = make([]byte, nroots+1)
-	rs.fcr = byte(fcr)   //nolint:gosec // G115: unchecked narrowing conversion, see #294
-	rs.prim = byte(prim) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+
+	var fcrErr, primErr error
+
+	rs.fcr, fcrErr = safecast.Convert[byte](fcr)
+	if fcrErr != nil {
+		return nil, fmt.Errorf("first consecutive root %d doesn't fit in a byte: %w", fcr, fcrErr)
+	}
+
+	rs.prim, primErr = safecast.Convert[byte](prim)
+	if primErr != nil {
+		return nil, fmt.Errorf("primitive element %d doesn't fit in a byte: %w", prim, primErr)
+	}
+
 	rs.nroots = nroots
 
 	// Find prim-th root of 1, used in decoding
@@ -116,7 +145,12 @@ func New(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) (*Codec, e
 		iprim += int(rs.nn)
 	}
 
-	rs.iprim = byte(iprim / int(prim)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	var iprimErr error
+
+	rs.iprim, iprimErr = safecast.Convert[byte](iprim / int(prim))
+	if iprimErr != nil {
+		return nil, fmt.Errorf("prim-th root of 1 %d doesn't fit in a byte: %w", iprim/int(prim), iprimErr)
+	}
 
 	rs.genpoly[0] = 1
 	for i, root := 0, int(fcr)*int(prim); i < int(nroots); i, root = i+1, root+int(prim) {
