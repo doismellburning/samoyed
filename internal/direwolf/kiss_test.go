@@ -75,7 +75,7 @@ func rawTerminal(t *testing.T, f *os.File) {
 func startKissPTListener(ctx context.Context, t *testing.T, debug int) (*KissPT, *os.File, <-chan struct{}) {
 	t.Helper()
 
-	var kp = newKissPT(kissTestRadioConfig(), debug)
+	var kp = newKissPT(NewKissHandler(kissTestRadioConfig(), new(XmitService), nil), debug)
 
 	kp.openPT()
 
@@ -320,13 +320,6 @@ func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 
 	// Laid out like the channel table startKissPT gives the TNC.
 	var audioConfig = kissTestRadioConfig()
-
-	var origXmitSvc, origKissNetSvc = xmitSvc, kissNetSvc
-
-	t.Cleanup(func() { xmitSvc, kissNetSvc = origXmitSvc, origKissNetSvc })
-
-	xmitSvc = new(XmitService)
-	kissNetSvc = NewKissNetService(new(misc_config_s), audioConfig, 0)
 
 	transmitQueue.Init(audioConfig)
 

@@ -105,13 +105,13 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	mc.kiss_port[0] = port
 	mc.kiss_chan[0] = channel
 
-	var kns = NewKissNetService(mc, kissTestRadioConfig(), 0)
+	var kns = NewKissNetService(mc, 0)
 
 	// A client's reader polls for it to attach; not every real second,
 	// though, which would cost each test here most of one.
 	kns.pollInterval = 10 * time.Millisecond
 
-	kns.Start(t.Context())
+	kns.Start(t.Context(), NewKissHandler(kissTestRadioConfig(), new(XmitService), kns))
 
 	return kns, port
 }
@@ -395,7 +395,7 @@ func TestKissNetStartedTwiceComplains(t *testing.T) {
 
 	t.Cleanup(hook.Reset)
 
-	kns.Start(t.Context())
+	kns.Start(t.Context(), kns.handler)
 
 	// Only the errors: the probe waitUntilListening made may still be being
 	// reported as a client attaching.
@@ -461,36 +461,19 @@ func TestKissNetListenFails(t *testing.T) {
 	assert.Contains(t, entry.Message, "Listen failed")
 }
 
-// setupKissNetTNC gives the KISS command handling what it reaches for, but
-// deliberately not the transmit queue.
-//
-// A service's listening goroutines outlive the test that started them - there
-// is nothing to wait on - and TransmitQueue.Init writes the queue's fields without
-// holding its lock, so a later test initialising the queue would race with
-// anything one of these goroutines had put on it.  Hence the end-to-end tests
-// here exercise commands that are answered rather than transmitted; a client's
-// data frame reaching the queue is covered against the transports whose
-// goroutine a test can wait for, in kiss_test.go and kissserial_test.go.
-func setupKissNetTNC(t *testing.T) {
-	t.Helper()
-
-	var origXmit, origKissNet = xmitSvc, kissNetSvc
-
-	t.Cleanup(func() {
-		xmitSvc, kissNetSvc = origXmit, origKissNet
-	})
-
-	xmitSvc = new(XmitService)
-}
+// The end-to-end tests below exercise commands that are answered rather than
+// transmitted, and leave the transmit queue alone.  A service's listening
+// goroutines outlive the test that started them - there is nothing to wait on
+// - and TransmitQueue.Init writes the queue's fields without holding its lock,
+// so a later test initialising the queue would race with anything one of
+// these goroutines had put on it.  A client's data frame reaching the queue is
+// covered against the transports whose goroutine a test can wait for, in
+// kiss_test.go and kissserial_test.go.
 
 // The round trip: a client's command is collected from the socket, acted on,
 // and the answer written back to that same client.
 func TestKissNetClientCommandIsAnswered(t *testing.T) {
-	setupKissNetTNC(t)
-
 	var kns, port = startKissNet(t, -1)
-
-	kissNetSvc = kns
 
 	var conn, _ = dialKissNet(t, kns, port)
 
@@ -509,19 +492,15 @@ func TestKissNetClientCommandIsAnswered(t *testing.T) {
 // A client's data frame is checked against the channel table the service was
 // built with.  Here the port carries a channel that table does not have, so
 // the frame is turned away - before it gets near the transmit queue, which
-// setupKissNetTNC leaves alone - and the client is still answered afterwards.
+// these tests leave alone - and the client is still answered afterwards.
 // A service that lost its table on the way to the check would panic in the
 // listening goroutine instead, and take the test binary down with it.
 func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
-	setupKissNetTNC(t)
-
 	const unconfigured = 5
 
 	var kns, port = startKissNet(t, unconfigured)
 
-	kissNetSvc = kns
-
-	require.Equal(t, MEDIUM_NONE, kns.audioConfigP.chan_medium[unconfigured])
+	require.Equal(t, MEDIUM_NONE, kns.handler.audioConfig.chan_medium[unconfigured])
 
 	var conn, _ = dialKissNet(t, kns, port)
 
@@ -545,11 +524,7 @@ func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
 // An application that thinks it is driving an old command-mode TNC is
 // answered with a command prompt, which is what stops it asking.
 func TestKissNetAnswersCommandModeNoise(t *testing.T) {
-	setupKissNetTNC(t)
-
 	var kns, port = startKissNet(t, -1)
-
-	kissNetSvc = kns
 
 	var conn, _ = dialKissNet(t, kns, port)
 

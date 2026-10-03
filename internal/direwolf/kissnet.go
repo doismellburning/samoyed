@@ -166,7 +166,7 @@ const kissnetPollInterval = time.Second
 // Each TCP port has its own status block in a linked list.
 type KissNetService struct {
 	miscConfigP  *misc_config_s
-	audioConfigP *RadioConfig // Which channels a client may transmit on.
+	handler      *KissHandler // Acts on what a client sends; set by Start.
 	allPorts     *kissport_status_s
 	debug        int           /* Print information flowing from and to client. */
 	pollInterval time.Duration // For a client to attach, or a slot to come free.
@@ -184,8 +184,6 @@ type KissNetService struct {
  * Inputs:	mc.kiss_port	- TCP port for server.
  *				  0 means disable.  New in version 1.2.
  *
- *		audioConfig	- Which channels a client may transmit on.
- *
  *		debug		- Print information flowing from and to
  *				  clients.
  *
@@ -195,10 +193,9 @@ type KissNetService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewKissNetService(mc *misc_config_s, audioConfig *RadioConfig, debug int) *KissNetService {
+func NewKissNetService(mc *misc_config_s, debug int) *KissNetService {
 	var kns = new(KissNetService)
 	kns.miscConfigP = mc
-	kns.audioConfigP = audioConfig
 	kns.debug = debug
 	kns.pollInterval = kissnetPollInterval
 
@@ -218,7 +215,8 @@ func NewKissNetService(mc *misc_config_s, audioConfig *RadioConfig, debug int) *
 	return kns
 }
 
-// Start listens on each configured port until ctx is cancelled.  For each it
+// Start listens on each configured port until ctx is cancelled, handing what
+// each client sends to handler.  For each port it
 // starts goroutines to listen for a connection from a client application, and
 // for commands from each client, so the caller doesn't block while we wait for
 // these.  Anything the goroutines read, such as debug, must be set before
@@ -226,12 +224,15 @@ func NewKissNetService(mc *misc_config_s, audioConfig *RadioConfig, debug int) *
 //
 // Starting it again would try to bind every port a second time, so a second
 // Start is complained about and ignored.
-func (kns *KissNetService) Start(ctx context.Context) {
+func (kns *KissNetService) Start(ctx context.Context, handler *KissHandler) {
 	if !kns.started.CompareAndSwap(false, true) {
 		logrus.Error("KISS TCP service started twice; ignoring the second start")
 
 		return
 	}
+
+	// Before any goroutine that reads it exists.
+	kns.handler = handler
 
 	// The list is newest first; start them in the order they were configured.
 	var ports []*kissport_status_s
@@ -383,6 +384,10 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
  *--------------------------------------------------------------------*/
 
 func (kns *KissNetService) Copy(msg []byte, channel int, cmd int, from_kps *kissport_status_s, from_client int) {
+	if kns == nil {
+		return // No TCP clients to copy to.
+	}
+
 	if kns.miscConfigP.kiss_copy {
 		for kps := kns.allPorts; kps != nil; kps = kps.pnext {
 			for client := range MAX_NET_CLIENTS {
@@ -512,7 +517,7 @@ func (kns *KissNetService) listenThread(ctx context.Context, kps *kissport_statu
 			return // Cancelled.
 		}
 
-		KissRecByte(frame, kns.audioConfigP, ch, kns.debug, kps, client, kns.SendRecPacket)
+		kns.handler.RecByte(frame, ch, kns.debug, kps, client, kns.SendRecPacket)
 	}
 } /* end listenThread */
 

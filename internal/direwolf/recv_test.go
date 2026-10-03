@@ -302,7 +302,7 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 
 	t.Cleanup(func() { kissNetSvc = origKissNetSvc })
 
-	kissNetSvc = NewKissNetService(miscConfig, new(RadioConfig), 0)
+	kissNetSvc = NewKissNetService(miscConfig, 0)
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil

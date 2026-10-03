@@ -149,7 +149,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	waypointSender = ws
 
 	agwServer = nil
-	kissNetSvc = NewKissNetService(new(misc_config_s), audioConfig, 0)
+	kissNetSvc = NewKissNetService(new(misc_config_s), 0)
 	kissSerial = nil
 	kissPT = nil
 

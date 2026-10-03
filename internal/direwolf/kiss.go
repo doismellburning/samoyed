@@ -74,7 +74,7 @@ import (
 type KissPT struct {
 	debug int /* Print information flowing from and to client. */
 
-	audioConfig *RadioConfig // Which channels the client may transmit on.
+	handler *KissHandler // Acts on what the client sends.
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
@@ -105,9 +105,9 @@ type KissPT struct {
 const TMP_KISSTNC_SYMLINK = "/tmp/kisstnc"
 
 // newKissPT builds a KissPT with nothing opened or started.
-func newKissPT(audioConfig *RadioConfig, debug int) *KissPT {
+func newKissPT(handler *KissHandler, debug int) *KissPT {
 	var kp = new(KissPT)
-	kp.audioConfig = audioConfig
+	kp.handler = handler
 	kp.debug = debug
 	kp.kf = new(kiss.Collector)
 
@@ -134,8 +134,8 @@ func newKissPT(audioConfig *RadioConfig, debug int) *KissPT {
  *
  *--------------------------------------------------------------------*/
 
-func NewKissPT(ctx context.Context, mc *misc_config_s, audioConfig *RadioConfig, debug int) *KissPT {
-	var kp = newKissPT(audioConfig, debug)
+func NewKissPT(ctx context.Context, mc *misc_config_s, handler *KissHandler, debug int) *KissPT {
+	var kp = newKissPT(handler, debug)
 
 	if mc.enable_kiss_pt {
 		// Nothing else is running yet, so there is no lock to take.
@@ -529,6 +529,6 @@ func (kp *KissPT) listenThread(ctx context.Context) {
 		if err != nil {
 			return
 		}
-		KissRecByte(kp.kf, kp.audioConfig, ch, kp.debug, nil, -1, kp.SendRecPacket)
+		kp.handler.RecByte(kp.kf, ch, kp.debug, nil, -1, kp.SendRecPacket)
 	}
 }

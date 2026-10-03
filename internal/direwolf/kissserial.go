@@ -83,9 +83,9 @@ import (
 // KissSerial is a virtual KISS TNC on a serial port: the port, the state of
 // the frame being decoded from it, and the configuration it was set up with.
 type KissSerial struct {
-	miscConfig  *misc_config_s
-	audioConfig *RadioConfig // Which channels the client may transmit on.
-	debug       int          /* Print information flowing from and to client. */
+	miscConfig *misc_config_s
+	handler    *KissHandler // Acts on what the client sends.
+	debug      int          /* Print information flowing from and to client. */
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
@@ -114,10 +114,10 @@ type KissSerial struct {
 }
 
 // newKissSerial builds a KissSerial for mc with nothing opened or started.
-func newKissSerial(mc *misc_config_s, audioConfig *RadioConfig, debug int) *KissSerial {
+func newKissSerial(mc *misc_config_s, handler *KissHandler, debug int) *KissSerial {
 	var ks = new(KissSerial)
 	ks.miscConfig = mc
-	ks.audioConfig = audioConfig
+	ks.handler = handler
 	ks.debug = debug
 	ks.kf = new(kiss.Collector)
 
@@ -144,8 +144,8 @@ func newKissSerial(mc *misc_config_s, audioConfig *RadioConfig, debug int) *Kiss
  *
  *--------------------------------------------------------------------*/
 
-func NewKissSerial(ctx context.Context, mc *misc_config_s, audioConfig *RadioConfig, debug int) *KissSerial {
-	var ks = newKissSerial(mc, audioConfig, debug)
+func NewKissSerial(ctx context.Context, mc *misc_config_s, handler *KissHandler, debug int) *KissSerial {
+	var ks = newKissSerial(mc, handler, debug)
 
 	if mc.kiss_serial_port != "" {
 		if mc.kiss_serial_poll == 0 {
@@ -455,9 +455,9 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
  * Inputs:	ks.fd
  *
  * Description:	Reads bytes from the serial port KISS client app and
- *		sends them to KissRecByte for processing.
- *		KissRecByte is a common function used by all 3 KISS
- *		interfaces: serial port, pseudo terminal, and TCP.
+ *		sends them to the KissHandler for processing, which
+ *		all 3 KISS interfaces share: serial port, pseudo terminal,
+ *		and TCP.
  *
  *--------------------------------------------------------------------*/
 
@@ -474,6 +474,6 @@ func (ks *KissSerial) listenThread(ctx context.Context) {
 			return
 		}
 
-		KissRecByte(ks.kf, ks.audioConfig, ch, ks.debug, nil, -1, ks.SendRecPacket)
+		ks.handler.RecByte(ks.kf, ch, ks.debug, nil, -1, ks.SendRecPacket)
 	}
 }

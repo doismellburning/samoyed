@@ -251,14 +251,34 @@ func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport st
 	return buf
 }
 
+// KissHandler acts on what a KISS client application sends the TNC, whichever
+// transport it arrives by - TCP, the serial port or the pseudo terminal - so
+// each of them hands its client's bytes to the same one.
+type KissHandler struct {
+	audioConfig *RadioConfig    // Which channels a client may transmit on.
+	xmit        *XmitService    // The transmit timing a client may change.
+	peers       *KissNetService // The TCP clients KISSCOPY copies a data frame to, or nil.
+}
+
+// NewKissHandler builds a KissHandler that checks a client's data frames
+// against audioConfig before they are queued, applies its timing commands to
+// xmit, and with KISSCOPY copies its data frames to the clients of peers.
+func NewKissHandler(audioConfig *RadioConfig, xmit *XmitService, peers *KissNetService) *KissHandler {
+	var h = new(KissHandler)
+	h.audioConfig = audioConfig
+	h.xmit = xmit
+	h.peers = peers
+
+	return h
+}
+
 /*-------------------------------------------------------------------
  *
- * Name:        KissRecByte
+ * Name:        RecByte
  *
  * Purpose:     Process one byte from a KISS client app.
  *
  * Inputs:	kf	- Current state of building a frame.
- *		audioConfig - Which channels are configured.
  *		ch	- A byte from the input stream.
  *		debug	- Activates debug output.
  *		kps	- KISS TCP port status block.
@@ -299,7 +319,7 @@ func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport st
 
 type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
-func KissRecByte(kf *kiss.Collector, audioConfig *RadioConfig, ch byte, debug int,
+func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
 	kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
 	var chunk = kf.Add(ch)
@@ -351,13 +371,13 @@ func KissRecByte(kf *kiss.Collector, audioConfig *RadioConfig, ch byte, debug in
 			dwutil.HexDump(unwrapped[1:])
 		}
 
-		kiss_process_msg(unwrapped, audioConfig, debug, kps, client, sendfun)
+		h.processMsg(unwrapped, debug, kps, client, sendfun)
 	}
-} /* end KissRecByte */
+} /* end RecByte */
 
 /*-------------------------------------------------------------------
  *
- * Name:        kiss_process_msg
+ * Name:        processMsg
  *
  * Purpose:     Process a message from the KISS client.
  *
@@ -365,9 +385,6 @@ func KissRecByte(kf *kiss.Collector, audioConfig *RadioConfig, ch byte, debug in
  *				  The first byte contains channel and command.
  *
  *		kiss_len	- Number of bytes including the command.
- *
- *		audioConfig	- Which channels are configured, so that a
- *				  frame for one that isn't can be rejected.
  *
  *		debug		- Debug option is selected.
  *
@@ -384,7 +401,7 @@ func KissRecByte(kf *kiss.Collector, audioConfig *RadioConfig, ch byte, debug in
 
 // This is used only by the TNC side.
 
-func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
+func (h *KissHandler) processMsg(kiss_msg []byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
 	// New in 1.7:
 	// We can have KISS TCP ports which convey only a single radio channel.
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.
@@ -405,7 +422,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps 
 	case kiss.CmdDataFrame: /* 0 = Data Frame */
 		// The copies carry the channel and command we have already
 		// determined, rather than the first byte as it came.
-		kissNetSvc.Copy(kiss_msg, channel, int(cmd), kps, client)
+		h.peers.Copy(kiss_msg, channel, int(cmd), kps, client)
 
 		/* Note July 2017: There is a variant of of KISS, called SMACK, that assumes */
 		/* a TNC can never have more than 8 channels.  http://symek.de/g/smack.html */
@@ -459,7 +476,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps 
 		// matter for an out-of-range channel - and indexed chan_medium with
 		// it to find out.  An in-range IGate channel is not MEDIUM_NONE.
 
-		if channel < 0 || channel >= MAX_TOTAL_CHANS || audioConfig.chan_medium[channel] == MEDIUM_NONE {
+		if channel < 0 || channel >= MAX_TOTAL_CHANS || h.audioConfig.chan_medium[channel] == MEDIUM_NONE {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid transmit channel %d from KISS client app.\n", channel)
 			dw_printf("\n")
@@ -515,7 +532,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps 
 			dw_printf("section, to understand what this means.\n")
 		}
 
-		xmitSvc.SetTxdelay(channel, int(kiss_msg[1]))
+		h.xmit.SetTxdelay(channel, int(kiss_msg[1]))
 
 	case kiss.CmdPersistence: /* 2 = Persistence */
 		if len(kiss_msg) < 2 {
@@ -535,7 +552,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps 
 			dw_printf("section, to understand what this means.\n")
 		}
 
-		xmitSvc.SetPersist(channel, int(kiss_msg[1]))
+		h.xmit.SetPersist(channel, int(kiss_msg[1]))
 
 	case kiss.CmdSlotTime: /* 3 = SlotTime */
 		if len(kiss_msg) < 2 {
@@ -555,7 +572,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps 
 			dw_printf("section, to understand what this means.\n")
 		}
 
-		xmitSvc.SetSlottime(channel, int(kiss_msg[1]))
+		h.xmit.SetSlottime(channel, int(kiss_msg[1]))
 
 	case kiss.CmdTxTail: /* 4 = TXtail */
 		if len(kiss_msg) < 2 {
@@ -575,7 +592,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps 
 			dw_printf("section, to understand what this means.\n")
 		}
 
-		xmitSvc.SetTxtail(channel, int(kiss_msg[1]))
+		h.xmit.SetTxtail(channel, int(kiss_msg[1]))
 
 	case kiss.CmdFullDuplex: /* 5 = FullDuplex */
 		if len(kiss_msg) < 2 {
@@ -588,7 +605,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps 
 
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol set FullDuplex = %t, channel %d\n", val, channel)
-		xmitSvc.SetFulldup(channel, val)
+		h.xmit.SetFulldup(channel, val)
 
 	case kiss.CmdSetHardware: /* 6 = TNC specific */
 		if len(kiss_msg) < 2 {
@@ -627,7 +644,7 @@ func kiss_process_msg(kiss_msg []byte, audioConfig *RadioConfig, debug int, kps 
 			dw_printf("\n")
 		}
 	}
-} /* end kiss_process_msg */
+} /* end processMsg */
 
 /*-------------------------------------------------------------------
  *
