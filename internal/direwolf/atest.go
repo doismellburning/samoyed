@@ -93,6 +93,10 @@ type AtestOptions struct {
 	// il2p_parse_version takes it.
 	IL2PVersion string
 
+	// IL2PCRC expects, and checks, a trailing CRC on IL2P frames, as
+	// IL2PRXCRC does.  samoyed-atest turns it on unless asked not to.
+	IL2PCRC bool
+
 	// DecodeOnly is which audio channel of the file to decode: 0 or 1, or 2
 	// for both.
 	DecodeOnly int
@@ -141,6 +145,7 @@ func NewAtest(opts *AtestOptions) (*Atest, error) {
 
 	for channel := range MAX_RADIO_CHANS {
 		audio.achan[channel].il2p_version = il2p_version
+		audio.achan[channel].il2p_rx_crc = opts.IL2PCRC
 	}
 
 	var fixBitsLevel, fixBitsPassall, fixBitsValid = atestFixBits(opts.FixBits)

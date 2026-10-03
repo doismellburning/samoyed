@@ -54,6 +54,7 @@ o = DCD output control
     0.6     - 16 parity symbols per payload block, ignoring that reserved bit.  (default)
     0.4     - The header FEC Level bit selects the number of payload parity symbols.
     compat  - Same as 0.6.`)
+	var il2pCRC = pflag.Bool("il2p-crc", true, "Expect, and check, a trailing CRC on IL2P frames.  --il2p-crc=false to receive frames without one.")
 	var help = pflag.Bool("help", false, "Display help text.")
 
 	pflag.Usage = usage
@@ -70,6 +71,7 @@ o = DCD output control
 	opts.Modem = modemFlags
 	opts.FixBits = *fixBits
 	opts.IL2PVersion = *il2pVersion
+	opts.IL2PCRC = *il2pCRC
 	opts.BitErrorRate = *bitErrorRate
 	opts.HexDisplay = *hexDisplay
 
