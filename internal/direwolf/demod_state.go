@@ -191,9 +191,9 @@ type demodulator_state_s struct {
 
 		// This is for detecting phase lock to incoming signal.
 
-		good_flag int // Set if transition is near where expected,
+		good_flag byte // Set if transition is near where expected,
 		// i.e. at a good time.
-		bad_flag int // Set if transition is not where expected,
+		bad_flag byte // Set if transition is not where expected,
 		// i.e. at a bad time.
 		good_hist byte   // History of good transitions for past octet.
 		bad_hist  byte   // History of bad transitions for past octet.

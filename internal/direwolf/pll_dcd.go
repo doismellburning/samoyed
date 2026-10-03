@@ -74,11 +74,11 @@ func pll_dcd_signal_transition2(dcdConfig *DCDConfig, D *demodulator_state_s, sl
 
 func pll_dcd_each_symbol2(dcdConfig *DCDConfig, D *demodulator_state_s, channel int, subchan int, slice int) {
 	D.slicer[slice].good_hist <<= 1
-	D.slicer[slice].good_hist |= byte(D.slicer[slice].good_flag)
+	D.slicer[slice].good_hist |= D.slicer[slice].good_flag
 	D.slicer[slice].good_flag = 0
 
 	D.slicer[slice].bad_hist <<= 1
-	D.slicer[slice].bad_hist |= byte(D.slicer[slice].bad_flag)
+	D.slicer[slice].bad_hist |= D.slicer[slice].bad_flag
 	D.slicer[slice].bad_flag = 0
 
 	D.slicer[slice].score <<= 1

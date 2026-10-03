@@ -230,7 +230,7 @@ func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport st
 		frame = frame[:ax25.MaxPacketLen]
 	}
 
-	var stemp = append([]byte{byte((channel << 4) | cmd)}, frame...)
+	var stemp = append([]byte{byte(channel&0xf)<<4 | byte(cmd&0xf)}, frame...)
 
 	if debug >= 2 {
 		/* AX.25 frame with the CRC removed. */

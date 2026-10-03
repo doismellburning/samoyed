@@ -1248,8 +1248,8 @@ func dl_data_request(E *dlq_item_t) {
 
 	nseg_to_follow--
 
-	first_segment.header = byte(0x80 | nseg_to_follow)
-	first_segment.original_pid = byte(E.txdata.pid)
+	first_segment.header = 0x80 | byte(nseg_to_follow&0x7f)
+	first_segment.original_pid = byte(E.txdata.pid & 0xff)
 	var seglen = min(S.n1_paclen-2, remaining_len)
 
 	if seglen < 1 || seglen > S.n1_paclen-2 || seglen > remaining_len || seglen > len(first_segment.segdata) {
@@ -1283,7 +1283,7 @@ func dl_data_request(E *dlq_item_t) {
 
 		nseg_to_follow--
 
-		subsequent_segment.header = byte(nseg_to_follow)
+		subsequent_segment.header = byte(nseg_to_follow & 0xff)
 		seglen = min(S.n1_paclen-1, remaining_len)
 
 		if seglen < 1 || seglen > S.n1_paclen-1 || seglen > remaining_len || seglen > len(subsequent_segment.segdata) {
@@ -1771,7 +1771,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
 			S.ra_buff = nil
 
 			return
-		} else if (dataBytes[0] & 0x7f) != byte(S.ra_following-1) {
+		} else if int(dataBytes[0]&0x7f) != S.ra_following-1 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Segments out of sequence.\n", S.stream_id)
 			dataLinkQueue.DeleteCData(S.ra_buff)
@@ -2945,9 +2945,9 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 			// think it is worth the effort to generate it.  Maybe later.
 
 			if S.modulo == 8 {
-				info = append(info, byte(resend[i])<<5)
+				info = append(info, byte(resend[i]&0x07)<<5)
 			} else {
-				info = append(info, byte(resend[i])<<1)
+				info = append(info, byte(resend[i]&0x7f)<<1)
 			}
 		}
 
