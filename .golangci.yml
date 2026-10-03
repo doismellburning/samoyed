@@ -72,7 +72,6 @@ linters:
     gosec:
       excludes:
         - "G104"  # Stop complaining about me not checking a fmt.Printf err via dw_printf...
-        - "G115"  # I appreciate concerns about overflow via cast, but let's deal with them later
         - "G404"  # Weak RNGs are fine for our uses here, certainly for now(!)
         - "G602"  # "slice index out of range" checks that *may* be valid but it's hard to tell - if they're not false positives, they're niche issues
     nestif:
