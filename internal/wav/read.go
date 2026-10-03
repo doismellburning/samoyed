@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
+	"github.com/ccoveille/go-safecast/v2"
 )
 
 // riffHeader is the start of every .WAV file, followed by a series of chunks.
@@ -62,7 +64,11 @@ func ReadHeader(r io.ReadSeeker) (Format, int, error) {
 
 	var format fmtChunk
 
-	var formatSize = int32(binary.Size(format)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	formatSize, err := safecast.Convert[int32](binary.Size(format))
+	if err != nil {
+		return Format{}, 0, fmt.Errorf("wav: fmt chunk size doesn't fit a chunk header: %w", err)
+	}
+
 	if chunk.Datasize != formatSize && chunk.Datasize != formatSize+2 {
 		return Format{}, 0, fmt.Errorf("wav: need fmt chunk datasize of %d or %d, found %d", formatSize, formatSize+2, chunk.Datasize)
 	}
