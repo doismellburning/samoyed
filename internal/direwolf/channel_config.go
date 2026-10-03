@@ -1,6 +1,7 @@
 package direwolf
 
 import (
+	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/phy"
 )
 
@@ -13,6 +14,7 @@ const (
 	MEDIUM_RADIO                  // Internal modem for radio.
 	MEDIUM_IGATE                  // Access IGate as ordinary channel.
 	MEDIUM_NETTNC                 // Remote network TNC.  (new in 1.8)
+	MEDIUM_AXUDP                  // AX.25 over UDP to other nodes.
 )
 
 type sanity_t = phy.Sanity
@@ -329,6 +331,7 @@ type RadioConfig struct {
 	// MEDIUM_RADIO for internal modem.  (only possibility earlier)
 	// MEDIUM_IGATE allows application access to IGate.
 	// MEDIUM_NETTNC for external TNC via TCP.
+	// MEDIUM_AXUDP for AX.25 frames in UDP datagrams.
 
 	igate_vchannel int /* Virtual channel mapped to APRS-IS. */
 	/* -1 for none. */
@@ -340,6 +343,11 @@ type RadioConfig struct {
 	nettnc_addr [MAX_TOTAL_CHANS]string // Network TNC address:  hostname or IP addr.
 
 	nettnc_port [MAX_TOTAL_CHANS]int // Network TNC TCP port.
+
+	// Applies only to AXUDP channels.
+
+	axudp_port   [MAX_TOTAL_CHANS]int          // Local UDP port.
+	axudp_routes [MAX_TOTAL_CHANS]axudp.Routes // Where frames sent on the channel go.
 
 	achan [MAX_RADIO_CHANS]achan_param_s
 

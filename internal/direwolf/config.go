@@ -31,6 +31,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/coordconvutil"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -1537,7 +1538,8 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		/* When IGate is enabled, all radio channels must have a callsign associated. */
 
 		if len(ps.igate.t2_login) > 0 &&
-			(ps.audio.chan_medium[i] == MEDIUM_RADIO || ps.audio.chan_medium[i] == MEDIUM_NETTNC) {
+			(ps.audio.chan_medium[i] == MEDIUM_RADIO || ps.audio.chan_medium[i] == MEDIUM_NETTNC ||
+				ps.audio.chan_medium[i] == MEDIUM_AXUDP) {
 			if IsNoCall(ps.audio.mycall[i]) {
 				ps.errorf("config file: MYCALL must be set for receive channel %d before Rx IGate is allowed", i)
 
@@ -1558,7 +1560,8 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 	if len(ps.igate.t2_login) > 0 {
 		for j := range MAX_TOTAL_CHANS {
-			if ps.audio.chan_medium[j] == MEDIUM_RADIO || ps.audio.chan_medium[j] == MEDIUM_NETTNC {
+			if ps.audio.chan_medium[j] == MEDIUM_RADIO || ps.audio.chan_medium[j] == MEDIUM_NETTNC ||
+				ps.audio.chan_medium[j] == MEDIUM_AXUDP {
 				if ps.digi.filter_str[MAX_TOTAL_CHANS][j] == "" {
 					ps.digi.filter_str[MAX_TOTAL_CHANS][j] = "i/180"
 				}
@@ -1942,6 +1945,47 @@ func handleNCHANNEL(ps *parseState) error {
 	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
 	ps.audio.nettnc_addr[nchan] = addr
 	ps.audio.nettnc_port[nchan] = n
+
+	return nil
+}
+
+// applyAXUDPPORT checks an AXUDP port and makes its channel an AXUDP one.
+func (ps *parseState) applyAXUDPPORT(settings AXUDPPortSettings) error {
+	if settings.Port < MIN_IP_PORT_NUMBER || settings.Port > MAX_IP_PORT_NUMBER {
+		return fmt.Errorf("line %d: Invalid UDP port number %d for AXUDP port. Must be in range %d to %d", ps.line, settings.Port, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
+	}
+
+	if settings.Channel == nil {
+		return fmt.Errorf("line %d: Missing channel number for AXUDP port %d", ps.line, settings.Port)
+	}
+
+	var channel = *settings.Channel
+	if channel < MAX_RADIO_CHANS || channel >= MAX_TOTAL_CHANS {
+		return fmt.Errorf("line %d: AXUDP port channel must be in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
+	}
+	if ps.audio.chan_medium[channel] != MEDIUM_NONE {
+		return fmt.Errorf("line %d: AXUDP port can't use channel %d because it is already in use", ps.line, channel)
+	}
+
+	// Two channels cannot both listen on the one port, and finding that out
+	// when the second fails to bind at startup is later than it needs to be.
+	for c := range MAX_TOTAL_CHANS {
+		if ps.audio.chan_medium[c] == MEDIUM_AXUDP && ps.audio.axudp_port[c] == settings.Port {
+			return fmt.Errorf("line %d: UDP port %d is already used by the AXUDP port for channel %d", ps.line, settings.Port, c)
+		}
+	}
+
+	var routes, err = axudp.NewRoutes(settings.Broadcast, settings.Maps)
+	if err != nil {
+		return fmt.Errorf("line %d: AXUDP port %d: %w", ps.line, settings.Port, err)
+	}
+
+	// Claim the channel only once all of it has checked out, as NCHANNEL
+	// does: NewAXUDPChannels opens every MEDIUM_AXUDP channel and exits if
+	// it cannot.
+	ps.audio.chan_medium[channel] = MEDIUM_AXUDP
+	ps.audio.axudp_port[channel] = settings.Port
+	ps.audio.axudp_routes[channel] = routes
 
 	return nil
 }
@@ -3322,10 +3366,11 @@ func handleDIGIPEAT(ps *parseState) error {
 		return fmt.Errorf("config file: FROM-channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
 	}
 
-	// Channels specified must be radio channels or network TNCs.
+	// Channels specified must be radio channels, network TNCs or AXUDP.
 
 	if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO &&
-		ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC {
+		ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC &&
+		ps.audio.chan_medium[from_chan] != MEDIUM_AXUDP {
 		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 	}
 
@@ -3344,7 +3389,8 @@ func handleDIGIPEAT(ps *parseState) error {
 	}
 
 	if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO &&
-		ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC {
+		ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC &&
+		ps.audio.chan_medium[to_chan] != MEDIUM_AXUDP {
 		return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 	}
 
@@ -3622,7 +3668,8 @@ func handleFILTER(ps *parseState) error {
 		}
 
 		if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO &&
-			ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC {
+			ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC &&
+			ps.audio.chan_medium[from_chan] != MEDIUM_AXUDP {
 			return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 		}
 
@@ -3656,7 +3703,8 @@ func handleFILTER(ps *parseState) error {
 		}
 
 		if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO &&
-			ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC {
+			ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC &&
+			ps.audio.chan_medium[to_chan] != MEDIUM_AXUDP {
 			return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 		}
 
@@ -4623,7 +4671,8 @@ func handleTTOBJ(ps *parseState) error {
 					x = -1
 					whereToValid = false
 				} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
-					ps.audio.chan_medium[x] != MEDIUM_NETTNC {
+					ps.audio.chan_medium[x] != MEDIUM_NETTNC &&
+					ps.audio.chan_medium[x] != MEDIUM_AXUDP {
 					ps.errorf("config file, line %d: TTOBJ transmit channel %d is not valid", ps.line, x)
 					x = -1
 					whereToValid = false
@@ -4652,7 +4701,8 @@ func handleTTOBJ(ps *parseState) error {
 								x = -1
 								whereToValid = false
 							} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
-								ps.audio.chan_medium[x] != MEDIUM_NETTNC {
+								ps.audio.chan_medium[x] != MEDIUM_NETTNC &&
+								ps.audio.chan_medium[x] != MEDIUM_AXUDP {
 								ps.errorf("config file, line %d: TTOBJ transmit channel %d is not valid", ps.line, x)
 								x = -1
 								whereToValid = false

@@ -25,13 +25,19 @@ import (
 //
 // Config file (axudp.yaml):
 //
+//	broadcast: [NODES]
 //	maps:
 //	  - ax25addr: Q1TEST
 //	    host: 192.0.2.1
 //	    port: 20093
+//	    broadcast: true
 //	  - ax25addr: Q2TEST
 //	    host: 192.0.2.2
 //	    port: 93
+//
+// A frame for one of the broadcast addresses, such as NET/ROM's NODES, goes
+// to every map entry with broadcast: true, like BPQ's BROADCAST lines and
+// MAP ... B.
 
 func main() {
 	pflag.Usage = func() {
@@ -45,14 +51,22 @@ nodes that speak AXUDP (raw AX.25 frames in UDP datagrams, per RFC 1226).
 samoyed-direwolf connects to samoyed-axudp using an
 NCHANNEL directive in its config file.
 
+samoyed-direwolf can also speak AXUDP itself, without this bridge: see
+axudpPorts in its YAML configuration.
+
 Usage:
   samoyed-axudp [--config <file>] [--udpport <n>] [--kissport <n>]
 
 Example config file (axudp.yaml):
+  broadcast: [NODES]
   maps:
     - ax25addr: Q1TEST-1
       host: 192.0.2.1
       port: 93
+      broadcast: true
+
+A frame for a broadcast address, such as NET/ROM's NODES, goes to every
+map entry with broadcast: true.
 
 Example samoyed-direwolf config to connect via samoyed-axudp:
   CHANNEL 2
@@ -82,7 +96,7 @@ Flags:
 		os.Exit(0)
 	}
 
-	var maps, parseErr = axudp.ParseConfig(*configFile)
+	var routes, parseErr = axudp.ParseConfig(*configFile)
 	if parseErr != nil {
 		fmt.Fprintf(os.Stderr, "samoyed-axudp: reading config: %v\n", parseErr)
 		os.Exit(1)
@@ -90,7 +104,7 @@ Flags:
 
 	fmt.Printf("samoyed-axudp: WARNING: this is beta software; behaviour may change in future releases\n")
 	fmt.Printf("samoyed-axudp: MAP table:\n")
-	for _, e := range maps {
+	for _, e := range routes.Maps {
 		fmt.Printf("  %s -> %s\n", e.AX25Addr, e.Addr)
 	}
 
@@ -114,7 +128,7 @@ Flags:
 	}
 	fmt.Printf("samoyed-axudp: KISS TCP server listening on port %d\n", *kissPort)
 
-	var b = axudp.NewBridge(maps, udpConn)
+	var b = axudp.NewBridge(routes, udpConn)
 
 	// Both halves run until the user interrupts us, at which point they give
 	// their sockets up rather than being cut off mid-flight.  Not deferred:

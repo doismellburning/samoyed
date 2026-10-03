@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,67 +29,126 @@ type MapEntry struct {
 	AX25Addr string       // AX.25 address, i.e. callsign and optional SSID, e.g. "Q1TEST" or "Q1TEST-1"
 	Addr     string       // UDP address string for display/logging, e.g. "192.0.2.1:20093"
 	UDPAddr  *net.UDPAddr // pre-resolved UDP address for sending
+
+	// Broadcast is whether frames for a broadcast address go here too, like
+	// the B flag on a BPQ AXIP MAP line.
+	Broadcast bool
+}
+
+// MapSettings is one MAP entry as written in a config file: frames for
+// AX25Addr go to Host:Port.
+type MapSettings struct {
+	AX25Addr string `yaml:"ax25addr"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+
+	// Broadcast sends this peer frames for the broadcast addresses too.
+	Broadcast bool `yaml:"broadcast"`
+}
+
+// Routes says where an AX.25 frame sent over AXUDP goes.
+type Routes struct {
+	Maps []MapEntry
+
+	// Broadcast holds the destination addresses, such as NET/ROM's NODES,
+	// whose frames go to every map entry marked Broadcast rather than to the
+	// one entry for that address, like BPQ's AXIP BROADCAST lines.
+	Broadcast []string
 }
 
 // yamlConfig is the top-level structure of the axudp.yaml config file.
 type yamlConfig struct {
-	Maps []yamlMapEntry `yaml:"maps"`
+	Broadcast []string      `yaml:"broadcast"`
+	Maps      []MapSettings `yaml:"maps"`
 }
 
-// yamlMapEntry represents one entry under the "maps" key.
-type yamlMapEntry struct {
-	AX25Addr string `yaml:"ax25addr"`
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-}
+// ParseConfig reads a YAML config file from path and returns the routes it
+// describes.
+func ParseConfig(path string) (Routes, error) {
+	var none Routes
 
-// ParseConfig reads a YAML config file from path and returns the map entries.
-func ParseConfig(path string) ([]MapEntry, error) {
 	var data, err = os.ReadFile(path) //nolint:gosec
 	if err != nil {
-		return nil, err
+		return none, err
 	}
 
 	var cfg yamlConfig
 	var unmarshalErr = yaml.Unmarshal(data, &cfg)
 	if unmarshalErr != nil {
-		return nil, fmt.Errorf("parsing YAML config: %w", unmarshalErr)
+		return none, fmt.Errorf("parsing YAML config: %w", unmarshalErr)
 	}
 
-	var entries = make([]MapEntry, 0, len(cfg.Maps))
-	for i, m := range cfg.Maps {
-		// Normalise ax25addr: strip surrounding whitespace, uppercase, and
-		// remove a trailing "-0" (SSID 0 is represented without any suffix by
-		// extractDest, so "CALL-0" would never match without this step).
-		var ax25addr = strings.ToUpper(strings.TrimSpace(m.AX25Addr))
-		ax25addr = strings.TrimSuffix(ax25addr, "-0")
-		if ax25addr == "" {
-			return nil, fmt.Errorf("map entry %d: ax25addr is empty", i)
-		}
-		if m.Host == "" {
-			return nil, fmt.Errorf("map entry %d: host is empty", i)
-		}
-		if m.Port < 1 || m.Port > 65535 {
-			return nil, fmt.Errorf("map entry %d: port %d out of range (1-65535)", i, m.Port)
-		}
-		var addr = net.JoinHostPort(m.Host, strconv.Itoa(m.Port))
-		var udpAddr, resolveErr = net.ResolveUDPAddr("udp", addr)
-		if resolveErr != nil {
-			return nil, fmt.Errorf("map entry %d: resolving %s: %w", i, addr, resolveErr)
-		}
-		entries = append(entries, MapEntry{
-			AX25Addr: ax25addr,
-			Addr:     addr,
-			UDPAddr:  udpAddr,
-		})
-	}
-
-	return entries, nil
+	return NewRoutes(cfg.Broadcast, cfg.Maps)
 }
 
-// extractDest extracts the destination AX.25 address from a raw AX.25 frame.
+// NewRoutes checks and normalises the broadcast addresses and maps, resolving
+// each host, and returns the routes they describe.
+func NewRoutes(broadcast []string, maps []MapSettings) (Routes, error) {
+	var none, routes Routes
+
+	routes.Broadcast = make([]string, 0, len(broadcast))
+	for i, b := range broadcast {
+		var addr = normaliseAX25Addr(b)
+		if addr == "" {
+			return none, fmt.Errorf("broadcast address %d is empty", i)
+		}
+
+		routes.Broadcast = append(routes.Broadcast, addr)
+	}
+
+	routes.Maps = make([]MapEntry, 0, len(maps))
+
+	for i, m := range maps {
+		var entry, err = newMapEntry(m)
+		if err != nil {
+			return none, fmt.Errorf("map entry %d: %w", i, err)
+		}
+
+		routes.Maps = append(routes.Maps, entry)
+	}
+
+	return routes, nil
+}
+
+// normaliseAX25Addr strips surrounding whitespace, uppercases, and removes a
+// trailing "-0": SSID 0 is represented without any suffix by ExtractDest, so
+// "CALL-0" would never match without this step.
+func normaliseAX25Addr(addr string) string {
+	return strings.TrimSuffix(strings.ToUpper(strings.TrimSpace(addr)), "-0")
+}
+
+// newMapEntry checks and normalises m, resolving its host.
+func newMapEntry(m MapSettings) (MapEntry, error) {
+	var none MapEntry
+
+	var ax25addr = normaliseAX25Addr(m.AX25Addr)
+	if ax25addr == "" {
+		return none, errors.New("ax25addr is empty")
+	}
+	if m.Host == "" {
+		return none, errors.New("host is empty")
+	}
+	if m.Port < 1 || m.Port > 65535 {
+		return none, fmt.Errorf("port %d out of range (1-65535)", m.Port)
+	}
+
+	var addr = net.JoinHostPort(m.Host, strconv.Itoa(m.Port))
+	var udpAddr, resolveErr = net.ResolveUDPAddr("udp", addr)
+	if resolveErr != nil {
+		return none, fmt.Errorf("resolving %s: %w", addr, resolveErr)
+	}
+
+	return MapEntry{
+		AX25Addr:  ax25addr,
+		Addr:      addr,
+		UDPAddr:   udpAddr,
+		Broadcast: m.Broadcast,
+	}, nil
+}
+
+// ExtractDest extracts the destination AX.25 address from a raw AX.25 frame.
 // Returns "" if the frame is too short.
-func extractDest(frame []byte) string {
+func ExtractDest(frame []byte) string {
 	if len(frame) < 7 {
 		return ""
 	}
@@ -110,7 +170,7 @@ func extractDest(frame []byte) string {
 
 // Bridge is the live state of the bridge.
 type Bridge struct {
-	maps    []MapEntry
+	routes  Routes
 	udpConn *net.UDPConn
 
 	mu      sync.Mutex
@@ -122,12 +182,12 @@ type Bridge struct {
 	maxAcceptBackoff time.Duration
 }
 
-// NewBridge creates a new Bridge routing AXUDP datagrams according to maps,
+// NewBridge creates a new Bridge routing AXUDP datagrams according to routes,
 // sending/receiving on udpConn.  Per-packet logging is emitted at logrus Trace
 // level, so enabling that level is what makes the bridge verbose.
-func NewBridge(maps []MapEntry, udpConn *net.UDPConn) *Bridge {
+func NewBridge(routes Routes, udpConn *net.UDPConn) *Bridge {
 	var b = new(Bridge)
-	b.maps = maps
+	b.routes = routes
 	b.udpConn = udpConn
 	b.acceptBackoff = defaultAcceptBackoff
 	b.maxAcceptBackoff = defaultMaxAcceptBackoff
@@ -135,11 +195,11 @@ func NewBridge(maps []MapEntry, udpConn *net.UDPConn) *Bridge {
 	return b
 }
 
-// maxUDPPayload is the maximum value of the UDP length field (which covers the
+// MaxUDPPayload is the maximum value of the UDP length field (which covers the
 // 8-byte UDP header plus payload, so actual payload is up to 8 bytes less).
 // Using this as a read buffer size guarantees ReadFromUDP never truncates a
 // datagram regardless of payload length.
-const maxUDPPayload = 65535
+const MaxUDPPayload = 65535
 
 // RunUDPListener reads incoming AXUDP datagrams and forwards them as KISS to
 // all clients, until ctx is cancelled.  It returns an error only on a read
@@ -152,7 +212,7 @@ func (b *Bridge) RunUDPListener(ctx context.Context) error {
 	// closing the socket is what gets us back when we are asked to stop.
 	defer dwutil.CloseOnDone(ctx, b.udpConn)()
 
-	var buf = make([]byte, maxUDPPayload)
+	var buf = make([]byte, MaxUDPPayload)
 	for ctx.Err() == nil {
 		var n, _, readErr = b.udpConn.ReadFromUDP(buf)
 		if readErr != nil {
@@ -178,7 +238,7 @@ func (b *Bridge) RunUDPListener(ctx context.Context) error {
 		// checksum.  We auto-detect by checking whether the trailing 2 bytes
 		// form a valid checksum; if so we strip them.
 		var ax25frame []byte
-		if stripped, ok := stripCRC(raw); ok {
+		if stripped, ok := StripCRC(raw); ok {
 			ax25frame = stripped
 		} else {
 			ax25frame = raw
@@ -188,14 +248,14 @@ func (b *Bridge) RunUDPListener(ctx context.Context) error {
 			continue
 		}
 
-		// This fires once per datagram and extractDest allocates a string
+		// This fires once per datagram and ExtractDest allocates a string
 		// nothing else here needs, so do not pay for it unless it will print.
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			// The first 7 bytes of an AX.25 frame are the destination address —
 			// for an incoming AXUDP datagram this is typically our local callsign.
 			logrus.WithFields(logrus.Fields{
 				"bytes": n,
-				"dest":  extractDest(ax25frame),
+				"dest":  ExtractDest(ax25frame),
 			}).Trace("Received AXUDP datagram")
 		}
 		b.broadcastKISS(ax25frame)
@@ -359,20 +419,42 @@ func ax25AddrBase(cs string) string {
 	return cs
 }
 
+// Route returns the MAP entries a frame for dest goes to: every entry marked
+// Broadcast if dest is a broadcast address, otherwise the one lookupMap finds,
+// if any.
+func (r *Routes) Route(dest string) []MapEntry {
+	if slices.Contains(r.Broadcast, dest) {
+		var entries []MapEntry
+		for _, e := range r.Maps {
+			if e.Broadcast {
+				entries = append(entries, e)
+			}
+		}
+
+		return entries
+	}
+
+	if entry, ok := r.lookupMap(dest); ok {
+		return []MapEntry{entry}
+	}
+
+	return nil
+}
+
 // lookupMap finds the MAP entry for the given destination AX.25 address.
 // A MAP entry with no SSID matches any SSID of that base address;
 // a MAP entry with an SSID matches only that exact address-SSID pair.
 // Exact matches always take priority over wildcard (no-SSID) matches,
 // regardless of the order entries appear in the config file.
-func (b *Bridge) lookupMap(dest string) (MapEntry, bool) {
+func (r *Routes) lookupMap(dest string) (MapEntry, bool) {
 	// First pass: exact match (callsign + SSID must match precisely).
-	for _, e := range b.maps {
+	for _, e := range r.Maps {
 		if e.AX25Addr == dest {
 			return e, true
 		}
 	}
 	// Second pass: base-call wildcard (entry has no SSID, matches any SSID).
-	for _, e := range b.maps {
+	for _, e := range r.Maps {
 		if !strings.ContainsRune(e.AX25Addr, '-') && ax25AddrBase(dest) == e.AX25Addr {
 			return e, true
 		}
@@ -381,19 +463,19 @@ func (b *Bridge) lookupMap(dest string) (MapEntry, bool) {
 	return MapEntry{}, false //nolint: exhaustruct_v5
 }
 
-// addCRC appends the 2-byte AXUDP checksum to frame and returns the
+// AddCRC appends the 2-byte AXUDP checksum to frame and returns the
 // result.  The checksum is CRC-CCITT (poly 0x1021, seed 0xFFFF, final XOR
 // 0xFFFF) over the frame bytes, appended little-endian.
-func addCRC(frame []byte) []byte {
+func AddCRC(frame []byte) []byte {
 	var crc = fcs.Calc(frame)
 
 	return append(append([]byte(nil), frame...), byte(crc), byte(crc>>8))
 }
 
-// stripCRC validates and strips the 2-byte AXUDP checksum from the
+// StripCRC validates and strips the 2-byte AXUDP checksum from the
 // end of pkt.  Returns the AX.25 frame and true if valid, or nil and false if
 // the checksum is wrong or the packet is too short.
-func stripCRC(pkt []byte) ([]byte, bool) {
+func StripCRC(pkt []byte) ([]byte, bool) {
 	if len(pkt) < 2 {
 		return nil, false
 	}
@@ -410,7 +492,7 @@ func stripCRC(pkt []byte) ([]byte, bool) {
 // sendAXUDP sends a raw AX.25 frame to the given UDP address.
 // A CRC-CCITT checksum is always appended (per RFC 1226 / AXUDP convention).
 func (b *Bridge) sendAXUDP(ax25frame []byte, entry MapEntry) {
-	var pkt = addCRC(ax25frame)
+	var pkt = AddCRC(ax25frame)
 	var n, writeErr = b.udpConn.WriteTo(pkt, entry.UDPAddr)
 	if writeErr != nil {
 		logrus.WithField("dest", entry.Addr).WithError(writeErr).Error("Could not send AXUDP datagram")
@@ -496,7 +578,7 @@ func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 	}
 	if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == kiss.CmdDataFrame {
 		var ax25frame = unwrapped[1:]
-		var dest = extractDest(ax25frame)
+		var dest = ExtractDest(ax25frame)
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithFields(logrus.Fields{
 				"dest":  dest,
@@ -505,8 +587,10 @@ func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 		}
 		if dest == "" {
 			logrus.Warn("Dropping AX.25 frame too short to extract a destination from")
-		} else if entry, ok := b2.lookupMap(dest); ok {
-			b2.sendAXUDP(ax25frame, entry)
+		} else if entries := b2.routes.Route(dest); len(entries) > 0 {
+			for _, entry := range entries {
+				b2.sendAXUDP(ax25frame, entry)
+			}
 		} else {
 			logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
 		}

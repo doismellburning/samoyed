@@ -492,6 +492,10 @@ x = Silence FX.25 information.`)
 	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config))
 	stopIfCancelled(ctx)
 
+	// Likewise a channel can be AX.25 over UDP to other nodes.
+	transmitQueue.SetAXUDPChannels(NewAXUDPChannels(ctx, audio_config))
+	stopIfCancelled(ctx)
+
 	/*
 	 * Should there be an option for audio output level?
 	 * Note:  This is not the same as a volume control you would see on the screen.
@@ -809,7 +813,7 @@ func app_process_rec_packet(
 	spectrum string,
 ) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
-	dwutil.Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
+	dwutil.Assert(subchan >= -4 && subchan < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
 	dwutil.Assert(pp != nil) // 1.1J+
 
@@ -921,7 +925,7 @@ func app_process_rec_packet(
 			Warn("Audio input level is too high. This may cause distortion and reduced decode performance. " +
 				"Solution is to decrease the audio input level. " +
 				"Setting audio input level so most stations are around 50 will provide good dynamic range.")
-	} else if alevel.Rec < 5 && channel != audio_config.igate_vchannel && subchan != -3 {
+	} else if alevel.Rec < 5 && channel != audio_config.igate_vchannel && subchan != -3 && subchan != -4 {
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		logrus.WithField("alevel", alevel.Rec).Warn("Audio input level is too low.  Increase so most stations are around 50.")
 	}
@@ -946,6 +950,8 @@ func app_process_rec_packet(
 		logEntry = logEntry.WithField("subchan", "is")
 	case -3: // nettnc
 		logEntry = logEntry.WithField("subchan", "nettnc")
+	case -4: // AXUDP
+		logEntry = logEntry.WithField("subchan", "axudp")
 	default:
 		var numSubchan, numSlicers = channelLayout(channel)
 

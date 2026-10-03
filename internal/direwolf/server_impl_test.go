@@ -483,6 +483,16 @@ func TestConnectedModeAllowed_MediumNETTNC(t *testing.T) {
 	assert.True(t, s.connectedModeAllowed(MAX_RADIO_CHANS))
 }
 
+func TestConnectedModeAllowed_MediumAXUDP(t *testing.T) {
+	var s = new(AGWServer)
+
+	var cfg RadioConfig
+	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_AXUDP
+	s.audioConfigP = &cfg
+
+	assert.True(t, s.connectedModeAllowed(MAX_RADIO_CHANS))
+}
+
 func TestConnectedModeAllowed_MediumIGate(t *testing.T) {
 	var s = new(AGWServer)
 
@@ -624,6 +634,26 @@ func TestHandleClientCommand_G_IGateAndNetTNC(t *testing.T) {
 
 	var want = fmt.Sprintf("2;Port%d Internet Gateway;Port%d Network TNC;", MAX_RADIO_CHANS+1, MAX_RADIO_CHANS+2)
 	assert.Equal(t, want, string(reply.Data))
+}
+
+func TestHandleClientCommand_G_AXUDP(t *testing.T) {
+	var s = new(AGWServer)
+
+	var cfg = new(RadioConfig)
+	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_AXUDP
+	s.audioConfigP = cfg
+
+	var client = setupClientPipe(t, s)
+	var replyCh = asyncReply(client)
+
+	var cmd = new(agwpe.Message)
+	cmd.Header.DataKind = 'G'
+	s.handleClientCommand(0, cmd)
+
+	var reply = <-replyCh
+	require.NotNil(t, reply)
+
+	assert.Equal(t, fmt.Sprintf("1;Port%d AXUDP;", MAX_RADIO_CHANS+1), string(reply.Data))
 }
 
 // 'H' (recently heard stations) is not implemented: nothing is sent back and

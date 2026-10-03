@@ -33,6 +33,9 @@ type ConfigFile struct {
 	// lines would be.
 	KISSPorts []KISSPortSettings `yaml:"kissPorts"`
 
+	// AXUDPPorts are the AXUDP ports, each its own virtual channel.
+	AXUDPPorts []AXUDPPortSettings `yaml:"axudpPorts"`
+
 	// Legacy holds directives in the line-at-a-time format, read after
 	// everything else, for anything not yet given a YAML form.
 	Legacy string `yaml:"legacy"`
@@ -315,6 +318,11 @@ func (ps *parseState) applyYAMLPorts(file *ConfigFile, top map[string]yamlEntry)
 	for i, port := range file.KISSPorts {
 		ps.line = yamlItem(top["kissPorts"].value, i).Line
 		ps.reportIfError(ps.applyKISSPORT(port))
+	}
+
+	for i, port := range file.AXUDPPorts {
+		ps.line = yamlItem(top["axudpPorts"].value, i).Line
+		ps.reportIfError(ps.applyAXUDPPORT(port))
 	}
 }
 

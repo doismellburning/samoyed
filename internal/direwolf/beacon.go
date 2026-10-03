@@ -87,7 +87,8 @@ func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate
 		}
 
 		if bs.modemConfig.chan_medium[channel] == MEDIUM_RADIO ||
-			bs.modemConfig.chan_medium[channel] == MEDIUM_NETTNC {
+			bs.modemConfig.chan_medium[channel] == MEDIUM_NETTNC ||
+			bs.modemConfig.chan_medium[channel] == MEDIUM_AXUDP {
 			if !IsNoCall(bs.modemConfig.mycall[channel]) {
 				switch bs.miscConfig.beacon[j].btype {
 				case BEACON_OBJECT:
