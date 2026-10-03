@@ -32,6 +32,7 @@ import (
 	"os"
 	"unicode"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
 )
@@ -158,9 +159,14 @@ func main() {
 				hdr.DataKind = 'K'
 
 				var reply_bytes = reply_pp.Pack()
-				hdr.DataLen = 1 + uint32(len(reply_bytes)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
-				var replyWriteErr = binary.Write(server_sock, binary.LittleEndian, hdr)
+				// The "TNC" byte ahead of the frame counts towards the length.
+				var dataLen, replyWriteErr = safecast.Convert[uint32](1 + len(reply_bytes))
+				hdr.DataLen = dataLen
+
+				if replyWriteErr == nil {
+					replyWriteErr = binary.Write(server_sock, binary.LittleEndian, hdr)
+				}
 				if replyWriteErr == nil {
 					_, replyWriteErr = server_sock.Write([]byte{0x0})
 				}
