@@ -24,6 +24,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -330,7 +331,7 @@ func digit_suffix(callsign string) string {
 	var two_key, _ = touchtone.TextToTwoKey(callsign, false)
 
 	for _, t := range two_key {
-		if unicode.IsDigit(t) {
+		if t >= '0' && t <= '9' {
 			suffix[0] = suffix[1]
 			suffix[1] = suffix[2]
 			suffix[2] = byte(t)
@@ -804,7 +805,8 @@ func (u *ttUsers) objectReportText(i int, first_time bool) string {
 
 	// info part of Object Report packet
 	stemp += aprs.EncodeObject(object_name, false, u.user[i].last_heard, olat, olong, oambig,
-		byte(u.user[i].overlay), byte(u.user[i].symbol),
+		// Both started out as bytes, so they fit back in one.
+		safecast.MustConvert[byte](u.user[i].overlay), safecast.MustConvert[byte](u.user[i].symbol),
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", /* PHGD */
 		maybe.Nothing[int](), maybe.Nothing[int](), /* Course/Speed */
 		freq,

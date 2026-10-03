@@ -223,7 +223,7 @@ func main() {
 	}
 } /* end main */
 
-func parse_number(str string, de_fault int) int {
+func parse_number(str string, de_fault byte) byte {
 	str = strings.TrimSpace(str)
 
 	if len(str) == 0 {
@@ -245,7 +245,7 @@ func parse_number(str string, de_fault int) int {
 		return de_fault
 	}
 
-	return n
+	return byte(n)
 }
 
 /*-------------------------------------------------------------------
@@ -324,19 +324,19 @@ func process_input(stuff string) {
 		switch stuff[0] {
 		case 'd': // txDelay, 10ms units
 			var value = parse_number(stuff[1:], defaultTXDelay)
-			send_to_kiss_tnc(channel, kiss.CmdTxDelay, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdTxDelay, []byte{value})
 		case 'p': // Persistence
 			var value = parse_number(stuff[1:], defaultPersist)
-			send_to_kiss_tnc(channel, kiss.CmdPersistence, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdPersistence, []byte{value})
 		case 's': // Slot time, 10ms units
 			var value = parse_number(stuff[1:], defaultSlotTime)
-			send_to_kiss_tnc(channel, kiss.CmdSlotTime, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdSlotTime, []byte{value})
 		case 't': // txTail, 10ms units
 			var value = parse_number(stuff[1:], defaultTXTail)
-			send_to_kiss_tnc(channel, kiss.CmdTxTail, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdTxTail, []byte{value})
 		case 'f': // Full duplex
 			var value = parse_number(stuff[1:], 0)
-			send_to_kiss_tnc(channel, kiss.CmdFullDuplex, []byte{byte(value)})
+			send_to_kiss_tnc(channel, kiss.CmdFullDuplex, []byte{value})
 		case 'h': // set Hardware
 			var p = strings.TrimSpace(stuff[1:])
 			send_to_kiss_tnc(channel, kiss.CmdSetHardware, []byte(p))

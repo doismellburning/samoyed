@@ -30,7 +30,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -233,8 +232,8 @@ func calculator(str string) int {
 	var lastop = NONE
 
 	for _, p := range str {
-		if unicode.IsDigit(p) {
-			num = num*10 + int(byte(p)-byte('0'))
+		if p >= '0' && p <= '9' {
+			num = num*10 + int(p-'0')
 		} else if p == '*' {
 			result = do_lastop(lastop, result, num)
 			num = 0

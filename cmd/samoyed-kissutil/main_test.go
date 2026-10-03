@@ -65,7 +65,7 @@ func TestMain(m *testing.M) {
 func Test_parse_number(t *testing.T) {
 	var testCases = map[string]struct {
 		in   string
-		want int
+		want byte
 	}{
 		"number":       {" 30 ", 30},
 		"zero":         {"0", 0},
@@ -78,7 +78,7 @@ func Test_parse_number(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			var got int
+			var got byte
 
 			testutils.CaptureOutput(t, func() { got = parse_number(tc.in, 99) })
 
