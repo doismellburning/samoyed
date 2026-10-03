@@ -145,3 +145,57 @@ func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 		})
 	}
 }
+
+// A type 1 header cannot represent every AX.25 frame exactly - AX.25 v1 C bits,
+// with both set, come back as a command - and a trailing CRC computed over the
+// original would then fail against what the receiver rebuilds.  FromText makes
+// such a frame whenever there is no digipeater path.
+func TestIL2PCRCLossyType1Header(t *testing.T) {
+	il2p_init(0)
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello world", true)
+	require.NotNil(t, pp)
+
+	var _, e = il2p_type_1_header(pp, 1)
+	require.GreaterOrEqual(t, e, 0, "frame should fit a type 1 header")
+
+	t.Run("codec", func(t *testing.T) {
+		var encoded, n = il2p_encode_frame(pp, IL2P_VERSION_0_6, 1, true)
+		require.Positive(t, n)
+
+		var pp2 = il2p_decode_frame(encoded[:n], IL2P_VERSION_0_6)
+		require.NotNil(t, pp2)
+		assert.Equal(t, pp.FrameData(), pp2.FrameData())
+	})
+
+	t.Run("loopback", func(t *testing.T) {
+		var recorder = il2pLoopback(t, IL2P_VERSION_0_6)
+
+		require.Positive(t, NewHDLCSender(0, nil, nil, 0).sendIL2PFrame(pp, IL2P_VERSION_0_6, 1, true, 0))
+		recorder.flush()
+
+		var received = recorder.take()
+		require.Len(t, received, 1)
+		assert.Equal(t, []byte("hello world"), received[0].info)
+	})
+}
+
+// The type 0 fallback is only for frames a type 1 header would change: one it
+// represents exactly keeps the more compact header.
+func TestIL2PCRCKeepsExactType1Header(t *testing.T) {
+	il2p_init(0)
+
+	var addrs [ax25.MaxAddrs]string
+	addrs[0] = "Q1TEST"
+	addrs[1] = "Q2TEST"
+
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, []byte("hello world"))
+	require.NotNil(t, pp)
+
+	var encoded, n = il2p_encode_frame(pp, IL2P_VERSION_0_6, 1, true)
+	require.Positive(t, n)
+
+	var uhdr, e = il2p_clarify_header(encoded[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY])
+	require.GreaterOrEqual(t, e, 0)
+	assert.Equal(t, 1, GET_HDR_TYPE(uhdr))
+}
