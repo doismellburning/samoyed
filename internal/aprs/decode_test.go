@@ -10,6 +10,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -395,6 +396,23 @@ func Test_decode_aprs_ack_and_rej(t *testing.T) {
 		assert.Equal(t, "42", A.MessageNumber, "%s", tc.info)
 		assert.Equal(t, "Q2TEST", A.Addressee, "%s", tc.info)
 	}
+}
+
+// A position a hair short of a whole degree used to print as 59.99995 minutes
+// or more rounded up to 60, as "W 000°60.0000", rather than carried into the
+// degrees.  Floating point on arm64 lands a Maidenhead square's corner there.
+func Test_decode_aprs_print_carries_minutes(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var A = new(Decoded)
+	A.DataTypeDesc = "Position"
+	A.SymbolCode = ' '
+	A.Lat = maybe.Just(51.0 - 1e-9)
+	A.Lon = maybe.Just(-(1.0 - 1e-9))
+
+	var output = testutils.CaptureOutput(t, func() { aprsDecoder.Print(A) })
+
+	assert.Equal(t, "Position\nN 51°00.0000, W 001°00.0000\n", output)
 }
 
 // A course and speed extension can be the whole of the information field,

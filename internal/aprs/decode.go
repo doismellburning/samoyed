@@ -553,6 +553,21 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *D
 	return A
 } /* end decode_aprs */
 
+// degreesAndMinutes splits a latitude or longitude, without its sign, into
+// whole degrees and minutes to four places.  Minutes that round up to 60 are
+// carried into the degrees, as LatitudeToNMEA does, rather than shown as 60.
+func degreesAndMinutes(absll float64) (int, string) {
+	var deg = int(absll)
+	var minutes = fmt.Sprintf("%07.4f", (absll-float64(deg))*60.0)
+
+	if minutes[0] == '6' {
+		deg++
+		minutes = "00.0000"
+	}
+
+	return deg, minutes
+}
+
 // Print writes out what Decode found, in human readable form.
 func (d *Decoder) Print(A *Decoded) {
 	/*
@@ -665,9 +680,8 @@ func (d *Decoder) Print(A *Decoded) {
 				absll = -lat
 				news = 'S'
 			}
-			var deg = int(absll)
-			var _min = (absll - float64(deg)) * 60.0
-			s_lat = fmt.Sprintf("%c %02d°%07.4f", news, deg, _min)
+			var deg, _min = degreesAndMinutes(absll)
+			s_lat = fmt.Sprintf("%c %02d°%s", news, deg, _min)
 		} else {
 			s_lat = "Invalid Latitude"
 		}
@@ -683,9 +697,8 @@ func (d *Decoder) Print(A *Decoded) {
 				absll = -lon
 				news = 'W'
 			}
-			var deg = int(absll)
-			var _min = (absll - float64(deg)) * 60.0
-			s_lon = fmt.Sprintf("%c %03d°%07.4f", news, deg, _min)
+			var deg, _min = degreesAndMinutes(absll)
+			s_lon = fmt.Sprintf("%c %03d°%s", news, deg, _min)
 		} else {
 			s_lon = "Invalid Longitude"
 		}
