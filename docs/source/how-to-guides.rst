@@ -230,6 +230,72 @@ An audio *input* device is also still required: there is nothing to do without
 one, so Samoyed stops if it cannot be opened.
 
 
+Receive from an UberSDR instance
+--------------------------------
+
+`UberSDR <https://ubersdr.org/>`_ is a web SDR that serves many listeners from one receiver,
+and many instances are open to the public.
+Samoyed can listen to one directly,
+with no audio cable or separate client in between,
+by naming it as an audio device:
+
+.. code::
+
+    ADEVICE ubersdr:https://sdr.example.org/?frequency=10147600&mode=usb
+
+This tunes the receiver to 10.1476 MHz upper sideband,
+which suits 300 baud HF packet,
+and decodes what it hears as it would a sound card.
+The same name works as the ``input`` of a YAML ``audioDevices`` entry,
+or as the audio source on the command line:
+
+.. code::
+
+    $ samoyed-direwolf -c rx.conf 'ubersdr:https://sdr.example.org/?frequency=10147600&mode=usb'
+
+Quote it in the shell, as the ``&`` would otherwise end the command.
+
+The URL is the address you would open the instance at in a browser, followed by these parameters:
+
+``frequency``
+    The frequency to tune to, in Hz.  Required.
+
+``mode``
+    One of ``usb`` (the default), ``lsb``, ``cwu``, ``cwl``, ``am``, ``sam``, ``fm`` or ``nfm``.
+
+``bandwidthLow``, ``bandwidthHigh``
+    The edges of the receiver's filter, in Hz either side of the frequency,
+    if its default for the mode doesn't suit.
+
+``password``
+    For an instance whose operator has given you one,
+    which may lift its limits on how long you can stay connected.
+
+Any other parameter is refused rather than ignored, so a misspelt one is noticed.
+
+UberSDR streams each mode at a fixed sample rate -
+12000 samples per second for ``usb``, ``lsb``, ``cwu`` and ``cwl``,
+and 24000 for ``am``, ``sam``, ``fm`` and ``nfm`` -
+so Samoyed uses that rate whatever ``ARATE`` says,
+and says so when it differs.
+The audio is mono, so the device needs ``ACHANNELS 1``,
+which is the default.
+At these rates, 300 and 1200 baud work well;
+9600 baud needs a far higher sample rate than UberSDR provides.
+
+The device can only receive, so it behaves as the receive-only sources above do:
+nothing is transmitted unless the ``ADEVICE`` line names a separate output device.
+
+If the instance can't be reached when Samoyed starts, or drops the connection later -
+public instances commonly limit how long a listener can stay -
+Samoyed carries on and reconnects,
+waiting a little longer after each failed attempt, up to a minute.
+Each connection identifies itself to the instance as ``Samoyed``.
+Please be considerate of instances run for the public:
+a monitoring station that stays connected around the clock uses a slot that others could have,
+so ask the operator first.
+
+
 Run two instances talking to each other via ALSA loopback (Linux)
 -----------------------------------------------------------------
 

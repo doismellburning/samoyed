@@ -7,9 +7,10 @@ direwolf \- Soundcard TNC for packet radio.
 .SH SYNOPSIS
 .B direwolf 
 [ \fIoptions\fR ]
-[ \- | \fBudp:\fR9999 ]
+[ \- | \fBudp:\fR9999 | \fBubersdr:\fR\fIURL\fR ]
 .P
 The first audio channel can be streamed thru stdin or a UDP port.  This is typically used with an SDR receiver.
+It can also come straight from an UberSDR web SDR, tuned as the URL says; see EXAMPLES.
 
 
 .SH DESCRIPTION
@@ -225,6 +226,12 @@ Other SDR applications might produce audio on stdout so it is convenient to pipe
 .RS
 .P
 rtl_fm \-f 144.39M \-o 4 \- | direwolf \-n 1 \-r 24000 \-b 16 \-
+.RE
+.P
+Audio can be received straight from an UberSDR web SDR instance, which is tuned to the frequency (in Hz) and mode the URL gives.  The sample rate is set by the mode: 12000 for usb, lsb, cwu and cwl; 24000 for am, sam, fm and nfm.
+.RS
+.P
+direwolf 'ubersdr:https://sdr.example.org/?frequency=10147600&mode=usb'
 .RE
 .P
 Audio output can also be sent to another host via UDP by setting ADEVICE_OUT (or the second argument to ADEVICE) to \fBudp:host:port\fR in the configuration file.  For example, to stream encoded audio to a local port:
