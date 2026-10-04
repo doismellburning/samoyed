@@ -414,6 +414,10 @@ func Parse(sentence string) (*Data, error) {
 
 	var stemp = sentence
 
+	if len(stemp) == 0 {
+		return nil, errors.New("empty AIS sentence")
+	}
+
 	// Verify and remove checksum.
 
 	var calculatedChecksum byte = 0

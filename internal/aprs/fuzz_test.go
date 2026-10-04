@@ -67,6 +67,9 @@ func FuzzDecodeAPRS(f *testing.F) {
 	// form, so the 4 character one is tried with exactly 4 bytes.
 	f.Add("Q1TEST>APDW17:>IO91/#  ")
 
+	// AIS user-defined data with no AIS sentence at all.
+	f.Add("0>0:{DA")
+
 	f.Fuzz(func(t *testing.T, monitor string) {
 		var pp = ax25.FromTextWithStrictness(monitor, ax25.AddrLenient)
 		if pp == nil {
