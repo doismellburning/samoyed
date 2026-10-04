@@ -13,6 +13,7 @@
 ## Documentation
 
 * Update documentation in `docs/source` where appropriate
+* Write prose in `docs/source` with [semantic line breaks](https://sembr.org/): a new line after each sentence, and at clause boundaries where a sentence runs long, rather than wrapping at a fixed width. A diff then shows which sentence changed. Existing pages don't need reflowing just to match
 
 ## Git and PRs
 
