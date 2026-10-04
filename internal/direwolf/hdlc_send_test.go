@@ -358,10 +358,10 @@ func TestPreambleIsTheIL2PPatternForIL2P(t *testing.T) {
 // Inverted polarity is the same pattern the other way up.
 func TestIL2PPolarityInvertsEveryBit(t *testing.T) {
 	var upright = captureBits(t, nil, func(s *Layer2Sender) {
-		s.sendByteMSBFirst(IL2P_PREAMBLE, 0)
+		s.il2p.sendByteMSBFirst(IL2P_PREAMBLE, 0)
 	})
 	var inverted = captureBits(t, nil, func(s *Layer2Sender) {
-		s.sendByteMSBFirst(IL2P_PREAMBLE, 1)
+		s.il2p.sendByteMSBFirst(IL2P_PREAMBLE, 1)
 	})
 
 	require.Len(t, inverted, len(upright))

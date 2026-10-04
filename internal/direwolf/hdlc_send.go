@@ -24,6 +24,8 @@ type Layer2Sender struct {
 	stuff int
 
 	line *linecode.Encoder // Puts the bits on the line, keeping its NRZI level.
+
+	il2p *IL2PSender // Sends IL2P, on the same line.
 }
 
 // NewLayer2Sender makes a Layer2Sender for channel, sending the layer 2
@@ -36,6 +38,7 @@ func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneG
 	s.toneGenerator = toneGenerator
 	s.fx25Debug = fx25Debug
 	s.line = linecode.NewEncoder(s.putBit)
+	s.il2p = NewIL2PSender(s.line, channel)
 
 	return s
 }
@@ -100,7 +103,7 @@ func (s *Layer2Sender) SendFrame(pp *ax25.Packet, badFCS bool) int {
 	var achan = &s.audioConfig.achan[s.channel]
 
 	if achan.layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
-		var n = s.sendIL2PFrame(pp, achan.il2p_version, achan.il2p_max_fec, achan.il2p_crc, achan.il2p_invert_polarity)
+		var n = s.il2p.SendFrame(pp, achan.il2p_version, achan.il2p_max_fec, achan.il2p_crc, achan.il2p_invert_polarity)
 		if n > 0 {
 			return n
 		}
@@ -167,12 +170,16 @@ func (s *Layer2Sender) SendPreamblePostamble(nbytes int, finish bool) int {
 
 	var achan = &s.audioConfig.achan[s.channel]
 
-	for range nbytes {
-		if achan.layer2_xmit == LAYER2_IL2P {
-			s.sendByteMSBFirst(IL2P_PREAMBLE, achan.il2p_invert_polarity)
-		} else {
+	var sent int
+
+	if achan.layer2_xmit == LAYER2_IL2P {
+		sent = s.il2p.SendPreamble(nbytes, achan.il2p_invert_polarity)
+	} else {
+		for range nbytes {
 			s.sendControlNRZI(0x7e)
 		}
+
+		sent = s.bitsSent
 	}
 
 	/* Push out the final partial buffer! */
@@ -181,7 +188,7 @@ func (s *Layer2Sender) SendPreamblePostamble(nbytes int, finish bool) int {
 		s.flush()
 	}
 
-	return s.bitsSent
+	return sent
 }
 
 // sendAX25Frame is ax25_only_hdlc_send_frame in Dire Wolf.
@@ -214,22 +221,6 @@ func (s *Layer2Sender) sendAX25Frame(fbuf []byte, badFCS bool) int {
 	s.sendControlNRZI(0x7e) /* End frame */
 
 	return s.bitsSent
-}
-
-// The next one is only for IL2P.  No NRZI.
-// MSB first, opposite of AX.25.
-// NRZI would be applied for AX.25 but IL2P does not use it.
-// However we do have an option to invert the signal.
-// The direwolf receive implementation will automatically compensate
-// for either polarity but other implementations might not.
-
-func (s *Layer2Sender) sendByteMSBFirst(x int, polarity int) {
-	for range 8 {
-		s.line.Write((x&0x80) != 0, polarity&1 != 0)
-
-		x <<= 1
-		s.bitsSent++
-	}
 }
 
 // The following are only for HDLC.
