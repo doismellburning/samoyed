@@ -26,6 +26,10 @@ extensions = [
     "godeps",
 ]
 
+# Label sections "page:Heading" rather than "Heading", so different pages can
+# share subheadings without clashing.
+autosectionlabel_prefix_document = True
+
 graphviz_output_format = "svg"
 
 pygments_style = "default"

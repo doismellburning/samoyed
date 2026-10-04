@@ -1,0 +1,19 @@
+..
+    SPDX-FileCopyrightText: The Samoyed Authors
+    SPDX-License-Identifier: GPL-2.0-or-later
+
+AX.25
+=====
+
+🤖 The link-layer protocol of packet radio:
+HDLC frames addressed by callsign and SSID,
+with an optional path of digipeaters.
+It has connectionless (UI) frames, which :doc:`aprs` uses,
+and a connected mode with acknowledgements and retries.
+FX.25 and IL2P add forward error correction on air.
+
+References
+----------
+
+* `AX.25 Link Access Protocol for Amateur Packet Radio, v2.2 <https://www.tapr.org/pdf/AX25.2.2.pdf>`__ (TAPR)
+* `AX.25 on Wikipedia <https://en.wikipedia.org/wiki/AX.25>`__
