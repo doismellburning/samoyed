@@ -130,6 +130,11 @@ For Dire Wolf documentation, see the [Dire Wolf doc directory](https://github.co
 
 ## License
 
-GPL-2.0-or-later. See [LICENSES/](./LICENSES/) and [REUSE.toml](./REUSE.toml) for full details.
+Samoyed as a whole is distributed under the terms of the [GNU Affero General Public License](./LICENSES/AGPL-3.0-or-later.txt), version 3 or later.
+
+Samoyed's own work is AGPL-3.0-or-later.
+Code derived from Dire Wolf remains available under Dire Wolf's GPL-2.0-or-later as well, so those files are `GPL-2.0-or-later AND AGPL-3.0-or-later`;
+GPLv3's section 13 is what lets the two be combined.
+See [LICENSES/](./LICENSES/) and [REUSE.toml](./REUSE.toml) for per-file details.
 
 Samoyed is a fork of Dire Wolf — see [AUTHORS.md](./AUTHORS.md) for authorship and attribution.

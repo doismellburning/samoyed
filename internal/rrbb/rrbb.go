@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
 // Package rrbb holds the Raw Received Bit Buffer: the bits of one frame as
 // they come out of a demodulator, before HDLC decoding turns them into bytes.

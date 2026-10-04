@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2007 Jim McGuire KB3MPL
 // SPDX-FileCopyrightText: 2019 John Langner, WB2OSZ
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
 package reedsolomon
 

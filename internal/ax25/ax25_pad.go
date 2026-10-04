@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
 // Package ax25 assembles and disassembles AX.25 frames: building a Packet from
 // the monitor text format or from a received frame, taking it apart address by

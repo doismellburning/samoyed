@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /*
  * Decode a captured KISS byte stream.
  *

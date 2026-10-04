@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package testutils holds helpers for tests that more than one package wants,
 // such as the commands under cmd/, whose tests drive main as a user would.

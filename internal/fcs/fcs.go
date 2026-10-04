@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
 // Package fcs calculates the frame check sequence AX.25 appends to each frame:
 // a 16 bit CRC, over the polynomial defined by the CCITT (now the ITU-T), that

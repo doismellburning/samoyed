@@ -87,5 +87,6 @@
 ## Licensing
 
 * `make reuse` checks [REUSE](https://reuse.software/) compliance and must always pass
-* New files should have copyright assigned to "The Samoyed Authors" and be GPL-2.0-or-later, as per REUSE.toml
+* New files should credit copyright to "The Samoyed Authors" and be AGPL-3.0-or-later, as per REUSE.toml
+* Code ported or moved from Dire Wolf-derived code is `GPL-2.0-or-later AND AGPL-3.0-or-later` instead - Dire Wolf's authors are among The Samoyed Authors (see `AUTHORS.md`), and their code can't be relicensed, only combined with AGPL code under GPLv3 section 13. A wholly new file in a directory REUSE.toml marks as Dire Wolf-derived (e.g. `internal/direwolf`, `cmd`) needs its own AGPL-3.0-or-later SPDX header
 * New individual files should declare this via SPDX headers where possible - if adding new entire directories, then adding an annotation path to REUSE.toml is acceptable

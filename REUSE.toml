@@ -9,6 +9,7 @@ path = [
 SPDX-FileCopyrightText = "The Dire Wolf Authors"
 SPDX-License-Identifier = "GPL-2.0-or-later"
 
+# Samoyed's own work.
 [[annotations]]
 path = [
 	"*.md",
@@ -17,15 +18,31 @@ path = [
 	".github/**",
 	".golangci.yml",
 	"Makefile",
-	"cmd/**",
 	"docs/**",
 	"go.mod",
 	"go.sum",
-	"internal/direwolf/*.go",
-	"test-scripts/**",
 	"upstream-tracker/**",
 ]
 SPDX-FileCopyrightText = "The Samoyed Authors"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+# Derived from Dire Wolf, whose authors are among The Samoyed Authors (see AUTHORS.md).
+# Dire Wolf's GPL-2.0-or-later lets it be combined with AGPL-3.0-or-later code (GPLv3 section 13).
+# Original files in these directories declare AGPL-3.0-or-later in their own headers.
+[[annotations]]
+path = [
+	"README.md",
+	"cmd/**",
+	"internal/direwolf/*.go",
+	"test-scripts/**",
+]
+SPDX-FileCopyrightText = "The Samoyed Authors"
+SPDX-License-Identifier = "GPL-2.0-or-later AND AGPL-3.0-or-later"
+
+# Dire Wolf's revision history, carried over as-is.
+[[annotations]]
+path = "CHANGES.md"
+SPDX-FileCopyrightText = "The Dire Wolf Authors"
 SPDX-License-Identifier = "GPL-2.0-or-later"
 
 [[annotations]]

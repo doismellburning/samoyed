@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
 // Only where the terminal settings ioctls below are spelled the way
 // termios_linux_test.go and termios_darwin_test.go spell them, which is every
