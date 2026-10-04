@@ -5,7 +5,9 @@
 PTT
 ===
 
-🤖 Push to talk:
+.. ai-label:: generated
+
+Push to talk:
 switching the radio into transmit before sending and back afterwards.
 It can be done with a serial port's RTS or DTR line,
 a GPIO pin,

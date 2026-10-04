@@ -5,7 +5,9 @@
 IGate
 =====
 
-🤖 An internet gateway for :doc:`aprs`:
+.. ai-label:: generated
+
+An internet gateway for :doc:`aprs`:
 a station that passes packets it hears on air to APRS-IS,
 the internet backbone of APRS,
 and can pass selected traffic,

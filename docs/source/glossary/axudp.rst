@@ -5,7 +5,9 @@
 AXUDP
 =====
 
-🤖 Raw :doc:`ax25` frames carried in UDP datagrams:
+.. ai-label:: generated
+
+Raw :doc:`ax25` frames carried in UDP datagrams:
 the UDP form of the encapsulation in :rfc:`1226`.
 
 References

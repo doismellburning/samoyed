@@ -5,7 +5,9 @@
 PSK
 ===
 
-🤖 Phase-shift keying:
+.. ai-label:: generated
+
+Phase-shift keying:
 data sent as changes of phase of a single audio tone,
 packing more bits into each symbol than :doc:`afsk` does.
 The packet modems follow the ITU modem standards:

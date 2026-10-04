@@ -5,7 +5,9 @@
 KISS
 ====
 
-🤖 "Keep It Simple, Stupid":
+.. ai-label:: generated
+
+"Keep It Simple, Stupid":
 the minimal protocol between a TNC and a host application.
 Each :doc:`ax25` frame travels whole,
 delimited by ``FEND`` bytes and with a one-byte command and port number in front;

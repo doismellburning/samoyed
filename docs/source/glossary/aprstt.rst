@@ -5,7 +5,9 @@
 APRStt
 ======
 
-🤖 APRS touch tone:
+.. ai-label:: generated
+
+APRS touch tone:
 a way for a radio with only a DTMF keypad to take part in :doc:`aprs`.
 The user keys in a callsign, a position or a short message as DTMF digits,
 and a gateway turns them into APRS objects

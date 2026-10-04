@@ -5,7 +5,9 @@
 AIS
 ===
 
-🤖 The Automatic Identification System:
+.. ai-label:: generated
+
+The Automatic Identification System:
 ships, and some aircraft and shore stations,
 broadcast their identity, position, course and speed on marine VHF
 at 9600 bit/s in :doc:`hdlc` frames.

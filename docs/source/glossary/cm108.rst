@@ -5,7 +5,9 @@
 CM108
 =====
 
-🤖 A family of cheap USB audio chips
+.. ai-label:: generated
+
+A family of cheap USB audio chips
 (CM108, CM119 and compatibles)
 whose spare GPIO pins can key a transmitter.
 Many radio interfaces are built around one,

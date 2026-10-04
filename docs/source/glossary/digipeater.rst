@@ -5,7 +5,9 @@
 Digipeater
 ==========
 
-🤖 A digital repeater:
+.. ai-label:: generated
+
+A digital repeater:
 a station that retransmits :doc:`ax25` frames
 whose path names it, or a generic alias such as ``WIDE2-2``,
 marking that hop as used so the frame doesn't bounce back and forth.

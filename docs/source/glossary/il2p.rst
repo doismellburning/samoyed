@@ -5,7 +5,9 @@
 IL2P
 ====
 
-🤖 Improved Layer 2 Protocol, by Nino Carrillo KK4HEJ:
+.. ai-label:: generated
+
+Improved Layer 2 Protocol, by Nino Carrillo KK4HEJ:
 an on-air format for :doc:`ax25` frames
 that replaces :doc:`hdlc` framing with a compact header,
 scrambling and Reed-Solomon forward error correction.

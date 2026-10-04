@@ -5,7 +5,9 @@
 GPS
 ===
 
-🤖 Satellite positioning,
+.. ai-label:: generated
+
+Satellite positioning,
 which lets a station beacon its own position as a tracker.
 A receiver reports as NMEA 0183 sentences over a serial port,
 or through the gpsd daemon.

@@ -5,7 +5,9 @@
 G3RUH
 =====
 
-🤖 The usual 9600 baud packet modem,
+.. ai-label:: generated
+
+The usual 9600 baud packet modem,
 designed by James Miller G3RUH.
 Rather than audio tones it sends scrambled baseband data
 straight to the radio's modulator,

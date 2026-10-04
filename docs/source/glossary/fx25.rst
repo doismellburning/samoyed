@@ -5,7 +5,9 @@
 FX.25
 =====
 
-🤖 Forward error correction for :doc:`ax25`:
+.. ai-label:: generated
+
+Forward error correction for :doc:`ax25`:
 the usual :doc:`hdlc` frame is wrapped in a Reed-Solomon code block,
 preceded by a correlation tag that says which code was used.
 A receiver that knows FX.25 can repair damaged bits;

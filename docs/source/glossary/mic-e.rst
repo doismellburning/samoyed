@@ -5,7 +5,9 @@
 Mic-E
 =====
 
-🤖 A compact :doc:`aprs` position format:
+.. ai-label:: generated
+
+A compact :doc:`aprs` position format:
 the latitude and a few flags ride in the :doc:`ax25` destination address
 and the longitude, course and speed in a handful of bytes of the information field.
 

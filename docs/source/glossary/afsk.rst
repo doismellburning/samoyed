@@ -5,7 +5,9 @@
 AFSK
 ====
 
-🤖 Audio frequency-shift keying:
+.. ai-label:: generated
+
+Audio frequency-shift keying:
 data sent as a pair of audio tones through an ordinary voice radio's
 microphone and speaker connections.
 Bell 202 is 1200 baud,

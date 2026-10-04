@@ -5,7 +5,9 @@
 AX.25
 =====
 
-🤖 The link-layer protocol of packet radio:
+.. ai-label:: generated
+
+The link-layer protocol of packet radio:
 :doc:`hdlc` frames addressed by callsign and SSID,
 with an optional path of :doc:`digipeaters <digipeater>`.
 It has connectionless (UI) frames, which :doc:`aprs` uses,

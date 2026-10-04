@@ -5,7 +5,9 @@
 HDLC
 ====
 
-🤖 High-Level Data Link Control,
+.. ai-label:: generated
+
+High-Level Data Link Control,
 the framing :doc:`ax25` borrows:
 a frame starts and ends with the ``01111110`` flag,
 a 0 is stuffed after five 1s in a row so data never looks like a flag,

@@ -5,7 +5,9 @@
 AGWPE
 =====
 
-🤖 The TCP application interface of SV2AGW's AGW Packet Engine.
+.. ai-label:: generated
+
+The TCP application interface of SV2AGW's AGW Packet Engine.
 A client application connects
 and exchanges frames
 to send and monitor :doc:`ax25` traffic

@@ -5,7 +5,9 @@
 EAS SAME
 ========
 
-🤖 The Specific Area Message Encoding of the US Emergency Alert System:
+.. ai-label:: generated
+
+The Specific Area Message Encoding of the US Emergency Alert System:
 short bursts of 520.83 baud :doc:`afsk`
 that say what kind of alert follows,
 where it applies and for how long.
