@@ -116,6 +116,16 @@ func Test_anyDeviceRequiresPortAudio(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "ubersdr in, nothing out",
+			pa:   makeRadioConfig("ubersdr:https://sdr.example.org/?frequency=10147600", "ubersdr:https://sdr.example.org/?frequency=10147600"),
+			want: false,
+		},
+		{
+			name: "ubersdr in, soundcard out",
+			pa:   makeRadioConfig("ubersdr:https://sdr.example.org/?frequency=10147600", "default"),
+			want: true,
+		},
+		{
 			name: "stdin in, soundcard out",
 			pa:   makeRadioConfig("stdin", "default"),
 			want: true,
@@ -277,6 +287,9 @@ func Test_audioOutType(t *testing.T) {
 		{"udp listen port copied to the output side", "udp:7355", "udp:7355", false, AUDIO_OUT_TYPE_NONE},
 		{"udp listen port, mixed case", "UDP:7355", "udp:7355", false, AUDIO_OUT_TYPE_NONE},
 		{"same udp name on both sides, but named for transmit", "udp:7355", "udp:7355", true, AUDIO_OUT_TYPE_UDP},
+		{"ubersdr copied to the output side", "ubersdr:https://sdr.example.org/?frequency=10147600", "ubersdr:https://sdr.example.org/?frequency=10147600", false, AUDIO_OUT_TYPE_NONE},
+		{"ubersdr named for transmit", "plughw:1,0", "UberSDR:https://sdr.example.org/?frequency=10147600", true, AUDIO_OUT_TYPE_NONE},
+		{"ubersdr in, soundcard out", "ubersdr:https://sdr.example.org/?frequency=10147600", "plughw:1,0", true, AUDIO_OUT_TYPE_SOUNDCARD},
 	}
 
 	for _, tt := range tests {

@@ -167,7 +167,7 @@ x = Silence FX.25 information.`)
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s - a software 'soundcard' modem/TNC and APRS encoder/decoder.\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\n")
-		fmt.Fprintf(os.Stderr, "Usage: direwolf [options] [ - | stdin | UDP:nnnn]\n")
+		fmt.Fprintf(os.Stderr, "Usage: direwolf [options] [ - | stdin | UDP:nnnn | ubersdr:URL ]\n")
 		pflag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n")
 		fmt.Fprintf(os.Stderr, "After any options, there can be a single command line argument for the source of\n")
