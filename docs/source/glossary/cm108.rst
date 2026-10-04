@@ -1,0 +1,19 @@
+..
+    SPDX-FileCopyrightText: The Samoyed Authors
+    SPDX-License-Identifier: GPL-2.0-or-later
+
+CM108
+=====
+
+.. ai-label:: generated
+
+A family of cheap USB audio chips
+(CM108, CM119 and compatibles)
+whose spare GPIO pins can key a transmitter.
+Many radio interfaces are built around one,
+so a single USB connection gives both audio and :doc:`ptt`.
+
+References
+----------
+
+* `CM108 compatible chips with GPIO <https://irongarment.wordpress.com/2011/03/29/cm108-compatible-chips-with-gpio/>`__

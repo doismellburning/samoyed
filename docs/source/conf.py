@@ -24,6 +24,7 @@ extensions = [
     "sphinx.ext.extlinks",
     "sphinx.ext.graphviz",
     "godeps",
+    "sphinx_eu_ai_label",
 ]
 
 # Label sections "page:Heading" rather than "Heading", so different pages can

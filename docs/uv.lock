@@ -289,6 +289,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "sphinx" },
     { name = "sphinx-autobuild" },
+    { name = "sphinx-eu-ai-label" },
     { name = "sphinx-rtd-theme" },
     { name = "structlog" },
 ]
@@ -304,6 +305,7 @@ dev = [
 requires-dist = [
     { name = "sphinx", specifier = ">=9.1.0" },
     { name = "sphinx-autobuild", specifier = ">=2025.8.25" },
+    { name = "sphinx-eu-ai-label", git = "https://github.com/doismellburning/sphinx-eu-ai-label" },
     { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },
     { name = "structlog" },
 ]
@@ -367,6 +369,14 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e0/3c/a59a3a453d4133777f7ed2e83c80b7dc817d43c74b74298ca0af869662ad/sphinx_autobuild-2025.8.25.tar.gz", hash = "sha256:9cf5aab32853c8c31af572e4fecdc09c997e2b8be5a07daf2a389e270e85b213", size = 15200, upload-time = "2025-08-25T18:44:55.436Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/20/56411b52f917696995f5ad27d2ea7e9492c84a043c5b49a3a3173573cd93/sphinx_autobuild-2025.8.25-py3-none-any.whl", hash = "sha256:b750ac7d5a18603e4665294323fd20f6dcc0a984117026d1986704fa68f0379a", size = 12535, upload-time = "2025-08-25T18:44:54.164Z" },
+]
+
+[[package]]
+name = "sphinx-eu-ai-label"
+version = "0.1.0"
+source = { git = "https://github.com/doismellburning/sphinx-eu-ai-label#4e44a1397503a878cbcbcf9d99ea6c8faf518073" }
+dependencies = [
+    { name = "sphinx" },
 ]
 
 [[package]]

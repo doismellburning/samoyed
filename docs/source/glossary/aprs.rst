@@ -5,11 +5,13 @@
 APRS
 ====
 
-🤖 The Automatic Packet Reporting System:
+.. ai-label:: generated
+
+The Automatic Packet Reporting System:
 positions, messages, objects, weather and telemetry
 sent as :doc:`ax25` UI frames,
-spread by digipeaters
-and gatewayed to the internet (APRS-IS) by IGates.
+spread by :doc:`digipeaters <digipeater>`
+and gatewayed to the internet (APRS-IS) by :doc:`IGates <igate>`.
 
 References
 ----------
