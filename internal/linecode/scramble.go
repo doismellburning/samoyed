@@ -3,6 +3,21 @@
 
 package linecode
 
+// Scrambler applies G3RUH scrambling (1 + x^12 + x^17), as used at 9600
+// baud, to the bits going out.  Its zero value is ready to use.
+type Scrambler struct {
+	lfsr int // The bits sent so far, most recent in bit 0.
+}
+
+// Scramble takes one bit to send, 0 or 1, and returns the bit to put on the
+// line in its place.
+func (s *Scrambler) Scramble(in int) int {
+	var out = (in ^ (s.lfsr >> 16) ^ (s.lfsr >> 11)) & 1
+	s.lfsr = (s.lfsr << 1) | (out & 1)
+
+	return out
+}
+
 // Descrambler undoes G3RUH scrambling (1 + x^12 + x^17), as used at 9600
 // baud.  It is self-synchronising: each output bit depends only on the last
 // 17 bits received, so it locks on to a transmission within 17 bits whatever

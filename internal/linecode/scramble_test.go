@@ -97,3 +97,38 @@ func TestDescramblerStateCarriesOn(t *testing.T) {
 
 	assert.Equal(t, whole, append(firstHalf, secondHalf...))
 }
+
+func scrambleAll(s *Scrambler, in []int) []int {
+	var out = make([]int, len(in))
+	for i, b := range in {
+		out[i] = s.Scramble(b)
+	}
+
+	return out
+}
+
+// Scrambling feeds its own output back, y[n] = x[n] ^ y[n-12] ^ y[n-17], so a
+// lone 1 keeps echoing.  Worked by hand for the first 41 bits.
+func TestScramblerImpulseResponse(t *testing.T) {
+	var in = make([]int, 41)
+	in[0] = 1
+
+	var expected = make([]int, 41)
+	for _, n := range []int{0, 12, 17, 24, 34, 36} {
+		expected[n] = 1
+	}
+
+	assert.Equal(t, expected, scrambleAll(new(Scrambler), in))
+}
+
+func TestScramblerMatchesItsDefinition(t *testing.T) {
+	var data = randomBits(1000)
+
+	assert.Equal(t, referenceScramble(data), scrambleAll(new(Scrambler), data))
+}
+
+func TestScramblerRoundTrip(t *testing.T) {
+	var data = randomBits(1000)
+
+	assert.Equal(t, data, descrambleAll(new(Descrambler), scrambleAll(new(Scrambler), data)))
+}

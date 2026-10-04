@@ -93,3 +93,60 @@ func TestDecoderPrevRawIsTheLastBit(t *testing.T) {
 	d.Decode(false, true)
 	assert.False(t, d.PrevRaw())
 }
+
+// encodeAll NRZI encodes data with an Encoder, returning the line levels.
+func encodeAll(data []int) []int {
+	var line []int
+
+	var e = NewEncoder(func(level int) { line = append(line, level) })
+	for _, d := range data {
+		e.WriteNRZI(d != 0)
+	}
+
+	return line
+}
+
+func TestEncoderMatchesNRZI(t *testing.T) {
+	var data = randomBits(1000)
+
+	assert.Equal(t, referenceNRZI(data), encodeAll(data))
+}
+
+func TestEncoderDecoderRoundTrip(t *testing.T) {
+	var data = randomBits(1000)
+
+	assert.Equal(t, data, decodeAll(new(Decoder), encodeAll(data), false))
+}
+
+func TestEncoderDecoderRoundTripScrambled(t *testing.T) {
+	var data = randomBits(1000)
+
+	var s Scrambler
+
+	var line = encodeAll(data)
+	for i, b := range line {
+		line[i] = s.Scramble(b)
+	}
+
+	assert.Equal(t, data, decodeAll(new(Decoder), line, true))
+}
+
+// IL2P sends bits as they are, inverted if asked, and must not disturb the
+// NRZI level an HDLC frame after it carries on from.
+func TestEncoderWriteLeavesTheNRZILevelAlone(t *testing.T) {
+	var line []int
+
+	var e = NewEncoder(func(level int) { line = append(line, level) })
+
+	e.WriteNRZI(false)
+	e.Write(true, false)
+	e.Write(false, false)
+	e.Write(true, true)
+	e.Write(false, true)
+
+	assert.Equal(t, 1, e.Level())
+
+	e.WriteNRZI(true)
+
+	assert.Equal(t, []int{1, 1, 0, 0, 1, 1}, line)
+}

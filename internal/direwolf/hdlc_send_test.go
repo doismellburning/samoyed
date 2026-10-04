@@ -287,7 +287,7 @@ func TestHDLCSendersKeepTheirOwnLineLevel(t *testing.T) {
 		s.sendBitNRZI(true)
 	})
 
-	assert.Equal(t, 1, other.nrziOutput, "the other sender's zero should have inverted its own line")
+	assert.Equal(t, 1, other.line.Level(), "the other sender's zero should have inverted its own line")
 	assert.Equal(t, []int{1, 1}, bits, "this sender's line should start where it was, not where the other left it")
 }
 

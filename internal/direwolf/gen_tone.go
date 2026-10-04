@@ -13,6 +13,7 @@ import (
 	"os"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/sirupsen/logrus"
 )
 
@@ -61,7 +62,7 @@ type ToneGenerator struct {
 
 	bitLenAcc int // To accumulate fractional samples per bit.
 
-	lfsr int // Shift register for scrambler.
+	scrambler linecode.Scrambler // For 9600 baud.
 
 	bitCount int // Counter incremented for each bit transmitted
 	// on the channel.   This is only used for QPSK.
@@ -470,9 +471,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 	// That would mean putting in at least 3 places and testing all rather than just one.
 	if audioConfig.achan[tg.channel].modem_type == MODEM_SCRAMBLE &&
 		audioConfig.achan[tg.channel].layer2_xmit != LAYER2_IL2P {
-		var x = (dat ^ (tg.lfsr >> 16) ^ (tg.lfsr >> 11)) & 1
-		tg.lfsr = (tg.lfsr << 1) | (x & 1)
-		dat = x
+		dat = tg.scrambler.Scramble(dat)
 	}
 	/*
 		#if PSKIQ
