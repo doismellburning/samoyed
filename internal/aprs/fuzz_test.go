@@ -67,6 +67,26 @@ func FuzzDecodeAPRS(f *testing.F) {
 	// form, so the 4 character one is tried with exactly 4 bytes.
 	f.Add("Q1TEST>APDW17:>IO91/#  ")
 
+	// AIS user-defined data with no AIS sentence at all.
+	f.Add("0>0:{DA")
+
+	// One of each of the formats the decoder knows, for the fuzzer to work
+	// from: Mic-E with an altitude and a device suffix, a compressed
+	// position and object, raw NMEA, both Ultimeter forms, a reply-ack
+	// message, telemetry, AIS, and a comment with a frequency and !DAO!.
+	f.Add("Q1TEST>T2SP0W:`c_Vm6hk/`\"49}Q1TEST_%")
+	f.Add("Q1TEST>APDW17:=/5L!!<*e7>{?!Range")
+	f.Add("Q1TEST>APDW17:;Q2TEST   *092345z/5L!!<*e7OS]S")
+	f.Add("Q1TEST>APDW17:$GPRMC,063909,A,3349.4302,N,11700.3721,W,43.022,89.3,291099,13.6,E*52")
+	f.Add("Q1TEST>APDW17:$GPGGA,102705,5157.9762,N,00029.3256,W,1,04,2.0,75.7,M,47.6,M,,*62")
+	f.Add("Q1TEST>APDW17:$ULTW0000000001110B6E27F4FFF3897B0001035E004E04DD00030000")
+	f.Add("Q1TEST>APDW17:!!00000066013D000028710166--------0158053201200210")
+	f.Add("Q1TEST>APDW17::Q2TEST   :Hello{AB}CD")
+	f.Add("Q1TEST>APDW17::Q1TEST   :EQNS.0,0.1,0,0,1,-40,0,1,0")
+	f.Add("Q1TEST>APDW17:{DA!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0*4E")
+	f.Add("Q1TEST>APDW17:!4903.50N/07201.75W-146.520MHz C100 -060 R25m!w\"<!")
+	f.Add("Q1TEST>APDW17:}Q2TEST>APDW17,TCPIP,Q1TEST*:>IO91SX/G Status")
+
 	f.Fuzz(func(t *testing.T, monitor string) {
 		var pp = ax25.FromTextWithStrictness(monitor, ax25.AddrLenient)
 		if pp == nil {

@@ -553,6 +553,21 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *D
 	return A
 } /* end decode_aprs */
 
+// degreesAndMinutes splits a latitude or longitude, without its sign, into
+// whole degrees and minutes to four places.  Minutes that round up to 60 are
+// carried into the degrees, as LatitudeToNMEA does, rather than shown as 60.
+func degreesAndMinutes(absll float64) (int, string) {
+	var deg = int(absll)
+	var minutes = fmt.Sprintf("%07.4f", (absll-float64(deg))*60.0)
+
+	if minutes[0] == '6' {
+		deg++
+		minutes = "00.0000"
+	}
+
+	return deg, minutes
+}
+
 // Print writes out what Decode found, in human readable form.
 func (d *Decoder) Print(A *Decoded) {
 	/*
@@ -665,9 +680,8 @@ func (d *Decoder) Print(A *Decoded) {
 				absll = -lat
 				news = 'S'
 			}
-			var deg = int(absll)
-			var _min = (absll - float64(deg)) * 60.0
-			s_lat = fmt.Sprintf("%c %02d°%07.4f", news, deg, _min)
+			var deg, _min = degreesAndMinutes(absll)
+			s_lat = fmt.Sprintf("%c %02d°%s", news, deg, _min)
 		} else {
 			s_lat = "Invalid Latitude"
 		}
@@ -683,9 +697,8 @@ func (d *Decoder) Print(A *Decoded) {
 				absll = -lon
 				news = 'W'
 			}
-			var deg = int(absll)
-			var _min = (absll - float64(deg)) * 60.0
-			s_lon = fmt.Sprintf("%c %03d°%07.4f", news, deg, _min)
+			var deg, _min = degreesAndMinutes(absll)
+			s_lon = fmt.Sprintf("%c %03d°%s", news, deg, _min)
 		} else {
 			s_lon = "Invalid Longitude"
 		}
@@ -825,6 +838,23 @@ func (d *Decoder) Print(A *Decoded) {
 	}
 }
 
+// positionIsHumanReadable reports whether the position that starts at
+// info[start] is in the human-readable form, whose latitude begins with a
+// digit, rather than compressed, which begins with a symbol table identifier.
+func positionIsHumanReadable(info []byte, start int) bool {
+	return len(info) > start && unicode.IsDigit(rune(info[start]))
+}
+
+// warnShortPosition complains about a report that stops before the end of its
+// position.  A position that isn't all there is not a position: binary.Decode
+// leaves the struct zeroed and says so, and decoding that would report a
+// place nobody mentioned.
+func warnShortPosition(A *Decoded, info []byte) {
+	if !A.quiet {
+		logrus.WithField("length", len(info)).Warn("Report has too few bytes for a position")
+	}
+}
+
 /*------------------------------------------------------------------
  *
  * Function:	aprsLLPos
@@ -869,10 +899,16 @@ func aprsLLPos(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 
 	A.DataTypeDesc = "Position"
 
-	var ll_bytes, _ = binary.Decode(info, binary.NativeEndian, &p)
-	var compressed_bytes, _ = binary.Decode(info, binary.NativeEndian, &q)
+	var ll_bytes, llErr = binary.Decode(info, binary.NativeEndian, &p)
+	var compressed_bytes, compressedErr = binary.Decode(info, binary.NativeEndian, &q)
 
-	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
+	if positionIsHumanReadable(info, 1) { /* Human-readable location. */
+		if llErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodePosition(A, &(p.Pos))
 
 		if A.SymbolCode == '_' {
@@ -911,6 +947,12 @@ func aprsLLPos(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 			dataExtensionComment(A, telemetryState, info[ll_bytes:])
 		}
 	} else { /* Compressed location. */
+		if compressedErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodeCompressedPosition(A, &(q.CPos))
 
 		if A.SymbolCode == '_' {
@@ -962,28 +1004,47 @@ func aprsLLPos(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
  *------------------------------------------------------------------*/
 
 func aprsLLPosTime(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
-	type llPosTime struct {
+	type posTimeHeader struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
-		Pos       latLongPosition
+	}
+	var h posTimeHeader
+
+	type llPosTime struct {
+		Header posTimeHeader
+		Pos    latLongPosition
 	}
 	var p llPosTime
 
 	type compressedPosTime struct {
-		DTI       byte /* / or @ */
-		Timestamp [7]byte
-		CPos      compressedPositionData
+		Header posTimeHeader
+		CPos   compressedPositionData
 	}
 	var q compressedPosTime
 
 	A.DataTypeDesc = "Position with time"
 
-	var llBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
-	var compressedBytes, _ = binary.Decode(info, binary.NativeEndian, &q)
+	// The timestamp is read on its own, so that a position too short to
+	// decode doesn't take it with it.
+	var headerBytes, headerErr = binary.Decode(info, binary.NativeEndian, &h)
+	if headerErr != nil {
+		warnShortPosition(A, info)
 
-	getTimestamp(A, p.Timestamp) // Only checked, not kept.
+		return
+	}
 
-	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
+	var llBytes, llErr = binary.Decode(info, binary.NativeEndian, &p)
+	var compressedBytes, compressedErr = binary.Decode(info, binary.NativeEndian, &q)
+
+	getTimestamp(A, h.Timestamp) // Only checked, not kept.
+
+	if positionIsHumanReadable(info, headerBytes) { /* Human-readable location. */
+		if llErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodePosition(A, &(p.Pos))
 
 		if A.SymbolCode == '_' {
@@ -997,6 +1058,12 @@ func aprsLLPosTime(A *Decoded, telemetryState *aprstelemetry.State, info []byte)
 			dataExtensionComment(A, telemetryState, info[llBytes:])
 		}
 	} else { /* Compressed location. */
+		if compressedErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodeCompressedPosition(A, &(q.CPos))
 
 		if A.SymbolCode == '_' {
@@ -1518,14 +1585,16 @@ func aprsMicE(A *Decoded, telemetryState *aprstelemetry.State, deviceIDs *device
 
 	/* Speed and course from next 3 bytes. */
 
-	var n = int((p.SpeedCourse[0]-28)*10) + int((p.SpeedCourse[1]-28)/10)
+	// Widen before the arithmetic: speeds are usually sent with 800 knots
+	// added, which in a byte would wrap long before it could be taken off.
+	var n = (int(p.SpeedCourse[0])-28)*10 + (int(p.SpeedCourse[1])-28)/10
 	if n >= 800 {
 		n -= 800
 	}
 
 	A.SpeedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n)))
 
-	n = int((p.SpeedCourse[1]-28)%10)*100 + int(p.SpeedCourse[2]-28)
+	n = ((int(p.SpeedCourse[1])-28)%10)*100 + int(p.SpeedCourse[2]) - 28
 	if n >= 400 {
 		n -= 400
 	}
@@ -1852,7 +1921,7 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 		}
 
 		A.DataTypeDesc = fmt.Sprintf("\"%s\" REJected message number \"%s\" from \"%s\"", A.Src, A.MessageNumber, addressee)
-		A.MessageSubtype = MessageSubtypeAck
+		A.MessageSubtype = MessageSubtypeRej
 	} else {
 		// Message to a particular station or a bulletin.
 		// message number is optional here.
@@ -1943,33 +2012,47 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
  *------------------------------------------------------------------*/
 
 func aprsObject(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
-	type objectInfo struct {
+	type objectHeader struct {
 		DTI          byte /* ; */
 		Name         [9]byte
 		LiveOrKilled byte /* * for live or _ for killed */
 		Timestamp    [7]byte
-		Pos          latLongPosition
+	}
+	var h objectHeader
+
+	type objectInfo struct {
+		Header objectHeader
+		Pos    latLongPosition
 	}
 	var p objectInfo
 
 	type compressedObjectInfo struct {
-		DTI          byte /* ; */
-		Name         [9]byte
-		LiveOrKilled byte /* * for live or _ for killed */
-		Timestamp    [7]byte
-		CPos         compressedPositionData
+		Header objectHeader
+		CPos   compressedPositionData
 	}
 	var q compressedObjectInfo
 
-	var objectPosBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
-	var objectCompressedPosBytes, _ = binary.Decode(info, binary.NativeEndian, &q)
+	// The name and the rest are read on their own, so that a position too
+	// short for the human-readable form - every compressed one, say - doesn't
+	// take them with it.
+	var headerBytes, headerErr = binary.Decode(info, binary.NativeEndian, &h)
+	if headerErr != nil {
+		A.DataTypeDesc = "Object"
+
+		warnShortPosition(A, info)
+
+		return
+	}
+
+	var objectPosBytes, objectPosErr = binary.Decode(info, binary.NativeEndian, &p)
+	var objectCompressedPosBytes, objectCompressedPosErr = binary.Decode(info, binary.NativeEndian, &q)
 
 	//Assert (sizeof(A.Name) > sizeof(p.name));
 
-	A.Name = string(p.Name[:])
+	A.Name = string(h.Name[:])
 	A.Name = strings.TrimSpace(A.Name)
 
-	switch p.LiveOrKilled {
+	switch h.LiveOrKilled {
 	case '*':
 		A.DataTypeDesc = "Object"
 	case '_':
@@ -1978,9 +2061,15 @@ func aprsObject(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 		A.DataTypeDesc = "Object - invalid live/killed"
 	}
 
-	getTimestamp(A, p.Timestamp) // Only checked, not kept.
+	getTimestamp(A, h.Timestamp) // Only checked, not kept.
 
-	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
+	if positionIsHumanReadable(info, headerBytes) { /* Human-readable location. */
+		if objectPosErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodePosition(A, &(p.Pos))
 
 		if A.SymbolCode == '_' {
@@ -1994,6 +2083,12 @@ func aprsObject(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 			dataExtensionComment(A, telemetryState, info[objectPosBytes:])
 		}
 	} else { /* Compressed location. */
+		if objectCompressedPosErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodeCompressedPosition(A, &(q.CPos))
 
 		if A.SymbolCode == '_' {
@@ -3021,6 +3116,17 @@ func weatherData(A *Decoded, wdata []byte) {
  *
  *------------------------------------------------------------------*/
 
+// signed16 reads v as two's complement, which is how the Ultimeter sends a
+// temperature below zero.
+func signed16(v uint16) int {
+	var n = int(v)
+	if n >= 1<<15 {
+		n -= 1 << 16
+	}
+
+	return n
+}
+
 func aprsUltimeter(A *Decoded, info []byte) {
 	// Header = $ULTW
 	// Data Fields
@@ -3046,7 +3152,7 @@ func aprsUltimeter(A *Decoded, info []byte) {
 	A.DataTypeDesc = "Ultimeter"
 
 	if info[0] == '$' {
-		var n, _ = fmt.Sscanf(string(info[5:]), "%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx",
+		var n, _ = fmt.Sscanf(string(info[5:]), "%4x%4x%4x%4x%4x%4x%4x%4x%4x%4x%4x%4x%4x",
 			&h_windpeak,
 			&h_wdir,
 			&h_otemp,
@@ -3066,7 +3172,7 @@ func aprsUltimeter(A *Decoded, info []byte) {
 
 			windpeak = dwutil.DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
 			wdir = float64(h_wdir&0xff) * 360. / 256.
-			otemp = float64(h_otemp) * 0.1
+			otemp = float64(signed16(h_otemp)) * 0.1
 			baro = float64(dwutil.DW_MBAR_TO_INHG(float64(h_baro) * 0.1))
 			ohumid = float64(h_ohumid) * 0.1
 
@@ -3095,7 +3201,7 @@ func aprsUltimeter(A *Decoded, info []byte) {
 	// Total size: 40, 44 or 48 characters (hex digits) + header, carriage return and line feed
 
 	if info[0] == '!' {
-		var n, _ = fmt.Sscanf(string(info[2:]), "%4hx%4hx%4hx%4hx",
+		var n, _ = fmt.Sscanf(string(info[2:]), "%4x%4x%4x%4x",
 			&h_windpeak,
 			&h_wdir,
 			&h_otemp,
@@ -3106,9 +3212,9 @@ func aprsUltimeter(A *Decoded, info []byte) {
 
 			windpeak = dwutil.DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
 			wdir = float64(h_wdir&0xff) * 360. / 256.
-			otemp = float64(h_otemp) * 0.1
+			otemp = float64(signed16(h_otemp)) * 0.1
 
-			A.Weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f\n",
+			A.Weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f",
 				windpeak, wdir, otemp)
 		}
 	}
@@ -3179,7 +3285,7 @@ func decodePosition(A *Decoded, ppos *latLongPosition) {
 
 func decodeCompressedPosition(A *Decoded, pcpos *compressedPositionData) {
 	if isBase91Digit(pcpos.Y[0]) && isBase91Digit(pcpos.Y[1]) && isBase91Digit(pcpos.Y[2]) && isBase91Digit(pcpos.Y[3]) {
-		A.Lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
+		A.Lat = maybe.Just(90 - float64(base91Value(pcpos.Y[:]))/380926.0)
 	} else {
 		if !A.quiet {
 			logrus.WithField("latitude", string(pcpos.Y[:])).Warn("Invalid character in compressed latitude: must be in range '!' to '{'")
@@ -3189,7 +3295,7 @@ func decodeCompressedPosition(A *Decoded, pcpos *compressedPositionData) {
 	}
 
 	if isBase91Digit(pcpos.X[0]) && isBase91Digit(pcpos.X[1]) && isBase91Digit(pcpos.X[2]) && isBase91Digit(pcpos.X[3]) {
-		A.Lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
+		A.Lon = maybe.Just(-180 + float64(base91Value(pcpos.X[:]))/190463.0)
 	} else {
 		if !A.quiet {
 			logrus.WithField("longitude", string(pcpos.X[:])).Warn("Invalid character in compressed longitude: must be in range '!' to '{'")

@@ -106,6 +106,15 @@ func Test_ais_parse_payload_shorter_than_message_type(t *testing.T) {
 	assert.Equal(t, "000000000", aisData.MMSI)
 }
 
+// An empty sentence is an error.  It used to panic, skipping the leading "!"
+// it didn't have, and APRS user-defined data reaches it from anyone on
+// frequency.
+func Test_ais_parse_empty(t *testing.T) {
+	var aisData, err = Parse("")
+	require.Error(t, err)
+	assert.Nil(t, aisData)
+}
+
 // The checksum is over the bytes of the sentence.  Summing its runes instead
 // rejected any sentence carrying a byte above 0x7f, having decoded it to
 // something else entirely.
