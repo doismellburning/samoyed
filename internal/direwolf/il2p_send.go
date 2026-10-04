@@ -49,7 +49,7 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func (s *HDLCSender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc bool, polarity int) int {
+func (s *Layer2Sender) sendIL2PFrame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc bool, polarity int) int {
 	var syncWordBytes = []byte{
 		(IL2P_SYNC_WORD >> 16) & 0xff,
 		(IL2P_SYNC_WORD >> 8) & 0xff,

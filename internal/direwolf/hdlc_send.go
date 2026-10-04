@@ -7,11 +7,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// HDLCSender turns frames into the bits one radio channel sends.  It holds
+// Layer2Sender turns frames into the bits one radio channel sends.  It holds
 // what has to carry over from one byte, or one frame, to the next: the NRZI
 // line level and the run of ones that decides when to bit stuff.  Each
 // channel wants its own, and only one goroutine may drive it at a time.
-type HDLCSender struct {
+type Layer2Sender struct {
 	channel       int
 	audioConfig   *RadioConfig
 	toneGenerator *ToneGenerator // Where the bits go; nil for a channel with no radio.
@@ -26,11 +26,11 @@ type HDLCSender struct {
 	line *linecode.Encoder // Puts the bits on the line, keeping its NRZI level.
 }
 
-// NewHDLCSender makes an HDLCSender for channel, sending the layer 2
+// NewLayer2Sender makes a Layer2Sender for channel, sending the layer 2
 // protocol audioConfig says to use there to toneGenerator, with FX.25's
 // debug level at fx25Debug.
-func NewHDLCSender(channel int, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fx25Debug int) *HDLCSender {
-	var s = new(HDLCSender)
+func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fx25Debug int) *Layer2Sender {
+	var s = new(Layer2Sender)
 	s.channel = channel
 	s.audioConfig = audioConfig
 	s.toneGenerator = toneGenerator
@@ -41,7 +41,7 @@ func NewHDLCSender(channel int, audioConfig *RadioConfig, toneGenerator *ToneGen
 }
 
 // putQuietMs sends timeMs of silence.
-func (s *HDLCSender) putQuietMs(timeMs int) {
+func (s *Layer2Sender) putQuietMs(timeMs int) {
 	if s.toneGenerator == nil {
 		logrus.WithField("channel", s.channel).Error("Invalid channel for tone generation")
 
@@ -52,7 +52,7 @@ func (s *HDLCSender) putQuietMs(timeMs int) {
 }
 
 // flush pushes out whatever the channel's samples are waiting in.
-func (s *HDLCSender) flush() {
+func (s *Layer2Sender) flush() {
 	if s.toneGenerator == nil {
 		logrus.WithField("channel", s.channel).Error("Invalid channel for tone generation")
 
@@ -96,7 +96,7 @@ func (s *HDLCSender) flush() {
  *
  *--------------------------------------------------------------*/
 
-func (s *HDLCSender) SendFrame(pp *ax25.Packet, badFCS bool) int {
+func (s *Layer2Sender) SendFrame(pp *ax25.Packet, badFCS bool) int {
 	var achan = &s.audioConfig.achan[s.channel]
 
 	if achan.layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
@@ -151,7 +151,7 @@ func (s *HDLCSender) SendFrame(pp *ax25.Packet, badFCS bool) int {
  *
  *--------------------------------------------------------------*/
 
-func (s *HDLCSender) SendPreamblePostamble(nbytes int, finish bool) int {
+func (s *Layer2Sender) SendPreamblePostamble(nbytes int, finish bool) int {
 	s.bitsSent = 0
 
 	logrus.WithFields(logrus.Fields{
@@ -185,7 +185,7 @@ func (s *HDLCSender) SendPreamblePostamble(nbytes int, finish bool) int {
 }
 
 // sendAX25Frame is ax25_only_hdlc_send_frame in Dire Wolf.
-func (s *HDLCSender) sendAX25Frame(fbuf []byte, badFCS bool) int {
+func (s *Layer2Sender) sendAX25Frame(fbuf []byte, badFCS bool) int {
 	s.bitsSent = 0
 
 	logrus.WithFields(logrus.Fields{
@@ -223,7 +223,7 @@ func (s *HDLCSender) sendAX25Frame(fbuf []byte, badFCS bool) int {
 // The direwolf receive implementation will automatically compensate
 // for either polarity but other implementations might not.
 
-func (s *HDLCSender) sendByteMSBFirst(x int, polarity int) {
+func (s *Layer2Sender) sendByteMSBFirst(x int, polarity int) {
 	for range 8 {
 		s.line.Write((x&0x80) != 0, polarity&1 != 0)
 
@@ -236,7 +236,7 @@ func (s *HDLCSender) sendByteMSBFirst(x int, polarity int) {
 // All bits are sent NRZI.
 // Data (non flags) use bit stuffing.
 
-func (s *HDLCSender) sendControlNRZI(x byte) {
+func (s *Layer2Sender) sendControlNRZI(x byte) {
 	for range 8 {
 		s.sendBitNRZI(x&1 != 0)
 		x >>= 1
@@ -245,7 +245,7 @@ func (s *HDLCSender) sendControlNRZI(x byte) {
 	s.stuff = 0
 }
 
-func (s *HDLCSender) sendDataNRZI(x byte) {
+func (s *Layer2Sender) sendDataNRZI(x byte) {
 	for range 8 {
 		s.sendBitNRZI(x&1 != 0)
 
@@ -269,7 +269,7 @@ func (s *HDLCSender) sendDataNRZI(x byte) {
  * data 0 bit -> invert signal.
  */
 
-func (s *HDLCSender) sendBitNRZI(b bool) {
+func (s *Layer2Sender) sendBitNRZI(b bool) {
 	s.line.WriteNRZI(b)
 
 	s.bitsSent++

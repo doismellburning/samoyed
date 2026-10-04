@@ -44,7 +44,7 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func (s *HDLCSender) sendFX25Frame(fbuf []byte, fx_mode int) int {
+func (s *Layer2Sender) sendFX25Frame(fbuf []byte, fx_mode int) int {
 	var ctag_num, data, check = fx25_encode_frame(s.channel, fbuf, fx_mode, s.fx25Debug)
 	if ctag_num < CTAG_MIN {
 		return (-1)
@@ -152,7 +152,7 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 // sendFX25Bytes sends NRZI, with no stuffing: the codeblock was stuffed before
 // it was encoded.  It shares the line level with AX.25, since the receiver
 // sees only the one line.
-func (s *HDLCSender) sendFX25Bytes(b []byte) {
+func (s *Layer2Sender) sendFX25Bytes(b []byte) {
 	for _, x := range b {
 		for range 8 {
 			s.sendBitNRZI(x&0x01 != 0)

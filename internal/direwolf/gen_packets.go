@@ -90,7 +90,7 @@ type GenPackets struct {
 
 	// One per channel, kept for the whole run, so the NRZI line level carries
 	// over from one packet to the next as it does on the air.
-	hdlcSenders []*HDLCSender
+	layer2Senders []*Layer2Sender
 }
 
 // NewGenPackets sets up the modulator as opts asks, and creates the .WAV file
@@ -157,9 +157,9 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 	// Just use the default of minimal information for FX.25.
 	const fx25Debug = 1
 
-	g.hdlcSenders = make([]*HDLCSender, MAX_RADIO_CHANS)
-	for c := range g.hdlcSenders {
-		g.hdlcSenders[c] = NewHDLCSender(c, audio, nil, fx25Debug)
+	g.layer2Senders = make([]*Layer2Sender, MAX_RADIO_CHANS)
+	for c := range g.layer2Senders {
+		g.layer2Senders[c] = NewLayer2Sender(c, audio, nil, fx25Debug)
 	}
 
 	g.setTones()
@@ -170,11 +170,11 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 }
 
 // setTones makes the tone generators afresh from the current settings, and
-// hands each channel's to its HDLCSender, which keeps its line level.
+// hands each channel's to its Layer2Sender, which keeps its line level.
 func (g *GenPackets) setTones() {
 	g.toneGenerators = NewToneGenerators(g.audio, g.amplitude/2, g.sink)
 
-	for c, s := range g.hdlcSenders {
+	for c, s := range g.layer2Senders {
 		s.toneGenerator = g.toneGenerators[c]
 	}
 }
@@ -314,7 +314,7 @@ func (g *GenPackets) SendPacket(str string) error {
 			repeat = 1
 		}
 
-		g.hdlcSenders[0].sendEAS(pinfo, repeat, 500, 500)
+		g.layer2Senders[0].sendEAS(pinfo, repeat, 500, 500)
 
 		return nil
 	}
@@ -347,9 +347,9 @@ func (g *GenPackets) SendPacket(str string) error {
 			g.toneGenerators[c].PutSample(0)
 		}
 
-		g.hdlcSenders[c].SendPreamblePostamble(32, false)
-		g.hdlcSenders[c].SendFrame(pp, false)
-		g.hdlcSenders[c].SendPreamblePostamble(2, true)
+		g.layer2Senders[c].SendPreamblePostamble(32, false)
+		g.layer2Senders[c].SendFrame(pp, false)
+		g.layer2Senders[c].SendPreamblePostamble(2, true)
 	}
 
 	return nil

@@ -28,7 +28,7 @@ func TestEASSendRepeatsTheMessageWithItsPreamble(t *testing.T) {
 
 	var elapsed int
 
-	var bits = captureBitsWithToneGenerator(t, nil, toneGenerator, func(s *HDLCSender) {
+	var bits = captureBitsWithToneGenerator(t, nil, toneGenerator, func(s *Layer2Sender) {
 		elapsed = s.sendEAS(message, repeat, txdelay, txtail)
 	})
 

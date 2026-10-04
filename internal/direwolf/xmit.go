@@ -112,10 +112,10 @@ type XmitService struct {
 	saidCannotTransmit [MAX_RADIO_CHANS]bool
 
 	/*
-	 * Each channel's HDLC state, which carries over from one transmission
+	 * Each channel's layer 2 sending state, which carries over from one transmission
 	 * to the next.  Only that channel's xmit_thread touches it.
 	 */
-	hdlcSenders [MAX_RADIO_CHANS]*HDLCSender
+	layer2Senders [MAX_RADIO_CHANS]*Layer2Sender
 
 	/*
 	 * Each radio channel's tone generator.  Only that channel's
@@ -140,7 +140,7 @@ type XmitService struct {
  *		toneGenerators	- Each radio channel's tone generator.
  *
  *		fx25Debug	- FX.25's debug level, for each channel's
- *				  HDLCSender.
+ *				  Layer2Sender.
  *
  *
  * Outputs:	Returns a new XmitService with required information set up.
@@ -284,14 +284,14 @@ func (xs *XmitService) channelTiming(channel int) xmitTiming {
 	return xs.timing[channel]
 }
 
-// hdlcSender is channel's HDLCSender, made on first use.  Only the channel's
+// layer2Sender is channel's Layer2Sender, made on first use.  Only the channel's
 // own xmit_thread asks for it, so there is nothing to lock.
-func (xs *XmitService) hdlcSender(channel int) *HDLCSender {
-	if xs.hdlcSenders[channel] == nil {
-		xs.hdlcSenders[channel] = NewHDLCSender(channel, xs.p_modem, xs.toneGenerators[channel], xs.fx25Debug)
+func (xs *XmitService) layer2Sender(channel int) *Layer2Sender {
+	if xs.layer2Senders[channel] == nil {
+		xs.layer2Senders[channel] = NewLayer2Sender(channel, xs.p_modem, xs.toneGenerators[channel], xs.fx25Debug)
 	}
 
-	return xs.hdlcSenders[channel]
+	return xs.layer2Senders[channel]
 }
 
 /*-------------------------------------------------------------------
@@ -724,7 +724,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	var pre_flags = xs.msToBits(timing.txdelay*10, channel) / 8
 
 	/* Total number of bits in transmission including all flags and bit stuffing. */
-	var num_bits = xs.hdlcSender(channel).SendPreamblePostamble(pre_flags, false)
+	var num_bits = xs.layer2Sender(channel).SendPreamblePostamble(pre_flags, false)
 
 	logrus.WithFields(logrus.Fields{
 		"t":         time.Since(time_ptt),
@@ -820,7 +820,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	 */
 
 	var post_flags = xs.msToBits(timing.txtail*10, channel) / 8
-	nb = xs.hdlcSender(channel).SendPreamblePostamble(post_flags, true)
+	nb = xs.layer2Sender(channel).SendPreamblePostamble(post_flags, true)
 	num_bits += nb
 	logrus.WithFields(logrus.Fields{
 		"t":          time.Since(time_ptt),
@@ -995,7 +995,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 		}
 	}
 
-	var nb = xs.hdlcSender(c).SendFrame(pp, send_invalid_fcs2)
+	var nb = xs.layer2Sender(c).SendFrame(pp, send_invalid_fcs2)
 
 	metrics.RecordFrameTransmitted(c)
 	webPublishTransmitted(c, pp)

@@ -13,7 +13,7 @@ var toneGenCapture func(channel int, data int)
 
 // putBit hands one bit to whatever is standing in for the modulator: the
 // capture if a test has set one, the sender's tone generator otherwise.
-func (s *HDLCSender) putBit(data int) {
+func (s *Layer2Sender) putBit(data int) {
 	if toneGenCapture != nil {
 		toneGenCapture(s.channel, data)
 

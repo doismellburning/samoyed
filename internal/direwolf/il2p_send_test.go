@@ -25,7 +25,7 @@ func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
 		audioConfig.achan[hdlcSendTestChannel].il2p_version = IL2P_VERSION_COMPAT
 		audioConfig.achan[hdlcSendTestChannel].il2p_crc = crc
 
-		var bits = captureBits(t, audioConfig, func(s *HDLCSender) {
+		var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
 			s.SendFrame(pp, false)
 		})
 

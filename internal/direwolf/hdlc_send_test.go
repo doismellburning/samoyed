@@ -22,8 +22,8 @@ const (
 )
 
 // captureBits collects the bits sent to the modulator while fn runs, handing
-// fn a new HDLCSender so the stream starts from a known place.
-func captureBits(t *testing.T, audioConfig *RadioConfig, fn func(s *HDLCSender)) []int {
+// fn a new Layer2Sender so the stream starts from a known place.
+func captureBits(t *testing.T, audioConfig *RadioConfig, fn func(s *Layer2Sender)) []int {
 	t.Helper()
 
 	return captureBitsWithToneGenerator(t, audioConfig, nil, fn)
@@ -32,7 +32,7 @@ func captureBits(t *testing.T, audioConfig *RadioConfig, fn func(s *HDLCSender))
 // captureBitsWithToneGenerator is captureBits for a sender that sends to
 // toneGenerator, for what goes to it other than bits: the quiet periods, and
 // the flush.
-func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fn func(s *HDLCSender)) []int {
+func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fn func(s *Layer2Sender)) []int {
 	t.Helper()
 
 	var bits []int
@@ -45,7 +45,7 @@ func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGe
 
 	t.Cleanup(func() { toneGenCapture = nil })
 
-	fn(NewHDLCSender(hdlcSendTestChannel, audioConfig, toneGenerator, 0))
+	fn(NewLayer2Sender(hdlcSendTestChannel, audioConfig, toneGenerator, 0))
 
 	toneGenCapture = nil
 
@@ -183,7 +183,7 @@ func TestAX25FrameIsSentBetweenFlagsWithItsFCS(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, nil, func(s *HDLCSender) {
+	var bits = captureBits(t, nil, func(s *Layer2Sender) {
 		sent = s.sendAX25Frame(fbuf, false)
 	})
 
@@ -203,10 +203,10 @@ func TestAX25FrameIsSentBetweenFlagsWithItsFCS(t *testing.T) {
 func TestAX25BadFCSSendsTheComplementOfTheRealOne(t *testing.T) {
 	var fbuf = []byte{'Q', '1', 'T', 'E', 'S', 'T'}
 
-	var good = captureBits(t, nil, func(s *HDLCSender) {
+	var good = captureBits(t, nil, func(s *Layer2Sender) {
 		s.sendAX25Frame(fbuf, false)
 	})
-	var bad = captureBits(t, nil, func(s *HDLCSender) {
+	var bad = captureBits(t, nil, func(s *Layer2Sender) {
 		s.sendAX25Frame(fbuf, true)
 	})
 
@@ -226,10 +226,10 @@ func TestAX25BadFCSSendsTheComplementOfTheRealOne(t *testing.T) {
 // A data byte gets a zero after five consecutive ones; a flag, which has six
 // of them, must not, or it would no longer be a flag.
 func TestOnlyDataIsBitStuffed(t *testing.T) {
-	var asData = captureBits(t, nil, func(s *HDLCSender) {
+	var asData = captureBits(t, nil, func(s *Layer2Sender) {
 		s.sendDataNRZI(hdlcFlag)
 	})
-	var asControl = captureBits(t, nil, func(s *HDLCSender) {
+	var asControl = captureBits(t, nil, func(s *Layer2Sender) {
 		s.sendControlNRZI(hdlcFlag)
 	})
 
@@ -240,7 +240,7 @@ func TestOnlyDataIsBitStuffed(t *testing.T) {
 	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, destuff(nrziDecode(asData))))
 
 	// However long the run, a control byte is sent as it stands.
-	var allOnes = captureBits(t, nil, func(s *HDLCSender) {
+	var allOnes = captureBits(t, nil, func(s *Layer2Sender) {
 		s.sendControlNRZI(0xff)
 	})
 
@@ -250,7 +250,7 @@ func TestOnlyDataIsBitStuffed(t *testing.T) {
 
 // A run of ones long enough to need stuffing twice gets a zero each time.
 func TestBitStuffingRepeatsForALongRunOfOnes(t *testing.T) {
-	var bits = captureBits(t, nil, func(s *HDLCSender) {
+	var bits = captureBits(t, nil, func(s *Layer2Sender) {
 		s.sendDataNRZI(0xff)
 		s.sendDataNRZI(0xff)
 	})
@@ -261,7 +261,7 @@ func TestBitStuffingRepeatsForALongRunOfOnes(t *testing.T) {
 
 // NRZI: a one leaves the signal alone, a zero inverts it.
 func TestNRZIInvertsOnAZeroOnly(t *testing.T) {
-	var bits = captureBits(t, nil, func(s *HDLCSender) {
+	var bits = captureBits(t, nil, func(s *Layer2Sender) {
 		s.sendBitNRZI(true)
 		s.sendBitNRZI(true)
 		s.sendBitNRZI(false)
@@ -275,14 +275,14 @@ func TestNRZIInvertsOnAZeroOnly(t *testing.T) {
 // The line level carries over from one call to the next on the same sender,
 // but each sender has its own: sending on one channel must not change what
 // the next bit on another looks like.
-func TestHDLCSendersKeepTheirOwnLineLevel(t *testing.T) {
-	var other = NewHDLCSender(1, nil, nil, 0)
+func TestLayer2SendersKeepTheirOwnLineLevel(t *testing.T) {
+	var other = NewLayer2Sender(1, nil, nil, 0)
 
 	toneGenCapture = func(int, int) {}
 
 	other.sendBitNRZI(false)
 
-	var bits = captureBits(t, nil, func(s *HDLCSender) {
+	var bits = captureBits(t, nil, func(s *Layer2Sender) {
 		s.sendBitNRZI(false)
 		s.sendBitNRZI(true)
 	})
@@ -298,7 +298,7 @@ func TestPreambleIsFlagsForAX25(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		sent = s.SendPreamblePostamble(4, false)
 	})
 
@@ -318,7 +318,7 @@ func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBitsWithToneGenerator(t, audioConfig, toneGenerator, func(s *HDLCSender) {
+	var bits = captureBitsWithToneGenerator(t, audioConfig, toneGenerator, func(s *Layer2Sender) {
 		sent = s.SendPreamblePostamble(2, true)
 	})
 
@@ -347,7 +347,7 @@ func TestPreambleIsTheIL2PPatternForIL2P(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		sent = s.SendPreamblePostamble(3, false)
 	})
 
@@ -357,10 +357,10 @@ func TestPreambleIsTheIL2PPatternForIL2P(t *testing.T) {
 
 // Inverted polarity is the same pattern the other way up.
 func TestIL2PPolarityInvertsEveryBit(t *testing.T) {
-	var upright = captureBits(t, nil, func(s *HDLCSender) {
+	var upright = captureBits(t, nil, func(s *Layer2Sender) {
 		s.sendByteMSBFirst(IL2P_PREAMBLE, 0)
 	})
-	var inverted = captureBits(t, nil, func(s *HDLCSender) {
+	var inverted = captureBits(t, nil, func(s *Layer2Sender) {
 		s.sendByteMSBFirst(IL2P_PREAMBLE, 1)
 	})
 
@@ -398,7 +398,7 @@ func TestLayer2SendFrameSendsAX25AsHDLC(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		sent = s.SendFrame(pp, false)
 	})
 
@@ -422,7 +422,7 @@ func TestLayer2SendFrameSendsIL2PWhenConfigured(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		sent = s.SendFrame(pp, false)
 	})
 
@@ -450,11 +450,11 @@ func TestLayer2SendFrameFallsBackToAX25WhenIL2PCannotCarryTheFrame(t *testing.T)
 	// One byte more of information part than IL2P can encode.
 	var pp = newHDLCSendTestPacket(t, 1024)
 
-	var viaIL2P = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var viaIL2P = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		s.SendFrame(pp, false)
 	})
 
-	var asAX25 = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		s.sendAX25Frame(pp.Pack(), false)
 	})
 
@@ -470,13 +470,13 @@ func TestLayer2SendFrameSendsFX25WhenConfigured(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		sent = s.SendFrame(pp, false)
 	})
 
 	assert.Equal(t, len(bits), sent)
 
-	var asAX25 = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		s.sendAX25Frame(pp.Pack(), false)
 	})
 
@@ -493,11 +493,11 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 	// Comfortably more than the largest FX.25 codeblock carries.
 	var pp = newHDLCSendTestPacket(t, FX25_MAX_DATA)
 
-	var viaFX25 = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var viaFX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		s.SendFrame(pp, false)
 	})
 
-	var asAX25 = captureBits(t, audioConfig, func(s *HDLCSender) {
+	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		s.sendAX25Frame(pp.Pack(), false)
 	})
 
@@ -506,6 +506,6 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 
 // A sender reports on FX.25 at the debug level it was made with, so each
 // program that sends - samoyed-direwolf, samoyed-gen-packets - has its own.
-func TestHDLCSenderKeepsItsFX25DebugLevel(t *testing.T) {
-	assert.Equal(t, 3, NewHDLCSender(hdlcSendTestChannel, nil, nil, 3).fx25Debug)
+func TestLayer2SenderKeepsItsFX25DebugLevel(t *testing.T) {
+	assert.Equal(t, 3, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 3).fx25Debug)
 }
