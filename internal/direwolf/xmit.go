@@ -998,6 +998,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 	var nb = xs.hdlcSender(c).SendFrame(pp, send_invalid_fcs2)
 
 	metrics.RecordFrameTransmitted(c)
+	webPublishTransmitted(c, pp)
 
 	// Optionally send confirmation to AGW client app if monitoring enabled.
 

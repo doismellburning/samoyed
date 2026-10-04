@@ -163,6 +163,9 @@ type misc_config_s struct {
 	metrics_port int /* TCP Port number for the Prometheus "/metrics" HTTP endpoint. */
 	/* 0 (default) disables it. */
 
+	web_port int /* TCP Port number for the read-only web dashboard and map. */
+	/* 0 (default) disables it. */
+
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.
 	// Unfortunately, most applications don't know how to deal with multi-radio TNCs.
@@ -1112,6 +1115,7 @@ var configHandlers = map[string]configHandler{
 	"AGWPORT":        handleAGWPORT,
 	"AGWLOGIN":       handleAGWLOGIN,
 	"METRICSPORT":    handleMETRICSPORT,
+	"WEBPORT":        handleWEBPORT,
 	"KISSPORT":       handleKISSPORT,
 	"NULLMODEM":      handleNULLMODEM,
 	"SERIALKISS":     handleNULLMODEM,
@@ -1334,6 +1338,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
 	p_misc_config.metrics_port = 0 // Disabled by default.
+	p_misc_config.web_port = 0     // Disabled by default.
 
 	for i := range MAX_KISS_TCP_PORTS {
 		p_misc_config.kiss_port[i] = 0 // entry not used.
@@ -5247,6 +5252,39 @@ func handleMETRICSPORT(ps *parseState) error {
 		ps.misc.metrics_port = 0
 
 		ps.errorf("line %d: Invalid port number for the metrics endpoint. Disabling it", ps.line)
+	}
+
+	return nil
+}
+
+// handleWEBPORT handles the WEBPORT keyword.
+func handleWEBPORT(ps *parseState) error {
+	/*
+	 * WEBPORT 	- Port number for the read-only web dashboard and map.
+	 *
+	 * 0 disables it.  Disabled by default.
+	 */
+	var t = ps.split(false)
+	if t == "" {
+		return fmt.Errorf("line %d: Missing port number for WEBPORT command", ps.line)
+	}
+
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		return fmt.Errorf("line %d: Invalid port number \"%s\" for WEBPORT command", ps.line, t)
+	}
+
+	t = ps.split(false)
+	if t != "" {
+		return fmt.Errorf("line %d: Unexpected \"%s\" after the port number", ps.line, t)
+	}
+
+	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
+		ps.misc.web_port = n
+	} else {
+		ps.misc.web_port = 0
+
+		ps.errorf("line %d: Invalid port number for the web interface. Disabling it", ps.line)
 	}
 
 	return nil
