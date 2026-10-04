@@ -376,6 +376,27 @@ func Test_decode_aprs_short_position(t *testing.T) {
 	assert.Equal(t, "Q2TEST", A.Name)
 }
 
+// An ack and a rej are told apart by their subtype, which a rej used to share
+// with an ack.
+func Test_decode_aprs_ack_and_rej(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	for _, tc := range []struct {
+		info    string
+		subtype MessageSubtype
+	}{
+		{":Q2TEST   :ack42", MessageSubtypeAck},
+		{":Q2TEST   :rej42", MessageSubtypeRej},
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+tc.info, true), true)
+
+		assert.Equal(t, tc.subtype, A.MessageSubtype, "%s", tc.info)
+		assert.Equal(t, PacketTypeMessage, A.PacketType, "%s", tc.info)
+		assert.Equal(t, "42", A.MessageNumber, "%s", tc.info)
+		assert.Equal(t, "Q2TEST", A.Addressee, "%s", tc.info)
+	}
+}
+
 // A course and speed extension can be the whole of the information field,
 // with nothing after it - and then there is no bearing and no NRQ to look at.
 func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {

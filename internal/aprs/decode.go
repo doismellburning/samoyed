@@ -1908,7 +1908,7 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 		}
 
 		A.DataTypeDesc = fmt.Sprintf("\"%s\" REJected message number \"%s\" from \"%s\"", A.Src, A.MessageNumber, addressee)
-		A.MessageSubtype = MessageSubtypeAck
+		A.MessageSubtype = MessageSubtypeRej
 	} else {
 		// Message to a particular station or a bulletin.
 		// message number is optional here.
