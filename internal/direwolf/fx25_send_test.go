@@ -62,7 +62,7 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 	var beforeLen int
 
 	var bits = captureBits(t, nil, func(s *Layer2Sender) {
-		beforeLen = s.sendAX25Frame(before, false)
+		beforeLen = s.hdlc.SendFrame(before, false)
 		s.fx25.SendFrame(fbuf, 16)
 	})
 

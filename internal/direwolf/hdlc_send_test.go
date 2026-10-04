@@ -184,7 +184,7 @@ func TestAX25FrameIsSentBetweenFlagsWithItsFCS(t *testing.T) {
 	var sent int
 
 	var bits = captureBits(t, nil, func(s *Layer2Sender) {
-		sent = s.sendAX25Frame(fbuf, false)
+		sent = s.hdlc.SendFrame(fbuf, false)
 	})
 
 	assert.Equal(t, len(bits), sent, "the count returned should be the bits actually sent")
@@ -204,10 +204,10 @@ func TestAX25BadFCSSendsTheComplementOfTheRealOne(t *testing.T) {
 	var fbuf = []byte{'Q', '1', 'T', 'E', 'S', 'T'}
 
 	var good = captureBits(t, nil, func(s *Layer2Sender) {
-		s.sendAX25Frame(fbuf, false)
+		s.hdlc.SendFrame(fbuf, false)
 	})
 	var bad = captureBits(t, nil, func(s *Layer2Sender) {
-		s.sendAX25Frame(fbuf, true)
+		s.hdlc.SendFrame(fbuf, true)
 	})
 
 	var goodData = hdlcFrameFromBits(t, good)
@@ -227,10 +227,10 @@ func TestAX25BadFCSSendsTheComplementOfTheRealOne(t *testing.T) {
 // of them, must not, or it would no longer be a flag.
 func TestOnlyDataIsBitStuffed(t *testing.T) {
 	var asData = captureBits(t, nil, func(s *Layer2Sender) {
-		s.sendDataNRZI(hdlcFlag)
+		s.hdlc.sendDataNRZI(hdlcFlag)
 	})
 	var asControl = captureBits(t, nil, func(s *Layer2Sender) {
-		s.sendControlNRZI(hdlcFlag)
+		s.hdlc.sendControlNRZI(hdlcFlag)
 	})
 
 	assert.Len(t, asControl, 8, "a flag is sent as it stands")
@@ -241,7 +241,7 @@ func TestOnlyDataIsBitStuffed(t *testing.T) {
 
 	// However long the run, a control byte is sent as it stands.
 	var allOnes = captureBits(t, nil, func(s *Layer2Sender) {
-		s.sendControlNRZI(0xff)
+		s.hdlc.sendControlNRZI(0xff)
 	})
 
 	assert.Len(t, allOnes, 8)
@@ -251,8 +251,8 @@ func TestOnlyDataIsBitStuffed(t *testing.T) {
 // A run of ones long enough to need stuffing twice gets a zero each time.
 func TestBitStuffingRepeatsForALongRunOfOnes(t *testing.T) {
 	var bits = captureBits(t, nil, func(s *Layer2Sender) {
-		s.sendDataNRZI(0xff)
-		s.sendDataNRZI(0xff)
+		s.hdlc.sendDataNRZI(0xff)
+		s.hdlc.sendDataNRZI(0xff)
 	})
 
 	assert.Len(t, bits, 16+3, "sixteen ones need three stuffed zeros")
@@ -262,11 +262,11 @@ func TestBitStuffingRepeatsForALongRunOfOnes(t *testing.T) {
 // NRZI: a one leaves the signal alone, a zero inverts it.
 func TestNRZIInvertsOnAZeroOnly(t *testing.T) {
 	var bits = captureBits(t, nil, func(s *Layer2Sender) {
-		s.sendBitNRZI(true)
-		s.sendBitNRZI(true)
-		s.sendBitNRZI(false)
-		s.sendBitNRZI(true)
-		s.sendBitNRZI(false)
+		s.hdlc.sendBitNRZI(true)
+		s.hdlc.sendBitNRZI(true)
+		s.hdlc.sendBitNRZI(false)
+		s.hdlc.sendBitNRZI(true)
+		s.hdlc.sendBitNRZI(false)
 	})
 
 	assert.Equal(t, []int{0, 0, 1, 1, 0}, bits)
@@ -280,11 +280,11 @@ func TestLayer2SendersKeepTheirOwnLineLevel(t *testing.T) {
 
 	toneGenCapture = func(int, int) {}
 
-	other.sendBitNRZI(false)
+	other.hdlc.sendBitNRZI(false)
 
 	var bits = captureBits(t, nil, func(s *Layer2Sender) {
-		s.sendBitNRZI(false)
-		s.sendBitNRZI(true)
+		s.hdlc.sendBitNRZI(false)
+		s.hdlc.sendBitNRZI(true)
 	})
 
 	assert.Equal(t, 1, other.line.Level(), "the other sender's zero should have inverted its own line")
@@ -455,7 +455,7 @@ func TestLayer2SendFrameFallsBackToAX25WhenIL2PCannotCarryTheFrame(t *testing.T)
 	})
 
 	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
-		s.sendAX25Frame(pp.Pack(), false)
+		s.hdlc.SendFrame(pp.Pack(), false)
 	})
 
 	assert.Equal(t, asAX25, viaIL2P, "an oversized frame should have gone out as plain AX.25")
@@ -477,7 +477,7 @@ func TestLayer2SendFrameSendsFX25WhenConfigured(t *testing.T) {
 	assert.Equal(t, len(bits), sent)
 
 	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
-		s.sendAX25Frame(pp.Pack(), false)
+		s.hdlc.SendFrame(pp.Pack(), false)
 	})
 
 	assert.NotEqual(t, asAX25, bits, "the frame should have been wrapped up as FX.25")
@@ -498,7 +498,7 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 	})
 
 	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
-		s.sendAX25Frame(pp.Pack(), false)
+		s.hdlc.SendFrame(pp.Pack(), false)
 	})
 
 	assert.Equal(t, asAX25, viaFX25, "an oversized frame should have gone out as plain AX.25")

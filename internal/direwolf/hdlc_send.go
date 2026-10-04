@@ -7,23 +7,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Layer2Sender turns frames into the bits one radio channel sends.  It holds
-// what has to carry over from one byte, or one frame, to the next: the NRZI
-// line level and the run of ones that decides when to bit stuff.  Each
-// channel wants its own, and only one goroutine may drive it at a time.
+// Layer2Sender turns frames into the bits one radio channel sends, with
+// whichever of HDLC, FX.25 and IL2P the channel is set to use.  The three
+// share the channel's line, whose NRZI level carries over from one frame to
+// the next.  Each channel wants its own, and only one goroutine may drive it
+// at a time.
 type Layer2Sender struct {
 	channel       int
 	audioConfig   *RadioConfig
 	toneGenerator *ToneGenerator // Where the bits go; nil for a channel with no radio.
 
-	bitsSent int // Count number of bits sent by SendFrame or SendPreamblePostamble.
-
-	// Count number of "1" bits to keep track of when we need to break up a
-	// long run by "bit stuffing."
-	stuff int
-
 	line *linecode.Encoder // Puts the bits on the line, keeping its NRZI level.
 
+	hdlc *HDLCSender // Sends AX.25 frames, and the flags between them.
 	fx25 *FX25Sender // Sends FX.25, on the same line.
 	il2p *IL2PSender // Sends IL2P, on the same line.
 }
@@ -37,6 +33,7 @@ func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneG
 	s.audioConfig = audioConfig
 	s.toneGenerator = toneGenerator
 	s.line = linecode.NewEncoder(s.putBit)
+	s.hdlc = NewHDLCSender(s.line, channel)
 	s.fx25 = NewFX25Sender(s.line, channel, fx25Debug)
 	s.il2p = NewIL2PSender(s.line, channel)
 
@@ -125,7 +122,7 @@ func (s *Layer2Sender) SendFrame(pp *ax25.Packet, badFCS bool) int {
 
 	var fbuf = pp.Pack()
 
-	return s.sendAX25Frame(fbuf, badFCS)
+	return s.hdlc.SendFrame(fbuf, badFCS)
 }
 
 /*-------------------------------------------------------------
@@ -155,8 +152,6 @@ func (s *Layer2Sender) SendFrame(pp *ax25.Packet, badFCS bool) int {
  *--------------------------------------------------------------*/
 
 func (s *Layer2Sender) SendPreamblePostamble(nbytes int, finish bool) int {
-	s.bitsSent = 0
-
 	logrus.WithFields(logrus.Fields{
 		"channel": s.channel,
 		"nbytes":  nbytes,
@@ -175,11 +170,7 @@ func (s *Layer2Sender) SendPreamblePostamble(nbytes int, finish bool) int {
 	if achan.layer2_xmit == LAYER2_IL2P {
 		sent = s.il2p.SendPreamble(nbytes, achan.il2p_invert_polarity)
 	} else {
-		for range nbytes {
-			s.sendControlNRZI(0x7e)
-		}
-
-		sent = s.bitsSent
+		sent = s.hdlc.SendFlags(nbytes)
 	}
 
 	/* Push out the final partial buffer! */
@@ -191,8 +182,46 @@ func (s *Layer2Sender) SendPreamblePostamble(nbytes int, finish bool) int {
 	return sent
 }
 
-// sendAX25Frame is ax25_only_hdlc_send_frame in Dire Wolf.
-func (s *Layer2Sender) sendAX25Frame(fbuf []byte, badFCS bool) int {
+// HDLCSender sends AX.25 frames as HDLC on a channel's line: between flags,
+// bit stuffed, with the FCS appended, and NRZI.  It holds the run of ones
+// that decides when to bit stuff; the line holds the NRZI level.
+type HDLCSender struct {
+	line    *linecode.Encoder
+	channel int // For logging.
+
+	bitsSent int // Count number of bits sent by SendFrame or SendFlags.
+
+	// Count number of "1" bits to keep track of when we need to break up a
+	// long run by "bit stuffing."
+	stuff int
+}
+
+// NewHDLCSender makes an HDLCSender for channel that sends on line.
+func NewHDLCSender(line *linecode.Encoder, channel int) *HDLCSender {
+	var s = new(HDLCSender)
+	s.line = line
+	s.channel = channel
+
+	return s
+}
+
+// SendFlags sends nbytes of the 01111110 flag pattern, NRZI and with no bit
+// stuffing, which is what the transmitter sends before, between and after
+// frames.  It returns the number of bits sent.
+func (s *HDLCSender) SendFlags(nbytes int) int {
+	s.bitsSent = 0
+
+	for range nbytes {
+		s.sendControlNRZI(0x7e)
+	}
+
+	return s.bitsSent
+}
+
+// SendFrame is ax25_only_hdlc_send_frame in Dire Wolf.  It sends fbuf, an
+// AX.25 frame without its FCS, and returns the number of bits sent.  badFCS
+// sends a corrupt FCS instead of the right one, for testing.
+func (s *HDLCSender) SendFrame(fbuf []byte, badFCS bool) int {
 	s.bitsSent = 0
 
 	logrus.WithFields(logrus.Fields{
@@ -227,7 +256,7 @@ func (s *Layer2Sender) sendAX25Frame(fbuf []byte, badFCS bool) int {
 // All bits are sent NRZI.
 // Data (non flags) use bit stuffing.
 
-func (s *Layer2Sender) sendControlNRZI(x byte) {
+func (s *HDLCSender) sendControlNRZI(x byte) {
 	for range 8 {
 		s.sendBitNRZI(x&1 != 0)
 		x >>= 1
@@ -236,7 +265,7 @@ func (s *Layer2Sender) sendControlNRZI(x byte) {
 	s.stuff = 0
 }
 
-func (s *Layer2Sender) sendDataNRZI(x byte) {
+func (s *HDLCSender) sendDataNRZI(x byte) {
 	for range 8 {
 		s.sendBitNRZI(x&1 != 0)
 
@@ -260,7 +289,7 @@ func (s *Layer2Sender) sendDataNRZI(x byte) {
  * data 0 bit -> invert signal.
  */
 
-func (s *Layer2Sender) sendBitNRZI(b bool) {
+func (s *HDLCSender) sendBitNRZI(b bool) {
 	s.line.WriteNRZI(b)
 
 	s.bitsSent++
