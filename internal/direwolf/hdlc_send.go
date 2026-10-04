@@ -15,7 +15,6 @@ type Layer2Sender struct {
 	channel       int
 	audioConfig   *RadioConfig
 	toneGenerator *ToneGenerator // Where the bits go; nil for a channel with no radio.
-	fx25Debug     int            // FX.25's debug level.
 
 	bitsSent int // Count number of bits sent by SendFrame or SendPreamblePostamble.
 
@@ -25,6 +24,7 @@ type Layer2Sender struct {
 
 	line *linecode.Encoder // Puts the bits on the line, keeping its NRZI level.
 
+	fx25 *FX25Sender // Sends FX.25, on the same line.
 	il2p *IL2PSender // Sends IL2P, on the same line.
 }
 
@@ -36,8 +36,8 @@ func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneG
 	s.channel = channel
 	s.audioConfig = audioConfig
 	s.toneGenerator = toneGenerator
-	s.fx25Debug = fx25Debug
 	s.line = linecode.NewEncoder(s.putBit)
+	s.fx25 = NewFX25Sender(s.line, channel, fx25Debug)
 	s.il2p = NewIL2PSender(s.line, channel)
 
 	return s
@@ -113,7 +113,7 @@ func (s *Layer2Sender) SendFrame(pp *ax25.Packet, badFCS bool) int {
 	} else if achan.layer2_xmit == LAYER2_FX25 {
 		var fbuf = pp.Pack()
 
-		var n = s.sendFX25Frame(fbuf, achan.fx25_strength)
+		var n = s.fx25.SendFrame(fbuf, achan.fx25_strength)
 		if n > 0 {
 			return n
 		}

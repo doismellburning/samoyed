@@ -507,5 +507,5 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 // A sender reports on FX.25 at the debug level it was made with, so each
 // program that sends - samoyed-direwolf, samoyed-gen-packets - has its own.
 func TestLayer2SenderKeepsItsFX25DebugLevel(t *testing.T) {
-	assert.Equal(t, 3, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 3).fx25Debug)
+	assert.Equal(t, 3, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 3).fx25.debug)
 }
