@@ -1518,14 +1518,16 @@ func aprsMicE(A *Decoded, telemetryState *aprstelemetry.State, deviceIDs *device
 
 	/* Speed and course from next 3 bytes. */
 
-	var n = int((p.SpeedCourse[0]-28)*10) + int((p.SpeedCourse[1]-28)/10)
+	// Widen before the arithmetic: speeds are usually sent with 800 knots
+	// added, which in a byte would wrap long before it could be taken off.
+	var n = (int(p.SpeedCourse[0])-28)*10 + (int(p.SpeedCourse[1])-28)/10
 	if n >= 800 {
 		n -= 800
 	}
 
 	A.SpeedMPH = maybe.Just(dwutil.DW_KNOTS_TO_MPH(float64(n)))
 
-	n = int((p.SpeedCourse[1]-28)%10)*100 + int(p.SpeedCourse[2]-28)
+	n = ((int(p.SpeedCourse[1])-28)%10)*100 + int(p.SpeedCourse[2]) - 28
 	if n >= 400 {
 		n -= 400
 	}

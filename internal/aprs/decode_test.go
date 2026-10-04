@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -239,6 +240,30 @@ func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
 	assert.Equal(t, "MIC-E", A.DataTypeDesc)
 	assert.Equal(t, maybe.Nothing[float64](), A.Lat)
 	assert.Equal(t, maybe.Nothing[float64](), A.Lon)
+}
+
+// Mic-E speed is usually sent with 800 knots added, which the decoder takes
+// off again - but it used to do the sum in a byte, which wrapped long before
+// it got there, so 12 knots came out as 44.  The expected values are what Dire
+// Wolf's decode_aprs makes of the same packets.
+func Test_decode_aprs_mic_e_speed_and_course(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	for _, tc := range []struct {
+		monitor string
+		knots   float64
+		course  float64
+	}{
+		{"Q1TEST>T2SP0W:`c_Vm6hk/`\"49}_%", 12, 276},
+		{"Q1TEST>S32U6T:`(_fn\"Oj/", 20, 251},
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText(tc.monitor, true), true)
+
+		var speed, speedOK = A.SpeedMPH.Get()
+		assert.True(t, speedOK, "%s", tc.monitor)
+		assert.InDelta(t, dwutil.DW_KNOTS_TO_MPH(tc.knots), speed, 0.001, "%s", tc.monitor)
+		assert.Equal(t, maybe.Just(tc.course), A.Course, "%s", tc.monitor)
+	}
 }
 
 // A course and speed extension can be the whole of the information field,
