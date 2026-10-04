@@ -9,6 +9,7 @@ package direwolf
 import (
 	"math/bits"
 
+	"github.com/doismellburning/samoyed/internal/bitstuff"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/sirupsen/logrus"
@@ -277,7 +278,15 @@ func (F *fx25Receiver) processRSBlock() {
 			}).Debug("FX.25: FEC complete")
 		}
 
-		var frame_buf = my_unstuff(channel, subchannel, slice, F.block[:], F.dlen)
+		var frame_buf, err = bitstuff.Unstuff(F.block[:F.dlen])
+		if err != nil {
+			// Most likely cause is defective sender software.
+			F.logEntry().WithError(err).Warn("FX.25: Invalid AX.25 frame")
+			dwutil.LogHexDump(F.logEntry(), logrus.WarnLevel, F.block[:F.dlen])
+
+			return
+		}
+
 		var frame_len = len(frame_buf)
 
 		if frame_len >= 14+1+2 { // Minimum length: Two addresses & control & FCS.
@@ -306,107 +315,4 @@ func (F *fx25Receiver) processRSBlock() {
 	} else if F.debug >= 2 {
 		F.logEntry().Debug("FX.25: FEC failed.  Too many errors.")
 	}
-}
-
-/***********************************************************************************
- *
- * Name:	my_unstuff
- *
- * Purpose:	Remove HDLC bit stuffing and surrounding flag delimiters.
- *
- * Inputs:      channel, subchannel, slice	- For error messages.
- *
- *		pin	- "data" part of RS codeblock.
- *			  First byte must be HDLC "flag".
- *			  May be followed by additional flags.
- *			  There must be terminating flag but it might not be byte aligned.
- *
- *		ilen	- Number of bytes in pin.
- *
- * Outputs:	frame_buf - Frame contents including FCS.
- *			    Bit stuffing is gone so it should be a whole number of bytes.
- *
- * Returns:	Number of bytes in frame_buf, including 2 for FCS.
- *		This can never be larger than the max "data" size.
- *		0 if any error.
- *
- * Errors:	First byte is not not flag.
- *		Found seven '1' bits in a row.
- *		Result is not whole number of bytes after removing bit stuffing.
- *		Trailing flag not found.
- *		Most likely cause, for all of these, is defective sender software.
- *
- ***********************************************************************************/
-
-func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []byte {
-	var logEntry = logrus.WithFields(logrus.Fields{
-		"channel":    channel,
-		"subchannel": subchannel,
-		"slice":      slice,
-	})
-
-	var pat_det byte = 0 // Pattern detector.
-	var oacc byte = 0    // Accumulator for a byte out.
-	var olen = 0         // Number of good bits in oacc.
-
-	if pin[0] != 0x7e {
-		logEntry.Warn("FX.25: Data section did not start with 0x7e")
-		dwutil.LogHexDump(logEntry, logrus.WarnLevel, pin[:ilen])
-
-		return nil
-	}
-
-	for ilen > 0 && pin[0] == 0x7e {
-		ilen--
-		pin = pin[1:] // Skip over leading flag byte(s).
-	}
-
-	var frame_buf []byte
-	for i := range ilen {
-		for imask := byte(0x01); imask != 0; imask <<= 1 {
-			var dbit = dwutil.IfThenElse[byte]((pin[i]&imask) != 0, 1, 0)
-
-			pat_det >>= 1 // Shift the most recent eight bits thru the pattern detector.
-			pat_det |= dbit << 7
-
-			if pat_det == 0xfe {
-				logEntry.Warn("FX.25: Invalid AX.25 frame - Seven '1' bits in a row")
-				dwutil.LogHexDump(logEntry, logrus.WarnLevel, pin[i:ilen])
-
-				return nil
-			}
-
-			if dbit != 0 {
-				oacc >>= 1
-				oacc |= 0x80
-			} else {
-				if pat_det == 0x7e { // "flag" pattern - End of frame.
-					if olen == 7 {
-						return frame_buf // Whole number of bytes in result including CRC
-					} else {
-						logEntry.Warn("FX.25: Invalid AX.25 frame - Not a whole number of bytes")
-						dwutil.LogHexDump(logEntry, logrus.WarnLevel, pin[i:ilen])
-
-						return nil
-					}
-				} else if (pat_det >> 2) == 0x1f {
-					continue // Five '1' bits in a row, followed by '0'.  Discard the '0'.
-				}
-
-				oacc >>= 1
-			}
-
-			olen++
-			if olen&8 != 0 {
-				olen = 0
-
-				frame_buf = append(frame_buf, oacc)
-			}
-		}
-	} /* end of loop on all bits in block */
-
-	logEntry.Warn("FX.25: Invalid AX.25 frame - Terminating flag not found")
-	dwutil.LogHexDump(logEntry, logrus.WarnLevel, pin[:ilen])
-
-	return nil // Should never fall off the end.
 }

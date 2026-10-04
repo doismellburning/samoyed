@@ -1,6 +1,7 @@
 package direwolf
 
 import (
+	"github.com/doismellburning/samoyed/internal/bitstuff"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/sirupsen/logrus"
@@ -96,7 +97,7 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 	fbuf = append(fbuf, byte((frameFCS>>8)&0xff))
 
 	// Add bit-stuffing, filling to FX25_MAX_DATA bytes with flag patterns
-	var stuffedBytes, meaningfulLen = bitStuff(fbuf, FX25_MAX_DATA)
+	var stuffedBytes, meaningfulLen = bitstuff.Stuff(fbuf, FX25_MAX_DATA)
 	var dlen = meaningfulLen // Use meaningful length, not total buffer size
 
 	// Pick suitable correlation tag depending on
@@ -158,120 +159,4 @@ func (s *HDLCSender) sendFX25Bytes(b []byte) {
 			x >>= 1
 		}
 	}
-}
-
-/*-------------------------------------------------------------
- *
- * Name:	bitStuff
- *
- * Purpose:	Perform HDLC bit-stuffing and add "flag" octets in
- *		preparation for the RS encoding.
- *
- * Inputs:	in	- Frame, including FCS, in.
- *
- *		maxBytes - if >0, fill output to exactly this many bytes with flag patterns
- *
- * Returns:	Stuffed bytes, and meaningful length before flag padding
- *
- * Description:	Convert to stream of bits including:
- *			start flag
- *			bit stuffed data, including FCS
- *			end flag
- *
- *--------------------------------------------------------------*/
-
-// Is it particularly time/space efficient? No.
-// But it should work!
-func bitStuff(in []byte, maxBytes int) ([]byte, int) {
-	const flag byte = 0x7e
-
-	var outBits []bool
-
-	// Start flag
-
-	for i := range 8 {
-		var v = flag&(1<<i) > 0
-		outBits = append(outBits, v)
-	}
-
-	// In data
-
-	var ones = 0
-
-	for _, b := range in {
-		for i := range 8 {
-			var v = b&(1<<i) > 0
-			outBits = append(outBits, v)
-
-			if v {
-				ones++
-				if ones == 5 {
-					outBits = append(outBits, false)
-					ones = 0
-				}
-			} else {
-				ones = 0
-			}
-		}
-	}
-
-	// End flag
-
-	for i := range 8 {
-		var v = flag&(1<<i) > 0
-		outBits = append(outBits, v)
-	}
-
-	dwutil.Assert(len(outBits) >= 16) // Start and end flags
-	dwutil.Assert(len(outBits) >= 16+8*len(in))
-
-	// Remember where meaningful data ends (before flag padding)
-	meaningfulBits := len(outBits)
-
-	// Fill remainder with flag patterns (rotating through flag bits)
-	if maxBytes > 0 {
-		maxBits := maxBytes * 8
-
-		bitPos := 0 // Which bit position of flag to use (0-7)
-		for len(outBits) < maxBits {
-			v := flag&(1<<bitPos) > 0
-			outBits = append(outBits, v)
-			bitPos = (bitPos + 1) % 8
-		}
-	}
-
-	// Now byte it up
-
-	var outBytes []byte
-
-	for len(outBits) >= 8 {
-		var b byte
-
-		for bitIdx := range 8 {
-			if outBits[bitIdx] {
-				b |= 1 << bitIdx
-			}
-		}
-
-		outBytes = append(outBytes, b)
-		outBits = outBits[8:]
-	}
-
-	// And the last 0-7 bits if present
-
-	if len(outBits) > 0 {
-		var b byte
-
-		for bitIdx := 0; bitIdx < 8 && bitIdx < len(outBits); bitIdx++ {
-			if outBits[bitIdx] {
-				b |= 1 << bitIdx
-			}
-		}
-
-		outBytes = append(outBytes, b)
-	}
-
-	var meaningfulLen = (meaningfulBits + 7) / 8 // Round up to bytes
-
-	return outBytes, meaningfulLen
 }
