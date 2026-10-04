@@ -10,18 +10,10 @@ import (
 	"slices"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/doismellburning/samoyed/internal/rrbb"
 )
-
-/* Undo data scrambling for 9600 baud. */
-
-func descramble(in int, state *int) int {
-	var out = (in ^ (*state >> 16) ^ (*state >> 11)) & 1
-	*state = (*state << 1) | (in & 1)
-
-	return (out)
-}
 
 //#define TEST 1				/* Define for unit testing. */
 
@@ -40,12 +32,7 @@ type hdlcState struct {
 	receiver                   *HDLCReceiver
 	channel, subchannel, slice int
 
-	prevRaw bool /* Keep track of previous bit so */
-	/* we can look for transitions. */
-
-	lfsr int /* Descrambler shift register for 9600 baud. */
-
-	prevDescram int /* Previous descrambled for 9600 baud. */
+	line linecode.Decoder /* Undoes NRZI, and scrambling for 9600 baud. */
 
 	patDet byte /* 8 bit pattern detector shift register. */
 	/* See below for more details. */
@@ -111,7 +98,8 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 	// TODO: FIX13 wasteful if not needed.
 	// Should loop on number of slicers, not max.
 
-	s.rawBits = rrbb.New(channel, subchannel, slice, scrambled, s.lfsr, s.prevDescram)
+	var descramState, prevDescram = s.line.State()
+	s.rawBits = rrbb.New(channel, subchannel, slice, scrambled, descramState, prevDescram)
 
 	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
 	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc)
@@ -239,19 +227,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 	 *   A '1' bit is represented by no change.
 	 */
 
-	var dbit bool /* Data bit after undoing NRZI. */
-
-	if is_scrambled {
-		var descram = descramble(dwutil.IfThenElse(raw, 1, 0), &(s.lfsr))
-
-		dbit = (descram == s.prevDescram)
-		s.prevDescram = descram
-		s.prevRaw = raw
-	} else {
-		dbit = (raw == s.prevRaw)
-
-		s.prevRaw = raw
-	}
+	var dbit = s.line.Decode(raw, is_scrambled) /* Data bit after undoing NRZI. */
 
 	// After BER insertion, NRZI, and any descrambling, feed into FX.25 decoder as well.
 	// Don't waste time on this if AIS.  EAS does not get this far.
@@ -376,19 +352,21 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 			/* Handed off to hdlc_rec2_block. */
 			s.rawBits = nil
 
-			s.rawBits = rrbb.New(channel, subchannel, slice, is_scrambled, s.lfsr, s.prevDescram) /* Allocate a new one. */
+			var descramState, prevDescram = s.line.State()
+			s.rawBits = rrbb.New(channel, subchannel, slice, is_scrambled, descramState, prevDescram) /* Allocate a new one. */
 		} else {
 			//JWL - start of frame
 			*pll_nudge_total = 0
 			*pll_symbol_count = -1 // comes out better than using 0.
 
-			s.rawBits.Clear(is_scrambled, s.lfsr, s.prevDescram)
+			var descramState, prevDescram = s.line.State()
+			s.rawBits.Clear(is_scrambled, descramState, prevDescram)
 		}
 
 		s.olen = 0 /* Allow accumulation of octets. */
 		s.frameLen = 0
 
-		s.rawBits.AppendBit(dwutil.IfThenElse[byte](s.prevRaw, 1, 0)) /* Last bit of flag.  Needed to get first data bit. */
+		s.rawBits.AppendBit(dwutil.IfThenElse[byte](s.line.PrevRaw(), 1, 0)) /* Last bit of flag.  Needed to get first data bit. */
 		/* Now that we are saving other initial state information, */
 		/* it would be sensible to do the same for this instead */
 		/* of lumping it in with the frame data bits. */
@@ -431,7 +409,8 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 		s.olen = -1    /* Stop accumulating octets. */
 		s.frameLen = 0 /* Discard anything in progress. */
 
-		s.rawBits.Clear(is_scrambled, s.lfsr, s.prevDescram)
+		var descramState, prevDescram = s.line.State()
+		s.rawBits.Clear(is_scrambled, descramState, prevDescram)
 	} else if (s.patDet & 0xfc) == 0x7c {
 
 		/*

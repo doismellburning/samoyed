@@ -3,6 +3,7 @@ package direwolf
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,7 +23,7 @@ type HDLCSender struct {
 	// long run by "bit stuffing."
 	stuff int
 
-	nrziOutput int // The level the line was last left at.
+	line *linecode.Encoder // Puts the bits on the line, keeping its NRZI level.
 }
 
 // NewHDLCSender makes an HDLCSender for channel, sending the layer 2
@@ -34,6 +35,7 @@ func NewHDLCSender(channel int, audioConfig *RadioConfig, toneGenerator *ToneGen
 	s.audioConfig = audioConfig
 	s.toneGenerator = toneGenerator
 	s.fx25Debug = fx25Debug
+	s.line = linecode.NewEncoder(s.putBit)
 
 	return s
 }
@@ -223,12 +225,7 @@ func (s *HDLCSender) sendAX25Frame(fbuf []byte, badFCS bool) int {
 
 func (s *HDLCSender) sendByteMSBFirst(x int, polarity int) {
 	for range 8 {
-		var dbit = 0
-		if (x & 0x80) != 0 {
-			dbit = 1
-		}
-
-		s.putBit((dbit ^ polarity) & 1)
+		s.line.Write((x&0x80) != 0, polarity&1 != 0)
 
 		x <<= 1
 		s.bitsSent++
@@ -273,11 +270,7 @@ func (s *HDLCSender) sendDataNRZI(x byte) {
  */
 
 func (s *HDLCSender) sendBitNRZI(b bool) {
-	if !b {
-		s.nrziOutput = 1 - s.nrziOutput
-	}
-
-	s.putBit(s.nrziOutput)
+	s.line.WriteNRZI(b)
 
 	s.bitsSent++
 }

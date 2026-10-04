@@ -312,30 +312,31 @@ func TestToneGeneratorPutBitScrambles(t *testing.T) {
 	// With an empty shift register, the scrambler passes the first bits
 	// through, and they go into the register.
 	tg.PutBit(1)
-	assert.Equal(t, 1, tg.lfsr)
 	assert.Equal(t, 1, tg.prevDat)
 
-	tg.PutBit(0)
-	assert.Equal(t, 2, tg.lfsr)
-	assert.Equal(t, 0, tg.prevDat)
+	for range 11 {
+		tg.PutBit(0)
+		assert.Equal(t, 0, tg.prevDat)
+	}
 
-	// Once a set bit reaches tap 11, a 0 in comes out as a 1.
-	tg.lfsr = 1 << 11
-
+	// Once that set bit reaches tap 11, a 0 in comes out as a 1.
 	tg.PutBit(0)
 	assert.Equal(t, 1, tg.prevDat)
-	assert.Equal(t, (1<<12)|1, tg.lfsr)
 }
 
 func TestToneGeneratorPutBitIL2PNotScrambled(t *testing.T) {
 	var tg, _, cfg = newCapturingToneGenerator(MODEM_SCRAMBLE, 9600, 48000)
 	cfg.achan[0].layer2_xmit = LAYER2_IL2P
 
-	tg.lfsr = 1 << 11
+	// What the scrambler would have turned into a 1, as above, goes out
+	// as it is.
+	tg.PutBit(1)
 
-	tg.PutBit(0)
+	for range 12 {
+		tg.PutBit(0)
+	}
+
 	assert.Equal(t, 0, tg.prevDat)
-	assert.Equal(t, 1<<11, tg.lfsr)
 }
 
 func TestToneGeneratorPutSampleFormats(t *testing.T) {

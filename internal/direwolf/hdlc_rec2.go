@@ -73,6 +73,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/rrbb"
 	"github.com/sirupsen/logrus"
 )
@@ -132,12 +133,9 @@ type retry_conf_t struct {
 // "2" was added to reduce confusion.  Can be trimmed down.
 
 type hdlc_state2_s struct {
-	prev_raw bool /* Keep track of previous bit so */
-	/* we can look for transitions. */
+	line linecode.Decoder /* Undoes NRZI, and scrambling for 9600 baud. */
 
 	is_scrambled bool /* Set for 9600 baud. */
-	lfsr         int  /* Descrambler shift register for 9600 baud. */
-	prev_descram int  /* Previous unscrambled for 9600 baud. */
 
 	pat_det byte /* 8 bit pattern detector shift register. */
 	/* See below for more details. */
@@ -497,9 +495,8 @@ func try_decode(block *rrbb.Buffer, achan *achan_param_s, channel int, subchan i
 	var fcs_ok = false
 
 	H2.is_scrambled = block.IsScrambled()
-	H2.prev_descram = block.PrevDescram()
-	H2.lfsr = block.DescramState()
-	H2.prev_raw = block.Bit(0) > 0 /* Actually last bit of the */
+
+	var prevRaw = block.Bit(0) > 0 /* Actually last bit of the */
 	/* opening flag so we can derive the */
 	/* first data bit.  */
 
@@ -510,8 +507,10 @@ func try_decode(block *rrbb.Buffer, achan *achan_param_s, channel int, subchan i
 
 	if (retry_conf.mode == RETRY_MODE_CONTIGUOUS && is_contig_bit_modified(0, retry_conf)) ||
 		(retry_conf.mode == RETRY_MODE_SEPARATED && is_sep_bit_modified(0, retry_conf)) {
-		H2.prev_raw = !H2.prev_raw
+		prevRaw = !prevRaw
 	}
+
+	H2.line.Restore(block.DescramState(), block.PrevDescram(), prevRaw)
 
 	H2.pat_det = 0
 	H2.oacc = 0
@@ -550,25 +549,9 @@ func try_decode(block *rrbb.Buffer, achan *achan_param_s, channel int, subchan i
 		 * Using NRZI encoding,
 		 *   A '0' bit is represented by an inversion since previous bit.
 		 *   A '1' bit is represented by no change.
-		 *   Note: this code can be factorized with the raw != H2.prev_raw code at the cost of processing time
 		 */
 
-		var dbit bool
-
-		if H2.is_scrambled {
-			var _raw = 0
-			if raw {
-				_raw = 1
-			}
-			var descram = descramble(_raw, &(H2.lfsr))
-
-			dbit = (descram == H2.prev_descram)
-			H2.prev_descram = descram
-			H2.prev_raw = raw
-		} else {
-			dbit = (raw == H2.prev_raw)
-			H2.prev_raw = raw
-		}
+		var dbit = H2.line.Decode(raw, H2.is_scrambled)
 
 		if dbit {
 			H2.pat_det |= 0x80
