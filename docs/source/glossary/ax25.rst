@@ -6,11 +6,11 @@ AX.25
 =====
 
 🤖 The link-layer protocol of packet radio:
-HDLC frames addressed by callsign and SSID,
-with an optional path of digipeaters.
+:doc:`hdlc` frames addressed by callsign and SSID,
+with an optional path of :doc:`digipeaters <digipeater>`.
 It has connectionless (UI) frames, which :doc:`aprs` uses,
 and a connected mode with acknowledgements and retries.
-FX.25 and IL2P add forward error correction on air.
+:doc:`fx25` and :doc:`il2p` add forward error correction on air.
 
 References
 ----------

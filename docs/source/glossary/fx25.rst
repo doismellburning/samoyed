@@ -1,0 +1,19 @@
+..
+    SPDX-FileCopyrightText: The Samoyed Authors
+    SPDX-License-Identifier: GPL-2.0-or-later
+
+FX.25
+=====
+
+🤖 Forward error correction for :doc:`ax25`:
+the usual :doc:`hdlc` frame is wrapped in a Reed-Solomon code block,
+preceded by a correlation tag that says which code was used.
+A receiver that knows FX.25 can repair damaged bits;
+one that doesn't still finds the ordinary frame inside
+and decodes it as before.
+
+References
+----------
+
+* `FX.25 specification <http://www.stensat.org/Docs/Docs.htm>`__ (Stensat Group)
+* `Reed-Solomon error correction on Wikipedia <https://en.wikipedia.org/wiki/Reed%E2%80%93Solomon_error_correction>`__
