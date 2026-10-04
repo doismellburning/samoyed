@@ -266,6 +266,38 @@ func Test_decode_aprs_mic_e_speed_and_course(t *testing.T) {
 	}
 }
 
+// Compressed positions, from the examples in chapter 9 of the APRS 1.0.1
+// spec.  The base 91 sums used to be done in a byte, which wrapped, so every
+// one of these came out somewhere near the North Pole on the date line.
+func Test_decode_aprs_compressed_position(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	for _, info := range []string{
+		"!/5L!!<*e7>7P[",
+		"=/5L!!<*e7>7P[",
+		"@092345z/5L!!<*e7>7P[",
+		"/092345z/5L!!<*e7>7P[",
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+info, true), true)
+
+		var lat, latOK = A.Lat.Get()
+		assert.True(t, latOK, "%s", info)
+		assert.InDelta(t, 49.5, lat, 0.00001, "%s", info)
+
+		var lon, lonOK = A.Lon.Get()
+		assert.True(t, lonOK, "%s", info)
+		assert.InDelta(t, -72.75, lon, 0.00001, "%s", info)
+
+		assert.Equal(t, byte('/'), A.SymbolTable, "%s", info)
+		assert.Equal(t, byte('>'), A.SymbolCode, "%s", info)
+		assert.Equal(t, maybe.Just(88.0), A.Course, "%s", info)
+
+		var speed, speedOK = A.SpeedMPH.Get()
+		assert.True(t, speedOK, "%s", info)
+		assert.InDelta(t, dwutil.DW_KNOTS_TO_MPH(36.2), speed, 0.1, "%s", info) // 1.08^47 - 1 knots, to one place
+	}
+}
+
 // A course and speed extension can be the whole of the information field,
 // with nothing after it - and then there is no bearing and no NRQ to look at.
 func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {

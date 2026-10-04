@@ -3181,7 +3181,7 @@ func decodePosition(A *Decoded, ppos *latLongPosition) {
 
 func decodeCompressedPosition(A *Decoded, pcpos *compressedPositionData) {
 	if isBase91Digit(pcpos.Y[0]) && isBase91Digit(pcpos.Y[1]) && isBase91Digit(pcpos.Y[2]) && isBase91Digit(pcpos.Y[3]) {
-		A.Lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
+		A.Lat = maybe.Just(90 - float64(base91Value(pcpos.Y[:]))/380926.0)
 	} else {
 		if !A.quiet {
 			logrus.WithField("latitude", string(pcpos.Y[:])).Warn("Invalid character in compressed latitude: must be in range '!' to '{'")
@@ -3191,7 +3191,7 @@ func decodeCompressedPosition(A *Decoded, pcpos *compressedPositionData) {
 	}
 
 	if isBase91Digit(pcpos.X[0]) && isBase91Digit(pcpos.X[1]) && isBase91Digit(pcpos.X[2]) && isBase91Digit(pcpos.X[3]) {
-		A.Lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
+		A.Lon = maybe.Just(-180 + float64(base91Value(pcpos.X[:]))/190463.0)
 	} else {
 		if !A.quiet {
 			logrus.WithField("longitude", string(pcpos.X[:])).Warn("Invalid character in compressed longitude: must be in range '!' to '{'")
