@@ -27,6 +27,14 @@ linters:
       - path: _test\.go
         linters:
           - dupl  # Repeated setup and parallel table tests are normal in tests
+    paths:
+      # UberSDR's own PCM v4 decoder and test encoder, kept verbatim so that
+      # upstream changes can be diffed in - see internal/ubersdr/pcmv4/doc.go.
+      # doc.go and fuzz_test.go there are ours, and stay linted.
+      - "internal/ubersdr/pcmv4/pcm_.*\\.go$"
+      - "internal/ubersdr/pcmv4/pcmv4_test\\.go$"
+      - "internal/ubersdr/pcmv4/roundtrip_test\\.go$"
+      - "internal/ubersdr/internal/v4enc/"
   settings:
     dupl:
       threshold: 150  # The default; tighten later
