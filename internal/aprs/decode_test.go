@@ -298,6 +298,41 @@ func Test_decode_aprs_compressed_position(t *testing.T) {
 	}
 }
 
+// Both Ultimeter formats, with the readings Dire Wolf's decode_aprs gives.
+// The fields were read with C's "%4hx", which Go's fmt doesn't know, so
+// neither format ever gave any weather.
+func Test_decode_aprs_ultimeter(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	for _, tc := range []struct {
+		info    string
+		weather string
+	}{
+		{
+			"$ULTW0000000001110B6E27F4FFF3897B0001035E004E04DD00030000",
+			"wind 0.0 mph, direction 0, temperature 27.3, barometer 30.21, humidity 86",
+		},
+		{
+			"!!00000066013D000028710166--------0158053201200210",
+			"wind 0.0 mph, direction 143, temperature 31.7",
+		},
+		// Temperatures below zero are two's complement: 0xff9c is -10.0.
+		{
+			"$ULTW00000000FF9C0B6E27F4FFF3897B0001035E004E04DD00030000",
+			"wind 0.0 mph, direction 0, temperature -10.0, barometer 30.21, humidity 86",
+		},
+		{
+			"!!00000066FF9C000028710166--------0158053201200210",
+			"wind 0.0 mph, direction 143, temperature -10.0",
+		},
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+tc.info, true), true)
+
+		assert.Equal(t, "Ultimeter", A.DataTypeDesc, "%s", tc.info)
+		assert.Equal(t, tc.weather, A.Weather, "%s", tc.info)
+	}
+}
+
 // A course and speed extension can be the whole of the information field,
 // with nothing after it - and then there is no bearing and no NRQ to look at.
 func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {

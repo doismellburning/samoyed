@@ -3023,6 +3023,17 @@ func weatherData(A *Decoded, wdata []byte) {
  *
  *------------------------------------------------------------------*/
 
+// signed16 reads v as two's complement, which is how the Ultimeter sends a
+// temperature below zero.
+func signed16(v uint16) int {
+	var n = int(v)
+	if n >= 1<<15 {
+		n -= 1 << 16
+	}
+
+	return n
+}
+
 func aprsUltimeter(A *Decoded, info []byte) {
 	// Header = $ULTW
 	// Data Fields
@@ -3048,7 +3059,7 @@ func aprsUltimeter(A *Decoded, info []byte) {
 	A.DataTypeDesc = "Ultimeter"
 
 	if info[0] == '$' {
-		var n, _ = fmt.Sscanf(string(info[5:]), "%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx",
+		var n, _ = fmt.Sscanf(string(info[5:]), "%4x%4x%4x%4x%4x%4x%4x%4x%4x%4x%4x%4x%4x",
 			&h_windpeak,
 			&h_wdir,
 			&h_otemp,
@@ -3068,7 +3079,7 @@ func aprsUltimeter(A *Decoded, info []byte) {
 
 			windpeak = dwutil.DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
 			wdir = float64(h_wdir&0xff) * 360. / 256.
-			otemp = float64(h_otemp) * 0.1
+			otemp = float64(signed16(h_otemp)) * 0.1
 			baro = float64(dwutil.DW_MBAR_TO_INHG(float64(h_baro) * 0.1))
 			ohumid = float64(h_ohumid) * 0.1
 
@@ -3097,7 +3108,7 @@ func aprsUltimeter(A *Decoded, info []byte) {
 	// Total size: 40, 44 or 48 characters (hex digits) + header, carriage return and line feed
 
 	if info[0] == '!' {
-		var n, _ = fmt.Sscanf(string(info[2:]), "%4hx%4hx%4hx%4hx",
+		var n, _ = fmt.Sscanf(string(info[2:]), "%4x%4x%4x%4x",
 			&h_windpeak,
 			&h_wdir,
 			&h_otemp,
@@ -3108,9 +3119,9 @@ func aprsUltimeter(A *Decoded, info []byte) {
 
 			windpeak = dwutil.DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
 			wdir = float64(h_wdir&0xff) * 360. / 256.
-			otemp = float64(h_otemp) * 0.1
+			otemp = float64(signed16(h_otemp)) * 0.1
 
-			A.Weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f\n",
+			A.Weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f",
 				windpeak, wdir, otemp)
 		}
 	}
