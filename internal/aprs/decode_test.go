@@ -333,6 +333,49 @@ func Test_decode_aprs_ultimeter(t *testing.T) {
 	}
 }
 
+// An object's name, live/killed indicator and timestamp come before its
+// position, but were only read along with a human-readable one, which is six
+// bytes longer than a compressed one - so a compressed object lost its name.
+func Test_decode_aprs_compressed_object(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:;Q2TEST   *092345z/5L!!<*e7>7P[", true), true)
+
+	assert.Equal(t, "Object", A.DataTypeDesc)
+	assert.Equal(t, "Q2TEST", A.Name)
+
+	var lat, latOK = A.Lat.Get()
+	assert.True(t, latOK)
+	assert.InDelta(t, 49.5, lat, 0.00001)
+}
+
+// A report that stops before the end of its position has no position.  One
+// that stopped short of a human-readable position used to be read as a
+// compressed one instead, which put it somewhere nobody mentioned.
+func Test_decode_aprs_short_position(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	for _, info := range []string{
+		"!4903.50N/07201.75W", // no symbol code
+		"=4903.50N",
+		"@092345z4903.50N/07201.75W",
+		"/092345z/5L!!<*e7",
+		"@0923",
+		";Q2TEST   *092345z4903.50N/07201.75W",
+		";Q2TEST   *092345z/5L!",
+		";Q2TEST",
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+info, true), true)
+
+		assert.Equal(t, maybe.Nothing[float64](), A.Lat, "%s", info)
+		assert.Equal(t, maybe.Nothing[float64](), A.Lon, "%s", info)
+	}
+
+	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:;Q2TEST   _092345z4903.50N", true), true)
+	assert.Equal(t, "Killed Object", A.DataTypeDesc)
+	assert.Equal(t, "Q2TEST", A.Name)
+}
+
 // A course and speed extension can be the whole of the information field,
 // with nothing after it - and then there is no bearing and no NRQ to look at.
 func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {

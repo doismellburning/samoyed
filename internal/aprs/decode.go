@@ -825,6 +825,23 @@ func (d *Decoder) Print(A *Decoded) {
 	}
 }
 
+// positionIsHumanReadable reports whether the position that starts at
+// info[start] is in the human-readable form, whose latitude begins with a
+// digit, rather than compressed, which begins with a symbol table identifier.
+func positionIsHumanReadable(info []byte, start int) bool {
+	return len(info) > start && unicode.IsDigit(rune(info[start]))
+}
+
+// warnShortPosition complains about a report that stops before the end of its
+// position.  A position that isn't all there is not a position: binary.Decode
+// leaves the struct zeroed and says so, and decoding that would report a
+// place nobody mentioned.
+func warnShortPosition(A *Decoded, info []byte) {
+	if !A.quiet {
+		logrus.WithField("length", len(info)).Warn("Report has too few bytes for a position")
+	}
+}
+
 /*------------------------------------------------------------------
  *
  * Function:	aprsLLPos
@@ -869,10 +886,16 @@ func aprsLLPos(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 
 	A.DataTypeDesc = "Position"
 
-	var ll_bytes, _ = binary.Decode(info, binary.NativeEndian, &p)
-	var compressed_bytes, _ = binary.Decode(info, binary.NativeEndian, &q)
+	var ll_bytes, llErr = binary.Decode(info, binary.NativeEndian, &p)
+	var compressed_bytes, compressedErr = binary.Decode(info, binary.NativeEndian, &q)
 
-	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
+	if positionIsHumanReadable(info, 1) { /* Human-readable location. */
+		if llErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodePosition(A, &(p.Pos))
 
 		if A.SymbolCode == '_' {
@@ -911,6 +934,12 @@ func aprsLLPos(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 			dataExtensionComment(A, telemetryState, info[ll_bytes:])
 		}
 	} else { /* Compressed location. */
+		if compressedErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodeCompressedPosition(A, &(q.CPos))
 
 		if A.SymbolCode == '_' {
@@ -962,28 +991,47 @@ func aprsLLPos(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
  *------------------------------------------------------------------*/
 
 func aprsLLPosTime(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
-	type llPosTime struct {
+	type posTimeHeader struct {
 		DTI       byte /* / or @ */
 		Timestamp [7]byte
-		Pos       latLongPosition
+	}
+	var h posTimeHeader
+
+	type llPosTime struct {
+		Header posTimeHeader
+		Pos    latLongPosition
 	}
 	var p llPosTime
 
 	type compressedPosTime struct {
-		DTI       byte /* / or @ */
-		Timestamp [7]byte
-		CPos      compressedPositionData
+		Header posTimeHeader
+		CPos   compressedPositionData
 	}
 	var q compressedPosTime
 
 	A.DataTypeDesc = "Position with time"
 
-	var llBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
-	var compressedBytes, _ = binary.Decode(info, binary.NativeEndian, &q)
+	// The timestamp is read on its own, so that a position too short to
+	// decode doesn't take it with it.
+	var headerBytes, headerErr = binary.Decode(info, binary.NativeEndian, &h)
+	if headerErr != nil {
+		warnShortPosition(A, info)
 
-	getTimestamp(A, p.Timestamp) // Only checked, not kept.
+		return
+	}
 
-	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
+	var llBytes, llErr = binary.Decode(info, binary.NativeEndian, &p)
+	var compressedBytes, compressedErr = binary.Decode(info, binary.NativeEndian, &q)
+
+	getTimestamp(A, h.Timestamp) // Only checked, not kept.
+
+	if positionIsHumanReadable(info, headerBytes) { /* Human-readable location. */
+		if llErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodePosition(A, &(p.Pos))
 
 		if A.SymbolCode == '_' {
@@ -997,6 +1045,12 @@ func aprsLLPosTime(A *Decoded, telemetryState *aprstelemetry.State, info []byte)
 			dataExtensionComment(A, telemetryState, info[llBytes:])
 		}
 	} else { /* Compressed location. */
+		if compressedErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodeCompressedPosition(A, &(q.CPos))
 
 		if A.SymbolCode == '_' {
@@ -1945,33 +1999,47 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
  *------------------------------------------------------------------*/
 
 func aprsObject(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
-	type objectInfo struct {
+	type objectHeader struct {
 		DTI          byte /* ; */
 		Name         [9]byte
 		LiveOrKilled byte /* * for live or _ for killed */
 		Timestamp    [7]byte
-		Pos          latLongPosition
+	}
+	var h objectHeader
+
+	type objectInfo struct {
+		Header objectHeader
+		Pos    latLongPosition
 	}
 	var p objectInfo
 
 	type compressedObjectInfo struct {
-		DTI          byte /* ; */
-		Name         [9]byte
-		LiveOrKilled byte /* * for live or _ for killed */
-		Timestamp    [7]byte
-		CPos         compressedPositionData
+		Header objectHeader
+		CPos   compressedPositionData
 	}
 	var q compressedObjectInfo
 
-	var objectPosBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
-	var objectCompressedPosBytes, _ = binary.Decode(info, binary.NativeEndian, &q)
+	// The name and the rest are read on their own, so that a position too
+	// short for the human-readable form - every compressed one, say - doesn't
+	// take them with it.
+	var headerBytes, headerErr = binary.Decode(info, binary.NativeEndian, &h)
+	if headerErr != nil {
+		A.DataTypeDesc = "Object"
+
+		warnShortPosition(A, info)
+
+		return
+	}
+
+	var objectPosBytes, objectPosErr = binary.Decode(info, binary.NativeEndian, &p)
+	var objectCompressedPosBytes, objectCompressedPosErr = binary.Decode(info, binary.NativeEndian, &q)
 
 	//Assert (sizeof(A.Name) > sizeof(p.name));
 
-	A.Name = string(p.Name[:])
+	A.Name = string(h.Name[:])
 	A.Name = strings.TrimSpace(A.Name)
 
-	switch p.LiveOrKilled {
+	switch h.LiveOrKilled {
 	case '*':
 		A.DataTypeDesc = "Object"
 	case '_':
@@ -1980,9 +2048,15 @@ func aprsObject(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 		A.DataTypeDesc = "Object - invalid live/killed"
 	}
 
-	getTimestamp(A, p.Timestamp) // Only checked, not kept.
+	getTimestamp(A, h.Timestamp) // Only checked, not kept.
 
-	if unicode.IsDigit(rune(p.Pos.Lat[0])) { /* Human-readable location. */
+	if positionIsHumanReadable(info, headerBytes) { /* Human-readable location. */
+		if objectPosErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodePosition(A, &(p.Pos))
 
 		if A.SymbolCode == '_' {
@@ -1996,6 +2070,12 @@ func aprsObject(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 			dataExtensionComment(A, telemetryState, info[objectPosBytes:])
 		}
 	} else { /* Compressed location. */
+		if objectCompressedPosErr != nil {
+			warnShortPosition(A, info)
+
+			return
+		}
+
 		decodeCompressedPosition(A, &(q.CPos))
 
 		if A.SymbolCode == '_' {
