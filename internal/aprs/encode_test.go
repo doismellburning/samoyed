@@ -7,7 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -139,4 +141,73 @@ func Test_compressed_position_course_wraps(t *testing.T) {
 
 	var c = compressedPosition('/', '>', 0, 0, none, none, none, maybe.Just(-90), maybe.Just(10))
 	assert.Equal(t, byte('!'+68), c.C, "-90, as 270 rounds to 272")
+}
+
+// checkSymbol complains about each part of a symbol that isn't valid, but
+// leaves the encoding to go ahead.
+func Test_checkSymbol(t *testing.T) {
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	checkSymbol('/', '>')
+	checkSymbol('\\', '!')
+	checkSymbol('A', '~')
+	checkSymbol('9', '#')
+	assert.Empty(t, hook.AllEntries())
+
+	checkSymbol('a', '>')
+	assert.Contains(t, hook.LastEntry().Message, "Symbol table identifier")
+
+	checkSymbol('/', ' ')
+	assert.Contains(t, hook.LastEntry().Message, "Symbol code")
+}
+
+// What the encoder makes, the decoder reads back, in each hemisphere and in
+// both forms.  A compressed position only round trips to within its
+// resolution, and a human-readable one to a hundredth of a minute.
+func Test_encode_decode_round_trip(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var none = maybe.Nothing[int]()
+	var noFreq = maybe.Nothing[float64]()
+
+	for _, tc := range []struct {
+		lat float64
+		lon float64
+	}{
+		{42.6190, -71.3472},
+		{-33.8568, 151.2153},
+		{51.4779, 0.0015},
+		{-0.5, -0.5},
+	} {
+		for _, compressed := range []bool{false, true} {
+			var delta = 1.0 / 6000
+			if compressed {
+				delta = 0.00001
+			}
+
+			var info = EncodePosition(false, compressed, tc.lat, tc.lon, 0, none, '/', '>',
+				none, none, none, "", maybe.Just(88), maybe.Just(36), noFreq, noFreq, noFreq, "Round trip")
+
+			var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+info, true), true)
+
+			assertMaybeInDelta(t, maybe.Just(tc.lat), A.Lat, delta, "%s", info)
+			assertMaybeInDelta(t, maybe.Just(tc.lon), A.Lon, delta, "%s", info)
+			assert.Equal(t, byte('/'), A.SymbolTable, "%s", info)
+			assert.Equal(t, byte('>'), A.SymbolCode, "%s", info)
+			assertMaybeInDelta(t, maybe.Just(88.0), A.Course, 4, "%s", info) // Compressed course is in steps of 4 degrees.
+			assert.Equal(t, "Round trip", A.Comment, "%s", info)
+
+			info = EncodeObject("Q2TEST", compressed, time.Time{}, tc.lat, tc.lon, 0, '/', '>',
+				none, none, none, "", none, none, noFreq, noFreq, noFreq, "")
+
+			A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+info, true), true)
+
+			assert.Equal(t, "Object", A.DataTypeDesc, "%s", info)
+			assert.Equal(t, "Q2TEST", A.Name, "%s", info)
+			assertMaybeInDelta(t, maybe.Just(tc.lat), A.Lat, delta, "%s", info)
+			assertMaybeInDelta(t, maybe.Just(tc.lon), A.Lon, delta, "%s", info)
+		}
+	}
 }

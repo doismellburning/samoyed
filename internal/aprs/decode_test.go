@@ -559,3 +559,600 @@ func Test_decode_aprs_telemetry_metadata_per_decoder(t *testing.T) {
 	var other = NewDecoder(nil, nil)
 	assert.NotContains(t, other.Decode(data, true).Telemetry, "Volts")
 }
+
+// assertMaybeInDelta checks that got is present exactly when want is, and then
+// that the two are within delta of each other.
+func assertMaybeInDelta(t *testing.T, want maybe.Maybe[float64], got maybe.Maybe[float64], delta float64, msgAndArgs ...any) {
+	t.Helper()
+
+	var wantValue, wantOK = want.Get()
+	var gotValue, gotOK = got.Get()
+
+	if assert.Equal(t, wantOK, gotOK, msgAndArgs...) && wantOK {
+		assert.InDelta(t, wantValue, gotValue, delta, msgAndArgs...)
+	}
+}
+
+// The tests from here on cover the formats one at a time.  Unless they say
+// otherwise, the expected values are what Dire Wolf's decode_aprs makes of the
+// same packet.
+
+// Mic-E keeps the latitude, the message bits and the longitude offset in the
+// destination, and the rest in the first nine bytes of the information part.
+// Each of these varies one of them, valid or not.
+func Test_decode_aprs_mic_e(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var nothing = maybe.Nothing[float64]()
+
+	for _, tc := range []struct {
+		monitor string
+		lat     maybe.Maybe[float64]
+		lon     maybe.Maybe[float64]
+		status  string
+		mfr     string
+		comment string
+	}{
+		// Standard message bits, north, west, no offset.
+		{"Q1TEST>S32U6T:`(_fn\"Oj/", maybe.Just(33 + 25.64/60), maybe.Just(-(12 + 7.74/60)), "Returning", unknownDevice, ""},
+		// No message bits is an emergency.  South and east.
+		{"Q1TEST>332564:`(_fn\"Oj/>Kenwood TH-D7", maybe.Just(-(33 + 25.64/60)), maybe.Just(12 + 7.74/60), "Emergency", "Kenwood TH-D7A", "Kenwood TH-D7"},
+		// A custom message bit.
+		{"Q1TEST>C32U6T:`(_fn\"Oj/]=", maybe.Just(23 + 25.64/60), maybe.Just(-(12 + 7.74/60)), "Custom-3", "Kenwood TM-D710", ""},
+		// A standard and a custom bit together aren't any known message.
+		{"Q1TEST>SC2U6T:`(_fn\"Oj/", maybe.Just(32 + 25.64/60), maybe.Just(-(12 + 7.74/60)), "Unknown MIC-E Message Type", unknownDevice, ""},
+		// K, L and Z are digits of 0, with or without a message bit.
+		{"Q1TEST>KLZU6T:`(_fn\"Oj/", maybe.Just(5.64 / 60), maybe.Just(-(12 + 7.74/60)), "Unknown MIC-E Message Type", unknownDevice, ""},
+		// The three ranges of degrees with a longitude offset of 100.
+		{"Q1TEST>S32UZT:`x_fn\"Oj/", maybe.Just(33 + 25.04/60), maybe.Just(-(2 + 7.74/60)), "Returning", unknownDevice, ""},
+		{"Q1TEST>S32UZT:`n_fn\"Oj/", maybe.Just(33 + 25.04/60), maybe.Just(-(102 + 7.74/60)), "Returning", unknownDevice, ""},
+		{"Q1TEST>S32UZT:`(_fn\"Oj/", maybe.Just(33 + 25.04/60), maybe.Just(-(112 + 7.74/60)), "Returning", unknownDevice, ""},
+		// A longitude offset that is neither, taken as none.
+		{"Q1TEST>S32UK6:`(_fn\"Oj/", maybe.Just(33 + 25.06/60), maybe.Just(12 + 7.74/60), "Returning", unknownDevice, ""},
+		// Minutes under 10.
+		{"Q1TEST>S32U6T:`(Zfn\"Oj/", maybe.Just(33 + 25.64/60), maybe.Just(-(12 + 2.74/60)), "Returning", unknownDevice, ""},
+		// Degrees, minutes and hundredths that are out of range.
+		{"Q1TEST>S32U6T:`!_fn\"Oj/", maybe.Just(33 + 25.64/60), nothing, "Returning", unknownDevice, ""},
+		{"Q1TEST>S32U6T:`(!fn\"Oj/", maybe.Just(33 + 25.64/60), nothing, "Returning", unknownDevice, ""},
+		{"Q1TEST>S32U6T:`(Z\x1an\"Oj/", maybe.Just(33 + 25.64/60), nothing, "Returning", unknownDevice, ""},
+		// North/south and east/west that are neither: north and east.
+		{"Q1TEST>S32A6T:`(_fn\"Oj/", maybe.Just(33 + 20.64/60), maybe.Just(-(12 + 7.74/60)), "Returning", unknownDevice, ""},
+		{"Q1TEST>S32U6A:`(_fn\"Oj/", maybe.Just(33 + 25.60/60), maybe.Just(12 + 7.74/60), "Returning", unknownDevice, ""},
+		// A latitude digit that isn't any kind of digit counts as 0.
+		{"Q1TEST>Sa2U6T:`(_fn\"Oj/", maybe.Just(30 + 25.64/60), maybe.Just(-(12 + 7.74/60)), "Returning", unknownDevice, ""},
+		// A trailing CR isn't part of the comment, or of the device suffix.
+		{"Q1TEST>S32U6T:`(_fn\"Oj/\r", maybe.Just(33 + 25.64/60), maybe.Just(-(12 + 7.74/60)), "Returning", unknownDevice, ""},
+		{"Q1TEST>S32U6T:'(_fn\"Oj/]\r", maybe.Just(33 + 25.64/60), maybe.Just(-(12 + 7.74/60)), "Returning", "Kenwood TM-D700", ""},
+		{"Q1TEST>T2SP0W:`c_Vm6hk/ Comment here", maybe.Just(42 + 30.07/60), maybe.Just(-(71 + 7.58/60)), "In Service", unknownDevice, " Comment here"},
+	} {
+		// Lenient, as the APRS-IS input is, to get a lower case destination in.
+		var A = aprsDecoder.Decode(ax25.FromTextWithStrictness(tc.monitor, ax25.AddrLenient), true)
+
+		assert.Equal(t, "MIC-E", A.DataTypeDesc, "%q", tc.monitor)
+		assert.Equal(t, PacketTypePosition, A.PacketType, "%q", tc.monitor)
+		assertMaybeInDelta(t, tc.lat, A.Lat, 0.000001, "%q", tc.monitor)
+		assertMaybeInDelta(t, tc.lon, A.Lon, 0.000001, "%q", tc.monitor)
+		assert.Equal(t, tc.status, A.MicEStatus, "%q", tc.monitor)
+		assert.Equal(t, tc.mfr, A.Mfr, "%q", tc.monitor)
+		assert.Equal(t, tc.comment, A.Comment, "%q", tc.monitor)
+	}
+}
+
+// The parts of a Mic-E report after the position: symbol, course, and the
+// altitude at the start of the comment.
+func Test_decode_aprs_mic_e_symbol_course_altitude(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>T2SP0W:`c_Vm6hk/`\"49}Q1TEST_%", true), true)
+	assert.Equal(t, byte('/'), A.SymbolTable)
+	assert.Equal(t, byte('k'), A.SymbolCode)
+	assert.Equal(t, "Yaesu FTM-400DR", A.Mfr)
+	assertMaybeInDelta(t, maybe.Just(dwutil.DW_METERS_TO_FEET(34)), A.AltitudeFt, 0.000001)
+	assert.Equal(t, "Q1TEST", A.Comment)
+
+	// A symbol table that isn't one falls back to the primary table.
+	A = aprsDecoder.Decode(ax25.FromText("Q1TEST>S32U6T:`(_fn\"Oja", true), true)
+	assert.Equal(t, byte('/'), A.SymbolTable)
+	assert.Equal(t, byte('j'), A.SymbolCode)
+
+	// A course of 0 is unknown, and 360 is north.
+	A = aprsDecoder.Decode(ax25.FromText("Q1TEST>S32U6T:`(_fnX\x1cj/", true), true)
+	assert.Equal(t, maybe.Nothing[float64](), A.Course)
+	assertMaybeInDelta(t, maybe.Just(dwutil.DW_KNOTS_TO_MPH(26)), A.SpeedMPH, 0.000001)
+
+	A = aprsDecoder.Decode(ax25.FromText("Q1TEST>S32U6T:`(_fn)Xj/", true), true)
+	assert.Equal(t, maybe.Just(0.0), A.Course)
+	assertMaybeInDelta(t, maybe.Just(dwutil.DW_KNOTS_TO_MPH(21)), A.SpeedMPH, 0.000001)
+}
+
+// The many things a "message" can be.
+func Test_decode_aprs_message(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	for _, tc := range []struct {
+		info       string
+		desc       string
+		addressee  string
+		subtype    MessageSubtype
+		packetType PacketType
+		number     string
+		comment    string
+	}{
+		{
+			":Q2TEST   :Hello there{42",
+			`APRS Message, number "42", from "Q1TEST" to "Q2TEST"`,
+			"Q2TEST", MessageSubtypeMessage, PacketTypeMessage, "42", "Hello there",
+		},
+		{
+			":Q2TEST   :No number",
+			`APRS Message, with no number, from "Q1TEST" to "Q2TEST"`,
+			"Q2TEST", MessageSubtypeMessage, PacketTypeMessage, "", "No number",
+		},
+		{
+			// A reply-ack: the message's own number, then the one it acks.
+			":Q2TEST   :Hello{AB}CD",
+			`APRS Message, number "AB", from "Q1TEST" to "Q2TEST", with ACK for "CD"`,
+			"Q2TEST", MessageSubtypeMessage, PacketTypeMessage, "AB", "Hello",
+		},
+		{
+			":BLN1     :Bulletin text",
+			`Bulletin with identifier "1"`,
+			"BLN1", MessageSubtypeBulletin, PacketTypeNone, "", "Bulletin text",
+		},
+		{
+			":BLNA     :Announcement text",
+			`Bulletin with identifier "A"`,
+			"BLNA", MessageSubtypeBulletin, PacketTypeNone, "", "Announcement text",
+		},
+		{
+			":NWS-WARN :Flood warning",
+			`Weather bulletin with identifier "WARN"`,
+			"NWS-WARN", MessageSubtypeNWS, PacketTypeNWS, "", "Flood warning",
+		},
+		{
+			":Q2TEST   :?APRSD",
+			"Directed Station Query",
+			"Q2TEST", MessageSubtypeDirectedQuery, PacketTypeQuery, "", "",
+		},
+		{
+			// The addressee must be padded to 9 characters.
+			":Q2TEST:Short addressee",
+			"APRS Message",
+			"", MessageSubtypeInvalid, PacketTypeNone, "", "",
+		},
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+tc.info, true), true)
+
+		assert.Equal(t, tc.desc, A.DataTypeDesc, "%s", tc.info)
+		assert.Equal(t, tc.addressee, A.Addressee, "%s", tc.info)
+		assert.Equal(t, tc.subtype, A.MessageSubtype, "%s", tc.info)
+		assert.Equal(t, tc.packetType, A.PacketType, "%s", tc.info)
+		assert.Equal(t, tc.number, A.MessageNumber, "%s", tc.info)
+		assert.Equal(t, tc.comment, A.Comment, "%s", tc.info)
+	}
+}
+
+// Telemetry metadata is sent as messages to the station it describes, and
+// shapes how that station's telemetry is shown from then on.
+func Test_decode_aprs_telemetry_metadata(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	for _, tc := range []struct {
+		info    string
+		desc    string
+		subtype MessageSubtype
+	}{
+		{":Q1TEST   :PARM.Battery,Temp,Light,B1,B2", `Telemetry Parameter Name for "Q1TEST"`, MessageSubtypeTelemParm},
+		{":Q1TEST   :UNIT.Volts,deg.C,lux,on,on", `Telemetry Unit/Label for "Q1TEST"`, MessageSubtypeTelemUnit},
+		{":Q1TEST   :EQNS.0,0.1,0,0,1,-40,0,1,0", `Telemetry Equation Coefficients for "Q1TEST"`, MessageSubtypeTelemEqns},
+		{":Q1TEST   :BITS.11111111,Balloon project", `Telemetry Bit Sense/Project Name for "Q1TEST"`, MessageSubtypeTelemBits},
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+tc.info, true), true)
+
+		assert.Equal(t, tc.desc, A.DataTypeDesc, "%s", tc.info)
+		assert.Equal(t, "Q1TEST", A.Addressee, "%s", tc.info)
+		assert.Equal(t, tc.subtype, A.MessageSubtype, "%s", tc.info)
+		assert.Equal(t, PacketTypeTelemetry, A.PacketType, "%s", tc.info)
+	}
+
+	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:T#005,199,000,255,073,123,01101001", true), true)
+	assert.Equal(t, "Telemetry", A.DataTypeDesc)
+	assert.Equal(t, PacketTypeTelemetry, A.PacketType)
+	assert.Equal(t,
+		"Balloon project: Seq=5, Battery=19.9 Volts, Temp=-40 deg.C, Light=255 lux, B1=73 on, B2=123 on, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1",
+		A.Telemetry)
+}
+
+// Raw NMEA sentences straight from a GPS receiver.  Only RMC and GGA carry a
+// position for us; anything else is just data of an unknown type.
+func Test_decode_aprs_raw_nmea(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:$GPRMC,063909,A,3349.4302,N,11700.3721,W,43.022,89.3,291099,13.6,E*52", true), true)
+	assert.Equal(t, "Raw GPS data", A.DataTypeDesc)
+	assert.Equal(t, PacketTypePosition, A.PacketType)
+	assertMaybeInDelta(t, maybe.Just(33+49.4302/60), A.Lat, 0.000001)
+	assertMaybeInDelta(t, maybe.Just(-(117 + 0.3721/60)), A.Lon, 0.000001)
+	assertMaybeInDelta(t, maybe.Just(dwutil.DW_KNOTS_TO_MPH(43.022)), A.SpeedMPH, 0.000001)
+	assertMaybeInDelta(t, maybe.Just(89.3), A.Course, 0.000001)
+
+	A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:$GPGGA,102705,5157.9762,N,00029.3256,W,1,04,2.0,75.7,M,47.6,M,,*62", true), true)
+	assert.Equal(t, "Raw GPS data", A.DataTypeDesc)
+	assertMaybeInDelta(t, maybe.Just(51+57.9762/60), A.Lat, 0.000001)
+	assertMaybeInDelta(t, maybe.Just(-29.3256/60), A.Lon, 0.000001)
+	assertMaybeInDelta(t, maybe.Just(dwutil.DW_METERS_TO_FEET(75.7)), A.AltitudeFt, 0.000001)
+
+	for _, info := range []string{
+		"$GPGLL,4916.45,N,12311.12,W,225444,A,*1D",
+		"$GPWPL,4916.45,N,12311.12,W,WPTNME*5C",
+		"$PGRMZ,1234,f,3*2D",
+	} {
+		A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+info, true), true)
+		assert.Equal(t, `ERROR!!!  Unknown APRS Data Type Indicator "$"`, A.DataTypeDesc, "%s", info)
+		assert.Equal(t, maybe.Nothing[float64](), A.Lat, "%s", info)
+	}
+
+	// Raw NMEA has no symbol of its own, so the source SSID gives one: 5 is
+	// a yacht.
+	A = aprsDecoder.Decode(ax25.FromText("Q1TEST-5>APDW17:$GPXYZ,1,2,3", true), true)
+	assert.Equal(t, byte('/'), A.SymbolTable)
+	assert.Equal(t, byte('Y'), A.SymbolCode)
+}
+
+// Formats whose information part is little more than a comment.
+func Test_decode_aprs_comment_only_formats(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	for _, tc := range []struct {
+		info       string
+		desc       string
+		packetType PacketType
+		comment    string
+	}{
+		{"<IGATE,MSG_CNT=30,LOC_CNT=20", "Station Capabilities", PacketTypeCapabilities, "IGATE,MSG_CNT=30,LOC_CNT=20"},
+		{"{Q1qwerty", "User-Defined Data", PacketTypeUserDefined, ""},
+		{"{{experimental", "User-Defined Experimental", PacketTypeUserDefined, ""},
+		{"{DT2A22A#", "Raw Touch Tone Data", PacketTypeUserDefined, "2A22A#"},
+		{"{tt2A22A#", "Raw Touch Tone Data", PacketTypeUserDefined, "2A22A#"},
+		{"t2A22A#", "Raw Touch Tone Data", PacketTypeNone, "2A22A#"},
+		{"{DMSOS", "Morse Code Data", PacketTypeUserDefined, "SOS"},
+		{"{mcSOS", "Morse Code Data", PacketTypeUserDefined, "SOS"},
+		{"mSOS", "Morse Code Data", PacketTypeNone, "SOS"},
+		{"}garbage", "Third Party Header: Unable to parse payload.", PacketTypeNone, ""},
+		{">Plain status", "Status Report", PacketTypeStatus, "Plain status"},
+		{">092345zNet Control", "Status Report", PacketTypeStatus, "Net Control"},
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+tc.info, true), true)
+
+		assert.Equal(t, tc.desc, A.DataTypeDesc, "%s", tc.info)
+		assert.Equal(t, tc.packetType, A.PacketType, "%s", tc.info)
+		assert.Equal(t, tc.comment, A.Comment, "%s", tc.info)
+	}
+}
+
+// AIS reports carried in Samoyed's own user-defined data type.
+func Test_decode_aprs_ais(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	// The sentence is the example from https://www.aggsoft.com/ais-decoder.htm
+	// that the AIS package's tests use too.
+	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:{DA!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0*4E", true), true)
+	assert.Equal(t, "AIS 1: Position Report Class A", A.DataTypeDesc)
+	assert.Equal(t, PacketTypeUserDefined, A.PacketType)
+	assert.Equal(t, "366730000", A.Name)
+	assertMaybeInDelta(t, maybe.Just(37.8038033), A.Lat, 0.000001)
+	assertMaybeInDelta(t, maybe.Just(-122.3925333), A.Lon, 0.000001)
+	assertMaybeInDelta(t, maybe.Just(51.3), A.Course, 0.000001)
+	assert.Empty(t, A.Mfr)
+
+	// Not an AIS sentence at all.
+	A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:{DAx", true), true)
+	assert.Equal(t, "AIS", A.DataTypeDesc)
+	assert.Equal(t, maybe.Nothing[float64](), A.Lat)
+}
+
+// The human-readable latitude and longitude, including position ambiguity,
+// where trailing digits are spaces, and the various ways each can be wrong.
+func Test_decode_aprs_lat_long(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var lat = maybe.Just(49 + 3.5/60)
+	var lon = maybe.Just(-(72 + 1.75/60))
+	var nothing = maybe.Nothing[float64]()
+
+	for _, tc := range []struct {
+		info string
+		lat  maybe.Maybe[float64]
+		lon  maybe.Maybe[float64]
+	}{
+		{"!4903.50N/07201.75W-", lat, lon},
+		{"!4903.50S/07201.75E-", maybe.Just(-(49 + 3.5/60)), maybe.Just(72 + 1.75/60)},
+		{"!4903.50n/07201.75w-", lat, lon}, // The spec says upper case, but lower case is seen.
+		{"!4903.  N/07201.  W-", maybe.Just(49 + 3.0/60), maybe.Just(-(72 + 1.0/60))},
+		{"!49  .  N/072  .  W-", maybe.Just(49.0), maybe.Just(-72.0)},
+		{"!4903.50X/07201.75W-", nothing, lon},
+		{"!49O3.50N/07201.75W-", nothing, lon},
+		{"!4903.50N/07201.75X-", lat, nothing},
+		{"!4903.50N/072O1.75W-", lat, nothing},
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+tc.info, true), true)
+
+		assert.Equal(t, "Position", A.DataTypeDesc, "%s", tc.info)
+		assertMaybeInDelta(t, tc.lat, A.Lat, 0.000001, "%s", tc.info)
+		assertMaybeInDelta(t, tc.lon, A.Lon, 0.000001, "%s", tc.info)
+	}
+}
+
+// The data extensions that can follow a human-readable position, and what
+// processComment finds in the comment after them.
+func Test_decode_aprs_data_extensions(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var decode = func(info string) *Decoded {
+		return aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:!4903.50N/07201.75W"+info, true), true)
+	}
+
+	// PHG: power is the square of the digit, height 10 * 2^digit, and the
+	// last digit is the direction of a directional antenna, or 0 for omni.
+	for _, tc := range []struct {
+		info        string
+		directivity string
+	}{
+		{"#PHG5130", "omni"},
+		{"#PHG5132WIDE", "E"},
+		{"#PHG5138", "N"},
+	} {
+		var A = decode(tc.info)
+		assert.Equal(t, maybe.Just(25), A.Power, "%s", tc.info)
+		assert.Equal(t, maybe.Just(20), A.HeightFt, "%s", tc.info)
+		assert.Equal(t, maybe.Just(3), A.Gain, "%s", tc.info)
+		assert.Equal(t, tc.directivity, A.Directivity, "%s", tc.info)
+	}
+
+	assert.Equal(t, "WIDE", decode("#PHG5132WIDE").Comment)
+
+	assertMaybeInDelta(t, maybe.Just(50.0), decode("#RNG0050").RadioRange, 0.000001)
+
+	// DFS: strength, then height and gain like PHG.
+	var A = decode(`\DFS2360`)
+	assert.Equal(t, maybe.Just(80), A.HeightFt)
+	assert.Equal(t, maybe.Just(6), A.Gain)
+	assert.Equal(t, "omni", A.Directivity)
+
+	A = decode(">088/036/A=001234")
+	assert.Equal(t, maybe.Just(88.0), A.Course)
+	assertMaybeInDelta(t, maybe.Just(dwutil.DW_KNOTS_TO_MPH(36)), A.SpeedMPH, 0.000001)
+	assert.Equal(t, maybe.Just(1234.0), A.AltitudeFt)
+
+	// The altitude can be anywhere in the comment.  Dire Wolf 1.7 doesn't
+	// take a negative one, but newer versions do.
+	A = decode("-Comment /A=001234 more")
+	assert.Equal(t, maybe.Just(1234.0), A.AltitudeFt)
+	assert.Equal(t, "Comment  more", A.Comment)
+	assert.Equal(t, maybe.Just(-12.0), decode(">/A=-00012").AltitudeFt)
+
+	// Frequency, tone or DCS, offset and range, in the forms
+	// http://www.aprs.org/info/freqspec.txt gives.
+	A = decode("-146.520MHz T100 +060")
+	assert.Equal(t, maybe.Just(146.52), A.Freq)
+	assert.Equal(t, maybe.Just(100.0), A.Tone)
+	assert.Equal(t, maybe.Just(600), A.Offset)
+
+	A = decode("-146.520MHz C100 -060 R25m")
+	assert.Equal(t, maybe.Just(100.0), A.Tone)
+	assert.Equal(t, maybe.Just(-600), A.Offset)
+	assert.Equal(t, maybe.Just(25.0), A.RadioRange)
+
+	A = decode("-146.520MHz D023 +600 Rptr")
+	assert.Equal(t, maybe.Just(0o23), A.DCS)
+	assert.Equal(t, maybe.Just(6000), A.Offset)
+	assert.Equal(t, " Rptr", A.Comment)
+
+	assert.Equal(t, maybe.Just(0.0), decode("-146.520MHz Toff").Tone)
+
+	// Not quite the standard form, but recognisable.
+	A = decode("-146.52MHz 1234.12MHz")
+	assert.Equal(t, maybe.Just(146.52), A.Freq)
+	assert.Equal(t, "146.52MHz 1234.12MHz", A.Comment)
+}
+
+// !DAO! adds a digit of precision to a position, either as a human-readable
+// digit (upper case datum) or base 91 (lower case), or is an APRStt location.
+func Test_decode_aprs_dao(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	for _, tc := range []struct {
+		dao       string
+		lat       float64
+		lon       float64
+		aprsttLoc string
+	}{
+		{"!W60!", 49 + 3.506/60, -(72 + 1.75/60), ""},
+		{"!w\"<!", 49.058335166666666, -72.02921616666667, ""},
+		{"!T  !", 49 + 3.5/60, -(72 + 1.75/60), "APRStt corral location"},
+		{"!TB2!", 49 + 3.5/60, -(72 + 1.75/60), "APRStt location B2..."},
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:!4903.50N/07201.75W-Hello"+tc.dao, true), true)
+
+		assertMaybeInDelta(t, maybe.Just(tc.lat), A.Lat, 0.0000001, "%s", tc.dao)
+		assertMaybeInDelta(t, maybe.Just(tc.lon), A.Lon, 0.0000001, "%s", tc.dao)
+		assert.Equal(t, tc.aprsttLoc, A.APRSttLoc, "%s", tc.dao)
+		assert.Equal(t, "Hello", A.Comment, "%s", tc.dao)
+	}
+}
+
+// Timestamps, objects and items around a human-readable position.
+func Test_decode_aprs_timestamps_objects_items(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var lat = maybe.Just(49 + 3.5/60)
+	var lon = maybe.Just(-(72 + 1.75/60))
+
+	for _, tc := range []struct {
+		info       string
+		desc       string
+		name       string
+		packetType PacketType
+	}{
+		{"/092345z4903.50N/07201.75W>", "Position with time", "", PacketTypePosition},
+		{"@092345/4903.50N/07201.75W>", "Position with time", "", PacketTypePosition},
+		{"@234517h4903.50N/07201.75W>", "Position with time", "", PacketTypePosition},
+		{";LEADER   *092345z4903.50N/07201.75W>", "Object", "LEADER", PacketTypeObject},
+		{";LEADER   _092345z4903.50N/07201.75W>", "Killed Object", "LEADER", PacketTypeObject},
+		{")AID #2!4903.50N/07201.75WA", "Item", "AID #2", PacketTypeItem},
+	} {
+		var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:"+tc.info, true), true)
+
+		assert.Equal(t, tc.desc, A.DataTypeDesc, "%s", tc.info)
+		assert.Equal(t, tc.name, A.Name, "%s", tc.info)
+		assert.Equal(t, tc.packetType, A.PacketType, "%s", tc.info)
+		assertMaybeInDelta(t, lat, A.Lat, 0.000001, "%s", tc.info)
+		assertMaybeInDelta(t, lon, A.Lon, 0.000001, "%s", tc.info)
+	}
+}
+
+// The rest of the compressed position examples from chapter 9 of the spec,
+// whose last three bytes are an altitude or a radio range rather than course
+// and speed.
+func Test_decode_aprs_compressed_altitude_and_range(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:!/5L!!<*e7OS]S", true), true)
+	assertMaybeInDelta(t, maybe.Just(10004.52), A.AltitudeFt, 0.01)
+	assert.Equal(t, maybe.Nothing[float64](), A.Course)
+
+	A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:=/5L!!<*e7>{?!Range", true), true)
+	assertMaybeInDelta(t, maybe.Just(20.12531), A.RadioRange, 0.00001)
+	assert.Equal(t, "Range", A.Comment)
+}
+
+// A status report can start with a Maidenhead locator and a symbol.
+func Test_decode_aprs_status_maidenhead(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:>IO91SX/G Status", true), true)
+	assert.Equal(t, "Status Report", A.DataTypeDesc)
+	assert.Equal(t, "IO91SX", A.Maidenhead)
+	assert.Equal(t, byte('/'), A.SymbolTable)
+	assert.Equal(t, byte('G'), A.SymbolCode)
+	assert.Equal(t, "Status", A.Comment)
+
+	// The locator isn't turned into a latitude and longitude until it's printed.
+	assert.Equal(t, maybe.Nothing[float64](), A.Lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.Lon)
+}
+
+// A third party header carries another station's packet, which is decoded as
+// that station's.
+func Test_decode_aprs_third_party(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:}Q2TEST>APDW17,TCPIP,Q1TEST*:!4903.50N/07201.75W-", true), true)
+	assert.True(t, A.HasThirdPartyHeader)
+	assert.Equal(t, "Q2TEST", A.Src)
+	assert.Equal(t, "Position", A.DataTypeDesc)
+	assertMaybeInDelta(t, maybe.Just(49+3.5/60), A.Lat, 0.000001)
+}
+
+// Print writes the human-readable form decode_aprs shows.  Apart from the
+// device descriptions, which come from a newer tocalls.yaml, and the degree
+// signs, which Dire Wolf leaves out, these are all what Dire Wolf prints.
+func Test_decode_aprs_print(t *testing.T) {
+	for _, tc := range []struct {
+		monitor string
+		want    string
+	}{
+		{
+			"Q1TEST>APDW17:!4903.50N/07201.75W#PHG5132WIDE",
+			"Position, Generic digipeater, WB2OSZ DireWolf, 25 W height(HAAT)=20ft=6m 3dBi E\n" +
+				"N 49°03.5000, W 072°01.7500\n" +
+				"WIDE\n",
+		},
+		{
+			"Q1TEST>APDW17:!4903.50N/07201.75W-146.520MHz C100 -060 R25m",
+			"Position, House, WB2OSZ DireWolf, range=25.0\n" +
+				"N 49°03.5000, W 072°01.7500, 146.520 MHz, -600k, PL 100.0\n",
+		},
+		{
+			"Q1TEST>APDW17:!4903.50N/07201.75W-146.520MHz D023 +600 Rptr",
+			"Position, House, WB2OSZ DireWolf\n" +
+				"N 49°03.5000, W 072°01.7500, 146.520 MHz, +6M, DCS 023\n" +
+				"Rptr\n",
+		},
+		{
+			"Q1TEST>APDW17:!4903.50N/07201.75W-146.520MHz Toff",
+			"Position, House, WB2OSZ DireWolf\n" +
+				"N 49°03.5000, W 072°01.7500, 146.520 MHz, no PL\n",
+		},
+		{
+			"Q1TEST>APDW17:!4903.50X/07201.75W-",
+			"Position, House, WB2OSZ DireWolf\n" +
+				"Invalid Latitude, W 072°01.7500\n",
+		},
+		{
+			"Q1TEST>APDW17:!4903.50S/07201.75E-Hello!TB2!",
+			"Position, House, WB2OSZ DireWolf\n" +
+				"S 49°03.5000, E 072°01.7500, APRStt location B2...\n" +
+				"Hello\n",
+		},
+		{
+			"Q1TEST>T2SP0W:`c_Vm6hk/`\"49}Q1TEST_%",
+			"MIC-E, truck, Yaesu FTM-400DR, In Service\n" +
+				"N 42°30.0700, W 071°07.5800, 22 km/h (14 MPH), course 276, alt 34 m (112 ft)\n" +
+				"Q1TEST\n",
+		},
+		{
+			"Q1TEST>APDW17:;LEADER   _092345z4903.50N/07201.75W>",
+			"Killed Object, \"LEADER\", normal car (side view), WB2OSZ DireWolf\n" +
+				"N 49°03.5000, W 072°01.7500\n",
+		},
+		{
+			"Q1TEST>APDW17:>IO91SX/G Status",
+			"Status Report, Grid Square (6 digit), WB2OSZ DireWolf\n" +
+				"Grid square = IO91SX, N 51°58.7500, W 000°27.5000\n" +
+				"Status\n",
+		},
+		{
+			"Q1TEST>APDW17:$ULTW0000000001110B6E27F4FFF3897B0001035E004E04DD00030000",
+			"Ultimeter, WB2OSZ DireWolf\n" +
+				"wind 0.0 mph, direction 0, temperature 27.3, barometer 30.21, humidity 86\n",
+		},
+		{
+			"Q1TEST>APDW17:T#005,199,000,255,073,123,01101001",
+			"Telemetry, WB2OSZ DireWolf\n" +
+				"Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1\n",
+		},
+		{
+			// Newer than Dire Wolf 1.7.
+			"Q1TEST>BEACON:>hi",
+			"Status Report\n" +
+				"Use of \"BEACON\" in the destination field is obsolete.  You can help to improve the quality of APRS signals.\n" +
+				"Tell the sender (Q1TEST) to use the proper product identifier from https://github.com/aprsorg/aprs-deviceid \n" +
+				"hi\n",
+		},
+	} {
+		// Each with a decoder of its own, so no telemetry metadata carries over.
+		var aprsDecoder = NewDecoderFromDataFiles()
+		var A = aprsDecoder.Decode(ax25.FromText(tc.monitor, true), true)
+
+		var output = testutils.CaptureOutput(t, func() { aprsDecoder.Print(A) })
+
+		assert.Equal(t, tc.want, output, "%s", tc.monitor)
+	}
+}
+
+// A grid square is turned into a position when it's printed.
+func Test_decode_aprs_print_maidenhead_only(t *testing.T) {
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var A = new(Decoded)
+	A.DataTypeDesc = "Status Report"
+	A.SymbolCode = ' '
+	A.Maidenhead = "IO91"
+
+	var output = testutils.CaptureOutput(t, func() { aprsDecoder.Print(A) })
+
+	assert.Equal(t, "Status Report\nGrid square = IO91, N 51°30.0000, W 001°00.0000\n", output)
+	assertMaybeInDelta(t, maybe.Just(51.5), A.Lat, 0.000001)
+	assertMaybeInDelta(t, maybe.Just(-1.0), A.Lon, 0.000001)
+}
