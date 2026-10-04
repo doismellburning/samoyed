@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
 // Package waypointsym maps APRS symbols to the waypoint symbols and icons that
 // GPS receivers understand, for the $PGRMW (Garmin) and $PMGNWPL (Magellan)

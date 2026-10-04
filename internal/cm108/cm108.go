@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
 // Package cm108 drives the GPIO pins of CM108/CM119 (and compatible) USB
 // audio adapters, typically for push to talk, and takes inventory of the USB

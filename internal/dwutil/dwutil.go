@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
 // Package dwutil holds small helpers that code ported from Dire Wolf's C leans
 // on - in place of C idioms Go lacks, such as assert and the ?: operator, the

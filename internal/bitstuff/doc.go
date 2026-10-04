@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package bitstuff does HDLC framing on a whole buffer at a time: flags
 // around the frame, and bit stuffing - a 0 inserted after every five 1s - so

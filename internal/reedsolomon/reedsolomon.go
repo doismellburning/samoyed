@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2002 Phil Karn, KA9Q
 // SPDX-FileCopyrightText: 2007 Jim McGuire KB3MPL
 // SPDX-FileCopyrightText: The Samoyed Authors
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
 // Package reedsolomon is a Reed-Solomon codec for symbols of up to 8 bits,
 // as used by the FX.25 and IL2P forward error correction schemes.

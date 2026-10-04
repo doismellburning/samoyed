@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: The Samoyed Authors
-# SPDX-License-Identifier: GPL-2.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 """Generate a Graphviz graph of Samoyed's internal package dependencies.
 
