@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -884,4 +885,206 @@ func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 		"the transmission finished sooner than the maximum speed could have, so the SSID was taken at face value")
 	assert.Less(t, elapsed.Milliseconds(), int64(atDefault)-400,
 		"the SSID was ignored and the default speed used")
+}
+
+// The line level carries over from one call to the next on the same sender,
+// but each sender has its own: sending on one channel must not change what
+// the next bit on another looks like.
+func TestLayer2SendersKeepTheirOwnLineLevel(t *testing.T) {
+	var other = NewLayer2Sender(1, nil, nil, 0)
+
+	toneGenCapture = func(int, int) {}
+
+	other.hdlc.sendBitNRZI(false)
+
+	var bits = captureBits(t, nil, func(s *Layer2Sender) {
+		s.hdlc.sendBitNRZI(false)
+		s.hdlc.sendBitNRZI(true)
+	})
+
+	assert.Equal(t, 1, other.line.Level(), "the other sender's zero should have inverted its own line")
+	assert.Equal(t, []int{1, 1}, bits, "this sender's line should start where it was, not where the other left it")
+}
+
+// Between frames the transmitter sends flags, so the receiver has something
+// to keep its clock on.
+func TestPreambleIsFlagsForAX25(t *testing.T) {
+	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
+
+	var sent int
+
+	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		sent = s.SendPreamblePostamble(4, false)
+	})
+
+	assert.Equal(t, 4*8, sent, "flags are not stuffed, so it is eight bits a byte")
+	assert.Len(t, bits, sent)
+	assert.Equal(t, []byte{hdlcFlag, hdlcFlag, hdlcFlag, hdlcFlag}, packLSBFirst(t, nrziDecode(bits)))
+}
+
+// The last thing sent before the transmitter drops has to be pushed out
+// rather than left sitting in a buffer.
+func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
+	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
+
+	var sink = new(flushCountingSink)
+
+	var toneGenerator = NewToneGenerator(hdlcSendTestChannel, audioConfig, 100, sink)
+
+	var sent int
+
+	var bits = captureBitsWithToneGenerator(t, audioConfig, toneGenerator, func(s *Layer2Sender) {
+		sent = s.SendPreamblePostamble(2, true)
+	})
+
+	assert.Equal(t, 2*8, sent, "finishing does not change what goes out")
+	assert.Equal(t, []byte{hdlcFlag, hdlcFlag}, packLSBFirst(t, nrziDecode(bits)))
+	assert.Equal(t, 1, sink.flushes, "the end of the transmission should be flushed out")
+}
+
+// flushCountingSink discards the samples it is given, and counts how often it
+// is asked to push them out.
+type flushCountingSink struct {
+	flushes int
+}
+
+func (s *flushCountingSink) Put(int, uint8) int { return 0 }
+
+func (s *flushCountingSink) Flush(int) int {
+	s.flushes++
+
+	return 0
+}
+
+// IL2P has its own filler pattern, sent MSB first and without NRZI.
+func TestPreambleIsTheIL2PPatternForIL2P(t *testing.T) {
+	var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
+
+	var sent int
+
+	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		sent = s.SendPreamblePostamble(3, false)
+	})
+
+	assert.Equal(t, 3*8, sent)
+	assert.Equal(t, []byte{IL2P_PREAMBLE, IL2P_PREAMBLE, IL2P_PREAMBLE}, packMSBFirst(t, bits))
+}
+
+// An AX.25 channel sends the frame as HDLC, with nothing wrapped around it.
+func TestLayer2SendFrameSendsAX25AsHDLC(t *testing.T) {
+	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
+	var pp = newHDLCSendTestPacket(t, 16)
+
+	var sent int
+
+	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		sent = s.SendFrame(pp, false)
+	})
+
+	assert.Equal(t, len(bits), sent)
+
+	var fbuf = pp.Pack()
+	var frameFCS = fcs.Calc(fbuf)
+	var expected = append(append([]byte{}, fbuf...), byte(frameFCS)&0xff, byte(frameFCS>>8)&0xff) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+
+	assert.Equal(t, expected, hdlcFrameFromBits(t, bits))
+}
+
+// An IL2P channel sends the frame wrapped up as IL2P instead.
+func TestLayer2SendFrameSendsIL2PWhenConfigured(t *testing.T) {
+	var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
+	audioConfig.achan[hdlcSendTestChannel].il2p_version = IL2P_VERSION_COMPAT
+
+	il2p_init(0)
+
+	var pp = newHDLCSendTestPacket(t, 16)
+
+	var sent int
+
+	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		sent = s.SendFrame(pp, false)
+	})
+
+	assert.Equal(t, len(bits), sent)
+
+	var sentBytes = packMSBFirst(t, bits)
+
+	require.Greater(t, len(sentBytes), 1+IL2P_SYNC_WORD_SIZE, "there should be a frame after the sync word")
+	assert.Equal(t, []byte{
+		IL2P_PREAMBLE,
+		(IL2P_SYNC_WORD >> 16) & 0xff,
+		(IL2P_SYNC_WORD >> 8) & 0xff,
+		IL2P_SYNC_WORD & 0xff,
+	}, sentBytes[:1+IL2P_SYNC_WORD_SIZE], "an IL2P frame opens with the preamble and sync word")
+}
+
+// IL2P cannot carry a frame beyond a certain size.  One that does not fit
+// still has to go out, as plain AX.25.
+func TestLayer2SendFrameFallsBackToAX25WhenIL2PCannotCarryTheFrame(t *testing.T) {
+	var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
+	audioConfig.achan[hdlcSendTestChannel].il2p_version = IL2P_VERSION_COMPAT
+
+	il2p_init(0)
+
+	// One byte more of information part than IL2P can encode.
+	var pp = newHDLCSendTestPacket(t, 1024)
+
+	var viaIL2P = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		s.SendFrame(pp, false)
+	})
+
+	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		s.hdlc.SendFrame(pp.Pack(), false)
+	})
+
+	assert.Equal(t, asAX25, viaIL2P, "an oversized frame should have gone out as plain AX.25")
+}
+
+// An FX.25 channel wraps the frame in a codeblock with its correlation tag.
+func TestLayer2SendFrameSendsFX25WhenConfigured(t *testing.T) {
+	var audioConfig = newHDLCSendTestConfig(LAYER2_FX25)
+	audioConfig.achan[hdlcSendTestChannel].fx25_strength = 1
+
+	var pp = newHDLCSendTestPacket(t, 16)
+
+	var sent int
+
+	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		sent = s.SendFrame(pp, false)
+	})
+
+	assert.Equal(t, len(bits), sent)
+
+	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		s.hdlc.SendFrame(pp.Pack(), false)
+	})
+
+	assert.NotEqual(t, asAX25, bits, "the frame should have been wrapped up as FX.25")
+	assert.Greater(t, len(bits), len(asAX25), "an FX.25 codeblock carries check bytes as well as the frame")
+}
+
+// FX.25 can only wrap a frame up to a certain size.  A frame that does not
+// fit still has to go out, as plain AX.25.
+func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T) {
+	var audioConfig = newHDLCSendTestConfig(LAYER2_FX25)
+	audioConfig.achan[hdlcSendTestChannel].fx25_strength = 1
+
+	// Comfortably more than the largest FX.25 codeblock carries.
+	var pp = newHDLCSendTestPacket(t, FX25_MAX_DATA)
+
+	var viaFX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		s.SendFrame(pp, false)
+	})
+
+	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		s.hdlc.SendFrame(pp.Pack(), false)
+	})
+
+	assert.Equal(t, asAX25, viaFX25, "an oversized frame should have gone out as plain AX.25")
+}
+
+// A sender reports on FX.25 at the debug level it was made with, so each
+// program that sends - samoyed-direwolf, samoyed-gen-packets - has its own.
+func TestLayer2SenderKeepsItsFX25DebugLevel(t *testing.T) {
+	assert.Equal(t, 3, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 3).fx25.debug)
 }
