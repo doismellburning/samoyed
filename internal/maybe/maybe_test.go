@@ -4,6 +4,7 @@
 package maybe
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 )
@@ -323,5 +324,73 @@ func TestString(t *testing.T) {
 
 	if got := fmt.Sprintf("%v", Nothing[int]()); got != "Nothing" {
 		t.Errorf("formatting Nothing gave %q, want \"Nothing\"", got)
+	}
+}
+
+func TestIsZero(t *testing.T) {
+	if !Nothing[int]().IsZero() {
+		t.Error("Nothing should be zero")
+	}
+
+	if Just(0).IsZero() {
+		t.Error("Just 0 should not be zero")
+	}
+}
+
+func TestMarshalJSON(t *testing.T) {
+	var cases = []struct {
+		name string
+		m    any
+		want string
+	}{
+		{"Just", Just(1.5), `1.5`},
+		{"Just zero", Just(0), `0`},
+		{"Just string", Just(`<b>`), `"\u003cb\u003e"`},
+		{"Just struct", Just(struct {
+			A int `json:"a"`
+		}{A: 1}), `{"a":1}`},
+		{"Nothing", Nothing[int](), `null`},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			data, err := json.Marshal(c.m) // := for errchkjson, which doesn't follow var.
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if string(data) != c.want {
+				t.Errorf("got %s, want %s", data, c.want)
+			}
+		})
+	}
+}
+
+func TestMarshalJSONInStruct(t *testing.T) {
+	type record struct {
+		Plain   Maybe[int] `json:"plain"`
+		Omitted Maybe[int] `json:"omitted,omitzero"`
+	}
+
+	var cases = []struct {
+		name string
+		r    record
+		want string
+	}{
+		{"Nothing", record{Plain: Nothing[int](), Omitted: Nothing[int]()}, `{"plain":null}`},
+		{"Just zero", record{Plain: Just(0), Omitted: Just(0)}, `{"plain":0,"omitted":0}`},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			data, err := json.Marshal(c.r) // := for errchkjson, which doesn't follow var.
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if string(data) != c.want {
+				t.Errorf("got %s, want %s", data, c.want)
+			}
+		})
 	}
 }

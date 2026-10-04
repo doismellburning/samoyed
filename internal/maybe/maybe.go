@@ -19,9 +19,15 @@
 //	maybe.Bind(m, f)        -- m >>= f
 //
 // Maybe[T] is comparable whenever T is, so two Maybes can be compared with ==.
+//
+// A Maybe marshals to JSON as its value, or null when Nothing; tag the field
+// "omitzero" to leave a Nothing out altogether.
 package maybe
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Maybe is an optional value of type T: either Just a value, or Nothing.
 // The zero value is Nothing.
@@ -81,6 +87,27 @@ func (m Maybe[T]) String() string {
 	}
 
 	return fmt.Sprintf("Just %v", m.value)
+}
+
+// IsZero reports whether m is Nothing, which is its zero value.  It is what the
+// encoding/json "omitzero" option consults, so a field tagged
+//
+//	Speed maybe.Maybe[float64] `json:"speed,omitzero"`
+//
+// is left out when Nothing, and written as its value when Just - including
+// Just 0, which "omitempty" could not tell from absent.
+func (m Maybe[T]) IsZero() bool {
+	return !m.just
+}
+
+// MarshalJSON implements json.Marshaler: Just a value encodes as that value, and
+// Nothing as null.
+func (m Maybe[T]) MarshalJSON() ([]byte, error) {
+	if !m.just {
+		return []byte("null"), nil
+	}
+
+	return json.Marshal(m.value)
 }
 
 // FromMaybe returns the value held by m, or defaultValue if m is Nothing.
