@@ -20,7 +20,7 @@ package direwolf
  *
  *		(a) Main program (direwolf.c or atest.c) calls
  *		    demod_init to set up modem properties and
- *		    NewHDLCReceiver for the HDLC decoders.
+ *		    NewLayer2Receiver for the HDLC decoders.
  *
  *		(b) demod_process_sample is called for each audio sample
  *		    from the input audio stream.
@@ -180,7 +180,7 @@ func (s *radioSink) DCDChange(channel int, state int) {
 
 func multi_modem_init(pa *RadioConfig, fx25Debug int, sink ReceiveSink) {
 	demod_init(pa)
-	hdlcReceiver = NewHDLCReceiver(pa, demodulators, fx25Debug, sink)
+	layer2Receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, sink)
 
 	for channel, m := range multiModems {
 		m.audioConfig = pa
@@ -293,7 +293,7 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
 			if c.packet_p != nil {
 				c.age++
 				if c.age > m.processAge {
-					if hdlcReceiver.fx25Busy(channel) {
+					if layer2Receiver.fx25Busy(channel) {
 						c.age = 0
 					} else {
 						m.pickBestCandidate()
@@ -399,7 +399,7 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, a
 
 	if numSubchan == 1 &&
 		numSlicers == 1 &&
-		!hdlcReceiver.fx25Busy(channel) {
+		!layer2Receiver.fx25Busy(channel) {
 		var drop_it = false
 
 		if pa.recv_error_rate != 0 {

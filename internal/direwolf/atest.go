@@ -351,7 +351,7 @@ func (s *readerSampleSource) GetByte(_ int) int {
 func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	s.packetsDecoded++
 
-	if hdlcReceiver.DataDetectAny(channel) == 0 {
+	if layer2Receiver.DataDetectAny(channel) == 0 {
 		s.dcdMissingErrors++
 	}
 

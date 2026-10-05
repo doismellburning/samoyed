@@ -78,7 +78,7 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 	require.NotNil(t, demodulators[0])
 	assert.Equal(t, 3, demodulators[0].NumSubchan())
 	assert.Same(t, demodulators[0], multiModems[0].demodulator)
-	assert.Equal(t, 3, hdlcReceiver.numSubchannel[0])
+	assert.Equal(t, 3, layer2Receiver.numSubchannel[0])
 }
 
 // atest hands multi_modem_init a configuration of its own, carrying its
@@ -95,7 +95,7 @@ func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
 
 	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
 
-	var rx = hdlcReceiver.slicer[0][0][0].il2p
+	var rx = layer2Receiver.slicer[0][0][0].il2p
 	assert.Equal(t, IL2P_VERSION_0_4, rx.version)
 	assert.False(t, rx.crc)
 }
@@ -115,9 +115,9 @@ func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
 	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
 	multi_modem_init(audioConfig, 3, new(recordingReceiveSink))
 
-	for sub := range hdlcReceiver.numSubchannel[0] {
+	for sub := range layer2Receiver.numSubchannel[0] {
 		for slice := range MAX_SLICERS {
-			assert.Equal(t, 3, hdlcReceiver.slicer[0][sub][slice].fx25.debug, "subchannel %d, slice %d", sub, slice)
+			assert.Equal(t, 3, layer2Receiver.slicer[0][sub][slice].fx25.debug, "subchannel %d, slice %d", sub, slice)
 		}
 	}
 }
@@ -126,10 +126,10 @@ func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
 // costs: undoing NRZI, then the HDLC, FX.25 and IL2P receivers that each
 // look at it.  The bits are noise, as most of what a receiver hears is.
 func BenchmarkLayer2ReceiveBit(b *testing.B) {
-	var origReceiver = hdlcReceiver
+	var origReceiver = layer2Receiver
 
 	b.Cleanup(func() {
-		hdlcReceiver = origReceiver
+		layer2Receiver = origReceiver
 		multiModems = newMultiModems()
 	})
 
@@ -148,6 +148,6 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 	b.ResetTimer()
 
 	for i := range b.N {
-		hdlcReceiver.RecBit(0, 0, 0, bits[i%len(bits)], false, 0)
+		layer2Receiver.RecBit(0, 0, 0, bits[i%len(bits)], false, 0)
 	}
 }

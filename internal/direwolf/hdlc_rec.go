@@ -29,7 +29,7 @@ import (
  */
 
 type hdlcState struct {
-	receiver                   *HDLCReceiver
+	receiver                   *Layer2Receiver
 	channel, subchannel, slice int
 
 	line linecode.Decoder /* Undoes NRZI, and scrambling for 9600 baud. */
@@ -69,9 +69,11 @@ type hdlcState struct {
 	il2p *il2pReceiver /* IL2P decoder fed the same raw bits. */
 }
 
-// HDLCReceiver holds the HDLC bit-decoder state for every (channel, subchannel, slicer)
-// combination, along with the aggregated DCD/receive state shared across them.
-type HDLCReceiver struct {
+// Layer2Receiver takes the bits each radio channel's demodulators hear, and
+// hands them to the layer 2 receivers - HDLC, FX.25 and IL2P - for every
+// (channel, subchannel, slicer) combination.  It also keeps the aggregated
+// DCD state of each channel.
+type Layer2Receiver struct {
 	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*hdlcState
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
 	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
@@ -87,7 +89,7 @@ type HDLCReceiver struct {
 
 const hdlcRecRandMax int32 = 0x7fffffff
 
-func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scrambled bool) *hdlcState {
+func newHDLCState(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *hdlcState {
 	var s = new(hdlcState)
 	s.receiver = r
 	s.channel = channel
@@ -109,7 +111,7 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 
 /***********************************************************************************
  *
- * Name:	NewHDLCReceiver
+ * Name:	NewLayer2Receiver
  *
  * Purpose:	Call once at the beginning to initialize.
  *
@@ -126,11 +128,11 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
  *
  ***********************************************************************************/
 
-func NewHDLCReceiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, sink ReceiveSink) *HDLCReceiver {
+func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, sink ReceiveSink) *Layer2Receiver {
 	//text_color_set(DW_COLOR_DEBUG);
-	//dw_printf ("NewHDLCReceiver (%p) \n", pa);
+	//dw_printf ("NewLayer2Receiver (%p) \n", pa);
 
-	var r = new(HDLCReceiver)
+	var r = new(Layer2Receiver)
 	r.audio = pa
 	r.fx25Debug = fx25Debug
 	r.sink = sink
@@ -178,13 +180,13 @@ func NewHDLCReceiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25
  *
  ***********************************************************************************/
 
-func (r *HDLCReceiver) RecBit(channel int, subchannel int, slice int, raw int, is_scrambled bool, not_used_remove int) {
+func (r *Layer2Receiver) RecBit(channel int, subchannel int, slice int, raw int, is_scrambled bool, not_used_remove int) {
 	var dummyll int64
 	var dummy int
 	r.RecBitNew(channel, subchannel, slice, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
 }
 
-func (r *HDLCReceiver) RecBitNew(channel int, subchannel int, slice int, _raw int, is_scrambled bool, not_used_remove int,
+func (r *Layer2Receiver) RecBitNew(channel int, subchannel int, slice int, _raw int, is_scrambled bool, not_used_remove int,
 	pll_nudge_total *int64, pll_symbol_count *int) {
 	var raw = _raw != 0
 
@@ -478,7 +480,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
  *
  *--------------------------------------------------------------------*/
 
-func (r *HDLCReceiver) DCDChange(channel int, subchannel int, slice int, state int) {
+func (r *Layer2Receiver) DCDChange(channel int, subchannel int, slice int, state int) {
 	/*
 		#if DEBUG3
 			text_color_set(DW_COLOR_DEBUG);
@@ -532,7 +534,7 @@ func (r *HDLCReceiver) DCDChange(channel int, subchannel int, slice int, state i
  *
  *--------------------------------------------------------------------*/
 
-func (r *HDLCReceiver) DataDetectAny(channel int) int {
+func (r *Layer2Receiver) DataDetectAny(channel int) int {
 	for sc := range r.numSubchannel[channel] {
 		if slices.Contains(r.compositeDCD[channel][sc][:], true) {
 			return (1)
@@ -546,7 +548,7 @@ func (r *HDLCReceiver) DataDetectAny(channel int) int {
 	return (0)
 } /* end DataDetectAny */
 
-func (r *HDLCReceiver) rand() int32 {
+func (r *Layer2Receiver) rand() int32 {
 	r.randSeed = (r.randSeed*1103515245 + 12345) & hdlcRecRandMax // Wraps on overflow, as intended.
 
 	return r.randSeed
