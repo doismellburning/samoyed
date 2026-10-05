@@ -151,3 +151,47 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 		layer2Receiver.RecBit(0, 0, 0, bits[i%len(bits)], false, 0)
 	}
 }
+
+// An EAS channel's bits go to its EAS receiver alone: SAME is not HDLC, so
+// neither the line decoder nor the HDLC receiver should see them.  Other
+// channels have no EAS receiver at all.
+func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
+	var origReceiver = layer2Receiver
+
+	t.Cleanup(func() {
+		layer2Receiver = origReceiver
+		multiModems = newMultiModems()
+	})
+
+	var audioConfig = newRecvTestRadioConfig(2)
+	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[1].num_freq = 1
+	audioConfig.achan[1].modem_type = MODEM_EAS
+	audioConfig.achan[1].baud = 521
+	audioConfig.achan[1].mark_freq = 2083
+	audioConfig.achan[1].space_freq = 1563
+
+	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
+
+	assert.Nil(t, layer2Receiver.slicer[0][0][0].eas)
+
+	var s = layer2Receiver.slicer[1][0][0]
+	require.NotNil(t, s.eas)
+
+	// The SAME preamble, then "ZCZC", least significant bit first.
+	for _, b := range []byte{0xab, 0xab, 0xab, 0xab, 'Z', 'C', 'Z', 'C'} {
+		for i := range 8 {
+			layer2Receiver.RecBit(1, 0, 0, int(b>>i)&1, false, 0)
+		}
+	}
+
+	assert.True(t, s.eas.easGathering, "the EAS receiver should have found the start of a message")
+	assert.Equal(t, "ZCZC", string(s.eas.frameBuf[:s.eas.frameLen]))
+
+	// "ZCZC" ends on a 0, which is also where an untouched line decoder
+	// starts, so end on a 1 that the decoder would remember if it saw it.
+	layer2Receiver.RecBit(1, 0, 0, 1, false, 0)
+
+	assert.False(t, s.line.PrevRaw(), "the line decoder should not have been given any bits")
+	assert.Zero(t, s.hdlc.patDet, "the HDLC receiver should not have been given any bits")
+}

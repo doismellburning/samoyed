@@ -55,25 +55,19 @@ type hdlcReceiver struct {
 	/* Should be in range of 0 .. MAX_FRAME_LEN. */
 
 	rawBits *rrbb.Buffer /* Handle for bit array for raw received bits. */
-
-	easAcc uint64 /* Accumulate most recent 64 bits received for EAS. */
-
-	easGathering bool /* Decoding in progress. */
-
-	easPlusFound bool /* "+" seen, indicating end of geographical area list. */
-
-	easFieldsAfterPlus int /* Number of "-" characters after the "+". */
 }
 
 // slicerReceivers are the receivers one slicer's bits go to.  Its line
 // decoder undoes NRZI, and scrambling for 9600 baud, once for all of them:
 // HDLC and FX.25 take the data bits it gives, IL2P the raw bits before it.
+// An EAS channel's bits go to its EAS receiver instead, and nowhere else.
 type slicerReceivers struct {
 	line linecode.Decoder
 
 	hdlc *hdlcReceiver
 	fx25 *fx25Receiver
 	il2p *il2pReceiver
+	eas  *easReceiver // nil unless the channel is EAS.
 }
 
 func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *slicerReceivers {
@@ -81,6 +75,10 @@ func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice in
 	s.hdlc = newHDLCReceiver(r, channel, subchannel, slice, scrambled, &s.line)
 	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
 	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, il2pDeliverPacket)
+
+	if r.audio.achan[channel].modem_type == MODEM_EAS {
+		s.eas = newEASReceiver(channel, subchannel, slice)
+	}
 
 	return s
 }
@@ -222,7 +220,7 @@ func (r *Layer2Receiver) RecBitNew(channel int, subchannel int, slice int, _raw 
 	// EAS does not use HDLC.
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.hdlc.recEasBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
+		s.eas.recBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
 
 		return
 	}

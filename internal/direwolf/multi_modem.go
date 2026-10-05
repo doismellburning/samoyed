@@ -20,7 +20,8 @@ package direwolf
  *
  *		(a) Main program (direwolf.c or atest.c) calls
  *		    demod_init to set up modem properties and
- *		    NewLayer2Receiver for the HDLC decoders.
+ *		    NewLayer2Receiver for the HDLC, FX.25, IL2P and EAS
+ *		    receivers.
  *
  *		(b) demod_process_sample is called for each audio sample
  *		    from the input audio stream.
