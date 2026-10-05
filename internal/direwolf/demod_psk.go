@@ -153,7 +153,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		correct_baud = bps // 1 bit per symbol
 		carrier_freq = 1800
 
-		switch unicode.ToUpper(profile) {
+		switch unicode.ToUpper(profile) { //nolint:dupl // Per-modem profile tables, kept parallel to upstream
 		case 'L': /* Self correlation technique. */
 			D.u.psk.use_prefilter = 0 /* No bandpass filter. */
 
@@ -229,7 +229,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			#endif
 		*/
 
-		switch unicode.ToUpper(profile) {
+		switch unicode.ToUpper(profile) { //nolint:dupl // Per-modem profile tables, kept parallel to upstream
 		case 'P': /* Self correlation technique. */
 			D.u.psk.use_prefilter = 0 /* No bandpass filter. */
 
@@ -312,7 +312,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			#endif
 		*/
 
-		switch unicode.ToUpper(profile) {
+		switch unicode.ToUpper(profile) { //nolint:dupl // Per-modem profile tables, kept parallel to upstream
 		case 'T': /* Self correlation technique. */
 			D.u.psk.use_prefilter = 0 /* No bandpass filter. */
 
