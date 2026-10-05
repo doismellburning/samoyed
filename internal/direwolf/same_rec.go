@@ -16,6 +16,9 @@ package direwolf
 type easReceiver struct {
 	channel, subchannel, slice int
 
+	audioLevel audioLevelFunc // For the audio level to deliver each message with.
+	sink       frameSink      // Where each message goes.
+
 	easAcc uint64 /* Accumulate most recent 64 bits received for EAS. */
 
 	easGathering bool /* Decoding in progress. */
@@ -31,11 +34,13 @@ type easReceiver struct {
 	frameLen int /* Number of octets in frameBuf. */
 }
 
-func newEASReceiver(channel int, subchannel int, slice int) *easReceiver {
+func newEASReceiver(channel int, subchannel int, slice int, audioLevel audioLevelFunc, sink frameSink) *easReceiver {
 	var s = new(easReceiver)
 	s.channel = channel
 	s.subchannel = subchannel
 	s.slice = slice
+	s.audioLevel = audioLevel
+	s.sink = sink
 	s.olen = -1
 
 	return s
@@ -60,8 +65,8 @@ func newEASReceiver(channel int, subchannel int, slice int) *easReceiver {
  *
  *
  * Description:	This is called once for each received bit.
- *		For each valid transmission, process_rec_frame()
- *		is called for further processing.
+ *		Each valid transmission is handed to the receiver's sink,
+ *		which in normal operation is multi_modem_process_rec_frame.
  *
  ***********************************************************************************/
 
@@ -158,8 +163,8 @@ func (s *easReceiver) recBit(raw int, future_use int) { //nolint:unparam
 				  dw_printf ("frameBuf %d = %s\n", s.slice, s.frameBuf);
 			#endif
 		*/
-		var alevel = demod_get_audio_level(s.channel, s.subchannel)
-		multi_modem_process_rec_frame(s.channel, s.subchannel, s.slice, s.frameBuf[:s.frameLen], alevel, 0, 0)
+		var alevel = s.audioLevel(s.channel, s.subchannel)
+		s.sink(s.channel, s.subchannel, s.slice, s.frameBuf[:s.frameLen], alevel, 0, 0)
 		s.easGathering = false
 	}
 }
