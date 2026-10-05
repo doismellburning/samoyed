@@ -28,7 +28,7 @@ import (
  * Should have a reset function instead of initializations here.
  */
 
-type hdlcState struct {
+type hdlcReceiver struct {
 	receiver                   *Layer2Receiver
 	channel, subchannel, slice int
 
@@ -74,7 +74,7 @@ type hdlcState struct {
 // (channel, subchannel, slicer) combination.  It also keeps the aggregated
 // DCD state of each channel.
 type Layer2Receiver struct {
-	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*hdlcState
+	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*hdlcReceiver
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
 	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
 	audio         *RadioConfig
@@ -89,8 +89,8 @@ type Layer2Receiver struct {
 
 const hdlcRecRandMax int32 = 0x7fffffff
 
-func newHDLCState(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *hdlcState {
-	var s = new(hdlcState)
+func newHDLCReceiver(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *hdlcReceiver {
+	var s = new(hdlcReceiver)
 	s.receiver = r
 	s.channel = channel
 	s.subchannel = subchannel
@@ -144,7 +144,7 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 
 			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {
-					r.slicer[ch][sub][slice] = newHDLCState(r, ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
+					r.slicer[ch][sub][slice] = newHDLCReceiver(r, ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
 				}
 			}
 		}
@@ -216,7 +216,7 @@ func (r *Layer2Receiver) RecBitNew(channel int, subchannel int, slice int, _raw 
 	s.recBitNew(raw, is_scrambled, pll_nudge_total, pll_symbol_count)
 }
 
-func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
+func (s *hdlcReceiver) recBitNew(raw bool, is_scrambled bool,
 	pll_nudge_total *int64, pll_symbol_count *int) {
 	var channel = s.channel
 	var subchannel = s.subchannel

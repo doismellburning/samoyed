@@ -40,7 +40,7 @@ const PREAMBLE_ZCZC = 0x435a435aabababab
 const PREAMBLE_NNNN = 0x4e4e4e4eabababab
 const EAS_MAX_LEN = 268 // Not including preamble.  Up to 31 geographic areas.
 
-func (s *hdlcState) recEasBit(raw int, future_use int) { //nolint:unparam
+func (s *hdlcReceiver) recEasBit(raw int, future_use int) { //nolint:unparam
 	//dw_printf ("slice %d = %d\n", s.slice, raw);
 
 	// Accumulate most recent 64 bits.
