@@ -27,8 +27,9 @@ const (
 // ("subchannel") of one channel.
 type fx25Receiver struct {
 	channel, subchannel, slice int
-	debug                      int             // FX.25's debug level.
-	sink                       fx25_frame_sink // Where each extracted frame goes.
+	debug                      int            // FX.25's debug level.
+	audioLevel                 audioLevelFunc // For the audio level to deliver each frame with.
+	sink                       frameSink      // Where each extracted frame goes.
 
 	state        FX25RecState
 	accum        uint64 // Accumulate bits for matching to correlation tag.
@@ -42,7 +43,7 @@ type fx25Receiver struct {
 	block        [FX25_BLOCK_SIZE + 1]byte
 }
 
-func newFX25Receiver(channel int, subchannel int, slice int, debug int, sink fx25_frame_sink) *fx25Receiver {
+func newFX25Receiver(channel int, subchannel int, slice int, debug int, audioLevel audioLevelFunc, sink frameSink) *fx25Receiver {
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -52,6 +53,7 @@ func newFX25Receiver(channel int, subchannel int, slice int, debug int, sink fx2
 	F.subchannel = subchannel
 	F.slice = slice
 	F.debug = debug
+	F.audioLevel = audioLevel
 	F.sink = sink
 
 	return F
@@ -78,26 +80,13 @@ func (F *fx25Receiver) logEntry() *logrus.Entry {
  *
  * Description: This is called once for each received bit.
  *              Each valid frame is handed to the receiver's sink, which in
- *              normal operation is fx25_deliver_frame.
+ *              normal operation is multi_modem_process_rec_frame.
  *		It can gather multiple candidates from different parallel demodulators
  *		("subchannels") and slicers, then decide which one is the best.
  *
  ***********************************************************************************/
 
 const FENCE = 0x55 // to detect buffer overflow.
-
-// fx25_frame_sink is handed each AX.25 frame, with the FCS removed, extracted
-// from the received bit stream, along with the number of bytes that the FEC
-// decoder had to correct.
-type fx25_frame_sink func(channel int, subchannel int, slice int, frame []byte, derrors int)
-
-// fx25_deliver_frame is the sink used in normal operation, passing the frame on
-// to the rest of the receive path.
-func fx25_deliver_frame(channel int, subchannel int, slice int, frame []byte, derrors int) {
-	var alevel = demod_get_audio_level(channel, subchannel)
-
-	multi_modem_process_rec_frame(channel, subchannel, slice, frame, alevel, BitFixLevel(derrors), 1)
-}
 
 // Note that the sink is called before the state machine is reset, so that
 // Layer2Receiver.fx25Busy still reports reception in progress during delivery.
@@ -254,7 +243,9 @@ func (F *fx25Receiver) processRSBlock() {
 					dwutil.LogHexDump(F.logEntry(), logrus.DebugLevel, frame_buf[:frame_len])
 				}
 
-				F.sink(channel, subchannel, slice, frame_buf[:frame_len-2], derrors) /* len-2 to remove FCS. */
+				// The number of bytes the FEC decoder had to correct stands
+				// for how much fixing the frame took.
+				F.sink(channel, subchannel, slice, frame_buf[:frame_len-2], F.audioLevel(channel, subchannel), BitFixLevel(derrors), fec_type_fx25) /* len-2 to remove FCS. */
 			} else {
 				// Most likely cause is defective sender software.
 				F.logEntry().Warn("FX.25: Bad FCS for AX.25 frame")

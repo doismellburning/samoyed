@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,12 +72,12 @@ func fxTestReceive(block []byte) ([][]byte, []int) {
 	var frames [][]byte
 	var derrors []int
 
-	var collect = func(channel int, subchannel int, slice int, frame []byte, d int) {
+	var collect = func(_ int, _ int, _ int, frame []byte, _ ax25.ALevel, retries BitFixLevel, _ fec_type_t) {
 		frames = append(frames, frame)
-		derrors = append(derrors, d)
+		derrors = append(derrors, int(retries))
 	}
 
-	var rx = newFX25Receiver(0, 0, 0, 1, collect)
+	var rx = newFX25Receiver(0, 0, 0, 1, silentAudioLevel, collect)
 
 	for _, b := range block {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {
