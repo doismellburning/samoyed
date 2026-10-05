@@ -4,12 +4,36 @@ import (
 	"github.com/doismellburning/samoyed/internal/bitstuff"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/sirupsen/logrus"
 )
 
+// FX25Sender sends FX.25 frames on a channel's line.  An FX.25 codeblock
+// carries a complete HDLC frame, so goes out NRZI like one, carrying on from
+// whatever level the last frame left the line at, but with no further bit
+// stuffing: the frame inside was stuffed before it was encoded.
+type FX25Sender struct {
+	line    *linecode.Encoder
+	channel int // For logging.
+	debug   int // FX.25's debug level.
+
+	bitsSent int // Count number of bits sent by SendFrame.
+}
+
+// NewFX25Sender makes an FX25Sender for channel that sends on line, with
+// FX.25's debug level at debug.
+func NewFX25Sender(line *linecode.Encoder, channel int, debug int) *FX25Sender {
+	var s = new(FX25Sender)
+	s.line = line
+	s.channel = channel
+	s.debug = debug
+
+	return s
+}
+
 /*-------------------------------------------------------------
  *
- * Name:	sendFX25Frame (fx25_send_frame in Dire Wolf)
+ * Name:	SendFrame (fx25_send_frame in Dire Wolf)
  *
  * Purpose:	Convert HDLC frames to a stream of bits.
  *
@@ -44,22 +68,27 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func (s *HDLCSender) sendFX25Frame(fbuf []byte, fx_mode int) int {
-	var ctag_num, data, check = fx25_encode_frame(s.channel, fbuf, fx_mode, s.fx25Debug)
+func (s *FX25Sender) SendFrame(fbuf []byte, fx_mode int) int {
+	var ctag_num, data, check = fx25_encode_frame(s.channel, fbuf, fx_mode, s.debug)
 	if ctag_num < CTAG_MIN {
 		return (-1)
 	}
 
-	s.bitsSent = 0
-
+	// The correlation tag, least significant byte first, then the data
+	// and check bytes of the codeblock.
 	var ctag_value = fx25_get_ctag_value(ctag_num)
 
+	var frame = make([]byte, 0, 8+len(data)+len(check))
 	for k := range 8 {
-		s.sendFX25Bytes([]byte{byte((ctag_value >> (k * 8)) & 0xff)})
+		frame = append(frame, byte((ctag_value>>(k*8))&0xff))
 	}
 
-	s.sendFX25Bytes(data)
-	s.sendFX25Bytes(check)
+	frame = append(frame, data...)
+	frame = append(frame, check...)
+
+	s.bitsSent = 0
+
+	s.sendBytes(frame)
 
 	return s.bitsSent
 }
@@ -70,7 +99,7 @@ func (s *HDLCSender) sendFX25Frame(fbuf []byte, fx_mode int) int {
  *
  * Purpose:	Wrap an AX.25 frame up as an FX.25 codeblock.
  *
- * Inputs:	channel, fx_mode - As for sendFX25Frame.
+ * Inputs:	channel, fx_mode - As for FX25Sender.SendFrame.
  *
  *		debug	- FX.25's debug level.
  *
@@ -149,14 +178,16 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 	return ctag_num, data[:k_data_radio], check[:nroots]
 }
 
-// sendFX25Bytes sends NRZI, with no stuffing: the codeblock was stuffed before
-// it was encoded.  It shares the line level with AX.25, since the receiver
-// sees only the one line.
-func (s *HDLCSender) sendFX25Bytes(b []byte) {
+// sendBytes sends NRZI, least significant bit first, with no stuffing: the
+// codeblock was stuffed before it was encoded.  It shares the line level
+// with AX.25, since the receiver sees only the one line.
+func (s *FX25Sender) sendBytes(b []byte) {
 	for _, x := range b {
 		for range 8 {
-			s.sendBitNRZI(x&0x01 != 0)
+			s.line.WriteNRZI(x&0x01 != 0)
 			x >>= 1
+
+			s.bitsSent++
 		}
 	}
 }

@@ -41,6 +41,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -112,10 +113,10 @@ type XmitService struct {
 	saidCannotTransmit [MAX_RADIO_CHANS]bool
 
 	/*
-	 * Each channel's HDLC state, which carries over from one transmission
+	 * Each channel's layer 2 sending state, which carries over from one transmission
 	 * to the next.  Only that channel's xmit_thread touches it.
 	 */
-	hdlcSenders [MAX_RADIO_CHANS]*HDLCSender
+	layer2Senders [MAX_RADIO_CHANS]*Layer2Sender
 
 	/*
 	 * Each radio channel's tone generator.  Only that channel's
@@ -140,7 +141,7 @@ type XmitService struct {
  *		toneGenerators	- Each radio channel's tone generator.
  *
  *		fx25Debug	- FX.25's debug level, for each channel's
- *				  HDLCSender.
+ *				  Layer2Sender.
  *
  *
  * Outputs:	Returns a new XmitService with required information set up.
@@ -284,14 +285,14 @@ func (xs *XmitService) channelTiming(channel int) xmitTiming {
 	return xs.timing[channel]
 }
 
-// hdlcSender is channel's HDLCSender, made on first use.  Only the channel's
+// layer2Sender is channel's Layer2Sender, made on first use.  Only the channel's
 // own xmit_thread asks for it, so there is nothing to lock.
-func (xs *XmitService) hdlcSender(channel int) *HDLCSender {
-	if xs.hdlcSenders[channel] == nil {
-		xs.hdlcSenders[channel] = NewHDLCSender(channel, xs.p_modem, xs.toneGenerators[channel], xs.fx25Debug)
+func (xs *XmitService) layer2Sender(channel int) *Layer2Sender {
+	if xs.layer2Senders[channel] == nil {
+		xs.layer2Senders[channel] = NewLayer2Sender(channel, xs.p_modem, xs.toneGenerators[channel], xs.fx25Debug)
 	}
 
-	return xs.hdlcSenders[channel]
+	return xs.layer2Senders[channel]
 }
 
 /*-------------------------------------------------------------------
@@ -724,7 +725,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	var pre_flags = xs.msToBits(timing.txdelay*10, channel) / 8
 
 	/* Total number of bits in transmission including all flags and bit stuffing. */
-	var num_bits = xs.hdlcSender(channel).SendPreamblePostamble(pre_flags, false)
+	var num_bits = xs.layer2Sender(channel).SendPreamblePostamble(pre_flags, false)
 
 	logrus.WithFields(logrus.Fields{
 		"t":         time.Since(time_ptt),
@@ -820,7 +821,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	 */
 
 	var post_flags = xs.msToBits(timing.txtail*10, channel) / 8
-	nb = xs.hdlcSender(channel).SendPreamblePostamble(post_flags, true)
+	nb = xs.layer2Sender(channel).SendPreamblePostamble(post_flags, true)
 	num_bits += nb
 	logrus.WithFields(logrus.Fields{
 		"t":          time.Since(time_ptt),
@@ -995,7 +996,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 		}
 	}
 
-	var nb = xs.hdlcSender(c).SendFrame(pp, send_invalid_fcs2)
+	var nb = xs.layer2Sender(c).SendFrame(pp, send_invalid_fcs2)
 
 	metrics.RecordFrameTransmitted(c)
 	webPublishTransmitted(c, pp)
@@ -1353,6 +1354,181 @@ func (xs *XmitService) bitsToMS(b, ch int) int {
 
 func (xs *XmitService) msToBits(ms, ch int) int {
 	return ms * xs.bits_per_sec[ch] / 1000
+}
+
+// Layer2Sender turns frames into the bits one radio channel sends, with
+// whichever of HDLC, FX.25 and IL2P the channel is set to use.  The three
+// share the channel's line, whose NRZI level carries over from one frame to
+// the next.  Each channel wants its own, and only one goroutine may drive it
+// at a time.
+type Layer2Sender struct {
+	channel       int
+	audioConfig   *RadioConfig
+	toneGenerator *ToneGenerator // Where the bits go; nil for a channel with no radio.
+
+	line *linecode.Encoder // Puts the bits on the line, keeping its NRZI level.
+
+	hdlc *HDLCSender // Sends AX.25 frames, and the flags between them.
+	fx25 *FX25Sender // Sends FX.25, on the same line.
+	il2p *IL2PSender // Sends IL2P, on the same line.
+}
+
+// NewLayer2Sender makes a Layer2Sender for channel, sending the layer 2
+// protocol audioConfig says to use there to toneGenerator, with FX.25's
+// debug level at fx25Debug.
+func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fx25Debug int) *Layer2Sender {
+	var s = new(Layer2Sender)
+	s.channel = channel
+	s.audioConfig = audioConfig
+	s.toneGenerator = toneGenerator
+	s.line = linecode.NewEncoder(s.putBit)
+	s.hdlc = NewHDLCSender(s.line, channel)
+	s.fx25 = NewFX25Sender(s.line, channel, fx25Debug)
+	s.il2p = NewIL2PSender(s.line, channel)
+
+	return s
+}
+
+// putQuietMs sends timeMs of silence.
+func (s *Layer2Sender) putQuietMs(timeMs int) {
+	if s.toneGenerator == nil {
+		logrus.WithField("channel", s.channel).Error("Invalid channel for tone generation")
+
+		return
+	}
+
+	s.toneGenerator.PutQuietMs(timeMs)
+}
+
+// flush pushes out whatever the channel's samples are waiting in.
+func (s *Layer2Sender) flush() {
+	if s.toneGenerator == nil {
+		logrus.WithField("channel", s.channel).Error("Invalid channel for tone generation")
+
+		return
+	}
+
+	s.toneGenerator.Flush()
+}
+
+/*-------------------------------------------------------------
+ *
+ * Name:	SendFrame (layer2_send_frame in Dire Wolf)
+ *
+ * Purpose:	Convert frames to a stream of bits.
+ *		Originally this was for AX.25 only, hence the file name.
+ *		Over time, FX.25 and IL2P were shoehorned in.
+ *
+ * Inputs:	pp	- Packet object.
+ *
+ *		badFCS	- Append an invalid FCS for testing purposes.
+ *			  Applies only to regular AX.25.
+ *
+ * Outputs:	Bits are shipped out to the sender's tone generator.
+ *
+ * Returns:	Number of bits sent including "flags" and the
+ *		stuffing bits.
+ *		The required time can be calculated by dividing this
+ *		number by the transmit rate of bits/sec.
+ *
+ * Description:	For AX.25, send:
+ *			start flag
+ *			bit stuffed data
+ *			calculated FCS
+ *			end flag
+ *		NRZI encoding for all but the "flags."
+ *
+ *
+ * Assumptions:	It is assumed that the tone_gen module has been
+ *		properly initialized so that bits sent with
+ *		the tone generator are processed correctly.
+ *
+ *--------------------------------------------------------------*/
+
+func (s *Layer2Sender) SendFrame(pp *ax25.Packet, badFCS bool) int {
+	var achan = &s.audioConfig.achan[s.channel]
+
+	if achan.layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
+		var n = s.il2p.SendFrame(pp, achan.il2p_version, achan.il2p_max_fec, achan.il2p_crc, achan.il2p_invert_polarity)
+		if n > 0 {
+			return n
+		}
+
+		logrus.WithField("channel", s.channel).Warn("Unable to send IL2P frame.  Falling back to regular AX.25.")
+		// Not sure if we should fall back to AX.25 or not here.
+	} else if achan.layer2_xmit == LAYER2_FX25 {
+		var fbuf = pp.Pack()
+
+		var n = s.fx25.SendFrame(fbuf, achan.fx25_strength)
+		if n > 0 {
+			return n
+		}
+
+		logrus.WithField("channel", s.channel).Warn("Unable to send FX.25.  Falling back to regular AX.25.")
+		// Definitely need to fall back to AX.25 here because
+		// the FX.25 frame length is so limited.
+	}
+
+	var fbuf = pp.Pack()
+
+	return s.hdlc.SendFrame(fbuf, badFCS)
+}
+
+/*-------------------------------------------------------------
+ *
+ * Name:	SendPreamblePostamble (layer2_preamble_postamble in Dire Wolf)
+ *
+ * Purpose:	Send filler pattern before and after the frame.
+ *		For HDLC it is 01111110, for IL2P 01010101.
+ *
+ * Inputs:	nbytes	- Number of bytes to send.
+ *
+ *		finish	- True for end of transmission.
+ *			  This causes the last audio buffer to be flushed.
+ *
+ * Outputs:	Bits are shipped out to the sender's tone generator.
+ *
+ * Returns:	Number of bits sent.
+ *		There is no bit-stuffing so we would expect this to
+ *		be 8 * nbytes.
+ *		The required time can be calculated by dividing this
+ *		number by the transmit rate of bits/sec.
+ *
+ * Assumptions:	It is assumed that the tone_gen module has been
+ *		properly initialized so that bits sent with
+ *		the tone generator are processed correctly.
+ *
+ *--------------------------------------------------------------*/
+
+func (s *Layer2Sender) SendPreamblePostamble(nbytes int, finish bool) int {
+	logrus.WithFields(logrus.Fields{
+		"channel": s.channel,
+		"nbytes":  nbytes,
+		"finish":  finish,
+	}).Debug("layer2_preamble_postamble")
+
+	// When the transmitter is on but not sending data, it should be sending
+	// a stream of a filler pattern.
+	// For AX.25, it is the 01111110 "flag" pattern with NRZI and no bit stuffing.
+	// For IL2P, it is 01010101 without NRZI.
+
+	var achan = &s.audioConfig.achan[s.channel]
+
+	var sent int
+
+	if achan.layer2_xmit == LAYER2_IL2P {
+		sent = s.il2p.SendPreamble(nbytes, achan.il2p_invert_polarity)
+	} else {
+		sent = s.hdlc.SendFlags(nbytes)
+	}
+
+	/* Push out the final partial buffer! */
+
+	if finish {
+		s.flush()
+	}
+
+	return sent
 }
 
 /* end xmit.c */

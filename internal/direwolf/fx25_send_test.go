@@ -17,8 +17,8 @@ func TestFX25FrameIsSentAsTagDataAndCheck(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, nil, func(s *HDLCSender) {
-		sent = s.sendFX25Frame(fbuf, 16)
+	var bits = captureBits(t, nil, func(s *Layer2Sender) {
+		sent = s.fx25.SendFrame(fbuf, 16)
 	})
 
 	assert.Equal(t, len(bits), sent, "the count returned should be the bits actually sent")
@@ -39,8 +39,8 @@ func TestFX25FrameIsSentAsTagDataAndCheck(t *testing.T) {
 // A frame too large for FX.25 is rejected without sending anything, so the
 // caller can fall back to AX.25.
 func TestFX25FrameTooLargeSendsNothing(t *testing.T) {
-	var bits = captureBits(t, nil, func(s *HDLCSender) {
-		assert.Equal(t, -1, s.sendFX25Frame(make([]byte, FX25_MAX_DATA), 16))
+	var bits = captureBits(t, nil, func(s *Layer2Sender) {
+		assert.Equal(t, -1, s.fx25.SendFrame(make([]byte, FX25_MAX_DATA), 16))
 	})
 
 	assert.Empty(t, bits)
@@ -61,9 +61,9 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 
 	var beforeLen int
 
-	var bits = captureBits(t, nil, func(s *HDLCSender) {
-		beforeLen = s.sendAX25Frame(before, false)
-		s.sendFX25Frame(fbuf, 16)
+	var bits = captureBits(t, nil, func(s *Layer2Sender) {
+		beforeLen = s.hdlc.SendFrame(before, false)
+		s.fx25.SendFrame(fbuf, 16)
 	})
 
 	require.Equal(t, 1, bits[beforeLen-1], "the frame before should leave the line at 1")

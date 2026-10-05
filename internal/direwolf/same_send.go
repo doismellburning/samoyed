@@ -33,14 +33,14 @@ package direwolf
  *
  *--------------------------------------------------------------------*/
 
-func (s *HDLCSender) easPutByte(b byte) {
+func (s *Layer2Sender) easPutByte(b byte) {
 	for range 8 {
 		s.putBit(int(b & 1))
 		b >>= 1
 	}
 }
 
-func (s *HDLCSender) sendEAS(str []byte, repeat int, txdelay int, txtail int) int {
+func (s *Layer2Sender) sendEAS(str []byte, repeat int, txdelay int, txtail int) int {
 	var bytes_sent = 0
 	const gap = 1000
 	var gaps_sent = 0
