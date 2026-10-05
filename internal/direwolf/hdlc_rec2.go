@@ -74,6 +74,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/rrbb"
 	"github.com/sirupsen/logrus"
 )
@@ -97,7 +98,7 @@ const RETRY_TYPE_NONE = 0
 const RETRY_TYPE_SWAP = 1
 
 type retry_conf_t struct {
-	retry BitFixLevel
+	retry phy.BitFixLevel
 	mode  retry_mode_t
 	_type retry_type_t
 
@@ -222,11 +223,11 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *hdlcConfig, sink frameSink) {
 
 	retry_cfg._type = RETRY_TYPE_NONE
 	retry_cfg.mode = RETRY_MODE_CONTIGUOUS
-	retry_cfg.retry = RETRY_NONE
+	retry_cfg.retry = phy.BitFixNone
 	retry_cfg.contig.nr_bits = 0
 	retry_cfg.contig.bit_idx = 0
 
-	var ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == RETRY_NONE))
+	var ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == phy.BitFixNone))
 	if ok {
 		logrus.Trace("Got it the first time.")
 
@@ -295,13 +296,13 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, sink frameSink
 	/*
 	 * Try inverting one bit.
 	 */
-	if fix_bits < RETRY_INVERT_SINGLE {
+	if fix_bits < phy.BitFixSingle {
 		/* Stop before single bit fix up. */
 		return false /* failure. */
 	}
 	/* Try to swap one bit */
 	retry_cfg._type = RETRY_TYPE_SWAP
-	retry_cfg.retry = RETRY_INVERT_SINGLE
+	retry_cfg.retry = phy.BitFixSingle
 	retry_cfg.contig.nr_bits = 1
 
 	for i := range length {
@@ -322,11 +323,11 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, sink frameSink
 	/*
 	 * Try inverting two adjacent bits.
 	 */
-	if fix_bits < RETRY_INVERT_DOUBLE {
+	if fix_bits < phy.BitFixDouble {
 		return false
 	}
 	/* Try to swap two contiguous bits */
-	retry_cfg.retry = RETRY_INVERT_DOUBLE
+	retry_cfg.retry = phy.BitFixDouble
 	retry_cfg.contig.nr_bits = 2
 
 	for i := range length - 1 {
@@ -346,11 +347,11 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, sink frameSink
 	/*
 	 * Try inverting adjacent three bits.
 	 */
-	if fix_bits < RETRY_INVERT_TRIPLE {
+	if fix_bits < phy.BitFixTriple {
 		return false
 	}
 	/* Try to swap three contiguous bits */
-	retry_cfg.retry = RETRY_INVERT_TRIPLE
+	retry_cfg.retry = phy.BitFixTriple
 	retry_cfg.contig.nr_bits = 3
 
 	for i := range length - 2 {
@@ -373,13 +374,13 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, sink frameSink
 	 *
 	 * Processing time is order N squared so time goes up rapidly with larger frames.
 	 */
-	if fix_bits < RETRY_INVERT_TWO_SEP {
+	if fix_bits < phy.BitFixTwoSep {
 		return false
 	}
 
 	retry_cfg.mode = RETRY_MODE_SEPARATED
 	retry_cfg._type = RETRY_TYPE_SWAP
-	retry_cfg.retry = RETRY_INVERT_TWO_SEP
+	retry_cfg.retry = phy.BitFixTwoSep
 	retry_cfg.sep.bit_idx_c = -1
 
 	logrus.WithField("len", length).Trace("Try flipping TWO SEPARATED BITS")
@@ -532,7 +533,7 @@ func try_decode(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel 
 		/* Get the value for the current bit */
 		var raw = block.Bit(i) > 0
 		/* If swap two sep mode , swap the bit if needed */
-		if retry_conf_retry == RETRY_INVERT_TWO_SEP {
+		if retry_conf_retry == phy.BitFixTwoSep {
 			if is_sep_bit_modified(i, retry_conf) {
 				raw = !raw
 			}
@@ -653,7 +654,7 @@ func try_decode(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel 
 					H2.frame_buf[:H2.frame_len-2],
 					alevel,
 					retry_conf.retry,
-					0,
+					phy.FECNone,
 				) /* len-2 to remove FCS. */
 
 				return true
@@ -667,14 +668,14 @@ func try_decode(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel 
 			// Let's make sure that assumption is good...
 			dwutil.Assert(block.Channel() == channel)
 			dwutil.Assert(block.Subchannel() == subchan)
-			sink(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
+			sink(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, retry_conf.retry, phy.FECNone) /* len-2 to remove FCS. */
 
 			return true /* success */
 		} else if passall {
-			if retry_conf_retry == RETRY_NONE && retry_conf_type == RETRY_TYPE_NONE {
+			if retry_conf_retry == phy.BitFixNone && retry_conf_type == RETRY_TYPE_NONE {
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("ATTEMPTING PASSALL PROCESSING\n");
-				sink(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, BitFixPassall, 0) /* len-2 to remove FCS. */
+				sink(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, phy.BitFixPassall, phy.FECNone) /* len-2 to remove FCS. */
 
 				return true /* success */
 			} else {
@@ -749,13 +750,13 @@ failure:
  *
  ***********************************************************************************/
 
-func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bool {
+func sanity_check(buf []byte, bits_flipped phy.BitFixLevel, sanity_test phy.Sanity) bool {
 	/*
 	 * No sanity check if we didn't try fixing the data.
 	 * Should we have different levels of checking depending on
 	 * how much we try changing the raw data?
 	 */
-	if bits_flipped == RETRY_NONE {
+	if bits_flipped == phy.BitFixNone {
 		return true
 	}
 
@@ -763,7 +764,7 @@ func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bo
 	 * If using frames that do not conform to AX.25, it might be
 	 * desirable to skip the sanity check entirely.
 	 */
-	if sanity_test == SANITY_NONE {
+	if sanity_test == phy.SanityNone {
 		return true
 	}
 
@@ -825,7 +826,7 @@ func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bo
 	 * That's good enough for the AX.25 sanity check.
 	 * Continue below for additional APRS checking.
 	 */
-	if sanity_test == SANITY_AX25 {
+	if sanity_test == phy.SanityAX25 {
 		return true
 	}
 

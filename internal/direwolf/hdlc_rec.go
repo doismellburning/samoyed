@@ -9,6 +9,7 @@ package direwolf
 import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/rrbb"
 )
 
@@ -27,10 +28,10 @@ import (
 
 // hdlcConfig is the part of a channel's configuration the HDLC receiver uses.
 type hdlcConfig struct {
-	fixBits    BitFixLevel // How hard to try to fix a frame with a bad FCS.
-	passall    bool        // Let a frame through with a bad FCS once every fix has failed.
-	ais        bool        // The channel is AIS, which checks a frame's length rather than its contents.
-	sanityTest sanity_t    // What a frame has to look like once bits have been fixed.
+	fixBits    phy.BitFixLevel // How hard to try to fix a frame with a bad FCS.
+	passall    bool            // Let a frame through with a bad FCS once every fix has failed.
+	ais        bool            // The channel is AIS, which checks a frame's length rather than its contents.
+	sanityTest phy.Sanity      // What a frame has to look like once bits have been fixed.
 }
 
 type hdlcReceiver struct {
