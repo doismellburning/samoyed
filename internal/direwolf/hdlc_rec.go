@@ -32,7 +32,7 @@ type hdlcReceiver struct {
 	receiver                   *Layer2Receiver
 	channel, subchannel, slice int
 
-	line linecode.Decoder /* Undoes NRZI, and scrambling for 9600 baud. */
+	line *linecode.Decoder /* The slicer's line decoder, for the state the retries start from. */
 
 	patDet byte /* 8 bit pattern detector shift register. */
 	/* See below for more details. */
@@ -63,10 +63,26 @@ type hdlcReceiver struct {
 	easPlusFound bool /* "+" seen, indicating end of geographical area list. */
 
 	easFieldsAfterPlus int /* Number of "-" characters after the "+". */
+}
 
-	fx25 *fx25Receiver /* FX.25 decoder fed the same data bits. */
+// slicerReceivers are the receivers one slicer's bits go to.  Its line
+// decoder undoes NRZI, and scrambling for 9600 baud, once for all of them:
+// HDLC and FX.25 take the data bits it gives, IL2P the raw bits before it.
+type slicerReceivers struct {
+	line linecode.Decoder
 
-	il2p *il2pReceiver /* IL2P decoder fed the same raw bits. */
+	hdlc *hdlcReceiver
+	fx25 *fx25Receiver
+	il2p *il2pReceiver
+}
+
+func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *slicerReceivers {
+	var s = new(slicerReceivers)
+	s.hdlc = newHDLCReceiver(r, channel, subchannel, slice, scrambled, &s.line)
+	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
+	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, il2pDeliverPacket)
+
+	return s
 }
 
 // Layer2Receiver takes the bits each radio channel's demodulators hear, and
@@ -74,7 +90,7 @@ type hdlcReceiver struct {
 // (channel, subchannel, slicer) combination.  It also keeps the aggregated
 // DCD state of each channel.
 type Layer2Receiver struct {
-	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*hdlcReceiver
+	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*slicerReceivers
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
 	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
 	audio         *RadioConfig
@@ -89,12 +105,13 @@ type Layer2Receiver struct {
 
 const hdlcRecRandMax int32 = 0x7fffffff
 
-func newHDLCReceiver(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *hdlcReceiver {
+func newHDLCReceiver(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool, line *linecode.Decoder) *hdlcReceiver {
 	var s = new(hdlcReceiver)
 	s.receiver = r
 	s.channel = channel
 	s.subchannel = subchannel
 	s.slice = slice
+	s.line = line
 	s.olen = -1
 
 	// TODO: FIX13 wasteful if not needed.
@@ -102,9 +119,6 @@ func newHDLCReceiver(r *Layer2Receiver, channel int, subchannel int, slice int, 
 
 	var descramState, prevDescram = s.line.State()
 	s.rawBits = rrbb.New(channel, subchannel, slice, scrambled, descramState, prevDescram)
-
-	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
-	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, il2pDeliverPacket)
 
 	return s
 }
@@ -144,7 +158,7 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 
 			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {
-					r.slicer[ch][sub][slice] = newHDLCReceiver(r, ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
+					r.slicer[ch][sub][slice] = newSlicerReceivers(r, ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
 				}
 			}
 		}
@@ -208,20 +222,10 @@ func (r *Layer2Receiver) RecBitNew(channel int, subchannel int, slice int, _raw 
 	// EAS does not use HDLC.
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.recEasBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
+		s.hdlc.recEasBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
 
 		return
 	}
-
-	s.recBitNew(raw, is_scrambled, pll_nudge_total, pll_symbol_count)
-}
-
-func (s *hdlcReceiver) recBitNew(raw bool, is_scrambled bool,
-	pll_nudge_total *int64, pll_symbol_count *int) {
-	var channel = s.channel
-	var subchannel = s.subchannel
-	var slice = s.slice
-	var r = s.receiver
 
 	/*
 	 * Using NRZI encoding,
@@ -238,6 +242,17 @@ func (s *hdlcReceiver) recBitNew(raw bool, is_scrambled bool,
 		s.fx25.recBit(dwutil.IfThenElse(dbit, 1, 0))
 		s.il2p.recBit(dwutil.IfThenElse(raw, 1, 0)) // Note: skip NRZI.
 	}
+
+	s.hdlc.recBit(raw, dbit, is_scrambled, pll_nudge_total, pll_symbol_count)
+}
+
+// recBit takes one bit as the demodulator heard it, and the data bit the
+// slicer's line decoder made of it.
+func (s *hdlcReceiver) recBit(raw bool, dbit bool, is_scrambled bool,
+	pll_nudge_total *int64, pll_symbol_count *int) {
+	var channel = s.channel
+	var subchannel = s.subchannel
+	var slice = s.slice
 
 	/*
 	 * Octets are sent LSB first.
