@@ -25,8 +25,16 @@ import (
  * Should have a reset function instead of initializations here.
  */
 
+// hdlcConfig is the part of a channel's configuration the HDLC receiver uses.
+type hdlcConfig struct {
+	fixBits    BitFixLevel // How hard to try to fix a frame with a bad FCS.
+	passall    bool        // Let a frame through with a bad FCS once every fix has failed.
+	ais        bool        // The channel is AIS, which checks a frame's length rather than its contents.
+	sanityTest sanity_t    // What a frame has to look like once bits have been fixed.
+}
+
 type hdlcReceiver struct {
-	receiver                   *Layer2Receiver
+	config                     hdlcConfig
 	channel, subchannel, slice int
 
 	line *linecode.Decoder /* The slicer's line decoder, for the state the retries start from. */
@@ -54,9 +62,9 @@ type hdlcReceiver struct {
 	rawBits *rrbb.Buffer /* Handle for bit array for raw received bits. */
 }
 
-func newHDLCReceiver(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool, line *linecode.Decoder) *hdlcReceiver {
+func newHDLCReceiver(config hdlcConfig, channel int, subchannel int, slice int, scrambled bool, line *linecode.Decoder) *hdlcReceiver {
 	var s = new(hdlcReceiver)
-	s.receiver = r
+	s.config = config
 	s.channel = channel
 	s.subchannel = subchannel
 	s.slice = slice
@@ -191,7 +199,7 @@ func (s *hdlcReceiver) recBit(raw bool, dbit bool, is_scrambled bool,
 			var alevel = demod_get_audio_level(channel, subchannel)
 
 			s.rawBits.SetAudioLevel(alevel)
-			hdlc_rec2_block(s.rawBits, &s.receiver.audio.achan[channel])
+			hdlc_rec2_block(s.rawBits, &s.config)
 			/* Handed off to hdlc_rec2_block. */
 			s.rawBits = nil
 

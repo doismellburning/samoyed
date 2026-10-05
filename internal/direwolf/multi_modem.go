@@ -666,9 +666,19 @@ type slicerReceivers struct {
 	eas  *easReceiver // nil unless the channel is EAS.
 }
 
+// newHDLCConfig takes what the HDLC receiver needs from a channel's settings.
+func newHDLCConfig(achan *achan_param_s) hdlcConfig {
+	return hdlcConfig{
+		fixBits:    achan.fix_bits,
+		passall:    achan.passall,
+		ais:        achan.modem_type == MODEM_AIS,
+		sanityTest: achan.sanity_test,
+	}
+}
+
 func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *slicerReceivers {
 	var s = new(slicerReceivers)
-	s.hdlc = newHDLCReceiver(r, channel, subchannel, slice, scrambled, &s.line)
+	s.hdlc = newHDLCReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line)
 	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
 	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, il2pDeliverPacket)
 
