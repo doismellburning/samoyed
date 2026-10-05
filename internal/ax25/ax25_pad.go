@@ -2310,39 +2310,24 @@ func (this_p *Packet) HexDump() {
 	// Using all zero bits in one of these 6 positions is wrong.
 	// Any non printable characters will be printed as "." here.
 
-	fmt.Printf(" dest    %c%c%c%c%c%c %2d c/r=%d res=%d last=%d\n",
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[0]>>1)), fptr[0]>>1, '.'),
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[1]>>1)), fptr[1]>>1, '.'),
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[2]>>1)), fptr[2]>>1, '.'),
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[3]>>1)), fptr[3]>>1, '.'),
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[4]>>1)), fptr[4]>>1, '.'),
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[5]>>1)), fptr[5]>>1, '.'),
+	fmt.Printf(" dest    %s %2d c/r=%d res=%d last=%d\n",
+		printableAddress(fptr[0:6]),
 		(fptr[6]&SSIDSSIDMask)>>SSIDSSIDShift,
 		(fptr[6]&SSIDHMask)>>SSIDHShift,
 		(fptr[6]&SSIDRRMask)>>SSIDRRShift,
 		fptr[6]&SSIDLastMask)
 
-	fmt.Printf(" source  %c%c%c%c%c%c %2d c/r=%d res=%d last=%d\n",
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[7]>>1)), fptr[7]>>1, '.'),
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[8]>>1)), fptr[8]>>1, '.'),
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[9]>>1)), fptr[9]>>1, '.'),
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[10]>>1)), fptr[10]>>1, '.'),
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[11]>>1)), fptr[11]>>1, '.'),
-		dwutil.IfThenElse(unicode.IsPrint(rune(fptr[12]>>1)), fptr[12]>>1, '.'),
+	fmt.Printf(" source  %s %2d c/r=%d res=%d last=%d\n",
+		printableAddress(fptr[7:13]),
 		(fptr[13]&SSIDSSIDMask)>>SSIDSSIDShift,
 		(fptr[13]&SSIDHMask)>>SSIDHShift,
 		(fptr[13]&SSIDRRMask)>>SSIDRRShift,
 		fptr[13]&SSIDLastMask)
 
 	for n := 2; n < this_p.num_addr; n++ {
-		fmt.Printf(" digi %d  %c%c%c%c%c%c %2d   h=%d res=%d last=%d\n",
+		fmt.Printf(" digi %d  %s %2d   h=%d res=%d last=%d\n",
 			n-1,
-			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+0]>>1)), fptr[n*7+0]>>1, '.'),
-			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+1]>>1)), fptr[n*7+1]>>1, '.'),
-			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+2]>>1)), fptr[n*7+2]>>1, '.'),
-			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+3]>>1)), fptr[n*7+3]>>1, '.'),
-			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+4]>>1)), fptr[n*7+4]>>1, '.'),
-			dwutil.IfThenElse(unicode.IsPrint(rune(fptr[n*7+5]>>1)), fptr[n*7+5]>>1, '.'),
+			printableAddress(fptr[n*7:n*7+6]),
 			(fptr[n*7+6]&SSIDSSIDMask)>>SSIDSSIDShift,
 			(fptr[n*7+6]&SSIDHMask)>>SSIDHShift,
 			(fptr[n*7+6]&SSIDRRMask)>>SSIDRRShift,
@@ -2351,6 +2336,18 @@ func (this_p *Packet) HexDump() {
 
 	dwutil.HexDump(fptr[:this_p.frame_len])
 } /* end HexDump */
+
+// printableAddress renders the six shifted callsign octets of an address
+// field, with any non-printable character shown as ".".
+func printableAddress(field []byte) string {
+	var chars = make([]rune, 0, len(field))
+
+	for _, b := range field {
+		chars = append(chars, dwutil.IfThenElse(unicode.IsPrint(rune(b>>1)), rune(b>>1), '.'))
+	}
+
+	return string(chars)
+}
 
 /*------------------------------------------------------------------
  *
