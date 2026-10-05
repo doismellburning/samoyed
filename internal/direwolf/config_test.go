@@ -1208,7 +1208,7 @@ type directiveCase struct {
 	check  func(a *assert.Assertions, c configs)
 }
 
-func directiveTests() map[string][]directiveCase {
+func directiveTests() map[string][]directiveCase { //nolint:funlen // One big test table
 	return map[string][]directiveCase{
 		"ACHANNELS": {
 			{

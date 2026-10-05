@@ -116,7 +116,7 @@ func demod_init(pa *RadioConfig) {
 // them - how many subchannels and slicers, the normalised profiles, the
 // decimation and upsampling ratios - it keeps: achan is its own copy, and the
 // configuration is left as it was.
-func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodulator {
+func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodulator { //nolint:funlen // Ported from Dire Wolf as one function
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	var demodulator = new(Demodulator)
