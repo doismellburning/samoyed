@@ -75,7 +75,7 @@ var connectedDigipeater *ConnectedDigipeater
 var pttControl *PTT
 var xmitSvc *XmitService
 var ttGateway *TTGateway
-var hdlcReceiver *HDLCReceiver
+var layer2Receiver *Layer2Receiver
 
 /*-------------------------------------------------------------------
  *

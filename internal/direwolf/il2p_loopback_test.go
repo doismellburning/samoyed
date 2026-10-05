@@ -71,7 +71,7 @@ func il2pLoopback(t *testing.T, version il2p_version_t) *il2pLoopbackRecorder {
 	// half-gathered frame.  A decoder left part way through gathering a payload
 	// swallows the next frame it is given while it resynchronises, which a
 	// deliberate version mismatch is apt to leave behind.
-	recorder.rx = newIL2PReceiver(0, 0, 0, version, true)
+	recorder.rx = newIL2PReceiver(0, 0, 0, version, true, il2pDeliverPacket)
 
 	toneGenCapture = func(channel int, data int) {
 		require.Zero(t, channel)

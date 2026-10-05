@@ -1275,7 +1275,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 	if !fulldup {
 	start_over_again:
 
-		for hdlcReceiver.DataDetectAny(channel) > 0 {
+		for layer2Receiver.DataDetectAny(channel) > 0 {
 			if !dwutil.SleepCtx(ctx, WAIT_CHECK_EVERY_MS*time.Millisecond) {
 				return false
 			}
@@ -1299,7 +1299,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 			}
 		}
 
-		if hdlcReceiver.DataDetectAny(channel) > 0 {
+		if layer2Receiver.DataDetectAny(channel) > 0 {
 			goto start_over_again
 		}
 
@@ -1312,7 +1312,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 				return false
 			}
 
-			if hdlcReceiver.DataDetectAny(channel) > 0 {
+			if layer2Receiver.DataDetectAny(channel) > 0 {
 				goto start_over_again
 			}
 

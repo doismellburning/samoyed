@@ -71,7 +71,7 @@ func (F *fx25Receiver) logEntry() *logrus.Entry {
  *
  * Purpose:     Extract FX.25 codeblocks from a stream of bits.
  *		In a completely integrated AX.25 / FX.25 receive system,
- *		this would see the same bit stream as hdlcReceiver.RecBit.
+ *		this would see the same bit stream as layer2Receiver.RecBit.
  *
  * Inputs:      dbit	- Data bit after NRZI and any descrambling.
  *			  Any non-zero value is logic '1'.
@@ -100,7 +100,7 @@ func fx25_deliver_frame(channel int, subchannel int, slice int, frame []byte, de
 }
 
 // Note that the sink is called before the state machine is reset, so that
-// HDLCReceiver.fx25Busy still reports reception in progress during delivery.
+// Layer2Receiver.fx25Busy still reports reception in progress during delivery.
 func (F *fx25Receiver) recBit(dbit int) {
 	// State machine to identify correlation tag then gather appropriate number of data and check bytes.
 
@@ -170,51 +170,6 @@ func (F *fx25Receiver) recBit(dbit int) {
 			}
 		}
 	}
-}
-
-/***********************************************************************************
- *
- * Name:        HDLCReceiver.fx25Busy
- *
- * Purpose:     Is FX.25 reception currently in progress?
- *
- * Inputs:      channel    - Channel number.
- *
- * Returns:	True if currently in progress for the specified channel.
- *
- * Description: This is required for duplicate removal.  One channel and can have
- *		multiple demodulators (called subchannels) running in parallel.
- *		Each of them can have multiple slicers.  Duplicates need to be
- *		removed.  Normally a delay of a couple bits (or more accurately
- *		symbols) was fine because they all took about the same amount of time.
- *		Now, we can have an additional delay of up to 64 check bytes and
- *		some filler in the data portion.  We can't simply wait that long.
- *		With normal AX.25 a couple frames can come and go during that time.
- *		We want to delay the duplicate removal while FX.25 block reception
- *		is going on.
- *
- ***********************************************************************************/
-
-func (r *HDLCReceiver) fx25Busy(channel int) bool {
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-
-	if r == nil {
-		return false
-	}
-
-	// This could be a little faster if we knew number of
-	// subchannels and slicers but it is probably insignificant.
-
-	for sub := range MAX_SUBCHANS {
-		for slice := range MAX_SLICERS {
-			var s = r.slicer[channel][sub][slice]
-			if s != nil && s.fx25.busy() {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 // busy reports whether an FX.25 codeblock is part way through being received.

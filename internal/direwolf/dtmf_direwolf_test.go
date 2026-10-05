@@ -16,11 +16,11 @@ func Test_dtmf(t *testing.T) {
 
 	// A decoded button raises the channel's DCD, which goes to the HDLC
 	// receiver; nothing here wants to hear about it.
-	var origReceiver = hdlcReceiver
+	var origReceiver = layer2Receiver
 
-	t.Cleanup(func() { hdlcReceiver = origReceiver })
+	t.Cleanup(func() { layer2Receiver = origReceiver })
 
-	hdlcReceiver = NewHDLCReceiver(&my_audio_config, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
+	layer2Receiver = NewLayer2Receiver(&my_audio_config, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
 
 	var decoder = NewDTMFDecoder(c, sampleRate)
 

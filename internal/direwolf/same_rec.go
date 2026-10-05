@@ -11,6 +11,36 @@ package direwolf
  *
  *******************************************************************************/
 
+// easReceiver is the EAS SAME receive state for one slicer of one
+// demodulator ("subchannel") of one channel.
+type easReceiver struct {
+	channel, subchannel, slice int
+
+	easAcc uint64 /* Accumulate most recent 64 bits received for EAS. */
+
+	easGathering bool /* Decoding in progress. */
+
+	easPlusFound bool /* "+" seen, indicating end of geographical area list. */
+
+	easFieldsAfterPlus int /* Number of "-" characters after the "+". */
+
+	olen int /* Number of bits gathered towards the next octet. */
+
+	frameBuf [MAX_FRAME_LEN]byte /* The transmission gathered so far. */
+
+	frameLen int /* Number of octets in frameBuf. */
+}
+
+func newEASReceiver(channel int, subchannel int, slice int) *easReceiver {
+	var s = new(easReceiver)
+	s.channel = channel
+	s.subchannel = subchannel
+	s.slice = slice
+	s.olen = -1
+
+	return s
+}
+
 /***********************************************************************************
  *
  * Name:	eas_rec_bit
@@ -40,7 +70,7 @@ const PREAMBLE_ZCZC = 0x435a435aabababab
 const PREAMBLE_NNNN = 0x4e4e4e4eabababab
 const EAS_MAX_LEN = 268 // Not including preamble.  Up to 31 geographic areas.
 
-func (s *hdlcState) recEasBit(raw int, future_use int) { //nolint:unparam
+func (s *easReceiver) recBit(raw int, future_use int) { //nolint:unparam
 	//dw_printf ("slice %d = %d\n", s.slice, raw);
 
 	// Accumulate most recent 64 bits.

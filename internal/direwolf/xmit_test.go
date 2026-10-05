@@ -671,11 +671,11 @@ func TestXmitNextBundlesOrdinaryFrames(t *testing.T) {
 func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var origReceiver = hdlcReceiver
+	var origReceiver = layer2Receiver
 
-	t.Cleanup(func() { hdlcReceiver = origReceiver })
+	t.Cleanup(func() { layer2Receiver = origReceiver })
 
-	hdlcReceiver = NewHDLCReceiver(xs.p_modem, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
+	layer2Receiver = NewLayer2Receiver(xs.p_modem, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
 
 	xs.timing[0].slottime = 100 // A second per slot,
 	xs.timing[0].persist = -1   // and never our turn.

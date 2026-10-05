@@ -40,11 +40,11 @@ func TestSendDTMFDecodesBack(t *testing.T) {
 	audioConfig.adev[0].bits_per_sample = 16
 	audioConfig.adev[0].samples_per_sec = sampleRate
 
-	var origReceiver = hdlcReceiver
+	var origReceiver = layer2Receiver
 
-	t.Cleanup(func() { hdlcReceiver = origReceiver })
+	t.Cleanup(func() { layer2Receiver = origReceiver })
 
-	hdlcReceiver = NewHDLCReceiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
+	layer2Receiver = NewLayer2Receiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
 
 	var sink = new(byteSink)
 	var tg = NewToneGenerator(channel, audioConfig, 50, sink)

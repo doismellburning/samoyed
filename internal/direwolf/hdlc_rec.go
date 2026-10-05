@@ -7,11 +7,8 @@ package direwolf
  *******************************************************************************/
 
 import (
-	"slices"
-
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/linecode"
-	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/doismellburning/samoyed/internal/rrbb"
 )
 
@@ -28,11 +25,11 @@ import (
  * Should have a reset function instead of initializations here.
  */
 
-type hdlcState struct {
-	receiver                   *HDLCReceiver
+type hdlcReceiver struct {
+	receiver                   *Layer2Receiver
 	channel, subchannel, slice int
 
-	line linecode.Decoder /* Undoes NRZI, and scrambling for 9600 baud. */
+	line *linecode.Decoder /* The slicer's line decoder, for the state the retries start from. */
 
 	patDet byte /* 8 bit pattern detector shift register. */
 	/* See below for more details. */
@@ -55,44 +52,15 @@ type hdlcState struct {
 	/* Should be in range of 0 .. MAX_FRAME_LEN. */
 
 	rawBits *rrbb.Buffer /* Handle for bit array for raw received bits. */
-
-	easAcc uint64 /* Accumulate most recent 64 bits received for EAS. */
-
-	easGathering bool /* Decoding in progress. */
-
-	easPlusFound bool /* "+" seen, indicating end of geographical area list. */
-
-	easFieldsAfterPlus int /* Number of "-" characters after the "+". */
-
-	fx25 *fx25Receiver /* FX.25 decoder fed the same data bits. */
-
-	il2p *il2pReceiver /* IL2P decoder fed the same raw bits. */
 }
 
-// HDLCReceiver holds the HDLC bit-decoder state for every (channel, subchannel, slicer)
-// combination, along with the aggregated DCD/receive state shared across them.
-type HDLCReceiver struct {
-	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*hdlcState
-	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
-	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
-	audio         *RadioConfig
-	fx25Debug     int // FX.25's debug level, for every slicer's FX.25 receiver.
-	sink          ReceiveSink
-
-	// Own copy of random number generator so we can get
-	// same predictable results on different operating systems.
-	// TODO: Consolidate multiple copies somewhere.
-	randSeed int32
-}
-
-const hdlcRecRandMax int32 = 0x7fffffff
-
-func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scrambled bool) *hdlcState {
-	var s = new(hdlcState)
+func newHDLCReceiver(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool, line *linecode.Decoder) *hdlcReceiver {
+	var s = new(hdlcReceiver)
 	s.receiver = r
 	s.channel = channel
 	s.subchannel = subchannel
 	s.slice = slice
+	s.line = line
 	s.olen = -1
 
 	// TODO: FIX13 wasteful if not needed.
@@ -101,141 +69,16 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 	var descramState, prevDescram = s.line.State()
 	s.rawBits = rrbb.New(channel, subchannel, slice, scrambled, descramState, prevDescram)
 
-	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
-	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc)
-
 	return s
 }
 
-/***********************************************************************************
- *
- * Name:	NewHDLCReceiver
- *
- * Purpose:	Call once at the beginning to initialize.
- *
- * Inputs:	pa	- Audio configuration.
- *
- *		demods	- Each radio channel's demodulators, which say how
- *			  many subchannels it has; nil for any other channel.
- *
- *		fx25Debug - FX.25's debug level, for every slicer's FX.25
- *			  receiver.
- *
- *		sink	- Where a change in the channel's data carrier detect
- *			  state is reported.
- *
- ***********************************************************************************/
-
-func NewHDLCReceiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, sink ReceiveSink) *HDLCReceiver {
-	//text_color_set(DW_COLOR_DEBUG);
-	//dw_printf ("NewHDLCReceiver (%p) \n", pa);
-
-	var r = new(HDLCReceiver)
-	r.audio = pa
-	r.fx25Debug = fx25Debug
-	r.sink = sink
-	r.randSeed = 1
-
-	for ch, d := range demods {
-		if d != nil {
-			r.numSubchannel[ch] = d.NumSubchan()
-
-			for sub := range r.numSubchannel[ch] {
-				for slice := range MAX_SLICERS {
-					r.slicer[ch][sub][slice] = newHDLCState(r, ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
-				}
-			}
-		}
-	}
-
-	return r
-}
-
-/***********************************************************************************
- *
- * Name:	hdlc_rec_bit
- *
- * Purpose:	Extract HDLC frames from a stream of bits.
- *
- * Inputs:	channel	- Channel number.
- *
- *		subchannel	- This allows multiple demodulators per channel.
- *
- *		slice	- Allows multiple slicers per demodulator (subchannel).
- *
- *		raw 	- One bit from the demodulator.
- *			  should be 0 or 1.
- *
- *		is_scrambled - Is the data scrambled?
- *
- *		descram_state - Current descrambler state.  (not used - remove)
- *				Not so fast - plans to add new parameter.  PSK already provides it.
- *
- *
- * Description:	This is called once for each received bit.
- *		For each valid frame, process_rec_frame()
- *		is called for further processing.
- *
- ***********************************************************************************/
-
-func (r *HDLCReceiver) RecBit(channel int, subchannel int, slice int, raw int, is_scrambled bool, not_used_remove int) {
-	var dummyll int64
-	var dummy int
-	r.RecBitNew(channel, subchannel, slice, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
-}
-
-func (r *HDLCReceiver) RecBitNew(channel int, subchannel int, slice int, _raw int, is_scrambled bool, not_used_remove int,
-	pll_nudge_total *int64, pll_symbol_count *int) {
-	var raw = _raw != 0
-
-	// -e option can be used to artificially introduce the desired
-	// Bit Error Rate (BER) for testing.
-
-	if r.audio.recv_ber != 0 {
-		var p = float64(r.rand()) / float64(hdlcRecRandMax) // calculate as double to preserve all 31 bits.
-		if r.audio.recv_ber > p {
-			// FIXME
-			//text_color_set(DW_COLOR_DEBUG);
-			//dw_printf ("hdlc_rec_bit randomly clobber bit, ber = %.6f\n", r.audio.recv_ber);
-			raw = !raw
-		}
-	}
-
-	var s = r.slicer[channel][subchannel][slice]
-
-	// EAS does not use HDLC.
-
-	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.recEasBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
-
-		return
-	}
-
-	s.recBitNew(raw, is_scrambled, pll_nudge_total, pll_symbol_count)
-}
-
-func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
+// recBit takes one bit as the demodulator heard it, and the data bit the
+// slicer's line decoder made of it.
+func (s *hdlcReceiver) recBit(raw bool, dbit bool, is_scrambled bool,
 	pll_nudge_total *int64, pll_symbol_count *int) {
 	var channel = s.channel
 	var subchannel = s.subchannel
 	var slice = s.slice
-	var r = s.receiver
-
-	/*
-	 * Using NRZI encoding,
-	 *   A '0' bit is represented by an inversion since previous bit.
-	 *   A '1' bit is represented by no change.
-	 */
-
-	var dbit = s.line.Decode(raw, is_scrambled) /* Data bit after undoing NRZI. */
-
-	// After BER insertion, NRZI, and any descrambling, feed into FX.25 decoder as well.
-	// Don't waste time on this if AIS.  EAS does not get this far.
-
-	if r.audio.achan[channel].modem_type != MODEM_AIS {
-		s.fx25.recBit(dwutil.IfThenElse(dbit, 1, 0))
-		s.il2p.recBit(dwutil.IfThenElse(raw, 1, 0)) // Note: skip NRZI.
-	}
 
 	/*
 	 * Octets are sent LSB first.
@@ -445,111 +288,6 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 			}
 		}
 	}
-}
-
-// TODO:  Data Carrier Detect (DCD) is now based on DPLL lock
-// rather than data patterns found here.
-// It would make sense to move the next 2 functions to demod.c
-// because this is done at the modem level, rather than HDLC decoder.
-
-/*-------------------------------------------------------------------
- *
- * Name:        dcd_change
- *
- * Purpose:     Combine DCD states of all subchannels/ into an overall
- *		state for the channel.
- *
- * Inputs:	channel
- *
- *		subchannel		0 to MAX_SUBCHANS-1 for HDLC.
- *				SPECIAL CASE --> MAX_SUBCHANS for DTMF decoder.
- *
- *		slice		slicer number, 0 .. MAX_SLICERS - 1.
- *
- *		state		1 for active, 0 for not.
- *
- * Returns:	None.  Use hdlc_rec_data_detect_any to retrieve result.
- *
- * Description:	DCD for the channel is active if ANY of the subchannels/slices
- *		are active.  Update the DCD indicator.
- *
- * version 1.3:	Add DTMF detection into the final result.
- *		This is now called from dtmf.c too.
- *
- *--------------------------------------------------------------------*/
-
-func (r *HDLCReceiver) DCDChange(channel int, subchannel int, slice int, state int) {
-	/*
-		#if DEBUG3
-			text_color_set(DW_COLOR_DEBUG);
-			dw_printf ("DCD %d.%d.%d = %d \n", channel, subchannel, slice, state);
-		#endif
-	*/
-
-	var old = r.DataDetectAny(channel)
-
-	if state != 0 {
-		r.compositeDCD[channel][subchannel][slice] = true
-	} else {
-		r.compositeDCD[channel][subchannel][slice] = false
-	}
-
-	var newVal = r.DataDetectAny(channel)
-
-	if newVal != old {
-		r.sink.DCDChange(channel, newVal)
-		metrics.SetDCD(channel, newVal != 0)
-	}
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        hdlc_rec_data_detect_any
- *
- * Purpose:     Determine if the radio channel is currently busy
- *		with packet data.
- *		This version doesn't care about voice or other sounds.
- *		This is used by the transmit logic to transmit only
- *		when the channel is clear.
- *
- * Inputs:	channel	- Audio channel.
- *
- * Returns:	True if channel is busy (data detected) or
- *		false if OK to transmit.
- *
- *
- * Description:	We have two different versions here.
- *
- *		hdlc_rec_data_detect_any sees if ANY of the decoders
- *		for this channel are receiving a signal.   This is
- *		used to determine whether the channel is clear and
- *		we can transmit.  This would apply to the 300 baud
- *		HF SSB case where we have multiple decoders running
- *		at the same time.  The channel is busy if ANY of them
- *		thinks the channel is busy.
- *
- * Version 1.3: New option for input signal to inhibit transmit.
- *
- *--------------------------------------------------------------------*/
-
-func (r *HDLCReceiver) DataDetectAny(channel int) int {
-	for sc := range r.numSubchannel[channel] {
-		if slices.Contains(r.compositeDCD[channel][sc][:], true) {
-			return (1)
-		}
-	}
-
-	if pttControl.GetInput(ICTYPE_TXINH, channel) == 1 {
-		return (1)
-	}
-
-	return (0)
-} /* end DataDetectAny */
-
-func (r *HDLCReceiver) rand() int32 {
-	r.randSeed = (r.randSeed*1103515245 + 12345) & hdlcRecRandMax // Wraps on overflow, as intended.
-
-	return r.randSeed
 }
 
 /* end hdlc_rec.c */

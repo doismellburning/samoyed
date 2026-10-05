@@ -219,7 +219,7 @@ func (d *DTMFDecoder) Sample(input float64) rune {
 			_tmpIntBool = 1
 		}
 
-		hdlcReceiver.DCDChange(d.channel, MAX_SUBCHANS, 0, _tmpIntBool)
+		layer2Receiver.DCDChange(d.channel, MAX_SUBCHANS, 0, _tmpIntBool)
 
 		/* Reset timeout timer. */
 		if decoded != ' ' {

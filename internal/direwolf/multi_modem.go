@@ -20,7 +20,8 @@ package direwolf
  *
  *		(a) Main program (direwolf.c or atest.c) calls
  *		    demod_init to set up modem properties and
- *		    NewHDLCReceiver for the HDLC decoders.
+ *		    NewLayer2Receiver for the HDLC, FX.25, IL2P and EAS
+ *		    receivers.
  *
  *		(b) demod_process_sample is called for each audio sample
  *		    from the input audio stream.
@@ -67,11 +68,14 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"slices"
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/sirupsen/logrus"
 )
 
@@ -180,7 +184,7 @@ func (s *radioSink) DCDChange(channel int, state int) {
 
 func multi_modem_init(pa *RadioConfig, fx25Debug int, sink ReceiveSink) {
 	demod_init(pa)
-	hdlcReceiver = NewHDLCReceiver(pa, demodulators, fx25Debug, sink)
+	layer2Receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, sink)
 
 	for channel, m := range multiModems {
 		m.audioConfig = pa
@@ -293,7 +297,7 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
 			if c.packet_p != nil {
 				c.age++
 				if c.age > m.processAge {
-					if hdlcReceiver.fx25Busy(channel) {
+					if layer2Receiver.fx25Busy(channel) {
 						c.age = 0
 					} else {
 						m.pickBestCandidate()
@@ -399,7 +403,7 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, a
 
 	if numSubchan == 1 &&
 		numSlicers == 1 &&
-		!hdlcReceiver.fx25Busy(channel) {
+		!layer2Receiver.fx25Busy(channel) {
 		var drop_it = false
 
 		if pa.recv_error_rate != 0 {
@@ -648,5 +652,324 @@ func (m *MultiModem) pickBestCandidate() {
 
 	m.candidates = [MAX_SUBCHANS][MAX_SLICERS]candidate_t{}
 } /* end pickBestCandidate */
+
+// slicerReceivers are the receivers one slicer's bits go to.  Its line
+// decoder undoes NRZI, and scrambling for 9600 baud, once for all of them:
+// HDLC and FX.25 take the data bits it gives, IL2P the raw bits before it.
+// An EAS channel's bits go to its EAS receiver instead, and nowhere else.
+type slicerReceivers struct {
+	line linecode.Decoder
+
+	hdlc *hdlcReceiver
+	fx25 *fx25Receiver
+	il2p *il2pReceiver
+	eas  *easReceiver // nil unless the channel is EAS.
+}
+
+func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *slicerReceivers {
+	var s = new(slicerReceivers)
+	s.hdlc = newHDLCReceiver(r, channel, subchannel, slice, scrambled, &s.line)
+	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
+	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, il2pDeliverPacket)
+
+	if r.audio.achan[channel].modem_type == MODEM_EAS {
+		s.eas = newEASReceiver(channel, subchannel, slice)
+	}
+
+	return s
+}
+
+// Layer2Receiver takes the bits each radio channel's demodulators hear, and
+// hands them to the layer 2 receivers - HDLC, FX.25 and IL2P - for every
+// (channel, subchannel, slicer) combination.  It also keeps the aggregated
+// DCD state of each channel.
+type Layer2Receiver struct {
+	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*slicerReceivers
+	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
+	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
+	audio         *RadioConfig
+	fx25Debug     int // FX.25's debug level, for every slicer's FX.25 receiver.
+	sink          ReceiveSink
+
+	// Own copy of random number generator so we can get
+	// same predictable results on different operating systems.
+	// TODO: Consolidate multiple copies somewhere.
+	randSeed int32
+}
+
+const hdlcRecRandMax int32 = 0x7fffffff
+
+/***********************************************************************************
+ *
+ * Name:	NewLayer2Receiver
+ *
+ * Purpose:	Call once at the beginning to initialize.
+ *
+ * Inputs:	pa	- Audio configuration.
+ *
+ *		demods	- Each radio channel's demodulators, which say how
+ *			  many subchannels it has; nil for any other channel.
+ *
+ *		fx25Debug - FX.25's debug level, for every slicer's FX.25
+ *			  receiver.
+ *
+ *		sink	- Where a change in the channel's data carrier detect
+ *			  state is reported.
+ *
+ ***********************************************************************************/
+
+func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, sink ReceiveSink) *Layer2Receiver {
+	//text_color_set(DW_COLOR_DEBUG);
+	//dw_printf ("NewLayer2Receiver (%p) \n", pa);
+
+	var r = new(Layer2Receiver)
+	r.audio = pa
+	r.fx25Debug = fx25Debug
+	r.sink = sink
+	r.randSeed = 1
+
+	for ch, d := range demods {
+		if d != nil {
+			r.numSubchannel[ch] = d.NumSubchan()
+
+			for sub := range r.numSubchannel[ch] {
+				for slice := range MAX_SLICERS {
+					r.slicer[ch][sub][slice] = newSlicerReceivers(r, ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
+				}
+			}
+		}
+	}
+
+	return r
+}
+
+/***********************************************************************************
+ *
+ * Name:	hdlc_rec_bit
+ *
+ * Purpose:	Extract HDLC frames from a stream of bits.
+ *
+ * Inputs:	channel	- Channel number.
+ *
+ *		subchannel	- This allows multiple demodulators per channel.
+ *
+ *		slice	- Allows multiple slicers per demodulator (subchannel).
+ *
+ *		raw 	- One bit from the demodulator.
+ *			  should be 0 or 1.
+ *
+ *		is_scrambled - Is the data scrambled?
+ *
+ *		descram_state - Current descrambler state.  (not used - remove)
+ *				Not so fast - plans to add new parameter.  PSK already provides it.
+ *
+ *
+ * Description:	This is called once for each received bit.
+ *		For each valid frame, process_rec_frame()
+ *		is called for further processing.
+ *
+ ***********************************************************************************/
+
+func (r *Layer2Receiver) RecBit(channel int, subchannel int, slice int, raw int, is_scrambled bool, not_used_remove int) {
+	var dummyll int64
+	var dummy int
+	r.RecBitNew(channel, subchannel, slice, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
+}
+
+func (r *Layer2Receiver) RecBitNew(channel int, subchannel int, slice int, _raw int, is_scrambled bool, not_used_remove int,
+	pll_nudge_total *int64, pll_symbol_count *int) {
+	var raw = _raw != 0
+
+	// -e option can be used to artificially introduce the desired
+	// Bit Error Rate (BER) for testing.
+
+	if r.audio.recv_ber != 0 {
+		var p = float64(r.rand()) / float64(hdlcRecRandMax) // calculate as double to preserve all 31 bits.
+		if r.audio.recv_ber > p {
+			// FIXME
+			//text_color_set(DW_COLOR_DEBUG);
+			//dw_printf ("hdlc_rec_bit randomly clobber bit, ber = %.6f\n", r.audio.recv_ber);
+			raw = !raw
+		}
+	}
+
+	var s = r.slicer[channel][subchannel][slice]
+
+	// EAS does not use HDLC.
+
+	if r.audio.achan[channel].modem_type == MODEM_EAS {
+		s.eas.recBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
+
+		return
+	}
+
+	/*
+	 * Using NRZI encoding,
+	 *   A '0' bit is represented by an inversion since previous bit.
+	 *   A '1' bit is represented by no change.
+	 */
+
+	var dbit = s.line.Decode(raw, is_scrambled) /* Data bit after undoing NRZI. */
+
+	// After BER insertion, NRZI, and any descrambling, feed into FX.25 decoder as well.
+	// Don't waste time on this if AIS.  EAS does not get this far.
+
+	if r.audio.achan[channel].modem_type != MODEM_AIS {
+		s.fx25.recBit(dwutil.IfThenElse(dbit, 1, 0))
+		s.il2p.recBit(dwutil.IfThenElse(raw, 1, 0)) // Note: skip NRZI.
+	}
+
+	s.hdlc.recBit(raw, dbit, is_scrambled, pll_nudge_total, pll_symbol_count)
+}
+
+/***********************************************************************************
+ *
+ * Name:        Layer2Receiver.fx25Busy
+ *
+ * Purpose:     Is FX.25 reception currently in progress?
+ *
+ * Inputs:      channel    - Channel number.
+ *
+ * Returns:	True if currently in progress for the specified channel.
+ *
+ * Description: This is required for duplicate removal.  One channel and can have
+ *		multiple demodulators (called subchannels) running in parallel.
+ *		Each of them can have multiple slicers.  Duplicates need to be
+ *		removed.  Normally a delay of a couple bits (or more accurately
+ *		symbols) was fine because they all took about the same amount of time.
+ *		Now, we can have an additional delay of up to 64 check bytes and
+ *		some filler in the data portion.  We can't simply wait that long.
+ *		With normal AX.25 a couple frames can come and go during that time.
+ *		We want to delay the duplicate removal while FX.25 block reception
+ *		is going on.
+ *
+ ***********************************************************************************/
+
+func (r *Layer2Receiver) fx25Busy(channel int) bool {
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+
+	if r == nil {
+		return false
+	}
+
+	// This could be a little faster if we knew number of
+	// subchannels and slicers but it is probably insignificant.
+
+	for sub := range MAX_SUBCHANS {
+		for slice := range MAX_SLICERS {
+			var s = r.slicer[channel][sub][slice]
+			if s != nil && s.fx25.busy() {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// TODO:  Data Carrier Detect (DCD) is now based on DPLL lock
+// rather than data patterns found here.
+// It would make sense to move the next 2 functions to demod.c
+// because this is done at the modem level, rather than HDLC decoder.
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        dcd_change
+ *
+ * Purpose:     Combine DCD states of all subchannels/ into an overall
+ *		state for the channel.
+ *
+ * Inputs:	channel
+ *
+ *		subchannel		0 to MAX_SUBCHANS-1 for HDLC.
+ *				SPECIAL CASE --> MAX_SUBCHANS for DTMF decoder.
+ *
+ *		slice		slicer number, 0 .. MAX_SLICERS - 1.
+ *
+ *		state		1 for active, 0 for not.
+ *
+ * Returns:	None.  Use hdlc_rec_data_detect_any to retrieve result.
+ *
+ * Description:	DCD for the channel is active if ANY of the subchannels/slices
+ *		are active.  Update the DCD indicator.
+ *
+ * version 1.3:	Add DTMF detection into the final result.
+ *		This is now called from dtmf.c too.
+ *
+ *--------------------------------------------------------------------*/
+
+func (r *Layer2Receiver) DCDChange(channel int, subchannel int, slice int, state int) {
+	/*
+		#if DEBUG3
+			text_color_set(DW_COLOR_DEBUG);
+			dw_printf ("DCD %d.%d.%d = %d \n", channel, subchannel, slice, state);
+		#endif
+	*/
+
+	var old = r.DataDetectAny(channel)
+
+	if state != 0 {
+		r.compositeDCD[channel][subchannel][slice] = true
+	} else {
+		r.compositeDCD[channel][subchannel][slice] = false
+	}
+
+	var newVal = r.DataDetectAny(channel)
+
+	if newVal != old {
+		r.sink.DCDChange(channel, newVal)
+		metrics.SetDCD(channel, newVal != 0)
+	}
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        hdlc_rec_data_detect_any
+ *
+ * Purpose:     Determine if the radio channel is currently busy
+ *		with packet data.
+ *		This version doesn't care about voice or other sounds.
+ *		This is used by the transmit logic to transmit only
+ *		when the channel is clear.
+ *
+ * Inputs:	channel	- Audio channel.
+ *
+ * Returns:	True if channel is busy (data detected) or
+ *		false if OK to transmit.
+ *
+ *
+ * Description:	We have two different versions here.
+ *
+ *		hdlc_rec_data_detect_any sees if ANY of the decoders
+ *		for this channel are receiving a signal.   This is
+ *		used to determine whether the channel is clear and
+ *		we can transmit.  This would apply to the 300 baud
+ *		HF SSB case where we have multiple decoders running
+ *		at the same time.  The channel is busy if ANY of them
+ *		thinks the channel is busy.
+ *
+ * Version 1.3: New option for input signal to inhibit transmit.
+ *
+ *--------------------------------------------------------------------*/
+
+func (r *Layer2Receiver) DataDetectAny(channel int) int {
+	for sc := range r.numSubchannel[channel] {
+		if slices.Contains(r.compositeDCD[channel][sc][:], true) {
+			return (1)
+		}
+	}
+
+	if pttControl.GetInput(ICTYPE_TXINH, channel) == 1 {
+		return (1)
+	}
+
+	return (0)
+} /* end DataDetectAny */
+
+func (r *Layer2Receiver) rand() int32 {
+	r.randSeed = (r.randSeed*1103515245 + 12345) & hdlcRecRandMax // Wraps on overflow, as intended.
+
+	return r.randSeed
+}
 
 /* end multi_modem.c */
