@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"math/rand/v2"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -118,5 +119,35 @@ func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
 		for slice := range MAX_SLICERS {
 			assert.Equal(t, 3, hdlcReceiver.slicer[0][sub][slice].fx25.debug, "subchannel %d, slice %d", sub, slice)
 		}
+	}
+}
+
+// BenchmarkLayer2ReceiveBit measures what each bit a demodulator hands on
+// costs: undoing NRZI, then the HDLC, FX.25 and IL2P receivers that each
+// look at it.  The bits are noise, as most of what a receiver hears is.
+func BenchmarkLayer2ReceiveBit(b *testing.B) {
+	var origReceiver = hdlcReceiver
+
+	b.Cleanup(func() {
+		hdlcReceiver = origReceiver
+		multiModems = newMultiModems()
+	})
+
+	var audioConfig = newRecvTestRadioConfig(1)
+	audioConfig.achan[0].num_freq = 1
+
+	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
+
+	var rng = rand.New(rand.NewPCG(1, 2))
+
+	var bits = make([]int, 4096)
+	for i := range bits {
+		bits[i] = rng.IntN(2)
+	}
+
+	b.ResetTimer()
+
+	for i := range b.N {
+		hdlcReceiver.RecBit(0, 0, 0, bits[i%len(bits)], false, 0)
 	}
 }
