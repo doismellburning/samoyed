@@ -102,7 +102,7 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 	s.rawBits = rrbb.New(channel, subchannel, slice, scrambled, descramState, prevDescram)
 
 	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
-	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc)
+	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, il2pDeliverPacket)
 
 	return s
 }
