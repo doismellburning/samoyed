@@ -7,9 +7,22 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// captureHDLCBits collects the line levels a new HDLCSender sends while fn
+// runs.  The line starts low.
+func captureHDLCBits(fn func(s *HDLCSender)) []int {
+	var bits []int
+
+	fn(NewHDLCSender(linecode.NewEncoder(func(level int) {
+		bits = append(bits, level)
+	}), 0))
+
+	return bits
+}
 
 // A frame goes out between flags, with its FCS appended and any run of more
 // than five ones broken up.
@@ -20,8 +33,8 @@ func TestAX25FrameIsSentBetweenFlagsWithItsFCS(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, nil, func(s *Layer2Sender) {
-		sent = s.hdlc.SendFrame(fbuf, false)
+	var bits = captureHDLCBits(func(s *HDLCSender) {
+		sent = s.SendFrame(fbuf, false)
 	})
 
 	assert.Equal(t, len(bits), sent, "the count returned should be the bits actually sent")
@@ -40,11 +53,11 @@ func TestAX25FrameIsSentBetweenFlagsWithItsFCS(t *testing.T) {
 func TestAX25BadFCSSendsTheComplementOfTheRealOne(t *testing.T) {
 	var fbuf = []byte{'Q', '1', 'T', 'E', 'S', 'T'}
 
-	var good = captureBits(t, nil, func(s *Layer2Sender) {
-		s.hdlc.SendFrame(fbuf, false)
+	var good = captureHDLCBits(func(s *HDLCSender) {
+		s.SendFrame(fbuf, false)
 	})
-	var bad = captureBits(t, nil, func(s *Layer2Sender) {
-		s.hdlc.SendFrame(fbuf, true)
+	var bad = captureHDLCBits(func(s *HDLCSender) {
+		s.SendFrame(fbuf, true)
 	})
 
 	var goodData = hdlcFrameFromBits(t, good)
@@ -63,11 +76,11 @@ func TestAX25BadFCSSendsTheComplementOfTheRealOne(t *testing.T) {
 // A data byte gets a zero after five consecutive ones; a flag, which has six
 // of them, must not, or it would no longer be a flag.
 func TestOnlyDataIsBitStuffed(t *testing.T) {
-	var asData = captureBits(t, nil, func(s *Layer2Sender) {
-		s.hdlc.sendDataNRZI(hdlcFlag)
+	var asData = captureHDLCBits(func(s *HDLCSender) {
+		s.sendDataNRZI(hdlcFlag)
 	})
-	var asControl = captureBits(t, nil, func(s *Layer2Sender) {
-		s.hdlc.sendControlNRZI(hdlcFlag)
+	var asControl = captureHDLCBits(func(s *HDLCSender) {
+		s.sendControlNRZI(hdlcFlag)
 	})
 
 	assert.Len(t, asControl, 8, "a flag is sent as it stands")
@@ -77,8 +90,8 @@ func TestOnlyDataIsBitStuffed(t *testing.T) {
 	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, destuff(nrziDecode(asData))))
 
 	// However long the run, a control byte is sent as it stands.
-	var allOnes = captureBits(t, nil, func(s *Layer2Sender) {
-		s.hdlc.sendControlNRZI(0xff)
+	var allOnes = captureHDLCBits(func(s *HDLCSender) {
+		s.sendControlNRZI(0xff)
 	})
 
 	assert.Len(t, allOnes, 8)
@@ -87,9 +100,9 @@ func TestOnlyDataIsBitStuffed(t *testing.T) {
 
 // A run of ones long enough to need stuffing twice gets a zero each time.
 func TestBitStuffingRepeatsForALongRunOfOnes(t *testing.T) {
-	var bits = captureBits(t, nil, func(s *Layer2Sender) {
-		s.hdlc.sendDataNRZI(0xff)
-		s.hdlc.sendDataNRZI(0xff)
+	var bits = captureHDLCBits(func(s *HDLCSender) {
+		s.sendDataNRZI(0xff)
+		s.sendDataNRZI(0xff)
 	})
 
 	assert.Len(t, bits, 16+3, "sixteen ones need three stuffed zeros")
@@ -98,12 +111,12 @@ func TestBitStuffingRepeatsForALongRunOfOnes(t *testing.T) {
 
 // NRZI: a one leaves the signal alone, a zero inverts it.
 func TestNRZIInvertsOnAZeroOnly(t *testing.T) {
-	var bits = captureBits(t, nil, func(s *Layer2Sender) {
-		s.hdlc.sendBitNRZI(true)
-		s.hdlc.sendBitNRZI(true)
-		s.hdlc.sendBitNRZI(false)
-		s.hdlc.sendBitNRZI(true)
-		s.hdlc.sendBitNRZI(false)
+	var bits = captureHDLCBits(func(s *HDLCSender) {
+		s.sendBitNRZI(true)
+		s.sendBitNRZI(true)
+		s.sendBitNRZI(false)
+		s.sendBitNRZI(true)
+		s.sendBitNRZI(false)
 	})
 
 	assert.Equal(t, []int{0, 0, 1, 1, 0}, bits)
