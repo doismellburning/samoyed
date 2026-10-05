@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,7 +47,7 @@ func TestHDLCReceiverHandsFramesToItsSink(t *testing.T) {
 
 	var pllSymbolCount int
 
-	var sender = NewHDLCSender(linecode.NewEncoder(func(level int) {
+	var sender = hdlc.NewSender(linecode.NewEncoder(func(level int) {
 		var raw = level != 0
 		rx.recBit(raw, line.Decode(raw, false), false, &pllNudgeTotal, &pllSymbolCount)
 	}), 1)

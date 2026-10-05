@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package hdlc
 
 import (
 	"github.com/doismellburning/samoyed/internal/fcs"
@@ -6,10 +9,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// HDLCSender sends AX.25 frames as HDLC on a channel's line: between flags,
+// Sender sends AX.25 frames as HDLC on a channel's line: between flags,
 // bit stuffed, with the FCS appended, and NRZI.  It holds the run of ones
 // that decides when to bit stuff; the line holds the NRZI level.
-type HDLCSender struct {
+type Sender struct {
 	line    *linecode.Encoder
 	channel int // For logging.
 
@@ -20,9 +23,9 @@ type HDLCSender struct {
 	stuff int
 }
 
-// NewHDLCSender makes an HDLCSender for channel that sends on line.
-func NewHDLCSender(line *linecode.Encoder, channel int) *HDLCSender {
-	var s = new(HDLCSender)
+// NewSender makes a Sender for channel that sends on line.
+func NewSender(line *linecode.Encoder, channel int) *Sender {
+	var s = new(Sender)
 	s.line = line
 	s.channel = channel
 
@@ -32,7 +35,7 @@ func NewHDLCSender(line *linecode.Encoder, channel int) *HDLCSender {
 // SendFlags sends nbytes of the 01111110 flag pattern, NRZI and with no bit
 // stuffing, which is what the transmitter sends before, between and after
 // frames.  It returns the number of bits sent.
-func (s *HDLCSender) SendFlags(nbytes int) int {
+func (s *Sender) SendFlags(nbytes int) int {
 	s.bitsSent = 0
 
 	for range nbytes {
@@ -45,7 +48,7 @@ func (s *HDLCSender) SendFlags(nbytes int) int {
 // SendFrame is ax25_only_hdlc_send_frame in Dire Wolf.  It sends fbuf, an
 // AX.25 frame without its FCS, and returns the number of bits sent.  badFCS
 // sends a corrupt FCS instead of the right one, for testing.
-func (s *HDLCSender) SendFrame(fbuf []byte, badFCS bool) int {
+func (s *Sender) SendFrame(fbuf []byte, badFCS bool) int {
 	s.bitsSent = 0
 
 	logrus.WithFields(logrus.Fields{
@@ -80,7 +83,7 @@ func (s *HDLCSender) SendFrame(fbuf []byte, badFCS bool) int {
 // All bits are sent NRZI.
 // Data (non flags) use bit stuffing.
 
-func (s *HDLCSender) sendControlNRZI(x byte) {
+func (s *Sender) sendControlNRZI(x byte) {
 	for range 8 {
 		s.sendBitNRZI(x&1 != 0)
 		x >>= 1
@@ -89,7 +92,7 @@ func (s *HDLCSender) sendControlNRZI(x byte) {
 	s.stuff = 0
 }
 
-func (s *HDLCSender) sendDataNRZI(x byte) {
+func (s *Sender) sendDataNRZI(x byte) {
 	for range 8 {
 		s.sendBitNRZI(x&1 != 0)
 
@@ -113,7 +116,7 @@ func (s *HDLCSender) sendDataNRZI(x byte) {
  * data 0 bit -> invert signal.
  */
 
-func (s *HDLCSender) sendBitNRZI(b bool) {
+func (s *Sender) sendBitNRZI(b bool) {
 	s.line.WriteNRZI(b)
 
 	s.bitsSent++
