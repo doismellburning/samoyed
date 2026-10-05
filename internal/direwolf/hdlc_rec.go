@@ -35,6 +35,8 @@ type hdlcConfig struct {
 
 type hdlcReceiver struct {
 	config                     hdlcConfig
+	audioLevel                 audioLevelFunc // For the audio level to deliver each frame with.
+	sink                       frameSink      // Where each frame goes.
 	channel, subchannel, slice int
 
 	line *linecode.Decoder /* The slicer's line decoder, for the state the retries start from. */
@@ -62,9 +64,11 @@ type hdlcReceiver struct {
 	rawBits *rrbb.Buffer /* Handle for bit array for raw received bits. */
 }
 
-func newHDLCReceiver(config hdlcConfig, channel int, subchannel int, slice int, scrambled bool, line *linecode.Decoder) *hdlcReceiver {
+func newHDLCReceiver(config hdlcConfig, channel int, subchannel int, slice int, scrambled bool, line *linecode.Decoder, audioLevel audioLevelFunc, sink frameSink) *hdlcReceiver {
 	var s = new(hdlcReceiver)
 	s.config = config
+	s.audioLevel = audioLevel
+	s.sink = sink
 	s.channel = channel
 	s.subchannel = subchannel
 	s.slice = slice
@@ -196,10 +200,10 @@ func (s *hdlcReceiver) recBit(raw bool, dbit bool, is_scrambled bool,
 
 			s.rawBits.SetSpeedError(speed_error)
 
-			var alevel = demod_get_audio_level(channel, subchannel)
+			var alevel = s.audioLevel(channel, subchannel)
 
 			s.rawBits.SetAudioLevel(alevel)
-			hdlc_rec2_block(s.rawBits, &s.config)
+			hdlc_rec2_block(s.rawBits, &s.config, s.sink)
 			/* Handed off to hdlc_rec2_block. */
 			s.rawBits = nil
 

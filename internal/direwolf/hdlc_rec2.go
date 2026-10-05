@@ -187,6 +187,8 @@ type hdlc_state2_s struct {
  *					The channel is AIS, which checks a frame's
  *					length rather than its contents.
  *
+ *		sink		- Where each frame extracted goes.
+ *
  * Description:	The other (original) hdlc decoder took one bit at a time
  *		right out of the demodulator.
  *
@@ -200,7 +202,7 @@ type hdlc_state2_s struct {
  *
  ***********************************************************************************/
 
-func hdlc_rec2_block(block *rrbb.Buffer, config *hdlcConfig) {
+func hdlc_rec2_block(block *rrbb.Buffer, config *hdlcConfig, sink frameSink) {
 	var channel = block.Channel()
 	var subchan = block.Subchannel()
 	var slice = block.Slice()
@@ -224,7 +226,7 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *hdlcConfig) {
 	retry_cfg.contig.nr_bits = 0
 	retry_cfg.contig.bit_idx = 0
 
-	var ok = try_decode(block, config, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == RETRY_NONE))
+	var ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == RETRY_NONE))
 	if ok {
 		logrus.Trace("Got it the first time.")
 
@@ -235,7 +237,7 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *hdlcConfig) {
 	 * Not successful with frame in original form.
 	 * See if we can "fix" it.
 	 */
-	if try_to_fix_quick_now(block, config, channel, subchan, slice, alevel) {
+	if try_to_fix_quick_now(block, config, sink, channel, subchan, slice, alevel) {
 		return
 	}
 
@@ -243,7 +245,7 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *hdlcConfig) {
 		/* Exhausted all desired fix up attempts. */
 		/* Let thru even with bad CRC.  Of course, it still */
 		/* needs to be a minimum number of whole octets. */
-		try_decode(block, config, channel, subchan, slice, alevel, retry_cfg, true)
+		try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, true)
 	}
 } /* end hdlc_rec2_block */
 
@@ -280,7 +282,7 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *hdlcConfig) {
  *
  ***********************************************************************************/
 
-func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, channel int, subchan int, slice int, alevel ax25.ALevel) bool {
+func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel int, subchan int, slice int, alevel ax25.ALevel) bool {
 	var fix_bits = config.fixBits
 
 	var length = block.Len()
@@ -306,7 +308,7 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, channel int, s
 		/* Set the index of the bit to swap */
 		retry_cfg.contig.bit_idx = i
 
-		var ok = try_decode(block, config, channel, subchan, slice, alevel, retry_cfg, false)
+		var ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
@@ -330,7 +332,7 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, channel int, s
 	for i := range length - 1 {
 		retry_cfg.contig.bit_idx = i
 
-		var ok = try_decode(block, config, channel, subchan, slice, alevel, retry_cfg, false)
+		var ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
@@ -354,7 +356,7 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, channel int, s
 	for i := range length - 2 {
 		retry_cfg.contig.bit_idx = i
 
-		var ok = try_decode(block, config, channel, subchan, slice, alevel, retry_cfg, false)
+		var ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
@@ -390,7 +392,7 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, channel int, s
 		for j := i + 2; j < length; j++ {
 			retry_cfg.sep.bit_idx_b = j
 
-			ok = try_decode(block, config, channel, subchan, slice, alevel, retry_cfg, false)
+			ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, false)
 			if ok {
 				break
 			}
@@ -487,7 +489,7 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  *
  ***********************************************************************************/
 
-func try_decode(block *rrbb.Buffer, config *hdlcConfig, channel int, subchan int, slice int, alevel ax25.ALevel, retry_conf *retry_conf_t, passall bool) bool {
+func try_decode(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel int, subchan int, slice int, alevel ax25.ALevel, retry_conf *retry_conf_t, passall bool) bool {
 	var retry_conf_mode = retry_conf.mode
 	var retry_conf_type = retry_conf._type
 	var retry_conf_retry = retry_conf.retry
@@ -644,7 +646,7 @@ func try_decode(block *rrbb.Buffer, config *hdlcConfig, channel int, subchan int
 		if actual_fcs == expected_fcs && config.ais {
 			// Sanity check for AIS.
 			if ais.CheckLength(int(H2.frame_buf[0]>>2)&0x3f, H2.frame_len-2) == 0 {
-				multi_modem_process_rec_frame(
+				sink(
 					channel,
 					subchan,
 					slice,
@@ -665,14 +667,14 @@ func try_decode(block *rrbb.Buffer, config *hdlcConfig, channel int, subchan int
 			// Let's make sure that assumption is good...
 			dwutil.Assert(block.Channel() == channel)
 			dwutil.Assert(block.Subchannel() == subchan)
-			multi_modem_process_rec_frame(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
+			sink(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
 
 			return true /* success */
 		} else if passall {
 			if retry_conf_retry == RETRY_NONE && retry_conf_type == RETRY_TYPE_NONE {
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("ATTEMPTING PASSALL PROCESSING\n");
-				multi_modem_process_rec_frame(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, BitFixPassall, 0) /* len-2 to remove FCS. */
+				sink(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, BitFixPassall, 0) /* len-2 to remove FCS. */
 
 				return true /* success */
 			} else {
