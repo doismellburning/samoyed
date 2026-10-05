@@ -13,20 +13,31 @@ import (
 )
 
 // A receiver hands each packet it decodes to the sink it was made with,
-// rather than straight to the rest of the receive path.
+// rather than straight to the rest of the receive path, along with the audio
+// level from the function it was made with.
 func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 	il2p_init(0)
 
 	type delivery struct {
 		channel, subchannel, slice int
 		pp                         *ax25.Packet
+		alevel                     ax25.ALevel
 		fecType                    fec_type_t
 	}
 
 	var got []delivery
 
-	var rx = newIL2PReceiver(1, 2, 3, IL2P_VERSION_COMPAT, false, func(channel int, subchannel int, slice int, pp *ax25.Packet, _ BitFixLevel, fecType fec_type_t) {
-		got = append(got, delivery{channel, subchannel, slice, pp, fecType})
+	var alevel = ax25.ALevel{Rec: 42, Mark: 41, Space: 43}
+
+	var audioLevel = func(channel int, subchannel int) ax25.ALevel {
+		assert.Equal(t, 1, channel)
+		assert.Equal(t, 2, subchannel)
+
+		return alevel
+	}
+
+	var rx = newIL2PReceiver(1, 2, 3, IL2P_VERSION_COMPAT, false, audioLevel, func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, _ BitFixLevel, fecType fec_type_t) {
+		got = append(got, delivery{channel, subchannel, slice, pp, alevel, fecType})
 	})
 
 	var sender = NewIL2PSender(linecode.NewEncoder(rx.recBit), 1)
@@ -40,6 +51,7 @@ func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 	assert.Equal(t, 1, got[0].channel)
 	assert.Equal(t, 2, got[0].subchannel)
 	assert.Equal(t, 3, got[0].slice)
+	assert.Equal(t, alevel, got[0].alevel)
 	assert.Equal(t, fec_type_il2p, got[0].fecType)
 	assert.Equal(t, pp.FrameData(), got[0].pp.FrameData())
 }

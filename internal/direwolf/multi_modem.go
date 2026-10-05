@@ -666,14 +666,33 @@ type slicerReceivers struct {
 	eas  *easReceiver // nil unless the channel is EAS.
 }
 
+// audioLevelFunc reports the audio level a subchannel's demodulator is
+// hearing, which a receiver delivers each frame with.
+type audioLevelFunc func(channel int, subchannel int) ax25.ALevel
+
+// frameSink takes each frame a receiver extracts, without its FCS, with the
+// audio level it was heard at, how much fixing it took, and the FEC, if any,
+// that carried it.  In normal operation it is multi_modem_process_rec_frame.
+type frameSink func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t)
+
+// newHDLCConfig takes what the HDLC receiver needs from a channel's settings.
+func newHDLCConfig(achan *achan_param_s) hdlcConfig {
+	return hdlcConfig{
+		fixBits:    achan.fix_bits,
+		passall:    achan.passall,
+		ais:        achan.modem_type == MODEM_AIS,
+		sanityTest: achan.sanity_test,
+	}
+}
+
 func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *slicerReceivers {
 	var s = new(slicerReceivers)
-	s.hdlc = newHDLCReceiver(r, channel, subchannel, slice, scrambled, &s.line)
-	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, fx25_deliver_frame)
-	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, il2pDeliverPacket)
+	s.hdlc = newHDLCReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, demod_get_audio_level, multi_modem_process_rec_frame)
+	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, demod_get_audio_level, multi_modem_process_rec_frame)
+	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, demod_get_audio_level, multi_modem_process_rec_packet)
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.eas = newEASReceiver(channel, subchannel, slice)
+		s.eas = newEASReceiver(channel, subchannel, slice, demod_get_audio_level, multi_modem_process_rec_frame)
 	}
 
 	return s

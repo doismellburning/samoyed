@@ -335,11 +335,15 @@ func FuzzFX25RecBit(f *testing.F) {
 		}
 
 		// What the receive path does next with a frame, short of queueing it.
-		var sink = func(channel int, subchannel int, slice int, frame []byte, derrors int) {
-			ax25.FromFrame(frame, ax25.ALevel{Rec: 50, Mark: 50, Space: 50})
+		var audioLevel = func(int, int) ax25.ALevel {
+			return ax25.ALevel{Rec: 50, Mark: 50, Space: 50}
 		}
 
-		var rx = newFX25Receiver(0, 0, 0, int(debug%4), sink)
+		var sink = func(_ int, _ int, _ int, frame []byte, alevel ax25.ALevel, _ BitFixLevel, _ fec_type_t) {
+			ax25.FromFrame(frame, alevel)
+		}
+
+		var rx = newFX25Receiver(0, 0, 0, int(debug%4), audioLevel, sink)
 
 		for _, b := range stream {
 			for imask := byte(0x01); imask != 0; imask <<= 1 {
