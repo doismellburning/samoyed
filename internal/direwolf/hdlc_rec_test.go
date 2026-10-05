@@ -9,6 +9,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,8 +19,8 @@ type hdlcRecTestDelivery struct {
 	channel, subchannel, slice int
 	frame                      []byte
 	alevel                     ax25.ALevel
-	retries                    BitFixLevel
-	fecType                    fec_type_t
+	retries                    phy.BitFixLevel
+	fecType                    phy.FECType
 }
 
 // A receiver needs nothing but its config, its line decoder, and the two
@@ -32,14 +33,14 @@ func TestHDLCReceiverHandsFramesToItsSink(t *testing.T) {
 
 	var line linecode.Decoder
 
-	var rx = newHDLCReceiver(hdlcConfig{fixBits: RETRY_NONE, passall: false, ais: false, sanityTest: SANITY_AX25}, 1, 2, 3, false, &line,
+	var rx = newHDLCReceiver(hdlcConfig{fixBits: phy.BitFixNone, passall: false, ais: false, sanityTest: phy.SanityAX25}, 1, 2, 3, false, &line,
 		func(channel int, subchannel int) ax25.ALevel {
 			assert.Equal(t, 1, channel)
 			assert.Equal(t, 2, subchannel)
 
 			return alevel
 		},
-		func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t) {
+		func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType) {
 			got = append(got, hdlcRecTestDelivery{channel, subchannel, slice, append([]byte{}, frame...), alevel, retries, fecType})
 		})
 
@@ -52,12 +53,19 @@ func TestHDLCReceiverHandsFramesToItsSink(t *testing.T) {
 		rx.recBit(raw, line.Decode(raw, false), false, &pllNudgeTotal, &pllSymbolCount)
 	}), 1)
 
-	var frame = newHDLCSendTestPacket(t, 16).Pack()
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q2TEST"
+	addrs[ax25.Source] = "Q1TEST"
+
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, []byte("abcdefghijklmnop"))
+	require.NotNil(t, pp)
+
+	var frame = pp.Pack()
 
 	sender.SendFlags(4)
 	sender.SendFrame(frame, false)
 	sender.SendFlags(2)
 
 	require.Len(t, got, 1)
-	assert.Equal(t, hdlcRecTestDelivery{1, 2, 3, frame, alevel, RETRY_NONE, fec_type_none}, got[0])
+	assert.Equal(t, hdlcRecTestDelivery{1, 2, 3, frame, alevel, phy.BitFixNone, phy.FECNone}, got[0])
 }
