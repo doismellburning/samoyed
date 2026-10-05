@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package hdlc
 
 /********************************************************************************
  *
@@ -83,9 +86,9 @@ import (
  * Minimum & maximum sizes of an AX.25 frame including the 2 octet FCS.
  */
 
-const MIN_FRAME_LEN = ((ax25.MinPacketLen) + 2)
+const MinFrameLen = ((ax25.MinPacketLen) + 2)
 
-const MAX_FRAME_LEN = ((ax25.MaxPacketLen) + 2)
+const MaxFrameLen = ((ax25.MaxPacketLen) + 2)
 
 type retry_mode_t int
 
@@ -147,11 +150,11 @@ type hdlc_state2_s struct {
 	/* When this reaches 8, oacc is copied */
 	/* to the frame buffer and olen is zeroed. */
 
-	frame_buf [MAX_FRAME_LEN]byte
+	frame_buf [MaxFrameLen]byte
 	/* One frame is kept here. */
 
 	frame_len int /* Number of octets in frame_buf. */
-	/* Should be in range of 0 .. MAX_FRAME_LEN. */
+	/* Should be in range of 0 .. MaxFrameLen. */
 
 }
 
@@ -168,23 +171,23 @@ type hdlc_state2_s struct {
  *		config		- Configuration for the channel it came from.
  *				  This is what we care about:
  *
- *	   			BitFixLevel fixBits;
+ *	   			phy.BitFixLevel FixBits;
  *					Level of effort to recover from
  *					a bad FCS on the frame.
  *					0 = no effort
  *					1 = try inverting a single bit
  *					2... = more techniques...
  *
- *	    			sanity_t sanityTest;
+ *	    			phy.Sanity SanityTest;
  *					Sanity test to apply when finding a good
  *					CRC after changing one or more bits.
  *					Must look like APRS, AX.25, or anything.
  *
- *	    			bool passall;
+ *	    			bool Passall;
  *					Allow thru even with bad CRC after exhausting
  *					all fixup attempts.
  *
- *	    			bool ais;
+ *	    			bool AIS;
  *					The channel is AIS, which checks a frame's
  *					length rather than its contents.
  *
@@ -203,13 +206,13 @@ type hdlc_state2_s struct {
  *
  ***********************************************************************************/
 
-func hdlc_rec2_block(block *rrbb.Buffer, config *hdlcConfig, sink frameSink) {
+func hdlc_rec2_block(block *rrbb.Buffer, config *Config, sink FrameSink) {
 	var channel = block.Channel()
 	var subchan = block.Subchannel()
 	var slice = block.Slice()
 	var alevel = block.AudioLevel()
-	var fix_bits = config.fixBits
-	var passall = config.passall
+	var fix_bits = config.FixBits
+	var passall = config.Passall
 
 	logrus.Trace("--- try to decode ---")
 
@@ -260,7 +263,7 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *hdlcConfig, sink frameSink) {
  *		channel	- Radio channel from which it was received.
  *		subchan	- Which demodulator when more than one per channel.
  *		alevel	- Audio level for later reporting.
- *		config	- Configuration for that channel.  Uses fixBits,
+ *		config	- Configuration for that channel.  Uses FixBits,
  *			  the maximum level of fix up to attempt:
  *
  *				RETRY_NONE (0)	- Don't try any.
@@ -283,8 +286,8 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *hdlcConfig, sink frameSink) {
  *
  ***********************************************************************************/
 
-func try_to_fix_quick_now(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel int, subchan int, slice int, alevel ax25.ALevel) bool {
-	var fix_bits = config.fixBits
+func try_to_fix_quick_now(block *rrbb.Buffer, config *Config, sink FrameSink, channel int, subchan int, slice int, alevel ax25.ALevel) bool {
+	var fix_bits = config.FixBits
 
 	var length = block.Len()
 	/* Prepare the retry configuration */
@@ -453,7 +456,7 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  * Inputs:	block		- Bit string that was collected between "flag" patterns.
  *
  *		config		- Configuration for that channel.  Uses
- *				  ais and sanityTest.
+ *				  AIS and SanityTest.
  *
  *		channel, subchan	- where it came from.
  *
@@ -490,7 +493,7 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  *
  ***********************************************************************************/
 
-func try_decode(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel int, subchan int, slice int, alevel ax25.ALevel, retry_conf *retry_conf_t, passall bool) bool {
+func try_decode(block *rrbb.Buffer, config *Config, sink FrameSink, channel int, subchan int, slice int, alevel ax25.ALevel, retry_conf *retry_conf_t, passall bool) bool {
 	var retry_conf_mode = retry_conf.mode
 	var retry_conf_type = retry_conf._type
 	var retry_conf_retry = retry_conf.retry
@@ -606,7 +609,7 @@ func try_decode(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel 
 		if (H2.olen & 8) > 0 {
 			H2.olen = 0
 
-			if H2.frame_len < MAX_FRAME_LEN {
+			if H2.frame_len < MaxFrameLen {
 				H2.frame_buf[H2.frame_len] = H2.oacc
 				H2.frame_len++
 			}
@@ -623,7 +626,7 @@ func try_decode(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel 
 		}).Trace("try_decode")
 	}
 
-	if H2.olen == 0 && H2.frame_len >= MIN_FRAME_LEN {
+	if H2.olen == 0 && H2.frame_len >= MinFrameLen {
 		if retry_conf_type == RETRY_TYPE_NONE && logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithFields(logrus.Fields{
 				"frame_len": H2.frame_len,
@@ -644,7 +647,7 @@ func try_decode(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel 
 
 		fcs_ok = actual_fcs == expected_fcs
 
-		if actual_fcs == expected_fcs && config.ais {
+		if actual_fcs == expected_fcs && config.AIS {
 			// Sanity check for AIS.
 			if ais.CheckLength(int(H2.frame_buf[0]>>2)&0x3f, H2.frame_len-2) == 0 {
 				sink(
@@ -662,7 +665,7 @@ func try_decode(block *rrbb.Buffer, config *hdlcConfig, sink frameSink, channel 
 				return false /* did not pass sanity check */
 			}
 		} else if actual_fcs == expected_fcs &&
-			sanity_check(H2.frame_buf[:H2.frame_len-2], retry_conf.retry, config.sanityTest) {
+			sanity_check(H2.frame_buf[:H2.frame_len-2], retry_conf.retry, config.SanityTest) {
 			// TODO: Shouldn't be necessary to pass chan, subchan, alevel into
 			// try_decode because we can obtain them from block.
 			// Let's make sure that assumption is good...
@@ -707,7 +710,7 @@ failure:
 		switch {
 		case H2.olen != 0:
 			logEntry.Trace("try_decode: FAILURE, bad olen")
-		case H2.frame_len < MIN_FRAME_LEN:
+		case H2.frame_len < MinFrameLen:
 			logEntry.Trace("try_decode: FAILURE, frame too small")
 		default:
 			logEntry.WithFields(logrus.Fields{

@@ -74,6 +74,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/sirupsen/logrus"
@@ -660,7 +661,7 @@ func (m *MultiModem) pickBestCandidate() {
 type slicerReceivers struct {
 	line linecode.Decoder
 
-	hdlc *hdlcReceiver
+	hdlc *hdlc.Receiver
 	fx25 *fx25Receiver
 	il2p *il2pReceiver
 	eas  *easReceiver // nil unless the channel is EAS.
@@ -676,18 +677,18 @@ type audioLevelFunc func(channel int, subchannel int) ax25.ALevel
 type frameSink func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t)
 
 // newHDLCConfig takes what the HDLC receiver needs from a channel's settings.
-func newHDLCConfig(achan *achan_param_s) hdlcConfig {
-	return hdlcConfig{
-		fixBits:    achan.fix_bits,
-		passall:    achan.passall,
-		ais:        achan.modem_type == MODEM_AIS,
-		sanityTest: achan.sanity_test,
+func newHDLCConfig(achan *achan_param_s) hdlc.Config {
+	return hdlc.Config{
+		FixBits:    achan.fix_bits,
+		Passall:    achan.passall,
+		AIS:        achan.modem_type == MODEM_AIS,
+		SanityTest: achan.sanity_test,
 	}
 }
 
 func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *slicerReceivers {
 	var s = new(slicerReceivers)
-	s.hdlc = newHDLCReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, demod_get_audio_level, multi_modem_process_rec_frame)
+	s.hdlc = hdlc.NewReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, demod_get_audio_level, multi_modem_process_rec_frame)
 	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, demod_get_audio_level, multi_modem_process_rec_frame)
 	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, demod_get_audio_level, multi_modem_process_rec_packet)
 
@@ -838,7 +839,7 @@ func (r *Layer2Receiver) RecBitNew(channel int, subchannel int, slice int, _raw 
 		s.il2p.recBit(dwutil.IfThenElse(raw, 1, 0)) // Note: skip NRZI.
 	}
 
-	s.hdlc.recBit(raw, dbit, is_scrambled, pll_nudge_total, pll_symbol_count)
+	s.hdlc.RecBit(raw, dbit, is_scrambled, pll_nudge_total, pll_symbol_count)
 }
 
 /***********************************************************************************

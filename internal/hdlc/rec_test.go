@@ -1,13 +1,12 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package hdlc
 
 import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +32,7 @@ func TestHDLCReceiverHandsFramesToItsSink(t *testing.T) {
 
 	var line linecode.Decoder
 
-	var rx = newHDLCReceiver(hdlcConfig{fixBits: phy.BitFixNone, passall: false, ais: false, sanityTest: phy.SanityAX25}, 1, 2, 3, false, &line,
+	var rx = NewReceiver(Config{FixBits: phy.BitFixNone, Passall: false, AIS: false, SanityTest: phy.SanityAX25}, 1, 2, 3, false, &line,
 		func(channel int, subchannel int) ax25.ALevel {
 			assert.Equal(t, 1, channel)
 			assert.Equal(t, 2, subchannel)
@@ -48,9 +47,9 @@ func TestHDLCReceiverHandsFramesToItsSink(t *testing.T) {
 
 	var pllSymbolCount int
 
-	var sender = hdlc.NewSender(linecode.NewEncoder(func(level int) {
+	var sender = NewSender(linecode.NewEncoder(func(level int) {
 		var raw = level != 0
-		rx.recBit(raw, line.Decode(raw, false), false, &pllNudgeTotal, &pllSymbolCount)
+		rx.RecBit(raw, line.Decode(raw, false), false, &pllNudgeTotal, &pllSymbolCount)
 	}), 1)
 
 	var addrs [ax25.MaxAddrs]string

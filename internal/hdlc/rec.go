@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package hdlc
 
 /********************************************************************************
  *
@@ -7,6 +10,7 @@ package direwolf
  *******************************************************************************/
 
 import (
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
@@ -26,18 +30,29 @@ import (
  * Should have a reset function instead of initializations here.
  */
 
-// hdlcConfig is the part of a channel's configuration the HDLC receiver uses.
-type hdlcConfig struct {
-	fixBits    phy.BitFixLevel // How hard to try to fix a frame with a bad FCS.
-	passall    bool            // Let a frame through with a bad FCS once every fix has failed.
-	ais        bool            // The channel is AIS, which checks a frame's length rather than its contents.
-	sanityTest phy.Sanity      // What a frame has to look like once bits have been fixed.
+// Config is the part of a channel's configuration the HDLC receiver uses.
+type Config struct {
+	FixBits    phy.BitFixLevel // How hard to try to fix a frame with a bad FCS.
+	Passall    bool            // Let a frame through with a bad FCS once every fix has failed.
+	AIS        bool            // The channel is AIS, which checks a frame's length rather than its contents.
+	SanityTest phy.Sanity      // What a frame has to look like once bits have been fixed.
 }
 
-type hdlcReceiver struct {
-	config                     hdlcConfig
-	audioLevel                 audioLevelFunc // For the audio level to deliver each frame with.
-	sink                       frameSink      // Where each frame goes.
+// AudioLevelFunc reports the audio level a subchannel's demodulator is
+// hearing, which the receiver delivers each frame with.
+type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
+
+// FrameSink takes each frame the receiver extracts, without its FCS, with the
+// audio level it was heard at, how much fixing it took, and the FEC that
+// carried it, which for plain HDLC is always phy.FECNone.
+type FrameSink func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
+
+// Receiver extracts HDLC frames from the bits one slicer of one demodulator
+// ("subchannel") of one channel hears.
+type Receiver struct {
+	config                     Config
+	audioLevel                 AudioLevelFunc // For the audio level to deliver each frame with.
+	sink                       FrameSink      // Where each frame goes.
 	channel, subchannel, slice int
 
 	line *linecode.Decoder /* The slicer's line decoder, for the state the retries start from. */
@@ -56,17 +71,20 @@ type hdlcReceiver struct {
 	/* The value of -1 is a special case meaning */
 	/* bits should not be accumulated. */
 
-	frameBuf [MAX_FRAME_LEN]byte
+	frameBuf [MaxFrameLen]byte
 	/* One frame is kept here. */
 
 	frameLen int /* Number of octets in frameBuf. */
-	/* Should be in range of 0 .. MAX_FRAME_LEN. */
+	/* Should be in range of 0 .. MaxFrameLen. */
 
 	rawBits *rrbb.Buffer /* Handle for bit array for raw received bits. */
 }
 
-func newHDLCReceiver(config hdlcConfig, channel int, subchannel int, slice int, scrambled bool, line *linecode.Decoder, audioLevel audioLevelFunc, sink frameSink) *hdlcReceiver {
-	var s = new(hdlcReceiver)
+// NewReceiver makes a Receiver for one slicer, which reads the descrambler
+// state each frame starts from out of line, the slicer's line decoder.  It
+// gives each frame it extracts to sink, with the level audioLevel reports.
+func NewReceiver(config Config, channel int, subchannel int, slice int, scrambled bool, line *linecode.Decoder, audioLevel AudioLevelFunc, sink FrameSink) *Receiver {
+	var s = new(Receiver)
 	s.config = config
 	s.audioLevel = audioLevel
 	s.sink = sink
@@ -85,9 +103,9 @@ func newHDLCReceiver(config hdlcConfig, channel int, subchannel int, slice int, 
 	return s
 }
 
-// recBit takes one bit as the demodulator heard it, and the data bit the
+// RecBit takes one bit as the demodulator heard it, and the data bit the
 // slicer's line decoder made of it.
-func (s *hdlcReceiver) recBit(raw bool, dbit bool, is_scrambled bool,
+func (s *Receiver) RecBit(raw bool, dbit bool, is_scrambled bool,
 	pll_nudge_total *int64, pll_symbol_count *int) {
 	var channel = s.channel
 	var subchannel = s.subchannel
@@ -182,7 +200,7 @@ func (s *hdlcReceiver) recBit(raw bool, dbit bool, is_scrambled bool,
 				  dw_printf ("\nfound flag, channel %d.%d, %d bits in frame\n", channel, subchannel, H.rawBits.Len() - 1);
 			#endif
 		*/
-		if s.rawBits.Len() >= MIN_FRAME_LEN*8 {
+		if s.rawBits.Len() >= MinFrameLen*8 {
 			//JWL - end of frame
 			var speed_error float64    // in percentage.
 			if *pll_symbol_count > 0 { // avoid divde by 0.
@@ -294,7 +312,7 @@ func (s *hdlcReceiver) recBit(raw bool, dbit bool, is_scrambled bool,
 			if s.olen == 8 {
 				s.olen = 0
 
-				if s.frameLen < MAX_FRAME_LEN {
+				if s.frameLen < MaxFrameLen {
 					s.frameBuf[s.frameLen] = s.oacc
 					s.frameLen++
 				}
