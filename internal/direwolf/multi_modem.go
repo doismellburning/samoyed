@@ -689,7 +689,7 @@ func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice in
 	var s = new(slicerReceivers)
 	s.hdlc = newHDLCReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, demod_get_audio_level, multi_modem_process_rec_frame)
 	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, demod_get_audio_level, multi_modem_process_rec_frame)
-	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, il2pDeliverPacket)
+	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, demod_get_audio_level, multi_modem_process_rec_packet)
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
 		s.eas = newEASReceiver(channel, subchannel, slice)

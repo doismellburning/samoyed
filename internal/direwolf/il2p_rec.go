@@ -55,24 +55,17 @@ type il2pReceiver struct {
 
 	corrected int // Number of symbols corrected by RS FEC.
 
-	sink il2pPacketSink // Where each extracted packet goes.
+	audioLevel audioLevelFunc // For the audio level to deliver each packet with.
+	sink       il2pPacketSink // Where each extracted packet goes.
 }
 
 // il2pPacketSink is handed each packet extracted from the received bit
-// stream, along with the number of symbols the FEC decoder had to correct.
-type il2pPacketSink func(channel int, subchannel int, slice int, pp *ax25.Packet, retries BitFixLevel, fecType fec_type_t)
+// stream, along with the audio level it was heard at and the number of
+// symbols the FEC decoder had to correct.  In normal operation it is
+// multi_modem_process_rec_packet.
+type il2pPacketSink func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t)
 
-// il2pDeliverPacket is the sink used in normal operation, passing the packet
-// on to the rest of the receive path.
-func il2pDeliverPacket(channel int, subchannel int, slice int, pp *ax25.Packet, retries BitFixLevel, fecType fec_type_t) {
-	var alevel = demod_get_audio_level(channel, subchannel)
-
-	// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
-
-	multi_modem_process_rec_packet(channel, subchannel, slice, pp, alevel, retries, fecType)
-}
-
-func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_version_t, crc bool, sink il2pPacketSink) *il2pReceiver {
+func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_version_t, crc bool, audioLevel audioLevelFunc, sink il2pPacketSink) *il2pReceiver {
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -83,6 +76,7 @@ func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_versio
 	F.slice = slice
 	F.version = version
 	F.crc = crc
+	F.audioLevel = audioLevel
 	F.sink = sink
 
 	return F
@@ -106,7 +100,7 @@ func (F *il2pReceiver) logEntry() *logrus.Entry {
  *
  * Description: This is called once for each received bit.
  *              Each valid packet is handed to the receiver's sink, which in
- *              normal operation is il2pDeliverPacket.
+ *              normal operation is multi_modem_process_rec_packet.
  *		It can gather multiple candidates from different parallel demodulators
  *		("subchannels") and slicers, then decide which one is the best.
  *
@@ -299,7 +293,9 @@ func (F *il2pReceiver) recBit(dbit int) {
 			}
 
 			if pp != nil {
-				F.sink(channel, subchannel, slice, pp, BitFixLevel(F.corrected), fec_type_il2p)
+				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
+
+				F.sink(channel, subchannel, slice, pp, F.audioLevel(channel, subchannel), BitFixLevel(F.corrected), fec_type_il2p)
 			}
 		} // end block for local variables.
 
