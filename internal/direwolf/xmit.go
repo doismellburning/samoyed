@@ -41,6 +41,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
@@ -1368,9 +1369,9 @@ type Layer2Sender struct {
 
 	line *linecode.Encoder // Puts the bits on the line, keeping its NRZI level.
 
-	hdlc *HDLCSender // Sends AX.25 frames, and the flags between them.
-	fx25 *FX25Sender // Sends FX.25, on the same line.
-	il2p *IL2PSender // Sends IL2P, on the same line.
+	hdlc *hdlc.Sender // Sends AX.25 frames, and the flags between them.
+	fx25 *FX25Sender  // Sends FX.25, on the same line.
+	il2p *IL2PSender  // Sends IL2P, on the same line.
 }
 
 // NewLayer2Sender makes a Layer2Sender for channel, sending the layer 2
@@ -1382,7 +1383,7 @@ func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneG
 	s.audioConfig = audioConfig
 	s.toneGenerator = toneGenerator
 	s.line = linecode.NewEncoder(s.putBit)
-	s.hdlc = NewHDLCSender(s.line, channel)
+	s.hdlc = hdlc.NewSender(s.line, channel)
 	s.fx25 = NewFX25Sender(s.line, channel, fx25Debug)
 	s.il2p = NewIL2PSender(s.line, channel)
 

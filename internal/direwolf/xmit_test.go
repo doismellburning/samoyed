@@ -895,11 +895,11 @@ func TestLayer2SendersKeepTheirOwnLineLevel(t *testing.T) {
 
 	toneGenCapture = func(int, int) {}
 
-	other.hdlc.sendBitNRZI(false)
+	other.line.WriteNRZI(false)
 
 	var bits = captureBits(t, nil, func(s *Layer2Sender) {
-		s.hdlc.sendBitNRZI(false)
-		s.hdlc.sendBitNRZI(true)
+		s.line.WriteNRZI(false)
+		s.line.WriteNRZI(true)
 	})
 
 	assert.Equal(t, 1, other.line.Level(), "the other sender's zero should have inverted its own line")

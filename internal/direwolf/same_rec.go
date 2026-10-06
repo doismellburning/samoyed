@@ -3,6 +3,10 @@
 
 package direwolf
 
+import (
+	"github.com/doismellburning/samoyed/internal/ax25"
+)
+
 /********************************************************************************
  *
  * Purpose:	Extract EAS SAME transmissions from a stream of bits.
@@ -10,6 +14,11 @@ package direwolf
  *		SAME is not HDLC: it has no flags, bit stuffing or NRZI.
  *
  *******************************************************************************/
+
+// easBufLen is the size of the EAS receiver's buffer.  Dire Wolf gave it the
+// HDLC receiver's, room for the longest AX.25 frame and its FCS; it keeps that
+// size, but as its own, since SAME is not HDLC.
+const easBufLen = ax25.MaxPacketLen + 2
 
 // easReceiver is the EAS SAME receive state for one slicer of one
 // demodulator ("subchannel") of one channel.
@@ -29,7 +38,7 @@ type easReceiver struct {
 
 	olen int /* Number of bits gathered towards the next octet. */
 
-	frameBuf [MAX_FRAME_LEN]byte /* The transmission gathered so far. */
+	frameBuf [easBufLen]byte /* The transmission gathered so far. */
 
 	frameLen int /* Number of octets in frameBuf. */
 }

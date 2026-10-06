@@ -153,8 +153,8 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 }
 
 // An EAS channel's bits go to its EAS receiver alone: SAME is not HDLC, so
-// neither the line decoder nor the HDLC receiver should see them.  Other
-// channels have no EAS receiver at all.
+// neither the line decoder nor the HDLC, FX.25 or IL2P receivers should see
+// them.  Other channels have no EAS receiver at all.
 func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	var origReceiver = layer2Receiver
 
@@ -178,6 +178,12 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	var s = layer2Receiver.slicer[1][0][0]
 	require.NotNil(t, s.eas)
 
+	// Without its other receivers, the slicer would panic if it handed any
+	// of them a bit.
+	s.hdlc = nil
+	s.fx25 = nil
+	s.il2p = nil
+
 	// The SAME preamble, then "ZCZC", least significant bit first.
 	for _, b := range []byte{0xab, 0xab, 0xab, 0xab, 'Z', 'C', 'Z', 'C'} {
 		for i := range 8 {
@@ -193,5 +199,4 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	layer2Receiver.RecBit(1, 0, 0, 1, false, 0)
 
 	assert.False(t, s.line.PrevRaw(), "the line decoder should not have been given any bits")
-	assert.Zero(t, s.hdlc.patDet, "the HDLC receiver should not have been given any bits")
 }
