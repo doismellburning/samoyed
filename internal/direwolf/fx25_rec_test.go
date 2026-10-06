@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,8 +21,8 @@ func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
 		channel, subchannel, slice int
 		frame                      []byte
 		alevel                     ax25.ALevel
-		retries                    BitFixLevel
-		fecType                    fec_type_t
+		retries                    phy.BitFixLevel
+		fecType                    phy.FECType
 	}
 
 	var got []delivery
@@ -35,7 +36,7 @@ func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
 
 			return alevel
 		},
-		func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t) {
+		func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType) {
 			got = append(got, delivery{channel, subchannel, slice, slices.Clone(frame), alevel, retries, fecType})
 		})
 
@@ -56,5 +57,5 @@ func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
 	}
 
 	require.Len(t, got, 1)
-	assert.Equal(t, delivery{1, 2, 3, fxTestFrame, alevel, BitFixLevel(2), fec_type_fx25}, got[0])
+	assert.Equal(t, delivery{1, 2, 3, fxTestFrame, alevel, phy.BitFixLevel(2), phy.FECFX25}, got[0])
 }

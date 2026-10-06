@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,7 +73,7 @@ func fxTestReceive(block []byte) ([][]byte, []int) {
 	var frames [][]byte
 	var derrors []int
 
-	var collect = func(_ int, _ int, _ int, frame []byte, _ ax25.ALevel, retries BitFixLevel, _ fec_type_t) {
+	var collect = func(_ int, _ int, _ int, frame []byte, _ ax25.ALevel, retries phy.BitFixLevel, _ phy.FECType) {
 		frames = append(frames, frame)
 		derrors = append(derrors, int(retries))
 	}

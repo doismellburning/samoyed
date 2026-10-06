@@ -12,6 +12,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/bitstuff"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -44,9 +45,9 @@ type fx25Receiver struct {
 }
 
 func newFX25Receiver(channel int, subchannel int, slice int, debug int, audioLevel audioLevelFunc, sink frameSink) *fx25Receiver {
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
-	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
+	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
+	dwutil.Assert(subchannel >= 0 && subchannel < phy.MaxSubchans)
+	dwutil.Assert(slice >= 0 && slice < phy.MaxSlicers)
 
 	var F = new(fx25Receiver)
 	F.channel = channel
@@ -245,7 +246,7 @@ func (F *fx25Receiver) processRSBlock() {
 
 				// The number of bytes the FEC decoder had to correct stands
 				// for how much fixing the frame took.
-				F.sink(channel, subchannel, slice, frame_buf[:frame_len-2], F.audioLevel(channel, subchannel), BitFixLevel(derrors), fec_type_fx25) /* len-2 to remove FCS. */
+				F.sink(channel, subchannel, slice, frame_buf[:frame_len-2], F.audioLevel(channel, subchannel), phy.BitFixLevel(derrors), phy.FECFX25) /* len-2 to remove FCS. */
 			} else {
 				// Most likely cause is defective sender software.
 				F.logEntry().Warn("FX.25: Bad FCS for AX.25 frame")
