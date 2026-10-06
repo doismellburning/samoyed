@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
-	"github.com/stretchr/testify/require"
 )
 
 const il2pTestText = `'... As I was saying, that seems to be done right - though I haven't time to look it over thoroughly just now - and ` +
@@ -30,8 +30,10 @@ type il2pLoopbackFrame struct {
 	retries phy.BitFixLevel // Symbols the Reed Solomon decoder had to correct.
 }
 
-// il2pLoopbackRecorder collects the frames that came back out of the receiver.
+// il2pLoopbackRecorder holds a sender wired straight into a receiver, and
+// collects the frames that come back out of the receiver.
 type il2pLoopbackRecorder struct {
+	sender *IL2PSender
 	rx     *il2pReceiver
 	frames []il2pLoopbackFrame
 }
@@ -50,38 +52,29 @@ func (r *il2pLoopbackRecorder) flush() {
 	r.rx.recBit(0)
 }
 
-// il2pLoopback wires the transmitter's bit stream straight into the receiver
-// and collects the frames that come back out, for the duration of the test.
-// That is the same serialize and deserialize path used on the air, standing in
-// for the audio hardware at one end and the data link queue at the other.
+// il2pLoopback wires a sender's bit stream straight into a receiver, and
+// collects the frames that come back out.  That is the same serialize and
+// deserialize path used on the air, without the audio hardware at one end
+// and the data link queue at the other.
 //
-// The receiver speaks the given version and expects a trailing CRC.  The
-// transmitter adds one because its configuration asks for it.
+// The receiver speaks the given version and expects a trailing CRC.  Frames
+// sent with the recorder's sender should ask for one.
 func il2pLoopback(t *testing.T, version il2p_version_t) *il2pLoopbackRecorder {
 	t.Helper()
 
 	var recorder = new(il2pLoopbackRecorder)
 
-	var savedTone, savedRec = toneGenCapture, multiModemRecCapture
-
-	t.Cleanup(func() {
-		toneGenCapture, multiModemRecCapture = savedTone, savedRec
-	})
-
 	// A receiver of its own, so this test neither inherits nor bequeaths a
 	// half-gathered frame.  A decoder left part way through gathering a payload
 	// swallows the next frame it is given while it resynchronises, which a
 	// deliberate version mismatch is apt to leave behind.
-	recorder.rx = newIL2PReceiver(0, 0, 0, version, true, demod_get_audio_level, multi_modem_process_rec_packet)
+	recorder.rx = newIL2PReceiver(0, 0, 0, version, true,
+		func(int, int) ax25.ALevel { return ax25.ALevel{Rec: 0, Mark: 0, Space: 0} },
+		func(_ int, _ int, _ int, pp *ax25.Packet, _ ax25.ALevel, retries phy.BitFixLevel, _ phy.FECType) {
+			recorder.frames = append(recorder.frames, il2pLoopbackFrame{info: pp.Info(), retries: retries})
+		})
 
-	toneGenCapture = func(channel int, data int) {
-		require.Zero(t, channel)
-		recorder.rx.recBit(data)
-	}
-
-	multiModemRecCapture = func(_ int, _ int, _ int, pp *ax25.Packet, _ ax25.ALevel, retries phy.BitFixLevel, _ phy.FECType) {
-		recorder.frames = append(recorder.frames, il2pLoopbackFrame{info: pp.Info(), retries: retries})
-	}
+	recorder.sender = NewIL2PSender(linecode.NewEncoder(recorder.rx.recBit), 0)
 
 	return recorder
 }
