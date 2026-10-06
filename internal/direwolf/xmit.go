@@ -41,6 +41,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/il2p"
@@ -1374,6 +1375,7 @@ type Layer2Sender struct {
 	hdlc *hdlc.Sender // Sends AX.25 frames, and the flags between them.
 	fx25 *fx25.Sender // Sends FX.25, on the same line.
 	il2p *il2p.Sender // Sends IL2P, on the same line.
+	eas  *eas.Sender  // Sends EAS SAME, on the same line.
 }
 
 // NewLayer2Sender makes a Layer2Sender for channel, sending the layer 2
@@ -1388,6 +1390,7 @@ func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneG
 	s.hdlc = hdlc.NewSender(s.line, channel)
 	s.fx25 = fx25.NewSender(s.line, channel, fx25Debug)
 	s.il2p = il2p.NewSender(s.line, channel)
+	s.eas = eas.NewSender(s.line)
 
 	return s
 }
@@ -1535,3 +1538,53 @@ func (s *Layer2Sender) SendPreamblePostamble(nbytes int, finish bool) int {
 }
 
 /* end xmit.c */
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        sendEAS (eas_send in Dire Wolf)
+ *
+ * Purpose:    	Serialize EAS SAME for transmission.
+ *
+ * Inputs:	str	- Character string to send.
+ *		repeat	- Number of times to repeat with 1 sec quiet between.
+ *		txdelay	- Delay (ms) from PTT to first preamble bit.
+ *		txtail	- Delay (ms) from last data bit to PTT off.
+ *
+ *
+ * Returns:	Total number of milliseconds to activate PTT.
+ *		This includes delays before the first character
+ *		and after the last to avoid chopping off part of it.
+ *
+ * Description:	xmit_thread calls this instead of the usual hdlc_send
+ *		when we have a special packet that means send EAS SAME
+ *		code.
+ *
+ *--------------------------------------------------------------------*/
+
+func (s *Layer2Sender) sendEAS(str []byte, repeat int, txdelay int, txtail int) int {
+	var bytes_sent = 0
+	const gap = 1000
+	var gaps_sent = 0
+
+	s.putQuietMs(txdelay)
+
+	for r := range repeat {
+		bytes_sent += s.eas.SendMessage(str) / 8
+
+		if r < repeat-1 {
+			s.putQuietMs(gap)
+
+			gaps_sent++
+		}
+	}
+
+	s.putQuietMs(txtail)
+
+	s.flush()
+
+	var elapsed = txdelay + int(float64(bytes_sent)*8*1.92) + (gaps_sent * gap) + txtail
+
+	// dw_printf ("DEBUG:  EAS total time = %d ms\n", elapsed);
+
+	return (elapsed)
+} /* end sendEAS */

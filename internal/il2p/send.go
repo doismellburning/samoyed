@@ -20,7 +20,7 @@ type Sender struct {
 	bitsSent int // Count number of bits sent by SendFrame or SendPreamble.
 }
 
-// NewSender makes an Sender for channel that sends on line.
+// NewSender makes a Sender for channel that sends on line.
 func NewSender(line *linecode.Encoder, channel int) *Sender {
 	var s = new(Sender)
 	s.line = line

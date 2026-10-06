@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package eas
 
 import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,14 +30,14 @@ func TestEASReceiverHandsMessagesToItsSink(t *testing.T) {
 
 			var alevel = ax25.ALevel{Rec: 42, Mark: 41, Space: 43}
 
-			var rx = newEASReceiver(1, 2, 3,
+			var rx = NewReceiver(1, 2, 3,
 				func(channel int, subchannel int) ax25.ALevel {
 					assert.Equal(t, 1, channel)
 					assert.Equal(t, 2, subchannel)
 
 					return alevel
 				},
-				func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, _ BitFixLevel, _ fec_type_t) {
+				func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, _ phy.BitFixLevel, _ phy.FECType) {
 					got = append(got, delivery{channel, subchannel, slice, string(frame), alevel})
 				})
 
@@ -44,7 +45,7 @@ func TestEASReceiverHandsMessagesToItsSink(t *testing.T) {
 			// bit first, as same_send.go sends them.
 			for _, b := range append([]byte{0xab, 0xab, 0xab, 0xab}, message...) {
 				for i := range 8 {
-					rx.recBit(int(b>>i)&1, 0)
+					rx.RecBit(int(b>>i)&1, 0)
 				}
 			}
 

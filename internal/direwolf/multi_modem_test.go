@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/il2p"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -179,23 +181,33 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	var s = layer2Receiver.slicer[1][0][0]
 	require.NotNil(t, s.eas)
 
+	// An EAS receiver of the same kind, but one whose messages this test can
+	// see.
+	var got []string
+
+	s.eas = eas.NewReceiver(1, 0, 0,
+		func(int, int) ax25.ALevel { return ax25.ALevel{Rec: 0, Mark: 0, Space: 0} },
+		func(_ int, _ int, _ int, frame []byte, _ ax25.ALevel, _ phy.BitFixLevel, _ phy.FECType) {
+			got = append(got, string(frame))
+		})
+
 	// Without its other receivers, the slicer would panic if it handed any
 	// of them a bit.
 	s.hdlc = nil
 	s.fx25 = nil
 	s.il2p = nil
 
-	// The SAME preamble, then "ZCZC", least significant bit first.
-	for _, b := range []byte{0xab, 0xab, 0xab, 0xab, 'Z', 'C', 'Z', 'C'} {
+	// The SAME preamble, then "NNNN", the end of message, least significant
+	// bit first.
+	for _, b := range []byte{0xab, 0xab, 0xab, 0xab, 'N', 'N', 'N', 'N'} {
 		for i := range 8 {
 			layer2Receiver.RecBit(1, 0, 0, int(b>>i)&1, false, 0)
 		}
 	}
 
-	assert.True(t, s.eas.easGathering, "the EAS receiver should have found the start of a message")
-	assert.Equal(t, "ZCZC", string(s.eas.frameBuf[:s.eas.frameLen]))
+	assert.Equal(t, []string{"NNNN"}, got, "the EAS receiver should have been given the message")
 
-	// "ZCZC" ends on a 0, which is also where an untouched line decoder
+	// "NNNN" ends on a 0, which is also where an untouched line decoder
 	// starts, so end on a 1 that the decoder would remember if it saw it.
 	layer2Receiver.RecBit(1, 0, 0, 1, false, 0)
 

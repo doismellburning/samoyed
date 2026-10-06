@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-package direwolf
+package eas
 
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 )
 
 /********************************************************************************
@@ -20,13 +21,22 @@ import (
 // size, but as its own, since SAME is not HDLC.
 const easBufLen = ax25.MaxPacketLen + 2
 
-// easReceiver is the EAS SAME receive state for one slicer of one
+// AudioLevelFunc reports the audio level a subchannel's demodulator is
+// hearing, which the receiver delivers each message with.
+type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
+
+// FrameSink takes each message the receiver extracts, with the audio level it
+// was heard at, and phy.BitFixNone and phy.FECNone, since SAME has neither
+// fixing up nor FEC.
+type FrameSink func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
+
+// Receiver is the EAS SAME receive state for one slicer of one
 // demodulator ("subchannel") of one channel.
-type easReceiver struct {
+type Receiver struct {
 	channel, subchannel, slice int
 
-	audioLevel audioLevelFunc // For the audio level to deliver each message with.
-	sink       frameSink      // Where each message goes.
+	audioLevel AudioLevelFunc // For the audio level to deliver each message with.
+	sink       FrameSink      // Where each message goes.
 
 	easAcc uint64 /* Accumulate most recent 64 bits received for EAS. */
 
@@ -43,8 +53,10 @@ type easReceiver struct {
 	frameLen int /* Number of octets in frameBuf. */
 }
 
-func newEASReceiver(channel int, subchannel int, slice int, audioLevel audioLevelFunc, sink frameSink) *easReceiver {
-	var s = new(easReceiver)
+// NewReceiver makes a Receiver for one slicer.  It gives each message it
+// extracts to sink, with the level audioLevel reports.
+func NewReceiver(channel int, subchannel int, slice int, audioLevel AudioLevelFunc, sink FrameSink) *Receiver {
+	var s = new(Receiver)
 	s.channel = channel
 	s.subchannel = subchannel
 	s.slice = slice
@@ -84,7 +96,7 @@ const PREAMBLE_ZCZC = 0x435a435aabababab
 const PREAMBLE_NNNN = 0x4e4e4e4eabababab
 const EAS_MAX_LEN = 268 // Not including preamble.  Up to 31 geographic areas.
 
-func (s *easReceiver) recBit(raw int, future_use int) { //nolint:unparam
+func (s *Receiver) RecBit(raw int, future_use int) {
 	//dw_printf ("slice %d = %d\n", s.slice, raw);
 
 	// Accumulate most recent 64 bits.
@@ -173,7 +185,7 @@ func (s *easReceiver) recBit(raw int, future_use int) { //nolint:unparam
 			#endif
 		*/
 		var alevel = s.audioLevel(s.channel, s.subchannel)
-		s.sink(s.channel, s.subchannel, s.slice, s.frameBuf[:s.frameLen], alevel, 0, 0)
+		s.sink(s.channel, s.subchannel, s.slice, s.frameBuf[:s.frameLen], alevel, phy.BitFixNone, phy.FECNone)
 		s.easGathering = false
 	}
 }
