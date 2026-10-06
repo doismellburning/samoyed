@@ -3,6 +3,10 @@
 
 package direwolf
 
+import (
+	"github.com/doismellburning/samoyed/internal/linecode"
+)
+
 /********************************************************************************
  *
  * Purpose:	Serialize EAS SAME for transmission.
@@ -11,69 +15,44 @@ package direwolf
  *
  *******************************************************************************/
 
-/*-------------------------------------------------------------------
- *
- * Name:        sendEAS (eas_send in Dire Wolf)
- *
- * Purpose:    	Serialize EAS SAME for transmission.
- *
- * Inputs:	str	- Character string to send.
- *		repeat	- Number of times to repeat with 1 sec quiet between.
- *		txdelay	- Delay (ms) from PTT to first preamble bit.
- *		txtail	- Delay (ms) from last data bit to PTT off.
- *
- *
- * Returns:	Total number of milliseconds to activate PTT.
- *		This includes delays before the first character
- *		and after the last to avoid chopping off part of it.
- *
- * Description:	xmit_thread calls this instead of the usual hdlc_send
- *		when we have a special packet that means send EAS SAME
- *		code.
- *
- *--------------------------------------------------------------------*/
+// EASSender sends EAS SAME messages on a channel's line: each byte as it is,
+// least significant bit first, with no NRZI, so it leaves the NRZI level the
+// line carries from one HDLC frame to the next alone.
+type EASSender struct {
+	line *linecode.Encoder
 
-func (s *Layer2Sender) easPutByte(b byte) {
-	for range 8 {
-		s.putBit(int(b & 1))
-		b >>= 1
-	}
+	bitsSent int // Count number of bits sent by SendMessage.
 }
 
-func (s *Layer2Sender) sendEAS(str []byte, repeat int, txdelay int, txtail int) int {
-	var bytes_sent = 0
-	const gap = 1000
-	var gaps_sent = 0
+// NewEASSender makes an EASSender that sends on line.
+func NewEASSender(line *linecode.Encoder) *EASSender {
+	var s = new(EASSender)
+	s.line = line
 
-	s.putQuietMs(txdelay)
+	return s
+}
 
-	for r := range repeat {
-		for range 16 {
-			s.easPutByte(0xAB)
+// SendMessage sends one repeat of str: the preamble, then the message.  It
+// returns the number of bits sent.
+func (s *EASSender) SendMessage(str []byte) int {
+	s.bitsSent = 0
 
-			bytes_sent++
-		}
-
-		for _, p := range str {
-			s.easPutByte(p)
-
-			bytes_sent++
-		}
-
-		if r < repeat-1 {
-			s.putQuietMs(gap)
-
-			gaps_sent++
-		}
+	for range 16 {
+		s.putByte(0xAB)
 	}
 
-	s.putQuietMs(txtail)
+	for _, p := range str {
+		s.putByte(p)
+	}
 
-	s.flush()
+	return s.bitsSent
+}
 
-	var elapsed = txdelay + int(float64(bytes_sent)*8*1.92) + (gaps_sent * gap) + txtail
+func (s *EASSender) putByte(b byte) {
+	for range 8 {
+		s.line.Write(b&1 != 0, false)
+		b >>= 1
 
-	// dw_printf ("DEBUG:  EAS total time = %d ms\n", elapsed);
-
-	return (elapsed)
-} /* end sendEAS */
+		s.bitsSent++
+	}
+}
