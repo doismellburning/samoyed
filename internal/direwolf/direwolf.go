@@ -670,7 +670,12 @@ x = Silence FX.25 information.`)
 	 */
 	agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
 	metrics_init(ctx, audio_config, misc_config)
-	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
+	var kissNetPorts, kissNetListenErr = ListenKissNetPorts(ctx, misc_config)
+	if kissNetListenErr != nil {
+		logrus.WithError(kissNetListenErr).Error("Unable to listen for KISS TCP client applications")
+	}
+
+	var kissNetSvc = NewKissNetService(misc_config, kissNetPorts, d_n_opt)
 
 	// All three KISS transports hand what their clients send to the same
 	// handler, which copies data frames to the TCP clients with KISSCOPY.

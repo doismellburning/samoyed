@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -98,17 +99,15 @@ func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
 }
 
 func TestKissNetServiceStopsWhenCancelled(t *testing.T) {
-	var port = freeTCPPort(t)
-
-	var mc = new(misc_config_s)
-	mc.kiss_port[0] = port
-	mc.kiss_chan[0] = -1
+	var listener, _ = testutils.Listen(t)
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	NewKissNetService(mc, 0).Start(ctx, NewKissHandler(new(RadioConfig), new(XmitService), nil))
+	var kns = NewKissNetService(new(misc_config_s), []KissNetPort{{Listener: listener, Channel: -1}}, 0)
 
-	waitUntilListening(t, port)
+	kns.Start(ctx, NewKissHandler(new(RadioConfig), new(XmitService), nil))
+
+	var port = kns.allPorts.tcp_port
 
 	// An attached client is what the per-client read threads are blocked on,
 	// so it is how we can tell they noticed the cancellation rather than only
