@@ -57,30 +57,6 @@ func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGe
 	return bits
 }
 
-// destuff drops the zero the sender inserts after five consecutive ones.
-func destuff(bits []bool) []bool {
-	var data []bool
-	var ones = 0
-
-	for _, bit := range bits {
-		if ones == 5 {
-			ones = 0
-
-			continue // The stuffed zero, which was never data.
-		}
-
-		data = append(data, bit)
-
-		if bit {
-			ones++
-		} else {
-			ones = 0
-		}
-	}
-
-	return data
-}
-
 // packMSBFirst reassembles bytes from bits in the order IL2P sends them.
 func packMSBFirst(t *testing.T, bits []int) []byte {
 	t.Helper()
@@ -122,23 +98,6 @@ func newHDLCSendTestConfig(layer2 layer2_t) *RadioConfig {
 	audioConfig.achan[hdlcSendTestChannel].layer2_xmit = layer2
 
 	return audioConfig
-}
-
-// hdlcFrameFromBits takes the frame out of a captured stream: a flag at each
-// end, and in between it the frame with the stuffing the sender added.
-func hdlcFrameFromBits(t *testing.T, bits []int) []byte {
-	t.Helper()
-
-	var data = testutils.NRZIDecode(bits)
-
-	require.Greater(t, len(data), 16, "there should be a frame between the flags")
-
-	// Flags are sent without stuffing, so they are whole bytes at each end
-	// of the stream.
-	assert.Equal(t, []byte{hdlcFlag}, testutils.PackLSBFirst(t, data[:8]), "missing start flag")
-	assert.Equal(t, []byte{hdlcFlag}, testutils.PackLSBFirst(t, data[len(data)-8:]), "missing end flag")
-
-	return testutils.PackLSBFirst(t, destuff(data[8:len(data)-8]))
 }
 
 // FX.25 and AX.25 go out on the same line, so a codeblock has to start from

@@ -989,7 +989,7 @@ func TestLayer2SendFrameSendsAX25AsHDLC(t *testing.T) {
 	var frameFCS = fcs.Calc(fbuf)
 	var expected = append(append([]byte{}, fbuf...), byte(frameFCS)&0xff, byte(frameFCS>>8)&0xff) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
-	assert.Equal(t, expected, hdlcFrameFromBits(t, bits))
+	assert.Equal(t, expected, testutils.HDLCFrameFromLevels(t, bits))
 }
 
 // An IL2P channel sends the frame wrapped up as IL2P instead.
