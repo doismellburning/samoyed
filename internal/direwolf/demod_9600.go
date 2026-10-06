@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -20,7 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var DCD_CONFIG_9600 = &DCDConfig{
+var DCD_CONFIG_9600 = &DCDConfig{ //nolint:gochecknoglobals // Constant tuning, never written
 	// Hysteresis: Can miss 0 out of 32 for detecting lock.
 	// This is best for actual on-the-air signals.
 	// Still too many brief false matches.
@@ -29,7 +28,19 @@ var DCD_CONFIG_9600 = &DCDConfig{
 	DCD_GOOD_WIDTH: 1024,
 }
 
-var slice_point [MAX_SUBCHANS]float64
+// slice_point is the slicing level of each slicer, spread evenly and
+// symmetrically about zero.
+// Version 1.2: Experiment with different slicing levels.
+// Really didn't help that much because we should have a symmetrical signal.
+var slice_point = func() [MAX_SUBCHANS]float64 { //nolint:gochecknoglobals // Built once from constants, then only read
+	var points [MAX_SUBCHANS]float64
+
+	for j := range points {
+		points[j] = 0.02 * float64(j-0.5*(MAX_SUBCHANS-1))
+	}
+
+	return points
+}()
 
 /* Add sample to buffer and shift the rest down. */
 
@@ -296,14 +307,6 @@ func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int,
 				}
 			}
 		}
-	}
-
-	/* Version 1.2: Experiment with different slicing levels. */
-	// Really didn't help that much because we should have a symmetrical signal.
-
-	for j := range MAX_SUBCHANS {
-		slice_point[j] = 0.02 * float64(j-0.5*(MAX_SUBCHANS-1))
-		//dw_printf ("slice_point[%d] = %+5.2f\n", j, slice_point[j]);
 	}
 } /* end fsk_demod_init */
 

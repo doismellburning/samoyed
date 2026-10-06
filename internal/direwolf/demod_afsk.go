@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 // #define DEBUG1 1     /* display debugging info */
@@ -28,7 +27,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
-var DCD_CONFIG_AFSK = GenericDCDConfig()
+var DCD_CONFIG_AFSK = GenericDCDConfig() //nolint:gochecknoglobals // Constant tuning, never written
 
 func TUNE(envvar string, param any, name string, fmt string) {
 	/*
@@ -45,7 +44,15 @@ func TUNE(envvar string, param any, name string, fmt string) {
 }
 
 // Cosine table indexed by unsigned byte.
-var fcos256_table [256]float64
+var fcos256_table = func() [256]float64 { //nolint:gochecknoglobals // Built once from constants, then only read
+	var table [256]float64
+
+	for j := range table {
+		table[j] = math.Cos(float64(j) * 2.0 * math.Pi / 256.0)
+	}
+
+	return table
+}()
 
 func fcos256(x uint) float64 {
 	return (fcos256_table[((x)>>24)&0xff])
@@ -85,7 +92,22 @@ func fsin256(x uint) float64 {
 const MIN_G = 0.5
 const MAX_G = 4.0
 
-var afskSpaceGain [MAX_SUBCHANS]float64
+// afskSpaceGain is the gain applied to the space tone at each slicer, spaced
+// geometrically from MIN_G to MAX_G.
+// Starting with version 1.2, try using multiple slicing points instead of the
+// traditional AGC.
+var afskSpaceGain = func() [MAX_SUBCHANS]float64 { //nolint:gochecknoglobals // Built once from constants, then only read
+	var gain [MAX_SUBCHANS]float64
+
+	gain[0] = MIN_G
+
+	var step = math.Pow(10.0, math.Log10(MAX_G/MIN_G)/(MAX_SUBCHANS-1))
+	for j := 1; j < MAX_SUBCHANS; j++ {
+		gain[j] = gain[j-1] * step
+	}
+
+	return gain
+}()
 
 /*------------------------------------------------------------------
  *
@@ -114,10 +136,6 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 	space_freq int, profile rune, D *demodulator_state_s) {
 	var samples_per_sec = float64(_samples_per_sec)
 	var baud = float64(_baud)
-
-	for j := range 256 {
-		fcos256_table[j] = float64(math.Cos(float64(j) * 2.0 * math.Pi / 256.0))
-	}
 
 	*D = demodulator_state_s{} //nolint:exhaustruct_v5
 
@@ -369,17 +387,6 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 
 		var fc = float64(baud) * D.lpf_baud / samples_per_sec
 		dsp.Lowpass(fc, D.lp_filter[:D.lp_filter_taps], D.lp_window)
-	}
-
-	/*
-	 * Starting with version 1.2
-	 * try using multiple slicing points instead of the traditional AGC.
-	 */
-	afskSpaceGain[0] = MIN_G
-
-	var step = math.Pow(10.0, math.Log10(MAX_G/MIN_G)/(MAX_SUBCHANS-1))
-	for j := 1; j < MAX_SUBCHANS; j++ {
-		afskSpaceGain[j] = afskSpaceGain[j-1] * float64(step)
 	}
 } /* demod_afsk_init */
 
