@@ -31,6 +31,11 @@ func NewFX25Sender(line *linecode.Encoder, channel int, debug int) *FX25Sender {
 	return s
 }
 
+// Debug returns the sender's FX.25 debug level.
+func (s *FX25Sender) Debug() int {
+	return s.debug
+}
+
 /*-------------------------------------------------------------
  *
  * Name:	SendFrame (fx25_send_frame in Dire Wolf)

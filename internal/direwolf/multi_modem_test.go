@@ -117,7 +117,7 @@ func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
 
 	for sub := range layer2Receiver.numSubchannel[0] {
 		for slice := range MAX_SLICERS {
-			assert.Equal(t, 3, layer2Receiver.slicer[0][sub][slice].fx25.debug, "subchannel %d, slice %d", sub, slice)
+			assert.Equal(t, 3, layer2Receiver.slicer[0][sub][slice].fx25.Debug(), "subchannel %d, slice %d", sub, slice)
 		}
 	}
 }

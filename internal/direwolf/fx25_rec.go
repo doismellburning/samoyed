@@ -60,6 +60,11 @@ func newFX25Receiver(channel int, subchannel int, slice int, debug int, audioLev
 	return F
 }
 
+// Debug returns the receiver's FX.25 debug level.
+func (F *fx25Receiver) Debug() int {
+	return F.debug
+}
+
 func (F *fx25Receiver) logEntry() *logrus.Entry {
 	return logrus.WithFields(logrus.Fields{
 		"channel":    F.channel,
