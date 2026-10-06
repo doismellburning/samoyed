@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +27,7 @@ Humpty Dumpty smiled contemptuously. 'Of course you don't - till I tell you. I m
 // test has anything to say about.
 type il2pLoopbackFrame struct {
 	info    []byte
-	retries BitFixLevel // Symbols the Reed Solomon decoder had to correct.
+	retries phy.BitFixLevel // Symbols the Reed Solomon decoder had to correct.
 }
 
 // il2pLoopbackRecorder collects the frames that came back out of the receiver.
@@ -78,7 +79,7 @@ func il2pLoopback(t *testing.T, version il2p_version_t) *il2pLoopbackRecorder {
 		recorder.rx.recBit(data)
 	}
 
-	multiModemRecCapture = func(_ int, _ int, _ int, pp *ax25.Packet, _ ax25.ALevel, retries BitFixLevel, _ fec_type_t) {
+	multiModemRecCapture = func(_ int, _ int, _ int, pp *ax25.Packet, _ ax25.ALevel, retries phy.BitFixLevel, _ phy.FECType) {
 		recorder.frames = append(recorder.frames, il2pLoopbackFrame{info: pp.Info(), retries: retries})
 	}
 

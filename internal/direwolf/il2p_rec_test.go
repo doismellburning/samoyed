@@ -8,6 +8,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +23,7 @@ func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 		channel, subchannel, slice int
 		pp                         *ax25.Packet
 		alevel                     ax25.ALevel
-		fecType                    fec_type_t
+		fecType                    phy.FECType
 	}
 
 	var got []delivery
@@ -36,7 +37,7 @@ func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 		return alevel
 	}
 
-	var rx = newIL2PReceiver(1, 2, 3, IL2P_VERSION_COMPAT, false, audioLevel, func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, _ BitFixLevel, fecType fec_type_t) {
+	var rx = newIL2PReceiver(1, 2, 3, IL2P_VERSION_COMPAT, false, audioLevel, func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, _ phy.BitFixLevel, fecType phy.FECType) {
 		got = append(got, delivery{channel, subchannel, slice, pp, alevel, fecType})
 	})
 
@@ -52,6 +53,6 @@ func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 	assert.Equal(t, 2, got[0].subchannel)
 	assert.Equal(t, 3, got[0].slice)
 	assert.Equal(t, alevel, got[0].alevel)
-	assert.Equal(t, fec_type_il2p, got[0].fecType)
+	assert.Equal(t, phy.FECIL2P, got[0].fecType)
 	assert.Equal(t, pp.FrameData(), got[0].pp.FrameData())
 }

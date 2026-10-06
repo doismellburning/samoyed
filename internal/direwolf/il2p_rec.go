@@ -13,6 +13,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -63,12 +64,12 @@ type il2pReceiver struct {
 // stream, along with the audio level it was heard at and the number of
 // symbols the FEC decoder had to correct.  In normal operation it is
 // multi_modem_process_rec_packet.
-type il2pPacketSink func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t)
+type il2pPacketSink func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
 
 func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_version_t, crc bool, audioLevel audioLevelFunc, sink il2pPacketSink) *il2pReceiver {
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
-	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
+	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
+	dwutil.Assert(subchannel >= 0 && subchannel < phy.MaxSubchans)
+	dwutil.Assert(slice >= 0 && slice < phy.MaxSlicers)
 
 	var F = new(il2pReceiver)
 	F.channel = channel
@@ -295,7 +296,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 			if pp != nil {
 				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
 
-				F.sink(channel, subchannel, slice, pp, F.audioLevel(channel, subchannel), BitFixLevel(F.corrected), fec_type_il2p)
+				F.sink(channel, subchannel, slice, pp, F.audioLevel(channel, subchannel), phy.BitFixLevel(F.corrected), phy.FECIL2P)
 			}
 		} // end block for local variables.
 

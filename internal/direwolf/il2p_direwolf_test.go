@@ -8,6 +8,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -782,7 +783,7 @@ func test_serdes(t *testing.T) {
 					assert.Equal(t, il2pTestText, string(frame.info))
 
 					if polarity == 2 {
-						assert.Equal(t, BitFixLevel(10), frame.retries)
+						assert.Equal(t, phy.BitFixLevel(10), frame.retries)
 					} else {
 						assert.Zero(t, frame.retries)
 					}
