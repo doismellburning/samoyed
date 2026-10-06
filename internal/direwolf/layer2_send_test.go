@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -183,8 +184,14 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 	var before = []byte{hdlcSixtyOne, 'Q', '1', 'T', 'E', 'S', 'T'}
 	var fbuf = []byte{'Q', '2', 'T', 'E', 'S', 'T'}
 
-	var ctagNum, data, check = fx25_encode_frame(hdlcSendTestChannel, append([]byte{}, fbuf...), 16, 0)
-	require.GreaterOrEqual(t, ctagNum, CTAG_MIN)
+	// The codeblock as an FX.25 sender sends it on a line of its own, which
+	// starts low.
+	var alone []int
+
+	var aloneLen = NewFX25Sender(linecode.NewEncoder(func(level int) {
+		alone = append(alone, level)
+	}), 0, 0).SendFrame(fbuf, 16)
+	require.Positive(t, aloneLen)
 
 	var beforeLen int
 
@@ -195,17 +202,8 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 
 	require.Equal(t, 1, bits[beforeLen-1], "the frame before should leave the line at 1")
 
-	var ctagValue = fx25_get_ctag_value(ctagNum)
-
-	var expected []byte
-	for k := range 8 {
-		expected = append(expected, byte(ctagValue>>(k*8))) //nolint:gosec // G115: unchecked narrowing conversion, see #294
-	}
-
-	expected = append(expected, data...)
-	expected = append(expected, check...)
-
-	assert.Equal(t, expected, packLSBFirst(t, nrziDecode(bits)[beforeLen:]))
+	assert.Equal(t, nrziDecode(alone), nrziDecode(bits)[beforeLen:],
+		"the codeblock should carry the same data as if it had had the line to itself")
 }
 
 // newHDLCSendTestPacket is a packet with an information part of the requested
