@@ -34,7 +34,9 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/ubersdr"
 	"github.com/gordonklaus/portaudio"
+	"github.com/sirupsen/logrus"
 )
 
 type audio_in_type_e int
@@ -43,6 +45,7 @@ const (
 	AUDIO_IN_TYPE_SOUNDCARD audio_in_type_e = iota
 	AUDIO_IN_TYPE_SDR_UDP
 	AUDIO_IN_TYPE_STDIN
+	AUDIO_IN_TYPE_UBERSDR
 )
 
 type adev_param_s struct {
@@ -59,7 +62,7 @@ type adev_param_s struct {
 	/* original device and can't be changed. */
 	/* -1 for normal case. */
 
-	adevice_in string /* Name of the audio input device (or file?). Can be udp:nnn for UDP or "-" to read from stdin. */
+	adevice_in string /* Name of the audio input device (or file?). Can be udp:nnn for UDP, "-" to read from stdin, or ubersdr:URL. */
 
 	adevice_out string /* Name of the audio output device. Can be udp:host:port to send audio via UDP. */
 
@@ -318,6 +321,11 @@ type adev_s struct {
 	// UDP socket for SDR input
 	udp_sock *net.UDPConn
 
+	// Stops the goroutine receiving from UberSDR, and is closed once it has
+	// returned - see openUberSDRInput.
+	uberSDRCancel context.CancelFunc
+	uberSDRDoneCh chan struct{}
+
 	// UDP connection for audio output
 	udp_out_sock net.Conn
 
@@ -464,7 +472,7 @@ const (
 // Call this before AudioOpen rewrites the input name, so that the input and
 // output names can still be compared.
 func audioOutType(ad *adev_param_s) audio_out_type_e {
-	if audioNameIsStdin(ad.adevice_out) {
+	if audioNameIsStdin(ad.adevice_out) || audioNameIsUberSDR(ad.adevice_out) {
 		return AUDIO_OUT_TYPE_NONE
 	}
 
@@ -524,7 +532,7 @@ func (d *AudioDevices) transmitAvailable(a int) bool {
 }
 
 // anyInputRequiresPortAudio reports whether any configured audio device needs
-// PortAudio to receive (i.e. is a soundcard rather than stdin or UDP).
+// PortAudio to receive (i.e. is a soundcard rather than stdin, UDP or UberSDR).
 func anyInputRequiresPortAudio(pa *RadioConfig) bool {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined == 0 {
@@ -532,7 +540,7 @@ func anyInputRequiresPortAudio(pa *RadioConfig) bool {
 		}
 
 		var inName = pa.adev[a].adevice_in
-		if !audioNameIsStdin(inName) && !audioNameIsUDP(inName) {
+		if !audioNameIsStdin(inName) && !audioNameIsUDP(inName) && !audioNameIsUberSDR(inName) {
 			return true
 		}
 	}
@@ -908,6 +916,24 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, p
 	d.dev[a].outbuf = nil
 	d.dev[a].outbufLen = 0
 
+	// UberSDR decides the format itself, so settle it before anything below
+	// is sized from it.
+	var uberSDRSource *ubersdr.Source
+
+	if audioNameIsUberSDR(pa.adev[a].adevice_in) {
+		var err error
+
+		uberSDRSource, err = ubersdr.ParseSource(pa.adev[a].adevice_in)
+		if err != nil {
+			return fmt.Errorf("audio device %d: %w", a, err)
+		}
+
+		err = applyUberSDRFormat(a, &pa.adev[a], uberSDRSource)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Store audio format
 	d.dev[a].sampleRate = pa.adev[a].samples_per_sec
 	d.dev[a].numChannels = pa.adev[a].num_channels
@@ -924,12 +950,18 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, p
 
 	if outType == AUDIO_OUT_TYPE_NONE && audioOutputRequired(&pa.adev[a]) {
 		// Named for transmit, but not a transmit device: standard
-		// input, or a UDP port to listen on rather than send to.
+		// input, a UDP port to listen on rather than send to, or an
+		// UberSDR receiver.
+		var outName = pa.adev[a].adevice_out
+		if audioNameIsUberSDR(outName) {
+			outName = ubersdr.Prefix + "..." // Its URL may carry a password
+		}
+
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Audio device %s cannot transmit.\n", pa.adev[a].adevice_out)
+		dw_printf("Audio device %s cannot transmit.\n", outName)
 		dw_printf("A transmit device is a soundcard, or udp:host:port.\n")
 
-		return fmt.Errorf("audio device %s cannot transmit", pa.adev[a].adevice_out)
+		return fmt.Errorf("audio device %s cannot transmit", outName)
 	}
 
 	/*
@@ -953,12 +985,21 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, p
 		}
 	}
 
+	if uberSDRSource != nil {
+		d.dev[a].g_audio_in_type = AUDIO_IN_TYPE_UBERSDR
+	}
+
 	/* Let user know what is going on. */
 
 	/* If not specified, the device names should be "default". */
 
 	var audio_in_name = pa.adev[a].adevice_in
 	var audio_out_name = pa.adev[a].adevice_out
+
+	if uberSDRSource != nil {
+		// Without its password, which the name may carry.
+		audio_in_name = "UberSDR " + uberSDRSource.String()
+	}
 
 	var ctemp string
 
@@ -1023,6 +1064,9 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, p
 	case AUDIO_IN_TYPE_STDIN:
 		/* Do we need to adjust any properties of stdin? */
 		d.dev[a].inbufSizeInBytes = 1024
+
+	case AUDIO_IN_TYPE_UBERSDR:
+		d.openUberSDRInput(ctx, a, pa, uberSDRSource)
 
 	default:
 		text_color_set(DW_COLOR_ERROR)
@@ -1226,6 +1270,28 @@ func AudioOpen(ctx context.Context, pa *RadioConfig) (*AudioDevices, error) {
  *
  *----------------------------------------------------------------*/
 
+// fillFromRing refills audio device a's inbuf from its input ring buffer once
+// it has been used up, in a single bulk read: that takes the ring buffer's
+// mutex once per inbuf-worth of data rather than once per byte.  It reports
+// false once the ring buffer has been closed - the stream has ended.
+func (d *AudioDevices) fillFromRing(a int) bool {
+	for d.dev[a].inbufNext >= d.dev[a].inbufLen {
+		var n, ok = d.dev[a].inputRingBuf.readChunk(d.dev[a].inbuf)
+		if !ok {
+			return false
+		}
+
+		if n > 0 {
+			d.dev[a].inbufLen = n
+			d.dev[a].inbufNext = 0
+
+			d.dev[a].recordRead(a, n)
+		}
+	}
+
+	return true
+}
+
 // GetByte makes AudioDevices a SampleSource.
 func (d *AudioDevices) GetByte(a int) int {
 	dwutil.Assert(d.dev[a].inbufSizeInBytes >= 100 && d.dev[a].inbufSizeInBytes <= 32768)
@@ -1249,28 +1315,30 @@ func (d *AudioDevices) GetByte(a int) int {
 			d.dev[a].recordRead(a, 0)
 		}
 
-		// Drain the ring buffer into inbuf in a single bulk read when exhausted.
-		// This acquires the ring buffer mutex only once per inbuf-worth of data
-		// rather than once per byte.
-		for d.dev[a].inbufNext >= d.dev[a].inbufLen {
-			var n, ok = d.dev[a].inputRingBuf.readChunk(d.dev[a].inbuf)
-			if !ok {
-				// Ring buffer was closed - stream ended
-				return -1
-			}
-
-			if n > 0 {
-				d.dev[a].inbufLen = n
-				d.dev[a].inbufNext = 0
-
-				d.dev[a].recordRead(a, n)
-			}
+		if !d.fillFromRing(a) {
+			return -1
 		}
 
 		var b = d.dev[a].inbuf[d.dev[a].inbufNext]
 		d.dev[a].inbufNext++
 
 		return int(b)
+
+	/*
+	 * UberSDR - its goroutine writes to the ring buffer as packets arrive.
+	 */
+	case AUDIO_IN_TYPE_UBERSDR:
+		dwutil.Assert(d.dev[a].inputRingBuf != nil)
+
+		if d.dev[a].inputRingBuf.checkOverflow() {
+			logrus.WithField("device", a).Warn("UberSDR audio arrived faster than it could be demodulated - some samples lost")
+
+			d.dev[a].recordRead(a, 0)
+		}
+
+		if !d.fillFromRing(a) {
+			return -1
+		}
 
 		/*
 		 * UDP.
@@ -1588,8 +1656,12 @@ func (d *AudioDevices) wait(a int) {
 
 func (d *AudioDevices) Close() {
 	for a := range MAX_ADEVS {
-		if d.dev[a] != nil && (d.dev[a].inputStream != nil || d.dev[a].outputStream != nil || d.dev[a].udp_sock != nil || d.dev[a].udp_out_sock != nil) {
+		if d.dev[a] != nil && (d.dev[a].inputStream != nil || d.dev[a].outputStream != nil || d.dev[a].udp_sock != nil || d.dev[a].udp_out_sock != nil || d.dev[a].uberSDRCancel != nil) {
 			d.wait(a)
+
+			// Stop the UberSDR goroutine before the ring buffer it writes to
+			// is closed below.
+			d.closeUberSDRInput(a)
 
 			if d.dev[a].inputStream != nil {
 				d.dev[a].inputStream.Stop()

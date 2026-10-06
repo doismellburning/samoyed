@@ -57,3 +57,8 @@ SPDX-FileCopyrightText = [
 	"2010-2011 CloudMade",
 ]
 SPDX-License-Identifier = "BSD-2-Clause"
+
+[[annotations]]
+path = "internal/ubersdr/pcmv4/testdata/**"
+SPDX-FileCopyrightText = "The UberSDR Authors"
+SPDX-License-Identifier = "GPL-3.0-only"
