@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package fx25
 
 /********************************************************************************
  *
@@ -9,6 +12,7 @@ package direwolf
 import (
 	"math/bits"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/bitstuff"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
@@ -24,13 +28,22 @@ const (
 	FX_CHECK
 )
 
-// fx25Receiver is the FX.25 receive state for one slicer of one demodulator
+// AudioLevelFunc reports the audio level a subchannel's demodulator is
+// hearing, which the receiver delivers each frame with.
+type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
+
+// FrameSink takes each frame the receiver extracts, without its FCS, with the
+// audio level it was heard at, how many bytes the Reed-Solomon decoder
+// corrected, and phy.FECFX25.
+type FrameSink func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
+
+// Receiver is the FX.25 receive state for one slicer of one demodulator
 // ("subchannel") of one channel.
-type fx25Receiver struct {
+type Receiver struct {
 	channel, subchannel, slice int
 	debug                      int            // FX.25's debug level.
-	audioLevel                 audioLevelFunc // For the audio level to deliver each frame with.
-	sink                       frameSink      // Where each extracted frame goes.
+	audioLevel                 AudioLevelFunc // For the audio level to deliver each frame with.
+	sink                       FrameSink      // Where each extracted frame goes.
 
 	state        FX25RecState
 	accum        uint64 // Accumulate bits for matching to correlation tag.
@@ -44,12 +57,15 @@ type fx25Receiver struct {
 	block        [FX25_BLOCK_SIZE + 1]byte
 }
 
-func newFX25Receiver(channel int, subchannel int, slice int, debug int, audioLevel audioLevelFunc, sink frameSink) *fx25Receiver {
+// NewReceiver makes a Receiver for one slicer, reporting at FX.25 debug level
+// debug.  It gives each frame it extracts to sink, with the level audioLevel
+// reports.
+func NewReceiver(channel int, subchannel int, slice int, debug int, audioLevel AudioLevelFunc, sink FrameSink) *Receiver {
 	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
 	dwutil.Assert(subchannel >= 0 && subchannel < phy.MaxSubchans)
 	dwutil.Assert(slice >= 0 && slice < phy.MaxSlicers)
 
-	var F = new(fx25Receiver)
+	var F = new(Receiver)
 	F.channel = channel
 	F.subchannel = subchannel
 	F.slice = slice
@@ -61,11 +77,11 @@ func newFX25Receiver(channel int, subchannel int, slice int, debug int, audioLev
 }
 
 // Debug returns the receiver's FX.25 debug level.
-func (F *fx25Receiver) Debug() int {
+func (F *Receiver) Debug() int {
 	return F.debug
 }
 
-func (F *fx25Receiver) logEntry() *logrus.Entry {
+func (F *Receiver) logEntry() *logrus.Entry {
 	return logrus.WithFields(logrus.Fields{
 		"channel":    F.channel,
 		"subchannel": F.subchannel,
@@ -75,7 +91,7 @@ func (F *fx25Receiver) logEntry() *logrus.Entry {
 
 /***********************************************************************************
  *
- * Name:        fx25Receiver.recBit
+ * Name:        Receiver.RecBit
  *
  * Purpose:     Extract FX.25 codeblocks from a stream of bits.
  *		In a completely integrated AX.25 / FX.25 receive system,
@@ -94,9 +110,10 @@ func (F *fx25Receiver) logEntry() *logrus.Entry {
 
 const FENCE = 0x55 // to detect buffer overflow.
 
-// Note that the sink is called before the state machine is reset, so that
-// Layer2Receiver.fx25Busy still reports reception in progress during delivery.
-func (F *fx25Receiver) recBit(dbit int) {
+// RecBit takes the next data bit, as above.  It calls the sink before it
+// resets the state machine, so that Busy still reports reception in progress,
+// as Layer2Receiver.fx25Busy relies on, during delivery.
+func (F *Receiver) RecBit(dbit int) {
 	// State machine to identify correlation tag then gather appropriate number of data and check bytes.
 
 	switch F.state {
@@ -167,14 +184,14 @@ func (F *fx25Receiver) recBit(dbit int) {
 	}
 }
 
-// busy reports whether an FX.25 codeblock is part way through being received.
-func (F *fx25Receiver) busy() bool {
+// Busy reports whether an FX.25 codeblock is part way through being received.
+func (F *Receiver) Busy() bool {
 	return F.state != FX_TAG
 }
 
 /***********************************************************************************
  *
- * Name:	fx25Receiver.processRSBlock
+ * Name:	Receiver.processRSBlock
  *
  * Purpose:     After the correlation tag was detected and the appropriate number
  *		of data and check bytes are accumulated, this performs the processing
@@ -199,7 +216,7 @@ func (F *fx25Receiver) busy() bool {
  *
  ***********************************************************************************/
 
-func (F *fx25Receiver) processRSBlock() {
+func (F *Receiver) processRSBlock() {
 	var channel = F.channel
 	var subchannel = F.subchannel
 	var slice = F.slice

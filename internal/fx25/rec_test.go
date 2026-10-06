@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package fx25
 
 import (
 	"slices"
@@ -29,7 +29,7 @@ func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
 
 	var alevel = ax25.ALevel{Rec: 42, Mark: 41, Space: 43}
 
-	var rx = newFX25Receiver(1, 2, 3, 0,
+	var rx = NewReceiver(1, 2, 3, 0,
 		func(channel int, subchannel int) ax25.ALevel {
 			assert.Equal(t, 1, channel)
 			assert.Equal(t, 2, subchannel)
@@ -52,7 +52,7 @@ func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
 
 	for _, b := range block {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {
-			rx.recBit(int(b & imask))
+			rx.RecBit(int(b & imask))
 		}
 	}
 

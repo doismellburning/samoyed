@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package fx25
 
 import (
 	"io"
@@ -82,11 +82,11 @@ func FuzzFX25RecBit(f *testing.F) {
 			ax25.FromFrame(frame, alevel)
 		}
 
-		var rx = newFX25Receiver(0, 0, 0, int(debug%4), audioLevel, sink)
+		var rx = NewReceiver(0, 0, 0, int(debug%4), audioLevel, sink)
 
 		for _, b := range stream {
 			for imask := byte(0x01); imask != 0; imask <<= 1 {
-				rx.recBit(int(b & imask))
+				rx.RecBit(int(b & imask))
 			}
 		}
 	})

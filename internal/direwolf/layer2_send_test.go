@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -188,7 +189,7 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 	// starts low.
 	var alone []int
 
-	var aloneLen = NewFX25Sender(linecode.NewEncoder(func(level int) {
+	var aloneLen = fx25.NewSender(linecode.NewEncoder(func(level int) {
 		alone = append(alone, level)
 	}), 0, 0).SendFrame(fbuf, 16)
 	require.Positive(t, aloneLen)

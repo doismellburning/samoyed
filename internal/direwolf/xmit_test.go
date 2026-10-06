@@ -13,6 +13,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1070,7 +1071,7 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 	audioConfig.achan[hdlcSendTestChannel].fx25_strength = 1
 
 	// Comfortably more than the largest FX.25 codeblock carries.
-	var pp = newHDLCSendTestPacket(t, FX25_MAX_DATA)
+	var pp = newHDLCSendTestPacket(t, fx25.MaxData)
 
 	var viaFX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
 		s.SendFrame(pp, false)

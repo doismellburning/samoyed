@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package fx25
 
 import (
 	"fmt"
@@ -78,11 +81,11 @@ func fxTestReceive(block []byte) ([][]byte, []int) {
 		derrors = append(derrors, int(retries))
 	}
 
-	var rx = newFX25Receiver(0, 0, 0, 1, silentAudioLevel, collect)
+	var rx = NewReceiver(0, 0, 0, 1, silentAudioLevel, collect)
 
 	for _, b := range block {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {
-			rx.recBit(int(b & imask))
+			rx.RecBit(int(b & imask))
 		}
 	}
 

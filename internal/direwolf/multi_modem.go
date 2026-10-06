@@ -74,6 +74,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/metrics"
@@ -662,7 +663,7 @@ type slicerReceivers struct {
 	line linecode.Decoder
 
 	hdlc *hdlc.Receiver
-	fx25 *fx25Receiver
+	fx25 *fx25.Receiver
 	il2p *il2pReceiver
 	eas  *easReceiver // nil unless the channel is EAS.
 }
@@ -689,7 +690,7 @@ func newHDLCConfig(achan *achan_param_s) hdlc.Config {
 func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *slicerReceivers {
 	var s = new(slicerReceivers)
 	s.hdlc = hdlc.NewReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, demod_get_audio_level, multi_modem_process_rec_frame)
-	s.fx25 = newFX25Receiver(channel, subchannel, slice, r.fx25Debug, demod_get_audio_level, multi_modem_process_rec_frame)
+	s.fx25 = fx25.NewReceiver(channel, subchannel, slice, r.fx25Debug, demod_get_audio_level, multi_modem_process_rec_frame)
 	s.il2p = newIL2PReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, demod_get_audio_level, multi_modem_process_rec_packet)
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
@@ -835,7 +836,7 @@ func (r *Layer2Receiver) RecBitNew(channel int, subchannel int, slice int, _raw 
 	// Don't waste time on this if AIS.  EAS does not get this far.
 
 	if r.audio.achan[channel].modem_type != MODEM_AIS {
-		s.fx25.recBit(dwutil.IfThenElse(dbit, 1, 0))
+		s.fx25.RecBit(dwutil.IfThenElse(dbit, 1, 0))
 		s.il2p.recBit(dwutil.IfThenElse(raw, 1, 0)) // Note: skip NRZI.
 	}
 
@@ -878,7 +879,7 @@ func (r *Layer2Receiver) fx25Busy(channel int) bool {
 	for sub := range MAX_SUBCHANS {
 		for slice := range MAX_SLICERS {
 			var s = r.slicer[channel][sub][slice]
-			if s != nil && s.fx25.busy() {
+			if s != nil && s.fx25.Busy() {
 				return true
 			}
 		}
