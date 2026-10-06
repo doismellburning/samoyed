@@ -119,3 +119,9 @@ func TestMustFromText(t *testing.T) {
 
 	assert.PanicsWithValue(t, "not an AX.25 packet: Q1TEST", func() { MustFromText("Q1TEST") })
 }
+
+func Test_printableAddress(t *testing.T) {
+	var field = []byte{'Q' << 1, '1' << 1, 'T' << 1, 0x07 << 1, ' ' << 1, ' ' << 1}
+
+	assert.Equal(t, "Q1T.  ", printableAddress(field))
+}

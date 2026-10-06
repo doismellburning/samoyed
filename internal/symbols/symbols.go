@@ -40,6 +40,7 @@ type entry struct {
 	description string
 }
 
+//nolint:dupl // A lookup table, which dupl reads as the same shape as the other one
 func primarySymtab() []entry {
 	return []entry{
 
@@ -145,6 +146,7 @@ func primarySymtab() []entry {
  * Alternate symbol table.
  */
 
+//nolint:dupl // A lookup table, which dupl reads as the same shape as the other one
 func alternateSymtab() []entry {
 	return []entry{
 
