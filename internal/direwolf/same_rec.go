@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 )
 
 /********************************************************************************
@@ -173,7 +174,7 @@ func (s *easReceiver) recBit(raw int, future_use int) { //nolint:unparam
 			#endif
 		*/
 		var alevel = s.audioLevel(s.channel, s.subchannel)
-		s.sink(s.channel, s.subchannel, s.slice, s.frameBuf[:s.frameLen], alevel, 0, 0)
+		s.sink(s.channel, s.subchannel, s.slice, s.frameBuf[:s.frameLen], alevel, phy.BitFixNone, phy.FECNone)
 		s.easGathering = false
 	}
 }

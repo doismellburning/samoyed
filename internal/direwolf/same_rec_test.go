@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,7 +37,7 @@ func TestEASReceiverHandsMessagesToItsSink(t *testing.T) {
 
 					return alevel
 				},
-				func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, _ BitFixLevel, _ fec_type_t) {
+				func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, _ phy.BitFixLevel, _ phy.FECType) {
 					got = append(got, delivery{channel, subchannel, slice, string(frame), alevel})
 				})
 
