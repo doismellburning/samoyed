@@ -11,6 +11,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/doismellburning/samoyed/internal/wav"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -190,11 +191,11 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 
 	// The codeblock as an FX.25 sender sends it on a line of its own, which
 	// starts low.
-	var alone []int
+	var aloneLen int
 
-	var aloneLen = fx25.NewSender(linecode.NewEncoder(func(level int) {
-		alone = append(alone, level)
-	}), 0, 0).SendFrame(fbuf, 16)
+	var alone = testutils.LineLevels(func(line *linecode.Encoder) {
+		aloneLen = fx25.NewSender(line, 0, 0).SendFrame(fbuf, 16)
+	})
 	require.Positive(t, aloneLen)
 
 	var beforeLen int
@@ -229,10 +230,12 @@ func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
 			s.SendFrame(pp, false)
 		})
 
-		var sender = il2p.NewSender(linecode.NewEncoder(func(level int) {
-			alone[crc] = append(alone[crc], level)
-		}), 0)
-		require.Positive(t, sender.SendFrame(pp, il2p.VersionCompat, 0, crc, 0))
+		var sentAlone int
+
+		alone[crc] = testutils.LineLevels(func(line *linecode.Encoder) {
+			sentAlone = il2p.NewSender(line, 0).SendFrame(pp, il2p.VersionCompat, 0, crc, 0)
+		})
+		require.Positive(t, sentAlone)
 
 		assert.Equal(t, alone[crc], bits, "il2p_crc = %v", crc)
 	}

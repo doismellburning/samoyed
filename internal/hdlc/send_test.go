@@ -8,6 +8,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,13 +102,7 @@ func hdlcFrameFromBits(t *testing.T, bits []int) []byte {
 // captureHDLCBits collects the line levels a new Sender sends while fn
 // runs.  The line starts low.
 func captureHDLCBits(fn func(s *Sender)) []int {
-	var bits []int
-
-	fn(NewSender(linecode.NewEncoder(func(level int) {
-		bits = append(bits, level)
-	}), 0))
-
-	return bits
+	return testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0)) })
 }
 
 // A frame goes out between flags, with its FCS appended and any run of more

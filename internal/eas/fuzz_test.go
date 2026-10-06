@@ -10,6 +10,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,23 +23,7 @@ const fuzzMaxStream = 1024
 // bit, packed eight to a byte, least significant bit first, as the fuzz target
 // unpacks them.
 func fuzzLevels(message string) []byte {
-	var out []byte
-
-	var n = 0
-
-	NewSender(linecode.NewEncoder(func(level int) {
-		if n%8 == 0 {
-			out = append(out, 0)
-		}
-
-		if level != 0 {
-			out[len(out)-1] |= 1 << (n % 8)
-		}
-
-		n++
-	})).SendMessage([]byte(message))
-
-	return out
+	return testutils.PackLevels(testutils.LineLevels(func(line *linecode.Encoder) { NewSender(line).SendMessage([]byte(message)) }))
 }
 
 // fuzzReceive feeds stream to a new Receiver and returns how many messages it

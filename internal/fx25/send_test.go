@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,13 +53,7 @@ func packLSBFirst(t *testing.T, bits []bool) []byte {
 // captureFX25Bits collects the line levels a new Sender sends while fn
 // runs.  The line starts low.
 func captureFX25Bits(fn func(s *Sender)) []int {
-	var bits []int
-
-	fn(NewSender(linecode.NewEncoder(func(level int) {
-		bits = append(bits, level)
-	}), 0, 0))
-
-	return bits
+	return testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0, 0)) })
 }
 
 // An FX.25 frame goes out as its correlation tag, then the data and check

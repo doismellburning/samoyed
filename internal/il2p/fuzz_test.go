@@ -53,23 +53,7 @@ const (
 // bit, packed eight to a byte, least significant bit first, as the receiver
 // target unpacks them.
 func recBitFuzzLevels(fn func(s *Sender)) []byte {
-	var out []byte
-
-	var n = 0
-
-	fn(NewSender(linecode.NewEncoder(func(level int) {
-		if n%8 == 0 {
-			out = append(out, 0)
-		}
-
-		if level != 0 {
-			out[len(out)-1] |= 1 << (n % 8)
-		}
-
-		n++
-	}), 0))
-
-	return out
+	return testutils.PackLevels(testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0)) }))
 }
 
 // recBitFuzzReceive feeds stream to a new Receiver with the settings packed in
