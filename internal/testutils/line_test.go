@@ -29,3 +29,26 @@ func TestPackLevelsIsLeastSignificantBitFirst(t *testing.T) {
 	assert.Equal(t, []byte{0xAB, 0x01}, PackLevels([]int{1, 1, 0, 1, 0, 1, 0, 1, 1}))
 	assert.Empty(t, PackLevels(nil))
 }
+
+// A one leaves the line as it was and a zero inverts it, from a low start.
+func TestNRZIDecodeUndoesWriteNRZI(t *testing.T) {
+	var data = []bool{true, false, false, true, false, true, true, false}
+
+	var levels = LineLevels(func(line *linecode.Encoder) {
+		for _, bit := range data {
+			line.WriteNRZI(bit)
+		}
+	})
+
+	assert.Equal(t, data, NRZIDecode(levels))
+}
+
+// Without NRZI, each level is its bit.
+func TestLevelBitsTakesLevelsAsTheyAre(t *testing.T) {
+	assert.Equal(t, []bool{false, true, true, false}, LevelBits([]int{0, 1, 1, 0}))
+}
+
+// The first bit is the least significant.
+func TestPackLSBFirstIsLeastSignificantBitFirst(t *testing.T) {
+	assert.Equal(t, []byte{0xAB, 0x7E}, PackLSBFirst(t, LevelBits([]int{1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0})))
+}

@@ -57,21 +57,6 @@ func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGe
 	return bits
 }
 
-// nrziDecode recovers the data bits from an NRZI stream: a one leaves the
-// signal as it was, a zero inverts it.  The line starts at the level
-// captureBits reset it to.
-func nrziDecode(bits []int) []bool {
-	var data []bool
-	var previous = 0
-
-	for _, bit := range bits {
-		data = append(data, bit == previous)
-		previous = bit
-	}
-
-	return data
-}
-
 // destuff drops the zero the sender inserts after five consecutive ones.
 func destuff(bits []bool) []bool {
 	var data []bool
@@ -94,29 +79,6 @@ func destuff(bits []bool) []bool {
 	}
 
 	return data
-}
-
-// packLSBFirst reassembles bytes from bits in the order HDLC sends them.
-func packLSBFirst(t *testing.T, bits []bool) []byte {
-	t.Helper()
-
-	require.Zero(t, len(bits)%8, "a whole number of bytes should have been sent")
-
-	var out = make([]byte, 0, len(bits)/8)
-
-	for i := 0; i < len(bits); i += 8 {
-		var b byte
-
-		for j := range 8 {
-			if bits[i+j] {
-				b |= 1 << j
-			}
-		}
-
-		out = append(out, b)
-	}
-
-	return out
 }
 
 // packMSBFirst reassembles bytes from bits in the order IL2P sends them.
@@ -167,16 +129,16 @@ func newHDLCSendTestConfig(layer2 layer2_t) *RadioConfig {
 func hdlcFrameFromBits(t *testing.T, bits []int) []byte {
 	t.Helper()
 
-	var data = nrziDecode(bits)
+	var data = testutils.NRZIDecode(bits)
 
 	require.Greater(t, len(data), 16, "there should be a frame between the flags")
 
 	// Flags are sent without stuffing, so they are whole bytes at each end
 	// of the stream.
-	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, data[:8]), "missing start flag")
-	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, data[len(data)-8:]), "missing end flag")
+	assert.Equal(t, []byte{hdlcFlag}, testutils.PackLSBFirst(t, data[:8]), "missing start flag")
+	assert.Equal(t, []byte{hdlcFlag}, testutils.PackLSBFirst(t, data[len(data)-8:]), "missing end flag")
 
-	return packLSBFirst(t, destuff(data[8:len(data)-8]))
+	return testutils.PackLSBFirst(t, destuff(data[8:len(data)-8]))
 }
 
 // FX.25 and AX.25 go out on the same line, so a codeblock has to start from
@@ -207,7 +169,7 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 
 	require.Equal(t, 1, bits[beforeLen-1], "the frame before should leave the line at 1")
 
-	assert.Equal(t, nrziDecode(alone), nrziDecode(bits)[beforeLen:],
+	assert.Equal(t, testutils.NRZIDecode(alone), testutils.NRZIDecode(bits)[beforeLen:],
 		"the codeblock should carry the same data as if it had had the line to itself")
 }
 
@@ -314,7 +276,7 @@ func TestEASSendRepeatsTheMessageWithItsPreamble(t *testing.T) {
 		sentBits = append(sentBits, bit != 0)
 	}
 
-	assert.Equal(t, expected, packLSBFirst(t, sentBits), "each repeat is the preamble followed by the message")
+	assert.Equal(t, expected, testutils.PackLSBFirst(t, sentBits), "each repeat is the preamble followed by the message")
 
 	// The time to hold PTT for covers the data, the gap between the
 	// repeats, and the delays at each end.

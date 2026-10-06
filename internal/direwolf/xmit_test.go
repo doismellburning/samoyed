@@ -921,7 +921,7 @@ func TestPreambleIsFlagsForAX25(t *testing.T) {
 
 	assert.Equal(t, 4*8, sent, "flags are not stuffed, so it is eight bits a byte")
 	assert.Len(t, bits, sent)
-	assert.Equal(t, []byte{hdlcFlag, hdlcFlag, hdlcFlag, hdlcFlag}, packLSBFirst(t, nrziDecode(bits)))
+	assert.Equal(t, []byte{hdlcFlag, hdlcFlag, hdlcFlag, hdlcFlag}, testutils.PackLSBFirst(t, testutils.NRZIDecode(bits)))
 }
 
 // The last thing sent before the transmitter drops has to be pushed out
@@ -940,7 +940,7 @@ func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
 	})
 
 	assert.Equal(t, 2*8, sent, "finishing does not change what goes out")
-	assert.Equal(t, []byte{hdlcFlag, hdlcFlag}, packLSBFirst(t, nrziDecode(bits)))
+	assert.Equal(t, []byte{hdlcFlag, hdlcFlag}, testutils.PackLSBFirst(t, testutils.NRZIDecode(bits)))
 	assert.Equal(t, 1, sink.flushes, "the end of the transmission should be flushed out")
 }
 
