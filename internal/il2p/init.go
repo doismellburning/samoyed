@@ -16,21 +16,41 @@ const MAX_NROOTS = 16
 
 const NTAB = 5
 
-type TabType struct {
+// il2pTabEntry is one of the Reed-Solomon codes IL2P uses, and its codec.
+type il2pTabEntry struct {
 	symsize uint               // Symbol size, bits (1-8).  Always 8 for this application.
 	genpoly uint               // Field generator polynomial coefficients.
 	fcs     uint               // First root of RS code generator polynomial, index form. FX.25 uses 1 but IL2P uses 0.
 	prim    uint               // Primitive element to generate polynomial roots.
 	nroots  uint               // RS code generator polynomial degree (number of roots). Same as number of check bytes added.
-	rs      *reedsolomon.Codec // RS codec control block.  Filled in at init time.
+	rs      *reedsolomon.Codec // RS codec control block.
 }
 
-var Tab = [NTAB]TabType{
-	{8, 0x11d, 0, 1, 2, nil},  // 2 parity
-	{8, 0x11d, 0, 1, 4, nil},  // 4 parity
-	{8, 0x11d, 0, 1, 6, nil},  // 6 parity
-	{8, 0x11d, 0, 1, 8, nil},  // 8 parity
-	{8, 0x11d, 0, 1, 16, nil}, // 16 parity
+// il2pTab is built once, when the package is initialised, and only read after
+// that, so every IL2P sender and receiver can share it without a lock.
+var il2pTab = [NTAB]il2pTabEntry{
+	newIL2PTabEntry(2),  // 2 parity
+	newIL2PTabEntry(4),  // 4 parity
+	newIL2PTabEntry(6),  // 6 parity
+	newIL2PTabEntry(8),  // 8 parity
+	newIL2PTabEntry(16), // 16 parity
+}
+
+// newIL2PTabEntry sets up the codec for IL2P's Reed-Solomon code with nroots
+// parity symbols.  IL2P's codes differ only in that, so the rest are fixed
+// here.  The parameters are all constants, so a failure is a bug, not
+// something a user can do anything about.
+func newIL2PTabEntry(nroots uint) il2pTabEntry {
+	dwutil.Assert(nroots <= MAX_NROOTS)
+
+	const symsize, genpoly, fcs, prim = 8, 0x11d, 0, 1
+
+	var rs, err = reedsolomon.New(symsize, genpoly, fcs, prim, nroots)
+	if err != nil {
+		logrus.WithError(err).Fatal("IL2P internal error: Could not set up Reed-Solomon codec")
+	}
+
+	return il2pTabEntry{symsize: symsize, genpoly: genpoly, fcs: fcs, prim: prim, nroots: nroots, rs: rs}
 }
 
 var g_il2p_debug = 0
@@ -40,7 +60,6 @@ var g_il2p_debug = 0
  * Name:	Init (il2p_init in Dire Wolf)
  *
  * Purpose:	This must be called at application start up time.
- *		It sets up tables for the Reed-Solomon functions.
  *
  * Inputs:	debug	- Enable debug output.
  *
@@ -48,17 +67,6 @@ var g_il2p_debug = 0
 
 func Init(il2p_debug int) {
 	g_il2p_debug = il2p_debug
-
-	for i := range NTAB {
-		dwutil.Assert(Tab[i].nroots <= MAX_NROOTS)
-
-		var rs, err = reedsolomon.New(Tab[i].symsize, Tab[i].genpoly, Tab[i].fcs, Tab[i].prim, Tab[i].nroots)
-		if err != nil {
-			logrus.WithError(err).Fatal("IL2P internal error: Could not set up Reed-Solomon codec")
-		}
-
-		Tab[i].rs = rs
-	}
 }
 
 func il2p_get_debug() int {
@@ -69,12 +77,8 @@ func il2p_get_debug() int {
 
 func il2p_find_rs(nparity int) (*reedsolomon.Codec, error) {
 	for n := range NTAB {
-		if Tab[n].nroots == uint(nparity) {
-			if Tab[n].rs == nil {
-				return nil, fmt.Errorf("RS control block for nparity = %d is not set up; Init has not been called", nparity)
-			}
-
-			return Tab[n].rs, nil
+		if il2pTab[n].nroots == uint(nparity) {
+			return il2pTab[n].rs, nil
 		}
 	}
 
