@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package fx25
 
 import (
 	"fmt"
@@ -6,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -72,16 +76,16 @@ func fxTestReceive(block []byte) ([][]byte, []int) {
 	var frames [][]byte
 	var derrors []int
 
-	var collect = func(_ int, _ int, _ int, frame []byte, _ ax25.ALevel, retries BitFixLevel, _ fec_type_t) {
+	var collect = func(_ int, _ int, _ int, frame []byte, _ ax25.ALevel, retries phy.BitFixLevel, _ phy.FECType) {
 		frames = append(frames, frame)
 		derrors = append(derrors, int(retries))
 	}
 
-	var rx = newFX25Receiver(0, 0, 0, 1, silentAudioLevel, collect)
+	var rx = NewReceiver(0, 0, 0, 1, silentAudioLevel, collect)
 
 	for _, b := range block {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {
-			rx.recBit(int(b & imask))
+			rx.RecBit(int(b & imask))
 		}
 	}
 

@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/fx25"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -171,6 +173,38 @@ func hdlcFrameFromBits(t *testing.T, bits []int) []byte {
 	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, data[len(data)-8:]), "missing end flag")
 
 	return packLSBFirst(t, destuff(data[8:len(data)-8]))
+}
+
+// FX.25 and AX.25 go out on the same line, so a codeblock has to start from
+// the level whatever went before it left the line at, or its first bit is
+// received inverted.
+func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
+	// A frame and its FCS always hold an even number of zeros, so it takes
+	// a stuffed zero to leave the line at 1, where starting the codeblock
+	// afresh from 0 would show.
+	var before = []byte{hdlcSixtyOne, 'Q', '1', 'T', 'E', 'S', 'T'}
+	var fbuf = []byte{'Q', '2', 'T', 'E', 'S', 'T'}
+
+	// The codeblock as an FX.25 sender sends it on a line of its own, which
+	// starts low.
+	var alone []int
+
+	var aloneLen = fx25.NewSender(linecode.NewEncoder(func(level int) {
+		alone = append(alone, level)
+	}), 0, 0).SendFrame(fbuf, 16)
+	require.Positive(t, aloneLen)
+
+	var beforeLen int
+
+	var bits = captureBits(t, nil, func(s *Layer2Sender) {
+		beforeLen = s.hdlc.SendFrame(before, false)
+		s.fx25.SendFrame(fbuf, 16)
+	})
+
+	require.Equal(t, 1, bits[beforeLen-1], "the frame before should leave the line at 1")
+
+	assert.Equal(t, nrziDecode(alone), nrziDecode(bits)[beforeLen:],
+		"the codeblock should carry the same data as if it had had the line to itself")
 }
 
 // newHDLCSendTestPacket is a packet with an information part of the requested

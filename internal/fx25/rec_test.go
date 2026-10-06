@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package fx25
 
 import (
 	"slices"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,22 +21,22 @@ func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
 		channel, subchannel, slice int
 		frame                      []byte
 		alevel                     ax25.ALevel
-		retries                    BitFixLevel
-		fecType                    fec_type_t
+		retries                    phy.BitFixLevel
+		fecType                    phy.FECType
 	}
 
 	var got []delivery
 
 	var alevel = ax25.ALevel{Rec: 42, Mark: 41, Space: 43}
 
-	var rx = newFX25Receiver(1, 2, 3, 0,
+	var rx = NewReceiver(1, 2, 3, 0,
 		func(channel int, subchannel int) ax25.ALevel {
 			assert.Equal(t, 1, channel)
 			assert.Equal(t, 2, subchannel)
 
 			return alevel
 		},
-		func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t) {
+		func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType) {
 			got = append(got, delivery{channel, subchannel, slice, slices.Clone(frame), alevel, retries, fecType})
 		})
 
@@ -51,10 +52,16 @@ func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
 
 	for _, b := range block {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {
-			rx.recBit(int(b & imask))
+			rx.RecBit(int(b & imask))
 		}
 	}
 
 	require.Len(t, got, 1)
-	assert.Equal(t, delivery{1, 2, 3, fxTestFrame, alevel, BitFixLevel(2), fec_type_fx25}, got[0])
+	assert.Equal(t, delivery{1, 2, 3, fxTestFrame, alevel, phy.BitFixLevel(2), phy.FECFX25}, got[0])
+}
+
+// silentAudioLevel stands in for a demodulator when a test drives a receiver
+// directly, with no audio for it to have heard.
+func silentAudioLevel(int, int) ax25.ALevel {
+	return ax25.ALevel{Rec: 0, Mark: 0, Space: 0}
 }

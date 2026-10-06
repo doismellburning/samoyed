@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package fx25
 
 import (
 	"github.com/doismellburning/samoyed/internal/bitstuff"
@@ -8,11 +11,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// FX25Sender sends FX.25 frames on a channel's line.  An FX.25 codeblock
+// Sender sends FX.25 frames on a channel's line.  An FX.25 codeblock
 // carries a complete HDLC frame, so goes out NRZI like one, carrying on from
 // whatever level the last frame left the line at, but with no further bit
 // stuffing: the frame inside was stuffed before it was encoded.
-type FX25Sender struct {
+type Sender struct {
 	line    *linecode.Encoder
 	channel int // For logging.
 	debug   int // FX.25's debug level.
@@ -20,15 +23,20 @@ type FX25Sender struct {
 	bitsSent int // Count number of bits sent by SendFrame.
 }
 
-// NewFX25Sender makes an FX25Sender for channel that sends on line, with
+// NewSender makes a Sender for channel that sends on line, with
 // FX.25's debug level at debug.
-func NewFX25Sender(line *linecode.Encoder, channel int, debug int) *FX25Sender {
-	var s = new(FX25Sender)
+func NewSender(line *linecode.Encoder, channel int, debug int) *Sender {
+	var s = new(Sender)
 	s.line = line
 	s.channel = channel
 	s.debug = debug
 
 	return s
+}
+
+// Debug returns the sender's FX.25 debug level.
+func (s *Sender) Debug() int {
+	return s.debug
 }
 
 /*-------------------------------------------------------------
@@ -68,7 +76,7 @@ func NewFX25Sender(line *linecode.Encoder, channel int, debug int) *FX25Sender {
  *
  *--------------------------------------------------------------*/
 
-func (s *FX25Sender) SendFrame(fbuf []byte, fx_mode int) int {
+func (s *Sender) SendFrame(fbuf []byte, fx_mode int) int {
 	var ctag_num, data, check = fx25_encode_frame(s.channel, fbuf, fx_mode, s.debug)
 	if ctag_num < CTAG_MIN {
 		return (-1)
@@ -99,7 +107,7 @@ func (s *FX25Sender) SendFrame(fbuf []byte, fx_mode int) int {
  *
  * Purpose:	Wrap an AX.25 frame up as an FX.25 codeblock.
  *
- * Inputs:	channel, fx_mode - As for FX25Sender.SendFrame.
+ * Inputs:	channel, fx_mode - As for Sender.SendFrame.
  *
  *		debug	- FX.25's debug level.
  *
@@ -125,8 +133,8 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 	fbuf = append(fbuf, byte(frameFCS&0xff))
 	fbuf = append(fbuf, byte((frameFCS>>8)&0xff))
 
-	// Add bit-stuffing, filling to FX25_MAX_DATA bytes with flag patterns
-	var stuffedBytes, meaningfulLen = bitstuff.Stuff(fbuf, FX25_MAX_DATA)
+	// Add bit-stuffing, filling to MaxData bytes with flag patterns
+	var stuffedBytes, meaningfulLen = bitstuff.Stuff(fbuf, MaxData)
 	var dlen = meaningfulLen // Use meaningful length, not total buffer size
 
 	// Pick suitable correlation tag depending on
@@ -147,9 +155,9 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 	var k_data_rs = fx25_get_k_data_rs(ctag_num)
 
 	// Zero out part of data which won't be transmitted
-	var shorten_by = FX25_MAX_DATA - k_data_radio
+	var shorten_by = MaxData - k_data_radio
 	if shorten_by > 0 {
-		for i := k_data_radio; i < FX25_MAX_DATA; i++ {
+		for i := k_data_radio; i < MaxData; i++ {
 			stuffedBytes[i] = 0
 		}
 	}
@@ -181,7 +189,7 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int, debug int) (int, [
 // sendBytes sends NRZI, least significant bit first, with no stuffing: the
 // codeblock was stuffed before it was encoded.  It shares the line level
 // with AX.25, since the receiver sees only the one line.
-func (s *FX25Sender) sendBytes(b []byte) {
+func (s *Sender) sendBytes(b []byte) {
 	for _, x := range b {
 		for range 8 {
 			s.line.WriteNRZI(x&0x01 != 0)
