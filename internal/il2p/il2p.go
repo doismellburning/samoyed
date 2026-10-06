@@ -1,10 +1,13 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-const IL2P_PREAMBLE = 0x55
+package il2p
 
-const IL2P_SYNC_WORD = 0xF15E48
+const Preamble = 0x55
 
-const IL2P_SYNC_WORD_SIZE = 3
+const SyncWord = 0xF15E48
+
+const SyncWordSize = 3
 const IL2P_HEADER_SIZE = 13 // Does not include 2 parity.
 const IL2P_HEADER_PARITY = 2
 
@@ -19,4 +22,4 @@ const IL2P_CRC_ENCODED_SIZE = 4 // 16-bit CRC → 4 Hamming-encoded bytes
 // symbols, which is what IL2P uses, as FX.25 does.
 const IL2P_RS_BLOCK_SIZE = 255
 
-const IL2P_MAX_PACKET_SIZE = (IL2P_SYNC_WORD_SIZE + IL2P_HEADER_SIZE + IL2P_HEADER_PARITY + IL2P_MAX_ENCODED_PAYLOAD_SIZE + IL2P_CRC_ENCODED_SIZE)
+const IL2P_MAX_PACKET_SIZE = (SyncWordSize + IL2P_HEADER_SIZE + IL2P_HEADER_PARITY + IL2P_MAX_ENCODED_PAYLOAD_SIZE + IL2P_CRC_ENCODED_SIZE)

@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package il2p
 
 import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,13 +17,13 @@ import (
 // rather than straight to the rest of the receive path, along with the audio
 // level from the function it was made with.
 func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
-	il2p_init(0)
+	Init(0)
 
 	type delivery struct {
 		channel, subchannel, slice int
 		pp                         *ax25.Packet
 		alevel                     ax25.ALevel
-		fecType                    fec_type_t
+		fecType                    phy.FECType
 	}
 
 	var got []delivery
@@ -36,22 +37,27 @@ func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 		return alevel
 	}
 
-	var rx = newIL2PReceiver(1, 2, 3, IL2P_VERSION_COMPAT, false, audioLevel, func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, _ BitFixLevel, fecType fec_type_t) {
+	var rx = NewReceiver(1, 2, 3, VersionCompat, false, audioLevel, func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, _ phy.BitFixLevel, fecType phy.FECType) {
 		got = append(got, delivery{channel, subchannel, slice, pp, alevel, fecType})
 	})
 
-	var sender = NewIL2PSender(linecode.NewEncoder(rx.recBit), 1)
+	var sender = NewSender(linecode.NewEncoder(rx.RecBit), 1)
 
-	var pp = newHDLCSendTestPacket(t, 16)
-	require.Positive(t, sender.SendFrame(pp, IL2P_VERSION_COMPAT, 1, false, 0))
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q2TEST"
+	addrs[ax25.Source] = "Q1TEST"
 
-	rx.recBit(0) // One more bit to see the last byte through.
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, []byte("abcdefghijklmnop"))
+	require.NotNil(t, pp)
+	require.Positive(t, sender.SendFrame(pp, VersionCompat, 1, false, 0))
+
+	rx.RecBit(0) // One more bit to see the last byte through.
 
 	require.Len(t, got, 1)
 	assert.Equal(t, 1, got[0].channel)
 	assert.Equal(t, 2, got[0].subchannel)
 	assert.Equal(t, 3, got[0].slice)
 	assert.Equal(t, alevel, got[0].alevel)
-	assert.Equal(t, fec_type_il2p, got[0].fecType)
+	assert.Equal(t, phy.FECIL2P, got[0].fecType)
 	assert.Equal(t, pp.FrameData(), got[0].pp.FrameData())
 }

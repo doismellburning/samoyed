@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,14 +91,14 @@ func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
 	})
 
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].il2p_version = IL2P_VERSION_0_4
+	audioConfig.achan[0].il2p_version = il2p.Version04
 	audioConfig.achan[0].il2p_crc = false
 
 	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
 
 	var rx = layer2Receiver.slicer[0][0][0].il2p
-	assert.Equal(t, IL2P_VERSION_0_4, rx.version)
-	assert.False(t, rx.crc)
+	assert.Equal(t, il2p.Version04, rx.Version())
+	assert.False(t, rx.CRC())
 }
 
 // Every slicer's FX.25 receiver reports at the debug level multi_modem_init

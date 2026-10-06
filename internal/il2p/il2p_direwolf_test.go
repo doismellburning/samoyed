@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package il2p
 
 import (
 	"fmt"
@@ -8,6 +11,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +26,7 @@ import (
 
 func Test_IL2P(t *testing.T) {
 	var enable_debug_out = 0
-	il2p_init(enable_debug_out)
+	Init(enable_debug_out)
 
 	fmt.Println("Begin IL2P unit tests.")
 
@@ -289,7 +293,7 @@ func test_example_headers(t *testing.T) {
 	//	IL2P Data After Scrambling and RS Encoding:
 	//	26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e 8a 97
 
-	dw_printf("Example 1: AX.25 S-Frame...\n")
+	t.Logf("Example 1: AX.25 S-Frame...")
 
 	var example1 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x6f, 0xb1}
 	var header1 = []byte{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
@@ -339,7 +343,7 @@ func test_example_headers(t *testing.T) {
 
 	// TODO: compare binary.
 
-	dw_printf("Example 1 header OK\n")
+	t.Logf("Example 1 header OK")
 
 	// -------------- Example 2 - UI frame, no info part  ------------------
 
@@ -415,7 +419,7 @@ func test_example_headers(t *testing.T) {
 
 	// TODO: more examples
 
-	dw_printf("Example 2 header OK\n")
+	t.Logf("Example 2 header OK")
 
 	// -------------- Example 3 - I Frame  ------------------
 
@@ -493,7 +497,7 @@ func test_example_headers(t *testing.T) {
 
 	// TODO: compare binary.
 
-	dw_printf("Example 3 header OK\n")
+	t.Logf("Example 3 header OK")
 
 	// Example 3 again, this time the Information part is included.
 
@@ -501,7 +505,7 @@ func test_example_headers(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	var max_fec = 0
-	var iout, ioutLen = il2p_encode_frame(pp, IL2P_VERSION_0_4, max_fec)
+	var iout, ioutLen = il2p_encode_frame(pp, Version04, max_fec)
 
 	// dw_printf ("expected for example 3:\n");
 	// fx_hex_dump(complete3, sizeof(complete3));
@@ -511,7 +515,7 @@ func test_example_headers(t *testing.T) {
 	assert.Equal(t, len(complete3), ioutLen)
 	assert.Equal(t, complete3, iout)
 
-	dw_printf("Example 3 with info OK\n")
+	t.Logf("Example 3 with info OK")
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -527,13 +531,13 @@ func enc_dec_compare(t *testing.T, pp1 *ax25.Packet) {
 
 	// Every version, and for v0.4 both FEC levels, should survive a round trip.
 	var cases = []struct {
-		version il2p_version_t
+		version Version
 		max_fec int
 	}{
-		{IL2P_VERSION_0_4, 0},
-		{IL2P_VERSION_0_4, 1},
-		{IL2P_VERSION_0_6, 0},
-		{IL2P_VERSION_COMPAT, 1}, // Compatibility transmits v0.4 but receives v0.6.
+		{Version04, 0},
+		{Version04, 1},
+		{Version06, 0},
+		{VersionCompat, 1}, // Compatibility transmits v0.4 but receives v0.6.
 
 	}
 
@@ -553,13 +557,13 @@ func enc_dec_compare(t *testing.T, pp1 *ax25.Packet) {
 		var data2 = pp2.FrameData()
 
 		if len1 != len2 || !slices.Equal(data1, data2) {
-			dw_printf("\nEncode/Decode Error.  Original:\n")
+			t.Logf("Encode/Decode Error.  Original:")
 			pp1.HexDump()
 
-			dw_printf("IL2P encoded as:\n")
+			t.Logf("IL2P encoded as:")
 			dwutil.HexDump(encoded)
 
-			dw_printf("Got turned into this:\n")
+			t.Logf("Got turned into this:")
 			pp2.HexDump()
 		}
 
@@ -579,11 +583,11 @@ func all_frame_types(t *testing.T) {
 	addrs[1] = "WB2OSZ-12"
 	var num_addr = 2
 
-	dw_printf("Testing all frame types.\n")
+	t.Logf("Testing all frame types.")
 
 	/* U frame */
 
-	dw_printf("\nU frames...\n")
+	t.Logf("U frames...")
 
 	for ftype := ax25.FrameTypeUSABME; ftype <= ax25.FrameTypeUTEST; ftype++ {
 		for pf := range 2 {
@@ -623,7 +627,7 @@ func all_frame_types(t *testing.T) {
 			}
 
 			for cr := cmin; cr <= cmax; cr++ {
-				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+				t.Logf("Construct U frame, cr=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 				var pp = ax25.UFrame(addrs, num_addr, cr, ftype, pf, pid, pinfo)
 				pp.HexDump()
@@ -637,7 +641,7 @@ func all_frame_types(t *testing.T) {
 	// strcpy (addrs[2], "DIGI1-1");
 	// num_addr = 3;
 
-	dw_printf("\nS frames...\n")
+	t.Logf("S frames...")
 
 	for ftype := ax25.FrameTypeSRR; ftype <= ax25.FrameTypeSSREJ; ftype++ {
 		for pf := range 2 {
@@ -650,7 +654,7 @@ func all_frame_types(t *testing.T) {
 					continue
 				}
 
-				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+				t.Logf("Construct S frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 				var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 
@@ -667,7 +671,7 @@ func all_frame_types(t *testing.T) {
 					continue
 				}
 
-				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+				t.Logf("Construct S frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 				var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 
@@ -688,7 +692,7 @@ func all_frame_types(t *testing.T) {
 		var nr = 127
 		var cr = ax25.CRRes
 
-		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+		t.Logf("Construct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 		var pp = ax25.SFrame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
 
@@ -698,7 +702,7 @@ func all_frame_types(t *testing.T) {
 
 	/* I frame */
 
-	dw_printf("\nI frames...\n")
+	t.Logf("I frames...")
 
 	pinfo = []byte("The rain in Spain stays mainly on the plain.")
 
@@ -708,7 +712,7 @@ func all_frame_types(t *testing.T) {
 		var ns = 0xaa & int(modulo-1)
 
 		for cr := ax25.CmdRes(1); cr <= 1; cr++ { // can only be command
-			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+			t.Logf("Construct I frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 			var pp = ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
 
@@ -721,7 +725,7 @@ func all_frame_types(t *testing.T) {
 		ns = 0xaa & int(modulo-1)
 
 		for cr := ax25.CmdRes(1); cr <= 1; cr++ {
-			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
+			t.Logf("Construct I frame, cmd=%d, ftype=%d, pid=0x%02x", cr, ftype, pid)
 
 			var pp = ax25.IFrame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo)
 
@@ -745,11 +749,11 @@ var addrs3 = "AA1AAA-1>ZZ9ZZZ-9,DIGI*"
 func test_serdes(t *testing.T) {
 	t.Helper()
 
-	dw_printf("\nTest serialize / deserialize...\n")
+	t.Logf("Test serialize / deserialize...")
 
 	// Frames are sent as v0.4, so the receiver has to read the header FEC
 	// Level bit rather than assume the v0.6 fixed size.
-	var recorder = il2pLoopback(t, IL2P_VERSION_0_4)
+	var recorder = il2pLoopback(t, Version04)
 	var recCount = 0
 
 	// try combinations of header type, max_fec, polarity, errors.
@@ -764,12 +768,10 @@ func test_serdes(t *testing.T) {
 		var pp = ax25.FromText(packet, true)
 		assert.NotNil(t, pp)
 
-		var sender = NewLayer2Sender(0, nil, nil, 0)
-
 		for max_fec := range 2 {
 			for polarity := range 3 { // 2 means throw in some errors.
-				var num_bits_sent = sender.il2p.SendFrame(pp, IL2P_VERSION_0_4, max_fec, true, polarity)
-				dw_printf("%d bits sent.\n", num_bits_sent)
+				var num_bits_sent = recorder.sender.SendFrame(pp, Version04, max_fec, true, polarity)
+				t.Logf("%d bits sent.", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.
 				recorder.flush()
@@ -782,7 +784,7 @@ func test_serdes(t *testing.T) {
 					assert.Equal(t, il2pTestText, string(frame.info))
 
 					if polarity == 2 {
-						assert.Equal(t, BitFixLevel(10), frame.retries)
+						assert.Equal(t, phy.BitFixLevel(10), frame.retries)
 					} else {
 						assert.Zero(t, frame.retries)
 					}
@@ -791,6 +793,6 @@ func test_serdes(t *testing.T) {
 		}
 	}
 
-	dw_printf("Serdes receive count = %d\n", recCount)
+	t.Logf("Serdes receive count = %d", recCount)
 	assert.Equal(t, 6, recCount, "every frame sent should have been received")
 }

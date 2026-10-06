@@ -14,6 +14,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/fx25"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -968,7 +969,7 @@ func TestPreambleIsTheIL2PPatternForIL2P(t *testing.T) {
 	})
 
 	assert.Equal(t, 3*8, sent)
-	assert.Equal(t, []byte{IL2P_PREAMBLE, IL2P_PREAMBLE, IL2P_PREAMBLE}, packMSBFirst(t, bits))
+	assert.Equal(t, []byte{il2p.Preamble, il2p.Preamble, il2p.Preamble}, packMSBFirst(t, bits))
 }
 
 // An AX.25 channel sends the frame as HDLC, with nothing wrapped around it.
@@ -994,9 +995,9 @@ func TestLayer2SendFrameSendsAX25AsHDLC(t *testing.T) {
 // An IL2P channel sends the frame wrapped up as IL2P instead.
 func TestLayer2SendFrameSendsIL2PWhenConfigured(t *testing.T) {
 	var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
-	audioConfig.achan[hdlcSendTestChannel].il2p_version = IL2P_VERSION_COMPAT
+	audioConfig.achan[hdlcSendTestChannel].il2p_version = il2p.VersionCompat
 
-	il2p_init(0)
+	il2p.Init(0)
 
 	var pp = newHDLCSendTestPacket(t, 16)
 
@@ -1010,22 +1011,22 @@ func TestLayer2SendFrameSendsIL2PWhenConfigured(t *testing.T) {
 
 	var sentBytes = packMSBFirst(t, bits)
 
-	require.Greater(t, len(sentBytes), 1+IL2P_SYNC_WORD_SIZE, "there should be a frame after the sync word")
+	require.Greater(t, len(sentBytes), 1+il2p.SyncWordSize, "there should be a frame after the sync word")
 	assert.Equal(t, []byte{
-		IL2P_PREAMBLE,
-		(IL2P_SYNC_WORD >> 16) & 0xff,
-		(IL2P_SYNC_WORD >> 8) & 0xff,
-		IL2P_SYNC_WORD & 0xff,
-	}, sentBytes[:1+IL2P_SYNC_WORD_SIZE], "an IL2P frame opens with the preamble and sync word")
+		il2p.Preamble,
+		(il2p.SyncWord >> 16) & 0xff,
+		(il2p.SyncWord >> 8) & 0xff,
+		il2p.SyncWord & 0xff,
+	}, sentBytes[:1+il2p.SyncWordSize], "an IL2P frame opens with the preamble and sync word")
 }
 
 // IL2P cannot carry a frame beyond a certain size.  One that does not fit
 // still has to go out, as plain AX.25.
 func TestLayer2SendFrameFallsBackToAX25WhenIL2PCannotCarryTheFrame(t *testing.T) {
 	var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
-	audioConfig.achan[hdlcSendTestChannel].il2p_version = IL2P_VERSION_COMPAT
+	audioConfig.achan[hdlcSendTestChannel].il2p_version = il2p.VersionCompat
 
-	il2p_init(0)
+	il2p.Init(0)
 
 	// One byte more of information part than IL2P can encode.
 	var pp = newHDLCSendTestPacket(t, 1024)

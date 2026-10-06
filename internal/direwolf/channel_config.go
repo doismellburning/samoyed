@@ -2,6 +2,7 @@ package direwolf
 
 import (
 	"github.com/doismellburning/samoyed/internal/axudp"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/phy"
 )
 
@@ -108,7 +109,7 @@ type achan_param_s struct {
 	il2p_max_fec int // 1 for max FEC length, 0 for automatic based on size.
 	// Only consulted when speaking v0.4; v0.6 always uses max FEC.
 
-	il2p_version il2p_version_t // IL2P protocol version spoken on this channel.
+	il2p_version il2p.Version // IL2P protocol version spoken on this channel.
 
 	il2p_invert_polarity int // 1 means invert on transmit.  Receive handles either automatically.
 

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
@@ -1037,32 +1038,32 @@ func Test_config_init_pbeacon_no_options(t *testing.T) {
 func Test_config_init_il2pversion(t *testing.T) {
 	t.Run("0.6 by default", func(t *testing.T) {
 		var audio, _ = configFromString(t, "")
-		assert.Equal(t, IL2P_VERSION_0_6, audio.achan[0].il2p_version)
+		assert.Equal(t, il2p.Version06, audio.achan[0].il2p_version)
 	})
 
 	t.Run("0.4 stored", func(t *testing.T) {
 		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PVERSION 0.4\n")
-		assert.Equal(t, IL2P_VERSION_0_4, audio.achan[0].il2p_version)
+		assert.Equal(t, il2p.Version04, audio.achan[0].il2p_version)
 	})
 
 	t.Run("0.6 stored", func(t *testing.T) {
 		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PVERSION 0.6\n")
-		assert.Equal(t, IL2P_VERSION_0_6, audio.achan[0].il2p_version)
+		assert.Equal(t, il2p.Version06, audio.achan[0].il2p_version)
 	})
 
 	t.Run("compat stored", func(t *testing.T) {
 		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PVERSION compat\n")
-		assert.Equal(t, IL2P_VERSION_COMPAT, audio.achan[0].il2p_version)
+		assert.Equal(t, il2p.VersionCompat, audio.achan[0].il2p_version)
 	})
 
 	t.Run("unrecognised version leaves the default", func(t *testing.T) {
 		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PVERSION 0.5\n")
-		assert.Equal(t, IL2P_VERSION_0_6, audio.achan[0].il2p_version)
+		assert.Equal(t, il2p.Version06, audio.achan[0].il2p_version)
 	})
 
 	t.Run("missing version leaves the default", func(t *testing.T) {
 		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PVERSION\n")
-		assert.Equal(t, IL2P_VERSION_0_6, audio.achan[0].il2p_version)
+		assert.Equal(t, il2p.Version06, audio.achan[0].il2p_version)
 	})
 }
 

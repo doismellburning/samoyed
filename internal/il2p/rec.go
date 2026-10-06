@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package il2p
 
 /********************************************************************************
  *
@@ -13,6 +16,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -24,13 +28,13 @@ const IL2P_PAYLOAD IL2PState = 2
 const IL2P_DECODE IL2PState = 3
 const IL2P_CRC IL2PState = 4
 
-// il2pReceiver is the IL2P receive state for one slicer of one demodulator
+// Receiver is the IL2P receive state for one slicer of one demodulator
 // ("subchannel") of one channel.
-type il2pReceiver struct {
+type Receiver struct {
 	channel, subchannel, slice int
 
-	version il2p_version_t // IL2P protocol version spoken on this channel.
-	crc     bool           // true if frames carry a trailing CRC.
+	version Version // IL2P protocol version spoken on this channel.
+	crc     bool    // true if frames carry a trailing CRC.
 
 	state IL2PState
 
@@ -55,22 +59,29 @@ type il2pReceiver struct {
 
 	corrected int // Number of symbols corrected by RS FEC.
 
-	audioLevel audioLevelFunc // For the audio level to deliver each packet with.
-	sink       il2pPacketSink // Where each extracted packet goes.
+	audioLevel AudioLevelFunc // For the audio level to deliver each packet with.
+	sink       PacketSink     // Where each extracted packet goes.
 }
 
-// il2pPacketSink is handed each packet extracted from the received bit
+// AudioLevelFunc reports the audio level a subchannel's demodulator is
+// hearing, which the receiver delivers each packet with.
+type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
+
+// PacketSink is handed each packet extracted from the received bit
 // stream, along with the audio level it was heard at and the number of
 // symbols the FEC decoder had to correct.  In normal operation it is
 // multi_modem_process_rec_packet.
-type il2pPacketSink func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t)
+type PacketSink func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
 
-func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_version_t, crc bool, audioLevel audioLevelFunc, sink il2pPacketSink) *il2pReceiver {
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
-	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
+// NewReceiver makes a Receiver for one slicer, speaking IL2P version version
+// and expecting a trailing CRC if crc is set.  It gives each packet it
+// decodes to sink, with the level audioLevel reports.
+func NewReceiver(channel int, subchannel int, slice int, version Version, crc bool, audioLevel AudioLevelFunc, sink PacketSink) *Receiver {
+	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
+	dwutil.Assert(subchannel >= 0 && subchannel < phy.MaxSubchans)
+	dwutil.Assert(slice >= 0 && slice < phy.MaxSlicers)
 
-	var F = new(il2pReceiver)
+	var F = new(Receiver)
 	F.channel = channel
 	F.subchannel = subchannel
 	F.slice = slice
@@ -82,7 +93,17 @@ func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_versio
 	return F
 }
 
-func (F *il2pReceiver) logEntry() *logrus.Entry {
+// Version returns the IL2P protocol version the receiver speaks.
+func (F *Receiver) Version() Version {
+	return F.version
+}
+
+// CRC reports whether the receiver expects frames to carry a trailing CRC.
+func (F *Receiver) CRC() bool {
+	return F.crc
+}
+
+func (F *Receiver) logEntry() *logrus.Entry {
 	return logrus.WithFields(logrus.Fields{
 		"channel":    F.channel,
 		"subchannel": F.subchannel,
@@ -92,7 +113,7 @@ func (F *il2pReceiver) logEntry() *logrus.Entry {
 
 /***********************************************************************************
  *
- * Name:        il2pReceiver.recBit
+ * Name:        Receiver.RecBit
  *
  * Purpose:     Extract IL2P packets from a stream of bits.
  *
@@ -106,7 +127,7 @@ func (F *il2pReceiver) logEntry() *logrus.Entry {
  *
  ***********************************************************************************/
 
-func (F *il2pReceiver) recBit(dbit int) {
+func (F *Receiver) RecBit(dbit int) {
 	var channel = F.channel
 	var subchannel = F.subchannel
 	var slice = F.slice
@@ -119,14 +140,14 @@ func (F *il2pReceiver) recBit(dbit int) {
 
 	switch F.state {
 	case IL2P_SEARCHING: // Searching for the sync word.
-		if bits.OnesCount(F.acc^IL2P_SYNC_WORD) <= 1 { // allow single bit mismatch
+		if bits.OnesCount(F.acc^SyncWord) <= 1 { // allow single bit mismatch
 			//text_color_set (DW_COLOR_INFO);
 			//dw_printf ("IL2P header has normal polarity\n");
 			F.polarity = false
 			F.state = IL2P_HEADER
 			F.bc = 0
 			F.hc = 0
-		} else if bits.OnesCount((^F.acc&0x00ffffff)^IL2P_SYNC_WORD) <= 1 {
+		} else if bits.OnesCount((^F.acc&0x00ffffff)^SyncWord) <= 1 {
 			// FIXME - this pops up occasionally with random noise.  Find better way to convey information.
 			// This also happens for each slicer - to noisy.
 			//dw_printf ("IL2P header has reverse polarity\n");
@@ -295,7 +316,7 @@ func (F *il2pReceiver) recBit(dbit int) {
 			if pp != nil {
 				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
 
-				F.sink(channel, subchannel, slice, pp, F.audioLevel(channel, subchannel), BitFixLevel(F.corrected), fec_type_il2p)
+				F.sink(channel, subchannel, slice, pp, F.audioLevel(channel, subchannel), phy.BitFixLevel(F.corrected), phy.FECIL2P)
 			}
 		} // end block for local variables.
 

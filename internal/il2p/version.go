@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package il2p
 
 import "strings"
 
@@ -23,27 +23,27 @@ import "strings"
  *
  *--------------------------------------------------------------*/
 
-type il2p_version_t int
+type Version int
 
 const (
-	// IL2P_VERSION_0_6 always uses 16 parity symbols per payload block and
+	// Version06 always uses 16 parity symbols per payload block and
 	// sends that header bit, which it reserves, as 0.  The default, and what
 	// current NinoTNC firmware, QtSM and MMDVM-TNC speak.
-	IL2P_VERSION_0_6 il2p_version_t = iota
+	Version06 Version = iota
 
-	// IL2P_VERSION_0_4 reads and writes the header bit as the FEC Level.
-	IL2P_VERSION_0_4
+	// Version04 reads and writes the header bit as the FEC Level.
+	Version04
 
-	// IL2P_VERSION_COMPAT transmits v0.4 and receives v0.6.  With the
+	// VersionCompat transmits v0.4 and receives v0.6.  With the
 	// maximum FEC that IL2PTX selects by default, a v0.4 frame differs from
 	// a v0.6 one only in that header bit, which v0.6 stations ignore, so it
 	// is understood by both.
-	IL2P_VERSION_COMPAT
+	VersionCompat
 )
 
 /*-------------------------------------------------------------
  *
- * Name:	il2p_parse_version
+ * Name:	ParseVersion (il2p_parse_version in Dire Wolf)
  *
  * Purpose:	Convert a version name, as written in a configuration file or
  *		on the command line, to a version.
@@ -54,24 +54,24 @@ const (
  *
  *--------------------------------------------------------------*/
 
-func il2p_parse_version(s string) (il2p_version_t, bool) {
+func ParseVersion(s string) (Version, bool) {
 	switch strings.ToUpper(strings.TrimSpace(s)) {
 	case "0.4", "4":
-		return IL2P_VERSION_0_4, true
+		return Version04, true
 	case "0.6", "6":
-		return IL2P_VERSION_0_6, true
+		return Version06, true
 	case "COMPAT":
-		return IL2P_VERSION_COMPAT, true
+		return VersionCompat, true
 	default:
-		return IL2P_VERSION_0_6, false
+		return Version06, false
 	}
 }
 
-func (v il2p_version_t) String() string {
+func (v Version) String() string {
 	switch v {
-	case IL2P_VERSION_0_4:
+	case Version04:
 		return "0.4"
-	case IL2P_VERSION_COMPAT:
+	case VersionCompat:
 		return "compat"
 	default:
 		return "0.6"
@@ -93,12 +93,12 @@ func (v il2p_version_t) String() string {
  *
  *--------------------------------------------------------------*/
 
-func il2p_tx_fec(version il2p_version_t, max_fec int) (int, int) {
-	if version == IL2P_VERSION_0_6 {
+func il2p_tx_fec(version Version, max_fec int) (int, int) {
+	if version == Version06 {
 		return 0, 1 // Bit is RESERVED, 16 parity symbols are mandatory.
 	}
 
-	return max_fec, max_fec // v0.4, which is what IL2P_VERSION_COMPAT transmits.
+	return max_fec, max_fec // v0.4, which is what VersionCompat transmits.
 }
 
 /*-------------------------------------------------------------
@@ -116,8 +116,8 @@ func il2p_tx_fec(version il2p_version_t, max_fec int) (int, int) {
  *
  *--------------------------------------------------------------*/
 
-func il2p_rx_max_fec(version il2p_version_t, fec_level int) int {
-	if version == IL2P_VERSION_0_4 {
+func il2p_rx_max_fec(version Version, fec_level int) int {
+	if version == Version04 {
 		return fec_level
 	}
 

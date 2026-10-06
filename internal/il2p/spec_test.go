@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package il2p
 
 // Test examples found in the IL2P spec
 // https://tarpn.net/t/il2p/il2p-specification_draft_v0-6.pdf
@@ -62,12 +62,12 @@ var il2pSpecExamples = []struct {
 }
 
 func TestIL2PSpec(t *testing.T) {
-	il2p_init(0)
+	Init(0)
 
 	for _, testDatum := range il2pSpecExamples {
 		t.Run(testDatum.name, func(t *testing.T) {
 			var b = il2pDataStringToBytes(testDatum.inputData)
-			var pp = il2p_decode_frame(b, IL2P_VERSION_0_6)
+			var pp = il2p_decode_frame(b, Version06)
 
 			// Did we actually decode a frame?
 			require.NotNil(t, pp)
@@ -85,7 +85,7 @@ func TestIL2PSpec(t *testing.T) {
 				"Trailing CRC mismatch for %s", testDatum.expectedAddrs)
 
 			// The default version receives v0.6 too.
-			assert.Equal(t, pp.Pack(), il2p_decode_frame(b, IL2P_VERSION_COMPAT).Pack())
+			assert.Equal(t, pp.Pack(), il2p_decode_frame(b, VersionCompat).Pack())
 		})
 	}
 }
@@ -94,16 +94,16 @@ func TestIL2PSpec(t *testing.T) {
 // wrong size.  It should come up empty handed rather than mistake the result
 // for a frame it has decoded correctly.
 func TestIL2PSpecExamplesRejectedAsV04(t *testing.T) {
-	il2p_init(0)
+	Init(0)
 
 	// Only the I-frame example has a payload, so only it can differ.
 	var b = il2pDataStringToBytes(il2pSpecExamples[2].inputData)
 
-	assert.Nil(t, il2p_decode_frame(b, IL2P_VERSION_0_4))
+	assert.Nil(t, il2p_decode_frame(b, Version04))
 }
 
 func TestIL2PSpecEncode(t *testing.T) {
-	il2p_init(0)
+	Init(0)
 
 	for _, testDatum := range il2pSpecExamples {
 		t.Run(testDatum.name, func(t *testing.T) {
@@ -111,7 +111,7 @@ func TestIL2PSpecEncode(t *testing.T) {
 			var pp = ax25.FromFrame(il2pDataStringToBytes(testDatum.ax25Data), alevel)
 			require.NotNil(t, pp)
 
-			var encoded, elen = il2p_encode_frame(pp, IL2P_VERSION_0_6, 0, true)
+			var encoded, elen = il2p_encode_frame(pp, Version06, 0, true)
 			require.Positive(t, elen)
 
 			assert.Equal(t, il2pDataStringToBytes(testDatum.inputData), encoded)
