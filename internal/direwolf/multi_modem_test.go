@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
@@ -184,7 +185,7 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	// see.
 	var got []string
 
-	s.eas = newEASReceiver(1, 0, 0,
+	s.eas = eas.NewReceiver(1, 0, 0,
 		func(int, int) ax25.ALevel { return ax25.ALevel{Rec: 0, Mark: 0, Space: 0} },
 		func(_ int, _ int, _ int, frame []byte, _ ax25.ALevel, _ phy.BitFixLevel, _ phy.FECType) {
 			got = append(got, string(frame))

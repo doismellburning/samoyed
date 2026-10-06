@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-package direwolf
+package eas
 
 import (
 	"github.com/doismellburning/samoyed/internal/linecode"
@@ -15,18 +15,18 @@ import (
  *
  *******************************************************************************/
 
-// EASSender sends EAS SAME messages on a channel's line: each byte as it is,
+// Sender sends EAS SAME messages on a channel's line: each byte as it is,
 // least significant bit first, with no NRZI, so it leaves the NRZI level the
 // line carries from one HDLC frame to the next alone.
-type EASSender struct {
+type Sender struct {
 	line *linecode.Encoder
 
 	bitsSent int // Count number of bits sent by SendMessage.
 }
 
-// NewEASSender makes an EASSender that sends on line.
-func NewEASSender(line *linecode.Encoder) *EASSender {
-	var s = new(EASSender)
+// NewSender makes a Sender that sends on line.
+func NewSender(line *linecode.Encoder) *Sender {
+	var s = new(Sender)
 	s.line = line
 
 	return s
@@ -34,7 +34,7 @@ func NewEASSender(line *linecode.Encoder) *EASSender {
 
 // SendMessage sends one repeat of str: the preamble, then the message.  It
 // returns the number of bits sent.
-func (s *EASSender) SendMessage(str []byte) int {
+func (s *Sender) SendMessage(str []byte) int {
 	s.bitsSent = 0
 
 	for range 16 {
@@ -48,7 +48,7 @@ func (s *EASSender) SendMessage(str []byte) int {
 	return s.bitsSent
 }
 
-func (s *EASSender) putByte(b byte) {
+func (s *Sender) putByte(b byte) {
 	for range 8 {
 		s.line.Write(b&1 != 0, false)
 		b >>= 1

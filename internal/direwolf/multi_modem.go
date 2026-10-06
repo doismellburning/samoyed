@@ -74,6 +74,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/il2p"
@@ -666,17 +667,8 @@ type slicerReceivers struct {
 	hdlc *hdlc.Receiver
 	fx25 *fx25.Receiver
 	il2p *il2p.Receiver
-	eas  *easReceiver // nil unless the channel is EAS.
+	eas  *eas.Receiver // nil unless the channel is EAS.
 }
-
-// audioLevelFunc reports the audio level a subchannel's demodulator is
-// hearing, which a receiver delivers each frame with.
-type audioLevelFunc func(channel int, subchannel int) ax25.ALevel
-
-// frameSink takes each frame a receiver extracts, without its FCS, with the
-// audio level it was heard at, how much fixing it took, and the FEC, if any,
-// that carried it.  In normal operation it is multi_modem_process_rec_frame.
-type frameSink func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t)
 
 // newHDLCConfig takes what the HDLC receiver needs from a channel's settings.
 func newHDLCConfig(achan *achan_param_s) hdlc.Config {
@@ -695,7 +687,7 @@ func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice in
 	s.il2p = il2p.NewReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, demod_get_audio_level, multi_modem_process_rec_packet)
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.eas = newEASReceiver(channel, subchannel, slice, demod_get_audio_level, multi_modem_process_rec_frame)
+		s.eas = eas.NewReceiver(channel, subchannel, slice, demod_get_audio_level, multi_modem_process_rec_frame)
 	}
 
 	return s
@@ -820,7 +812,7 @@ func (r *Layer2Receiver) RecBitNew(channel int, subchannel int, slice int, _raw 
 	// EAS does not use HDLC.
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.eas.recBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
+		s.eas.RecBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
 
 		return
 	}

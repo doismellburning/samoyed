@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package eas
 
 import (
 	"testing"
@@ -30,7 +30,7 @@ func TestEASReceiverHandsMessagesToItsSink(t *testing.T) {
 
 			var alevel = ax25.ALevel{Rec: 42, Mark: 41, Space: 43}
 
-			var rx = newEASReceiver(1, 2, 3,
+			var rx = NewReceiver(1, 2, 3,
 				func(channel int, subchannel int) ax25.ALevel {
 					assert.Equal(t, 1, channel)
 					assert.Equal(t, 2, subchannel)
@@ -45,7 +45,7 @@ func TestEASReceiverHandsMessagesToItsSink(t *testing.T) {
 			// bit first, as same_send.go sends them.
 			for _, b := range append([]byte{0xab, 0xab, 0xab, 0xab}, message...) {
 				for i := range 8 {
-					rx.recBit(int(b>>i)&1, 0)
+					rx.RecBit(int(b>>i)&1, 0)
 				}
 			}
 

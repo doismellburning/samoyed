@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package eas
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// easUnpack turns the line levels an EASSender sent back into bytes, least
+// easUnpack turns the line levels a Sender sent back into bytes, least
 // significant bit first: SAME has no NRZI, so each level is a bit.
 func easUnpack(t *testing.T, levels []int) []byte {
 	t.Helper()
@@ -56,7 +56,7 @@ func TestEASSenderSendsThePreambleThenTheMessage(t *testing.T) {
 
 	var message = []byte("ZCZC-Q1TEST")
 
-	var sent = NewEASSender(line).SendMessage(message)
+	var sent = NewSender(line).SendMessage(message)
 
 	assert.Len(t, levels, sent, "the count returned should be the bits actually sent")
 

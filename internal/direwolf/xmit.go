@@ -41,6 +41,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/il2p"
@@ -1374,7 +1375,7 @@ type Layer2Sender struct {
 	hdlc *hdlc.Sender // Sends AX.25 frames, and the flags between them.
 	fx25 *fx25.Sender // Sends FX.25, on the same line.
 	il2p *il2p.Sender // Sends IL2P, on the same line.
-	eas  *EASSender   // Sends EAS SAME, on the same line.
+	eas  *eas.Sender  // Sends EAS SAME, on the same line.
 }
 
 // NewLayer2Sender makes a Layer2Sender for channel, sending the layer 2
@@ -1389,7 +1390,7 @@ func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneG
 	s.hdlc = hdlc.NewSender(s.line, channel)
 	s.fx25 = fx25.NewSender(s.line, channel, fx25Debug)
 	s.il2p = il2p.NewSender(s.line, channel)
-	s.eas = NewEASSender(s.line)
+	s.eas = eas.NewSender(s.line)
 
 	return s
 }
