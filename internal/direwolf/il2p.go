@@ -15,4 +15,8 @@ const IL2P_MAX_ENCODED_PAYLOAD_SIZE = (IL2P_MAX_PAYLOAD_SIZE + IL2P_MAX_PAYLOAD_
 
 const IL2P_CRC_ENCODED_SIZE = 4 // 16-bit CRC → 4 Hamming-encoded bytes
 
+// IL2P_RS_BLOCK_SIZE is the size of a Reed-Solomon codeblock with 8 bit
+// symbols, which is what IL2P uses, as FX.25 does.
+const IL2P_RS_BLOCK_SIZE = 255
+
 const IL2P_MAX_PACKET_SIZE = (IL2P_SYNC_WORD_SIZE + IL2P_HEADER_SIZE + IL2P_HEADER_PARITY + IL2P_MAX_ENCODED_PAYLOAD_SIZE + IL2P_CRC_ENCODED_SIZE)

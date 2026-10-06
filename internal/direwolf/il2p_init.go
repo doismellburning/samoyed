@@ -109,7 +109,7 @@ func il2p_encode_rs(tx_data []byte, num_parity int) ([]byte, error) {
 		return nil, err
 	}
 
-	var rs_block [FX25_BLOCK_SIZE]byte
+	var rs_block [IL2P_RS_BLOCK_SIZE]byte
 	copy(rs_block[len(rs_block)-data_size-num_parity:], tx_data)
 
 	return rs.Encode(rs_block[:len(rs_block)-num_parity]), nil
@@ -141,7 +141,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 
 	var n = data_size + num_parity // total size in.
 
-	var rs_block [FX25_BLOCK_SIZE]byte
+	var rs_block [IL2P_RS_BLOCK_SIZE]byte
 
 	copy(rs_block[len(rs_block)-n:], rec_block)
 
