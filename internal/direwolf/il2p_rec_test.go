@@ -43,7 +43,12 @@ func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 
 	var sender = NewIL2PSender(linecode.NewEncoder(rx.recBit), 1)
 
-	var pp = newHDLCSendTestPacket(t, 16)
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q2TEST"
+	addrs[ax25.Source] = "Q1TEST"
+
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, []byte("abcdefghijklmnop"))
+	require.NotNil(t, pp)
 	require.Positive(t, sender.SendFrame(pp, IL2P_VERSION_COMPAT, 1, false, 0))
 
 	rx.recBit(0) // One more bit to see the last byte through.
