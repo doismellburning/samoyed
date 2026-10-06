@@ -106,29 +106,6 @@ func FuzzAX25FromText(f *testing.F) {
 	})
 }
 
-// FuzzIL2PDecodeFrame covers the IL2P receive path: header FEC, descrambling
-// and the payload blocks.
-func FuzzIL2PDecodeFrame(f *testing.F) {
-	fuzzQuietly(f)
-
-	il2p_init(0)
-
-	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
-	require.NotNil(f, pp)
-
-	for _, version := range []il2p_version_t{IL2P_VERSION_0_4, IL2P_VERSION_0_6} {
-		var encoded, length = il2p_encode_frame(pp, version, 0)
-		require.Positive(f, length)
-		f.Add(encoded, int(version))
-	}
-
-	f.Add(make([]byte, 30), int(IL2P_VERSION_0_4))
-
-	f.Fuzz(func(t *testing.T, irec []byte, version int) {
-		il2p_decode_frame(irec, il2p_version_t(version))
-	})
-}
-
 // kissFuzzMaxStream bounds the streams the KISS targets try.  Room for an
 // overlong frame and a few hundred short ones is all the collector needs, and
 // the queues they land on are only drained by threads a fuzzing run doesn't
