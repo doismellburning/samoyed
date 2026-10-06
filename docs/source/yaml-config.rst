@@ -122,6 +122,11 @@ Reference
     ``il2pversion``
         The IL2P version (``IL2PVERSION``): ``0.4``, ``0.6`` or ``compat``.
 
+    ``il2prxcrc``
+        ``false`` to receive IL2P frames without a trailing CRC
+        (``IL2PRXCRC``).  Left out, it is ``true``: frames must carry one, and
+        it must match.
+
     ``modem``
         The modem (``MODEM``):
 

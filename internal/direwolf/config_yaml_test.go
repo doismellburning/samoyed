@@ -208,6 +208,11 @@ channels:
 			yaml:   "channels:\n  - {channel: 0, il2pversion: \"0.5\"}\n",
 		},
 		{
+			name:   "IL2P receive without a CRC",
+			legacy: "IL2PRXCRC OFF\n",
+			yaml:   "channels:\n  - {channel: 0, il2prxcrc: false}\n",
+		},
+		{
 			name:   "network ports",
 			legacy: "AGWPORT 8010\nKISSPORT 0\nKISSPORT 8011\nKISSPORT 8012 1\n",
 			yaml:   "agwPort: 8010\nkissPorts:\n  - port: 0\n  - port: 8011\n  - {port: 8012, channel: 1}\n",

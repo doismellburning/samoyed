@@ -1083,6 +1083,7 @@ var configHandlers = map[string]configHandler{
 	"FX25AUTO":       handleFX25AUTO,
 	"IL2PTX":         handleIL2PTX,
 	"IL2PVERSION":    handleIL2PVERSION,
+	"IL2PRXCRC":      handleIL2PRXCRC,
 	"DIGIPEAT":       handleDIGIPEAT,
 	"DIGIPEATER":     handleDIGIPEAT,
 	"DEDUPE":         handleDEDUPE,
@@ -1267,6 +1268,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		p_audio_config.achan[channel].il2p_version = il2p.Version06
 		p_audio_config.achan[channel].il2p_invert_polarity = 0
 		p_audio_config.achan[channel].il2p_crc = true
+		p_audio_config.achan[channel].il2p_rx_crc = true
 
 		p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS
 		p_audio_config.achan[channel].sanity_test = SANITY_APRS
@@ -3311,6 +3313,41 @@ func (ps *parseState) applyIL2PTX(settings IL2PTXSettings) error {
 	}
 
 	achan.il2p_crc = settings.CRC == nil || *settings.CRC
+
+	return nil
+}
+
+// handleIL2PRXCRC handles the IL2PRXCRC keyword.
+func handleIL2PRXCRC(ps *parseState) error {
+	/*
+	 * IL2PRXCRC  {on|off}		- Expect, and check, a trailing CRC on received
+	 *				  IL2P frames.  Default on.  Turn it off to hear
+	 *				  stations that send none, such as Dire Wolf 1.7.
+	 */
+	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
+		return fmt.Errorf("line %d: IL2PRXCRC can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
+	}
+
+	var t = ps.split(false)
+	if t == "" {
+		return fmt.Errorf("line %d: Missing parameter for IL2PRXCRC command.  Expecting ON or OFF", ps.line)
+	}
+
+	if strings.EqualFold(t, "ON") {
+		return ps.applyIL2PRXCRC(true)
+	} else if strings.EqualFold(t, "OFF") {
+		return ps.applyIL2PRXCRC(false)
+	}
+
+	ps.errorf("line %d: Expected ON or OFF for IL2PRXCRC", ps.line)
+
+	return nil
+}
+
+// applyIL2PRXCRC sets whether the current channel expects a trailing CRC on
+// the IL2P frames it receives.
+func (ps *parseState) applyIL2PRXCRC(on bool) error {
+	ps.audio.achan[ps.channel].il2p_rx_crc = on
 
 	return nil
 }
