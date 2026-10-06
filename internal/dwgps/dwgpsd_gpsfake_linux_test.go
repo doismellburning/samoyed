@@ -136,8 +136,10 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	// gpsd emits several TPV reports per cycle as each NMEA sentence arrives:
 	// a 2D-only one from $GPRMC, then a 3D one still without altitude, then
 	// finally the fuller one derived from $GPGGA that carries altitude. Wait
-	// for that last one rather than just the first 3D report.
-	var deadline = time.Now().Add(10 * time.Second)
+	// for that last one rather than just the first 3D report.  It normally
+	// comes within two seconds, but a busy CI runner can be much slower, and
+	// waiting longer costs nothing when it does come.
+	var deadline = time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		info = gps.Read()
 		if info.Fix >= DWFIX_3D && info.Altitude.IsJust() {
