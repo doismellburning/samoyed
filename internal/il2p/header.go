@@ -682,6 +682,7 @@ func il2p_get_header_attributes(hdr []byte) (int, int, int) {
  *		This involves RS FEC then descrambling.
  *
  * Inputs:      rec_hdr	- Header as received over the radio.
+ *		debug	- IL2P's debug level.
  *
  * Returns:     corrected_descrambled_hdr - After RS FEC and unscrambling.
  *
@@ -692,8 +693,8 @@ func il2p_get_header_attributes(hdr []byte) (int, int, int) {
  *
  ***********************************************************************************/
 
-func il2p_clarify_header(rec_hdr []byte) ([]byte, int) {
-	var corrected, e = il2p_decode_rs(rec_hdr, IL2P_HEADER_PARITY)
+func il2p_clarify_header(rec_hdr []byte, debug int) ([]byte, int) {
+	var corrected, e = il2p_decode_rs(rec_hdr, IL2P_HEADER_PARITY, debug)
 
 	var corrected_descrambled_hdr = il2p_descramble_block(corrected)
 

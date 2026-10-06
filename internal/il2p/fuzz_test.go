@@ -19,8 +19,6 @@ import (
 func FuzzIL2PDecodeFrame(f *testing.F) {
 	testutils.DiscardLogrus(f)
 
-	Init(0)
-
 	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
 	require.NotNil(f, pp)
 
@@ -33,7 +31,7 @@ func FuzzIL2PDecodeFrame(f *testing.F) {
 	f.Add(make([]byte, 30), int(Version04))
 
 	f.Fuzz(func(t *testing.T, irec []byte, version int) {
-		il2p_decode_frame(irec, Version(version))
+		il2p_decode_frame(irec, Version(version), 0)
 	})
 }
 
@@ -53,7 +51,7 @@ const (
 // bit, packed eight to a byte, least significant bit first, as the receiver
 // target unpacks them.
 func recBitFuzzLevels(fn func(s *Sender)) []byte {
-	return testutils.PackLevels(testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0)) }))
+	return testutils.PackLevels(testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0, 0)) }))
 }
 
 // recBitFuzzReceive feeds stream to a new Receiver with the settings packed in
@@ -69,7 +67,7 @@ func recBitFuzzReceive(tb testing.TB, stream []byte, settings byte) int {
 
 	var delivered = 0
 
-	var rx = NewReceiver(1, 2, 3, version, settings&recBitFuzzCRC != 0,
+	var rx = NewReceiver(1, 2, 3, version, settings&recBitFuzzCRC != 0, 0,
 		func(int, int) ax25.ALevel { return alevel },
 		func(channel int, subchannel int, slice int, pp *ax25.Packet, gotAlevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType) {
 			delivered++
@@ -105,8 +103,6 @@ func recBitFuzzReceive(tb testing.TB, stream []byte, settings byte) int {
 // same decoding FuzzIL2PDecodeFrame covers.
 func FuzzReceiverRecBit(f *testing.F) {
 	testutils.DiscardLogrus(f)
-
-	Init(0)
 
 	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
 	require.NotNil(f, pp)

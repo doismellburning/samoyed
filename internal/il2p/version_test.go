@@ -49,8 +49,6 @@ func TestIL2PRXMaxFEC(t *testing.T) {
 // Send a frame over the fake modem and see whether the receiver, speaking the
 // version it was given, makes sense of it.
 func TestIL2POnAirVersions(t *testing.T) {
-	Init(0)
-
 	// Check the information part of whatever arrives against il2pTestText, so
 	// build the frame directly rather than from text: the IL2P header cannot
 	// represent every combination of the AX.25 address C bits, and a frame

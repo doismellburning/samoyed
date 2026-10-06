@@ -178,6 +178,8 @@ func (s *radioSink) DCDChange(channel int, state int) {
  *
  *		fx25Debug - FX.25's debug level, for the HDLC decoders.
  *
+ *		il2pDebug - IL2P's debug level, likewise.
+ *
  *		sink	- Where the decoders' output goes.
  *
  * Outputs:
@@ -186,9 +188,9 @@ func (s *radioSink) DCDChange(channel int, state int) {
  *
  *------------------------------------------------------------------------------*/
 
-func multi_modem_init(pa *RadioConfig, fx25Debug int, sink ReceiveSink) {
+func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink ReceiveSink) {
 	demod_init(pa)
-	layer2Receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, sink)
+	layer2Receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, il2pDebug, sink)
 
 	for channel, m := range multiModems {
 		m.audioConfig = pa
@@ -684,7 +686,7 @@ func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice in
 	var s = new(slicerReceivers)
 	s.hdlc = hdlc.NewReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, demod_get_audio_level, multi_modem_process_rec_frame)
 	s.fx25 = fx25.NewReceiver(channel, subchannel, slice, r.fx25Debug, demod_get_audio_level, multi_modem_process_rec_frame)
-	s.il2p = il2p.NewReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, demod_get_audio_level, multi_modem_process_rec_packet)
+	s.il2p = il2p.NewReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, r.il2pDebug, demod_get_audio_level, multi_modem_process_rec_packet)
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
 		s.eas = eas.NewReceiver(channel, subchannel, slice, demod_get_audio_level, multi_modem_process_rec_frame)
@@ -703,6 +705,7 @@ type Layer2Receiver struct {
 	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
 	audio         *RadioConfig
 	fx25Debug     int // FX.25's debug level, for every slicer's FX.25 receiver.
+	il2pDebug     int // IL2P's debug level, for every slicer's IL2P receiver.
 	sink          ReceiveSink
 
 	// Own copy of random number generator so we can get
@@ -727,18 +730,22 @@ const hdlcRecRandMax int32 = 0x7fffffff
  *		fx25Debug - FX.25's debug level, for every slicer's FX.25
  *			  receiver.
  *
+ *		il2pDebug - IL2P's debug level, for every slicer's IL2P
+ *			  receiver.
+ *
  *		sink	- Where a change in the channel's data carrier detect
  *			  state is reported.
  *
  ***********************************************************************************/
 
-func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, sink ReceiveSink) *Layer2Receiver {
+func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, il2pDebug int, sink ReceiveSink) *Layer2Receiver {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("NewLayer2Receiver (%p) \n", pa);
 
 	var r = new(Layer2Receiver)
 	r.audio = pa
 	r.fx25Debug = fx25Debug
+	r.il2pDebug = il2pDebug
 	r.sink = sink
 	r.randSeed = 1
 

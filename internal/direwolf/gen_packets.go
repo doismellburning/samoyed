@@ -155,17 +155,16 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 	g.sink = sink
 
 	// We don't have -d or -q options here.
-	// Just use the default of minimal information for FX.25.
+	// Just use the default of minimal information for FX.25, and none for IL2P.
 	const fx25Debug = 1
+	const il2pDebug = 0
 
 	g.layer2Senders = make([]*Layer2Sender, MAX_RADIO_CHANS)
 	for c := range g.layer2Senders {
-		g.layer2Senders[c] = NewLayer2Sender(c, audio, nil, fx25Debug)
+		g.layer2Senders[c] = NewLayer2Sender(c, audio, nil, fx25Debug, il2pDebug)
 	}
 
 	g.setTones()
-
-	il2p.Init(0) // There are no "-d" options so far but it could be handy here.
 
 	return g, nil
 }

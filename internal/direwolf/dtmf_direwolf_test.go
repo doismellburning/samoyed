@@ -20,7 +20,7 @@ func Test_dtmf(t *testing.T) {
 
 	t.Cleanup(func() { layer2Receiver = origReceiver })
 
-	layer2Receiver = NewLayer2Receiver(&my_audio_config, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
+	layer2Receiver = NewLayer2Receiver(&my_audio_config, [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
 
 	var decoder = NewDTMFDecoder(c, sampleRate)
 

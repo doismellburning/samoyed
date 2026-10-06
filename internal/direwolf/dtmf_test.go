@@ -44,7 +44,7 @@ func TestSendDTMFDecodesBack(t *testing.T) {
 
 	t.Cleanup(func() { layer2Receiver = origReceiver })
 
-	layer2Receiver = NewLayer2Receiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
+	layer2Receiver = NewLayer2Receiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
 
 	var sink = new(byteSink)
 	var tg = NewToneGenerator(channel, audioConfig, 50, sink)

@@ -53,26 +53,6 @@ func newIL2PTabEntry(nroots uint) il2pTabEntry {
 	return il2pTabEntry{symsize: symsize, genpoly: genpoly, fcs: fcs, prim: prim, nroots: nroots, rs: rs}
 }
 
-var g_il2p_debug = 0
-
-/*-------------------------------------------------------------
- *
- * Name:	Init (il2p_init in Dire Wolf)
- *
- * Purpose:	This must be called at application start up time.
- *
- * Inputs:	debug	- Enable debug output.
- *
- *--------------------------------------------------------------*/
-
-func Init(il2p_debug int) {
-	g_il2p_debug = il2p_debug
-}
-
-func il2p_get_debug() int {
-	return g_il2p_debug
-}
-
 // Find RS codec control block for specified number of parity symbols.
 
 func il2p_find_rs(nparity int) (*reedsolomon.Codec, error) {
@@ -132,6 +112,7 @@ func il2p_encode_rs(tx_data []byte, num_parity int) ([]byte, error) {
  *				Total size is sum of following two parameters.
  *		rec_block	data_size + num_parity bytes.
  *		num_parity	Number of parity symbols (bytes) in above.
+ *		debug		IL2P's debug level.
  *
  * Returns:	out		Original with possible corrections applied.
  *				data_size bytes.
@@ -141,7 +122,7 @@ func il2p_encode_rs(tx_data []byte, num_parity int) ([]byte, error) {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
+func il2p_decode_rs(rec_block []byte, num_parity int, debug int) ([]byte, int) {
 	var data_size = len(rec_block) - num_parity
 
 	//  Use zero padding in front if data size is too small.
@@ -152,7 +133,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 
 	copy(rs_block[len(rs_block)-n:], rec_block)
 
-	if il2p_get_debug() >= 3 {
+	if debug >= 3 {
 		var logEntry = logrus.WithFields(logrus.Fields{
 			"filler": len(rs_block) - n,
 			"data":   data_size,
@@ -178,7 +159,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 	var out = make([]byte, data_size)
 	copy(out, rs_block[len(rs_block)-n:len(rs_block)-n+data_size])
 
-	if il2p_get_debug() >= 3 && derrors >= 0 {
+	if debug >= 3 && derrors >= 0 {
 		var logEntry = logrus.WithFields(logrus.Fields{
 			"errors":    derrors,
 			"positions": derrlocs,
@@ -196,7 +177,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 
 	for i := 0; i < derrors; i++ {
 		if derrlocs[i] < len(rs_block)-n {
-			if il2p_get_debug() >= 3 {
+			if debug >= 3 {
 				logrus.WithFields(logrus.Fields{
 					"position": derrlocs[i],
 					"value":    fmt.Sprintf("0x%02x", rs_block[derrlocs[i]]),
@@ -209,7 +190,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 		}
 	}
 
-	if il2p_get_debug() >= 3 {
+	if debug >= 3 {
 		logrus.WithField("derrors", derrors).Debug("il2p_decode_rs returns")
 	}
 

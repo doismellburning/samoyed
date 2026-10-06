@@ -13,8 +13,6 @@ import (
 // il2p_find_rs used to report an unknown parity count and then hand back
 // the first table entry's codec anyway.
 func TestIL2PFindRSUnknownParityCount(t *testing.T) {
-	Init(0)
-
 	var rs, err = il2p_find_rs(3)
 	require.Error(t, err)
 	assert.Nil(t, rs)

@@ -82,7 +82,7 @@ func generate9600(t *testing.T, audioConfig *RadioConfig, channel int, frames []
 
 	var sink = new(byteSink)
 
-	var sender = NewLayer2Sender(channel, audioConfig, NewToneGenerator(channel, audioConfig, 50, sink), 0)
+	var sender = NewLayer2Sender(channel, audioConfig, NewToneGenerator(channel, audioConfig, 50, sink), 0, 0)
 
 	sender.SendPreamblePostamble(32, false)
 
@@ -120,7 +120,7 @@ func demodulate9600(t *testing.T, audioConfig *RadioConfig, channel int, samples
 
 	var sink = new(recordingReceiveSink)
 
-	multi_modem_init(audioConfig, 0, sink)
+	multi_modem_init(audioConfig, 0, 0, sink)
 
 	for _, sam := range samples {
 		multi_modem_process_sample(channel, sam)

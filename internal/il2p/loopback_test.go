@@ -68,13 +68,13 @@ func il2pLoopback(t *testing.T, version Version) *il2pLoopbackRecorder {
 	// half-gathered frame.  A decoder left part way through gathering a payload
 	// swallows the next frame it is given while it resynchronises, which a
 	// deliberate version mismatch is apt to leave behind.
-	recorder.rx = NewReceiver(0, 0, 0, version, true,
+	recorder.rx = NewReceiver(0, 0, 0, version, true, 0,
 		func(int, int) ax25.ALevel { return ax25.ALevel{Rec: 0, Mark: 0, Space: 0} },
 		func(_ int, _ int, _ int, pp *ax25.Packet, _ ax25.ALevel, retries phy.BitFixLevel, _ phy.FECType) {
 			recorder.frames = append(recorder.frames, il2pLoopbackFrame{info: pp.Info(), retries: retries})
 		})
 
-	recorder.sender = NewSender(linecode.NewEncoder(recorder.rx.RecBit), 0)
+	recorder.sender = NewSender(linecode.NewEncoder(recorder.rx.RecBit), 0, 0)
 
 	return recorder
 }

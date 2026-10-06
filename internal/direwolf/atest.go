@@ -115,6 +115,7 @@ type AtestOptions struct {
 type Atest struct {
 	audio      *RadioConfig
 	fx25Debug  int
+	il2pDebug  int
 	decodeOnly int
 
 	// One sink for the whole run, so its DCD counts are of everything
@@ -170,11 +171,10 @@ func NewAtest(opts *AtestOptions) (*Atest, error) {
 
 	audio.achan[1] = audio.achan[0]
 
-	il2p.Init(opts.DebugIL2P)
-
 	var a = new(Atest)
 	a.audio = audio
 	a.fx25Debug = opts.DebugFX25
+	a.il2pDebug = opts.DebugIL2P
 	a.decodeOnly = opts.DecodeOnly
 	a.sink = new(atestSink)
 	a.sink.audio = audio
@@ -246,7 +246,7 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 	 * Initialize the AFSK demodulator and HDLC decoder.
 	 * Needs to be done for each file because they could have different sample rates.
 	 */
-	multi_modem_init(audio, a.fx25Debug, a.sink)
+	multi_modem_init(audio, a.fx25Debug, a.il2pDebug, a.sink)
 
 	a.sink.packetsDecoded = 0
 

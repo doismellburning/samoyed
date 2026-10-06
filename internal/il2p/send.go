@@ -16,17 +16,25 @@ import (
 type Sender struct {
 	line    *linecode.Encoder
 	channel int // For logging.
+	debug   int // IL2P's debug level.
 
 	bitsSent int // Count number of bits sent by SendFrame or SendPreamble.
 }
 
-// NewSender makes a Sender for channel that sends on line.
-func NewSender(line *linecode.Encoder, channel int) *Sender {
+// NewSender makes a Sender for channel that sends on line, with
+// IL2P's debug level at debug.
+func NewSender(line *linecode.Encoder, channel int, debug int) *Sender {
 	var s = new(Sender)
 	s.line = line
 	s.channel = channel
+	s.debug = debug
 
 	return s
+}
+
+// Debug returns the sender's IL2P debug level.
+func (s *Sender) Debug() int {
+	return s.debug
 }
 
 /*-------------------------------------------------------------
@@ -90,7 +98,7 @@ func (s *Sender) SendFrame(pp *ax25.Packet, version Version, max_fec int, crc bo
 
 	s.bitsSent = 0
 
-	if il2p_get_debug() >= 1 {
+	if s.debug >= 1 {
 		var logEntry = logrus.WithFields(logrus.Fields{
 			"channel": s.channel,
 			"version": version.String(),

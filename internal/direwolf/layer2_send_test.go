@@ -50,7 +50,7 @@ func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGe
 
 	t.Cleanup(func() { toneGenCapture = nil })
 
-	fn(NewLayer2Sender(hdlcSendTestChannel, audioConfig, toneGenerator, 0))
+	fn(NewLayer2Sender(hdlcSendTestChannel, audioConfig, toneGenerator, 0, 0))
 
 	toneGenCapture = nil
 
@@ -136,8 +136,6 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 // for it, and without when they don't, just as the IL2P sender itself does
 // when asked.
 func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
-	il2p.Init(0)
-
 	var pp = newHDLCSendTestPacket(t, 16)
 
 	var alone = map[bool][]int{}
@@ -154,7 +152,7 @@ func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
 		var sentAlone int
 
 		alone[crc] = testutils.LineLevels(func(line *linecode.Encoder) {
-			sentAlone = il2p.NewSender(line, 0).SendFrame(pp, il2p.VersionCompat, 0, crc, 0)
+			sentAlone = il2p.NewSender(line, 0, 0).SendFrame(pp, il2p.VersionCompat, 0, crc, 0)
 		})
 		require.Positive(t, sentAlone)
 
@@ -168,8 +166,6 @@ func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
 // NRZI level alone, or an HDLC frame sent after it would start from the wrong
 // level and arrive with its first bit inverted.
 func TestIL2PLeavesTheNRZILevelForTheNextHDLCFrame(t *testing.T) {
-	il2p.Init(0)
-
 	// A stuffed zero leaves the line at 1 after this frame, where starting
 	// the next frame afresh from 0 would show.
 	var first = []byte{hdlcSixtyOne, 'Q', '1', 'T', 'E', 'S', 'T'}
