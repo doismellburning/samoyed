@@ -59,3 +59,9 @@ func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
 	require.Len(t, got, 1)
 	assert.Equal(t, delivery{1, 2, 3, fxTestFrame, alevel, phy.BitFixLevel(2), phy.FECFX25}, got[0])
 }
+
+// silentAudioLevel stands in for a demodulator when a test drives a receiver
+// directly, with no audio for it to have heard.
+func silentAudioLevel(int, int) ax25.ALevel {
+	return ax25.ALevel{Rec: 0, Mark: 0, Space: 0}
+}

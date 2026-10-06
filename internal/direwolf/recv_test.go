@@ -468,9 +468,3 @@ func TestRecvProcessRunsTheLinkTimersWhileTheQueueIsEmpty(t *testing.T) {
 		return transmitQueue.Count(0, -1, "", "", false) > 1
 	}, 30*time.Second, 10*time.Millisecond, "the connect attempt was never retried")
 }
-
-// silentAudioLevel stands in for a demodulator when a test drives a receiver
-// directly, with no audio for it to have heard.
-func silentAudioLevel(int, int) ax25.ALevel {
-	return ax25.ALevel{Rec: 0, Mark: 0, Space: 0}
-}
