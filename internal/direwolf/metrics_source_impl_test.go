@@ -19,7 +19,7 @@ import (
 )
 
 func TestMetricsInitImplDisabledStartsNothing(t *testing.T) {
-	var port = freeTCPPort(t)
+	var port = testutils.UnusedPortNumber(t)
 
 	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO

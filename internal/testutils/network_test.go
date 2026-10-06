@@ -4,6 +4,7 @@
 package testutils
 
 import (
+	"fmt"
 	"net"
 	"testing"
 
@@ -33,5 +34,10 @@ func TestListenAndAccept(t *testing.T) {
 
 func TestUnusedPort(t *testing.T) {
 	var _, err = new(net.Dialer).DialContext(t.Context(), "tcp4", net.JoinHostPort("127.0.0.1", UnusedPort(t)))
+	assert.Error(t, err)
+}
+
+func TestUnusedPortNumber(t *testing.T) {
+	var _, err = new(net.Dialer).DialContext(t.Context(), "tcp4", fmt.Sprintf("127.0.0.1:%d", UnusedPortNumber(t)))
 	assert.Error(t, err)
 }

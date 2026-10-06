@@ -48,7 +48,7 @@ func TestIgateDialCountsOnlySuccessfulConnections(t *testing.T) {
 	assert.InDelta(t, failedBefore, metricValue(t, failed, noLabels), 0, "nothing failed")
 
 	// Now a port with nothing listening on it.
-	var closedPort = freeTCPPort(t)
+	var closedPort = testutils.UnusedPortNumber(t)
 
 	connectsBefore = metricValue(t, connects, noLabels)
 	failedBefore = metricValue(t, failed, noLabels)
@@ -60,20 +60,6 @@ func TestIgateDialCountsOnlySuccessfulConnections(t *testing.T) {
 	assert.InDelta(t, connectsBefore, metricValue(t, connects, noLabels), 0,
 		"a failed attempt is not a connection")
 	assert.InDelta(t, failedBefore+1, metricValue(t, failed, noLabels), 0, "the failure was counted")
-}
-
-// freeTCPPort returns a loopback port that was free a moment ago.
-func freeTCPPort(t *testing.T) int {
-	t.Helper()
-
-	var l, err = new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	var port = l.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert
-
-	require.NoError(t, l.Close())
-
-	return port
 }
 
 // TestIGateConnectThreadWaitsBeforeRedialling is a regression test: the
@@ -89,7 +75,7 @@ func TestIGateConnectThreadWaitsBeforeRedialling(t *testing.T) {
 	igate.dropConnection(conn)
 
 	igate.config.t2_server_name = "127.0.0.1"
-	igate.config.t2_server_port = freeTCPPort(t)
+	igate.config.t2_server_port = testutils.UnusedPortNumber(t)
 	igate.retryInterval = 200 * time.Millisecond
 
 	var failedBefore = metricValue(t, failed, map[string]string{})
