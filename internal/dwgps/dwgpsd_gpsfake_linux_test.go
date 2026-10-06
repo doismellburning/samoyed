@@ -62,7 +62,9 @@ func startGpsfake(t *testing.T, port int) {
 	var fixture = filepath.Join(t.TempDir(), "gpsfake.log")
 	require.NoError(t, os.WriteFile(fixture, []byte(gpsfakeFixtureNMEA(time.Now())), 0o600))
 
-	var cmd = exec.CommandContext(context.Background(), "gpsfake", "-n", "-P", strconv.Itoa(port), "-c", "0.1", fixture) //nolint:gosec
+	// -D 2 has gpsd log its warnings, and what its clients ask of it,
+	// alongside gpsfake's own output, which the test prints if it fails.
+	var cmd = exec.CommandContext(context.Background(), "gpsfake", "-n", "-P", strconv.Itoa(port), "-c", "0.1", "-D", "2", fixture) //nolint:gosec
 
 	// Only Setpgid is relevant here; the rest are fine at their zero values.
 	cmd.SysProcAttr = &syscall.SysProcAttr{ //nolint:exhaustruct_v5
