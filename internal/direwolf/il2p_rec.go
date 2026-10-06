@@ -83,6 +83,16 @@ func newIL2PReceiver(channel int, subchannel int, slice int, version il2p_versio
 	return F
 }
 
+// Version returns the IL2P protocol version the receiver speaks.
+func (F *il2pReceiver) Version() il2p_version_t {
+	return F.version
+}
+
+// CRC reports whether the receiver expects frames to carry a trailing CRC.
+func (F *il2pReceiver) CRC() bool {
+	return F.crc
+}
+
 func (F *il2pReceiver) logEntry() *logrus.Entry {
 	return logrus.WithFields(logrus.Fields{
 		"channel":    F.channel,
