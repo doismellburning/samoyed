@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package il2p
 
 import (
 	"testing"
@@ -33,8 +33,8 @@ type il2pLoopbackFrame struct {
 // il2pLoopbackRecorder holds a sender wired straight into a receiver, and
 // collects the frames that come back out of the receiver.
 type il2pLoopbackRecorder struct {
-	sender *IL2PSender
-	rx     *il2pReceiver
+	sender *Sender
+	rx     *Receiver
 	frames []il2pLoopbackFrame
 }
 
@@ -49,7 +49,7 @@ func (r *il2pLoopbackRecorder) take() []il2pLoopbackFrame {
 // flush sends the receiver the one extra bit its state machine needs to
 // finish decoding a frame whose last bit it has already seen.
 func (r *il2pLoopbackRecorder) flush() {
-	r.rx.recBit(0)
+	r.rx.RecBit(0)
 }
 
 // il2pLoopback wires a sender's bit stream straight into a receiver, and
@@ -59,7 +59,7 @@ func (r *il2pLoopbackRecorder) flush() {
 //
 // The receiver speaks the given version and expects a trailing CRC.  Frames
 // sent with the recorder's sender should ask for one.
-func il2pLoopback(t *testing.T, version il2p_version_t) *il2pLoopbackRecorder {
+func il2pLoopback(t *testing.T, version Version) *il2pLoopbackRecorder {
 	t.Helper()
 
 	var recorder = new(il2pLoopbackRecorder)
@@ -68,13 +68,13 @@ func il2pLoopback(t *testing.T, version il2p_version_t) *il2pLoopbackRecorder {
 	// half-gathered frame.  A decoder left part way through gathering a payload
 	// swallows the next frame it is given while it resynchronises, which a
 	// deliberate version mismatch is apt to leave behind.
-	recorder.rx = newIL2PReceiver(0, 0, 0, version, true,
+	recorder.rx = NewReceiver(0, 0, 0, version, true,
 		func(int, int) ax25.ALevel { return ax25.ALevel{Rec: 0, Mark: 0, Space: 0} },
 		func(_ int, _ int, _ int, pp *ax25.Packet, _ ax25.ALevel, retries phy.BitFixLevel, _ phy.FECType) {
 			recorder.frames = append(recorder.frames, il2pLoopbackFrame{info: pp.Info(), retries: retries})
 		})
 
-	recorder.sender = NewIL2PSender(linecode.NewEncoder(recorder.rx.recBit), 0)
+	recorder.sender = NewSender(linecode.NewEncoder(recorder.rx.RecBit), 0)
 
 	return recorder
 }

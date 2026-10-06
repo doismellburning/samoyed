@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package il2p
 
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -7,19 +10,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// IL2PSender sends IL2P frames, and IL2P's preamble, on a channel's line.
+// Sender sends IL2P frames, and IL2P's preamble, on a channel's line.
 // IL2P is not HDLC and skips NRZI: its bits go out as they are, most
 // significant first, inverted if asked.
-type IL2PSender struct {
+type Sender struct {
 	line    *linecode.Encoder
 	channel int // For logging.
 
 	bitsSent int // Count number of bits sent by SendFrame or SendPreamble.
 }
 
-// NewIL2PSender makes an IL2PSender for channel that sends on line.
-func NewIL2PSender(line *linecode.Encoder, channel int) *IL2PSender {
-	var s = new(IL2PSender)
+// NewSender makes an Sender for channel that sends on line.
+func NewSender(line *linecode.Encoder, channel int) *Sender {
+	var s = new(Sender)
 	s.line = line
 	s.channel = channel
 
@@ -38,7 +41,7 @@ func NewIL2PSender(line *linecode.Encoder, channel int) *IL2PSender {
  *
  *		max_fec	- 1 to force 16 parity symbols for each payload block.
  *			  0 for automatic depending on block size.
- *			  Only consulted for IL2P_VERSION_0_4.
+ *			  Only consulted for Version04.
  *
  *		crc	- true to append the trailing CRC.
  *
@@ -69,11 +72,11 @@ func NewIL2PSender(line *linecode.Encoder, channel int) *IL2PSender {
  *
  *--------------------------------------------------------------*/
 
-func (s *IL2PSender) SendFrame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc bool, polarity int) int {
+func (s *Sender) SendFrame(pp *ax25.Packet, version Version, max_fec int, crc bool, polarity int) int {
 	var syncWordBytes = []byte{
-		(IL2P_SYNC_WORD >> 16) & 0xff,
-		(IL2P_SYNC_WORD >> 8) & 0xff,
-		(IL2P_SYNC_WORD) & 0xff,
+		(SyncWord >> 16) & 0xff,
+		(SyncWord >> 8) & 0xff,
+		(SyncWord) & 0xff,
 	}
 
 	var encoded, elen = il2p_encode_frame(pp, version, max_fec, crc)
@@ -107,7 +110,7 @@ func (s *IL2PSender) SendFrame(pp *ax25.Packet, version il2p_version_t, max_fec 
 
 	// Send bits to modulator.
 
-	s.sendByteMSBFirst(IL2P_PREAMBLE, polarity)
+	s.sendByteMSBFirst(Preamble, polarity)
 
 	for _, x := range data {
 		s.sendByteMSBFirst(int(x), polarity)
@@ -119,11 +122,11 @@ func (s *IL2PSender) SendFrame(pp *ax25.Packet, version il2p_version_t, max_fec 
 // SendPreamble sends nbytes of IL2P's filler pattern, 01010101, for before
 // and after a frame, and returns the number of bits sent.  polarity is as for
 // SendFrame.
-func (s *IL2PSender) SendPreamble(nbytes int, polarity int) int {
+func (s *Sender) SendPreamble(nbytes int, polarity int) int {
 	s.bitsSent = 0
 
 	for range nbytes {
-		s.sendByteMSBFirst(IL2P_PREAMBLE, polarity)
+		s.sendByteMSBFirst(Preamble, polarity)
 	}
 
 	return s.bitsSent
@@ -136,7 +139,7 @@ func (s *IL2PSender) SendPreamble(nbytes int, polarity int) int {
 // The direwolf receive implementation will automatically compensate
 // for either polarity but other implementations might not.
 
-func (s *IL2PSender) sendByteMSBFirst(x int, polarity int) {
+func (s *Sender) sendByteMSBFirst(x int, polarity int) {
 	for range 8 {
 		s.line.Write((x&0x80) != 0, polarity&1 != 0)
 

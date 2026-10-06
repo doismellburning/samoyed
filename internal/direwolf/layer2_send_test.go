@@ -8,6 +8,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/fx25"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -211,7 +212,7 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 // for it, and without when they don't, just as the IL2P sender itself does
 // when asked.
 func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
-	il2p_init(0)
+	il2p.Init(0)
 
 	var pp = newHDLCSendTestPacket(t, 16)
 
@@ -219,17 +220,17 @@ func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
 
 	for _, crc := range []bool{false, true} {
 		var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
-		audioConfig.achan[hdlcSendTestChannel].il2p_version = IL2P_VERSION_COMPAT
+		audioConfig.achan[hdlcSendTestChannel].il2p_version = il2p.VersionCompat
 		audioConfig.achan[hdlcSendTestChannel].il2p_crc = crc
 
 		var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
 			s.SendFrame(pp, false)
 		})
 
-		var sender = NewIL2PSender(linecode.NewEncoder(func(level int) {
+		var sender = il2p.NewSender(linecode.NewEncoder(func(level int) {
 			alone[crc] = append(alone[crc], level)
 		}), 0)
-		require.Positive(t, sender.SendFrame(pp, IL2P_VERSION_COMPAT, 0, crc, 0))
+		require.Positive(t, sender.SendFrame(pp, il2p.VersionCompat, 0, crc, 0))
 
 		assert.Equal(t, alone[crc], bits, "il2p_crc = %v", crc)
 	}
@@ -241,7 +242,7 @@ func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
 // NRZI level alone, or an HDLC frame sent after it would start from the wrong
 // level and arrive with its first bit inverted.
 func TestIL2PLeavesTheNRZILevelForTheNextHDLCFrame(t *testing.T) {
-	il2p_init(0)
+	il2p.Init(0)
 
 	// A stuffed zero leaves the line at 1 after this frame, where starting
 	// the next frame afresh from 0 would show.
@@ -260,7 +261,7 @@ func TestIL2PLeavesTheNRZILevelForTheNextHDLCFrame(t *testing.T) {
 
 		var withIL2P = captureBits(t, nil, func(s *Layer2Sender) {
 			firstLen = s.hdlc.SendFrame(first, false)
-			il2pLen = s.il2p.SendFrame(pp, IL2P_VERSION_COMPAT, 0, false, polarity)
+			il2pLen = s.il2p.SendFrame(pp, il2p.VersionCompat, 0, false, polarity)
 			s.hdlc.SendFrame(second, false)
 		})
 

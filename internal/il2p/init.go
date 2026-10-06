@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package il2p
 
 import (
 	"fmt"
@@ -34,7 +37,7 @@ var g_il2p_debug = 0
 
 /*-------------------------------------------------------------
  *
- * Name:	il2p_init
+ * Name:	Init (il2p_init in Dire Wolf)
  *
  * Purpose:	This must be called at application start up time.
  *		It sets up tables for the Reed-Solomon functions.
@@ -43,7 +46,7 @@ var g_il2p_debug = 0
  *
  *--------------------------------------------------------------*/
 
-func il2p_init(il2p_debug int) {
+func Init(il2p_debug int) {
 	g_il2p_debug = il2p_debug
 
 	for i := range NTAB {
@@ -68,7 +71,7 @@ func il2p_find_rs(nparity int) (*reedsolomon.Codec, error) {
 	for n := range NTAB {
 		if Tab[n].nroots == uint(nparity) {
 			if Tab[n].rs == nil {
-				return nil, fmt.Errorf("RS control block for nparity = %d is not set up; il2p_init has not been called", nparity)
+				return nil, fmt.Errorf("RS control block for nparity = %d is not set up; Init has not been called", nparity)
 			}
 
 			return Tab[n].rs, nil

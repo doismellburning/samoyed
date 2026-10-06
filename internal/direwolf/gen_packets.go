@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/wav"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -164,7 +165,7 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 
 	g.setTones()
 
-	il2p_init(0) // There are no "-d" options so far but it could be handy here.
+	il2p.Init(0) // There are no "-d" options so far but it could be handy here.
 
 	return g, nil
 }
@@ -586,7 +587,7 @@ func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
 		return errors.New("either -j or -J must be specified when using 2400 bps QPSK")
 	}
 
-	var il2p_version, il2p_version_ok = il2p_parse_version(*f.il2pVersion)
+	var il2p_version, il2p_version_ok = il2p.ParseVersion(*f.il2pVersion)
 	if !il2p_version_ok {
 		return fmt.Errorf("invalid IL2P version %s.  Expected 0.4, 0.6, or compat", *f.il2pVersion)
 	}

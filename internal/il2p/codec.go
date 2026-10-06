@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package il2p
 
 import (
 	"bytes"
@@ -28,7 +31,7 @@ import (
  *		version	- IL2P version to speak.
  *
  *		max_fec	- 1 to send maximum FEC size rather than automatic.
- *			  Only consulted for IL2P_VERSION_0_4.
+ *			  Only consulted for Version04.
  *
  * Outputs:	iout	- Encoded result, excluding the 3 byte sync word.
  *			  Caller should provide  IL2P_MAX_PACKET_SIZE  bytes.
@@ -47,7 +50,7 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_frame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc ...bool) ([]byte, int) {
+func il2p_encode_frame(pp *ax25.Packet, version Version, max_fec int, crc ...bool) ([]byte, int) {
 	var appendCRC = len(crc) > 0 && crc[0]
 
 	var fec_level, use_max_fec = il2p_tx_fec(version, max_fec)
@@ -167,7 +170,7 @@ func il2p_encode_frame(pp *ax25.Packet, version il2p_version_t, max_fec int, crc
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_frame(irec []byte, version il2p_version_t) *ax25.Packet {
+func il2p_decode_frame(irec []byte, version Version) *ax25.Packet {
 	if len(irec) < IL2P_HEADER_SIZE+IL2P_HEADER_PARITY {
 		return nil
 	}
@@ -230,7 +233,7 @@ func il2p_decode_frame(irec []byte, version il2p_version_t) *ax25.Packet {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_version_t, symbols_corrected *int) *ax25.Packet {
+func il2p_decode_header_payload(uhdr []byte, epayload []byte, version Version, symbols_corrected *int) *ax25.Packet {
 	var hdr_type, fec_level, payload_len = il2p_get_header_attributes(uhdr)
 	var max_fec = il2p_rx_max_fec(version, fec_level)
 

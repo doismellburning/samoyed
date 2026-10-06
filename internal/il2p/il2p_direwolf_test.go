@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package il2p
 
 import (
 	"fmt"
@@ -23,7 +26,7 @@ import (
 
 func Test_IL2P(t *testing.T) {
 	var enable_debug_out = 0
-	il2p_init(enable_debug_out)
+	Init(enable_debug_out)
 
 	fmt.Println("Begin IL2P unit tests.")
 
@@ -502,7 +505,7 @@ func test_example_headers(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	var max_fec = 0
-	var iout, ioutLen = il2p_encode_frame(pp, IL2P_VERSION_0_4, max_fec)
+	var iout, ioutLen = il2p_encode_frame(pp, Version04, max_fec)
 
 	// dw_printf ("expected for example 3:\n");
 	// fx_hex_dump(complete3, sizeof(complete3));
@@ -528,13 +531,13 @@ func enc_dec_compare(t *testing.T, pp1 *ax25.Packet) {
 
 	// Every version, and for v0.4 both FEC levels, should survive a round trip.
 	var cases = []struct {
-		version il2p_version_t
+		version Version
 		max_fec int
 	}{
-		{IL2P_VERSION_0_4, 0},
-		{IL2P_VERSION_0_4, 1},
-		{IL2P_VERSION_0_6, 0},
-		{IL2P_VERSION_COMPAT, 1}, // Compatibility transmits v0.4 but receives v0.6.
+		{Version04, 0},
+		{Version04, 1},
+		{Version06, 0},
+		{VersionCompat, 1}, // Compatibility transmits v0.4 but receives v0.6.
 
 	}
 
@@ -750,7 +753,7 @@ func test_serdes(t *testing.T) {
 
 	// Frames are sent as v0.4, so the receiver has to read the header FEC
 	// Level bit rather than assume the v0.6 fixed size.
-	var recorder = il2pLoopback(t, IL2P_VERSION_0_4)
+	var recorder = il2pLoopback(t, Version04)
 	var recCount = 0
 
 	// try combinations of header type, max_fec, polarity, errors.
@@ -767,7 +770,7 @@ func test_serdes(t *testing.T) {
 
 		for max_fec := range 2 {
 			for polarity := range 3 { // 2 means throw in some errors.
-				var num_bits_sent = recorder.sender.SendFrame(pp, IL2P_VERSION_0_4, max_fec, true, polarity)
+				var num_bits_sent = recorder.sender.SendFrame(pp, Version04, max_fec, true, polarity)
 				t.Logf("%d bits sent.", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.

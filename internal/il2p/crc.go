@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //nolint:gochecknoglobals
-package direwolf
+package il2p
 
 import "github.com/doismellburning/samoyed/internal/fcs"
 
