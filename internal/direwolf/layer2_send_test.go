@@ -11,6 +11,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/doismellburning/samoyed/internal/wav"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,68 +57,6 @@ func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGe
 	return bits
 }
 
-// nrziDecode recovers the data bits from an NRZI stream: a one leaves the
-// signal as it was, a zero inverts it.  The line starts at the level
-// captureBits reset it to.
-func nrziDecode(bits []int) []bool {
-	var data []bool
-	var previous = 0
-
-	for _, bit := range bits {
-		data = append(data, bit == previous)
-		previous = bit
-	}
-
-	return data
-}
-
-// destuff drops the zero the sender inserts after five consecutive ones.
-func destuff(bits []bool) []bool {
-	var data []bool
-	var ones = 0
-
-	for _, bit := range bits {
-		if ones == 5 {
-			ones = 0
-
-			continue // The stuffed zero, which was never data.
-		}
-
-		data = append(data, bit)
-
-		if bit {
-			ones++
-		} else {
-			ones = 0
-		}
-	}
-
-	return data
-}
-
-// packLSBFirst reassembles bytes from bits in the order HDLC sends them.
-func packLSBFirst(t *testing.T, bits []bool) []byte {
-	t.Helper()
-
-	require.Zero(t, len(bits)%8, "a whole number of bytes should have been sent")
-
-	var out = make([]byte, 0, len(bits)/8)
-
-	for i := 0; i < len(bits); i += 8 {
-		var b byte
-
-		for j := range 8 {
-			if bits[i+j] {
-				b |= 1 << j
-			}
-		}
-
-		out = append(out, b)
-	}
-
-	return out
-}
-
 // packMSBFirst reassembles bytes from bits in the order IL2P sends them.
 func packMSBFirst(t *testing.T, bits []int) []byte {
 	t.Helper()
@@ -161,23 +100,6 @@ func newHDLCSendTestConfig(layer2 layer2_t) *RadioConfig {
 	return audioConfig
 }
 
-// hdlcFrameFromBits takes the frame out of a captured stream: a flag at each
-// end, and in between it the frame with the stuffing the sender added.
-func hdlcFrameFromBits(t *testing.T, bits []int) []byte {
-	t.Helper()
-
-	var data = nrziDecode(bits)
-
-	require.Greater(t, len(data), 16, "there should be a frame between the flags")
-
-	// Flags are sent without stuffing, so they are whole bytes at each end
-	// of the stream.
-	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, data[:8]), "missing start flag")
-	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, data[len(data)-8:]), "missing end flag")
-
-	return packLSBFirst(t, destuff(data[8:len(data)-8]))
-}
-
 // FX.25 and AX.25 go out on the same line, so a codeblock has to start from
 // the level whatever went before it left the line at, or its first bit is
 // received inverted.
@@ -190,11 +112,11 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 
 	// The codeblock as an FX.25 sender sends it on a line of its own, which
 	// starts low.
-	var alone []int
+	var aloneLen int
 
-	var aloneLen = fx25.NewSender(linecode.NewEncoder(func(level int) {
-		alone = append(alone, level)
-	}), 0, 0).SendFrame(fbuf, 16)
+	var alone = testutils.LineLevels(func(line *linecode.Encoder) {
+		aloneLen = fx25.NewSender(line, 0, 0).SendFrame(fbuf, 16)
+	})
 	require.Positive(t, aloneLen)
 
 	var beforeLen int
@@ -206,7 +128,7 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 
 	require.Equal(t, 1, bits[beforeLen-1], "the frame before should leave the line at 1")
 
-	assert.Equal(t, nrziDecode(alone), nrziDecode(bits)[beforeLen:],
+	assert.Equal(t, testutils.NRZIDecode(alone), testutils.NRZIDecode(bits)[beforeLen:],
 		"the codeblock should carry the same data as if it had had the line to itself")
 }
 
@@ -229,10 +151,12 @@ func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
 			s.SendFrame(pp, false)
 		})
 
-		var sender = il2p.NewSender(linecode.NewEncoder(func(level int) {
-			alone[crc] = append(alone[crc], level)
-		}), 0)
-		require.Positive(t, sender.SendFrame(pp, il2p.VersionCompat, 0, crc, 0))
+		var sentAlone int
+
+		alone[crc] = testutils.LineLevels(func(line *linecode.Encoder) {
+			sentAlone = il2p.NewSender(line, 0).SendFrame(pp, il2p.VersionCompat, 0, crc, 0)
+		})
+		require.Positive(t, sentAlone)
 
 		assert.Equal(t, alone[crc], bits, "il2p_crc = %v", crc)
 	}
@@ -311,7 +235,7 @@ func TestEASSendRepeatsTheMessageWithItsPreamble(t *testing.T) {
 		sentBits = append(sentBits, bit != 0)
 	}
 
-	assert.Equal(t, expected, packLSBFirst(t, sentBits), "each repeat is the preamble followed by the message")
+	assert.Equal(t, expected, testutils.PackLSBFirst(t, sentBits), "each repeat is the preamble followed by the message")
 
 	// The time to hold PTT for covers the data, the gap between the
 	// repeats, and the delays at each end.

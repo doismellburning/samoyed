@@ -4,11 +4,10 @@
 package aprs
 
 import (
-	"io"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/sirupsen/logrus"
+	"github.com/doismellburning/samoyed/internal/testutils"
 )
 
 // APRS packets arrive from anyone on frequency, or from anyone on APRS-IS by
@@ -19,23 +18,10 @@ import (
 // Seeds added here run as ordinary unit tests under "go test", so an input
 // that once crashed a decoder stays checked even when nobody is fuzzing.
 
-// The decoder complains at length about a malformed packet, and a fuzzing
-// run has nobody to read it, so send logrus to the bin for the duration.
-func fuzzQuietly(tb testing.TB) {
-	tb.Helper()
-
-	var saved = logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
-
-	tb.Cleanup(func() {
-		logrus.SetOutput(saved)
-	})
-}
-
 // FuzzDecodeAPRS covers the information part decoders, which is where most of
 // the reading-off-the-end has been.
 func FuzzDecodeAPRS(f *testing.F) {
-	fuzzQuietly(f)
+	testutils.DiscardLogrus(f)
 
 	var aprsDecoder = NewDecoderFromDataFiles()
 

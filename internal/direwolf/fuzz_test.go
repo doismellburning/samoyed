@@ -19,7 +19,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
-	"github.com/sirupsen/logrus"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,14 +43,12 @@ func fuzzQuietly(tb testing.TB) {
 	var saved = os.Stdout
 	os.Stdout = devNull
 
-	var savedLog = logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
-
 	tb.Cleanup(func() {
 		os.Stdout = saved
-		logrus.SetOutput(savedLog)
 		devNull.Close()
 	})
+
+	testutils.DiscardLogrus(tb)
 }
 
 // FuzzAX25FromFrame covers the path every received frame takes, from the

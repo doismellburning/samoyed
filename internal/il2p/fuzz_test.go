@@ -4,32 +4,20 @@
 package il2p
 
 import (
-	"io"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
-	"github.com/sirupsen/logrus"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// il2pFuzzQuietly points logrus at the bin for the duration of a fuzz run,
-// which has nobody to read what IL2P reports about a malformed frame.
-func il2pFuzzQuietly(tb testing.TB) {
-	tb.Helper()
-
-	var saved = logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
-
-	tb.Cleanup(func() { logrus.SetOutput(saved) })
-}
-
 // FuzzIL2PDecodeFrame covers the IL2P receive path: header FEC, descrambling
 // and the payload blocks.
 func FuzzIL2PDecodeFrame(f *testing.F) {
-	il2pFuzzQuietly(f)
+	testutils.DiscardLogrus(f)
 
 	Init(0)
 
@@ -65,23 +53,7 @@ const (
 // bit, packed eight to a byte, least significant bit first, as the receiver
 // target unpacks them.
 func recBitFuzzLevels(fn func(s *Sender)) []byte {
-	var out []byte
-
-	var n = 0
-
-	fn(NewSender(linecode.NewEncoder(func(level int) {
-		if n%8 == 0 {
-			out = append(out, 0)
-		}
-
-		if level != 0 {
-			out[len(out)-1] |= 1 << (n % 8)
-		}
-
-		n++
-	}), 0))
-
-	return out
+	return testutils.PackLevels(testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0)) }))
 }
 
 // recBitFuzzReceive feeds stream to a new Receiver with the settings packed in
@@ -132,7 +104,7 @@ func recBitFuzzReceive(tb testing.TB, stream []byte, settings byte) int {
 // the sync word, then the header, payload and CRC it announces, through the
 // same decoding FuzzIL2PDecodeFrame covers.
 func FuzzReceiverRecBit(f *testing.F) {
-	il2pFuzzQuietly(f)
+	testutils.DiscardLogrus(f)
 
 	Init(0)
 

@@ -4,13 +4,12 @@
 package hdlc
 
 import (
-	"io"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
-	"github.com/sirupsen/logrus"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,23 +34,7 @@ const (
 // packed eight to a byte, least significant bit first, as the fuzz target
 // unpacks them.
 func fuzzLevels(fn func(s *Sender)) []byte {
-	var out []byte
-
-	var n = 0
-
-	fn(NewSender(linecode.NewEncoder(func(level int) {
-		if n%8 == 0 {
-			out = append(out, 0)
-		}
-
-		if level != 0 {
-			out[len(out)-1] |= 1 << (n % 8)
-		}
-
-		n++
-	}), 0))
-
-	return out
+	return testutils.PackLevels(testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0)) }))
 }
 
 // fuzzReceive feeds stream to a new Receiver with the settings packed in
@@ -116,10 +99,7 @@ func fuzzReceive(tb testing.TB, stream []byte, settings byte) int {
 // the demodulator makes of anything transmitting on the channel, through
 // finding frames between flags, fixing bits, and the sanity checks.
 func FuzzReceiverRecBit(f *testing.F) {
-	var savedLog = logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
-
-	f.Cleanup(func() { logrus.SetOutput(savedLog) })
+	testutils.DiscardLogrus(f)
 
 	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
 	require.NotNil(f, pp)

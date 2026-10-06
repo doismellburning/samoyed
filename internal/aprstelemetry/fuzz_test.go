@@ -4,10 +4,9 @@
 package aprstelemetry
 
 import (
-	"io"
 	"testing"
 
-	"github.com/sirupsen/logrus"
+	"github.com/doismellburning/samoyed/internal/testutils"
 )
 
 // Telemetry arrives from anyone on frequency, or from anyone on APRS-IS by way
@@ -18,22 +17,9 @@ import (
 // Seeds added here run as ordinary unit tests under "go test", so an input
 // that once crashed a decoder stays checked even when nobody is fuzzing.
 
-// The decoders complain at length about malformed telemetry, and a fuzzing run
-// has nobody to read it, so send logrus to the bin for the duration.
-func fuzzQuietly(tb testing.TB) {
-	tb.Helper()
-
-	var saved = logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
-
-	tb.Cleanup(func() {
-		logrus.SetOutput(saved)
-	})
-}
-
 // FuzzDataOriginal covers the original "T#" format, complaints and all.
 func FuzzDataOriginal(f *testing.F) {
-	fuzzQuietly(f)
+	testutils.DiscardLogrus(f)
 
 	// From the protocol spec, with and without a comment.
 	f.Add("T#005,199,000,255,073,123,01101001")
@@ -57,7 +43,7 @@ func FuzzDataOriginal(f *testing.F) {
 // expression only ever hands over an even number of 4 to 14 base 91 digits,
 // but DataBase91 is exported, so it gets anything.
 func FuzzDataBase91(f *testing.F) {
-	fuzzQuietly(f)
+	testutils.DiscardLogrus(f)
 
 	f.Add("ss11")
 	f.Add("ss1122334455!$")
@@ -76,7 +62,7 @@ func FuzzDataBase91(f *testing.F) {
 // whatever they left behind, so odd names, units, coefficients and precisions
 // all find their way into the formatting.
 func FuzzMetadata(f *testing.F) {
-	fuzzQuietly(f)
+	testutils.DiscardLogrus(f)
 
 	// A balloon's metadata and data, from the ported unit test.
 	f.Add(

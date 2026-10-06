@@ -4,26 +4,14 @@
 package fx25
 
 import (
-	"io"
 	"slices"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/phy"
-	"github.com/sirupsen/logrus"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
-
-// fx25FuzzQuietly points logrus at the bin for the duration of a fuzz run,
-// which has nobody to read what the receiver reports at higher debug levels.
-func fx25FuzzQuietly(tb testing.TB) {
-	tb.Helper()
-
-	var saved = logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
-
-	tb.Cleanup(func() { logrus.SetOutput(saved) })
-}
 
 // fx25FuzzMaxStream bounds the bytes, each eight received bits, the FX.25
 // target feeds the receiver.  The largest codeblock, tag and all, is under
@@ -35,7 +23,7 @@ const fx25FuzzMaxStream = 2048
 // Reed-Solomon decoder and the HDLC unstuffing of what it hands back.  Anyone
 // transmitting on the channel controls those bits.
 func FuzzFX25RecBit(f *testing.F) {
-	fx25FuzzQuietly(f)
+	testutils.DiscardLogrus(f)
 
 	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
 	require.NotNil(f, pp)

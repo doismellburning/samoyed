@@ -8,6 +8,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,95 +20,10 @@ const (
 	hdlcSixtyOne byte = 0x3f
 )
 
-// nrziDecode recovers the data bits from an NRZI stream: a one leaves the
-// signal as it was, a zero inverts it.  The line starts at the level
-// captureHDLCBits starts it at.
-func nrziDecode(bits []int) []bool {
-	var data []bool
-	var previous = 0
-
-	for _, bit := range bits {
-		data = append(data, bit == previous)
-		previous = bit
-	}
-
-	return data
-}
-
-// destuff drops the zero the sender inserts after five consecutive ones.
-func destuff(bits []bool) []bool {
-	var data []bool
-	var ones = 0
-
-	for _, bit := range bits {
-		if ones == 5 {
-			ones = 0
-
-			continue // The stuffed zero, which was never data.
-		}
-
-		data = append(data, bit)
-
-		if bit {
-			ones++
-		} else {
-			ones = 0
-		}
-	}
-
-	return data
-}
-
-// packLSBFirst reassembles bytes from bits in the order HDLC sends them.
-func packLSBFirst(t *testing.T, bits []bool) []byte {
-	t.Helper()
-
-	require.Zero(t, len(bits)%8, "a whole number of bytes should have been sent")
-
-	var out = make([]byte, 0, len(bits)/8)
-
-	for i := 0; i < len(bits); i += 8 {
-		var b byte
-
-		for j := range 8 {
-			if bits[i+j] {
-				b |= 1 << j
-			}
-		}
-
-		out = append(out, b)
-	}
-
-	return out
-}
-
-// hdlcFrameFromBits takes the frame out of a captured stream: a flag at each
-// end, and in between it the frame with the stuffing the sender added.
-func hdlcFrameFromBits(t *testing.T, bits []int) []byte {
-	t.Helper()
-
-	var data = nrziDecode(bits)
-
-	require.Greater(t, len(data), 16, "there should be a frame between the flags")
-
-	// Flags are sent without stuffing, so they are whole bytes at each end
-	// of the stream.
-	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, data[:8]), "missing start flag")
-	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, data[len(data)-8:]), "missing end flag")
-
-	return packLSBFirst(t, destuff(data[8:len(data)-8]))
-}
-
 // captureHDLCBits collects the line levels a new Sender sends while fn
 // runs.  The line starts low.
 func captureHDLCBits(fn func(s *Sender)) []int {
-	var bits []int
-
-	fn(NewSender(linecode.NewEncoder(func(level int) {
-		bits = append(bits, level)
-	}), 0))
-
-	return bits
+	return testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0)) })
 }
 
 // A frame goes out between flags, with its FCS appended and any run of more
@@ -128,7 +44,7 @@ func TestAX25FrameIsSentBetweenFlagsWithItsFCS(t *testing.T) {
 	var frameFCS = fcs.Calc(fbuf)
 	var expected = append(append([]byte{}, fbuf...), byte(frameFCS)&0xff, byte(frameFCS>>8)&0xff) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
-	assert.Equal(t, expected, hdlcFrameFromBits(t, bits),
+	assert.Equal(t, expected, testutils.HDLCFrameFromLevels(t, bits),
 		"the frame between the flags should be what was asked for, plus its FCS")
 
 	// Stuffing is what makes the frame longer than the bytes it carries.
@@ -146,8 +62,8 @@ func TestAX25BadFCSSendsTheComplementOfTheRealOne(t *testing.T) {
 		s.SendFrame(fbuf, true)
 	})
 
-	var goodData = hdlcFrameFromBits(t, good)
-	var badData = hdlcFrameFromBits(t, bad)
+	var goodData = testutils.HDLCFrameFromLevels(t, good)
+	var badData = testutils.HDLCFrameFromLevels(t, bad)
 
 	require.Len(t, badData, len(goodData), "only the FCS should differ")
 
@@ -170,10 +86,10 @@ func TestOnlyDataIsBitStuffed(t *testing.T) {
 	})
 
 	assert.Len(t, asControl, 8, "a flag is sent as it stands")
-	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, nrziDecode(asControl)))
+	assert.Equal(t, []byte{hdlcFlag}, testutils.PackLSBFirst(t, testutils.NRZIDecode(asControl)))
 
 	assert.Len(t, asData, 9, "the same byte as data needs a stuffed bit")
-	assert.Equal(t, []byte{hdlcFlag}, packLSBFirst(t, destuff(nrziDecode(asData))))
+	assert.Equal(t, []byte{hdlcFlag}, testutils.PackLSBFirst(t, testutils.Destuff(testutils.NRZIDecode(asData))))
 
 	// However long the run, a control byte is sent as it stands.
 	var allOnes = captureHDLCBits(func(s *Sender) {
@@ -181,7 +97,7 @@ func TestOnlyDataIsBitStuffed(t *testing.T) {
 	})
 
 	assert.Len(t, allOnes, 8)
-	assert.Equal(t, []byte{0xff}, packLSBFirst(t, nrziDecode(allOnes)))
+	assert.Equal(t, []byte{0xff}, testutils.PackLSBFirst(t, testutils.NRZIDecode(allOnes)))
 }
 
 // A run of ones long enough to need stuffing twice gets a zero each time.
@@ -192,7 +108,7 @@ func TestBitStuffingRepeatsForALongRunOfOnes(t *testing.T) {
 	})
 
 	assert.Len(t, bits, 16+3, "sixteen ones need three stuffed zeros")
-	assert.Equal(t, []byte{0xff, 0xff}, packLSBFirst(t, destuff(nrziDecode(bits))))
+	assert.Equal(t, []byte{0xff, 0xff}, testutils.PackLSBFirst(t, testutils.Destuff(testutils.NRZIDecode(bits))))
 }
 
 // NRZI: a one leaves the signal alone, a zero inverts it.

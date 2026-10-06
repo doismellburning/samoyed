@@ -921,7 +921,7 @@ func TestPreambleIsFlagsForAX25(t *testing.T) {
 
 	assert.Equal(t, 4*8, sent, "flags are not stuffed, so it is eight bits a byte")
 	assert.Len(t, bits, sent)
-	assert.Equal(t, []byte{hdlcFlag, hdlcFlag, hdlcFlag, hdlcFlag}, packLSBFirst(t, nrziDecode(bits)))
+	assert.Equal(t, []byte{hdlcFlag, hdlcFlag, hdlcFlag, hdlcFlag}, testutils.PackLSBFirst(t, testutils.NRZIDecode(bits)))
 }
 
 // The last thing sent before the transmitter drops has to be pushed out
@@ -940,7 +940,7 @@ func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
 	})
 
 	assert.Equal(t, 2*8, sent, "finishing does not change what goes out")
-	assert.Equal(t, []byte{hdlcFlag, hdlcFlag}, packLSBFirst(t, nrziDecode(bits)))
+	assert.Equal(t, []byte{hdlcFlag, hdlcFlag}, testutils.PackLSBFirst(t, testutils.NRZIDecode(bits)))
 	assert.Equal(t, 1, sink.flushes, "the end of the transmission should be flushed out")
 }
 
@@ -989,7 +989,7 @@ func TestLayer2SendFrameSendsAX25AsHDLC(t *testing.T) {
 	var frameFCS = fcs.Calc(fbuf)
 	var expected = append(append([]byte{}, fbuf...), byte(frameFCS)&0xff, byte(frameFCS>>8)&0xff) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
-	assert.Equal(t, expected, hdlcFrameFromBits(t, bits))
+	assert.Equal(t, expected, testutils.HDLCFrameFromLevels(t, bits))
 }
 
 // An IL2P channel sends the frame wrapped up as IL2P instead.

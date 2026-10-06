@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,13 +15,7 @@ import (
 // captureIL2PBits collects the line levels a new Sender sends while fn
 // runs.
 func captureIL2PBits(fn func(s *Sender)) []int {
-	var bits []int
-
-	fn(NewSender(linecode.NewEncoder(func(level int) {
-		bits = append(bits, level)
-	}), 0))
-
-	return bits
+	return testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0)) })
 }
 
 // Inverted polarity is the same pattern the other way up.
