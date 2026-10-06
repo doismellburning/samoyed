@@ -4,13 +4,12 @@
 package hdlc
 
 import (
-	"io"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
-	"github.com/sirupsen/logrus"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -116,10 +115,7 @@ func fuzzReceive(tb testing.TB, stream []byte, settings byte) int {
 // the demodulator makes of anything transmitting on the channel, through
 // finding frames between flags, fixing bits, and the sanity checks.
 func FuzzReceiverRecBit(f *testing.F) {
-	var savedLog = logrus.StandardLogger().Out
-	logrus.SetOutput(io.Discard)
-
-	f.Cleanup(func() { logrus.SetOutput(savedLog) })
+	testutils.DiscardLogrus(f)
 
 	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
 	require.NotNil(f, pp)
