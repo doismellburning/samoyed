@@ -562,10 +562,11 @@ func TestHandleClientCommand_G_NilRadioConfig(t *testing.T) {
 // The debug level has to be in place before the constructor starts the
 // goroutines that consult it, so it is given rather than set afterwards.
 func TestNewAGWServer_TakesTheDebugLevel(t *testing.T) {
-	var mc = new(misc_config_s) /* agwpe_port 0, so no goroutines to stop. */
+	var mc = new(misc_config_s)
 
-	assert.Equal(t, 2, NewAGWServer(t.Context(), nil, mc, 2).debug)
-	assert.Equal(t, 0, NewAGWServer(t.Context(), nil, mc, 0).debug)
+	// No listener, so no goroutines to stop.
+	assert.Equal(t, 2, NewAGWServer(t.Context(), nil, mc, nil, 2).debug)
+	assert.Equal(t, 0, NewAGWServer(t.Context(), nil, mc, nil, 0).debug)
 }
 
 // setupAGWTransmitQueue points the transmit queue at cfg and empties it again

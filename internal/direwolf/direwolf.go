@@ -668,7 +668,12 @@ x = Silence FX.25 information.`)
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
+	var agwListener, agwListenErr = ListenAGW(ctx, misc_config)
+	if agwListenErr != nil {
+		logrus.WithError(agwListenErr).Error("Unable to listen for AGW client applications")
+	}
+
+	agwServer = NewAGWServer(ctx, audio_config, misc_config, agwListener, d_a_opt)
 	metrics_init(ctx, audio_config, misc_config)
 	var kissNetPorts, kissNetListenErr = ListenKissNetPorts(ctx, misc_config)
 	if kissNetListenErr != nil {

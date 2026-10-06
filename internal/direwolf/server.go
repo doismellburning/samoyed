@@ -211,6 +211,28 @@ type agwClient struct {
 	loginExempt bool
 }
 
+// ListenAGW binds the AGW port configured in mc.agwpe_port, ready to hand to
+// NewAGWServer.  The main program has a default of 8000 but allows an
+// alternative to be specified on the command line; 0 means disabled (new in
+// version 1.2), for which it returns a nil listener and no error.
+func ListenAGW(ctx context.Context, mc *misc_config_s) (net.Listener, error) {
+	if mc.agwpe_port == 0 {
+		text_color_set(DW_COLOR_INFO)
+		dw_printf("Disabled AGW network client port.\n")
+
+		return nil, nil //nolint:nilnil // Disabled is neither a listener nor a failure.
+	}
+
+	logrus.WithField("port", mc.agwpe_port).Debug("Binding to port")
+
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", mc.agwpe_port))
+	if listenErr != nil {
+		return nil, fmt.Errorf("AGW port %d: %w", mc.agwpe_port, listenErr)
+	}
+
+	return listener, nil
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        NewAGWServer
@@ -218,11 +240,8 @@ type agwClient struct {
  * Purpose:     Set up a server to listen for connection requests from
  *		an application such as Xastir.
  *
- * Inputs:	mc.agwpe_port	- TCP port for server.
- *				  Main program has default of 8000 but allows
- *				  an alternative to be specified on the command line
- *
- *				0 means disable.  New in version 1.2.
+ * Inputs:	listener	- Already bound, by ListenAGW or by a test.
+ *				  nil means disabled.
  *
  *		debug		- "-d a" level: print the messages flowing to and
  *				  from clients.
@@ -236,10 +255,8 @@ type agwClient struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewAGWServer(ctx context.Context, audio_config_p *RadioConfig, mc *misc_config_s, debug int) *AGWServer {
-	var server_port = mc.agwpe_port /* Usually 8000 but can be changed. */
-
-	logrus.WithField("server_port", server_port).Debug("NewAGWServer")
+func NewAGWServer(ctx context.Context, audio_config_p *RadioConfig, mc *misc_config_s, listener net.Listener, debug int) *AGWServer {
+	logrus.WithField("listening", listener != nil).Debug("NewAGWServer")
 
 	var s = new(AGWServer)
 	s.audioConfigP = audio_config_p
@@ -252,10 +269,7 @@ func NewAGWServer(ctx context.Context, audio_config_p *RadioConfig, mc *misc_con
 	 * zero value of the client table is.
 	 */
 
-	if server_port == 0 {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Disabled AGW network client port.\n")
-
+	if listener == nil {
 		return s
 	}
 
@@ -268,7 +282,7 @@ func NewAGWServer(ctx context.Context, audio_config_p *RadioConfig, mc *misc_con
 	/*
 	 * This waits for a client to connect and attaches it to a free slot.
 	 */
-	go s.connectListenThread(ctx, server_port)
+	go s.connectListenThread(ctx, listener)
 
 	/*
 	 * These read messages from client when the client's slot holds a socket.
@@ -1001,9 +1015,7 @@ func (s *AGWServer) connectedModeAllowed(portx byte) bool {
  *
  * Purpose:     Wait for a connection request from an application.
  *
- * Inputs:	arg		- TCP port for server.
- *				  Main program has default of 8000 but allows
- *				  an alternative to be specified on the command line
+ * Inputs:	listener	- Already bound, by ListenAGW or by a test.
  *
  * Outputs:	The accepted connection is attached to a free client slot.
  *
@@ -1014,14 +1026,10 @@ func (s *AGWServer) connectedModeAllowed(portx byte) bool {
  *
  *--------------------------------------------------------------------*/
 
-func (s *AGWServer) connectListenThread(ctx context.Context, server_port int) {
-	logrus.WithField("port", server_port).Debug("Binding to port")
-	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", server_port))
-	if listenErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("connect_listen_thread: Listen failed: %s", listenErr)
-
-		return
+func (s *AGWServer) connectListenThread(ctx context.Context, listener net.Listener) {
+	var server_port int
+	if addr, ok := listener.Addr().(*net.TCPAddr); ok {
+		server_port = addr.Port
 	}
 
 	// Dire Wolf set SO_REUSEADDR here (its version 1.3, as suggested by

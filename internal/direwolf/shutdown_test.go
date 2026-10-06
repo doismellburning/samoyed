@@ -57,7 +57,9 @@ func requirePortFree(t *testing.T, port int) {
 }
 
 func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
-	var port = freeTCPPort(t)
+	var listener, _ = testutils.Listen(t)
+
+	var port = listener.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert // A TCP listener has a TCP address.
 
 	// The listener attaches the probe connection waitUntilListening makes to
 	// this server, and no cmdListenThread is running here to notice it go away
@@ -82,7 +84,7 @@ func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
 	go func() {
 		defer close(stopped)
 
-		s.connectListenThread(ctx, port)
+		s.connectListenThread(ctx, listener)
 	}()
 
 	waitUntilListening(t, port)
