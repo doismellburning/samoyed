@@ -173,6 +173,41 @@ func hdlcFrameFromBits(t *testing.T, bits []int) []byte {
 	return packLSBFirst(t, destuff(data[8:len(data)-8]))
 }
 
+// FX.25 and AX.25 go out on the same line, so a codeblock has to start from
+// the level whatever went before it left the line at, or its first bit is
+// received inverted.
+func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
+	// A frame and its FCS always hold an even number of zeros, so it takes
+	// a stuffed zero to leave the line at 1, where starting the codeblock
+	// afresh from 0 would show.
+	var before = []byte{hdlcSixtyOne, 'Q', '1', 'T', 'E', 'S', 'T'}
+	var fbuf = []byte{'Q', '2', 'T', 'E', 'S', 'T'}
+
+	var ctagNum, data, check = fx25_encode_frame(hdlcSendTestChannel, append([]byte{}, fbuf...), 16, 0)
+	require.GreaterOrEqual(t, ctagNum, CTAG_MIN)
+
+	var beforeLen int
+
+	var bits = captureBits(t, nil, func(s *Layer2Sender) {
+		beforeLen = s.hdlc.SendFrame(before, false)
+		s.fx25.SendFrame(fbuf, 16)
+	})
+
+	require.Equal(t, 1, bits[beforeLen-1], "the frame before should leave the line at 1")
+
+	var ctagValue = fx25_get_ctag_value(ctagNum)
+
+	var expected []byte
+	for k := range 8 {
+		expected = append(expected, byte(ctagValue>>(k*8))) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	}
+
+	expected = append(expected, data...)
+	expected = append(expected, check...)
+
+	assert.Equal(t, expected, packLSBFirst(t, nrziDecode(bits)[beforeLen:]))
+}
+
 // newHDLCSendTestPacket is a packet with an information part of the requested
 // length.
 func newHDLCSendTestPacket(t *testing.T, infoLen int) *ax25.Packet {
