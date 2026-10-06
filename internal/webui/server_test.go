@@ -92,27 +92,21 @@ func TestAPIHandlers(t *testing.T) {
 	})
 }
 
-func TestStartServesEventsAndShutsDown(t *testing.T) {
+func TestServeServesEventsAndShutsDown(t *testing.T) {
 	var hub, _ = newTestHub()
 
 	var ctx, cancel = context.WithCancel(t.Context())
 	defer cancel()
 
-	// Port 0 isn't a valid WEBPORT, but here it lets the kernel pick a
-	// free one; we find out which from the listener's address below.
-	var lc net.ListenConfig
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", "127.0.0.1:0")
+	require.NoError(t, listenErr)
 
-	var probe, probeErr = lc.Listen(ctx, "tcp", "127.0.0.1:0")
-	require.NoError(t, probeErr)
-
-	var addr, isTCP = probe.Addr().(*net.TCPAddr)
+	var addr, isTCP = listener.Addr().(*net.TCPAddr)
 	require.True(t, isTCP)
 
 	var port = addr.Port
-	require.NoError(t, probe.Close())
 
-	var errCh, err = Start(ctx, port, hub)
-	require.NoError(t, err)
+	var errCh = Serve(ctx, listener, hub)
 
 	var req, reqErr = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/events", port), nil)
 	require.NoError(t, reqErr)

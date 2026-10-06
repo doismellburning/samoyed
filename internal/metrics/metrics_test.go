@@ -127,34 +127,14 @@ func TestSetAudioLevelDoesNotAllocate(t *testing.T) {
 	assert.InDelta(t, 0, allocs, 0, "SetAudioLevel must not allocate")
 }
 
-func TestStartReportsBindFailureSynchronously(t *testing.T) {
-	// Regression: the bind used to happen inside the goroutine, so the caller
-	// logged "listening on port N" and only then discovered the port was taken.
-	//
-	// The blocker has to occupy the same address the code under test binds -
-	// the wildcard, not just loopback.  Linux treats a wildcard bind as
-	// conflicting with a specific-address bind on the same port; BSD, with the
-	// SO_REUSEADDR that Go sets by default, does not.  Blocking only 127.0.0.1
-	// therefore fails to block anything on macOS.
-	var blocker, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", ":0")
+func TestServeServesMetrics(t *testing.T) {
+	var listener, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, listenErr)
 
-	t.Cleanup(func() { blocker.Close() }) //nolint:errcheck
+	var port = listener.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert // A TCP listener has a TCP address.
 
-	var port = blocker.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert
+	var errCh = Serve(t.Context(), listener)
 
-	var errCh, startErr = Start(t.Context(), port)
-
-	require.Error(t, startErr, "a port already in use must fail before Start returns")
-	assert.Nil(t, errCh)
-}
-
-func TestStartServesMetrics(t *testing.T) {
-	var port = freePort(t)
-
-	var errCh, startErr = Start(t.Context(), port)
-
-	require.NoError(t, startErr)
 	require.NotNil(t, errCh)
 
 	var client = &http.Client{Timeout: 5 * time.Second} //nolint:exhaustruct_v5
@@ -173,19 +153,4 @@ func TestStartServesMetrics(t *testing.T) {
 	var body, readErr = io.ReadAll(resp.Body)
 	require.NoError(t, readErr)
 	assert.Contains(t, string(body), "samoyed_")
-}
-
-// freePort returns a port that was free a moment ago.  Start takes a port
-// rather than returning the one it bound, so a test has to guess.
-func freePort(t *testing.T) int {
-	t.Helper()
-
-	var l, err = new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	var port = l.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert
-
-	require.NoError(t, l.Close())
-
-	return port
 }

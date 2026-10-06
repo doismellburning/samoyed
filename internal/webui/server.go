@@ -59,19 +59,13 @@ func Handler(hub *Hub) http.Handler {
 	return securityHeaders(mux)
 }
 
-// Start starts the web interface on port.  As with metrics.Start, the listening
-// socket is bound before returning, so a failure to bind comes back as the
-// error return, and the returned channel receives a single error if and when
-// the server stops.  Logging is the caller's responsibility.
+// Serve serves the web interface on listener, which the caller has already
+// bound, as with metrics.Serve.  The returned channel receives a single error
+// if and when the server stops.  Logging is the caller's responsibility.
 //
-// Cancelling ctx shuts the server down, event streams included, so the channel
-// then reports http.ErrServerClosed.
-func Start(ctx context.Context, port int, hub *Hub) (<-chan error, error) {
-	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", port))
-	if listenErr != nil {
-		return nil, listenErr
-	}
-
+// Cancelling ctx shuts the server down, event streams included, closing
+// listener, so the channel then reports http.ErrServerClosed.
+func Serve(ctx context.Context, listener net.Listener, hub *Hub) <-chan error {
 	var server = new(http.Server)
 	server.Handler = Handler(hub)
 	server.ReadHeaderTimeout = readHeaderTimeout
@@ -96,7 +90,7 @@ func Start(ctx context.Context, port int, hub *Hub) (<-chan error, error) {
 		_ = server.Shutdown(shutdownCtx)
 	})
 
-	return errCh, nil
+	return errCh
 }
 
 // serveEvents streams the Hub's events to one page as Server-Sent Events until

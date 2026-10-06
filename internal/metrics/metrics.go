@@ -23,7 +23,6 @@ package metrics
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -270,23 +269,18 @@ const (
 	metricsShutdownTimeout = 5 * time.Second
 )
 
-// Start starts the Prometheus "/metrics" HTTP endpoint on port.  The listening
-// socket is bound before returning, so a failure to bind (a port already in
-// use, say) comes back as the error return rather than arriving later on the
-// channel - the caller can report "listening" without getting ahead of itself.
-// The returned channel receives a single error if and when the server stops.
-// Logging is the caller's responsibility.
+// Serve serves the Prometheus "/metrics" HTTP endpoint on listener, which the
+// caller has already bound - so a failure to bind (a port already in use,
+// say) is the caller's to report before anything starts, and a test can bind
+// any free port and hand that over.  The returned channel receives a single
+// error if and when the server stops.  Logging is the caller's
+// responsibility.
 //
-// Cancelling ctx shuts the endpoint down, so the channel then reports
-// http.ErrServerClosed.
-func Start(ctx context.Context, port int) (<-chan error, error) {
+// Cancelling ctx shuts the endpoint down, closing listener, so the channel
+// then reports http.ErrServerClosed.
+func Serve(ctx context.Context, listener net.Listener) <-chan error {
 	var mux = http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-
-	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", port))
-	if listenErr != nil {
-		return nil, listenErr
-	}
 
 	var server = new(http.Server)
 	server.Handler = mux
@@ -313,5 +307,5 @@ func Start(ctx context.Context, port int) (<-chan error, error) {
 		_ = server.Shutdown(shutdownCtx)
 	})
 
-	return errCh, nil
+	return errCh
 }
