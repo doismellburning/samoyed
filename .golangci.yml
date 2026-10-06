@@ -8,7 +8,6 @@ linters:
     - "errcheck"  # I appreciate the intent, but I'm not checking errors on fmt.Printf etc.
     - "exhaustruct"  # Superseded by exhaustruct_v5; disabled to avoid a deprecation warning from enabling all
     - "forbidigo"  # fmt.Print* are fine for now
-    - "funlen"  # We have inherited lots of long lines
     - "gocyclo"  # One day
     - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
@@ -38,6 +37,9 @@ linters:
               desc: Dummy deny because we need a non-empty list
     exhaustive:
       default-signifies-exhaustive: true  # Soften the check for now...
+    funlen:
+      lines: 400  # I sure wish this could be lower - there are plenty of long functions inherited from upstream
+      statements: 200
     funcorder:
       struct-method: false  # Keeping exported methods ahead of unexported ones means moving code about for no change in meaning
     gocognit:

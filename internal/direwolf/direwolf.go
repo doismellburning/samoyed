@@ -104,7 +104,7 @@ const audio_amplitude = 100 /* % of audio sample range. */
 // the terminal, say.  Everything long-lived started from here takes it, so a
 // cancellation reaches the goroutines doing the work rather than only the
 // process itself.
-func DirewolfMain(ctx context.Context) {
+func DirewolfMain(ctx context.Context) { //nolint:funlen // Ported from Dire Wolf as one function
 	// logrus writes to stderr by default, while everything still going through
 	// dw_printf writes to stdout. Until the conversion is finished the two are
 	// halves of one console stream - a "Packet" entry on stderr whose packet

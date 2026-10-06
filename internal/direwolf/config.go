@@ -6019,7 +6019,7 @@ func parse_beacon_number(keyword string, value string, line int) (float64, error
 // e.g.  IBEACON DELAY=1 EVERY=1 SENDTO=IG OVERLAY=R SYMBOL="igate" LAT=37^44.46N LONG=122^27.19W COMMENT="N1KOL-1 IGATE"
 // Just ignores overlay, symbol, lat, long, and comment.
 
-func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) error {
+func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) error { //nolint:funlen // Ported from Dire Wolf as one function
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
 	b.delay = 60
