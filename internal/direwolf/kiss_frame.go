@@ -39,7 +39,9 @@ type kissport_status_s struct {
 	arg2 int //nolint:unused // temp for passing second arg into
 	// kissnet_listen_thread
 
-	tcp_port int // default 8001
+	tcp_port int // default 8001; the one listener is bound to.
+
+	listener net.Listener // Bound before the service starts; only connectListenThread accepts on it.
 
 	channel int // Radio channel for this tcp port.
 	// -1 for all.

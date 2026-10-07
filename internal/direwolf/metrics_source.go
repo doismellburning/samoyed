@@ -6,6 +6,8 @@ package direwolf
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/doismellburning/samoyed/internal/metrics"
@@ -69,8 +71,7 @@ func recordRadioFrame(channel int, fecType fec_type_t, retries BitFixLevel) {
 
 // metrics_init starts the Prometheus "/metrics" HTTP endpoint if a port was
 // configured with METRICSPORT, and pushes each channel's static up/down
-// state from audio, seeding the rest of that channel's series at
-// zero (everything else pushes from its own subsystem as events happen).
+// state from audio either way, as metricsStart describes.
 // A port of 0 (the default) disables it.
 func metrics_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
 	if mc.metrics_port == 0 {
@@ -80,6 +81,22 @@ func metrics_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
 		return
 	}
 
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", mc.metrics_port))
+	if listenErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Unable to start Prometheus metrics endpoint on port %d: %v\n", mc.metrics_port, listenErr)
+
+		listener = nil
+	}
+
+	metricsStart(ctx, audio, listener)
+}
+
+// metricsStart pushes each channel's static up/down state from audio, seeding
+// the rest of that channel's series at zero (everything else pushes from its
+// own subsystem as events happen), and serves the "/metrics" endpoint on
+// listener, already bound, unless it is nil.
+func metricsStart(ctx context.Context, audio *RadioConfig, listener net.Listener) {
 	for channel := range MAX_RADIO_CHANS {
 		var isRadio = isRadioChannel(audio, channel)
 
@@ -90,22 +107,25 @@ func metrics_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
 		}
 	}
 
-	var errCh, startErr = metrics.Start(ctx, mc.metrics_port)
-	if startErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to start Prometheus metrics endpoint on port %d: %v\n", mc.metrics_port, startErr)
-
+	if listener == nil {
 		return
 	}
+
+	var port int
+	if addr, ok := listener.Addr().(*net.TCPAddr); ok {
+		port = addr.Port
+	}
+
+	var errCh = metrics.Serve(ctx, listener)
 
 	go func() {
 		var err = <-errCh
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Prometheus metrics endpoint on port %d stopped: %v\n", mc.metrics_port, err)
+			dw_printf("Prometheus metrics endpoint on port %d stopped: %v\n", port, err)
 		}
 	}()
 
 	text_color_set(DW_COLOR_INFO)
-	dw_printf("Prometheus metrics endpoint listening on port %d.\n", mc.metrics_port)
+	dw_printf("Prometheus metrics endpoint listening on port %d.\n", port)
 }

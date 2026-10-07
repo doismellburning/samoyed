@@ -13,12 +13,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMetricsInitImplDisabledStartsNothing(t *testing.T) {
-	var port = freeTCPPort(t)
+	var port = testutils.UnusedPortNumber(t)
 
 	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
@@ -40,18 +41,19 @@ func TestMetricsInitImplDisabledStartsNothing(t *testing.T) {
 	assert.Error(t, err, "a disabled metrics endpoint listens nowhere")
 }
 
-func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
+func TestMetricsStartImplServesAndMarksChannels(t *testing.T) {
 	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
 	audio.chan_medium[1] = MEDIUM_NETTNC
 
-	var mc = new(misc_config_s)
-	mc.metrics_port = freeTCPPort(t)
+	var listener, _ = testutils.Listen(t)
+
+	var port = listener.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert // A TCP listener has a TCP address.
 
 	var ctx, cancel = context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
-	metrics_init(ctx, audio, mc)
+	metricsStart(ctx, audio, listener)
 
 	assert.InDelta(t, 1, metricValue(t, "samoyed_channel_up", map[string]string{"channel": "0"}), 0,
 		"a radio channel is up")
@@ -60,9 +62,9 @@ func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
 	assert.InDelta(t, 0, metricValue(t, "samoyed_channel_up", map[string]string{"channel": "2"}), 0,
 		"nor is one never configured")
 
-	// The endpoint is bound before metrics_init returns, so it can be scraped
+	// The endpoint was bound before it was handed over, so it can be scraped
 	// straight away, and the seeded series for the radio channel are there.
-	var url = "http://127.0.0.1:" + strconv.Itoa(mc.metrics_port) + "/metrics"
+	var url = "http://127.0.0.1:" + strconv.Itoa(port) + "/metrics"
 
 	var req, reqErr = http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
 	require.NoError(t, reqErr)
@@ -86,7 +88,7 @@ func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
 		var dialer = new(net.Dialer)
 		dialer.Timeout = 100 * time.Millisecond
 
-		var conn, err = dialer.DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", mc.metrics_port))
+		var conn, err = dialer.DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
 		if err != nil {
 			return true
 		}
@@ -98,7 +100,7 @@ func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
 }
 
 func TestMetricsInitImplPortInUse(t *testing.T) {
-	// Hold the port ourselves, on all interfaces as metrics.Start binds, so
+	// Hold the port ourselves, on all interfaces as metrics_init binds, so
 	// that metrics_init's own bind fails.
 	var listener, err = new(net.ListenConfig).Listen(t.Context(), "tcp", ":0")
 	require.NoError(t, err)

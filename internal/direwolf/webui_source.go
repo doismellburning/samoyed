@@ -6,6 +6,8 @@ package direwolf
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
@@ -32,12 +34,14 @@ func webui_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
 		}
 	}
 
-	var errCh, startErr = webui.Start(ctx, mc.web_port, hub)
-	if startErr != nil {
-		logrus.WithError(startErr).WithField("port", mc.web_port).Error("Unable to start web interface")
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", mc.web_port))
+	if listenErr != nil {
+		logrus.WithError(listenErr).WithField("port", mc.web_port).Error("Unable to start web interface")
 
 		return
 	}
+
+	var errCh = webui.Serve(ctx, listener, hub)
 
 	webHub = hub
 

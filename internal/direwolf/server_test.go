@@ -6,6 +6,7 @@ package direwolf
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -885,4 +887,37 @@ func TestHandleClientCommand_V_QueuesFrameViaDigipeaters(t *testing.T) {
 	require.NotNil(t, pp, "frame via digipeaters not queued")
 	assert.Equal(t, "Q1TEST>Q2TEST,Q3TEST,WIDE2-1:", pp.FormatAddrs())
 	assert.Equal(t, []byte("hello"), pp.Info())
+}
+
+// Two things cannot have the same port, and the one that loses says so before
+// anything starts, rather than sitting there looking ready for clients.
+func TestListenAGWFails(t *testing.T) {
+	// Every address, as ListenAGW itself binds: see TestKissNetListenFails.
+	var listener, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp", ":0")
+	require.NoError(t, listenErr)
+
+	defer listener.Close()
+
+	var mc = new(misc_config_s)
+	mc.agwpe_port = listener.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert // A TCP listener has a TCP address.
+
+	var agw, err = ListenAGW(t.Context(), mc)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), fmt.Sprintf("AGW port %d", mc.agwpe_port))
+	assert.Nil(t, agw)
+}
+
+// An AGW port of 0 is how the configuration says "no AGW", and nothing is
+// bound.
+func TestListenAGWDisabled(t *testing.T) {
+	var agw net.Listener
+
+	var err error
+
+	var output = testutils.CaptureOutput(t, func() { agw, err = ListenAGW(t.Context(), new(misc_config_s)) })
+
+	require.NoError(t, err)
+	assert.Nil(t, agw)
+	assert.Contains(t, output, "Disabled AGW network client port")
 }
