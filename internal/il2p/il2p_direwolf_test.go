@@ -24,10 +24,10 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func Test_IL2P(t *testing.T) {
-	var enable_debug_out = 0
-	Init(enable_debug_out)
+// enable_debug_out is the IL2P debug level these tests decode at.
+const enable_debug_out = 0
 
+func Test_IL2P(t *testing.T) {
 	fmt.Println("Begin IL2P unit tests.")
 
 	// These start simple and later complex cases build upon earlier successes.
@@ -111,29 +111,29 @@ func test_rs(t *testing.T) {
 	var corrected []byte
 	var e int
 
-	corrected, e = il2p_decode_rs(example_s, 2)
+	corrected, e = il2p_decode_rs(example_s, 2, enable_debug_out)
 	assert.Zero(t, e)
 	assert.Equal(t, example_s[:13], corrected)
 
 	copy(received, example_s)
 	received[0] = '?'
-	corrected, e = il2p_decode_rs(received, 2)
+	corrected, e = il2p_decode_rs(received, 2, enable_debug_out)
 	assert.Equal(t, 1, e)
 	assert.Equal(t, example_s[:13], corrected)
 
-	corrected, e = il2p_decode_rs(example_u, 2)
+	corrected, e = il2p_decode_rs(example_u, 2, enable_debug_out)
 	assert.Zero(t, e)
 	assert.Equal(t, example_u[:13], corrected)
 
 	copy(received, example_u)
 	received[12] = '?'
-	corrected, e = il2p_decode_rs(received, 2)
+	corrected, e = il2p_decode_rs(received, 2, enable_debug_out)
 	assert.Equal(t, 1, e)
 	assert.Equal(t, example_u[:13], corrected)
 
 	received[1] = '?'
 	received[2] = '?'
-	_, e = il2p_decode_rs(received, 2)
+	_, e = il2p_decode_rs(received, 2, enable_debug_out)
 	assert.Equal(t, -1, e)
 }
 
@@ -252,7 +252,7 @@ func test_payload(t *testing.T) {
 			// Now extract.
 
 			var symbols_corrected = 0
-			var extracted, e = il2p_decode_payload(encoded, payload_length, max_fec, &symbols_corrected)
+			var extracted, e = il2p_decode_payload(encoded, payload_length, max_fec, &symbols_corrected, enable_debug_out)
 			// dw_printf ("e = %d, payload_length = %d\n", e, payload_length);
 			assert.Equal(t, payload_length, e)
 
@@ -545,7 +545,7 @@ func enc_dec_compare(t *testing.T, pp1 *ax25.Packet) {
 		var encoded, enc_len = il2p_encode_frame(pp1, c.version, c.max_fec)
 		assert.GreaterOrEqual(t, enc_len, 0)
 
-		var pp2 = il2p_decode_frame(encoded, c.version)
+		var pp2 = il2p_decode_frame(encoded, c.version, enable_debug_out)
 		assert.NotNil(t, pp2)
 
 		// Is it the same after encoding to IL2P and then decoding?

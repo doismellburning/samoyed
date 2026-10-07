@@ -130,6 +130,7 @@ type XmitService struct {
 
 	p_modem   *RadioConfig
 	fx25Debug int
+	il2pDebug int
 }
 
 /*-------------------------------------------------------------------
@@ -147,6 +148,8 @@ type XmitService struct {
  *		fx25Debug	- FX.25's debug level, for each channel's
  *				  Layer2Sender.
  *
+ *		il2pDebug	- IL2P's debug level, likewise.
+ *
  *
  * Outputs:	Returns a new XmitService with required information set up.
  *		The PTT hardware is set up beforehand, by NewPTT.
@@ -162,13 +165,14 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(ctx context.Context, p_modem *RadioConfig, audio *AudioDevices, toneGenerators [MAX_RADIO_CHANS]*ToneGenerator, debug_xmit_packet bool, fx25Debug int) *XmitService {
+func NewXmitService(ctx context.Context, p_modem *RadioConfig, audio *AudioDevices, toneGenerators [MAX_RADIO_CHANS]*ToneGenerator, debug_xmit_packet bool, fx25Debug int, il2pDebug int) *XmitService {
 	logrus.Debug("xmit_init")
 	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem
 	xs.audio = audio
 	xs.toneGenerators = toneGenerators
 	xs.fx25Debug = fx25Debug
+	xs.il2pDebug = il2pDebug
 
 	xs.debugXmitPacket = debug_xmit_packet
 
@@ -293,7 +297,7 @@ func (xs *XmitService) channelTiming(channel int) xmitTiming {
 // own xmit_thread asks for it, so there is nothing to lock.
 func (xs *XmitService) layer2Sender(channel int) *Layer2Sender {
 	if xs.layer2Senders[channel] == nil {
-		xs.layer2Senders[channel] = NewLayer2Sender(channel, xs.p_modem, xs.toneGenerators[channel], xs.fx25Debug)
+		xs.layer2Senders[channel] = NewLayer2Sender(channel, xs.p_modem, xs.toneGenerators[channel], xs.fx25Debug, xs.il2pDebug)
 	}
 
 	return xs.layer2Senders[channel]
@@ -1380,8 +1384,8 @@ type Layer2Sender struct {
 
 // NewLayer2Sender makes a Layer2Sender for channel, sending the layer 2
 // protocol audioConfig says to use there to toneGenerator, with FX.25's
-// debug level at fx25Debug.
-func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fx25Debug int) *Layer2Sender {
+// debug level at fx25Debug and IL2P's at il2pDebug.
+func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fx25Debug int, il2pDebug int) *Layer2Sender {
 	var s = new(Layer2Sender)
 	s.channel = channel
 	s.audioConfig = audioConfig
@@ -1389,7 +1393,7 @@ func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneG
 	s.line = linecode.NewEncoder(s.putBit)
 	s.hdlc = hdlc.NewSender(s.line, channel)
 	s.fx25 = fx25.NewSender(s.line, channel, fx25Debug)
-	s.il2p = il2p.NewSender(s.line, channel)
+	s.il2p = il2p.NewSender(s.line, channel, il2pDebug)
 	s.eas = eas.NewSender(s.line)
 
 	return s

@@ -35,6 +35,7 @@ type Receiver struct {
 
 	version Version // IL2P protocol version spoken on this channel.
 	crc     bool    // true if frames carry a trailing CRC.
+	debug   int     // IL2P's debug level.
 
 	state IL2PState
 
@@ -73,10 +74,11 @@ type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
 // multi_modem_process_rec_packet.
 type PacketSink func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
 
-// NewReceiver makes a Receiver for one slicer, speaking IL2P version version
-// and expecting a trailing CRC if crc is set.  It gives each packet it
-// decodes to sink, with the level audioLevel reports.
-func NewReceiver(channel int, subchannel int, slice int, version Version, crc bool, audioLevel AudioLevelFunc, sink PacketSink) *Receiver {
+// NewReceiver makes a Receiver for one slicer, speaking IL2P version version,
+// expecting a trailing CRC if crc is set and reporting at IL2P debug level
+// debug.  It gives each packet it decodes to sink, with the level audioLevel
+// reports.
+func NewReceiver(channel int, subchannel int, slice int, version Version, crc bool, debug int, audioLevel AudioLevelFunc, sink PacketSink) *Receiver {
 	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
 	dwutil.Assert(subchannel >= 0 && subchannel < phy.MaxSubchans)
 	dwutil.Assert(slice >= 0 && slice < phy.MaxSlicers)
@@ -87,6 +89,7 @@ func NewReceiver(channel int, subchannel int, slice int, version Version, crc bo
 	F.slice = slice
 	F.version = version
 	F.crc = crc
+	F.debug = debug
 	F.audioLevel = audioLevel
 	F.sink = sink
 
@@ -101,6 +104,11 @@ func (F *Receiver) Version() Version {
 // CRC reports whether the receiver expects frames to carry a trailing CRC.
 func (F *Receiver) CRC() bool {
 	return F.crc
+}
+
+// Debug returns the receiver's IL2P debug level.
+func (F *Receiver) Debug() int {
+	return F.debug
 }
 
 func (F *Receiver) logEntry() *logrus.Entry {
@@ -170,13 +178,13 @@ func (F *Receiver) RecBit(dbit int) {
 			}
 
 			if F.hc == IL2P_HEADER_SIZE+IL2P_HEADER_PARITY { // Have all of header
-				if il2p_get_debug() >= 1 {
+				if F.debug >= 1 {
 					F.logEntry().Debug("IL2P header as received")
 					dwutil.LogHexDump(F.logEntry(), logrus.DebugLevel, F.shdr[:])
 				}
 
 				// Fix any errors and descramble.
-				var uhdr, corrected = il2p_clarify_header(F.shdr[:])
+				var uhdr, corrected = il2p_clarify_header(F.shdr[:], F.debug)
 				F.corrected = corrected
 				copy(F.uhdr[:], uhdr)
 
@@ -188,7 +196,7 @@ func (F *Receiver) RecBit(dbit int) {
 					var plprop, eplen = il2p_payload_compute(length, max_fec)
 					F.eplen = eplen
 
-					if il2p_get_debug() >= 1 {
+					if F.debug >= 1 {
 						var logEntry = F.logEntry().WithField("corrected", F.corrected)
 						logEntry.Debug("IL2P header after correcting symbols and unscrambling")
 						dwutil.LogHexDump(logEntry, logrus.DebugLevel, F.uhdr[:])
@@ -217,7 +225,7 @@ func (F *Receiver) RecBit(dbit int) {
 							F.state = IL2P_DECODE
 						}
 					} else { // Error.
-						if il2p_get_debug() >= 1 {
+						if F.debug >= 1 {
 							F.logEntry().Debug("IL2P header INVALID")
 						}
 
@@ -291,9 +299,10 @@ func (F *Receiver) RecBit(dbit int) {
 				F.spayload[:encoded_payload_size],
 				version,
 				&F.corrected,
+				F.debug,
 			)
 
-			if il2p_get_debug() >= 1 {
+			if F.debug >= 1 {
 				if pp != nil {
 					pp.HexDump()
 				} else {
@@ -306,7 +315,7 @@ func (F *Receiver) RecBit(dbit int) {
 			if pp != nil && F.crc {
 				var frame_data = pp.FrameData()
 				if !il2p_crc_check(frame_data, F.scrc[:]) {
-					if il2p_get_debug() >= 1 {
+					if F.debug >= 1 {
 						F.logEntry().Debug("IL2P trailing CRC mismatch")
 					}
 					pp = nil

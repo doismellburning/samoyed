@@ -196,6 +196,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
  *		payload_size	0 to 1023.  (IL2P_MAX_PAYLOAD_SIZE)
  *				Expected result size based on header.
  *		max_fec		true for 16 parity symbols, false for automatic.
+ *		debug		IL2P's debug level.
  *
  * In/Out:	symbols_corrected	Number of symbols corrected.
  *
@@ -213,7 +214,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols_corrected *int) ([]byte, int) {
+func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols_corrected *int, debug int) ([]byte, int) {
 	// Determine number of blocks and sizes.
 	var ipp, e = il2p_payload_compute(payload_size, max_fec)
 	if e <= 0 {
@@ -228,7 +229,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 	// First the large blocks.
 
 	for range ipp.large_block_count {
-		var corrected_block, e = il2p_decode_rs(pin[:ipp.large_block_size+ipp.parity_symbols_per_block], ipp.parity_symbols_per_block)
+		var corrected_block, e = il2p_decode_rs(pin[:ipp.large_block_size+ipp.parity_symbols_per_block], ipp.parity_symbols_per_block, debug)
 
 		// dw_printf ("%s:%d: large block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
 
@@ -241,7 +242,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		var descrambled = il2p_descramble_block(corrected_block)
 		pout = append(pout, descrambled...)
 
-		if il2p_get_debug() >= 2 {
+		if debug >= 2 {
 			var logEntry = logrus.WithField("bytes", ipp.large_block_size)
 			logEntry.Debug("IL2P: Descrambled large payload block")
 			dwutil.LogHexDump(logEntry, logrus.DebugLevel, descrambled)
@@ -254,7 +255,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 	// Then the small blocks.
 
 	for range ipp.small_block_count {
-		var corrected_block, e = il2p_decode_rs(pin[:ipp.small_block_size+ipp.parity_symbols_per_block], ipp.parity_symbols_per_block)
+		var corrected_block, e = il2p_decode_rs(pin[:ipp.small_block_size+ipp.parity_symbols_per_block], ipp.parity_symbols_per_block, debug)
 
 		// dw_printf ("%s:%d: small block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
 
@@ -267,7 +268,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		var descrambled = il2p_descramble_block(corrected_block)
 		pout = append(pout, descrambled...)
 
-		if il2p_get_debug() >= 2 {
+		if debug >= 2 {
 			var logEntry = logrus.WithField("bytes", ipp.small_block_size)
 			logEntry.Debug("IL2P: Descrambled small payload block")
 			dwutil.LogHexDump(logEntry, logrus.DebugLevel, descrambled)

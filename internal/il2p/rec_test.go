@@ -17,8 +17,6 @@ import (
 // rather than straight to the rest of the receive path, along with the audio
 // level from the function it was made with.
 func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
-	Init(0)
-
 	type delivery struct {
 		channel, subchannel, slice int
 		pp                         *ax25.Packet
@@ -37,11 +35,11 @@ func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 		return alevel
 	}
 
-	var rx = NewReceiver(1, 2, 3, VersionCompat, false, audioLevel, func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, _ phy.BitFixLevel, fecType phy.FECType) {
+	var rx = NewReceiver(1, 2, 3, VersionCompat, false, 0, audioLevel, func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, _ phy.BitFixLevel, fecType phy.FECType) {
 		got = append(got, delivery{channel, subchannel, slice, pp, alevel, fecType})
 	})
 
-	var sender = NewSender(linecode.NewEncoder(rx.RecBit), 1)
+	var sender = NewSender(linecode.NewEncoder(rx.RecBit), 1, 0)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Destination] = "Q2TEST"

@@ -41,7 +41,7 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 	audioConfig.achan[0].num_freq = 1
 
 	var first = new(recordingReceiveSink)
-	multi_modem_init(audioConfig, 0, first)
+	multi_modem_init(audioConfig, 0, 0, first)
 	require.Equal(t, 2, demodulators[0].NumSubchan())
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:left over", true)
@@ -50,7 +50,7 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 	multi_modem_process_rec_packet_real(0, 0, 0, pp, alevel, RETRY_NONE, fec_type_none)
 
 	var second = new(recordingReceiveSink)
-	multi_modem_init(audioConfig, 0, second)
+	multi_modem_init(audioConfig, 0, 0, second)
 
 	// Silence decodes to nothing, so long enough for any waiting frame to be
 	// picked should hand on nothing at all.
@@ -76,7 +76,7 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 	audioConfig.achan[0].profiles = "ABA"
 	audioConfig.achan[0].num_freq = 1
 
-	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
+	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
 	require.NotNil(t, demodulators[0])
 	assert.Equal(t, 3, demodulators[0].NumSubchan())
@@ -96,7 +96,7 @@ func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
 	audioConfig.achan[0].il2p_version = il2p.Version04
 	audioConfig.achan[0].il2p_crc = false
 
-	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
+	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
 	var rx = layer2Receiver.slicer[0][0][0].il2p
 	assert.Equal(t, il2p.Version04, rx.Version())
@@ -115,12 +115,34 @@ func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
 	audioConfig.achan[0].profiles = "AB"
 	audioConfig.achan[0].num_freq = 1
 
-	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
-	multi_modem_init(audioConfig, 3, new(recordingReceiveSink))
+	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
+	multi_modem_init(audioConfig, 3, 0, new(recordingReceiveSink))
 
 	for sub := range layer2Receiver.numSubchannel[0] {
 		for slice := range MAX_SLICERS {
 			assert.Equal(t, 3, layer2Receiver.slicer[0][sub][slice].fx25.Debug(), "subchannel %d, slice %d", sub, slice)
+		}
+	}
+}
+
+// Every slicer's IL2P receiver reports at the debug level multi_modem_init
+// was handed - atest's -d2, say - rather than whatever an earlier caller
+// asked for.
+func TestMultiModemInitHandsIL2PItsDebugLevel(t *testing.T) {
+	t.Cleanup(func() {
+		multiModems = newMultiModems()
+	})
+
+	var audioConfig = newRecvTestRadioConfig(1)
+	audioConfig.achan[0].profiles = "AB"
+	audioConfig.achan[0].num_freq = 1
+
+	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
+	multi_modem_init(audioConfig, 0, 2, new(recordingReceiveSink))
+
+	for sub := range layer2Receiver.numSubchannel[0] {
+		for slice := range MAX_SLICERS {
+			assert.Equal(t, 2, layer2Receiver.slicer[0][sub][slice].il2p.Debug(), "subchannel %d, slice %d", sub, slice)
 		}
 	}
 }
@@ -139,7 +161,7 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].num_freq = 1
 
-	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
+	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
 	var rng = rand.New(rand.NewPCG(1, 2))
 
@@ -174,7 +196,7 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	audioConfig.achan[1].mark_freq = 2083
 	audioConfig.achan[1].space_freq = 1563
 
-	multi_modem_init(audioConfig, 0, new(recordingReceiveSink))
+	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
 	assert.Nil(t, layer2Receiver.slicer[0][0][0].eas)
 

@@ -164,18 +164,20 @@ func il2p_encode_frame(pp *ax25.Packet, version Version, max_fec int, crc ...boo
  *
  *		version	- IL2P version to speak.
  *
+ *		debug	- IL2P's debug level.
+ *
  * Future Out:	Number of symbols corrected.
  *
  * Returns:	Packet pointer or nil for error.
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_frame(irec []byte, version Version) *ax25.Packet {
+func il2p_decode_frame(irec []byte, version Version, debug int) *ax25.Packet {
 	if len(irec) < IL2P_HEADER_SIZE+IL2P_HEADER_PARITY {
 		return nil
 	}
 
-	var uhdr, e = il2p_clarify_header(irec[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY])
+	var uhdr, e = il2p_clarify_header(irec[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY], debug)
 	if e < 0 {
 		return nil
 	}
@@ -198,13 +200,13 @@ func il2p_decode_frame(irec []byte, version Version) *ax25.Packet {
 		return nil
 	}
 
-	var pp = il2p_decode_header_payload(uhdr, payload, version, &e)
+	var pp = il2p_decode_header_payload(uhdr, payload, version, &e, debug)
 
 	// Validate CRC if present.
 	if pp != nil && crc_bytes != nil {
 		var frame_data = pp.FrameData()
 		if !il2p_crc_check(frame_data, crc_bytes) {
-			if il2p_get_debug() >= 1 {
+			if debug >= 1 {
 				logrus.Debug("IL2P trailing CRC mismatch")
 			}
 
@@ -224,6 +226,7 @@ func il2p_decode_frame(irec []byte, version Version) *ax25.Packet {
  * Inputs:	uhdr 		- Received header after FEC and descrambling.
  *		epayload	- Encoded payload.
  *		version		- IL2P version to speak.
+ *		debug		- IL2P's debug level.
  *
  * In/Out:	symbols_corrected - Symbols (bytes) corrected in the header.
  *				  Should be 0 or 1 because it has 2 parity symbols.
@@ -233,7 +236,7 @@ func il2p_decode_frame(irec []byte, version Version) *ax25.Packet {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_header_payload(uhdr []byte, epayload []byte, version Version, symbols_corrected *int) *ax25.Packet {
+func il2p_decode_header_payload(uhdr []byte, epayload []byte, version Version, symbols_corrected *int, debug int) *ax25.Packet {
 	var hdr_type, fec_level, payload_len = il2p_get_header_attributes(uhdr)
 	var max_fec = il2p_rx_max_fec(version, fec_level)
 
@@ -247,7 +250,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version Version, s
 
 		if payload_len > 0 {
 			// This is the AX.25 Information part.
-			var extracted, e = il2p_decode_payload(epayload, payload_len, max_fec, symbols_corrected)
+			var extracted, e = il2p_decode_payload(epayload, payload_len, max_fec, symbols_corrected, debug)
 
 			// It would be possible to have a good header but too many errors in the payload.
 
@@ -270,7 +273,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version Version, s
 		return (pp)
 	} else {
 		// Header type 0.  The payload is the entire AX.25 frame.
-		var extracted, e = il2p_decode_payload(epayload, payload_len, max_fec, symbols_corrected)
+		var extracted, e = il2p_decode_payload(epayload, payload_len, max_fec, symbols_corrected, debug)
 
 		if e <= 0 { // Payload was not received correctly.
 			return (nil)

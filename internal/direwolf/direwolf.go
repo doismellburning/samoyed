@@ -21,7 +21,6 @@ import (
 	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
-	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -484,8 +483,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
-	multi_modem_init(audio_config, d_x_opt, new(radioSink))
-	il2p.Init(d_2_opt)
+	multi_modem_init(audio_config, d_x_opt, d_2_opt, new(radioSink))
 
 	/*
 	 * New in 1.8 - Allow a channel to be mapped to a network TNC rather than
@@ -531,7 +529,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, d_p_opt, d_x_opt)
+	xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx)
 
 	/*

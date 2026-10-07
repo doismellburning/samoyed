@@ -677,7 +677,7 @@ func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
 
 	t.Cleanup(func() { layer2Receiver = origReceiver })
 
-	layer2Receiver = NewLayer2Receiver(xs.p_modem, [MAX_RADIO_CHANS]*Demodulator{}, 0, new(discardReceiveSink))
+	layer2Receiver = NewLayer2Receiver(xs.p_modem, [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
 
 	xs.timing[0].slottime = 100 // A second per slot,
 	xs.timing[0].persist = -1   // and never our turn.
@@ -893,7 +893,7 @@ func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 // but each sender has its own: sending on one channel must not change what
 // the next bit on another looks like.
 func TestLayer2SendersKeepTheirOwnLineLevel(t *testing.T) {
-	var other = NewLayer2Sender(1, nil, nil, 0)
+	var other = NewLayer2Sender(1, nil, nil, 0, 0)
 
 	toneGenCapture = func(int, int) {}
 
@@ -997,8 +997,6 @@ func TestLayer2SendFrameSendsIL2PWhenConfigured(t *testing.T) {
 	var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
 	audioConfig.achan[hdlcSendTestChannel].il2p_version = il2p.VersionCompat
 
-	il2p.Init(0)
-
 	var pp = newHDLCSendTestPacket(t, 16)
 
 	var sent int
@@ -1025,8 +1023,6 @@ func TestLayer2SendFrameSendsIL2PWhenConfigured(t *testing.T) {
 func TestLayer2SendFrameFallsBackToAX25WhenIL2PCannotCarryTheFrame(t *testing.T) {
 	var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
 	audioConfig.achan[hdlcSendTestChannel].il2p_version = il2p.VersionCompat
-
-	il2p.Init(0)
 
 	// One byte more of information part than IL2P can encode.
 	var pp = newHDLCSendTestPacket(t, 1024)
@@ -1088,5 +1084,9 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 // A sender reports on FX.25 at the debug level it was made with, so each
 // program that sends - samoyed-direwolf, samoyed-gen-packets - has its own.
 func TestLayer2SenderKeepsItsFX25DebugLevel(t *testing.T) {
-	assert.Equal(t, 3, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 3).fx25.Debug())
+	assert.Equal(t, 3, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 3, 0).fx25.Debug())
+}
+
+func TestLayer2SenderKeepsItsIL2PDebugLevel(t *testing.T) {
+	assert.Equal(t, 2, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 0, 2).il2p.Debug())
 }

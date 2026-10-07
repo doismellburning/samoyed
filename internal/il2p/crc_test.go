@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,8 +45,6 @@ func TestIL2PCRCHammingSingleBitCorrection(t *testing.T) {
 }
 
 func TestIL2PCRCCalcSpec(t *testing.T) {
-	Init(0)
-
 	// Example 1: S-frame AX.25 data → CRC should decode to match encoded bytes.
 	var ex1AX25 = []byte{0x96, 0x82, 0x64, 0x88, 0x8A, 0xAE, 0xE4, 0x96, 0x96, 0x68, 0x90, 0x8A, 0x94, 0x6F, 0x81}
 	var crc1 = il2p_crc_calc(ex1AX25)
@@ -69,8 +69,6 @@ func TestIL2PCRCEncodeDecode(t *testing.T) {
 }
 
 func TestIL2PCRCCheck(t *testing.T) {
-	Init(0)
-
 	// Example 1: Verify CRC check passes.
 	var ex1AX25 = []byte{0x96, 0x82, 0x64, 0x88, 0x8A, 0xAE, 0xE4, 0x96, 0x96, 0x68, 0x90, 0x8A, 0x94, 0x6F, 0x81}
 	var ex1CRCBytes = []byte{0x7F, 0x00, 0x1D, 0x2B}
@@ -82,8 +80,6 @@ func TestIL2PCRCCheck(t *testing.T) {
 }
 
 func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
-	Init(0)
-
 	// Encode a frame with CRC, then decode it and verify round-trip.
 	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "W2UB"
@@ -102,16 +98,54 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 		_ = encodedNoCRC
 
 		// Decode should succeed with CRC.
-		var pp2 = il2p_decode_frame(encoded, Version04)
+		var pp2 = il2p_decode_frame(encoded, Version04, 0)
 		require.NotNil(t, pp2, "Failed to decode frame with CRC, max_fec=%d", max_fec)
 
 		assert.Equal(t, pp.FrameData(), pp2.FrameData())
 	}
 }
 
-func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
-	Init(0)
+// A frame whose trailing CRC doesn't match is dropped whatever the debug
+// level, but only said so from debug level 1.
+func TestIL2PCRCMismatchLoggedAtDebugLevel(t *testing.T) {
+	var addrs [ax25.MaxAddrs]string
+	addrs[0] = "Q1TEST"
+	addrs[1] = "Q2TEST"
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, []byte("Hello CRC test"))
+	require.NotNil(t, pp)
 
+	var encoded, enc_len = il2p_encode_frame(pp, Version04, 0, true)
+	require.Positive(t, enc_len)
+
+	var wrongCRC = il2p_crc_encode(il2p_crc_calc(pp.FrameData()) ^ 0xffff)
+	copy(encoded[len(encoded)-IL2P_CRC_ENCODED_SIZE:], wrongCRC[:])
+
+	var savedLevel = logrus.GetLevel()
+	logrus.SetLevel(logrus.DebugLevel)
+	t.Cleanup(func() { logrus.SetLevel(savedLevel) })
+
+	var hook = test.NewGlobal()
+	t.Cleanup(hook.Reset)
+
+	var mismatches = func() int {
+		var n = 0
+		for _, entry := range hook.AllEntries() {
+			if entry.Message == "IL2P trailing CRC mismatch" {
+				n++
+			}
+		}
+
+		return n
+	}
+
+	assert.Nil(t, il2p_decode_frame(encoded, Version04, 0))
+	assert.Equal(t, 0, mismatches(), "debug level 0 should keep quiet")
+
+	assert.Nil(t, il2p_decode_frame(encoded, Version04, 1))
+	assert.Equal(t, 1, mismatches(), "debug level 1 should report the mismatch")
+}
+
+func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 	// Verify that the spec example IL2P data (which includes trailing CRC)
 	// decodes correctly.
 	var testData = []struct {
@@ -134,7 +168,7 @@ func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 	for _, td := range testData {
 		t.Run(td.name, func(t *testing.T) {
 			var b = il2pDataStringToBytes(td.inputData)
-			var pp = il2p_decode_frame(b, VersionCompat)
+			var pp = il2p_decode_frame(b, VersionCompat, 0)
 			require.NotNil(t, pp)
 
 			var frameData = pp.FrameData()

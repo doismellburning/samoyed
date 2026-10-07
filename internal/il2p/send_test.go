@@ -15,7 +15,7 @@ import (
 // captureIL2PBits collects the line levels a new Sender sends while fn
 // runs.
 func captureIL2PBits(fn func(s *Sender)) []int {
-	return testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0)) })
+	return testutils.LineLevels(func(line *linecode.Encoder) { fn(NewSender(line, 0, 0)) })
 }
 
 // Inverted polarity is the same pattern the other way up.
