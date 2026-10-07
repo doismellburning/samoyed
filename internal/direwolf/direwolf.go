@@ -520,16 +520,17 @@ x = Silence FX.25 information.`)
 
 	/*
 	 * Start the web interface before anything that can send or receive a
-	 * frame, as those goroutines read webHub without a lock.
+	 * frame: the transmit service is handed it, and the receive goroutines
+	 * read webHub, through app_process_rec_packet, without a lock.
 	 */
 
-	webui_init(ctx, audio_config, misc_config)
+	webHub = webui_init(ctx, audio_config, misc_config)
 
 	/*
 	 * Initialize the transmit queue.
 	 */
 
-	xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, d_p_opt, d_x_opt, d_2_opt)
+	xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, webHub, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx)
 
 	/*
@@ -1134,7 +1135,7 @@ func app_process_rec_packet(
 
 	/* Send to another application if connected. */
 	clientApplications.SendRecPacket(channel, pp)
-	webPublishReceived(channel, subchan, pp, decoded, alevel)
+	webPublishReceived(webHub, channel, subchan, pp, decoded, alevel)
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
 		var ao_pp = ax25.FromText(ais_obj_packet, true)

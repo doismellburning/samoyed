@@ -47,6 +47,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
 )
@@ -128,6 +129,8 @@ type XmitService struct {
 	 */
 	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 
+	webHub *webui.Hub // Shown each frame we send; nil without a web interface.
+
 	p_modem   *RadioConfig
 	fx25Debug int
 	il2pDebug int
@@ -144,6 +147,9 @@ type XmitService struct {
  *		audio		- The audio devices to transmit through.
  *
  *		toneGenerators	- Each radio channel's tone generator.
+ *
+ *		hub		- The web interface, shown each frame we send;
+ *				  nil without one.
  *
  *		fx25Debug	- FX.25's debug level, for each channel's
  *				  Layer2Sender.
@@ -165,12 +171,22 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(ctx context.Context, p_modem *RadioConfig, audio *AudioDevices, toneGenerators [MAX_RADIO_CHANS]*ToneGenerator, debug_xmit_packet bool, fx25Debug int, il2pDebug int) *XmitService {
+func NewXmitService(
+	ctx context.Context,
+	p_modem *RadioConfig,
+	audio *AudioDevices,
+	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator,
+	hub *webui.Hub,
+	debug_xmit_packet bool,
+	fx25Debug int,
+	il2pDebug int,
+) *XmitService {
 	logrus.Debug("xmit_init")
 	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem
 	xs.audio = audio
 	xs.toneGenerators = toneGenerators
+	xs.webHub = hub
 	xs.fx25Debug = fx25Debug
 	xs.il2pDebug = il2pDebug
 
@@ -1007,7 +1023,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 	var nb = xs.layer2Sender(c).SendFrame(pp, send_invalid_fcs2)
 
 	metrics.RecordFrameTransmitted(c)
-	webPublishTransmitted(c, pp)
+	webPublishTransmitted(xs.webHub, c, pp)
 
 	// Optionally send confirmation to AGW client app if monitoring enabled.
 
