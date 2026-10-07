@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -27,6 +28,7 @@ type BeaconService struct {
 	miscConfig        *misc_config_s
 	igateConfig       *igate_config_s
 	gps               *dwgps.GPS
+	logger            *aprslog.Logger // Where "-dttt" logs tracker beacons, or nil.
 	trackerDebugLevel int
 }
 
@@ -45,6 +47,8 @@ type BeaconService struct {
  *		pigate		- IGate configuration.
  *			  Need this for calculating IGate statistics.
  *
+ *		logger		- Where "-dttt" logs the tracker beacons it
+ *			  sends, with fake channel 999; nil for nowhere.
  *
  * Outputs:	Remember required information for future use.
  *
@@ -55,12 +59,13 @@ type BeaconService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *dwgps.GPS) *BeaconService {
+func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *dwgps.GPS, logger *aprslog.Logger) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct_v5
 		modemConfig: pmodem,
 		miscConfig:  pconfig,
 		igateConfig: pigate,
 		gps:         gps,
+		logger:      logger,
 	}
 
 	/*
@@ -827,7 +832,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			/* actually transmitting and relying on someone else to receive */
 			/* the signals. */
 
-			if bs.trackerDebugLevel >= 3 {
+			if bs.trackerDebugLevel >= 3 && bs.logger != nil {
 				/* Frequency, offset, tone and DCS are unknown here, which is */
 				/* what the zero value of each of those fields already means. */
 				var A aprs.Decoded
@@ -843,7 +848,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel ax25.ALevel
-				aprsLogger.Write(999, &A, nil, alevel, 0)
+				bs.logger.Write(999, &A, nil, alevel, 0)
 			}
 		} else {
 			return /* No position.  Skip this time. */
