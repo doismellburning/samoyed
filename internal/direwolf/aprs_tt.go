@@ -283,6 +283,8 @@ type TTGateway struct {
  *		p	- Pointer to configuration options gathered by config.c.
  *		apps	- The client applications object reports go to, when
  *			  configured to; nil for none.
+ *		digi	- The APRS digipeater, told about each object report
+ *			  we transmit so it doesn't digipeat our own; nil for none.
  *		debug	- Debug printing control.
  *
  * Returns:     Pointer to new TTGateway.
@@ -292,12 +294,13 @@ type TTGateway struct {
  *
  *----------------------------------------------------------------*/
 
-func NewTTGateway(audioConfig *RadioConfig, p *tt_config_s, apps *clientApps, debug int) *TTGateway {
+func NewTTGateway(audioConfig *RadioConfig, p *tt_config_s, apps *clientApps, digi *Digipeater, debug int) *TTGateway {
 	var g = &TTGateway{debug: debug} //nolint:exhaustruct_v5
 
 	g.config = p
 	g.users = newTTUsers(audioConfig, p)
 	g.users.apps = apps
+	g.users.digipeater = digi
 
 	return g
 }

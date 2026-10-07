@@ -122,6 +122,7 @@ type ttUsers struct {
 	audioConfig *RadioConfig
 	ttConfig    *tt_config_s
 	apps        *clientApps // Where object reports go to client applications, or nil.
+	digipeater  *Digipeater // Told what we transmit, so it doesn't digipeat our own, or nil.
 
 	mu   sync.Mutex
 	user [MAX_TT_USERS]tt_user_s
@@ -659,7 +660,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 
 	if !first_time && u.ttConfig.obj_xmit_chan >= 0 {
 		/* Remember it so we don't digipeat our own. */
-		aprsDigipeater.Remember(pp, u.ttConfig.obj_xmit_chan)
+		u.digipeater.Remember(pp, u.ttConfig.obj_xmit_chan)
 
 		transmitQueue.Append(u.ttConfig.obj_xmit_chan, TQ_PRIO_1_LO, pp)
 	}
