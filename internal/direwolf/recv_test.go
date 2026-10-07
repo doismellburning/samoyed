@@ -90,7 +90,7 @@ func TestRecvInitReportsTheDeviceWhoseInputFailed(t *testing.T) {
 
 	var src = setupRecvTest(t, audioConfig, silence16(2000))
 
-	var failed = recv_init(t.Context(), audioConfig, src)
+	var failed = recv_init(t.Context(), audioConfig, src, nil)
 
 	select {
 	case a := <-failed:
@@ -108,7 +108,7 @@ func TestRecvInitStartsNothingForAnUndefinedDevice(t *testing.T) {
 
 	var src = setupRecvTest(t, audioConfig, silence16(2000))
 
-	var failed = recv_init(t.Context(), audioConfig, src)
+	var failed = recv_init(t.Context(), audioConfig, src, nil)
 
 	select {
 	case a := <-failed:
@@ -133,7 +133,7 @@ func TestRecvAdevThreadStopsWhenCancelledWithoutReportingAFailure(t *testing.T) 
 	var done = make(chan struct{})
 
 	go func() {
-		recv_adev_thread(ctx, audioConfig, 0, failed, src)
+		recv_adev_thread(ctx, audioConfig, 0, failed, src, nil)
 		close(done)
 	}()
 
@@ -165,7 +165,7 @@ func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
 	multiModems[0].dcAverage = 0
 	multiModems[1].dcAverage = 0
 
-	var failed = recv_init(t.Context(), audioConfig, src)
+	var failed = recv_init(t.Context(), audioConfig, src, nil)
 
 	select {
 	case <-failed:
@@ -185,13 +185,9 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 
 	var src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
-	var origGateway = ttGateway
+	var gateway = NewTTGateway(new(RadioConfig), new(tt_config_s), nil, nil, 0)
 
-	t.Cleanup(func() { ttGateway = origGateway })
-
-	ttGateway = NewTTGateway(new(RadioConfig), new(tt_config_s), nil, nil, 0)
-
-	var failed = recv_init(t.Context(), audioConfig, src)
+	var failed = recv_init(t.Context(), audioConfig, src, gateway)
 
 	select {
 	case <-failed:
@@ -199,7 +195,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 		t.Fatal("no failure reported after the audio ran out")
 	}
 
-	assert.Equal(t, "1", ttGateway.msgStr[0], "the button press should have reached the APRStt gateway")
+	assert.Equal(t, "1", gateway.msgStr[0], "the button press should have reached the APRStt gateway")
 }
 
 // And not otherwise: DTMF decoding off means nothing reaches the gateway, no
@@ -210,13 +206,9 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 
 	var src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
-	var origGateway = ttGateway
+	var gateway = NewTTGateway(new(RadioConfig), new(tt_config_s), nil, nil, 0)
 
-	t.Cleanup(func() { ttGateway = origGateway })
-
-	ttGateway = NewTTGateway(new(RadioConfig), new(tt_config_s), nil, nil, 0)
-
-	var failed = recv_init(t.Context(), audioConfig, src)
+	var failed = recv_init(t.Context(), audioConfig, src, gateway)
 
 	select {
 	case <-failed:
@@ -224,7 +216,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 		t.Fatal("no failure reported after the audio ran out")
 	}
 
-	assert.Empty(t, ttGateway.msgStr[0], "nothing should reach the gateway with DTMF decoding off")
+	assert.Empty(t, gateway.msgStr[0], "nothing should reach the gateway with DTMF decoding off")
 }
 
 // dtmfSamples is ms milliseconds of the tone pair for a button, as 16 bit

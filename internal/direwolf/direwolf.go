@@ -744,7 +744,7 @@ x = Silence FX.25 information.`)
 	 * Use hot attribute for all functions called for every audio sample.
 	 */
 
-	var adev_failed = recv_init(ctx, audio_config, audioDevices)
+	var adev_failed = recv_init(ctx, audio_config, audioDevices, ttGateway)
 
 	go recv_process(ctx, aprsDecoder)
 
