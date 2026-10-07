@@ -260,11 +260,7 @@ func boolToFloat(b bool) float64 {
 }
 
 // The slicing levels are spread evenly and symmetrically about zero.
-func TestDemod9600InitSlicePoints(t *testing.T) {
-	var D = new(demodulator_state_s)
-
-	demod_9600_init(MODEM_SCRAMBLE, 48000, 1, 9600, D)
-
+func TestSlicePoints(t *testing.T) {
 	for j := range MAX_SUBCHANS {
 		assert.InDelta(t, -slice_point[MAX_SUBCHANS-1-j], slice_point[j], 1e-12)
 	}
