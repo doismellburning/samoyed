@@ -703,7 +703,7 @@ x = Silence FX.25 information.`)
 	 * client applications too.  Each audio device's receive thread makes the
 	 * touch tone decoders for its own channels, once receiving starts below.
 	 */
-	ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprstt_debug)
+	ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, aprstt_debug)
 
 	/*
 	 * Open port for communication with GPS.

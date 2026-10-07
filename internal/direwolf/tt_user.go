@@ -123,6 +123,10 @@ type ttUsers struct {
 	ttConfig    *tt_config_s
 	apps        *clientApps // Where object reports go to client applications, or nil.
 
+	// remember is told each object report we transmit, so the digipeater
+	// doesn't repeat our own, or is nil.
+	remember func(pp *ax25.Packet, channel int)
+
 	mu   sync.Mutex
 	user [MAX_TT_USERS]tt_user_s
 }
@@ -659,7 +663,9 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 
 	if !first_time && u.ttConfig.obj_xmit_chan >= 0 {
 		/* Remember it so we don't digipeat our own. */
-		aprsDigipeater.Remember(pp, u.ttConfig.obj_xmit_chan)
+		if u.remember != nil {
+			u.remember(pp, u.ttConfig.obj_xmit_chan)
+		}
 
 		transmitQueue.Append(u.ttConfig.obj_xmit_chan, TQ_PRIO_1_LO, pp)
 	}

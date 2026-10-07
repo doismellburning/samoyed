@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,7 +95,7 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	my_tt_config.num_xmits = 1
 	my_tt_config.obj_xmit_chan = -1 // Keep the reports off the transmit queue.
 
-	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, 0)
+	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, nil, 0)
 
 	var done = make(chan struct{})
 
@@ -112,4 +113,31 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	}
 
 	<-done
+}
+
+// An object report going out over the radio is handed to whatever the gateway
+// was told to remember transmissions with - the digipeater, in DirewolfMain -
+// so that hearing it again doesn't get it digipeated.
+func TestTransmittedObjectReportIsRemembered(t *testing.T) {
+	var audioConfig = makeBeaconModemConfig()
+
+	setupBeaconTransmitQueue(t, audioConfig)
+
+	var ttConfig tt_config_s
+
+	ttConfig.obj_xmit_chan = 0
+
+	var remembered []string
+
+	var remember = func(pp *ax25.Packet, channel int) {
+		assert.Equal(t, 0, channel)
+
+		remembered = append(remembered, pp.FormatAddrs()+string(pp.Info()))
+	}
+
+	var gw = NewTTGateway(audioConfig, &ttConfig, nil, remember, 0)
+
+	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
+
+	assert.Equal(t, []string{"Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W="}, remembered)
 }

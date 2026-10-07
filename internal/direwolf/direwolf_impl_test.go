@@ -154,7 +154,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	igate = NewIGate(audioConfig, igateConfig, digiConfig, filter, 0)
 	aprsDigipeater = NewDigipeater(audioConfig, digiConfig, filter)
 	connectedDigipeater = NewConnectedDigipeater(audioConfig, new(cdigi_config_s), filter)
-	ttGateway = NewTTGateway(audioConfig, &dw_tt_config, nil, 0)
+	ttGateway = NewTTGateway(audioConfig, &dw_tt_config, nil, aprsDigipeater.Remember, 0)
 
 	return &recPacketTest{audioConfig: audioConfig, waypoints: waypoints}
 }
