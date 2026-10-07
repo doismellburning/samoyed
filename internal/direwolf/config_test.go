@@ -388,7 +388,7 @@ func Test_config_init_beacon_unreadable_interval(t *testing.T) {
 	modem.mycall[0] = "Q1TEST"
 
 	assert.NotPanics(t, func() {
-		NewBeaconService(modem, misc, new(igate_config_s), nil)
+		NewBeaconService(modem, misc, new(igate_config_s), nil, nil)
 	})
 }
 
@@ -437,7 +437,7 @@ func Test_config_init_beacon_out_of_range_lat(t *testing.T) {
 	modem.chan_medium[0] = MEDIUM_RADIO
 	modem.mycall[0] = "Q1TEST"
 
-	var bs = NewBeaconService(modem, misc, new(igate_config_s), nil)
+	var bs = NewBeaconService(modem, misc, new(igate_config_s), nil, nil)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
