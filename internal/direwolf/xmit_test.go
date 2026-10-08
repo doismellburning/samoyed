@@ -394,6 +394,25 @@ func TestSendOneFrame(t *testing.T) {
 	assert.Contains(t, output, "[0L] Q1TEST>Q2TEST:hello")
 }
 
+// Each frame sent is passed on, with its channel, to whatever the transmit
+// service was told to report them to - the web interface, in DirewolfMain.
+func TestSendOneFrameReportsWhatWasSent(t *testing.T) {
+	var xs = setupXmitTransmission(t)
+
+	var sent []string
+
+	xs.onTransmit = func(channel int, pp *ax25.Packet) {
+		sent = append(sent, strconv.Itoa(channel)+" "+pp.FormatAddrs()+string(pp.Info()))
+	}
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
+	testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
+
+	assert.Equal(t, []string{"0 Q1TEST>Q2TEST:hello"}, sent)
+}
+
 // A connected mode frame is not self-explanatory the way an APRS one is, so
 // the frame type is spelled out.
 func TestSendOneFrameNonAPRS(t *testing.T) {
