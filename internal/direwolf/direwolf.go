@@ -751,7 +751,24 @@ x = Silence FX.25 information.`)
 
 	var adev_failed = recv_init(ctx, audio_config, audioDevices, ttGateway.Button)
 
-	go recv_process(ctx, aprsDecoder, webHub)
+	var recHandler = new(recPacketHandler)
+	recHandler.audioConfig = audio_config
+	recHandler.ttConfig = &dw_tt_config
+	recHandler.decoder = aprsDecoder
+	recHandler.webHub = webHub
+	recHandler.logger = aprsLogger
+	recHandler.waypoints = waypointSender
+	recHandler.apps = clientApplications
+	recHandler.digipeater = aprsDigipeater
+	recHandler.connectedDigipeater = connectedDigipeater
+	recHandler.ttGateway = ttGateway
+	recHandler.dumpUTF8 = d_u_opt
+	recHandler.dumpPackets = d_p_opt
+	recHandler.quietHeard = q_h_opt
+	recHandler.quietDecode = q_d_opt
+	recHandler.aisToObject = A_opt_ais_to_obj
+
+	go recv_process(ctx, recHandler)
 
 	// Startup is done, so we sit here until we are asked to stop or an audio
 	// device input fails.  There is no point in going on without audio.
@@ -771,6 +788,30 @@ x = Silence FX.25 information.`)
 		teardown()
 		os.Exit(1)
 	}
+}
+
+// recPacketHandler is what a received frame is handed on to, once it has been
+// accepted: the console, the log, the client applications, the web interface,
+// the IGate and the digipeaters.  DirewolfMain builds one once all of those
+// exist, and gives it to recv_process.
+type recPacketHandler struct {
+	audioConfig *RadioConfig
+	ttConfig    *tt_config_s
+	decoder     *aprs.Decoder
+	webHub      *webui.Hub // Nil without a web interface.
+	logger      *aprslog.Logger
+	waypoints   *WaypointSender
+	apps        *clientApps // Nil for none.
+
+	digipeater          *Digipeater
+	connectedDigipeater *ConnectedDigipeater
+	ttGateway           *TTGateway
+
+	dumpUTF8    bool // "-d u": print UTF-8 in hexadecimal too.
+	dumpPackets bool // "-d p": dump each packet.
+	quietHeard  bool // "-q h": don't print the "heard" line with its audio level.
+	quietDecode bool // "-q d": don't print what an APRS packet means.
+	aisToObject bool // "-A": turn AIS into an APRS object report.
 }
 
 /*-------------------------------------------------------------------
@@ -813,10 +854,8 @@ func ais_object_course_speed(A *aprs.Decoded) (maybe.Maybe[int], maybe.Maybe[int
 	return course, speed
 }
 
-func app_process_rec_packet(
+func (rh *recPacketHandler) app_process_rec_packet(
 	ctx context.Context,
-	aprsDecoder *aprs.Decoder,
-	webHub *webui.Hub,
 	channel int,
 	subchan int,
 	slice int,
@@ -843,7 +882,7 @@ func app_process_rec_packet(
 	default:
 		// Possible fix_bits indication.  Only radio channels (< MAX_RADIO_CHANS) have achan entries;
 		// virtual channels such as NCHANNEL do not.
-		if channel < MAX_RADIO_CHANS && (audio_config.achan[channel].fix_bits != RETRY_NONE || audio_config.achan[channel].passall) {
+		if channel < MAX_RADIO_CHANS && (rh.audioConfig.achan[channel].fix_bits != RETRY_NONE || rh.audioConfig.achan[channel].passall) {
 			dwutil.Assert(retries >= RETRY_NONE && retries <= BitFixPassall)
 			display_retries = fmt.Sprintf(" [%s] ", retries.String())
 		}
@@ -873,9 +912,9 @@ func app_process_rec_packet(
 
 	// The HEARD line.
 
-	if !q_h_opt && alevel.Rec >= 0 { /* suppress if "-q h" option */
+	if !rh.quietHeard && alevel.Rec >= 0 { /* suppress if "-q h" option */
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
-		if channel != audio_config.igate_vchannel { // suppress if from ICHANNEL
+		if channel != rh.audioConfig.igate_vchannel { // suppress if from ICHANNEL
 			var logEntry = logrus.WithField("heard", heard)
 
 			if h != -1 && h != ax25.Source {
@@ -939,7 +978,7 @@ func app_process_rec_packet(
 			Warn("Audio input level is too high. This may cause distortion and reduced decode performance. " +
 				"Solution is to decrease the audio input level. " +
 				"Setting audio input level so most stations are around 50 will provide good dynamic range.")
-	} else if alevel.Rec < 5 && channel != audio_config.igate_vchannel && subchan != -3 && subchan != -4 {
+	} else if alevel.Rec < 5 && channel != rh.audioConfig.igate_vchannel && subchan != -3 && subchan != -4 {
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		logrus.WithField("alevel", alevel.Rec).Warn("Audio input level is too low.  Increase so most stations are around 50.")
 	}
@@ -952,8 +991,8 @@ func app_process_rec_packet(
 
 	var logEntry = logrus.WithField("channel", channel)
 
-	if len(audio_config.timestamp_format) > 0 {
-		var formattedTime, _ = strftime.Format(audio_config.timestamp_format, time.Now())
+	if len(rh.audioConfig.timestamp_format) > 0 {
+		var formattedTime, _ = strftime.Format(rh.audioConfig.timestamp_format, time.Now())
 		logEntry = logEntry.WithField("ts", formattedTime)
 	}
 
@@ -988,7 +1027,7 @@ func app_process_rec_packet(
 	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
 
 	var asciiOnly = false
-	if !pp.IsAPRS() && !d_u_opt {
+	if !pp.IsAPRS() && !rh.dumpUTF8 {
 		asciiOnly = true
 	}
 
@@ -1021,7 +1060,7 @@ func app_process_rec_packet(
 
 	// Also display in pure ASCII if non-ASCII characters and "-d u" option specified.
 
-	if d_u_opt {
+	if rh.dumpUTF8 {
 		var hasNonPrintable = false
 
 		for _, r := range pinfo {
@@ -1041,7 +1080,7 @@ func app_process_rec_packet(
 
 	/* Optional hex dump of packet. */
 
-	if d_p_opt {
+	if rh.dumpPackets {
 		logrus.Debug("--debug p hexdump below:")
 		pp.HexDump()
 	}
@@ -1059,12 +1098,12 @@ func app_process_rec_packet(
 	if pp.IsAPRS() {
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
-		var A = aprsDecoder.Decode(pp, q_d_opt)
+		var A = rh.decoder.Decode(pp, rh.quietDecode)
 		decoded = A
 
-		if !q_d_opt {
+		if !rh.quietDecode {
 			// Print it all out in human readable format unless "-q d" option used.
-			aprsDecoder.Print(A)
+			rh.decoder.Print(A)
 		}
 
 		/*
@@ -1075,7 +1114,7 @@ func app_process_rec_packet(
 
 		// Send to log file.
 
-		aprsLogger.Write(channel, A, pp, alevel, int(retries))
+		rh.logger.Write(channel, A, pp, alevel, int(retries))
 
 		// temp experiment.
 		// aprsLogger.RRBits(A, pp)
@@ -1093,12 +1132,12 @@ func app_process_rec_packet(
 		var user_def_da = "{" + string(aprs.UserDefUserID) + string(aprs.UserDefTypeAIS)
 
 		if strings.HasPrefix(string(pinfo), user_def_da) {
-			waypointSender.SendAIS(pinfo[3:])
+			rh.waypoints.SendAIS(pinfo[3:])
 
 			var lat, haveLat = A.Lat.Get()
 			var lon, haveLon = A.Lon.Get()
 
-			if A_opt_ais_to_obj && haveLat && haveLon {
+			if rh.aisToObject && haveLat && haveLon {
 				var course, speed = ais_object_course_speed(A)
 
 				var ais_obj_info = aprs.EncodeObject(A.Name, false, time.Now(),
@@ -1130,7 +1169,7 @@ func app_process_rec_packet(
 					nameIn = A.Name
 				}
 
-				waypointSender.SendSentence(nameIn,
+				rh.waypoints.SendSentence(nameIn,
 					lat, lon, rune(A.SymbolTable), A.SymbolCode,
 					maybe.Fmap(dwutil.DW_FEET_TO_METERS, A.AltitudeFt), A.Course, maybe.Fmap(dwutil.DW_MPH_TO_KNOTS, A.SpeedMPH),
 					A.Comment)
@@ -1139,13 +1178,13 @@ func app_process_rec_packet(
 	}
 
 	/* Send to another application if connected. */
-	clientApplications.SendRecPacket(channel, pp)
-	webPublishReceived(webHub, channel, subchan, pp, decoded, alevel)
+	rh.apps.SendRecPacket(channel, pp)
+	webPublishReceived(rh.webHub, channel, subchan, pp, decoded, alevel)
 
-	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
+	if rh.aisToObject && len(ais_obj_packet) != 0 {
 		var ao_pp = ax25.FromText(ais_obj_packet, true)
 		if ao_pp != nil {
-			clientApplications.SendRecPacket(channel, ao_pp)
+			rh.apps.SendRecPacket(channel, ao_pp)
 		}
 	}
 
@@ -1155,7 +1194,7 @@ func app_process_rec_packet(
 	 * Don't do anything with it after printing and sending to client apps.
 	 */
 
-	if channel == audio_config.igate_vchannel {
+	if channel == rh.audioConfig.igate_vchannel {
 		return
 	}
 
@@ -1168,14 +1207,14 @@ func app_process_rec_packet(
 	 */
 
 	if subchan == -1 { // from DTMF decoder
-		if dw_tt_config.gateway_enabled > 0 && len(pinfo) >= 2 {
-			ttGateway.Sequence(ctx, channel, string(pinfo[1:]))
+		if rh.ttConfig.gateway_enabled > 0 && len(pinfo) >= 2 {
+			rh.ttGateway.Sequence(ctx, channel, string(pinfo[1:]))
 		}
-	} else if len(pinfo) >= 2 && pinfo[0] == 't' && dw_tt_config.gateway_enabled > 0 {
+	} else if len(pinfo) >= 2 && pinfo[0] == 't' && rh.ttConfig.gateway_enabled > 0 {
 		// For testing.
 		// Would be nice to verify it was generated locally,
 		// not received over the air.
-		ttGateway.Sequence(ctx, channel, string(pinfo[1:]))
+		rh.ttGateway.Sequence(ctx, channel, string(pinfo[1:]))
 	} else {
 		/*
 		 * Send to the IGate processing.
@@ -1193,7 +1232,7 @@ func app_process_rec_packet(
 		/* Initial feedback was positive but it fell by the wayside. */
 		/* Should follow up with testers and either document this or clean out the clutter. */
 
-		aprsDigipeater.Regen(channel, pp)
+		rh.digipeater.Regen(channel, pp)
 
 		/*
 		 * Send to APRS digipeater.
@@ -1203,7 +1242,7 @@ func app_process_rec_packet(
 		 * confidence that it is correct.
 		 */
 		if pp.IsAPRS() && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
-			aprsDigipeater.Digipeat(channel, pp)
+			rh.digipeater.Digipeat(channel, pp)
 		}
 
 		/*
@@ -1213,7 +1252,7 @@ func app_process_rec_packet(
 
 		if channel < MAX_RADIO_CHANS {
 			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
-				connectedDigipeater.Digipeat(channel, pp)
+				rh.connectedDigipeater.Digipeat(channel, pp)
 			}
 		}
 	}
