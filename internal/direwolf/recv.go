@@ -85,8 +85,6 @@ package direwolf
 import (
 	"context"
 
-	"github.com/doismellburning/samoyed/internal/aprs"
-	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/sirupsen/logrus"
 )
 
@@ -211,9 +209,9 @@ func recv_adev_thread(ctx context.Context, pa *RadioConfig, a int, failed chan<-
 	failed <- a
 }
 
-// recv_process drains the received data queue until ctx is cancelled,
-// showing each frame on the web interface webHub, if it isn't nil.
-func recv_process(ctx context.Context, aprsDecoder *aprs.Decoder, webHub *webui.Hub) {
+// recv_process drains the received data queue until ctx is cancelled, handing
+// each frame received to rh.
+func recv_process(ctx context.Context, rh *recPacketHandler) {
 	for ctx.Err() == nil {
 		var timeout_value = ax25_link_get_next_timer_expiry()
 
@@ -244,7 +242,7 @@ func recv_process(ctx context.Context, aprsDecoder *aprs.Decoder, webHub *webui.
 					 *	- Send to Igate.
 					 *	- Digipeater.
 					 */
-					app_process_rec_packet(ctx, aprsDecoder, webHub, pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
+					rh.app_process_rec_packet(ctx, pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
 
 					/*
 					 * Link processing.

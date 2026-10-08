@@ -70,60 +70,35 @@ func Test_teardown_closes_what_startup_opened(t *testing.T) {
 
 // recPacketTest is what app_process_rec_packet reaches out to, set up afresh.
 type recPacketTest struct {
+	handler     *recPacketHandler
 	audioConfig *RadioConfig
 	waypoints   net.PacketConn
 }
 
 // setupRecPacketTest sets up everything app_process_rec_packet hands a packet
-// on to, with nothing configured that would transmit, and puts back what was
-// there before when the test ends.
+// on to, with nothing configured that would transmit, and puts back the
+// globals it still needs - those other files read too - when the test ends.
 func setupRecPacketTest(t *testing.T) *recPacketTest {
 	t.Helper()
 
 	var (
-		origAudioConfig = audio_config
-		origTTConfig    = dw_tt_config
-		origLogger      = aprsLogger
-		origMheard      = mheardDB
-		origWaypoint    = waypointSender
-		origAGW         = agwServer
-		origApps        = clientApplications
-		origIGate       = igate
-		origDigi        = aprsDigipeater
-		origCDigi       = connectedDigipeater
-		origTT          = ttGateway
-		origLogOut      = logrus.StandardLogger().Out
-		origOpts        = [...]bool{d_u_opt, d_p_opt, q_h_opt, q_d_opt, A_opt_ais_to_obj}
+		origMheard = mheardDB
+		origAGW    = agwServer
+		origIGate  = igate
+		origLogOut = logrus.StandardLogger().Out
 	)
 
 	t.Cleanup(func() {
-		audio_config = origAudioConfig
-		dw_tt_config = origTTConfig
-		aprsLogger = origLogger
 		mheardDB = origMheard
-		waypointSender = origWaypoint
 		agwServer = origAGW
-		clientApplications = origApps
 		igate = origIGate
-		aprsDigipeater = origDigi
-		connectedDigipeater = origCDigi
-		ttGateway = origTT
 		logrus.SetOutput(origLogOut)
-		d_u_opt, d_p_opt, q_h_opt, q_d_opt, A_opt_ais_to_obj = origOpts[0], origOpts[1], origOpts[2], origOpts[3], origOpts[4]
 	})
-
-	d_u_opt, d_p_opt, q_h_opt, q_d_opt, A_opt_ais_to_obj = false, false, false, false, false
 
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 	audioConfig.igate_vchannel = -1
-	audio_config = audioConfig
 
-	var noTouchTones tt_config_s
-
-	dw_tt_config = noTouchTones
-
-	aprsLogger = aprslog.New(false, "")
 	mheardDB = mheard.New(0)
 
 	// Waypoints go to a UDP socket of our own, so a position that reaches
@@ -142,33 +117,37 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	t.Cleanup(ws.Close)
 
-	waypointSender = ws
-
 	agwServer = nil
-	clientApplications = nil
 
 	var igateConfig = new(igate_config_s)
 	var digiConfig = new(digi_config_s)
 	var filter = NewPacketFilter(igateConfig, aprs.NewDecoderFromDataFiles(), 0)
 
 	igate = NewIGate(audioConfig, igateConfig, digiConfig, filter, 0)
-	aprsDigipeater = NewDigipeater(audioConfig, digiConfig, filter)
-	connectedDigipeater = NewConnectedDigipeater(audioConfig, new(cdigi_config_s), filter)
-	ttGateway = NewTTGateway(audioConfig, &dw_tt_config, nil, aprsDigipeater.Remember, 0)
 
-	return &recPacketTest{audioConfig: audioConfig, waypoints: waypoints}
+	var handler = new(recPacketHandler)
+	handler.audioConfig = audioConfig
+	handler.ttConfig = new(tt_config_s) // No touch tones.
+	handler.decoder = aprs.NewDecoderFromDataFiles()
+	handler.logger = aprslog.New(false, "")
+	handler.waypoints = ws
+	handler.digipeater = NewDigipeater(audioConfig, digiConfig, filter)
+	handler.connectedDigipeater = NewConnectedDigipeater(audioConfig, new(cdigi_config_s), filter)
+	handler.ttGateway = NewTTGateway(audioConfig, handler.ttConfig, nil, handler.digipeater.Remember, 0)
+
+	return &recPacketTest{handler: handler, audioConfig: audioConfig, waypoints: waypoints}
 }
 
 // processRecPacket runs app_process_rec_packet on channel 0 and returns what
 // it printed, log entries included.
-func processRecPacket(t *testing.T, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fecType fec_type_t, retries BitFixLevel, spectrum string) string {
+func (rt *recPacketTest) processRecPacket(t *testing.T, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fecType fec_type_t, retries BitFixLevel, spectrum string) string {
 	t.Helper()
 
 	require.NotNil(t, pp)
 
 	return testutils.CaptureOutput(t, func() {
 		logrus.SetOutput(os.Stdout)
-		app_process_rec_packet(t.Context(), aprs.NewDecoderFromDataFiles(), nil, 0, subchan, slice, pp, alevel, fecType, retries, spectrum)
+		rt.handler.app_process_rec_packet(t.Context(), 0, subchan, slice, pp, alevel, fecType, retries, spectrum)
 	})
 }
 
@@ -198,7 +177,7 @@ func Test_app_process_rec_packet_aprs_position(t *testing.T) {
 
 	var pp = ax25.FromText("Q1TEST>APRS,WIDE1-1:!4221.60N/07103.60W-Test", true)
 
-	var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 	assert.Contains(t, output, "Heard")
 	assert.Contains(t, output, "heard=Q1TEST")
@@ -217,17 +196,17 @@ func Test_app_process_rec_packet_object_name_is_waypoint(t *testing.T) {
 
 	var pp = ax25.FromText("Q1TEST>APRS:;LEADER   *092345z4903.50N/07201.75W>088/036", true)
 
-	processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+	rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 	assert.Contains(t, rt.readWaypoint(t), "LEADER")
 }
 
 func Test_app_process_rec_packet_heard_via_digipeater(t *testing.T) {
-	setupRecPacketTest(t)
+	var rt = setupRecPacketTest(t)
 
 	var pp = ax25.FromText("Q1TEST>APRS,Q2TEST*:>status", true)
 
-	var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 	assert.Contains(t, output, "heard=Q2TEST")
 	assert.Contains(t, output, "digipeater=true")
@@ -235,13 +214,13 @@ func Test_app_process_rec_packet_heard_via_digipeater(t *testing.T) {
 
 // Hearing WIDEn-0 most likely means hearing the station before it in the path.
 func Test_app_process_rec_packet_heard_via_wide(t *testing.T) {
-	setupRecPacketTest(t)
+	var rt = setupRecPacketTest(t)
 
 	for _, subchan := range []int{0, -2} {
 		t.Run(strconv.Itoa(subchan), func(t *testing.T) {
 			var pp = ax25.FromText("Q1TEST>APRS,Q2TEST*,WIDE2*:>status", true)
 
-			var output = processRecPacket(t, subchan, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+			var output = rt.processRecPacket(t, subchan, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 			assert.Contains(t, output, "heard=WIDE2")
 			assert.Contains(t, output, "probably_really=Q2TEST")
@@ -269,7 +248,7 @@ func Test_app_process_rec_packet_fec_and_retries(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var pp = ax25.FromText("Q1TEST>APRS:>status", true)
 
-			var output = processRecPacket(t, 0, 0, pp, goodLevel(), tt.fecType, tt.retries, "|")
+			var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), tt.fecType, tt.retries, "|")
 
 			assert.Contains(t, output, tt.want)
 		})
@@ -277,35 +256,35 @@ func Test_app_process_rec_packet_fec_and_retries(t *testing.T) {
 }
 
 func Test_app_process_rec_packet_audio_levels(t *testing.T) {
-	setupRecPacketTest(t)
+	var rt = setupRecPacketTest(t)
 
 	var pp = ax25.FromText("Q1TEST>APRS:>status", true)
 
-	var output = processRecPacket(t, 0, 0, pp, ax25.ALevel{Rec: 150, Mark: 0, Space: 0}, fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, 0, 0, pp, ax25.ALevel{Rec: 150, Mark: 0, Space: 0}, fec_type_none, RETRY_NONE, "")
 	assert.Contains(t, output, "Audio input level is too high")
 
 	pp = ax25.FromText("Q1TEST>APRS:>status", true)
 
-	output = processRecPacket(t, 0, 0, pp, ax25.ALevel{Rec: 1, Mark: 0, Space: 0}, fec_type_none, RETRY_NONE, "")
+	output = rt.processRecPacket(t, 0, 0, pp, ax25.ALevel{Rec: 1, Mark: 0, Space: 0}, fec_type_none, RETRY_NONE, "")
 	assert.Contains(t, output, "Audio input level is too low")
 
 	// A network TNC has no audio level to be low.
 	pp = ax25.FromText("Q1TEST>APRS:>status", true)
 
-	output = processRecPacket(t, -3, 0, pp, ax25.ALevel{Rec: 1, Mark: 0, Space: 0}, fec_type_none, RETRY_NONE, "")
+	output = rt.processRecPacket(t, -3, 0, pp, ax25.ALevel{Rec: 1, Mark: 0, Space: 0}, fec_type_none, RETRY_NONE, "")
 	assert.NotContains(t, output, "Audio input level is too low")
 	assert.Contains(t, output, "subchan=nettnc")
 }
 
 func Test_app_process_rec_packet_quiet(t *testing.T) {
-	setupRecPacketTest(t)
+	var rt = setupRecPacketTest(t)
 
-	q_h_opt = true
-	q_d_opt = true
+	rt.handler.quietHeard = true
+	rt.handler.quietDecode = true
 
 	var pp = ax25.FromText("Q1TEST>APRS:!4221.60N/07103.60W-Test", true)
 
-	var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 	assert.NotContains(t, output, "Heard")
 	assert.Contains(t, output, "!4221.60N/07103.60W-Test")
@@ -318,7 +297,7 @@ func Test_app_process_rec_packet_timestamp(t *testing.T) {
 
 	var pp = ax25.FromText("Q1TEST>APRS:>status", true)
 
-	var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 	assert.Contains(t, output, fmt.Sprintf("ts=TS%d", time.Now().Year()))
 }
@@ -332,20 +311,20 @@ func Test_app_process_rec_packet_from_igate_channel(t *testing.T) {
 
 	var pp = ax25.FromText("Q1TEST>APRS:>status", true)
 
-	var output = processRecPacket(t, -2, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, -2, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 	assert.NotContains(t, output, "Heard")
 	assert.Contains(t, output, "subchan=is")
 }
 
 func Test_app_process_rec_packet_dtmf(t *testing.T) {
-	setupRecPacketTest(t)
+	var rt = setupRecPacketTest(t)
 
-	dw_tt_config.gateway_enabled = 1
+	rt.handler.ttConfig.gateway_enabled = 1
 
 	var pp = ax25.FromText("DTMF>APRS:t2A22A#", true)
 
-	var output = processRecPacket(t, -1, 0, pp, ax25.ALevel{Rec: -2, Mark: 0, Space: 0}, fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, -1, 0, pp, ax25.ALevel{Rec: -2, Mark: 0, Space: 0}, fec_type_none, RETRY_NONE, "")
 
 	assert.Contains(t, output, "subchan=dtmf")
 }
@@ -353,22 +332,22 @@ func Test_app_process_rec_packet_dtmf(t *testing.T) {
 // A touch tone sequence can be simulated with a packet whose information
 // starts with 't'.
 func Test_app_process_rec_packet_simulated_dtmf(t *testing.T) {
-	setupRecPacketTest(t)
+	var rt = setupRecPacketTest(t)
 
-	dw_tt_config.gateway_enabled = 1
+	rt.handler.ttConfig.gateway_enabled = 1
 
 	var pp = ax25.FromText("DTMF>APRS:t2A22A#", true)
 
-	var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 	assert.Contains(t, output, "heard=DTMF")
 }
 
 func Test_app_process_rec_packet_non_aprs(t *testing.T) {
-	setupRecPacketTest(t)
+	var rt = setupRecPacketTest(t)
 
-	d_u_opt = true
-	d_p_opt = true
+	rt.handler.dumpUTF8 = true
+	rt.handler.dumpPackets = true
 
 	var origLevel = logrus.GetLevel()
 
@@ -383,7 +362,7 @@ func Test_app_process_rec_packet_non_aprs(t *testing.T) {
 	t.Run("SABM", func(t *testing.T) {
 		var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil)
 
-		var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+		var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 		assert.Contains(t, output, "desc=")
 		assert.Contains(t, output, "--debug p hexdump below")
@@ -392,7 +371,7 @@ func Test_app_process_rec_packet_non_aprs(t *testing.T) {
 	t.Run("XID", func(t *testing.T) {
 		var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUXID, 1, 0, nil)
 
-		var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+		var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 		assert.Contains(t, output, "info=")
 	})
@@ -400,7 +379,7 @@ func Test_app_process_rec_packet_non_aprs(t *testing.T) {
 	t.Run("non-printable", func(t *testing.T) {
 		var pp = ax25.FromText("Q1TEST>APRS:>caf\xc3\xa9\x01", true)
 
-		var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+		var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 		assert.Contains(t, output, "--debug u hexdump below")
 	})
@@ -408,7 +387,7 @@ func Test_app_process_rec_packet_non_aprs(t *testing.T) {
 
 // A frame with no AX.25 addresses at all has nobody to have been heard.
 func Test_app_process_rec_packet_no_addresses(t *testing.T) {
-	setupRecPacketTest(t)
+	var rt = setupRecPacketTest(t)
 
 	var frame = []byte("abcdefghijklmnopqrstuvwxyz")
 
@@ -416,7 +395,7 @@ func Test_app_process_rec_packet_no_addresses(t *testing.T) {
 	require.NotNil(t, pp)
 	require.Equal(t, 0, pp.NumAddr())
 
-	var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 	assert.Contains(t, output, "Heard")
 }
@@ -424,12 +403,12 @@ func Test_app_process_rec_packet_no_addresses(t *testing.T) {
 func Test_app_process_rec_packet_ais_to_object(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
-	A_opt_ais_to_obj = true
+	rt.handler.aisToObject = true
 
 	var sentence = aisPositionReport(t, 208, 900)
 	var pp = ax25.FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", aprs.UserDefUserID, aprs.UserDefTypeAIS, sentence), true)
 
-	var output = processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, 0, 0, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 	assert.Contains(t, output, "ais_obj_packet=")
 	assert.Contains(t, output, ";366730000*")
@@ -439,7 +418,7 @@ func Test_app_process_rec_packet_ais_to_object(t *testing.T) {
 }
 
 func Test_app_process_rec_packet_multiple_subchannels(t *testing.T) {
-	setupRecPacketTest(t)
+	var rt = setupRecPacketTest(t)
 
 	var origDemods = demodulators
 
@@ -457,7 +436,7 @@ func Test_app_process_rec_packet_multiple_subchannels(t *testing.T) {
 
 	var pp = ax25.FromText("Q1TEST>APRS:>status", true)
 
-	var output = processRecPacket(t, 1, 2, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
+	var output = rt.processRecPacket(t, 1, 2, pp, goodLevel(), fec_type_none, RETRY_NONE, "")
 
 	assert.Contains(t, output, "subchan=1")
 	assert.Contains(t, output, "slice=2")

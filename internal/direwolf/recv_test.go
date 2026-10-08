@@ -279,10 +279,11 @@ func dtmfSamples(t *testing.T, button rune, ms int, samplesPerSec int) []byte {
 }
 
 // setupRecvProcessTest initialises what recv_process dispatches into: the
-// transmit queue, the link state machines, and an empty received data queue.
-// Nothing drains the transmit queue, so what the link layer decides to send
-// stays there to be counted.
-func setupRecvProcessTest(t *testing.T, frack int) {
+// transmit queue, the link state machines, an empty received data queue, and
+// the handler for frames received, which it returns.  Nothing drains the
+// transmit queue, so what the link layer decides to send stays there to be
+// counted.
+func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 	t.Helper()
 
 	var audioConfig = new(RadioConfig)
@@ -293,16 +294,18 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 	// need configuration that has nothing to do with the receive thread.
 	audioConfig.igate_vchannel = 0
 
-	var origAudioConfig, origLogger, origMheard = audio_config, aprsLogger, mheardDB
+	var origMheard = mheardDB
 
-	t.Cleanup(func() {
-		audio_config, aprsLogger, mheardDB = origAudioConfig, origLogger, origMheard
-	})
+	t.Cleanup(func() { mheardDB = origMheard })
 
-	audio_config = audioConfig
 	// A received frame is logged and remembered on its way through, so
-	// both need to be there even with no log file to write to.
-	aprsLogger = aprslog.New(false, "")
+	// both need to be there even with no log file to write to.  It goes
+	// out to the attached client applications too, of which there are none.
+	var handler = new(recPacketHandler)
+	handler.audioConfig = audioConfig
+	handler.ttConfig = new(tt_config_s)
+	handler.decoder = aprs.NewDecoderFromDataFiles()
+	handler.logger = aprslog.New(false, "")
 	mheardDB = mheard.New(0)
 
 	usePTT(t, audioConfig)
@@ -316,14 +319,6 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 
 	ax25_link_init(miscConfig, 1)
-
-	// A received frame goes out to the attached client applications, of
-	// which there are none.
-	var origApps = clientApplications
-
-	t.Cleanup(func() { clientApplications = origApps })
-
-	clientApplications = nil
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil
@@ -346,18 +341,20 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 
 		dataLinkQueue.Init()
 	})
+
+	return handler
 }
 
-// startRecvProcess runs recv_process until the test ends, failing the test if
-// it does not then finish.
-func startRecvProcess(t *testing.T) {
+// startRecvProcess runs recv_process, handing what it receives to rh, until
+// the test ends, failing the test if it does not then finish.
+func startRecvProcess(t *testing.T, rh *recPacketHandler) {
 	t.Helper()
 
 	var ctx, cancel = context.WithCancel(t.Context())
 	var done = make(chan struct{})
 
 	go func() {
-		recv_process(ctx, aprs.NewDecoderFromDataFiles(), nil)
+		recv_process(ctx, rh)
 		close(done)
 	}()
 
@@ -375,9 +372,9 @@ func startRecvProcess(t *testing.T) {
 // The queue is where the receive threads hand work over, so an item put on it
 // has to be dispatched to the handler for its type.
 func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
-	setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
+	var rh = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
-	startRecvProcess(t)
+	startRecvProcess(t, rh)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
@@ -395,9 +392,9 @@ func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 // recv_process is the only place the queue is served, so every kind of item
 // has to have somewhere to go from it.
 func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
-	setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
+	var rh = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
-	startRecvProcess(t)
+	startRecvProcess(t, rh)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
@@ -438,7 +435,7 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 // a sender's wake-up outlives the item that prompted it - but it is worth
 // knowing about.
 func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
-	setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
+	var rh = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
 	var hook = test.NewGlobal()
 
@@ -450,7 +447,7 @@ func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
 
 	t.Cleanup(func() { logrus.SetLevel(previousLevel) })
 
-	startRecvProcess(t)
+	startRecvProcess(t, rh)
 
 	// Wake the queue without putting anything on it.
 	assert.Eventually(t, func() bool {
@@ -474,9 +471,9 @@ func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
 // allowed to expire.
 func TestRecvProcessRunsTheLinkTimersWhileTheQueueIsEmpty(t *testing.T) {
 	// One second of T1, so the retry does not hold the test up for long.
-	setupRecvProcessTest(t, 1)
+	var rh = setupRecvProcessTest(t, 1)
 
-	startRecvProcess(t)
+	startRecvProcess(t, rh)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
