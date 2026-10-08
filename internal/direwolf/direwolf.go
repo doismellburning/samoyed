@@ -50,30 +50,13 @@ import (
  *
  *---------------------------------------------------------------*/
 
-var d_u_opt bool /* "-d u" command line option to print UTF-8 also in hexadecimal. */
-var d_p_opt bool /* "-d p" option for dumping packets over radio. */
-
-var q_h_opt bool /* "-q h" Quiet, suppress the "heard" line with audio level. */
-var q_d_opt bool /* "-q d" Quiet, suppress the printing of description of APRS packets. */
-
-var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." */
-
-var audio_config *RadioConfig
-var dw_tt_config tt_config_s
-var misc_config *misc_config_s
 var aprsSymbolData *symbols.Data
 var waypointSender *WaypointSender
 var aprsLogger *aprslog.Logger
-var beaconService *BeaconService
 var gpsReceiver *dwgps.GPS
 var agwServer *AGWServer
-var clientApplications *clientApps
 var mheardDB *mheard.DB
-var aprsDigipeater *Digipeater
-var connectedDigipeater *ConnectedDigipeater
 var pttControl *PTT
-var xmitSvc *XmitService
-var ttGateway *TTGateway
 var layer2Receiver *Layer2Receiver
 
 /*-------------------------------------------------------------------
@@ -199,9 +182,7 @@ x = Silence FX.25 information.`)
 		os.Exit(0)
 	}
 
-	if *aisToAPRS {
-		A_opt_ais_to_obj = true
-	}
+	var A_opt_ais_to_obj = *aisToAPRS /* "-A" Convert received AIS to APRS "Object Report." */
 
 	var d_a_opt = 0      /* "-d a" option for AGW client applications.  Can be repeated for more detail. */
 	var d_k_opt = 0      /* "-d k" option for serial port KISS.  Can be repeated for more detail. */
@@ -218,6 +199,10 @@ x = Silence FX.25 information.`)
 	var d_2_opt = 0      /* "-d 2" option for IL2P.  Default minimal. Repeat for more detail. */
 	var d_c_opt = 0      /* "-d c" option for connected mode data link state machine. */
 	var aprstt_debug = 0 /* "-d d" option for APRStt (think Dtmf) debug. */
+	var d_u_opt = false  /* "-d u" option to print UTF-8 also in hexadecimal. */
+	var d_p_opt = false  /* "-d p" option for dumping packets over radio. */
+	var q_h_opt = false  /* "-q h" Quiet, suppress the "heard" line with audio level. */
+	var q_d_opt = false  /* "-q d" Quiet, suppress the printing of description of APRS packets. */
 
 	if *debugStr != "" {
 		// A -d option of any sort is a request for debug output, and logrus
@@ -304,8 +289,9 @@ x = Silence FX.25 information.`)
 	aprsSymbolData = symbols.New()
 	var aprsDecoder = aprs.NewDecoder(deviceid.New(), aprsSymbolData)
 
-	audio_config = new(RadioConfig)
-	misc_config = new(misc_config_s)
+	var audio_config = new(RadioConfig)
+	var misc_config = new(misc_config_s)
+	var dw_tt_config tt_config_s
 	var digi_config digi_config_s
 	var cdigi_config cdigi_config_s
 	var igate_config igate_config_s
@@ -534,7 +520,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, publishTransmitted, d_p_opt, d_x_opt, d_2_opt)
+	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, publishTransmitted, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx)
 
 	/*
@@ -661,11 +647,11 @@ x = Silence FX.25 information.`)
 	 */
 	mheardDB = mheard.New(d_m_opt)
 	var packetFilter = NewPacketFilter(&igate_config, aprsDecoder, d_f_opt)
-	aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter)
+	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter)
 	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, d_i_opt)
 	igate.start(ctx)
 	stopIfCancelled(ctx)
-	connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
+	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
 	ax25_link_init(misc_config, d_c_opt)
 
 	/*
@@ -697,7 +683,7 @@ x = Silence FX.25 information.`)
 	stopIfCancelled(ctx)
 
 	// What we hear goes to each of these.
-	clientApplications = new(clientApps)
+	var clientApplications = new(clientApps)
 	clientApplications.agw = agwServer
 	clientApplications.kissNet = kissNetSvc
 	clientApplications.kissSerial = kissSerial
@@ -708,7 +694,7 @@ x = Silence FX.25 information.`)
 	 * client applications too.  Each audio device's receive thread makes the
 	 * touch tone decoders for its own channels, once receiving starts below.
 	 */
-	ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, aprstt_debug)
+	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, aprstt_debug)
 
 	/*
 	 * Open port for communication with GPS.
@@ -739,7 +725,7 @@ x = Silence FX.25 information.`)
 	 */
 
 	aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
-	beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger)
+	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
 	stopIfCancelled(ctx)
@@ -1117,7 +1103,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		rh.logger.Write(channel, A, pp, alevel, int(retries))
 
 		// temp experiment.
-		// aprsLogger.RRBits(A, pp)
+		// rh.logger.RRBits(A, pp)
 
 		// Add to list of stations heard over the radio.
 
