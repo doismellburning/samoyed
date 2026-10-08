@@ -69,7 +69,6 @@ var gpsReceiver *dwgps.GPS
 var agwServer *AGWServer
 var clientApplications *clientApps
 var mheardDB *mheard.DB
-var webHub *webui.Hub // Nil, and so a no-op, unless WEBPORT is set.
 var aprsDigipeater *Digipeater
 var connectedDigipeater *ConnectedDigipeater
 var pttControl *PTT
@@ -520,16 +519,22 @@ x = Silence FX.25 information.`)
 
 	/*
 	 * Start the web interface before anything that can send or receive a
-	 * frame, as those goroutines read webHub without a lock.
+	 * frame, so that both sides can be handed it.  Nil, and so a no-op,
+	 * unless WEBPORT is set.
 	 */
 
-	webui_init(ctx, audio_config, misc_config)
+	var webHub = webui_init(ctx, audio_config, misc_config)
+
+	var publishTransmitted func(channel int, pp *ax25.Packet) // Nobody to tell, without a web interface.
+	if webHub != nil {
+		publishTransmitted = func(channel int, pp *ax25.Packet) { webPublishTransmitted(webHub, channel, pp) }
+	}
 
 	/*
 	 * Initialize the transmit queue.
 	 */
 
-	xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, webPublishTransmitted, d_p_opt, d_x_opt, d_2_opt)
+	xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, publishTransmitted, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx)
 
 	/*
@@ -746,7 +751,7 @@ x = Silence FX.25 information.`)
 
 	var adev_failed = recv_init(ctx, audio_config, audioDevices, ttGateway.Button)
 
-	go recv_process(ctx, aprsDecoder)
+	go recv_process(ctx, aprsDecoder, webHub)
 
 	// Startup is done, so we sit here until we are asked to stop or an audio
 	// device input fails.  There is no point in going on without audio.
@@ -811,6 +816,7 @@ func ais_object_course_speed(A *aprs.Decoded) (maybe.Maybe[int], maybe.Maybe[int
 func app_process_rec_packet(
 	ctx context.Context,
 	aprsDecoder *aprs.Decoder,
+	webHub *webui.Hub,
 	channel int,
 	subchan int,
 	slice int,
@@ -1134,7 +1140,7 @@ func app_process_rec_packet(
 
 	/* Send to another application if connected. */
 	clientApplications.SendRecPacket(channel, pp)
-	webPublishReceived(channel, subchan, pp, decoded, alevel)
+	webPublishReceived(webHub, channel, subchan, pp, decoded, alevel)
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
 		var ao_pp = ax25.FromText(ais_obj_packet, true)

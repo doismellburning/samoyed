@@ -357,7 +357,7 @@ func startRecvProcess(t *testing.T) {
 	var done = make(chan struct{})
 
 	go func() {
-		recv_process(ctx, aprs.NewDecoderFromDataFiles())
+		recv_process(ctx, aprs.NewDecoderFromDataFiles(), nil)
 		close(done)
 	}()
 

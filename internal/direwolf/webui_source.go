@@ -16,12 +16,14 @@ import (
 )
 
 // webui_init starts the web dashboard and map if a port was configured with
-// WEBPORT.  A port of 0 (the default) disables it.
-func webui_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
+// WEBPORT, and returns the hub to publish frames to.  A port of 0 (the
+// default) disables it, as does failing to start it, and either returns nil -
+// which webPublishReceived and webPublishTransmitted take as nothing to do.
+func webui_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) *webui.Hub {
 	if mc.web_port == 0 {
 		logrus.Debug("Web interface disabled")
 
-		return
+		return nil
 	}
 
 	var hub = webui.NewHub()
@@ -36,10 +38,8 @@ func webui_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
 	if startErr != nil {
 		logrus.WithError(startErr).WithField("port", mc.web_port).Error("Unable to start web interface")
 
-		return
+		return nil
 	}
-
-	webHub = hub
 
 	go func() {
 		var err = <-errCh
@@ -49,6 +49,8 @@ func webui_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
 	}()
 
 	logrus.WithField("port", mc.web_port).Info("Web interface listening")
+
+	return hub
 }
 
 // channelDescription names what a configured channel is connected to, or
@@ -90,9 +92,10 @@ func subchanVia(subchan int) string {
 	return "radio"
 }
 
-// webPublishReceived hands a received frame to the web interface.
-func webPublishReceived(channel int, subchan int, pp *ax25.Packet, A *aprs.Decoded, alevel ax25.ALevel) {
-	if webHub == nil {
+// webPublishReceived hands a received frame to the web interface, if there is
+// one.
+func webPublishReceived(hub *webui.Hub, channel int, subchan int, pp *ax25.Packet, A *aprs.Decoded, alevel ax25.ALevel) {
+	if hub == nil {
 		return
 	}
 
@@ -104,17 +107,18 @@ func webPublishReceived(channel int, subchan int, pp *ax25.Packet, A *aprs.Decod
 		p.AudioLevel = maybe.Just(alevel.Rec)
 	}
 
-	webHub.Publish(p)
+	hub.Publish(p)
 }
 
-// webPublishTransmitted hands a transmitted frame to the web interface.
-func webPublishTransmitted(channel int, pp *ax25.Packet) {
-	if webHub == nil {
+// webPublishTransmitted hands a transmitted frame to the web interface, if
+// there is one.
+func webPublishTransmitted(hub *webui.Hub, channel int, pp *ax25.Packet) {
+	if hub == nil {
 		return
 	}
 
 	var p = webui.NewPacket(pp, nil, webui.Transmitted)
 	p.Channel = channel
 
-	webHub.Publish(p)
+	hub.Publish(p)
 }
