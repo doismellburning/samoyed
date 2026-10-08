@@ -283,6 +283,9 @@ type TTGateway struct {
  *		p	- Pointer to configuration options gathered by config.c.
  *		apps	- The client applications object reports go to, when
  *			  configured to; nil for none.
+ *		remember - Called with each object report we transmit, and its
+ *			  channel, so the digipeater doesn't repeat our own;
+ *			  nil for nobody to tell.
  *		debug	- Debug printing control.
  *
  * Returns:     Pointer to new TTGateway.
@@ -292,12 +295,13 @@ type TTGateway struct {
  *
  *----------------------------------------------------------------*/
 
-func NewTTGateway(audioConfig *RadioConfig, p *tt_config_s, apps *clientApps, debug int) *TTGateway {
+func NewTTGateway(audioConfig *RadioConfig, p *tt_config_s, apps *clientApps, remember func(pp *ax25.Packet, channel int), debug int) *TTGateway {
 	var g = &TTGateway{debug: debug} //nolint:exhaustruct_v5
 
 	g.config = p
 	g.users = newTTUsers(audioConfig, p)
 	g.users.apps = apps
+	g.users.remember = remember
 
 	return g
 }

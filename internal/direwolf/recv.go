@@ -86,6 +86,7 @@ import (
 	"context"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/sirupsen/logrus"
 )
 
@@ -102,6 +103,9 @@ import (
  *
  *		src		- Where the audio samples come from.
  *
+ *		onButton	- Called with each touch tone button the DTMF
+ *				  decoders hear, and its channel; nil for
+ *				  nobody to tell.
  *
  * Returns:     A channel reporting the number of any audio device whose
  *		input failed.  There is no point in going on without audio,
@@ -109,14 +113,14 @@ import (
  *
  *----------------------------------------------------------------*/
 
-func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource) <-chan int {
+func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource, onButton func(channel int, button rune)) <-chan int {
 	// Buffered so that a failing device thread can report and finish even
 	// though nobody is listening any more.
 	var failed = make(chan int, MAX_ADEVS)
 
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined > 0 {
-			go recv_adev_thread(ctx, pa, a, failed, src)
+			go recv_adev_thread(ctx, pa, a, failed, src, onButton)
 		}
 	}
 
@@ -131,7 +135,7 @@ func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource) <-chan in
 // that would mean tearing the device down underneath the demodulator.  A
 // device delivering samples at all therefore stops promptly; one that has gone
 // quiet without failing outright holds the goroutine until it says something.
-func recv_adev_thread(ctx context.Context, pa *RadioConfig, a int, failed chan<- int, src SampleSource) {
+func recv_adev_thread(ctx context.Context, pa *RadioConfig, a int, failed chan<- int, src SampleSource, onButton func(channel int, button rune)) {
 	/* This audio device can have one (mono) or two (stereo) channels. */
 	/* Find number of the first channel and number of channels. */
 	var first_chan = ADEVFIRSTCHAN(a)
@@ -182,9 +186,9 @@ func recv_adev_thread(ctx context.Context, pa *RadioConfig, a int, failed chan<-
 			/* sequences arriving at the same instant. */
 
 			if dtmfDecoders[c] != nil {
-				var tt = dtmfDecoders[c].Sample(float64(audio_sample) / 16384.)
-				if tt != ' ' {
-					ttGateway.Button(first_chan+c, tt)
+				var button = dtmfDecoders[c].Sample(float64(audio_sample) / 16384.)
+				if button != ' ' && onButton != nil {
+					onButton(first_chan+c, button)
 				}
 			}
 		} // for c is just 0 or 0 then 1
@@ -207,8 +211,9 @@ func recv_adev_thread(ctx context.Context, pa *RadioConfig, a int, failed chan<-
 	failed <- a
 }
 
-// recv_process drains the received data queue until ctx is cancelled.
-func recv_process(ctx context.Context, aprsDecoder *aprs.Decoder) {
+// recv_process drains the received data queue until ctx is cancelled,
+// showing each frame on the web interface webHub, if it isn't nil.
+func recv_process(ctx context.Context, aprsDecoder *aprs.Decoder, webHub *webui.Hub) {
 	for ctx.Err() == nil {
 		var timeout_value = ax25_link_get_next_timer_expiry()
 
@@ -239,7 +244,7 @@ func recv_process(ctx context.Context, aprsDecoder *aprs.Decoder) {
 					 *	- Send to Igate.
 					 *	- Digipeater.
 					 */
-					app_process_rec_packet(ctx, aprsDecoder, pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
+					app_process_rec_packet(ctx, aprsDecoder, webHub, pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
 
 					/*
 					 * Link processing.
