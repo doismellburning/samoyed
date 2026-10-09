@@ -51,7 +51,6 @@ import (
 
 var aprsSymbolData *symbols.Data
 var agwServer *AGWServer
-var pttControl *PTT
 var layer2Receiver *Layer2Receiver
 
 /*-------------------------------------------------------------------
@@ -494,9 +493,7 @@ x = Silence FX.25 information.`)
 	 * Push to Talk (PTT) control.
 	 */
 
-	var pttErr error
-
-	pttControl, pttErr = NewPTT(audio_config, d_o_opt)
+	var pttControl, pttErr = NewPTT(audio_config, d_o_opt)
 	td.add(pttControl.Term) // Which does nothing if there is no PTT.
 	stopIfCancelled(ctx, td)
 
