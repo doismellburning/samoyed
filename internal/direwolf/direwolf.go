@@ -785,7 +785,8 @@ x = Silence FX.25 information.`)
 	go recv_process(ctx, recHandler)
 
 	// Startup is done, so we sit here until we are asked to stop or an audio
-	// device input fails.  There is no point in going on without audio.
+	// device input fails or runs out.  There is no point in going on without
+	// audio.
 	select {
 	case <-ctx.Done():
 		cleanup(td)
@@ -793,6 +794,11 @@ x = Silence FX.25 information.`)
 		// Our own stop can look like a device failing, if it closes the
 		// device under a reader.
 		stopIfCancelled(ctx, td)
+
+		// Standard input running out is the end of the run, not a failure.
+		if audioDevices.inputEnded(a) {
+			td.exit(0)
+		}
 
 		logrus.WithField("adev", a).Error("Terminating after audio device input failure")
 

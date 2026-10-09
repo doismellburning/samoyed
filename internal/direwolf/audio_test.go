@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -515,4 +516,30 @@ func Test_adev_param_validate(t *testing.T) {
 	var adev = *good
 	adev.num_channels = 3
 	require.EqualError(t, adev.validate(), "number of audio channels (ACHANNELS) must be 1 or 2, not 3")
+}
+
+// Standard input running out is the end of the run rather than a failure,
+// but it is for DirewolfMain to end it, through the teardown: the device says
+// it has no more to give, and remembers that it ran out rather than failed.
+func TestStdinEndOfFileEndsInput(t *testing.T) {
+	var _, w = setStdin(t)
+
+	var d = openAudio(t, makeRadioConfig("-", "-"))
+
+	var _, err = w.Write([]byte{0x11})
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	assert.Equal(t, 0x11, d.GetByte(0))
+	assert.False(t, d.inputEnded(0), "there was a byte still to read")
+
+	var output = testutils.CaptureOutput(t, func() {
+		assert.Equal(t, -1, d.GetByte(0))
+		assert.True(t, d.inputEnded(0), "standard input ran out")
+
+		// The other channel of a stereo device asks too.
+		assert.Equal(t, -1, d.GetByte(0))
+	})
+
+	assert.Equal(t, 1, strings.Count(output, "End of file on stdin"), "said once: %s", output)
 }

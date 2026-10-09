@@ -31,6 +31,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -302,6 +303,7 @@ type adev_s struct {
 	inbuf             []byte
 	inbufLen          int
 	inbufNext         int
+	inputEnded        atomic.Bool // Standard input ran out, rather than failed.
 	outbufSizeInBytes int
 	outbuf            []byte
 	outbufLen         int
@@ -1208,6 +1210,13 @@ func AudioOpen(ctx context.Context, pa *RadioConfig) (*AudioDevices, error) {
 	return d, nil
 } /* end AudioOpen */
 
+// inputEnded says whether device a's input ran out - standard input reaching
+// its end - rather than failed, for DirewolfMain to tell the two apart when
+// the receive thread reports the device giving no more.
+func (d *AudioDevices) inputEnded(a int) bool {
+	return d.dev[a] != nil && d.dev[a].inputEnded.Load()
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        GetByte
@@ -1303,13 +1312,26 @@ func (d *AudioDevices) GetByte(a int) int {
 		 * stdin.
 		 */
 	case AUDIO_IN_TYPE_STDIN:
+		// Once it has run out there is no more to read, nor to say about it:
+		// the other channel of a stereo device asks too, before the receive
+		// thread stops.
+		if d.dev[a].inputEnded.Load() && d.dev[a].inbufNext >= d.dev[a].inbufLen {
+			return -1
+		}
+
 		for d.dev[a].inbufNext >= d.dev[a].inbufLen {
 			var n, err = os.Stdin.Read(d.dev[a].inbuf)
 			if err != nil {
 				if errors.Is(err, io.EOF) {
+					// The end of the run, which DirewolfMain makes, through
+					// the teardown, once the receive thread reports the
+					// device as giving no more.
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("\nEnd of file on stdin.  Exiting.\n")
-					os.Exit(0)
+
+					d.dev[a].inputEnded.Store(true)
+
+					return -1
 				}
 
 				text_color_set(DW_COLOR_ERROR)
