@@ -51,7 +51,6 @@ import (
 
 var aprsSymbolData *symbols.Data
 var agwServer *AGWServer
-var mheardDB *mheard.DB
 var pttControl *PTT
 var layer2Receiver *Layer2Receiver
 
@@ -646,7 +645,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the digipeater and IGate functions.
 	 */
-	mheardDB = mheard.New(d_m_opt)
+	var mheardDB = mheard.New(d_m_opt)
 	var packetFilter = NewPacketFilter(&igate_config, aprsDecoder, mheardDB, d_f_opt)
 	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter)
 	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, d_i_opt)
