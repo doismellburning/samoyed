@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -350,8 +351,6 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	audioConfig.achan[channel].mark_freq = 1200
 	audioConfig.achan[channel].space_freq = 2200
 	audioConfig.achan[channel].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_NONE
-
-	usePTT(t, audioConfig)
 
 	transmitQueue.Init(audioConfig)
 	dataLinkQueue.Init()
@@ -779,9 +778,16 @@ func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 }
 
 // A frame addressed to MORSE is keyed rather than modulated, for a repeater
-// identification or a beacon somebody might be listening to by ear.
+// identification or a beacon somebody might be listening to by ear.  The
+// transmitter is keyed for the length of it, and let go after.
 func TestXmitMorse(t *testing.T) {
 	var xs = setupXmitTransmission(t)
+
+	var keyed []string
+
+	xs.setOutput = func(ot int, channel int, state int) {
+		keyed = append(keyed, fmt.Sprintf("%s %d=%d", octypeName(ot), channel, state))
+	}
 
 	var pp = ax25.FromText("Q1TEST>MORSE:HI", true)
 	require.NotNil(t, pp)
@@ -789,6 +795,7 @@ func TestXmitMorse(t *testing.T) {
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_morse(0, pp, MORSE_DEFAULT_WPM) })
 
 	assert.Contains(t, output, `[0.morse] "HI"`)
+	assert.Equal(t, []string{"PTT 0=1", "PTT 0=0"}, keyed)
 }
 
 // A frame addressed to DTMF is sent as touch tones, which is how APRStt
