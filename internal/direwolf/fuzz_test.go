@@ -243,8 +243,8 @@ func setupIGateFromServer(t *testing.T) {
 	igateConfig.tx_limit_5 = IGATE_TX_LIMIT_5_DEFAULT
 	igateConfig.igmsp = 1
 
-	igate = NewIGate(audioConfig, igateConfig, new(digi_config_s), NewPacketFilter(igateConfig, nil, 0), 0)
 	mheardDB = mheard.New(0)
+	igate = NewIGate(audioConfig, igateConfig, new(digi_config_s), NewPacketFilter(igateConfig, nil, mheardDB, 0), 0)
 
 	transmitQueue.Init(audioConfig)
 	dataLinkQueue.Init()

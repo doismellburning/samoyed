@@ -144,9 +144,9 @@ func setupIGate(t *testing.T) net.Conn {
 
 	var digiConfig = new(digi_config_s)
 
-	igate = NewIGate(audioConfig, igateConfig, digiConfig, NewPacketFilter(igateConfig, nil, 0), 0)
-
 	mheardDB = mheard.New(0)
+
+	igate = NewIGate(audioConfig, igateConfig, digiConfig, NewPacketFilter(igateConfig, nil, mheardDB, 0), 0)
 
 	var server, client = connectedTCPPair(t)
 
