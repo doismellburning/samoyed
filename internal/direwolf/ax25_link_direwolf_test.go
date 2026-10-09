@@ -150,7 +150,7 @@ func setupTestEnv(t *testing.T) {
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 	miscConfig.maxv22 = 0 // Default: don't try v2.2 (for most tests)
 
-	ax25_link_init(miscConfig, nil, 1)
+	ax25_link_init(miscConfig, nil, nil, 1)
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil // Clear registered callsigns
@@ -172,7 +172,7 @@ func setupTestEnvV22(t *testing.T) {
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 	miscConfig.maxv22 = 3 // Enable v2.2
 
-	ax25_link_init(miscConfig, nil, 1)
+	ax25_link_init(miscConfig, nil, nil, 1)
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil // Clear registered callsigns

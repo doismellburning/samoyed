@@ -262,9 +262,9 @@ func setupIGateFromServer(t *testing.T) {
 }
 
 // fuzzAGWServer returns a server with a client attached as client 0, by way of
-// a pipe whose far end is read and thrown away, and makes it the one the
-// connected-mode link reports to.  Nothing a target does then blocks on a
-// reply that nobody collects.
+// a pipe whose far end is read and thrown away, for fuzzLinkReset to make the
+// one the connected-mode link reports to.  Nothing a target does then blocks
+// on a reply that nobody collects.
 func fuzzAGWServer(tb testing.TB) *AGWServer {
 	tb.Helper()
 
@@ -275,12 +275,7 @@ func fuzzAGWServer(tb testing.TB) *AGWServer {
 
 	go io.Copy(io.Discard, theirs) //nolint:errcheck // Ends when the pipe is closed, which is all it can report.
 
-	var saved = agwServer
-	agwServer = s
-
 	tb.Cleanup(func() {
-		agwServer = saved
-
 		ours.Close()
 		theirs.Close()
 	})
@@ -317,8 +312,9 @@ const linkFuzzPaclen = 64
 
 // fuzzLinkReset gives each run of a connected-mode target a link with no
 // state machines, nothing registered and nothing queued either way, so one
-// input cannot leave anything behind for the next.
-func fuzzLinkReset(cfg *RadioConfig, v22 bool) {
+// input cannot leave anything behind for the next, and which tells clients
+// what happens on it.
+func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
 	transmitQueue.Init(cfg)
 	dataLinkQueue.Init()
 
@@ -336,7 +332,7 @@ func fuzzLinkReset(cfg *RadioConfig, v22 bool) {
 	}
 
 	*ax25Link = *NewAX25Link()
-	ax25_link_init(miscConfig, nil, 0)
+	ax25_link_init(miscConfig, nil, clients, 0)
 }
 
 // fuzzLinkDrain does what recv_process does with everything on the data link
@@ -496,7 +492,8 @@ func linkFuzzAddrs(cr byte) []byte {
 func FuzzAX25Link(f *testing.F) {
 	fuzzQuietly(f)
 	fuzzLinkKeep(f)
-	fuzzAGWServer(f)
+
+	var agw = fuzzAGWServer(f)
 
 	var xid xid_param_s
 	xid.full_duplex = maybe.Just(false)
@@ -590,7 +587,7 @@ func FuzzAX25Link(f *testing.F) {
 			t.Skip()
 		}
 
-		fuzzLinkReset(cfg, v22)
+		fuzzLinkReset(cfg, v22, agw)
 		dataLinkQueue.RegisterCallsign("Q1TEST", 0, 0)
 		fuzzLinkDrain()
 
@@ -770,7 +767,7 @@ func FuzzAGWHandleClientCommand(f *testing.F) {
 			t.Skip()
 		}
 
-		fuzzLinkReset(cfg, true)
+		fuzzLinkReset(cfg, true, s)
 
 		// A newly connected client, which has not logged in.
 		var fresh agwClient

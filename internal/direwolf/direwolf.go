@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unicode"
@@ -50,7 +51,6 @@ import (
  *---------------------------------------------------------------*/
 
 var aprsSymbolData *symbols.Data
-var agwServer *AGWServer
 var layer2Receiver *Layer2Receiver
 
 /*-------------------------------------------------------------------
@@ -517,16 +517,23 @@ x = Silence FX.25 information.`)
 
 	var webHub = webui_init(ctx, audio_config, misc_config)
 
-	var publishTransmitted func(channel int, pp *ax25.Packet) // Nobody to tell, without a web interface.
-	if webHub != nil {
-		publishTransmitted = func(channel int, pp *ax25.Packet) { webPublishTransmitted(webHub, channel, pp) }
+	// Each frame sent is shown on the web interface, if there is one, and to
+	// the AGW clients monitoring.  The AGW server is made further down, once
+	// the transmit queue its clients feed has been set up here, and the
+	// transmit goroutines started here may be sending by then, so it is
+	// handed over through monitorAGW rather than an unguarded variable.
+	var monitorAGW atomic.Pointer[AGWServer]
+
+	var onTransmit = func(channel int, pp *ax25.Packet) {
+		webPublishTransmitted(webHub, channel, pp)
+		monitorAGW.Load().SendMonitored(channel, pp, 1) // Nil, so nobody, until it is made.
 	}
 
 	/*
 	 * Initialize the transmit queue.
 	 */
 
-	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, publishTransmitted, d_p_opt, d_x_opt, d_2_opt)
+	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, onTransmit, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx, td)
 
 	/*
@@ -658,12 +665,16 @@ x = Silence FX.25 information.`)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)
 	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
-	ax25_link_init(misc_config, pttControl.Set, d_c_opt)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
+	var agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
+	monitorAGW.Store(agwServer)
+
+	// The connected-mode link layer, after the AGW server whose clients it
+	// tells about the links they asked for.
+	ax25_link_init(misc_config, pttControl.Set, agwServer, d_c_opt)
 	metrics_init(ctx, audio_config, misc_config)
 	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
 

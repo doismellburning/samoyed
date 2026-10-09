@@ -1045,10 +1045,6 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 		xs.onTransmit(c, pp)
 	}
 
-	// Optionally send confirmation to AGW client app if monitoring enabled.
-
-	agwServer.SendMonitored(c, pp, 1)
-
 	return nb
 } /* end send_one_frame */
 

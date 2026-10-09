@@ -87,13 +87,11 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	t.Helper()
 
 	var (
-		origAGW    = agwServer
 		origIGate  = igate
 		origLogOut = logrus.StandardLogger().Out
 	)
 
 	t.Cleanup(func() {
-		agwServer = origAGW
 		igate = origIGate
 		logrus.SetOutput(origLogOut)
 	})
@@ -119,8 +117,6 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	require.NoError(t, wsErr)
 
 	t.Cleanup(ws.Close)
-
-	agwServer = nil
 
 	var igateConfig = new(igate_config_s)
 	var digiConfig = new(digi_config_s)
