@@ -145,6 +145,11 @@ type IGate struct {
 	digiConfig  *digi_config_s
 	filter      *PacketFilter
 
+	// heard records who has been heard from APRS-IS, and how many of a
+	// message sender's positions are still to be passed along to RF.  Nil
+	// records nothing, and owes nobody a position.
+	heard igateHeard
+
 	/*
 	 * debugLevel	- 0  print packets FROM APRS-IS,
 	 *		     establishing connection with server, and
@@ -223,16 +228,25 @@ type igateStats struct {
 // it is inert - no configuration, no connection - so that the packet paths
 // which reach for it before, or without, an IGate being set up find something
 // harmless rather than nil.
-var igate = NewIGate(nil, nil, nil, nil, 0)
+var igate = NewIGate(nil, nil, nil, nil, nil, 0)
+
+// igateHeard is what the IGate keeps about the stations it hears from APRS-IS
+// and the courtesy positions it owes message senders.  *mheard.DB is one.
+type igateHeard interface {
+	SaveIS(ptext string)
+	GetMSP(callsign string) int
+	SetMSP(callsign string, num int)
+}
 
 // NewIGate returns an IGate that knows what it is meant to do but is not yet
 // doing it.  start connects to the server and sets the goroutines going.
-func NewIGate(audioConfig *RadioConfig, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *PacketFilter, debugLevel int) *IGate {
+func NewIGate(audioConfig *RadioConfig, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *PacketFilter, heard igateHeard, debugLevel int) *IGate {
 	var ig = &IGate{ //nolint:exhaustruct_v5
 		audioConfig:   audioConfig,
 		config:        igateConfig,
 		digiConfig:    digiConfig,
 		filter:        filter,
+		heard:         heard,
 		debugLevel:    debugLevel,
 		retryInterval: IGATE_RETRY_INTERVAL,
 	}
@@ -1178,7 +1192,9 @@ func (ig *IGate) processServerLine(message []byte) {
 		/*
 		 * Record that we heard from the source address.
 		 */
-		mheardDB.SaveIS(string(message))
+		if ig.heard != nil {
+			ig.heard.SaveIS(string(message))
+		}
 
 		ig.updateStats(func(s *igateStats) { s.downlinkPackets++ })
 		metrics.RecordDownlink()
@@ -1537,8 +1553,8 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 
 	var msp_special_case = false
 
-	if len(pinfo) >= 1 && bytes.ContainsAny(pinfo[0:1], "!=/@'`") {
-		var n = mheardDB.GetMSP(string(src))
+	if len(pinfo) >= 1 && bytes.ContainsAny(pinfo[0:1], "!=/@'`") && ig.heard != nil {
+		var n = ig.heard.GetMSP(string(src))
 
 		if n > 0 {
 			msp_special_case = true
@@ -1548,7 +1564,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 				dw_printf("Special case, allow position from message sender %s, %d remaining.\n", src, n-1)
 			}
 
-			mheardDB.SetMSP(string(src), n-1)
+			ig.heard.SetMSP(string(src), n-1)
 		}
 	}
 
@@ -1652,11 +1668,11 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 			})
 			metrics.RecordRFTransmitted()
 
-			if isMessage {
+			if isMessage && ig.heard != nil {
 				// We transmitted a "message."  Telemetry metadata is excluded.
 				// Remember to pass along address of the sender later.
 
-				mheardDB.SetMSP(string(src), ig.config.igmsp)
+				ig.heard.SetMSP(string(src), ig.config.igmsp)
 			}
 
 			ig.igToTxRemember(pp3, ig.config.tx_chan, 0) // correct. version before encapsulating it.
