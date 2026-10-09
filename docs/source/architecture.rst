@@ -20,3 +20,12 @@ so it always matches the code it was built from.
 
 .. graphviz:: _generated/deps.dot
    :alt: Samoyed's internal package dependency graph
+
+Data flow
+---------
+
+.. toctree::
+   :maxdepth: 1
+   :glob:
+
+   architecture/*
