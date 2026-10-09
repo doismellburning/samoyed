@@ -296,6 +296,32 @@ func TestDTMFButtonMakesChannelBusy(t *testing.T) {
 	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
 }
 
+// The receive threads change a channel's DCD while the transmit side asks
+// whether it is busy.  Under the race detector, this fails if the two are
+// not synchronised.
+func TestDCDChangeWhileTransmitterAsks(t *testing.T) {
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
+	r.numSubchannel[0] = 1
+
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for i := range 1000 {
+			r.DCDChange(0, 0, 0, i&1)
+		}
+	}()
+
+	for range 1000 {
+		r.DataDetectAny(0)
+	}
+
+	<-done
+
+	assert.Equal(t, 1, r.DataDetectAny(0), "the last change set DCD")
+}
+
 // countingBitReceiver counts the bits handed to it, and ignores the rest.
 type countingBitReceiver struct {
 	bits int
