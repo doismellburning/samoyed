@@ -52,14 +52,6 @@ func (s *multiModemImplSink) DCDChange(int, int) {}
 func newMultiModemImplTest(t *testing.T, numSubchan int, numSlicers int) (*MultiModem, *multiModemImplSink) {
 	t.Helper()
 
-	var origLayer2Receiver = layer2Receiver
-
-	t.Cleanup(func() {
-		layer2Receiver = origLayer2Receiver
-	})
-
-	layer2Receiver = nil
-
 	var d = new(Demodulator)
 	d.numSubchan = numSubchan
 	d.numSlicers = numSlicers

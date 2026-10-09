@@ -114,8 +114,9 @@ const PROCESS_AFTER_BITS = 3
 type MultiModem struct {
 	channel     int
 	audioConfig *RadioConfig
-	demodulator *Demodulator // nil for a channel that is not a radio.
-	sink        ReceiveSink  // Where the frames it picks go.
+	demodulator *Demodulator    // nil for a channel that is not a radio.
+	receiver    *Layer2Receiver // Asked whether FX.25 is mid-block; nil for never.
+	sink        ReceiveSink     // Where the frames it picks go.
 
 	candidates [MAX_SUBCHANS][MAX_SLICERS]candidate_t
 
@@ -208,6 +209,7 @@ func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink Receiv
 	for channel, m := range multiModems {
 		m.audioConfig = pa
 		m.demodulator = demodulators[channel]
+		m.receiver = layer2Receiver
 		m.sink = sink
 
 		// Anything still waiting to be picked came from before, e.g. the
@@ -316,7 +318,7 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
 			if c.packet_p != nil {
 				c.age++
 				if c.age > m.processAge {
-					if layer2Receiver.fx25Busy(channel) {
+					if m.receiver.fx25Busy(channel) {
 						c.age = 0
 					} else {
 						m.pickBestCandidate()
@@ -422,7 +424,7 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, a
 
 	if numSubchan == 1 &&
 		numSlicers == 1 &&
-		!layer2Receiver.fx25Busy(channel) {
+		!m.receiver.fx25Busy(channel) {
 		var drop_it = false
 
 		if pa.recv_error_rate != 0 {
