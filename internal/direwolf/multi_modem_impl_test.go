@@ -251,32 +251,28 @@ func TestMultiModemImplPickBestCandidateTrace(t *testing.T) {
 
 // A frame waits processAge samples for others to turn up, then goes on.
 func TestMultiModemImplProcessSamplePicksAfterAge(t *testing.T) {
-	t.Cleanup(func() {
-		multiModems = newMultiModems()
-	})
-
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "AB"
 	audioConfig.achan[0].num_freq = 1
 
 	var sink = new(multiModemImplSink)
-	multi_modem_init(audioConfig, 0, 0, sink)
+	var receiver = multi_modem_init(audioConfig, 0, 0, sink)
 
-	var m = multiModems[0]
+	var m = receiver.modems[0]
 	require.Equal(t, 3*44100/1200, m.processAge)
 
 	var pp = multiModemImplPacket(t, "waiting")
 	var alevel ax25.ALevel
-	multi_modem_process_rec_packet_real(0, 1, 0, pp, alevel, RETRY_NONE, fec_type_none)
+	receiver.recPacket(0, 1, 0, pp, alevel, RETRY_NONE, fec_type_none)
 
 	for range m.processAge {
-		multi_modem_process_sample(0, 0)
+		receiver.ProcessSample(0, 0)
 	}
 
 	assert.Empty(t, sink.frames, "still waiting for others")
 	assert.Equal(t, m.processAge, m.candidates[1][0].age)
 
-	multi_modem_process_sample(0, 0)
+	receiver.ProcessSample(0, 0)
 
 	require.Len(t, sink.frames, 1)
 	assert.Same(t, pp, sink.frames[0].pp)
@@ -286,10 +282,6 @@ func TestMultiModemImplProcessSamplePicksAfterAge(t *testing.T) {
 
 // Baud rates for QPSK and 8PSK are in bits, but the wait is in symbols.
 func TestMultiModemImplInitProcessAgeInSymbols(t *testing.T) {
-	t.Cleanup(func() {
-		multiModems = newMultiModems()
-	})
-
 	var tests = []struct {
 		name      string
 		modemType modem_t
@@ -308,28 +300,26 @@ func TestMultiModemImplInitProcessAgeInSymbols(t *testing.T) {
 			audioConfig.achan[0].mark_freq = 1800
 			audioConfig.achan[0].space_freq = 0
 
-			multi_modem_init(audioConfig, 0, 0, new(multiModemImplSink))
+			var receiver = multi_modem_init(audioConfig, 0, 0, new(multiModemImplSink))
 
-			assert.Equal(t, PROCESS_AFTER_BITS*44100/tc.symbols, multiModems[0].processAge)
+			assert.Equal(t, PROCESS_AFTER_BITS*44100/tc.symbols, receiver.modems[0].processAge)
 		})
 	}
 }
 
-// multiModemImplRecFrame hands fbuf to multi_modem_process_rec_frame on a
+// multiModemImplRecFrame hands fbuf to Layer2Receiver.recFrame on a
 // channel of the given modem type, and returns the packet made from it.
 func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.Packet {
 	t.Helper()
 
 	var origCapture = multiModemRecCapture
 
-	t.Cleanup(func() {
-		multiModemRecCapture = origCapture
-		multiModems = newMultiModems()
-	})
+	t.Cleanup(func() { multiModemRecCapture = origCapture })
 
 	var audioConfig = new(RadioConfig)
 	audioConfig.achan[0].modem_type = modemType
-	multiModems[0].audioConfig = audioConfig
+
+	var receiver = NewLayer2Receiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(multiModemImplSink))
 
 	var got *ax25.Packet
 
@@ -344,7 +334,7 @@ func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.
 	}
 
 	var alevel ax25.ALevel
-	multi_modem_process_rec_frame(0, 1, 2, fbuf, alevel, RETRY_INVERT_SINGLE, fec_type_none)
+	receiver.recFrame(0, 1, 2, fbuf, alevel, RETRY_INVERT_SINGLE, fec_type_none)
 
 	require.NotNil(t, got)
 

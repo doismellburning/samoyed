@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -115,7 +114,7 @@ type MultiModem struct {
 	channel     int
 	audioConfig *RadioConfig
 	demodulator *Demodulator    // nil for a channel that is not a radio.
-	receiver    *Layer2Receiver // Asked whether FX.25 is mid-block; nil for never.
+	receiver    *Layer2Receiver // Asked whether FX.25 is mid-block.
 	sink        ReceiveSink     // Where the frames it picks go.
 
 	candidates [MAX_SUBCHANS][MAX_SLICERS]candidate_t
@@ -126,16 +125,33 @@ type MultiModem struct {
 	dcAverage float64
 }
 
-// multiModems holds every channel's MultiModem, built at package
-// initialisation so the decoders that hand frames on never find one nil.
-var multiModems = newMultiModems()
+// newMultiModem builds the MultiModem for a channel, which hands what it
+// picks to sink.  demodulator is nil for a channel that is not a radio.
+func newMultiModem(channel int, pa *RadioConfig, demodulator *Demodulator, receiver *Layer2Receiver, sink ReceiveSink) *MultiModem {
+	var m = new(MultiModem)
+	m.channel = channel
+	m.audioConfig = pa
+	m.demodulator = demodulator
+	m.receiver = receiver
+	m.sink = sink
 
-func newMultiModems() [MAX_RADIO_CHANS]*MultiModem {
-	var m [MAX_RADIO_CHANS]*MultiModem
+	if pa.chan_medium[channel] == MEDIUM_RADIO {
+		if pa.achan[channel].baud <= 0 {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Internal multi_modem_init error, channel=%d\n", channel)
+			pa.achan[channel].baud = DEFAULT_BAUD
+		}
 
-	for channel := range m {
-		m[channel] = new(MultiModem)
-		m[channel].channel = channel
+		var real_baud = pa.achan[channel].baud
+		if pa.achan[channel].modem_type == MODEM_QPSK {
+			real_baud = pa.achan[channel].baud / 2
+		}
+
+		if pa.achan[channel].modem_type == MODEM_8PSK {
+			real_baud = pa.achan[channel].baud / 3
+		}
+
+		m.processAge = PROCESS_AFTER_BITS * pa.adev[ACHAN2ADEV(channel)].samples_per_sec / real_baud
 	}
 
 	return m
@@ -208,44 +224,12 @@ func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink Receiv
 		}
 	}
 
-	for channel, m := range multiModems {
-		m.audioConfig = pa
-		m.demodulator = demodulators[channel]
-		m.receiver = receiver
-		m.sink = sink
-
-		// Anything still waiting to be picked came from before, e.g. the
-		// previous file atest decoded, and would otherwise be handed on as
-		// part of what comes next.
-		m.candidates = [MAX_SUBCHANS][MAX_SLICERS]candidate_t{}
-
-		if pa.chan_medium[channel] == MEDIUM_RADIO {
-			if pa.achan[channel].baud <= 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Internal multi_modem_init error, channel=%d\n", channel)
-				pa.achan[channel].baud = DEFAULT_BAUD
-			}
-
-			var real_baud = pa.achan[channel].baud
-			if pa.achan[channel].modem_type == MODEM_QPSK {
-				real_baud = pa.achan[channel].baud / 2
-			}
-
-			if pa.achan[channel].modem_type == MODEM_8PSK {
-				real_baud = pa.achan[channel].baud / 3
-			}
-
-			m.processAge = PROCESS_AFTER_BITS * pa.adev[ACHAN2ADEV(channel)].samples_per_sec / real_baud
-			//crc_queue_of_last_to_app[channel] = nil;
-		}
-	}
-
 	return receiver
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	multi_modem_process_sample
+ * Name:	MultiModem.ProcessSample
  *
  * Purpose:	Feed the sample into the proper modem(s) for the channel.
  *
@@ -274,16 +258,6 @@ func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink Receiv
  *
  *------------------------------------------------------------------------------*/
 
-func multi_modem_get_dc_average(channel int) int { //nolint:unused
-	// Scale to +- 200 so it will like the deviation measurement.
-	return int(multiModems[channel].dcAverage * (200.0 / 32767.0))
-}
-
-// multi_modem_process_sample is MultiModem.ProcessSample for a channel.
-func multi_modem_process_sample(channel int, audio_sample int) bool {
-	return multiModems[channel].ProcessSample(audio_sample)
-}
-
 // ProcessSample feeds one audio sample to each of the channel's demodulators,
 // and sends on the best of the frames decoded once they have waited long
 // enough for the others to catch up.  It returns false, having said why, if
@@ -303,7 +277,7 @@ func (m *MultiModem) ProcessSample(audio_sample int) bool {
 	if numSubchan <= 0 || numSubchan > MAX_SUBCHANS ||
 		numSlicers <= 0 || numSlicers > MAX_SLICERS {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR!  Something is seriously wrong in multi_modem_process_sample\n")
+		dw_printf("ERROR!  Something is seriously wrong in MultiModem.ProcessSample\n")
 		dw_printf("channel = %d, num_subchan = %d [max %d], num_slicers = %d [max %d]\n", channel,
 			numSubchan, MAX_SUBCHANS,
 			numSlicers, MAX_SLICERS)
@@ -339,79 +313,6 @@ func (m *MultiModem) ProcessSample(audio_sample int) bool {
 	return true
 }
 
-/*-------------------------------------------------------------------
- *
- * Name:        multi_modem_process_rec_frame
- *
- * Purpose:     This is called when we receive a frame with a valid
- *		FCS and acceptable size.
- *
- * Inputs:	channel	- Audio channel number, 0 or 1.
- *		subchan	- Which modem found it.
- *		slice	- Which slice found it.
- *		fbuf	- Pointer to first byte in HDLC frame.
- *		flen	- Number of bytes excluding the FCS.
- *		alevel	- Audio level, range of 0 - 100.
- *				(Special case, use negative to skip
- *				 display of audio level line.
- *				 Use -2 to indicate DTMF message.)
- *		retries	- Level of correction used.
- *		fec_type	- none(0), fx25, il2p
- *
- * Description:	Add to list of candidates.  Best one will be picked later.
- *
- *--------------------------------------------------------------------*/
-
-func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
-	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
-
-	var pa = multiModems[channel].audioConfig
-
-	// Special encapsulation for AIS & EAS so they can be treated normally pretty much everywhere else.
-
-	var pp *ax25.Packet
-
-	switch pa.achan[channel].modem_type {
-	case MODEM_AIS:
-		var nmea, err = ais.ToNMEA(fbuf)
-		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%v\n", err)
-
-			return
-		}
-
-		// The intention is for the AIS sentences to go only to attached applications.
-		// e.g. SARTrack knows how to parse the AIS sentences.
-
-		// Put NOGATE in path so RF>IS IGates will block this.
-		// TODO: Use station callsign, rather than "AIS," so we know where it is coming from,
-		// if it happens to get onto RF somehow.
-
-		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, aprs.UserDefUserID, aprs.UserDefTypeAIS, string(nmea))
-		pp = ax25.FromText(monfmt, true)
-
-		// alevel gets in there somehow making me question why it is passed thru here.
-	case MODEM_EAS:
-		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, aprs.UserDefUserID, aprs.UserDefTypeEAS, string(fbuf))
-		pp = ax25.FromText(monfmt, true)
-
-		// alevel gets in there somehow making me question why it is passed thru here.
-	default:
-		pp = ax25.FromFrame(fbuf, alevel)
-	}
-
-	multi_modem_process_rec_packet(channel, subchan, slice, pp, alevel, retries, fec_type)
-}
-
-// TODO: Eliminate function above and move code elsewhere?
-
-func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
-	multiModems[channel].processRecPacket(subchan, slice, pp, alevel, retries, fec_type)
-}
-
 // processRecPacket takes a frame one of the channel's decoders found: straight
 // on if there is only the one decoder, otherwise as a candidate for
 // pickBestCandidate.
@@ -421,7 +322,7 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, a
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unexpected internal problem in multi_modem_process_rec_packet_real\n")
+		dw_printf("Unexpected internal problem in MultiModem.processRecPacket\n")
 
 		return /* oops!  why would it fail? */
 	}
@@ -709,12 +610,12 @@ func newHDLCConfig(achan *achan_param_s) hdlc.Config {
 
 func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *slicerReceivers {
 	var s = new(slicerReceivers)
-	s.hdlc = hdlc.NewReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, demod_get_audio_level, multi_modem_process_rec_frame)
-	s.fx25 = fx25.NewReceiver(channel, subchannel, slice, r.fx25Debug, demod_get_audio_level, multi_modem_process_rec_frame)
-	s.il2p = il2p.NewReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, r.il2pDebug, demod_get_audio_level, multi_modem_process_rec_packet)
+	s.hdlc = hdlc.NewReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, demod_get_audio_level, r.recFrame)
+	s.fx25 = fx25.NewReceiver(channel, subchannel, slice, r.fx25Debug, demod_get_audio_level, r.recFrame)
+	s.il2p = il2p.NewReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, r.il2pDebug, demod_get_audio_level, r.recPacket)
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.eas = eas.NewReceiver(channel, subchannel, slice, demod_get_audio_level, multi_modem_process_rec_frame)
+		s.eas = eas.NewReceiver(channel, subchannel, slice, demod_get_audio_level, r.recFrame)
 	}
 
 	return s
@@ -727,6 +628,10 @@ func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice in
 type Layer2Receiver struct {
 	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*slicerReceivers
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
+
+	// modems are each channel's MultiModem, which pick the best of what the
+	// channel's slicers decode.  None is nil.
+	modems [MAX_RADIO_CHANS]*MultiModem
 
 	// dcdMu guards compositeDCD, which the receive threads set while the
 	// transmit side reads it to see whether a channel is busy.
@@ -795,7 +700,97 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 		}
 	}
 
+	for ch, d := range demods {
+		r.modems[ch] = newMultiModem(ch, pa, d, r, sink)
+	}
+
 	return r
+}
+
+// ProcessSample is MultiModem.ProcessSample for a channel.
+func (r *Layer2Receiver) ProcessSample(channel int, sample int) bool {
+	return r.modems[channel].ProcessSample(sample)
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        Layer2Receiver.recFrame
+ *
+ * Purpose:     This is called when we receive a frame with a valid
+ *		FCS and acceptable size.
+ *
+ * Inputs:	channel	- Audio channel number, 0 or 1.
+ *		subchan	- Which modem found it.
+ *		slice	- Which slice found it.
+ *		fbuf	- Pointer to first byte in HDLC frame.
+ *		flen	- Number of bytes excluding the FCS.
+ *		alevel	- Audio level, range of 0 - 100.
+ *				(Special case, use negative to skip
+ *				 display of audio level line.
+ *				 Use -2 to indicate DTMF message.)
+ *		retries	- Level of correction used.
+ *		fec_type	- none(0), fx25, il2p
+ *
+ * Description:	Add to list of candidates.  Best one will be picked later.
+ *
+ *--------------------------------------------------------------------*/
+
+func (r *Layer2Receiver) recFrame(channel int, subchan int, slice int, fbuf []byte, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
+	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
+
+	var pa = r.audio
+
+	// Special encapsulation for AIS & EAS so they can be treated normally pretty much everywhere else.
+
+	var pp *ax25.Packet
+
+	switch pa.achan[channel].modem_type {
+	case MODEM_AIS:
+		var nmea, err = ais.ToNMEA(fbuf)
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("%v\n", err)
+
+			return
+		}
+
+		// The intention is for the AIS sentences to go only to attached applications.
+		// e.g. SARTrack knows how to parse the AIS sentences.
+
+		// Put NOGATE in path so RF>IS IGates will block this.
+		// TODO: Use station callsign, rather than "AIS," so we know where it is coming from,
+		// if it happens to get onto RF somehow.
+
+		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, aprs.UserDefUserID, aprs.UserDefTypeAIS, string(nmea))
+		pp = ax25.FromText(monfmt, true)
+
+		// alevel gets in there somehow making me question why it is passed thru here.
+	case MODEM_EAS:
+		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, aprs.UserDefUserID, aprs.UserDefTypeEAS, string(fbuf))
+		pp = ax25.FromText(monfmt, true)
+
+		// alevel gets in there somehow making me question why it is passed thru here.
+	default:
+		pp = ax25.FromFrame(fbuf, alevel)
+	}
+
+	r.recPacket(channel, subchan, slice, pp, alevel, retries, fec_type)
+}
+
+// TODO: Eliminate function above and move code elsewhere?
+
+// recPacket hands one received frame to its channel's MultiModem, or to
+// whatever is standing in for the rest of the receive path.
+func (r *Layer2Receiver) recPacket(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
+	if multiModemRecCapture != nil {
+		multiModemRecCapture(channel, subchannel, slice, pp, alevel, retries, fec_type)
+
+		return
+	}
+
+	r.modems[channel].processRecPacket(subchannel, slice, pp, alevel, retries, fec_type)
 }
 
 /***********************************************************************************

@@ -757,7 +757,7 @@ x = Silence FX.25 information.`)
 	 * Use hot attribute for all functions called for every audio sample.
 	 */
 
-	var adev_failed = recv_init(ctx, audio_config, audioDevices, ttGateway.Button, layer2Receiver.DCDChange)
+	var adev_failed = recv_init(ctx, audio_config, audioDevices, layer2Receiver, ttGateway.Button)
 
 	var recHandler = new(recPacketHandler)
 	recHandler.audioConfig = audio_config

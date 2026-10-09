@@ -111,23 +111,20 @@ func demodulate9600(t *testing.T, audioConfig *RadioConfig, channel int, samples
 
 	var origDemodulators = demodulators
 
-	t.Cleanup(func() {
-		demodulators = origDemodulators
-		multiModems = newMultiModems()
-	})
+	t.Cleanup(func() { demodulators = origDemodulators })
 
 	var sink = new(recordingReceiveSink)
 
-	multi_modem_init(audioConfig, 0, 0, sink)
+	var receiver = multi_modem_init(audioConfig, 0, 0, sink)
 
 	for _, sam := range samples {
-		multi_modem_process_sample(channel, sam)
+		receiver.ProcessSample(channel, sam)
 	}
 
 	// Enough silence afterwards for the last frame to be picked from the
 	// candidates, however many slicers heard it.
-	for range 2 * multiModems[channel].processAge {
-		multi_modem_process_sample(channel, 0)
+	for range 2 * receiver.modems[channel].processAge {
+		receiver.ProcessSample(channel, 0)
 	}
 
 	return sink.frames

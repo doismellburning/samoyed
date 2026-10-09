@@ -42,7 +42,7 @@ func isRadioChannel(audio *RadioConfig, channel int) bool {
 }
 
 // recordRadioFrame accounts for a frame the demodulator accepted.  It is called
-// from multi_modem's two hand-off points rather than from
+// from the multi-modem's two hand-off points rather than from
 // app_process_rec_packet, which is also reached by APRS-IS packets injected on
 // ICHANNEL, network-TNC frames, APRStt, and locally generated SENDTO_RECV
 // beacons - none of which came off the air, and counting those would leave

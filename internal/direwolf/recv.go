@@ -66,7 +66,7 @@ package direwolf
  *		recv_init()		This starts up a separate thread
  *					for each audio device.
  *					Each thread reads audio samples and
- *					passes them to multi_modem_process_sample.
+ *					passes them to the layer 2 receiver.
  *
  *					The difference is that app_process_rec_frame
  *					is no longer called directly.  Instead
@@ -101,13 +101,14 @@ import (
  *
  *		src		- Where the audio samples come from.
  *
+ *		receiver	- Where each channel's samples go, and what
+ *				  is told when its DTMF decoder starts or
+ *				  stops hearing a button, for the DCD
+ *				  indicator.
+ *
  *		onButton	- Called with each touch tone button the DTMF
  *				  decoders hear, and its channel; nil for
  *				  nobody to tell.
- *
- *		onDCD		- Told when the DTMF decoders start or stop
- *				  hearing a button, for the DCD indicator; nil
- *				  for nobody to tell.
  *
  * Returns:     A channel reporting the number of any audio device whose
  *		input failed.  There is no point in going on without audio,
@@ -115,14 +116,24 @@ import (
  *
  *----------------------------------------------------------------*/
 
-func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource, onButton func(channel int, button rune), onDCD func(channel int, subchannel int, slice int, state int)) <-chan int {
+// sampleReceiver is where an audio device's samples go: each channel's
+// demodulators, and the DCD its touch tone decoder raises for a button.
+type sampleReceiver interface {
+	// ProcessSample hands a channel one sample, and returns false if the
+	// channel can't be fed at all.
+	ProcessSample(channel int, sample int) bool
+
+	DCDChange(channel int, subchannel int, slice int, state int)
+}
+
+func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource, receiver sampleReceiver, onButton func(channel int, button rune)) <-chan int {
 	// Buffered so that a failing device thread can report and finish even
 	// though nobody is listening any more.
 	var failed = make(chan int, MAX_ADEVS)
 
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined > 0 {
-			go recv_adev_thread(ctx, pa, a, failed, src, onButton, onDCD)
+			go recv_adev_thread(ctx, pa, a, failed, src, receiver, onButton)
 		}
 	}
 
@@ -143,8 +154,8 @@ func recv_adev_thread(
 	a int,
 	failed chan<- int,
 	src SampleSource,
+	receiver sampleReceiver,
 	onButton func(channel int, button rune),
-	onDCD func(channel int, subchannel int, slice int, state int),
 ) {
 	/* This audio device can have one (mono) or two (stereo) channels. */
 	/* Find number of the first channel and number of channels. */
@@ -156,7 +167,7 @@ func recv_adev_thread(
 
 	for c := range num_chan {
 		if pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
-			dtmfDecoders[c] = NewDTMFDecoder(first_chan+c, pa.adev[a].samples_per_sec, onDCD)
+			dtmfDecoders[c] = NewDTMFDecoder(first_chan+c, pa.adev[a].samples_per_sec, receiver.DCDChange)
 		}
 	}
 
@@ -174,7 +185,7 @@ func recv_adev_thread(
 
 			// Future?  provide more flexible mapping.
 			// i.e. for each valid channel where audio_source[] is first_chan+c.
-			if !multi_modem_process_sample(first_chan+c, audio_sample) {
+			if !receiver.ProcessSample(first_chan+c, audio_sample) {
 				// Nothing on this device can be decoded, so give up on it
 				// as though it had failed.
 				eof = true

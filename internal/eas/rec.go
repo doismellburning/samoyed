@@ -87,7 +87,7 @@ func NewReceiver(channel int, subchannel int, slice int, audioLevel AudioLevelFu
  *
  * Description:	This is called once for each received bit.
  *		Each valid transmission is handed to the receiver's sink,
- *		which in normal operation is multi_modem_process_rec_frame.
+ *		which in normal operation is the layer 2 receiver's recFrame.
  *
  ***********************************************************************************/
 

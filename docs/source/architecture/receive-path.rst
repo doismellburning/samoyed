@@ -28,7 +28,7 @@ to the application layer and the AX.25 data link state machine.
            src [label="AudioDevices\nsound card (PortAudio), SDR over UDP, stdin"];
            get [label="demod_get_sample"];
            dtmf [label="DTMFDecoder.Sample\n-> onButton (ttGateway.Button)"];
-           mm [label="MultiModem.ProcessSample\nDC average, fan out to subchannels"];
+           mm [label="Layer2Receiver.ProcessSample\n-> MultiModem.ProcessSample\nDC average, fan out to subchannels"];
            demod [label="Demodulator.ProcessSample\naudio level, decimation, pick modem"];
            afsk [label="demod_afsk_process_sample"];
            psk [label="demod_psk_process_sample"];
@@ -42,7 +42,7 @@ to the application layer and the AX.25 data link state machine.
            fx25 [label="fx25.Receiver.RecBit\nReed-Solomon"];
            hdlc [label="hdlc.Receiver.RecBit\nflag detection, collect raw bits"];
            rec2 [label="hdlc_rec2_block / try_decode\nbit unstuffing, FCS check,\nbit-fixing retries"];
-           prf [label="multi_modem_process_rec_frame\nbytes -> ax25.Packet\n(AIS, EAS wrapped as UI frames)"];
+           prf [label="Layer2Receiver.recFrame\nbytes -> ax25.Packet\n(AIS, EAS wrapped as UI frames)"];
            prp [label="MultiModem.processRecPacket"];
            cand [label="candidates[subchan][slice]\naged per sample"];
            pick [label="pickBestCandidate\nprefer FEC, fewest bits fixed,\nagreement between decoders;\ndrop the rest"];

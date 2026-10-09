@@ -28,14 +28,10 @@ func (s *recordingReceiveSink) RecFrame(_ int, _ int, _ int, pp *ax25.Packet, _ 
 
 func (s *recordingReceiveSink) DCDChange(int, int) {}
 
-// A frame still waiting to be picked when multi_modem_init runs again - atest
-// decoding its next file - belongs to what came before, and must not turn up
-// in what comes after.
-func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
-	t.Cleanup(func() {
-		multiModems = newMultiModems()
-	})
-
+// What multi_modem_init set up before - for atest, the file it decoded last -
+// is left behind when it runs again: neither a frame still waiting to be
+// picked nor the DC bias of the old audio turns up in what comes after.
+func TestMultiModemInitStartsAfresh(t *testing.T) {
 	// Two demodulators, so a frame waits to be compared rather than going
 	// straight through.
 	var audioConfig = newRecvTestRadioConfig(1)
@@ -43,21 +39,26 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 	audioConfig.achan[0].num_freq = 1
 
 	var first = new(recordingReceiveSink)
-	multi_modem_init(audioConfig, 0, 0, first)
+	var firstReceiver = multi_modem_init(audioConfig, 0, 0, first)
 	require.Equal(t, 2, demodulators[0].NumSubchan())
+
+	firstReceiver.ProcessSample(0, 10000)
+	require.NotZero(t, firstReceiver.modems[0].dcAverage)
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:left over", true)
 	require.NotNil(t, pp)
 	var alevel ax25.ALevel
-	multi_modem_process_rec_packet_real(0, 0, 0, pp, alevel, RETRY_NONE, fec_type_none)
+	firstReceiver.recPacket(0, 0, 0, pp, alevel, RETRY_NONE, fec_type_none)
 
 	var second = new(recordingReceiveSink)
-	multi_modem_init(audioConfig, 0, 0, second)
+	var secondReceiver = multi_modem_init(audioConfig, 0, 0, second)
+
+	assert.Zero(t, secondReceiver.modems[0].dcAverage, "the old audio's DC bias")
 
 	// Silence decodes to nothing, so long enough for any waiting frame to be
 	// picked should hand on nothing at all.
-	for range 2 * multiModems[0].processAge {
-		multi_modem_process_sample(0, 0)
+	for range 2 * secondReceiver.modems[0].processAge {
+		secondReceiver.ProcessSample(0, 0)
 	}
 
 	assert.Empty(t, first.frames)
@@ -70,10 +71,6 @@ func TestMultiModemInitDropsWaitingCandidates(t *testing.T) {
 // the demodulators ran three, which fails silently, and only on a
 // multi-decoder configuration.
 func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
-	t.Cleanup(func() {
-		multiModems = newMultiModems()
-	})
-
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "ABA"
 	audioConfig.achan[0].num_freq = 1
@@ -82,7 +79,7 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 
 	require.NotNil(t, demodulators[0])
 	assert.Equal(t, 3, demodulators[0].NumSubchan())
-	assert.Same(t, demodulators[0], multiModems[0].demodulator)
+	assert.Same(t, demodulators[0], receiver.modems[0].demodulator)
 	assert.Equal(t, 3, receiver.numSubchannel[0])
 }
 
@@ -90,10 +87,6 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 // --il2p-version option, so the IL2P receivers have to take their settings
 // from what they are given.
 func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
-	t.Cleanup(func() {
-		multiModems = newMultiModems()
-	})
-
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].il2p_version = il2p.Version04
 	audioConfig.achan[0].il2p_crc = false
@@ -109,10 +102,6 @@ func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
 // was handed - atest's -dx, say - rather than whatever an earlier caller
 // asked for.
 func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
-	t.Cleanup(func() {
-		multiModems = newMultiModems()
-	})
-
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "AB"
 	audioConfig.achan[0].num_freq = 1
@@ -131,10 +120,6 @@ func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
 // was handed - atest's -d2, say - rather than whatever an earlier caller
 // asked for.
 func TestMultiModemInitHandsIL2PItsDebugLevel(t *testing.T) {
-	t.Cleanup(func() {
-		multiModems = newMultiModems()
-	})
-
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "AB"
 	audioConfig.achan[0].num_freq = 1
@@ -153,10 +138,6 @@ func TestMultiModemInitHandsIL2PItsDebugLevel(t *testing.T) {
 // costs: undoing NRZI, then the HDLC, FX.25 and IL2P receivers that each
 // look at it.  The bits are noise, as most of what a receiver hears is.
 func BenchmarkLayer2ReceiveBit(b *testing.B) {
-	b.Cleanup(func() {
-		multiModems = newMultiModems()
-	})
-
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].num_freq = 1
 
@@ -180,10 +161,6 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 // neither the line decoder nor the HDLC, FX.25 or IL2P receivers should see
 // them.  Other channels have no EAS receiver at all.
 func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
-	t.Cleanup(func() {
-		multiModems = newMultiModems()
-	})
-
 	var audioConfig = newRecvTestRadioConfig(2)
 	audioConfig.achan[0].num_freq = 1
 	audioConfig.achan[1].num_freq = 1
@@ -361,15 +338,12 @@ func (r *countingBitReceiver) DCDChange(int, int, int, int) {}
 func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
 	var origDemodulators = demodulators
 
-	t.Cleanup(func() {
-		demodulators = origDemodulators
-		multiModems = newMultiModems()
-	})
+	t.Cleanup(func() { demodulators = origDemodulators })
 
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].num_freq = 1
 
-	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
+	var layer2 = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
 	var receiver = new(countingBitReceiver)
 	demodulators[0].setReceiver(receiver)
@@ -377,7 +351,7 @@ func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
 	var rng = rand.New(rand.NewPCG(1, 2))
 
 	for range audioConfig.adev[0].samples_per_sec / 10 {
-		multi_modem_process_sample(0, rng.IntN(20000)-10000)
+		layer2.ProcessSample(0, rng.IntN(20000)-10000)
 	}
 
 	assert.Positive(t, receiver.bits)

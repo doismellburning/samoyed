@@ -277,7 +277,7 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 				continue
 			}
 
-			if !multi_modem_process_sample(c, audio_sample) {
+			if !a.sink.receiver.ProcessSample(c, audio_sample) {
 				// It has said why; nothing more of this file can be decoded.
 				e_o_f = true
 

@@ -16,15 +16,3 @@ import (
 // The same shape as toneGenCapture, and for the same reason: a test needs to
 // watch something that would otherwise disappear into the rest of the program.
 var multiModemRecCapture func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t)
-
-// multi_modem_process_rec_packet hands one received frame to whatever is
-// standing in for the rest of the receive path.
-func multi_modem_process_rec_packet(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
-	if multiModemRecCapture != nil {
-		multiModemRecCapture(channel, subchannel, slice, pp, alevel, retries, fec_type)
-
-		return
-	}
-
-	multi_modem_process_rec_packet_real(channel, subchannel, slice, pp, alevel, retries, fec_type)
-}
