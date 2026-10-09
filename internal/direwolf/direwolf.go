@@ -750,6 +750,7 @@ x = Silence FX.25 information.`)
 	recHandler.decoder = aprsDecoder
 	recHandler.webHub = webHub
 	recHandler.logger = aprsLogger
+	recHandler.heard = mheardDB
 	recHandler.waypoints = waypointSender
 	recHandler.apps = clientApplications
 	recHandler.digipeater = aprsDigipeater
@@ -793,6 +794,7 @@ type recPacketHandler struct {
 	decoder     *aprs.Decoder
 	webHub      *webui.Hub // Nil without a web interface.
 	logger      *aprslog.Logger
+	heard       *mheard.DB // Where the stations heard over the radio are remembered.
 	waypoints   *WaypointSender
 	apps        *clientApps // Nil for none.
 
@@ -1115,7 +1117,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		// Add to list of stations heard over the radio.
 
 		var lat, lon = mheardPosition(A)
-		mheardDB.SaveRF(channel, pp, lat, lon)
+		rh.heard.SaveRF(channel, pp, lat, lon)
 
 		// For AIS, we have an option to convert the NMEA format, in User Defined data,
 		// into an APRS "Object Report" and send that to the clients as well.

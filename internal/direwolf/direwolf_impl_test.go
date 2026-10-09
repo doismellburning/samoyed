@@ -87,14 +87,12 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	t.Helper()
 
 	var (
-		origMheard = mheardDB
 		origAGW    = agwServer
 		origIGate  = igate
 		origLogOut = logrus.StandardLogger().Out
 	)
 
 	t.Cleanup(func() {
-		mheardDB = origMheard
 		agwServer = origAGW
 		igate = origIGate
 		logrus.SetOutput(origLogOut)
@@ -104,7 +102,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 	audioConfig.igate_vchannel = -1
 
-	mheardDB = mheard.New(0)
+	var heardDB = mheard.New(0)
 
 	// Waypoints go to a UDP socket of our own, so a position that reaches
 	// them can be seen to have done so.
@@ -126,15 +124,16 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	var igateConfig = new(igate_config_s)
 	var digiConfig = new(digi_config_s)
-	var filter = NewPacketFilter(igateConfig, aprs.NewDecoderFromDataFiles(), mheardDB, 0)
+	var filter = NewPacketFilter(igateConfig, aprs.NewDecoderFromDataFiles(), heardDB, 0)
 
-	igate = NewIGate(audioConfig, igateConfig, digiConfig, filter, mheardDB, 0)
+	igate = NewIGate(audioConfig, igateConfig, digiConfig, filter, heardDB, 0)
 
 	var handler = new(recPacketHandler)
 	handler.audioConfig = audioConfig
 	handler.ttConfig = new(tt_config_s) // No touch tones.
 	handler.decoder = aprs.NewDecoderFromDataFiles()
 	handler.logger = aprslog.New(false, "")
+	handler.heard = heardDB
 	handler.waypoints = ws
 	handler.digipeater = NewDigipeater(audioConfig, digiConfig, filter)
 	handler.connectedDigipeater = NewConnectedDigipeater(audioConfig, new(cdigi_config_s), filter)
@@ -192,7 +191,7 @@ func Test_app_process_rec_packet_aprs_position(t *testing.T) {
 	var sentence = rt.readWaypoint(t)
 	assert.Contains(t, sentence, "Q1TEST")
 
-	var heard = mheardDB.Count(0, 30)
+	var heard = rt.handler.heard.Count(0, 30)
 	assert.Equal(t, 1, heard, "the station should have been remembered as heard")
 }
 
