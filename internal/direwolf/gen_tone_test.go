@@ -5,8 +5,10 @@ package direwolf
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,4 +45,35 @@ func TestGenToneTestConfigGeneratesEveryChannel(t *testing.T) {
 			}
 		})
 	}
+}
+
+// putCountingSink counts the bytes put to it.
+type putCountingSink struct {
+	puts int
+}
+
+func (s *putCountingSink) Put(int, uint8) int {
+	s.puts++
+
+	return 0
+}
+
+func (s *putCountingSink) Flush(int) int { return 0 }
+
+// A channel the tone generator has no way to modulate for is an internal
+// error, which the transmitter is told of once and otherwise carries on past,
+// sending nothing.  It runs mid-transmission, with the PTT keyed, so ending
+// the process there would leave the transmitter keyed.
+func TestPutBitWithUnknownModemSendsNothing(t *testing.T) {
+	var sink = new(putCountingSink)
+	var audioConfig = newTestRadioConfig(0, MODEM_OFF, 1200, 1200, 2200, 44100)
+	var tg = NewToneGenerator(0, audioConfig, 100, sink)
+
+	var output = testutils.CaptureOutput(t, func() {
+		tg.PutBit(1)
+		tg.PutBit(0)
+	})
+
+	assert.Equal(t, 0, sink.puts, "nothing should have been sent")
+	assert.Equal(t, 1, strings.Count(output, "INTERNAL ERROR"), "the error should be reported once: %s", output)
 }

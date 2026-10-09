@@ -10,7 +10,6 @@ package direwolf
 
 import (
 	"math"
-	"os"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/linecode"
@@ -63,6 +62,10 @@ type ToneGenerator struct {
 	bitLenAcc int // To accumulate fractional samples per bit.
 
 	scrambler linecode.Scrambler // For 9600 baud.
+
+	// unknownModemReported is set once PutBit has said it has no way to
+	// modulate for the channel's modem type, so it says so only once.
+	unknownModemReported bool
 
 	bitCount int // Counter incremented for each bit transmitted
 	// on the channel.   This is only used for QPSK.
@@ -570,10 +573,19 @@ func (tg *ToneGenerator) PutBit(dat int) {
 			tg.PutSample(sam)
 
 		default:
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("INTERNAL ERROR: achan[%d].modem_type = %d\n",
-				tg.channel, audioConfig.achan[tg.channel].modem_type)
-			os.Exit(1)
+			// This runs mid-transmission, with the PTT keyed, so carry on
+			// sending nothing rather than end the process and leave the
+			// transmitter keyed.  The transmission then ends, and the PTT
+			// drops, as usual.
+			if !tg.unknownModemReported {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("INTERNAL ERROR: achan[%d].modem_type = %d\n",
+					tg.channel, audioConfig.achan[tg.channel].modem_type)
+
+				tg.unknownModemReported = true
+			}
+
+			return
 		}
 
 		/* Enough for the bit time? */
