@@ -53,7 +53,7 @@ header {
   border-bottom: 1px solid var(--border);
 }
 
-h1 { font-size: 18px; margin: 0; }
+h1 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; }
 h2 { font-size: 14px; margin: 0; }
 
 nav { display: flex; gap: 4px; }
