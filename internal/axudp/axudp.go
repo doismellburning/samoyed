@@ -412,11 +412,9 @@ func (b *Bridge) broadcastKISS(ax25frame []byte) {
 
 // ax25AddrBase returns the AX.25 address without any SSID suffix (i.e. strips "-N").
 func ax25AddrBase(cs string) string {
-	if idx := strings.LastIndexByte(cs, '-'); idx >= 0 {
-		return cs[:idx]
-	}
+	var base, _, _ = strings.CutLast(cs, "-")
 
-	return cs
+	return base
 }
 
 // Route returns the MAP entries a frame for dest goes to: every entry marked

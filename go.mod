@@ -1,6 +1,6 @@
 module github.com/doismellburning/samoyed
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/brutella/dnssd v1.2.14
@@ -36,7 +36,7 @@ require (
 	github.com/vishvananda/netlink v1.2.1-beta.2 // indirect
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
 	golang.org/x/mod v0.18.0 // indirect
-	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
