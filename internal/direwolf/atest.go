@@ -277,7 +277,12 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 				continue
 			}
 
-			multi_modem_process_sample(c, audio_sample)
+			if !multi_modem_process_sample(c, audio_sample) {
+				// It has said why; nothing more of this file can be decoded.
+				e_o_f = true
+
+				break
+			}
 		}
 
 		/* When a complete frame is accumulated, */

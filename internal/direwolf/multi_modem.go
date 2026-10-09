@@ -67,7 +67,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"os"
 	"slices"
 	"sync"
 
@@ -280,14 +279,17 @@ func multi_modem_get_dc_average(channel int) int { //nolint:unused
 	return int(multiModems[channel].dcAverage * (200.0 / 32767.0))
 }
 
-func multi_modem_process_sample(channel int, audio_sample int) {
-	multiModems[channel].ProcessSample(audio_sample)
+// multi_modem_process_sample is MultiModem.ProcessSample for a channel.
+func multi_modem_process_sample(channel int, audio_sample int) bool {
+	return multiModems[channel].ProcessSample(audio_sample)
 }
 
 // ProcessSample feeds one audio sample to each of the channel's demodulators,
 // and sends on the best of the frames decoded once they have waited long
-// enough for the others to catch up.
-func (m *MultiModem) ProcessSample(audio_sample int) {
+// enough for the others to catch up.  It returns false, having said why, if
+// the channel's demodulators can't be fed at all; there is then no point
+// handing it any more.
+func (m *MultiModem) ProcessSample(audio_sample int) bool {
 	var channel = m.channel
 
 	// Accumulate an average DC bias level.
@@ -306,7 +308,8 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
 			numSubchan, MAX_SUBCHANS,
 			numSlicers, MAX_SLICERS)
 		dw_printf("Please report this message and include a copy of your configuration file.\n")
-		os.Exit(1)
+
+		return false
 	}
 
 	/* Formerly one loop. */
@@ -332,6 +335,8 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
 			}
 		}
 	}
+
+	return true
 }
 
 /*-------------------------------------------------------------------
