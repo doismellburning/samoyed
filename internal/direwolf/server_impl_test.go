@@ -14,6 +14,9 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
@@ -559,13 +562,42 @@ func TestHandleClientCommand_G_NilRadioConfig(t *testing.T) {
 	assert.Equal(t, "0;", string(reply.Data))
 }
 
-// The debug level has to be in place before the constructor starts the
-// goroutines that consult it, so it is given rather than set afterwards.
+// The debug level has to be in place before Start starts the goroutines that
+// consult it, so the constructor is given it rather than having it set
+// afterwards.
 func TestNewAGWServer_TakesTheDebugLevel(t *testing.T) {
-	var mc = new(misc_config_s) /* agwpe_port 0, so no goroutines to stop. */
+	var mc = new(misc_config_s)
 
-	assert.Equal(t, 2, NewAGWServer(t.Context(), nil, mc, 2).debug)
-	assert.Equal(t, 0, NewAGWServer(t.Context(), nil, mc, 0).debug)
+	assert.Equal(t, 2, NewAGWServer(nil, mc, 2).debug)
+	assert.Equal(t, 0, NewAGWServer(nil, mc, 0).debug)
+}
+
+// With no port configured, starting says the AGW port is disabled and lets
+// nobody in; starting again is refused, and says so, rather than starting
+// a second set of goroutines on the same port.
+func TestAGWServerStart_NoPortAndOnlyOnce(t *testing.T) {
+	var s = NewAGWServer(nil, new(misc_config_s), 0) /* agwpe_port 0. */
+
+	var output = testutils.CaptureOutput(t, func() { s.Start(t.Context()) })
+
+	assert.Contains(t, output, "Disabled AGW network client port")
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	s.Start(t.Context())
+
+	require.Len(t, hook.AllEntries(), 1)
+	assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
+	assert.Contains(t, hook.LastEntry().Message, "started twice")
+}
+
+// A nil server, as for an interface that was never set up, starts nothing.
+func TestAGWServerStart_Nil(t *testing.T) {
+	var s *AGWServer
+
+	s.Start(t.Context())
 }
 
 // setupAGWTransmitQueue points the transmit queue at cfg and empties it again

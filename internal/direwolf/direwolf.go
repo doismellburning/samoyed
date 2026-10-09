@@ -669,7 +669,8 @@ x = Silence FX.25 information.`)
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	var agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
+	var agwServer = NewAGWServer(audio_config, misc_config, d_a_opt)
+	agwServer.Start(ctx)
 	monitorAGW.Store(agwServer)
 
 	// The connected-mode link layer, after the AGW server whose clients it

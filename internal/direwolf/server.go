@@ -123,6 +123,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/agwpe"
@@ -160,10 +161,16 @@ type AGWServer struct {
 	logins []agwpe_login_s
 
 	// Print information flowing from and to client.  Settled by the
-	// constructor, before it starts the goroutines that read it, and never
+	// constructor, before Start starts the goroutines that read it, and never
 	// written again - so no lock, and none of the cost of one on a path that
 	// consults it for every frame.
 	debug int
+
+	// port is the TCP port Start listens on, or 0 for none.
+	port int
+
+	// started keeps Start to one run.
+	started atomic.Bool
 
 	// mu guards clients below, which connectListenThread (attaching a newly
 	// accepted connection), each client's own cmdListenThread (acting on what
@@ -216,7 +223,7 @@ type agwClient struct {
  * Name:        NewAGWServer
  *
  * Purpose:     Set up a server to listen for connection requests from
- *		an application such as Xastir.
+ *		an application such as Xastir, once Start is called.
  *
  * Inputs:	mc.agwpe_port	- TCP port for server.
  *				  Main program has default of 8000 but allows
@@ -227,24 +234,18 @@ type agwClient struct {
  *		debug		- "-d a" level: print the messages flowing to and
  *				  from clients.
  *
- * Outputs:
- *
- * Description:	This starts at least two threads:
- *		  *  one to listen for a connection from client app.
- *		  *  one or more to listen for commands from client app.
- *		so the main application doesn't block while we wait for these.
+ * Description:	Nothing is started here: Start does that.  So a server can
+ *		be made, and handed to what tells it about frames and
+ *		links, before any client is let in.
  *
  *--------------------------------------------------------------------*/
 
-func NewAGWServer(ctx context.Context, audio_config_p *RadioConfig, mc *misc_config_s, debug int) *AGWServer {
-	var server_port = mc.agwpe_port /* Usually 8000 but can be changed. */
-
-	logrus.WithField("server_port", server_port).Debug("NewAGWServer")
-
+func NewAGWServer(audio_config_p *RadioConfig, mc *misc_config_s, debug int) *AGWServer {
 	var s = new(AGWServer)
 	s.audioConfigP = audio_config_p
 	s.logins = mc.agwpe_logins
 	s.debug = debug
+	s.port = mc.agwpe_port /* Usually 8000 but can be changed. */
 
 	/*
 	 * A new server starts with every client slot empty, and with none of the
@@ -252,11 +253,32 @@ func NewAGWServer(ctx context.Context, audio_config_p *RadioConfig, mc *misc_con
 	 * zero value of the client table is.
 	 */
 
-	if server_port == 0 {
+	return s
+}
+
+// Start says how the server is set up, and if it has a port starts at least
+// two goroutines until ctx is cancelled: one to listen for a connection from a
+// client application, and one or more to listen for commands from each.  The
+// main application doesn't block while it waits for these.  Only the first
+// call does anything, and on a nil server not even that.
+func (s *AGWServer) Start(ctx context.Context) {
+	if s == nil {
+		return
+	}
+
+	if !s.started.CompareAndSwap(false, true) {
+		logrus.Error("AGW server started twice; ignoring the second start")
+
+		return
+	}
+
+	logrus.WithField("server_port", s.port).Debug("AGWServer.Start")
+
+	if s.port == 0 {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Disabled AGW network client port.\n")
 
-		return s
+		return
 	}
 
 	if s.loginRequired() {
@@ -268,7 +290,7 @@ func NewAGWServer(ctx context.Context, audio_config_p *RadioConfig, mc *misc_con
 	/*
 	 * This waits for a client to connect and attaches it to a free slot.
 	 */
-	go s.connectListenThread(ctx, server_port)
+	go s.connectListenThread(ctx, s.port)
 
 	/*
 	 * These read messages from client when the client's slot holds a socket.
@@ -278,8 +300,6 @@ func NewAGWServer(ctx context.Context, audio_config_p *RadioConfig, mc *misc_con
 	for client := range MAX_NET_CLIENTS {
 		go s.cmdListenThread(ctx, client)
 	}
-
-	return s
 }
 
 /*-------------------------------------------------------------------
