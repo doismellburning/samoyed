@@ -45,6 +45,10 @@ func dtmfTones() [NUM_TONES]int {
 type DTMFDecoder struct {
 	channel int
 
+	// onDCD is told when a button starts or stops being heard, for the
+	// channel's DCD indicator, or is nil when there is nobody to tell.
+	onDCD func(channel int, subchannel int, slice int, state int)
+
 	sampleRate int /* Samples per sec.  Typ. 44100, 8000, etc. */
 	blockSize  int /* Number of samples to process in one block. */
 	coef       [NUM_TONES]float64
@@ -66,6 +70,10 @@ type DTMFDecoder struct {
  *
  * Inputs:      channel		- Radio channel number, for the DCD indicator.
  *
+ *		onDCD		- Told when a button starts (state 1) or stops
+ *				  (0) being heard, as subchannel MAX_SUBCHANS of
+ *				  the channel; nil for nobody to tell.
+ *
  *		sampleRate	- Audio sample frequency, typically
  *				  44100, 22050, 8000, etc.
  *
@@ -75,12 +83,13 @@ type DTMFDecoder struct {
  *
  *----------------------------------------------------------------*/
 
-func NewDTMFDecoder(channel int, sampleRate int) *DTMFDecoder {
+func NewDTMFDecoder(channel int, sampleRate int, onDCD func(channel int, subchannel int, slice int, state int)) *DTMFDecoder {
 	logrus.WithField("channel", channel).Debug("NewDTMFDecoder")
 
 	var d = new(DTMFDecoder)
 
 	d.channel = channel
+	d.onDCD = onDCD
 	d.sampleRate = sampleRate
 	d.prevDec = ' '
 	d.debounced = ' '
@@ -219,7 +228,9 @@ func (d *DTMFDecoder) Sample(input float64) rune {
 			_tmpIntBool = 1
 		}
 
-		layer2Receiver.DCDChange(d.channel, MAX_SUBCHANS, 0, _tmpIntBool)
+		if d.onDCD != nil {
+			d.onDCD(d.channel, MAX_SUBCHANS, 0, _tmpIntBool)
+		}
 
 		/* Reset timeout timer. */
 		if decoded != ' ' {
