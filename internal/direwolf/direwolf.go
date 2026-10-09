@@ -1,6 +1,4 @@
 // Package direwolf is a Go port of the Dire Wolf C source.
-//
-//nolint:gochecknoglobals
 package direwolf
 
 import (
@@ -48,8 +46,6 @@ import (
  *			AIS receiver for tracking ships.
  *
  *---------------------------------------------------------------*/
-
-var aprsSymbolData *symbols.Data
 
 /*-------------------------------------------------------------------
  *
@@ -169,8 +165,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if *symbolDump {
-		aprsSymbolData = symbols.New()
-		aprsSymbolData.List()
+		symbols.New().List()
 		os.Exit(0)
 	}
 
@@ -278,7 +273,7 @@ x = Silence FX.25 information.`)
 
 	goHamlib.SetDebugLevel(goHamlib.DebugLevel(d_h_opt))
 
-	aprsSymbolData = symbols.New()
+	var aprsSymbolData = symbols.New()
 	var aprsDecoder = aprs.NewDecoder(deviceid.New(), aprsSymbolData)
 
 	var audio_config = new(RadioConfig)
@@ -288,7 +283,7 @@ x = Silence FX.25 information.`)
 	var cdigi_config cdigi_config_s
 	var igate_config igate_config_s
 
-	var configResult = config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
+	var configResult = config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config, aprsSymbolData)
 
 	if *configCheck {
 		// Checking the configuration file is the whole job here, so stop before
