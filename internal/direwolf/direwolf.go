@@ -50,7 +50,6 @@ import (
  *---------------------------------------------------------------*/
 
 var aprsSymbolData *symbols.Data
-var layer2Receiver *Layer2Receiver
 
 /*-------------------------------------------------------------------
  *
@@ -467,7 +466,7 @@ x = Silence FX.25 information.`)
 	 */
 	var sink = new(radioSink)
 
-	multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
+	var layer2Receiver = multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
 
 	/*
 	 * New in 1.8 - Allow a channel to be mapped to a network TNC rather than

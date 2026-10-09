@@ -246,7 +246,7 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 	 * Initialize the AFSK demodulator and HDLC decoder.
 	 * Needs to be done for each file because they could have different sample rates.
 	 */
-	multi_modem_init(audio, a.fx25Debug, a.il2pDebug, a.sink)
+	a.sink.receiver = multi_modem_init(audio, a.fx25Debug, a.il2pDebug, a.sink)
 
 	a.sink.packetsDecoded = 0
 
@@ -352,7 +352,7 @@ func (s *readerSampleSource) GetByte(_ int) int {
 func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	s.packetsDecoded++
 
-	if layer2Receiver.DataDetectAny(channel) == 0 {
+	if s.receiver.DataDetectAny(channel) == 0 {
 		s.dcdMissingErrors++
 	}
 
@@ -487,8 +487,9 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packe
 // time the channel was busy for.
 type atestSink struct {
 	audio      *RadioConfig
-	hexDisplay bool // -h
-	debugDCD   int  // -d o
+	receiver   *Layer2Receiver // Asked whether DCD was up for each frame decoded.
+	hexDisplay bool            // -h
+	debugDCD   int             // -d o
 
 	// sampleNumber is the number of the sample being decoded, counted on
 	// channel 0 across every file, for the time a frame was decoded at.

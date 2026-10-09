@@ -190,26 +190,28 @@ func (s *radioSink) DCDChange(channel int, state int) {
  *
  *		sink	- Where the decoders' output goes.
  *
- * Outputs:
+ * Returns:	The layer 2 receiver the demodulators hand their bits to, for
+ *		whatever else wants to know what it is hearing.
  *
  * Description:	Called once at application startup time.
  *
  *------------------------------------------------------------------------------*/
 
-func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink ReceiveSink) {
+func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink ReceiveSink) *Layer2Receiver {
 	demod_init(pa)
-	layer2Receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, il2pDebug, sink)
+
+	var receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, il2pDebug, sink)
 
 	for _, d := range demodulators {
 		if d != nil {
-			d.setReceiver(layer2Receiver)
+			d.setReceiver(receiver)
 		}
 	}
 
 	for channel, m := range multiModems {
 		m.audioConfig = pa
 		m.demodulator = demodulators[channel]
-		m.receiver = layer2Receiver
+		m.receiver = receiver
 		m.sink = sink
 
 		// Anything still waiting to be picked came from before, e.g. the
@@ -237,6 +239,8 @@ func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink Receiv
 			//crc_queue_of_last_to_app[channel] = nil;
 		}
 	}
+
+	return receiver
 }
 
 /*------------------------------------------------------------------------------
