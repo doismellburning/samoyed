@@ -962,10 +962,11 @@ func (r *Layer2Receiver) DCDChange(channel int, subchannel int, slice int, state
 	var now = r.dataDetected(channel)
 	r.dcdMu.Unlock()
 
-	// A transmit inhibit holds the channel busy whatever its decoders see, so
-	// a change underneath it changes nothing.  Only this channel's receive
-	// thread changes its DCD, so the changes reach the sink in order.
-	if now != old && !r.transmitInhibited(channel) {
+	// DCD shows what the decoders hear.  A transmit inhibit makes the
+	// channel busy for the transmitter, in DataDetectAny, but does not light
+	// DCD.  Only this channel's receive thread changes its DCD, so the
+	// changes reach the sink in order.
+	if now != old {
 		var newVal = 0
 		if now {
 			newVal = 1

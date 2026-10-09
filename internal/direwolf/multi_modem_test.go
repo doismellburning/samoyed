@@ -296,6 +296,28 @@ func TestDTMFButtonMakesChannelBusy(t *testing.T) {
 	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
 }
 
+// The DCD indicator shows the data heard on a channel, whether or not its
+// transmit inhibit is set.  Were it held where it was while the channel is
+// inhibited, a packet ending under the inhibit would leave it lit.
+func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
+	var sink = new(dcdRecordingSink)
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
+	r.numSubchannel[0] = 1
+
+	var inhibited = 0
+
+	r.getInput = func(int, int) int { return inhibited }
+
+	r.DCDChange(0, 0, 0, 1)
+
+	inhibited = 1
+
+	r.DCDChange(0, 0, 0, 0)
+
+	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
+	assert.Equal(t, 1, r.DataDetectAny(0), "still inhibited, so still busy")
+}
+
 // The receive threads change a channel's DCD while the transmit side asks
 // whether it is busy.  Under the race detector, this fails if the two are
 // not synchronised.
