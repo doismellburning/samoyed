@@ -12,6 +12,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/phy"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -380,4 +381,18 @@ func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
 	}
 
 	assert.Positive(t, receiver.bits)
+}
+
+// A channel whose demodulators can't be fed - here, it has none - says so,
+// for the receive thread to give up on its device and DirewolfMain to end the
+// run through the teardown, rather than ending the process itself.
+func TestProcessSampleWithoutDemodulatorSaysSo(t *testing.T) {
+	var m = new(MultiModem)
+
+	var ok bool
+
+	var output = testutils.CaptureOutput(t, func() { ok = m.ProcessSample(0) })
+
+	assert.False(t, ok)
+	assert.Contains(t, output, "Something is seriously wrong")
 }
