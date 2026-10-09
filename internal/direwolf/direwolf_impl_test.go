@@ -9,7 +9,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -28,30 +27,20 @@ import (
 // A run that nobody has asked to stop carries on: were stopIfCancelled to
 // clean up and exit here, the test binary would go with it.
 func Test_stopIfCancelled_carries_on_while_running(t *testing.T) {
-	stopIfCancelled(t.Context())
+	stopIfCancelled(t.Context(), new(teardownList))
 }
 
 // --- teardown ---
 
-// The teardown closes the APRS log and the waypoint output when startup got
-// as far as opening them, and does it only once however often it is asked.
-func Test_teardown_closes_what_startup_opened(t *testing.T) {
-	var origLogger, origWaypoint, origPTT, origGPS = aprsLogger, waypointSender, pttControl, gpsReceiver
+// The teardown releases what was added to it, in the order it was added - so
+// the PTT, which startup acquires first, is released first - and does it only
+// once however often it is asked.
+func Test_teardown_releases_what_startup_acquired(t *testing.T) {
+	var td = new(teardownList)
+	var released []string
 
-	t.Cleanup(func() {
-		aprsLogger, waypointSender, pttControl, gpsReceiver = origLogger, origWaypoint, origPTT, origGPS
-		teardownOnce = sync.Once{}
-	})
-
-	teardownOnce = sync.Once{}
-	pttControl = nil
-	gpsReceiver = nil
-	aprsLogger = aprslog.New(false, t.TempDir())
-
-	var ws, wsErr = NewWaypointSender(t.Context(), new(misc_config_s), nil)
-	require.NoError(t, wsErr)
-
-	waypointSender = ws
+	td.add(func() { released = append(released, "ptt") })
+	td.add(func() { released = append(released, "gps") })
 
 	var origLogOut = logrus.StandardLogger().Out
 
@@ -59,11 +48,27 @@ func Test_teardown_closes_what_startup_opened(t *testing.T) {
 
 	var output = testutils.CaptureOutput(t, func() {
 		logrus.SetOutput(os.Stdout)
-		teardown()
-		teardown()
+		td.run()
+		td.run()
 	})
 
+	assert.Equal(t, []string{"ptt", "gps"}, released)
 	assert.Equal(t, 1, strings.Count(output, "QRT"))
+}
+
+// A teardown with nothing added, as when startup stops before acquiring
+// anything, still says it is going.
+func Test_teardown_with_nothing_to_release(t *testing.T) {
+	var origLogOut = logrus.StandardLogger().Out
+
+	t.Cleanup(func() { logrus.SetOutput(origLogOut) })
+
+	var output = testutils.CaptureOutput(t, func() {
+		logrus.SetOutput(os.Stdout)
+		new(teardownList).run()
+	})
+
+	assert.Contains(t, output, "QRT")
 }
 
 // --- app_process_rec_packet ---

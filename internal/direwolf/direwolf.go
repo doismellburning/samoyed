@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 	"unicode"
@@ -51,9 +50,6 @@ import (
  *---------------------------------------------------------------*/
 
 var aprsSymbolData *symbols.Data
-var waypointSender *WaypointSender
-var aprsLogger *aprslog.Logger
-var gpsReceiver *dwgps.GPS
 var agwServer *AGWServer
 var mheardDB *mheard.DB
 var pttControl *PTT
@@ -434,10 +430,14 @@ x = Silence FX.25 information.`)
 
 	go resetSignalsOnCancel(ctx)
 
+	// Each step below that acquires something adds its release to this, so
+	// that a stop part way through startup releases what it got that far.
+	var td = new(teardownList)
+
 	// A stop can arrive at any point from here on.  Startup checks for one
 	// before each step that acquires something, and stops there rather than
 	// carrying on behind a teardown that has already finished with it.
-	stopIfCancelled(ctx)
+	stopIfCancelled(ctx, td)
 
 	/*
 	 * Open the audio source
@@ -454,7 +454,7 @@ x = Silence FX.25 information.`)
 	}
 
 	var audioDevices, err = AudioOpen(ctx, audio_config)
-	stopIfCancelled(ctx)
+	stopIfCancelled(ctx, td)
 
 	if err != nil {
 		logrus.WithError(err).Debug("AudioOpen failed")
@@ -476,11 +476,11 @@ x = Silence FX.25 information.`)
 	 * I put it here so channel properties would come out in right order.
 	 */
 	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config))
-	stopIfCancelled(ctx)
+	stopIfCancelled(ctx, td)
 
 	// Likewise a channel can be AX.25 over UDP to other nodes.
 	transmitQueue.SetAXUDPChannels(NewAXUDPChannels(ctx, audio_config))
-	stopIfCancelled(ctx)
+	stopIfCancelled(ctx, td)
 
 	/*
 	 * Should there be an option for audio output level?
@@ -496,7 +496,8 @@ x = Silence FX.25 information.`)
 	var pttErr error
 
 	pttControl, pttErr = NewPTT(audio_config, d_o_opt)
-	stopIfCancelled(ctx)
+	td.add(pttControl.Term) // Which does nothing if there is no PTT.
+	stopIfCancelled(ctx, td)
 
 	if pttErr != nil {
 		logrus.WithError(pttErr).Error("Could not set up PTT")
@@ -521,7 +522,7 @@ x = Silence FX.25 information.`)
 	 */
 
 	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, publishTransmitted, d_p_opt, d_x_opt, d_2_opt)
-	stopIfCancelled(ctx)
+	stopIfCancelled(ctx, td)
 
 	/*
 	 * If -x N option specified, transmit calibration tones for transmitter
@@ -626,7 +627,7 @@ x = Silence FX.25 information.`)
 
 				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 0)
 				text_color_set(DW_COLOR_INFO)
-				stopIfCancelled(ctx)
+				stopIfCancelled(ctx, td)
 				os.Exit(0)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
@@ -650,7 +651,7 @@ x = Silence FX.25 information.`)
 	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter)
 	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, d_i_opt)
 	igate.start(ctx)
-	stopIfCancelled(ctx)
+	stopIfCancelled(ctx, td)
 	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
 	ax25_link_init(misc_config, d_c_opt)
 
@@ -673,14 +674,14 @@ x = Silence FX.25 information.`)
 		dns_sd_announce(ctx, misc_config)
 	}
 
-	stopIfCancelled(ctx)
+	stopIfCancelled(ctx, td)
 
 	/*
 	 * Create a pseudo terminal and KISS TNC emulator.
 	 */
 	var kissPT = NewKissPT(ctx, misc_config, kissHandler, d_k_opt)
 	var kissSerial = NewKissSerial(ctx, misc_config, kissHandler, d_k_opt)
-	stopIfCancelled(ctx)
+	stopIfCancelled(ctx, td)
 
 	// What we hear goes to each of these.
 	var clientApplications = new(clientApps)
@@ -705,11 +706,16 @@ x = Silence FX.25 information.`)
 	gpsConfig.GPSDHost = misc_config.gpsd_host
 	gpsConfig.GPSDPort = misc_config.gpsd_port
 
-	gpsReceiver = dwgps.NewGPS(ctx, gpsConfig, d_g_opt)
+	var gpsReceiver = dwgps.NewGPS(ctx, gpsConfig, d_g_opt)
+	td.add(gpsReceiver.Term)
 
-	var waypointErr error
-	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config, gpsReceiver)
-	stopIfCancelled(ctx)
+	var waypointSender, waypointErr = NewWaypointSender(ctx, misc_config, gpsReceiver)
+
+	if waypointSender != nil {
+		td.add(waypointSender.Close)
+	}
+
+	stopIfCancelled(ctx, td)
 
 	if waypointErr != nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -724,11 +730,12 @@ x = Silence FX.25 information.`)
 	 * log the tracker beacon transmissions with fake channel 999.
 	 */
 
-	aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
+	var aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
+	td.add(aprsLogger.Close)
 	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
-	stopIfCancelled(ctx)
+	stopIfCancelled(ctx, td)
 
 	/*
 	 * Get sound samples and decode them.
@@ -760,18 +767,18 @@ x = Silence FX.25 information.`)
 	// device input fails.  There is no point in going on without audio.
 	select {
 	case <-ctx.Done():
-		cleanup()
+		cleanup(td)
 	case a := <-adev_failed:
 		// Our own stop can look like a device failing, if it closes the
 		// device under a reader.
-		stopIfCancelled(ctx)
+		stopIfCancelled(ctx, td)
 
 		logrus.WithField("adev", a).Error("Terminating after audio device input failure")
 
 		// Nothing else will release what startup acquired - a keyed PTT
 		// above all - so do it on the way out, and whether or not a stop
 		// arrives in the meantime.
-		teardown()
+		td.run()
 		os.Exit(1)
 	}
 }
@@ -1267,31 +1274,42 @@ func resetSignalsOnCancel(ctx context.Context) {
 // that acquire something, so that the teardown runs once startup has either
 // finished or stopped - never alongside it, releasing a PTT that startup is
 // yet to open.
-func stopIfCancelled(ctx context.Context) {
+func stopIfCancelled(ctx context.Context, td *teardownList) {
 	if ctx.Err() != nil {
-		cleanup()
+		cleanup(td)
 	}
 }
 
-// teardownOnce keeps the teardown to one run, however many ways there turn out
-// to be of asking for it.
-var teardownOnce sync.Once
+// teardownList releases what startup acquired.  DirewolfMain adds each
+// release as it acquires the thing, so a startup stopped part way through
+// releases what it got that far and nothing more.  Only DirewolfMain's own
+// goroutine uses one.
+type teardownList struct {
+	ran      bool // So that asking again, however it is asked, does nothing.
+	releases []func()
+}
 
-// teardown releases what startup acquired.
-func teardown() {
-	teardownOnce.Do(func() {
-		text_color_set(DW_COLOR_INFO)
-		logrus.Info("QRT")
-		if aprsLogger != nil {
-			aprsLogger.Close()
-		}
-		pttControl.Term()
-		gpsReceiver.Term()
+// add arranges for run to call release.
+func (td *teardownList) add(release func()) {
+	td.releases = append(td.releases, release)
+}
 
-		if waypointSender != nil {
-			waypointSender.Close()
-		}
-	})
+// run releases what was added, in the order it was added, and does nothing
+// if it has run already.  Startup acquires the PTT first, so the release that
+// matters on the air goes first, ahead of any close that might block.
+func (td *teardownList) run() {
+	if td.ran {
+		return
+	}
+
+	td.ran = true
+
+	text_color_set(DW_COLOR_INFO)
+	logrus.Info("QRT")
+
+	for _, release := range td.releases {
+		release()
+	}
 }
 
 // cleanup releases what startup acquired and ends the process after a stop.
@@ -1299,8 +1317,8 @@ func teardown() {
 // The goroutines started during startup take the same context and wind
 // themselves up, but they are not waited for: cleanup gives them a moment and
 // then ends the process.
-func cleanup() {
-	teardown()
+func cleanup(td *teardownList) {
+	td.run()
 
 	// A moment for the goroutines that took the same context to notice it and
 	// put their own resources down before the process goes away underneath
