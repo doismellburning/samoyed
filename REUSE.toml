@@ -57,3 +57,14 @@ SPDX-FileCopyrightText = [
 	"2010-2011 CloudMade",
 ]
 SPDX-License-Identifier = "BSD-2-Clause"
+
+# The logo. Use of the name and logo is also governed by TRADEMARKS.md.
+[[annotations]]
+path = [
+	"docs/source/_static/favicon.png",
+	"docs/source/_static/logo.png",
+	"internal/webui/static/favicon.png",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "The Samoyed Authors"
+SPDX-License-Identifier = "CC-BY-SA-4.0"

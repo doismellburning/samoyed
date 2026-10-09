@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/source/_static/logo.png" alt="Samoyed logo: a cartoon Samoyed dog" width="200"></p>
+
 # Samoyed
 
 Samoyed is a fully-featured software modem/TNC for packet radio.
@@ -136,5 +138,8 @@ Samoyed's own work is AGPL-3.0-or-later.
 Code derived from Dire Wolf remains available under Dire Wolf's GPL-2.0-or-later as well, so those files are `GPL-2.0-or-later AND AGPL-3.0-or-later`;
 GPLv3's section 13 is what lets the two be combined.
 See [LICENSES/](./LICENSES/) and [REUSE.toml](./REUSE.toml) for per-file details.
+
+The Samoyed logo is CC-BY-SA-4.0.
+The name and logo are also covered by the [trademark policy](./TRADEMARKS.md): modified versions should rebrand.
 
 Samoyed is a fork of Dire Wolf — see [AUTHORS.md](./AUTHORS.md) for authorship and attribution.
