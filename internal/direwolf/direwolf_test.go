@@ -5,6 +5,9 @@ package direwolf
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -160,4 +163,42 @@ func TestMheardPosition(t *testing.T) {
 	lat, lon = mheardPosition(object)
 	assert.Equal(t, maybe.Nothing[float64](), lat)
 	assert.Equal(t, maybe.Nothing[float64](), lon)
+}
+
+// teardownExitEnv, when set, has TestTeardownExitReleasesBeforeExiting exit
+// the test binary the way startup does when it gives up, rather than run the
+// test.
+const teardownExitEnv = "SAMOYED_TEST_TEARDOWN_EXIT"
+
+// Startup giving up part way through - a bad option once the PTT is open,
+// say - stops its goroutines and releases what it acquired before it ends
+// the process, as a stop does.  Ending the process takes the test binary
+// with it, so the test runs a copy of itself to do it.
+func TestTeardownExitReleasesBeforeExiting(t *testing.T) {
+	if os.Getenv(teardownExitEnv) != "" {
+		var td = new(teardownList)
+		td.stop = func() { fmt.Println("stopped the goroutines") }
+		td.add(func() { fmt.Println("released the ptt") })
+		td.exit(3)
+
+		return
+	}
+
+	var cmd = exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestTeardownExitReleasesBeforeExiting$") //nolint:gosec // G204: our own test binary.
+	cmd.Env = append(os.Environ(), teardownExitEnv+"=1")
+
+	var out, err = cmd.CombinedOutput()
+	var output = string(out)
+
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr, "the copy should have exited with a failure: %s", output)
+	assert.Equal(t, 3, exitErr.ExitCode(), "with the code it was given")
+	assert.Contains(t, output, "QRT")
+
+	var stopped = strings.Index(output, "stopped the goroutines")
+	var released = strings.Index(output, "released the ptt")
+
+	require.GreaterOrEqual(t, stopped, 0, "the goroutines should have been stopped: %s", output)
+	require.GreaterOrEqual(t, released, 0, "the PTT should have been released: %s", output)
+	assert.Less(t, stopped, released, "the goroutines should be stopped before the PTT is released")
 }

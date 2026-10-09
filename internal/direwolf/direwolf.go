@@ -430,6 +430,13 @@ x = Silence FX.25 information.`)
 	// that a stop part way through startup releases what it got that far.
 	var td = new(teardownList)
 
+	// Startup giving up stops the goroutines started so far before it
+	// releases anything, as a stop from outside does, so that none of them
+	// keys the PTT again once the teardown has released it.
+	var stop context.CancelFunc
+	ctx, stop = context.WithCancel(ctx)
+	td.stop = stop // DirewolfMain only ever ends in os.Exit, so this is what calls it.
+
 	// A stop can arrive at any point from here on.  Startup checks for one
 	// before each step that acquires something, and stops there rather than
 	// carrying on behind a teardown that has already finished with it.
@@ -497,7 +504,7 @@ x = Silence FX.25 information.`)
 
 	if pttErr != nil {
 		logrus.WithError(pttErr).Error("Could not set up PTT")
-		os.Exit(1)
+		td.exit(1)
 	}
 
 	// The demodulators were set up before the PTT, so that the channels
@@ -568,7 +575,7 @@ x = Silence FX.25 information.`)
 				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Invalid option '%c' for -x. Must be a, m, s, or p.\n", p)
 				text_color_set(DW_COLOR_INFO)
-				os.Exit(1)
+				td.exit(1)
 			}
 		}
 
@@ -576,7 +583,7 @@ x = Silence FX.25 information.`)
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Invalid channel %d for -x. \n", transmitCalibrationChannel)
 			text_color_set(DW_COLOR_INFO)
-			os.Exit(1)
+			td.exit(1)
 		}
 
 		if audio_config.chan_medium[transmitCalibrationChannel] == MEDIUM_RADIO {
@@ -591,7 +598,7 @@ x = Silence FX.25 information.`)
 					fmt.Printf("Channel %d has no audio output device, so calibration tones cannot be sent.\n", transmitCalibrationChannel)
 					fmt.Printf("Use -x p to key PTT without audio.\n")
 					text_color_set(DW_COLOR_INFO)
-					os.Exit(1)
+					td.exit(1)
 				}
 
 				var max_duration = 60
@@ -638,18 +645,18 @@ x = Silence FX.25 information.`)
 				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 0)
 				text_color_set(DW_COLOR_INFO)
 				stopIfCancelled(ctx, td)
-				os.Exit(0)
+				td.exit(0)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("\nMark/Space frequencies not defined for channel %d. Cannot calibrate using this modem type.\n", transmitCalibrationChannel)
 				text_color_set(DW_COLOR_INFO)
-				os.Exit(1)
+				td.exit(1)
 			}
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\nChannel %d is not configured as a radio channel.\n", transmitCalibrationChannel)
 			text_color_set(DW_COLOR_INFO)
-			os.Exit(1)
+			td.exit(1)
 		}
 	}
 
@@ -733,7 +740,7 @@ x = Silence FX.25 information.`)
 	if waypointErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%v\n", waypointErr)
-		os.Exit(1)
+		td.exit(1)
 	}
 	waypointSender.SetDebug(d_w_opt)
 
@@ -792,8 +799,7 @@ x = Silence FX.25 information.`)
 		// Nothing else will release what startup acquired - a keyed PTT
 		// above all - so do it on the way out, and whether or not a stop
 		// arrives in the meantime.
-		td.run()
-		os.Exit(1)
+		td.exit(1)
 	}
 }
 
@@ -1302,6 +1308,9 @@ func stopIfCancelled(ctx context.Context, td *teardownList) {
 type teardownList struct {
 	ran      bool // So that asking again, however it is asked, does nothing.
 	releases []func()
+
+	// stop cancels the context startup handed its goroutines, or is nil.
+	stop context.CancelFunc
 }
 
 // add arranges for run to call release.
@@ -1322,9 +1331,24 @@ func (td *teardownList) run() {
 	text_color_set(DW_COLOR_INFO)
 	logrus.Info("QRT")
 
+	// Stop the goroutines first, so that none of them is still using what is
+	// about to be released.  A stop from outside has done this already.
+	if td.stop != nil {
+		td.stop()
+	}
+
 	for _, release := range td.releases {
 		release()
 	}
+}
+
+// exit releases what startup acquired and ends the process with code, for
+// DirewolfMain giving up part way through startup.  Once it holds anything -
+// the PTT above all - DirewolfMain ends the process this way rather than with
+// os.Exit.
+func (td *teardownList) exit(code int) {
+	td.run()
+	os.Exit(code)
 }
 
 // cleanup releases what startup acquired and ends the process after a stop.
