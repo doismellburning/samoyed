@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"testing"
 
@@ -234,4 +235,38 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	layer2Receiver.RecBit(1, 0, 0, 1, false, 0)
 
 	assert.False(t, s.line.PrevRaw(), "the line decoder should not have been given any bits")
+}
+
+// A radio channel's DCD output follows the data detected on it.
+func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
+	var set []string
+
+	var sink = new(radioSink)
+	sink.setOutput = func(ot int, channel int, state int) {
+		set = append(set, fmt.Sprintf("%s %d=%d", octypeName(ot), channel, state))
+	}
+
+	sink.DCDChange(1, 1)
+	sink.DCDChange(1, 0)
+
+	assert.Equal(t, []string{"DCD 1=1", "DCD 1=0"}, set)
+}
+
+// A channel whose transmit inhibit input is set counts as busy, data or no
+// data, so nothing is transmitted on it.
+func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
+
+	assert.Equal(t, 0, r.DataDetectAny(0), "nothing heard and no inputs, so not busy")
+
+	r.getInput = func(it int, channel int) int {
+		if it == ICTYPE_TXINH && channel == 0 {
+			return 1
+		}
+
+		return 0
+	}
+
+	assert.Equal(t, 1, r.DataDetectAny(0), "transmit inhibited, so busy")
+	assert.Equal(t, 0, r.DataDetectAny(1), "another channel is not inhibited")
 }

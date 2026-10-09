@@ -157,14 +157,21 @@ type ReceiveSink interface {
 }
 
 // radioSink is the ReceiveSink for a channel with a radio on the end of it.
-type radioSink struct{}
+type radioSink struct {
+	// setOutput sets one of a channel's outputs - here only ever OCTYPE_DCD,
+	// the data carrier detect indicator - or is nil when there is nothing to
+	// set.
+	setOutput func(ot int, channel int, state int)
+}
 
 func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	dataLinkQueue.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
 }
 
 func (s *radioSink) DCDChange(channel int, state int) {
-	pttControl.Set(OCTYPE_DCD, channel, state)
+	if s.setOutput != nil {
+		s.setOutput(OCTYPE_DCD, channel, state)
+	}
 }
 
 /*------------------------------------------------------------------------------
@@ -708,6 +715,10 @@ type Layer2Receiver struct {
 	il2pDebug     int // IL2P's debug level, for every slicer's IL2P receiver.
 	sink          ReceiveSink
 
+	// getInput reads one of a channel's inputs - here only ever ICTYPE_TXINH,
+	// which inhibits transmitting - or is nil when there are none.
+	getInput func(it int, channel int) int
+
 	// Own copy of random number generator so we can get
 	// same predictable results on different operating systems.
 	// TODO: Consolidate multiple copies somewhere.
@@ -980,7 +991,7 @@ func (r *Layer2Receiver) DataDetectAny(channel int) int {
 		}
 	}
 
-	if pttControl.GetInput(ICTYPE_TXINH, channel) == 1 {
+	if r.getInput != nil && r.getInput(ICTYPE_TXINH, channel) == 1 {
 		return (1)
 	}
 

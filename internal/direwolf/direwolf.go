@@ -467,7 +467,9 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
-	multi_modem_init(audio_config, d_x_opt, d_2_opt, new(radioSink))
+	var sink = new(radioSink)
+
+	multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
 
 	/*
 	 * New in 1.8 - Allow a channel to be mapped to a network TNC rather than
@@ -502,6 +504,13 @@ x = Silence FX.25 information.`)
 		logrus.WithError(pttErr).Error("Could not set up PTT")
 		os.Exit(1)
 	}
+
+	// The demodulators were set up before the PTT, so that the channels
+	// are described before the PTT says how it is keying them.  They set
+	// the DCD output and read the transmit inhibit input, so hand them the
+	// PTT now, before anything that receives or transmits is started.
+	sink.setOutput = pttControl.Set
+	layer2Receiver.getInput = pttControl.GetInput
 
 	/*
 	 * Start the web interface before anything that can send or receive a
