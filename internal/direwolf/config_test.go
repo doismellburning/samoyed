@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -245,6 +247,14 @@ func parseConfig(t *testing.T, content string) configs {
 func parseConfigNamed(t *testing.T, pattern string, content string) configs {
 	t.Helper()
 
+	return parseConfigWith(t, pattern, content, new(symbols.Data))
+}
+
+// parseConfigWith is parseConfigNamed with the symbol table config_init looks
+// symbols up in given.
+func parseConfigWith(t *testing.T, pattern string, content string, symbolTable symbolCodes) configs {
+	t.Helper()
+
 	var tmpFile, err = os.CreateTemp(t.TempDir(), pattern)
 	require.NoError(t, err)
 	_, err = tmpFile.WriteString(content)
@@ -273,7 +283,7 @@ func parseConfigNamed(t *testing.T, pattern string, content string) configs {
 
 		defer logrus.SetOutput(oldLogOutput)
 
-		var report = config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
+		var report = config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc, symbolTable)
 		c.errors, c.warnings, c.fatal = report.errors, report.warnings, report.fatal
 	})
 
@@ -677,7 +687,7 @@ func Test_config_init_modem_directive(t *testing.T) {
 			var miscConfig misc_config_s
 
 			config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-				&ttConfig, &igateConfig, &miscConfig)
+				&ttConfig, &igateConfig, &miscConfig, nil)
 
 			assert.Equal(t, tt.wantBaud, audioConfig.achan[0].baud)
 			assert.Equal(t, tt.wantModemType, audioConfig.achan[0].modem_type)
@@ -726,7 +736,7 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 			var miscConfig misc_config_s
 
 			config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-				&ttConfig, &igateConfig, &miscConfig)
+				&ttConfig, &igateConfig, &miscConfig, nil)
 
 			if tt.wantSet {
 				assert.NotEmpty(t, digiConfig.filter_str[0][0])
@@ -771,7 +781,7 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 			var miscConfig misc_config_s
 
 			config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-				&ttConfig, &igateConfig, &miscConfig)
+				&ttConfig, &igateConfig, &miscConfig, nil)
 
 			if tt.wantSet {
 				assert.NotEmpty(t, cdigiConfig.cfilter_str[0][0])
@@ -5306,4 +5316,37 @@ func Test_parse_ll_maybe_rejects_what_it_complains_about(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
+}
+
+// recordingSymbolCodes is a symbol table that answers every description with
+// the same symbol, and records what it was asked.
+type recordingSymbolCodes struct {
+	descriptions []string
+}
+
+func (r *recordingSymbolCodes) CodeFromDescription(_ byte, description string) (byte, byte, bool) {
+	r.descriptions = append(r.descriptions, description)
+
+	return '/', '!', true
+}
+
+func (r *recordingSymbolCodes) ToTones(symtab byte, symbol byte) string {
+	return fmt.Sprintf("<%c%c>", symtab, symbol)
+}
+
+// The configuration looks symbols up in the table it is handed, both a
+// TTMACRO's symbol description and a beacon's.
+func TestConfigLooksSymbolsUpInTheTableItIsGiven(t *testing.T) {
+	var table = new(recordingSymbolCodes)
+
+	var c = parseConfigWith(t, "direwolf*.conf", "MYCALL Q1TEST\n"+
+		"TTMACRO 914 B9AB{fire truck}\n"+
+		"PBEACON delay=1 every=30 symbol=\"ambulance\"\n", table)
+
+	assert.Equal(t, []string{"fire truck", "ambulance"}, table.descriptions)
+	require.Len(t, c.tt.ttlocs, 1)
+	assert.Contains(t, c.tt.ttlocs[0].macro.definition, "</!>")
+	require.Equal(t, 1, c.misc.num_beacons)
+	assert.Equal(t, byte('/'), c.misc.beacon[0].symtab)
+	assert.Equal(t, byte('!'), c.misc.beacon[0].symbol)
 }

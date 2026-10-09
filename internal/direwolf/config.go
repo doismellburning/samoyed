@@ -37,6 +37,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
@@ -877,6 +878,13 @@ func rtfm() {
 	dw_printf("    general APRS info:    https://how.aprs.works\n")
 }
 
+// symbolCodes is the APRS symbol table, as far as the configuration needs it:
+// to turn a symbol description into its code, and a code into touch tones.
+type symbolCodes interface {
+	CodeFromDescription(overlay byte, description string) (byte, byte, bool)
+	ToTones(symtab byte, symbol byte) string
+}
+
 // parseState holds the mutable parsing context threaded through config_init.
 type parseState struct {
 	channel int
@@ -892,6 +900,9 @@ type parseState struct {
 	tt    *tt_config_s
 	igate *igate_config_s
 	misc  *misc_config_s
+
+	// symbols is where a symbol given by description is looked up.
+	symbols symbolCodes
 
 	// Tallies of what the file turned out to be like, for the caller to act on.
 	// An error means the configuration is wrong - a directive that could not be
@@ -1215,7 +1226,8 @@ func config_init(fname string, p_audio_config *RadioConfig,
 	p_cdigi_config *cdigi_config_s,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
-	p_misc_config *misc_config_s) configReport {
+	p_misc_config *misc_config_s,
+	symbolTable symbolCodes) configReport {
 	logrus.WithField("fname", fname).Debug("config_init")
 
 	/*
@@ -1410,6 +1422,13 @@ func config_init(fname string, p_audio_config *RadioConfig,
 	/* on the other end. */
 	p_misc_config.noxid_count = 0
 
+	// The two lookups the configuration makes need only the built-in tables,
+	// which a zero symbols.Data has, so a caller without a table of its own
+	// gets that.
+	if symbolTable == nil {
+		symbolTable = new(symbols.Data)
+	}
+
 	// Persistent context as we work through the file
 	var ps = &parseState{
 		channel: 0,
@@ -1424,6 +1443,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		tt:      p_tt_config,
 		igate:   p_igate_config,
 		misc:    p_misc_config,
+		symbols: symbolTable,
 
 		nerrors:   0,
 		nwarnings: 0,
@@ -4526,7 +4546,7 @@ func handleTTMACRO(ps *parseState) error {
 			if len(tmp) > 0 && tmp[0] == '}' {
 				// First try to find something matching the description.
 
-				var symtab, symbol, ok = aprsSymbolData.CodeFromDescription(' ', stemp.String())
+				var symtab, symbol, ok = ps.symbols.CodeFromDescription(' ', stemp.String())
 
 				if !ok {
 					ps.errorf("line %d: Couldn't convert \"%s\" to APRS symbol code.  Using default", ps.line, stemp.String())
@@ -4536,7 +4556,7 @@ func handleTTMACRO(ps *parseState) error {
 
 				// Convert symtab(overlay) & symbol to tone sequence.
 
-				var ttemp = aprsSymbolData.ToTones(symtab, symbol)
+				var ttemp = ps.symbols.ToTones(symtab, symbol)
 
 				//text_color_set(DW_COLOR_DEBUG);
 				//dw_printf ("DEBUG config file Line %d: AB{%s} -> %s\n", line, stemp, ttemp);
@@ -6420,7 +6440,7 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) er
 			}
 		} else {
 			/* Try to look up by description. */
-			var symtab, symbol, ok = aprsSymbolData.CodeFromDescription(b.symtab, temp_symbol)
+			var symtab, symbol, ok = ps.symbols.CodeFromDescription(b.symtab, temp_symbol)
 			if ok {
 				b.symtab = symtab
 				b.symbol = symbol
