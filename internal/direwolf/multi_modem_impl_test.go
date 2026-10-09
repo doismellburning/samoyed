@@ -52,14 +52,6 @@ func (s *multiModemImplSink) DCDChange(int, int) {}
 func newMultiModemImplTest(t *testing.T, numSubchan int, numSlicers int) (*MultiModem, *multiModemImplSink) {
 	t.Helper()
 
-	var origLayer2Receiver = layer2Receiver
-
-	t.Cleanup(func() {
-		layer2Receiver = origLayer2Receiver
-	})
-
-	layer2Receiver = nil
-
 	var d = new(Demodulator)
 	d.numSubchan = numSubchan
 	d.numSlicers = numSlicers
@@ -259,10 +251,7 @@ func TestMultiModemImplPickBestCandidateTrace(t *testing.T) {
 
 // A frame waits processAge samples for others to turn up, then goes on.
 func TestMultiModemImplProcessSamplePicksAfterAge(t *testing.T) {
-	var origLayer2Receiver = layer2Receiver
-
 	t.Cleanup(func() {
-		layer2Receiver = origLayer2Receiver
 		multiModems = newMultiModems()
 	})
 
@@ -297,10 +286,7 @@ func TestMultiModemImplProcessSamplePicksAfterAge(t *testing.T) {
 
 // Baud rates for QPSK and 8PSK are in bits, but the wait is in symbols.
 func TestMultiModemImplInitProcessAgeInSymbols(t *testing.T) {
-	var origLayer2Receiver = layer2Receiver
-
 	t.Cleanup(func() {
-		layer2Receiver = origLayer2Receiver
 		multiModems = newMultiModems()
 	})
 

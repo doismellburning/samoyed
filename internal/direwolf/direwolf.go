@@ -50,7 +50,6 @@ import (
  *---------------------------------------------------------------*/
 
 var aprsSymbolData *symbols.Data
-var layer2Receiver *Layer2Receiver
 
 /*-------------------------------------------------------------------
  *
@@ -467,7 +466,7 @@ x = Silence FX.25 information.`)
 	 */
 	var sink = new(radioSink)
 
-	multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
+	var layer2Receiver = multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
 
 	/*
 	 * New in 1.8 - Allow a channel to be mapped to a network TNC rather than
@@ -532,7 +531,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, onTransmit, d_p_opt, d_x_opt, d_2_opt)
+	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, layer2Receiver.DataDetectAny, onTransmit, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx, td)
 
 	/*
@@ -756,7 +755,7 @@ x = Silence FX.25 information.`)
 	 * Use hot attribute for all functions called for every audio sample.
 	 */
 
-	var adev_failed = recv_init(ctx, audio_config, audioDevices, ttGateway.Button)
+	var adev_failed = recv_init(ctx, audio_config, audioDevices, ttGateway.Button, layer2Receiver.DCDChange)
 
 	var recHandler = new(recPacketHandler)
 	recHandler.audioConfig = audio_config

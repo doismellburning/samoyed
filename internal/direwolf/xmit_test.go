@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/il2p"
@@ -684,18 +685,35 @@ func TestXmitNextBundlesOrdinaryFrames(t *testing.T) {
 	assert.Nil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO))
 }
 
+// A channel with something being heard on it is waited for, rather than
+// talked over, until it clears.
+func TestWaitForClearChannelWaitsWhileBusy(t *testing.T) {
+	var xs = setupXmitTransmission(t)
+
+	var asked = 0
+
+	xs.dataDetect = func(channel int) int {
+		require.Equal(t, 0, channel)
+
+		asked++
+
+		return dwutil.IfThenElse(asked < 3, 1, 0) // Busy the first two times.
+	}
+
+	transmitQueue.Append(0, TQ_PRIO_0_HI, newTestPacket(t)) // So no random wait.
+
+	assert.True(t, xs.wait_for_clear_channel(t.Context(), 0, 0, 255, false))
+	assert.GreaterOrEqual(t, asked, 3, "the channel should have been asked about until it cleared")
+
+	xs.audio.outputMu[ACHAN2ADEV(0)].Unlock() // Which a clear channel leaves locked.
+}
+
 // Shutting down while waiting for a clear channel is not a timeout: the wait
 // stops straight away, and the frame is left on the queue rather than
 // discarded as though the channel had been busy for a minute.  Nor may the
 // loop around it go straight back for the same frame again.
 func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
 	var xs = setupXmitTransmission(t)
-
-	var origReceiver = layer2Receiver
-
-	t.Cleanup(func() { layer2Receiver = origReceiver })
-
-	layer2Receiver = NewLayer2Receiver(xs.p_modem, [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
 
 	xs.timing[0].slottime = 100 // A second per slot,
 	xs.timing[0].persist = -1   // and never our turn.

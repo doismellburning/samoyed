@@ -114,8 +114,9 @@ const PROCESS_AFTER_BITS = 3
 type MultiModem struct {
 	channel     int
 	audioConfig *RadioConfig
-	demodulator *Demodulator // nil for a channel that is not a radio.
-	sink        ReceiveSink  // Where the frames it picks go.
+	demodulator *Demodulator    // nil for a channel that is not a radio.
+	receiver    *Layer2Receiver // Asked whether FX.25 is mid-block; nil for never.
+	sink        ReceiveSink     // Where the frames it picks go.
 
 	candidates [MAX_SUBCHANS][MAX_SLICERS]candidate_t
 
@@ -189,19 +190,28 @@ func (s *radioSink) DCDChange(channel int, state int) {
  *
  *		sink	- Where the decoders' output goes.
  *
- * Outputs:
+ * Returns:	The layer 2 receiver the demodulators hand their bits to, for
+ *		whatever else wants to know what it is hearing.
  *
  * Description:	Called once at application startup time.
  *
  *------------------------------------------------------------------------------*/
 
-func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink ReceiveSink) {
+func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink ReceiveSink) *Layer2Receiver {
 	demod_init(pa)
-	layer2Receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, il2pDebug, sink)
+
+	var receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, il2pDebug, sink)
+
+	for _, d := range demodulators {
+		if d != nil {
+			d.setReceiver(receiver)
+		}
+	}
 
 	for channel, m := range multiModems {
 		m.audioConfig = pa
 		m.demodulator = demodulators[channel]
+		m.receiver = receiver
 		m.sink = sink
 
 		// Anything still waiting to be picked came from before, e.g. the
@@ -229,6 +239,8 @@ func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink Receiv
 			//crc_queue_of_last_to_app[channel] = nil;
 		}
 	}
+
+	return receiver
 }
 
 /*------------------------------------------------------------------------------
@@ -310,7 +322,7 @@ func (m *MultiModem) ProcessSample(audio_sample int) {
 			if c.packet_p != nil {
 				c.age++
 				if c.age > m.processAge {
-					if layer2Receiver.fx25Busy(channel) {
+					if m.receiver.fx25Busy(channel) {
 						c.age = 0
 					} else {
 						m.pickBestCandidate()
@@ -416,7 +428,7 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, a
 
 	if numSubchan == 1 &&
 		numSlicers == 1 &&
-		!layer2Receiver.fx25Busy(channel) {
+		!m.receiver.fx25Busy(channel) {
 		var drop_it = false
 
 		if pa.recv_error_rate != 0 {

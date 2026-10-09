@@ -135,6 +135,10 @@ type XmitService struct {
 	// to key the transmitter - or is nil when there is nothing to key.
 	setOutput func(ot int, channel int, state int)
 
+	// dataDetect says whether anything is being heard on a channel (above 0)
+	// or not, or is nil when nothing can be.
+	dataDetect func(channel int) int
+
 	p_modem   *RadioConfig
 	fx25Debug int
 	il2pDebug int
@@ -154,6 +158,10 @@ type XmitService struct {
  *
  *		setOutput	- Sets a channel's output, PTT here, to key the
  *				  transmitter; nil for nothing to key.
+ *
+ *		dataDetect	- Says whether a channel is busy with something
+ *				  being heard, so as to wait for it to clear; nil
+ *				  for never.
  *
  *		onTransmit	- Called with each frame we send, and its
  *				  channel; nil for nobody to tell.
@@ -184,6 +192,7 @@ func NewXmitService(
 	audio *AudioDevices,
 	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator,
 	setOutput func(ot int, channel int, state int),
+	dataDetect func(channel int) int,
 	onTransmit func(channel int, pp *ax25.Packet),
 	debug_xmit_packet bool,
 	fx25Debug int,
@@ -196,6 +205,7 @@ func NewXmitService(
 	xs.toneGenerators = toneGenerators
 	xs.onTransmit = onTransmit
 	xs.setOutput = setOutput
+	xs.dataDetect = dataDetect
 	xs.fx25Debug = fx25Debug
 	xs.il2pDebug = il2pDebug
 
@@ -238,6 +248,12 @@ func NewXmitService(
 	logrus.Debug("xmit_init: finished")
 
 	return xs
+}
+
+// channelBusy is whether something is being heard on a channel, so that
+// transmitting would talk over it.
+func (xs *XmitService) channelBusy(channel int) bool {
+	return xs.dataDetect != nil && xs.dataDetect(channel) > 0
 }
 
 // keyPTT turns a channel's transmitter on (state 1) or off (0), if there is a
@@ -1315,7 +1331,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 	if !fulldup {
 	start_over_again:
 
-		for layer2Receiver.DataDetectAny(channel) > 0 {
+		for xs.channelBusy(channel) {
 			if !dwutil.SleepCtx(ctx, WAIT_CHECK_EVERY_MS*time.Millisecond) {
 				return false
 			}
@@ -1339,7 +1355,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 			}
 		}
 
-		if layer2Receiver.DataDetectAny(channel) > 0 {
+		if xs.channelBusy(channel) {
 			goto start_over_again
 		}
 
@@ -1352,7 +1368,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 				return false
 			}
 
-			if layer2Receiver.DataDetectAny(channel) > 0 {
+			if xs.channelBusy(channel) {
 				goto start_over_again
 			}
 

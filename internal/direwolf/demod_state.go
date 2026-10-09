@@ -19,6 +19,10 @@ type demodulator_state_s struct {
 	 */
 	modem_type modem_t // MODEM_AFSK, MODEM_8PSK, etc.
 
+	// receiver is where the bits demodulated go, and is told when data
+	// starts and stops being detected.  multi_modem_init sets it.
+	receiver bitReceiver
+
 	//	enum v26_e v26_alt;			// Which alternative when V.26.
 
 	profile rune // 'A', 'B', etc.	Upper case.

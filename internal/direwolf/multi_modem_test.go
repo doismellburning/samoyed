@@ -77,12 +77,12 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 	audioConfig.achan[0].profiles = "ABA"
 	audioConfig.achan[0].num_freq = 1
 
-	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
+	var receiver = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
 	require.NotNil(t, demodulators[0])
 	assert.Equal(t, 3, demodulators[0].NumSubchan())
 	assert.Same(t, demodulators[0], multiModems[0].demodulator)
-	assert.Equal(t, 3, layer2Receiver.numSubchannel[0])
+	assert.Equal(t, 3, receiver.numSubchannel[0])
 }
 
 // atest hands multi_modem_init a configuration of its own, carrying its
@@ -97,9 +97,9 @@ func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
 	audioConfig.achan[0].il2p_version = il2p.Version04
 	audioConfig.achan[0].il2p_crc = false
 
-	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
+	var receiver = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
-	var rx = layer2Receiver.slicer[0][0][0].il2p
+	var rx = receiver.slicer[0][0][0].il2p
 	assert.Equal(t, il2p.Version04, rx.Version())
 	assert.False(t, rx.CRC())
 }
@@ -117,11 +117,11 @@ func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
 	audioConfig.achan[0].num_freq = 1
 
 	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
-	multi_modem_init(audioConfig, 3, 0, new(recordingReceiveSink))
+	var receiver = multi_modem_init(audioConfig, 3, 0, new(recordingReceiveSink))
 
-	for sub := range layer2Receiver.numSubchannel[0] {
+	for sub := range receiver.numSubchannel[0] {
 		for slice := range MAX_SLICERS {
-			assert.Equal(t, 3, layer2Receiver.slicer[0][sub][slice].fx25.Debug(), "subchannel %d, slice %d", sub, slice)
+			assert.Equal(t, 3, receiver.slicer[0][sub][slice].fx25.Debug(), "subchannel %d, slice %d", sub, slice)
 		}
 	}
 }
@@ -139,11 +139,11 @@ func TestMultiModemInitHandsIL2PItsDebugLevel(t *testing.T) {
 	audioConfig.achan[0].num_freq = 1
 
 	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
-	multi_modem_init(audioConfig, 0, 2, new(recordingReceiveSink))
+	var receiver = multi_modem_init(audioConfig, 0, 2, new(recordingReceiveSink))
 
-	for sub := range layer2Receiver.numSubchannel[0] {
+	for sub := range receiver.numSubchannel[0] {
 		for slice := range MAX_SLICERS {
-			assert.Equal(t, 2, layer2Receiver.slicer[0][sub][slice].il2p.Debug(), "subchannel %d, slice %d", sub, slice)
+			assert.Equal(t, 2, receiver.slicer[0][sub][slice].il2p.Debug(), "subchannel %d, slice %d", sub, slice)
 		}
 	}
 }
@@ -152,17 +152,14 @@ func TestMultiModemInitHandsIL2PItsDebugLevel(t *testing.T) {
 // costs: undoing NRZI, then the HDLC, FX.25 and IL2P receivers that each
 // look at it.  The bits are noise, as most of what a receiver hears is.
 func BenchmarkLayer2ReceiveBit(b *testing.B) {
-	var origReceiver = layer2Receiver
-
 	b.Cleanup(func() {
-		layer2Receiver = origReceiver
 		multiModems = newMultiModems()
 	})
 
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].num_freq = 1
 
-	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
+	var receiver = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
 	var rng = rand.New(rand.NewPCG(1, 2))
 
@@ -174,7 +171,7 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 	b.ResetTimer()
 
 	for i := range b.N {
-		layer2Receiver.RecBit(0, 0, 0, bits[i%len(bits)], false, 0)
+		receiver.RecBit(0, 0, 0, bits[i%len(bits)], false, 0)
 	}
 }
 
@@ -182,10 +179,7 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 // neither the line decoder nor the HDLC, FX.25 or IL2P receivers should see
 // them.  Other channels have no EAS receiver at all.
 func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
-	var origReceiver = layer2Receiver
-
 	t.Cleanup(func() {
-		layer2Receiver = origReceiver
 		multiModems = newMultiModems()
 	})
 
@@ -197,11 +191,11 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	audioConfig.achan[1].mark_freq = 2083
 	audioConfig.achan[1].space_freq = 1563
 
-	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
+	var receiver = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
-	assert.Nil(t, layer2Receiver.slicer[0][0][0].eas)
+	assert.Nil(t, receiver.slicer[0][0][0].eas)
 
-	var s = layer2Receiver.slicer[1][0][0]
+	var s = receiver.slicer[1][0][0]
 	require.NotNil(t, s.eas)
 
 	// An EAS receiver of the same kind, but one whose messages this test can
@@ -224,7 +218,7 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	// bit first.
 	for _, b := range []byte{0xab, 0xab, 0xab, 0xab, 'N', 'N', 'N', 'N'} {
 		for i := range 8 {
-			layer2Receiver.RecBit(1, 0, 0, int(b>>i)&1, false, 0)
+			receiver.RecBit(1, 0, 0, int(b>>i)&1, false, 0)
 		}
 	}
 
@@ -232,7 +226,7 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 
 	// "NNNN" ends on a 0, which is also where an untouched line decoder
 	// starts, so end on a 1 that the decoder would remember if it saw it.
-	layer2Receiver.RecBit(1, 0, 0, 1, false, 0)
+	receiver.RecBit(1, 0, 0, 1, false, 0)
 
 	assert.False(t, s.line.PrevRaw(), "the line decoder should not have been given any bits")
 }
@@ -269,4 +263,42 @@ func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {
 
 	assert.Equal(t, 1, r.DataDetectAny(0), "transmit inhibited, so busy")
 	assert.Equal(t, 0, r.DataDetectAny(1), "another channel is not inhibited")
+}
+
+// countingBitReceiver counts the bits handed to it, and ignores the rest.
+type countingBitReceiver struct {
+	bits int
+}
+
+func (r *countingBitReceiver) RecBit(int, int, int, int, bool, int) { r.bits++ }
+
+func (r *countingBitReceiver) RecBitNew(int, int, int, int, bool, int, *int64, *int) { r.bits++ }
+
+func (r *countingBitReceiver) DCDChange(int, int, int, int) {}
+
+// What a demodulator demodulates goes to the receiver it was given - noise
+// decodes to bits like anything else.
+func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
+	var origDemodulators = demodulators
+
+	t.Cleanup(func() {
+		demodulators = origDemodulators
+		multiModems = newMultiModems()
+	})
+
+	var audioConfig = newRecvTestRadioConfig(1)
+	audioConfig.achan[0].num_freq = 1
+
+	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
+
+	var receiver = new(countingBitReceiver)
+	demodulators[0].setReceiver(receiver)
+
+	var rng = rand.New(rand.NewPCG(1, 2))
+
+	for range audioConfig.adev[0].samples_per_sec / 10 {
+		multi_modem_process_sample(0, rng.IntN(20000)-10000)
+	}
+
+	assert.Positive(t, receiver.bits)
 }

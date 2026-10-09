@@ -109,11 +109,9 @@ func generate9600(t *testing.T, audioConfig *RadioConfig, channel int, frames []
 func demodulate9600(t *testing.T, audioConfig *RadioConfig, channel int, samples []int) []*ax25.Packet {
 	t.Helper()
 
-	var origReceiver = layer2Receiver
 	var origDemodulators = demodulators
 
 	t.Cleanup(func() {
-		layer2Receiver = origReceiver
 		demodulators = origDemodulators
 		multiModems = newMultiModems()
 	})

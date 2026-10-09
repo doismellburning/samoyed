@@ -91,7 +91,7 @@ func TestRecvInitReportsTheDeviceWhoseInputFailed(t *testing.T) {
 
 	var src = setupRecvTest(t, audioConfig, silence16(2000))
 
-	var failed = recv_init(t.Context(), audioConfig, src, nil)
+	var failed = recv_init(t.Context(), audioConfig, src, nil, nil)
 
 	select {
 	case a := <-failed:
@@ -109,7 +109,7 @@ func TestRecvInitStartsNothingForAnUndefinedDevice(t *testing.T) {
 
 	var src = setupRecvTest(t, audioConfig, silence16(2000))
 
-	var failed = recv_init(t.Context(), audioConfig, src, nil)
+	var failed = recv_init(t.Context(), audioConfig, src, nil, nil)
 
 	select {
 	case a := <-failed:
@@ -134,7 +134,7 @@ func TestRecvAdevThreadStopsWhenCancelledWithoutReportingAFailure(t *testing.T) 
 	var done = make(chan struct{})
 
 	go func() {
-		recv_adev_thread(ctx, audioConfig, 0, failed, src, nil)
+		recv_adev_thread(ctx, audioConfig, 0, failed, src, nil, nil)
 		close(done)
 	}()
 
@@ -166,7 +166,7 @@ func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
 	multiModems[0].dcAverage = 0
 	multiModems[1].dcAverage = 0
 
-	var failed = recv_init(t.Context(), audioConfig, src, nil)
+	var failed = recv_init(t.Context(), audioConfig, src, nil, nil)
 
 	select {
 	case <-failed:
@@ -194,7 +194,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 		}
 	}
 
-	var failed = recv_init(t.Context(), audioConfig, src, onButton)
+	var failed = recv_init(t.Context(), audioConfig, src, onButton, nil)
 
 	select {
 	case <-failed:
@@ -213,7 +213,7 @@ func TestRecvAdevThreadDecodesTouchTonesForNobody(t *testing.T) {
 
 	var src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
-	var failed = recv_init(t.Context(), audioConfig, src, nil)
+	var failed = recv_init(t.Context(), audioConfig, src, nil, nil)
 
 	select {
 	case <-failed:
@@ -238,7 +238,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 		}
 	}
 
-	var failed = recv_init(t.Context(), audioConfig, src, onButton)
+	var failed = recv_init(t.Context(), audioConfig, src, onButton, nil)
 
 	select {
 	case <-failed:
