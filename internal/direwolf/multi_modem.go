@@ -1003,6 +1003,13 @@ func (r *Layer2Receiver) DataDetectAny(channel int) int {
 		}
 	}
 
+	// The DTMF decoder reports itself as the subchannel after the
+	// demodulators' last.  Dire Wolf left it out here, so a button being held
+	// neither kept the transmitter off the channel nor showed on DCD.
+	if slices.Contains(r.compositeDCD[channel][MAX_SUBCHANS][:], true) {
+		return (1)
+	}
+
 	if r.getInput != nil && r.getInput(ICTYPE_TXINH, channel) == 1 {
 		return (1)
 	}

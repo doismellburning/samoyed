@@ -265,6 +265,37 @@ func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {
 	assert.Equal(t, 0, r.DataDetectAny(1), "another channel is not inhibited")
 }
 
+// dcdRecordingSink is a ReceiveSink that records the DCD changes it is told
+// of, and ignores frames.
+type dcdRecordingSink struct {
+	discardReceiveSink
+
+	changes []string
+}
+
+func (s *dcdRecordingSink) DCDChange(channel int, state int) {
+	s.changes = append(s.changes, fmt.Sprintf("%d=%d", channel, state))
+}
+
+// A touch-tone button being held makes its channel busy, as a packet being
+// heard does, so nothing is transmitted over it, and raises the channel's
+// DCD indicator.  The DTMF decoder reports itself as subchannel
+// MAX_SUBCHANS, after the demodulators' subchannels.
+func TestDTMFButtonMakesChannelBusy(t *testing.T) {
+	var sink = new(dcdRecordingSink)
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
+
+	r.DCDChange(0, MAX_SUBCHANS, 0, 1)
+
+	assert.Equal(t, 1, r.DataDetectAny(0), "a button is held, so busy")
+	assert.Equal(t, 0, r.DataDetectAny(1), "another channel hears no button")
+
+	r.DCDChange(0, MAX_SUBCHANS, 0, 0)
+
+	assert.Equal(t, 0, r.DataDetectAny(0), "the button is released, so not busy")
+	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
+}
+
 // countingBitReceiver counts the bits handed to it, and ignores the rest.
 type countingBitReceiver struct {
 	bits int
