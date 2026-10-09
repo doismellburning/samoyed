@@ -192,6 +192,10 @@ type AX25Link struct {
 
 	miscConfig *misc_config_s
 
+	// setOutput sets one of a channel's outputs - here only ever OCTYPE_CON,
+	// the connected indicator - or is nil when there is nothing to set.
+	setOutput func(ot int, channel int, state int)
+
 	// Debug switches for different types of information.
 	// Should have command line options instead of changing source and recompiling.
 
@@ -601,17 +605,21 @@ func WITHIN_WINDOW_SIZE(x *ax25_dlsm_t) bool { // TODO int is fake
  * Inputs:	pconfig		- misc. configuration from config file or command line.
  *				  Beacon stuff ended up here.
  *
+ *		setOutput	- Sets a channel's output, the connected
+ *				  indicator here; nil for nothing to set.
+ *
  *		debug 		- debug level.
  *
  * Outputs:	Remember required information for future use.  That's all.
  *
  *--------------------------------------------------------------------*/
 
-func ax25_link_init(pconfig *misc_config_s, debug int) {
+func ax25_link_init(pconfig *misc_config_s, setOutput func(ot int, channel int, state int), debug int) {
 	/*
 	 * Save parameters for later use.
 	 */
 	ax25Link.miscConfig = pconfig
+	ax25Link.setOutput = setOutput
 
 	if debug >= 1 { // Only single level so far.
 		ax25Link.debugProtocolErrors = true // Less serious Protocol errors.
@@ -5871,10 +5879,10 @@ func enter_new_state(S *ax25_dlsm_t, new_state dlsm_state_e) {
 
 	if (new_state == state_3_connected || new_state == state_4_timer_recovery) &&
 		S.state != state_3_connected && S.state != state_4_timer_recovery {
-		pttControl.Set(OCTYPE_CON, S.channel, 1) // Turn on connected indicator if configured.
+		setConnectedIndicator(S.channel, 1) // Turn on connected indicator if configured.
 	} else if (new_state != state_3_connected && new_state != state_4_timer_recovery) &&
 		(S.state == state_3_connected || S.state == state_4_timer_recovery) {
-		pttControl.Set(OCTYPE_CON, S.channel, 0) // Turn off connected indicator if configured.
+		setConnectedIndicator(S.channel, 0) // Turn off connected indicator if configured.
 		// Ideally we should look at any other link state machines
 		// for this channel and leave the indicator on if any
 		// are connected.  I'm not that worried about it.
@@ -5882,6 +5890,14 @@ func enter_new_state(S *ax25_dlsm_t, new_state dlsm_state_e) {
 
 	S.state = new_state
 } /* end enter_new_state */
+
+// setConnectedIndicator turns a channel's connected indicator on (state 1) or
+// off (0), if there is anything to set.
+func setConnectedIndicator(channel int, state int) {
+	if ax25Link.setOutput != nil {
+		ax25Link.setOutput(OCTYPE_CON, channel, state)
+	}
+}
 
 /*------------------------------------------------------------------------------
  *

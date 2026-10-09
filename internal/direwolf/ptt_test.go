@@ -68,25 +68,6 @@ func setupGPIODChannel(t *testing.T, invert bool) (*PTT, *mockGPIODLine) {
 	return p, mock
 }
 
-// usePTT makes a PTT for cfg the one the rest of the package keys, for the
-// duration of the test.
-func usePTT(t *testing.T, cfg *RadioConfig) {
-	t.Helper()
-
-	var p, err = NewPTT(cfg, 0)
-	require.NoError(t, err)
-
-	var saved = pttControl
-
-	pttControl = p
-
-	t.Cleanup(func() {
-		p.Term()
-
-		pttControl = saved
-	})
-}
-
 // TestPttSetRealGPIOD_Activate verifies that PTT-active drives the line high.
 func TestPttSetRealGPIOD_Activate(t *testing.T) {
 	var p, mock = setupGPIODChannel(t, false)

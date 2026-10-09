@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -515,4 +516,28 @@ func TestDLDataIndicationShortSegments(t *testing.T) {
 			assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
 		})
 	}
+}
+
+// A link coming up turns on its channel's connected indicator, and going down
+// turns it off again.
+func TestEnterNewStateSetsConnectedIndicator(t *testing.T) {
+	var origSetOutput = ax25Link.setOutput
+
+	t.Cleanup(func() { ax25Link.setOutput = origSetOutput })
+
+	var set []string
+
+	ax25Link.setOutput = func(ot int, channel int, state int) {
+		set = append(set, fmt.Sprintf("%s %d=%d", octypeName(ot), channel, state))
+	}
+
+	var S = new(ax25_dlsm_t)
+	S.channel = 1
+	S.state = state_1_awaiting_connection
+
+	enter_new_state(S, state_3_connected)
+	enter_new_state(S, state_4_timer_recovery) // Still connected, so no change.
+	enter_new_state(S, state_0_disconnected)
+
+	assert.Equal(t, []string{"CON 1=1", "CON 1=0"}, set)
 }

@@ -131,6 +131,10 @@ type XmitService struct {
 	// onTransmit is told each frame we send, and its channel, or is nil.
 	onTransmit func(channel int, pp *ax25.Packet)
 
+	// setOutput sets one of a channel's outputs - here only ever OCTYPE_PTT,
+	// to key the transmitter - or is nil when there is nothing to key.
+	setOutput func(ot int, channel int, state int)
+
 	p_modem   *RadioConfig
 	fx25Debug int
 	il2pDebug int
@@ -147,6 +151,9 @@ type XmitService struct {
  *		audio		- The audio devices to transmit through.
  *
  *		toneGenerators	- Each radio channel's tone generator.
+ *
+ *		setOutput	- Sets a channel's output, PTT here, to key the
+ *				  transmitter; nil for nothing to key.
  *
  *		onTransmit	- Called with each frame we send, and its
  *				  channel; nil for nobody to tell.
@@ -176,6 +183,7 @@ func NewXmitService(
 	p_modem *RadioConfig,
 	audio *AudioDevices,
 	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator,
+	setOutput func(ot int, channel int, state int),
 	onTransmit func(channel int, pp *ax25.Packet),
 	debug_xmit_packet bool,
 	fx25Debug int,
@@ -187,6 +195,7 @@ func NewXmitService(
 	xs.audio = audio
 	xs.toneGenerators = toneGenerators
 	xs.onTransmit = onTransmit
+	xs.setOutput = setOutput
 	xs.fx25Debug = fx25Debug
 	xs.il2pDebug = il2pDebug
 
@@ -229,6 +238,14 @@ func NewXmitService(
 	logrus.Debug("xmit_init: finished")
 
 	return xs
+}
+
+// keyPTT turns a channel's transmitter on (state 1) or off (0), if there is a
+// PTT to key.
+func (xs *XmitService) keyPTT(channel int, state int) {
+	if xs.setOutput != nil {
+		xs.setOutput(OCTYPE_PTT, channel, state)
+	}
 }
 
 /*-------------------------------------------------------------------
@@ -737,7 +754,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 		"channel": channel,
 		"speed":   xs.bits_per_sec[channel],
 	}).Debug("xmit_thread: Turn on PTT now")
-	pttControl.Set(OCTYPE_PTT, channel, 1)
+	xs.keyPTT(channel, 1)
 
 	// Inform data link state machine that we are now transmitting.
 
@@ -909,7 +926,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 		"duration_ms": durationMS,
 	}).Debug("xmit_thread: Turn off PTT now")
 
-	pttControl.Set(OCTYPE_PTT, channel, 0)
+	xs.keyPTT(channel, 0)
 } /* end xmit_ax25_frames */
 
 /*-------------------------------------------------------------------
@@ -1075,7 +1092,7 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) 
 	/*
 	 * Turn on transmitter.
 	 */
-	pttControl.Set(OCTYPE_PTT, c, 1)
+	xs.keyPTT(c, 1)
 
 	/*
 	 * Invoke the speech-to-text script.
@@ -1087,7 +1104,7 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) 
 	 * Turn off transmitter.
 	 */
 
-	pttControl.Set(OCTYPE_PTT, c, 0)
+	xs.keyPTT(c, 0)
 } /* end xmit_speech */
 
 /* Broken out into separate function so configuration can validate it. */
@@ -1157,7 +1174,7 @@ func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, string(pinfo))
 
-	pttControl.Set(OCTYPE_PTT, c, 1)
+	xs.keyPTT(c, 1)
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
@@ -1175,7 +1192,7 @@ func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 		time.Sleep(timeToWait)
 	}
 
-	pttControl.Set(OCTYPE_PTT, c, 0)
+	xs.keyPTT(c, 0)
 } /* end xmit_morse */
 
 /*-------------------------------------------------------------------
@@ -1208,7 +1225,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, string(pinfo))
 
-	pttControl.Set(OCTYPE_PTT, c, 1)
+	xs.keyPTT(c, 1)
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
@@ -1229,7 +1246,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 		dw_printf("Oops.  CPU too slow to keep up with DTMF generation.\n")
 	}
 
-	pttControl.Set(OCTYPE_PTT, c, 0)
+	xs.keyPTT(c, 0)
 } /* end xmit_dtmf */
 
 /*-------------------------------------------------------------------

@@ -51,7 +51,6 @@ import (
 
 var aprsSymbolData *symbols.Data
 var agwServer *AGWServer
-var pttControl *PTT
 var layer2Receiver *Layer2Receiver
 
 /*-------------------------------------------------------------------
@@ -467,7 +466,9 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
-	multi_modem_init(audio_config, d_x_opt, d_2_opt, new(radioSink))
+	var sink = new(radioSink)
+
+	multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
 
 	/*
 	 * New in 1.8 - Allow a channel to be mapped to a network TNC rather than
@@ -492,9 +493,7 @@ x = Silence FX.25 information.`)
 	 * Push to Talk (PTT) control.
 	 */
 
-	var pttErr error
-
-	pttControl, pttErr = NewPTT(audio_config, d_o_opt)
+	var pttControl, pttErr = NewPTT(audio_config, d_o_opt)
 	td.add(pttControl.Term) // Which does nothing if there is no PTT.
 	stopIfCancelled(ctx, td)
 
@@ -502,6 +501,13 @@ x = Silence FX.25 information.`)
 		logrus.WithError(pttErr).Error("Could not set up PTT")
 		os.Exit(1)
 	}
+
+	// The demodulators were set up before the PTT, so that the channels
+	// are described before the PTT says how it is keying them.  They set
+	// the DCD output and read the transmit inhibit input, so hand them the
+	// PTT now, before anything that receives or transmits is started.
+	sink.setOutput = pttControl.Set
+	layer2Receiver.getInput = pttControl.GetInput
 
 	/*
 	 * Start the web interface before anything that can send or receive a
@@ -520,7 +526,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, publishTransmitted, d_p_opt, d_x_opt, d_2_opt)
+	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, publishTransmitted, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx, td)
 
 	/*
@@ -652,7 +658,7 @@ x = Silence FX.25 information.`)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)
 	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
-	ax25_link_init(misc_config, d_c_opt)
+	ax25_link_init(misc_config, pttControl.Set, d_c_opt)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
