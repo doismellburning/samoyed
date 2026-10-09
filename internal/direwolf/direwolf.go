@@ -51,7 +51,6 @@ import (
  *---------------------------------------------------------------*/
 
 var aprsSymbolData *symbols.Data
-var agwServer *AGWServer
 var layer2Receiver *Layer2Receiver
 
 /*-------------------------------------------------------------------
@@ -670,7 +669,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
+	var agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
 	monitorAGW.Store(agwServer)
 
 	// The connected-mode link layer, after the AGW server whose clients it
