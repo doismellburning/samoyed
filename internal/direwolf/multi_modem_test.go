@@ -270,3 +270,41 @@ func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {
 	assert.Equal(t, 1, r.DataDetectAny(0), "transmit inhibited, so busy")
 	assert.Equal(t, 0, r.DataDetectAny(1), "another channel is not inhibited")
 }
+
+// countingBitReceiver counts the bits handed to it, and ignores the rest.
+type countingBitReceiver struct {
+	bits int
+}
+
+func (r *countingBitReceiver) RecBit(int, int, int, int, bool, int) { r.bits++ }
+
+func (r *countingBitReceiver) RecBitNew(int, int, int, int, bool, int, *int64, *int) { r.bits++ }
+
+func (r *countingBitReceiver) DCDChange(int, int, int, int) {}
+
+// What a demodulator demodulates goes to the receiver it was given - noise
+// decodes to bits like anything else.
+func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
+	var origDemodulators = demodulators
+
+	t.Cleanup(func() {
+		demodulators = origDemodulators
+		multiModems = newMultiModems()
+	})
+
+	var audioConfig = newRecvTestRadioConfig(1)
+	audioConfig.achan[0].num_freq = 1
+
+	multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
+
+	var receiver = new(countingBitReceiver)
+	demodulators[0].setReceiver(receiver)
+
+	var rng = rand.New(rand.NewPCG(1, 2))
+
+	for range audioConfig.adev[0].samples_per_sec / 10 {
+		multi_modem_process_sample(0, rng.IntN(20000)-10000)
+	}
+
+	assert.Positive(t, receiver.bits)
+}

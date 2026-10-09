@@ -7,7 +7,7 @@ package direwolf
  *
  * Input:	Audio samples from either a file or the "sound card."
  *
- * Outputs:	Calls layer2Receiver.RecBit() for each bit demodulated.
+ * Outputs:	Hands each bit demodulated to its receiver's RecBit.
  *
  *---------------------------------------------------------------*/
 
@@ -43,6 +43,15 @@ type Demodulator struct {
 
 	states [MAX_SUBCHANS]demodulator_state_s // One per subchannel.
 	muted  atomic.Bool
+}
+
+// bitReceiver is what a demodulator hands each bit it demodulates to, and
+// tells when it starts or stops detecting data on a slicer.
+// *Layer2Receiver is one.
+type bitReceiver interface {
+	RecBit(channel int, subchannel int, slice int, raw int, isScrambled bool, notUsedRemove int)
+	RecBitNew(channel int, subchannel int, slice int, raw int, isScrambled bool, notUsedRemove int, pllNudgeTotal *int64, pllSymbolCount *int)
+	DCDChange(channel int, subchannel int, slice int, state int)
 }
 
 // demodulators holds every radio channel's Demodulator.  demod_init builds
@@ -776,6 +785,13 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 	demodulator.upsample = achan.upsample
 
 	return demodulator
+}
+
+// setReceiver makes r where every subchannel of d hands its bits.
+func (d *Demodulator) setReceiver(r bitReceiver) {
+	for sub := range d.states {
+		d.states[sub].receiver = r
+	}
 }
 
 // NumSubchan is how many demodulators the channel has, each with its own

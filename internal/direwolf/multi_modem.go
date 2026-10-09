@@ -199,6 +199,12 @@ func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink Receiv
 	demod_init(pa)
 	layer2Receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, il2pDebug, sink)
 
+	for _, d := range demodulators {
+		if d != nil {
+			d.setReceiver(layer2Receiver)
+		}
+	}
+
 	for channel, m := range multiModems {
 		m.audioConfig = pa
 		m.demodulator = demodulators[channel]
