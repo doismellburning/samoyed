@@ -10,6 +10,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -540,4 +541,40 @@ func TestEnterNewStateSetsConnectedIndicator(t *testing.T) {
 	enter_new_state(S, state_0_disconnected)
 
 	assert.Equal(t, []string{"CON 1=1", "CON 1=0"}, set)
+}
+
+// recordingLinkClients notes the outstanding frame counts the link layer
+// reports, and ignores the rest.
+type recordingLinkClients struct {
+	noLinkClients
+
+	replies []string
+}
+
+func (r *recordingLinkClients) OutstandingFramesReply(channel int, client int, ownCall string, remoteCall string, count int) {
+	r.replies = append(r.replies, fmt.Sprintf("%d/%d %s>%s %d", channel, client, ownCall, remoteCall, count))
+}
+
+// A client asking how much is waiting on a link that doesn't exist is told
+// nothing is, rather than left waiting for an answer.
+func TestOutstandingFramesForNoLinkRepliesNone(t *testing.T) {
+	var saved = *ax25Link
+
+	t.Cleanup(func() { *ax25Link = saved })
+
+	*ax25Link = *NewAX25Link()
+
+	var clients = new(recordingLinkClients)
+	ax25_link_init(new(misc_config_s), nil, clients, 0)
+
+	var E = new(dlq_item_t)
+	E._chan = 0
+	E.client = 2
+	E.addrs[OWNCALL] = "Q1TEST"
+	E.addrs[PEERCALL] = "Q2TEST"
+	E.num_addr = 2
+
+	testutils.CaptureOutput(t, func() { dl_outstanding_frames_request(E) })
+
+	assert.Equal(t, []string{"0/2 Q1TEST>Q2TEST 0"}, clients.replies)
 }

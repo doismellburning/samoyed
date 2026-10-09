@@ -313,7 +313,7 @@ func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 	miscConfig.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 
-	ax25_link_init(miscConfig, nil, 1)
+	ax25_link_init(miscConfig, nil, nil, 1)
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil

@@ -666,13 +666,16 @@ x = Silence FX.25 information.`)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)
 	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
-	ax25_link_init(misc_config, pttControl.Set, d_c_opt)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
 	agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
 	monitorAGW.Store(agwServer)
+
+	// The connected-mode link layer, after the AGW server whose clients it
+	// tells about the links they asked for.
+	ax25_link_init(misc_config, pttControl.Set, agwServer, d_c_opt)
 	metrics_init(ctx, audio_config, misc_config)
 	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
 
