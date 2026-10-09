@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"syscall"
 	"time"
 	"unicode"
@@ -517,16 +516,16 @@ x = Silence FX.25 information.`)
 
 	var webHub = webui_init(ctx, audio_config, misc_config)
 
-	// Each frame sent is shown on the web interface, if there is one, and to
-	// the AGW clients monitoring.  The AGW server is made further down, once
-	// the transmit queue its clients feed has been set up here, and the
-	// transmit goroutines started here may be sending by then, so it is
-	// handed over through monitorAGW rather than an unguarded variable.
-	var monitorAGW atomic.Pointer[AGWServer]
+	// The AGW server is made here, so the transmit service can be told to
+	// show it each frame sent, but only started further down: its clients
+	// feed a transmit queue that the transmit service sets up.
+	var agwServer = NewAGWServer(audio_config, misc_config, d_a_opt)
 
+	// Each frame sent is shown on the web interface, if there is one, and to
+	// the AGW clients monitoring.
 	var onTransmit = func(channel int, pp *ax25.Packet) {
 		webPublishTransmitted(webHub, channel, pp)
-		monitorAGW.Load().SendMonitored(channel, pp, 1) // Nil, so nobody, until it is made.
+		agwServer.SendMonitored(channel, pp, 1)
 	}
 
 	/*
@@ -669,8 +668,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	var agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
-	monitorAGW.Store(agwServer)
+	agwServer.Start(ctx)
 
 	// The connected-mode link layer, after the AGW server whose clients it
 	// tells about the links they asked for.
