@@ -294,10 +294,6 @@ func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 	// need configuration that has nothing to do with the receive thread.
 	audioConfig.igate_vchannel = 0
 
-	var origMheard = mheardDB
-
-	t.Cleanup(func() { mheardDB = origMheard })
-
 	// A received frame is logged and remembered on its way through, so
 	// both need to be there even with no log file to write to.  It goes
 	// out to the attached client applications too, of which there are none.
@@ -306,7 +302,7 @@ func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 	handler.ttConfig = new(tt_config_s)
 	handler.decoder = aprs.NewDecoderFromDataFiles()
 	handler.logger = aprslog.New(false, "")
-	mheardDB = mheard.New(0)
+	handler.heard = mheard.New(0)
 
 	usePTT(t, audioConfig)
 	transmitQueue.Init(audioConfig)

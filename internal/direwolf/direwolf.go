@@ -51,7 +51,6 @@ import (
 
 var aprsSymbolData *symbols.Data
 var agwServer *AGWServer
-var mheardDB *mheard.DB
 var pttControl *PTT
 var layer2Receiver *Layer2Receiver
 
@@ -646,10 +645,10 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the digipeater and IGate functions.
 	 */
-	mheardDB = mheard.New(d_m_opt)
-	var packetFilter = NewPacketFilter(&igate_config, aprsDecoder, d_f_opt)
+	var mheardDB = mheard.New(d_m_opt)
+	var packetFilter = NewPacketFilter(&igate_config, aprsDecoder, mheardDB, d_f_opt)
 	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter)
-	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, d_i_opt)
+	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, d_i_opt)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)
 	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
@@ -732,7 +731,7 @@ x = Silence FX.25 information.`)
 
 	var aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
 	td.add(aprsLogger.Close)
-	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger)
+	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger, mheardDB)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
 	stopIfCancelled(ctx, td)
@@ -750,6 +749,7 @@ x = Silence FX.25 information.`)
 	recHandler.decoder = aprsDecoder
 	recHandler.webHub = webHub
 	recHandler.logger = aprsLogger
+	recHandler.heard = mheardDB
 	recHandler.waypoints = waypointSender
 	recHandler.apps = clientApplications
 	recHandler.digipeater = aprsDigipeater
@@ -793,6 +793,7 @@ type recPacketHandler struct {
 	decoder     *aprs.Decoder
 	webHub      *webui.Hub // Nil without a web interface.
 	logger      *aprslog.Logger
+	heard       *mheard.DB // Where the stations heard over the radio are remembered.
 	waypoints   *WaypointSender
 	apps        *clientApps // Nil for none.
 
@@ -1115,7 +1116,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		// Add to list of stations heard over the radio.
 
 		var lat, lon = mheardPosition(A)
-		mheardDB.SaveRF(channel, pp, lat, lon)
+		rh.heard.SaveRF(channel, pp, lat, lon)
 
 		// For AIS, we have an option to convert the NMEA format, in User Defined data,
 		// into an APRS "Object Report" and send that to the clients as well.

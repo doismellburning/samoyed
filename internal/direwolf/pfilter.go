@@ -53,6 +53,11 @@ type PacketFilter struct {
 	// all a syntax check needs.
 	aprsDecoder *aprs.Decoder
 
+	// heard is what an "i" filter asks whether a station has been heard
+	// recently and nearby.  Nil, as in the zero PacketFilter config-file
+	// validation evaluates with, has heard nothing.
+	heard heardNearby
+
 	// debug is how much to say about each decision:
 	//	0	no debug output.
 	//	1	single summary line with final result. Indent by 1.
@@ -61,14 +66,22 @@ type PacketFilter struct {
 	debug int
 }
 
+// heardNearby says whether a station has been heard recently, and near enough,
+// for an "i" filter.  *mheard.DB is one.
+type heardNearby interface {
+	WasRecentlyNearby(role string, callsign string, timeLimitMinutes int, maxHops int, dlat maybe.Maybe[float64], dlon maybe.Maybe[float64], km maybe.Maybe[float64]) bool
+}
+
 // NewPacketFilter returns a PacketFilter that takes an "i" filter's default
 // hop count from igateConfig, which may be nil, decodes APRS packets with
-// aprsDecoder, which may also be nil, and says as much about each decision
-// as debugLevel asks for.
-func NewPacketFilter(igateConfig *igate_config_s, aprsDecoder *aprs.Decoder, debugLevel int) *PacketFilter {
+// aprsDecoder, which may also be nil, asks heard which stations have been
+// heard, nil for none, and says as much about each decision as debugLevel
+// asks for.
+func NewPacketFilter(igateConfig *igate_config_s, aprsDecoder *aprs.Decoder, heard heardNearby, debugLevel int) *PacketFilter {
 	var f = new(PacketFilter)
 	f.igateConfig = igateConfig
 	f.aprsDecoder = aprsDecoder
+	f.heard = heard
 	f.debug = debugLevel
 
 	return f
@@ -125,6 +138,7 @@ type pfstate_t struct {
 	 * What the PacketFilter doing the evaluating was built with.
 	 */
 	igate_config *igate_config_s // nil when there is no IGate configuration.
+	heard        heardNearby     // nil when nothing has been heard.
 	debug        int
 
 	/*
@@ -231,6 +245,7 @@ func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.
 
 	if f != nil {
 		pfstate.igate_config = f.igateConfig
+		pfstate.heard = f.heard
 		pfstate.debug = f.debug
 
 		if f.aprsDecoder != nil {
@@ -1379,14 +1394,13 @@ func filt_i(pf *pfstate_t) (int, error) {
 
 	// An absent database has heard nothing, which is the same answer an empty
 	// one gives: the addressee has not been heard, so there is no point
-	// gating the message to it.  This runs during config-file validation, and
-	// from callers that are not the TNC, either of which can get here before
-	// the database exists.
-	if mheardDB == nil {
+	// gating the message to it.  Config-file validation evaluates with a
+	// filter that has no database.
+	if pf.heard == nil {
 		return 0, nil
 	}
 
-	var was_heard = mheardDB.WasRecentlyNearby("addressee", pf.decoded.Addressee, heardtime, maxhops, dlat, dlon, km)
+	var was_heard = pf.heard.WasRecentlyNearby("addressee", pf.decoded.Addressee, heardtime, maxhops, dlat, dlon, km)
 
 	if !was_heard {
 		return 0, nil
@@ -1409,7 +1423,7 @@ func filt_i(pf *pfstate_t) (int, error) {
 	 * the past minute, rather than the usual 180 minutes for the addressee.
 	 */
 
-	was_heard = mheardDB.WasRecentlyNearby("source", pf.decoded.Src, 1, 0,
+	was_heard = pf.heard.WasRecentlyNearby("source", pf.decoded.Src, 1, 0,
 		maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]())
 
 	if was_heard {
@@ -1522,9 +1536,7 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
  *--------------------------------------------------------------------*/
 
 func PfilterStandaloneInit(debug_level int) *PacketFilter {
-	mheardDB = mheard.New(0)
-
-	return NewPacketFilter(new(igate_config_s), aprs.NewDecoderFromDataFiles(), debug_level)
+	return NewPacketFilter(new(igate_config_s), aprs.NewDecoderFromDataFiles(), mheard.New(0), debug_level)
 }
 
 // PfilterMaxDebugLevel is the most verbose debug level a PacketFilter has

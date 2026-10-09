@@ -23,12 +23,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// heardCounter counts the stations heard recently, for the IGate statistics
+// beacon.  *mheard.DB is one.
+type heardCounter interface {
+	Count(maxHops int, timeLimit int) int
+}
+
 type BeaconService struct {
 	modemConfig       *RadioConfig
 	miscConfig        *misc_config_s
 	igateConfig       *igate_config_s
 	gps               *dwgps.GPS
 	logger            *aprslog.Logger // Where "-dttt" logs tracker beacons, or nil.
+	heardCounter      heardCounter    // Counts the stations heard recently; nil for none.
 	trackerDebugLevel int
 }
 
@@ -50,6 +57,9 @@ type BeaconService struct {
  *		logger		- Where "-dttt" logs the tracker beacons it
  *			  sends, with fake channel 999; nil for nowhere.
  *
+ *		heard		- A counter of the stations heard recently, for
+ *			  the IGate statistics beacon; nil for none heard.
+ *
  * Outputs:	Remember required information for future use.
  *
  * Description:	Do some validity checking on the beacon configuration.
@@ -59,13 +69,14 @@ type BeaconService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *dwgps.GPS, logger *aprslog.Logger) *BeaconService {
+func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *dwgps.GPS, logger *aprslog.Logger, heard heardCounter) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct_v5
-		modemConfig: pmodem,
-		miscConfig:  pconfig,
-		igateConfig: pigate,
-		gps:         gps,
-		logger:      logger,
+		modemConfig:  pmodem,
+		miscConfig:   pconfig,
+		igateConfig:  pigate,
+		gps:          gps,
+		logger:       logger,
+		heardCounter: heard,
 	}
 
 	/*
@@ -273,6 +284,16 @@ func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate
 
 func (bs *BeaconService) SetDebug(level int) {
 	bs.trackerDebugLevel = level
+}
+
+// heardCount is how many stations bs.heardCounter counts within maxHops in the
+// last minutes, or none without it.
+func (bs *BeaconService) heardCount(maxHops int, minutes int) int {
+	if bs.heardCounter == nil {
+		return 0
+	}
+
+	return bs.heardCounter.Count(maxHops, minutes)
 }
 
 /*-------------------------------------------------------------------
@@ -883,9 +904,9 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			var stuff = fmt.Sprintf("<IGATE,MSG_CNT=%d,PKT_CNT=%d,DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d,UPL_CNT=%d,DNL_CNT=%d",
 				igate.msgCount(),
 				igate.pktCount(),
-				mheardDB.Count(0, last_minutes),
-				mheardDB.Count(bs.igateConfig.max_digi_hops, last_minutes),
-				mheardDB.Count(8, last_minutes),
+				bs.heardCount(0, last_minutes),
+				bs.heardCount(bs.igateConfig.max_digi_hops, last_minutes),
+				bs.heardCount(8, last_minutes),
 				igate.uplinkCount(),
 				igate.downlinkCount())
 

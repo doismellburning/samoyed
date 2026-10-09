@@ -230,7 +230,7 @@ func FuzzIGateServerLines(f *testing.F) {
 func setupIGateFromServer(t *testing.T) {
 	t.Helper()
 
-	var origIGate, origMheard = igate, mheardDB
+	var origIGate = igate
 
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
@@ -243,14 +243,14 @@ func setupIGateFromServer(t *testing.T) {
 	igateConfig.tx_limit_5 = IGATE_TX_LIMIT_5_DEFAULT
 	igateConfig.igmsp = 1
 
-	igate = NewIGate(audioConfig, igateConfig, new(digi_config_s), NewPacketFilter(igateConfig, nil, 0), 0)
-	mheardDB = mheard.New(0)
+	var heardDB = mheard.New(0)
+	igate = NewIGate(audioConfig, igateConfig, new(digi_config_s), NewPacketFilter(igateConfig, nil, heardDB, 0), heardDB, 0)
 
 	transmitQueue.Init(audioConfig)
 	dataLinkQueue.Init()
 
 	t.Cleanup(func() {
-		igate, mheardDB = origIGate, origMheard
+		igate = origIGate
 
 		for p := range TQ_NUM_PRIO {
 			for transmitQueue.Remove(0, p) != nil { //revive:disable-line:empty-block

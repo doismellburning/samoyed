@@ -16,7 +16,7 @@ import (
 // (issue #504), used to trip an assertion in the type filter.
 func Test_pfilter_empty_info(t *testing.T) {
 	var p_igate_config igate_config_s
-	var packetFilter = NewPacketFilter(&p_igate_config, aprs.NewDecoderFromDataFiles(), 0)
+	var packetFilter = NewPacketFilter(&p_igate_config, aprs.NewDecoderFromDataFiles(), nil, 0)
 
 	var pp = ax25.FromText("Q1TEST>ID:", true)
 	require.NotNil(t, pp)
@@ -28,17 +28,12 @@ func Test_pfilter_empty_info(t *testing.T) {
 }
 
 // An "i" filter asks the heard-recently database about the addressee, and
-// pfilter runs in places - config-file validation, and callers that are not
-// the TNC - that can get there before the database exists.  An absent one
-// answers as an empty one does rather than bringing the program down.
+// pfilter runs in places - config-file validation, for one - with no database
+// to ask.  An absent one answers as an empty one does rather than bringing the
+// program down.
 func Test_pfilter_igate_without_a_heard_database(t *testing.T) {
 	var p_igate_config igate_config_s
-	var packetFilter = NewPacketFilter(&p_igate_config, aprs.NewDecoderFromDataFiles(), 0)
-
-	var saved_mheardDB = mheardDB
-	mheardDB = nil
-
-	defer func() { mheardDB = saved_mheardDB }()
+	var packetFilter = NewPacketFilter(&p_igate_config, aprs.NewDecoderFromDataFiles(), nil, 0)
 
 	var pp = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Hello", true)
 	require.NotNil(t, pp)
@@ -96,12 +91,8 @@ func Test_pfilter_validate(t *testing.T) {
 func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	var p_igate_config igate_config_s
 	p_igate_config.max_digi_hops = 2
-	var packetFilter = NewPacketFilter(&p_igate_config, nil, 0)
-
-	var saved_mheardDB = mheardDB
-	mheardDB = mheard.New(0)
-
-	defer func() { mheardDB = saved_mheardDB }()
+	var heardDB = mheard.New(0)
+	var packetFilter = NewPacketFilter(&p_igate_config, nil, heardDB, 0)
 
 	// Q1TEST has just been heard directly over the radio, and nothing at all
 	// has been heard from the addressee Q2TEST, so the filter has every reason
@@ -110,7 +101,7 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	require.NotNil(t, heard)
 
 	var lat, lon = mheardPosition(new(aprs.Decoder).Decode(heard, true))
-	mheardDB.SaveRF(0, heard, lat, lon)
+	heardDB.SaveRF(0, heard, lat, lon)
 
 	var message = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Happy Birthday{001", true)
 	require.NotNil(t, message)
@@ -133,21 +124,19 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 	var p_igate_config igate_config_s
 	p_igate_config.max_digi_hops = 2
-	var packetFilter = NewPacketFilter(&p_igate_config, nil, 0)
-
 	// Q2TEST is about 4 km from 42.6 -71.3.
 	const q2testPosition = "Q2TEST>APDW17:!4237.14NS07120.83W#"
 
-	// hearRF makes the heard list believe the given monitor line just arrived
-	// over the radio.
-	var hearRF = func(t *testing.T, monitor string) {
+	// hearRF makes heardDB believe the given monitor line just arrived over
+	// the radio.
+	var hearRF = func(t *testing.T, heardDB *mheard.DB, monitor string) {
 		t.Helper()
 
 		var pp = ax25.FromText(monitor, true)
 		require.NotNil(t, pp)
 
 		var lat, lon = mheardPosition(new(aprs.Decoder).Decode(pp, true))
-		mheardDB.SaveRF(0, pp, lat, lon)
+		heardDB.SaveRF(0, pp, lat, lon)
 	}
 
 	var testCases = []struct {
@@ -202,13 +191,11 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var saved_mheardDB = mheardDB
-			mheardDB = mheard.New(0)
-
-			defer func() { mheardDB = saved_mheardDB }()
+			var heardDB = mheard.New(0)
+			var packetFilter = NewPacketFilter(&p_igate_config, nil, heardDB, 0)
 
 			for _, monitor := range tc.heard {
-				hearRF(t, monitor)
+				hearRF(t, heardDB, monitor)
 			}
 
 			var message = ax25.FromText(tc.message, true)

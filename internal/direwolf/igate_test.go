@@ -123,11 +123,9 @@ func Test_is_message_message(t *testing.T) {
 func setupIGate(t *testing.T) net.Conn {
 	t.Helper()
 
-	var origIGate, origMheard = igate, mheardDB
+	var origIGate = igate
 
-	t.Cleanup(func() {
-		igate, mheardDB = origIGate, origMheard
-	})
+	t.Cleanup(func() { igate = origIGate })
 
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
@@ -144,9 +142,9 @@ func setupIGate(t *testing.T) net.Conn {
 
 	var digiConfig = new(digi_config_s)
 
-	igate = NewIGate(audioConfig, igateConfig, digiConfig, NewPacketFilter(igateConfig, nil, 0), 0)
+	var heardDB = mheard.New(0)
 
-	mheardDB = mheard.New(0)
+	igate = NewIGate(audioConfig, igateConfig, digiConfig, NewPacketFilter(igateConfig, nil, heardDB, 0), heardDB, 0)
 
 	var server, client = connectedTCPPair(t)
 
@@ -505,8 +503,8 @@ func TestIGateTransmitCourtesyPosition(t *testing.T) {
 	igate.digiConfig.filter_str[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
 
 	// SetMSP only knows about stations that have been heard.
-	mheardDB.SaveIS("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there")
-	mheardDB.SetMSP("Q2TEST", 1)
+	igate.heard.SaveIS("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there")
+	igate.heard.SetMSP("Q2TEST", 1)
 
 	igate.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:=4237.14N/07120.83W#"), 0)
 
@@ -524,7 +522,7 @@ func TestIGateTransmitMessageRemembersTheSender(t *testing.T) {
 	setupIGateToRadio(t)
 
 	// The station has to have been heard for us to remember anything about it.
-	mheardDB.SaveIS("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there")
+	igate.heard.SaveIS("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there")
 
 	igate.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there"), 0)
 
@@ -532,7 +530,26 @@ func TestIGateTransmitMessageRemembersTheSender(t *testing.T) {
 
 	assert.Equal(t, 1, igate.msgCount())
 	assert.Equal(t, 0, igate.pktCount(), "a message is not counted as an other packet")
-	assert.Equal(t, igate.config.igmsp, mheardDB.GetMSP("Q2TEST"))
+	assert.Equal(t, igate.config.igmsp, igate.heard.GetMSP("Q2TEST"))
+}
+
+// With nothing to keep track of who has been heard, a message still goes out
+// to RF; there is just nobody to remember to pass a position along for.
+func TestIGateTransmitMessageWithoutAHeardDatabase(t *testing.T) {
+	setupIGateToRadio(t)
+
+	igate.heard = nil
+
+	igate.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there"), 0)
+
+	assert.NotNil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "the message was not transmitted")
+
+	// Nor is anyone owed a position, so a filter that passes nothing drops it.
+	igate.digiConfig.filter_str[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
+
+	igate.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:=4237.14N/07120.83W#"), 0)
+
+	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "a position was passed along that nobody was owed")
 }
 
 // The same packet again within the dedupe window is dropped: it has already
