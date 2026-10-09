@@ -50,9 +50,6 @@ import (
  *---------------------------------------------------------------*/
 
 var aprsSymbolData *symbols.Data
-var waypointSender *WaypointSender
-var aprsLogger *aprslog.Logger
-var gpsReceiver *dwgps.GPS
 var agwServer *AGWServer
 var mheardDB *mheard.DB
 var pttControl *PTT
@@ -709,11 +706,10 @@ x = Silence FX.25 information.`)
 	gpsConfig.GPSDHost = misc_config.gpsd_host
 	gpsConfig.GPSDPort = misc_config.gpsd_port
 
-	gpsReceiver = dwgps.NewGPS(ctx, gpsConfig, d_g_opt)
+	var gpsReceiver = dwgps.NewGPS(ctx, gpsConfig, d_g_opt)
 	td.add(gpsReceiver.Term)
 
-	var waypointErr error
-	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config, gpsReceiver)
+	var waypointSender, waypointErr = NewWaypointSender(ctx, misc_config, gpsReceiver)
 
 	if waypointSender != nil {
 		td.add(waypointSender.Close)
@@ -734,7 +730,7 @@ x = Silence FX.25 information.`)
 	 * log the tracker beacon transmissions with fake channel 999.
 	 */
 
-	aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
+	var aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
 	td.add(aprsLogger.Close)
 	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger)
 	beaconService.SetDebug(d_t_opt)
