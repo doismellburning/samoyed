@@ -652,7 +652,7 @@ x = Silence FX.25 information.`)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)
 	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
-	ax25_link_init(misc_config, d_c_opt)
+	ax25_link_init(misc_config, pttControl.Set, d_c_opt)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
