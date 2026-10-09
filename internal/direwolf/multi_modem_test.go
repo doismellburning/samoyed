@@ -265,6 +265,85 @@ func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {
 	assert.Equal(t, 0, r.DataDetectAny(1), "another channel is not inhibited")
 }
 
+// dcdRecordingSink is a ReceiveSink that records the DCD changes it is told
+// of, and ignores frames.
+type dcdRecordingSink struct {
+	discardReceiveSink
+
+	changes []string
+}
+
+func (s *dcdRecordingSink) DCDChange(channel int, state int) {
+	s.changes = append(s.changes, fmt.Sprintf("%d=%d", channel, state))
+}
+
+// A touch-tone button being held makes its channel busy, as a packet being
+// heard does, so nothing is transmitted over it, and raises the channel's
+// DCD indicator.  The DTMF decoder reports itself as subchannel
+// MAX_SUBCHANS, after the demodulators' subchannels.
+func TestDTMFButtonMakesChannelBusy(t *testing.T) {
+	var sink = new(dcdRecordingSink)
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
+
+	r.DCDChange(0, MAX_SUBCHANS, 0, 1)
+
+	assert.Equal(t, 1, r.DataDetectAny(0), "a button is held, so busy")
+	assert.Equal(t, 0, r.DataDetectAny(1), "another channel hears no button")
+
+	r.DCDChange(0, MAX_SUBCHANS, 0, 0)
+
+	assert.Equal(t, 0, r.DataDetectAny(0), "the button is released, so not busy")
+	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
+}
+
+// The DCD indicator shows the data heard on a channel, whether or not its
+// transmit inhibit is set.  Were it held where it was while the channel is
+// inhibited, a packet ending under the inhibit would leave it lit.
+func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
+	var sink = new(dcdRecordingSink)
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
+	r.numSubchannel[0] = 1
+
+	var inhibited = 0
+
+	r.getInput = func(int, int) int { return inhibited }
+
+	r.DCDChange(0, 0, 0, 1)
+
+	inhibited = 1
+
+	r.DCDChange(0, 0, 0, 0)
+
+	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
+	assert.Equal(t, 1, r.DataDetectAny(0), "still inhibited, so still busy")
+}
+
+// The receive threads change a channel's DCD while the transmit side asks
+// whether it is busy.  Under the race detector, this fails if the two are
+// not synchronised.
+func TestDCDChangeWhileTransmitterAsks(t *testing.T) {
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
+	r.numSubchannel[0] = 1
+
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for i := range 1000 {
+			r.DCDChange(0, 0, 0, i&1)
+		}
+	}()
+
+	for range 1000 {
+		r.DataDetectAny(0)
+	}
+
+	<-done
+
+	assert.Equal(t, 1, r.DataDetectAny(0), "the last change set DCD")
+}
+
 // countingBitReceiver counts the bits handed to it, and ignores the rest.
 type countingBitReceiver struct {
 	bits int

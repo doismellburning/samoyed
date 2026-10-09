@@ -69,6 +69,7 @@ import (
 	"math/rand"
 	"os"
 	"slices"
+	"sync"
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/aprs"
@@ -721,11 +722,16 @@ func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice in
 type Layer2Receiver struct {
 	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*slicerReceivers
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
-	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
-	audio         *RadioConfig
-	fx25Debug     int // FX.25's debug level, for every slicer's FX.25 receiver.
-	il2pDebug     int // IL2P's debug level, for every slicer's IL2P receiver.
-	sink          ReceiveSink
+
+	// dcdMu guards compositeDCD, which the receive threads set while the
+	// transmit side reads it to see whether a channel is busy.
+	dcdMu        sync.Mutex
+	compositeDCD [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
+
+	audio     *RadioConfig
+	fx25Debug int // FX.25's debug level, for every slicer's FX.25 receiver.
+	il2pDebug int // IL2P's debug level, for every slicer's IL2P receiver.
+	sink      ReceiveSink
 
 	// getInput reads one of a channel's inputs - here only ever ICTYPE_TXINH,
 	// which inhibits transmitting - or is nil when there are none.
@@ -950,17 +956,22 @@ func (r *Layer2Receiver) DCDChange(channel int, subchannel int, slice int, state
 		#endif
 	*/
 
-	var old = r.DataDetectAny(channel)
+	r.dcdMu.Lock()
+	var old = r.dataDetected(channel)
+	r.compositeDCD[channel][subchannel][slice] = state != 0
+	var now = r.dataDetected(channel)
+	r.dcdMu.Unlock()
 
-	if state != 0 {
-		r.compositeDCD[channel][subchannel][slice] = true
-	} else {
-		r.compositeDCD[channel][subchannel][slice] = false
-	}
+	// DCD shows what the decoders hear.  A transmit inhibit makes the
+	// channel busy for the transmitter, in DataDetectAny, but does not light
+	// DCD.  Only this channel's receive thread changes its DCD, so the
+	// changes reach the sink in order.
+	if now != old {
+		var newVal = 0
+		if now {
+			newVal = 1
+		}
 
-	var newVal = r.DataDetectAny(channel)
-
-	if newVal != old {
 		r.sink.DCDChange(channel, newVal)
 		metrics.SetDCD(channel, newVal != 0)
 	}
@@ -997,18 +1008,36 @@ func (r *Layer2Receiver) DCDChange(channel int, subchannel int, slice int, state
  *--------------------------------------------------------------------*/
 
 func (r *Layer2Receiver) DataDetectAny(channel int) int {
-	for sc := range r.numSubchannel[channel] {
-		if slices.Contains(r.compositeDCD[channel][sc][:], true) {
-			return (1)
-		}
-	}
+	r.dcdMu.Lock()
+	var detected = r.dataDetected(channel)
+	r.dcdMu.Unlock()
 
-	if r.getInput != nil && r.getInput(ICTYPE_TXINH, channel) == 1 {
+	if detected || r.transmitInhibited(channel) {
 		return (1)
 	}
 
 	return (0)
 } /* end DataDetectAny */
+
+// dataDetected says whether any of a channel's decoders is seeing data.  The
+// caller holds dcdMu.
+func (r *Layer2Receiver) dataDetected(channel int) bool {
+	for sc := range r.numSubchannel[channel] {
+		if slices.Contains(r.compositeDCD[channel][sc][:], true) {
+			return true
+		}
+	}
+
+	// The DTMF decoder reports itself as the subchannel after the
+	// demodulators' last.  Dire Wolf left it out here, so a button being held
+	// neither kept the transmitter off the channel nor showed on DCD.
+	return slices.Contains(r.compositeDCD[channel][MAX_SUBCHANS][:], true)
+}
+
+// transmitInhibited says whether a channel's transmit inhibit input is set.
+func (r *Layer2Receiver) transmitInhibited(channel int) bool {
+	return r.getInput != nil && r.getInput(ICTYPE_TXINH, channel) == 1
+}
 
 func (r *Layer2Receiver) rand() int32 {
 	r.randSeed = (r.randSeed*1103515245 + 12345) & hdlcRecRandMax // Wraps on overflow, as intended.
