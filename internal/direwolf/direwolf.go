@@ -732,7 +732,7 @@ x = Silence FX.25 information.`)
 
 	var aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
 	td.add(aprsLogger.Close)
-	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger)
+	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger, mheardDB)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
 	stopIfCancelled(ctx, td)
