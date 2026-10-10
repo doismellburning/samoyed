@@ -36,6 +36,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/sirupsen/logrus"
 )
 
@@ -142,7 +143,7 @@ type IGate struct {
 	audioConfig *RadioConfig
 	config      *igate_config_s
 	digiConfig  *digi_config_s
-	filter      *PacketFilter
+	filter      *pfilter.PacketFilter
 
 	// heard records who has been heard from APRS-IS, and how many of a
 	// message sender's positions are still to be passed along to RF.  Nil
@@ -233,7 +234,7 @@ type igateHeard interface {
 
 // NewIGate returns an IGate that knows what it is meant to do but is not yet
 // doing it.  start connects to the server and sets the goroutines going.
-func NewIGate(audioConfig *RadioConfig, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *PacketFilter, heard igateHeard, debugLevel int) *IGate {
+func NewIGate(audioConfig *RadioConfig, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *pfilter.PacketFilter, heard igateHeard, debugLevel int) *IGate {
 	var ig = &IGate{ //nolint:exhaustruct_v5
 		audioConfig:   audioConfig,
 		config:        igateConfig,
@@ -591,7 +592,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 
 	if channel >= 0 && channel < MAX_TOTAL_CHANS && // in radio channel range
 		ig.digiConfig.filter_str[channel][MAX_TOTAL_CHANS] != "" {
-		var result, err = ig.filter.pfilter(channel, MAX_TOTAL_CHANS, ig.digiConfig.filter_str[channel][MAX_TOTAL_CHANS], recv_pp, true)
+		var result, err = ig.filter.Filter(channel, MAX_TOTAL_CHANS, ig.digiConfig.filter_str[channel][MAX_TOTAL_CHANS], recv_pp, true)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%s\n", err)
@@ -1563,7 +1564,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 
 	if !msp_special_case {
 		if ig.digiConfig.filter_str[MAX_TOTAL_CHANS][to_chan] != "" {
-			var result, err = ig.filter.pfilter(MAX_TOTAL_CHANS, to_chan, ig.digiConfig.filter_str[MAX_TOTAL_CHANS][to_chan], pp3, true)
+			var result, err = ig.filter.Filter(MAX_TOTAL_CHANS, to_chan, ig.digiConfig.filter_str[MAX_TOTAL_CHANS][to_chan], pp3, true)
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%s\n", err)

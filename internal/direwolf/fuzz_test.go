@@ -18,6 +18,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/stretchr/testify/require"
@@ -170,7 +171,7 @@ func setupIGateFromServer(t *testing.T) *IGate {
 	igateConfig.igmsp = 1
 
 	var heardDB = mheard.New(0)
-	var ig = NewIGate(audioConfig, igateConfig, new(digi_config_s), NewPacketFilter(igateConfig, nil, heardDB, 0), heardDB, 0)
+	var ig = NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, 0)
 
 	transmitQueue.Init(audioConfig)
 	dataLinkQueue.Init()

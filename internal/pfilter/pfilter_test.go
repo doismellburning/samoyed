@@ -1,12 +1,19 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package pfilter
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,13 +22,12 @@ import (
 // A UI frame with an empty information field, as sent by linbpq ID broadcasts
 // (issue #504), used to trip an assertion in the type filter.
 func Test_pfilter_empty_info(t *testing.T) {
-	var p_igate_config igate_config_s
-	var packetFilter = NewPacketFilter(&p_igate_config, aprs.NewDecoderFromDataFiles(), nil, 0)
+	var packetFilter = New(0, aprs.NewDecoderFromDataFiles(), nil, 0)
 
 	var pp = ax25.FromText("Q1TEST>ID:", true)
 	require.NotNil(t, pp)
 
-	var result, err = packetFilter.pfilter(0, 0, "t/p", pp, true)
+	var result, err = packetFilter.Filter(0, 0, "t/p", pp, true)
 
 	require.NoError(t, err)
 	assert.Equal(t, 0, result, "a frame with no information field matches no packet type")
@@ -32,13 +38,12 @@ func Test_pfilter_empty_info(t *testing.T) {
 // to ask.  An absent one answers as an empty one does rather than bringing the
 // program down.
 func Test_pfilter_igate_without_a_heard_database(t *testing.T) {
-	var p_igate_config igate_config_s
-	var packetFilter = NewPacketFilter(&p_igate_config, aprs.NewDecoderFromDataFiles(), nil, 0)
+	var packetFilter = New(0, aprs.NewDecoderFromDataFiles(), nil, 0)
 
 	var pp = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Hello", true)
 	require.NotNil(t, pp)
 
-	var result, err = packetFilter.pfilter(MAX_TOTAL_CHANS, 0, "i/60/0/51.5/-0.1/50", pp, true)
+	var result, err = packetFilter.Filter(phy.MaxTotalChans, 0, "i/60/0/51.5/-0.1/50", pp, true)
 
 	require.NoError(t, err)
 	assert.Equal(t, 0, result, "an absent database has heard nothing, as an empty one would")
@@ -84,15 +89,24 @@ func Test_pfilter_validate(t *testing.T) {
 	})
 }
 
+// heardPosition is the position the stations-heard list records for a decoded
+// packet, as internal/direwolf's mheardPosition decides it: its location if it
+// is a position report, and nothing otherwise.
+func heardPosition(decoded *aprs.Decoded) (maybe.Maybe[float64], maybe.Maybe[float64]) {
+	if decoded.PacketType != aprs.PacketTypePosition {
+		return maybe.Nothing[float64](), maybe.Nothing[float64]()
+	}
+
+	return decoded.Lat, decoded.Lon
+}
+
 // Test_pfilter_igate_message_filter_is_evaluated checks that the syntax-only
 // shortcut taken by pfilter_validate (and by the ported Dire Wolf filter
 // tests) does not leak into a real packet's evaluation: an "i" filter must
 // still consult the heard list, rather than passing everything.
 func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
-	var p_igate_config igate_config_s
-	p_igate_config.max_digi_hops = 2
 	var heardDB = mheard.New(0)
-	var packetFilter = NewPacketFilter(&p_igate_config, nil, heardDB, 0)
+	var packetFilter = New(2, nil, heardDB, 0)
 
 	// Q1TEST has just been heard directly over the radio, and nothing at all
 	// has been heard from the addressee Q2TEST, so the filter has every reason
@@ -100,13 +114,13 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 	var heard = ax25.FromText("Q1TEST>APDW17:!4237.14NS07120.83W#", true)
 	require.NotNil(t, heard)
 
-	var lat, lon = mheardPosition(new(aprs.Decoder).Decode(heard, true))
+	var lat, lon = heardPosition(new(aprs.Decoder).Decode(heard, true))
 	heardDB.SaveRF(0, heard, lat, lon)
 
 	var message = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Happy Birthday{001", true)
 	require.NotNil(t, message)
 
-	var result, err = packetFilter.pfilter(0, 0, "i/30", message, true)
+	var result, err = packetFilter.Filter(0, 0, "i/30", message, true)
 	require.NoError(t, err)
 	assert.Equal(t, 0, result, "an i/ filter should consult the heard list, not pass everything")
 
@@ -122,8 +136,6 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 // condition 1 was inverted, so a message was dropped precisely when its
 // addressee had been heard nearby recently.
 func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
-	var p_igate_config igate_config_s
-	p_igate_config.max_digi_hops = 2
 	// Q2TEST is about 4 km from 42.6 -71.3.
 	const q2testPosition = "Q2TEST>APDW17:!4237.14NS07120.83W#"
 
@@ -135,7 +147,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 		var pp = ax25.FromText(monitor, true)
 		require.NotNil(t, pp)
 
-		var lat, lon = mheardPosition(new(aprs.Decoder).Decode(pp, true))
+		var lat, lon = heardPosition(new(aprs.Decoder).Decode(pp, true))
 		heardDB.SaveRF(0, pp, lat, lon)
 	}
 
@@ -192,7 +204,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var heardDB = mheard.New(0)
-			var packetFilter = NewPacketFilter(&p_igate_config, nil, heardDB, 0)
+			var packetFilter = New(2, nil, heardDB, 0)
 
 			for _, monitor := range tc.heard {
 				hearRF(t, heardDB, monitor)
@@ -201,7 +213,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 			var message = ax25.FromText(tc.message, true)
 			require.NotNil(t, message)
 
-			var result, err = packetFilter.pfilter(0, 0, tc.filter, message, true)
+			var result, err = packetFilter.Filter(0, 0, tc.filter, message, true)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expected, result)
 		})
@@ -236,7 +248,7 @@ func pfilterMonitorLines(t *testing.T, packetFilter *PacketFilter, from_chan int
 }
 
 func Test_PacketFilterMonitorLine(t *testing.T) {
-	var packetFilter = PfilterStandaloneInit(0)
+	var packetFilter = NewStandalone(0)
 
 	var testCases = []struct {
 		name     string
@@ -320,7 +332,7 @@ func Test_PacketFilterMonitorLine(t *testing.T) {
 }
 
 func Test_PacketFilterMonitorLine_connectedMode(t *testing.T) {
-	var packetFilter = PfilterStandaloneInit(0)
+	var packetFilter = NewStandalone(0)
 
 	var packets = []string{pfilterTestPositionPacket, pfilterTestStatusPacket}
 
@@ -328,7 +340,7 @@ func Test_PacketFilterMonitorLine_connectedMode(t *testing.T) {
 }
 
 func Test_PacketFilterMonitorLine_unparseablePacket(t *testing.T) {
-	var packetFilter = PfilterStandaloneInit(0)
+	var packetFilter = NewStandalone(0)
 
 	// AX25FromText has plenty to say about a line it cannot parse, and says it
 	// on stdout, so let it.
@@ -342,10 +354,10 @@ func Test_PacketFilterMonitorLine_unparseablePacket(t *testing.T) {
 }
 
 func Test_PacketFilterMonitorLine_igateFilterWithNothingHeard(t *testing.T) {
-	// PfilterStandaloneInit gives the filter engine an empty "heard recently"
+	// NewStandalone gives the filter engine an empty "heard recently"
 	// database, and an "i" filter gates a message only to an addressee that
 	// has been heard, so there is nothing here it will pass.
-	var packetFilter = PfilterStandaloneInit(0)
+	var packetFilter = NewStandalone(0)
 
 	var packets = []string{pfilterTestMessagePacket, pfilterTestStatusPacket}
 
@@ -356,7 +368,7 @@ func Test_PacketFilterMonitorLine_igateFilterWithNothingHeard(t *testing.T) {
 	t.Cleanup(hook.Reset)
 
 	testutils.CaptureOutput(t, func() {
-		verdicts = pfilterMonitorLines(t, packetFilter, MAX_TOTAL_CHANS, 0, "i/60/0/51.5/-0.1/50", true, packets)
+		verdicts = pfilterMonitorLines(t, packetFilter, phy.MaxTotalChans, 0, "i/60/0/51.5/-0.1/50", true, packets)
 	})
 
 	assert.Equal(t, []bool{false, false}, verdicts)
@@ -370,76 +382,121 @@ func Test_PacketFilterMonitorLine_igateFilterWithNothingHeard(t *testing.T) {
 	assert.Equal(t, "Q2TEST", entry.Data["callsign"])
 }
 
-func Test_PfilterValidate(t *testing.T) {
-	var packetFilter = PfilterStandaloneInit(0)
+func Test_Validate(t *testing.T) {
+	var packetFilter = NewStandalone(0)
 
 	t.Run("a valid filter is accepted", func(t *testing.T) {
-		assert.NoError(t, PfilterValidate(0, 0, "t/m & ! d/WIDE*", true))
+		assert.NoError(t, Validate(0, 0, "t/m & ! d/WIDE*", true))
 	})
 
 	t.Run("a bad expression is rejected", func(t *testing.T) {
-		var err = PfilterValidate(0, 0, "t/m & ( t/w", true)
+		var err = Validate(0, 0, "t/m & ( t/w", true)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `Expected ")" here.`)
 	})
 
 	t.Run("an APRS-only filter type is rejected in connected mode", func(t *testing.T) {
-		assert.Error(t, PfilterValidate(0, 0, "t/m", false))
+		assert.Error(t, Validate(0, 0, "t/m", false))
 	})
 
 	t.Run("the channels appear in the error message", func(t *testing.T) {
-		var err = PfilterValidate(MAX_TOTAL_CHANS, 2, "x/", true)
+		var err = Validate(phy.MaxTotalChans, 2, "x/", true)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "filter[IG,2]")
 	})
 
 	t.Run("a channel out of range is rejected rather than asserted on", func(t *testing.T) {
-		require.Error(t, PfilterValidate(-1, 0, "b/Q1TEST", true))
-		require.Error(t, PfilterValidate(0, MAX_TOTAL_CHANS+1, "b/Q1TEST", true))
+		require.Error(t, Validate(-1, 0, "b/Q1TEST", true))
+		require.Error(t, Validate(0, phy.MaxTotalChans+1, "b/Q1TEST", true))
 
-		var _, err = packetFilter.MonitorLine(MAX_TOTAL_CHANS+1, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
+		var _, err = packetFilter.MonitorLine(phy.MaxTotalChans+1, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
 		require.Error(t, err)
 	})
 
 	t.Run("validation says nothing about its own synthetic packet", func(t *testing.T) {
 		// As samoyed-pftest -vvv sets it up before validating.
-		PfilterStandaloneInit(PfilterMaxDebugLevel)
+		NewStandalone(MaxDebugLevel)
 
-		var output = testutils.CaptureOutput(t, func() {
-			require.NoError(t, PfilterValidate(0, 0, "b/Q1TEST", true))
+		var entries = pfilterTraceEntries(t, func() {
+			require.NoError(t, Validate(0, 0, "b/Q1TEST", true))
 		})
 
-		assert.Empty(t, output)
+		assert.Empty(t, entries)
 	})
 }
 
-func Test_PfilterStandaloneInit_debugLevelExplainsTheDecision(t *testing.T) {
-	var packetFilter = PfilterStandaloneInit(2)
+// pfilterTraceEntries runs f with logrus at Trace, where the filter explains
+// its decisions, and returns what the filter said.
+func pfilterTraceEntries(t *testing.T, f func()) []*logrus.Entry {
+	t.Helper()
 
-	testutils.AssertOutputContains(t, func() {
+	var savedLevel = logrus.GetLevel()
+	logrus.SetLevel(logrus.TraceLevel)
+	t.Cleanup(func() { logrus.SetLevel(savedLevel) })
+
+	var hook = test.NewGlobal()
+	t.Cleanup(hook.Reset)
+
+	testutils.CaptureOutput(t, f)
+
+	var entries []*logrus.Entry
+
+	for _, entry := range hook.AllEntries() {
+		if strings.HasPrefix(entry.Message, "Packet filter") {
+			entries = append(entries, entry)
+		}
+	}
+
+	return entries
+}
+
+// assertSpecEvaluated asserts that entries include filter specification spec
+// returning result.
+func assertSpecEvaluated(t *testing.T, entries []*logrus.Entry, spec string, result string) {
+	t.Helper()
+
+	for _, entry := range entries {
+		if entry.Data["filter"] == spec {
+			assert.Equal(t, result, entry.Data["result"])
+
+			return
+		}
+	}
+
+	assert.Failf(t, "filter specification not explained", "no trace entry for %s among %v", spec, entries)
+}
+
+func Test_NewStandalone_debugLevelExplainsTheDecision(t *testing.T) {
+	var packetFilter = NewStandalone(2)
+
+	var entries = pfilterTraceEntries(t, func() {
 		var _, err = packetFilter.MonitorLine(0, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
 		require.NoError(t, err)
-	}, "b/Q1TEST returns TRUE")
+	})
+
+	assertSpecEvaluated(t, entries, "b/Q1TEST", "TRUE")
 }
 
 // Each PacketFilter keeps the debug level it was built with, rather than
 // whichever one was set up last - the debug level used to be shared by the
 // whole package, and so by every filter in it.
 func Test_PacketFilter_debugLevelIsItsOwn(t *testing.T) {
-	var verbose = PfilterStandaloneInit(2)
-	var quiet = PfilterStandaloneInit(0)
+	var verbose = NewStandalone(2)
+	var quiet = NewStandalone(0)
 
-	testutils.AssertOutputContains(t, func() {
+	var entries = pfilterTraceEntries(t, func() {
 		var _, err = verbose.MonitorLine(0, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
 		require.NoError(t, err)
-	}, "b/Q1TEST returns TRUE")
+	})
 
-	var output = testutils.CaptureOutput(t, func() {
+	assertSpecEvaluated(t, entries, "b/Q1TEST", "TRUE")
+
+	entries = pfilterTraceEntries(t, func() {
 		var _, err = quiet.MonitorLine(0, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
 		require.NoError(t, err)
 	})
 
-	assert.Empty(t, output)
+	assert.Empty(t, entries)
 }

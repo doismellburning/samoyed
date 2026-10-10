@@ -14,6 +14,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -140,7 +141,7 @@ func setupIGate(t *testing.T) (*IGate, net.Conn) {
 
 	var heardDB = mheard.New(0)
 
-	var ig = NewIGate(audioConfig, igateConfig, digiConfig, NewPacketFilter(igateConfig, nil, heardDB, 0), heardDB, 0)
+	var ig = NewIGate(audioConfig, igateConfig, digiConfig, pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, 0)
 
 	var server, client = connectedTCPPair(t)
 

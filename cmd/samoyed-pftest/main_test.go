@@ -8,8 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -85,7 +87,7 @@ func Test_run_rejectsAnInvalidFilter(t *testing.T) {
 
 func Test_run_rejectsAChannelOutOfRange(t *testing.T) {
 	var opts = defaultOptions("b/Q1TEST")
-	opts.toChannel = direwolf.MAX_TOTAL_CHANS + 1
+	opts.toChannel = phy.MaxTotalChans + 1
 
 	var exitStatus, _, errOut = runWith(opts, positionPacket+"\n")
 
@@ -130,12 +132,29 @@ func Test_run_verboseExplainsTheDecision(t *testing.T) {
 	var opts = defaultOptions("b/Q1TEST")
 	opts.debugLevel = 2
 
-	// The filter engine's debug output goes to stdout, not to the writer run
-	// prints verdicts to.
-	testutils.AssertOutputContains(t, func() {
-		var exitStatus, _, _ = runWith(opts, positionPacket+"\n")
-		assert.Equal(t, 0, exitStatus)
-	}, "b/Q1TEST returns TRUE")
+	// The filter engine explains itself through logrus, at Trace, which main
+	// turns on for a verbose run.
+	var savedLevel = logrus.GetLevel()
+	logrus.SetLevel(logrus.TraceLevel)
+	t.Cleanup(func() { logrus.SetLevel(savedLevel) })
+
+	var hook = test.NewGlobal()
+	t.Cleanup(hook.Reset)
+
+	var exitStatus, _, _ = runWith(opts, positionPacket+"\n")
+	assert.Equal(t, 0, exitStatus)
+
+	var explained = false
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Data["filter"] == "b/Q1TEST" {
+			assert.Equal(t, "TRUE", entry.Data["result"])
+
+			explained = true
+		}
+	}
+
+	assert.True(t, explained, "the b/Q1TEST specification should have explained itself")
 }
 
 func TestMain(m *testing.M) {
@@ -201,7 +220,7 @@ func Test_main_options(t *testing.T) {
 			[]string{"--validate", "t/m & ! d/WIDE*"}, 0, "", "",
 		},
 		"verbose": {
-			[]string{"-vv", "t/m"}, 0, "PASS", "",
+			[]string{"-vv", "t/m"}, 0, "PASS", "filter=t/m",
 		},
 		"connected mode": {
 			[]string{"-c", "--from-channel", "1", "--to-channel", "2", "b/Q1TEST"}, 0, "PASS\t" + messagePacket, "",

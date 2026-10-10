@@ -26,6 +26,16 @@ const MaxADevs = 3
 const MaxRadioChans = ((MaxADevs) * 2)
 
 /*
+ * v1.7 allows additional virtual channels which are connected
+ * to something other than radio modems.
+ * Total maximum channels is based on the 4 bit KISS field.
+ * Someone with very unusual requirements could increase this and
+ * use only the AGW network protocol.
+ */
+
+const MaxTotalChans = 16
+
+/*
  * Maximum number of modems per channel.
  * I called them "subchannels" (in the code) because
  * it is short and unambiguous.

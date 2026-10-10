@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package pfilter
 
 import (
 	"testing"
@@ -11,8 +14,8 @@ import (
 var pftest_error_count int
 
 func Test_pfilter(t *testing.T) {
-	dw_printf("Quick test for packet filtering.\n")
-	dw_printf("Some error messages are normal.  Look at the final success/fail message.\n")
+	t.Log("Quick test for packet filtering.")
+	t.Log("Some error messages are normal.  Look at the final success/fail message.")
 
 	pftest(t, 1, "", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0)
 	pftest(t, 2, "0", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0)
@@ -223,20 +226,17 @@ func Test_pfilter(t *testing.T) {
 	// TODO: to be continued...  directed query ...
 
 	if pftest_error_count > 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nPacket Filtering Test - FAILED!     %d errors\n", pftest_error_count)
+		t.Logf("Packet Filtering Test - FAILED!     %d errors", pftest_error_count)
 		t.Fail()
 	}
 
-	text_color_set(DW_COLOR_REC)
-	dw_printf("\nPacket Filtering Test - SUCCESS!\n")
+	t.Log("Packet Filtering Test - SUCCESS!")
 }
 
 func pftest(t *testing.T, test_num int, filter string, monitor string, expected int) {
 	t.Helper()
 
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("test number %d\n", test_num)
+	t.Logf("test number %d", test_num)
 
 	var pp = ax25.FromText(monitor, true)
 	assert.NotNil(t, pp)
