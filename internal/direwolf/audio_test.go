@@ -408,7 +408,7 @@ func Test_GetByte_recordsStatisticsFromTheDevicesOwnSettings(t *testing.T) {
 		require.Equal(t, 0, d.GetByte(0))
 	}
 
-	var samples, _ = d.dev[0].stats.counts()
+	var samples, _ = d.dev[0].stats.Counts()
 	assert.Equal(t, 0, samples)
 
 	require.Equal(t, 0, d.GetByte(0))
@@ -417,7 +417,7 @@ func Test_GetByte_recordsStatisticsFromTheDevicesOwnSettings(t *testing.T) {
 
 	var errors int
 
-	samples, errors = d.dev[0].stats.counts()
+	samples, errors = d.dev[0].stats.Counts()
 	assert.Equal(t, 10, samples)
 	assert.Equal(t, 0, errors)
 }

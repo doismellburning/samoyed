@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package audiostats
 
 import (
 	"testing"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -15,16 +16,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newTestAudioStats gives each audio device a fresh AudioStats, each of them
+// newTestAudioStats gives each audio device a fresh Stats, each of them
 // reporting known audio levels, so a test starts from a known position and
 // leaves nothing behind.
-func newTestAudioStats(t *testing.T) *[MAX_ADEVS]AudioStats {
+func newTestAudioStats(t *testing.T) *[phy.MaxADevs]Stats {
 	t.Helper()
 
-	var stats = new([MAX_ADEVS]AudioStats)
+	var stats = new([phy.MaxADevs]Stats)
 
 	for adev := range stats {
-		stats[adev].audioLevel = audioStatsTestLevels
+		stats[adev].AudioLevel = audioStatsTestLevels
 	}
 
 	return stats
@@ -51,19 +52,19 @@ const audioStatsTestInterval = 10
 // audioStatsRewind moves a device's last report one interval into the past, so
 // the next call reaches the reporting branch without the test waiting for real
 // time to pass.
-func audioStatsRewind(s *AudioStats) {
+func audioStatsRewind(s *Stats) {
 	s.lastTime = s.lastTime.Add(-audioStatsTestInterval * time.Second)
 }
 
 // audioStatsPastFirstReport runs a device up to the point where the next
 // elapsed interval will actually print: started, and with the deliberately
 // suppressed first report out of the way.
-func audioStatsPastFirstReport(t *testing.T, stats *[MAX_ADEVS]AudioStats, adev int, nchan int) {
+func audioStatsPastFirstReport(t *testing.T, stats *[phy.MaxADevs]Stats, adev int, nchan int) {
 	t.Helper()
 
-	stats[adev].record(adev, nchan, 1, audioStatsTestInterval)
+	stats[adev].Record(adev, nchan, 1, audioStatsTestInterval)
 	audioStatsRewind(&stats[adev])
-	stats[adev].record(adev, nchan, 1, audioStatsTestInterval)
+	stats[adev].Record(adev, nchan, 1, audioStatsTestInterval)
 
 	assert.False(t, stats[adev].suppressFirst)
 }
@@ -113,8 +114,8 @@ func TestAudioStatsIntervalOffDoesNothing(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
 	var reports = audioStatsReports(t, func() {
-		stats[0].record(0, 1, 44100, 0)
-		stats[0].record(0, 1, 44100, -1)
+		stats[0].Record(0, 1, 44100, 0)
+		stats[0].Record(0, 1, 44100, -1)
 	})
 
 	assert.Empty(t, reports)
@@ -127,7 +128,7 @@ func TestAudioStatsFirstCallStartsCollecting(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
 	var reports = audioStatsReports(t, func() {
-		stats[0].record(0, 1, 44100, 100)
+		stats[0].Record(0, 1, 44100, 100)
 	})
 
 	assert.Empty(t, reports)
@@ -146,11 +147,11 @@ func TestAudioStatsCountsSamplesAndErrors(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
 	var reports = audioStatsReports(t, func() {
-		stats[0].record(0, 1, 0, 100) // Starts collecting.
-		stats[0].record(0, 1, 1000, 100)
-		stats[0].record(0, 1, 500, 100)
-		stats[0].record(0, 1, 0, 100)
-		stats[0].record(0, 1, -1, 100)
+		stats[0].Record(0, 1, 0, 100) // Starts collecting.
+		stats[0].Record(0, 1, 1000, 100)
+		stats[0].Record(0, 1, 500, 100)
+		stats[0].Record(0, 1, 0, 100)
+		stats[0].Record(0, 1, -1, 100)
 	})
 
 	assert.Empty(t, reports, "the interval has not elapsed")
@@ -163,11 +164,11 @@ func TestAudioStatsCountsSamplesAndErrors(t *testing.T) {
 func TestAudioStatsSuppressesFirstReport(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
-	stats[0].record(0, 1, 44100, audioStatsTestInterval)
+	stats[0].Record(0, 1, 44100, audioStatsTestInterval)
 	audioStatsRewind(&stats[0])
 
 	var reports = audioStatsReports(t, func() {
-		stats[0].record(0, 1, 44100, audioStatsTestInterval)
+		stats[0].Record(0, 1, 44100, audioStatsTestInterval)
 	})
 
 	assert.Empty(t, reports)
@@ -183,7 +184,7 @@ func TestAudioStatsReportsSampleRate(t *testing.T) {
 	audioStatsRewind(&stats[0])
 
 	var report = requireOneAudioStatsReport(t, func() {
-		stats[0].record(0, 1, 441000, audioStatsTestInterval)
+		stats[0].Record(0, 1, 441000, audioStatsTestInterval)
 	})
 
 	assertAudioStatsReport(t, report, 0, 44.1, 0, map[int]int{0: 10})
@@ -195,12 +196,12 @@ func TestAudioStatsReportsErrorCount(t *testing.T) {
 	var stats = newTestAudioStats(t)
 	audioStatsPastFirstReport(t, stats, 0, 1)
 
-	stats[0].record(0, 1, 0, audioStatsTestInterval)
-	stats[0].record(0, 1, 0, audioStatsTestInterval)
+	stats[0].Record(0, 1, 0, audioStatsTestInterval)
+	stats[0].Record(0, 1, 0, audioStatsTestInterval)
 	audioStatsRewind(&stats[0])
 
 	var report = requireOneAudioStatsReport(t, func() {
-		stats[0].record(0, 1, 0, audioStatsTestInterval)
+		stats[0].Record(0, 1, 0, audioStatsTestInterval)
 	})
 
 	assertAudioStatsReport(t, report, 0, 0.0, 3, map[int]int{0: 10})
@@ -216,7 +217,7 @@ func TestAudioStatsReportsBothChannels(t *testing.T) {
 	audioStatsRewind(&stats[0])
 
 	var report = requireOneAudioStatsReport(t, func() {
-		stats[0].record(0, 2, 441000, audioStatsTestInterval)
+		stats[0].Record(0, 2, 441000, audioStatsTestInterval)
 	})
 
 	assertAudioStatsReport(t, report, 0, 44.1, 0, map[int]int{0: 10, 1: 20})
@@ -227,11 +228,11 @@ func TestAudioStatsSecondDeviceIsIndependent(t *testing.T) {
 	var stats = newTestAudioStats(t)
 	audioStatsPastFirstReport(t, stats, 1, 1)
 
-	stats[0].record(0, 1, 44100, audioStatsTestInterval) // Device 0 only just starts collecting.
+	stats[0].Record(0, 1, 44100, audioStatsTestInterval) // Device 0 only just starts collecting.
 	audioStatsRewind(&stats[1])
 
 	var report = requireOneAudioStatsReport(t, func() {
-		stats[1].record(1, 1, 220500, audioStatsTestInterval)
+		stats[1].Record(1, 1, 220500, audioStatsTestInterval)
 	})
 
 	assertAudioStatsReport(t, report, 1, 22.05, 0, map[int]int{2: 30})
@@ -242,9 +243,9 @@ func TestAudioStatsSecondDeviceIsIndependent(t *testing.T) {
 func TestAudioStatsRejectsDeviceOutOfRange(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
-	assert.Panics(t, func() { stats[0].record(MAX_ADEVS, 1, 44100, audioStatsTestInterval) })
-	assert.Panics(t, func() { stats[0].record(-1, 1, 44100, audioStatsTestInterval) })
+	assert.Panics(t, func() { stats[0].Record(phy.MaxADevs, 1, 44100, audioStatsTestInterval) })
+	assert.Panics(t, func() { stats[0].Record(-1, 1, 44100, audioStatsTestInterval) })
 
 	// Turned off, we never get as far as looking at the device number.
-	assert.NotPanics(t, func() { stats[0].record(MAX_ADEVS, 1, 44100, 0) })
+	assert.NotPanics(t, func() { stats[0].Record(phy.MaxADevs, 1, 44100, 0) })
 }

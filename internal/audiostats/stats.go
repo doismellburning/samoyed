@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package audiostats
 
 /*------------------------------------------------------------------
  *
@@ -39,12 +42,12 @@ import (
 
 /*------------------------------------------------------------------
 *
-* Name:        AudioStats.record
+* Name:        Stats.Record
 *
 * Purpose:     Add sample count from one buffer to the statistics.
 *		Print if specified amount of time has passed.
 *
-* Inputs:	adev	- Audio device number:  0, 1, ..., MAX_ADEVS-1
+* Inputs:	adev	- Audio device number:  0, 1, ..., phy.MaxADevs-1
 *
 		nchan	- Number of channels for this device, 1 or 2.
 *
@@ -59,44 +62,44 @@ import (
 *
 *----------------------------------------------------------------*/
 
-// AudioStats accumulates the statistics for one audio device between reports.
+// Stats accumulates the statistics for one audio device between reports.
 // The zero value is ready to use: collection starts on the first call to
-// record.  Each device's reads happen on its own receive goroutine, which is
+// Record.  Each device's reads happen on its own receive goroutine, which is
 // the only caller, so there is nothing to lock.
-type AudioStats struct {
+type Stats struct {
 	lastTime      time.Time
 	sampleCount   int
 	errorCount    int
 	suppressFirst bool
 
-	// audioLevel reports a channel's received audio level, or is nil for
+	// AudioLevel reports a channel's received audio level, or is nil for
 	// none to report.
-	audioLevel func(channel int, subchan int) ax25.ALevel
+	AudioLevel func(channel int, subchan int) ax25.ALevel
 }
 
-// counts is how many samples, and how many reads that returned none, have
+// Counts is how many samples, and how many reads that returned none, have
 // been counted since the last report.
-func (s *AudioStats) counts() (samples int, errors int) {
+func (s *Stats) Counts() (samples int, errors int) {
 	return s.sampleCount, s.errorCount
 }
 
 // level is the channel's received audio level, or zero if there is nothing
 // to ask.
-func (s *AudioStats) level(channel int) int {
-	if s.audioLevel == nil {
+func (s *Stats) level(channel int) int {
+	if s.AudioLevel == nil {
 		return 0
 	}
 
-	return s.audioLevel(channel, 0).Rec
+	return s.AudioLevel(channel, 0).Rec
 }
 
-func (s *AudioStats) record(adev int, nchan int, nsamp int, interval int) {
+func (s *Stats) Record(adev int, nchan int, nsamp int, interval int) {
 	/* Gather numbers for read from audio device. */
 	if interval <= 0 {
 		return
 	}
 
-	dwutil.Assert(adev >= 0 && adev < MAX_ADEVS)
+	dwutil.Assert(adev >= 0 && adev < phy.MaxADevs)
 
 	/*
 	 * Print information about the sample rate as a troubleshooting aid.
