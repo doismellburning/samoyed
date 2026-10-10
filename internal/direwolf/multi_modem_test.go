@@ -28,6 +28,14 @@ func (s *recordingReceiveSink) RecFrame(_ int, _ int, _ int, pp *ax25.Packet, _ 
 
 func (s *recordingReceiveSink) DCDChange(int, int) {}
 
+// discardReceiveSink is a ReceiveSink that ignores whatever it is told.
+type discardReceiveSink struct{}
+
+func (discardReceiveSink) RecFrame(int, int, int, *ax25.Packet, ax25.ALevel, fec_type_t, BitFixLevel, string) {
+}
+
+func (discardReceiveSink) DCDChange(int, int) {}
+
 // What multi_modem_init set up before - for atest, the file it decoded last -
 // is left behind when it runs again: neither a frame still waiting to be
 // picked nor the DC bias of the old audio turns up in what comes after.

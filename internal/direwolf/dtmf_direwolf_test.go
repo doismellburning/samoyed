@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/require"
 )
 
@@ -105,11 +104,3 @@ func Test_dtmf(t *testing.T) {
 	require.NotEqual(t, "123A456B789C*0#D123789", result.String(), "Time-out failed, otherwise OK")
 	require.Equal(t, "123A456B789C*0#D123$789$", result.String())
 }
-
-// discardReceiveSink is a ReceiveSink that ignores whatever it is told.
-type discardReceiveSink struct{}
-
-func (discardReceiveSink) RecFrame(int, int, int, *ax25.Packet, ax25.ALevel, fec_type_t, BitFixLevel, string) {
-}
-
-func (discardReceiveSink) DCDChange(int, int) {}
