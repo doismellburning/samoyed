@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package dedupe
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 )
 
 func Test_dedupe_check_duplicate(t *testing.T) {
-	var ds = NewDedupeService(30*time.Second, nil)
+	var ds = New(30*time.Second, nil)
 
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
@@ -25,7 +25,7 @@ func Test_dedupe_check_duplicate(t *testing.T) {
 }
 
 func Test_dedupe_check_different_channel_not_duplicate(t *testing.T) {
-	var ds = NewDedupeService(30*time.Second, nil)
+	var ds = New(30*time.Second, nil)
 
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
@@ -36,7 +36,7 @@ func Test_dedupe_check_different_channel_not_duplicate(t *testing.T) {
 }
 
 func Test_dedupe_check_expired_not_duplicate(t *testing.T) {
-	var ds = NewDedupeService(30*time.Second, nil)
+	var ds = New(30*time.Second, nil)
 
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
@@ -54,7 +54,7 @@ func Test_dedupe_check_expired_not_duplicate(t *testing.T) {
 }
 
 func Test_dedupe_check_empty_history_not_duplicate(t *testing.T) {
-	var ds = NewDedupeService(30*time.Second, nil)
+	var ds = New(30*time.Second, nil)
 
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
@@ -66,7 +66,7 @@ func Test_dedupe_check_empty_history_not_duplicate(t *testing.T) {
 // object reports remember from the audio thread that decoded the tones, so
 // the history is shared between goroutines.  Run under -race.
 func Test_dedupe_concurrent_remember_and_check(t *testing.T) {
-	var ds = NewDedupeService(30*time.Second, nil)
+	var ds = New(30*time.Second, nil)
 
 	var pp = ax25.FromText("Q1TEST>APRS:test packet", true)
 	require.NotNil(t, pp)
@@ -95,7 +95,7 @@ func Test_dedupe_concurrent_remember_and_check(t *testing.T) {
 func TestDedupeRememberTellsWhoItWasHanded(t *testing.T) {
 	var told []string
 
-	var ds = NewDedupeService(30*time.Second, func(pp *ax25.Packet, channel int) {
+	var ds = New(30*time.Second, func(pp *ax25.Packet, channel int) {
 		told = append(told, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
 	})
 

@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package dedupe
 
 /*------------------------------------------------------------------
  *
@@ -98,7 +101,7 @@ type historyEntry struct {
 
 }
 
-type DedupeService struct {
+type Service struct {
 	historyTime time.Duration /* Number of seconds to keep information */
 
 	// mu guards insertNext and history: the digipeater checks and remembers
@@ -116,7 +119,7 @@ type DedupeService struct {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	NewDedupeService
+ * Name:	New
  *
  * Purpose:	Initialize the duplicate detection subsystem.
  *
@@ -127,19 +130,24 @@ type DedupeService struct {
  *			  channel; nil for nobody to tell.
  *
  *
- * Returns:	New DedupeService
+ * Returns:	New Service
  *
  * Description:	This should be called at application startup.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func NewDedupeService(ttl time.Duration, onRemember func(pp *ax25.Packet, channel int)) *DedupeService {
-	var ds = new(DedupeService)
+func New(ttl time.Duration, onRemember func(pp *ax25.Packet, channel int)) *Service {
+	var ds = new(Service)
 	ds.historyTime = ttl
 	ds.onRemember = onRemember
 
 	return ds
+}
+
+// TTL is how long the service remembers a transmission for.
+func (ds *Service) TTL() time.Duration {
+	return ds.historyTime
 }
 
 /*------------------------------------------------------------------------------
@@ -178,7 +186,7 @@ func NewDedupeService(ttl time.Duration, onRemember func(pp *ax25.Packet, channe
  *
  *------------------------------------------------------------------------------*/
 
-func (ds *DedupeService) Remember(pp *ax25.Packet, channel int) {
+func (ds *Service) Remember(pp *ax25.Packet, channel int) {
 	ds.mu.Lock()
 	ds.history[ds.insertNext].time_stamp = time.Now()
 	ds.history[ds.insertNext].checksum = pp.DedupeCRC()
@@ -214,7 +222,7 @@ func (ds *DedupeService) Remember(pp *ax25.Packet, channel int) {
  *
  *------------------------------------------------------------------------------*/
 
-func (ds *DedupeService) Check(pp *ax25.Packet, channel int) bool {
+func (ds *Service) Check(pp *ax25.Packet, channel int) bool {
 	var crc = pp.DedupeCRC()
 	var now = time.Now()
 
