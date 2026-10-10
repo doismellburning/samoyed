@@ -196,6 +196,7 @@ func fuzzAGWServer(tb testing.TB) *AGWServer {
 	tb.Helper()
 
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var ours, theirs = net.Pipe()
 	s.clients[0].conn = ours

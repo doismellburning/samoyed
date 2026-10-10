@@ -528,7 +528,7 @@ x = Silence FX.25 information.`)
 	// The AGW server is made here, so the transmit service can be told to
 	// show it each frame sent, but only started further down: its clients
 	// feed a transmit queue that the transmit service sets up.
-	var agwServer = NewAGWServer(audio_config, misc_config, d_a_opt)
+	var agwServer = NewAGWServer(audio_config, misc_config, dataLinkQueue, d_a_opt)
 
 	// Each frame sent is shown on the web interface, if there is one, and to
 	// the AGW clients monitoring.

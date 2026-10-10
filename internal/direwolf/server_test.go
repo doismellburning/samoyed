@@ -524,6 +524,7 @@ func (c *nullConn) RemoteAddr() net.Addr        { return c.addr }
 // under -race, this fails if the table is not guarded.
 func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
@@ -579,6 +580,7 @@ func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
 // callsigns away, while its socket stays attached and it is told nothing.
 func TestDetachClient_StaleConnLeavesItsSuccessorAlone(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var first = new(nullConn)
 	first.addr = tcpAddr(t, "192.168.1.10")
@@ -598,6 +600,7 @@ func TestDetachClient_StaleConnLeavesItsSuccessorAlone(t *testing.T) {
 // The ordinary case still cleans up, of course.
 func TestDetachClient_AttachedConnIsCleanedUp(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var conn = new(nullConn)
 	conn.addr = tcpAddr(t, "192.168.1.10")
@@ -619,6 +622,7 @@ func TestDetachClient_AttachedConnIsCleanedUp(t *testing.T) {
 // dropping the error left it saying nothing at all.
 func TestSendToClient_WriteErrorDetachesTheClient(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var server, client = net.Pipe()
 	client.Close()

@@ -222,6 +222,7 @@ func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
 
 func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var cfg RadioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
@@ -303,6 +304,7 @@ func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 // silently treating the malformed frame as a direct connect.
 func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	rapid.Check(t, func(t *rapid.T) {
 		var numDigi = rapid.OneOf(
@@ -334,6 +336,7 @@ func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
 // would Assert-panic on channel >= MAX_RADIO_CHANS.
 func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	rapid.Check(t, func(t *rapid.T) {
 		var dataKind = rapid.SampledFrom([]byte{'C', 'v', 'c', 'D', 'd', 'Y'}).Draw(t, "dataKind")
@@ -359,6 +362,7 @@ func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T
 // buffer and appeared as a 0x00 prefix on the next received command.
 func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var payload = []byte("CMD1\r")
 
@@ -390,6 +394,7 @@ func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 // enqueueing anything.
 func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'D'
@@ -408,6 +413,7 @@ func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
 
 func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	// Encode the via_info payload: num_digi + 7 x 10-byte callsign slots.
 	var via struct {
@@ -568,15 +574,15 @@ func TestHandleClientCommand_G_NilRadioConfig(t *testing.T) {
 func TestNewAGWServer_TakesTheDebugLevel(t *testing.T) {
 	var mc = new(misc_config_s)
 
-	assert.Equal(t, 2, NewAGWServer(nil, mc, 2).debug)
-	assert.Equal(t, 0, NewAGWServer(nil, mc, 0).debug)
+	assert.Equal(t, 2, NewAGWServer(nil, mc, nil, 2).debug)
+	assert.Equal(t, 0, NewAGWServer(nil, mc, nil, 0).debug)
 }
 
 // With no port configured, starting says the AGW port is disabled and lets
 // nobody in; starting again is refused, and says so, rather than starting
 // a second set of goroutines on the same port.
 func TestAGWServerStart_NoPortAndOnlyOnce(t *testing.T) {
-	var s = NewAGWServer(nil, new(misc_config_s), 0) /* agwpe_port 0. */
+	var s = NewAGWServer(nil, new(misc_config_s), nil, 0) /* agwpe_port 0. */
 
 	var output = testutils.CaptureOutput(t, func() { s.Start(t.Context()) })
 
@@ -695,6 +701,7 @@ func TestHandleClientCommand_G_AXUDP(t *testing.T) {
 // nothing is queued.
 func TestHandleClientCommand_H_DoesNothing(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 	var conn = new(writeCountingConn)
 	s.clients[0].conn = conn
 
@@ -709,6 +716,7 @@ func TestHandleClientCommand_H_DoesNothing(t *testing.T) {
 // An unrecognised command is reported and otherwise ignored.
 func TestHandleClientCommand_UnknownCommandIgnored(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 	var conn = new(writeCountingConn)
 	s.clients[0].conn = conn
 
@@ -932,6 +940,7 @@ func TestHandleClientCommand_y_NonRadioPortReportsZero(t *testing.T) {
 
 func TestHandleClientCommand_X_RegistersCallsign(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 	s.clients[2].conn = new(nullConn)
 
 	var cmd = new(agwpe.Message)
@@ -968,6 +977,7 @@ func TestHandleClientCommand_X_ReplyCarriesPortAndCallsign(t *testing.T) {
 
 func TestHandleClientCommand_x_UnregistersCallsign(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'x'
@@ -985,6 +995,7 @@ func TestHandleClientCommand_x_UnregistersCallsign(t *testing.T) {
 
 func TestHandleClientCommand_x_InvalidChannelUnregistersNothing(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'x'
@@ -999,6 +1010,7 @@ func TestHandleClientCommand_Cc_ConnectWithoutDigipeaters(t *testing.T) {
 	for _, kind := range []byte{'C', 'c'} {
 		t.Run(string(kind), func(t *testing.T) {
 			var s = new(AGWServer)
+			s.dataLink = dataLinkQueue
 
 			var cmd = new(agwpe.Message)
 			cmd.Header.DataKind = kind
@@ -1023,6 +1035,7 @@ func TestHandleClientCommand_Cc_ConnectWithoutDigipeaters(t *testing.T) {
 // 'v' with no payload at all cannot say how many digipeaters there are.
 func TestHandleClientCommand_v_EmptyPayloadNoDLQAppend(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'v'
@@ -1035,6 +1048,7 @@ func TestHandleClientCommand_v_EmptyPayloadNoDLQAppend(t *testing.T) {
 
 func TestHandleClientCommand_v_PayloadTooShortForDigipeatersNoDLQAppend(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'v'
@@ -1051,6 +1065,7 @@ func TestHandleClientCommand_v_PayloadTooShortForDigipeatersNoDLQAppend(t *testi
 // about, but the connection is still attempted.
 func TestHandleClientCommand_v_UnexpectedDataLenStillConnects(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var data = make([]byte, 1+10+5)
 	data[0] = 1
@@ -1073,6 +1088,7 @@ func TestHandleClientCommand_v_UnexpectedDataLenStillConnects(t *testing.T) {
 
 func TestHandleClientCommand_d_RequestsDisconnect(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'd'
@@ -1093,6 +1109,7 @@ func TestHandleClientCommand_d_RequestsDisconnect(t *testing.T) {
 
 func TestHandleClientCommand_Y_RequestsOutstandingFrames(t *testing.T) {
 	var s = new(AGWServer)
+	s.dataLink = dataLinkQueue
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'Y'
