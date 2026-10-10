@@ -9,7 +9,10 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // newTestAudioStats gives each audio device a fresh AudioStats, each of them
@@ -65,17 +68,56 @@ func audioStatsPastFirstReport(t *testing.T, stats *[MAX_ADEVS]AudioStats, adev 
 	assert.False(t, stats[adev].suppressFirst)
 }
 
+// audioStatsReports runs f and returns the statistics reports it logged.
+func audioStatsReports(t *testing.T, f func()) []*logrus.Entry {
+	t.Helper()
+
+	testutils.DiscardLogrus(t)
+
+	var hook = test.NewGlobal()
+	t.Cleanup(hook.Reset)
+
+	f()
+
+	return hook.AllEntries()
+}
+
+// requireOneAudioStatsReport runs f and returns the one statistics report it
+// should have logged.
+func requireOneAudioStatsReport(t *testing.T, f func()) *logrus.Entry {
+	t.Helper()
+
+	var reports = audioStatsReports(t, f)
+	require.Len(t, reports, 1)
+
+	return reports[0]
+}
+
+// assertAudioStatsReport checks that report is the statistics for device
+// adev: its sample rate in thousands of samples a second, its error count, and
+// each of its channels' audio levels.
+func assertAudioStatsReport(t *testing.T, report *logrus.Entry, adev int, rateKHz float64, errors int, levels map[int]int) {
+	t.Helper()
+
+	assert.Equal(t, logrus.InfoLevel, report.Level)
+	assert.Equal(t, "Audio input statistics", report.Message)
+	assert.Equal(t, adev, report.Data["adevice"])
+	assert.InDelta(t, rateKHz, report.Data["sample_rate_khz"], 0.001)
+	assert.Equal(t, errors, report.Data["errors"])
+	assert.Equal(t, levels, report.Data["audio_levels"])
+}
+
 // An interval of 0 is how the statistics are turned off, and nothing should be
 // collected in that case, never mind printed.
 func TestAudioStatsIntervalOffDoesNothing(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var reports = audioStatsReports(t, func() {
 		stats[0].record(0, 1, 44100, 0)
 		stats[0].record(0, 1, 44100, -1)
 	})
 
-	assert.Empty(t, output)
+	assert.Empty(t, reports)
 	assert.True(t, stats[0].lastTime.IsZero(), "collection should not have started")
 }
 
@@ -84,11 +126,11 @@ func TestAudioStatsIntervalOffDoesNothing(t *testing.T) {
 func TestAudioStatsFirstCallStartsCollecting(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var reports = audioStatsReports(t, func() {
 		stats[0].record(0, 1, 44100, 100)
 	})
 
-	assert.Empty(t, output)
+	assert.Empty(t, reports)
 	assert.False(t, stats[0].lastTime.IsZero())
 	assert.True(t, stats[0].suppressFirst)
 	assert.Zero(t, stats[0].sampleCount, "the starting call's samples are not counted")
@@ -103,7 +145,7 @@ func TestAudioStatsFirstCallStartsCollecting(t *testing.T) {
 func TestAudioStatsCountsSamplesAndErrors(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var reports = audioStatsReports(t, func() {
 		stats[0].record(0, 1, 0, 100) // Starts collecting.
 		stats[0].record(0, 1, 1000, 100)
 		stats[0].record(0, 1, 500, 100)
@@ -111,7 +153,7 @@ func TestAudioStatsCountsSamplesAndErrors(t *testing.T) {
 		stats[0].record(0, 1, -1, 100)
 	})
 
-	assert.Empty(t, output, "the interval has not elapsed")
+	assert.Empty(t, reports, "the interval has not elapsed")
 	assert.Equal(t, 1500, stats[0].sampleCount)
 	assert.Equal(t, 2, stats[0].errorCount)
 }
@@ -124,11 +166,11 @@ func TestAudioStatsSuppressesFirstReport(t *testing.T) {
 	stats[0].record(0, 1, 44100, audioStatsTestInterval)
 	audioStatsRewind(&stats[0])
 
-	var output = testutils.CaptureOutput(t, func() {
+	var reports = audioStatsReports(t, func() {
 		stats[0].record(0, 1, 44100, audioStatsTestInterval)
 	})
 
-	assert.Empty(t, output)
+	assert.Empty(t, reports)
 	assert.False(t, stats[0].suppressFirst, "only the first one is suppressed")
 	assert.Zero(t, stats[0].sampleCount, "counters restart for the next interval")
 	assert.Zero(t, stats[0].errorCount)
@@ -140,11 +182,12 @@ func TestAudioStatsReportsSampleRate(t *testing.T) {
 
 	audioStatsRewind(&stats[0])
 
-	var output = testutils.CaptureOutput(t, func() {
+	var report = requireOneAudioStatsReport(t, func() {
 		stats[0].record(0, 1, 441000, audioStatsTestInterval)
 	})
 
-	assert.Contains(t, output, "ADEVICE0: Sample rate approx. 44.1 k, 0 errors, receive audio level CH0 10")
+	assertAudioStatsReport(t, report, 0, 44.1, 0, map[int]int{0: 10})
+
 	assert.Zero(t, stats[0].sampleCount, "counters restart after a report")
 }
 
@@ -156,11 +199,12 @@ func TestAudioStatsReportsErrorCount(t *testing.T) {
 	stats[0].record(0, 1, 0, audioStatsTestInterval)
 	audioStatsRewind(&stats[0])
 
-	var output = testutils.CaptureOutput(t, func() {
+	var report = requireOneAudioStatsReport(t, func() {
 		stats[0].record(0, 1, 0, audioStatsTestInterval)
 	})
 
-	assert.Contains(t, output, "ADEVICE0: Sample rate approx. 0.0 k, 3 errors, receive audio level CH0 10")
+	assertAudioStatsReport(t, report, 0, 0.0, 3, map[int]int{0: 10})
+
 	assert.Zero(t, stats[0].errorCount, "counters restart after a report")
 }
 
@@ -171,11 +215,11 @@ func TestAudioStatsReportsBothChannels(t *testing.T) {
 
 	audioStatsRewind(&stats[0])
 
-	var output = testutils.CaptureOutput(t, func() {
+	var report = requireOneAudioStatsReport(t, func() {
 		stats[0].record(0, 2, 441000, audioStatsTestInterval)
 	})
 
-	assert.Contains(t, output, "ADEVICE0: Sample rate approx. 44.1 k, 0 errors, receive audio levels CH0 10, CH1 20")
+	assertAudioStatsReport(t, report, 0, 44.1, 0, map[int]int{0: 10, 1: 20})
 }
 
 // Each device keeps its own counters, and reports its own channel numbers.
@@ -186,12 +230,12 @@ func TestAudioStatsSecondDeviceIsIndependent(t *testing.T) {
 	stats[0].record(0, 1, 44100, audioStatsTestInterval) // Device 0 only just starts collecting.
 	audioStatsRewind(&stats[1])
 
-	var output = testutils.CaptureOutput(t, func() {
+	var report = requireOneAudioStatsReport(t, func() {
 		stats[1].record(1, 1, 220500, audioStatsTestInterval)
 	})
 
-	assert.Contains(t, output, "ADEVICE1: Sample rate approx. 22.1 k, 0 errors, receive audio level CH2 30")
-	assert.NotContains(t, output, "ADEVICE0")
+	assertAudioStatsReport(t, report, 1, 22.05, 0, map[int]int{2: 30})
+
 	assert.True(t, stats[0].suppressFirst, "device 0 should be untouched")
 }
 

@@ -33,6 +33,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
 )
 
 /*------------------------------------------------------------------
@@ -126,20 +127,17 @@ func (s *AudioStats) record(adev int, nchan int, nsamp int, interval int) {
 			} else {
 				var ave_rate = (float64(s.sampleCount) / 1000.0) / float64(interval)
 
-				text_color_set(DW_COLOR_DEBUG)
-
-				if nchan > 1 {
-					var ch0 = ADEVFIRSTCHAN(adev)
-					var ch1 = ADEVFIRSTCHAN(adev) + 1
-
-					dw_printf("\nADEVICE%d: Sample rate approx. %.1f k, %d errors, receive audio levels CH%d %d, CH%d %d\n\n",
-						adev, ave_rate, s.errorCount, ch0, s.level(ch0), ch1, s.level(ch1))
-				} else {
-					var ch0 = ADEVFIRSTCHAN(adev)
-
-					dw_printf("\nADEVICE%d: Sample rate approx. %.1f k, %d errors, receive audio level CH%d %d\n\n",
-						adev, ave_rate, s.errorCount, ch0, s.level(ch0))
+				var levels = make(map[int]int, nchan)
+				for ch := ADEVFIRSTCHAN(adev); ch < ADEVFIRSTCHAN(adev)+nchan; ch++ {
+					levels[ch] = s.level(ch)
 				}
+
+				logrus.WithFields(logrus.Fields{
+					"adevice":         adev,
+					"sample_rate_khz": ave_rate,
+					"errors":          s.errorCount,
+					"audio_levels":    levels,
+				}).Info("Audio input statistics")
 			}
 
 			s.lastTime = this_time
