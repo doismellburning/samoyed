@@ -765,6 +765,7 @@ x = Silence FX.25 information.`)
 
 	var recHandler = new(recPacketHandler)
 	recHandler.audioConfig = audio_config
+	recHandler.layout = layer2Receiver.Layout
 	recHandler.ttConfig = &dw_tt_config
 	recHandler.decoder = aprsDecoder
 	recHandler.webHub = webHub
@@ -814,13 +815,18 @@ x = Silence FX.25 information.`)
 // exist, and gives it to recv_process.
 type recPacketHandler struct {
 	audioConfig *RadioConfig
-	ttConfig    *tt_config_s
-	decoder     *aprs.Decoder
-	webHub      *webui.Hub // Nil without a web interface.
-	logger      *aprslog.Logger
-	heard       *mheard.DB // Where the stations heard over the radio are remembered.
-	waypoints   *WaypointSender
-	apps        *clientApps // Nil for none.
+
+	// layout says how many subchannels, and slicers in each, a channel's
+	// demodulator has, so a frame's are shown only where they say something;
+	// nil for one of each everywhere.
+	layout    func(channel int) (int, int)
+	ttConfig  *tt_config_s
+	decoder   *aprs.Decoder
+	webHub    *webui.Hub // Nil without a web interface.
+	logger    *aprslog.Logger
+	heard     *mheard.DB // Where the stations heard over the radio are remembered.
+	waypoints *WaypointSender
+	apps      *clientApps // Nil for none.
 
 	digipeater          *Digipeater
 	connectedDigipeater *ConnectedDigipeater
@@ -1025,7 +1031,10 @@ func (rh *recPacketHandler) app_process_rec_packet(
 	case -4: // AXUDP
 		logEntry = logEntry.WithField("subchan", "axudp")
 	default:
-		var numSubchan, numSlicers = channelLayout(channel)
+		var numSubchan, numSlicers = 1, 1
+		if rh.layout != nil {
+			numSubchan, numSlicers = rh.layout(channel)
+		}
 
 		if numSubchan > 1 {
 			logEntry = logEntry.WithField("subchan", subchan)

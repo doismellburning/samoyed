@@ -239,14 +239,14 @@ func TestChannelLayout(t *testing.T) {
 	audioConfig.achan[0].num_freq = 1
 	audioConfig.achan[0].profiles = "AB+"
 
-	demod_init(audioConfig)
+	var receiver = multi_modem_init(audioConfig, 0, 0, new(discardReceiveSink))
 
-	var numSubchan, numSlicers = channelLayout(0)
+	var numSubchan, numSlicers = receiver.Layout(0)
 	assert.Equal(t, 2, numSubchan)
 	assert.Equal(t, MAX_SLICERS, numSlicers)
 
 	for _, channel := range []int{1, MAX_RADIO_CHANS, -1} {
-		numSubchan, numSlicers = channelLayout(channel)
+		numSubchan, numSlicers = receiver.Layout(channel)
 		assert.Equal(t, 1, numSubchan, "channel %d", channel)
 		assert.Equal(t, 1, numSlicers, "channel %d", channel)
 	}

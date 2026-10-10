@@ -729,6 +729,19 @@ func (r *Layer2Receiver) AudioLevel(channel int, subchan int) ax25.ALevel {
 	return d.AudioLevel(subchan)
 }
 
+// Layout is how many subchannels, and slicers in each, a channel's
+// demodulator has - which is to say, whether a frame's subchannel and slicer
+// are worth showing.  A channel without a demodulator has one of each.
+func (r *Layer2Receiver) Layout(channel int) (int, int) {
+	if channel < 0 || channel >= MAX_RADIO_CHANS || r.demods[channel] == nil {
+		return 1, 1
+	}
+
+	var d = r.demods[channel]
+
+	return d.NumSubchan(), d.NumSlicers()
+}
+
 // ProcessSample is MultiModem.ProcessSample for a channel.
 func (r *Layer2Receiver) ProcessSample(channel int, sample int) bool {
 	return r.modems[channel].ProcessSample(sample)

@@ -440,7 +440,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packe
 		text_color_set(DW_COLOR_DEBUG)
 	}
 
-	var numSubchan, numSlicers = channelLayout(channel)
+	var numSubchan, numSlicers = s.receiver.Layout(channel)
 
 	if numSubchan > 1 && numSlicers == 1 {
 		dw_printf("[%d.%d] ", channel, subchan)

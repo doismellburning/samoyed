@@ -805,19 +805,6 @@ func (d *Demodulator) NumSlicers() int {
 	return d.numSlicers
 }
 
-// channelLayout is how many subchannels, and slicers in each, a channel's
-// demodulator has - which is to say, whether a frame's subchannel and slicer
-// are worth showing.  A channel without a demodulator has one of each.
-func channelLayout(channel int) (int, int) {
-	if channel < 0 || channel >= MAX_RADIO_CHANS || demodulators[channel] == nil {
-		return 1, 1
-	}
-
-	var d = demodulators[channel]
-
-	return d.NumSubchan(), d.NumSlicers()
-}
-
 /*------------------------------------------------------------------
  *
  * Name:        demod_get_sample

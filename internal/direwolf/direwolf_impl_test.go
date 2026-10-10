@@ -420,19 +420,7 @@ func Test_app_process_rec_packet_ais_to_object(t *testing.T) {
 func Test_app_process_rec_packet_multiple_subchannels(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
-	var origDemods = demodulators
-
-	t.Cleanup(func() { demodulators = origDemods })
-
-	// Only the layout matters here, not a demodulator that could do anything.
-	var d = new(Demodulator)
-	d.numSubchan = 2
-	d.numSlicers = 3
-	demodulators[0] = d
-
-	var numSubchan, numSlicers = channelLayout(0)
-	require.Greater(t, numSubchan, 1)
-	require.Greater(t, numSlicers, 1)
+	rt.handler.layout = func(int) (int, int) { return 2, 3 }
 
 	var pp = ax25.FromText("Q1TEST>APRS:>status", true)
 
