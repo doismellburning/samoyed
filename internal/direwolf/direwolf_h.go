@@ -13,13 +13,8 @@ const (
 	MAX_RADIO_CHANS = phy.MaxRadioChans
 	MAX_SUBCHANS    = phy.MaxSubchans
 	MAX_SLICERS     = phy.MaxSlicers
+	MAX_TOTAL_CHANS = phy.MaxTotalChans
 )
-
-const MAX_TOTAL_CHANS = 16 // v1.7 allows additional virtual channels which are connected
-// to something other than radio modems.
-// Total maximum channels is based on the 4 bit KISS field.
-// Someone with very unusual requirements could increase this and
-// use only the AGW network protocol.
 
 /*
  * Maximum number of rigs.
