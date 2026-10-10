@@ -9,6 +9,8 @@ package direwolf
 
 import (
 	"unicode"
+
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -116,8 +118,7 @@ const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
 
 func morse_send(toneGenerator *ToneGenerator, channel int, str string, wpm int, txdelay int, txtail int) int {
 	if toneGenerator == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for sending Morse Code.\n", channel)
+		logrus.WithField("channel", channel).Error("Invalid channel for sending Morse Code")
 	} else {
 		toneGenerator.SendMorse(str, wpm, txdelay, txtail)
 	}
@@ -169,7 +170,10 @@ func (tg *ToneGenerator) SendMorse(str string, wpm int, txdelay int, txtail int)
 	tg.morseQuietMs(txtail)
 
 	if time_units != morse_units_str(str) {
-		dw_printf("morse: Internal error.  Inconsistent length, %d vs. %d calculated.\n", time_units, morse_units_str(str))
+		logrus.WithFields(logrus.Fields{
+			"sent":       time_units,
+			"calculated": morse_units_str(str),
+		}).Error("morse: Internal error.  Inconsistent length")
 	}
 
 	tg.Flush()
@@ -304,7 +308,7 @@ func morse_units_ch(ch rune) int {
 		case '-':
 			units += 3
 		default:
-			dw_printf("ERROR: morse_units_ch: should not be here.\n")
+			logrus.WithField("element", string(k)).Error("morse_units_ch: should not be here")
 		}
 	}
 
