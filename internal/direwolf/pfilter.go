@@ -29,6 +29,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/sirupsen/logrus"
 )
 
 // PacketFilter evaluates the FILTER, CFILTER and IGate filter expressions from
@@ -280,17 +281,24 @@ func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.
 	}
 
 	if pfstate.debug >= 1 {
-		text_color_set(DW_COLOR_DEBUG)
+		var what string
 
 		if from_chan == MAX_TOTAL_CHANS {
-			dw_printf(" Packet filter from IGate to radio channel %d returns %s\n", to_chan, bool2text(result))
+			what = "IGate to radio"
 		} else if to_chan == MAX_TOTAL_CHANS {
-			dw_printf(" Packet filter from radio channel %d to IGate returns %s\n", from_chan, bool2text(result))
+			what = "radio to IGate"
 		} else if is_aprs {
-			dw_printf(" Packet filter for APRS digipeater from radio channel %d to %d returns %s\n", from_chan, to_chan, bool2text(result))
+			what = "APRS digipeater"
 		} else {
-			dw_printf(" Packet filter for traditional digipeater from radio channel %d to %d returns %s\n", from_chan, to_chan, bool2text(result))
+			what = "traditional digipeater"
 		}
+
+		logrus.WithFields(logrus.Fields{
+			"filter":       what,
+			"from_channel": from_chan,
+			"to_channel":   to_chan,
+			"result":       bool2text(result),
+		}).Trace("Packet filter evaluated")
 	}
 
 	return result, err
@@ -422,8 +430,10 @@ func parse_or_expr(pf *pfstate_t) (int, error) {
 		var e, eerr = parse_and_expr(pf)
 
 		if pf.debug >= 3 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("  %s | %s\n", bool2text(result), bool2text(e))
+			logrus.WithFields(logrus.Fields{
+				"left":  bool2text(result),
+				"right": bool2text(e),
+			}).Trace("Packet filter OR")
 		}
 
 		if eerr != nil {
@@ -449,8 +459,10 @@ func parse_and_expr(pf *pfstate_t) (int, error) {
 		var e, eerr = parse_primary(pf)
 
 		if pf.debug >= 3 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("  %s & %s\n", bool2text(result), bool2text(e))
+			logrus.WithFields(logrus.Fields{
+				"left":  bool2text(result),
+				"right": bool2text(e),
+			}).Trace("Packet filter AND")
 		}
 
 		if eerr != nil {
@@ -487,8 +499,7 @@ func parse_primary(pf *pfstate_t) (int, error) {
 		var e, eerr = parse_primary(pf)
 
 		if pf.debug >= 3 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("  ! %s\n", bool2text(e))
+			logrus.WithField("operand", bool2text(e)).Trace("Packet filter NOT")
 		}
 
 		if eerr != nil {
@@ -506,6 +517,16 @@ func parse_primary(pf *pfstate_t) (int, error) {
 	}
 
 	return result, err
+}
+
+// traceSpec logs what one filter specification decided, and what about the
+// packet it decided it on.
+func traceSpec(pf *pfstate_t, result int, about string) {
+	logrus.WithFields(logrus.Fields{
+		"filter": pf.token_str,
+		"result": bool2text(result),
+		"for":    about,
+	}).Trace("Packet filter specification evaluated")
 }
 
 /*-------------------------------------------------------------------
@@ -571,16 +592,14 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		result, err = filt_bodgu(pf, addr)
 
 		if pf.debug >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr)
+			traceSpec(pf, result, addr)
 		}
 	} else if pf.token_str[0] == 'o' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* o - object or item name */
 		result, err = filt_bodgu(pf, pf.decoded.Name)
 
 		if pf.debug >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.Name)
+			traceSpec(pf, result, pf.decoded.Name)
 		}
 	} else if pf.token_str[0] == 'd' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* d - was digipeated by */
@@ -601,8 +620,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 				path = "no digipeater path"
 			}
 
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), path)
+			traceSpec(pf, result, path)
 		}
 	} else if pf.token_str[0] == 'v' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* v - via not used */
@@ -624,8 +642,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 				path = "no digipeater path"
 			}
 
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), path)
+			traceSpec(pf, result, path)
 		}
 	} else if pf.token_str[0] == 'g' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* g - Addressee of message. e.g. "BLN*" for bulletins. */
@@ -638,15 +655,13 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 			result, err = filt_bodgu(pf, pf.decoded.Addressee)
 
 			if pf.debug >= 2 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.Addressee)
+				traceSpec(pf, result, pf.decoded.Addressee)
 			}
 		} else {
 			result = 0
 
 			if pf.debug >= 2 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), "not a message")
+				traceSpec(pf, result, "not a message")
 			}
 		}
 	} else if pf.token_str[0] == 'u' && unicode.IsPunct(rune(pf.token_str[1])) {
@@ -658,15 +673,13 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 			result, err = filt_bodgu(pf, addr)
 
 			if pf.debug >= 2 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr)
+				traceSpec(pf, result, addr)
 			}
 		} else {
 			result = 0
 
 			if pf.debug >= 2 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), "MIC-E packet type")
+				traceSpec(pf, result, "MIC-E packet type")
 			}
 		}
 	} else if pf.token_str[0] == 't' && unicode.IsPunct(rune(pf.token_str[1])) {
@@ -677,11 +690,9 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 			var infop = pf.pp.Info()
 
 			if len(infop) > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("   %s returns %s for %c data type indicator\n", pf.token_str, bool2text(result), infop[0])
+				traceSpec(pf, result, fmt.Sprintf("%c data type indicator", infop[0]))
 			} else {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("   %s returns %s for empty info part\n", pf.token_str, bool2text(result))
+				traceSpec(pf, result, "empty info part")
 			}
 		}
 	} else if pf.token_str[0] == 'r' && unicode.IsPunct(rune(pf.token_str[1])) {
@@ -691,22 +702,19 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		result, sdist, err = filt_r(pf)
 
 		if pf.debug >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), sdist)
+			traceSpec(pf, result, sdist)
 		}
 	} else if pf.token_str[0] == 's' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* s - symbol */
 		result, err = filt_s(pf)
 
 		if pf.debug >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-
 			if pf.decoded.SymbolTable == '/' { //nolint:staticcheck
-				dw_printf("   %s returns %s for symbol %c in primary table\n", pf.token_str, bool2text(result), pf.decoded.SymbolCode)
+				traceSpec(pf, result, fmt.Sprintf("symbol %c in primary table", pf.decoded.SymbolCode))
 			} else if pf.decoded.SymbolTable == '\\' {
-				dw_printf("   %s returns %s for symbol %c in alternate table\n", pf.token_str, bool2text(result), pf.decoded.SymbolCode)
+				traceSpec(pf, result, fmt.Sprintf("symbol %c in alternate table", pf.decoded.SymbolCode))
 			} else {
-				dw_printf("   %s returns %s for symbol %c with overlay %c\n", pf.token_str, bool2text(result), pf.decoded.SymbolCode, pf.decoded.SymbolTable)
+				traceSpec(pf, result, fmt.Sprintf("symbol %c with overlay %c", pf.decoded.SymbolCode, pf.decoded.SymbolTable))
 			}
 		}
 	} else if pf.token_str[0] == 'i' && unicode.IsPunct(rune(pf.token_str[1])) {
@@ -715,12 +723,10 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		result, err = filt_i(pf)
 
 		if pf.debug >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-
 			if pf.decoded.PacketType == aprs.PacketTypeMessage {
-				dw_printf("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), pf.decoded.Addressee)
+				traceSpec(pf, result, "message to "+pf.decoded.Addressee)
 			} else {
-				dw_printf("   %s returns %s for not an APRS 'message'\n", pf.token_str, bool2text(result))
+				traceSpec(pf, result, "not an APRS 'message'")
 			}
 		}
 	} else {

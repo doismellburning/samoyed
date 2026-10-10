@@ -1,12 +1,14 @@
 package direwolf
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -401,21 +403,64 @@ func Test_PfilterValidate(t *testing.T) {
 		// As samoyed-pftest -vvv sets it up before validating.
 		PfilterStandaloneInit(PfilterMaxDebugLevel)
 
-		var output = testutils.CaptureOutput(t, func() {
+		var entries = pfilterTraceEntries(t, func() {
 			require.NoError(t, PfilterValidate(0, 0, "b/Q1TEST", true))
 		})
 
-		assert.Empty(t, output)
+		assert.Empty(t, entries)
 	})
+}
+
+// pfilterTraceEntries runs f with logrus at Trace, where the filter explains
+// its decisions, and returns what the filter said.
+func pfilterTraceEntries(t *testing.T, f func()) []*logrus.Entry {
+	t.Helper()
+
+	var savedLevel = logrus.GetLevel()
+	logrus.SetLevel(logrus.TraceLevel)
+	t.Cleanup(func() { logrus.SetLevel(savedLevel) })
+
+	var hook = test.NewGlobal()
+	t.Cleanup(hook.Reset)
+
+	testutils.CaptureOutput(t, f)
+
+	var entries []*logrus.Entry
+
+	for _, entry := range hook.AllEntries() {
+		if strings.HasPrefix(entry.Message, "Packet filter") {
+			entries = append(entries, entry)
+		}
+	}
+
+	return entries
+}
+
+// assertSpecEvaluated asserts that entries include filter specification spec
+// returning result.
+func assertSpecEvaluated(t *testing.T, entries []*logrus.Entry, spec string, result string) {
+	t.Helper()
+
+	for _, entry := range entries {
+		if entry.Data["filter"] == spec {
+			assert.Equal(t, result, entry.Data["result"])
+
+			return
+		}
+	}
+
+	assert.Failf(t, "filter specification not explained", "no trace entry for %s among %v", spec, entries)
 }
 
 func Test_PfilterStandaloneInit_debugLevelExplainsTheDecision(t *testing.T) {
 	var packetFilter = PfilterStandaloneInit(2)
 
-	testutils.AssertOutputContains(t, func() {
+	var entries = pfilterTraceEntries(t, func() {
 		var _, err = packetFilter.MonitorLine(0, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
 		require.NoError(t, err)
-	}, "b/Q1TEST returns TRUE")
+	})
+
+	assertSpecEvaluated(t, entries, "b/Q1TEST", "TRUE")
 }
 
 // Each PacketFilter keeps the debug level it was built with, rather than
@@ -425,15 +470,17 @@ func Test_PacketFilter_debugLevelIsItsOwn(t *testing.T) {
 	var verbose = PfilterStandaloneInit(2)
 	var quiet = PfilterStandaloneInit(0)
 
-	testutils.AssertOutputContains(t, func() {
+	var entries = pfilterTraceEntries(t, func() {
 		var _, err = verbose.MonitorLine(0, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
 		require.NoError(t, err)
-	}, "b/Q1TEST returns TRUE")
+	})
 
-	var output = testutils.CaptureOutput(t, func() {
+	assertSpecEvaluated(t, entries, "b/Q1TEST", "TRUE")
+
+	entries = pfilterTraceEntries(t, func() {
 		var _, err = quiet.MonitorLine(0, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
 		require.NoError(t, err)
 	})
 
-	assert.Empty(t, output)
+	assert.Empty(t, entries)
 }

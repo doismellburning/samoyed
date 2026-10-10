@@ -14,10 +14,10 @@
  *		each.
  *
  * Outputs:	The verdicts on stdout, and what went wrong with a line, or
- *		with the filter, on stderr.  The filter engine and the packet
- *		parser explain themselves on stdout as well, so a verbose run,
- *		or one with packets they object to, has their commentary
- *		interleaved with the verdicts.
+ *		with the filter, on stderr.  A verbose run has the filter
+ *		engine explain itself through logrus, on stderr too.  The
+ *		packet parser explains itself on stdout, so a run with packets
+ *		it objects to has its commentary interleaved with the verdicts.
  *
  *		Exit status is non-zero if the filter is invalid or any input
  *		line could not be evaluated.
@@ -34,6 +34,7 @@ import (
 	"strings"
 
 	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -114,6 +115,11 @@ func main() {
 	if *toChannel < 0 || *toChannel > direwolf.MAX_TOTAL_CHANS {
 		fmt.Fprintf(os.Stderr, "--to-channel must be between 0 and %d.\n", direwolf.MAX_TOTAL_CHANS)
 		os.Exit(1)
+	}
+
+	// The filter engine explains its decisions at Trace.
+	if *verbose > 0 {
+		logrus.SetLevel(logrus.TraceLevel)
 	}
 
 	var opts = options{

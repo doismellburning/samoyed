@@ -129,13 +129,15 @@ which is what you want from a script or a pre-commit check:
 ``-v`` asks the filter engine to explain itself, up to three times for more
 detail: once for the final result, twice for each individual filter
 specification, three times for the logical operators as well.
+The explanations are logged at ``trace`` level, on stderr
+(timestamps, and other trace entries, trimmed here):
 
 .. code::
 
     $ echo 'Q1TEST>APDW17::Q2TEST   :Hello' | samoyed-pftest -vv 'b/Q2* | t/m'
-       b/Q2* returns FALSE for Q1TEST
-       t/m returns TRUE for : data type indicator
-     Packet filter for APRS digipeater from radio channel 0 to 0 returns TRUE
+    level=trace msg="Packet filter specification evaluated" filter="b/Q2*" for=Q1TEST result=FALSE
+    level=trace msg="Packet filter specification evaluated" filter=t/m for=": data type indicator" result=TRUE
+    level=trace msg="Packet filter evaluated" filter="APRS digipeater" from_channel=0 result=TRUE to_channel=0
     PASS	Q1TEST>APDW17::Q2TEST   :Hello
 
 ``--connected-mode`` selects the smaller grammar that ``CFILTER`` uses, and
