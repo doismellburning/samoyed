@@ -395,28 +395,31 @@ func Test_GetByte_recordsStatisticsFromTheDevicesOwnSettings(t *testing.T) {
 	// 2 channels of 16 bits is 4 bytes a sample.
 	var datagram = make([]byte, 40)
 
-	// The first read only starts the statistics off.
-	_, err = conn.Write(datagram)
-	require.NoError(t, err)
+	// The first read only starts the statistics off, and the second is
+	// counted.  The first report is due 3 seconds after the first read, and
+	// resets the count, so both datagrams go out before anything reads them:
+	// the two reads then follow one another with nothing in between.
+	for range 2 {
+		_, err = conn.Write(datagram)
+		require.NoError(t, err)
+	}
 
 	for range datagram {
 		require.Equal(t, 0, d.GetByte(0))
 	}
 
-	assert.Equal(t, 100, d.dev[0].statisticsInterval)
-	assert.Equal(t, 0, d.dev[0].stats.sampleCount)
+	var samples, _ = d.dev[0].stats.counts()
+	assert.Equal(t, 0, samples)
 
-	// The first report is due 3 seconds after that, and resets the count, so
-	// put it out of reach of a slow runner.
-	d.dev[0].stats.lastTime = time.Now().Add(time.Hour)
-
-	// The second is counted.
-	_, err = conn.Write(datagram)
-	require.NoError(t, err)
 	require.Equal(t, 0, d.GetByte(0))
 
-	assert.Equal(t, 10, d.dev[0].stats.sampleCount)
-	assert.Equal(t, 0, d.dev[0].stats.errorCount)
+	assert.Equal(t, 100, d.dev[0].statisticsInterval)
+
+	var errors int
+
+	samples, errors = d.dev[0].stats.counts()
+	assert.Equal(t, 10, samples)
+	assert.Equal(t, 0, errors)
 }
 
 // --- applyCommandLineAudioSource ---

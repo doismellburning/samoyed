@@ -74,6 +74,12 @@ type AudioStats struct {
 	audioLevel func(channel int, subchan int) ax25.ALevel
 }
 
+// counts is how many samples, and how many reads that returned none, have
+// been counted since the last report.
+func (s *AudioStats) counts() (samples int, errors int) {
+	return s.sampleCount, s.errorCount
+}
+
 // level is the channel's received audio level, or zero if there is nothing
 // to ask.
 func (s *AudioStats) level(channel int) int {
