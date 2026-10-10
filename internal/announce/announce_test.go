@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package announce
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// cancelledContext is what the announcement tests hand dns_sd_announce: the
+// cancelledContext is what the announcement tests hand KISS: the
 // message we care about is logged before the responder goroutine starts, and
 // an already-cancelled context stops that goroutine putting mDNS traffic on
 // the network, or logging, after the test has finished.
@@ -69,7 +69,7 @@ func TestDNSSDAnnounceUsesConfiguredName(t *testing.T) {
 	requireMDNSSockets(t)
 
 	var entry = announceLogged(t, "DNS-SD: Announcing KISS TCP", func() {
-		dns_sd_announce(cancelledContext(t), "Q1TEST TNC", 8001)
+		KISS(cancelledContext(t), "Q1TEST TNC", 8001)
 	})
 
 	assert.Equal(t, logrus.InfoLevel, entry.Level)
@@ -82,7 +82,7 @@ func TestDNSSDAnnounceDefaultsName(t *testing.T) {
 	requireMDNSSockets(t)
 
 	var entry = announceLogged(t, "DNS-SD: Announcing KISS TCP", func() {
-		dns_sd_announce(cancelledContext(t), "", 8002)
+		KISS(cancelledContext(t), "", 8002)
 	})
 
 	assert.Equal(t, dns_sd_default_service_name(), entry.Data["name"])
@@ -96,7 +96,7 @@ func TestDNSSDAnnounceRejectsPortZero(t *testing.T) {
 
 	t.Cleanup(hook.Reset)
 
-	dns_sd_announce(cancelledContext(t), "", 0)
+	KISS(cancelledContext(t), "", 0)
 
 	var entries = hook.AllEntries()
 

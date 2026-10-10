@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package announce
 
 /*------------------------------------------------------------------
  *
@@ -25,9 +28,9 @@ import (
 
 const DNS_SD_SERVICE = "_kiss-tnc._tcp"
 
-// dns_sd_announce announces the KISS TCP service listening on port, as name,
+// KISS announces the KISS TCP service listening on port, as name,
 // or as dns_sd_default_service_name if name is empty, until ctx is cancelled.
-func dns_sd_announce(ctx context.Context, name string, port int) {
+func KISS(ctx context.Context, name string, port int) {
 	if name == "" {
 		name = dns_sd_default_service_name()
 	}
