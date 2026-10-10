@@ -68,12 +68,8 @@ func announceLogged(t *testing.T, message string, f func()) *logrus.Entry {
 func TestDNSSDAnnounceUsesConfiguredName(t *testing.T) {
 	requireMDNSSockets(t)
 
-	var mc = new(misc_config_s)
-	mc.kiss_port[0] = 8001
-	mc.dns_sd_name = "Q1TEST TNC"
-
 	var entry = announceLogged(t, "DNS-SD: Announcing KISS TCP", func() {
-		dns_sd_announce(cancelledContext(t), mc)
+		dns_sd_announce(cancelledContext(t), "Q1TEST TNC", 8001)
 	})
 
 	assert.Equal(t, logrus.InfoLevel, entry.Level)
@@ -85,11 +81,8 @@ func TestDNSSDAnnounceUsesConfiguredName(t *testing.T) {
 func TestDNSSDAnnounceDefaultsName(t *testing.T) {
 	requireMDNSSockets(t)
 
-	var mc = new(misc_config_s)
-	mc.kiss_port[0] = 8002
-
 	var entry = announceLogged(t, "DNS-SD: Announcing KISS TCP", func() {
-		dns_sd_announce(cancelledContext(t), mc)
+		dns_sd_announce(cancelledContext(t), "", 8002)
 	})
 
 	assert.Equal(t, dns_sd_default_service_name(), entry.Data["name"])
@@ -99,13 +92,11 @@ func TestDNSSDAnnounceDefaultsName(t *testing.T) {
 // Nothing is listening on port 0, so there is nothing to announce - and saying
 // so beats advertising a service nobody can connect to.
 func TestDNSSDAnnounceRejectsPortZero(t *testing.T) {
-	var mc = new(misc_config_s)
-
 	var hook = test.NewGlobal()
 
 	t.Cleanup(hook.Reset)
 
-	dns_sd_announce(cancelledContext(t), mc)
+	dns_sd_announce(cancelledContext(t), "", 0)
 
 	var entries = hook.AllEntries()
 

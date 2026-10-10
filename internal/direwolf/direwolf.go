@@ -705,7 +705,7 @@ x = Silence FX.25 information.`)
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
 	// Let's just check [0] for now...
 	if misc_config.kiss_port[0] > 0 && misc_config.dns_sd_enabled {
-		dns_sd_announce(ctx, misc_config)
+		dns_sd_announce(ctx, misc_config.dns_sd_name, misc_config.kiss_port[0])
 	}
 
 	stopIfCancelled(ctx, td)

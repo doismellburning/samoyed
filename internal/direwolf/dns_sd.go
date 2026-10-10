@@ -25,8 +25,9 @@ import (
 
 const DNS_SD_SERVICE = "_kiss-tnc._tcp"
 
-func dns_sd_announce(ctx context.Context, mc *misc_config_s) {
-	var name = mc.dns_sd_name
+// dns_sd_announce announces the KISS TCP service listening on port, as name,
+// or as dns_sd_default_service_name if name is empty, until ctx is cancelled.
+func dns_sd_announce(ctx context.Context, name string, port int) {
 	if name == "" {
 		name = dns_sd_default_service_name()
 	}
@@ -34,7 +35,7 @@ func dns_sd_announce(ctx context.Context, mc *misc_config_s) {
 	var cfg = dnssd.Config{ //nolint:exhaustruct_v5
 		Name: name,
 		Type: DNS_SD_SERVICE,
-		Port: mc.kiss_port[0],
+		Port: port,
 	}
 
 	var sv, svErr = dnssd.NewService(cfg)
@@ -63,7 +64,7 @@ func dns_sd_announce(ctx context.Context, mc *misc_config_s) {
 	// from the hostname this is the only place they are told it.
 	logrus.WithFields(logrus.Fields{
 		"name": name,
-		"port": mc.kiss_port[0],
+		"port": port,
 	}).Info("DNS-SD: Announcing KISS TCP")
 
 	go func() {
