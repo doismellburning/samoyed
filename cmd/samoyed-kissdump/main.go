@@ -25,7 +25,6 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/direwolf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/spf13/pflag"
@@ -272,7 +271,7 @@ func commandName(command byte) string {
 func dumpCommand(aprsDecoder *aprs.Decoder, command byte, payload []byte) int {
 	switch command {
 	case kiss.CmdDataFrame:
-		return direwolf.DescribeAX25Frame(aprsDecoder, payload)
+		return describeAX25Frame(aprsDecoder, payload)
 
 	case kiss.CmdTxDelay, kiss.CmdPersistence, kiss.CmdSlotTime, kiss.CmdTxTail, kiss.CmdFullDuplex:
 		if len(payload) != 1 {
