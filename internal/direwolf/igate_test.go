@@ -140,7 +140,7 @@ func setupIGate(t *testing.T) (*IGate, net.Conn) {
 
 	var heardDB = mheard.New(0)
 
-	var ig = NewIGate(audioConfig, igateConfig, digiConfig, NewPacketFilter(igateConfig, nil, heardDB, 0), heardDB, 0)
+	var ig = NewIGate(audioConfig, igateConfig, digiConfig, NewPacketFilter(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, 0)
 
 	var server, client = connectedTCPPair(t)
 

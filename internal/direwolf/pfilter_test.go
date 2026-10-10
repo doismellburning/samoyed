@@ -15,8 +15,7 @@ import (
 // A UI frame with an empty information field, as sent by linbpq ID broadcasts
 // (issue #504), used to trip an assertion in the type filter.
 func Test_pfilter_empty_info(t *testing.T) {
-	var p_igate_config igate_config_s
-	var packetFilter = NewPacketFilter(&p_igate_config, aprs.NewDecoderFromDataFiles(), nil, 0)
+	var packetFilter = NewPacketFilter(0, aprs.NewDecoderFromDataFiles(), nil, 0)
 
 	var pp = ax25.FromText("Q1TEST>ID:", true)
 	require.NotNil(t, pp)
@@ -32,8 +31,7 @@ func Test_pfilter_empty_info(t *testing.T) {
 // to ask.  An absent one answers as an empty one does rather than bringing the
 // program down.
 func Test_pfilter_igate_without_a_heard_database(t *testing.T) {
-	var p_igate_config igate_config_s
-	var packetFilter = NewPacketFilter(&p_igate_config, aprs.NewDecoderFromDataFiles(), nil, 0)
+	var packetFilter = NewPacketFilter(0, aprs.NewDecoderFromDataFiles(), nil, 0)
 
 	var pp = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Hello", true)
 	require.NotNil(t, pp)
@@ -89,10 +87,8 @@ func Test_pfilter_validate(t *testing.T) {
 // tests) does not leak into a real packet's evaluation: an "i" filter must
 // still consult the heard list, rather than passing everything.
 func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
-	var p_igate_config igate_config_s
-	p_igate_config.max_digi_hops = 2
 	var heardDB = mheard.New(0)
-	var packetFilter = NewPacketFilter(&p_igate_config, nil, heardDB, 0)
+	var packetFilter = NewPacketFilter(2, nil, heardDB, 0)
 
 	// Q1TEST has just been heard directly over the radio, and nothing at all
 	// has been heard from the addressee Q2TEST, so the filter has every reason
@@ -122,8 +118,6 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 // condition 1 was inverted, so a message was dropped precisely when its
 // addressee had been heard nearby recently.
 func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
-	var p_igate_config igate_config_s
-	p_igate_config.max_digi_hops = 2
 	// Q2TEST is about 4 km from 42.6 -71.3.
 	const q2testPosition = "Q2TEST>APDW17:!4237.14NS07120.83W#"
 
@@ -192,7 +186,7 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var heardDB = mheard.New(0)
-			var packetFilter = NewPacketFilter(&p_igate_config, nil, heardDB, 0)
+			var packetFilter = NewPacketFilter(2, nil, heardDB, 0)
 
 			for _, monitor := range tc.heard {
 				hearRF(t, heardDB, monitor)

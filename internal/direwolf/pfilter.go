@@ -37,16 +37,18 @@ import (
 // goroutines; it is not changed once built, so it needs no lock.
 //
 // Its zero value, which checking a filter's syntax uses, has no debug output
-// and no IGate configuration.  So does a nil one.
+// and an "i" filter default of no digipeater hops.  So does a nil one.
 type PacketFilter struct {
-	// igateConfig is where an "i" filter takes its default maximum
-	// digipeater hop count from (IGTXVIA).  Nil when there is none.
+	// igateMaxDigiHops is an "i" filter's default maximum digipeater hop
+	// count: the IGate's, from IGTXVIA, and 0 when there is no IGTXVIA or
+	// no IGate.
 	//
-	// This was a file-scope static in Dire Wolf, pfilter.c's own
+	// Dire Wolf kept a pointer to the whole IGate configuration, to read
+	// just this from, in a file-scope static, pfilter.c's own
 	// save_igate_config_p, which the port first flattened into the same
 	// package variable as igate.c's and then gave a package variable of its
 	// own.  See issue #674.
-	igateConfig *igate_config_s
+	igateMaxDigiHops int
 
 	// aprsDecoder decodes the packets an APRS filter is asked about.  Nil
 	// decodes without identifying devices or describing symbols, which is
@@ -72,14 +74,14 @@ type heardNearby interface {
 	WasRecentlyNearby(role string, callsign string, timeLimitMinutes int, maxHops int, dlat maybe.Maybe[float64], dlon maybe.Maybe[float64], km maybe.Maybe[float64]) bool
 }
 
-// NewPacketFilter returns a PacketFilter that takes an "i" filter's default
-// hop count from igateConfig, which may be nil, decodes APRS packets with
-// aprsDecoder, which may also be nil, asks heard which stations have been
-// heard, nil for none, and says as much about each decision as debugLevel
-// asks for.
-func NewPacketFilter(igateConfig *igate_config_s, aprsDecoder *aprs.Decoder, heard heardNearby, debugLevel int) *PacketFilter {
+// NewPacketFilter returns a PacketFilter that gives an "i" filter a default
+// of igateMaxDigiHops digipeater hops, the IGate's maximum (0 for none),
+// decodes APRS packets with aprsDecoder, which may be nil, asks heard which
+// stations have been heard, nil for none, and says as much about each
+// decision as debugLevel asks for.
+func NewPacketFilter(igateMaxDigiHops int, aprsDecoder *aprs.Decoder, heard heardNearby, debugLevel int) *PacketFilter {
 	var f = new(PacketFilter)
-	f.igateConfig = igateConfig
+	f.igateMaxDigiHops = igateMaxDigiHops
 	f.aprsDecoder = aprsDecoder
 	f.heard = heard
 	f.debug = debugLevel
@@ -137,9 +139,9 @@ type pfstate_t struct {
 	/*
 	 * What the PacketFilter doing the evaluating was built with.
 	 */
-	igate_config *igate_config_s // nil when there is no IGate configuration.
-	heard        heardNearby     // nil when nothing has been heard.
-	debug        int
+	igate_max_digi_hops int         // 0 when there is no IGate configuration.
+	heard               heardNearby // nil when nothing has been heard.
+	debug               int
 
 	/*
 	 * Packet split into separate parts if APRS.
@@ -244,7 +246,7 @@ func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.
 	var aprsDecoder = new(aprs.Decoder)
 
 	if f != nil {
-		pfstate.igate_config = f.igateConfig
+		pfstate.igate_max_digi_hops = f.igateMaxDigiHops
 		pfstate.heard = f.heard
 		pfstate.debug = f.debug
 
@@ -1273,11 +1275,8 @@ func filt_i(pf *pfstate_t) (int, error) {
 	// TODO: Should produce a warning if a user specified filter does not include "i".
 	// 3 hours * 60 min/hr = 180 minutes
 	// TODO KG: This was unused in the original C, but I think that was accidental given all the context here
-	var heardtime = 180 //nolint:ineffassign,wastedassign
-	var maxhops = 0     // from IGTXVIA config.
-	if pf.igate_config != nil {
-		maxhops = pf.igate_config.max_digi_hops
-	}
+	var heardtime = 180                  //nolint:ineffassign,wastedassign
+	var maxhops = pf.igate_max_digi_hops // from IGTXVIA config.
 	var dlat maybe.Maybe[float64]
 	var dlon maybe.Maybe[float64]
 	var km maybe.Maybe[float64]
@@ -1528,15 +1527,15 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
  * Description:	TNC startup would have put a few things in place that pfilter
  *		expects: an Decoder with its tables loaded, the list of
  *		stations heard recently that an "i" filter
- *		consults, and an IGate configuration to take a default hop
- *		count from.  The last two are empty here, so an "i" filter
- *		finds that nothing has been heard and that no IGTXVIA was
- *		configured.
+ *		consults, and the IGate's maximum digipeater hop count for
+ *		it to default to.  Here nothing has been heard and the hop
+ *		count is 0, so an "i" filter finds that nothing has been
+ *		heard and that no IGTXVIA was configured.
  *
  *--------------------------------------------------------------------*/
 
 func PfilterStandaloneInit(debug_level int) *PacketFilter {
-	return NewPacketFilter(new(igate_config_s), aprs.NewDecoderFromDataFiles(), mheard.New(0), debug_level)
+	return NewPacketFilter(0, aprs.NewDecoderFromDataFiles(), mheard.New(0), debug_level)
 }
 
 // PfilterMaxDebugLevel is the most verbose debug level a PacketFilter has
