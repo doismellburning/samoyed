@@ -31,6 +31,7 @@ package direwolf
 import (
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -65,6 +66,20 @@ type AudioStats struct {
 	sampleCount   int
 	errorCount    int
 	suppressFirst bool
+
+	// audioLevel reports a channel's received audio level, or is nil for
+	// none to report.
+	audioLevel func(channel int, subchan int) ax25.ALevel
+}
+
+// level is the channel's received audio level, or zero if there is nothing
+// to ask.
+func (s *AudioStats) level(channel int) int {
+	if s.audioLevel == nil {
+		return 0
+	}
+
+	return s.audioLevel(channel, 0).Rec
 }
 
 func (s *AudioStats) record(adev int, nchan int, nsamp int, interval int) {
@@ -115,18 +130,15 @@ func (s *AudioStats) record(adev int, nchan int, nsamp int, interval int) {
 
 				if nchan > 1 {
 					var ch0 = ADEVFIRSTCHAN(adev)
-					var alevel0 = demod_get_audio_level(ch0, 0)
 					var ch1 = ADEVFIRSTCHAN(adev) + 1
-					var alevel1 = demod_get_audio_level(ch1, 0)
 
 					dw_printf("\nADEVICE%d: Sample rate approx. %.1f k, %d errors, receive audio levels CH%d %d, CH%d %d\n\n",
-						adev, ave_rate, s.errorCount, ch0, alevel0.Rec, ch1, alevel1.Rec)
+						adev, ave_rate, s.errorCount, ch0, s.level(ch0), ch1, s.level(ch1))
 				} else {
 					var ch0 = ADEVFIRSTCHAN(adev)
-					var alevel0 = demod_get_audio_level(ch0, 0)
 
 					dw_printf("\nADEVICE%d: Sample rate approx. %.1f k, %d errors, receive audio level CH%d %d\n\n",
-						adev, ave_rate, s.errorCount, ch0, alevel0.Rec)
+						adev, ave_rate, s.errorCount, ch0, s.level(ch0))
 				}
 			}
 

@@ -999,7 +999,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 		if D.alevel_metric_countdown <= 0 {
 			D.alevel_metric_countdown = audioLevelDecimation
 
-			metrics.SetAudioLevel(channel, demod_get_audio_level(channel, 0).Rec)
+			metrics.SetAudioLevel(channel, d.AudioLevel(0).Rec)
 		}
 	}
 
@@ -1049,21 +1049,6 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 /* Resulting scale is 0 to almost 100. */
 /* Cranking up the input level produces no more than 97 or 98. */
 /* We currently produce a message when this goes over 90. */
-
-func demod_get_audio_level(channel int, subchan int) ax25.ALevel {
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-
-	// audio_stats asks after both of a stereo device's channels, whether or
-	// not demod_init set them up.
-	var d = demodulators[channel]
-	if d == nil {
-		var alevel ax25.ALevel
-
-		return alevel
-	}
-
-	return d.AudioLevel(subchan)
-}
 
 // AudioLevel reports the received audio level the subchannel's demodulator
 // has seen, and for AFSK its mark and space amplitudes.

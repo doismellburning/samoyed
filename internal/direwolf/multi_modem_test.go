@@ -224,6 +224,17 @@ func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
 	assert.Equal(t, []string{"DCD 1=1", "DCD 1=0"}, set)
 }
 
+// A channel with no demodulator - the other side of a stereo device that is
+// not a radio, say, which the audio statistics still ask about - has heard
+// nothing.
+func TestAudioLevelWithoutDemodulatorIsZero(t *testing.T) {
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
+
+	var zero ax25.ALevel
+
+	assert.Equal(t, zero, r.AudioLevel(0, 0))
+}
+
 // A channel whose transmit inhibit input is set counts as busy, data or no
 // data, so nothing is transmitted on it.
 func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {

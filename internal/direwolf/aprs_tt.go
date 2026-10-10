@@ -271,6 +271,10 @@ type TTGateway struct {
 	pollPeriod     int
 	runningTests   bool
 	lastParseState ttParseState
+
+	// audioLevel reports a channel's received audio level, for a touch
+	// tone message to carry, or is nil for none to report.
+	audioLevel func(channel int, subchan int) ax25.ALevel
 }
 
 /*------------------------------------------------------------------
@@ -286,6 +290,8 @@ type TTGateway struct {
  *		remember - Called with each object report we transmit, and its
  *			  channel, so the digipeater doesn't repeat our own;
  *			  nil for nobody to tell.
+ *		audioLevel - Reports a channel's received audio level, for a
+ *			  touch tone message to carry; nil for none.
  *		debug	- Debug printing control.
  *
  * Returns:     Pointer to new TTGateway.
@@ -295,10 +301,18 @@ type TTGateway struct {
  *
  *----------------------------------------------------------------*/
 
-func NewTTGateway(audioConfig *RadioConfig, p *tt_config_s, apps *clientApps, remember func(pp *ax25.Packet, channel int), debug int) *TTGateway {
+func NewTTGateway(
+	audioConfig *RadioConfig,
+	p *tt_config_s,
+	apps *clientApps,
+	remember func(pp *ax25.Packet, channel int),
+	audioLevel func(channel int, subchan int) ax25.ALevel,
+	debug int,
+) *TTGateway {
 	var g = &TTGateway{debug: debug} //nolint:exhaustruct_v5
 
 	g.config = p
+	g.audioLevel = audioLevel
 	g.users = newTTUsers(audioConfig, p)
 	g.users.apps = apps
 	g.users.remember = remember
@@ -356,7 +370,12 @@ func (g *TTGateway) Button(channel int, button rune) {
 			 * This way they are all processed by the common receive thread
 			 * rather than the thread associated with the particular audio device.
 			 */
-			raw_tt_data_to_app(channel, g.msgStr[channel])
+			var alevel ax25.ALevel
+			if g.audioLevel != nil {
+				alevel = g.audioLevel(channel, 0)
+			}
+
+			raw_tt_data_to_app(channel, g.msgStr[channel], alevel)
 
 			g.msgStr[channel] = ""
 		}
@@ -1628,6 +1647,7 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
  * Inputs:      channel		- Channel where touch tone data heard.
  *		msg		- String of button pushes.
  *				  Normally ends with #.
+ *		alevel		- The channel's received audio level.
  *
  * Returns:     None
  *
@@ -1642,7 +1662,7 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func raw_tt_data_to_app(channel int, msg string) {
+func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel) {
 	// Set source and dest to something valid to keep rest of processing happy.
 	// For lack of a better idea, make source "DTMF" to indicate where it came from.
 	// Application version might be useful in case we end up using different
@@ -1667,7 +1687,6 @@ func raw_tt_data_to_app(channel int, msg string) {
 	 */
 
 	if pp != nil {
-		var alevel = demod_get_audio_level(channel, 0)
 		alevel.Mark = -2
 		alevel.Space = -2
 

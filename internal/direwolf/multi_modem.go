@@ -610,12 +610,12 @@ func newHDLCConfig(achan *achan_param_s) hdlc.Config {
 
 func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *slicerReceivers {
 	var s = new(slicerReceivers)
-	s.hdlc = hdlc.NewReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, demod_get_audio_level, r.recFrame)
-	s.fx25 = fx25.NewReceiver(channel, subchannel, slice, r.fx25Debug, demod_get_audio_level, r.recFrame)
-	s.il2p = il2p.NewReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, r.il2pDebug, demod_get_audio_level, r.recPacket)
+	s.hdlc = hdlc.NewReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, r.AudioLevel, r.recFrame)
+	s.fx25 = fx25.NewReceiver(channel, subchannel, slice, r.fx25Debug, r.AudioLevel, r.recFrame)
+	s.il2p = il2p.NewReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, r.il2pDebug, r.AudioLevel, r.recPacket)
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.eas = eas.NewReceiver(channel, subchannel, slice, demod_get_audio_level, r.recFrame)
+		s.eas = eas.NewReceiver(channel, subchannel, slice, r.AudioLevel, r.recFrame)
 	}
 
 	return s
@@ -628,6 +628,10 @@ func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice in
 type Layer2Receiver struct {
 	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*slicerReceivers
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
+
+	// demods are each radio channel's demodulators, which hand their bits
+	// here; nil for a channel that is not a radio.
+	demods [MAX_RADIO_CHANS]*Demodulator
 
 	// modems are each channel's MultiModem, which pick the best of what the
 	// channel's slicers decode.  None is nil.
@@ -686,6 +690,7 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 	r.fx25Debug = fx25Debug
 	r.il2pDebug = il2pDebug
 	r.sink = sink
+	r.demods = demods
 	r.randSeed = 1
 
 	for ch, d := range demods {
@@ -705,6 +710,23 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 	}
 
 	return r
+}
+
+// AudioLevel is the received audio level a channel's subchannel has seen,
+// and for AFSK its mark and space amplitudes.  A channel with no demodulator
+// - the second channel of a stereo device that is not a radio, say - has
+// heard nothing.
+func (r *Layer2Receiver) AudioLevel(channel int, subchan int) ax25.ALevel {
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+
+	var d = r.demods[channel]
+	if d == nil {
+		var alevel ax25.ALevel
+
+		return alevel
+	}
+
+	return d.AudioLevel(subchan)
 }
 
 // ProcessSample is MultiModem.ProcessSample for a channel.
