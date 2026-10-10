@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package waypoint
 
 /*------------------------------------------------------------------
  *
@@ -24,24 +27,28 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// The sentence formats a WaypointSender can generate, as waypointConfig.formats
-// flags, with the letter that asks for each in the WAYPOINT configuration.
-const WPL_FORMAT_NMEA_GENERIC = 0x01 /* N	$GPWPL */
-const WPL_FORMAT_GARMIN = 0x02       /* G	$PGRMW */
-const WPL_FORMAT_MAGELLAN = 0x04     /* M	$PMGNWPL */
-const WPL_FORMAT_KENWOOD = 0x08      /* K	$PKWDWPL */
-const WPL_FORMAT_AIS = 0x10          /* A	!AIVDM */
+// The sentence formats a Sender can generate, as Config.Formats flags, with
+// the letter that asks for each in the WAYPOINT configuration.
+const (
+	FormatNMEAGeneric = 0x01 /* N	$GPWPL */
+	FormatGarmin      = 0x02 /* G	$PGRMW */
+	FormatMagellan    = 0x04 /* M	$PMGNWPL */
+	FormatKenwood     = 0x08 /* K	$PKWDWPL */
+	FormatAIS         = 0x10 /* A	!AIVDM */
+)
 
-// waypointConfig says where NewWaypointSender sends waypoints, and in which
-// formats.  Leave serialPort empty, or udpPort zero, to not send them there.
-type waypointConfig struct {
-	serialPort  string // Serial port name, e.g. COM22, /dev/ttyACM0.
-	udpHostname string // Destination host when using UDP.
-	udpPort     int    // UDP port.
-	formats     int    // Which sentence formats should be generated?  WPL_FORMAT_* flags.
+// Config says where NewSender sends waypoints, and in which formats.  Leave
+// SerialPort empty, or UDPPort zero, to not send them there.
+type Config struct {
+	SerialPort  string // Serial port name, e.g. COM22, /dev/ttyACM0.
+	UDPHostname string // Destination host when using UDP.
+	UDPPort     int    // UDP port.
+	Formats     int    // Which sentence formats should be generated?  Format* flags.
 }
 
-type WaypointSender struct {
+// Sender sends waypoint and AIS sentences to the serial port and UDP
+// destination it was configured with.
+type Sender struct {
 	serialPortFd *term.Term
 	udpSock      net.Conn
 	formats      int // which formats should we generate?
@@ -50,22 +57,22 @@ type WaypointSender struct {
 
 /*-------------------------------------------------------------------
  *
- * Name:	NewWaypointSender
+ * Name:	NewSender
  *
- * Purpose:	Initialise and return a new WaypointSender.
+ * Purpose:	Initialise and return a new Sender.
  *
  * Inputs:	config			- Where to send waypoints, and in which formats.
  *
- *		  ->serialPort		- Name of serial port.  COM1, /dev/ttyS0, etc.
+ *		  ->SerialPort		- Name of serial port.  COM1, /dev/ttyS0, etc.
  *
- *		  ->udpHostname		- Destination host when using UDP.
+ *		  ->UDPHostname		- Destination host when using UDP.
  *
- *		  ->udpPort		- UDP port number.
+ *		  ->UDPPort		- UDP port number.
  *
  *		  (currently none)	- speed, baud.  Default 4800 if not set
  *
  *
- *		  ->formats		- Set of formats enabled.
+ *		  ->Formats		- Set of formats enabled.
  *					  If none set, default to generic & Kenwood here.
  *
  *		gps			- The GPS, whose serial port we share if it is
@@ -80,20 +87,20 @@ type WaypointSender struct {
  *
  *---------------------------------------------------------------*/
 
-func NewWaypointSender(ctx context.Context, config *waypointConfig, gps *dwgps.GPS) (*WaypointSender, error) {
+func NewSender(ctx context.Context, config *Config, gps *dwgps.GPS) (*Sender, error) {
 	logrus.WithFields(logrus.Fields{
-		"serial_device": config.serialPort,
-		"formats":       config.formats,
-		"udp_hostname":  config.udpHostname,
-		"udp_port":      config.udpPort,
+		"serial_device": config.SerialPort,
+		"formats":       config.Formats,
+		"udp_hostname":  config.UDPHostname,
+		"udp_port":      config.UDPPort,
 	}).Debug("waypoint_init")
-	var ws = &WaypointSender{} //nolint:exhaustruct_v5
+	var ws = &Sender{} //nolint:exhaustruct_v5
 
-	var udpRequested = config.udpPort > 0
-	var serialRequested = config.serialPort != ""
+	var udpRequested = config.UDPPort > 0
+	var serialRequested = config.SerialPort != ""
 
 	if udpRequested {
-		var addr = net.JoinHostPort(config.udpHostname, strconv.Itoa(config.udpPort))
+		var addr = net.JoinHostPort(config.UDPHostname, strconv.Itoa(config.UDPPort))
 
 		var conn, err = new(net.Dialer).DialContext(ctx, "udp", addr)
 		if err != nil {
@@ -110,16 +117,16 @@ func NewWaypointSender(ctx context.Context, config *waypointConfig, gps *dwgps.G
 	 * If that fails, do own serial port open.
 	 */
 	if serialRequested {
-		ws.serialPortFd = gps.SharedNMEAPort(config.serialPort, 4800)
+		ws.serialPortFd = gps.SharedNMEAPort(config.SerialPort, 4800)
 
 		if ws.serialPortFd == nil {
-			ws.serialPortFd = serialport.Open(config.serialPort, 4800)
+			ws.serialPortFd = serialport.Open(config.SerialPort, 4800)
 		} else {
-			logrus.WithField("port", config.serialPort).Debug("Sharing same port for GPS input and waypoint output")
+			logrus.WithField("port", config.SerialPort).Debug("Sharing same port for GPS input and waypoint output")
 		}
 
 		if ws.serialPortFd == nil {
-			logrus.WithField("port", config.serialPort).Error("Unable to open serial port for waypoint output")
+			logrus.WithField("port", config.SerialPort).Error("Unable to open serial port for waypoint output")
 		}
 	}
 
@@ -129,10 +136,10 @@ func NewWaypointSender(ctx context.Context, config *waypointConfig, gps *dwgps.G
 	if (udpRequested || serialRequested) && ws.udpSock == nil && ws.serialPortFd == nil {
 		var requested []string
 		if udpRequested {
-			requested = append(requested, "UDP "+net.JoinHostPort(config.udpHostname, strconv.Itoa(config.udpPort)))
+			requested = append(requested, "UDP "+net.JoinHostPort(config.UDPHostname, strconv.Itoa(config.UDPPort)))
 		}
 		if serialRequested {
-			requested = append(requested, "serial port "+config.serialPort)
+			requested = append(requested, "serial port "+config.SerialPort)
 		}
 
 		return nil, fmt.Errorf("waypoint output requested but no destination could be opened (%s)", strings.Join(requested, ", "))
@@ -140,19 +147,19 @@ func NewWaypointSender(ctx context.Context, config *waypointConfig, gps *dwgps.G
 
 	// Set default formats if user did not specify any.
 
-	ws.formats = config.formats
+	ws.formats = config.Formats
 	if ws.formats == 0 {
-		ws.formats = WPL_FORMAT_NMEA_GENERIC | WPL_FORMAT_KENWOOD
+		ws.formats = FormatNMEAGeneric | FormatKenwood
 	}
 
-	if ws.formats&WPL_FORMAT_GARMIN > 0 {
-		ws.formats |= WPL_FORMAT_NMEA_GENERIC /* See explanation below. */
+	if ws.formats&FormatGarmin > 0 {
+		ws.formats |= FormatNMEAGeneric /* See explanation below. */
 	}
 
 	return ws, nil
 }
 
-func (ws *WaypointSender) SetDebug(n int) {
+func (ws *Sender) SetDebug(n int) {
 	ws.debug = n
 }
 
@@ -225,7 +232,7 @@ func appendChecksum(sentence []byte) []byte {
  *
  *--------------------------------------------------------------------*/
 
-func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float64, symtab rune, symbol byte,
+func (ws *Sender) SendSentence(name_in string, dlat float64, dlong float64, symtab rune, symbol byte,
 	alt maybe.Maybe[float64], course maybe.Maybe[float64], speed maybe.Maybe[float64], comment_in string) {
 	logrus.WithFields(logrus.Fields{
 		"name":   name_in,
@@ -288,7 +295,7 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 	 *		*99		is checksum
 	 */
 
-	if ws.formats&WPL_FORMAT_NMEA_GENERIC > 0 {
+	if ws.formats&FormatNMEAGeneric > 0 {
 		var sentence = fmt.Sprintf("$GPWPL,%s,%s,%s,%s,%s", slat, slat_ns, slong, slong_ew, wname)
 		var full_sentence = appendChecksum([]byte(sentence))
 		ws.send(full_sentence)
@@ -316,7 +323,7 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 	 *		*99		is checksum
 	 */
 
-	if ws.formats&WPL_FORMAT_GARMIN > 0 {
+	if ws.formats&FormatGarmin > 0 {
 		var grm_sym = waypointsym.Garmin(symtab, symbol) /* Garmin symbol code. */
 
 		var sentence = fmt.Sprintf("$PGRMW,%s,%s,%04X,%s", wname, salt, grm_sym, wcomment)
@@ -350,7 +357,7 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 	 * to delete that specific waypoint.
 	 */
 
-	if ws.formats&WPL_FORMAT_MAGELLAN > 0 {
+	if ws.formats&FormatMagellan > 0 {
 		var sicon = waypointsym.Magellan(symtab, symbol) /* Magellan icon string.  Currently 1 or 2 characters. */
 
 		var sentence = fmt.Sprintf("$PMGNWPL,%s,%s,%s,%s,%s,M,%s,%s,%s", slat, slat_ns, slong, slong_ew, salt, wname, wcomment, sicon)
@@ -444,7 +451,7 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 	 *	Oddly, there is no place for comment.
 	 */
 
-	if ws.formats&WPL_FORMAT_KENWOOD > 0 {
+	if ws.formats&FormatKenwood > 0 {
 		var now = time.Now()
 		var stime = now.Format("150405") // "%H%M%S"
 		var sdate = now.Format("020106") // "%d%m%y"
@@ -519,17 +526,17 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
  *
  *--------------------------------------------------------------------*/
 
-func (ws *WaypointSender) SendAIS(sentence []byte) {
+func (ws *Sender) SendAIS(sentence []byte) {
 	if ws.serialPortFd == nil && ws.udpSock == nil {
 		return
 	}
 
-	if ws.formats&WPL_FORMAT_AIS > 0 {
+	if ws.formats&FormatAIS > 0 {
 		ws.send(sentence)
 	}
 }
 
-func (ws *WaypointSender) Close() {
+func (ws *Sender) Close() {
 	if ws.serialPortFd != nil {
 		serialport.Close(ws.serialPortFd)
 		ws.serialPortFd = nil
@@ -545,7 +552,7 @@ func (ws *WaypointSender) Close() {
  * Append CR LF and send it.
  */
 
-func (ws *WaypointSender) send(sentence []byte) {
+func (ws *Sender) send(sentence []byte) {
 	if ws.debug > 0 {
 		logrus.WithField("sentence", string(sentence)).Trace("waypoint send sentence")
 	}

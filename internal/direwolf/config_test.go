@@ -16,6 +16,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/doismellburning/samoyed/internal/waypoint"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -4900,7 +4901,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "the formats after the device are all enabled",
 				config: "WAYPOINT /dev/ttyS0 NGA\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(WPL_FORMAT_NMEA_GENERIC|WPL_FORMAT_GARMIN|WPL_FORMAT_AIS,
+					a.Equal(waypoint.FormatNMEAGeneric|waypoint.FormatGarmin|waypoint.FormatAIS,
 						c.misc.waypoint_formats)
 				},
 			},
@@ -4908,14 +4909,14 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "format letters may be lower case and separated by commas",
 				config: "WAYPOINT /dev/ttyS0 m,k\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(WPL_FORMAT_MAGELLAN|WPL_FORMAT_KENWOOD, c.misc.waypoint_formats)
+					a.Equal(waypoint.FormatMagellan|waypoint.FormatKenwood, c.misc.waypoint_formats)
 				},
 			},
 			{
 				name:   "an unrecognised format letter is reported and the rest still apply",
 				config: "WAYPOINT /dev/ttyS0 NX\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(WPL_FORMAT_NMEA_GENERIC, c.misc.waypoint_formats)
+					a.Equal(waypoint.FormatNMEAGeneric, c.misc.waypoint_formats)
 					a.Contains(c.output, "Invalid output format")
 				},
 			},

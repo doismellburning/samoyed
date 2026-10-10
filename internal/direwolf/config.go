@@ -40,6 +40,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/touchtone"
+	"github.com/doismellburning/samoyed/internal/waypoint"
 	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
 )
@@ -5620,15 +5621,15 @@ func handleWAYPOINT(ps *parseState) error {
 	for _, c := range t {
 		switch unicode.ToUpper(c) {
 		case 'N':
-			ps.misc.waypoint_formats |= WPL_FORMAT_NMEA_GENERIC
+			ps.misc.waypoint_formats |= waypoint.FormatNMEAGeneric
 		case 'G':
-			ps.misc.waypoint_formats |= WPL_FORMAT_GARMIN
+			ps.misc.waypoint_formats |= waypoint.FormatGarmin
 		case 'M':
-			ps.misc.waypoint_formats |= WPL_FORMAT_MAGELLAN
+			ps.misc.waypoint_formats |= waypoint.FormatMagellan
 		case 'K':
-			ps.misc.waypoint_formats |= WPL_FORMAT_KENWOOD
+			ps.misc.waypoint_formats |= waypoint.FormatKenwood
 		case 'A':
-			ps.misc.waypoint_formats |= WPL_FORMAT_AIS
+			ps.misc.waypoint_formats |= waypoint.FormatAIS
 		case ' ', ',':
 		default:
 			ps.errorf("config file: Invalid output format '%c' for WAYPOINT on line %d", c, ps.line)

@@ -22,6 +22,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/symbols"
+	"github.com/doismellburning/samoyed/internal/waypoint"
 	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/lestrrat-go/strftime"
@@ -741,13 +742,13 @@ x = Silence FX.25 information.`)
 	var gpsReceiver = dwgps.NewGPS(ctx, gpsConfig, d_g_opt)
 	td.add(gpsReceiver.Term)
 
-	var wpConfig = new(waypointConfig)
-	wpConfig.serialPort = misc_config.waypoint_serial_port
-	wpConfig.udpHostname = misc_config.waypoint_udp_hostname
-	wpConfig.udpPort = misc_config.waypoint_udp_portnum
-	wpConfig.formats = misc_config.waypoint_formats
+	var wpConfig = new(waypoint.Config)
+	wpConfig.SerialPort = misc_config.waypoint_serial_port
+	wpConfig.UDPHostname = misc_config.waypoint_udp_hostname
+	wpConfig.UDPPort = misc_config.waypoint_udp_portnum
+	wpConfig.Formats = misc_config.waypoint_formats
 
-	var waypointSender, waypointErr = NewWaypointSender(ctx, wpConfig, gpsReceiver)
+	var waypointSender, waypointErr = waypoint.NewSender(ctx, wpConfig, gpsReceiver)
 
 	if waypointSender != nil {
 		td.add(waypointSender.Close)
@@ -849,7 +850,7 @@ type recPacketHandler struct {
 	webHub    *webui.Hub // Nil without a web interface.
 	logger    *aprslog.Logger
 	heard     *mheard.DB // Where the stations heard over the radio are remembered.
-	waypoints *WaypointSender
+	waypoints *waypoint.Sender
 	apps      *clientApps // Nil for none.
 
 	digipeater          *Digipeater
