@@ -422,16 +422,16 @@ func FuzzAX25Link(f *testing.F) {
 
 	var agw = fuzzAGWServer(f)
 
-	var xid xid_param_s
-	xid.FullDuplex = maybe.Just(false)
-	xid.SREJ = SREJSingle
-	xid.Modulo = 128
-	xid.IFieldLengthRx = maybe.Just(256)
-	xid.WindowSizeRx = maybe.Just(32)
-	xid.AckTimer = maybe.Just(3000)
-	xid.Retries = maybe.Just(10)
+	var xidParam xid_param_s
+	xidParam.FullDuplex = maybe.Just(false)
+	xidParam.SREJ = SREJSingle
+	xidParam.Modulo = 128
+	xidParam.IFieldLengthRx = maybe.Just(256)
+	xidParam.WindowSizeRx = maybe.Just(32)
+	xidParam.AckTimer = maybe.Just(3000)
+	xidParam.Retries = maybe.Just(10)
 
-	var xidInfo = xid_encode(&xid, ax25.CRCmd)
+	var xidInfo = xid_encode(&xidParam, ax25.CRCmd)
 
 	for _, script := range []linkFuzzScript{
 		// They connect to us, send a couple of frames, take some back,
