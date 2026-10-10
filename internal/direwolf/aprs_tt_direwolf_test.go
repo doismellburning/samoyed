@@ -151,7 +151,7 @@ func check_result(t *testing.T, testCase ttTestCase) {
 func Test_APRS_TT(t *testing.T) {
 	var cfg tt_config_s
 	cfg.ttlocs = aprs_tt_test_config
-	gateway = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, 0)
+	gateway = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, 0)
 	gateway.runningTests = true
 
 	for testNum, testCase := range ttTestCases {

@@ -12,6 +12,8 @@ import (
 )
 
 func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var cfg = new(misc_config_s)
 
 	cfg.num_beacons = 1
@@ -25,17 +27,15 @@ func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
 		modemConfig: makeBeaconModemConfig(),
 		miscConfig:  cfg,
 		igateConfig: new(igate_config_s),
+		recFrame:    dlq.RecFrame,
 	}
 
 	var gpsinfo = new(dwgps.GPSInfo)
 	gpsinfo.Fix = dwgps.DWFIX_2D
 
-	for dataLinkQueue.Remove() != nil {
-	}
-
 	bs.send(t.Context(), 0, gpsinfo)
 
-	var item = dataLinkQueue.Remove()
+	var item = dlq.Remove()
 	if item != nil {
 		t.Errorf("transmitted %s", item.pp.FormatAddrs()+string(item.pp.Info()))
 	}

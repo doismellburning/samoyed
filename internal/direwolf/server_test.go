@@ -523,7 +523,10 @@ func (c *nullConn) RemoteAddr() net.Addr        { return c.addr }
 // transmit paths walk the whole table for every frame that goes past.  Run
 // under -race, this fails if the table is not guarded.
 func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
+	s.dataLink = dlq
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
@@ -543,7 +546,7 @@ func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
 	// Detaching a client tells the data link machinery it has gone, and
 	// nothing here drains that queue, so put it back afterwards rather than
 	// leave a pile of cleanups behind for whatever test runs next.
-	dlqAppended(func() {
+	dlqAppended(dlq, func() {
 		wg.Go(func() { /* The receive path, for every frame heard. */
 			for {
 				select {
@@ -578,7 +581,10 @@ func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
 // meant for the old connection takes the new client's links and registered
 // callsigns away, while its socket stays attached and it is told nothing.
 func TestDetachClient_StaleConnLeavesItsSuccessorAlone(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
+	s.dataLink = dlq
 
 	var first = new(nullConn)
 	first.addr = tcpAddr(t, "192.168.1.10")
@@ -589,7 +595,7 @@ func TestDetachClient_StaleConnLeavesItsSuccessorAlone(t *testing.T) {
 	s.clientAccepted(0, first)
 	s.clientAccepted(0, second) /* The slot has moved on. */
 
-	var item = dlqAppended(func() { s.detachClient(0, first) })
+	var item = dlqAppended(dlq, func() { s.detachClient(0, first) })
 
 	assert.Nil(t, item, "cleanup queued against the client that holds the slot now")
 	assert.Equal(t, net.Conn(second), s.clientConn(0), "the newer connection was detached")
@@ -597,14 +603,17 @@ func TestDetachClient_StaleConnLeavesItsSuccessorAlone(t *testing.T) {
 
 // The ordinary case still cleans up, of course.
 func TestDetachClient_AttachedConnIsCleanedUp(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
+	s.dataLink = dlq
 
 	var conn = new(nullConn)
 	conn.addr = tcpAddr(t, "192.168.1.10")
 
 	s.clientAccepted(0, conn)
 
-	var item = dlqAppended(func() { s.detachClient(0, conn) })
+	var item = dlqAppended(dlq, func() { s.detachClient(0, conn) })
 
 	require.NotNil(t, item, "no cleanup queued for a client that really has gone")
 	assert.Equal(t, DLQ_CLIENT_CLEANUP, item._type)
@@ -618,7 +627,10 @@ func TestDetachClient_AttachedConnIsCleanedUp(t *testing.T) {
 // only once its read returns; until then this is the one place that knows, and
 // dropping the error left it saying nothing at all.
 func TestSendToClient_WriteErrorDetachesTheClient(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
+	s.dataLink = dlq
 
 	var server, client = net.Pipe()
 	client.Close()
@@ -630,7 +642,7 @@ func TestSendToClient_WriteErrorDetachesTheClient(t *testing.T) {
 	var version = new(agwpe.Message)
 	version.Header.DataKind = 'R'
 
-	var item = dlqAppended(func() { s.handleClientCommand(0, version) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(0, version) })
 
 	assert.Nil(t, s.clientConn(0), "the connection we could not write to is still attached")
 	require.NotNil(t, item, "connected mode was not told the client had gone")

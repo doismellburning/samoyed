@@ -33,13 +33,17 @@ type AXUDPChannel struct {
 	routes  axudp.Routes
 	conn    *net.UDPConn
 	started atomic.Bool
+
+	// recFrame is where frames received on the channel go, or nil to drop
+	// them.
+	recFrame frameReceiver
 }
 
 // NewAXUDPChannels opens the socket for every AXUDP channel in pa and starts
 // listening on it, until ctx is cancelled.  It returns the channel for each
 // AXUDP channel number, nil for every other.  It exits if a socket cannot be
 // opened; if cancelled part way, it returns those opened so far.
-func NewAXUDPChannels(ctx context.Context, pa *RadioConfig) [MAX_TOTAL_CHANS]*AXUDPChannel {
+func NewAXUDPChannels(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [MAX_TOTAL_CHANS]*AXUDPChannel {
 	var channels [MAX_TOTAL_CHANS]*AXUDPChannel
 
 	for i := range MAX_TOTAL_CHANS {
@@ -52,7 +56,7 @@ func NewAXUDPChannels(ctx context.Context, pa *RadioConfig) [MAX_TOTAL_CHANS]*AX
 			"port":    pa.axudp_port[i],
 		}).Debug("Opening AXUDP channel")
 
-		var ac, err = NewAXUDPChannel(ctx, i, pa.axudp_port[i], pa.axudp_routes[i])
+		var ac, err = NewAXUDPChannel(ctx, i, pa.axudp_port[i], pa.axudp_routes[i], recFrame)
 		if err != nil {
 			if ctx.Err() != nil {
 				return channels
@@ -70,9 +74,10 @@ func NewAXUDPChannels(ctx context.Context, pa *RadioConfig) [MAX_TOTAL_CHANS]*AX
 	return channels
 }
 
-// NewAXUDPChannel opens the UDP socket for channel on port, sending by routes.
-// Nothing is read from it until Start is called.
-func NewAXUDPChannel(ctx context.Context, channel int, port int, routes axudp.Routes) (*AXUDPChannel, error) {
+// NewAXUDPChannel opens the UDP socket for channel on port, sending by routes,
+// with the frames it receives going to recFrame (nil to drop them).  Nothing
+// is read from it until Start is called.
+func NewAXUDPChannel(ctx context.Context, channel int, port int, routes axudp.Routes, recFrame frameReceiver) (*AXUDPChannel, error) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	var pc, err = new(net.ListenConfig).ListenPacket(ctx, "udp", net.JoinHostPort("", strconv.Itoa(port)))
@@ -83,6 +88,7 @@ func NewAXUDPChannel(ctx context.Context, channel int, port int, routes axudp.Ro
 	var ac = new(AXUDPChannel)
 	ac.channel = channel
 	ac.routes = routes
+	ac.recFrame = recFrame
 	ac.conn = pc.(*net.UDPConn) //nolint:forcetypeassert // A UDP listener is a UDPConn.
 
 	return ac, nil
@@ -176,7 +182,9 @@ func (ac *AXUDPChannel) receive(datagram []byte, from *net.UDPAddr) {
 
 	var retries BitFixLevel
 
-	dataLinkQueue.RecFrame(ac.channel, -4, 0, pp, alevel, fec_type_none, retries, "AXUDP")
+	if ac.recFrame != nil {
+		ac.recFrame(ac.channel, -4, 0, pp, alevel, fec_type_none, retries, "AXUDP")
+	}
 }
 
 // sendPacket sends pp to wherever the channel's routes say its destination

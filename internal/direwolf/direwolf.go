@@ -465,10 +465,16 @@ x = Silence FX.25 information.`)
 		os.Exit(1)
 	}
 
+	// What the receive threads, the network channels and the rest hand their
+	// events to, for recv_process to take them from.  The network channels'
+	// listeners, started below, can hand it frames straight away.
+	var dataLinkQueue = NewDataLinkQueue()
+
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
 	var sink = new(radioSink)
+	sink.recFrame = dataLinkQueue.RecFrame
 
 	var layer2Receiver = multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
 
@@ -481,11 +487,12 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config))
+	transmitQueue.SetSeizeConfirm(dataLinkQueue.SeizeConfirm)
+	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame))
 	stopIfCancelled(ctx, td)
 
 	// Likewise a channel can be AX.25 over UDP to other nodes.
-	transmitQueue.SetAXUDPChannels(NewAXUDPChannels(ctx, audio_config))
+	transmitQueue.SetAXUDPChannels(NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame))
 	stopIfCancelled(ctx, td)
 
 	/*
@@ -499,7 +506,7 @@ x = Silence FX.25 information.`)
 	 * Push to Talk (PTT) control.
 	 */
 
-	var pttControl, pttErr = NewPTT(audio_config, layer2Receiver.MuteInput, d_o_opt)
+	var pttControl, pttErr = NewPTT(audio_config, layer2Receiver.MuteInput, dataLinkQueue.ChannelBusy, d_o_opt)
 	td.add(pttControl.Term) // Which does nothing if there is no PTT.
 	stopIfCancelled(ctx, td)
 
@@ -526,7 +533,7 @@ x = Silence FX.25 information.`)
 	// The AGW server is made here, so the transmit service can be told to
 	// show it each frame sent, but only started further down: its clients
 	// feed a transmit queue that the transmit service sets up.
-	var agwServer = NewAGWServer(audio_config, misc_config, d_a_opt)
+	var agwServer = NewAGWServer(audio_config, misc_config, dataLinkQueue, d_a_opt)
 
 	// Each frame sent is shown on the web interface, if there is one, and to
 	// the AGW clients monitoring.
@@ -539,7 +546,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, layer2Receiver.DataDetectAny, onTransmit, d_p_opt, d_x_opt, d_2_opt)
+	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx, td)
 
 	/*
@@ -666,7 +673,7 @@ x = Silence FX.25 information.`)
 	 */
 	var mheardDB = mheard.New(d_m_opt)
 	var packetFilter = pfilter.New(igate_config.max_digi_hops, aprsDecoder, mheardDB, d_f_opt)
-	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, d_i_opt)
+	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, dataLinkQueue.RecFrame, d_i_opt)
 	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated)
 
 	// The transmit queue predates the IGate, and nothing queues a packet for
@@ -720,7 +727,7 @@ x = Silence FX.25 information.`)
 	 * client applications too.  Each audio device's receive thread makes the
 	 * touch tone decoders for its own channels, once receiving starts below.
 	 */
-	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, igate.sendRecPacket, layer2Receiver.AudioLevel, aprstt_debug)
+	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, igate.sendRecPacket, dataLinkQueue.RecFrame, layer2Receiver.AudioLevel, aprstt_debug)
 
 	/*
 	 * Open port for communication with GPS.
@@ -757,7 +764,7 @@ x = Silence FX.25 information.`)
 
 	var aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
 	td.add(aprsLogger.Close)
-	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger, mheardDB, igate)
+	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger, mheardDB, igate, dataLinkQueue.RecFrame)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
 	stopIfCancelled(ctx, td)
@@ -789,7 +796,7 @@ x = Silence FX.25 information.`)
 	recHandler.quietDecode = q_d_opt
 	recHandler.aisToObject = A_opt_ais_to_obj
 
-	go recv_process(ctx, recHandler)
+	go recv_process(ctx, dataLinkQueue, recHandler)
 
 	// Startup is done, so we sit here until we are asked to stop or an audio
 	// device input fails or runs out.  There is no point in going on without

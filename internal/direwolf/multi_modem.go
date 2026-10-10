@@ -179,10 +179,15 @@ type radioSink struct {
 	// the data carrier detect indicator - or is nil when there is nothing to
 	// set.
 	setOutput func(ot int, channel int, state int)
+
+	// recFrame is where the frames go, or nil to drop them.
+	recFrame frameReceiver
 }
 
 func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
-	dataLinkQueue.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+	if s.recFrame != nil {
+		s.recFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+	}
 }
 
 func (s *radioSink) DCDChange(channel int, state int) {

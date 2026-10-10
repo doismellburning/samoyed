@@ -70,7 +70,7 @@ package direwolf
  *
  *					The difference is that app_process_rec_frame
  *					is no longer called directly.  Instead
- *					the frame is appended to a queue with dataLinkQueue.RecFrame.
+ *					the frame is appended to a queue with DataLinkQueue.RecFrame.
  *
  *					Received frames can now be processed one at
  *					a time and we don't need to worry about later
@@ -84,6 +84,7 @@ package direwolf
 
 import (
 	"context"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/dtmf"
 	"github.com/sirupsen/logrus"
@@ -222,7 +223,7 @@ func recv_adev_thread(
 		} // for c is just 0 or 0 then 1
 
 		/* When a complete frame is accumulated, */
-		/* dataLinkQueue.RecFrame, is called. */
+		/* DataLinkQueue.RecFrame, is called. */
 
 		/* recv_process, below, drains the queue. */
 	} // while !eof on audio stream
@@ -239,13 +240,21 @@ func recv_adev_thread(
 	failed <- a
 }
 
-// recv_process drains the received data queue until ctx is cancelled, handing
-// each frame received to rh.
-func recv_process(ctx context.Context, rh *recPacketHandler) {
+// dataLinkSource is where recv_process takes the data link's events from.
+// *DataLinkQueue is one.
+type dataLinkSource interface {
+	WaitWhileEmpty(ctx context.Context, timeout time.Time) bool
+	Remove() *dlq_item_t
+	Delete(pitem *dlq_item_t)
+}
+
+// recv_process drains the received data queue, q, until ctx is cancelled,
+// handing each frame received to rh.
+func recv_process(ctx context.Context, q dataLinkSource, rh *recPacketHandler) {
 	for ctx.Err() == nil {
 		var timeout_value = ax25_link_get_next_timer_expiry()
 
-		var timed_out = dataLinkQueue.WaitWhileEmpty(ctx, timeout_value)
+		var timed_out = q.WaitWhileEmpty(ctx, timeout_value)
 
 		if ctx.Err() != nil {
 			// Cancelled rather than woken by an item, so there is nothing
@@ -256,7 +265,7 @@ func recv_process(ctx context.Context, rh *recPacketHandler) {
 		if timed_out {
 			dl_timer_expiry()
 		} else {
-			var pitem = dataLinkQueue.Remove()
+			var pitem = q.Remove()
 
 			if pitem != nil {
 				switch pitem._type {
@@ -298,7 +307,7 @@ func recv_process(ctx context.Context, rh *recPacketHandler) {
 					dl_client_cleanup(pitem)
 				}
 
-				dataLinkQueue.Delete(pitem)
+				q.Delete(pitem)
 			} else {
 				logrus.Debug("recv_process: spurious wakeup. (Temp debugging message - not a problem if only occasional.)")
 			}

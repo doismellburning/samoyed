@@ -37,6 +37,7 @@ type NetTNC struct {
 	reattachDelay time.Duration // Between attempts to reattach.
 	started       atomic.Bool
 	debug         int
+	recFrame      frameReceiver // Where frames from the TNC go, or nil to drop them.
 }
 
 /*-------------------------------------------------------------------
@@ -61,7 +62,7 @@ type NetTNC struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewNetTNCs(ctx context.Context, pa *RadioConfig) [MAX_TOTAL_CHANS]*NetTNC {
+func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [MAX_TOTAL_CHANS]*NetTNC {
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
 	for i := range MAX_TOTAL_CHANS {
@@ -69,7 +70,7 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig) [MAX_TOTAL_CHANS]*NetTNC {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Channel %d: Network TNC %s %d\n", i, pa.nettnc_addr[i], pa.nettnc_port[i])
 
-			var nt, err = NewNetTNC(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i])
+			var nt, err = NewNetTNC(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i], recFrame)
 			if err != nil {
 				// A stop that cut the connection short is not a failure to
 				// connect: go back and let the caller tear down.
@@ -101,6 +102,8 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig) [MAX_TOTAL_CHANS]*NetTNC {
  *
  *		port	- TCP port number.  Typically 8001.
  *
+ *		recFrame - Where frames from the TNC go; nil to drop them.
+ *
  *		init_func - Call this function after establishing communication //
  *			with the TNC.  We put it here, so that it can be done//
  *			again automatically if the TNC disappears and we//
@@ -114,7 +117,7 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig) [MAX_TOTAL_CHANS]*NetTNC {
  *
  *--------------------------------------------------------------------*/
 
-func NewNetTNC(ctx context.Context, channel int, host string, port int) (*NetTNC, error) {
+func NewNetTNC(ctx context.Context, channel int, host string, port int, recFrame frameReceiver) (*NetTNC, error) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	var conn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
@@ -127,6 +130,7 @@ func NewNetTNC(ctx context.Context, channel int, host string, port int) (*NetTNC
 	nt.host = host
 	nt.port = port
 	nt.reattachDelay = nettncReattachDelay
+	nt.recFrame = recFrame
 	nt.setSock(conn)
 
 	// TNC initialization if specified.
@@ -276,18 +280,18 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 			for j := range n {
 				// Separate the byte stream into KISS frame(s) and make it
 				// look like this came from a radio channel.
-				nettncRecByte(&kstate, buf[j], nt.debug, channel)
+				nettncRecByte(&kstate, buf[j], nt.debug, channel, nt.recFrame)
 			}
 		} // nt.sock != nil
 	} // until cancelled
 }
 
 // nettncRecByte takes one byte from a KISS network TNC, and passes each frame
-// it completes to the received packet queue - as though it came from a radio
-// channel, the one the network TNC is attached to, whatever channel the frame
-// itself names.  Anything outside a frame is not ours to answer, so it's
-// ignored.
-func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int) {
+// it completes to recFrame - as though it came from a radio channel, the one
+// the network TNC is attached to, whatever channel the frame itself names.
+// Anything outside a frame is not ours to answer, so it's ignored.  With no
+// recFrame, frames are dropped.
+func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int, recFrame frameReceiver) {
 	var chunk = kc.Add(b)
 
 	if chunk.Err != nil {
@@ -341,7 +345,9 @@ func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int) {
 		var retries BitFixLevel
 
 		var spectrum = "Network TNC"
-		dataLinkQueue.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+		if recFrame != nil {
+			recFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet object for KISS frame from channel %d network TNC.\n", channel)

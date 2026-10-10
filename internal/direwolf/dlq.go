@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -152,12 +151,6 @@ type DataLinkQueue struct {
 	wake chan struct{}
 }
 
-// dataLinkQueue is the queue the receive threads, client applications and
-// transmit side hand their events to, and recv_process takes them from.  It
-// exists from package initialisation, so it is never nil and is usable
-// before Init is called.
-var dataLinkQueue = NewDataLinkQueue()
-
 // NewDataLinkQueue returns an empty queue.
 func NewDataLinkQueue() *DataLinkQueue {
 	var q = new(DataLinkQueue)
@@ -167,30 +160,9 @@ func NewDataLinkQueue() *DataLinkQueue {
 	return q
 }
 
-/*-------------------------------------------------------------------
- *
- * Name:        Init
- *
- * Purpose:     Initialize the queue.
- *
- * Inputs:	None.
- *
- * Outputs:
- *
- * Description:	Empty the queue and discard any wake-up left over from
- *		items that were on it.
- *
- *--------------------------------------------------------------------*/
-
-func (q *DataLinkQueue) Init() {
-	logrus.Debug("dlq_init")
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	q.head = nil
-
-	q.discardWakeUpLocked()
-} /* end Init */
+// frameReceiver is where a received frame goes on its way to recv_process:
+// DataLinkQueue.RecFrame, or a stand-in for it.
+type frameReceiver func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
 
 /*-------------------------------------------------------------------
  *
@@ -472,7 +444,7 @@ func (q *DataLinkQueue) XmitDataRequest(addrs [ax25.MaxAddrs]string, num_addr in
 
 	/* Attach the transmit data. */
 
-	pnew.txdata = q.NewCData(pid, xdata)
+	pnew.txdata = NewCData(pid, xdata)
 
 	/* Put it into queue. */
 
@@ -801,7 +773,7 @@ func (q *DataLinkQueue) Delete(pitem *dlq_item_t) {
 	pitem.pp = nil
 
 	if pitem.txdata != nil {
-		q.DeleteCData(pitem.txdata)
+		DeleteCData(pitem.txdata)
 		pitem.txdata = nil
 	}
 } /* end Delete */
@@ -830,7 +802,7 @@ func (q *DataLinkQueue) Delete(pitem *dlq_item_t) {
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) NewCData(pid int, data []byte) *cdata_t {
+func NewCData(pid int, data []byte) *cdata_t {
 	var cdata = new(cdata_t)
 
 	cdata.magic = TXDATA_MAGIC
@@ -856,7 +828,7 @@ func (q *DataLinkQueue) NewCData(pid int, data []byte) *cdata_t {
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) DeleteCData(cdata *cdata_t) {
+func DeleteCData(cdata *cdata_t) {
 	if cdata == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR: cdata_delete()  given nil pointer.\n")

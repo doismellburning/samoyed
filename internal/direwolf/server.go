@@ -141,6 +141,18 @@ const AGW_LOGIN_FIELD_LEN = 255
 // a buffer of that size, keeping a byte back.
 const agwMaxDataLen = ax25.MaxPacketLen - 1
 
+// agwDataLink is the data link state machine, as far as the AGW server needs
+// it: where its clients' connected mode requests go.  *DataLinkQueue is one.
+type agwDataLink interface {
+	ConnectRequest(addrs [ax25.MaxAddrs]string, num_addr int, channel int, client int, pid int)
+	DisconnectRequest(addrs [ax25.MaxAddrs]string, num_addr int, channel int, client int)
+	OutstandingFramesRequest(addrs [ax25.MaxAddrs]string, num_addr int, channel int, client int)
+	XmitDataRequest(addrs [ax25.MaxAddrs]string, num_addr int, channel int, client int, pid int, xdata []byte)
+	RegisterCallsign(addr string, channel int, client int)
+	UnregisterCallsign(addr string, channel int, client int)
+	ClientCleanup(client int)
+}
+
 // AGWServer provides the "AGW TCPIP Socket Interface" to client applications.
 //
 // The main program makes one of these, and everything the interface remembers
@@ -153,6 +165,10 @@ type AGWServer struct {
 	// connected mode may be used on.  audio.go owns this; we only read it,
 	// and it is nil in tests that do not set one up.
 	audioConfigP *RadioConfig
+
+	// dataLink is where clients' connected mode requests go, or nil to
+	// ignore them.
+	dataLink agwDataLink
 
 	// User names and passwords, any one of which a client may send in an
 	// "Application Login" frame before we honour any of its other commands.
@@ -240,9 +256,10 @@ type agwClient struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewAGWServer(audio_config_p *RadioConfig, mc *misc_config_s, debug int) *AGWServer {
+func NewAGWServer(audio_config_p *RadioConfig, mc *misc_config_s, dataLink agwDataLink, debug int) *AGWServer {
 	var s = new(AGWServer)
 	s.audioConfigP = audio_config_p
+	s.dataLink = dataLink
 	s.logins = mc.agwpe_logins
 	s.debug = debug
 	s.port = mc.agwpe_port /* Usually 8000 but can be changed. */
@@ -1176,7 +1193,9 @@ func (s *AGWServer) detachClient(client int, conn net.Conn) {
 	s.mu.Unlock()
 
 	if wasAttached {
-		dataLinkQueue.ClientCleanup(client)
+		if s.dataLink != nil {
+			s.dataLink.ClientCleanup(client)
+		}
 	}
 }
 
@@ -1876,7 +1895,9 @@ func (s *AGWServer) handleRegisterCallsignRequest(client int, cmd *agwpe.Message
 	if s.connectedModeAllowed(cmd.Header.Portx) {
 		ok = 1
 
-		dataLinkQueue.RegisterCallsign(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+		if s.dataLink != nil {
+			s.dataLink.RegisterCallsign(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
@@ -1900,7 +1921,9 @@ func (s *AGWServer) handleUnregisterCallsignRequest(client int, cmd *agwpe.Messa
 	var channel = int(cmd.Header.Portx)
 
 	if s.connectedModeAllowed(cmd.Header.Portx) {
-		dataLinkQueue.UnregisterCallsign(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+		if s.dataLink != nil {
+			s.dataLink.UnregisterCallsign(dwutil.ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
@@ -1974,7 +1997,9 @@ func (s *AGWServer) handleConnectRequest(client int, cmd *agwpe.Message) {
 		}
 	}
 
-	dataLinkQueue.ConnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
+	if s.dataLink != nil {
+		s.dataLink.ConnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
+	}
 }
 
 // handleConnectedDataRequest handles 'D', which sends data over an established
@@ -2000,7 +2025,9 @@ func (s *AGWServer) handleConnectedDataRequest(client int, cmd *agwpe.Message) {
 	callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
 	callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
 
-	dataLinkQueue.XmitDataRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
+	if s.dataLink != nil {
+		s.dataLink.XmitDataRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
+	}
 }
 
 // handleDisconnectRequest handles 'd', which terminates an AX.25 connection.
@@ -2018,7 +2045,9 @@ func (s *AGWServer) handleDisconnectRequest(client int, cmd *agwpe.Message) {
 	callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
 	callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
 
-	dataLinkQueue.DisconnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
+	if s.dataLink != nil {
+		s.dataLink.DisconnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
+	}
 }
 
 // handleTransmitUnprotoRequest handles 'M', which asks for UNPROTO information
@@ -2160,5 +2189,7 @@ func (s *AGWServer) handleLinkOutstandingFramesRequest(client int, cmd *agwpe.Me
 	callsigns[ax25.Source] = dwutil.ByteArrayToString(cmd.Header.CallFrom[:])
 	callsigns[ax25.Destination] = dwutil.ByteArrayToString(cmd.Header.CallTo[:])
 
-	dataLinkQueue.OutstandingFramesRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
+	if s.dataLink != nil {
+		s.dataLink.OutstandingFramesRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
+	}
 }

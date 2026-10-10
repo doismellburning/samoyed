@@ -95,7 +95,7 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	my_tt_config.num_xmits = 1
 	my_tt_config.obj_xmit_chan = -1 // Keep the reports off the transmit queue.
 
-	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, nil, nil, nil, 0)
+	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, nil, nil, nil, nil, 0)
 
 	var done = make(chan struct{})
 
@@ -135,7 +135,7 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 		remembered = append(remembered, pp.FormatAddrs()+string(pp.Info()))
 	}
 
-	var gw = NewTTGateway(audioConfig, &ttConfig, nil, remember, nil, nil, 0)
+	var gw = NewTTGateway(audioConfig, &ttConfig, nil, remember, nil, nil, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
 
@@ -159,7 +159,7 @@ func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
 		sent = append(sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
 	}
 
-	var gw = NewTTGateway(audioConfig, &ttConfig, nil, nil, toIGate, nil, 0)
+	var gw = NewTTGateway(audioConfig, &ttConfig, nil, nil, toIGate, nil, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)

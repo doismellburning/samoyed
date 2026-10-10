@@ -25,7 +25,7 @@ func TestParseLocationRejectsOutOfRangeMaidenhead(t *testing.T) {
 		{ttlocType: TTLOC_MHEAD, pattern: "BAxxxx", mhead: mheadTTLoc{prefix: ""}}, //nolint:exhaustruct_v5
 	}
 
-	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, 0)
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, 0)
 	gw.runningTests = true
 
 	// Confirm the premise: the locator converts cleanly but is out of range.

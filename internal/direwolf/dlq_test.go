@@ -13,7 +13,7 @@ import (
 )
 
 func TestCDataNew_Empty(t *testing.T) {
-	var cdata = NewDataLinkQueue().NewCData(1, nil)
+	var cdata = NewCData(1, nil)
 
 	assert.Empty(t, cdata.data)
 }
@@ -21,7 +21,7 @@ func TestCDataNew_Empty(t *testing.T) {
 func TestCDataNew(t *testing.T) {
 	// Because sometimes I didn't manage to get the copy right(!)
 	var testData = []byte("badger")
-	var cdata = NewDataLinkQueue().NewCData(1, testData)
+	var cdata = NewCData(1, testData)
 
 	assert.Equal(t, cdata.data, testData)
 }

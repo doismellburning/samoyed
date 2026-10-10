@@ -88,6 +88,11 @@ type TransmitQueue struct {
 	// toIGate is where a packet for the IGate's channel goes instead of a
 	// queue, or nil to discard such packets.
 	toIGate func(channel int, pp *ax25.Packet)
+
+	// seizeConfirm tells the data link state machine that a channel without
+	// a transmitter of ours - a network TNC or AXUDP one - is clear to send
+	// on, or is nil for nobody to tell.
+	seizeConfirm func(channel int)
 }
 
 // transmitQueue is the queue every producer - KISS, AGW, beacon, digipeater,
@@ -189,6 +194,13 @@ func (tq *TransmitQueue) SetNetTNCs(netTNCs [MAX_TOTAL_CHANS]*NetTNC) {
 // to.  Like SetNetTNCs, it must be called before anything is queued.
 func (tq *TransmitQueue) SetAXUDPChannels(channels [MAX_TOTAL_CHANS]*AXUDPChannel) {
 	tq.axudpChannels = channels
+}
+
+// SetSeizeConfirm hands the queue what to tell when a seize request on a
+// channel without a transmitter of ours is granted at once.  Like SetNetTNCs,
+// it must be called before anything is queued.
+func (tq *TransmitQueue) SetSeizeConfirm(seizeConfirm func(channel int)) {
+	tq.seizeConfirm = seizeConfirm
 }
 
 // SetIGate hands the queue where packets for the IGate's channel go.  Like
@@ -637,7 +649,9 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 		(tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC || tq.audioConfig.chan_medium[channel] == MEDIUM_AXUDP) {
 		// MEDIUM_NETTNC, MEDIUM_AXUDP: no internal modem to seize; confirm the channel immediately.
 		// See LMDataRequest for the rationale for allowing them.
-		dataLinkQueue.SeizeConfirm(channel)
+		if tq.seizeConfirm != nil {
+			tq.seizeConfirm(channel)
+		}
 
 		return
 	}

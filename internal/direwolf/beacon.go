@@ -48,6 +48,7 @@ type BeaconService struct {
 	logger            *aprslog.Logger // Where "-dttt" logs tracker beacons, or nil.
 	heardCounter      heardCounter    // Counts the stations heard recently; nil for none.
 	igate             beaconIGate     // Where SENDTO_IGATE beacons go, and the source of IGate statistics; nil for none.
+	recFrame          frameReceiver   // Where SENDTO_RECV beacons go, as though received; nil to drop them.
 	trackerDebugLevel int
 }
 
@@ -75,6 +76,9 @@ type BeaconService struct {
  *		ig		- The IGate, for beacons sent to APRS-IS and the
  *			  IGate statistics beacon; nil for none.
  *
+ *		recFrame	- Where SENDTO_RECV beacons go, as though
+ *			  received; nil to drop them.
+ *
  * Outputs:	Remember required information for future use.
  *
  * Description:	Do some validity checking on the beacon configuration.
@@ -84,7 +88,16 @@ type BeaconService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *dwgps.GPS, logger *aprslog.Logger, heard heardCounter, ig beaconIGate) *BeaconService {
+func NewBeaconService(
+	pmodem *RadioConfig,
+	pconfig *misc_config_s,
+	pigate *igate_config_s,
+	gps *dwgps.GPS,
+	logger *aprslog.Logger,
+	heard heardCounter,
+	ig beaconIGate,
+	recFrame frameReceiver,
+) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct_v5
 		modemConfig:  pmodem,
 		miscConfig:   pconfig,
@@ -93,6 +106,7 @@ func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate
 		logger:       logger,
 		heardCounter: heard,
 		igate:        ig,
+		recFrame:     recFrame,
 	}
 
 	/*
@@ -966,7 +980,9 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
 			var alevel ax25.ALevel
-			dataLinkQueue.RecFrame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
+			if bs.recFrame != nil {
+				bs.recFrame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
+			}
 		default:
 			transmitQueue.Append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
 		}
