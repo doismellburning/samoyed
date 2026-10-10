@@ -164,12 +164,6 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 // What NewDemodulator works out from a channel's settings, it keeps: the
 // configuration is left as the file and command line had it.
 func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
-	var saved = demodulators
-
-	t.Cleanup(func() {
-		demodulators = saved
-	})
-
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 300, 1600, 1800, 48000)
 	audioConfig.achan[channel].num_freq = 3
@@ -178,9 +172,7 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 
 	var before = audioConfig.achan[channel]
 
-	demod_init(audioConfig)
-
-	var d = demodulators[channel]
+	var d = demod_init(audioConfig)[channel]
 	require.NotNil(t, d)
 	assert.Equal(t, "AB+", d.profiles)
 	assert.Equal(t, 2, d.NumSubchan(), "+ can't be combined with multiple frequencies, so one per letter")
@@ -190,21 +182,13 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 	assert.Equal(t, before, audioConfig.achan[channel])
 }
 
-// demod_init builds a Demodulator for each radio channel, and drops any left
-// over from before for a channel that no longer is one.
+// demod_init builds a Demodulator for each radio channel, and none for a
+// channel that is not one.
 func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
-	var saved = demodulators
-
-	t.Cleanup(func() {
-		demodulators = saved
-	})
-
-	demodulators[1] = new(Demodulator)
-
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[0].num_freq = 1
 
-	demod_init(audioConfig)
+	var demodulators = demod_init(audioConfig)
 
 	require.NotNil(t, demodulators[0])
 	assert.Equal(t, 0, demodulators[0].channel)
@@ -215,12 +199,6 @@ func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
 // demodulator has more than one; a channel without one, whether not a radio
 // or out of range altogether, has one of each.
 func TestChannelLayout(t *testing.T) {
-	var saved = demodulators
-
-	t.Cleanup(func() {
-		demodulators = saved
-	})
-
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[0].num_freq = 1
 	audioConfig.achan[0].profiles = "AB+"

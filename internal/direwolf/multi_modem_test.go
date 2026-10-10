@@ -40,7 +40,7 @@ func TestMultiModemInitStartsAfresh(t *testing.T) {
 
 	var first = new(recordingReceiveSink)
 	var firstReceiver = multi_modem_init(audioConfig, 0, 0, first)
-	require.Equal(t, 2, demodulators[0].NumSubchan())
+	require.Equal(t, 2, firstReceiver.demods[0].NumSubchan())
 
 	firstReceiver.ProcessSample(0, 10000)
 	require.NotZero(t, firstReceiver.modems[0].dcAverage)
@@ -77,9 +77,9 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 
 	var receiver = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
-	require.NotNil(t, demodulators[0])
-	assert.Equal(t, 3, demodulators[0].NumSubchan())
-	assert.Same(t, demodulators[0], receiver.modems[0].demodulator)
+	require.NotNil(t, receiver.demods[0])
+	assert.Equal(t, 3, receiver.demods[0].NumSubchan())
+	assert.Same(t, receiver.demods[0], receiver.modems[0].demodulator)
 	assert.Equal(t, 3, receiver.numSubchannel[0])
 }
 
@@ -361,17 +361,13 @@ func (r *countingBitReceiver) DCDChange(int, int, int, int) {}
 // What a demodulator demodulates goes to the receiver it was given - noise
 // decodes to bits like anything else.
 func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
-	var origDemodulators = demodulators
-
-	t.Cleanup(func() { demodulators = origDemodulators })
-
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].num_freq = 1
 
 	var layer2 = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 
 	var receiver = new(countingBitReceiver)
-	demodulators[0].setReceiver(receiver)
+	layer2.demods[0].setReceiver(receiver)
 
 	var rng = rand.New(rand.NewPCG(1, 2))
 

@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -54,10 +53,6 @@ type bitReceiver interface {
 	DCDChange(channel int, subchannel int, slice int, state int)
 }
 
-// demodulators holds every radio channel's Demodulator.  demod_init builds
-// them, so until then, and for a channel that is not a radio, it is nil.
-var demodulators [MAX_RADIO_CHANS]*Demodulator
-
 // audioLevelDecimation is how many audio samples pass between pushes of the
 // received audio level to the metrics endpoint: ~10Hz at a 44.1kHz sample rate.
 const audioLevelDecimation = 4410
@@ -98,10 +93,12 @@ func capProfiles(channel int, profiles string) string {
 	return profiles[:MAX_SUBCHANS]
 }
 
-func demod_init(pa *RadioConfig) {
-	for channel := range MAX_RADIO_CHANS {
-		demodulators[channel] = nil
+// demod_init builds a Demodulator for each radio channel, and returns them;
+// a channel that is not a radio has none.
+func demod_init(pa *RadioConfig) [MAX_RADIO_CHANS]*Demodulator {
+	var demodulators [MAX_RADIO_CHANS]*Demodulator
 
+	for channel := range MAX_RADIO_CHANS {
 		if pa.chan_medium[channel] == MEDIUM_RADIO {
 			demodulators[channel] = NewDemodulator(channel, pa.achan[channel], pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
 		}
@@ -118,6 +115,8 @@ func demod_init(pa *RadioConfig) {
 			dw_printf("Channel %d: IGate virtual channel.\n", channel)
 		}
 	}
+
+	return demodulators
 } /* end demod_init */
 
 // NewDemodulator sets up the demodulators for a radio channel, from achan, its
