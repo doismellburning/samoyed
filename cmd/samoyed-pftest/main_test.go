@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -87,7 +87,7 @@ func Test_run_rejectsAnInvalidFilter(t *testing.T) {
 
 func Test_run_rejectsAChannelOutOfRange(t *testing.T) {
 	var opts = defaultOptions("b/Q1TEST")
-	opts.toChannel = direwolf.MAX_TOTAL_CHANS + 1
+	opts.toChannel = phy.MaxTotalChans + 1
 
 	var exitStatus, _, errOut = runWith(opts, positionPacket+"\n")
 

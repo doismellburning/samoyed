@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,7 +50,7 @@ func setupDigipeater(t *testing.T) (*Digipeater, *digi_config_s) {
 
 	transmitQueue.Init(audioConfig)
 
-	return NewDigipeater(audioConfig, digiConfig, new(PacketFilter), nil), digiConfig
+	return NewDigipeater(audioConfig, digiConfig, new(pfilter.PacketFilter), nil), digiConfig
 }
 
 // enableDigipeat turns on digipeating from digiFromChan to the given channel,
@@ -206,7 +207,7 @@ func TestNewDigipeater(t *testing.T) {
 	var digiConfig = new(digi_config_s)
 	digiConfig.dedupe_time = 30
 
-	var filter = new(PacketFilter)
+	var filter = new(pfilter.PacketFilter)
 
 	var digi = NewDigipeater(audioConfig, digiConfig, filter, nil)
 

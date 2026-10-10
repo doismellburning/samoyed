@@ -37,6 +37,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/sirupsen/logrus"
@@ -3745,7 +3746,7 @@ func handleFILTER(ps *parseState) error {
 		t = " " /* Empty means permit nothing. */
 	}
 
-	var err = pfilter_validate(from_chan, to_chan, t, true)
+	var err = pfilter.Validate(from_chan, to_chan, t, true)
 	if err != nil {
 		return fmt.Errorf("config file, line %d: Invalid FILTER expression:\n%w", ps.line, err)
 	}
@@ -3809,7 +3810,7 @@ func handleCFILTER(ps *parseState) error {
 		t = " " /* Empty means permit nothing. */
 	}
 
-	var err = pfilter_validate(from_chan, to_chan, t, false)
+	var err = pfilter.Validate(from_chan, to_chan, t, false)
 	if err != nil {
 		return fmt.Errorf("config file, line %d: Invalid CFILTER expression:\n%w", ps.line, err)
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -114,7 +115,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	var igateConfig = new(igate_config_s)
 	var digiConfig = new(digi_config_s)
-	var filter = NewPacketFilter(igateConfig.max_digi_hops, aprs.NewDecoderFromDataFiles(), heardDB, 0)
+	var filter = pfilter.New(igateConfig.max_digi_hops, aprs.NewDecoderFromDataFiles(), heardDB, 0)
 
 	var ig = NewIGate(audioConfig, igateConfig, digiConfig, filter, heardDB, 0)
 

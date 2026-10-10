@@ -40,6 +40,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/sirupsen/logrus"
 )
 
@@ -97,7 +98,7 @@ type digi_config_s struct {
 type Digipeater struct {
 	audioConfig *RadioConfig
 	config      *digi_config_s
-	filter      *PacketFilter
+	filter      *pfilter.PacketFilter
 	dedupe      *DedupeService
 	count       [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
 }
@@ -122,7 +123,7 @@ type Digipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *PacketFilter, onRemember func(pp *ax25.Packet, channel int)) *Digipeater {
+func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, onRemember func(pp *ax25.Packet, channel int)) *Digipeater {
 	var d = new(Digipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_digi_config
@@ -355,7 +356,7 @@ func (d *Digipeater) match(
 	 * First check if filtering has been configured.
 	 */
 	if filter_str != "" {
-		var result, err = d.filter.pfilter(from_chan, to_chan, filter_str, pp, true)
+		var result, err = d.filter.Filter(from_chan, to_chan, filter_str, pp, true)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%s\n", err)

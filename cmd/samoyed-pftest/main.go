@@ -33,7 +33,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/doismellburning/samoyed/internal/direwolf"
+	"github.com/doismellburning/samoyed/internal/pfilter"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
@@ -59,7 +60,7 @@ type options struct {
 	isAPRS bool
 
 	// fromChannel and toChannel give context in error messages and debug
-	// output; direwolf.MAX_TOTAL_CHANS means the IGate.
+	// output; phy.MaxTotalChans means the IGate.
 	fromChannel int
 	toChannel   int
 
@@ -67,7 +68,7 @@ type options struct {
 	validateOnly bool
 
 	// debugLevel asks the filter engine to explain itself, 0 (quiet) to
-	// direwolf.PfilterMaxDebugLevel.
+	// pfilter.MaxDebugLevel.
 	debugLevel int
 }
 
@@ -83,11 +84,11 @@ func main() {
 -vvv  Result of each logical operator.`)
 	var fromChannel = pflag.Int(
 		"from-channel", 0,
-		fmt.Sprintf("Radio channel the packet came from, or %d for the IGate.  Only affects error messages and verbose output.", direwolf.MAX_TOTAL_CHANS),
+		fmt.Sprintf("Radio channel the packet came from, or %d for the IGate.  Only affects error messages and verbose output.", phy.MaxTotalChans),
 	)
 	var toChannel = pflag.Int(
 		"to-channel", 0,
-		fmt.Sprintf("Radio channel the packet is going to, or %d for the IGate.  Only affects error messages and verbose output.", direwolf.MAX_TOTAL_CHANS),
+		fmt.Sprintf("Radio channel the packet is going to, or %d for the IGate.  Only affects error messages and verbose output.", phy.MaxTotalChans),
 	)
 	var help = pflag.BoolP("help", "h", false, "Display help text.")
 
@@ -107,13 +108,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *fromChannel < 0 || *fromChannel > direwolf.MAX_TOTAL_CHANS {
-		fmt.Fprintf(os.Stderr, "--from-channel must be between 0 and %d.\n", direwolf.MAX_TOTAL_CHANS)
+	if *fromChannel < 0 || *fromChannel > phy.MaxTotalChans {
+		fmt.Fprintf(os.Stderr, "--from-channel must be between 0 and %d.\n", phy.MaxTotalChans)
 		os.Exit(1)
 	}
 
-	if *toChannel < 0 || *toChannel > direwolf.MAX_TOTAL_CHANS {
-		fmt.Fprintf(os.Stderr, "--to-channel must be between 0 and %d.\n", direwolf.MAX_TOTAL_CHANS)
+	if *toChannel < 0 || *toChannel > phy.MaxTotalChans {
+		fmt.Fprintf(os.Stderr, "--to-channel must be between 0 and %d.\n", phy.MaxTotalChans)
 		os.Exit(1)
 	}
 
@@ -128,7 +129,7 @@ func main() {
 		fromChannel:  *fromChannel,
 		toChannel:    *toChannel,
 		validateOnly: *validate,
-		debugLevel:   min(*verbose, direwolf.PfilterMaxDebugLevel),
+		debugLevel:   min(*verbose, pfilter.MaxDebugLevel),
 	}
 
 	os.Exit(run(opts, os.Stdin, os.Stdout, os.Stderr))
@@ -159,9 +160,9 @@ func usage() {
 // run is main once the command line has been dealt with, taking its streams as
 // arguments so it can be tested.  It returns the exit status.
 func run(opts options, in io.Reader, out io.Writer, errOut io.Writer) int {
-	var packetFilter = direwolf.PfilterStandaloneInit(opts.debugLevel)
+	var packetFilter = pfilter.NewStandalone(opts.debugLevel)
 
-	var filterErr = direwolf.PfilterValidate(opts.fromChannel, opts.toChannel, opts.filter, opts.isAPRS)
+	var filterErr = pfilter.Validate(opts.fromChannel, opts.toChannel, opts.filter, opts.isAPRS)
 	if filterErr != nil {
 		fmt.Fprintf(errOut, "Invalid filter: %v\n", filterErr)
 

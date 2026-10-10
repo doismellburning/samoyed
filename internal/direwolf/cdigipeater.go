@@ -23,6 +23,7 @@ import (
 	"regexp"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/pfilter"
 )
 
 /*
@@ -61,7 +62,7 @@ type cdigi_config_s struct {
 type ConnectedDigipeater struct {
 	audioConfig *RadioConfig
 	config      *cdigi_config_s
-	filter      *PacketFilter
+	filter      *pfilter.PacketFilter
 	count       [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
 }
 
@@ -81,7 +82,7 @@ type ConnectedDigipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewConnectedDigipeater(p_audio_config *RadioConfig, p_cdigi_config *cdigi_config_s, filter *PacketFilter) *ConnectedDigipeater {
+func NewConnectedDigipeater(p_audio_config *RadioConfig, p_cdigi_config *cdigi_config_s, filter *pfilter.PacketFilter) *ConnectedDigipeater {
 	var d = new(ConnectedDigipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_cdigi_config
@@ -217,7 +218,7 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *ax25.Packet, mycall_rec s
 	 * But here we only have to do it once.
 	 */
 	if cfilter_str != "" {
-		var result, err = d.filter.pfilter(from_chan, to_chan, cfilter_str, pp, false)
+		var result, err = d.filter.Filter(from_chan, to_chan, cfilter_str, pp, false)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%s\n", err)

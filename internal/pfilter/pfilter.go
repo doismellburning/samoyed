@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package pfilter
 
 /*------------------------------------------------------------------
  *
@@ -29,6 +32,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -75,12 +79,12 @@ type heardNearby interface {
 	WasRecentlyNearby(role string, callsign string, timeLimitMinutes int, maxHops int, dlat maybe.Maybe[float64], dlon maybe.Maybe[float64], km maybe.Maybe[float64]) bool
 }
 
-// NewPacketFilter returns a PacketFilter that gives an "i" filter a default
-// of igateMaxDigiHops digipeater hops, the IGate's maximum (0 for none),
-// decodes APRS packets with aprsDecoder, which may be nil, asks heard which
-// stations have been heard, nil for none, and says as much about each
-// decision as debugLevel asks for.
-func NewPacketFilter(igateMaxDigiHops int, aprsDecoder *aprs.Decoder, heard heardNearby, debugLevel int) *PacketFilter {
+// New returns a PacketFilter that gives an "i" filter a default of
+// igateMaxDigiHops digipeater hops, the IGate's maximum (0 for none), decodes
+// APRS packets with aprsDecoder, which may be nil, asks heard which stations
+// have been heard, nil for none, and says as much about each decision as
+// debugLevel asks for.
+func New(igateMaxDigiHops int, aprsDecoder *aprs.Decoder, heard heardNearby, debugLevel int) *PacketFilter {
 	var f = new(PacketFilter)
 	f.igateMaxDigiHops = igateMaxDigiHops
 	f.aprsDecoder = aprsDecoder
@@ -88,6 +92,32 @@ func NewPacketFilter(igateMaxDigiHops int, aprsDecoder *aprs.Decoder, heard hear
 	f.debug = debugLevel
 
 	return f
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:   	NewStandalone
+ *
+ * Purpose:     Set up what pfilter leans on, for a program that wants to run
+ *		filters but is not the TNC.
+ *
+ * Inputs:	debug_level	- As for PacketFilter's debug: 0 for nothing, up
+ *				  to MaxDebugLevel for the most detail.
+ *
+ * Returns:	The PacketFilter to run them with.
+ *
+ * Description:	TNC startup would have put a few things in place that pfilter
+ *		expects: an Decoder with its tables loaded, the list of
+ *		stations heard recently that an "i" filter
+ *		consults, and the IGate's maximum digipeater hop count for
+ *		it to default to.  Here nothing has been heard and the hop
+ *		count is 0, so an "i" filter finds that nothing has been
+ *		heard and that no IGTXVIA was configured.
+ *
+ *--------------------------------------------------------------------*/
+
+func NewStandalone(debug_level int) *PacketFilter {
+	return New(0, aprs.NewDecoderFromDataFiles(), mheard.New(0), debug_level)
 }
 
 type token_type_t int
@@ -206,17 +236,17 @@ func bool2text(val int) string {
  *
  *--------------------------------------------------------------------*/
 
-func (f *PacketFilter) pfilter(from_chan int, to_chan int, filter string, pp *ax25.Packet, is_aprs bool) (int, error) {
+func (f *PacketFilter) Filter(from_chan int, to_chan int, filter string, pp *ax25.Packet, is_aprs bool) (int, error) {
 	return f.eval(from_chan, to_chan, filter, pp, is_aprs, false)
 }
 
-// eval is pfilter with the syntax_only switch exposed.  With
+// eval is Filter with the syntax_only switch exposed.  With
 // syntax_only set, filter specs that would otherwise consult runtime state
 // stop once their arguments have been parsed, so an expression can be checked
 // against a synthetic packet - see pfilter_validate.
 func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.Packet, is_aprs bool, syntax_only bool) (int, error) {
-	dwutil.Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
-	dwutil.Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
+	dwutil.Assert(from_chan >= 0 && from_chan <= phy.MaxTotalChans)
+	dwutil.Assert(to_chan >= 0 && to_chan <= phy.MaxTotalChans)
 
 	if pp == nil {
 		return -1, errors.New("INTERNAL ERROR in pfilter: nil packet pointer, please report this")
@@ -283,9 +313,9 @@ func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.
 	if pfstate.debug >= 1 {
 		var what string
 
-		if from_chan == MAX_TOTAL_CHANS {
+		if from_chan == phy.MaxTotalChans {
 			what = "IGate to radio"
-		} else if to_chan == MAX_TOTAL_CHANS {
+		} else if to_chan == phy.MaxTotalChans {
 			what = "radio to IGate"
 		} else if is_aprs {
 			what = "APRS digipeater"
@@ -1455,14 +1485,14 @@ func filt_i(pf *pfstate_t) (int, error) {
 func newFilterError(pf *pfstate_t, msg string) error {
 	var intro string
 
-	if pf.from_chan == MAX_TOTAL_CHANS {
-		if pf.to_chan == MAX_TOTAL_CHANS {
+	if pf.from_chan == phy.MaxTotalChans {
+		if pf.to_chan == phy.MaxTotalChans {
 			intro = "filter[IG,IG]: "
 		} else {
 			intro = fmt.Sprintf("filter[IG,%d]: ", pf.to_chan)
 		}
 	} else {
-		if pf.to_chan == MAX_TOTAL_CHANS {
+		if pf.to_chan == phy.MaxTotalChans {
 			intro = fmt.Sprintf("filter[%d,IG]: ", pf.from_chan)
 		} else {
 			intro = fmt.Sprintf("filter[%d,%d]: ", pf.from_chan, pf.to_chan)
@@ -1476,10 +1506,10 @@ func newFilterError(pf *pfstate_t, msg string) error {
 // and addressee used to exercise as much of the filter grammar as possible
 // during config-time syntax validation.
 //
-// This lives here, not in a _test.go file, because pfilter_validate() is a
-// runtime dependency of config.go (handleFILTER/handleCFILTER), not just
-// something exercised by tests: it needs a real *packet_t to drive the
-// parser/evaluator against when checking FILTER/CFILTER syntax at config
+// This lives here, not in a _test.go file, because Validate is a runtime
+// dependency of internal/direwolf's config.go (handleFILTER/handleCFILTER),
+// not just something exercised by tests: it needs a real *packet_t to drive
+// the parser/evaluator against when checking FILTER/CFILTER syntax at config
 // load time, and this constant is that fixture.
 const pfilterDummyMonitorLine = "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA"
 
@@ -1518,45 +1548,19 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
 	return err
 }
 
-/*-------------------------------------------------------------------
- *
- * Name:   	PfilterStandaloneInit
- *
- * Purpose:     Set up what pfilter leans on, for a program that wants to run
- *		filters but is not the TNC.
- *
- * Inputs:	debug_level	- As for PacketFilter's debug: 0 for nothing, up
- *				  to PfilterMaxDebugLevel for the most detail.
- *
- * Returns:	The PacketFilter to run them with.
- *
- * Description:	TNC startup would have put a few things in place that pfilter
- *		expects: an Decoder with its tables loaded, the list of
- *		stations heard recently that an "i" filter
- *		consults, and the IGate's maximum digipeater hop count for
- *		it to default to.  Here nothing has been heard and the hop
- *		count is 0, so an "i" filter finds that nothing has been
- *		heard and that no IGTXVIA was configured.
- *
- *--------------------------------------------------------------------*/
-
-func PfilterStandaloneInit(debug_level int) *PacketFilter {
-	return NewPacketFilter(0, aprs.NewDecoderFromDataFiles(), mheard.New(0), debug_level)
-}
-
-// PfilterMaxDebugLevel is the most verbose debug level a PacketFilter has
+// MaxDebugLevel is the most verbose debug level a PacketFilter has
 // anything to say at.
-const PfilterMaxDebugLevel = 3
+const MaxDebugLevel = 3
 
 // pfilter_check_channels keeps a caller from tripping pfilter's assertion that
 // its channels are channels.
 func pfilter_check_channels(from_chan int, to_chan int) error {
-	if from_chan < 0 || from_chan > MAX_TOTAL_CHANS {
-		return fmt.Errorf("filter from channel %d is not between 0 and %d", from_chan, MAX_TOTAL_CHANS)
+	if from_chan < 0 || from_chan > phy.MaxTotalChans {
+		return fmt.Errorf("filter from channel %d is not between 0 and %d", from_chan, phy.MaxTotalChans)
 	}
 
-	if to_chan < 0 || to_chan > MAX_TOTAL_CHANS {
-		return fmt.Errorf("filter to channel %d is not between 0 and %d", to_chan, MAX_TOTAL_CHANS)
+	if to_chan < 0 || to_chan > phy.MaxTotalChans {
+		return fmt.Errorf("filter to channel %d is not between 0 and %d", to_chan, phy.MaxTotalChans)
 	}
 
 	return nil
@@ -1564,13 +1568,16 @@ func pfilter_check_channels(from_chan int, to_chan int) error {
 
 /*-------------------------------------------------------------------
  *
- * Name:   	PfilterValidate
+ * Name:   	Validate
  *
- * Purpose:     pfilter_validate, for a program outside this package.
+ * Purpose:     pfilter_validate, for a program outside this package: the
+ *		config file reader, or samoyed-pftest.  The channels are
+ *		checked first, so a bad one is an error rather than an
+ *		assertion failure.
  *
  * Inputs:	from_chan, to_chan - Channels the filter sits between, used
  *			  only to give context in any error message.
- *			  MAX_TOTAL_CHANS means the IGate.
+ *			  phy.MaxTotalChans means the IGate.
  *
  *		filter	- Filter specification/expression, as it would appear
  *			  in the config file.
@@ -1583,7 +1590,7 @@ func pfilter_check_channels(from_chan int, to_chan int) error {
  *
  *--------------------------------------------------------------------*/
 
-func PfilterValidate(from_chan int, to_chan int, filter string, is_aprs bool) error {
+func Validate(from_chan int, to_chan int, filter string, is_aprs bool) error {
 	var channelErr = pfilter_check_channels(from_chan, to_chan)
 	if channelErr != nil {
 		return channelErr
@@ -1596,10 +1603,10 @@ func PfilterValidate(from_chan int, to_chan int, filter string, is_aprs bool) er
  *
  * Name:   	MonitorLine
  *
- * Purpose:     pfilter, for a program outside this package, against a packet
+ * Purpose:     Filter, for a program outside this package, against a packet
  *		written out in the usual monitoring format.
  *
- * Inputs:	from_chan, to_chan, filter, is_aprs - As for PfilterValidate.
+ * Inputs:	from_chan, to_chan, filter, is_aprs - As for Validate.
  *
  *		monitor_line - A packet in the usual monitoring format,
  *			  e.g. "WB2OSZ-1>APDW17:>Hello".
@@ -1624,7 +1631,7 @@ func (f *PacketFilter) MonitorLine(from_chan int, to_chan int, filter string, is
 		return false, fmt.Errorf("could not parse monitoring format input: %q", monitor_line)
 	}
 
-	var result, err = f.pfilter(from_chan, to_chan, filter, pp, is_aprs)
+	var result, err = f.Filter(from_chan, to_chan, filter, pp, is_aprs)
 	if err != nil {
 		return false, err
 	}

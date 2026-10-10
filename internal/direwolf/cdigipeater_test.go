@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,7 +47,7 @@ func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *RadioConfig, *cdigi_
 
 	transmitQueue.Init(audioConfig)
 
-	return NewConnectedDigipeater(audioConfig, cdigiConfig, new(PacketFilter)), audioConfig, cdigiConfig
+	return NewConnectedDigipeater(audioConfig, cdigiConfig, new(pfilter.PacketFilter)), audioConfig, cdigiConfig
 }
 
 // A station that named us as its next digipeater is repeated, with the
@@ -264,7 +265,7 @@ func TestNewConnectedDigipeater(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	var cdigiConfig = new(cdigi_config_s)
 
-	var filter = new(PacketFilter)
+	var filter = new(pfilter.PacketFilter)
 
 	var cdigi = NewConnectedDigipeater(audioConfig, cdigiConfig, filter)
 
