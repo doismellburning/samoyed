@@ -170,6 +170,10 @@ type AGWServer struct {
 	// ignore them.
 	dataLink agwDataLink
 
+	// queue is where clients' frames to transmit go, and what a 'y' query
+	// counts, or nil to drop them.
+	queue clientTransmitQueue
+
 	// User names and passwords, any one of which a client may send in an
 	// "Application Login" frame before we honour any of its other commands.
 	// Empty means no login is required.  Written once at startup, read by
@@ -247,6 +251,9 @@ type agwClient struct {
  *
  *				0 means disable.  New in version 1.2.
  *
+ *		queue		- Where clients' frames to transmit go; nil to
+ *				  drop them.
+ *
  *		debug		- "-d a" level: print the messages flowing to and
  *				  from clients.
  *
@@ -256,10 +263,11 @@ type agwClient struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewAGWServer(audio_config_p *RadioConfig, mc *misc_config_s, dataLink agwDataLink, debug int) *AGWServer {
+func NewAGWServer(audio_config_p *RadioConfig, mc *misc_config_s, dataLink agwDataLink, queue clientTransmitQueue, debug int) *AGWServer {
 	var s = new(AGWServer)
 	s.audioConfigP = audio_config_p
 	s.dataLink = dataLink
+	s.queue = queue
 	s.logins = mc.agwpe_logins
 	s.debug = debug
 	s.port = mc.agwpe_port /* Usually 8000 but can be changed. */
@@ -1751,7 +1759,7 @@ func (*AGWServer) handleHeardStationsRequest() {
 
 // handleTransmitUIViaRequest handles 'V', which asks for a UI frame to be
 // transmitted along a digipeater path.
-func (*AGWServer) handleTransmitUIViaRequest(cmd *agwpe.Message) {
+func (s *AGWServer) handleTransmitUIViaRequest(cmd *agwpe.Message) {
 	// Data format is:
 	//	1 byte for number of digipeaters.
 	//	10 bytes for each digipeater.
@@ -1818,12 +1826,14 @@ func (*AGWServer) handleTransmitUIViaRequest(cmd *agwpe.Message) {
 	/* xastir when using the AGW interface.  */
 	/* The current version uses only the 'V' message, not 'K' for transmitting. */
 
-	transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+	if s.queue != nil {
+		s.queue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+	}
 }
 
 // handleTransmitRawRequest handles 'K', which asks for a raw AX.25 frame to be
 // transmitted.
-func (*AGWServer) handleTransmitRawRequest(cmd *agwpe.Message) {
+func (s *AGWServer) handleTransmitRawRequest(cmd *agwpe.Message) {
 	// Message contains:
 	//	port number for transmission.
 	//	data length
@@ -1861,7 +1871,7 @@ func (*AGWServer) handleTransmitRawRequest(cmd *agwpe.Message) {
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create frame from AGW 'K' message.\n")
-	} else {
+	} else if s.queue != nil {
 		/* How can we determine if it is an original or repeated message? */
 		/* If there is at least one digipeater in the frame, AND */
 		/* that digipeater has been used, it should go out quickly thru */
@@ -1869,9 +1879,9 @@ func (*AGWServer) handleTransmitRawRequest(cmd *agwpe.Message) {
 		/* Otherwise, it is an original for the low priority queue. */
 		if pp.NumRepeaters() >= 1 &&
 			pp.H(ax25.Repeater1) > 0 {
-			transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
+			s.queue.Append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
 		} else {
-			transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+			s.queue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
 		}
 	}
 }
@@ -2052,7 +2062,7 @@ func (s *AGWServer) handleDisconnectRequest(client int, cmd *agwpe.Message) {
 
 // handleTransmitUnprotoRequest handles 'M', which asks for UNPROTO information
 // to be transmitted, with no digipeater path.
-func (*AGWServer) handleTransmitUnprotoRequest(cmd *agwpe.Message) {
+func (s *AGWServer) handleTransmitUnprotoRequest(cmd *agwpe.Message) {
 	/*
 				Added in version 1.3.
 				This is the same as 'V' except there is no provision for digipeaters.
@@ -2106,7 +2116,9 @@ func (*AGWServer) handleTransmitUnprotoRequest(cmd *agwpe.Message) {
 	// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
 	pp.SetPID(pid)
 
-	transmitQueue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+	if s.queue != nil {
+		s.queue.Append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+	}
 }
 
 // handlePortOutstandingFramesRequest answers 'y', which asks how many frames
@@ -2126,9 +2138,9 @@ func (s *AGWServer) handlePortOutstandingFramesRequest(client int, cmd *agwpe.Me
 	reply.Header.DataLen = 4
 
 	var n = 0
-	if cmd.Header.Portx < MAX_RADIO_CHANS {
+	if cmd.Header.Portx < MAX_RADIO_CHANS && s.queue != nil {
 		// Count both normal and expedited in transmit queue for given channel.
-		n = transmitQueue.Count(int(cmd.Header.Portx), -1, "", "", false)
+		n = s.queue.Count(int(cmd.Header.Portx), -1, "", "", false)
 	}
 
 	reply.Data = make([]byte, 4)

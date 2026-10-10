@@ -261,7 +261,7 @@ func dlqAppended(q *DataLinkQueue, f func()) *dlq_item_t {
 func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 	var s = new(AGWServer)
 	s.audioConfigP = new(RadioConfig)
-	setupAGWTransmitQueue(t, s.audioConfigP)
+	setupAGWTransmitQueue(t, s, s.audioConfigP)
 
 	rapid.Check(t, func(t *rapid.T) {
 		var cmd = new(agwpe.Message)
@@ -280,7 +280,7 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 	var s = new(AGWServer)
 	s.audioConfigP = new(RadioConfig)
-	setupAGWTransmitQueue(t, s.audioConfigP)
+	setupAGWTransmitQueue(t, s, s.audioConfigP)
 
 	rapid.Check(t, func(t *rapid.T) {
 		var cmd = new(agwpe.Message)
@@ -576,15 +576,15 @@ func TestHandleClientCommand_G_NilRadioConfig(t *testing.T) {
 func TestNewAGWServer_TakesTheDebugLevel(t *testing.T) {
 	var mc = new(misc_config_s)
 
-	assert.Equal(t, 2, NewAGWServer(nil, mc, nil, 2).debug)
-	assert.Equal(t, 0, NewAGWServer(nil, mc, nil, 0).debug)
+	assert.Equal(t, 2, NewAGWServer(nil, mc, nil, nil, 2).debug)
+	assert.Equal(t, 0, NewAGWServer(nil, mc, nil, nil, 0).debug)
 }
 
 // With no port configured, starting says the AGW port is disabled and lets
 // nobody in; starting again is refused, and says so, rather than starting
 // a second set of goroutines on the same port.
 func TestAGWServerStart_NoPortAndOnlyOnce(t *testing.T) {
-	var s = NewAGWServer(nil, new(misc_config_s), nil, 0) /* agwpe_port 0. */
+	var s = NewAGWServer(nil, new(misc_config_s), nil, nil, 0) /* agwpe_port 0. */
 
 	var output = testutils.CaptureOutput(t, func() { s.Start(t.Context()) })
 
@@ -608,23 +608,17 @@ func TestAGWServerStart_Nil(t *testing.T) {
 	s.Start(t.Context())
 }
 
-// setupAGWTransmitQueue points the transmit queue at cfg and empties it again
-// once the test is done, so the frames an AGW command queues can be looked at.
-func setupAGWTransmitQueue(t *testing.T, cfg *RadioConfig) {
+// setupAGWTransmitQueue hands s a transmit queue of its own for cfg's
+// channels, and returns it, so the frames an AGW command queues can be looked
+// at.
+func setupAGWTransmitQueue(t *testing.T, s *AGWServer, cfg *RadioConfig) *TransmitQueue {
 	t.Helper()
 
-	var drain = func() {
-		for c := range MAX_RADIO_CHANS {
-			for p := range TQ_NUM_PRIO {
-				for transmitQueue.Remove(c, p) != nil { //revive:disable-line:empty-block
-				}
-			}
-		}
-	}
+	var tq = NewTransmitQueue()
+	tq.Init(cfg)
+	s.queue = tq
 
-	transmitQueue.Init(cfg)
-	drain()
-	t.Cleanup(drain)
+	return tq
 }
 
 // radioChannelZero returns a configuration with channel 0 on a radio.
@@ -749,7 +743,7 @@ func (c *writeCountingConn) Write(b []byte) (int, error) {
 
 func TestHandleClientCommand_V_QueuesFrameWithPID(t *testing.T) {
 	var s = new(AGWServer)
-	setupAGWTransmitQueue(t, radioChannelZero())
+	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
 	var data = append([]byte{0}, []byte("hello")...) /* No digipeaters. */
 
@@ -764,17 +758,17 @@ func TestHandleClientCommand_V_QueuesFrameWithPID(t *testing.T) {
 
 	s.handleClientCommand(0, cmd)
 
-	var pp = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+	var pp = tq.Remove(0, TQ_PRIO_1_LO)
 	require.NotNil(t, pp)
 	assert.Equal(t, "Q1TEST>Q2TEST:", pp.FormatAddrs())
 	assert.Equal(t, []byte("hello"), pp.Info())
 	assert.Equal(t, 0xCF, pp.PID())
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_0_HI))
+	assert.Nil(t, tq.Remove(0, TQ_PRIO_0_HI))
 }
 
 func TestHandleClientCommand_V_TooShortForDigipeatersQueuesNothing(t *testing.T) {
 	var s = new(AGWServer)
-	setupAGWTransmitQueue(t, radioChannelZero())
+	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'V'
@@ -785,12 +779,12 @@ func TestHandleClientCommand_V_TooShortForDigipeatersQueuesNothing(t *testing.T)
 
 	s.handleClientCommand(0, cmd)
 
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
+	assert.Nil(t, tq.Remove(0, TQ_PRIO_1_LO))
 }
 
 func TestHandleClientCommand_V_BadAddressQueuesNothing(t *testing.T) {
 	var s = new(AGWServer)
-	setupAGWTransmitQueue(t, radioChannelZero())
+	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'V'
@@ -801,12 +795,12 @@ func TestHandleClientCommand_V_BadAddressQueuesNothing(t *testing.T) {
 
 	s.handleClientCommand(0, cmd)
 
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
+	assert.Nil(t, tq.Remove(0, TQ_PRIO_1_LO))
 }
 
 func TestHandleClientCommand_M_QueuesFrameWithPID(t *testing.T) {
 	var s = new(AGWServer)
-	setupAGWTransmitQueue(t, radioChannelZero())
+	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'M'
@@ -819,7 +813,7 @@ func TestHandleClientCommand_M_QueuesFrameWithPID(t *testing.T) {
 
 	s.handleClientCommand(0, cmd)
 
-	var pp = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+	var pp = tq.Remove(0, TQ_PRIO_1_LO)
 	require.NotNil(t, pp)
 	assert.Equal(t, "Q1TEST>Q2TEST:", pp.FormatAddrs())
 	assert.Equal(t, []byte("hello"), pp.Info())
@@ -828,7 +822,7 @@ func TestHandleClientCommand_M_QueuesFrameWithPID(t *testing.T) {
 
 func TestHandleClientCommand_M_BadAddressQueuesNothing(t *testing.T) {
 	var s = new(AGWServer)
-	setupAGWTransmitQueue(t, radioChannelZero())
+	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'M'
@@ -839,7 +833,7 @@ func TestHandleClientCommand_M_BadAddressQueuesNothing(t *testing.T) {
 
 	s.handleClientCommand(0, cmd)
 
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
+	assert.Nil(t, tq.Remove(0, TQ_PRIO_1_LO))
 }
 
 // rawAGWFrame builds a 'K' command for the frame given in monitor format,
@@ -862,14 +856,14 @@ func rawAGWFrame(t *testing.T, monitor string) *agwpe.Message {
 // A raw frame that has already been digipeated goes out at high priority.
 func TestHandleClientCommand_K_UsedDigipeaterQueuesHighPriority(t *testing.T) {
 	var s = new(AGWServer)
-	setupAGWTransmitQueue(t, radioChannelZero())
+	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
 	s.handleClientCommand(0, rawAGWFrame(t, "Q1TEST>Q2TEST,Q3TEST*:hello"))
 
-	var pp = transmitQueue.Remove(0, TQ_PRIO_0_HI)
+	var pp = tq.Remove(0, TQ_PRIO_0_HI)
 	require.NotNil(t, pp)
 	assert.Equal(t, []byte("hello"), pp.Info())
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
+	assert.Nil(t, tq.Remove(0, TQ_PRIO_1_LO))
 }
 
 // An original raw frame - unused digipeater, or none - goes out at low priority.
@@ -877,21 +871,21 @@ func TestHandleClientCommand_K_OriginalQueuesLowPriority(t *testing.T) {
 	for _, monitor := range []string{"Q1TEST>Q2TEST,Q3TEST:hello", "Q1TEST>Q2TEST:hello"} {
 		t.Run(monitor, func(t *testing.T) {
 			var s = new(AGWServer)
-			setupAGWTransmitQueue(t, radioChannelZero())
+			var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
 			s.handleClientCommand(0, rawAGWFrame(t, monitor))
 
-			var pp = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+			var pp = tq.Remove(0, TQ_PRIO_1_LO)
 			require.NotNil(t, pp)
 			assert.Equal(t, []byte("hello"), pp.Info())
-			assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_0_HI))
+			assert.Nil(t, tq.Remove(0, TQ_PRIO_0_HI))
 		})
 	}
 }
 
 func TestHandleClientCommand_K_UndecodableFrameQueuesNothing(t *testing.T) {
 	var s = new(AGWServer)
-	setupAGWTransmitQueue(t, radioChannelZero())
+	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'K'
@@ -900,16 +894,16 @@ func TestHandleClientCommand_K_UndecodableFrameQueuesNothing(t *testing.T) {
 
 	s.handleClientCommand(0, cmd)
 
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_0_HI))
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
+	assert.Nil(t, tq.Remove(0, TQ_PRIO_0_HI))
+	assert.Nil(t, tq.Remove(0, TQ_PRIO_1_LO))
 }
 
 func TestHandleClientCommand_y_CountsQueuedFrames(t *testing.T) {
 	var s = new(AGWServer)
-	setupAGWTransmitQueue(t, radioChannelZero())
+	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
-	transmitQueue.Append(0, TQ_PRIO_0_HI, ax25.MustFromText("Q1TEST>Q2TEST:one"))
-	transmitQueue.Append(0, TQ_PRIO_1_LO, ax25.MustFromText("Q1TEST>Q2TEST:two"))
+	tq.Append(0, TQ_PRIO_0_HI, ax25.MustFromText("Q1TEST>Q2TEST:one"))
+	tq.Append(0, TQ_PRIO_1_LO, ax25.MustFromText("Q1TEST>Q2TEST:two"))
 
 	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)

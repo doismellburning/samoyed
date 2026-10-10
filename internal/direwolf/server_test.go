@@ -873,7 +873,7 @@ func TestReadCommandData_ReportsDataCutShort(t *testing.T) {
 // address.
 func TestHandleClientCommand_V_QueuesFrameViaDigipeaters(t *testing.T) {
 	var s = new(AGWServer)
-	setupAGWTransmitQueue(t, radioChannelZero())
+	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
 	var data = []byte{2}
 	for _, digi := range []string{"Q3TEST", "WIDE2-1"} {
@@ -893,7 +893,7 @@ func TestHandleClientCommand_V_QueuesFrameViaDigipeaters(t *testing.T) {
 
 	s.handleClientCommand(0, cmd)
 
-	var pp = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+	var pp = tq.Remove(0, TQ_PRIO_1_LO)
 	require.NotNil(t, pp, "frame via digipeaters not queued")
 	assert.Equal(t, "Q1TEST>Q2TEST,Q3TEST,WIDE2-1:", pp.FormatAddrs())
 	assert.Equal(t, []byte("hello"), pp.Info())
