@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -152,12 +151,6 @@ type DataLinkQueue struct {
 	wake chan struct{}
 }
 
-// dataLinkQueue is the queue the receive threads, client applications and
-// transmit side hand their events to, and recv_process takes them from.  It
-// exists from package initialisation, so it is never nil and is usable
-// before Init is called.
-var dataLinkQueue = NewDataLinkQueue()
-
 // NewDataLinkQueue returns an empty queue.
 func NewDataLinkQueue() *DataLinkQueue {
 	var q = new(DataLinkQueue)
@@ -166,31 +159,6 @@ func NewDataLinkQueue() *DataLinkQueue {
 
 	return q
 }
-
-/*-------------------------------------------------------------------
- *
- * Name:        Init
- *
- * Purpose:     Initialize the queue.
- *
- * Inputs:	None.
- *
- * Outputs:
- *
- * Description:	Empty the queue and discard any wake-up left over from
- *		items that were on it.
- *
- *--------------------------------------------------------------------*/
-
-func (q *DataLinkQueue) Init() {
-	logrus.Debug("dlq_init")
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	q.head = nil
-
-	q.discardWakeUpLocked()
-} /* end Init */
 
 // frameReceiver is where a received frame goes on its way to recv_process:
 // DataLinkQueue.RecFrame, or a stand-in for it.

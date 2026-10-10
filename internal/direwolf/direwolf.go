@@ -465,6 +465,11 @@ x = Silence FX.25 information.`)
 		os.Exit(1)
 	}
 
+	// What the receive threads, the network channels and the rest hand their
+	// events to, for recv_process to take them from.  The network channels'
+	// listeners, started below, can hand it frames straight away.
+	var dataLinkQueue = NewDataLinkQueue()
+
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
@@ -791,7 +796,7 @@ x = Silence FX.25 information.`)
 	recHandler.quietDecode = q_d_opt
 	recHandler.aisToObject = A_opt_ais_to_obj
 
-	go recv_process(ctx, recHandler)
+	go recv_process(ctx, dataLinkQueue, recHandler)
 
 	// Startup is done, so we sit here until we are asked to stop or an audio
 	// device input fails or runs out.  There is no point in going on without

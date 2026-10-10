@@ -124,16 +124,16 @@ func TestDiscardUntransmittableEmptiesTheQueue(t *testing.T) {
 // session waiting for a confirmation that never comes, so the discard path
 // answers it too.
 func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var channel = 0
 
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)
-	dataLinkQueue.Init()
-
 	var xs = new(XmitService)
-	xs.seizeConfirm = dataLinkQueue.SeizeConfirm
+	xs.seizeConfirm = dlq.SeizeConfirm
 
 	transmitQueue.Append(channel, TQ_PRIO_1_LO, ax25.New()) // What TransmitQueue.LMSeizeRequest queues.
 	transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
@@ -144,7 +144,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 
 	var confirmed = false
 
-	for item := dataLinkQueue.Remove(); item != nil; item = dataLinkQueue.Remove() {
+	for item := dlq.Remove(); item != nil; item = dlq.Remove() {
 		if item._type == DLQ_SEIZE_CONFIRM && item._chan == channel {
 			confirmed = true
 		}
@@ -341,8 +341,6 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 			for transmitQueue.Remove(channel, p) != nil { //revive:disable-line:empty-block
 			}
 		}
-
-		dataLinkQueue.Init()
 	})
 
 	var audioConfig = new(RadioConfig)
@@ -359,7 +357,6 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	audioConfig.achan[channel].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_NONE
 
 	transmitQueue.Init(audioConfig)
-	dataLinkQueue.Init()
 
 	// Sending a frame serialises it to bits; the capture takes them instead of
 	// the modulator.  The device itself still has to be there, though: the
@@ -379,7 +376,6 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	xs.toneGenerators = NewToneGenerators(audioConfig, 100, audio)
 	xs.bits_per_sec[channel] = 1200
 	xs.audioOutAvailable[0] = true
-	xs.seizeConfirm = dataLinkQueue.SeizeConfirm
 
 	return xs
 }
@@ -463,13 +459,16 @@ func TestSendOneFrameXID(t *testing.T) {
 // something to send: nothing goes on the air, and the data link state machine
 // is told the opportunity has arrived.
 func TestSendOneFrameNullFrame(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var xs = setupXmitTransmission(t)
+	xs.seizeConfirm = dlq.SeizeConfirm
 
 	assert.Equal(t, 0, xs.send_one_frame(0, TQ_PRIO_1_LO, ax25.New()))
 
 	var confirmed = false
 
-	for item := dataLinkQueue.Remove(); item != nil; item = dataLinkQueue.Remove() {
+	for item := dlq.Remove(); item != nil; item = dlq.Remove() {
 		if item._type == DLQ_SEIZE_CONFIRM {
 			confirmed = true
 		}

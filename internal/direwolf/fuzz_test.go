@@ -100,12 +100,10 @@ func FuzzNetTNCRecByte(f *testing.F) {
 			t.Skip()
 		}
 
-		expectReceivedFrames(t)
-
 		var kc kiss.Collector
 
 		for _, b := range stream {
-			nettncRecByte(&kc, b, int(debug%3), nettncTestChannel, dataLinkQueue.RecFrame)
+			nettncRecByte(&kc, b, int(debug%3), nettncTestChannel, nil)
 		}
 	})
 }
@@ -171,18 +169,14 @@ func setupIGateFromServer(t *testing.T) *IGate {
 	igateConfig.igmsp = 1
 
 	var heardDB = mheard.New(0)
-	var ig = NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, dataLinkQueue.RecFrame, 0)
+	var ig = NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, nil, 0)
 
 	transmitQueue.Init(audioConfig)
-	dataLinkQueue.Init()
-
 	t.Cleanup(func() {
 		for p := range TQ_NUM_PRIO {
 			for transmitQueue.Remove(0, p) != nil { //revive:disable-line:empty-block
 			}
 		}
-
-		dataLinkQueue.Init()
 	})
 
 	return ig
@@ -192,11 +186,11 @@ func setupIGateFromServer(t *testing.T) *IGate {
 // a pipe whose far end is read and thrown away, for fuzzLinkReset to make the
 // one the connected-mode link reports to.  Nothing a target does then blocks
 // on a reply that nobody collects.
-func fuzzAGWServer(tb testing.TB) *AGWServer {
+func fuzzAGWServer(tb testing.TB, dataLink agwDataLink) *AGWServer {
 	tb.Helper()
 
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dataLink
 
 	var ours, theirs = net.Pipe()
 	s.clients[0].conn = ours
@@ -229,8 +223,6 @@ func fuzzLinkKeep(tb testing.TB) {
 
 	tb.Cleanup(func() {
 		*ax25Link = saved
-
-		dataLinkQueue.Init()
 	})
 }
 
@@ -244,7 +236,6 @@ const linkFuzzPaclen = 64
 // what happens on it.
 func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
 	transmitQueue.Init(cfg)
-	dataLinkQueue.Init()
 
 	var miscConfig = new(misc_config_s)
 	// Shorter than the default, so a client's data can be long enough to
@@ -266,9 +257,9 @@ func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
 // fuzzLinkDrain does what recv_process does with everything on the data link
 // queue, for the items that concern the connected-mode link: there is no
 // receive thread in a fuzzing run to do it.
-func fuzzLinkDrain() {
+func fuzzLinkDrain(q *DataLinkQueue) {
 	for {
-		var item = dataLinkQueue.Remove()
+		var item = q.Remove()
 		if item == nil {
 			return
 		}
@@ -296,7 +287,7 @@ func fuzzLinkDrain() {
 			dl_client_cleanup(item)
 		}
 
-		dataLinkQueue.Delete(item)
+		q.Delete(item)
 	}
 }
 
@@ -418,10 +409,12 @@ func linkFuzzAddrs(cr byte) []byte {
 // Q1TEST registered for incoming connections, so a frame can reach every
 // state, not just the disconnected one every link starts in.
 func FuzzAX25Link(f *testing.F) {
+	var dlq = NewDataLinkQueue()
+
 	testutils.FuzzQuietly(f)
 	fuzzLinkKeep(f)
 
-	var agw = fuzzAGWServer(f)
+	var agw = fuzzAGWServer(f, dlq)
 
 	var xidParam xid.Param
 	xidParam.FullDuplex = maybe.Just(false)
@@ -516,8 +509,8 @@ func FuzzAX25Link(f *testing.F) {
 		}
 
 		fuzzLinkReset(cfg, v22, agw)
-		dataLinkQueue.RegisterCallsign("Q1TEST", 0, 0)
-		fuzzLinkDrain()
+		dlq.RegisterCallsign("Q1TEST", 0, 0)
+		fuzzLinkDrain(dlq)
 
 		for len(script) > 0 {
 			var op = script[0]
@@ -531,24 +524,24 @@ func FuzzAX25Link(f *testing.F) {
 
 				var pp = ax25.FromFrame(append(linkFuzzAddrs(op>>3), chunk...), alevel)
 				if pp != nil {
-					dataLinkQueue.RecFrame(0, 0, 0, pp, alevel, fec_type_none, RETRY_NONE, "")
+					dlq.RecFrame(0, 0, 0, pp, alevel, fec_type_none, RETRY_NONE, "")
 				}
 
 			case linkOpSeizeConfirm:
-				dataLinkQueue.SeizeConfirm(0)
+				dlq.SeizeConfirm(0)
 
 			case linkOpExpireTimers:
 				fuzzLinkExpireTimers()
 
 			case linkOpData:
 				chunk, script = linkFuzzChunk(script)
-				dataLinkQueue.XmitDataRequest(addrs, 2, 0, 0, 0xf0, chunk)
+				dlq.XmitDataRequest(addrs, 2, 0, 0, 0xf0, chunk)
 
 			case linkOpConnect:
-				dataLinkQueue.ConnectRequest(addrs, 2, 0, 0, 0xf0)
+				dlq.ConnectRequest(addrs, 2, 0, 0, 0xf0)
 
 			case linkOpDisconnect:
-				dataLinkQueue.DisconnectRequest(addrs, 2, 0, 0)
+				dlq.DisconnectRequest(addrs, 2, 0, 0)
 
 			case linkOpChannelBusy:
 				var activity = OCTYPE_PTT
@@ -556,13 +549,13 @@ func FuzzAX25Link(f *testing.F) {
 					activity = OCTYPE_DCD
 				}
 
-				dataLinkQueue.ChannelBusy(0, activity, int(op>>4)&1)
+				dlq.ChannelBusy(0, activity, int(op>>4)&1)
 
 			case linkOpOutstanding:
-				dataLinkQueue.OutstandingFramesRequest(addrs, 2, 0, 0)
+				dlq.OutstandingFramesRequest(addrs, 2, 0, 0)
 			}
 
-			fuzzLinkDrain()
+			fuzzLinkDrain(dlq)
 		}
 	})
 }
@@ -615,7 +608,9 @@ func FuzzAGWHandleClientCommand(f *testing.F) {
 	testutils.FuzzQuietly(f)
 	fuzzLinkKeep(f)
 
-	var s = fuzzAGWServer(f)
+	var dlq = NewDataLinkQueue()
+
+	var s = fuzzAGWServer(f, dlq)
 	var conn = s.clients[0].conn
 
 	var cfg = fuzzLinkConfig()
@@ -726,7 +721,7 @@ func FuzzAGWHandleClientCommand(f *testing.F) {
 			}
 
 			s.handleClientCommand(0, cmd)
-			fuzzLinkDrain()
+			fuzzLinkDrain(dlq)
 		}
 	})
 }

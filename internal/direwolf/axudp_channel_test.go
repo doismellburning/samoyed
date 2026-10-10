@@ -56,10 +56,10 @@ func axudpTestMap(t *testing.T, ax25addr string, peer *net.UDPConn, broadcast bo
 
 // openTestAXUDPChannel opens channel axudpTestChannel on a free port, sending
 // by routes, and starts it.
-func openTestAXUDPChannel(ctx context.Context, t *testing.T, routes axudp.Routes) *AXUDPChannel {
+func openTestAXUDPChannel(ctx context.Context, t *testing.T, routes axudp.Routes, recFrame frameReceiver) *AXUDPChannel {
 	t.Helper()
 
-	var ac, err = NewAXUDPChannel(ctx, axudpTestChannel, 0, routes, dataLinkQueue.RecFrame)
+	var ac, err = NewAXUDPChannel(ctx, axudpTestChannel, 0, routes, recFrame)
 	require.NoError(t, err)
 
 	t.Cleanup(func() { ac.conn.Close() })
@@ -109,9 +109,9 @@ func assertNoTestAXUDPDatagram(t *testing.T, peer *net.UDPConn) {
 func TestAXUDPChannelReceivedFrameReachesTheQueue(t *testing.T) {
 	for _, withCRC := range []bool{true, false} {
 		t.Run(map[bool]string{true: "with CRC", false: "without CRC"}[withCRC], func(t *testing.T) {
-			expectReceivedFrames(t)
+			var dlq = NewDataLinkQueue()
 
-			var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes())
+			var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), dlq.RecFrame)
 			var peer = newTestAXUDPPeer(t)
 
 			var pp = newTestPacket(t)
@@ -127,7 +127,7 @@ func TestAXUDPChannelReceivedFrameReachesTheQueue(t *testing.T) {
 			var item *dlq_item_t
 
 			require.Eventually(t, func() bool {
-				item = dataLinkQueue.Remove()
+				item = dlq.Remove()
 
 				return item != nil
 			}, 10*time.Second, 10*time.Millisecond, "the frame never reached the received queue")
@@ -143,9 +143,9 @@ func TestAXUDPChannelReceivedFrameReachesTheQueue(t *testing.T) {
 
 // A datagram that is not an AX.25 frame is dropped, and the channel carries on.
 func TestAXUDPChannelUndecodableDatagramIsDropped(t *testing.T) {
-	expectReceivedFrames(t)
+	var dlq = NewDataLinkQueue()
 
-	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes())
+	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), dlq.RecFrame)
 	var peer = newTestAXUDPPeer(t)
 
 	var _, err = peer.WriteTo([]byte("junk"), testAXUDPChannelAddr(t, ac))
@@ -158,13 +158,13 @@ func TestAXUDPChannelUndecodableDatagramIsDropped(t *testing.T) {
 	var item *dlq_item_t
 
 	require.Eventually(t, func() bool {
-		item = dataLinkQueue.Remove()
+		item = dlq.Remove()
 
 		return item != nil
 	}, 10*time.Second, 10*time.Millisecond, "the frame after the junk never reached the received queue")
 
 	assert.Equal(t, pp.FrameData(), item.pp.FrameData())
-	assert.Nil(t, dataLinkQueue.Remove(), "the junk was taken for a frame")
+	assert.Nil(t, dlq.Remove(), "the junk was taken for a frame")
 }
 
 // Sending goes to the node mapped for the destination, checksum appended.
@@ -178,7 +178,7 @@ func TestAXUDPChannelSendPacket(t *testing.T) {
 		axudpTestMap(t, "Q3TEST", other, false),
 	}
 
-	var ac = openTestAXUDPChannel(t.Context(), t, routes)
+	var ac = openTestAXUDPChannel(t.Context(), t, routes, nil)
 
 	var pp = newTestPacket(t) // To Q1TEST.
 
@@ -204,7 +204,7 @@ func TestAXUDPChannelSendBroadcast(t *testing.T) {
 		axudpTestMap(t, "Q3TEST", unmarked, false),
 	}
 
-	var ac = openTestAXUDPChannel(t.Context(), t, routes)
+	var ac = openTestAXUDPChannel(t.Context(), t, routes, nil)
 
 	var pp = ax25.FromText("Q3TEST>NODES:hello", true)
 	require.NotNil(t, pp)
@@ -222,7 +222,7 @@ func TestAXUDPChannelSendBroadcast(t *testing.T) {
 
 // A frame for somewhere nobody is mapped to goes nowhere, and says so.
 func TestAXUDPChannelSendUnrouted(t *testing.T) {
-	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes())
+	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), nil)
 
 	var hook = test.NewGlobal()
 
@@ -253,7 +253,7 @@ func TestAXUDPChannelSendPacketNoChannel(t *testing.T) {
 
 // Starting twice would split what arrives between two readers.
 func TestAXUDPChannelStartedTwiceComplains(t *testing.T) {
-	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes())
+	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), nil)
 
 	var hook = test.NewGlobal()
 
@@ -270,7 +270,7 @@ func TestAXUDPChannelStartedTwiceComplains(t *testing.T) {
 func TestAXUDPChannelStopsWhenCancelled(t *testing.T) {
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	var ac = openTestAXUDPChannel(ctx, t, noAXUDPRoutes())
+	var ac = openTestAXUDPChannel(ctx, t, noAXUDPRoutes(), nil)
 	var addr = ac.conn.LocalAddr().String()
 
 	cancel()
@@ -290,11 +290,11 @@ func TestAXUDPChannelStopsWhenCancelled(t *testing.T) {
 // Two channels cannot share a port, and the second saying so is better than
 // silently hearing nothing.
 func TestAXUDPChannelPortInUse(t *testing.T) {
-	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes())
+	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), nil)
 
 	var port = testAXUDPChannelAddr(t, ac).Port
 
-	var second, err = NewAXUDPChannel(t.Context(), axudpTestChannel+1, port, noAXUDPRoutes(), dataLinkQueue.RecFrame)
+	var second, err = NewAXUDPChannel(t.Context(), axudpTestChannel+1, port, noAXUDPRoutes(), nil)
 	require.Error(t, err)
 	assert.Nil(t, second)
 }
@@ -306,7 +306,7 @@ func TestAXUDPChannelTransmitQueue(t *testing.T) {
 	var routes = noAXUDPRoutes()
 	routes.Maps = []axudp.MapEntry{axudpTestMap(t, "Q1TEST", peer, false)}
 
-	var ac = openTestAXUDPChannel(t.Context(), t, routes)
+	var ac = openTestAXUDPChannel(t.Context(), t, routes, nil)
 
 	var audio = new(RadioConfig)
 	audio.chan_medium[axudpTestChannel] = MEDIUM_AXUDP
@@ -332,14 +332,14 @@ func TestAXUDPChannelTransmitQueue(t *testing.T) {
 // the data link goes straight out, and a seize is confirmed at once, there
 // being no radio channel to wait for.
 func TestAXUDPChannelConnectedMode(t *testing.T) {
-	expectReceivedFrames(t)
+	var dlq = NewDataLinkQueue()
 
 	var peer = newTestAXUDPPeer(t)
 
 	var routes = noAXUDPRoutes()
 	routes.Maps = []axudp.MapEntry{axudpTestMap(t, "Q1TEST", peer, false)}
 
-	var ac = openTestAXUDPChannel(t.Context(), t, routes)
+	var ac = openTestAXUDPChannel(t.Context(), t, routes, dlq.RecFrame)
 
 	var audio = new(RadioConfig)
 	audio.chan_medium[axudpTestChannel] = MEDIUM_AXUDP
@@ -350,7 +350,7 @@ func TestAXUDPChannelConnectedMode(t *testing.T) {
 	var tq = NewTransmitQueue()
 	tq.Init(audio)
 	tq.SetAXUDPChannels(channels)
-	tq.SetSeizeConfirm(dataLinkQueue.SeizeConfirm)
+	tq.SetSeizeConfirm(dlq.SeizeConfirm)
 
 	var pp = newTestPacket(t)
 	var want = pp.FrameData()
@@ -363,7 +363,7 @@ func TestAXUDPChannelConnectedMode(t *testing.T) {
 
 	tq.LMSeizeRequest(axudpTestChannel)
 
-	var item = dataLinkQueue.Remove()
+	var item = dlq.Remove()
 	require.NotNil(t, item, "the seize was not confirmed")
 	assert.Equal(t, DLQ_SEIZE_CONFIRM, item._type)
 	assert.Equal(t, axudpTestChannel, item._chan)
@@ -372,13 +372,13 @@ func TestAXUDPChannelConnectedMode(t *testing.T) {
 // Anyone who can reach the port can send junk, so turning it away is not
 // worth a warning each time.
 func TestAXUDPChannelJunkIsNotWarnedAbout(t *testing.T) {
-	expectReceivedFrames(t)
+	var dlq = NewDataLinkQueue()
 
 	var hook = test.NewGlobal()
 
 	t.Cleanup(hook.Reset)
 
-	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes())
+	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), dlq.RecFrame)
 
 	for _, junk := range [][]byte{[]byte("x"), make([]byte, ax25.MaxPacketLen+1)} {
 		ac.receive(junk, new(net.UDPAddr))
@@ -388,7 +388,7 @@ func TestAXUDPChannelJunkIsNotWarnedAbout(t *testing.T) {
 		assert.Greater(t, entry.Level, logrus.WarnLevel, "logged at %s: %s", entry.Level, entry.Message)
 	}
 
-	assert.Nil(t, dataLinkQueue.Remove())
+	assert.Nil(t, dlq.Remove())
 }
 
 // Sending on a channel whose socket has been closed on the way out is not an
@@ -401,7 +401,7 @@ func TestAXUDPChannelSendAfterCloseIsQuiet(t *testing.T) {
 
 	// Not started: a listener would see the close too, and say so at Error
 	// whenever it got round to it, which is not what is under test.
-	var ac, err = NewAXUDPChannel(t.Context(), axudpTestChannel, 0, routes, dataLinkQueue.RecFrame)
+	var ac, err = NewAXUDPChannel(t.Context(), axudpTestChannel, 0, routes, nil)
 	require.NoError(t, err)
 	require.NoError(t, ac.conn.Close())
 

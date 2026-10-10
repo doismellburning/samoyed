@@ -222,7 +222,6 @@ func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
 
 func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
 
 	var cfg RadioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
@@ -245,22 +244,15 @@ func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
 	assert.Equal(t, byte(1), reply.Data[0]) // success
 }
 
-// dlqAppended clears the DLQ, calls f, returns the first item appended
-// during f (or nil if nothing was appended), then restores the original queue.
-func dlqAppended(f func()) *dlq_item_t {
-	dataLinkQueue.mu.Lock()
-	var savedHead = dataLinkQueue.head
-	dataLinkQueue.head = nil
-	dataLinkQueue.mu.Unlock()
+// dlqAppended empties q, calls f, and returns the first item f appended to
+// q, or nil if it appended nothing.
+func dlqAppended(q *DataLinkQueue, f func()) *dlq_item_t {
+	for q.Remove() != nil { //revive:disable-line:empty-block
+	}
 
 	f()
 
-	dataLinkQueue.mu.Lock()
-	var newItem = dataLinkQueue.head
-	dataLinkQueue.head = savedHead
-	dataLinkQueue.mu.Unlock()
-
-	return newItem
+	return q.Remove()
 }
 
 // Property: 'V' handler tolerates any cmd.Data without panicking.
@@ -300,11 +292,13 @@ func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 }
 
 // Property: 'v' handler with numDigi outside [1,7] must not enqueue a connect request.
-// Before the fix, the invalid-numDigi else branch fell through to dataLinkQueue.ConnectRequest,
+// Before the fix, the invalid-numDigi else branch fell through to dlq.ConnectRequest,
 // silently treating the malformed frame as a direct connect.
 func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	rapid.Check(t, func(t *rapid.T) {
 		var numDigi = rapid.OneOf(
@@ -324,7 +318,7 @@ func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
 		cmd.Data = data
 		cmd.Header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
-		var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+		var item = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 		if item != nil {
 			t.Errorf("expected no DLQ append for out-of-range numDigi %d, got %+v", numDigi, item)
 		}
@@ -335,8 +329,10 @@ func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
 // anything when Portx is not a radio channel.  Before the fix, the DLQ functions
 // would Assert-panic on channel >= MAX_RADIO_CHANS.
 func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	rapid.Check(t, func(t *rapid.T) {
 		var dataKind = rapid.SampledFrom([]byte{'C', 'v', 'c', 'D', 'd', 'Y'}).Draw(t, "dataKind")
@@ -348,7 +344,7 @@ func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T
 		copy(cmd.Header.CallFrom[:], "Q1TEST")
 		copy(cmd.Header.CallTo[:], "Q2TEST")
 
-		var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+		var item = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 		if item != nil {
 			t.Errorf("expected no DLQ append for non-radio Portx %d with command '%c'", portx, dataKind)
 		}
@@ -357,12 +353,14 @@ func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T
 
 // TestAGWPEConnectedDataNoTrailingNull is a regression test for a bug where the
 // debug null byte appended to cmd.Data was included in the data passed to
-// dataLinkQueue.XmitDataRequest, causing the remote station to receive an extra 0x00 byte
+// dlq.XmitDataRequest, causing the remote station to receive an extra 0x00 byte
 // at the end of each transmitted packet. This null byte sat in the remote's input
 // buffer and appeared as a 0x00 prefix on the next received command.
 func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	var payload = []byte("CMD1\r")
 
@@ -379,7 +377,7 @@ func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 	cmd.Data = data
 
-	var got = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+	var got = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 
 	require.NotNil(t, got, "DLQ_XMIT_DATA_REQUEST item never appeared")
 	require.Equal(t, DLQ_XMIT_DATA_REQUEST, got._type)
@@ -393,8 +391,10 @@ func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 // command whose DataLen exceeds len(Data) is rejected without panicking or
 // enqueueing anything.
 func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'D'
@@ -405,15 +405,17 @@ func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 
-	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 	if item != nil {
 		t.Errorf("expected no DLQ append for oversized DataLen, got %+v", item)
 	}
 }
 
 func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	// Encode the via_info payload: num_digi + 7 x 10-byte callsign slots.
 	var via struct {
@@ -435,7 +437,7 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	cmd.Header.DataLen = uint32(via.NumDigi)*10 + 1 // expected size per protocol
 	cmd.Data = buf.Bytes()[:int(cmd.Header.DataLen)]
 
-	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 
 	require.NotNil(t, item)
 	assert.Equal(t, DLQ_CONNECT_REQUEST, item._type)
@@ -700,30 +702,34 @@ func TestHandleClientCommand_G_AXUDP(t *testing.T) {
 // 'H' (recently heard stations) is not implemented: nothing is sent back and
 // nothing is queued.
 func TestHandleClientCommand_H_DoesNothing(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 	var conn = new(writeCountingConn)
 	s.clients[0].conn = conn
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'H'
 
-	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 	assert.Nil(t, item)
 	assert.Zero(t, conn.writes.Load())
 }
 
 // An unrecognised command is reported and otherwise ignored.
 func TestHandleClientCommand_UnknownCommandIgnored(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 	var conn = new(writeCountingConn)
 	s.clients[0].conn = conn
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'Z'
 
-	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 	assert.Nil(t, item)
 	assert.Zero(t, conn.writes.Load())
 }
@@ -939,8 +945,10 @@ func TestHandleClientCommand_y_NonRadioPortReportsZero(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_RegistersCallsign(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 	s.clients[2].conn = new(nullConn)
 
 	var cmd = new(agwpe.Message)
@@ -948,7 +956,7 @@ func TestHandleClientCommand_X_RegistersCallsign(t *testing.T) {
 	cmd.Header.Portx = 1
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 
-	var item = dlqAppended(func() { s.handleClientCommand(2, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(2, cmd) })
 
 	require.NotNil(t, item)
 	assert.Equal(t, DLQ_REGISTER_CALLSIGN, item._type)
@@ -976,15 +984,17 @@ func TestHandleClientCommand_X_ReplyCarriesPortAndCallsign(t *testing.T) {
 }
 
 func TestHandleClientCommand_x_UnregistersCallsign(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'x'
 	cmd.Header.Portx = 1
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 
-	var item = dlqAppended(func() { s.handleClientCommand(2, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(2, cmd) })
 
 	require.NotNil(t, item)
 	assert.Equal(t, DLQ_UNREGISTER_CALLSIGN, item._type)
@@ -994,23 +1004,27 @@ func TestHandleClientCommand_x_UnregistersCallsign(t *testing.T) {
 }
 
 func TestHandleClientCommand_x_InvalidChannelUnregistersNothing(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'x'
 	cmd.Header.Portx = MAX_RADIO_CHANS
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 
-	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 	assert.Nil(t, item)
 }
 
 func TestHandleClientCommand_Cc_ConnectWithoutDigipeaters(t *testing.T) {
 	for _, kind := range []byte{'C', 'c'} {
 		t.Run(string(kind), func(t *testing.T) {
+			var dlq = NewDataLinkQueue()
+
 			var s = new(AGWServer)
-			s.dataLink = dataLinkQueue
+			s.dataLink = dlq
 
 			var cmd = new(agwpe.Message)
 			cmd.Header.DataKind = kind
@@ -1019,7 +1033,7 @@ func TestHandleClientCommand_Cc_ConnectWithoutDigipeaters(t *testing.T) {
 			copy(cmd.Header.CallFrom[:], "Q1TEST")
 			copy(cmd.Header.CallTo[:], "Q2TEST")
 
-			var item = dlqAppended(func() { s.handleClientCommand(2, cmd) })
+			var item = dlqAppended(dlq, func() { s.handleClientCommand(2, cmd) })
 
 			require.NotNil(t, item)
 			assert.Equal(t, DLQ_CONNECT_REQUEST, item._type)
@@ -1034,21 +1048,25 @@ func TestHandleClientCommand_Cc_ConnectWithoutDigipeaters(t *testing.T) {
 
 // 'v' with no payload at all cannot say how many digipeaters there are.
 func TestHandleClientCommand_v_EmptyPayloadNoDLQAppend(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'v'
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 
-	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 	assert.Nil(t, item)
 }
 
 func TestHandleClientCommand_v_PayloadTooShortForDigipeatersNoDLQAppend(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'v'
@@ -1057,15 +1075,17 @@ func TestHandleClientCommand_v_PayloadTooShortForDigipeatersNoDLQAppend(t *testi
 	cmd.Data = []byte{2, 'Q', '3'}
 	cmd.Header.DataLen = 21 /* What two digipeaters would need. */
 
-	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 	assert.Nil(t, item)
 }
 
 // A data length other than what the digipeater count implies is complained
 // about, but the connection is still attempted.
 func TestHandleClientCommand_v_UnexpectedDataLenStillConnects(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	var data = make([]byte, 1+10+5)
 	data[0] = 1
@@ -1078,7 +1098,7 @@ func TestHandleClientCommand_v_UnexpectedDataLenStillConnects(t *testing.T) {
 	cmd.Data = data
 	cmd.Header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
 
-	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(0, cmd) })
 
 	require.NotNil(t, item)
 	assert.Equal(t, DLQ_CONNECT_REQUEST, item._type)
@@ -1087,8 +1107,10 @@ func TestHandleClientCommand_v_UnexpectedDataLenStillConnects(t *testing.T) {
 }
 
 func TestHandleClientCommand_d_RequestsDisconnect(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'd'
@@ -1096,7 +1118,7 @@ func TestHandleClientCommand_d_RequestsDisconnect(t *testing.T) {
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 
-	var item = dlqAppended(func() { s.handleClientCommand(2, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(2, cmd) })
 
 	require.NotNil(t, item)
 	assert.Equal(t, DLQ_DISCONNECT_REQUEST, item._type)
@@ -1108,8 +1130,10 @@ func TestHandleClientCommand_d_RequestsDisconnect(t *testing.T) {
 }
 
 func TestHandleClientCommand_Y_RequestsOutstandingFrames(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var s = new(AGWServer)
-	s.dataLink = dataLinkQueue
+	s.dataLink = dlq
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'Y'
@@ -1117,7 +1141,7 @@ func TestHandleClientCommand_Y_RequestsOutstandingFrames(t *testing.T) {
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 
-	var item = dlqAppended(func() { s.handleClientCommand(2, cmd) })
+	var item = dlqAppended(dlq, func() { s.handleClientCommand(2, cmd) })
 
 	require.NotNil(t, item)
 	assert.Equal(t, DLQ_OUTSTANDING_FRAMES_REQUEST, item._type)

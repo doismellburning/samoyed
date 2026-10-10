@@ -316,8 +316,6 @@ func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil
 
-	dataLinkQueue.Init()
-
 	// Leave nothing behind for whatever test runs next: a link still
 	// retrying its connection, or the frames it queued, would turn up
 	// there.  This runs last, once recv_process has stopped.
@@ -331,23 +329,22 @@ func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 				}
 			}
 		}
-
-		dataLinkQueue.Init()
 	})
 
 	return handler
 }
 
-// startRecvProcess runs recv_process, handing what it receives to rh, until
-// the test ends, failing the test if it does not then finish.
-func startRecvProcess(t *testing.T, rh *recPacketHandler) {
+// startRecvProcess runs recv_process, taking from q and handing what it
+// receives to rh, until the test ends, failing the test if it does not then
+// finish.
+func startRecvProcess(t *testing.T, q *DataLinkQueue, rh *recPacketHandler) {
 	t.Helper()
 
 	var ctx, cancel = context.WithCancel(t.Context())
 	var done = make(chan struct{})
 
 	go func() {
-		recv_process(ctx, rh)
+		recv_process(ctx, q, rh)
 		close(done)
 	}()
 
@@ -365,15 +362,17 @@ func startRecvProcess(t *testing.T, rh *recPacketHandler) {
 // The queue is where the receive threads hand work over, so an item put on it
 // has to be dispatched to the handler for its type.
 func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var rh = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
-	startRecvProcess(t, rh)
+	startRecvProcess(t, dlq, rh)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
 	addrs[PEERCALL] = "Q2TEST"
 
-	dataLinkQueue.ConnectRequest(addrs, 2, 0, 0, 0)
+	dlq.ConnectRequest(addrs, 2, 0, 0, 0)
 
 	// Connecting starts with a SABM, so something reaching the transmit
 	// queue says the request was dispatched rather than merely dequeued.
@@ -385,9 +384,11 @@ func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 // recv_process is the only place the queue is served, so every kind of item
 // has to have somewhere to go from it.
 func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var rh = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
-	startRecvProcess(t, rh)
+	startRecvProcess(t, dlq, rh)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
@@ -398,26 +399,26 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 
 	var alevel ax25.ALevel
 
-	dataLinkQueue.RecFrame(0, 0, 0, pp, alevel, fec_type_none, RETRY_NONE, "")
-	dataLinkQueue.RegisterCallsign("Q1TEST", 0, 0)
+	dlq.RecFrame(0, 0, 0, pp, alevel, fec_type_none, RETRY_NONE, "")
+	dlq.RegisterCallsign("Q1TEST", 0, 0)
 	// Connecting first, so that the data request behind it has a link with
 	// agreed parameters to be queued on.
-	dataLinkQueue.ConnectRequest(addrs, 2, 0, 0, 0)
-	dataLinkQueue.OutstandingFramesRequest(addrs, 2, 0, 0)
-	dataLinkQueue.XmitDataRequest(addrs, 2, 0, 0, 0xF0, []byte("Testing"))
-	dataLinkQueue.ChannelBusy(0, OCTYPE_DCD, 1)
-	dataLinkQueue.ChannelBusy(0, OCTYPE_DCD, 0)
-	dataLinkQueue.SeizeConfirm(0)
-	dataLinkQueue.DisconnectRequest(addrs, 2, 0, 0)
-	dataLinkQueue.UnregisterCallsign("Q1TEST", 0, 0)
-	dataLinkQueue.ClientCleanup(0)
+	dlq.ConnectRequest(addrs, 2, 0, 0, 0)
+	dlq.OutstandingFramesRequest(addrs, 2, 0, 0)
+	dlq.XmitDataRequest(addrs, 2, 0, 0, 0xF0, []byte("Testing"))
+	dlq.ChannelBusy(0, OCTYPE_DCD, 1)
+	dlq.ChannelBusy(0, OCTYPE_DCD, 0)
+	dlq.SeizeConfirm(0)
+	dlq.DisconnectRequest(addrs, 2, 0, 0)
+	dlq.UnregisterCallsign("Q1TEST", 0, 0)
+	dlq.ClientCleanup(0)
 
 	// Everything is served in turn, so a SABM for a second station, asked
 	// for at the back of the queue, says the whole queue was dispatched.
 	var otherAddrs = addrs
 	otherAddrs[PEERCALL] = "Q3TEST"
 
-	dataLinkQueue.ConnectRequest(otherAddrs, 2, 0, 0, 0)
+	dlq.ConnectRequest(otherAddrs, 2, 0, 0, 0)
 
 	assert.Eventually(t, func() bool {
 		return transmitQueue.Count(0, -1, "", "Q3TEST", false) > 0
@@ -428,6 +429,8 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 // a sender's wake-up outlives the item that prompted it - but it is worth
 // knowing about.
 func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	var rh = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
 	var hook = test.NewGlobal()
@@ -440,12 +443,12 @@ func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
 
 	t.Cleanup(func() { logrus.SetLevel(previousLevel) })
 
-	startRecvProcess(t, rh)
+	startRecvProcess(t, dlq, rh)
 
 	// Wake the queue without putting anything on it.
 	assert.Eventually(t, func() bool {
 		select {
-		case dataLinkQueue.wake <- struct{}{}:
+		case dlq.wake <- struct{}{}:
 		default:
 		}
 
@@ -463,16 +466,18 @@ func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
 // timers: a link whose acknowledgement never comes gets nowhere unless T1 is
 // allowed to expire.
 func TestRecvProcessRunsTheLinkTimersWhileTheQueueIsEmpty(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
 	// One second of T1, so the retry does not hold the test up for long.
 	var rh = setupRecvProcessTest(t, 1)
 
-	startRecvProcess(t, rh)
+	startRecvProcess(t, dlq, rh)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
 	addrs[PEERCALL] = "Q2TEST"
 
-	dataLinkQueue.ConnectRequest(addrs, 2, 0, 0, 0)
+	dlq.ConnectRequest(addrs, 2, 0, 0, 0)
 
 	// Nothing is answering, so the second SABM can only come from T1
 	// expiring while the queue sits empty.
