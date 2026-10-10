@@ -1140,6 +1140,38 @@ func TestLayer2SenderKeepsItsIL2PDebugLevel(t *testing.T) {
 	assert.Equal(t, 2, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 0, 2).il2p.Debug())
 }
 
+// Morse goes through the channel's tone generator and its own audio config,
+// so it needs nothing another test left behind (issue #761).
+func TestMorseSendWithoutSharedRadioConfig(t *testing.T) {
+	const channel = 0
+	const sampleRate = 8000
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.adev[0].num_channels = 1
+	audioConfig.adev[0].bits_per_sample = 16
+	audioConfig.adev[0].samples_per_sec = sampleRate
+	audioConfig.chan_medium[channel] = MEDIUM_RADIO
+
+	var sink = new(byteSink)
+
+	var tg = NewToneGenerator(channel, audioConfig, 50, sink)
+
+	var ms = morse_send(tg, channel, "SOS", MORSE_DEFAULT_WPM, 300, 250)
+
+	assert.Equal(t, 1, sink.flushes, "the tones should be flushed out once, at the end")
+
+	// Two bytes per sample; allow a little for rounding each element.
+	var samples = len(sink.data) / 2
+	assert.InDelta(t, ms*sampleRate/1000, samples, float64(sampleRate)/100)
+}
+
+// A channel with no tone generator still says how long the transmission would
+// have been, as xmit_thread holds the PTT for that long.
+func TestMorseSendWithoutToneGenerator(t *testing.T) {
+	// E is a single unit, which is 120 ms at 10 WPM.
+	assert.Equal(t, 300+120+250, morse_send(nil, 0, "E", 10, 300, 250))
+}
+
 // A channel with no tone generator still says how long the transmission would
 // have been, as xmit_thread holds the PTT for that long.
 func TestDTMFSendWithoutToneGenerator(t *testing.T) {
