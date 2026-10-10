@@ -596,6 +596,65 @@ func (r *Router) forget(c *Circuit, err error) {
 	}
 }
 
+// CloseCircuit starts an orderly disconnect of the circuit whose
+// CircuitInfo.ID is id, reporting whether there was one.
+func (r *Router) CloseCircuit(id string, now time.Time) bool {
+	r.now = now
+
+	for key, c := range r.circuits {
+		if circuitID(key.index, key.id) == id {
+			c.Close()
+			r.deliverLooped()
+
+			return true
+		}
+	}
+
+	return false
+}
+
+// LockNeighbour configures a neighbour at a fixed quality, as
+// Config.Neighbours does at startup.
+func (r *Router) LockNeighbour(n LockedNeighbour, now time.Time) error {
+	r.now = now
+
+	var call, err = NormaliseCall(n.Call)
+	if err != nil {
+		return err
+	}
+
+	var alias, aerr = NormaliseAlias(n.Alias)
+	if aerr != nil {
+		return aerr
+	}
+
+	if n.Quality < 0 || n.Quality > 255 {
+		return fmt.Errorf("netrom: quality %d not in 0 to 255", n.Quality)
+	}
+
+	if _, ok := r.cfg.PortConfig(n.Port); !ok {
+		return fmt.Errorf("netrom: port %d is not a NET/ROM port", n.Port)
+	}
+
+	r.table.LockNeighbour(NeighbourKey{Port: n.Port, Call: call}, alias, n.Quality)
+	r.emit(routesChanged())
+
+	return nil
+}
+
+// UnlockNeighbour makes a locked neighbour an ordinary one again, whose routes
+// age out unless its broadcasts refresh them, reporting whether it was locked.
+func (r *Router) UnlockNeighbour(key NeighbourKey, now time.Time) bool {
+	r.now = now
+
+	var ok = r.table.UnlockNeighbour(key)
+	if ok {
+		r.emit(routesChanged())
+	}
+
+	return ok
+}
+
 // NeighbourFailed says a neighbour could not be reached: routes through it
 // are dropped until it is heard again, and circuits whose only way to their
 // far end went through it are closed.

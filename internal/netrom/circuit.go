@@ -5,6 +5,7 @@ package netrom
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -110,6 +111,7 @@ type Circuit struct {
 
 // CircuitInfo is a snapshot of a circuit, for showing.
 type CircuitInfo struct {
+	ID             string // This node's circuit index and ID, which Router.CloseCircuit takes.
 	Local, Remote  string
 	User, UserNode string
 	Incoming       bool
@@ -124,6 +126,7 @@ type CircuitInfo struct {
 // Info returns a snapshot of c.
 func (c *Circuit) Info() CircuitInfo {
 	return CircuitInfo{
+		ID:       circuitID(c.myIndex, c.myID),
 		Local:    c.local,
 		Remote:   c.remote,
 		User:     c.user,
@@ -137,6 +140,10 @@ func (c *Circuit) Info() CircuitInfo {
 		Sent:     c.sentBytes,
 		Received: c.receivedBytes,
 	}
+}
+
+func circuitID(index byte, id byte) string {
+	return fmt.Sprintf("%02X%02X", index, id)
 }
 
 // Remote returns the far end's node.
