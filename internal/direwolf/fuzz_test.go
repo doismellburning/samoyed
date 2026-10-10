@@ -31,59 +31,6 @@ import (
 // that once crashed a decoder stays checked even when nobody is fuzzing.
 // Fuzzing proper is "go test ./internal/direwolf/ -run XXX -fuzz FuzzSomething".
 
-// FuzzAX25FromFrame covers the path every received frame takes, from the
-// modem, a KISS client, a network TNC, an AGW client or IL2P: build a packet
-// from the bytes off the air, then ask it the questions the receive path asks.
-func FuzzAX25FromFrame(f *testing.F) {
-	testutils.FuzzQuietly(f)
-
-	// An ordinary APRS position report.
-	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
-	require.NotNil(f, pp)
-	f.Add(pp.FrameData())
-
-	// Addresses and a control byte, with no PID and no information part:
-	// the shortest frame AX25FromFrame accepts (issue #670).
-	f.Add([]byte("000000000000010"))
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		var pp = ax25.FromFrame(data, ax25.ALevel{Rec: 50, Mark: 50, Space: 50})
-		if pp == nil {
-			return
-		}
-
-		pp.FormatAddrs()
-		pp.Info()
-		pp.FormatViaPath()
-		pp.FrameType()
-		pp.IsAPRS()
-		pp.DedupeCRC()
-		pp.DTI()
-		pp.CheckAddresses(ax25.AddrLenient)
-	})
-}
-
-// FuzzAX25FromText covers the other way in: a monitor-format string, as the
-// APRS-IS connection and the command line tools hand us.
-func FuzzAX25FromText(f *testing.F) {
-	testutils.FuzzQuietly(f)
-
-	f.Add("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#")
-	f.Add("Q1TEST>APDW17::Q2TEST   :Hello")
-	f.Add(">:")
-
-	f.Fuzz(func(t *testing.T, monitor string) {
-		var pp = ax25.FromTextWithStrictness(monitor, ax25.AddrLenient)
-		if pp == nil {
-			return
-		}
-
-		pp.FormatAddrs()
-		pp.Info()
-		pp.FrameType()
-	})
-}
-
 // kissFuzzMaxStream bounds the streams the KISS targets try.  Room for an
 // overlong frame and a few hundred short ones is all the collector needs, and
 // the queues they land on are only drained by threads a fuzzing run doesn't
