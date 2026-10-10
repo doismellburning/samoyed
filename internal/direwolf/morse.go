@@ -108,32 +108,6 @@ type morseSampleSink interface {
 
 /*-------------------------------------------------------------------
  *
- * Name:        morse_send
- *
- * Purpose:    	Send str as Morse code through a channel's tone generator.
- *
- * Inputs:	toneGenerator	- The channel's tone generator.
- *		channel	- Radio channel number.
- *		str, wpm, txdelay, txtail - As morseSend.
- *
- * Returns:	Total number of milliseconds to activate PTT, as
- *		morseDuration.
- *
- *--------------------------------------------------------------------*/
-
-func morse_send(toneGenerator *ToneGenerator, channel int, str string, wpm int, txdelay int, txtail int) int {
-	if toneGenerator == nil {
-		logrus.WithField("channel", channel).Error("Invalid channel for sending Morse Code")
-	} else {
-		var sampleRate = toneGenerator.audioConfig.adev[toneGenerator.adevIndex].samples_per_sec
-		morseSend(toneGenerator, sampleRate, toneGenerator.amplitude, str, wpm, txdelay, txtail)
-	}
-
-	return morseDuration(str, wpm, txdelay, txtail)
-} /* end morse_send */
-
-/*-------------------------------------------------------------------
- *
  * Name:        morseSend
  *
  * Purpose:    	Given a string, generate appropriate lengths of
