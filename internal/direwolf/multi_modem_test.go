@@ -225,14 +225,28 @@ func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
 }
 
 // A channel with no demodulator - the other side of a stereo device that is
-// not a radio, say, which the audio statistics still ask about - has heard
-// nothing.
-func TestAudioLevelWithoutDemodulatorIsZero(t *testing.T) {
+// not a radio, say, which the audio statistics still ask about, or one that
+// transmit calibration keys - has heard nothing, and has nothing to mute.
+func TestReceiverChannelWithoutDemodulator(t *testing.T) {
 	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
 
 	var zero ax25.ALevel
 
 	assert.Equal(t, zero, r.AudioLevel(0, 0))
+	assert.NotPanics(t, func() { r.MuteInput(0, true) })
+}
+
+// Muting a channel mutes its demodulator, and unmuting unmutes it.
+func TestMuteInputMutesTheChannelsDemodulator(t *testing.T) {
+	var audioConfig = newRecvTestRadioConfig(1)
+
+	var r = multi_modem_init(audioConfig, 0, 0, new(discardReceiveSink))
+
+	r.MuteInput(0, true)
+	assert.True(t, r.demods[0].muted.Load())
+
+	r.MuteInput(0, false)
+	assert.False(t, r.demods[0].muted.Load())
 }
 
 // A channel whose transmit inhibit input is set counts as busy, data or no

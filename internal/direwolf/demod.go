@@ -924,18 +924,6 @@ func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
 // I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
 // This is called from PTT.Set for half duplex.
 
-func demod_mute_input(channel int, mute_during_xmit int) {
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-
-	// Transmit calibration, for one, keys a channel that may not be listening.
-	var d = demodulators[channel]
-	if d == nil {
-		return
-	}
-
-	d.Mute(mute_during_xmit != 0)
-}
-
 // Mute silences the channel's input, or stops silencing it.
 func (d *Demodulator) Mute(mute bool) {
 	d.muted.Store(mute)

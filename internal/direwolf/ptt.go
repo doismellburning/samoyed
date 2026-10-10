@@ -200,6 +200,11 @@ type PTT struct {
 	audioConfig *RadioConfig
 	debugLevel  int
 
+	// muteInput silences a channel's received audio, or stops silencing it,
+	// so a half duplex channel doesn't hear its own transmissions; nil for
+	// nothing to silence.
+	muteInput func(channel int, mute bool)
+
 	// gpioSysfsDir is a field rather than always defaultGPIOSysfsDir so that
 	// a test can point it at a fake tree and exercise the GPIO paths without
 	// a kernel that offers the real one.
@@ -267,6 +272,10 @@ type PTT struct {
  *					>= 3 for specific radio model.
  *					-1 guess at what is out there.  (AUTO option in config file.)
  *
+ *		muteInput		- Silences a half duplex channel's received
+ *					  audio while it transmits; nil for nothing
+ *					  to silence.
+ *
  *		debug			- "-d o" level: 1 reports each change of an
  *					  output, 2 also the configuration and GPIO detail.
  *
@@ -278,15 +287,16 @@ type PTT struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewPTT(audio_config_p *RadioConfig, debug int) (*PTT, error) {
-	return newPTT(audio_config_p, debug, defaultGPIOSysfsDir)
+func NewPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), debug int) (*PTT, error) {
+	return newPTT(audio_config_p, muteInput, debug, defaultGPIOSysfsDir)
 }
 
 // newPTT is NewPTT with the root of the sysfs GPIO interface given, so that a
 // test can supply a fake one.
-func newPTT(audio_config_p *RadioConfig, debug int, gpioSysfsDir string) (*PTT, error) {
+func newPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), debug int, gpioSysfsDir string) (*PTT, error) {
 	var p = new(PTT)
 	p.audioConfig = audio_config_p
+	p.muteInput = muteInput
 	p.debugLevel = debug
 	p.gpioSysfsDir = gpioSysfsDir
 	p.lptPortPath = defaultLPTPortPath
@@ -370,8 +380,8 @@ func (p *PTT) set(ot int, channel int, ptt_signal int) {
 	// I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
 
 	// #ifndef TEST
-	if ot == OCTYPE_PTT && !p.audioConfig.achan[channel].fulldup {
-		demod_mute_input(channel, ptt_signal)
+	if ot == OCTYPE_PTT && !p.audioConfig.achan[channel].fulldup && p.muteInput != nil {
+		p.muteInput(channel, ptt_signal != 0)
 	}
 	// #endif
 
@@ -1508,7 +1518,7 @@ func PTTTestMain() error {
 
 	/* initialize - both off */
 
-	var p, initErr = NewPTT(&my_audio_config, 0)
+	var p, initErr = NewPTT(&my_audio_config, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1544,7 +1554,7 @@ func PTTTestMain() error {
 
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_invert = true
 
-	p, initErr = NewPTT(&my_audio_config, 0)
+	p, initErr = NewPTT(&my_audio_config, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1585,7 +1595,7 @@ func PTTTestMain() error {
 
 	dw_printf("Try GPIO %d a few times...\n", my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num)
 
-	p, initErr = NewPTT(&my_audio_config, 0)
+	p, initErr = NewPTT(&my_audio_config, nil, 0)
 	if initErr != nil {
 		return initErr
 	}

@@ -742,6 +742,20 @@ func (r *Layer2Receiver) Layout(channel int) (int, int) {
 	return d.NumSubchan(), d.NumSlicers()
 }
 
+// MuteInput silences a channel's received audio, or stops silencing it; a
+// channel without a demodulator - one transmit calibration keys, say - has
+// nothing to silence.
+func (r *Layer2Receiver) MuteInput(channel int, mute bool) {
+	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+
+	var d = r.demods[channel]
+	if d == nil {
+		return
+	}
+
+	d.Mute(mute)
+}
+
 // ProcessSample is MultiModem.ProcessSample for a channel.
 func (r *Layer2Receiver) ProcessSample(channel int, sample int) bool {
 	return r.modems[channel].ProcessSample(sample)

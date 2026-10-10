@@ -190,20 +190,6 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 	assert.Equal(t, before, audioConfig.achan[channel])
 }
 
-// Only a radio channel gets a Demodulator, and until demod_init has run there
-// are none at all, so what reaches one by channel number has to cope.
-func TestDemodNilChannel(t *testing.T) {
-	var saved = demodulators
-
-	t.Cleanup(func() {
-		demodulators = saved
-	})
-
-	demodulators = [MAX_RADIO_CHANS]*Demodulator{}
-
-	assert.NotPanics(t, func() { demod_mute_input(0, 1) })
-}
-
 // demod_init builds a Demodulator for each radio channel, and drops any left
 // over from before for a channel that no longer is one.
 func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
