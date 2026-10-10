@@ -257,6 +257,26 @@ Reference
           neighbours:
             - {channel: 10, call: Q2TEST-2, alias: TWO, quality: 220}
 
+``node``
+    How the node serves the users who connect to it (see :doc:`node`).
+    It has no equivalent in Dire Wolf's format.
+    It has:
+
+    ``info``
+        What the ``I`` command shows.
+
+    ``idleTimeout``
+        How long a user may do nothing before being disconnected
+        (``15m``, ``0s`` for never).
+
+    .. code:: yaml
+
+        node:
+          info: |
+            Samoyed node in the back bedroom.
+            Sysop: Q1TEST.
+          idleTimeout: 20m
+
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as
     though they were a file of their own - so a channel setting there needs its

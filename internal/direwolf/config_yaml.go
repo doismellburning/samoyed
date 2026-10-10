@@ -39,6 +39,9 @@ type ConfigFile struct {
 	// NetROM is the NET/ROM node, if there is one.
 	NetROM *NetROMSettings `yaml:"netrom"`
 
+	// Node is how the node greets and serves the users who connect to it.
+	Node *NodeSettings `yaml:"node"`
+
 	// Legacy holds directives in the line-at-a-time format, read after
 	// everything else, for anything not yet given a YAML form.
 	Legacy string `yaml:"legacy"`
@@ -164,6 +167,11 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 	if file.NetROM != nil {
 		ps.line = top["netrom"].line(new(yaml.Node))
 		ps.reportIfError(ps.applyNETROM(*file.NetROM))
+	}
+
+	if file.Node != nil {
+		ps.line = top["node"].line(new(yaml.Node))
+		ps.reportIfError(ps.applyNODE(*file.Node))
 	}
 
 	if file.Legacy != "" {

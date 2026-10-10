@@ -38,6 +38,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/netrom"
+	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/sirupsen/logrus"
@@ -170,6 +171,7 @@ type misc_config_s struct {
 	/* 0 (default) disables it. */
 
 	netrom *netrom.Config /* The NET/ROM node, or nil for none.  YAML only. */
+	node   node.Config    /* How the node serves its users.  YAML only. */
 
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.
@@ -1355,6 +1357,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
 	p_misc_config.metrics_port = 0 // Disabled by default.
 	p_misc_config.web_port = 0     // Disabled by default.
+	p_misc_config.node.IdleTimeout = defaultNodeIdleTimeout
 
 	for i := range MAX_KISS_TCP_PORTS {
 		p_misc_config.kiss_port[i] = 0 // entry not used.

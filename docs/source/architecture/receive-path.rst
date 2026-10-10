@@ -156,7 +156,7 @@ to the application layer and the AX.25 data link state machine.
        app -> aprsdec [label="APRS"];
        app -> clients;
        app -> web;
-       app -> nodes [label="UI to NODES,\nPID 0xCF"];
+       app -> nodes [label="every frame: heard list;\nNODES broadcasts"];
        app -> ichan;
        ichan -> ttq [label="no"];
        ttq -> ttseq [label="yes"];
@@ -242,7 +242,8 @@ Requests carry a client number,
 and the data link state machine tells ``linkRouter`` what happens on each link under the number that asked for it.
 ``linkRouter`` passes that on to the AGW server for its clients' numbers,
 and to an in-process application, such as the NET/ROM node, for the numbers ``linkRouter.attach`` handed it.
-The NET/ROM node also takes NODES broadcasts from ``app_process_rec_packet``.
+The NET/ROM node also takes every frame received on its ports from ``app_process_rec_packet``,
+for its heard list and for the NODES broadcasts among them.
 It does its work on a goroutine of its own,
 so both hand-offs only queue work for it.
 

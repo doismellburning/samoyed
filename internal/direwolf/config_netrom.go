@@ -174,3 +174,33 @@ func netromConfigFor(cfg netrom.Config, audio *RadioConfig) (netrom.Config, erro
 
 	return cfg, cfg.Validate()
 }
+
+// NodeSettings describes how the node serves the users who connect to it.  It
+// has no line-format directive: it is written in YAML, under "node".
+type NodeSettings struct {
+	// Info is what the INFO command shows.
+	Info string `yaml:"info"`
+
+	// IdleTimeout disconnects a user who has done nothing for this long;
+	// "0s" for never.
+	IdleTimeout *time.Duration `yaml:"idleTimeout"`
+}
+
+// defaultNodeIdleTimeout is how long a node user may sit idle, unless the
+// configuration says otherwise.
+const defaultNodeIdleTimeout = 15 * time.Minute
+
+// applyNODE checks the node's settings and keeps them for startup.
+func (ps *parseState) applyNODE(settings NodeSettings) error {
+	ps.misc.node.Info = settings.Info
+
+	if settings.IdleTimeout != nil {
+		if *settings.IdleTimeout < 0 {
+			return fmt.Errorf("line %d: node idleTimeout must not be negative", ps.line)
+		}
+
+		ps.misc.node.IdleTimeout = *settings.IdleTimeout
+	}
+
+	return nil
+}
