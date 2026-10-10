@@ -482,11 +482,11 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config))
+	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame))
 	stopIfCancelled(ctx, td)
 
 	// Likewise a channel can be AX.25 over UDP to other nodes.
-	transmitQueue.SetAXUDPChannels(NewAXUDPChannels(ctx, audio_config))
+	transmitQueue.SetAXUDPChannels(NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame))
 	stopIfCancelled(ctx, td)
 
 	/*

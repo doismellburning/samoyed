@@ -85,7 +85,7 @@ func attachTestNetTNC(ctx context.Context, t *testing.T) (*NetTNC, net.Conn, <-c
 
 	var port, conns = newTestNetTNC(ctx, t)
 
-	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port)
+	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port, dataLinkQueue.RecFrame)
 	require.NoError(t, err)
 
 	// Reattaching after the TNC goes away waits between attempts; not the
@@ -119,7 +119,7 @@ func TestNetTNCAttachRefused(t *testing.T) {
 	// A port nothing is listening on: one taken and given straight back.
 	var port = freeTCPPort(t)
 
-	var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port)
+	var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, dataLinkQueue.RecFrame)
 
 	require.Error(t, err)
 	assert.Nil(t, nt)
@@ -295,7 +295,7 @@ func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	for _, b := range append([]byte("cmd:\r\n"), kissFrameFor(pp)...) {
-		nettncRecByte(kf, b, 0, nettncTestChannel)
+		nettncRecByte(kf, b, 0, nettncTestChannel, dataLinkQueue.RecFrame)
 	}
 
 	var item = dataLinkQueue.Remove()
@@ -310,7 +310,7 @@ func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	for _, b := range []byte{kiss.FEND, kiss.FEND, kiss.FEND, kiss.FEND} {
-		nettncRecByte(kf, b, 0, nettncTestChannel)
+		nettncRecByte(kf, b, 0, nettncTestChannel, dataLinkQueue.RecFrame)
 	}
 
 	assert.Nil(t, dataLinkQueue.Remove(), "an empty KISS frame was taken for a received frame")
@@ -325,7 +325,7 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range kiss.Encapsulate([]byte{0, 'n', 'o', 't', ' ', 'a', 'x', '2', '5'}) {
-			nettncRecByte(kf, b, 0, nettncTestChannel)
+			nettncRecByte(kf, b, 0, nettncTestChannel, dataLinkQueue.RecFrame)
 		}
 	})
 
@@ -343,7 +343,7 @@ func TestNetTNCFrameEmptyOnceUnescapedIsReported(t *testing.T) {
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.FEND} {
-			nettncRecByte(kf, b, 2, nettncTestChannel)
+			nettncRecByte(kf, b, 2, nettncTestChannel, dataLinkQueue.RecFrame)
 		}
 	})
 
@@ -358,10 +358,10 @@ func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
-		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel)
+		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel, dataLinkQueue.RecFrame)
 
 		for range kiss.MaxFrameLen + 10 {
-			nettncRecByte(kf, 'x', 0, nettncTestChannel)
+			nettncRecByte(kf, 'x', 0, nettncTestChannel, dataLinkQueue.RecFrame)
 		}
 	})
 
@@ -378,13 +378,13 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
-		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel)
+		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel, dataLinkQueue.RecFrame)
 
 		for range kiss.MaxFrameLen + 10 {
-			nettncRecByte(kf, 'x', 0, nettncTestChannel)
+			nettncRecByte(kf, 'x', 0, nettncTestChannel, dataLinkQueue.RecFrame)
 		}
 
-		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel)
+		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel, dataLinkQueue.RecFrame)
 	})
 
 	assert.Contains(t, output, "KISS frame from network TNC exceeded maximum length.  Discarding it.")
@@ -392,7 +392,7 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 
 	// And a well formed frame after it still gets through.
 	for _, b := range kissFrameFor(newTestPacket(t)) {
-		nettncRecByte(kf, b, 0, nettncTestChannel)
+		nettncRecByte(kf, b, 0, nettncTestChannel, dataLinkQueue.RecFrame)
 	}
 
 	assert.NotNil(t, dataLinkQueue.Remove())
@@ -408,7 +408,7 @@ func TestNetTNCDebugPrints(t *testing.T) {
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range kissFrameFor(newTestPacket(t)) {
-			nettncRecByte(kf, b, 2, nettncTestChannel)
+			nettncRecByte(kf, b, 2, nettncTestChannel, dataLinkQueue.RecFrame)
 		}
 	})
 
@@ -429,7 +429,7 @@ func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
-	var output = testutils.CaptureOutput(t, func() { tncs = NewNetTNCs(t.Context(), audioConfig) })
+	var output = testutils.CaptureOutput(t, func() { tncs = NewNetTNCs(t.Context(), audioConfig, dataLinkQueue.RecFrame) })
 
 	assert.Contains(t, output, fmt.Sprintf("Channel %d: Network TNC 127.0.0.1 %d", nettncTestChannel, port))
 
@@ -453,7 +453,7 @@ func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
 
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
-	testutils.CaptureOutput(t, func() { tncs = NewNetTNCs(ctx, audioConfig) })
+	testutils.CaptureOutput(t, func() { tncs = NewNetTNCs(ctx, audioConfig, dataLinkQueue.RecFrame) })
 
 	assert.Nil(t, tncs[nettncTestChannel], "a connection cut short should not have been attached")
 }

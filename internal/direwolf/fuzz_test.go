@@ -105,7 +105,7 @@ func FuzzNetTNCRecByte(f *testing.F) {
 		var kc kiss.Collector
 
 		for _, b := range stream {
-			nettncRecByte(&kc, b, int(debug%3), nettncTestChannel)
+			nettncRecByte(&kc, b, int(debug%3), nettncTestChannel, dataLinkQueue.RecFrame)
 		}
 	})
 }

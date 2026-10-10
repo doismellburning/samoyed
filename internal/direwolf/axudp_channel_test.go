@@ -59,7 +59,7 @@ func axudpTestMap(t *testing.T, ax25addr string, peer *net.UDPConn, broadcast bo
 func openTestAXUDPChannel(ctx context.Context, t *testing.T, routes axudp.Routes) *AXUDPChannel {
 	t.Helper()
 
-	var ac, err = NewAXUDPChannel(ctx, axudpTestChannel, 0, routes)
+	var ac, err = NewAXUDPChannel(ctx, axudpTestChannel, 0, routes, dataLinkQueue.RecFrame)
 	require.NoError(t, err)
 
 	t.Cleanup(func() { ac.conn.Close() })
@@ -294,7 +294,7 @@ func TestAXUDPChannelPortInUse(t *testing.T) {
 
 	var port = testAXUDPChannelAddr(t, ac).Port
 
-	var second, err = NewAXUDPChannel(t.Context(), axudpTestChannel+1, port, noAXUDPRoutes())
+	var second, err = NewAXUDPChannel(t.Context(), axudpTestChannel+1, port, noAXUDPRoutes(), dataLinkQueue.RecFrame)
 	require.Error(t, err)
 	assert.Nil(t, second)
 }
@@ -400,7 +400,7 @@ func TestAXUDPChannelSendAfterCloseIsQuiet(t *testing.T) {
 
 	// Not started: a listener would see the close too, and say so at Error
 	// whenever it got round to it, which is not what is under test.
-	var ac, err = NewAXUDPChannel(t.Context(), axudpTestChannel, 0, routes)
+	var ac, err = NewAXUDPChannel(t.Context(), axudpTestChannel, 0, routes, dataLinkQueue.RecFrame)
 	require.NoError(t, err)
 	require.NoError(t, ac.conn.Close())
 
