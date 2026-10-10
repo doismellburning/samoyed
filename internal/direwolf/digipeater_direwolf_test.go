@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dedupe"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -100,7 +101,7 @@ func Test_Digipeater(t *testing.T) {
 	digipeaterTestMyCall = "WB2OSZ-9"
 
 	digipeaterTestDigi = new(Digipeater)
-	digipeaterTestDigi.dedupe = NewDedupeService(100*time.Millisecond, nil)
+	digipeaterTestDigi.dedupe = dedupe.New(100*time.Millisecond, nil)
 
 	/*
 	 * Compile the patterns.

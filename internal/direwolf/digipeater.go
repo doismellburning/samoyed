@@ -39,6 +39,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dedupe"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/sirupsen/logrus"
@@ -99,7 +100,7 @@ type Digipeater struct {
 	audioConfig *RadioConfig
 	config      *digi_config_s
 	filter      *pfilter.PacketFilter
-	dedupe      *DedupeService
+	dedupe      *dedupe.Service
 	count       [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
 }
 
@@ -128,7 +129,7 @@ func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, fi
 	d.audioConfig = p_audio_config
 	d.config = p_digi_config
 	d.filter = filter
-	d.dedupe = NewDedupeService(time.Duration(p_digi_config.dedupe_time)*time.Second, onRemember)
+	d.dedupe = dedupe.New(time.Duration(p_digi_config.dedupe_time)*time.Second, onRemember)
 
 	return d
 }
