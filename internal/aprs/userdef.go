@@ -8,7 +8,7 @@ package aprs
 
 // UserDefUserID : KG 2026-01-19: Dire Wolf has D reserved per
 // https://www.aprs.org/aprs11/expfmts.txt and there seems a lot less space for
-// me to comfortably just DIY like with APP_TOCALL (and S is already assigned).
+// me to comfortably just DIY like with version.Tocall (and S is already assigned).
 // So I'll stick with D for now as it seems the least-worst option.
 const UserDefUserID = 'D'
 

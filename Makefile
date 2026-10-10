@@ -28,7 +28,7 @@ cmds: $(CMDS)
 $(CMDS): $(addprefix $(DIST_DIR)/,$$@)
 
 $(DIST_DIR)/%: $(DIST_DIR) $(C_FILES) $(GO_FILES) ./cmd/%
-	go build -o $(DIST_DIR)/ -ldflags "-X 'github.com/doismellburning/samoyed/internal/direwolf.SAMOYED_VERSION=$(SAMOYED_VERSION)'" ./cmd/$*/...
+	go build -o $(DIST_DIR)/ -ldflags "-X 'github.com/doismellburning/samoyed/internal/version.Version=$(SAMOYED_VERSION)'" ./cmd/$*/...
 
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)

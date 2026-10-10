@@ -37,6 +37,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/doismellburning/samoyed/internal/pfilter"
+	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
 )
 
@@ -506,7 +507,7 @@ func (ig *IGate) connectThread(ctx context.Context) {
 
 				var stemp = fmt.Sprintf("user %s pass %s vers Samoyed %s",
 					ig.config.t2_login, ig.config.t2_passcode,
-					SAMOYED_VERSION)
+					version.Version)
 				if ig.config.t2_filter != "" {
 					stemp += " filter "
 					stemp += ig.config.t2_filter
@@ -1648,7 +1649,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	if ig.igToTxAllow(pp3, to_chan) {
 		var radio = fmt.Sprintf("%s>%s%d%d%s:}%s",
 			ig.audioConfig.mycall[to_chan],
-			APP_TOCALL, MAJOR_VERSION, MINOR_VERSION,
+			version.Tocall, version.Major, version.Minor,
 			ig.config.tx_via,
 			payload)
 

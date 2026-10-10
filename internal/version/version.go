@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: 2026 The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package version
 
 import (
 	"fmt"
@@ -6,19 +9,20 @@ import (
 	"strconv"
 )
 
-var SAMOYED_VERSION string //nolint:gochecknoglobals // Set at build time via `-ldflags "-X 'github.com/doismellburning/samoyed/internal/direwolf.SAMOYED_VERSION=X'"`
+// Version is Samoyed's version, a CalVer string.
+var Version string //nolint:gochecknoglobals // Set at build time via `-ldflags "-X 'github.com/doismellburning/samoyed/internal/version.Version=X'"`
 
-// MAJOR_VERSION and MINOR_VERSION exist because a bunch of things, both Dire Wolf and APRS,
+// Major and Minor exist because a bunch of things, both Dire Wolf and APRS,
 // seem to expect two-part single-digit versions.
 // This obviously doesn't interact well with my choice of CalVer...
-// TODO Figure out what to do with MAJOR_VERSION etc.
-const MAJOR_VERSION = 0
-const MINOR_VERSION = 0
+// TODO Figure out what to do with Major etc.
+const Major = 0
+const Minor = 0
 
-// APP_TOCALL is put in APRS destination field to identify the equipment used.
+// Tocall is put in APRS destination field to identify the equipment used.
 // Dire Wolf used APDW - "Assigned by WB4APR in tocalls.txt".
 // KG 2026-01-19: Nobody has assigned SMYD, but I figured it was better to differentiate sooner rather than later.
-const APP_TOCALL = "SMYD"
+const Tocall = "SMYD"
 
 func getBuildSettingOrDefault(bi *debug.BuildInfo, key string, defaultValue string) string {
 	for _, bs := range bi.Settings {
@@ -30,7 +34,9 @@ func getBuildSettingOrDefault(bi *debug.BuildInfo, key string, defaultValue stri
 	return defaultValue
 }
 
-func printVersion(verbose bool) {
+// Print prints Samoyed's version, VCS revision and build time to stdout,
+// and with verbose the whole of the Go BuildInfo too.
+func Print(verbose bool) {
 	var buildInfo, _ = debug.ReadBuildInfo()
 
 	// TODO KG Allow overriding by env var for reproducible builds? Or does Go support this already?
@@ -50,7 +56,7 @@ func printVersion(verbose bool) {
 		buildCommit += "-UNKNOWNDIRTY"
 	}
 
-	var version = SAMOYED_VERSION
+	var version = Version
 	if version == "" {
 		version = "!UNKNOWN!"
 	}

@@ -15,6 +15,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
@@ -572,7 +573,7 @@ func assertNothingSent(t *testing.T) {
 
 // beaconDefaultDest is the destination a beacon without DEST gets: our tocall and version.
 func beaconDefaultDest() string {
-	return fmt.Sprintf("%s%1d%1d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
+	return fmt.Sprintf("%s%1d%1d", version.Tocall, version.Major, version.Minor)
 }
 
 func Test_BeaconSend_position(t *testing.T) {

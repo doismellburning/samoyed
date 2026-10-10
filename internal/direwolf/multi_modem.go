@@ -79,6 +79,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
 )
 
@@ -817,12 +818,12 @@ func (r *Layer2Receiver) recFrame(channel int, subchan int, slice int, fbuf []by
 		// TODO: Use station callsign, rather than "AIS," so we know where it is coming from,
 		// if it happens to get onto RF somehow.
 
-		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, aprs.UserDefUserID, aprs.UserDefTypeAIS, string(nmea))
+		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", version.Tocall, version.Major, version.Minor, aprs.UserDefUserID, aprs.UserDefTypeAIS, string(nmea))
 		pp = ax25.FromText(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	case MODEM_EAS:
-		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, aprs.UserDefUserID, aprs.UserDefTypeEAS, string(fbuf))
+		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", version.Tocall, version.Major, version.Minor, aprs.UserDefUserID, aprs.UserDefTypeEAS, string(fbuf))
 		pp = ax25.FromText(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.

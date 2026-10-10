@@ -20,6 +20,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
 )
 
@@ -798,7 +799,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 	if bp.dest != "" {
 		beacon_text += bp.dest
 	} else {
-		var stemp = fmt.Sprintf("%s%1d%1d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
+		var stemp = fmt.Sprintf("%s%1d%1d", version.Tocall, version.Major, version.Minor)
 		beacon_text += stemp
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
 )
 
@@ -725,7 +726,7 @@ func kiss_set_hardware(channel int, command []byte, from kissClient) {
 				dw_printf("KISS Set Hardware TNC: Did not expect a parameter.\n")
 			}
 
-			var response = fmt.Sprintf("DIREWOLF %d.%d", MAJOR_VERSION, MINOR_VERSION)
+			var response = fmt.Sprintf("DIREWOLF %d.%d", version.Major, version.Minor)
 			from.reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else if bytes.Equal(cmd, []byte("TXBUF")) { /* TXBUF - Number of bytes in transmit queue. */
 			if len(value) > 0 {
