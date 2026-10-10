@@ -95,3 +95,16 @@ func TestPutBitWithUnknownModemSendsNothing(t *testing.T) {
 	assert.Equal(t, 0, sink.puts, "nothing should have been sent")
 	assert.Equal(t, 1, strings.Count(output, "INTERNAL ERROR"), "the error should be reported once: %s", output)
 }
+
+// At a sample rate that isn't a multiple of 1000, the sample count for a
+// quiet period, such as Morse's txdelay and txtail, must not be truncated by
+// integer division (issue #762).
+func TestPutQuietMsRoundsAt44100(t *testing.T) {
+	var sink = new(byteSink)
+	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	var tg = NewToneGenerator(0, audioConfig, 50, sink)
+
+	// 5 ms is 220.5 samples, which rounds to 221.
+	tg.PutQuietMs(5)
+	assert.Equal(t, 221, len(sink.data)/2)
+}
