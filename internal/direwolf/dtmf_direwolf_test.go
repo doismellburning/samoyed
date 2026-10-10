@@ -32,7 +32,7 @@ func Test_dtmf(t *testing.T) {
 		}
 	}
 
-	dw_printf("\nFirst, check all button tone pairs. \n\n")
+	t.Log("First, check all button tone pairs.")
 	/* Max auto dialing rate is 10 per second. */
 
 	push_button_test(c, '1', 50)
@@ -71,7 +71,7 @@ func Test_dtmf(t *testing.T) {
 	push_button_test(c, 'D', 50)
 	push_button_test(c, ' ', 50)
 
-	dw_printf("\nShould reject very short pulses.\n\n")
+	t.Log("Should reject very short pulses.")
 
 	push_button_test(c, '1', 20)
 	push_button_test(c, ' ', 50)
@@ -84,7 +84,7 @@ func Test_dtmf(t *testing.T) {
 	push_button_test(c, '1', 20)
 	push_button_test(c, ' ', 50)
 
-	dw_printf("\nTest timeout after inactivity.\n\n")
+	t.Log("Test timeout after inactivity.")
 
 	push_button_test(c, '1', 250)
 	push_button_test(c, ' ', 500)
