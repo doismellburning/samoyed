@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dtmf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/fx25"
@@ -1163,7 +1164,7 @@ func TestDTMFSendDecodesBack(t *testing.T) {
 	assert.Equal(t, 1, sink.flushes, "the tones should be flushed out once, at the end")
 	require.Zero(t, len(sink.data)%2, "16 bit samples come in pairs of bytes")
 
-	var decoder = NewDTMFDecoder(channel, sampleRate, nil)
+	var decoder = dtmf.NewDecoder(channel, sampleRate, nil)
 
 	var heard strings.Builder
 

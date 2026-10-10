@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package dtmf
 
 import (
 	"strings"
@@ -13,12 +16,12 @@ func Test_dtmf(t *testing.T) {
 
 	// A decoded button raises the channel's DCD; nothing here wants to hear
 	// about it.
-	var decoder = NewDTMFDecoder(c, sampleRate, nil)
+	var decoder = NewDecoder(c, sampleRate, nil)
 
 	var result strings.Builder
 
 	var push_button_test = func(_ int, button rune, ms int) {
-		for dtmf := range dtmfButtonSamples(button, ms, sampleRate) {
+		for dtmf := range buttonSamples(button, ms, sampleRate) {
 			/* Make sure it is insensitive to signal amplitude. */
 			/* (Uncomment each of below when testing.) */
 			var x = decoder.Sample(dtmf)

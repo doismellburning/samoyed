@@ -1,11 +1,14 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package dtmf
 
 // Sending DTMF, "touch tones": the audio for each button comes from
-// dtmfButtonSamples, beside the decoder in dtmf.go, and goes to whatever dtmfSampleSink the caller hands over,
+// buttonSamples, and goes to whatever SampleSink the caller hands over,
 // typically a channel's tone generator.
 
-// dtmfSampleSink is where dtmfSend puts the audio it generates.
-type dtmfSampleSink interface {
+// SampleSink is where Send puts the audio it generates.
+type SampleSink interface {
 	// PutSample ships out one audio sample, in the range of a signed 16 bit
 	// integer.
 	PutSample(sam int)
@@ -16,7 +19,7 @@ type dtmfSampleSink interface {
 
 /*-------------------------------------------------------------------
  *
- * Name:        dtmfSend
+ * Name:        Send
  *
  * Purpose:    	Generate DTMF tones from text string.
  *
@@ -31,11 +34,11 @@ type dtmfSampleSink interface {
  *
  * Description:	xmit_thread calls this instead of the usual hdlc_send
  *		when we have a special packet that means send DTMF.
- *		dtmfDuration says how long it takes, PTT included.
+ *		Duration says how long it takes, PTT included.
  *
  *--------------------------------------------------------------------*/
 
-func dtmfSend(out dtmfSampleSink, sampleRate int, amplitude int, str string, speed int, txdelay int, txtail int) {
+func Send(out SampleSink, sampleRate int, amplitude int, str string, speed int, txdelay int, txtail int) {
 	// Length of tone or gap between.
 	var len_ms = int((500.0 / float64(speed)) + 0.5)
 
@@ -51,10 +54,10 @@ func dtmfSend(out dtmfSampleSink, sampleRate int, amplitude int, str string, spe
 	out.Flush()
 }
 
-// dtmfDuration returns the total number of milliseconds to activate PTT to dtmfSend
+// Duration returns the total number of milliseconds to activate PTT to Send
 // str at speed.  This includes delays before the first tone and after the last
 // to avoid chopping off part of it.
-func dtmfDuration(str string, speed int, txdelay int, txtail int) int {
+func Duration(str string, speed int, txdelay int, txtail int) int {
 	return (txdelay +
 		int(1000.0*float64(len(str))/float64(speed)+0.5) +
 		txtail)
@@ -75,8 +78,8 @@ func dtmfDuration(str string, speed int, txdelay int, txtail int) int {
  *
  *----------------------------------------------------------------*/
 
-func pushButton(out dtmfSampleSink, sampleRate int, amplitude int, button rune, ms int) {
-	for sample := range dtmfButtonSamples(button, ms, sampleRate) {
+func pushButton(out SampleSink, sampleRate int, amplitude int, button rune, ms int) {
+	for sample := range buttonSamples(button, ms, sampleRate) {
 		// 'sample' can be in range of +-2.0 because it is sum of two sine waves.
 		// Amplitude of 100 would use full +-32k range.
 		out.PutSample(int(sample * 16383.0 * float64(amplitude) / 100.0))

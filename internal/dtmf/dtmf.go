@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package dtmf
 
 /*------------------------------------------------------------------
  *
@@ -20,6 +23,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,12 +41,12 @@ func dtmfTones() [NUM_TONES]int {
 	return [NUM_TONES]int{697, 770, 852, 941, 1209, 1336, 1477, 1633}
 }
 
-// A DTMFDecoder is the current state of the DTMF decoding for one radio
+// A Decoder is the current state of the DTMF decoding for one radio
 // channel.
 //
 // Only the receive goroutine for the channel's audio device drives it, so it
 // needs no lock.
-type DTMFDecoder struct {
+type Decoder struct {
 	channel int
 
 	// onDCD is told when a button starts or stops being heard, for the
@@ -64,14 +68,14 @@ type DTMFDecoder struct {
 
 /*------------------------------------------------------------------
  *
- * Name:        NewDTMFDecoder
+ * Name:        NewDecoder
  *
  * Purpose:     Initialize the DTMF decoder for one radio channel.
  *
  * Inputs:      channel		- Radio channel number, for the DCD indicator.
  *
  *		onDCD		- Told when a button starts (state 1) or stops
- *				  (0) being heard, as subchannel MAX_SUBCHANS of
+ *				  (0) being heard, as subchannel phy.MaxSubchans of
  *				  the channel; nil for nobody to tell.
  *
  *		sampleRate	- Audio sample frequency, typically
@@ -83,10 +87,10 @@ type DTMFDecoder struct {
  *
  *----------------------------------------------------------------*/
 
-func NewDTMFDecoder(channel int, sampleRate int, onDCD func(channel int, subchannel int, slice int, state int)) *DTMFDecoder {
-	logrus.WithField("channel", channel).Debug("NewDTMFDecoder")
+func NewDecoder(channel int, sampleRate int, onDCD func(channel int, subchannel int, slice int, state int)) *Decoder {
+	logrus.WithField("channel", channel).Debug("dtmf.NewDecoder")
 
-	var d = new(DTMFDecoder)
+	var d = new(Decoder)
 
 	d.channel = channel
 	d.onDCD = onDCD
@@ -137,7 +141,7 @@ func NewDTMFDecoder(channel int, sampleRate int, onDCD func(channel int, subchan
  *
  *----------------------------------------------------------------*/
 
-func (d *DTMFDecoder) Sample(input float64) rune {
+func (d *Decoder) Sample(input float64) rune {
 	for i := range NUM_TONES {
 		var q0 = input + d.q1[i]*d.coef[i] - d.q2[i]
 		d.q2[i] = d.q1[i]
@@ -208,7 +212,7 @@ func (d *DTMFDecoder) Sample(input float64) rune {
 	}
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		logrus.WithField("output", output).Trace("DTMFDecoder.Sample tone outputs")
+		logrus.WithField("output", output).Trace("dtmf.Decoder.Sample tone outputs")
 	}
 
 	var decoded = ' '
@@ -229,7 +233,7 @@ func (d *DTMFDecoder) Sample(input float64) rune {
 		}
 
 		if d.onDCD != nil {
-			d.onDCD(d.channel, MAX_SUBCHANS, 0, _tmpIntBool)
+			d.onDCD(d.channel, phy.MaxSubchans, 0, _tmpIntBool)
 		}
 
 		/* Reset timeout timer. */
@@ -268,16 +272,16 @@ func (d *DTMFDecoder) Sample(input float64) rune {
 			"deb":     string(d.debounced),
 			"ret":     string(ret),
 			"timeout": d.timeout,
-		}).Trace("DTMFDecoder.Sample")
+		}).Trace("dtmf.Decoder.Sample")
 	}
 
 	return ret
 }
 
-// dtmfButtonSamples is ms milliseconds of audio at sampleRate for button: the
+// buttonSamples is ms milliseconds of audio at sampleRate for button: the
 // sum of its two sine waves, so in the range +-2.0, or silence for anything
 // that isn't a button.
-func dtmfButtonSamples(button rune, ms int, sampleRate int) iter.Seq[float64] {
+func buttonSamples(button rune, ms int, sampleRate int) iter.Seq[float64] {
 	return func(yield func(float64) bool) {
 		var fa, fb int
 

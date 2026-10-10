@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-package direwolf
+package dtmf
 
 import (
 	"strings"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// sampleRecorder is a dtmfSampleSink that keeps what it is given, and counts
+// sampleRecorder is a SampleSink that keeps what it is given, and counts
 // flushes.
 type sampleRecorder struct {
 	samples []int
@@ -25,17 +25,17 @@ func (r *sampleRecorder) Flush() {
 	r.flushes++
 }
 
-// What dtmfSend puts on the air, a decoder on the same channel reads back.
-func TestDTMFSendSamplesDecodeBack(t *testing.T) {
+// What Send puts on the air, a decoder on the same channel reads back.
+func TestSendDecodesBack(t *testing.T) {
 	const sampleRate = 8000
 
 	var out = new(sampleRecorder)
 
-	dtmfSend(out, sampleRate, 50, "159D*#", 10, 300, 250)
+	Send(out, sampleRate, 50, "159D*#", 10, 300, 250)
 
 	assert.Equal(t, 1, out.flushes, "the tones should be flushed out once, at the end")
 
-	var decoder = NewDTMFDecoder(0, sampleRate, nil)
+	var decoder = NewDecoder(0, sampleRate, nil)
 
 	var heard strings.Builder
 
@@ -51,6 +51,6 @@ func TestDTMFSendSamplesDecodeBack(t *testing.T) {
 
 // The PTT is held for the delays either side and half a tone period of tone
 // and of quiet per button.
-func TestDTMFDuration(t *testing.T) {
-	assert.Equal(t, 300+400+250, dtmfDuration("1234", 10, 300, 250))
+func TestDuration(t *testing.T) {
+	assert.Equal(t, 300+400+250, Duration("1234", 10, 300, 250))
 }

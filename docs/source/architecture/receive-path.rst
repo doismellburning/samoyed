@@ -27,7 +27,7 @@ to the application layer and the AX.25 data link state machine.
 
            src [label="AudioDevices\nsound card (PortAudio), SDR over UDP, stdin"];
            get [label="demod_get_sample"];
-           dtmf [label="DTMFDecoder.Sample\n-> onButton (ttGateway.Button)"];
+           dtmf [label="dtmf.Decoder.Sample\n-> onButton (ttGateway.Button)"];
            mm [label="Layer2Receiver.ProcessSample\n-> MultiModem.ProcessSample\nDC average, fan out to subchannels"];
            demod [label="Demodulator.ProcessSample\naudio level, decimation, pick modem"];
            afsk [label="demod_afsk_process_sample"];
