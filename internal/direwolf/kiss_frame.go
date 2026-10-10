@@ -255,18 +255,21 @@ func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport st
 // transport it arrives by - TCP, the serial port or the pseudo terminal - so
 // each of them hands its client's bytes to the same one.
 type KissHandler struct {
-	audioConfig *RadioConfig    // Which channels a client may transmit on.
-	xmit        *XmitService    // The transmit timing a client may change.
-	peers       *KissNetService // The TCP clients KISSCOPY copies a data frame to, or nil.
+	audioConfig *RadioConfig        // Which channels a client may transmit on.
+	xmit        *XmitService        // The transmit timing a client may change.
+	queue       clientTransmitQueue // Where a client's data frames go, and what TXBUF reports on; nil to drop them.
+	peers       *KissNetService     // The TCP clients KISSCOPY copies a data frame to, or nil.
 }
 
 // NewKissHandler builds a KissHandler that checks a client's data frames
-// against audioConfig before they are queued, applies its timing commands to
-// xmit, and with KISSCOPY copies its data frames to the clients of peers.
-func NewKissHandler(audioConfig *RadioConfig, xmit *XmitService, peers *KissNetService) *KissHandler {
+// against audioConfig before they are put on queue, applies its timing
+// commands to xmit, and with KISSCOPY copies its data frames to the clients of
+// peers.
+func NewKissHandler(audioConfig *RadioConfig, xmit *XmitService, queue clientTransmitQueue, peers *KissNetService) *KissHandler {
 	var h = new(KissHandler)
 	h.audioConfig = audioConfig
 	h.xmit = xmit
+	h.queue = queue
 	h.peers = peers
 
 	return h
@@ -492,7 +495,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR - Invalid KISS data frame from client app.\n")
-		} else {
+		} else if h.queue != nil {
 			/* How can we determine if it is an original or repeated message? */
 			/* If there is at least one digipeater in the frame, AND */
 			/* that digipeater has been used, it should go out quickly thru */
@@ -500,9 +503,9 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			/* Otherwise, it is an original for the low priority queue. */
 			if pp.NumRepeaters() >= 1 &&
 				pp.H(ax25.Repeater1) > 0 {
-				transmitQueue.Append(channel, TQ_PRIO_0_HI, pp)
+				h.queue.Append(channel, TQ_PRIO_0_HI, pp)
 			} else {
-				transmitQueue.Append(channel, TQ_PRIO_1_LO, pp)
+				h.queue.Append(channel, TQ_PRIO_1_LO, pp)
 			}
 		}
 
@@ -609,7 +612,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol set hardware \"%s\", channel %d\n", kiss_msg[1:], channel)
-		kiss_set_hardware(channel, kiss_msg[1:], from)
+		kiss_set_hardware(channel, kiss_msg[1:], from, h.queue)
 
 	case kiss.CmdEndKiss: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
@@ -656,6 +659,9 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
  *				  serial port, pseudo terminal, and multiple TCP clients.
  *				  We need to send the response to same place where query came
  *				  from, which is what from's reply does.
+ *
+ *		queue		- The transmit queue TXBUF reports on; nil for
+ *				  one that is always empty.
  *
  *
  * Description:	This is new in version 1.5.  "Set hardware" was previously ignored.
@@ -715,7 +721,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
  *
  *--------------------------------------------------------------------*/
 
-func kiss_set_hardware(channel int, command []byte, from kissClient) {
+func kiss_set_hardware(channel int, command []byte, from kissClient, queue clientTransmitQueue) {
 	var cmd, value, found = bytes.Cut(command, []byte{':'})
 
 	if found {
@@ -733,7 +739,11 @@ func kiss_set_hardware(channel int, command []byte, from kissClient) {
 				dw_printf("KISS Set Hardware TXBUF: Did not expect a parameter.\n")
 			}
 
-			var n = transmitQueue.Count(channel, -1, "", "", true)
+			var n = 0
+			if queue != nil {
+				n = queue.Count(channel, -1, "", "", true)
+			}
+
 			var response = fmt.Sprintf("TXBUF:%d", n)
 			from.reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else {

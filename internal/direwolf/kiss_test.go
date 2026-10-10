@@ -75,7 +75,7 @@ func rawTerminal(t *testing.T, f *os.File) {
 func startKissPTListener(ctx context.Context, t *testing.T, debug int) (*KissPT, *os.File, <-chan struct{}) {
 	t.Helper()
 
-	var kp = newKissPT(NewKissHandler(kissTestRadioConfig(), new(XmitService), nil), debug)
+	var kp = newKissPT(setupKissProcessMsg(t), debug)
 
 	kp.openPT()
 
@@ -318,17 +318,7 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 	const channel = 0
 
-	// Laid out like the channel table startKissPT gives the TNC.
-	var audioConfig = kissTestRadioConfig()
-
-	transmitQueue.Init(audioConfig)
-
-	t.Cleanup(func() {
-		for transmitQueue.Remove(channel, TQ_PRIO_1_LO) != nil { //revive:disable-line:empty-block
-		}
-	})
-
-	var _, client = startKissPT(t, 0)
+	var kp, client = startKissPT(t, 0)
 
 	var pp = newTestPacket(t)
 
@@ -341,7 +331,7 @@ func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 	// TransmitQueue.Count rather than TransmitQueue.Peek: the queue is being filled by the
 	// listening goroutine, and only TransmitQueue.Count reads it under the lock.
 	assert.Eventually(t, func() bool {
-		return transmitQueue.Count(channel, TQ_PRIO_1_LO, "", "", false) > 0
+		return kp.handler.queue.Count(channel, TQ_PRIO_1_LO, "", "", false) > 0
 	}, 5*time.Second, 10*time.Millisecond, "the frame from the KISS client was not queued for transmission")
 }
 
