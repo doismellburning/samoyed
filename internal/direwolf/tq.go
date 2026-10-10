@@ -39,7 +39,8 @@ type frameSender func(channel int, prio int, pp *ax25.Packet)
 
 // clientTransmitQueue is what a client application's frames are queued on to
 // be transmitted, and what it asks how much is still waiting: the KISS
-// handler's TXBUF query counts bytes there.  *TransmitQueue is one.
+// handler's TXBUF query counts bytes there, and the AGW server's 'y' query
+// frames.  *TransmitQueue is one.
 type clientTransmitQueue interface {
 	Append(channel int, prio int, pp *ax25.Packet)
 	Count(channel int, prio int, source string, dest string, bytes bool) int
