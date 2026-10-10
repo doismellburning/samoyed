@@ -35,7 +35,7 @@ func TestXIDEncodeZeroValueOmitsOptionalParameters(t *testing.T) {
 
 	// And it round-trips back to "not specified" rather than to zeroes.
 	var parsed, _, status = xid_parse(info)
-	assert.Equal(t, 1, status)
+	assert.True(t, status)
 	assert.Equal(t, maybe.Nothing[int](), parsed.i_field_length_rx)
 	assert.Equal(t, maybe.Nothing[int](), parsed.window_size_rx)
 	assert.Equal(t, maybe.Nothing[int](), parsed.ack_timer)
@@ -52,15 +52,15 @@ func TestXIDParseTruncatedInfo(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		info   []byte
-		status int
+		status bool
 	}{
-		{"one byte, not a format indicator", []byte{0x00}, 0},
-		{"format indicator alone", []byte{FI_Format_Indicator}, 0},
-		{"no group length", []byte{FI_Format_Indicator, GI_Group_Identifier}, 0},
-		{"half a group length", []byte{FI_Format_Indicator, GI_Group_Identifier, 0}, 0},
-		{"group length claims more than there is", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4}, 1},
-		{"parameter with no length", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4, PI_Window_Size_Rx}, 1},
-		{"parameter value cut short", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4, PI_Ack_Timer, 2, 0x0b}, 1},
+		{"one byte, not a format indicator", []byte{0x00}, false},
+		{"format indicator alone", []byte{FI_Format_Indicator}, false},
+		{"no group length", []byte{FI_Format_Indicator, GI_Group_Identifier}, false},
+		{"half a group length", []byte{FI_Format_Indicator, GI_Group_Identifier, 0}, false},
+		{"group length claims more than there is", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4}, true},
+		{"parameter with no length", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4, PI_Window_Size_Rx}, true},
+		{"parameter value cut short", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4, PI_Ack_Timer, 2, 0x0b}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var param, _, status = xid_parse(tc.info)
@@ -74,7 +74,7 @@ func TestXIDParseTruncatedInfo(t *testing.T) {
 	var info = []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 9, PI_Window_Size_Rx, 1, 4, PI_Ack_Timer, 2, 0x0b}
 
 	var param, _, status = xid_parse(info)
-	assert.Equal(t, 1, status)
+	assert.True(t, status)
 	assert.Equal(t, maybe.Just(4), param.window_size_rx)
 	assert.Equal(t, maybe.Nothing[int](), param.ack_timer)
 }

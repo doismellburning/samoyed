@@ -44,7 +44,7 @@ func TestNegotiationResponseFillsInDefaults(t *testing.T) {
 	var S = newNegotiationTestLink()
 
 	var param, _, status = xid_parse(nil)
-	assert.Equal(t, 1, status)
+	assert.True(t, status)
 
 	negotiation_response(S, param)
 
@@ -117,7 +117,7 @@ func TestCompleteNegotiationKeepsWhatTheResponseOmits(t *testing.T) {
 
 	// Everything absent, as xid_parse gives for an empty info field.
 	var param, _, status = xid_parse(nil)
-	assert.Equal(t, 1, status)
+	assert.True(t, status)
 
 	complete_negotiation(S, param)
 
@@ -137,7 +137,7 @@ func TestCompleteNegotiationAppliesOnlyWhatTheResponseSpecifies(t *testing.T) {
 	var S = newNegotiationTestLink()
 
 	var param, _, status = xid_parse(nil)
-	assert.Equal(t, 1, status)
+	assert.True(t, status)
 
 	param.ack_timer = maybe.Just(4500)
 
@@ -258,7 +258,7 @@ func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 			sent.window_size_rx = maybe.Just(0)
 
 			var param, _, status = xid_parse(xid_encode(sent, path.cr))
-			require.Equal(t, 1, status)
+			require.True(t, status)
 
 			var S = newNegotiationTestLink()
 
@@ -306,7 +306,7 @@ func TestCompleteNegotiationNarrowsTheWindowToTheNewModulo(t *testing.T) {
 	S.k_maxframe = 32
 
 	var param, _, status = xid_parse(nil)
-	assert.Equal(t, 1, status)
+	assert.True(t, status)
 
 	param.modulo = ax25.Modulo8
 
@@ -325,7 +325,7 @@ func TestCompleteNegotiationRaisesN1ToTheNewModulo(t *testing.T) {
 	S.n1_paclen = 1
 
 	var param, _, status = xid_parse(nil)
-	assert.Equal(t, 1, status)
+	assert.True(t, status)
 
 	param.modulo = ax25.Modulo128
 

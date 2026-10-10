@@ -4612,7 +4612,7 @@ func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 				// Adjust my working configuration and send it back.
 				var param, _, ok = xid_parse(info)
 
-				if ok > 0 {
+				if ok {
 					negotiation_response(S, param)
 
 					var res = ax25.CRRes
@@ -4638,7 +4638,7 @@ func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 				// Got expected response.  Copy into my working parameters.
 				var param, _, ok = xid_parse(info)
 
-				if ok > 0 {
+				if ok {
 					complete_negotiation(S, param)
 				}
 

@@ -1303,13 +1303,13 @@ func TestAX25LinkXIDParse(t *testing.T) {
 
 	// Test empty XID info
 	result, _, status := xid_parse(nil)
-	assert.Equal(t, 1, status, "Empty XID should parse successfully")
+	assert.True(t, status, "Empty XID should parse successfully")
 	assert.Equal(t, maybe.Nothing[bool](), result.full_duplex)
 
 	// Test XID with just format indicator (minimal valid)
 	info := []byte{FI_Format_Indicator, GI_Group_Identifier, 0x00, 0x00}
 	_, _, status = xid_parse(info)
-	assert.Equal(t, 1, status, "Minimal XID should parse successfully")
+	assert.True(t, status, "Minimal XID should parse successfully")
 }
 
 // XID frame encoding
@@ -1354,7 +1354,7 @@ func TestAX25LinkXIDRoundtrip(t *testing.T) {
 
 	// Parse back
 	parsed, _, status := xid_parse(info)
-	assert.Equal(t, 1, status)
+	assert.True(t, status)
 
 	// Verify values match
 	assert.Equal(t, original.full_duplex, parsed.full_duplex)

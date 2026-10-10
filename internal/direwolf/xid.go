@@ -138,7 +138,7 @@ type xid_param_s struct {
  *
  *		desc		- Text description for troubleshooting.
  *
- * statusNo -	1 for mostly successful (with possible error messages), 0 for failure.
+ *		ok		- true for mostly successful (with possible error messages), false for failure.
  *
  * Description:	6.3.2 "The receipt of an XID response from the other station
  *		establishes that both stations are using AX.25 version
@@ -147,7 +147,7 @@ type xid_param_s struct {
  *
  *--------------------------------------------------------------------*/
 
-func xid_parse(info []byte) (*xid_param_s, string, int) {
+func xid_parse(info []byte) (*xid_param_s, string, bool) {
 	// What should we do when some fields are missing?
 
 	// The  AX.25 v2.2 protocol spec says, for most of these,
@@ -165,7 +165,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	/* Information field is optional but that seems pretty lame. */
 
 	if len(info) == 0 {
-		return result, desc, 1
+		return result, desc, true
 	}
 
 	// The info field comes off the air, so nothing in it - not even that
@@ -179,7 +179,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			"length": len(info),
 		}).Errorf("XID error: First byte of info field should be Format Indicator, %02x", FI_Format_Indicator)
 
-		return result, desc, 0
+		return result, desc, false
 	}
 
 	// Format Indicator, Group Identifier and a two byte group length.
@@ -188,7 +188,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	if len(info) < headerLen {
 		logrus.WithField("length", len(info)).Error("XID error: Info field too short for its header")
 
-		return result, desc, 0
+		return result, desc, false
 	}
 
 	i++
@@ -196,7 +196,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	if info[i] != GI_Group_Identifier {
 		logrus.Errorf("XID error: Second byte of info field should be Group Indicator, %d", GI_Group_Identifier)
 
-		return result, desc, 0
+		return result, desc, false
 	}
 
 	i++
@@ -213,7 +213,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 		if i+2 > len(info) {
 			logrus.WithField("group_len", group_len).Error("XID error: Group length runs past the end of the info field")
 
-			return result, desc, 1 // got this far.
+			return result, desc, true // got this far.
 		}
 
 		var pind = info[i]
@@ -230,7 +230,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 				"length":    plen,
 			}).Error("XID error: Parameter length is not 1 thru 4")
 
-			return result, desc, 1 // got this far.
+			return result, desc, true // got this far.
 		}
 
 		if i+int(plen) > len(info) {
@@ -239,7 +239,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 				"length":    plen,
 			}).Error("XID error: Parameter runs past the end of the info field")
 
-			return result, desc, 1 // got this far.
+			return result, desc, true // got this far.
 		}
 
 		var pval = 0
@@ -368,7 +368,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 		}).Error("XID error: Frame / Group Length mismatch")
 	}
 
-	return result, desc, 1
+	return result, desc, true
 } /* end xid_parse */
 
 /*-------------------------------------------------------------------

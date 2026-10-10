@@ -71,7 +71,7 @@ func Test_XID(t *testing.T) {
 
 	t.Logf("%d: %s", 0, desc)
 
-	assert.Equal(t, 1, n)
+	assert.True(t, n)
 	assert.Equal(t, maybe.Just(false), param.full_duplex)
 	assert.Equal(t, srej_single, param.srej)
 	assert.Equal(t, ax25.Modulo128, param.modulo)
@@ -85,7 +85,7 @@ func Test_XID(t *testing.T) {
 	var info = xid_encode(param, ax25.CRCmd)
 	assert.Len(t, info, len(xid_example))
 
-	assert.Equal(t, info, xid_example, "n: %d, info: %v, xid_example[0]: %v", n, info, xid_example)
+	assert.Equal(t, info, xid_example, "n: %v, info: %v, xid_example[0]: %v", n, info, xid_example)
 
 	/* try a couple different values, no srej. */
 
