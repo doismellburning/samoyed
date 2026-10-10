@@ -85,6 +85,7 @@ package direwolf
 import (
 	"context"
 
+	"github.com/doismellburning/samoyed/internal/dtmf"
 	"github.com/sirupsen/logrus"
 )
 
@@ -163,11 +164,11 @@ func recv_adev_thread(
 	var num_chan = pa.adev[a].num_channels
 
 	// Only this goroutine drives its channels' touch tone decoders.
-	var dtmfDecoders = make([]*DTMFDecoder, num_chan)
+	var dtmfDecoders = make([]*dtmf.Decoder, num_chan)
 
 	for c := range num_chan {
 		if pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
-			dtmfDecoders[c] = NewDTMFDecoder(first_chan+c, pa.adev[a].samples_per_sec, receiver.DCDChange)
+			dtmfDecoders[c] = dtmf.NewDecoder(first_chan+c, pa.adev[a].samples_per_sec, receiver.DCDChange)
 		}
 	}
 

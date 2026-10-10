@@ -1,10 +1,12 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package dtmf
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,12 +16,12 @@ func Test_dtmf(t *testing.T) {
 
 	// A decoded button raises the channel's DCD; nothing here wants to hear
 	// about it.
-	var decoder = NewDTMFDecoder(c, sampleRate, nil)
+	var decoder = NewDecoder(c, sampleRate, nil)
 
 	var result strings.Builder
 
 	var push_button_test = func(_ int, button rune, ms int) {
-		for dtmf := range dtmfButtonSamples(button, ms, sampleRate) {
+		for dtmf := range buttonSamples(button, ms, sampleRate) {
 			/* Make sure it is insensitive to signal amplitude. */
 			/* (Uncomment each of below when testing.) */
 			var x = decoder.Sample(dtmf)
@@ -32,7 +34,7 @@ func Test_dtmf(t *testing.T) {
 		}
 	}
 
-	dw_printf("\nFirst, check all button tone pairs. \n\n")
+	t.Log("First, check all button tone pairs.")
 	/* Max auto dialing rate is 10 per second. */
 
 	push_button_test(c, '1', 50)
@@ -71,7 +73,7 @@ func Test_dtmf(t *testing.T) {
 	push_button_test(c, 'D', 50)
 	push_button_test(c, ' ', 50)
 
-	dw_printf("\nShould reject very short pulses.\n\n")
+	t.Log("Should reject very short pulses.")
 
 	push_button_test(c, '1', 20)
 	push_button_test(c, ' ', 50)
@@ -84,7 +86,7 @@ func Test_dtmf(t *testing.T) {
 	push_button_test(c, '1', 20)
 	push_button_test(c, ' ', 50)
 
-	dw_printf("\nTest timeout after inactivity.\n\n")
+	t.Log("Test timeout after inactivity.")
 
 	push_button_test(c, '1', 250)
 	push_button_test(c, ' ', 500)
@@ -105,11 +107,3 @@ func Test_dtmf(t *testing.T) {
 	require.NotEqual(t, "123A456B789C*0#D123789", result.String(), "Time-out failed, otherwise OK")
 	require.Equal(t, "123A456B789C*0#D123$789$", result.String())
 }
-
-// discardReceiveSink is a ReceiveSink that ignores whatever it is told.
-type discardReceiveSink struct{}
-
-func (discardReceiveSink) RecFrame(int, int, int, *ax25.Packet, ax25.ALevel, fec_type_t, BitFixLevel, string) {
-}
-
-func (discardReceiveSink) DCDChange(int, int) {}

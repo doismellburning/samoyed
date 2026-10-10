@@ -40,6 +40,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dtmf"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/fx25"
@@ -1261,6 +1262,32 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 
 	xs.keyPTT(c, 0)
 } /* end xmit_dtmf */
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        dtmf_send
+ *
+ * Purpose:    	Send str as touch tones through a channel's tone generator.
+ *
+ * Inputs:	toneGenerator	- The channel's tone generator.
+ *		channel	- Radio channel number.
+ *		str, speed, txdelay, txtail - As dtmf.Send.
+ *
+ * Returns:	Total number of milliseconds to activate PTT, as
+ *		dtmf.Duration.
+ *
+ *--------------------------------------------------------------------*/
+
+func dtmf_send(toneGenerator *ToneGenerator, channel int, str string, speed int, txdelay int, txtail int) int {
+	if toneGenerator == nil {
+		logrus.WithField("channel", channel).Error("Invalid channel for tone generation")
+	} else {
+		var sampleRate = toneGenerator.audioConfig.adev[toneGenerator.adevIndex].samples_per_sec
+		dtmf.Send(toneGenerator, sampleRate, toneGenerator.amplitude, str, speed, txdelay, txtail)
+	}
+
+	return dtmf.Duration(str, speed, txdelay, txtail)
+} /* end dtmf_send */
 
 /*-------------------------------------------------------------------
  *

@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package dtmf
 
 /*------------------------------------------------------------------
  *
@@ -20,6 +23,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,12 +41,12 @@ func dtmfTones() [NUM_TONES]int {
 	return [NUM_TONES]int{697, 770, 852, 941, 1209, 1336, 1477, 1633}
 }
 
-// A DTMFDecoder is the current state of the DTMF decoding for one radio
+// A Decoder is the current state of the DTMF decoding for one radio
 // channel.
 //
 // Only the receive goroutine for the channel's audio device drives it, so it
 // needs no lock.
-type DTMFDecoder struct {
+type Decoder struct {
 	channel int
 
 	// onDCD is told when a button starts or stops being heard, for the
@@ -64,14 +68,14 @@ type DTMFDecoder struct {
 
 /*------------------------------------------------------------------
  *
- * Name:        NewDTMFDecoder
+ * Name:        NewDecoder
  *
  * Purpose:     Initialize the DTMF decoder for one radio channel.
  *
  * Inputs:      channel		- Radio channel number, for the DCD indicator.
  *
  *		onDCD		- Told when a button starts (state 1) or stops
- *				  (0) being heard, as subchannel MAX_SUBCHANS of
+ *				  (0) being heard, as subchannel phy.MaxSubchans of
  *				  the channel; nil for nobody to tell.
  *
  *		sampleRate	- Audio sample frequency, typically
@@ -83,10 +87,10 @@ type DTMFDecoder struct {
  *
  *----------------------------------------------------------------*/
 
-func NewDTMFDecoder(channel int, sampleRate int, onDCD func(channel int, subchannel int, slice int, state int)) *DTMFDecoder {
-	logrus.WithField("channel", channel).Debug("NewDTMFDecoder")
+func NewDecoder(channel int, sampleRate int, onDCD func(channel int, subchannel int, slice int, state int)) *Decoder {
+	logrus.WithField("channel", channel).Debug("dtmf.NewDecoder")
 
-	var d = new(DTMFDecoder)
+	var d = new(Decoder)
 
 	d.channel = channel
 	d.onDCD = onDCD
@@ -137,7 +141,7 @@ func NewDTMFDecoder(channel int, sampleRate int, onDCD func(channel int, subchan
  *
  *----------------------------------------------------------------*/
 
-func (d *DTMFDecoder) Sample(input float64) rune {
+func (d *Decoder) Sample(input float64) rune {
 	for i := range NUM_TONES {
 		var q0 = input + d.q1[i]*d.coef[i] - d.q2[i]
 		d.q2[i] = d.q1[i]
@@ -208,7 +212,7 @@ func (d *DTMFDecoder) Sample(input float64) rune {
 	}
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		logrus.WithField("output", output).Trace("DTMFDecoder.Sample tone outputs")
+		logrus.WithField("output", output).Trace("dtmf.Decoder.Sample tone outputs")
 	}
 
 	var decoded = ' '
@@ -229,7 +233,7 @@ func (d *DTMFDecoder) Sample(input float64) rune {
 		}
 
 		if d.onDCD != nil {
-			d.onDCD(d.channel, MAX_SUBCHANS, 0, _tmpIntBool)
+			d.onDCD(d.channel, phy.MaxSubchans, 0, _tmpIntBool)
 		}
 
 		/* Reset timeout timer. */
@@ -268,95 +272,16 @@ func (d *DTMFDecoder) Sample(input float64) rune {
 			"deb":     string(d.debounced),
 			"ret":     string(ret),
 			"timeout": d.timeout,
-		}).Trace("DTMFDecoder.Sample")
+		}).Trace("dtmf.Decoder.Sample")
 	}
 
 	return ret
 }
 
-/*-------------------------------------------------------------------
- *
- * Name:        dtmf_send
- *
- * Purpose:    	Generate DTMF tones from text string.
- *
- * Inputs:	toneGenerator	- The channel's tone generator.
- *
- *		channel	- Radio channel number.
- *		str	- Character string to send.  0-9, A-D, *, #
- *		speed	- Number of tones per second.  Range 1 to 10.
- *		txdelay	- Delay (ms) from PTT to start.
- *		txtail	- Delay (ms) from end to PTT off.
- *
- * Returns:	Total number of milliseconds to activate PTT.
- *		This includes delays before the first tone
- *		and after the last to avoid chopping off part of it.
- *
- * Description:	xmit_thread calls this instead of the usual hdlc_send
- *		when we have a special packet that means send DTMF.
- *
- *--------------------------------------------------------------------*/
-
-func dtmf_send(toneGenerator *ToneGenerator, channel int, str string, speed int, txdelay int, txtail int) int {
-	if toneGenerator == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for tone generation.\n", channel)
-	} else {
-		toneGenerator.SendDTMF(str, speed, txdelay, txtail)
-	}
-
-	return (txdelay +
-		int(1000.0*float64(len(str))/float64(speed)+0.5) +
-		txtail)
-} /* end dtmf_send */
-
-// SendDTMF generates the tones for str, as dtmf_send describes, on the
-// generator's channel.
-func (tg *ToneGenerator) SendDTMF(str string, speed int, txdelay int, txtail int) {
-	// Length of tone or gap between.
-	var len_ms = int((500.0 / float64(speed)) + 0.5)
-
-	tg.pushButton(' ', txdelay)
-
-	for _, p := range str {
-		tg.pushButton(p, len_ms)
-		tg.pushButton(' ', len_ms)
-	}
-
-	tg.pushButton(' ', txtail)
-
-	tg.Flush()
-}
-
-/*------------------------------------------------------------------
- *
- * Name:        pushButton
- *
- * Purpose:     Generate DTMF tone for a button push.
- *
- * Inputs:	button	- One of 0-9, A-D, *, #.  Others result in silence.
- *
- *		ms	- Duration in milliseconds.
- *			  Use 50 ms for tone and 50 ms of silence for max rate of 10 per second.
- *
- * Outputs:	Audio is sent to radio.
- *
- *----------------------------------------------------------------*/
-
-func (tg *ToneGenerator) pushButton(button rune, ms int) {
-	var sampleRate = tg.audioConfig.adev[tg.adevIndex].samples_per_sec
-
-	for dtmf := range dtmfButtonSamples(button, ms, sampleRate) {
-		// 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.
-		// Amplitude of 100 would use full +-32k range.
-		tg.PutSample(int(dtmf * 16383.0 * float64(tg.amplitude) / 100.0))
-	}
-}
-
-// dtmfButtonSamples is ms milliseconds of audio at sampleRate for button: the
+// buttonSamples is ms milliseconds of audio at sampleRate for button: the
 // sum of its two sine waves, so in the range +-2.0, or silence for anything
 // that isn't a button.
-func dtmfButtonSamples(button rune, ms int, sampleRate int) iter.Seq[float64] {
+func buttonSamples(button rune, ms int, sampleRate int) iter.Seq[float64] {
 	return func(yield func(float64) bool) {
 		var fa, fb int
 
