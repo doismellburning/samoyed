@@ -84,6 +84,10 @@ type TransmitQueue struct {
 	// axudpChannels is where a packet for an AXUDP channel goes instead of
 	// a queue.  A channel with nothing here discards such packets.
 	axudpChannels [MAX_TOTAL_CHANS]*AXUDPChannel
+
+	// toIGate is where a packet for the IGate's channel goes instead of a
+	// queue, or nil to discard such packets.
+	toIGate func(channel int, pp *ax25.Packet)
 }
 
 // transmitQueue is the queue every producer - KISS, AGW, beacon, digipeater,
@@ -185,6 +189,12 @@ func (tq *TransmitQueue) SetNetTNCs(netTNCs [MAX_TOTAL_CHANS]*NetTNC) {
 // to.  Like SetNetTNCs, it must be called before anything is queued.
 func (tq *TransmitQueue) SetAXUDPChannels(channels [MAX_TOTAL_CHANS]*AXUDPChannel) {
 	tq.axudpChannels = channels
+}
+
+// SetIGate hands the queue where packets for the IGate's channel go.  Like
+// SetNetTNCs, it must be called before anything is queued for that channel.
+func (tq *TransmitQueue) SetIGate(toIGate func(channel int, pp *ax25.Packet)) {
+	tq.toIGate = toIGate
 }
 
 /*-------------------------------------------------------------------
@@ -299,7 +309,9 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 
 		switch tq.audioConfig.chan_medium[channel] {
 		case MEDIUM_IGATE:
-			igate.sendRecPacket(channel, pp)
+			if tq.toIGate != nil {
+				tq.toIGate(channel, pp)
+			}
 		case MEDIUM_AXUDP:
 			tq.axudpChannels[channel].sendPacket(channel, pp)
 		default: // network TNC
