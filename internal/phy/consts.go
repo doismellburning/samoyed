@@ -25,6 +25,12 @@ const MaxADevs = 3
 
 const MaxRadioChans = ((MaxADevs) * 2)
 
+// ADevFirstChan is the first radio channel of audio device adev: its only
+// channel in mono, or its left one in stereo, with the right one after it.
+func ADevFirstChan(adev int) int {
+	return adev * 2
+}
+
 /*
  * v1.7 allows additional virtual channels which are connected
  * to something other than radio modems.

@@ -34,6 +34,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/audiostats"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/gordonklaus/portaudio"
@@ -334,14 +335,14 @@ type adev_s struct {
 
 	// Sample rate and error statistics, reported every statisticsInterval
 	// seconds.
-	stats              AudioStats
+	stats              audiostats.Stats
 	statisticsInterval int
 }
 
 // recordRead adds a read of nbytes from device a to its statistics.  A read
 // of nothing counts as an error.
 func (d *adev_s) recordRead(a int, nbytes int) {
-	d.stats.record(a, d.numChannels, nbytes/d.bytesPerFrame, d.statisticsInterval)
+	d.stats.Record(a, d.numChannels, nbytes/d.bytesPerFrame, d.statisticsInterval)
 }
 
 // AudioDevices is the set of audio devices that AudioOpen opened, which
@@ -1216,7 +1217,7 @@ func AudioOpen(ctx context.Context, pa *RadioConfig) (*AudioDevices, error) {
 func (d *AudioDevices) setAudioLevel(audioLevel func(channel int, subchan int) ax25.ALevel) {
 	for _, dev := range d.dev {
 		if dev != nil {
-			dev.stats.audioLevel = audioLevel
+			dev.stats.AudioLevel = audioLevel
 		}
 	}
 }
