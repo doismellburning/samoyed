@@ -95,7 +95,7 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	my_tt_config.num_xmits = 1
 	my_tt_config.obj_xmit_chan = -1 // Keep the reports off the transmit queue.
 
-	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, nil, nil, 0)
+	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, nil, nil, nil, 0)
 
 	var done = make(chan struct{})
 
@@ -135,9 +135,34 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 		remembered = append(remembered, pp.FormatAddrs()+string(pp.Info()))
 	}
 
-	var gw = NewTTGateway(audioConfig, &ttConfig, nil, remember, nil, 0)
+	var gw = NewTTGateway(audioConfig, &ttConfig, nil, remember, nil, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
 
 	assert.Equal(t, []string{"Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W="}, remembered)
+}
+
+// An object report bound for APRS-IS goes to the IGate the gateway was
+// handed, the first time only, on the channel it was heard on.
+func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
+	var audioConfig = makeBeaconModemConfig()
+
+	var ttConfig tt_config_s
+
+	ttConfig.obj_send_to_ig = 1
+	ttConfig.obj_recv_chan = 1
+	ttConfig.obj_xmit_chan = -1
+
+	var sent []string
+
+	var toIGate = func(channel int, pp *ax25.Packet) {
+		sent = append(sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
+	}
+
+	var gw = NewTTGateway(audioConfig, &ttConfig, nil, nil, toIGate, nil, 0)
+
+	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
+	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
+
+	assert.Equal(t, []string{"1 Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W="}, sent)
 }

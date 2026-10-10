@@ -290,6 +290,8 @@ type TTGateway struct {
  *		remember - Called with each object report we transmit, and its
  *			  channel, so the digipeater doesn't repeat our own;
  *			  nil for nobody to tell.
+ *		toIGate	- Sends an object report to APRS-IS; nil for no
+ *			  IGate.
  *		audioLevel - Reports a channel's received audio level, for a
  *			  touch tone message to carry; nil for none.
  *		debug	- Debug printing control.
@@ -306,6 +308,7 @@ func NewTTGateway(
 	p *tt_config_s,
 	apps *clientApps,
 	remember func(pp *ax25.Packet, channel int),
+	toIGate func(channel int, pp *ax25.Packet),
 	audioLevel func(channel int, subchan int) ax25.ALevel,
 	debug int,
 ) *TTGateway {
@@ -316,6 +319,7 @@ func NewTTGateway(
 	g.users = newTTUsers(audioConfig, p)
 	g.users.apps = apps
 	g.users.remember = remember
+	g.users.toIGate = toIGate
 
 	return g
 }
