@@ -205,6 +205,11 @@ type PTT struct {
 	// nothing to silence.
 	muteInput func(channel int, mute bool)
 
+	// channelBusy tells the data link state machine of each change to a
+	// channel's outputs - PTT, DCD or connected indicator - and is left to
+	// pick out the ones it cares about; nil for nobody to tell.
+	channelBusy func(channel int, activity int, status int)
+
 	// gpioSysfsDir is a field rather than always defaultGPIOSysfsDir so that
 	// a test can point it at a fake tree and exercise the GPIO paths without
 	// a kernel that offers the real one.
@@ -276,6 +281,12 @@ type PTT struct {
  *					  audio while it transmits; nil for nothing
  *					  to silence.
  *
+ *		channelBusy		- Told of each change to a channel's
+ *					  outputs (PTT, DCD or connected
+ *					  indicator), for the data link state
+ *					  machine to pick from; nil for nobody to
+ *					  tell.
+ *
  *		debug			- "-d o" level: 1 reports each change of an
  *					  output, 2 also the configuration and GPIO detail.
  *
@@ -287,16 +298,17 @@ type PTT struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), debug int) (*PTT, error) {
-	return newPTT(audio_config_p, muteInput, debug, defaultGPIOSysfsDir)
+func NewPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity int, status int), debug int) (*PTT, error) {
+	return newPTT(audio_config_p, muteInput, channelBusy, debug, defaultGPIOSysfsDir)
 }
 
 // newPTT is NewPTT with the root of the sysfs GPIO interface given, so that a
 // test can supply a fake one.
-func newPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), debug int, gpioSysfsDir string) (*PTT, error) {
+func newPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity int, status int), debug int, gpioSysfsDir string) (*PTT, error) {
 	var p = new(PTT)
 	p.audioConfig = audio_config_p
 	p.muteInput = muteInput
+	p.channelBusy = channelBusy
 	p.debugLevel = debug
 	p.gpioSysfsDir = gpioSysfsDir
 	p.lptPortPath = defaultLPTPortPath
@@ -390,9 +402,9 @@ func (p *PTT) set(ot int, channel int, ptt_signal int) {
 	 * This is a very convenient place to get that information.
 	 */
 
-	// #ifndef TEST
-	dataLinkQueue.ChannelBusy(channel, ot, ptt_signal)
-	// #endif
+	if p.channelBusy != nil {
+		p.channelBusy(channel, ot, ptt_signal)
+	}
 
 	/*
 	 * Inverted output?
@@ -1518,7 +1530,7 @@ func PTTTestMain() error {
 
 	/* initialize - both off */
 
-	var p, initErr = NewPTT(&my_audio_config, nil, 0)
+	var p, initErr = NewPTT(&my_audio_config, nil, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1554,7 +1566,7 @@ func PTTTestMain() error {
 
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_invert = true
 
-	p, initErr = NewPTT(&my_audio_config, nil, 0)
+	p, initErr = NewPTT(&my_audio_config, nil, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1595,7 +1607,7 @@ func PTTTestMain() error {
 
 	dw_printf("Try GPIO %d a few times...\n", my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num)
 
-	p, initErr = NewPTT(&my_audio_config, nil, 0)
+	p, initErr = NewPTT(&my_audio_config, nil, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
