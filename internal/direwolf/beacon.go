@@ -23,6 +23,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// beaconIGate is the IGate, as far as the beacons need it: somewhere to send
+// a beacon bound for APRS-IS, and the counts the IGate statistics beacon
+// reports.  *IGate is one.
+type beaconIGate interface {
+	sendRecPacket(channel int, pp *ax25.Packet)
+	msgCount() int
+	pktCount() int
+	uplinkCount() int
+	downlinkCount() int
+}
+
 // heardCounter counts the stations heard recently, for the IGate statistics
 // beacon.  *mheard.DB is one.
 type heardCounter interface {
@@ -36,6 +47,7 @@ type BeaconService struct {
 	gps               *dwgps.GPS
 	logger            *aprslog.Logger // Where "-dttt" logs tracker beacons, or nil.
 	heardCounter      heardCounter    // Counts the stations heard recently; nil for none.
+	igate             beaconIGate     // Where SENDTO_IGATE beacons go, and the source of IGate statistics; nil for none.
 	trackerDebugLevel int
 }
 
@@ -60,6 +72,9 @@ type BeaconService struct {
  *		heard		- A counter of the stations heard recently, for
  *			  the IGate statistics beacon; nil for none heard.
  *
+ *		ig		- The IGate, for beacons sent to APRS-IS and the
+ *			  IGate statistics beacon; nil for none.
+ *
  * Outputs:	Remember required information for future use.
  *
  * Description:	Do some validity checking on the beacon configuration.
@@ -69,7 +84,7 @@ type BeaconService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *dwgps.GPS, logger *aprslog.Logger, heard heardCounter) *BeaconService {
+func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate_config_s, gps *dwgps.GPS, logger *aprslog.Logger, heard heardCounter, ig beaconIGate) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct_v5
 		modemConfig:  pmodem,
 		miscConfig:   pconfig,
@@ -77,6 +92,7 @@ func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate
 		gps:          gps,
 		logger:       logger,
 		heardCounter: heard,
+		igate:        ig,
 	}
 
 	/*
@@ -284,6 +300,16 @@ func NewBeaconService(pmodem *RadioConfig, pconfig *misc_config_s, pigate *igate
 
 func (bs *BeaconService) SetDebug(level int) {
 	bs.trackerDebugLevel = level
+}
+
+// igateStats is the IGate's message, packet, uplink and downlink counts, or
+// all zero with no IGate.
+func (bs *BeaconService) igateStats() (int, int, int, int) {
+	if bs.igate == nil {
+		return 0, 0, 0, 0
+	}
+
+	return bs.igate.msgCount(), bs.igate.pktCount(), bs.igate.uplinkCount(), bs.igate.downlinkCount()
 }
 
 // heardCount is how many stations bs.heardCounter counts within maxHops in the
@@ -901,14 +927,16 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 		{
 			var last_minutes = 30
 
+			var msgCount, pktCount, uplinkCount, downlinkCount = bs.igateStats()
+
 			var stuff = fmt.Sprintf("<IGATE,MSG_CNT=%d,PKT_CNT=%d,DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d,UPL_CNT=%d,DNL_CNT=%d",
-				igate.msgCount(),
-				igate.pktCount(),
+				msgCount,
+				pktCount,
 				bs.heardCount(0, last_minutes),
 				bs.heardCount(bs.igateConfig.max_digi_hops, last_minutes),
 				bs.heardCount(8, last_minutes),
-				igate.uplinkCount(),
-				igate.downlinkCount())
+				uplinkCount,
+				downlinkCount)
 
 			beacon_text += stuff
 		}
@@ -932,7 +960,9 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			text_color_set(DW_COLOR_XMIT)
 			dw_printf("[ig] %s\n", beacon_text)
 
-			igate.sendRecPacket(-1, pp) // Channel -1 to avoid RF>IS filtering.
+			if bs.igate != nil {
+				bs.igate.sendRecPacket(-1, pp) // Channel -1 to avoid RF>IS filtering.
+			}
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
 			var alevel ax25.ALevel

@@ -81,20 +81,14 @@ type recPacketTest struct {
 }
 
 // setupRecPacketTest sets up everything app_process_rec_packet hands a packet
-// on to, with nothing configured that would transmit, and puts back the
-// globals it still needs - those other files read too - when the test ends.
+// on to, with nothing configured that would transmit, and puts logrus's output
+// back when the test ends.
 func setupRecPacketTest(t *testing.T) *recPacketTest {
 	t.Helper()
 
-	var (
-		origIGate  = igate
-		origLogOut = logrus.StandardLogger().Out
-	)
+	var origLogOut = logrus.StandardLogger().Out
 
-	t.Cleanup(func() {
-		igate = origIGate
-		logrus.SetOutput(origLogOut)
-	})
+	t.Cleanup(func() { logrus.SetOutput(origLogOut) })
 
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
@@ -122,18 +116,19 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	var digiConfig = new(digi_config_s)
 	var filter = NewPacketFilter(igateConfig, aprs.NewDecoderFromDataFiles(), heardDB, 0)
 
-	igate = NewIGate(audioConfig, igateConfig, digiConfig, filter, heardDB, 0)
+	var ig = NewIGate(audioConfig, igateConfig, digiConfig, filter, heardDB, 0)
 
 	var handler = new(recPacketHandler)
+	handler.toIGate = ig.sendRecPacket
 	handler.audioConfig = audioConfig
 	handler.ttConfig = new(tt_config_s) // No touch tones.
 	handler.decoder = aprs.NewDecoderFromDataFiles()
 	handler.logger = aprslog.New(false, "")
 	handler.heard = heardDB
 	handler.waypoints = ws
-	handler.digipeater = NewDigipeater(audioConfig, digiConfig, filter)
+	handler.digipeater = NewDigipeater(audioConfig, digiConfig, filter, nil)
 	handler.connectedDigipeater = NewConnectedDigipeater(audioConfig, new(cdigi_config_s), filter)
-	handler.ttGateway = NewTTGateway(audioConfig, handler.ttConfig, nil, handler.digipeater.Remember, nil, 0)
+	handler.ttGateway = NewTTGateway(audioConfig, handler.ttConfig, nil, handler.digipeater.Remember, nil, nil, 0)
 
 	return &recPacketTest{handler: handler, audioConfig: audioConfig, waypoints: waypoints}
 }
@@ -415,6 +410,24 @@ func Test_app_process_rec_packet_ais_to_object(t *testing.T) {
 
 	// The position goes out as a waypoint named after the vessel.
 	assert.Contains(t, rt.readWaypoint(t), "366730000")
+}
+
+// A received APRS packet goes to the IGate only if it can be trusted: heard
+// clean, or put right by FEC, but not mended by flipping bits.
+func Test_app_process_rec_packet_hands_trusted_APRS_to_the_IGate(t *testing.T) {
+	var rt = setupRecPacketTest(t)
+
+	var toIGate []string
+
+	rt.handler.toIGate = func(channel int, pp *ax25.Packet) {
+		toIGate = append(toIGate, fmt.Sprintf("%d %s", channel, pp.Info()))
+	}
+
+	rt.processRecPacket(t, 0, 0, ax25.FromText("Q1TEST>APRS:>clean", true), goodLevel(), fec_type_none, RETRY_NONE, "")
+	rt.processRecPacket(t, 0, 0, ax25.FromText("Q1TEST>APRS:>fx25", true), goodLevel(), fec_type_fx25, RETRY_NONE, "")
+	rt.processRecPacket(t, 0, 0, ax25.FromText("Q1TEST>APRS:>mended", true), goodLevel(), fec_type_none, RETRY_INVERT_SINGLE, "")
+
+	assert.Equal(t, []string{"0 >clean", "0 >fx25"}, toIGate)
 }
 
 func Test_app_process_rec_packet_multiple_subchannels(t *testing.T) {

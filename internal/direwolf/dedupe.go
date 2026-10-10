@@ -107,6 +107,11 @@ type DedupeService struct {
 	mu         sync.Mutex
 	insertNext int /* Index, in array below, where next item should be stored. */
 	history    [HISTORY_MAX]historyEntry
+
+	// onRemember is told of each packet remembered, and its channel - the
+	// IGate, so it doesn't send to RF what the digipeater already has; nil
+	// for nobody to tell.
+	onRemember func(pp *ax25.Packet, channel int)
 }
 
 /*------------------------------------------------------------------------------
@@ -118,6 +123,9 @@ type DedupeService struct {
  * Input:	ttl	- Number of seconds to retain information
  *			  about recent transmissions.
  *
+ *		onRemember - Told of each packet remembered, and its
+ *			  channel; nil for nobody to tell.
+ *
  *
  * Returns:	New DedupeService
  *
@@ -126,9 +134,10 @@ type DedupeService struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewDedupeService(ttl time.Duration) *DedupeService {
+func NewDedupeService(ttl time.Duration, onRemember func(pp *ax25.Packet, channel int)) *DedupeService {
 	var ds = new(DedupeService)
 	ds.historyTime = ttl
+	ds.onRemember = onRemember
 
 	return ds
 }
@@ -185,7 +194,9 @@ func (ds *DedupeService) Remember(pp *ax25.Packet, channel int) {
 	/* want to do it again if it comes from APRS-IS. */
 	/* Not sure about the other way around. */
 
-	igate.igToTxRemember(pp, channel, 1)
+	if ds.onRemember != nil {
+		ds.onRemember(pp, channel)
+	}
 }
 
 /*------------------------------------------------------------------------------

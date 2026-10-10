@@ -127,6 +127,9 @@ type ttUsers struct {
 	// doesn't repeat our own, or is nil.
 	remember func(pp *ax25.Packet, channel int)
 
+	// toIGate sends an object report to APRS-IS, or is nil for no IGate.
+	toIGate func(channel int, pp *ax25.Packet)
+
 	mu   sync.Mutex
 	user [MAX_TT_USERS]tt_user_s
 }
@@ -658,7 +661,9 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	if first_time && u.ttConfig.obj_send_to_ig > 0 {
 		// text_color_set(DW_COLOR_DEBUG);
 		// dw_printf ("xmit_object_report (): send to IGate\n");
-		igate.sendRecPacket(u.ttConfig.obj_recv_chan, pp)
+		if u.toIGate != nil {
+			u.toIGate(u.ttConfig.obj_recv_chan, pp)
+		}
 	}
 
 	if !first_time && u.ttConfig.obj_xmit_chan >= 0 {

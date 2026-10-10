@@ -5,12 +5,14 @@ package direwolf
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -247,4 +249,27 @@ func TestTqAppendOutOfRangeChannel(t *testing.T) {
 
 	assert.Equal(t, 0, transmitQueue.Count(0, -1, "", "", false),
 		"an out-of-range request should not have landed on a real channel")
+}
+
+// A packet for the IGate's channel goes to the IGate the queue was handed,
+// not into a queue for a transmitter.
+func TestAppendForTheIGateChannelGoesToTheIGate(t *testing.T) {
+	var audio = new(RadioConfig)
+	audio.chan_medium[MAX_RADIO_CHANS] = MEDIUM_IGATE
+
+	var tq = NewTransmitQueue()
+	tq.Init(audio)
+
+	var sent []string
+
+	tq.SetIGate(func(channel int, pp *ax25.Packet) {
+		sent = append(sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
+	})
+
+	var pp = ax25.FromText("Q1TEST>APRS:hello", true)
+	require.NotNil(t, pp)
+
+	testutils.CaptureOutput(t, func() { tq.Append(MAX_RADIO_CHANS, TQ_PRIO_1_LO, pp) })
+
+	assert.Equal(t, []string{fmt.Sprintf("%d Q1TEST>APRS:hello", MAX_RADIO_CHANS)}, sent)
 }

@@ -140,13 +140,13 @@ func FuzzIGateServerLines(f *testing.F) {
 			t.Skip()
 		}
 
-		setupIGateFromServer(t)
+		var ig = setupIGateFromServer(t)
 
 		var lines = new(igateLineReader)
 
 		for _, b := range stream {
 			if line, complete := lines.add(b); complete {
-				igate.processServerLine(line)
+				ig.processServerLine(line)
 			}
 		}
 	})
@@ -155,10 +155,8 @@ func FuzzIGateServerLines(f *testing.F) {
 // setupIGateFromServer gives FuzzIGateServerLines an IGate that will pass
 // what it hears from the server both to the radio and to ICHANNEL, with
 // nothing connected - processServerLine doesn't need the socket.
-func setupIGateFromServer(t *testing.T) {
+func setupIGateFromServer(t *testing.T) *IGate {
 	t.Helper()
-
-	var origIGate = igate
 
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
@@ -172,14 +170,12 @@ func setupIGateFromServer(t *testing.T) {
 	igateConfig.igmsp = 1
 
 	var heardDB = mheard.New(0)
-	igate = NewIGate(audioConfig, igateConfig, new(digi_config_s), NewPacketFilter(igateConfig, nil, heardDB, 0), heardDB, 0)
+	var ig = NewIGate(audioConfig, igateConfig, new(digi_config_s), NewPacketFilter(igateConfig, nil, heardDB, 0), heardDB, 0)
 
 	transmitQueue.Init(audioConfig)
 	dataLinkQueue.Init()
 
 	t.Cleanup(func() {
-		igate = origIGate
-
 		for p := range TQ_NUM_PRIO {
 			for transmitQueue.Remove(0, p) != nil { //revive:disable-line:empty-block
 			}
@@ -187,6 +183,8 @@ func setupIGateFromServer(t *testing.T) {
 
 		dataLinkQueue.Init()
 	})
+
+	return ig
 }
 
 // fuzzAGWServer returns a server with a client attached as client 0, by way of

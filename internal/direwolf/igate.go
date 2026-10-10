@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -223,12 +222,6 @@ type igateStats struct {
 	/* not the special case of telemetry metadata. */
 	msgCount int
 }
-
-// igate is the IGate.  Until DirewolfMain replaces it with a configured one,
-// it is inert - no configuration, no connection - so that the packet paths
-// which reach for it before, or without, an IGate being set up find something
-// harmless rather than nil.
-var igate = NewIGate(nil, nil, nil, nil, nil, 0)
 
 // igateHeard is what the IGate keeps about the stations it hears from APRS-IS
 // and the courtesy positions it owes message senders.  *mheard.DB is one.
@@ -2096,6 +2089,11 @@ func (h *ig2txHistory) reset() {
 		// Not a channel, so an empty slot is not a match for channel 0.
 		h.entries[n].channel = 0xff
 	}
+}
+
+// rememberDigipeated is igToTxRemember for a packet the digipeater sent.
+func (ig *IGate) rememberDigipeated(pp *ax25.Packet, channel int) {
+	ig.igToTxRemember(pp, channel, 1)
 }
 
 func (ig *IGate) igToTxRemember(pp *ax25.Packet, channel int, bydigi int) {

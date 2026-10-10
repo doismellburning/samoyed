@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/aprslog"
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
@@ -170,7 +171,7 @@ func Test_NewBeaconService_obeacon_without_objname_is_ignored(t *testing.T) {
 	cfg.beacon[0].every = 600
 	// objname intentionally empty
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
@@ -186,7 +187,7 @@ func Test_NewBeaconService_pbeacon_without_lat_lon_is_ignored(t *testing.T) {
 	cfg.beacon[0].every = 600
 	// lat and lon are left unset, which is what the zero value of a Maybe means.
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
@@ -203,7 +204,7 @@ func Test_NewBeaconService_pbeacon_with_valid_lat_lon_not_ignored(t *testing.T) 
 	cfg.beacon[0].lat = maybe.Just(42.3601)
 	cfg.beacon[0].lon = maybe.Just(-71.0589)
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 	assert.Equal(t, BEACON_POSITION, bs.miscConfig.beacon[0].btype)
 }
 
@@ -219,7 +220,7 @@ func Test_NewBeaconService_cbeacon_without_custom_info_is_ignored(t *testing.T) 
 	cfg.beacon[0].every = 600
 	// custom_info and custom_infocmd intentionally empty
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
@@ -235,7 +236,7 @@ func Test_NewBeaconService_cbeacon_with_custom_info_not_ignored(t *testing.T) {
 	cfg.beacon[0].every = 600
 	cfg.beacon[0].custom_info = ">Hello from Q1TEST"
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 	assert.Equal(t, BEACON_CUSTOM, bs.miscConfig.beacon[0].btype)
 }
 
@@ -250,7 +251,7 @@ func Test_NewBeaconService_ibeacon_without_igate_config_is_ignored(t *testing.T)
 	cfg.beacon[0].delay = 60
 	cfg.beacon[0].every = 600
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
@@ -265,7 +266,7 @@ func Test_NewBeaconService_ibeacon_with_igate_config_not_ignored(t *testing.T) {
 	cfg.beacon[0].delay = 60
 	cfg.beacon[0].every = 600
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 	assert.Equal(t, BEACON_IGATE, bs.miscConfig.beacon[0].btype)
 }
 
@@ -285,7 +286,7 @@ func Test_NewBeaconService_missing_mycall_is_ignored(t *testing.T) {
 	cfg.beacon[0].lat = maybe.Just(42.0)
 	cfg.beacon[0].lon = maybe.Just(-71.0)
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
@@ -305,7 +306,7 @@ func Test_NewBeaconService_invalid_channel_medium_is_ignored(t *testing.T) {
 	cfg.beacon[0].lat = maybe.Just(42.0)
 	cfg.beacon[0].lon = maybe.Just(-71.0)
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
@@ -326,7 +327,7 @@ func Test_NewBeaconService_axudp_channel_not_ignored(t *testing.T) {
 	cfg.beacon[0].lat = maybe.Just(42.0)
 	cfg.beacon[0].lon = maybe.Just(-71.0)
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 	assert.Equal(t, BEACON_POSITION, bs.miscConfig.beacon[0].btype)
 }
 
@@ -345,7 +346,7 @@ func Test_NewBeaconService_sets_next_time_from_delay(t *testing.T) {
 	cfg.beacon[0].lon = maybe.Just(-71.0)
 
 	var before = time.Now()
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 
 	var next = bs.miscConfig.beacon[0].next
 	assert.WithinDuration(t, before.Add(120*time.Second), next, 5*time.Second,
@@ -365,7 +366,7 @@ func Test_NewBeaconService_slotted_beacon_adjusts_interval_if_not_IS_GOOD(t *tes
 	cfg.beacon[0].lat = maybe.Just(42.0)
 	cfg.beacon[0].lon = maybe.Just(-71.0)
 
-	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil)
+	var bs = NewBeaconService(modem, cfg, igate, nil, nil, nil, nil)
 
 	// After adjustment, every should be a valid divisor of 3600
 	assert.True(t, IS_GOOD(bs.miscConfig.beacon[0].every),
@@ -874,15 +875,47 @@ func Test_BeaconSend_ichannel_uses_channel_0_call(t *testing.T) {
 	assert.Nil(t, transmitQueue.Remove(1, TQ_PRIO_1_LO))
 }
 
+// recordingBeaconIGate is an IGate that reports fixed counts and records the
+// packets it is given.
+type recordingBeaconIGate struct {
+	sent []string
+}
+
+func (r *recordingBeaconIGate) sendRecPacket(channel int, pp *ax25.Packet) {
+	r.sent = append(r.sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
+}
+
+func (*recordingBeaconIGate) msgCount() int      { return 1 }
+func (*recordingBeaconIGate) pktCount() int      { return 2 }
+func (*recordingBeaconIGate) uplinkCount() int   { return 3 }
+func (*recordingBeaconIGate) downlinkCount() int { return 4 }
+
 func Test_BeaconSend_to_igate_bypasses_transmit_queue(t *testing.T) {
 	var bs = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
 	bs.miscConfig.beacon[0].sendto_type = SENDTO_IGATE
 
+	var ig = new(recordingBeaconIGate)
+	bs.igate = ig
+
 	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assertNothingSent(t)
+	assert.Equal(t, []string{"-1 Q1TEST>" + beaconDefaultDest() + ":>Hello"}, ig.sent, "on its way to APRS-IS, channel -1 to skip RF>IS filtering")
+}
+
+// The IGate statistics beacon reports the counts of the IGate it was given.
+func Test_BeaconSend_igate_status_reports_the_igates_counts(t *testing.T) {
+	var bs = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_IGATE
+	bs.igate = new(recordingBeaconIGate)
+
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
+
+	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+
+		":<IGATE,MSG_CNT=1,PKT_CNT=2,DIR_CNT=0,LOC_CNT=0,RF_CNT=0,UPL_CNT=3,DNL_CNT=4",
+		sentBeacon(t))
 }
 
 func Test_BeaconSend_to_recv_is_simulated_reception(t *testing.T) {
@@ -1150,7 +1183,7 @@ func Test_NewBeaconService_tbeacon_without_gps_is_ignored(t *testing.T) {
 	cfg.beacon[0].btype = BEACON_TRACKER
 	cfg.beacon[0].every = 600
 
-	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil, nil, nil)
+	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil, nil, nil, nil)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
@@ -1165,7 +1198,7 @@ func Test_NewBeaconService_tbeacon_with_gps_not_ignored(t *testing.T) {
 	cfg.beacon[0].btype = BEACON_TRACKER
 	cfg.beacon[0].every = 600
 
-	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), gps, nil, nil)
+	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), gps, nil, nil, nil)
 	assert.Equal(t, BEACON_TRACKER, bs.miscConfig.beacon[0].btype)
 }
 
@@ -1184,7 +1217,7 @@ func Test_NewBeaconService_info_on_non_custom_beacons_is_only_complained_about(t
 	cfg.beacon[1].btype = BEACON_TRACKER
 	cfg.beacon[1].custom_infocmd = "q1test-cmd"
 
-	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), gps, nil, nil)
+	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), gps, nil, nil, nil)
 	assert.Equal(t, BEACON_POSITION, bs.miscConfig.beacon[0].btype)
 	assert.Equal(t, BEACON_TRACKER, bs.miscConfig.beacon[1].btype)
 }
@@ -1197,7 +1230,7 @@ func Test_NewBeaconService_obeacon_with_objname_and_position_not_ignored(t *test
 	cfg.beacon[0].lat = maybe.Just(42.0)
 	cfg.beacon[0].lon = maybe.Just(-71.0)
 
-	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil, nil, nil)
+	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil, nil, nil, nil)
 	assert.Equal(t, BEACON_OBJECT, bs.miscConfig.beacon[0].btype)
 }
 
@@ -1212,7 +1245,7 @@ func Test_NewBeaconService_out_of_range_channels_use_channel_0_call(t *testing.T
 	cfg.beacon[1].sendto_chan = MAX_TOTAL_CHANS
 	cfg.beacon[2].btype = BEACON_IGNORE
 
-	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil, nil, nil)
+	var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil, nil, nil, nil)
 	assert.Equal(t, BEACON_CUSTOM, bs.miscConfig.beacon[0].btype)
 	assert.Equal(t, BEACON_CUSTOM, bs.miscConfig.beacon[1].btype)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[2].btype)
@@ -1239,7 +1272,7 @@ func Test_NewBeaconService_slotted_beacon_schedule(t *testing.T) {
 			cfg.beacon[0].every = tt.every
 
 			var before = time.Now()
-			var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil, nil, nil)
+			var bs = NewBeaconService(makeBeaconModemConfig(), cfg, new(igate_config_s), nil, nil, nil, nil)
 			var bp = bs.miscConfig.beacon[0]
 
 			assert.Equal(t, tt.wantEvery, bp.every)

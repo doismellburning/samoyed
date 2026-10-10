@@ -83,14 +83,14 @@ func freeTCPPort(t *testing.T) int {
 func TestIGateConnectThreadWaitsBeforeRedialling(t *testing.T) {
 	const failed = "samoyed_igate_failed_connects_total"
 
-	setupIGate(t)
+	var ig, _ = setupIGate(t)
 
-	var conn, _ = igate.connection()
-	igate.dropConnection(conn)
+	var conn, _ = ig.connection()
+	ig.dropConnection(conn)
 
-	igate.config.t2_server_name = "127.0.0.1"
-	igate.config.t2_server_port = freeTCPPort(t)
-	igate.retryInterval = 200 * time.Millisecond
+	ig.config.t2_server_name = "127.0.0.1"
+	ig.config.t2_server_port = freeTCPPort(t)
+	ig.retryInterval = 200 * time.Millisecond
 
 	var failedBefore = metricValue(t, failed, map[string]string{})
 
@@ -98,7 +98,7 @@ func TestIGateConnectThreadWaitsBeforeRedialling(t *testing.T) {
 		var ctx, cancel = context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 
-		igate.connectThread(ctx)
+		ig.connectThread(ctx)
 	})
 
 	var attempts = metricValue(t, failed, map[string]string{}) - failedBefore

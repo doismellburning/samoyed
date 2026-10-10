@@ -100,7 +100,7 @@ func Test_Digipeater(t *testing.T) {
 	digipeaterTestMyCall = "WB2OSZ-9"
 
 	digipeaterTestDigi = new(Digipeater)
-	digipeaterTestDigi.dedupe = NewDedupeService(100 * time.Millisecond)
+	digipeaterTestDigi.dedupe = NewDedupeService(100*time.Millisecond, nil)
 
 	/*
 	 * Compile the patterns.
