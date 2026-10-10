@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"io"
 	"net"
-	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -31,78 +30,6 @@ import (
 // Seeds added here run as ordinary unit tests under "go test", so an input
 // that once crashed a decoder stays checked even when nobody is fuzzing.
 // Fuzzing proper is "go test ./internal/direwolf/ -run XXX -fuzz FuzzSomething".
-
-// The decoders narrate a malformed packet at length, and a fuzzing run has
-// nobody to read it, so point stdout, and logrus, at the bin for the duration.
-func fuzzQuietly(tb testing.TB) {
-	tb.Helper()
-
-	var devNull, err = os.OpenFile(os.DevNull, os.O_WRONLY, 0)
-	require.NoError(tb, err)
-
-	var saved = os.Stdout
-	os.Stdout = devNull
-
-	tb.Cleanup(func() {
-		os.Stdout = saved
-		devNull.Close()
-	})
-
-	testutils.DiscardLogrus(tb)
-}
-
-// FuzzAX25FromFrame covers the path every received frame takes, from the
-// modem, a KISS client, a network TNC, an AGW client or IL2P: build a packet
-// from the bytes off the air, then ask it the questions the receive path asks.
-func FuzzAX25FromFrame(f *testing.F) {
-	fuzzQuietly(f)
-
-	// An ordinary APRS position report.
-	var pp = ax25.FromText("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#", true)
-	require.NotNil(f, pp)
-	f.Add(pp.FrameData())
-
-	// Addresses and a control byte, with no PID and no information part:
-	// the shortest frame AX25FromFrame accepts (issue #670).
-	f.Add([]byte("000000000000010"))
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		var pp = ax25.FromFrame(data, ax25.ALevel{Rec: 50, Mark: 50, Space: 50})
-		if pp == nil {
-			return
-		}
-
-		pp.FormatAddrs()
-		pp.Info()
-		pp.FormatViaPath()
-		pp.FrameType()
-		pp.IsAPRS()
-		pp.DedupeCRC()
-		pp.DTI()
-		pp.CheckAddresses(ax25.AddrLenient)
-	})
-}
-
-// FuzzAX25FromText covers the other way in: a monitor-format string, as the
-// APRS-IS connection and the command line tools hand us.
-func FuzzAX25FromText(f *testing.F) {
-	fuzzQuietly(f)
-
-	f.Add("Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#")
-	f.Add("Q1TEST>APDW17::Q2TEST   :Hello")
-	f.Add(">:")
-
-	f.Fuzz(func(t *testing.T, monitor string) {
-		var pp = ax25.FromTextWithStrictness(monitor, ax25.AddrLenient)
-		if pp == nil {
-			return
-		}
-
-		pp.FormatAddrs()
-		pp.Info()
-		pp.FrameType()
-	})
-}
 
 // kissFuzzMaxStream bounds the streams the KISS targets try.  Room for an
 // overlong frame and a few hundred short ones is all the collector needs, and
@@ -141,7 +68,7 @@ func kissFuzzSeeds(f *testing.F) {
 // the TCP port, the serial port or the pseudo terminal: anyone who can reach
 // one of those reaches this, frame collection and command handling both.
 func FuzzKissRecByte(f *testing.F) {
-	fuzzQuietly(f)
+	testutils.FuzzQuietly(f)
 	kissFuzzSeeds(f)
 
 	f.Fuzz(func(t *testing.T, stream []byte, debug byte) {
@@ -163,7 +90,7 @@ func FuzzKissRecByte(f *testing.F) {
 // FuzzNetTNCRecByte covers what a network TNC sends us, for the channel it is
 // attached to - it is at the far end of a TCP connection, and may not be ours.
 func FuzzNetTNCRecByte(f *testing.F) {
-	fuzzQuietly(f)
+	testutils.FuzzQuietly(f)
 	kissFuzzSeeds(f)
 
 	f.Fuzz(func(t *testing.T, stream []byte, debug byte) {
@@ -191,7 +118,7 @@ const igateFuzzMaxStream = 4 * igateMaxLineLen
 // into a frame for the radio and for a client application.  The server is
 // across the internet, and anything sent to it by anyone comes back out.
 func FuzzIGateServerLines(f *testing.F) {
-	fuzzQuietly(f)
+	testutils.FuzzQuietly(f)
 
 	for _, seed := range []string{
 		"# aprsc 2.1.19-g730c5c0\r\n# logresp Q1TEST verified, server T2TEST\r\n",
@@ -490,7 +417,7 @@ func linkFuzzAddrs(cr byte) []byte {
 // Q1TEST registered for incoming connections, so a frame can reach every
 // state, not just the disconnected one every link starts in.
 func FuzzAX25Link(f *testing.F) {
-	fuzzQuietly(f)
+	testutils.FuzzQuietly(f)
 	fuzzLinkKeep(f)
 
 	var agw = fuzzAGWServer(f)
@@ -684,7 +611,7 @@ func agwFuzzDigis(digis ...string) []byte {
 // cmdListenThread cuts the socket, with the last one's data stopping where the
 // stream does.
 func FuzzAGWHandleClientCommand(f *testing.F) {
-	fuzzQuietly(f)
+	testutils.FuzzQuietly(f)
 	fuzzLinkKeep(f)
 
 	var s = fuzzAGWServer(f)
