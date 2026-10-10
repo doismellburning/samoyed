@@ -40,6 +40,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/touchtone"
+	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
 )
@@ -1682,7 +1683,7 @@ func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel, recFrame fr
 	// Application version might be useful in case we end up using different
 	// message formats in later versions.
 	var src = "DTMF"
-	var dest = fmt.Sprintf("%s%d%d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
+	var dest = fmt.Sprintf("%s%d%d", version.Tocall, version.Major, version.Minor)
 	var raw_tt_msg = fmt.Sprintf("%s>%s:t%s", src, dest, msg)
 
 	var pp = ax25.FromText(raw_tt_msg, true)

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package version
 
 import (
 	"io"
@@ -61,24 +61,24 @@ func TestVersionGetBuildSettingOrDefault(t *testing.T) {
 	assert.Equal(t, "fallback", getBuildSettingOrDefault(new(debug.BuildInfo), "vcs.time", "fallback"))
 }
 
-func TestVersionPrintVersion(t *testing.T) {
-	var oldVersion = SAMOYED_VERSION
+func TestVersionPrint(t *testing.T) {
+	var oldVersion = Version
 
-	t.Cleanup(func() { SAMOYED_VERSION = oldVersion })
+	t.Cleanup(func() { Version = oldVersion })
 
 	t.Run("unknown version", func(t *testing.T) {
-		SAMOYED_VERSION = ""
+		Version = ""
 
-		var out = captureVersionStdout(t, func() { printVersion(false) })
+		var out = captureVersionStdout(t, func() { Print(false) })
 
 		assert.Contains(t, out, "Samoyed - Version !UNKNOWN! (revision ")
 		assert.NotContains(t, out, "BuildInfo:")
 	})
 
 	t.Run("set version, verbose", func(t *testing.T) {
-		SAMOYED_VERSION = "2026.09.27"
+		Version = "2026.09.27"
 
-		var out = captureVersionStdout(t, func() { printVersion(true) })
+		var out = captureVersionStdout(t, func() { Print(true) })
 
 		assert.Contains(t, out, "Samoyed - Version 2026.09.27 (revision ")
 		assert.Contains(t, out, ", built at ")

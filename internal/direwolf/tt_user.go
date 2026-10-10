@@ -29,6 +29,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/touchtone"
+	"github.com/doismellburning/samoyed/internal/version"
 )
 
 /*
@@ -788,9 +789,9 @@ func (u *ttUsers) objectReportText(i int, first_time bool) string {
 	}
 
 	stemp += ">"
-	stemp += APP_TOCALL
-	stemp += string(rune('0' + MAJOR_VERSION))
-	stemp += string(rune('0' + MINOR_VERSION)) // TODO KG This seems to assume some limits on version numbers...
+	stemp += version.Tocall
+	stemp += string(rune('0' + version.Major))
+	stemp += string(rune('0' + version.Minor)) // TODO KG This seems to assume some limits on version numbers...
 
 	/*
 	 * Append via path, for transmission, if specified.

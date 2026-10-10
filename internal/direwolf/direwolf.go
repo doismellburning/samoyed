@@ -22,6 +22,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/symbols"
+	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/doismellburning/samoyed/internal/waypoint"
 	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/doismellburning/samoyed/internal/xid"
@@ -157,7 +158,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if *showVersion {
-		printVersion(true)
+		version.Print(true)
 		os.Exit(0)
 	}
 
@@ -420,7 +421,7 @@ x = Silence FX.25 information.`)
 	// Might want to print OS version here.   For Windows, see:
 	// https://msdn.microsoft.com/en-us/library/ms724451(v=VS.85).aspx
 
-	printVersion(false)
+	version.Print(false)
 
 	go resetSignalsOnCancel(ctx)
 
@@ -1202,7 +1203,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 					A.Comment)
 
 				// TODO Bodge
-				ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.Src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)
+				ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.Src, version.Tocall, version.Major, version.Minor, ais_obj_info)
 
 				logrus.WithFields(logrus.Fields{
 					"channel":        channel,
