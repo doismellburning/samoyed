@@ -274,6 +274,14 @@ Reference
         (see :doc:`node`).
         Left out, there is no admin API.
 
+    ``chat``
+        A chat server, as the shell's ``CHAT`` command (see :doc:`node`),
+        with ``defaultRoom``, the room users start in (``General``),
+        and ``rateLines`` and ``rateWindow``,
+        how many lines a user may send in how long before the rest are turned away
+        (10 in ``30s``; ``rateLines: 0`` for no limit).
+        ``chat: {}`` gives one with the defaults.
+
     .. code:: yaml
 
         node:
@@ -282,6 +290,7 @@ Reference
             Sysop: Q1TEST.
           idleTimeout: 20m
           adminToken: a-long-random-string
+          chat: {}
 
 ``mqtt``
     An MQTT broker to publish the node's events to (see :doc:`node`).

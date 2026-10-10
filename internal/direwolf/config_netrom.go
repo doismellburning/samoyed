@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/chat"
 	"github.com/doismellburning/samoyed/internal/mqttpub"
 	"github.com/doismellburning/samoyed/internal/netrom"
 )
@@ -189,6 +190,20 @@ type NodeSettings struct {
 	// AdminToken is the bearer token the web interface's admin API wants;
 	// left out, there is no admin API.
 	AdminToken string `yaml:"adminToken"`
+
+	// Chat gives the node a chat server; left out, there is none.
+	Chat *ChatSettings `yaml:"chat"`
+}
+
+// ChatSettings describes the node's chat server.
+type ChatSettings struct {
+	// DefaultRoom is the room users start in; left out, "General".
+	DefaultRoom string `yaml:"defaultRoom"`
+
+	// RateLines is how many lines a user may send in RateWindow; left out,
+	// 10 in 30s.  0 is no limit.
+	RateLines  *int           `yaml:"rateLines"`
+	RateWindow *time.Duration `yaml:"rateWindow"`
 }
 
 // MQTTSettings describes where the node publishes its events.  It has no
@@ -234,6 +249,23 @@ const defaultNodeIdleTimeout = 15 * time.Minute
 func (ps *parseState) applyNODE(settings NodeSettings) error {
 	ps.misc.node.Info = settings.Info
 	ps.misc.node_admin_token = settings.AdminToken
+
+	if settings.Chat != nil {
+		var cfg = chat.DefaultConfig()
+		if settings.Chat.DefaultRoom != "" {
+			cfg.DefaultRoom = settings.Chat.DefaultRoom
+		}
+
+		setIf(&cfg.RateLines, settings.Chat.RateLines)
+		setIf(&cfg.RateWindow, settings.Chat.RateWindow)
+
+		var _, err = chat.New(cfg)
+		if err != nil {
+			return fmt.Errorf("line %d: %w", ps.line, err)
+		}
+
+		ps.misc.node_chat = &cfg
+	}
 
 	if settings.IdleTimeout != nil {
 		if *settings.IdleTimeout < 0 {

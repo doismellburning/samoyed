@@ -39,7 +39,7 @@ func TestRunPublishesEvents(t *testing.T) {
 	var port = 3
 	events <- nodeevents.Event{
 		Time: time.Unix(1000, 0).UTC(), Kind: nodeevents.LinkUp, Node: "Q1TEST", Port: &port,
-		Local: "", Remote: "Q2TEST", User: "", Incoming: false, Role: "user", Error: "",
+		Local: "", Remote: "Q2TEST", User: "", Incoming: false, Role: "user", Error: "", Room: "",
 		Destinations: 0, Neighbours: 0,
 	}
 	close(events)

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/chat"
 	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -172,4 +173,64 @@ mqtt:
 
 	c = parseYAMLConfig(t, "")
 	assert.Equal(t, defaultNodeIdleTimeout, c.misc.node.IdleTimeout)
+}
+
+func TestNodeChat(t *testing.T) {
+	var n = newFakeNet(t)
+	var a = n.add("Q1TEST", "ONE")
+	require.NoError(t, a.addChat(chat.DefaultConfig()))
+
+	n.userConnects("Q4TEST", "Q1TEST")
+	n.userConnects("Q5TEST", "Q1TEST")
+	n.userSaw("Q4TEST")
+	n.userSaw("Q5TEST")
+
+	n.userTypes("Q4TEST", "Q1TEST", "?\r")
+	assert.Contains(t, n.userSaw("Q4TEST"), "CHAT", "chat is a command of the shell")
+
+	n.userTypes("Q4TEST", "Q1TEST", "CHAT\r")
+	n.userTypes("Q5TEST", "Q1TEST", "chat\r")
+	n.userSaw("Q5TEST")
+	assert.Contains(t, n.userSaw("Q4TEST"), "*** Q5TEST has joined General.")
+
+	n.userTypes("Q4TEST", "Q1TEST", "hello\r")
+	assert.Equal(t, "<Q4TEST> hello\n", n.userSaw("Q5TEST"))
+
+	var ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	go a.run(ctx)
+
+	var w = newNodeWeb("s3cret")
+	w.set(a)
+
+	var h = webui.Handler(webui.NewHub(), w.routes()...)
+
+	var rooms []chat.Room
+	require.Equal(t, http.StatusOK, get(t, h, "/api/node/chat", &rooms))
+	assert.Equal(t, []chat.Room{{Name: "General", Users: []string{"Q4TEST", "Q5TEST"}}}, rooms)
+
+	assert.Equal(t, http.StatusBadRequest, post(t, h, http.MethodPost, "/api/admin/chat/announce", "s3cret", `{"text": "two\nlines"}`))
+	assert.Equal(t, http.StatusNoContent, post(t, h, http.MethodPost, "/api/admin/chat/announce", "s3cret", `{"text": "rebooting soon"}`))
+
+	// The action is done by the time the response comes back.
+	assert.Contains(t, n.users["Q4TEST"].String(), "*** Announcement: rebooting soon")
+}
+
+func TestConfigNodeChat(t *testing.T) {
+	var c = parseYAMLConfig(t, "node:\n  chat:\n    defaultRoom: lobby\n    rateLines: 0\n")
+	require.Zero(t, c.errors, c.output)
+	require.NotNil(t, c.misc.node_chat)
+	assert.Equal(t, "lobby", c.misc.node_chat.DefaultRoom)
+	assert.Zero(t, c.misc.node_chat.RateLines)
+
+	c = parseYAMLConfig(t, "node:\n  chat: {}\n")
+	require.Zero(t, c.errors, c.output)
+	assert.Equal(t, chat.DefaultRoom, c.misc.node_chat.DefaultRoom)
+
+	c = parseYAMLConfig(t, "node:\n  chat:\n    defaultRoom: not valid\n")
+	assert.NotZero(t, c.errors)
+
+	c = parseYAMLConfig(t, "node:\n  info: x\n")
+	assert.Nil(t, c.misc.node_chat)
 }

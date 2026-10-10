@@ -32,6 +32,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/axudp"
+	"github.com/doismellburning/samoyed/internal/chat"
 	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/coordconvutil"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -175,6 +176,8 @@ type misc_config_s struct {
 	node   node.Config    /* How the node serves its users.  YAML only. */
 
 	node_admin_token string /* Bearer token for the node's web admin API; "" disables it. */
+
+	node_chat *chat.Config /* The node's chat server, or nil for none.  YAML only. */
 
 	mqtt *mqttpub.Config /* Where to publish the node's events, or nil for nowhere.  YAML only. */
 

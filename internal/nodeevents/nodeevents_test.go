@@ -14,7 +14,7 @@ import (
 func event(kind Kind) Event {
 	return Event{
 		Time: time.Time{}, Kind: kind, Node: "Q1TEST", Port: nil, Local: "", Remote: "", User: "",
-		Incoming: false, Role: "", Error: "", Destinations: 0, Neighbours: 0,
+		Incoming: false, Role: "", Error: "", Room: "", Destinations: 0, Neighbours: 0,
 	}
 }
 

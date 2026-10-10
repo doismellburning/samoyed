@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/chat"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/doismellburning/samoyed/internal/mqttpub"
 	"github.com/doismellburning/samoyed/internal/netrom"
@@ -90,6 +91,9 @@ type netromNode struct {
 	// events is told what happens; nil for nobody.
 	events *nodeevents.Bus
 
+	// chat is the chat server, or nil for none.
+	chat *chat.Server
+
 	// work carries what is to be run on the node's goroutine.
 	work chan func()
 
@@ -124,6 +128,7 @@ func newNetromNode(cfg netrom.Config, shellCfg node.Config, ports []node.Port, l
 	n.shellCfg = shellCfg
 	n.shellCfg.Call = n.cfg.Call
 	n.shellCfg.Alias = n.cfg.Alias
+	n.shellCfg.Applications = slices.Clone(shellCfg.Applications)
 
 	// Users reach the shell over NET/ROM by connecting to the node itself.
 	var lerr = r.Listen(n.cfg.Call, n.cfg.Alias, 0, n.acceptCircuit)
@@ -240,7 +245,7 @@ func (n *netromNode) logEvent(e netrom.Event) {
 func (n *netromNode) event(kind nodeevents.Kind) nodeevents.Event {
 	return nodeevents.Event{
 		Time: n.now().UTC(), Kind: kind, Node: n.cfg.Call,
-		Port: nil, Local: "", Remote: "", User: "", Incoming: false, Role: "", Error: "",
+		Port: nil, Local: "", Remote: "", User: "", Incoming: false, Role: "", Error: "", Room: "",
 		Destinations: 0, Neighbours: 0,
 	}
 }
@@ -546,6 +551,14 @@ func netrom_init(ctx context.Context, audio *RadioConfig, misc *misc_config_s, l
 	}
 
 	n.events = nodeevents.NewBus(metrics.RecordNodeEventDropped)
+
+	if misc.node_chat != nil {
+		var cerr = n.addChat(*misc.node_chat)
+		if cerr != nil {
+			return nil, cerr
+		}
+	}
+
 	n.start(ctx, links.attach(n))
 
 	logrus.WithFields(logrus.Fields{
@@ -596,4 +609,34 @@ func mqtt_init(ctx context.Context, misc *misc_config_s, n *netromNode) {
 	go mqttpub.Run(ctx, cfg, events, broker)
 
 	logrus.WithFields(logrus.Fields{"broker": cfg.Broker, "topic": cfg.Topic("#")}).Info("Publishing node events to MQTT")
+}
+
+// addChat gives the node a chat server, as a command in its shells.  It must
+// be called before the node starts.
+func (n *netromNode) addChat(cfg chat.Config) error {
+	cfg.Now = n.now
+
+	cfg.OnJoin = func(user string, room string) {
+		var ev = n.event(nodeevents.ChatJoin)
+		ev.User = user
+		ev.Room = room
+		n.events.Publish(ev)
+	}
+
+	cfg.OnLeave = func(user string, room string) {
+		var ev = n.event(nodeevents.ChatLeave)
+		ev.User = user
+		ev.Room = room
+		n.events.Publish(ev)
+	}
+
+	var server, err = chat.New(cfg)
+	if err != nil {
+		return err
+	}
+
+	n.chat = server
+	n.shellCfg.Applications = append(n.shellCfg.Applications, server)
+
+	return nil
 }

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/chat"
 	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/webui"
 )
@@ -55,6 +56,7 @@ func (w *nodeWeb) routes() []webui.Route {
 		{Pattern: "GET /api/node/circuits", Handler: w.view(nodeCircuits)},
 		{Pattern: "GET /api/node/links", Handler: w.view(nodeLinks)},
 		{Pattern: "GET /api/node/heard", Handler: w.view(nodeHeard)},
+		{Pattern: "GET /api/node/chat", Handler: w.view(nodeChat)},
 	}
 
 	if w.token == "" {
@@ -67,6 +69,7 @@ func (w *nodeWeb) routes() []webui.Route {
 		{Pattern: "POST /api/admin/links/close", Handler: w.action(adminCloseLink)},
 		{Pattern: "POST /api/admin/neighbours", Handler: w.action(adminLockNeighbour)},
 		{Pattern: "DELETE /api/admin/neighbours/{port}/{call}", Handler: w.action(adminUnlockNeighbour)},
+		{Pattern: "POST /api/admin/chat/announce", Handler: w.action(adminChatAnnounce)},
 	} {
 		r.Handler = webui.RequireToken(w.token, r.Handler)
 		routes = append(routes, r)
@@ -406,6 +409,48 @@ func adminUnlockNeighbour(n *netromNode, r *http.Request) error {
 	if !n.router.UnlockNeighbour(netrom.NeighbourKey{Port: port, Call: normalisedCall(r.PathValue("call"))}, n.now()) {
 		return errNotFound
 	}
+
+	return nil
+}
+
+// nodeChat lists the chat rooms and who is in them, or nothing without a chat
+// server.
+func nodeChat(n *netromNode) any {
+	if n.chat == nil {
+		return []chat.Room{}
+	}
+
+	var rooms = n.chat.Rooms()
+	if rooms == nil {
+		rooms = []chat.Room{}
+	}
+
+	return rooms
+}
+
+// announceRequest is an announcement to every chat user.
+type announceRequest struct {
+	Text string `json:"text"`
+}
+
+func adminChatAnnounce(n *netromNode, r *http.Request) error {
+	if n.chat == nil {
+		return errNotFound
+	}
+
+	var req announceRequest
+
+	var err = decodeBody(r, &req)
+	if err != nil {
+		return err
+	}
+
+	var text = strings.TrimSpace(req.Text)
+	if text == "" || strings.ContainsAny(text, "\r\n") {
+		return errors.Join(errBadRequest, errors.New("an announcement is one line of text"))
+	}
+
+	n.chat.Announce(text)
 
 	return nil
 }

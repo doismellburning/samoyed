@@ -61,9 +61,43 @@ Commands are not case sensitive, and most have a one-letter form.
 ``?``
     List the commands.
 
+``CHAT``
+    Enter the chat server, if the ``node`` section has a ``chat``.
+
 When a connection onwards closes,
 the user is returned to the node's prompt.
 A user idle for longer than the ``node`` section's ``idleTimeout`` is disconnected.
+
+Chat
+----
+
+The chat server puts a user into a room,
+``General`` unless the configuration says otherwise,
+and sends each line they type to everyone else in it.
+A line starting with ``/`` is a command:
+
+``/join <room>``
+    Move to another room, starting it if nobody is in it yet.
+    A room's name is letters, digits, ``-`` and ``_``, up to sixteen of them.
+
+``/leave``
+    Go back to the room users start in.
+
+``/who [room]``
+    List who is in a room, by default your own.
+
+``/rooms``
+    List the rooms with anyone in them.
+
+``/msg <user> <text>``
+    Send a line to one user, wherever they are.
+
+``/quit``
+    Leave chat, back to the node's prompt.
+
+A user sending lines faster than the configured rate is told to slow down,
+and the lines over it are not sent.
+Rooms are local to the node: they are not linked to chat servers on other nodes.
 
 Watching the node
 -----------------
@@ -90,6 +124,9 @@ The same is there as JSON for other programs:
 ``GET /api/node/heard``
     The stations heard directly on the node's ports.
 
+``GET /api/node/chat``
+    The chat rooms with anyone in them, and who.
+
 MQTT
 ~~~~
 
@@ -112,6 +149,9 @@ as JSON under ``samoyed/<callsign>/``:
 ``heard``
     A station was heard directly on ``port``,
     for the first time or the first in fifteen minutes.
+
+``chat/join``, ``chat/leave``
+    A ``user`` joined or left a chat ``room``.
 
 Each event also has ``time``, ``kind`` and ``node``,
 and ``error`` when a link or circuit went other than in an orderly way.
@@ -143,6 +183,9 @@ who must send the token as ``Authorization: Bearer <token>``:
 ``DELETE /api/admin/neighbours/<port>/<call>``
     Unlock a neighbour, whose routes then age out like any other's
     unless its broadcasts refresh them.
+
+``POST /api/admin/chat/announce``
+    Send everyone in chat a line of text, given by a JSON body with ``text``.
 
 The web interface serves plain HTTP,
 so the token crosses the network in the clear:
