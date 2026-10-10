@@ -37,6 +37,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/sirupsen/logrus"
@@ -167,6 +168,8 @@ type misc_config_s struct {
 
 	web_port int /* TCP Port number for the read-only web dashboard and map. */
 	/* 0 (default) disables it. */
+
+	netrom *netrom.Config /* The NET/ROM node, or nil for none.  YAML only. */
 
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.

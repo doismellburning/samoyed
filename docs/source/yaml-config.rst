@@ -200,6 +200,63 @@ Reference
               - {ax25addr: Q1TEST-2, host: node.example.org, port: 10093, broadcast: true}
               - {ax25addr: Q2TEST, host: 192.0.2.2, port: 93}
 
+``netrom``
+    A NET/ROM node: see :doc:`glossary/netrom`.
+    It has no equivalent in Dire Wolf's format.
+    It has:
+
+    ``call``
+        The node's callsign.
+        Left out, it is the ``mycall`` of the first port's channel.
+
+    ``alias``
+        The node's alias, up to six characters, such as ``SAMOYD``.
+
+    ``ports``
+        The channels NET/ROM runs on - radio, ``NCHANNEL`` or AXUDP - each with
+        ``channel``,
+        ``quality`` (given to neighbours heard there, 0 to 255, 192 if left out)
+        and ``broadcast`` (whether NODES broadcasts are sent there, true if left
+        out).
+
+    ``neighbours``
+        Neighbours configured at a fixed quality rather than learned from their
+        broadcasts, each with ``channel``, ``call``, ``alias`` and ``quality``.
+        Their routes never age out.
+
+    ``minQuality``, ``obsolescence``, ``minObsolescenceBroadcast``, ``broadcastInterval``
+        How routes are judged and aged:
+        the least quality worth keeping (50),
+        what a refreshed route's obsolescence count starts at (6),
+        the least count a route needs to be passed on in our own broadcasts (5),
+        and how often those go out (``30m``).
+
+    ``ttl``, ``window``, ``timeout``, ``retries``, ``ackDelay``, ``busyDelay``, ``idleTimeout``
+        The network and transport layers:
+        the hops a packet may make (16),
+        the transport window offered (4),
+        how long to wait for an acknowledgement before sending again (``120s``)
+        and how many times (3),
+        how long to hold an acknowledgement back in case data can carry it
+        (``3s``),
+        how long to wait when the far end says it is busy (``180s``),
+        and how long a circuit may sit idle before it is closed (``15m``,
+        ``0s`` for never).
+
+    Durations are written as Go durations, such as ``90s`` or ``1h``.
+
+    .. code:: yaml
+
+        netrom:
+          alias: SAMOYD
+          ports:
+            - channel: 0
+              quality: 192
+            - channel: 10
+              quality: 220
+          neighbours:
+            - {channel: 10, call: Q2TEST-2, alias: TWO, quality: 220}
+
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as
     though they were a file of their own - so a channel setting there needs its

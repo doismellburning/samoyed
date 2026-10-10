@@ -677,10 +677,16 @@ x = Silence FX.25 information.`)
 	agwServer.Start(ctx)
 
 	// The connected-mode link layer, after the AGW server whose clients it
-	// tells about the links they asked for.  In-process applications take
-	// links through the same router.
+	// tells about the links they asked for.  In-process applications - the
+	// NET/ROM node - take links through the same router.
 	var linkClients = newLinkRouter(agwServer)
 	ax25_link_init(misc_config, pttControl.Set, linkClients, d_c_opt)
+
+	var netromNode, netromErr = netrom_init(ctx, audio_config, misc_config, linkClients)
+	if netromErr != nil {
+		logrus.WithError(netromErr).Error("Could not start NET/ROM")
+		td.exit(1)
+	}
 
 	metrics_init(ctx, audio_config, misc_config)
 	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
@@ -779,6 +785,7 @@ x = Silence FX.25 information.`)
 	recHandler.apps = clientApplications
 	recHandler.digipeater = aprsDigipeater
 	recHandler.connectedDigipeater = connectedDigipeater
+	recHandler.netrom = netromNode
 	recHandler.ttGateway = ttGateway
 	recHandler.dumpUTF8 = d_u_opt
 	recHandler.dumpPackets = d_p_opt
@@ -835,6 +842,7 @@ type recPacketHandler struct {
 	digipeater          *Digipeater
 	connectedDigipeater *ConnectedDigipeater
 	ttGateway           *TTGateway
+	netrom              *netromNode // Nil without NET/ROM.
 
 	dumpUTF8    bool // "-d u": print UTF-8 in hexadecimal too.
 	dumpPackets bool // "-d p": dump each packet.
@@ -1211,6 +1219,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 
 	/* Send to another application if connected. */
 	rh.apps.SendRecPacket(channel, pp)
+	rh.netrom.heardFrame(channel, pp)
 	webPublishReceived(rh.webHub, channel, subchan, pp, decoded, alevel)
 
 	if rh.aisToObject && len(ais_obj_packet) != 0 {

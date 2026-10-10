@@ -36,6 +36,9 @@ type ConfigFile struct {
 	// AXUDPPorts are the AXUDP ports, each its own virtual channel.
 	AXUDPPorts []AXUDPPortSettings `yaml:"axudpPorts"`
 
+	// NetROM is the NET/ROM node, if there is one.
+	NetROM *NetROMSettings `yaml:"netrom"`
+
 	// Legacy holds directives in the line-at-a-time format, read after
 	// everything else, for anything not yet given a YAML form.
 	Legacy string `yaml:"legacy"`
@@ -157,6 +160,11 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 	ps.applyYAMLAudioDevices(file.AudioDevices, top["audioDevices"])
 	ps.applyYAMLChannels(file.Channels, top["channels"])
 	ps.applyYAMLPorts(file, top)
+
+	if file.NetROM != nil {
+		ps.line = top["netrom"].line(new(yaml.Node))
+		ps.reportIfError(ps.applyNETROM(*file.NetROM))
+	}
 
 	if file.Legacy != "" {
 		// Start the legacy block afresh, as though it were a file of its

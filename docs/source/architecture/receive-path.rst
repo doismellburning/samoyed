@@ -87,6 +87,7 @@ to the application layer and the AX.25 data link state machine.
            beacon [label="Beacons with SENDTO=R\n(simulated reception)"];
            tt [label="APRStt gateway"];
            agw [label="AGW clients\nconnect, disconnect,\ndata, register"];
+           netrom_req [label="NET/ROM node\nconnect, data, register"];
            ptt [label="PTT: channel busy"];
            xmit [label="Transmitter:\nseize confirm"];
        }
@@ -106,6 +107,7 @@ to the application layer and the AX.25 data link state machine.
        beacon -> dlq_frame;
        tt -> dlq_frame;
        agw -> dlq_req;
+       netrom_req -> dlq_req;
        ptt -> dlq_req;
        xmit -> dlq_req;
 
@@ -147,12 +149,14 @@ to the application layer and the AX.25 data link state machine.
            regen [label="APRS digipeater\nRegen"];
            digi [label="APRS digipeater\nDigipeat"];
            cdigi [label="Connected-mode digipeater"];
+           nodes [label="NET/ROM node\nnetromNode.heardFrame"];
        }
 
        app -> log;
        app -> aprsdec [label="APRS"];
        app -> clients;
        app -> web;
+       app -> nodes [label="UI to NODES,\nPID 0xCF"];
        app -> ichan;
        ichan -> ttq [label="no"];
        ttq -> ttseq [label="yes"];
@@ -190,10 +194,14 @@ to the application layer and the AX.25 data link state machine.
        lmx -> states;
 
        tq [label="Transmit queue\n-> transmitter, modulator"];
+       router [label="linkRouter\nby client number"];
        agw_out [label="AGW clients"];
+       netrom_out [label="NET/ROM node\nPID 0xCF: netrom.Router\nothers: users"];
 
        states -> tq [label="frames to send"];
-       states -> agw_out [label="link up and down,\nreceived data"];
+       states -> router [label="link up and down,\nreceived data"];
+       router -> agw_out;
+       router -> netrom_out;
    }
 
 Concurrency
@@ -229,6 +237,14 @@ all go onto the ``DataLinkQueue``.
 ``recv_process`` gives every received frame first to ``recPacketHandler.app_process_rec_packet``
 and then to ``lm_data_indication``,
 the entry point to the data link state machine.
+
+Requests carry a client number,
+and the data link state machine tells ``linkRouter`` what happens on each link under the number that asked for it.
+``linkRouter`` passes that on to the AGW server for its clients' numbers,
+and to an in-process application, such as the NET/ROM node, for the numbers ``linkRouter.attach`` handed it.
+The NET/ROM node also takes NODES broadcasts from ``app_process_rec_packet``.
+It does its work on a goroutine of its own,
+so both hand-offs only queue work for it.
 
 "Clean or FEC" in the diagram means a frame decoded without any bits fixed,
 or one received with FX.25 or IL2P forward error correction.
