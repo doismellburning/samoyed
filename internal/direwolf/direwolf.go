@@ -469,6 +469,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
 	var sink = new(radioSink)
+	sink.recFrame = dataLinkQueue.RecFrame
 
 	var layer2Receiver = multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
 

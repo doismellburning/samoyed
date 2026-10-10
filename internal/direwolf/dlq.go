@@ -192,6 +192,10 @@ func (q *DataLinkQueue) Init() {
 	q.discardWakeUpLocked()
 } /* end Init */
 
+// frameReceiver is where a received frame goes on its way to recv_process:
+// DataLinkQueue.RecFrame, or a stand-in for it.
+type frameReceiver func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
+
 /*-------------------------------------------------------------------
  *
  * Name:        RecFrame

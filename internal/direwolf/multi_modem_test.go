@@ -217,6 +217,28 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	assert.False(t, s.line.PrevRaw(), "the line decoder should not have been given any bits")
 }
 
+// A frame a radio channel decodes goes on to where the sink was told, and
+// nowhere at all if it wasn't told anywhere.
+func TestRadioSinkHandsFramesOn(t *testing.T) {
+	var pp = ax25.FromText("Q1TEST>APRS:heard", true)
+	require.NotNil(t, pp)
+
+	var alevel ax25.ALevel
+
+	assert.NotPanics(t, func() { new(radioSink).RecFrame(0, 0, 0, pp, alevel, fec_type_none, RETRY_NONE, "") })
+
+	var got []string
+
+	var sink = new(radioSink)
+	sink.recFrame = func(channel int, subchan int, slice int, pp *ax25.Packet, _ ax25.ALevel, _ fec_type_t, _ BitFixLevel, spectrum string) {
+		got = append(got, fmt.Sprintf("%d.%d.%d %s%s %s", channel, subchan, slice, pp.FormatAddrs(), pp.Info(), spectrum))
+	}
+
+	sink.RecFrame(1, 2, 3, pp, alevel, fec_type_none, RETRY_NONE, "|_")
+
+	assert.Equal(t, []string{"1.2.3 Q1TEST>APRS:heard |_"}, got)
+}
+
 // A radio channel's DCD output follows the data detected on it.
 func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
 	var set []string
