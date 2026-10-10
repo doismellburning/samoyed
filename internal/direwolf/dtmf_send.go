@@ -1,63 +1,67 @@
 package direwolf
 
-// Sending DTMF, "touch tones", through a channel's tone generator.  The audio
-// for each button comes from dtmfButtonSamples, beside the decoder in dtmf.go.
+// Sending DTMF, "touch tones": the audio for each button comes from
+// dtmfButtonSamples, beside the decoder in dtmf.go, and goes to whatever dtmfSampleSink the caller hands over,
+// typically a channel's tone generator.
 
 import (
 	"github.com/sirupsen/logrus"
 )
 
+// dtmfSampleSink is where dtmfSend puts the audio it generates.
+type dtmfSampleSink interface {
+	// PutSample ships out one audio sample, in the range of a signed 16 bit
+	// integer.
+	PutSample(sam int)
+
+	// Flush pushes out whatever audio is still buffered.
+	Flush()
+}
+
 /*-------------------------------------------------------------------
  *
- * Name:        dtmf_send
+ * Name:        dtmfSend
  *
  * Purpose:    	Generate DTMF tones from text string.
  *
- * Inputs:	toneGenerator	- The channel's tone generator.
+ * Inputs:	out	- Where the audio goes.
  *
- *		channel	- Radio channel number.
+ *		sampleRate - Samples per second of out.
+ *		amplitude - Signal amplitude on scale of 0 .. 100.
  *		str	- Character string to send.  0-9, A-D, *, #
  *		speed	- Number of tones per second.  Range 1 to 10.
  *		txdelay	- Delay (ms) from PTT to start.
  *		txtail	- Delay (ms) from end to PTT off.
  *
- * Returns:	Total number of milliseconds to activate PTT.
- *		This includes delays before the first tone
- *		and after the last to avoid chopping off part of it.
- *
  * Description:	xmit_thread calls this instead of the usual hdlc_send
  *		when we have a special packet that means send DTMF.
+ *		dtmfDuration says how long it takes, PTT included.
  *
  *--------------------------------------------------------------------*/
 
-func dtmf_send(toneGenerator *ToneGenerator, channel int, str string, speed int, txdelay int, txtail int) int {
-	if toneGenerator == nil {
-		logrus.WithField("channel", channel).Error("Invalid channel for tone generation")
-	} else {
-		toneGenerator.SendDTMF(str, speed, txdelay, txtail)
-	}
-
-	return (txdelay +
-		int(1000.0*float64(len(str))/float64(speed)+0.5) +
-		txtail)
-} /* end dtmf_send */
-
-// SendDTMF generates the tones for str, as dtmf_send describes, on the
-// generator's channel.
-func (tg *ToneGenerator) SendDTMF(str string, speed int, txdelay int, txtail int) {
+func dtmfSend(out dtmfSampleSink, sampleRate int, amplitude int, str string, speed int, txdelay int, txtail int) {
 	// Length of tone or gap between.
 	var len_ms = int((500.0 / float64(speed)) + 0.5)
 
-	tg.pushButton(' ', txdelay)
+	pushButton(out, sampleRate, amplitude, ' ', txdelay)
 
 	for _, p := range str {
-		tg.pushButton(p, len_ms)
-		tg.pushButton(' ', len_ms)
+		pushButton(out, sampleRate, amplitude, p, len_ms)
+		pushButton(out, sampleRate, amplitude, ' ', len_ms)
 	}
 
-	tg.pushButton(' ', txtail)
+	pushButton(out, sampleRate, amplitude, ' ', txtail)
 
-	tg.Flush()
+	out.Flush()
+}
+
+// dtmfDuration returns the total number of milliseconds to activate PTT to dtmfSend
+// str at speed.  This includes delays before the first tone and after the last
+// to avoid chopping off part of it.
+func dtmfDuration(str string, speed int, txdelay int, txtail int) int {
+	return (txdelay +
+		int(1000.0*float64(len(str))/float64(speed)+0.5) +
+		txtail)
 }
 
 /*------------------------------------------------------------------
@@ -71,16 +75,40 @@ func (tg *ToneGenerator) SendDTMF(str string, speed int, txdelay int, txtail int
  *		ms	- Duration in milliseconds.
  *			  Use 50 ms for tone and 50 ms of silence for max rate of 10 per second.
  *
- * Outputs:	Audio is sent to radio.
+ * Outputs:	Audio is sent to out.
  *
  *----------------------------------------------------------------*/
 
-func (tg *ToneGenerator) pushButton(button rune, ms int) {
-	var sampleRate = tg.audioConfig.adev[tg.adevIndex].samples_per_sec
-
-	for dtmf := range dtmfButtonSamples(button, ms, sampleRate) {
-		// 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.
+func pushButton(out dtmfSampleSink, sampleRate int, amplitude int, button rune, ms int) {
+	for sample := range dtmfButtonSamples(button, ms, sampleRate) {
+		// 'sample' can be in range of +-2.0 because it is sum of two sine waves.
 		// Amplitude of 100 would use full +-32k range.
-		tg.PutSample(int(dtmf * 16383.0 * float64(tg.amplitude) / 100.0))
+		out.PutSample(int(sample * 16383.0 * float64(amplitude) / 100.0))
 	}
 }
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        dtmf_send
+ *
+ * Purpose:    	Send str as touch tones through a channel's tone generator.
+ *
+ * Inputs:	toneGenerator	- The channel's tone generator.
+ *		channel	- Radio channel number.
+ *		str, speed, txdelay, txtail - As dtmfSend.
+ *
+ * Returns:	Total number of milliseconds to activate PTT, as
+ *		dtmfDuration.
+ *
+ *--------------------------------------------------------------------*/
+
+func dtmf_send(toneGenerator *ToneGenerator, channel int, str string, speed int, txdelay int, txtail int) int {
+	if toneGenerator == nil {
+		logrus.WithField("channel", channel).Error("Invalid channel for tone generation")
+	} else {
+		var sampleRate = toneGenerator.audioConfig.adev[toneGenerator.adevIndex].samples_per_sec
+		dtmfSend(toneGenerator, sampleRate, toneGenerator.amplitude, str, speed, txdelay, txtail)
+	}
+
+	return dtmfDuration(str, speed, txdelay, txtail)
+} /* end dtmf_send */
