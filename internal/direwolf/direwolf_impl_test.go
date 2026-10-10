@@ -131,7 +131,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	handler.logger = aprslog.New(false, "")
 	handler.heard = heardDB
 	handler.waypoints = ws
-	handler.digipeater = NewDigipeater(audioConfig, digiConfig, filter)
+	handler.digipeater = NewDigipeater(audioConfig, digiConfig, filter, nil)
 	handler.connectedDigipeater = NewConnectedDigipeater(audioConfig, new(cdigi_config_s), filter)
 	handler.ttGateway = NewTTGateway(audioConfig, handler.ttConfig, nil, handler.digipeater.Remember, nil, 0)
 

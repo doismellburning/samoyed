@@ -2098,6 +2098,11 @@ func (h *ig2txHistory) reset() {
 	}
 }
 
+// rememberDigipeated is igToTxRemember for a packet the digipeater sent.
+func (ig *IGate) rememberDigipeated(pp *ax25.Packet, channel int) {
+	ig.igToTxRemember(pp, channel, 1)
+}
+
 func (ig *IGate) igToTxRemember(pp *ax25.Packet, channel int, bydigi int) {
 	var now = time.Now()
 	var crc = pp.DedupeCRC()

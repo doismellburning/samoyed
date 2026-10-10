@@ -114,16 +114,20 @@ type Digipeater struct {
  *
  *		filter		- What decides whether FILTER lets a packet through.
  *
+ *		onRemember	- Told of each packet digipeated, and its channel,
+ *				  so the IGate doesn't send the same to RF; nil
+ *				  for nobody to tell.
+ *
  * Description:	Called once at application startup time.
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *PacketFilter) *Digipeater {
+func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *PacketFilter, onRemember func(pp *ax25.Packet, channel int)) *Digipeater {
 	var d = new(Digipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_digi_config
 	d.filter = filter
-	d.dedupe = NewDedupeService(time.Duration(p_digi_config.dedupe_time) * time.Second)
+	d.dedupe = NewDedupeService(time.Duration(p_digi_config.dedupe_time)*time.Second, onRemember)
 
 	return d
 }

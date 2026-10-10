@@ -49,7 +49,7 @@ func setupDigipeater(t *testing.T) (*Digipeater, *digi_config_s) {
 
 	transmitQueue.Init(audioConfig)
 
-	return NewDigipeater(audioConfig, digiConfig, new(PacketFilter)), digiConfig
+	return NewDigipeater(audioConfig, digiConfig, new(PacketFilter), nil), digiConfig
 }
 
 // enableDigipeat turns on digipeating from digiFromChan to the given channel,
@@ -208,7 +208,7 @@ func TestNewDigipeater(t *testing.T) {
 
 	var filter = new(PacketFilter)
 
-	var digi = NewDigipeater(audioConfig, digiConfig, filter)
+	var digi = NewDigipeater(audioConfig, digiConfig, filter, nil)
 
 	assert.Same(t, audioConfig, digi.audioConfig)
 	assert.Same(t, digiConfig, digi.config)
