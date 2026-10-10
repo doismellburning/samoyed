@@ -665,7 +665,7 @@ x = Silence FX.25 information.`)
 	 */
 	var mheardDB = mheard.New(d_m_opt)
 	var packetFilter = NewPacketFilter(&igate_config, aprsDecoder, mheardDB, d_f_opt)
-	igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, d_i_opt)
+	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, d_i_opt)
 	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated)
 
 	// The transmit queue predates the IGate, and nothing queues a packet for
@@ -771,6 +771,7 @@ x = Silence FX.25 information.`)
 	var recHandler = new(recPacketHandler)
 	recHandler.audioConfig = audio_config
 	recHandler.layout = layer2Receiver.Layout
+	recHandler.toIGate = igate.sendRecPacket
 	recHandler.ttConfig = &dw_tt_config
 	recHandler.decoder = aprsDecoder
 	recHandler.webHub = webHub
@@ -824,7 +825,11 @@ type recPacketHandler struct {
 	// layout says how many subchannels, and slicers in each, a channel's
 	// demodulator has, so a frame's are shown only where they say something;
 	// nil for one of each everywhere.
-	layout    func(channel int) (int, int)
+	layout func(channel int) (int, int)
+
+	// toIGate hands a received APRS packet to the IGate, for APRS-IS; nil
+	// for no IGate.
+	toIGate   func(channel int, pp *ax25.Packet)
 	ttConfig  *tt_config_s
 	decoder   *aprs.Decoder
 	webHub    *webui.Hub // Nil without a web interface.
@@ -1256,8 +1261,8 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if pp.IsAPRS() && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
-			igate.sendRecPacket(channel, pp)
+		if pp.IsAPRS() && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) && rh.toIGate != nil {
+			rh.toIGate(channel, pp)
 		}
 
 		/* Send out a regenerated copy. Applies to all types, not just APRS. */
