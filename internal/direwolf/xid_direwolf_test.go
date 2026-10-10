@@ -72,13 +72,13 @@ func Test_XID(t *testing.T) {
 	t.Logf("%d: %s", 0, desc)
 
 	assert.True(t, n)
-	assert.Equal(t, maybe.Just(false), param.full_duplex)
-	assert.Equal(t, srej_single, param.srej)
-	assert.Equal(t, ax25.Modulo128, param.modulo)
-	assert.Equal(t, maybe.Just(128), param.i_field_length_rx)
-	assert.Equal(t, maybe.Just(2), param.window_size_rx)
-	assert.Equal(t, maybe.Just(4096), param.ack_timer)
-	assert.Equal(t, maybe.Just(3), param.retries)
+	assert.Equal(t, maybe.Just(false), param.FullDuplex)
+	assert.Equal(t, SREJSingle, param.SREJ)
+	assert.Equal(t, ax25.Modulo128, param.Modulo)
+	assert.Equal(t, maybe.Just(128), param.IFieldLengthRx)
+	assert.Equal(t, maybe.Just(2), param.WindowSizeRx)
+	assert.Equal(t, maybe.Just(4096), param.AckTimer)
+	assert.Equal(t, maybe.Just(3), param.Retries)
 
 	/* encode and verify it comes out the same. */
 
@@ -89,95 +89,95 @@ func Test_XID(t *testing.T) {
 
 	/* try a couple different values, no srej. */
 
-	param.full_duplex = maybe.Just(true)
-	param.srej = srej_none
-	param.modulo = ax25.Modulo8
-	param.i_field_length_rx = maybe.Just(2048)
-	param.window_size_rx = maybe.Just(3)
-	param.ack_timer = maybe.Just(1234)
-	param.retries = maybe.Just(12)
+	param.FullDuplex = maybe.Just(true)
+	param.SREJ = SREJNone
+	param.Modulo = ax25.Modulo8
+	param.IFieldLengthRx = maybe.Just(2048)
+	param.WindowSizeRx = maybe.Just(3)
+	param.AckTimer = maybe.Just(1234)
+	param.Retries = maybe.Just(12)
 
 	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
 	t.Logf("%d: %s", 0, desc)
 
-	assert.Equal(t, maybe.Just(true), param2.full_duplex)
-	assert.Equal(t, srej_none, param2.srej)
-	assert.Equal(t, ax25.Modulo8, param2.modulo)
-	assert.Equal(t, maybe.Just(2048), param2.i_field_length_rx)
-	assert.Equal(t, maybe.Just(3), param2.window_size_rx)
-	assert.Equal(t, maybe.Just(1234), param2.ack_timer)
-	assert.Equal(t, maybe.Just(12), param2.retries)
+	assert.Equal(t, maybe.Just(true), param2.FullDuplex)
+	assert.Equal(t, SREJNone, param2.SREJ)
+	assert.Equal(t, ax25.Modulo8, param2.Modulo)
+	assert.Equal(t, maybe.Just(2048), param2.IFieldLengthRx)
+	assert.Equal(t, maybe.Just(3), param2.WindowSizeRx)
+	assert.Equal(t, maybe.Just(1234), param2.AckTimer)
+	assert.Equal(t, maybe.Just(12), param2.Retries)
 
 	/* Other values, single srej. */
 
-	param.full_duplex = maybe.Just(false)
-	param.srej = srej_single
-	param.modulo = ax25.Modulo8
-	param.i_field_length_rx = maybe.Just(61)
-	param.window_size_rx = maybe.Just(4)
-	param.ack_timer = maybe.Just(5555)
-	param.retries = maybe.Just(9)
+	param.FullDuplex = maybe.Just(false)
+	param.SREJ = SREJSingle
+	param.Modulo = ax25.Modulo8
+	param.IFieldLengthRx = maybe.Just(61)
+	param.WindowSizeRx = maybe.Just(4)
+	param.AckTimer = maybe.Just(5555)
+	param.Retries = maybe.Just(9)
 
 	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
 	t.Logf("%d: %s", 0, desc)
 
-	assert.Equal(t, maybe.Just(false), param2.full_duplex)
-	assert.Equal(t, srej_single, param2.srej)
-	assert.Equal(t, ax25.Modulo8, param2.modulo)
-	assert.Equal(t, maybe.Just(61), param2.i_field_length_rx)
-	assert.Equal(t, maybe.Just(4), param2.window_size_rx)
-	assert.Equal(t, maybe.Just(5555), param2.ack_timer)
-	assert.Equal(t, maybe.Just(9), param2.retries)
+	assert.Equal(t, maybe.Just(false), param2.FullDuplex)
+	assert.Equal(t, SREJSingle, param2.SREJ)
+	assert.Equal(t, ax25.Modulo8, param2.Modulo)
+	assert.Equal(t, maybe.Just(61), param2.IFieldLengthRx)
+	assert.Equal(t, maybe.Just(4), param2.WindowSizeRx)
+	assert.Equal(t, maybe.Just(5555), param2.AckTimer)
+	assert.Equal(t, maybe.Just(9), param2.Retries)
 
 	/* Other values, multi srej. */
 
-	param.full_duplex = maybe.Just(false)
-	param.srej = srej_multi
-	param.modulo = ax25.Modulo128
-	param.i_field_length_rx = maybe.Just(61)
-	param.window_size_rx = maybe.Just(4)
-	param.ack_timer = maybe.Just(5555)
-	param.retries = maybe.Just(9)
+	param.FullDuplex = maybe.Just(false)
+	param.SREJ = SREJMulti
+	param.Modulo = ax25.Modulo128
+	param.IFieldLengthRx = maybe.Just(61)
+	param.WindowSizeRx = maybe.Just(4)
+	param.AckTimer = maybe.Just(5555)
+	param.Retries = maybe.Just(9)
 
 	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
 	t.Logf("%d: %s", 0, desc)
 
-	assert.Equal(t, maybe.Just(false), param2.full_duplex)
-	assert.Equal(t, srej_multi, param2.srej)
-	assert.Equal(t, ax25.Modulo128, param2.modulo)
-	assert.Equal(t, maybe.Just(61), param2.i_field_length_rx)
-	assert.Equal(t, maybe.Just(4), param2.window_size_rx)
-	assert.Equal(t, maybe.Just(5555), param2.ack_timer)
-	assert.Equal(t, maybe.Just(9), param2.retries)
+	assert.Equal(t, maybe.Just(false), param2.FullDuplex)
+	assert.Equal(t, SREJMulti, param2.SREJ)
+	assert.Equal(t, ax25.Modulo128, param2.Modulo)
+	assert.Equal(t, maybe.Just(61), param2.IFieldLengthRx)
+	assert.Equal(t, maybe.Just(4), param2.WindowSizeRx)
+	assert.Equal(t, maybe.Just(5555), param2.AckTimer)
+	assert.Equal(t, maybe.Just(9), param2.Retries)
 
 	/* Specify some and not others. */
 
-	param.full_duplex = maybe.Just(false)
-	param.srej = srej_single
-	param.modulo = ax25.Modulo8
-	param.i_field_length_rx = maybe.Nothing[int]()
-	param.window_size_rx = maybe.Nothing[int]()
-	param.ack_timer = maybe.Just(999)
-	param.retries = maybe.Nothing[int]()
+	param.FullDuplex = maybe.Just(false)
+	param.SREJ = SREJSingle
+	param.Modulo = ax25.Modulo8
+	param.IFieldLengthRx = maybe.Nothing[int]()
+	param.WindowSizeRx = maybe.Nothing[int]()
+	param.AckTimer = maybe.Just(999)
+	param.Retries = maybe.Nothing[int]()
 
 	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
 	t.Logf("%d: %s", 0, desc)
 
-	assert.Equal(t, maybe.Just(false), param2.full_duplex)
-	assert.Equal(t, srej_single, param2.srej)
-	assert.Equal(t, ax25.Modulo8, param2.modulo)
-	assert.Equal(t, maybe.Nothing[int](), param2.i_field_length_rx)
-	assert.Equal(t, maybe.Nothing[int](), param2.window_size_rx)
-	assert.Equal(t, maybe.Just(999), param2.ack_timer)
-	assert.Equal(t, maybe.Nothing[int](), param2.retries)
+	assert.Equal(t, maybe.Just(false), param2.FullDuplex)
+	assert.Equal(t, SREJSingle, param2.SREJ)
+	assert.Equal(t, ax25.Modulo8, param2.Modulo)
+	assert.Equal(t, maybe.Nothing[int](), param2.IFieldLengthRx)
+	assert.Equal(t, maybe.Nothing[int](), param2.WindowSizeRx)
+	assert.Equal(t, maybe.Just(999), param2.AckTimer)
+	assert.Equal(t, maybe.Nothing[int](), param2.Retries)
 
 	/* Default values for empty info field. */
 
@@ -186,11 +186,11 @@ func Test_XID(t *testing.T) {
 
 	t.Logf("%d: %s", 0, desc)
 
-	assert.Equal(t, maybe.Nothing[bool](), param2.full_duplex)
-	assert.Equal(t, srej_not_specified, param2.srej)
-	assert.Equal(t, ax25.ModuloUnknown, param2.modulo)
-	assert.Equal(t, maybe.Nothing[int](), param2.i_field_length_rx)
-	assert.Equal(t, maybe.Nothing[int](), param2.window_size_rx)
-	assert.Equal(t, maybe.Nothing[int](), param2.ack_timer)
-	assert.Equal(t, maybe.Nothing[int](), param2.retries)
+	assert.Equal(t, maybe.Nothing[bool](), param2.FullDuplex)
+	assert.Equal(t, SREJNotSpecified, param2.SREJ)
+	assert.Equal(t, ax25.ModuloUnknown, param2.Modulo)
+	assert.Equal(t, maybe.Nothing[int](), param2.IFieldLengthRx)
+	assert.Equal(t, maybe.Nothing[int](), param2.WindowSizeRx)
+	assert.Equal(t, maybe.Nothing[int](), param2.AckTimer)
+	assert.Equal(t, maybe.Nothing[int](), param2.Retries)
 }

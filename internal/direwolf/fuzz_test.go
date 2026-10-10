@@ -423,13 +423,13 @@ func FuzzAX25Link(f *testing.F) {
 	var agw = fuzzAGWServer(f)
 
 	var xid xid_param_s
-	xid.full_duplex = maybe.Just(false)
-	xid.srej = srej_single
-	xid.modulo = 128
-	xid.i_field_length_rx = maybe.Just(256)
-	xid.window_size_rx = maybe.Just(32)
-	xid.ack_timer = maybe.Just(3000)
-	xid.retries = maybe.Just(10)
+	xid.FullDuplex = maybe.Just(false)
+	xid.SREJ = SREJSingle
+	xid.Modulo = 128
+	xid.IFieldLengthRx = maybe.Just(256)
+	xid.WindowSizeRx = maybe.Just(32)
+	xid.AckTimer = maybe.Just(3000)
+	xid.Retries = maybe.Just(10)
 
 	var xidInfo = xid_encode(&xid, ax25.CRCmd)
 

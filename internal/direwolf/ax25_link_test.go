@@ -24,7 +24,7 @@ func newNegotiationTestLink() *ax25_dlsm_t {
 	var S = new(ax25_dlsm_t)
 
 	S.modulo = ax25.Modulo8
-	S.srej_enable = srej_none
+	S.srej_enable = SREJNone
 	S.n1_paclen = 128
 	S.k_maxframe = 2
 	S.n2_retry = 5
@@ -48,12 +48,12 @@ func TestNegotiationResponseFillsInDefaults(t *testing.T) {
 
 	negotiation_response(S, param)
 
-	assert.Equal(t, ax25.Modulo8, param.modulo)
-	assert.Equal(t, srej_none, param.srej)
-	assert.Equal(t, maybe.Just(AX25_N1_PACLEN_DEFAULT), param.i_field_length_rx)
-	assert.Equal(t, maybe.Just(AX25_K_MAXFRAME_BASIC_DEFAULT), param.window_size_rx)
-	assert.Equal(t, maybe.Just(3000), param.ack_timer)
-	assert.Equal(t, maybe.Just(AX25_N2_RETRY_DEFAULT), param.retries)
+	assert.Equal(t, ax25.Modulo8, param.Modulo)
+	assert.Equal(t, SREJNone, param.SREJ)
+	assert.Equal(t, maybe.Just(AX25_N1_PACLEN_DEFAULT), param.IFieldLengthRx)
+	assert.Equal(t, maybe.Just(AX25_K_MAXFRAME_BASIC_DEFAULT), param.WindowSizeRx)
+	assert.Equal(t, maybe.Just(3000), param.AckTimer)
+	assert.Equal(t, maybe.Just(AX25_N2_RETRY_DEFAULT), param.Retries)
 
 	// And what we agreed is what the link now runs with.
 	assert.Equal(t, AX25_N1_PACLEN_DEFAULT, S.n1_paclen)
@@ -83,26 +83,26 @@ func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
 			var S = newNegotiationTestLink()
 
 			var param = new(xid_param_s)
-			param.srej = srej_multi
-			param.modulo = test.modulo
-			param.i_field_length_rx = maybe.Just(8000) // More than we can hold.
-			param.window_size_rx = maybe.Just(100)     // Wider than we allow.
-			param.ack_timer = maybe.Just(1000)         // Quicker than our FRACK.
-			param.retries = maybe.Just(2)              // Fewer than our N2.
+			param.SREJ = SREJMulti
+			param.Modulo = test.modulo
+			param.IFieldLengthRx = maybe.Just(8000) // More than we can hold.
+			param.WindowSizeRx = maybe.Just(100)    // Wider than we allow.
+			param.AckTimer = maybe.Just(1000)       // Quicker than our FRACK.
+			param.Retries = maybe.Just(2)           // Fewer than our N2.
 
 			negotiation_response(S, param)
 
-			assert.Equal(t, maybe.Just(AX25_N1_PACLEN_MAX), param.i_field_length_rx)
-			assert.Equal(t, maybe.Just(test.wantWindow), param.window_size_rx)
-			assert.Equal(t, maybe.Just(5000), param.ack_timer)
-			assert.Equal(t, maybe.Just(5), param.retries)
+			assert.Equal(t, maybe.Just(AX25_N1_PACLEN_MAX), param.IFieldLengthRx)
+			assert.Equal(t, maybe.Just(test.wantWindow), param.WindowSizeRx)
+			assert.Equal(t, maybe.Just(5000), param.AckTimer)
+			assert.Equal(t, maybe.Just(5), param.Retries)
 
 			assert.Equal(t, AX25_N1_PACLEN_MAX, S.n1_paclen)
 			assert.Equal(t, test.wantWindow, S.k_maxframe)
 			assert.Equal(t, 5*time.Second, S.t1v)
 			assert.Equal(t, 5, S.n2_retry)
 			assert.Equal(t, test.modulo, S.modulo)
-			assert.Equal(t, srej_multi, S.srej_enable)
+			assert.Equal(t, SREJMulti, S.srej_enable)
 		})
 	}
 }
@@ -122,7 +122,7 @@ func TestCompleteNegotiationKeepsWhatTheResponseOmits(t *testing.T) {
 	complete_negotiation(S, param)
 
 	assert.Equal(t, ax25.Modulo8, S.modulo)
-	assert.Equal(t, srej_none, S.srej_enable)
+	assert.Equal(t, SREJNone, S.srej_enable)
 	assert.Equal(t, 128, S.n1_paclen)
 	assert.Equal(t, 2, S.k_maxframe)
 	assert.Equal(t, 5, S.n2_retry)
@@ -139,7 +139,7 @@ func TestCompleteNegotiationAppliesOnlyWhatTheResponseSpecifies(t *testing.T) {
 	var param, _, status = xid_parse(nil)
 	assert.True(t, status)
 
-	param.ack_timer = maybe.Just(4500)
+	param.AckTimer = maybe.Just(4500)
 
 	complete_negotiation(S, param)
 
@@ -202,10 +202,10 @@ func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 				var S = newNegotiationTestLink()
 
 				var param = new(xid_param_s)
-				param.srej = srej_none
-				param.modulo = tc.modulo
-				param.i_field_length_rx = maybe.Just(tc.length)
-				param.window_size_rx = maybe.Just(tc.window)
+				param.SREJ = SREJNone
+				param.Modulo = tc.modulo
+				param.IFieldLengthRx = maybe.Just(tc.length)
+				param.WindowSizeRx = maybe.Just(tc.window)
 
 				path.apply(S, param)
 
@@ -253,9 +253,9 @@ func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 			t.Cleanup(hook.Reset)
 
 			var sent = new(xid_param_s)
-			sent.srej = srej_none
-			sent.modulo = ax25.Modulo8
-			sent.window_size_rx = maybe.Just(0)
+			sent.SREJ = SREJNone
+			sent.Modulo = ax25.Modulo8
+			sent.WindowSizeRx = maybe.Just(0)
 
 			var param, _, status = xid_parse(xid_encode(sent, path.cr))
 			require.True(t, status)
@@ -284,16 +284,16 @@ func TestNegotiationResponseSendsBackWhatItApplied(t *testing.T) {
 	var S = newNegotiationTestLink()
 
 	var param = new(xid_param_s)
-	param.srej = srej_none
-	param.modulo = 16
-	param.i_field_length_rx = maybe.Just(0)
-	param.window_size_rx = maybe.Just(0)
+	param.SREJ = SREJNone
+	param.Modulo = 16
+	param.IFieldLengthRx = maybe.Just(0)
+	param.WindowSizeRx = maybe.Just(0)
 
 	negotiation_response(S, param)
 
-	assert.Equal(t, S.modulo, param.modulo)
-	assert.Equal(t, maybe.Just(S.n1_paclen), param.i_field_length_rx)
-	assert.Equal(t, maybe.Just(S.k_maxframe), param.window_size_rx)
+	assert.Equal(t, S.modulo, param.Modulo)
+	assert.Equal(t, maybe.Just(S.n1_paclen), param.IFieldLengthRx)
+	assert.Equal(t, maybe.Just(S.k_maxframe), param.WindowSizeRx)
 }
 
 // A response that moves the link to modulo 8 but leaves the window size out
@@ -308,7 +308,7 @@ func TestCompleteNegotiationNarrowsTheWindowToTheNewModulo(t *testing.T) {
 	var param, _, status = xid_parse(nil)
 	assert.True(t, status)
 
-	param.modulo = ax25.Modulo8
+	param.Modulo = ax25.Modulo8
 
 	complete_negotiation(S, param)
 
@@ -327,7 +327,7 @@ func TestCompleteNegotiationRaisesN1ToTheNewModulo(t *testing.T) {
 	var param, _, status = xid_parse(nil)
 	assert.True(t, status)
 
-	param.modulo = ax25.Modulo128
+	param.Modulo = ax25.Modulo128
 
 	complete_negotiation(S, param)
 

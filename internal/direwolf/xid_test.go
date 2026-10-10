@@ -36,10 +36,10 @@ func TestXIDEncodeZeroValueOmitsOptionalParameters(t *testing.T) {
 	// And it round-trips back to "not specified" rather than to zeroes.
 	var parsed, _, status = xid_parse(info)
 	assert.True(t, status)
-	assert.Equal(t, maybe.Nothing[int](), parsed.i_field_length_rx)
-	assert.Equal(t, maybe.Nothing[int](), parsed.window_size_rx)
-	assert.Equal(t, maybe.Nothing[int](), parsed.ack_timer)
-	assert.Equal(t, maybe.Nothing[int](), parsed.retries)
+	assert.Equal(t, maybe.Nothing[int](), parsed.IFieldLengthRx)
+	assert.Equal(t, maybe.Nothing[int](), parsed.WindowSizeRx)
+	assert.Equal(t, maybe.Nothing[int](), parsed.AckTimer)
+	assert.Equal(t, maybe.Nothing[int](), parsed.Retries)
 }
 
 // An XID's info field comes off the air, and xid_parse used to index into it
@@ -65,8 +65,8 @@ func TestXIDParseTruncatedInfo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var param, _, status = xid_parse(tc.info)
 			assert.Equal(t, tc.status, status)
-			assert.Equal(t, maybe.Nothing[int](), param.ack_timer)
-			assert.Equal(t, maybe.Nothing[int](), param.window_size_rx)
+			assert.Equal(t, maybe.Nothing[int](), param.AckTimer)
+			assert.Equal(t, maybe.Nothing[int](), param.WindowSizeRx)
 		})
 	}
 
@@ -75,6 +75,6 @@ func TestXIDParseTruncatedInfo(t *testing.T) {
 
 	var param, _, status = xid_parse(info)
 	assert.True(t, status)
-	assert.Equal(t, maybe.Just(4), param.window_size_rx)
-	assert.Equal(t, maybe.Nothing[int](), param.ack_timer)
+	assert.Equal(t, maybe.Just(4), param.WindowSizeRx)
+	assert.Equal(t, maybe.Nothing[int](), param.AckTimer)
 }

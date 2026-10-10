@@ -87,13 +87,13 @@ const PV_HDLC_Optional_Functions_Synchronous_Tx = 0x000002
 type srej_e int
 
 // Order is important because negotiation keeps the lower value of
-// REJ  (srej_none),  SREJ (default without negotiation), Multi-SREJ (if both agree).
+// REJ  (SREJNone),  SREJ (default without negotiation), Multi-SREJ (if both agree).
 
 const (
-	srej_none          srej_e = 0
-	srej_single        srej_e = 1
-	srej_multi         srej_e = 2
-	srej_not_specified srej_e = 3
+	SREJNone         srej_e = 0
+	SREJSingle       srej_e = 1
+	SREJMulti        srej_e = 2
+	SREJNotSpecified srej_e = 3
 )
 
 // xid_param_s is a set of XID parameters, as sent or received.  The fields the
@@ -101,26 +101,26 @@ const (
 // one that was never set cannot be mistaken for one that was negotiated to
 // zero.
 //
-// srej and modulo are enums with their own "not specified" members, and only
-// modulo has it at zero: an unset srej reads as srej_none, which
+// SREJ and Modulo are enums with their own "not specified" members, and only
+// Modulo has it at zero: an unset SREJ reads as SREJNone, which
 // complete_negotiation will apply, so build the struct through xid_parse or
 // initiate_negotiation rather than relying on its zero value throughout.  The
-// srej_e order is load-bearing for negotiation, which is why srej_not_specified
+// srej_e order is load-bearing for negotiation, which is why SREJNotSpecified
 // sits at the end rather than at zero.
 type xid_param_s struct {
-	full_duplex maybe.Maybe[bool]
+	FullDuplex maybe.Maybe[bool]
 
-	srej srej_e
+	SREJ srej_e
 
-	modulo ax25.Modulo
+	Modulo ax25.Modulo
 
-	i_field_length_rx maybe.Maybe[int] /* In bytes.  XID has it in bits. */
+	IFieldLengthRx maybe.Maybe[int] /* In bytes.  XID has it in bits. */
 
-	window_size_rx maybe.Maybe[int]
+	WindowSizeRx maybe.Maybe[int]
 
-	ack_timer maybe.Maybe[int] /* "T1" in mSec. */
+	AckTimer maybe.Maybe[int] /* "T1" in mSec. */
 
-	retries maybe.Maybe[int] /* "N1" */
+	Retries maybe.Maybe[int] /* "N1" */
 }
 
 /*-------------------------------------------------------------------
@@ -157,8 +157,8 @@ func xid_parse(info []byte) (*xid_param_s, string, bool) {
 	// so only the two enums need setting to their own "not specified" members.
 	var result = new(xid_param_s)
 
-	result.srej = srej_not_specified
-	result.modulo = ax25.ModuloUnknown
+	result.SREJ = SREJNotSpecified
+	result.Modulo = ax25.ModuloUnknown
 
 	var desc string
 
@@ -257,16 +257,16 @@ func xid_parse(info []byte) (*xid_param_s, string, bool) {
 			}
 
 			if pval&PV_Classes_Procedures_Half_Duplex > 0 && (pval&PV_Classes_Procedures_Full_Duplex) == 0 {
-				result.full_duplex = maybe.Just(false)
+				result.FullDuplex = maybe.Just(false)
 				desc += "Half-Duplex "
 			} else if pval&PV_Classes_Procedures_Full_Duplex > 0 && (pval&PV_Classes_Procedures_Half_Duplex) == 0 {
-				result.full_duplex = maybe.Just(true)
+				result.FullDuplex = maybe.Just(true)
 				desc += "Full-Duplex "
 			} else {
 				//  https://groups.io/g/bpq32/topic/113348033#msg44169
 				//text_color_set (DW_COLOR_ERROR);
 				//dw_printf ("XID error: Expected one of Half or Full Duplex be set.\n");
-				result.full_duplex = maybe.Just(false)
+				result.FullDuplex = maybe.Just(false)
 			}
 
 		case PI_HDLC_Optional_Functions:
@@ -284,22 +284,22 @@ func xid_parse(info []byte) (*xid_param_s, string, bool) {
 			}
 
 			if pval&PV_HDLC_Optional_Functions_Multi_SREJ_cmd_resp > 0 {
-				result.srej = srej_multi
+				result.SREJ = SREJMulti
 			} else if pval&PV_HDLC_Optional_Functions_SREJ_cmd_resp > 0 {
-				result.srej = srej_single
+				result.SREJ = SREJSingle
 			} else if pval&PV_HDLC_Optional_Functions_REJ_cmd_resp > 0 {
-				result.srej = srej_none
+				result.SREJ = SREJNone
 			} else {
 				logrus.Error("XID error: Expected at least one of REJ, SREJ, Multi-SREJ to be set")
 
-				result.srej = srej_none
+				result.SREJ = SREJNone
 			}
 
 			if (pval&PV_HDLC_Optional_Functions_Modulo_8) > 0 && (pval&PV_HDLC_Optional_Functions_Modulo_128) == 0 {
-				result.modulo = ax25.Modulo8
+				result.Modulo = ax25.Modulo8
 				desc += "modulo-8 "
 			} else if (pval&PV_HDLC_Optional_Functions_Modulo_128) > 0 && (pval&PV_HDLC_Optional_Functions_Modulo_8) == 0 {
-				result.modulo = ax25.Modulo128
+				result.Modulo = ax25.Modulo128
 				desc += "modulo-128 "
 			} else {
 				logrus.Error("XID error: Expected one of Modulo 8 or 128 be set")
@@ -324,7 +324,7 @@ func xid_parse(info []byte) (*xid_param_s, string, bool) {
 			}
 
 		case PI_I_Field_Length_Rx:
-			result.i_field_length_rx = maybe.Just(pval / 8)
+			result.IFieldLengthRx = maybe.Just(pval / 8)
 
 			desc += fmt.Sprintf("I-Field-Length-Rx=%d ", pval/8)
 
@@ -333,7 +333,7 @@ func xid_parse(info []byte) (*xid_param_s, string, bool) {
 			}
 
 		case PI_Window_Size_Rx:
-			result.window_size_rx = maybe.Just(pval)
+			result.WindowSizeRx = maybe.Just(pval)
 
 			desc += fmt.Sprintf("Window-Size-Rx=%d ", pval)
 
@@ -348,12 +348,12 @@ func xid_parse(info []byte) (*xid_param_s, string, bool) {
 			//continue here with more error checking.
 
 		case PI_Ack_Timer:
-			result.ack_timer = maybe.Just(pval)
+			result.AckTimer = maybe.Just(pval)
 
 			desc += fmt.Sprintf("Ack-Timer=%d ", pval)
 
 		case PI_Retries: // Is it retrys or retries?
-			result.retries = maybe.Just(pval)
+			result.Retries = maybe.Just(pval)
 
 			desc += fmt.Sprintf("Retries=%d ", pval)
 
@@ -378,31 +378,31 @@ func xid_parse(info []byte) (*xid_param_s, string, bool) {
  * Purpose:    	Encode the information part of an XID frame.
  *
  * Inputs:	param.
- *			full_duplex	- As command, am I capable of full duplex operation?
+ *			FullDuplex	- As command, am I capable of full duplex operation?
  *					  When a response, are we both?
  *					  Nothing is treated as half duplex.
  *
- * 			srej		- Level of selective reject.
- *					  srej_none (use REJ), srej_single, srej_multi
+ * 			SREJ		- Level of selective reject.
+ *					  SREJNone (use REJ), SREJSingle, SREJMulti
  *					  As command, offer a menu of what I can handle.  (i.e. perhaps multiple bits set)
  *					  As response, take minimum of what is offered and what I can handle. (one bit set)
  *
- *			modulo	- 8 or 128.
+ *			Modulo	- 8 or 128.
  *
- *			i_field_length_rx - Maximum number of bytes I can handle in info part.
+ *			IFieldLengthRx - Maximum number of bytes I can handle in info part.
  *					    Default is 256.
  *					    Up to 8191 will fit into the field.
  *					    Leave it Nothing to omit this.
  *
- *			window_size_rx 	- Maximum window size ("k") that I can handle.
+ *			WindowSizeRx 	- Maximum window size ("k") that I can handle.
  *				   Defaults are are 4 for modulo 8 and 32 for modulo 128.
  *
- *			ack_timer	- Acknowledge timer in milliseconds.
+ *			AckTimer	- Acknowledge timer in milliseconds.
  *					*** describe meaning.  ***
  *				  Default is 3000.
  *				  Leave it Nothing to omit this.
  *
- *			retries		- Allows negotiation of retries.
+ *			Retries		- Allows negotiation of retries.
  *				  Default is 10.
  *				  Leave it Nothing to omit this.
  *
@@ -450,19 +450,19 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 	var m byte = 4 // classes of procedures
 
 	m += 5 // HDLC optional features
-	if param.i_field_length_rx.IsJust() {
+	if param.IFieldLengthRx.IsJust() {
 		m += 4
 	}
 
-	if param.window_size_rx.IsJust() {
+	if param.WindowSizeRx.IsJust() {
 		m += 3
 	}
 
-	if param.ack_timer.IsJust() {
+	if param.AckTimer.IsJust() {
 		m += 4
 	}
 
-	if param.retries.IsJust() {
+	if param.Retries.IsJust() {
 		m += 3
 	}
 
@@ -477,7 +477,7 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 
 	var x = PV_Classes_Procedures_Balanced_ABM
 
-	if maybe.FromMaybe(false, param.full_duplex) {
+	if maybe.FromMaybe(false, param.FullDuplex) {
 		x |= PV_Classes_Procedures_Full_Duplex
 	} else { // includes Nothing
 		x |= PV_Classes_Procedures_Half_Duplex
@@ -501,34 +501,34 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 
 	//text_color_set (DW_COLOR_ERROR);
 	//dw_printf ("******      XID temp hack - test no SREJ      ******\n");
-	// param.srej = srej_none;
+	// param.SREJ = SREJNone;
 
 	if cr == ax25.CRCmd {
 		// offer a "menu" of acceptable choices.  i.e. 1, 2 or 3 bits set.
-		switch param.srej {
-		default: // Includes srej_none
+		switch param.SREJ {
+		default: // Includes SREJNone
 			x |= PV_HDLC_Optional_Functions_REJ_cmd_resp
-		case srej_single:
+		case SREJSingle:
 			x |= PV_HDLC_Optional_Functions_REJ_cmd_resp |
 				PV_HDLC_Optional_Functions_SREJ_cmd_resp
-		case srej_multi:
+		case SREJMulti:
 			x |= PV_HDLC_Optional_Functions_REJ_cmd_resp |
 				PV_HDLC_Optional_Functions_SREJ_cmd_resp |
 				PV_HDLC_Optional_Functions_Multi_SREJ_cmd_resp
 		}
 	} else {
 		// for response, set only a single bit.
-		switch param.srej {
-		default: // Includes srej_none
+		switch param.SREJ {
+		default: // Includes SREJNone
 			x |= PV_HDLC_Optional_Functions_REJ_cmd_resp
-		case srej_single:
+		case SREJSingle:
 			x |= PV_HDLC_Optional_Functions_SREJ_cmd_resp
-		case srej_multi:
+		case SREJMulti:
 			x |= PV_HDLC_Optional_Functions_Multi_SREJ_cmd_resp
 		}
 	}
 
-	if param.modulo == ax25.Modulo128 {
+	if param.Modulo == ax25.Modulo128 {
 		x |= PV_HDLC_Optional_Functions_Modulo_128
 	} else { // includes modulo_8 and modulo_unknown
 		x |= PV_HDLC_Optional_Functions_Modulo_8
@@ -543,7 +543,7 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 	// "I Field Length Rx" - max I field length acceptable to me.
 	// This is in bits.  8191 would be max number of bytes to fit in field.
 
-	if length, ok := param.i_field_length_rx.Get(); ok {
+	if length, ok := param.IFieldLengthRx.Get(); ok {
 		info = append(info, byte(PI_I_Field_Length_Rx))
 		info = append(info, 2)
 
@@ -555,7 +555,7 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 
 	// "Window Size Rx"
 
-	if window, ok := param.window_size_rx.Get(); ok {
+	if window, ok := param.WindowSizeRx.Get(); ok {
 		info = append(info, byte(PI_Window_Size_Rx))
 		info = append(info, 1)
 		info = append(info, byte(window&0xff))
@@ -563,7 +563,7 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 
 	// "Ack Timer" milliseconds.  We could handle up to 65535 here.
 
-	if timer, ok := param.ack_timer.Get(); ok {
+	if timer, ok := param.AckTimer.Get(); ok {
 		info = append(info, byte(PI_Ack_Timer))
 		info = append(info, 2)
 		info = append(info, byte((timer>>8)&0xff))
@@ -572,7 +572,7 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 
 	// "Retries."
 
-	if retries, ok := param.retries.Get(); ok {
+	if retries, ok := param.Retries.Get(); ok {
 		info = append(info, byte(PI_Retries))
 		info = append(info, 1)
 		info = append(info, byte(retries&0xff))
