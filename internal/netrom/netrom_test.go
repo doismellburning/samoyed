@@ -655,3 +655,50 @@ func TestConfigValidate(t *testing.T) {
 		assert.Error(t, bad.Validate())
 	}
 }
+
+func TestCloseCircuitByID(t *testing.T) {
+	var n = lineNet(t)
+	var far = new(recorder)
+
+	require.NoError(t, n.routers["Q3TEST"].Listen("Q3TEST", "THREE", 0, func(*Circuit) CircuitHandler { return far }))
+
+	var near = new(recorder)
+
+	var _, err = n.routers["Q1TEST"].Connect("Q3TEST", "Q1TEST", near, n.now)
+	require.NoError(t, err)
+	n.pump()
+
+	var infos = n.routers["Q1TEST"].Circuits()
+	require.Len(t, infos, 1)
+	assert.Len(t, infos[0].ID, 4)
+
+	assert.False(t, n.routers["Q1TEST"].CloseCircuit("FFFF", n.now))
+	assert.True(t, n.routers["Q1TEST"].CloseCircuit(infos[0].ID, n.now))
+	n.pump()
+	assert.True(t, near.closed)
+	assert.True(t, far.closed)
+}
+
+func TestLockAndUnlockNeighbour(t *testing.T) {
+	var n = lineNet(t)
+	var r = n.routers["Q1TEST"]
+
+	require.Error(t, r.LockNeighbour(LockedNeighbour{Port: 9, Call: "Q9TEST", Alias: "NINE", Quality: 100}, n.now), "not a NET/ROM port")
+	require.Error(t, r.LockNeighbour(LockedNeighbour{Port: 0, Call: "Q9TEST", Alias: "NINE", Quality: 300}, n.now))
+	require.NoError(t, r.LockNeighbour(LockedNeighbour{Port: 0, Call: "q9test", Alias: "nine", Quality: 100}, n.now))
+
+	var nb, ok = r.Table().Neighbour(NeighbourKey{Port: 0, Call: "Q9TEST"})
+	require.True(t, ok)
+	assert.True(t, nb.Locked)
+
+	assert.True(t, r.UnlockNeighbour(NeighbourKey{Port: 0, Call: "Q9TEST"}, n.now))
+	assert.False(t, r.UnlockNeighbour(NeighbourKey{Port: 0, Call: "Q9TEST"}, n.now), "no longer locked")
+
+	// Unlocked and never heard from, it ages out like any other.
+	for range DefaultConfig().ObsolescenceInit {
+		r.Table().Age()
+	}
+
+	var _, still = r.Table().Lookup("NINE")
+	assert.False(t, still)
+}

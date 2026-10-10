@@ -103,6 +103,27 @@ func (t *Table) LockNeighbour(key NeighbourKey, alias string, quality int) {
 	t.addRoute(d, Route{Neighbour: key, Quality: quality, Obsolescence: t.cfg.ObsolescenceInit, Locked: true})
 }
 
+// UnlockNeighbour makes a locked neighbour an ordinary one, whose routes age
+// as any other's, reporting whether it was locked.
+func (t *Table) UnlockNeighbour(key NeighbourKey) bool {
+	var n, ok = t.neighbours[key]
+	if !ok || !n.Locked {
+		return false
+	}
+
+	n.Locked = false
+
+	for _, d := range t.destinations {
+		for i := range d.Routes {
+			if d.Routes[i].Neighbour == key {
+				d.Routes[i].Locked = false
+			}
+		}
+	}
+
+	return true
+}
+
 // Neighbour returns the neighbour named by key.
 func (t *Table) Neighbour(key NeighbourKey) (Neighbour, bool) {
 	var n, ok = t.neighbours[key]
