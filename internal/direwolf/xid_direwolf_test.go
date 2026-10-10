@@ -69,10 +69,7 @@ func Test_XID(t *testing.T) {
 
 	var param, desc, n = xid_parse(xid_example)
 
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("%d: %s\n", 0, desc)
-
-	text_color_set(DW_COLOR_ERROR)
+	t.Logf("%d: %s", 0, desc)
 
 	assert.Equal(t, 1, n)
 	assert.Equal(t, maybe.Just(false), param.full_duplex)
@@ -103,10 +100,7 @@ func Test_XID(t *testing.T) {
 	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("%d: %s\n", 0, desc)
-
-	text_color_set(DW_COLOR_ERROR)
+	t.Logf("%d: %s", 0, desc)
 
 	assert.Equal(t, maybe.Just(true), param2.full_duplex)
 	assert.Equal(t, srej_none, param2.srej)
@@ -129,10 +123,7 @@ func Test_XID(t *testing.T) {
 	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("%d: %s\n", 0, desc)
-
-	text_color_set(DW_COLOR_ERROR)
+	t.Logf("%d: %s", 0, desc)
 
 	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
@@ -155,10 +146,7 @@ func Test_XID(t *testing.T) {
 	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("%d: %s\n", 0, desc)
-
-	text_color_set(DW_COLOR_ERROR)
+	t.Logf("%d: %s", 0, desc)
 
 	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_multi, param2.srej)
@@ -181,10 +169,7 @@ func Test_XID(t *testing.T) {
 	info = xid_encode(param, ax25.CRCmd)
 	param2, desc, _ = xid_parse(info)
 
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("%d: %s\n", 0, desc)
-
-	text_color_set(DW_COLOR_ERROR)
+	t.Logf("%d: %s", 0, desc)
 
 	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
@@ -199,10 +184,7 @@ func Test_XID(t *testing.T) {
 	info = []byte{}
 	param2, desc, _ = xid_parse(info)
 
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("%d: %s\n", 0, desc)
-
-	text_color_set(DW_COLOR_ERROR)
+	t.Logf("%d: %s", 0, desc)
 
 	assert.Equal(t, maybe.Nothing[bool](), param2.full_duplex)
 	assert.Equal(t, srej_not_specified, param2.srej)
@@ -211,7 +193,4 @@ func Test_XID(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[int](), param2.window_size_rx)
 	assert.Equal(t, maybe.Nothing[int](), param2.ack_timer)
 	assert.Equal(t, maybe.Nothing[int](), param2.retries)
-
-	text_color_set(DW_COLOR_REC)
-	dw_printf("XID test:  Success.\n")
 }

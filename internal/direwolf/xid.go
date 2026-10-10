@@ -174,9 +174,10 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	var i = 0
 
 	if info[i] != FI_Format_Indicator {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("XID error: First byte of info field should be Format Indicator, %02x.\n", FI_Format_Indicator)
-		dw_printf("XID info part: % x ... length=%d\n", info[:min(len(info), 5)], len(info))
+		logrus.WithFields(logrus.Fields{
+			"info":   fmt.Sprintf("% x", info[:min(len(info), 5)]),
+			"length": len(info),
+		}).Errorf("XID error: First byte of info field should be Format Indicator, %02x", FI_Format_Indicator)
 
 		return result, desc, 0
 	}
@@ -193,8 +194,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	i++
 
 	if info[i] != GI_Group_Identifier {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("XID error: Second byte of info field should be Group Indicator, %d.\n", GI_Group_Identifier)
+		logrus.Errorf("XID error: Second byte of info field should be Group Indicator, %d", GI_Group_Identifier)
 
 		return result, desc, 0
 	}
@@ -225,8 +225,10 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 		i++
 
 		if plen < 1 || plen > 4 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("XID error: Length ?????   TODO   ????  %d.\n", plen)
+			logrus.WithFields(logrus.Fields{
+				"parameter": pind,
+				"length":    plen,
+			}).Error("XID error: Parameter length is not 1 thru 4")
 
 			return result, desc, 1 // got this far.
 		}
@@ -288,8 +290,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			} else if pval&PV_HDLC_Optional_Functions_REJ_cmd_resp > 0 {
 				result.srej = srej_none
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("XID error: Expected at least one of REJ, SREJ, Multi-SREJ to be set.\n")
+				logrus.Error("XID error: Expected at least one of REJ, SREJ, Multi-SREJ to be set")
 
 				result.srej = srej_none
 			}
@@ -301,8 +302,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 				result.modulo = ax25.Modulo128
 				desc += "modulo-128 "
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("XID error: Expected one of Modulo 8 or 128 be set.\n")
+				logrus.Error("XID error: Expected one of Modulo 8 or 128 be set")
 			}
 
 			if (pval & PV_HDLC_Optional_Functions_Extended_Address) == 0 { //nolint:staticcheck
@@ -312,18 +312,15 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			}
 
 			if (pval & PV_HDLC_Optional_Functions_TEST_cmd_resp) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("XID error: Expected TEST cmd/resp to be set.\n")
+				logrus.Error("XID error: Expected TEST cmd/resp to be set")
 			}
 
 			if (pval & PV_HDLC_Optional_Functions_16_bit_FCS) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("XID error: Expected 16 bit FCS to be set.\n")
+				logrus.Error("XID error: Expected 16 bit FCS to be set")
 			}
 
 			if (pval & PV_HDLC_Optional_Functions_Synchronous_Tx) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("XID error: Expected Synchronous Tx to be set.\n")
+				logrus.Error("XID error: Expected Synchronous Tx to be set")
 			}
 
 		case PI_I_Field_Length_Rx:
@@ -332,8 +329,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			desc += fmt.Sprintf("I-Field-Length-Rx=%d ", pval/8)
 
 			if pval&0x7 > 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("XID error: I Field Length Rx, %d, is not a whole number of bytes.\n", pval)
+				logrus.WithField("bits", pval).Error("XID error: I Field Length Rx is not a whole number of bytes")
 			}
 
 		case PI_Window_Size_Rx:
@@ -342,8 +338,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			desc += fmt.Sprintf("Window-Size-Rx=%d ", pval)
 
 			if pval < 1 || pval > 127 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("XID error: Window Size Rx, %d, is not in range of 1 thru 127.\n", pval)
+				logrus.WithField("window_size_rx", pval).Error("XID error: Window Size Rx is not in range of 1 thru 127")
 
 				// Left as it is for complete_negotiation to bound for
 				// the modulus in force - putting 127 in its place would
@@ -367,8 +362,10 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	}
 
 	if i != len(info) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("XID error: Frame / Group Length mismatch.\n")
+		logrus.WithFields(logrus.Fields{
+			"group_len": group_len,
+			"length":    len(info),
+		}).Error("XID error: Frame / Group Length mismatch")
 	}
 
 	return result, desc, 1
