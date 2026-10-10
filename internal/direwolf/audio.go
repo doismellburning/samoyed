@@ -34,6 +34,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/gordonklaus/portaudio"
 )
@@ -1209,6 +1210,16 @@ func AudioOpen(ctx context.Context, pa *RadioConfig) (*AudioDevices, error) {
 
 	return d, nil
 } /* end AudioOpen */
+
+// setAudioLevel has each device's statistics report its channels' received
+// audio levels from audioLevel.  It is for before anything reads a device.
+func (d *AudioDevices) setAudioLevel(audioLevel func(channel int, subchan int) ax25.ALevel) {
+	for _, dev := range d.dev {
+		if dev != nil {
+			dev.stats.audioLevel = audioLevel
+		}
+	}
+}
 
 // inputEnded says whether device a's input ran out - standard input reaching
 // its end - rather than failed, for DirewolfMain to tell the two apart when

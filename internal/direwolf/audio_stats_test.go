@@ -7,19 +7,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 )
 
-// newTestAudioStats gives each audio device a fresh AudioStats, and gives
-// demod_get_audio_level something known to report, so a test starts from a
-// known position and leaves nothing behind.
+// newTestAudioStats gives each audio device a fresh AudioStats, each of them
+// reporting known audio levels, so a test starts from a known position and
+// leaves nothing behind.
 func newTestAudioStats(t *testing.T) *[MAX_ADEVS]AudioStats {
 	t.Helper()
 
-	setTestAudioLevels(t)
+	var stats = new([MAX_ADEVS]AudioStats)
 
-	return new([MAX_ADEVS]AudioStats)
+	for adev := range stats {
+		stats[adev].audioLevel = audioStatsTestLevels
+	}
+
+	return stats
 }
 
 // audioStatsTestLevel is the receive audio level a test rigs channel ch to
@@ -28,28 +33,12 @@ func audioStatsTestLevel(ch int) int {
 	return 10 * (ch + 1)
 }
 
-// setTestAudioLevels gives each channel a Demodulator of its own, at a known
-// peak, so demod_get_audio_level returns audioStatsTestLevel rather than
-// whatever some earlier test left behind.
-func setTestAudioLevels(t *testing.T) {
-	t.Helper()
+// audioStatsTestLevels reports audioStatsTestLevel for each channel.
+func audioStatsTestLevels(channel int, _ int) ax25.ALevel {
+	var alevel ax25.ALevel
+	alevel.Rec = audioStatsTestLevel(channel)
 
-	var saved = demodulators
-
-	t.Cleanup(func() {
-		demodulators = saved
-	})
-
-	for ch := range MAX_RADIO_CHANS {
-		var d = new(Demodulator)
-		d.channel = ch
-
-		// demod_get_audio_level halves the peak-to-peak swing, in units of 100.
-		d.states[0].num_slicers = 1
-		d.states[0].alevel_rec_peak = float64(audioStatsTestLevel(ch)) / 50.0
-
-		demodulators[ch] = d
-	}
+	return alevel
 }
 
 // audioStatsTestInterval is the reporting interval, in seconds, that the tests

@@ -70,8 +70,8 @@ type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
 
 // PacketSink is handed each packet extracted from the received bit
 // stream, along with the audio level it was heard at and the number of
-// symbols the FEC decoder had to correct.  In normal operation it is
-// multi_modem_process_rec_packet.
+// symbols the FEC decoder had to correct.  In normal operation it is the
+// layer 2 receiver's recPacket.
 type PacketSink func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
 
 // NewReceiver makes a Receiver for one slicer, speaking IL2P version version,
@@ -129,7 +129,7 @@ func (F *Receiver) logEntry() *logrus.Entry {
  *
  * Description: This is called once for each received bit.
  *              Each valid packet is handed to the receiver's sink, which in
- *              normal operation is multi_modem_process_rec_packet.
+ *              normal operation is the layer 2 receiver's recPacket.
  *		It can gather multiple candidates from different parallel demodulators
  *		("subchannels") and slicers, then decide which one is the best.
  *

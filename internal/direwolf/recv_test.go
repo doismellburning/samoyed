@@ -46,14 +46,15 @@ func newRecvTestRadioConfig(numChannels int) *RadioConfig {
 }
 
 // setupRecvTest initialises the demodulators for audioConfig, and returns the
-// SampleSource that hands the receive thread the given samples.  The real one
-// asserts on a device that was never opened, so a test brings its own.
-func setupRecvTest(t *testing.T, audioConfig *RadioConfig, samples []byte) *readerSampleSource {
+// receiver they hand on to and the SampleSource that hands the receive thread
+// the given samples.  The real one asserts on a device that was never opened,
+// so a test brings its own.
+func setupRecvTest(t *testing.T, audioConfig *RadioConfig, samples []byte) (*Layer2Receiver, *readerSampleSource) {
 	t.Helper()
 
-	multi_modem_init(audioConfig, 0, 0, new(radioSink))
+	var receiver = multi_modem_init(audioConfig, 0, 0, new(radioSink))
 
-	return newReaderSampleSource(bytes.NewReader(samples), len(samples))
+	return receiver, newReaderSampleSource(bytes.NewReader(samples), len(samples))
 }
 
 // silence16 is nbytes of 16 bit samples at zero.
@@ -89,9 +90,9 @@ func samples16(samples []int16) []byte {
 func TestRecvInitReportsTheDeviceWhoseInputFailed(t *testing.T) {
 	var audioConfig = newRecvTestRadioConfig(1)
 
-	var src = setupRecvTest(t, audioConfig, silence16(2000))
+	var receiver, src = setupRecvTest(t, audioConfig, silence16(2000))
 
-	var failed = recv_init(t.Context(), audioConfig, src, nil, nil)
+	var failed = recv_init(t.Context(), audioConfig, src, receiver, nil)
 
 	select {
 	case a := <-failed:
@@ -107,9 +108,9 @@ func TestRecvInitStartsNothingForAnUndefinedDevice(t *testing.T) {
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.adev[0].defined = 0
 
-	var src = setupRecvTest(t, audioConfig, silence16(2000))
+	var receiver, src = setupRecvTest(t, audioConfig, silence16(2000))
 
-	var failed = recv_init(t.Context(), audioConfig, src, nil, nil)
+	var failed = recv_init(t.Context(), audioConfig, src, receiver, nil)
 
 	select {
 	case a := <-failed:
@@ -123,7 +124,7 @@ func TestRecvInitStartsNothingForAnUndefinedDevice(t *testing.T) {
 func TestRecvAdevThreadStopsWhenCancelledWithoutReportingAFailure(t *testing.T) {
 	var audioConfig = newRecvTestRadioConfig(1)
 
-	setupRecvTest(t, audioConfig, nil)
+	var receiver, _ = setupRecvTest(t, audioConfig, nil)
 	// Audio that never ends, so cancellation is the only way out.
 	var src = newReaderSampleSource(endlessAudio{}, math.MaxInt32)
 
@@ -134,7 +135,7 @@ func TestRecvAdevThreadStopsWhenCancelledWithoutReportingAFailure(t *testing.T) 
 	var done = make(chan struct{})
 
 	go func() {
-		recv_adev_thread(ctx, audioConfig, 0, failed, src, nil, nil)
+		recv_adev_thread(ctx, audioConfig, 0, failed, src, receiver, nil)
 		close(done)
 	}()
 
@@ -161,12 +162,9 @@ func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
 		samples = append(samples, 8000, -8000)
 	}
 
-	var src = setupRecvTest(t, audioConfig, samples16(samples))
+	var receiver, src = setupRecvTest(t, audioConfig, samples16(samples))
 
-	multiModems[0].dcAverage = 0
-	multiModems[1].dcAverage = 0
-
-	var failed = recv_init(t.Context(), audioConfig, src, nil, nil)
+	var failed = recv_init(t.Context(), audioConfig, src, receiver, nil)
 
 	select {
 	case <-failed:
@@ -174,8 +172,8 @@ func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
 		t.Fatal("no failure reported after the audio ran out")
 	}
 
-	assert.Positive(t, multiModems[0].dcAverage, "channel 0 should have been fed the left samples")
-	assert.Negative(t, multiModems[1].dcAverage, "channel 1 should have been fed the right samples")
+	assert.Positive(t, receiver.modems[0].dcAverage, "channel 0 should have been fed the left samples")
+	assert.Negative(t, receiver.modems[1].dcAverage, "channel 1 should have been fed the right samples")
 }
 
 // Touch tones are decoded, and each button passed on, only where DTMF decoding
@@ -184,7 +182,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_ON
 
-	var src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
+	var receiver, src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
 	var buttons []string
 
@@ -194,7 +192,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 		}
 	}
 
-	var failed = recv_init(t.Context(), audioConfig, src, onButton, nil)
+	var failed = recv_init(t.Context(), audioConfig, src, receiver, onButton)
 
 	select {
 	case <-failed:
@@ -211,9 +209,9 @@ func TestRecvAdevThreadDecodesTouchTonesForNobody(t *testing.T) {
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_ON
 
-	var src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
+	var receiver, src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
-	var failed = recv_init(t.Context(), audioConfig, src, nil, nil)
+	var failed = recv_init(t.Context(), audioConfig, src, receiver, nil)
 
 	select {
 	case <-failed:
@@ -228,7 +226,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_OFF
 
-	var src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
+	var receiver, src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
 	var buttons []string
 
@@ -238,7 +236,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 		}
 	}
 
-	var failed = recv_init(t.Context(), audioConfig, src, onButton, nil)
+	var failed = recv_init(t.Context(), audioConfig, src, receiver, onButton)
 
 	select {
 	case <-failed:

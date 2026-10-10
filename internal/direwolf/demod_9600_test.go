@@ -105,32 +105,26 @@ func generate9600(t *testing.T, audioConfig *RadioConfig, channel int, frames []
 }
 
 // demodulate9600 runs samples through the demodulators set up for
-// audioConfig, and returns the frames they hand on.
-func demodulate9600(t *testing.T, audioConfig *RadioConfig, channel int, samples []int) []*ax25.Packet {
+// audioConfig, and returns the frames they hand on and the receiver that
+// holds the demodulators.
+func demodulate9600(t *testing.T, audioConfig *RadioConfig, channel int, samples []int) ([]*ax25.Packet, *Layer2Receiver) {
 	t.Helper()
-
-	var origDemodulators = demodulators
-
-	t.Cleanup(func() {
-		demodulators = origDemodulators
-		multiModems = newMultiModems()
-	})
 
 	var sink = new(recordingReceiveSink)
 
-	multi_modem_init(audioConfig, 0, 0, sink)
+	var receiver = multi_modem_init(audioConfig, 0, 0, sink)
 
 	for _, sam := range samples {
-		multi_modem_process_sample(channel, sam)
+		receiver.ProcessSample(channel, sam)
 	}
 
 	// Enough silence afterwards for the last frame to be picked from the
 	// candidates, however many slicers heard it.
-	for range 2 * multiModems[channel].processAge {
-		multi_modem_process_sample(channel, 0)
+	for range 2 * receiver.modems[channel].processAge {
+		receiver.ProcessSample(channel, 0)
 	}
 
-	return sink.frames
+	return sink.frames, receiver
 }
 
 func new9600TestRadioConfig(sampleRate int, profiles string, upsample int) *RadioConfig {
@@ -178,7 +172,7 @@ func TestDemod9600RoundTrip(t *testing.T) {
 			var samples = generate9600(t, new9600TestRadioConfig(tc.sampleRate, tc.profiles, tc.upsample), 0, frames)
 
 			var audioConfig = new9600TestRadioConfig(tc.sampleRate, tc.profiles, tc.upsample)
-			var got = demodulate9600(t, audioConfig, 0, samples)
+			var got, receiver = demodulate9600(t, audioConfig, 0, samples)
 
 			require.Len(t, got, len(texts))
 
@@ -186,7 +180,7 @@ func TestDemod9600RoundTrip(t *testing.T) {
 				assert.Equal(t, texts[i], pp.FormatAddrs()+string(pp.Info()))
 			}
 
-			var d = demodulators[0]
+			var d = receiver.demods[0]
 			require.NotNil(t, d)
 
 			if tc.profiles == "+" {
@@ -206,7 +200,7 @@ func TestDemod9600RoundTrip(t *testing.T) {
 func TestDemod9600Silence(t *testing.T) {
 	var audioConfig = new9600TestRadioConfig(48000, "-", 0)
 
-	var got = demodulate9600(t, audioConfig, 0, make([]int, 48000/10))
+	var got, _ = demodulate9600(t, audioConfig, 0, make([]int, 48000/10))
 
 	assert.Empty(t, got)
 }

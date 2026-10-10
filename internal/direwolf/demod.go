@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -54,10 +53,6 @@ type bitReceiver interface {
 	DCDChange(channel int, subchannel int, slice int, state int)
 }
 
-// demodulators holds every radio channel's Demodulator.  demod_init builds
-// them, so until then, and for a channel that is not a radio, it is nil.
-var demodulators [MAX_RADIO_CHANS]*Demodulator
-
 // audioLevelDecimation is how many audio samples pass between pushes of the
 // received audio level to the metrics endpoint: ~10Hz at a 44.1kHz sample rate.
 const audioLevelDecimation = 4410
@@ -98,10 +93,12 @@ func capProfiles(channel int, profiles string) string {
 	return profiles[:MAX_SUBCHANS]
 }
 
-func demod_init(pa *RadioConfig) {
-	for channel := range MAX_RADIO_CHANS {
-		demodulators[channel] = nil
+// demod_init builds a Demodulator for each radio channel, and returns them;
+// a channel that is not a radio has none.
+func demod_init(pa *RadioConfig) [MAX_RADIO_CHANS]*Demodulator {
+	var demodulators [MAX_RADIO_CHANS]*Demodulator
 
+	for channel := range MAX_RADIO_CHANS {
 		if pa.chan_medium[channel] == MEDIUM_RADIO {
 			demodulators[channel] = NewDemodulator(channel, pa.achan[channel], pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
 		}
@@ -118,6 +115,8 @@ func demod_init(pa *RadioConfig) {
 			dw_printf("Channel %d: IGate virtual channel.\n", channel)
 		}
 	}
+
+	return demodulators
 } /* end demod_init */
 
 // NewDemodulator sets up the demodulators for a radio channel, from achan, its
@@ -805,19 +804,6 @@ func (d *Demodulator) NumSlicers() int {
 	return d.numSlicers
 }
 
-// channelLayout is how many subchannels, and slicers in each, a channel's
-// demodulator has - which is to say, whether a frame's subchannel and slicer
-// are worth showing.  A channel without a demodulator has one of each.
-func channelLayout(channel int) (int, int) {
-	if channel < 0 || channel >= MAX_RADIO_CHANS || demodulators[channel] == nil {
-		return 1, 1
-	}
-
-	var d = demodulators[channel]
-
-	return d.NumSubchan(), d.NumSlicers()
-}
-
 /*------------------------------------------------------------------
  *
  * Name:        demod_get_sample
@@ -937,18 +923,6 @@ func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
 // I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
 // This is called from PTT.Set for half duplex.
 
-func demod_mute_input(channel int, mute_during_xmit int) {
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-
-	// Transmit calibration, for one, keys a channel that may not be listening.
-	var d = demodulators[channel]
-	if d == nil {
-		return
-	}
-
-	d.Mute(mute_during_xmit != 0)
-}
-
 // Mute silences the channel's input, or stops silencing it.
 func (d *Demodulator) Mute(mute bool) {
 	d.muted.Store(mute)
@@ -999,7 +973,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 		if D.alevel_metric_countdown <= 0 {
 			D.alevel_metric_countdown = audioLevelDecimation
 
-			metrics.SetAudioLevel(channel, demod_get_audio_level(channel, 0).Rec)
+			metrics.SetAudioLevel(channel, d.AudioLevel(0).Rec)
 		}
 	}
 
@@ -1049,21 +1023,6 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 /* Resulting scale is 0 to almost 100. */
 /* Cranking up the input level produces no more than 97 or 98. */
 /* We currently produce a message when this goes over 90. */
-
-func demod_get_audio_level(channel int, subchan int) ax25.ALevel {
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-
-	// audio_stats asks after both of a stereo device's channels, whether or
-	// not demod_init set them up.
-	var d = demodulators[channel]
-	if d == nil {
-		var alevel ax25.ALevel
-
-		return alevel
-	}
-
-	return d.AudioLevel(subchan)
-}
 
 // AudioLevel reports the received audio level the subchannel's demodulator
 // has seen, and for AFSK its mark and space amplitudes.

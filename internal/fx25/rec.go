@@ -102,7 +102,7 @@ func (F *Receiver) logEntry() *logrus.Entry {
  *
  * Description: This is called once for each received bit.
  *              Each valid frame is handed to the receiver's sink, which in
- *              normal operation is multi_modem_process_rec_frame.
+ *              normal operation is the layer 2 receiver's recFrame.
  *		It can gather multiple candidates from different parallel demodulators
  *		("subchannels") and slicers, then decide which one is the best.
  *

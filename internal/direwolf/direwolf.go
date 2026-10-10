@@ -470,6 +470,10 @@ x = Silence FX.25 information.`)
 
 	var layer2Receiver = multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
 
+	// The audio statistics report each channel's level, which the
+	// demodulators keep.  Nothing reads a device until recv_init, below.
+	audioDevices.setAudioLevel(layer2Receiver.AudioLevel)
+
 	/*
 	 * New in 1.8 - Allow a channel to be mapped to a network TNC rather than
 	 * an internal modem and radio.
@@ -493,7 +497,7 @@ x = Silence FX.25 information.`)
 	 * Push to Talk (PTT) control.
 	 */
 
-	var pttControl, pttErr = NewPTT(audio_config, d_o_opt)
+	var pttControl, pttErr = NewPTT(audio_config, layer2Receiver.MuteInput, d_o_opt)
 	td.add(pttControl.Term) // Which does nothing if there is no PTT.
 	stopIfCancelled(ctx, td)
 
@@ -710,7 +714,7 @@ x = Silence FX.25 information.`)
 	 * client applications too.  Each audio device's receive thread makes the
 	 * touch tone decoders for its own channels, once receiving starts below.
 	 */
-	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, aprstt_debug)
+	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, layer2Receiver.AudioLevel, aprstt_debug)
 
 	/*
 	 * Open port for communication with GPS.
@@ -757,10 +761,11 @@ x = Silence FX.25 information.`)
 	 * Use hot attribute for all functions called for every audio sample.
 	 */
 
-	var adev_failed = recv_init(ctx, audio_config, audioDevices, ttGateway.Button, layer2Receiver.DCDChange)
+	var adev_failed = recv_init(ctx, audio_config, audioDevices, layer2Receiver, ttGateway.Button)
 
 	var recHandler = new(recPacketHandler)
 	recHandler.audioConfig = audio_config
+	recHandler.layout = layer2Receiver.Layout
 	recHandler.ttConfig = &dw_tt_config
 	recHandler.decoder = aprsDecoder
 	recHandler.webHub = webHub
@@ -810,13 +815,18 @@ x = Silence FX.25 information.`)
 // exist, and gives it to recv_process.
 type recPacketHandler struct {
 	audioConfig *RadioConfig
-	ttConfig    *tt_config_s
-	decoder     *aprs.Decoder
-	webHub      *webui.Hub // Nil without a web interface.
-	logger      *aprslog.Logger
-	heard       *mheard.DB // Where the stations heard over the radio are remembered.
-	waypoints   *WaypointSender
-	apps        *clientApps // Nil for none.
+
+	// layout says how many subchannels, and slicers in each, a channel's
+	// demodulator has, so a frame's are shown only where they say something;
+	// nil for one of each everywhere.
+	layout    func(channel int) (int, int)
+	ttConfig  *tt_config_s
+	decoder   *aprs.Decoder
+	webHub    *webui.Hub // Nil without a web interface.
+	logger    *aprslog.Logger
+	heard     *mheard.DB // Where the stations heard over the radio are remembered.
+	waypoints *WaypointSender
+	apps      *clientApps // Nil for none.
 
 	digipeater          *Digipeater
 	connectedDigipeater *ConnectedDigipeater
@@ -1021,7 +1031,10 @@ func (rh *recPacketHandler) app_process_rec_packet(
 	case -4: // AXUDP
 		logEntry = logEntry.WithField("subchan", "axudp")
 	default:
-		var numSubchan, numSlicers = channelLayout(channel)
+		var numSubchan, numSlicers = 1, 1
+		if rh.layout != nil {
+			numSubchan, numSlicers = rh.layout(channel)
+		}
 
 		if numSubchan > 1 {
 			logEntry = logEntry.WithField("subchan", subchan)

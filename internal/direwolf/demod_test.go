@@ -6,7 +6,6 @@ package direwolf
 import (
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -165,12 +164,6 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 // What NewDemodulator works out from a channel's settings, it keeps: the
 // configuration is left as the file and command line had it.
 func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
-	var saved = demodulators
-
-	t.Cleanup(func() {
-		demodulators = saved
-	})
-
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 300, 1600, 1800, 48000)
 	audioConfig.achan[channel].num_freq = 3
@@ -179,9 +172,7 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 
 	var before = audioConfig.achan[channel]
 
-	demod_init(audioConfig)
-
-	var d = demodulators[channel]
+	var d = demod_init(audioConfig)[channel]
 	require.NotNil(t, d)
 	assert.Equal(t, "AB+", d.profiles)
 	assert.Equal(t, 2, d.NumSubchan(), "+ can't be combined with multiple frequencies, so one per letter")
@@ -191,38 +182,13 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 	assert.Equal(t, before, audioConfig.achan[channel])
 }
 
-// Only a radio channel gets a Demodulator, and until demod_init has run there
-// are none at all, so what reaches one by channel number has to cope.
-func TestDemodNilChannel(t *testing.T) {
-	var saved = demodulators
-
-	t.Cleanup(func() {
-		demodulators = saved
-	})
-
-	demodulators = [MAX_RADIO_CHANS]*Demodulator{}
-
-	var zero ax25.ALevel
-
-	assert.Equal(t, zero, demod_get_audio_level(0, 0))
-	assert.NotPanics(t, func() { demod_mute_input(0, 1) })
-}
-
-// demod_init builds a Demodulator for each radio channel, and drops any left
-// over from before for a channel that no longer is one.
+// demod_init builds a Demodulator for each radio channel, and none for a
+// channel that is not one.
 func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
-	var saved = demodulators
-
-	t.Cleanup(func() {
-		demodulators = saved
-	})
-
-	demodulators[1] = new(Demodulator)
-
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[0].num_freq = 1
 
-	demod_init(audioConfig)
+	var demodulators = demod_init(audioConfig)
 
 	require.NotNil(t, demodulators[0])
 	assert.Equal(t, 0, demodulators[0].channel)
@@ -233,24 +199,18 @@ func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
 // demodulator has more than one; a channel without one, whether not a radio
 // or out of range altogether, has one of each.
 func TestChannelLayout(t *testing.T) {
-	var saved = demodulators
-
-	t.Cleanup(func() {
-		demodulators = saved
-	})
-
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[0].num_freq = 1
 	audioConfig.achan[0].profiles = "AB+"
 
-	demod_init(audioConfig)
+	var receiver = multi_modem_init(audioConfig, 0, 0, new(discardReceiveSink))
 
-	var numSubchan, numSlicers = channelLayout(0)
+	var numSubchan, numSlicers = receiver.Layout(0)
 	assert.Equal(t, 2, numSubchan)
 	assert.Equal(t, MAX_SLICERS, numSlicers)
 
 	for _, channel := range []int{1, MAX_RADIO_CHANS, -1} {
-		numSubchan, numSlicers = channelLayout(channel)
+		numSubchan, numSlicers = receiver.Layout(channel)
 		assert.Equal(t, 1, numSubchan, "channel %d", channel)
 		assert.Equal(t, 1, numSlicers, "channel %d", channel)
 	}
