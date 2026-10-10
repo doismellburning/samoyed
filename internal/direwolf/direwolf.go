@@ -22,6 +22,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/webui"
+	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -1068,7 +1069,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		logEntry = logEntry.WithField("desc", desc)
 
 		if ftype == ax25.FrameTypeUXID {
-			var _, info2text, _ = xid_parse(pinfo)
+			var _, info2text, _ = xid.Parse(pinfo)
 			logEntry.WithField("info", info2text).Info("Packet")
 		} else {
 			logEntry.Info("Packet ax25_safe_print below:")

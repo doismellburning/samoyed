@@ -47,6 +47,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
 )
@@ -1013,7 +1014,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 		dw_printf("(%s)", desc)
 
 		if ftype == ax25.FrameTypeUXID {
-			var _, info2text, _ = xid_parse(pinfo)
+			var _, info2text, _ = xid.Parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {
 			ax25.SafePrint(pinfo, !pp.IsAPRS())

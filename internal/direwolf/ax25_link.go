@@ -157,6 +157,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -363,9 +364,9 @@ type ax25_dlsm_t struct {
 	// Determines whether we have one or two control
 	// octets.  128 allows a much larger window size.
 
-	srej_enable srej_e // Is other end capable of processing SREJ?  (Am I allowed to send it?)
-	// Starts out as 'srej_none' for v2.0 or 'srej_single' for v2.2.
-	// Can be changed to 'srej_multi' with XID exchange.
+	srej_enable xid.SREJ // Is other end capable of processing SREJ?  (Am I allowed to send it?)
+	// Starts out as 'xid.SREJNone' for v2.0 or 'xid.SREJSingle' for v2.2.
+	// Can be changed to 'xid.SREJMulti' with XID exchange.
 	// Should be used only with modulo 128.  (Is this enforced?)
 
 	n1_paclen int // Maximum length of information field, in bytes.
@@ -2594,7 +2595,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		}
-	} else if S.srej_enable == srej_none {
+	} else if S.srej_enable == xid.SREJNone {
 		// The received sequence number is not the expected one and we can't use SREJ.
 		// The old v2.0 approach is to send and REJ with the number we are expecting.
 		// This can be very inefficient.  For example if we received 1,3,4,5,6 in one transmission,
@@ -2979,7 +2980,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 	// Multi-SREJ - Use info part for additional sequence number(s) instead of sending separate SREJ for each.
 
-	if S.srej_enable == srej_multi && count > 1 {
+	if S.srej_enable == xid.SREJMulti && count > 1 {
 		var info []byte
 
 		for i := 1; i < count; i++ { // skip first one
@@ -4610,13 +4611,13 @@ func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 				// Take parameters sent by other station.
 				// Generally we take minimum of what he wants and what I can do.
 				// Adjust my working configuration and send it back.
-				var param, _, ok = xid_parse(info)
+				var param, _, ok = xid.Parse(info)
 
-				if ok > 0 {
+				if ok {
 					negotiation_response(S, param)
 
 					var res = ax25.CRRes
-					var xinfo = xid_encode(param, res)
+					var xinfo = xid.Encode(param, res)
 
 					var nopid = 0
 					var f = -1
@@ -4636,9 +4637,9 @@ func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 		if cr == ax25.CRRes {
 			if pf == 1 {
 				// Got expected response.  Copy into my working parameters.
-				var param, _, ok = xid_parse(info)
+				var param, _, ok = xid.Parse(info)
 
-				if ok > 0 {
+				if ok {
 					complete_negotiation(S, param)
 				}
 
@@ -5015,10 +5016,10 @@ func tm201_expiry(S *ax25_dlsm_t) {
 			S.mdl_state = mdl_state_0_ready
 		} else {
 			// No response.  Ask again.
-			var param xid_param_s
+			var param xid.Param
 			initiate_negotiation(S, &param)
 
-			var xinfo = xid_encode(&param, cmd)
+			var xinfo = xid.Encode(&param, cmd)
 
 			var pp = ax25.UFrame(S.addrs, S.num_addr, cmd, ax25.FrameTypeUXID, p, nopid, xinfo)
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
@@ -5256,7 +5257,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25.FrameType, f int) {
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false // because we sent N(R) from V(R).
-		} else if S.srej_enable == srej_single || S.srej_enable == srej_multi {
+		} else if S.srej_enable == xid.SREJSingle || S.srej_enable == xid.SREJMulti {
 			// SREJ is enabled. This is based on X.25 2.4.6.11.
 			if S.modulo != 128 {
 				text_color_set(DW_COLOR_ERROR)
@@ -5378,7 +5379,7 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 	// I don't think we should be here if SREJ is enabled.
 	// TODO: Figure out why this happens occasionally.
 
-	//	if (S.srej_enable != srej_none) {
+	//	if (S.srej_enable != xid.SREJNone) {
 	//	  text_color_set(DW_COLOR_ERROR);
 	//	  dw_printf ("Internal Error, Did not expect to be here when SREJ enabled.  %s %s %d\n", __FILE__, __func__, __LINE__);
 	//	}
@@ -5668,7 +5669,7 @@ func select_t1_value(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func set_version_2_0(S *ax25_dlsm_t) {
-	S.srej_enable = srej_none
+	S.srej_enable = xid.SREJNone
 	S.modulo = 8
 	S.n1_paclen = ax25Link.miscConfig.paclen
 	S.k_maxframe = ax25Link.miscConfig.maxframe_basic
@@ -5682,7 +5683,7 @@ func set_version_2_0(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func set_version_2_2(S *ax25_dlsm_t) {
-	S.srej_enable = srej_single // Start with single.
+	S.srej_enable = xid.SREJSingle // Start with single.
 	// Can be increased to multi with XID exchange.
 	S.modulo = 128
 	S.n1_paclen = ax25Link.miscConfig.paclen
@@ -5961,11 +5962,11 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 
 	switch S.mdl_state {
 	case mdl_state_0_ready:
-		var param xid_param_s
+		var param xid.Param
 		initiate_negotiation(S, &param)
 
 		var cmd = ax25.CRCmd
-		var xinfo = xid_encode(&param, cmd)
+		var xinfo = xid.Encode(&param, cmd)
 
 		var p = 1
 		var nopid = 0
@@ -5991,23 +5992,23 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
-	param.full_duplex = maybe.Just(false)
+func initiate_negotiation(S *ax25_dlsm_t, param *xid.Param) {
+	param.FullDuplex = maybe.Just(false)
 
 	switch S.srej_enable {
-	case srej_single, srej_multi:
-		param.srej = srej_multi // see if other end reconizes it.
+	case xid.SREJSingle, xid.SREJMulti:
+		param.SREJ = xid.SREJMulti // see if other end reconizes it.
 	default:
-		param.srej = srej_none
+		param.SREJ = xid.SREJNone
 	}
 
-	param.modulo = S.modulo
-	param.i_field_length_rx = maybe.Just(S.n1_paclen) // Hmmmm.  Should we ask for what the user
+	param.Modulo = S.modulo
+	param.IFieldLengthRx = maybe.Just(S.n1_paclen) // Hmmmm.  Should we ask for what the user
 	// specified for PACLEN or offer the maximum
 	// that we can handle, AX25_N1_PACLEN_MAX?
-	param.window_size_rx = maybe.Just(S.k_maxframe)
-	param.ack_timer = maybe.Just(ax25Link.miscConfig.frack * 1000)
-	param.retries = maybe.Just(S.n2_retry)
+	param.WindowSizeRx = maybe.Just(S.k_maxframe)
+	param.AckTimer = maybe.Just(ax25Link.miscConfig.frack * 1000)
+	param.Retries = maybe.Just(S.n2_retry)
 }
 
 /*------------------------------------------------------------------------------
@@ -6030,56 +6031,56 @@ func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
+func negotiation_response(S *ax25_dlsm_t, param *xid.Param) {
 	// TODO: Integrate with new full duplex capability in v1.5.
-	param.full_duplex = maybe.Just(false)
+	param.FullDuplex = maybe.Just(false)
 
 	// Other end might want 8.
 	// Seems unlikely.  If it implements XID it should have modulo 128.
 
-	if param.modulo == ax25.ModuloUnknown {
-		param.modulo = ax25.Modulo8 // Not specified.  Set default.
+	if param.Modulo == ax25.ModuloUnknown {
+		param.Modulo = ax25.Modulo8 // Not specified.  Set default.
 	} else {
-		param.modulo = min(param.modulo, ax25.Modulo128)
+		param.Modulo = min(param.Modulo, ax25.Modulo128)
 	}
 
 	// We can do REJ or SREJ but won't combine them.
 	// Erratum:  2006 version, section, 4.3.3.7 says default selective reject - reject.
 	// We can't do that.
 
-	if param.srej == srej_not_specified {
+	if param.SREJ == xid.SREJNotSpecified {
 		// not specified, set default
-		if param.modulo == 128 {
-			param.srej = srej_single
+		if param.Modulo == 128 {
+			param.SREJ = xid.SREJSingle
 		} else {
-			param.srej = srej_none
+			param.SREJ = xid.SREJNone
 		}
 	}
 
 	// We can currently do up to 2k.
 	// Take minimum of that and what other guy asks for.
 
-	if length, ok := param.i_field_length_rx.Get(); ok {
-		param.i_field_length_rx = maybe.Just(min(length, AX25_N1_PACLEN_MAX))
+	if length, ok := param.IFieldLengthRx.Get(); ok {
+		param.IFieldLengthRx = maybe.Just(min(length, AX25_N1_PACLEN_MAX))
 	} else {
-		param.i_field_length_rx = maybe.Just(256) // Not specified, take default.
+		param.IFieldLengthRx = maybe.Just(256) // Not specified, take default.
 	}
 
 	// In theory extended mode can have window size of 127 but
 	// I'm limiting it to 63 for the reason mentioned in the SREJ logic.
 
-	if window, ok := param.window_size_rx.Get(); ok {
-		if param.modulo == ax25.Modulo128 {
-			param.window_size_rx = maybe.Just(min(window, AX25_K_MAXFRAME_EXTENDED_MAX))
+	if window, ok := param.WindowSizeRx.Get(); ok {
+		if param.Modulo == ax25.Modulo128 {
+			param.WindowSizeRx = maybe.Just(min(window, AX25_K_MAXFRAME_EXTENDED_MAX))
 		} else {
-			param.window_size_rx = maybe.Just(min(window, AX25_K_MAXFRAME_BASIC_MAX))
+			param.WindowSizeRx = maybe.Just(min(window, AX25_K_MAXFRAME_BASIC_MAX))
 		}
 	} else {
 		// not specified, set default.
-		if param.modulo == ax25.Modulo128 {
-			param.window_size_rx = maybe.Just(32)
+		if param.Modulo == ax25.Modulo128 {
+			param.WindowSizeRx = maybe.Just(32)
 		} else {
-			param.window_size_rx = maybe.Just(4)
+			param.WindowSizeRx = maybe.Just(4)
 		}
 	}
 
@@ -6089,16 +6090,16 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	// digipeaters in the path.  I'm assuming this is the FRACK value and any additional time, for
 	// digipeaters will be added in locally at each end on top of this exchanged value.
 
-	if timer, ok := param.ack_timer.Get(); ok {
-		param.ack_timer = maybe.Just(max(timer, ax25Link.miscConfig.frack*1000))
+	if timer, ok := param.AckTimer.Get(); ok {
+		param.AckTimer = maybe.Just(max(timer, ax25Link.miscConfig.frack*1000))
 	} else {
-		param.ack_timer = maybe.Just(3000) // not specified, set default.
+		param.AckTimer = maybe.Just(3000) // not specified, set default.
 	}
 
-	if retries, ok := param.retries.Get(); ok {
-		param.retries = maybe.Just(max(retries, S.n2_retry))
+	if retries, ok := param.Retries.Get(); ok {
+		param.Retries = maybe.Just(max(retries, S.n2_retry))
 	} else {
-		param.retries = maybe.Just(10) // not specified, set default.
+		param.Retries = maybe.Just(10) // not specified, set default.
 	}
 
 	// IMPORTANT:  Take values we have agreed upon and put into my running configuration.
@@ -6124,31 +6125,31 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
-	if param.srej != srej_not_specified {
-		S.srej_enable = param.srej
+func complete_negotiation(S *ax25_dlsm_t, param *xid.Param) {
+	if param.SREJ != xid.SREJNotSpecified {
+		S.srej_enable = param.SREJ
 	}
 
-	switch param.modulo {
+	switch param.Modulo {
 	case ax25.Modulo8, ax25.Modulo128:
 		// Disaster if aren't agreeing on this.
-		S.modulo = param.modulo
+		S.modulo = param.Modulo
 	case ax25.ModuloUnknown:
 	default:
 		// Not one we implement, so keep what we have.
-		warnXIDOutOfRange(S, "modulo", int(param.modulo), int(S.modulo))
-		param.modulo = S.modulo
+		warnXIDOutOfRange(S, "modulo", int(param.Modulo), int(S.modulo))
+		param.Modulo = S.modulo
 	}
 
 	// Bounded by what segmentation needs with the modulus now in force, even
 	// if only the modulus changed.
 	var n1Min = smallestUsableN1(S.modulo)
-	if length, ok := param.i_field_length_rx.Get(); ok {
+	if length, ok := param.IFieldLengthRx.Get(); ok {
 		S.n1_paclen = min(max(length, n1Min), AX25_N1_PACLEN_MAX)
 		if S.n1_paclen != length {
 			warnXIDOutOfRange(S, "i_field_length_rx", length, S.n1_paclen)
 		}
-		param.i_field_length_rx = maybe.Just(S.n1_paclen)
+		param.IFieldLengthRx = maybe.Just(S.n1_paclen)
 	} else {
 		S.n1_paclen = min(max(S.n1_paclen, n1Min), AX25_N1_PACLEN_MAX)
 	}
@@ -6158,19 +6159,19 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	if S.modulo == ax25.Modulo128 {
 		kMin, kMax = AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX
 	}
-	if window, ok := param.window_size_rx.Get(); ok {
+	if window, ok := param.WindowSizeRx.Get(); ok {
 		S.k_maxframe = min(max(window, kMin), kMax)
 		if S.k_maxframe != window {
 			warnXIDOutOfRange(S, "window_size_rx", window, S.k_maxframe)
 		}
-		param.window_size_rx = maybe.Just(S.k_maxframe)
+		param.WindowSizeRx = maybe.Just(S.k_maxframe)
 	} else {
 		S.k_maxframe = min(max(S.k_maxframe, kMin), kMax)
 	}
 
-	S.n2_retry = maybe.FromMaybe(S.n2_retry, param.retries)
+	S.n2_retry = maybe.FromMaybe(S.n2_retry, param.Retries)
 
-	if timer, ok := param.ack_timer.Get(); ok {
+	if timer, ok := param.AckTimer.Get(); ok {
 		S.t1v = time.Duration(timer) * time.Millisecond
 	}
 }

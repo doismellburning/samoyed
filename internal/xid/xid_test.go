@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-package direwolf
+package xid
 
 import (
 	"testing"
@@ -12,16 +12,16 @@ import (
 )
 
 // A set of parameters nobody has filled in should offer nothing beyond the two
-// groups xid_encode always sends.  While the optional fields were ints holding
-// G_UNKNOWN for "not specified", the zero value of xid_param_s said instead
+// groups Encode always sends.  While the optional fields were ints holding
+// G_UNKNOWN for "not specified", the zero value of Param said instead
 // that every one of them had been negotiated to zero, and a caller that built
 // the struct without going through initiate_negotiation would transmit a
 // zero-length I field, a zero-frame window, a zero acknowledge timer and zero
 // retries as though they had been asked for.
 func TestXIDEncodeZeroValueOmitsOptionalParameters(t *testing.T) {
-	var param xid_param_s
+	var param Param
 
-	var info = xid_encode(&param, ax25.CRCmd)
+	var info = Encode(&param, ax25.CRCmd)
 
 	// Format Indicator, Group Identifier, two group length bytes, then only
 	// Classes of Procedures (4 bytes) and HDLC Optional Functions (5 bytes).
@@ -34,15 +34,15 @@ func TestXIDEncodeZeroValueOmitsOptionalParameters(t *testing.T) {
 	assert.NotContains(t, info[4:], byte(PI_Retries))
 
 	// And it round-trips back to "not specified" rather than to zeroes.
-	var parsed, _, status = xid_parse(info)
-	assert.Equal(t, 1, status)
-	assert.Equal(t, maybe.Nothing[int](), parsed.i_field_length_rx)
-	assert.Equal(t, maybe.Nothing[int](), parsed.window_size_rx)
-	assert.Equal(t, maybe.Nothing[int](), parsed.ack_timer)
-	assert.Equal(t, maybe.Nothing[int](), parsed.retries)
+	var parsed, _, status = Parse(info)
+	assert.True(t, status)
+	assert.Equal(t, maybe.Nothing[int](), parsed.IFieldLengthRx)
+	assert.Equal(t, maybe.Nothing[int](), parsed.WindowSizeRx)
+	assert.Equal(t, maybe.Nothing[int](), parsed.AckTimer)
+	assert.Equal(t, maybe.Nothing[int](), parsed.Retries)
 }
 
-// An XID's info field comes off the air, and xid_parse used to index into it
+// An XID's info field comes off the air, and Parse used to index into it
 // wherever its header and group length said there would be something, so a
 // short or truncated one - a single byte would do - took the program down.
 // The monitor display parses every XID frame it hears, so this was in reach of
@@ -52,29 +52,29 @@ func TestXIDParseTruncatedInfo(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		info   []byte
-		status int
+		status bool
 	}{
-		{"one byte, not a format indicator", []byte{0x00}, 0},
-		{"format indicator alone", []byte{FI_Format_Indicator}, 0},
-		{"no group length", []byte{FI_Format_Indicator, GI_Group_Identifier}, 0},
-		{"half a group length", []byte{FI_Format_Indicator, GI_Group_Identifier, 0}, 0},
-		{"group length claims more than there is", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4}, 1},
-		{"parameter with no length", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4, PI_Window_Size_Rx}, 1},
-		{"parameter value cut short", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4, PI_Ack_Timer, 2, 0x0b}, 1},
+		{"one byte, not a format indicator", []byte{0x00}, false},
+		{"format indicator alone", []byte{FI_Format_Indicator}, false},
+		{"no group length", []byte{FI_Format_Indicator, GI_Group_Identifier}, false},
+		{"half a group length", []byte{FI_Format_Indicator, GI_Group_Identifier, 0}, false},
+		{"group length claims more than there is", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4}, true},
+		{"parameter with no length", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4, PI_Window_Size_Rx}, true},
+		{"parameter value cut short", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4, PI_Ack_Timer, 2, 0x0b}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var param, _, status = xid_parse(tc.info)
+			var param, _, status = Parse(tc.info)
 			assert.Equal(t, tc.status, status)
-			assert.Equal(t, maybe.Nothing[int](), param.ack_timer)
-			assert.Equal(t, maybe.Nothing[int](), param.window_size_rx)
+			assert.Equal(t, maybe.Nothing[int](), param.AckTimer)
+			assert.Equal(t, maybe.Nothing[int](), param.WindowSizeRx)
 		})
 	}
 
 	// Parameters that fit are kept even when a later one does not.
 	var info = []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 9, PI_Window_Size_Rx, 1, 4, PI_Ack_Timer, 2, 0x0b}
 
-	var param, _, status = xid_parse(info)
-	assert.Equal(t, 1, status)
-	assert.Equal(t, maybe.Just(4), param.window_size_rx)
-	assert.Equal(t, maybe.Nothing[int](), param.ack_timer)
+	var param, _, status = Parse(info)
+	assert.True(t, status)
+	assert.Equal(t, maybe.Just(4), param.WindowSizeRx)
+	assert.Equal(t, maybe.Nothing[int](), param.AckTimer)
 }
