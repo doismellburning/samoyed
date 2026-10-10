@@ -162,12 +162,12 @@ func setupUDPWaypoint(t *testing.T, formats int) (*WaypointSender, net.PacketCon
 	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	var mc = misc_config_s{ //nolint: exhaustruct_v5
-		waypoint_udp_hostname: "127.0.0.1",
-		waypoint_udp_portnum:  udpPort(t, listener),
-		waypoint_formats:      formats,
+	var config = waypointConfig{ //nolint: exhaustruct_v5
+		udpHostname: "127.0.0.1",
+		udpPort:     udpPort(t, listener),
+		formats:     formats,
 	}
-	var ws, sendErr = NewWaypointSender(t.Context(), &mc, nil)
+	var ws, sendErr = NewWaypointSender(t.Context(), &config, nil)
 	require.NoError(t, sendErr)
 
 	t.Cleanup(func() {
@@ -314,12 +314,12 @@ func TestWaypointDefaultFormats(t *testing.T) {
 	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	var mc = misc_config_s{ //nolint: exhaustruct_v5
-		waypoint_udp_hostname: "127.0.0.1",
-		waypoint_udp_portnum:  udpPort(t, listener),
-		waypoint_formats:      0, // let NewWaypointSender pick defaults
+	var config = waypointConfig{ //nolint: exhaustruct_v5
+		udpHostname: "127.0.0.1",
+		udpPort:     udpPort(t, listener),
+		formats:     0, // let NewWaypointSender pick defaults
 	}
-	var ws, sendErr = NewWaypointSender(t.Context(), &mc, nil)
+	var ws, sendErr = NewWaypointSender(t.Context(), &config, nil)
 	require.NoError(t, sendErr)
 
 	t.Cleanup(func() {
@@ -336,12 +336,12 @@ func TestWaypointGarminImpliesNMEAGeneric(t *testing.T) {
 	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	var mc = misc_config_s{ //nolint: exhaustruct_v5
-		waypoint_udp_hostname: "127.0.0.1",
-		waypoint_udp_portnum:  udpPort(t, listener),
-		waypoint_formats:      WPL_FORMAT_GARMIN,
+	var config = waypointConfig{ //nolint: exhaustruct_v5
+		udpHostname: "127.0.0.1",
+		udpPort:     udpPort(t, listener),
+		formats:     WPL_FORMAT_GARMIN,
 	}
-	var ws, sendErr = NewWaypointSender(t.Context(), &mc, nil)
+	var ws, sendErr = NewWaypointSender(t.Context(), &config, nil)
 	require.NoError(t, sendErr)
 
 	t.Cleanup(func() {
@@ -361,12 +361,12 @@ func TestWaypointTermClearsState(t *testing.T) {
 		listener.Close() //nolint:errcheck
 	})
 
-	var mc = misc_config_s{ //nolint: exhaustruct_v5
-		waypoint_udp_hostname: "127.0.0.1",
-		waypoint_udp_portnum:  udpPort(t, listener),
-		waypoint_formats:      WPL_FORMAT_KENWOOD,
+	var config = waypointConfig{ //nolint: exhaustruct_v5
+		udpHostname: "127.0.0.1",
+		udpPort:     udpPort(t, listener),
+		formats:     WPL_FORMAT_KENWOOD,
 	}
-	var ws, sendErr = NewWaypointSender(t.Context(), &mc, nil)
+	var ws, sendErr = NewWaypointSender(t.Context(), &config, nil)
 	require.NoError(t, sendErr)
 	require.NotNil(t, ws.udpSock, "socket should be open after NewWaypointSender")
 
@@ -378,9 +378,9 @@ func TestWaypointTermClearsState(t *testing.T) {
 // TestNewWaypointSenderNoDestRequested verifies that not asking for any waypoint
 // destination is not an error.
 func TestNewWaypointSenderNoDestRequested(t *testing.T) {
-	var mc = misc_config_s{} //nolint: exhaustruct_v5
+	var config = waypointConfig{} //nolint: exhaustruct_v5
 
-	var ws, err = NewWaypointSender(t.Context(), &mc, nil)
+	var ws, err = NewWaypointSender(t.Context(), &config, nil)
 	require.NoError(t, err)
 	require.NotNil(t, ws)
 	assert.Nil(t, ws.udpSock)
@@ -390,12 +390,12 @@ func TestNewWaypointSenderNoDestRequested(t *testing.T) {
 // TestNewWaypointSenderUDPFailureReturnsError verifies that NewWaypointSender
 // reports an error when the only requested destination (UDP) fails to open.
 func TestNewWaypointSenderUDPFailureReturnsError(t *testing.T) {
-	var mc = misc_config_s{ //nolint: exhaustruct_v5
-		waypoint_udp_hostname: "\x7f invalid host",
-		waypoint_udp_portnum:  12345,
+	var config = waypointConfig{ //nolint: exhaustruct_v5
+		udpHostname: "\x7f invalid host",
+		udpPort:     12345,
 	}
 
-	var ws, err = NewWaypointSender(t.Context(), &mc, nil)
+	var ws, err = NewWaypointSender(t.Context(), &config, nil)
 	require.Error(t, err, "should report an error rather than a silently useless sender")
 	assert.Nil(t, ws)
 	assert.Contains(t, err.Error(), "12345", "error should identify the destination that failed to open")

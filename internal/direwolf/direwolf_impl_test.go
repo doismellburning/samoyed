@@ -104,11 +104,11 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	t.Cleanup(func() { waypoints.Close() })
 
-	var miscConfig = new(misc_config_s)
-	miscConfig.waypoint_udp_hostname = "127.0.0.1"
-	miscConfig.waypoint_udp_portnum = waypoints.LocalAddr().(*net.UDPAddr).Port //nolint:forcetypeassert
+	var wpConfig = new(waypointConfig)
+	wpConfig.udpHostname = "127.0.0.1"
+	wpConfig.udpPort = waypoints.LocalAddr().(*net.UDPAddr).Port //nolint:forcetypeassert
 
-	var ws, wsErr = NewWaypointSender(t.Context(), miscConfig, nil)
+	var ws, wsErr = NewWaypointSender(t.Context(), wpConfig, nil)
 	require.NoError(t, wsErr)
 
 	t.Cleanup(ws.Close)

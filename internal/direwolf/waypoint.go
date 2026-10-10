@@ -24,6 +24,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// waypointConfig says where NewWaypointSender sends waypoints, and in which
+// formats.  Leave serialPort empty, or udpPort zero, to not send them there.
+type waypointConfig struct {
+	serialPort  string // Serial port name, e.g. COM22, /dev/ttyACM0.
+	udpHostname string // Destination host when using UDP.
+	udpPort     int    // UDP port.
+	formats     int    // Which sentence formats should be generated?  WPL_FORMAT_* flags.
+}
+
 type WaypointSender struct {
 	serialPortFd *term.Term
 	udpSock      net.Conn
@@ -37,18 +46,18 @@ type WaypointSender struct {
  *
  * Purpose:	Initialise and return a new WaypointSender.
  *
- * Inputs:	mc			- Pointer to configuration options.
+ * Inputs:	config			- Where to send waypoints, and in which formats.
  *
- *		  ->waypoint_serial_port	- Name of serial port.  COM1, /dev/ttyS0, etc.
+ *		  ->serialPort		- Name of serial port.  COM1, /dev/ttyS0, etc.
  *
- *		  ->waypoint_udp_hostname	- Destination host when using UDP.
+ *		  ->udpHostname		- Destination host when using UDP.
  *
- *		  ->waypoint_udp_portnum	- UDP port number.
+ *		  ->udpPort		- UDP port number.
  *
  *		  (currently none)	- speed, baud.  Default 4800 if not set
  *
  *
- *		  ->waypoint_formats	- Set of formats enabled.
+ *		  ->formats		- Set of formats enabled.
  *					  If none set, default to generic & Kenwood here.
  *
  *		gps			- The GPS, whose serial port we share if it is
@@ -63,20 +72,20 @@ type WaypointSender struct {
  *
  *---------------------------------------------------------------*/
 
-func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *dwgps.GPS) (*WaypointSender, error) {
+func NewWaypointSender(ctx context.Context, config *waypointConfig, gps *dwgps.GPS) (*WaypointSender, error) {
 	logrus.WithFields(logrus.Fields{
-		"serial_device": mc.waypoint_serial_port,
-		"formats":       mc.waypoint_formats,
-		"udp_hostname":  mc.waypoint_udp_hostname,
-		"udp_port":      mc.waypoint_udp_portnum,
+		"serial_device": config.serialPort,
+		"formats":       config.formats,
+		"udp_hostname":  config.udpHostname,
+		"udp_port":      config.udpPort,
 	}).Debug("waypoint_init")
 	var ws = &WaypointSender{} //nolint:exhaustruct_v5
 
-	var udpRequested = mc.waypoint_udp_portnum > 0
-	var serialRequested = mc.waypoint_serial_port != ""
+	var udpRequested = config.udpPort > 0
+	var serialRequested = config.serialPort != ""
 
 	if udpRequested {
-		var addr = net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(mc.waypoint_udp_portnum))
+		var addr = net.JoinHostPort(config.udpHostname, strconv.Itoa(config.udpPort))
 
 		var conn, err = new(net.Dialer).DialContext(ctx, "udp", addr)
 		if err != nil {
@@ -93,16 +102,16 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *dwgps.GPS) (
 	 * If that fails, do own serial port open.
 	 */
 	if serialRequested {
-		ws.serialPortFd = gps.SharedNMEAPort(mc.waypoint_serial_port, 4800)
+		ws.serialPortFd = gps.SharedNMEAPort(config.serialPort, 4800)
 
 		if ws.serialPortFd == nil {
-			ws.serialPortFd = serialport.Open(mc.waypoint_serial_port, 4800)
+			ws.serialPortFd = serialport.Open(config.serialPort, 4800)
 		} else {
-			logrus.WithField("port", mc.waypoint_serial_port).Debug("Sharing same port for GPS input and waypoint output")
+			logrus.WithField("port", config.serialPort).Debug("Sharing same port for GPS input and waypoint output")
 		}
 
 		if ws.serialPortFd == nil {
-			logrus.WithField("port", mc.waypoint_serial_port).Error("Unable to open serial port for waypoint output")
+			logrus.WithField("port", config.serialPort).Error("Unable to open serial port for waypoint output")
 		}
 	}
 
@@ -112,10 +121,10 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *dwgps.GPS) (
 	if (udpRequested || serialRequested) && ws.udpSock == nil && ws.serialPortFd == nil {
 		var requested []string
 		if udpRequested {
-			requested = append(requested, "UDP "+net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(mc.waypoint_udp_portnum)))
+			requested = append(requested, "UDP "+net.JoinHostPort(config.udpHostname, strconv.Itoa(config.udpPort)))
 		}
 		if serialRequested {
-			requested = append(requested, "serial port "+mc.waypoint_serial_port)
+			requested = append(requested, "serial port "+config.serialPort)
 		}
 
 		return nil, fmt.Errorf("waypoint output requested but no destination could be opened (%s)", strings.Join(requested, ", "))
@@ -123,7 +132,7 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *dwgps.GPS) (
 
 	// Set default formats if user did not specify any.
 
-	ws.formats = mc.waypoint_formats
+	ws.formats = config.formats
 	if ws.formats == 0 {
 		ws.formats = WPL_FORMAT_NMEA_GENERIC | WPL_FORMAT_KENWOOD
 	}

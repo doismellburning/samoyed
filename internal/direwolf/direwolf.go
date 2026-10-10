@@ -741,7 +741,13 @@ x = Silence FX.25 information.`)
 	var gpsReceiver = dwgps.NewGPS(ctx, gpsConfig, d_g_opt)
 	td.add(gpsReceiver.Term)
 
-	var waypointSender, waypointErr = NewWaypointSender(ctx, misc_config, gpsReceiver)
+	var wpConfig = new(waypointConfig)
+	wpConfig.serialPort = misc_config.waypoint_serial_port
+	wpConfig.udpHostname = misc_config.waypoint_udp_hostname
+	wpConfig.udpPort = misc_config.waypoint_udp_portnum
+	wpConfig.formats = misc_config.waypoint_formats
+
+	var waypointSender, waypointErr = NewWaypointSender(ctx, wpConfig, gpsReceiver)
 
 	if waypointSender != nil {
 		td.add(waypointSender.Close)
