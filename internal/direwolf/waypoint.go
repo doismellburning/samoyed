@@ -80,8 +80,7 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *dwgps.GPS) (
 
 		var conn, err = new(net.Dialer).DialContext(ctx, "udp", addr)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Couldn't create socket for waypoint send to %s: %s\n", addr, err)
+			logrus.WithError(err).WithField("address", addr).Error("Couldn't create socket for waypoint send")
 		} else {
 			ws.udpSock = conn
 		}
@@ -99,13 +98,11 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *dwgps.GPS) (
 		if ws.serialPortFd == nil {
 			ws.serialPortFd = serialport.Open(mc.waypoint_serial_port, 4800)
 		} else {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Note: Sharing same port for GPS input and waypoint output.\n")
+			logrus.WithField("port", mc.waypoint_serial_port).Debug("Sharing same port for GPS input and waypoint output")
 		}
 
 		if ws.serialPortFd == nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Unable to open serial port %s for waypoint output.\n", mc.waypoint_serial_port)
+			logrus.WithField("port", mc.waypoint_serial_port).Error("Unable to open serial port for waypoint output")
 		}
 	}
 
@@ -216,7 +213,7 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 	logrus.WithFields(logrus.Fields{
 		"name":   name_in,
 		"symbol": string([]rune{symtab, rune(symbol)}),
-	}).Debug("waypoint_send_sentence")
+	}).Trace("waypoint_send_sentence")
 
 	// Don't waste time if no destinations specified.
 	if ws.serialPortFd == nil && ws.udpSock == nil {
@@ -533,8 +530,7 @@ func (ws *WaypointSender) Close() {
 
 func (ws *WaypointSender) send(sentence []byte) {
 	if ws.debug > 0 {
-		text_color_set(DW_COLOR_XMIT)
-		dw_printf("waypoint send sentence: \"%s\"\n", sentence)
+		logrus.WithField("sentence", string(sentence)).Trace("waypoint send sentence")
 	}
 
 	var final = sentence
@@ -550,8 +546,7 @@ func (ws *WaypointSender) send(sentence []byte) {
 	if ws.udpSock != nil {
 		var n, err = ws.udpSock.Write(final)
 		if n != final_len {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Failed to send waypoint via UDP, err=%s\n", err)
+			logrus.WithError(err).Error("Failed to send waypoint via UDP")
 		}
 	}
 } /* send */
