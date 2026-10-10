@@ -73,12 +73,6 @@ const (
 const MAX_BEACONS = 30
 const MAX_KISS_TCP_PORTS = (MAX_RADIO_CHANS + 1)
 
-const WPL_FORMAT_NMEA_GENERIC = 0x01 /* N	$GPWPL */
-const WPL_FORMAT_GARMIN = 0x02       /* G	$PGRMW */
-const WPL_FORMAT_MAGELLAN = 0x04     /* M	$PMGNWPL */
-const WPL_FORMAT_KENWOOD = 0x08      /* K	$PKWDWPL */
-const WPL_FORMAT_AIS = 0x10          /* A	!AIVDM */
-
 type beacon_s struct {
 	btype beacon_type_e /* Position or object. */
 

@@ -24,6 +24,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// The sentence formats a WaypointSender can generate, as waypointConfig.formats
+// flags, with the letter that asks for each in the WAYPOINT configuration.
+const WPL_FORMAT_NMEA_GENERIC = 0x01 /* N	$GPWPL */
+const WPL_FORMAT_GARMIN = 0x02       /* G	$PGRMW */
+const WPL_FORMAT_MAGELLAN = 0x04     /* M	$PMGNWPL */
+const WPL_FORMAT_KENWOOD = 0x08      /* K	$PKWDWPL */
+const WPL_FORMAT_AIS = 0x10          /* A	!AIVDM */
+
 // waypointConfig says where NewWaypointSender sends waypoints, and in which
 // formats.  Leave serialPort empty, or udpPort zero, to not send them there.
 type waypointConfig struct {
