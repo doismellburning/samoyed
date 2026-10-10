@@ -46,7 +46,7 @@ type ToneGenerator struct {
 	adevIndex   int
 	audioConfig *RadioConfig
 	sink        AudioSink // Where the samples go.
-	amplitude   int       // 0 .. 100, for DTMF; the rest use sineTable.
+	amplitude   int       // 0 .. 100, for DTMF and Morse; the rest use sineTable.
 
 	sineTable [256]int16 // One cycle, scaled to the amplitude asked for.
 
