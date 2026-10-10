@@ -139,8 +139,8 @@ func Test_AX25_Link(t *testing.T) {
 func setupTestEnv(t *testing.T) {
 	t.Helper()
 
-	var audioConfig = new(RadioConfig)
-	transmitQueue.Init(audioConfig)
+	var tq = NewTransmitQueue()
+	tq.Init(new(RadioConfig))
 
 	var miscConfig = new(misc_config_s)
 	// Set proper defaults for connected mode
@@ -151,7 +151,7 @@ func setupTestEnv(t *testing.T) {
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 	miscConfig.maxv22 = 0 // Default: don't try v2.2 (for most tests)
 
-	ax25_link_init(miscConfig, nil, nil, 1)
+	ax25_link_init(miscConfig, nil, nil, tq, 1)
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil // Clear registered callsigns
@@ -161,8 +161,8 @@ func setupTestEnv(t *testing.T) {
 func setupTestEnvV22(t *testing.T) {
 	t.Helper()
 
-	var audioConfig = new(RadioConfig)
-	transmitQueue.Init(audioConfig)
+	var tq = NewTransmitQueue()
+	tq.Init(new(RadioConfig))
 
 	var miscConfig = new(misc_config_s)
 	// Set proper defaults for connected mode
@@ -173,7 +173,7 @@ func setupTestEnvV22(t *testing.T) {
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 	miscConfig.maxv22 = 3 // Enable v2.2
 
-	ax25_link_init(miscConfig, nil, nil, 1)
+	ax25_link_init(miscConfig, nil, nil, tq, 1)
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil // Clear registered callsigns

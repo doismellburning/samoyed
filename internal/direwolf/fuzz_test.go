@@ -229,7 +229,8 @@ const linkFuzzPaclen = 64
 // input cannot leave anything behind for the next, and which tells clients
 // what happens on it.
 func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
-	transmitQueue.Init(cfg)
+	var tq = NewTransmitQueue()
+	tq.Init(cfg)
 
 	var miscConfig = new(misc_config_s)
 	// Shorter than the default, so a client's data can be long enough to
@@ -245,7 +246,7 @@ func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
 	}
 
 	*ax25Link = *NewAX25Link()
-	ax25_link_init(miscConfig, nil, clients, 0)
+	ax25_link_init(miscConfig, nil, clients, tq, 0)
 }
 
 // fuzzLinkDrain does what recv_process does with everything on the data link

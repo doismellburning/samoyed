@@ -278,10 +278,10 @@ func dtmfSamples(t *testing.T, button rune, ms int, samplesPerSec int) []byte {
 
 // setupRecvProcessTest initialises what recv_process dispatches into: the
 // transmit queue, the link state machines, an empty received data queue, and
-// the handler for frames received, which it returns.  Nothing drains the
-// transmit queue, so what the link layer decides to send stays there to be
-// counted.
-func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
+// the handler for frames received, which it returns along with the transmit
+// queue.  Nothing drains the transmit queue, so what the link layer decides to
+// send stays there to be counted.
+func setupRecvProcessTest(t *testing.T, frack int) (*recPacketHandler, *TransmitQueue) {
 	t.Helper()
 
 	var audioConfig = new(RadioConfig)
@@ -302,7 +302,8 @@ func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 	handler.logger = aprslog.New(false, "")
 	handler.heard = mheard.New(0)
 
-	transmitQueue.Init(audioConfig)
+	var tq = NewTransmitQueue()
+	tq.Init(audioConfig)
 
 	var miscConfig = new(misc_config_s)
 	miscConfig.paclen = AX25_N1_PACLEN_DEFAULT
@@ -311,27 +312,20 @@ func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 	miscConfig.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 
-	ax25_link_init(miscConfig, nil, nil, 1)
+	ax25_link_init(miscConfig, nil, nil, tq, 1)
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil
 
 	// Leave nothing behind for whatever test runs next: a link still
-	// retrying its connection, or the frames it queued, would turn up
-	// there.  This runs last, once recv_process has stopped.
+	// retrying its connection would turn up there.  This runs last, once
+	// recv_process has stopped.
 	t.Cleanup(func() {
 		ax25Link.listHead = nil
 		ax25Link.regCallsignList = nil
-
-		for c := range MAX_RADIO_CHANS {
-			for p := range TQ_NUM_PRIO {
-				for transmitQueue.Remove(c, p) != nil { //revive:disable-line:empty-block
-				}
-			}
-		}
 	})
 
-	return handler
+	return handler, tq
 }
 
 // startRecvProcess runs recv_process, taking from q and handing what it
@@ -364,7 +358,7 @@ func startRecvProcess(t *testing.T, q *DataLinkQueue, rh *recPacketHandler) {
 func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
-	var rh = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
+	var rh, tq = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
 	startRecvProcess(t, dlq, rh)
 
@@ -377,7 +371,7 @@ func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 	// Connecting starts with a SABM, so something reaching the transmit
 	// queue says the request was dispatched rather than merely dequeued.
 	assert.Eventually(t, func() bool {
-		return transmitQueue.Count(0, -1, "", "", false) > 0
+		return tq.Count(0, -1, "", "", false) > 0
 	}, 10*time.Second, 10*time.Millisecond, "the connect request was not acted on")
 }
 
@@ -386,7 +380,7 @@ func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
-	var rh = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
+	var rh, tq = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
 	startRecvProcess(t, dlq, rh)
 
@@ -421,7 +415,7 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 	dlq.ConnectRequest(otherAddrs, 2, 0, 0, 0)
 
 	assert.Eventually(t, func() bool {
-		return transmitQueue.Count(0, -1, "", "Q3TEST", false) > 0
+		return tq.Count(0, -1, "", "Q3TEST", false) > 0
 	}, 10*time.Second, 10*time.Millisecond, "the queue was not served to the end")
 }
 
@@ -431,7 +425,7 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
-	var rh = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
+	var rh, _ = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
 	var hook = test.NewGlobal()
 
@@ -469,7 +463,7 @@ func TestRecvProcessRunsTheLinkTimersWhileTheQueueIsEmpty(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
 	// One second of T1, so the retry does not hold the test up for long.
-	var rh = setupRecvProcessTest(t, 1)
+	var rh, tq = setupRecvProcessTest(t, 1)
 
 	startRecvProcess(t, dlq, rh)
 
@@ -482,6 +476,6 @@ func TestRecvProcessRunsTheLinkTimersWhileTheQueueIsEmpty(t *testing.T) {
 	// Nothing is answering, so the second SABM can only come from T1
 	// expiring while the queue sits empty.
 	assert.Eventually(t, func() bool {
-		return transmitQueue.Count(0, -1, "", "", false) > 1
+		return tq.Count(0, -1, "", "", false) > 1
 	}, 30*time.Second, 10*time.Millisecond, "the connect attempt was never retried")
 }
