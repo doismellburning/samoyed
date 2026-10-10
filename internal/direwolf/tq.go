@@ -37,6 +37,14 @@ const TQ_PRIO_1_LO = 1
 // stand-in for it.
 type frameSender func(channel int, prio int, pp *ax25.Packet)
 
+// clientTransmitQueue is what a client application's frames are queued on to
+// be transmitted, and what it asks how much is still waiting: the KISS
+// handler's TXBUF query counts bytes there.  *TransmitQueue is one.
+type clientTransmitQueue interface {
+	Append(channel int, prio int, pp *ax25.Packet)
+	Count(channel int, prio int, source string, dest string, bytes bool) int
+}
+
 // TransmitQueue holds the packets waiting for each radio channel's transmit
 // thread, one queue per channel and priority.
 type TransmitQueue struct {

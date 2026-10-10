@@ -65,7 +65,7 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*KissSerial, <-chan struct{}) {
 	t.Helper()
 
-	var ks = newKissSerial(mc, NewKissHandler(kissTestRadioConfig(), new(XmitService), nil), 0)
+	var ks = newKissSerial(mc, setupKissProcessMsg(t), 0)
 
 	if mc.kiss_serial_poll == 0 {
 		ks.fd = serialport.Open(mc.kiss_serial_port, mc.kiss_serial_speed)
@@ -102,7 +102,7 @@ func openKissSerialPort(t *testing.T, debug int) (*KissSerial, *os.File) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var ks = newKissSerial(mc, NewKissHandler(kissTestRadioConfig(), new(XmitService), nil), debug)
+	var ks = newKissSerial(mc, setupKissProcessMsg(t), debug)
 
 	t.Cleanup(ks.closePort)
 
@@ -286,22 +286,12 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	const channel = 0
 
-	// Laid out like the channel table startKissSerial gives the TNC.
-	var audioConfig = kissTestRadioConfig()
-
-	transmitQueue.Init(audioConfig)
-
-	t.Cleanup(func() {
-		for transmitQueue.Remove(channel, TQ_PRIO_1_LO) != nil { //revive:disable-line:empty-block
-		}
-	})
-
 	var name, client = newTestSerialDevice(t)
 
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	startKissSerial(t.Context(), t, mc)
+	var ks, _ = startKissSerial(t.Context(), t, mc)
 
 	var pp = newTestPacket(t)
 
@@ -312,7 +302,7 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	// TransmitQueue.Count rather than TransmitQueue.Peek: the queue is being filled by the
 	// listening goroutine, and only TransmitQueue.Count reads it under the lock.
 	assert.Eventually(t, func() bool {
-		return transmitQueue.Count(channel, TQ_PRIO_1_LO, "", "", false) > 0
+		return ks.handler.queue.Count(channel, TQ_PRIO_1_LO, "", "", false) > 0
 	}, 5*time.Second, 10*time.Millisecond, "the frame from the KISS client was not queued for transmission")
 
 	require.NoError(t, client.Close())

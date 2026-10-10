@@ -111,7 +111,7 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	// though, which would cost each test here most of one.
 	kns.pollInterval = 10 * time.Millisecond
 
-	kns.Start(t.Context(), NewKissHandler(kissTestRadioConfig(), new(XmitService), kns))
+	kns.Start(t.Context(), NewKissHandler(kissTestRadioConfig(), new(XmitService), nil, kns))
 
 	return kns, port
 }
