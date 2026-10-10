@@ -18,6 +18,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -436,9 +437,9 @@ func TestSendOneFrameNonAPRS(t *testing.T) {
 func TestSendOneFrameXID(t *testing.T) {
 	var xs = setupXmitTransmission(t)
 
-	var param xid_param_s
+	var param xid.Param
 
-	var info = xid_encode(&param, ax25.CRCmd)
+	var info = xid.Encode(&param, ax25.CRCmd)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Destination] = "Q1TEST"

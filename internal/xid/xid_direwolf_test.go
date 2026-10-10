@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package xid
 
 import (
 	"testing"
@@ -63,11 +66,11 @@ func Test_XID(t *testing.T) {
 		char desc[150];		// I've seen 109.
 	*/
 
-	var param2 *xid_param_s
+	var param2 *Param
 
 	/* parse example. */
 
-	var param, desc, n = xid_parse(xid_example)
+	var param, desc, n = Parse(xid_example)
 
 	t.Logf("%d: %s", 0, desc)
 
@@ -82,7 +85,7 @@ func Test_XID(t *testing.T) {
 
 	/* encode and verify it comes out the same. */
 
-	var info = xid_encode(param, ax25.CRCmd)
+	var info = Encode(param, ax25.CRCmd)
 	assert.Len(t, info, len(xid_example))
 
 	assert.Equal(t, info, xid_example, "n: %v, info: %v, xid_example[0]: %v", n, info, xid_example)
@@ -97,8 +100,8 @@ func Test_XID(t *testing.T) {
 	param.AckTimer = maybe.Just(1234)
 	param.Retries = maybe.Just(12)
 
-	info = xid_encode(param, ax25.CRCmd)
-	param2, desc, _ = xid_parse(info)
+	info = Encode(param, ax25.CRCmd)
+	param2, desc, _ = Parse(info)
 
 	t.Logf("%d: %s", 0, desc)
 
@@ -120,8 +123,8 @@ func Test_XID(t *testing.T) {
 	param.AckTimer = maybe.Just(5555)
 	param.Retries = maybe.Just(9)
 
-	info = xid_encode(param, ax25.CRCmd)
-	param2, desc, _ = xid_parse(info)
+	info = Encode(param, ax25.CRCmd)
+	param2, desc, _ = Parse(info)
 
 	t.Logf("%d: %s", 0, desc)
 
@@ -143,8 +146,8 @@ func Test_XID(t *testing.T) {
 	param.AckTimer = maybe.Just(5555)
 	param.Retries = maybe.Just(9)
 
-	info = xid_encode(param, ax25.CRCmd)
-	param2, desc, _ = xid_parse(info)
+	info = Encode(param, ax25.CRCmd)
+	param2, desc, _ = Parse(info)
 
 	t.Logf("%d: %s", 0, desc)
 
@@ -166,8 +169,8 @@ func Test_XID(t *testing.T) {
 	param.AckTimer = maybe.Just(999)
 	param.Retries = maybe.Nothing[int]()
 
-	info = xid_encode(param, ax25.CRCmd)
-	param2, desc, _ = xid_parse(info)
+	info = Encode(param, ax25.CRCmd)
+	param2, desc, _ = Parse(info)
 
 	t.Logf("%d: %s", 0, desc)
 
@@ -182,7 +185,7 @@ func Test_XID(t *testing.T) {
 	/* Default values for empty info field. */
 
 	info = []byte{}
-	param2, desc, _ = xid_parse(info)
+	param2, desc, _ = Parse(info)
 
 	t.Logf("%d: %s", 0, desc)
 

@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package xid
 
 /*------------------------------------------------------------------
  *
@@ -84,33 +87,34 @@ const PV_HDLC_Optional_Functions_Segmenter = 0x000040
 
 const PV_HDLC_Optional_Functions_Synchronous_Tx = 0x000002
 
-type srej_e int
+// SREJ is the level of selective reject a station offers or agrees to.
+type SREJ int
 
 // Order is important because negotiation keeps the lower value of
 // REJ  (SREJNone),  SREJ (default without negotiation), Multi-SREJ (if both agree).
 
 const (
-	SREJNone         srej_e = 0
-	SREJSingle       srej_e = 1
-	SREJMulti        srej_e = 2
-	SREJNotSpecified srej_e = 3
+	SREJNone         SREJ = 0
+	SREJSingle       SREJ = 1
+	SREJMulti        SREJ = 2
+	SREJNotSpecified SREJ = 3
 )
 
-// xid_param_s is a set of XID parameters, as sent or received.  The fields the
+// Param is a set of XID parameters, as sent or received.  The fields the
 // other station may leave out are Maybe values, whose zero value is Nothing, so
 // one that was never set cannot be mistaken for one that was negotiated to
 // zero.
 //
 // SREJ and Modulo are enums with their own "not specified" members, and only
-// Modulo has it at zero: an unset SREJ reads as SREJNone, which
-// complete_negotiation will apply, so build the struct through xid_parse or
-// initiate_negotiation rather than relying on its zero value throughout.  The
-// srej_e order is load-bearing for negotiation, which is why SREJNotSpecified
-// sits at the end rather than at zero.
-type xid_param_s struct {
+// Modulo has it at zero: an unset SREJ reads as SREJNone, which the data link
+// state machine's complete_negotiation will apply, so build the struct through
+// Parse or the state machine's initiate_negotiation rather than relying on its
+// zero value throughout.  The SREJ order is load-bearing for negotiation, which
+// is why SREJNotSpecified sits at the end rather than at zero.
+type Param struct {
 	FullDuplex maybe.Maybe[bool]
 
-	SREJ srej_e
+	SREJ SREJ
 
 	Modulo ax25.Modulo
 
@@ -125,7 +129,7 @@ type xid_param_s struct {
 
 /*-------------------------------------------------------------------
  *
- * Name:        xid_parse
+ * Name:        Parse
  *
  * Purpose:    	Decode information part of XID frame into individual values.
  *
@@ -147,7 +151,10 @@ type xid_param_s struct {
  *
  *--------------------------------------------------------------------*/
 
-func xid_parse(info []byte) (*xid_param_s, string, bool) {
+// Parse decodes the information part of an XID frame, returning the
+// parameters it holds, a text description for troubleshooting, and whether it
+// was mostly successful.
+func Parse(info []byte) (*Param, string, bool) {
 	// What should we do when some fields are missing?
 
 	// The  AX.25 v2.2 protocol spec says, for most of these,
@@ -155,7 +162,7 @@ func xid_parse(info []byte) (*xid_param_s, string, bool) {
 
 	// The Maybe fields start out Nothing, which is what we want for "undefined",
 	// so only the two enums need setting to their own "not specified" members.
-	var result = new(xid_param_s)
+	var result = new(Param)
 
 	result.SREJ = SREJNotSpecified
 	result.Modulo = ax25.ModuloUnknown
@@ -369,11 +376,11 @@ func xid_parse(info []byte) (*xid_param_s, string, bool) {
 	}
 
 	return result, desc, true
-} /* end xid_parse */
+} /* end Parse */
 
 /*-------------------------------------------------------------------
  *
- * Name:        xid_encode
+ * Name:        Encode
  *
  * Purpose:    	Encode the information part of an XID frame.
  *
@@ -440,7 +447,9 @@ func xid_parse(info []byte) (*xid_param_s, string, bool) {
  *
  *--------------------------------------------------------------------*/
 
-func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
+// Encode encodes param as the information part of an XID command or
+// response, not including the control byte.
+func Encode(param *Param, cr ax25.CmdRes) []byte {
 	var info []byte
 
 	info = append(info, FI_Format_Indicator)
@@ -579,4 +588,4 @@ func xid_encode(param *xid_param_s, cr ax25.CmdRes) []byte {
 	}
 
 	return info
-} /* end xid_encode */
+} /* end Encode */

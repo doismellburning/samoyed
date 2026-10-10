@@ -157,6 +157,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/sirupsen/logrus"
 )
 
@@ -363,9 +364,9 @@ type ax25_dlsm_t struct {
 	// Determines whether we have one or two control
 	// octets.  128 allows a much larger window size.
 
-	srej_enable srej_e // Is other end capable of processing SREJ?  (Am I allowed to send it?)
-	// Starts out as 'SREJNone' for v2.0 or 'SREJSingle' for v2.2.
-	// Can be changed to 'SREJMulti' with XID exchange.
+	srej_enable xid.SREJ // Is other end capable of processing SREJ?  (Am I allowed to send it?)
+	// Starts out as 'xid.SREJNone' for v2.0 or 'xid.SREJSingle' for v2.2.
+	// Can be changed to 'xid.SREJMulti' with XID exchange.
 	// Should be used only with modulo 128.  (Is this enforced?)
 
 	n1_paclen int // Maximum length of information field, in bytes.
@@ -2594,7 +2595,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		}
-	} else if S.srej_enable == SREJNone {
+	} else if S.srej_enable == xid.SREJNone {
 		// The received sequence number is not the expected one and we can't use SREJ.
 		// The old v2.0 approach is to send and REJ with the number we are expecting.
 		// This can be very inefficient.  For example if we received 1,3,4,5,6 in one transmission,
@@ -2979,7 +2980,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 	// Multi-SREJ - Use info part for additional sequence number(s) instead of sending separate SREJ for each.
 
-	if S.srej_enable == SREJMulti && count > 1 {
+	if S.srej_enable == xid.SREJMulti && count > 1 {
 		var info []byte
 
 		for i := 1; i < count; i++ { // skip first one
@@ -4610,13 +4611,13 @@ func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 				// Take parameters sent by other station.
 				// Generally we take minimum of what he wants and what I can do.
 				// Adjust my working configuration and send it back.
-				var param, _, ok = xid_parse(info)
+				var param, _, ok = xid.Parse(info)
 
 				if ok {
 					negotiation_response(S, param)
 
 					var res = ax25.CRRes
-					var xinfo = xid_encode(param, res)
+					var xinfo = xid.Encode(param, res)
 
 					var nopid = 0
 					var f = -1
@@ -4636,7 +4637,7 @@ func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 		if cr == ax25.CRRes {
 			if pf == 1 {
 				// Got expected response.  Copy into my working parameters.
-				var param, _, ok = xid_parse(info)
+				var param, _, ok = xid.Parse(info)
 
 				if ok {
 					complete_negotiation(S, param)
@@ -5015,10 +5016,10 @@ func tm201_expiry(S *ax25_dlsm_t) {
 			S.mdl_state = mdl_state_0_ready
 		} else {
 			// No response.  Ask again.
-			var param xid_param_s
+			var param xid.Param
 			initiate_negotiation(S, &param)
 
-			var xinfo = xid_encode(&param, cmd)
+			var xinfo = xid.Encode(&param, cmd)
 
 			var pp = ax25.UFrame(S.addrs, S.num_addr, cmd, ax25.FrameTypeUXID, p, nopid, xinfo)
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
@@ -5256,7 +5257,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25.FrameType, f int) {
 			transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false // because we sent N(R) from V(R).
-		} else if S.srej_enable == SREJSingle || S.srej_enable == SREJMulti {
+		} else if S.srej_enable == xid.SREJSingle || S.srej_enable == xid.SREJMulti {
 			// SREJ is enabled. This is based on X.25 2.4.6.11.
 			if S.modulo != 128 {
 				text_color_set(DW_COLOR_ERROR)
@@ -5378,7 +5379,7 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 	// I don't think we should be here if SREJ is enabled.
 	// TODO: Figure out why this happens occasionally.
 
-	//	if (S.srej_enable != SREJNone) {
+	//	if (S.srej_enable != xid.SREJNone) {
 	//	  text_color_set(DW_COLOR_ERROR);
 	//	  dw_printf ("Internal Error, Did not expect to be here when SREJ enabled.  %s %s %d\n", __FILE__, __func__, __LINE__);
 	//	}
@@ -5668,7 +5669,7 @@ func select_t1_value(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func set_version_2_0(S *ax25_dlsm_t) {
-	S.srej_enable = SREJNone
+	S.srej_enable = xid.SREJNone
 	S.modulo = 8
 	S.n1_paclen = ax25Link.miscConfig.paclen
 	S.k_maxframe = ax25Link.miscConfig.maxframe_basic
@@ -5682,7 +5683,7 @@ func set_version_2_0(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func set_version_2_2(S *ax25_dlsm_t) {
-	S.srej_enable = SREJSingle // Start with single.
+	S.srej_enable = xid.SREJSingle // Start with single.
 	// Can be increased to multi with XID exchange.
 	S.modulo = 128
 	S.n1_paclen = ax25Link.miscConfig.paclen
@@ -5961,11 +5962,11 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 
 	switch S.mdl_state {
 	case mdl_state_0_ready:
-		var param xid_param_s
+		var param xid.Param
 		initiate_negotiation(S, &param)
 
 		var cmd = ax25.CRCmd
-		var xinfo = xid_encode(&param, cmd)
+		var xinfo = xid.Encode(&param, cmd)
 
 		var p = 1
 		var nopid = 0
@@ -5991,14 +5992,14 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
+func initiate_negotiation(S *ax25_dlsm_t, param *xid.Param) {
 	param.FullDuplex = maybe.Just(false)
 
 	switch S.srej_enable {
-	case SREJSingle, SREJMulti:
-		param.SREJ = SREJMulti // see if other end reconizes it.
+	case xid.SREJSingle, xid.SREJMulti:
+		param.SREJ = xid.SREJMulti // see if other end reconizes it.
 	default:
-		param.SREJ = SREJNone
+		param.SREJ = xid.SREJNone
 	}
 
 	param.Modulo = S.modulo
@@ -6030,7 +6031,7 @@ func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
+func negotiation_response(S *ax25_dlsm_t, param *xid.Param) {
 	// TODO: Integrate with new full duplex capability in v1.5.
 	param.FullDuplex = maybe.Just(false)
 
@@ -6047,12 +6048,12 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	// Erratum:  2006 version, section, 4.3.3.7 says default selective reject - reject.
 	// We can't do that.
 
-	if param.SREJ == SREJNotSpecified {
+	if param.SREJ == xid.SREJNotSpecified {
 		// not specified, set default
 		if param.Modulo == 128 {
-			param.SREJ = SREJSingle
+			param.SREJ = xid.SREJSingle
 		} else {
-			param.SREJ = SREJNone
+			param.SREJ = xid.SREJNone
 		}
 	}
 
@@ -6124,8 +6125,8 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
-	if param.SREJ != SREJNotSpecified {
+func complete_negotiation(S *ax25_dlsm_t, param *xid.Param) {
+	if param.SREJ != xid.SREJNotSpecified {
 		S.srej_enable = param.SREJ
 	}
 

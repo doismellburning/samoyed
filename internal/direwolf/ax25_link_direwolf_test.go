@@ -21,6 +21,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1302,13 +1303,13 @@ func TestAX25LinkXIDParse(t *testing.T) {
 	t.Helper()
 
 	// Test empty XID info
-	result, _, status := xid_parse(nil)
+	result, _, status := xid.Parse(nil)
 	assert.True(t, status, "Empty XID should parse successfully")
 	assert.Equal(t, maybe.Nothing[bool](), result.FullDuplex)
 
 	// Test XID with just format indicator (minimal valid)
-	info := []byte{FI_Format_Indicator, GI_Group_Identifier, 0x00, 0x00}
-	_, _, status = xid_parse(info)
+	info := []byte{xid.FI_Format_Indicator, xid.GI_Group_Identifier, 0x00, 0x00}
+	_, _, status = xid.Parse(info)
 	assert.True(t, status, "Minimal XID should parse successfully")
 }
 
@@ -1316,9 +1317,9 @@ func TestAX25LinkXIDParse(t *testing.T) {
 func TestAX25LinkXIDEncode(t *testing.T) {
 	t.Helper()
 
-	var param xid_param_s
+	var param xid.Param
 	param.FullDuplex = maybe.Just(false) // half duplex
-	param.SREJ = SREJSingle
+	param.SREJ = xid.SREJSingle
 	param.Modulo = 128
 	param.IFieldLengthRx = maybe.Just(256)
 	param.WindowSizeRx = maybe.Just(32)
@@ -1326,22 +1327,22 @@ func TestAX25LinkXIDEncode(t *testing.T) {
 	param.Retries = maybe.Just(10)
 
 	// Encode the parameters
-	info := xid_encode(&param, ax25.CRCmd)
+	info := xid.Encode(&param, ax25.CRCmd)
 	assert.NotNil(t, info, "XID encode should produce info field")
 	assert.Greater(t, len(info), 4, "XID info should have content")
 
 	// Verify format indicator
-	assert.Equal(t, byte(FI_Format_Indicator), info[0])
-	assert.Equal(t, byte(GI_Group_Identifier), info[1])
+	assert.Equal(t, byte(xid.FI_Format_Indicator), info[0])
+	assert.Equal(t, byte(xid.GI_Group_Identifier), info[1])
 }
 
 // XID roundtrip (encode then parse)
 func TestAX25LinkXIDRoundtrip(t *testing.T) {
 	t.Helper()
 
-	var original xid_param_s
+	var original xid.Param
 	original.FullDuplex = maybe.Just(true)
-	original.SREJ = SREJMulti
+	original.SREJ = xid.SREJMulti
 	original.Modulo = 128
 	original.IFieldLengthRx = maybe.Just(512)
 	original.WindowSizeRx = maybe.Just(64)
@@ -1349,11 +1350,11 @@ func TestAX25LinkXIDRoundtrip(t *testing.T) {
 	original.Retries = maybe.Just(15)
 
 	// Encode
-	info := xid_encode(&original, ax25.CRCmd)
+	info := xid.Encode(&original, ax25.CRCmd)
 	assert.NotNil(t, info)
 
 	// Parse back
-	parsed, _, status := xid_parse(info)
+	parsed, _, status := xid.Parse(info)
 	assert.True(t, status)
 
 	// Verify values match
@@ -1388,16 +1389,16 @@ func TestAX25LinkXIDFrameConnected(t *testing.T) {
 	assert.Equal(t, state_3_connected, S.state)
 
 	// Receive XID command
-	var param xid_param_s
+	var param xid.Param
 	param.FullDuplex = maybe.Just(false)
-	param.SREJ = SREJSingle
+	param.SREJ = xid.SREJSingle
 	param.Modulo = 128
 	param.IFieldLengthRx = maybe.Just(256)
 	param.WindowSizeRx = maybe.Just(32)
 	param.AckTimer = maybe.Just(3000)
 	param.Retries = maybe.Just(10)
 
-	xidInfo := xid_encode(&param, ax25.CRCmd)
+	xidInfo := xid.Encode(&param, ax25.CRCmd)
 
 	addrs[ax25.Destination] = MY_CALL
 	addrs[ax25.Source] = THEIR_CALL
@@ -2026,7 +2027,7 @@ func TestAX25LinkSetVersion20(t *testing.T) {
 
 	set_version_2_0(S)
 
-	assert.Equal(t, SREJNone, S.srej_enable)
+	assert.Equal(t, xid.SREJNone, S.srej_enable)
 	assert.Equal(t, ax25.Modulo(8), S.modulo)
 }
 
@@ -2051,7 +2052,7 @@ func TestAX25LinkSetVersion22(t *testing.T) {
 	var S = ax25Link.listHead
 
 	// Should be v2.2
-	assert.Equal(t, SREJSingle, S.srej_enable)
+	assert.Equal(t, xid.SREJSingle, S.srej_enable)
 	assert.Equal(t, ax25.Modulo(128), S.modulo)
 }
 

@@ -19,6 +19,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -422,16 +423,16 @@ func FuzzAX25Link(f *testing.F) {
 
 	var agw = fuzzAGWServer(f)
 
-	var xidParam xid_param_s
+	var xidParam xid.Param
 	xidParam.FullDuplex = maybe.Just(false)
-	xidParam.SREJ = SREJSingle
+	xidParam.SREJ = xid.SREJSingle
 	xidParam.Modulo = 128
 	xidParam.IFieldLengthRx = maybe.Just(256)
 	xidParam.WindowSizeRx = maybe.Just(32)
 	xidParam.AckTimer = maybe.Just(3000)
 	xidParam.Retries = maybe.Just(10)
 
-	var xidInfo = xid_encode(&xidParam, ax25.CRCmd)
+	var xidInfo = xid.Encode(&xidParam, ax25.CRCmd)
 
 	for _, script := range []linkFuzzScript{
 		// They connect to us, send a couple of frames, take some back,
