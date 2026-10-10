@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package morse
 
 /*------------------------------------------------------------------
  *
@@ -91,8 +94,8 @@ var MORSE []morse_s = []morse_s{
 
 const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
 
-// morseSampleSink is where morseSend puts the audio it generates.
-type morseSampleSink interface {
+// SampleSink is where Send puts the audio it generates.
+type SampleSink interface {
 	// PutSample ships out one audio sample, in the range of a signed 16 bit
 	// integer.
 	PutSample(sam int)
@@ -108,7 +111,7 @@ type morseSampleSink interface {
 
 /*-------------------------------------------------------------------
  *
- * Name:        morseSend
+ * Name:        Send
  *
  * Purpose:    	Given a string, generate appropriate lengths of
  *		tone and silence.
@@ -124,16 +127,16 @@ type morseSampleSink interface {
  *
  * Description:	xmit_thread calls this instead of the usual hdlc_send
  *		when we have a special packet that means send morse
- *		code.  morseDuration says how long it takes, PTT included.
+ *		code.  Duration says how long it takes, PTT included.
  *
  *--------------------------------------------------------------------*/
 
-func morseSend(out morseSampleSink, sampleRate int, amplitude int, str string, wpm int, txdelay int, txtail int) {
-	var sineTable = morseSineTable(amplitude)
+func Send(out SampleSink, sampleRate int, amplitude int, str string, wpm int, txdelay int, txtail int) {
+	var sineTable = newSineTable(amplitude)
 
 	var time_units = 0
 
-	morseQuietMs(out, txdelay)
+	quietMs(out, txdelay)
 
 	for strIdx, p := range str {
 		var i = morse_lookup(p)
@@ -141,35 +144,35 @@ func morseSend(out morseSampleSink, sampleRate int, amplitude int, str string, w
 			var enc = MORSE[i].enc
 			for encIdx, e := range enc {
 				if e == '.' {
-					morseTone(out, sampleRate, &sineTable, 1, wpm)
+					tone(out, sampleRate, &sineTable, 1, wpm)
 
 					time_units++
 				} else {
-					morseTone(out, sampleRate, &sineTable, 3, wpm)
+					tone(out, sampleRate, &sineTable, 3, wpm)
 
 					time_units += 3
 				}
 
 				if encIdx != len(enc)-1 { // Intersperse quiet
-					morseQuiet(out, sampleRate, 1, wpm)
+					quiet(out, sampleRate, 1, wpm)
 
 					time_units++
 				}
 			}
 		} else {
-			morseQuiet(out, sampleRate, 1, wpm)
+			quiet(out, sampleRate, 1, wpm)
 
 			time_units++
 		}
 
 		if strIdx != len(str)-1 { // Intersperse quiet
-			morseQuiet(out, sampleRate, 3, wpm)
+			quiet(out, sampleRate, 3, wpm)
 
 			time_units += 3
 		}
 	}
 
-	morseQuietMs(out, txtail)
+	quietMs(out, txtail)
 
 	if time_units != morse_units_str(str) {
 		logrus.WithFields(logrus.Fields{
@@ -181,18 +184,18 @@ func morseSend(out morseSampleSink, sampleRate int, amplitude int, str string, w
 	out.Flush()
 }
 
-// morseDuration returns the total number of milliseconds to activate PTT to
-// morseSend str at wpm.  This includes delays before the first character and
+// Duration returns the total number of milliseconds to activate PTT to
+// Send str at wpm.  This includes delays before the first character and
 // after the last to avoid chopping off part of it.
-func morseDuration(str string, wpm int, txdelay int, txtail int) int {
+func Duration(str string, wpm int, txdelay int, txtail int) int {
 	return (txdelay + int(TIME_UNITS_TO_MS(morse_units_str(str), wpm)+0.5) + txtail)
 }
 
-// morseSineTable makes one cycle of a sine wave, amplitude percent of the
+// newSineTable makes one cycle of a sine wave, amplitude percent of the
 // full 16 bit sample range, clipping anything that would not fit - worked
 // out just as the tone generator works out its own, which the Morse tone
 // used to be read from.
-func morseSineTable(amplitude int) [256]int16 {
+func newSineTable(amplitude int) [256]int16 {
 	var table [256]int16
 
 	for j := range 256 {
@@ -215,7 +218,7 @@ func morseSineTable(amplitude int) [256]int16 {
 
 /*-------------------------------------------------------------------
  *
- * Name:        morseTone
+ * Name:        tone
  *
  * Purpose:    	Generate tone for specified number of time units.
  *
@@ -227,7 +230,7 @@ func morseSineTable(amplitude int) [256]int16 {
  *
  *--------------------------------------------------------------------*/
 
-func morseTone(out morseSampleSink, sampleRate int, sineTable *[256]int16, tu int, wpm int) {
+func tone(out SampleSink, sampleRate int, sineTable *[256]int16, tu int, wpm int) {
 	// Phase accumulator for tone generation.
 	// Upper bits are used as index into sine table.
 	var tone_phase = 0
@@ -241,11 +244,11 @@ func morseTone(out morseSampleSink, sampleRate int, sineTable *[256]int16, tu in
 		tone_phase += f1_change_per_sample
 		out.PutSample(int(sineTable[(tone_phase>>24)&0xff]))
 	}
-} /* end morseTone */
+} /* end tone */
 
 /*-------------------------------------------------------------------
  *
- * Name:        morseQuiet
+ * Name:        quiet
  *
  * Purpose:    	Generate silence for specified number of time units.
  *
@@ -256,17 +259,17 @@ func morseTone(out morseSampleSink, sampleRate int, sineTable *[256]int16, tu in
  *
  *--------------------------------------------------------------------*/
 
-func morseQuiet(out morseSampleSink, sampleRate int, tu int, wpm int) {
+func quiet(out SampleSink, sampleRate int, tu int, wpm int) {
 	var nsamples = int((TIME_UNITS_TO_MS(tu, wpm) * float64(sampleRate) / 1000.) + 0.5)
 
 	for range nsamples {
 		out.PutSample(0)
 	}
-} /* end morseQuiet */
+} /* end quiet */
 
 /*-------------------------------------------------------------------
  *
- * Name:        morseQuietMs
+ * Name:        quietMs
  *
  * Purpose:    	Generate silence for specified number of milliseconds.
  *		This is used for the txdelay and txtail times.
@@ -276,9 +279,9 @@ func morseQuiet(out morseSampleSink, sampleRate int, tu int, wpm int) {
  *
  *--------------------------------------------------------------------*/
 
-func morseQuietMs(out morseSampleSink, ms int) {
+func quietMs(out SampleSink, ms int) {
 	out.PutQuietMs(ms)
-} /* end morseQuietMs */
+} /* end quietMs */
 
 /*-------------------------------------------------------------------
  *

@@ -22,7 +22,7 @@ import (
  * 16 bit samples are signed short in range of -32768 .. +32767.
  */
 
-// TODO KG Also defined in morse.go: const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
+const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
 
 const PHASE_SHIFT_180 = (uint(128) << 24)
 const PHASE_SHIFT_90 = (uint(64) << 24)

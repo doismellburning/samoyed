@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package morse
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 )
 
 // morseWPM and morseSamplesPerSec are deliberately not the Dire Wolf defaults
-// (10 WPM, DEFAULT_SAMPLES_PER_SEC). Both only affect how long the generated
+// (10 WPM, 44100 samples per second). Both only affect how long the generated
 // .WAV is, and both generating and decoding it cost time proportional to that
 // length, so the defaults made this test spend all its time on audio nobody
 // looks at. Sending faster into a lower sample rate shrinks the file ~8x
@@ -24,15 +24,15 @@ import (
 const morseWPM = 40
 const morseSamplesPerSec = 22050
 
-// wavMorseSink is a morseSampleSink that writes 16 bit mono samples to a .WAV
+// wavSink is a SampleSink that writes 16 bit mono samples to a .WAV
 // file, keeping the first error it meets.
-type wavMorseSink struct {
+type wavSink struct {
 	w          *wav.Writer
 	sampleRate int
 	err        error
 }
 
-func (s *wavMorseSink) PutSample(sam int) {
+func (s *wavSink) PutSample(sam int) {
 	if s.err == nil {
 		s.err = s.w.WriteByte(byte(sam & 0xff))
 	}
@@ -42,13 +42,13 @@ func (s *wavMorseSink) PutSample(sam int) {
 	}
 }
 
-func (s *wavMorseSink) PutQuietMs(ms int) {
+func (s *wavSink) PutQuietMs(ms int) {
 	for range int((float64(ms) * float64(s.sampleRate) / 1000.) + 0.5) {
 		s.PutSample(0)
 	}
 }
 
-func (s *wavMorseSink) Flush() {}
+func (s *wavSink) Flush() {}
 
 func morseToFile(t *testing.T, filename string, message string) {
 	t.Helper()
@@ -60,12 +60,12 @@ func morseToFile(t *testing.T, filename string, message string) {
 	})
 	require.NoError(t, err)
 
-	var sink = new(wavMorseSink)
+	var sink = new(wavSink)
 	sink.w = w
 	sink.sampleRate = morseSamplesPerSec
 
 	var amplitude = 100
-	morseSend(sink, morseSamplesPerSec, amplitude, message, morseWPM, 100, 100)
+	Send(sink, morseSamplesPerSec, amplitude, message, morseWPM, 100, 100)
 	require.NoError(t, sink.err)
 	require.NoError(t, w.Close())
 }

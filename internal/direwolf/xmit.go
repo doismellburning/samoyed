@@ -48,6 +48,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/morse"
 	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -1235,10 +1236,10 @@ func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
  *
  * Inputs:	toneGenerator	- The channel's tone generator.
  *		channel	- Radio channel number.
- *		str, wpm, txdelay, txtail - As morseSend.
+ *		str, wpm, txdelay, txtail - As morse.Send.
  *
  * Returns:	Total number of milliseconds to activate PTT, as
- *		morseDuration.
+ *		morse.Duration.
  *
  *--------------------------------------------------------------------*/
 
@@ -1247,10 +1248,10 @@ func morse_send(toneGenerator *ToneGenerator, channel int, str string, wpm int, 
 		logrus.WithField("channel", channel).Error("Invalid channel for sending Morse Code")
 	} else {
 		var sampleRate = toneGenerator.audioConfig.adev[toneGenerator.adevIndex].samples_per_sec
-		morseSend(toneGenerator, sampleRate, toneGenerator.amplitude, str, wpm, txdelay, txtail)
+		morse.Send(toneGenerator, sampleRate, toneGenerator.amplitude, str, wpm, txdelay, txtail)
 	}
 
-	return morseDuration(str, wpm, txdelay, txtail)
+	return morse.Duration(str, wpm, txdelay, txtail)
 } /* end morse_send */
 
 /*-------------------------------------------------------------------
