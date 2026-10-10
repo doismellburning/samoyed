@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/wav"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,33 +24,50 @@ import (
 const morseWPM = 40
 const morseSamplesPerSec = 22050
 
+// wavMorseSink is a morseSampleSink that writes 16 bit mono samples to a .WAV
+// file, keeping the first error it meets.
+type wavMorseSink struct {
+	w          *wav.Writer
+	sampleRate int
+	err        error
+}
+
+func (s *wavMorseSink) PutSample(sam int) {
+	if s.err == nil {
+		s.err = s.w.WriteByte(byte(sam & 0xff))
+	}
+
+	if s.err == nil {
+		s.err = s.w.WriteByte(byte((sam >> 8) & 0xff))
+	}
+}
+
+func (s *wavMorseSink) PutQuietMs(ms int) {
+	for range int((float64(ms) * float64(s.sampleRate) / 1000.) + 0.5) {
+		s.PutSample(0)
+	}
+}
+
+func (s *wavMorseSink) Flush() {}
+
 func morseToFile(t *testing.T, filename string, message string) {
 	t.Helper()
 
-	// Copied from gen_packets without using all the CLI parsing...
-
-	var modem RadioConfig
-	modem.adev[0].defined = 1
-	modem.adev[0].num_channels = DEFAULT_NUM_CHANNELS
-	modem.adev[0].samples_per_sec = morseSamplesPerSec
-
-	modem.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
-	for channel := range MAX_RADIO_CHANS {
-		modem.achan[channel].modem_type = MODEM_AFSK
-		modem.achan[channel].mark_freq = DEFAULT_MARK_FREQ
-		modem.achan[channel].space_freq = DEFAULT_SPACE_FREQ
-		modem.achan[channel].baud = DEFAULT_BAUD
-	}
-
-	modem.chan_medium[0] = MEDIUM_RADIO
-
-	var sink, err = audio_file_open(filename, &modem)
+	var w, err = wav.Create(filename, wav.Format{
+		NumChannels:   1,
+		SamplesPerSec: morseSamplesPerSec,
+		BitsPerSample: 16,
+	})
 	require.NoError(t, err)
 
+	var sink = new(wavMorseSink)
+	sink.w = w
+	sink.sampleRate = morseSamplesPerSec
+
 	var amplitude = 100
-	var toneGenerators = NewToneGenerators(&modem, amplitude, sink)
-	morse_send(toneGenerators[0], 0, message, morseWPM, 100, 100)
-	require.NoError(t, audio_file_close(sink))
+	morseSend(sink, morseSamplesPerSec, amplitude, message, morseWPM, 100, 100)
+	require.NoError(t, sink.err)
+	require.NoError(t, w.Close())
 }
 
 // gen_packets will generate Morse, so let's test it and try to decode
