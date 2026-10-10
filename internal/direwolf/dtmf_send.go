@@ -4,10 +4,6 @@ package direwolf
 // dtmfButtonSamples, beside the decoder in dtmf.go, and goes to whatever dtmfSampleSink the caller hands over,
 // typically a channel's tone generator.
 
-import (
-	"github.com/sirupsen/logrus"
-)
-
 // dtmfSampleSink is where dtmfSend puts the audio it generates.
 type dtmfSampleSink interface {
 	// PutSample ships out one audio sample, in the range of a signed 16 bit
@@ -86,29 +82,3 @@ func pushButton(out dtmfSampleSink, sampleRate int, amplitude int, button rune, 
 		out.PutSample(int(sample * 16383.0 * float64(amplitude) / 100.0))
 	}
 }
-
-/*-------------------------------------------------------------------
- *
- * Name:        dtmf_send
- *
- * Purpose:    	Send str as touch tones through a channel's tone generator.
- *
- * Inputs:	toneGenerator	- The channel's tone generator.
- *		channel	- Radio channel number.
- *		str, speed, txdelay, txtail - As dtmfSend.
- *
- * Returns:	Total number of milliseconds to activate PTT, as
- *		dtmfDuration.
- *
- *--------------------------------------------------------------------*/
-
-func dtmf_send(toneGenerator *ToneGenerator, channel int, str string, speed int, txdelay int, txtail int) int {
-	if toneGenerator == nil {
-		logrus.WithField("channel", channel).Error("Invalid channel for tone generation")
-	} else {
-		var sampleRate = toneGenerator.audioConfig.adev[toneGenerator.adevIndex].samples_per_sec
-		dtmfSend(toneGenerator, sampleRate, toneGenerator.amplitude, str, speed, txdelay, txtail)
-	}
-
-	return dtmfDuration(str, speed, txdelay, txtail)
-} /* end dtmf_send */

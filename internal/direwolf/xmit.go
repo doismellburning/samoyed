@@ -1264,6 +1264,32 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 
 /*-------------------------------------------------------------------
  *
+ * Name:        dtmf_send
+ *
+ * Purpose:    	Send str as touch tones through a channel's tone generator.
+ *
+ * Inputs:	toneGenerator	- The channel's tone generator.
+ *		channel	- Radio channel number.
+ *		str, speed, txdelay, txtail - As dtmfSend.
+ *
+ * Returns:	Total number of milliseconds to activate PTT, as
+ *		dtmfDuration.
+ *
+ *--------------------------------------------------------------------*/
+
+func dtmf_send(toneGenerator *ToneGenerator, channel int, str string, speed int, txdelay int, txtail int) int {
+	if toneGenerator == nil {
+		logrus.WithField("channel", channel).Error("Invalid channel for tone generation")
+	} else {
+		var sampleRate = toneGenerator.audioConfig.adev[toneGenerator.adevIndex].samples_per_sec
+		dtmfSend(toneGenerator, sampleRate, toneGenerator.amplitude, str, speed, txdelay, txtail)
+	}
+
+	return dtmfDuration(str, speed, txdelay, txtail)
+} /* end dtmf_send */
+
+/*-------------------------------------------------------------------
+ *
  * Name:        wait_for_clear_channel
  *
  * Purpose:     Wait for the radio channel to be clear and any

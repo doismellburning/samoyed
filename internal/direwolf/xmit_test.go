@@ -5,10 +5,12 @@ package direwolf
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1134,4 +1136,48 @@ func TestLayer2SenderKeepsItsFX25DebugLevel(t *testing.T) {
 
 func TestLayer2SenderKeepsItsIL2PDebugLevel(t *testing.T) {
 	assert.Equal(t, 2, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 0, 2).il2p.Debug())
+}
+
+// A channel with no tone generator still says how long the transmission would
+// have been, as xmit_thread holds the PTT for that long.
+func TestDTMFSendWithoutToneGenerator(t *testing.T) {
+	assert.Equal(t, 300+400+250, dtmf_send(nil, 0, "1234", 10, 300, 250))
+}
+
+// What dtmf_send puts through a channel's tone generator, a decoder on the
+// same channel reads back.
+func TestDTMFSendDecodesBack(t *testing.T) {
+	const channel = 0
+	const sampleRate = 8000
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.adev[0].num_channels = 1
+	audioConfig.adev[0].bits_per_sample = 16
+	audioConfig.adev[0].samples_per_sec = sampleRate
+
+	var sink = new(byteSink)
+	var tg = NewToneGenerator(channel, audioConfig, 50, sink)
+
+	dtmf_send(tg, channel, "159D*#", 10, 300, 250)
+
+	assert.Equal(t, 1, sink.flushes, "the tones should be flushed out once, at the end")
+	require.Zero(t, len(sink.data)%2, "16 bit samples come in pairs of bytes")
+
+	var decoder = NewDTMFDecoder(channel, sampleRate, nil)
+
+	var heard strings.Builder
+
+	for i := 0; i < len(sink.data); i += 2 {
+		var sam int16
+
+		var _, err = binary.Decode(sink.data[i:i+2], binary.LittleEndian, &sam)
+		require.NoError(t, err)
+
+		var x = decoder.Sample(float64(sam) / 16384.)
+		if x != ' ' && x != '.' {
+			heard.WriteRune(x)
+		}
+	}
+
+	assert.Equal(t, "159D*#", heard.String())
 }
