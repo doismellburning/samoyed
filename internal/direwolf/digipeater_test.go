@@ -215,7 +215,7 @@ func TestNewDigipeater(t *testing.T) {
 	assert.Same(t, digiConfig, digi.config)
 	assert.Same(t, filter, digi.filter)
 	require.NotNil(t, digi.dedupe, "the duplicate suppression the digipeater relies on was not set up")
-	assert.Equal(t, 30*time.Second, digi.dedupe.historyTime)
+	assert.Equal(t, 30*time.Second, digi.dedupe.TTL())
 }
 
 // APRStt object reports reach for the digipeater whether or not startup has

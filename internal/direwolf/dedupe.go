@@ -142,6 +142,11 @@ func NewDedupeService(ttl time.Duration, onRemember func(pp *ax25.Packet, channe
 	return ds
 }
 
+// TTL is how long the service remembers a transmission for.
+func (ds *DedupeService) TTL() time.Duration {
+	return ds.historyTime
+}
+
 /*------------------------------------------------------------------------------
  *
  * Name:	dedupe_remember
