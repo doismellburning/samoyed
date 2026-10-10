@@ -299,8 +299,7 @@ func (d *DTMFDecoder) Sample(input float64) rune {
 
 func dtmf_send(toneGenerator *ToneGenerator, channel int, str string, speed int, txdelay int, txtail int) int {
 	if toneGenerator == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for tone generation.\n", channel)
+		logrus.WithField("channel", channel).Error("Invalid channel for tone generation")
 	} else {
 		toneGenerator.SendDTMF(str, speed, txdelay, txtail)
 	}
