@@ -33,6 +33,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -128,7 +129,7 @@ func (s *AudioStats) record(adev int, nchan int, nsamp int, interval int) {
 				var ave_rate = (float64(s.sampleCount) / 1000.0) / float64(interval)
 
 				var levels = make(map[int]int, nchan)
-				for ch := ADEVFIRSTCHAN(adev); ch < ADEVFIRSTCHAN(adev)+nchan; ch++ {
+				for ch := phy.ADevFirstChan(adev); ch < phy.ADevFirstChan(adev)+nchan; ch++ {
 					levels[ch] = s.level(ch)
 				}
 
