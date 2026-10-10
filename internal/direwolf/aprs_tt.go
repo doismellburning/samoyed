@@ -275,6 +275,10 @@ type TTGateway struct {
 	// audioLevel reports a channel's received audio level, for a touch
 	// tone message to carry, or is nil for none to report.
 	audioLevel func(channel int, subchan int) ax25.ALevel
+
+	// recFrame is where a raw touch tone message goes, as though received,
+	// or nil to drop it.
+	recFrame frameReceiver
 }
 
 /*------------------------------------------------------------------
@@ -292,6 +296,8 @@ type TTGateway struct {
  *			  nil for nobody to tell.
  *		toIGate	- Sends an object report to APRS-IS; nil for no
  *			  IGate.
+ *		recFrame - Where a raw touch tone message goes, as though
+ *			  received; nil to drop it.
  *		audioLevel - Reports a channel's received audio level, for a
  *			  touch tone message to carry; nil for none.
  *		debug	- Debug printing control.
@@ -309,6 +315,7 @@ func NewTTGateway(
 	apps *clientApps,
 	remember func(pp *ax25.Packet, channel int),
 	toIGate func(channel int, pp *ax25.Packet),
+	recFrame frameReceiver,
 	audioLevel func(channel int, subchan int) ax25.ALevel,
 	debug int,
 ) *TTGateway {
@@ -316,6 +323,7 @@ func NewTTGateway(
 
 	g.config = p
 	g.audioLevel = audioLevel
+	g.recFrame = recFrame
 	g.users = newTTUsers(audioConfig, p)
 	g.users.apps = apps
 	g.users.remember = remember
@@ -379,7 +387,7 @@ func (g *TTGateway) Button(channel int, button rune) {
 				alevel = g.audioLevel(channel, 0)
 			}
 
-			raw_tt_data_to_app(channel, g.msgStr[channel], alevel)
+			raw_tt_data_to_app(channel, g.msgStr[channel], alevel, g.recFrame)
 
 			g.msgStr[channel] = ""
 		}
@@ -1652,6 +1660,8 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
  *		msg		- String of button pushes.
  *				  Normally ends with #.
  *		alevel		- The channel's received audio level.
+ *		recFrame	- Where the packet goes, as though received;
+ *				  nil to drop it.
  *
  * Returns:     None
  *
@@ -1666,7 +1676,7 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel) {
+func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel, recFrame frameReceiver) {
 	// Set source and dest to something valid to keep rest of processing happy.
 	// For lack of a better idea, make source "DTMF" to indicate where it came from.
 	// Application version might be useful in case we end up using different
@@ -1694,7 +1704,9 @@ func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel) {
 		alevel.Mark = -2
 		alevel.Space = -2
 
-		dataLinkQueue.RecFrame(channel, -1, 0, pp, alevel, fec_type_none, RETRY_NONE, "tt")
+		if recFrame != nil {
+			recFrame(channel, -1, 0, pp, alevel, fec_type_none, RETRY_NONE, "tt")
+		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg)

@@ -667,7 +667,7 @@ x = Silence FX.25 information.`)
 	 */
 	var mheardDB = mheard.New(d_m_opt)
 	var packetFilter = pfilter.New(igate_config.max_digi_hops, aprsDecoder, mheardDB, d_f_opt)
-	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, d_i_opt)
+	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, dataLinkQueue.RecFrame, d_i_opt)
 	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated)
 
 	// The transmit queue predates the IGate, and nothing queues a packet for
@@ -721,7 +721,7 @@ x = Silence FX.25 information.`)
 	 * client applications too.  Each audio device's receive thread makes the
 	 * touch tone decoders for its own channels, once receiving starts below.
 	 */
-	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, igate.sendRecPacket, layer2Receiver.AudioLevel, aprstt_debug)
+	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, igate.sendRecPacket, dataLinkQueue.RecFrame, layer2Receiver.AudioLevel, aprstt_debug)
 
 	/*
 	 * Open port for communication with GPS.
@@ -758,7 +758,7 @@ x = Silence FX.25 information.`)
 
 	var aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
 	td.add(aprsLogger.Close)
-	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger, mheardDB, igate)
+	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger, mheardDB, igate, dataLinkQueue.RecFrame)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
 	stopIfCancelled(ctx, td)

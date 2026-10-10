@@ -25,6 +25,7 @@ func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
 		modemConfig: makeBeaconModemConfig(),
 		miscConfig:  cfg,
 		igateConfig: new(igate_config_s),
+		recFrame:    dataLinkQueue.RecFrame,
 	}
 
 	var gpsinfo = new(dwgps.GPSInfo)

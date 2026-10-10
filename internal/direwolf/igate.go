@@ -145,6 +145,10 @@ type IGate struct {
 	digiConfig  *digi_config_s
 	filter      *pfilter.PacketFilter
 
+	// recFrame is where a packet from APRS-IS for ICHANNEL goes, as
+	// though received there, or nil to drop it.
+	recFrame frameReceiver
+
 	// heard records who has been heard from APRS-IS, and how many of a
 	// message sender's positions are still to be passed along to RF.  Nil
 	// records nothing, and owes nobody a position.
@@ -234,12 +238,13 @@ type igateHeard interface {
 
 // NewIGate returns an IGate that knows what it is meant to do but is not yet
 // doing it.  start connects to the server and sets the goroutines going.
-func NewIGate(audioConfig *RadioConfig, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *pfilter.PacketFilter, heard igateHeard, debugLevel int) *IGate {
+func NewIGate(audioConfig *RadioConfig, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *pfilter.PacketFilter, heard igateHeard, recFrame frameReceiver, debugLevel int) *IGate {
 	var ig = &IGate{ //nolint:exhaustruct_v5
 		audioConfig:   audioConfig,
 		config:        igateConfig,
 		digiConfig:    digiConfig,
 		filter:        filter,
+		recFrame:      recFrame,
 		heard:         heard,
 		debugLevel:    debugLevel,
 		retryInterval: IGATE_RETRY_INTERVAL,
@@ -1245,7 +1250,9 @@ func (ig *IGate) processServerLine(message []byte) {
 				var slice = 0
 				var fec_type = fec_type_none
 				var spectrum = "APRS-IS"
-				dataLinkQueue.RecFrame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
+				if ig.recFrame != nil {
+					ig.recFrame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
+				}
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("ICHANNEL %d: Could not parse message from APRS-IS server.\n", ichan)

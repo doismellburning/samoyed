@@ -171,7 +171,7 @@ func setupIGateFromServer(t *testing.T) *IGate {
 	igateConfig.igmsp = 1
 
 	var heardDB = mheard.New(0)
-	var ig = NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, 0)
+	var ig = NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, dataLinkQueue.RecFrame, 0)
 
 	transmitQueue.Init(audioConfig)
 	dataLinkQueue.Init()
