@@ -14,9 +14,9 @@ import (
 func TestHeardList(t *testing.T) {
 	var h = NewHeardList(2)
 
-	h.Heard(0, "Q1TEST", time.Unix(10, 0))
-	h.Heard(1, "Q2TEST", time.Unix(20, 0))
-	h.Heard(0, "Q1TEST", time.Unix(30, 0))
+	assert.True(t, h.Heard(0, "Q1TEST", time.Unix(10, 0)))
+	assert.True(t, h.Heard(1, "Q2TEST", time.Unix(20, 0)))
+	assert.False(t, h.Heard(0, "Q1TEST", time.Unix(30, 0)), "heard just now")
 
 	var all = h.Stations(-1)
 	require.Len(t, all, 2)
@@ -28,4 +28,6 @@ func TestHeardList(t *testing.T) {
 	h.Heard(0, "Q3TEST", time.Unix(40, 0))
 	assert.Empty(t, h.Stations(1))
 	assert.Len(t, h.Stations(0), 2)
+
+	assert.True(t, h.Heard(0, "Q3TEST", time.Unix(40, 0).Add(heardQuiet)), "heard again after a while")
 }

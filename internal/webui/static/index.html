@@ -20,6 +20,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
   <nav role="tablist">
     <button role="tab" id="tab-dashboard" aria-controls="view-dashboard" aria-selected="true">Dashboard</button>
     <button role="tab" id="tab-map" aria-controls="view-map" aria-selected="false">Map</button>
+    <button role="tab" id="tab-node" aria-controls="view-node" aria-selected="false" hidden>Node</button>
   </nav>
   <span id="status" class="status" data-state="connecting">Connecting…</span>
 </header>
@@ -60,6 +61,48 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
   <section id="view-map" role="tabpanel" aria-labelledby="tab-map" hidden>
     <div id="map"></div>
+  </section>
+
+  <section id="view-node" role="tabpanel" aria-labelledby="tab-node" hidden>
+    <p id="node-title" class="node-title"></p>
+    <div class="panels node-panels">
+      <section class="panel">
+        <div class="panel-head"><h2>Neighbours</h2></div>
+        <div class="scroll">
+          <table id="node-neighbours">
+            <thead><tr><th>Port</th><th>Node</th><th class="num">Quality</th><th class="num">Routes</th><th>Link</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Nodes</h2></div>
+        <div class="scroll">
+          <table id="node-nodes">
+            <thead><tr><th>Node</th><th>Via</th><th class="num">Quality</th><th class="num">Obs</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Circuits</h2></div>
+        <div class="scroll">
+          <table id="node-circuits">
+            <thead><tr><th>User</th><th>Far end</th><th>State</th><th class="num">Sent</th><th class="num">Received</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>Links</h2></div>
+        <div class="scroll">
+          <table id="node-links">
+            <thead><tr><th>Port</th><th>From</th><th>To</th><th>Role</th><th>State</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   </section>
 </main>
 </body>

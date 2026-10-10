@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/mqttpub"
 	"github.com/doismellburning/samoyed/internal/netrom"
 )
 
@@ -184,6 +185,45 @@ type NodeSettings struct {
 	// IdleTimeout disconnects a user who has done nothing for this long;
 	// "0s" for never.
 	IdleTimeout *time.Duration `yaml:"idleTimeout"`
+
+	// AdminToken is the bearer token the web interface's admin API wants;
+	// left out, there is no admin API.
+	AdminToken string `yaml:"adminToken"`
+}
+
+// MQTTSettings describes where the node publishes its events.  It has no
+// line-format directive: it is written in YAML, under "mqtt".
+type MQTTSettings struct {
+	Broker      string `yaml:"broker"`
+	Username    string `yaml:"username"`
+	Password    string `yaml:"password"`
+	ClientID    string `yaml:"clientId"`
+	TopicPrefix string `yaml:"topicPrefix"`
+}
+
+// applyMQTT checks the MQTT settings and keeps them for startup.
+func (ps *parseState) applyMQTT(settings MQTTSettings) error {
+	var cfg = mqttpub.Config{
+		Broker:      settings.Broker,
+		Username:    settings.Username,
+		Password:    settings.Password,
+		ClientID:    settings.ClientID,
+		TopicPrefix: settings.TopicPrefix,
+		Node:        "",
+	}
+
+	// Checked as it is, but kept as it was written: the node's callsign,
+	// which the client ID defaults from, is only known at startup.
+	var check = cfg
+
+	var err = check.Validate()
+	if err != nil {
+		return fmt.Errorf("line %d: %w", ps.line, err)
+	}
+
+	ps.misc.mqtt = &cfg
+
+	return nil
 }
 
 // defaultNodeIdleTimeout is how long a node user may sit idle, unless the
@@ -193,6 +233,7 @@ const defaultNodeIdleTimeout = 15 * time.Minute
 // applyNODE checks the node's settings and keeps them for startup.
 func (ps *parseState) applyNODE(settings NodeSettings) error {
 	ps.misc.node.Info = settings.Info
+	ps.misc.node_admin_token = settings.AdminToken
 
 	if settings.IdleTimeout != nil {
 		if *settings.IdleTimeout < 0 {

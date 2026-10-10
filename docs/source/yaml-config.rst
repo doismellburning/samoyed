@@ -269,6 +269,11 @@ Reference
         How long a user may do nothing before being disconnected
         (``15m``, ``0s`` for never).
 
+    ``adminToken``
+        The bearer token the web interface's admin API wants
+        (see :doc:`node`).
+        Left out, there is no admin API.
+
     .. code:: yaml
 
         node:
@@ -276,6 +281,31 @@ Reference
             Samoyed node in the back bedroom.
             Sysop: Q1TEST.
           idleTimeout: 20m
+          adminToken: a-long-random-string
+
+``mqtt``
+    An MQTT broker to publish the node's events to (see :doc:`node`).
+    It has no equivalent in Dire Wolf's format.
+    It has:
+
+    ``broker``
+        The broker's URL:
+        ``tcp://host:1883``, ``ssl://host:8883`` for TLS,
+        or ``ws://`` or ``wss://`` for MQTT over WebSockets.
+
+    ``username``, ``password``
+        Credentials, if the broker wants them.
+
+    ``clientId``
+        The client ID; left out, ``samoyed-`` and the node's callsign.
+
+    ``topicPrefix``
+        The first level of every topic; left out, ``samoyed``.
+
+    .. code:: yaml
+
+        mqtt:
+          broker: tcp://mqtt.example.org:1883
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

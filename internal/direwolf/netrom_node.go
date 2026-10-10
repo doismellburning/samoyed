@@ -22,8 +22,11 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/mqttpub"
 	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/node"
+	"github.com/doismellburning/samoyed/internal/nodeevents"
 	"github.com/sirupsen/logrus"
 )
 
@@ -67,6 +70,7 @@ type axSession struct {
 
 	shell    *node.Shell   // For a user connected to the node.
 	downlink node.Downlink // For a link opened onwards for a shell.
+	role     string        // "neighbour", "user" or "downlink", for events.
 }
 
 // netromNode runs a NET/ROM Router, and the shells of the users connected to
@@ -82,6 +86,9 @@ type netromNode struct {
 	ports    []node.Port
 	heard    *node.HeardList
 	shells   map[*node.Shell]bool
+
+	// events is told what happens; nil for nobody.
+	events *nodeevents.Bus
 
 	// work carries what is to be run on the node's goroutine.
 	work chan func()
@@ -182,26 +189,81 @@ func (n *netromNode) do(f func()) {
 	n.work <- f
 }
 
-// logEvent logs what the Router says happened.
+// logEvent logs and publishes what the Router says happened.
 func (n *netromNode) logEvent(e netrom.Event) {
+	var ev = n.event(nodeevents.RoutesChanged)
+
 	switch e.Kind {
 	case netrom.EventRoutesChanged:
+		var destinations = len(n.router.Table().Destinations())
+		var neighbours = len(n.router.Table().Neighbours())
+
 		logrus.WithFields(logrus.Fields{
-			"destinations": len(n.router.Table().Destinations()),
-			"neighbours":   len(n.router.Table().Neighbours()),
+			"destinations": destinations,
+			"neighbours":   neighbours,
 		}).Debug("NET/ROM routes changed")
+		metrics.SetNetROMDestinations(destinations)
+
+		ev.Destinations = destinations
+		ev.Neighbours = neighbours
 	case netrom.EventCircuitUp:
 		logrus.WithFields(logrus.Fields{
 			"remote": e.Circuit.Remote,
 			"user":   e.Circuit.User,
 		}).Info("NET/ROM circuit up")
+
+		ev.Kind = nodeevents.CircuitUp
 	case netrom.EventCircuitDown:
 		logrus.WithFields(logrus.Fields{
 			"remote": e.Circuit.Remote,
 			"user":   e.Circuit.User,
 			"error":  e.Err,
 		}).Info("NET/ROM circuit down")
+
+		ev.Kind = nodeevents.CircuitDown
+		ev.Error = errorText(e.Err)
 	}
+
+	if e.Kind != netrom.EventRoutesChanged {
+		metrics.SetNetROMCircuits(len(n.router.Circuits()))
+
+		ev.Local = e.Circuit.Local
+		ev.Remote = e.Circuit.Remote
+		ev.User = e.Circuit.User
+		ev.Incoming = e.Circuit.Incoming
+	}
+
+	n.events.Publish(ev)
+}
+
+// event returns an event of kind, about this node, now.
+func (n *netromNode) event(kind nodeevents.Kind) nodeevents.Event {
+	return nodeevents.Event{
+		Time: n.now().UTC(), Kind: kind, Node: n.cfg.Call,
+		Port: nil, Local: "", Remote: "", User: "", Incoming: false, Role: "", Error: "",
+		Destinations: 0, Neighbours: 0,
+	}
+}
+
+// linkEvent returns an event of kind about the AX.25 link s.
+func (n *netromNode) linkEvent(kind nodeevents.Kind, s *axSession) nodeevents.Event {
+	var ev = n.event(kind)
+	var port = s.key.port
+	ev.Port = &port
+	ev.Local = s.key.own
+	ev.Remote = s.key.remote
+	ev.Incoming = s.incoming
+	ev.Role = s.role
+
+	return ev
+}
+
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	return err.Error()
 }
 
 // heardFrame takes in a received frame: every one goes in the heard list, and
@@ -229,8 +291,11 @@ func (n *netromNode) heardFrame(channel int, pp *ax25.Packet) {
 	n.do(func() {
 		var now = n.now()
 
-		if direct {
-			n.heard.Heard(channel, from, now)
+		if direct && n.heard.Heard(channel, from, now) {
+			var ev = n.event(nodeevents.Heard)
+			ev.Port = &channel
+			ev.Remote = from
+			n.events.Publish(ev)
 		}
 
 		if nodes {
@@ -357,10 +422,16 @@ func (n *netromNode) linkUp(key axKey, incoming bool) {
 
 	switch {
 	case s.downlink != nil:
+		s.role = "downlink"
 		s.downlink.Connected()
 	case incoming && n.isNodeCall(key.own) && !n.isNeighbour(key):
+		s.role = "user"
 		n.startShell(s)
+	default:
+		s.role = "neighbour"
 	}
+
+	n.events.Publish(n.linkEvent(nodeevents.LinkUp, s))
 }
 
 // LinkTerminated is the link layer saying a link has gone, or could not be
@@ -378,6 +449,15 @@ func (n *netromNode) linkDown(key axKey, timeout bool) {
 	}
 
 	delete(n.sessions, key)
+
+	if s.everUp {
+		var ev = n.linkEvent(nodeevents.LinkDown, s)
+		if timeout {
+			ev.Error = "timeout"
+		}
+
+		n.events.Publish(ev)
+	}
 
 	if s.shell != nil {
 		delete(n.shells, s.shell)
@@ -423,6 +503,7 @@ func (n *netromNode) linkData(key axKey, pid int, data []byte) {
 			delete(n.shells, s.shell)
 			s.shell.Closed()
 			s.shell = nil
+			s.role = "neighbour"
 		}
 
 		n.router.ReceivePacket(netrom.NeighbourKey{Port: key.port, Call: key.remote}, data, n.now())
@@ -464,6 +545,7 @@ func netrom_init(ctx context.Context, audio *RadioConfig, misc *misc_config_s, l
 		return nil, nerr
 	}
 
+	n.events = nodeevents.NewBus(metrics.RecordNodeEventDropped)
 	n.start(ctx, links.attach(n))
 
 	logrus.WithFields(logrus.Fields{
@@ -472,4 +554,46 @@ func netrom_init(ctx context.Context, audio *RadioConfig, misc *misc_config_s, l
 	}).Info("NET/ROM node started")
 
 	return n, nil
+}
+
+// mqttBuffer is how many events the MQTT publisher can fall behind by before
+// it starts missing them.
+const mqttBuffer = 256
+
+// mqtt_init starts publishing the node's events to an MQTT broker, if the
+// configuration names one.
+func mqtt_init(ctx context.Context, misc *misc_config_s, n *netromNode) {
+	if misc.mqtt == nil {
+		return
+	}
+
+	if n == nil {
+		logrus.Warn("MQTT is configured, but there is no node to publish the events of")
+
+		return
+	}
+
+	var cfg = *misc.mqtt
+	cfg.Node = n.cfg.Call
+
+	var err = cfg.Validate()
+	if err != nil {
+		logrus.WithError(err).Error("MQTT")
+
+		return
+	}
+
+	var broker, cerr = mqttpub.Connect(ctx, cfg)
+	if cerr != nil {
+		logrus.WithError(cerr).Error("Could not start MQTT")
+
+		return
+	}
+
+	var events, stop = n.events.Subscribe(mqttBuffer)
+	context.AfterFunc(ctx, stop)
+
+	go mqttpub.Run(ctx, cfg, events, broker)
+
+	logrus.WithFields(logrus.Fields{"broker": cfg.Broker, "topic": cfg.Topic("#")}).Info("Publishing node events to MQTT")
 }

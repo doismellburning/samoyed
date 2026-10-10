@@ -263,7 +263,7 @@
   // ---- Tabs ----
 
   function selectTab(which) {
-    for (const t of ["dashboard", "map"]) {
+    for (const t of ["dashboard", "map", "node"]) {
       $("tab-" + t).setAttribute("aria-selected", String(t === which));
       $("view-" + t).hidden = t !== which;
     }
@@ -271,11 +271,63 @@
       ensureMap();
       fitToStations();
     }
+    if (which === "node") loadNode();
     try { localStorage.setItem("samoyed.tab", which); } catch { /* fine */ }
   }
 
   $("tab-dashboard").addEventListener("click", () => selectTab("dashboard"));
   $("tab-map").addEventListener("click", () => selectTab("map"));
+  $("tab-node").addEventListener("click", () => selectTab("node"));
+
+  // ---- Node ----
+
+  // The Node tab is there only when Samoyed is running a node.
+
+  function fillTable(id, rows) {
+    const body = $(id).querySelector("tbody");
+    body.replaceChildren(...rows.map((cells) =>
+      el("tr", {}, ...cells.map(([text, cls]) => el("td", cls ? { class: cls, text } : { text })))));
+  }
+
+  function nodeName(call, alias) {
+    return alias ? `${alias}:${call}` : call;
+  }
+
+  async function loadNode() {
+    try {
+      const [info, neighbours, nodes, circuits, links] = await Promise.all([
+        getJSON("api/node/info"), getJSON("api/node/neighbours"), getJSON("api/node/nodes"),
+        getJSON("api/node/circuits"), getJSON("api/node/links")]);
+      $("node-title").textContent = `Node ${nodeName(info.call, info.alias)}`;
+      fillTable("node-neighbours", neighbours.map((n) => [
+        [String(n.port)], [nodeName(n.call, n.alias) + (n.locked ? " (locked)" : "")],
+        [String(n.quality), "num"], [String(n.routes), "num"], [n.linked ? "up" : "—"]]));
+      fillTable("node-nodes", nodes.map((d) => {
+        const best = d.routes[0] || { neighbour: "", port: "", quality: 0, obsolescence: 0 };
+        return [[nodeName(d.call, d.alias)], [`${best.neighbour} (port ${best.port})`],
+          [String(best.quality), "num"], [String(best.obsolescence), "num"]];
+      }));
+      fillTable("node-circuits", circuits.map((c) => [
+        [c.user], [c.remote], [c.state], [String(c.sent), "num"], [String(c.received), "num"]]));
+      fillTable("node-links", links.map((l) => [
+        [String(l.port)], [l.local], [[l.remote, ...l.via].join(" via ")], [l.role || "—"], [l.up ? "up" : "connecting"]]));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function detectNode() {
+    try {
+      const r = await fetch("api/node/info", { cache: "no-store" });
+      if (!r.ok) return false;
+      $("tab-node").hidden = false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  setInterval(() => { if (!$("view-node").hidden) loadNode(); }, 5000);
 
   // ---- Data ----
 
@@ -361,5 +413,6 @@
   let initial = "dashboard";
   try { initial = localStorage.getItem("samoyed.tab") || initial; } catch { /* fine */ }
   selectTab(initial === "map" ? "map" : "dashboard");
+  detectNode().then((hasNode) => { if (hasNode && initial === "node") selectTab("node"); });
   connect();
 })();

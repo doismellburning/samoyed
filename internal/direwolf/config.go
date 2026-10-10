@@ -37,6 +37,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/mqttpub"
 	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -172,6 +173,10 @@ type misc_config_s struct {
 
 	netrom *netrom.Config /* The NET/ROM node, or nil for none.  YAML only. */
 	node   node.Config    /* How the node serves its users.  YAML only. */
+
+	node_admin_token string /* Bearer token for the node's web admin API; "" disables it. */
+
+	mqtt *mqttpub.Config /* Where to publish the node's events, or nil for nowhere.  YAML only. */
 
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.

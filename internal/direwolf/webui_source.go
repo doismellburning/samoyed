@@ -19,7 +19,7 @@ import (
 // WEBPORT, and returns the hub to publish frames to.  A port of 0 (the
 // default) disables it, as does failing to start it, and either returns nil -
 // which webPublishReceived and webPublishTransmitted take as nothing to do.
-func webui_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) *webui.Hub {
+func webui_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s, extra ...webui.Route) *webui.Hub {
 	if mc.web_port == 0 {
 		logrus.Debug("Web interface disabled")
 
@@ -34,7 +34,7 @@ func webui_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) *web
 		}
 	}
 
-	var errCh, startErr = webui.Start(ctx, mc.web_port, hub)
+	var errCh, startErr = webui.Start(ctx, mc.web_port, hub, extra...)
 	if startErr != nil {
 		logrus.WithError(startErr).WithField("port", mc.web_port).Error("Unable to start web interface")
 

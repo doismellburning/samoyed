@@ -520,7 +520,11 @@ x = Silence FX.25 information.`)
 	 * unless WEBPORT is set.
 	 */
 
-	var webHub = webui_init(ctx, audio_config, misc_config)
+	// The node's part of the interface is there from the start, and answers
+	// once the node is.
+	var nodeWeb = newNodeWeb(misc_config.node_admin_token)
+
+	var webHub = webui_init(ctx, audio_config, misc_config, nodeWeb.routes()...)
 
 	// The AGW server is made here, so the transmit service can be told to
 	// show it each frame sent, but only started further down: its clients
@@ -687,6 +691,9 @@ x = Silence FX.25 information.`)
 		logrus.WithError(netromErr).Error("Could not start NET/ROM")
 		td.exit(1)
 	}
+
+	nodeWeb.set(netromNode)
+	mqtt_init(ctx, misc_config, netromNode)
 
 	metrics_init(ctx, audio_config, misc_config)
 	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)

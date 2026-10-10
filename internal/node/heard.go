@@ -38,11 +38,18 @@ func NewHeardList(limit int) *HeardList {
 	return h
 }
 
-// Heard notes a frame from call on port at now.
-func (h *HeardList) Heard(port int, call string, now time.Time) {
+// heardQuiet is how long a station must go unheard to count as newly heard
+// when it is heard again.
+const heardQuiet = 15 * time.Minute
+
+// Heard notes a frame from call on port at now, and says whether the station
+// is newly heard: never before, or not for a while.
+func (h *HeardList) Heard(port int, call string, now time.Time) bool {
 	var key = heardKey{port: port, call: call}
 
 	var s, ok = h.stations[key]
+	var fresh = !ok || now.Sub(s.Last) >= heardQuiet
+
 	if !ok {
 		if len(h.stations) >= h.max {
 			h.forgetOldest()
@@ -56,6 +63,8 @@ func (h *HeardList) Heard(port int, call string, now time.Time) {
 
 	s.Last = now
 	s.Frames++
+
+	return fresh
 }
 
 func (h *HeardList) forgetOldest() {

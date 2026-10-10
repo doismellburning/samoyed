@@ -34,9 +34,22 @@ const (
 //go:embed static
 var staticFiles embed.FS
 
-// Handler returns the web interface's routes, reading from hub.
-func Handler(hub *Hub) http.Handler {
+// Route is a route served alongside the web interface's own, for a part of
+// Samoyed the interface does not know about - the packet node, say.
+type Route struct {
+	// Pattern is an http.ServeMux pattern, such as "GET /api/node/nodes".
+	Pattern string
+	Handler http.Handler
+}
+
+// Handler returns the web interface's routes, reading from hub, and the extra
+// routes given.
+func Handler(hub *Hub, extra ...Route) http.Handler {
 	var mux = http.NewServeMux()
+
+	for _, r := range extra {
+		mux.Handle(r.Pattern, r.Handler)
+	}
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, staticFiles, "static/index.html")
@@ -66,14 +79,14 @@ func Handler(hub *Hub) http.Handler {
 //
 // Cancelling ctx shuts the server down, event streams included, so the channel
 // then reports http.ErrServerClosed.
-func Start(ctx context.Context, port int, hub *Hub) (<-chan error, error) {
+func Start(ctx context.Context, port int, hub *Hub, extra ...Route) (<-chan error, error) {
 	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", port))
 	if listenErr != nil {
 		return nil, listenErr
 	}
 
 	var server = new(http.Server)
-	server.Handler = Handler(hub)
+	server.Handler = Handler(hub, extra...)
 	server.ReadHeaderTimeout = readHeaderTimeout
 	server.ReadTimeout = readTimeout
 	server.WriteTimeout = writeTimeout
@@ -149,6 +162,11 @@ func serveEvents(w http.ResponseWriter, r *http.Request, hub *Hub) {
 			return
 		}
 	}
+}
+
+// WriteJSON sends v as a JSON response, as the web interface's own routes do.
+func WriteJSON(w http.ResponseWriter, v any) {
+	writeJSON(w, v)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

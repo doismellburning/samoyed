@@ -12,6 +12,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/node"
+	"github.com/doismellburning/samoyed/internal/nodeevents"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -166,8 +167,11 @@ func (n *fakeNet) pump() {
 	}
 }
 
-func (n *fakeNet) tick(d time.Duration) {
-	n.now = n.now.Add(d)
+// tick moves the clock on a second and runs the nodes' timers.  The first
+// tick sends the NODES broadcasts: the routers started on the real clock, a
+// moment ago.
+func (n *fakeNet) tick() {
+	n.now = n.now.Add(time.Second)
 
 	for _, node := range n.nodes {
 		node.do(func() { node.router.Tick(n.now) })
@@ -191,7 +195,7 @@ func TestNetromNodesOverAX25(t *testing.T) {
 	var a = n.add("Q1TEST", "ONE")
 	var b = n.add("Q2TEST", "TWO")
 
-	n.tick(time.Second) // The routers started on the real clock, a moment ago.
+	n.tick()
 
 	var d, ok = a.router.Table().Lookup("TWO")
 	require.True(t, ok, "A learned B from its NODES broadcast")
@@ -338,7 +342,7 @@ func TestNodeShellOverAX25AndNetROM(t *testing.T) {
 	var n = newFakeNet(t)
 	n.add("Q1TEST", "ONE")
 	n.add("Q2TEST", "TWO")
-	n.tick(time.Second)
+	n.tick()
 
 	n.userConnects("Q4TEST", "Q1TEST")
 	assert.Equal(t, "ONE:Q1TEST} Welcome to ONE:Q1TEST, Q4TEST.  Type ? for a list of commands.\n", n.userSaw("Q4TEST"))
@@ -400,4 +404,46 @@ func TestDownlinkCall(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, want, got)
 	}
+}
+
+func TestNodePublishesEvents(t *testing.T) {
+	var n = newFakeNet(t)
+	var a = n.add("Q1TEST", "ONE")
+	n.add("Q2TEST", "TWO")
+
+	a.events = nodeevents.NewBus(nil)
+
+	var events, stop = a.events.Subscribe(100)
+	defer stop()
+
+	n.tick()
+	n.userConnects("Q4TEST", "Q1TEST")
+	n.userTypes("Q4TEST", "Q1TEST", "C TWO\r")
+	n.userTypes("Q4TEST", "Q1TEST", "BYE\r")
+	a.LinkTerminated(0, firstAppClient, "Q4TEST", "Q1TEST", false)
+	n.pump()
+
+	var kinds []string
+
+	for len(events) > 0 {
+		var e = <-events
+		assert.Equal(t, "Q1TEST", e.Node)
+
+		var what = string(e.Kind)
+		if e.Role != "" {
+			what += " " + e.Role
+		}
+
+		kinds = append(kinds, what)
+	}
+
+	assert.Equal(t, []string{
+		"heard", // TWO's NODES broadcast.
+		"routes/changed",
+		"link/up user",
+		"link/up neighbour",
+		"circuit/up",
+		"circuit/down",
+		"link/down user",
+	}, kinds)
 }
