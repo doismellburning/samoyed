@@ -482,6 +482,7 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
+	transmitQueue.SetSeizeConfirm(dataLinkQueue.SeizeConfirm)
 	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame))
 	stopIfCancelled(ctx, td)
 
@@ -540,7 +541,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, layer2Receiver.DataDetectAny, onTransmit, d_p_opt, d_x_opt, d_2_opt)
+	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx, td)
 
 	/*

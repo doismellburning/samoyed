@@ -350,6 +350,7 @@ func TestAXUDPChannelConnectedMode(t *testing.T) {
 	var tq = NewTransmitQueue()
 	tq.Init(audio)
 	tq.SetAXUDPChannels(channels)
+	tq.SetSeizeConfirm(dataLinkQueue.SeizeConfirm)
 
 	var pp = newTestPacket(t)
 	var want = pp.FrameData()

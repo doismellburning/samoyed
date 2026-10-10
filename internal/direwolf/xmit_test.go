@@ -133,6 +133,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 	dataLinkQueue.Init()
 
 	var xs = new(XmitService)
+	xs.seizeConfirm = dataLinkQueue.SeizeConfirm
 
 	transmitQueue.Append(channel, TQ_PRIO_1_LO, ax25.New()) // What TransmitQueue.LMSeizeRequest queues.
 	transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
@@ -378,6 +379,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	xs.toneGenerators = NewToneGenerators(audioConfig, 100, audio)
 	xs.bits_per_sec[channel] = 1200
 	xs.audioOutAvailable[0] = true
+	xs.seizeConfirm = dataLinkQueue.SeizeConfirm
 
 	return xs
 }

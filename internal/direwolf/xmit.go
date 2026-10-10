@@ -133,6 +133,10 @@ type XmitService struct {
 	// onTransmit is told each frame we send, and its channel, or is nil.
 	onTransmit func(channel int, pp *ax25.Packet)
 
+	// seizeConfirm tells the data link state machine that a channel's
+	// transmission opportunity has arrived, or is nil for nobody to tell.
+	seizeConfirm func(channel int)
+
 	// setOutput sets one of a channel's outputs - here only ever OCTYPE_PTT,
 	// to key the transmitter - or is nil when there is nothing to key.
 	setOutput func(ot int, channel int, state int)
@@ -168,6 +172,10 @@ type XmitService struct {
  *		onTransmit	- Called with each frame we send, and its
  *				  channel; nil for nobody to tell.
  *
+ *		seizeConfirm	- Told when a channel's transmission opportunity
+ *				  has arrived, for the data link state machine;
+ *				  nil for nobody to tell.
+ *
  *		fx25Debug	- FX.25's debug level, for each channel's
  *				  Layer2Sender.
  *
@@ -196,6 +204,7 @@ func NewXmitService(
 	setOutput func(ot int, channel int, state int),
 	dataDetect func(channel int) int,
 	onTransmit func(channel int, pp *ax25.Packet),
+	seizeConfirm func(channel int),
 	debug_xmit_packet bool,
 	fx25Debug int,
 	il2pDebug int,
@@ -206,6 +215,7 @@ func NewXmitService(
 	xs.audio = audio
 	xs.toneGenerators = toneGenerators
 	xs.onTransmit = onTransmit
+	xs.seizeConfirm = seizeConfirm
 	xs.setOutput = setOutput
 	xs.dataDetect = dataDetect
 	xs.fx25Debug = fx25Debug
@@ -256,6 +266,14 @@ func NewXmitService(
 // transmitting would talk over it.
 func (xs *XmitService) channelBusy(channel int) bool {
 	return xs.dataDetect != nil && xs.dataDetect(channel) > 0
+}
+
+// confirmSeize tells the data link state machine, if there is one to tell,
+// that the channel's transmission opportunity has arrived.
+func (xs *XmitService) confirmSeize(channel int) {
+	if xs.seizeConfirm != nil {
+		xs.seizeConfirm(channel)
+	}
 }
 
 // keyPTT turns a channel's transmitter on (state 1) or off (0), if there is a
@@ -531,7 +549,7 @@ func (xs *XmitService) discard_untransmittable(channel int) {
 			}
 
 			if pp.IsNullFrame() {
-				dataLinkQueue.SeizeConfirm(channel) // C4.2.  "This primitive indicates, to the
+				xs.confirmSeize(channel) // C4.2.  "This primitive indicates, to the
 				// Data-link State machine, that the transmission opportunity has arrived."
 
 				confirmed = true
@@ -776,7 +794,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 
 	// Inform data link state machine that we are now transmitting.
 
-	dataLinkQueue.SeizeConfirm(channel) // C4.2.  "This primitive indicates, to the Data-link State
+	xs.confirmSeize(channel) // C4.2.  "This primitive indicates, to the Data-link State
 	// machine, that the transmission opportunity has arrived."
 
 	var timing = xs.channelTiming(channel)
@@ -797,7 +815,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 
 	time.Sleep(10 * time.Millisecond) // Give data link state machine a chance to
 	// to stuff more frames into the transmit queue,
-	// in response to dataLinkQueue.SeizeConfirm, so
+	// in response to the seize confirm, so
 	// we don't run off the end too soon.
 
 	logrus.WithFields(logrus.Fields{
@@ -977,12 +995,12 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 		// I think the solution is to send back a seize confirm here.
 		// It shouldn't hurt if we send it redundantly.
 		// Added for 1.5 beta test 4.
-		dataLinkQueue.SeizeConfirm(c) // C4.2.  "This primitive indicates, to the Data-link State
+		xs.confirmSeize(c) // C4.2.  "This primitive indicates, to the Data-link State
 		// machine, that the transmission opportunity has arrived."
 
 		time.Sleep(10 * time.Millisecond) // Give data link state machine a chance to
 		// to stuff more frames into the transmit queue,
-		// in response to dataLinkQueue.SeizeConfirm, so
+		// in response to the seize confirm, so
 		// we don't run off the end too soon.
 
 		return (0)
