@@ -13,24 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// byteSink is an AudioSink that keeps what it is given, and counts flushes.
-type byteSink struct {
-	data    []byte
-	flushes int
-}
-
-func (s *byteSink) Put(_ int, c uint8) int {
-	s.data = append(s.data, c)
-
-	return 0
-}
-
-func (s *byteSink) Flush(int) int {
-	s.flushes++
-
-	return 0
-}
-
 // What SendDTMF puts on the air, a decoder on the same channel reads back.
 func TestSendDTMFDecodesBack(t *testing.T) {
 	const channel = 0
