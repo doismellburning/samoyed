@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package main
 
 /*------------------------------------------------------------------
  *
@@ -25,7 +25,7 @@ import (
 
 /*------------------------------------------------------------------
  *
- * Function:	DescribeAX25Frame
+ * Function:	describeAX25Frame
  *
  * Purpose:	Print a description of one AX.25 frame: the header, the
  *		digipeater path, the control and PID fields, and the
@@ -40,7 +40,7 @@ import (
  *
  *------------------------------------------------------------------*/
 
-func DescribeAX25Frame(aprsDecoder *aprs.Decoder, frame []byte) int {
+func describeAX25Frame(aprsDecoder *aprs.Decoder, frame []byte) int {
 	if len(frame) < ax25.MinPacketLen {
 		fmt.Printf("ERROR: The frame is %d bytes, too short for an AX.25 header of at least %d.\n", len(frame), ax25.MinPacketLen)
 
