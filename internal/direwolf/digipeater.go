@@ -101,6 +101,7 @@ type Digipeater struct {
 	config      *digi_config_s
 	filter      *pfilter.PacketFilter
 	dedupe      *dedupe.Service
+	transmit    frameSender // Where digipeated packets go; nil to drop them.
 	count       [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
 }
 
@@ -120,15 +121,19 @@ type Digipeater struct {
  *				  so the IGate doesn't send the same to RF; nil
  *				  for nobody to tell.
  *
+ *		transmit	- Where digipeated packets go, to be
+ *				  transmitted; nil to drop them.
+ *
  * Description:	Called once at application startup time.
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, onRemember func(pp *ax25.Packet, channel int)) *Digipeater {
+func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, onRemember func(pp *ax25.Packet, channel int), transmit frameSender) *Digipeater {
 	var d = new(Digipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_digi_config
 	d.filter = filter
+	d.transmit = transmit
 	d.dedupe = dedupe.New(time.Duration(p_digi_config.dedupe_time)*time.Second, onRemember)
 
 	return d
@@ -225,7 +230,10 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 					d.config.filter_str[from_chan][to_chan])
 				if result != nil {
 					d.dedupe.Remember(pp, to_chan)
-					transmitQueue.Append(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
+					if d.transmit != nil {
+						d.transmit(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
+					}
+
 					d.count[from_chan][to_chan]++
 				}
 			}
@@ -249,7 +257,10 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 					d.config.filter_str[from_chan][to_chan])
 				if result != nil {
 					d.dedupe.Remember(pp, to_chan)
-					transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
+					if d.transmit != nil {
+						d.transmit(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
+					}
+
 					d.count[from_chan][to_chan]++
 				}
 			}
@@ -286,9 +297,9 @@ func (d *Digipeater) Regen(from_chan int, pp *ax25.Packet) {
 	for to_chan := range MAX_TOTAL_CHANS {
 		if d.config.regen[from_chan][to_chan] {
 			var result = pp.Dup()
-			if result != nil {
+			if result != nil && d.transmit != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
-				transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result)
+				d.transmit(to_chan, TQ_PRIO_1_LO, result)
 			}
 		}
 	}

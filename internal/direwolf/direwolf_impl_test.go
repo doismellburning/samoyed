@@ -118,7 +118,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	var digiConfig = new(digi_config_s)
 	var filter = pfilter.New(igateConfig.max_digi_hops, aprs.NewDecoderFromDataFiles(), heardDB, 0)
 
-	var ig = NewIGate(audioConfig, igateConfig, digiConfig, filter, heardDB, nil, 0)
+	var ig = NewIGate(audioConfig, igateConfig, digiConfig, filter, heardDB, nil, nil, 0)
 
 	var handler = new(recPacketHandler)
 	handler.toIGate = ig.sendRecPacket
@@ -128,9 +128,9 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	handler.logger = aprslog.New(false, "")
 	handler.heard = heardDB
 	handler.waypoints = ws
-	handler.digipeater = NewDigipeater(audioConfig, digiConfig, filter, nil)
-	handler.connectedDigipeater = NewConnectedDigipeater(audioConfig, new(cdigi_config_s), filter)
-	handler.ttGateway = NewTTGateway(audioConfig, handler.ttConfig, nil, handler.digipeater.Remember, nil, nil, nil, 0)
+	handler.digipeater = NewDigipeater(audioConfig, digiConfig, filter, nil, nil)
+	handler.connectedDigipeater = NewConnectedDigipeater(audioConfig, new(cdigi_config_s), filter, nil)
+	handler.ttGateway = NewTTGateway(audioConfig, handler.ttConfig, nil, handler.digipeater.Remember, nil, nil, nil, nil, 0)
 
 	return &recPacketTest{handler: handler, audioConfig: audioConfig, waypoints: waypoints}
 }

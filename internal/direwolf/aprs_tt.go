@@ -279,6 +279,10 @@ type TTGateway struct {
 	// recFrame is where a raw touch tone message goes, as though received,
 	// or nil to drop it.
 	recFrame frameReceiver
+
+	// transmit is where an audible response goes, to be transmitted, or nil to
+	// drop it.
+	transmit frameSender
 }
 
 /*------------------------------------------------------------------
@@ -298,6 +302,8 @@ type TTGateway struct {
  *			  IGate.
  *		recFrame - Where a raw touch tone message goes, as though
  *			  received; nil to drop it.
+ *		transmit - Where audible responses and object reports go, to
+ *			  be transmitted; nil to drop them.
  *		audioLevel - Reports a channel's received audio level, for a
  *			  touch tone message to carry; nil for none.
  *		debug	- Debug printing control.
@@ -316,6 +322,7 @@ func NewTTGateway(
 	remember func(pp *ax25.Packet, channel int),
 	toIGate func(channel int, pp *ax25.Packet),
 	recFrame frameReceiver,
+	transmit frameSender,
 	audioLevel func(channel int, subchan int) ax25.ALevel,
 	debug int,
 ) *TTGateway {
@@ -324,10 +331,12 @@ func NewTTGateway(
 	g.config = p
 	g.audioLevel = audioLevel
 	g.recFrame = recFrame
+	g.transmit = transmit
 	g.users = newTTUsers(audioConfig, p)
 	g.users.apps = apps
 	g.users.remember = remember
 	g.users.toIGate = toIGate
+	g.users.transmit = transmit
 
 	return g
 }
@@ -525,7 +534,9 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 		return
 	}
 
-	transmitQueue.Append(channel, TQ_PRIO_0_HI, pp)
+	if g.transmit != nil {
+		g.transmit(channel, TQ_PRIO_0_HI, pp)
+	}
 } /* end Sequence */
 
 /*------------------------------------------------------------------

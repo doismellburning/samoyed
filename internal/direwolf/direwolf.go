@@ -674,15 +674,15 @@ x = Silence FX.25 information.`)
 	 */
 	var mheardDB = mheard.New(d_m_opt)
 	var packetFilter = pfilter.New(igate_config.max_digi_hops, aprsDecoder, mheardDB, d_f_opt)
-	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, dataLinkQueue.RecFrame, d_i_opt)
-	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated)
+	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, dataLinkQueue.RecFrame, transmitQueue.Append, d_i_opt)
+	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated, transmitQueue.Append)
 
 	// The transmit queue predates the IGate, and nothing queues a packet for
 	// the IGate's channel before the services below are started.
 	transmitQueue.SetIGate(igate.sendRecPacket)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)
-	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
+	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter, transmitQueue.Append)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
@@ -728,7 +728,8 @@ x = Silence FX.25 information.`)
 	 * client applications too.  Each audio device's receive thread makes the
 	 * touch tone decoders for its own channels, once receiving starts below.
 	 */
-	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, igate.sendRecPacket, dataLinkQueue.RecFrame, layer2Receiver.AudioLevel, aprstt_debug)
+	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, igate.sendRecPacket,
+		dataLinkQueue.RecFrame, transmitQueue.Append, layer2Receiver.AudioLevel, aprstt_debug)
 
 	/*
 	 * Open port for communication with GPS.
@@ -771,7 +772,7 @@ x = Silence FX.25 information.`)
 
 	var aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
 	td.add(aprsLogger.Close)
-	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger, mheardDB, igate, dataLinkQueue.RecFrame)
+	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger, mheardDB, igate, dataLinkQueue.RecFrame, transmitQueue.Append)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
 	stopIfCancelled(ctx, td)

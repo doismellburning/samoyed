@@ -149,6 +149,10 @@ type IGate struct {
 	// though received there, or nil to drop it.
 	recFrame frameReceiver
 
+	// transmit is where a packet from APRS-IS for a radio channel goes, to be
+	// transmitted, or nil to drop it.
+	transmit frameSender
+
 	// heard records who has been heard from APRS-IS, and how many of a
 	// message sender's positions are still to be passed along to RF.  Nil
 	// records nothing, and owes nobody a position.
@@ -238,13 +242,23 @@ type igateHeard interface {
 
 // NewIGate returns an IGate that knows what it is meant to do but is not yet
 // doing it.  start connects to the server and sets the goroutines going.
-func NewIGate(audioConfig *RadioConfig, igateConfig *igate_config_s, digiConfig *digi_config_s, filter *pfilter.PacketFilter, heard igateHeard, recFrame frameReceiver, debugLevel int) *IGate {
+func NewIGate(
+	audioConfig *RadioConfig,
+	igateConfig *igate_config_s,
+	digiConfig *digi_config_s,
+	filter *pfilter.PacketFilter,
+	heard igateHeard,
+	recFrame frameReceiver,
+	transmit frameSender,
+	debugLevel int,
+) *IGate {
 	var ig = &IGate{ //nolint:exhaustruct_v5
 		audioConfig:   audioConfig,
 		config:        igateConfig,
 		digiConfig:    digiConfig,
 		filter:        filter,
 		recFrame:      recFrame,
+		transmit:      transmit,
 		heard:         heard,
 		debugLevel:    debugLevel,
 		retryInterval: IGATE_RETRY_INTERVAL,
@@ -1655,7 +1669,10 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 		var pradio = ax25.FromText(radio, true)
 		if pradio != nil {
 			/* This consumes packet so don't reference it again! */
-			transmitQueue.Append(to_chan, TQ_PRIO_1_LO, pradio)
+			if ig.transmit != nil {
+				ig.transmit(to_chan, TQ_PRIO_1_LO, pradio)
+			}
+
 			// Both counters in one go, so that pktCount never sees one
 			// without the other.
 			var isMessage = is_message_message(string(pinfo))

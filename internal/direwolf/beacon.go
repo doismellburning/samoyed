@@ -49,6 +49,7 @@ type BeaconService struct {
 	heardCounter      heardCounter    // Counts the stations heard recently; nil for none.
 	igate             beaconIGate     // Where SENDTO_IGATE beacons go, and the source of IGate statistics; nil for none.
 	recFrame          frameReceiver   // Where SENDTO_RECV beacons go, as though received; nil to drop them.
+	transmit          frameSender     // Where beacons for a channel go, to be transmitted; nil to drop them.
 	trackerDebugLevel int
 }
 
@@ -79,6 +80,9 @@ type BeaconService struct {
  *		recFrame	- Where SENDTO_RECV beacons go, as though
  *			  received; nil to drop them.
  *
+ *		transmit	- Where beacons for a channel go, to be
+ *			  transmitted; nil to drop them.
+ *
  * Outputs:	Remember required information for future use.
  *
  * Description:	Do some validity checking on the beacon configuration.
@@ -97,6 +101,7 @@ func NewBeaconService(
 	heard heardCounter,
 	ig beaconIGate,
 	recFrame frameReceiver,
+	transmit frameSender,
 ) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct_v5
 		modemConfig:  pmodem,
@@ -107,6 +112,7 @@ func NewBeaconService(
 		heardCounter: heard,
 		igate:        ig,
 		recFrame:     recFrame,
+		transmit:     transmit,
 	}
 
 	/*
@@ -984,7 +990,9 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 				bs.recFrame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
 			}
 		default:
-			transmitQueue.Append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
+			if bs.transmit != nil {
+				bs.transmit(bp.sendto_chan, TQ_PRIO_1_LO, pp)
+			}
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
