@@ -302,8 +302,7 @@ func setupRecvProcessTest(t *testing.T, frack int) (*recPacketHandler, *Transmit
 	handler.logger = aprslog.New(false, "")
 	handler.heard = mheard.New(0)
 
-	var tq = NewTransmitQueue()
-	tq.Init(audioConfig)
+	var tq = NewTransmitQueue(audioConfig)
 
 	var miscConfig = new(misc_config_s)
 	miscConfig.paclen = AX25_N1_PACLEN_DEFAULT

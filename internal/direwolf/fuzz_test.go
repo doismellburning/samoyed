@@ -170,8 +170,7 @@ func setupIGateFromServer(t *testing.T) *IGate {
 
 	var heardDB = mheard.New(0)
 	// Nothing reads what it queues: each run has a queue of its own.
-	var tq = NewTransmitQueue()
-	tq.Init(audioConfig)
+	var tq = NewTransmitQueue(audioConfig)
 
 	return NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, nil, tq.Append, 0)
 }
@@ -229,8 +228,7 @@ const linkFuzzPaclen = 64
 // input cannot leave anything behind for the next, and which tells clients
 // what happens on it.
 func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
-	var tq = NewTransmitQueue()
-	tq.Init(cfg)
+	var tq = NewTransmitQueue(cfg)
 
 	var miscConfig = new(misc_config_s)
 	// Shorter than the default, so a client's data can be long enough to

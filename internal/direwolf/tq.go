@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -108,43 +107,15 @@ type TransmitQueue struct {
 	seizeConfirm func(channel int)
 }
 
-// transmitQueue is the queue every producer - KISS, AGW, beacon, digipeater,
-// IGate, APRStt, the connected-mode link - hands its packets to, and the
-// transmit threads take them from.  It exists from package initialisation, so
-// it is never nil; Init must still be called before anything is queued.
-var transmitQueue = NewTransmitQueue()
-
-// NewTransmitQueue returns an empty queue, with no audio configuration yet.
-func NewTransmitQueue() *TransmitQueue {
-	var tq = new(TransmitQueue)
-
-	for c := range MAX_RADIO_CHANS {
-		tq.wake[c] = make(chan struct{}, 1)
-	}
-
-	return tq
-}
-
-// tq_is_real_packet reports whether a queue entry is a real packet rather than
-// LMSeizeRequest's null wake-up frame, matching countLocked's own test.
-func tq_is_real_packet(pp *ax25.Packet) bool {
-	return pp.NumAddr() >= ax25.MinAddrs
-}
-
 /*-------------------------------------------------------------------
  *
- * Name:        Init
+ * Name:        NewTransmitQueue
  *
- * Purpose:     Initialize the transmit queue.
+ * Purpose:     Make an empty transmit queue.
  *
  * Inputs:	audio_config_p	- Audio device configuration.
  *
- * Outputs:
- *
- * Description:	Initialize the queue to be empty and set up other
- *		mechanisms for sharing it between different threads.
- *
- *		We have different timing rules for different types of
+ * Description:	We have different timing rules for different types of
  *		packets so they are put into different queues.
  *
  *		High Priority -
@@ -163,41 +134,37 @@ func tq_is_real_packet(pp *ax25.Packet) bool {
  *
  *		Each audio channel has its own queue.
  *
+ *		The published queue depth is one per channel and priority
+ *		for the whole process, not one per queue, so it is cleared
+ *		here: whatever it says describes a queue before this one.
+ *
  *--------------------------------------------------------------------*/
 
-func (tq *TransmitQueue) Init(audio_config_p *RadioConfig) {
+func NewTransmitQueue(audio_config_p *RadioConfig) *TransmitQueue {
 	logrus.Debug("tq_init")
+
+	var tq = new(TransmitQueue)
 	tq.audioConfig = audio_config_p
 
 	for c := range MAX_RADIO_CHANS {
-		for p := range TQ_NUM_PRIO {
-			tq.head[c][p] = nil
-			tq.length[c][p] = 0
+		tq.wake[c] = make(chan struct{}, 1)
 
+		for p := range TQ_NUM_PRIO {
 			metrics.SetTxQueueDepth(c, p, 0)
 		}
 	}
 
-	// Any wake-up left latched from before describes queues we have just
-	// emptied, so drain it: acting on it would only cost the transmit thread
-	// a lap of its loop, but starting from a clean state is easier to reason
-	// about.
-	//
-	// Under mu, like the enqueue paths that raise it.
-	tq.mu.Lock()
+	return tq
+}
 
-	for c := range MAX_RADIO_CHANS {
-		select {
-		case <-tq.wake[c]:
-		default:
-		}
-	}
-
-	tq.mu.Unlock()
-} /* end Init */
+// tq_is_real_packet reports whether a queue entry is a real packet rather than
+// LMSeizeRequest's null wake-up frame, matching countLocked's own test.
+func tq_is_real_packet(pp *ax25.Packet) bool {
+	return pp.NumAddr() >= ax25.MinAddrs
+}
 
 // SetNetTNCs hands the queue the network TNCs that packets for NCHANNEL
-// channels go to.  Like Init, it must be called before anything is queued: it
+// channels go to.  It must be called before anything is queued: it
 // is read without a lock.
 func (tq *TransmitQueue) SetNetTNCs(netTNCs [MAX_TOTAL_CHANS]*NetTNC) {
 	tq.netTNCs = netTNCs

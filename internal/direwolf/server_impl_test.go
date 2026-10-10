@@ -614,8 +614,7 @@ func TestAGWServerStart_Nil(t *testing.T) {
 func setupAGWTransmitQueue(t *testing.T, s *AGWServer, cfg *RadioConfig) *TransmitQueue {
 	t.Helper()
 
-	var tq = NewTransmitQueue()
-	tq.Init(cfg)
+	var tq = NewTransmitQueue(cfg)
 	s.queue = tq
 
 	return tq

@@ -509,8 +509,7 @@ func newSendTestBeaconService(t *testing.T) (*BeaconService, *TransmitQueue) {
 	t.Helper()
 
 	var modem = makeBeaconModemConfig()
-	var tq = NewTransmitQueue()
-	tq.Init(modem)
+	var tq = NewTransmitQueue(modem)
 
 	var cfg = new(misc_config_s)
 	cfg.num_beacons = 1

@@ -423,8 +423,7 @@ func setupIGateToRadio(t *testing.T) (*IGate, *TransmitQueue) {
 
 	var ig, _ = setupIGate(t)
 
-	var tq = NewTransmitQueue()
-	tq.Init(ig.audioConfig)
+	var tq = NewTransmitQueue(ig.audioConfig)
 	ig.transmit = tq.Append
 
 	return ig, tq

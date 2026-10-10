@@ -471,6 +471,12 @@ x = Silence FX.25 information.`)
 	// listeners, started below, can hand it frames straight away.
 	var dataLinkQueue = NewDataLinkQueue()
 
+	// What everything with a packet to send - KISS, AGW, beacon, digipeater,
+	// IGate, APRStt, the connected-mode link - hands it to, and the transmit
+	// threads take it from.  Nothing queues anything until the services
+	// below are started.
+	var transmitQueue = NewTransmitQueue(audio_config)
+
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
@@ -544,10 +550,11 @@ x = Silence FX.25 information.`)
 	}
 
 	/*
-	 * Initialize the transmit queue.
+	 * Start the transmit threads.
 	 */
 
-	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
+	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, transmitQueue, pttControl.Set,
+		layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx, td)
 
 	/*
