@@ -64,6 +64,9 @@ Commands are not case sensitive, and most have a one-letter form.
 ``CHAT``
     Enter the chat server, if the ``node`` section has a ``chat``.
 
+``BBS``
+    Enter the BBS, if there is one (see :doc:`bbs`).
+
 When a connection onwards closes,
 the user is returned to the node's prompt.
 A user idle for longer than the ``node`` section's ``idleTimeout`` is disconnected.
@@ -152,6 +155,9 @@ as JSON under ``samoyed/<callsign>/``:
 
 ``chat/join``, ``chat/leave``
     A ``user`` joined or left a chat ``room``.
+
+``bbs/message``
+    The BBS took a new message (see :doc:`bbs`).
 
 Each event also has ``time``, ``kind`` and ``node``,
 and ``error`` when a link or circuit went other than in an orderly way.

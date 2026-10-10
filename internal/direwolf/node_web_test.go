@@ -107,6 +107,21 @@ func TestNodeWebWithoutNode(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
+func getAuthed(t *testing.T, h http.Handler, path string, token string, v any) int {
+	t.Helper()
+
+	var rec = httptest.NewRecorder()
+	var r = httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
+	r.Header.Set("Authorization", "Bearer "+token)
+	h.ServeHTTP(rec, r)
+
+	if rec.Code == http.StatusOK {
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), v))
+	}
+
+	return rec.Code
+}
+
 func post(t *testing.T, h http.Handler, method string, path string, token string, body string) int {
 	t.Helper()
 

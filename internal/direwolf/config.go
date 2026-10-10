@@ -179,6 +179,10 @@ type misc_config_s struct {
 
 	node_chat *chat.Config /* The node's chat server, or nil for none.  YAML only. */
 
+	bbs *BBSSettings /* The node's BBS, or nil for none.  YAML only. */
+
+	data_dir string /* Where what is kept from one run to the next lives.  YAML only. */
+
 	mqtt *mqttpub.Config /* Where to publish the node's events, or nil for nowhere.  YAML only. */
 
 	// Previously we allowed only a single TCP port for KISS.

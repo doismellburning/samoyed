@@ -316,6 +316,55 @@ Reference
         mqtt:
           broker: tcp://mqtt.example.org:1883
 
+``dataDir``
+    Where what is kept from one run to the next lives:
+    the BBS keeps its messages in ``bbs`` under it.
+    It has no equivalent in Dire Wolf's format.
+
+``bbs``
+    A BBS (see :doc:`bbs`), which needs ``dataDir``.
+    It has no equivalent in Dire Wolf's format.
+    It has:
+
+    ``call``
+        The BBS's own callsign, such as the node's with another SSID,
+        which stations and partners can connect to directly.
+        Left out, the BBS is reached only from the node's shell,
+        and goes by the node's callsign.
+
+    ``alias``, ``quality``
+        The alias and quality (200 if left out) the node advertises for ``call``
+        in its NODES broadcasts.
+
+    ``hroute``
+        Where the BBS is, hierarchically, such as ``#HANTS.GBR.EURO``,
+        for the ``R:`` lines it adds.
+
+    ``partners``
+        The BBSes it forwards with, each with:
+        ``call``;
+        ``node``, the NET/ROM node or application to connect to,
+        or else ``channel`` and ``via`` to connect to ``call`` over AX.25;
+        ``script``, lines to send once connected, to get from a node's shell to its BBS;
+        ``routes``, which mail goes this way
+        (a pattern matches an @ field with it as one of its parts, and ``*`` matches all);
+        ``bulletins``, whether bulletins go this way;
+        and ``interval``, how often to connect whether or not there is mail to send.
+
+    .. code:: yaml
+
+        dataDir: /var/lib/samoyed
+        bbs:
+          call: Q1TEST-1
+          alias: ONEBBS
+          hroute: "#HANTS.GBR.EURO"
+          partners:
+            - call: Q2TEST-1
+              node: TWOBBS
+              routes: ["*"]
+              bulletins: true
+              interval: 1h
+
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as
     though they were a file of their own - so a channel setting there needs its

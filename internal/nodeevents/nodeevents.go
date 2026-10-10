@@ -27,6 +27,7 @@ const (
 	Heard         Kind = "heard"          // A station was heard, for the first time in a while.
 	ChatJoin      Kind = "chat/join"      // A user joined a chat room.
 	ChatLeave     Kind = "chat/leave"     // A user left a chat room.
+	BBSMessage    Kind = "bbs/message"    // The BBS took a new message.
 )
 
 // Event is something that happened on the node.  Which fields are set depends
@@ -46,6 +47,14 @@ type Event struct {
 	Error    string `json:"error,omitempty"`    // Why a link or circuit went, if not in an orderly way.
 
 	Room string `json:"room,omitempty"` // For chat: the room.
+
+	// For a BBS message: its number, type, who it is from and to, and the
+	// BBS or distribution it is for.
+	Number int    `json:"number,omitempty"`
+	Type   string `json:"type,omitempty"`
+	From   string `json:"from,omitempty"`
+	To     string `json:"to,omitempty"`
+	At     string `json:"at,omitempty"`
 
 	Destinations int `json:"destinations,omitempty"` // For routes: how many nodes are known.
 	Neighbours   int `json:"neighbours,omitempty"`   // For routes: how many neighbours.

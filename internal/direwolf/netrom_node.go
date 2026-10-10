@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/bbs"
 	"github.com/doismellburning/samoyed/internal/chat"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/doismellburning/samoyed/internal/mqttpub"
@@ -69,9 +70,10 @@ type axSession struct {
 	incoming bool
 	pending  [][]byte // NET/ROM packets waiting for the link to come up.
 
-	shell    *node.Shell   // For a user connected to the node.
-	downlink node.Downlink // For a link opened onwards for a shell.
-	role     string        // "neighbour", "user" or "downlink", for events.
+	shell    *node.Shell     // For a user connected to the node.
+	app      node.AppSession // For a station connected straight to an application: the BBS.
+	downlink node.Downlink   // For a link opened onwards for a shell.
+	role     string          // "neighbour", "user" or "downlink", for events.
 }
 
 // netromNode runs a NET/ROM Router, and the shells of the users connected to
@@ -93,6 +95,11 @@ type netromNode struct {
 
 	// chat is the chat server, or nil for none.
 	chat *chat.Server
+
+	// bbs is the BBS, or nil for none, and bbsCall the callsign stations
+	// connect to it directly at, or "" for none.
+	bbs     *bbs.BBS
+	bbsCall string
 
 	// work carries what is to be run on the node's goroutine.
 	work chan func()
@@ -142,19 +149,23 @@ func newNetromNode(cfg netrom.Config, shellCfg node.Config, ports []node.Port, l
 // heardMax is how many stations the node's heard list remembers.
 const heardMax = 200
 
-// start registers the node's callsign and alias with the link layer as client,
-// so neighbours and users can connect to it, then runs the node until ctx is
-// cancelled.
+// start registers the node's callsign, its alias and its BBS's callsign with
+// the link layer as client, on every port, so neighbours and users can
+// connect to them, then runs the node until ctx is cancelled.
 func (n *netromNode) start(ctx context.Context, client int) {
 	n.client = client
 
-	for _, p := range n.cfg.Ports {
-		n.links.RegisterCallsign(n.cfg.Call, p.Port, client)
+	for _, p := range n.ports {
+		n.links.RegisterCallsign(n.cfg.Call, p.Number, client)
 
 		// An alias that is also a valid callsign can be connected to as one.
 		var _, aliasErr = netrom.NormaliseCall(n.cfg.Alias)
 		if n.cfg.Alias != "" && aliasErr == nil {
-			n.links.RegisterCallsign(n.cfg.Alias, p.Port, client)
+			n.links.RegisterCallsign(n.cfg.Alias, p.Number, client)
+		}
+
+		if n.bbsCall != "" {
+			n.links.RegisterCallsign(n.bbsCall, p.Number, client)
 		}
 	}
 
@@ -185,6 +196,10 @@ func (n *netromNode) tick() {
 
 	for s := range n.shells {
 		s.Tick(now)
+	}
+
+	if n.bbs != nil {
+		n.bbs.Tick(now)
 	}
 }
 
@@ -246,6 +261,7 @@ func (n *netromNode) event(kind nodeevents.Kind) nodeevents.Event {
 	return nodeevents.Event{
 		Time: n.now().UTC(), Kind: kind, Node: n.cfg.Call,
 		Port: nil, Local: "", Remote: "", User: "", Incoming: false, Role: "", Error: "", Room: "",
+		Number: 0, Type: "", From: "", To: "", At: "",
 		Destinations: 0, Neighbours: 0,
 	}
 }
@@ -429,6 +445,9 @@ func (n *netromNode) linkUp(key axKey, incoming bool) {
 	case s.downlink != nil:
 		s.role = "downlink"
 		s.downlink.Connected()
+	case incoming && n.bbsCall != "" && key.own == n.bbsCall:
+		s.role = "bbs"
+		s.app = n.bbs.OpenDirect(key.remote, axConn{n: n, s: s})
 	case incoming && n.isNodeCall(key.own) && !n.isNeighbour(key):
 		s.role = "user"
 		n.startShell(s)
@@ -467,6 +486,10 @@ func (n *netromNode) linkDown(key axKey, timeout bool) {
 	if s.shell != nil {
 		delete(n.shells, s.shell)
 		s.shell.Closed()
+	}
+
+	if s.app != nil {
+		s.app.Close()
 	}
 
 	if s.downlink != nil {
@@ -523,6 +546,8 @@ func (n *netromNode) linkData(key axKey, pid int, data []byte) {
 	switch {
 	case s.shell != nil:
 		s.shell.Input(data, n.now())
+	case s.app != nil:
+		s.app.Input(data)
 	case s.downlink != nil:
 		s.downlink.Received(data)
 	}
@@ -556,6 +581,13 @@ func netrom_init(ctx context.Context, audio *RadioConfig, misc *misc_config_s, l
 		var cerr = n.addChat(*misc.node_chat)
 		if cerr != nil {
 			return nil, cerr
+		}
+	}
+
+	if misc.bbs != nil {
+		var berr = n.addBBS(*misc.bbs, misc.data_dir)
+		if berr != nil {
+			return nil, berr
 		}
 	}
 
