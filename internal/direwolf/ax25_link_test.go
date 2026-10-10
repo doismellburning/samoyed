@@ -411,7 +411,7 @@ func newDataRequest(myCall string, theirCall string, channel int, data []byte) *
 	E.addrs[OWNCALL] = myCall
 	E.addrs[PEERCALL] = theirCall
 	E.num_addr = 2
-	E.txdata = dataLinkQueue.NewCData(0xF0, data)
+	E.txdata = NewCData(0xF0, data)
 
 	return E
 }

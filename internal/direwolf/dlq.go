@@ -472,7 +472,7 @@ func (q *DataLinkQueue) XmitDataRequest(addrs [ax25.MaxAddrs]string, num_addr in
 
 	/* Attach the transmit data. */
 
-	pnew.txdata = q.NewCData(pid, xdata)
+	pnew.txdata = NewCData(pid, xdata)
 
 	/* Put it into queue. */
 
@@ -801,7 +801,7 @@ func (q *DataLinkQueue) Delete(pitem *dlq_item_t) {
 	pitem.pp = nil
 
 	if pitem.txdata != nil {
-		q.DeleteCData(pitem.txdata)
+		DeleteCData(pitem.txdata)
 		pitem.txdata = nil
 	}
 } /* end Delete */
@@ -830,7 +830,7 @@ func (q *DataLinkQueue) Delete(pitem *dlq_item_t) {
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) NewCData(pid int, data []byte) *cdata_t {
+func NewCData(pid int, data []byte) *cdata_t {
 	var cdata = new(cdata_t)
 
 	cdata.magic = TXDATA_MAGIC
@@ -856,7 +856,7 @@ func (q *DataLinkQueue) NewCData(pid int, data []byte) *cdata_t {
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) DeleteCData(cdata *cdata_t) {
+func DeleteCData(cdata *cdata_t) {
 	if cdata == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR: cdata_delete()  given nil pointer.\n")
