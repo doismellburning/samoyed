@@ -18,6 +18,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/doismellburning/samoyed/internal/waypoint"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -104,11 +105,11 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 
 	t.Cleanup(func() { waypoints.Close() })
 
-	var miscConfig = new(misc_config_s)
-	miscConfig.waypoint_udp_hostname = "127.0.0.1"
-	miscConfig.waypoint_udp_portnum = waypoints.LocalAddr().(*net.UDPAddr).Port //nolint:forcetypeassert
+	var wpConfig = new(waypoint.Config)
+	wpConfig.UDPHostname = "127.0.0.1"
+	wpConfig.UDPPort = waypoints.LocalAddr().(*net.UDPAddr).Port //nolint:forcetypeassert
 
-	var ws, wsErr = NewWaypointSender(t.Context(), miscConfig, nil)
+	var ws, wsErr = waypoint.NewSender(t.Context(), wpConfig, nil)
 	require.NoError(t, wsErr)
 
 	t.Cleanup(ws.Close)
