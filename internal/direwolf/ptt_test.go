@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -178,7 +179,7 @@ func TestExportGPIOOutput(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	var p = testPTT(cfg, dir)
 
-	require.NoError(t, p.exportGPIO(0, OCTYPE_PTT, false, 1))
+	require.NoError(t, p.exportGPIO(0, int(OCTYPE_PTT), false, 1))
 
 	var exported, readErr = os.ReadFile(filepath.Join(dir, "export")) //nolint:gosec
 	require.NoError(t, readErr)
@@ -201,7 +202,7 @@ func TestExportGPIOOutputInverted(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	var p = testPTT(cfg, dir)
 
-	require.NoError(t, p.exportGPIO(0, OCTYPE_PTT, true, 1))
+	require.NoError(t, p.exportGPIO(0, int(OCTYPE_PTT), true, 1))
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25", "direction")) //nolint:gosec
 	require.NoError(t, dirErr)
@@ -239,7 +240,7 @@ func TestExportGPIOSuffixedNode(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	var p = testPTT(cfg, dir)
 
-	require.NoError(t, p.exportGPIO(0, OCTYPE_PTT, false, 1))
+	require.NoError(t, p.exportGPIO(0, int(OCTYPE_PTT), false, 1))
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25_ph11", "direction")) //nolint:gosec
 	require.NoError(t, dirErr)
@@ -257,7 +258,7 @@ func TestExportGPIONoSuchNode(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	var p = testPTT(cfg, dir)
 
-	var err = p.exportGPIO(0, OCTYPE_PTT, false, 1)
+	var err = p.exportGPIO(0, int(OCTYPE_PTT), false, 1)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "gpio number 25")
@@ -273,7 +274,7 @@ func TestExportGPIONoSysfs(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	var p = testPTT(cfg, dir)
 
-	var err = p.exportGPIO(0, OCTYPE_PTT, false, 1)
+	var err = p.exportGPIO(0, int(OCTYPE_PTT), false, 1)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GPIO user interface")
@@ -948,7 +949,7 @@ func TestPTTTellsWhoWasHandedOfChannelActivity(t *testing.T) {
 
 	var busy []string
 
-	var p, err = NewPTT(audioConfig, nil, func(channel int, activity int, isBusy bool) {
+	var p, err = NewPTT(audioConfig, nil, func(channel int, activity outputType, isBusy bool) {
 		busy = append(busy, fmt.Sprintf("%d %s=%t", channel, octypeName(activity), isBusy))
 	}, 0)
 	require.NoError(t, err)
@@ -972,7 +973,7 @@ func newRecordingPTT(t *testing.T) (*PTT, *[]string) {
 
 	var set []string
 
-	var p, err = newPTT(cfg, nil, func(channel int, ot int, busy bool) {
+	var p, err = newPTT(cfg, nil, func(channel int, ot outputType, busy bool) {
 		set = append(set, fmt.Sprintf("%s %d=%t", octypeName(ot), channel, busy))
 	}, 0, t.TempDir())
 	require.NoError(t, err)
@@ -1016,4 +1017,14 @@ func TestPTTTransmitInhibitedWithoutAnInput(t *testing.T) {
 
 	var none *PTT
 	assert.False(t, none.TransmitInhibited(0))
+}
+
+func TestOutputTypesYieldsEachOutputInOrder(t *testing.T) {
+	assert.Equal(t, []outputType{OCTYPE_PTT, OCTYPE_DCD, OCTYPE_CON}, slices.Collect(outputTypes()))
+
+	for ot := range outputTypes() {
+		assert.Equal(t, OCTYPE_PTT, ot, "stopping early should stop at the first")
+
+		break
+	}
 }

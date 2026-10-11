@@ -115,7 +115,7 @@ type dlq_item_t struct {
 	// It is useful to know when the channel is busy either for carrier detect
 	// or when we are transmitting.
 
-	activity int /* OCTYPE_PTT for my transmission start/end. */
+	activity outputType /* OCTYPE_PTT for my transmission start/end. */
 	/* OCTYPE_DCD if we hear someone else. */
 
 	busy bool /* Active, or quiet. */
@@ -540,7 +540,7 @@ func (q *DataLinkQueue) UnregisterCallsign(addr string, channel int, client int)
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) ChannelBusy(channel int, activity int, busy bool) {
+func (q *DataLinkQueue) ChannelBusy(channel int, activity outputType, busy bool) {
 	if activity == OCTYPE_PTT || activity == OCTYPE_DCD {
 		logrus.WithFields(logrus.Fields{
 			"channel":  channel,
