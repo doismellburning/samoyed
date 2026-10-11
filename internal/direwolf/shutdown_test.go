@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -106,7 +107,7 @@ func TestKissNetServiceStopsWhenCancelled(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	NewKissNetService(mc, 0).Start(ctx, NewKissHandler(newKissTNC(new(RadioConfig), new(XmitService), nil), nil))
+	NewKissNetService(mc, 0).Start(ctx, kisstnc.NewHandler(newKissTNC(new(RadioConfig), new(XmitService), nil), nil))
 
 	waitUntilListening(t, port)
 

@@ -21,6 +21,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/sirupsen/logrus"
 )
 
@@ -310,7 +311,7 @@ func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int, recFrame 
 		/* As received over the wire from network TNC. */
 		// May include escapted characters.  What about FEND?
 		// FIXME: make it say Network TNC.
-		kiss_debug_print(FROM_CLIENT, "", chunk.Frame)
+		kisstnc.DebugPrint(kisstnc.FromClient, "", chunk.Frame)
 	}
 
 	var unwrapped = kiss.Unwrap(chunk.Frame)

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package kisstnc
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 
 // The KISS command set is what a client application uses to drive the TNC:
 // data frames to transmit, and the timing parameters that decide when they go
-// out.  KissHandler.processMsg is where a frame with its escapes already removed is
+// out.  Handler.processMsg is where a frame with its escapes already removed is
 // acted on, so it can be driven directly, with a recording stand-in for the
 // function that answers the client.
 
@@ -32,7 +32,7 @@ type sentToClient struct {
 	prompt  bool
 }
 
-// recordingClient is a kissClient that keeps what it is sent, so a test can
+// recordingClient is a Client that keeps what it is sent, so a test can
 // see what the TNC would have answered.
 type recordingClient struct {
 	sent *[]sentToClient
@@ -71,7 +71,7 @@ type tncTiming struct {
 	fulldup                            bool
 }
 
-// recordingTNC is a kissTNC that keeps what it is asked to do, so a test can
+// recordingTNC is a TNC that keeps what it is asked to do, so a test can
 // see what the handler made of a client's messages.  Channels 0 and 1 are the
 // ones it has, and queued is what it says is waiting to go out.
 type recordingTNC struct {
@@ -105,15 +105,15 @@ func (r *recordingTNC) SetFulldup(channel int, value bool) {
 	r.timingFor(channel).fulldup = value
 }
 
-// setupKissProcessMsg hands back a KissHandler for the KISS tests to drive,
+// setupKissProcessMsg hands back a Handler for the KISS tests to drive,
 // and the recording TNC it hands what it is asked to do.
-func setupKissProcessMsg(t *testing.T) (*KissHandler, *recordingTNC) {
+func setupKissProcessMsg(t *testing.T) (*Handler, *recordingTNC) {
 	t.Helper()
 
 	var tnc = new(recordingTNC)
 	tnc.timing = make(map[int]*tncTiming)
 
-	return NewKissHandler(tnc, nil), tnc
+	return NewHandler(tnc, nil), tnc
 }
 
 // copiedFrame is a data frame the handler had copied to the other clients.
@@ -121,15 +121,15 @@ type copiedFrame struct {
 	msg     []byte
 	channel int
 	cmd     int
-	from    kissClient
+	from    Client
 }
 
-// recordingCopier is a kissCopier that keeps what it is asked to copy.
+// recordingCopier is a Copier that keeps what it is asked to copy.
 type recordingCopier struct {
 	copied []copiedFrame
 }
 
-func (r *recordingCopier) Copy(msg []byte, channel int, cmd int, from kissClient) {
+func (r *recordingCopier) Copy(msg []byte, channel int, cmd int, from Client) {
 	r.copied = append(r.copied, copiedFrame{msg: msg, channel: channel, cmd: cmd, from: from})
 }
 
@@ -137,6 +137,8 @@ func (r *recordingCopier) Copy(msg []byte, channel int, cmd int, from kissClient
 // well as transmitted, with the channel and command the handler made of it
 // and the client it came from, so as not to be copied back.
 func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
+	t.Parallel()
+
 	var h, tnc = setupKissProcessMsg(t)
 
 	var peers = new(recordingCopier)
@@ -158,6 +160,8 @@ func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 
 // Nor is anything but a data frame copied.
 func Test_kiss_process_msg_copies_only_data_frames(t *testing.T) {
+	t.Parallel()
+
 	var h, _ = setupKissProcessMsg(t)
 
 	var peers = new(recordingCopier)
@@ -175,6 +179,8 @@ func Test_kiss_process_msg_copies_only_data_frames(t *testing.T) {
 // with no used digipeater in it - goes on the low priority queue behind
 // anything already being repeated.
 func Test_kiss_process_msg_data_frame(t *testing.T) {
+	t.Parallel()
+
 	var h, tnc = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
@@ -193,6 +199,8 @@ func Test_kiss_process_msg_data_frame(t *testing.T) {
 // A frame that has already been through a digipeater is somebody waiting on
 // air for it, so it jumps the queue.
 func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
+	t.Parallel()
+
 	var h, tnc = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
@@ -209,6 +217,8 @@ func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
 // The channel is in the top half of the first byte, and a client asking for a
 // channel we do not have is the AX.25-for-Linux CRC mode problem, which gets
 // an explanation rather than a transmission.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	var h, tnc = setupKissProcessMsg(t)
 
@@ -232,6 +242,8 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 // 12, and the hex dump that goes with the explanation had nothing left to show
 // once it skipped what it took for a leading FEND - it indexed past the end.
 // Any client of the KISS ports could send it.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kiss_process_msg_invalid_channel_escaped_fend_only(t *testing.T) {
 	var h, _ = setupKissProcessMsg(t)
 
@@ -249,12 +261,14 @@ func Test_kiss_process_msg_invalid_channel_escaped_fend_only(t *testing.T) {
 
 // The debug print of a message has something to say even when there is nothing
 // of the message to print.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kiss_debug_print_empty(t *testing.T) {
 	for _, msg := range [][]byte{nil, {kiss.FEND}} {
 		var hook = test.NewGlobal()
 		t.Cleanup(hook.Reset)
 
-		kiss_debug_print(FROM_CLIENT, "", msg)
+		DebugPrint(FromClient, "", msg)
 
 		require.NotNil(t, hook.LastEntry(), "message %v", msg)
 		assert.Equal(t, "Empty message for KISS client application", hook.LastEntry().Message)
@@ -277,6 +291,8 @@ func (c singleChannelClient) RadioChannel(int) int {
 // not be the one in the frame: an application that thinks it has a one-radio
 // TNC always says 0.
 func Test_kiss_process_msg_client_channel_overrides_the_frame(t *testing.T) {
+	t.Parallel()
+
 	var h, tnc = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
@@ -292,6 +308,8 @@ func Test_kiss_process_msg_client_channel_overrides_the_frame(t *testing.T) {
 
 // Bytes that are not an AX.25 frame cannot be transmitted, and are reported
 // rather than passed on.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 	var h, _ = setupKissProcessMsg(t)
 
@@ -306,6 +324,8 @@ func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 
 // The timing parameters are the rest of what a client sets up, and each is one
 // byte after the command.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 	var h, tnc = setupKissProcessMsg(t)
 
@@ -331,6 +351,8 @@ func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 
 // A value nobody would want on purpose is applied, because the client asked,
 // but pointed at the part of the guide that explains what it means.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 	var h, tnc = setupKissProcessMsg(t)
 
@@ -362,6 +384,8 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 
 // A parameter command with no parameter is a protocol error, and leaves the
 // setting alone rather than applying whatever happened to be next.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 	var h, tnc = setupKissProcessMsg(t)
 
@@ -394,6 +418,8 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 
 // Leaving KISS mode is for a TNC that has another mode to go back to.  We
 // don't, so it is noted and ignored.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kiss_process_msg_end_kiss(t *testing.T) {
 	var h, _ = setupKissProcessMsg(t)
 
@@ -409,6 +435,8 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 // A command we don't implement gets the troubleshooting tip, and the two
 // XKISS ones additionally say what the application should be configured as
 // instead.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	var h, _ = setupKissProcessMsg(t)
 
@@ -444,6 +472,8 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 // question-and-answer form fldigi established, which several applications
 // already speak.
 func Test_kiss_set_hardware_tnc_version(t *testing.T) {
+	t.Parallel()
+
 	var h, _ = setupKissProcessMsg(t)
 
 	var sent, from = recordingKissClient()
@@ -458,18 +488,20 @@ func Test_kiss_set_hardware_tnc_version(t *testing.T) {
 // TXBUF is the one an application actually wanted: how much is still waiting
 // to go out, so that it can throttle a long transmission.
 func Test_kiss_set_hardware_txbuf(t *testing.T) {
+	t.Parallel()
+
 	var _, tnc = setupKissProcessMsg(t)
 
 	var sent, from = recordingKissClient()
 
-	kiss_set_hardware(tnc, 0, []byte("TXBUF:"), from)
+	setHardware(tnc, 0, []byte("TXBUF:"), from)
 
 	require.Len(t, *sent, 1)
 	assert.Equal(t, "TXBUF:0", string((*sent)[0].body))
 
 	tnc.queued = 42
 
-	kiss_set_hardware(tnc, 0, []byte("TXBUF:"), from)
+	setHardware(tnc, 0, []byte("TXBUF:"), from)
 
 	require.Len(t, *sent, 2)
 	assert.Equal(t, "TXBUF:42", string((*sent)[1].body))
@@ -478,6 +510,8 @@ func Test_kiss_set_hardware_txbuf(t *testing.T) {
 // A query with a parameter, a command we don't know, and one that isn't in the
 // COMMAND:parameter form at all all get complained about rather than guessed
 // at.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kiss_set_hardware_malformed(t *testing.T) {
 	var _, tnc = setupKissProcessMsg(t)
 
@@ -496,7 +530,7 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 		t.Run(c.command, func(t *testing.T) {
 			var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-			kiss_set_hardware(tnc, 0, []byte(c.command), from)
+			setHardware(tnc, 0, []byte(c.command), from)
 
 			assert.Equal(t, c.level, testutils.LoggedEntry(t, hook, c.expect).Level)
 		})
@@ -511,7 +545,7 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 
 // feedKissBytes hands the bytes to the collector one at a time, as a
 // transport does, and returns whatever was sent back to the client.
-func feedKissBytes(h *KissHandler, kf *kiss.Collector, debug int, data []byte) *[]sentToClient {
+func feedKissBytes(h *Handler, kf *kiss.Collector, debug int, data []byte) *[]sentToClient {
 	var sent, from = recordingKissClient()
 
 	for _, b := range data {
@@ -522,6 +556,8 @@ func feedKissBytes(h *KissHandler, kf *kiss.Collector, debug int, data []byte) *
 }
 
 func Test_KissRecByte_whole_frame(t *testing.T) {
+	t.Parallel()
+
 	var h, tnc = setupKissProcessMsg(t)
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
@@ -539,6 +575,8 @@ func Test_KissRecByte_whole_frame(t *testing.T) {
 // lines of text.  Each one ending in a carriage return is answered with a
 // command prompt, which is what stops it trying.
 func Test_KissRecByte_command_prompt(t *testing.T) {
+	t.Parallel()
+
 	var h, _ = setupKissProcessMsg(t)
 
 	var kf = new(kiss.Collector)
@@ -553,10 +591,14 @@ func Test_KissRecByte_command_prompt(t *testing.T) {
 // "RESTART" and "RESET" get an empty KISS frame instead, which is what the
 // applications sending them are waiting for.
 func Test_KissRecByte_restart(t *testing.T) {
+	t.Parallel()
+
 	var h, _ = setupKissProcessMsg(t)
 
 	for _, word := range []string{"RESTART\r", "reset\r"} {
 		t.Run(word, func(t *testing.T) {
+			t.Parallel()
+
 			var kf = new(kiss.Collector)
 
 			var sent = feedKissBytes(h, kf, 0, []byte(word))
@@ -569,6 +611,8 @@ func Test_KissRecByte_restart(t *testing.T) {
 
 // With the debug option on, the noise before a frame is shown, so that a
 // client that is not being understood can be looked at.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_KissRecByte_noise_is_printed(t *testing.T) {
 	var h, _ = setupKissProcessMsg(t)
 
@@ -584,6 +628,8 @@ func Test_KissRecByte_noise_is_printed(t *testing.T) {
 // FENDs with nothing between them are how some clients idle, and are not
 // frames.
 func Test_KissRecByte_empty_frames(t *testing.T) {
+	t.Parallel()
+
 	var h, tnc = setupKissProcessMsg(t)
 
 	var kf = new(kiss.Collector)
@@ -595,6 +641,8 @@ func Test_KissRecByte_empty_frames(t *testing.T) {
 
 // A client that never sends a closing FEND is told about once, not once for
 // every byte past the limit.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_KissRecByte_overlong_frame(t *testing.T) {
 	var h, _ = setupKissProcessMsg(t)
 
@@ -612,6 +660,8 @@ func Test_KissRecByte_overlong_frame(t *testing.T) {
 // written to was one past the end of the buffer - which took the whole program
 // down, from anything that could talk to the KISS port.  The overlong frame is
 // thrown away, and the collector is left ready for the next one.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 	var h, tnc = setupKissProcessMsg(t)
 
@@ -637,6 +687,8 @@ func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 
 // With "-d kn" the frame is shown as it arrived and again as it was decoded,
 // which is the pair a protocol problem shows up in.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 	var h, _ = setupKissProcessMsg(t)
 
@@ -657,6 +709,8 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 // FEND FESC FEND is a frame, but escapes nothing, so there is no type byte
 // once it is unescaped.  Three bytes from any KISS client used to take the
 // whole program down, looking for one.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_KissRecByte_frame_empty_once_unescaped(t *testing.T) {
 	var h, tnc = setupKissProcessMsg(t)
 
@@ -673,6 +727,8 @@ func Test_KissRecByte_frame_empty_once_unescaped(t *testing.T) {
 // What goes to a client is the type byte - channel in the top nybble, command
 // in the bottom - then the frame, with KISS framing and escapes added.
 func Test_kissClientFrame(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		name    string
 		channel int
@@ -687,19 +743,23 @@ func Test_kissClientFrame(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			assert.Equal(t, c.want, kissClientFrame(c.channel, c.cmd, c.frame, 0, "Test"))
+			t.Parallel()
+
+			assert.Equal(t, c.want, ClientFrame(c.channel, c.cmd, c.frame, 0, "Test"))
 		})
 	}
 }
 
 // A frame longer than AX.25 allows is cut to length before it is framed, so
 // the client is sent what it was told it would get, and the user hears why.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_kissClientFrame_truncates(t *testing.T) {
 	var frame = bytes.Repeat([]byte{'x'}, ax25.MaxPacketLen+10)
 
 	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	var got = kissClientFrame(0, kiss.CmdDataFrame, frame, 0, "Test")
+	var got = ClientFrame(0, kiss.CmdDataFrame, frame, 0, "Test")
 
 	var entry = testutils.LoggedEntry(t, hook, "KISS frame for client application too long, truncating it")
 	assert.Equal(t, logrus.ErrorLevel, entry.Level)

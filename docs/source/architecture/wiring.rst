@@ -44,7 +44,7 @@ Dashed arrows are connections made after construction rather than at it.
        igate [label="IGate"];
        digi [label="Digipeater"];
        cdigi [label="ConnectedDigipeater"];
-       kiss [label="KissHandler"];
+       kiss [label="kisstnc.Handler"];
        kisstnc [label="kissTNCAdapter"];
        kissnet [label="KISS TCP, serial,\npseudo terminal"];
        apps [label="clientApps"];
@@ -94,10 +94,10 @@ Dashed arrows are connections made after construction rather than at it.
        link -> agw [label="linkClients"];
        link -> tq [label="linkTransmitter"];
 
-       kiss -> kisstnc [label="kissTNC"];
+       kiss -> kisstnc [label="kisstnc.TNC"];
        kisstnc -> xmit [label="timing setters"];
        kisstnc -> tq [label="clientTransmitQueue"];
-       kiss -> kissnet [label="KISSCOPY peers\n(kissCopier)"];
+       kiss -> kissnet [label="KISSCOPY peers\n(kisstnc.Copier)"];
        kissnet -> kiss [label="client bytes\n(at Start)", style=dashed];
 
        apps -> agw;
@@ -195,7 +195,7 @@ and handed the IGate's ``sendRecPacket`` with ``TransmitQueue.SetIGate`` once th
 
 **The KISS handler and the KISS TCP service.**
 The handler copies a client's data frames to the TCP clients with KISSCOPY,
-so it is made after the ``KissNetService`` and handed it, as its ``kissCopier``.
+so it is made after the ``KissNetService`` and handed it, as its ``kisstnc.Copier``.
 The service is handed the handler when it is started (``KissNetService.Start``),
 rather than when it is made.
 
@@ -217,9 +217,10 @@ The shapes in the diagram follow the dependency conventions in ``AGENTS.md``:
   ``frameReceiver``, ``frameSender``, ``igateSender``, ``seizeConfirmer``.
 - A component that makes several calls is handed a small interface,
   declared beside it and holding only those calls:
-  ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``, ``kissTNC``, ``kissCopier``.
+  ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``,
+  and ``kisstnc.TNC`` and ``kisstnc.Copier``, declared beside the KISS handler in ``internal/kisstnc``.
 - ``*TransmitQueue``, ``*DataLinkQueue``, ``*AGWServer`` and ``*KissNetService`` satisfy those interfaces without knowing about them.
-- ``kissTNCAdapter`` is the KISS handler's ``kissTNC``:
+- ``kissTNCAdapter`` is the KISS handler's ``kisstnc.TNC``:
   it puts a client's frames on the ``clientTransmitQueue`` it is handed
   and its timing commands to the ``XmitService``,
   so that the handler needs neither.
@@ -239,11 +240,11 @@ References
   ``ax25_link.go`` (``NewAX25Link``, ``linkClients``, ``linkTransmitter``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
-  ``kiss_frame.go`` (``NewKissHandler``, ``kissTNC``, ``kissCopier``),
   ``kiss_tnc.go`` (``newKissTNC``),
   ``kissnet.go`` (``KissNetService.Start``),
   ``aprs_tt.go`` (``NewTTGateway``),
   ``beacon.go`` (``NewBeaconService``, ``beaconIGate``),
   ``audio.go`` (``AudioDevices.setAudioLevel``)
   and ``recv.go`` (``recv_init``, ``recv_process``).
+- ``internal/kisstnc/handler.go``: ``NewHandler``, ``TNC`` and ``Copier``.
 - ``AGENTS.md``, the "Dependencies" section.

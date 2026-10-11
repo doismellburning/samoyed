@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -111,7 +112,7 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	// though, which would cost each test here most of one.
 	kns.pollInterval = 10 * time.Millisecond
 
-	kns.Start(t.Context(), NewKissHandler(newKissTNC(kissTestRadioConfig(), new(XmitService), nil), kns))
+	kns.Start(t.Context(), kisstnc.NewHandler(newKissTNC(kissTestRadioConfig(), new(XmitService), nil), kns))
 
 	return kns, port
 }
@@ -520,7 +521,7 @@ func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
 
 	var kns, port = startKissNet(t, unconfigured)
 
-	require.False(t, kns.handler.tnc.ChannelValid(unconfigured))
+	require.Equal(t, MEDIUM_NONE, kissTestRadioConfig().chan_medium[unconfigured])
 
 	var conn, _ = dialKissNet(t, kns, port)
 
@@ -584,12 +585,12 @@ func TestKissNetCopiesAHandlersDataFrames(t *testing.T) {
 	var peers, clients = newAttachedKissNet(t, -1, true, 1)
 
 	var tnc = setupKissTNC(t)
-	var h = NewKissHandler(tnc, peers)
+	var h = kisstnc.NewHandler(tnc, peers)
 
 	var pp = newTestPacket(t)
-	var _, from = recordingKissClient()
+	var from = quietKissClient{}
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
+	handleKissMsg(h, append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
 
 	assert.Equal(t,
 		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
@@ -687,14 +688,14 @@ func Test_kissport_status_stop(t *testing.T) {
 // frame: the application thinks it has a one-radio TNC and always says 0.
 func TestKissNetPortChannelOverridesTheFrame(t *testing.T) {
 	var tnc = setupKissTNC(t)
-	var h = NewKissHandler(tnc, nil)
+	var h = kisstnc.NewHandler(tnc, nil)
 
 	var kps = new(kissport_status_s)
 	kps.channel = 1
 
 	var pp = newTestPacket(t)
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
+	handleKissMsg(h, append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
 
 	assert.Equal(t, 1, tnc.queue.Count(1, TQ_PRIO_1_LO, "", "", false), "the port's channel should have been used")
 	assert.Equal(t, 0, tnc.queue.Count(0, TQ_PRIO_1_LO, "", "", false))

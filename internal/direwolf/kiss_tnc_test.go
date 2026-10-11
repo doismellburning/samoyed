@@ -8,6 +8,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +16,7 @@ import (
 )
 
 // kissTestRadioConfig is the channel table the KISS tests hand to
-// the KissHandler, to check a transmit
+// the kisstnc.Handler, to check a transmit
 // request against: channels 0 and 1 are radios, and nothing else is set up.
 func kissTestRadioConfig() *RadioConfig {
 	var audioConfig = new(RadioConfig)
@@ -25,7 +26,27 @@ func kissTestRadioConfig() *RadioConfig {
 	return audioConfig
 }
 
-// setupKissTNC hands back the TNC a KissHandler drives, over the channel table
+// quietKissClient is a client application that drops whatever it is sent, for
+// the tests that care only what the TNC makes of what it sends.
+type quietKissClient struct{}
+
+func (quietKissClient) Reply(int, int, []byte) {}
+
+func (quietKissClient) Prompt([]byte) {}
+
+func (quietKissClient) RadioChannel(frameChannel int) int { return frameChannel }
+
+// handleKissMsg hands h msg, a KISS frame without its framing, as though from
+// had sent it.
+func handleKissMsg(h *kisstnc.Handler, msg []byte, from kisstnc.Client) {
+	var kc kiss.Collector
+
+	for _, b := range kiss.Encapsulate(msg) {
+		h.RecByte(&kc, b, 0, from)
+	}
+}
+
+// setupKissTNC hands back the TNC a kisstnc.Handler drives, over the channel table
 // kissTestRadioConfig lays out, with transmit settings and a transmit queue of
 // its own.
 func setupKissTNC(t *testing.T) kissTNCAdapter {
@@ -36,12 +57,12 @@ func setupKissTNC(t *testing.T) kissTNCAdapter {
 	return newKissTNC(audioConfig, new(XmitService), newTestTransmitQueue(audioConfig))
 }
 
-// newTestKissHandler hands back a KissHandler over the TNC setupKissTNC lays
+// newTestKissHandler hands back a kisstnc.Handler over the TNC setupKissTNC lays
 // out, for the transports' tests to give their clients' bytes to.
-func newTestKissHandler(t *testing.T) *KissHandler {
+func newTestKissHandler(t *testing.T) *kisstnc.Handler {
 	t.Helper()
 
-	return NewKissHandler(setupKissTNC(t), nil)
+	return kisstnc.NewHandler(setupKissTNC(t), nil)
 }
 
 // An original goes on the low priority queue behind anything already being
@@ -131,7 +152,7 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
 	assert.NotPanics(t, func() {
-		h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
+		handleKissMsg(h, append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
 	})
 
 	assert.Equal(t, 16, testutils.LoggedEntry(t, hook, "Invalid transmit channel from KISS client application").Data["channel"])
