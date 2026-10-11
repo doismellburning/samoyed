@@ -17,6 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// newTestTransmitQueue returns an empty transmit queue for audioConfig's
+// channels, with no network TNCs or AXUDP channels and nobody to tell of a
+// seize.
+func newTestTransmitQueue(audioConfig *RadioConfig) *TransmitQueue {
+	return NewTransmitQueue(audioConfig, [MAX_TOTAL_CHANS]*NetTNC{}, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
+}
+
 // TestTqPeekUnderConcurrentAppend is a regression test for a data race.
 // TransmitQueue.Peek used to read the queue's head without holding the queue's mutex, on the strength of
 // a comment saying a critical region was not needed.  Every other reader and
@@ -40,7 +47,7 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	// Built up front: ax25_new increments an unsynchronised global sequence
 	// counter, which is a separate matter from the queue and would otherwise
@@ -133,7 +140,7 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 		audioConfig.chan_medium[c] = MEDIUM_RADIO
 	}
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	// Built up front: ax25_new increments an unsynchronised global sequence
 	// counter, which is a separate matter from the queue and would otherwise
@@ -207,7 +214,7 @@ func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
@@ -239,7 +246,7 @@ func TestTqAppendOutOfRangeChannel(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	for _, channel := range []int{-1, MAX_TOTAL_CHANS} {
 		assert.NotPanics(t, func() {
@@ -257,7 +264,7 @@ func TestAppendForTheIGateChannelGoesToTheIGate(t *testing.T) {
 	var audio = new(RadioConfig)
 	audio.chan_medium[MAX_RADIO_CHANS] = MEDIUM_IGATE
 
-	var tq = NewTransmitQueue(audio)
+	var tq = newTestTransmitQueue(audio)
 
 	var sent []string
 

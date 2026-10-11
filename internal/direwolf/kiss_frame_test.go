@@ -78,7 +78,7 @@ func setupKissProcessMsg(t *testing.T) *KissHandler {
 
 	var audioConfig = kissTestRadioConfig()
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	return NewKissHandler(audioConfig, new(XmitService), tq, nil)
 }

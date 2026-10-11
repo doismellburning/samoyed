@@ -36,7 +36,7 @@ func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
 	var xs = new(XmitService)
 	xs.audio = new(AudioDevices)
 	xs.timing[channel].fulldup = true // Skip the channel-busy check and random wait.
-	xs.queue = NewTransmitQueue(new(RadioConfig))
+	xs.queue = newTestTransmitQueue(new(RadioConfig))
 
 	xs.xmit_next(t.Context(), channel)
 
@@ -57,7 +57,7 @@ func TestXmitTimingSetWhileTransmitting(t *testing.T) {
 	var xs = new(XmitService)
 	xs.audio = new(AudioDevices)
 	xs.SetFulldup(channel, true) // Skip the channel-busy check and random wait.
-	xs.queue = NewTransmitQueue(new(RadioConfig))
+	xs.queue = newTestTransmitQueue(new(RadioConfig))
 
 	var done = make(chan struct{})
 
@@ -90,7 +90,7 @@ func TestDiscardUntransmittableEmptiesTheQueue(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	var xs = new(XmitService)
 	xs.queue = tq
@@ -120,7 +120,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 	var xs = new(XmitService)
 	xs.queue = tq
 	xs.seizeConfirm = dlq.SeizeConfirm
@@ -154,7 +154,7 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	var xs = new(XmitService)
 	xs.queue = tq
@@ -190,7 +190,7 @@ func TestXmitThreadStopsWhenCancelled(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	var xs = new(XmitService)
 	xs.queue = tq
@@ -226,7 +226,7 @@ func TestXmitThreadStopsWhenCancelledBeforeStarting(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 	cancel()
 
 	var xs = new(XmitService)
@@ -345,7 +345,7 @@ func setupXmitTransmission(t *testing.T) (*XmitService, *TransmitQueue) {
 	audioConfig.achan[channel].space_freq = 2200
 	audioConfig.achan[channel].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_NONE
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	// Sending a frame serialises it to bits; the capture takes them instead of
 	// the modulator.  The device itself still has to be there, though: the

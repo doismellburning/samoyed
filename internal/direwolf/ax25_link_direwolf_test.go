@@ -139,7 +139,7 @@ func Test_AX25_Link(t *testing.T) {
 func setupTestEnv(t *testing.T) {
 	t.Helper()
 
-	var tq = NewTransmitQueue(new(RadioConfig))
+	var tq = newTestTransmitQueue(new(RadioConfig))
 
 	var miscConfig = new(misc_config_s)
 	// Set proper defaults for connected mode
@@ -160,7 +160,7 @@ func setupTestEnv(t *testing.T) {
 func setupTestEnvV22(t *testing.T) {
 	t.Helper()
 
-	var tq = NewTransmitQueue(new(RadioConfig))
+	var tq = newTestTransmitQueue(new(RadioConfig))
 
 	var miscConfig = new(misc_config_s)
 	// Set proper defaults for connected mode

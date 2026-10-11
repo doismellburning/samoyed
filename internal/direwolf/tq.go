@@ -115,6 +115,18 @@ type TransmitQueue struct {
  *
  * Inputs:	audio_config_p	- Audio device configuration.
  *
+ *		netTNCs		- Where a packet for an NCHANNEL channel goes
+ *				  instead of a queue.  A channel with no TNC
+ *				  here discards such packets.
+ *
+ *		axudpChannels	- Where a packet for an AXUDP channel goes
+ *				  instead of a queue.  A channel with nothing
+ *				  here discards such packets.
+ *
+ *		seizeConfirm	- Told that a channel without a transmitter of
+ *				  ours is clear to send on; nil for nobody to
+ *				  tell.
+ *
  * Description:	We have different timing rules for different types of
  *		packets so they are put into different queues.
  *
@@ -140,11 +152,19 @@ type TransmitQueue struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewTransmitQueue(audio_config_p *RadioConfig) *TransmitQueue {
+func NewTransmitQueue(
+	audio_config_p *RadioConfig,
+	netTNCs [MAX_TOTAL_CHANS]*NetTNC,
+	axudpChannels [MAX_TOTAL_CHANS]*AXUDPChannel,
+	seizeConfirm seizeConfirmer,
+) *TransmitQueue {
 	logrus.Debug("tq_init")
 
 	var tq = new(TransmitQueue)
 	tq.audioConfig = audio_config_p
+	tq.netTNCs = netTNCs
+	tq.axudpChannels = axudpChannels
+	tq.seizeConfirm = seizeConfirm
 
 	for c := range MAX_RADIO_CHANS {
 		tq.wake[c] = make(chan struct{}, 1)
@@ -163,28 +183,14 @@ func tq_is_real_packet(pp *ax25.Packet) bool {
 	return pp.NumAddr() >= ax25.MinAddrs
 }
 
-// SetNetTNCs hands the queue the network TNCs that packets for NCHANNEL
-// channels go to.  It must be called before anything is queued: it
-// is read without a lock.
-func (tq *TransmitQueue) SetNetTNCs(netTNCs [MAX_TOTAL_CHANS]*NetTNC) {
-	tq.netTNCs = netTNCs
-}
-
-// SetAXUDPChannels hands the queue the AXUDP channels that packets for them go
-// to.  Like SetNetTNCs, it must be called before anything is queued.
-func (tq *TransmitQueue) SetAXUDPChannels(channels [MAX_TOTAL_CHANS]*AXUDPChannel) {
-	tq.axudpChannels = channels
-}
-
-// SetSeizeConfirm hands the queue what to tell when a seize request on a
-// channel without a transmitter of ours is granted at once.  Like SetNetTNCs,
-// it must be called before anything is queued.
-func (tq *TransmitQueue) SetSeizeConfirm(seizeConfirm seizeConfirmer) {
-	tq.seizeConfirm = seizeConfirm
-}
-
-// SetIGate hands the queue where packets for the IGate's channel go.  Like
-// SetNetTNCs, it must be called before anything is queued for that channel.
+// SetIGate hands the queue where packets for the IGate's channel go.  It
+// must be called before anything is queued for that channel: it is read
+// without a lock.
+//
+// This is set after construction, rather than handed to NewTransmitQueue,
+// because the two depend on each other: the IGate queues what it hears from
+// APRS-IS for transmission, and the queue hands the IGate whatever is queued
+// for its channel.
 func (tq *TransmitQueue) SetIGate(toIGate igateSender) {
 	tq.toIGate = toIGate
 }

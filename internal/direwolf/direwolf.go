@@ -474,12 +474,6 @@ x = Silence FX.25 information.`)
 	// listeners, started below, can hand it frames straight away.
 	var dataLinkQueue = NewDataLinkQueue()
 
-	// What everything with a packet to send - KISS, AGW, beacon, digipeater,
-	// IGate, APRStt, the connected-mode link - hands it to, and the transmit
-	// threads take it from.  Nothing queues anything until the services
-	// below are started.
-	var transmitQueue = NewTransmitQueue(audio_config)
-
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
@@ -497,13 +491,18 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	transmitQueue.SetSeizeConfirm(dataLinkQueue.SeizeConfirm)
-	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame))
+	var netTNCs = NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
 
 	// Likewise a channel can be AX.25 over UDP to other nodes.
-	transmitQueue.SetAXUDPChannels(NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame))
+	var axudpChannels = NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
+
+	// What everything with a packet to send - KISS, AGW, beacon, digipeater,
+	// IGate, APRStt, the connected-mode link - hands it to, and the transmit
+	// threads, the network TNCs and the AXUDP channels take it from.  Nothing
+	// queues anything until the services below are started.
+	var transmitQueue = NewTransmitQueue(audio_config, netTNCs, axudpChannels, dataLinkQueue.SeizeConfirm)
 
 	/*
 	 * Should there be an option for audio output level?
@@ -688,8 +687,9 @@ x = Silence FX.25 information.`)
 	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, dataLinkQueue.RecFrame, transmitQueue.Append, d_i_opt)
 	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated, transmitQueue.Append)
 
-	// The transmit queue predates the IGate, and nothing queues a packet for
-	// the IGate's channel before the services below are started.
+	// The IGate and the transmit queue send to each other, so the queue,
+	// made first, is handed the IGate now.  Nothing queues a packet for the
+	// IGate's channel before the services below are started.
 	transmitQueue.SetIGate(igate.sendRecPacket)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)

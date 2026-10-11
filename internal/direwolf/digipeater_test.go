@@ -39,7 +39,7 @@ func setupDigipeater(t *testing.T) (*Digipeater, *digi_config_s, *TransmitQueue)
 	var digiConfig = new(digi_config_s)
 	digiConfig.dedupe_time = 30
 
-	var tq = NewTransmitQueue(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	return NewDigipeater(audioConfig, digiConfig, new(pfilter.PacketFilter), nil, tq.Append), digiConfig, tq
 }
