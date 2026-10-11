@@ -622,7 +622,7 @@ func newSlicerReceivers(r *Layer2Receiver, from dwcore.SlicerID, scrambled bool)
 	var s = new(slicerReceivers)
 	s.hdlc = hdlc.NewReceiver(newHDLCConfig(achan), from, scrambled, &s.line, r.AudioLevel, r.recFrame)
 	s.fx25 = fx25.NewReceiver(from, r.fx25Debug, r.AudioLevel, r.recFrame)
-	s.il2p = il2p.NewReceiver(from.Channel, from.Subchannel, from.Slice, achan.il2p_version, achan.il2p_crc, r.il2pDebug, r.AudioLevel, positionalPacketSink(r.recPacket))
+	s.il2p = il2p.NewReceiver(from, achan.il2p_version, achan.il2p_crc, r.il2pDebug, r.AudioLevel, r.recPacket)
 
 	if achan.modem_type == MODEM_EAS {
 		s.eas = eas.NewReceiver(from.Channel, from.Subchannel, from.Slice, r.AudioLevel, positionalFrameSink(r.recFrame))
@@ -636,13 +636,6 @@ func newSlicerReceivers(r *Layer2Receiver, from dwcore.SlicerID, scrambled bool)
 func positionalFrameSink(sink dwcore.FrameSink) func(int, int, int, []byte, ax25.ALevel, BitFixLevel, fec_type_t) {
 	return func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t) {
 		sink(dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}, frame, dwcore.RxInfo{ALevel: alevel, Retries: retries, FEC: fecType})
-	}
-}
-
-// positionalPacketSink is positionalFrameSink for a packet sink.
-func positionalPacketSink(sink dwcore.PacketSink) func(int, int, int, *ax25.Packet, ax25.ALevel, BitFixLevel, fec_type_t) {
-	return func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t) {
-		sink(dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}, pp, dwcore.RxInfo{ALevel: alevel, Retries: retries, FEC: fecType})
 	}
 }
 

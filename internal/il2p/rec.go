@@ -14,7 +14,7 @@ package il2p
 import (
 	"math/bits"
 
-	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
@@ -31,7 +31,7 @@ const IL2P_CRC IL2PState = 4
 // Receiver is the IL2P receive state for one slicer of one demodulator
 // ("subchannel") of one channel.
 type Receiver struct {
-	channel, subchannel, slice int
+	from dwcore.SlicerID // The slicer whose bits these are.
 
 	version Version // IL2P protocol version spoken on this channel.
 	crc     bool    // true if frames carry a trailing CRC.
@@ -60,33 +60,23 @@ type Receiver struct {
 
 	corrected int // Number of symbols corrected by RS FEC.
 
-	audioLevel AudioLevelFunc // For the audio level to deliver each packet with.
-	sink       PacketSink     // Where each extracted packet goes.
+	audioLevel dwcore.AudioLevelFunc // For the audio level to deliver each packet with.
+	sink       dwcore.PacketSink     // Where each extracted packet goes.
 }
 
-// AudioLevelFunc reports the audio level a subchannel's demodulator is
-// hearing, which the receiver delivers each packet with.
-type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
-
-// PacketSink is handed each packet extracted from the received bit
-// stream, along with the audio level it was heard at and the number of
-// symbols the FEC decoder had to correct.  In normal operation it is the
-// layer 2 receiver's recPacket.
-type PacketSink func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
-
-// NewReceiver makes a Receiver for one slicer, speaking IL2P version version,
-// expecting a trailing CRC if crc is set and reporting at IL2P debug level
-// debug.  It gives each packet it decodes to sink, with the level audioLevel
-// reports.
-func NewReceiver(channel int, subchannel int, slice int, version Version, crc bool, debug int, audioLevel AudioLevelFunc, sink PacketSink) *Receiver {
-	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
-	dwutil.Assert(subchannel >= 0 && subchannel < phy.MaxSubchans)
-	dwutil.Assert(slice >= 0 && slice < phy.MaxSlicers)
+// NewReceiver makes a Receiver for the slicer from, speaking IL2P version
+// version, expecting a trailing CRC if crc is set and reporting at IL2P debug
+// level debug.  It gives each packet it decodes to sink, with the level
+// audioLevel reports, the number of symbols the FEC decoder had to correct as
+// its retries, and phy.FECIL2P.  In normal operation sink is the layer 2
+// receiver's recPacket.
+func NewReceiver(from dwcore.SlicerID, version Version, crc bool, debug int, audioLevel dwcore.AudioLevelFunc, sink dwcore.PacketSink) *Receiver {
+	dwutil.Assert(from.Channel >= 0 && from.Channel < phy.MaxRadioChans)
+	dwutil.Assert(from.Subchannel >= 0 && from.Subchannel < phy.MaxSubchans)
+	dwutil.Assert(from.Slice >= 0 && from.Slice < phy.MaxSlicers)
 
 	var F = new(Receiver)
-	F.channel = channel
-	F.subchannel = subchannel
-	F.slice = slice
+	F.from = from
 	F.version = version
 	F.crc = crc
 	F.debug = debug
@@ -113,9 +103,9 @@ func (F *Receiver) Debug() int {
 
 func (F *Receiver) logEntry() *logrus.Entry {
 	return logrus.WithFields(logrus.Fields{
-		"channel":    F.channel,
-		"subchannel": F.subchannel,
-		"slice":      F.slice,
+		"channel":    F.from.Channel,
+		"subchannel": F.from.Subchannel,
+		"slice":      F.from.Slice,
 	})
 }
 
@@ -136,10 +126,6 @@ func (F *Receiver) logEntry() *logrus.Entry {
  ***********************************************************************************/
 
 func (F *Receiver) RecBit(dbit int) {
-	var channel = F.channel
-	var subchannel = F.subchannel
-	var slice = F.slice
-
 	// Accumulate most recent 24 bits received.  Most recent is LSB.
 
 	F.acc = ((F.acc << 1) | uint(dbit&1)) & 0x00ffffff
@@ -325,7 +311,7 @@ func (F *Receiver) RecBit(dbit int) {
 			if pp != nil {
 				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
 
-				F.sink(channel, subchannel, slice, pp, F.audioLevel(channel, subchannel), phy.BitFixLevel(F.corrected), phy.FECIL2P)
+				F.sink(F.from, pp, dwcore.RxInfo{ALevel: F.audioLevel(F.from.Channel, F.from.Subchannel), Retries: phy.BitFixLevel(F.corrected), FEC: phy.FECIL2P})
 			}
 		} // end block for local variables.
 
