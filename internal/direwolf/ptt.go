@@ -164,7 +164,7 @@ func DTR_OFF(fd uintptr) {
 const LPT_IO_ADDR = 0x378
 
 // octypeName is the name of an output control type, for messages.
-func octypeName(ot int) string {
+func octypeName(ot outputType) string {
 	switch ot {
 	case OCTYPE_PTT:
 		return "PTT"
@@ -208,7 +208,7 @@ type PTT struct {
 	// channelBusy tells the data link state machine of each change to a
 	// channel's outputs - PTT, DCD or connected indicator - and is left to
 	// pick out the ones it cares about; nil for nobody to tell.
-	channelBusy func(channel int, activity int, status int)
+	channelBusy func(channel int, activity outputType, busy bool)
 
 	// gpioSysfsDir is a field rather than always defaultGPIOSysfsDir so that
 	// a test can point it at a fake tree and exercise the GPIO paths without
@@ -298,13 +298,13 @@ type PTT struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity int, status int), debug int) (*PTT, error) {
+func NewPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity outputType, busy bool), debug int) (*PTT, error) {
 	return newPTT(audio_config_p, muteInput, channelBusy, debug, defaultGPIOSysfsDir)
 }
 
 // newPTT is NewPTT with the root of the sysfs GPIO interface given, so that a
 // test can supply a fake one.
-func newPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity int, status int), debug int, gpioSysfsDir string) (*PTT, error) {
+func newPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity outputType, busy bool), debug int, gpioSysfsDir string) (*PTT, error) {
 	var p = new(PTT)
 	p.audioConfig = audio_config_p
 	p.muteInput = muteInput
@@ -347,7 +347,7 @@ func newPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool),
 
 // JWL - save status and new get_ptt function.
 
-func (p *PTT) Set(ot int, channel int, ptt_signal int) {
+func (p *PTT) Set(ot outputType, channel int, ptt_signal int) {
 	if p == nil {
 		return
 	}
@@ -374,7 +374,7 @@ func (p *PTT) SetDCD(channel int, on bool) {
 }
 
 // set is Set for a caller that already holds p.mu, for reading or writing.
-func (p *PTT) set(ot int, channel int, ptt_signal int) {
+func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	var ptt = ptt_signal
 	var ptt2 = ptt_signal
 
@@ -418,7 +418,7 @@ func (p *PTT) set(ot int, channel int, ptt_signal int) {
 	 */
 
 	if p.channelBusy != nil {
-		p.channelBusy(channel, ot, ptt_signal)
+		p.channelBusy(channel, ot, ptt_signal != 0)
 	}
 
 	/*
@@ -725,7 +725,7 @@ func (p *PTT) Term() {
 
 	for n := range MAX_RADIO_CHANS {
 		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				p.set(ot, n, 0)
 			}
 		}
@@ -733,7 +733,7 @@ func (p *PTT) Term() {
 
 	for n := range MAX_RADIO_CHANS {
 		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				if p.fd[n][ot] != nil {
 					p.fd[n][ot].Close()
 					p.fd[n][ot] = nil
@@ -744,7 +744,7 @@ func (p *PTT) Term() {
 
 	for n := range MAX_RADIO_CHANS {
 		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				if p.gpiodLine[n][ot] != nil {
 					p.gpiodLine[n][ot].Close()
 					p.gpiodLine[n][ot] = nil
@@ -755,7 +755,7 @@ func (p *PTT) Term() {
 
 	for n := range MAX_RADIO_CHANS {
 		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				if p.rig[n][ot] != nil {
 					p.rig[n][ot].Close()   //nolint:errcheck
 					p.rig[n][ot].Cleanup() //nolint:errcheck
@@ -789,7 +789,7 @@ func (p *PTT) setup() error {
 	var audio_config_p = p.audioConfig
 
 	for ch := range MAX_RADIO_CHANS {
-		for ot := range NUM_OCTYPES {
+		for ot := range outputTypes() {
 			if p.debugLevel >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("ch=%d, %s method=%d, device=%s, line=%d, name=%s, gpio=%d, lpt_bit=%d, invert=%t\n",
@@ -815,7 +815,7 @@ func (p *PTT) setup() error {
 
 	for ch := range MAX_RADIO_CHANS {
 		if audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_SERIAL {
 					/* Translate Windows device name into Linux name. */
 					/* COM1 -> /dev/ttyS0, etc. */
@@ -842,7 +842,7 @@ func (p *PTT) setup() error {
 
 					for j := ch; j >= 0; j-- {
 						if audio_config_p.chan_medium[j] == MEDIUM_RADIO {
-							var k = NUM_OCTYPES - 1
+							var k outputType = NUM_OCTYPES - 1
 							if j == ch {
 								k = ot - 1
 							}
@@ -897,7 +897,7 @@ func (p *PTT) setup() error {
 
 	for ch := range MAX_RADIO_CHANS {
 		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
 					using_gpio = true
 				}
@@ -920,7 +920,7 @@ func (p *PTT) setup() error {
 	// GPIOD
 	for ch := range MAX_RADIO_CHANS {
 		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
 					var chip_name = audio_config_p.achan[ch].octrl[ot].out_gpio_name
 					var line_number = audio_config_p.achan[ch].octrl[ot].out_gpio_num
@@ -952,9 +952,9 @@ func (p *PTT) setup() error {
 	for ch := range MAX_RADIO_CHANS {
 		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
 			// output control type, PTT, DCD, CON, ...
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-					var exportErr = p.exportGPIO(ch, ot, audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
+					var exportErr = p.exportGPIO(ch, int(ot), audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
 					if exportErr != nil {
 						return fmt.Errorf("channel %d %s: %w", ch, octypeName(ot), exportErr)
 					}
@@ -982,7 +982,7 @@ func (p *PTT) setup() error {
 
 	for ch := range MAX_RADIO_CHANS {
 		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_LPT {
 					/* Can't open the same device more than once so we */
 					/* need more logic to look for the case of multiple radio */
@@ -993,7 +993,7 @@ func (p *PTT) setup() error {
 
 					for j := ch; j >= 0; j-- {
 						if audio_config_p.chan_medium[j] == MEDIUM_RADIO {
-							var k = NUM_OCTYPES - 1
+							var k outputType = NUM_OCTYPES - 1
 							if j == ch {
 								k = ot - 1
 							}
@@ -1039,7 +1039,7 @@ func (p *PTT) setup() error {
 
 	for ch := range MAX_RADIO_CHANS {
 		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_HAMLIB {
 					if ot == OCTYPE_PTT {
 						if audio_config_p.achan[ch].octrl[ot].ptt_model == -1 {
@@ -1139,7 +1139,7 @@ func (p *PTT) setup() error {
 
 	for ch := range MAX_RADIO_CHANS {
 		if audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
+			for ot := range outputTypes() {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_CM108 {
 					var device = audio_config_p.achan[ch].octrl[ot].ptt_device
 

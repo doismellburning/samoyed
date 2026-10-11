@@ -567,6 +567,10 @@ func (ig *IGate) connectThread(ctx context.Context) {
  *
  *--------------------------------------------------------------------*/
 
+// igateSender hands a packet heard on a channel to the IGate, for APRS-IS:
+// IGate.sendRecPacket, or a stand-in for it.
+type igateSender func(channel int, pp *ax25.Packet)
+
 const IGATE_MAX_MSG = 512 /* "All 'packets' sent to APRS-IS must be in the TNC2 format terminated */
 /* by a carriage return, line feed sequence. No line may exceed 512 bytes */
 /* including the CR/LF sequence." */
@@ -2097,7 +2101,7 @@ func (h *ig2txHistory) reset() {
 }
 
 // rememberDigipeated is igToTxRemember for a packet the digipeater sent.
-func (ig *IGate) rememberDigipeated(pp *ax25.Packet, channel int) {
+func (ig *IGate) rememberDigipeated(channel int, pp *ax25.Packet) {
 	ig.igToTxRemember(pp, channel, 1)
 }
 

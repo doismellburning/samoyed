@@ -294,7 +294,7 @@ func (ps *parseState) applyYAMLChannels(channels []ChannelConfig, node yamlEntry
 
 		for _, control := range []struct {
 			key      string
-			ot       int
+			ot       outputType
 			settings *OutputControlSettings
 		}{
 			{"ptt", OCTYPE_PTT, channel.PTT},

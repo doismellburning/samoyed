@@ -124,7 +124,7 @@ type Digipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, onRemember func(pp *ax25.Packet, channel int)) *Digipeater {
+func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, onRemember func(channel int, pp *ax25.Packet)) *Digipeater {
 	var d = new(Digipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_digi_config
@@ -142,12 +142,12 @@ func (d *Digipeater) GetCount(from_chan, to_chan int) int {
 // digipeater will not repeat it when it is heard again.  It does nothing on a
 // nil receiver, so a caller need not check whether the digipeater has been
 // started yet.
-func (d *Digipeater) Remember(pp *ax25.Packet, channel int) {
+func (d *Digipeater) Remember(channel int, pp *ax25.Packet) {
 	if d == nil {
 		return
 	}
 
-	d.dedupe.Remember(pp, channel)
+	d.dedupe.Remember(channel, pp)
 }
 
 /*------------------------------------------------------------------------------
@@ -224,7 +224,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 					d.config.atgp[from_chan][to_chan],
 					d.config.filter_str[from_chan][to_chan])
 				if result != nil {
-					d.dedupe.Remember(pp, to_chan)
+					d.dedupe.Remember(to_chan, pp)
 					transmitQueue.Append(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
 					d.count[from_chan][to_chan]++
 				}
@@ -248,7 +248,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 					d.config.atgp[from_chan][to_chan],
 					d.config.filter_str[from_chan][to_chan])
 				if result != nil {
-					d.dedupe.Remember(pp, to_chan)
+					d.dedupe.Remember(to_chan, pp)
 					transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
 					d.count[from_chan][to_chan]++
 				}
@@ -452,7 +452,7 @@ func (d *Digipeater) match(
 	 *
 	 */
 
-	if d.dedupe.Check(pp, to_chan) {
+	if d.dedupe.Check(to_chan, pp) {
 		//#if DEBUG
 		/* Might be useful if people are wondering why */
 		/* some are not repeated.  Might also cause confusion. */

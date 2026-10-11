@@ -1,5 +1,7 @@
 package direwolf
 
+import "iter"
+
 /*
  * PTT control.
  */
@@ -24,11 +26,25 @@ const (
 	PTT_LINE_DTR
 )
 
-const OCTYPE_PTT = 0
-const OCTYPE_DCD = 1
-const OCTYPE_CON = 2
+// outputType is one of the outputs the PTT controller drives for a channel.
+type outputType int
+
+const OCTYPE_PTT outputType = 0
+const OCTYPE_DCD outputType = 1
+const OCTYPE_CON outputType = 2
 
 const NUM_OCTYPES = 3 /* number of values above.   i.e. last value +1. */
+
+// outputTypes yields each output type in turn, from OCTYPE_PTT to OCTYPE_CON.
+func outputTypes() iter.Seq[outputType] {
+	return func(yield func(outputType) bool) {
+		for ot := range outputType(NUM_OCTYPES) {
+			if !yield(ot) {
+				return
+			}
+		}
+	}
+}
 
 const MAX_GPIO_NAME_LEN = 20 // 12 would cover any case I've seen so this should be safe
 

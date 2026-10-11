@@ -118,7 +118,7 @@ func TestDigipeaterRemembersWhatItRepeated(t *testing.T) {
 
 	require.NotNil(t, transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))
 
-	assert.True(t, digi.dedupe.Check(pp, digiFromChan),
+	assert.True(t, digi.dedupe.Check(digiFromChan, pp),
 		"the repeated frame was not remembered, so the next copy of it would go out too")
 }
 
@@ -226,7 +226,7 @@ func TestDigipeaterRememberNil(t *testing.T) {
 
 	var digi *Digipeater
 
-	assert.NotPanics(t, func() { digi.Remember(pp, digiFromChan) })
+	assert.NotPanics(t, func() { digi.Remember(digiFromChan, pp) })
 }
 
 // What an APRStt object report remembers, the digipeater will not repeat.
@@ -238,7 +238,7 @@ func TestDigipeaterRemember(t *testing.T) {
 	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
-	digi.Remember(pp, digiFromChan)
+	digi.Remember(digiFromChan, pp)
 	digi.Digipeat(digiFromChan, pp)
 
 	assert.Nil(t, transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))

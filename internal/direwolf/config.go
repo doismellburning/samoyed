@@ -1279,7 +1279,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS
 		p_audio_config.achan[channel].sanity_test = SANITY_APRS
 
-		for ot := range NUM_OCTYPES {
+		for ot := range outputTypes() {
 			p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_NONE
 			p_audio_config.achan[channel].octrl[ot].ptt_device = ""
 			p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_NONE
@@ -2493,7 +2493,7 @@ func handlePTTDCDCON(ps *parseState) error {
 
 // outputControlType maps a PTT, DCD or CON keyword to the output control it
 // configures, and the name to use for it in messages.
-func outputControlType(keyword string) (int, string) {
+func outputControlType(keyword string) (outputType, string) {
 	switch {
 	case strings.EqualFold(keyword, "PTT"):
 		return OCTYPE_PTT, "PTT"
@@ -2645,7 +2645,7 @@ func serialControlLine(name string) (ptt_line_t, bool) {
 
 // applyOutputControl sets up output control ot (PTT, DCD or CON) for the
 // current channel.
-func (ps *parseState) applyOutputControl(ot int, settings OutputControlSettings) error {
+func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSettings) error {
 	var otname = [NUM_OCTYPES]string{OCTYPE_PTT: "PTT", OCTYPE_DCD: "DCD", OCTYPE_CON: "CON"}[ot]
 
 	// Work on a copy of the control and commit it at the end, so that settings

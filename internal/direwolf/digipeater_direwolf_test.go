@@ -81,7 +81,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	var xmit string
 
 	if result != nil {
-		digipeaterTestDigi.Remember(result, 0)
+		digipeaterTestDigi.Remember(0, result)
 		xmit = result.FormatAddrs()
 		pinfo = result.Info()
 		xmit += string(pinfo)

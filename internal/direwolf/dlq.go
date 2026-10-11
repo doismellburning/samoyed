@@ -115,10 +115,10 @@ type dlq_item_t struct {
 	// It is useful to know when the channel is busy either for carrier detect
 	// or when we are transmitting.
 
-	activity int /* OCTYPE_PTT for my transmission start/end. */
+	activity outputType /* OCTYPE_PTT for my transmission start/end. */
 	/* OCTYPE_DCD if we hear someone else. */
 
-	status int /* 1 for active or 0 for quiet. */
+	busy bool /* Active, or quiet. */
 
 }
 
@@ -156,6 +156,11 @@ func NewDataLinkQueue() *DataLinkQueue {
 // frameReceiver is where a received frame goes on its way to recv_process:
 // DataLinkQueue.RecFrame, or a stand-in for it.
 type frameReceiver func(src dwcore.Source, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string)
+
+// seizeConfirmer tells the data link state machine that a channel's
+// transmission opportunity has arrived: DataLinkQueue.SeizeConfirm, or a
+// stand-in for it.
+type seizeConfirmer func(channel int)
 
 /*-------------------------------------------------------------------
  *
@@ -522,7 +527,7 @@ func (q *DataLinkQueue) UnregisterCallsign(addr string, channel int, client int)
  *		activity	- OCTYPE_PTT or OCTYPE_DCD, as defined in audio.h.
  *				  Other values will be discarded.
  *
- *		status		- 1 for active or 0 for quiet.
+ *		busy		- Whether it is active, or quiet.
  *
  * Outputs:	Request is appended to queue for processing by
  *		the data link state machine.
@@ -535,12 +540,12 @@ func (q *DataLinkQueue) UnregisterCallsign(addr string, channel int, client int)
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) ChannelBusy(channel int, activity int, status int) {
+func (q *DataLinkQueue) ChannelBusy(channel int, activity outputType, busy bool) {
 	if activity == OCTYPE_PTT || activity == OCTYPE_DCD {
 		logrus.WithFields(logrus.Fields{
 			"channel":  channel,
 			"activity": activity,
-			"status":   status,
+			"busy":     busy,
 		}).Debug("dlq_channel_busy")
 
 		/* Allocate a new queue item. */
@@ -549,7 +554,7 @@ func (q *DataLinkQueue) ChannelBusy(channel int, activity int, status int) {
 		pnew._type = DLQ_CHANNEL_BUSY
 		pnew._chan = channel
 		pnew.activity = activity
-		pnew.status = status
+		pnew.busy = busy
 
 		/* Put it into queue. */
 

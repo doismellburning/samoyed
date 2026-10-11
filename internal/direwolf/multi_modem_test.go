@@ -288,12 +288,12 @@ func TestMuteInputMutesTheChannelsDemodulator(t *testing.T) {
 func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {
 	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
 
-	assert.Equal(t, 0, r.DataDetectAny(0), "nothing heard and no inputs, so not busy")
+	assert.False(t, r.DataDetectAny(0), "nothing heard and no inputs, so not busy")
 
 	r.txInhibited = func(channel int) bool { return channel == 0 }
 
-	assert.Equal(t, 1, r.DataDetectAny(0), "transmit inhibited, so busy")
-	assert.Equal(t, 0, r.DataDetectAny(1), "another channel is not inhibited")
+	assert.True(t, r.DataDetectAny(0), "transmit inhibited, so busy")
+	assert.False(t, r.DataDetectAny(1), "another channel is not inhibited")
 }
 
 // dcdRecordingSink is a ReceiveSink that records the DCD changes it is told
@@ -318,12 +318,12 @@ func TestDTMFButtonMakesChannelBusy(t *testing.T) {
 
 	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: MAX_SUBCHANS, Slice: 0}, 1)
 
-	assert.Equal(t, 1, r.DataDetectAny(0), "a button is held, so busy")
-	assert.Equal(t, 0, r.DataDetectAny(1), "another channel hears no button")
+	assert.True(t, r.DataDetectAny(0), "a button is held, so busy")
+	assert.False(t, r.DataDetectAny(1), "another channel hears no button")
 
 	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: MAX_SUBCHANS, Slice: 0}, 0)
 
-	assert.Equal(t, 0, r.DataDetectAny(0), "the button is released, so not busy")
+	assert.False(t, r.DataDetectAny(0), "the button is released, so not busy")
 	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
 }
 
@@ -346,7 +346,7 @@ func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
 	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, 0)
 
 	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
-	assert.Equal(t, 1, r.DataDetectAny(0), "still inhibited, so still busy")
+	assert.True(t, r.DataDetectAny(0), "still inhibited, so still busy")
 }
 
 // The receive threads change a channel's DCD while the transmit side asks
@@ -372,7 +372,7 @@ func TestDCDChangeWhileTransmitterAsks(t *testing.T) {
 
 	<-done
 
-	assert.Equal(t, 1, r.DataDetectAny(0), "the last change set DCD")
+	assert.True(t, r.DataDetectAny(0), "the last change set DCD")
 }
 
 // countingBitReceiver counts the bits handed to it, and ignores the rest.

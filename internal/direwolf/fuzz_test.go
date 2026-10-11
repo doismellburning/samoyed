@@ -550,7 +550,7 @@ func FuzzAX25Link(f *testing.F) {
 					activity = OCTYPE_DCD
 				}
 
-				dlq.ChannelBusy(0, activity, int(op>>4)&1)
+				dlq.ChannelBusy(0, activity, op&(1<<4) != 0)
 
 			case linkOpOutstanding:
 				dlq.OutstandingFramesRequest(addrs, 2, 0, 0)

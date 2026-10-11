@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -178,7 +179,7 @@ func TestExportGPIOOutput(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	var p = testPTT(cfg, dir)
 
-	require.NoError(t, p.exportGPIO(0, OCTYPE_PTT, false, 1))
+	require.NoError(t, p.exportGPIO(0, int(OCTYPE_PTT), false, 1))
 
 	var exported, readErr = os.ReadFile(filepath.Join(dir, "export")) //nolint:gosec
 	require.NoError(t, readErr)
@@ -201,7 +202,7 @@ func TestExportGPIOOutputInverted(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	var p = testPTT(cfg, dir)
 
-	require.NoError(t, p.exportGPIO(0, OCTYPE_PTT, true, 1))
+	require.NoError(t, p.exportGPIO(0, int(OCTYPE_PTT), true, 1))
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25", "direction")) //nolint:gosec
 	require.NoError(t, dirErr)
@@ -239,7 +240,7 @@ func TestExportGPIOSuffixedNode(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	var p = testPTT(cfg, dir)
 
-	require.NoError(t, p.exportGPIO(0, OCTYPE_PTT, false, 1))
+	require.NoError(t, p.exportGPIO(0, int(OCTYPE_PTT), false, 1))
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25_ph11", "direction")) //nolint:gosec
 	require.NoError(t, dirErr)
@@ -257,7 +258,7 @@ func TestExportGPIONoSuchNode(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	var p = testPTT(cfg, dir)
 
-	var err = p.exportGPIO(0, OCTYPE_PTT, false, 1)
+	var err = p.exportGPIO(0, int(OCTYPE_PTT), false, 1)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "gpio number 25")
@@ -273,7 +274,7 @@ func TestExportGPIONoSysfs(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	var p = testPTT(cfg, dir)
 
-	var err = p.exportGPIO(0, OCTYPE_PTT, false, 1)
+	var err = p.exportGPIO(0, int(OCTYPE_PTT), false, 1)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GPIO user interface")
@@ -948,8 +949,8 @@ func TestPTTTellsWhoWasHandedOfChannelActivity(t *testing.T) {
 
 	var busy []string
 
-	var p, err = NewPTT(audioConfig, nil, func(channel int, activity int, status int) {
-		busy = append(busy, fmt.Sprintf("%d %s=%d", channel, octypeName(activity), status))
+	var p, err = NewPTT(audioConfig, nil, func(channel int, activity outputType, isBusy bool) {
+		busy = append(busy, fmt.Sprintf("%d %s=%t", channel, octypeName(activity), isBusy))
 	}, 0)
 	require.NoError(t, err)
 
@@ -957,7 +958,7 @@ func TestPTTTellsWhoWasHandedOfChannelActivity(t *testing.T) {
 	p.Set(OCTYPE_DCD, 0, 1)
 	p.Set(OCTYPE_PTT, 0, 0)
 
-	assert.Equal(t, []string{"0 PTT=1", "0 DCD=1", "0 PTT=0"}, busy)
+	assert.Equal(t, []string{"0 PTT=true", "0 DCD=true", "0 PTT=false"}, busy)
 }
 
 // newRecordingPTT is a PTT for radio channel 0 with nothing to drive, which
@@ -972,8 +973,8 @@ func newRecordingPTT(t *testing.T) (*PTT, *[]string) {
 
 	var set []string
 
-	var p, err = newPTT(cfg, nil, func(channel int, ot int, state int) {
-		set = append(set, fmt.Sprintf("%s %d=%d", octypeName(ot), channel, state))
+	var p, err = newPTT(cfg, nil, func(channel int, ot outputType, busy bool) {
+		set = append(set, fmt.Sprintf("%s %d=%t", octypeName(ot), channel, busy))
 	}, 0, t.TempDir())
 	require.NoError(t, err)
 
@@ -986,7 +987,7 @@ func TestPTTSetDCD(t *testing.T) {
 	p.SetDCD(0, true)
 	p.SetDCD(0, false)
 
-	assert.Equal(t, []string{"DCD 0=1", "DCD 0=0"}, *set)
+	assert.Equal(t, []string{"DCD 0=true", "DCD 0=false"}, *set)
 }
 
 func TestPTTSetPTT(t *testing.T) {
@@ -995,7 +996,7 @@ func TestPTTSetPTT(t *testing.T) {
 	p.SetPTT(0, true)
 	p.SetPTT(0, false)
 
-	assert.Equal(t, []string{"PTT 0=1", "PTT 0=0"}, *set)
+	assert.Equal(t, []string{"PTT 0=true", "PTT 0=false"}, *set)
 }
 
 func TestPTTSetConnected(t *testing.T) {
@@ -1004,7 +1005,7 @@ func TestPTTSetConnected(t *testing.T) {
 	p.SetConnected(0, true)
 	p.SetConnected(0, false)
 
-	assert.Equal(t, []string{"CON 0=1", "CON 0=0"}, *set)
+	assert.Equal(t, []string{"CON 0=true", "CON 0=false"}, *set)
 }
 
 // A channel with no transmit inhibit input configured, or no PTT at all, is
@@ -1016,4 +1017,14 @@ func TestPTTTransmitInhibitedWithoutAnInput(t *testing.T) {
 
 	var none *PTT
 	assert.False(t, none.TransmitInhibited(0))
+}
+
+func TestOutputTypesYieldsEachOutputInOrder(t *testing.T) {
+	assert.Equal(t, []outputType{OCTYPE_PTT, OCTYPE_DCD, OCTYPE_CON}, slices.Collect(outputTypes()))
+
+	for ot := range outputTypes() {
+		assert.Equal(t, OCTYPE_PTT, ot, "stopping early should stop at the first")
+
+		break
+	}
 }

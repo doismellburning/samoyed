@@ -1069,16 +1069,12 @@ func (r *Layer2Receiver) DCDChange(from dwcore.SlicerID, state int) {
  *
  *--------------------------------------------------------------------*/
 
-func (r *Layer2Receiver) DataDetectAny(channel int) int {
+func (r *Layer2Receiver) DataDetectAny(channel int) bool {
 	r.dcdMu.Lock()
 	var detected = r.dataDetected(channel)
 	r.dcdMu.Unlock()
 
-	if detected || r.transmitInhibited(channel) {
-		return (1)
-	}
-
-	return (0)
+	return detected || r.transmitInhibited(channel)
 } /* end DataDetectAny */
 
 // dataDetected says whether any of a channel's decoders is seeing data.  The

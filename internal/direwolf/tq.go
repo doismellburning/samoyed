@@ -87,12 +87,12 @@ type TransmitQueue struct {
 
 	// toIGate is where a packet for the IGate's channel goes instead of a
 	// queue, or nil to discard such packets.
-	toIGate func(channel int, pp *ax25.Packet)
+	toIGate igateSender
 
 	// seizeConfirm tells the data link state machine that a channel without
 	// a transmitter of ours - a network TNC or AXUDP one - is clear to send
 	// on, or is nil for nobody to tell.
-	seizeConfirm func(channel int)
+	seizeConfirm seizeConfirmer
 }
 
 // transmitQueue is the queue every producer - KISS, AGW, beacon, digipeater,
@@ -199,13 +199,13 @@ func (tq *TransmitQueue) SetAXUDPChannels(channels [MAX_TOTAL_CHANS]*AXUDPChanne
 // SetSeizeConfirm hands the queue what to tell when a seize request on a
 // channel without a transmitter of ours is granted at once.  Like SetNetTNCs,
 // it must be called before anything is queued.
-func (tq *TransmitQueue) SetSeizeConfirm(seizeConfirm func(channel int)) {
+func (tq *TransmitQueue) SetSeizeConfirm(seizeConfirm seizeConfirmer) {
 	tq.seizeConfirm = seizeConfirm
 }
 
 // SetIGate hands the queue where packets for the IGate's channel go.  Like
 // SetNetTNCs, it must be called before anything is queued for that channel.
-func (tq *TransmitQueue) SetIGate(toIGate func(channel int, pp *ax25.Packet)) {
+func (tq *TransmitQueue) SetIGate(toIGate igateSender) {
 	tq.toIGate = toIGate
 }
 
