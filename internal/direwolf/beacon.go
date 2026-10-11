@@ -49,6 +49,7 @@ type BeaconService struct {
 	gps               *dwgps.GPS
 	logger            *aprslog.Logger // Where "-dttt" logs tracker beacons, or nil.
 	heardCounter      heardCounter    // Counts the stations heard recently; nil for none.
+	transmitQueue     *TransmitQueue  // Where beacons for a radio channel go to be sent.
 	igate             beaconIGate     // Where SENDTO_IGATE beacons go, and the source of IGate statistics; nil for none.
 	recFrame          frameReceiver   // Where SENDTO_RECV beacons go, as though received; nil to drop them.
 	trackerDebugLevel int
@@ -75,6 +76,9 @@ type BeaconService struct {
  *		heard		- A counter of the stations heard recently, for
  *			  the IGate statistics beacon; nil for none heard.
  *
+ *		transmitQueue	- Where beacons for a radio channel go to be
+ *			  sent.
+ *
  *		ig		- The IGate, for beacons sent to APRS-IS and the
  *			  IGate statistics beacon; nil for none.
  *
@@ -97,18 +101,20 @@ func NewBeaconService(
 	gps *dwgps.GPS,
 	logger *aprslog.Logger,
 	heard heardCounter,
+	transmitQueue *TransmitQueue,
 	ig beaconIGate,
 	recFrame frameReceiver,
 ) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct_v5
-		modemConfig:  pmodem,
-		miscConfig:   pconfig,
-		igateConfig:  pigate,
-		gps:          gps,
-		logger:       logger,
-		heardCounter: heard,
-		igate:        ig,
-		recFrame:     recFrame,
+		modemConfig:   pmodem,
+		miscConfig:    pconfig,
+		igateConfig:   pigate,
+		gps:           gps,
+		logger:        logger,
+		heardCounter:  heard,
+		transmitQueue: transmitQueue,
+		igate:         ig,
+		recFrame:      recFrame,
 	}
 
 	/*
@@ -986,7 +992,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 				bs.recFrame(dwcore.RadioSource(dwcore.SlicerID{Channel: bp.sendto_chan, Subchannel: 0, Slice: 0}), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, "")
 			}
 		default:
-			transmitQueue.Append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
+			bs.transmitQueue.Append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
