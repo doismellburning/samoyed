@@ -208,18 +208,6 @@ func fuzzLinkConfig() *RadioConfig {
 	return cfg
 }
 
-// fuzzLinkKeep puts the connected-mode link back as it was once a target has
-// finished with it, for the sake of whatever test runs next.
-func fuzzLinkKeep(tb testing.TB) {
-	tb.Helper()
-
-	var saved = *ax25Link
-
-	tb.Cleanup(func() {
-		*ax25Link = saved
-	})
-}
-
 // linkFuzzPaclen is the longest information part the connected-mode targets'
 // link will send in one frame.
 const linkFuzzPaclen = 64
@@ -228,7 +216,7 @@ const linkFuzzPaclen = 64
 // state machines, nothing registered and nothing queued either way, so one
 // input cannot leave anything behind for the next, and which tells clients
 // what happens on it.
-func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
+func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) *AX25Link {
 	var tq = newTestTransmitQueue(cfg)
 
 	var miscConfig = new(misc_config_s)
@@ -244,14 +232,13 @@ func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
 		miscConfig.maxv22 = 3
 	}
 
-	*ax25Link = *NewAX25Link()
-	ax25_link_init(miscConfig, nil, clients, tq, 0)
+	return NewAX25Link(miscConfig, nil, clients, tq, 0)
 }
 
 // fuzzLinkDrain does what recv_process does with everything on the data link
 // queue, for the items that concern the connected-mode link: there is no
 // receive thread in a fuzzing run to do it.
-func fuzzLinkDrain(q *DataLinkQueue) {
+func fuzzLinkDrain(q *DataLinkQueue, link *AX25Link) {
 	for {
 		var item = q.Remove()
 		if item == nil {
@@ -260,25 +247,25 @@ func fuzzLinkDrain(q *DataLinkQueue) {
 
 		switch item._type {
 		case DLQ_REC_FRAME:
-			lm_data_indication(item)
+			link.lm_data_indication(item)
 		case DLQ_CONNECT_REQUEST:
-			dl_connect_request(item)
+			link.dl_connect_request(item)
 		case DLQ_DISCONNECT_REQUEST:
-			dl_disconnect_request(item)
+			link.dl_disconnect_request(item)
 		case DLQ_XMIT_DATA_REQUEST:
-			dl_data_request(item)
+			link.dl_data_request(item)
 		case DLQ_REGISTER_CALLSIGN:
-			dl_register_callsign(item)
+			link.dl_register_callsign(item)
 		case DLQ_UNREGISTER_CALLSIGN:
-			dl_unregister_callsign(item)
+			link.dl_unregister_callsign(item)
 		case DLQ_OUTSTANDING_FRAMES_REQUEST:
-			dl_outstanding_frames_request(item)
+			link.dl_outstanding_frames_request(item)
 		case DLQ_CHANNEL_BUSY:
-			lm_channel_busy(item)
+			link.lm_channel_busy(item)
 		case DLQ_SEIZE_CONFIRM:
-			lm_seize_confirm(item)
+			link.lm_seize_confirm(item)
 		case DLQ_CLIENT_CLEANUP:
-			dl_client_cleanup(item)
+			link.dl_client_cleanup(item)
 		}
 
 		q.Delete(item)
@@ -287,10 +274,10 @@ func fuzzLinkDrain(q *DataLinkQueue) {
 
 // fuzzLinkExpireTimers lets enough time pass for every running, unpaused timer
 // to run out, without the run having to wait for it.
-func fuzzLinkExpireTimers() {
+func fuzzLinkExpireTimers(link *AX25Link) {
 	var now = time.Now()
 
-	for p := ax25Link.listHead; p != nil; p = p.next {
+	for p := link.listHead; p != nil; p = p.next {
 		if !p.t1_exp.IsZero() && p.t1_paused_at.IsZero() {
 			p.t1_exp = now
 		}
@@ -304,7 +291,7 @@ func fuzzLinkExpireTimers() {
 		}
 	}
 
-	dl_timer_expiry()
+	link.dl_timer_expiry()
 }
 
 // The connected-mode target's input is a script of things happening to the
@@ -406,7 +393,6 @@ func FuzzAX25Link(f *testing.F) {
 	var dlq = NewDataLinkQueue()
 
 	testutils.FuzzQuietly(f)
-	fuzzLinkKeep(f)
 
 	var agw = fuzzAGWServer(f, dlq)
 
@@ -502,9 +488,9 @@ func FuzzAX25Link(f *testing.F) {
 			t.Skip()
 		}
 
-		fuzzLinkReset(cfg, v22, agw)
+		var link = fuzzLinkReset(cfg, v22, agw)
 		dlq.RegisterCallsign("Q1TEST", 0, 0)
-		fuzzLinkDrain(dlq)
+		fuzzLinkDrain(dlq, link)
 
 		for len(script) > 0 {
 			var op = script[0]
@@ -525,7 +511,7 @@ func FuzzAX25Link(f *testing.F) {
 				dlq.SeizeConfirm(0)
 
 			case linkOpExpireTimers:
-				fuzzLinkExpireTimers()
+				fuzzLinkExpireTimers(link)
 
 			case linkOpData:
 				chunk, script = linkFuzzChunk(script)
@@ -549,7 +535,7 @@ func FuzzAX25Link(f *testing.F) {
 				dlq.OutstandingFramesRequest(addrs, 2, 0, 0)
 			}
 
-			fuzzLinkDrain(dlq)
+			fuzzLinkDrain(dlq, link)
 		}
 	})
 }
@@ -600,7 +586,6 @@ func agwFuzzDigis(digis ...string) []byte {
 // stream does.
 func FuzzAGWHandleClientCommand(f *testing.F) {
 	testutils.FuzzQuietly(f)
-	fuzzLinkKeep(f)
 
 	var dlq = NewDataLinkQueue()
 
@@ -684,7 +669,7 @@ func FuzzAGWHandleClientCommand(f *testing.F) {
 			t.Skip()
 		}
 
-		fuzzLinkReset(cfg, true, s)
+		var link = fuzzLinkReset(cfg, true, s)
 
 		// A newly connected client, which has not logged in.
 		var fresh agwClient
@@ -715,7 +700,7 @@ func FuzzAGWHandleClientCommand(f *testing.F) {
 			}
 
 			s.handleClientCommand(0, cmd)
-			fuzzLinkDrain(dlq)
+			fuzzLinkDrain(dlq, link)
 		}
 	})
 }
