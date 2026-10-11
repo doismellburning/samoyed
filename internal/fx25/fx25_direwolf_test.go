@@ -8,8 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/phy"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -76,12 +75,12 @@ func fxTestReceive(block []byte) ([][]byte, []int) {
 	var frames [][]byte
 	var derrors []int
 
-	var collect = func(_ int, _ int, _ int, frame []byte, _ ax25.ALevel, retries phy.BitFixLevel, _ phy.FECType) {
+	var collect = func(_ dwcore.SlicerID, frame []byte, rxInfo dwcore.RxInfo) {
 		frames = append(frames, frame)
-		derrors = append(derrors, int(retries))
+		derrors = append(derrors, int(rxInfo.Retries))
 	}
 
-	var rx = NewReceiver(0, 0, 0, 1, silentAudioLevel, collect)
+	var rx = NewReceiver(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, 1, silentAudioLevel, collect)
 
 	for _, b := range block {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {

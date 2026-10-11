@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/phy"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
@@ -66,11 +66,11 @@ func FuzzFX25RecBit(f *testing.F) {
 			return ax25.ALevel{Rec: 50, Mark: 50, Space: 50}
 		}
 
-		var sink = func(_ int, _ int, _ int, frame []byte, alevel ax25.ALevel, _ phy.BitFixLevel, _ phy.FECType) {
-			ax25.FromFrame(frame, alevel)
+		var sink = func(_ dwcore.SlicerID, frame []byte, rxInfo dwcore.RxInfo) {
+			ax25.FromFrame(frame, rxInfo.ALevel)
 		}
 
-		var rx = NewReceiver(0, 0, 0, int(debug%4), audioLevel, sink)
+		var rx = NewReceiver(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, int(debug%4), audioLevel, sink)
 
 		for _, b := range stream {
 			for imask := byte(0x01); imask != 0; imask <<= 1 {
