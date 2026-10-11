@@ -179,10 +179,9 @@ type ReceiveSink interface {
 
 // radioSink is the ReceiveSink for a channel with a radio on the end of it.
 type radioSink struct {
-	// setOutput sets one of a channel's outputs - here only ever OCTYPE_DCD,
-	// the data carrier detect indicator - or is nil when there is nothing to
-	// set.
-	setOutput func(ot int, channel int, state int)
+	// setDCD turns a channel's data carrier detect indicator on or off, or
+	// is nil when there is nothing to set.
+	setDCD func(channel int, on bool)
 
 	// recFrame is where the frames go, or nil to drop them.
 	recFrame frameReceiver
@@ -195,8 +194,8 @@ func (s *radioSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcor
 }
 
 func (s *radioSink) DCDChange(channel int, state int) {
-	if s.setOutput != nil {
-		s.setOutput(OCTYPE_DCD, channel, state)
+	if s.setDCD != nil {
+		s.setDCD(channel, state != 0)
 	}
 }
 

@@ -248,14 +248,14 @@ func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
 	var set []string
 
 	var sink = new(radioSink)
-	sink.setOutput = func(ot int, channel int, state int) {
-		set = append(set, fmt.Sprintf("%s %d=%d", octypeName(ot), channel, state))
+	sink.setDCD = func(channel int, on bool) {
+		set = append(set, fmt.Sprintf("%d=%t", channel, on))
 	}
 
 	sink.DCDChange(1, 1)
 	sink.DCDChange(1, 0)
 
-	assert.Equal(t, []string{"DCD 1=1", "DCD 1=0"}, set)
+	assert.Equal(t, []string{"1=true", "1=false"}, set)
 }
 
 // A channel with no demodulator - the other side of a stereo device that is

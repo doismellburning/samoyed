@@ -523,7 +523,7 @@ x = Silence FX.25 information.`)
 	// are described before the PTT says how it is keying them.  They set
 	// the DCD output and read the transmit inhibit input, so hand them the
 	// PTT now, before anything that receives or transmits is started.
-	sink.setOutput = pttControl.Set
+	sink.setDCD = pttControl.SetDCD
 	layer2Receiver.getInput = pttControl.GetInput
 
 	/*
