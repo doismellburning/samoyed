@@ -208,7 +208,7 @@ type PTT struct {
 	// channelBusy tells the data link state machine of each change to a
 	// channel's outputs - PTT, DCD or connected indicator - and is left to
 	// pick out the ones it cares about; nil for nobody to tell.
-	channelBusy func(channel int, activity int, status int)
+	channelBusy func(channel int, activity int, busy bool)
 
 	// gpioSysfsDir is a field rather than always defaultGPIOSysfsDir so that
 	// a test can point it at a fake tree and exercise the GPIO paths without
@@ -298,13 +298,13 @@ type PTT struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity int, status int), debug int) (*PTT, error) {
+func NewPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity int, busy bool), debug int) (*PTT, error) {
 	return newPTT(audio_config_p, muteInput, channelBusy, debug, defaultGPIOSysfsDir)
 }
 
 // newPTT is NewPTT with the root of the sysfs GPIO interface given, so that a
 // test can supply a fake one.
-func newPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity int, status int), debug int, gpioSysfsDir string) (*PTT, error) {
+func newPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity int, busy bool), debug int, gpioSysfsDir string) (*PTT, error) {
 	var p = new(PTT)
 	p.audioConfig = audio_config_p
 	p.muteInput = muteInput
@@ -418,7 +418,7 @@ func (p *PTT) set(ot int, channel int, ptt_signal int) {
 	 */
 
 	if p.channelBusy != nil {
-		p.channelBusy(channel, ot, ptt_signal)
+		p.channelBusy(channel, ot, ptt_signal != 0)
 	}
 
 	/*

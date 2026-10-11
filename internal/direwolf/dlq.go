@@ -118,7 +118,7 @@ type dlq_item_t struct {
 	activity int /* OCTYPE_PTT for my transmission start/end. */
 	/* OCTYPE_DCD if we hear someone else. */
 
-	status int /* 1 for active or 0 for quiet. */
+	busy bool /* Active, or quiet. */
 
 }
 
@@ -527,7 +527,7 @@ func (q *DataLinkQueue) UnregisterCallsign(addr string, channel int, client int)
  *		activity	- OCTYPE_PTT or OCTYPE_DCD, as defined in audio.h.
  *				  Other values will be discarded.
  *
- *		status		- 1 for active or 0 for quiet.
+ *		busy		- Whether it is active, or quiet.
  *
  * Outputs:	Request is appended to queue for processing by
  *		the data link state machine.
@@ -540,12 +540,12 @@ func (q *DataLinkQueue) UnregisterCallsign(addr string, channel int, client int)
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) ChannelBusy(channel int, activity int, status int) {
+func (q *DataLinkQueue) ChannelBusy(channel int, activity int, busy bool) {
 	if activity == OCTYPE_PTT || activity == OCTYPE_DCD {
 		logrus.WithFields(logrus.Fields{
 			"channel":  channel,
 			"activity": activity,
-			"status":   status,
+			"busy":     busy,
 		}).Debug("dlq_channel_busy")
 
 		/* Allocate a new queue item. */
@@ -554,7 +554,7 @@ func (q *DataLinkQueue) ChannelBusy(channel int, activity int, status int) {
 		pnew._type = DLQ_CHANNEL_BUSY
 		pnew._chan = channel
 		pnew.activity = activity
-		pnew.status = status
+		pnew.busy = busy
 
 		/* Put it into queue. */
 

@@ -249,8 +249,8 @@ type AX25Link struct {
 	nextStreamID int // Assigned to each new link state machine.
 
 	// Last DCD and PTT status reported for each channel, by lm_channel_busy.
-	dcdStatus [MAX_TOTAL_CHANS]int
-	pttStatus [MAX_TOTAL_CHANS]int
+	dcdStatus [MAX_TOTAL_CHANS]bool
+	pttStatus [MAX_TOTAL_CHANS]bool
 }
 
 // ax25Link is the one data link every connected-mode request and received
@@ -1855,7 +1855,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
  *		E.activity	- OCTYPE_PTT for my transmission start/end.
  *				- OCTYPE_DCD if we hear someone else.
  *
- *		E.status	- 1 for active or 0 for quiet.
+ *		E.busy		- Whether it is active, or quiet.
  *
  * Outputs:	S.radio_channel_busy
  *
@@ -1868,30 +1868,29 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
 func lm_channel_busy(E *dlq_item_t) {
 	dwutil.Assert(E._chan >= 0 && E._chan < MAX_TOTAL_CHANS)
 	dwutil.Assert(E.activity == OCTYPE_PTT || E.activity == OCTYPE_DCD)
-	dwutil.Assert(E.status == 1 || E.status == 0)
 
 	switch E.activity {
 	case OCTYPE_DCD:
 		if ax25Link.debugRadio {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("lm_channel_busy: DCD chan %d = %d\n", E._chan, E.status)
+			dw_printf("lm_channel_busy: DCD chan %d = %t\n", E._chan, E.busy)
 		}
 
-		ax25Link.dcdStatus[E._chan] = E.status
+		ax25Link.dcdStatus[E._chan] = E.busy
 
 	case OCTYPE_PTT:
 		if ax25Link.debugRadio {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("lm_channel_busy: PTT chan %d = %d\n", E._chan, E.status)
+			dw_printf("lm_channel_busy: PTT chan %d = %t\n", E._chan, E.busy)
 		}
 
-		ax25Link.pttStatus[E._chan] = E.status
+		ax25Link.pttStatus[E._chan] = E.busy
 
 	default:
 		// Nothing to be done
 	}
 
-	var busy = (ax25Link.dcdStatus[E._chan] | ax25Link.pttStatus[E._chan]) > 0
+	var busy = ax25Link.dcdStatus[E._chan] || ax25Link.pttStatus[E._chan]
 
 	/*
 	 * We know if the given radio channel is busy or not.
