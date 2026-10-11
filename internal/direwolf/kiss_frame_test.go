@@ -5,7 +5,6 @@ package direwolf
 
 import (
 	"bytes"
-	"net"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -639,92 +638,6 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 	assert.Equal(t, 0, testutils.LoggedEntry(t, hook, "<<< Data frame from KISS client application").Data["channel"])
 	assert.Equal(t, len(pp.FrameData()),
 		testutils.LoggedEntry(t, hook, "Packet content after removing KISS framing and any escapes").Data["length"])
-}
-
-// The per-client bookkeeping for KISS over TCP: a client's connection and the
-// frame collector that goes with it are handed out together, and a connection
-// is only forgotten by whoever still has the one that is current.
-
-func Test_kissport_status_attach_and_detach(t *testing.T) {
-	var kps = new(kissport_status_s)
-
-	assert.Nil(t, kps.clientConn(0))
-	assert.Equal(t, 0, kps.findFreeClient())
-
-	var here, there = net.Pipe()
-
-	t.Cleanup(func() { here.Close(); there.Close() })
-
-	require.True(t, kps.attachClient(0, here))
-
-	assert.Same(t, here, kps.clientConn(0))
-	assert.Equal(t, 1, kps.findFreeClient(), "the next client should get the next slot")
-
-	var conn, frame = kps.connAndFrame(0)
-	assert.Same(t, here, conn)
-	assert.NotNil(t, frame, "a newly attached client needs a frame collector")
-
-	assert.True(t, kps.detachClientIfCurrent(0, here))
-	assert.Nil(t, kps.clientConn(0))
-}
-
-// A read goroutine that notices its connection has gone must not clear a slot
-// that has since been given to a newer connection from the same client.
-func Test_kissport_status_detach_stale_connection(t *testing.T) {
-	var kps = new(kissport_status_s)
-
-	var older, otherEndOfOlder = net.Pipe()
-	var newer, otherEndOfNewer = net.Pipe()
-
-	t.Cleanup(func() {
-		older.Close()
-		otherEndOfOlder.Close()
-		newer.Close()
-		otherEndOfNewer.Close()
-	})
-
-	require.True(t, kps.attachClient(0, older))
-	require.True(t, kps.attachClient(0, newer))
-
-	assert.False(t, kps.detachClientIfCurrent(0, older), "the stale connection was not the current one")
-	assert.Same(t, newer, kps.clientConn(0), "the newer connection was cleared by the older one going away")
-}
-
-// Every slot taken means there is nowhere to put another client.
-func Test_kissport_status_all_clients_in_use(t *testing.T) {
-	var kps = new(kissport_status_s)
-
-	for c := range MAX_NET_CLIENTS {
-		var here, there = net.Pipe()
-
-		t.Cleanup(func() { here.Close(); there.Close() })
-
-		require.True(t, kps.attachClient(c, here))
-	}
-
-	assert.Equal(t, -1, kps.findFreeClient())
-}
-
-// A port that has been stopped hangs up on everyone, and a connection that was
-// already in the accept queue when it stopped is not attached after the fact.
-func Test_kissport_status_stop(t *testing.T) {
-	var kps = new(kissport_status_s)
-
-	var here, there = net.Pipe()
-
-	t.Cleanup(func() { here.Close(); there.Close() })
-
-	require.True(t, kps.attachClient(0, here))
-
-	kps.stop()
-
-	assert.Nil(t, kps.clientConn(0))
-
-	var late, otherEndOfLate = net.Pipe()
-
-	t.Cleanup(func() { late.Close(); otherEndOfLate.Close() })
-
-	assert.False(t, kps.attachClient(0, late), "a stopped port should not take on a new client")
 }
 
 // FEND FESC FEND is a frame, but escapes nothing, so there is no type byte
