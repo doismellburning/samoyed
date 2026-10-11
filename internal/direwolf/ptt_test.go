@@ -997,3 +997,12 @@ func TestPTTSetPTT(t *testing.T) {
 
 	assert.Equal(t, []string{"PTT 0=1", "PTT 0=0"}, *set)
 }
+
+func TestPTTSetConnected(t *testing.T) {
+	var p, set = newRecordingPTT(t)
+
+	p.SetConnected(0, true)
+	p.SetConnected(0, false)
+
+	assert.Equal(t, []string{"CON 0=1", "CON 0=0"}, *set)
+}

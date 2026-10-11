@@ -363,6 +363,11 @@ func (p *PTT) SetPTT(channel int, on bool) {
 	p.Set(OCTYPE_PTT, channel, dwutil.IfThenElse(on, 1, 0))
 }
 
+// SetConnected turns a channel's connected indicator on or off.
+func (p *PTT) SetConnected(channel int, on bool) {
+	p.Set(OCTYPE_CON, channel, dwutil.IfThenElse(on, 1, 0))
+}
+
 // SetDCD turns a channel's data carrier detect indicator on or off.
 func (p *PTT) SetDCD(channel int, on bool) {
 	p.Set(OCTYPE_DCD, channel, dwutil.IfThenElse(on, 1, 0))
