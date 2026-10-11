@@ -236,7 +236,7 @@ func TestKissNetSendRecPacketSingleChannelPort(t *testing.T) {
 func TestKissNetSendRecPacketToOneClient(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 2)
 
-	kissNetClient{kns: kns, kps: kns.allPorts, client: 1, conn: kns.allPorts.clientConn(1)}.reply(0, kiss.CmdSetHardware, []byte("TXBUF:0"))
+	kissNetClient{kns: kns, kps: kns.allPorts, client: 1, conn: kns.allPorts.clientConn(1)}.Reply(0, kiss.CmdSetHardware, []byte("TXBUF:0"))
 
 	assert.Equal(t,
 		kiss.Encapsulate(append([]byte{kiss.CmdSetHardware}, []byte("TXBUF:0")...)),
@@ -263,8 +263,8 @@ func TestKissNetReplyNotToTheNextClientInTheSlot(t *testing.T) {
 	var server, newcomer = connectedTCPPair(t)
 	require.True(t, kps.attachClient(0, server))
 
-	asker.reply(0, kiss.CmdSetHardware, []byte("TNC:DIREWOLF"))
-	asker.prompt([]byte("\r\ncmd:"))
+	asker.Reply(0, kiss.CmdSetHardware, []byte("TNC:DIREWOLF"))
+	asker.Prompt([]byte("\r\ncmd:"))
 
 	requireNothingToRead(t, newcomer, "the newcomer was sent an answer to a question it never asked")
 }
@@ -275,7 +275,7 @@ func TestKissNetPrompt(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
 	var output = testutils.CaptureOutput(t, func() {
-		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
+		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.Prompt([]byte("\r\ncmd:"))
 	})
 
 	assert.Contains(t, output, "Is client app treating this like an old TNC with command mode?")
@@ -387,7 +387,7 @@ func TestKissNetDebugPrints(t *testing.T) {
 	assert.Equal(t, 1, testutils.LoggedEntry(t, hook, ">>> Data frame to KISS client application").Data["channel"])
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
+	kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.Prompt([]byte("\r\ncmd:"))
 
 	testutils.LoggedEntry(t, hook, ">>> Fake command prompt to KISS client application")
 }

@@ -251,7 +251,7 @@ func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 func TestKissSerialPrompt(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 0)
 
-	ks.prompt([]byte("\r\ncmd:"))
+	ks.Prompt([]byte("\r\ncmd:"))
 
 	assert.Equal(t, "\r\ncmd:", readSerialText(t, client, len("\r\ncmd:")))
 }
@@ -448,7 +448,7 @@ func TestKissSerialDebugPrints(t *testing.T) {
 	testutils.LoggedEntry(t, hook, "Packet content before adding KISS framing and any escapes")
 	assert.Equal(t, 1, testutils.LoggedEntry(t, hook, ">>> Data frame to KISS client application").Data["channel"])
 
-	ks.prompt([]byte("\r\ncmd:"))
+	ks.Prompt([]byte("\r\ncmd:"))
 
 	testutils.LoggedEntry(t, hook, ">>> Fake command prompt to KISS client application")
 }

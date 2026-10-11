@@ -39,15 +39,15 @@ type recordingClient struct {
 	sent *[]sentToClient
 }
 
-func (c recordingClient) reply(channel int, cmd int, frame []byte) {
+func (c recordingClient) Reply(channel int, cmd int, frame []byte) {
 	*c.sent = append(*c.sent, sentToClient{channel: channel, cmd: cmd, body: frame, prompt: false})
 }
 
-func (c recordingClient) prompt(text []byte) {
+func (c recordingClient) Prompt(text []byte) {
 	*c.sent = append(*c.sent, sentToClient{channel: 0, cmd: 0, body: text, prompt: true})
 }
 
-func (c recordingClient) radioChannel(frameChannel int) int {
+func (c recordingClient) RadioChannel(frameChannel int) int {
 	return frameChannel
 }
 

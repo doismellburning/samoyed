@@ -219,11 +219,11 @@ func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, frame []byte) {
 // The serial port has one client at the far end, which is where an answer to
 // anything it sends goes.
 
-func (ks *KissSerial) reply(channel int, cmd int, frame []byte) {
+func (ks *KissSerial) Reply(channel int, cmd int, frame []byte) {
 	ks.SendRecPacket(channel, cmd, frame)
 }
 
-func (ks *KissSerial) prompt(text []byte) {
+func (ks *KissSerial) Prompt(text []byte) {
 	var fd, failed = ks.port()
 	if fd == nil || failed {
 		return
@@ -236,7 +236,7 @@ func (ks *KissSerial) prompt(text []byte) {
 	ks.write(text)
 }
 
-func (ks *KissSerial) radioChannel(frameChannel int) int {
+func (ks *KissSerial) RadioChannel(frameChannel int) int {
 	return frameChannel
 }
 

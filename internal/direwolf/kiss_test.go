@@ -283,7 +283,7 @@ func TestKissPTSendRecPacketEscapes(t *testing.T) {
 func TestKissPTPrompt(t *testing.T) {
 	var kp, client = startKissPT(t, 0)
 
-	kp.prompt([]byte("\r\ncmd:"))
+	kp.Prompt([]byte("\r\ncmd:"))
 
 	assert.Equal(t, "\r\ncmd:", readKissText(t, client, len("\r\ncmd:")))
 }
@@ -457,7 +457,7 @@ func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	assert.Equal(t, 1, testutils.LoggedEntry(t, hook, ">>> Data frame to KISS client application").Data["channel"])
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	kp.prompt([]byte("\r\ncmd:"))
+	kp.Prompt([]byte("\r\ncmd:"))
 
 	readKissText(t, client, len("\r\ncmd:"))
 
