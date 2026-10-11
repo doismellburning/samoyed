@@ -34,20 +34,27 @@ func newNegotiationTestLink() *ax25_dlsm_t {
 	return S
 }
 
+// completeNegotiationOn is complete_negotiation in the shape of the
+// negotiation methods, for a test that tries it alongside them: it needs no
+// data link.
+func completeNegotiationOn(_ *AX25Link, S *ax25_dlsm_t, param *xid.Param) {
+	complete_negotiation(S, param)
+}
+
 // An XID command that specifies nothing should get back a complete set of
 // defaults, per the 2006 revision of the spec.
 func TestNegotiationResponseFillsInDefaults(t *testing.T) {
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	// Distinct from the 3000 mSec default so the two branches can be told apart.
-	ax25Link.miscConfig.frack = 5
+	link.miscConfig.frack = 5
 
 	var S = newNegotiationTestLink()
 
 	var param, _, status = xid.Parse(nil)
 	assert.True(t, status)
 
-	ax25Link.negotiation_response(S, param)
+	link.negotiation_response(S, param)
 
 	assert.Equal(t, ax25.Modulo8, param.Modulo)
 	assert.Equal(t, xid.SREJNone, param.SREJ)
@@ -77,9 +84,9 @@ func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			setupTestEnv(t)
+			var link = setupTestEnv(t)
 
-			ax25Link.miscConfig.frack = 5
+			link.miscConfig.frack = 5
 
 			var S = newNegotiationTestLink()
 
@@ -91,7 +98,7 @@ func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
 			param.AckTimer = maybe.Just(1000)       // Quicker than our FRACK.
 			param.Retries = maybe.Just(2)           // Fewer than our N2.
 
-			ax25Link.negotiation_response(S, param)
+			link.negotiation_response(S, param)
 
 			assert.Equal(t, maybe.Just(AX25_N1_PACLEN_MAX), param.IFieldLengthRx)
 			assert.Equal(t, maybe.Just(test.wantWindow), param.WindowSizeRx)
@@ -112,8 +119,6 @@ func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
 // that leaves a parameter out must not reset the running configuration to a
 // default, or to zero.
 func TestCompleteNegotiationKeepsWhatTheResponseOmits(t *testing.T) {
-	setupTestEnv(t)
-
 	var S = newNegotiationTestLink()
 
 	// Everything absent, as xid.Parse gives for an empty info field.
@@ -133,8 +138,6 @@ func TestCompleteNegotiationKeepsWhatTheResponseOmits(t *testing.T) {
 // A response that specifies one parameter applies that one and leaves the rest,
 // including converting the acknowledge timer from mSec to a Duration.
 func TestCompleteNegotiationAppliesOnlyWhatTheResponseSpecifies(t *testing.T) {
-	setupTestEnv(t)
-
 	var S = newNegotiationTestLink()
 
 	var param, _, status = xid.Parse(nil)
@@ -160,11 +163,11 @@ func TestCompleteNegotiationAppliesOnlyWhatTheResponseSpecifies(t *testing.T) {
 func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 	var paths = []struct {
 		name    string
-		apply   func(S *ax25_dlsm_t, param *xid.Param)
+		apply   func(link *AX25Link, S *ax25_dlsm_t, param *xid.Param)
 		command bool
 	}{
-		{"command", ax25Link.negotiation_response, true},
-		{"response", complete_negotiation, false},
+		{"command", (*AX25Link).negotiation_response, true},
+		{"response", completeNegotiationOn, false},
 	}
 
 	var tests = []struct {
@@ -194,7 +197,7 @@ func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 	for _, path := range paths {
 		for _, tc := range tests {
 			t.Run(path.name+"/"+tc.name, func(t *testing.T) {
-				setupTestEnv(t)
+				var link = setupTestEnv(t)
 
 				var hook = test.NewGlobal()
 
@@ -208,7 +211,7 @@ func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 				param.IFieldLengthRx = maybe.Just(tc.length)
 				param.WindowSizeRx = maybe.Just(tc.window)
 
-				path.apply(S, param)
+				path.apply(link, S, param)
 
 				assert.Equal(t, tc.wantModulo, S.modulo)
 				assert.Equal(t, tc.wantLength, S.n1_paclen)
@@ -239,15 +242,15 @@ func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 	var paths = []struct {
 		name  string
 		cr    ax25.CmdRes
-		apply func(S *ax25_dlsm_t, param *xid.Param)
+		apply func(link *AX25Link, S *ax25_dlsm_t, param *xid.Param)
 	}{
-		{"command", ax25.CRCmd, ax25Link.negotiation_response},
-		{"response", ax25.CRRes, complete_negotiation},
+		{"command", ax25.CRCmd, (*AX25Link).negotiation_response},
+		{"response", ax25.CRRes, completeNegotiationOn},
 	}
 
 	for _, path := range paths {
 		t.Run(path.name, func(t *testing.T) {
-			setupTestEnv(t)
+			var link = setupTestEnv(t)
 
 			var hook = test.NewGlobal()
 
@@ -263,7 +266,7 @@ func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 
 			var S = newNegotiationTestLink()
 
-			path.apply(S, param)
+			path.apply(link, S, param)
 
 			assert.Equal(t, AX25_K_MAXFRAME_BASIC_MIN, S.k_maxframe)
 
@@ -280,7 +283,7 @@ func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 // Answering an XID command, what we send back is what we now run with, so the
 // two ends agree - not the nonsense the other station asked for.
 func TestNegotiationResponseSendsBackWhatItApplied(t *testing.T) {
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	var S = newNegotiationTestLink()
 
@@ -290,7 +293,7 @@ func TestNegotiationResponseSendsBackWhatItApplied(t *testing.T) {
 	param.IFieldLengthRx = maybe.Just(0)
 	param.WindowSizeRx = maybe.Just(0)
 
-	ax25Link.negotiation_response(S, param)
+	link.negotiation_response(S, param)
 
 	assert.Equal(t, S.modulo, param.Modulo)
 	assert.Equal(t, maybe.Just(S.n1_paclen), param.IFieldLengthRx)
@@ -300,8 +303,6 @@ func TestNegotiationResponseSendsBackWhatItApplied(t *testing.T) {
 // A response that moves the link to modulo 8 but leaves the window size out
 // must not keep a window wider than modulo 8 can hold.
 func TestCompleteNegotiationNarrowsTheWindowToTheNewModulo(t *testing.T) {
-	setupTestEnv(t)
-
 	var S = newNegotiationTestLink()
 	S.modulo = ax25.Modulo128
 	S.k_maxframe = 32
@@ -320,8 +321,6 @@ func TestCompleteNegotiationNarrowsTheWindowToTheNewModulo(t *testing.T) {
 // A response that moves the link to modulo 128 but leaves the I field length
 // out must not keep an N1 too small for V2.2 segmentation to send anything.
 func TestCompleteNegotiationRaisesN1ToTheNewModulo(t *testing.T) {
-	setupTestEnv(t)
-
 	var S = newNegotiationTestLink()
 	S.n1_paclen = 1
 
@@ -348,7 +347,7 @@ func TestIgnoredConnectRequestIsLogged(t *testing.T) {
 		CHANNEL    = 1
 	)
 
-	setupTestEnv(t) // Leaves ax25Link.regCallsignList empty, so nothing is registered.
+	var link = setupTestEnv(t) // Registers no callsigns.
 
 	var hook = test.NewGlobal()
 
@@ -367,9 +366,9 @@ func TestIgnoredConnectRequestIsLogged(t *testing.T) {
 	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil)
 	require.NotNil(t, pp)
 
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
-	assert.Nil(t, ax25Link.listHead, "an unregistered callsign gets no link state machine")
+	assert.Nil(t, link.listHead, "an unregistered callsign gets no link state machine")
 
 	var entry = hook.LastEntry()
 
@@ -428,18 +427,18 @@ func TestDataRequestForALinkThatWasNeverConnected(t *testing.T) {
 		CHANNEL    = 0
 	)
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	var E = newDataRequest(MY_CALL, THEIR_CALL, CHANNEL, []byte("Testing"))
 
-	runWithTimeout(t, "dl_data_request", func() { ax25Link.dl_data_request(E) })
+	runWithTimeout(t, "dl_data_request", func() { link.dl_data_request(E) })
 
-	require.NotNil(t, ax25Link.listHead, "the request should have made a link")
-	assert.Equal(t, ax25Link.miscConfig.paclen, ax25Link.listHead.n1_paclen,
+	require.NotNil(t, link.listHead, "the request should have made a link")
+	assert.Equal(t, link.miscConfig.paclen, link.listHead.n1_paclen,
 		"a new link should start out able to carry what this station is configured for")
-	assert.Equal(t, ax25Link.miscConfig.maxframe_basic, ax25Link.listHead.k_maxframe)
-	assert.Equal(t, ax25Link.miscConfig.retry, ax25Link.listHead.n2_retry)
-	assert.Equal(t, ax25.Modulo8, ax25Link.listHead.modulo)
+	assert.Equal(t, link.miscConfig.maxframe_basic, link.listHead.k_maxframe)
+	assert.Equal(t, link.miscConfig.retry, link.listHead.n2_retry)
+	assert.Equal(t, ax25.Modulo8, link.listHead.modulo)
 }
 
 // A link can end up with a maximum information field that nothing will fit
@@ -466,9 +465,9 @@ func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			setupTestEnv(t)
+			var link = setupTestEnv(t)
 
-			var S = ax25Link.get_link_handle([ax25.MaxAddrs]string{OWNCALL: MY_CALL, PEERCALL: THEIR_CALL}, 2, CHANNEL, 0, true)
+			var S = link.get_link_handle([ax25.MaxAddrs]string{OWNCALL: MY_CALL, PEERCALL: THEIR_CALL}, 2, CHANNEL, 0, true)
 			require.NotNil(t, S)
 
 			S.modulo = testCase.modulo
@@ -476,7 +475,7 @@ func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
 
 			var E = newDataRequest(MY_CALL, THEIR_CALL, CHANNEL, []byte("Testing"))
 
-			runWithTimeout(t, "dl_data_request", func() { ax25Link.dl_data_request(E) })
+			runWithTimeout(t, "dl_data_request", func() { link.dl_data_request(E) })
 
 			assert.Nil(t, E.txdata, "data that cannot be sent should have been discarded")
 		})
@@ -499,19 +498,19 @@ func TestDLDataIndicationShortSegments(t *testing.T) {
 		{"empty fragment, reassembling", true, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			setupTestEnv(t)
+			var link = setupTestEnv(t)
 
-			var S = establishConnection(t, "Q1TEST", "Q2TEST", 0)
+			var S = establishConnection(t, link, "Q1TEST", "Q2TEST", 0)
 
 			if tc.reassembling {
-				ax25Link.dl_data_indication(S, ax25.PIDSegmentationFragment, firstSegment)
+				link.dl_data_indication(S, ax25.PIDSegmentationFragment, firstSegment)
 				require.NotNil(t, S.ra_buff)
 			}
 
 			var hook = test.NewGlobal()
 			t.Cleanup(hook.Reset)
 
-			ax25Link.dl_data_indication(S, ax25.PIDSegmentationFragment, tc.segment)
+			link.dl_data_indication(S, ax25.PIDSegmentationFragment, tc.segment)
 
 			assert.Nil(t, S.ra_buff, "a bad segment abandons any reassembly")
 			require.NotNil(t, hook.LastEntry())
@@ -523,23 +522,19 @@ func TestDLDataIndicationShortSegments(t *testing.T) {
 // A link coming up turns on its channel's connected indicator, and going down
 // turns it off again.
 func TestEnterNewStateSetsConnectedIndicator(t *testing.T) {
-	var origSetConnected = ax25Link.setConnected
-
-	t.Cleanup(func() { ax25Link.setConnected = origSetConnected })
-
 	var set []string
 
-	ax25Link.setConnected = func(channel int, on bool) {
+	var link = NewAX25Link(new(misc_config_s), func(channel int, on bool) {
 		set = append(set, fmt.Sprintf("%d=%t", channel, on))
-	}
+	}, nil, nil, 0)
 
 	var S = new(ax25_dlsm_t)
 	S.channel = 1
 	S.state = state_1_awaiting_connection
 
-	ax25Link.enter_new_state(S, state_3_connected)
-	ax25Link.enter_new_state(S, state_4_timer_recovery) // Still connected, so no change.
-	ax25Link.enter_new_state(S, state_0_disconnected)
+	link.enter_new_state(S, state_3_connected)
+	link.enter_new_state(S, state_4_timer_recovery) // Still connected, so no change.
+	link.enter_new_state(S, state_0_disconnected)
 
 	assert.Equal(t, []string{"1=true", "1=false"}, set)
 }
@@ -559,14 +554,8 @@ func (r *recordingLinkClients) OutstandingFramesReply(channel int, client int, o
 // A client asking how much is waiting on a link that doesn't exist is told
 // nothing is, rather than left waiting for an answer.
 func TestOutstandingFramesForNoLinkRepliesNone(t *testing.T) {
-	var saved = *ax25Link
-
-	t.Cleanup(func() { *ax25Link = saved })
-
-	*ax25Link = *NewAX25Link()
-
 	var clients = new(recordingLinkClients)
-	ax25_link_init(new(misc_config_s), nil, clients, nil, 0)
+	var link = NewAX25Link(new(misc_config_s), nil, clients, nil, 0)
 
 	var E = new(dlq_item_t)
 	E._chan = 0
@@ -575,7 +564,7 @@ func TestOutstandingFramesForNoLinkRepliesNone(t *testing.T) {
 	E.addrs[PEERCALL] = "Q2TEST"
 	E.num_addr = 2
 
-	testutils.CaptureOutput(t, func() { ax25Link.dl_outstanding_frames_request(E) })
+	testutils.CaptureOutput(t, func() { link.dl_outstanding_frames_request(E) })
 
 	assert.Equal(t, []string{"0/2 Q1TEST>Q2TEST 0"}, clients.replies)
 }

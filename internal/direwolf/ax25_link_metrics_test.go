@@ -26,7 +26,7 @@ func TestAX25LinkFirstTryConnectIsNotARetry(t *testing.T) {
 
 	var labels = map[string]string{"channel": "1"}
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	var before = metricValue(t, "samoyed_ax25_link_retries_total", labels)
 
@@ -38,7 +38,7 @@ func TestAX25LinkFirstTryConnectIsNotARetry(t *testing.T) {
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
-	ax25Link.dl_connect_request(E)
+	link.dl_connect_request(E)
 
 	// Peer acknowledges first time, so nothing was ever retransmitted.
 	var addrs [ax25.MaxAddrs]string
@@ -52,10 +52,10 @@ func TestAX25LinkFirstTryConnectIsNotARetry(t *testing.T) {
 	E._chan = CHANNEL
 	E.pp = pp
 
-	ax25Link.lm_data_indication(E)
+	link.lm_data_indication(E)
 
-	require.NotNil(t, ax25Link.listHead)
-	require.Equal(t, state_3_connected, ax25Link.listHead.state, "%+v", ax25Link.listHead)
+	require.NotNil(t, link.listHead)
+	require.Equal(t, state_3_connected, link.listHead.state, "%+v", link.listHead)
 
 	assert.InDelta(t, before, metricValue(t, "samoyed_ax25_link_retries_total", labels), 0,
 		"a first-try connect is not a retry")
@@ -72,7 +72,7 @@ func TestAX25LinkT1ExpiryCountsARetry(t *testing.T) {
 
 	var labels = map[string]string{"channel": "1"}
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	var E = new(dlq_item_t)
 	E._type = DLQ_CONNECT_REQUEST
@@ -81,15 +81,15 @@ func TestAX25LinkT1ExpiryCountsARetry(t *testing.T) {
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
-	ax25Link.dl_connect_request(E)
+	link.dl_connect_request(E)
 
-	require.NotNil(t, ax25Link.listHead)
-	require.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
+	require.NotNil(t, link.listHead)
+	require.Equal(t, state_1_awaiting_connection, link.listHead.state)
 
 	var before = metricValue(t, "samoyed_ax25_link_retries_total", labels)
 
 	// No UA came back, so T1 expires and the SABM is sent again.
-	ax25Link.t1_expiry(ax25Link.listHead)
+	link.t1_expiry(link.listHead)
 
 	assert.InDelta(t, before+1, metricValue(t, "samoyed_ax25_link_retries_total", labels), 0,
 		"a retransmitted SABM is a retry")
@@ -106,7 +106,7 @@ func TestAX25LinkT3ExpiryIsNotARetry(t *testing.T) {
 
 	var labels = map[string]string{"channel": "1"}
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	var E = new(dlq_item_t)
 	E._type = DLQ_CONNECT_REQUEST
@@ -115,7 +115,7 @@ func TestAX25LinkT3ExpiryIsNotARetry(t *testing.T) {
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
-	ax25Link.dl_connect_request(E)
+	link.dl_connect_request(E)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
@@ -128,14 +128,14 @@ func TestAX25LinkT3ExpiryIsNotARetry(t *testing.T) {
 	E._chan = CHANNEL
 	E.pp = pp
 
-	ax25Link.lm_data_indication(E)
+	link.lm_data_indication(E)
 
-	require.NotNil(t, ax25Link.listHead)
-	require.Equal(t, state_3_connected, ax25Link.listHead.state)
+	require.NotNil(t, link.listHead)
+	require.Equal(t, state_3_connected, link.listHead.state)
 
 	var before = metricValue(t, "samoyed_ax25_link_retries_total", labels)
 
-	ax25Link.t3_expiry(ax25Link.listHead)
+	link.t3_expiry(link.listHead)
 
 	assert.InDelta(t, before, metricValue(t, "samoyed_ax25_link_retries_total", labels), 0,
 		"a T3 keepalive poll is not a retry")

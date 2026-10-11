@@ -250,10 +250,11 @@ type dataLinkSource interface {
 }
 
 // recv_process drains the received data queue, q, until ctx is cancelled,
-// handing each frame received to rh.
-func recv_process(ctx context.Context, q dataLinkSource, rh *recPacketHandler) {
+// handing each frame received to rh and everything for the connected-mode
+// data link, frames included, to link.
+func recv_process(ctx context.Context, q dataLinkSource, link *AX25Link, rh *recPacketHandler) {
 	for ctx.Err() == nil {
-		var timeout_value = ax25Link.ax25_link_get_next_timer_expiry()
+		var timeout_value = link.ax25_link_get_next_timer_expiry()
 
 		var timed_out = q.WaitWhileEmpty(ctx, timeout_value)
 
@@ -264,7 +265,7 @@ func recv_process(ctx context.Context, q dataLinkSource, rh *recPacketHandler) {
 		}
 
 		if timed_out {
-			ax25Link.dl_timer_expiry()
+			link.dl_timer_expiry()
 		} else {
 			var pitem = q.Remove()
 
@@ -287,25 +288,25 @@ func recv_process(ctx context.Context, q dataLinkSource, rh *recPacketHandler) {
 					/*
 					 * Link processing.
 					 */
-					ax25Link.lm_data_indication(pitem)
+					link.lm_data_indication(pitem)
 				case DLQ_CONNECT_REQUEST:
-					ax25Link.dl_connect_request(pitem)
+					link.dl_connect_request(pitem)
 				case DLQ_DISCONNECT_REQUEST:
-					ax25Link.dl_disconnect_request(pitem)
+					link.dl_disconnect_request(pitem)
 				case DLQ_XMIT_DATA_REQUEST:
-					ax25Link.dl_data_request(pitem)
+					link.dl_data_request(pitem)
 				case DLQ_REGISTER_CALLSIGN:
-					ax25Link.dl_register_callsign(pitem)
+					link.dl_register_callsign(pitem)
 				case DLQ_UNREGISTER_CALLSIGN:
-					ax25Link.dl_unregister_callsign(pitem)
+					link.dl_unregister_callsign(pitem)
 				case DLQ_OUTSTANDING_FRAMES_REQUEST:
-					ax25Link.dl_outstanding_frames_request(pitem)
+					link.dl_outstanding_frames_request(pitem)
 				case DLQ_CHANNEL_BUSY:
-					ax25Link.lm_channel_busy(pitem)
+					link.lm_channel_busy(pitem)
 				case DLQ_SEIZE_CONFIRM:
-					ax25Link.lm_seize_confirm(pitem)
+					link.lm_seize_confirm(pitem)
 				case DLQ_CLIENT_CLEANUP:
-					ax25Link.dl_client_cleanup(pitem)
+					link.dl_client_cleanup(pitem)
 				}
 
 				q.Delete(pitem)

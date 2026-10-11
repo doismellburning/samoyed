@@ -136,7 +136,7 @@ func Test_AX25_Link(t *testing.T) {
 }
 
 // Helper to set up a fresh test environment
-func setupTestEnv(t *testing.T) {
+func setupTestEnv(t *testing.T) *AX25Link {
 	t.Helper()
 
 	var tq = newTestTransmitQueue(new(RadioConfig))
@@ -150,14 +150,11 @@ func setupTestEnv(t *testing.T) {
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 	miscConfig.maxv22 = 0 // Default: don't try v2.2 (for most tests)
 
-	ax25_link_init(miscConfig, nil, nil, tq, 1)
-
-	ax25Link.listHead = nil
-	ax25Link.regCallsignList = nil // Clear registered callsigns
+	return NewAX25Link(miscConfig, nil, nil, tq, 1)
 }
 
 // Helper to set up environment with v2.2 support enabled
-func setupTestEnvV22(t *testing.T) {
+func setupTestEnvV22(t *testing.T) *AX25Link {
 	t.Helper()
 
 	var tq = newTestTransmitQueue(new(RadioConfig))
@@ -171,14 +168,11 @@ func setupTestEnvV22(t *testing.T) {
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 	miscConfig.maxv22 = 3 // Enable v2.2
 
-	ax25_link_init(miscConfig, nil, nil, tq, 1)
-
-	ax25Link.listHead = nil
-	ax25Link.regCallsignList = nil // Clear registered callsigns
+	return NewAX25Link(miscConfig, nil, nil, tq, 1)
 }
 
 // Helper to initiate a connect request
-func initiateConnect(t *testing.T, myCall, theirCall string, channel int) {
+func initiateConnect(t *testing.T, link *AX25Link, myCall, theirCall string, channel int) {
 	t.Helper()
 
 	var E = new(dlq_item_t)
@@ -188,25 +182,25 @@ func initiateConnect(t *testing.T, myCall, theirCall string, channel int) {
 	E.addrs[PEERCALL] = theirCall
 	E.num_addr = 2
 
-	ax25Link.dl_connect_request(E)
+	link.dl_connect_request(E)
 }
 
 // Helper to simulate receiving a frame
-func receiveFrame(t *testing.T, pp *ax25.Packet, channel int) {
+func receiveFrame(t *testing.T, link *AX25Link, pp *ax25.Packet, channel int) {
 	t.Helper()
 
 	var E = new(dlq_item_t)
 	E._chan = channel
 	E.pp = pp
 
-	ax25Link.lm_data_indication(E)
+	link.lm_data_indication(E)
 }
 
 // Helper to establish a connection (SABM/UA exchange)
-func establishConnection(t *testing.T, myCall, theirCall string, channel int) *ax25_dlsm_t { //nolint:unparam
+func establishConnection(t *testing.T, link *AX25Link, myCall, theirCall string, channel int) *ax25_dlsm_t { //nolint:unparam
 	t.Helper()
 
-	initiateConnect(t, myCall, theirCall, channel)
+	initiateConnect(t, link, myCall, theirCall, channel)
 
 	// Receive UA response
 	var addrs [ax25.MaxAddrs]string
@@ -215,12 +209,12 @@ func establishConnection(t *testing.T, myCall, theirCall string, channel int) *a
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	assert.NotNil(t, pp)
 
-	receiveFrame(t, pp, channel)
+	receiveFrame(t, link, pp, channel)
 
-	assert.NotNil(t, ax25Link.listHead)
-	assert.Equal(t, state_3_connected, ax25Link.listHead.state)
+	assert.NotNil(t, link.listHead)
+	assert.Equal(t, state_3_connected, link.listHead.state)
 
-	return ax25Link.listHead
+	return link.listHead
 }
 
 // ============================================================================
@@ -237,7 +231,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	var THEIR_CALL = "2E0KGG"
 	const CHANNEL = 1
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	var E *dlq_item_t
 	var pp *ax25.Packet
@@ -251,7 +245,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
-	ax25Link.dl_connect_request(E)
+	link.dl_connect_request(E)
 
 	// Now acknowledge
 	addrs[OWNCALL] = THEIR_CALL
@@ -263,17 +257,17 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	E._chan = CHANNEL
 	E.pp = pp
 
-	ax25Link.lm_data_indication(E)
+	link.lm_data_indication(E)
 
 	// And now we should be connected!
-	assert.NotNil(t, ax25Link.listHead)
-	assert.Equal(t, state_3_connected, ax25Link.listHead.state, "%+v", ax25Link.listHead)
+	assert.NotNil(t, link.listHead)
+	assert.Equal(t, state_3_connected, link.listHead.state, "%+v", link.listHead)
 
 	// Verify state variables initialized
-	assert.Equal(t, 0, ax25Link.listHead.vs, "V(S) should be 0")
-	assert.Equal(t, 0, ax25Link.listHead.vr, "V(R) should be 0")
-	assert.Equal(t, 0, ax25Link.listHead.va, "V(A) should be 0")
-	assert.Equal(t, ax25.Modulo(8), ax25Link.listHead.modulo, "Should be modulo 8")
+	assert.Equal(t, 0, link.listHead.vs, "V(S) should be 0")
+	assert.Equal(t, 0, link.listHead.vr, "V(R) should be 0")
+	assert.Equal(t, 0, link.listHead.va, "V(A) should be 0")
+	assert.Equal(t, ax25.Modulo(8), link.listHead.modulo, "Should be modulo 8")
 }
 
 // SABME/UA Exchange (Modulo 128)
@@ -284,14 +278,14 @@ func TestAX25LinkSABMEConnection(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnvV22(t) // Use v2.2 enabled environment
+	var link = setupTestEnvV22(t) // Use v2.2 enabled environment
 
 	// Initiate connection - will try SABME first for v2.2
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Should be in awaiting v2.2 connection state
-	assert.NotNil(t, ax25Link.listHead)
-	assert.Equal(t, state_5_awaiting_v22_connection, ax25Link.listHead.state)
+	assert.NotNil(t, link.listHead)
+	assert.Equal(t, state_5_awaiting_v22_connection, link.listHead.state)
 
 	// Receive UA response (accepting v2.2)
 	var addrs [ax25.MaxAddrs]string
@@ -300,11 +294,11 @@ func TestAX25LinkSABMEConnection(t *testing.T) {
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	assert.NotNil(t, pp)
 
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should now be connected with modulo 128
-	assert.Equal(t, state_3_connected, ax25Link.listHead.state)
-	assert.Equal(t, ax25.Modulo(128), ax25Link.listHead.modulo, "Should be modulo 128 for v2.2")
+	assert.Equal(t, state_3_connected, link.listHead.state)
+	assert.Equal(t, ax25.Modulo(128), link.listHead.modulo, "Should be modulo 128 for v2.2")
 }
 
 // Connection Rejected with DM
@@ -315,9 +309,9 @@ func TestAX25LinkConnectionRejectedWithDM(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive DM response (connection rejected)
 	var addrs [ax25.MaxAddrs]string
@@ -326,11 +320,11 @@ func TestAX25LinkConnectionRejectedWithDM(t *testing.T) {
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUDM, 1, 0, nil)
 	assert.NotNil(t, pp)
 
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should return to disconnected state
-	assert.NotNil(t, ax25Link.listHead)
-	assert.Equal(t, state_0_disconnected, ax25Link.listHead.state, "Should be disconnected after DM")
+	assert.NotNil(t, link.listHead)
+	assert.Equal(t, state_0_disconnected, link.listHead.state, "Should be disconnected after DM")
 }
 
 // Normal DISC/UA Exchange
@@ -341,10 +335,10 @@ func TestAX25LinkDISCDisconnection(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	// First establish a connection
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 	assert.Equal(t, state_3_connected, S.state)
 
 	// Request disconnection
@@ -355,7 +349,7 @@ func TestAX25LinkDISCDisconnection(t *testing.T) {
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
-	ax25Link.dl_disconnect_request(E)
+	link.dl_disconnect_request(E)
 
 	// Should be in awaiting release state
 	assert.Equal(t, state_2_awaiting_release, S.state)
@@ -367,7 +361,7 @@ func TestAX25LinkDISCDisconnection(t *testing.T) {
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
 	assert.NotNil(t, pp)
 
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should now be disconnected
 	assert.Equal(t, state_0_disconnected, S.state)
@@ -381,7 +375,7 @@ func TestAX25LinkDISCInDisconnectedState(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	// Register our callsign to receive frames
 	var regE = new(dlq_item_t)
@@ -389,7 +383,7 @@ func TestAX25LinkDISCInDisconnectedState(t *testing.T) {
 	regE._chan = CHANNEL
 	regE.addrs[0] = MY_CALL // Register uses addrs[0]
 	regE.client = 0
-	ax25Link.dl_register_callsign(regE)
+	link.dl_register_callsign(regE)
 
 	// Receive DISC in disconnected state
 	var addrs [ax25.MaxAddrs]string
@@ -398,11 +392,11 @@ func TestAX25LinkDISCInDisconnectedState(t *testing.T) {
 	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUDISC, 1, 0, nil)
 	assert.NotNil(t, pp)
 
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should respond with DM and remain disconnected (no state machine created)
 	// The frame processing should not crash
-	// ax25Link.listHead should still be nil as no connection was established
+	// link.listHead should still be nil as no connection was established
 }
 
 // ============================================================================
@@ -417,9 +411,9 @@ func TestAX25LinkIFrameExchange(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive I-frame with N(S)=0
 	var addrs [ax25.MaxAddrs]string
@@ -429,7 +423,7 @@ func TestAX25LinkIFrameExchange(t *testing.T) {
 	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 0, 0, ax25.PIDNoLayer3, info)
 	assert.NotNil(t, pp)
 
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// V(R) should increment to 1
 	assert.Equal(t, 1, S.vr, "V(R) should be 1 after receiving I-frame")
@@ -444,9 +438,9 @@ func TestAX25LinkRRResponse(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive RR with N(R)=0 (poll)
 	var addrs [ax25.MaxAddrs]string
@@ -455,7 +449,7 @@ func TestAX25LinkRRResponse(t *testing.T) {
 	var pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSRR, 8, 0, 1, nil)
 	assert.NotNil(t, pp)
 
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should still be connected
 	assert.Equal(t, state_3_connected, S.state)
@@ -469,9 +463,9 @@ func TestAX25LinkRNRFlowControl(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive RNR (peer busy)
 	var addrs [ax25.MaxAddrs]string
@@ -480,14 +474,14 @@ func TestAX25LinkRNRFlowControl(t *testing.T) {
 	var pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSRNR, 8, 0, 0, nil)
 	assert.NotNil(t, pp)
 
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Peer receiver busy flag should be set
 	assert.True(t, S.peer_receiver_busy, "Peer receiver busy should be set")
 
 	// Now receive RR to clear busy condition
 	pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSRR, 8, 0, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Peer receiver busy should be cleared
 	assert.False(t, S.peer_receiver_busy, "Peer receiver busy should be cleared")
@@ -506,9 +500,9 @@ func TestAX25LinkREJErrorRecovery(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive REJ command with P=1 (poll)
 	// This tests REJ handling when no frames are outstanding
@@ -518,7 +512,7 @@ func TestAX25LinkREJErrorRecovery(t *testing.T) {
 	var pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSREJ, 8, 0, 1, nil) // P=1
 	assert.NotNil(t, pp)
 
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should still be connected (REJ with valid N(R)=0 when V(A)=0 is valid)
 	assert.Equal(t, state_3_connected, S.state)
@@ -536,7 +530,7 @@ func TestAX25LinkIncomingSABM(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	// Register our callsign for incoming connections
 	// dl_register_callsign uses addrs[0] for the callsign
@@ -545,7 +539,7 @@ func TestAX25LinkIncomingSABM(t *testing.T) {
 	regE._chan = CHANNEL
 	regE.addrs[0] = MY_CALL // Register uses addrs[0]
 	regE.client = 0
-	ax25Link.dl_register_callsign(regE)
+	link.dl_register_callsign(regE)
 
 	// Receive SABM from peer
 	var addrs [ax25.MaxAddrs]string
@@ -554,16 +548,16 @@ func TestAX25LinkIncomingSABM(t *testing.T) {
 	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil)
 	assert.NotNil(t, pp)
 
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should now be connected
-	if assert.NotNil(t, ax25Link.listHead, "Should have created state machine for incoming connection") {
-		assert.Equal(t, state_3_connected, ax25Link.listHead.state)
+	if assert.NotNil(t, link.listHead, "Should have created state machine for incoming connection") {
+		assert.Equal(t, state_3_connected, link.listHead.state)
 
 		// Verify state variables initialized
-		assert.Equal(t, 0, ax25Link.listHead.vs, "V(S) should be 0")
-		assert.Equal(t, 0, ax25Link.listHead.vr, "V(R) should be 0")
-		assert.Equal(t, 0, ax25Link.listHead.va, "V(A) should be 0")
+		assert.Equal(t, 0, link.listHead.vs, "V(S) should be 0")
+		assert.Equal(t, 0, link.listHead.vr, "V(R) should be 0")
+		assert.Equal(t, 0, link.listHead.va, "V(A) should be 0")
 	}
 }
 
@@ -583,9 +577,9 @@ func TestAX25LinkStateVariables(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Initial state variables
 	assert.Equal(t, 0, S.vs, "Initial V(S) should be 0")
@@ -593,16 +587,16 @@ func TestAX25LinkStateVariables(t *testing.T) {
 	assert.Equal(t, 0, S.va, "Initial V(A) should be 0")
 
 	// Test SET_VS
-	ax25Link.SET_VS(S, 3)
+	link.SET_VS(S, 3)
 	assert.Equal(t, 3, S.vs, "V(S) should be 3")
 
 	// Test SET_VR
-	ax25Link.SET_VR(S, 2)
+	link.SET_VR(S, 2)
 	assert.Equal(t, 2, S.vr, "V(R) should be 2")
 
 	// Test SET_VA - need VS to be >= VA value first
 	S.vs = 5 // Set VS high enough
-	ax25Link.SET_VA(S, 1)
+	link.SET_VA(S, 1)
 	assert.Equal(t, 1, S.va, "V(A) should be 1")
 
 	// Test WITHIN_WINDOW_SIZE
@@ -627,9 +621,9 @@ func TestAX25LinkMultipleIFrames(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Destination] = MY_CALL
@@ -640,7 +634,7 @@ func TestAX25LinkMultipleIFrames(t *testing.T) {
 		var info = []byte("Frame " + string(rune('0'+ns)))
 		var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, ns, 0, ax25.PIDNoLayer3, info)
 		assert.NotNil(t, pp)
-		receiveFrame(t, pp, CHANNEL)
+		receiveFrame(t, link, pp, CHANNEL)
 
 		// V(R) should increment
 		assert.Equal(t, ns+1, S.vr, "V(R) should be %d after frame %d", ns+1, ns)
@@ -657,9 +651,9 @@ func TestAX25LinkOutOfSequenceIFrame(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Destination] = MY_CALL
@@ -667,12 +661,12 @@ func TestAX25LinkOutOfSequenceIFrame(t *testing.T) {
 
 	// Receive I-frame 0
 	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 0, 0, ax25.PIDNoLayer3, []byte("Frame 0"))
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 	assert.Equal(t, 1, S.vr, "V(R) should be 1")
 
 	// Receive I-frame 2 (out of sequence, expecting 1)
 	pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 2, 0, ax25.PIDNoLayer3, []byte("Frame 2"))
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// V(R) should NOT increment (frame rejected)
 	assert.Equal(t, 1, S.vr, "V(R) should still be 1")
@@ -688,9 +682,9 @@ func TestAX25LinkIFrameWithAck(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Simulate that we've sent some frames by setting V(S)
 	S.vs = 3
@@ -701,7 +695,7 @@ func TestAX25LinkIFrameWithAck(t *testing.T) {
 
 	// Receive I-frame with N(R)=2 (acknowledging our frames 0 and 1)
 	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 2, 0, 0, ax25.PIDNoLayer3, []byte("Data"))
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// V(A) should be updated to 2
 	assert.Equal(t, 2, S.va, "V(A) should be 2 after receiving N(R)=2")
@@ -719,9 +713,9 @@ func TestAX25LinkDISCWhileConnected(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 	assert.Equal(t, state_3_connected, S.state)
 
 	// Receive DISC from peer
@@ -729,7 +723,7 @@ func TestAX25LinkDISCWhileConnected(t *testing.T) {
 	addrs[ax25.Destination] = MY_CALL
 	addrs[ax25.Source] = THEIR_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUDISC, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should transition to disconnected
 	assert.Equal(t, state_0_disconnected, S.state)
@@ -743,9 +737,9 @@ func TestAX25LinkSABMWhileConnected(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Set some non-zero state variables
 	S.vs = 3
@@ -757,7 +751,7 @@ func TestAX25LinkSABMWhileConnected(t *testing.T) {
 	addrs[ax25.Destination] = MY_CALL
 	addrs[ax25.Source] = THEIR_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should remain connected but state variables reset
 	assert.Equal(t, state_3_connected, S.state)
@@ -774,9 +768,9 @@ func TestAX25LinkDMAfterDISC(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Request disconnection
 	var E = new(dlq_item_t)
@@ -785,7 +779,7 @@ func TestAX25LinkDMAfterDISC(t *testing.T) {
 	E.addrs[OWNCALL] = MY_CALL
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
-	ax25Link.dl_disconnect_request(E)
+	link.dl_disconnect_request(E)
 
 	assert.Equal(t, state_2_awaiting_release, S.state)
 
@@ -794,7 +788,7 @@ func TestAX25LinkDMAfterDISC(t *testing.T) {
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUDM, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should transition to disconnected
 	assert.Equal(t, state_0_disconnected, S.state)
@@ -808,13 +802,13 @@ func TestAX25LinkSABMCollision(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	// Initiate connection (sends SABM, enters awaiting connection)
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
-	assert.NotNil(t, ax25Link.listHead)
-	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
+	assert.NotNil(t, link.listHead)
+	assert.Equal(t, state_1_awaiting_connection, link.listHead.state)
 
 	// Receive SABM from peer (collision)
 	// Per the protocol, we send UA but stay in state 1 waiting for peer's UA
@@ -822,19 +816,19 @@ func TestAX25LinkSABMCollision(t *testing.T) {
 	addrs[ax25.Destination] = MY_CALL
 	addrs[ax25.Source] = THEIR_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Still in state 1 - we sent UA but still waiting for their UA
-	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
+	assert.Equal(t, state_1_awaiting_connection, link.listHead.state)
 
 	// Now receive the UA from peer (completing the collision resolution)
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 	pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Now should be connected
-	assert.Equal(t, state_3_connected, ax25Link.listHead.state)
+	assert.Equal(t, state_3_connected, link.listHead.state)
 }
 
 // Timer recovery state entry on receiving poll
@@ -845,12 +839,12 @@ func TestAX25LinkTimerRecoveryState(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Manually put into timer recovery state
-	ax25Link.enter_new_state(S, state_4_timer_recovery)
+	link.enter_new_state(S, state_4_timer_recovery)
 	assert.Equal(t, state_4_timer_recovery, S.state)
 
 	// Receive RR with F=1 (response to our poll)
@@ -858,7 +852,7 @@ func TestAX25LinkTimerRecoveryState(t *testing.T) {
 	addrs[ax25.Destination] = MY_CALL
 	addrs[ax25.Source] = THEIR_CALL
 	var pp = ax25.SFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeSRR, 8, 0, 1, nil) // F=1
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should return to connected state
 	assert.Equal(t, state_3_connected, S.state)
@@ -876,18 +870,18 @@ func TestAX25LinkSREJFrame(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnvV22(t) // SREJ requires v2.2
+	var link = setupTestEnvV22(t) // SREJ requires v2.2
 
 	// Establish v2.2 connection
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
-	var S = ax25Link.listHead
+	var S = link.listHead
 	assert.Equal(t, state_3_connected, S.state)
 	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
@@ -898,7 +892,7 @@ func TestAX25LinkSREJFrame(t *testing.T) {
 	addrs[ax25.Destination] = MY_CALL
 	addrs[ax25.Source] = THEIR_CALL
 	pp = ax25.SFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeSSREJ, 128, 2, 1, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should still be connected
 	assert.Equal(t, state_3_connected, S.state)
@@ -916,9 +910,9 @@ func TestAX25LinkWindowSize(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Default k=4 for modulo 8
 	S.k_maxframe = 4
@@ -953,18 +947,18 @@ func TestAX25LinkWindowSizeMod128(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnvV22(t)
+	var link = setupTestEnvV22(t)
 
 	// Establish v2.2 connection
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
-	var S = ax25Link.listHead
+	var S = link.listHead
 	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
 	// Default k=32 for modulo 128
@@ -993,13 +987,13 @@ func TestAX25LinkFRMRResponse(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnvV22(t)
+	var link = setupTestEnvV22(t)
 
 	// Initiate v2.2 connection
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
-	assert.NotNil(t, ax25Link.listHead)
-	assert.Equal(t, state_5_awaiting_v22_connection, ax25Link.listHead.state)
+	assert.NotNil(t, link.listHead)
+	assert.Equal(t, state_5_awaiting_v22_connection, link.listHead.state)
 
 	// Receive FRMR (peer doesn't understand SABME)
 	var addrs [ax25.MaxAddrs]string
@@ -1008,12 +1002,12 @@ func TestAX25LinkFRMRResponse(t *testing.T) {
 	// FRMR has info field with error details
 	var frmrInfo = []byte{0x00, 0x00, 0x00} // Minimal FRMR info
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUFRMR, 1, 0, frmrInfo)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should fall back to v2.0 and retry with SABM
 	// State should be awaiting connection (v2.0)
-	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
-	assert.Equal(t, ax25.Modulo(8), ax25Link.listHead.modulo, "Should fall back to modulo 8")
+	assert.Equal(t, state_1_awaiting_connection, link.listHead.state)
+	assert.Equal(t, ax25.Modulo(8), link.listHead.modulo, "Should fall back to modulo 8")
 }
 
 // ============================================================================
@@ -1028,9 +1022,9 @@ func TestAX25LinkPollResponse(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Destination] = MY_CALL
@@ -1038,7 +1032,7 @@ func TestAX25LinkPollResponse(t *testing.T) {
 
 	// Receive I-frame with P=1 (poll)
 	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 0, 1, ax25.PIDNoLayer3, []byte("Poll"))
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// V(R) should increment
 	assert.Equal(t, 1, S.vr)
@@ -1054,9 +1048,9 @@ func TestAX25LinkRRPoll(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Destination] = MY_CALL
@@ -1064,7 +1058,7 @@ func TestAX25LinkRRPoll(t *testing.T) {
 
 	// Receive RR with P=1
 	var pp = ax25.SFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeSRR, 8, 0, 1, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should remain connected
 	assert.Equal(t, state_3_connected, S.state)
@@ -1082,40 +1076,40 @@ func TestAX25LinkIsGoodNR(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// V(A)=0, V(S)=0: only N(R)=0 is valid
 	S.va = 0
 	S.vs = 0
-	assert.True(t, ax25Link.is_good_nr(S, 0), "N(R)=0 valid when V(A)=0, V(S)=0")
-	assert.False(t, ax25Link.is_good_nr(S, 1), "N(R)=1 invalid when V(S)=0")
+	assert.True(t, link.is_good_nr(S, 0), "N(R)=0 valid when V(A)=0, V(S)=0")
+	assert.False(t, link.is_good_nr(S, 1), "N(R)=1 invalid when V(S)=0")
 
 	// V(A)=0, V(S)=3: N(R) 0-3 valid
 	S.vs = 3
-	assert.True(t, ax25Link.is_good_nr(S, 0), "N(R)=0 valid")
-	assert.True(t, ax25Link.is_good_nr(S, 1), "N(R)=1 valid")
-	assert.True(t, ax25Link.is_good_nr(S, 2), "N(R)=2 valid")
-	assert.True(t, ax25Link.is_good_nr(S, 3), "N(R)=3 valid")
-	assert.False(t, ax25Link.is_good_nr(S, 4), "N(R)=4 invalid")
+	assert.True(t, link.is_good_nr(S, 0), "N(R)=0 valid")
+	assert.True(t, link.is_good_nr(S, 1), "N(R)=1 valid")
+	assert.True(t, link.is_good_nr(S, 2), "N(R)=2 valid")
+	assert.True(t, link.is_good_nr(S, 3), "N(R)=3 valid")
+	assert.False(t, link.is_good_nr(S, 4), "N(R)=4 invalid")
 
 	// V(A)=2, V(S)=5: N(R) 2-5 valid
 	S.va = 2
 	S.vs = 5
-	assert.False(t, ax25Link.is_good_nr(S, 1), "N(R)=1 invalid (< V(A))")
-	assert.True(t, ax25Link.is_good_nr(S, 2), "N(R)=2 valid")
-	assert.True(t, ax25Link.is_good_nr(S, 5), "N(R)=5 valid")
-	assert.False(t, ax25Link.is_good_nr(S, 6), "N(R)=6 invalid")
+	assert.False(t, link.is_good_nr(S, 1), "N(R)=1 invalid (< V(A))")
+	assert.True(t, link.is_good_nr(S, 2), "N(R)=2 valid")
+	assert.True(t, link.is_good_nr(S, 5), "N(R)=5 valid")
+	assert.False(t, link.is_good_nr(S, 6), "N(R)=6 invalid")
 
 	// Test wrap-around: V(A)=6, V(S)=2 (wrapped)
 	S.va = 6
 	S.vs = 2
-	assert.True(t, ax25Link.is_good_nr(S, 6), "N(R)=6 valid")
-	assert.True(t, ax25Link.is_good_nr(S, 7), "N(R)=7 valid")
-	assert.True(t, ax25Link.is_good_nr(S, 0), "N(R)=0 valid (wrapped)")
-	assert.True(t, ax25Link.is_good_nr(S, 2), "N(R)=2 valid")
-	assert.False(t, ax25Link.is_good_nr(S, 3), "N(R)=3 invalid")
+	assert.True(t, link.is_good_nr(S, 6), "N(R)=6 valid")
+	assert.True(t, link.is_good_nr(S, 7), "N(R)=7 valid")
+	assert.True(t, link.is_good_nr(S, 0), "N(R)=0 valid (wrapped)")
+	assert.True(t, link.is_good_nr(S, 2), "N(R)=2 valid")
+	assert.False(t, link.is_good_nr(S, 3), "N(R)=3 invalid")
 }
 
 // ============================================================================
@@ -1130,20 +1124,20 @@ func TestAX25LinkT1Timer(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Initially T1 should not be running
-	assert.False(t, ax25Link.IS_T1_RUNNING(S), "T1 should not be running initially")
+	assert.False(t, link.IS_T1_RUNNING(S), "T1 should not be running initially")
 
 	// Start T1
-	ax25Link.START_T1(S)
-	assert.True(t, ax25Link.IS_T1_RUNNING(S), "T1 should be running after START_T1")
+	link.START_T1(S)
+	assert.True(t, link.IS_T1_RUNNING(S), "T1 should be running after START_T1")
 
 	// Stop T1
-	ax25Link.STOP_T1(S)
-	assert.False(t, ax25Link.IS_T1_RUNNING(S), "T1 should not be running after STOP_T1")
+	link.STOP_T1(S)
+	assert.False(t, link.IS_T1_RUNNING(S), "T1 should not be running after STOP_T1")
 }
 
 // T3 timer start/stop
@@ -1154,16 +1148,16 @@ func TestAX25LinkT3Timer(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Start T3
-	ax25Link.START_T3(S)
+	link.START_T3(S)
 	assert.False(t, S.t3_exp.IsZero(), "T3 should be running after START_T3")
 
 	// Stop T3
-	ax25Link.STOP_T3(S)
+	link.STOP_T3(S)
 	assert.True(t, S.t3_exp.IsZero(), "T3 should not be running after STOP_T3")
 }
 
@@ -1175,21 +1169,21 @@ func TestAX25LinkT1PauseResume(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
-	ax25Link.START_T1(S)
-	assert.True(t, ax25Link.IS_T1_RUNNING(S))
+	link.START_T1(S)
+	assert.True(t, link.IS_T1_RUNNING(S))
 
 	// Pause T1
-	ax25Link.PAUSE_T1(S)
+	link.PAUSE_T1(S)
 	assert.False(t, S.t1_paused_at.IsZero(), "T1 should be paused")
 
 	// Resume T1
-	ax25Link.RESUME_T1(S)
+	link.RESUME_T1(S)
 	assert.True(t, S.t1_paused_at.IsZero(), "T1 should not be paused after resume")
-	assert.True(t, ax25Link.IS_T1_RUNNING(S), "T1 should still be running")
+	assert.True(t, link.IS_T1_RUNNING(S), "T1 should still be running")
 }
 
 // Timer expiry functions can be called directly
@@ -1200,15 +1194,15 @@ func TestAX25LinkT1Expiry(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Set retry counter
-	ax25Link.SET_RC(S, 0)
+	link.SET_RC(S, 0)
 
 	// Call t1_expiry - should increment RC and potentially change state
-	ax25Link.t1_expiry(S)
+	link.t1_expiry(S)
 
 	// RC should have incremented
 	assert.Equal(t, 1, S.rc, "RC should increment on T1 expiry")
@@ -1222,12 +1216,12 @@ func TestAX25LinkT3Expiry(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Call t3_expiry - should send a poll
-	ax25Link.t3_expiry(S)
+	link.t3_expiry(S)
 
 	// State should remain connected or go to timer recovery
 	assert.True(t, S.state == state_3_connected || S.state == state_4_timer_recovery)
@@ -1245,23 +1239,23 @@ func TestAX25LinkSABMDISCCollision(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	// Initiate connection
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
-	assert.NotNil(t, ax25Link.listHead)
-	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
+	assert.NotNil(t, link.listHead)
+	assert.Equal(t, state_1_awaiting_connection, link.listHead.state)
 
 	// Receive DISC while awaiting connection
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Destination] = MY_CALL
 	addrs[ax25.Source] = THEIR_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUDISC, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Protocol sends DM but stays in awaiting connection state
-	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
+	assert.Equal(t, state_1_awaiting_connection, link.listHead.state)
 }
 
 // Unexpected UA in connected state triggers link reset
@@ -1272,9 +1266,9 @@ func TestAX25LinkUnexpectedUA(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Set some state
 	S.vs = 3
@@ -1285,7 +1279,7 @@ func TestAX25LinkUnexpectedUA(t *testing.T) {
 	addrs[ax25.Destination] = MY_CALL
 	addrs[ax25.Source] = THEIR_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 0, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should trigger link reset - state goes to awaiting connection
 	assert.True(t, S.state == state_1_awaiting_connection || S.state == state_5_awaiting_v22_connection,
@@ -1372,18 +1366,18 @@ func TestAX25LinkXIDFrameConnected(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnvV22(t)
+	var link = setupTestEnvV22(t)
 
 	// Establish v2.2 connection
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
-	var S = ax25Link.listHead
+	var S = link.listHead
 	assert.Equal(t, state_3_connected, S.state)
 
 	// Receive XID command
@@ -1401,7 +1395,7 @@ func TestAX25LinkXIDFrameConnected(t *testing.T) {
 	addrs[ax25.Destination] = MY_CALL
 	addrs[ax25.Source] = THEIR_CALL
 	pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUXID, 1, 0, xidInfo)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should still be connected
 	assert.Equal(t, state_3_connected, S.state)
@@ -1498,17 +1492,17 @@ func TestAX25LinkModulo8WrapAround(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Test sequence wrap from 7 to 0
 	S.vs = 7
-	ax25Link.SET_VS(S, AX25MODULO(S.vs+1, S.modulo))
+	link.SET_VS(S, AX25MODULO(S.vs+1, S.modulo))
 	assert.Equal(t, 0, S.vs, "V(S) should wrap from 7 to 0")
 
 	S.vr = 7
-	ax25Link.SET_VR(S, AX25MODULO(S.vr+1, S.modulo))
+	link.SET_VR(S, AX25MODULO(S.vr+1, S.modulo))
 	assert.Equal(t, 0, S.vr, "V(R) should wrap from 7 to 0")
 }
 
@@ -1520,22 +1514,22 @@ func TestAX25LinkModulo128WrapAround(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnvV22(t)
+	var link = setupTestEnvV22(t)
 
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
-	var S = ax25Link.listHead
+	var S = link.listHead
 	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
 	// Test sequence wrap from 127 to 0
 	S.vs = 127
-	ax25Link.SET_VS(S, AX25MODULO(S.vs+1, S.modulo))
+	link.SET_VS(S, AX25MODULO(S.vs+1, S.modulo))
 	assert.Equal(t, 0, S.vs, "V(S) should wrap from 127 to 0")
 }
 
@@ -1547,21 +1541,21 @@ func TestAX25LinkNSInWindow(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	S.vr = 0
 	// The window check uses GENEROUS_K (63) and formula: V(R) < N(S) < V(R) + GENEROUS_K
 
 	// N(S)=1 should be in window (0 < 1 < 63)
-	assert.True(t, ax25Link.is_ns_in_window(S, 1))
+	assert.True(t, link.is_ns_in_window(S, 1))
 
 	// N(S)=62 should be in window (0 < 62 < 63)
-	assert.True(t, ax25Link.is_ns_in_window(S, 62))
+	assert.True(t, link.is_ns_in_window(S, 62))
 
 	// N(S)=0 is NOT in window (0 < 0 is false)
-	assert.False(t, ax25Link.is_ns_in_window(S, 0))
+	assert.False(t, link.is_ns_in_window(S, 0))
 }
 
 // ============================================================================
@@ -1576,9 +1570,9 @@ func TestAX25LinkReassemblerInitialState(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Reassembler buffer should be nil initially
 	assert.Nil(t, S.ra_buff, "Reassembler buffer should be nil initially")
@@ -1592,9 +1586,9 @@ func TestAX25LinkFirstSegmentFlag(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Create first segment:
 	// Format: [0x80 | count] [original_pid] [data...]
@@ -1602,7 +1596,7 @@ func TestAX25LinkFirstSegmentFlag(t *testing.T) {
 	var segmentData = []byte{0x82, 0xF0, 'H', 'e', 'l', 'l', 'o'} // first segment, pid=0xF0
 
 	// Simulate receiving the segment via dl_data_indication
-	ax25Link.dl_data_indication(S, ax25.PIDSegmentationFragment, segmentData)
+	link.dl_data_indication(S, ax25.PIDSegmentationFragment, segmentData)
 
 	// Reassembler should now have a buffer allocated
 	assert.NotNil(t, S.ra_buff, "Reassembler buffer should be allocated after first segment")
@@ -1616,20 +1610,20 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnvV22(t)
+	var link = setupTestEnvV22(t)
 
 	// Establish a v2.2 (modulo 128) connection via SABME/UA exchange.
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
-	assert.NotNil(t, ax25Link.listHead)
-	assert.Equal(t, state_5_awaiting_v22_connection, ax25Link.listHead.state)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
+	assert.NotNil(t, link.listHead)
+	assert.Equal(t, state_5_awaiting_v22_connection, link.listHead.state)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
-	var S = ax25Link.listHead
+	var S = link.listHead
 	assert.Equal(t, state_3_connected, S.state)
 	assert.Equal(t, ax25.Modulo(128), S.modulo)
 
@@ -1653,7 +1647,7 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 	E.num_addr = 2
 	E.txdata = txdata
 
-	ax25Link.dl_data_request(E)
+	link.dl_data_request(E)
 
 	// Collect the queued segment frames.
 	var frames []*cdata_t
@@ -1688,32 +1682,32 @@ func TestAX25LinkMultipleConcurrentLinks(t *testing.T) {
 
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	// Establish first connection
-	initiateConnect(t, "STA1", "STA2", CHANNEL)
+	initiateConnect(t, link, "STA1", "STA2", CHANNEL)
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "STA2"
 	addrs[PEERCALL] = "STA1"
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
-	var link1 = ax25Link.listHead
+	var link1 = link.listHead
 	assert.NotNil(t, link1)
 	assert.Equal(t, state_3_connected, link1.state)
 
 	// Establish second connection (different callsigns)
-	initiateConnect(t, "STA1", "STA3", CHANNEL)
+	initiateConnect(t, link, "STA1", "STA3", CHANNEL)
 
 	addrs[OWNCALL] = "STA3"
 	addrs[PEERCALL] = "STA1"
 	pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Both links should exist
-	assert.NotNil(t, ax25Link.listHead)
+	assert.NotNil(t, link.listHead)
 	// The new link is at the head
-	var link2 = ax25Link.listHead
+	var link2 = link.listHead
 	assert.Equal(t, state_3_connected, link2.state)
 
 	// Original link should still be connected
@@ -1729,27 +1723,27 @@ func TestAX25LinkIsolation(t *testing.T) {
 
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	// Establish first connection
-	initiateConnect(t, "STA1", "STA2", CHANNEL)
+	initiateConnect(t, link, "STA1", "STA2", CHANNEL)
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "STA2"
 	addrs[PEERCALL] = "STA1"
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
-	var link1 = ax25Link.listHead
+	var link1 = link.listHead
 
 	// Establish second connection
-	initiateConnect(t, "STA1", "STA3", CHANNEL)
+	initiateConnect(t, link, "STA1", "STA3", CHANNEL)
 
 	addrs[OWNCALL] = "STA3"
 	addrs[PEERCALL] = "STA1"
 	pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
-	var link2 = ax25Link.listHead
+	var link2 = link.listHead
 
 	// Modify state on link2
 	link2.vs = 5
@@ -1768,9 +1762,9 @@ func TestAX25LinkChannelBusy(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Initially not busy
 	assert.False(t, S.radio_channel_busy)
@@ -1780,7 +1774,7 @@ func TestAX25LinkChannelBusy(t *testing.T) {
 	E._type = DLQ_CHANNEL_BUSY
 	E._chan = CHANNEL
 	E.activity = 1 // channel is busy
-	ax25Link.lm_channel_busy(E)
+	link.lm_channel_busy(E)
 
 	// Note: channel busy affects timer behavior
 }
@@ -1897,20 +1891,20 @@ func TestAX25LinkInvalidNR(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Set V(S)=3 (we've sent frames 0, 1, 2)
 	S.vs = 3
 	S.va = 0
 
 	// Valid N(R) values are 0, 1, 2, 3
-	assert.True(t, ax25Link.is_good_nr(S, 0))
-	assert.True(t, ax25Link.is_good_nr(S, 3))
+	assert.True(t, link.is_good_nr(S, 0))
+	assert.True(t, link.is_good_nr(S, 3))
 
 	// N(R)=5 is invalid (> V(S))
-	assert.False(t, ax25Link.is_good_nr(S, 5))
+	assert.False(t, link.is_good_nr(S, 5))
 }
 
 // ============================================================================
@@ -1925,9 +1919,9 @@ func TestAX25LinkClearExceptionConditions(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Set all exception conditions
 	S.peer_receiver_busy = true
@@ -1936,7 +1930,7 @@ func TestAX25LinkClearExceptionConditions(t *testing.T) {
 	S.acknowledge_pending = true
 
 	// Clear them
-	ax25Link.clear_exception_conditions(S)
+	link.clear_exception_conditions(S)
 
 	assert.False(t, S.peer_receiver_busy)
 	assert.False(t, S.reject_exception)
@@ -1952,9 +1946,9 @@ func TestAX25LinkRejectExceptionFlag(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Initially not set
 	assert.False(t, S.reject_exception)
@@ -1966,17 +1960,17 @@ func TestAX25LinkRejectExceptionFlag(t *testing.T) {
 
 	// First receive frame 0
 	var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 0, 0, ax25.PIDNoLayer3, []byte("0"))
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 	assert.Equal(t, 1, S.vr)
 
 	// Now receive frame 2 (skip 1) - should set reject_exception
 	pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 2, 0, ax25.PIDNoLayer3, []byte("2"))
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 	assert.True(t, S.reject_exception, "Reject exception should be set")
 
 	// Receive expected frame 1 - should clear reject_exception
 	pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, 1, 0, ax25.PIDNoLayer3, []byte("1"))
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 	assert.False(t, S.reject_exception, "Reject exception should be cleared")
 }
 
@@ -1992,15 +1986,15 @@ func TestAX25LinkRetryCounter(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Initial value
 	assert.Equal(t, 0, S.rc)
 
 	// Set and verify
-	ax25Link.SET_RC(S, 5)
+	link.SET_RC(S, 5)
 	assert.Equal(t, 5, S.rc)
 
 	// Track peak value
@@ -2019,11 +2013,11 @@ func TestAX25LinkSetVersion20(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
-	ax25Link.set_version_2_0(S)
+	link.set_version_2_0(S)
 
 	assert.Equal(t, xid.SREJNone, S.srej_enable)
 	assert.Equal(t, ax25.Modulo(8), S.modulo)
@@ -2037,17 +2031,17 @@ func TestAX25LinkSetVersion22(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnvV22(t)
+	var link = setupTestEnvV22(t)
 
-	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	initiateConnect(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
 	addrs[PEERCALL] = MY_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
-	var S = ax25Link.listHead
+	var S = link.listHead
 
 	// Should be v2.2
 	assert.Equal(t, xid.SREJSingle, S.srej_enable)
@@ -2064,7 +2058,7 @@ func TestAX25LinkConnectRequestTypes(t *testing.T) {
 
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
 	// Test DLQ_CONNECT_REQUEST
 	var E = new(dlq_item_t)
@@ -2075,10 +2069,10 @@ func TestAX25LinkConnectRequestTypes(t *testing.T) {
 	E.num_addr = 2
 	E.client = 0
 
-	ax25Link.dl_connect_request(E)
+	link.dl_connect_request(E)
 
-	assert.NotNil(t, ax25Link.listHead)
-	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
+	assert.NotNil(t, link.listHead)
+	assert.Equal(t, state_1_awaiting_connection, link.listHead.state)
 }
 
 // Disconnect request handling
@@ -2089,9 +2083,9 @@ func TestAX25LinkDisconnectRequestTypes(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Test DLQ_DISCONNECT_REQUEST
 	var E = new(dlq_item_t)
@@ -2102,7 +2096,7 @@ func TestAX25LinkDisconnectRequestTypes(t *testing.T) {
 	E.num_addr = 2
 	E.client = 0
 
-	ax25Link.dl_disconnect_request(E)
+	link.dl_disconnect_request(E)
 
 	assert.Equal(t, state_2_awaiting_release, S.state)
 }
@@ -2119,9 +2113,9 @@ func TestAX25LinkTESTFrame(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive TEST command
 	var addrs [ax25.MaxAddrs]string
@@ -2129,7 +2123,7 @@ func TestAX25LinkTESTFrame(t *testing.T) {
 	addrs[ax25.Source] = THEIR_CALL
 	var testInfo = []byte("Test data")
 	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUTEST, 1, 0, testInfo)
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should still be connected (TEST doesn't change state)
 	assert.Equal(t, state_3_connected, S.state)
@@ -2147,16 +2141,16 @@ func TestAX25LinkUIFrameConnected(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Receive UI frame
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Destination] = MY_CALL
 	addrs[ax25.Source] = THEIR_CALL
 	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, ax25.PIDNoLayer3, []byte("UI data"))
-	receiveFrame(t, pp, CHANNEL)
+	receiveFrame(t, link, pp, CHANNEL)
 
 	// Should still be connected
 	assert.Equal(t, state_3_connected, S.state)
@@ -2174,9 +2168,9 @@ func TestAX25LinkFrameCountStats(t *testing.T) {
 	var THEIR_CALL = "TEST2"
 	const CHANNEL = 0
 
-	setupTestEnv(t)
+	var link = setupTestEnv(t)
 
-	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
+	var S = establishConnection(t, link, MY_CALL, THEIR_CALL, CHANNEL)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Destination] = MY_CALL
@@ -2185,7 +2179,7 @@ func TestAX25LinkFrameCountStats(t *testing.T) {
 	// Receive some I-frames
 	for i := range 3 {
 		var pp = ax25.IFrame(addrs, 2, ax25.CRCmd, 8, 0, i, 0, ax25.PIDNoLayer3, []byte("data"))
-		receiveFrame(t, pp, CHANNEL)
+		receiveFrame(t, link, pp, CHANNEL)
 	}
 
 	// Check that I-frame count increased

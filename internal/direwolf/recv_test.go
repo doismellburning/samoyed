@@ -277,12 +277,11 @@ func dtmfSamples(t *testing.T, button rune, ms int, samplesPerSec int) []byte {
 	return samples16(samples)
 }
 
-// setupRecvProcessTest initialises what recv_process dispatches into: the
-// transmit queue, the link state machines, an empty received data queue, and
-// the handler for frames received, which it returns along with the transmit
-// queue.  Nothing drains the transmit queue, so what the link layer decides to
+// setupRecvProcessTest makes what recv_process dispatches into: the handler
+// for frames received, the data link, and the transmit queue the link sends
+// on, and returns all three.  Nothing drains the transmit queue, so what the link layer decides to
 // send stays there to be counted.
-func setupRecvProcessTest(t *testing.T, frack int) (*recPacketHandler, *TransmitQueue) {
+func setupRecvProcessTest(t *testing.T, frack int) (*recPacketHandler, *AX25Link, *TransmitQueue) {
 	t.Helper()
 
 	var audioConfig = new(RadioConfig)
@@ -312,33 +311,20 @@ func setupRecvProcessTest(t *testing.T, frack int) (*recPacketHandler, *Transmit
 	miscConfig.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 
-	ax25_link_init(miscConfig, nil, nil, tq, 1)
-
-	ax25Link.listHead = nil
-	ax25Link.regCallsignList = nil
-
-	// Leave nothing behind for whatever test runs next: a link still
-	// retrying its connection would turn up there.  This runs last, once
-	// recv_process has stopped.
-	t.Cleanup(func() {
-		ax25Link.listHead = nil
-		ax25Link.regCallsignList = nil
-	})
-
-	return handler, tq
+	return handler, NewAX25Link(miscConfig, nil, nil, tq, 1), tq
 }
 
 // startRecvProcess runs recv_process, taking from q and handing what it
-// receives to rh, until the test ends, failing the test if it does not then
+// receives to link and rh, until the test ends, failing the test if it does not then
 // finish.
-func startRecvProcess(t *testing.T, q *DataLinkQueue, rh *recPacketHandler) {
+func startRecvProcess(t *testing.T, q *DataLinkQueue, link *AX25Link, rh *recPacketHandler) {
 	t.Helper()
 
 	var ctx, cancel = context.WithCancel(t.Context())
 	var done = make(chan struct{})
 
 	go func() {
-		recv_process(ctx, q, rh)
+		recv_process(ctx, q, link, rh)
 		close(done)
 	}()
 
@@ -358,9 +344,9 @@ func startRecvProcess(t *testing.T, q *DataLinkQueue, rh *recPacketHandler) {
 func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
-	var rh, tq = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
+	var rh, link, tq = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
-	startRecvProcess(t, dlq, rh)
+	startRecvProcess(t, dlq, link, rh)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
@@ -380,9 +366,9 @@ func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
-	var rh, tq = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
+	var rh, link, tq = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
-	startRecvProcess(t, dlq, rh)
+	startRecvProcess(t, dlq, link, rh)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"
@@ -425,7 +411,7 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
-	var rh, _ = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
+	var rh, link, _ = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
 
 	var hook = test.NewGlobal()
 
@@ -437,7 +423,7 @@ func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
 
 	t.Cleanup(func() { logrus.SetLevel(previousLevel) })
 
-	startRecvProcess(t, dlq, rh)
+	startRecvProcess(t, dlq, link, rh)
 
 	// Wake the queue without putting anything on it.
 	assert.Eventually(t, func() bool {
@@ -463,9 +449,9 @@ func TestRecvProcessRunsTheLinkTimersWhileTheQueueIsEmpty(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
 	// One second of T1, so the retry does not hold the test up for long.
-	var rh, tq = setupRecvProcessTest(t, 1)
+	var rh, link, tq = setupRecvProcessTest(t, 1)
 
-	startRecvProcess(t, dlq, rh)
+	startRecvProcess(t, dlq, link, rh)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = "Q1TEST"

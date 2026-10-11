@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -198,13 +197,13 @@ type AX25Link struct {
 	setConnected func(channel int, on bool)
 
 	// clients is told what happens on the links the client applications
-	// asked for.  Never nil: NewAX25Link and ax25_link_init put
-	// noLinkClients there when there are none.
+	// asked for.  Never nil: NewAX25Link puts noLinkClients there when there
+	// are none.
 	clients linkClients
 
 	// queue is where the frames the link sends go, and its requests to seize
-	// a channel.  Never nil: NewAX25Link and ax25_link_init put
-	// noLinkTransmitter there when there is none.
+	// a channel.  Never nil: NewAX25Link puts noLinkTransmitter there when
+	// there is none.
 	queue linkTransmitter
 
 	// Debug switches for different types of information.
@@ -258,21 +257,77 @@ type AX25Link struct {
 	pttStatus [MAX_TOTAL_CHANS]bool
 }
 
-// ax25Link is the one data link every connected-mode request and received
-// frame goes through.  It exists from package initialisation, so it is never
-// nil; ax25_link_init must still be called before it is used.
-var ax25Link = NewAX25Link()
+/*-------------------------------------------------------------------
+ *
+ * Name:        NewAX25Link
+ *
+ * Purpose:     Make the data link every connected-mode request and received
+ *		frame goes through, with no links and no registered callsigns yet.
+ *
+ * Inputs:	pconfig		- misc. configuration from config file or command line.
+ *				  Beacon stuff ended up here.
+ *
+ *		setConnected	- Turns a channel's connected indicator on or
+ *				  off; nil for nothing to set.
+ *
+ *		clients		- The client applications told what happens on
+ *				  the links they asked for; nil for none.
+ *
+ *		queue		- Where the link's frames go to be transmitted;
+ *				  nil to drop them.
+ *
+ *		debug 		- debug level.
+ *
+ * Returns:	The data link, remembering the above for future use.
+ *
+ *--------------------------------------------------------------------*/
 
-// NewAX25Link returns a data link with no links, no registered callsigns, no
-// configuration yet, no client applications to tell, nowhere to send frames,
-// and debugging off.
-func NewAX25Link() *AX25Link {
-	var l = new(AX25Link)
-	l.clients = noLinkClients{}
-	l.queue = noLinkTransmitter{}
+func NewAX25Link(pconfig *misc_config_s, setConnected func(channel int, on bool), clients linkClients, queue linkTransmitter, debug int) *AX25Link {
+	var link = new(AX25Link)
 
-	return l
-}
+	/*
+	 * Save parameters for later use.
+	 */
+	link.miscConfig = pconfig
+	link.setConnected = setConnected
+
+	if clients == nil {
+		clients = noLinkClients{}
+	}
+
+	link.clients = clients
+
+	if queue == nil {
+		queue = noLinkTransmitter{}
+	}
+
+	link.queue = queue
+
+	if debug >= 1 { // Only single level so far.
+		link.debugProtocolErrors = true // Less serious Protocol errors.
+
+		link.debugClientApp = true // Interaction with client application.
+		// dl_connect_request, dl_data_request, dl_data_indication, etc.
+
+		link.debugRadio = true // Received frames and channel busy status.
+		// lm_data_indication, lm_channel_busy
+
+		link.debugVariables = true // Variables, state changes.
+
+		link.debugRetry = true // Related to lost I frames, REJ, SREJ, timeout, resending.
+
+		link.debugLinkHandle = true // Create data link state machine or pick existing one,
+		// based on my address, peer address, client app index, and radio channel.
+
+		link.debugStats = true // Statistics when connection is closed.
+
+		link.debugMisc = true // Anything left over that might be interesting.
+
+		link.debugTimers = true // Timer details.
+	}
+
+	return link
+} /* end NewAX25Link */
 
 // linkClients is told what happens on the connected-mode links the client
 // applications asked for: links coming up and going down, data arriving on
@@ -648,73 +703,6 @@ func WITHIN_WINDOW_SIZE(x *ax25_dlsm_t) bool { // TODO int is fake
 	return (x.vs != AX25MODULO(x.va+x.k_maxframe, x.modulo))
 }
 
-/*-------------------------------------------------------------------
- *
- * Name:        ax25_link_init
- *
- * Purpose:     Initialize the ax25_link module.
- *
- * Inputs:	pconfig		- misc. configuration from config file or command line.
- *				  Beacon stuff ended up here.
- *
- *		setConnected	- Turns a channel's connected indicator on or
- *				  off; nil for nothing to set.
- *
- *		clients		- The client applications told what happens on
- *				  the links they asked for; nil for none.
- *
- *		queue		- Where the link's frames go to be transmitted;
- *				  nil to drop them.
- *
- *		debug 		- debug level.
- *
- * Outputs:	Remember required information for future use.  That's all.
- *
- *--------------------------------------------------------------------*/
-
-func ax25_link_init(pconfig *misc_config_s, setConnected func(channel int, on bool), clients linkClients, queue linkTransmitter, debug int) {
-	/*
-	 * Save parameters for later use.
-	 */
-	ax25Link.miscConfig = pconfig
-	ax25Link.setConnected = setConnected
-
-	if clients == nil {
-		clients = noLinkClients{}
-	}
-
-	ax25Link.clients = clients
-
-	if queue == nil {
-		queue = noLinkTransmitter{}
-	}
-
-	ax25Link.queue = queue
-
-	if debug >= 1 { // Only single level so far.
-		ax25Link.debugProtocolErrors = true // Less serious Protocol errors.
-
-		ax25Link.debugClientApp = true // Interaction with client application.
-		// dl_connect_request, dl_data_request, dl_data_indication, etc.
-
-		ax25Link.debugRadio = true // Received frames and channel busy status.
-		// lm_data_indication, lm_channel_busy
-
-		ax25Link.debugVariables = true // Variables, state changes.
-
-		ax25Link.debugRetry = true // Related to lost I frames, REJ, SREJ, timeout, resending.
-
-		ax25Link.debugLinkHandle = true // Create data link state machine or pick existing one,
-		// based on my address, peer address, client app index, and radio channel.
-
-		ax25Link.debugStats = true // Statistics when connection is closed.
-
-		ax25Link.debugMisc = true // Anything left over that might be interesting.
-
-		ax25Link.debugTimers = true // Timer details.
-	}
-} /* end ax25_link_init */
-
 /*------------------------------------------------------------------------------
  *
  * Name:	get_link_handle
@@ -893,7 +881,7 @@ func (link *AX25Link) get_link_handle(addrs [ax25.MaxAddrs]string, num_addr int,
 //
 //	Incoming:
 //
-//		Requests from the client application.  Set ax25Link.debugClientApp for debugging.
+//		Requests from the client application.  Set debugClientApp for debugging.
 //
 //			dl_connect_request
 //			dl_disconnect_request
@@ -906,13 +894,13 @@ func (link *AX25Link) get_link_handle(addrs [ax25.MaxAddrs]string, num_addr int,
 // 			dl_unregister_callsign		- Unregister callsigns(s) ...
 //			dl_client_cleanup		- Clean up after client which has disappeared.
 //
-//		Stuff from the radio channel.  Set ax25Link.debugRadio for debugging.
+//		Stuff from the radio channel.  Set debugRadio for debugging.
 //
 //			lm_data_indication		- Received frame.
 //			lm_channel_busy			- Change in PTT or DCD.
 //			lm_seize_confirm		- We have started to transmit.
 //
-//		Timer expiration.  Set ax25Link.debugTimers for debugging.
+//		Timer expiration.  Set debugTimers for debugging.
 //
 //			dl_timer_expiry
 //
@@ -1474,7 +1462,7 @@ func (link *AX25Link) data_request_good_size(S *ax25_dlsm_t, txdata *cdata_t) {
  * Inputs:	E	- Event from the queue.
  *			  The caller will free it.
  *
- * Outputs:	New item is pushed on the head of ax25Link.regCallsignList.
+ * Outputs:	New item is pushed on the head of the registered callsign list.
  *		We don't bother checking for duplicates so the most recent wins.
  *
  * Description:	The data link state machine does not use MYCALL from the APRS configuration.
