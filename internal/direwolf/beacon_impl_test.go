@@ -503,25 +503,6 @@ func Test_sbCalculateNextTime_result_within_rate_bounds(t *testing.T) {
 // Beacons that go to a radio channel end up in the transmit queue, so that is
 // where these look for what was sent.
 
-// setupBeaconTransmitQueue points the transmit queue at the given modem
-// configuration and empties it again once the test is done.
-func setupBeaconTransmitQueue(t *testing.T, modem *RadioConfig) {
-	t.Helper()
-
-	var drain = func() {
-		for c := range MAX_RADIO_CHANS {
-			for p := range TQ_NUM_PRIO {
-				for transmitQueue.Remove(c, p) != nil { //revive:disable-line:empty-block
-				}
-			}
-		}
-	}
-
-	transmitQueue.Init(modem)
-	drain()
-	t.Cleanup(drain)
-}
-
 // newSendTestBeaconService is a BeaconService with one beacon, sending to
 // radio channel 0 with Q1TEST as its call, and a transmit queue of its own
 // to catch what it sends.

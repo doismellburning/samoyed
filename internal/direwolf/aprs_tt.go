@@ -281,6 +281,10 @@ type TTGateway struct {
 	// recFrame is where a raw touch tone message goes, as though received,
 	// or nil to drop it.
 	recFrame frameReceiver
+
+	// transmitQueue is where the audible response to a tone sequence goes
+	// to be sent.
+	transmitQueue *TransmitQueue
 }
 
 /*------------------------------------------------------------------
@@ -293,6 +297,8 @@ type TTGateway struct {
  *		p	- Pointer to configuration options gathered by config.c.
  *		apps	- The client applications object reports go to, when
  *			  configured to; nil for none.
+ *		transmitQueue - Where audible responses and object reports go
+ *			  to be sent over the radio.
  *		remember - Called with each object report we transmit, and its
  *			  channel, so the digipeater doesn't repeat our own;
  *			  nil for nobody to tell.
@@ -315,6 +321,7 @@ func NewTTGateway(
 	audioConfig *RadioConfig,
 	p *tt_config_s,
 	apps *clientApps,
+	transmitQueue *TransmitQueue,
 	remember func(channel int, pp *ax25.Packet),
 	toIGate igateSender,
 	recFrame frameReceiver,
@@ -326,8 +333,10 @@ func NewTTGateway(
 	g.config = p
 	g.audioLevel = audioLevel
 	g.recFrame = recFrame
+	g.transmitQueue = transmitQueue
 	g.users = newTTUsers(audioConfig, p)
 	g.users.apps = apps
+	g.users.transmitQueue = transmitQueue
 	g.users.remember = remember
 	g.users.toIGate = toIGate
 
@@ -527,7 +536,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 		return
 	}
 
-	transmitQueue.Append(channel, TQ_PRIO_0_HI, pp)
+	g.transmitQueue.Append(channel, TQ_PRIO_0_HI, pp)
 } /* end Sequence */
 
 /*------------------------------------------------------------------

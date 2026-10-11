@@ -61,7 +61,9 @@ func TestTTGatewaySendsObjectReportsToClientApps(t *testing.T) {
 	var apps = new(clientApps)
 	apps.kissNet = kns
 
-	var gw = NewTTGateway(new(RadioConfig), &cfg, apps, nil, nil, nil, nil, 0)
+	var audioConfig = new(RadioConfig)
+
+	var gw = NewTTGateway(audioConfig, &cfg, apps, newTestTransmitQueue(t, audioConfig), nil, nil, nil, nil, 0)
 
 	var report = "Q1TEST>APRS:;Q2TEST   *111111z4237.14N/07120.83W-"
 
