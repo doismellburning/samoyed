@@ -245,7 +245,7 @@ func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
 	}
 
 	*ax25Link = *NewAX25Link()
-	ax25_link_init(miscConfig, nil, clients, 0)
+	ax25_link_init(miscConfig, transmitQueue, nil, clients, 0)
 }
 
 // fuzzLinkDrain does what recv_process does with everything on the data link
