@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 // The TNC side of the KISS protocol - collecting frames from a client
@@ -15,18 +14,6 @@ import (
 	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
 )
-
-type fromto_t int
-
-const (
-	FROM_CLIENT fromto_t = 0
-	TO_CLIENT   fromto_t = 1
-)
-
-var FROMTO_PREFIX = map[fromto_t]string{
-	FROM_CLIENT: "<<<",
-	TO_CLIENT:   ">>>",
-}
 
 /*-------------------------------------------------------------------
  *
