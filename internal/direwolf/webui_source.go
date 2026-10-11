@@ -10,6 +10,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/sirupsen/logrus"
@@ -75,35 +76,18 @@ func channelDescription(audio *RadioConfig, channel int) maybe.Maybe[string] {
 	return maybe.Nothing[string]()
 }
 
-// subchanVia names where app_process_rec_packet's subchan says a frame came
-// from.
-func subchanVia(subchan int) string {
-	switch subchan {
-	case -1:
-		return "dtmf"
-	case -2:
-		return "aprs-is"
-	case -3:
-		return "network"
-	case -4:
-		return "axudp"
-	}
-
-	return "radio"
-}
-
-// webPublishReceived hands a received frame to the web interface, if there is
-// one.
-func webPublishReceived(hub *webui.Hub, channel int, subchan int, pp *ax25.Packet, A *aprs.Decoded, alevel ax25.ALevel) {
+// webPublishReceived hands a frame received from src to the web interface,
+// if there is one.
+func webPublishReceived(hub *webui.Hub, src dwcore.Source, pp *ax25.Packet, A *aprs.Decoded, alevel ax25.ALevel) {
 	if hub == nil {
 		return
 	}
 
 	var p = webui.NewPacket(pp, A, webui.Received)
-	p.Channel = channel
-	p.Via = subchanVia(subchan)
+	p.Channel = src.Slicer.Channel
+	p.Via = src.Kind.String()
 
-	if alevel.Rec >= 0 && subchan >= 0 {
+	if alevel.Rec >= 0 && src.Kind == dwcore.SourceRadio {
 		p.AudioLevel = maybe.Just(alevel.Rec)
 	}
 
