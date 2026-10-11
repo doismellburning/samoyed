@@ -129,7 +129,7 @@ type ttUsers struct {
 	remember func(channel int, pp *ax25.Packet)
 
 	// toIGate sends an object report to APRS-IS, or is nil for no IGate.
-	toIGate func(channel int, pp *ax25.Packet)
+	toIGate igateSender
 
 	mu   sync.Mutex
 	user [MAX_TT_USERS]tt_user_s

@@ -136,7 +136,7 @@ type XmitService struct {
 
 	// seizeConfirm tells the data link state machine that a channel's
 	// transmission opportunity has arrived, or is nil for nobody to tell.
-	seizeConfirm func(channel int)
+	seizeConfirm seizeConfirmer
 
 	// setPTT keys a channel's transmitter or lets it go, or is nil when
 	// there is nothing to key.
@@ -205,7 +205,7 @@ func NewXmitService(
 	setPTT func(channel int, on bool),
 	dataDetect func(channel int) int,
 	onTransmit func(channel int, pp *ax25.Packet),
-	seizeConfirm func(channel int),
+	seizeConfirm seizeConfirmer,
 	debug_xmit_packet bool,
 	fx25Debug int,
 	il2pDebug int,

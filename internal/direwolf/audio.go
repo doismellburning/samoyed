@@ -35,7 +35,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/audiostats"
-	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/gordonklaus/portaudio"
 )
@@ -1214,7 +1214,7 @@ func AudioOpen(ctx context.Context, pa *RadioConfig) (*AudioDevices, error) {
 
 // setAudioLevel has each device's statistics report its channels' received
 // audio levels from audioLevel.  It is for before anything reads a device.
-func (d *AudioDevices) setAudioLevel(audioLevel func(channel int, subchan int) ax25.ALevel) {
+func (d *AudioDevices) setAudioLevel(audioLevel dwcore.AudioLevelFunc) {
 	for _, dev := range d.dev {
 		if dev != nil {
 			dev.stats.AudioLevel = audioLevel

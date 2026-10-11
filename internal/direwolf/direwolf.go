@@ -847,7 +847,7 @@ type recPacketHandler struct {
 
 	// toIGate hands a received APRS packet to the IGate, for APRS-IS; nil
 	// for no IGate.
-	toIGate   func(channel int, pp *ax25.Packet)
+	toIGate   igateSender
 	ttConfig  *tt_config_s
 	decoder   *aprs.Decoder
 	webHub    *webui.Hub // Nil without a web interface.

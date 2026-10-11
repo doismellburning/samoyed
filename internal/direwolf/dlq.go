@@ -157,6 +157,11 @@ func NewDataLinkQueue() *DataLinkQueue {
 // DataLinkQueue.RecFrame, or a stand-in for it.
 type frameReceiver func(src dwcore.Source, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string)
 
+// seizeConfirmer tells the data link state machine that a channel's
+// transmission opportunity has arrived: DataLinkQueue.SeizeConfirm, or a
+// stand-in for it.
+type seizeConfirmer func(channel int)
+
 /*-------------------------------------------------------------------
  *
  * Name:        RecFrame

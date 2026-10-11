@@ -276,7 +276,7 @@ type TTGateway struct {
 
 	// audioLevel reports a channel's received audio level, for a touch
 	// tone message to carry, or is nil for none to report.
-	audioLevel func(channel int, subchan int) ax25.ALevel
+	audioLevel dwcore.AudioLevelFunc
 
 	// recFrame is where a raw touch tone message goes, as though received,
 	// or nil to drop it.
@@ -316,9 +316,9 @@ func NewTTGateway(
 	p *tt_config_s,
 	apps *clientApps,
 	remember func(channel int, pp *ax25.Packet),
-	toIGate func(channel int, pp *ax25.Packet),
+	toIGate igateSender,
 	recFrame frameReceiver,
-	audioLevel func(channel int, subchan int) ax25.ALevel,
+	audioLevel dwcore.AudioLevelFunc,
 	debug int,
 ) *TTGateway {
 	var g = &TTGateway{debug: debug} //nolint:exhaustruct_v5
