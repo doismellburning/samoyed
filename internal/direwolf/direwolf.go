@@ -715,7 +715,7 @@ x = Silence FX.25 information.`)
 
 	// All three KISS transports hand what their clients send to the same
 	// handler, which copies data frames to the TCP clients with KISSCOPY.
-	var kissHandler = NewKissHandler(audio_config, xmitSvc, kissNetSvc)
+	var kissHandler = NewKissHandler(audio_config, transmitQueue, xmitSvc, kissNetSvc)
 
 	kissNetSvc.Start(ctx, kissHandler)
 

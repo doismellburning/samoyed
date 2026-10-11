@@ -256,17 +256,20 @@ func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport st
 // transport it arrives by - TCP, the serial port or the pseudo terminal - so
 // each of them hands its client's bytes to the same one.
 type KissHandler struct {
-	audioConfig *RadioConfig    // Which channels a client may transmit on.
-	xmit        *XmitService    // The transmit timing a client may change.
-	peers       *KissNetService // The TCP clients KISSCOPY copies a data frame to, or nil.
+	audioConfig   *RadioConfig    // Which channels a client may transmit on.
+	transmitQueue *TransmitQueue  // Where a client's data frames go to be sent.
+	xmit          *XmitService    // The transmit timing a client may change.
+	peers         *KissNetService // The TCP clients KISSCOPY copies a data frame to, or nil.
 }
 
 // NewKissHandler builds a KissHandler that checks a client's data frames
-// against audioConfig before they are queued, applies its timing commands to
-// xmit, and with KISSCOPY copies its data frames to the clients of peers.
-func NewKissHandler(audioConfig *RadioConfig, xmit *XmitService, peers *KissNetService) *KissHandler {
+// against audioConfig before putting them on transmitQueue, applies its timing
+// commands to xmit, and with KISSCOPY copies its data frames to the clients of
+// peers.
+func NewKissHandler(audioConfig *RadioConfig, transmitQueue *TransmitQueue, xmit *XmitService, peers *KissNetService) *KissHandler {
 	var h = new(KissHandler)
 	h.audioConfig = audioConfig
+	h.transmitQueue = transmitQueue
 	h.xmit = xmit
 	h.peers = peers
 
@@ -501,9 +504,9 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			/* Otherwise, it is an original for the low priority queue. */
 			if pp.NumRepeaters() >= 1 &&
 				pp.H(ax25.Repeater1) > 0 {
-				transmitQueue.Append(channel, TQ_PRIO_0_HI, pp)
+				h.transmitQueue.Append(channel, TQ_PRIO_0_HI, pp)
 			} else {
-				transmitQueue.Append(channel, TQ_PRIO_1_LO, pp)
+				h.transmitQueue.Append(channel, TQ_PRIO_1_LO, pp)
 			}
 		}
 
@@ -610,7 +613,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol set hardware \"%s\", channel %d\n", kiss_msg[1:], channel)
-		kiss_set_hardware(channel, kiss_msg[1:], from)
+		h.kiss_set_hardware(channel, kiss_msg[1:], from)
 
 	case kiss.CmdEndKiss: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
@@ -716,7 +719,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
  *
  *--------------------------------------------------------------------*/
 
-func kiss_set_hardware(channel int, command []byte, from kissClient) {
+func (h *KissHandler) kiss_set_hardware(channel int, command []byte, from kissClient) {
 	var cmd, value, found = bytes.Cut(command, []byte{':'})
 
 	if found {
@@ -734,7 +737,7 @@ func kiss_set_hardware(channel int, command []byte, from kissClient) {
 				dw_printf("KISS Set Hardware TXBUF: Did not expect a parameter.\n")
 			}
 
-			var n = transmitQueue.Count(channel, -1, "", "", true)
+			var n = h.transmitQueue.Count(channel, -1, "", "", true)
 			var response = fmt.Sprintf("TXBUF:%d", n)
 			from.reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else {
