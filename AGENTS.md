@@ -59,6 +59,14 @@
 * A converted entry's level follows how often it fires, not how interesting it is. `Debug` is for configuration and lifecycle - init, a port bound, a packet queued - and `Trace` for anything the signal drives: per audio sample, per bit, per byte, or several times per queue operation (the `try_decode` retry machinery, the `tq_*` lock tracing, the per-byte KISS/IGate/serial reads). Nothing in samoyed-direwolf enables `Trace` yet (see issue #645), so those entries are dormant there until it does
 * logrus builds an entry's fields before it consults the level, so `logrus.WithField(k, expensive()).Trace(...)` pays for `expensive()` even when nothing will print it. Where the fields cost an allocation - a `fmt.Sprintf`, a `string(...)` conversion - and the site is hot, guard the block with `logrus.IsLevelEnabled(logrus.TraceLevel)` first
 
+### Dependencies
+
+* A component is handed what it depends on, as constructor (or `*_init`) arguments, rather than reaching for package-level state. `DirewolfMain` builds the components and wires them together. Wiring one up after it is built - setting a field, or a `Set*` call - is only for breaking a genuine cycle, and is commented to say which
+* A single event or query is a func; a role with several methods is a small interface, named for the role and declared beside its consumer (e.g. `ReceiveSink`, `linkClients`)
+* A callback is named and typed for what its caller does with it - `setDCD func(channel int, on bool)`, `txInhibited func(channel int) bool` - not after a general-purpose function it happens to be, like `PTT.Set(ot, channel, state int)`. Give the general-purpose type a method per use instead (`PTT.SetDCD`, `PTT.TransmitInhibited`), so the wiring is a method value rather than a closure
+* No ints standing in for bools or enums in a signature. A callback signature used in more than one place gets a named type (`frameReceiver`, `dwcore.FrameSink`), and values that always travel together become a struct (`dwcore.SlicerID`, `dwcore.RxInfo`, `dwcore.Source`) rather than a run of positional arguments that would still compile in the wrong order
+* No package-level variable as a test hook, and no test-only branch on a production path: give the component a field a test can set on its own instance (e.g. `Layer2Receiver.packetSink`)
+
 ### Pitfalls
 
 * Code paths that can run during config-file validation (before the rest of startup init has run, e.g. `pfilter_validate` from `handleFILTER`/`handleCFILTER`) must not lean on state that another subsystem's init sets. Prefer handing them what they need - `pfilter_validate` evaluates with a zero `PacketFilter`, which has no IGate configuration - and where one still reads a global config pointer, guard it with a nil check and a safe default
