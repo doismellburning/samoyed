@@ -111,7 +111,7 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	// though, which would cost each test here most of one.
 	kns.pollInterval = 10 * time.Millisecond
 
-	kns.Start(t.Context(), NewKissHandler(kissTestRadioConfig(), new(XmitService), nil, kns))
+	kns.Start(t.Context(), NewKissHandler(newKissTNC(kissTestRadioConfig(), new(XmitService), nil), kns))
 
 	return kns, port
 }
@@ -520,7 +520,7 @@ func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
 
 	var kns, port = startKissNet(t, unconfigured)
 
-	require.Equal(t, MEDIUM_NONE, kns.handler.audioConfig.chan_medium[unconfigured])
+	require.False(t, kns.handler.tnc.ChannelValid(unconfigured))
 
 	var conn, _ = dialKissNet(t, kns, port)
 

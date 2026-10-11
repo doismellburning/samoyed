@@ -252,25 +252,41 @@ func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport st
 	return buf
 }
 
+// kissTNC is the TNC a KISS client application drives: where its data frames
+// go, and the transmit timing its commands change.
+type kissTNC interface {
+	// Transmit queues pp to go out on channel, ahead of the originals waiting
+	// if it is urgent.
+	Transmit(channel int, urgent bool, pp *ax25.Packet)
+
+	// QueuedBytes is how many bytes of frames are waiting to go out on
+	// channel, for the TXBUF query.
+	QueuedBytes(channel int) int
+
+	// ChannelValid reports whether channel is one a client may transmit on.
+	ChannelValid(channel int) bool
+
+	SetTxdelay(channel, value int)
+	SetPersist(channel, value int)
+	SetSlottime(channel, value int)
+	SetTxtail(channel, value int)
+	SetFulldup(channel int, value bool)
+}
+
 // KissHandler acts on what a KISS client application sends the TNC, whichever
 // transport it arrives by - TCP, the serial port or the pseudo terminal - so
 // each of them hands its client's bytes to the same one.
 type KissHandler struct {
-	audioConfig *RadioConfig        // Which channels a client may transmit on.
-	xmit        *XmitService        // The transmit timing a client may change.
-	queue       clientTransmitQueue // Where a client's data frames go, and what TXBUF reports on; nil to drop them.
-	peers       *KissNetService     // The TCP clients KISSCOPY copies a data frame to, or nil.
+	tnc   kissTNC         // Where a client's frames and timing commands go.
+	peers *KissNetService // The TCP clients KISSCOPY copies a data frame to, or nil.
 }
 
-// NewKissHandler builds a KissHandler that checks a client's data frames
-// against audioConfig before they are put on queue, applies its timing
-// commands to xmit, and with KISSCOPY copies its data frames to the clients of
-// peers.
-func NewKissHandler(audioConfig *RadioConfig, xmit *XmitService, queue clientTransmitQueue, peers *KissNetService) *KissHandler {
+// NewKissHandler builds a KissHandler that hands a client's data frames and
+// timing commands to tnc, and with KISSCOPY copies its data frames to the
+// clients of peers.
+func NewKissHandler(tnc kissTNC, peers *KissNetService) *KissHandler {
 	var h = new(KissHandler)
-	h.audioConfig = audioConfig
-	h.xmit = xmit
-	h.queue = queue
+	h.tnc = tnc
 	h.peers = peers
 
 	return h
@@ -465,11 +481,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 
 		/* Verify that the radio channel number is valid. */
 		/* Any sort of medium should be OK here. */
-		// Dire Wolf also excused MEDIUM_IGATE here, which could only ever
-		// matter for an out-of-range channel - and indexed chan_medium with
-		// it to find out.  An in-range IGate channel is not MEDIUM_NONE.
-
-		if channel < 0 || channel >= MAX_TOTAL_CHANS || h.audioConfig.chan_medium[channel] == MEDIUM_NONE {
+		if !h.tnc.ChannelValid(channel) {
 			logrus.WithFields(logrus.Fields{
 				"channel":   channel,
 				"type_byte": fmt.Sprintf("0x%02x", kiss_msg[0]),
@@ -491,18 +503,13 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 		var pp = ax25.FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {
 			logrus.WithField("channel", channel).Error("Invalid KISS data frame from client application")
-		} else if h.queue != nil {
+		} else {
 			/* How can we determine if it is an original or repeated message? */
 			/* If there is at least one digipeater in the frame, AND */
 			/* that digipeater has been used, it should go out quickly thru */
 			/* the high priority queue. */
 			/* Otherwise, it is an original for the low priority queue. */
-			if pp.NumRepeaters() >= 1 &&
-				pp.H(ax25.Repeater1) > 0 {
-				h.queue.Append(channel, TQ_PRIO_0_HI, pp)
-			} else {
-				h.queue.Append(channel, TQ_PRIO_1_LO, pp)
-			}
+			h.tnc.Transmit(channel, pp.NumRepeaters() >= 1 && pp.H(ax25.Repeater1) > 0, pp)
 		}
 
 	case kiss.CmdTxDelay: /* 1 = TXDELAY */
@@ -523,7 +530,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			entry.Warn("Are you sure you want such an extreme value for TXDELAY?  Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\" section, to understand what this means.")
 		}
 
-		h.xmit.SetTxdelay(channel, int(kiss_msg[1]))
+		h.tnc.SetTxdelay(channel, int(kiss_msg[1]))
 
 	case kiss.CmdPersistence: /* 2 = Persistence */
 		if len(kiss_msg) < 2 {
@@ -542,7 +549,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			entry.Warn("Are you sure you want such an extreme value for PERSIST?  Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\" section, to understand what this means.")
 		}
 
-		h.xmit.SetPersist(channel, int(kiss_msg[1]))
+		h.tnc.SetPersist(channel, int(kiss_msg[1]))
 
 	case kiss.CmdSlotTime: /* 3 = SlotTime */
 		if len(kiss_msg) < 2 {
@@ -562,7 +569,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			entry.Warn("Are you sure you want such an extreme value for SLOTTIME?  Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\" section, to understand what this means.")
 		}
 
-		h.xmit.SetSlottime(channel, int(kiss_msg[1]))
+		h.tnc.SetSlottime(channel, int(kiss_msg[1]))
 
 	case kiss.CmdTxTail: /* 4 = TXtail */
 		if len(kiss_msg) < 2 {
@@ -584,7 +591,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			)
 		}
 
-		h.xmit.SetTxtail(channel, int(kiss_msg[1]))
+		h.tnc.SetTxtail(channel, int(kiss_msg[1]))
 
 	case kiss.CmdFullDuplex: /* 5 = FullDuplex */
 		if len(kiss_msg) < 2 {
@@ -598,7 +605,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			"channel":    channel,
 			"fullduplex": val,
 		}).Debug("KISS protocol set FullDuplex")
-		h.xmit.SetFulldup(channel, val)
+		h.tnc.SetFulldup(channel, val)
 
 	case kiss.CmdSetHardware: /* 6 = TNC specific */
 		if len(kiss_msg) < 2 {
@@ -611,7 +618,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			"channel":  channel,
 			"hardware": string(kiss_msg[1:]),
 		}).Debug("KISS protocol set hardware")
-		kiss_set_hardware(channel, kiss_msg[1:], from, h.queue)
+		kiss_set_hardware(h.tnc, channel, kiss_msg[1:], from)
 
 	case kiss.CmdEndKiss: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
@@ -643,7 +650,9 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
  *
  * Purpose:     Process the "set hardware" command.
  *
- * Inputs:	channel		- channel, 0 - 15.
+ * Inputs:	tnc		- The TNC whose state a query asks about.
+ *
+ *		channel		- channel, 0 - 15.
  *
  *		command		- All but the first byte.  e.g.  "TXBUF:99"
  *				  Case sensitive.
@@ -655,9 +664,6 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
  *				  serial port, pseudo terminal, and multiple TCP clients.
  *				  We need to send the response to same place where query came
  *				  from, which is what from's reply does.
- *
- *		queue		- The transmit queue TXBUF reports on; nil for
- *				  one that is always empty.
  *
  *
  * Description:	This is new in version 1.5.  "Set hardware" was previously ignored.
@@ -717,7 +723,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
  *
  *--------------------------------------------------------------------*/
 
-func kiss_set_hardware(channel int, command []byte, from kissClient, queue clientTransmitQueue) {
+func kiss_set_hardware(tnc kissTNC, channel int, command []byte, from kissClient) {
 	var cmd, value, found = bytes.Cut(command, []byte{':'})
 
 	if found {
@@ -733,11 +739,7 @@ func kiss_set_hardware(channel int, command []byte, from kissClient, queue clien
 				logrus.WithField("query", "TXBUF").Warn("KISS Set Hardware query did not expect a parameter")
 			}
 
-			var n = 0
-			if queue != nil {
-				n = queue.Count(channel, -1, "", "", true)
-			}
-
+			var n = tnc.QueuedBytes(channel)
 			var response = fmt.Sprintf("TXBUF:%d", n)
 			from.reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else {

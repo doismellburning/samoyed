@@ -45,6 +45,7 @@ Dashed arrows are connections made after construction rather than at it.
        digi [label="Digipeater"];
        cdigi [label="ConnectedDigipeater"];
        kiss [label="KissHandler"];
+       kisstnc [label="kissTNCAdapter"];
        kissnet [label="KISS TCP, serial,\npseudo terminal"];
        apps [label="clientApps"];
        tt [label="TTGateway\nAPRStt"];
@@ -93,8 +94,9 @@ Dashed arrows are connections made after construction rather than at it.
        link -> agw [label="linkClients"];
        link -> tq [label="linkTransmitter"];
 
-       kiss -> xmit [label="timing setters"];
-       kiss -> tq [label="clientTransmitQueue"];
+       kiss -> kisstnc [label="kissTNC"];
+       kisstnc -> xmit [label="timing setters"];
+       kisstnc -> tq [label="clientTransmitQueue"];
        kiss -> kissnet [label="KISSCOPY peers"];
        kissnet -> kiss [label="client bytes\n(at Start)", style=dashed];
 
@@ -215,8 +217,12 @@ The shapes in the diagram follow the dependency conventions in ``AGENTS.md``:
   ``frameReceiver``, ``frameSender``, ``igateSender``, ``seizeConfirmer``.
 - A component that makes several calls is handed a small interface,
   declared beside it and holding only those calls:
-  ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``.
+  ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``, ``kissTNC``.
 - ``*TransmitQueue``, ``*DataLinkQueue`` and ``*AGWServer`` satisfy those interfaces without knowing about them.
+- ``kissTNCAdapter`` is the KISS handler's ``kissTNC``:
+  it puts a client's frames on the ``clientTransmitQueue`` it is handed
+  and its timing commands to the ``XmitService``,
+  so that the handler needs neither.
 
 References
 ----------
@@ -233,7 +239,8 @@ References
   ``ax25_link.go`` (``NewAX25Link``, ``linkClients``, ``linkTransmitter``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
-  ``kiss_frame.go`` (``NewKissHandler``),
+  ``kiss_frame.go`` (``NewKissHandler``, ``kissTNC``),
+  ``kiss_tnc.go`` (``newKissTNC``),
   ``kissnet.go`` (``KissNetService.Start``),
   ``aprs_tt.go`` (``NewTTGateway``),
   ``beacon.go`` (``NewBeaconService``, ``beaconIGate``),

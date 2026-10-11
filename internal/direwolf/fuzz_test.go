@@ -79,7 +79,7 @@ func FuzzKissRecByte(f *testing.F) {
 			t.Skip()
 		}
 
-		var h = setupKissProcessMsg(t)
+		var h = newTestKissHandler(t)
 
 		var _, from = recordingKissClient()
 		var kc kiss.Collector

@@ -146,7 +146,7 @@ References
 * `internal/direwolf/config_yaml.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/config_yaml.go>`__ - ``axudpPorts``
 * `internal/direwolf/tq.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/tq.go>`__ -
   ``TransmitQueue.Append``, ``LMDataRequest`` and ``LMSeizeRequest``
-* `internal/direwolf/kiss_frame.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/kiss_frame.go>`__ - KISS client transmit check
+* `internal/direwolf/kiss_tnc.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/kiss_tnc.go>`__ - KISS client transmit check
 * `internal/direwolf/server.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/server.go>`__ - AGW port list and connected-mode check
 * `internal/direwolf/beacon.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/beacon.go>`__ - beacon ``MYCALL`` choice
 * `internal/direwolf/digipeater.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/digipeater.go>`__
