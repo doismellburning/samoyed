@@ -358,6 +358,11 @@ func (p *PTT) Set(ot int, channel int, ptt_signal int) {
 	p.set(ot, channel, ptt_signal)
 }
 
+// SetPTT keys a channel's transmitter, or lets it go.
+func (p *PTT) SetPTT(channel int, on bool) {
+	p.Set(OCTYPE_PTT, channel, dwutil.IfThenElse(on, 1, 0))
+}
+
 // SetDCD turns a channel's data carrier detect indicator on or off.
 func (p *PTT) SetDCD(channel int, on bool) {
 	p.Set(OCTYPE_DCD, channel, dwutil.IfThenElse(on, 1, 0))

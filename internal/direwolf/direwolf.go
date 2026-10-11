@@ -550,7 +550,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
+	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.SetPTT, layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx, td)
 
 	/*
@@ -617,7 +617,7 @@ x = Silence FX.25 information.`)
 				var n = audio_config.achan[transmitCalibrationChannel].baud * max_duration
 
 				text_color_set(DW_COLOR_INFO)
-				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 1)
+				pttControl.SetPTT(transmitCalibrationChannel, true)
 
 				switch transmitCalibrationType {
 				default:
@@ -654,7 +654,7 @@ x = Silence FX.25 information.`)
 					dwutil.SleepSecCtx(ctx, max_duration)
 				}
 
-				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 0)
+				pttControl.SetPTT(transmitCalibrationChannel, false)
 				text_color_set(DW_COLOR_INFO)
 				stopIfCancelled(ctx, td)
 				td.exit(0)

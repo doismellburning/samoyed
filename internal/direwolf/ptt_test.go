@@ -988,3 +988,12 @@ func TestPTTSetDCD(t *testing.T) {
 
 	assert.Equal(t, []string{"DCD 0=1", "DCD 0=0"}, *set)
 }
+
+func TestPTTSetPTT(t *testing.T) {
+	var p, set = newRecordingPTT(t)
+
+	p.SetPTT(0, true)
+	p.SetPTT(0, false)
+
+	assert.Equal(t, []string{"PTT 0=1", "PTT 0=0"}, *set)
+}

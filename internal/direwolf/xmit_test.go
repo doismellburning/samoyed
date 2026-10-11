@@ -808,8 +808,8 @@ func TestXmitMorse(t *testing.T) {
 
 	var keyed []string
 
-	xs.setOutput = func(ot int, channel int, state int) {
-		keyed = append(keyed, fmt.Sprintf("%s %d=%d", octypeName(ot), channel, state))
+	xs.setPTT = func(channel int, on bool) {
+		keyed = append(keyed, fmt.Sprintf("%d=%t", channel, on))
 	}
 
 	var pp = ax25.FromText("Q1TEST>MORSE:HI", true)
@@ -818,7 +818,7 @@ func TestXmitMorse(t *testing.T) {
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_morse(0, pp, MORSE_DEFAULT_WPM) })
 
 	assert.Contains(t, output, `[0.morse] "HI"`)
-	assert.Equal(t, []string{"PTT 0=1", "PTT 0=0"}, keyed)
+	assert.Equal(t, []string{"0=true", "0=false"}, keyed)
 }
 
 // A frame addressed to DTMF is sent as touch tones, which is how APRStt
