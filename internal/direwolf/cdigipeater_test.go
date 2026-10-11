@@ -24,18 +24,9 @@ const (
 )
 
 // setupCDigipeater points a connected mode digipeater at two radio channels
-// with our callsign on each, and empties the transmit queues it fills.
+// with our callsign on each, and a transmit queue of its own.
 func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *RadioConfig, *cdigi_config_s) {
 	t.Helper()
-
-	t.Cleanup(func() {
-		for c := range MAX_RADIO_CHANS {
-			for p := range TQ_NUM_PRIO {
-				for transmitQueue.Remove(c, p) != nil { //revive:disable-line:empty-block
-				}
-			}
-		}
-	})
 
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[cdigiFromChan] = MEDIUM_RADIO
@@ -45,9 +36,9 @@ func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *RadioConfig, *cdigi_
 
 	var cdigiConfig = new(cdigi_config_s)
 
-	transmitQueue.Init(audioConfig)
+	var tq = newTestTransmitQueue(t, audioConfig)
 
-	return NewConnectedDigipeater(audioConfig, cdigiConfig, new(pfilter.PacketFilter)), audioConfig, cdigiConfig
+	return NewConnectedDigipeater(audioConfig, cdigiConfig, new(pfilter.PacketFilter), tq), audioConfig, cdigiConfig
 }
 
 // A station that named us as its next digipeater is repeated, with the
@@ -178,7 +169,7 @@ func TestCDigipeaterSameChannel(t *testing.T) {
 
 	cdigi.Digipeat(cdigiFromChan, pp)
 
-	var sent = transmitQueue.Remove(cdigiFromChan, TQ_PRIO_0_HI)
+	var sent = cdigi.transmitQueue.Remove(cdigiFromChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
 	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST*:", sent.FormatAddrs())
 
@@ -198,9 +189,9 @@ func TestCDigipeaterCrossChannel(t *testing.T) {
 
 	cdigi.Digipeat(cdigiFromChan, pp)
 
-	assert.Nil(t, transmitQueue.Remove(cdigiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
+	assert.Nil(t, cdigi.transmitQueue.Remove(cdigiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
 
-	var sent = transmitQueue.Remove(cdigiToChan, TQ_PRIO_0_HI)
+	var sent = cdigi.transmitQueue.Remove(cdigiToChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for the other channel")
 	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", sent.FormatAddrs())
 
@@ -218,7 +209,7 @@ func TestCDigipeaterNotEnabled(t *testing.T) {
 	cdigi.Digipeat(cdigiFromChan, pp)
 
 	for c := range MAX_RADIO_CHANS {
-		assert.Nil(t, transmitQueue.Remove(c, TQ_PRIO_0_HI), "channel %d repeated a frame with digipeating disabled", c)
+		assert.Nil(t, cdigi.transmitQueue.Remove(c, TQ_PRIO_0_HI), "channel %d repeated a frame with digipeating disabled", c)
 	}
 
 	assert.Zero(t, cdigi.GetCount(cdigiFromChan, cdigiFromChan))
@@ -267,9 +258,12 @@ func TestNewConnectedDigipeater(t *testing.T) {
 
 	var filter = new(pfilter.PacketFilter)
 
-	var cdigi = NewConnectedDigipeater(audioConfig, cdigiConfig, filter)
+	var tq = newTestTransmitQueue(t, audioConfig)
+
+	var cdigi = NewConnectedDigipeater(audioConfig, cdigiConfig, filter, tq)
 
 	assert.Same(t, audioConfig, cdigi.audioConfig)
 	assert.Same(t, cdigiConfig, cdigi.config)
 	assert.Same(t, filter, cdigi.filter)
+	assert.Same(t, tq, cdigi.transmitQueue)
 }
