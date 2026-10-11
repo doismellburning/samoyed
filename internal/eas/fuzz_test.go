@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -35,15 +36,17 @@ func fuzzReceive(tb testing.TB, stream []byte) int {
 
 	var delivered = 0
 
-	var rx = NewReceiver(1, 2, 3,
+	var from = dwcore.SlicerID{Channel: 1, Subchannel: 2, Slice: 3}
+
+	var rx = NewReceiver(from,
 		func(int, int) ax25.ALevel { return alevel },
-		func(channel int, subchannel int, slice int, frame []byte, gotAlevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType) {
+		func(gotFrom dwcore.SlicerID, frame []byte, rxInfo dwcore.RxInfo) {
 			delivered++
 
-			assert.Equal(tb, []int{1, 2, 3}, []int{channel, subchannel, slice}, "a message should say where it was heard")
-			assert.Equal(tb, alevel, gotAlevel)
-			assert.Equal(tb, phy.BitFixNone, retries, "SAME has no fixing up")
-			assert.Equal(tb, phy.FECNone, fecType, "SAME has no FEC")
+			assert.Equal(tb, from, gotFrom, "a message should say where it was heard")
+			assert.Equal(tb, alevel, rxInfo.ALevel)
+			assert.Equal(tb, phy.BitFixNone, rxInfo.Retries, "SAME has no fixing up")
+			assert.Equal(tb, phy.FECNone, rxInfo.FEC, "SAME has no FEC")
 
 			assert.LessOrEqual(tb, len(frame), EAS_MAX_LEN, "a message longer than SAME allows should not be delivered")
 

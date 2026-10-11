@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,26 +19,26 @@ import (
 // the bytes the FEC corrected as the fix level.
 func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
 	type delivery struct {
-		channel, subchannel, slice int
-		frame                      []byte
-		alevel                     ax25.ALevel
-		retries                    phy.BitFixLevel
-		fecType                    phy.FECType
+		from   dwcore.SlicerID
+		frame  []byte
+		rxInfo dwcore.RxInfo
 	}
 
 	var got []delivery
 
 	var alevel = ax25.ALevel{Rec: 42, Mark: 41, Space: 43}
 
-	var rx = NewReceiver(1, 2, 3, 0,
+	var from = dwcore.SlicerID{Channel: 1, Subchannel: 2, Slice: 3}
+
+	var rx = NewReceiver(from, 0,
 		func(channel int, subchannel int) ax25.ALevel {
 			assert.Equal(t, 1, channel)
 			assert.Equal(t, 2, subchannel)
 
 			return alevel
 		},
-		func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType) {
-			got = append(got, delivery{channel, subchannel, slice, slices.Clone(frame), alevel, retries, fecType})
+		func(from dwcore.SlicerID, frame []byte, rxInfo dwcore.RxInfo) {
+			got = append(got, delivery{from, slices.Clone(frame), rxInfo})
 		})
 
 	var ctagNum, data, check = fx25_encode_frame(0, slices.Clone(fxTestFrame), 16, 0)
@@ -57,7 +58,7 @@ func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
 	}
 
 	require.Len(t, got, 1)
-	assert.Equal(t, delivery{1, 2, 3, fxTestFrame, alevel, phy.BitFixLevel(2), phy.FECFX25}, got[0])
+	assert.Equal(t, delivery{from, fxTestFrame, dwcore.RxInfo{ALevel: alevel, Retries: phy.BitFixLevel(2), FEC: phy.FECFX25}}, got[0])
 }
 
 // silentAudioLevel stands in for a demodulator when a test drives a receiver

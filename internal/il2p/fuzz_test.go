@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -67,15 +68,17 @@ func recBitFuzzReceive(tb testing.TB, stream []byte, settings byte) int {
 
 	var delivered = 0
 
-	var rx = NewReceiver(1, 2, 3, version, settings&recBitFuzzCRC != 0, 0,
+	var from = dwcore.SlicerID{Channel: 1, Subchannel: 2, Slice: 3}
+
+	var rx = NewReceiver(from, version, settings&recBitFuzzCRC != 0, 0,
 		func(int, int) ax25.ALevel { return alevel },
-		func(channel int, subchannel int, slice int, pp *ax25.Packet, gotAlevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType) {
+		func(gotFrom dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo) {
 			delivered++
 
-			assert.Equal(tb, []int{1, 2, 3}, []int{channel, subchannel, slice}, "a packet should say where it was heard")
-			assert.Equal(tb, alevel, gotAlevel)
-			assert.Equal(tb, phy.FECIL2P, fecType)
-			assert.GreaterOrEqual(tb, int(retries), 0, "a negative number of symbols can't have been corrected")
+			assert.Equal(tb, from, gotFrom, "a packet should say where it was heard")
+			assert.Equal(tb, alevel, rxInfo.ALevel)
+			assert.Equal(tb, phy.FECIL2P, rxInfo.FEC)
+			assert.GreaterOrEqual(tb, int(rxInfo.Retries), 0, "a negative number of symbols can't have been corrected")
 
 			if assert.NotNil(tb, pp) {
 				// What the receive path does next with a packet, short of

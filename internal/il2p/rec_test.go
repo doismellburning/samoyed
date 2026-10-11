@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
@@ -18,10 +19,9 @@ import (
 // level from the function it was made with.
 func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 	type delivery struct {
-		channel, subchannel, slice int
-		pp                         *ax25.Packet
-		alevel                     ax25.ALevel
-		fecType                    phy.FECType
+		from   dwcore.SlicerID
+		pp     *ax25.Packet
+		rxInfo dwcore.RxInfo
 	}
 
 	var got []delivery
@@ -35,8 +35,10 @@ func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 		return alevel
 	}
 
-	var rx = NewReceiver(1, 2, 3, VersionCompat, false, 0, audioLevel, func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, _ phy.BitFixLevel, fecType phy.FECType) {
-		got = append(got, delivery{channel, subchannel, slice, pp, alevel, fecType})
+	var from = dwcore.SlicerID{Channel: 1, Subchannel: 2, Slice: 3}
+
+	var rx = NewReceiver(from, VersionCompat, false, 0, audioLevel, func(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo) {
+		got = append(got, delivery{from, pp, rxInfo})
 	})
 
 	var sender = NewSender(linecode.NewEncoder(rx.RecBit), 1, 0)
@@ -52,10 +54,8 @@ func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
 	rx.RecBit(0) // One more bit to see the last byte through.
 
 	require.Len(t, got, 1)
-	assert.Equal(t, 1, got[0].channel)
-	assert.Equal(t, 2, got[0].subchannel)
-	assert.Equal(t, 3, got[0].slice)
-	assert.Equal(t, alevel, got[0].alevel)
-	assert.Equal(t, phy.FECIL2P, got[0].fecType)
+	assert.Equal(t, from, got[0].from)
+	assert.Equal(t, alevel, got[0].rxInfo.ALevel)
+	assert.Equal(t, phy.FECIL2P, got[0].rxInfo.FEC)
 	assert.Equal(t, pp.FrameData(), got[0].pp.FrameData())
 }

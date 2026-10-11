@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/il2p"
-	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,7 +56,7 @@ func TestMultiModemInitStartsAfresh(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:left over", true)
 	require.NotNil(t, pp)
 	var alevel ax25.ALevel
-	firstReceiver.recPacket(0, 0, 0, pp, alevel, RETRY_NONE, fec_type_none)
+	firstReceiver.recPacket(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
 
 	var second = new(recordingReceiveSink)
 	var secondReceiver = multi_modem_init(audioConfig, 0, 0, second)
@@ -188,9 +188,9 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	// see.
 	var got []string
 
-	s.eas = eas.NewReceiver(1, 0, 0,
+	s.eas = eas.NewReceiver(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0},
 		func(int, int) ax25.ALevel { return ax25.ALevel{Rec: 0, Mark: 0, Space: 0} },
-		func(_ int, _ int, _ int, frame []byte, _ ax25.ALevel, _ phy.BitFixLevel, _ phy.FECType) {
+		func(_ dwcore.SlicerID, frame []byte, _ dwcore.RxInfo) {
 			got = append(got, string(frame))
 		})
 

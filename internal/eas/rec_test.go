@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,24 +22,26 @@ func TestEASReceiverHandsMessagesToItsSink(t *testing.T) {
 	} {
 		t.Run(message, func(t *testing.T) {
 			type delivery struct {
-				channel, subchannel, slice int
-				message                    string
-				alevel                     ax25.ALevel
+				from    dwcore.SlicerID
+				message string
+				rxInfo  dwcore.RxInfo
 			}
 
 			var got []delivery
 
 			var alevel = ax25.ALevel{Rec: 42, Mark: 41, Space: 43}
 
-			var rx = NewReceiver(1, 2, 3,
+			var from = dwcore.SlicerID{Channel: 1, Subchannel: 2, Slice: 3}
+
+			var rx = NewReceiver(from,
 				func(channel int, subchannel int) ax25.ALevel {
 					assert.Equal(t, 1, channel)
 					assert.Equal(t, 2, subchannel)
 
 					return alevel
 				},
-				func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, _ phy.BitFixLevel, _ phy.FECType) {
-					got = append(got, delivery{channel, subchannel, slice, string(frame), alevel})
+				func(from dwcore.SlicerID, frame []byte, rxInfo dwcore.RxInfo) {
+					got = append(got, delivery{from, string(frame), rxInfo})
 				})
 
 			// The preamble, then the message, each byte least significant
@@ -50,7 +53,7 @@ func TestEASReceiverHandsMessagesToItsSink(t *testing.T) {
 			}
 
 			require.Len(t, got, 1)
-			assert.Equal(t, delivery{1, 2, 3, message, alevel}, got[0])
+			assert.Equal(t, delivery{from, message, dwcore.RxInfo{ALevel: alevel, Retries: phy.BitFixNone, FEC: phy.FECNone}}, got[0])
 		})
 	}
 }

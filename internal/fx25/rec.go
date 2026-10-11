@@ -12,8 +12,8 @@ package fx25
 import (
 	"math/bits"
 
-	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/bitstuff"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/phy"
@@ -28,22 +28,13 @@ const (
 	FX_CHECK
 )
 
-// AudioLevelFunc reports the audio level a subchannel's demodulator is
-// hearing, which the receiver delivers each frame with.
-type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
-
-// FrameSink takes each frame the receiver extracts, without its FCS, with the
-// audio level it was heard at, how many bytes the Reed-Solomon decoder
-// corrected, and phy.FECFX25.
-type FrameSink func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
-
 // Receiver is the FX.25 receive state for one slicer of one demodulator
 // ("subchannel") of one channel.
 type Receiver struct {
-	channel, subchannel, slice int
-	debug                      int            // FX.25's debug level.
-	audioLevel                 AudioLevelFunc // For the audio level to deliver each frame with.
-	sink                       FrameSink      // Where each extracted frame goes.
+	from       dwcore.SlicerID       // The slicer whose bits these are.
+	debug      int                   // FX.25's debug level.
+	audioLevel dwcore.AudioLevelFunc // For the audio level to deliver each frame with.
+	sink       dwcore.FrameSink      // Where each extracted frame goes.
 
 	state        FX25RecState
 	accum        uint64 // Accumulate bits for matching to correlation tag.
@@ -57,18 +48,17 @@ type Receiver struct {
 	block        [FX25_BLOCK_SIZE + 1]byte
 }
 
-// NewReceiver makes a Receiver for one slicer, reporting at FX.25 debug level
-// debug.  It gives each frame it extracts to sink, with the level audioLevel
-// reports.
-func NewReceiver(channel int, subchannel int, slice int, debug int, audioLevel AudioLevelFunc, sink FrameSink) *Receiver {
-	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
-	dwutil.Assert(subchannel >= 0 && subchannel < phy.MaxSubchans)
-	dwutil.Assert(slice >= 0 && slice < phy.MaxSlicers)
+// NewReceiver makes a Receiver for the slicer from, reporting at FX.25 debug
+// level debug.  It gives each frame it extracts to sink, without its FCS, with
+// the level audioLevel reports, the number of bytes the Reed-Solomon decoder
+// corrected as its retries, and phy.FECFX25.
+func NewReceiver(from dwcore.SlicerID, debug int, audioLevel dwcore.AudioLevelFunc, sink dwcore.FrameSink) *Receiver {
+	dwutil.Assert(from.Channel >= 0 && from.Channel < phy.MaxRadioChans)
+	dwutil.Assert(from.Subchannel >= 0 && from.Subchannel < phy.MaxSubchans)
+	dwutil.Assert(from.Slice >= 0 && from.Slice < phy.MaxSlicers)
 
 	var F = new(Receiver)
-	F.channel = channel
-	F.subchannel = subchannel
-	F.slice = slice
+	F.from = from
 	F.debug = debug
 	F.audioLevel = audioLevel
 	F.sink = sink
@@ -83,9 +73,9 @@ func (F *Receiver) Debug() int {
 
 func (F *Receiver) logEntry() *logrus.Entry {
 	return logrus.WithFields(logrus.Fields{
-		"channel":    F.channel,
-		"subchannel": F.subchannel,
-		"slice":      F.slice,
+		"channel":    F.from.Channel,
+		"subchannel": F.from.Subchannel,
+		"slice":      F.from.Slice,
 	})
 }
 
@@ -217,10 +207,6 @@ func (F *Receiver) Busy() bool {
  ***********************************************************************************/
 
 func (F *Receiver) processRSBlock() {
-	var channel = F.channel
-	var subchannel = F.subchannel
-	var slice = F.slice
-
 	if F.debug >= 3 {
 		F.logEntry().Debug("FX.25: Received RS codeblock")
 		dwutil.LogHexDump(F.logEntry(), logrus.DebugLevel, F.block[:FX25_BLOCK_SIZE])
@@ -268,7 +254,11 @@ func (F *Receiver) processRSBlock() {
 
 				// The number of bytes the FEC decoder had to correct stands
 				// for how much fixing the frame took.
-				F.sink(channel, subchannel, slice, frame_buf[:frame_len-2], F.audioLevel(channel, subchannel), phy.BitFixLevel(derrors), phy.FECFX25) /* len-2 to remove FCS. */
+				F.sink(
+					F.from,
+					frame_buf[:frame_len-2],
+					dwcore.RxInfo{ALevel: F.audioLevel(F.from.Channel, F.from.Subchannel), Retries: phy.BitFixLevel(derrors), FEC: phy.FECFX25},
+				) /* len-2 to remove FCS. */
 			} else {
 				// Most likely cause is defective sender software.
 				F.logEntry().Warn("FX.25: Bad FCS for AX.25 frame")

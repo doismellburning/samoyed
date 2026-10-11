@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
@@ -15,11 +16,9 @@ import (
 
 // hdlcRecTestDelivery is one frame an HDLC receiver handed to its sink.
 type hdlcRecTestDelivery struct {
-	channel, subchannel, slice int
-	frame                      []byte
-	alevel                     ax25.ALevel
-	retries                    phy.BitFixLevel
-	fecType                    phy.FECType
+	from   dwcore.SlicerID
+	frame  []byte
+	rxInfo dwcore.RxInfo
 }
 
 // A receiver needs nothing but its config, its line decoder, and the two
@@ -32,15 +31,17 @@ func TestHDLCReceiverHandsFramesToItsSink(t *testing.T) {
 
 	var line linecode.Decoder
 
-	var rx = NewReceiver(Config{FixBits: phy.BitFixNone, Passall: false, AIS: false, SanityTest: phy.SanityAX25}, 1, 2, 3, false, &line,
+	var from = dwcore.SlicerID{Channel: 1, Subchannel: 2, Slice: 3}
+
+	var rx = NewReceiver(Config{FixBits: phy.BitFixNone, Passall: false, AIS: false, SanityTest: phy.SanityAX25}, from, false, &line,
 		func(channel int, subchannel int) ax25.ALevel {
 			assert.Equal(t, 1, channel)
 			assert.Equal(t, 2, subchannel)
 
 			return alevel
 		},
-		func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType) {
-			got = append(got, hdlcRecTestDelivery{channel, subchannel, slice, append([]byte{}, frame...), alevel, retries, fecType})
+		func(from dwcore.SlicerID, frame []byte, rxInfo dwcore.RxInfo) {
+			got = append(got, hdlcRecTestDelivery{from, append([]byte{}, frame...), rxInfo})
 		})
 
 	var pllNudgeTotal int64
@@ -66,5 +67,5 @@ func TestHDLCReceiverHandsFramesToItsSink(t *testing.T) {
 	sender.SendFlags(2)
 
 	require.Len(t, got, 1)
-	assert.Equal(t, hdlcRecTestDelivery{1, 2, 3, frame, alevel, phy.BitFixNone, phy.FECNone}, got[0])
+	assert.Equal(t, hdlcRecTestDelivery{from, frame, dwcore.RxInfo{ALevel: alevel, Retries: phy.BitFixNone, FEC: phy.FECNone}}, got[0])
 }

@@ -17,6 +17,7 @@ package rrbb
 
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -31,9 +32,7 @@ const MaxNumBits = maxFrameLen * 8 * 6 / 5
 
 // Buffer holds the raw bits of one received frame.
 type Buffer struct {
-	channel    int /* Radio channel from which it was received. */
-	subchannel int /* Which modem when more than one per channel. */
-	slice      int /* Which slicer. */
+	from dwcore.SlicerID // Which slicer the bits were received by.
 
 	alevel     ax25.ALevel /* Received audio level at time of frame capture. */
 	speedError float64     /* Received data speed error as percentage. */
@@ -46,14 +45,12 @@ type Buffer struct {
 	fdata [MaxNumBits]byte
 }
 
-// New allocates a bit buffer for frames heard on the given radio
-// channel, demodulator (subchannel) and slicer, and clears it as Clear does.
-func New(channel int, subchannel int, slice int, isScrambled bool, descramState int, prevDescram int) *Buffer {
+// New allocates a bit buffer for frames heard by the slicer from, and clears
+// it as Clear does.
+func New(from dwcore.SlicerID, isScrambled bool, descramState int, prevDescram int) *Buffer {
 	var result = new(Buffer)
 
-	result.channel = channel
-	result.subchannel = subchannel
-	result.slice = slice
+	result.from = from
 
 	result.Clear(isScrambled, descramState, prevDescram)
 
@@ -106,19 +103,9 @@ func (b *Buffer) Bit(ind int) byte {
 	return b.fdata[ind]
 }
 
-// Channel returns the radio channel the bits were received on.
-func (b *Buffer) Channel() int {
-	return b.channel
-}
-
-// Subchannel returns the demodulator the bits were received by.
-func (b *Buffer) Subchannel() int {
-	return b.subchannel
-}
-
-// Slice returns the slicer the bits were received by.
-func (b *Buffer) Slice() int {
-	return b.slice
+// SlicerID returns the slicer the bits were received by.
+func (b *Buffer) SlicerID() dwcore.SlicerID {
+	return b.from
 }
 
 // SetAudioLevel sets the audio level at the time the frame was received.

@@ -7,15 +7,20 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewRecordsWhereTheBitsCameFrom(t *testing.T) {
-	var b = New(1, 2, 3, true, 0x1234, 1)
+// testSlicer is the slicer the tests' buffers are for: any will do, but
+// distinct values show each field is kept.
+func testSlicer() dwcore.SlicerID {
+	return dwcore.SlicerID{Channel: 1, Subchannel: 2, Slice: 3}
+}
 
-	assert.Equal(t, 1, b.Channel())
-	assert.Equal(t, 2, b.Subchannel())
-	assert.Equal(t, 3, b.Slice())
+func TestNewRecordsWhereTheBitsCameFrom(t *testing.T) {
+	var b = New(testSlicer(), true, 0x1234, 1)
+
+	assert.Equal(t, testSlicer(), b.SlicerID())
 	assert.True(t, b.IsScrambled())
 	assert.Equal(t, 0x1234, b.DescramState())
 	assert.Equal(t, 1, b.PrevDescram())
@@ -24,16 +29,14 @@ func TestNewRecordsWhereTheBitsCameFrom(t *testing.T) {
 }
 
 func TestClearEmptiesButKeepsWhereTheBitsCameFrom(t *testing.T) {
-	var b = New(1, 2, 3, false, 0, 0)
+	var b = New(testSlicer(), false, 0, 0)
 
 	b.AppendBit(1)
 	b.SetAudioLevel(ax25.ALevel{Rec: 50, Mark: 40, Space: 30}) //nolint:exhaustruct
 	b.Clear(true, 0x55, 1)
 
 	assert.Equal(t, 0, b.Len())
-	assert.Equal(t, 1, b.Channel())
-	assert.Equal(t, 2, b.Subchannel())
-	assert.Equal(t, 3, b.Slice())
+	assert.Equal(t, testSlicer(), b.SlicerID())
 	assert.True(t, b.IsScrambled())
 	assert.Equal(t, 0x55, b.DescramState())
 	assert.Equal(t, 1, b.PrevDescram())
@@ -41,13 +44,13 @@ func TestClearEmptiesButKeepsWhereTheBitsCameFrom(t *testing.T) {
 }
 
 func TestClearRejectsANonBitPrevDescram(t *testing.T) {
-	var b = New(0, 0, 0, false, 0, 0)
+	var b = New(testSlicer(), false, 0, 0)
 
 	assert.Panics(t, func() { b.Clear(false, 0, 2) })
 }
 
 func TestAppendBitThenBit(t *testing.T) {
-	var b = New(0, 0, 0, false, 0, 0)
+	var b = New(testSlicer(), false, 0, 0)
 	var bits = []byte{1, 0, 0, 1, 1}
 
 	for _, bit := range bits {
@@ -62,7 +65,7 @@ func TestAppendBitThenBit(t *testing.T) {
 }
 
 func TestAppendBitDiscardsOnceFull(t *testing.T) {
-	var b = New(0, 0, 0, false, 0, 0)
+	var b = New(testSlicer(), false, 0, 0)
 
 	for range MaxNumBits {
 		b.AppendBit(0)
@@ -75,7 +78,7 @@ func TestAppendBitDiscardsOnceFull(t *testing.T) {
 }
 
 func TestChop8(t *testing.T) {
-	var b = New(0, 0, 0, false, 0, 0)
+	var b = New(testSlicer(), false, 0, 0)
 
 	for range 10 {
 		b.AppendBit(1)
@@ -90,7 +93,7 @@ func TestChop8(t *testing.T) {
 }
 
 func TestSpeedError(t *testing.T) {
-	var b = New(0, 0, 0, false, 0, 0)
+	var b = New(testSlicer(), false, 0, 0)
 
 	b.SetSpeedError(-1.5)
 
