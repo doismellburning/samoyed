@@ -72,6 +72,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/fx25"
@@ -87,14 +88,14 @@ import (
 
 type candidate_t struct {
 	packet_p    *ax25.Packet
-	alevel      ax25.ALevel
-	speed_error float64     //nolint:unused
-	fec_type    fec_type_t  // Type of FEC: none(0), fx25, il2p
-	retries     BitFixLevel // For the old "fix bits" strategy, this is the
-	// number of bits that were modified to get a good CRC.
-	// It would be 0 to something around 4.
-	// For FX.25, it is the number of corrected.
-	// This could be from 0 thru 32.
+	speed_error float64 //nolint:unused
+
+	// rxInfo is how it was heard.  Its FEC is none(0), fx25 or il2p.  For the
+	// old "fix bits" strategy, its Retries is the number of bits that were
+	// modified to get a good CRC, 0 to something around 4.  For FX.25, it is
+	// the number corrected, from 0 thru 32.
+	rxInfo dwcore.RxInfo
+
 	age   int
 	crc   uint16
 	score int
@@ -322,9 +323,11 @@ func (m *MultiModem) ProcessSample(audio_sample int) bool {
 // processRecPacket takes a frame one of the channel's decoders found: straight
 // on if there is only the one decoder, otherwise as a candidate for
 // pickBestCandidate.
-func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
+func (m *MultiModem) processRecPacket(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo) {
 	var channel = m.channel
 	var pa = m.audioConfig
+
+	dwutil.Assert(from.Channel == channel)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -356,8 +359,8 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, a
 		}
 
 		if !drop_it {
-			recordRadioFrame(channel, fec_type, retries)
-			m.sink.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, "")
+			recordRadioFrame(channel, rxInfo.FEC, rxInfo.Retries)
+			m.sink.RecFrame(channel, from.Subchannel, from.Slice, pp, rxInfo.ALevel, rxInfo.FEC, rxInfo.Retries, "")
 		}
 
 		return
@@ -368,12 +371,10 @@ func (m *MultiModem) processRecPacket(subchan int, slice int, pp *ax25.Packet, a
 	 */
 	/* Plain old AX.25: Oops!  Didn't expect one to be there already. */
 	/* FX.25: Quietly replace anything already there.  It will have priority. */
-	var c = &m.candidates[subchan][slice]
+	var c = &m.candidates[from.Subchannel][from.Slice]
 
 	c.packet_p = pp
-	c.alevel = alevel
-	c.fec_type = fec_type
-	c.retries = retries
+	c.rxInfo = rxInfo
 	c.age = 0
 	c.crc = pp.MultiModemCRC()
 }
@@ -434,16 +435,16 @@ func (m *MultiModem) pickBestCandidate() {
 
 		if m.candidates[j][k].packet_p == nil {
 			spectrum[n] = '_'
-		} else if m.candidates[j][k].fec_type != fec_type_none { // FX.25 or IL2P
+		} else if m.candidates[j][k].rxInfo.FEC != fec_type_none { // FX.25 or IL2P
 			// FIXME: using retries both as an enum and later int too.
-			if m.candidates[j][k].retries >= 0 && m.candidates[j][k].retries <= 9 {
-				spectrum[n] = '0' + byte(m.candidates[j][k].retries)
+			if m.candidates[j][k].rxInfo.Retries >= 0 && m.candidates[j][k].rxInfo.Retries <= 9 {
+				spectrum[n] = '0' + byte(m.candidates[j][k].rxInfo.Retries)
 			} else {
 				spectrum[n] = '+'
 			}
-		} else if m.candidates[j][k].retries == RETRY_NONE { // AX.25 below
+		} else if m.candidates[j][k].rxInfo.Retries == RETRY_NONE { // AX.25 below
 			spectrum[n] = '|'
-		} else if m.candidates[j][k].retries == RETRY_INVERT_SINGLE {
+		} else if m.candidates[j][k].rxInfo.Retries == RETRY_INVERT_SINGLE {
 			spectrum[n] = ':'
 		} else {
 			spectrum[n] = '.'
@@ -454,14 +455,14 @@ func (m *MultiModem) pickBestCandidate() {
 		if m.candidates[j][k].packet_p == nil {
 			m.candidates[j][k].score = 0
 		} else {
-			if m.candidates[j][k].fec_type != fec_type_none {
-				m.candidates[j][k].score = 9000 - 100*int(m.candidates[j][k].retries) // has FEC
+			if m.candidates[j][k].rxInfo.FEC != fec_type_none {
+				m.candidates[j][k].score = 9000 - 100*int(m.candidates[j][k].rxInfo.Retries) // has FEC
 			} else {
 				/* Originally, this produced 0 for the PASSALL case. */
 				/* This didn't work so well when looking for the best score. */
 				/* Around 1.3 dev H, we add an extra 1 in here so the minimum */
 				/* score should now be 1 for anything received.  */
-				m.candidates[j][k].score = int(BitFixPassall)*1000 - int(m.candidates[j][k].retries*1000) + 1
+				m.candidates[j][k].score = int(BitFixPassall)*1000 - int(m.candidates[j][k].rxInfo.Retries*1000) + 1
 			}
 		}
 	}
@@ -522,8 +523,8 @@ func (m *MultiModem) pickBestCandidate() {
 				logEntry.Trace("candidate: no packet")
 			} else {
 				logEntry.WithFields(logrus.Fields{
-					"fec_type": c.fec_type,
-					"retries":  c.retries,
+					"fec_type": c.rxInfo.FEC,
+					"retries":  c.rxInfo.Retries,
 					"age":      c.age,
 					"crc":      fmt.Sprintf("%04x", c.crc),
 					"score":    c.score,
@@ -574,12 +575,13 @@ func (m *MultiModem) pickBestCandidate() {
 		m.candidates[j][k].packet_p = nil
 	} else {
 		dwutil.Assert(m.candidates[j][k].packet_p != nil)
-		recordRadioFrame(channel, m.candidates[j][k].fec_type, m.candidates[j][k].retries)
+		var rxInfo = m.candidates[j][k].rxInfo
+		recordRadioFrame(channel, rxInfo.FEC, rxInfo.Retries)
 		m.sink.RecFrame(channel, j, k,
 			m.candidates[j][k].packet_p,
-			m.candidates[j][k].alevel,
-			m.candidates[j][k].fec_type,
-			(m.candidates[j][k].retries),
+			rxInfo.ALevel,
+			rxInfo.FEC,
+			rxInfo.Retries,
 			string(spectrum[:num_bars]))
 
 		/* Ownership has been transferred, so drop our reference. */
@@ -839,13 +841,17 @@ func (r *Layer2Receiver) recFrame(channel int, subchan int, slice int, fbuf []by
 // recPacket hands one received frame to its channel's MultiModem, or to
 // whatever is standing in for the rest of the receive path.
 func (r *Layer2Receiver) recPacket(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
+	var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
+
+	var rxInfo = dwcore.RxInfo{ALevel: alevel, Retries: retries, FEC: fec_type}
+
 	if multiModemRecCapture != nil {
-		multiModemRecCapture(channel, subchannel, slice, pp, alevel, retries, fec_type)
+		multiModemRecCapture(from, pp, rxInfo)
 
 		return
 	}
 
-	r.modems[channel].processRecPacket(subchannel, slice, pp, alevel, retries, fec_type)
+	r.modems[channel].processRecPacket(from, pp, rxInfo)
 }
 
 /***********************************************************************************

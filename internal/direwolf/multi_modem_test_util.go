@@ -5,7 +5,7 @@
 package direwolf
 
 import (
-	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 )
 
 // multiModemRecCapture, when set, is given each frame the demodulators
@@ -15,4 +15,4 @@ import (
 //
 // The same shape as toneGenCapture, and for the same reason: a test needs to
 // watch something that would otherwise disappear into the rest of the program.
-var multiModemRecCapture func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t)
+var multiModemRecCapture dwcore.PacketSink

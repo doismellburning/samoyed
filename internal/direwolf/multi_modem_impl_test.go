@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,6 +68,12 @@ func newMultiModemImplTest(t *testing.T, numSubchan int, numSlicers int) (*Multi
 	return m, sink
 }
 
+// multiModemImplFrom is the slicer subchan, slice of channel 0, where the
+// MultiModem newMultiModemImplTest makes is listening.
+func multiModemImplFrom(subchan int, slice int) dwcore.SlicerID {
+	return dwcore.SlicerID{Channel: 0, Subchannel: subchan, Slice: slice}
+}
+
 func multiModemImplPacket(t *testing.T, info string) *ax25.Packet {
 	t.Helper()
 
@@ -81,7 +88,7 @@ func TestMultiModemImplSingleDecoderPassesStraightThrough(t *testing.T) {
 
 	var pp = multiModemImplPacket(t, "hello")
 	var alevel ax25.ALevel
-	m.processRecPacket(0, 0, pp, alevel, RETRY_INVERT_SINGLE, fec_type_none)
+	m.processRecPacket(multiModemImplFrom(0, 0), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_INVERT_SINGLE, FEC: fec_type_none})
 
 	require.Len(t, sink.frames, 1)
 	assert.Same(t, pp, sink.frames[0].pp)
@@ -94,7 +101,7 @@ func TestMultiModemImplNilPacketIgnored(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 2, 1)
 
 	var alevel ax25.ALevel
-	m.processRecPacket(0, 0, nil, alevel, RETRY_NONE, fec_type_none)
+	m.processRecPacket(multiModemImplFrom(0, 0), nil, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
 
 	assert.Empty(t, sink.frames)
 	assert.Nil(t, m.candidates[0][0].packet_p)
@@ -105,7 +112,7 @@ func TestMultiModemImplSingleDecoderErrorRateDrops(t *testing.T) {
 	m.audioConfig.recv_error_rate = 100
 
 	var alevel ax25.ALevel
-	m.processRecPacket(0, 0, multiModemImplPacket(t, "dropped"), alevel, RETRY_NONE, fec_type_none)
+	m.processRecPacket(multiModemImplFrom(0, 0), multiModemImplPacket(t, "dropped"), dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
 
 	assert.Empty(t, sink.frames)
 }
@@ -115,14 +122,14 @@ func TestMultiModemImplMultipleDecodersHoldCandidate(t *testing.T) {
 
 	var pp = multiModemImplPacket(t, "held")
 	var alevel ax25.ALevel
-	m.processRecPacket(1, 0, pp, alevel, RETRY_INVERT_SINGLE, fec_type_fx25)
+	m.processRecPacket(multiModemImplFrom(1, 0), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_INVERT_SINGLE, FEC: fec_type_fx25})
 
 	assert.Empty(t, sink.frames)
 
 	var c = m.candidates[1][0]
 	assert.Same(t, pp, c.packet_p)
-	assert.Equal(t, fec_type_fx25, c.fec_type)
-	assert.Equal(t, RETRY_INVERT_SINGLE, c.retries)
+	assert.Equal(t, fec_type_fx25, c.rxInfo.FEC)
+	assert.Equal(t, RETRY_INVERT_SINGLE, c.rxInfo.Retries)
 	assert.Equal(t, 0, c.age)
 	assert.Equal(t, pp.MultiModemCRC(), c.crc)
 }
@@ -135,10 +142,10 @@ func TestMultiModemImplPickBestCandidatePrefersFEC(t *testing.T) {
 	var alevel ax25.ALevel
 
 	var best = multiModemImplPacket(t, "fx25 three")
-	m.processRecPacket(0, 0, best, alevel, BitFixLevel(3), fec_type_fx25)
-	m.processRecPacket(1, 0, multiModemImplPacket(t, "clean"), alevel, RETRY_NONE, fec_type_none)
-	m.processRecPacket(0, 1, multiModemImplPacket(t, "il2p twelve"), alevel, BitFixLevel(12), fec_type_il2p)
-	m.processRecPacket(1, 1, multiModemImplPacket(t, "passall"), alevel, BitFixPassall, fec_type_none)
+	m.processRecPacket(multiModemImplFrom(0, 0), best, dwcore.RxInfo{ALevel: alevel, Retries: BitFixLevel(3), FEC: fec_type_fx25})
+	m.processRecPacket(multiModemImplFrom(1, 0), multiModemImplPacket(t, "clean"), dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
+	m.processRecPacket(multiModemImplFrom(0, 1), multiModemImplPacket(t, "il2p twelve"), dwcore.RxInfo{ALevel: alevel, Retries: BitFixLevel(12), FEC: fec_type_il2p})
+	m.processRecPacket(multiModemImplFrom(1, 1), multiModemImplPacket(t, "passall"), dwcore.RxInfo{ALevel: alevel, Retries: BitFixPassall, FEC: fec_type_none})
 
 	m.pickBestCandidate()
 
@@ -160,7 +167,7 @@ func TestMultiModemImplSpectrumNegativeCorrections(t *testing.T) {
 
 	var alevel ax25.ALevel
 
-	m.processRecPacket(0, 0, multiModemImplPacket(t, "fx25 negative"), alevel, BitFixLevel(-1), fec_type_fx25)
+	m.processRecPacket(multiModemImplFrom(0, 0), multiModemImplPacket(t, "fx25 negative"), dwcore.RxInfo{ALevel: alevel, Retries: BitFixLevel(-1), FEC: fec_type_fx25})
 
 	m.pickBestCandidate()
 
@@ -174,8 +181,8 @@ func TestMultiModemImplPickBestCandidatePrefersNoRetries(t *testing.T) {
 	var alevel ax25.ALevel
 
 	var best = multiModemImplPacket(t, "clean")
-	m.processRecPacket(0, 0, multiModemImplPacket(t, "fixed"), alevel, RETRY_INVERT_SINGLE, fec_type_none)
-	m.processRecPacket(1, 0, best, alevel, RETRY_NONE, fec_type_none)
+	m.processRecPacket(multiModemImplFrom(0, 0), multiModemImplPacket(t, "fixed"), dwcore.RxInfo{ALevel: alevel, Retries: RETRY_INVERT_SINGLE, FEC: fec_type_none})
+	m.processRecPacket(multiModemImplFrom(1, 0), best, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
 
 	m.pickBestCandidate()
 
@@ -191,9 +198,9 @@ func TestMultiModemImplPickBestCandidatePrefersAgreement(t *testing.T) {
 
 	var alevel ax25.ALevel
 
-	m.processRecPacket(0, 0, multiModemImplPacket(t, "loner"), alevel, RETRY_INVERT_SINGLE, fec_type_none)
-	m.processRecPacket(1, 0, multiModemImplPacket(t, "agreed"), alevel, RETRY_INVERT_SINGLE, fec_type_none)
-	m.processRecPacket(2, 0, multiModemImplPacket(t, "agreed"), alevel, RETRY_INVERT_SINGLE, fec_type_none)
+	m.processRecPacket(multiModemImplFrom(0, 0), multiModemImplPacket(t, "loner"), dwcore.RxInfo{ALevel: alevel, Retries: RETRY_INVERT_SINGLE, FEC: fec_type_none})
+	m.processRecPacket(multiModemImplFrom(1, 0), multiModemImplPacket(t, "agreed"), dwcore.RxInfo{ALevel: alevel, Retries: RETRY_INVERT_SINGLE, FEC: fec_type_none})
+	m.processRecPacket(multiModemImplFrom(2, 0), multiModemImplPacket(t, "agreed"), dwcore.RxInfo{ALevel: alevel, Retries: RETRY_INVERT_SINGLE, FEC: fec_type_none})
 
 	m.pickBestCandidate()
 
@@ -208,8 +215,8 @@ func TestMultiModemImplPickBestCandidateErrorRateDrops(t *testing.T) {
 	m.audioConfig.recv_error_rate = 100
 
 	var alevel ax25.ALevel
-	m.processRecPacket(0, 0, multiModemImplPacket(t, "a"), alevel, RETRY_NONE, fec_type_none)
-	m.processRecPacket(1, 0, multiModemImplPacket(t, "b"), alevel, RETRY_NONE, fec_type_none)
+	m.processRecPacket(multiModemImplFrom(0, 0), multiModemImplPacket(t, "a"), dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
+	m.processRecPacket(multiModemImplFrom(1, 0), multiModemImplPacket(t, "b"), dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
 
 	m.pickBestCandidate()
 
@@ -236,7 +243,7 @@ func TestMultiModemImplPickBestCandidateTrace(t *testing.T) {
 
 	var alevel ax25.ALevel
 	var pp = multiModemImplPacket(t, "traced")
-	m.processRecPacket(1, 0, pp, alevel, RETRY_NONE, fec_type_none)
+	m.processRecPacket(multiModemImplFrom(1, 0), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
 
 	m.pickBestCandidate()
 
@@ -323,12 +330,10 @@ func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.
 
 	var got *ax25.Packet
 
-	multiModemRecCapture = func(channel int, subchannel int, slice int, pp *ax25.Packet, _ ax25.ALevel, retries BitFixLevel, fecType fec_type_t) {
-		assert.Equal(t, 0, channel)
-		assert.Equal(t, 1, subchannel)
-		assert.Equal(t, 2, slice)
-		assert.Equal(t, RETRY_INVERT_SINGLE, retries)
-		assert.Equal(t, fec_type_none, fecType)
+	multiModemRecCapture = func(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo) {
+		assert.Equal(t, dwcore.SlicerID{Channel: 0, Subchannel: 1, Slice: 2}, from)
+		assert.Equal(t, RETRY_INVERT_SINGLE, rxInfo.Retries)
+		assert.Equal(t, fec_type_none, rxInfo.FEC)
 
 		got = pp
 	}
