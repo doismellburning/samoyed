@@ -11,6 +11,7 @@ package hdlc
 
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
@@ -98,7 +99,7 @@ func NewReceiver(config Config, channel int, subchannel int, slice int, scramble
 	// Should loop on number of slicers, not max.
 
 	var descramState, prevDescram = s.line.State()
-	s.rawBits = rrbb.New(channel, subchannel, slice, scrambled, descramState, prevDescram)
+	s.rawBits = rrbb.New(dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}, scrambled, descramState, prevDescram)
 
 	return s
 }
@@ -227,7 +228,7 @@ func (s *Receiver) RecBit(raw bool, dbit bool, is_scrambled bool,
 			s.rawBits = nil
 
 			var descramState, prevDescram = s.line.State()
-			s.rawBits = rrbb.New(channel, subchannel, slice, is_scrambled, descramState, prevDescram) /* Allocate a new one. */
+			s.rawBits = rrbb.New(dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}, is_scrambled, descramState, prevDescram) /* Allocate a new one. */
 		} else {
 			//JWL - start of frame
 			*pll_nudge_total = 0

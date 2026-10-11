@@ -207,9 +207,10 @@ type hdlc_state2_s struct {
  ***********************************************************************************/
 
 func hdlc_rec2_block(block *rrbb.Buffer, config *Config, sink FrameSink) {
-	var channel = block.Channel()
-	var subchan = block.Subchannel()
-	var slice = block.Slice()
+	var from = block.SlicerID()
+	var channel = from.Channel
+	var subchan = from.Subchannel
+	var slice = from.Slice
 	var alevel = block.AudioLevel()
 	var fix_bits = config.FixBits
 	var passall = config.Passall
@@ -669,8 +670,8 @@ func try_decode(block *rrbb.Buffer, config *Config, sink FrameSink, channel int,
 			// TODO: Shouldn't be necessary to pass chan, subchan, alevel into
 			// try_decode because we can obtain them from block.
 			// Let's make sure that assumption is good...
-			dwutil.Assert(block.Channel() == channel)
-			dwutil.Assert(block.Subchannel() == subchan)
+			dwutil.Assert(block.SlicerID().Channel == channel)
+			dwutil.Assert(block.SlicerID().Subchannel == subchan)
 			sink(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, retry_conf.retry, phy.FECNone) /* len-2 to remove FCS. */
 
 			return true /* success */
