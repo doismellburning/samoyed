@@ -361,7 +361,7 @@ func (s *atestSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcor
 
 	s.packetsDecoded++
 
-	if s.receiver.DataDetectAny(channel) == 0 {
+	if !s.receiver.DataDetectAny(channel) {
 		s.dcdMissingErrors++
 	}
 

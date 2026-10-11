@@ -16,7 +16,6 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dtmf"
-	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/fx25"
 	"github.com/doismellburning/samoyed/internal/il2p"
@@ -697,12 +696,12 @@ func TestWaitForClearChannelWaitsWhileBusy(t *testing.T) {
 
 	var asked = 0
 
-	xs.dataDetect = func(channel int) int {
+	xs.dataDetect = func(channel int) bool {
 		require.Equal(t, 0, channel)
 
 		asked++
 
-		return dwutil.IfThenElse(asked < 3, 1, 0) // Busy the first two times.
+		return asked < 3 // Busy the first two times.
 	}
 
 	transmitQueue.Append(0, TQ_PRIO_0_HI, newTestPacket(t)) // So no random wait.

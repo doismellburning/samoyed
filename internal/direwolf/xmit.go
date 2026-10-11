@@ -142,9 +142,9 @@ type XmitService struct {
 	// there is nothing to key.
 	setPTT func(channel int, on bool)
 
-	// dataDetect says whether anything is being heard on a channel (above 0)
-	// or not, or is nil when nothing can be.
-	dataDetect func(channel int) int
+	// dataDetect says whether anything is being heard on a channel, or is nil
+	// when nothing can be.
+	dataDetect func(channel int) bool
 
 	p_modem   *RadioConfig
 	fx25Debug int
@@ -203,7 +203,7 @@ func NewXmitService(
 	audio *AudioDevices,
 	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator,
 	setPTT func(channel int, on bool),
-	dataDetect func(channel int) int,
+	dataDetect func(channel int) bool,
 	onTransmit func(channel int, pp *ax25.Packet),
 	seizeConfirm seizeConfirmer,
 	debug_xmit_packet bool,
@@ -266,7 +266,7 @@ func NewXmitService(
 // channelBusy is whether something is being heard on a channel, so that
 // transmitting would talk over it.
 func (xs *XmitService) channelBusy(channel int) bool {
-	return xs.dataDetect != nil && xs.dataDetect(channel) > 0
+	return xs.dataDetect != nil && xs.dataDetect(channel)
 }
 
 // confirmSeize tells the data link state machine, if there is one to tell,
