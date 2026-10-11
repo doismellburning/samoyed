@@ -47,7 +47,7 @@ func TestNegotiationResponseFillsInDefaults(t *testing.T) {
 	var param, _, status = xid.Parse(nil)
 	assert.True(t, status)
 
-	negotiation_response(S, param)
+	ax25Link.negotiation_response(S, param)
 
 	assert.Equal(t, ax25.Modulo8, param.Modulo)
 	assert.Equal(t, xid.SREJNone, param.SREJ)
@@ -91,7 +91,7 @@ func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
 			param.AckTimer = maybe.Just(1000)       // Quicker than our FRACK.
 			param.Retries = maybe.Just(2)           // Fewer than our N2.
 
-			negotiation_response(S, param)
+			ax25Link.negotiation_response(S, param)
 
 			assert.Equal(t, maybe.Just(AX25_N1_PACLEN_MAX), param.IFieldLengthRx)
 			assert.Equal(t, maybe.Just(test.wantWindow), param.WindowSizeRx)
@@ -163,7 +163,7 @@ func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 		apply   func(S *ax25_dlsm_t, param *xid.Param)
 		command bool
 	}{
-		{"command", negotiation_response, true},
+		{"command", ax25Link.negotiation_response, true},
 		{"response", complete_negotiation, false},
 	}
 
@@ -241,7 +241,7 @@ func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 		cr    ax25.CmdRes
 		apply func(S *ax25_dlsm_t, param *xid.Param)
 	}{
-		{"command", ax25.CRCmd, negotiation_response},
+		{"command", ax25.CRCmd, ax25Link.negotiation_response},
 		{"response", ax25.CRRes, complete_negotiation},
 	}
 
@@ -290,7 +290,7 @@ func TestNegotiationResponseSendsBackWhatItApplied(t *testing.T) {
 	param.IFieldLengthRx = maybe.Just(0)
 	param.WindowSizeRx = maybe.Just(0)
 
-	negotiation_response(S, param)
+	ax25Link.negotiation_response(S, param)
 
 	assert.Equal(t, S.modulo, param.Modulo)
 	assert.Equal(t, maybe.Just(S.n1_paclen), param.IFieldLengthRx)
@@ -432,7 +432,7 @@ func TestDataRequestForALinkThatWasNeverConnected(t *testing.T) {
 
 	var E = newDataRequest(MY_CALL, THEIR_CALL, CHANNEL, []byte("Testing"))
 
-	runWithTimeout(t, "dl_data_request", func() { dl_data_request(E) })
+	runWithTimeout(t, "dl_data_request", func() { ax25Link.dl_data_request(E) })
 
 	require.NotNil(t, ax25Link.listHead, "the request should have made a link")
 	assert.Equal(t, ax25Link.miscConfig.paclen, ax25Link.listHead.n1_paclen,
@@ -468,7 +468,7 @@ func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			setupTestEnv(t)
 
-			var S = get_link_handle([ax25.MaxAddrs]string{OWNCALL: MY_CALL, PEERCALL: THEIR_CALL}, 2, CHANNEL, 0, true)
+			var S = ax25Link.get_link_handle([ax25.MaxAddrs]string{OWNCALL: MY_CALL, PEERCALL: THEIR_CALL}, 2, CHANNEL, 0, true)
 			require.NotNil(t, S)
 
 			S.modulo = testCase.modulo
@@ -476,7 +476,7 @@ func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
 
 			var E = newDataRequest(MY_CALL, THEIR_CALL, CHANNEL, []byte("Testing"))
 
-			runWithTimeout(t, "dl_data_request", func() { dl_data_request(E) })
+			runWithTimeout(t, "dl_data_request", func() { ax25Link.dl_data_request(E) })
 
 			assert.Nil(t, E.txdata, "data that cannot be sent should have been discarded")
 		})
@@ -504,14 +504,14 @@ func TestDLDataIndicationShortSegments(t *testing.T) {
 			var S = establishConnection(t, "Q1TEST", "Q2TEST", 0)
 
 			if tc.reassembling {
-				dl_data_indication(S, ax25.PIDSegmentationFragment, firstSegment)
+				ax25Link.dl_data_indication(S, ax25.PIDSegmentationFragment, firstSegment)
 				require.NotNil(t, S.ra_buff)
 			}
 
 			var hook = test.NewGlobal()
 			t.Cleanup(hook.Reset)
 
-			dl_data_indication(S, ax25.PIDSegmentationFragment, tc.segment)
+			ax25Link.dl_data_indication(S, ax25.PIDSegmentationFragment, tc.segment)
 
 			assert.Nil(t, S.ra_buff, "a bad segment abandons any reassembly")
 			require.NotNil(t, hook.LastEntry())
@@ -537,9 +537,9 @@ func TestEnterNewStateSetsConnectedIndicator(t *testing.T) {
 	S.channel = 1
 	S.state = state_1_awaiting_connection
 
-	enter_new_state(S, state_3_connected)
-	enter_new_state(S, state_4_timer_recovery) // Still connected, so no change.
-	enter_new_state(S, state_0_disconnected)
+	ax25Link.enter_new_state(S, state_3_connected)
+	ax25Link.enter_new_state(S, state_4_timer_recovery) // Still connected, so no change.
+	ax25Link.enter_new_state(S, state_0_disconnected)
 
 	assert.Equal(t, []string{"1=true", "1=false"}, set)
 }
@@ -575,7 +575,7 @@ func TestOutstandingFramesForNoLinkRepliesNone(t *testing.T) {
 	E.addrs[PEERCALL] = "Q2TEST"
 	E.num_addr = 2
 
-	testutils.CaptureOutput(t, func() { dl_outstanding_frames_request(E) })
+	testutils.CaptureOutput(t, func() { ax25Link.dl_outstanding_frames_request(E) })
 
 	assert.Equal(t, []string{"0/2 Q1TEST>Q2TEST 0"}, clients.replies)
 }

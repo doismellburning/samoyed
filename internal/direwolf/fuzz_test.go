@@ -260,25 +260,25 @@ func fuzzLinkDrain(q *DataLinkQueue) {
 
 		switch item._type {
 		case DLQ_REC_FRAME:
-			lm_data_indication(item)
+			ax25Link.lm_data_indication(item)
 		case DLQ_CONNECT_REQUEST:
-			dl_connect_request(item)
+			ax25Link.dl_connect_request(item)
 		case DLQ_DISCONNECT_REQUEST:
-			dl_disconnect_request(item)
+			ax25Link.dl_disconnect_request(item)
 		case DLQ_XMIT_DATA_REQUEST:
-			dl_data_request(item)
+			ax25Link.dl_data_request(item)
 		case DLQ_REGISTER_CALLSIGN:
-			dl_register_callsign(item)
+			ax25Link.dl_register_callsign(item)
 		case DLQ_UNREGISTER_CALLSIGN:
-			dl_unregister_callsign(item)
+			ax25Link.dl_unregister_callsign(item)
 		case DLQ_OUTSTANDING_FRAMES_REQUEST:
-			dl_outstanding_frames_request(item)
+			ax25Link.dl_outstanding_frames_request(item)
 		case DLQ_CHANNEL_BUSY:
-			lm_channel_busy(item)
+			ax25Link.lm_channel_busy(item)
 		case DLQ_SEIZE_CONFIRM:
-			lm_seize_confirm(item)
+			ax25Link.lm_seize_confirm(item)
 		case DLQ_CLIENT_CLEANUP:
-			dl_client_cleanup(item)
+			ax25Link.dl_client_cleanup(item)
 		}
 
 		q.Delete(item)
@@ -304,7 +304,7 @@ func fuzzLinkExpireTimers() {
 		}
 	}
 
-	dl_timer_expiry()
+	ax25Link.dl_timer_expiry()
 }
 
 // The connected-mode target's input is a script of things happening to the

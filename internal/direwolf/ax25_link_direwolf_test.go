@@ -188,7 +188,7 @@ func initiateConnect(t *testing.T, myCall, theirCall string, channel int) {
 	E.addrs[PEERCALL] = theirCall
 	E.num_addr = 2
 
-	dl_connect_request(E)
+	ax25Link.dl_connect_request(E)
 }
 
 // Helper to simulate receiving a frame
@@ -199,7 +199,7 @@ func receiveFrame(t *testing.T, pp *ax25.Packet, channel int) {
 	E._chan = channel
 	E.pp = pp
 
-	lm_data_indication(E)
+	ax25Link.lm_data_indication(E)
 }
 
 // Helper to establish a connection (SABM/UA exchange)
@@ -251,7 +251,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
-	dl_connect_request(E)
+	ax25Link.dl_connect_request(E)
 
 	// Now acknowledge
 	addrs[OWNCALL] = THEIR_CALL
@@ -263,7 +263,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	E._chan = CHANNEL
 	E.pp = pp
 
-	lm_data_indication(E)
+	ax25Link.lm_data_indication(E)
 
 	// And now we should be connected!
 	assert.NotNil(t, ax25Link.listHead)
@@ -355,7 +355,7 @@ func TestAX25LinkDISCDisconnection(t *testing.T) {
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
-	dl_disconnect_request(E)
+	ax25Link.dl_disconnect_request(E)
 
 	// Should be in awaiting release state
 	assert.Equal(t, state_2_awaiting_release, S.state)
@@ -389,7 +389,7 @@ func TestAX25LinkDISCInDisconnectedState(t *testing.T) {
 	regE._chan = CHANNEL
 	regE.addrs[0] = MY_CALL // Register uses addrs[0]
 	regE.client = 0
-	dl_register_callsign(regE)
+	ax25Link.dl_register_callsign(regE)
 
 	// Receive DISC in disconnected state
 	var addrs [ax25.MaxAddrs]string
@@ -545,7 +545,7 @@ func TestAX25LinkIncomingSABM(t *testing.T) {
 	regE._chan = CHANNEL
 	regE.addrs[0] = MY_CALL // Register uses addrs[0]
 	regE.client = 0
-	dl_register_callsign(regE)
+	ax25Link.dl_register_callsign(regE)
 
 	// Receive SABM from peer
 	var addrs [ax25.MaxAddrs]string
@@ -593,16 +593,16 @@ func TestAX25LinkStateVariables(t *testing.T) {
 	assert.Equal(t, 0, S.va, "Initial V(A) should be 0")
 
 	// Test SET_VS
-	SET_VS(S, 3)
+	ax25Link.SET_VS(S, 3)
 	assert.Equal(t, 3, S.vs, "V(S) should be 3")
 
 	// Test SET_VR
-	SET_VR(S, 2)
+	ax25Link.SET_VR(S, 2)
 	assert.Equal(t, 2, S.vr, "V(R) should be 2")
 
 	// Test SET_VA - need VS to be >= VA value first
 	S.vs = 5 // Set VS high enough
-	SET_VA(S, 1)
+	ax25Link.SET_VA(S, 1)
 	assert.Equal(t, 1, S.va, "V(A) should be 1")
 
 	// Test WITHIN_WINDOW_SIZE
@@ -785,7 +785,7 @@ func TestAX25LinkDMAfterDISC(t *testing.T) {
 	E.addrs[OWNCALL] = MY_CALL
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
-	dl_disconnect_request(E)
+	ax25Link.dl_disconnect_request(E)
 
 	assert.Equal(t, state_2_awaiting_release, S.state)
 
@@ -850,7 +850,7 @@ func TestAX25LinkTimerRecoveryState(t *testing.T) {
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Manually put into timer recovery state
-	enter_new_state(S, state_4_timer_recovery)
+	ax25Link.enter_new_state(S, state_4_timer_recovery)
 	assert.Equal(t, state_4_timer_recovery, S.state)
 
 	// Receive RR with F=1 (response to our poll)
@@ -1089,33 +1089,33 @@ func TestAX25LinkIsGoodNR(t *testing.T) {
 	// V(A)=0, V(S)=0: only N(R)=0 is valid
 	S.va = 0
 	S.vs = 0
-	assert.True(t, is_good_nr(S, 0), "N(R)=0 valid when V(A)=0, V(S)=0")
-	assert.False(t, is_good_nr(S, 1), "N(R)=1 invalid when V(S)=0")
+	assert.True(t, ax25Link.is_good_nr(S, 0), "N(R)=0 valid when V(A)=0, V(S)=0")
+	assert.False(t, ax25Link.is_good_nr(S, 1), "N(R)=1 invalid when V(S)=0")
 
 	// V(A)=0, V(S)=3: N(R) 0-3 valid
 	S.vs = 3
-	assert.True(t, is_good_nr(S, 0), "N(R)=0 valid")
-	assert.True(t, is_good_nr(S, 1), "N(R)=1 valid")
-	assert.True(t, is_good_nr(S, 2), "N(R)=2 valid")
-	assert.True(t, is_good_nr(S, 3), "N(R)=3 valid")
-	assert.False(t, is_good_nr(S, 4), "N(R)=4 invalid")
+	assert.True(t, ax25Link.is_good_nr(S, 0), "N(R)=0 valid")
+	assert.True(t, ax25Link.is_good_nr(S, 1), "N(R)=1 valid")
+	assert.True(t, ax25Link.is_good_nr(S, 2), "N(R)=2 valid")
+	assert.True(t, ax25Link.is_good_nr(S, 3), "N(R)=3 valid")
+	assert.False(t, ax25Link.is_good_nr(S, 4), "N(R)=4 invalid")
 
 	// V(A)=2, V(S)=5: N(R) 2-5 valid
 	S.va = 2
 	S.vs = 5
-	assert.False(t, is_good_nr(S, 1), "N(R)=1 invalid (< V(A))")
-	assert.True(t, is_good_nr(S, 2), "N(R)=2 valid")
-	assert.True(t, is_good_nr(S, 5), "N(R)=5 valid")
-	assert.False(t, is_good_nr(S, 6), "N(R)=6 invalid")
+	assert.False(t, ax25Link.is_good_nr(S, 1), "N(R)=1 invalid (< V(A))")
+	assert.True(t, ax25Link.is_good_nr(S, 2), "N(R)=2 valid")
+	assert.True(t, ax25Link.is_good_nr(S, 5), "N(R)=5 valid")
+	assert.False(t, ax25Link.is_good_nr(S, 6), "N(R)=6 invalid")
 
 	// Test wrap-around: V(A)=6, V(S)=2 (wrapped)
 	S.va = 6
 	S.vs = 2
-	assert.True(t, is_good_nr(S, 6), "N(R)=6 valid")
-	assert.True(t, is_good_nr(S, 7), "N(R)=7 valid")
-	assert.True(t, is_good_nr(S, 0), "N(R)=0 valid (wrapped)")
-	assert.True(t, is_good_nr(S, 2), "N(R)=2 valid")
-	assert.False(t, is_good_nr(S, 3), "N(R)=3 invalid")
+	assert.True(t, ax25Link.is_good_nr(S, 6), "N(R)=6 valid")
+	assert.True(t, ax25Link.is_good_nr(S, 7), "N(R)=7 valid")
+	assert.True(t, ax25Link.is_good_nr(S, 0), "N(R)=0 valid (wrapped)")
+	assert.True(t, ax25Link.is_good_nr(S, 2), "N(R)=2 valid")
+	assert.False(t, ax25Link.is_good_nr(S, 3), "N(R)=3 invalid")
 }
 
 // ============================================================================
@@ -1135,15 +1135,15 @@ func TestAX25LinkT1Timer(t *testing.T) {
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Initially T1 should not be running
-	assert.False(t, IS_T1_RUNNING(S), "T1 should not be running initially")
+	assert.False(t, ax25Link.IS_T1_RUNNING(S), "T1 should not be running initially")
 
 	// Start T1
-	START_T1(S)
-	assert.True(t, IS_T1_RUNNING(S), "T1 should be running after START_T1")
+	ax25Link.START_T1(S)
+	assert.True(t, ax25Link.IS_T1_RUNNING(S), "T1 should be running after START_T1")
 
 	// Stop T1
-	STOP_T1(S)
-	assert.False(t, IS_T1_RUNNING(S), "T1 should not be running after STOP_T1")
+	ax25Link.STOP_T1(S)
+	assert.False(t, ax25Link.IS_T1_RUNNING(S), "T1 should not be running after STOP_T1")
 }
 
 // T3 timer start/stop
@@ -1159,11 +1159,11 @@ func TestAX25LinkT3Timer(t *testing.T) {
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Start T3
-	START_T3(S)
+	ax25Link.START_T3(S)
 	assert.False(t, S.t3_exp.IsZero(), "T3 should be running after START_T3")
 
 	// Stop T3
-	STOP_T3(S)
+	ax25Link.STOP_T3(S)
 	assert.True(t, S.t3_exp.IsZero(), "T3 should not be running after STOP_T3")
 }
 
@@ -1179,17 +1179,17 @@ func TestAX25LinkT1PauseResume(t *testing.T) {
 
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	START_T1(S)
-	assert.True(t, IS_T1_RUNNING(S))
+	ax25Link.START_T1(S)
+	assert.True(t, ax25Link.IS_T1_RUNNING(S))
 
 	// Pause T1
-	PAUSE_T1(S)
+	ax25Link.PAUSE_T1(S)
 	assert.False(t, S.t1_paused_at.IsZero(), "T1 should be paused")
 
 	// Resume T1
-	RESUME_T1(S)
+	ax25Link.RESUME_T1(S)
 	assert.True(t, S.t1_paused_at.IsZero(), "T1 should not be paused after resume")
-	assert.True(t, IS_T1_RUNNING(S), "T1 should still be running")
+	assert.True(t, ax25Link.IS_T1_RUNNING(S), "T1 should still be running")
 }
 
 // Timer expiry functions can be called directly
@@ -1205,10 +1205,10 @@ func TestAX25LinkT1Expiry(t *testing.T) {
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Set retry counter
-	SET_RC(S, 0)
+	ax25Link.SET_RC(S, 0)
 
 	// Call t1_expiry - should increment RC and potentially change state
-	t1_expiry(S)
+	ax25Link.t1_expiry(S)
 
 	// RC should have incremented
 	assert.Equal(t, 1, S.rc, "RC should increment on T1 expiry")
@@ -1227,7 +1227,7 @@ func TestAX25LinkT3Expiry(t *testing.T) {
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Call t3_expiry - should send a poll
-	t3_expiry(S)
+	ax25Link.t3_expiry(S)
 
 	// State should remain connected or go to timer recovery
 	assert.True(t, S.state == state_3_connected || S.state == state_4_timer_recovery)
@@ -1504,11 +1504,11 @@ func TestAX25LinkModulo8WrapAround(t *testing.T) {
 
 	// Test sequence wrap from 7 to 0
 	S.vs = 7
-	SET_VS(S, AX25MODULO(S.vs+1, S.modulo))
+	ax25Link.SET_VS(S, AX25MODULO(S.vs+1, S.modulo))
 	assert.Equal(t, 0, S.vs, "V(S) should wrap from 7 to 0")
 
 	S.vr = 7
-	SET_VR(S, AX25MODULO(S.vr+1, S.modulo))
+	ax25Link.SET_VR(S, AX25MODULO(S.vr+1, S.modulo))
 	assert.Equal(t, 0, S.vr, "V(R) should wrap from 7 to 0")
 }
 
@@ -1535,7 +1535,7 @@ func TestAX25LinkModulo128WrapAround(t *testing.T) {
 
 	// Test sequence wrap from 127 to 0
 	S.vs = 127
-	SET_VS(S, AX25MODULO(S.vs+1, S.modulo))
+	ax25Link.SET_VS(S, AX25MODULO(S.vs+1, S.modulo))
 	assert.Equal(t, 0, S.vs, "V(S) should wrap from 127 to 0")
 }
 
@@ -1555,13 +1555,13 @@ func TestAX25LinkNSInWindow(t *testing.T) {
 	// The window check uses GENEROUS_K (63) and formula: V(R) < N(S) < V(R) + GENEROUS_K
 
 	// N(S)=1 should be in window (0 < 1 < 63)
-	assert.True(t, is_ns_in_window(S, 1))
+	assert.True(t, ax25Link.is_ns_in_window(S, 1))
 
 	// N(S)=62 should be in window (0 < 62 < 63)
-	assert.True(t, is_ns_in_window(S, 62))
+	assert.True(t, ax25Link.is_ns_in_window(S, 62))
 
 	// N(S)=0 is NOT in window (0 < 0 is false)
-	assert.False(t, is_ns_in_window(S, 0))
+	assert.False(t, ax25Link.is_ns_in_window(S, 0))
 }
 
 // ============================================================================
@@ -1602,7 +1602,7 @@ func TestAX25LinkFirstSegmentFlag(t *testing.T) {
 	var segmentData = []byte{0x82, 0xF0, 'H', 'e', 'l', 'l', 'o'} // first segment, pid=0xF0
 
 	// Simulate receiving the segment via dl_data_indication
-	dl_data_indication(S, ax25.PIDSegmentationFragment, segmentData)
+	ax25Link.dl_data_indication(S, ax25.PIDSegmentationFragment, segmentData)
 
 	// Reassembler should now have a buffer allocated
 	assert.NotNil(t, S.ra_buff, "Reassembler buffer should be allocated after first segment")
@@ -1653,7 +1653,7 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 	E.num_addr = 2
 	E.txdata = txdata
 
-	dl_data_request(E)
+	ax25Link.dl_data_request(E)
 
 	// Collect the queued segment frames.
 	var frames []*cdata_t
@@ -1780,7 +1780,7 @@ func TestAX25LinkChannelBusy(t *testing.T) {
 	E._type = DLQ_CHANNEL_BUSY
 	E._chan = CHANNEL
 	E.activity = 1 // channel is busy
-	lm_channel_busy(E)
+	ax25Link.lm_channel_busy(E)
 
 	// Note: channel busy affects timer behavior
 }
@@ -1906,11 +1906,11 @@ func TestAX25LinkInvalidNR(t *testing.T) {
 	S.va = 0
 
 	// Valid N(R) values are 0, 1, 2, 3
-	assert.True(t, is_good_nr(S, 0))
-	assert.True(t, is_good_nr(S, 3))
+	assert.True(t, ax25Link.is_good_nr(S, 0))
+	assert.True(t, ax25Link.is_good_nr(S, 3))
 
 	// N(R)=5 is invalid (> V(S))
-	assert.False(t, is_good_nr(S, 5))
+	assert.False(t, ax25Link.is_good_nr(S, 5))
 }
 
 // ============================================================================
@@ -1936,7 +1936,7 @@ func TestAX25LinkClearExceptionConditions(t *testing.T) {
 	S.acknowledge_pending = true
 
 	// Clear them
-	clear_exception_conditions(S)
+	ax25Link.clear_exception_conditions(S)
 
 	assert.False(t, S.peer_receiver_busy)
 	assert.False(t, S.reject_exception)
@@ -2000,7 +2000,7 @@ func TestAX25LinkRetryCounter(t *testing.T) {
 	assert.Equal(t, 0, S.rc)
 
 	// Set and verify
-	SET_RC(S, 5)
+	ax25Link.SET_RC(S, 5)
 	assert.Equal(t, 5, S.rc)
 
 	// Track peak value
@@ -2023,7 +2023,7 @@ func TestAX25LinkSetVersion20(t *testing.T) {
 
 	var S = establishConnection(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	set_version_2_0(S)
+	ax25Link.set_version_2_0(S)
 
 	assert.Equal(t, xid.SREJNone, S.srej_enable)
 	assert.Equal(t, ax25.Modulo(8), S.modulo)
@@ -2075,7 +2075,7 @@ func TestAX25LinkConnectRequestTypes(t *testing.T) {
 	E.num_addr = 2
 	E.client = 0
 
-	dl_connect_request(E)
+	ax25Link.dl_connect_request(E)
 
 	assert.NotNil(t, ax25Link.listHead)
 	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
@@ -2102,7 +2102,7 @@ func TestAX25LinkDisconnectRequestTypes(t *testing.T) {
 	E.num_addr = 2
 	E.client = 0
 
-	dl_disconnect_request(E)
+	ax25Link.dl_disconnect_request(E)
 
 	assert.Equal(t, state_2_awaiting_release, S.state)
 }

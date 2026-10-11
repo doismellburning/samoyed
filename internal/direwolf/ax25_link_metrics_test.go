@@ -38,7 +38,7 @@ func TestAX25LinkFirstTryConnectIsNotARetry(t *testing.T) {
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
-	dl_connect_request(E)
+	ax25Link.dl_connect_request(E)
 
 	// Peer acknowledges first time, so nothing was ever retransmitted.
 	var addrs [ax25.MaxAddrs]string
@@ -52,7 +52,7 @@ func TestAX25LinkFirstTryConnectIsNotARetry(t *testing.T) {
 	E._chan = CHANNEL
 	E.pp = pp
 
-	lm_data_indication(E)
+	ax25Link.lm_data_indication(E)
 
 	require.NotNil(t, ax25Link.listHead)
 	require.Equal(t, state_3_connected, ax25Link.listHead.state, "%+v", ax25Link.listHead)
@@ -81,7 +81,7 @@ func TestAX25LinkT1ExpiryCountsARetry(t *testing.T) {
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
-	dl_connect_request(E)
+	ax25Link.dl_connect_request(E)
 
 	require.NotNil(t, ax25Link.listHead)
 	require.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
@@ -89,7 +89,7 @@ func TestAX25LinkT1ExpiryCountsARetry(t *testing.T) {
 	var before = metricValue(t, "samoyed_ax25_link_retries_total", labels)
 
 	// No UA came back, so T1 expires and the SABM is sent again.
-	t1_expiry(ax25Link.listHead)
+	ax25Link.t1_expiry(ax25Link.listHead)
 
 	assert.InDelta(t, before+1, metricValue(t, "samoyed_ax25_link_retries_total", labels), 0,
 		"a retransmitted SABM is a retry")
@@ -115,7 +115,7 @@ func TestAX25LinkT3ExpiryIsNotARetry(t *testing.T) {
 	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
-	dl_connect_request(E)
+	ax25Link.dl_connect_request(E)
 
 	var addrs [ax25.MaxAddrs]string
 	addrs[OWNCALL] = THEIR_CALL
@@ -128,14 +128,14 @@ func TestAX25LinkT3ExpiryIsNotARetry(t *testing.T) {
 	E._chan = CHANNEL
 	E.pp = pp
 
-	lm_data_indication(E)
+	ax25Link.lm_data_indication(E)
 
 	require.NotNil(t, ax25Link.listHead)
 	require.Equal(t, state_3_connected, ax25Link.listHead.state)
 
 	var before = metricValue(t, "samoyed_ax25_link_retries_total", labels)
 
-	t3_expiry(ax25Link.listHead)
+	ax25Link.t3_expiry(ax25Link.listHead)
 
 	assert.InDelta(t, before, metricValue(t, "samoyed_ax25_link_retries_total", labels), 0,
 		"a T3 keepalive poll is not a retry")

@@ -253,7 +253,7 @@ type dataLinkSource interface {
 // handing each frame received to rh.
 func recv_process(ctx context.Context, q dataLinkSource, rh *recPacketHandler) {
 	for ctx.Err() == nil {
-		var timeout_value = ax25_link_get_next_timer_expiry()
+		var timeout_value = ax25Link.ax25_link_get_next_timer_expiry()
 
 		var timed_out = q.WaitWhileEmpty(ctx, timeout_value)
 
@@ -264,7 +264,7 @@ func recv_process(ctx context.Context, q dataLinkSource, rh *recPacketHandler) {
 		}
 
 		if timed_out {
-			dl_timer_expiry()
+			ax25Link.dl_timer_expiry()
 		} else {
 			var pitem = q.Remove()
 
@@ -287,25 +287,25 @@ func recv_process(ctx context.Context, q dataLinkSource, rh *recPacketHandler) {
 					/*
 					 * Link processing.
 					 */
-					lm_data_indication(pitem)
+					ax25Link.lm_data_indication(pitem)
 				case DLQ_CONNECT_REQUEST:
-					dl_connect_request(pitem)
+					ax25Link.dl_connect_request(pitem)
 				case DLQ_DISCONNECT_REQUEST:
-					dl_disconnect_request(pitem)
+					ax25Link.dl_disconnect_request(pitem)
 				case DLQ_XMIT_DATA_REQUEST:
-					dl_data_request(pitem)
+					ax25Link.dl_data_request(pitem)
 				case DLQ_REGISTER_CALLSIGN:
-					dl_register_callsign(pitem)
+					ax25Link.dl_register_callsign(pitem)
 				case DLQ_UNREGISTER_CALLSIGN:
-					dl_unregister_callsign(pitem)
+					ax25Link.dl_unregister_callsign(pitem)
 				case DLQ_OUTSTANDING_FRAMES_REQUEST:
-					dl_outstanding_frames_request(pitem)
+					ax25Link.dl_outstanding_frames_request(pitem)
 				case DLQ_CHANNEL_BUSY:
-					lm_channel_busy(pitem)
+					ax25Link.lm_channel_busy(pitem)
 				case DLQ_SEIZE_CONFIRM:
-					lm_seize_confirm(pitem)
+					ax25Link.lm_seize_confirm(pitem)
 				case DLQ_CLIENT_CLEANUP:
-					dl_client_cleanup(pitem)
+					ax25Link.dl_client_cleanup(pitem)
 				}
 
 				q.Delete(pitem)
