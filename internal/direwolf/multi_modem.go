@@ -625,18 +625,10 @@ func newSlicerReceivers(r *Layer2Receiver, from dwcore.SlicerID, scrambled bool)
 	s.il2p = il2p.NewReceiver(from, achan.il2p_version, achan.il2p_crc, r.il2pDebug, r.AudioLevel, r.recPacket)
 
 	if achan.modem_type == MODEM_EAS {
-		s.eas = eas.NewReceiver(from.Channel, from.Subchannel, from.Slice, r.AudioLevel, positionalFrameSink(r.recFrame))
+		s.eas = eas.NewReceiver(from, r.AudioLevel, r.recFrame)
 	}
 
 	return s
-}
-
-// positionalFrameSink hands a frame sink's arguments on to sink as a
-// SlicerID and an RxInfo, for the receivers yet to take a dwcore.FrameSink.
-func positionalFrameSink(sink dwcore.FrameSink) func(int, int, int, []byte, ax25.ALevel, BitFixLevel, fec_type_t) {
-	return func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t) {
-		sink(dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}, frame, dwcore.RxInfo{ALevel: alevel, Retries: retries, FEC: fecType})
-	}
 }
 
 // Layer2Receiver takes the bits each radio channel's demodulators hear, and

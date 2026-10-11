@@ -5,6 +5,7 @@ package eas
 
 import (
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/phy"
 )
 
@@ -21,22 +22,13 @@ import (
 // size, but as its own, since SAME is not HDLC.
 const easBufLen = ax25.MaxPacketLen + 2
 
-// AudioLevelFunc reports the audio level a subchannel's demodulator is
-// hearing, which the receiver delivers each message with.
-type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
-
-// FrameSink takes each message the receiver extracts, with the audio level it
-// was heard at, and phy.BitFixNone and phy.FECNone, since SAME has neither
-// fixing up nor FEC.
-type FrameSink func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
-
 // Receiver is the EAS SAME receive state for one slicer of one
 // demodulator ("subchannel") of one channel.
 type Receiver struct {
-	channel, subchannel, slice int
+	from dwcore.SlicerID // The slicer whose bits these are.
 
-	audioLevel AudioLevelFunc // For the audio level to deliver each message with.
-	sink       FrameSink      // Where each message goes.
+	audioLevel dwcore.AudioLevelFunc // For the audio level to deliver each message with.
+	sink       dwcore.FrameSink      // Where each message goes.
 
 	easAcc uint64 /* Accumulate most recent 64 bits received for EAS. */
 
@@ -53,13 +45,12 @@ type Receiver struct {
 	frameLen int /* Number of octets in frameBuf. */
 }
 
-// NewReceiver makes a Receiver for one slicer.  It gives each message it
-// extracts to sink, with the level audioLevel reports.
-func NewReceiver(channel int, subchannel int, slice int, audioLevel AudioLevelFunc, sink FrameSink) *Receiver {
+// NewReceiver makes a Receiver for the slicer from.  It gives each message it
+// extracts to sink, with the level audioLevel reports, and phy.BitFixNone and
+// phy.FECNone, since SAME has neither fixing up nor FEC.
+func NewReceiver(from dwcore.SlicerID, audioLevel dwcore.AudioLevelFunc, sink dwcore.FrameSink) *Receiver {
 	var s = new(Receiver)
-	s.channel = channel
-	s.subchannel = subchannel
-	s.slice = slice
+	s.from = from
 	s.audioLevel = audioLevel
 	s.sink = sink
 	s.olen = -1
@@ -97,7 +88,7 @@ const PREAMBLE_NNNN = 0x4e4e4e4eabababab
 const EAS_MAX_LEN = 268 // Not including preamble.  Up to 31 geographic areas.
 
 func (s *Receiver) RecBit(raw int, future_use int) {
-	//dw_printf ("slice %d = %d\n", s.slice, raw);
+	//dw_printf ("slice %d = %d\n", s.from.Slice, raw);
 
 	// Accumulate most recent 64 bits.
 
@@ -145,7 +136,7 @@ func (s *Receiver) RecBit(raw int, future_use int) {
 				//#define DEBUG_E 1
 				/*
 				   #ifdef DEBUG_E
-				   	      dw_printf ("reject %d invalid character = %s\n", s.slice, s.frameBuf);
+				   	      dw_printf ("reject %d invalid character = %s\n", s.from.Slice, s.frameBuf);
 				   #endif
 				*/
 				s.easGathering = false
@@ -156,7 +147,7 @@ func (s *Receiver) RecBit(raw int, future_use int) {
 			if s.frameLen > EAS_MAX_LEN { // FIXME: look for other places with max length
 				/*
 					#ifdef DEBUG_E
-						      dw_printf ("reject %d too long = %s\n", s.slice, s.frameBuf);
+						      dw_printf ("reject %d too long = %s\n", s.from.Slice, s.frameBuf);
 					#endif
 				*/
 				s.easGathering = false
@@ -181,11 +172,11 @@ func (s *Receiver) RecBit(raw int, future_use int) {
 	if done {
 		/*
 			#ifdef DEBUG_E
-				  dw_printf ("frameBuf %d = %s\n", s.slice, s.frameBuf);
+				  dw_printf ("frameBuf %d = %s\n", s.from.Slice, s.frameBuf);
 			#endif
 		*/
-		var alevel = s.audioLevel(s.channel, s.subchannel)
-		s.sink(s.channel, s.subchannel, s.slice, s.frameBuf[:s.frameLen], alevel, phy.BitFixNone, phy.FECNone)
+		var alevel = s.audioLevel(s.from.Channel, s.from.Subchannel)
+		s.sink(s.from, s.frameBuf[:s.frameLen], dwcore.RxInfo{ALevel: alevel, Retries: phy.BitFixNone, FEC: phy.FECNone})
 		s.easGathering = false
 	}
 }
