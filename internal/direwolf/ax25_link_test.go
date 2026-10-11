@@ -523,14 +523,14 @@ func TestDLDataIndicationShortSegments(t *testing.T) {
 // A link coming up turns on its channel's connected indicator, and going down
 // turns it off again.
 func TestEnterNewStateSetsConnectedIndicator(t *testing.T) {
-	var origSetOutput = ax25Link.setOutput
+	var origSetConnected = ax25Link.setConnected
 
-	t.Cleanup(func() { ax25Link.setOutput = origSetOutput })
+	t.Cleanup(func() { ax25Link.setConnected = origSetConnected })
 
 	var set []string
 
-	ax25Link.setOutput = func(ot int, channel int, state int) {
-		set = append(set, fmt.Sprintf("%s %d=%d", octypeName(ot), channel, state))
+	ax25Link.setConnected = func(channel int, on bool) {
+		set = append(set, fmt.Sprintf("%d=%t", channel, on))
 	}
 
 	var S = new(ax25_dlsm_t)
@@ -541,7 +541,7 @@ func TestEnterNewStateSetsConnectedIndicator(t *testing.T) {
 	enter_new_state(S, state_4_timer_recovery) // Still connected, so no change.
 	enter_new_state(S, state_0_disconnected)
 
-	assert.Equal(t, []string{"CON 1=1", "CON 1=0"}, set)
+	assert.Equal(t, []string{"1=true", "1=false"}, set)
 }
 
 // recordingLinkClients notes the outstanding frame counts the link layer

@@ -358,6 +358,21 @@ func (p *PTT) Set(ot int, channel int, ptt_signal int) {
 	p.set(ot, channel, ptt_signal)
 }
 
+// SetPTT keys a channel's transmitter, or lets it go.
+func (p *PTT) SetPTT(channel int, on bool) {
+	p.Set(OCTYPE_PTT, channel, dwutil.IfThenElse(on, 1, 0))
+}
+
+// SetConnected turns a channel's connected indicator on or off.
+func (p *PTT) SetConnected(channel int, on bool) {
+	p.Set(OCTYPE_CON, channel, dwutil.IfThenElse(on, 1, 0))
+}
+
+// SetDCD turns a channel's data carrier detect indicator on or off.
+func (p *PTT) SetDCD(channel int, on bool) {
+	p.Set(OCTYPE_DCD, channel, dwutil.IfThenElse(on, 1, 0))
+}
+
 // set is Set for a caller that already holds p.mu, for reading or writing.
 func (p *PTT) set(ot int, channel int, ptt_signal int) {
 	var ptt = ptt_signal
@@ -677,6 +692,12 @@ func (p *PTT) GetInput(it int, channel int) int {
 	}
 
 	return -1 /* Method was none, or something went wrong */
+}
+
+// TransmitInhibited says whether a channel's transmit inhibit input is set.
+// With no PTT, or no input configured, it never is.
+func (p *PTT) TransmitInhibited(channel int) bool {
+	return p.GetInput(ICTYPE_TXINH, channel) == 1
 }
 
 /*-------------------------------------------------------------------

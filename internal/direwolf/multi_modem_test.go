@@ -248,14 +248,14 @@ func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
 	var set []string
 
 	var sink = new(radioSink)
-	sink.setOutput = func(ot int, channel int, state int) {
-		set = append(set, fmt.Sprintf("%s %d=%d", octypeName(ot), channel, state))
+	sink.setDCD = func(channel int, on bool) {
+		set = append(set, fmt.Sprintf("%d=%t", channel, on))
 	}
 
 	sink.DCDChange(1, 1)
 	sink.DCDChange(1, 0)
 
-	assert.Equal(t, []string{"DCD 1=1", "DCD 1=0"}, set)
+	assert.Equal(t, []string{"1=true", "1=false"}, set)
 }
 
 // A channel with no demodulator - the other side of a stereo device that is
@@ -290,13 +290,7 @@ func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {
 
 	assert.Equal(t, 0, r.DataDetectAny(0), "nothing heard and no inputs, so not busy")
 
-	r.getInput = func(it int, channel int) int {
-		if it == ICTYPE_TXINH && channel == 0 {
-			return 1
-		}
-
-		return 0
-	}
+	r.txInhibited = func(channel int) bool { return channel == 0 }
 
 	assert.Equal(t, 1, r.DataDetectAny(0), "transmit inhibited, so busy")
 	assert.Equal(t, 0, r.DataDetectAny(1), "another channel is not inhibited")
@@ -341,13 +335,13 @@ func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
 	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
 	r.numSubchannel[0] = 1
 
-	var inhibited = 0
+	var inhibited = false
 
-	r.getInput = func(int, int) int { return inhibited }
+	r.txInhibited = func(int) bool { return inhibited }
 
 	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, 1)
 
-	inhibited = 1
+	inhibited = true
 
 	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, 0)
 

@@ -959,3 +959,61 @@ func TestPTTTellsWhoWasHandedOfChannelActivity(t *testing.T) {
 
 	assert.Equal(t, []string{"0 PTT=1", "0 DCD=1", "0 PTT=0"}, busy)
 }
+
+// newRecordingPTT is a PTT for radio channel 0 with nothing to drive, which
+// records each output it is told to set, as the data link queue would hear
+// of it.
+func newRecordingPTT(t *testing.T) (*PTT, *[]string) {
+	t.Helper()
+
+	var cfg = new(RadioConfig)
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	cfg.achan[0].fulldup = true
+
+	var set []string
+
+	var p, err = newPTT(cfg, nil, func(channel int, ot int, state int) {
+		set = append(set, fmt.Sprintf("%s %d=%d", octypeName(ot), channel, state))
+	}, 0, t.TempDir())
+	require.NoError(t, err)
+
+	return p, &set
+}
+
+func TestPTTSetDCD(t *testing.T) {
+	var p, set = newRecordingPTT(t)
+
+	p.SetDCD(0, true)
+	p.SetDCD(0, false)
+
+	assert.Equal(t, []string{"DCD 0=1", "DCD 0=0"}, *set)
+}
+
+func TestPTTSetPTT(t *testing.T) {
+	var p, set = newRecordingPTT(t)
+
+	p.SetPTT(0, true)
+	p.SetPTT(0, false)
+
+	assert.Equal(t, []string{"PTT 0=1", "PTT 0=0"}, *set)
+}
+
+func TestPTTSetConnected(t *testing.T) {
+	var p, set = newRecordingPTT(t)
+
+	p.SetConnected(0, true)
+	p.SetConnected(0, false)
+
+	assert.Equal(t, []string{"CON 0=1", "CON 0=0"}, *set)
+}
+
+// A channel with no transmit inhibit input configured, or no PTT at all, is
+// never inhibited.
+func TestPTTTransmitInhibitedWithoutAnInput(t *testing.T) {
+	var p, _ = newRecordingPTT(t)
+
+	assert.False(t, p.TransmitInhibited(0))
+
+	var none *PTT
+	assert.False(t, none.TransmitInhibited(0))
+}

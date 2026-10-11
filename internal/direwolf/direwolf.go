@@ -523,8 +523,8 @@ x = Silence FX.25 information.`)
 	// are described before the PTT says how it is keying them.  They set
 	// the DCD output and read the transmit inhibit input, so hand them the
 	// PTT now, before anything that receives or transmits is started.
-	sink.setOutput = pttControl.Set
-	layer2Receiver.getInput = pttControl.GetInput
+	sink.setDCD = pttControl.SetDCD
+	layer2Receiver.txInhibited = pttControl.TransmitInhibited
 
 	/*
 	 * Start the web interface before anything that can send or receive a
@@ -550,7 +550,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.Set, layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
+	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.SetPTT, layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx, td)
 
 	/*
@@ -617,7 +617,7 @@ x = Silence FX.25 information.`)
 				var n = audio_config.achan[transmitCalibrationChannel].baud * max_duration
 
 				text_color_set(DW_COLOR_INFO)
-				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 1)
+				pttControl.SetPTT(transmitCalibrationChannel, true)
 
 				switch transmitCalibrationType {
 				default:
@@ -654,7 +654,7 @@ x = Silence FX.25 information.`)
 					dwutil.SleepSecCtx(ctx, max_duration)
 				}
 
-				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 0)
+				pttControl.SetPTT(transmitCalibrationChannel, false)
 				text_color_set(DW_COLOR_INFO)
 				stopIfCancelled(ctx, td)
 				td.exit(0)
@@ -694,7 +694,7 @@ x = Silence FX.25 information.`)
 
 	// The connected-mode link layer, after the AGW server whose clients it
 	// tells about the links they asked for.
-	ax25_link_init(misc_config, pttControl.Set, agwServer, d_c_opt)
+	ax25_link_init(misc_config, pttControl.SetConnected, agwServer, d_c_opt)
 	metrics_init(ctx, audio_config, misc_config)
 	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
 

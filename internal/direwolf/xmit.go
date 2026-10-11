@@ -138,9 +138,9 @@ type XmitService struct {
 	// transmission opportunity has arrived, or is nil for nobody to tell.
 	seizeConfirm func(channel int)
 
-	// setOutput sets one of a channel's outputs - here only ever OCTYPE_PTT,
-	// to key the transmitter - or is nil when there is nothing to key.
-	setOutput func(ot int, channel int, state int)
+	// setPTT keys a channel's transmitter or lets it go, or is nil when
+	// there is nothing to key.
+	setPTT func(channel int, on bool)
 
 	// dataDetect says whether anything is being heard on a channel (above 0)
 	// or not, or is nil when nothing can be.
@@ -163,8 +163,8 @@ type XmitService struct {
  *
  *		toneGenerators	- Each radio channel's tone generator.
  *
- *		setOutput	- Sets a channel's output, PTT here, to key the
- *				  transmitter; nil for nothing to key.
+ *		setPTT		- Keys a channel's transmitter, or lets it
+ *				  go; nil for nothing to key.
  *
  *		dataDetect	- Says whether a channel is busy with something
  *				  being heard, so as to wait for it to clear; nil
@@ -202,7 +202,7 @@ func NewXmitService(
 	p_modem *RadioConfig,
 	audio *AudioDevices,
 	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator,
-	setOutput func(ot int, channel int, state int),
+	setPTT func(channel int, on bool),
 	dataDetect func(channel int) int,
 	onTransmit func(channel int, pp *ax25.Packet),
 	seizeConfirm func(channel int),
@@ -217,7 +217,7 @@ func NewXmitService(
 	xs.toneGenerators = toneGenerators
 	xs.onTransmit = onTransmit
 	xs.seizeConfirm = seizeConfirm
-	xs.setOutput = setOutput
+	xs.setPTT = setPTT
 	xs.dataDetect = dataDetect
 	xs.fx25Debug = fx25Debug
 	xs.il2pDebug = il2pDebug
@@ -277,11 +277,11 @@ func (xs *XmitService) confirmSeize(channel int) {
 	}
 }
 
-// keyPTT turns a channel's transmitter on (state 1) or off (0), if there is a
-// PTT to key.
-func (xs *XmitService) keyPTT(channel int, state int) {
-	if xs.setOutput != nil {
-		xs.setOutput(OCTYPE_PTT, channel, state)
+// keyPTT keys a channel's transmitter or lets it go, if there is a PTT to
+// key.
+func (xs *XmitService) keyPTT(channel int, on bool) {
+	if xs.setPTT != nil {
+		xs.setPTT(channel, on)
 	}
 }
 
@@ -791,7 +791,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 		"channel": channel,
 		"speed":   xs.bits_per_sec[channel],
 	}).Debug("xmit_thread: Turn on PTT now")
-	xs.keyPTT(channel, 1)
+	xs.keyPTT(channel, true)
 
 	// Inform data link state machine that we are now transmitting.
 
@@ -963,7 +963,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 		"duration_ms": durationMS,
 	}).Debug("xmit_thread: Turn off PTT now")
 
-	xs.keyPTT(channel, 0)
+	xs.keyPTT(channel, false)
 } /* end xmit_ax25_frames */
 
 /*-------------------------------------------------------------------
@@ -1125,7 +1125,7 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) 
 	/*
 	 * Turn on transmitter.
 	 */
-	xs.keyPTT(c, 1)
+	xs.keyPTT(c, true)
 
 	/*
 	 * Invoke the speech-to-text script.
@@ -1137,7 +1137,7 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) 
 	 * Turn off transmitter.
 	 */
 
-	xs.keyPTT(c, 0)
+	xs.keyPTT(c, false)
 } /* end xmit_speech */
 
 /* Broken out into separate function so configuration can validate it. */
@@ -1207,7 +1207,7 @@ func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, string(pinfo))
 
-	xs.keyPTT(c, 1)
+	xs.keyPTT(c, true)
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
@@ -1225,7 +1225,7 @@ func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 		time.Sleep(timeToWait)
 	}
 
-	xs.keyPTT(c, 0)
+	xs.keyPTT(c, false)
 } /* end xmit_morse */
 
 /*-------------------------------------------------------------------
@@ -1284,7 +1284,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, string(pinfo))
 
-	xs.keyPTT(c, 1)
+	xs.keyPTT(c, true)
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
@@ -1305,7 +1305,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 		dw_printf("Oops.  CPU too slow to keep up with DTMF generation.\n")
 	}
 
-	xs.keyPTT(c, 0)
+	xs.keyPTT(c, false)
 } /* end xmit_dtmf */
 
 /*-------------------------------------------------------------------
