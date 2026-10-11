@@ -143,7 +143,9 @@ func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 
 	h.peers = peers
 
-	var pp = newTestPacket(t)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
 	var _, from = recordingKissClient()
 
 	var msg = append([]byte{0x10 | kiss.CmdDataFrame}, pp.FrameData()...)
@@ -259,21 +261,33 @@ func Test_kiss_debug_print_empty(t *testing.T) {
 	}
 }
 
-// A KISS TCP port carrying a single radio channel ignores the channel in the
-// frame: the application thinks it has a one-radio TNC and always says 0.
-func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
+// singleChannelClient is a client whose messages are all for one radio
+// channel, whatever their frames say - as on a KISS TCP port that carries one.
+type singleChannelClient struct {
+	recordingClient
+
+	channel int
+}
+
+func (c singleChannelClient) RadioChannel(int) int {
+	return c.channel
+}
+
+// The radio channel a frame is for is the one its client says, which need
+// not be the one in the frame: an application that thinks it has a one-radio
+// TNC always says 0.
+func Test_kiss_process_msg_client_channel_overrides_the_frame(t *testing.T) {
 	var h, tnc = setupKissProcessMsg(t)
 
-	var kps = new(kissport_status_s)
-	kps.channel = 1
+	var _, from = recordingKissClient()
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), singleChannelClient{recordingClient: from, channel: 1})
 
 	require.Len(t, tnc.transmitted, 1)
-	assert.Equal(t, 1, tnc.transmitted[0].channel, "the port's channel should have been used")
+	assert.Equal(t, 1, tnc.transmitted[0].channel, "the client's channel should have been used")
 }
 
 // Bytes that are not an AX.25 frame cannot be transmitted, and are reported

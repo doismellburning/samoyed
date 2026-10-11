@@ -682,3 +682,20 @@ func Test_kissport_status_stop(t *testing.T) {
 
 	assert.False(t, kps.attachClient(0, late), "a stopped port should not take on a new client")
 }
+
+// A KISS TCP port carrying a single radio channel ignores the channel in the
+// frame: the application thinks it has a one-radio TNC and always says 0.
+func TestKissNetPortChannelOverridesTheFrame(t *testing.T) {
+	var tnc = setupKissTNC(t)
+	var h = NewKissHandler(tnc, nil)
+
+	var kps = new(kissport_status_s)
+	kps.channel = 1
+
+	var pp = newTestPacket(t)
+
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
+
+	assert.Equal(t, 1, tnc.queue.Count(1, TQ_PRIO_1_LO, "", "", false), "the port's channel should have been used")
+	assert.Equal(t, 0, tnc.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+}
