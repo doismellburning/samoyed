@@ -36,6 +36,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/coordconvutil"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -1706,7 +1707,7 @@ func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel, recFrame fr
 		alevel.Space = -2
 
 		if recFrame != nil {
-			recFrame(channel, -1, 0, pp, alevel, fec_type_none, RETRY_NONE, "tt")
+			recFrame(dwcore.ChannelSource(dwcore.SourceDTMF, channel), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, "tt")
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)

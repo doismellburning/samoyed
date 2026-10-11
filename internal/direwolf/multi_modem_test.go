@@ -232,13 +232,13 @@ func TestRadioSinkHandsFramesOn(t *testing.T) {
 	var got []string
 
 	var sink = new(radioSink)
-	sink.recFrame = func(channel int, subchan int, slice int, pp *ax25.Packet, _ ax25.ALevel, _ fec_type_t, _ BitFixLevel, spectrum string) {
-		got = append(got, fmt.Sprintf("%d.%d.%d %s%s %s", channel, subchan, slice, pp.FormatAddrs(), pp.Info(), spectrum))
+	sink.recFrame = func(src dwcore.Source, pp *ax25.Packet, _ dwcore.RxInfo, spectrum string) {
+		got = append(got, fmt.Sprintf("%v %d.%d.%d %s%s %s", src.Kind, src.Slicer.Channel, src.Slicer.Subchannel, src.Slicer.Slice, pp.FormatAddrs(), pp.Info(), spectrum))
 	}
 
 	sink.RecFrame(dwcore.SlicerID{Channel: 1, Subchannel: 2, Slice: 3}, pp, rxInfo, "|_")
 
-	assert.Equal(t, []string{"1.2.3 Q1TEST>APRS:heard |_"}, got)
+	assert.Equal(t, []string{"radio 1.2.3 Q1TEST>APRS:heard |_"}, got)
 }
 
 // A radio channel's DCD output follows the data detected on it.

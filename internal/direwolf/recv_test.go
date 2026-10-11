@@ -15,6 +15,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -399,7 +400,7 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 
 	var alevel ax25.ALevel
 
-	dlq.RecFrame(0, 0, 0, pp, alevel, fec_type_none, RETRY_NONE, "")
+	dlq.RecFrame(dwcore.RadioSource(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, "")
 	dlq.RegisterCallsign("Q1TEST", 0, 0)
 	// Connecting first, so that the data request behind it has a link with
 	// agreed parameters to be queued on.

@@ -84,9 +84,11 @@ package direwolf
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dtmf"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/sirupsen/logrus"
 )
 
@@ -248,6 +250,26 @@ type dataLinkSource interface {
 	Delete(pitem *dlq_item_t)
 }
 
+// legacySubchan is the subchannel app_process_rec_packet expects for a frame
+// from src: a radio's demodulator, or a negative number standing for some
+// other kind of source.
+func legacySubchan(src dwcore.Source) int {
+	switch src.Kind {
+	case dwcore.SourceRadio:
+		return src.Slicer.Subchannel
+	case dwcore.SourceDTMF:
+		return -1
+	case dwcore.SourceAPRSIS:
+		return -2
+	case dwcore.SourceNetTNC:
+		return -3
+	case dwcore.SourceAXUDP:
+		return -4
+	default:
+		panic(fmt.Sprintf("unknown source kind %v", src.Kind))
+	}
+}
+
 // recv_process drains the received data queue, q, until ctx is cancelled,
 // handing each frame received to rh.
 func recv_process(ctx context.Context, q dataLinkSource, rh *recPacketHandler) {
@@ -281,7 +303,7 @@ func recv_process(ctx context.Context, q dataLinkSource, rh *recPacketHandler) {
 					 *	- Send to Igate.
 					 *	- Digipeater.
 					 */
-					rh.app_process_rec_packet(ctx, pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
+					rh.app_process_rec_packet(ctx, pitem._chan, legacySubchan(pitem.src), pitem.src.Slicer.Slice, pitem.pp, pitem.rxInfo.ALevel, pitem.rxInfo.FEC, pitem.rxInfo.Retries, pitem.spectrum)
 
 					/*
 					 * Link processing.

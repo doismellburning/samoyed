@@ -19,6 +19,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/axudp"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -183,7 +184,7 @@ func (ac *AXUDPChannel) receive(datagram []byte, from *net.UDPAddr) {
 	var retries BitFixLevel
 
 	if ac.recFrame != nil {
-		ac.recFrame(ac.channel, -4, 0, pp, alevel, fec_type_none, retries, "AXUDP")
+		ac.recFrame(dwcore.ChannelSource(dwcore.SourceAXUDP, ac.channel), pp, dwcore.RxInfo{ALevel: alevel, Retries: retries, FEC: fec_type_none}, "AXUDP")
 	}
 }
 

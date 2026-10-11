@@ -4,6 +4,8 @@
 package dwcore
 
 import (
+	"fmt"
+
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/phy"
 )
@@ -35,3 +37,65 @@ type FrameSink func(from SlicerID, frame []byte, rxInfo RxInfo)
 // PacketSink is FrameSink for a receiver that hands over packets it has
 // already parsed, rather than raw frames.
 type PacketSink func(from SlicerID, pp *ax25.Packet, rxInfo RxInfo)
+
+// SourceKind is what a received frame came from: a radio channel's
+// demodulators, or something standing in for one.
+type SourceKind int
+
+const (
+	// SourceRadio is a radio channel's demodulators - or a beacon sent to
+	// one as though heard on it.
+	SourceRadio SourceKind = iota
+
+	// SourceDTMF is a channel's touch tone decoder, via the APRStt gateway.
+	SourceDTMF
+
+	// SourceAPRSIS is the APRS-IS server, via the IGate.
+	SourceAPRSIS
+
+	// SourceNetTNC is a network TNC the channel is mapped to.
+	SourceNetTNC
+
+	// SourceAXUDP is another node, over AX.25 over UDP.
+	SourceAXUDP
+)
+
+// String names the kind of source as the web interface shows it.
+func (k SourceKind) String() string {
+	switch k {
+	case SourceRadio:
+		return "radio"
+	case SourceDTMF:
+		return "dtmf"
+	case SourceAPRSIS:
+		return "aprs-is"
+	case SourceNetTNC:
+		return "network"
+	case SourceAXUDP:
+		return "axudp"
+	default:
+		return fmt.Sprintf("SourceKind(%d)", int(k))
+	}
+}
+
+// Source is where a received frame came from: which kind of source, on
+// which channel, and - for SourceRadio - which slicer heard it.
+type Source struct {
+	Kind SourceKind
+
+	// Slicer's Channel is the channel the frame arrived on, whatever its
+	// kind.  Its Subchannel and Slice say which slicer heard it only for
+	// SourceRadio, and are 0 otherwise.
+	Slicer SlicerID
+}
+
+// RadioSource is a frame heard by the slicer from.
+func RadioSource(from SlicerID) Source {
+	return Source{Kind: SourceRadio, Slicer: from}
+}
+
+// ChannelSource is a frame that arrived on channel from a kind of source
+// with no slicers of its own.
+func ChannelSource(kind SourceKind, channel int) Source {
+	return Source{Kind: kind, Slicer: SlicerID{Channel: channel, Subchannel: 0, Slice: 0}}
+}

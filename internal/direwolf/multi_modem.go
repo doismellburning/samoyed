@@ -190,7 +190,7 @@ type radioSink struct {
 
 func (s *radioSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string) {
 	if s.recFrame != nil {
-		s.recFrame(from.Channel, from.Subchannel, from.Slice, pp, rxInfo.ALevel, rxInfo.FEC, rxInfo.Retries, spectrum)
+		s.recFrame(dwcore.RadioSource(from), pp, rxInfo, spectrum)
 	}
 }
 
