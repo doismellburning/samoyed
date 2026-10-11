@@ -34,6 +34,7 @@ func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
 	var channel = 0
 
 	var xs = new(XmitService)
+	xs.queue = transmitQueue
 	xs.audio = new(AudioDevices)
 	xs.timing[channel].fulldup = true // Skip the channel-busy check and random wait.
 
@@ -62,6 +63,7 @@ func TestXmitTimingSetWhileTransmitting(t *testing.T) {
 	var channel = 0
 
 	var xs = new(XmitService)
+	xs.queue = transmitQueue
 	xs.audio = new(AudioDevices)
 	xs.SetFulldup(channel, true) // Skip the channel-busy check and random wait.
 
@@ -104,6 +106,7 @@ func TestDiscardUntransmittableEmptiesTheQueue(t *testing.T) {
 	transmitQueue.Init(audioConfig)
 
 	var xs = new(XmitService)
+	xs.queue = transmitQueue
 
 	transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
 	transmitQueue.Append(channel, TQ_PRIO_0_HI, newTestPacket(t))
@@ -132,6 +135,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 
 	transmitQueue.Init(audioConfig)
 	var xs = new(XmitService)
+	xs.queue = transmitQueue
 	xs.seizeConfirm = dlq.SeizeConfirm
 
 	transmitQueue.Append(channel, TQ_PRIO_1_LO, ax25.New()) // What TransmitQueue.LMSeizeRequest queues.
@@ -166,6 +170,7 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 	transmitQueue.Init(audioConfig)
 
 	var xs = new(XmitService)
+	xs.queue = transmitQueue
 	xs.audio = new(AudioDevices)
 	xs.audioOutAvailable[ACHAN2ADEV(channel)] = false
 
@@ -201,6 +206,7 @@ func TestXmitThreadStopsWhenCancelled(t *testing.T) {
 	transmitQueue.Init(audioConfig)
 
 	var xs = new(XmitService)
+	xs.queue = transmitQueue
 
 	var stopped = make(chan struct{})
 
@@ -237,6 +243,7 @@ func TestXmitThreadStopsWhenCancelledBeforeStarting(t *testing.T) {
 	cancel()
 
 	var xs = new(XmitService)
+	xs.queue = transmitQueue
 
 	var stopped = make(chan struct{})
 
@@ -370,6 +377,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	audio.dev[0].outbuf = make([]byte, audio.dev[0].outbufSizeInBytes)
 
 	var xs = new(XmitService)
+	xs.queue = transmitQueue
 	xs.p_modem = audioConfig
 	xs.audio = audio
 	xs.toneGenerators = NewToneGenerators(audioConfig, 100, audio)
