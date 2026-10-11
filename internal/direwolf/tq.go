@@ -33,6 +33,10 @@ const TQ_NUM_PRIO = 2 /* Number of priorities. */
 const TQ_PRIO_0_HI = 0
 const TQ_PRIO_1_LO = 1
 
+// frameSender is where a packet to transmit goes: TransmitQueue.Append, or a
+// stand-in for it.
+type frameSender func(channel int, prio int, pp *ax25.Packet)
+
 // TransmitQueue holds the packets waiting for each radio channel's transmit
 // thread, one queue per channel and priority.
 type TransmitQueue struct {

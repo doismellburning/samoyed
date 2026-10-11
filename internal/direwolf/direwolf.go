@@ -678,7 +678,7 @@ x = Silence FX.25 information.`)
 	var mheardDB = mheard.New(d_m_opt)
 	var packetFilter = pfilter.New(igate_config.max_digi_hops, aprsDecoder, mheardDB, d_f_opt)
 	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, dataLinkQueue.RecFrame, d_i_opt)
-	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated)
+	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated, transmitQueue.Append)
 
 	// The transmit queue predates the IGate, and nothing queues a packet for
 	// the IGate's channel before the services below are started.
