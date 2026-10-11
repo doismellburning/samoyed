@@ -58,7 +58,7 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	transmitQueue.Init(audioConfig)
+	var tq = NewTransmitQueue(audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
@@ -88,10 +88,10 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 		defer close(observerDone)
 
 		for !done.Load() {
-			transmitQueue.mu.Lock()
-			var count = transmitQueue.countLocked(CHANNEL, PRIO, "", "", false)
+			tq.mu.Lock()
+			var count = tq.countLocked(CHANNEL, PRIO, "", "", false)
 			var gauge, gatherErr = gatherMetricValue("samoyed_tx_queue_depth", labels)
-			transmitQueue.mu.Unlock()
+			tq.mu.Unlock()
 
 			if gatherErr != nil {
 				return
@@ -112,7 +112,7 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 	for sender := range NUM_SEND {
 		wg.Go(func() {
 			for i := range PER_SENDR {
-				transmitQueue.LMDataRequest(CHANNEL, PRIO, packets[sender*PER_SENDR+i])
+				tq.LMDataRequest(CHANNEL, PRIO, packets[sender*PER_SENDR+i])
 			}
 		})
 	}
@@ -124,7 +124,7 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 	assert.False(t, disagreed.Load(),
 		"queue held %d packets but the gauge reported %d", sawCount.Load(), sawGauge.Load())
 
-	var actual = transmitQueue.Count(CHANNEL, PRIO, "", "", false)
+	var actual = tq.Count(CHANNEL, PRIO, "", "", false)
 	require.Equal(t, NUM_PKTS, actual, "all packets should be queued")
 
 	assert.InDelta(t, float64(actual), metricValue(t, "samoyed_tx_queue_depth", labels), 0,
@@ -149,7 +149,7 @@ func TestTxQueueDepthTracksDrain(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	transmitQueue.Init(audioConfig)
+	var tq = NewTransmitQueue(audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
@@ -159,16 +159,16 @@ func TestTxQueueDepthTracksDrain(t *testing.T) {
 	for range NUM_PKTS {
 		var pp = newTestPacket(t)
 
-		transmitQueue.LMDataRequest(CHANNEL, PRIO, pp)
+		tq.LMDataRequest(CHANNEL, PRIO, pp)
 	}
 
 	assert.InDelta(t, float64(NUM_PKTS), metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"all packets queued")
 
 	for remaining := NUM_PKTS - 1; remaining >= 0; remaining-- {
-		require.NotNil(t, transmitQueue.Remove(CHANNEL, PRIO))
+		require.NotNil(t, tq.Remove(CHANNEL, PRIO))
 
-		assert.InDelta(t, float64(transmitQueue.Count(CHANNEL, PRIO, "", "", false)),
+		assert.InDelta(t, float64(tq.Count(CHANNEL, PRIO, "", "", false)),
 			metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 			"published depth should match the queue after removing down to %d", remaining)
 		assert.InDelta(t, float64(remaining), metricValue(t, "samoyed_tx_queue_depth", labels), 0,
@@ -176,7 +176,7 @@ func TestTxQueueDepthTracksDrain(t *testing.T) {
 	}
 
 	// Removing from an empty queue must not take the depth negative.
-	assert.Nil(t, transmitQueue.Remove(CHANNEL, PRIO))
+	assert.Nil(t, tq.Remove(CHANNEL, PRIO))
 	assert.InDelta(t, 0, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"an empty queue stays at zero")
 }
@@ -196,16 +196,16 @@ func TestTxQueueDepthIgnoresSeizeMarker(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	transmitQueue.Init(audioConfig)
+	var tq = NewTransmitQueue(audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
 		"priority": strconv.Itoa(PRIO),
 	}
 
-	transmitQueue.LMSeizeRequest(CHANNEL)
+	tq.LMSeizeRequest(CHANNEL)
 
-	require.Equal(t, 0, transmitQueue.Count(CHANNEL, PRIO, "", "", false),
+	require.Equal(t, 0, tq.Count(CHANNEL, PRIO, "", "", false),
 		"the wake-up marker is not a packet")
 	assert.InDelta(t, 0, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"nor should it be published as one")
@@ -213,23 +213,24 @@ func TestTxQueueDepthIgnoresSeizeMarker(t *testing.T) {
 	// A real packet behind it is still counted, and only it.
 	var pp = newTestPacket(t)
 
-	transmitQueue.LMDataRequest(CHANNEL, PRIO, pp)
+	tq.LMDataRequest(CHANNEL, PRIO, pp)
 
-	require.Equal(t, 1, transmitQueue.Count(CHANNEL, PRIO, "", "", false))
+	require.Equal(t, 1, tq.Count(CHANNEL, PRIO, "", "", false))
 	assert.InDelta(t, 1, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"the real packet is counted, the marker still is not")
 
 	// Draining the marker must not take the depth below the real packet count.
-	require.NotNil(t, transmitQueue.Remove(CHANNEL, PRIO))
-	assert.InDelta(t, float64(transmitQueue.Count(CHANNEL, PRIO, "", "", false)),
+	require.NotNil(t, tq.Remove(CHANNEL, PRIO))
+	assert.InDelta(t, float64(tq.Count(CHANNEL, PRIO, "", "", false)),
 		metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"depth still matches the queue after the marker is taken")
 }
 
-// TestTxQueueDepthResetOnInit covers TransmitQueue.Init: it clears the queues, so the
-// published depth has to be cleared with them.  A gauge left at its old value
-// would describe a queue that no longer exists until the next enqueue.
-func TestTxQueueDepthResetOnInit(t *testing.T) {
+// TestTxQueueDepthResetByNewQueue covers NewTransmitQueue: the published depth
+// is one per channel and priority for the whole process, so a new, empty queue
+// has to clear it.  A gauge left at its old value would describe a queue that
+// no longer exists until the next enqueue.
+func TestTxQueueDepthResetByNewQueue(t *testing.T) {
 	const (
 		CHANNEL = 0
 		PRIO    = TQ_PRIO_1_LO
@@ -238,7 +239,7 @@ func TestTxQueueDepthResetOnInit(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	transmitQueue.Init(audioConfig)
+	var tq = NewTransmitQueue(audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
@@ -247,11 +248,11 @@ func TestTxQueueDepthResetOnInit(t *testing.T) {
 
 	var pp = newTestPacket(t)
 
-	transmitQueue.LMDataRequest(CHANNEL, PRIO, pp)
+	tq.LMDataRequest(CHANNEL, PRIO, pp)
 	require.InDelta(t, 1, metricValue(t, "samoyed_tx_queue_depth", labels), 0)
 
-	transmitQueue.Init(audioConfig)
+	NewTransmitQueue(audioConfig)
 
 	assert.InDelta(t, 0, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
-		"re-initialising the queues must clear the published depth too")
+		"a new queue must clear the published depth too")
 }

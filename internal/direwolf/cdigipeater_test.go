@@ -36,8 +36,7 @@ func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *RadioConfig, *cdigi_
 
 	var cdigiConfig = new(cdigi_config_s)
 
-	var tq = NewTransmitQueue()
-	tq.Init(audioConfig)
+	var tq = NewTransmitQueue(audioConfig)
 
 	return NewConnectedDigipeater(audioConfig, cdigiConfig, new(pfilter.PacketFilter), tq.Append), audioConfig, cdigiConfig, tq
 }

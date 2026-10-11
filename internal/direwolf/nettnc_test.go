@@ -471,8 +471,7 @@ func TestNetTNCTransmitQueueSendsToItsTNCs(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
 
-	var tq = NewTransmitQueue()
-	tq.Init(audioConfig)
+	var tq = NewTransmitQueue(audioConfig)
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 	tncs[nettncTestChannel] = nt
 

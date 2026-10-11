@@ -486,13 +486,11 @@ func TestKissNetListenFails(t *testing.T) {
 }
 
 // The end-to-end tests below exercise commands that are answered rather than
-// transmitted, and leave the transmit queue alone.  A service's listening
-// goroutines outlive the test that started them - there is nothing to wait on
-// - and TransmitQueue.Init writes the queue's fields without holding its lock,
-// so a later test initialising the queue would race with anything one of
-// these goroutines had put on it.  A client's data frame reaching the queue is
-// covered against the transports whose goroutine a test can wait for, in
-// kiss_test.go and kissserial_test.go.
+// transmitted, and the service they start has no transmit queue.  A service's
+// listening goroutines outlive the test that started them - there is nothing
+// to wait on - so a client's data frame reaching the queue is covered against
+// the transports whose goroutine a test can wait for, in kiss_test.go and
+// kissserial_test.go.
 
 // The round trip: a client's command is collected from the socket, acted on,
 // and the answer written back to that same client.

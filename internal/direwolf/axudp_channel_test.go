@@ -315,8 +315,7 @@ func TestAXUDPChannelTransmitQueue(t *testing.T) {
 	var channels [MAX_TOTAL_CHANS]*AXUDPChannel
 	channels[axudpTestChannel] = ac
 
-	var tq = NewTransmitQueue()
-	tq.Init(audio)
+	var tq = NewTransmitQueue(audio)
 	tq.SetAXUDPChannels(channels)
 
 	var pp = newTestPacket(t)
@@ -348,8 +347,7 @@ func TestAXUDPChannelConnectedMode(t *testing.T) {
 	var channels [MAX_TOTAL_CHANS]*AXUDPChannel
 	channels[axudpTestChannel] = ac
 
-	var tq = NewTransmitQueue()
-	tq.Init(audio)
+	var tq = NewTransmitQueue(audio)
 	tq.SetAXUDPChannels(channels)
 	tq.SetSeizeConfirm(dlq.SeizeConfirm)
 

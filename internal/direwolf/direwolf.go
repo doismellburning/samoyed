@@ -474,6 +474,12 @@ x = Silence FX.25 information.`)
 	// listeners, started below, can hand it frames straight away.
 	var dataLinkQueue = NewDataLinkQueue()
 
+	// What everything with a packet to send - KISS, AGW, beacon, digipeater,
+	// IGate, APRStt, the connected-mode link - hands it to, and the transmit
+	// threads take it from.  Nothing queues anything until the services
+	// below are started.
+	var transmitQueue = NewTransmitQueue(audio_config)
+
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
@@ -535,8 +541,9 @@ x = Silence FX.25 information.`)
 	var webHub = webui_init(ctx, audio_config, misc_config)
 
 	// The AGW server is made here, so the transmit service can be told to
-	// show it each frame sent, but only started further down: its clients
-	// feed a transmit queue that the transmit service sets up.
+	// show it each frame sent, but only started further down, once the
+	// transmit service is taking what its clients queue off the transmit
+	// queue.
 	var agwServer = NewAGWServer(audio_config, misc_config, dataLinkQueue, transmitQueue, d_a_opt)
 
 	// Each frame sent is shown on the web interface, if there is one, and to
@@ -547,10 +554,8 @@ x = Silence FX.25 information.`)
 	}
 
 	/*
-	 * Initialize the transmit queue.
+	 * Start the transmit threads.
 	 */
-
-	transmitQueue.Init(audio_config)
 
 	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, transmitQueue, pttControl.SetPTT,
 		layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
