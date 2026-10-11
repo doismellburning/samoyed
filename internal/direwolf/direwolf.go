@@ -685,7 +685,7 @@ x = Silence FX.25 information.`)
 	transmitQueue.SetIGate(igate.sendRecPacket)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)
-	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
+	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter, transmitQueue.Append)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.

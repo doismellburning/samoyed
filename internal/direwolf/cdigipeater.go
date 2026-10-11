@@ -63,6 +63,7 @@ type ConnectedDigipeater struct {
 	audioConfig *RadioConfig
 	config      *cdigi_config_s
 	filter      *pfilter.PacketFilter
+	transmit    frameSender // Where digipeated packets go; nil to drop them.
 	count       [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
 }
 
@@ -78,15 +79,19 @@ type ConnectedDigipeater struct {
  *
  *		filter		- What decides whether CFILTER lets a packet through.
  *
+ *		transmit	- Where digipeated packets go, to be
+ *				  transmitted; nil to drop them.
+ *
  * Description:	Called once at application startup time.
  *
  *------------------------------------------------------------------------------*/
 
-func NewConnectedDigipeater(p_audio_config *RadioConfig, p_cdigi_config *cdigi_config_s, filter *pfilter.PacketFilter) *ConnectedDigipeater {
+func NewConnectedDigipeater(p_audio_config *RadioConfig, p_cdigi_config *cdigi_config_s, filter *pfilter.PacketFilter, transmit frameSender) *ConnectedDigipeater {
 	var d = new(ConnectedDigipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_cdigi_config
 	d.filter = filter
+	d.transmit = transmit
 
 	return d
 }
@@ -154,7 +159,10 @@ func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *ax25.Pa
 		d.config.alias[from_chan][to_chan], to_chan,
 		d.config.cfilter_str[from_chan][to_chan])
 	if result != nil {
-		transmitQueue.Append(to_chan, TQ_PRIO_0_HI, result)
+		if d.transmit != nil {
+			d.transmit(to_chan, TQ_PRIO_0_HI, result)
+		}
+
 		d.count[from_chan][to_chan]++
 	}
 }
