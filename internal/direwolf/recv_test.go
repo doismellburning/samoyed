@@ -303,8 +303,6 @@ func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 	handler.logger = aprslog.New(false, "")
 	handler.heard = mheard.New(0)
 
-	transmitQueue.Init(audioConfig)
-
 	var miscConfig = new(misc_config_s)
 	miscConfig.paclen = AX25_N1_PACLEN_DEFAULT
 	miscConfig.retry = AX25_N2_RETRY_DEFAULT
@@ -312,7 +310,7 @@ func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 	miscConfig.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 
-	ax25_link_init(miscConfig, transmitQueue, nil, nil, 1)
+	ax25_link_init(miscConfig, newTestTransmitQueue(t, audioConfig), nil, nil, 1)
 
 	ax25Link.listHead = nil
 	ax25Link.regCallsignList = nil
@@ -323,13 +321,6 @@ func setupRecvProcessTest(t *testing.T, frack int) *recPacketHandler {
 	t.Cleanup(func() {
 		ax25Link.listHead = nil
 		ax25Link.regCallsignList = nil
-
-		for c := range MAX_RADIO_CHANS {
-			for p := range TQ_NUM_PRIO {
-				for transmitQueue.Remove(c, p) != nil { //revive:disable-line:empty-block
-				}
-			}
-		}
 	})
 
 	return handler
@@ -378,7 +369,7 @@ func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 	// Connecting starts with a SABM, so something reaching the transmit
 	// queue says the request was dispatched rather than merely dequeued.
 	assert.Eventually(t, func() bool {
-		return transmitQueue.Count(0, -1, "", "", false) > 0
+		return ax25Link.transmitQueue.Count(0, -1, "", "", false) > 0
 	}, 10*time.Second, 10*time.Millisecond, "the connect request was not acted on")
 }
 
@@ -422,7 +413,7 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 	dlq.ConnectRequest(otherAddrs, 2, 0, 0, 0)
 
 	assert.Eventually(t, func() bool {
-		return transmitQueue.Count(0, -1, "", "Q3TEST", false) > 0
+		return ax25Link.transmitQueue.Count(0, -1, "", "Q3TEST", false) > 0
 	}, 10*time.Second, 10*time.Millisecond, "the queue was not served to the end")
 }
 
@@ -483,6 +474,6 @@ func TestRecvProcessRunsTheLinkTimersWhileTheQueueIsEmpty(t *testing.T) {
 	// Nothing is answering, so the second SABM can only come from T1
 	// expiring while the queue sits empty.
 	assert.Eventually(t, func() bool {
-		return transmitQueue.Count(0, -1, "", "", false) > 1
+		return ax25Link.transmitQueue.Count(0, -1, "", "", false) > 1
 	}, 30*time.Second, 10*time.Millisecond, "the connect attempt was never retried")
 }

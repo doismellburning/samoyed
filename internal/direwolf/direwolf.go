@@ -491,13 +491,17 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	transmitQueue.SetSeizeConfirm(dataLinkQueue.SeizeConfirm)
-	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame))
+	var netTNCs = NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
 
 	// Likewise a channel can be AX.25 over UDP to other nodes.
-	transmitQueue.SetAXUDPChannels(NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame))
+	var axudpChannels = NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
+
+	// What everything that transmits - KISS, AGW, beacons, the digipeaters,
+	// the IGate, APRStt and the connected-mode link - queues its frames on,
+	// for the transmit threads, a network TNC or an AXUDP channel to send.
+	var transmitQueue = NewTransmitQueue(audio_config, netTNCs, axudpChannels, dataLinkQueue.SeizeConfirm)
 
 	/*
 	 * Should there be an option for audio output level?
@@ -547,10 +551,8 @@ x = Silence FX.25 information.`)
 	}
 
 	/*
-	 * Initialize the transmit queue.
+	 * Start the transmit threads, which take what is queued.
 	 */
-
-	transmitQueue.Init(audio_config)
 
 	var xmitSvc = NewXmitService(
 		ctx,
@@ -695,8 +697,9 @@ x = Silence FX.25 information.`)
 	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, transmitQueue, dataLinkQueue.RecFrame, d_i_opt)
 	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, transmitQueue, igate.rememberDigipeated)
 
-	// The transmit queue predates the IGate, and nothing queues a packet for
-	// the IGate's channel before the services below are started.
+	// The IGate and the transmit queue send to each other, so the queue,
+	// made first, is handed the IGate now.  Nothing queues a packet for the
+	// IGate's channel before the services below are started.
 	transmitQueue.SetIGate(igate.sendRecPacket)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)

@@ -486,13 +486,8 @@ func TestKissNetListenFails(t *testing.T) {
 }
 
 // The end-to-end tests below exercise commands that are answered rather than
-// transmitted, and leave the transmit queue alone.  A service's listening
-// goroutines outlive the test that started them - there is nothing to wait on
-// - and TransmitQueue.Init writes the queue's fields without holding its lock,
-// so a later test initialising the queue would race with anything one of
-// these goroutines had put on it.  A client's data frame reaching the queue is
-// covered against the transports whose goroutine a test can wait for, in
-// kiss_test.go and kissserial_test.go.
+// transmitted.  A client's data frame reaching the queue is covered against
+// the other transports, in kiss_test.go and kissserial_test.go.
 
 // The round trip: a client's command is collected from the socket, acted on,
 // and the answer written back to that same client.
@@ -515,8 +510,8 @@ func TestKissNetClientCommandIsAnswered(t *testing.T) {
 
 // A client's data frame is checked against the channel table the service was
 // built with.  Here the port carries a channel that table does not have, so
-// the frame is turned away - before it gets near the transmit queue, which
-// these tests leave alone - and the client is still answered afterwards.
+// the frame is turned away - before it gets near the transmit queue - and the
+// client is still answered afterwards.
 // A service that lost its table on the way to the check would panic in the
 // listening goroutine instead, and take the test binary down with it.
 func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {

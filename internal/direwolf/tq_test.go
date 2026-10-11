@@ -22,10 +22,7 @@ import (
 func newTestTransmitQueue(t *testing.T, audioConfig *RadioConfig) *TransmitQueue {
 	t.Helper()
 
-	var tq = NewTransmitQueue()
-	tq.Init(audioConfig)
-
-	return tq
+	return NewTransmitQueue(audioConfig, [MAX_TOTAL_CHANS]*NetTNC{}, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
 }
 
 // TestTqPeekUnderConcurrentAppend is a regression test for a data race.

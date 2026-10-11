@@ -226,10 +226,11 @@ func TestTxQueueDepthIgnoresSeizeMarker(t *testing.T) {
 		"depth still matches the queue after the marker is taken")
 }
 
-// TestTxQueueDepthResetOnInit covers TransmitQueue.Init: it clears the queues, so the
-// published depth has to be cleared with them.  A gauge left at its old value
-// would describe a queue that no longer exists until the next enqueue.
-func TestTxQueueDepthResetOnInit(t *testing.T) {
+// TestTxQueueDepthResetOnNew covers NewTransmitQueue: the published depth
+// outlives any one queue, so a new, empty one has to clear it.  A gauge left
+// at its old value would describe a queue that no longer exists until the next
+// enqueue.
+func TestTxQueueDepthResetOnNew(t *testing.T) {
 	const (
 		CHANNEL = 0
 		PRIO    = TQ_PRIO_1_LO
@@ -250,8 +251,8 @@ func TestTxQueueDepthResetOnInit(t *testing.T) {
 	tq.LMDataRequest(CHANNEL, PRIO, pp)
 	require.InDelta(t, 1, metricValue(t, "samoyed_tx_queue_depth", labels), 0)
 
-	tq.Init(audioConfig)
+	newTestTransmitQueue(t, audioConfig)
 
 	assert.InDelta(t, 0, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
-		"re-initialising the queues must clear the published depth too")
+		"a new queue must clear the published depth too")
 }

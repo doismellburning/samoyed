@@ -183,7 +183,6 @@ func fuzzAGWServer(tb testing.TB, dataLink agwDataLink) *AGWServer {
 	tb.Helper()
 
 	var s = new(AGWServer)
-	s.transmitQueue = transmitQueue
 	s.dataLink = dataLink
 
 	var ours, theirs = net.Pipe()
@@ -227,9 +226,10 @@ const linkFuzzPaclen = 64
 // fuzzLinkReset gives each run of a connected-mode target a link with no
 // state machines, nothing registered and nothing queued either way, so one
 // input cannot leave anything behind for the next, and which tells clients
-// what happens on it.
-func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
-	transmitQueue.Init(cfg)
+// what happens on it.  It returns the new, empty transmit queue the link
+// sends on.
+func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) *TransmitQueue {
+	var tq = NewTransmitQueue(cfg, [MAX_TOTAL_CHANS]*NetTNC{}, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
 
 	var miscConfig = new(misc_config_s)
 	// Shorter than the default, so a client's data can be long enough to
@@ -245,7 +245,9 @@ func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
 	}
 
 	*ax25Link = *NewAX25Link()
-	ax25_link_init(miscConfig, transmitQueue, nil, clients, 0)
+	ax25_link_init(miscConfig, tq, nil, clients, 0)
+
+	return tq
 }
 
 // fuzzLinkDrain does what recv_process does with everything on the data link
@@ -684,7 +686,7 @@ func FuzzAGWHandleClientCommand(f *testing.F) {
 			t.Skip()
 		}
 
-		fuzzLinkReset(cfg, true, s)
+		s.transmitQueue = fuzzLinkReset(cfg, true, s)
 
 		// A newly connected client, which has not logged in.
 		var fresh agwClient
