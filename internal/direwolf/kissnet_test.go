@@ -377,21 +377,19 @@ func TestKissNetDebugPrints(t *testing.T) {
 	// newAttachedKissNet starts no goroutines, so the level can be set directly.
 	kns.debug = 2
 
-	var output = testutils.CaptureOutput(t, func() {
-		kns.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
+	var hook = testutils.CaptureLogrus(t, logrus.DebugLevel)
 
-		readKissNetFrame(t, clients[0])
-	})
+	kns.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
-	assert.Contains(t, output, "Packet content before adding KISS framing")
-	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
+	readKissNetFrame(t, clients[0])
+
+	testutils.LoggedEntry(t, hook, "Packet content before adding KISS framing and any escapes")
+	assert.Equal(t, 1, testutils.LoggedEntry(t, hook, ">>> Data frame to KISS client application").Data["channel"])
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	output = testutils.CaptureOutput(t, func() {
-		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
-	})
+	kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
 
-	assert.Contains(t, output, "Fake command prompt")
+	testutils.LoggedEntry(t, hook, ">>> Fake command prompt to KISS client application")
 }
 
 // A KISS TCP port of 0 is how the configuration says "no KISS over TCP", and

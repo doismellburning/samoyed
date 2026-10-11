@@ -394,13 +394,15 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 func TestNetTNCDebugPrints(t *testing.T) {
 	var kf = new(kiss.Collector)
 
+	var hook = testutils.CaptureLogrus(t, logrus.DebugLevel)
+
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range kissFrameFor(newTestPacket(t)) {
 			nettncRecByte(kf, b, 2, nettncTestChannel, nil)
 		}
 	})
 
-	assert.Contains(t, output, "<<< Data frame from KISS client application")
+	testutils.LoggedEntry(t, hook, "<<< Data frame from KISS client application")
 	assert.Contains(t, output, "Frame content after removing KISS framing")
 }
 

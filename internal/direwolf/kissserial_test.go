@@ -23,6 +23,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -270,11 +271,11 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	// is longer than the terminal will hold.
 	var got = drainKissFrame(t, client)
 
-	var output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(0, kiss.CmdDataFrame, frame)
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	assert.Contains(t, output, "Truncated")
+	ks.SendRecPacket(0, kiss.CmdDataFrame, frame)
+
+	testutils.LoggedEntry(t, hook, "KISS frame for client application too long, truncating it")
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
 	assert.Len(t, <-got, ax25.MaxPacketLen+3)
@@ -433,20 +434,18 @@ func TestKissSerialPollingStopsWhenCancelled(t *testing.T) {
 func TestKissSerialDebugPrints(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 2)
 
-	var output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
+	var hook = testutils.CaptureLogrus(t, logrus.DebugLevel)
 
-		readSerialKissFrame(t, client)
-	})
+	ks.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
-	assert.Contains(t, output, "Packet content before adding KISS framing")
-	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
+	readSerialKissFrame(t, client)
 
-	output = testutils.CaptureOutput(t, func() {
-		ks.prompt([]byte("\r\ncmd:"))
-	})
+	testutils.LoggedEntry(t, hook, "Packet content before adding KISS framing and any escapes")
+	assert.Equal(t, 1, testutils.LoggedEntry(t, hook, ">>> Data frame to KISS client application").Data["channel"])
 
-	assert.Contains(t, output, "Fake command prompt")
+	ks.prompt([]byte("\r\ncmd:"))
+
+	testutils.LoggedEntry(t, hook, ">>> Fake command prompt to KISS client application")
 }
 
 // The receive path writes to the port while the listening goroutine reads from

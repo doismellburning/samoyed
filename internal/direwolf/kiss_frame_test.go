@@ -6,12 +6,12 @@ package direwolf
 import (
 	"bytes"
 	"net"
-	"strings"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -147,12 +147,14 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var output = testutils.CaptureOutput(t, func() {
-		h.processMsg(append([]byte{0x80 | kiss.CmdDataFrame}, pp.FrameData()...), from)
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	assert.Contains(t, output, "Invalid transmit channel 8 from KISS client app")
-	assert.Contains(t, output, "kissparms -c 1 -p radio")
+	h.processMsg(append([]byte{0x80 | kiss.CmdDataFrame}, pp.FrameData()...), from)
+
+	var entry = testutils.LoggedEntry(t, hook, "Invalid transmit channel from KISS client application")
+	assert.Equal(t, logrus.ErrorLevel, entry.Level)
+	assert.Equal(t, 8, entry.Data["channel"])
+	assert.Contains(t, entry.Data["hint"], "kissparms -c 1 -p radio")
 	assert.Equal(t, 0, h.queue.Count(8, -1, "", "", false))
 }
 
@@ -166,13 +168,13 @@ func Test_kiss_process_msg_invalid_channel_escaped_fend_only(t *testing.T) {
 	var _, from = recordingKissClient()
 	var kc kiss.Collector
 
-	var output = testutils.CaptureOutput(t, func() {
-		for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.TFEND, kiss.FEND} {
-			h.RecByte(&kc, b, 0, from)
-		}
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.DebugLevel)
 
-	assert.Contains(t, output, "Invalid transmit channel 12 from KISS client app")
+	for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.TFEND, kiss.FEND} {
+		h.RecByte(&kc, b, 0, from)
+	}
+
+	assert.Equal(t, 12, testutils.LoggedEntry(t, hook, "Invalid transmit channel from KISS client application").Data["channel"])
 }
 
 // The debug print of a message has something to say even when there is nothing
@@ -219,15 +221,13 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var output string
+	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
 	assert.NotPanics(t, func() {
-		output = testutils.CaptureOutput(t, func() {
-			h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
-		})
+		h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
 	})
 
-	assert.Contains(t, output, "Invalid transmit channel 16 from KISS client app")
+	assert.Equal(t, 16, testutils.LoggedEntry(t, hook, "Invalid transmit channel from KISS client application").Data["channel"])
 }
 
 // Bytes that are not an AX.25 frame cannot be transmitted, and are reported
@@ -237,11 +237,11 @@ func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 
 	var _, from = recordingKissClient()
 
-	var output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{kiss.CmdDataFrame, 'n', 'o'}, from)
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	assert.Contains(t, output, "Invalid KISS data frame from client app")
+	h.processMsg([]byte{kiss.CmdDataFrame, 'n', 'o'}, from)
+
+	assert.Equal(t, logrus.ErrorLevel, testutils.LoggedEntry(t, hook, "Invalid KISS data frame from client application").Level)
 }
 
 // The timing parameters are the rest of what a client sets up, and each is one
@@ -251,6 +251,8 @@ func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 	var xs = h.xmit
 
 	var _, from = recordingKissClient()
+
+	var hook = testutils.CaptureLogrus(t, logrus.DebugLevel)
 
 	h.processMsg([]byte{kiss.CmdTxDelay, 30}, from)
 	h.processMsg([]byte{kiss.CmdPersistence, 63}, from)
@@ -263,6 +265,13 @@ func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 	assert.Equal(t, 10, xs.timing[0].slottime)
 	assert.Equal(t, 10, xs.timing[0].txtail)
 	assert.True(t, xs.timing[0].fulldup)
+
+	// Each is noted, for anyone wondering where a setting came from.
+	var txdelay = testutils.LoggedEntry(t, hook, "KISS protocol set TXDELAY")
+	assert.Equal(t, logrus.DebugLevel, txdelay.Level)
+	assert.Equal(t, byte(30), txdelay.Data["txdelay"])
+	assert.Equal(t, 300, txdelay.Data["ms"])
+	assert.Equal(t, true, testutils.LoggedEntry(t, hook, "KISS protocol set FullDuplex").Data["fullduplex"])
 }
 
 // A value nobody would want on purpose is applied, because the client asked,
@@ -283,9 +292,13 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 		{"TXTAIL", []byte{kiss.CmdTxTail, 1}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() { h.processMsg(c.msg, from) })
+			var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-			assert.Contains(t, output, "Radio Channel - Transmit Timing")
+			h.processMsg(c.msg, from)
+
+			require.NotNil(t, hook.LastEntry())
+			assert.Equal(t, logrus.WarnLevel, hook.LastEntry().Level)
+			assert.Contains(t, hook.LastEntry().Message, "Radio Channel - Transmit Timing")
 		})
 	}
 
@@ -313,9 +326,13 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 		{"SET HARDWARE", kiss.CmdSetHardware},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() { h.processMsg([]byte{c.cmd}, from) })
+			var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-			assert.Contains(t, output, "KISS ERROR")
+			h.processMsg([]byte{c.cmd}, from)
+
+			var entry = testutils.LoggedEntry(t, hook, "Missing value for KISS command")
+			assert.Equal(t, logrus.ErrorLevel, entry.Level)
+			assert.Equal(t, c.name, entry.Data["command"])
 		})
 	}
 
@@ -329,11 +346,11 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 
 	var _, from = recordingKissClient()
 
-	var output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{kiss.CmdEndKiss}, from)
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.DebugLevel)
 
-	assert.Contains(t, output, "end KISS mode - Ignored")
+	h.processMsg([]byte{kiss.CmdEndKiss}, from)
+
+	testutils.LoggedEntry(t, hook, "KISS protocol end KISS mode, ignoring it")
 }
 
 // A command we don't implement gets the troubleshooting tip, and the two
@@ -344,26 +361,30 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 
 	var _, from = recordingKissClient()
 
-	var output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{7}, from)
-	})
+	// The hint for the command processMsg is handed.
+	var hint = func(cmd byte) string {
+		var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	assert.Contains(t, output, "KISS Invalid command 7")
-	assert.Contains(t, output, `Use "-d kn" option`)
-	assert.NotContains(t, output, "XKISS")
+		h.processMsg([]byte{cmd}, from)
 
-	output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{kiss.CmdXKissData}, from)
-	})
+		var entry = testutils.LoggedEntry(t, hook, "Invalid KISS command from client application")
+		assert.Equal(t, logrus.ErrorLevel, entry.Level)
+		assert.Equal(t, cmd, entry.Data["command"])
 
-	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
-	assert.Contains(t, output, "Winlink Express")
+		var text, ok = entry.Data["hint"].(string)
+		require.True(t, ok)
 
-	output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{kiss.CmdXKissPoll}, from)
-	})
+		return text
+	}
 
-	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
+	assert.Contains(t, hint(7), `Use the "-d kn" option`)
+	assert.NotContains(t, hint(7), "XKISS")
+
+	assert.Contains(t, hint(kiss.CmdXKissData), `"XKISS" protocol which is not supported`)
+	assert.Contains(t, hint(kiss.CmdXKissData), "Winlink Express")
+	assert.Contains(t, hint(kiss.CmdXKissData), `Use the "-d kn" option`)
+
+	assert.Contains(t, hint(kiss.CmdXKissPoll), `"XKISS" protocol which is not supported`)
 }
 
 // "Set hardware" is the one command with an answer: the human readable
@@ -412,19 +433,20 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 
 	for _, c := range []struct {
 		command string
+		level   logrus.Level
 		expect  string
 	}{
-		{"TNC:9", "Did not expect a parameter"},
-		{"TXBUF:9", "Did not expect a parameter"},
-		{"NOSUCH:", "unrecognized command: NOSUCH"},
-		{"TNC", "expected the form COMMAND:"},
+		{"TNC:9", logrus.WarnLevel, "KISS Set Hardware query did not expect a parameter"},
+		{"TXBUF:9", logrus.WarnLevel, "KISS Set Hardware query did not expect a parameter"},
+		{"NOSUCH:", logrus.ErrorLevel, "KISS Set Hardware command not recognised"},
+		{"TNC", logrus.ErrorLevel, "KISS Set Hardware expected the form COMMAND:[parameter[,parameter...]]"},
 	} {
 		t.Run(c.command, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() {
-				kiss_set_hardware(0, []byte(c.command), from, nil)
-			})
+			var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-			assert.Contains(t, output, c.expect)
+			kiss_set_hardware(0, []byte(c.command), from, nil)
+
+			assert.Equal(t, c.level, testutils.LoggedEntry(t, hook, c.expect).Level)
 		})
 	}
 
@@ -499,11 +521,11 @@ func Test_KissRecByte_noise_is_printed(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
-		feedKissBytes(h, kf, 1, append([]byte("junk"), kiss.FEND))
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.DebugLevel)
 
-	assert.Contains(t, output, "Rejected Noise")
+	feedKissBytes(h, kf, 1, append([]byte("junk"), kiss.FEND))
+
+	testutils.LoggedEntry(t, hook, "<<< Rejected Noise from KISS client application")
 }
 
 // FENDs with nothing between them are how some clients idle, and are not
@@ -525,11 +547,12 @@ func Test_KissRecByte_overlong_frame(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
-		feedKissBytes(h, kf, 0, append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen+10)...))
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	assert.Equal(t, 1, strings.Count(output, "KISS message exceeded maximum length"))
+	feedKissBytes(h, kf, 0, append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen+10)...))
+
+	assert.Equal(t, logrus.ErrorLevel,
+		testutils.LoggedEntry(t, hook, "KISS message from client application exceeded maximum length, discarding it").Level)
 }
 
 // The client does eventually send its closing FEND, and the byte it used to be
@@ -543,11 +566,11 @@ func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 
 	var overlong = append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen+10)...)
 
-	var output = testutils.CaptureOutput(t, func() {
-		feedKissBytes(h, kf, 0, append(overlong, kiss.FEND))
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	assert.Contains(t, output, "KISS message exceeded maximum length.  Discarding it.")
+	feedKissBytes(h, kf, 0, append(overlong, kiss.FEND))
+
+	testutils.LoggedEntry(t, hook, "KISS message from client application exceeded maximum length, discarding it")
 	assert.Equal(t, 0, h.queue.Count(0, -1, "", "", false), "a fragment of the overlong frame was acted on")
 
 	// And a well formed frame after it still gets through.
@@ -569,12 +592,13 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
-		feedKissBytes(h, kf, 2, kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)))
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.DebugLevel)
 
-	assert.Contains(t, output, "<<< Data frame from KISS client application, channel 0")
-	assert.Contains(t, output, "Packet content after removing KISS framing")
+	feedKissBytes(h, kf, 2, kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)))
+
+	assert.Equal(t, 0, testutils.LoggedEntry(t, hook, "<<< Data frame from KISS client application").Data["channel"])
+	assert.Equal(t, len(pp.FrameData()),
+		testutils.LoggedEntry(t, hook, "Packet content after removing KISS framing and any escapes").Data["length"])
 }
 
 // The per-client bookkeeping for KISS over TCP: a client's connection and the
@@ -671,11 +695,11 @@ func Test_KissRecByte_frame_empty_once_unescaped(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
-		feedKissBytes(h, kf, 2, []byte{kiss.FEND, kiss.FESC, kiss.FEND})
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	assert.Contains(t, output, "nothing in it")
+	feedKissBytes(h, kf, 2, []byte{kiss.FEND, kiss.FESC, kiss.FEND})
+
+	testutils.LoggedEntry(t, hook, "KISS frame from client application has nothing in it once unescaped, ignoring it")
 	assert.Equal(t, 0, h.queue.Count(0, -1, "", "", false))
 }
 
@@ -706,13 +730,13 @@ func Test_kissClientFrame(t *testing.T) {
 func Test_kissClientFrame_truncates(t *testing.T) {
 	var frame = bytes.Repeat([]byte{'x'}, ax25.MaxPacketLen+10)
 
-	var got []byte
+	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	var output = testutils.CaptureOutput(t, func() {
-		got = kissClientFrame(0, kiss.CmdDataFrame, frame, 0, "Test")
-	})
+	var got = kissClientFrame(0, kiss.CmdDataFrame, frame, 0, "Test")
 
-	assert.Contains(t, output, "Test KISS buffer too small.  Truncated.")
+	var entry = testutils.LoggedEntry(t, hook, "KISS frame for client application too long, truncating it")
+	assert.Equal(t, logrus.ErrorLevel, entry.Level)
+	assert.Equal(t, "Test", entry.Data["transport"])
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
 	assert.Len(t, got, ax25.MaxPacketLen+3)
