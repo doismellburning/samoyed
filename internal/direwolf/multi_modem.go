@@ -656,6 +656,12 @@ type Layer2Receiver struct {
 	il2pDebug int // IL2P's debug level, for every slicer's IL2P receiver.
 	sink      ReceiveSink
 
+	// packetSink is where every packet the slicers' receivers decode goes:
+	// toMultiModem, for its channel's MultiModem to pick from, unless
+	// something - a test watching what comes out of the decoders - stands in
+	// for the rest of the receive path.
+	packetSink dwcore.PacketSink
+
 	// txInhibited says whether a channel's transmit inhibit input is set, or
 	// is nil when there are no inputs.
 	txInhibited func(channel int) bool
@@ -700,6 +706,7 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 	r.il2pDebug = il2pDebug
 	r.sink = sink
 	r.demods = demods
+	r.packetSink = r.toMultiModem
 	r.randSeed = 1
 
 	for ch, d := range demods {
@@ -840,15 +847,13 @@ func (r *Layer2Receiver) recFrame(from dwcore.SlicerID, fbuf []byte, rxInfo dwco
 
 // TODO: Eliminate function above and move code elsewhere?
 
-// recPacket hands one received frame to its channel's MultiModem, or to
-// whatever is standing in for the rest of the receive path.
+// recPacket hands one received frame on to r.packetSink.
 func (r *Layer2Receiver) recPacket(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo) {
-	if multiModemRecCapture != nil {
-		multiModemRecCapture(from, pp, rxInfo)
+	r.packetSink(from, pp, rxInfo)
+}
 
-		return
-	}
-
+// toMultiModem hands one received frame to its channel's MultiModem.
+func (r *Layer2Receiver) toMultiModem(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo) {
 	r.modems[from.Channel].processRecPacket(from, pp, rxInfo)
 }
 
