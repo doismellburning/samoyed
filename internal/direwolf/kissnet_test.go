@@ -576,3 +576,23 @@ func TestKissNetClientCanReattach(t *testing.T) {
 
 	assert.GreaterOrEqual(t, reattachedSlot, 0, "a client could not attach again")
 }
+
+// With KISSCOPY, a data frame a client sends is shown to the TCP clients the
+// handler was given, whichever transport it came by - here, one with no TCP
+// port of its own, such as the serial port.
+func TestKissNetCopiesAHandlersDataFrames(t *testing.T) {
+	var peers, clients = newAttachedKissNet(t, -1, true, 1)
+
+	var tnc = setupKissTNC(t)
+	var h = NewKissHandler(tnc, peers)
+
+	var pp = newTestPacket(t)
+	var _, from = recordingKissClient()
+
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
+
+	assert.Equal(t,
+		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
+		readKissNetFrame(t, clients[0]))
+	assert.Equal(t, 1, tnc.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+}

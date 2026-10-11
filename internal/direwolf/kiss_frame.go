@@ -273,18 +273,26 @@ type kissTNC interface {
 	SetFulldup(channel int, value bool)
 }
 
+// kissCopier is where KISSCOPY sends a copy of a client's data frame: the
+// other clients, those that want one.
+type kissCopier interface {
+	// Copy shows msg, a data frame for channel with command cmd, to every
+	// client that wants a copy other than from, the client it came from.
+	Copy(msg []byte, channel int, cmd int, from kissClient)
+}
+
 // KissHandler acts on what a KISS client application sends the TNC, whichever
 // transport it arrives by - TCP, the serial port or the pseudo terminal - so
 // each of them hands its client's bytes to the same one.
 type KissHandler struct {
-	tnc   kissTNC         // Where a client's frames and timing commands go.
-	peers *KissNetService // The TCP clients KISSCOPY copies a data frame to, or nil.
+	tnc   kissTNC    // Where a client's frames and timing commands go.
+	peers kissCopier // Where KISSCOPY copies a data frame to, or nil.
 }
 
 // NewKissHandler builds a KissHandler that hands a client's data frames and
-// timing commands to tnc, and with KISSCOPY copies its data frames to the
-// clients of peers.
-func NewKissHandler(tnc kissTNC, peers *KissNetService) *KissHandler {
+// timing commands to tnc, and copies its data frames to peers, which may be
+// nil.
+func NewKissHandler(tnc kissTNC, peers kissCopier) *KissHandler {
 	var h = new(KissHandler)
 	h.tnc = tnc
 	h.peers = peers
@@ -431,7 +439,9 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 	case kiss.CmdDataFrame: /* 0 = Data Frame */
 		// The copies carry the channel and command we have already
 		// determined, rather than the first byte as it came.
-		h.peers.Copy(kiss_msg, channel, int(cmd), from)
+		if h.peers != nil {
+			h.peers.Copy(kiss_msg, channel, int(cmd), from)
+		}
 
 		/* Note July 2017: There is a variant of of KISS, called SMACK, that assumes */
 		/* a TNC can never have more than 8 channels.  http://symek.de/g/smack.html */

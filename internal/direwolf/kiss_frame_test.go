@@ -117,25 +117,57 @@ func setupKissProcessMsg(t *testing.T) (*KissHandler, *recordingTNC) {
 	return NewKissHandler(tnc, nil), tnc
 }
 
-// With KISSCOPY, a data frame a client sends is shown to the TCP clients the
-// handler was given, whichever transport it came by - here, one with no TCP
-// port of its own, such as the serial port.
+// copiedFrame is a data frame the handler had copied to the other clients.
+type copiedFrame struct {
+	msg     []byte
+	channel int
+	cmd     int
+	from    kissClient
+}
+
+// recordingCopier is a kissCopier that keeps what it is asked to copy.
+type recordingCopier struct {
+	copied []copiedFrame
+}
+
+func (r *recordingCopier) Copy(msg []byte, channel int, cmd int, from kissClient) {
+	r.copied = append(r.copied, copiedFrame{msg: msg, channel: channel, cmd: cmd, from: from})
+}
+
+// A data frame a client sends is copied to the other clients - KISSCOPY - as
+// well as transmitted, with the channel and command the handler made of it
+// and the client it came from, so as not to be copied back.
 func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 	var h, tnc = setupKissProcessMsg(t)
 
-	var peers, clients = newAttachedKissNet(t, -1, true, 1)
+	var peers = new(recordingCopier)
 
 	h.peers = peers
 
 	var pp = newTestPacket(t)
 	var _, from = recordingKissClient()
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
+	var msg = append([]byte{0x10 | kiss.CmdDataFrame}, pp.FrameData()...)
 
-	assert.Equal(t,
-		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
-		readKissNetFrame(t, clients[0]))
+	h.processMsg(msg, from)
+
+	assert.Equal(t, []copiedFrame{{msg: msg, channel: 1, cmd: kiss.CmdDataFrame, from: from}}, peers.copied)
 	assert.Len(t, tnc.transmitted, 1)
+}
+
+// Nor is anything but a data frame copied.
+func Test_kiss_process_msg_copies_only_data_frames(t *testing.T) {
+	var h, _ = setupKissProcessMsg(t)
+
+	var peers = new(recordingCopier)
+
+	h.peers = peers
+
+	var _, from = recordingKissClient()
+
+	h.processMsg([]byte{kiss.CmdTxDelay, 30}, from)
+
+	assert.Empty(t, peers.copied)
 }
 
 // A data frame from the client is a frame to transmit, and an original - one

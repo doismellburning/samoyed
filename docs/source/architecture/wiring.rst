@@ -97,7 +97,7 @@ Dashed arrows are connections made after construction rather than at it.
        kiss -> kisstnc [label="kissTNC"];
        kisstnc -> xmit [label="timing setters"];
        kisstnc -> tq [label="clientTransmitQueue"];
-       kiss -> kissnet [label="KISSCOPY peers"];
+       kiss -> kissnet [label="KISSCOPY peers\n(kissCopier)"];
        kissnet -> kiss [label="client bytes\n(at Start)", style=dashed];
 
        apps -> agw;
@@ -195,7 +195,7 @@ and handed the IGate's ``sendRecPacket`` with ``TransmitQueue.SetIGate`` once th
 
 **The KISS handler and the KISS TCP service.**
 The handler copies a client's data frames to the TCP clients with KISSCOPY,
-so it is made after the ``KissNetService`` and handed it.
+so it is made after the ``KissNetService`` and handed it, as its ``kissCopier``.
 The service is handed the handler when it is started (``KissNetService.Start``),
 rather than when it is made.
 
@@ -217,8 +217,8 @@ The shapes in the diagram follow the dependency conventions in ``AGENTS.md``:
   ``frameReceiver``, ``frameSender``, ``igateSender``, ``seizeConfirmer``.
 - A component that makes several calls is handed a small interface,
   declared beside it and holding only those calls:
-  ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``, ``kissTNC``.
-- ``*TransmitQueue``, ``*DataLinkQueue`` and ``*AGWServer`` satisfy those interfaces without knowing about them.
+  ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``, ``kissTNC``, ``kissCopier``.
+- ``*TransmitQueue``, ``*DataLinkQueue``, ``*AGWServer`` and ``*KissNetService`` satisfy those interfaces without knowing about them.
 - ``kissTNCAdapter`` is the KISS handler's ``kissTNC``:
   it puts a client's frames on the ``clientTransmitQueue`` it is handed
   and its timing commands to the ``XmitService``,
@@ -239,7 +239,7 @@ References
   ``ax25_link.go`` (``NewAX25Link``, ``linkClients``, ``linkTransmitter``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
-  ``kiss_frame.go`` (``NewKissHandler``, ``kissTNC``),
+  ``kiss_frame.go`` (``NewKissHandler``, ``kissTNC``, ``kissCopier``),
   ``kiss_tnc.go`` (``newKissTNC``),
   ``kissnet.go`` (``KissNetService.Start``),
   ``aprs_tt.go`` (``NewTTGateway``),
