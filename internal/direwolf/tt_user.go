@@ -131,6 +131,10 @@ type ttUsers struct {
 	// toIGate sends an object report to APRS-IS, or is nil for no IGate.
 	toIGate igateSender
 
+	// transmit is where an object report goes, to be transmitted, or is nil to
+	// drop it.
+	transmit frameSender
+
 	mu   sync.Mutex
 	user [MAX_TT_USERS]tt_user_s
 }
@@ -673,7 +677,9 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 			u.remember(u.ttConfig.obj_xmit_chan, pp)
 		}
 
-		transmitQueue.Append(u.ttConfig.obj_xmit_chan, TQ_PRIO_1_LO, pp)
+		if u.transmit != nil {
+			u.transmit(u.ttConfig.obj_xmit_chan, TQ_PRIO_1_LO, pp)
+		}
 	}
 }
 

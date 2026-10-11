@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -32,6 +31,19 @@ const TQ_NUM_PRIO = 2 /* Number of priorities. */
 
 const TQ_PRIO_0_HI = 0
 const TQ_PRIO_1_LO = 1
+
+// frameSender is where a packet to transmit goes: TransmitQueue.Append, or a
+// stand-in for it.
+type frameSender func(channel int, prio int, pp *ax25.Packet)
+
+// clientTransmitQueue is what a client application's frames are queued on to
+// be transmitted, and what it asks how much is still waiting: the KISS
+// handler's TXBUF query counts bytes there, and the AGW server's 'y' query
+// frames.  *TransmitQueue is one.
+type clientTransmitQueue interface {
+	Append(channel int, prio int, pp *ax25.Packet)
+	Count(channel int, prio int, source string, dest string, bytes bool) int
+}
 
 // TransmitQueue holds the packets waiting for each radio channel's transmit
 // thread, one queue per channel and priority.
@@ -95,43 +107,27 @@ type TransmitQueue struct {
 	seizeConfirm seizeConfirmer
 }
 
-// transmitQueue is the queue every producer - KISS, AGW, beacon, digipeater,
-// IGate, APRStt, the connected-mode link - hands its packets to, and the
-// transmit threads take them from.  It exists from package initialisation, so
-// it is never nil; Init must still be called before anything is queued.
-var transmitQueue = NewTransmitQueue()
-
-// NewTransmitQueue returns an empty queue, with no audio configuration yet.
-func NewTransmitQueue() *TransmitQueue {
-	var tq = new(TransmitQueue)
-
-	for c := range MAX_RADIO_CHANS {
-		tq.wake[c] = make(chan struct{}, 1)
-	}
-
-	return tq
-}
-
-// tq_is_real_packet reports whether a queue entry is a real packet rather than
-// LMSeizeRequest's null wake-up frame, matching countLocked's own test.
-func tq_is_real_packet(pp *ax25.Packet) bool {
-	return pp.NumAddr() >= ax25.MinAddrs
-}
-
 /*-------------------------------------------------------------------
  *
- * Name:        Init
+ * Name:        NewTransmitQueue
  *
- * Purpose:     Initialize the transmit queue.
+ * Purpose:     Make an empty transmit queue.
  *
  * Inputs:	audio_config_p	- Audio device configuration.
  *
- * Outputs:
+ *		netTNCs		- Where a packet for an NCHANNEL channel goes
+ *				  instead of a queue.  A channel with no TNC
+ *				  here discards such packets.
  *
- * Description:	Initialize the queue to be empty and set up other
- *		mechanisms for sharing it between different threads.
+ *		axudpChannels	- Where a packet for an AXUDP channel goes
+ *				  instead of a queue.  A channel with nothing
+ *				  here discards such packets.
  *
- *		We have different timing rules for different types of
+ *		seizeConfirm	- Told that a channel without a transmitter of
+ *				  ours is clear to send on; nil for nobody to
+ *				  tell.
+ *
+ * Description:	We have different timing rules for different types of
  *		packets so they are put into different queues.
  *
  *		High Priority -
@@ -150,61 +146,51 @@ func tq_is_real_packet(pp *ax25.Packet) bool {
  *
  *		Each audio channel has its own queue.
  *
+ *		The published queue depth is one per channel and priority
+ *		for the whole process, not one per queue, so it is cleared
+ *		here: whatever it says describes a queue before this one.
+ *
  *--------------------------------------------------------------------*/
 
-func (tq *TransmitQueue) Init(audio_config_p *RadioConfig) {
+func NewTransmitQueue(
+	audio_config_p *RadioConfig,
+	netTNCs [MAX_TOTAL_CHANS]*NetTNC,
+	axudpChannels [MAX_TOTAL_CHANS]*AXUDPChannel,
+	seizeConfirm seizeConfirmer,
+) *TransmitQueue {
 	logrus.Debug("tq_init")
+
+	var tq = new(TransmitQueue)
 	tq.audioConfig = audio_config_p
+	tq.netTNCs = netTNCs
+	tq.axudpChannels = axudpChannels
+	tq.seizeConfirm = seizeConfirm
 
 	for c := range MAX_RADIO_CHANS {
-		for p := range TQ_NUM_PRIO {
-			tq.head[c][p] = nil
-			tq.length[c][p] = 0
+		tq.wake[c] = make(chan struct{}, 1)
 
+		for p := range TQ_NUM_PRIO {
 			metrics.SetTxQueueDepth(c, p, 0)
 		}
 	}
 
-	// Any wake-up left latched from before describes queues we have just
-	// emptied, so drain it: acting on it would only cost the transmit thread
-	// a lap of its loop, but starting from a clean state is easier to reason
-	// about.
-	//
-	// Under mu, like the enqueue paths that raise it.
-	tq.mu.Lock()
-
-	for c := range MAX_RADIO_CHANS {
-		select {
-		case <-tq.wake[c]:
-		default:
-		}
-	}
-
-	tq.mu.Unlock()
-} /* end Init */
-
-// SetNetTNCs hands the queue the network TNCs that packets for NCHANNEL
-// channels go to.  Like Init, it must be called before anything is queued: it
-// is read without a lock.
-func (tq *TransmitQueue) SetNetTNCs(netTNCs [MAX_TOTAL_CHANS]*NetTNC) {
-	tq.netTNCs = netTNCs
+	return tq
 }
 
-// SetAXUDPChannels hands the queue the AXUDP channels that packets for them go
-// to.  Like SetNetTNCs, it must be called before anything is queued.
-func (tq *TransmitQueue) SetAXUDPChannels(channels [MAX_TOTAL_CHANS]*AXUDPChannel) {
-	tq.axudpChannels = channels
+// tq_is_real_packet reports whether a queue entry is a real packet rather than
+// LMSeizeRequest's null wake-up frame, matching countLocked's own test.
+func tq_is_real_packet(pp *ax25.Packet) bool {
+	return pp.NumAddr() >= ax25.MinAddrs
 }
 
-// SetSeizeConfirm hands the queue what to tell when a seize request on a
-// channel without a transmitter of ours is granted at once.  Like SetNetTNCs,
-// it must be called before anything is queued.
-func (tq *TransmitQueue) SetSeizeConfirm(seizeConfirm seizeConfirmer) {
-	tq.seizeConfirm = seizeConfirm
-}
-
-// SetIGate hands the queue where packets for the IGate's channel go.  Like
-// SetNetTNCs, it must be called before anything is queued for that channel.
+// SetIGate hands the queue where packets for the IGate's channel go.  It
+// must be called before anything is queued for that channel: it is read
+// without a lock.
+//
+// This is set after construction, rather than handed to NewTransmitQueue,
+// because the two depend on each other: the IGate queues what it hears from
+// APRS-IS for transmission, and the queue hands the IGate whatever is queued
+// for its channel.
 func (tq *TransmitQueue) SetIGate(toIGate igateSender) {
 	tq.toIGate = toIGate
 }

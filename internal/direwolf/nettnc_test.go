@@ -471,12 +471,10 @@ func TestNetTNCTransmitQueueSendsToItsTNCs(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
 
-	var tq = NewTransmitQueue()
-	tq.Init(audioConfig)
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 	tncs[nettncTestChannel] = nt
 
-	tq.SetNetTNCs(tncs)
+	var tq = NewTransmitQueue(audioConfig, tncs, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
 
 	var pp = newTestPacket(t)
 

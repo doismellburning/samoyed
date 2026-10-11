@@ -566,7 +566,7 @@ func TestOutstandingFramesForNoLinkRepliesNone(t *testing.T) {
 	*ax25Link = *NewAX25Link()
 
 	var clients = new(recordingLinkClients)
-	ax25_link_init(new(misc_config_s), nil, clients, 0)
+	ax25_link_init(new(misc_config_s), nil, clients, nil, 0)
 
 	var E = new(dlq_item_t)
 	E._chan = 0

@@ -491,13 +491,18 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	transmitQueue.SetSeizeConfirm(dataLinkQueue.SeizeConfirm)
-	transmitQueue.SetNetTNCs(NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame))
+	var netTNCs = NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
 
 	// Likewise a channel can be AX.25 over UDP to other nodes.
-	transmitQueue.SetAXUDPChannels(NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame))
+	var axudpChannels = NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
+
+	// What everything with a packet to send - KISS, AGW, beacon, digipeater,
+	// IGate, APRStt, the connected-mode link - hands it to, and the transmit
+	// threads, the network TNCs and the AXUDP channels take it from.  Nothing
+	// queues anything until the services below are started.
+	var transmitQueue = NewTransmitQueue(audio_config, netTNCs, axudpChannels, dataLinkQueue.SeizeConfirm)
 
 	/*
 	 * Should there be an option for audio output level?
@@ -535,9 +540,10 @@ x = Silence FX.25 information.`)
 	var webHub = webui_init(ctx, audio_config, misc_config)
 
 	// The AGW server is made here, so the transmit service can be told to
-	// show it each frame sent, but only started further down: its clients
-	// feed a transmit queue that the transmit service sets up.
-	var agwServer = NewAGWServer(audio_config, misc_config, dataLinkQueue, d_a_opt)
+	// show it each frame sent, but only started further down, once the
+	// transmit service is taking what its clients queue off the transmit
+	// queue.
+	var agwServer = NewAGWServer(audio_config, misc_config, dataLinkQueue, transmitQueue, d_a_opt)
 
 	// Each frame sent is shown on the web interface, if there is one, and to
 	// the AGW clients monitoring.
@@ -547,10 +553,11 @@ x = Silence FX.25 information.`)
 	}
 
 	/*
-	 * Initialize the transmit queue.
+	 * Start the transmit threads.
 	 */
 
-	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, pttControl.SetPTT, layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
+	var xmitSvc = NewXmitService(ctx, audio_config, audioDevices, toneGenerators, transmitQueue, pttControl.SetPTT,
+		layer2Receiver.DataDetectAny, onTransmit, dataLinkQueue.SeizeConfirm, d_p_opt, d_x_opt, d_2_opt)
 	stopIfCancelled(ctx, td)
 
 	/*
@@ -677,15 +684,16 @@ x = Silence FX.25 information.`)
 	 */
 	var mheardDB = mheard.New(d_m_opt)
 	var packetFilter = pfilter.New(igate_config.max_digi_hops, aprsDecoder, mheardDB, d_f_opt)
-	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, dataLinkQueue.RecFrame, d_i_opt)
-	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated)
+	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, dataLinkQueue.RecFrame, transmitQueue.Append, d_i_opt)
+	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated, transmitQueue.Append)
 
-	// The transmit queue predates the IGate, and nothing queues a packet for
-	// the IGate's channel before the services below are started.
+	// The IGate and the transmit queue send to each other, so the queue,
+	// made first, is handed the IGate now.  Nothing queues a packet for the
+	// IGate's channel before the services below are started.
 	transmitQueue.SetIGate(igate.sendRecPacket)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)
-	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter)
+	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter, transmitQueue.Append)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
@@ -694,13 +702,13 @@ x = Silence FX.25 information.`)
 
 	// The connected-mode link layer, after the AGW server whose clients it
 	// tells about the links they asked for.
-	ax25_link_init(misc_config, pttControl.SetConnected, agwServer, d_c_opt)
+	ax25_link_init(misc_config, pttControl.SetConnected, agwServer, transmitQueue, d_c_opt)
 	metrics_init(ctx, audio_config, misc_config)
 	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
 
 	// All three KISS transports hand what their clients send to the same
 	// handler, which copies data frames to the TCP clients with KISSCOPY.
-	var kissHandler = NewKissHandler(audio_config, xmitSvc, kissNetSvc)
+	var kissHandler = NewKissHandler(audio_config, xmitSvc, transmitQueue, kissNetSvc)
 
 	kissNetSvc.Start(ctx, kissHandler)
 
@@ -731,7 +739,8 @@ x = Silence FX.25 information.`)
 	 * client applications too.  Each audio device's receive thread makes the
 	 * touch tone decoders for its own channels, once receiving starts below.
 	 */
-	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, igate.sendRecPacket, dataLinkQueue.RecFrame, layer2Receiver.AudioLevel, aprstt_debug)
+	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, igate.sendRecPacket,
+		dataLinkQueue.RecFrame, transmitQueue.Append, layer2Receiver.AudioLevel, aprstt_debug)
 
 	/*
 	 * Open port for communication with GPS.
@@ -774,7 +783,7 @@ x = Silence FX.25 information.`)
 
 	var aprsLogger = aprslog.New(misc_config.log_daily_names, misc_config.log_path)
 	td.add(aprsLogger.Close)
-	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger, mheardDB, igate, dataLinkQueue.RecFrame)
+	var beaconService = NewBeaconService(audio_config, misc_config, &igate_config, gpsReceiver, aprsLogger, mheardDB, igate, dataLinkQueue.RecFrame, transmitQueue.Append)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
 	stopIfCancelled(ctx, td)

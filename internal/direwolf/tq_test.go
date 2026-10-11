@@ -17,6 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// newTestTransmitQueue returns an empty transmit queue for audioConfig's
+// channels, with no network TNCs or AXUDP channels and nobody to tell of a
+// seize.
+func newTestTransmitQueue(audioConfig *RadioConfig) *TransmitQueue {
+	return NewTransmitQueue(audioConfig, [MAX_TOTAL_CHANS]*NetTNC{}, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
+}
+
 // TestTqPeekUnderConcurrentAppend is a regression test for a data race.
 // TransmitQueue.Peek used to read the queue's head without holding the queue's mutex, on the strength of
 // a comment saying a critical region was not needed.  Every other reader and
@@ -40,7 +47,7 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	transmitQueue.Init(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	// Built up front: ax25_new increments an unsynchronised global sequence
 	// counter, which is a separate matter from the queue and would otherwise
@@ -69,7 +76,7 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 		defer close(appendDone)
 
 		for _, pp := range packets {
-			transmitQueue.LMDataRequest(CHANNEL, PRIO, pp)
+			tq.LMDataRequest(CHANNEL, PRIO, pp)
 		}
 	})
 
@@ -81,7 +88,7 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 			default:
 			}
 
-			var pp = transmitQueue.Peek(CHANNEL, PRIO)
+			var pp = tq.Peek(CHANNEL, PRIO)
 			if pp != nil && !queued[pp] {
 				strayPeek.Store(true)
 
@@ -93,7 +100,7 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 	wg.Wait()
 
 	assert.False(t, strayPeek.Load(), "tq_peek returned a packet that was never queued")
-	require.Equal(t, NUM_PKTS, transmitQueue.Count(CHANNEL, PRIO, "", "", false),
+	require.Equal(t, NUM_PKTS, tq.Count(CHANNEL, PRIO, "", "", false),
 		"every packet should still be queued: peeking must not consume")
 }
 
@@ -133,7 +140,7 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 		audioConfig.chan_medium[c] = MEDIUM_RADIO
 	}
 
-	transmitQueue.Init(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	// Built up front: ax25_new increments an unsynchronised global sequence
 	// counter, which is a separate matter from the queue and would otherwise
@@ -149,7 +156,7 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 
 	for round := range ROUNDS {
 		for c := range CHANNELS {
-			require.Equal(t, 0, transmitQueue.Count(c, -1, "", "", false),
+			require.Equal(t, 0, tq.Count(c, -1, "", "", false),
 				"round %d channel %d should start with an empty queue", round, c)
 		}
 
@@ -169,13 +176,13 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 
 				<-start
 
-				transmitQueue.WaitWhileEmpty(t.Context(), c)
+				tq.WaitWhileEmpty(t.Context(), c)
 			}()
 
 			wg.Go(func() {
 				<-start
 
-				transmitQueue.LMDataRequest(c, PRIO, packets[c][round])
+				tq.LMDataRequest(c, PRIO, packets[c][round])
 			})
 		}
 
@@ -190,7 +197,7 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 					round, c, WAKE_WAIT)
 			}
 
-			require.NotNil(t, transmitQueue.Remove(c, PRIO),
+			require.NotNil(t, tq.Remove(c, PRIO),
 				"round %d channel %d: the queued packet should still be there", round, c)
 		}
 	}
@@ -207,7 +214,7 @@ func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	transmitQueue.Init(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
@@ -216,7 +223,7 @@ func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 	go func() {
 		defer close(returned)
 
-		transmitQueue.WaitWhileEmpty(ctx, CHANNEL)
+		tq.WaitWhileEmpty(ctx, CHANNEL)
 	}()
 
 	cancel()
@@ -227,7 +234,7 @@ func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 		t.Fatal("tq_wait_while_empty did not return when its context was cancelled")
 	}
 
-	assert.Equal(t, 0, transmitQueue.Count(CHANNEL, -1, "", "", false),
+	assert.Equal(t, 0, tq.Count(CHANNEL, -1, "", "", false),
 		"cancellation should not have invented a packet")
 }
 
@@ -239,15 +246,15 @@ func TestTqAppendOutOfRangeChannel(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 
-	transmitQueue.Init(audioConfig)
+	var tq = newTestTransmitQueue(audioConfig)
 
 	for _, channel := range []int{-1, MAX_TOTAL_CHANS} {
 		assert.NotPanics(t, func() {
-			transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
+			tq.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
 		}, "channel %d", channel)
 	}
 
-	assert.Equal(t, 0, transmitQueue.Count(0, -1, "", "", false),
+	assert.Equal(t, 0, tq.Count(0, -1, "", "", false),
 		"an out-of-range request should not have landed on a real channel")
 }
 
@@ -257,8 +264,7 @@ func TestAppendForTheIGateChannelGoesToTheIGate(t *testing.T) {
 	var audio = new(RadioConfig)
 	audio.chan_medium[MAX_RADIO_CHANS] = MEDIUM_IGATE
 
-	var tq = NewTransmitQueue()
-	tq.Init(audio)
+	var tq = newTestTransmitQueue(audio)
 
 	var sent []string
 

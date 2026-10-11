@@ -170,17 +170,10 @@ func setupIGateFromServer(t *testing.T) *IGate {
 	igateConfig.igmsp = 1
 
 	var heardDB = mheard.New(0)
-	var ig = NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, nil, 0)
+	// Nothing reads what it queues: each run has a queue of its own.
+	var tq = newTestTransmitQueue(audioConfig)
 
-	transmitQueue.Init(audioConfig)
-	t.Cleanup(func() {
-		for p := range TQ_NUM_PRIO {
-			for transmitQueue.Remove(0, p) != nil { //revive:disable-line:empty-block
-			}
-		}
-	})
-
-	return ig
+	return NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, nil, tq.Append, 0)
 }
 
 // fuzzAGWServer returns a server with a client attached as client 0, by way of
@@ -236,7 +229,7 @@ const linkFuzzPaclen = 64
 // input cannot leave anything behind for the next, and which tells clients
 // what happens on it.
 func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
-	transmitQueue.Init(cfg)
+	var tq = newTestTransmitQueue(cfg)
 
 	var miscConfig = new(misc_config_s)
 	// Shorter than the default, so a client's data can be long enough to
@@ -252,7 +245,7 @@ func fuzzLinkReset(cfg *RadioConfig, v22 bool, clients linkClients) {
 	}
 
 	*ax25Link = *NewAX25Link()
-	ax25_link_init(miscConfig, nil, clients, 0)
+	ax25_link_init(miscConfig, nil, clients, tq, 0)
 }
 
 // fuzzLinkDrain does what recv_process does with everything on the data link
