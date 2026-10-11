@@ -1006,3 +1006,14 @@ func TestPTTSetConnected(t *testing.T) {
 
 	assert.Equal(t, []string{"CON 0=1", "CON 0=0"}, *set)
 }
+
+// A channel with no transmit inhibit input configured, or no PTT at all, is
+// never inhibited.
+func TestPTTTransmitInhibitedWithoutAnInput(t *testing.T) {
+	var p, _ = newRecordingPTT(t)
+
+	assert.False(t, p.TransmitInhibited(0))
+
+	var none *PTT
+	assert.False(t, none.TransmitInhibited(0))
+}

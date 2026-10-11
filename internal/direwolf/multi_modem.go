@@ -656,9 +656,9 @@ type Layer2Receiver struct {
 	il2pDebug int // IL2P's debug level, for every slicer's IL2P receiver.
 	sink      ReceiveSink
 
-	// getInput reads one of a channel's inputs - here only ever ICTYPE_TXINH,
-	// which inhibits transmitting - or is nil when there are none.
-	getInput func(it int, channel int) int
+	// txInhibited says whether a channel's transmit inhibit input is set, or
+	// is nil when there are no inputs.
+	txInhibited func(channel int) bool
 
 	// Own copy of random number generator so we can get
 	// same predictable results on different operating systems.
@@ -1093,7 +1093,7 @@ func (r *Layer2Receiver) dataDetected(channel int) bool {
 
 // transmitInhibited says whether a channel's transmit inhibit input is set.
 func (r *Layer2Receiver) transmitInhibited(channel int) bool {
-	return r.getInput != nil && r.getInput(ICTYPE_TXINH, channel) == 1
+	return r.txInhibited != nil && r.txInhibited(channel)
 }
 
 func (r *Layer2Receiver) rand() int32 {

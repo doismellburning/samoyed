@@ -524,7 +524,7 @@ x = Silence FX.25 information.`)
 	// the DCD output and read the transmit inhibit input, so hand them the
 	// PTT now, before anything that receives or transmits is started.
 	sink.setDCD = pttControl.SetDCD
-	layer2Receiver.getInput = pttControl.GetInput
+	layer2Receiver.txInhibited = pttControl.TransmitInhibited
 
 	/*
 	 * Start the web interface before anything that can send or receive a

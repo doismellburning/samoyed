@@ -694,6 +694,12 @@ func (p *PTT) GetInput(it int, channel int) int {
 	return -1 /* Method was none, or something went wrong */
 }
 
+// TransmitInhibited says whether a channel's transmit inhibit input is set.
+// With no PTT, or no input configured, it never is.
+func (p *PTT) TransmitInhibited(channel int) bool {
+	return p.GetInput(ICTYPE_TXINH, channel) == 1
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        Term
