@@ -183,6 +183,7 @@ func fuzzAGWServer(tb testing.TB, dataLink agwDataLink) *AGWServer {
 	tb.Helper()
 
 	var s = new(AGWServer)
+	s.transmitQueue = transmitQueue
 	s.dataLink = dataLink
 
 	var ours, theirs = net.Pipe()
