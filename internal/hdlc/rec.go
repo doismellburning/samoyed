@@ -10,7 +10,6 @@ package hdlc
  *******************************************************************************/
 
 import (
-	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/linecode"
@@ -39,22 +38,13 @@ type Config struct {
 	SanityTest phy.Sanity      // What a frame has to look like once bits have been fixed.
 }
 
-// AudioLevelFunc reports the audio level a subchannel's demodulator is
-// hearing, which the receiver delivers each frame with.
-type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
-
-// FrameSink takes each frame the receiver extracts, without its FCS, with the
-// audio level it was heard at, how much fixing it took, and the FEC that
-// carried it, which for plain HDLC is always phy.FECNone.
-type FrameSink func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType)
-
 // Receiver extracts HDLC frames from the bits one slicer of one demodulator
 // ("subchannel") of one channel hears.
 type Receiver struct {
-	config                     Config
-	audioLevel                 AudioLevelFunc // For the audio level to deliver each frame with.
-	sink                       FrameSink      // Where each frame goes.
-	channel, subchannel, slice int
+	config     Config
+	audioLevel dwcore.AudioLevelFunc // For the audio level to deliver each frame with.
+	sink       dwcore.FrameSink      // Where each frame goes.
+	from       dwcore.SlicerID       // The slicer whose bits these are.
 
 	line *linecode.Decoder /* The slicer's line decoder, for the state the retries start from. */
 
@@ -81,17 +71,17 @@ type Receiver struct {
 	rawBits *rrbb.Buffer /* Handle for bit array for raw received bits. */
 }
 
-// NewReceiver makes a Receiver for one slicer, which reads the descrambler
-// state each frame starts from out of line, the slicer's line decoder.  It
-// gives each frame it extracts to sink, with the level audioLevel reports.
-func NewReceiver(config Config, channel int, subchannel int, slice int, scrambled bool, line *linecode.Decoder, audioLevel AudioLevelFunc, sink FrameSink) *Receiver {
+// NewReceiver makes a Receiver for the slicer from, which reads the
+// descrambler state each frame starts from out of line, the slicer's line
+// decoder.  It gives each frame it extracts to sink, with the level audioLevel
+// reports, how much fixing the frame took, and phy.FECNone, since plain HDLC
+// has no FEC.
+func NewReceiver(config Config, from dwcore.SlicerID, scrambled bool, line *linecode.Decoder, audioLevel dwcore.AudioLevelFunc, sink dwcore.FrameSink) *Receiver {
 	var s = new(Receiver)
 	s.config = config
 	s.audioLevel = audioLevel
 	s.sink = sink
-	s.channel = channel
-	s.subchannel = subchannel
-	s.slice = slice
+	s.from = from
 	s.line = line
 	s.olen = -1
 
@@ -99,7 +89,7 @@ func NewReceiver(config Config, channel int, subchannel int, slice int, scramble
 	// Should loop on number of slicers, not max.
 
 	var descramState, prevDescram = s.line.State()
-	s.rawBits = rrbb.New(dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}, scrambled, descramState, prevDescram)
+	s.rawBits = rrbb.New(from, scrambled, descramState, prevDescram)
 
 	return s
 }
@@ -108,10 +98,6 @@ func NewReceiver(config Config, channel int, subchannel int, slice int, scramble
 // slicer's line decoder made of it.
 func (s *Receiver) RecBit(raw bool, dbit bool, is_scrambled bool,
 	pll_nudge_total *int64, pll_symbol_count *int) {
-	var channel = s.channel
-	var subchannel = s.subchannel
-	var slice = s.slice
-
 	/*
 	 * Octets are sent LSB first.
 	 * Shift the most recent 8 bits thru the pattern detector.
@@ -220,7 +206,7 @@ func (s *Receiver) RecBit(raw bool, dbit bool, is_scrambled bool,
 
 			s.rawBits.SetSpeedError(speed_error)
 
-			var alevel = s.audioLevel(channel, subchannel)
+			var alevel = s.audioLevel(s.from.Channel, s.from.Subchannel)
 
 			s.rawBits.SetAudioLevel(alevel)
 			hdlc_rec2_block(s.rawBits, &s.config, s.sink)
@@ -228,7 +214,7 @@ func (s *Receiver) RecBit(raw bool, dbit bool, is_scrambled bool,
 			s.rawBits = nil
 
 			var descramState, prevDescram = s.line.State()
-			s.rawBits = rrbb.New(dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}, is_scrambled, descramState, prevDescram) /* Allocate a new one. */
+			s.rawBits = rrbb.New(s.from, is_scrambled, descramState, prevDescram) /* Allocate a new one. */
 		} else {
 			//JWL - start of frame
 			*pll_nudge_total = 0

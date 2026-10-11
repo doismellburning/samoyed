@@ -74,6 +74,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
 	"github.com/doismellburning/samoyed/internal/linecode"
@@ -206,11 +207,8 @@ type hdlc_state2_s struct {
  *
  ***********************************************************************************/
 
-func hdlc_rec2_block(block *rrbb.Buffer, config *Config, sink FrameSink) {
+func hdlc_rec2_block(block *rrbb.Buffer, config *Config, sink dwcore.FrameSink) {
 	var from = block.SlicerID()
-	var channel = from.Channel
-	var subchan = from.Subchannel
-	var slice = from.Slice
 	var alevel = block.AudioLevel()
 	var fix_bits = config.FixBits
 	var passall = config.Passall
@@ -231,7 +229,7 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *Config, sink FrameSink) {
 	retry_cfg.contig.nr_bits = 0
 	retry_cfg.contig.bit_idx = 0
 
-	var ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == phy.BitFixNone))
+	var ok = try_decode(block, config, sink, from, alevel, retry_cfg, passall && (fix_bits == phy.BitFixNone))
 	if ok {
 		logrus.Trace("Got it the first time.")
 
@@ -242,7 +240,7 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *Config, sink FrameSink) {
 	 * Not successful with frame in original form.
 	 * See if we can "fix" it.
 	 */
-	if try_to_fix_quick_now(block, config, sink, channel, subchan, slice, alevel) {
+	if try_to_fix_quick_now(block, config, sink, from, alevel) {
 		return
 	}
 
@@ -250,7 +248,7 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *Config, sink FrameSink) {
 		/* Exhausted all desired fix up attempts. */
 		/* Let thru even with bad CRC.  Of course, it still */
 		/* needs to be a minimum number of whole octets. */
-		try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, true)
+		try_decode(block, config, sink, from, alevel, retry_cfg, true)
 	}
 } /* end hdlc_rec2_block */
 
@@ -261,8 +259,7 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *Config, sink FrameSink) {
  * Purpose:	Attempt some quick fixups that don't take very long.
  *
  * Inputs:	block	- Stream of bits that might be a frame.
- *		channel	- Radio channel from which it was received.
- *		subchan	- Which demodulator when more than one per channel.
+ *		from	- The slicer that heard it.
  *		alevel	- Audio level for later reporting.
  *		config	- Configuration for that channel.  Uses FixBits,
  *			  the maximum level of fix up to attempt:
@@ -287,7 +284,7 @@ func hdlc_rec2_block(block *rrbb.Buffer, config *Config, sink FrameSink) {
  *
  ***********************************************************************************/
 
-func try_to_fix_quick_now(block *rrbb.Buffer, config *Config, sink FrameSink, channel int, subchan int, slice int, alevel ax25.ALevel) bool {
+func try_to_fix_quick_now(block *rrbb.Buffer, config *Config, sink dwcore.FrameSink, from dwcore.SlicerID, alevel ax25.ALevel) bool {
 	var fix_bits = config.FixBits
 
 	var length = block.Len()
@@ -313,7 +310,7 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *Config, sink FrameSink, ch
 		/* Set the index of the bit to swap */
 		retry_cfg.contig.bit_idx = i
 
-		var ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, false)
+		var ok = try_decode(block, config, sink, from, alevel, retry_cfg, false)
 		if ok {
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
@@ -337,7 +334,7 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *Config, sink FrameSink, ch
 	for i := range length - 1 {
 		retry_cfg.contig.bit_idx = i
 
-		var ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, false)
+		var ok = try_decode(block, config, sink, from, alevel, retry_cfg, false)
 		if ok {
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
@@ -361,7 +358,7 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *Config, sink FrameSink, ch
 	for i := range length - 2 {
 		retry_cfg.contig.bit_idx = i
 
-		var ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, false)
+		var ok = try_decode(block, config, sink, from, alevel, retry_cfg, false)
 		if ok {
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
@@ -397,7 +394,7 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *Config, sink FrameSink, ch
 		for j := i + 2; j < length; j++ {
 			retry_cfg.sep.bit_idx_b = j
 
-			ok = try_decode(block, config, sink, channel, subchan, slice, alevel, retry_cfg, false)
+			ok = try_decode(block, config, sink, from, alevel, retry_cfg, false)
 			if ok {
 				break
 			}
@@ -459,7 +456,7 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  *		config		- Configuration for that channel.  Uses
  *				  AIS and SanityTest.
  *
- *		channel, subchan	- where it came from.
+ *		from		- The slicer that heard it.
  *
  *		alevel		- audio level for later reporting.
  *
@@ -494,7 +491,7 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  *
  ***********************************************************************************/
 
-func try_decode(block *rrbb.Buffer, config *Config, sink FrameSink, channel int, subchan int, slice int, alevel ax25.ALevel, retry_conf *retry_conf_t, passall bool) bool {
+func try_decode(block *rrbb.Buffer, config *Config, sink dwcore.FrameSink, from dwcore.SlicerID, alevel ax25.ALevel, retry_conf *retry_conf_t, passall bool) bool {
 	var retry_conf_mode = retry_conf.mode
 	var retry_conf_type = retry_conf._type
 	var retry_conf_retry = retry_conf.retry
@@ -651,15 +648,7 @@ func try_decode(block *rrbb.Buffer, config *Config, sink FrameSink, channel int,
 		if actual_fcs == expected_fcs && config.AIS {
 			// Sanity check for AIS.
 			if ais.CheckLength(int(H2.frame_buf[0]>>2)&0x3f, H2.frame_len-2) == 0 {
-				sink(
-					channel,
-					subchan,
-					slice,
-					H2.frame_buf[:H2.frame_len-2],
-					alevel,
-					retry_conf.retry,
-					phy.FECNone,
-				) /* len-2 to remove FCS. */
+				sink(from, H2.frame_buf[:H2.frame_len-2], dwcore.RxInfo{ALevel: alevel, Retries: retry_conf.retry, FEC: phy.FECNone}) /* len-2 to remove FCS. */
 
 				return true
 			} else {
@@ -667,19 +656,18 @@ func try_decode(block *rrbb.Buffer, config *Config, sink FrameSink, channel int,
 			}
 		} else if actual_fcs == expected_fcs &&
 			sanity_check(H2.frame_buf[:H2.frame_len-2], retry_conf.retry, config.SanityTest) {
-			// TODO: Shouldn't be necessary to pass chan, subchan, alevel into
+			// TODO: Shouldn't be necessary to pass from, alevel into
 			// try_decode because we can obtain them from block.
 			// Let's make sure that assumption is good...
-			dwutil.Assert(block.SlicerID().Channel == channel)
-			dwutil.Assert(block.SlicerID().Subchannel == subchan)
-			sink(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, retry_conf.retry, phy.FECNone) /* len-2 to remove FCS. */
+			dwutil.Assert(block.SlicerID() == from)
+			sink(from, H2.frame_buf[:H2.frame_len-2], dwcore.RxInfo{ALevel: alevel, Retries: retry_conf.retry, FEC: phy.FECNone}) /* len-2 to remove FCS. */
 
 			return true /* success */
 		} else if passall {
 			if retry_conf_retry == phy.BitFixNone && retry_conf_type == RETRY_TYPE_NONE {
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("ATTEMPTING PASSALL PROCESSING\n");
-				sink(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, phy.BitFixPassall, phy.FECNone) /* len-2 to remove FCS. */
+				sink(from, H2.frame_buf[:H2.frame_len-2], dwcore.RxInfo{ALevel: alevel, Retries: phy.BitFixPassall, FEC: phy.FECNone}) /* len-2 to remove FCS. */
 
 				return true /* success */
 			} else {

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -58,27 +59,29 @@ func fuzzReceive(tb testing.TB, stream []byte, settings byte) int {
 
 	var line linecode.Decoder
 
-	var rx = NewReceiver(config, 1, 2, 3, scrambled, &line,
+	var from = dwcore.SlicerID{Channel: 1, Subchannel: 2, Slice: 3}
+
+	var rx = NewReceiver(config, from, scrambled, &line,
 		func(int, int) ax25.ALevel { return alevel },
-		func(channel int, subchannel int, slice int, frame []byte, gotAlevel ax25.ALevel, retries phy.BitFixLevel, fecType phy.FECType) {
+		func(gotFrom dwcore.SlicerID, frame []byte, rxInfo dwcore.RxInfo) {
 			delivered++
 
-			assert.Equal(tb, []int{1, 2, 3}, []int{channel, subchannel, slice}, "a frame should say where it was heard")
-			assert.Equal(tb, alevel, gotAlevel)
-			assert.Equal(tb, phy.FECNone, fecType, "plain HDLC has no FEC")
+			assert.Equal(tb, from, gotFrom, "a frame should say where it was heard")
+			assert.Equal(tb, alevel, rxInfo.ALevel)
+			assert.Equal(tb, phy.FECNone, rxInfo.FEC, "plain HDLC has no FEC")
 
 			assert.GreaterOrEqual(tb, len(frame), MinFrameLen-2, "a frame shorter than the shortest AX.25 frame should not be delivered")
 			assert.LessOrEqual(tb, len(frame), MaxFrameLen-2, "a frame longer than the longest AX.25 frame should not be delivered")
 
-			if retries == phy.BitFixPassall {
+			if rxInfo.Retries == phy.BitFixPassall {
 				assert.True(tb, config.Passall, "only passall lets a frame through with a bad FCS")
 			} else {
-				assert.LessOrEqual(tb, retries, config.FixBits, "no more bits should be fixed than asked for")
+				assert.LessOrEqual(tb, rxInfo.Retries, config.FixBits, "no more bits should be fixed than asked for")
 			}
 
 			// What the receive path does next with a frame, short of
 			// queueing it.
-			ax25.FromFrame(frame, gotAlevel)
+			ax25.FromFrame(frame, rxInfo.ALevel)
 		})
 
 	var pllNudgeTotal int64
