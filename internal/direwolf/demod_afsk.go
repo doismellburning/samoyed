@@ -24,6 +24,7 @@ import (
 	"os"
 
 	"github.com/doismellburning/samoyed/internal/dsp"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -765,7 +766,8 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 		*/
 
 		// #if 1
-		D.receiver.RecBit(channel, subchannel, slice, dwutil.IfThenElse(demod_out > 0, 1, 0), false, quality)
+		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
+		D.receiver.RecBit(from, dwutil.IfThenElse(demod_out > 0, 1, 0), false, quality)
 		/*
 			#else  // TODO: new feature to measure data speed error.
 			// Maybe hdlc_rec_bit could provide indication when frame starts.

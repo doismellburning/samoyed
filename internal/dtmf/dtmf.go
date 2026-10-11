@@ -22,6 +22,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
@@ -51,7 +52,7 @@ type Decoder struct {
 
 	// onDCD is told when a button starts or stops being heard, for the
 	// channel's DCD indicator, or is nil when there is nobody to tell.
-	onDCD func(channel int, subchannel int, slice int, state int)
+	onDCD func(from dwcore.SlicerID, state int)
 
 	sampleRate int /* Samples per sec.  Typ. 44100, 8000, etc. */
 	blockSize  int /* Number of samples to process in one block. */
@@ -87,7 +88,7 @@ type Decoder struct {
  *
  *----------------------------------------------------------------*/
 
-func NewDecoder(channel int, sampleRate int, onDCD func(channel int, subchannel int, slice int, state int)) *Decoder {
+func NewDecoder(channel int, sampleRate int, onDCD func(from dwcore.SlicerID, state int)) *Decoder {
 	logrus.WithField("channel", channel).Debug("dtmf.NewDecoder")
 
 	var d = new(Decoder)
@@ -233,7 +234,7 @@ func (d *Decoder) Sample(input float64) rune {
 		}
 
 		if d.onDCD != nil {
-			d.onDCD(d.channel, phy.MaxSubchans, 0, _tmpIntBool)
+			d.onDCD(dwcore.SlicerID{Channel: d.channel, Subchannel: phy.MaxSubchans, Slice: 0}, _tmpIntBool)
 		}
 
 		/* Reset timeout timer. */

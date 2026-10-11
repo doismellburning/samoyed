@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/sirupsen/logrus"
@@ -335,18 +336,13 @@ func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int, recFrame 
 	// Convert to packet object and send to received packet queue.
 	// Note that we use channel associated with the network TNC, not channel in KISS frame.
 
-	var subchan = -3
-	var slice = 0
 	var alevel ax25.ALevel
 	var pp = ax25.FromFrame(unwrapped[1:], alevel)
 
 	if pp != nil {
-		var fec_type = fec_type_none
-		var retries BitFixLevel
-
 		var spectrum = "Network TNC"
 		if recFrame != nil {
-			recFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+			recFrame(dwcore.ChannelSource(dwcore.SourceNetTNC, channel), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, spectrum)
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)

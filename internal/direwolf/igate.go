@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/doismellburning/samoyed/internal/pfilter"
@@ -1245,14 +1246,9 @@ func (ig *IGate) processServerLine(message []byte) {
 				alevel.Mark = -2 // FIXME: Do we want some other special case?
 				alevel.Space = -2
 
-				var subchan = -2 // FIXME: -1 is special case for APRStt.
-				// See what happens with -2 and follow up on this.
-				// Do we need something else here?
-				var slice = 0
-				var fec_type = fec_type_none
 				var spectrum = "APRS-IS"
 				if ig.recFrame != nil {
-					ig.recFrame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
+					ig.recFrame(dwcore.ChannelSource(dwcore.SourceAPRSIS, ichan), pp3, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, spectrum)
 				}
 			} else {
 				text_color_set(DW_COLOR_ERROR)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,8 +22,8 @@ func TestDecoderSetsDCD(t *testing.T) {
 
 	var dcd []string
 
-	var decoder = NewDecoder(channel, sampleRate, func(c int, subchannel int, slice int, state int) {
-		var entry = fmt.Sprintf("%d/%d/%d=%d", c, subchannel, slice, state)
+	var decoder = NewDecoder(channel, sampleRate, func(from dwcore.SlicerID, state int) {
+		var entry = fmt.Sprintf("%d/%d/%d=%d", from.Channel, from.Subchannel, from.Slice, state)
 		if len(dcd) == 0 || dcd[len(dcd)-1] != entry {
 			dcd = append(dcd, entry)
 		}

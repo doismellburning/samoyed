@@ -17,6 +17,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/deviceid"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -873,19 +874,17 @@ type recPacketHandler struct {
  * Purpose:     This is called when we receive a frame with a valid
  *		FCS and acceptable size.
  *
- * Inputs:	chan	- Audio channel number, 0 or 1.
- *		subchan	- Which modem caught it.
- *			  Special cases:
- *				-1 for DTMF decoder.
- *				-2 for channel mapped to APRS-IS.
- *				-3 for channel mapped to network TNC.
- *		slice	- Slicer which caught it.
+ * Inputs:	src	- Where it came from: the channel, and either the
+ *			  modem (subchannel) and slicer which caught it, or
+ *			  the DTMF decoder, APRS-IS, a network TNC or AXUDP.
  *		pp	- Packet handle.
- *		alevel	- Audio level, range of 0 - 100.
+ *		rxInfo	- How it was heard:
+ *			  ALevel - audio level, range of 0 - 100.
  *				(Special case, use negative to skip
  *				 display of audio level line.
  *				 Use -2 to indicate DTMF message.)
- *		retries	- Level of bit correction used.
+ *			  FEC - none, FX.25 or IL2P.
+ *			  Retries - level of bit correction used.
  *		spectrum - Display of how well multiple decoders did.
  *
  *
@@ -908,18 +907,17 @@ func ais_object_course_speed(A *aprs.Decoded) (maybe.Maybe[int], maybe.Maybe[int
 
 func (rh *recPacketHandler) app_process_rec_packet(
 	ctx context.Context,
-	channel int,
-	subchan int,
-	slice int,
+	src dwcore.Source,
 	pp *ax25.Packet,
-	alevel ax25.ALevel,
-	fec_type fec_type_t,
-	retries BitFixLevel,
+	rxInfo dwcore.RxInfo,
 	spectrum string,
 ) {
+	var channel = src.Slicer.Channel
+	var alevel, fec_type, retries = rxInfo.ALevel, rxInfo.FEC, rxInfo.Retries
+
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
-	dwutil.Assert(subchan >= -4 && subchan < MAX_SUBCHANS)
-	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
+	dwutil.Assert(src.Slicer.Subchannel >= 0 && src.Slicer.Subchannel < MAX_SUBCHANS)
+	dwutil.Assert(src.Slicer.Slice >= 0 && src.Slicer.Slice < MAX_SLICERS)
 	dwutil.Assert(pp != nil) // 1.1J+
 
 	// Extra stuff before slice indicators.
@@ -996,7 +994,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 				logEntry = logEntry.WithField("probably_really", probably_really)
 
 				// audio level applies only for internal modem channels.
-				if subchan >= 0 {
+				if src.Kind == dwcore.SourceRadio {
 					logEntry = logEntry.WithFields(logrus.Fields{
 						"audio_level": alevel_text,
 						"retries":     display_retries,
@@ -1007,7 +1005,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 				logEntry = logEntry.WithField("audio_level", alevel_text)
 			} else {
 				// audio level applies only for internal modem channels.
-				if subchan >= 0 {
+				if src.Kind == dwcore.SourceRadio {
 					logEntry = logEntry.WithFields(logrus.Fields{
 						"audio_level": alevel_text,
 						"retries":     display_retries,
@@ -1030,7 +1028,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 			Warn("Audio input level is too high. This may cause distortion and reduced decode performance. " +
 				"Solution is to decrease the audio input level. " +
 				"Setting audio input level so most stations are around 50 will provide good dynamic range.")
-	} else if alevel.Rec < 5 && channel != rh.audioConfig.igate_vchannel && subchan != -3 && subchan != -4 {
+	} else if alevel.Rec < 5 && channel != rh.audioConfig.igate_vchannel && src.Kind != dwcore.SourceNetTNC && src.Kind != dwcore.SourceAXUDP {
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		logrus.WithField("alevel", alevel.Rec).Warn("Audio input level is too low.  Increase so most stations are around 50.")
 	}
@@ -1048,26 +1046,26 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		logEntry = logEntry.WithField("ts", formattedTime)
 	}
 
-	switch subchan {
-	case -1: // dtmf
+	switch src.Kind {
+	case dwcore.SourceDTMF:
 		logEntry = logEntry.WithField("subchan", "dtmf")
-	case -2: // APRS-IS
+	case dwcore.SourceAPRSIS:
 		logEntry = logEntry.WithField("subchan", "is")
-	case -3: // nettnc
+	case dwcore.SourceNetTNC:
 		logEntry = logEntry.WithField("subchan", "nettnc")
-	case -4: // AXUDP
+	case dwcore.SourceAXUDP:
 		logEntry = logEntry.WithField("subchan", "axudp")
-	default:
+	case dwcore.SourceRadio:
 		var numSubchan, numSlicers = 1, 1
 		if rh.layout != nil {
 			numSubchan, numSlicers = rh.layout(channel)
 		}
 
 		if numSubchan > 1 {
-			logEntry = logEntry.WithField("subchan", subchan)
+			logEntry = logEntry.WithField("subchan", src.Slicer.Subchannel)
 		}
 		if numSlicers > 1 {
-			logEntry = logEntry.WithField("slice", slice)
+			logEntry = logEntry.WithField("slice", src.Slicer.Slice)
 		}
 
 		if pp.IsAPRS() {
@@ -1234,7 +1232,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 
 	/* Send to another application if connected. */
 	rh.apps.SendRecPacket(channel, pp)
-	webPublishReceived(rh.webHub, channel, subchan, pp, decoded, alevel)
+	webPublishReceived(rh.webHub, src, pp, decoded, alevel)
 
 	if rh.aisToObject && len(ais_obj_packet) != 0 {
 		var ao_pp = ax25.FromText(ais_obj_packet, true)
@@ -1254,14 +1252,14 @@ func (rh *recPacketHandler) app_process_rec_packet(
 	}
 
 	/*
-	 * If it came from DTMF decoder (subchan == -1), send it to APRStt gateway.
+	 * If it came from DTMF decoder, send it to APRStt gateway.
 	 * Otherwise, it is a candidate for IGate and digipeater.
 	 *
 	 * It is also useful to have some way to simulate touch tone
 	 * sequences with BEACON sendto=R0 for testing.
 	 */
 
-	if subchan == -1 { // from DTMF decoder
+	if src.Kind == dwcore.SourceDTMF {
 		if rh.ttConfig.gateway_enabled > 0 && len(pinfo) >= 2 {
 			rh.ttGateway.Sequence(ctx, channel, string(pinfo[1:]))
 		}

@@ -87,6 +87,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dtmf"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/sirupsen/logrus"
 )
 
@@ -125,7 +126,7 @@ type sampleReceiver interface {
 	// channel can't be fed at all.
 	ProcessSample(channel int, sample int) bool
 
-	DCDChange(channel int, subchannel int, slice int, state int)
+	DCDChange(from dwcore.SlicerID, state int)
 }
 
 func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource, receiver sampleReceiver, onButton func(channel int, button rune)) <-chan int {
@@ -281,7 +282,7 @@ func recv_process(ctx context.Context, q dataLinkSource, rh *recPacketHandler) {
 					 *	- Send to Igate.
 					 *	- Digipeater.
 					 */
-					rh.app_process_rec_packet(ctx, pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
+					rh.app_process_rec_packet(ctx, pitem.src, pitem.pp, pitem.rxInfo, pitem.spectrum)
 
 					/*
 					 * Link processing.

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
@@ -87,22 +88,14 @@ type dlq_item_t struct {
 
 	// Used for received frame.
 
-	subchan int /* Winning "subchannel" when using multiple */
-	/* decoders on one channel.  */
-	/* Special case, -1 means DTMF decoder. */
-	/* Maybe we should have a different type in this case? */
-
-	slice int /* Winning slicer. */
+	src dwcore.Source // Where it came from: for a radio, the winning slicer.
 
 	pp *ax25.Packet /* Pointer to frame structure. */
 
-	alevel ax25.ALevel /* Audio level. */
-
-	fec_type fec_type_t // Type of FEC for received signal: none, FX.25, or IL2P.
-
-	retries BitFixLevel /* Effort expended to get a valid CRC. */
-	/* Bits changed for regular AX.25. */
-	/* Number of bytes fixed for FX.25. */
+	// rxInfo is how it was heard: the audio level, the FEC that carried
+	// it, and the effort expended to get a valid CRC - bits changed for
+	// regular AX.25, bytes fixed for FX.25.
+	rxInfo dwcore.RxInfo
 
 	spectrum string /* "Spectrum" display for multi-decoders. */
 
@@ -162,7 +155,7 @@ func NewDataLinkQueue() *DataLinkQueue {
 
 // frameReceiver is where a received frame goes on its way to recv_process:
 // DataLinkQueue.RecFrame, or a stand-in for it.
-type frameReceiver func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
+type frameReceiver func(src dwcore.Source, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string)
 
 /*-------------------------------------------------------------------
  *
@@ -174,27 +167,23 @@ type frameReceiver func(channel int, subchannel int, slice int, pp *ax25.Packet,
  *
  *		This would correspond to PH-DATA Indication in the AX.25 protocol spec.
  *
- * Inputs:	chan	- Channel, 0 is first.
- *
- *		subchan	- Which modem caught it.
- *			  Special case -1 for APRStt gateway.
- *
- *		slice	- Which slice we picked.
+ * Inputs:	src	- Where it came from: the channel, 0 is first, and
+ *			  what on it - a radio's winning slicer, or the
+ *			  APRStt gateway, APRS-IS, a network TNC or AXUDP.
  *
  *		pp	- Address of packet object.
  *				Caller should NOT make any references to
  *				it after this point because it could
  *				be deleted at any time.
  *
- *		alevel	- Audio level, range of 0 - 100.
+ *		rxInfo	- How it was heard:
+ *			  ALevel - audio level, range of 0 - 100.
  *				(Special case, use negative to skip
  *				 display of audio level line.
  *				 Use -2 to indicate DTMF message.)
- *
- *		fec_type - Was it from FX.25 or IL2P?  Need to know because
- *			  meaning of retries is different.
- *
- *		retries	- Level of correction used.
+ *			  FEC - was it from FX.25 or IL2P?  Need to know
+ *				because meaning of Retries is different.
+ *			  Retries - level of correction used.
  *
  *		spectrum - Display of how well multiple decoders did.
  *
@@ -204,7 +193,9 @@ type frameReceiver func(channel int, subchannel int, slice int, pp *ax25.Packet,
  *
  *--------------------------------------------------------------------*/
 
-func (q *DataLinkQueue) RecFrame(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func (q *DataLinkQueue) RecFrame(src dwcore.Source, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string) {
+	var channel = src.Slicer.Channel
+
 	logrus.WithField("channel", channel).Debug("dlq_rec_frame")
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL to include virtual channels.
 
@@ -220,7 +211,7 @@ func (q *DataLinkQueue) RecFrame(channel int, subchannel int, slice int, pp *ax2
 
 		if (ax25memdebug_get()) {
 		  text_color_set(DW_COLOR_DEBUG);
-		  dw_printf ("dlq_rec_frame (chan=%d.%d, seq=%d, ...)\n", channel, subchannel, ax25memdebug_seq(pp));
+		  dw_printf ("dlq_rec_frame (chan=%d.%d, seq=%d, ...)\n", channel, src.Slicer.Subchannel, ax25memdebug_seq(pp));
 		}
 	#endif
 	*/
@@ -232,12 +223,9 @@ func (q *DataLinkQueue) RecFrame(channel int, subchannel int, slice int, pp *ax2
 	pnew.nextp = nil
 	pnew._type = DLQ_REC_FRAME
 	pnew._chan = channel
-	pnew.slice = slice
-	pnew.subchan = subchannel
+	pnew.src = src
 	pnew.pp = pp
-	pnew.alevel = alevel
-	pnew.fec_type = fec_type
-	pnew.retries = retries
+	pnew.rxInfo = rxInfo
 	pnew.spectrum = spectrum
 
 	/* Put it into queue. */

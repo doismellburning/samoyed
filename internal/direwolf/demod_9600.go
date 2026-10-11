@@ -15,6 +15,7 @@ import (
 	"math"
 
 	"github.com/doismellburning/samoyed/internal/dsp"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 )
@@ -579,7 +580,8 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 
 	if D.slicer[slice].prev_d_c_pll > 1000000000 && D.slicer[slice].data_clock_pll < -1000000000 {
 		/* Overflow.  Was large positive, wrapped around, now large negative. */
-		D.receiver.RecBitNew(channel, subchannel, slice, dwutil.IfThenElse(demod_out_f > 0, 1, 0), D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
+		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
+		D.receiver.RecBitNew(from, dwutil.IfThenElse(demod_out_f > 0, 1, 0), D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
 			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		D.slicer[slice].pll_symbol_count++
 

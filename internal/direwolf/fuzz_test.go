@@ -15,6 +15,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
@@ -524,7 +525,7 @@ func FuzzAX25Link(f *testing.F) {
 
 				var pp = ax25.FromFrame(append(linkFuzzAddrs(op>>3), chunk...), alevel)
 				if pp != nil {
-					dlq.RecFrame(0, 0, 0, pp, alevel, fec_type_none, RETRY_NONE, "")
+					dlq.RecFrame(dwcore.RadioSource(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, "")
 				}
 
 			case linkOpSeizeConfirm:

@@ -17,6 +17,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -982,7 +983,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			/* Simulated reception from radio. */
 			var alevel ax25.ALevel
 			if bs.recFrame != nil {
-				bs.recFrame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
+				bs.recFrame(dwcore.RadioSource(dwcore.SlicerID{Channel: bp.sendto_chan, Subchannel: 0, Slice: 0}), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, "")
 			}
 		default:
 			transmitQueue.Append(bp.sendto_chan, TQ_PRIO_1_LO, pp)

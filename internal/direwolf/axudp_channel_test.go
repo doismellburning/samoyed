@@ -14,6 +14,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/axudp"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -133,7 +134,7 @@ func TestAXUDPChannelReceivedFrameReachesTheQueue(t *testing.T) {
 			}, 10*time.Second, 10*time.Millisecond, "the frame never reached the received queue")
 
 			assert.Equal(t, axudpTestChannel, item._chan)
-			assert.Equal(t, -4, item.subchan)
+			assert.Equal(t, dwcore.ChannelSource(dwcore.SourceAXUDP, axudpTestChannel), item.src)
 			assert.Equal(t, "AXUDP", item.spectrum)
 			require.NotNil(t, item.pp)
 			assert.Equal(t, pp.FrameData(), item.pp.FrameData())
