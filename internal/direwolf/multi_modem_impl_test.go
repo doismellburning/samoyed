@@ -270,7 +270,7 @@ func TestMultiModemImplProcessSamplePicksAfterAge(t *testing.T) {
 
 	var pp = multiModemImplPacket(t, "waiting")
 	var alevel ax25.ALevel
-	receiver.recPacket(0, 1, 0, pp, alevel, RETRY_NONE, fec_type_none)
+	receiver.recPacket(dwcore.SlicerID{Channel: 0, Subchannel: 1, Slice: 0}, pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
 
 	for range m.processAge {
 		receiver.ProcessSample(0, 0)
@@ -339,7 +339,7 @@ func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.
 	}
 
 	var alevel ax25.ALevel
-	receiver.recFrame(0, 1, 2, fbuf, alevel, RETRY_INVERT_SINGLE, fec_type_none)
+	receiver.recFrame(dwcore.SlicerID{Channel: 0, Subchannel: 1, Slice: 2}, fbuf, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_INVERT_SINGLE, FEC: fec_type_none})
 
 	require.NotNil(t, got)
 

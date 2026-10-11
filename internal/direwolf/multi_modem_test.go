@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/phy"
@@ -56,7 +57,7 @@ func TestMultiModemInitStartsAfresh(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:left over", true)
 	require.NotNil(t, pp)
 	var alevel ax25.ALevel
-	firstReceiver.recPacket(0, 0, 0, pp, alevel, RETRY_NONE, fec_type_none)
+	firstReceiver.recPacket(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
 
 	var second = new(recordingReceiveSink)
 	var secondReceiver = multi_modem_init(audioConfig, 0, 0, second)

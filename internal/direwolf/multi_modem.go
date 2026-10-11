@@ -616,17 +616,34 @@ func newHDLCConfig(achan *achan_param_s) hdlc.Config {
 	}
 }
 
-func newSlicerReceivers(r *Layer2Receiver, channel int, subchannel int, slice int, scrambled bool) *slicerReceivers {
-	var s = new(slicerReceivers)
-	s.hdlc = hdlc.NewReceiver(newHDLCConfig(&r.audio.achan[channel]), channel, subchannel, slice, scrambled, &s.line, r.AudioLevel, r.recFrame)
-	s.fx25 = fx25.NewReceiver(channel, subchannel, slice, r.fx25Debug, r.AudioLevel, r.recFrame)
-	s.il2p = il2p.NewReceiver(channel, subchannel, slice, r.audio.achan[channel].il2p_version, r.audio.achan[channel].il2p_crc, r.il2pDebug, r.AudioLevel, r.recPacket)
+func newSlicerReceivers(r *Layer2Receiver, from dwcore.SlicerID, scrambled bool) *slicerReceivers {
+	var achan = &r.audio.achan[from.Channel]
 
-	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.eas = eas.NewReceiver(channel, subchannel, slice, r.AudioLevel, r.recFrame)
+	var s = new(slicerReceivers)
+	s.hdlc = hdlc.NewReceiver(newHDLCConfig(achan), from.Channel, from.Subchannel, from.Slice, scrambled, &s.line, r.AudioLevel, positionalFrameSink(r.recFrame))
+	s.fx25 = fx25.NewReceiver(from.Channel, from.Subchannel, from.Slice, r.fx25Debug, r.AudioLevel, positionalFrameSink(r.recFrame))
+	s.il2p = il2p.NewReceiver(from.Channel, from.Subchannel, from.Slice, achan.il2p_version, achan.il2p_crc, r.il2pDebug, r.AudioLevel, positionalPacketSink(r.recPacket))
+
+	if achan.modem_type == MODEM_EAS {
+		s.eas = eas.NewReceiver(from.Channel, from.Subchannel, from.Slice, r.AudioLevel, positionalFrameSink(r.recFrame))
 	}
 
 	return s
+}
+
+// positionalFrameSink hands a frame sink's arguments on to sink as a
+// SlicerID and an RxInfo, for the receivers yet to take a dwcore.FrameSink.
+func positionalFrameSink(sink dwcore.FrameSink) func(int, int, int, []byte, ax25.ALevel, BitFixLevel, fec_type_t) {
+	return func(channel int, subchannel int, slice int, frame []byte, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t) {
+		sink(dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}, frame, dwcore.RxInfo{ALevel: alevel, Retries: retries, FEC: fecType})
+	}
+}
+
+// positionalPacketSink is positionalFrameSink for a packet sink.
+func positionalPacketSink(sink dwcore.PacketSink) func(int, int, int, *ax25.Packet, ax25.ALevel, BitFixLevel, fec_type_t) {
+	return func(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fecType fec_type_t) {
+		sink(dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}, pp, dwcore.RxInfo{ALevel: alevel, Retries: retries, FEC: fecType})
+	}
 }
 
 // Layer2Receiver takes the bits each radio channel's demodulators hear, and
@@ -707,7 +724,8 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 
 			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {
-					r.slicer[ch][sub][slice] = newSlicerReceivers(r, ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
+					var from = dwcore.SlicerID{Channel: ch, Subchannel: sub, Slice: slice}
+					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
 				}
 			}
 		}
@@ -776,26 +794,26 @@ func (r *Layer2Receiver) ProcessSample(channel int, sample int) bool {
  * Purpose:     This is called when we receive a frame with a valid
  *		FCS and acceptable size.
  *
- * Inputs:	channel	- Audio channel number, 0 or 1.
- *		subchan	- Which modem found it.
- *		slice	- Which slice found it.
- *		fbuf	- Pointer to first byte in HDLC frame.
- *		flen	- Number of bytes excluding the FCS.
- *		alevel	- Audio level, range of 0 - 100.
+ * Inputs:	from	- Which channel, modem (subchannel) and slicer found it.
+ *		fbuf	- The frame, excluding the FCS.
+ *		rxInfo	- How it was heard:
+ *			  ALevel - audio level, range of 0 - 100.
  *				(Special case, use negative to skip
  *				 display of audio level line.
  *				 Use -2 to indicate DTMF message.)
- *		retries	- Level of correction used.
- *		fec_type	- none(0), fx25, il2p
+ *			  Retries - level of correction used.
+ *			  FEC - none(0), fx25, il2p
  *
  * Description:	Add to list of candidates.  Best one will be picked later.
  *
  *--------------------------------------------------------------------*/
 
-func (r *Layer2Receiver) recFrame(channel int, subchan int, slice int, fbuf []byte, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
+func (r *Layer2Receiver) recFrame(from dwcore.SlicerID, fbuf []byte, rxInfo dwcore.RxInfo) {
+	var channel = from.Channel
+
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
-	dwutil.Assert(slice >= 0 && slice < MAX_SLICERS)
+	dwutil.Assert(from.Subchannel >= 0 && from.Subchannel < MAX_SUBCHANS)
+	dwutil.Assert(from.Slice >= 0 && from.Slice < MAX_SLICERS)
 
 	var pa = r.audio
 
@@ -830,28 +848,24 @@ func (r *Layer2Receiver) recFrame(channel int, subchan int, slice int, fbuf []by
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	default:
-		pp = ax25.FromFrame(fbuf, alevel)
+		pp = ax25.FromFrame(fbuf, rxInfo.ALevel)
 	}
 
-	r.recPacket(channel, subchan, slice, pp, alevel, retries, fec_type)
+	r.recPacket(from, pp, rxInfo)
 }
 
 // TODO: Eliminate function above and move code elsewhere?
 
 // recPacket hands one received frame to its channel's MultiModem, or to
 // whatever is standing in for the rest of the receive path.
-func (r *Layer2Receiver) recPacket(channel int, subchannel int, slice int, pp *ax25.Packet, alevel ax25.ALevel, retries BitFixLevel, fec_type fec_type_t) {
-	var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
-
-	var rxInfo = dwcore.RxInfo{ALevel: alevel, Retries: retries, FEC: fec_type}
-
+func (r *Layer2Receiver) recPacket(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo) {
 	if multiModemRecCapture != nil {
 		multiModemRecCapture(from, pp, rxInfo)
 
 		return
 	}
 
-	r.modems[channel].processRecPacket(from, pp, rxInfo)
+	r.modems[from.Channel].processRecPacket(from, pp, rxInfo)
 }
 
 /***********************************************************************************
