@@ -95,7 +95,7 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	my_tt_config.num_xmits = 1
 	my_tt_config.obj_xmit_chan = -1 // Keep the reports off the transmit queue.
 
-	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, nil, nil, nil, nil, 0)
+	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, nil, nil, nil, nil, nil, 0)
 
 	var done = make(chan struct{})
 
@@ -121,8 +121,6 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 	var audioConfig = makeBeaconModemConfig()
 
-	setupBeaconTransmitQueue(t, audioConfig)
-
 	var ttConfig tt_config_s
 
 	ttConfig.obj_xmit_chan = 0
@@ -135,11 +133,18 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 		remembered = append(remembered, pp.FormatAddrs()+string(pp.Info()))
 	}
 
-	var gw = NewTTGateway(audioConfig, &ttConfig, nil, remember, nil, nil, nil, 0)
+	var transmitted []string
+
+	var transmit = func(channel int, prio int, pp *ax25.Packet) {
+		transmitted = append(transmitted, fmt.Sprintf("%d %d %s%s", channel, prio, pp.FormatAddrs(), pp.Info()))
+	}
+
+	var gw = NewTTGateway(audioConfig, &ttConfig, nil, remember, nil, nil, transmit, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
 
 	assert.Equal(t, []string{"Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W="}, remembered)
+	assert.Equal(t, []string{"0 1 Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W="}, transmitted)
 }
 
 // An object report bound for APRS-IS goes to the IGate the gateway was
@@ -159,7 +164,7 @@ func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
 		sent = append(sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
 	}
 
-	var gw = NewTTGateway(audioConfig, &ttConfig, nil, nil, toIGate, nil, nil, 0)
+	var gw = NewTTGateway(audioConfig, &ttConfig, nil, nil, toIGate, nil, nil, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)

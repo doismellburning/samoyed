@@ -61,7 +61,7 @@ func TestTTGatewaySendsObjectReportsToClientApps(t *testing.T) {
 	var apps = new(clientApps)
 	apps.kissNet = kns
 
-	var gw = NewTTGateway(new(RadioConfig), &cfg, apps, nil, nil, nil, nil, 0)
+	var gw = NewTTGateway(new(RadioConfig), &cfg, apps, nil, nil, nil, nil, nil, 0)
 
 	var report = "Q1TEST>APRS:;Q2TEST   *111111z4237.14N/07120.83W-"
 
