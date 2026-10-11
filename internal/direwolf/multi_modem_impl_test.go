@@ -319,10 +319,6 @@ func TestMultiModemImplInitProcessAgeInSymbols(t *testing.T) {
 func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.Packet {
 	t.Helper()
 
-	var origCapture = multiModemRecCapture
-
-	t.Cleanup(func() { multiModemRecCapture = origCapture })
-
 	var audioConfig = new(RadioConfig)
 	audioConfig.achan[0].modem_type = modemType
 
@@ -330,7 +326,7 @@ func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.
 
 	var got *ax25.Packet
 
-	multiModemRecCapture = func(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo) {
+	receiver.packetSink = func(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo) {
 		assert.Equal(t, dwcore.SlicerID{Channel: 0, Subchannel: 1, Slice: 2}, from)
 		assert.Equal(t, RETRY_INVERT_SINGLE, rxInfo.Retries)
 		assert.Equal(t, fec_type_none, rxInfo.FEC)
