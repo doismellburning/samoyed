@@ -34,16 +34,9 @@ func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
 	var channel = 0
 
 	var xs = new(XmitService)
+	xs.transmitQueue = newTestTransmitQueue(t, new(RadioConfig))
 	xs.audio = new(AudioDevices)
 	xs.timing[channel].fulldup = true // Skip the channel-busy check and random wait.
-
-	// The transmit queues are package globals shared with every other test
-	// here, some of which leave entries behind, so empty this channel's rather
-	// than assume they already are.
-	for _, prio := range []int{TQ_PRIO_0_HI, TQ_PRIO_1_LO} {
-		for transmitQueue.Remove(channel, prio) != nil {
-		}
-	}
 
 	xs.xmit_next(t.Context(), channel)
 
@@ -62,13 +55,9 @@ func TestXmitTimingSetWhileTransmitting(t *testing.T) {
 	var channel = 0
 
 	var xs = new(XmitService)
+	xs.transmitQueue = newTestTransmitQueue(t, new(RadioConfig))
 	xs.audio = new(AudioDevices)
 	xs.SetFulldup(channel, true) // Skip the channel-busy check and random wait.
-
-	for _, prio := range []int{TQ_PRIO_0_HI, TQ_PRIO_1_LO} {
-		for transmitQueue.Remove(channel, prio) != nil {
-		}
-	}
 
 	var done = make(chan struct{})
 
@@ -101,17 +90,16 @@ func TestDiscardUntransmittableEmptiesTheQueue(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	transmitQueue.Init(audioConfig)
-
 	var xs = new(XmitService)
+	xs.transmitQueue = newTestTransmitQueue(t, audioConfig)
 
-	transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
-	transmitQueue.Append(channel, TQ_PRIO_0_HI, newTestPacket(t))
+	xs.transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
+	xs.transmitQueue.Append(channel, TQ_PRIO_0_HI, newTestPacket(t))
 
 	xs.discard_untransmittable(channel)
 
-	assert.Nil(t, transmitQueue.Peek(channel, TQ_PRIO_0_HI))
-	assert.Nil(t, transmitQueue.Peek(channel, TQ_PRIO_1_LO))
+	assert.Nil(t, xs.transmitQueue.Peek(channel, TQ_PRIO_0_HI))
+	assert.Nil(t, xs.transmitQueue.Peek(channel, TQ_PRIO_1_LO))
 
 	// The explanation is printed once, however many frames are discarded.
 	assert.True(t, xs.saidCannotTransmit[channel])
@@ -130,16 +118,16 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	transmitQueue.Init(audioConfig)
 	var xs = new(XmitService)
+	xs.transmitQueue = newTestTransmitQueue(t, audioConfig)
 	xs.seizeConfirm = dlq.SeizeConfirm
 
-	transmitQueue.Append(channel, TQ_PRIO_1_LO, ax25.New()) // What TransmitQueue.LMSeizeRequest queues.
-	transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
+	xs.transmitQueue.Append(channel, TQ_PRIO_1_LO, ax25.New()) // What TransmitQueue.LMSeizeRequest queues.
+	xs.transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
 
 	xs.discard_untransmittable(channel)
 
-	assert.Nil(t, transmitQueue.Peek(channel, TQ_PRIO_1_LO))
+	assert.Nil(t, xs.transmitQueue.Peek(channel, TQ_PRIO_1_LO))
 
 	var confirmed = false
 
@@ -163,19 +151,18 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	transmitQueue.Init(audioConfig)
-
 	var xs = new(XmitService)
+	xs.transmitQueue = newTestTransmitQueue(t, audioConfig)
 	xs.audio = new(AudioDevices)
 	xs.audioOutAvailable[ACHAN2ADEV(channel)] = false
 
-	transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
-	transmitQueue.Append(channel, TQ_PRIO_0_HI, newTestPacket(t))
+	xs.transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
+	xs.transmitQueue.Append(channel, TQ_PRIO_0_HI, newTestPacket(t))
 
 	xs.xmit_until_empty(t.Context(), channel)
 
-	assert.Nil(t, transmitQueue.Peek(channel, TQ_PRIO_0_HI))
-	assert.Nil(t, transmitQueue.Peek(channel, TQ_PRIO_1_LO))
+	assert.Nil(t, xs.transmitQueue.Peek(channel, TQ_PRIO_0_HI))
+	assert.Nil(t, xs.transmitQueue.Peek(channel, TQ_PRIO_1_LO))
 	assert.True(t, xs.saidCannotTransmit[channel], "Expected the frames to go down the discard path, not the transmit path")
 
 	// The audio output device is never seized on the way, so nothing is left
@@ -198,9 +185,8 @@ func TestXmitThreadStopsWhenCancelled(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	transmitQueue.Init(audioConfig)
-
 	var xs = new(XmitService)
+	xs.transmitQueue = newTestTransmitQueue(t, audioConfig)
 
 	var stopped = make(chan struct{})
 
@@ -233,10 +219,10 @@ func TestXmitThreadStopsWhenCancelledBeforeStarting(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	transmitQueue.Init(audioConfig)
 	cancel()
 
 	var xs = new(XmitService)
+	xs.transmitQueue = newTestTransmitQueue(t, audioConfig)
 
 	var stopped = make(chan struct{})
 
@@ -335,11 +321,6 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 
 	t.Cleanup(func() {
 		toneGenCapture = origToneGen
-
-		for p := range TQ_NUM_PRIO {
-			for transmitQueue.Remove(channel, p) != nil { //revive:disable-line:empty-block
-			}
-		}
 	})
 
 	var audioConfig = new(RadioConfig)
@@ -354,8 +335,6 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	audioConfig.achan[channel].mark_freq = 1200
 	audioConfig.achan[channel].space_freq = 2200
 	audioConfig.achan[channel].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_NONE
-
-	transmitQueue.Init(audioConfig)
 
 	// Sending a frame serialises it to bits; the capture takes them instead of
 	// the modulator.  The device itself still has to be there, though: the
@@ -372,6 +351,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	var xs = new(XmitService)
 	xs.p_modem = audioConfig
 	xs.audio = audio
+	xs.transmitQueue = newTestTransmitQueue(t, audioConfig)
 	xs.toneGenerators = NewToneGenerators(audioConfig, 100, audio)
 	xs.bits_per_sec[channel] = 1200
 	xs.audioOutAvailable[0] = true
@@ -517,13 +497,13 @@ func TestXmitAX25FramesBundles(t *testing.T) {
 	var second = ax25.FromText("Q1TEST>Q2TEST:second", true)
 	require.NotNil(t, second)
 
-	transmitQueue.Append(0, TQ_PRIO_1_LO, second)
+	xs.transmitQueue.Append(0, TQ_PRIO_1_LO, second)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 7) })
 
 	assert.Contains(t, output, ":first")
 	assert.Contains(t, output, ":second", "the queued frame should have shared the transmission")
-	assert.Nil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO), "the bundled frame should have left the queue")
+	assert.Nil(t, xs.transmitQueue.Peek(0, TQ_PRIO_1_LO), "the bundled frame should have left the queue")
 }
 
 // A digipeated APRS frame gets a transmission to itself: bundling it behind
@@ -537,13 +517,13 @@ func TestXmitAX25FramesDoesNotBundleDigipeated(t *testing.T) {
 	var digipeated = ax25.FromText("Q1TEST>Q2TEST,Q3TEST*:repeated", true)
 	require.NotNil(t, digipeated)
 
-	transmitQueue.Append(0, TQ_PRIO_1_LO, digipeated)
+	xs.transmitQueue.Append(0, TQ_PRIO_1_LO, digipeated)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 7) })
 
 	assert.Contains(t, output, ":first")
 	assert.NotContains(t, output, ":repeated")
-	assert.NotNil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO), "the digipeated frame should still be waiting its own turn")
+	assert.NotNil(t, xs.transmitQueue.Peek(0, TQ_PRIO_1_LO), "the digipeated frame should still be waiting its own turn")
 }
 
 // A limit of one frame per transmission is what the bundling rules ask for in
@@ -557,12 +537,12 @@ func TestXmitAX25FramesRespectsMaxBundle(t *testing.T) {
 	var second = ax25.FromText("Q1TEST>Q2TEST:second", true)
 	require.NotNil(t, second)
 
-	transmitQueue.Append(0, TQ_PRIO_1_LO, second)
+	xs.transmitQueue.Append(0, TQ_PRIO_1_LO, second)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 1) })
 
 	assert.NotContains(t, output, ":second")
-	assert.NotNil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO))
+	assert.NotNil(t, xs.transmitQueue.Peek(0, TQ_PRIO_1_LO))
 }
 
 // A frame waiting at high priority is taken before one at low priority, even
@@ -583,13 +563,13 @@ func TestXmitAX25FramesTakesHighPriorityFirst(t *testing.T) {
 	var high = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 0, 0, nil)
 	require.NotNil(t, high)
 
-	transmitQueue.Append(0, TQ_PRIO_1_LO, low)
-	transmitQueue.Append(0, TQ_PRIO_0_HI, high)
+	xs.transmitQueue.Append(0, TQ_PRIO_1_LO, low)
+	xs.transmitQueue.Append(0, TQ_PRIO_0_HI, high)
 
 	testutils.CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 2) })
 
-	assert.Nil(t, transmitQueue.Peek(0, TQ_PRIO_0_HI), "the high priority frame should have gone first")
-	assert.NotNil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO), "and used up the bundle, leaving the low priority one")
+	assert.Nil(t, xs.transmitQueue.Peek(0, TQ_PRIO_0_HI), "the high priority frame should have gone first")
+	assert.NotNil(t, xs.transmitQueue.Peek(0, TQ_PRIO_1_LO), "and used up the bundle, leaving the low priority one")
 }
 
 // A frame addressed to SPEECH is spoken rather than modulated, by a script the
@@ -658,14 +638,14 @@ func TestXmitNextDoesNotBundleBehindADigipeatedFrame(t *testing.T) {
 	var other = ax25.FromText("Q1TEST>Q2TEST:other", true)
 	require.NotNil(t, other)
 
-	transmitQueue.Append(0, TQ_PRIO_0_HI, digipeated)
-	transmitQueue.Append(0, TQ_PRIO_1_LO, other)
+	xs.transmitQueue.Append(0, TQ_PRIO_0_HI, digipeated)
+	xs.transmitQueue.Append(0, TQ_PRIO_1_LO, other)
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
 
 	assert.Contains(t, output, ":repeated")
 	assert.NotContains(t, output, ":other")
-	assert.NotNil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO), "the other frame should still be waiting its own turn")
+	assert.NotNil(t, xs.transmitQueue.Peek(0, TQ_PRIO_1_LO), "the other frame should still be waiting its own turn")
 }
 
 // Anything else can share a transmission, so emptying the queue takes one
@@ -679,14 +659,14 @@ func TestXmitNextBundlesOrdinaryFrames(t *testing.T) {
 		var pp = ax25.FromText(text, true)
 		require.NotNil(t, pp)
 
-		transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
+		xs.transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
 	}
 
 	var output = testutils.CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
 
 	assert.Contains(t, output, ":first")
 	assert.Contains(t, output, ":second")
-	assert.Nil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO))
+	assert.Nil(t, xs.transmitQueue.Peek(0, TQ_PRIO_1_LO))
 }
 
 // A channel with something being heard on it is waited for, rather than
@@ -704,7 +684,7 @@ func TestWaitForClearChannelWaitsWhileBusy(t *testing.T) {
 		return asked < 3 // Busy the first two times.
 	}
 
-	transmitQueue.Append(0, TQ_PRIO_0_HI, newTestPacket(t)) // So no random wait.
+	xs.transmitQueue.Append(0, TQ_PRIO_0_HI, newTestPacket(t)) // So no random wait.
 
 	assert.True(t, xs.wait_for_clear_channel(t.Context(), 0, 0, 255, false))
 	assert.GreaterOrEqual(t, asked, 3, "the channel should have been asked about until it cleared")
@@ -725,7 +705,7 @@ func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
+	xs.transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
 
 	var ctx, cancel = context.WithCancel(t.Context())
 	defer cancel()
@@ -754,7 +734,7 @@ func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
 	}
 
 	assert.NotContains(t, output, "Waited too long")
-	assert.NotNil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO), "the frame should still be queued")
+	assert.NotNil(t, xs.transmitQueue.Peek(0, TQ_PRIO_1_LO), "the frame should still be queued")
 }
 
 // The APRStt morse delay comes after the frame has left the queue, so
@@ -768,7 +748,7 @@ func TestXmitNextSendsAPRSttMorseWhenCancelled(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>MORSE:HI", true)
 	require.NotNil(t, pp)
 
-	transmitQueue.Append(0, TQ_PRIO_0_HI, pp)
+	xs.transmitQueue.Append(0, TQ_PRIO_0_HI, pp)
 
 	var ctx, cancel = context.WithCancel(t.Context())
 	cancel()
@@ -789,7 +769,7 @@ func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
+	xs.transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
 
 	testutils.CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
 
@@ -845,7 +825,7 @@ func timeXmitNext(t *testing.T, xs *XmitService, text string) (time.Duration, st
 	var pp = ax25.FromText(text, true)
 	require.NotNil(t, pp)
 
-	transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
+	xs.transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
 
 	var started = time.Now()
 

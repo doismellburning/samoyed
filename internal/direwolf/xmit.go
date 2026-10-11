@@ -131,6 +131,9 @@ type XmitService struct {
 	 */
 	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 
+	// transmitQueue is where each channel's frames wait to be sent.
+	transmitQueue *TransmitQueue
+
 	// onTransmit is told each frame we send, and its channel, or is nil.
 	onTransmit func(channel int, pp *ax25.Packet)
 
@@ -163,6 +166,9 @@ type XmitService struct {
  *
  *		toneGenerators	- Each radio channel's tone generator.
  *
+ *		transmitQueue	- Where each channel's frames wait to be sent.
+ *				  Initialised beforehand.
+ *
  *		setPTT		- Keys a channel's transmitter, or lets it
  *				  go; nil for nothing to key.
  *
@@ -186,10 +192,7 @@ type XmitService struct {
  * Outputs:	Returns a new XmitService with required information set up.
  *		The PTT hardware is set up beforehand, by NewPTT.
  *
- * Description:	Initialize the queue to be empty and set up other
- *		mechanisms for sharing it between different threads.
- *
- *		Start up xmit_thread(s) to actually send the packets
+ * Description:	Start up xmit_thread(s) to actually send the packets
  *		at the appropriate time.
  *
  * Version 1.2:	We now allow multiple audio devices with one or two channels each.
@@ -202,6 +205,7 @@ func NewXmitService(
 	p_modem *RadioConfig,
 	audio *AudioDevices,
 	toneGenerators [MAX_RADIO_CHANS]*ToneGenerator,
+	transmitQueue *TransmitQueue,
 	setPTT func(channel int, on bool),
 	dataDetect func(channel int) bool,
 	onTransmit func(channel int, pp *ax25.Packet),
@@ -215,6 +219,7 @@ func NewXmitService(
 	xs.p_modem = p_modem
 	xs.audio = audio
 	xs.toneGenerators = toneGenerators
+	xs.transmitQueue = transmitQueue
 	xs.onTransmit = onTransmit
 	xs.seizeConfirm = seizeConfirm
 	xs.setPTT = setPTT
@@ -243,9 +248,6 @@ func NewXmitService(
 			fulldup:  p_modem.achan[j].fulldup,
 		}
 	}
-
-	logrus.Debug("xmit_init: about to call tq_init")
-	transmitQueue.Init(p_modem)
 
 	logrus.Debug("xmit_init: about to create threads")
 
@@ -487,7 +489,7 @@ func frame_flavor(pp *ax25.Packet) flavor_t {
 // channel are left on the queue.
 func (xs *XmitService) xmit_thread(ctx context.Context, channel int) {
 	for ctx.Err() == nil {
-		transmitQueue.WaitWhileEmpty(ctx, channel)
+		xs.transmitQueue.WaitWhileEmpty(ctx, channel)
 		logrus.WithField("channel", channel).Debug("xmit_thread: woke up")
 
 		// Does this extra loop offer any benefit?
@@ -502,7 +504,7 @@ func (xs *XmitService) xmit_thread(ctx context.Context, channel int) {
 // xmit_thread, so that the decision between the two can be tested: xmit_thread
 // itself never returns.
 func (xs *XmitService) xmit_until_empty(ctx context.Context, channel int) {
-	for transmitQueue.Peek(channel, TQ_PRIO_0_HI) != nil || transmitQueue.Peek(channel, TQ_PRIO_1_LO) != nil {
+	for xs.transmitQueue.Peek(channel, TQ_PRIO_0_HI) != nil || xs.transmitQueue.Peek(channel, TQ_PRIO_1_LO) != nil {
 		// xmit_next leaves the queue alone once ctx is cancelled, so without
 		// this we would go straight round again, and forever.
 		if ctx.Err() != nil {
@@ -544,7 +546,7 @@ func (xs *XmitService) discard_untransmittable(channel int) {
 
 	for _, prio := range []int{TQ_PRIO_0_HI, TQ_PRIO_1_LO} {
 		for {
-			var pp = transmitQueue.Remove(channel, prio)
+			var pp = xs.transmitQueue.Remove(channel, prio)
 			if pp == nil {
 				break
 			}
@@ -597,11 +599,11 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 
 	var prio = TQ_PRIO_1_LO
 
-	var pp = transmitQueue.Remove(channel, TQ_PRIO_0_HI)
+	var pp = xs.transmitQueue.Remove(channel, TQ_PRIO_0_HI)
 	if pp != nil {
 		prio = TQ_PRIO_0_HI
 	} else {
-		pp = transmitQueue.Remove(channel, TQ_PRIO_1_LO)
+		pp = xs.transmitQueue.Remove(channel, TQ_PRIO_1_LO)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -855,11 +857,11 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 		 */
 		prio = TQ_PRIO_1_LO
 
-		pp = transmitQueue.Peek(channel, TQ_PRIO_0_HI)
+		pp = xs.transmitQueue.Peek(channel, TQ_PRIO_0_HI)
 		if pp != nil {
 			prio = TQ_PRIO_0_HI
 		} else {
-			pp = transmitQueue.Peek(channel, TQ_PRIO_1_LO)
+			pp = xs.transmitQueue.Peek(channel, TQ_PRIO_1_LO)
 		}
 
 		if pp != nil {
@@ -868,7 +870,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 				done = true // not eligible for bundling.
 
 			case FLAVOR_APRS_NEW, FLAVOR_OTHER:
-				pp = transmitQueue.Remove(channel, prio)
+				pp = xs.transmitQueue.Remove(channel, prio)
 				logrus.WithFields(logrus.Fields{
 					"t":       time.Since(time_ptt),
 					"channel": channel,
@@ -1436,7 +1438,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 		 * Wait random time.
 		 * Proceed to transmit sooner if anything shows up in high priority queue.
 		 */
-		for transmitQueue.Peek(channel, TQ_PRIO_0_HI) == nil {
+		for xs.transmitQueue.Peek(channel, TQ_PRIO_0_HI) == nil {
 			if !dwutil.SleepCtx(ctx, time.Duration(slottime)*10*time.Millisecond) {
 				return false
 			}
