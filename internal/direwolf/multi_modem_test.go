@@ -158,10 +158,12 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 		bits[i] = rng.IntN(2)
 	}
 
+	var from = dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}
+
 	b.ResetTimer()
 
 	for i := range b.N {
-		receiver.RecBit(0, 0, 0, bits[i%len(bits)], false, 0)
+		receiver.RecBit(from, bits[i%len(bits)], false, 0)
 	}
 }
 
@@ -204,7 +206,7 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	// bit first.
 	for _, b := range []byte{0xab, 0xab, 0xab, 0xab, 'N', 'N', 'N', 'N'} {
 		for i := range 8 {
-			receiver.RecBit(1, 0, 0, int(b>>i)&1, false, 0)
+			receiver.RecBit(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0}, int(b>>i)&1, false, 0)
 		}
 	}
 
@@ -212,7 +214,7 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 
 	// "NNNN" ends on a 0, which is also where an untouched line decoder
 	// starts, so end on a 1 that the decoder would remember if it saw it.
-	receiver.RecBit(1, 0, 0, 1, false, 0)
+	receiver.RecBit(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0}, 1, false, 0)
 
 	assert.False(t, s.line.PrevRaw(), "the line decoder should not have been given any bits")
 }
@@ -320,12 +322,12 @@ func TestDTMFButtonMakesChannelBusy(t *testing.T) {
 	var sink = new(dcdRecordingSink)
 	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
 
-	r.DCDChange(0, MAX_SUBCHANS, 0, 1)
+	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: MAX_SUBCHANS, Slice: 0}, 1)
 
 	assert.Equal(t, 1, r.DataDetectAny(0), "a button is held, so busy")
 	assert.Equal(t, 0, r.DataDetectAny(1), "another channel hears no button")
 
-	r.DCDChange(0, MAX_SUBCHANS, 0, 0)
+	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: MAX_SUBCHANS, Slice: 0}, 0)
 
 	assert.Equal(t, 0, r.DataDetectAny(0), "the button is released, so not busy")
 	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
@@ -343,11 +345,11 @@ func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
 
 	r.getInput = func(int, int) int { return inhibited }
 
-	r.DCDChange(0, 0, 0, 1)
+	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, 1)
 
 	inhibited = 1
 
-	r.DCDChange(0, 0, 0, 0)
+	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, 0)
 
 	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
 	assert.Equal(t, 1, r.DataDetectAny(0), "still inhibited, so still busy")
@@ -366,7 +368,7 @@ func TestDCDChangeWhileTransmitterAsks(t *testing.T) {
 		defer close(done)
 
 		for i := range 1000 {
-			r.DCDChange(0, 0, 0, i&1)
+			r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, i&1)
 		}
 	}()
 
@@ -384,11 +386,11 @@ type countingBitReceiver struct {
 	bits int
 }
 
-func (r *countingBitReceiver) RecBit(int, int, int, int, bool, int) { r.bits++ }
+func (r *countingBitReceiver) RecBit(dwcore.SlicerID, int, bool, int) { r.bits++ }
 
-func (r *countingBitReceiver) RecBitNew(int, int, int, int, bool, int, *int64, *int) { r.bits++ }
+func (r *countingBitReceiver) RecBitNew(dwcore.SlicerID, int, bool, int, *int64, *int) { r.bits++ }
 
-func (r *countingBitReceiver) DCDChange(int, int, int, int) {}
+func (r *countingBitReceiver) DCDChange(dwcore.SlicerID, int) {}
 
 // What a demodulator demodulates goes to the receiver it was given - noise
 // decodes to bits like anything else.

@@ -87,6 +87,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dtmf"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/sirupsen/logrus"
 )
 
@@ -125,7 +126,7 @@ type sampleReceiver interface {
 	// channel can't be fed at all.
 	ProcessSample(channel int, sample int) bool
 
-	DCDChange(channel int, subchannel int, slice int, state int)
+	DCDChange(from dwcore.SlicerID, state int)
 }
 
 func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource, receiver sampleReceiver, onButton func(channel int, button rune)) <-chan int {

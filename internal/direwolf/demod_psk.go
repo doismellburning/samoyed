@@ -64,6 +64,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/dsp"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 )
 
@@ -810,27 +811,29 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 	if D.slicer[slice].data_clock_pll < 0 && D.slicer[slice].prev_d_c_pll >= 0 {
 		/* Overflow of PLL counter. */
 		/* This is where we sample the data. */
+		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
+
 		switch D.modem_type {
 		case MODEM_BPSK:
 			var gray = demod_bits
 
-			D.receiver.RecBitNew(channel, subchannel, slice, gray&1, false, bit_quality[0],
+			D.receiver.RecBitNew(from, gray&1, false, bit_quality[0],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		case MODEM_QPSK:
 			var gray = demod_bits
 
-			D.receiver.RecBitNew(channel, subchannel, slice, (gray>>1)&1, false, bit_quality[1],
+			D.receiver.RecBitNew(from, (gray>>1)&1, false, bit_quality[1],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			D.receiver.RecBitNew(channel, subchannel, slice, gray&1, false, bit_quality[0],
+			D.receiver.RecBitNew(from, gray&1, false, bit_quality[0],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		default:
 			var gray = demod_bits
 
-			D.receiver.RecBitNew(channel, subchannel, slice, (gray>>2)&1, false, bit_quality[2],
+			D.receiver.RecBitNew(from, (gray>>2)&1, false, bit_quality[2],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			D.receiver.RecBitNew(channel, subchannel, slice, (gray>>1)&1, false, bit_quality[1],
+			D.receiver.RecBitNew(from, (gray>>1)&1, false, bit_quality[1],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			D.receiver.RecBitNew(channel, subchannel, slice, gray&1, false, bit_quality[0],
+			D.receiver.RecBitNew(from, gray&1, false, bit_quality[0],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		}
 

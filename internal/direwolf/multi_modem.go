@@ -859,11 +859,8 @@ func (r *Layer2Receiver) recPacket(from dwcore.SlicerID, pp *ax25.Packet, rxInfo
  *
  * Purpose:	Extract HDLC frames from a stream of bits.
  *
- * Inputs:	channel	- Channel number.
- *
- *		subchannel	- This allows multiple demodulators per channel.
- *
- *		slice	- Allows multiple slicers per demodulator (subchannel).
+ * Inputs:	from	- The slicer that heard it: which slicer of which
+ *			  demodulator (subchannel) of which channel.
  *
  *		raw 	- One bit from the demodulator.
  *			  should be 0 or 1.
@@ -880,14 +877,15 @@ func (r *Layer2Receiver) recPacket(from dwcore.SlicerID, pp *ax25.Packet, rxInfo
  *
  ***********************************************************************************/
 
-func (r *Layer2Receiver) RecBit(channel int, subchannel int, slice int, raw int, is_scrambled bool, not_used_remove int) {
+func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw int, is_scrambled bool, not_used_remove int) {
 	var dummyll int64
 	var dummy int
-	r.RecBitNew(channel, subchannel, slice, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
+	r.RecBitNew(from, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
 }
 
-func (r *Layer2Receiver) RecBitNew(channel int, subchannel int, slice int, _raw int, is_scrambled bool, not_used_remove int,
+func (r *Layer2Receiver) RecBitNew(from dwcore.SlicerID, _raw int, is_scrambled bool, not_used_remove int,
 	pll_nudge_total *int64, pll_symbol_count *int) {
+	var channel = from.Channel
 	var raw = _raw != 0
 
 	// -e option can be used to artificially introduce the desired
@@ -903,7 +901,7 @@ func (r *Layer2Receiver) RecBitNew(channel int, subchannel int, slice int, _raw 
 		}
 	}
 
-	var s = r.slicer[channel][subchannel][slice]
+	var s = r.slicer[channel][from.Subchannel][from.Slice]
 
 	// EAS does not use HDLC.
 
@@ -989,12 +987,10 @@ func (r *Layer2Receiver) fx25Busy(channel int) bool {
  * Purpose:     Combine DCD states of all subchannels/ into an overall
  *		state for the channel.
  *
- * Inputs:	channel
- *
- *		subchannel		0 to MAX_SUBCHANS-1 for HDLC.
+ * Inputs:	from	- The channel, and which of its slicers:
+ *			  Subchannel - 0 to MAX_SUBCHANS-1 for HDLC.
  *				SPECIAL CASE --> MAX_SUBCHANS for DTMF decoder.
- *
- *		slice		slicer number, 0 .. MAX_SLICERS - 1.
+ *			  Slice - slicer number, 0 .. MAX_SLICERS - 1.
  *
  *		state		1 for active, 0 for not.
  *
@@ -1008,17 +1004,19 @@ func (r *Layer2Receiver) fx25Busy(channel int) bool {
  *
  *--------------------------------------------------------------------*/
 
-func (r *Layer2Receiver) DCDChange(channel int, subchannel int, slice int, state int) {
+func (r *Layer2Receiver) DCDChange(from dwcore.SlicerID, state int) {
+	var channel = from.Channel
+
 	/*
 		#if DEBUG3
 			text_color_set(DW_COLOR_DEBUG);
-			dw_printf ("DCD %d.%d.%d = %d \n", channel, subchannel, slice, state);
+			dw_printf ("DCD %d.%d.%d = %d \n", channel, from.Subchannel, from.Slice, state);
 		#endif
 	*/
 
 	r.dcdMu.Lock()
 	var old = r.dataDetected(channel)
-	r.compositeDCD[channel][subchannel][slice] = state != 0
+	r.compositeDCD[channel][from.Subchannel][from.Slice] = state != 0
 	var now = r.dataDetected(channel)
 	r.dcdMu.Unlock()
 

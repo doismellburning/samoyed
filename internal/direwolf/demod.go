@@ -16,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/sirupsen/logrus"
@@ -48,9 +49,9 @@ type Demodulator struct {
 // tells when it starts or stops detecting data on a slicer.
 // *Layer2Receiver is one.
 type bitReceiver interface {
-	RecBit(channel int, subchannel int, slice int, raw int, isScrambled bool, notUsedRemove int)
-	RecBitNew(channel int, subchannel int, slice int, raw int, isScrambled bool, notUsedRemove int, pllNudgeTotal *int64, pllSymbolCount *int)
-	DCDChange(channel int, subchannel int, slice int, state int)
+	RecBit(from dwcore.SlicerID, raw int, isScrambled bool, notUsedRemove int)
+	RecBitNew(from dwcore.SlicerID, raw int, isScrambled bool, notUsedRemove int, pllNudgeTotal *int64, pllSymbolCount *int)
+	DCDChange(from dwcore.SlicerID, state int)
 }
 
 // audioLevelDecimation is how many audio samples pass between pushes of the
