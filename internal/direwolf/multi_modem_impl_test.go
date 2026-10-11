@@ -32,14 +32,14 @@ type multiModemImplSink struct {
 	frames []multiModemImplFrame
 }
 
-func (s *multiModemImplSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, _ ax25.ALevel, fecType fec_type_t, retries BitFixLevel, spectrum string) {
+func (s *multiModemImplSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string) {
 	var f = multiModemImplFrame{
-		channel:  channel,
-		subchan:  subchan,
-		slice:    slice,
+		channel:  from.Channel,
+		subchan:  from.Subchannel,
+		slice:    from.Slice,
 		pp:       pp,
-		fecType:  fecType,
-		retries:  retries,
+		fecType:  rxInfo.FEC,
+		retries:  rxInfo.Retries,
 		spectrum: spectrum,
 	}
 	s.frames = append(s.frames, f)

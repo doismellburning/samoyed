@@ -49,6 +49,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/wav"
@@ -354,7 +355,10 @@ func (s *readerSampleSource) GetByte(_ int) int {
  * This is called when we have a good frame.
  */
 
-func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func (s *atestSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string) {
+	var channel, subchan, slice = from.Channel, from.Subchannel, from.Slice
+	var alevel, fec_type, retries = rxInfo.ALevel, rxInfo.FEC, rxInfo.Retries
+
 	s.packetsDecoded++
 
 	if s.receiver.DataDetectAny(channel) == 0 {

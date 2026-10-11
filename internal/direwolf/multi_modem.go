@@ -167,8 +167,10 @@ func newMultiModem(channel int, pa *RadioConfig, demodulator *Demodulator, recei
 // samoyed-atest, which decodes a .WAV file to report on what is in it rather
 // than to act on it, has its own.
 type ReceiveSink interface {
-	// RecFrame hands over a frame that has been decoded successfully.
-	RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
+	// RecFrame hands over a frame that has been decoded successfully: the
+	// slicer that heard it, how, and the "spectrum" showing what each of
+	// the channel's decoders made of it.
+	RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string)
 
 	// DCDChange reports that the decoders for a channel have collectively
 	// started (state 1) or stopped (state 0) seeing data.
@@ -186,9 +188,9 @@ type radioSink struct {
 	recFrame frameReceiver
 }
 
-func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *ax25.Packet, alevel ax25.ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func (s *radioSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string) {
 	if s.recFrame != nil {
-		s.recFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+		s.recFrame(from.Channel, from.Subchannel, from.Slice, pp, rxInfo.ALevel, rxInfo.FEC, rxInfo.Retries, spectrum)
 	}
 }
 
@@ -360,7 +362,7 @@ func (m *MultiModem) processRecPacket(from dwcore.SlicerID, pp *ax25.Packet, rxI
 
 		if !drop_it {
 			recordRadioFrame(channel, rxInfo.FEC, rxInfo.Retries)
-			m.sink.RecFrame(channel, from.Subchannel, from.Slice, pp, rxInfo.ALevel, rxInfo.FEC, rxInfo.Retries, "")
+			m.sink.RecFrame(from, pp, rxInfo, "")
 		}
 
 		return
@@ -577,11 +579,9 @@ func (m *MultiModem) pickBestCandidate() {
 		dwutil.Assert(m.candidates[j][k].packet_p != nil)
 		var rxInfo = m.candidates[j][k].rxInfo
 		recordRadioFrame(channel, rxInfo.FEC, rxInfo.Retries)
-		m.sink.RecFrame(channel, j, k,
+		m.sink.RecFrame(dwcore.SlicerID{Channel: channel, Subchannel: j, Slice: k},
 			m.candidates[j][k].packet_p,
-			rxInfo.ALevel,
-			rxInfo.FEC,
-			rxInfo.Retries,
+			rxInfo,
 			string(spectrum[:num_bars]))
 
 		/* Ownership has been transferred, so drop our reference. */

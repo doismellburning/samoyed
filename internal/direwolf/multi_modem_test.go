@@ -22,7 +22,7 @@ type recordingReceiveSink struct {
 	frames []*ax25.Packet
 }
 
-func (s *recordingReceiveSink) RecFrame(_ int, _ int, _ int, pp *ax25.Packet, _ ax25.ALevel, _ fec_type_t, _ BitFixLevel, _ string) {
+func (s *recordingReceiveSink) RecFrame(_ dwcore.SlicerID, pp *ax25.Packet, _ dwcore.RxInfo, _ string) {
 	s.frames = append(s.frames, pp)
 }
 
@@ -31,7 +31,7 @@ func (s *recordingReceiveSink) DCDChange(int, int) {}
 // discardReceiveSink is a ReceiveSink that ignores whatever it is told.
 type discardReceiveSink struct{}
 
-func (discardReceiveSink) RecFrame(int, int, int, *ax25.Packet, ax25.ALevel, fec_type_t, BitFixLevel, string) {
+func (discardReceiveSink) RecFrame(dwcore.SlicerID, *ax25.Packet, dwcore.RxInfo, string) {
 }
 
 func (discardReceiveSink) DCDChange(int, int) {}
@@ -225,7 +225,9 @@ func TestRadioSinkHandsFramesOn(t *testing.T) {
 
 	var alevel ax25.ALevel
 
-	assert.NotPanics(t, func() { new(radioSink).RecFrame(0, 0, 0, pp, alevel, fec_type_none, RETRY_NONE, "") })
+	var rxInfo = dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}
+
+	assert.NotPanics(t, func() { new(radioSink).RecFrame(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, pp, rxInfo, "") })
 
 	var got []string
 
@@ -234,7 +236,7 @@ func TestRadioSinkHandsFramesOn(t *testing.T) {
 		got = append(got, fmt.Sprintf("%d.%d.%d %s%s %s", channel, subchan, slice, pp.FormatAddrs(), pp.Info(), spectrum))
 	}
 
-	sink.RecFrame(1, 2, 3, pp, alevel, fec_type_none, RETRY_NONE, "|_")
+	sink.RecFrame(dwcore.SlicerID{Channel: 1, Subchannel: 2, Slice: 3}, pp, rxInfo, "|_")
 
 	assert.Equal(t, []string{"1.2.3 Q1TEST>APRS:heard |_"}, got)
 }
