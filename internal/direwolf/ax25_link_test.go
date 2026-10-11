@@ -24,6 +24,7 @@ import (
 func newNegotiationTestLink() *ax25_dlsm_t {
 	var S = new(ax25_dlsm_t)
 
+	S.services = ax25Link.linkServices
 	S.modulo = ax25.Modulo8
 	S.srej_enable = xid.SREJNone
 	S.n1_paclen = 128
@@ -534,6 +535,7 @@ func TestEnterNewStateSetsConnectedIndicator(t *testing.T) {
 	}
 
 	var S = new(ax25_dlsm_t)
+	S.services = ax25Link.linkServices
 	S.channel = 1
 	S.state = state_1_awaiting_connection
 
