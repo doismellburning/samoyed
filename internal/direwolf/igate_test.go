@@ -120,7 +120,8 @@ func Test_is_message_message(t *testing.T) {
 // holds the other end of, so nothing here needs the internet.
 
 // setupIGate points the IGate at a socket the test can read, logged in and
-// ready to send, and hands back the server's end of the connection.
+// ready to send, with a transmit queue of its own, and hands back the server's
+// end of the connection.
 func setupIGate(t *testing.T) (*IGate, net.Conn) {
 	t.Helper()
 
@@ -141,7 +142,9 @@ func setupIGate(t *testing.T) (*IGate, net.Conn) {
 
 	var heardDB = mheard.New(0)
 
-	var ig = NewIGate(audioConfig, igateConfig, digiConfig, pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, nil, 0)
+	var tq = newTestTransmitQueue(t, audioConfig)
+
+	var ig = NewIGate(audioConfig, igateConfig, digiConfig, pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, tq, nil, 0)
 
 	var server, client = connectedTCPPair(t)
 
@@ -416,35 +419,14 @@ func TestIGateUplinkCountsOnlyWhatWasSent(t *testing.T) {
 	}
 }
 
-// setupIGateToRadio adds what the IS>RF direction needs on top of setupIGate:
-// a transmit queue for the frames it decides to send.
-func setupIGateToRadio(t *testing.T) *IGate {
-	t.Helper()
-
-	var ig, _ = setupIGate(t)
-
-	var audioConfig = ig.audioConfig
-
-	transmitQueue.Init(audioConfig)
-
-	t.Cleanup(func() {
-		for p := range TQ_NUM_PRIO {
-			for transmitQueue.Remove(0, p) != nil { //revive:disable-line:empty-block
-			}
-		}
-	})
-
-	return ig
-}
-
 // A packet from the server is transmitted wrapped as third party traffic,
 // with the via path it arrived with replaced by TCPIP and our own callsign.
 func TestIGateTransmitFromServer(t *testing.T) {
-	var ig = setupIGateToRadio(t)
+	var ig, _ = setupIGate(t)
 
 	ig.maybeXmitPacketFromIGate([]byte("Q2TEST-1>APWW10,TCPIP*,qAC,T2TEST:>hello"), 0)
 
-	var sent = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+	var sent = ig.transmitQueue.Remove(0, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "nothing was queued for transmission")
 
 	var info = string(sent.Info())
@@ -459,11 +441,11 @@ func TestIGateTransmitFromServer(t *testing.T) {
 func TestIGateTransmitPathSaysNo(t *testing.T) {
 	for _, via := range []string{"qAX", "TCPXX", "RFONLY", "NOGATE"} {
 		t.Run(via, func(t *testing.T) {
-			var ig = setupIGateToRadio(t)
+			var ig, _ = setupIGate(t)
 
 			ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,"+via+":>hello"), 0)
 
-			assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "a packet with %s in the path was transmitted", via)
+			assert.Nil(t, ig.transmitQueue.Remove(0, TQ_PRIO_1_LO), "a packet with %s in the path was transmitted", via)
 		})
 	}
 }
@@ -471,32 +453,32 @@ func TestIGateTransmitPathSaysNo(t *testing.T) {
 // Something the parser cannot make sense of is reported rather than passed on
 // as a frame that would not survive the trip.
 func TestIGateTransmitUnparseable(t *testing.T) {
-	var ig = setupIGateToRadio(t)
+	var ig, _ = setupIGate(t)
 
 	var output = testutils.CaptureOutput(t, func() {
 		ig.maybeXmitPacketFromIGate([]byte("this is not a packet"), 0)
 	})
 
 	assert.Contains(t, output, "Could not parse message from server")
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
+	assert.Nil(t, ig.transmitQueue.Remove(0, TQ_PRIO_1_LO))
 }
 
 // IGFILTER on the IGate-to-channel pair narrows what is put on the air.
 func TestIGateTransmitFiltered(t *testing.T) {
-	var ig = setupIGateToRadio(t)
+	var ig, _ = setupIGate(t)
 
 	ig.digiConfig.filter_str[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
 
 	ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:>hello"), 0)
 
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "a packet the filter rejected was transmitted")
+	assert.Nil(t, ig.transmitQueue.Remove(0, TQ_PRIO_1_LO), "a packet the filter rejected was transmitted")
 }
 
 // Having transmitted a message for somebody, we pass along their next
 // position report even though the filter would otherwise drop it, so that the
 // recipient can see where the sender is.
 func TestIGateTransmitCourtesyPosition(t *testing.T) {
-	var ig = setupIGateToRadio(t)
+	var ig, _ = setupIGate(t)
 
 	// A filter that passes nothing, so only the special case can get through.
 	ig.digiConfig.filter_str[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
@@ -507,25 +489,25 @@ func TestIGateTransmitCourtesyPosition(t *testing.T) {
 
 	ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:=4237.14N/07120.83W#"), 0)
 
-	assert.NotNil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "the message sender's position was not passed along")
+	assert.NotNil(t, ig.transmitQueue.Remove(0, TQ_PRIO_1_LO), "the message sender's position was not passed along")
 
 	// Once only: the count is used up.
 	ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:=4237.14N/07120.83W#"), 0)
 
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "the special case should have been used up")
+	assert.Nil(t, ig.transmitQueue.Remove(0, TQ_PRIO_1_LO), "the special case should have been used up")
 }
 
 // Transmitting a message for a station is what arranges for its next position
 // to be passed along, and it is counted separately in the IGate statistics.
 func TestIGateTransmitMessageRemembersTheSender(t *testing.T) {
-	var ig = setupIGateToRadio(t)
+	var ig, _ = setupIGate(t)
 
 	// The station has to have been heard for us to remember anything about it.
 	ig.heard.SaveIS("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there")
 
 	ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there"), 0)
 
-	require.NotNil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
+	require.NotNil(t, ig.transmitQueue.Remove(0, TQ_PRIO_1_LO))
 
 	assert.Equal(t, 1, ig.msgCount())
 	assert.Equal(t, 0, ig.pktCount(), "a message is not counted as an other packet")
@@ -535,20 +517,20 @@ func TestIGateTransmitMessageRemembersTheSender(t *testing.T) {
 // With nothing to keep track of who has been heard, a message still goes out
 // to RF; there is just nobody to remember to pass a position along for.
 func TestIGateTransmitMessageWithoutAHeardDatabase(t *testing.T) {
-	var ig = setupIGateToRadio(t)
+	var ig, _ = setupIGate(t)
 
 	ig.heard = nil
 
 	ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there"), 0)
 
-	assert.NotNil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "the message was not transmitted")
+	assert.NotNil(t, ig.transmitQueue.Remove(0, TQ_PRIO_1_LO), "the message was not transmitted")
 
 	// Nor is anyone owed a position, so a filter that passes nothing drops it.
 	ig.digiConfig.filter_str[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
 
 	ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:=4237.14N/07120.83W#"), 0)
 
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "a position was passed along that nobody was owed")
+	assert.Nil(t, ig.transmitQueue.Remove(0, TQ_PRIO_1_LO), "a position was passed along that nobody was owed")
 }
 
 // The same packet again within the dedupe window is dropped: it has already
@@ -1042,7 +1024,7 @@ func TestIGateDebugOutput(t *testing.T) {
 
 // The same for the other direction.
 func TestIGateToRadioDebugOutput(t *testing.T) {
-	var ig = setupIGateToRadio(t)
+	var ig, _ = setupIGate(t)
 
 	ig.debugLevel = 3
 
@@ -1186,7 +1168,7 @@ func TestIGateLineReaderNulCountsExpanded(t *testing.T) {
 // A packet from the server is counted and queued for transmission; a server
 // comment or an empty line is neither.
 func TestIGateProcessServerLine(t *testing.T) {
-	var ig = setupIGateToRadio(t)
+	var ig, _ = setupIGate(t)
 
 	ig.audioConfig.igate_vchannel = -1
 
@@ -1194,13 +1176,13 @@ func TestIGateProcessServerLine(t *testing.T) {
 	ig.processServerLine([]byte("\r\n"))
 
 	assert.Equal(t, 0, ig.downlinkCount())
-	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
+	assert.Nil(t, ig.transmitQueue.Remove(0, TQ_PRIO_1_LO))
 
 	ig.processServerLine([]byte("Q2TEST-1>APWW10,TCPIP*,qAC,T2TEST:>hello\r\n"))
 
 	assert.Equal(t, 1, ig.downlinkCount())
 
-	var sent = transmitQueue.Remove(0, TQ_PRIO_1_LO)
+	var sent = ig.transmitQueue.Remove(0, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "nothing was queued for transmission")
 	assert.Equal(t, "}Q2TEST-1>APWW10,TCPIP,Q1TEST*:>hello", string(sent.Info()))
 }
@@ -1208,7 +1190,7 @@ func TestIGateProcessServerLine(t *testing.T) {
 // End to end: after an over-long line from the server, the receive thread
 // still handles the next one.
 func TestIGateRecvThreadSurvivesAnOverlongLine(t *testing.T) {
-	var ig = setupIGateToRadio(t)
+	var ig, _ = setupIGate(t)
 
 	ig.audioConfig.igate_vchannel = -1
 

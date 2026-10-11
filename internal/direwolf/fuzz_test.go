@@ -170,17 +170,9 @@ func setupIGateFromServer(t *testing.T) *IGate {
 	igateConfig.igmsp = 1
 
 	var heardDB = mheard.New(0)
-	var ig = NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, nil, 0)
+	var tq = newTestTransmitQueue(t, audioConfig)
 
-	transmitQueue.Init(audioConfig)
-	t.Cleanup(func() {
-		for p := range TQ_NUM_PRIO {
-			for transmitQueue.Remove(0, p) != nil { //revive:disable-line:empty-block
-			}
-		}
-	})
-
-	return ig
+	return NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, tq, nil, 0)
 }
 
 // fuzzAGWServer returns a server with a client attached as client 0, by way of

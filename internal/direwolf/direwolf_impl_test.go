@@ -118,7 +118,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	var digiConfig = new(digi_config_s)
 	var filter = pfilter.New(igateConfig.max_digi_hops, aprs.NewDecoderFromDataFiles(), heardDB, 0)
 
-	var ig = NewIGate(audioConfig, igateConfig, digiConfig, filter, heardDB, nil, 0)
+	var ig = NewIGate(audioConfig, igateConfig, digiConfig, filter, heardDB, transmitQueue, nil, 0)
 
 	var handler = new(recPacketHandler)
 	handler.toIGate = ig.sendRecPacket
