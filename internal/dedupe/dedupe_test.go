@@ -19,9 +19,9 @@ func Test_dedupe_check_duplicate(t *testing.T) {
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
 
-	ds.Remember(pp, 0)
+	ds.Remember(0, pp)
 
-	assert.True(t, ds.Check(pp, 0), "packet remembered on channel 0 should be a duplicate on channel 0")
+	assert.True(t, ds.Check(0, pp), "packet remembered on channel 0 should be a duplicate on channel 0")
 }
 
 func Test_dedupe_check_different_channel_not_duplicate(t *testing.T) {
@@ -30,9 +30,9 @@ func Test_dedupe_check_different_channel_not_duplicate(t *testing.T) {
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
 
-	ds.Remember(pp, 0)
+	ds.Remember(0, pp)
 
-	assert.False(t, ds.Check(pp, 1), "packet remembered on channel 0 should not be a duplicate on channel 1")
+	assert.False(t, ds.Check(1, pp), "packet remembered on channel 0 should not be a duplicate on channel 1")
 }
 
 func Test_dedupe_check_expired_not_duplicate(t *testing.T) {
@@ -41,7 +41,7 @@ func Test_dedupe_check_expired_not_duplicate(t *testing.T) {
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
 
-	ds.Remember(pp, 0)
+	ds.Remember(0, pp)
 
 	// Wind the recorded timestamp back past the TTL so the entry is expired.
 	var idx = ds.insertNext - 1
@@ -50,7 +50,7 @@ func Test_dedupe_check_expired_not_duplicate(t *testing.T) {
 	}
 	ds.history[idx].time_stamp = time.Now().Add(-1 * time.Hour)
 
-	assert.False(t, ds.Check(pp, 0), "expired entry should not be considered a duplicate")
+	assert.False(t, ds.Check(0, pp), "expired entry should not be considered a duplicate")
 }
 
 func Test_dedupe_check_empty_history_not_duplicate(t *testing.T) {
@@ -59,7 +59,7 @@ func Test_dedupe_check_empty_history_not_duplicate(t *testing.T) {
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
 
-	assert.False(t, ds.Check(pp, 0), "nothing has been remembered, so no duplicates")
+	assert.False(t, ds.Check(0, pp), "nothing has been remembered, so no duplicates")
 }
 
 // The digipeater checks and remembers from the receive thread, while APRStt
@@ -77,17 +77,17 @@ func Test_dedupe_concurrent_remember_and_check(t *testing.T) {
 		defer close(done)
 
 		for range 100 {
-			ds.Remember(pp, 0)
+			ds.Remember(0, pp)
 		}
 	}()
 
 	for range 100 {
-		ds.Check(pp, 0)
+		ds.Check(0, pp)
 	}
 
 	<-done
 
-	assert.True(t, ds.Check(pp, 0))
+	assert.True(t, ds.Check(0, pp))
 }
 
 // What the digipeater remembers sending, it also tells whoever it was handed
@@ -95,14 +95,14 @@ func Test_dedupe_concurrent_remember_and_check(t *testing.T) {
 func TestDedupeRememberTellsWhoItWasHanded(t *testing.T) {
 	var told []string
 
-	var ds = New(30*time.Second, func(pp *ax25.Packet, channel int) {
+	var ds = New(30*time.Second, func(channel int, pp *ax25.Packet) {
 		told = append(told, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
 	})
 
 	var pp = ax25.FromText("Q1TEST>APRS:test packet", true)
 	require.NotNil(t, pp)
 
-	ds.Remember(pp, 1)
+	ds.Remember(1, pp)
 
 	assert.Equal(t, []string{"1 Q1TEST>APRS:test packet"}, told)
 }

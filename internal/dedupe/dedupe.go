@@ -114,7 +114,7 @@ type Service struct {
 	// onRemember is told of each packet remembered, and its channel - the
 	// IGate, so it doesn't send to RF what the digipeater already has; nil
 	// for nobody to tell.
-	onRemember func(pp *ax25.Packet, channel int)
+	onRemember func(channel int, pp *ax25.Packet)
 }
 
 /*------------------------------------------------------------------------------
@@ -137,7 +137,7 @@ type Service struct {
  *
  *------------------------------------------------------------------------------*/
 
-func New(ttl time.Duration, onRemember func(pp *ax25.Packet, channel int)) *Service {
+func New(ttl time.Duration, onRemember func(channel int, pp *ax25.Packet)) *Service {
 	var ds = new(Service)
 	ds.historyTime = ttl
 	ds.onRemember = onRemember
@@ -157,9 +157,9 @@ func (ds *Service) TTL() time.Duration {
  * Purpose:	Save information about a packet being transmitted so we
  *		can detect, and avoid, duplicates later.
  *
- * Input:	pp	- Pointer to packet object.
+ * Input:	chan	- Radio channel for transmission.
  *
- *		chan	- Radio channel for transmission.
+ *		pp	- Pointer to packet object.
  *
  * Returns:	None
  *
@@ -186,7 +186,7 @@ func (ds *Service) TTL() time.Duration {
  *
  *------------------------------------------------------------------------------*/
 
-func (ds *Service) Remember(pp *ax25.Packet, channel int) {
+func (ds *Service) Remember(channel int, pp *ax25.Packet) {
 	ds.mu.Lock()
 	ds.history[ds.insertNext].time_stamp = time.Now()
 	ds.history[ds.insertNext].checksum = pp.DedupeCRC()
@@ -203,7 +203,7 @@ func (ds *Service) Remember(pp *ax25.Packet, channel int) {
 	/* Not sure about the other way around. */
 
 	if ds.onRemember != nil {
-		ds.onRemember(pp, channel)
+		ds.onRemember(channel, pp)
 	}
 }
 
@@ -213,16 +213,16 @@ func (ds *Service) Remember(pp *ax25.Packet, channel int) {
  *
  * Purpose:	Check whether this is a duplicate of another sent recently.
  *
- * Input:	pp	- Pointer to packet object.
+ * Input:	chan	- Radio channel for transmission.
  *
- *		chan	- Radio channel for transmission.
+ *		pp	- Pointer to packet object.
  *
  * Returns:	True if it is a duplicate.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func (ds *Service) Check(pp *ax25.Packet, channel int) bool {
+func (ds *Service) Check(channel int, pp *ax25.Packet) bool {
 	var crc = pp.DedupeCRC()
 	var now = time.Now()
 

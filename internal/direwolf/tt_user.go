@@ -126,7 +126,7 @@ type ttUsers struct {
 
 	// remember is told each object report we transmit, so the digipeater
 	// doesn't repeat our own, or is nil.
-	remember func(pp *ax25.Packet, channel int)
+	remember func(channel int, pp *ax25.Packet)
 
 	// toIGate sends an object report to APRS-IS, or is nil for no IGate.
 	toIGate func(channel int, pp *ax25.Packet)
@@ -670,7 +670,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	if !first_time && u.ttConfig.obj_xmit_chan >= 0 {
 		/* Remember it so we don't digipeat our own. */
 		if u.remember != nil {
-			u.remember(pp, u.ttConfig.obj_xmit_chan)
+			u.remember(u.ttConfig.obj_xmit_chan, pp)
 		}
 
 		transmitQueue.Append(u.ttConfig.obj_xmit_chan, TQ_PRIO_1_LO, pp)

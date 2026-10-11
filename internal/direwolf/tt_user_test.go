@@ -129,7 +129,7 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 
 	var remembered []string
 
-	var remember = func(pp *ax25.Packet, channel int) {
+	var remember = func(channel int, pp *ax25.Packet) {
 		assert.Equal(t, 0, channel)
 
 		remembered = append(remembered, pp.FormatAddrs()+string(pp.Info()))

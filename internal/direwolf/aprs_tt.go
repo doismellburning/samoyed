@@ -315,7 +315,7 @@ func NewTTGateway(
 	audioConfig *RadioConfig,
 	p *tt_config_s,
 	apps *clientApps,
-	remember func(pp *ax25.Packet, channel int),
+	remember func(channel int, pp *ax25.Packet),
 	toIGate func(channel int, pp *ax25.Packet),
 	recFrame frameReceiver,
 	audioLevel func(channel int, subchan int) ax25.ALevel,

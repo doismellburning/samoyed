@@ -2097,7 +2097,7 @@ func (h *ig2txHistory) reset() {
 }
 
 // rememberDigipeated is igToTxRemember for a packet the digipeater sent.
-func (ig *IGate) rememberDigipeated(pp *ax25.Packet, channel int) {
+func (ig *IGate) rememberDigipeated(channel int, pp *ax25.Packet) {
 	ig.igToTxRemember(pp, channel, 1)
 }
 
