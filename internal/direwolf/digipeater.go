@@ -101,7 +101,11 @@ type Digipeater struct {
 	config      *digi_config_s
 	filter      *pfilter.PacketFilter
 	dedupe      *dedupe.Service
-	count       [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
+
+	// transmitQueue is where the packets digipeated go to be sent.
+	transmitQueue *TransmitQueue
+
+	count [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
 }
 
 /*------------------------------------------------------------------------------
@@ -116,6 +120,8 @@ type Digipeater struct {
  *
  *		filter		- What decides whether FILTER lets a packet through.
  *
+ *		transmitQueue	- Where the packets digipeated go to be sent.
+ *
  *		onRemember	- Told of each packet digipeated, and its channel,
  *				  so the IGate doesn't send the same to RF; nil
  *				  for nobody to tell.
@@ -124,11 +130,12 @@ type Digipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, onRemember func(channel int, pp *ax25.Packet)) *Digipeater {
+func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, transmitQueue *TransmitQueue, onRemember func(channel int, pp *ax25.Packet)) *Digipeater {
 	var d = new(Digipeater)
 	d.audioConfig = p_audio_config
 	d.config = p_digi_config
 	d.filter = filter
+	d.transmitQueue = transmitQueue
 	d.dedupe = dedupe.New(time.Duration(p_digi_config.dedupe_time)*time.Second, onRemember)
 
 	return d
@@ -225,7 +232,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 					d.config.filter_str[from_chan][to_chan])
 				if result != nil {
 					d.dedupe.Remember(to_chan, pp)
-					transmitQueue.Append(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
+					d.transmitQueue.Append(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
 					d.count[from_chan][to_chan]++
 				}
 			}
@@ -249,7 +256,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 					d.config.filter_str[from_chan][to_chan])
 				if result != nil {
 					d.dedupe.Remember(to_chan, pp)
-					transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
+					d.transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
 					d.count[from_chan][to_chan]++
 				}
 			}
@@ -288,7 +295,7 @@ func (d *Digipeater) Regen(from_chan int, pp *ax25.Packet) {
 			var result = pp.Dup()
 			if result != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
-				transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result)
+				d.transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result)
 			}
 		}
 	}

@@ -26,18 +26,9 @@ const (
 )
 
 // setupDigipeater points a new APRS digipeater at two radio channels with our
-// callsign on each, and empties the transmit queues it fills.
+// callsign on each, and a transmit queue of its own.
 func setupDigipeater(t *testing.T) (*Digipeater, *digi_config_s) {
 	t.Helper()
-
-	t.Cleanup(func() {
-		for c := range MAX_RADIO_CHANS {
-			for p := range TQ_NUM_PRIO {
-				for transmitQueue.Remove(c, p) != nil { //revive:disable-line:empty-block
-				}
-			}
-		}
-	})
 
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[digiFromChan] = MEDIUM_RADIO
@@ -48,9 +39,7 @@ func setupDigipeater(t *testing.T) (*Digipeater, *digi_config_s) {
 	var digiConfig = new(digi_config_s)
 	digiConfig.dedupe_time = 30
 
-	transmitQueue.Init(audioConfig)
-
-	return NewDigipeater(audioConfig, digiConfig, new(pfilter.PacketFilter), nil), digiConfig
+	return NewDigipeater(audioConfig, digiConfig, new(pfilter.PacketFilter), newTestTransmitQueue(t, audioConfig), nil), digiConfig
 }
 
 // enableDigipeat turns on digipeating from digiFromChan to the given channel,
@@ -75,7 +64,7 @@ func TestDigipeaterSameChannel(t *testing.T) {
 
 	digi.Digipeat(digiFromChan, pp)
 
-	var sent = transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI)
+	var sent = digi.transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
 	assert.Equal(t, "Q3TEST>APDW17,Q1TEST*,WIDE2-1:", sent.FormatAddrs())
 
@@ -94,9 +83,9 @@ func TestDigipeaterCrossChannel(t *testing.T) {
 
 	digi.Digipeat(digiFromChan, pp)
 
-	assert.Nil(t, transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
+	assert.Nil(t, digi.transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
 
-	var sent = transmitQueue.Remove(digiToChan, TQ_PRIO_1_LO)
+	var sent = digi.transmitQueue.Remove(digiToChan, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "the repeated frame was not queued for the other channel")
 	assert.Equal(t, "Q3TEST>APDW17,Q2TEST*,WIDE2-1:", sent.FormatAddrs(),
 		"the callsign of the channel it goes out on should have been used")
@@ -116,7 +105,7 @@ func TestDigipeaterRemembersWhatItRepeated(t *testing.T) {
 
 	digi.Digipeat(digiFromChan, pp)
 
-	require.NotNil(t, transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))
+	require.NotNil(t, digi.transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))
 
 	assert.True(t, digi.dedupe.Check(digiFromChan, pp),
 		"the repeated frame was not remembered, so the next copy of it would go out too")
@@ -134,7 +123,7 @@ func TestDigipeaterNotEnabled(t *testing.T) {
 
 	for c := range MAX_RADIO_CHANS {
 		for p := range TQ_NUM_PRIO {
-			assert.Nil(t, transmitQueue.Remove(c, p), "channel %d repeated a frame with digipeating disabled", c)
+			assert.Nil(t, digi.transmitQueue.Remove(c, p), "channel %d repeated a frame with digipeating disabled", c)
 		}
 	}
 }
@@ -151,7 +140,7 @@ func TestDigipeaterNothingToDo(t *testing.T) {
 
 	digi.Digipeat(digiFromChan, pp)
 
-	assert.Nil(t, transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))
+	assert.Nil(t, digi.transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))
 	assert.Zero(t, digi.GetCount(digiFromChan, digiFromChan))
 }
 
@@ -182,7 +171,7 @@ func TestDigiRegen(t *testing.T) {
 
 	digi.Regen(digiFromChan, pp)
 
-	var sent = transmitQueue.Remove(digiToChan, TQ_PRIO_1_LO)
+	var sent = digi.transmitQueue.Remove(digiToChan, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "nothing was regenerated")
 	assert.Equal(t, "Q3TEST>APDW17,WIDE2-2:", sent.FormatAddrs(),
 		"a regenerated frame goes out exactly as it arrived")
@@ -198,7 +187,7 @@ func TestDigiRegenDisabled(t *testing.T) {
 	digi.Regen(digiFromChan, pp)
 
 	for c := range MAX_RADIO_CHANS {
-		assert.Nil(t, transmitQueue.Remove(c, TQ_PRIO_1_LO))
+		assert.Nil(t, digi.transmitQueue.Remove(c, TQ_PRIO_1_LO))
 	}
 }
 
@@ -209,11 +198,14 @@ func TestNewDigipeater(t *testing.T) {
 
 	var filter = new(pfilter.PacketFilter)
 
-	var digi = NewDigipeater(audioConfig, digiConfig, filter, nil)
+	var tq = newTestTransmitQueue(t, audioConfig)
+
+	var digi = NewDigipeater(audioConfig, digiConfig, filter, tq, nil)
 
 	assert.Same(t, audioConfig, digi.audioConfig)
 	assert.Same(t, digiConfig, digi.config)
 	assert.Same(t, filter, digi.filter)
+	assert.Same(t, tq, digi.transmitQueue)
 	require.NotNil(t, digi.dedupe, "the duplicate suppression the digipeater relies on was not set up")
 	assert.Equal(t, 30*time.Second, digi.dedupe.TTL())
 }
@@ -241,6 +233,6 @@ func TestDigipeaterRemember(t *testing.T) {
 	digi.Remember(digiFromChan, pp)
 	digi.Digipeat(digiFromChan, pp)
 
-	assert.Nil(t, transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))
+	assert.Nil(t, digi.transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))
 	assert.Zero(t, digi.GetCount(digiFromChan, digiFromChan))
 }
