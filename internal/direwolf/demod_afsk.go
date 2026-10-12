@@ -743,17 +743,13 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 			#endif
 		*/
 
-		// #if 1
+		// TODO: new feature to measure data speed error, as 9600 and PSK do.
+		// Unlike them, this neither counts symbols nor sums the nudges (see
+		// below), so the HDLC receiver never sees a symbol count above 0 and
+		// records a speed error of 0, as Dire Wolf does for AFSK.
 		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
-		D.receiver.RecBit(from, dwutil.IfThenElse(demod_out > 0, 1, 0), false)
-		/*
-			#else  // TODO: new feature to measure data speed error.
-			// Maybe hdlc_rec_bit could provide indication when frame starts.
-				  hdlc_rec_bit_new (channel, subchannel, slice, demod_out > 0, 0, quality,
-						&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count));
-				  D.slicer[slice].pll_symbol_count++;
-			#endif
-		*/
+		D.receiver.RecBitNew(from, dwutil.IfThenElse(demod_out > 0, 1, 0), false,
+			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		pll_dcd_each_symbol2(DCD_CONFIG_AFSK, D, channel, subchannel, slice)
 	}
 
