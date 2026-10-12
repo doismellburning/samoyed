@@ -163,7 +163,7 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 	b.ResetTimer()
 
 	for i := range b.N {
-		receiver.RecBit(from, bits[i%len(bits)], false, 0)
+		receiver.RecBit(from, bits[i%len(bits)], false)
 	}
 }
 
@@ -206,7 +206,7 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	// bit first.
 	for _, b := range []byte{0xab, 0xab, 0xab, 0xab, 'N', 'N', 'N', 'N'} {
 		for i := range 8 {
-			receiver.RecBit(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0}, int(b>>i)&1, false, 0)
+			receiver.RecBit(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0}, int(b>>i)&1, false)
 		}
 	}
 
@@ -214,7 +214,7 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 
 	// "NNNN" ends on a 0, which is also where an untouched line decoder
 	// starts, so end on a 1 that the decoder would remember if it saw it.
-	receiver.RecBit(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0}, 1, false, 0)
+	receiver.RecBit(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0}, 1, false)
 
 	assert.False(t, s.line.PrevRaw(), "the line decoder should not have been given any bits")
 }
@@ -380,9 +380,9 @@ type countingBitReceiver struct {
 	bits int
 }
 
-func (r *countingBitReceiver) RecBit(dwcore.SlicerID, int, bool, int) { r.bits++ }
+func (r *countingBitReceiver) RecBit(dwcore.SlicerID, int, bool) { r.bits++ }
 
-func (r *countingBitReceiver) RecBitNew(dwcore.SlicerID, int, bool, int, *int64, *int) { r.bits++ }
+func (r *countingBitReceiver) RecBitNew(dwcore.SlicerID, int, bool, *int64, *int) { r.bits++ }
 
 func (r *countingBitReceiver) DCDChange(dwcore.SlicerID, int) {}
 

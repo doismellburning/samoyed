@@ -871,23 +871,19 @@ func (r *Layer2Receiver) toMultiModem(from dwcore.SlicerID, pp *ax25.Packet, rxI
  *
  *		is_scrambled - Is the data scrambled?
  *
- *		descram_state - Current descrambler state.  (not used - remove)
- *				Not so fast - plans to add new parameter.  PSK already provides it.
- *
- *
  * Description:	This is called once for each received bit.
  *		For each valid frame, process_rec_frame()
  *		is called for further processing.
  *
  ***********************************************************************************/
 
-func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw int, is_scrambled bool, not_used_remove int) {
+func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw int, is_scrambled bool) {
 	var dummyll int64
 	var dummy int
-	r.RecBitNew(from, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
+	r.RecBitNew(from, raw, is_scrambled, &dummyll, &dummy)
 }
 
-func (r *Layer2Receiver) RecBitNew(from dwcore.SlicerID, _raw int, is_scrambled bool, not_used_remove int,
+func (r *Layer2Receiver) RecBitNew(from dwcore.SlicerID, _raw int, is_scrambled bool,
 	pll_nudge_total *int64, pll_symbol_count *int) {
 	var channel = from.Channel
 	var raw = _raw != 0

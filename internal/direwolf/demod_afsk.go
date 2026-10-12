@@ -745,7 +745,7 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 
 		// #if 1
 		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
-		D.receiver.RecBit(from, dwutil.IfThenElse(demod_out > 0, 1, 0), false, 0)
+		D.receiver.RecBit(from, dwutil.IfThenElse(demod_out > 0, 1, 0), false)
 		/*
 			#else  // TODO: new feature to measure data speed error.
 			// Maybe hdlc_rec_bit could provide indication when frame starts.
