@@ -270,11 +270,11 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	// is longer than the terminal will hold.
 	var got = drainKissFrame(t, client)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		ks.SendRecPacket(0, kiss.CmdDataFrame, frame)
 	})
 
-	assert.Contains(t, output, "Truncated")
+	assert.Contains(t, output, "truncated")
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
 	assert.Len(t, <-got, ax25.MaxPacketLen+3)
@@ -433,16 +433,16 @@ func TestKissSerialPollingStopsWhenCancelled(t *testing.T) {
 func TestKissSerialDebugPrints(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 2)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		ks.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readSerialKissFrame(t, client)
 	})
 
 	assert.Contains(t, output, "Packet content before adding KISS framing")
-	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
+	assert.Contains(t, output, `channel=1 direction=to function="Data frame"`)
 
-	output = testutils.CaptureOutput(t, func() {
+	output = captureKissLog(t, func() {
 		ks.prompt([]byte("\r\ncmd:"))
 	})
 

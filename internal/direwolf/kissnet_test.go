@@ -371,17 +371,17 @@ func TestKissNetDebugPrints(t *testing.T) {
 	// newAttachedKissNet starts no goroutines, so the level can be set directly.
 	kns.debug = 2
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		kns.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readKissNetFrame(t, clients[0])
 	})
 
 	assert.Contains(t, output, "Packet content before adding KISS framing")
-	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
+	assert.Contains(t, output, `channel=1 direction=to function="Data frame"`)
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	output = testutils.CaptureOutput(t, func() {
+	output = captureKissLog(t, func() {
 		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
 	})
 
