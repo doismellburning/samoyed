@@ -249,13 +249,20 @@ func (kp *KissPT) write(master *os.File, buf []byte) {
 	var n, err = master.Write(buf)
 
 	if n != len(buf) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%s, len=%d, write returned %d, err = %s\n\n",
-			master.Name(), len(buf), n, err)
+		var entry = logrus.WithFields(logrus.Fields{
+			"device":  master.Name(),
+			"length":  len(buf),
+			"written": n,
+		})
+		if err != nil {
+			entry = entry.WithError(err)
+		}
+
+		entry.Error("Error sending KISS message to client application on pseudo terminal")
 	} else if err != nil /* TODO KG Need to test real behaviour here: && errno == EWOULDBLOCK */ {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS SEND - Discarding message because no one is listening.\n")
-		dw_printf("This happens when you use the -p option and don't read from the pseudo terminal.\n")
+		logrus.WithError(err).WithField(
+			"hint", "This happens when you use the -p option and don't read from the pseudo terminal",
+		).Info("KISS send discarding message because no one is listening")
 	}
 }
 
@@ -265,16 +272,14 @@ func (kp *KissPT) openPT() {
 	logrus.Debug("KissPT.openPT")
 	var ptmx, pts, err = pty.Open()
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Could not create pseudo terminal for KISS TNC: %s.\n", err)
+		logrus.WithError(err).Error("Could not create pseudo terminal for KISS TNC")
 
 		return
 	}
 
 	var master, pollableErr = pollable(ptmx)
 	if pollableErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Could not set up pseudo terminal for KISS TNC: %s.\n", pollableErr)
+		logrus.WithError(pollableErr).Error("Could not set up pseudo terminal for KISS TNC")
 		pts.Close()
 
 		return
@@ -321,8 +326,7 @@ func (kp *KissPT) openPT() {
 	}
 	*/
 
-	text_color_set(DW_COLOR_INFO)
-	dw_printf("Virtual KISS TNC is available on %s\n", kp.slave.Name())
+	logrus.WithField("device", kp.slave.Name()).Info("Virtual KISS TNC is available")
 
 	// Sample code shows this. Why would we open it here?
 	// On Ubuntu, the slave side disappears after a few
@@ -462,8 +466,7 @@ func (kp *KissPT) get(ctx context.Context) (byte, error) {
 			return ch[0], nil
 		}
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nError receiving KISS message from client application.  Closing %s. %s\n\n", kp.slave.Name(), err)
+			logrus.WithError(err).WithField("device", kp.slave.Name()).Error("Error receiving KISS message from client application, closing")
 
 			kp.closePTIfCurrent(master)
 
