@@ -6,8 +6,10 @@ package direwolf
 import (
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // PSK has no decimating path, so decimation is ruled out for it, and said so
@@ -18,9 +20,17 @@ func TestSettleModemOptionsRejectsPSKDecimation(t *testing.T) {
 		var audioConfig = newTestRadioConfig(channel, modemType, 2400, 0, 0, 44100)
 		audioConfig.achan[channel].decimate = 3
 
-		testutils.AssertOutputContains(t, func() {
-			settleModemOptions(audioConfig)
-		}, "Decimation is not supported for PSK")
+		var hook = test.NewGlobal()
+
+		settleModemOptions(audioConfig)
+
+		var entry = lastEntryWithMessage(hook, "Decimation is not supported for PSK, ignoring")
+
+		require.NotNil(t, entry)
+		assert.Equal(t, logrus.WarnLevel, entry.Level)
+		assert.Equal(t, 3, entry.Data["decimate"])
+
+		hook.Reset()
 
 		assert.Equal(t, 1, audioConfig.achan[channel].decimate)
 	}
@@ -51,12 +61,19 @@ func TestSettleModemOptionsTurnsOffFixBitsForEASAndAIS(t *testing.T) {
 		audioConfig.achan[channel].fix_bits = RETRY_INVERT_SINGLE
 		audioConfig.achan[channel].passall = true
 
-		var output = testutils.CaptureOutput(t, func() {
-			settleModemOptions(audioConfig)
-		})
+		var hook = test.NewGlobal()
 
-		assert.Contains(t, output, "Channel 0: FIX_BITS option has been turned off for "+tc.name)
-		assert.Contains(t, output, "Channel 0: PASSALL option has been turned off for "+tc.name)
+		settleModemOptions(audioConfig)
+
+		for _, message := range []string{"FIX_BITS option has been turned off", "PASSALL option has been turned off"} {
+			var entry = lastEntryWithMessage(hook, message)
+
+			require.NotNil(t, entry, message)
+			assert.Equal(t, channel, entry.Data["channel"])
+			assert.Equal(t, tc.name, entry.Data["modem"])
+		}
+
+		hook.Reset()
 		assert.Equal(t, RETRY_NONE, audioConfig.achan[channel].fix_bits)
 		assert.False(t, audioConfig.achan[channel].passall)
 	}
@@ -81,17 +98,23 @@ func TestSettleModemOptionsDefaultsV26Alternative(t *testing.T) {
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
 
-	testutils.AssertOutputContains(t, func() {
-		settleModemOptions(audioConfig)
-	}, "The default is now MFJ-2400 compatibility mode.")
+	var hook = test.NewGlobal()
 
+	t.Cleanup(hook.Reset)
+
+	settleModemOptions(audioConfig)
+
+	var entry = hook.LastEntry()
+
+	require.NotNil(t, entry)
+	assert.Contains(t, entry.Message, "Defaulting to MFJ-2400 compatibility mode")
 	assert.Equal(t, V26_DEFAULT, audioConfig.achan[channel].v26_alternative)
 
-	var output = testutils.CaptureOutput(t, func() {
-		settleModemOptions(audioConfig)
-	})
+	hook.Reset()
 
-	assert.Empty(t, output, "a V.26 alternative already chosen is left alone")
+	settleModemOptions(audioConfig)
+
+	assert.Empty(t, hook.AllEntries(), "a V.26 alternative already chosen is left alone")
 	assert.Equal(t, V26_DEFAULT, audioConfig.achan[channel].v26_alternative)
 }
 

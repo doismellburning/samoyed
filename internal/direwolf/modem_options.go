@@ -3,7 +3,10 @@
 
 package direwolf
 
-import "github.com/doismellburning/samoyed/internal/dwutil"
+import (
+	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
+)
 
 // settleModemOptions applies, to each radio channel, the rules about which
 // modem options go together, so that the configuration is final before any
@@ -29,15 +32,19 @@ func (achan *achan_param_s) settleModemOptions(channel int) {
 		var name = dwutil.IfThenElse(achan.modem_type == MODEM_EAS, "EAS", "AIS")
 
 		if achan.fix_bits != RETRY_NONE {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Channel %d: FIX_BITS option has been turned off for %s.\n", channel, name)
+			logrus.WithFields(logrus.Fields{
+				"channel": channel,
+				"modem":   name,
+			}).Info("FIX_BITS option has been turned off")
 
 			achan.fix_bits = RETRY_NONE
 		}
 
 		if achan.passall {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Channel %d: PASSALL option has been turned off for %s.\n", channel, name)
+			logrus.WithFields(logrus.Fields{
+				"channel": channel,
+				"modem":   name,
+			}).Info("PASSALL option has been turned off")
 
 			achan.passall = false
 		}
@@ -55,14 +62,10 @@ func (achan *achan_param_s) settleModemOptions(channel int) {
 		// The transmitter reads this too, so it has to be settled before
 		// either end is set up.
 		if achan.v26_alternative == V26_UNSPECIFIED {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Two incompatible versions of 2400 bps QPSK are now available.\n")
-			dw_printf("For compatibility with direwolf <= 1.5, use 'V26A' modem option in config file.\n")
-			dw_printf("For compatibility MFJ-2400 use 'V26B' modem option in config file.\n")
-			dw_printf("Command line options -j and -J can be used for channel 0.\n")
-			dw_printf("For more information, read the Dire Wolf User Guide and\n")
-			dw_printf("2400-4800-PSK-for-APRS-Packet-Radio.pdf.\n")
-			dw_printf("The default is now MFJ-2400 compatibility mode.\n")
+			logrus.WithField("channel", channel).Warn("Two incompatible versions of 2400 bps QPSK are available; " +
+				"use the 'V26A' modem option for compatibility with direwolf <= 1.5, or 'V26B' for MFJ-2400 " +
+				"(-j and -J on the command line for channel 0; see the Dire Wolf User Guide and 2400-4800-PSK-for-APRS-Packet-Radio.pdf). " +
+				"Defaulting to MFJ-2400 compatibility mode")
 
 			achan.v26_alternative = V26_DEFAULT
 		}
@@ -82,8 +85,10 @@ func (achan *achan_param_s) settleModemOptions(channel int) {
 // configuration asked for decimation.
 func (achan *achan_param_s) forbidPSKDecimation(channel int) {
 	if achan.decimate > 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Channel %d: Decimation is not supported for PSK - ignoring.\n", channel)
+		logrus.WithFields(logrus.Fields{
+			"channel":  channel,
+			"decimate": achan.decimate,
+		}).Warn("Decimation is not supported for PSK, ignoring")
 	}
 
 	achan.decimate = 1
