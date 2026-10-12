@@ -52,7 +52,7 @@ func TestEASReceiverHandsMessagesToItsSink(t *testing.T) {
 			// bit first, as same_send.go sends them.
 			for _, b := range append([]byte{0xab, 0xab, 0xab, 0xab}, message...) {
 				for i := range 8 {
-					rx.RecBit(int(b>>i)&1, 0)
+					rx.RecBit(int(b>>i) & 1)
 				}
 			}
 

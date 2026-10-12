@@ -910,7 +910,7 @@ func (r *Layer2Receiver) RecBitNew(from dwcore.SlicerID, _raw int, is_scrambled 
 	// EAS does not use HDLC.
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.eas.RecBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
+		s.eas.RecBit(dwutil.IfThenElse(raw, 1, 0))
 
 		return
 	}

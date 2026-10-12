@@ -60,21 +60,12 @@ func NewReceiver(from dwcore.SlicerID, audioLevel dwcore.AudioLevelFunc, sink dw
 
 /***********************************************************************************
  *
- * Name:	eas_rec_bit
+ * Name:	Receiver.RecBit
  *
  * Purpose:	Extract EAS trasmissions from a stream of bits.
  *
- * Inputs:	channel	- Channel number.
- *
- *		subchannel	- This allows multiple demodulators per channel.
- *
- *		slice	- Allows multiple slicers per demodulator (subchannel).
- *
- *		raw 	- One bit from the demodulator.
+ * Inputs:	raw 	- One bit from the demodulator.
  *			  should be 0 or 1.
- *
- *		future_use - Not implemented yet.  PSK already provides it.
- *
  *
  * Description:	This is called once for each received bit.
  *		Each valid transmission is handed to the receiver's sink,
@@ -87,7 +78,7 @@ const PREAMBLE_ZCZC = 0x435a435aabababab
 const PREAMBLE_NNNN = 0x4e4e4e4eabababab
 const EAS_MAX_LEN = 268 // Not including preamble.  Up to 31 geographic areas.
 
-func (s *Receiver) RecBit(raw int, future_use int) {
+func (s *Receiver) RecBit(raw int) {
 	//dw_printf ("slice %d = %d\n", s.from.Slice, raw);
 
 	// Accumulate most recent 64 bits.
