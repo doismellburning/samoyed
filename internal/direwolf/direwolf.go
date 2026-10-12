@@ -712,11 +712,9 @@ x = Silence FX.25 information.`)
 
 	kissNetSvc.Start(ctx, kissHandler)
 
-	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
-	// Let's just check [0] for now...
-	if misc_config.kiss_port[0] > 0 && misc_config.dns_sd_enabled {
+	if misc_config.dns_sd_enabled {
 		var ports = new(announce.Ports)
-		ports.KISS = misc_config.kiss_port[:1]
+		ports.KISS = misc_config.kiss_port[:]
 
 		announce.Announce(ctx, announce.Services(misc_config.dns_sd_name, ports))
 	}

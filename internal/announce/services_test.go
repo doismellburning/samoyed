@@ -20,6 +20,24 @@ func TestServicesKISS(t *testing.T) {
 		Services("Q1TEST TNC", ports))
 }
 
+// Each KISS port is announced, the second and later carrying their port number
+// so that each instance name stays unique.  The first, which once was all we
+// announced, keeps the plain name; an unused slot before it doesn't change that.
+func TestServicesEveryKISSPort(t *testing.T) {
+	t.Parallel()
+
+	var ports = new(Ports)
+	ports.KISS = []int{0, 8001, 0, 8002, 8003}
+
+	assert.Equal(t,
+		[]Service{
+			{Name: "Q1TEST TNC", Type: KISSType, Port: 8001},
+			{Name: "Q1TEST TNC (port 8002)", Type: KISSType, Port: 8002},
+			{Name: "Q1TEST TNC (port 8003)", Type: KISSType, Port: 8003},
+		},
+		Services("Q1TEST TNC", ports))
+}
+
 // With no name configured we fall back to the hostname-derived default.
 func TestServicesDefaultsName(t *testing.T) {
 	t.Parallel()
