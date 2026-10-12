@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -17,9 +18,32 @@ import (
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// captureIGateLog runs fn and returns what it wrote to stdout, along with what
+// it logged at Debug level and above: the IGate logs through logrus, and its
+// "-d ig" output goes out at Debug.
+func captureIGateLog(t *testing.T, fn func()) string {
+	t.Helper()
+
+	return testutils.CaptureOutput(t, func() {
+		var oldLogOutput = logrus.StandardLogger().Out
+		var oldLevel = logrus.GetLevel()
+
+		logrus.SetOutput(os.Stdout)
+		logrus.SetLevel(logrus.DebugLevel)
+
+		defer func() {
+			logrus.SetOutput(oldLogOutput)
+			logrus.SetLevel(oldLevel)
+		}()
+
+		fn()
+	})
+}
 
 func Test_is_message_message(t *testing.T) {
 	tests := []struct {
@@ -407,7 +431,7 @@ func TestIGateUplinkCountsOnlyWhatWasSent(t *testing.T) {
 			var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 			require.NotNil(t, pp)
 
-			testutils.CaptureOutput(t, func() { ig.sendPacketToServer(tc.conn, pp, 0) })
+			captureIGateLog(t, func() { ig.sendPacketToServer(tc.conn, pp, 0) })
 
 			assert.Equal(t, 0, ig.uplinkCount())
 			assert.Equal(t, 0, ig.stats.uplinkBytes)
@@ -466,7 +490,7 @@ func TestIGateTransmitPathSaysNo(t *testing.T) {
 func TestIGateTransmitUnparseable(t *testing.T) {
 	var ig, tq = setupIGateToRadio(t)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureIGateLog(t, func() {
 		ig.maybeXmitPacketFromIGate([]byte("this is not a packet"), 0)
 	})
 
@@ -556,7 +580,7 @@ func TestIGToTxAllowDropsDuplicates(t *testing.T) {
 
 	ig.igToTxRemember(pp, 0, 0)
 
-	var output = testutils.CaptureOutput(t, func() { assert.False(t, ig.igToTxAllow(pp, 0)) })
+	var output = captureIGateLog(t, func() { assert.False(t, ig.igToTxAllow(pp, 0)) })
 
 	assert.Contains(t, output, "Drop duplicate packet transmitted recently")
 
@@ -583,7 +607,7 @@ func TestIGToTxHistoryConcurrent(t *testing.T) {
 		}
 	}()
 
-	testutils.CaptureOutput(t, func() {
+	captureIGateLog(t, func() {
 		for range 100 {
 			ig.igToTxAllow(pp, 0)
 		}
@@ -591,7 +615,7 @@ func TestIGToTxHistoryConcurrent(t *testing.T) {
 
 	<-done
 
-	testutils.CaptureOutput(t, func() { assert.False(t, ig.igToTxAllow(pp, 0)) })
+	captureIGateLog(t, func() { assert.False(t, ig.igToTxAllow(pp, 0)) })
 }
 
 // The receive history is remembered into and consulted by everything that
@@ -634,7 +658,7 @@ func TestIGateConnectionStateConcurrent(t *testing.T) {
 	var pp = ax25.FromText("Q2TEST>APWW10:>hello", true)
 	require.NotNil(t, pp)
 
-	testutils.CaptureOutput(t, func() {
+	captureIGateLog(t, func() {
 		var ctx, cancel = context.WithCancel(t.Context())
 
 		var recvDone = make(chan struct{})
@@ -736,9 +760,10 @@ func TestIGToTxAllowRateLimits(t *testing.T) {
 	var next = ax25.FromText("Q2TEST>APWW10:>one too many", true)
 	require.NotNil(t, next)
 
-	var output = testutils.CaptureOutput(t, func() { assert.False(t, ig.igToTxAllow(next, 0)) })
+	var output = captureIGateLog(t, func() { assert.False(t, ig.igToTxAllow(next, 0)) })
 
-	assert.Contains(t, output, "maximum of 2 packets in 1 minute")
+	assert.Contains(t, output, "maximum packets in 1 minute")
+	assert.Contains(t, output, "limit=2")
 }
 
 // The five minute limit is separate, and reached by packets that the one
@@ -759,9 +784,10 @@ func TestIGToTxAllowFiveMinuteLimit(t *testing.T) {
 	var next = ax25.FromText("Q2TEST>APWW10:>one too many", true)
 	require.NotNil(t, next)
 
-	var output = testutils.CaptureOutput(t, func() { assert.False(t, ig.igToTxAllow(next, 0)) })
+	var output = captureIGateLog(t, func() { assert.False(t, ig.igToTxAllow(next, 0)) })
 
-	assert.Contains(t, output, "maximum of 3 packets in 5 minutes")
+	assert.Contains(t, output, "maximum packets in 5 minutes")
+	assert.Contains(t, output, "limit=3")
 }
 
 // Messages get three times the limit: they are rare, deliberate, and it would
@@ -857,7 +883,7 @@ func TestIGateSatgateQueueConcurrent(t *testing.T) {
 	ig.config.satgate_delay = MAX_SATGATE_DELAY // Nothing comes due during the test.
 	ig.dpQueueHead = nil
 
-	testutils.CaptureOutput(t, func() {
+	captureIGateLog(t, func() {
 		var stop = make(chan struct{})
 
 		var done = make(chan struct{})
@@ -905,7 +931,7 @@ func TestIGateSatgateDelaysDirectPackets(t *testing.T) {
 	var pp = ax25.FromText("Q2TEST>APDW17,WIDE1-1:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = testutils.CaptureOutput(t, func() { ig.sendRecPacket(0, pp) })
+	var output = captureIGateLog(t, func() { ig.sendRecPacket(0, pp) })
 
 	assert.Contains(t, output, "SATgate mode, delay packet heard directly")
 	assert.NotNil(t, ig.dpQueueHead, "the packet was not put on the delay queue")
@@ -949,7 +975,7 @@ func TestIGateSatgateWaitsForLogin(t *testing.T) {
 	var pp = ax25.FromText("Q2TEST>APDW17,WIDE1-1:>hello", true)
 	require.NotNil(t, pp)
 
-	testutils.CaptureOutput(t, func() { ig.satgateDelayPacket(pp, 0) })
+	captureIGateLog(t, func() { ig.satgateDelayPacket(pp, 0) })
 	pp.SetReleaseTime(time.Now().Add(-time.Second))
 
 	// Reconnected, but not logged in yet.
@@ -996,7 +1022,7 @@ func TestIGateSatgateQueueKeepsOrder(t *testing.T) {
 		var pp = ax25.FromText(text, true)
 		require.NotNil(t, pp)
 
-		testutils.CaptureOutput(t, func() { ig.satgateDelayPacket(pp, 0) })
+		captureIGateLog(t, func() { ig.satgateDelayPacket(pp, 0) })
 	}
 
 	require.NotNil(t, ig.dpQueueHead)
@@ -1018,7 +1044,7 @@ func TestIGateDebugOutput(t *testing.T) {
 	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = testutils.CaptureOutput(t, func() { ig.sendRecPacket(0, pp) })
+	var output = captureIGateLog(t, func() { ig.sendRecPacket(0, pp) })
 
 	assert.Contains(t, output, "[rx>ig]")
 	assert.Contains(t, output, "rx_to_ig_allow? YES")
@@ -1027,9 +1053,9 @@ func TestIGateDebugOutput(t *testing.T) {
 	readFromIGate(t, server)
 
 	// And the second time round, why it was dropped.
-	output = testutils.CaptureOutput(t, func() { ig.sendRecPacket(0, pp) })
+	output = captureIGateLog(t, func() { ig.sendRecPacket(0, pp) })
 
-	assert.Contains(t, output, "rx_to_ig_allow? NO. Seen")
+	assert.Contains(t, output, "rx_to_ig_allow? NO, seen recently")
 	assert.Contains(t, output, "Drop duplicate of same packet seen recently")
 }
 
@@ -1042,7 +1068,7 @@ func TestIGateToRadioDebugOutput(t *testing.T) {
 	var pp = ax25.FromText("Q2TEST>APWW10:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureIGateLog(t, func() {
 		assert.True(t, ig.igToTxAllow(pp, 0))
 
 		ig.igToTxRemember(pp, 0, 0)
@@ -1052,14 +1078,15 @@ func TestIGateToRadioDebugOutput(t *testing.T) {
 
 	assert.Contains(t, output, "ig_to_tx_allow? YES")
 	assert.Contains(t, output, "ig_to_tx_remember")
-	assert.Contains(t, output, "ig_to_tx_allow? NO. Duplicate sent")
+	assert.Contains(t, output, "ig_to_tx_allow? NO, duplicate sent recently")
 
 	// And a packet turned away for its path.
-	output = testutils.CaptureOutput(t, func() {
+	output = captureIGateLog(t, func() {
 		ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,NOGATE:>hello"), 0)
 	})
 
-	assert.Contains(t, output, "Do not transmit with NOGATE in path")
+	assert.Contains(t, output, "Do not transmit, via path forbids it")
+	assert.Contains(t, output, "via=NOGATE")
 }
 
 // The RF>IS side says why it dropped something too.
@@ -1073,16 +1100,16 @@ func TestIGateSendRecPacketDebugOutput(t *testing.T) {
 		text   string
 		expect string
 	}{
-		{"path says no", "Q2TEST>APDW17,NOGATE:>hello", "Do not relay with NOGATE in path"},
+		{"path says no", "Q2TEST>APDW17,NOGATE:>hello", "via=NOGATE"},
 		{"generic query", "Q2TEST>APDW17:?APRS?", "Do not relay generic query"},
 		{"no information", "Q2TEST>APDW17:", "Information part length is zero"},
-		{"third party", "Q3TEST>APDW17:}Q2TEST>APDW17,TCPIP:>inner", "Do not relay with TCPIP in path"},
+		{"third party", "Q3TEST>APDW17:}Q2TEST>APDW17,TCPIP:>inner", "via=TCPIP"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			var pp = ax25.FromText(c.text, true)
 			require.NotNil(t, pp)
 
-			var output = testutils.CaptureOutput(t, func() { ig.sendRecPacket(0, pp) })
+			var output = captureIGateLog(t, func() { ig.sendRecPacket(0, pp) })
 
 			assert.Contains(t, output, c.expect)
 		})
@@ -1094,9 +1121,9 @@ func TestIGateSendRecPacketDebugOutput(t *testing.T) {
 	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = testutils.CaptureOutput(t, func() { ig.sendRecPacket(0, pp) })
+	var output = captureIGateLog(t, func() { ig.sendRecPacket(0, pp) })
 
-	assert.Contains(t, output, "was rejected by filter")
+	assert.Contains(t, output, "rejected by filter")
 }
 
 // The GPS reader's debug level and the IGate's were separate file-scope
@@ -1115,7 +1142,7 @@ func TestNewGPSLeavesTheIGateDebugLevelAlone(t *testing.T) {
 	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = testutils.CaptureOutput(t, func() { ig.sendRecPacket(0, pp) })
+	var output = captureIGateLog(t, func() { ig.sendRecPacket(0, pp) })
 
 	assert.Contains(t, output, "rx_to_ig_allow? YES", "the IGate stopped reporting at its own debug level")
 
