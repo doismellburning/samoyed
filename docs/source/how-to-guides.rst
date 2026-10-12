@@ -44,9 +44,9 @@ reads the file and stops there:
 
     $ samoyed-direwolf -c /etc/direwolf.conf --config-check
 
-    Reading config file /etc/direwolf.conf
-    Line 12: Invalid port number "eight thousand" for AGWPORT command.
-    Config file: Unrecognized command 'MYCAL' on line 17.
+    INFO[2026-10-18T17:20:03.141Z] Reading config file                           file=/etc/direwolf.conf
+    ERRO[2026-10-18T17:20:03.141Z] Line 12: Invalid port number "eight thousand" for AGWPORT command.
+    ERRO[2026-10-18T17:20:03.141Z] Config file: Unrecognized command 'MYCAL' on line 17.
 
     Configuration file /etc/direwolf.conf: 2 errors, 0 warnings.
 

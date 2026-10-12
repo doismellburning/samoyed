@@ -649,7 +649,8 @@ legacy: |
 	t.Run("an unknown PTT method is refused", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0, ptt: {method: pigeon}}\n")
 		assert.Equal(t, 1, c.errors)
-		assert.Contains(t, c.output, "Unknown PTT method \"pigeon\"")
+		// logrus quotes the message, escaping the quotes inside it.
+		assert.Contains(t, c.output, `Unknown PTT method \"pigeon\"`)
 		assert.Equal(t, PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].Method)
 	})
 
@@ -669,7 +670,7 @@ legacy: |
 		var c = parseConfigNamed(t, "samoyed*.yaml", "channels:\n  - {channel: 0, mycall: Q1TEST}\n")
 		assert.True(t, c.fatal)
 		assert.Contains(t, c.output, "line 1")
-		assert.Contains(t, c.output, `top-level "samoyed" key`)
+		assert.Contains(t, c.output, `top-level \"samoyed\" key`)
 		assert.True(t, IsNoCall(c.audio.mycall[0]))
 	})
 

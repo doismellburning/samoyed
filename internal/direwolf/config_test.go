@@ -3125,7 +3125,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
 					a.Equal(9600, c.audio.serialTNCBaud[6])
 					a.Equal(1, c.errors)
-					a.Contains(c.output, "Unsupported data rate \"12345\" for SCHANNEL command")
+					a.Contains(c.output, `Unsupported data rate \"12345\" for SCHANNEL command`)
 				},
 			},
 			{

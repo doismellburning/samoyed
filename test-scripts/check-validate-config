@@ -112,7 +112,9 @@ function expect_output() {
 # Every problem, not just the first: two bad directives, two complaints.
 expect_output errors.conf.out "Unrecognized command 'NOSUCHKEYWORD'" \
 	"an unrecognised directive is reported"
-expect_output errors.conf.out "Invalid port number \"notanumber\" for AGWPORT command" \
+# logrus quotes its message when it holds quotes of its own, so the ones round
+# the port arrive backslash-escaped.
+expect_output errors.conf.out 'Invalid port number \"notanumber\" for AGWPORT command' \
 	"the directive after it is reported too, not just the first"
 expect_output errors.conf.out "2 errors, 0 warnings" \
 	"both are counted"
