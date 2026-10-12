@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 // The TNC side of the KISS protocol - collecting frames from a client
@@ -24,11 +23,6 @@ const (
 	FROM_CLIENT fromto_t = 0
 	TO_CLIENT   fromto_t = 1
 )
-
-var FROMTO_PREFIX = map[fromto_t]string{
-	FROM_CLIENT: "<<<",
-	TO_CLIENT:   ">>>",
-}
 
 // This is used only for TCPKISS but it put in kissnet.h,
 // there would be a circular dependency between the two header files.
