@@ -45,6 +45,9 @@ the rest are *virtual* channels.
    * - ``MEDIUM_NETTNC``
      - ``NCHANNEL`` - a remote TNC reached by KISS over TCP
      - 6 to 15
+   * - ``MediumSerialTNC``
+     - ``SCHANNEL`` - a TNC reached by KISS over a serial port
+     - 6 to 15
    * - ``MEDIUM_AXUDP``
      - ``axudpPorts`` in the :doc:`../yaml-config` - AX.25 over UDP
      - 6 to 15
@@ -65,13 +68,13 @@ What any medium will do
 Client applications
     A KISS client may transmit on any channel whose medium isn't ``MEDIUM_NONE``.
     Every frame received, whatever its channel, goes to the KISS and AGW clients,
-    and AGW's port list describes all four media.
+    and AGW's port list describes all five media.
 
 The transmit queue
     ``TransmitQueue.Append`` is where the medium decides where a frame goes:
     a radio channel's frames join the queue for the modem,
     an IGate channel's go to APRS-IS,
-    and a network TNC's or AXUDP channel's are sent straight out.
+    and a network or serial TNC's or AXUDP channel's are sent straight out.
     Anything that ends up there therefore works on any configured channel.
 
 Beacons
@@ -82,19 +85,19 @@ Beacons
 What will cross-route
 ---------------------
 
-For the APRS paths, radio, network TNC and AXUDP channels are interchangeable,
+For the APRS paths, radio, network TNC, serial TNC and AXUDP channels are interchangeable,
 in either direction.
 The digipeater's own comment gives the reason:
-"Network TNC is OK for UI frames where we don't care about timing."
+"Network or serial TNC is OK for UI frames where we don't care about timing."
 
 ``DIGIPEAT`` and ``FILTER``
     The APRS digipeater takes its FROM and TO channels from
-    ``MEDIUM_RADIO``, ``MEDIUM_NETTNC`` and ``MEDIUM_AXUDP``,
+    ``MEDIUM_RADIO``, ``MEDIUM_NETTNC``, ``MediumSerialTNC`` and ``MEDIUM_AXUDP``,
     so a frame heard on a radio can be repeated to an AXUDP neighbour, or the reverse.
     ``FILTER`` names APRS-IS as ``IG`` and refuses the IGate channel's number.
 
 IGate, RF to APRS-IS
-    Frames received on any of those three media are gated.
+    Frames received on any of those four media are gated.
     Each such channel needs a ``MYCALL`` before the IGate will start,
     and each gets the default ``i/180`` APRS-IS-to-RF filter.
 
@@ -103,7 +106,7 @@ IGate, APRS-IS to RF (``IGTXVIA``)
     but its medium is not checked.
 
 ``TTOBJ`` transmit
-    Any of the three media, alongside the ``APP`` and ``IG`` destinations.
+    Any of the four media, alongside the ``APP`` and ``IG`` destinations.
 
 What only a radio will do
 -------------------------
@@ -122,11 +125,11 @@ Loose ends
 ----------
 
 Connected mode
-    The AX.25 link layer, and AGW's connect command, accept network TNC and AXUDP channels as well as radios.
+    The AX.25 link layer, and AGW's connect command, accept network TNC, serial TNC and AXUDP channels as well as radios.
     With no modem to seize, the transmit queue confirms the channel at once
     and sends each frame straight out, leaving the timing to whatever is on the far end.
     The connected-mode digipeater, by contrast, refuses them.
-    Its receive check lists ``MEDIUM_NETTNC`` as acceptable
+    Its receive check lists ``MEDIUM_NETTNC`` and ``MediumSerialTNC`` as acceptable
     but also requires a radio channel number,
     so in practice it only ever accepts radio channels.
 
@@ -142,7 +145,7 @@ References
 * `internal/direwolf/direwolf_h.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/direwolf_h.go>`__
   and `internal/phy/consts.go <https://github.com/doismellburning/samoyed/blob/main/internal/phy/consts.go>`__ - the channel limits
 * `internal/direwolf/config.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/config.go>`__ -
-  ``ICHANNEL``, ``NCHANNEL``, the AXUDP port checks, ``DIGIPEAT``, ``REGEN``, ``CDIGIPEAT``, ``FILTER``, ``CFILTER``, ``TTOBJ``, ``IGTXVIA`` and the IGate ``MYCALL`` checks
+  ``ICHANNEL``, ``NCHANNEL``, ``SCHANNEL``, the AXUDP port checks, ``DIGIPEAT``, ``REGEN``, ``CDIGIPEAT``, ``FILTER``, ``CFILTER``, ``TTOBJ``, ``IGTXVIA`` and the IGate ``MYCALL`` checks
 * `internal/direwolf/config_yaml.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/config_yaml.go>`__ - ``axudpPorts``
 * `internal/direwolf/tq.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/tq.go>`__ -
   ``TransmitQueue.Append``, ``LMDataRequest`` and ``LMSeizeRequest``
