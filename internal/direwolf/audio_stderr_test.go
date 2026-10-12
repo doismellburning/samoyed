@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -37,14 +38,17 @@ func stderrIdentity(t *testing.T) string {
 	return fmt.Sprintf("%v:%v", stat.Dev, stat.Ino)
 }
 
-// captureStdout collects what fn prints via dw_printf, which goes to stdout.
+// captureStdout collects what fn prints to stdout and what it logs through
+// logrus, as samoyed-direwolf sends both to stdout.
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
 
 	var oldStdout = os.Stdout
+	var oldLogOutput = logrus.StandardLogger().Out
 
 	defer func() {
 		os.Stdout = oldStdout
+		logrus.SetOutput(oldLogOutput)
 	}()
 
 	var reader, writer, err = os.Pipe()
@@ -52,10 +56,12 @@ func captureStdout(t *testing.T, fn func()) string {
 	require.NoError(t, err)
 
 	os.Stdout = writer
+	logrus.SetOutput(writer)
 
 	fn()
 
 	os.Stdout = oldStdout
+	logrus.SetOutput(oldLogOutput)
 
 	require.NoError(t, writer.Close())
 
