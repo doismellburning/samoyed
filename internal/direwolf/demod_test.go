@@ -4,9 +4,9 @@
 package direwolf
 
 import (
+	"slices"
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -18,19 +18,24 @@ import (
 // configuration as it found it, settleModemOptions being where that is
 // reported and put right.
 //
-//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
+	var hook = test.NewGlobal()
+
 	for _, modemType := range []modem_t{MODEM_QPSK, MODEM_8PSK, MODEM_BPSK} {
 		var channel = 0
 		var audioConfig = newTestRadioConfig(channel, modemType, 2400, 0, 0, 44100)
 		audioConfig.achan[channel].decimate = 3
 		audioConfig.achan[channel].num_freq = 1
 
-		var output = testutils.CaptureOutput(t, func() {
-			demod_init(audioConfig)
-		})
+		demod_init(audioConfig)
 
-		assert.NotContains(t, output, "/ 3")
+		for _, entry := range hook.AllEntries() {
+			assert.NotContains(t, entry.Data, "decimate")
+		}
+
+		hook.Reset()
+
 		assert.Equal(t, 3, audioConfig.achan[channel].decimate)
 	}
 }
@@ -38,7 +43,7 @@ func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
 // demod_init sets up the demodulators from the modem options without
 // changing them: the rules about which go together are settleModemOptions'.
 //
-//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 	var channel = 0
 
@@ -55,11 +60,21 @@ func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 	var qpsk = newTestRadioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
 	qpsk.achan[channel].num_freq = 1
 
-	var output = testutils.CaptureOutput(t, func() {
-		demod_init(qpsk)
-	})
+	var hook = test.NewGlobal()
 
-	assert.Contains(t, output, "compatible with MFJ-2400", "an unsettled V.26 alternative still gets the default")
+	t.Cleanup(hook.Reset)
+
+	demod_init(qpsk)
+
+	var compatibleWith any
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Message == "QPSK demodulator" {
+			compatibleWith = entry.Data["compatible_with"]
+		}
+	}
+
+	assert.Equal(t, "MFJ-2400", compatibleWith, "an unsettled V.26 alternative still gets the default")
 	assert.Equal(t, V26_UNSPECIFIED, qpsk.achan[channel].v26_alternative)
 }
 
@@ -98,11 +113,10 @@ func TestDemodInitCapsProfileLetters(t *testing.T) {
 	assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
 	assert.Equal(t, "ABDEABDEA", d.profiles)
 
-	var entry = hook.LastEntry()
+	var entry = lastEntryWithMessage(hook, "More demodulator types than there are demodulators")
 
 	require.NotNil(t, entry, "using fewer demodulator types than asked for must be reported")
 	assert.Equal(t, logrus.ErrorLevel, entry.Level)
-	assert.Contains(t, entry.Message, "More demodulator types than there are demodulators")
 	assert.Equal(t, channel, entry.Data["channel"])
 	assert.Equal(t, MAX_SUBCHANS, entry.Data["available"])
 	assert.Equal(t, "ABDEABDEA", entry.Data["using"])
@@ -136,11 +150,10 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 		assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
 		assert.Equal(t, tc.want, d.profiles)
 
-		var entry = hook.LastEntry()
+		var entry = lastEntryWithMessage(hook, "More demodulator types than there are demodulators")
 
 		require.NotNil(t, entry, "an overlong PSK profile list must be reported")
 		assert.Equal(t, logrus.ErrorLevel, entry.Level)
-		assert.Contains(t, entry.Message, "More demodulator types than there are demodulators")
 
 		hook.Reset()
 	}
@@ -232,4 +245,18 @@ func TestChannelLayout(t *testing.T) {
 		assert.Equal(t, 1, numSubchan, "channel %d", channel)
 		assert.Equal(t, 1, numSlicers, "channel %d", channel)
 	}
+}
+
+// lastEntryWithMessage returns the last entry hook saw with message, or nil if
+// there was none: other entries can follow the one a test is after.
+func lastEntryWithMessage(hook *test.Hook, message string) *logrus.Entry {
+	var entries = hook.AllEntries()
+
+	for _, entry := range slices.Backward(entries) {
+		if entry.Message == message {
+			return entry
+		}
+	}
+
+	return nil
 }

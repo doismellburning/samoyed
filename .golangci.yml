@@ -68,6 +68,7 @@ linters:
         - "line"
         - "now"
         - "output"
+        - "profiles"
     gocritic:
       disabled-checks:
         - captLocal  # I agree, but I want to stay semi-consistent with upstream for now
