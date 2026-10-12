@@ -9,6 +9,7 @@ import "fmt"
 // isn't listening.
 type Ports struct {
 	KISS []int
+	AGW  int
 }
 
 // Services lists what there is to announce on ports, as name, or as
@@ -36,6 +37,10 @@ func Services(name string, ports *Ports) []Service {
 		}
 
 		services = append(services, Service{Name: kissName, Type: KISSType, Port: port})
+	}
+
+	if ports.AGW != 0 {
+		services = append(services, Service{Name: name, Type: AGWType, Port: ports.AGW})
 	}
 
 	return services

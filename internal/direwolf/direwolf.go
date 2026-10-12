@@ -715,6 +715,7 @@ x = Silence FX.25 information.`)
 	if misc_config.dns_sd_enabled {
 		var ports = new(announce.Ports)
 		ports.KISS = misc_config.kiss_port[:]
+		ports.AGW = misc_config.agwpe_port
 
 		announce.Announce(ctx, announce.Services(misc_config.dns_sd_name, ports))
 	}

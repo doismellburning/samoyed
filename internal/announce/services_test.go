@@ -38,6 +38,17 @@ func TestServicesEveryKISSPort(t *testing.T) {
 		Services("Q1TEST TNC", ports))
 }
 
+func TestServicesAGW(t *testing.T) {
+	t.Parallel()
+
+	var ports = new(Ports)
+	ports.AGW = 8000
+
+	assert.Equal(t,
+		[]Service{{Name: "Q1TEST TNC", Type: AGWType, Port: 8000}},
+		Services("Q1TEST TNC", ports))
+}
+
 // With no name configured we fall back to the hostname-derived default.
 func TestServicesDefaultsName(t *testing.T) {
 	t.Parallel()
@@ -57,6 +68,7 @@ func TestServicesSkipsUnusedPorts(t *testing.T) {
 
 	var ports = new(Ports)
 	ports.KISS = []int{0}
+	ports.AGW = 0
 
 	assert.Empty(t, Services("Q1TEST TNC", ports))
 	assert.Empty(t, Services("Q1TEST TNC", new(Ports)))

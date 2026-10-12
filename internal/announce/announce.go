@@ -30,6 +30,10 @@ import (
 // announces it and clients such as APRSdroid look for it.
 const KISSType = "_kiss-tnc._tcp"
 
+// AGWType is the DNS-SD service type for the AGW TCPIP Socket Interface.
+// Nothing is registered for it, so this is ours.
+const AGWType = "_agwpe._tcp"
+
 // Service is one service to announce: an instance Name, unique among those of
 // its Type, and the Port it listens on.
 type Service struct {
