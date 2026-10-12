@@ -73,6 +73,11 @@
 * When refactoring per-channel globals (arrays indexed by channel) into a per-channel struct accessed via a pointer array/map, guard lookups (e.g. `s_foo[channel]`) and any field/method access on the result against `nil` - a channel that was never attached, or whose connection has since dropped, can legitimately be `nil`
 * When an `int` from config or the CLI is stored into a fixed-width field of a C-derived binary struct (e.g. the `int32`/`int16` fields of a `.WAV` or KISS/AX.25 header), validate that it fits *before* converting, including derived fields (a byte rate is a sample rate times a frame size, so overflows sooner) - an out-of-range value otherwise wraps silently, and `gosec`'s integer-overflow check doesn't catch it
 
+### Parallel Tests
+
+* `paralleltest` wants every test and `t.Run` subtest to call `t.Parallel()`. One that touches something the whole process shares - capturing stdout or stdin, a logrus global hook or level, `t.Setenv`, a package-level variable, a port it expects to stay unused - stays serial, with `//nolint:paralleltest // Serial: <why>.` on the function. Go holds the parallel tests back until every serial one has finished, so the two never overlap
+* `internal/direwolf` is excluded for now, as its tests still share stdout and logrus's global logger throughout (#972)
+
 ### Test Callsigns
 
 * Use `Q1TEST`, `Q2TEST`, etc. as synthetic callsigns in tests - the `Q` prefix is ITU-reserved for Q-codes and never assigned to amateur radio operators, so these can't be real callsigns

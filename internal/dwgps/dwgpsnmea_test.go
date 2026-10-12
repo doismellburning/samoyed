@@ -17,6 +17,8 @@ import (
 // --- remove_checksum ---
 
 func Test_remove_checksum(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		sent        string
@@ -56,6 +58,8 @@ func Test_remove_checksum(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var result, err = remove_checksum(tt.sent, true)
 
 			if tt.wantErr {
@@ -73,7 +77,11 @@ func Test_remove_checksum(t *testing.T) {
 // --- ParseGPRMC ---
 
 func Test_dwgpsnmea_gprmc(t *testing.T) {
+	t.Parallel()
+
 	t.Run("active fix with position, speed, and course", func(t *testing.T) {
+		t.Parallel()
+
 		// Example from source code comments.
 		var result = ParseGPRMC("$GPRMC,003413.710,A,4237.1240,N,07120.8333,W,5.07,291.42,160614,,,A*7F", true)
 
@@ -86,6 +94,8 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("empty course field leaves course unknown", func(t *testing.T) {
+		t.Parallel()
+
 		// Stationary: speed is reported but the course field is empty.
 		var result = ParseGPRMC("$GPRMC,003413.710,A,4237.1240,N,07120.8333,W,0.00,,160614,,,A*6F", true)
 
@@ -96,6 +106,8 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("negative speed is an error", func(t *testing.T) {
+		t.Parallel()
+
 		// Speed over ground is a magnitude, so a receiver cannot have measured
 		// this and the sentence is no more usable than one whose speed field
 		// isn't a number.
@@ -107,6 +119,8 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("non-finite speed is an error", func(t *testing.T) {
+		t.Parallel()
+
 		// ParseFloat is happy to read these, and int(NaN) is not defined.
 		for _, field := range []string{"inf", "NaN"} {
 			var sentence = "$GPRMC,003413.710,A,4237.1240,N,07120.8333,W," + field + ",291.42,160614,,,A*02"
@@ -119,6 +133,8 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("course outside a circle stays unknown", func(t *testing.T) {
+		t.Parallel()
+
 		var result = ParseGPRMC("$GPRMC,003413.710,A,4237.1240,N,07120.8333,W,5.07,361.00,160614,,,A*77", true)
 
 		require.NotNil(t, result)
@@ -133,6 +149,8 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("void status returns no fix", func(t *testing.T) {
+		t.Parallel()
+
 		// Example from source code comments.
 		var result = ParseGPRMC("$GPRMC,001431.00,V,,,,,,,121015,,,N*7C", true)
 
@@ -141,6 +159,8 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("unparseable latitude leaves position unknown", func(t *testing.T) {
+		t.Parallel()
+
 		// latlong.LatitudeFromNMEA returns an error for a field it can't parse; that
 		// must not reach the caller as a position, and a sentence carrying one
 		// is as unusable as a sentence with no latitude field at all.
@@ -152,6 +172,8 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("out of range latitude leaves position unknown", func(t *testing.T) {
+		t.Parallel()
+
 		var result = ParseGPRMC("$GPRMC,003413.710,A,9537.1240,N,07120.8333,W,5.07,291.42,160614,,,A*75", true)
 
 		require.NotNil(t, result)
@@ -160,6 +182,8 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("bad hemisphere leaves position unknown", func(t *testing.T) {
+		t.Parallel()
+
 		var result = ParseGPRMC("$GPRMC,003413.710,A,4237.1240,X,07120.8333,W,5.07,291.42,160614,,,A*69", true)
 
 		require.NotNil(t, result)
@@ -168,6 +192,8 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("bad checksum returns error", func(t *testing.T) {
+		t.Parallel()
+
 		var result = ParseGPRMC("$GPRMC,003413.710,A,4237.1240,N,07120.8333,W,5.07,291.42,160614,,,A*00", true)
 
 		require.NotNil(t, result)
@@ -178,7 +204,11 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 // --- ParseGPGGA ---
 
 func Test_dwgpsnmea_gpgga(t *testing.T) {
+	t.Parallel()
+
 	t.Run("valid 3D fix with altitude", func(t *testing.T) {
+		t.Parallel()
+
 		// Example from source code comments.
 		var result = ParseGPGGA("$GPGGA,003518.710,4237.1250,N,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*5B", true)
 
@@ -190,6 +220,8 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 	})
 
 	t.Run("2D fix leaves altitude unknown", func(t *testing.T) {
+		t.Parallel()
+
 		// Example from source code comments: altitude field is empty.
 		var result = ParseGPGGA("$GPGGA,212407.000,4237.1505,N,07120.8602,W,0,00,,,M,,M,,*58", true)
 
@@ -198,6 +230,8 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 	})
 
 	t.Run("an implausible altitude is still an altitude", func(t *testing.T) {
+		t.Parallel()
+
 		// -999999 was the G_UNKNOWN sentinel, and a value a receiver would
 		// never send, but it is a number and nothing here filters numbers for
 		// plausibility.  This pins that deliberate choice so a sentinel-shaped
@@ -210,6 +244,8 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 	})
 
 	t.Run("non-finite altitude is an error", func(t *testing.T) {
+		t.Parallel()
+
 		// Unlike -999999, these do not survive conversion to the integer feet
 		// of an /A= field.
 		for _, field := range []string{"NaN", "inf"} {
@@ -223,6 +259,8 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 	})
 
 	t.Run("fix field zero returns no fix", func(t *testing.T) {
+		t.Parallel()
+
 		// Example from source code comments.
 		var result = ParseGPGGA("$GPGGA,001429.00,,,,,0,00,99.99,,,,,,*68", true)
 
@@ -235,6 +273,8 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 	// unknown and the fix in error, whatever is wrong with it.
 
 	t.Run("unparseable latitude leaves position unknown", func(t *testing.T) {
+		t.Parallel()
+
 		var result = ParseGPGGA("$GPGGA,003518.710,X237.1250,N,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*37", true)
 
 		require.NotNil(t, result)
@@ -243,6 +283,8 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 	})
 
 	t.Run("out of range latitude leaves position unknown", func(t *testing.T) {
+		t.Parallel()
+
 		var result = ParseGPGGA("$GPGGA,003518.710,9537.1250,N,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*51", true)
 
 		require.NotNil(t, result)
@@ -251,6 +293,8 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 	})
 
 	t.Run("sixty minutes of latitude leaves position unknown", func(t *testing.T) {
+		t.Parallel()
+
 		var result = ParseGPGGA("$GPGGA,003518.710,4260.1250,N,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*59", true)
 
 		require.NotNil(t, result)
@@ -259,6 +303,8 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 	})
 
 	t.Run("bad hemisphere leaves position unknown", func(t *testing.T) {
+		t.Parallel()
+
 		var result = ParseGPGGA("$GPGGA,003518.710,4237.1250,X,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*4D", true)
 
 		require.NotNil(t, result)
@@ -267,6 +313,8 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 	})
 
 	t.Run("bad checksum returns error", func(t *testing.T) {
+		t.Parallel()
+
 		var result = ParseGPGGA("$GPGGA,003518.710,4237.1250,N,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*00", true)
 
 		require.NotNil(t, result)
@@ -299,6 +347,8 @@ func openTestGPSNMEA(t *testing.T) (*GPS, string, *os.File) {
 }
 
 func TestSharedNMEAPort(t *testing.T) {
+	t.Parallel()
+
 	var gps, name, _ = openTestGPSNMEA(t)
 
 	assert.NotNil(t, gps.SharedNMEAPort(name, 4800), "the same port at the same speed is shared")
@@ -312,6 +362,8 @@ func TestSharedNMEAPort(t *testing.T) {
 // forgets it, while the waypoint sender may be asking for it on another
 // goroutine.  The two used to meet in an unguarded package variable.
 func TestSharedNMEAPortAfterReceiverIsLost(t *testing.T) {
+	t.Parallel()
+
 	var gps, name, master = openTestGPSNMEA(t)
 
 	require.NoError(t, master.Close())

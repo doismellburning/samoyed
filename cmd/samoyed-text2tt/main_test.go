@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_Text2TT(t *testing.T) {
 	// From `man text2tt`
 	testutils.AssertOutputContains(t, func() { text2tt([]string{"abcdefg", "0123"}) }, "2A22A2223A33A33340A00122223333")
@@ -24,6 +25,8 @@ func TestMain(m *testing.M) {
 }
 
 func Test_main(t *testing.T) {
+	t.Parallel()
+
 	var result = testutils.RunMain(t, "", "abcdefg", "0123")
 	var out, status = result.Output(), result.Status
 
@@ -40,6 +43,8 @@ func Test_main(t *testing.T) {
 // The checksum treats letters of either case alike, and skips anything that
 // isn't a letter or digit.
 func Test_checksum(t *testing.T) {
+	t.Parallel()
+
 	// "Hello" in the two-key method, as text2tt prints it.
 	assert.Equal(t, 1, checksum("4B3B5C5C6C"))
 	assert.Equal(t, 6, checksum("4B3B5C"))

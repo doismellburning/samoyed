@@ -12,6 +12,8 @@ import (
 )
 
 func Test_ax25_unwrap_third_party(t *testing.T) {
+	t.Parallel()
+
 	// Taken from the original comments for the function:
 	// Example: Input:      A>B,C:}D>E,F:info
 	// Output:     D>E,F:info
@@ -23,6 +25,8 @@ func Test_ax25_unwrap_third_party(t *testing.T) {
 }
 
 func Test_ax25_set_info(t *testing.T) {
+	t.Parallel()
+
 	var p = FromText("D>E,F:info", true)
 	var initialInfo = p.Info()
 	assert.Equal(t, "info", string(initialInfo)) // Make sure I set this up right!
@@ -39,6 +43,8 @@ func Test_ax25_set_info(t *testing.T) {
 }
 
 func Test_ax25_parse_addr_strictness(t *testing.T) {
+	t.Parallel()
+
 	// Lower case, a trailing "*" and an over-long address are each accepted
 	// or rejected depending on the strictness asked for.  The decode_aprs
 	// utility uses AddrStrictLowerCaseWarning so that a packet captured from
@@ -77,6 +83,8 @@ func Test_ax25_parse_addr_strictness(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("%s/%d", tc.addr, tc.strictness), func(t *testing.T) {
+			t.Parallel()
+
 			var _, _, _, ok = ParseAddr(Source, tc.addr, tc.strictness)
 			assert.Equal(t, tc.ok, ok)
 		})
@@ -84,6 +92,8 @@ func Test_ax25_parse_addr_strictness(t *testing.T) {
 }
 
 func Test_ax25_frame_with_no_pid(t *testing.T) {
+	t.Parallel()
+
 	// The shortest frame FromFrame accepts is two addresses plus a control
 	// byte: no PID and no information part.  Everything that reads the
 	// information part has to cope with an offset that lands past the end of
@@ -112,6 +122,8 @@ func Test_ax25_frame_with_no_pid(t *testing.T) {
 }
 
 func TestMustFromText(t *testing.T) {
+	t.Parallel()
+
 	var pp = MustFromText("Q1TEST>APDW17,WIDE1-1:>Testing")
 
 	assert.Equal(t, "Q1TEST>APDW17,WIDE1-1:", pp.FormatAddrs())
@@ -121,6 +133,8 @@ func TestMustFromText(t *testing.T) {
 }
 
 func Test_printableAddress(t *testing.T) {
+	t.Parallel()
+
 	var field = []byte{'Q' << 1, '1' << 1, 'T' << 1, 0x07 << 1, ' ' << 1, ' ' << 1}
 
 	assert.Equal(t, "Q1T.  ", printableAddress(field))

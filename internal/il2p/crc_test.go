@@ -14,6 +14,8 @@ import (
 )
 
 func TestIL2PCRCHammingEncodeTable(t *testing.T) {
+	t.Parallel()
+
 	// Verify some known values from the spec's Hamming (7,4) encode table.
 	assert.Equal(t, byte(0x00), il2p_hamming_encode[0x0])
 	assert.Equal(t, byte(0x71), il2p_hamming_encode[0x1])
@@ -22,6 +24,8 @@ func TestIL2PCRCHammingEncodeTable(t *testing.T) {
 }
 
 func TestIL2PCRCHammingDecodeTable(t *testing.T) {
+	t.Parallel()
+
 	// Verify that decoding each valid Hamming codeword recovers the original nibble.
 	for nibble := range byte(16) {
 		var codeword = il2p_hamming_encode[nibble]
@@ -31,6 +35,8 @@ func TestIL2PCRCHammingDecodeTable(t *testing.T) {
 }
 
 func TestIL2PCRCHammingSingleBitCorrection(t *testing.T) {
+	t.Parallel()
+
 	// Verify single-bit error correction in the Hamming decode table.
 	for nibble := range byte(16) {
 		var codeword = il2p_hamming_encode[nibble]
@@ -45,6 +51,8 @@ func TestIL2PCRCHammingSingleBitCorrection(t *testing.T) {
 }
 
 func TestIL2PCRCCalcSpec(t *testing.T) {
+	t.Parallel()
+
 	// Example 1: S-frame AX.25 data → CRC should decode to match encoded bytes.
 	var ex1AX25 = []byte{0x96, 0x82, 0x64, 0x88, 0x8A, 0xAE, 0xE4, 0x96, 0x96, 0x68, 0x90, 0x8A, 0x94, 0x6F, 0x81}
 	var crc1 = il2p_crc_calc(ex1AX25)
@@ -59,6 +67,8 @@ func TestIL2PCRCCalcSpec(t *testing.T) {
 }
 
 func TestIL2PCRCEncodeDecode(t *testing.T) {
+	t.Parallel()
+
 	// Round-trip: encode a CRC then decode it.
 	var testCRCs = []uint16{0x0000, 0xFFFF, 0x1234, 0xABCD, 0xF0DB}
 	for _, crc := range testCRCs {
@@ -69,6 +79,8 @@ func TestIL2PCRCEncodeDecode(t *testing.T) {
 }
 
 func TestIL2PCRCCheck(t *testing.T) {
+	t.Parallel()
+
 	// Example 1: Verify CRC check passes.
 	var ex1AX25 = []byte{0x96, 0x82, 0x64, 0x88, 0x8A, 0xAE, 0xE4, 0x96, 0x96, 0x68, 0x90, 0x8A, 0x94, 0x6F, 0x81}
 	var ex1CRCBytes = []byte{0x7F, 0x00, 0x1D, 0x2B}
@@ -80,6 +92,8 @@ func TestIL2PCRCCheck(t *testing.T) {
 }
 
 func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
+	t.Parallel()
+
 	// Encode a frame with CRC, then decode it and verify round-trip.
 	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "W2UB"
@@ -107,6 +121,8 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 
 // A frame whose trailing CRC doesn't match is dropped whatever the debug
 // level, but only said so from debug level 1.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestIL2PCRCMismatchLoggedAtDebugLevel(t *testing.T) {
 	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "Q1TEST"
@@ -146,6 +162,8 @@ func TestIL2PCRCMismatchLoggedAtDebugLevel(t *testing.T) {
 }
 
 func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
+	t.Parallel()
+
 	// Verify that the spec example IL2P data (which includes trailing CRC)
 	// decodes correctly.
 	var testData = []struct {
@@ -167,6 +185,8 @@ func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 
 	for _, td := range testData {
 		t.Run(td.name, func(t *testing.T) {
+			t.Parallel()
+
 			var b = il2pDataStringToBytes(td.inputData)
 			var pp = il2p_decode_frame(b, VersionCompat, 0)
 			require.NotNil(t, pp)

@@ -58,6 +58,8 @@ var xid_example = []byte{
 }
 
 func Test_XID(t *testing.T) {
+	t.Parallel()
+
 	/*
 		struct xid_param_s param;
 		struct xid_param_s param2;

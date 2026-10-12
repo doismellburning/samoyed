@@ -62,6 +62,8 @@ func fakeGPS(t *testing.T) string {
 }
 
 func Test_run_reportsAFix(t *testing.T) {
+	t.Parallel()
+
 	var port = fakeGPS(t)
 
 	// The first reading comes shortly after starting up, and the next not for
@@ -79,6 +81,8 @@ func Test_run_reportsAFix(t *testing.T) {
 }
 
 func Test_run_withoutAReceiver(t *testing.T) {
+	t.Parallel()
+
 	var ctx, cancel = context.WithTimeout(context.Background(), 1500*time.Millisecond)
 	defer cancel()
 

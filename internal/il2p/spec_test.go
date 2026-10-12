@@ -62,8 +62,12 @@ var il2pSpecExamples = []struct {
 }
 
 func TestIL2PSpec(t *testing.T) {
+	t.Parallel()
+
 	for _, testDatum := range il2pSpecExamples {
 		t.Run(testDatum.name, func(t *testing.T) {
+			t.Parallel()
+
 			var b = il2pDataStringToBytes(testDatum.inputData)
 			var pp = il2p_decode_frame(b, Version06, 0)
 
@@ -92,6 +96,8 @@ func TestIL2PSpec(t *testing.T) {
 // wrong size.  It should come up empty handed rather than mistake the result
 // for a frame it has decoded correctly.
 func TestIL2PSpecExamplesRejectedAsV04(t *testing.T) {
+	t.Parallel()
+
 	// Only the I-frame example has a payload, so only it can differ.
 	var b = il2pDataStringToBytes(il2pSpecExamples[2].inputData)
 
@@ -99,8 +105,12 @@ func TestIL2PSpecExamplesRejectedAsV04(t *testing.T) {
 }
 
 func TestIL2PSpecEncode(t *testing.T) {
+	t.Parallel()
+
 	for _, testDatum := range il2pSpecExamples {
 		t.Run(testDatum.name, func(t *testing.T) {
+			t.Parallel()
+
 			var alevel ax25.ALevel
 			var pp = ax25.FromFrame(il2pDataStringToBytes(testDatum.ax25Data), alevel)
 			require.NotNil(t, pp)

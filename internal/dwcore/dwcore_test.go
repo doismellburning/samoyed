@@ -12,6 +12,8 @@ import (
 // The names are the ones the web interface has always shown, and which its
 // JavaScript expects.
 func TestSourceKindString(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, "radio", SourceRadio.String())
 	assert.Equal(t, "dtmf", SourceDTMF.String())
 	assert.Equal(t, "aprs-is", SourceAPRSIS.String())
@@ -21,12 +23,16 @@ func TestSourceKindString(t *testing.T) {
 }
 
 func TestRadioSourceKeepsTheSlicer(t *testing.T) {
+	t.Parallel()
+
 	var from = SlicerID{Channel: 1, Subchannel: 2, Slice: 3}
 
 	assert.Equal(t, Source{Kind: SourceRadio, Slicer: from}, RadioSource(from))
 }
 
 func TestChannelSourceHasOnlyAChannel(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t,
 		Source{Kind: SourceAXUDP, Slicer: SlicerID{Channel: 4, Subchannel: 0, Slice: 0}},
 		ChannelSource(SourceAXUDP, 4))

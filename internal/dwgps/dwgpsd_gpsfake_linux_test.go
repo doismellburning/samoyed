@@ -115,6 +115,7 @@ func startGpsfake(t *testing.T, port int) {
 	t.Fatalf("gpsd never started listening on %s (if AppArmor is enforcing, try ./dev-setup.sh gpsd-apparmor)", addr)
 }
 
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	var port, portErr = strconv.Atoi(testutils.UnusedPort(t))
 	require.NoError(t, portErr)
@@ -159,6 +160,8 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 
 // The checksum is the one the sentence the fixture used to carry has.
 func TestNMEASentenceChecksum(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, "$GPGGA,003518.710,4237.1250,N,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*5B\n",
 		nmeaSentence("GPGGA,003518.710,4237.1250,N,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000"))
 }

@@ -17,6 +17,8 @@ import (
 // analog one.
 
 func Test_telemetry_data_base91_invalid_character(t *testing.T) {
+	t.Parallel()
+
 	var ts = New()
 
 	assert.Equal(t,
@@ -48,6 +50,8 @@ func Test_telemetry_data_base91_invalid_character(t *testing.T) {
 // number or analog value used to be reported as a real reading of zero.
 
 func Test_telemetry_data_original_unparseable_value(t *testing.T) {
+	t.Parallel()
+
 	var ts = New()
 
 	var result, _ = ts.DataOriginal("Q1TEST", "T#005,199,000,255,073,123,01101001", true)
@@ -75,6 +79,8 @@ func Test_telemetry_data_original_unparseable_value(t *testing.T) {
 // This only fails under the race detector, which CI runs with "make race".
 
 func Test_State_concurrent(t *testing.T) {
+	t.Parallel()
+
 	var ts = New()
 
 	var wg sync.WaitGroup
@@ -109,6 +115,8 @@ func Test_State_concurrent(t *testing.T) {
 // used are kept.  One dropped to make room decodes with the defaults again.
 
 func Test_State_drops_least_recently_used(t *testing.T) {
+	t.Parallel()
+
 	var ts = New()
 	ts.capacity = 2
 
@@ -137,6 +145,8 @@ func Test_State_drops_least_recently_used(t *testing.T) {
 // and there is nothing of the station's to keep, so nothing is kept.
 
 func Test_State_keeps_nothing_for_data_alone(t *testing.T) {
+	t.Parallel()
+
 	var ts = New()
 
 	var result, _ = ts.DataOriginal("Q1TEST", "T#005,199,000,255,073,123,01101001", true)

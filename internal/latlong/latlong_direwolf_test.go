@@ -6,6 +6,8 @@ package latlong
 import "testing"
 
 func Test_latlong(t *testing.T) {
+	t.Parallel()
+
 	var result string
 
 	/* Latitude to APRS format. */

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:paralleltest // Serial: Parse records ships in the package-level ships list.
 func Test_AIS(t *testing.T) {
 	test_sextet(t)
 	test_basic_parse(t)

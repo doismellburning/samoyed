@@ -19,6 +19,8 @@ import (
  *------------------------------------------------------------------------------*/
 
 func Test_AX25_PAD2(t *testing.T) {
+	t.Parallel()
+
 	var pid = 0xf0
 	var info []byte
 

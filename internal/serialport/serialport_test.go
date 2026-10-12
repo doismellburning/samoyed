@@ -38,6 +38,7 @@ func openTestSerialPort(t *testing.T, baud int) (*term.Term, *os.File) {
 	return fd, master
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestOpenNonexistentDevice(t *testing.T) {
 	var fd *term.Term
 
@@ -50,6 +51,8 @@ func TestOpenNonexistentDevice(t *testing.T) {
 }
 
 // A speed we know about is set without comment.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestOpenSupportedSpeed(t *testing.T) {
 	var output = testutils.CaptureOutput(t, func() {
 		openTestSerialPort(t, 9600)
@@ -60,6 +63,8 @@ func TestOpenSupportedSpeed(t *testing.T) {
 
 // A speed of 0 means "leave whatever the device already had alone", which is
 // not the same thing as an unsupported speed.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestOpenSpeedZeroLeavesItAlone(t *testing.T) {
 	var output = testutils.CaptureOutput(t, func() {
 		openTestSerialPort(t, 0)
@@ -69,6 +74,8 @@ func TestOpenSpeedZeroLeavesItAlone(t *testing.T) {
 }
 
 // Anything else says so and falls back to 4800 rather than failing the open.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestOpenUnsupportedSpeed(t *testing.T) {
 	var fd *term.Term
 
@@ -82,6 +89,8 @@ func TestOpenUnsupportedSpeed(t *testing.T) {
 }
 
 func TestWrite(t *testing.T) {
+	t.Parallel()
+
 	var fd, master = openTestSerialPort(t, 9600)
 
 	var data = []byte("Q1TEST")
@@ -98,10 +107,14 @@ func TestWrite(t *testing.T) {
 // A nil handle is what Open returns on failure, and callers hang on
 // to it, so writing to one has to be an error rather than a panic.
 func TestWriteNilHandle(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, -1, Write(nil, []byte("Q1TEST")))
 }
 
 func TestWriteAfterClose(t *testing.T) {
+	t.Parallel()
+
 	var fd, _ = openTestSerialPort(t, 9600)
 
 	Close(fd)
@@ -110,6 +123,8 @@ func TestWriteAfterClose(t *testing.T) {
 }
 
 func TestGet1(t *testing.T) {
+	t.Parallel()
+
 	var fd, master = openTestSerialPort(t, 9600)
 
 	var _, writeErr = master.WriteString("Q2")
@@ -126,6 +141,8 @@ func TestGet1(t *testing.T) {
 
 // The far end going away is reported, rather than looking like a byte of 0.
 func TestGet1AfterFarEndCloses(t *testing.T) {
+	t.Parallel()
+
 	var fd, master = openTestSerialPort(t, 9600)
 
 	require.NoError(t, master.Close())
@@ -137,5 +154,7 @@ func TestGet1AfterFarEndCloses(t *testing.T) {
 }
 
 func TestCloseNilHandle(t *testing.T) {
+	t.Parallel()
+
 	assert.NotPanics(t, func() { Close(nil) })
 }

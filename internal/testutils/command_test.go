@@ -54,7 +54,11 @@ func TestMain(m *testing.M) {
 }
 
 func TestRunMain(t *testing.T) {
+	t.Parallel()
+
 	t.Run("arguments arrive intact", func(t *testing.T) {
+		t.Parallel()
+
 		var result = RunMain(t, "", "args", "with space", "")
 
 		assert.Equal(t, 0, result.Status)
@@ -62,10 +66,14 @@ func TestRunMain(t *testing.T) {
 	})
 
 	t.Run("stdin", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(t, "Q1TEST>APDW17:>Testing\n", RunMain(t, "Q1TEST>APDW17:>Testing\n", "cat").Stdout)
 	})
 
 	t.Run("stderr", func(t *testing.T) {
+		t.Parallel()
+
 		var result = RunMain(t, "", "stderr", "went", "wrong")
 
 		assert.Empty(t, result.Stdout)
@@ -74,6 +82,8 @@ func TestRunMain(t *testing.T) {
 	})
 
 	t.Run("exit status", func(t *testing.T) {
+		t.Parallel()
+
 		var result = RunMain(t, "", "exit", "3")
 
 		assert.Equal(t, 3, result.Status)
@@ -82,6 +92,8 @@ func TestRunMain(t *testing.T) {
 }
 
 func TestStartMain(t *testing.T) {
+	t.Parallel()
+
 	var p = StartMain(t, "lines", "one", "two", "three")
 
 	assert.Equal(t, []string{"one", "two"}, p.WaitFor(t, "two"))
@@ -96,6 +108,8 @@ func TestStartMain(t *testing.T) {
 }
 
 func TestOutput(t *testing.T) {
+	t.Parallel()
+
 	var p = StartMain(t, "lines", "one", "two", "three")
 
 	p.WaitFor(t, "one")
@@ -106,6 +120,8 @@ func TestOutput(t *testing.T) {
 }
 
 func TestSignal(t *testing.T) {
+	t.Parallel()
+
 	// It carries on until stdin closes, which here it never does.
 	var p = StartMain(t, "lines", "started")
 
@@ -116,11 +132,15 @@ func TestSignal(t *testing.T) {
 }
 
 func TestStartExitStatus(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 2, StartMain(t, "exit", "2").Wait())
 }
 
 // Start runs whatever it is given; here that is this test binary, told to be
 // the fake command just as RunMain would.
+//
+
 func TestStart(t *testing.T) {
 	t.Setenv(runMainEnv, encodeArgs(t, []string{"args", "given"}))
 
@@ -136,6 +156,8 @@ func TestStart(t *testing.T) {
 const timeoutEnv = "SAMOYED_TESTUTILS_TIMEOUT"
 
 func TestTimingOut(t *testing.T) {
+	t.Parallel()
+
 	var helper = os.Getenv(timeoutEnv)
 	if helper == "" {
 		t.Skip("Only run by TestTimeoutFailsTheTest")
@@ -160,8 +182,12 @@ func TestTimingOut(t *testing.T) {
 // A command that times out can't be relied on, whatever its exit status, so it
 // fails the test.
 func TestTimeoutFailsTheTest(t *testing.T) {
+	t.Parallel()
+
 	for _, helper := range []string{"RunMain", "StartMain"} {
 		t.Run(helper, func(t *testing.T) {
+			t.Parallel()
+
 			var cmd = exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestTimingOut$", "-test.v") //nolint:gosec // Running ourselves.
 			cmd.Env = append(os.Environ(), timeoutEnv+"="+helper)
 

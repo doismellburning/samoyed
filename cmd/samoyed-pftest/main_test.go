@@ -46,6 +46,8 @@ func runWith(opts options, input string) (int, string, string) {
 }
 
 func Test_run_reportsAVerdictPerPacket(t *testing.T) {
+	t.Parallel()
+
 	var exitStatus, out, errOut = runWith(defaultOptions("t/m"), positionPacket+"\n"+messagePacket+"\n")
 
 	assert.Equal(t, 0, exitStatus)
@@ -54,6 +56,8 @@ func Test_run_reportsAVerdictPerPacket(t *testing.T) {
 }
 
 func Test_run_passesThroughBlankAndCommentLines(t *testing.T) {
+	t.Parallel()
+
 	var exitStatus, out, errOut = runWith(defaultOptions("b/Q1TEST"), "# a comment\n\n"+positionPacket+"\n")
 
 	assert.Equal(t, 0, exitStatus)
@@ -61,6 +65,7 @@ func Test_run_passesThroughBlankAndCommentLines(t *testing.T) {
 	assert.Empty(t, errOut)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_run_reportsAnUnparseableLine(t *testing.T) {
 	// AX25FromText explains what is wrong with the line on stdout, which is
 	// not the output under test here.
@@ -77,6 +82,8 @@ func Test_run_reportsAnUnparseableLine(t *testing.T) {
 }
 
 func Test_run_rejectsAnInvalidFilter(t *testing.T) {
+	t.Parallel()
+
 	var exitStatus, out, errOut = runWith(defaultOptions("x/"), positionPacket+"\n")
 
 	assert.Equal(t, 1, exitStatus)
@@ -86,6 +93,8 @@ func Test_run_rejectsAnInvalidFilter(t *testing.T) {
 }
 
 func Test_run_rejectsAChannelOutOfRange(t *testing.T) {
+	t.Parallel()
+
 	var opts = defaultOptions("b/Q1TEST")
 	opts.toChannel = phy.MaxTotalChans + 1
 
@@ -96,7 +105,11 @@ func Test_run_rejectsAChannelOutOfRange(t *testing.T) {
 }
 
 func Test_run_validateOnly(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a valid filter says nothing and succeeds", func(t *testing.T) {
+		t.Parallel()
+
 		var opts = defaultOptions("t/m & ! d/WIDE*")
 		opts.validateOnly = true
 
@@ -108,6 +121,8 @@ func Test_run_validateOnly(t *testing.T) {
 	})
 
 	t.Run("an invalid filter explains itself and fails", func(t *testing.T) {
+		t.Parallel()
+
 		var opts = defaultOptions("t/m & ( t/w")
 		opts.validateOnly = true
 
@@ -119,6 +134,8 @@ func Test_run_validateOnly(t *testing.T) {
 }
 
 func Test_run_connectedMode(t *testing.T) {
+	t.Parallel()
+
 	var opts = defaultOptions("t/m")
 	opts.isAPRS = false
 
@@ -128,6 +145,7 @@ func Test_run_connectedMode(t *testing.T) {
 	assert.Contains(t, errOut, "Invalid filter")
 }
 
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_run_verboseExplainsTheDecision(t *testing.T) {
 	var opts = defaultOptions("b/Q1TEST")
 	opts.debugLevel = 2
@@ -164,6 +182,8 @@ func TestMain(m *testing.M) {
 }
 
 func Test_main(t *testing.T) {
+	t.Parallel()
+
 	var input = positionPacket + "\n" + messagePacket + "\n"
 
 	var result = testutils.RunMain(t, input, "t/m")
@@ -210,6 +230,8 @@ func assertErrors(t *testing.T, want string, errOut string) {
 }
 
 func Test_main_options(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		args   []string
 		status int
@@ -247,6 +269,8 @@ func Test_main_options(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, messagePacket+"\n", tc.args...)
 			var exitStatus, out, errOut = result.Status, result.Stdout, result.Stderr
 

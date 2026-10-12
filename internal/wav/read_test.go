@@ -103,6 +103,8 @@ func requireReadHeader(t *testing.T, data []byte) Format {
 }
 
 func TestReadHeader(t *testing.T) {
+	t.Parallel()
+
 	var format = requireReadHeader(t, wavWithExtraChunks())
 	assert.Equal(t, Format{NumChannels: 1, SamplesPerSec: 8000, BitsPerSample: 8}, format)
 }
@@ -110,6 +112,8 @@ func TestReadHeader(t *testing.T) {
 // TestReadHeaderFmtExtension checks that an 18-byte "fmt " chunk, which ends
 // with the (for PCM, unused) size of an extension, is read past.
 func TestReadHeaderFmtExtension(t *testing.T) {
+	t.Parallel()
+
 	var data = buildWAV(
 		chunk("fmt ", append(fmtPayload(1, 2, 44100, 16), 0, 0)),
 		chunk("data", monoSamples()),
@@ -121,6 +125,8 @@ func TestReadHeaderFmtExtension(t *testing.T) {
 
 // TestReadHeaderRoundTrip reads back what a Writer wrote.
 func TestReadHeaderRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	var path = filepath.Join(t.TempDir(), "round.wav")
 	var format = Format{NumChannels: 2, SamplesPerSec: 22050, BitsPerSample: 16}
 
@@ -143,6 +149,8 @@ func TestReadHeaderRoundTrip(t *testing.T) {
 }
 
 func TestReadHeaderErrors(t *testing.T) {
+	t.Parallel()
+
 	var valid = wavWithExtraChunks()
 
 	var testCases = map[string][]byte{
@@ -166,6 +174,8 @@ func TestReadHeaderErrors(t *testing.T) {
 
 	for name, data := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var _, _, err = ReadHeader(bytes.NewReader(data))
 			assert.Error(t, err)
 		})
@@ -173,6 +183,8 @@ func TestReadHeaderErrors(t *testing.T) {
 }
 
 func TestReadHeaderNotWAV(t *testing.T) {
+	t.Parallel()
+
 	var _, _, err = ReadHeader(bytes.NewReader([]byte("RIFF\x00\x00\x00\x00AVI LIST")))
 	assert.ErrorIs(t, err, ErrNotWAV)
 }

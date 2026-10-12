@@ -44,6 +44,8 @@ func feed(c *Collector, data []byte) collected {
 }
 
 func TestCollectorWholeFrame(t *testing.T) {
+	t.Parallel()
+
 	var frame = Encapsulate([]byte{CmdDataFrame, FEND, 'h', 'i', FESC})
 
 	var got = feed(new(Collector), frame)
@@ -55,6 +57,8 @@ func TestCollectorWholeFrame(t *testing.T) {
 }
 
 func TestCollectorFramesBackToBack(t *testing.T) {
+	t.Parallel()
+
 	var first = Encapsulate([]byte{CmdDataFrame, 'a'})
 	var second = Encapsulate([]byte{CmdDataFrame, 'b'})
 
@@ -67,6 +71,8 @@ func TestCollectorFramesBackToBack(t *testing.T) {
 // FENDs with nothing between them are how some clients and TNCs idle, and
 // are not frames.
 func TestCollectorEmptyFrames(t *testing.T) {
+	t.Parallel()
+
 	var got = feed(new(Collector), []byte{FEND, FEND, FEND, FEND})
 
 	assert.Empty(t, got.frames)
@@ -76,6 +82,8 @@ func TestCollectorEmptyFrames(t *testing.T) {
 // Whatever precedes a frame is handed over as noise when the frame starts,
 // and the frame is unaffected by it.
 func TestCollectorNoiseBeforeAFrame(t *testing.T) {
+	t.Parallel()
+
 	var frame = Encapsulate([]byte{CmdDataFrame, 'h', 'i'})
 
 	var got = feed(new(Collector), append([]byte("junk"), frame...))
@@ -88,6 +96,8 @@ func TestCollectorNoiseBeforeAFrame(t *testing.T) {
 // Something that thinks it is talking to a command-mode TNC sends lines of
 // text, each of which is handed over as it ends.
 func TestCollectorNoiseLines(t *testing.T) {
+	t.Parallel()
+
 	var got = feed(new(Collector), []byte("XFLOW OFF\rKISS ON\r"))
 
 	assert.Equal(t, [][]byte{[]byte("XFLOW OFF\r"), []byte("KISS ON\r")}, got.noise)
@@ -98,6 +108,8 @@ func TestCollectorNoiseLines(t *testing.T) {
 // Noise is kept only so far: a stream of it must not make the Collector grow
 // without limit.
 func TestCollectorNoiseIsBounded(t *testing.T) {
+	t.Parallel()
+
 	var got = feed(new(Collector), append(bytes.Repeat([]byte{'x'}, MaxNoiseLen*2), '\r'))
 
 	require.Len(t, got.noise, 1)
@@ -108,6 +120,8 @@ func TestCollectorNoiseIsBounded(t *testing.T) {
 // A frame that never ends would otherwise fill the buffer without limit.  It
 // is reported once, however much more of it there is.
 func TestCollectorOverlongFrameIsReportedOnce(t *testing.T) {
+	t.Parallel()
+
 	var got = feed(new(Collector), append([]byte{FEND}, bytes.Repeat([]byte{'x'}, MaxFrameLen*2)...))
 
 	assert.Equal(t, []error{ErrFrameTooLong}, got.errs)
@@ -117,6 +131,8 @@ func TestCollectorOverlongFrameIsReportedOnce(t *testing.T) {
 // When the frame does end it is thrown away, not handed over as a fragment,
 // and the next frame still arrives.
 func TestCollectorOverlongFrameIsDiscarded(t *testing.T) {
+	t.Parallel()
+
 	var next = Encapsulate([]byte{CmdDataFrame, 'o', 'k'})
 
 	var stream = append([]byte{FEND}, bytes.Repeat([]byte{'x'}, MaxFrameLen+10)...)
@@ -133,6 +149,8 @@ func TestCollectorOverlongFrameIsDiscarded(t *testing.T) {
 // A frame that fills the buffer exactly leaves no room for its closing FEND,
 // so it is overlong too.
 func TestCollectorExactlyFullFrameIsDiscarded(t *testing.T) {
+	t.Parallel()
+
 	var stream = append([]byte{FEND}, bytes.Repeat([]byte{'x'}, MaxFrameLen-1)...)
 	stream = append(stream, FEND)
 
@@ -144,6 +162,8 @@ func TestCollectorExactlyFullFrameIsDiscarded(t *testing.T) {
 
 // And the largest frame that does fit gets through.
 func TestCollectorLargestFrame(t *testing.T) {
+	t.Parallel()
+
 	var stream = append([]byte{FEND}, bytes.Repeat([]byte{'x'}, MaxFrameLen-2)...)
 	stream = append(stream, FEND)
 

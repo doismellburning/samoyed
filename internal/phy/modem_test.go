@@ -10,6 +10,8 @@ import (
 )
 
 func TestModemString(t *testing.T) {
+	t.Parallel()
+
 	var tests = []struct {
 		m    Modem
 		want string

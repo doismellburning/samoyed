@@ -25,6 +25,8 @@ func decodedPacket(t *testing.T, monitor string) Packet {
 }
 
 func TestNewPacketPosition(t *testing.T) {
+	t.Parallel()
+
 	var p = decodedPacket(t, "Q1TEST-9>APRS,WIDE1-1:!5130.00N/00007.50W>Mobile")
 
 	assert.Equal(t, Received, p.Direction)
@@ -41,6 +43,8 @@ func TestNewPacketPosition(t *testing.T) {
 }
 
 func TestNewPacketObjectIsFiledUnderItsName(t *testing.T) {
+	t.Parallel()
+
 	// The object's position mustn't move the station that sent it.
 	var p = decodedPacket(t, "Q1TEST>APRS:;EVENT    *111111z5130.00N/00007.50W-Fete")
 
@@ -49,6 +53,8 @@ func TestNewPacketObjectIsFiledUnderItsName(t *testing.T) {
 }
 
 func TestNewPacketStatusHasNoPosition(t *testing.T) {
+	t.Parallel()
+
 	var p = decodedPacket(t, "Q1TEST>APRS:>On the air")
 
 	assert.Equal(t, "Q1TEST", p.Station)
@@ -56,6 +62,8 @@ func TestNewPacketStatusHasNoPosition(t *testing.T) {
 }
 
 func TestNewPacketNotAPRS(t *testing.T) {
+	t.Parallel()
+
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 

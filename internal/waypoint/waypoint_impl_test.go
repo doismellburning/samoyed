@@ -32,6 +32,8 @@ func computeChecksum(sentence string) int {
 
 // TestAppendChecksumBasic tests simple known inputs.
 func TestAppendChecksumBasic(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		input    string
@@ -61,6 +63,8 @@ func TestAppendChecksumBasic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = appendChecksum([]byte(tt.input))
 			assert.Equal(t, tt.expected, string(result))
 		})
@@ -69,6 +73,8 @@ func TestAppendChecksumBasic(t *testing.T) {
 
 // TestAppendChecksumFormat verifies the output always ends with *XX.
 func TestAppendChecksumFormat(t *testing.T) {
+	t.Parallel()
+
 	var inputs = []string{
 		"$GPWPL,4221.6060,N,07120.8300,W,TEST",
 		"$PKWDWPL,150803,V,4237.14,N,07120.83,W,,,190316,,test,/'",
@@ -77,6 +83,8 @@ func TestAppendChecksumFormat(t *testing.T) {
 
 	for _, input := range inputs {
 		t.Run(input[:8], func(t *testing.T) {
+			t.Parallel()
+
 			var result = string(appendChecksum([]byte(input)))
 
 			// Must preserve original sentence.
@@ -102,6 +110,8 @@ func TestAppendChecksumFormat(t *testing.T) {
 
 // TestAppendChecksumCorrectness verifies the checksum value is correct.
 func TestAppendChecksumCorrectness(t *testing.T) {
+	t.Parallel()
+
 	var inputs = []string{
 		"$GPWPL,0000.0000,N,00000.0000,E,WPT1",
 		"$PGRMW,TEST,100.0,0041,hello",
@@ -111,6 +121,8 @@ func TestAppendChecksumCorrectness(t *testing.T) {
 
 	for _, input := range inputs {
 		t.Run(input[:8], func(t *testing.T) {
+			t.Parallel()
+
 			var result = string(appendChecksum([]byte(input)))
 			var expected = computeChecksum(input)
 			var actual = 0
@@ -123,6 +135,8 @@ func TestAppendChecksumCorrectness(t *testing.T) {
 
 // TestAppendChecksumIdempotentInput verifies the input slice is not modified in place.
 func TestAppendChecksumIdempotentInput(t *testing.T) {
+	t.Parallel()
+
 	var input = []byte("$GPWPL,test")
 	var original = string(input)
 	var result = appendChecksum(input)
@@ -180,6 +194,8 @@ func setupUDPWaypoint(t *testing.T, formats int) (*Sender, net.PacketConn) {
 
 // TestWaypointSendSentenceNMEAGeneric verifies $GPWPL output over UDP.
 func TestWaypointSendSentenceNMEAGeneric(t *testing.T) {
+	t.Parallel()
+
 	var ws, listener = setupUDPWaypoint(t, FormatNMEAGeneric)
 
 	ws.SendSentence("TEST", 42.0, -71.0, '/', 'a', maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
@@ -206,6 +222,8 @@ func TestWaypointSendSentenceNMEAGeneric(t *testing.T) {
 
 // TestWaypointSendSentenceKenwood verifies $PKWDWPL output over UDP.
 func TestWaypointSendSentenceKenwood(t *testing.T) {
+	t.Parallel()
+
 	var ws, listener = setupUDPWaypoint(t, FormatKenwood)
 
 	ws.SendSentence("W1AW", 41.7147, -72.7272, '/', '-', maybe.Just(100.0), maybe.Just(270.0), maybe.Just(10.0), "")
@@ -218,6 +236,8 @@ func TestWaypointSendSentenceKenwood(t *testing.T) {
 
 // TestWaypointSendSentenceMagellan verifies $PMGNWPL output over UDP.
 func TestWaypointSendSentenceMagellan(t *testing.T) {
+	t.Parallel()
+
 	var ws, listener = setupUDPWaypoint(t, FormatMagellan)
 
 	ws.SendSentence("MAGSTN", 34.0, -118.0, '/', '-', maybe.Just(50.0), maybe.Nothing[float64](), maybe.Nothing[float64](), "a comment")
@@ -230,6 +250,8 @@ func TestWaypointSendSentenceMagellan(t *testing.T) {
 
 // TestWaypointSendSentenceNoDest verifies early return when no destination is configured.
 func TestWaypointSendSentenceNoDest(t *testing.T) {
+	t.Parallel()
+
 	var ws = new(Sender)
 
 	// Should not panic.
@@ -238,6 +260,8 @@ func TestWaypointSendSentenceNoDest(t *testing.T) {
 
 // TestWaypointSendSentenceCommaInName verifies comma substitution.
 func TestWaypointSendSentenceCommaInName(t *testing.T) {
+	t.Parallel()
+
 	var ws, listener = setupUDPWaypoint(t, FormatNMEAGeneric)
 
 	ws.SendSentence("MY,OBJ", 42.0, -71.0, '/', '-', maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
@@ -250,6 +274,8 @@ func TestWaypointSendSentenceCommaInName(t *testing.T) {
 
 // TestWaypointSendSentenceAsteriskInName verifies asterisk substitution.
 func TestWaypointSendSentenceAsteriskInName(t *testing.T) {
+	t.Parallel()
+
 	var ws, listener = setupUDPWaypoint(t, FormatNMEAGeneric)
 
 	ws.SendSentence("MY*OBJ", 42.0, -71.0, '/', '-', maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
@@ -260,6 +286,8 @@ func TestWaypointSendSentenceAsteriskInName(t *testing.T) {
 
 // TestWaypointSendSentenceKenwoodSymbolComma verifies Kenwood comma-symbol substitution.
 func TestWaypointSendSentenceKenwoodSymbolComma(t *testing.T) {
+	t.Parallel()
+
 	var ws, listener = setupUDPWaypoint(t, FormatKenwood)
 
 	// Symbol ',' (Boy Scouts) should be substituted to '|'.
@@ -276,6 +304,8 @@ func TestWaypointSendSentenceKenwoodSymbolComma(t *testing.T) {
 
 // TestWaypointSendAisNoDest verifies AIS early return when no destination configured.
 func TestWaypointSendAisNoDest(t *testing.T) {
+	t.Parallel()
+
 	var ws = new(Sender)
 
 	// Should not panic.
@@ -284,6 +314,8 @@ func TestWaypointSendAisNoDest(t *testing.T) {
 
 // TestWaypointSendAisUDP verifies AIS sentences are forwarded over UDP.
 func TestWaypointSendAisUDP(t *testing.T) {
+	t.Parallel()
+
 	var ws, listener = setupUDPWaypoint(t, FormatAIS)
 
 	var aisMsg = []byte("!AIVDM,1,1,,A,35NO=dPOiAJriVDH@94E84AJ0000,0*4B")
@@ -297,6 +329,8 @@ func TestWaypointSendAisUDP(t *testing.T) {
 
 // TestWaypointSendAisWrongFormat verifies AIS not sent when format flag not set.
 func TestWaypointSendAisWrongFormat(t *testing.T) {
+	t.Parallel()
+
 	var ws, listener = setupUDPWaypoint(t, FormatNMEAGeneric)
 
 	ws.SendAIS([]byte("!AIVDM,1,1,,A,35NO=dPOiAJriVDH@94E84AJ0000,0*4B"))
@@ -311,6 +345,8 @@ func TestWaypointSendAisWrongFormat(t *testing.T) {
 
 // TestWaypointDefaultFormats verifies that NewSender sets defaults when formats==0.
 func TestWaypointDefaultFormats(t *testing.T) {
+	t.Parallel()
+
 	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
@@ -333,6 +369,8 @@ func TestWaypointDefaultFormats(t *testing.T) {
 
 // TestWaypointGarminImpliesNMEAGeneric verifies Garmin format forces NMEA generic.
 func TestWaypointGarminImpliesNMEAGeneric(t *testing.T) {
+	t.Parallel()
+
 	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
@@ -355,6 +393,8 @@ func TestWaypointGarminImpliesNMEAGeneric(t *testing.T) {
 
 // TestWaypointTermClearsState verifies that Close resets the struct fields.
 func TestWaypointTermClearsState(t *testing.T) {
+	t.Parallel()
+
 	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -378,6 +418,8 @@ func TestWaypointTermClearsState(t *testing.T) {
 // TestNewSenderNoDestRequested verifies that not asking for any waypoint
 // destination is not an error.
 func TestNewSenderNoDestRequested(t *testing.T) {
+	t.Parallel()
+
 	var config = Config{} //nolint: exhaustruct_v5
 
 	var ws, err = NewSender(t.Context(), &config, nil)
@@ -390,6 +432,8 @@ func TestNewSenderNoDestRequested(t *testing.T) {
 // TestNewSenderUDPFailureReturnsError verifies that NewSender
 // reports an error when the only requested destination (UDP) fails to open.
 func TestNewSenderUDPFailureReturnsError(t *testing.T) {
+	t.Parallel()
+
 	var config = Config{ //nolint: exhaustruct_v5
 		UDPHostname: "\x7f invalid host",
 		UDPPort:     12345,

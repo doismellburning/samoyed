@@ -50,6 +50,8 @@ func (failingWriter) Write(_ []byte) (int, error) {
 }
 
 func Test_writeFull(t *testing.T) {
+	t.Parallel()
+
 	var w = new(shortWriter)
 
 	require.NoError(t, writeFull(w, []byte("0001 send data\r")))
@@ -94,6 +96,7 @@ func resetState(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func Test_process_rec_data(t *testing.T) {
 	resetState(t)
 
@@ -120,6 +123,8 @@ func Test_process_rec_data(t *testing.T) {
 // A serial TNC says more than the test's own data - its prompt, its
 // connection reports, its answers to our commands - and none of that is for
 // process_rec_data to count or to object to.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func Test_process_rec_data_serialChatter(t *testing.T) {
 	resetState(t)
 
@@ -164,6 +169,7 @@ func callsign(c agwpe.Callsign) string {
 	return c.String()
 }
 
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func Test_tnc_commands_net(t *testing.T) {
 	resetState(t)
 
@@ -269,6 +275,8 @@ func readUntil(t *testing.T, f *os.File, want string) string {
 
 // With the TNC already showing its command prompt, there's no need to break
 // into command mode first, and none of its long waits.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func Test_tnc_commands_serial(t *testing.T) {
 	resetState(t)
 
@@ -295,6 +303,8 @@ func Test_tnc_commands_serial(t *testing.T) {
 // A serial TNC's prompt and connection reports pass through the line handling
 // without upsetting it, the reports keep track of the connection, and the
 // test's own data is still answered.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func Test_tnc_serial_line_chatter(t *testing.T) {
 	resetState(t)
 
@@ -323,6 +333,8 @@ func Test_tnc_serial_line_chatter(t *testing.T) {
 // main takes hours over a full run, and its TNC goroutines exit the process
 // when a TNC goes away, so it runs on its own.
 func Test_main_connects(t *testing.T) {
+	t.Parallel()
+
 	var ln0, port0 = testutils.Listen(t)
 	var ln1, port1 = testutils.Listen(t)
 
@@ -358,6 +370,7 @@ func Test_main_connects(t *testing.T) {
 	p.WaitFor(t, "*** Connected to DW1 ***")
 }
 
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func Test_main_badArguments(t *testing.T) {
 	var gone = "127.0.0.1:" + testutils.UnusedPort(t)
 
@@ -556,6 +569,8 @@ func Test_main_serial(t *testing.T) {
 }
 
 // While the TNC says it is busy, data waits until it isn't.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func Test_tnc_send_data_busy(t *testing.T) {
 	resetState(t)
 

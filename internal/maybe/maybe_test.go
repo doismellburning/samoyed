@@ -10,6 +10,8 @@ import (
 )
 
 func TestZeroValueIsNothing(t *testing.T) {
+	t.Parallel()
+
 	var m Maybe[float64]
 
 	if m.IsJust() {
@@ -31,6 +33,8 @@ func TestZeroValueIsNothing(t *testing.T) {
 }
 
 func TestJust(t *testing.T) {
+	t.Parallel()
+
 	var m = Just(42)
 
 	if !m.IsJust() || m.IsNothing() {
@@ -46,6 +50,8 @@ func TestJust(t *testing.T) {
 // Just(0) is a value that happens to be zero, not an absent one - the whole
 // point of the type.
 func TestJustZeroIsNotNothing(t *testing.T) {
+	t.Parallel()
+
 	if Just(0.0).IsNothing() {
 		t.Error("Just(0.0) should not be Nothing")
 	}
@@ -56,6 +62,8 @@ func TestJustZeroIsNotNothing(t *testing.T) {
 }
 
 func TestComparable(t *testing.T) {
+	t.Parallel()
+
 	var one, anotherOne, two = Just(1), Just(1), Just(2)
 
 	if one != anotherOne {
@@ -68,6 +76,8 @@ func TestComparable(t *testing.T) {
 }
 
 func TestFromMaybe(t *testing.T) {
+	t.Parallel()
+
 	if got := FromMaybe(7, Just(42)); got != 42 {
 		t.Errorf("FromMaybe on Just gave %v, want 42", got)
 	}
@@ -78,12 +88,16 @@ func TestFromMaybe(t *testing.T) {
 }
 
 func TestFromJust(t *testing.T) {
+	t.Parallel()
+
 	if got := FromJust(Just(42)); got != 42 {
 		t.Errorf("FromJust gave %v, want 42", got)
 	}
 }
 
 func TestFromJustPanicsOnNothing(t *testing.T) {
+	t.Parallel()
+
 	defer func() {
 		if recover() == nil {
 			t.Error("FromJust on Nothing should panic")
@@ -94,6 +108,8 @@ func TestFromJustPanicsOnNothing(t *testing.T) {
 }
 
 func TestOr(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		name string
 		m    Maybe[int]
@@ -108,6 +124,8 @@ func TestOr(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
 			if got := c.m.Or(c.alt); got != c.want {
 				t.Errorf("Or gave %v, want %v", got, c.want)
 			}
@@ -116,6 +134,8 @@ func TestOr(t *testing.T) {
 }
 
 func TestFold(t *testing.T) {
+	t.Parallel()
+
 	var double = func(n int) int { return n * 2 }
 
 	if got := Fold(-1, double, Just(21)); got != 42 {
@@ -128,6 +148,8 @@ func TestFold(t *testing.T) {
 }
 
 func TestFmap(t *testing.T) {
+	t.Parallel()
+
 	var itoa = func(n int) string { return fmt.Sprintf("<%d>", n) }
 
 	if got := Fmap(itoa, Just(42)); got != Just("<42>") {
@@ -141,6 +163,8 @@ func TestFmap(t *testing.T) {
 
 // fmap id == id, and fmap (f . g) == fmap f . fmap g
 func TestFunctorLaws(t *testing.T) {
+	t.Parallel()
+
 	var identity = func(n int) int { return n }
 	var f = func(n int) int { return n + 1 }
 	var g = func(n int) int { return n * 3 }
@@ -158,6 +182,8 @@ func TestFunctorLaws(t *testing.T) {
 }
 
 func TestAp(t *testing.T) {
+	t.Parallel()
+
 	var add = func(n int) int { return n + 1 }
 
 	if got := Ap(Just(add), Just(41)); got != Just(42) {
@@ -175,6 +201,8 @@ func TestAp(t *testing.T) {
 
 // pure id <*> v == v, and pure f <*> pure x == pure (f x)
 func TestApplicativeLaws(t *testing.T) {
+	t.Parallel()
+
 	var identity = func(n int) int { return n }
 
 	for _, m := range []Maybe[int]{Just(5), Nothing[int]()} {
@@ -190,6 +218,8 @@ func TestApplicativeLaws(t *testing.T) {
 }
 
 func TestLiftA2(t *testing.T) {
+	t.Parallel()
+
 	var sum = func(a, b int) int { return a + b }
 
 	if got := LiftA2(sum, Just(1), Just(2)); got != Just(3) {
@@ -206,6 +236,8 @@ func TestLiftA2(t *testing.T) {
 }
 
 func TestBind(t *testing.T) {
+	t.Parallel()
+
 	// Halve only even numbers, so the function itself can fail.
 	var halve = func(n int) Maybe[int] {
 		if n%2 != 0 {
@@ -230,6 +262,8 @@ func TestBind(t *testing.T) {
 
 // return a >>= f == f a, m >>= return == m, and associativity
 func TestMonadLaws(t *testing.T) {
+	t.Parallel()
+
 	var f = func(n int) Maybe[int] { return Just(n + 1) }
 	var g = func(n int) Maybe[int] { return Just(n * 3) }
 
@@ -250,6 +284,8 @@ func TestMonadLaws(t *testing.T) {
 }
 
 func TestCatMaybes(t *testing.T) {
+	t.Parallel()
+
 	var got = CatMaybes([]Maybe[int]{Just(1), Nothing[int](), Just(3)})
 
 	if len(got) != 2 || got[0] != 1 || got[1] != 3 {
@@ -262,6 +298,8 @@ func TestCatMaybes(t *testing.T) {
 }
 
 func TestMapMaybe(t *testing.T) {
+	t.Parallel()
+
 	var positive = func(n int) Maybe[int] {
 		if n <= 0 {
 			return Nothing[int]()
@@ -278,6 +316,8 @@ func TestMapMaybe(t *testing.T) {
 }
 
 func TestFromPointer(t *testing.T) {
+	t.Parallel()
+
 	var value = 1
 
 	if got := FromPointer(&value); got != Just(1) {
@@ -296,6 +336,8 @@ func TestFromPointer(t *testing.T) {
 }
 
 func TestListToMaybe(t *testing.T) {
+	t.Parallel()
+
 	if got := ListToMaybe([]int{1, 2}); got != Just(1) {
 		t.Errorf("ListToMaybe gave %v, want Just 1", got)
 	}
@@ -306,6 +348,8 @@ func TestListToMaybe(t *testing.T) {
 }
 
 func TestMaybeToList(t *testing.T) {
+	t.Parallel()
+
 	var got = MaybeToList(Just(1))
 
 	if len(got) != 1 || got[0] != 1 {
@@ -318,6 +362,8 @@ func TestMaybeToList(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
+	t.Parallel()
+
 	if got := fmt.Sprintf("%v", Just(42)); got != "Just 42" {
 		t.Errorf("formatting Just gave %q, want \"Just 42\"", got)
 	}
@@ -328,6 +374,8 @@ func TestString(t *testing.T) {
 }
 
 func TestIsZero(t *testing.T) {
+	t.Parallel()
+
 	if !Nothing[int]().IsZero() {
 		t.Error("Nothing should be zero")
 	}
@@ -338,6 +386,8 @@ func TestIsZero(t *testing.T) {
 }
 
 func TestMarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		name string
 		m    any
@@ -354,6 +404,8 @@ func TestMarshalJSON(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
 			data, err := json.Marshal(c.m) // := for errchkjson, which doesn't follow var.
 			if err != nil {
 				t.Fatal(err)
@@ -367,6 +419,8 @@ func TestMarshalJSON(t *testing.T) {
 }
 
 func TestMarshalJSONInStruct(t *testing.T) {
+	t.Parallel()
+
 	type record struct {
 		Plain   Maybe[int] `json:"plain"`
 		Omitted Maybe[int] `json:"omitted,omitzero"`
@@ -383,6 +437,8 @@ func TestMarshalJSONInStruct(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
 			data, err := json.Marshal(c.r) // := for errchkjson, which doesn't follow var.
 			if err != nil {
 				t.Fatal(err)

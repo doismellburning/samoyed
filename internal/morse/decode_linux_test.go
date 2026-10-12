@@ -72,6 +72,8 @@ func morseToFile(t *testing.T, filename string, message string) {
 
 // gen_packets will generate Morse, so let's test it and try to decode
 func Test_Morse_Generate_Decode(t *testing.T) {
+	t.Parallel()
+
 	// First, generate
 	var tmpdir = t.TempDir()
 

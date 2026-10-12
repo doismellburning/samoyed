@@ -12,6 +12,8 @@ import (
 /* Quick unit test for encapsulate & unwrap */
 
 func Test_KISS(t *testing.T) {
+	t.Parallel()
+
 	var din = make([]byte, 512)
 
 	for k := range 512 {

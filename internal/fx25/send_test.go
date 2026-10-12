@@ -21,6 +21,8 @@ func captureFX25Bits(fn func(s *Sender)) []int {
 // An FX.25 frame goes out as its correlation tag, then the data and check
 // bytes of the codeblock, NRZI encoded and least significant bit first.
 func TestFX25FrameIsSentAsTagDataAndCheck(t *testing.T) {
+	t.Parallel()
+
 	var fbuf = []byte{'Q', '1', 'T', 'E', 'S', 'T'}
 
 	var ctagNum, data, check = fx25_encode_frame(0, append([]byte{}, fbuf...), 16, 0)
@@ -50,6 +52,8 @@ func TestFX25FrameIsSentAsTagDataAndCheck(t *testing.T) {
 // A frame too large for FX.25 is rejected without sending anything, so the
 // caller can fall back to AX.25.
 func TestFX25FrameTooLargeSendsNothing(t *testing.T) {
+	t.Parallel()
+
 	var bits = captureFX25Bits(func(s *Sender) {
 		assert.Equal(t, -1, s.SendFrame(make([]byte, MaxData), 16))
 	})

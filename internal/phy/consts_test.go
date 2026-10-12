@@ -12,6 +12,8 @@ import (
 // Each audio device has two radio channels to itself, used or not, so the
 // channel numbers of every device fit within MaxRadioChans.
 func TestADevFirstChan(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 0, ADevFirstChan(0))
 	assert.Equal(t, 2, ADevFirstChan(1))
 	assert.Equal(t, MaxRadioChans, ADevFirstChan(MaxADevs-1)+2)

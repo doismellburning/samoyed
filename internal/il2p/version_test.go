@@ -12,6 +12,8 @@ import (
 )
 
 func TestIL2PTXFEC(t *testing.T) {
+	t.Parallel()
+
 	var testData = []struct {
 		version     Version
 		max_fec     int
@@ -37,6 +39,8 @@ func TestIL2PTXFEC(t *testing.T) {
 }
 
 func TestIL2PRXMaxFEC(t *testing.T) {
+	t.Parallel()
+
 	// Only v0.4 reads the bit; the others know it is reserved.
 	assert.Equal(t, 0, il2p_rx_max_fec(Version04, 0))
 	assert.Equal(t, 1, il2p_rx_max_fec(Version04, 1))
@@ -49,6 +53,8 @@ func TestIL2PRXMaxFEC(t *testing.T) {
 // Send a frame over the fake modem and see whether the receiver, speaking the
 // version it was given, makes sense of it.
 func TestIL2POnAirVersions(t *testing.T) {
+	t.Parallel()
+
 	// Check the information part of whatever arrives against il2pTestText, so
 	// build the frame directly rather than from text: the IL2P header cannot
 	// represent every combination of the AX.25 address C bits, and a frame
@@ -87,6 +93,8 @@ func TestIL2POnAirVersions(t *testing.T) {
 
 	for _, testDatum := range testData {
 		t.Run(testDatum.name, func(t *testing.T) {
+			t.Parallel()
+
 			var recorder = il2pLoopback(t, testDatum.rx_version)
 
 			require.Positive(t, recorder.sender.SendFrame(pp, testDatum.tx_version, testDatum.max_fec, true, 0))

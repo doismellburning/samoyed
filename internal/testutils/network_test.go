@@ -12,6 +12,8 @@ import (
 )
 
 func TestListenAndAccept(t *testing.T) {
+	t.Parallel()
+
 	var ln, port = Listen(t)
 
 	var client, dialErr = new(net.Dialer).DialContext(t.Context(), "tcp4", net.JoinHostPort("127.0.0.1", port))
@@ -31,6 +33,7 @@ func TestListenAndAccept(t *testing.T) {
 	assert.Equal(t, "hello", string(buf))
 }
 
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func TestUnusedPort(t *testing.T) {
 	var _, err = new(net.Dialer).DialContext(t.Context(), "tcp4", net.JoinHostPort("127.0.0.1", UnusedPort(t)))
 	assert.Error(t, err)

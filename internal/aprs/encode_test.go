@@ -20,6 +20,8 @@ import (
 // packet.
 
 func Test_phg_data_extension_partially_specified(t *testing.T) {
+	t.Parallel()
+
 	var none = maybe.Nothing[int]()
 	var some = maybe.Just[int]
 
@@ -34,6 +36,8 @@ func Test_phg_data_extension_partially_specified(t *testing.T) {
 // Gain is a single digit, so anything above 9 dB goes out as 9, as power
 // does.  Dire Wolf sent it as 0, claiming no gain at all.
 func Test_phg_data_extension_high_gain(t *testing.T) {
+	t.Parallel()
+
 	var none = maybe.Nothing[int]()
 
 	assert.Equal(t, "PHG0090", phgDataExtension(none, none, maybe.Just(9), ""))
@@ -41,6 +45,8 @@ func Test_phg_data_extension_high_gain(t *testing.T) {
 }
 
 func Test_phg_data_extension_directivity(t *testing.T) {
+	t.Parallel()
+
 	var none = maybe.Nothing[int]()
 
 	for dir, want := range map[string]string{
@@ -62,6 +68,8 @@ func Test_phg_data_extension_directivity(t *testing.T) {
 }
 
 func Test_EncodePosition_partially_specified_phg(t *testing.T) {
+	t.Parallel()
+
 	var none = maybe.Nothing[int]()
 	var some = maybe.Just[int]
 	var noFloat = maybe.Nothing[float64]()
@@ -86,6 +94,8 @@ func Test_EncodePosition_partially_specified_phg(t *testing.T) {
 // and the encoders guarded on all three being non-zero.
 
 func Test_EncodePosition_explicit_zero_frequency_spec(t *testing.T) {
+	t.Parallel()
+
 	var none = maybe.Nothing[int]()
 	var noFloat = maybe.Nothing[float64]()
 	var zero = maybe.Just(0.0)
@@ -106,6 +116,8 @@ func Test_EncodePosition_explicit_zero_frequency_spec(t *testing.T) {
 // the time carried, so an evening report from east of Greenwich came out hours
 // off and could not be told from a morning one.
 func Test_encode_object_timestamp_is_24_hour_utc(t *testing.T) {
+	t.Parallel()
+
 	var eastOfGreenwich = time.FixedZone("UTC+1", 60*60)
 
 	var info = EncodeObject("Q1TEST", false, time.Date(2026, 9, 26, 18, 30, 0, 0, eastOfGreenwich),
@@ -121,6 +133,8 @@ func Test_encode_object_timestamp_is_24_hour_utc(t *testing.T) {
 // speed must still come out as printable, as the radio range beside it does,
 // rather than running past '~' into bytes that aren't ASCII.
 func Test_compressed_position_speed_is_printable(t *testing.T) {
+	t.Parallel()
+
 	var none = maybe.Nothing[int]()
 
 	var c = compressedPosition('/', '>', 0, 0, none, none, none, maybe.Just(90), maybe.Just(1000000))
@@ -132,6 +146,8 @@ func Test_compressed_position_speed_is_printable(t *testing.T) {
 // degrees through as '{', which marks the byte after it as radio range instead
 // of speed.
 func Test_compressed_position_course_wraps(t *testing.T) {
+	t.Parallel()
+
 	var none = maybe.Nothing[int]()
 
 	for _, degrees := range []int{0, 360, 720, -360, -720} {
@@ -145,6 +161,8 @@ func Test_compressed_position_course_wraps(t *testing.T) {
 
 // checkSymbol complains about each part of a symbol that isn't valid, but
 // leaves the encoding to go ahead.
+//
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func Test_checkSymbol(t *testing.T) {
 	var hook = test.NewGlobal()
 
@@ -167,6 +185,8 @@ func Test_checkSymbol(t *testing.T) {
 // both forms.  A compressed position only round trips to within its
 // resolution, and a human-readable one to a hundredth of a minute.
 func Test_encode_decode_round_trip(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var none = maybe.Nothing[int]()

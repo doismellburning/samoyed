@@ -110,6 +110,8 @@ func assertAudioStatsReport(t *testing.T, report *logrus.Entry, adev int, rateKH
 
 // An interval of 0 is how the statistics are turned off, and nothing should be
 // collected in that case, never mind printed.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestAudioStatsIntervalOffDoesNothing(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
@@ -124,6 +126,8 @@ func TestAudioStatsIntervalOffDoesNothing(t *testing.T) {
 
 // The first call only starts the clock - and shortens the first collection
 // period to 3 seconds, so there isn't a long silence before the first report.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestAudioStatsFirstCallStartsCollecting(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
@@ -143,6 +147,8 @@ func TestAudioStatsFirstCallStartsCollecting(t *testing.T) {
 
 // A read that returned samples counts as samples; one that didn't counts as an
 // error.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestAudioStatsCountsSamplesAndErrors(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
@@ -161,6 +167,8 @@ func TestAudioStatsCountsSamplesAndErrors(t *testing.T) {
 
 // The first report would be measured over a period that didn't start on a
 // second boundary, so its rate would be noticeably wrong.  It is dropped.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestAudioStatsSuppressesFirstReport(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
@@ -177,6 +185,7 @@ func TestAudioStatsSuppressesFirstReport(t *testing.T) {
 	assert.Zero(t, stats[0].errorCount)
 }
 
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestAudioStatsReportsSampleRate(t *testing.T) {
 	var stats = newTestAudioStats(t)
 	audioStatsPastFirstReport(t, stats, 0, 1)
@@ -192,6 +201,7 @@ func TestAudioStatsReportsSampleRate(t *testing.T) {
 	assert.Zero(t, stats[0].sampleCount, "counters restart after a report")
 }
 
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestAudioStatsReportsErrorCount(t *testing.T) {
 	var stats = newTestAudioStats(t)
 	audioStatsPastFirstReport(t, stats, 0, 1)
@@ -210,6 +220,8 @@ func TestAudioStatsReportsErrorCount(t *testing.T) {
 }
 
 // A stereo device reports a level per channel.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestAudioStatsReportsBothChannels(t *testing.T) {
 	var stats = newTestAudioStats(t)
 	audioStatsPastFirstReport(t, stats, 0, 2)
@@ -224,6 +236,8 @@ func TestAudioStatsReportsBothChannels(t *testing.T) {
 }
 
 // Each device keeps its own counters, and reports its own channel numbers.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestAudioStatsSecondDeviceIsIndependent(t *testing.T) {
 	var stats = newTestAudioStats(t)
 	audioStatsPastFirstReport(t, stats, 1, 1)
@@ -241,6 +255,8 @@ func TestAudioStatsSecondDeviceIsIndependent(t *testing.T) {
 }
 
 func TestAudioStatsRejectsDeviceOutOfRange(t *testing.T) {
+	t.Parallel()
+
 	var stats = newTestAudioStats(t)
 
 	assert.Panics(t, func() { stats[0].Record(phy.MaxADevs, 1, 44100, audioStatsTestInterval) })

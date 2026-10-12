@@ -52,6 +52,7 @@ func testCapture(t *testing.T, monitor string) []byte {
 	return kiss.Encapsulate(append([]byte{0x00}, ax25.MustFromText(monitor).Pack()...))
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_APRS(t *testing.T) {
 	var capture = testCapture(t, "Q1TEST-9>APDW17,WIDE1-1:!4237.14NS07120.83W#PHG7130Chelmsford, MA")
 
@@ -65,6 +66,8 @@ func Test_APRS(t *testing.T) {
 }
 
 // The channel is in the upper nybble of the command byte.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_Port(t *testing.T) {
 	var frame = ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()
 
@@ -75,6 +78,8 @@ func Test_Port(t *testing.T) {
 }
 
 // Escaped bytes should come back as the bytes they stand for.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_Escapes(t *testing.T) {
 	var frame = ax25.MustFromText("Q1TEST>APDW17:>FEND <0xc0> and FESC <0xdb>").Pack()
 
@@ -91,6 +96,8 @@ func Test_Escapes(t *testing.T) {
 }
 
 // Extra FENDs are padding, not empty frames.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_Padding(t *testing.T) {
 	var capture = []byte{kiss.FEND, kiss.FEND}
 	capture = append(capture, testCapture(t, "Q1TEST>APDW17:>Testing")...)
@@ -102,6 +109,7 @@ func Test_Padding(t *testing.T) {
 	assert.Contains(t, output, "1 frame, 0 problems.")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_Unterminated(t *testing.T) {
 	var capture = testCapture(t, "Q1TEST>APDW17:>Testing")
 
@@ -113,6 +121,7 @@ func Test_Unterminated(t *testing.T) {
 	assert.Contains(t, output, "Q1TEST>APDW17:")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_BadEscape(t *testing.T) {
 	var capture = testCapture(t, "Q1TEST>APDW17:>Testing")
 
@@ -125,6 +134,7 @@ func Test_BadEscape(t *testing.T) {
 	assert.Contains(t, output, "not TFEND (0xdc) or TFESC (0xdd)")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_TruncatedEscape(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, 0x00, kiss.FESC, kiss.FEND}, false)
 
@@ -132,6 +142,7 @@ func Test_TruncatedEscape(t *testing.T) {
 	assert.Contains(t, output, "the escaped byte is missing")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_ShortFrame(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, 0x00, 0x82, 0xa0, kiss.FEND}, false)
 
@@ -139,6 +150,7 @@ func Test_ShortFrame(t *testing.T) {
 	assert.Contains(t, output, "too short for an AX.25 header of at least 15")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_NoCommandByte(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.FESC, kiss.FEND}, false)
 
@@ -147,6 +159,8 @@ func Test_NoCommandByte(t *testing.T) {
 }
 
 // The end of address bit has to mark out whole 7 byte addresses.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_MalformedAddresses(t *testing.T) {
 	var frame = ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()
 
@@ -161,6 +175,8 @@ func Test_MalformedAddresses(t *testing.T) {
 // A frame that stops at the end of its address field has no control byte, so
 // nothing should be said about one: the octets a control and PID would have
 // been are past the end of the frame.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_NoControlByte(t *testing.T) {
 	var frame = ax25.MustFromText("Q1TEST>Q2TEST,Q3TEST:>Testing").Pack()
 
@@ -175,6 +191,8 @@ func Test_NoControlByte(t *testing.T) {
 }
 
 // AX25SafePrint stops after MAXSAFE bytes, which has to be said out loud.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_SetHardwareTruncated(t *testing.T) {
 	var capture = []byte{kiss.FEND, kiss.CmdSetHardware}
 	capture = append(capture, bytes.Repeat([]byte("x"), ax25.MaxSafe+100)...)
@@ -187,6 +205,8 @@ func Test_SetHardwareTruncated(t *testing.T) {
 }
 
 // A UI frame whose PID octet was lost ends before the information field.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_NoPID(t *testing.T) {
 	var frame = ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()
 
@@ -197,6 +217,8 @@ func Test_NoPID(t *testing.T) {
 }
 
 // Connected mode frames are AX.25 but not APRS.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_NotAPRS(t *testing.T) {
 	var frame = ax25.MustFromText("Q1TEST>Q2TEST:>Testing").Pack()
 
@@ -211,6 +233,8 @@ func Test_NotAPRS(t *testing.T) {
 
 // A UI frame with a PID other than 0xf0 is not APRS either, and the control
 // byte is not the thing to blame for it.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_NotAPRSByPID(t *testing.T) {
 	var frame = ax25.MustFromText("Q1TEST>Q2TEST:>Testing").Pack()
 
@@ -225,6 +249,7 @@ func Test_NotAPRSByPID(t *testing.T) {
 	assert.NotContains(t, output, "Control 0x")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_Parameters(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{
 		kiss.FEND, kiss.CmdTxDelay, 30, kiss.FEND,
@@ -245,6 +270,7 @@ func Test_Parameters(t *testing.T) {
 	assert.Contains(t, output, "6 frames, 0 problems.")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_ParameterWrongLength(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.CmdSlotTime, 10, 10, kiss.FEND}, false)
 
@@ -252,6 +278,7 @@ func Test_ParameterWrongLength(t *testing.T) {
 	assert.Contains(t, output, "SlotTime takes exactly one parameter byte, not 2")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_SetHardware(t *testing.T) {
 	var capture = []byte{kiss.FEND, kiss.CmdSetHardware}
 	capture = append(capture, []byte("TXBUF:1")...)
@@ -263,6 +290,7 @@ func Test_SetHardware(t *testing.T) {
 	assert.Contains(t, output, "TNC-specific: TXBUF:1")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_XKISS(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.CmdXKissPoll, kiss.FEND}, false)
 
@@ -270,6 +298,7 @@ func Test_XKISS(t *testing.T) {
 	assert.Contains(t, output, "is an XKISS extension, which is not supported")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_InvalidCommand(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, 0x07, kiss.FEND}, false)
 
@@ -277,6 +306,7 @@ func Test_InvalidCommand(t *testing.T) {
 	assert.Contains(t, output, "Command 7 is not part of the KISS protocol")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_JunkBeforeFirstFEND(t *testing.T) {
 	var capture = append([]byte{0xde, 0xad}, testCapture(t, "Q1TEST>APDW17:>Testing")...)
 
@@ -286,6 +316,7 @@ func Test_JunkBeforeFirstFEND(t *testing.T) {
 	assert.Contains(t, output, "2 bytes before the first FEND")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_NoFEND(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{0x00, 0x82, 0xa0}, false)
 
@@ -294,6 +325,8 @@ func Test_NoFEND(t *testing.T) {
 }
 
 // Padding and nothing else is not a capture anyone can learn anything from.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_OnlyPadding(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.FEND, kiss.FEND}, false)
 
@@ -302,6 +335,7 @@ func Test_OnlyPadding(t *testing.T) {
 	assert.Contains(t, output, "0 frames, 1 problem.")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_Empty(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{}, false)
 
@@ -311,6 +345,8 @@ func Test_Empty(t *testing.T) {
 
 // Hex input should describe the same capture as the bytes it stands for,
 // however it happens to be laid out.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_Hex(t *testing.T) {
 	var capture = testCapture(t, "Q1TEST-9>APDW17,WIDE1-1:!4237.14NS07120.83W#Testing")
 
@@ -342,6 +378,7 @@ func hexDigits(b byte) string {
 	return string([]byte{digits[b>>4], digits[b&0x0f]})
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_HexNotHex(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte("c0 00\nc0 zz\n"), true)
 
@@ -349,6 +386,7 @@ func Test_HexNotHex(t *testing.T) {
 	assert.Contains(t, output, "line 2: 'z' (0x7a) is not a hexadecimal digit")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_HexOddDigits(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte("c0 00 c"), true)
 
@@ -356,6 +394,7 @@ func Test_HexOddDigits(t *testing.T) {
 	assert.Contains(t, output, "is an odd number")
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_HexEmpty(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte("   \n\n"), true)
 
@@ -364,6 +403,8 @@ func Test_HexEmpty(t *testing.T) {
 }
 
 // Test_XKISS covers polling; data is the other XKISS command.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func Test_XKISSData(t *testing.T) {
 	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.CmdXKissData, kiss.FEND}, false)
 
@@ -378,9 +419,13 @@ func TestMain(m *testing.M) {
 }
 
 func Test_main(t *testing.T) {
+	t.Parallel()
+
 	var capture = testCapture(t, "Q1TEST>APDW17:>Testing")
 
 	t.Run("raw", func(t *testing.T) {
+		t.Parallel()
+
 		var result = testutils.RunMain(t, string(capture))
 		var out, status = result.Output(), result.Status
 
@@ -391,6 +436,8 @@ func Test_main(t *testing.T) {
 	})
 
 	t.Run("hex", func(t *testing.T) {
+		t.Parallel()
+
 		var result = testutils.RunMain(t, fmt.Sprintf("% x\n", capture), "--hex")
 		var out, status = result.Output(), result.Status
 
@@ -400,6 +447,8 @@ func Test_main(t *testing.T) {
 	})
 
 	t.Run("problems", func(t *testing.T) {
+		t.Parallel()
+
 		var result = testutils.RunMain(t, string(kiss.Encapsulate([]byte{0x07})))
 		var out, status = result.Output(), result.Status
 
@@ -408,6 +457,8 @@ func Test_main(t *testing.T) {
 	})
 
 	t.Run("unexpected argument", func(t *testing.T) {
+		t.Parallel()
+
 		var result = testutils.RunMain(t, "", "capture.bin")
 		var out, status = result.Output(), result.Status
 
@@ -416,6 +467,8 @@ func Test_main(t *testing.T) {
 	})
 
 	t.Run("help", func(t *testing.T) {
+		t.Parallel()
+
 		var result = testutils.RunMain(t, "", "--help")
 		var out, status = result.Output(), result.Status
 

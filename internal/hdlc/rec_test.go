@@ -25,6 +25,8 @@ type hdlcRecTestDelivery struct {
 // functions it is handed: it takes the audio level from one and gives each
 // frame it extracts to the other.
 func TestHDLCReceiverHandsFramesToItsSink(t *testing.T) {
+	t.Parallel()
+
 	var got []hdlcRecTestDelivery
 
 	var alevel = ax25.ALevel{Rec: 42, Mark: 41, Space: 43}

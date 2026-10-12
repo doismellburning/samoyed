@@ -18,6 +18,8 @@ func testSlicer() dwcore.SlicerID {
 }
 
 func TestNewRecordsWhereTheBitsCameFrom(t *testing.T) {
+	t.Parallel()
+
 	var b = New(testSlicer(), true, 0x1234, 1)
 
 	assert.Equal(t, testSlicer(), b.SlicerID())
@@ -29,6 +31,8 @@ func TestNewRecordsWhereTheBitsCameFrom(t *testing.T) {
 }
 
 func TestClearEmptiesButKeepsWhereTheBitsCameFrom(t *testing.T) {
+	t.Parallel()
+
 	var b = New(testSlicer(), false, 0, 0)
 
 	b.AppendBit(1)
@@ -44,12 +48,16 @@ func TestClearEmptiesButKeepsWhereTheBitsCameFrom(t *testing.T) {
 }
 
 func TestClearRejectsANonBitPrevDescram(t *testing.T) {
+	t.Parallel()
+
 	var b = New(testSlicer(), false, 0, 0)
 
 	assert.Panics(t, func() { b.Clear(false, 0, 2) })
 }
 
 func TestAppendBitThenBit(t *testing.T) {
+	t.Parallel()
+
 	var b = New(testSlicer(), false, 0, 0)
 	var bits = []byte{1, 0, 0, 1, 1}
 
@@ -65,6 +73,8 @@ func TestAppendBitThenBit(t *testing.T) {
 }
 
 func TestAppendBitDiscardsOnceFull(t *testing.T) {
+	t.Parallel()
+
 	var b = New(testSlicer(), false, 0, 0)
 
 	for range MaxNumBits {
@@ -78,6 +88,8 @@ func TestAppendBitDiscardsOnceFull(t *testing.T) {
 }
 
 func TestChop8(t *testing.T) {
+	t.Parallel()
+
 	var b = New(testSlicer(), false, 0, 0)
 
 	for range 10 {
@@ -93,6 +105,8 @@ func TestChop8(t *testing.T) {
 }
 
 func TestSpeedError(t *testing.T) {
+	t.Parallel()
+
 	var b = New(testSlicer(), false, 0, 0)
 
 	b.SetSpeedError(-1.5)

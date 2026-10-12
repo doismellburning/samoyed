@@ -39,6 +39,8 @@ func testBlock(c *Codec, rng *rand.Rand) []byte {
 }
 
 func TestNew_Invalid(t *testing.T) {
+	t.Parallel()
+
 	for name, args := range map[string][5]uint{
 		"symsize too big":    {9, 0x11d, 1, 1, 16},
 		"fcr out of range":   {8, 0x11d, 256, 1, 16},
@@ -48,6 +50,8 @@ func TestNew_Invalid(t *testing.T) {
 		"poly not primitive": {8, 0x100, 1, 1, 16},
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var c, err = New(args[0], args[1], args[2], args[3], args[4])
 			require.Error(t, err)
 			assert.Nil(t, c)
@@ -56,10 +60,15 @@ func TestNew_Invalid(t *testing.T) {
 }
 
 func TestDecode_NoErrors(t *testing.T) {
-	var rng = rand.New(rand.NewSource(1))
+	t.Parallel()
 
 	for name, c := range testCodecs(t) {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			// A source of its own, so the subtests can run in parallel.
+			var rng = rand.New(rand.NewSource(1))
+
 			var block = testBlock(c, rng)
 			var original = slices.Clone(block)
 
@@ -73,10 +82,15 @@ func TestDecode_NoErrors(t *testing.T) {
 
 // NRoots()/2 errors in unknown places is as many as the code can repair.
 func TestDecode_CorrectsErrors(t *testing.T) {
-	var rng = rand.New(rand.NewSource(2))
+	t.Parallel()
 
 	for name, c := range testCodecs(t) {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			// A source of its own, so the subtests can run in parallel.
+			var rng = rand.New(rand.NewSource(2))
+
 			var block = testBlock(c, rng)
 			var original = slices.Clone(block)
 
@@ -96,10 +110,15 @@ func TestDecode_CorrectsErrors(t *testing.T) {
 // With the positions known up front, NRoots() erasures can be repaired - twice
 // as many as unknown errors.
 func TestDecode_CorrectsErasures(t *testing.T) {
-	var rng = rand.New(rand.NewSource(3))
+	t.Parallel()
 
 	for name, c := range testCodecs(t) {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			// A source of its own, so the subtests can run in parallel.
+			var rng = rand.New(rand.NewSource(3))
+
 			var block = testBlock(c, rng)
 			var original = slices.Clone(block)
 
@@ -116,6 +135,8 @@ func TestDecode_CorrectsErasures(t *testing.T) {
 }
 
 func TestDecode_Uncorrectable(t *testing.T) {
+	t.Parallel()
+
 	var rng = rand.New(rand.NewSource(4))
 
 	var c, err = New(8, 0x11d, 1, 1, 16)
@@ -147,6 +168,8 @@ func TestDecode_Uncorrectable(t *testing.T) {
 }
 
 func TestDecode_BadArguments(t *testing.T) {
+	t.Parallel()
+
 	var c, err = New(8, 0x11d, 1, 1, 4)
 	require.NoError(t, err)
 
@@ -164,6 +187,8 @@ func TestDecode_BadArguments(t *testing.T) {
 }
 
 func TestEncode_WrongLengthPanics(t *testing.T) {
+	t.Parallel()
+
 	var c, err = New(8, 0x11d, 1, 1, 16)
 	require.NoError(t, err)
 

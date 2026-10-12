@@ -65,6 +65,7 @@ func announceLogged(t *testing.T, message string, f func()) *logrus.Entry {
 	return nil
 }
 
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func TestDNSSDAnnounceUsesConfiguredName(t *testing.T) {
 	requireMDNSSockets(t)
 
@@ -78,6 +79,8 @@ func TestDNSSDAnnounceUsesConfiguredName(t *testing.T) {
 }
 
 // With no name configured we fall back to the hostname-derived default.
+//
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func TestDNSSDAnnounceDefaultsName(t *testing.T) {
 	requireMDNSSockets(t)
 
@@ -91,6 +94,8 @@ func TestDNSSDAnnounceDefaultsName(t *testing.T) {
 
 // Nothing is listening on port 0, so there is nothing to announce - and saying
 // so beats advertising a service nobody can connect to.
+//
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func TestDNSSDAnnounceRejectsPortZero(t *testing.T) {
 	var hook = test.NewGlobal()
 

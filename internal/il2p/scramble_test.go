@@ -12,6 +12,8 @@ import (
 
 // Test that scramble followed by descramble is the identity.
 func Test_il2p_scramble_round_trip(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(t *rapid.T) {
 		// il2p_scramble_block asserts len >= 1.
 		var in = rapid.SliceOfN(rapid.Byte(), 1, 255).Draw(t, "in")

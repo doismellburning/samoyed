@@ -27,6 +27,8 @@ func notAHID(t *testing.T) string {
 }
 
 func TestCheckDeviceIoctlFailureIsReported(t *testing.T) {
+	t.Parallel()
+
 	// This replaces the coverage TestCM108WriteReportsIoctlFailure gave while
 	// the check lived in cm108_write and printed rather than returning.
 	var err = CheckDevice(notAHID(t))
@@ -37,6 +39,8 @@ func TestCheckDeviceIoctlFailureIsReported(t *testing.T) {
 }
 
 func TestCheckDeviceMissing(t *testing.T) {
+	t.Parallel()
+
 	var err = CheckDevice(filepath.Join(t.TempDir(), "nonexistent"))
 
 	require.Error(t, err)
@@ -44,6 +48,8 @@ func TestCheckDeviceMissing(t *testing.T) {
 }
 
 func TestSetGPIOPinRejectsBadArguments(t *testing.T) {
+	t.Parallel()
+
 	// Note there is no device here at all - these should be rejected before we
 	// go anywhere near one.
 	require.Error(t, SetGPIOPin("/dev/hidraw0", 0, 1))
@@ -53,6 +59,8 @@ func TestSetGPIOPinRejectsBadArguments(t *testing.T) {
 }
 
 func TestSetGPIOPinWrites(t *testing.T) {
+	t.Parallel()
+
 	var name = notAHID(t)
 
 	require.NoError(t, SetGPIOPin(name, 3, 1))
@@ -69,6 +77,8 @@ func TestSetGPIOPinWrites(t *testing.T) {
 }
 
 func TestSetGPIOPinMissingDevice(t *testing.T) {
+	t.Parallel()
+
 	var err = SetGPIOPin(filepath.Join(t.TempDir(), "nonexistent"), 3, 1)
 
 	require.Error(t, err)
@@ -76,6 +86,8 @@ func TestSetGPIOPinMissingDevice(t *testing.T) {
 }
 
 func TestPermissionAdviceNamesDevice(t *testing.T) {
+	t.Parallel()
+
 	var advice = strings.Join(PermissionAdvice("/dev/hidraw7"), "\n")
 
 	assert.Contains(t, advice, "/dev/hidraw7")

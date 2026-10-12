@@ -49,6 +49,8 @@ func captureVersionStdout(t *testing.T, fn func()) string {
 }
 
 func TestVersionGetBuildSettingOrDefault(t *testing.T) {
+	t.Parallel()
+
 	var bi = new(debug.BuildInfo)
 	bi.Settings = []debug.BuildSetting{
 		{Key: "vcs.revision", Value: "abc123"},
@@ -61,6 +63,7 @@ func TestVersionGetBuildSettingOrDefault(t *testing.T) {
 	assert.Equal(t, "fallback", getBuildSettingOrDefault(new(debug.BuildInfo), "vcs.time", "fallback"))
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
 func TestVersionPrint(t *testing.T) {
 	var oldVersion = Version
 

@@ -13,6 +13,8 @@ import (
 // The unit conversions are plain multiplications now that absence is carried
 // by maybe.Maybe rather than by a sentinel the conversion had to recognise.
 func Test_unit_conversions(t *testing.T) {
+	t.Parallel()
+
 	assert.InDelta(t, 11.5077945, DW_KNOTS_TO_MPH(10), 0.0000001)
 	assert.InDelta(t, 8.68976, DW_MPH_TO_KNOTS(10), 0.0000001)
 	assert.InDelta(t, 32.808399, DW_METERS_TO_FEET(10), 0.0000001)
@@ -26,6 +28,8 @@ func Test_unit_conversions(t *testing.T) {
 }
 
 func TestAngleConversions(t *testing.T) {
+	t.Parallel()
+
 	assert.InDelta(t, math.Pi, D2R(180), 0.0000001)
 	assert.InDelta(t, 90.0, R2D(math.Pi/2), 0.0000001)
 	assert.InDelta(t, 51.5, R2D(D2R(51.5)), 0.0000001)

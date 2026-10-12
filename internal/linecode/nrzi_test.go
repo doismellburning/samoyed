@@ -39,6 +39,8 @@ func decodeAll(d *Decoder, line []int, scrambled bool) []int {
 }
 
 func TestDecoderUndoesNRZI(t *testing.T) {
+	t.Parallel()
+
 	// No change is a 1; a change either way is a 0.
 	var line = []int{0, 1, 1, 0, 0, 0, 1}
 
@@ -46,6 +48,8 @@ func TestDecoderUndoesNRZI(t *testing.T) {
 }
 
 func TestDecoderRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	var data = randomBits(1000)
 
 	assert.Equal(t, data, decodeAll(new(Decoder), referenceNRZI(data), false))
@@ -54,6 +58,8 @@ func TestDecoderRoundTrip(t *testing.T) {
 // At 9600 baud the sender NRZI encodes and then scrambles, so the receiver
 // descrambles and then undoes NRZI.
 func TestDecoderRoundTripScrambled(t *testing.T) {
+	t.Parallel()
+
 	var data = randomBits(1000)
 
 	assert.Equal(t, data, decodeAll(new(Decoder), referenceScramble(referenceNRZI(data)), true))
@@ -62,6 +68,8 @@ func TestDecoderRoundTripScrambled(t *testing.T) {
 // A frame is decoded again, with bits flipped, from the state the decoder was
 // in at its start.  Restoring that state must give what carrying on would.
 func TestDecoderRestoreCarriesOn(t *testing.T) {
+	t.Parallel()
+
 	for _, scrambled := range []bool{false, true} {
 		var line = referenceNRZI(randomBits(200))
 		if scrambled {
@@ -85,6 +93,8 @@ func TestDecoderRestoreCarriesOn(t *testing.T) {
 }
 
 func TestDecoderPrevRawIsTheLastBit(t *testing.T) {
+	t.Parallel()
+
 	var d Decoder
 
 	d.Decode(true, false)
@@ -107,18 +117,24 @@ func encodeAll(data []int) []int {
 }
 
 func TestEncoderMatchesNRZI(t *testing.T) {
+	t.Parallel()
+
 	var data = randomBits(1000)
 
 	assert.Equal(t, referenceNRZI(data), encodeAll(data))
 }
 
 func TestEncoderDecoderRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	var data = randomBits(1000)
 
 	assert.Equal(t, data, decodeAll(new(Decoder), encodeAll(data), false))
 }
 
 func TestEncoderDecoderRoundTripScrambled(t *testing.T) {
+	t.Parallel()
+
 	var data = randomBits(1000)
 
 	var s Scrambler
@@ -134,6 +150,8 @@ func TestEncoderDecoderRoundTripScrambled(t *testing.T) {
 // IL2P sends bits as they are, inverted if asked, and must not disturb the
 // NRZI level an HDLC frame after it carries on from.
 func TestEncoderWriteLeavesTheNRZILevelAlone(t *testing.T) {
+	t.Parallel()
+
 	var line []int
 
 	var e = NewEncoder(func(level int) { line = append(line, level) })

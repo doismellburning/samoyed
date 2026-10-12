@@ -18,6 +18,8 @@ import (
 // with the audio level from the function it was made with, the FEC type, and
 // the bytes the FEC corrected as the fix level.
 func TestFX25ReceiverHandsFramesToItsSink(t *testing.T) {
+	t.Parallel()
+
 	type delivery struct {
 		from   dwcore.SlicerID
 		frame  []byte

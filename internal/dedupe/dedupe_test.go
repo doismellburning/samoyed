@@ -14,6 +14,8 @@ import (
 )
 
 func Test_dedupe_check_duplicate(t *testing.T) {
+	t.Parallel()
+
 	var ds = New(30*time.Second, nil)
 
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
@@ -25,6 +27,8 @@ func Test_dedupe_check_duplicate(t *testing.T) {
 }
 
 func Test_dedupe_check_different_channel_not_duplicate(t *testing.T) {
+	t.Parallel()
+
 	var ds = New(30*time.Second, nil)
 
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
@@ -36,6 +40,8 @@ func Test_dedupe_check_different_channel_not_duplicate(t *testing.T) {
 }
 
 func Test_dedupe_check_expired_not_duplicate(t *testing.T) {
+	t.Parallel()
+
 	var ds = New(30*time.Second, nil)
 
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
@@ -54,6 +60,8 @@ func Test_dedupe_check_expired_not_duplicate(t *testing.T) {
 }
 
 func Test_dedupe_check_empty_history_not_duplicate(t *testing.T) {
+	t.Parallel()
+
 	var ds = New(30*time.Second, nil)
 
 	var pp = ax25.FromText("W1AW>APRS:test packet", true)
@@ -66,6 +74,8 @@ func Test_dedupe_check_empty_history_not_duplicate(t *testing.T) {
 // object reports remember from the audio thread that decoded the tones, so
 // the history is shared between goroutines.  Run under -race.
 func Test_dedupe_concurrent_remember_and_check(t *testing.T) {
+	t.Parallel()
+
 	var ds = New(30*time.Second, nil)
 
 	var pp = ax25.FromText("Q1TEST>APRS:test packet", true)
@@ -93,6 +103,8 @@ func Test_dedupe_concurrent_remember_and_check(t *testing.T) {
 // What the digipeater remembers sending, it also tells whoever it was handed
 // - the IGate, so it doesn't send the same packet to RF again.
 func TestDedupeRememberTellsWhoItWasHanded(t *testing.T) {
+	t.Parallel()
+
 	var told []string
 
 	var ds = New(30*time.Second, func(channel int, pp *ax25.Packet) {

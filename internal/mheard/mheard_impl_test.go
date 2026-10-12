@@ -21,21 +21,31 @@ import (
 // --- age ---
 
 func TestAge(t *testing.T) {
+	t.Parallel()
+
 	var now = time.Now()
 
 	t.Run("zero time returns placeholder", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(t, "-", age(now, time.Time{}))
 	})
 
 	t.Run("90 minutes ago", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(t, "1:30", age(now, now.Add(-90*time.Minute)))
 	})
 
 	t.Run("5 minutes ago", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(t, "0:05", age(now, now.Add(-5*time.Minute)))
 	})
 
 	t.Run("same moment", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(t, "0:00", age(now, now))
 	})
 }
@@ -43,19 +53,29 @@ func TestAge(t *testing.T) {
 // --- latLon ---
 
 func TestLatLon(t *testing.T) {
+	t.Parallel()
+
 	t.Run("both unknown", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(t, "-", latLon(maybe.Nothing[float64](), maybe.Nothing[float64]()))
 	})
 
 	t.Run("lat unknown lon known", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(t, "-", latLon(maybe.Nothing[float64](), maybe.Just(-71.0)))
 	})
 
 	t.Run("lat known lon unknown", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(t, "-", latLon(maybe.Just(42.0), maybe.Nothing[float64]()))
 	})
 
 	t.Run("both known", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(t, "42.36 -71.06", latLon(maybe.Just(42.36), maybe.Just(-71.06)))
 	})
 }
@@ -63,6 +83,8 @@ func TestLatLon(t *testing.T) {
 // --- New ---
 
 func TestNew(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(3)
 	require.NotNil(t, mdb)
 	assert.Equal(t, 3, mdb.debug)
@@ -73,14 +95,20 @@ func TestNew(t *testing.T) {
 // --- Count ---
 
 func TestDBCount(t *testing.T) {
+	t.Parallel()
+
 	var now = time.Now()
 
 	t.Run("empty db", func(t *testing.T) {
+		t.Parallel()
+
 		var mdb = New(0)
 		assert.Equal(t, 0, mdb.Count(0, 60))
 	})
 
 	t.Run("station heard directly counted", func(t *testing.T) {
+		t.Parallel()
+
 		var mdb = New(0)
 		mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
 			callsign:    "W1AW",
@@ -91,6 +119,8 @@ func TestDBCount(t *testing.T) {
 	})
 
 	t.Run("station excluded by max hops", func(t *testing.T) {
+		t.Parallel()
+
 		var mdb = New(0)
 		mdb.db["W2AW"] = &station{ //nolint:exhaustruct_v5
 			callsign:    "W2AW",
@@ -101,6 +131,8 @@ func TestDBCount(t *testing.T) {
 	})
 
 	t.Run("IS-only station not counted", func(t *testing.T) {
+		t.Parallel()
+
 		var mdb = New(0)
 		mdb.db["IS1"] = &station{ //nolint:exhaustruct_v5
 			callsign:    "IS1",
@@ -110,6 +142,8 @@ func TestDBCount(t *testing.T) {
 	})
 
 	t.Run("old RF station excluded by time limit", func(t *testing.T) {
+		t.Parallel()
+
 		var mdb = New(0)
 		mdb.db["OLD"] = &station{ //nolint:exhaustruct_v5
 			callsign:    "OLD",
@@ -120,6 +154,8 @@ func TestDBCount(t *testing.T) {
 	})
 
 	t.Run("multiple stations counted correctly", func(t *testing.T) {
+		t.Parallel()
+
 		var mdb = New(0)
 		mdb.db["A"] = &station{lastHeardRF: now.Add(-5 * time.Minute), numDigiHops: 0}  //nolint:exhaustruct_v5
 		mdb.db["B"] = &station{lastHeardRF: now.Add(-10 * time.Minute), numDigiHops: 1} //nolint:exhaustruct_v5
@@ -129,6 +165,8 @@ func TestDBCount(t *testing.T) {
 	})
 
 	t.Run("debug mode prints message", func(t *testing.T) {
+		t.Parallel()
+
 		var mdb = New(1)
 		mdb.db["X"] = &station{lastHeardRF: now.Add(-5 * time.Minute), numDigiHops: 0} //nolint:exhaustruct_v5
 		assert.Equal(t, 1, mdb.Count(0, 60))
@@ -142,6 +180,8 @@ var saveRFNoLat, saveRFNoLon = maybe.Nothing[float64](), maybe.Nothing[float64](
 // --- SaveRF ---
 
 func TestDBSaveRFNewStation(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 
@@ -156,6 +196,8 @@ func TestDBSaveRFNewStation(t *testing.T) {
 }
 
 func TestDBSaveRFPositionSaved(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 
@@ -167,6 +209,8 @@ func TestDBSaveRFPositionSaved(t *testing.T) {
 }
 
 func TestDBSaveRFPositionNotSavedForNonPositionPacket(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 
@@ -176,6 +220,8 @@ func TestDBSaveRFPositionNotSavedForNonPositionPacket(t *testing.T) {
 }
 
 func TestDBSaveRFUnknownPositionNotSaved(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 
@@ -185,6 +231,8 @@ func TestDBSaveRFUnknownPositionNotSaved(t *testing.T) {
 }
 
 func TestDBSaveRFExistingStationUpdated(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 
@@ -198,6 +246,8 @@ func TestDBSaveRFExistingStationUpdated(t *testing.T) {
 }
 
 func TestDBSaveRFHigherHopSkippedWithin15s(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 
 	// First: heard directly (0 hops).
@@ -215,6 +265,8 @@ func TestDBSaveRFHigherHopSkippedWithin15s(t *testing.T) {
 }
 
 func TestDBSaveRFWideHopHackReducesCount(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	// W3AW* (used, len 4 – not WIDE) then WIDE2* (used, len 5, WIDE prefix, ssid 0).
 	// Raw hops = 2, hack reduces by one → hops = 1.
@@ -226,6 +278,8 @@ func TestDBSaveRFWideHopHackReducesCount(t *testing.T) {
 }
 
 func TestDBSaveRFWideHackIgnoresNonZeroSsid(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	// WIDE1-1 has ssid 1, so the hack must not fire.
 	// Raw hops = 2 and nothing should be reduced.
@@ -237,6 +291,8 @@ func TestDBSaveRFWideHackIgnoresNonZeroSsid(t *testing.T) {
 }
 
 func TestDBSaveRFDebug1SkipBranch(t *testing.T) {
+	t.Parallel()
+
 	// debug=1 + higher-hop copy within 15 s → exercises the "skip" debug message.
 	var mdb = New(1)
 	var ppDirect = ax25.FromText("W1AW>APRS:test", true)
@@ -247,6 +303,8 @@ func TestDBSaveRFDebug1SkipBranch(t *testing.T) {
 }
 
 func TestDBSaveRFDebug1UpdateBranch(t *testing.T) {
+	t.Parallel()
+
 	// debug=1 + update after >15 s → exercises the "update time" debug message.
 	var mdb = New(1)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
@@ -256,6 +314,8 @@ func TestDBSaveRFDebug1UpdateBranch(t *testing.T) {
 }
 
 func TestDBSaveRFDebug1TriggersDump(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(1)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 	// Must not panic; dump is triggered by debug > 0.
@@ -263,6 +323,8 @@ func TestDBSaveRFDebug1TriggersDump(t *testing.T) {
 }
 
 func TestDBSaveRFDebug2PrintsCountAndDump(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(2)
 	var pp = ax25.FromText("W1AW>APRS:test", true)
 	// Must not panic; both the count debug line and dump are triggered.
@@ -275,6 +337,8 @@ func TestDBSaveRFDebug2PrintsCountAndDump(t *testing.T) {
 // timestamp is newer than their RF timestamp, guaranteeing the
 // "ta = ma.lastHeardIS" branch inside the sort comparator is reached.
 func TestDBDumpSortIsAfterRf(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	var now = time.Now()
 
@@ -293,6 +357,8 @@ func TestDBDumpSortIsAfterRf(t *testing.T) {
 // SaveRF with debug=1.  The stations have deliberately varied timestamps so
 // that all three comparison outcomes (before / after / equal) are reached.
 func TestDBDumpSort(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(1)
 	var now = time.Now()
 	var sameTime = now.Add(-20 * time.Minute)
@@ -327,6 +393,8 @@ func TestDBDumpSort(t *testing.T) {
 // --- SaveIS ---
 
 func TestDBSaveISNewStation(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 
 	mdb.SaveIS("W1AW>APRS,TCPIP*,qAC,T2SERVER:test")
@@ -337,6 +405,8 @@ func TestDBSaveISNewStation(t *testing.T) {
 }
 
 func TestDBSaveISExistingStationUpdated(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 
 	mdb.SaveIS("W1AW>APRS:first")
@@ -346,6 +416,8 @@ func TestDBSaveISExistingStationUpdated(t *testing.T) {
 }
 
 func TestDBSaveISDebug1(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(1)
 	// Exercises both the "added new" and "update time" debug paths.
 	mdb.SaveIS("W1AW>APRS:test1")
@@ -353,6 +425,8 @@ func TestDBSaveISDebug1(t *testing.T) {
 }
 
 func TestDBSaveISDebug2(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(2)
 	mdb.SaveIS("W1AW>APRS:test")
 }
@@ -360,11 +434,15 @@ func TestDBSaveISDebug2(t *testing.T) {
 // --- WasRecentlyNearby ---
 
 func TestDBWasRecentlyNearbyUnknownStation(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestDBWasRecentlyNearbyISOnlyStation(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
 		callsign:    "W1AW",
@@ -374,6 +452,8 @@ func TestDBWasRecentlyNearbyISOnlyStation(t *testing.T) {
 }
 
 func TestDBWasRecentlyNearbyTooLongAgo(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
 		callsign:    "W1AW",
@@ -384,6 +464,8 @@ func TestDBWasRecentlyNearbyTooLongAgo(t *testing.T) {
 }
 
 func TestDBWasRecentlyNearbyTooManyHops(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
 		callsign:    "W1AW",
@@ -394,6 +476,8 @@ func TestDBWasRecentlyNearbyTooManyHops(t *testing.T) {
 }
 
 func TestDBWasRecentlyNearbyTrue(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
 		callsign:    "W1AW",
@@ -404,6 +488,8 @@ func TestDBWasRecentlyNearbyTrue(t *testing.T) {
 }
 
 func TestDBWasRecentlyNearbyWithinDistance(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
 		callsign:    "W1AW",
@@ -417,6 +503,8 @@ func TestDBWasRecentlyNearbyWithinDistance(t *testing.T) {
 }
 
 func TestDBWasRecentlyNearbyTooFar(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
 		callsign:    "W1AW",
@@ -430,6 +518,8 @@ func TestDBWasRecentlyNearbyTooFar(t *testing.T) {
 }
 
 func TestDBWasRecentlyNearbyUnknownStationLocationSkipsDistanceCheck(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	mdb.db["W1AW"] = &station{ //nolint:exhaustruct_v5
 		callsign:    "W1AW",
@@ -443,11 +533,15 @@ func TestDBWasRecentlyNearbyUnknownStationLocationSkipsDistanceCheck(t *testing.
 }
 
 func TestDBWasRecentlyNearbyEmptyRoleSuppressesOutput(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	assert.False(t, mdb.WasRecentlyNearby("", "UNKNOWN", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestDBWasRecentlyNearbyRoleWithDistanceFilter(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	// Station not in db; the verbose branch with distance parameters should print.
 	assert.False(t, mdb.WasRecentlyNearby("addressee", "UNKNOWN", 60, 2, maybe.Just(42.36), maybe.Just(-71.06), maybe.Just(50.0)))
@@ -456,16 +550,22 @@ func TestDBWasRecentlyNearbyRoleWithDistanceFilter(t *testing.T) {
 // --- SetMSP / GetMSP ---
 
 func TestDBGetMSPUnknownStation(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	assert.Equal(t, 0, mdb.GetMSP("W1AW"))
 }
 
 func TestDBSetMSPUnknownStationDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	mdb.SetMSP("W1AW", 3) // should not panic; prints an error message
 }
 
 func TestDBSetThenGetMSP(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(0)
 	mdb.db["W1AW"] = &station{callsign: "W1AW"} //nolint:exhaustruct_v5
 	mdb.SetMSP("W1AW", 5)
@@ -473,6 +573,8 @@ func TestDBSetThenGetMSP(t *testing.T) {
 }
 
 func TestDBSetMSPDebugPrintsMessage(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(1)
 	mdb.db["W1AW"] = &station{callsign: "W1AW"} //nolint:exhaustruct_v5
 	mdb.SetMSP("W1AW", 3)
@@ -480,6 +582,8 @@ func TestDBSetMSPDebugPrintsMessage(t *testing.T) {
 }
 
 func TestDBGetMSPDebugPrintsMessage(t *testing.T) {
+	t.Parallel()
+
 	var mdb = New(1)
 	mdb.db["W1AW"] = &station{callsign: "W1AW", msp: 7} //nolint:exhaustruct_v5
 	assert.Equal(t, 7, mdb.GetMSP("W1AW"))

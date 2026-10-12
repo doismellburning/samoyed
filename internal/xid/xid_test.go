@@ -19,6 +19,8 @@ import (
 // zero-length I field, a zero-frame window, a zero acknowledge timer and zero
 // retries as though they had been asked for.
 func TestXIDEncodeZeroValueOmitsOptionalParameters(t *testing.T) {
+	t.Parallel()
+
 	var param Param
 
 	var info = Encode(&param, ax25.CRCmd)
@@ -49,6 +51,8 @@ func TestXIDEncodeZeroValueOmitsOptionalParameters(t *testing.T) {
 // anyone on frequency, connected or not.  What was whole before the info field
 // ran out is kept, as for a parameter with a bad length.
 func TestXIDParseTruncatedInfo(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name   string
 		info   []byte
@@ -63,6 +67,8 @@ func TestXIDParseTruncatedInfo(t *testing.T) {
 		{"parameter value cut short", []byte{FI_Format_Indicator, GI_Group_Identifier, 0, 4, PI_Ack_Timer, 2, 0x0b}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var param, _, status = Parse(tc.info)
 			assert.Equal(t, tc.status, status)
 			assert.Equal(t, maybe.Nothing[int](), param.AckTimer)

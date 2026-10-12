@@ -10,6 +10,8 @@ import (
 )
 
 func TestLayer2String(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, "AX.25", Layer2AX25.String())
 	assert.Equal(t, "FX.25", Layer2FX25.String())
 	assert.Equal(t, "IL2P", Layer2IL2P.String())

@@ -13,6 +13,8 @@ import (
 
 // Nothing logged while a test is discarding reaches the output it had before,
 // and that output is back once the test is done.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestDiscardLogrusPutsTheOutputBack(t *testing.T) {
 	var buf bytes.Buffer
 

@@ -33,6 +33,8 @@ func (r *sampleRecorder) Flush() {
 // generator can tidy up after them, the characters between them as samples,
 // and the lot is flushed out once, at the end.
 func TestSendToASink(t *testing.T) {
+	t.Parallel()
+
 	const sampleRate = 8000
 
 	var out = new(sampleRecorder)
@@ -62,6 +64,8 @@ func TestSendToASink(t *testing.T) {
 // gives txdelay and txtail, is checked beside the tone generator in
 // internal/direwolf.
 func TestSampleCountsAt44100(t *testing.T) {
+	t.Parallel()
+
 	const sampleRate = 44100
 
 	var out = new(sampleRecorder)

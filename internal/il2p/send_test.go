@@ -20,6 +20,8 @@ func captureIL2PBits(fn func(s *Sender)) []int {
 
 // Inverted polarity is the same pattern the other way up.
 func TestIL2PPolarityInvertsEveryBit(t *testing.T) {
+	t.Parallel()
+
 	var upright = captureIL2PBits(func(s *Sender) {
 		s.sendByteMSBFirst(Preamble, 0)
 	})

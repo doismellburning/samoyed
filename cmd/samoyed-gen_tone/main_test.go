@@ -52,6 +52,7 @@ func risingZeroCrossings(data []byte) int {
 	return crossings
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_genTone(t *testing.T) {
 	var sink = new(recordingSink)
 

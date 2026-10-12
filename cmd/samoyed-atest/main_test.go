@@ -50,6 +50,8 @@ func genPackets(t *testing.T) string {
 }
 
 func Test_run_decodesAFile(t *testing.T) {
+	t.Parallel()
+
 	var out strings.Builder
 
 	var exitStatus = run(newAtest(t), []string{genPackets(t)}, expected{atLeast: 4, atMost: 4}, false, &out)
@@ -60,6 +62,8 @@ func Test_run_decodesAFile(t *testing.T) {
 }
 
 func Test_run_failsOutsideTheExpectedRange(t *testing.T) {
+	t.Parallel()
+
 	var f = genPackets(t)
 
 	var testCases = map[string]expected{
@@ -69,6 +73,8 @@ func Test_run_failsOutsideTheExpectedRange(t *testing.T) {
 
 	for name, want := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var out strings.Builder
 
 			var exitStatus = run(newAtest(t), []string{f}, want, false, &out)
@@ -80,6 +86,8 @@ func Test_run_failsOutsideTheExpectedRange(t *testing.T) {
 }
 
 func Test_run_failsOnAMissingFile(t *testing.T) {
+	t.Parallel()
+
 	var out strings.Builder
 
 	var exitStatus = run(newAtest(t), []string{filepath.Join(t.TempDir(), "missing.wav")}, expected{atLeast: -1, atMost: -1}, false, &out)
@@ -90,6 +98,8 @@ func Test_run_failsOnAMissingFile(t *testing.T) {
 }
 
 func Test_run_reportsDCD(t *testing.T) {
+	t.Parallel()
+
 	var out strings.Builder
 
 	var exitStatus = run(newAtest(t), []string{genPackets(t)}, expected{atLeast: -1, atMost: -1}, true, &out)
@@ -99,6 +109,8 @@ func Test_run_reportsDCD(t *testing.T) {
 }
 
 func Test_main_decodes(t *testing.T) {
+	t.Parallel()
+
 	var f = genPackets(t)
 
 	var testCases = map[string]struct {
@@ -121,6 +133,8 @@ func Test_main_decodes(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, "", tc.args...)
 			var out, status = result.Output(), result.Status
 
@@ -133,6 +147,8 @@ func Test_main_decodes(t *testing.T) {
 // Test_main_debugsFEC checks that -d x and -d 2 show the FX.25 and IL2P
 // receivers' debug output, which they log at Debug.
 func Test_main_debugsFEC(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		genArgs []string
 		args    []string
@@ -144,6 +160,8 @@ func Test_main_debugsFEC(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var f = filepath.Join(t.TempDir(), "fec.wav")
 
 			var cmd = exec.CommandContext(t.Context(), "gen_packets", append(tc.genArgs, "-n", "1", "-o", f)...) //nolint:gosec
@@ -158,6 +176,8 @@ func Test_main_debugsFEC(t *testing.T) {
 }
 
 func Test_main_badArguments(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		args []string
 		want string
@@ -172,6 +192,8 @@ func Test_main_badArguments(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, "", tc.args...)
 			var out, status = result.Output(), result.Status
 

@@ -56,6 +56,8 @@ func descrambleAll(d *Descrambler, in []int) []int {
 // Descrambling is x[n] = y[n] ^ y[n-12] ^ y[n-17], so a lone 1 comes out at
 // those three places and nowhere else.
 func TestDescramblerImpulseResponse(t *testing.T) {
+	t.Parallel()
+
 	var in = make([]int, 40)
 	in[0] = 1
 
@@ -68,6 +70,8 @@ func TestDescramblerImpulseResponse(t *testing.T) {
 }
 
 func TestDescramblerUndoesScrambling(t *testing.T) {
+	t.Parallel()
+
 	var data = randomBits(1000)
 
 	assert.Equal(t, data, descrambleAll(new(Descrambler), referenceScramble(data)))
@@ -76,6 +80,8 @@ func TestDescramblerUndoesScrambling(t *testing.T) {
 // A receiver joining part way through a transmission starts in the wrong
 // state, but has the right one once 17 bits have gone through.
 func TestDescramblerSynchronisesWithin17Bits(t *testing.T) {
+	t.Parallel()
+
 	var data = randomBits(200)
 
 	var d = NewDescrambler(0x5a5a5)
@@ -85,6 +91,8 @@ func TestDescramblerSynchronisesWithin17Bits(t *testing.T) {
 }
 
 func TestDescramblerStateCarriesOn(t *testing.T) {
+	t.Parallel()
+
 	var line = referenceScramble(randomBits(200))
 
 	var whole = descrambleAll(new(Descrambler), line)
@@ -110,6 +118,8 @@ func scrambleAll(s *Scrambler, in []int) []int {
 // Scrambling feeds its own output back, y[n] = x[n] ^ y[n-12] ^ y[n-17], so a
 // lone 1 keeps echoing.  Worked by hand for the first 41 bits.
 func TestScramblerImpulseResponse(t *testing.T) {
+	t.Parallel()
+
 	var in = make([]int, 41)
 	in[0] = 1
 
@@ -122,12 +132,16 @@ func TestScramblerImpulseResponse(t *testing.T) {
 }
 
 func TestScramblerMatchesItsDefinition(t *testing.T) {
+	t.Parallel()
+
 	var data = randomBits(1000)
 
 	assert.Equal(t, referenceScramble(data), scrambleAll(new(Scrambler), data))
 }
 
 func TestScramblerRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	var data = randomBits(1000)
 
 	assert.Equal(t, data, descrambleAll(new(Descrambler), scrambleAll(new(Scrambler), data)))

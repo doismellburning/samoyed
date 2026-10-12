@@ -12,6 +12,8 @@ import (
 /* Quick, incomplete, unit test. */
 
 func Test_Symbols(t *testing.T) {
+	t.Parallel()
+
 	var sd = New()
 
 	var symtab, symbol byte

@@ -14,6 +14,8 @@ import (
 // FromMicE needs only the MIC-E table, so a Data whose tocalls section is
 // empty must still identify a MIC-E device.
 func TestFromMicEWithoutTocalls(t *testing.T) {
+	t.Parallel()
+
 	var m = new(mice)
 	m.prefix = ">"
 	m.vendor = "Kenwood"
@@ -29,6 +31,8 @@ func TestFromMicEWithoutTocalls(t *testing.T) {
 
 // New reports a missing tocalls.yaml once; the lookups, which run for every
 // packet heard, must not report it again each time.
+//
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func TestLookupsWithoutTablesDoNotLogPerPacket(t *testing.T) {
 	var hook = test.NewGlobal()
 

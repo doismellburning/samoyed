@@ -10,6 +10,8 @@ import (
 )
 
 func Test_telemetry(t *testing.T) {
+	t.Parallel()
+
 	var result string
 	var comment string
 
