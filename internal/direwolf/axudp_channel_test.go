@@ -315,7 +315,7 @@ func TestAXUDPChannelTransmitQueue(t *testing.T) {
 	var channels [MAX_TOTAL_CHANS]*AXUDPChannel
 	channels[axudpTestChannel] = ac
 
-	var tq = NewTransmitQueue(audio, [MAX_TOTAL_CHANS]*NetTNC{}, channels, nil)
+	var tq = NewTransmitQueue(audio, [MAX_TOTAL_CHANS]*NetTNC{}, [MAX_TOTAL_CHANS]*SerialTNC{}, channels, nil)
 
 	var pp = newTestPacket(t)
 	var want = pp.FrameData()
@@ -346,7 +346,7 @@ func TestAXUDPChannelConnectedMode(t *testing.T) {
 	var channels [MAX_TOTAL_CHANS]*AXUDPChannel
 	channels[axudpTestChannel] = ac
 
-	var tq = NewTransmitQueue(audio, [MAX_TOTAL_CHANS]*NetTNC{}, channels, dlq.SeizeConfirm)
+	var tq = NewTransmitQueue(audio, [MAX_TOTAL_CHANS]*NetTNC{}, [MAX_TOTAL_CHANS]*SerialTNC{}, channels, dlq.SeizeConfirm)
 
 	var pp = newTestPacket(t)
 	var want = pp.FrameData()

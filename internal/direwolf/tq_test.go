@@ -21,7 +21,7 @@ import (
 // channels, with no network TNCs or AXUDP channels and nobody to tell of a
 // seize.
 func newTestTransmitQueue(audioConfig *RadioConfig) *TransmitQueue {
-	return NewTransmitQueue(audioConfig, [MAX_TOTAL_CHANS]*NetTNC{}, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
+	return NewTransmitQueue(audioConfig, [MAX_TOTAL_CHANS]*NetTNC{}, [MAX_TOTAL_CHANS]*SerialTNC{}, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
 }
 
 // TestTqPeekUnderConcurrentAppend is a regression test for a data race.

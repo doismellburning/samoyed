@@ -494,6 +494,10 @@ x = Silence FX.25 information.`)
 	var netTNCs = NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
 
+	// Or a serial TNC.  (also new in 1.8)
+	var serialTNCs = NewSerialTNCs(ctx, audio_config, dataLinkQueue.RecFrame)
+	stopIfCancelled(ctx, td)
+
 	// Likewise a channel can be AX.25 over UDP to other nodes.
 	var axudpChannels = NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
@@ -502,7 +506,7 @@ x = Silence FX.25 information.`)
 	// IGate, APRStt, the connected-mode link - hands it to, and the transmit
 	// threads, the network TNCs and the AXUDP channels take it from.  Nothing
 	// queues anything until the services below are started.
-	var transmitQueue = NewTransmitQueue(audio_config, netTNCs, axudpChannels, dataLinkQueue.SeizeConfirm)
+	var transmitQueue = NewTransmitQueue(audio_config, netTNCs, serialTNCs, axudpChannels, dataLinkQueue.SeizeConfirm)
 
 	/*
 	 * Should there be an option for audio output level?

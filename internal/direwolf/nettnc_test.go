@@ -474,7 +474,7 @@ func TestNetTNCTransmitQueueSendsToItsTNCs(t *testing.T) {
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 	tncs[nettncTestChannel] = nt
 
-	var tq = NewTransmitQueue(audioConfig, tncs, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
+	var tq = NewTransmitQueue(audioConfig, tncs, [MAX_TOTAL_CHANS]*SerialTNC{}, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
 
 	var pp = newTestPacket(t)
 

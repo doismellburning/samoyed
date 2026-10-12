@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwcore"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -316,4 +317,62 @@ func TestNewSerialTNCsAttachesSerialChannels(t *testing.T) {
 	require.NoError(t, writeErr)
 
 	assert.Equal(t, serialTNCTestChannel, nextDLQItem(t, dlq)._chan)
+}
+
+// A packet queued for an SCHANNEL channel skips the radio queues and goes to
+// the serial TNC the transmit queue was handed.
+func TestSerialTNCTransmitQueueSendsToItsTNCs(t *testing.T) {
+	var device, tnc = newTestSerialDevice(t)
+
+	var st, _, _ = startTestSerialTNC(t, device, nil, func() { tnc.Close() })
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[serialTNCTestChannel] = MediumSerialTNC
+
+	var tncs [MAX_TOTAL_CHANS]*SerialTNC
+	tncs[serialTNCTestChannel] = st
+
+	var tq = NewTransmitQueue(audioConfig, [MAX_TOTAL_CHANS]*NetTNC{}, tncs, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
+
+	var pp = newTestPacket(t)
+	var want = kissFrameFor(pp)
+
+	var output = testutils.CaptureOutput(t, func() { tq.Append(serialTNCTestChannel, TQ_PRIO_1_LO, pp) })
+
+	assert.Contains(t, output, "[4>st] ")
+	assert.Equal(t, want, readSerialKissFrame(t, tnc))
+	assert.Nil(t, tq.Peek(serialTNCTestChannel, TQ_PRIO_1_LO), "the packet should not have been queued for a radio")
+}
+
+// Connected mode works over a serial TNC as it does over a network TNC: a
+// frame from the data link goes straight out, and a seize is confirmed at
+// once, there being no radio channel of ours to wait for.
+func TestSerialTNCConnectedMode(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
+	var device, tnc = newTestSerialDevice(t)
+
+	var st, _, _ = startTestSerialTNC(t, device, nil, func() { tnc.Close() })
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[serialTNCTestChannel] = MediumSerialTNC
+
+	var tncs [MAX_TOTAL_CHANS]*SerialTNC
+	tncs[serialTNCTestChannel] = st
+
+	var tq = NewTransmitQueue(audioConfig, [MAX_TOTAL_CHANS]*NetTNC{}, tncs, [MAX_TOTAL_CHANS]*AXUDPChannel{}, dlq.SeizeConfirm)
+
+	var pp = newTestPacket(t)
+	var want = kissFrameFor(pp)
+
+	testutils.CaptureOutput(t, func() { tq.LMDataRequest(serialTNCTestChannel, TQ_PRIO_1_LO, pp) })
+
+	assert.Equal(t, want, readSerialKissFrame(t, tnc))
+
+	tq.LMSeizeRequest(serialTNCTestChannel)
+
+	var item = dlq.Remove()
+	require.NotNil(t, item, "the seize was not confirmed")
+	assert.Equal(t, DLQ_SEIZE_CONFIRM, item._type)
+	assert.Equal(t, serialTNCTestChannel, item._chan)
 }
