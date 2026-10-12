@@ -29,6 +29,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -38,6 +39,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/gordonklaus/portaudio"
+	"github.com/sirupsen/logrus"
 )
 
 type audio_in_type_e int
@@ -418,8 +420,7 @@ func (d *AudioDevices) printAudioBackendNoise() {
 		return
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Messages from the audio backend, which may explain this:\n%s", noise)
+	logrus.WithField("messages", noise).Error("Messages from the audio backend, which may explain this")
 }
 
 // releasePortAudio undoes the PortAudio initialization that opening the
@@ -628,8 +629,7 @@ func (d *AudioDevices) findPortAudioDevice(name string, forInput bool) *portaudi
 
 	var dev = matchPortAudioDeviceByName(name, forInput, devices, alsaCardsPath)
 	if dev == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not match audio device '%s' to any PortAudio device.\n", name)
+		logrus.WithField("device", name).Error("Could not match audio device to any PortAudio device")
 		// The noise is left for AudioOpen to print after its own message about
 		// the device, so the explanation follows the failure rather than
 		// landing between the two.
@@ -643,8 +643,7 @@ func (d *AudioDevices) findPortAudioDevice(name string, forInput bool) *portaudi
 func (d *AudioDevices) openSoundcardInput(a int, pa *RadioConfig, name string, framesPerBuffer int, bufSizeInBytes int) error {
 	var inputDev = d.findPortAudioDevice(name, true)
 	if inputDev == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not find audio input device: %s\n", name)
+		logrus.WithField("device", name).Error("Could not find audio input device")
 		d.printAudioBackendNoise()
 
 		return fmt.Errorf("no audio input device %s", name)
@@ -716,8 +715,7 @@ func (d *AudioDevices) openSoundcardInput(a int, pa *RadioConfig, name string, f
 	}
 
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open audio device %s for input: %v\n", name, err)
+		logrus.WithError(err).WithField("device", name).Error("Could not open audio device for input")
 		d.printAudioBackendNoise()
 
 		return fmt.Errorf("opening audio device %s for input: %w", name, err)
@@ -725,8 +723,7 @@ func (d *AudioDevices) openSoundcardInput(a int, pa *RadioConfig, name string, f
 
 	err = d.dev[a].inputStream.Start()
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not start audio input stream: %v\n", err)
+		logrus.WithError(err).WithField("device", name).Error("Could not start audio input stream")
 
 		return fmt.Errorf("starting audio input stream: %w", err)
 	}
@@ -741,8 +738,7 @@ func (d *AudioDevices) openSoundcardInput(a int, pa *RadioConfig, name string, f
 func (d *AudioDevices) openUDPInput(a int, name string) error {
 	var udpAddr, addrErr = net.ResolveUDPAddr("udp", name[3:]) // Capture the colon onwards from "udp:$PORT"
 	if addrErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Error with UDP address: %s\n", addrErr)
+		logrus.WithError(addrErr).WithField("device", name).Error("Error with UDP address")
 
 		return fmt.Errorf("UDP address %s: %w", name, addrErr)
 	}
@@ -751,8 +747,7 @@ func (d *AudioDevices) openUDPInput(a int, name string) error {
 
 	d.dev[a].udp_sock, udpErr = net.ListenUDP("udp", udpAddr) // Capture the colon onwards from `udp:$PORT`
 	if udpErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Couldn't create listening socket: %s\n", udpErr)
+		logrus.WithError(udpErr).WithField("device", name).Error("Couldn't create listening socket")
 
 		return fmt.Errorf("listening on %s: %w", name, udpErr)
 	}
@@ -773,14 +768,13 @@ func (d *AudioDevices) openUDPOutput(ctx context.Context, a int, pa *RadioConfig
 	var outAddr = name[4:] // skip "udp:"
 	var udpOutConn, dialErr = new(net.Dialer).DialContext(ctx, "udp", outAddr)
 	if dialErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not connect to UDP output address %s: %v\n", outAddr, dialErr)
+		logrus.WithError(dialErr).WithField("address", outAddr).Error("Could not connect to UDP output address")
 
 		if audioOutputRequired(&pa.adev[a]) {
 			return fmt.Errorf("connecting to UDP output address %s: %w", outAddr, dialErr)
 		}
 
-		dw_printf("Transmitting will not be possible.\n")
+		logrus.WithField("device", name).Warn("Transmitting will not be possible")
 
 		return nil
 	}
@@ -819,23 +813,21 @@ func (d *AudioDevices) openSoundcardOutput(a int, pa *RadioConfig, name string, 
 			return fmt.Errorf("no PortAudio for audio output device %s", name)
 		}
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Transmitting will not be possible.\n")
+		logrus.WithField("device", name).Warn("Transmitting will not be possible")
 
 		return nil
 	}
 
 	var outputDev = d.findPortAudioDevice(name, false)
 	if outputDev == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not find audio output device: %s\n", name)
+		logrus.WithField("device", name).Error("Could not find audio output device")
 		d.printAudioBackendNoise()
 
 		if audioOutputRequired(&pa.adev[a]) {
 			return fmt.Errorf("no audio output device %s", name)
 		}
 
-		dw_printf("Transmitting will not be possible.\n")
+		logrus.WithField("device", name).Warn("Transmitting will not be possible")
 
 		return nil
 	}
@@ -876,15 +868,14 @@ func (d *AudioDevices) openSoundcardOutput(a int, pa *RadioConfig, name string, 
 	}
 
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open audio device %s for output: %v\n", name, err)
+		logrus.WithError(err).WithField("device", name).Error("Could not open audio device for output")
 		d.printAudioBackendNoise()
 
 		if audioOutputRequired(&pa.adev[a]) {
 			return fmt.Errorf("opening audio device %s for output: %w", name, err)
 		}
 
-		dw_printf("Transmitting will not be possible.\n")
+		logrus.WithField("device", name).Warn("Transmitting will not be possible")
 
 		d.dev[a].outputBuf16 = nil
 		d.dev[a].outputBuf8 = nil
@@ -929,9 +920,10 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, p
 	if outType == AUDIO_OUT_TYPE_NONE && audioOutputRequired(&pa.adev[a]) {
 		// Named for transmit, but not a transmit device: standard
 		// input, or a UDP port to listen on rather than send to.
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Audio device %s cannot transmit.\n", pa.adev[a].adevice_out)
-		dw_printf("A transmit device is a soundcard, or udp:host:port.\n")
+		logrus.WithFields(logrus.Fields{
+			"device": pa.adev[a].adevice_out,
+			"hint":   "A transmit device is a soundcard, or udp:host:port",
+		}).Error("Audio device cannot transmit")
 
 		return fmt.Errorf("audio device %s cannot transmit", pa.adev[a].adevice_out)
 	}
@@ -964,26 +956,26 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, p
 	var audio_in_name = pa.adev[a].adevice_in
 	var audio_out_name = pa.adev[a].adevice_out
 
-	var ctemp string
+	var channels string
 
 	if pa.adev[a].num_channels == 2 {
-		ctemp = fmt.Sprintf(" (channels %d & %d)", ADEVFIRSTCHAN(a), ADEVFIRSTCHAN(a)+1)
+		channels = fmt.Sprintf("%d & %d", ADEVFIRSTCHAN(a), ADEVFIRSTCHAN(a)+1)
 	} else {
-		ctemp = fmt.Sprintf(" (channel %d)", ADEVFIRSTCHAN(a))
+		channels = strconv.Itoa(ADEVFIRSTCHAN(a))
 	}
-
-	text_color_set(DW_COLOR_INFO)
 
 	switch {
 	case outType == AUDIO_OUT_TYPE_NONE:
-		dw_printf("Audio input device for receive: %s %s\n", audio_in_name, ctemp)
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("No audio output device, so transmitting is not possible.\n")
+		logrus.WithFields(logrus.Fields{"input": audio_in_name, "channels": channels}).Info("Audio input device for receive")
+		logrus.WithField("channels", channels).Warn("No audio output device, so transmitting is not possible")
 	case audio_in_name == audio_out_name:
-		dw_printf("Audio device for both receive and transmit: %s %s\n", audio_in_name, ctemp)
+		logrus.WithFields(logrus.Fields{"device": audio_in_name, "channels": channels}).Info("Audio device for both receive and transmit")
 	default:
-		dw_printf("Audio input device for receive: %s %s\n", audio_in_name, ctemp)
-		dw_printf("Audio out device for transmit: %s %s\n", audio_out_name, ctemp)
+		logrus.WithFields(logrus.Fields{
+			"input":    audio_in_name,
+			"output":   audio_out_name,
+			"channels": channels,
+		}).Info("Audio devices for receive and transmit")
 	}
 
 	// Calculate buffer size
@@ -1029,8 +1021,7 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, p
 		d.dev[a].inbufSizeInBytes = 1024
 
 	default:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error, invalid audio_in_type\n")
+		logrus.WithField("type", d.dev[a].g_audio_in_type).Error("Internal error, invalid audio_in_type")
 
 		return fmt.Errorf("invalid audio input type %d", d.dev[a].g_audio_in_type)
 	}
@@ -1067,12 +1058,15 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, p
 
 	// Version 1.3 - after a report of this situation for Mac OSX version.
 	if d.dev[a].inbufSizeInBytes < 256 || d.dev[a].inbufSizeInBytes > 32768 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Audio buffer has unexpected extreme size of %d bytes.\n", d.dev[a].inbufSizeInBytes)
-		dw_printf("This might be caused by unusual audio device configuration values.\n")
+		var extremeSize = d.dev[a].inbufSizeInBytes
 
 		d.dev[a].inbufSizeInBytes = 2048
-		dw_printf("Using %d to attempt recovery.\n", d.dev[a].inbufSizeInBytes)
+
+		logrus.WithFields(logrus.Fields{
+			"size":     extremeSize,
+			"recovery": d.dev[a].inbufSizeInBytes,
+			"hint":     "This might be caused by unusual audio device configuration values",
+		}).Error("Audio buffer has unexpected extreme size")
 	}
 
 	/*
@@ -1173,8 +1167,7 @@ func AudioOpen(ctx context.Context, pa *RadioConfig) (*AudioDevices, error) {
 			d.portaudioHeld = true
 			portaudioReady = true
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("PortAudio initialization failed: %v\n", err)
+			logrus.WithError(err).Error("PortAudio initialization failed")
 			d.printAudioBackendNoise()
 
 			// Without a soundcard we can't receive, so there is nothing left
@@ -1262,10 +1255,11 @@ func (d *AudioDevices) GetByte(a int) int {
 
 		// Check for overflow (data was dropped in the callback)
 		if d.dev[a].inputRingBuf.checkOverflow() {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Audio input overflow on device %d - some samples lost\n", a)
-			dw_printf("If receiving is fine and strange things happen when transmitting, it is probably RF energy\n")
-			dw_printf("getting into your audio or digital wiring.\n")
+			logrus.WithFields(logrus.Fields{
+				"adev": a,
+				"hint": "If receiving is fine and strange things happen when transmitting, " +
+					"it is probably RF energy getting into your audio or digital wiring",
+			}).Error("Audio input overflow, some samples lost")
 
 			d.dev[a].recordRead(a, 0)
 		}
@@ -1303,8 +1297,7 @@ func (d *AudioDevices) GetByte(a int) int {
 
 			var n, _, readErr = d.dev[a].udp_sock.ReadFromUDP(d.dev[a].inbuf)
 			if readErr != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't read from udp socket: %s", readErr)
+				logrus.WithError(readErr).WithField("adev", a).Error("Can't read from UDP socket")
 
 				d.dev[a].inbufLen = 0
 				d.dev[a].inbufNext = 0
@@ -1338,16 +1331,14 @@ func (d *AudioDevices) GetByte(a int) int {
 					// The end of the run, which DirewolfMain makes, through
 					// the teardown, once the receive thread reports the
 					// device as giving no more.
-					text_color_set(DW_COLOR_INFO)
-					dw_printf("\nEnd of file on stdin.  Exiting.\n")
+					logrus.Info("End of file on stdin, exiting")
 
 					d.dev[a].inputEnded.Store(true)
 
 					return -1
 				}
 
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Error reading from stdin: %v\n", err)
+				logrus.WithError(err).Error("Error reading from stdin")
 
 				return -1
 			}
@@ -1433,15 +1424,13 @@ func (d *AudioDevices) Flush(a int) int {
 		d.dev[a].outbufLen = 0
 
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Audio UDP output write error: %v\n", err)
+			logrus.WithError(err).WithField("adev", a).Error("Audio UDP output write error")
 
 			return -1
 		}
 
 		if n != toWrite {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Audio UDP output short write: wrote %d of %d bytes\n", n, toWrite)
+			logrus.WithFields(logrus.Fields{"adev": a, "wrote": n, "length": toWrite}).Error("Audio UDP output short write")
 
 			return -1
 		}
@@ -1478,8 +1467,7 @@ func (d *AudioDevices) Flush(a int) int {
 	if !d.dev[a].outputStarted {
 		var err = d.dev[a].outputStream.Start()
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Could not start audio output stream: %v\n", err)
+			logrus.WithError(err).WithField("adev", a).Error("Could not start audio output stream")
 
 			return -1
 		}
@@ -1489,12 +1477,11 @@ func (d *AudioDevices) Flush(a int) int {
 
 	var err = d.dev[a].outputStream.Write()
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Audio output write error: %v\n", err)
+		logrus.WithError(err).WithField("adev", a).Error("Audio output write error")
 
 		var stopErr = d.dev[a].outputStream.Stop()
 		if stopErr != nil {
-			dw_printf("Audio output stream stop error: %v\n", stopErr)
+			logrus.WithError(stopErr).WithField("adev", a).Error("Audio output stream stop error")
 		}
 
 		d.dev[a].outputStarted = false
@@ -1604,8 +1591,7 @@ func (d *AudioDevices) wait(a int) {
 	if d.dev[a].outputStream != nil && d.dev[a].outputStarted {
 		var err = d.dev[a].outputStream.Stop()
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Failed to stop audio output stream for device %d: %v\n", a, err)
+			logrus.WithError(err).WithField("adev", a).Error("Failed to stop audio output stream")
 		}
 
 		d.dev[a].outputStarted = false
