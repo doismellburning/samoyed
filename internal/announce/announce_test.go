@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// cancelledContext is what the announcement tests hand KISS: the
+// cancelledContext is what the announcement tests hand Announce: the
 // message we care about is logged before the responder goroutine starts, and
 // an already-cancelled context stops that goroutine putting mDNS traffic on
 // the network, or logging, after the test has finished.
@@ -66,47 +66,70 @@ func announceLogged(t *testing.T, message string, f func()) *logrus.Entry {
 }
 
 //nolint:paralleltest // Serial: hooks logrus's global logger.
-func TestDNSSDAnnounceUsesConfiguredName(t *testing.T) {
+func TestDNSSDAnnounceLogsService(t *testing.T) {
 	requireMDNSSockets(t)
 
-	var entry = announceLogged(t, "DNS-SD: Announcing KISS TCP", func() {
-		KISS(cancelledContext(t), "Q1TEST TNC", 8001)
+	var entry = announceLogged(t, "DNS-SD: Announcing", func() {
+		Announce(cancelledContext(t), []Service{{Name: "Q1TEST TNC", Type: KISSType, Port: 8001}})
 	})
 
 	assert.Equal(t, logrus.InfoLevel, entry.Level)
 	assert.Equal(t, "Q1TEST TNC", entry.Data["name"])
+	assert.Equal(t, KISSType, entry.Data["type"])
 	assert.Equal(t, 8001, entry.Data["port"])
 }
 
-// With no name configured we fall back to the hostname-derived default.
+// Every service handed over is announced, through the one responder.
 //
 //nolint:paralleltest // Serial: hooks logrus's global logger.
-func TestDNSSDAnnounceDefaultsName(t *testing.T) {
+func TestDNSSDAnnounceSeveralServices(t *testing.T) {
 	requireMDNSSockets(t)
 
-	var entry = announceLogged(t, "DNS-SD: Announcing KISS TCP", func() {
-		KISS(cancelledContext(t), "", 8002)
+	var hook = test.NewGlobal()
+	t.Cleanup(hook.Reset)
+
+	Announce(cancelledContext(t), []Service{
+		{Name: "Q1TEST TNC", Type: KISSType, Port: 8001},
+		{Name: "Q1TEST TNC (port 8002)", Type: KISSType, Port: 8002},
 	})
 
-	assert.Equal(t, dns_sd_default_service_name(), entry.Data["name"])
-	assert.Equal(t, 8002, entry.Data["port"])
+	var ports []any
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Message == "DNS-SD: Announcing" {
+			ports = append(ports, entry.Data["port"])
+		}
+	}
+
+	assert.Equal(t, []any{8001, 8002}, ports)
 }
 
 // Nothing is listening on port 0, so there is nothing to announce - and saying
-// so beats advertising a service nobody can connect to.
+// so beats advertising a service nobody can connect to.  It is reported before
+// any mDNS socket is opened, so this needs none.
 //
 //nolint:paralleltest // Serial: hooks logrus's global logger.
 func TestDNSSDAnnounceRejectsPortZero(t *testing.T) {
 	var hook = test.NewGlobal()
-
 	t.Cleanup(hook.Reset)
 
-	KISS(cancelledContext(t), "", 0)
+	Announce(cancelledContext(t), []Service{{Name: "Q1TEST TNC", Type: KISSType, Port: 0}})
 
 	var entries = hook.AllEntries()
-
 	require.Len(t, entries, 1)
 	assert.Equal(t, logrus.ErrorLevel, entries[0].Level)
 	assert.Equal(t, "DNS-SD: Failed to create service", entries[0].Message)
 	assert.Contains(t, entries[0].Data, logrus.ErrorKey)
+}
+
+// Announcing nothing opens no sockets and logs nothing.
+//
+//nolint:paralleltest // Serial: hooks logrus's global logger.
+func TestDNSSDAnnounceNothing(t *testing.T) {
+	var hook = test.NewGlobal()
+	t.Cleanup(hook.Reset)
+
+	Announce(cancelledContext(t), nil)
+
+	assert.Empty(t, hook.AllEntries())
 }

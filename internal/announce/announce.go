@@ -26,25 +26,54 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const DNS_SD_SERVICE = "_kiss-tnc._tcp"
+// KISSType is the DNS-SD service type for KISS over TCP, as Dire Wolf
+// announces it and clients such as APRSdroid look for it.
+const KISSType = "_kiss-tnc._tcp"
 
-// KISS announces the KISS TCP service listening on port, as name,
-// or as dns_sd_default_service_name if name is empty, until ctx is cancelled.
-func KISS(ctx context.Context, name string, port int) {
-	if name == "" {
-		name = dns_sd_default_service_name()
+// Service is one service to announce: an instance Name, unique among those of
+// its Type, and the Port it listens on.
+type Service struct {
+	Name string
+	Type string
+	Port int
+}
+
+// Announce announces services, until ctx is cancelled.  One that cannot be
+// announced is logged and left out, without holding up the rest.
+func Announce(ctx context.Context, services []Service) {
+	type pending struct {
+		service dnssd.Service
+		fields  logrus.Fields
 	}
 
-	var cfg = dnssd.Config{ //nolint:exhaustruct_v5
-		Name: name,
-		Type: DNS_SD_SERVICE,
-		Port: port,
+	var valid []pending
+
+	for _, service := range services {
+		var fields = logrus.Fields{
+			"name": service.Name,
+			"type": service.Type,
+			"port": service.Port,
+		}
+
+		var cfg = dnssd.Config{ //nolint:exhaustruct_v5
+			Name: service.Name,
+			Type: service.Type,
+			Port: service.Port,
+		}
+
+		var sv, svErr = dnssd.NewService(cfg)
+		if svErr != nil {
+			logrus.WithError(svErr).WithFields(fields).Error("DNS-SD: Failed to create service")
+
+			continue
+		}
+
+		valid = append(valid, pending{service: sv, fields: fields})
 	}
 
-	var sv, svErr = dnssd.NewService(cfg)
-	if svErr != nil {
-		logrus.WithError(svErr).Error("DNS-SD: Failed to create service")
-
+	// Checked only now, so that a service we could never have announced is
+	// reported as such even where the mDNS sockets are unavailable.
+	if len(valid) == 0 {
 		return
 	}
 
@@ -55,20 +84,19 @@ func KISS(ctx context.Context, name string, port int) {
 		return
 	}
 
-	var _, addErr = rp.Add(sv)
-	if addErr != nil {
-		logrus.WithError(addErr).Error("DNS-SD: Failed to add service")
+	for _, p := range valid {
+		var _, addErr = rp.Add(p.service)
+		if addErr != nil {
+			logrus.WithError(addErr).WithFields(p.fields).Error("DNS-SD: Failed to add service")
 
-		return
+			continue
+		}
+
+		// Info rather than Debug: the name is what an operator looks for in a
+		// client's list of discovered services, and when it defaults to one
+		// made up from the hostname this is the only place they are told it.
+		logrus.WithFields(p.fields).Info("DNS-SD: Announcing")
 	}
-
-	// Info rather than Debug: the name is what an operator looks for in a
-	// client's list of discovered TNCs, and when it defaults to one made up
-	// from the hostname this is the only place they are told it.
-	logrus.WithFields(logrus.Fields{
-		"name": name,
-		"port": port,
-	}).Info("DNS-SD: Announcing KISS TCP")
 
 	go func() {
 		// Respond runs until its context is cancelled, so this is what
