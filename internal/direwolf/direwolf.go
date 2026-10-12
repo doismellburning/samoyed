@@ -702,7 +702,7 @@ x = Silence FX.25 information.`)
 
 	// The connected-mode link layer, after the AGW server whose clients it
 	// tells about the links they asked for.
-	ax25_link_init(misc_config, pttControl.SetConnected, agwServer, transmitQueue, d_c_opt)
+	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, agwServer, transmitQueue, d_c_opt)
 	metrics_init(ctx, audio_config, misc_config)
 	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
 
@@ -815,7 +815,7 @@ x = Silence FX.25 information.`)
 	recHandler.quietDecode = q_d_opt
 	recHandler.aisToObject = A_opt_ais_to_obj
 
-	go recv_process(ctx, dataLinkQueue, recHandler)
+	go recv_process(ctx, dataLinkQueue, ax25Link, recHandler)
 
 	// Startup is done, so we sit here until we are asked to stop or an audio
 	// device input fails or runs out.  There is no point in going on without
