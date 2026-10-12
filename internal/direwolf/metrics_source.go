@@ -71,13 +71,14 @@ func recordRadioFrame(channel int, fecType fec_type_t, retries BitFixLevel) {
 // configured with METRICSPORT, and pushes each channel's static up/down
 // state from audio, seeding the rest of that channel's series at
 // zero (everything else pushes from its own subsystem as events happen).
-// A port of 0 (the default) disables it.
-func metrics_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
+// A port of 0 (the default) disables it.  It reports whether the endpoint is
+// listening, which it is not if disabled or if it failed to start.
+func metrics_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) bool {
 	if mc.metrics_port == 0 {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Disabled Prometheus metrics endpoint.\n")
 
-		return
+		return false
 	}
 
 	for channel := range MAX_RADIO_CHANS {
@@ -95,7 +96,7 @@ func metrics_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unable to start Prometheus metrics endpoint on port %d: %v\n", mc.metrics_port, startErr)
 
-		return
+		return false
 	}
 
 	go func() {
@@ -108,4 +109,6 @@ func metrics_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) {
 
 	text_color_set(DW_COLOR_INFO)
 	dw_printf("Prometheus metrics endpoint listening on port %d.\n", mc.metrics_port)
+
+	return true
 }

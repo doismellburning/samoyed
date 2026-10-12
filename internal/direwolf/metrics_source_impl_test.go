@@ -25,7 +25,7 @@ func TestMetricsInitImplDisabledStartsNothing(t *testing.T) {
 
 	// Port 0 is "disabled": no endpoint, and nothing is pushed.
 	var mc = new(misc_config_s)
-	metrics_init(t.Context(), audio, mc)
+	assert.False(t, metrics_init(t.Context(), audio, mc), "a disabled endpoint is not listening")
 
 	// Nothing should be listening on the port we picked either; the point is
 	// just that metrics_init returned without binding anything.
@@ -51,7 +51,7 @@ func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
 	var ctx, cancel = context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
-	metrics_init(ctx, audio, mc)
+	assert.True(t, metrics_init(ctx, audio, mc), "the endpoint is listening")
 
 	assert.InDelta(t, 1, metricValue(t, "samoyed_channel_up", map[string]string{"channel": "0"}), 0,
 		"a radio channel is up")
@@ -116,7 +116,10 @@ func TestMetricsInitImplPortInUse(t *testing.T) {
 
 	// A failure to bind is reported and metrics_init returns rather than
 	// panicking or claiming to be listening.
-	require.NotPanics(t, func() { metrics_init(t.Context(), audio, mc) })
+	var started = true
+
+	require.NotPanics(t, func() { started = metrics_init(t.Context(), audio, mc) })
+	assert.False(t, started, "an endpoint that failed to bind is not listening")
 
 	// The channel state was still pushed before the bind was attempted.
 	assert.InDelta(t, 1, metricValue(t, "samoyed_channel_up", map[string]string{"channel": "0"}), 0)
