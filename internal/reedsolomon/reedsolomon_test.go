@@ -56,10 +56,11 @@ func TestNew_Invalid(t *testing.T) {
 }
 
 func TestDecode_NoErrors(t *testing.T) {
-	var rng = rand.New(rand.NewSource(1))
-
 	for name, c := range testCodecs(t) {
 		t.Run(name, func(t *testing.T) {
+			// A source of its own, so the subtests can run in parallel.
+			var rng = rand.New(rand.NewSource(1))
+
 			var block = testBlock(c, rng)
 			var original = slices.Clone(block)
 
@@ -73,10 +74,11 @@ func TestDecode_NoErrors(t *testing.T) {
 
 // NRoots()/2 errors in unknown places is as many as the code can repair.
 func TestDecode_CorrectsErrors(t *testing.T) {
-	var rng = rand.New(rand.NewSource(2))
-
 	for name, c := range testCodecs(t) {
 		t.Run(name, func(t *testing.T) {
+			// A source of its own, so the subtests can run in parallel.
+			var rng = rand.New(rand.NewSource(2))
+
 			var block = testBlock(c, rng)
 			var original = slices.Clone(block)
 
@@ -96,10 +98,11 @@ func TestDecode_CorrectsErrors(t *testing.T) {
 // With the positions known up front, NRoots() erasures can be repaired - twice
 // as many as unknown errors.
 func TestDecode_CorrectsErasures(t *testing.T) {
-	var rng = rand.New(rand.NewSource(3))
-
 	for name, c := range testCodecs(t) {
 		t.Run(name, func(t *testing.T) {
+			// A source of its own, so the subtests can run in parallel.
+			var rng = rand.New(rand.NewSource(3))
+
 			var block = testBlock(c, rng)
 			var original = slices.Clone(block)
 
