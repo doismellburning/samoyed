@@ -395,8 +395,10 @@ func (kns *KissNetService) sendOn(kps *kissport_status_s, client int, conn net.C
 func (kns *KissNetService) write(kps *kissport_status_s, client int, conn net.Conn, buf []byte) {
 	var _, err = conn.Write(buf)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError %s sending message to KISS client application %d on port %d.  Closing connection.\n\n", err, client, kps.tcp_port)
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"tcp_port": kps.tcp_port,
+			"client":   client,
+		}).Error("Error sending message to KISS client application, closing connection")
 		conn.Close()
 		kps.detachClientIfCurrent(client, conn)
 	}
@@ -437,13 +439,15 @@ func (c kissNetClient) prompt(text []byte) {
 	// A client app might think it is attached to a traditional TNC.
 	// It might try sending commands over and over again trying to get the TNC into KISS mode.
 	// We recognize this attempt and send it something to keep it happy.
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("KISS TCP: Something unexpected from client application.\n")
-	dw_printf("Is client app treating this like an old TNC with command mode?\n")
-	dw_printf("This can be caused by the application sending commands to put a\n")
-	dw_printf("traditional TNC into KISS mode.  It is usually a harmless warning.\n")
-	dw_printf("For best results, configure for a KISS-only TNC to avoid this.\n")
-	dw_printf("In the case of APRSISCE/32, use \"Simply(KISS)\" rather than \"KISS.\"\n")
+	logrus.WithFields(logrus.Fields{
+		"tcp_port": c.kps.tcp_port,
+		"client":   c.client,
+		"hint": "Is client app treating this like an old TNC with command mode?  " +
+			"This can be caused by the application sending commands to put a " +
+			"traditional TNC into KISS mode.  It is usually a harmless warning.  " +
+			"For best results, configure for a KISS-only TNC to avoid this.  " +
+			"In the case of APRSISCE/32, use Simply(KISS) rather than KISS",
+	}).Warn("Something unexpected from KISS TCP client application")
 
 	if c.kns.debug > 0 {
 		kiss_debug_print(TO_CLIENT, "Fake command prompt", text)

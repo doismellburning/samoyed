@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/kiss"
-	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -278,7 +277,7 @@ func TestKissNetReplyNotToTheNextClientInTheSlot(t *testing.T) {
 func TestKissNetPrompt(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
 	})
 
