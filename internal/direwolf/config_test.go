@@ -3012,6 +3012,117 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				},
 			},
 		},
+		"SCHANNEL": {
+			{
+				name:   "a virtual channel, device and baud rate are stored",
+				config: "SCHANNEL 6 /dev/ttyUSB0 19200\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
+					a.Equal("/dev/ttyUSB0", c.audio.serialTNCDevice[6])
+					a.Equal(19200, c.audio.serialTNCBaud[6])
+					a.Zero(c.errors)
+				},
+			},
+			{
+				name:   "the baud rate defaults to 9600",
+				config: "SCHANNEL 6 /dev/ttyUSB0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
+					a.Equal(9600, c.audio.serialTNCBaud[6])
+					a.Zero(c.errors)
+				},
+			},
+			{
+				name:   "an unsupported baud rate falls back to 9600",
+				config: "SCHANNEL 6 /dev/ttyUSB0 12345\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
+					a.Equal(9600, c.audio.serialTNCBaud[6])
+					a.Equal(1, c.errors)
+					a.Contains(c.output, "Unsupported data rate \"12345\" for SCHANNEL command")
+				},
+			},
+			{
+				name:   "an unreadable baud rate falls back to 9600",
+				config: "SCHANNEL 6 /dev/ttyUSB0 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
+					a.Equal(9600, c.audio.serialTNCBaud[6])
+					a.Equal(1, c.errors)
+				},
+			},
+			{
+				name:   "a channel below the virtual range is rejected",
+				config: "SCHANNEL 5 /dev/ttyUSB0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[5])
+					a.Empty(c.audio.serialTNCDevice[5])
+				},
+			},
+			{
+				name:   "a channel beyond the virtual range is rejected",
+				config: "SCHANNEL 16 /dev/ttyUSB0\n",
+				check: func(a *assert.Assertions, c configs) {
+					for channel := range MAX_TOTAL_CHANS {
+						a.NotEqual(MediumSerialTNC, c.audio.chan_medium[channel])
+					}
+				},
+			},
+			{
+				name:   "an unreadable channel number is rejected",
+				config: "SCHANNEL six /dev/ttyUSB0\n",
+				check: func(a *assert.Assertions, c configs) {
+					for channel := range MAX_TOTAL_CHANS {
+						a.NotEqual(MediumSerialTNC, c.audio.chan_medium[channel])
+					}
+				},
+			},
+			{
+				name:   "a channel already in use is left as it was",
+				config: "NCHANNEL 6 localhost 8001\nSCHANNEL 6 /dev/ttyUSB0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NETTNC, c.audio.chan_medium[6])
+					a.Empty(c.audio.serialTNCDevice[6])
+				},
+			},
+			{
+				name:   "a serial TNC's channel cannot be taken by a network TNC",
+				config: "SCHANNEL 6 /dev/ttyUSB0\nNCHANNEL 6 localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+				},
+			},
+			{
+				name:   "two serial TNCs can be configured at once",
+				config: "SCHANNEL 6 /dev/ttyUSB0\nSCHANNEL 7 /dev/ttyUSB1 4800\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyUSB0", c.audio.serialTNCDevice[6])
+					a.Equal(9600, c.audio.serialTNCBaud[6])
+					a.Equal("/dev/ttyUSB1", c.audio.serialTNCDevice[7])
+					a.Equal(4800, c.audio.serialTNCBaud[7])
+				},
+			},
+			{
+				name:   "a missing channel number does not eat the next line",
+				config: "SCHANNEL\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// NewSerialTNCs attaches to every MediumSerialTNC channel at startup
+			// and exits if it cannot, so a line that is rejected must not leave
+			// one behind.
+			{
+				name:   "a missing device leaves the channel alone",
+				config: "SCHANNEL 6\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Equal(1, c.errors)
+					a.Contains(c.output, "Missing serial TNC device for SCHANNEL command")
+				},
+			},
+		},
 		"NOXID": {
 			{
 				name:   "an address is stored",

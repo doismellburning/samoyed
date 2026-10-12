@@ -278,3 +278,42 @@ func TestSerialTNCStopsWhenCancelled(t *testing.T) {
 	var fd, _ = st.port()
 	assert.Nil(t, fd, "the port was not closed when the listener stopped")
 }
+
+// Each SCHANNEL in the configuration gets a serial TNC attached to it, and no
+// other channel does.
+func TestNewSerialTNCsAttachesSerialChannels(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
+	var device, tnc = newTestSerialDevice(t)
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[0] = MEDIUM_RADIO
+	audioConfig.chan_medium[serialTNCTestChannel] = MediumSerialTNC
+	audioConfig.serialTNCDevice[serialTNCTestChannel] = device
+	audioConfig.serialTNCBaud[serialTNCTestChannel] = 9600
+
+	var ctx, cancel = context.WithCancel(t.Context())
+
+	var tncs = NewSerialTNCs(ctx, audioConfig, dlq.RecFrame)
+
+	// The listener cannot be interrupted mid-read, so stop it, and let go of
+	// the port, by hanging up the far end once it has been cancelled.
+	t.Cleanup(func() {
+		cancel()
+		tnc.Close()
+	})
+
+	require.NotNil(t, tncs[serialTNCTestChannel])
+
+	for channel, st := range tncs {
+		if channel != serialTNCTestChannel {
+			assert.Nil(t, st, "channel %d should not have a serial TNC", channel)
+		}
+	}
+
+	// Started, too: what the TNC says reaches the received queue.
+	var _, writeErr = tnc.Write(kissFrameFor(newTestPacket(t)))
+	require.NoError(t, writeErr)
+
+	assert.Equal(t, serialTNCTestChannel, nextDLQItem(t, dlq)._chan)
+}

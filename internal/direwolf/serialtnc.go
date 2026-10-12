@@ -3,6 +3,7 @@ package direwolf
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,6 +51,36 @@ type SerialTNC struct {
 	// port itself - the listening goroutine may be blocked reading it - so it
 	// stops writing to it and leaves the closing to the listener.
 	failed bool
+}
+
+// NewSerialTNCs attaches a SerialTNC to each SCHANNEL channel in audio, and
+// starts it listening until ctx is cancelled, its frames going to recFrame.
+// It returns the TNC for each such channel, and nil for every other.  It is
+// called once at startup, and exits if a TNC's port cannot be opened.
+func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiver) [MAX_TOTAL_CHANS]*SerialTNC {
+	var tncs [MAX_TOTAL_CHANS]*SerialTNC
+
+	for i := range MAX_TOTAL_CHANS {
+		if audio.chan_medium[i] != MediumSerialTNC {
+			continue
+		}
+
+		var log = logrus.WithFields(logrus.Fields{"channel": i, "device": audio.serialTNCDevice[i], "baud": audio.serialTNCBaud[i]})
+
+		log.Debug("Serial TNC")
+
+		var st, err = NewSerialTNC(i, audio.serialTNCDevice[i], audio.serialTNCBaud[i], recFrame)
+		if err != nil {
+			log.WithError(err).Error("Could not attach to serial TNC")
+			os.Exit(1)
+		}
+
+		st.Start(ctx)
+
+		tncs[i] = st
+	}
+
+	return tncs
 }
 
 // NewSerialTNC attaches channel, an SCHANNEL one, to the KISS TNC on the

@@ -20,11 +20,13 @@ func TestChannelDescription(t *testing.T) {
 	audio.chan_medium[1] = MEDIUM_IGATE
 	audio.chan_medium[2] = MEDIUM_NETTNC
 	audio.chan_medium[4] = MEDIUM_AXUDP
+	audio.chan_medium[5] = MediumSerialTNC
 
 	assert.Equal(t, maybe.Just("radio"), channelDescription(audio, 0))
 	assert.Equal(t, maybe.Just("aprs-is"), channelDescription(audio, 1))
 	assert.Equal(t, maybe.Just("network"), channelDescription(audio, 2))
 	assert.Equal(t, maybe.Just("axudp"), channelDescription(audio, 4))
+	assert.Equal(t, maybe.Just("serial"), channelDescription(audio, 5))
 	assert.Equal(t, maybe.Nothing[string](), channelDescription(audio, 3))
 	assert.Equal(t, maybe.Nothing[string](), channelDescription(audio, MAX_TOTAL_CHANS))
 	assert.Equal(t, maybe.Nothing[string](), channelDescription(nil, 0))
@@ -49,6 +51,7 @@ func TestWebPublishReceivedSaysWhereTheFrameCameFrom(t *testing.T) {
 		{dwcore.ChannelSource(dwcore.SourceAPRSIS, 1), "aprs-is", maybe.Nothing[int]()},
 		{dwcore.ChannelSource(dwcore.SourceNetTNC, 1), "network", maybe.Nothing[int]()},
 		{dwcore.ChannelSource(dwcore.SourceAXUDP, 1), "axudp", maybe.Nothing[int]()},
+		{dwcore.ChannelSource(dwcore.SourceSerialTNC, 1), "serial", maybe.Nothing[int]()},
 	} {
 		t.Run(tc.via, func(t *testing.T) {
 			var hub = webui.NewHub()
