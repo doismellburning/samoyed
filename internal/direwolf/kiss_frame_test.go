@@ -6,12 +6,14 @@ package direwolf
 import (
 	"bytes"
 	"net"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,6 +24,28 @@ import (
 // out.  KissHandler.processMsg is where a frame with its escapes already removed is
 // acted on, so it can be driven directly, with a recording stand-in for the
 // function that answers the client.
+
+// captureKissLog runs fn and returns what it wrote to stdout, logrus entries
+// included.  samoyed-direwolf sends logrus to stdout alongside everything
+// else, and any -d option turns on Debug, which is where the KISS debug
+// prints go, so do the same here.
+func captureKissLog(t *testing.T, fn func()) string {
+	t.Helper()
+
+	return testutils.CaptureOutput(t, func() {
+		var oldOut = logrus.StandardLogger().Out
+		var oldLevel = logrus.GetLevel()
+
+		defer func() {
+			logrus.SetOutput(oldOut)
+			logrus.SetLevel(oldLevel)
+		}()
+
+		logrus.SetOutput(os.Stdout)
+		logrus.SetLevel(logrus.DebugLevel)
+		fn()
+	})
+}
 
 // sentToClient is one message the TNC sent back to the client application:
 // a frame, or the fake command prompt, which is text and has no channel or
@@ -155,11 +179,12 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		h.processMsg(append([]byte{0x80 | kiss.CmdDataFrame}, pp.FrameData()...), from)
 	})
 
-	assert.Contains(t, output, "Invalid transmit channel 8 from KISS client app")
+	assert.Contains(t, output, "Invalid transmit channel from KISS client application")
+	assert.Contains(t, output, "channel=8")
 	assert.Contains(t, output, "kissparms -c 1 -p radio")
 	assert.Equal(t, 0, h.queue.Count(8, -1, "", "", false))
 }
@@ -176,13 +201,14 @@ func Test_kiss_process_msg_invalid_channel_escaped_fend_only(t *testing.T) {
 	var _, from = recordingKissClient()
 	var kc kiss.Collector
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.TFEND, kiss.FEND} {
 			h.RecByte(&kc, b, 0, from)
 		}
 	})
 
-	assert.Contains(t, output, "Invalid transmit channel 12 from KISS client app")
+	assert.Contains(t, output, "Invalid transmit channel from KISS client application")
+	assert.Contains(t, output, "channel=12")
 }
 
 // The debug print of a message has something to say even when there is nothing
@@ -238,12 +264,13 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 	var output string
 
 	assert.NotPanics(t, func() {
-		output = testutils.CaptureOutput(t, func() {
+		output = captureKissLog(t, func() {
 			h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
 		})
 	})
 
-	assert.Contains(t, output, "Invalid transmit channel 16 from KISS client app")
+	assert.Contains(t, output, "Invalid transmit channel from KISS client application")
+	assert.Contains(t, output, "channel=16")
 }
 
 // Bytes that are not an AX.25 frame cannot be transmitted, and are reported
@@ -255,7 +282,7 @@ func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 
 	var _, from = recordingKissClient()
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		h.processMsg([]byte{kiss.CmdDataFrame, 'n', 'o'}, from)
 	})
 
@@ -305,7 +332,7 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 		{"TXTAIL", []byte{kiss.CmdTxTail, 1}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() { h.processMsg(c.msg, from) })
+			var output = captureKissLog(t, func() { h.processMsg(c.msg, from) })
 
 			assert.Contains(t, output, "Radio Channel - Transmit Timing")
 		})
@@ -337,9 +364,9 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 		{"SET HARDWARE", kiss.CmdSetHardware},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() { h.processMsg([]byte{c.cmd}, from) })
+			var output = captureKissLog(t, func() { h.processMsg([]byte{c.cmd}, from) })
 
-			assert.Contains(t, output, "KISS ERROR")
+			assert.Contains(t, output, "Missing value for KISS command")
 		})
 	}
 
@@ -355,11 +382,11 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 
 	var _, from = recordingKissClient()
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		h.processMsg([]byte{kiss.CmdEndKiss}, from)
 	})
 
-	assert.Contains(t, output, "end KISS mode - Ignored")
+	assert.Contains(t, output, "end KISS mode ignored")
 }
 
 // A command we don't implement gets the troubleshooting tip, and the two
@@ -372,26 +399,27 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 
 	var _, from = recordingKissClient()
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		h.processMsg([]byte{7}, from)
 	})
 
-	assert.Contains(t, output, "KISS Invalid command 7")
-	assert.Contains(t, output, `Use "-d kn" option`)
+	assert.Contains(t, output, "Invalid KISS command")
+	assert.Contains(t, output, "command=7")
+	assert.Contains(t, output, "'-d kn' option")
 	assert.NotContains(t, output, "XKISS")
 
-	output = testutils.CaptureOutput(t, func() {
+	output = captureKissLog(t, func() {
 		h.processMsg([]byte{kiss.CmdXKissData}, from)
 	})
 
-	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
+	assert.Contains(t, output, "XKISS protocol, which is not supported")
 	assert.Contains(t, output, "Winlink Express")
 
-	output = testutils.CaptureOutput(t, func() {
+	output = captureKissLog(t, func() {
 		h.processMsg([]byte{kiss.CmdXKissPoll}, from)
 	})
 
-	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
+	assert.Contains(t, output, "XKISS protocol, which is not supported")
 }
 
 // "Set hardware" is the one command with an answer: the human readable
@@ -448,13 +476,13 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 		command string
 		expect  string
 	}{
-		{"TNC:9", "Did not expect a parameter"},
-		{"TXBUF:9", "Did not expect a parameter"},
-		{"NOSUCH:", "unrecognized command: NOSUCH"},
+		{"TNC:9", "did not expect a parameter"},
+		{"TXBUF:9", "did not expect a parameter"},
+		{"NOSUCH:", "command=NOSUCH"},
 		{"TNC", "expected the form COMMAND:"},
 	} {
 		t.Run(c.command, func(t *testing.T) {
-			var output = testutils.CaptureOutput(t, func() {
+			var output = captureKissLog(t, func() {
 				kiss_set_hardware(0, []byte(c.command), from, nil)
 			})
 
@@ -543,7 +571,7 @@ func Test_KissRecByte_noise_is_printed(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		feedKissBytes(h, kf, 1, append([]byte("junk"), kiss.FEND))
 	})
 
@@ -573,7 +601,7 @@ func Test_KissRecByte_overlong_frame(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		feedKissBytes(h, kf, 0, append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen+10)...))
 	})
 
@@ -593,11 +621,11 @@ func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 
 	var overlong = append([]byte{kiss.FEND}, bytes.Repeat([]byte{'x'}, kiss.MaxFrameLen+10)...)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		feedKissBytes(h, kf, 0, append(overlong, kiss.FEND))
 	})
 
-	assert.Contains(t, output, "KISS message exceeded maximum length.  Discarding it.")
+	assert.Contains(t, output, "KISS message exceeded maximum length, discarded")
 	assert.Equal(t, 0, h.queue.Count(0, -1, "", "", false), "a fragment of the overlong frame was acted on")
 
 	// And a well formed frame after it still gets through.
@@ -621,11 +649,11 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		feedKissBytes(h, kf, 2, kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)))
 	})
 
-	assert.Contains(t, output, "<<< Data frame from KISS client application, channel 0")
+	assert.Contains(t, output, `channel=0 direction=from function="Data frame"`)
 	assert.Contains(t, output, "Packet content after removing KISS framing")
 }
 
@@ -733,11 +761,11 @@ func Test_KissRecByte_frame_empty_once_unescaped(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		feedKissBytes(h, kf, 2, []byte{kiss.FEND, kiss.FESC, kiss.FEND})
 	})
 
-	assert.Contains(t, output, "nothing in it")
+	assert.Contains(t, output, "empty once unescaped")
 	assert.Equal(t, 0, h.queue.Count(0, -1, "", "", false))
 }
 
@@ -776,11 +804,12 @@ func Test_kissClientFrame_truncates(t *testing.T) {
 
 	var got []byte
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		got = kissClientFrame(0, kiss.CmdDataFrame, frame, 0, "Test")
 	})
 
-	assert.Contains(t, output, "Test KISS buffer too small.  Truncated.")
+	assert.Contains(t, output, "KISS buffer too small, frame truncated")
+	assert.Contains(t, output, "transport=Test")
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
 	assert.Len(t, got, ax25.MaxPacketLen+3)

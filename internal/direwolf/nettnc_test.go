@@ -459,7 +459,7 @@ func TestNetTNCDebugPrints(t *testing.T) {
 		}
 	})
 
-	assert.Contains(t, output, "<<< Data frame from KISS client application")
+	assert.Contains(t, output, `direction=from function="Data frame"`)
 	assert.Contains(t, output, "Frame content after removing KISS framing")
 }
 
