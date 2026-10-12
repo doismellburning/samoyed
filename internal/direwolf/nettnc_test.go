@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,28 @@ import (
 )
 
 const nettncTestChannel = 3
+
+// captureLogOutput runs fn and returns what it wrote to stdout, logrus
+// entries at level and above included - samoyed-direwolf sends logrus to
+// stdout alongside everything else.
+func captureLogOutput(t *testing.T, level logrus.Level, fn func()) string {
+	t.Helper()
+
+	return testutils.CaptureOutput(t, func() {
+		var oldLogOutput = logrus.StandardLogger().Out
+		var oldLevel = logrus.GetLevel()
+
+		logrus.SetOutput(os.Stdout)
+		logrus.SetLevel(level)
+
+		defer func() {
+			logrus.SetOutput(oldLogOutput)
+			logrus.SetLevel(oldLevel)
+		}()
+
+		fn()
+	})
+}
 
 // newTestNetTNC listens on a free port, playing the network KISS TNC, and
 // hands back the port along with a channel delivering each connection it
@@ -196,9 +219,10 @@ func TestNetTNCSendPacket(t *testing.T) {
 func TestNetTNCSendPacketNoTNC(t *testing.T) {
 	var nt *NetTNC
 
-	var output = testutils.CaptureOutput(t, func() { nt.sendPacket(nettncTestChannel, newTestPacket(t)) })
+	var output = captureLogOutput(t, logrus.InfoLevel, func() { nt.sendPacket(nettncTestChannel, newTestPacket(t)) })
 
-	assert.Contains(t, output, "Not connected to network TNC for channel 3")
+	assert.Contains(t, output, "Not connected to network TNC")
+	assert.Contains(t, output, "channel=3")
 }
 
 // A TNC that has gone away is not connected either, even though we attached to
@@ -207,9 +231,10 @@ func TestNetTNCSendPacketNotConnected(t *testing.T) {
 	var nt = new(NetTNC)
 	nt.host = "127.0.0.1"
 
-	var output = testutils.CaptureOutput(t, func() { nt.sendPacket(nettncTestChannel, newTestPacket(t)) })
+	var output = captureLogOutput(t, logrus.InfoLevel, func() { nt.sendPacket(nettncTestChannel, newTestPacket(t)) })
 
-	assert.Contains(t, output, "Not connected to network TNC for channel 3")
+	assert.Contains(t, output, "Not connected to network TNC")
+	assert.Contains(t, output, "channel=3")
 }
 
 // A write that fails means the connection is no use any more, so it is given
@@ -224,9 +249,10 @@ func TestNetTNCSendPacketWriteErrorClosesTheConnection(t *testing.T) {
 
 	require.NoError(t, there.Close())
 
-	var output = testutils.CaptureOutput(t, func() { nt.sendPacket(nettncTestChannel, newTestPacket(t)) })
+	var output = captureLogOutput(t, logrus.InfoLevel, func() { nt.sendPacket(nettncTestChannel, newTestPacket(t)) })
 
-	assert.Contains(t, output, "sending packet to KISS Network TNC for channel 3")
+	assert.Contains(t, output, "Error sending packet to KISS network TNC")
+	assert.Contains(t, output, "channel=3")
 	assert.Nil(t, nt.getSock(), "the connection was not given up after the write failed")
 }
 
@@ -313,13 +339,14 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureLogOutput(t, logrus.InfoLevel, func() {
 		for _, b := range kiss.Encapsulate([]byte{0, 'n', 'o', 't', ' ', 'a', 'x', '2', '5'}) {
 			tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
 		}
 	})
 
-	assert.Contains(t, output, "Failed to create packet object for KISS frame from channel 3 network TNC")
+	assert.Contains(t, output, "Failed to create packet object for KISS frame")
+	assert.Contains(t, output, "channel=3")
 	assert.Nil(t, dlq.Remove())
 }
 
@@ -331,7 +358,7 @@ func TestNetTNCFrameEmptyOnceUnescapedIsReported(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureLogOutput(t, logrus.InfoLevel, func() {
 		for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.FEND} {
 			tncRecByte(kf, b, 2, nettncTestChannel, netTNC(), dlq.RecFrame)
 		}
@@ -347,7 +374,7 @@ func TestNetTNCFrameEmptyOnceUnescapedIsReported(t *testing.T) {
 func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureLogOutput(t, logrus.InfoLevel, func() {
 		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(), nil)
 
 		for range kiss.MaxFrameLen + 10 {
@@ -355,7 +382,7 @@ func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 		}
 	})
 
-	assert.Equal(t, 1, strings.Count(output, "KISS frame from network TNC exceeded maximum length"))
+	assert.Equal(t, 1, strings.Count(output, "KISS frame exceeded maximum length"))
 }
 
 // The TNC does eventually send its closing FEND, and the byte it used to be
@@ -367,7 +394,7 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureLogOutput(t, logrus.InfoLevel, func() {
 		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
 
 		for range kiss.MaxFrameLen + 10 {
@@ -377,7 +404,7 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
 	})
 
-	assert.Contains(t, output, "KISS frame from network TNC exceeded maximum length.  Discarding it.")
+	assert.Contains(t, output, "KISS frame exceeded maximum length; discarding it")
 	assert.Nil(t, dlq.Remove(), "a fragment of the overlong frame was acted on")
 
 	// And a well formed frame after it still gets through.
@@ -394,7 +421,7 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 func TestNetTNCDebugPrints(t *testing.T) {
 	var kf = new(kiss.Collector)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
 		for _, b := range kissFrameFor(newTestPacket(t)) {
 			tncRecByte(kf, b, 2, nettncTestChannel, netTNC(), nil)
 		}
@@ -417,9 +444,9 @@ func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
-	var output = testutils.CaptureOutput(t, func() { tncs = NewNetTNCs(t.Context(), audioConfig, nil) })
+	var output = captureLogOutput(t, logrus.InfoLevel, func() { tncs = NewNetTNCs(t.Context(), audioConfig, nil) })
 
-	assert.Contains(t, output, fmt.Sprintf("Channel %d: Network TNC 127.0.0.1 %d", nettncTestChannel, port))
+	assert.Contains(t, output, fmt.Sprintf(`msg="Network TNC" channel=%d host=127.0.0.1 port=%d`, nettncTestChannel, port))
 
 	nextTestNetTNCConn(t, conns)
 
