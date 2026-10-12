@@ -32,6 +32,7 @@ package direwolf
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -547,9 +548,7 @@ func (xs *XmitService) discard_untransmittable(channel int) {
 	if !xs.saidCannotTransmit[channel] {
 		xs.saidCannotTransmit[channel] = true
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Channel %d has no audio output device, so nothing can be transmitted on it.\n", channel)
-		dw_printf("Frames queued for it are discarded, and this is said only once.\n")
+		logrus.WithField("channel", channel).Error("Channel has no audio output device, so nothing can be transmitted on it; frames queued for it are discarded, and this is said only once")
 	}
 
 	var confirmed = false
@@ -688,19 +687,17 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 			 * Discard the packet.
 			 * Display with ERROR color rather than XMIT color.
 			 */
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Waited too long for clear channel.  Discarding packet below.\n")
+			logrus.WithFields(logrus.Fields{"channel": channel, "prio": prio}).Error("Waited too long for clear channel, discarding packet below")
 
 			var stemp = pp.FormatAddrs()
 
 			var pinfo = pp.Info()
 
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("[%d%c] ", channel, priorityToRune(prio))
+			fmt.Printf("[%d%c] ", channel, priorityToRune(prio))
 
-			dw_printf("%s", stemp) /* stations followed by : */
+			fmt.Print(stemp) /* stations followed by : */
 			ax25.SafePrint(pinfo, !pp.IsAPRS())
-			dw_printf("\n")
+			fmt.Println()
 		} /* wait for clear channel error. */
 	} /* Have pp */
 } /* end xmit_next */
@@ -963,8 +960,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 
 		/* Looks like a bug with the RPi audio system. Never an issue with Ubuntu.  */
 		/* This runs over randomly sometimes. TODO:  investigate more fully sometime. */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Transmit timing error: PTT is on %d mSec too long.\n", -wait_more.Milliseconds())
+		logrus.WithFields(logrus.Fields{"channel": channel, "overrun_ms": -wait_more.Milliseconds()}).Error("Transmit timing error: PTT is on too long")
 	}
 
 	/*
@@ -1025,7 +1021,6 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 
 	var pinfo = pp.Info()
 
-	text_color_set(DW_COLOR_XMIT)
 	/*
 		#if 0						// FIXME - enable this?
 			dw_printf ("[%d%c%s%s] ", c,
@@ -1034,27 +1029,27 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 					ts);
 		#else
 	*/
-	dw_printf("[%d%c%s] ", c, priorityToRune(p), ts)
+	fmt.Printf("[%d%c%s] ", c, priorityToRune(p), ts)
 	/* #endif */
-	dw_printf("%s", stemp) /* stations followed by : */
+	fmt.Print(stemp) /* stations followed by : */
 
 	/* Demystify non-APRS.  Use same format for received frames in direwolf.c. */
 
 	if !pp.IsAPRS() {
 		var _, desc, _, _, _, ftype = pp.FrameType()
 
-		dw_printf("(%s)", desc)
+		fmt.Printf("(%s)", desc)
 
 		if ftype == ax25.FrameTypeUXID {
 			var _, info2text, _ = xid.Parse(pinfo)
-			dw_printf(" %s\n", info2text)
+			fmt.Printf(" %s\n", info2text)
 		} else {
 			ax25.SafePrint(pinfo, !pp.IsAPRS())
-			dw_printf("\n")
+			fmt.Println()
 		}
 	} else {
 		ax25.SafePrint(pinfo, !pp.IsAPRS())
-		dw_printf("\n")
+		fmt.Println()
 	}
 
 	pp.CheckAddresses(ax25.AddrStrict)
@@ -1062,10 +1057,9 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 	/* Optional hex dump of packet. */
 
 	if xs.debugXmitPacket {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("------\n")
+		fmt.Println("------")
 		pp.HexDump()
-		dw_printf("------\n")
+		fmt.Println("------")
 	}
 
 	/*
@@ -1081,8 +1075,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 		if float64(xs.p_modem.xmit_error_rate)/100.0 > r {
 			send_invalid_fcs2 = true
 
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Intentionally sending invalid CRC for frame above.  Xmit Error rate = %d per cent.\n", xs.p_modem.xmit_error_rate)
+			logrus.WithFields(logrus.Fields{"channel": c, "error_rate_percent": xs.p_modem.xmit_error_rate}).Info("Intentionally sending invalid CRC for frame above")
 		}
 	}
 
@@ -1124,12 +1117,10 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) 
 
 	var pinfo = pp.Info()
 
-	text_color_set(DW_COLOR_XMIT)
-	dw_printf("[%d.speech%s] \"%s\"\n", c, ts, string(pinfo))
+	fmt.Printf("[%d.speech%s] \"%s\"\n", c, ts, string(pinfo))
 
 	if xs.p_modem.tts_script == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Text-to-speech script has not been configured.\n")
+		logrus.WithField("channel", c).Error("Text-to-speech script has not been configured")
 
 		return
 	}
@@ -1167,13 +1158,13 @@ func xmit_speak_it(ctx context.Context, script string, c int, msg string) error 
 
 	var err = cmd.Run()
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Failed to run text-to-speech script, %s\n", script)
-
 		var cwd, _ = os.Getwd()
-		dw_printf("CWD = %s\n", cwd)
 
-		dw_printf("PATH = %s\n", os.Getenv("PATH"))
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"script": script,
+			"cwd":    cwd,
+			"path":   os.Getenv("PATH"),
+		}).Error("Failed to run text-to-speech script")
 	}
 
 	return (err)
@@ -1216,8 +1207,7 @@ func (xs *XmitService) xmit_morse(c int, pp *ax25.Packet, wpm int) {
 
 	var pinfo = pp.Info()
 
-	text_color_set(DW_COLOR_XMIT)
-	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, string(pinfo))
+	fmt.Printf("[%d.morse%s] \"%s\"\n", c, ts, string(pinfo))
 
 	xs.keyPTT(c, true)
 	var start_ptt = time.Now()
@@ -1293,8 +1283,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 
 	var pinfo = pp.Info()
 
-	text_color_set(DW_COLOR_XMIT)
-	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, string(pinfo))
+	fmt.Printf("[%d.dtmf%s] \"%s\"\n", c, ts, string(pinfo))
 
 	xs.keyPTT(c, true)
 	var start_ptt = time.Now()
@@ -1313,8 +1302,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *ax25.Packet, speed int) {
 	if timeToWait.Milliseconds() > 0 {
 		time.Sleep(timeToWait)
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Oops.  CPU too slow to keep up with DTMF generation.\n")
+		logrus.WithField("channel", c).Error("CPU too slow to keep up with DTMF generation")
 	}
 
 	xs.keyPTT(c, false)
