@@ -189,10 +189,6 @@ type demodulator_state_s struct {
 		// Used to look for transitions.
 		prev_demod_out_f float64
 
-		/* This is used only for "9600" baud data. */
-
-		lfsr int // Descrambler shift register.
-
 		// This is for detecting phase lock to incoming signal.
 
 		good_flag byte // Set if transition is near where expected,
