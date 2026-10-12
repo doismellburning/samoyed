@@ -21,9 +21,25 @@ import (
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/doismellburning/samoyed/internal/xid"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// captureXmitLog runs f and returns what it logged, with whatever it printed
+// to stdout alongside.
+func captureXmitLog(t *testing.T, f func()) string {
+	t.Helper()
+
+	return testutils.CaptureOutput(t, func() {
+		var oldLogOutput = logrus.StandardLogger().Out
+		logrus.SetOutput(os.Stdout)
+
+		defer logrus.SetOutput(oldLogOutput)
+
+		f()
+	})
+}
 
 // wait_for_clear_channel locks the audio output device on success, and it is
 // xmit_next's job to release it again.  An empty queue means there is nothing
@@ -507,7 +523,7 @@ func TestSendOneFrameDeliberateBadFCS(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
+	var output = captureXmitLog(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
 
 	assert.Contains(t, output, "Intentionally sending invalid CRC")
 }
@@ -661,7 +677,7 @@ func TestXmitSpeechWithoutAScript(t *testing.T) {
 	var pp = ax25.FromText("Q1TEST>SPEECH:Hello there", true)
 	require.NotNil(t, pp)
 
-	var output = testutils.CaptureOutput(t, func() { xs.xmit_speech(t.Context(), 0, pp) })
+	var output = captureXmitLog(t, func() { xs.xmit_speech(t.Context(), 0, pp) })
 
 	assert.Contains(t, output, "Text-to-speech script has not been configured")
 }
@@ -673,13 +689,13 @@ func TestXmitSpeechWithoutAScript(t *testing.T) {
 func TestXmitSpeakItScriptFails(t *testing.T) {
 	var err error
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureXmitLog(t, func() {
 		err = xmit_speak_it(t.Context(), filepath.Join(t.TempDir(), "no-such-script"), 0, "hello")
 	})
 
 	require.Error(t, err)
 	assert.Contains(t, output, "Failed to run text-to-speech script")
-	assert.Contains(t, output, "PATH = ")
+	assert.Contains(t, output, "path=")
 }
 
 // An APRS frame being digipeated gets a transmission to itself, which is what
@@ -782,7 +798,7 @@ func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
 	go func() {
 		defer close(stopped)
 
-		output = testutils.CaptureOutput(t, func() { xs.xmit_until_empty(ctx, 0) })
+		output = captureXmitLog(t, func() { xs.xmit_until_empty(ctx, 0) })
 	}()
 
 	// Give it time to get into the first slot's wait, so that the
