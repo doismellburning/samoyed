@@ -5,7 +5,8 @@ package announce
 
 /*------------------------------------------------------------------
  *
- * Purpose:   	Announce the KISS over TCP service using DNS-SD
+ * Purpose:   	Announce the KISS over TCP service, and the others we
+ *		listen for, using DNS-SD
  *
  * Description:
  *
