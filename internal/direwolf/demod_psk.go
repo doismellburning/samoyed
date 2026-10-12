@@ -66,6 +66,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dsp"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
 )
 
 var DCD_CONFIG_PSK = &DCDConfig{
@@ -179,8 +180,10 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		default: //nolint: gocritic
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid demodulator profile %c for BPSK.  Valid choices are L, M, N, O.  Using default.\n", profile)
+			logrus.WithFields(logrus.Fields{
+				"profile": string(profile),
+				"valid":   "L, M, N, O",
+			}).Error("Invalid demodulator profile for BPSK, using default")
 
 			fallthrough
 
@@ -255,8 +258,10 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		default: //nolint: gocritic
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid demodulator profile %c for v.26 QPSK.  Valid choices are P, Q, R, S.  Using default.\n", profile)
+			logrus.WithFields(logrus.Fields{
+				"profile": string(profile),
+				"valid":   "P, Q, R, S",
+			}).Error("Invalid demodulator profile for v.26 QPSK, using default")
 
 			fallthrough
 
@@ -338,8 +343,10 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		default: //nolint: gocritic
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid demodulator profile %c for v.27 8PSK.  Valid choices are T, U, V, W.  Using default.\n", profile)
+			logrus.WithFields(logrus.Fields{
+				"profile": string(profile),
+				"valid":   "T, U, V, W",
+			}).Error("Invalid demodulator profile for v.27 8PSK, using default")
 
 			fallthrough
 
@@ -448,29 +455,26 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 	TUNE("TUNE_LP_FILTER_TAPS", D.u.psk.lp_filter_taps, "lp_filter_taps (FIR)", "%d")
 
 	if D.u.psk.pre_filter_taps > MAX_FILTER_SIZE {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Calculated pre filter size of %d is too large.\n", D.u.psk.pre_filter_taps)
-		dw_printf("Decrease the audio sample rate or increase the baud rate or\n")
-		dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n",
-			MAX_FILTER_SIZE)
+		logrus.WithFields(logrus.Fields{
+			"size":            D.u.psk.pre_filter_taps,
+			"max_filter_size": MAX_FILTER_SIZE,
+		}).Error("Calculated pre filter size is too large; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE")
 		os.Exit(1)
 	}
 
 	if D.u.psk.delay_line_taps > MAX_FILTER_SIZE {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Calculated delay line size of %d is too large.\n", D.u.psk.delay_line_taps)
-		dw_printf("Decrease the audio sample rate or increase the baud rate or\n")
-		dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n",
-			MAX_FILTER_SIZE)
+		logrus.WithFields(logrus.Fields{
+			"size":            D.u.psk.delay_line_taps,
+			"max_filter_size": MAX_FILTER_SIZE,
+		}).Error("Calculated delay line size is too large; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE")
 		os.Exit(1)
 	}
 
 	if D.u.psk.lp_filter_taps > MAX_FILTER_SIZE {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Calculated low pass filter size of %d is too large.\n", D.u.psk.lp_filter_taps)
-		dw_printf("Decrease the audio sample rate or increase the baud rate or\n")
-		dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n",
-			MAX_FILTER_SIZE)
+		logrus.WithFields(logrus.Fields{
+			"size":            D.u.psk.lp_filter_taps,
+			"max_filter_size": MAX_FILTER_SIZE,
+		}).Error("Calculated low pass filter size is too large; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE")
 		os.Exit(1)
 	}
 
@@ -492,8 +496,10 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			#endif
 		*/
 		if f1 <= 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Prefilter of %.0f to %.0f Hz doesn't make sense.\n", f1, f2)
+			logrus.WithFields(logrus.Fields{
+				"low_hz":  math.Round(f1),
+				"high_hz": math.Round(f2),
+			}).Error("Prefilter range doesn't make sense")
 			f1 = 10
 		}
 
