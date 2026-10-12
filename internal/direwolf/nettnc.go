@@ -281,23 +281,35 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 			for j := range n {
 				// Separate the byte stream into KISS frame(s) and make it
 				// look like this came from a radio channel.
-				nettncRecByte(&kstate, buf[j], nt.debug, channel, nt.recFrame)
+				tncRecByte(&kstate, buf[j], nt.debug, channel, netTNC(), nt.recFrame)
 			}
 		} // nt.sock != nil
 	} // until cancelled
 }
 
-// nettncRecByte takes one byte from a KISS network TNC, and passes each frame
+// kissTNC says which sort of external KISS TNC tncRecByte is reading from.
+type kissTNC struct {
+	source   dwcore.SourceKind // What its frames are received as coming from.
+	name     string            // As messages name it.
+	spectrum string            // As the received queue shows it.
+}
+
+// netTNC describes a KISS TNC reached over TCP, for NCHANNEL.
+func netTNC() kissTNC {
+	return kissTNC{source: dwcore.SourceNetTNC, name: "network TNC", spectrum: "Network TNC"}
+}
+
+// tncRecByte takes one byte from an external KISS TNC, and passes each frame
 // it completes to recFrame - as though it came from a radio channel, the one
-// the network TNC is attached to, whatever channel the frame itself names.
+// the TNC is attached to, whatever channel the frame itself names.
 // Anything outside a frame is not ours to answer, so it's ignored.  With no
 // recFrame, frames are dropped.
-func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int, recFrame frameReceiver) {
+func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC, recFrame frameReceiver) {
 	var chunk = kc.Add(b)
 
 	if chunk.Err != nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS frame from network TNC exceeded maximum length.  Discarding it.\n")
+		dw_printf("KISS frame from %s exceeded maximum length.  Discarding it.\n", tnc.name)
 
 		return
 	}
@@ -307,9 +319,9 @@ func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int, recFrame 
 	}
 
 	if debug > 0 {
-		/* As received over the wire from network TNC. */
+		/* As received over the wire from the TNC. */
 		// May include escapted characters.  What about FEND?
-		// FIXME: make it say Network TNC.
+		// FIXME: make it say which TNC.
 		kiss_debug_print(FROM_CLIENT, "", chunk.Frame)
 	}
 
@@ -318,7 +330,7 @@ func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int, recFrame 
 	if len(unwrapped) == 0 {
 		// FEND FESC FEND, say: no type byte, so nothing to pass on.
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS frame from network TNC has nothing in it once unescaped.  Ignoring it.\n")
+		dw_printf("KISS frame from %s has nothing in it once unescaped.  Ignoring it.\n", tnc.name)
 
 		return
 	}
@@ -334,19 +346,18 @@ func nettncRecByte(kc *kiss.Collector, b byte, debug int, channel int, recFrame 
 	}
 
 	// Convert to packet object and send to received packet queue.
-	// Note that we use channel associated with the network TNC, not channel in KISS frame.
+	// Note that we use channel associated with the TNC, not channel in KISS frame.
 
 	var alevel ax25.ALevel
 	var pp = ax25.FromFrame(unwrapped[1:], alevel)
 
 	if pp != nil {
-		var spectrum = "Network TNC"
 		if recFrame != nil {
-			recFrame(dwcore.ChannelSource(dwcore.SourceNetTNC, channel), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, spectrum)
+			recFrame(dwcore.ChannelSource(tnc.source, channel), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, tnc.spectrum)
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Failed to create packet object for KISS frame from channel %d network TNC.\n", channel)
+		dw_printf("Failed to create packet object for KISS frame from channel %d %s.\n", channel, tnc.name)
 	}
 }
 
