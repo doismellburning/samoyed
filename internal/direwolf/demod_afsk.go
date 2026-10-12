@@ -748,7 +748,7 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 		// below), so the HDLC receiver never sees a symbol count above 0 and
 		// records a speed error of 0, as Dire Wolf does for AFSK.
 		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
-		D.receiver.RecBitNew(from, dwutil.IfThenElse(demod_out > 0, 1, 0), false,
+		D.receiver.RecBit(from, dwutil.IfThenElse(demod_out > 0, 1, 0), false,
 			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		pll_dcd_each_symbol2(DCD_CONFIG_AFSK, D, channel, subchannel, slice)
 	}
