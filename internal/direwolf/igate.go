@@ -524,8 +524,7 @@ func (ig *IGate) connectThread(ctx context.Context) {
 			ig.updateStats(func(s *igateStats) { s.connectedAt = time.Now() })
 
 			if connErr != nil {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("Connect to IGate server %s failed.\n\n", server_name)
+				logrus.WithError(connErr).WithField("server", server_name).Info("Connect to IGate server failed")
 
 				if !dwutil.SleepCtx(ctx, ig.retryInterval) {
 					return
@@ -534,14 +533,15 @@ func (ig *IGate) connectThread(ctx context.Context) {
 				continue
 			} else {
 				/* Success. */
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("\nNow connected to IGate server %s\n", server_name)
-
+				var statusURL = "http://" + server_name + ":14501"
 				if strings.Contains(server_name, ":") {
-					dw_printf("Check server status here http://[%s]:14501\n\n", server_name)
-				} else {
-					dw_printf("Check server status here http://%s:14501\n\n", server_name)
+					statusURL = "http://[" + server_name + "]:14501"
 				}
+
+				logrus.WithFields(logrus.Fields{
+					"server":     server_name,
+					"status_url": statusURL,
+				}).Info("Now connected to IGate server")
 
 				/*
 				 * Set ig.sock so everyone else can start using it.
@@ -658,8 +658,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 		ig.digiConfig.FilterStr[channel][MAX_TOTAL_CHANS] != "" {
 		var result, err = ig.filter.Filter(channel, MAX_TOTAL_CHANS, ig.digiConfig.FilterStr[channel][MAX_TOTAL_CHANS], recv_pp, true)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s\n", err)
+			logrus.WithError(err).WithField("channel", channel).Error("Rx IGate filter failed")
 		}
 
 		if result != 1 {
@@ -667,8 +666,10 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 			// Originally this was always printed but there was a request to add a "quiet" option to suppress this.
 			// version 1.4: Instead, make the default off and activate it only with the debug igate option.
 			if ig.debugLevel >= 1 {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("Packet from channel %d to IGate was rejected by filter: %s\n", channel, ig.digiConfig.FilterStr[channel][MAX_TOTAL_CHANS])
+				logrus.WithFields(logrus.Fields{
+					"channel": channel,
+					"filter":  ig.digiConfig.FilterStr[channel][MAX_TOTAL_CHANS],
+				}).Debug("Packet to IGate rejected by filter")
 			}
 
 			return
@@ -694,8 +695,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 				via == "RFONLY" ||
 				via == "NOGATE" {
 				if ig.debugLevel >= 1 {
-					text_color_set(DW_COLOR_DEBUG)
-					dw_printf("Rx IGate: Do not relay with %s in path.\n", via)
+					logrus.WithField("via", via).Debug("Rx IGate: Do not relay, via path forbids it")
 				}
 
 				return
@@ -703,8 +703,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 		}
 
 		if ig.debugLevel >= 1 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Rx IGate: Unwrap third party message.\n")
+			logrus.Debug("Rx IGate: Unwrap third party message")
 		}
 
 		var inner_pp = pp.UnwrapThirdParty()
@@ -727,8 +726,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 			via == "RFONLY" ||
 			via == "NOGATE" {
 			if ig.debugLevel >= 1 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Rx IGate: Do not relay with %s in path.\n", via)
+				logrus.WithField("via", via).Debug("Rx IGate: Do not relay, via path forbids it")
 			}
 
 			return
@@ -741,8 +739,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 	 */
 	if pp.DTI() == '?' {
 		if ig.debugLevel >= 1 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Rx IGate: Do not relay generic query.\n")
+			logrus.Debug("Rx IGate: Do not relay generic query")
 		}
 
 		return
@@ -757,8 +754,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 
 	if pp.CutAtCRLF() > 0 {
 		if ig.debugLevel >= 1 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Rx IGate: Truncated information part at CR.\n")
+			logrus.Debug("Rx IGate: Truncated information part at CR")
 		}
 	}
 
@@ -769,8 +765,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 	 */
 	if len(pinfo) == 0 {
 		if ig.debugLevel >= 1 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Rx IGate: Information part length is zero.\n")
+			logrus.Debug("Rx IGate: Information part length is zero")
 		}
 
 		return
@@ -827,8 +822,7 @@ func (ig *IGate) sendPacketToServer(conn net.Conn, pp *ax25.Packet, channel int)
 
 	if !ig.rxToIgAllow(pp) {
 		if ig.debugLevel >= 1 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Rx IGate: Drop duplicate of same packet seen recently.\n")
+			logrus.Debug("Rx IGate: Drop duplicate of same packet seen recently")
 		}
 
 		return
@@ -993,18 +987,18 @@ func (ig *IGate) sendMsgToServer(conn net.Conn, imsg string) bool {
 	*/
 
 	if ig.debugLevel >= 1 {
-		text_color_set(DW_COLOR_XMIT)
-		dw_printf("[rx>ig] ")
+		// ax25.SafePrint writes straight to stdout, so the rest of the
+		// monitor line goes there too to keep it in one piece.
+		fmt.Print("[rx>ig] ")
 		ax25.SafePrint([]byte(imsg), false)
-		dw_printf("\n")
+		fmt.Println()
 	}
 
 	imsg += "\r\n"
 
 	var _, err = conn.Write([]byte(imsg)) // TODO KG Should imsg just be a []byte?
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError sending to IGate server.  Closing connection.\n\n")
+		logrus.WithError(err).Error("Error sending to IGate server, closing connection")
 		ig.dropConnection(conn)
 
 		return false
@@ -1052,7 +1046,7 @@ func (ig *IGate) get1ch(ctx context.Context) (byte, bool) {
 		var stopClose = dwutil.CloseOnDone(ctx, conn)
 
 		var ch = make([]byte, 1)
-		var n, _ = conn.Read(ch)
+		var n, err = conn.Read(ch)
 
 		stopClose()
 
@@ -1071,8 +1065,7 @@ func (ig *IGate) get1ch(ctx context.Context) (byte, bool) {
 			return ch[0], true
 		}
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError reading from IGate server.  Closing connection.\n\n")
+		logrus.WithError(err).Error("Error reading from IGate server, closing connection")
 		ig.dropConnection(conn)
 	}
 
@@ -1218,10 +1211,9 @@ func (ig *IGate) processServerLine(message []byte) {
 		 * be bothered by the heart beat messages.
 		 */
 		if _, okToSend := ig.connection(); !okToSend {
-			text_color_set(DW_COLOR_REC)
-			dw_printf("[ig] ")
+			fmt.Print("[ig] ")
 			ax25.SafePrint(message, false)
-			dw_printf("\n")
+			fmt.Println()
 		}
 	} else {
 		/*
@@ -1231,16 +1223,13 @@ func (ig *IGate) processServerLine(message []byte) {
 		 * channels, each with own client side filtering and via path.
 		 * If so, loop here over all configured channels.
 		 */
-		text_color_set(DW_COLOR_REC)
-		dw_printf("\n[ig>tx] ") // formerly just [ig]
+		fmt.Print("\n[ig>tx] ") // formerly just [ig]
 		ax25.SafePrint(message, false)
-		dw_printf("\n")
+		fmt.Println()
 
 		if bytes.Contains(message, []byte{0}) {
 			// Invalid.  Either drop it or pass it along as-is.  Don't change.
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("'nul' character found in packet from IS.  This should never happen.\n")
-			dw_printf("The source station is probably transmitting with defective software.\n")
+			logrus.Error("'nul' character found in packet from IS, the source station is probably transmitting with defective software")
 
 			//if (strcmp((char*)pinfo, "4P") == 0) {
 			//  dw_printf("The TM-D710 will do this intermittently.  A firmware upgrade is needed to fix it.\n");
@@ -1308,9 +1297,10 @@ func (ig *IGate) processServerLine(message []byte) {
 					ig.recFrame(dwcore.ChannelSource(dwcore.SourceAPRSIS, ichan), pp3, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, spectrum)
 				}
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("ICHANNEL %d: Could not parse message from APRS-IS server.\n", ichan)
-				dw_printf("%s\n", message)
+				logrus.WithFields(logrus.Fields{
+					"ichannel": ichan,
+					"message":  string(message),
+				}).Error("Could not parse message from APRS-IS server")
 			}
 		} // end ICHANNEL option
 	}
@@ -1352,10 +1342,9 @@ func (ig *IGate) processServerLine(message []byte) {
  *
  *--------------------------------------------------------------------*/
 
-func (ig *IGate) satgateDelayPacket(pp *ax25.Packet, channel int) { //nolint:unparam
+func (ig *IGate) satgateDelayPacket(pp *ax25.Packet, channel int) {
 	//if (ig.debugLevel >= 1) {
-	text_color_set(DW_COLOR_INFO)
-	dw_printf("Rx IGate: SATgate mode, delay packet heard directly.\n")
+	logrus.WithField("channel", channel).Info("Rx IGate: SATgate mode, delay packet heard directly")
 	//}
 
 	pp.SetReleaseTime(time.Now().Add(time.Duration(ig.config.satgate_delay) * time.Second))
@@ -1532,9 +1521,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	 */
 	var pp3 = ax25.FromText(string(message), false)
 	if pp3 == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Tx IGate: Could not parse message from server.\n")
-		dw_printf("%s\n", message)
+		logrus.WithField("message", string(message)).Error("Tx IGate: Could not parse message from server")
 
 		return
 	}
@@ -1564,8 +1551,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 			via == "RFONLY" ||
 			via == "NOGATE" {
 			if ig.debugLevel >= 1 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Tx IGate: Do not transmit with %s in path.\n", via)
+				logrus.WithField("via", via).Debug("Tx IGate: Do not transmit, via path forbids it")
 			}
 
 			return
@@ -1615,8 +1601,10 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 			msp_special_case = true
 
 			if ig.debugLevel >= 1 {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("Special case, allow position from message sender %s, %d remaining.\n", src, n-1)
+				logrus.WithFields(logrus.Fields{
+					"source":    string(src),
+					"remaining": n - 1,
+				}).Debug("Tx IGate: Special case, allow position from message sender")
 			}
 
 			ig.heard.SetMSP(string(src), n-1)
@@ -1627,8 +1615,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 		if ig.digiConfig.FilterStr[MAX_TOTAL_CHANS][to_chan] != "" {
 			var result, err = ig.filter.Filter(MAX_TOTAL_CHANS, to_chan, ig.digiConfig.FilterStr[MAX_TOTAL_CHANS][to_chan], pp3, true)
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("%s\n", err)
+				logrus.WithError(err).WithField("channel", to_chan).Error("Tx IGate filter failed")
 			}
 
 			if result != 1 {
@@ -1735,11 +1722,10 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 
 			ig.igToTxRemember(pp3, ig.config.tx_chan, 0) // correct. version before encapsulating it.
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Received invalid packet from IGate.\n")
-			dw_printf("%s\n", payload)
-			dw_printf("Will not attempt to transmit third party packet.\n")
-			dw_printf("%s\n", radio)
+			logrus.WithFields(logrus.Fields{
+				"payload": payload,
+				"radio":   radio,
+			}).Error("Received invalid packet from IGate, will not attempt to transmit third party packet")
 		}
 	}
 } /* end maybeXmitPacketFromIGate */
@@ -1856,12 +1842,12 @@ func (ig *IGate) rxToIgRemember(pp *ax25.Packet) {
 		var dest = pp.AddrWithSSID(ax25.Destination)
 		var pinfo = pp.Info()
 
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("rx_to_ig_remember [%d] = %s %d \"%s>%s:%s\"\n",
-			ig.rx2ig.insertNext,
-			ig.rx2ig.entries[ig.rx2ig.insertNext].timeStamp.String(),
-			ig.rx2ig.entries[ig.rx2ig.insertNext].checksum,
-			src, dest, string(pinfo))
+		logrus.WithFields(logrus.Fields{
+			"index":     ig.rx2ig.insertNext,
+			"timestamp": ig.rx2ig.entries[ig.rx2ig.insertNext].timeStamp,
+			"crc":       ig.rx2ig.entries[ig.rx2ig.insertNext].checksum,
+			"packet":    src + ">" + dest + ":" + string(pinfo),
+		}).Debug("rx_to_ig_remember")
 	}
 
 	ig.rx2ig.insertNext++
@@ -1879,16 +1865,17 @@ func (ig *IGate) rxToIgAllow(pp *ax25.Packet) bool {
 		var dest = pp.AddrWithSSID(ax25.Destination)
 		var pinfo = pp.Info()
 
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("rx_to_ig_allow? %d \"%s>%s:%s\"\n", crc, src, dest, string(pinfo))
+		logrus.WithFields(logrus.Fields{
+			"crc":    crc,
+			"packet": src + ">" + dest + ":" + string(pinfo),
+		}).Debug("rx_to_ig_allow?")
 	}
 
 	// Do we have duplicate checking at all in the RF>IS direction?
 
 	if ig.config.rx2ig_dedupe_time == 0 {
 		if ig.debugLevel >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("rx_to_ig_allow? YES, no dedupe checking\n")
+			logrus.Debug("rx_to_ig_allow? YES, no dedupe checking")
 		}
 
 		return true
@@ -1902,9 +1889,8 @@ func (ig *IGate) rxToIgAllow(pp *ax25.Packet) bool {
 	for j := range RX2IG_HISTORY_MAX {
 		if ig.rx2ig.entries[j].checksum == int(crc) && !ig.rx2ig.entries[j].timeStamp.Before(now.Add(-time.Duration(ig.config.rx2ig_dedupe_time)*time.Second)) {
 			if ig.debugLevel >= 2 {
-				text_color_set(DW_COLOR_DEBUG)
 				// could be multiple entries and this might not be the most recent.
-				dw_printf("rx_to_ig_allow? NO. Seen %d seconds ago.\n", int(time.Since(ig.rx2ig.entries[j].timeStamp).Seconds()))
+				logrus.WithField("seconds_ago", int(time.Since(ig.rx2ig.entries[j].timeStamp).Seconds())).Debug("rx_to_ig_allow? NO, seen recently")
 			}
 
 			return false
@@ -1912,8 +1898,7 @@ func (ig *IGate) rxToIgAllow(pp *ax25.Packet) bool {
 	}
 
 	if ig.debugLevel >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("rx_to_ig_allow? YES\n")
+		logrus.Debug("rx_to_ig_allow? YES")
 	}
 
 	return true
@@ -2173,12 +2158,14 @@ func (ig *IGate) igToTxRemember(pp *ax25.Packet, channel int, bydigi int) {
 		var dest = pp.AddrWithSSID(ax25.Destination)
 		var pinfo = pp.Info()
 
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("ig_to_tx_remember [%d] = ch%d d%d %s %d \"%s>%s:%s\"\n",
-			ig.ig2tx.insertNext,
-			channel, bydigi,
-			now.String(), crc,
-			src, dest, string(pinfo))
+		logrus.WithFields(logrus.Fields{
+			"index":     ig.ig2tx.insertNext,
+			"channel":   channel,
+			"bydigi":    bydigi,
+			"timestamp": now,
+			"crc":       crc,
+			"packet":    src + ">" + dest + ":" + string(pinfo),
+		}).Debug("ig_to_tx_remember")
 	}
 
 	ig.ig2tx.entries[ig.ig2tx.insertNext].timeStamp = now
@@ -2202,8 +2189,11 @@ func (ig *IGate) igToTxAllow(pp *ax25.Packet, channel int) bool {
 		var src = pp.AddrWithSSID(ax25.Source)
 		var dest = pp.AddrWithSSID(ax25.Destination)
 
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("ig_to_tx_allow? ch%d %d \"%s>%s:%s\"\n", channel, crc, src, dest, string(pinfo))
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"crc":     crc,
+			"packet":  src + ">" + dest + ":" + string(pinfo),
+		}).Debug("ig_to_tx_allow?")
 	}
 
 	ig.ig2tx.mu.Lock()
@@ -2220,19 +2210,22 @@ func (ig *IGate) igToTxAllow(pp *ax25.Packet, channel int) bool {
 				/* Station X then sends exactly the same thing 20 seconds later.  */
 				/* We don't want to suppress the retry. */
 				if ig.debugLevel >= 2 {
-					text_color_set(DW_COLOR_DEBUG)
-					dw_printf("ig_to_tx_allow? Yes for duplicate message sent %d seconds ago. bydigi=%d\n", int(time.Since(ig.ig2tx.entries[j].timeStamp).Seconds()), ig.ig2tx.entries[j].bydigi)
+					logrus.WithFields(logrus.Fields{
+						"seconds_ago": int(time.Since(ig.ig2tx.entries[j].timeStamp).Seconds()),
+						"bydigi":      ig.ig2tx.entries[j].bydigi,
+					}).Debug("ig_to_tx_allow? YES for duplicate message")
 				}
 			} else {
 				/* Normal (non-message) case. */
 				if ig.debugLevel >= 2 {
-					text_color_set(DW_COLOR_DEBUG)
 					// could be multiple entries and this might not be the most recent.
-					dw_printf("ig_to_tx_allow? NO. Duplicate sent %d seconds ago. bydigi=%d\n", int(time.Since(ig.ig2tx.entries[j].timeStamp).Seconds()), ig.ig2tx.entries[j].bydigi)
+					logrus.WithFields(logrus.Fields{
+						"seconds_ago": int(time.Since(ig.ig2tx.entries[j].timeStamp).Seconds()),
+						"bydigi":      ig.ig2tx.entries[j].bydigi,
+					}).Debug("ig_to_tx_allow? NO, duplicate sent recently")
 				}
 
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("Tx IGate: Drop duplicate packet transmitted recently.\n")
+				logrus.WithField("channel", channel).Info("Tx IGate: Drop duplicate packet transmitted recently")
 
 				return false
 			}
@@ -2270,22 +2263,25 @@ func (ig *IGate) igToTxAllow(pp *ax25.Packet, channel int) bool {
 	}
 
 	if count_1 >= ig.config.tx_limit_1*increase_limit {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Tx IGate: Already transmitted maximum of %d packets in 1 minute.\n", ig.config.tx_limit_1)
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"limit":   ig.config.tx_limit_1,
+		}).Error("Tx IGate: Already transmitted maximum packets in 1 minute")
 
 		return false
 	}
 
 	if count_5 >= ig.config.tx_limit_5*increase_limit {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Tx IGate: Already transmitted maximum of %d packets in 5 minutes.\n", ig.config.tx_limit_5)
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"limit":   ig.config.tx_limit_5,
+		}).Error("Tx IGate: Already transmitted maximum packets in 5 minutes")
 
 		return false
 	}
 
 	if ig.debugLevel >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("ig_to_tx_allow? YES\n")
+		logrus.Debug("ig_to_tx_allow? YES")
 	}
 
 	return true
