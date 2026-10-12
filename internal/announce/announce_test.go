@@ -70,7 +70,7 @@ func TestDNSSDAnnounceLogsService(t *testing.T) {
 	requireMDNSSockets(t)
 
 	var entry = announceLogged(t, "DNS-SD: Announcing", func() {
-		Announce(cancelledContext(t), []Service{{Name: "Q1TEST TNC", Type: KISSType, Port: 8001}})
+		Announce(cancelledContext(t), []Service{{Name: "Q1TEST TNC", Type: KISSType, Port: 8001, Text: nil}})
 	})
 
 	assert.Equal(t, logrus.InfoLevel, entry.Level)
@@ -89,8 +89,8 @@ func TestDNSSDAnnounceSeveralServices(t *testing.T) {
 	t.Cleanup(hook.Reset)
 
 	Announce(cancelledContext(t), []Service{
-		{Name: "Q1TEST TNC", Type: KISSType, Port: 8001},
-		{Name: "Q1TEST TNC (port 8002)", Type: KISSType, Port: 8002},
+		{Name: "Q1TEST TNC", Type: KISSType, Port: 8001, Text: nil},
+		{Name: "Q1TEST TNC (port 8002)", Type: KISSType, Port: 8002, Text: nil},
 	})
 
 	var ports []any
@@ -113,7 +113,7 @@ func TestDNSSDAnnounceRejectsPortZero(t *testing.T) {
 	var hook = test.NewGlobal()
 	t.Cleanup(hook.Reset)
 
-	Announce(cancelledContext(t), []Service{{Name: "Q1TEST TNC", Type: KISSType, Port: 0}})
+	Announce(cancelledContext(t), []Service{{Name: "Q1TEST TNC", Type: KISSType, Port: 0, Text: nil}})
 
 	var entries = hook.AllEntries()
 	require.Len(t, entries, 1)

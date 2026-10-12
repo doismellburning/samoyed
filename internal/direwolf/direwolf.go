@@ -717,6 +717,11 @@ x = Silence FX.25 information.`)
 		ports.KISS = misc_config.kiss_port[:]
 		ports.AGW = misc_config.agwpe_port
 
+		// Only if it started: webui_init hands back no hub if it didn't.
+		if webHub != nil {
+			ports.Web = misc_config.web_port
+		}
+
 		announce.Announce(ctx, announce.Services(misc_config.dns_sd_name, ports))
 	}
 

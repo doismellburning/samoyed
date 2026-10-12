@@ -10,6 +10,7 @@ import "fmt"
 type Ports struct {
 	KISS []int
 	AGW  int
+	Web  int
 }
 
 // Services lists what there is to announce on ports, as name, or as
@@ -36,11 +37,15 @@ func Services(name string, ports *Ports) []Service {
 			kissName = fmt.Sprintf("%s (port %d)", name, port)
 		}
 
-		services = append(services, Service{Name: kissName, Type: KISSType, Port: port})
+		services = append(services, Service{Name: kissName, Type: KISSType, Port: port, Text: nil})
 	}
 
 	if ports.AGW != 0 {
-		services = append(services, Service{Name: name, Type: AGWType, Port: ports.AGW})
+		services = append(services, Service{Name: name, Type: AGWType, Port: ports.AGW, Text: nil})
+	}
+
+	if ports.Web != 0 {
+		services = append(services, Service{Name: name, Type: HTTPType, Port: ports.Web, Text: map[string]string{"path": "/"}})
 	}
 
 	return services

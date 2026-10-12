@@ -16,7 +16,7 @@ func TestServicesKISS(t *testing.T) {
 	ports.KISS = []int{8001}
 
 	assert.Equal(t,
-		[]Service{{Name: "Q1TEST TNC", Type: KISSType, Port: 8001}},
+		[]Service{{Name: "Q1TEST TNC", Type: KISSType, Port: 8001, Text: nil}},
 		Services("Q1TEST TNC", ports))
 }
 
@@ -31,9 +31,9 @@ func TestServicesEveryKISSPort(t *testing.T) {
 
 	assert.Equal(t,
 		[]Service{
-			{Name: "Q1TEST TNC", Type: KISSType, Port: 8001},
-			{Name: "Q1TEST TNC (port 8002)", Type: KISSType, Port: 8002},
-			{Name: "Q1TEST TNC (port 8003)", Type: KISSType, Port: 8003},
+			{Name: "Q1TEST TNC", Type: KISSType, Port: 8001, Text: nil},
+			{Name: "Q1TEST TNC (port 8002)", Type: KISSType, Port: 8002, Text: nil},
+			{Name: "Q1TEST TNC (port 8003)", Type: KISSType, Port: 8003, Text: nil},
 		},
 		Services("Q1TEST TNC", ports))
 }
@@ -45,7 +45,20 @@ func TestServicesAGW(t *testing.T) {
 	ports.AGW = 8000
 
 	assert.Equal(t,
-		[]Service{{Name: "Q1TEST TNC", Type: AGWType, Port: 8000}},
+		[]Service{{Name: "Q1TEST TNC", Type: AGWType, Port: 8000, Text: nil}},
+		Services("Q1TEST TNC", ports))
+}
+
+// The web interface is announced as a web page, with the path a browser should
+// open in its TXT record.
+func TestServicesWeb(t *testing.T) {
+	t.Parallel()
+
+	var ports = new(Ports)
+	ports.Web = 8080
+
+	assert.Equal(t,
+		[]Service{{Name: "Q1TEST TNC", Type: HTTPType, Port: 8080, Text: map[string]string{"path": "/"}}},
 		Services("Q1TEST TNC", ports))
 }
 
@@ -69,6 +82,7 @@ func TestServicesSkipsUnusedPorts(t *testing.T) {
 	var ports = new(Ports)
 	ports.KISS = []int{0}
 	ports.AGW = 0
+	ports.Web = 0
 
 	assert.Empty(t, Services("Q1TEST TNC", ports))
 	assert.Empty(t, Services("Q1TEST TNC", new(Ports)))

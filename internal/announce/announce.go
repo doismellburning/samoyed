@@ -34,12 +34,17 @@ const KISSType = "_kiss-tnc._tcp"
 // Nothing is registered for it, so this is ours.
 const AGWType = "_agwpe._tcp"
 
+// HTTPType is the DNS-SD service type for a web page (RFC 6763 section 7).
+const HTTPType = "_http._tcp"
+
 // Service is one service to announce: an instance Name, unique among those of
-// its Type, and the Port it listens on.
+// its Type, the Port it listens on, and any key/value pairs to put in its TXT
+// record (such as the "path" of a web page).
 type Service struct {
 	Name string
 	Type string
 	Port int
+	Text map[string]string
 }
 
 // Announce announces services, until ctx is cancelled.  One that cannot be
@@ -63,6 +68,7 @@ func Announce(ctx context.Context, services []Service) {
 			Name: service.Name,
 			Type: service.Type,
 			Port: service.Port,
+			Text: service.Text,
 		}
 
 		var sv, svErr = dnssd.NewService(cfg)
