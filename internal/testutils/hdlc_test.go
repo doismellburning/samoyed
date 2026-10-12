@@ -13,6 +13,8 @@ import (
 // A zero after five ones is a stuffed one, whether the next bit is a one or
 // a zero, and the count starts again after it.
 func TestDestuffDropsTheZeroAfterFiveOnes(t *testing.T) {
+	t.Parallel()
+
 	var stuffed = []bool{true, true, true, true, true, false, true, true, true, true, true, false, false}
 
 	assert.Equal(t, []bool{true, true, true, true, true, true, true, true, true, true, false}, Destuff(stuffed))
@@ -20,6 +22,8 @@ func TestDestuffDropsTheZeroAfterFiveOnes(t *testing.T) {
 
 // A frame comes out from between its flags with the stuffing taken out.
 func TestHDLCFrameFromLevelsTakesTheFrameFromBetweenTheFlags(t *testing.T) {
+	t.Parallel()
+
 	// 0xff needs a stuffed zero after its fifth one.
 	var levels = LineLevels(func(line *linecode.Encoder) {
 		// The run of ones carries on from one byte to the next.

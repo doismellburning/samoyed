@@ -12,6 +12,8 @@ import (
 )
 
 func TestStuffProperties(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(t *rapid.T) {
 		var in = rapid.SliceOf(rapid.Byte()).Draw(t, "in")
 
@@ -43,6 +45,8 @@ func TestStuffProperties(t *testing.T) {
 //
 // which packs into 7e df fd 00.
 func TestStuffKnownAnswer(t *testing.T) {
+	t.Parallel()
+
 	var out, meaningful = Stuff([]byte{0xff}, 0)
 
 	assert.Equal(t, []byte{0x7e, 0xdf, 0xfd, 0x00}, out)
@@ -52,6 +56,8 @@ func TestStuffKnownAnswer(t *testing.T) {
 // FX.25 fills the rest of its codeblock with flags, as if the end flag
 // carried on repeating.
 func TestStuffPadsWithFlags(t *testing.T) {
+	t.Parallel()
+
 	var unpadded, meaningful = Stuff([]byte{0xff}, 0)
 	var padded, paddedMeaningful = Stuff([]byte{0xff}, 8)
 
@@ -65,6 +71,8 @@ func TestStuffPadsWithFlags(t *testing.T) {
 }
 
 func TestUnstuffRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(t *rapid.T) {
 		// An empty frame is only flags, which Unstuff skips over looking
 		// for the start of the frame.
@@ -85,6 +93,8 @@ func TestUnstuffRoundTrip(t *testing.T) {
 }
 
 func TestUnstuffSkipsExtraLeadingFlags(t *testing.T) {
+	t.Parallel()
+
 	var stuffed, _ = Stuff([]byte("Q1TEST"), 0)
 
 	var out, err = Unstuff(append([]byte{flag, flag}, stuffed...))
@@ -93,6 +103,8 @@ func TestUnstuffSkipsExtraLeadingFlags(t *testing.T) {
 }
 
 func TestUnstuffErrors(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name string
 		in   []byte
@@ -107,6 +119,8 @@ func TestUnstuffErrors(t *testing.T) {
 		{"only flags", []byte{flag, flag}, ErrNoEndFlag},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var out, err = Unstuff(tc.in)
 
 			require.ErrorIs(t, err, tc.want)

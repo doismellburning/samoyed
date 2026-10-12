@@ -12,6 +12,8 @@ import (
 )
 
 func Test_encode_aprs(t *testing.T) {
+	t.Parallel()
+
 	var result string
 
 	var noInt = maybe.Nothing[int]()

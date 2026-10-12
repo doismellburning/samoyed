@@ -18,6 +18,8 @@ import (
 // Test that decode_aprs does not panic on an AX.25 UI frame with an empty
 // information field, as sent by linbpq ID broadcasts (issue #504).
 func Test_decode_aprs_empty_info(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var pp = ax25.FromText("Q1TEST>ID:", true)
@@ -37,6 +39,8 @@ func Test_decode_aprs_empty_info(t *testing.T) {
 // and so was taken for a real position by everything downstream.  An unknown
 // longitude must stay unknown.
 func Test_decode_aprs_dao_does_not_invent_a_position(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var pp = ax25.FromText("Q1TEST>APRS:!4237.14N/xxxxx.83W-Hi!W99!", true)
@@ -57,6 +61,8 @@ func Test_decode_aprs_dao_does_not_invent_a_position(t *testing.T) {
 // anywhere other than decode_aprs (beacon.go does this) does not start out
 // claiming a position off the coast of Africa.
 func Test_decode_aprs_zero_value_has_no_position(t *testing.T) {
+	t.Parallel()
+
 	var A Decoded
 
 	assert.Equal(t, maybe.Nothing[float64](), A.Lat)
@@ -70,6 +76,8 @@ func Test_decode_aprs_zero_value_has_no_position(t *testing.T) {
 // program down with it - from a received packet, so anyone within earshot
 // could do it.  Each of these is truncated at a different point.
 func Test_decode_aprs_truncated_weather(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, info := range []string{
@@ -102,6 +110,8 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 // struct zeroed, so the weather was thrown away and the station type came out
 // as a hundred NUL bytes.
 func Test_decode_aprs_positionless_weather(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APRS:_10090556c220s004g005t077r000p000P000h50b09900wRSW", true), true)
@@ -117,6 +127,8 @@ func Test_decode_aprs_positionless_weather(t *testing.T) {
 // A positionless weather report with nothing after its timestamp has no
 // weather data to decode, and must say so rather than read off the end.
 func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, info := range []string{"_", "_1009", "_10090556", "_10090556c2"} {
@@ -129,6 +141,8 @@ func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
 // unknown, and must not be reported as a reading.  It used to come back as the
 // G_UNKNOWN sentinel, which every caller had to remember to test for.
 func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var known = aprsDecoder.Decode(ax25.FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g005t077r000p000P000h50b09900wRSW", true), true)
@@ -150,6 +164,8 @@ func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
 // speedMPH before it returns - the wind belongs on the weather line, not on
 // the location line - so the distinction has to be checked at getWeatherData.
 func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	// The field is there; it just has no value in it.
@@ -185,6 +201,8 @@ func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
 // live/killed indicator.  aprsItem used to walk off the end looking for one,
 // bringing the program down on a packet that arrived off the air.
 func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:)Zb00000Zb00001", true)
@@ -200,6 +218,8 @@ func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
 // The name is meant to be 3 to 9 characters.  One that isn't was an assertion
 // failure, which is to say a crash, rather than something to report.
 func Test_decode_aprs_item_with_short_name(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:)AB!4237.14N/07120.83W#", true)
@@ -215,6 +235,8 @@ func Test_decode_aprs_item_with_short_name(t *testing.T) {
 // An item that stops before its position has no position, rather than the
 // zeroed one binary.Decode leaves behind.
 func Test_decode_aprs_item_without_position(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:)ABCDE!", true)
@@ -231,6 +253,8 @@ func Test_decode_aprs_item_without_position(t *testing.T) {
 // - what the APRS-IS input and samoyed-decode_aprs both use - will accept a
 // shorter one, which used to be read off the end of the address.
 func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var pp = ax25.FromTextWithStrictness("Q1TEST>0:'0000000000000000000", ax25.AddrLenient)
@@ -248,6 +272,8 @@ func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
 // it got there, so 12 knots came out as 44.  The expected values are what Dire
 // Wolf's decode_aprs makes of the same packets.
 func Test_decode_aprs_mic_e_speed_and_course(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, tc := range []struct {
@@ -271,6 +297,8 @@ func Test_decode_aprs_mic_e_speed_and_course(t *testing.T) {
 // spec.  The base 91 sums used to be done in a byte, which wrapped, so every
 // one of these came out somewhere near the North Pole on the date line.
 func Test_decode_aprs_compressed_position(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, info := range []string{
@@ -303,6 +331,8 @@ func Test_decode_aprs_compressed_position(t *testing.T) {
 // The fields were read with C's "%4hx", which Go's fmt doesn't know, so
 // neither format ever gave any weather.
 func Test_decode_aprs_ultimeter(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, tc := range []struct {
@@ -338,6 +368,8 @@ func Test_decode_aprs_ultimeter(t *testing.T) {
 // position, but were only read along with a human-readable one, which is six
 // bytes longer than a compressed one - so a compressed object lost its name.
 func Test_decode_aprs_compressed_object(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:;Q2TEST   *092345z/5L!!<*e7>7P[", true), true)
@@ -354,6 +386,8 @@ func Test_decode_aprs_compressed_object(t *testing.T) {
 // that stopped short of a human-readable position used to be read as a
 // compressed one instead, which put it somewhere nobody mentioned.
 func Test_decode_aprs_short_position(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, info := range []string{
@@ -380,6 +414,8 @@ func Test_decode_aprs_short_position(t *testing.T) {
 // An ack and a rej are told apart by their subtype, which a rej used to share
 // with an ack.
 func Test_decode_aprs_ack_and_rej(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, tc := range []struct {
@@ -401,6 +437,8 @@ func Test_decode_aprs_ack_and_rej(t *testing.T) {
 // A position a hair short of a whole degree used to print as 59.99995 minutes
 // or more rounded up to 60, as "W 000°60.0000", rather than carried into the
 // degrees.  Floating point on arm64 lands a Maidenhead square's corner there.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_decode_aprs_print_carries_minutes(t *testing.T) {
 	var aprsDecoder = NewDecoderFromDataFiles()
 
@@ -418,6 +456,8 @@ func Test_decode_aprs_print_carries_minutes(t *testing.T) {
 // A course and speed extension can be the whole of the information field,
 // with nothing after it - and then there is no bearing and no NRQ to look at.
 func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var pp = ax25.FromTextWithStrictness("Q1TEST>APDW17:!0000.00N/00000.00W/000/000", ax25.AddrLenient)
@@ -434,6 +474,8 @@ func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
 // field that stops before them is user-defined data we know nothing about
 // rather than something to read off the end of.
 func Test_decode_aprs_user_defined_without_id(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var pp = ax25.FromTextWithStrictness("Q1TEST>APDW17:{", ax25.AddrLenient)
@@ -449,6 +491,8 @@ func Test_decode_aprs_user_defined_without_id(t *testing.T) {
 // number of fields, reading off the end of a shorter one (and never decoding a
 // well-formed footprint at all).
 func Test_decode_aprs_general_query_footprint(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:?APRS? 42.3714,-71.2083,0050", true)
@@ -465,6 +509,8 @@ func Test_decode_aprs_general_query_footprint(t *testing.T) {
 // A general query whose footprint is not three comma-separated fields is
 // rejected rather than read off the end (found by fuzzing).
 func Test_decode_aprs_general_query_short_footprint(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var pp = ax25.FromText("Q1TEST>APDW17:?APRS?0", true)
@@ -483,6 +529,8 @@ func Test_decode_aprs_general_query_short_footprint(t *testing.T) {
 // than the "ack"/"rej" they compare against - read off the end (found by
 // fuzzing).
 func Test_decode_aprs_short_message(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, tc := range []struct{ monitor, comment string }{
@@ -501,6 +549,8 @@ func Test_decode_aprs_short_message(t *testing.T) {
 
 // A quiet decode keeps its complaints to itself, but a malformed timestamp
 // used to be reported regardless.
+//
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func Test_decode_aprs_quiet_bad_timestamp(t *testing.T) {
 	var aprsDecoder = NewDecoderFromDataFiles()
 
@@ -522,6 +572,8 @@ func Test_decode_aprs_quiet_bad_timestamp(t *testing.T) {
 // Dire Wolf warned about a comment too long for its 256 byte buffer, but the
 // port measured against the still-empty comment string, so it warned about
 // every comment at all.
+//
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func Test_decode_aprs_comment_length_warning(t *testing.T) {
 	var aprsDecoder = NewDecoderFromDataFiles()
 
@@ -549,6 +601,8 @@ func Test_decode_aprs_comment_length_warning(t *testing.T) {
 // decoded it, for decoding that station's later telemetry data, and not by
 // any other Decoder.
 func Test_decode_aprs_telemetry_metadata_per_decoder(t *testing.T) {
+	t.Parallel()
+
 	var parm = ax25.FromText("Q1TEST>APRS::Q1TEST   :PARM.Volts", true)
 	var data = ax25.FromText("Q1TEST>APRS:T#005,199,000,255,073,123,01101001", true)
 
@@ -581,6 +635,8 @@ func assertMaybeInDelta(t *testing.T, want maybe.Maybe[float64], got maybe.Maybe
 // destination, and the rest in the first nine bytes of the information part.
 // Each of these varies one of them, valid or not.
 func Test_decode_aprs_mic_e(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var nothing = maybe.Nothing[float64]()
@@ -641,6 +697,8 @@ func Test_decode_aprs_mic_e(t *testing.T) {
 // The parts of a Mic-E report after the position: symbol, course, and the
 // altitude at the start of the comment.
 func Test_decode_aprs_mic_e_symbol_course_altitude(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>T2SP0W:`c_Vm6hk/`\"49}Q1TEST_%", true), true)
@@ -667,6 +725,8 @@ func Test_decode_aprs_mic_e_symbol_course_altitude(t *testing.T) {
 
 // The many things a "message" can be.
 func Test_decode_aprs_message(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, tc := range []struct {
@@ -735,6 +795,8 @@ func Test_decode_aprs_message(t *testing.T) {
 // Telemetry metadata is sent as messages to the station it describes, and
 // shapes how that station's telemetry is shown from then on.
 func Test_decode_aprs_telemetry_metadata(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, tc := range []struct {
@@ -766,6 +828,8 @@ func Test_decode_aprs_telemetry_metadata(t *testing.T) {
 // Raw NMEA sentences straight from a GPS receiver.  Only RMC and GGA carry a
 // position for us; anything else is just data of an unknown type.
 func Test_decode_aprs_raw_nmea(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:$GPRMC,063909,A,3349.4302,N,11700.3721,W,43.022,89.3,291099,13.6,E*52", true), true)
@@ -801,6 +865,8 @@ func Test_decode_aprs_raw_nmea(t *testing.T) {
 
 // Formats whose information part is little more than a comment.
 func Test_decode_aprs_comment_only_formats(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, tc := range []struct {
@@ -832,6 +898,8 @@ func Test_decode_aprs_comment_only_formats(t *testing.T) {
 
 // AIS reports carried in Samoyed's own user-defined data type.
 func Test_decode_aprs_ais(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	// The sentence is the example from https://www.aggsoft.com/ais-decoder.htm
@@ -854,6 +922,8 @@ func Test_decode_aprs_ais(t *testing.T) {
 // The human-readable latitude and longitude, including position ambiguity,
 // where trailing digits are spaces, and the various ways each can be wrong.
 func Test_decode_aprs_lat_long(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var lat = maybe.Just(49 + 3.5/60)
@@ -886,6 +956,8 @@ func Test_decode_aprs_lat_long(t *testing.T) {
 // The data extensions that can follow a human-readable position, and what
 // processComment finds in the comment after them.
 func Test_decode_aprs_data_extensions(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var decode = func(info string) *Decoded {
@@ -959,6 +1031,8 @@ func Test_decode_aprs_data_extensions(t *testing.T) {
 // !DAO! adds a digit of precision to a position, either as a human-readable
 // digit (upper case datum) or base 91 (lower case), or is an APRStt location.
 func Test_decode_aprs_dao(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	for _, tc := range []struct {
@@ -983,6 +1057,8 @@ func Test_decode_aprs_dao(t *testing.T) {
 
 // Timestamps, objects and items around a human-readable position.
 func Test_decode_aprs_timestamps_objects_items(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var lat = maybe.Just(49 + 3.5/60)
@@ -1015,6 +1091,8 @@ func Test_decode_aprs_timestamps_objects_items(t *testing.T) {
 // whose last three bytes are an altitude or a radio range rather than course
 // and speed.
 func Test_decode_aprs_compressed_altitude_and_range(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:!/5L!!<*e7OS]S", true), true)
@@ -1028,6 +1106,8 @@ func Test_decode_aprs_compressed_altitude_and_range(t *testing.T) {
 
 // A status report can start with a Maidenhead locator and a symbol.
 func Test_decode_aprs_status_maidenhead(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:>IO91SX/G Status", true), true)
@@ -1045,6 +1125,8 @@ func Test_decode_aprs_status_maidenhead(t *testing.T) {
 // A third party header carries another station's packet, which is decoded as
 // that station's.
 func Test_decode_aprs_third_party(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = NewDecoderFromDataFiles()
 
 	var A = aprsDecoder.Decode(ax25.FromText("Q1TEST>APDW17:}Q2TEST>APDW17,TCPIP,Q1TEST*:!4903.50N/07201.75W-", true), true)
@@ -1057,6 +1139,8 @@ func Test_decode_aprs_third_party(t *testing.T) {
 // Print writes the human-readable form decode_aprs shows.  Apart from the
 // device descriptions, which come from a newer tocalls.yaml, and the degree
 // signs, which Dire Wolf leaves out, these are all what Dire Wolf prints.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_decode_aprs_print(t *testing.T) {
 	for _, tc := range []struct {
 		monitor string
@@ -1142,6 +1226,8 @@ func Test_decode_aprs_print(t *testing.T) {
 }
 
 // A grid square is turned into a position when it's printed.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_decode_aprs_print_maidenhead_only(t *testing.T) {
 	var aprsDecoder = NewDecoderFromDataFiles()
 

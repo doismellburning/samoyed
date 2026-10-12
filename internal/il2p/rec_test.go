@@ -18,6 +18,8 @@ import (
 // rather than straight to the rest of the receive path, along with the audio
 // level from the function it was made with.
 func TestIL2PReceiverHandsPacketsToItsSink(t *testing.T) {
+	t.Parallel()
+
 	type delivery struct {
 		from   dwcore.SlicerID
 		pp     *ax25.Packet

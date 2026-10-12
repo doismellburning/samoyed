@@ -36,6 +36,8 @@ func rx(station string) Packet {
 }
 
 func TestNilHubIsANoOp(t *testing.T) {
+	t.Parallel()
+
 	var h *Hub
 
 	h.AddChannel(0, "radio")
@@ -47,6 +49,8 @@ func TestNilHubIsANoOp(t *testing.T) {
 }
 
 func TestPacketsWrapOldestFirst(t *testing.T) {
+	t.Parallel()
+
 	var h, _ = newTestHub()
 	h.maxPackets = 3
 
@@ -63,6 +67,8 @@ func TestPacketsWrapOldestFirst(t *testing.T) {
 }
 
 func TestPublishFillsInTime(t *testing.T) {
+	t.Parallel()
+
 	var h, _ = newTestHub()
 
 	h.Publish(rx("Q1TEST"))
@@ -71,6 +77,8 @@ func TestPublishFillsInTime(t *testing.T) {
 }
 
 func TestStationKeepsEarlierPositionSymbolAndComment(t *testing.T) {
+	t.Parallel()
+
 	var h, now = newTestHub()
 
 	var first = rx("Q1TEST")
@@ -95,6 +103,8 @@ func TestStationKeepsEarlierPositionSymbolAndComment(t *testing.T) {
 }
 
 func TestTransmittedAndAnonymousPacketsMakeNoStation(t *testing.T) {
+	t.Parallel()
+
 	var h, _ = newTestHub()
 
 	var tx = rx("Q1TEST")
@@ -107,6 +117,8 @@ func TestTransmittedAndAnonymousPacketsMakeNoStation(t *testing.T) {
 }
 
 func TestStationsMostRecentFirstAndExpire(t *testing.T) {
+	t.Parallel()
+
 	var h, now = newTestHub()
 
 	h.Publish(rx("Q1TEST"))
@@ -126,6 +138,8 @@ func TestStationsMostRecentFirstAndExpire(t *testing.T) {
 }
 
 func TestStationTableEvictsLeastRecentlyHeard(t *testing.T) {
+	t.Parallel()
+
 	var h, now = newTestHub()
 	h.maxStations = 2
 
@@ -146,6 +160,8 @@ func TestStationTableEvictsLeastRecentlyHeard(t *testing.T) {
 }
 
 func TestChannelCounts(t *testing.T) {
+	t.Parallel()
+
 	var h, _ = newTestHub()
 
 	h.AddChannel(1, "aprs-is")
@@ -165,6 +181,8 @@ func TestChannelCounts(t *testing.T) {
 }
 
 func TestSubscriberGetsPacketThenStation(t *testing.T) {
+	t.Parallel()
+
 	var h, _ = newTestHub()
 	var sub = h.subscribe()
 
@@ -177,6 +195,8 @@ func TestSubscriberGetsPacketThenStation(t *testing.T) {
 }
 
 func TestSlowSubscriberIsCutOffWithoutBlocking(t *testing.T) {
+	t.Parallel()
+
 	var h, _ = newTestHub()
 	var slow = h.subscribe()
 
@@ -200,6 +220,8 @@ func TestSlowSubscriberIsCutOffWithoutBlocking(t *testing.T) {
 }
 
 func TestPacketJSONOmitsAbsentValues(t *testing.T) {
+	t.Parallel()
+
 	var p = rx("Q1TEST")
 	p.Time = testEpoch()
 
@@ -220,6 +242,8 @@ func TestPacketJSONOmitsAbsentValues(t *testing.T) {
 // The page reads these field names, so pin the whole shape: a rename here is a
 // change to what the browser receives.
 func TestJSONShape(t *testing.T) {
+	t.Parallel()
+
 	var full = Packet{
 		Time:        testEpoch(),
 		Channel:     1,
@@ -289,6 +313,8 @@ func TestJSONShape(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
 			data, err := json.Marshal(c.v) // := for errchkjson, which doesn't follow var.
 			require.NoError(t, err)
 			assert.JSONEq(t, c.want, string(data))

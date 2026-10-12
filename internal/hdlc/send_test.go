@@ -29,6 +29,8 @@ func captureHDLCBits(fn func(s *Sender)) []int {
 // A frame goes out between flags, with its FCS appended and any run of more
 // than five ones broken up.
 func TestAX25FrameIsSentBetweenFlagsWithItsFCS(t *testing.T) {
+	t.Parallel()
+
 	// The 0x3f bytes are six consecutive ones each, so the frame cannot go
 	// out without stuffing.
 	var fbuf = []byte{hdlcSixtyOne, 'Q', '1', 'T', 'E', 'S', 'T', hdlcSixtyOne}
@@ -53,6 +55,8 @@ func TestAX25FrameIsSentBetweenFlagsWithItsFCS(t *testing.T) {
 
 // The bad FCS option is for making a frame that a receiver has to reject.
 func TestAX25BadFCSSendsTheComplementOfTheRealOne(t *testing.T) {
+	t.Parallel()
+
 	var fbuf = []byte{'Q', '1', 'T', 'E', 'S', 'T'}
 
 	var good = captureHDLCBits(func(s *Sender) {
@@ -78,6 +82,8 @@ func TestAX25BadFCSSendsTheComplementOfTheRealOne(t *testing.T) {
 // A data byte gets a zero after five consecutive ones; a flag, which has six
 // of them, must not, or it would no longer be a flag.
 func TestOnlyDataIsBitStuffed(t *testing.T) {
+	t.Parallel()
+
 	var asData = captureHDLCBits(func(s *Sender) {
 		s.sendDataNRZI(hdlcFlag)
 	})
@@ -102,6 +108,8 @@ func TestOnlyDataIsBitStuffed(t *testing.T) {
 
 // A run of ones long enough to need stuffing twice gets a zero each time.
 func TestBitStuffingRepeatsForALongRunOfOnes(t *testing.T) {
+	t.Parallel()
+
 	var bits = captureHDLCBits(func(s *Sender) {
 		s.sendDataNRZI(0xff)
 		s.sendDataNRZI(0xff)
@@ -113,6 +121,8 @@ func TestBitStuffingRepeatsForALongRunOfOnes(t *testing.T) {
 
 // NRZI: a one leaves the signal alone, a zero inverts it.
 func TestNRZIInvertsOnAZeroOnly(t *testing.T) {
+	t.Parallel()
+
 	var bits = captureHDLCBits(func(s *Sender) {
 		s.sendBitNRZI(true)
 		s.sendBitNRZI(true)

@@ -24,6 +24,8 @@ func TestMain(m *testing.M) {
 }
 
 func Test_calculator(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 46, calculator("12a34#"))
 	assert.Equal(t, 10, calculator("2*3A4#"))
 	assert.Equal(t, 503, calculator("5*100A3#"))
@@ -34,6 +36,8 @@ func Test_calculator(t *testing.T) {
 // end with the "#" that terminates a well-formed one.  It used to fall out of
 // the loop and panic.
 func Test_calculator_unterminated(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 46, calculator("12a34"))
 	assert.Equal(t, 10, calculator("2*3A4"))
 	assert.Equal(t, 12, calculator("12"))
@@ -44,12 +48,16 @@ func Test_calculator_unterminated(t *testing.T) {
 // A digit that isn't ASCII is not one the keypad sends, and is ignored -
 // rather than narrowed to a byte and taken for some other character.
 func Test_calculator_ignores_non_ascii_digits(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 46, calculator("12a3\u06644#")) // ARABIC-INDIC DIGIT FOUR
 }
 
 // Subtraction and division have no key to call them yet, but are there for
 // whoever adds one.
 func Test_do_lastop(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 7, do_lastop(NONE, 3, 7))
 	assert.Equal(t, 10, do_lastop(ADD, 3, 7))
 	assert.Equal(t, -4, do_lastop(SUB, 3, 7))
@@ -57,6 +65,7 @@ func Test_do_lastop(t *testing.T) {
 	assert.Equal(t, 3, do_lastop(DIV, 21, 7))
 }
 
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func Test_connect_to_server(t *testing.T) {
 	var ln, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp4", "127.0.0.1:0")
 	require.NoError(t, listenErr)
@@ -101,6 +110,8 @@ func sendRaw(t *testing.T, conn net.Conn, channel byte, data []byte) {
 // main always talks to a TNC on port 8000 of this machine, so this plays one
 // there, if it can have the port.
 func Test_main(t *testing.T) {
+	t.Parallel()
+
 	var ln, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp4", "127.0.0.1:8000")
 	if listenErr != nil {
 		t.Skipf("Can't play the TNC on port 8000: %v", listenErr)

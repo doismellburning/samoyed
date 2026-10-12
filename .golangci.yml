@@ -15,7 +15,6 @@ linters:
     - "mnd"  # I do not like magic numbers, but there are plenty inherited from upstream, so let's roll with them for now
     - "nakedret"  # Naked returns in long functions are kinda an ok tradeoff right now
     - "nonamedreturns"  # Named returns seem a useful tradeoff for now - several functions that return ("output") many things, and names help
-    - "paralleltest"  # One day, but let's have *working* tests first
     - "prealloc"  # One day, but not now
     - "testpackage"  # Noble intent, but right now we're doing all sorts of juggling with packages, so let's save this for later
     - "varnamelen"  # Noble intent, but we're inheriting lots of short variable names, and I'd like to stay close to upstream at first
@@ -27,6 +26,9 @@ linters:
       - path: _test\.go
         linters:
           - dupl  # Repeated setup and parallel table tests are normal in tests
+      - path: ^internal/direwolf/
+        linters:
+          - paralleltest  # Its tests still share stdout and logrus's global logger, see #972
   settings:
     dupl:
       threshold: 150  # The default; tighten later

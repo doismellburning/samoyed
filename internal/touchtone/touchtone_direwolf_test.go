@@ -56,6 +56,8 @@ func test_tt2text(t *testing.T, buttons string, _expect_mp string, _expect_2k st
 }
 
 func Test_TTText(t *testing.T) {
+	t.Parallel()
+
 	t.Log("Test conversions between normal text and DTMF representation.")
 	t.Log("Some error messages are normal.  Just look for number of errors at end.")
 

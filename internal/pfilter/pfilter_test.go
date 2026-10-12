@@ -22,6 +22,8 @@ import (
 // A UI frame with an empty information field, as sent by linbpq ID broadcasts
 // (issue #504), used to trip an assertion in the type filter.
 func Test_pfilter_empty_info(t *testing.T) {
+	t.Parallel()
+
 	var packetFilter = New(0, aprs.NewDecoderFromDataFiles(), nil, 0)
 
 	var pp = ax25.FromText("Q1TEST>ID:", true)
@@ -38,6 +40,8 @@ func Test_pfilter_empty_info(t *testing.T) {
 // to ask.  An absent one answers as an empty one does rather than bringing the
 // program down.
 func Test_pfilter_igate_without_a_heard_database(t *testing.T) {
+	t.Parallel()
+
 	var packetFilter = New(0, aprs.NewDecoderFromDataFiles(), nil, 0)
 
 	var pp = ax25.FromText("Q1TEST>APDW17::Q2TEST   :Hello", true)
@@ -50,23 +54,35 @@ func Test_pfilter_igate_without_a_heard_database(t *testing.T) {
 }
 
 func Test_pfilter_validate(t *testing.T) {
+	t.Parallel()
+
 	t.Run("valid APRS filter returns no error", func(t *testing.T) {
+		t.Parallel()
+
 		assert.NoError(t, pfilter_validate(0, 0, "t/p & b/Q1TEST", true))
 	})
 
 	t.Run("valid connected-mode filter returns no error", func(t *testing.T) {
+		t.Parallel()
+
 		assert.NoError(t, pfilter_validate(0, 0, "b/Q1TEST", false))
 	})
 
 	t.Run("bad wildcard placement returns an error", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Error(t, pfilter_validate(0, 0, "b/Q1TEST*Q2TEST", true))
 	})
 
 	t.Run("unrecognized filter type returns an error", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Error(t, pfilter_validate(0, 0, "x/", true))
 	})
 
 	t.Run("a type letter with nothing after it returns an error", func(t *testing.T) {
+		t.Parallel()
+
 		// Each of these reaches a different arm of parse_filter_spec's chain,
 		// and every one of them used to index past the end of the token.
 		for _, filter := range []string{"b", "d", "v", "u", "o", "g", "t", "r", "s", "i"} {
@@ -75,14 +91,20 @@ func Test_pfilter_validate(t *testing.T) {
 	})
 
 	t.Run("filter type not allowed in connected mode returns an error", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Error(t, pfilter_validate(0, 0, "t/p", false))
 	})
 
 	t.Run("unbalanced parentheses returns an error", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Error(t, pfilter_validate(0, 0, "t/w & ( t/w | t/w ", true))
 	})
 
 	t.Run("error message reflects the real from/to channels", func(t *testing.T) {
+		t.Parallel()
+
 		var err = pfilter_validate(1, 2, "x/", true)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "filter[1,2]")
@@ -105,6 +127,8 @@ func heardPosition(decoded *aprs.Decoded) (maybe.Maybe[float64], maybe.Maybe[flo
 // tests) does not leak into a real packet's evaluation: an "i" filter must
 // still consult the heard list, rather than passing everything.
 func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
+	t.Parallel()
+
 	var heardDB = mheard.New(0)
 	var packetFilter = New(2, nil, heardDB, 0)
 
@@ -136,6 +160,8 @@ func Test_pfilter_igate_message_filter_is_evaluated(t *testing.T) {
 // condition 1 was inverted, so a message was dropped precisely when its
 // addressee had been heard nearby recently.
 func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
+	t.Parallel()
+
 	// Q2TEST is about 4 km from 42.6 -71.3.
 	const q2testPosition = "Q2TEST>APDW17:!4237.14NS07120.83W#"
 
@@ -203,6 +229,8 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var heardDB = mheard.New(0)
 			var packetFilter = New(2, nil, heardDB, 0)
 
@@ -248,6 +276,8 @@ func pfilterMonitorLines(t *testing.T, packetFilter *PacketFilter, from_chan int
 }
 
 func Test_PacketFilterMonitorLine(t *testing.T) {
+	t.Parallel()
+
 	var packetFilter = NewStandalone(0)
 
 	var testCases = []struct {
@@ -326,12 +356,16 @@ func Test_PacketFilterMonitorLine(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, testCase.expected, pfilterMonitorLines(t, packetFilter, 0, 0, testCase.filter, true, testCase.packets))
 		})
 	}
 }
 
 func Test_PacketFilterMonitorLine_connectedMode(t *testing.T) {
+	t.Parallel()
+
 	var packetFilter = NewStandalone(0)
 
 	var packets = []string{pfilterTestPositionPacket, pfilterTestStatusPacket}
@@ -339,6 +373,7 @@ func Test_PacketFilterMonitorLine_connectedMode(t *testing.T) {
 	assert.Equal(t, []bool{true, false}, pfilterMonitorLines(t, packetFilter, 0, 0, "b/Q1TEST", false, packets))
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_PacketFilterMonitorLine_unparseablePacket(t *testing.T) {
 	var packetFilter = NewStandalone(0)
 
@@ -353,6 +388,7 @@ func Test_PacketFilterMonitorLine_unparseablePacket(t *testing.T) {
 	assert.Contains(t, err.Error(), "could not parse monitoring format input")
 }
 
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func Test_PacketFilterMonitorLine_igateFilterWithNothingHeard(t *testing.T) {
 	// NewStandalone gives the filter engine an empty "heard recently"
 	// database, and an "i" filter gates a message only to an addressee that
@@ -382,6 +418,7 @@ func Test_PacketFilterMonitorLine_igateFilterWithNothingHeard(t *testing.T) {
 	assert.Equal(t, "Q2TEST", entry.Data["callsign"])
 }
 
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_Validate(t *testing.T) {
 	var packetFilter = NewStandalone(0)
 
@@ -468,6 +505,7 @@ func assertSpecEvaluated(t *testing.T, entries []*logrus.Entry, spec string, res
 	assert.Failf(t, "filter specification not explained", "no trace entry for %s among %v", spec, entries)
 }
 
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_NewStandalone_debugLevelExplainsTheDecision(t *testing.T) {
 	var packetFilter = NewStandalone(2)
 
@@ -482,6 +520,8 @@ func Test_NewStandalone_debugLevelExplainsTheDecision(t *testing.T) {
 // Each PacketFilter keeps the debug level it was built with, rather than
 // whichever one was set up last - the debug level used to be shared by the
 // whole package, and so by every filter in it.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func Test_PacketFilter_debugLevelIsItsOwn(t *testing.T) {
 	var verbose = NewStandalone(2)
 	var quiet = NewStandalone(0)

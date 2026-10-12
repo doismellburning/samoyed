@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_TT2Text(t *testing.T) {
 	// From `man tt2text`
 	testutils.AssertOutputContains(t, func() { tt2text("2A22A2223A33A33340A00122223333") }, "ABCDEFG 0123")
@@ -24,6 +25,8 @@ func TestMain(m *testing.M) {
 }
 
 func Test_main(t *testing.T) {
+	t.Parallel()
+
 	// Arguments are run together, so spaces can break up a long sequence.
 	var result = testutils.RunMain(t, "", "2A22A2223A33A33340", "A00122223333")
 	var out, status = result.Output(), result.Status

@@ -16,11 +16,15 @@ import (
 // A receiver hands each SAME message it finds to the sink it was made with,
 // along with the audio level from the function it was made with.
 func TestEASReceiverHandsMessagesToItsSink(t *testing.T) {
+	t.Parallel()
+
 	for _, message := range []string{
 		"ZCZC-EAS-RWT-012057+0030-2780415-WTSP/TV-",
 		"NNNN",
 	} {
 		t.Run(message, func(t *testing.T) {
+			t.Parallel()
+
 			type delivery struct {
 				from    dwcore.SlicerID
 				message string

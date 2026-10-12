@@ -11,6 +11,8 @@ import (
 )
 
 func TestOpenDataFileFindsSourceTreeCopy(t *testing.T) {
+	t.Parallel()
+
 	var fp, err = OpenDataFile("tocalls.yaml")
 	require.NoError(t, err)
 
@@ -20,6 +22,8 @@ func TestOpenDataFileFindsSourceTreeCopy(t *testing.T) {
 }
 
 func TestOpenDataFileNamesSearchedLocations(t *testing.T) {
+	t.Parallel()
+
 	var fp, err = OpenDataFile("no-such-data-file.txt")
 	assert.Nil(t, fp)
 	require.Error(t, err)

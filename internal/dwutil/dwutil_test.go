@@ -13,6 +13,8 @@ import (
 )
 
 func TestAssert(t *testing.T) {
+	t.Parallel()
+
 	assert.NotPanics(t, func() { Assert(true) })
 
 	// The message names the caller, not Assert itself.
@@ -26,10 +28,13 @@ func TestAssert(t *testing.T) {
 }
 
 func TestIfThenElse(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, "yes", IfThenElse(true, "yes", "no"))
 	assert.Equal(t, "no", IfThenElse(false, "yes", "no"))
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestHexDump(t *testing.T) {
 	var output = testutils.CaptureOutput(t, func() {
 		HexDump([]byte("Q1TEST>Q2TEST:\x00hello world\x7f!"))
@@ -41,11 +46,14 @@ func TestHexDump(t *testing.T) {
 		output)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestHexDumpEmpty(t *testing.T) {
 	assert.Empty(t, testutils.CaptureOutput(t, func() { HexDump(nil) }))
 }
 
 func TestHexDumpLines(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t,
 		[]string{
 			"  000:  51 31 54 45 53 54 3e 51 32 54 45 53 54 3a 00 68  Q1TEST>Q2TEST:.h",
@@ -55,10 +63,14 @@ func TestHexDumpLines(t *testing.T) {
 }
 
 func TestHexDumpLinesEmpty(t *testing.T) {
+	t.Parallel()
+
 	assert.Empty(t, HexDumpLines(nil))
 }
 
 func TestLogHexDump(t *testing.T) {
+	t.Parallel()
+
 	var logger, hook = test.NewNullLogger()
 
 	LogHexDump(logrus.NewEntry(logger).WithField("channel", 1), logrus.WarnLevel,
@@ -75,6 +87,8 @@ func TestLogHexDump(t *testing.T) {
 }
 
 func TestLogHexDumpBelowLevel(t *testing.T) {
+	t.Parallel()
+
 	var logger, hook = test.NewNullLogger()
 
 	LogHexDump(logrus.NewEntry(logger), logrus.DebugLevel, []byte("Q1TEST"))

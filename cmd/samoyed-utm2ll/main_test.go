@@ -55,6 +55,8 @@ func TestMain(m *testing.M) {
 
 // A position that can't be converted is reported, but isn't a usage error.
 func Test_main_unconvertible(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		args []string
 		want string
@@ -65,6 +67,8 @@ func Test_main_unconvertible(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, "", tc.args...)
 			var out, status = result.Output(), result.Status
 
@@ -75,6 +79,8 @@ func Test_main_unconvertible(t *testing.T) {
 }
 
 func Test_main_invalid(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		args []string
 		want string
@@ -89,6 +95,8 @@ func Test_main_invalid(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, "", tc.args...)
 			var out, status = result.Output(), result.Status
 

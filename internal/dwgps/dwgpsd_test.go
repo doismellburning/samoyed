@@ -15,6 +15,8 @@ import (
 )
 
 func Test_parse_gpsd_tpv(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		line      string
@@ -91,6 +93,8 @@ func Test_parse_gpsd_tpv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var report, err = parse_gpsd_tpv([]byte(tt.line))
 
 			if tt.wantErr {
@@ -123,6 +127,8 @@ func Test_parse_gpsd_tpv(t *testing.T) {
 }
 
 func Test_apply_gpsd_tpv_no_fix_keeps_last_location(t *testing.T) {
+	t.Parallel()
+
 	var info = new(GPSInfo)
 	info.Fix = DWFIX_3D
 	info.Lat = maybe.Just(42.0)
@@ -142,6 +148,8 @@ func Test_apply_gpsd_tpv_no_fix_keeps_last_location(t *testing.T) {
 }
 
 func Test_apply_gpsd_tpv_2d_keeps_last_altitude(t *testing.T) {
+	t.Parallel()
+
 	var info = new(GPSInfo)
 	info.Fix = DWFIX_3D
 	info.Altitude = maybe.Just(123.0)
@@ -157,6 +165,8 @@ func Test_apply_gpsd_tpv_2d_keeps_last_altitude(t *testing.T) {
 }
 
 func Test_dwgps_info_zero_value_is_nothing_known(t *testing.T) {
+	t.Parallel()
+
 	var info GPSInfo
 
 	assert.Equal(t, DWFIX_NOT_SEEN, info.Fix)
@@ -168,6 +178,8 @@ func Test_dwgps_info_zero_value_is_nothing_known(t *testing.T) {
 }
 
 func Test_apply_gpsd_tpv_absent_fields_are_nothing(t *testing.T) {
+	t.Parallel()
+
 	var info = new(GPSInfo)
 
 	// A 2D report from $GPRMC alone carries neither altitude nor, when
@@ -219,6 +231,8 @@ func fakeGpsd(t *testing.T) (*Config, <-chan net.Conn) {
 // Every GPS used to share one gpsd connection handle, so Term on one closed
 // whichever connection had been made last - another GPS's.
 func TestGPSTermLeavesAnotherGPSsGpsdConnectionAlone(t *testing.T) {
+	t.Parallel()
+
 	var config1, conns1 = fakeGpsd(t)
 	var config2, conns2 = fakeGpsd(t)
 

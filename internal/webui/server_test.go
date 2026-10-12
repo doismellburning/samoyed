@@ -29,6 +29,8 @@ func get(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
 }
 
 func TestAPIHandlers(t *testing.T) {
+	t.Parallel()
+
 	var hub, _ = newTestHub()
 	hub.AddChannel(0, "radio")
 
@@ -40,6 +42,8 @@ func TestAPIHandlers(t *testing.T) {
 	var h = Handler(hub)
 
 	t.Run("packets", func(t *testing.T) {
+		t.Parallel()
+
 		var w = get(t, h, "/api/packets")
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
@@ -51,6 +55,8 @@ func TestAPIHandlers(t *testing.T) {
 	})
 
 	t.Run("stations", func(t *testing.T) {
+		t.Parallel()
+
 		var got []map[string]any
 		require.NoError(t, json.Unmarshal(get(t, h, "/api/stations").Body.Bytes(), &got))
 		require.Len(t, got, 1)
@@ -58,34 +64,46 @@ func TestAPIHandlers(t *testing.T) {
 	})
 
 	t.Run("channels", func(t *testing.T) {
+		t.Parallel()
+
 		var got []Channel
 		require.NoError(t, json.Unmarshal(get(t, h, "/api/channels").Body.Bytes(), &got))
 		assert.Equal(t, []Channel{{Number: 0, Description: "radio", Received: 1, Transmitted: 0}}, got)
 	})
 
 	t.Run("security headers", func(t *testing.T) {
+		t.Parallel()
+
 		var w = get(t, h, "/api/packets")
 		assert.Contains(t, w.Header().Get("Content-Security-Policy"), "default-src 'self'")
 		assert.Equal(t, "nosniff", w.Header().Get("X-Content-Type-Options"))
 	})
 
 	t.Run("page", func(t *testing.T) {
+		t.Parallel()
+
 		var w = get(t, h, "/")
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Contains(t, w.Body.String(), "<title>Samoyed</title>")
 	})
 
 	t.Run("assets", func(t *testing.T) {
+		t.Parallel()
+
 		for _, path := range []string{"/static/app.js", "/static/app.css", "/static/vendor/leaflet/leaflet.js"} {
 			assert.Equal(t, http.StatusOK, get(t, h, path).Code, path)
 		}
 	})
 
 	t.Run("unknown path", func(t *testing.T) {
+		t.Parallel()
+
 		assert.Equal(t, http.StatusNotFound, get(t, h, "/nope").Code)
 	})
 
 	t.Run("no writes", func(t *testing.T) {
+		t.Parallel()
+
 		var w = httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/packets", nil))
 		assert.Equal(t, http.StatusMethodNotAllowed, w.Code)
@@ -93,6 +111,8 @@ func TestAPIHandlers(t *testing.T) {
 }
 
 func TestStartServesEventsAndShutsDown(t *testing.T) {
+	t.Parallel()
+
 	var hub, _ = newTestHub()
 
 	var ctx, cancel = context.WithCancel(t.Context())

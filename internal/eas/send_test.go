@@ -18,6 +18,8 @@ import (
 // so there is no NRZI and no stuffing, and the line's NRZI level, which the
 // next HDLC frame carries on from, is left as it was.
 func TestEASSenderSendsThePreambleThenTheMessage(t *testing.T) {
+	t.Parallel()
+
 	var message = []byte("ZCZC-Q1TEST")
 
 	var sent, levelAfter int

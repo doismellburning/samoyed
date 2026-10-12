@@ -48,6 +48,8 @@ func setFieldString(t *testing.T, base []byte, start uint, length uint, s string
 // Reading it used to run off the end of the frame and panic - and 53 bytes is
 // the length of a type 5 message, which is not exotic at all.
 func Test_ais_to_nmea_frame_length_not_multiple_of_3(t *testing.T) {
+	t.Parallel()
+
 	for n := 1; n <= 53; n++ {
 		var nmea, err = ToNMEA(make([]byte, n))
 		require.NoError(t, err)
@@ -67,6 +69,8 @@ func Test_ais_to_nmea_frame_length_not_multiple_of_3(t *testing.T) {
 
 // The type 5 message is both a length that needs padding and the one carrying
 // the ship's details, so round trip one whole.
+//
+//nolint:paralleltest // Serial: Parse records ships in the package-level ships list.
 func Test_ais_type_5_round_trip(t *testing.T) {
 	var ais = make([]byte, 53) // 424 bits.
 
@@ -89,6 +93,8 @@ func Test_ais_type_5_round_trip(t *testing.T) {
 // The bit vector used to be a fixed 256 bytes, which a user-defined APRS
 // packet could overrun: it can carry far more payload than any real AIS
 // message.
+//
+//nolint:paralleltest // Serial: Parse records ships in the package-level ships list.
 func Test_ais_parse_payload_longer_than_bit_vector(t *testing.T) {
 	var payload = strings.Repeat("1", 400) // 2400 bits, against 2048 of vector.
 
@@ -99,6 +105,8 @@ func Test_ais_parse_payload_longer_than_bit_vector(t *testing.T) {
 
 // A short sentence is decoded as though the bits it lacks were zero, rather
 // than failing or reading whatever follows the vector.
+//
+//nolint:paralleltest // Serial: Parse records ships in the package-level ships list.
 func Test_ais_parse_payload_shorter_than_message_type(t *testing.T) {
 	var aisData, err = Parse(nmeaSentence("!AIVDM,1,1,,A,5,6"))
 	require.NoError(t, err)
@@ -109,6 +117,8 @@ func Test_ais_parse_payload_shorter_than_message_type(t *testing.T) {
 // An empty sentence is an error.  It used to panic, skipping the leading "!"
 // it didn't have, and APRS user-defined data reaches it from anyone on
 // frequency.
+//
+//nolint:paralleltest // Serial: Parse records ships in the package-level ships list.
 func Test_ais_parse_empty(t *testing.T) {
 	var aisData, err = Parse("")
 	require.Error(t, err)
@@ -118,6 +128,8 @@ func Test_ais_parse_empty(t *testing.T) {
 // The checksum is over the bytes of the sentence.  Summing its runes instead
 // rejected any sentence carrying a byte above 0x7f, having decoded it to
 // something else entirely.
+//
+//nolint:paralleltest // Serial: Parse records ships in the package-level ships list.
 func Test_ais_parse_checksum_is_over_bytes(t *testing.T) {
 	var aisData, err = Parse(nmeaSentence("!AIVDM,1,1,,\xc3,15MgK45P3@G?fl0E`JbR0OwT0@MS,0"))
 	require.NoError(t, err)
@@ -126,6 +138,8 @@ func Test_ais_parse_checksum_is_over_bytes(t *testing.T) {
 
 // A checksum field that is not two hexadecimal digits is an error, rather than
 // being quietly read as zero or accepted for the value it happens to hold.
+//
+//nolint:paralleltest // Serial: Parse records ships in the package-level ships list.
 func Test_ais_parse_malformed_checksum(t *testing.T) {
 	// The first sentence checksums to 0x4e and the second to 0x02, so each of
 	// these fields is either unparseable or the right value at the wrong width.
@@ -156,6 +170,8 @@ func Test_ais_parse_malformed_checksum(t *testing.T) {
 // Latitude and longitude are two's complement, so the southern and western
 // hemispheres depend on the field being sign extended from its own width.
 func Test_get_field_signed(t *testing.T) {
+	t.Parallel()
+
 	var testCases = []struct {
 		length   uint
 		raw      int
@@ -180,6 +196,8 @@ func Test_get_field_signed(t *testing.T) {
 
 // The altitude of a SAR aircraft is 12 bits, and the all-ones value means it
 // is not available - which was being reported as a position 4095 metres up.
+//
+//nolint:paralleltest // Serial: Parse records ships in the package-level ships list.
 func Test_ais_type_9_altitude_not_available(t *testing.T) {
 	var altitude = func(raw int) maybe.Maybe[float64] {
 		var ais = make([]byte, 21) // 168 bits.

@@ -61,6 +61,7 @@ func sendMonitored(t *testing.T, conn net.Conn, portx byte, frame []byte) {
 	require.NoError(t, err)
 }
 
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func Test_main(t *testing.T) {
 	t.Run("network and serial", func(t *testing.T) {
 		var ln, port = testutils.Listen(t)
@@ -123,6 +124,8 @@ func Test_main(t *testing.T) {
 }
 
 func Test_main_badArguments(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		args []string
 		want string
@@ -135,6 +138,8 @@ func Test_main_badArguments(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, "", tc.args...)
 
 			assert.Equal(t, 1, result.Status)

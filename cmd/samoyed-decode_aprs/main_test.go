@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:paralleltest // Serial: swaps os.Stdin, which is process-wide.
 func Test_main(t *testing.T) {
 	var input = strings.Join([]string{
 		"# A comment is echoed back",
@@ -33,6 +34,7 @@ func Test_main(t *testing.T) {
 	require.Contains(t, output, "Chelmsford, MA")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_DecodeAPRSLine1(t *testing.T) {
 	var expected = "Yaesu"
 
@@ -41,6 +43,7 @@ func Test_DecodeAPRSLine1(t *testing.T) {
 	}, expected)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_DecodeAPRSLine2(t *testing.T) {
 	var expected = "Kantronics"
 
@@ -49,6 +52,7 @@ func Test_DecodeAPRSLine2(t *testing.T) {
 	}, expected)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_DecodeAPRSLine3(t *testing.T) {
 	var expected = "Echolink"
 
@@ -60,6 +64,7 @@ func Test_DecodeAPRSLine3(t *testing.T) {
 	}, expected)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_DecodeAPRSLine3NoSpaces(t *testing.T) {
 	var expected = "Echolink"
 

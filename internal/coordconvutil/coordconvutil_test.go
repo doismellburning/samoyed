@@ -11,6 +11,8 @@ import (
 )
 
 func TestHemisphereFromRune(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, coordconv.HemisphereNorth, HemisphereFromRune('N'))
 	assert.Equal(t, coordconv.HemisphereSouth, HemisphereFromRune('S'))
 	assert.Equal(t, coordconv.HemisphereInvalid, HemisphereFromRune('n'))
@@ -18,12 +20,16 @@ func TestHemisphereFromRune(t *testing.T) {
 }
 
 func TestHemisphereToRune(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 'N', HemisphereToRune(coordconv.HemisphereNorth))
 	assert.Equal(t, 'S', HemisphereToRune(coordconv.HemisphereSouth))
 	assert.Equal(t, '!', HemisphereToRune(coordconv.HemisphereInvalid))
 }
 
 func TestHemisphereRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	for _, r := range []rune{'N', 'S'} {
 		assert.Equal(t, r, HemisphereToRune(HemisphereFromRune(r)))
 	}

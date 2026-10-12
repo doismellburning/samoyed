@@ -9,6 +9,8 @@ import (
 
 // TODO Break down log2gpx into something easier to test...!
 // TODO Use a much less brittle test than "compare with exact Dire Wolf output"
+//
+//nolint:paralleltest // Serial: swaps os.Stdin, which is process-wide.
 func Test_log2gpx(t *testing.T) {
 	// Save original stdin/stdout
 	var oldStdin = os.Stdin

@@ -41,6 +41,8 @@ func TestMain(m *testing.M) {
 // a time, and Go formats each as a rune of its own, so it printed "maÃ±ana"
 // whatever the terminal could do.
 func TestPrintUTF8Test(t *testing.T) {
+	t.Parallel()
+
 	var result = testutils.RunMain(t, "", "-u")
 
 	require.Equal(t, 0, result.Status, "stderr: %s", result.Stderr)
@@ -68,8 +70,12 @@ func startDirewolf(t *testing.T) *testutils.Process {
 // disposition, so the process was killed outright and cleanup - which is what
 // unkeys a CM108 or hamlib PTT - never ran.
 func TestSignalShutsDownCleanly(t *testing.T) {
+	t.Parallel()
+
 	for _, signal := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
 		t.Run(signal.String(), func(t *testing.T) {
+			t.Parallel()
+
 			var p = startDirewolf(t)
 
 			p.WaitFor(t, startupComplete)
@@ -88,8 +94,12 @@ func TestSignalShutsDownCleanly(t *testing.T) {
 // it.  Startup has to stop at the signal and the teardown has to come after
 // it: nothing startup does may appear once the teardown has begun.
 func TestSignalDuringStartupStopsStartup(t *testing.T) {
+	t.Parallel()
+
 	for _, signal := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
 		t.Run(signal.String(), func(t *testing.T) {
+			t.Parallel()
+
 			var p = startDirewolf(t)
 
 			// The output is read as it comes, so the signal lands while

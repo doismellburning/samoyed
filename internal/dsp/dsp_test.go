@@ -40,6 +40,8 @@ func gainAt(filter []float64, f float64) float64 {
 }
 
 func TestWindowShape(t *testing.T) {
+	t.Parallel()
+
 	const size = 101
 
 	for _, w := range []Window{WindowTruncated, WindowCosine, WindowHamming, WindowBlackman} {
@@ -57,6 +59,8 @@ func TestWindowShape(t *testing.T) {
 }
 
 func TestLowpass(t *testing.T) {
+	t.Parallel()
+
 	for _, w := range []Window{WindowTruncated, WindowCosine, WindowHamming, WindowBlackman, WindowFlattop} {
 		var filter = make([]float64, 63)
 		Lowpass(0.1, filter, w)
@@ -71,6 +75,8 @@ func TestLowpass(t *testing.T) {
 }
 
 func TestBandpass(t *testing.T) {
+	t.Parallel()
+
 	var filter = make([]float64, 101)
 	Bandpass(0.1, 0.2, filter, WindowHamming)
 
@@ -84,11 +90,15 @@ func TestBandpass(t *testing.T) {
 }
 
 func TestFiltersRejectTooFewTaps(t *testing.T) {
+	t.Parallel()
+
 	assert.Panics(t, func() { Lowpass(0.1, make([]float64, 2), WindowTruncated) })
 	assert.Panics(t, func() { Bandpass(0.1, 0.2, make([]float64, 2), WindowTruncated) })
 }
 
 func TestRRC(t *testing.T) {
+	t.Parallel()
+
 	assert.InDelta(t, 1.0, rrc(0, 0.5), 1e-12)
 
 	for _, tt := range []float64{-3, -2, -1, 1, 2, 3} {
@@ -101,6 +111,8 @@ func TestRRC(t *testing.T) {
 }
 
 func TestRRCLowpass(t *testing.T) {
+	t.Parallel()
+
 	var filter = make([]float64, 81)
 	RRCLowpass(filter, 0.2, 10)
 

@@ -19,6 +19,8 @@ import (
  *------------------------------------------------------------------*/
 
 func Test_DeviceID(t *testing.T) {
+	t.Parallel()
+
 	var comment_out string
 
 	var device maybe.Maybe[string]

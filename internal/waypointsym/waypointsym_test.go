@@ -10,6 +10,8 @@ import (
 )
 
 func TestTablesCoverPrintableCharacters(t *testing.T) {
+	t.Parallel()
+
 	assert.Len(t, grm_primary_symtab, SYMTAB_SIZE)
 	assert.Len(t, grm_alternate_symtab, SYMTAB_SIZE)
 	assert.Len(t, mgn_primary_symtab, SYMTAB_SIZE)
@@ -17,6 +19,8 @@ func TestTablesCoverPrintableCharacters(t *testing.T) {
 }
 
 func TestGarmin(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, sym_rbcn, Garmin('/', '#'), "primary digi")
 	assert.Equal(t, sym_tall_tower, Garmin('/', 'y'), "primary yagi")
 	assert.Equal(t, sym_wreck, Garmin('\\', 'x'), "alternate wreck")
@@ -25,6 +29,8 @@ func TestGarmin(t *testing.T) {
 }
 
 func TestMagellan(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, MGN_aerial, Magellan('/', '#'), "primary digi")
 	assert.Equal(t, MGN_ATM, Magellan('\\', '$'), "alternate ATM")
 	assert.Equal(t, MGN_aerial, Magellan('I', '&'), "overlaid IGate uses the alternate table")
@@ -32,6 +38,8 @@ func TestMagellan(t *testing.T) {
 }
 
 func TestOutOfRangeSymbolsFallBack(t *testing.T) {
+	t.Parallel()
+
 	for _, symbol := range []byte{0, '\n', 0x1f, 0x7f, 0xff} {
 		assert.Equal(t, sym_default, Garmin('/', symbol))
 		assert.Equal(t, sym_default, Garmin('\\', symbol))

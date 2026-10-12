@@ -22,6 +22,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_cm108_print_inventory(t *testing.T) {
 	var adapter = new(cm108.Thing)
 	adapter.VID = 0x0d8c
@@ -63,6 +64,8 @@ func Test_cm108_print_inventory(t *testing.T) {
 // Toggling a pin carries on until interrupted, so this runs it as a process
 // of its own.
 func Test_main_togglesThePin(t *testing.T) {
+	t.Parallel()
+
 	// An ordinary file takes the writes a HID would, so the loop can run.
 	var hid = filepath.Join(t.TempDir(), "hidraw")
 	require.NoError(t, os.WriteFile(hid, nil, 0o600))
@@ -85,6 +88,8 @@ func Test_main_togglesThePin(t *testing.T) {
 }
 
 func Test_main_fails(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		args []string
 		want []string
@@ -105,6 +110,8 @@ func Test_main_fails(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, "", tc.args...)
 
 			assert.Equal(t, 1, result.Status)

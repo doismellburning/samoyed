@@ -14,6 +14,8 @@ import (
 // table, AB2nn for the alternate, and AB0nn followed by the overlay in
 // two-key form when there is one.  nn is the symbol's offset from space.
 func TestToTones(t *testing.T) {
+	t.Parallel()
+
 	var sd = New()
 
 	for _, tc := range []struct {
@@ -37,6 +39,8 @@ func TestToTones(t *testing.T) {
 // GPSCnn and GPSEnn forms, and Mic-E, whose destination is a latitude rather
 // than a symbol.
 func TestFromDestOrSrc(t *testing.T) {
+	t.Parallel()
+
 	var sd = New()
 
 	for _, tc := range []struct {
@@ -65,6 +69,8 @@ func TestFromDestOrSrc(t *testing.T) {
 		{"old Mic-E", '\'', "Q1TEST-14", "GPSC43", 0, 0, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var symtab, symbol, ok = sd.FromDestOrSrc(tc.dti, tc.src, tc.dest)
 
 			assert.Equal(t, tc.wantOK, ok)
@@ -74,6 +80,7 @@ func TestFromDestOrSrc(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestList(t *testing.T) {
 	var sd = New()
 
@@ -95,6 +102,8 @@ func TestList(t *testing.T) {
 // symbols-new.txt is only read for lines whose symbol is printable, so a
 // symbol off the end of the table can't come from there, but List would rather
 // skip one than index past the end of a table.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestListSkipsSymbolsOffTheTable(t *testing.T) {
 	var sd = new(Data)
 	sd.newSymbols = []*newSymbol{

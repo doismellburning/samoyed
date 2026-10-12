@@ -18,6 +18,8 @@ import (
 // running but has yet to be heard from - TBEACON's config check, for one,
 // relies on telling the two apart.
 func TestDWGPSReadWithoutAReceiver(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]string{
 		"none configured": "",
 		"can't be opened": filepath.Join(t.TempDir(), "missing"),
@@ -25,6 +27,8 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 
 	for name, port := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var config = new(Config)
 			config.NMEAPort = port
 
@@ -38,6 +42,8 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 // A GPS that was never started reads the same as one with no receiver, so
 // the beacon's config check works before startup has got that far.
 func TestDWGPSNilReadsAsNotInitialised(t *testing.T) {
+	t.Parallel()
+
 	var gps *GPS
 
 	var info = gps.Read()
@@ -49,6 +55,8 @@ func TestDWGPSNilReadsAsNotInitialised(t *testing.T) {
 }
 
 func TestDWGPSReadReturnsWhatWasSet(t *testing.T) {
+	t.Parallel()
+
 	var gps = new(GPS)
 
 	var report = new(GPSInfo)
@@ -65,6 +73,8 @@ func TestDWGPSReadReturnsWhatWasSet(t *testing.T) {
 
 // The reader goroutines set while beacons read; run under -race.
 func TestDWGPSConcurrentSetAndRead(t *testing.T) {
+	t.Parallel()
+
 	var gps = new(GPS)
 
 	var wg sync.WaitGroup

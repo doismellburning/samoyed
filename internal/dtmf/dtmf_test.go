@@ -17,6 +17,8 @@ import (
 // it can't be mistaken for a demodulator's, and it drops again once the
 // button is let go.
 func TestDecoderSetsDCD(t *testing.T) {
+	t.Parallel()
+
 	const channel = 1
 	const sampleRate = 44100
 

@@ -27,6 +27,8 @@ func (r *sampleRecorder) Flush() {
 
 // What Send puts on the air, a decoder on the same channel reads back.
 func TestSendDecodesBack(t *testing.T) {
+	t.Parallel()
+
 	const sampleRate = 8000
 
 	var out = new(sampleRecorder)
@@ -52,5 +54,7 @@ func TestSendDecodesBack(t *testing.T) {
 // The PTT is held for the delays either side and half a tone period of tone
 // and of quiet per button.
 func TestDuration(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 300+400+250, Duration("1234", 10, 300, 250))
 }

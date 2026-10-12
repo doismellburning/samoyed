@@ -28,6 +28,8 @@ import (
 const enable_debug_out = 0
 
 func Test_IL2P(t *testing.T) {
+	t.Parallel()
+
 	fmt.Println("Begin IL2P unit tests.")
 
 	// These start simple and later complex cases build upon earlier successes.

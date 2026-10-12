@@ -10,6 +10,8 @@ import (
 )
 
 func TestBitFixLevelString(t *testing.T) {
+	t.Parallel()
+
 	var tests = []struct {
 		level BitFixLevel
 		want  string

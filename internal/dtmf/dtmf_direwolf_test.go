@@ -11,6 +11,8 @@ import (
 )
 
 func Test_dtmf(t *testing.T) {
+	t.Parallel()
+
 	const c = 0 // radio channel.
 	const sampleRate = 44100
 

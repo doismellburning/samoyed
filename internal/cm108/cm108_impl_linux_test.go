@@ -13,6 +13,8 @@ import (
 )
 
 func TestCM108GoodDevice(t *testing.T) {
+	t.Parallel()
+
 	var tests = []struct {
 		name string
 		vid  int
@@ -42,6 +44,8 @@ func TestCM108GoodDevice(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.want, GOOD_DEVICE(tt.vid, tt.pid))
 		})
 	}
@@ -50,6 +54,8 @@ func TestCM108GoodDevice(t *testing.T) {
 // The inventory comes from the host's udev, which in CI has no USB audio at
 // all, so all we can say about it is that it is internally consistent.
 func TestInventoryIsConsistent(t *testing.T) {
+	t.Parallel()
+
 	var things, err = Inventory(MAXX_THINGS)
 	if err != nil {
 		t.Skipf("udev enumeration unavailable here: %v", err)
@@ -69,6 +75,8 @@ func TestInventoryIsConsistent(t *testing.T) {
 }
 
 func TestInventoryRespectsMaximum(t *testing.T) {
+	t.Parallel()
+
 	var things, err = Inventory(0)
 	if err != nil {
 		t.Skipf("udev enumeration unavailable here: %v", err)
@@ -78,8 +86,12 @@ func TestInventoryRespectsMaximum(t *testing.T) {
 }
 
 func TestFindPTTRejectsUnparseableDevice(t *testing.T) {
+	t.Parallel()
+
 	for _, device := range []string{"", "plughw", "default", ":2,0", "plughw:,0"} {
 		t.Run(device, func(t *testing.T) {
+			t.Parallel()
+
 			var ptt, err = FindPTT(device)
 
 			require.Error(t, err)
@@ -89,6 +101,8 @@ func TestFindPTTRejectsUnparseableDevice(t *testing.T) {
 }
 
 func TestFindPTTNoSuchCard(t *testing.T) {
+	t.Parallel()
+
 	// No machine has this many sound cards, nor one with this name.
 	for _, device := range []string{
 		"plughw:987654,0",
@@ -97,6 +111,8 @@ func TestFindPTTNoSuchCard(t *testing.T) {
 		"surround41:Q1TESTnonexistent",
 	} {
 		t.Run(device, func(t *testing.T) {
+			t.Parallel()
+
 			var ptt, err = FindPTT(device)
 
 			require.NoError(t, err)
@@ -108,6 +124,8 @@ func TestFindPTTNoSuchCard(t *testing.T) {
 // /dev/full accepts the open but fails every write with ENOSPC, which is the
 // nearest we can get to a HID refusing a report.
 func TestCM108WriteReportsWriteFailure(t *testing.T) {
+	t.Parallel()
+
 	var _, statErr = os.Stat("/dev/full")
 	if statErr != nil {
 		t.Skipf("no /dev/full here: %v", statErr)
@@ -183,6 +201,8 @@ func fakeCM108Devices() ([]cm108Device, []cm108Device) {
 }
 
 func TestInventoryOfFakeDevices(t *testing.T) {
+	t.Parallel()
+
 	var sound, hid = fakeCM108Devices()
 
 	var things = cm108_inventory_of(sound, hid, MAXX_THINGS)
@@ -233,6 +253,8 @@ func TestInventoryOfFakeDevices(t *testing.T) {
 }
 
 func TestInventoryOfLimitsItems(t *testing.T) {
+	t.Parallel()
+
 	var sound, hid = fakeCM108Devices()
 
 	// The first card's nodes use up the space, so its HID can still merge
@@ -250,10 +272,14 @@ func TestInventoryOfLimitsItems(t *testing.T) {
 }
 
 func TestInventoryOfNothing(t *testing.T) {
+	t.Parallel()
+
 	assert.Empty(t, cm108_inventory_of(nil, nil, MAXX_THINGS))
 }
 
 func TestInventoryOfMissingIDs(t *testing.T) {
+	t.Parallel()
+
 	// Without a vendor or product id, or a USB device node, there is nothing
 	// to merge a HID into a sound card by.
 	var anonymous = fakeUSB("", "", "", "")
@@ -278,6 +304,8 @@ func TestInventoryOfMissingIDs(t *testing.T) {
 }
 
 func TestFindPTTIn(t *testing.T) {
+	t.Parallel()
+
 	var sound, hid = fakeCM108Devices()
 	var things = cm108_inventory_of(sound, hid, MAXX_THINGS)
 
@@ -289,6 +317,8 @@ func TestFindPTTIn(t *testing.T) {
 		"surround41:Device_1",
 	} {
 		t.Run(device, func(t *testing.T) {
+			t.Parallel()
+
 			var ptt, err = cm108_find_ptt_in(things, device)
 
 			require.NoError(t, err)
@@ -297,6 +327,8 @@ func TestFindPTTIn(t *testing.T) {
 	}
 
 	t.Run("unknown device", func(t *testing.T) {
+		t.Parallel()
+
 		var ptt, err = cm108_find_ptt_in(things, "plughw:CODEC,0")
 
 		require.ErrorIs(t, err, ErrUnknownDevice)
@@ -305,6 +337,8 @@ func TestFindPTTIn(t *testing.T) {
 	})
 
 	t.Run("not a USB card", func(t *testing.T) {
+		t.Parallel()
+
 		var ptt, err = cm108_find_ptt_in(things, "plughw:3,0")
 
 		require.NoError(t, err)
@@ -312,6 +346,8 @@ func TestFindPTTIn(t *testing.T) {
 	})
 
 	t.Run("unparseable", func(t *testing.T) {
+		t.Parallel()
+
 		var ptt, err = cm108_find_ptt_in(things, "default")
 
 		require.Error(t, err)

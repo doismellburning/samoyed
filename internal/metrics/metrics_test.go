@@ -39,6 +39,8 @@ func metricOf(c prometheus.Collector) float64 {
 }
 
 func TestRecordFrameReceivedCountsFECSymbolsOnly(t *testing.T) {
+	t.Parallel()
+
 	// Regression: the bit-fix path reports which inversion strategy succeeded,
 	// not a count of corrected symbols, so feeding its value to a "symbols
 	// corrected" counter summed enum ordinals - and non-monotonically, since a
@@ -68,6 +70,8 @@ func TestRecordFrameReceivedCountsFECSymbolsOnly(t *testing.T) {
 }
 
 func TestRecordBitFixedCountsFramesByStrategy(t *testing.T) {
+	t.Parallel()
+
 	const channel = 91
 
 	var channelLabel = strconv.Itoa(channel)
@@ -85,6 +89,8 @@ func TestRecordBitFixedCountsFramesByStrategy(t *testing.T) {
 }
 
 func TestSeedChannelCreatesSeriesAtZero(t *testing.T) {
+	t.Parallel()
+
 	// Regression: with the gauges pushed rather than collected at scrape time,
 	// a quiet station exposed no series at all, so dashboards and alerts saw
 	// "no data" rather than 0.
@@ -114,6 +120,7 @@ func TestSeedChannelCreatesSeriesAtZero(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Serial: testing.AllocsPerRun refuses to run in a parallel test.
 func TestSetAudioLevelDoesNotAllocate(t *testing.T) {
 	// Regression: this is called from the demodulator, which sees every audio
 	// sample.  It used to LoadOrStore a freshly allocated counter on every
@@ -128,6 +135,8 @@ func TestSetAudioLevelDoesNotAllocate(t *testing.T) {
 }
 
 func TestStartReportsBindFailureSynchronously(t *testing.T) {
+	t.Parallel()
+
 	// Regression: the bind used to happen inside the goroutine, so the caller
 	// logged "listening on port N" and only then discovered the port was taken.
 	//
@@ -150,6 +159,8 @@ func TestStartReportsBindFailureSynchronously(t *testing.T) {
 }
 
 func TestStartServesMetrics(t *testing.T) {
+	t.Parallel()
+
 	var port = freePort(t)
 
 	var errCh, startErr = Start(t.Context(), port)

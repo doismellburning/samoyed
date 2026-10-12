@@ -188,6 +188,8 @@ func send(t *testing.T, tnc *fakeTNC, command string) []tncFrame {
 
 // TestByeDoesNotBlockTheListener covers the "bye" that used to sleep for ten
 // seconds inside the callback, freezing every other session on the TNC with it.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestByeDoesNotBlockTheListener(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -212,6 +214,8 @@ func TestByeDoesNotBlockTheListener(t *testing.T) {
 
 // TestByeDisconnectsOnceTheFarewellIsAcknowledged covers the other half: the
 // main loop must still pull the link down, once the queue has drained.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestByeDisconnectsOnceTheFarewellIsAcknowledged(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -247,6 +251,8 @@ func TestByeDisconnectsOnceTheFarewellIsAcknowledged(t *testing.T) {
 // the TNC had not reported yet.  Nothing asks the TNC about a station until it
 // has something to wait for, so the first check after "bye" saw the zero the
 // field started at, mistook it for an empty queue, and cut the farewell off.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestByeWaitsForTheTNCToAnswer(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -264,6 +270,8 @@ func TestByeWaitsForTheTNCToAnswer(t *testing.T) {
 
 // TestByeDisconnectsWhenTheStationStopsAcknowledging checks we do not wait for
 // a drain that is never going to come.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestByeDisconnectsWhenTheStationStopsAcknowledging(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -286,6 +294,8 @@ func TestByeDisconnectsWhenTheStationStopsAcknowledging(t *testing.T) {
 
 // TestHelpListsTheCommands covers the "?" that the greeting points at, which
 // used to answer "Help not yet available."
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestHelpListsTheCommands(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -307,6 +317,8 @@ func TestHelpListsTheCommands(t *testing.T) {
 }
 
 // TestHelpDescribesOneCommand covers "HELP <command>".
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestHelpDescribesOneCommand(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -325,6 +337,8 @@ func TestHelpDescribesOneCommand(t *testing.T) {
 
 // TestHelpRejectsAnUnknownCommand checks we say so rather than silently
 // printing nothing.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestHelpRejectsAnUnknownCommand(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -340,6 +354,8 @@ func TestHelpRejectsAnUnknownCommand(t *testing.T) {
 // TestEveryCommandIsDocumented guards against a command being added to the
 // table without anything for "?" and HELP to say about it.
 func TestEveryCommandIsDocumented(t *testing.T) {
+	t.Parallel()
+
 	for _, c := range userCommands() {
 		if c.usage == "" || c.summary == "" || len(c.detail) == 0 {
 			t.Errorf("Command %q is not documented: %+v", c.name, c)
@@ -353,6 +369,8 @@ func TestEveryCommandIsDocumented(t *testing.T) {
 
 // TestWhoShowsLoginTimes covers the Since column, which used to be the literal
 // string "[time later]" even though the login time was right there.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestWhoShowsLoginTimes(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -377,6 +395,8 @@ func TestWhoShowsLoginTimes(t *testing.T) {
 // TestCommandsIgnoreTheLineEnding covers a terminal that ends the line the way
 // terminals do: the carriage return used to be parsed as part of the command,
 // or of its last argument, so "who\r" was an invalid command.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestCommandsIgnoreTheLineEnding(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -397,6 +417,8 @@ func TestCommandsIgnoreTheLineEnding(t *testing.T) {
 
 // TestTestAcknowledgesTheRequest covers a "test" that used to start sending
 // without telling the user anything had happened.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestTestAcknowledgesTheRequest(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -418,6 +440,8 @@ func TestTestAcknowledgesTheRequest(t *testing.T) {
 
 // TestTestRejectsAnUnreadableCount checks that a typo is reported rather than
 // quietly setting the count to zero and doing nothing.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestTestRejectsAnUnreadableCount(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -440,6 +464,8 @@ func TestTestRejectsAnUnreadableCount(t *testing.T) {
 // TestTestRejectsTooManyFrames checks the cap on how much air one station can
 // ask for: any positive int used to be accepted, and the main loop would have
 // kept feeding the channel for as long as the station stayed connected.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestTestRejectsTooManyFrames(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -462,6 +488,8 @@ func TestTestRejectsTooManyFrames(t *testing.T) {
 // TestTimingTestSummaryIsInSeconds covers a summary that used to print the
 // elapsed time with %d on a time.Duration - so "3 bytes in 21015042 seconds",
 // the nanosecond count, followed by rates derived from a one-nanosecond run.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestTimingTestSummaryIsInSeconds(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -502,6 +530,8 @@ func TestTimingTestSummaryIsInSeconds(t *testing.T) {
 
 // The main loop's poll only asks the TNC about sessions with something
 // waiting on the answer - here, a goodbye.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestPollAsksAboutSessionsWithWorkInHand(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -531,6 +561,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func TestMainRefusesBadArguments(t *testing.T) {
 	var gone = testutils.UnusedPort(t)
 
@@ -555,6 +586,8 @@ func TestMainRefusesBadArguments(t *testing.T) {
 }
 
 func TestMainHelp(t *testing.T) {
+	t.Parallel()
+
 	var result = testutils.RunMain(t, "", "--help")
 
 	assert.Equal(t, 0, result.Status)
@@ -564,6 +597,8 @@ func TestMainHelp(t *testing.T) {
 // On attaching to the TNC, main asks what ports it has, and registers its
 // callsign on each.
 func TestMainRegistersOnEachPort(t *testing.T) {
+	t.Parallel()
+
 	var ln, port = testutils.Listen(t)
 
 	testutils.StartMain(t, "-h", "127.0.0.1", "-p", port, "q1test")

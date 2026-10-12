@@ -14,6 +14,8 @@ import (
 var pftest_error_count int
 
 func Test_pfilter(t *testing.T) {
+	t.Parallel()
+
 	t.Log("Quick test for packet filtering.")
 	t.Log("Some error messages are normal.  Look at the final success/fail message.")
 

@@ -12,12 +12,16 @@ import (
 )
 
 func TestIL2PDecodeFrameShortInputReturnsNil(t *testing.T) {
+	t.Parallel()
+
 	// Input shorter than IL2P_HEADER_SIZE+IL2P_HEADER_PARITY must not panic.
 	var pp = il2p_decode_frame([]byte{0x01, 0x02, 0x03}, Version04, 0)
 	assert.Nil(t, pp)
 }
 
 func TestIL2PDecodeFrameHeaderFECFailureReturnsNil(t *testing.T) {
+	t.Parallel()
+
 	// Two symbol errors exceed the correction capacity of the 2-parity header (e < 0).
 	// il2p_decode_frame must return nil rather than proceeding with a corrupt header.
 	var twoErrors = make([]byte, IL2P_HEADER_SIZE+IL2P_HEADER_PARITY)
@@ -28,6 +32,8 @@ func TestIL2PDecodeFrameHeaderFECFailureReturnsNil(t *testing.T) {
 }
 
 func TestIL2PDecodeFrameTruncatedPayloadReturnsNil(t *testing.T) {
+	t.Parallel()
+
 	// Build a real frame and encode it, then truncate the payload portion.
 	var addrs [ax25.MaxAddrs]string
 	addrs[0] = "Q1TEST"
@@ -46,6 +52,8 @@ func TestIL2PDecodeFrameTruncatedPayloadReturnsNil(t *testing.T) {
 }
 
 func TestIL2PDecodeFrameJunkTrailingBytesReturnsNil(t *testing.T) {
+	t.Parallel()
+
 	// A frame with 1–3 trailing bytes beyond encoded_payload_size is malformed:
 	// not enough to be a CRC, not exactly the right payload length. Must return nil.
 	var addrs [ax25.MaxAddrs]string

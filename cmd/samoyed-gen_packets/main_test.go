@@ -37,6 +37,8 @@ func decode(t *testing.T, name string) int {
 }
 
 func Test_main_generates(t *testing.T) {
+	t.Parallel()
+
 	var dir = t.TempDir()
 
 	var messages = filepath.Join(dir, "messages.txt")
@@ -66,6 +68,8 @@ func Test_main_generates(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var wav = filepath.Join(t.TempDir(), "out.wav")
 
 			var result = testutils.RunMain(t, tc.stdin, append([]string{"-o", wav}, tc.args...)...)
@@ -82,6 +86,8 @@ func Test_main_generates(t *testing.T) {
 }
 
 func Test_main_badArguments(t *testing.T) {
+	t.Parallel()
+
 	var dir = t.TempDir()
 	var wav = filepath.Join(dir, "out.wav")
 
@@ -104,6 +110,8 @@ func Test_main_badArguments(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, "", tc.args...)
 			var out = result.Output()
 

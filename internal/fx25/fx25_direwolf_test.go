@@ -31,8 +31,12 @@ var fxTestFrame = []byte{ //nolint:gochecknoglobals
 const fxTestCorruptBytes = 8
 
 func Test_FX25_round_trip(t *testing.T) {
+	t.Parallel()
+
 	for ctag := CTAG_MIN; ctag <= CTAG_MAX; ctag++ {
 		t.Run(fmt.Sprintf("ctag_%02x", ctag), func(t *testing.T) {
+			t.Parallel()
+
 			var ctag_num, data, check = fx25_encode_frame(0, slices.Clone(fxTestFrame), 100+ctag, 1)
 			require.Equal(t, ctag, ctag_num, "Wrong correlation tag chosen")
 

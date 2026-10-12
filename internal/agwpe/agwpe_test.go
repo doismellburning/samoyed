@@ -17,6 +17,8 @@ import (
 // was called with a non-pointer Header value, causing it to fail with
 // "invalid type direwolf.AGWPEHeader" and drop incoming connections.
 func TestHeaderBinaryRead(t *testing.T) {
+	t.Parallel()
+
 	var original = new(Header)
 	original.Portx = 1
 	original.DataKind = 'C'
@@ -36,6 +38,8 @@ func TestHeaderBinaryRead(t *testing.T) {
 }
 
 func TestMessageWriteRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	var payload = []byte("hello world")
 	var msg = new(Message)
 	msg.Header.DataKind = 'T'
@@ -59,6 +63,8 @@ func TestMessageWriteRoundTrip(t *testing.T) {
 
 // A callsign formats without the NUL padding of its fixed-width field.
 func TestCallsignString(t *testing.T) {
+	t.Parallel()
+
 	var c Callsign
 	copy(c[:], "Q1TEST-1")
 

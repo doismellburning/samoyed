@@ -6,6 +6,8 @@ package maybe
 import "testing"
 
 func TestFormat(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		name string
 		got  string

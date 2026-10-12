@@ -15,10 +15,14 @@ import (
 // Stdout and logrus both go somewhere else while a test is being quiet, and
 // are back as they were once it is done.
 func TestFuzzQuietlyPutsStdoutBack(t *testing.T) {
+	t.Parallel()
+
 	var savedStdout = os.Stdout
 	var savedLogrus = logrus.StandardLogger().Out
 
 	t.Run("quiet", func(t *testing.T) {
+		t.Parallel()
+
 		FuzzQuietly(t)
 
 		assert.NotSame(t, savedStdout, os.Stdout)

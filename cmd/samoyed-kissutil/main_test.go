@@ -62,6 +62,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_parse_number(t *testing.T) {
 	var testCases = map[string]struct {
 		in   string
@@ -87,6 +88,7 @@ func Test_parse_number(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_process_input(t *testing.T) {
 	var testCases = map[string]struct {
 		in   string
@@ -115,6 +117,7 @@ func Test_process_input(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_process_input_frame(t *testing.T) {
 	var tnc = fakeTNC(t)
 
@@ -126,6 +129,8 @@ func Test_process_input_frame(t *testing.T) {
 }
 
 // None of these are sent anywhere, so there's no TNC for them to go to.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_process_input_rejects(t *testing.T) {
 	var testCases = map[string]struct {
 		in   string
@@ -151,6 +156,7 @@ func Test_process_input_rejects(t *testing.T) {
 	assert.Empty(t, testutils.CaptureOutput(t, func() { process_input("[3]  ") }))
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_send_to_kiss_tnc_clamps(t *testing.T) {
 	var tnc = fakeTNC(t)
 
@@ -167,6 +173,7 @@ func Test_send_to_kiss_tnc_clamps(t *testing.T) {
 	assert.Equal(t, want, readKISS(t, tnc, len(want)))
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kissutil_kiss_process_msg(t *testing.T) {
 	var frame = append([]byte{0x30}, ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()...)
 
@@ -242,6 +249,7 @@ func feedKISS(t *testing.T, data []byte) string {
 	})
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kissutilRecByte(t *testing.T) {
 	var frame = kiss.Encapsulate(append([]byte{0x30}, ax25.MustFromText("Q1TEST>APDW17:>Testing").Pack()...))
 
@@ -293,12 +301,16 @@ func Test_kissutilRecByte(t *testing.T) {
 }
 
 func Test_timestamp_filename(t *testing.T) {
+	t.Parallel()
+
 	assert.Regexp(t, `^\d{8}-\d{6}-\d{3}$`, timestamp_filename())
 }
 
 // main starts goroutines that exit the process when the TNC goes away, so it
 // runs as a process of its own here, against a TNC played by the test.
 func Test_main_endToEnd(t *testing.T) {
+	t.Parallel()
+
 	var ln, port = testutils.Listen(t)
 
 	var p = testutils.StartMain(t, "-h", "127.0.0.1", "-p", port)
@@ -323,6 +335,8 @@ func Test_main_endToEnd(t *testing.T) {
 }
 
 // Losing the TNC, or never reaching it, ends the process with an error.
+//
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func Test_main_withoutATNC(t *testing.T) {
 	t.Run("goes away", func(t *testing.T) {
 		var ln, port = testutils.Listen(t)

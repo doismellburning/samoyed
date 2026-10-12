@@ -14,6 +14,8 @@ import (
 
 // Whatever Encapsulate escaped, Unescape should give back.
 func Test_Unescape_RoundTrip(t *testing.T) {
+	t.Parallel()
+
 	var original = []byte{0x00, 0x82, FEND, 0xa0, FESC, FEND, FESC, 0x41}
 
 	var encapsulated = Encapsulate(original)
@@ -27,6 +29,8 @@ func Test_Unescape_RoundTrip(t *testing.T) {
 }
 
 func Test_Unescape_NothingEscaped(t *testing.T) {
+	t.Parallel()
+
 	var unescaped, problems = Unescape([]byte{0x00, 0x82, 0xa0})
 
 	assert.Empty(t, problems)
@@ -36,6 +40,8 @@ func Test_Unescape_NothingEscaped(t *testing.T) {
 // An unexpected byte after FESC is taken literally so the rest of the frame
 // can still be decoded.
 func Test_Unescape_BadEscape(t *testing.T) {
+	t.Parallel()
+
 	var unescaped, problems = Unescape([]byte{0x00, FESC, 0x41, 0x82})
 
 	require.Len(t, problems, 1)
@@ -44,6 +50,8 @@ func Test_Unescape_BadEscape(t *testing.T) {
 }
 
 func Test_Unescape_TruncatedEscape(t *testing.T) {
+	t.Parallel()
+
 	var unescaped, problems = Unescape([]byte{0x00, 0x82, FESC})
 
 	require.Len(t, problems, 1)
@@ -52,6 +60,8 @@ func Test_Unescape_TruncatedEscape(t *testing.T) {
 }
 
 func Test_Unescape_Empty(t *testing.T) {
+	t.Parallel()
+
 	var unescaped, problems = Unescape([]byte{})
 
 	assert.Empty(t, problems)
@@ -62,6 +72,7 @@ func Test_Unescape_Empty(t *testing.T) {
 // anything malformed but carrying on - a live TNC has to do something with
 // what it was given.
 
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func Test_Unwrap_too_short(t *testing.T) {
 	var logs = logged(t, func() {
 		assert.Empty(t, Unwrap([]byte{FEND}))
@@ -70,6 +81,7 @@ func Test_Unwrap_too_short(t *testing.T) {
 	assert.Contains(t, logs, "less than minimum length")
 }
 
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func Test_Unwrap_no_trailing_fend(t *testing.T) {
 	var unwrapped []byte
 
@@ -81,6 +93,7 @@ func Test_Unwrap_no_trailing_fend(t *testing.T) {
 	assert.Equal(t, []byte{0x00, 'h', 'i'}, unwrapped)
 }
 
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func Test_Unwrap_fend_in_the_middle(t *testing.T) {
 	var logs = logged(t, func() {
 		Unwrap([]byte{FEND, 0x00, FEND, 'h', FEND})
@@ -91,6 +104,8 @@ func Test_Unwrap_fend_in_the_middle(t *testing.T) {
 
 // An escape followed by something that is not one of the two transposed bytes
 // is a protocol error; the byte is dropped rather than guessed at.
+//
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func Test_Unwrap_bad_escape(t *testing.T) {
 	var unwrapped []byte
 
@@ -104,6 +119,8 @@ func Test_Unwrap_bad_escape(t *testing.T) {
 
 // The leading FEND is optional, so a frame without one unwraps the same way.
 func Test_Unwrap_without_leading_fend(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, []byte{0x00, 'h', 'i'}, Unwrap([]byte{0x00, 'h', 'i', FEND}))
 }
 

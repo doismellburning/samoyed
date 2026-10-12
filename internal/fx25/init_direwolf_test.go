@@ -15,6 +15,8 @@ import (
 // enough.
 
 func TestFX25TablesAreConsistent(t *testing.T) {
+	t.Parallel()
+
 	for j := range 16 {
 		for k := range 16 {
 			var distance = bits.OnesCount64(tags[j].value ^ tags[k].value)
@@ -38,6 +40,8 @@ func TestFX25TablesAreConsistent(t *testing.T) {
 }
 
 func TestFX25PickMode(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		fxMode, dlen, want int
 	}{

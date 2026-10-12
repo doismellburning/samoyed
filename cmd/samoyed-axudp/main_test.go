@@ -54,6 +54,7 @@ func writeConfig(t *testing.T, content string) string {
 	return name
 }
 
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func Test_main_bridges(t *testing.T) {
 	// The remote AXUDP node, played by the test.
 	var remote, remoteErr = new(net.ListenConfig).ListenPacket(t.Context(), "udp", "127.0.0.1:0")
@@ -123,6 +124,8 @@ func Test_main_bridges(t *testing.T) {
 }
 
 func Test_main_fails(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		args func(t *testing.T) []string
 		want string
@@ -172,6 +175,8 @@ func Test_main_fails(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, "", tc.args(t)...)
 
 			assert.Equal(t, 1, result.Status, "output: %s", result.Output())
@@ -181,6 +186,8 @@ func Test_main_fails(t *testing.T) {
 }
 
 func Test_main_help(t *testing.T) {
+	t.Parallel()
+
 	var result = testutils.RunMain(t, "", "--help")
 
 	assert.Equal(t, 0, result.Status)

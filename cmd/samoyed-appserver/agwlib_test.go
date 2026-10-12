@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestAgwlibCommands(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -41,6 +42,7 @@ func fromTNC(kind byte, channel byte, callFrom agwpe.Callsign, callTo agwpe.Call
 	return &AGWPECommand{Header: h, Data: []byte(data)}
 }
 
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestProcessFromTNCFollowsASession(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -84,6 +86,8 @@ func TestProcessFromTNCFollowsASession(t *testing.T) {
 
 // An outgoing connection, accepted by the other station, also starts a
 // session.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestProcessFromTNCOutgoingConnection(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -96,6 +100,8 @@ func TestProcessFromTNCOutgoingConnection(t *testing.T) {
 
 // The TNC's list of ports is answered by registering our callsign on each.
 // It can leave gaps in the numbering, and "Port1" is channel 0.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestProcessFromTNCPortInformation(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -109,6 +115,8 @@ func TestProcessFromTNCPortInformation(t *testing.T) {
 
 // The list came from the TNC, so anything in it that isn't a port we can have
 // is skipped, however short.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestPortInformationRejectsBadDescriptions(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -124,6 +132,8 @@ func TestPortInformationRejectsBadDescriptions(t *testing.T) {
 }
 
 // An empty or malformed list registers nothing.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestProcessFromTNCEmptyPortInformation(t *testing.T) {
 	var tnc = newTestServer(t)
 
@@ -136,6 +146,8 @@ func TestProcessFromTNCEmptyPortInformation(t *testing.T) {
 
 // A connection report that isn't one of the two expected is ignored, however
 // short it is.
+//
+//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestProcessFromTNCUnexpectedConnection(t *testing.T) {
 	var tnc = newTestServer(t)
 

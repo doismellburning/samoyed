@@ -7,6 +7,8 @@ import "testing"
 
 // 0x906e is the published CRC-16/X-25 check value for "123456789".
 func TestCalcCheckValue(t *testing.T) {
+	t.Parallel()
+
 	var got = Calc([]byte("123456789"))
 
 	if got != 0x906e {
@@ -15,6 +17,8 @@ func TestCalcCheckValue(t *testing.T) {
 }
 
 func TestCRC16SeededWithFFFFMatchesCalc(t *testing.T) {
+	t.Parallel()
+
 	var data = []byte("Q1TEST>Q2TEST:hello")
 
 	var got = CRC16(data, 0xffff)
@@ -27,6 +31,8 @@ func TestCRC16SeededWithFFFFMatchesCalc(t *testing.T) {
 }
 
 func TestCRC16AccumulatedIsNotTheCRCOfTheConcatenation(t *testing.T) {
+	t.Parallel()
+
 	var region1 = []byte("Q1TEST")
 	var region2 = []byte("Q2TEST")
 

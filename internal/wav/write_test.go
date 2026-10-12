@@ -15,10 +15,14 @@ import (
 )
 
 func TestHeaderSize(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, HeaderSize, binary.Size(new(header)))
 }
 
 func TestFormatValidate(t *testing.T) {
+	t.Parallel()
+
 	var valid = Format{NumChannels: 1, SamplesPerSec: 44100, BitsPerSample: 16}
 	require.NoError(t, valid.Validate())
 
@@ -40,6 +44,8 @@ func TestFormatValidate(t *testing.T) {
 // writing a header that describes some other format. The byte rate is the
 // tighter bound of the two, as it is the sample rate times the frame size.
 func TestFormatValidateRejectsOverflow(t *testing.T) {
+	t.Parallel()
+
 	if math.MaxInt <= math.MaxInt32 {
 		t.Skip("int is not wider than int32 on this platform, so these rates are unrepresentable anyway")
 	}
@@ -60,6 +66,8 @@ func TestFormatValidateRejectsOverflow(t *testing.T) {
 }
 
 func TestCreateRejectsBadFormat(t *testing.T) {
+	t.Parallel()
+
 	var path = filepath.Join(t.TempDir(), "bad.wav")
 
 	var w, err = Create(path, Format{NumChannels: 7, SamplesPerSec: 44100, BitsPerSample: 16})
@@ -71,6 +79,8 @@ func TestCreateRejectsBadFormat(t *testing.T) {
 // TestWriteAndClose checks that a written file has the header we expect, with
 // the lengths filled in, followed by the sample data.
 func TestWriteAndClose(t *testing.T) {
+	t.Parallel()
+
 	var path = filepath.Join(t.TempDir(), "out.wav")
 
 	var w, err = Create(path, Format{NumChannels: 2, SamplesPerSec: 44100, BitsPerSample: 16})
@@ -112,6 +122,8 @@ func TestWriteAndClose(t *testing.T) {
 // TestEmptyFile checks that a file that never had any samples written to it is
 // still a valid (if silent) .WAV file.
 func TestEmptyFile(t *testing.T) {
+	t.Parallel()
+
 	var path = filepath.Join(t.TempDir(), "empty.wav")
 
 	var w, err = Create(path, Format{NumChannels: 1, SamplesPerSec: 8000, BitsPerSample: 8})
@@ -128,6 +140,8 @@ func TestEmptyFile(t *testing.T) {
 }
 
 func TestCloseRejectsOversizeData(t *testing.T) {
+	t.Parallel()
+
 	var path = filepath.Join(t.TempDir(), "huge.wav")
 
 	var w, err = Create(path, Format{NumChannels: 1, SamplesPerSec: 8000, BitsPerSample: 8})
@@ -141,6 +155,8 @@ func TestCloseRejectsOversizeData(t *testing.T) {
 }
 
 func TestUseAfterClose(t *testing.T) {
+	t.Parallel()
+
 	var path = filepath.Join(t.TempDir(), "closed.wav")
 
 	var w, err = Create(path, Format{NumChannels: 1, SamplesPerSec: 8000, BitsPerSample: 16})
@@ -156,6 +172,8 @@ func TestUseAfterClose(t *testing.T) {
 }
 
 func TestCreateUnwritable(t *testing.T) {
+	t.Parallel()
+
 	var path = filepath.Join(t.TempDir(), "nonexistent-dir", "out.wav")
 
 	var w, err = Create(path, Format{NumChannels: 1, SamplesPerSec: 8000, BitsPerSample: 16})

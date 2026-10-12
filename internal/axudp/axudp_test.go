@@ -30,6 +30,8 @@ func noRoutes() Routes {
 }
 
 func TestAddCRC(t *testing.T) {
+	t.Parallel()
+
 	// A minimal AX.25 frame (14 bytes: dest + src address fields).
 	var frame = []byte{
 		0x82, 0xA0, 0x6E, 0x98, 0x9C, 0x40, 0xE0, // dest
@@ -59,6 +61,8 @@ func TestAddCRC(t *testing.T) {
 }
 
 func TestStripCRC(t *testing.T) {
+	t.Parallel()
+
 	var frame = []byte{0xAA, 0xBB, 0xCC, 0xDD}
 	var withCRC = AddCRC(frame)
 
@@ -79,6 +83,8 @@ func TestStripCRC(t *testing.T) {
 }
 
 func TestStripCRCBadChecksum(t *testing.T) {
+	t.Parallel()
+
 	// A bare AX.25 frame with no CRC appended — should be rejected.
 	var raw = []byte{
 		0x82, 0xA0, 0x6E, 0x98, 0x9C, 0x40, 0xE0,
@@ -92,6 +98,8 @@ func TestStripCRCBadChecksum(t *testing.T) {
 }
 
 func TestParseConfig(t *testing.T) {
+	t.Parallel()
+
 	var dir = t.TempDir()
 	var p = filepath.Join(dir, "axudp.yaml")
 	var content = `maps:
@@ -130,6 +138,8 @@ func TestParseConfig(t *testing.T) {
 }
 
 func TestParseConfigNormalisesAX25Addr(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		name     string
 		ax25addr string
@@ -143,6 +153,8 @@ func TestParseConfigNormalisesAX25Addr(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var dir = t.TempDir()
 			var p = filepath.Join(dir, "axudp.yaml")
 			var content = "maps:\n  - ax25addr: " + tc.ax25addr + "\n    host: 192.0.2.1\n    port: 93\n"
@@ -162,6 +174,8 @@ func TestParseConfigNormalisesAX25Addr(t *testing.T) {
 }
 
 func TestParseConfigResolvesUDPAddr(t *testing.T) {
+	t.Parallel()
+
 	var dir = t.TempDir()
 	var p = filepath.Join(dir, "axudp.yaml")
 	var content = `maps:
@@ -187,6 +201,8 @@ func TestParseConfigResolvesUDPAddr(t *testing.T) {
 }
 
 func TestParseConfigFileNotFound(t *testing.T) {
+	t.Parallel()
+
 	var _, err = ParseConfig("/nonexistent/axudp.yaml")
 	if err == nil {
 		t.Error("ParseConfig: expected error for missing file, got nil")
@@ -194,6 +210,8 @@ func TestParseConfigFileNotFound(t *testing.T) {
 }
 
 func TestParseConfigValidation(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		name    string
 		content string
@@ -242,6 +260,8 @@ func TestParseConfigValidation(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var dir = t.TempDir()
 			var p = filepath.Join(dir, "axudp.yaml")
 			var writeErr = os.WriteFile(p, []byte(tc.content), 0600)
@@ -257,6 +277,8 @@ func TestParseConfigValidation(t *testing.T) {
 }
 
 func TestParseConfigBadYAML(t *testing.T) {
+	t.Parallel()
+
 	var dir = t.TempDir()
 	var p = filepath.Join(dir, "axudp.yaml")
 	var writeErr = os.WriteFile(p, []byte("{ not valid yaml: ["), 0600)
@@ -270,6 +292,8 @@ func TestParseConfigBadYAML(t *testing.T) {
 }
 
 func TestLookupMap(t *testing.T) {
+	t.Parallel()
+
 	var b = new(Bridge)
 	b.routes.Maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},   // no SSID — should match all SSIDs
@@ -309,6 +333,8 @@ func TestLookupMap(t *testing.T) {
 // TestLookupMapExactBeforeWildcard verifies that an exact SSID match takes
 // priority over a no-SSID (wildcard) entry regardless of YAML order.
 func TestLookupMapExactBeforeWildcard(t *testing.T) {
+	t.Parallel()
+
 	// Wildcard entry is listed first; specific SSID entry is listed second.
 	// A lookup for Q1TEST-7 must return the specific entry, not the wildcard.
 	var b = new(Bridge)
@@ -344,6 +370,8 @@ func TestLookupMapExactBeforeWildcard(t *testing.T) {
 // bridge with a nil UDP connection, which would panic.  A panic therefore means
 // the frame was forwarded; no panic means it was correctly discarded.
 func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
+	t.Parallel()
+
 	// Build a bridge with a map entry that matches the destination encoded in
 	// the test frame below.  The udpConn is intentionally left nil so that any
 	// accidental call to sendAXUDP panics immediately.
@@ -396,6 +424,8 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 // TestKISSOverflowDiscarded verifies that a frame whose raw KISS bytes exceed
 // kiss.MaxFrameLen is discarded on the closing FEND rather than forwarded in
 // truncated form, and is complained about once.
+//
+//nolint:paralleltest // Serial: hooks logrus's global logger.
 func TestKISSOverflowDiscarded(t *testing.T) {
 	// Empty bridge — no maps, so even an accidentally forwarded frame would
 	// just log to stderr rather than panic.
@@ -482,6 +512,8 @@ func (c *singleReadConn) Read(b []byte) (int, error) {
 // case where conn.Read returns (n>0, io.EOF): bytes in the final read must be
 // processed before the loop exits, not silently dropped.
 func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
+	t.Parallel()
+
 	// Create a UDP socket pair: src is used by the bridge, dst receives frames.
 	var srcPkt, srcErr = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if srcErr != nil {
@@ -563,6 +595,8 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 // kiss.MaxFrameLen.  Oversized frames would be silently truncated by the nettnc.go
 // KISS reader, producing corrupt AX.25 data.
 func TestBroadcastKISSDropsOversizedFrame(t *testing.T) {
+	t.Parallel()
+
 	var b = new(Bridge)
 	var fc = new(fakeConn)
 	b.clients = []net.Conn{fc}
@@ -587,6 +621,8 @@ func TestBroadcastKISSDropsOversizedFrame(t *testing.T) {
 // RunUDPListener return the read error to its caller rather than terminating
 // the process itself, so the caller decides what a dead UDP side means.
 func TestRunUDPListenerReturnsOnReadError(t *testing.T) {
+	t.Parallel()
+
 	var pkt, listenErr = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if listenErr != nil {
 		t.Fatal(listenErr)
@@ -625,6 +661,8 @@ func TestRunUDPListenerReturnsOnReadError(t *testing.T) {
 // RunKISSServer return rather than terminating the process or spinning on a
 // socket that cannot recover.
 func TestRunKISSServerReturnsOnListenerClose(t *testing.T) {
+	t.Parallel()
+
 	var ln, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if listenErr != nil {
 		t.Fatal(listenErr)
@@ -677,6 +715,8 @@ func (l *failingListener) Addr() net.Addr { return &net.TCPAddr{IP: net.IPv4zero
 // RunKISSServer return, rather than retrying forever in a tight loop that
 // spins the CPU and floods the log.
 func TestRunKISSServerGivesUpOnPersistentAcceptFailure(t *testing.T) {
+	t.Parallel()
+
 	var ln = new(failingListener)
 	var b = NewBridge(noRoutes(), nil)
 
@@ -712,6 +752,8 @@ func TestRunKISSServerGivesUpOnPersistentAcceptFailure(t *testing.T) {
 // by RunKISSServer is registered as a broadcast client, i.e. that frames
 // arriving over UDP would reach it.
 func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
+	t.Parallel()
+
 	var ln, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if listenErr != nil {
 		t.Fatal(listenErr)
@@ -763,6 +805,8 @@ func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
 }
 
 func TestParseConfigBroadcast(t *testing.T) {
+	t.Parallel()
+
 	var p = filepath.Join(t.TempDir(), "axudp.yaml")
 	var content = `broadcast: [nodes, " ID-0 "]
 maps:
@@ -786,6 +830,8 @@ maps:
 }
 
 func TestParseConfigEmptyBroadcastAddress(t *testing.T) {
+	t.Parallel()
+
 	var p = filepath.Join(t.TempDir(), "axudp.yaml")
 	require.NoError(t, os.WriteFile(p, []byte("broadcast: [NODES, \" \"]\nmaps: []\n"), 0600))
 
@@ -794,6 +840,8 @@ func TestParseConfigEmptyBroadcastAddress(t *testing.T) {
 }
 
 func TestRoute(t *testing.T) {
+	t.Parallel()
+
 	var routes = Routes{
 		Broadcast: []string{"NODES"},
 		Maps: []MapEntry{
@@ -827,6 +875,8 @@ func TestRoute(t *testing.T) {
 }
 
 func TestRouteBroadcastWithNoBroadcastPeers(t *testing.T) {
+	t.Parallel()
+
 	var routes = Routes{
 		Broadcast: []string{"NODES"},
 		Maps: []MapEntry{
@@ -842,6 +892,8 @@ func TestRouteBroadcastWithNoBroadcastPeers(t *testing.T) {
 // TestKISSBroadcastFansOut checks that a frame from a KISS client for a
 // broadcast address reaches every peer marked for broadcasts.
 func TestKISSBroadcastFansOut(t *testing.T) {
+	t.Parallel()
+
 	var listen = func() *net.UDPConn {
 		var pkt, err = new(net.ListenConfig).ListenPacket(t.Context(), "udp", "127.0.0.1:0")
 		require.NoError(t, err)

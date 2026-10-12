@@ -46,6 +46,8 @@ func Example_main_southern() {
 
 // UTM stops short of the poles, where MGRS carries on.
 func Test_main_polar(t *testing.T) {
+	t.Parallel()
+
 	var result = testutils.RunMain(t, "", "85", "10")
 	var out, status = result.Output(), result.Status
 
@@ -55,6 +57,8 @@ func Test_main_polar(t *testing.T) {
 }
 
 func Test_main_usage(t *testing.T) {
+	t.Parallel()
+
 	var result = testutils.RunMain(t, "")
 	var out, status = result.Output(), result.Status
 
@@ -63,6 +67,8 @@ func Test_main_usage(t *testing.T) {
 }
 
 func Test_main_invalid(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		args []string
 		want string
@@ -73,6 +79,8 @@ func Test_main_invalid(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, "", tc.args...)
 			var out, status = result.Output(), result.Status
 

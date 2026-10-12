@@ -79,6 +79,7 @@ func readN(t *testing.T, f *os.File, n int) []byte {
 	}
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_walk96(t *testing.T) {
 	var master = fakeTNC(t)
 
