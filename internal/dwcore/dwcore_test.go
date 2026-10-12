@@ -19,6 +19,7 @@ func TestSourceKindString(t *testing.T) {
 	assert.Equal(t, "aprs-is", SourceAPRSIS.String())
 	assert.Equal(t, "network", SourceNetTNC.String())
 	assert.Equal(t, "axudp", SourceAXUDP.String())
+	assert.Equal(t, "serial", SourceSerialTNC.String())
 	assert.Equal(t, "SourceKind(99)", SourceKind(99).String())
 }
 

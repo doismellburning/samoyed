@@ -58,6 +58,9 @@ const (
 
 	// SourceAXUDP is another node, over AX.25 over UDP.
 	SourceAXUDP
+
+	// SourceSerialTNC is a serial TNC the channel is mapped to.
+	SourceSerialTNC
 )
 
 // String names the kind of source as the web interface shows it.
@@ -73,6 +76,8 @@ func (k SourceKind) String() string {
 		return "network"
 	case SourceAXUDP:
 		return "axudp"
+	case SourceSerialTNC:
+		return "serial"
 	default:
 		return fmt.Sprintf("SourceKind(%d)", int(k))
 	}
