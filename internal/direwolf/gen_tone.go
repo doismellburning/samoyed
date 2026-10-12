@@ -203,13 +203,11 @@ func newSineTable(amp int) [256]int16 {
 		/* 16 bit sound sample must fit in range of -32768 .. +32767. */
 
 		if s < -32768 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("gen_tone_init: Excessive amplitude is being clipped.\n")
+			logrus.WithField("amp", amp).Error("Excessive transmit amplitude is being clipped")
 
 			s = -32768
 		} else if s > 32767 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("gen_tone_init: Excessive amplitude is being clipped.\n")
+			logrus.WithField("amp", amp).Error("Excessive transmit amplitude is being clipped")
 
 			s = 32767
 		}
@@ -578,9 +576,10 @@ func (tg *ToneGenerator) PutBit(dat int) {
 			// transmitter keyed.  The transmission then ends, and the PTT
 			// drops, as usual.
 			if !tg.unknownModemReported {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("INTERNAL ERROR: achan[%d].modem_type = %d\n",
-					tg.channel, audioConfig.achan[tg.channel].modem_type)
+				logrus.WithFields(logrus.Fields{
+					"channel":    tg.channel,
+					"modem_type": audioConfig.achan[tg.channel].modem_type,
+				}).Error("Internal error: tone generator can't modulate for this modem type")
 
 				tg.unknownModemReported = true
 			}
@@ -618,13 +617,18 @@ func (tg *ToneGenerator) PutSample(sam int) {
 	// Too late to change now because everyone would need to recalibrate their
 	// transmit audio level.
 
+	// This runs per sample, so it logs at Trace.
 	if sam < -32767 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Warning: Audio sample %d clipped to -32767.\n", sam)
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithField("sample", sam).Trace("Audio sample clipped to -32767")
+		}
+
 		sam = -32767
 	} else if sam > 32767 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Warning: Audio sample %d clipped to +32767.\n", sam)
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithField("sample", sam).Trace("Audio sample clipped to +32767")
+		}
+
 		sam = 32767
 	}
 
