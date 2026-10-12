@@ -530,8 +530,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	var pp = ax25.FromText(audible_response, false)
 
 	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error. Couldn't make frame from \"%s\"\n", audible_response)
+		logrus.WithField("response", audible_response).Error("Internal error: couldn't make frame from audible response")
 
 		return
 	}
@@ -618,8 +617,7 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
 				return (err)
 			}
 		default:
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Field does not start with A, B, C, or digit: \"%s\"\n", e)
+			logrus.WithField("field", e).Error("Touch tone field does not start with A, B, C, or digit")
 
 			return (TT_ERROR_D_MSG)
 		}
@@ -653,8 +651,7 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("Macro tone sequence: '%s'\n", e)
+	logrus.WithField("sequence", e).Debug("Macro tone sequence")
 
 	var xstr, ystr, zstr, _, _, ipat = g.findTTLocMatch(e)
 
@@ -664,14 +661,19 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 		// Only those 3 are processed below.
 
 		// dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s\n", ipat, g.config.ttlocs[ipat].pattern, xstr, ystr, zstr, bstr, dstr);
-		dw_printf("Matched pattern %3d: '%s', x=%s, y=%s, z=%s\n", ipat, g.config.ttlocs[ipat].pattern, xstr, ystr, zstr)
-
-		dw_printf("Replace with:        '%s'\n", g.config.ttlocs[ipat].macro.definition)
+		logrus.WithFields(logrus.Fields{
+			"pattern_index": ipat,
+			"pattern":       g.config.ttlocs[ipat].pattern,
+			"x":             xstr,
+			"y":             ystr,
+			"z":             zstr,
+			"definition":    g.config.ttlocs[ipat].macro.definition,
+		}).Debug("Macro matched pattern")
 
 		if g.config.ttlocs[ipat].ttlocType != TTLOC_MACRO {
 			/* Found match to a different type.  Really shouldn't be here. */
 			/* Print internal error message... */
-			dw_printf("expand_macro: type != TTLOC_MACRO\n")
+			logrus.WithField("pattern_index", ipat).Error("Internal error: expandMacro matched a pattern that is not a macro")
 
 			return (TT_ERROR_INTERNAL)
 		}
@@ -707,14 +709,13 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 		 * Process as if we heard this over the air.
 		 */
 
-		dw_printf("After substitution:  '%s'\n", stemp.String())
+		logrus.WithField("sequence", stemp.String()).Debug("Macro after substitution")
 
 		return (g.parseFields(state, stemp.String()))
 	} else {
 		/* Send reject sound. */
 		/* Does not match any macro definitions. */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Tone sequence did not match any pattern\n")
+		logrus.WithField("sequence", e).Error("Tone sequence did not match any pattern")
 
 		return (TT_ERROR_MACRO_NOMATCH)
 	}
@@ -763,16 +764,18 @@ func checksum_not_ok(str string, length int, found rune) int {
 		} else if c >= 'A' && c <= 'D' {
 			sum += int(c-'A') + 10
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("aprs_tt: checksum: bad character \"%c\" in checksum calculation!\n", c)
+			logrus.WithField("char", string(c)).Error("Bad character in touch tone checksum calculation")
 		}
 	}
 
 	var expected = rune('0' + (sum % 10))
 
 	if expected != found {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Bad checksum for \"%.*s\".  Expected %c but received %c.\n", length, str, expected, found)
+		logrus.WithFields(logrus.Fields{
+			"value":    str[:length],
+			"expected": string(expected),
+			"received": string(found),
+		}).Error("Bad touch tone checksum")
 
 		return (TT_ERROR_BAD_CHECKSUM)
 	}
@@ -782,8 +785,7 @@ func checksum_not_ok(str string, length int, found rune) int {
 
 func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 	if g.debug > 0 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("APRStt parse callsign (starts with A then digit): \"%s\"\n", e)
+		logrus.WithField("entry", e).Debug("APRStt parse callsign (starts with A then digit)")
 	}
 
 	dwutil.Assert(e[0] == 'A')
@@ -798,8 +800,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		state.callsign = e[1:]
 
 		if g.debug > 0 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Special case, 3 digit tactical call: \"%s\"\n", state.callsign)
+			logrus.WithField("callsign", state.callsign).Debug("Special case, 3 digit tactical call")
 		}
 
 		return (0)
@@ -834,18 +835,24 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			state.symtabOrOverlay = rune(stemp[0])
 
 			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Three digit abbreviation1: callsign \"%s\", symbol code '%c (Box DTMF)', overlay '%c', checksum %c\n",
-					state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
+				logrus.WithFields(logrus.Fields{
+					"callsign": state.callsign,
+					"symbol":   string(state.symbolCode),
+					"overlay":  string(state.symtabOrOverlay),
+					"checksum": string(e[length-1]),
+				}).Debug("Three digit abbreviation (two key overlay)")
 			}
 		} else {
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
 			state.symtabOrOverlay = rune(e[length-2])
 
 			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Three digit abbreviation2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-					state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
+				logrus.WithFields(logrus.Fields{
+					"callsign": state.callsign,
+					"symbol":   string(state.symbolCode),
+					"overlay":  string(state.symtabOrOverlay),
+					"checksum": string(e[length-1]),
+				}).Debug("Three digit abbreviation")
 			}
 		}
 
@@ -875,9 +882,12 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			state.symtabOrOverlay = rune(stemp[0])
 
 			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Callsign in two key format1: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-					state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
+				logrus.WithFields(logrus.Fields{
+					"callsign": state.callsign,
+					"symbol":   string(state.symbolCode),
+					"overlay":  string(state.symtabOrOverlay),
+					"checksum": string(e[length-1]),
+				}).Debug("Callsign in two key format (two key overlay)")
 			}
 		} else {
 			var tttemp = e[1 : length-2]
@@ -887,17 +897,19 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			state.symtabOrOverlay = rune(e[length-2])
 
 			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Callsign in two key format2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-					state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
+				logrus.WithFields(logrus.Fields{
+					"callsign": state.callsign,
+					"symbol":   string(state.symbolCode),
+					"overlay":  string(state.symtabOrOverlay),
+					"checksum": string(e[length-1]),
+				}).Debug("Callsign in two key format")
 			}
 		}
 
 		return (0)
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Touch tone callsign not valid: \"%s\"\n", e)
+	logrus.WithField("entry", e).Error("Touch tone callsign not valid")
 
 	return (TT_ERROR_INVALID_CALL)
 }
@@ -927,8 +939,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 
 func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 	if g.debug > 0 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("APRStt parse object name (starts with AA): \"%s\"\n", e)
+		logrus.WithField("entry", e).Debug("APRStt parse object name (starts with AA)")
 	}
 
 	dwutil.Assert(e[0] == 'A')
@@ -951,16 +962,14 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 			state.ssid = 0 /* No ssid for object name */
 
 			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Object name in two key format: \"%s\"\n", state.callsign)
+				logrus.WithField("object", state.callsign).Debug("Object name in two key format")
 			}
 
 			return (0)
 		}
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Touch tone object name not valid: \"%s\"\n", e)
+	logrus.WithField("entry", e).Error("Touch tone object name not valid")
 
 	return (TT_ERROR_INVALID_OBJNAME)
 } /* end parseObjectName */
@@ -1001,8 +1010,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 
 func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 	if g.debug > 0 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("APRStt parse symbol (starts with AB): \"%s\"\n", e)
+		logrus.WithField("entry", e).Debug("APRStt parse symbol (starts with AB)")
 	}
 
 	dwutil.Assert(e[0] == 'A')
@@ -1027,9 +1035,10 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 			state.symbolCode = rune(32 + nn)
 
 			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("symbol code '%c', primary symbol table '%c'\n",
-					state.symbolCode, state.symtabOrOverlay)
+				logrus.WithFields(logrus.Fields{
+					"symbol": string(state.symbolCode),
+					"table":  string(state.symtabOrOverlay),
+				}).Debug("Symbol from primary symbol table")
 			}
 
 			return (0)
@@ -1039,9 +1048,10 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 			state.symbolCode = rune(32 + nn)
 
 			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("symbol code '%c', alternate symbol table '%c'\n",
-					state.symbolCode, state.symtabOrOverlay)
+				logrus.WithFields(logrus.Fields{
+					"symbol": string(state.symbolCode),
+					"table":  string(state.symtabOrOverlay),
+				}).Debug("Symbol from alternate symbol table")
 			}
 
 			return (0)
@@ -1054,9 +1064,10 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 					state.symtabOrOverlay = rune(stemp[0])
 
 					if g.debug > 0 {
-						text_color_set(DW_COLOR_DEBUG)
-						dw_printf("symbol code '%c', alternate symbol table with overlay '%c'\n",
-							state.symbolCode, state.symtabOrOverlay)
+						logrus.WithFields(logrus.Fields{
+							"symbol":  string(state.symbolCode),
+							"overlay": string(state.symtabOrOverlay),
+						}).Debug("Symbol from alternate symbol table with overlay")
 					}
 
 					return (0)
@@ -1065,8 +1076,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 		}
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Touch tone symbol not valid: \"%s\"\n", e)
+	logrus.WithField("entry", e).Error("Touch tone symbol not valid")
 
 	return (TT_ERROR_INVALID_SYMBOL)
 } /* end parseSymbol */
@@ -1101,8 +1111,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 	dwutil.Assert(e[1] == 'C')
 
 	if g.debug > 0 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("APRStt parse QIKcom-2 / APRStt 3 ten digit call or five digit suffix (starts with AC): \"%s\"\n", e)
+		logrus.WithField("entry", e).Debug("APRStt parse QIKcom-2 / APRStt 3 ten digit call or five digit suffix (starts with AC)")
 	}
 
 	if len(e) == 2+10 {
@@ -1125,13 +1134,14 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 				/* In normal operation, try to find full callsign for the suffix received. */
 
 				if _idx >= 0 {
-					text_color_set(DW_COLOR_INFO)
-					dw_printf("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, _call)
+					logrus.WithFields(logrus.Fields{
+						"suffix":   suffix,
+						"callsign": _call,
+					}).Info("Touch tone suffix converted to full callsign")
 
 					state.callsign = _call
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", suffix)
+					logrus.WithField("suffix", suffix).Error("Couldn't find full callsign for touch tone suffix")
 
 					return (TT_ERROR_SUFFIX_NO_CALL) /* Don't know this user. */
 				}
@@ -1195,8 +1205,7 @@ const R_M = 6371000.0
 
 func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 	if g.debug > 0 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("APRStt parse location (starts with B): \"%s\"\n", e)
+		logrus.WithField("entry", e).Debug("APRStt parse location (starts with B)")
 		// TODO: more detail later...
 	}
 
@@ -1231,14 +1240,12 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_VECTOR:
 			if len(bstr) != 3 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Bearing \"%s\" should be 3 digits.\n", bstr)
+				logrus.WithField("bearing", bstr).Error("Touch tone bearing should be 3 digits")
 				// return error code?
 			}
 
 			if len(dstr) < 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Distance \"%s\" should 1 or more digits.\n", dstr)
+				logrus.WithField("distance", dstr).Error("Touch tone distance should be 1 or more digits")
 				// return error code?
 			}
 
@@ -1265,15 +1272,13 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_GRID:
 			if len(xstr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing X coordinate.\n")
+				logrus.Error("Touch tone location missing X coordinate")
 
 				xstr = "0"
 			}
 
 			if len(ystr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing Y coordinate.\n")
+				logrus.Error("Touch tone location missing Y coordinate")
 
 				ystr = "0"
 			}
@@ -1315,15 +1320,13 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_UTM:
 			if len(xstr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing X coordinate.\n")
+				logrus.Error("Touch tone location missing X coordinate")
 				/* Avoid divide by zero later.  Put in middle of range. */
 				xstr = "5"
 			}
 
 			if len(ystr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing Y coordinate.\n")
+				logrus.Error("Touch tone location missing Y coordinate")
 				/* Avoid divide by zero later.  Put in middle of range. */
 				ystr = "5"
 			}
@@ -1358,8 +1361,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 				// dw_printf ("DEBUG: from UTM, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Conversion from UTM failed:\n%s\n\n", geoErr)
+				logrus.WithError(geoErr).Error("Conversion from UTM failed")
 			}
 
 			state.dao[2] = e[0]
@@ -1367,15 +1369,13 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_MGRS, TTLOC_USNG:
 			if len(xstr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("MGRS/USNG: Missing X (easting) coordinate.\n")
+				logrus.Error("MGRS/USNG: Missing X (easting) coordinate")
 				/* Should not be possible to get here. Fake it and carry on. */
 				xstr = "5"
 			}
 
 			if len(ystr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("MGRS/USNG: Missing Y (northing) coordinate.\n")
+				logrus.Error("MGRS/USNG: Missing Y (northing) coordinate")
 				/* Should not be possible to get here. Fake it and carry on. */
 				ystr = "5"
 			}
@@ -1397,8 +1397,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 				// dw_printf ("DEBUG: from MGRS/USNG, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Conversion from MGRS/USNG failed:\n%s\n\n", convertErr)
+				logrus.WithError(convertErr).Error("Conversion from MGRS/USNG failed")
 			}
 
 			state.dao[2] = e[0]
@@ -1410,9 +1409,10 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			stemp += xstr
 
 			if len(stemp) != 4 && len(stemp) != 6 && len(stemp) != 10 && len(stemp) != 12 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator \"%s\" + \"%s\"\n",
-					g.config.ttlocs[ipat].mhead.prefix, xstr)
+				logrus.WithFields(logrus.Fields{
+					"prefix": g.config.ttlocs[ipat].mhead.prefix,
+					"x":      xstr,
+				}).Error("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator")
 
 				return (TT_ERROR_INVALID_MHEAD)
 			}
@@ -1428,8 +1428,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 				var lat, lon, err = latlong.FromGridSquare(state.locText)
 				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("%v\n", err)
+					logrus.WithError(err).Error("Invalid touch tone grid square")
 
 					return (TT_ERROR_INVALID_MHEAD)
 				}
@@ -1443,8 +1442,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_SATSQ:
 			if len(xstr) != 4 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Expected 4 digits for the Satellite Square.\n")
+				logrus.WithField("x", xstr).Error("Expected 4 digits for the Satellite Square")
 
 				return (TT_ERROR_INVALID_SATSQ)
 			}
@@ -1457,8 +1455,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 				var lat, lon, err = latlong.FromGridSquare(state.locText)
 				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("%v\n", err)
+					logrus.WithError(err).Error("Invalid touch tone grid square")
 
 					return (TT_ERROR_INVALID_SATSQ)
 				}
@@ -1472,8 +1469,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_AMBIG:
 			if len(xstr) != 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Expected 1 digits for the position ambiguity.\n")
+				logrus.WithField("x", xstr).Error("Expected 1 digit for the position ambiguity")
 
 				return (TT_ERROR_INVALID_LOC)
 			}
@@ -1490,8 +1486,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 	/* Does not match any location specification. */
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Received location \"%s\" does not match any definitions.\n", e)
+	logrus.WithField("entry", e).Error("Received touch tone location does not match any definitions")
 
 	/* Send reject sound. */
 
@@ -1579,7 +1574,7 @@ func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, st
 						match = false
 					}
 				default:
-					dw_printf("findTTLocMatch: shouldn't be here.\n")
+					logrus.WithFields(logrus.Fields{"pattern": pattern, "char": string(mc)}).Error("Internal error: findTTLocMatch hit an unexpected pattern character")
 					/* Shouldn't be here. */
 					match = false
 				} /* switch */
@@ -1721,8 +1716,7 @@ func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel, recFrame fr
 			recFrame(dwcore.ChannelSource(dwcore.SourceDTMF, channel), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, "tt")
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg)
+		logrus.WithField("packet", raw_tt_msg).Error("Could not convert touch tone message into APRS packet")
 	}
 }
 
