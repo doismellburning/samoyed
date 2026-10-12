@@ -160,15 +160,16 @@ func NewKissSerial(ctx context.Context, mc *misc_config_s, handler *KissHandler,
 			ks.fd = serialport.Open(mc.kiss_serial_port, mc.kiss_serial_speed)
 
 			if ks.fd != nil {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("Opened %s for serial port KISS.\n", mc.kiss_serial_port)
+				logrus.WithField("device", mc.kiss_serial_port).Info("Opened serial port for KISS")
 			} else { //nolint:staticcheck
 				// An error message was already displayed.
 			}
 		} else {
 			// Polling case.   Defer until read and device not opened.
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Will be checking periodically for %s\n", mc.kiss_serial_port)
+			logrus.WithFields(logrus.Fields{
+				"device":       mc.kiss_serial_port,
+				"poll_seconds": mc.kiss_serial_poll,
+			}).Info("Will be checking periodically for serial port")
 		}
 
 		if mc.kiss_serial_poll != 0 || ks.fd != nil {
@@ -283,8 +284,11 @@ func (ks *KissSerial) write(buf []byte) {
 	var n = serialport.Write(ks.fd, buf)
 
 	if n != len(buf) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError sending KISS message to client application thru serial port.\n\n")
+		logrus.WithFields(logrus.Fields{
+			"device":  ks.miscConfig.kiss_serial_port,
+			"length":  len(buf),
+			"written": n,
+		}).Error("Error sending KISS message to client application thru serial port")
 
 		// Not closed here: see KissSerial.failed.
 		ks.failed = true
@@ -353,8 +357,7 @@ func (ks *KissSerial) giveUpPortIfFailed() bool {
 		return false
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("\nSerial Port KISS write error. Closing connection.\n\n")
+	logrus.WithField("device", ks.miscConfig.kiss_serial_port).Error("Serial port KISS write error, closing connection")
 	ks.closePort()
 
 	return true
@@ -391,8 +394,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 		}
 
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
+			logrus.WithError(err).WithField("device", ks.miscConfig.kiss_serial_port).Error("Serial port KISS read error, closing connection")
 			ks.closePort()
 
 			return ch, err
@@ -425,8 +427,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 				return ch, nil
 			}
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
+			logrus.WithError(err).WithField("device", ks.miscConfig.kiss_serial_port).Error("Serial port KISS read error, closing connection")
 			ks.closePort()
 		} else {
 			// Not open.  Wait for it to appear and try opening.
@@ -440,8 +441,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 				var fd = serialport.Open(ks.miscConfig.kiss_serial_port, ks.miscConfig.kiss_serial_speed)
 
 				if fd != nil {
-					text_color_set(DW_COLOR_INFO)
-					dw_printf("\nOpened %s for serial port KISS.\n\n", ks.miscConfig.kiss_serial_port)
+					logrus.WithField("device", ks.miscConfig.kiss_serial_port).Info("Opened serial port for KISS")
 
 					ks.kf = new(kiss.Collector) // Start with clean state.
 

@@ -236,24 +236,24 @@ func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 
 	require.NoError(t, client.Close())
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 	})
 
 	assert.Contains(t, output, "Error sending KISS message to client application thru serial port")
 	assert.True(t, ks.failed, "the serial port was not given up after the write error")
 
-	output = testutils.CaptureOutput(t, func() {
+	output = captureKissLog(t, func() {
 		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 	})
 
 	assert.Empty(t, output, "the serial port was written to again after the write error")
 
-	output = testutils.CaptureOutput(t, func() {
+	output = captureKissLog(t, func() {
 		assert.True(t, ks.giveUpPortIfFailed())
 	})
 
-	assert.Contains(t, output, "Serial Port KISS write error. Closing connection.")
+	assert.Contains(t, output, "Serial port KISS write error, closing connection")
 	assert.Nil(t, ks.fd, "the listener did not close the failed serial port")
 	assert.False(t, ks.failed)
 }
