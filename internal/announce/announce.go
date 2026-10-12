@@ -37,6 +37,10 @@ const AGWType = "_agwpe._tcp"
 // HTTPType is the DNS-SD service type for a web page (RFC 6763 section 7).
 const HTTPType = "_http._tcp"
 
+// PrometheusType is the DNS-SD service type for a Prometheus metrics endpoint,
+// as https://github.com/msiebuhr/prometheus-mdns-sd discovers them.
+const PrometheusType = "_prometheus-http._tcp"
+
 // Service is one service to announce: an instance Name, unique among those of
 // its Type, the Port it listens on, and any key/value pairs to put in its TXT
 // record (such as the "path" of a web page).

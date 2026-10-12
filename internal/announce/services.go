@@ -8,9 +8,10 @@ import "fmt"
 // Ports are the ports of the services there are to announce, 0 for one that
 // isn't listening.
 type Ports struct {
-	KISS []int
-	AGW  int
-	Web  int
+	KISS    []int
+	AGW     int
+	Web     int
+	Metrics int
 }
 
 // Services lists what there is to announce on ports, as name, or as
@@ -46,6 +47,10 @@ func Services(name string, ports *Ports) []Service {
 
 	if ports.Web != 0 {
 		services = append(services, Service{Name: name, Type: HTTPType, Port: ports.Web, Text: map[string]string{"path": "/"}})
+	}
+
+	if ports.Metrics != 0 {
+		services = append(services, Service{Name: name, Type: PrometheusType, Port: ports.Metrics, Text: map[string]string{"path": "/metrics"}})
 	}
 
 	return services

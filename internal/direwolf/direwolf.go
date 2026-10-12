@@ -703,7 +703,7 @@ x = Silence FX.25 information.`)
 	// The connected-mode link layer, after the AGW server whose clients it
 	// tells about the links they asked for.
 	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, agwServer, transmitQueue, d_c_opt)
-	metrics_init(ctx, audio_config, misc_config)
+	var metricsListening = metrics_init(ctx, audio_config, misc_config)
 	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
 
 	// All three KISS transports hand what their clients send to the same
@@ -720,6 +720,10 @@ x = Silence FX.25 information.`)
 		// Only if it started: webui_init hands back no hub if it didn't.
 		if webHub != nil {
 			ports.Web = misc_config.web_port
+		}
+
+		if metricsListening {
+			ports.Metrics = misc_config.metrics_port
 		}
 
 		announce.Announce(ctx, announce.Services(misc_config.dns_sd_name, ports))
