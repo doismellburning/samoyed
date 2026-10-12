@@ -92,11 +92,12 @@ const nodeMapTimeout = 30 * time.Second
 func DirewolfMain(ctx context.Context) { //nolint:funlen // Ported from Dire Wolf as one function
 	var started = time.Now() // For the web interface's uptime.
 
-	// logrus writes to stderr by default, while everything still going through
-	// dw_printf writes to stdout. Until the conversion is finished the two are
-	// halves of one console stream - a "Packet" entry on stderr whose packet
-	// text went to stdout is no use to anyone, and anything reading our stdout
-	// would lose the converted lines altogether - so put logrus on stdout too.
+	// logrus writes to stderr by default, while the monitor output - the packet
+	// text ax25.SafePrint writes, and the lines printed around it - goes to
+	// stdout. The two are halves of one console stream - a "Packet" entry on
+	// stderr whose packet text went to stdout is no use to anyone, and anything
+	// reading our stdout would lose the log entries altogether - so put logrus
+	// on stdout too.
 	logrus.SetOutput(os.Stdout)
 	dwutil.SetLogFormat()
 
