@@ -23,6 +23,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -65,7 +66,7 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*KissSerial, <-chan struct{}) {
 	t.Helper()
 
-	var ks = newKissSerial(mc, setupKissProcessMsg(t), 0)
+	var ks = newKissSerial(mc, newTestKissHandler(t), 0)
 
 	if mc.kiss_serial_poll == 0 {
 		ks.fd = serialport.Open(mc.kiss_serial_port, mc.kiss_serial_speed)
@@ -102,7 +103,7 @@ func openKissSerialPort(t *testing.T, debug int) (*KissSerial, *os.File) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var ks = newKissSerial(mc, setupKissProcessMsg(t), debug)
+	var ks = newKissSerial(mc, newTestKissHandler(t), debug)
 
 	t.Cleanup(ks.closePort)
 
@@ -250,7 +251,7 @@ func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 func TestKissSerialPrompt(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 0)
 
-	ks.prompt([]byte("\r\ncmd:"))
+	ks.Prompt([]byte("\r\ncmd:"))
 
 	assert.Equal(t, "\r\ncmd:", readSerialText(t, client, len("\r\ncmd:")))
 }
@@ -270,11 +271,11 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	// is longer than the terminal will hold.
 	var got = drainKissFrame(t, client)
 
-	var output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(0, kiss.CmdDataFrame, frame)
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	assert.Contains(t, output, "Truncated")
+	ks.SendRecPacket(0, kiss.CmdDataFrame, frame)
+
+	testutils.LoggedEntry(t, hook, "KISS frame for client application too long, truncating it")
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
 	assert.Len(t, <-got, ax25.MaxPacketLen+3)
@@ -291,7 +292,7 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var ks, _ = startKissSerial(t.Context(), t, mc)
+	startKissSerial(t.Context(), t, mc)
 
 	var pp = newTestPacket(t)
 
@@ -299,11 +300,16 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 		[]byte{byte(channel<<4 | kiss.CmdDataFrame)}, pp.FrameData()...)))
 	require.NoError(t, writeErr)
 
-	// TransmitQueue.Count rather than TransmitQueue.Peek: the queue is being filled by the
-	// listening goroutine, and only TransmitQueue.Count reads it under the lock.
-	assert.Eventually(t, func() bool {
-		return ks.handler.queue.Count(channel, TQ_PRIO_1_LO, "", "", false) > 0
-	}, 5*time.Second, 10*time.Millisecond, "the frame from the KISS client was not queued for transmission")
+	// The client's bytes are handled in order, so the answer to a TXBUF query
+	// after the frame counts it if it was queued.
+	_, writeErr = client.Write(kiss.Encapsulate(append([]byte{byte(channel<<4 | kiss.CmdSetHardware)}, []byte("TXBUF:")...)))
+	require.NoError(t, writeErr)
+
+	var answer = kiss.Unwrap(readSerialKissFrame(t, client))
+	require.NotEmpty(t, answer)
+
+	assert.Equal(t, byte(kiss.CmdSetHardware), answer[0]&0xf)
+	assert.NotEqual(t, "TXBUF:0", string(answer[1:]), "the frame from the KISS client was not queued for transmission")
 
 	require.NoError(t, client.Close())
 }
@@ -433,20 +439,18 @@ func TestKissSerialPollingStopsWhenCancelled(t *testing.T) {
 func TestKissSerialDebugPrints(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 2)
 
-	var output = testutils.CaptureOutput(t, func() {
-		ks.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
+	var hook = testutils.CaptureLogrus(t, logrus.DebugLevel)
 
-		readSerialKissFrame(t, client)
-	})
+	ks.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
-	assert.Contains(t, output, "Packet content before adding KISS framing")
-	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
+	readSerialKissFrame(t, client)
 
-	output = testutils.CaptureOutput(t, func() {
-		ks.prompt([]byte("\r\ncmd:"))
-	})
+	testutils.LoggedEntry(t, hook, "Packet content before adding KISS framing and any escapes")
+	assert.Equal(t, 1, testutils.LoggedEntry(t, hook, ">>> Data frame to KISS client application").Data["channel"])
 
-	assert.Contains(t, output, "Fake command prompt")
+	ks.Prompt([]byte("\r\ncmd:"))
+
+	testutils.LoggedEntry(t, hook, ">>> Fake command prompt to KISS client application")
 }
 
 // The receive path writes to the port while the listening goroutine reads from

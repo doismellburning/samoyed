@@ -79,9 +79,9 @@ func FuzzKissRecByte(f *testing.F) {
 			t.Skip()
 		}
 
-		var h = setupKissProcessMsg(t)
+		var h = newTestKissHandler(t)
 
-		var _, from = recordingKissClient()
+		var from = quietKissClient{}
 		var kc kiss.Collector
 
 		for _, b := range stream {

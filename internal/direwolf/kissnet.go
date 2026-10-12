@@ -149,11 +149,13 @@ import (
 	"fmt"
 	"net"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/sirupsen/logrus"
 )
 
@@ -166,7 +168,7 @@ const kissnetPollInterval = time.Second
 // Each TCP port has its own status block in a linked list.
 type KissNetService struct {
 	miscConfigP  *misc_config_s
-	handler      *KissHandler // Acts on what a client sends; set by Start.
+	handler      *kisstnc.Handler // Acts on what a client sends; set by Start.
 	allPorts     *kissport_status_s
 	debug        int           /* Print information flowing from and to client. */
 	pollInterval time.Duration // For a client to attach, or a slot to come free.
@@ -224,7 +226,7 @@ func NewKissNetService(mc *misc_config_s, debug int) *KissNetService {
 //
 // Starting it again would try to bind every port a second time, so a second
 // Start is complained about and ignored.
-func (kns *KissNetService) Start(ctx context.Context, handler *KissHandler) {
+func (kns *KissNetService) Start(ctx context.Context, handler *kisstnc.Handler) {
 	if !kns.started.CompareAndSwap(false, true) {
 		logrus.Error("KISS TCP service started twice; ignoring the second start")
 
@@ -311,7 +313,7 @@ func (kns *KissNetService) sendOn(kps *kissport_status_s, client int, conn net.C
 		return
 	}
 
-	kns.write(kps, client, conn, kissClientFrame(portChannel, cmd, frame, kns.debug, "TCP"))
+	kns.write(kps, client, conn, kisstnc.ClientFrame(portChannel, cmd, frame, kns.debug, "TCP"))
 }
 
 // write sends buf, already framed or the fake command prompt, to client
@@ -345,7 +347,7 @@ func (c kissNetClient) attached() bool {
 	return c.conn != nil && c.kps.clientConn(c.client) == c.conn
 }
 
-func (c kissNetClient) reply(channel int, cmd int, frame []byte) {
+func (c kissNetClient) Reply(channel int, cmd int, frame []byte) {
 	if !c.attached() {
 		return
 	}
@@ -353,7 +355,7 @@ func (c kissNetClient) reply(channel int, cmd int, frame []byte) {
 	c.kns.sendOn(c.kps, c.client, c.conn, channel, cmd, frame)
 }
 
-func (c kissNetClient) prompt(text []byte) {
+func (c kissNetClient) Prompt(text []byte) {
 	if !c.attached() {
 		return
 	}
@@ -370,13 +372,13 @@ func (c kissNetClient) prompt(text []byte) {
 	dw_printf("In the case of APRSISCE/32, use \"Simply(KISS)\" rather than \"KISS.\"\n")
 
 	if c.kns.debug > 0 {
-		kiss_debug_print(TO_CLIENT, "Fake command prompt", text)
+		kisstnc.DebugPrint(kisstnc.ToClient, "Fake command prompt", text)
 	}
 
 	c.kns.write(c.kps, c.client, c.conn, text)
 }
 
-func (c kissNetClient) radioChannel(frameChannel int) int {
+func (c kissNetClient) RadioChannel(frameChannel int) int {
 	if c.kps.channel != -1 {
 		// Ignore channel from KISS and substitute radio channel for that KISS TCP port.
 		return c.kps.channel
@@ -414,7 +416,7 @@ func (c kissNetClient) radioChannel(frameChannel int) int {
  *
  *--------------------------------------------------------------------*/
 
-func (kns *KissNetService) Copy(msg []byte, channel int, cmd int, from kissClient) {
+func (kns *KissNetService) Copy(msg []byte, channel int, cmd int, from kisstnc.Client) {
 	if kns == nil {
 		return // No TCP clients to copy to.
 	}
@@ -428,7 +430,7 @@ func (kns *KissNetService) Copy(msg []byte, channel int, cmd int, from kissClien
 			var conn = kps.clientConn(client)
 
 			// To all but origin.
-			if conn != nil && from != kissClient(kissNetClient{kns: kns, kps: kps, client: client, conn: conn}) {
+			if conn != nil && from != kisstnc.Client(kissNetClient{kns: kns, kps: kps, client: client, conn: conn}) {
 				// msg[0] is the channel and command it came with; sendOn
 				// works out what this client's port shows instead.
 				kns.sendOn(kps, client, conn, channel, cmd, msg[1:])
@@ -527,7 +529,7 @@ func (kns *KissNetService) listenThread(ctx context.Context, kps *kissport_statu
 	// Built once per connection, rather than for every byte.
 	var lastConn net.Conn
 
-	var from kissClient
+	var from kisstnc.Client
 
 	for {
 		var ch, conn, frame, ok = kns.get(ctx, kps, client)
@@ -671,3 +673,137 @@ func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kisspor
 }
 
 /* end kissnet.go */
+
+// Each KISS TCP port has its own status block.
+
+type kissport_status_s struct {
+	pnext *kissport_status_s // To next in list.
+
+	arg2 int //nolint:unused // temp for passing second arg into
+	// kissnet_listen_thread
+
+	tcp_port int // default 8001
+
+	channel int // Radio channel for this tcp port.
+	// -1 for all.
+
+	// mu guards client_sock and kf below, which are read and written from
+	// connectListenThread (accepting new connections), listenThread/get
+	// (reading from a connected client and detecting disconnection), and
+	// SendRecPacket/Copy (writing to connected clients). Once those
+	// goroutines are running, always go through the kissport_status_s
+	// methods below rather than touching these fields directly. The one
+	// exception is initOne, which sets them directly during single-threaded
+	// startup, before any goroutine that shares mu exists.
+	mu sync.Mutex
+
+	client_sock [MAX_NET_CLIENTS]net.Conn
+
+	kf [MAX_NET_CLIENTS]*kiss.Collector
+	/* Accumulated KISS frame and state of decoder. */
+
+	// Set by stop, and guarded by mu along with everything above, so that a
+	// connection accepted at the same moment cannot be attached after the
+	// hanging up has been and gone.
+	stopped bool
+}
+
+// clientConn returns the currently connected socket for client, or nil if
+// not connected.
+func (kps *kissport_status_s) clientConn(client int) net.Conn {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	return kps.client_sock[client]
+}
+
+// attachClient installs conn as client's socket, along with a freshly reset
+// decoder state, atomically with respect to clientConn/detachClientIfCurrent.
+// This ensures listenThread can never observe a "live" socket for client
+// paired with decoder state left over from a previous connection, or from
+// another client's slot.
+//
+// It returns false, having attached nothing, once the port has been stopped:
+// the connection is then the caller's to close.  A connection completed by the
+// kernel sits in the listening socket's accept queue whether or not anybody is
+// still listening, so this can be the first anyone hears of it.
+func (kps *kissport_status_s) attachClient(client int, conn net.Conn) bool {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	if kps.stopped {
+		return false
+	}
+
+	kps.kf[client] = new(kiss.Collector)
+	kps.client_sock[client] = conn
+
+	return true
+}
+
+// detachClientIfCurrent clears client's socket, but only if it still equals
+// conn. This guards against a goroutine which detected an error/EOF on a
+// now-stale conn racing with, and clobbering, a newer connection that
+// connectListenThread has already installed in the same slot. Returns
+// whether it cleared the slot.
+func (kps *kissport_status_s) detachClientIfCurrent(client int, conn net.Conn) bool {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	if kps.client_sock[client] != conn {
+		return false
+	}
+
+	kps.client_sock[client] = nil
+
+	return true
+}
+
+// findFreeClient returns the index of the first client slot with no
+// connected socket, or -1 if all are in use.
+func (kps *kissport_status_s) findFreeClient() int {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	for c := range MAX_NET_CLIENTS {
+		if kps.client_sock[c] == nil {
+			return c
+		}
+	}
+
+	return -1
+}
+
+// stop hangs up on every attached client and refuses any further attachment.
+//
+// A client whose TNC is shutting down should find its connection closed there
+// and then, rather than holding one that will never say anything again; and
+// the per-client read goroutines only close the socket they are actually
+// blocked on, which leaves a client that connected while one of them was
+// between reads still attached.
+func (kps *kissport_status_s) stop() {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	kps.stopped = true
+
+	for c := range MAX_NET_CLIENTS {
+		if kps.client_sock[c] != nil {
+			kps.client_sock[c].Close()
+			kps.client_sock[c] = nil
+		}
+	}
+}
+
+// connAndFrame returns client's currently connected socket (or nil) together
+// with its decoder state, fetched under a single lock/unlock. Callers that
+// need to pair a connection with its decoder state (e.g. before reading a
+// byte from it) must use this rather than clientConn/frame separately: two
+// independently-locked calls could observe an attachClient in between them,
+// pairing a conn with a *kiss.Collector that belongs to a different connection.
+func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *kiss.Collector) {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	return kps.client_sock[client], kps.kf[client]
+}

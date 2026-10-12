@@ -22,6 +22,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -75,7 +76,7 @@ func rawTerminal(t *testing.T, f *os.File) {
 func startKissPTListener(ctx context.Context, t *testing.T, debug int) (*KissPT, *os.File, <-chan struct{}) {
 	t.Helper()
 
-	var kp = newKissPT(setupKissProcessMsg(t), debug)
+	var kp = newKissPT(newTestKissHandler(t), debug)
 
 	kp.openPT()
 
@@ -282,7 +283,7 @@ func TestKissPTSendRecPacketEscapes(t *testing.T) {
 func TestKissPTPrompt(t *testing.T) {
 	var kp, client = startKissPT(t, 0)
 
-	kp.prompt([]byte("\r\ncmd:"))
+	kp.Prompt([]byte("\r\ncmd:"))
 
 	assert.Equal(t, "\r\ncmd:", readKissText(t, client, len("\r\ncmd:")))
 }
@@ -302,11 +303,11 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 	// is longer than the terminal will hold.
 	var got = drainKissFrame(t, client)
 
-	var output = testutils.CaptureOutput(t, func() {
-		kp.SendRecPacket(0, kiss.CmdDataFrame, frame)
-	})
+	var hook = testutils.CaptureLogrus(t, logrus.InfoLevel)
 
-	assert.Contains(t, output, "Truncated")
+	kp.SendRecPacket(0, kiss.CmdDataFrame, frame)
+
+	testutils.LoggedEntry(t, hook, "KISS frame for client application too long, truncating it")
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
 	assert.Len(t, <-got, ax25.MaxPacketLen+3)
@@ -318,7 +319,7 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 	const channel = 0
 
-	var kp, client = startKissPT(t, 0)
+	var _, client = startKissPT(t, 0)
 
 	var pp = newTestPacket(t)
 
@@ -328,11 +329,16 @@ func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 	var _, writeErr = client.Write(kissFrame)
 	require.NoError(t, writeErr)
 
-	// TransmitQueue.Count rather than TransmitQueue.Peek: the queue is being filled by the
-	// listening goroutine, and only TransmitQueue.Count reads it under the lock.
-	assert.Eventually(t, func() bool {
-		return kp.handler.queue.Count(channel, TQ_PRIO_1_LO, "", "", false) > 0
-	}, 5*time.Second, 10*time.Millisecond, "the frame from the KISS client was not queued for transmission")
+	// The client's bytes are handled in order, so the answer to a TXBUF query
+	// after the frame counts it if it was queued.
+	_, writeErr = client.Write(kiss.Encapsulate(append([]byte{byte(channel<<4 | kiss.CmdSetHardware)}, []byte("TXBUF:")...)))
+	require.NoError(t, writeErr)
+
+	var answer = kiss.Unwrap(readKissFrame(t, client))
+	require.NotEmpty(t, answer)
+
+	assert.Equal(t, byte(kiss.CmdSetHardware), answer[0]&0xf)
+	assert.NotEqual(t, "TXBUF:0", string(answer[1:]), "the frame from the KISS client was not queued for transmission")
 }
 
 // An application that thinks it is driving an old command-mode TNC sends
@@ -441,23 +447,21 @@ func TestKissPTClientHangingUpClosesTheTerminal(t *testing.T) {
 func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	var kp, client = startKissPT(t, 2)
 
-	var output = testutils.CaptureOutput(t, func() {
-		kp.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
+	var hook = testutils.CaptureLogrus(t, logrus.DebugLevel)
 
-		readKissFrame(t, client)
-	})
+	kp.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
-	assert.Contains(t, output, "Packet content before adding KISS framing")
-	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
+	readKissFrame(t, client)
+
+	testutils.LoggedEntry(t, hook, "Packet content before adding KISS framing and any escapes")
+	assert.Equal(t, 1, testutils.LoggedEntry(t, hook, ">>> Data frame to KISS client application").Data["channel"])
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	output = testutils.CaptureOutput(t, func() {
-		kp.prompt([]byte("\r\ncmd:"))
+	kp.Prompt([]byte("\r\ncmd:"))
 
-		readKissText(t, client, len("\r\ncmd:"))
-	})
+	readKissText(t, client, len("\r\ncmd:"))
 
-	assert.Contains(t, output, "Fake command prompt")
+	testutils.LoggedEntry(t, hook, ">>> Fake command prompt to KISS client application")
 }
 
 // The receive path writes to the terminal while the listening goroutine reads
