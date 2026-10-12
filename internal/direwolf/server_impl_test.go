@@ -497,6 +497,16 @@ func TestConnectedModeAllowed_MediumNETTNC(t *testing.T) {
 	assert.True(t, s.connectedModeAllowed(MAX_RADIO_CHANS))
 }
 
+func TestConnectedModeAllowed_MediumSERTNC(t *testing.T) {
+	var s = new(AGWServer)
+
+	var cfg RadioConfig
+	cfg.chan_medium[MAX_RADIO_CHANS] = MediumSerialTNC
+	s.audioConfigP = &cfg
+
+	assert.True(t, s.connectedModeAllowed(MAX_RADIO_CHANS))
+}
+
 func TestConnectedModeAllowed_MediumAXUDP(t *testing.T) {
 	var s = new(AGWServer)
 

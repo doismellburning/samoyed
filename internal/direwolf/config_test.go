@@ -5462,3 +5462,21 @@ func TestConfigLooksSymbolsUpInTheTableItIsGiven(t *testing.T) {
 	assert.Equal(t, byte('/'), c.misc.beacon[0].symtab)
 	assert.Equal(t, byte('!'), c.misc.beacon[0].symbol)
 }
+
+// A serial TNC's channel stands in for a radio wherever a network TNC's does:
+// it can be digipeated to and from, filtered, and IGated.
+func TestSCHANNELIsAcceptedWhereNCHANNELIs(t *testing.T) {
+	var c = parseConfig(t, `MYCALL Q1TEST
+SCHANNEL 10 /dev/ttyUSB0
+DIGIPEAT 10 0 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$
+DIGIPEAT 0 10 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$
+FILTER 10 0 t/m
+FILTER 0 10 t/m
+IGLOGIN Q1TEST 12345
+`)
+
+	assert.Zero(t, c.errors, c.output)
+	assert.Equal(t, "t/m", c.digi.filter_str[10][0])
+	assert.Equal(t, "t/m", c.digi.filter_str[0][10])
+	assert.Equal(t, "i/180", c.digi.filter_str[MAX_TOTAL_CHANS][10], "an IGate should only pass on to the serial TNC what is near it")
+}

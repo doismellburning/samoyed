@@ -161,6 +161,40 @@ func TestDigipeaterInvalidChannel(t *testing.T) {
 	}
 }
 
+// A serial TNC's channel is heard as a radio's is, so what arrives on it can
+// be digipeated onto a radio channel.
+func TestDigipeaterFromSerialTNC(t *testing.T) {
+	const serialChan = MAX_RADIO_CHANS
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[digiToChan] = MEDIUM_RADIO
+	audioConfig.chan_medium[serialChan] = MediumSerialTNC
+	audioConfig.mycall[digiToChan] = "Q2TEST"
+	audioConfig.mycall[serialChan] = "Q1TEST"
+
+	var digiConfig = new(digi_config_s)
+	digiConfig.dedupe_time = 30
+	digiConfig.enabled[serialChan][digiToChan] = true
+	digiConfig.alias[serialChan][digiToChan] = regexp.MustCompile("^WIDE[4-7]-[1-7]|CITYD$")
+	digiConfig.wide[serialChan][digiToChan] = regexp.MustCompile("^WIDE[1-7]-[1-7]$")
+	digiConfig.preempt[serialChan][digiToChan] = PREEMPT_OFF
+
+	var tq = newTestTransmitQueue(audioConfig)
+
+	var digi = NewDigipeater(audioConfig, digiConfig, new(pfilter.PacketFilter), nil, tq.Append)
+
+	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
+	require.NotNil(t, pp)
+
+	var output = testutils.CaptureOutput(t, func() { digi.Digipeat(serialChan, pp) })
+
+	assert.NotContains(t, output, "Did not expect to receive on invalid channel")
+
+	var sent = tq.Remove(digiToChan, TQ_PRIO_1_LO)
+	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
+	assert.Equal(t, "Q3TEST>APDW17,Q2TEST*,WIDE2-1:", sent.FormatAddrs())
+}
+
 // Regeneration sends the frame on again exactly as it arrived, rather than
 // digipeating it - a separate option, for a separate purpose.
 func TestDigiRegen(t *testing.T) {
