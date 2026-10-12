@@ -17,6 +17,7 @@ package direwolf
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -239,8 +240,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 	dwutil.Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("INTERNAL ERROR:  tq_append nil packet pointer. Please report this!\n")
+		logrus.Error("INTERNAL ERROR: tq_append nil packet pointer. Please report this!")
 
 		return
 	}
@@ -290,8 +290,6 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 		var stemp = pp.FormatAddrs()
 		var pinfo = pp.Info()
 
-		text_color_set(DW_COLOR_XMIT)
-
 		// Where the packet is going, shown in front of it.
 		var to string
 
@@ -306,10 +304,12 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 			to = "nt"
 		}
 
-		dw_printf("[%d>%s%s] ", channel, to, ts)
-		dw_printf("%s", stemp) /* stations followed by : */
+		// This is the monitoring display of what we send, as the receive
+		// side shows what we hear, so it goes to stdout.
+		fmt.Printf("[%d>%s%s] ", channel, to, ts)
+		fmt.Printf("%s", stemp) /* stations followed by : */
 		ax25.SafePrint(pinfo, !pp.IsAPRS())
-		dw_printf("\n")
+		fmt.Println()
 
 		switch tq.audioConfig.chan_medium[channel] {
 		case MEDIUM_IGATE:
@@ -331,14 +331,14 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 	// Error if trying to transmit to a radio channel which was not configured.
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] == MEDIUM_NONE {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Request to transmit on invalid radio channel %d.\n", channel)
-		dw_printf("This is probably a client application error, not a problem with direwolf.\n")
-		dw_printf("Are you using AX.25 for Linux?  It might be trying to use a modified\n")
-		dw_printf("version of KISS which uses the port field differently than the\n")
-		dw_printf("original KISS protocol specification.  The solution might be to use\n")
-		dw_printf("a command like \"kissparms -c 1 -p radio\" to set CRC none mode.\n")
-		dw_printf("\n")
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"hint": "This is probably a client application error, not a problem with direwolf. " +
+				"Are you using AX.25 for Linux?  It might be trying to use a modified " +
+				"version of KISS which uses the port field differently than the " +
+				"original KISS protocol specification.  The solution might be to use " +
+				"a command like \"kissparms -c 1 -p radio\" to set CRC none mode.",
+		}).Error("Request to transmit on invalid radio channel")
 
 		return
 	}
@@ -367,9 +367,10 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 	 */
 
 	if pp.IsAPRS() && tq.Count(channel, prio, "", "", false) > 100 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
-		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"hint":    "Perhaps the channel is so busy there is no opportunity to send.",
+		}).Error("Transmit packet queue is too long, discarding packet")
 
 		return
 	}
@@ -487,8 +488,7 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *ax25.Packet) {
 	dwutil.Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("INTERNAL ERROR:  lm_data_request nil packet pointer. Please report this!\n")
+		logrus.Error("INTERNAL ERROR: lm_data_request nil packet pointer. Please report this!")
 
 		return
 	}
@@ -522,9 +522,10 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *ax25.Packet) {
 	}
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
-		dw_printf("Connected packet mode requires MEDIUM_RADIO, MEDIUM_NETTNC, MediumSerialTNC or MEDIUM_AXUDP.\n")
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"hint":    "Connected packet mode requires MEDIUM_RADIO, MEDIUM_NETTNC, MediumSerialTNC or MEDIUM_AXUDP.",
+		}).Error("Request to transmit on unsupported channel")
 
 		return
 	}
@@ -534,9 +535,10 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *ax25.Packet) {
 	 */
 
 	if tq.Count(channel, prio, "", "", false) > 250 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Warning: Transmit packet queue for channel %d is extremely long.\n", channel)
-		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"hint":    "Perhaps the channel is so busy there is no opportunity to send.",
+		}).Warn("Transmit packet queue is extremely long")
 	}
 
 	logrus.Trace("lm_data_request: enter critical section")
@@ -653,9 +655,10 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 	}
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
-		dw_printf("Connected packet mode requires MEDIUM_RADIO, MEDIUM_NETTNC, MediumSerialTNC or MEDIUM_AXUDP.\n")
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"hint":    "Connected packet mode requires MEDIUM_RADIO, MEDIUM_NETTNC, MediumSerialTNC or MEDIUM_AXUDP.",
+		}).Error("Request to transmit on unsupported channel")
 
 		return
 	}
@@ -1002,8 +1005,13 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 	// Array bounds check.  FIXME: TODO:  should have internal error instead of dying.
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || prio < 0 || prio >= TQ_NUM_PRIO {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("INTERNAL ERROR - countLocked(%d, %d, \"%s\", \"%s\", %t)\n", channel, prio, source, dest, bytes)
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+			"source":  source,
+			"dest":    dest,
+			"bytes":   bytes,
+		}).Error("INTERNAL ERROR: countLocked out of range")
 
 		return (0)
 	}
