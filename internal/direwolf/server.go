@@ -1633,6 +1633,7 @@ func (s *AGWServer) handleRadioPortsRequest(client int) {
 		if cfg.chan_medium[j] == MEDIUM_RADIO ||
 			cfg.chan_medium[j] == MEDIUM_IGATE ||
 			cfg.chan_medium[j] == MEDIUM_NETTNC ||
+			cfg.chan_medium[j] == MediumSerialTNC ||
 			cfg.chan_medium[j] == MEDIUM_AXUDP {
 			count++
 		}
@@ -1666,6 +1667,10 @@ func (s *AGWServer) handleRadioPortsRequest(client int) {
 		case MEDIUM_NETTNC:
 			// could elaborate with hostname, etc.
 			fmt.Fprintf(&info, "Port%d Network TNC;", j+1)
+
+		case MediumSerialTNC:
+			// could elaborate with device, etc.
+			fmt.Fprintf(&info, "Port%d Serial TNC;", j+1)
 
 		case MEDIUM_AXUDP:
 			fmt.Fprintf(&info, "Port%d AXUDP;", j+1)

@@ -682,6 +682,27 @@ func TestHandleClientCommand_G_IGateAndNetTNC(t *testing.T) {
 	assert.Equal(t, want, string(reply.Data))
 }
 
+func TestHandleClientCommand_G_SerialTNC(t *testing.T) {
+	var s = new(AGWServer)
+
+	var cfg = new(RadioConfig)
+	cfg.chan_medium[MAX_RADIO_CHANS] = MediumSerialTNC
+	s.audioConfigP = cfg
+
+	var client = setupClientPipe(t, s)
+	var replyCh = asyncReply(client)
+
+	var cmd = new(agwpe.Message)
+	cmd.Header.DataKind = 'G'
+	s.handleClientCommand(0, cmd)
+
+	var reply = <-replyCh
+	require.NotNil(t, reply)
+
+	var want = fmt.Sprintf("1;Port%d Serial TNC;", MAX_RADIO_CHANS+1)
+	assert.Equal(t, want, string(reply.Data))
+}
+
 func TestHandleClientCommand_G_AXUDP(t *testing.T) {
 	var s = new(AGWServer)
 
