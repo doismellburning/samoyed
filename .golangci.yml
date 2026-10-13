@@ -62,6 +62,14 @@ linters:
         - "channel"
         - "client"
         - "prio"
+        - "hint"
+        - "length"
+        - "stream"
+        - "peer"
+        - "state"
+        - "func"
+        - "line"
+        - "now"
     gocritic:
       disabled-checks:
         - captLocal  # I agree, but I want to stay semi-consistent with upstream for now
