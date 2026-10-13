@@ -703,7 +703,7 @@ x = Silence FX.25 information.`)
 	// The connected-mode link layer, after the AGW server whose clients it
 	// tells about the links they asked for.
 	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, agwServer, transmitQueue, d_c_opt)
-	metrics_init(ctx, audio_config, misc_config)
+	var metricsListening = metrics_init(ctx, audio_config, misc_config)
 	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
 
 	// All three KISS transports hand what their clients send to the same
@@ -712,10 +712,21 @@ x = Silence FX.25 information.`)
 
 	kissNetSvc.Start(ctx, kissHandler)
 
-	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
-	// Let's just check [0] for now...
-	if misc_config.kiss_port[0] > 0 && misc_config.dns_sd_enabled {
-		announce.KISS(ctx, misc_config.dns_sd_name, misc_config.kiss_port[0])
+	if misc_config.dns_sd_enabled {
+		var ports = new(announce.Ports)
+		ports.KISS = misc_config.kiss_port[:]
+		ports.AGW = misc_config.agwpe_port
+
+		// Only if it started: webui_init hands back no hub if it didn't.
+		if webHub != nil {
+			ports.Web = misc_config.web_port
+		}
+
+		if metricsListening {
+			ports.Metrics = misc_config.metrics_port
+		}
+
+		announce.Announce(ctx, announce.Services(misc_config.dns_sd_name, ports))
 	}
 
 	stopIfCancelled(ctx, td)

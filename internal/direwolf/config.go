@@ -227,8 +227,8 @@ type misc_config_s struct {
 
 	log_path string /* Either directory or full file name depending on above. */
 
-	dns_sd_enabled bool   /* DNS Service Discovery announcement enabled. */
-	dns_sd_name    string /* Name announced on dns-sd; defaults to "Dire Wolf on <hostname>" */
+	dns_sd_enabled bool   /* DNS Service Discovery announcement of the KISS, AGW, web and metrics ports enabled. */
+	dns_sd_name    string /* Name announced on dns-sd; defaults to "Samoyed on <hostname>" */
 
 	sb_configured bool /* TRUE if SmartBeaconing is configured. */
 	sb_fast_speed int  /* MPH */
@@ -5481,7 +5481,9 @@ func handleKISSCOPY(ps *parseState) error {
 func handleDNSSD(ps *parseState) error {
 	/*
 	 * DNSSD 		- Enable or disable (1/0) dns-sd, DNS Service Discovery announcements
-	 * DNSSDNAME            - Set DNS-SD service name, defaults to "Dire Wolf on <hostname>"
+	 *			  of each KISS TCP port, the AGW port, the web interface and
+	 *			  the metrics endpoint that is listening
+	 * DNSSDNAME            - Set DNS-SD service name, defaults to "Samoyed on <hostname>"
 	 */
 	var t = ps.split(false)
 	if t == "" {
