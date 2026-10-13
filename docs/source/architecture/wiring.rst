@@ -33,6 +33,7 @@ Dashed arrows are connections made after construction rather than at it.
        sink [label="radioSink"];
        dlq [label="DataLinkQueue"];
        nettnc [label="Network TNCs"];
+       serialtnc [label="Serial TNCs"];
        axudp [label="AXUDP channels"];
        tq [label="TransmitQueue"];
        tones [label="ToneGenerators"];
@@ -60,9 +61,11 @@ Dashed arrows are connections made after construction rather than at it.
        audio -> l2r [label="AudioLevel", style=dashed];
 
        nettnc -> dlq [label="RecFrame"];
+       serialtnc -> dlq [label="RecFrame"];
        axudp -> dlq [label="RecFrame"];
 
        tq -> nettnc [label="NetTNC per channel"];
+       tq -> serialtnc [label="SerialTNC per channel"];
        tq -> axudp [label="AXUDPChannel\nper channel"];
        tq -> dlq [label="SeizeConfirm\n(seizeConfirmer)"];
        tq -> igate [label="sendRecPacket\n(igateSender)", style=dashed];
@@ -152,10 +155,10 @@ so the order of construction follows the arrows:
    which almost everything feeds.
 #. The demodulators (``multi_modem_init``),
    handed a ``radioSink`` that passes their frames to the ``DataLinkQueue``.
-#. The network TNCs and the AXUDP channels.
+#. The network TNCs, the serial TNCs and the AXUDP channels.
    Their listeners start straight away and can hand the queue frames at once.
 #. The ``TransmitQueue``,
-   which sends a packet for a network TNC or AXUDP channel straight there
+   which sends a packet for a network TNC, serial TNC or AXUDP channel straight there
    rather than queueing it.
 #. The tone generators and the PTT.
 #. The web interface and the AGW server.

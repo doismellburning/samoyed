@@ -497,6 +497,16 @@ func TestConnectedModeAllowed_MediumNETTNC(t *testing.T) {
 	assert.True(t, s.connectedModeAllowed(MAX_RADIO_CHANS))
 }
 
+func TestConnectedModeAllowed_MediumSERTNC(t *testing.T) {
+	var s = new(AGWServer)
+
+	var cfg RadioConfig
+	cfg.chan_medium[MAX_RADIO_CHANS] = MediumSerialTNC
+	s.audioConfigP = &cfg
+
+	assert.True(t, s.connectedModeAllowed(MAX_RADIO_CHANS))
+}
+
 func TestConnectedModeAllowed_MediumAXUDP(t *testing.T) {
 	var s = new(AGWServer)
 
@@ -669,6 +679,27 @@ func TestHandleClientCommand_G_IGateAndNetTNC(t *testing.T) {
 	require.NotNil(t, reply)
 
 	var want = fmt.Sprintf("2;Port%d Internet Gateway;Port%d Network TNC;", MAX_RADIO_CHANS+1, MAX_RADIO_CHANS+2)
+	assert.Equal(t, want, string(reply.Data))
+}
+
+func TestHandleClientCommand_G_SerialTNC(t *testing.T) {
+	var s = new(AGWServer)
+
+	var cfg = new(RadioConfig)
+	cfg.chan_medium[MAX_RADIO_CHANS] = MediumSerialTNC
+	s.audioConfigP = cfg
+
+	var client = setupClientPipe(t, s)
+	var replyCh = asyncReply(client)
+
+	var cmd = new(agwpe.Message)
+	cmd.Header.DataKind = 'G'
+	s.handleClientCommand(0, cmd)
+
+	var reply = <-replyCh
+	require.NotNil(t, reply)
+
+	var want = fmt.Sprintf("1;Port%d Serial TNC;", MAX_RADIO_CHANS+1)
 	assert.Equal(t, want, string(reply.Data))
 }
 

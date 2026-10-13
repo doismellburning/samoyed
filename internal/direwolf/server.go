@@ -1023,7 +1023,7 @@ func (s *AGWServer) debugPrint(fromto fromto_t, client int, pmsg *agwpe.Message)
 }
 
 // connectedModeAllowed reports whether AX.25 connected mode is allowed on portx.
-// Connected mode is supported for MEDIUM_RADIO, MEDIUM_NETTNC and MEDIUM_AXUDP channels.
+// Connected mode is supported for MEDIUM_RADIO, MEDIUM_NETTNC, MediumSerialTNC and MEDIUM_AXUDP channels.
 // When there is no audio configuration to consult (e.g. in unit tests), only
 // channels < MAX_RADIO_CHANS are permitted, preserving the previous behaviour.
 func (s *AGWServer) connectedModeAllowed(portx byte) bool {
@@ -1037,7 +1037,7 @@ func (s *AGWServer) connectedModeAllowed(portx byte) bool {
 
 	var m = s.audioConfigP.chan_medium[portx]
 
-	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC || m == MEDIUM_AXUDP
+	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC || m == MediumSerialTNC || m == MEDIUM_AXUDP
 }
 
 /*-------------------------------------------------------------------
@@ -1633,6 +1633,7 @@ func (s *AGWServer) handleRadioPortsRequest(client int) {
 		if cfg.chan_medium[j] == MEDIUM_RADIO ||
 			cfg.chan_medium[j] == MEDIUM_IGATE ||
 			cfg.chan_medium[j] == MEDIUM_NETTNC ||
+			cfg.chan_medium[j] == MediumSerialTNC ||
 			cfg.chan_medium[j] == MEDIUM_AXUDP {
 			count++
 		}
@@ -1666,6 +1667,10 @@ func (s *AGWServer) handleRadioPortsRequest(client int) {
 		case MEDIUM_NETTNC:
 			// could elaborate with hostname, etc.
 			fmt.Fprintf(&info, "Port%d Network TNC;", j+1)
+
+		case MediumSerialTNC:
+			// could elaborate with device, etc.
+			fmt.Fprintf(&info, "Port%d Serial TNC;", j+1)
 
 		case MEDIUM_AXUDP:
 			fmt.Fprintf(&info, "Port%d AXUDP;", j+1)

@@ -1071,6 +1071,7 @@ var configHandlers = map[string]configHandler{
 	"CHANNEL":        handleCHANNEL,
 	"ICHANNEL":       handleICHANNEL,
 	"NCHANNEL":       handleNCHANNEL,
+	"SCHANNEL":       handleSCHANNEL,
 	"MYCALL":         handleMYCALL,
 	"MODEM":          handleMODEM,
 	"DTMF":           handleDTMF,
@@ -1561,6 +1562,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 		if len(ps.igate.t2_login) > 0 &&
 			(ps.audio.chan_medium[i] == MEDIUM_RADIO || ps.audio.chan_medium[i] == MEDIUM_NETTNC ||
+				ps.audio.chan_medium[i] == MediumSerialTNC ||
 				ps.audio.chan_medium[i] == MEDIUM_AXUDP) {
 			if IsNoCall(ps.audio.mycall[i]) {
 				ps.errorf("config file: MYCALL must be set for receive channel %d before Rx IGate is allowed", i)
@@ -1583,6 +1585,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 	if len(ps.igate.t2_login) > 0 {
 		for j := range MAX_TOTAL_CHANS {
 			if ps.audio.chan_medium[j] == MEDIUM_RADIO || ps.audio.chan_medium[j] == MEDIUM_NETTNC ||
+				ps.audio.chan_medium[j] == MediumSerialTNC ||
 				ps.audio.chan_medium[j] == MEDIUM_AXUDP {
 				if ps.digi.filter_str[MAX_TOTAL_CHANS][j] == "" {
 					ps.digi.filter_str[MAX_TOTAL_CHANS][j] = "i/180"
@@ -1967,6 +1970,58 @@ func handleNCHANNEL(ps *parseState) error {
 	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
 	ps.audio.nettnc_addr[nchan] = addr
 	ps.audio.nettnc_port[nchan] = n
+
+	return nil
+}
+
+// handleSCHANNEL handles the SCHANNEL keyword:
+//
+//	SCHANNEL channel device [baud]
+//
+// which makes channel, a virtual one outside the radio channels' range, a KISS
+// TNC on the serial port device, at baud bits per second (9600 if not given).
+// Frames to and from it use KISS channel 0, whatever channel it is here.
+//
+// FIXME: Can't set MYCALL for an SCHANNEL.
+func handleSCHANNEL(ps *parseState) error {
+	var t = ps.split(false)
+	if t == "" {
+		return fmt.Errorf("line %d: Missing virtual channel number for SCHANNEL command", ps.line)
+	}
+
+	var channel, _ = strconv.Atoi(t)
+	if channel < MAX_RADIO_CHANS || channel >= MAX_TOTAL_CHANS {
+		return fmt.Errorf("line %d: SCHANNEL number must be in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
+	}
+	if ps.audio.chan_medium[channel] != MEDIUM_NONE {
+		return fmt.Errorf("line %d: SCHANNEL can't use channel %d because it is already in use", ps.line, channel)
+	}
+
+	var device = ps.split(false)
+	if device == "" {
+		return fmt.Errorf("line %d: Missing serial TNC device for SCHANNEL command", ps.line)
+	}
+
+	var baud = 9600
+
+	t = ps.split(false)
+	if t != "" {
+		var n, _ = strconv.Atoi(t)
+
+		switch n {
+		case 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200:
+			baud = n
+		default:
+			ps.errorf("line %d: Unsupported data rate \"%s\" for SCHANNEL command.  Using %d.", ps.line, t, baud)
+		}
+	}
+
+	// Claim the channel only once the whole line has parsed, as NCHANNEL
+	// does: NewSerialTNCs attaches to every MediumSerialTNC channel and exits
+	// if it cannot.
+	ps.audio.chan_medium[channel] = MediumSerialTNC
+	ps.audio.serialTNCDevice[channel] = device
+	ps.audio.serialTNCBaud[channel] = baud
 
 	return nil
 }
@@ -3388,10 +3443,11 @@ func handleDIGIPEAT(ps *parseState) error {
 		return fmt.Errorf("config file: FROM-channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
 	}
 
-	// Channels specified must be radio channels, network TNCs or AXUDP.
+	// Channels specified must be radio channels, network or serial TNCs, or AXUDP.
 
 	if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO &&
 		ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC &&
+		ps.audio.chan_medium[from_chan] != MediumSerialTNC &&
 		ps.audio.chan_medium[from_chan] != MEDIUM_AXUDP {
 		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 	}
@@ -3412,6 +3468,7 @@ func handleDIGIPEAT(ps *parseState) error {
 
 	if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO &&
 		ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC &&
+		ps.audio.chan_medium[to_chan] != MediumSerialTNC &&
 		ps.audio.chan_medium[to_chan] != MEDIUM_AXUDP {
 		return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 	}
@@ -3691,6 +3748,7 @@ func handleFILTER(ps *parseState) error {
 
 		if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO &&
 			ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC &&
+			ps.audio.chan_medium[from_chan] != MediumSerialTNC &&
 			ps.audio.chan_medium[from_chan] != MEDIUM_AXUDP {
 			return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 		}
@@ -3726,6 +3784,7 @@ func handleFILTER(ps *parseState) error {
 
 		if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO &&
 			ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC &&
+			ps.audio.chan_medium[to_chan] != MediumSerialTNC &&
 			ps.audio.chan_medium[to_chan] != MEDIUM_AXUDP {
 			return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 		}
@@ -4694,6 +4753,7 @@ func handleTTOBJ(ps *parseState) error {
 					whereToValid = false
 				} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
 					ps.audio.chan_medium[x] != MEDIUM_NETTNC &&
+					ps.audio.chan_medium[x] != MediumSerialTNC &&
 					ps.audio.chan_medium[x] != MEDIUM_AXUDP {
 					ps.errorf("config file, line %d: TTOBJ transmit channel %d is not valid", ps.line, x)
 					x = -1
@@ -4724,6 +4784,7 @@ func handleTTOBJ(ps *parseState) error {
 								whereToValid = false
 							} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
 								ps.audio.chan_medium[x] != MEDIUM_NETTNC &&
+								ps.audio.chan_medium[x] != MediumSerialTNC &&
 								ps.audio.chan_medium[x] != MEDIUM_AXUDP {
 								ps.errorf("config file, line %d: TTOBJ transmit channel %d is not valid", ps.line, x)
 								x = -1

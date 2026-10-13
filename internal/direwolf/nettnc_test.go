@@ -285,7 +285,7 @@ func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	for _, b := range append([]byte("cmd:\r\n"), kissFrameFor(pp)...) {
-		nettncRecByte(kf, b, 0, nettncTestChannel, dlq.RecFrame)
+		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
 	}
 
 	var item = dlq.Remove()
@@ -300,7 +300,7 @@ func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	for _, b := range []byte{kiss.FEND, kiss.FEND, kiss.FEND, kiss.FEND} {
-		nettncRecByte(kf, b, 0, nettncTestChannel, dlq.RecFrame)
+		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
 	}
 
 	assert.Nil(t, dlq.Remove(), "an empty KISS frame was taken for a received frame")
@@ -315,7 +315,7 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range kiss.Encapsulate([]byte{0, 'n', 'o', 't', ' ', 'a', 'x', '2', '5'}) {
-			nettncRecByte(kf, b, 0, nettncTestChannel, dlq.RecFrame)
+			tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
 		}
 	})
 
@@ -333,7 +333,7 @@ func TestNetTNCFrameEmptyOnceUnescapedIsReported(t *testing.T) {
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.FEND} {
-			nettncRecByte(kf, b, 2, nettncTestChannel, dlq.RecFrame)
+			tncRecByte(kf, b, 2, nettncTestChannel, netTNC(), dlq.RecFrame)
 		}
 	})
 
@@ -348,10 +348,10 @@ func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
-		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel, nil)
+		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(), nil)
 
 		for range kiss.MaxFrameLen + 10 {
-			nettncRecByte(kf, 'x', 0, nettncTestChannel, nil)
+			tncRecByte(kf, 'x', 0, nettncTestChannel, netTNC(), nil)
 		}
 	})
 
@@ -368,13 +368,13 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	var output = testutils.CaptureOutput(t, func() {
-		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel, dlq.RecFrame)
+		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
 
 		for range kiss.MaxFrameLen + 10 {
-			nettncRecByte(kf, 'x', 0, nettncTestChannel, dlq.RecFrame)
+			tncRecByte(kf, 'x', 0, nettncTestChannel, netTNC(), dlq.RecFrame)
 		}
 
-		nettncRecByte(kf, kiss.FEND, 0, nettncTestChannel, dlq.RecFrame)
+		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
 	})
 
 	assert.Contains(t, output, "KISS frame from network TNC exceeded maximum length.  Discarding it.")
@@ -382,7 +382,7 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 
 	// And a well formed frame after it still gets through.
 	for _, b := range kissFrameFor(newTestPacket(t)) {
-		nettncRecByte(kf, b, 0, nettncTestChannel, dlq.RecFrame)
+		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
 	}
 
 	assert.NotNil(t, dlq.Remove())
@@ -396,7 +396,7 @@ func TestNetTNCDebugPrints(t *testing.T) {
 
 	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range kissFrameFor(newTestPacket(t)) {
-			nettncRecByte(kf, b, 2, nettncTestChannel, nil)
+			tncRecByte(kf, b, 2, nettncTestChannel, netTNC(), nil)
 		}
 	})
 
@@ -474,7 +474,7 @@ func TestNetTNCTransmitQueueSendsToItsTNCs(t *testing.T) {
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 	tncs[nettncTestChannel] = nt
 
-	var tq = NewTransmitQueue(audioConfig, tncs, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
+	var tq = NewTransmitQueue(audioConfig, tncs, [MAX_TOTAL_CHANS]*SerialTNC{}, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
 
 	var pp = newTestPacket(t)
 

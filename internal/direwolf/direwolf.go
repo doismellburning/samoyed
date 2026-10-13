@@ -494,6 +494,10 @@ x = Silence FX.25 information.`)
 	var netTNCs = NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
 
+	// Or a serial TNC.  (also new in 1.8)
+	var serialTNCs = NewSerialTNCs(ctx, audio_config, dataLinkQueue.RecFrame)
+	stopIfCancelled(ctx, td)
+
 	// Likewise a channel can be AX.25 over UDP to other nodes.
 	var axudpChannels = NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
@@ -502,7 +506,7 @@ x = Silence FX.25 information.`)
 	// IGate, APRStt, the connected-mode link - hands it to, and the transmit
 	// threads, the network TNCs and the AXUDP channels take it from.  Nothing
 	// queues anything until the services below are started.
-	var transmitQueue = NewTransmitQueue(audio_config, netTNCs, axudpChannels, dataLinkQueue.SeizeConfirm)
+	var transmitQueue = NewTransmitQueue(audio_config, netTNCs, serialTNCs, axudpChannels, dataLinkQueue.SeizeConfirm)
 
 	/*
 	 * Should there be an option for audio output level?
@@ -1048,7 +1052,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 			Warn("Audio input level is too high. This may cause distortion and reduced decode performance. " +
 				"Solution is to decrease the audio input level. " +
 				"Setting audio input level so most stations are around 50 will provide good dynamic range.")
-	} else if alevel.Rec < 5 && channel != rh.audioConfig.igate_vchannel && src.Kind != dwcore.SourceNetTNC && src.Kind != dwcore.SourceAXUDP {
+	} else if alevel.Rec < 5 && channel != rh.audioConfig.igate_vchannel && src.Kind != dwcore.SourceNetTNC && src.Kind != dwcore.SourceSerialTNC && src.Kind != dwcore.SourceAXUDP {
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		logrus.WithField("alevel", alevel.Rec).Warn("Audio input level is too low.  Increase so most stations are around 50.")
 	}
@@ -1073,6 +1077,8 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		logEntry = logEntry.WithField("subchan", "is")
 	case dwcore.SourceNetTNC:
 		logEntry = logEntry.WithField("subchan", "nettnc")
+	case dwcore.SourceSerialTNC:
+		logEntry = logEntry.WithField("subchan", "serialtnc")
 	case dwcore.SourceAXUDP:
 		logEntry = logEntry.WithField("subchan", "axudp")
 	case dwcore.SourceRadio:

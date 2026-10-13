@@ -36,7 +36,7 @@ d2927d6d7da7c6665737209e30dc2e39263cbdc7 pending Fix graph.
 0b34cb1f5ebb39e4b33e559e9dfededfc321c1cd pending Clean up sample direwolf.conf file.
 551d95ce5cd4e662b7caf511ee1b76a670e973c0 pending Fix copy/paste error in assertion in multi_modem_process_rec_frame
 11c4bdf70a8b8d204042c19bb27e1a085cee838a pending Merge pull request #605 from doismellburning/fix/multi_modem-assert
-f95c4e37dc08989465c32db86cdd7c5736dedd6e pending New SCHANNEL feature, like NCHANNEL but for serial TNCs
+f95c4e37dc08989465c32db86cdd7c5736dedd6e applied New SCHANNEL feature, like NCHANNEL but for serial TNCs
 df993f6859900e15a4f33444e896f7f5c2c5f63a pending More error checking and messages.
 ae1394debfef9f027a4f783f1cc69d019df03391 pending Fix x86_64 / i686 package name.
 aa476298b644766606e4dfc30e1f299023275fc6 pending Better error message.
@@ -44,7 +44,7 @@ aa476298b644766606e4dfc30e1f299023275fc6 pending Better error message.
 5285fec721c770013258622416bfafbb20f4d9f7 pending Most recent tocalls.yaml
 0d7448147cfb10d09f554126ea058b168a65b537 pending Change beta test to release.
 e494c948ad59f0362a939b569f88c7e94cd22c93 pending Update User Guide for release 1.8
-6c3deb2d40c53e840c936d4ef882a23c01f62970 pending Merge pull request #606 from mfncooper/schannel_support
+6c3deb2d40c53e840c936d4ef882a23c01f62970 applied Merge pull request #606 from mfncooper/schannel_support
 9fa31fdfde36240a2b1d22a9538bda38eddacf80 pending dev branch now for 1.9
 0c3a7bb32d221882e161446158b09de1f3abac00 pending Merge remote-tracking branch 'refs/remotes/origin/dev' into dev
 3658a878920803bbb69a4567579dcc4d6cb80a92 pending Issue 618 - Crash on hand crafted packet.
@@ -58,7 +58,7 @@ fde612f474525dee2d788f032e38840cfcbefe51 pending Merge pull request #622 from mf
 4bf4fe3b3e12931634e08808b6713b714d901729 pending Add text color options with black background.
 297be70046ad992519a0a735aed6ecc3e77ba7ee pending Issue 627 - Just add a comment for possible future use.
 cfabdfb62a5036d34f8904a3ad4b1e0ff6646df0 pending New text background options.
-f97d5b202e0681699b255c4c238b54b8145aa763 pending Add delay before retrying serial TNC.
+f97d5b202e0681699b255c4c238b54b8145aa763 applied Add delay before retrying serial TNC.
 c8319fcc7b7d8311ed7b42537ec82650ec48275b pending Add new build config for Direwolf with Hamlib on Windows (#626)
 591a897161f9d3ebfa8d0e162236029464f13582 pending Improved generation of SREJ frames for more efficient AX.25 v2.2 connected mode.
 1924999dbd24ce155aff69fec76cee35ad478bdd pending Linux compile error.

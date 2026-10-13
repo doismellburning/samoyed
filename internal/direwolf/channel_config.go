@@ -11,11 +11,12 @@ import (
 type medium_e int
 
 const (
-	MEDIUM_NONE   medium_e = iota // Channel is not valid for use.
-	MEDIUM_RADIO                  // Internal modem for radio.
-	MEDIUM_IGATE                  // Access IGate as ordinary channel.
-	MEDIUM_NETTNC                 // Remote network TNC.  (new in 1.8)
-	MEDIUM_AXUDP                  // AX.25 over UDP to other nodes.
+	MEDIUM_NONE     medium_e = iota // Channel is not valid for use.
+	MEDIUM_RADIO                    // Internal modem for radio.
+	MEDIUM_IGATE                    // Access IGate as ordinary channel.
+	MEDIUM_NETTNC                   // Remote network TNC.  (new in 1.8)
+	MediumSerialTNC                 // Local serial TNC.  (new in 1.8)
+	MEDIUM_AXUDP                    // AX.25 over UDP to other nodes.
 )
 
 type sanity_t = phy.Sanity
@@ -332,6 +333,7 @@ type RadioConfig struct {
 	// MEDIUM_RADIO for internal modem.  (only possibility earlier)
 	// MEDIUM_IGATE allows application access to IGate.
 	// MEDIUM_NETTNC for external TNC via TCP.
+	// MediumSerialTNC for external TNC via serial port.
 	// MEDIUM_AXUDP for AX.25 frames in UDP datagrams.
 
 	igate_vchannel int /* Virtual channel mapped to APRS-IS. */
@@ -344,6 +346,12 @@ type RadioConfig struct {
 	nettnc_addr [MAX_TOTAL_CHANS]string // Network TNC address:  hostname or IP addr.
 
 	nettnc_port [MAX_TOTAL_CHANS]int // Network TNC TCP port.
+
+	// Applies only to serial TNC type channels.
+
+	serialTNCDevice [MAX_TOTAL_CHANS]string // Serial TNC device name.
+
+	serialTNCBaud [MAX_TOTAL_CHANS]int // Serial TNC baud rate.
 
 	// Applies only to AXUDP channels.
 

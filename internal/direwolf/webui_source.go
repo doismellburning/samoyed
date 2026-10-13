@@ -68,6 +68,8 @@ func channelDescription(audio *RadioConfig, channel int) maybe.Maybe[string] {
 		return maybe.Just("aprs-is")
 	case MEDIUM_NETTNC:
 		return maybe.Just("network")
+	case MediumSerialTNC:
+		return maybe.Just("serial")
 	case MEDIUM_AXUDP:
 		return maybe.Just("axudp")
 	case MEDIUM_NONE:

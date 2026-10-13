@@ -277,6 +277,13 @@ func Test_app_process_rec_packet_audio_levels(t *testing.T) {
 	output = rt.processRecPacket(t, dwcore.ChannelSource(dwcore.SourceNetTNC, 0), pp, ax25.ALevel{Rec: 1, Mark: 0, Space: 0}, fec_type_none, RETRY_NONE, "")
 	assert.NotContains(t, output, "Audio input level is too low")
 	assert.Contains(t, output, "subchan=nettnc")
+
+	// Nor has a serial TNC.
+	pp = ax25.FromText("Q1TEST>APRS:>status", true)
+
+	output = rt.processRecPacket(t, dwcore.ChannelSource(dwcore.SourceSerialTNC, 0), pp, ax25.ALevel{Rec: 1, Mark: 0, Space: 0}, fec_type_none, RETRY_NONE, "")
+	assert.NotContains(t, output, "Audio input level is too low")
+	assert.Contains(t, output, "subchan=serialtnc")
 }
 
 func Test_app_process_rec_packet_quiet(t *testing.T) {

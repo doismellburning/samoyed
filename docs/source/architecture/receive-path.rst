@@ -82,6 +82,7 @@ to the application layer and the AX.25 data link state machine.
            style=dashed;
 
            nettnc [label="Network TNC"];
+           serialtnc [label="Serial TNC"];
            axudp [label="AXUDP channel"];
            igate_in [label="APRS-IS, as ICHANNEL"];
            beacon [label="Beacons with SENDTO=R\n(simulated reception)"];
@@ -101,6 +102,7 @@ to the application layer and the AX.25 data link state machine.
 
        sink -> dlq_frame;
        nettnc -> dlq_frame;
+       serialtnc -> dlq_frame;
        axudp -> dlq_frame;
        igate_in -> dlq_frame;
        beacon -> dlq_frame;
@@ -223,7 +225,7 @@ One queue, two consumers
 ------------------------
 
 Frames received over the air,
-frames from network sources such as AXUDP and the IGate,
+frames from external TNCs and network sources such as AXUDP and the IGate,
 and requests from AGW clients
 all go onto the ``DataLinkQueue``.
 ``recv_process`` gives every received frame first to ``recPacketHandler.app_process_rec_packet``
