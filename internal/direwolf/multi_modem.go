@@ -867,7 +867,6 @@ func (r *Layer2Receiver) toMultiModem(from dwcore.SlicerID, pp *ax25.Packet, rxI
  *			  demodulator (subchannel) of which channel.
  *
  *		raw 	- One bit from the demodulator.
- *			  should be 0 or 1.
  *
  *		is_scrambled - Is the data scrambled?
  *
@@ -883,10 +882,9 @@ func (r *Layer2Receiver) toMultiModem(from dwcore.SlicerID, pp *ax25.Packet, rxI
  *
  ***********************************************************************************/
 
-func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, _raw int, is_scrambled bool,
+func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled bool,
 	pll_nudge_total *int64, pll_symbol_count *int) {
 	var channel = from.Channel
-	var raw = _raw != 0
 
 	// -e option can be used to artificially introduce the desired
 	// Bit Error Rate (BER) for testing.
@@ -906,7 +904,7 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, _raw int, is_scrambled boo
 	// EAS does not use HDLC.
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.eas.RecBit(dwutil.IfThenElse(raw, 1, 0))
+		s.eas.RecBit(raw)
 
 		return
 	}

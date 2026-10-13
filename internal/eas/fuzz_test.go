@@ -65,7 +65,7 @@ func fuzzReceive(tb testing.TB, stream []byte) int {
 
 	for _, b := range stream {
 		for i := range 8 {
-			rx.RecBit(int(b>>i) & 1)
+			rx.RecBit((b>>i)&1 == 1)
 		}
 	}
 

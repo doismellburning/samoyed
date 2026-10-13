@@ -65,7 +65,6 @@ func NewReceiver(from dwcore.SlicerID, audioLevel dwcore.AudioLevelFunc, sink dw
  * Purpose:	Extract EAS trasmissions from a stream of bits.
  *
  * Inputs:	raw 	- One bit from the demodulator.
- *			  should be 0 or 1.
  *
  * Description:	This is called once for each received bit.
  *		Each valid transmission is handed to the receiver's sink,
@@ -78,13 +77,13 @@ const PREAMBLE_ZCZC = 0x435a435aabababab
 const PREAMBLE_NNNN = 0x4e4e4e4eabababab
 const EAS_MAX_LEN = 268 // Not including preamble.  Up to 31 geographic areas.
 
-func (s *Receiver) RecBit(raw int) {
+func (s *Receiver) RecBit(raw bool) {
 	//dw_printf ("slice %d = %d\n", s.from.Slice, raw);
 
 	// Accumulate most recent 64 bits.
 
 	s.easAcc >>= 1
-	if raw != 0 {
+	if raw {
 		s.easAcc |= 0x8000000000000000
 	}
 

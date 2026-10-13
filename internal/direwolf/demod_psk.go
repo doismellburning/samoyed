@@ -762,23 +762,23 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 		case MODEM_BPSK:
 			var gray = demod_bits
 
-			D.receiver.RecBit(from, gray&1, false,
+			D.receiver.RecBit(from, gray&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		case MODEM_QPSK:
 			var gray = demod_bits
 
-			D.receiver.RecBit(from, (gray>>1)&1, false,
+			D.receiver.RecBit(from, (gray>>1)&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			D.receiver.RecBit(from, gray&1, false,
+			D.receiver.RecBit(from, gray&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		default:
 			var gray = demod_bits
 
-			D.receiver.RecBit(from, (gray>>2)&1, false,
+			D.receiver.RecBit(from, (gray>>2)&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			D.receiver.RecBit(from, (gray>>1)&1, false,
+			D.receiver.RecBit(from, (gray>>1)&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			D.receiver.RecBit(from, gray&1, false,
+			D.receiver.RecBit(from, gray&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		}
 
