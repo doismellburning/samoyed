@@ -119,20 +119,16 @@ func TestStartServesEventsAndShutsDown(t *testing.T) {
 	defer cancel()
 
 	// Port 0 isn't a valid WEBPORT, but here it lets the kernel pick a
-	// free one; we find out which from the listener's address below.
-	var lc net.ListenConfig
+	// free one; we find out which from the server's address below.
+	var server, err = NewServer(ctx, "127.0.0.1:0", hub)
+	require.NoError(t, err)
 
-	var probe, probeErr = lc.Listen(ctx, "tcp", "127.0.0.1:0")
-	require.NoError(t, probeErr)
-
-	var addr, isTCP = probe.Addr().(*net.TCPAddr)
+	var addr, isTCP = server.Addr().(*net.TCPAddr)
 	require.True(t, isTCP)
 
 	var port = addr.Port
-	require.NoError(t, probe.Close())
 
-	var errCh, err = Start(ctx, port, hub)
-	require.NoError(t, err)
+	var errCh = server.Start(ctx)
 
 	var req, reqErr = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/events", port), nil)
 	require.NoError(t, reqErr)
@@ -174,4 +170,41 @@ func TestStartServesEventsAndShutsDown(t *testing.T) {
 	case <-time.After(shutdownTimeout / 2):
 		t.Fatal("server did not shut down promptly with an event stream open")
 	}
+}
+
+// A port already in use is reported by NewServer, before anything starts.
+func TestNewServerReportsBindFailure(t *testing.T) {
+	t.Parallel()
+
+	// Every address, not just loopback: see metrics.TestNewServerReportsBindFailure.
+	var blocker, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp", ":0")
+	require.NoError(t, listenErr)
+
+	t.Cleanup(func() { blocker.Close() })
+
+	var addr, isTCP = blocker.Addr().(*net.TCPAddr)
+	require.True(t, isTCP)
+
+	var server, err = NewServer(t.Context(), fmt.Sprintf(":%d", addr.Port), nil)
+
+	require.Error(t, err)
+	assert.Nil(t, server)
+}
+
+// A server that is made but never started gives its port up when closed, and
+// starting it after that serves nothing.
+func TestServerCloseGivesUpThePortOfAServerNeverStarted(t *testing.T) {
+	t.Parallel()
+
+	var server, err = NewServer(t.Context(), "127.0.0.1:0", nil)
+	require.NoError(t, err)
+
+	server.Close()
+
+	// The listener itself says it is closed, rather than this binding the port
+	// again: something else could take a port given up, however briefly.
+	var _, acceptErr = server.listener.Accept()
+	require.ErrorIs(t, acceptErr, net.ErrClosed)
+
+	assert.ErrorIs(t, <-server.Start(t.Context()), http.ErrServerClosed)
 }

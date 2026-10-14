@@ -16,17 +16,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// webui_init starts the web dashboard and map if a port was configured with
-// WEBPORT, and returns the hub to publish frames to.  A port of 0 (the
-// default) disables it, as does failing to start it, and either returns nil -
-// which webPublishReceived and webPublishTransmitted take as nothing to do.
-func webui_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) *webui.Hub {
-	if mc.web_port == 0 {
-		logrus.Debug("Web interface disabled")
-
-		return nil
-	}
-
+// webui_init starts the web dashboard and map on addr - every address on the
+// port configured with WEBPORT - and returns the hub to publish frames to.
+// Failing to start it returns nil, which webPublishReceived and
+// webPublishTransmitted take as nothing to do.  A port of 0 (the default)
+// disables it, so DirewolfMain doesn't call this, and has a nil hub too.
+func webui_init(ctx context.Context, audio *RadioConfig, addr string) *webui.Hub {
 	var hub = webui.NewHub()
 
 	for channel := range MAX_TOTAL_CHANS {
@@ -35,21 +30,25 @@ func webui_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) *web
 		}
 	}
 
-	var errCh, startErr = webui.Start(ctx, mc.web_port, hub)
-	if startErr != nil {
-		logrus.WithError(startErr).WithField("port", mc.web_port).Error("Unable to start web interface")
+	var server, serverErr = webui.NewServer(ctx, addr, hub)
+	if serverErr != nil {
+		logrus.WithError(serverErr).WithField("address", addr).Error("Unable to start web interface")
 
 		return nil
 	}
 
+	var listening = server.Addr()
+
+	var errCh = server.Start(ctx)
+
 	go func() {
 		var err = <-errCh
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logrus.WithError(err).WithField("port", mc.web_port).Error("Web interface stopped")
+			logrus.WithError(err).WithField("address", listening).Error("Web interface stopped")
 		}
 	}()
 
-	logrus.WithField("port", mc.web_port).Info("Web interface listening")
+	logrus.WithField("address", listening).Info("Web interface listening")
 
 	return hub
 }

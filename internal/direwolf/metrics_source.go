@@ -6,6 +6,7 @@ package direwolf
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 
 	"github.com/doismellburning/samoyed/internal/metrics"
@@ -67,20 +68,14 @@ func recordRadioFrame(channel int, fecType fec_type_t, retries BitFixLevel) {
 	}
 }
 
-// metrics_init starts the Prometheus "/metrics" HTTP endpoint if a port was
-// configured with METRICSPORT, and pushes each channel's static up/down
-// state from audio, seeding the rest of that channel's series at
-// zero (everything else pushes from its own subsystem as events happen).
-// A port of 0 (the default) disables it.  It reports whether the endpoint is
-// listening, which it is not if disabled or if it failed to start.
-func metrics_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) bool {
-	if mc.metrics_port == 0 {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Disabled Prometheus metrics endpoint.\n")
-
-		return false
-	}
-
+// metrics_init starts the Prometheus "/metrics" HTTP endpoint on addr - every
+// address on the port configured with METRICSPORT, or "127.0.0.1:0" for any
+// free one - and pushes each channel's static up/down state from audio,
+// seeding the rest of that channel's series at zero (everything else pushes
+// from its own subsystem as events happen).  A port of 0 (the default)
+// disables the endpoint, so DirewolfMain doesn't call this.  It reports where
+// the endpoint is listening: nil if it failed to start.
+func metrics_init(ctx context.Context, audio *RadioConfig, addr string) net.Addr {
 	for channel := range MAX_RADIO_CHANS {
 		var isRadio = isRadioChannel(audio, channel)
 
@@ -91,24 +86,28 @@ func metrics_init(ctx context.Context, audio *RadioConfig, mc *misc_config_s) bo
 		}
 	}
 
-	var errCh, startErr = metrics.Start(ctx, mc.metrics_port)
-	if startErr != nil {
+	var server, serverErr = metrics.NewServer(ctx, addr)
+	if serverErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to start Prometheus metrics endpoint on port %d: %v\n", mc.metrics_port, startErr)
+		dw_printf("Unable to start Prometheus metrics endpoint on %s: %v\n", addr, serverErr)
 
-		return false
+		return nil
 	}
+
+	var listening = server.Addr()
+
+	var errCh = server.Start(ctx)
 
 	go func() {
 		var err = <-errCh
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Prometheus metrics endpoint on port %d stopped: %v\n", mc.metrics_port, err)
+			dw_printf("Prometheus metrics endpoint on port %d stopped: %v\n", addrPort(listening), err)
 		}
 	}()
 
 	text_color_set(DW_COLOR_INFO)
-	dw_printf("Prometheus metrics endpoint listening on port %d.\n", mc.metrics_port)
+	dw_printf("Prometheus metrics endpoint listening on port %d.\n", addrPort(listening))
 
-	return true
+	return listening
 }

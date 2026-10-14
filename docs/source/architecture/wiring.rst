@@ -163,6 +163,9 @@ so the order of construction follows the arrows:
    rather than queueing it.
 #. The tone generators and the PTT.
 #. The web interface and the AGW server.
+   The web interface binds its port as it is made;
+   with its port disabled, or taken, there is no hub,
+   and the frames that would have gone to it go nowhere.
    The AGW server is made here,
    so that the transmit service can show its clients each frame sent,
    but only started once the transmit threads are running.
@@ -253,6 +256,8 @@ References
   ``audio.go`` (``AudioDevices.setAudioLevel``),
   ``channel_config.go`` (``RadioConfig.digipeaterPorts``)
   and ``recv.go`` (``recv_init``, ``recv_process``).
+- ``internal/direwolf/webui_source.go``: ``webui_init``,
+  and ``internal/webui/server.go``: ``NewServer``.
 - ``internal/ptt/ptt.go``: ``New``,
   handed each channel's configuration by ``RadioConfig.pttChannels`` (``internal/direwolf/channel_config.go``).
 - The digipeaters' constructors, and what they take,

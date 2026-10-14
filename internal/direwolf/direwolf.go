@@ -4,6 +4,7 @@ package direwolf
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -543,7 +544,13 @@ x = Silence FX.25 information.`)
 	 * unless WEBPORT is set.
 	 */
 
-	var webHub = webui_init(ctx, audio_config, misc_config)
+	var webHub *webui.Hub
+
+	if misc_config.web_port == 0 {
+		logrus.Debug("Web interface disabled")
+	} else {
+		webHub = webui_init(ctx, audio_config, fmt.Sprintf(":%d", misc_config.web_port))
+	}
 
 	// The AGW server is made here, so the transmit service can be told to
 	// show it each frame sent, but only started further down, once the
@@ -734,7 +741,14 @@ x = Silence FX.25 information.`)
 	}
 
 	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, linkClientApps, transmitQueue, d_c_opt)
-	var metricsListening = metrics_init(ctx, audio_config, misc_config)
+	var metricsAddr net.Addr // Where the endpoint is listening, if it is.
+
+	if misc_config.metrics_port == 0 {
+		logrus.Info("Disabled Prometheus metrics endpoint")
+	} else {
+		metricsAddr = metrics_init(ctx, audio_config, fmt.Sprintf(":%d", misc_config.metrics_port))
+	}
+
 	var kissNetSvc, kissNetErr = NewKissNetService(ctx, misc_config, kissNetAddrs(misc_config), d_n_opt)
 	if kissNetErr != nil {
 		logrus.WithError(kissNetErr).Error("Unable to listen for KISS TCP client applications")
@@ -756,9 +770,7 @@ x = Silence FX.25 information.`)
 			ports.Web = misc_config.web_port
 		}
 
-		if metricsListening {
-			ports.Metrics = misc_config.metrics_port
-		}
+		ports.Metrics = addrPort(metricsAddr)
 
 		announce.Announce(ctx, announce.Services(misc_config.dns_sd_name, ports))
 	}
