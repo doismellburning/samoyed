@@ -17,6 +17,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/deviceid"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -286,8 +287,8 @@ x = Silence FX.25 information.`)
 	var audio_config = new(RadioConfig)
 	var misc_config = new(misc_config_s)
 	var dw_tt_config tt_config_s
-	var digi_config digi_config_s
-	var cdigi_config cdigi_config_s
+	var digi_config digipeater.Config
+	var cdigi_config digipeater.ConnectedConfig
 	var igate_config igate_config_s
 
 	var configResult = config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config, aprsSymbolData)
@@ -690,7 +691,10 @@ x = Silence FX.25 information.`)
 	var mheardDB = mheard.New(d_m_opt)
 	var packetFilter = pfilter.New(igate_config.max_digi_hops, aprsDecoder, mheardDB, d_f_opt)
 	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, dataLinkQueue.RecFrame, transmitQueue.Append, d_i_opt)
-	var aprsDigipeater = NewDigipeater(audio_config, &digi_config, packetFilter, igate.rememberDigipeated, transmitQueue.Append)
+
+	var digipeaterPorts = audio_config.digipeaterPorts()
+
+	var aprsDigipeater = digipeater.New(digipeaterPorts, &digi_config, packetFilter, igate.rememberDigipeated, transmitQueue.Append)
 
 	// The IGate and the transmit queue send to each other, so the queue,
 	// made first, is handed the IGate now.  Nothing queues a packet for the
@@ -698,7 +702,7 @@ x = Silence FX.25 information.`)
 	transmitQueue.SetIGate(igate.sendRecPacket)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)
-	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter, transmitQueue.Append)
+	var connectedDigipeater = digipeater.NewConnected(digipeaterPorts, &cdigi_config, packetFilter, transmitQueue.Append)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
@@ -881,8 +885,8 @@ type recPacketHandler struct {
 	waypoints *waypoint.Sender
 	apps      *clientApps // Nil for none.
 
-	digipeater          *Digipeater
-	connectedDigipeater *ConnectedDigipeater
+	digipeater          *digipeater.Digipeater
+	connectedDigipeater *digipeater.Connected
 	ttGateway           *TTGateway
 
 	dumpUTF8    bool // "-d u": print UTF-8 in hexadecimal too.

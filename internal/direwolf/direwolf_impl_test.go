@@ -14,6 +14,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/aprslog"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/pfilter"
@@ -115,7 +116,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	t.Cleanup(ws.Close)
 
 	var igateConfig = new(igate_config_s)
-	var digiConfig = new(digi_config_s)
+	var digiConfig = new(digipeater.Config)
 	var filter = pfilter.New(igateConfig.max_digi_hops, aprs.NewDecoderFromDataFiles(), heardDB, 0)
 
 	var ig = NewIGate(audioConfig, igateConfig, digiConfig, filter, heardDB, nil, nil, 0)
@@ -128,8 +129,8 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	handler.logger = aprslog.New(false, "")
 	handler.heard = heardDB
 	handler.waypoints = ws
-	handler.digipeater = NewDigipeater(audioConfig, digiConfig, filter, nil, nil)
-	handler.connectedDigipeater = NewConnectedDigipeater(audioConfig, new(cdigi_config_s), filter, nil)
+	handler.digipeater = digipeater.New(audioConfig.digipeaterPorts(), digiConfig, filter, nil, nil)
+	handler.connectedDigipeater = digipeater.NewConnected(audioConfig.digipeaterPorts(), new(digipeater.ConnectedConfig), filter, nil)
 	handler.ttGateway = NewTTGateway(audioConfig, handler.ttConfig, nil, handler.digipeater.Remember, nil, nil, nil, nil, 0)
 
 	return &recPacketTest{handler: handler, audioConfig: audioConfig, waypoints: waypoints}

@@ -34,6 +34,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/coordconvutil"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -891,8 +892,8 @@ type parseState struct {
 	keyword string // original (not uppercased) keyword token
 
 	audio *RadioConfig
-	digi  *digi_config_s
-	cdigi *cdigi_config_s
+	digi  *digipeater.Config
+	cdigi *digipeater.ConnectedConfig
 	tt    *tt_config_s
 	igate *igate_config_s
 	misc  *misc_config_s
@@ -1219,8 +1220,8 @@ func (ps *parseState) readLegacy(r io.Reader, name string) {
 // file can override them.  It reports what the file drew, for a caller that
 // wants to act on it - see the --config-check option in DirewolfMain.
 func config_init(fname string, p_audio_config *RadioConfig,
-	p_digi_config *digi_config_s,
-	p_cdigi_config *cdigi_config_s,
+	p_digi_config *digipeater.Config,
+	p_cdigi_config *digipeater.ConnectedConfig,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
 	p_misc_config *misc_config_s,
@@ -1309,7 +1310,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 	p_audio_config.chan_medium[0] = MEDIUM_RADIO
 
-	p_digi_config.dedupe_time = DEFAULT_DEDUPE
+	p_digi_config.DedupeTime = digipeater.DefaultDedupe
 
 	p_tt_config.gateway_enabled = 0
 
@@ -1503,15 +1504,15 @@ func config_init(fname string, p_audio_config *RadioConfig,
 	for i := range MAX_TOTAL_CHANS {
 		for j := range MAX_TOTAL_CHANS {
 			/* APRS digipeating. */
-			if ps.digi.enabled[i][j] {
+			if ps.digi.Enabled[i][j] {
 				if IsNoCall(ps.audio.mycall[i]) {
 					ps.errorf("config file: MYCALL must be set for receive channel %d before digipeating is allowed", i)
-					ps.digi.enabled[i][j] = false
+					ps.digi.Enabled[i][j] = false
 				}
 
 				if IsNoCall(ps.audio.mycall[j]) {
 					ps.errorf("config file: MYCALL must be set for transmit channel %d before digipeating is allowed", j)
-					ps.digi.enabled[i][j] = false
+					ps.digi.Enabled[i][j] = false
 				}
 
 				var b = 0
@@ -1532,15 +1533,15 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 			/* Connected mode digipeating. */
 
-			if i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && ps.cdigi.enabled[i][j] {
+			if i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && ps.cdigi.Enabled[i][j] {
 				if IsNoCall(ps.audio.mycall[i]) {
 					ps.errorf("config file: MYCALL must be set for receive channel %d before digipeating is allowed", i)
-					ps.cdigi.enabled[i][j] = false
+					ps.cdigi.Enabled[i][j] = false
 				}
 
 				if IsNoCall(ps.audio.mycall[j]) {
 					ps.errorf("config file: MYCALL must be set for transmit channel %d before digipeating is allowed", j)
-					ps.cdigi.enabled[i][j] = false
+					ps.cdigi.Enabled[i][j] = false
 				}
 
 				var b = 0
@@ -1587,8 +1588,8 @@ func config_init(fname string, p_audio_config *RadioConfig,
 			if ps.audio.chan_medium[j] == MEDIUM_RADIO || ps.audio.chan_medium[j] == MEDIUM_NETTNC ||
 				ps.audio.chan_medium[j] == MediumSerialTNC ||
 				ps.audio.chan_medium[j] == MEDIUM_AXUDP {
-				if ps.digi.filter_str[MAX_TOTAL_CHANS][j] == "" {
-					ps.digi.filter_str[MAX_TOTAL_CHANS][j] = "i/180"
+				if ps.digi.FilterStr[MAX_TOTAL_CHANS][j] == "" {
+					ps.digi.FilterStr[MAX_TOTAL_CHANS][j] = "i/180"
 				}
 			}
 		}
@@ -3483,7 +3484,7 @@ func handleDIGIPEAT(ps *parseState) error {
 		return fmt.Errorf("config file: Invalid alias matching pattern on line %d:\n%w", ps.line, err)
 	}
 
-	ps.digi.alias[from_chan][to_chan] = r
+	ps.digi.Alias[from_chan][to_chan] = r
 
 	t = ps.split(false)
 	if t == "" {
@@ -3495,15 +3496,15 @@ func handleDIGIPEAT(ps *parseState) error {
 		return fmt.Errorf("config file: Invalid wide matching pattern on line %d:\n%w", ps.line, err)
 	}
 
-	ps.digi.wide[from_chan][to_chan] = r
+	ps.digi.Wide[from_chan][to_chan] = r
 
-	ps.digi.enabled[from_chan][to_chan] = true
-	ps.digi.preempt[from_chan][to_chan] = PREEMPT_OFF
+	ps.digi.Enabled[from_chan][to_chan] = true
+	ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptOff
 
 	t = ps.split(false)
 	if t != "" {
 		if strings.EqualFold(t, "OFF") {
-			ps.digi.preempt[from_chan][to_chan] = PREEMPT_OFF
+			ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptOff
 			t = ps.split(false)
 		} else if strings.EqualFold(t, "DROP") {
 			ps.errorf(
@@ -3511,7 +3512,7 @@ func handleDIGIPEAT(ps *parseState) error {
 				ps.line,
 			)
 
-			ps.digi.preempt[from_chan][to_chan] = PREEMPT_DROP
+			ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptDrop
 			t = ps.split(false)
 		} else if strings.EqualFold(t, "MARK") {
 			ps.errorf(
@@ -3519,13 +3520,13 @@ func handleDIGIPEAT(ps *parseState) error {
 				ps.line,
 			)
 
-			ps.digi.preempt[from_chan][to_chan] = PREEMPT_MARK
+			ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptMark
 			t = ps.split(false)
 		} else if (strings.EqualFold(t, "TRACE")) || (strings.HasPrefix(strings.ToUpper(t), "PREEMPT")) {
-			ps.digi.preempt[from_chan][to_chan] = PREEMPT_TRACE
+			ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptTrace
 			t = ps.split(false)
 		} else if strings.HasPrefix(strings.ToUpper(t), "ATGP=") {
-			ps.digi.atgp[from_chan][to_chan] = t[5:]
+			ps.digi.ATGP[from_chan][to_chan] = t[5:]
 			t = ps.split(false)
 		}
 	}
@@ -3549,14 +3550,14 @@ func handleDEDUPE(ps *parseState) error {
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		return fmt.Errorf("line %d: Time must be numeric for DEDUPE command. Keeping %d", ps.line, ps.digi.dedupe_time)
+		return fmt.Errorf("line %d: Time must be numeric for DEDUPE command. Keeping %d", ps.line, ps.digi.DedupeTime)
 	}
 	if n >= 0 && n < 600 {
-		ps.digi.dedupe_time = n
+		ps.digi.DedupeTime = n
 	} else {
-		ps.digi.dedupe_time = DEFAULT_DEDUPE
+		ps.digi.DedupeTime = digipeater.DefaultDedupe
 
-		ps.errorf("line %d: Unreasonable value for dedupe time. Using %d", ps.line, ps.digi.dedupe_time)
+		ps.errorf("line %d: Unreasonable value for dedupe time. Using %d", ps.line, ps.digi.DedupeTime)
 	}
 
 	return nil
@@ -3605,7 +3606,7 @@ func handleREGEN(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 	}
 
-	ps.digi.regen[from_chan][to_chan] = true
+	ps.digi.Regen[from_chan][to_chan] = true
 
 	return nil
 }
@@ -3664,8 +3665,8 @@ func handleCDIGIPEAT(ps *parseState) error {
 	if t != "" {
 		var r, err = regexp.Compile(t)
 		if err == nil {
-			ps.cdigi.alias[from_chan][to_chan] = r
-			ps.cdigi.has_alias[from_chan][to_chan] = true
+			ps.cdigi.Alias[from_chan][to_chan] = r
+			ps.cdigi.HasAlias[from_chan][to_chan] = true
 		} else {
 			return fmt.Errorf("config file: Invalid alias matching pattern on line %d:\n%w", ps.line, err)
 		}
@@ -3673,7 +3674,7 @@ func handleCDIGIPEAT(ps *parseState) error {
 		t = ps.split(false)
 	}
 
-	ps.cdigi.enabled[from_chan][to_chan] = true
+	ps.cdigi.Enabled[from_chan][to_chan] = true
 
 	if t != "" {
 		ps.errorf("config file, line %d: Found \"%s\" where end of line was expected", ps.line, t)
@@ -3805,12 +3806,12 @@ func handleFILTER(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: Invalid FILTER expression:\n%w", ps.line, err)
 	}
 
-	if ps.digi.filter_str[from_chan][to_chan] != "" {
-		ps.errorf("config file, line %d: Replacing previous filter for same from/to pair:\n        %s", ps.line, ps.digi.filter_str[from_chan][to_chan])
-		ps.digi.filter_str[from_chan][to_chan] = ""
+	if ps.digi.FilterStr[from_chan][to_chan] != "" {
+		ps.errorf("config file, line %d: Replacing previous filter for same from/to pair:\n        %s", ps.line, ps.digi.FilterStr[from_chan][to_chan])
+		ps.digi.FilterStr[from_chan][to_chan] = ""
 	}
 
-	ps.digi.filter_str[from_chan][to_chan] = t
+	ps.digi.FilterStr[from_chan][to_chan] = t
 
 	return nil
 }
@@ -3869,7 +3870,7 @@ func handleCFILTER(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: Invalid CFILTER expression:\n%w", ps.line, err)
 	}
 
-	ps.cdigi.cfilter_str[from_chan][to_chan] = t
+	ps.cdigi.CFilterStr[from_chan][to_chan] = t
 
 	return nil
 }

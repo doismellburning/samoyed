@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package digipeater
 
 /*------------------------------------------------------------------
  *
@@ -23,57 +26,61 @@ import (
 	"regexp"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/pfilter"
+	"github.com/doismellburning/samoyed/internal/phy"
+	"github.com/sirupsen/logrus"
 )
 
 /*
  * Information required for Connected mode digipeating.
  *
  * The configuration file reader fills in this information
- * and it is passed to NewConnectedDigipeater at application start up time.
+ * and it is passed to NewConnected at application start up time.
  */
 
-type cdigi_config_s struct {
+// ConnectedConfig is the connected mode digipeater's configuration.
+type ConnectedConfig struct {
 
 	/*
 	 * Rules for each of the [from_chan][to_chan] combinations.
 	 */
 
-	// For APRS digipeater, we use MAX_TOTAL_CHANS because we use external TNCs.
-	// Connected mode packet must use internal modems we we use MAX_RADIO_CHANS.
+	// For APRS digipeater, we use phy.MaxTotalChans because we use external TNCs.
+	// Connected mode packet must use internal modems we we use phy.MaxRadioChans.
 
-	enabled [MAX_RADIO_CHANS][MAX_RADIO_CHANS]bool // Is it enabled for from/to pair?
+	Enabled [phy.MaxRadioChans][phy.MaxRadioChans]bool // Is it enabled for from/to pair?
 
-	has_alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]bool // If there was no alias in the config file,
+	HasAlias [phy.MaxRadioChans][phy.MaxRadioChans]bool // If there was no alias in the config file,
 	// the structure below will not be set up
 	// properly and an attempt to use it could
 	// result in a crash.  (fixed v1.5)
 	// Not needed for [APRS] DIGIPEAT because
-	// the alias is mandatory there.
-	alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]*regexp.Regexp
+	// the Alias is mandatory there.
+	Alias [phy.MaxRadioChans][phy.MaxRadioChans]*regexp.Regexp
 
-	cfilter_str [MAX_RADIO_CHANS][MAX_RADIO_CHANS]string
+	CFilterStr [phy.MaxRadioChans][phy.MaxRadioChans]string
 	// NULL or optional Packet Filter strings such as "t/m".
 }
 
-// ConnectedDigipeater is the connected mode digipeater: the configuration it
+// Connected is the connected mode digipeater: the configuration it
 // was started with, and a count of packets digipeated for each combination of
 // from/to channel.
-type ConnectedDigipeater struct {
-	audioConfig *RadioConfig
-	config      *cdigi_config_s
-	filter      *pfilter.PacketFilter
-	transmit    frameSender // Where digipeated packets go; nil to drop them.
-	count       [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
+type Connected struct {
+	ports    [phy.MaxTotalChans]Port
+	config   *ConnectedConfig
+	filter   *pfilter.PacketFilter
+	transmit dwcore.FrameSender // Where digipeated packets go; nil to drop them.
+	count    [phy.MaxRadioChans][phy.MaxRadioChans]int
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	NewConnectedDigipeater
+ * Name:	NewConnected
  *
  * Purpose:	Initialize with stuff from configuration file.
  *
- * Inputs:	p_audio_config	- Configuration for audio channels.
+ * Inputs:	ports		- Our callsign and the medium of each channel.
  *
  *		p_cdigi_config	- Connected Digipeater configuration details.
  *
@@ -86,9 +93,9 @@ type ConnectedDigipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewConnectedDigipeater(p_audio_config *RadioConfig, p_cdigi_config *cdigi_config_s, filter *pfilter.PacketFilter, transmit frameSender) *ConnectedDigipeater {
-	var d = new(ConnectedDigipeater)
-	d.audioConfig = p_audio_config
+func NewConnected(ports [phy.MaxTotalChans]Port, p_cdigi_config *ConnectedConfig, filter *pfilter.PacketFilter, transmit dwcore.FrameSender) *Connected {
+	var d = new(Connected)
+	d.ports = ports
 	d.config = p_cdigi_config
 	d.filter = filter
 	d.transmit = transmit
@@ -96,7 +103,7 @@ func NewConnectedDigipeater(p_audio_config *RadioConfig, p_cdigi_config *cdigi_c
 	return d
 }
 
-func (d *ConnectedDigipeater) GetCount(from_chan, to_chan int) int {
+func (d *Connected) GetCount(from_chan, to_chan int) int {
 	return d.count[from_chan][to_chan]
 }
 
@@ -114,15 +121,14 @@ func (d *ConnectedDigipeater) GetCount(from_chan, to_chan int) int {
  *
  *------------------------------------------------------------------------------*/
 
-func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
+func (d *Connected) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Connected mode is allowed only for channels with internal modem.
 	// It probably wouldn't matter for digipeating but let's keep that rule simple and consistent.
-	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS ||
-		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
-			d.audioConfig.chan_medium[from_chan] != MEDIUM_NETTNC &&
-			d.audioConfig.chan_medium[from_chan] != MediumSerialTNC) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("cdigipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
+	if from_chan < 0 || from_chan >= phy.MaxRadioChans ||
+		(d.ports[from_chan].Medium != phy.MediumRadio &&
+			d.ports[from_chan].Medium != phy.MediumNetTNC &&
+			d.ports[from_chan].Medium != phy.MediumSerialTNC) {
+		logrus.WithField("channel", from_chan).Error("cdigipeater: Did not expect to receive on invalid channel")
 
 		return
 	}
@@ -134,8 +140,8 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 * Might not have a benefit here.
 	 */
 
-	for to_chan := range MAX_RADIO_CHANS {
-		if d.config.enabled[from_chan][to_chan] && to_chan == from_chan {
+	for to_chan := range phy.MaxRadioChans {
+		if d.config.Enabled[from_chan][to_chan] && to_chan == from_chan {
 			d.digipeatTo(from_chan, to_chan, pp)
 		}
 	}
@@ -144,8 +150,8 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 * Second pass:  Look at packets being digipeated to different channel.
 	 */
 
-	for to_chan := range MAX_RADIO_CHANS {
-		if d.config.enabled[from_chan][to_chan] && to_chan != from_chan {
+	for to_chan := range phy.MaxRadioChans {
+		if d.config.Enabled[from_chan][to_chan] && to_chan != from_chan {
 			d.digipeatTo(from_chan, to_chan, pp)
 		}
 	}
@@ -153,15 +159,15 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 
 // digipeatTo queues pp for transmission on to_chan if the from/to channel
 // pair's rules say it should be repeated.
-func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *ax25.Packet) {
-	var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
-		d.audioConfig.mycall[to_chan],
-		d.config.has_alias[from_chan][to_chan],
-		d.config.alias[from_chan][to_chan], to_chan,
-		d.config.cfilter_str[from_chan][to_chan])
+func (d *Connected) digipeatTo(from_chan int, to_chan int, pp *ax25.Packet) {
+	var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
+		d.ports[to_chan].MyCall,
+		d.config.HasAlias[from_chan][to_chan],
+		d.config.Alias[from_chan][to_chan], to_chan,
+		d.config.CFilterStr[from_chan][to_chan])
 	if result != nil {
 		if d.transmit != nil {
-			d.transmit(to_chan, TQ_PRIO_0_HI, result)
+			d.transmit(to_chan, dwcore.PrioHigh, result)
 		}
 
 		d.count[from_chan][to_chan]++
@@ -210,7 +216,7 @@ func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *ax25.Pa
  *
  *------------------------------------------------------------------------------*/
 
-func (d *ConnectedDigipeater) match(from_chan int, pp *ax25.Packet, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan int, cfilter_str string) *ax25.Packet {
+func (d *Connected) match(from_chan int, pp *ax25.Packet, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan int, cfilter_str string) *ax25.Packet {
 	/*
 	 * First check if filtering has been configured.
 	 * Note that we have three different config file filter commands:
@@ -229,8 +235,11 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *ax25.Packet, mycall_rec s
 	if cfilter_str != "" {
 		var result, err = d.filter.Filter(from_chan, to_chan, cfilter_str, pp, false)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s\n", err)
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"from_channel": from_chan,
+				"to_channel":   to_chan,
+				"filter":       cfilter_str,
+			}).Error("cdigipeater: Bad filter")
 		}
 
 		if result != 1 {

@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package digipeater
 
 import (
 	"regexp"
@@ -16,13 +19,11 @@ var digipeaterTestAliasRegexp *regexp.Regexp
 var digipeaterTestWideRegexp *regexp.Regexp
 var digipeaterTestConfigATGP = "HOP"
 var digipeaterTestFailed = 0
-var preempt = PREEMPT_OFF
+var preempt = PreemptOff
 var digipeaterTestDigi *Digipeater
 
 func digipeater_test(t *testing.T, in, out string) {
 	t.Helper()
-
-	dw_printf("\n")
 
 	/*
 	 * As an extra test, change text to internal format back to
@@ -36,8 +37,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	rec += string(pinfo)
 
 	if in != rec {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Text/internal/text error-1 %s -> %s\n", in, rec)
+		t.Logf("Text/internal/text error-1 %s -> %s", in, rec)
 	}
 
 	/*
@@ -59,20 +59,14 @@ func digipeater_test(t *testing.T, in, out string) {
 	rec += string(pinfo)
 
 	if in != rec {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf(
-			"internal/frame/internal/text error-2 %s -> %s\n",
-			in,
-			rec,
-		)
+		t.Logf("internal/frame/internal/text error-2 %s -> %s", in, rec)
 	}
 
 	/*
 	 * On with the digipeater test.
 	 */
 
-	text_color_set(DW_COLOR_REC)
-	dw_printf("Rec\t%s\n", rec)
+	t.Logf("Rec\t%s", rec)
 
 	//TODO:										  	             Add filtering to test.
 	//											             V
@@ -87,16 +81,14 @@ func digipeater_test(t *testing.T, in, out string) {
 		xmit += string(pinfo)
 	}
 
-	text_color_set(DW_COLOR_XMIT)
-	dw_printf("Xmit\t%s\n", xmit)
+	t.Logf("Xmit\t%s", xmit)
 
 	if !assert.Equal(t, out, xmit) {
 		digipeaterTestFailed++
 	}
-
-	dw_printf("\n")
 }
 
+//nolint:paralleltest // Serial: keeps its state in package-level variables.
 func Test_Digipeater(t *testing.T) {
 	digipeaterTestMyCall = "WB2OSZ-9"
 
@@ -244,12 +236,12 @@ func Test_Digipeater(t *testing.T) {
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:off",
 		"")
 
-	preempt = PREEMPT_DROP
+	preempt = PreemptDrop
 
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:drop",
 		"W1ABC>TEST11,WB2OSZ-9*,CITYE:drop")
 
-	preempt = PREEMPT_MARK
+	preempt = PreemptMark
 
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:mark1",
 		"W1ABC>TEST11,CITYA,CITYB,CITYC,WB2OSZ-9*,CITYE:mark1")
@@ -257,7 +249,7 @@ func Test_Digipeater(t *testing.T) {
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,WB2OSZ-9,CITYE:mark2",
 		"W1ABC>TEST11,CITYA,CITYB,CITYC,WB2OSZ-9*,CITYE:mark2")
 
-	preempt = PREEMPT_TRACE
+	preempt = PreemptTrace
 
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:trace1",
 		"W1ABC>TEST11,CITYA,WB2OSZ-9*,CITYE:trace1")
@@ -290,7 +282,7 @@ func Test_Digipeater(t *testing.T) {
 
 	// New in 1.7 - ATGP Hack
 
-	preempt = PREEMPT_OFF // Shouldn't make a difference here.
+	preempt = PreemptOff // Shouldn't make a difference here.
 
 	digipeater_test(t, "W1ABC>TEST51,HOP7-7,HOP7-7:stuff1",
 		"W1ABC>TEST51,WB2OSZ-9*,HOP7-6,HOP7-7:stuff1")
@@ -344,10 +336,8 @@ func Test_Digipeater(t *testing.T) {
 		"W1ABC>TEST67,SPRNGR-1,HOP7*:")
 
 	if digipeaterTestFailed == 0 {
-		dw_printf("SUCCESS -- All digipeater tests passed.\n")
+		t.Log("SUCCESS -- All digipeater tests passed.")
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - %d digipeater tests failed.\n", digipeaterTestFailed)
-		t.Fail()
+		t.Errorf("ERROR - %d digipeater tests failed.", digipeaterTestFailed)
 	}
 } /* end main */

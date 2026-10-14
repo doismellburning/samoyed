@@ -2,22 +2,21 @@ package direwolf
 
 import (
 	"github.com/doismellburning/samoyed/internal/axudp"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/ptt"
 )
 
-// Type of communication medium associated with the channel.
-
-type medium_e int
+type medium_e = phy.Medium
 
 const (
-	MEDIUM_NONE     medium_e = iota // Channel is not valid for use.
-	MEDIUM_RADIO                    // Internal modem for radio.
-	MEDIUM_IGATE                    // Access IGate as ordinary channel.
-	MEDIUM_NETTNC                   // Remote network TNC.  (new in 1.8)
-	MediumSerialTNC                 // Local serial TNC.  (new in 1.8)
-	MEDIUM_AXUDP                    // AX.25 over UDP to other nodes.
+	MEDIUM_NONE     = phy.MediumNone
+	MEDIUM_RADIO    = phy.MediumRadio
+	MEDIUM_IGATE    = phy.MediumIGate
+	MEDIUM_NETTNC   = phy.MediumNetTNC
+	MediumSerialTNC = phy.MediumSerialTNC
+	MEDIUM_AXUDP    = phy.MediumAXUDP
 )
 
 type sanity_t = phy.Sanity
@@ -363,3 +362,15 @@ const DEFAULT_PERSIST = 63
 const DEFAULT_TXDELAY = 30    // *10mS = 300mS
 const DEFAULT_TXTAIL = 10     // *10mS = 100mS
 const DEFAULT_FULLDUP = false // false = half duplex
+
+// digipeaterPorts is our callsign and the medium of each channel, as the
+// digipeaters need them.
+func (c *RadioConfig) digipeaterPorts() [MAX_TOTAL_CHANS]digipeater.Port {
+	var ports [MAX_TOTAL_CHANS]digipeater.Port
+
+	for channel := range MAX_TOTAL_CHANS {
+		ports[channel] = digipeater.Port{MyCall: c.mycall[channel], Medium: c.chan_medium[channel]}
+	}
+
+	return ports
+}

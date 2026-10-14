@@ -326,8 +326,8 @@ legacy: |
   FILTER 0 10 t/m
 `)
 		assert.Zero(t, c.errors, c.output)
-		assert.Equal(t, "t/m", c.digi.filter_str[10][0])
-		assert.Equal(t, "t/m", c.digi.filter_str[0][10])
+		assert.Equal(t, "t/m", c.digi.FilterStr[10][0])
+		assert.Equal(t, "t/m", c.digi.FilterStr[0][10])
 	})
 
 	t.Run("two AXUDP ports can't share a UDP port", func(t *testing.T) {

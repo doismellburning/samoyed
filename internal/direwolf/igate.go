@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
@@ -144,7 +145,7 @@ type IGate struct {
 	 */
 	audioConfig *RadioConfig
 	config      *igate_config_s
-	digiConfig  *digi_config_s
+	digiConfig  *digipeater.Config
 	filter      *pfilter.PacketFilter
 
 	// recFrame is where a packet from APRS-IS for ICHANNEL goes, as
@@ -153,7 +154,7 @@ type IGate struct {
 
 	// transmit is where a packet from APRS-IS for a radio channel goes, to be
 	// transmitted, or nil to drop it.
-	transmit frameSender
+	transmit dwcore.FrameSender
 
 	// heard records who has been heard from APRS-IS, and how many of a
 	// message sender's positions are still to be passed along to RF.  Nil
@@ -247,11 +248,11 @@ type igateHeard interface {
 func NewIGate(
 	audioConfig *RadioConfig,
 	igateConfig *igate_config_s,
-	digiConfig *digi_config_s,
+	digiConfig *digipeater.Config,
 	filter *pfilter.PacketFilter,
 	heard igateHeard,
 	recFrame frameReceiver,
-	transmit frameSender,
+	transmit dwcore.FrameSender,
 	debugLevel int,
 ) *IGate {
 	var ig = &IGate{ //nolint:exhaustruct_v5
@@ -616,8 +617,8 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 	// Client app to ICHANNEL is outside of radio channel range.
 
 	if channel >= 0 && channel < MAX_TOTAL_CHANS && // in radio channel range
-		ig.digiConfig.filter_str[channel][MAX_TOTAL_CHANS] != "" {
-		var result, err = ig.filter.Filter(channel, MAX_TOTAL_CHANS, ig.digiConfig.filter_str[channel][MAX_TOTAL_CHANS], recv_pp, true)
+		ig.digiConfig.FilterStr[channel][MAX_TOTAL_CHANS] != "" {
+		var result, err = ig.filter.Filter(channel, MAX_TOTAL_CHANS, ig.digiConfig.FilterStr[channel][MAX_TOTAL_CHANS], recv_pp, true)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%s\n", err)
@@ -629,7 +630,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *ax25.Packet) {
 			// version 1.4: Instead, make the default off and activate it only with the debug igate option.
 			if ig.debugLevel >= 1 {
 				text_color_set(DW_COLOR_INFO)
-				dw_printf("Packet from channel %d to IGate was rejected by filter: %s\n", channel, ig.digiConfig.filter_str[channel][MAX_TOTAL_CHANS])
+				dw_printf("Packet from channel %d to IGate was rejected by filter: %s\n", channel, ig.digiConfig.FilterStr[channel][MAX_TOTAL_CHANS])
 			}
 
 			return
@@ -1585,8 +1586,8 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	}
 
 	if !msp_special_case {
-		if ig.digiConfig.filter_str[MAX_TOTAL_CHANS][to_chan] != "" {
-			var result, err = ig.filter.Filter(MAX_TOTAL_CHANS, to_chan, ig.digiConfig.filter_str[MAX_TOTAL_CHANS][to_chan], pp3, true)
+		if ig.digiConfig.FilterStr[MAX_TOTAL_CHANS][to_chan] != "" {
+			var result, err = ig.filter.Filter(MAX_TOTAL_CHANS, to_chan, ig.digiConfig.FilterStr[MAX_TOTAL_CHANS][to_chan], pp3, true)
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%s\n", err)

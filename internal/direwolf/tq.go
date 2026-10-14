@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
@@ -29,12 +30,8 @@ import (
 
 const TQ_NUM_PRIO = 2 /* Number of priorities. */
 
-const TQ_PRIO_0_HI = 0
-const TQ_PRIO_1_LO = 1
-
-// frameSender is where a packet to transmit goes: TransmitQueue.Append, or a
-// stand-in for it.
-type frameSender func(channel int, prio int, pp *ax25.Packet)
+const TQ_PRIO_0_HI = dwcore.PrioHigh
+const TQ_PRIO_1_LO = dwcore.PrioLow
 
 // clientTransmitQueue is what a client application's frames are queued on to
 // be transmitted, and what it asks how much is still waiting: the KISS

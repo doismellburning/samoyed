@@ -26,6 +26,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/touchtone"
@@ -133,7 +134,7 @@ type ttUsers struct {
 
 	// transmit is where an object report goes, to be transmitted, or is nil to
 	// drop it.
-	transmit frameSender
+	transmit dwcore.FrameSender
 
 	mu   sync.Mutex
 	user [MAX_TT_USERS]tt_user_s

@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package digipeater
 
 /*------------------------------------------------------------------
  *
@@ -40,8 +43,10 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dedupe"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/pfilter"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -49,69 +54,81 @@ import (
  * Information required for digipeating.
  *
  * The configuration file reader fills in this information
- * and it is passed to NewDigipeater at application start up time.
+ * and it is passed to New at application start up time.
  */
 
-const DEFAULT_DEDUPE = 30
+// DefaultDedupe is how many seconds a packet is remembered for, so as not to
+// digipeat a duplicate of it, when the configuration doesn't say.
+const DefaultDedupe = 30
 
-type preempt_e int
+// Preempt is what preemptive digipeating does with the unused
+// digipeaters ahead of the one that matched us.
+type Preempt int
 
 const (
-	PREEMPT_OFF preempt_e = iota
-	PREEMPT_DROP
-	PREEMPT_MARK
-	PREEMPT_TRACE
+	PreemptOff Preempt = iota
+	PreemptDrop
+	PreemptMark
+	PreemptTrace
 )
 
-type digi_config_s struct {
-	dedupe_time int /* Don't digipeat duplicate packets */
+// Config is the APRS digipeater's configuration.
+type Config struct {
+	DedupeTime int /* Don't digipeat duplicate packets */
 	/* within this number of seconds. */
 
 	/*
 	 * Rules for each of the [from_chan][to_chan] combinations.
 	 */
 
-	alias [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]*regexp.Regexp
+	Alias [phy.MaxTotalChans][phy.MaxTotalChans]*regexp.Regexp
 
-	wide [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]*regexp.Regexp
+	Wide [phy.MaxTotalChans][phy.MaxTotalChans]*regexp.Regexp
 
-	enabled [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]bool
+	Enabled [phy.MaxTotalChans][phy.MaxTotalChans]bool
 
-	preempt [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]preempt_e
+	Preempt [phy.MaxTotalChans][phy.MaxTotalChans]Preempt
 
 	// ATGP is an ugly hack for the specific need of ATGP which needs more that 8 digipeaters.
 	// DO NOT put this in the User Guide.  On a need to know basis.
 
-	atgp [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]string
+	ATGP [phy.MaxTotalChans][phy.MaxTotalChans]string
 
-	filter_str [MAX_TOTAL_CHANS + 1][MAX_TOTAL_CHANS + 1]string
+	FilterStr [phy.MaxTotalChans + 1][phy.MaxTotalChans + 1]string
 	// NULL or optional Packet Filter strings such as "t/m".
 	// Notice the size of arrays is one larger than normal.
 	// That extra position is for the IGate.
 
-	regen [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]bool // Regenerate packet.
+	Regen [phy.MaxTotalChans][phy.MaxTotalChans]bool // Regenerate packet.
 	// Sort of like digipeating but passed along unchanged.
+}
+
+// Port is what a digipeater needs to know of each channel it might
+// hear on or transmit to: our callsign there, and what kind of medium it is.
+type Port struct {
+	MyCall string
+	Medium phy.Medium
 }
 
 // Digipeater is the APRS digipeater: the configuration it was started with,
 // the duplicate suppression it shares with APRStt object reports, and a count
 // of packets digipeated for each combination of from/to channel.
 type Digipeater struct {
-	audioConfig *RadioConfig
-	config      *digi_config_s
-	filter      *pfilter.PacketFilter
-	dedupe      *dedupe.Service
-	transmit    frameSender // Where digipeated packets go; nil to drop them.
-	count       [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
+	ports    [phy.MaxTotalChans]Port
+	config   *Config
+	filter   *pfilter.PacketFilter
+	dedupe   *dedupe.Service
+	transmit dwcore.FrameSender // Where digipeated packets go; nil to drop them.
+	count    [phy.MaxTotalChans][phy.MaxTotalChans]int
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	NewDigipeater
+ * Name:	New
  *
  * Purpose:	Initialize with stuff from configuration file.
  *
- * Inputs:	p_audio_config	- Configuration for audio channels.
+ * Inputs:	ports		- Our callsign and the medium of each channel.
  *
  *		p_digi_config	- Digipeater configuration details.
  *
@@ -128,13 +145,19 @@ type Digipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, onRemember func(channel int, pp *ax25.Packet), transmit frameSender) *Digipeater {
+func New(
+	ports [phy.MaxTotalChans]Port,
+	p_digi_config *Config,
+	filter *pfilter.PacketFilter,
+	onRemember func(channel int, pp *ax25.Packet),
+	transmit dwcore.FrameSender,
+) *Digipeater {
 	var d = new(Digipeater)
-	d.audioConfig = p_audio_config
+	d.ports = ports
 	d.config = p_digi_config
 	d.filter = filter
 	d.transmit = transmit
-	d.dedupe = dedupe.New(time.Duration(p_digi_config.dedupe_time)*time.Second, onRemember)
+	d.dedupe = dedupe.New(time.Duration(p_digi_config.DedupeTime)*time.Second, onRemember)
 
 	return d
 }
@@ -172,13 +195,12 @@ func (d *Digipeater) Remember(channel int, pp *ax25.Packet) {
 
 func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Network or serial TNC is OK for UI frames where we don't care about timing.
-	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
-		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
-			d.audioConfig.chan_medium[from_chan] != MEDIUM_NETTNC &&
-			d.audioConfig.chan_medium[from_chan] != MediumSerialTNC &&
-			d.audioConfig.chan_medium[from_chan] != MEDIUM_AXUDP) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("APRS digipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
+	if from_chan < 0 || from_chan >= phy.MaxTotalChans ||
+		(d.ports[from_chan].Medium != phy.MediumRadio &&
+			d.ports[from_chan].Medium != phy.MediumNetTNC &&
+			d.ports[from_chan].Medium != phy.MediumSerialTNC &&
+			d.ports[from_chan].Medium != phy.MediumAXUDP) {
+		logrus.WithField("channel", from_chan).Error("APRS digipeater: Did not expect to receive on invalid channel")
 
 		// Saying so and then carrying on meant indexing the per-channel
 		// configuration with the very channel number just called invalid,
@@ -220,19 +242,19 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 *
 	 */
 
-	for to_chan := range MAX_TOTAL_CHANS {
-		if d.config.enabled[from_chan][to_chan] {
+	for to_chan := range phy.MaxTotalChans {
+		if d.config.Enabled[from_chan][to_chan] {
 			if to_chan == from_chan {
-				var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
-					d.audioConfig.mycall[to_chan],
-					d.config.alias[from_chan][to_chan], d.config.wide[from_chan][to_chan],
-					to_chan, d.config.preempt[from_chan][to_chan],
-					d.config.atgp[from_chan][to_chan],
-					d.config.filter_str[from_chan][to_chan])
+				var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
+					d.ports[to_chan].MyCall,
+					d.config.Alias[from_chan][to_chan], d.config.Wide[from_chan][to_chan],
+					to_chan, d.config.Preempt[from_chan][to_chan],
+					d.config.ATGP[from_chan][to_chan],
+					d.config.FilterStr[from_chan][to_chan])
 				if result != nil {
 					d.dedupe.Remember(to_chan, pp)
 					if d.transmit != nil {
-						d.transmit(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
+						d.transmit(to_chan, dwcore.PrioHigh, result) //  High priority queue.
 					}
 
 					d.count[from_chan][to_chan]++
@@ -247,19 +269,19 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 * These are lower priority
 	 */
 
-	for to_chan := range MAX_TOTAL_CHANS {
-		if d.config.enabled[from_chan][to_chan] {
+	for to_chan := range phy.MaxTotalChans {
+		if d.config.Enabled[from_chan][to_chan] {
 			if to_chan != from_chan {
-				var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
-					d.audioConfig.mycall[to_chan],
-					d.config.alias[from_chan][to_chan], d.config.wide[from_chan][to_chan],
-					to_chan, d.config.preempt[from_chan][to_chan],
-					d.config.atgp[from_chan][to_chan],
-					d.config.filter_str[from_chan][to_chan])
+				var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
+					d.ports[to_chan].MyCall,
+					d.config.Alias[from_chan][to_chan], d.config.Wide[from_chan][to_chan],
+					to_chan, d.config.Preempt[from_chan][to_chan],
+					d.config.ATGP[from_chan][to_chan],
+					d.config.FilterStr[from_chan][to_chan])
 				if result != nil {
 					d.dedupe.Remember(to_chan, pp)
 					if d.transmit != nil {
-						d.transmit(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
+						d.transmit(to_chan, dwcore.PrioLow, result) // Low priority queue.
 					}
 
 					d.count[from_chan][to_chan]++
@@ -293,14 +315,14 @@ func (d *Digipeater) Regen(from_chan int, pp *ax25.Packet) {
 		packet_t result;
 	*/
 
-	dwutil.Assert(from_chan >= 0 && from_chan < MAX_TOTAL_CHANS)
+	dwutil.Assert(from_chan >= 0 && from_chan < phy.MaxTotalChans)
 
-	for to_chan := range MAX_TOTAL_CHANS {
-		if d.config.regen[from_chan][to_chan] {
+	for to_chan := range phy.MaxTotalChans {
+		if d.config.Regen[from_chan][to_chan] {
 			var result = pp.Dup()
 			if result != nil && d.transmit != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
-				d.transmit(to_chan, TQ_PRIO_1_LO, result)
+				d.transmit(to_chan, dwcore.PrioLow, result)
 			}
 		}
 	}
@@ -361,7 +383,7 @@ func (d *Digipeater) match(
 	alias *regexp.Regexp,
 	wide *regexp.Regexp,
 	to_chan int,
-	preempt preempt_e,
+	preempt Preempt,
 	atgp string,
 	filter_str string,
 ) *ax25.Packet {
@@ -371,8 +393,11 @@ func (d *Digipeater) match(
 	if filter_str != "" {
 		var result, err = d.filter.Filter(from_chan, to_chan, filter_str, pp, true)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s\n", err)
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"from_channel": from_chan,
+				"to_channel":   to_chan,
+				"filter":       filter_str,
+			}).Error("APRS digipeater: Bad filter")
 		}
 
 		if result != 1 {
@@ -465,12 +490,10 @@ func (d *Digipeater) match(
 	 */
 
 	if d.dedupe.Check(to_chan, pp) {
-		//#if DEBUG
 		/* Might be useful if people are wondering why */
 		/* some are not repeated.  Might also cause confusion. */
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Digipeater: Drop redundant packet to channel %d.\n", to_chan)
-		//#endif
+		logrus.WithField("channel", to_chan).Debug("Digipeater: Drop redundant packet")
+
 		return nil
 	}
 
@@ -500,7 +523,7 @@ func (d *Digipeater) match(
 	 * But consider this case:  https://github.com/wb2osz/direwolf/issues/488
 	 */
 
-	if preempt != PREEMPT_OFF {
+	if preempt != PreemptOff {
 		for r2 := r + 1; r2 < pp.NumAddr(); r2++ {
 			var repeater2 = pp.AddrWithSSID(r2)
 
@@ -514,27 +537,25 @@ func (d *Digipeater) match(
 				result.SetH(r2)
 
 				switch preempt {
-				case PREEMPT_DROP: /* remove all prior */
+				case PreemptDrop: /* remove all prior */
 					// TODO: deprecate this option.  Result is misleading.
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
+					logrus.Warn("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.")
 
 					for r2 > ax25.Repeater1 {
 						result.RemoveAddr(r2 - 1)
 						r2--
 					}
-				case PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
+				case PreemptMark: // TODO: deprecate this option.  Result is misleading.
+					logrus.Warn("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.")
 
 					r2--
 					for r2 >= ax25.Repeater1 && result.H(r2) == 0 {
 						result.SetH(r2)
 						r2--
 					}
-				/* 2025-07-29 KG Commenting out the PREEMPT_TRACE handling so it falls through to the default case,
+				/* 2025-07-29 KG Commenting out the PreemptTrace handling so it falls through to the default case,
 					which was the original behaviour of the C too
-				case PREEMPT_TRACE:
+				case PreemptTrace:
 				*/
 				/* My enhancement - remove prior unused digis. */
 				/* this provides an accurate path of where packet traveled. */
