@@ -13,7 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -486,15 +489,20 @@ func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
 	var cfg = new(RadioConfig)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 
-	var output = testutils.CaptureOutput(t, func() {
-		var p, err = newPTT(cfg, nil, nil, 2, t.TempDir())
-		require.NoError(t, err)
+	var hook = capturePTTLog(t)
 
-		p.Set(OCTYPE_PTT, 0, 1)
-	})
+	var p, err = newPTT(cfg, nil, nil, 2, t.TempDir())
+	require.NoError(t, err)
 
-	assert.Contains(t, output, "ch=0, PTT method=")
-	assert.Contains(t, output, "PTT 0 = 1")
+	p.Set(OCTYPE_PTT, 0, 1)
+
+	var configuration = pttLogEntry(t, hook, "Output control configuration")
+	assert.Equal(t, 0, configuration.Data["channel"])
+	assert.Equal(t, "PTT", configuration.Data["output"])
+
+	var set = pttLogEntry(t, hook, "Set output")
+	assert.Equal(t, 0, set.Data["channel"])
+	assert.Equal(t, 1, set.Data["state"])
 }
 
 // An NCHANNEL is somebody else's TNC on the far end of a socket: there is no
@@ -512,9 +520,42 @@ func TestPttSetRealInvalidChannel(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_NONE
 	var p = testPTT(cfg, t.TempDir())
 
-	var output = testutils.CaptureOutput(t, func() { p.Set(OCTYPE_PTT, 0, 1) })
+	var hook = capturePTTLog(t)
 
-	assert.Contains(t, output, "did not expect invalid channel")
+	p.Set(OCTYPE_PTT, 0, 1)
+
+	assert.Equal(t, logrus.ErrorLevel, pttLogEntry(t, hook, "Internal error, PTT.Set did not expect a channel that isn't a radio").Level)
+}
+
+// capturePTTLog records what PTT logs, at every level up to Debug, until t
+// finishes.
+func capturePTTLog(t *testing.T) *test.Hook {
+	t.Helper()
+
+	var savedLevel = logrus.GetLevel()
+	logrus.SetLevel(logrus.DebugLevel)
+	t.Cleanup(func() { logrus.SetLevel(savedLevel) })
+
+	var savedHooks = logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
+	t.Cleanup(func() { logrus.StandardLogger().ReplaceHooks(savedHooks) })
+
+	return test.NewGlobal()
+}
+
+// pttLogEntry is the first entry hook recorded with message, failing t if
+// there isn't one.
+func pttLogEntry(t *testing.T, hook *test.Hook, message string) *logrus.Entry {
+	t.Helper()
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Message == message {
+			return entry
+		}
+	}
+
+	require.Failf(t, "no log entry", "nothing logged with message %q", message)
+
+	return nil
 }
 
 // serialLineChange is one change made to a serial port's control lines.
@@ -800,9 +841,11 @@ func TestPttLPTOpenFailure(t *testing.T) {
 	var p = testPTT(cfg, t.TempDir())
 	p.lptPortPath = filepath.Join(t.TempDir(), "no-such-port")
 
-	var output = testutils.CaptureOutput(t, func() { require.NoError(t, p.init()) })
+	var hook = capturePTTLog(t)
 
-	assert.Contains(t, output, "Can't open")
+	require.NoError(t, p.init())
+
+	assert.Equal(t, p.lptPortPath, pttLogEntry(t, hook, "Can't open parallel printer port for PTT control").Data["device"])
 	assert.Equal(t, PTT_METHOD_NONE, cfg.achan[0].octrl[OCTYPE_PTT].ptt_method)
 	assert.Nil(t, p.fd[0][OCTYPE_PTT])
 }
@@ -842,18 +885,16 @@ func TestPttSetupTranslatesCOMPortNames(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = "COM3"
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
 
-	var p *PTT
+	var hook = capturePTTLog(t)
 
-	var output = testutils.CaptureOutput(t, func() {
-		var err error
-
-		p, err = newPTT(cfg, nil, nil, 0, t.TempDir())
-		require.NoError(t, err)
-	})
+	var p, err = newPTT(cfg, nil, nil, 0, t.TempDir())
+	require.NoError(t, err)
 
 	t.Cleanup(p.Term)
 
-	assert.Contains(t, output, "to Linux equivalent '/dev/ttyS2'")
+	var converted = pttLogEntry(t, hook, "Converted device to Linux equivalent")
+	assert.Equal(t, "COM3", converted.Data["from"])
+	assert.Equal(t, "/dev/ttyS2", converted.Data["to"])
 	assert.Equal(t, "/dev/ttyS2", cfg.achan[0].octrl[OCTYPE_PTT].ptt_device)
 }
 
@@ -865,14 +906,10 @@ func TestPttSetupTranslatesCOM0(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = "com0"
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
 
-	var p *PTT
+	testutils.DiscardLogrus(t)
 
-	testutils.CaptureOutput(t, func() {
-		var err error
-
-		p, err = newPTT(cfg, nil, nil, 0, t.TempDir())
-		require.NoError(t, err)
-	})
+	var p, err = newPTT(cfg, nil, nil, 0, t.TempDir())
+	require.NoError(t, err)
 
 	t.Cleanup(p.Term)
 
@@ -886,30 +923,32 @@ func TestGetInputRealInvalidChannel(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_NONE
 	var p = testPTT(cfg, t.TempDir())
 
-	var result int
+	var hook = capturePTTLog(t)
 
-	var output = testutils.CaptureOutput(t, func() { result = p.GetInput(ICTYPE_TXINH, 0) })
-
-	assert.Equal(t, -1, result)
-	assert.Contains(t, output, "did not expect invalid channel")
+	assert.Equal(t, -1, p.GetInput(ICTYPE_TXINH, 0))
+	pttLogEntry(t, hook, "Internal error, PTT.GetInput did not expect a channel that isn't a radio")
 }
 
 // A CM108 audio adapter's HID node is owned by root, and the advice about
 // what to do is worth more than the error on its own.  Anything else is not a
 // permission problem, and gets no advice.
 func TestCM108PermissionAdvice(t *testing.T) {
-	var output = testutils.CaptureOutput(t, func() {
-		cm108_print_permission_advice("/dev/hidraw0", fs.ErrPermission)
-	})
+	var hook = capturePTTLog(t)
 
-	assert.NotEmpty(t, output)
-	assert.Contains(t, output, "/dev/hidraw0")
+	cm108_print_permission_advice("/dev/hidraw0", fs.ErrPermission)
 
-	output = testutils.CaptureOutput(t, func() {
-		cm108_print_permission_advice("/dev/hidraw0", fs.ErrNotExist)
-	})
+	var advice = hook.AllEntries()
+	require.Len(t, advice, len(cm108.PermissionAdvice("/dev/hidraw0")), "one entry per line of advice")
 
-	assert.Empty(t, output, "only a permission problem gets the advice")
+	for _, entry := range advice {
+		assert.Equal(t, "/dev/hidraw0", entry.Data["device"])
+	}
+
+	hook.Reset()
+
+	cm108_print_permission_advice("/dev/hidraw0", fs.ErrNotExist)
+
+	assert.Empty(t, hook.AllEntries(), "only a permission problem gets the advice")
 }
 
 // A half duplex channel stops listening while it transmits, so it does not

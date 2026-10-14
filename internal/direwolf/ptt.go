@@ -130,6 +130,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
 	goHamlib "github.com/xylo04/goHamlib"
 	"golang.org/x/sys/unix"
 )
@@ -379,15 +380,21 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	}
 
 	if p.debugLevel >= 1 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("%s %d = %d\n", octypeName(ot), channel, ptt_signal)
+		logrus.WithFields(logrus.Fields{
+			"output":  octypeName(ot),
+			"channel": channel,
+			"state":   ptt_signal,
+		}).Debug("Set output")
 	}
 
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	if p.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error, PTT.Set ( %s, %d, %d ), did not expect invalid channel.\n", octypeName(ot), channel, ptt)
+		logrus.WithFields(logrus.Fields{
+			"output":  octypeName(ot),
+			"channel": channel,
+			"state":   ptt,
+		}).Error("Internal error, PTT.Set did not expect a channel that isn't a radio")
 
 		return
 	}
@@ -462,9 +469,10 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 
 		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0) //nolint:gosec
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error opening %s to set %s signal.\n", gpio_value_path, octypeName(ot))
-			dw_printf("%s\n", err)
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"path":   gpio_value_path,
+				"output": octypeName(ot),
+			}).Error("Error opening GPIO to set signal")
 
 			return
 		}
@@ -474,9 +482,10 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 
 		var _, writeErr = fd.WriteString(stemp)
 		if writeErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error setting GPIO %d for %s\n", p.audioConfig.achan[channel].octrl[ot].out_gpio_num, octypeName(ot))
-			dw_printf("%s\n", writeErr)
+			logrus.WithError(writeErr).WithFields(logrus.Fields{
+				"gpio":   p.audioConfig.achan[channel].octrl[ot].out_gpio_num,
+				"output": octypeName(ot),
+			}).Error("Error setting GPIO")
 		}
 	}
 
@@ -484,13 +493,16 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 		if p.gpiodLine[channel][ot] != nil {
 			var err = p.gpiodLine[channel][ot].SetValue(ptt)
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Error setting GPIOD for channel %d %s: %v\n", channel, octypeName(ot), err)
+				logrus.WithError(err).WithFields(logrus.Fields{
+					"channel": channel,
+					"output":  octypeName(ot),
+				}).Error("Error setting GPIOD")
 			} else if p.debugLevel >= 1 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("PTT_METHOD_GPIOD chip: %s line: %d ptt: %d\n",
-					p.audioConfig.achan[channel].octrl[ot].out_gpio_name,
-					p.audioConfig.achan[channel].octrl[ot].out_gpio_num, ptt)
+				logrus.WithFields(logrus.Fields{
+					"chip":  p.audioConfig.achan[channel].octrl[ot].out_gpio_name,
+					"line":  p.audioConfig.achan[channel].octrl[ot].out_gpio_num,
+					"state": ptt,
+				}).Debug("Set GPIOD line")
 			}
 		}
 	}
@@ -507,9 +519,10 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 		var n, readErr = p.fd[channel][ot].Read(lpt_data)
 
 		if readErr != nil || n != 1 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error reading current state of LPT for channel %d %s\n", channel, octypeName(ot))
-			dw_printf("%s\n", readErr)
+			logrus.WithError(readErr).WithFields(logrus.Fields{
+				"channel": channel,
+				"output":  octypeName(ot),
+			}).Error("Error reading current state of LPT")
 		}
 
 		if ptt != 0 {
@@ -522,9 +535,10 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 
 		var _, writeErr = p.fd[channel][ot].Write(lpt_data)
 		if writeErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error writing to LPT for channel %d %s\n", channel, octypeName(ot))
-			dw_printf("%s\n", writeErr)
+			logrus.WithError(writeErr).WithFields(logrus.Fields{
+				"channel": channel,
+				"output":  octypeName(ot),
+			}).Error("Error writing to LPT")
 		}
 	}
 
@@ -541,13 +555,16 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 
 			var retcode = p.rig[channel][ot].SetPtt(goHamlib.VFOCurrent, onoff)
 			if retcode != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Hamlib error: SetPtt command for channel %d %s\n", channel, octypeName(ot))
-				dw_printf("%s\n", retcode)
+				logrus.WithError(retcode).WithFields(logrus.Fields{
+					"channel": channel,
+					"output":  octypeName(ot),
+				}).Error("Hamlib error: SetPtt command failed")
 			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Hamlib: Can't use SetPtt for channel %d %s because rig open failed.\n", channel, octypeName(ot))
+			logrus.WithFields(logrus.Fields{
+				"channel": channel,
+				"output":  octypeName(ot),
+			}).Error("Hamlib: Can't use SetPtt because rig open failed")
 		}
 	}
 
@@ -559,9 +576,11 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 		var err = cm108.SetGPIOPin(p.audioConfig.achan[channel].octrl[ot].ptt_device,
 			p.audioConfig.achan[channel].octrl[ot].out_gpio_num, ptt)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ERROR:  %s for channel %d has failed: %v\n", octypeName(ot), channel, err)
-			dw_printf("See User Guide for troubleshooting tips.\n")
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"output":  octypeName(ot),
+				"channel": channel,
+				"hint":    "See User Guide for troubleshooting tips.",
+			}).Error("CM108 output failed")
 		}
 	}
 } /* end Set */
@@ -585,10 +604,8 @@ func cm108_print_permission_advice(name string, err error) {
 		return
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-
 	for _, line := range cm108.PermissionAdvice(name) {
-		dw_printf("%s\n", line)
+		logrus.WithField("device", name).Error(line)
 	}
 }
 
@@ -614,8 +631,10 @@ func (p *PTT) GetInput(it int, channel int) int {
 	}
 
 	if p.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error, PTT.GetInput ( %d, %d ), did not expect invalid channel.\n", it, channel)
+		logrus.WithFields(logrus.Fields{
+			"input":   it,
+			"channel": channel,
+		}).Error("Internal error, PTT.GetInput did not expect a channel that isn't a radio")
 
 		return -1
 	}
@@ -628,9 +647,7 @@ func (p *PTT) GetInput(it int, channel int) int {
 		// same thing once rather than twice.
 		var fd, openErr = os.Open(gpio_value_path) //nolint:gosec
 		if openErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error opening %s to check input.\n", gpio_value_path)
-			dw_printf("%s\n", openErr)
+			logrus.WithError(openErr).WithField("path", gpio_value_path).Error("Error opening GPIO to check input")
 
 			return -1
 		}
@@ -639,16 +656,17 @@ func (p *PTT) GetInput(it int, channel int) int {
 
 		var _, readErr = fd.Read(vtemp)
 		if readErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error getting GPIO %d value\n", p.audioConfig.achan[channel].ictrl[it].in_gpio_num)
-			dw_printf("%s\n", readErr)
+			logrus.WithError(readErr).WithField("gpio", p.audioConfig.achan[channel].ictrl[it].in_gpio_num).Error("Error getting GPIO value")
 		}
 
 		fd.Close()
 
 		var v, parseErr = strconv.Atoi(string(vtemp))
 		if parseErr != nil {
-			dw_printf("Error parsing return value (%s) from GPIO %d: %s\n", vtemp, p.audioConfig.achan[channel].ictrl[it].in_gpio_num, parseErr)
+			logrus.WithError(parseErr).WithFields(logrus.Fields{
+				"value": string(vtemp),
+				"gpio":  p.audioConfig.achan[channel].ictrl[it].in_gpio_num,
+			}).Error("Error parsing value read from GPIO")
 
 			return -1
 		}
@@ -768,17 +786,17 @@ func (p *PTT) setup() error {
 	for ch := range MAX_RADIO_CHANS {
 		for ot := range outputTypes() {
 			if p.debugLevel >= 2 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("ch=%d, %s method=%d, device=%s, line=%d, name=%s, gpio=%d, lpt_bit=%d, invert=%t\n",
-					ch,
-					octypeName(ot),
-					audio_config_p.achan[ch].octrl[ot].ptt_method,
-					audio_config_p.achan[ch].octrl[ot].ptt_device,
-					audio_config_p.achan[ch].octrl[ot].ptt_line,
-					audio_config_p.achan[ch].octrl[ot].out_gpio_name,
-					audio_config_p.achan[ch].octrl[ot].out_gpio_num,
-					audio_config_p.achan[ch].octrl[ot].ptt_lpt_bit,
-					audio_config_p.achan[ch].octrl[ot].ptt_invert)
+				logrus.WithFields(logrus.Fields{
+					"channel": ch,
+					"output":  octypeName(ot),
+					"method":  audio_config_p.achan[ch].octrl[ot].ptt_method,
+					"device":  audio_config_p.achan[ch].octrl[ot].ptt_device,
+					"line":    audio_config_p.achan[ch].octrl[ot].ptt_line,
+					"name":    audio_config_p.achan[ch].octrl[ot].out_gpio_name,
+					"gpio":    audio_config_p.achan[ch].octrl[ot].out_gpio_num,
+					"lpt_bit": audio_config_p.achan[ch].octrl[ot].ptt_lpt_bit,
+					"invert":  audio_config_p.achan[ch].octrl[ot].ptt_invert,
+				}).Debug("Output control configuration")
 			}
 		}
 	}
@@ -799,15 +817,19 @@ func (p *PTT) setup() error {
 					if strings.HasPrefix(strings.ToUpper(audio_config_p.achan[ch].octrl[ot].ptt_device), "COM") {
 						var n, _ = strconv.Atoi(audio_config_p.achan[ch].octrl[ot].ptt_device[3:])
 
-						text_color_set(DW_COLOR_INFO)
-						dw_printf("Converted %s device '%s'", audio_config_p.achan[ch].octrl[ot].ptt_device, octypeName(ot))
+						var windowsName = audio_config_p.achan[ch].octrl[ot].ptt_device
 
 						if n < 1 {
 							n = 1
 						}
 
 						audio_config_p.achan[ch].octrl[ot].ptt_device = fmt.Sprintf("/dev/ttyS%d", n-1)
-						dw_printf(" to Linux equivalent '%s'\n", audio_config_p.achan[ch].octrl[ot].ptt_device)
+
+						logrus.WithFields(logrus.Fields{
+							"output": octypeName(ot),
+							"from":   windowsName,
+							"to":     audio_config_p.achan[ch].octrl[ot].ptt_device,
+						}).Info("Converted device to Linux equivalent")
 					}
 					/* Can't open the same device more than once so we */
 					/* need more logic to look for the case of multiple radio */
@@ -843,10 +865,10 @@ func (p *PTT) setup() error {
 					if openErr == nil {
 						p.fd[ch][ot] = fd
 					} else {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("ERROR can't open device %s for channel %d PTT control.\n",
-							audio_config_p.achan[ch].octrl[ot].ptt_device, ch)
-						dw_printf("%s\n", openErr)
+						logrus.WithError(openErr).WithFields(logrus.Fields{
+							"device":  audio_config_p.achan[ch].octrl[ot].ptt_device,
+							"channel": ch,
+						}).Error("Can't open device for PTT control")
 						/* Don't try using it later if device open failed. */
 
 						audio_config_p.achan[ch].octrl[ot].ptt_method = PTT_METHOD_NONE
@@ -912,8 +934,10 @@ func (p *PTT) setup() error {
 					p.gpiodLine[ch][ot] = line
 
 					if p.debugLevel >= 2 {
-						text_color_set(DW_COLOR_DEBUG)
-						dw_printf("GPIOD init OK. Chip: %s line: %d\n", chip_name, line_number)
+						logrus.WithFields(logrus.Fields{
+							"chip": chip_name,
+							"line": line_number,
+						}).Debug("GPIOD init OK")
 					}
 					// Set initial state off.  Set will invert output signal if appropriate.
 					p.Set(ot, ch, 0)
@@ -991,13 +1015,12 @@ func (p *PTT) setup() error {
 					if openErr == nil {
 						p.fd[ch][ot] = fd
 					} else {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("ERROR - Can't open %s for parallel printer port PTT control.\n", p.lptPortPath)
-						dw_printf("%s\n", openErr)
-						dw_printf("You probably don't have adequate permissions to access I/O ports.\n")
-						dw_printf("Either run direwolf as root or change these permissions:\n")
-						dw_printf("  sudo chmod go+rw /dev/port\n")
-						dw_printf("  sudo setcap cap_sys_rawio=ep `which direwolf`\n")
+						logrus.WithError(openErr).WithFields(logrus.Fields{
+							"device": p.lptPortPath,
+							"hint": "You probably don't have adequate permissions to access I/O ports. " +
+								"Either run direwolf as root or change these permissions: " +
+								"sudo chmod go+rw /dev/port; sudo setcap cap_sys_rawio=ep `which direwolf`",
+						}).Error("Can't open parallel printer port for PTT control")
 
 						/* Don't try using it later if device open failed. */
 
@@ -1020,9 +1043,8 @@ func (p *PTT) setup() error {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_HAMLIB {
 					if ot == OCTYPE_PTT {
 						if audio_config_p.achan[ch].octrl[ot].ptt_model == -1 {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Hamlib error: AUTO rig model detection is not supported. Specify the model number explicitly.\n")
-							dw_printf("Run \"rigctl --list\" for a list of model numbers.\n")
+							logrus.WithField("hint", `Run "rigctl --list" for a list of model numbers.`).
+								Error("Hamlib error: AUTO rig model detection is not supported. Specify the model number explicitly.")
 
 							continue
 						}
@@ -1031,10 +1053,10 @@ func (p *PTT) setup() error {
 
 						var initErr = r.Init(goHamlib.RigModelID(audio_config_p.achan[ch].octrl[ot].ptt_model))
 						if initErr != nil {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Hamlib error: Unknown rig model %d. %s\n",
-								audio_config_p.achan[ch].octrl[ot].ptt_model, initErr)
-							dw_printf("Run \"rigctl --list\" for a list of model numbers.\n")
+							logrus.WithError(initErr).WithFields(logrus.Fields{
+								"model": audio_config_p.achan[ch].octrl[ot].ptt_model,
+								"hint":  `Run "rigctl --list" for a list of model numbers.`,
+							}).Error("Hamlib error: Unknown rig model")
 
 							continue
 						}
@@ -1059,17 +1081,15 @@ func (p *PTT) setup() error {
 							port.RigPortType = goHamlib.RigPortSerial
 
 							if audio_config_p.achan[ch].octrl[ot].ptt_rate > 0 {
-								text_color_set(DW_COLOR_INFO)
-								dw_printf("User configuration overriding hamlib CAT control speed to %d.\n",
-									audio_config_p.achan[ch].octrl[ot].ptt_rate)
+								logrus.WithField("rate", audio_config_p.achan[ch].octrl[ot].ptt_rate).
+									Info("User configuration overriding hamlib CAT control speed")
 								port.Baudrate = audio_config_p.achan[ch].octrl[ot].ptt_rate
 							}
 						}
 
 						var portErr = r.SetPort(port)
 						if portErr != nil {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Hamlib error setting port for channel %d: %s\n", ch, portErr)
+							logrus.WithError(portErr).WithField("channel", ch).Error("Hamlib error setting port")
 							r.Cleanup() //nolint:errcheck
 
 							continue
@@ -1087,8 +1107,7 @@ func (p *PTT) setup() error {
 								break
 							}
 
-							text_color_set(DW_COLOR_INFO)
-							dw_printf("Retrying Hamlib Rig open...\n")
+							logrus.WithError(openErr).Info("Retrying Hamlib rig open")
 							time.Sleep(5 * time.Second)
 						}
 
@@ -1101,8 +1120,10 @@ func (p *PTT) setup() error {
 						// Successful.  Later code should check for p.rig[ch][ot] not nil.
 						p.rig[ch][ot] = r
 					} else {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("HAMLIB can only be used for PTT.  Not DCD or other output.\n")
+						logrus.WithFields(logrus.Fields{
+							"channel": ch,
+							"output":  octypeName(ot),
+						}).Error("HAMLIB can only be used for PTT, not DCD or other output")
 					}
 				}
 			}
@@ -1120,16 +1141,18 @@ func (p *PTT) setup() error {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_CM108 {
 					var device = audio_config_p.achan[ch].octrl[ot].ptt_device
 
-					text_color_set(DW_COLOR_INFO)
-					dw_printf("Using %s GPIO %d for channel %d %s control.\n",
-						device,
-						audio_config_p.achan[ch].octrl[ot].out_gpio_num,
-						ch,
-						octypeName(ot))
+					logrus.WithFields(logrus.Fields{
+						"device":  device,
+						"gpio":    audio_config_p.achan[ch].octrl[ot].out_gpio_num,
+						"channel": ch,
+						"output":  octypeName(ot),
+					}).Info("Using CM108 GPIO for output control")
 
 					if device == "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Warning: No CM108 HID found for channel %d %s.  Specify one in the config file.\n", ch, octypeName(ot))
+						logrus.WithFields(logrus.Fields{
+							"channel": ch,
+							"output":  octypeName(ot),
+						}).Warn("No CM108 HID found. Specify one in the config file.")
 
 						continue
 					}
@@ -1138,8 +1161,7 @@ func (p *PTT) setup() error {
 					// first transmission.  An unfamiliar device may still work.
 					var checkErr = cm108.CheckDevice(device)
 					if checkErr != nil {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Warning: %v.  Proceed at your own risk.\n", checkErr)
+						logrus.WithError(checkErr).WithField("device", device).Warn("Unfamiliar CM108 device. Proceed at your own risk.")
 						cm108_print_permission_advice(device, checkErr)
 					}
 				}
@@ -1152,34 +1174,33 @@ func (p *PTT) setup() error {
 	for ch := range MAX_RADIO_CHANS {
 		if audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
 			if audio_config_p.achan[ch].octrl[OCTYPE_PTT].ptt_method == PTT_METHOD_NONE {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("\n")
-				dw_printf("Note: PTT not configured for channel %d. (OK if using VOX.)\n", ch)
-				dw_printf("When using VOX, ensure that it adds very little delay (e.g. 10-20) milliseconds\n")
-				dw_printf("between the time that transmit audio ends and PTT is deactivated.\n")
-				dw_printf("For example, if using a SignaLink USB, turn the DLY control all the\n")
-				dw_printf("way counter clockwise.\n")
-				dw_printf("\n")
-				dw_printf("Using VOX built in to the radio is a VERY BAD idea.  This is intended\n")
-				dw_printf("for voice operation, with gaps in the sound, and typically has a delay of about a\n")
-				dw_printf("half second between the time the audio stops and the transmitter is turned off.\n")
-				dw_printf("When using APRS your transmitter will be sending a quiet carrier for\n")
-				dw_printf("about a half second after your packet ends.  This may interfere with the\n")
-				dw_printf("the next station to transmit.  This is being inconsiderate.\n")
-				dw_printf("\n")
-				dw_printf("If you are trying to use VOX with connected mode packet, expect\n")
-				dw_printf("frustration and disappointment.  Connected mode involves rapid responses\n")
-				dw_printf("which you will probably miss because your transmitter is still on when\n")
-				dw_printf("the response is being transmitted.\n")
-				dw_printf("\n")
-				dw_printf("Read the User Guide 'Transmit Timing' section for more details.\n")
-				dw_printf("\n")
+				logrus.WithFields(logrus.Fields{
+					"channel": ch,
+					"hint":    voxAdvice,
+				}).Info("PTT not configured (OK if using VOX)")
 			}
 		}
 	}
 
 	return nil
 } /* end setup */
+
+// voxAdvice is what to bear in mind when a channel has no PTT configured, as
+// happens when it relies on VOX instead.
+const voxAdvice = "When using VOX, ensure that it adds very little delay (e.g. 10-20 milliseconds) " +
+	"between the time that transmit audio ends and PTT is deactivated. " +
+	"For example, if using a SignaLink USB, turn the DLY control all the way counter clockwise. " +
+	"Using VOX built in to the radio is a VERY BAD idea.  This is intended " +
+	"for voice operation, with gaps in the sound, and typically has a delay of about a " +
+	"half second between the time the audio stops and the transmitter is turned off. " +
+	"When using APRS your transmitter will be sending a quiet carrier for " +
+	"about a half second after your packet ends.  This may interfere with the " +
+	"the next station to transmit.  This is being inconsiderate. " +
+	"If you are trying to use VOX with connected mode packet, expect " +
+	"frustration and disappointment.  Connected mode involves rapid responses " +
+	"which you will probably miss because your transmitter is still on when " +
+	"the response is being transmitted. " +
+	"Read the User Guide 'Transmit Timing' section for more details."
 
 /*-------------------------------------------------------------------
  *
@@ -1220,20 +1241,16 @@ func (p *PTT) getAccessToGPIO(path string) error {
 
 	var my_groups, groupsErr = os.Getgroups()
 	if groupsErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Getgroups() failed to get supplementary groups, err=%s\n", groupsErr)
+		logrus.WithError(groupsErr).Error("Getgroups() failed to get supplementary groups")
 	}
 
 	if p.debugLevel >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
 		// TODO KG dw_printf("%s: uid=%d, gid=%d, mode=o%o\n", path, finfo.st_uid, finfo.st_gid, finfo.st_mode)
-		dw_printf("my uid=%d, gid=%d, supplementary groups=", my_uid, my_gid)
-
-		for _, g := range my_groups {
-			dw_printf(" %d", g)
-		}
-
-		dw_printf("\n")
+		logrus.WithFields(logrus.Fields{
+			"uid":    my_uid,
+			"gid":    my_gid,
+			"groups": my_groups,
+		}).Debug("My user and groups")
 	}
 
 	/*
@@ -1382,8 +1399,7 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 	 */
 
 	if p.debugLevel >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Contents of %s:\n", p.gpioSysfsDir)
+		logrus.WithField("path", p.gpioSysfsDir).Debug("Listing GPIO directory")
 	}
 
 	var dirEntries, readDirErr = os.ReadDir(p.gpioSysfsDir)
@@ -1392,17 +1408,14 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 
 	if readDirErr != nil {
 		// Something went wrong.  Fill in the simple expected name and keep going.
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR! Could not get directory listing for %s\n", p.gpioSysfsDir)
+		logrus.WithError(readDirErr).WithField("path", p.gpioSysfsDir).Error("Could not get GPIO directory listing")
 
 		gpio_name = fmt.Sprintf("gpio%d", gpio_num)
 		ok = true
 	} else {
 		if p.debugLevel >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-
 			for _, entry := range dirEntries {
-				dw_printf("\t%s\n", entry.Name())
+				logrus.WithField("name", entry.Name()).Debug("GPIO directory entry")
 			}
 		}
 
@@ -1445,8 +1458,10 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 	}
 
 	if p.debugLevel >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Path for gpio number %d is %s/%s\n", gpio_num, p.gpioSysfsDir, gpio_name)
+		logrus.WithFields(logrus.Fields{
+			"gpio": gpio_num,
+			"path": p.gpioSysfsDir + "/" + gpio_name,
+		}).Debug("Found path for GPIO")
 	}
 
 	/*
@@ -1538,7 +1553,7 @@ func PTTTestMain() error {
 	/* flash each a few times. */
 	var channel int
 
-	dw_printf("turn on RTS a few times...\n")
+	logrus.Info("Turn on RTS a few times")
 
 	channel = 0
 	for range 3 {
@@ -1548,7 +1563,7 @@ func PTTTestMain() error {
 		time.Sleep(1 * time.Second)
 	}
 
-	dw_printf("turn on DTR a few times...\n")
+	logrus.Info("Turn on DTR a few times")
 
 	channel = 1
 	for range 3 {
@@ -1571,7 +1586,7 @@ func PTTTestMain() error {
 
 	time.Sleep(2 * time.Second)
 
-	dw_printf("INVERTED -  RTS a few times...\n")
+	logrus.Info("INVERTED - RTS a few times")
 
 	channel = 0
 	for range 3 {
@@ -1581,7 +1596,7 @@ func PTTTestMain() error {
 		time.Sleep(1 * time.Second)
 	}
 
-	dw_printf("turn on DTR a few times...\n")
+	logrus.Info("Turn on DTR a few times")
 
 	channel = 1
 	for range 3 {
@@ -1603,7 +1618,7 @@ func PTTTestMain() error {
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 
-	dw_printf("Try GPIO %d a few times...\n", my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num)
+	logrus.WithField("gpio", my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num).Info("Try GPIO a few times")
 
 	p, initErr = NewPTT(&my_audio_config, nil, nil, 0)
 	if initErr != nil {
