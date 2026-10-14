@@ -13,6 +13,13 @@ Each :doc:`ax25` frame travels whole,
 delimited by ``FEND`` bytes and with a one-byte command and port number in front;
 the application does everything above the modem itself.
 
+Samoyed also accepts the ACKMODE data frame (command ``0x0C``) from the multi-drop KISS extension:
+its two-byte frame ID goes back to the client,
+as a ``0x0C`` frame of its own,
+once the frame has been transmitted.
+Winlink Express calls this its ``ACKMODE`` TNC model.
+The rest of multi-drop KISS, polling (``0x0E``) and checksums, is not supported.
+
 References
 ----------
 

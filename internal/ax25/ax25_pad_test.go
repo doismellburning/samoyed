@@ -139,3 +139,26 @@ func Test_printableAddress(t *testing.T) {
 
 	assert.Equal(t, "Q1T.  ", printableAddress(field))
 }
+
+// Whoever asked to hear that a frame was transmitted hears it once, however
+// many times it is said; a copy is a transmission of its own, so it doesn't
+// say it for the original.
+func TestTransmitted(t *testing.T) {
+	t.Parallel()
+
+	var pp = FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
+	pp.Transmitted() // Nobody asked: nothing to do.
+
+	var told = 0
+
+	pp.SetOnTransmitted(func() { told++ })
+
+	pp.Dup().Transmitted()
+	assert.Equal(t, 0, told, "the copy should not have said the original had gone")
+
+	pp.Transmitted()
+	pp.Transmitted()
+	assert.Equal(t, 1, told)
+}
