@@ -137,7 +137,7 @@ func setupIGate(t *testing.T) (*IGate, net.Conn) {
 	igateConfig.tx_limit_5 = IGATE_TX_LIMIT_5_DEFAULT
 	igateConfig.igmsp = 1
 
-	var digiConfig = new(digi_config_s)
+	var digiConfig = new(DigipeaterConfig)
 
 	var heardDB = mheard.New(0)
 
@@ -312,7 +312,7 @@ func TestIGateSendRecPacketThirdParty(t *testing.T) {
 func TestIGateSendRecPacketFiltered(t *testing.T) {
 	var ig, server = setupIGate(t)
 
-	ig.digiConfig.filter_str[0][MAX_TOTAL_CHANS] = "b/Q9TEST"
+	ig.digiConfig.FilterStr[0][MAX_TOTAL_CHANS] = "b/Q9TEST"
 
 	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
@@ -477,7 +477,7 @@ func TestIGateTransmitUnparseable(t *testing.T) {
 func TestIGateTransmitFiltered(t *testing.T) {
 	var ig, tq = setupIGateToRadio(t)
 
-	ig.digiConfig.filter_str[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
+	ig.digiConfig.FilterStr[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
 
 	ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:>hello"), 0)
 
@@ -491,7 +491,7 @@ func TestIGateTransmitCourtesyPosition(t *testing.T) {
 	var ig, tq = setupIGateToRadio(t)
 
 	// A filter that passes nothing, so only the special case can get through.
-	ig.digiConfig.filter_str[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
+	ig.digiConfig.FilterStr[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
 
 	// SetMSP only knows about stations that have been heard.
 	ig.heard.SaveIS("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there")
@@ -536,7 +536,7 @@ func TestIGateTransmitMessageWithoutAHeardDatabase(t *testing.T) {
 	assert.NotNil(t, tq.Remove(0, TQ_PRIO_1_LO), "the message was not transmitted")
 
 	// Nor is anyone owed a position, so a filter that passes nothing drops it.
-	ig.digiConfig.filter_str[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
+	ig.digiConfig.FilterStr[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
 
 	ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:=4237.14N/07120.83W#"), 0)
 
@@ -1088,7 +1088,7 @@ func TestIGateSendRecPacketDebugOutput(t *testing.T) {
 	}
 
 	// And the filter, which is off by default and only says so with -d ig.
-	ig.digiConfig.filter_str[0][MAX_TOTAL_CHANS] = "b/Q9TEST"
+	ig.digiConfig.FilterStr[0][MAX_TOTAL_CHANS] = "b/Q9TEST"
 
 	var pp = ax25.FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)

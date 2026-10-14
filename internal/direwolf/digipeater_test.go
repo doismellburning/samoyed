@@ -60,15 +60,15 @@ func (r *frameRecorder) take(channel int, prio int) *ax25.Packet {
 
 // setupDigipeater points a new APRS digipeater at two radio channels with our
 // callsign on each, and returns what it sends.
-func setupDigipeater(t *testing.T) (*Digipeater, *digi_config_s, *frameRecorder) {
+func setupDigipeater(t *testing.T) (*Digipeater, *DigipeaterConfig, *frameRecorder) {
 	t.Helper()
 
 	var ports [MAX_TOTAL_CHANS]DigipeaterPort
 	ports[digiFromChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumRadio}
 	ports[digiToChan] = DigipeaterPort{MyCall: "Q2TEST", Medium: phy.MediumRadio}
 
-	var digiConfig = new(digi_config_s)
-	digiConfig.dedupe_time = 30
+	var digiConfig = new(DigipeaterConfig)
+	digiConfig.DedupeTime = 30
 
 	var tx = new(frameRecorder)
 
@@ -77,11 +77,11 @@ func setupDigipeater(t *testing.T) (*Digipeater, *digi_config_s, *frameRecorder)
 
 // enableDigipeat turns on digipeating from digiFromChan to the given channel,
 // with the usual WIDEn-n handling.
-func enableDigipeat(digiConfig *digi_config_s, to int) {
-	digiConfig.enabled[digiFromChan][to] = true
-	digiConfig.alias[digiFromChan][to] = regexp.MustCompile("^WIDE[4-7]-[1-7]|CITYD$")
-	digiConfig.wide[digiFromChan][to] = regexp.MustCompile("^WIDE[1-7]-[1-7]$")
-	digiConfig.preempt[digiFromChan][to] = PREEMPT_OFF
+func enableDigipeat(digiConfig *DigipeaterConfig, to int) {
+	digiConfig.Enabled[digiFromChan][to] = true
+	digiConfig.Alias[digiFromChan][to] = regexp.MustCompile("^WIDE[4-7]-[1-7]|CITYD$")
+	digiConfig.Wide[digiFromChan][to] = regexp.MustCompile("^WIDE[1-7]-[1-7]$")
+	digiConfig.Preempt[digiFromChan][to] = PreemptOff
 }
 
 // Repeating on the channel it came in on is the ordinary case, and it goes out
@@ -207,12 +207,12 @@ func TestDigipeaterFromSerialTNC(t *testing.T) {
 	ports[digiToChan] = DigipeaterPort{MyCall: "Q2TEST", Medium: phy.MediumRadio}
 	ports[serialChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumSerialTNC}
 
-	var digiConfig = new(digi_config_s)
-	digiConfig.dedupe_time = 30
-	digiConfig.enabled[serialChan][digiToChan] = true
-	digiConfig.alias[serialChan][digiToChan] = regexp.MustCompile("^WIDE[4-7]-[1-7]|CITYD$")
-	digiConfig.wide[serialChan][digiToChan] = regexp.MustCompile("^WIDE[1-7]-[1-7]$")
-	digiConfig.preempt[serialChan][digiToChan] = PREEMPT_OFF
+	var digiConfig = new(DigipeaterConfig)
+	digiConfig.DedupeTime = 30
+	digiConfig.Enabled[serialChan][digiToChan] = true
+	digiConfig.Alias[serialChan][digiToChan] = regexp.MustCompile("^WIDE[4-7]-[1-7]|CITYD$")
+	digiConfig.Wide[serialChan][digiToChan] = regexp.MustCompile("^WIDE[1-7]-[1-7]$")
+	digiConfig.Preempt[serialChan][digiToChan] = PreemptOff
 
 	var tx = new(frameRecorder)
 
@@ -241,7 +241,7 @@ func TestDigipeaterFromSerialTNC(t *testing.T) {
 func TestDigiRegen(t *testing.T) {
 	var digi, digiConfig, tx = setupDigipeater(t)
 
-	digiConfig.regen[digiFromChan][digiToChan] = true
+	digiConfig.Regen[digiFromChan][digiToChan] = true
 
 	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
@@ -270,8 +270,8 @@ func TestNewDigipeater(t *testing.T) {
 	var ports [MAX_TOTAL_CHANS]DigipeaterPort
 	ports[digiFromChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumRadio}
 
-	var digiConfig = new(digi_config_s)
-	digiConfig.dedupe_time = 30
+	var digiConfig = new(DigipeaterConfig)
+	digiConfig.DedupeTime = 30
 
 	var filter = new(pfilter.PacketFilter)
 

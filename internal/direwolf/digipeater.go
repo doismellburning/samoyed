@@ -53,44 +53,49 @@ import (
  * and it is passed to NewDigipeater at application start up time.
  */
 
-const DEFAULT_DEDUPE = 30
+// DefaultDedupe is how many seconds a packet is remembered for, so as not to
+// digipeat a duplicate of it, when the configuration doesn't say.
+const DefaultDedupe = 30
 
-type preempt_e int
+// DigipeaterPreempt is what preemptive digipeating does with the unused
+// digipeaters ahead of the one that matched us.
+type DigipeaterPreempt int
 
 const (
-	PREEMPT_OFF preempt_e = iota
-	PREEMPT_DROP
-	PREEMPT_MARK
-	PREEMPT_TRACE
+	PreemptOff DigipeaterPreempt = iota
+	PreemptDrop
+	PreemptMark
+	PreemptTrace
 )
 
-type digi_config_s struct {
-	dedupe_time int /* Don't digipeat duplicate packets */
+// DigipeaterConfig is the APRS digipeater's configuration.
+type DigipeaterConfig struct {
+	DedupeTime int /* Don't digipeat duplicate packets */
 	/* within this number of seconds. */
 
 	/*
 	 * Rules for each of the [from_chan][to_chan] combinations.
 	 */
 
-	alias [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]*regexp.Regexp
+	Alias [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]*regexp.Regexp
 
-	wide [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]*regexp.Regexp
+	Wide [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]*regexp.Regexp
 
-	enabled [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]bool
+	Enabled [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]bool
 
-	preempt [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]preempt_e
+	Preempt [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]DigipeaterPreempt
 
 	// ATGP is an ugly hack for the specific need of ATGP which needs more that 8 digipeaters.
 	// DO NOT put this in the User Guide.  On a need to know basis.
 
-	atgp [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]string
+	ATGP [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]string
 
-	filter_str [MAX_TOTAL_CHANS + 1][MAX_TOTAL_CHANS + 1]string
+	FilterStr [MAX_TOTAL_CHANS + 1][MAX_TOTAL_CHANS + 1]string
 	// NULL or optional Packet Filter strings such as "t/m".
 	// Notice the size of arrays is one larger than normal.
 	// That extra position is for the IGate.
 
-	regen [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]bool // Regenerate packet.
+	Regen [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]bool // Regenerate packet.
 	// Sort of like digipeating but passed along unchanged.
 }
 
@@ -106,7 +111,7 @@ type DigipeaterPort struct {
 // of packets digipeated for each combination of from/to channel.
 type Digipeater struct {
 	ports    [MAX_TOTAL_CHANS]DigipeaterPort
-	config   *digi_config_s
+	config   *DigipeaterConfig
 	filter   *pfilter.PacketFilter
 	dedupe   *dedupe.Service
 	transmit frameSender // Where digipeated packets go; nil to drop them.
@@ -136,13 +141,19 @@ type Digipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(ports [MAX_TOTAL_CHANS]DigipeaterPort, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, onRemember func(channel int, pp *ax25.Packet), transmit frameSender) *Digipeater {
+func NewDigipeater(
+	ports [MAX_TOTAL_CHANS]DigipeaterPort,
+	p_digi_config *DigipeaterConfig,
+	filter *pfilter.PacketFilter,
+	onRemember func(channel int, pp *ax25.Packet),
+	transmit frameSender,
+) *Digipeater {
 	var d = new(Digipeater)
 	d.ports = ports
 	d.config = p_digi_config
 	d.filter = filter
 	d.transmit = transmit
-	d.dedupe = dedupe.New(time.Duration(p_digi_config.dedupe_time)*time.Second, onRemember)
+	d.dedupe = dedupe.New(time.Duration(p_digi_config.DedupeTime)*time.Second, onRemember)
 
 	return d
 }
@@ -228,14 +239,14 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 */
 
 	for to_chan := range MAX_TOTAL_CHANS {
-		if d.config.enabled[from_chan][to_chan] {
+		if d.config.Enabled[from_chan][to_chan] {
 			if to_chan == from_chan {
 				var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
 					d.ports[to_chan].MyCall,
-					d.config.alias[from_chan][to_chan], d.config.wide[from_chan][to_chan],
-					to_chan, d.config.preempt[from_chan][to_chan],
-					d.config.atgp[from_chan][to_chan],
-					d.config.filter_str[from_chan][to_chan])
+					d.config.Alias[from_chan][to_chan], d.config.Wide[from_chan][to_chan],
+					to_chan, d.config.Preempt[from_chan][to_chan],
+					d.config.ATGP[from_chan][to_chan],
+					d.config.FilterStr[from_chan][to_chan])
 				if result != nil {
 					d.dedupe.Remember(to_chan, pp)
 					if d.transmit != nil {
@@ -255,14 +266,14 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 */
 
 	for to_chan := range MAX_TOTAL_CHANS {
-		if d.config.enabled[from_chan][to_chan] {
+		if d.config.Enabled[from_chan][to_chan] {
 			if to_chan != from_chan {
 				var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
 					d.ports[to_chan].MyCall,
-					d.config.alias[from_chan][to_chan], d.config.wide[from_chan][to_chan],
-					to_chan, d.config.preempt[from_chan][to_chan],
-					d.config.atgp[from_chan][to_chan],
-					d.config.filter_str[from_chan][to_chan])
+					d.config.Alias[from_chan][to_chan], d.config.Wide[from_chan][to_chan],
+					to_chan, d.config.Preempt[from_chan][to_chan],
+					d.config.ATGP[from_chan][to_chan],
+					d.config.FilterStr[from_chan][to_chan])
 				if result != nil {
 					d.dedupe.Remember(to_chan, pp)
 					if d.transmit != nil {
@@ -303,7 +314,7 @@ func (d *Digipeater) Regen(from_chan int, pp *ax25.Packet) {
 	dwutil.Assert(from_chan >= 0 && from_chan < MAX_TOTAL_CHANS)
 
 	for to_chan := range MAX_TOTAL_CHANS {
-		if d.config.regen[from_chan][to_chan] {
+		if d.config.Regen[from_chan][to_chan] {
 			var result = pp.Dup()
 			if result != nil && d.transmit != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
@@ -368,7 +379,7 @@ func (d *Digipeater) match(
 	alias *regexp.Regexp,
 	wide *regexp.Regexp,
 	to_chan int,
-	preempt preempt_e,
+	preempt DigipeaterPreempt,
 	atgp string,
 	filter_str string,
 ) *ax25.Packet {
@@ -508,7 +519,7 @@ func (d *Digipeater) match(
 	 * But consider this case:  https://github.com/wb2osz/direwolf/issues/488
 	 */
 
-	if preempt != PREEMPT_OFF {
+	if preempt != PreemptOff {
 		for r2 := r + 1; r2 < pp.NumAddr(); r2++ {
 			var repeater2 = pp.AddrWithSSID(r2)
 
@@ -522,7 +533,7 @@ func (d *Digipeater) match(
 				result.SetH(r2)
 
 				switch preempt {
-				case PREEMPT_DROP: /* remove all prior */
+				case PreemptDrop: /* remove all prior */
 					// TODO: deprecate this option.  Result is misleading.
 					logrus.Warn("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.")
 
@@ -530,7 +541,7 @@ func (d *Digipeater) match(
 						result.RemoveAddr(r2 - 1)
 						r2--
 					}
-				case PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
+				case PreemptMark: // TODO: deprecate this option.  Result is misleading.
 					logrus.Warn("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.")
 
 					r2--
@@ -538,9 +549,9 @@ func (d *Digipeater) match(
 						result.SetH(r2)
 						r2--
 					}
-				/* 2025-07-29 KG Commenting out the PREEMPT_TRACE handling so it falls through to the default case,
+				/* 2025-07-29 KG Commenting out the PreemptTrace handling so it falls through to the default case,
 					which was the original behaviour of the C too
-				case PREEMPT_TRACE:
+				case PreemptTrace:
 				*/
 				/* My enhancement - remove prior unused digis. */
 				/* this provides an accurate path of where packet traveled. */

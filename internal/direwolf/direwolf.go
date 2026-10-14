@@ -286,7 +286,7 @@ x = Silence FX.25 information.`)
 	var audio_config = new(RadioConfig)
 	var misc_config = new(misc_config_s)
 	var dw_tt_config tt_config_s
-	var digi_config digi_config_s
+	var digi_config DigipeaterConfig
 	var cdigi_config cdigi_config_s
 	var igate_config igate_config_s
 

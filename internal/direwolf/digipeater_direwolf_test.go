@@ -16,7 +16,7 @@ var digipeaterTestAliasRegexp *regexp.Regexp
 var digipeaterTestWideRegexp *regexp.Regexp
 var digipeaterTestConfigATGP = "HOP"
 var digipeaterTestFailed = 0
-var preempt = PREEMPT_OFF
+var preempt = PreemptOff
 var digipeaterTestDigi *Digipeater
 
 func digipeater_test(t *testing.T, in, out string) {
@@ -232,12 +232,12 @@ func Test_Digipeater(t *testing.T) {
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:off",
 		"")
 
-	preempt = PREEMPT_DROP
+	preempt = PreemptDrop
 
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:drop",
 		"W1ABC>TEST11,WB2OSZ-9*,CITYE:drop")
 
-	preempt = PREEMPT_MARK
+	preempt = PreemptMark
 
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:mark1",
 		"W1ABC>TEST11,CITYA,CITYB,CITYC,WB2OSZ-9*,CITYE:mark1")
@@ -245,7 +245,7 @@ func Test_Digipeater(t *testing.T) {
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,WB2OSZ-9,CITYE:mark2",
 		"W1ABC>TEST11,CITYA,CITYB,CITYC,WB2OSZ-9*,CITYE:mark2")
 
-	preempt = PREEMPT_TRACE
+	preempt = PreemptTrace
 
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:trace1",
 		"W1ABC>TEST11,CITYA,WB2OSZ-9*,CITYE:trace1")
@@ -278,7 +278,7 @@ func Test_Digipeater(t *testing.T) {
 
 	// New in 1.7 - ATGP Hack
 
-	preempt = PREEMPT_OFF // Shouldn't make a difference here.
+	preempt = PreemptOff // Shouldn't make a difference here.
 
 	digipeater_test(t, "W1ABC>TEST51,HOP7-7,HOP7-7:stuff1",
 		"W1ABC>TEST51,WB2OSZ-9*,HOP7-6,HOP7-7:stuff1")

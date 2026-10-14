@@ -173,7 +173,7 @@ func setupIGateFromServer(t *testing.T) *IGate {
 	// Nothing reads what it queues: each run has a queue of its own.
 	var tq = newTestTransmitQueue(audioConfig)
 
-	return NewIGate(audioConfig, igateConfig, new(digi_config_s), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, nil, tq.Append, 0)
+	return NewIGate(audioConfig, igateConfig, new(DigipeaterConfig), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, nil, tq.Append, 0)
 }
 
 // fuzzAGWServer returns a server with a client attached as client 0, by way of

@@ -217,7 +217,7 @@ func Test_IsNoCall(t *testing.T) {
 // reported while doing so.
 type configs struct {
 	audio *RadioConfig
-	digi  *digi_config_s
+	digi  *DigipeaterConfig
 	cdigi *cdigi_config_s
 	tt    *tt_config_s
 	igate *igate_config_s
@@ -264,7 +264,7 @@ func parseConfigWith(t *testing.T, pattern string, content string, symbolTable s
 
 	var c = configs{
 		audio:  new(RadioConfig),
-		digi:   new(digi_config_s),
+		digi:   new(DigipeaterConfig),
 		cdigi:  new(cdigi_config_s),
 		tt:     new(tt_config_s),
 		igate:  new(igate_config_s),
@@ -681,7 +681,7 @@ func Test_config_init_modem_directive(t *testing.T) {
 			require.NoError(t, tmpFile.Close())
 
 			var audioConfig = new(RadioConfig)
-			var digiConfig digi_config_s
+			var digiConfig DigipeaterConfig
 			var cdigiConfig cdigi_config_s
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
@@ -730,7 +730,7 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 			require.NoError(t, tmpFile.Close())
 
 			var audioConfig = new(RadioConfig)
-			var digiConfig digi_config_s
+			var digiConfig DigipeaterConfig
 			var cdigiConfig cdigi_config_s
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
@@ -740,9 +740,9 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 				&ttConfig, &igateConfig, &miscConfig, nil)
 
 			if tt.wantSet {
-				assert.NotEmpty(t, digiConfig.filter_str[0][0])
+				assert.NotEmpty(t, digiConfig.FilterStr[0][0])
 			} else {
-				assert.Empty(t, digiConfig.filter_str[0][0])
+				assert.Empty(t, digiConfig.FilterStr[0][0])
 			}
 		})
 	}
@@ -775,7 +775,7 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 			require.NoError(t, tmpFile.Close())
 
 			var audioConfig = new(RadioConfig)
-			var digiConfig digi_config_s
+			var digiConfig DigipeaterConfig
 			var cdigiConfig cdigi_config_s
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
@@ -1518,28 +1518,28 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a valid time is stored",
 				config: "DEDUPE 45\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(45, c.digi.dedupe_time)
+					a.Equal(45, c.digi.DedupeTime)
 				},
 			},
 			{
 				name:   "no DEDUPE leaves the default",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+					a.Equal(DefaultDedupe, c.digi.DedupeTime)
 				},
 			},
 			{
 				name:   "zero turns duplicate suppression off",
 				config: "DEDUPE 0\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(0, c.digi.dedupe_time)
+					a.Equal(0, c.digi.DedupeTime)
 				},
 			},
 			{
 				name:   "an unreasonable time falls back to the default",
 				config: "DEDUPE 600\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+					a.Equal(DefaultDedupe, c.digi.DedupeTime)
 					a.Contains(c.output, "Unreasonable value for dedupe time")
 				},
 			},
@@ -1547,14 +1547,14 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a negative time falls back to the default",
 				config: "DEDUPE -1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+					a.Equal(DefaultDedupe, c.digi.DedupeTime)
 				},
 			},
 			{
 				name:   "a missing time does not eat the next line",
 				config: "DEDUPE\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+					a.Equal(DefaultDedupe, c.digi.DedupeTime)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -1565,7 +1565,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "an unreadable time keeps the configured one",
 				config: "DEDUPE 45\nDEDUPE abc\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(45, c.digi.dedupe_time)
+					a.Equal(45, c.digi.DedupeTime)
 				},
 			},
 		},
@@ -1577,38 +1577,38 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a valid line enables digipeating with both patterns",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.True(c.digi.enabled[0][1])
-					a.NotNil(c.digi.alias[0][1])
-					a.NotNil(c.digi.wide[0][1])
-					a.Equal(PREEMPT_OFF, c.digi.preempt[0][1])
+					a.True(c.digi.Enabled[0][1])
+					a.NotNil(c.digi.Alias[0][1])
+					a.NotNil(c.digi.Wide[0][1])
+					a.Equal(PreemptOff, c.digi.Preempt[0][1])
 				},
 			},
 			{
 				name:   "nothing is digipeated by default",
 				config: "MYCALL Q1TEST\nACHANNELS 2\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.digi.enabled[0][1])
+					a.False(c.digi.Enabled[0][1])
 				},
 			},
 			{
 				name:   "TRACE asks for preemptive digipeating",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ TRACE\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(PREEMPT_TRACE, c.digi.preempt[0][1])
+					a.Equal(PreemptTrace, c.digi.Preempt[0][1])
 				},
 			},
 			{
 				name:   "PREEMPT is the same thing under a better name",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ PREEMPT\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(PREEMPT_TRACE, c.digi.preempt[0][1])
+					a.Equal(PreemptTrace, c.digi.Preempt[0][1])
 				},
 			},
 			{
 				name:   "DROP is accepted and discouraged",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ DROP\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(PREEMPT_DROP, c.digi.preempt[0][1])
+					a.Equal(PreemptDrop, c.digi.Preempt[0][1])
 					a.Contains(c.output, "DROP option is discouraged")
 				},
 			},
@@ -1616,7 +1616,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "MARK is accepted and discouraged",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ MARK\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(PREEMPT_MARK, c.digi.preempt[0][1])
+					a.Equal(PreemptMark, c.digi.Preempt[0][1])
 					a.Contains(c.output, "MARK option is discouraged")
 				},
 			},
@@ -1624,14 +1624,14 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "ATGP takes the alias after the equals sign",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ ATGP=Q2TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("Q2TEST", c.digi.atgp[0][1])
+					a.Equal("Q2TEST", c.digi.ATGP[0][1])
 				},
 			},
 			{
 				name:   "a non-numeric channel is rejected",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT zero 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.digi.enabled[0][1])
+					a.False(c.digi.Enabled[0][1])
 					a.Contains(c.output, "is not allowed for FROM-channel")
 				},
 			},
@@ -1646,7 +1646,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a channel that is not a radio channel is rejected",
 				config: "MYCALL Q1TEST\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.digi.enabled[0][1])
+					a.False(c.digi.Enabled[0][1])
 					a.Contains(c.output, "TO-channel 1 is not valid")
 				},
 			},
@@ -1654,7 +1654,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "an unusable pattern is rejected and nothing is digipeated",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE([3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.digi.enabled[0][1])
+					a.False(c.digi.Enabled[0][1])
 					a.Contains(c.output, "Invalid alias matching pattern")
 				},
 			},
@@ -1662,7 +1662,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "anything after the options is reported",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ TRACE extra\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.True(c.digi.enabled[0][1])
+					a.True(c.digi.Enabled[0][1])
 					a.Contains(c.output, "where end of line was expected")
 				},
 			},
@@ -1670,7 +1670,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "digipeating a channel with no callsign is switched off again",
 				config: "ACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.digi.enabled[0][1])
+					a.False(c.digi.Enabled[0][1])
 					a.Contains(c.output, "MYCALL must be set for transmit channel")
 				},
 			},
@@ -1678,7 +1678,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing TO-channel does not eat the next line",
 				config: "ACHANNELS 2\nDIGIPEAT 0\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.digi.enabled[0][1])
+					a.False(c.digi.Enabled[0][1])
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -1688,9 +1688,9 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "the longer name is the same handler as DIGIPEAT",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEATER 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.True(c.digi.enabled[0][1])
-					a.NotNil(c.digi.alias[0][1])
-					a.NotNil(c.digi.wide[0][1])
+					a.True(c.digi.Enabled[0][1])
+					a.NotNil(c.digi.Alias[0][1])
+					a.NotNil(c.digi.Wide[0][1])
 				},
 			},
 		},
@@ -3724,21 +3724,21 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a valid line turns regeneration on",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nREGEN 0 1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.True(c.digi.regen[0][1])
+					a.True(c.digi.Regen[0][1])
 				},
 			},
 			{
 				name:   "nothing is regenerated by default",
 				config: "MYCALL Q1TEST\nACHANNELS 2\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.digi.regen[0][1])
+					a.False(c.digi.Regen[0][1])
 				},
 			},
 			{
 				name:   "a non-numeric channel is rejected",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nREGEN zero 1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.digi.regen[0][1])
+					a.False(c.digi.Regen[0][1])
 					a.Contains(c.output, "is not allowed for FROM-channel")
 				},
 			},
@@ -3753,7 +3753,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a channel that is not a radio channel is rejected",
 				config: "MYCALL Q1TEST\nREGEN 0 1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.digi.regen[0][1])
+					a.False(c.digi.Regen[0][1])
 					a.Contains(c.output, "TO-channel 1 is not valid")
 				},
 			},
@@ -3761,7 +3761,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing TO-channel does not eat the next line",
 				config: "ACHANNELS 2\nREGEN 0\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.digi.regen[0][1])
+					a.False(c.digi.Regen[0][1])
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -5476,7 +5476,7 @@ IGLOGIN Q1TEST 12345
 `)
 
 	assert.Zero(t, c.errors, c.output)
-	assert.Equal(t, "t/m", c.digi.filter_str[10][0])
-	assert.Equal(t, "t/m", c.digi.filter_str[0][10])
-	assert.Equal(t, "i/180", c.digi.filter_str[MAX_TOTAL_CHANS][10], "an IGate should only pass on to the serial TNC what is near it")
+	assert.Equal(t, "t/m", c.digi.FilterStr[10][0])
+	assert.Equal(t, "t/m", c.digi.FilterStr[0][10])
+	assert.Equal(t, "i/180", c.digi.FilterStr[MAX_TOTAL_CHANS][10], "an IGate should only pass on to the serial TNC what is near it")
 }

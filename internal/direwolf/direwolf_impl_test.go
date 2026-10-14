@@ -115,7 +115,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	t.Cleanup(ws.Close)
 
 	var igateConfig = new(igate_config_s)
-	var digiConfig = new(digi_config_s)
+	var digiConfig = new(DigipeaterConfig)
 	var filter = pfilter.New(igateConfig.max_digi_hops, aprs.NewDecoderFromDataFiles(), heardDB, 0)
 
 	var ig = NewIGate(audioConfig, igateConfig, digiConfig, filter, heardDB, nil, nil, 0)
