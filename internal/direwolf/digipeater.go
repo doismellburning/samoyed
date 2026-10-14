@@ -177,8 +177,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 			d.audioConfig.chan_medium[from_chan] != MEDIUM_NETTNC &&
 			d.audioConfig.chan_medium[from_chan] != MediumSerialTNC &&
 			d.audioConfig.chan_medium[from_chan] != MEDIUM_AXUDP) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("APRS digipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
+		logrus.WithField("channel", from_chan).Error("APRS digipeater: Did not expect to receive on invalid channel")
 
 		// Saying so and then carrying on meant indexing the per-channel
 		// configuration with the very channel number just called invalid,
@@ -371,8 +370,11 @@ func (d *Digipeater) match(
 	if filter_str != "" {
 		var result, err = d.filter.Filter(from_chan, to_chan, filter_str, pp, true)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s\n", err)
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"from_channel": from_chan,
+				"to_channel":   to_chan,
+				"filter":       filter_str,
+			}).Error("APRS digipeater: Bad filter")
 		}
 
 		if result != 1 {
@@ -465,12 +467,10 @@ func (d *Digipeater) match(
 	 */
 
 	if d.dedupe.Check(to_chan, pp) {
-		//#if DEBUG
 		/* Might be useful if people are wondering why */
 		/* some are not repeated.  Might also cause confusion. */
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Digipeater: Drop redundant packet to channel %d.\n", to_chan)
-		//#endif
+		logrus.WithField("channel", to_chan).Debug("Digipeater: Drop redundant packet")
+
 		return nil
 	}
 
@@ -516,16 +516,14 @@ func (d *Digipeater) match(
 				switch preempt {
 				case PREEMPT_DROP: /* remove all prior */
 					// TODO: deprecate this option.  Result is misleading.
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
+					logrus.Warn("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.")
 
 					for r2 > ax25.Repeater1 {
 						result.RemoveAddr(r2 - 1)
 						r2--
 					}
 				case PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
+					logrus.Warn("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.")
 
 					r2--
 					for r2 >= ax25.Repeater1 && result.H(r2) == 0 {

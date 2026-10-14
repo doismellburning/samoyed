@@ -15,7 +15,8 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/pfilter"
-	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -154,10 +155,20 @@ func TestDigipeaterInvalidChannel(t *testing.T) {
 	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
-	for _, channel := range []int{-1, MAX_TOTAL_CHANS} {
-		var output = testutils.CaptureOutput(t, func() { digi.Digipeat(channel, pp) })
+	var hook = test.NewGlobal()
 
-		assert.Contains(t, output, "Did not expect to receive on invalid channel")
+	t.Cleanup(hook.Reset)
+
+	for _, channel := range []int{-1, MAX_TOTAL_CHANS} {
+		hook.Reset()
+
+		digi.Digipeat(channel, pp)
+
+		var entry = hook.LastEntry()
+		require.NotNil(t, entry, "nothing was logged for channel %d", channel)
+		assert.Equal(t, logrus.ErrorLevel, entry.Level)
+		assert.Contains(t, entry.Message, "Did not expect to receive on invalid channel")
+		assert.Equal(t, channel, entry.Data["channel"])
 	}
 }
 
@@ -186,9 +197,15 @@ func TestDigipeaterFromSerialTNC(t *testing.T) {
 	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = testutils.CaptureOutput(t, func() { digi.Digipeat(serialChan, pp) })
+	var hook = test.NewGlobal()
 
-	assert.NotContains(t, output, "Did not expect to receive on invalid channel")
+	t.Cleanup(hook.Reset)
+
+	digi.Digipeat(serialChan, pp)
+
+	for _, entry := range hook.AllEntries() {
+		assert.NotContains(t, entry.Message, "Did not expect to receive on invalid channel")
+	}
 
 	var sent = tq.Remove(digiToChan, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
