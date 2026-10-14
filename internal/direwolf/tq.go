@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
@@ -29,8 +30,8 @@ import (
 
 const TQ_NUM_PRIO = 2 /* Number of priorities. */
 
-const TQ_PRIO_0_HI = 0
-const TQ_PRIO_1_LO = 1
+const TQ_PRIO_0_HI = dwcore.PrioHigh
+const TQ_PRIO_1_LO = dwcore.PrioLow
 
 // frameSender is where a packet to transmit goes: TransmitQueue.Append, or a
 // stand-in for it.

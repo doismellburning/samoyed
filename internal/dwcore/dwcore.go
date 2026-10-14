@@ -104,3 +104,13 @@ func RadioSource(from SlicerID) Source {
 func ChannelSource(kind SourceKind, channel int) Source {
 	return Source{Kind: kind, Slicer: SlicerID{Channel: channel, Subchannel: 0, Slice: 0}}
 }
+
+// The transmit queue priorities a frame to send can be given.
+const (
+	// PrioHigh is for a frame to go out as soon as the channel is clear,
+	// such as an APRS digipeater repeating on the channel it heard on.
+	PrioHigh = 0
+
+	// PrioLow is for everything else, which waits its turn.
+	PrioLow = 1
+)
