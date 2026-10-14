@@ -36,11 +36,11 @@ func newRecvTestRadioConfig(numChannels int) *RadioConfig {
 
 	for c := range numChannels {
 		audioConfig.chan_medium[c] = MEDIUM_RADIO
-		audioConfig.achan[c].modem_type = MODEM_AFSK
-		audioConfig.achan[c].baud = 1200
-		audioConfig.achan[c].mark_freq = 1200
-		audioConfig.achan[c].space_freq = 2200
-		audioConfig.achan[c].dtmf_decode = DTMF_DECODE_OFF
+		audioConfig.achan[c].ModemType = MODEM_AFSK
+		audioConfig.achan[c].Baud = 1200
+		audioConfig.achan[c].MarkFreq = 1200
+		audioConfig.achan[c].SpaceFreq = 2200
+		audioConfig.achan[c].DTMFDecode = DTMF_DECODE_OFF
 	}
 
 	return audioConfig
@@ -181,7 +181,7 @@ func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
 // is configured for the channel - as it is for the APRStt gateway.
 func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_ON
+	audioConfig.achan[0].DTMFDecode = DTMF_DECODE_ON
 
 	var receiver, src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
@@ -208,7 +208,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 // taking down the receive goroutine.
 func TestRecvAdevThreadDecodesTouchTonesForNobody(t *testing.T) {
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_ON
+	audioConfig.achan[0].DTMFDecode = DTMF_DECODE_ON
 
 	var receiver, src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
@@ -225,7 +225,7 @@ func TestRecvAdevThreadDecodesTouchTonesForNobody(t *testing.T) {
 // what is on the air.
 func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_OFF
+	audioConfig.achan[0].DTMFDecode = DTMF_DECODE_OFF
 
 	var receiver, src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 

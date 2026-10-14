@@ -22,11 +22,11 @@ func settleModemOptions(pa *RadioConfig) {
 // settleModemOptions applies the rules about which modem options go together
 // to one channel, saying what it changed.
 func (achan *achan_param_s) settleModemOptions(channel int) {
-	switch achan.modem_type {
+	switch achan.ModemType {
 	case MODEM_EAS, MODEM_AIS:
 		// For AIS we will accept only a good CRC without any fixup attempts.
 		// Even with that, there are still a lot of CRC false matches with random noise.
-		var name = dwutil.IfThenElse(achan.modem_type == MODEM_EAS, "EAS", "AIS")
+		var name = dwutil.IfThenElse(achan.ModemType == MODEM_EAS, "EAS", "AIS")
 
 		if achan.fix_bits != RETRY_NONE {
 			text_color_set(DW_COLOR_INFO)
@@ -54,7 +54,7 @@ func (achan *achan_param_s) settleModemOptions(channel int) {
 		//
 		// The transmitter reads this too, so it has to be settled before
 		// either end is set up.
-		if achan.v26_alternative == V26_UNSPECIFIED {
+		if achan.V26Alternative == V26_UNSPECIFIED {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Two incompatible versions of 2400 bps QPSK are now available.\n")
 			dw_printf("For compatibility with direwolf <= 1.5, use 'V26A' modem option in config file.\n")
@@ -64,7 +64,7 @@ func (achan *achan_param_s) settleModemOptions(channel int) {
 			dw_printf("2400-4800-PSK-for-APRS-Packet-Radio.pdf.\n")
 			dw_printf("The default is now MFJ-2400 compatibility mode.\n")
 
-			achan.v26_alternative = V26_DEFAULT
+			achan.V26Alternative = V26_DEFAULT
 		}
 
 		achan.forbidPSKDecimation(channel)
@@ -81,10 +81,10 @@ func (achan *achan_param_s) settleModemOptions(channel int) {
 // implemented for it.  Complain, rather than silently ignoring, when the
 // configuration asked for decimation.
 func (achan *achan_param_s) forbidPSKDecimation(channel int) {
-	if achan.decimate > 1 {
+	if achan.Decimate > 1 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Channel %d: Decimation is not supported for PSK - ignoring.\n", channel)
 	}
 
-	achan.decimate = 1
+	achan.Decimate = 1
 }

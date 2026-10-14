@@ -30,14 +30,14 @@ type modemResult struct {
 
 func modemResultOf(a *achan_param_s) modemResult {
 	return modemResult{
-		baud:     a.baud,
-		modem:    a.modem_type,
-		mark:     a.mark_freq,
-		space:    a.space_freq,
-		profiles: a.profiles,
-		v26:      a.v26_alternative,
-		decimate: a.decimate,
-		upsample: a.upsample,
+		baud:     a.Baud,
+		modem:    a.ModemType,
+		mark:     a.MarkFreq,
+		space:    a.SpaceFreq,
+		profiles: a.Profiles,
+		v26:      a.V26Alternative,
+		decimate: a.Decimate,
+		upsample: a.Upsample,
 		layer2:   a.layer2_xmit,
 		fx25:     a.fx25_strength,
 		il2pFEC:  a.il2p_max_fec,

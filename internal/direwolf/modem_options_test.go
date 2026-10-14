@@ -16,13 +16,13 @@ func TestSettleModemOptionsRejectsPSKDecimation(t *testing.T) {
 	for _, modemType := range []modem_t{MODEM_QPSK, MODEM_8PSK, MODEM_BPSK} {
 		var channel = 0
 		var audioConfig = newTestRadioConfig(channel, modemType, 2400, 0, 0, 44100)
-		audioConfig.achan[channel].decimate = 3
+		audioConfig.achan[channel].Decimate = 3
 
 		testutils.AssertOutputContains(t, func() {
 			settleModemOptions(audioConfig)
 		}, "Decimation is not supported for PSK")
 
-		assert.Equal(t, 1, audioConfig.achan[channel].decimate)
+		assert.Equal(t, 1, audioConfig.achan[channel].Decimate)
 	}
 }
 
@@ -30,11 +30,11 @@ func TestSettleModemOptionsRejectsPSKDecimation(t *testing.T) {
 func TestSettleModemOptionsKeepsAFSKDecimation(t *testing.T) {
 	var channel = 1
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 48000)
-	audioConfig.achan[channel].decimate = 3
+	audioConfig.achan[channel].Decimate = 3
 
 	settleModemOptions(audioConfig)
 
-	assert.Equal(t, 3, audioConfig.achan[channel].decimate)
+	assert.Equal(t, 3, audioConfig.achan[channel].Decimate)
 }
 
 // EAS and AIS take only a frame with a good CRC as it came.
@@ -85,22 +85,22 @@ func TestSettleModemOptionsDefaultsV26Alternative(t *testing.T) {
 		settleModemOptions(audioConfig)
 	}, "The default is now MFJ-2400 compatibility mode.")
 
-	assert.Equal(t, V26_DEFAULT, audioConfig.achan[channel].v26_alternative)
+	assert.Equal(t, V26_DEFAULT, audioConfig.achan[channel].V26Alternative)
 
 	var output = testutils.CaptureOutput(t, func() {
 		settleModemOptions(audioConfig)
 	})
 
 	assert.Empty(t, output, "a V.26 alternative already chosen is left alone")
-	assert.Equal(t, V26_DEFAULT, audioConfig.achan[channel].v26_alternative)
+	assert.Equal(t, V26_DEFAULT, audioConfig.achan[channel].V26Alternative)
 }
 
 // A channel with no radio on it has no modem options to settle.
 func TestSettleModemOptionsSkipsNonRadioChannels(t *testing.T) {
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
-	audioConfig.achan[1].modem_type = MODEM_QPSK
+	audioConfig.achan[1].ModemType = MODEM_QPSK
 
 	settleModemOptions(audioConfig)
 
-	assert.Equal(t, V26_UNSPECIFIED, audioConfig.achan[1].v26_alternative)
+	assert.Equal(t, V26_UNSPECIFIED, audioConfig.achan[1].V26Alternative)
 }

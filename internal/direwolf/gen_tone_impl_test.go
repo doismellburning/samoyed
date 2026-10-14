@@ -19,10 +19,10 @@ func newTestRadioConfig(channel int, modemType modem_t, baud int, markFreq int, 
 	var audioConfig RadioConfig
 
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
-	audioConfig.achan[channel].modem_type = modemType
-	audioConfig.achan[channel].baud = baud
-	audioConfig.achan[channel].mark_freq = markFreq
-	audioConfig.achan[channel].space_freq = spaceFreq
+	audioConfig.achan[channel].ModemType = modemType
+	audioConfig.achan[channel].Baud = baud
+	audioConfig.achan[channel].MarkFreq = markFreq
+	audioConfig.achan[channel].SpaceFreq = spaceFreq
 	audioConfig.adev[ACHAN2ADEV(channel)].samples_per_sec = samplesPerSec
 	audioConfig.adev[ACHAN2ADEV(channel)].num_channels = 1
 	audioConfig.adev[ACHAN2ADEV(channel)].bits_per_sample = 16
@@ -58,8 +58,8 @@ func TestNewToneGeneratorBPSK(t *testing.T) {
 
 	require.NotNil(t, tg)
 	// BPSK forces mark_freq to 1800 and mirrors it into space_freq.
-	assert.Equal(t, 1800, audioConfig.achan[channel].mark_freq)
-	assert.Equal(t, 1800, audioConfig.achan[channel].space_freq)
+	assert.Equal(t, 1800, audioConfig.achan[channel].MarkFreq)
+	assert.Equal(t, 1800, audioConfig.achan[channel].SpaceFreq)
 	assert.Equal(t, tg.f1ChangePerSample, tg.f2ChangePerSample)
 	assert.Equal(t, PHASE_SHIFT_45, tg.tonePhase)
 }
@@ -69,10 +69,10 @@ func TestToneGeneratorsAreIndependentPerChannel(t *testing.T) {
 	var chan1 = 1
 	var audioConfig = newTestRadioConfig(chan0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.chan_medium[chan1] = MEDIUM_RADIO
-	audioConfig.achan[chan1].modem_type = MODEM_AFSK
-	audioConfig.achan[chan1].baud = 9600
-	audioConfig.achan[chan1].mark_freq = 1200
-	audioConfig.achan[chan1].space_freq = 2200
+	audioConfig.achan[chan1].ModemType = MODEM_AFSK
+	audioConfig.achan[chan1].Baud = 9600
+	audioConfig.achan[chan1].MarkFreq = 1200
+	audioConfig.achan[chan1].SpaceFreq = 2200
 
 	var tg0 = NewToneGenerator(chan0, audioConfig, 100, nil)
 	var tg1 = NewToneGenerator(chan1, audioConfig, 100, nil)
@@ -200,15 +200,15 @@ func TestToneGeneratorPutBitBPSK(t *testing.T) {
 func TestNewToneGeneratorQPSKAnd8PSK(t *testing.T) {
 	var qpsk, _, qcfg = newCapturingToneGenerator(MODEM_QPSK, 2400, 44100)
 
-	assert.Equal(t, 1800, qcfg.achan[0].mark_freq)
-	assert.Equal(t, 1800, qcfg.achan[0].space_freq)
+	assert.Equal(t, 1800, qcfg.achan[0].MarkFreq)
+	assert.Equal(t, 1800, qcfg.achan[0].SpaceFreq)
 	assert.Equal(t, ticksFor(1200), qpsk.ticksPerBit)
 	assert.InDelta(t, 2*44100.0/2400.0, qpsk.samplesPerSymbol, 0.0001)
 	assert.Equal(t, PHASE_SHIFT_45, qpsk.tonePhase)
 
 	var psk8, _, ecfg = newCapturingToneGenerator(MODEM_8PSK, 4800, 44100)
 
-	assert.Equal(t, 1800, ecfg.achan[0].mark_freq)
+	assert.Equal(t, 1800, ecfg.achan[0].MarkFreq)
 	assert.Equal(t, ticksFor(1600), psk8.ticksPerBit)
 	assert.InDelta(t, 3*44100.0/4800.0, psk8.samplesPerSymbol, 0.0001)
 	assert.Zero(t, psk8.tonePhase)
@@ -226,7 +226,7 @@ func TestToneGeneratorPutBitQPSK(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// 2400 bps is 1200 symbols/sec: ten samples a symbol at 12000.
 			var tg, sink, cfg = newCapturingToneGenerator(MODEM_QPSK, 2400, 12000)
-			cfg.achan[0].v26_alternative = tc.alt
+			cfg.achan[0].V26Alternative = tc.alt
 
 			var start = tg.tonePhase
 

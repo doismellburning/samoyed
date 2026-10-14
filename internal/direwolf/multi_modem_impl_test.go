@@ -259,8 +259,8 @@ func TestMultiModemImplPickBestCandidateTrace(t *testing.T) {
 // A frame waits processAge samples for others to turn up, then goes on.
 func TestMultiModemImplProcessSamplePicksAfterAge(t *testing.T) {
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].profiles = "AB"
-	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].Profiles = "AB"
+	audioConfig.achan[0].NumFreq = 1
 
 	var sink = new(multiModemImplSink)
 	var receiver = multi_modem_init(audioConfig, 0, 0, sink)
@@ -302,10 +302,10 @@ func TestMultiModemImplInitProcessAgeInSymbols(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var audioConfig = newRecvTestRadioConfig(1)
-			audioConfig.achan[0].modem_type = tc.modemType
-			audioConfig.achan[0].baud = tc.baud
-			audioConfig.achan[0].mark_freq = 1800
-			audioConfig.achan[0].space_freq = 0
+			audioConfig.achan[0].ModemType = tc.modemType
+			audioConfig.achan[0].Baud = tc.baud
+			audioConfig.achan[0].MarkFreq = 1800
+			audioConfig.achan[0].SpaceFreq = 0
 
 			var receiver = multi_modem_init(audioConfig, 0, 0, new(multiModemImplSink))
 
@@ -320,7 +320,7 @@ func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.
 	t.Helper()
 
 	var audioConfig = new(RadioConfig)
-	audioConfig.achan[0].modem_type = modemType
+	audioConfig.achan[0].ModemType = modemType
 
 	var receiver = NewLayer2Receiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(multiModemImplSink))
 

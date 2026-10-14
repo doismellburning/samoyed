@@ -143,7 +143,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 	var numSubchan = 1
 	var numSlicers = 1
 
-	switch achan.modem_type {
+	switch achan.ModemType {
 	case MODEM_OFF:
 
 	case MODEM_AFSK, MODEM_EAS:
@@ -157,7 +157,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		var justLettersBuilder strings.Builder
 		var have_plus = 0
 
-		var profileStr = achan.profiles
+		var profileStr = achan.Profiles
 		for i, p := range profileStr {
 			if unicode.IsLower(p) {
 				justLettersBuilder.WriteRune(unicode.ToUpper(p))
@@ -171,7 +171,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				if i+1 != len(profileStr) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Channel %d: + option must appear at end of demodulator types \"%s\" \n",
-						channel, achan.profiles)
+						channel, achan.Profiles)
 				}
 			} else if p == '-' {
 				have_plus = -1
@@ -179,12 +179,12 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				if i+1 != len(profileStr) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Channel %d: - option must appear at end of demodulator types \"%s\" \n",
-						channel, achan.profiles)
+						channel, achan.Profiles)
 				}
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Channel %d: Demodulator types \"%s\" can contain only letters and + - characters.\n",
-					channel, achan.profiles)
+					channel, achan.Profiles)
 			}
 		}
 
@@ -239,11 +239,11 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		 * These can get extremely large for low speeds, e.g. 300 baud.
 		 * In this case, increase the decimation ration.  Crude approximation. Could be improved.
 		 */
-		if achan.decimate == 0 &&
+		if achan.Decimate == 0 &&
 			samplesPerSec > 40000 &&
-			achan.baud < 600 {
+			achan.Baud < 600 {
 			// Avoid enormous number of filter taps.
-			achan.decimate = 3
+			achan.Decimate = 3
 		}
 
 		/*
@@ -260,12 +260,12 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			have_plus = 0
 		}
 
-		achan.profiles = just_letters
+		achan.Profiles = just_letters
 
-		dwutil.Assert(len(achan.profiles) >= 1)
+		dwutil.Assert(len(achan.Profiles) >= 1)
 
 		if have_plus != 0 {
-			achan.profiles += "+"
+			achan.Profiles += "+"
 		}
 
 		/* These can be increased later for the multi-frequency case. */
@@ -281,42 +281,42 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		 *	- Multiple frequencies.
 		 */
 
-		if have_plus != 0 && achan.num_freq > 1 {
+		if have_plus != 0 && achan.NumFreq > 1 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Channel %d: Demodulator + option can't be combined with multiple frequencies.\n", channel)
 			numSubchan = 1 // Will be set higher later.
-			achan.num_freq = 1
+			achan.NumFreq = 1
 		}
 
-		if num_letters > 1 && achan.num_freq > 1 {
+		if num_letters > 1 && achan.NumFreq > 1 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Channel %d: Multiple demodulator types can't be combined with multiple frequencies.\n", channel)
 
-			achan.profiles = string(achan.profiles[0])
+			achan.Profiles = string(achan.Profiles[0])
 			num_letters = 1
 		}
 
-		if achan.decimate == 0 {
-			achan.decimate = 1
+		if achan.Decimate == 0 {
+			achan.Decimate = 1
 			if strings.Contains(just_letters, "B") && samplesPerSec > 40000 {
-				achan.decimate = 3
+				achan.Decimate = 3
 			}
 		}
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("Channel %d: %d baud, AFSK %d & %d Hz, %s, %d sample rate",
-			channel, achan.baud,
-			achan.mark_freq, achan.space_freq,
-			achan.profiles,
+			channel, achan.Baud,
+			achan.MarkFreq, achan.SpaceFreq,
+			achan.Profiles,
 			samplesPerSec)
 
-		if achan.decimate != 1 {
-			dw_printf(" / %d", achan.decimate)
+		if achan.Decimate != 1 {
+			dw_printf(" / %d", achan.Decimate)
 		}
 
 		dw_printf(", Tx %s", achan.layer2_xmit)
 
-		if achan.dtmf_decode != DTMF_DECODE_OFF {
+		if achan.DTMFDecode != DTMF_DECODE_OFF {
 			dw_printf(", DTMF decoder enabled")
 		}
 
@@ -344,13 +344,13 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			if numSubchan != num_letters {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("INTERNAL ERROR, chan=%d, num_subchan(%d) != strlen(\"%s\")\n",
-					channel, numSubchan, achan.profiles)
+					channel, numSubchan, achan.Profiles)
 			}
 
-			if achan.num_freq != 1 {
+			if achan.NumFreq != 1 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1\n",
-					channel, achan.num_freq)
+					channel, achan.NumFreq)
 			}
 
 			for d := range numSubchan {
@@ -358,17 +358,17 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 
 				var D = &demodulator.states[d]
 
-				var profile = achan.profiles[d]
-				var mark = achan.mark_freq
-				var space = achan.space_freq
+				var profile = achan.Profiles[d]
+				var mark = achan.MarkFreq
+				var space = achan.SpaceFreq
 
 				if numSubchan != 1 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
 				}
 
-				demod_afsk_init(samplesPerSec/achan.decimate,
-					achan.baud,
+				demod_afsk_init(samplesPerSec/achan.Decimate,
+					achan.Baud,
 					mark,
 					space,
 					rune(profile),
@@ -399,16 +399,16 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 					channel, just_letters)
 			}
 
-			if achan.num_freq != 1 {
+			if achan.NumFreq != 1 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1\n",
-					channel, achan.num_freq)
+					channel, achan.NumFreq)
 			}
 
-			if achan.num_freq != numSubchan {
+			if achan.NumFreq != numSubchan {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != num_subchan(%d)\n",
-					channel, achan.num_freq, numSubchan)
+					channel, achan.NumFreq, numSubchan)
 			}
 
 			var D = &demodulator.states[0]
@@ -418,11 +418,11 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 
 			numSlicers = MAX_SLICERS
 
-			demod_afsk_init(samplesPerSec/achan.decimate,
-				achan.baud,
-				achan.mark_freq,
-				achan.space_freq,
-				rune(achan.profiles[0]),
+			demod_afsk_init(samplesPerSec/achan.Decimate,
+				achan.Baud,
+				achan.MarkFreq,
+				achan.SpaceFreq,
+				rune(achan.Profiles[0]),
 				D)
 
 			if have_plus != 0 {
@@ -444,29 +444,29 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			if num_letters != 1 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1\n",
-					channel, achan.profiles)
+					channel, achan.Profiles)
 			}
 
-			numSubchan = achan.num_freq
+			numSubchan = achan.NumFreq
 
-			for d := range achan.num_freq {
+			for d := range achan.NumFreq {
 				dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 
 				var D = &demodulator.states[d]
 
-				var profile = achan.profiles[0]
+				var profile = achan.Profiles[0]
 
-				var k = d*achan.offset - ((achan.num_freq-1)*achan.offset)/2
-				var mark = achan.mark_freq + k
-				var space = achan.space_freq + k
+				var k = d*achan.Offset - ((achan.NumFreq-1)*achan.Offset)/2
+				var mark = achan.MarkFreq + k
+				var space = achan.SpaceFreq + k
 
-				if achan.num_freq != 1 {
+				if achan.NumFreq != 1 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
 				}
 
-				demod_afsk_init(samplesPerSec/achan.decimate,
-					achan.baud,
+				demod_afsk_init(samplesPerSec/achan.Decimate,
+					achan.Baud,
 					mark, space,
 					rune(profile),
 					D)
@@ -489,28 +489,28 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		// settleModemOptions has normally picked one already.  Without
 		// it, e.g. in a test, take the same default but leave the
 		// configuration alone.
-		var v26 = achan.v26_alternative
+		var v26 = achan.V26Alternative
 		if v26 == V26_UNSPECIFIED {
 			v26 = V26_DEFAULT
 		}
 
 		// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
 
-		if achan.profiles == "" {
+		if achan.Profiles == "" {
 			//#if __arm__
 			//	        strlcpy (achan.profiles, "R", sizeof(achan.profiles));
 			//#else
-			achan.profiles = "PQRS"
+			achan.Profiles = "PQRS"
 			//#endif
 		}
 
-		achan.profiles = capProfiles(channel, achan.profiles)
-		numSubchan = len(achan.profiles)
+		achan.Profiles = capProfiles(channel, achan.Profiles)
+		numSubchan = len(achan.Profiles)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("Channel %d: %d bps, QPSK, %s, %d sample rate",
-			channel, achan.baud,
-			achan.profiles,
+			channel, achan.Baud,
+			achan.Profiles,
 			samplesPerSec)
 
 		dw_printf(", Tx %s", achan.layer2_xmit)
@@ -521,7 +521,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			dw_printf(", compatible with earlier direwolf")
 		}
 
-		if achan.dtmf_decode != DTMF_DECODE_OFF {
+		if achan.DTMFDecode != DTMF_DECODE_OFF {
 			dw_printf(", DTMF decoder enabled")
 		}
 
@@ -530,16 +530,16 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		for d := range numSubchan {
 			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 			var D = &demodulator.states[d]
-			var profile = achan.profiles[d]
+			var profile = achan.Profiles[d]
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("About to call demod_psk_init for Q-PSK case, modem_type=%d, profile='%c'\n",
 			//	achan.modem_type, profile);
 
-			demod_psk_init(achan.modem_type,
+			demod_psk_init(achan.ModemType,
 				v26,
 				samplesPerSec,
-				achan.baud,
+				achan.Baud,
 				rune(profile),
 				D)
 
@@ -555,26 +555,26 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 
 	case MODEM_8PSK: // New for 1.4
 		// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
-		if achan.profiles == "" {
+		if achan.Profiles == "" {
 			//#if __arm__
 			//	        strlcpy (achan.profiles, "V", sizeof(achan.profiles));
 			//#else
-			achan.profiles = "TUVW"
+			achan.Profiles = "TUVW"
 			//#endif
 		}
 
-		achan.profiles = capProfiles(channel, achan.profiles)
-		numSubchan = len(achan.profiles)
+		achan.Profiles = capProfiles(channel, achan.Profiles)
+		numSubchan = len(achan.Profiles)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("Channel %d: %d bps, 8PSK, %s, %d sample rate",
-			channel, achan.baud,
-			achan.profiles,
+			channel, achan.Baud,
+			achan.Profiles,
 			samplesPerSec)
 
 		dw_printf(", Tx %s", achan.layer2_xmit)
 
-		if achan.dtmf_decode != DTMF_DECODE_OFF {
+		if achan.DTMFDecode != DTMF_DECODE_OFF {
 			dw_printf(", DTMF decoder enabled")
 		}
 
@@ -583,16 +583,16 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		for d := range numSubchan {
 			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 			var D = &demodulator.states[d]
-			var profile = achan.profiles[d]
+			var profile = achan.Profiles[d]
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("About to call demod_psk_init for 8-PSK case, modem_type=%d, profile='%c'\n",
 			//	achan.modem_type, profile);
 
-			demod_psk_init(achan.modem_type,
-				achan.v26_alternative,
+			demod_psk_init(achan.ModemType,
+				achan.V26Alternative,
 				samplesPerSec,
-				achan.baud,
+				achan.Baud,
 				rune(profile),
 				D)
 
@@ -607,22 +607,22 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		}
 
 	case MODEM_BPSK:
-		if achan.profiles == "" {
-			achan.profiles = "LMNO"
+		if achan.Profiles == "" {
+			achan.Profiles = "LMNO"
 		}
 
-		achan.profiles = capProfiles(channel, achan.profiles)
-		numSubchan = len(achan.profiles)
+		achan.Profiles = capProfiles(channel, achan.Profiles)
+		numSubchan = len(achan.Profiles)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("Channel %d: %d bps, BPSK, %s, %d sample rate",
-			channel, achan.baud,
-			achan.profiles,
+			channel, achan.Baud,
+			achan.Profiles,
 			samplesPerSec)
 
 		dw_printf(", Tx %s", achan.layer2_xmit)
 
-		if achan.dtmf_decode != DTMF_DECODE_OFF {
+		if achan.DTMFDecode != DTMF_DECODE_OFF {
 			dw_printf(", DTMF decoder enabled")
 		}
 
@@ -631,12 +631,12 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		for d := range numSubchan {
 			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 			var D = &demodulator.states[d]
-			var profile = achan.profiles[d]
+			var profile = achan.Profiles[d]
 
-			demod_psk_init(achan.modem_type,
+			demod_psk_init(achan.ModemType,
 				V26_UNSPECIFIED,
 				samplesPerSec,
-				achan.baud,
+				achan.Baud,
 				rune(profile),
 				D)
 
@@ -653,7 +653,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		   case MODEM_AIS:
 		*/
 		{
-			if achan.profiles == "" {
+			if achan.Profiles == "" {
 				/* Apply default if not set earlier. */
 				/* Not sure if it should be on for ARM too. */
 				/* Need to take a look at CPU usage and performance difference. */
@@ -661,7 +661,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				/* Version 1.5:  Remove special case for ARM. */
 				/* We want higher performance to be the default. */
 				/* "MODEM 9600 -" can be used on very slow CPU if necessary. */
-				achan.profiles = "+"
+				achan.Profiles = "+"
 			}
 
 			/*
@@ -669,35 +669,35 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			 * Easier to check here because demod_9600_init might have an adjusted sample rate.
 			 */
 
-			var ratio = float64(samplesPerSec) / float64(achan.baud)
+			var ratio = float64(samplesPerSec) / float64(achan.Baud)
 
 			/*
 			 * Set reasonable upsample ratio if user did not override.
 			 */
 
-			if achan.upsample == 0 {
+			if achan.Upsample == 0 {
 				if ratio < 4 {
 					// This is extreme.
 					// No one should be using a sample rate this low but
 					// amazingly a recording with 22050 rate can be decoded.
 					// 3 and 4 are the same.  Need more tests.
-					achan.upsample = 4
+					achan.Upsample = 4
 				} else if ratio < 5 {
 					// example: 44100 / 9600 is 4.59
 					// 3 is slightly better than 2 or 4.
-					achan.upsample = 3
+					achan.Upsample = 3
 				} else if ratio < 10 {
 					// example: 48000 / 9600 = 5
 					// 3 is slightly better than 2 or 4.
-					achan.upsample = 3
+					achan.Upsample = 3
 				} else if ratio < 15 {
 					// ... guessing
-					achan.upsample = 2
+					achan.Upsample = 2
 				} else { // >= 15
 					//
 					// An example of this might be .....
 					// Probably no benefit.
-					achan.upsample = 1
+					achan.Upsample = 1
 				}
 			}
 
@@ -710,14 +710,14 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Channel %d: %d baud, %s, %s, %d sample rate x %d",
 				channel,
-				achan.baud,
-				dwutil.IfThenElse(achan.modem_type == MODEM_AIS, "AIS", "K9NG/G3RUH"),
-				achan.profiles,
+				achan.Baud,
+				dwutil.IfThenElse(achan.ModemType == MODEM_AIS, "AIS", "K9NG/G3RUH"),
+				achan.Profiles,
 				samplesPerSec,
-				achan.upsample)
+				achan.Upsample)
 			dw_printf(", Tx %s", achan.layer2_xmit)
 
-			if achan.dtmf_decode != DTMF_DECODE_OFF {
+			if achan.DTMFDecode != DTMF_DECODE_OFF {
 				dw_printf(", DTMF decoder enabled")
 			}
 
@@ -728,7 +728,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			numSubchan = 1
 			numSlicers = 1
 
-			if strings.Contains(achan.profiles, "+") {
+			if strings.Contains(achan.Profiles, "+") {
 				/* I'm not happy about putting this hack here. */
 				/* This belongs in demod_9600_init but it doesn't have access to the audio config. */
 				numSlicers = MAX_SLICERS
@@ -737,7 +737,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("The ratio of audio samples per sec (%d) to data rate in baud (%d) is %.1f\n",
 				samplesPerSec,
-				achan.baud,
+				achan.Baud,
 				ratio)
 
 			if ratio < 3 {
@@ -757,12 +757,12 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				dw_printf("This is a suitable ratio for good performance.\n")
 			}
 
-			demod_9600_init(achan.modem_type,
+			demod_9600_init(achan.ModemType,
 				samplesPerSec,
-				achan.upsample,
-				achan.baud, D)
+				achan.Upsample,
+				achan.Baud, D)
 
-			if strings.Contains(achan.profiles, "+") {
+			if strings.Contains(achan.Profiles, "+") {
 				/* I'm not happy about putting this hack here. */
 				/* should pass in as a parameter rather than adding on later. */
 				numSlicers = MAX_SLICERS
@@ -776,12 +776,12 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		}
 	} /* switch on modulation type. */
 
-	demodulator.modemType = achan.modem_type
-	demodulator.profiles = achan.profiles
+	demodulator.modemType = achan.ModemType
+	demodulator.profiles = achan.Profiles
 	demodulator.numSubchan = numSubchan
 	demodulator.numSlicers = numSlicers
-	demodulator.decimate = achan.decimate
-	demodulator.upsample = achan.upsample
+	demodulator.decimate = achan.Decimate
+	demodulator.upsample = achan.Upsample
 
 	return demodulator
 }
