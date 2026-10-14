@@ -256,7 +256,7 @@ func commandName(command byte) string {
 	case kiss.CmdSetHardware:
 		return "SetHardware"
 	case kiss.CmdXKissData:
-		return "XKISS data"
+		return "ACKMODE data"
 	case kiss.CmdXKissPoll:
 		return "XKISS poll"
 	case kiss.CmdEndKiss:
@@ -307,7 +307,28 @@ func dumpCommand(aprsDecoder *aprs.Decoder, command byte, payload []byte) int {
 
 		return 0
 
-	case kiss.CmdXKissData, kiss.CmdXKissPoll:
+	case kiss.CmdXKissData:
+		// A client sends the frame ID followed by the AX.25 frame; the TNC
+		// sends the ID alone back once that frame has been transmitted.
+		if len(payload) < 2 {
+			fmt.Printf("ERROR: ACKMODE data needs a two byte frame ID, but only %s follows the command byte.\n", plural(len(payload), "byte"))
+
+			return 1
+		}
+
+		fmt.Printf("ACKMODE frame ID 0x%02x%02x", payload[0], payload[1])
+
+		if len(payload) == 2 {
+			fmt.Printf(" - an acknowledgement, from the TNC: the frame with this ID has been transmitted.\n")
+
+			return 0
+		}
+
+		fmt.Printf(" - acknowledge when transmitted.\n")
+
+		return describeAX25Frame(aprsDecoder, payload[2:])
+
+	case kiss.CmdXKissPoll:
 		fmt.Printf("ERROR: Command %d (%s) is an XKISS extension, which is not supported.\n", command, commandName(command))
 
 		return 1

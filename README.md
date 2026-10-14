@@ -45,6 +45,7 @@ As well as that, Samoyed also adds:
 - **IL2P CRC** — support for IL2P's Cyclic Redundancy Check for improved packet reconstruction, per the [IL2P Specification Draft v0.6](https://tarpn.net/t/il2p/il2p-specification_draft_v0-6.pdf)
 - **BPSK** — 300 bps Binary Phase Shift Keying, compatible with NinoTNC at 1500 Hz carrier (`MODEM 300 BPSK`)
 - **UDP audio output** — stream encoded audio to a remote host via UDP (`ADEVICE default udp:host:port`) for testing and experimentation
+- **KISS ACKMODE** — a KISS client can ask for each frame to be acknowledged once it has actually been transmitted, as Winlink Express's `ACKMODE` TNC model does
 - ...and more underway!
 
 ## Installation

@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
@@ -336,8 +337,8 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 	assert.Contains(t, output, "end KISS mode - Ignored")
 }
 
-// A command we don't implement gets the troubleshooting tip, and the two
-// XKISS ones additionally say what the application should be configured as
+// A command we don't implement gets the troubleshooting tip, and XKISS
+// polling additionally says what the application should be configured as
 // instead.
 func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	var h = setupKissProcessMsg(t)
@@ -352,18 +353,160 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	assert.Contains(t, output, `Use "-d kn" option`)
 	assert.NotContains(t, output, "XKISS")
 
-	output = testutils.CaptureOutput(t, func() {
-		h.processMsg([]byte{kiss.CmdXKissData}, from)
-	})
+	var hook = test.NewGlobal()
+	t.Cleanup(hook.Reset)
 
-	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
-	assert.Contains(t, output, "Winlink Express")
-
-	output = testutils.CaptureOutput(t, func() {
+	testutils.CaptureOutput(t, func() {
 		h.processMsg([]byte{kiss.CmdXKissPoll}, from)
 	})
 
-	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
+	require.NotNil(t, hook.LastEntry())
+	assert.Contains(t, hook.LastEntry().Message, `"XKISS" protocol, which is not supported`)
+	assert.Contains(t, hook.LastEntry().Message, "with or without ACKMODE")
+}
+
+// replyingClient is a kissClient that hands each reply over replies, from
+// whichever goroutine sends it.
+type replyingClient struct {
+	replies chan sentToClient
+}
+
+func (c replyingClient) reply(channel int, cmd int, frame []byte) {
+	c.replies <- sentToClient{channel: channel, cmd: cmd, body: frame, prompt: false}
+}
+
+func (c replyingClient) prompt(_ []byte) {}
+
+func (c replyingClient) radioChannel(frameChannel int) int {
+	return frameChannel
+}
+
+// ackmodeFrame is an ACKMODE data frame for channel, with frame ID id, carrying
+// pp.
+func ackmodeFrame(channel int, id []byte, pp *ax25.Packet) []byte {
+	var msg = []byte{byte((channel<<4)&0xf0) | kiss.CmdXKissData}
+	msg = append(msg, id...)
+
+	return append(msg, pp.FrameData()...)
+}
+
+// An ACKMODE data frame is queued like any other, and its ID goes back to the
+// client that sent it - once the frame has been transmitted, not when it is
+// queued.
+func Test_kiss_process_msg_ackmode(t *testing.T) {
+	var h = setupKissProcessMsg(t)
+
+	var from = replyingClient{replies: make(chan sentToClient, 1)}
+
+	var pp = newTestPacket(t)
+
+	h.processMsg(ackmodeFrame(1, []byte{0x12, 0x34}, pp), from)
+
+	assert.Empty(t, from.replies, "nothing has been transmitted yet")
+
+	var tq, ok = h.queue.(*TransmitQueue)
+	require.True(t, ok)
+
+	var queued = tq.Remove(1, TQ_PRIO_1_LO)
+	require.NotNil(t, queued)
+	assert.Equal(t, pp.FrameData(), queued.FrameData(), "the ID should not be part of the frame")
+
+	queued.Transmitted()
+
+	select {
+	case reply := <-from.replies:
+		assert.Equal(t, sentToClient{channel: 1, cmd: kiss.CmdXKissData, body: []byte{0x12, 0x34}, prompt: false}, reply)
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "no acknowledgement")
+	}
+}
+
+// The transmit thread is what says a frame has gone, so a client that has
+// stopped reading mustn't hold it up: nothing else would go out meanwhile.
+func Test_kiss_process_msg_ackmode_does_not_wait_for_the_client(t *testing.T) {
+	var h = setupKissProcessMsg(t)
+
+	var from = replyingClient{replies: make(chan sentToClient)} // Nobody reads it until the end.
+
+	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, newTestPacket(t)), from)
+
+	var tq, ok = h.queue.(*TransmitQueue)
+	require.True(t, ok)
+
+	var queued = tq.Remove(0, TQ_PRIO_1_LO)
+	require.NotNil(t, queued)
+
+	var done = make(chan struct{})
+
+	go func() {
+		queued.Transmitted()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "Transmitted waited for a client that isn't reading")
+	}
+
+	<-from.replies // Let the acknowledgement go.
+}
+
+// An ordinary data frame asks for no acknowledgement, so it gets none.
+func Test_kiss_process_msg_data_frame_not_acknowledged(t *testing.T) {
+	var h = setupKissProcessMsg(t)
+
+	var sent, from = recordingKissClient()
+
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, newTestPacket(t).FrameData()...), from)
+
+	var tq, ok = h.queue.(*TransmitQueue)
+	require.True(t, ok)
+
+	var queued = tq.Remove(0, TQ_PRIO_1_LO)
+	require.NotNil(t, queued)
+
+	queued.Transmitted()
+
+	assert.Empty(t, *sent)
+}
+
+// An ACKMODE frame too short to hold its ID has nothing to send and nothing
+// to acknowledge.
+func Test_kiss_process_msg_ackmode_without_id(t *testing.T) {
+	var h = setupKissProcessMsg(t)
+
+	var sent, from = recordingKissClient()
+
+	var hook = test.NewGlobal()
+	t.Cleanup(hook.Reset)
+
+	h.processMsg([]byte{kiss.CmdXKissData, 0x12}, from)
+
+	require.NotNil(t, hook.LastEntry())
+	assert.Equal(t, "KISS ACKMODE data frame is missing its frame ID.", hook.LastEntry().Message)
+	assert.Equal(t, 0, h.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+	assert.Empty(t, *sent)
+}
+
+// With KISSCOPY, an ACKMODE frame is shown to the other TCP clients as an
+// ordinary data frame: they didn't ask for an acknowledgement, and the ID is
+// not part of the AX.25 frame.
+func Test_kiss_process_msg_ackmode_copies_as_data_frame(t *testing.T) {
+	var h = setupKissProcessMsg(t)
+
+	var peers, clients = newAttachedKissNet(t, -1, true, 1)
+
+	h.peers = peers
+
+	var pp = newTestPacket(t)
+	var _, from = recordingKissClient()
+
+	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, pp), from)
+
+	assert.Equal(t,
+		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
+		readKissNetFrame(t, clients[0]))
 }
 
 // "Set hardware" is the one command with an answer: the human readable
