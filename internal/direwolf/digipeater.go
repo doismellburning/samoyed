@@ -42,6 +42,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dedupe"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/pfilter"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -93,16 +94,23 @@ type digi_config_s struct {
 	// Sort of like digipeating but passed along unchanged.
 }
 
+// DigipeaterPort is what a digipeater needs to know of each channel it might
+// hear on or transmit to: our callsign there, and what kind of medium it is.
+type DigipeaterPort struct {
+	MyCall string
+	Medium phy.Medium
+}
+
 // Digipeater is the APRS digipeater: the configuration it was started with,
 // the duplicate suppression it shares with APRStt object reports, and a count
 // of packets digipeated for each combination of from/to channel.
 type Digipeater struct {
-	audioConfig *RadioConfig
-	config      *digi_config_s
-	filter      *pfilter.PacketFilter
-	dedupe      *dedupe.Service
-	transmit    frameSender // Where digipeated packets go; nil to drop them.
-	count       [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
+	ports    [MAX_TOTAL_CHANS]DigipeaterPort
+	config   *digi_config_s
+	filter   *pfilter.PacketFilter
+	dedupe   *dedupe.Service
+	transmit frameSender // Where digipeated packets go; nil to drop them.
+	count    [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
 }
 
 /*------------------------------------------------------------------------------
@@ -111,7 +119,7 @@ type Digipeater struct {
  *
  * Purpose:	Initialize with stuff from configuration file.
  *
- * Inputs:	p_audio_config	- Configuration for audio channels.
+ * Inputs:	ports		- Our callsign and the medium of each channel.
  *
  *		p_digi_config	- Digipeater configuration details.
  *
@@ -128,9 +136,9 @@ type Digipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(p_audio_config *RadioConfig, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, onRemember func(channel int, pp *ax25.Packet), transmit frameSender) *Digipeater {
+func NewDigipeater(ports [MAX_TOTAL_CHANS]DigipeaterPort, p_digi_config *digi_config_s, filter *pfilter.PacketFilter, onRemember func(channel int, pp *ax25.Packet), transmit frameSender) *Digipeater {
 	var d = new(Digipeater)
-	d.audioConfig = p_audio_config
+	d.ports = ports
 	d.config = p_digi_config
 	d.filter = filter
 	d.transmit = transmit
@@ -173,10 +181,10 @@ func (d *Digipeater) Remember(channel int, pp *ax25.Packet) {
 func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Network or serial TNC is OK for UI frames where we don't care about timing.
 	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
-		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
-			d.audioConfig.chan_medium[from_chan] != MEDIUM_NETTNC &&
-			d.audioConfig.chan_medium[from_chan] != MediumSerialTNC &&
-			d.audioConfig.chan_medium[from_chan] != MEDIUM_AXUDP) {
+		(d.ports[from_chan].Medium != phy.MediumRadio &&
+			d.ports[from_chan].Medium != phy.MediumNetTNC &&
+			d.ports[from_chan].Medium != phy.MediumSerialTNC &&
+			d.ports[from_chan].Medium != phy.MediumAXUDP) {
 		logrus.WithField("channel", from_chan).Error("APRS digipeater: Did not expect to receive on invalid channel")
 
 		// Saying so and then carrying on meant indexing the per-channel
@@ -222,8 +230,8 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	for to_chan := range MAX_TOTAL_CHANS {
 		if d.config.enabled[from_chan][to_chan] {
 			if to_chan == from_chan {
-				var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
-					d.audioConfig.mycall[to_chan],
+				var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
+					d.ports[to_chan].MyCall,
 					d.config.alias[from_chan][to_chan], d.config.wide[from_chan][to_chan],
 					to_chan, d.config.preempt[from_chan][to_chan],
 					d.config.atgp[from_chan][to_chan],
@@ -249,8 +257,8 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	for to_chan := range MAX_TOTAL_CHANS {
 		if d.config.enabled[from_chan][to_chan] {
 			if to_chan != from_chan {
-				var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
-					d.audioConfig.mycall[to_chan],
+				var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
+					d.ports[to_chan].MyCall,
 					d.config.alias[from_chan][to_chan], d.config.wide[from_chan][to_chan],
 					to_chan, d.config.preempt[from_chan][to_chan],
 					d.config.atgp[from_chan][to_chan],

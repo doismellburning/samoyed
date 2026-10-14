@@ -15,6 +15,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/pfilter"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -62,18 +63,16 @@ func (r *frameRecorder) take(channel int, prio int) *ax25.Packet {
 func setupDigipeater(t *testing.T) (*Digipeater, *digi_config_s, *frameRecorder) {
 	t.Helper()
 
-	var audioConfig = new(RadioConfig)
-	audioConfig.chan_medium[digiFromChan] = MEDIUM_RADIO
-	audioConfig.chan_medium[digiToChan] = MEDIUM_RADIO
-	audioConfig.mycall[digiFromChan] = "Q1TEST"
-	audioConfig.mycall[digiToChan] = "Q2TEST"
+	var ports [MAX_TOTAL_CHANS]DigipeaterPort
+	ports[digiFromChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumRadio}
+	ports[digiToChan] = DigipeaterPort{MyCall: "Q2TEST", Medium: phy.MediumRadio}
 
 	var digiConfig = new(digi_config_s)
 	digiConfig.dedupe_time = 30
 
 	var tx = new(frameRecorder)
 
-	return NewDigipeater(audioConfig, digiConfig, new(pfilter.PacketFilter), nil, tx.send), digiConfig, tx
+	return NewDigipeater(ports, digiConfig, new(pfilter.PacketFilter), nil, tx.send), digiConfig, tx
 }
 
 // enableDigipeat turns on digipeating from digiFromChan to the given channel,
@@ -204,11 +203,9 @@ func TestDigipeaterInvalidChannel(t *testing.T) {
 func TestDigipeaterFromSerialTNC(t *testing.T) {
 	const serialChan = MAX_RADIO_CHANS
 
-	var audioConfig = new(RadioConfig)
-	audioConfig.chan_medium[digiToChan] = MEDIUM_RADIO
-	audioConfig.chan_medium[serialChan] = MediumSerialTNC
-	audioConfig.mycall[digiToChan] = "Q2TEST"
-	audioConfig.mycall[serialChan] = "Q1TEST"
+	var ports [MAX_TOTAL_CHANS]DigipeaterPort
+	ports[digiToChan] = DigipeaterPort{MyCall: "Q2TEST", Medium: phy.MediumRadio}
+	ports[serialChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumSerialTNC}
 
 	var digiConfig = new(digi_config_s)
 	digiConfig.dedupe_time = 30
@@ -219,7 +216,7 @@ func TestDigipeaterFromSerialTNC(t *testing.T) {
 
 	var tx = new(frameRecorder)
 
-	var digi = NewDigipeater(audioConfig, digiConfig, new(pfilter.PacketFilter), nil, tx.send)
+	var digi = NewDigipeater(ports, digiConfig, new(pfilter.PacketFilter), nil, tx.send)
 
 	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
@@ -270,15 +267,17 @@ func TestDigiRegenDisabled(t *testing.T) {
 }
 
 func TestNewDigipeater(t *testing.T) {
-	var audioConfig = new(RadioConfig)
+	var ports [MAX_TOTAL_CHANS]DigipeaterPort
+	ports[digiFromChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumRadio}
+
 	var digiConfig = new(digi_config_s)
 	digiConfig.dedupe_time = 30
 
 	var filter = new(pfilter.PacketFilter)
 
-	var digi = NewDigipeater(audioConfig, digiConfig, filter, nil, nil)
+	var digi = NewDigipeater(ports, digiConfig, filter, nil, nil)
 
-	assert.Same(t, audioConfig, digi.audioConfig)
+	assert.Equal(t, ports, digi.ports)
 	assert.Same(t, digiConfig, digi.config)
 	assert.Same(t, filter, digi.filter)
 	require.NotNil(t, digi.dedupe, "the duplicate suppression the digipeater relies on was not set up")

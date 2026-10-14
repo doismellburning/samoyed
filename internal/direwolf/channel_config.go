@@ -361,3 +361,15 @@ const DEFAULT_PERSIST = 63
 const DEFAULT_TXDELAY = 30    // *10mS = 300mS
 const DEFAULT_TXTAIL = 10     // *10mS = 100mS
 const DEFAULT_FULLDUP = false // false = half duplex
+
+// digipeaterPorts is our callsign and the medium of each channel, as the
+// digipeaters need them.
+func (c *RadioConfig) digipeaterPorts() [MAX_TOTAL_CHANS]DigipeaterPort {
+	var ports [MAX_TOTAL_CHANS]DigipeaterPort
+
+	for channel := range MAX_TOTAL_CHANS {
+		ports[channel] = DigipeaterPort{MyCall: c.mycall[channel], Medium: c.chan_medium[channel]}
+	}
+
+	return ports
+}
