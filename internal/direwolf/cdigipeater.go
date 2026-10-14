@@ -24,6 +24,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/pfilter"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -61,11 +62,11 @@ type cdigi_config_s struct {
 // was started with, and a count of packets digipeated for each combination of
 // from/to channel.
 type ConnectedDigipeater struct {
-	audioConfig *RadioConfig
-	config      *cdigi_config_s
-	filter      *pfilter.PacketFilter
-	transmit    frameSender // Where digipeated packets go; nil to drop them.
-	count       [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
+	ports    [MAX_TOTAL_CHANS]DigipeaterPort
+	config   *cdigi_config_s
+	filter   *pfilter.PacketFilter
+	transmit frameSender // Where digipeated packets go; nil to drop them.
+	count    [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
 }
 
 /*------------------------------------------------------------------------------
@@ -74,7 +75,7 @@ type ConnectedDigipeater struct {
  *
  * Purpose:	Initialize with stuff from configuration file.
  *
- * Inputs:	p_audio_config	- Configuration for audio channels.
+ * Inputs:	ports		- Our callsign and the medium of each channel.
  *
  *		p_cdigi_config	- Connected Digipeater configuration details.
  *
@@ -87,9 +88,9 @@ type ConnectedDigipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewConnectedDigipeater(p_audio_config *RadioConfig, p_cdigi_config *cdigi_config_s, filter *pfilter.PacketFilter, transmit frameSender) *ConnectedDigipeater {
+func NewConnectedDigipeater(ports [MAX_TOTAL_CHANS]DigipeaterPort, p_cdigi_config *cdigi_config_s, filter *pfilter.PacketFilter, transmit frameSender) *ConnectedDigipeater {
 	var d = new(ConnectedDigipeater)
-	d.audioConfig = p_audio_config
+	d.ports = ports
 	d.config = p_cdigi_config
 	d.filter = filter
 	d.transmit = transmit
@@ -119,9 +120,9 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Connected mode is allowed only for channels with internal modem.
 	// It probably wouldn't matter for digipeating but let's keep that rule simple and consistent.
 	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS ||
-		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
-			d.audioConfig.chan_medium[from_chan] != MEDIUM_NETTNC &&
-			d.audioConfig.chan_medium[from_chan] != MediumSerialTNC) {
+		(d.ports[from_chan].Medium != phy.MediumRadio &&
+			d.ports[from_chan].Medium != phy.MediumNetTNC &&
+			d.ports[from_chan].Medium != phy.MediumSerialTNC) {
 		logrus.WithField("channel", from_chan).Error("cdigipeater: Did not expect to receive on invalid channel")
 
 		return
@@ -154,8 +155,8 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 // digipeatTo queues pp for transmission on to_chan if the from/to channel
 // pair's rules say it should be repeated.
 func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *ax25.Packet) {
-	var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
-		d.audioConfig.mycall[to_chan],
+	var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
+		d.ports[to_chan].MyCall,
 		d.config.has_alias[from_chan][to_chan],
 		d.config.alias[from_chan][to_chan], to_chan,
 		d.config.cfilter_str[from_chan][to_chan])

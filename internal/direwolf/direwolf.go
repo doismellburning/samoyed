@@ -690,7 +690,10 @@ x = Silence FX.25 information.`)
 	var mheardDB = mheard.New(d_m_opt)
 	var packetFilter = pfilter.New(igate_config.max_digi_hops, aprsDecoder, mheardDB, d_f_opt)
 	var igate = NewIGate(audio_config, &igate_config, &digi_config, packetFilter, mheardDB, dataLinkQueue.RecFrame, transmitQueue.Append, d_i_opt)
-	var aprsDigipeater = NewDigipeater(audio_config.digipeaterPorts(), &digi_config, packetFilter, igate.rememberDigipeated, transmitQueue.Append)
+
+	var digipeaterPorts = audio_config.digipeaterPorts()
+
+	var aprsDigipeater = NewDigipeater(digipeaterPorts, &digi_config, packetFilter, igate.rememberDigipeated, transmitQueue.Append)
 
 	// The IGate and the transmit queue send to each other, so the queue,
 	// made first, is handed the IGate now.  Nothing queues a packet for the
@@ -698,7 +701,7 @@ x = Silence FX.25 information.`)
 	transmitQueue.SetIGate(igate.sendRecPacket)
 	igate.start(ctx)
 	stopIfCancelled(ctx, td)
-	var connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config, packetFilter, transmitQueue.Append)
+	var connectedDigipeater = NewConnectedDigipeater(digipeaterPorts, &cdigi_config, packetFilter, transmitQueue.Append)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
