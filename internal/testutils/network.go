@@ -5,6 +5,7 @@ package testutils
 
 import (
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -30,11 +31,26 @@ func Listen(t *testing.T) (net.Listener, string) {
 // UnusedPort returns, as text, the number of a TCP port on the loopback
 // interface that nothing is listening on, for a test of what happens when
 // there is nothing there.
+//
+// It is one that was taken and given straight back, so something else could
+// yet take it.  That will do for a port nothing should answer on; a test that
+// wants something to serve on a port should have that thing bind
+// "127.0.0.1:0" and say which port it got, rather than be handed this one.
 func UnusedPort(t *testing.T) string {
 	t.Helper()
 
 	var ln, port = Listen(t)
 	require.NoError(t, ln.Close())
+
+	return port
+}
+
+// UnusedPortNumber is UnusedPort, as a number.
+func UnusedPortNumber(t *testing.T) int {
+	t.Helper()
+
+	var port, err = strconv.Atoi(UnusedPort(t))
+	require.NoError(t, err)
 
 	return port
 }

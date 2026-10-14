@@ -107,7 +107,7 @@ func kissFrameFor(pp *ax25.Packet) []byte {
 // leaving a channel that looks connected.
 func TestNetTNCAttachRefused(t *testing.T) {
 	// A port nothing is listening on: one taken and given straight back.
-	var port = freeTCPPort(t)
+	var port = testutils.UnusedPortNumber(t)
 
 	var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, nil)
 
@@ -437,7 +437,7 @@ func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
 	audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
-	audioConfig.nettnc_port[nettncTestChannel] = freeTCPPort(t)
+	audioConfig.nettnc_port[nettncTestChannel] = testutils.UnusedPortNumber(t)
 
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
