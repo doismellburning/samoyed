@@ -2705,7 +2705,7 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 
 	// Work on a copy of the control and commit it at the end, so that settings
 	// rejected part way through leave whatever was configured earlier rather
-	// than a mixture of the two.  NewPTT reads these fields together.
+	// than a mixture of the two.  ptt.New reads these fields together.
 	var octrl = ps.audio.achan[ps.channel].octrl[ot]
 
 	switch strings.ToLower(settings.Method) {

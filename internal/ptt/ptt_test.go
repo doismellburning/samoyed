@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package ptt
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/cm108"
-	"github.com/doismellburning/samoyed/internal/ptt"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -45,7 +45,7 @@ func (m *mockGPIODLine) Close() error {
 // testPTT is a PTT for cfg that has not been set up, so that a test can drive
 // one part of it at a time.  GPIO goes through gpioSysfsDir, which a test
 // points at a temporary directory standing in for /sys/class/gpio.
-func testPTT(cfg *[MAX_RADIO_CHANS]ptt.ChannelConfig, gpioSysfsDir string) *PTT {
+func testPTT(cfg *[phy.MaxRadioChans]ChannelConfig, gpioSysfsDir string) *PTT {
 	var p = new(PTT)
 	p.channels = *cfg
 	p.gpioSysfsDir = gpioSysfsDir
@@ -54,22 +54,22 @@ func testPTT(cfg *[MAX_RADIO_CHANS]ptt.ChannelConfig, gpioSysfsDir string) *PTT 
 	return p
 }
 
-// setupGPIODChannel makes a PTT whose channel 0 OCTYPE_PTT is a GPIOD line,
+// setupGPIODChannel makes a PTT whose channel 0 OutputPTT is a GPIOD line,
 // returning it and the mock standing in for the line so the caller can
 // inspect it.
 func setupGPIODChannel(t *testing.T, invert bool) (*PTT, *mockGPIODLine) {
 	t.Helper()
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_GPIOD
-	cfg[0].Outputs[OCTYPE_PTT].GPIONum = 0
-	cfg[0].Outputs[OCTYPE_PTT].Invert = invert
+	cfg[0].Outputs[OutputPTT].Method = MethodGPIOD
+	cfg[0].Outputs[OutputPTT].GPIONum = 0
+	cfg[0].Outputs[OutputPTT].Invert = invert
 
 	var p = testPTT(cfg, t.TempDir())
 
 	var mock = new(mockGPIODLine)
-	p.gpiodLine[0][OCTYPE_PTT] = mock
+	p.gpiodLine[0][OutputPTT] = mock
 
 	return p, mock
 }
@@ -78,7 +78,7 @@ func setupGPIODChannel(t *testing.T, invert bool) (*PTT, *mockGPIODLine) {
 func TestPttSetRealGPIOD_Activate(t *testing.T) {
 	var p, mock = setupGPIODChannel(t, false)
 
-	p.Set(OCTYPE_PTT, 0, 1)
+	p.Set(OutputPTT, 0, 1)
 
 	assert.Equal(t, 1, mock.value, "line should be high when PTT is active")
 }
@@ -87,7 +87,7 @@ func TestPttSetRealGPIOD_Activate(t *testing.T) {
 func TestPttSetRealGPIOD_Deactivate(t *testing.T) {
 	var p, mock = setupGPIODChannel(t, false)
 
-	p.Set(OCTYPE_PTT, 0, 0)
+	p.Set(OutputPTT, 0, 0)
 
 	assert.Equal(t, 0, mock.value, "line should be low when PTT is inactive")
 }
@@ -97,7 +97,7 @@ func TestPttSetRealGPIOD_Deactivate(t *testing.T) {
 func TestPttSetRealGPIOD_Invert_Activate(t *testing.T) {
 	var p, mock = setupGPIODChannel(t, true)
 
-	p.Set(OCTYPE_PTT, 0, 1)
+	p.Set(OutputPTT, 0, 1)
 
 	assert.Equal(t, 0, mock.value, "inverted line should be low when PTT is active")
 }
@@ -107,7 +107,7 @@ func TestPttSetRealGPIOD_Invert_Activate(t *testing.T) {
 func TestPttSetRealGPIOD_Invert_Deactivate(t *testing.T) {
 	var p, mock = setupGPIODChannel(t, true)
 
-	p.Set(OCTYPE_PTT, 0, 0)
+	p.Set(OutputPTT, 0, 0)
 
 	assert.Equal(t, 1, mock.value, "inverted line should be high when PTT is inactive")
 }
@@ -115,14 +115,14 @@ func TestPttSetRealGPIOD_Invert_Deactivate(t *testing.T) {
 // TestPttSetRealGPIOD_NilLine verifies that Set does not panic when
 // the GPIOD line handle has not been initialised.
 func TestPttSetRealGPIOD_NilLine(t *testing.T) {
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_GPIOD
+	cfg[0].Outputs[OutputPTT].Method = MethodGPIOD
 
 	var p = testPTT(cfg, t.TempDir())
 
 	require.NotPanics(t, func() {
-		p.Set(OCTYPE_PTT, 0, 1)
+		p.Set(OutputPTT, 0, 1)
 	})
 }
 
@@ -134,7 +134,7 @@ func TestPttTermGPIOD(t *testing.T) {
 	p.Term()
 
 	assert.True(t, mock.closed, "Term should close the line handle")
-	assert.Nil(t, p.gpiodLine[0][OCTYPE_PTT], "Term should nil the line handle")
+	assert.Nil(t, p.gpiodLine[0][OutputPTT], "Term should nil the line handle")
 }
 
 // writeFakeGPIOExport creates the "export" file that a kernel with the sysfs
@@ -158,7 +158,7 @@ func writeFakeGPIONode(t *testing.T, dir string, name string) {
 // TestGetAccessToGPIOMissing verifies that an absent GPIO node is reported to
 // the caller rather than ending the process.
 func TestGetAccessToGPIOMissing(t *testing.T) {
-	var err = testPTT(new([MAX_RADIO_CHANS]ptt.ChannelConfig), t.TempDir()).getAccessToGPIO(filepath.Join(t.TempDir(), "export"))
+	var err = testPTT(new([phy.MaxRadioChans]ChannelConfig), t.TempDir()).getAccessToGPIO(filepath.Join(t.TempDir(), "export"))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GPIO user interface")
@@ -169,7 +169,7 @@ func TestGetAccessToGPIOPresent(t *testing.T) {
 	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 
-	require.NoError(t, testPTT(new([MAX_RADIO_CHANS]ptt.ChannelConfig), dir).getAccessToGPIO(filepath.Join(dir, "export")))
+	require.NoError(t, testPTT(new([phy.MaxRadioChans]ChannelConfig), dir).getAccessToGPIO(filepath.Join(dir, "export")))
 }
 
 // TestExportGPIOOutput verifies that exporting an output line writes the line
@@ -179,12 +179,12 @@ func TestExportGPIOOutput(t *testing.T) {
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio25")
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].GPIONum = 25
+	cfg[0].Outputs[OutputPTT].GPIONum = 25
 	var p = testPTT(cfg, dir)
 
-	require.NoError(t, p.exportGPIO(0, int(OCTYPE_PTT), false, 1))
+	require.NoError(t, p.exportGPIO(0, int(OutputPTT), false, 1))
 
 	var exported, readErr = os.ReadFile(filepath.Join(dir, "export")) //nolint:gosec
 	require.NoError(t, readErr)
@@ -202,12 +202,12 @@ func TestExportGPIOOutputInverted(t *testing.T) {
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio25")
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].GPIONum = 25
+	cfg[0].Outputs[OutputPTT].GPIONum = 25
 	var p = testPTT(cfg, dir)
 
-	require.NoError(t, p.exportGPIO(0, int(OCTYPE_PTT), true, 1))
+	require.NoError(t, p.exportGPIO(0, int(OutputPTT), true, 1))
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25", "direction")) //nolint:gosec
 	require.NoError(t, dirErr)
@@ -221,12 +221,12 @@ func TestExportGPIOInput(t *testing.T) {
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio7")
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Inputs[ICTYPE_TXINH].GPIONum = 7
+	cfg[0].Inputs[InputTxInhibit].GPIONum = 7
 	var p = testPTT(cfg, dir)
 
-	require.NoError(t, p.exportGPIO(0, ICTYPE_TXINH, false, 0))
+	require.NoError(t, p.exportGPIO(0, InputTxInhibit, false, 0))
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio7", "direction")) //nolint:gosec
 	require.NoError(t, dirErr)
@@ -240,12 +240,12 @@ func TestExportGPIOSuffixedNode(t *testing.T) {
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio25_ph11")
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].GPIONum = 25
+	cfg[0].Outputs[OutputPTT].GPIONum = 25
 	var p = testPTT(cfg, dir)
 
-	require.NoError(t, p.exportGPIO(0, int(OCTYPE_PTT), false, 1))
+	require.NoError(t, p.exportGPIO(0, int(OutputPTT), false, 1))
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25_ph11", "direction")) //nolint:gosec
 	require.NoError(t, dirErr)
@@ -258,12 +258,12 @@ func TestExportGPIONoSuchNode(t *testing.T) {
 	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].GPIONum = 25
+	cfg[0].Outputs[OutputPTT].GPIONum = 25
 	var p = testPTT(cfg, dir)
 
-	var err = p.exportGPIO(0, int(OCTYPE_PTT), false, 1)
+	var err = p.exportGPIO(0, int(OutputPTT), false, 1)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "gpio number 25")
@@ -274,27 +274,27 @@ func TestExportGPIONoSuchNode(t *testing.T) {
 func TestExportGPIONoSysfs(t *testing.T) {
 	var dir = t.TempDir()
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].GPIONum = 25
+	cfg[0].Outputs[OutputPTT].GPIONum = 25
 	var p = testPTT(cfg, dir)
 
-	var err = p.exportGPIO(0, int(OCTYPE_PTT), false, 1)
+	var err = p.exportGPIO(0, int(OutputPTT), false, 1)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GPIO user interface")
 }
 
-// TestPttInitGPIONoSysfs verifies that NewPTT reports a GPIO channel it
+// TestPttInitGPIONoSysfs verifies that New reports a GPIO channel it
 // cannot set up, rather than ending the process, which is what made the
 // function untestable.
 func TestPttInitGPIONoSysfs(t *testing.T) {
 	var dir = t.TempDir()
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_GPIO
-	cfg[0].Outputs[OCTYPE_PTT].GPIONum = 25
+	cfg[0].Outputs[OutputPTT].Method = MethodGPIO
+	cfg[0].Outputs[OutputPTT].GPIONum = 25
 	var _, err = newPTT(*cfg, nil, nil, 0, dir)
 
 	require.Error(t, err)
@@ -308,10 +308,10 @@ func TestPttInitGPIO(t *testing.T) {
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio25")
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_GPIO
-	cfg[0].Outputs[OCTYPE_PTT].GPIONum = 25
+	cfg[0].Outputs[OutputPTT].Method = MethodGPIO
+	cfg[0].Outputs[OutputPTT].GPIONum = 25
 	var _, err = newPTT(*cfg, nil, nil, 0, dir)
 	require.NoError(t, err)
 
@@ -324,11 +324,11 @@ func TestPttInitGPIO(t *testing.T) {
 // requested - here because the chip does not exist - is reported to the
 // caller.
 func TestPttInitGPIODRequestFailure(t *testing.T) {
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_GPIOD
-	cfg[0].Outputs[OCTYPE_PTT].GPIOName = "/dev/samoyed-no-such-gpiochip"
-	cfg[0].Outputs[OCTYPE_PTT].GPIONum = 17
+	cfg[0].Outputs[OutputPTT].Method = MethodGPIOD
+	cfg[0].Outputs[OutputPTT].GPIOName = "/dev/samoyed-no-such-gpiochip"
+	cfg[0].Outputs[OutputPTT].GPIONum = 17
 
 	var p = testPTT(cfg, t.TempDir())
 
@@ -336,7 +336,7 @@ func TestPttInitGPIODRequestFailure(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "/dev/samoyed-no-such-gpiochip")
-	assert.Nil(t, p.gpiodLine[0][OCTYPE_PTT], "a line that could not be requested should not be recorded")
+	assert.Nil(t, p.gpiodLine[0][OutputPTT], "a line that could not be requested should not be recorded")
 }
 
 // TestPttInitRollsBackOnFailure verifies that a failure part way through
@@ -347,34 +347,34 @@ func TestPttInitRollsBackOnFailure(t *testing.T) {
 	var openable = filepath.Join(t.TempDir(), "tty")
 	require.NoError(t, os.WriteFile(openable, nil, 0o600))
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	// A channel whose PTT device opens...
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_SERIAL
-	cfg[0].Outputs[OCTYPE_PTT].Device = openable
-	cfg[0].Outputs[OCTYPE_PTT].Line = PTT_LINE_RTS
+	cfg[0].Outputs[OutputPTT].Method = MethodSerial
+	cfg[0].Outputs[OutputPTT].Device = openable
+	cfg[0].Outputs[OutputPTT].Line = LineRTS
 	// ...followed by one that fails, after the first has been opened.
 	cfg[1].Radio = true
-	cfg[1].Outputs[OCTYPE_PTT].Method = PTT_METHOD_GPIOD
-	cfg[1].Outputs[OCTYPE_PTT].GPIOName = "/dev/samoyed-no-such-gpiochip"
+	cfg[1].Outputs[OutputPTT].Method = MethodGPIOD
+	cfg[1].Outputs[OutputPTT].GPIOName = "/dev/samoyed-no-such-gpiochip"
 
 	var p = testPTT(cfg, t.TempDir())
 
 	require.Error(t, p.init())
-	assert.Nil(t, p.fd[0][OCTYPE_PTT], "a serial port opened before the failure should be closed again")
+	assert.Nil(t, p.fd[0][OutputPTT], "a serial port opened before the failure should be closed again")
 }
 
 // TestPttInitSerialOpenFailure verifies that a serial port we cannot open is
 // not fatal: the channel falls back to no PTT method, as it always has.
 func TestPttInitSerialOpenFailure(t *testing.T) {
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_SERIAL
-	cfg[0].Outputs[OCTYPE_PTT].Device = filepath.Join(t.TempDir(), "no-such-tty")
-	cfg[0].Outputs[OCTYPE_PTT].Line = PTT_LINE_RTS
+	cfg[0].Outputs[OutputPTT].Method = MethodSerial
+	cfg[0].Outputs[OutputPTT].Device = filepath.Join(t.TempDir(), "no-such-tty")
+	cfg[0].Outputs[OutputPTT].Line = LineRTS
 	var p, err = newPTT(*cfg, nil, nil, 0, t.TempDir())
 	require.NoError(t, err)
-	assert.Equal(t, PTT_METHOD_NONE, p.channels[0].Outputs[OCTYPE_PTT].Method)
+	assert.Equal(t, MethodNone, p.channels[0].Outputs[OutputPTT].Method)
 }
 
 // TestGetInputRealGPIO verifies that an input line's value is read from sysfs,
@@ -385,17 +385,17 @@ func TestGetInputRealGPIO(t *testing.T) {
 	writeFakeGPIONode(t, dir, "gpio7")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "gpio7", "value"), []byte("1"), 0o600))
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Inputs[ICTYPE_TXINH].Method = PTT_METHOD_GPIO
-	cfg[0].Inputs[ICTYPE_TXINH].GPIOName = "gpio7"
+	cfg[0].Inputs[InputTxInhibit].Method = MethodGPIO
+	cfg[0].Inputs[InputTxInhibit].GPIOName = "gpio7"
 	var p = testPTT(cfg, dir)
 
-	assert.Equal(t, 1, p.GetInput(ICTYPE_TXINH, 0))
+	assert.Equal(t, 1, p.GetInput(InputTxInhibit, 0))
 
-	p.channels[0].Inputs[ICTYPE_TXINH].Invert = true
+	p.channels[0].Inputs[InputTxInhibit].Invert = true
 
-	assert.Equal(t, 0, p.GetInput(ICTYPE_TXINH, 0), "invert should flip the value read")
+	assert.Equal(t, 0, p.GetInput(InputTxInhibit, 0), "invert should flip the value read")
 }
 
 // TestGetInputRealGPIONoNode verifies that an input line whose sysfs node is
@@ -403,13 +403,13 @@ func TestGetInputRealGPIO(t *testing.T) {
 func TestGetInputRealGPIONoNode(t *testing.T) {
 	var dir = t.TempDir()
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Inputs[ICTYPE_TXINH].Method = PTT_METHOD_GPIO
-	cfg[0].Inputs[ICTYPE_TXINH].GPIOName = "gpio7"
+	cfg[0].Inputs[InputTxInhibit].Method = MethodGPIO
+	cfg[0].Inputs[InputTxInhibit].GPIOName = "gpio7"
 	var p = testPTT(cfg, dir)
 
-	assert.Equal(t, -1, p.GetInput(ICTYPE_TXINH, 0))
+	assert.Equal(t, -1, p.GetInput(InputTxInhibit, 0))
 }
 
 // TestPttInitGPIOThenSet is a regression test for a GPIO line that never
@@ -421,22 +421,22 @@ func TestPttInitGPIOThenSet(t *testing.T) {
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio25_ph11")
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_GPIO
-	cfg[0].Outputs[OCTYPE_PTT].GPIONum = 25
+	cfg[0].Outputs[OutputPTT].Method = MethodGPIO
+	cfg[0].Outputs[OutputPTT].GPIONum = 25
 	var p, err = newPTT(*cfg, nil, nil, 0, dir)
 	require.NoError(t, err)
-	assert.Equal(t, "gpio25_ph11", p.channels[0].Outputs[OCTYPE_PTT].GPIOName,
+	assert.Equal(t, "gpio25_ph11", p.channels[0].Outputs[OutputPTT].GPIOName,
 		"the node name found while exporting should be remembered")
 
-	p.Set(OCTYPE_PTT, 0, 1)
+	p.Set(OutputPTT, 0, 1)
 
 	var on, onErr = os.ReadFile(filepath.Join(dir, "gpio25_ph11", "value")) //nolint:gosec
 	require.NoError(t, onErr)
 	assert.Equal(t, "1", string(on), "PTT on should drive the line")
 
-	p.Set(OCTYPE_PTT, 0, 0)
+	p.Set(OutputPTT, 0, 0)
 
 	var off, offErr = os.ReadFile(filepath.Join(dir, "gpio25_ph11", "value")) //nolint:gosec
 	require.NoError(t, offErr)
@@ -451,15 +451,15 @@ func TestPttInitGPIOInputThenGet(t *testing.T) {
 	writeFakeGPIONode(t, dir, "gpio7_pi13")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "gpio7_pi13", "value"), []byte("1"), 0o600))
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Inputs[ICTYPE_TXINH].Method = PTT_METHOD_GPIO
-	cfg[0].Inputs[ICTYPE_TXINH].GPIONum = 7
+	cfg[0].Inputs[InputTxInhibit].Method = MethodGPIO
+	cfg[0].Inputs[InputTxInhibit].GPIONum = 7
 	var p, err = newPTT(*cfg, nil, nil, 0, dir)
 	require.NoError(t, err)
-	assert.Equal(t, "gpio7_pi13", p.channels[0].Inputs[ICTYPE_TXINH].GPIOName,
+	assert.Equal(t, "gpio7_pi13", p.channels[0].Inputs[InputTxInhibit].GPIOName,
 		"the node name found while exporting should be remembered")
-	assert.Equal(t, 1, p.GetInput(ICTYPE_TXINH, 0))
+	assert.Equal(t, 1, p.GetInput(InputTxInhibit, 0))
 }
 
 // TestPttNilBeforeStartup covers a stop signal that arrives while we are still
@@ -471,14 +471,14 @@ func TestPttNilBeforeStartup(t *testing.T) {
 	var p *PTT
 
 	require.NotPanics(t, p.Term)
-	require.NotPanics(t, func() { p.Set(OCTYPE_DCD, 0, 1) })
-	assert.Equal(t, -1, p.GetInput(ICTYPE_TXINH, 0))
+	require.NotPanics(t, func() { p.Set(OutputDCD, 0, 1) })
+	assert.Equal(t, -1, p.GetInput(InputTxInhibit, 0))
 }
 
 // The debug level decides how much the PTT code says about what it is doing,
 // which is the only way to tell a miswired interface from a misconfigured one.
 func TestNewPTTDebug(t *testing.T) {
-	var p, err = newPTT([MAX_RADIO_CHANS]ptt.ChannelConfig{}, nil, nil, 2, t.TempDir())
+	var p, err = newPTT([phy.MaxRadioChans]ChannelConfig{}, nil, nil, 2, t.TempDir())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, p.debugLevel)
@@ -487,7 +487,7 @@ func TestNewPTTDebug(t *testing.T) {
 // "-doo" prints every channel's PTT configuration at start up, and then each
 // change to it.
 func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
 
 	var hook = capturePTTLog(t)
@@ -495,7 +495,7 @@ func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
 	var p, err = newPTT(*cfg, nil, nil, 2, t.TempDir())
 	require.NoError(t, err)
 
-	p.Set(OCTYPE_PTT, 0, 1)
+	p.Set(OutputPTT, 0, 1)
 
 	var configuration = pttLogEntry(t, hook, "Output control configuration")
 	assert.Equal(t, 0, configuration.Data["channel"])
@@ -509,21 +509,21 @@ func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
 // An NCHANNEL is somebody else's TNC on the far end of a socket: there is no
 // PTT hardware here to key, and no configuration for it to look at either.
 func TestPttSetRealNetworkChannel(t *testing.T) {
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	var p = testPTT(cfg, t.TempDir())
 
-	assert.NotPanics(t, func() { p.Set(OCTYPE_PTT, MAX_RADIO_CHANS, 1) })
+	assert.NotPanics(t, func() { p.Set(OutputPTT, phy.MaxRadioChans, 1) })
 }
 
 // Keying a channel that is not a radio is a mistake worth saying out loud.
 func TestPttSetRealInvalidChannel(t *testing.T) {
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = false
 	var p = testPTT(cfg, t.TempDir())
 
 	var hook = capturePTTLog(t)
 
-	p.Set(OCTYPE_PTT, 0, 1)
+	p.Set(OutputPTT, 0, 1)
 
 	assert.Equal(t, logrus.ErrorLevel, pttLogEntry(t, hook, "Internal error, PTT.Set did not expect a channel that isn't a radio").Level)
 }
@@ -596,24 +596,24 @@ func captureSerialControlLines(t *testing.T, p *PTT) *[]serialLineChange {
 // openTestPTTSerialPort sets up a channel whose PTT is driven by a serial
 // control line, using a file that can be opened in place of a real port, and
 // collects the line changes that would have gone to it.
-func openTestPTTSerialPort(t *testing.T, line ptt_line_t, line2 ptt_line_t) (*PTT, *[]serialLineChange) {
+func openTestPTTSerialPort(t *testing.T, line Line, line2 Line) (*PTT, *[]serialLineChange) {
 	t.Helper()
 
 	var device = filepath.Join(t.TempDir(), "tty")
 	require.NoError(t, os.WriteFile(device, nil, 0o600))
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_SERIAL
-	cfg[0].Outputs[OCTYPE_PTT].Device = device
-	cfg[0].Outputs[OCTYPE_PTT].Line = line
-	cfg[0].Outputs[OCTYPE_PTT].Line2 = line2
+	cfg[0].Outputs[OutputPTT].Method = MethodSerial
+	cfg[0].Outputs[OutputPTT].Device = device
+	cfg[0].Outputs[OutputPTT].Line = line
+	cfg[0].Outputs[OutputPTT].Line2 = line2
 	var p, err = newPTT(*cfg, nil, nil, 0, t.TempDir())
 	require.NoError(t, err)
 
 	t.Cleanup(p.Term)
 
-	require.NotNil(t, p.fd[0][OCTYPE_PTT], "the serial port was not opened")
+	require.NotNil(t, p.fd[0][OutputPTT], "the serial port was not opened")
 
 	// After newPTT, which sets the initial state off and would otherwise
 	// show up as a change the test did not ask for.
@@ -625,33 +625,33 @@ func openTestPTTSerialPort(t *testing.T, line ptt_line_t, line2 ptt_line_t) (*PT
 func TestPttSetRealSerialLines(t *testing.T) {
 	for _, c := range []struct {
 		name  string
-		line  ptt_line_t
-		line2 ptt_line_t
+		line  Line
+		line2 Line
 		keyed []serialLineChange
 		unkey []serialLineChange
 	}{
 		{
-			name: "RTS", line: PTT_LINE_RTS, line2: PTT_LINE_NONE,
+			name: "RTS", line: LineRTS, line2: LineNone,
 			keyed: []serialLineChange{{unix.TIOCM_RTS, true}},
 			unkey: []serialLineChange{{unix.TIOCM_RTS, false}},
 		},
 		{
-			name: "DTR", line: PTT_LINE_DTR, line2: PTT_LINE_NONE,
+			name: "DTR", line: LineDTR, line2: LineNone,
 			keyed: []serialLineChange{{unix.TIOCM_DTR, true}},
 			unkey: []serialLineChange{{unix.TIOCM_DTR, false}},
 		},
 		{
-			name: "RTS and DTR", line: PTT_LINE_RTS, line2: PTT_LINE_DTR,
+			name: "RTS and DTR", line: LineRTS, line2: LineDTR,
 			keyed: []serialLineChange{{unix.TIOCM_RTS, true}, {unix.TIOCM_DTR, true}},
 			unkey: []serialLineChange{{unix.TIOCM_RTS, false}, {unix.TIOCM_DTR, false}},
 		},
 		{
-			name: "DTR and RTS", line: PTT_LINE_DTR, line2: PTT_LINE_RTS,
+			name: "DTR and RTS", line: LineDTR, line2: LineRTS,
 			keyed: []serialLineChange{{unix.TIOCM_DTR, true}, {unix.TIOCM_RTS, true}},
 			unkey: []serialLineChange{{unix.TIOCM_DTR, false}, {unix.TIOCM_RTS, false}},
 		},
 		{
-			name: "neither", line: PTT_LINE_NONE, line2: PTT_LINE_NONE,
+			name: "neither", line: LineNone, line2: LineNone,
 			keyed: nil,
 			unkey: nil,
 		},
@@ -659,13 +659,13 @@ func TestPttSetRealSerialLines(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			var p, changes = openTestPTTSerialPort(t, c.line, c.line2)
 
-			p.Set(OCTYPE_PTT, 0, 1)
+			p.Set(OutputPTT, 0, 1)
 
 			assert.Equal(t, c.keyed, *changes, "keying drove the wrong lines")
 
 			*changes = nil
 
-			p.Set(OCTYPE_PTT, 0, 0)
+			p.Set(OutputPTT, 0, 0)
 
 			assert.Equal(t, c.unkey, *changes, "unkeying drove the wrong lines")
 		})
@@ -698,12 +698,12 @@ func TestPttSetRealSerialInverted(t *testing.T) {
 		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var p, changes = openTestPTTSerialPort(t, PTT_LINE_RTS, PTT_LINE_DTR)
+			var p, changes = openTestPTTSerialPort(t, LineRTS, LineDTR)
 
-			p.channels[0].Outputs[OCTYPE_PTT].Invert = c.invert
-			p.channels[0].Outputs[OCTYPE_PTT].Invert2 = c.invert2
+			p.channels[0].Outputs[OutputPTT].Invert = c.invert
+			p.channels[0].Outputs[OutputPTT].Invert2 = c.invert2
 
-			p.Set(OCTYPE_PTT, 0, 1)
+			p.Set(OutputPTT, 0, 1)
 
 			assert.Equal(t, c.keyed, *changes, "keying drove the wrong levels")
 		})
@@ -719,11 +719,11 @@ func TestSerialLineChangeName(t *testing.T) {
 
 // The port is closed on the way out, so that a restart can open it again.
 func TestPttTermClosesTheSerialPort(t *testing.T) {
-	var p, _ = openTestPTTSerialPort(t, PTT_LINE_RTS, PTT_LINE_NONE)
+	var p, _ = openTestPTTSerialPort(t, LineRTS, LineNone)
 
 	p.Term()
 
-	assert.Nil(t, p.fd[0][OCTYPE_PTT], "the serial port was not closed")
+	assert.Nil(t, p.fd[0][OutputPTT], "the serial port was not closed")
 }
 
 // Term can run while another goroutine is still keying: the cleanup after a
@@ -737,15 +737,15 @@ func TestPttTermWaitsForSet(t *testing.T) {
 
 	// The connected indicator, rather than PTT or DCD, because keying it
 	// neither mutes the demodulator nor tells the data link state machine.
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_CON].Method = PTT_METHOD_SERIAL
-	cfg[0].Outputs[OCTYPE_CON].Device = device
-	cfg[0].Outputs[OCTYPE_CON].Line = PTT_LINE_RTS
+	cfg[0].Outputs[OutputCon].Method = MethodSerial
+	cfg[0].Outputs[OutputCon].Device = device
+	cfg[0].Outputs[OutputCon].Line = LineRTS
 
 	var p, err = newPTT(*cfg, nil, nil, 0, t.TempDir())
 	require.NoError(t, err)
-	require.NotNil(t, p.fd[0][OCTYPE_CON], "the serial port was not opened")
+	require.NotNil(t, p.fd[0][OutputCon], "the serial port was not opened")
 
 	// The first change to the control lines is held until the test lets it
 	// go.  Any after it, such as Term's own unkeying, pass straight through.
@@ -765,7 +765,7 @@ func TestPttTermWaitsForSet(t *testing.T) {
 	go func() {
 		defer close(setDone)
 
-		p.Set(OCTYPE_CON, 0, 1)
+		p.Set(OutputCon, 0, 1)
 	}()
 
 	<-inSet
@@ -789,7 +789,7 @@ func TestPttTermWaitsForSet(t *testing.T) {
 	<-setDone
 	<-termDone
 
-	assert.Nil(t, p.fd[0][OCTYPE_CON], "the serial port was not closed")
+	assert.Nil(t, p.fd[0][OutputCon], "the serial port was not closed")
 }
 
 // A parallel port PTT keys its bit of the port's data register, leaving the
@@ -803,10 +803,10 @@ func TestPttLPTKeysItsBit(t *testing.T) {
 	contents[LPT_IO_ADDR] = 0x01 // another channel's bit, already on
 	require.NoError(t, os.WriteFile(port, contents, 0o600))
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_LPT
-	cfg[0].Outputs[OCTYPE_PTT].LPTBit = 3
+	cfg[0].Outputs[OutputPTT].Method = MethodLPT
+	cfg[0].Outputs[OutputPTT].LPTBit = 3
 
 	var p = testPTT(cfg, t.TempDir())
 	p.lptPortPath = port
@@ -815,8 +815,8 @@ func TestPttLPTKeysItsBit(t *testing.T) {
 
 	t.Cleanup(p.Term)
 
-	require.NotNil(t, p.fd[0][OCTYPE_PTT], "the port was not kept")
-	assert.Equal(t, PTT_METHOD_LPT, p.channels[0].Outputs[OCTYPE_PTT].Method)
+	require.NotNil(t, p.fd[0][OutputPTT], "the port was not kept")
+	assert.Equal(t, MethodLPT, p.channels[0].Outputs[OutputPTT].Method)
 
 	var dataRegister = func() byte {
 		var b, err = os.ReadFile(port) //nolint:gosec
@@ -825,19 +825,19 @@ func TestPttLPTKeysItsBit(t *testing.T) {
 		return b[LPT_IO_ADDR]
 	}
 
-	p.Set(OCTYPE_PTT, 0, 1)
+	p.Set(OutputPTT, 0, 1)
 	assert.Equal(t, byte(0x09), dataRegister(), "keying should set bit 3 and leave bit 0")
 
-	p.Set(OCTYPE_PTT, 0, 0)
+	p.Set(OutputPTT, 0, 0)
 	assert.Equal(t, byte(0x01), dataRegister(), "unkeying should clear bit 3 and leave bit 0")
 }
 
 // A parallel port that cannot be opened is not fatal: the channel falls back
 // to no PTT method, as a serial port does, rather than keeping a nil handle.
 func TestPttLPTOpenFailure(t *testing.T) {
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_LPT
+	cfg[0].Outputs[OutputPTT].Method = MethodLPT
 
 	var p = testPTT(cfg, t.TempDir())
 	p.lptPortPath = filepath.Join(t.TempDir(), "no-such-port")
@@ -847,8 +847,8 @@ func TestPttLPTOpenFailure(t *testing.T) {
 	require.NoError(t, p.init())
 
 	assert.Equal(t, p.lptPortPath, pttLogEntry(t, hook, "Can't open parallel printer port for PTT control").Data["device"])
-	assert.Equal(t, PTT_METHOD_NONE, p.channels[0].Outputs[OCTYPE_PTT].Method)
-	assert.Nil(t, p.fd[0][OCTYPE_PTT])
+	assert.Equal(t, MethodNone, p.channels[0].Outputs[OutputPTT].Method)
+	assert.Nil(t, p.fd[0][OutputPTT])
 }
 
 // Two channels keying different lines of the same serial port share the one
@@ -857,34 +857,34 @@ func TestPttSetupSharesOneSerialPortBetweenChannels(t *testing.T) {
 	var device = filepath.Join(t.TempDir(), "tty")
 	require.NoError(t, os.WriteFile(device, nil, 0o600))
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 
 	for _, ch := range []int{0, 1} {
 		cfg[ch].Radio = true
-		cfg[ch].Outputs[OCTYPE_PTT].Method = PTT_METHOD_SERIAL
-		cfg[ch].Outputs[OCTYPE_PTT].Device = device
+		cfg[ch].Outputs[OutputPTT].Method = MethodSerial
+		cfg[ch].Outputs[OutputPTT].Device = device
 	}
 
-	cfg[0].Outputs[OCTYPE_PTT].Line = PTT_LINE_RTS
-	cfg[1].Outputs[OCTYPE_PTT].Line = PTT_LINE_DTR
+	cfg[0].Outputs[OutputPTT].Line = LineRTS
+	cfg[1].Outputs[OutputPTT].Line = LineDTR
 
 	var p, err = newPTT(*cfg, nil, nil, 0, t.TempDir())
 	require.NoError(t, err)
 
 	t.Cleanup(p.Term)
 
-	assert.Same(t, p.fd[0][OCTYPE_PTT], p.fd[1][OCTYPE_PTT],
+	assert.Same(t, p.fd[0][OutputPTT], p.fd[1][OutputPTT],
 		"the same device should have been opened once and shared")
 }
 
 // A Windows-style port name is translated, because the configuration file is
 // the same on both and people copy each other's.
 func TestPttSetupTranslatesCOMPortNames(t *testing.T) {
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_SERIAL
-	cfg[0].Outputs[OCTYPE_PTT].Device = "COM3"
-	cfg[0].Outputs[OCTYPE_PTT].Line = PTT_LINE_RTS
+	cfg[0].Outputs[OutputPTT].Method = MethodSerial
+	cfg[0].Outputs[OutputPTT].Device = "COM3"
+	cfg[0].Outputs[OutputPTT].Line = LineRTS
 
 	var hook = capturePTTLog(t)
 
@@ -896,16 +896,16 @@ func TestPttSetupTranslatesCOMPortNames(t *testing.T) {
 	var converted = pttLogEntry(t, hook, "Converted device to Linux equivalent")
 	assert.Equal(t, "COM3", converted.Data["from"])
 	assert.Equal(t, "/dev/ttyS2", converted.Data["to"])
-	assert.Equal(t, "/dev/ttyS2", p.channels[0].Outputs[OCTYPE_PTT].Device)
+	assert.Equal(t, "/dev/ttyS2", p.channels[0].Outputs[OutputPTT].Device)
 }
 
 // COM0 is not a thing; it is treated as COM1 rather than as /dev/ttyS-1.
 func TestPttSetupTranslatesCOM0(t *testing.T) {
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
-	cfg[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_SERIAL
-	cfg[0].Outputs[OCTYPE_PTT].Device = "com0"
-	cfg[0].Outputs[OCTYPE_PTT].Line = PTT_LINE_RTS
+	cfg[0].Outputs[OutputPTT].Method = MethodSerial
+	cfg[0].Outputs[OutputPTT].Device = "com0"
+	cfg[0].Outputs[OutputPTT].Line = LineRTS
 
 	testutils.DiscardLogrus(t)
 
@@ -914,19 +914,19 @@ func TestPttSetupTranslatesCOM0(t *testing.T) {
 
 	t.Cleanup(p.Term)
 
-	assert.Equal(t, "/dev/ttyS0", p.channels[0].Outputs[OCTYPE_PTT].Device)
+	assert.Equal(t, "/dev/ttyS0", p.channels[0].Outputs[OutputPTT].Device)
 }
 
 // Reading an input line from a channel that is not a radio is the same kind
 // of mistake as keying one.
 func TestGetInputRealInvalidChannel(t *testing.T) {
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = false
 	var p = testPTT(cfg, t.TempDir())
 
 	var hook = capturePTTLog(t)
 
-	assert.Equal(t, -1, p.GetInput(ICTYPE_TXINH, 0))
+	assert.Equal(t, -1, p.GetInput(InputTxInhibit, 0))
 	pttLogEntry(t, hook, "Internal error, PTT.GetInput did not expect a channel that isn't a radio")
 }
 
@@ -956,22 +956,22 @@ func TestCM108PermissionAdvice(t *testing.T) {
 // hear itself, and starts again when it stops; a full duplex one goes on
 // listening.  The PTT tells whatever it was handed to mute the input.
 func TestPTTMutesHalfDuplexInputWhileTransmitting(t *testing.T) {
-	var audioConfig = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var audioConfig = new([phy.MaxRadioChans]ChannelConfig)
 	audioConfig[0].Radio = true
 	audioConfig[1].Radio = true
 	audioConfig[1].FullDuplex = true
 
 	var muted []string
 
-	var p, err = NewPTT(*audioConfig, func(channel int, mute bool) {
+	var p, err = New(*audioConfig, func(channel int, mute bool) {
 		muted = append(muted, fmt.Sprintf("%d=%t", channel, mute))
 	}, nil, 0)
 	require.NoError(t, err)
 
-	p.Set(OCTYPE_PTT, 0, 1)
-	p.Set(OCTYPE_PTT, 0, 0)
-	p.Set(OCTYPE_PTT, 1, 1)
-	p.Set(OCTYPE_DCD, 0, 1)
+	p.Set(OutputPTT, 0, 1)
+	p.Set(OutputPTT, 0, 0)
+	p.Set(OutputPTT, 1, 1)
+	p.Set(OutputDCD, 0, 1)
 
 	assert.Equal(t, []string{"0=true", "0=false"}, muted)
 }
@@ -980,20 +980,20 @@ func TestPTTMutesHalfDuplexInputWhileTransmitting(t *testing.T) {
 // the PTT for it - the data link state machine, which waits for the channel
 // to be clear.
 func TestPTTTellsWhoWasHandedOfChannelActivity(t *testing.T) {
-	var audioConfig = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var audioConfig = new([phy.MaxRadioChans]ChannelConfig)
 	audioConfig[0].Radio = true
 	audioConfig[0].FullDuplex = true
 
 	var busy []string
 
-	var p, err = NewPTT(*audioConfig, nil, func(channel int, activity outputType, isBusy bool) {
+	var p, err = New(*audioConfig, nil, func(channel int, activity OutputType, isBusy bool) {
 		busy = append(busy, fmt.Sprintf("%d %s=%t", channel, octypeName(activity), isBusy))
 	}, 0)
 	require.NoError(t, err)
 
-	p.Set(OCTYPE_PTT, 0, 1)
-	p.Set(OCTYPE_DCD, 0, 1)
-	p.Set(OCTYPE_PTT, 0, 0)
+	p.Set(OutputPTT, 0, 1)
+	p.Set(OutputDCD, 0, 1)
+	p.Set(OutputPTT, 0, 0)
 
 	assert.Equal(t, []string{"0 PTT=true", "0 DCD=true", "0 PTT=false"}, busy)
 }
@@ -1004,13 +1004,13 @@ func TestPTTTellsWhoWasHandedOfChannelActivity(t *testing.T) {
 func newRecordingPTT(t *testing.T) (*PTT, *[]string) {
 	t.Helper()
 
-	var cfg = new([MAX_RADIO_CHANS]ptt.ChannelConfig)
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
 	cfg[0].Radio = true
 	cfg[0].FullDuplex = true
 
 	var set []string
 
-	var p, err = newPTT(*cfg, nil, func(channel int, ot outputType, busy bool) {
+	var p, err = newPTT(*cfg, nil, func(channel int, ot OutputType, busy bool) {
 		set = append(set, fmt.Sprintf("%s %d=%t", octypeName(ot), channel, busy))
 	}, 0, t.TempDir())
 	require.NoError(t, err)
@@ -1057,10 +1057,10 @@ func TestPTTTransmitInhibitedWithoutAnInput(t *testing.T) {
 }
 
 func TestOutputTypesYieldsEachOutputInOrder(t *testing.T) {
-	assert.Equal(t, []outputType{OCTYPE_PTT, OCTYPE_DCD, OCTYPE_CON}, slices.Collect(outputTypes()))
+	assert.Equal(t, []OutputType{OutputPTT, OutputDCD, OutputCon}, slices.Collect(OutputTypes()))
 
-	for ot := range outputTypes() {
-		assert.Equal(t, OCTYPE_PTT, ot, "stopping early should stop at the first")
+	for ot := range OutputTypes() {
+		assert.Equal(t, OutputPTT, ot, "stopping early should stop at the first")
 
 		break
 	}

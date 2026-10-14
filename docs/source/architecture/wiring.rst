@@ -232,7 +232,6 @@ References
   ``dlq.go`` (``frameReceiver``, ``seizeConfirmer``),
   ``tq.go`` (``NewTransmitQueue``, ``frameSender``, ``clientTransmitQueue``, ``SetIGate``),
   ``xmit.go`` (``NewXmitService``, ``xmitQueue``),
-  ``ptt.go`` (``NewPTT``),
   ``ax25_link.go`` (``NewAX25Link``, ``linkClients``, ``linkTransmitter``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
@@ -242,4 +241,6 @@ References
   ``beacon.go`` (``NewBeaconService``, ``beaconIGate``),
   ``audio.go`` (``AudioDevices.setAudioLevel``)
   and ``recv.go`` (``recv_init``, ``recv_process``).
+- ``internal/ptt/ptt.go``: ``New``,
+  handed each channel's configuration by ``RadioConfig.pttChannels`` (``internal/direwolf/channel_config.go``).
 - ``AGENTS.md``, the "Dependencies" section.

@@ -3634,8 +3634,8 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 			// Regression test: the chip name was stored before the line number had
 			// been read, so a line rejected after that point left this line's chip
 			// beside an earlier line's number and method - a pair that never
-			// appeared in the config file, and which NewPTT hands to
-			// RequestGPIODLine as though it had.
+			// appeared in the config file, and which ptt.New requests a GPIOD
+			// line for as though it had.
 			{
 				name:   "an unreadable GPIOD line number leaves the earlier chip alone",
 				config: "PTT GPIOD gpiochip3 12\nPTT GPIOD gpiochip9 twelve\n",
@@ -3667,7 +3667,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 			// Regression test: each branch of the handler stored fields as it read
 			// them, so a line rejected part way through left some of its own values
 			// beside the rest of an earlier line's - a control configuration that
-			// never appeared in the config file, and which NewPTT reads as one.
+			// never appeared in the config file, and which ptt.New reads as one.
 			{
 				name:   "a rejected serial line leaves the earlier device and line alone",
 				config: "PTT /dev/ttyS0 RTS\nPTT /dev/ttyS1 XYZ\n",

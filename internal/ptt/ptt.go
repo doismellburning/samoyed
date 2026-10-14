@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package ptt
 
 /*------------------------------------------------------------------
  *
@@ -130,7 +133,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/dwutil"
-	"github.com/doismellburning/samoyed/internal/ptt"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 	goHamlib "github.com/xylo04/goHamlib"
 	"golang.org/x/sys/unix"
@@ -151,13 +154,13 @@ func setSerialControlLine(fd int, bit int, on bool) {
 const LPT_IO_ADDR = 0x378
 
 // octypeName is the name of an output control type, for messages.
-func octypeName(ot outputType) string {
+func octypeName(ot OutputType) string {
 	switch ot {
-	case OCTYPE_PTT:
+	case OutputPTT:
 		return "PTT"
-	case OCTYPE_DCD:
+	case OutputDCD:
 		return "DCD"
-	case OCTYPE_CON:
+	case OutputCon:
 		return "CON"
 	default:
 		return fmt.Sprintf("octype %d", ot)
@@ -187,7 +190,7 @@ type PTT struct {
 	// channels is each radio channel's configuration: PTT's own copy, as it
 	// fills in a GPIO line's node name and turns off an output it could not
 	// open.
-	channels [MAX_RADIO_CHANS]ptt.ChannelConfig
+	channels [phy.MaxRadioChans]ChannelConfig
 
 	debugLevel int
 
@@ -199,7 +202,7 @@ type PTT struct {
 	// channelBusy tells the data link state machine of each change to a
 	// channel's outputs - PTT, DCD or connected indicator - and is left to
 	// pick out the ones it cares about; nil for nobody to tell.
-	channelBusy func(channel int, activity outputType, busy bool)
+	channelBusy func(channel int, activity OutputType, busy bool)
 
 	// gpioSysfsDir is a field rather than always defaultGPIOSysfsDir so that
 	// a test can point it at a fake tree and exercise the GPIO paths without
@@ -226,17 +229,17 @@ type PTT struct {
 	/* Serial port handle or fd.  */
 	/* Could be the same for two channels */
 	/* if using both RTS and DTR. */
-	fd [MAX_RADIO_CHANS][NUM_OCTYPES]*os.File
+	fd [phy.MaxRadioChans][NumOutputTypes]*os.File
 
-	rig [MAX_RADIO_CHANS][NUM_OCTYPES]*goHamlib.Rig
+	rig [phy.MaxRadioChans][NumOutputTypes]*goHamlib.Rig
 
 	/* GPIOD line handles, one per channel/output-type combination. */
-	gpiodLine [MAX_RADIO_CHANS][NUM_OCTYPES]gpiodOutputLine
+	gpiodLine [phy.MaxRadioChans][NumOutputTypes]gpiodOutputLine
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        NewPTT
+ * Name:        New
  *
  * Purpose:    	Open serial port(s) used for PTT signals and set to proper state.
  *
@@ -245,13 +248,13 @@ type PTT struct {
  *		    for each channel we have:
  *
  *			Method		Method for PTT signal.
- *					PTT_METHOD_NONE - not configured.  Could be using VOX.
- *					PTT_METHOD_SERIAL - serial (com) port.
- *					PTT_METHOD_GPIO - general purpose I/O (sysfs).
- *					PTT_METHOD_GPIOD - general purpose I/O (libgpiod).
- *					PTT_METHOD_LPT - Parallel printer port.
- *                  			PTT_METHOD_HAMLIB - HAMLib rig control.
- *					PTT_METHOD_CM108 - GPIO pins of CM108 etc. USB Audio.
+ *					MethodNone - not configured.  Could be using VOX.
+ *					MethodSerial - serial (com) port.
+ *					MethodGPIO - general purpose I/O (sysfs).
+ *					MethodGPIOD - general purpose I/O (libgpiod).
+ *					MethodLPT - Parallel printer port.
+ *                  			MethodHamlib - HAMLib rig control.
+ *					MethodCM108 - GPIO pins of CM108 etc. USB Audio.
  *
  *			Device		Name of serial port device.
  *					 e.g. COM1 or /dev/ttyS0.
@@ -261,11 +264,11 @@ type PTT struct {
  *			Line		RTS or DTR when using serial port.
  *
  *			GPIONum		GPIO number.  Only used for Linux.
- *					 Valid only when Method is PTT_METHOD_GPIO.
+ *					 Valid only when Method is MethodGPIO.
  *
  *			LPTBit		Bit number for parallel printer port.
  *					 Bit 0 = pin 2, ..., bit 7 = pin 9.
- *					 Valid only when Method is PTT_METHOD_LPT.
+ *					 Valid only when Method is MethodLPT.
  *
  *			Invert		Invert the signal.
  *					 Normally higher voltage means transmit or LED on.
@@ -296,16 +299,16 @@ type PTT struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewPTT(channels [MAX_RADIO_CHANS]ptt.ChannelConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity outputType, busy bool), debug int) (*PTT, error) {
+func New(channels [phy.MaxRadioChans]ChannelConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity OutputType, busy bool), debug int) (*PTT, error) {
 	return newPTT(channels, muteInput, channelBusy, debug, defaultGPIOSysfsDir)
 }
 
-// newPTT is NewPTT with the root of the sysfs GPIO interface given, so that a
+// newPTT is New with the root of the sysfs GPIO interface given, so that a
 // test can supply a fake one.
 func newPTT(
-	channels [MAX_RADIO_CHANS]ptt.ChannelConfig,
+	channels [phy.MaxRadioChans]ChannelConfig,
 	muteInput func(channel int, mute bool),
-	channelBusy func(channel int, activity outputType, busy bool),
+	channelBusy func(channel int, activity OutputType, busy bool),
 	debug int,
 	gpioSysfsDir string,
 ) (*PTT, error) {
@@ -336,14 +339,14 @@ func newPTT(
  *		probably be renamed something like octrl_set.
  *
  * Inputs:	ot		- Output control type:
- *				   OCTYPE_PTT, OCTYPE_DCD, OCTYPE_FUTURE
+ *				   OutputPTT, OutputDCD, OutputCon
  *
  *		channel		- channel, 0 .. (number of channels)-1
  *
  *		ptt_signal	- 1 for transmit, 0 for receive.
  *
  *
- * Assumption:	The PTT came from NewPTT.
+ * Assumption:	The PTT came from New.
  *
  * Description:	Set the RTS or DTR line or GPIO pin.
  *		More positive output corresponds to 1 unless invert is set.
@@ -352,7 +355,7 @@ func newPTT(
 
 // JWL - save status and new get_ptt function.
 
-func (p *PTT) Set(ot outputType, channel int, ptt_signal int) {
+func (p *PTT) Set(ot OutputType, channel int, ptt_signal int) {
 	if p == nil {
 		return
 	}
@@ -365,28 +368,28 @@ func (p *PTT) Set(ot outputType, channel int, ptt_signal int) {
 
 // SetPTT keys a channel's transmitter, or lets it go.
 func (p *PTT) SetPTT(channel int, on bool) {
-	p.Set(OCTYPE_PTT, channel, dwutil.IfThenElse(on, 1, 0))
+	p.Set(OutputPTT, channel, dwutil.IfThenElse(on, 1, 0))
 }
 
 // SetConnected turns a channel's connected indicator on or off.
 func (p *PTT) SetConnected(channel int, on bool) {
-	p.Set(OCTYPE_CON, channel, dwutil.IfThenElse(on, 1, 0))
+	p.Set(OutputCon, channel, dwutil.IfThenElse(on, 1, 0))
 }
 
 // SetDCD turns a channel's data carrier detect indicator on or off.
 func (p *PTT) SetDCD(channel int, on bool) {
-	p.Set(OCTYPE_DCD, channel, dwutil.IfThenElse(on, 1, 0))
+	p.Set(OutputDCD, channel, dwutil.IfThenElse(on, 1, 0))
 }
 
 // set is Set for a caller that already holds p.mu, for reading or writing.
-func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
+func (p *PTT) set(ot OutputType, channel int, ptt_signal int) {
 	var ptt = ptt_signal
 	var ptt2 = ptt_signal
 
-	dwutil.Assert(ot >= 0 && ot < NUM_OCTYPES)
-	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(ot >= 0 && ot < NumOutputTypes)
+	dwutil.Assert(channel >= 0 && channel < phy.MaxTotalChans)
 
-	if channel >= MAX_RADIO_CHANS {
+	if channel >= phy.MaxRadioChans {
 		return // NCHANNEL: no physical PTT hardware to drive
 	}
 
@@ -398,7 +401,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 		}).Debug("Set output")
 	}
 
-	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(channel >= 0 && channel < phy.MaxTotalChans)
 
 	if !p.channels[channel].Radio {
 		logrus.WithFields(logrus.Fields{
@@ -418,7 +421,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	// I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
 
 	// #ifndef TEST
-	if ot == OCTYPE_PTT && !p.channels[channel].FullDuplex && p.muteInput != nil {
+	if ot == OutputPTT && !p.channels[channel].FullDuplex && p.muteInput != nil {
 		p.muteInput(channel, ptt_signal != 0)
 	}
 	// #endif
@@ -447,14 +450,14 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	/*
 	 * Using serial port?
 	 */
-	if p.channels[channel].Outputs[ot].Method == PTT_METHOD_SERIAL &&
+	if p.channels[channel].Outputs[ot].Method == MethodSerial &&
 		p.fd[channel][ot] != nil {
 		switch p.channels[channel].Outputs[ot].Line {
-		case PTT_LINE_RTS:
+		case LineRTS:
 			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_RTS, ptt != 0)
-		case PTT_LINE_DTR:
+		case LineDTR:
 			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_DTR, ptt != 0)
-		case PTT_LINE_NONE:
+		case LineNone:
 		}
 
 		/*
@@ -462,11 +465,11 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 		 */
 
 		switch p.channels[channel].Outputs[ot].Line2 {
-		case PTT_LINE_RTS:
+		case LineRTS:
 			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_RTS, ptt2 != 0)
-		case PTT_LINE_DTR:
+		case LineDTR:
 			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_DTR, ptt2 != 0)
-		case PTT_LINE_NONE:
+		case LineNone:
 		}
 		/* else neither one */
 	}
@@ -475,7 +478,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	 * Using GPIO?
 	 */
 
-	if p.channels[channel].Outputs[ot].Method == PTT_METHOD_GPIO {
+	if p.channels[channel].Outputs[ot].Method == MethodGPIO {
 		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.channels[channel].Outputs[ot].GPIOName)
 
 		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0) //nolint:gosec
@@ -500,7 +503,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 		}
 	}
 
-	if p.channels[channel].Outputs[ot].Method == PTT_METHOD_GPIOD {
+	if p.channels[channel].Outputs[ot].Method == MethodGPIOD {
 		if p.gpiodLine[channel][ot] != nil {
 			var err = p.gpiodLine[channel][ot].SetValue(ptt)
 			if err != nil {
@@ -522,7 +525,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	 * Using parallel printer port?
 	 */
 
-	if p.channels[channel].Outputs[ot].Method == PTT_METHOD_LPT &&
+	if p.channels[channel].Outputs[ot].Method == MethodLPT &&
 		p.fd[channel][ot] != nil {
 		p.fd[channel][ot].Seek(LPT_IO_ADDR, io.SeekStart)
 
@@ -557,7 +560,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	 * Using hamlib?
 	 */
 
-	if p.channels[channel].Outputs[ot].Method == PTT_METHOD_HAMLIB {
+	if p.channels[channel].Outputs[ot].Method == MethodHamlib {
 		if p.rig[channel][ot] != nil {
 			var onoff = goHamlib.RIG_PTT_OFF
 			if ptt != 0 {
@@ -583,7 +586,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	 * Using CM108 USB Audio adapter GPIO?
 	 */
 
-	if p.channels[channel].Outputs[ot].Method == PTT_METHOD_CM108 {
+	if p.channels[channel].Outputs[ot].Method == MethodCM108 {
 		var err = cm108.SetGPIOPin(p.channels[channel].Outputs[ot].Device,
 			p.channels[channel].Outputs[ot].GPIONum, ptt)
 		if err != nil {
@@ -626,7 +629,7 @@ func cm108_print_permission_advice(name string, err error) {
  *
  * Purpose:	Read the value of an input line
  *
- * Inputs:	it	- Input type (ICTYPE_TCINH supported so far)
+ * Inputs:	it	- Input type (InputTxInhibit supported so far)
  * 		channel	- Audio channel number
  *
  * Outputs:	0 = inactive, 1 = active, -1 = error
@@ -634,8 +637,8 @@ func cm108_print_permission_advice(name string, err error) {
  * ------------------------------------------------------------------*/
 
 func (p *PTT) GetInput(it int, channel int) int {
-	dwutil.Assert(it >= 0 && it < NUM_ICTYPES)
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(it >= 0 && it < NumInputTypes)
+	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
 
 	if p == nil {
 		return -1 /* Not set up, so no method. */
@@ -650,7 +653,7 @@ func (p *PTT) GetInput(it int, channel int) int {
 		return -1
 	}
 
-	if p.channels[channel].Inputs[it].Method == PTT_METHOD_GPIO {
+	if p.channels[channel].Inputs[it].Method == MethodGPIO {
 		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.channels[channel].Inputs[it].GPIOName)
 
 		// No need to check access first: this runs on every transmit attempt,
@@ -703,7 +706,7 @@ func (p *PTT) GetInput(it int, channel int) int {
 // TransmitInhibited says whether a channel's transmit inhibit input is set.
 // With no PTT, or no input configured, it never is.
 func (p *PTT) TransmitInhibited(channel int) bool {
-	return p.GetInput(ICTYPE_TXINH, channel) == 1
+	return p.GetInput(InputTxInhibit, channel) == 1
 }
 
 /*-------------------------------------------------------------------
@@ -729,17 +732,17 @@ func (p *PTT) Term() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	for n := range MAX_RADIO_CHANS {
+	for n := range phy.MaxRadioChans {
 		if p.channels[n].Radio {
-			for ot := range outputTypes() {
+			for ot := range OutputTypes() {
 				p.set(ot, n, 0)
 			}
 		}
 	}
 
-	for n := range MAX_RADIO_CHANS {
+	for n := range phy.MaxRadioChans {
 		if p.channels[n].Radio {
-			for ot := range outputTypes() {
+			for ot := range OutputTypes() {
 				if p.fd[n][ot] != nil {
 					p.fd[n][ot].Close()
 					p.fd[n][ot] = nil
@@ -748,9 +751,9 @@ func (p *PTT) Term() {
 		}
 	}
 
-	for n := range MAX_RADIO_CHANS {
+	for n := range phy.MaxRadioChans {
 		if p.channels[n].Radio {
-			for ot := range outputTypes() {
+			for ot := range OutputTypes() {
 				if p.gpiodLine[n][ot] != nil {
 					p.gpiodLine[n][ot].Close()
 					p.gpiodLine[n][ot] = nil
@@ -759,9 +762,9 @@ func (p *PTT) Term() {
 		}
 	}
 
-	for n := range MAX_RADIO_CHANS {
+	for n := range phy.MaxRadioChans {
 		if p.channels[n].Radio {
-			for ot := range outputTypes() {
+			for ot := range OutputTypes() {
 				if p.rig[n][ot] != nil {
 					p.rig[n][ot].Close()   //nolint:errcheck
 					p.rig[n][ot].Cleanup() //nolint:errcheck
@@ -792,8 +795,8 @@ func (p *PTT) init() error {
 // setup does the work of init, stopping at the first failure.  Call init
 // rather than this: it is the one that tidies up after a failure.
 func (p *PTT) setup() error {
-	for ch := range MAX_RADIO_CHANS {
-		for ot := range outputTypes() {
+	for ch := range phy.MaxRadioChans {
+		for ot := range OutputTypes() {
 			if p.debugLevel >= 2 {
 				logrus.WithFields(logrus.Fields{
 					"channel": ch,
@@ -817,10 +820,10 @@ func (p *PTT) setup() error {
 	 * Set up serial ports.
 	 */
 
-	for ch := range MAX_RADIO_CHANS {
+	for ch := range phy.MaxRadioChans {
 		if p.channels[ch].Radio {
-			for ot := range outputTypes() {
-				if p.channels[ch].Outputs[ot].Method == PTT_METHOD_SERIAL {
+			for ot := range OutputTypes() {
+				if p.channels[ch].Outputs[ot].Method == MethodSerial {
 					/* Translate Windows device name into Linux name. */
 					/* COM1 -> /dev/ttyS0, etc. */
 					if strings.HasPrefix(strings.ToUpper(p.channels[ch].Outputs[ot].Device), "COM") {
@@ -850,7 +853,7 @@ func (p *PTT) setup() error {
 
 					for j := ch; j >= 0; j-- {
 						if p.channels[j].Radio {
-							var k outputType = NUM_OCTYPES - 1
+							var k OutputType = NumOutputTypes - 1
 							if j == ch {
 								k = ot - 1
 							}
@@ -880,7 +883,7 @@ func (p *PTT) setup() error {
 						}).Error("Can't open device for PTT control")
 						/* Don't try using it later if device open failed. */
 
-						p.channels[ch].Outputs[ot].Method = PTT_METHOD_NONE
+						p.channels[ch].Outputs[ot].Method = MethodNone
 					}
 
 					/*
@@ -903,16 +906,16 @@ func (p *PTT) setup() error {
 
 	var using_gpio = false
 
-	for ch := range MAX_RADIO_CHANS {
+	for ch := range phy.MaxRadioChans {
 		if p.channels[ch].Radio {
-			for ot := range outputTypes() {
-				if p.channels[ch].Outputs[ot].Method == PTT_METHOD_GPIO {
+			for ot := range OutputTypes() {
+				if p.channels[ch].Outputs[ot].Method == MethodGPIO {
 					using_gpio = true
 				}
 			}
 
-			for ot := range NUM_ICTYPES {
-				if p.channels[ch].Inputs[ot].Method == PTT_METHOD_GPIO {
+			for ot := range NumInputTypes {
+				if p.channels[ch].Inputs[ot].Method == MethodGPIO {
 					using_gpio = true
 				}
 			}
@@ -926,15 +929,15 @@ func (p *PTT) setup() error {
 		}
 	}
 	// GPIOD
-	for ch := range MAX_RADIO_CHANS {
+	for ch := range phy.MaxRadioChans {
 		if p.channels[ch].Radio {
-			for ot := range outputTypes() {
-				if p.channels[ch].Outputs[ot].Method == PTT_METHOD_GPIOD {
+			for ot := range OutputTypes() {
+				if p.channels[ch].Outputs[ot].Method == MethodGPIOD {
 					var chip_name = p.channels[ch].Outputs[ot].GPIOName
 					var line_number = p.channels[ch].Outputs[ot].GPIONum
 					var initialState = dwutil.IfThenElse(p.channels[ch].Outputs[ot].Invert, 1, 0) // Using "invert" as initial state means we always start "off"
 
-					var line, lineErr = RequestGPIODLine(chip_name, line_number, initialState)
+					var line, lineErr = requestGPIODLine(chip_name, line_number, initialState)
 					if lineErr != nil {
 						return fmt.Errorf("can't request GPIOD line %d on %s for channel %d %s: %w",
 							line_number, chip_name, ch, octypeName(ot), lineErr)
@@ -959,11 +962,11 @@ func (p *PTT) setup() error {
 	 * the pins we want to use.
 	 */
 
-	for ch := range MAX_RADIO_CHANS {
+	for ch := range phy.MaxRadioChans {
 		if p.channels[ch].Radio {
 			// output control type, PTT, DCD, CON, ...
-			for ot := range outputTypes() {
-				if p.channels[ch].Outputs[ot].Method == PTT_METHOD_GPIO {
+			for ot := range OutputTypes() {
+				if p.channels[ch].Outputs[ot].Method == MethodGPIO {
 					var exportErr = p.exportGPIO(ch, int(ot), p.channels[ch].Outputs[ot].Invert, 1)
 					if exportErr != nil {
 						return fmt.Errorf("channel %d %s: %w", ch, octypeName(ot), exportErr)
@@ -971,8 +974,8 @@ func (p *PTT) setup() error {
 				}
 			}
 			// input control type
-			for it := range NUM_ICTYPES {
-				if p.channels[ch].Inputs[it].Method == PTT_METHOD_GPIO {
+			for it := range NumInputTypes {
+				if p.channels[ch].Inputs[it].Method == MethodGPIO {
 					var exportErr = p.exportGPIO(ch, it, p.channels[ch].Inputs[it].Invert, 0)
 					if exportErr != nil {
 						return fmt.Errorf("channel %d input %d: %w", ch, it, exportErr)
@@ -990,10 +993,10 @@ func (p *PTT) setup() error {
 	 * 	For x86 Linux only.
 	 */
 
-	for ch := range MAX_RADIO_CHANS {
+	for ch := range phy.MaxRadioChans {
 		if p.channels[ch].Radio {
-			for ot := range outputTypes() {
-				if p.channels[ch].Outputs[ot].Method == PTT_METHOD_LPT {
+			for ot := range OutputTypes() {
+				if p.channels[ch].Outputs[ot].Method == MethodLPT {
 					/* Can't open the same device more than once so we */
 					/* need more logic to look for the case of multiple radio */
 					/* channels using different pins of the LPT port. */
@@ -1003,7 +1006,7 @@ func (p *PTT) setup() error {
 
 					for j := ch; j >= 0; j-- {
 						if p.channels[j].Radio {
-							var k outputType = NUM_OCTYPES - 1
+							var k OutputType = NumOutputTypes - 1
 							if j == ch {
 								k = ot - 1
 							}
@@ -1033,7 +1036,7 @@ func (p *PTT) setup() error {
 
 						/* Don't try using it later if device open failed. */
 
-						p.channels[ch].Outputs[ot].Method = PTT_METHOD_NONE
+						p.channels[ch].Outputs[ot].Method = MethodNone
 					}
 
 					/*
@@ -1046,11 +1049,11 @@ func (p *PTT) setup() error {
 		} /* if valid channel. */
 	} /* For each channel. */
 
-	for ch := range MAX_RADIO_CHANS {
+	for ch := range phy.MaxRadioChans {
 		if p.channels[ch].Radio {
-			for ot := range outputTypes() {
-				if p.channels[ch].Outputs[ot].Method == PTT_METHOD_HAMLIB {
-					if ot == OCTYPE_PTT {
+			for ot := range OutputTypes() {
+				if p.channels[ch].Outputs[ot].Method == MethodHamlib {
+					if ot == OutputPTT {
 						if p.channels[ch].Outputs[ot].Model == -1 {
 							logrus.WithField("hint", `Run "rigctl --list" for a list of model numbers.`).
 								Error("Hamlib error: AUTO rig model detection is not supported. Specify the model number explicitly.")
@@ -1144,10 +1147,10 @@ func (p *PTT) setup() error {
 	 * Could use some error checking for overlap.
 	 */
 
-	for ch := range MAX_RADIO_CHANS {
+	for ch := range phy.MaxRadioChans {
 		if p.channels[ch].Radio {
-			for ot := range outputTypes() {
-				if p.channels[ch].Outputs[ot].Method == PTT_METHOD_CM108 {
+			for ot := range OutputTypes() {
+				if p.channels[ch].Outputs[ot].Method == MethodCM108 {
 					var device = p.channels[ch].Outputs[ot].Device
 
 					logrus.WithFields(logrus.Fields{
@@ -1180,9 +1183,9 @@ func (p *PTT) setup() error {
 
 	/* Why doesn't it transmit?  Probably forgot to specify PTT option. */
 
-	for ch := range MAX_RADIO_CHANS {
+	for ch := range phy.MaxRadioChans {
 		if p.channels[ch].Radio {
-			if p.channels[ch].Outputs[OCTYPE_PTT].Method == PTT_METHOD_NONE {
+			if p.channels[ch].Outputs[OutputPTT].Method == MethodNone {
 				logrus.WithFields(logrus.Fields{
 					"channel": ch,
 					"hint":    voxAdvice,
@@ -1535,22 +1538,22 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
  */
 
 func PTTTestMain() error {
-	var channels [MAX_RADIO_CHANS]ptt.ChannelConfig
+	var channels [phy.MaxRadioChans]ChannelConfig
 
 	channels[0].Radio = true
-	channels[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_SERIAL
+	channels[0].Outputs[OutputPTT].Method = MethodSerial
 	// TODO: device should be command line argument.
-	channels[0].Outputs[OCTYPE_PTT].Device = "COM3"
-	channels[0].Outputs[OCTYPE_PTT].Line = PTT_LINE_RTS
+	channels[0].Outputs[OutputPTT].Device = "COM3"
+	channels[0].Outputs[OutputPTT].Line = LineRTS
 
 	channels[1].Radio = true
-	channels[1].Outputs[OCTYPE_PTT].Method = PTT_METHOD_SERIAL
-	channels[1].Outputs[OCTYPE_PTT].Device = "COM3"
-	channels[1].Outputs[OCTYPE_PTT].Line = PTT_LINE_DTR
+	channels[1].Outputs[OutputPTT].Method = MethodSerial
+	channels[1].Outputs[OutputPTT].Device = "COM3"
+	channels[1].Outputs[OutputPTT].Line = LineDTR
 
 	/* initialize - both off */
 
-	var p, initErr = NewPTT(channels, nil, nil, 0)
+	var p, initErr = New(channels, nil, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1564,9 +1567,9 @@ func PTTTestMain() error {
 
 	channel = 0
 	for range 3 {
-		p.Set(OCTYPE_PTT, channel, 1)
+		p.Set(OutputPTT, channel, 1)
 		time.Sleep(1 * time.Second)
-		p.Set(OCTYPE_PTT, channel, 0)
+		p.Set(OutputPTT, channel, 0)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -1574,9 +1577,9 @@ func PTTTestMain() error {
 
 	channel = 1
 	for range 3 {
-		p.Set(OCTYPE_PTT, channel, 1)
+		p.Set(OutputPTT, channel, 1)
 		time.Sleep(1 * time.Second)
-		p.Set(OCTYPE_PTT, channel, 0)
+		p.Set(OutputPTT, channel, 0)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -1584,9 +1587,9 @@ func PTTTestMain() error {
 
 	/* Same thing again but invert RTS. */
 
-	channels[0].Outputs[OCTYPE_PTT].Invert = true
+	channels[0].Outputs[OutputPTT].Invert = true
 
-	p, initErr = NewPTT(channels, nil, nil, 0)
+	p, initErr = New(channels, nil, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1597,9 +1600,9 @@ func PTTTestMain() error {
 
 	channel = 0
 	for range 3 {
-		p.Set(OCTYPE_PTT, channel, 1)
+		p.Set(OutputPTT, channel, 1)
 		time.Sleep(1 * time.Second)
-		p.Set(OCTYPE_PTT, channel, 0)
+		p.Set(OutputPTT, channel, 0)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -1607,9 +1610,9 @@ func PTTTestMain() error {
 
 	channel = 1
 	for range 3 {
-		p.Set(OCTYPE_PTT, channel, 1)
+		p.Set(OutputPTT, channel, 1)
 		time.Sleep(1 * time.Second)
-		p.Set(OCTYPE_PTT, channel, 0)
+		p.Set(OutputPTT, channel, 0)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -1619,14 +1622,14 @@ func PTTTestMain() error {
 
 	// #if __arm__
 
-	channels = [MAX_RADIO_CHANS]ptt.ChannelConfig{}
+	channels = [phy.MaxRadioChans]ChannelConfig{}
 	channels[0].Radio = true
-	channels[0].Outputs[OCTYPE_PTT].Method = PTT_METHOD_GPIO
-	channels[0].Outputs[OCTYPE_PTT].GPIONum = 25
+	channels[0].Outputs[OutputPTT].Method = MethodGPIO
+	channels[0].Outputs[OutputPTT].GPIONum = 25
 
-	logrus.WithField("gpio", channels[0].Outputs[OCTYPE_PTT].GPIONum).Info("Try GPIO a few times")
+	logrus.WithField("gpio", channels[0].Outputs[OutputPTT].GPIONum).Info("Try GPIO a few times")
 
-	p, initErr = NewPTT(channels, nil, nil, 0)
+	p, initErr = New(channels, nil, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1635,9 +1638,9 @@ func PTTTestMain() error {
 
 	channel = 0
 	for range 3 {
-		p.Set(OCTYPE_PTT, channel, 1)
+		p.Set(OutputPTT, channel, 1)
 		time.Sleep(1 * time.Second)
-		p.Set(OCTYPE_PTT, channel, 0)
+		p.Set(OutputPTT, channel, 0)
 		time.Sleep(1 * time.Second)
 	}
 
@@ -1656,19 +1659,19 @@ func PTTTestMain() error {
 	   	memset (&my_audio_config, 0, sizeof(my_audio_config));
 	   	my_audio_config.num_channels = 2;
 	   	my_audio_config.chan_medium[0] = MEDIUM_RADIO;
-	   	my_audio_config.adev[0].octrl[OCTYPE_PTT].Method = PTT_METHOD_LPT;
-	   	my_audio_config.adev[0].octrl[OCTYPE_PTT].LPTBit = 0;
+	   	my_audio_config.adev[0].octrl[OutputPTT].Method = MethodLPT;
+	   	my_audio_config.adev[0].octrl[OutputPTT].LPTBit = 0;
 	   	my_audio_config.chan_medium[1] = MEDIUM_RADIO;
-	   	my_audio_config.adev[1].octrl[OCTYPE_PTT].Method = PTT_METHOD_LPT;
-	   	my_audio_config.adev[1].octrl[OCTYPE_PTT].LPTBit = 1;
+	   	my_audio_config.adev[1].octrl[OutputPTT].Method = MethodLPT;
+	   	my_audio_config.adev[1].octrl[OutputPTT].LPTBit = 1;
 
 	   	dw_printf ("Try LPT bits 0 & 1 a few times...\n");
 
 	   	ptt_init (&my_audio_config);
 
 	   	for (n=0; n<8; n++) {
-	   	  ptt_set (OCTYPE_PTT, 0, n & 1);
-	   	  ptt_set (OCTYPE_PTT, 1, (n>>1) & 1);
+	   	  ptt_set (OutputPTT, 0, n & 1);
+	   	  ptt_set (OutputPTT, 1, (n>>1) & 1);
 	   	  SLEEP_SEC(1);
 	   	}
 
