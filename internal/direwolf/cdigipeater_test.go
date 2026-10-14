@@ -14,6 +14,8 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -147,13 +149,15 @@ func TestCDigipeatMatchFilterError(t *testing.T) {
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var result *ax25.Packet
+	var hook = test.NewGlobal()
 
-	var output = testutils.CaptureOutput(t, func() {
-		result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "z/nonsense")
-	})
+	t.Cleanup(hook.Reset)
 
-	assert.NotEmpty(t, output, "a filter that could not be understood was not reported")
+	var result = cdigi.match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "z/nonsense")
+
+	var entry = hook.LastEntry()
+	require.NotNil(t, entry, "a filter that could not be understood was not reported")
+	assert.Equal(t, logrus.ErrorLevel, entry.Level)
 	assert.Nil(t, result)
 }
 
@@ -225,10 +229,20 @@ func TestCDigipeaterInvalidChannel(t *testing.T) {
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
-	for _, channel := range []int{-1, 2, MAX_RADIO_CHANS} {
-		var output = testutils.CaptureOutput(t, func() { cdigi.Digipeat(channel, pp) })
+	var hook = test.NewGlobal()
 
-		assert.Contains(t, output, "Did not expect to receive on invalid channel")
+	t.Cleanup(hook.Reset)
+
+	for _, channel := range []int{-1, 2, MAX_RADIO_CHANS} {
+		hook.Reset()
+
+		cdigi.Digipeat(channel, pp)
+
+		var entry = hook.LastEntry()
+		require.NotNil(t, entry, "nothing was logged for channel %d", channel)
+		assert.Equal(t, logrus.ErrorLevel, entry.Level)
+		assert.Contains(t, entry.Message, "Did not expect to receive on invalid channel")
+		assert.Equal(t, channel, entry.Data["channel"])
 	}
 }
 

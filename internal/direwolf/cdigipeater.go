@@ -24,6 +24,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/pfilter"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -121,8 +122,7 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
 			d.audioConfig.chan_medium[from_chan] != MEDIUM_NETTNC &&
 			d.audioConfig.chan_medium[from_chan] != MediumSerialTNC) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("cdigipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
+		logrus.WithField("channel", from_chan).Error("cdigipeater: Did not expect to receive on invalid channel")
 
 		return
 	}
@@ -229,8 +229,11 @@ func (d *ConnectedDigipeater) match(from_chan int, pp *ax25.Packet, mycall_rec s
 	if cfilter_str != "" {
 		var result, err = d.filter.Filter(from_chan, to_chan, cfilter_str, pp, false)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s\n", err)
+			logrus.WithError(err).WithFields(logrus.Fields{
+				"from_channel": from_chan,
+				"to_channel":   to_chan,
+				"filter":       cfilter_str,
+			}).Error("cdigipeater: Bad filter")
 		}
 
 		if result != 1 {
