@@ -1281,17 +1281,17 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		p_audio_config.achan[channel].sanity_test = SANITY_APRS
 
 		for ot := range outputTypes() {
-			p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_NONE
-			p_audio_config.achan[channel].octrl[ot].ptt_device = ""
-			p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_NONE
-			p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_NONE
-			p_audio_config.achan[channel].octrl[ot].out_gpio_num = 0
-			p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = 0
+			p_audio_config.achan[channel].octrl[ot].Method = PTT_METHOD_NONE
+			p_audio_config.achan[channel].octrl[ot].Device = ""
+			p_audio_config.achan[channel].octrl[ot].Line = PTT_LINE_NONE
+			p_audio_config.achan[channel].octrl[ot].Line2 = PTT_LINE_NONE
+			p_audio_config.achan[channel].octrl[ot].GPIONum = 0
+			p_audio_config.achan[channel].octrl[ot].LPTBit = 0
 		}
 
 		for it := range NUM_ICTYPES {
-			p_audio_config.achan[channel].ictrl[it].method = PTT_METHOD_NONE
-			p_audio_config.achan[channel].ictrl[it].in_gpio_num = 0
+			p_audio_config.achan[channel].ictrl[it].Method = PTT_METHOD_NONE
+			p_audio_config.achan[channel].ictrl[it].GPIONum = 0
 		}
 
 		p_audio_config.achan[channel].dwait = DEFAULT_DWAIT
@@ -2721,11 +2721,11 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 			case settings.Device == "":
 				return fmt.Errorf("config file line %d: Missing GPIO chip name for %s.\nUse the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines", ps.line, otname)
 			case settings.Device[0] == '/': // Looks like device path.  Use as given.
-				octrl.out_gpio_name = settings.Device
+				octrl.GPIOName = settings.Device
 			case unicode.IsDigit(rune(settings.Device[0])): // or if digit, prepend "/dev/gpiochip"
-				octrl.out_gpio_name = "/dev/gpiochip" + settings.Device
+				octrl.GPIOName = "/dev/gpiochip" + settings.Device
 			default: // otherwise, prepend "/dev/" to the name
-				octrl.out_gpio_name = "/dev/" + settings.Device
+				octrl.GPIOName = "/dev/" + settings.Device
 			}
 		}
 
@@ -2739,9 +2739,9 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 			return fmt.Errorf("config file line %d: GPIO number %d for %s can't be negative - use invert to invert the signal", ps.line, *settings.Pin, otname)
 		}
 
-		octrl.out_gpio_num = *settings.Pin
-		octrl.ptt_invert = settings.Invert
-		octrl.ptt_method = dwutil.IfThenElse(strings.EqualFold(settings.Method, "gpiod"), PTT_METHOD_GPIOD, PTT_METHOD_GPIO)
+		octrl.GPIONum = *settings.Pin
+		octrl.Invert = settings.Invert
+		octrl.Method = dwutil.IfThenElse(strings.EqualFold(settings.Method, "gpiod"), PTT_METHOD_GPIOD, PTT_METHOD_GPIO)
 	case "lpt":
 		/* Parallel printer case, x86 Linux only. */
 		if settings.Pin == nil {
@@ -2754,16 +2754,16 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 			return fmt.Errorf("config file line %d: LPT bit number %d for %s can't be negative - use invert to invert the signal", ps.line, *settings.Pin, otname)
 		}
 
-		octrl.ptt_lpt_bit = *settings.Pin
-		octrl.ptt_invert = settings.Invert
-		octrl.ptt_method = PTT_METHOD_LPT
+		octrl.LPTBit = *settings.Pin
+		octrl.Invert = settings.Invert
+		octrl.Method = PTT_METHOD_LPT
 	case "rig":
 		if settings.Model == "" {
 			return fmt.Errorf("config file line %d: Missing model number for hamlib", ps.line)
 		}
 
 		if strings.EqualFold(settings.Model, "AUTO") {
-			octrl.ptt_model = -1
+			octrl.Model = -1
 		} else {
 			if !alldigits(settings.Model) {
 				return fmt.Errorf(
@@ -2779,23 +2779,23 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 				return fmt.Errorf("config file line %d: Unreasonable model number %d for hamlib", ps.line, n)
 			}
 
-			octrl.ptt_model = n
+			octrl.Model = n
 		}
 
 		if settings.Device == "" {
 			return fmt.Errorf("config file line %d: Missing port for hamlib", ps.line)
 		}
 
-		octrl.ptt_device = settings.Device
+		octrl.Device = settings.Device
 
 		if settings.Rate != nil {
 			if *settings.Rate < 0 {
 				return fmt.Errorf("config file line %d: CAT serial port speed %d can't be negative", ps.line, *settings.Rate)
 			}
 
-			octrl.ptt_rate = *settings.Rate
+			octrl.Rate = *settings.Rate
 		}
-		octrl.ptt_method = PTT_METHOD_HAMLIB
+		octrl.Method = PTT_METHOD_HAMLIB
 	case "cm108":
 		/* CM108 - GPIO of USB sound card. case, Linux and Windows only. */
 		if ot != OCTYPE_PTT {
@@ -2808,9 +2808,9 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 			return fmt.Errorf("config file line %d: PTT CM108 option is only valid for PTT, not %s", ps.line, otname)
 		}
 
-		octrl.out_gpio_num = 3 // All known designs use GPIO 3.
+		octrl.GPIONum = 3 // All known designs use GPIO 3.
 		// User can override for special cases.
-		octrl.ptt_invert = false // High for transmit.
+		octrl.Invert = false // High for transmit.
 
 		// Try to find PTT device for audio output device.
 		// Simplifiying assumption is that we have one radio per USB Audio Adapter.
@@ -2819,7 +2819,7 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 
 		var found_ptt, find_ptt_err = cm108.FindPTT(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
 
-		octrl.ptt_device = found_ptt
+		octrl.Device = found_ptt
 
 		if find_ptt_err != nil {
 			// A device we don't recognise may still be the right one, so that
@@ -2832,23 +2832,23 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 		}
 
 		if settings.Pin != nil {
-			octrl.out_gpio_num = *settings.Pin
+			octrl.GPIONum = *settings.Pin
 		}
 
 		// A legacy line only inverts along with a GPIO number, but YAML can
 		// ask to invert the default one.
-		octrl.ptt_invert = settings.Invert
+		octrl.Invert = settings.Invert
 
 		if settings.Device != "" {
-			octrl.ptt_device = settings.Device
+			octrl.Device = settings.Device
 		}
 
-		if octrl.out_gpio_num < 1 || octrl.out_gpio_num > 8 {
+		if octrl.GPIONum < 1 || octrl.GPIONum > 8 {
 			return fmt.Errorf("config file line %d: CM108 GPIO number %d is not in range of 1 thru 8", ps.line,
-				octrl.out_gpio_num)
+				octrl.GPIONum)
 		}
 
-		if octrl.ptt_device == "" {
+		if octrl.Device == "" {
 			return fmt.Errorf("config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s\n"+
 				"You must explicitly mention a device name such as /dev/hidraw1.\n"+
 				"Run \"cm108\" utility to get a list.\n"+
@@ -2856,13 +2856,13 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 				ps.line, ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
 		}
 
-		octrl.ptt_method = PTT_METHOD_CM108
+		octrl.Method = PTT_METHOD_CM108
 	case "serial":
 		if settings.Device == "" {
 			return fmt.Errorf("config file line %d: Missing output control device for %s command", ps.line, otname)
 		}
 
-		octrl.ptt_device = settings.Device
+		octrl.Device = settings.Device
 
 		if settings.Line == "" {
 			return fmt.Errorf("config file line %d: Missing RTS or DTR after %s device name", ps.line, otname)
@@ -2873,9 +2873,9 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 			return fmt.Errorf("config file line %d: Expected RTS or DTR after %s device name", ps.line, otname)
 		}
 
-		octrl.ptt_line = line
-		octrl.ptt_invert = settings.Invert
-		octrl.ptt_method = PTT_METHOD_SERIAL
+		octrl.Line = line
+		octrl.Invert = settings.Invert
+		octrl.Method = PTT_METHOD_SERIAL
 
 		if settings.Line2 != "" {
 			var line2, line2OK = serialControlLine(settings.Line2)
@@ -2883,12 +2883,12 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 				return fmt.Errorf("config file line %d: Expected RTS or DTR after first RTS or DTR", ps.line)
 			}
 
-			octrl.ptt_line2 = line2
-			octrl.ptt_invert2 = settings.Invert2
+			octrl.Line2 = line2
+			octrl.Invert2 = settings.Invert2
 
 			/* Would not make sense to specify the same one twice. */
 
-			if octrl.ptt_line == octrl.ptt_line2 {
+			if octrl.Line == octrl.Line2 {
 				ps.errorf("config file line %d: Doesn't make sense to specify the some control line twice", ps.line)
 			}
 		}
@@ -2937,14 +2937,14 @@ func handleTXINH(ps *parseState) error {
 			return fmt.Errorf("config file line %d: GPIO number must be numeric for %s", ps.line, itname)
 		}
 		if gpio < 0 {
-			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].in_gpio_num = -1 * gpio
-			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].invert = true
+			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].GPIONum = -1 * gpio
+			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].Invert = true
 		} else {
-			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].in_gpio_num = gpio
-			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].invert = false
+			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].GPIONum = gpio
+			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].Invert = false
 		}
 
-		ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
+		ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].Method = PTT_METHOD_GPIO
 		// #endif
 	} else {
 		return fmt.Errorf("config file line %d: Unrecognized input type name \"%s\" for %s command.  GPIO is the only one supported", ps.line, t, itname)

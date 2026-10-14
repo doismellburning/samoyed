@@ -4,6 +4,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/phy"
+	"github.com/doismellburning/samoyed/internal/ptt"
 )
 
 // Type of communication medium associated with the channel.
@@ -179,9 +180,9 @@ type achan_param_s struct {
 	/* In version 1.4 we add CON for connected to another station. */
 	/* Index following structure by one of these: */
 
-	octrl [NUM_OCTYPES]outputConfig
+	octrl [NUM_OCTYPES]ptt.OutputConfig
 
-	ictrl [NUM_ICTYPES]inputConfig
+	ictrl [NUM_ICTYPES]ptt.InputConfig
 
 	/* Transmit timing. */
 
@@ -212,90 +213,16 @@ type achan_param_s struct {
 
 }
 
-// outputConfig is how one of a radio channel's output control lines - PTT,
-// DCD or the connected indicator - is driven.
-type outputConfig struct {
-	ptt_method ptt_method_t /* none, serial port, GPIO, LPT, HAMLIB, CM108. */
-
-	ptt_device string /* Serial device name for PTT.  e.g. COM1 or /dev/ttyS0 */
-	/* Also used for HAMLIB.  Could be host:port when model is 1. */
-	/* For years, 20 characters was plenty then we start getting extreme names like this: */
-	/* /dev/serial/by-id/usb-FTDI_Navigator__CAT___2nd_PTT__00000000-if00-port0 */
-	/* /dev/serial/by-id/usb-Prolific_Technology_Inc._USB-Serial_Controller_D-if00-port0 */
-	/* Issue 104, changed to 100 bytes in version 1.5. */
-
-	/* This same field is also used for CM108/CM119 GPIO PTT which will */
-	/* have a name like /dev/hidraw1 for Linux or */
-	/* \\?\hid#vid_0d8c&pid_0008&mi_03#8&39d3555&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030} */
-	/* for Windows.  Largest observed was 95 but add some extra to be safe. */
-
-	ptt_line  ptt_line_t /* Control line when using serial port. PTT_LINE_RTS, PTT_LINE_DTR. */
-	ptt_line2 ptt_line_t /* Optional second one:  PTT_LINE_NONE when not used. */
-
-	out_gpio_num int /* GPIO number.  Originally this was only for PTT. */
-	/* It is now more general. */
-	/* octrl array is indexed by PTT, DCD, or CONnected indicator. */
-	/* For CM108/CM119, this should be in range of 1-8. */
-
-	out_gpio_name string
-	/* originally, gpio number NN was assumed to simply */
-	/* have the name gpioNN but this turned out not to be */
-	/* the case for CubieBoard where it was longer. */
-	/* NewPTT fills this in, in its own copy, so we don't have to */
-	/* recalculate it each time we access it. */
-	/* Also GPIO chip name for GPIOD method. Looks like 'gpiochip4' */
-
-	/* This could probably be collapsed into ptt_device instead of being separate. */
-
-	ptt_lpt_bit int /* Bit number for parallel printer port.  */
-	/* Bit 0 = pin 2, ..., bit 7 = pin 9. */
-
-	ptt_invert  bool /* Invert the output. */
-	ptt_invert2 bool /* Invert the secondary output. */
-
-	//#ifdef USE_HAMLIB
-
-	ptt_model int /* HAMLIB model.  -1 for AUTO.  2 for rigctld.  Others are radio model. */
-	ptt_rate  int /* Serial port speed when using hamlib CAT control for PTT. */
-	/* If zero, hamlib will come up with a default for pariticular rig. */
-	//#endif
-
-}
-
-// inputConfig is how one of a radio channel's input lines is read.
-type inputConfig struct {
-	method ptt_method_t /* none, serial port, GPIO, LPT. */
-
-	in_gpio_num int /* GPIO number */
-
-	in_gpio_name string
-	/* originally, gpio number NN was assumed to simply */
-	/* have the name gpioNN but this turned out not to be */
-	/* the case for CubieBoard where it was longer. */
-	/* NewPTT fills this in, in its own copy, so we don't have to */
-	/* recalculate it each time we access it. */
-
-	invert bool /* true = active low */
-}
-
-// pttChannelConfig is what the PTT needs to know about one radio channel.
-type pttChannelConfig struct {
-	radio      bool // The channel is a radio, so has lines to drive.
-	fullDuplex bool // Keep listening while transmitting.
-	outputs    [NUM_OCTYPES]outputConfig
-	inputs     [NUM_ICTYPES]inputConfig
-}
-
 // pttChannels is each radio channel's configuration, as the PTT needs it.
-func (c *RadioConfig) pttChannels() [MAX_RADIO_CHANS]pttChannelConfig {
-	var channels [MAX_RADIO_CHANS]pttChannelConfig
+func (c *RadioConfig) pttChannels() [MAX_RADIO_CHANS]ptt.ChannelConfig {
+	var channels [MAX_RADIO_CHANS]ptt.ChannelConfig
 
 	for ch := range MAX_RADIO_CHANS {
-		channels[ch] = pttChannelConfig{
-			radio:      c.chan_medium[ch] == MEDIUM_RADIO,
-			fullDuplex: c.achan[ch].fulldup,
-			outputs:    c.achan[ch].octrl,
-			inputs:     c.achan[ch].ictrl,
+		channels[ch] = ptt.ChannelConfig{
+			Radio:      c.chan_medium[ch] == MEDIUM_RADIO,
+			FullDuplex: c.achan[ch].fulldup,
+			Outputs:    c.achan[ch].octrl,
+			Inputs:     c.achan[ch].ictrl,
 		}
 	}
 

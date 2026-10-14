@@ -1,56 +1,47 @@
 package direwolf
 
-import "iter"
+import (
+	"iter"
+
+	"github.com/doismellburning/samoyed/internal/ptt"
+)
 
 /*
  * PTT control.
  */
 
-type ptt_method_t int
-
 const (
-	PTT_METHOD_NONE   ptt_method_t = iota /* VOX or no transmit. */
-	PTT_METHOD_SERIAL                     /* Serial port RTS or DTR. */
-	PTT_METHOD_GPIO                       /* General purpose I/O using sysfs, deprecated after 2020, Linux only. */
-	PTT_METHOD_GPIOD                      /* General purpose I/O, using libgpiod, Linux only. */
-	PTT_METHOD_LPT                        /* Parallel printer port, Linux only. */
-	PTT_METHOD_HAMLIB                     /* HAMLib, Linux only. */
-	PTT_METHOD_CM108                      /* GPIO pin of CM108/CM119/etc.  Linux only. */
+	PTT_METHOD_NONE   = ptt.MethodNone
+	PTT_METHOD_SERIAL = ptt.MethodSerial
+	PTT_METHOD_GPIO   = ptt.MethodGPIO
+	PTT_METHOD_GPIOD  = ptt.MethodGPIOD
+	PTT_METHOD_LPT    = ptt.MethodLPT
+	PTT_METHOD_HAMLIB = ptt.MethodHamlib
+	PTT_METHOD_CM108  = ptt.MethodCM108
 )
 
-type ptt_line_t int
+type ptt_line_t = ptt.Line
 
 const (
-	PTT_LINE_NONE ptt_line_t = iota //  Important: 0 for neither.
-	PTT_LINE_RTS
-	PTT_LINE_DTR
+	PTT_LINE_NONE = ptt.LineNone
+	PTT_LINE_RTS  = ptt.LineRTS
+	PTT_LINE_DTR  = ptt.LineDTR
 )
 
 // outputType is one of the outputs the PTT controller drives for a channel.
-type outputType int
+type outputType = ptt.OutputType
 
-const OCTYPE_PTT outputType = 0
-const OCTYPE_DCD outputType = 1
-const OCTYPE_CON outputType = 2
+const OCTYPE_PTT = ptt.OutputPTT
+const OCTYPE_DCD = ptt.OutputDCD
+const OCTYPE_CON = ptt.OutputCon
 
-const NUM_OCTYPES = 3 /* number of values above.   i.e. last value +1. */
+const NUM_OCTYPES = ptt.NumOutputTypes
 
 // outputTypes yields each output type in turn, from OCTYPE_PTT to OCTYPE_CON.
 func outputTypes() iter.Seq[outputType] {
-	return func(yield func(outputType) bool) {
-		for ot := range outputType(NUM_OCTYPES) {
-			if !yield(ot) {
-				return
-			}
-		}
-	}
+	return ptt.OutputTypes()
 }
 
-const MAX_GPIO_NAME_LEN = 20 // 12 would cover any case I've seen so this should be safe
+const ICTYPE_TXINH = ptt.InputTxInhibit
 
-/* Each channel can also have associated input lines. */
-/* So far, we just have one for transmit inhibit. */
-
-const ICTYPE_TXINH = 0
-
-const NUM_ICTYPES = 1 /* number of values above. i.e. last value +1. */
+const NUM_ICTYPES = ptt.NumInputTypes

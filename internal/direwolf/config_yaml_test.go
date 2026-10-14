@@ -398,7 +398,7 @@ legacy: |
 			var c = parseYAMLConfig(t, "channels:\n  - {channel: 0, ptt: {method: "+method+", pin: -2}}\n")
 			assert.Equal(t, 1, c.errors, method)
 			assert.Contains(t, c.output, "can't be negative", method)
-			assert.Equal(t, PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method, method)
+			assert.Equal(t, PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].Method, method)
 		}
 	})
 
@@ -407,9 +407,9 @@ legacy: |
 	t.Run("CM108 inverts its default GPIO", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0, ptt: {method: cm108, device: /dev/hidraw1, invert: true}}\n")
 		var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
-		assert.Equal(t, PTT_METHOD_CM108, octrl.ptt_method)
-		assert.Equal(t, 3, octrl.out_gpio_num)
-		assert.True(t, octrl.ptt_invert)
+		assert.Equal(t, PTT_METHOD_CM108, octrl.Method)
+		assert.Equal(t, 3, octrl.GPIONum)
+		assert.True(t, octrl.Invert)
 	})
 
 	// Regression test: a rejected device's channels were still applied, to
@@ -491,7 +491,7 @@ legacy: |
 		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0, ptt: {method: pigeon}}\n")
 		assert.Equal(t, 1, c.errors)
 		assert.Contains(t, c.output, "Unknown PTT method \"pigeon\"")
-		assert.Equal(t, PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+		assert.Equal(t, PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].Method)
 	})
 
 	t.Run("an unknown modem type is refused", func(t *testing.T) {
