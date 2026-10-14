@@ -45,6 +45,7 @@ func testPTT(cfg *RadioConfig, gpioSysfsDir string) *PTT {
 	var p = new(PTT)
 	p.audioConfig = cfg
 	p.gpioSysfsDir = gpioSysfsDir
+	p.serialControl = setSerialControlLine
 
 	return p
 }
@@ -538,16 +539,14 @@ func (c serialLineChange) name() string {
 // captureSerialControlLines collects the changes made to a serial port's
 // control lines rather than letting them reach the port, which neither a
 // pseudo terminal nor a plain file has any of.
-func captureSerialControlLines(t *testing.T) *[]serialLineChange {
+func captureSerialControlLines(t *testing.T, p *PTT) *[]serialLineChange {
 	t.Helper()
 
 	var changes = new([]serialLineChange)
 
-	serialControlCapture = func(bit int, on bool) {
+	p.serialControl = func(_ int, bit int, on bool) {
 		*changes = append(*changes, serialLineChange{bit: bit, on: on})
 	}
-
-	t.Cleanup(func() { serialControlCapture = nil })
 
 	return changes
 }
@@ -576,7 +575,7 @@ func openTestPTTSerialPort(t *testing.T, line ptt_line_t, line2 ptt_line_t) (*PT
 
 	// After newPTT, which sets the initial state off and would otherwise
 	// show up as a change the test did not ask for.
-	return p, cfg, captureSerialControlLines(t)
+	return p, cfg, captureSerialControlLines(t, p)
 }
 
 // Both control lines a serial port can key with, in both directions, and the
@@ -712,14 +711,12 @@ func TestPttTermWaitsForSet(t *testing.T) {
 	var release = make(chan struct{})
 	var held atomic.Bool
 
-	serialControlCapture = func(int, bool) {
+	p.serialControl = func(int, int, bool) {
 		if held.CompareAndSwap(false, true) {
 			close(inSet)
 			<-release
 		}
 	}
-
-	t.Cleanup(func() { serialControlCapture = nil })
 
 	var setDone = make(chan struct{})
 

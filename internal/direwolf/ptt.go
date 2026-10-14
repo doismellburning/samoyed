@@ -134,31 +134,16 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func _TIOCM_real(fd int, value int, on bool) {
+// setSerialControlLine sets or clears one of a serial port's control lines.
+func setSerialControlLine(fd int, bit int, on bool) {
 	var stuff, _ = unix.IoctlGetInt(fd, unix.TIOCMGET)
 	if on {
-		stuff |= value
+		stuff |= bit
 	} else {
-		stuff &= ^value
+		stuff &= ^bit
 	}
 
 	unix.IoctlSetInt(fd, unix.TIOCMSET, stuff)
-}
-
-func RTS_ON(fd uintptr) {
-	_TIOCM(int(fd), unix.TIOCM_RTS, true)
-}
-
-func RTS_OFF(fd uintptr) {
-	_TIOCM(int(fd), unix.TIOCM_RTS, false)
-}
-
-func DTR_ON(fd uintptr) {
-	_TIOCM(int(fd), unix.TIOCM_DTR, true)
-}
-
-func DTR_OFF(fd uintptr) {
-	_TIOCM(int(fd), unix.TIOCM_DTR, false)
 }
 
 const LPT_IO_ADDR = 0x378
@@ -218,6 +203,13 @@ type PTT struct {
 	// lptPortPath is a field rather than always defaultLPTPortPath for the
 	// same reason: a test can stand an ordinary file in for the I/O ports.
 	lptPortPath string
+
+	// serialControl sets or clears one of a serial port's control lines.  It
+	// is a field rather than always setSerialControlLine so that a test can
+	// see which line was driven and at what level: neither a pseudo terminal
+	// nor a plain file has modem control lines, and the ioctls simply fail on
+	// them, which is why their result is ignored.
+	serialControl func(fd int, bit int, on bool)
 
 	// mu guards the handles below.  Set reads them from the transmit and
 	// receive threads while Term, run by the shutdown path, closes and
@@ -312,6 +304,7 @@ func newPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool),
 	p.debugLevel = debug
 	p.gpioSysfsDir = gpioSysfsDir
 	p.lptPortPath = defaultLPTPortPath
+	p.serialControl = setSerialControlLine
 
 	var err = p.init()
 	if err != nil {
@@ -440,17 +433,9 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 		p.fd[channel][ot] != nil {
 		switch p.audioConfig.achan[channel].octrl[ot].ptt_line {
 		case PTT_LINE_RTS:
-			if ptt != 0 {
-				RTS_ON(p.fd[channel][ot].Fd())
-			} else {
-				RTS_OFF(p.fd[channel][ot].Fd())
-			}
+			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_RTS, ptt != 0)
 		case PTT_LINE_DTR:
-			if ptt != 0 {
-				DTR_ON(p.fd[channel][ot].Fd())
-			} else {
-				DTR_OFF(p.fd[channel][ot].Fd())
-			}
+			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_DTR, ptt != 0)
 		case PTT_LINE_NONE:
 		}
 
@@ -460,17 +445,9 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 
 		switch p.audioConfig.achan[channel].octrl[ot].ptt_line2 {
 		case PTT_LINE_RTS:
-			if ptt2 != 0 {
-				RTS_ON(p.fd[channel][ot].Fd())
-			} else {
-				RTS_OFF(p.fd[channel][ot].Fd())
-			}
+			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_RTS, ptt2 != 0)
 		case PTT_LINE_DTR:
-			if ptt2 != 0 {
-				DTR_ON(p.fd[channel][ot].Fd())
-			} else {
-				DTR_OFF(p.fd[channel][ot].Fd())
-			}
+			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_DTR, ptt2 != 0)
 		case PTT_LINE_NONE:
 		}
 		/* else neither one */
