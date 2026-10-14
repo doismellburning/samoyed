@@ -22,8 +22,6 @@ var digipeaterTestDigi *Digipeater
 func digipeater_test(t *testing.T, in, out string) {
 	t.Helper()
 
-	dw_printf("\n")
-
 	/*
 	 * As an extra test, change text to internal format back to
 	 * text again to make sure it comes out the same.
@@ -36,8 +34,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	rec += string(pinfo)
 
 	if in != rec {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Text/internal/text error-1 %s -> %s\n", in, rec)
+		t.Logf("Text/internal/text error-1 %s -> %s", in, rec)
 	}
 
 	/*
@@ -59,20 +56,14 @@ func digipeater_test(t *testing.T, in, out string) {
 	rec += string(pinfo)
 
 	if in != rec {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf(
-			"internal/frame/internal/text error-2 %s -> %s\n",
-			in,
-			rec,
-		)
+		t.Logf("internal/frame/internal/text error-2 %s -> %s", in, rec)
 	}
 
 	/*
 	 * On with the digipeater test.
 	 */
 
-	text_color_set(DW_COLOR_REC)
-	dw_printf("Rec\t%s\n", rec)
+	t.Logf("Rec\t%s", rec)
 
 	//TODO:										  	             Add filtering to test.
 	//											             V
@@ -87,14 +78,11 @@ func digipeater_test(t *testing.T, in, out string) {
 		xmit += string(pinfo)
 	}
 
-	text_color_set(DW_COLOR_XMIT)
-	dw_printf("Xmit\t%s\n", xmit)
+	t.Logf("Xmit\t%s", xmit)
 
 	if !assert.Equal(t, out, xmit) {
 		digipeaterTestFailed++
 	}
-
-	dw_printf("\n")
 }
 
 func Test_Digipeater(t *testing.T) {
@@ -344,10 +332,8 @@ func Test_Digipeater(t *testing.T) {
 		"W1ABC>TEST67,SPRNGR-1,HOP7*:")
 
 	if digipeaterTestFailed == 0 {
-		dw_printf("SUCCESS -- All digipeater tests passed.\n")
+		t.Log("SUCCESS -- All digipeater tests passed.")
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - %d digipeater tests failed.\n", digipeaterTestFailed)
-		t.Fail()
+		t.Errorf("ERROR - %d digipeater tests failed.", digipeaterTestFailed)
 	}
 } /* end main */
