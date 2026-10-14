@@ -287,7 +287,7 @@ x = Silence FX.25 information.`)
 	var misc_config = new(misc_config_s)
 	var dw_tt_config tt_config_s
 	var digi_config DigipeaterConfig
-	var cdigi_config cdigi_config_s
+	var cdigi_config ConnectedDigipeaterConfig
 	var igate_config igate_config_s
 
 	var configResult = config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config, aprsSymbolData)

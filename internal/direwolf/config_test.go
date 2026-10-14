@@ -218,7 +218,7 @@ func Test_IsNoCall(t *testing.T) {
 type configs struct {
 	audio *RadioConfig
 	digi  *DigipeaterConfig
-	cdigi *cdigi_config_s
+	cdigi *ConnectedDigipeaterConfig
 	tt    *tt_config_s
 	igate *igate_config_s
 	misc  *misc_config_s
@@ -265,7 +265,7 @@ func parseConfigWith(t *testing.T, pattern string, content string, symbolTable s
 	var c = configs{
 		audio:  new(RadioConfig),
 		digi:   new(DigipeaterConfig),
-		cdigi:  new(cdigi_config_s),
+		cdigi:  new(ConnectedDigipeaterConfig),
 		tt:     new(tt_config_s),
 		igate:  new(igate_config_s),
 		misc:   new(misc_config_s),
@@ -682,7 +682,7 @@ func Test_config_init_modem_directive(t *testing.T) {
 
 			var audioConfig = new(RadioConfig)
 			var digiConfig DigipeaterConfig
-			var cdigiConfig cdigi_config_s
+			var cdigiConfig ConnectedDigipeaterConfig
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
@@ -731,7 +731,7 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 
 			var audioConfig = new(RadioConfig)
 			var digiConfig DigipeaterConfig
-			var cdigiConfig cdigi_config_s
+			var cdigiConfig ConnectedDigipeaterConfig
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
@@ -776,7 +776,7 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 
 			var audioConfig = new(RadioConfig)
 			var digiConfig DigipeaterConfig
-			var cdigiConfig cdigi_config_s
+			var cdigiConfig ConnectedDigipeaterConfig
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
@@ -785,9 +785,9 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 				&ttConfig, &igateConfig, &miscConfig, nil)
 
 			if tt.wantSet {
-				assert.NotEmpty(t, cdigiConfig.cfilter_str[0][0])
+				assert.NotEmpty(t, cdigiConfig.CFilterStr[0][0])
 			} else {
-				assert.Empty(t, cdigiConfig.cfilter_str[0][0])
+				assert.Empty(t, cdigiConfig.CFilterStr[0][0])
 			}
 		})
 	}
@@ -1372,31 +1372,31 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a valid line enables connected mode digipeating",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.True(c.cdigi.enabled[0][1])
-					a.False(c.cdigi.has_alias[0][1])
+					a.True(c.cdigi.Enabled[0][1])
+					a.False(c.cdigi.HasAlias[0][1])
 				},
 			},
 			{
 				name:   "nothing is digipeated by default",
 				config: "MYCALL Q1TEST\nACHANNELS 2\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.cdigi.enabled[0][1])
+					a.False(c.cdigi.Enabled[0][1])
 				},
 			},
 			{
 				name:   "an alias pattern is stored",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1 ^Q[12]TEST$\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.True(c.cdigi.enabled[0][1])
-					a.True(c.cdigi.has_alias[0][1])
-					a.NotNil(c.cdigi.alias[0][1])
+					a.True(c.cdigi.Enabled[0][1])
+					a.True(c.cdigi.HasAlias[0][1])
+					a.NotNil(c.cdigi.Alias[0][1])
 				},
 			},
 			{
 				name:   "an unusable alias pattern is rejected and nothing is enabled",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1 ^Q([12]TEST$\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.cdigi.enabled[0][1])
+					a.False(c.cdigi.Enabled[0][1])
 					a.Contains(c.output, "Invalid alias matching pattern")
 				},
 			},
@@ -1404,7 +1404,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a non-numeric channel is rejected",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT zero 1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.cdigi.enabled[0][1])
+					a.False(c.cdigi.Enabled[0][1])
 					a.Contains(c.output, "is not allowed for FROM-channel")
 				},
 			},
@@ -1419,7 +1419,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "anything after the alias is reported",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1 ^Q[12]TEST$ extra\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.True(c.cdigi.enabled[0][1])
+					a.True(c.cdigi.Enabled[0][1])
 					a.Contains(c.output, "where end of line was expected")
 				},
 			},
@@ -1427,7 +1427,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "digipeating to a channel with no callsign is switched off again",
 				config: "ACHANNELS 2\nCDIGIPEAT 0 1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.cdigi.enabled[0][1])
+					a.False(c.cdigi.Enabled[0][1])
 					a.Contains(c.output, "MYCALL must be set for transmit channel")
 				},
 			},
@@ -1435,7 +1435,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing TO-channel does not eat the next line",
 				config: "ACHANNELS 2\nCDIGIPEAT 0\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.False(c.cdigi.enabled[0][1])
+					a.False(c.cdigi.Enabled[0][1])
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -1445,8 +1445,8 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "the longer name is the same handler as CDIGIPEAT",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEATER 0 1 ^Q[12]TEST$\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.True(c.cdigi.enabled[0][1])
-					a.True(c.cdigi.has_alias[0][1])
+					a.True(c.cdigi.Enabled[0][1])
+					a.True(c.cdigi.HasAlias[0][1])
 				},
 			},
 		},

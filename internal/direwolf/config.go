@@ -892,7 +892,7 @@ type parseState struct {
 
 	audio *RadioConfig
 	digi  *DigipeaterConfig
-	cdigi *cdigi_config_s
+	cdigi *ConnectedDigipeaterConfig
 	tt    *tt_config_s
 	igate *igate_config_s
 	misc  *misc_config_s
@@ -1220,7 +1220,7 @@ func (ps *parseState) readLegacy(r io.Reader, name string) {
 // wants to act on it - see the --config-check option in DirewolfMain.
 func config_init(fname string, p_audio_config *RadioConfig,
 	p_digi_config *DigipeaterConfig,
-	p_cdigi_config *cdigi_config_s,
+	p_cdigi_config *ConnectedDigipeaterConfig,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
 	p_misc_config *misc_config_s,
@@ -1532,15 +1532,15 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 			/* Connected mode digipeating. */
 
-			if i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && ps.cdigi.enabled[i][j] {
+			if i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && ps.cdigi.Enabled[i][j] {
 				if IsNoCall(ps.audio.mycall[i]) {
 					ps.errorf("config file: MYCALL must be set for receive channel %d before digipeating is allowed", i)
-					ps.cdigi.enabled[i][j] = false
+					ps.cdigi.Enabled[i][j] = false
 				}
 
 				if IsNoCall(ps.audio.mycall[j]) {
 					ps.errorf("config file: MYCALL must be set for transmit channel %d before digipeating is allowed", j)
-					ps.cdigi.enabled[i][j] = false
+					ps.cdigi.Enabled[i][j] = false
 				}
 
 				var b = 0
@@ -3664,8 +3664,8 @@ func handleCDIGIPEAT(ps *parseState) error {
 	if t != "" {
 		var r, err = regexp.Compile(t)
 		if err == nil {
-			ps.cdigi.alias[from_chan][to_chan] = r
-			ps.cdigi.has_alias[from_chan][to_chan] = true
+			ps.cdigi.Alias[from_chan][to_chan] = r
+			ps.cdigi.HasAlias[from_chan][to_chan] = true
 		} else {
 			return fmt.Errorf("config file: Invalid alias matching pattern on line %d:\n%w", ps.line, err)
 		}
@@ -3673,7 +3673,7 @@ func handleCDIGIPEAT(ps *parseState) error {
 		t = ps.split(false)
 	}
 
-	ps.cdigi.enabled[from_chan][to_chan] = true
+	ps.cdigi.Enabled[from_chan][to_chan] = true
 
 	if t != "" {
 		ps.errorf("config file, line %d: Found \"%s\" where end of line was expected", ps.line, t)
@@ -3869,7 +3869,7 @@ func handleCFILTER(ps *parseState) error {
 		return fmt.Errorf("config file, line %d: Invalid CFILTER expression:\n%w", ps.line, err)
 	}
 
-	ps.cdigi.cfilter_str[from_chan][to_chan] = t
+	ps.cdigi.CFilterStr[from_chan][to_chan] = t
 
 	return nil
 }

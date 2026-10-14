@@ -27,14 +27,14 @@ const (
 
 // setupCDigipeater points a connected mode digipeater at two radio channels
 // with our callsign on each, and returns what it sends.
-func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *cdigi_config_s, *frameRecorder) {
+func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *ConnectedDigipeaterConfig, *frameRecorder) {
 	t.Helper()
 
 	var ports [MAX_TOTAL_CHANS]DigipeaterPort
 	ports[cdigiFromChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumRadio}
 	ports[cdigiToChan] = DigipeaterPort{MyCall: "Q2TEST", Medium: phy.MediumRadio}
 
-	var cdigiConfig = new(cdigi_config_s)
+	var cdigiConfig = new(ConnectedDigipeaterConfig)
 
 	var tx = new(frameRecorder)
 
@@ -164,7 +164,7 @@ func TestCDigipeatMatchFilterError(t *testing.T) {
 func TestCDigipeaterSameChannel(t *testing.T) {
 	var cdigi, cdigiConfig, tx = setupCDigipeater(t)
 
-	cdigiConfig.enabled[cdigiFromChan][cdigiFromChan] = true
+	cdigiConfig.Enabled[cdigiFromChan][cdigiFromChan] = true
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
@@ -184,7 +184,7 @@ func TestCDigipeaterSameChannel(t *testing.T) {
 func TestCDigipeaterCrossChannel(t *testing.T) {
 	var cdigi, cdigiConfig, tx = setupCDigipeater(t)
 
-	cdigiConfig.enabled[cdigiFromChan][cdigiToChan] = true
+	cdigiConfig.Enabled[cdigiFromChan][cdigiToChan] = true
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
@@ -248,7 +248,7 @@ func TestCDigipeaterNetworkTNCChannel(t *testing.T) {
 	var cdigi, cdigiConfig, tx = setupCDigipeater(t)
 
 	cdigi.ports[cdigiFromChan].Medium = phy.MediumNetTNC
-	cdigiConfig.enabled[cdigiFromChan][cdigiFromChan] = true
+	cdigiConfig.Enabled[cdigiFromChan][cdigiFromChan] = true
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
@@ -263,7 +263,7 @@ func TestNewConnectedDigipeater(t *testing.T) {
 	var ports [MAX_TOTAL_CHANS]DigipeaterPort
 	ports[cdigiFromChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumRadio}
 
-	var cdigiConfig = new(cdigi_config_s)
+	var cdigiConfig = new(ConnectedDigipeaterConfig)
 
 	var filter = new(pfilter.PacketFilter)
 

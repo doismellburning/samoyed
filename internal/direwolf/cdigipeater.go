@@ -35,7 +35,8 @@ import (
  * and it is passed to NewConnectedDigipeater at application start up time.
  */
 
-type cdigi_config_s struct {
+// ConnectedDigipeaterConfig is the connected mode digipeater's configuration.
+type ConnectedDigipeaterConfig struct {
 
 	/*
 	 * Rules for each of the [from_chan][to_chan] combinations.
@@ -44,17 +45,17 @@ type cdigi_config_s struct {
 	// For APRS digipeater, we use MAX_TOTAL_CHANS because we use external TNCs.
 	// Connected mode packet must use internal modems we we use MAX_RADIO_CHANS.
 
-	enabled [MAX_RADIO_CHANS][MAX_RADIO_CHANS]bool // Is it enabled for from/to pair?
+	Enabled [MAX_RADIO_CHANS][MAX_RADIO_CHANS]bool // Is it enabled for from/to pair?
 
-	has_alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]bool // If there was no alias in the config file,
+	HasAlias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]bool // If there was no alias in the config file,
 	// the structure below will not be set up
 	// properly and an attempt to use it could
 	// result in a crash.  (fixed v1.5)
 	// Not needed for [APRS] DIGIPEAT because
-	// the alias is mandatory there.
-	alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]*regexp.Regexp
+	// the Alias is mandatory there.
+	Alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]*regexp.Regexp
 
-	cfilter_str [MAX_RADIO_CHANS][MAX_RADIO_CHANS]string
+	CFilterStr [MAX_RADIO_CHANS][MAX_RADIO_CHANS]string
 	// NULL or optional Packet Filter strings such as "t/m".
 }
 
@@ -63,7 +64,7 @@ type cdigi_config_s struct {
 // from/to channel.
 type ConnectedDigipeater struct {
 	ports    [MAX_TOTAL_CHANS]DigipeaterPort
-	config   *cdigi_config_s
+	config   *ConnectedDigipeaterConfig
 	filter   *pfilter.PacketFilter
 	transmit frameSender // Where digipeated packets go; nil to drop them.
 	count    [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
@@ -88,7 +89,7 @@ type ConnectedDigipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewConnectedDigipeater(ports [MAX_TOTAL_CHANS]DigipeaterPort, p_cdigi_config *cdigi_config_s, filter *pfilter.PacketFilter, transmit frameSender) *ConnectedDigipeater {
+func NewConnectedDigipeater(ports [MAX_TOTAL_CHANS]DigipeaterPort, p_cdigi_config *ConnectedDigipeaterConfig, filter *pfilter.PacketFilter, transmit frameSender) *ConnectedDigipeater {
 	var d = new(ConnectedDigipeater)
 	d.ports = ports
 	d.config = p_cdigi_config
@@ -136,7 +137,7 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 */
 
 	for to_chan := range MAX_RADIO_CHANS {
-		if d.config.enabled[from_chan][to_chan] && to_chan == from_chan {
+		if d.config.Enabled[from_chan][to_chan] && to_chan == from_chan {
 			d.digipeatTo(from_chan, to_chan, pp)
 		}
 	}
@@ -146,7 +147,7 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 */
 
 	for to_chan := range MAX_RADIO_CHANS {
-		if d.config.enabled[from_chan][to_chan] && to_chan != from_chan {
+		if d.config.Enabled[from_chan][to_chan] && to_chan != from_chan {
 			d.digipeatTo(from_chan, to_chan, pp)
 		}
 	}
@@ -157,9 +158,9 @@ func (d *ConnectedDigipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 func (d *ConnectedDigipeater) digipeatTo(from_chan int, to_chan int, pp *ax25.Packet) {
 	var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
 		d.ports[to_chan].MyCall,
-		d.config.has_alias[from_chan][to_chan],
-		d.config.alias[from_chan][to_chan], to_chan,
-		d.config.cfilter_str[from_chan][to_chan])
+		d.config.HasAlias[from_chan][to_chan],
+		d.config.Alias[from_chan][to_chan], to_chan,
+		d.config.CFilterStr[from_chan][to_chan])
 	if result != nil {
 		if d.transmit != nil {
 			d.transmit(to_chan, TQ_PRIO_0_HI, result)
