@@ -171,7 +171,7 @@ func TestBPSKPrefilterFitsBelowCarrier(t *testing.T) {
 
 		var hook = test.NewGlobal()
 
-		var _, initErr = NewDemodulator(0, audioConfig.achan[0], 44100)
+		var _, initErr = NewDemodulator(0, audioConfig.achan[0].ModemConfig, audioConfig.achan[0].layer2_xmit, 44100)
 		require.NoError(t, initErr)
 
 		assert.Nil(t, lastEntryWithMessage(hook, "Prefilter range doesn't make sense"), "at %d baud", baud)

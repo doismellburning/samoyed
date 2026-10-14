@@ -112,7 +112,7 @@ func TestDemodInitCapsProfileLetters(t *testing.T) {
 
 	t.Cleanup(hook.Reset)
 
-	var d, dErr = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+	var d, dErr = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 	require.NoError(t, dErr)
 
 	assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
@@ -149,7 +149,7 @@ func TestDemodInitIgnoresUnknownAFSKProfiles(t *testing.T) {
 
 		var hook = test.NewGlobal()
 
-		var d, dErr = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+		var d, dErr = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 		require.NoError(t, dErr)
 
 		assert.Equal(t, tc.want, d.profiles, tc.profiles)
@@ -188,7 +188,7 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 
 		var hook = test.NewGlobal()
 
-		var d, dErr = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+		var d, dErr = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 		require.NoError(t, dErr)
 
 		assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
@@ -211,7 +211,7 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
-	var d, dErr = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+	var d, dErr = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 	require.NoError(t, dErr)
 
 	var done = make(chan struct{})

@@ -21,6 +21,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -102,7 +103,7 @@ func demod_init(pa *RadioConfig) ([MAX_RADIO_CHANS]*Demodulator, error) {
 
 	for channel := range MAX_RADIO_CHANS {
 		if pa.chan_medium[channel] == MEDIUM_RADIO {
-			var demodulator, err = NewDemodulator(channel, pa.achan[channel], pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
+			var demodulator, err = NewDemodulator(channel, pa.achan[channel].ModemConfig, pa.achan[channel].layer2_xmit, pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
 			if err != nil {
 				return [MAX_RADIO_CHANS]*Demodulator{}, err
 			}
@@ -125,12 +126,13 @@ func demod_init(pa *RadioConfig) ([MAX_RADIO_CHANS]*Demodulator, error) {
 	return demodulators, nil
 } /* end demod_init */
 
-// NewDemodulator sets up the demodulators for a radio channel, from achan, its
-// settings, and the sample rate of its audio device.  What it works out from
-// them - how many subchannels and slicers, the normalised profiles, the
-// decimation and upsampling ratios - it keeps: achan is its own copy, and the
+// NewDemodulator sets up the demodulators for a radio channel, from its modem
+// settings and the sample rate of its audio device; layer2Xmit, how the channel
+// frames what it sends, is only for the summary it logs.  What it works out
+// from them - how many subchannels and slicers, the normalised profiles, the
+// decimation and upsampling ratios - it keeps: modem is its own copy, and the
 // configuration is left as it was.
-func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demodulator, error) { //nolint:funlen // Ported from Dire Wolf as one function
+func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, samplesPerSec int) (*Demodulator, error) { //nolint:funlen // Ported from Dire Wolf as one function
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	var demodulator = new(Demodulator)
@@ -149,7 +151,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 	var numSubchan = 1
 	var numSlicers = 1
 
-	switch achan.ModemType {
+	switch modem.ModemType {
 	case MODEM_OFF:
 
 	case MODEM_AFSK, MODEM_EAS:
@@ -163,7 +165,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 		var justLettersBuilder strings.Builder
 		var have_plus = 0
 
-		var profileStr = achan.Profiles
+		var profileStr = modem.Profiles
 		for i, p := range profileStr {
 			if ascii.IsAlpha(p) {
 				var letter = ascii.ToUpper(p)
@@ -173,7 +175,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 				if !strings.ContainsRune("ABDE", letter) {
 					logrus.WithFields(logrus.Fields{
 						"channel":  channel,
-						"profiles": achan.Profiles,
+						"profiles": modem.Profiles,
 						"profile":  string(letter),
 					}).Error("Unknown AFSK demodulator type; ignoring it")
 
@@ -188,7 +190,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 				if i+1 != len(profileStr) {
 					logrus.WithFields(logrus.Fields{
 						"channel":  channel,
-						"profiles": achan.Profiles,
+						"profiles": modem.Profiles,
 					}).Error("+ option must appear at end of demodulator types")
 				}
 			} else if p == '-' {
@@ -197,13 +199,13 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 				if i+1 != len(profileStr) {
 					logrus.WithFields(logrus.Fields{
 						"channel":  channel,
-						"profiles": achan.Profiles,
+						"profiles": modem.Profiles,
 					}).Error("- option must appear at end of demodulator types")
 				}
 			} else {
 				logrus.WithFields(logrus.Fields{
 					"channel":  channel,
-					"profiles": achan.Profiles,
+					"profiles": modem.Profiles,
 				}).Error("Demodulator types can contain only letters and + - characters")
 			}
 		}
@@ -259,11 +261,11 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 		 * These can get extremely large for low speeds, e.g. 300 baud.
 		 * In this case, increase the decimation ration.  Crude approximation. Could be improved.
 		 */
-		if achan.Decimate == 0 &&
+		if modem.Decimate == 0 &&
 			samplesPerSec > 40000 &&
-			achan.Baud < 600 {
+			modem.Baud < 600 {
 			// Avoid enormous number of filter taps.
-			achan.Decimate = 3
+			modem.Decimate = 3
 		}
 
 		/*
@@ -280,12 +282,12 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			have_plus = 0
 		}
 
-		achan.Profiles = just_letters
+		modem.Profiles = just_letters
 
-		dwutil.Assert(len(achan.Profiles) >= 1)
+		dwutil.Assert(len(modem.Profiles) >= 1)
 
 		if have_plus != 0 {
-			achan.Profiles += "+"
+			modem.Profiles += "+"
 		}
 
 		/* These can be increased later for the multi-frequency case. */
@@ -301,39 +303,39 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 		 *	- Multiple frequencies.
 		 */
 
-		if have_plus != 0 && achan.NumFreq > 1 {
+		if have_plus != 0 && modem.NumFreq > 1 {
 			logrus.WithField("channel", channel).Error("Demodulator + option can't be combined with multiple frequencies")
 			numSubchan = 1 // Will be set higher later.
-			achan.NumFreq = 1
+			modem.NumFreq = 1
 		}
 
-		if num_letters > 1 && achan.NumFreq > 1 {
+		if num_letters > 1 && modem.NumFreq > 1 {
 			logrus.WithField("channel", channel).Error("Multiple demodulator types can't be combined with multiple frequencies")
 
-			achan.Profiles = string(achan.Profiles[0])
+			modem.Profiles = string(modem.Profiles[0])
 			num_letters = 1
 		}
 
-		if achan.Decimate == 0 {
-			achan.Decimate = 1
+		if modem.Decimate == 0 {
+			modem.Decimate = 1
 			if strings.Contains(just_letters, "B") && samplesPerSec > 40000 {
-				achan.Decimate = 3
+				modem.Decimate = 3
 			}
 		}
 
 		var fields = logrus.Fields{
 			"channel":      channel,
-			"baud":         achan.Baud,
-			"mark":         achan.MarkFreq,
-			"space":        achan.SpaceFreq,
-			"profiles":     achan.Profiles,
+			"baud":         modem.Baud,
+			"mark":         modem.MarkFreq,
+			"space":        modem.SpaceFreq,
+			"profiles":     modem.Profiles,
 			"sample_rate":  samplesPerSec,
-			"tx":           achan.layer2_xmit,
-			"dtmf_decoder": achan.DTMFDecode != DTMF_DECODE_OFF,
+			"tx":           layer2Xmit,
+			"dtmf_decoder": modem.DTMFDecode != DTMF_DECODE_OFF,
 		}
 
-		if achan.Decimate != 1 {
-			fields["decimate"] = achan.Decimate
+		if modem.Decimate != 1 {
+			fields["decimate"] = modem.Decimate
 		}
 
 		logrus.WithFields(fields).Info("AFSK demodulator")
@@ -361,14 +363,14 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 				logrus.WithFields(logrus.Fields{
 					"channel":     channel,
 					"num_subchan": numSubchan,
-					"profiles":    achan.Profiles,
+					"profiles":    modem.Profiles,
 				}).Error("INTERNAL ERROR: num_subchan != len(profiles)")
 			}
 
-			if achan.NumFreq != 1 {
+			if modem.NumFreq != 1 {
 				logrus.WithFields(logrus.Fields{
 					"channel":  channel,
-					"num_freq": achan.NumFreq,
+					"num_freq": modem.NumFreq,
 				}).Error("INTERNAL ERROR: num_freq != 1")
 			}
 
@@ -377,9 +379,9 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 
 				var D = &demodulator.states[d]
 
-				var profile = achan.Profiles[d]
-				var mark = achan.MarkFreq
-				var space = achan.SpaceFreq
+				var profile = modem.Profiles[d]
+				var mark = modem.MarkFreq
+				var space = modem.SpaceFreq
 
 				if numSubchan != 1 {
 					logrus.WithFields(logrus.Fields{
@@ -391,8 +393,8 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 					}).Info("AFSK subchannel")
 				}
 
-				demod_afsk_init(samplesPerSec/achan.Decimate,
-					achan.Baud,
+				demod_afsk_init(samplesPerSec/modem.Decimate,
+					modem.Baud,
 					mark,
 					space,
 					profile,
@@ -424,17 +426,17 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 				}).Error("INTERNAL ERROR: len(profiles) != 1")
 			}
 
-			if achan.NumFreq != 1 {
+			if modem.NumFreq != 1 {
 				logrus.WithFields(logrus.Fields{
 					"channel":  channel,
-					"num_freq": achan.NumFreq,
+					"num_freq": modem.NumFreq,
 				}).Error("INTERNAL ERROR: num_freq != 1")
 			}
 
-			if achan.NumFreq != numSubchan {
+			if modem.NumFreq != numSubchan {
 				logrus.WithFields(logrus.Fields{
 					"channel":     channel,
-					"num_freq":    achan.NumFreq,
+					"num_freq":    modem.NumFreq,
 					"num_subchan": numSubchan,
 				}).Error("INTERNAL ERROR: num_freq != num_subchan")
 			}
@@ -446,11 +448,11 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 
 			numSlicers = MAX_SLICERS
 
-			demod_afsk_init(samplesPerSec/achan.Decimate,
-				achan.Baud,
-				achan.MarkFreq,
-				achan.SpaceFreq,
-				achan.Profiles[0],
+			demod_afsk_init(samplesPerSec/modem.Decimate,
+				modem.Baud,
+				modem.MarkFreq,
+				modem.SpaceFreq,
+				modem.Profiles[0],
 				D)
 
 			if have_plus != 0 {
@@ -472,24 +474,24 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			if num_letters != 1 {
 				logrus.WithFields(logrus.Fields{
 					"channel":  channel,
-					"profiles": achan.Profiles,
+					"profiles": modem.Profiles,
 				}).Error("INTERNAL ERROR: len(profiles) != 1")
 			}
 
-			numSubchan = achan.NumFreq
+			numSubchan = modem.NumFreq
 
-			for d := range achan.NumFreq {
+			for d := range modem.NumFreq {
 				dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 
 				var D = &demodulator.states[d]
 
-				var profile = achan.Profiles[0]
+				var profile = modem.Profiles[0]
 
-				var k = d*achan.Offset - ((achan.NumFreq-1)*achan.Offset)/2
-				var mark = achan.MarkFreq + k
-				var space = achan.SpaceFreq + k
+				var k = d*modem.Offset - ((modem.NumFreq-1)*modem.Offset)/2
+				var mark = modem.MarkFreq + k
+				var space = modem.SpaceFreq + k
 
-				if achan.NumFreq != 1 {
+				if modem.NumFreq != 1 {
 					logrus.WithFields(logrus.Fields{
 						"channel": channel,
 						"subchan": d,
@@ -499,8 +501,8 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 					}).Info("AFSK subchannel")
 				}
 
-				demod_afsk_init(samplesPerSec/achan.Decimate,
-					achan.Baud,
+				demod_afsk_init(samplesPerSec/modem.Decimate,
+					modem.Baud,
 					mark, space,
 					profile,
 					D)
@@ -523,47 +525,47 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 		// settleModemOptions has normally picked one already.  Without
 		// it, e.g. in a test, take the same default but leave the
 		// configuration alone.
-		var v26 = achan.V26Alternative
+		var v26 = modem.V26Alternative
 		if v26 == V26_UNSPECIFIED {
 			v26 = V26_DEFAULT
 		}
 
 		// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
 
-		if achan.Profiles == "" {
+		if modem.Profiles == "" {
 			//#if __arm__
 			//	        strlcpy (achan.profiles, "R", sizeof(achan.profiles));
 			//#else
-			achan.Profiles = defaultPSKProfiles(MODEM_QPSK)
+			modem.Profiles = defaultPSKProfiles(MODEM_QPSK)
 			//#endif
 		}
 
-		achan.Profiles = capProfiles(channel, achan.Profiles)
-		numSubchan = len(achan.Profiles)
+		modem.Profiles = capProfiles(channel, modem.Profiles)
+		numSubchan = len(modem.Profiles)
 
 		logrus.WithFields(logrus.Fields{
 			"channel":         channel,
-			"bps":             achan.Baud,
-			"profiles":        achan.Profiles,
+			"bps":             modem.Baud,
+			"profiles":        modem.Profiles,
 			"sample_rate":     samplesPerSec,
-			"tx":              achan.layer2_xmit,
+			"tx":              layer2Xmit,
 			"compatible_with": dwutil.IfThenElse(v26 == V26_B, "MFJ-2400", "earlier direwolf"),
-			"dtmf_decoder":    achan.DTMFDecode != DTMF_DECODE_OFF,
+			"dtmf_decoder":    modem.DTMFDecode != DTMF_DECODE_OFF,
 		}).Info("QPSK demodulator")
 
 		for d := range numSubchan {
 			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 			var D = &demodulator.states[d]
-			var profile = achan.Profiles[d]
+			var profile = modem.Profiles[d]
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("About to call demod_psk_init for Q-PSK case, modem_type=%d, profile='%c'\n",
 			//	achan.modem_type, profile);
 
-			var pskErr = demod_psk_init(achan.ModemType,
+			var pskErr = demod_psk_init(modem.ModemType,
 				v26,
 				samplesPerSec,
-				achan.Baud,
+				modem.Baud,
 				profile,
 				D)
 			if pskErr != nil {
@@ -582,39 +584,39 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 
 	case MODEM_8PSK: // New for 1.4
 		// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
-		if achan.Profiles == "" {
+		if modem.Profiles == "" {
 			//#if __arm__
 			//	        strlcpy (achan.profiles, "V", sizeof(achan.profiles));
 			//#else
-			achan.Profiles = defaultPSKProfiles(MODEM_8PSK)
+			modem.Profiles = defaultPSKProfiles(MODEM_8PSK)
 			//#endif
 		}
 
-		achan.Profiles = capProfiles(channel, achan.Profiles)
-		numSubchan = len(achan.Profiles)
+		modem.Profiles = capProfiles(channel, modem.Profiles)
+		numSubchan = len(modem.Profiles)
 
 		logrus.WithFields(logrus.Fields{
 			"channel":      channel,
-			"bps":          achan.Baud,
-			"profiles":     achan.Profiles,
+			"bps":          modem.Baud,
+			"profiles":     modem.Profiles,
 			"sample_rate":  samplesPerSec,
-			"tx":           achan.layer2_xmit,
-			"dtmf_decoder": achan.DTMFDecode != DTMF_DECODE_OFF,
+			"tx":           layer2Xmit,
+			"dtmf_decoder": modem.DTMFDecode != DTMF_DECODE_OFF,
 		}).Info("8PSK demodulator")
 
 		for d := range numSubchan {
 			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 			var D = &demodulator.states[d]
-			var profile = achan.Profiles[d]
+			var profile = modem.Profiles[d]
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("About to call demod_psk_init for 8-PSK case, modem_type=%d, profile='%c'\n",
 			//	achan.modem_type, profile);
 
-			var pskErr = demod_psk_init(achan.ModemType,
-				achan.V26Alternative,
+			var pskErr = demod_psk_init(modem.ModemType,
+				modem.V26Alternative,
 				samplesPerSec,
-				achan.Baud,
+				modem.Baud,
 				profile,
 				D)
 			if pskErr != nil {
@@ -632,31 +634,31 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 		}
 
 	case MODEM_BPSK:
-		if achan.Profiles == "" {
-			achan.Profiles = defaultPSKProfiles(MODEM_BPSK)
+		if modem.Profiles == "" {
+			modem.Profiles = defaultPSKProfiles(MODEM_BPSK)
 		}
 
-		achan.Profiles = capProfiles(channel, achan.Profiles)
-		numSubchan = len(achan.Profiles)
+		modem.Profiles = capProfiles(channel, modem.Profiles)
+		numSubchan = len(modem.Profiles)
 
 		logrus.WithFields(logrus.Fields{
 			"channel":      channel,
-			"bps":          achan.Baud,
-			"profiles":     achan.Profiles,
+			"bps":          modem.Baud,
+			"profiles":     modem.Profiles,
 			"sample_rate":  samplesPerSec,
-			"tx":           achan.layer2_xmit,
-			"dtmf_decoder": achan.DTMFDecode != DTMF_DECODE_OFF,
+			"tx":           layer2Xmit,
+			"dtmf_decoder": modem.DTMFDecode != DTMF_DECODE_OFF,
 		}).Info("BPSK demodulator")
 
 		for d := range numSubchan {
 			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
 			var D = &demodulator.states[d]
-			var profile = achan.Profiles[d]
+			var profile = modem.Profiles[d]
 
-			var pskErr = demod_psk_init(achan.ModemType,
+			var pskErr = demod_psk_init(modem.ModemType,
 				V26_UNSPECIFIED,
 				samplesPerSec,
-				achan.Baud,
+				modem.Baud,
 				profile,
 				D)
 			if pskErr != nil {
@@ -676,7 +678,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 		   case MODEM_AIS:
 		*/
 		{
-			if achan.Profiles == "" {
+			if modem.Profiles == "" {
 				/* Apply default if not set earlier. */
 				/* Not sure if it should be on for ARM too. */
 				/* Need to take a look at CPU usage and performance difference. */
@@ -684,7 +686,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 				/* Version 1.5:  Remove special case for ARM. */
 				/* We want higher performance to be the default. */
 				/* "MODEM 9600 -" can be used on very slow CPU if necessary. */
-				achan.Profiles = "+"
+				modem.Profiles = "+"
 			}
 
 			/*
@@ -692,35 +694,35 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			 * Easier to check here because demod_9600_init might have an adjusted sample rate.
 			 */
 
-			var ratio = float64(samplesPerSec) / float64(achan.Baud)
+			var ratio = float64(samplesPerSec) / float64(modem.Baud)
 
 			/*
 			 * Set reasonable upsample ratio if user did not override.
 			 */
 
-			if achan.Upsample == 0 {
+			if modem.Upsample == 0 {
 				if ratio < 4 {
 					// This is extreme.
 					// No one should be using a sample rate this low but
 					// amazingly a recording with 22050 rate can be decoded.
 					// 3 and 4 are the same.  Need more tests.
-					achan.Upsample = 4
+					modem.Upsample = 4
 				} else if ratio < 5 {
 					// example: 44100 / 9600 is 4.59
 					// 3 is slightly better than 2 or 4.
-					achan.Upsample = 3
+					modem.Upsample = 3
 				} else if ratio < 10 {
 					// example: 48000 / 9600 = 5
 					// 3 is slightly better than 2 or 4.
-					achan.Upsample = 3
+					modem.Upsample = 3
 				} else if ratio < 15 {
 					// ... guessing
-					achan.Upsample = 2
+					modem.Upsample = 2
 				} else { // >= 15
 					//
 					// An example of this might be .....
 					// Probably no benefit.
-					achan.Upsample = 1
+					modem.Upsample = 1
 				}
 			}
 
@@ -732,20 +734,20 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 
 			logrus.WithFields(logrus.Fields{
 				"channel":      channel,
-				"baud":         achan.Baud,
-				"profiles":     achan.Profiles,
+				"baud":         modem.Baud,
+				"profiles":     modem.Profiles,
 				"sample_rate":  samplesPerSec,
-				"upsample":     achan.Upsample,
-				"tx":           achan.layer2_xmit,
-				"dtmf_decoder": achan.DTMFDecode != DTMF_DECODE_OFF,
-			}).Info(dwutil.IfThenElse(achan.ModemType == MODEM_AIS, "AIS demodulator", "K9NG/G3RUH demodulator"))
+				"upsample":     modem.Upsample,
+				"tx":           layer2Xmit,
+				"dtmf_decoder": modem.DTMFDecode != DTMF_DECODE_OFF,
+			}).Info(dwutil.IfThenElse(modem.ModemType == MODEM_AIS, "AIS demodulator", "K9NG/G3RUH demodulator"))
 
 			var D = &demodulator.states[0] // first subchannel
 
 			numSubchan = 1
 			numSlicers = 1
 
-			if strings.Contains(achan.Profiles, "+") {
+			if strings.Contains(modem.Profiles, "+") {
 				/* I'm not happy about putting this hack here. */
 				/* This belongs in demod_9600_init but it doesn't have access to the audio config. */
 				numSlicers = MAX_SLICERS
@@ -754,7 +756,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			var ratioLog = logrus.WithFields(logrus.Fields{
 				"channel":     channel,
 				"sample_rate": samplesPerSec,
-				"baud":        achan.Baud,
+				"baud":        modem.Baud,
 				"ratio":       math.Round(ratio*10) / 10,
 			})
 
@@ -774,12 +776,12 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 				ratioLog.Info("Sample rate to baud ratio is suitable for good performance")
 			}
 
-			demod_9600_init(achan.ModemType,
+			demod_9600_init(modem.ModemType,
 				samplesPerSec,
-				achan.Upsample,
-				achan.Baud, D)
+				modem.Upsample,
+				modem.Baud, D)
 
-			if strings.Contains(achan.Profiles, "+") {
+			if strings.Contains(modem.Profiles, "+") {
 				/* I'm not happy about putting this hack here. */
 				/* should pass in as a parameter rather than adding on later. */
 				numSlicers = MAX_SLICERS
@@ -793,12 +795,12 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 		}
 	} /* switch on modulation type. */
 
-	demodulator.modemType = achan.ModemType
-	demodulator.profiles = achan.Profiles
+	demodulator.modemType = modem.ModemType
+	demodulator.profiles = modem.Profiles
 	demodulator.numSubchan = numSubchan
 	demodulator.numSlicers = numSlicers
-	demodulator.decimate = achan.Decimate
-	demodulator.upsample = achan.Upsample
+	demodulator.decimate = modem.Decimate
+	demodulator.upsample = modem.Upsample
 
 	return demodulator, nil
 }
