@@ -761,9 +761,7 @@ x = Silence FX.25 information.`)
 	kissNetSvc.Start(ctx, kissHandler)
 
 	if misc_config.dns_sd_enabled {
-		var ports = new(announce.Ports)
-		ports.KISS = misc_config.kiss_port[:]
-		ports.AGW = misc_config.agwpe_port
+		var ports = listeningPorts(kissNetSvc, agwServer)
 
 		// Only if it started: webui_init hands back no hub if it didn't.
 		if webHub != nil {
@@ -1508,4 +1506,20 @@ func mheardPosition(A *aprs.Decoded) (maybe.Maybe[float64], maybe.Maybe[float64]
 	}
 
 	return A.Lat, A.Lon
+}
+
+// listeningPorts is the KISS TCP and AGW ports there are to announce: those
+// the services are listening on, leaving out any that could not be bound, as
+// well as any never configured, so that nobody is sent to a port that is not
+// being served.  A nil agw has none.
+func listeningPorts(kissNet *KissNetService, agw *AGWServer) *announce.Ports {
+	var ports = new(announce.Ports)
+
+	for _, addr := range kissNet.Addrs() {
+		ports.KISS = append(ports.KISS, addrPort(addr))
+	}
+
+	ports.AGW = addrPort(agw.Addr())
+
+	return ports
 }
