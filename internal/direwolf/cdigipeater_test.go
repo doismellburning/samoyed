@@ -13,7 +13,6 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/pfilter"
-	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -26,8 +25,8 @@ const (
 )
 
 // setupCDigipeater points a connected mode digipeater at two radio channels
-// with our callsign on each, and returns the transmit queue it fills.
-func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *RadioConfig, *cdigi_config_s, *TransmitQueue) {
+// with our callsign on each, and returns what it sends.
+func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *RadioConfig, *cdigi_config_s, *frameRecorder) {
 	t.Helper()
 
 	var audioConfig = new(RadioConfig)
@@ -38,9 +37,9 @@ func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *RadioConfig, *cdigi_
 
 	var cdigiConfig = new(cdigi_config_s)
 
-	var tq = newTestTransmitQueue(audioConfig)
+	var tx = new(frameRecorder)
 
-	return NewConnectedDigipeater(audioConfig, cdigiConfig, new(pfilter.PacketFilter), tq.Append), audioConfig, cdigiConfig, tq
+	return NewConnectedDigipeater(audioConfig, cdigiConfig, new(pfilter.PacketFilter), tx.send), audioConfig, cdigiConfig, tx
 }
 
 // A station that named us as its next digipeater is repeated, with the
@@ -164,7 +163,7 @@ func TestCDigipeatMatchFilterError(t *testing.T) {
 // Repeating on the channel it came in on is the ordinary case, and the frame
 // goes out at high priority - it is somebody's connected session waiting.
 func TestCDigipeaterSameChannel(t *testing.T) {
-	var cdigi, _, cdigiConfig, tq = setupCDigipeater(t)
+	var cdigi, _, cdigiConfig, tx = setupCDigipeater(t)
 
 	cdigiConfig.enabled[cdigiFromChan][cdigiFromChan] = true
 
@@ -173,7 +172,7 @@ func TestCDigipeaterSameChannel(t *testing.T) {
 
 	cdigi.Digipeat(cdigiFromChan, pp)
 
-	var sent = tq.Remove(cdigiFromChan, TQ_PRIO_0_HI)
+	var sent = tx.take(cdigiFromChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
 	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST*:", sent.FormatAddrs())
 
@@ -184,7 +183,7 @@ func TestCDigipeaterSameChannel(t *testing.T) {
 // is the one belonging to the channel it goes out on, not the one it came in
 // on.
 func TestCDigipeaterCrossChannel(t *testing.T) {
-	var cdigi, _, cdigiConfig, tq = setupCDigipeater(t)
+	var cdigi, _, cdigiConfig, tx = setupCDigipeater(t)
 
 	cdigiConfig.enabled[cdigiFromChan][cdigiToChan] = true
 
@@ -193,9 +192,9 @@ func TestCDigipeaterCrossChannel(t *testing.T) {
 
 	cdigi.Digipeat(cdigiFromChan, pp)
 
-	assert.Nil(t, tq.Remove(cdigiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
+	assert.Nil(t, tx.take(cdigiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
 
-	var sent = tq.Remove(cdigiToChan, TQ_PRIO_0_HI)
+	var sent = tx.take(cdigiToChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for the other channel")
 	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", sent.FormatAddrs())
 
@@ -205,16 +204,14 @@ func TestCDigipeaterCrossChannel(t *testing.T) {
 // A channel pair with no CDIGIPEAT line repeats nothing, however the frame is
 // addressed.
 func TestCDigipeaterNotEnabled(t *testing.T) {
-	var cdigi, _, _, tq = setupCDigipeater(t)
+	var cdigi, _, _, tx = setupCDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
 	cdigi.Digipeat(cdigiFromChan, pp)
 
-	for c := range MAX_RADIO_CHANS {
-		assert.Nil(t, tq.Remove(c, TQ_PRIO_0_HI), "channel %d repeated a frame with digipeating disabled", c)
-	}
+	assert.Empty(t, tx.sent, "a frame was repeated with digipeating disabled")
 
 	assert.Zero(t, cdigi.GetCount(cdigiFromChan, cdigiFromChan))
 }
@@ -249,7 +246,7 @@ func TestCDigipeaterInvalidChannel(t *testing.T) {
 // A network TNC channel carries connected mode too, so it digipeats like a
 // radio channel rather than being turned away as invalid.
 func TestCDigipeaterNetworkTNCChannel(t *testing.T) {
-	var cdigi, audioConfig, cdigiConfig, _ = setupCDigipeater(t)
+	var cdigi, audioConfig, cdigiConfig, tx = setupCDigipeater(t)
 
 	audioConfig.chan_medium[cdigiFromChan] = MEDIUM_NETTNC
 	cdigiConfig.enabled[cdigiFromChan][cdigiFromChan] = true
@@ -257,13 +254,10 @@ func TestCDigipeaterNetworkTNCChannel(t *testing.T) {
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
-	// A network TNC channel has no transmit queue of its own - TransmitQueue.Append
-	// hands the frame straight to the TNC - so the count is what says it was
-	// repeated rather than turned away.
-	testutils.CaptureOutput(t, func() { cdigi.Digipeat(cdigiFromChan, pp) })
+	cdigi.Digipeat(cdigiFromChan, pp)
 
-	assert.Equal(t, 1, cdigi.GetCount(cdigiFromChan, cdigiFromChan),
-		"a network TNC channel should digipeat")
+	assert.NotNil(t, tx.take(cdigiFromChan, TQ_PRIO_0_HI), "a network TNC channel should digipeat")
+	assert.Equal(t, 1, cdigi.GetCount(cdigiFromChan, cdigiFromChan))
 }
 
 func TestNewConnectedDigipeater(t *testing.T) {
