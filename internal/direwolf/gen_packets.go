@@ -189,7 +189,7 @@ func (g *GenPackets) Close() error {
 func (g *GenPackets) SendBuiltIn() {
 	// This should send a total of 6.
 	// Note that sticking in the user defined type {DE is optional.
-	if g.audio.achan[0].modem_type == MODEM_EAS {
+	if g.audio.achan[0].ModemType == MODEM_EAS {
 		g.mustSendPacket("X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-")
 		g.mustSendPacket("X>X-2:{DENNNN")
 		g.mustSendPacket("X>X:NNNN")
@@ -215,7 +215,7 @@ func (g *GenPackets) SendNumbered(count int, noisy bool) {
 	 * for now just use a random number generator.
 	 */
 	for i := 1; i <= count; i++ {
-		var baud = g.audio.achan[0].baud
+		var baud = g.audio.achan[0].Baud
 		var progress = float64(i) / float64(count)
 
 		if baud < 600 {
@@ -251,17 +251,17 @@ func (g *GenPackets) SendVariableSpeed(maxError float64, increment float64) erro
 		return fmt.Errorf("variable speed increment must be more than 0, not %g", increment)
 	}
 
-	var normal_speed = g.audio.achan[0].baud
+	var normal_speed = g.audio.achan[0].Baud
 
 	for speed_error := -maxError; speed_error <= maxError+0.001; speed_error += increment {
 		// Baud is int so we get some roundoff.  Make it real?
-		g.audio.achan[0].baud = int(float64(normal_speed) * (1. + speed_error/100.))
+		g.audio.achan[0].Baud = int(float64(normal_speed) * (1. + speed_error/100.))
 		g.setTones()
 
 		g.mustSendPacket(fmt.Sprintf("WB2OSZ-15>TEST:, speed %+0.1f%%  The quick brown fox jumps over the lazy dog!", speed_error))
 	}
 
-	g.audio.achan[0].baud = normal_speed
+	g.audio.achan[0].Baud = normal_speed
 	g.setTones()
 
 	return nil
@@ -291,7 +291,7 @@ func (g *GenPackets) SendPacket(str string) error {
 		return fmt.Errorf("%q is not valid TNC2 monitoring format", str)
 	}
 
-	if g.audio.achan[0].modem_type == MODEM_EAS {
+	if g.audio.achan[0].ModemType == MODEM_EAS {
 		// Generate EAS SAME signal FOR RESEARCH AND TESTING ONLY!!!
 		// There could be legal consequences for sending unauhorized SAME
 		// over the radio so don't do it!
@@ -326,15 +326,15 @@ func (g *GenPackets) SendPacket(str string) error {
 
 		// Insert random amount of quiet time.
 
-		switch g.audio.achan[c].modem_type {
+		switch g.audio.achan[c].ModemType {
 		case MODEM_QPSK:
-			samples_per_symbol = g.audio.adev[0].samples_per_sec / (g.audio.achan[c].baud / 2)
+			samples_per_symbol = g.audio.adev[0].samples_per_sec / (g.audio.achan[c].Baud / 2)
 		case MODEM_8PSK:
-			samples_per_symbol = g.audio.adev[0].samples_per_sec / (g.audio.achan[c].baud / 3)
+			samples_per_symbol = g.audio.adev[0].samples_per_sec / (g.audio.achan[c].Baud / 3)
 		case MODEM_BPSK:
-			samples_per_symbol = g.audio.adev[0].samples_per_sec / g.audio.achan[c].baud
+			samples_per_symbol = g.audio.adev[0].samples_per_sec / g.audio.achan[c].Baud
 		default:
-			samples_per_symbol = g.audio.adev[0].samples_per_sec / g.audio.achan[c].baud
+			samples_per_symbol = g.audio.adev[0].samples_per_sec / g.audio.achan[c].Baud
 		}
 
 		// Provide enough time for the DCD to drop.
@@ -542,7 +542,7 @@ func AddGenPacketsModemFlags(fs *pflag.FlagSet) *GenPacketsModemFlags {
 
 // apply sets up achan from the options, once they have been parsed.
 func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
-	var err = f.modem.apply(achan)
+	var err = f.modem.apply(&achan.ModemConfig)
 	if err != nil {
 		return err
 	}
@@ -553,8 +553,8 @@ func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
 			return fmt.Errorf("use a more reasonable mark frequency in range of 300 - 3000, not %d", *f.mark)
 		}
 
-		achan.mark_freq = *f.mark
-		logrus.WithField("mark", achan.mark_freq).Info("Mark frequency set")
+		achan.MarkFreq = *f.mark
+		logrus.WithField("mark", achan.MarkFreq).Info("Mark frequency set")
 	}
 
 	if *f.space > 0 {
@@ -562,8 +562,8 @@ func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
 			return fmt.Errorf("use a more reasonable space frequency in range of 300 - 3000, not %d", *f.space)
 		}
 
-		achan.space_freq = *f.space
-		logrus.WithField("space", achan.space_freq).Info("Space frequency set")
+		achan.SpaceFreq = *f.space
+		logrus.WithField("space", achan.SpaceFreq).Info("Space frequency set")
 	}
 
 	if *f.bitrateOverride != "" {
@@ -576,13 +576,13 @@ func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
 			return fmt.Errorf("use a more reasonable bit rate in range of %d - %d", MIN_BAUD, MAX_BAUD)
 		}
 
-		achan.baud = bitrateOverride
-		logrus.WithField("bitrate", achan.baud).Info("Data rate set")
+		achan.Baud = bitrateOverride
+		logrus.WithField("bitrate", achan.Baud).Info("Data rate set")
 	}
 
-	// The demodulator falls back on a default V.26 alternative, with a warning;
-	// gen_packets makes the recording, so insists on being told.
-	if achan.modem_type == MODEM_QPSK && achan.v26_alternative == V26_UNSPECIFIED {
+	// Settling the modem options falls back on a default V.26 alternative,
+	// with a warning; gen_packets makes the recording, so insists on being told.
+	if achan.ModemType == MODEM_QPSK && achan.V26Alternative == V26_UNSPECIFIED {
 		return errors.New("either -j or -J must be specified when using 2400 bps QPSK")
 	}
 
@@ -610,10 +610,10 @@ func genPacketsDefaultAudio() *RadioConfig {
 	audio.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE /* -8 for 8 instead of 16 bits */
 
 	for channel := range MAX_RADIO_CHANS {
-		audio.achan[channel].modem_type = MODEM_AFSK         /* change with -g */
-		audio.achan[channel].mark_freq = DEFAULT_MARK_FREQ   /* -m option */
-		audio.achan[channel].space_freq = DEFAULT_SPACE_FREQ /* -s option */
-		audio.achan[channel].baud = DEFAULT_BAUD             /* -b option */
+		audio.achan[channel].ModemType = MODEM_AFSK         /* change with -g */
+		audio.achan[channel].MarkFreq = DEFAULT_MARK_FREQ   /* -m option */
+		audio.achan[channel].SpaceFreq = DEFAULT_SPACE_FREQ /* -s option */
+		audio.achan[channel].Baud = DEFAULT_BAUD            /* -b option */
 	}
 
 	audio.chan_medium[0] = MEDIUM_RADIO

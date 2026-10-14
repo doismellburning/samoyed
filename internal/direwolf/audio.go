@@ -1107,16 +1107,16 @@ func fillAudioDefaults(pa *RadioConfig) {
 		}
 
 		for channel := range MAX_RADIO_CHANS {
-			if pa.achan[channel].mark_freq == 0 {
-				pa.achan[channel].mark_freq = DEFAULT_MARK_FREQ
+			if pa.achan[channel].MarkFreq == 0 {
+				pa.achan[channel].MarkFreq = DEFAULT_MARK_FREQ
 			}
 
-			if pa.achan[channel].space_freq == 0 {
-				pa.achan[channel].space_freq = DEFAULT_SPACE_FREQ
+			if pa.achan[channel].SpaceFreq == 0 {
+				pa.achan[channel].SpaceFreq = DEFAULT_SPACE_FREQ
 			}
 
-			if pa.achan[channel].baud == 0 {
-				pa.achan[channel].baud = DEFAULT_BAUD
+			if pa.achan[channel].Baud == 0 {
+				pa.achan[channel].Baud = DEFAULT_BAUD
 			}
 		}
 	}

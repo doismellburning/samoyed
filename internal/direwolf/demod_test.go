@@ -21,15 +21,15 @@ func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
 	for _, modemType := range []modem_t{MODEM_QPSK, MODEM_8PSK, MODEM_BPSK} {
 		var channel = 0
 		var audioConfig = newTestRadioConfig(channel, modemType, 2400, 0, 0, 44100)
-		audioConfig.achan[channel].decimate = 3
-		audioConfig.achan[channel].num_freq = 1
+		audioConfig.achan[channel].Decimate = 3
+		audioConfig.achan[channel].NumFreq = 1
 
 		var output = testutils.CaptureOutput(t, func() {
 			demod_init(audioConfig)
 		})
 
 		assert.NotContains(t, output, "/ 3")
-		assert.Equal(t, 3, audioConfig.achan[channel].decimate)
+		assert.Equal(t, 3, audioConfig.achan[channel].Decimate)
 	}
 }
 
@@ -39,7 +39,7 @@ func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 	var channel = 0
 
 	var eas = newTestRadioConfig(channel, MODEM_EAS, 521, 2083, 1563, 44100)
-	eas.achan[channel].num_freq = 1
+	eas.achan[channel].NumFreq = 1
 	eas.achan[channel].fix_bits = RETRY_INVERT_SINGLE
 	eas.achan[channel].passall = true
 
@@ -49,26 +49,26 @@ func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 	assert.True(t, eas.achan[channel].passall)
 
 	var qpsk = newTestRadioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
-	qpsk.achan[channel].num_freq = 1
+	qpsk.achan[channel].NumFreq = 1
 
 	var output = testutils.CaptureOutput(t, func() {
 		demod_init(qpsk)
 	})
 
 	assert.Contains(t, output, "compatible with MFJ-2400", "an unsettled V.26 alternative still gets the default")
-	assert.Equal(t, V26_UNSPECIFIED, qpsk.achan[channel].v26_alternative)
+	assert.Equal(t, V26_UNSPECIFIED, qpsk.achan[channel].V26Alternative)
 }
 
 // AFSK, by contrast, does decimate.
 func TestDemodInitKeepsAFSKDecimation(t *testing.T) {
 	var channel = 1
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 48000)
-	audioConfig.achan[channel].decimate = 3
-	audioConfig.achan[channel].num_freq = 1
+	audioConfig.achan[channel].Decimate = 3
+	audioConfig.achan[channel].NumFreq = 1
 
 	demod_init(audioConfig)
 
-	assert.Equal(t, 3, audioConfig.achan[channel].decimate)
+	assert.Equal(t, 3, audioConfig.achan[channel].Decimate)
 }
 
 // Regression test for #671: the demodulator types are one letter per
@@ -77,15 +77,15 @@ func TestDemodInitKeepsAFSKDecimation(t *testing.T) {
 func TestDemodInitCapsProfileLetters(t *testing.T) {
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
-	audioConfig.achan[channel].num_freq = 1
-	audioConfig.achan[channel].profiles = "ABDEABDEABDE"
-	require.Greater(t, len(audioConfig.achan[channel].profiles), MAX_SUBCHANS)
+	audioConfig.achan[channel].NumFreq = 1
+	audioConfig.achan[channel].Profiles = "ABDEABDEABDE"
+	require.Greater(t, len(audioConfig.achan[channel].Profiles), MAX_SUBCHANS)
 
 	var hook = test.NewGlobal()
 
 	t.Cleanup(hook.Reset)
 
-	var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+	var d = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 
 	assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
 	assert.Equal(t, "ABDEABDEA", d.profiles)
@@ -115,13 +115,13 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 	} {
 		var channel = 0
 		var audioConfig = newTestRadioConfig(channel, tc.modemType, 2400, 0, 0, 44100)
-		audioConfig.achan[channel].num_freq = 1
-		audioConfig.achan[channel].profiles = tc.profiles
+		audioConfig.achan[channel].NumFreq = 1
+		audioConfig.achan[channel].Profiles = tc.profiles
 		require.Greater(t, len(tc.profiles), MAX_SUBCHANS)
 
 		var hook = test.NewGlobal()
 
-		var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+		var d = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 
 		assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
 		assert.Equal(t, tc.want, d.profiles)
@@ -142,7 +142,7 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
-	var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+	var d = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 
 	var done = make(chan struct{})
 
@@ -166,9 +166,9 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 300, 1600, 1800, 48000)
-	audioConfig.achan[channel].num_freq = 3
-	audioConfig.achan[channel].offset = 30
-	audioConfig.achan[channel].profiles = "ab+"
+	audioConfig.achan[channel].NumFreq = 3
+	audioConfig.achan[channel].Offset = 30
+	audioConfig.achan[channel].Profiles = "ab+"
 
 	var before = audioConfig.achan[channel]
 
@@ -186,7 +186,7 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 // channel that is not one.
 func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
-	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].NumFreq = 1
 
 	var demodulators = demod_init(audioConfig)
 
@@ -200,8 +200,8 @@ func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
 // or out of range altogether, has one of each.
 func TestChannelLayout(t *testing.T) {
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
-	audioConfig.achan[0].num_freq = 1
-	audioConfig.achan[0].profiles = "AB+"
+	audioConfig.achan[0].NumFreq = 1
+	audioConfig.achan[0].Profiles = "AB+"
 
 	var receiver = multi_modem_init(audioConfig, 0, 0, new(discardReceiveSink))
 

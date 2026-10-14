@@ -55,7 +55,7 @@ func TestGenToneTestConfigGeneratesEveryChannel(t *testing.T) {
 				sink.data = nil
 
 				// One second of bits is one second of audio.
-				for range config.achan[channel].baud {
+				for range config.achan[channel].Baud {
 					toneGenerators[channel].PutBit(1)
 				}
 

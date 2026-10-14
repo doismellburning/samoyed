@@ -51,22 +51,15 @@ const (
 	LAYER2_IL2P = phy.Layer2IL2P
 )
 
-type v26_e int
+type v26_e = phy.V26
 
 const (
-	V26_UNSPECIFIED v26_e = iota
-	V26_A
-	V26_B
+	V26_UNSPECIFIED = phy.V26Unspecified
+	V26_A           = phy.V26A
+	V26_B           = phy.V26B
 )
 
-const V26_DEFAULT = V26_B
-
-type dtmf_decode_t int
-
-const (
-	DTMF_DECODE_OFF dtmf_decode_t = iota
-	DTMF_DECODE_ON
-)
+const V26_DEFAULT = phy.V26Default
 
 /* Properties for each radio channel, common to receive and transmit. */
 /* Can be different for each radio channel. */
@@ -86,13 +79,8 @@ type achan_param_s struct {
 
 	// What else should be moved out of structure and enlarged when NETTNC is implemented.  ???
 
-	modem_type modem_t
-
-	/* Usual AFSK. */
-	/* Baseband signal. Not used yet. */
-	/* Scrambled http://www.amsat.org/amsat/articles/g3ruh/109/fig03.gif */
-	/* Might try MFJ-2400 / CCITT v.26 / Bell 201 someday. */
-	/* No modem.  Might want this for DTMF only channel. */
+	// The modem: its type, tones, speed and demodulator profiles.
+	phy.ModemConfig
 
 	layer2_xmit layer2_t
 
@@ -115,48 +103,6 @@ type achan_param_s struct {
 	il2p_invert_polarity int // 1 means invert on transmit.  Receive handles either automatically.
 
 	il2p_crc bool // true to append trailing CRC after IL2P frame.  Default true.
-
-	v26_alternative v26_e
-
-	// Original implementation used alternative A for 2400 bbps PSK.
-	// Years later, we discover that MFJ-2400 used alternative B.
-	// It's likely the others did too.  it also works a little better.
-	// Default to MFJ compatible and print warning if user did not
-	// pick one explicitly.
-
-	dtmf_decode dtmf_decode_t
-
-	/* Originally the DTMF ("Touch Tone") decoder was always */
-	/* enabled because it took a negligible amount of CPU. */
-	/* There were complaints about the false positives when */
-	/* hearing other modulation schemes on HF SSB so now it */
-	/* is enabled only when needed. */
-
-	/* "On" will send special "t" packet to attached applications */
-	/* and process as APRStt.  Someday we might want to separate */
-	/* these but for now, we have a single off/on. */
-
-	decimate int /* Reduce AFSK sample rate by this factor to */
-	/* decrease computational requirements. */
-
-	upsample int /* Upsample by this factor for G3RUH. */
-
-	mark_freq  int /* Two tones for AFSK modulation, in Hz. */
-	space_freq int /* Standard tones are 1200 and 2200 for 1200 baud. */
-
-	baud int /* Data bits per second. */
-	/* Standard rates are 1200 for VHF and 300 for HF. */
-	/* This should really be called bits per second. */
-
-	/* Next 3 come from config file or command line. */
-
-	profiles string /* zero or more of ABC etc, optional + */
-
-	num_freq int /* Number of different frequency pairs for decoders. */
-
-	offset int /* Spacing between filter frequencies. */
-
-	/* How many demodulators and slicers these come to is the Demodulator's. */
 
 	/* These are for dealing with imperfect frames. */
 
@@ -329,28 +275,13 @@ type RadioConfig struct {
 const DEFAULT_FIX_BITS = BitFixNone // Interesting research project but even a single bit fix up
 // will occasionally let corrupted packets through.
 
-/*
- * Standard for AFSK on VHF FM.
- * Reversing mark and space makes no difference because
- * NRZI encoding only cares about change or lack of change
- * between the two tones.
- *
- * HF SSB uses 300 baud and 200 Hz shift.
- * 1600 & 1800 Hz is a popular tone pair, sometimes
- * called the KAM tones.
- */
+const DEFAULT_MARK_FREQ = phy.DefaultMarkFreq
+const DEFAULT_SPACE_FREQ = phy.DefaultSpaceFreq
+const DEFAULT_BAUD = phy.DefaultBaud
 
-const DEFAULT_MARK_FREQ = 1200
-const DEFAULT_SPACE_FREQ = 2200
-const DEFAULT_BAUD = 1200
+const MIN_BAUD = phy.MinBaud
 
-/* Used for sanity checking in config file and command line options. */
-/* 9600 baud is known to work.  */
-/* TODO: Is 19200 possible with a soundcard at 44100 samples/sec or do we need a higher sample rate? */
-
-const MIN_BAUD = 100
-
-const MAX_BAUD = 40000 // Anyone want to try 38.4 k baud?
+const MAX_BAUD = phy.MaxBaud
 
 /*
  * Typical transmit timings for VHF.
