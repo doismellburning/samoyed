@@ -754,7 +754,7 @@ x = Silence FX.25 information.`)
 		}
 
 		if audio_config.chan_medium[transmitCalibrationChannel] == MEDIUM_RADIO {
-			if audio_config.achan[transmitCalibrationChannel].mark_freq != 0 && audio_config.achan[transmitCalibrationChannel].space_freq != 0 {
+			if audio_config.achan[transmitCalibrationChannel].MarkFreq != 0 && audio_config.achan[transmitCalibrationChannel].SpaceFreq != 0 {
 				// Keying the transmitter to send tones that go nowhere would
 				// leave an unmodulated carrier on the air.  "-x p" asks for
 				// exactly that carrier deliberately, and plays no audio, so it
@@ -767,7 +767,7 @@ x = Silence FX.25 information.`)
 				}
 
 				var max_duration = 60
-				var n = audio_config.achan[transmitCalibrationChannel].baud * max_duration
+				var n = audio_config.achan[transmitCalibrationChannel].Baud * max_duration
 
 				pttControl.SetPTT(transmitCalibrationChannel, true)
 
@@ -775,15 +775,15 @@ x = Silence FX.25 information.`)
 				default:
 				case 'a': // Alternating tones: -x a
 					fmt.Printf("\nSending alternating mark/space calibration tones (%d/%dHz) on channel %d.\nPress control-C to terminate.\n",
-						audio_config.achan[transmitCalibrationChannel].mark_freq,
-						audio_config.achan[transmitCalibrationChannel].space_freq,
+						audio_config.achan[transmitCalibrationChannel].MarkFreq,
+						audio_config.achan[transmitCalibrationChannel].SpaceFreq,
 						transmitCalibrationChannel)
 				case 'm': // "Mark" tone: -x m
 					fmt.Printf("\nSending mark calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
-						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
+						audio_config.achan[transmitCalibrationChannel].MarkFreq, transmitCalibrationChannel)
 				case 's': // "Space" tone: -x s
 					fmt.Printf("\nSending space calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
-						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
+						audio_config.achan[transmitCalibrationChannel].SpaceFreq, transmitCalibrationChannel)
 				case 'p': // Silence - set PTT only: -x p
 					fmt.Printf("\nSending silence (Set PTT only) on channel %d.\nPress control-C to terminate.\n", transmitCalibrationChannel)
 				}

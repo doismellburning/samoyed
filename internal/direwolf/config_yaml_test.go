@@ -493,7 +493,7 @@ legacy: |
 		var c = parseYAMLConfig(t, "node: {address: Q1TEST}\n")
 		assert.Zero(t, c.errors, c.output)
 
-		c.audio.achan[0].baud = 9600
+		c.audio.achan[0].Baud = 9600
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)

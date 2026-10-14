@@ -46,8 +46,8 @@ func TestMultiModemInitStartsAfresh(t *testing.T) {
 	// Two demodulators, so a frame waits to be compared rather than going
 	// straight through.
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].profiles = "AB"
-	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].Profiles = "AB"
+	audioConfig.achan[0].NumFreq = 1
 
 	var first = new(recordingReceiveSink)
 	var firstReceiver, firstReceiverErr = multi_modem_init(audioConfig, 0, 0, first)
@@ -87,8 +87,8 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 	t.Parallel()
 
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].profiles = "ABA"
-	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].Profiles = "ABA"
+	audioConfig.achan[0].NumFreq = 1
 
 	var receiver, receiverErr = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 	require.NoError(t, receiverErr)
@@ -124,8 +124,8 @@ func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
 	t.Parallel()
 
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].profiles = "AB"
-	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].Profiles = "AB"
+	audioConfig.achan[0].NumFreq = 1
 
 	var _, initErr = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 	require.NoError(t, initErr)
@@ -146,8 +146,8 @@ func TestMultiModemInitHandsIL2PItsDebugLevel(t *testing.T) {
 	t.Parallel()
 
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].profiles = "AB"
-	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].Profiles = "AB"
+	audioConfig.achan[0].NumFreq = 1
 
 	var _, initErr = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 	require.NoError(t, initErr)
@@ -166,7 +166,7 @@ func TestMultiModemInitHandsIL2PItsDebugLevel(t *testing.T) {
 // look at it.  The bits are noise, as most of what a receiver hears is.
 func BenchmarkLayer2ReceiveBit(b *testing.B) {
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].NumFreq = 1
 
 	var receiver, receiverErr = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 	require.NoError(b, receiverErr)
@@ -197,12 +197,12 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	t.Parallel()
 
 	var audioConfig = newRecvTestRadioConfig(2)
-	audioConfig.achan[0].num_freq = 1
-	audioConfig.achan[1].num_freq = 1
-	audioConfig.achan[1].modem_type = MODEM_EAS
-	audioConfig.achan[1].baud = 521
-	audioConfig.achan[1].mark_freq = 2083
-	audioConfig.achan[1].space_freq = 1563
+	audioConfig.achan[0].NumFreq = 1
+	audioConfig.achan[1].NumFreq = 1
+	audioConfig.achan[1].ModemType = MODEM_EAS
+	audioConfig.achan[1].Baud = 521
+	audioConfig.achan[1].MarkFreq = 2083
+	audioConfig.achan[1].SpaceFreq = 1563
 
 	var receiver, receiverErr = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 	require.NoError(t, receiverErr)
@@ -436,7 +436,7 @@ func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
 	t.Parallel()
 
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].NumFreq = 1
 
 	var layer2, layer2Err = multi_modem_init(audioConfig, 0, 0, new(recordingReceiveSink))
 	require.NoError(t, layer2Err)

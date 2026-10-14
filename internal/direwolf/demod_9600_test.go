@@ -137,9 +137,9 @@ func demodulateFrames(t *testing.T, audioConfig *RadioConfig, samples []int) ([]
 func new9600TestRadioConfig(sampleRate int, profiles string, upsample int) *RadioConfig {
 	var audioConfig = newTestRadioConfig(0, MODEM_SCRAMBLE, 9600, 0, 0, sampleRate)
 	audioConfig.adev[0].defined = 1
-	audioConfig.achan[0].num_freq = 1
-	audioConfig.achan[0].profiles = profiles
-	audioConfig.achan[0].upsample = upsample
+	audioConfig.achan[0].NumFreq = 1
+	audioConfig.achan[0].Profiles = profiles
+	audioConfig.achan[0].Upsample = upsample
 	audioConfig.achan[0].fix_bits = RETRY_NONE
 
 	return audioConfig

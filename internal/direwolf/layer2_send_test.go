@@ -86,10 +86,10 @@ func newHDLCSendTestConfig(layer2 layer2_t) *RadioConfig {
 	audioConfig.adev[0].samples_per_sec = 44100
 
 	audioConfig.chan_medium[hdlcSendTestChannel] = MEDIUM_RADIO
-	audioConfig.achan[hdlcSendTestChannel].modem_type = MODEM_AFSK
-	audioConfig.achan[hdlcSendTestChannel].baud = 1200
-	audioConfig.achan[hdlcSendTestChannel].mark_freq = 1200
-	audioConfig.achan[hdlcSendTestChannel].space_freq = 2200
+	audioConfig.achan[hdlcSendTestChannel].ModemType = MODEM_AFSK
+	audioConfig.achan[hdlcSendTestChannel].Baud = 1200
+	audioConfig.achan[hdlcSendTestChannel].MarkFreq = 1200
+	audioConfig.achan[hdlcSendTestChannel].SpaceFreq = 2200
 	audioConfig.achan[hdlcSendTestChannel].layer2_xmit = layer2
 
 	return audioConfig
@@ -249,7 +249,7 @@ func setupEASSendTest(t *testing.T) *ToneGenerator {
 	t.Helper()
 
 	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
-	audioConfig.achan[hdlcSendTestChannel].modem_type = MODEM_EAS
+	audioConfig.achan[hdlcSendTestChannel].ModemType = MODEM_EAS
 
 	// Samples go to a file rather than to an audio device.
 	var w, err = wav.Create(filepath.Join(t.TempDir(), "eas.wav"), wav.Format{

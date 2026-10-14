@@ -64,7 +64,7 @@ func TestGenToneTestConfigGeneratesEveryChannel(t *testing.T) {
 				sink.data = nil
 
 				// One second of bits is one second of audio.
-				for range config.achan[channel].baud {
+				for range config.achan[channel].Baud {
 					toneGenerators[channel].PutBit(1)
 				}
 
@@ -151,7 +151,7 @@ func TestBPSKReversalsHaveNoDiscontinuity(t *testing.T) {
 			var samples = decodeMono16(sink.data)
 			require.NotEmpty(t, samples)
 
-			var carrier = float64(cfg.achan[0].mark_freq)
+			var carrier = float64(cfg.achan[0].MarkFreq)
 			var slew = 2*math.Pi*carrier/float64(samplesPerSec) + 2*math.Pi*float64(baud)/float64(samplesPerSec)
 			var limit = 1.2 * 32767 * slew
 
@@ -195,7 +195,7 @@ func TestBPSKSpectrumIsContained(t *testing.T) {
 		sinTable[i] = math.Sin(2 * math.Pi * float64(i) / float64(n))
 	}
 
-	var carrier = float64(cfg.achan[0].mark_freq)
+	var carrier = float64(cfg.achan[0].MarkFreq)
 	var total, outside float64
 
 	for k := range n / 2 {

@@ -237,7 +237,7 @@ func NewXmitService(
 	}
 
 	for j := range MAX_RADIO_CHANS {
-		xs.bits_per_sec[j] = p_modem.achan[j].baud
+		xs.bits_per_sec[j] = p_modem.achan[j].Baud
 		xs.timing[j] = p_modem.achan[j].xmitTiming
 	}
 

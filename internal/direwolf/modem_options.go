@@ -25,11 +25,11 @@ func settleModemOptions(pa *RadioConfig) {
 // settleModemOptions applies the rules about which modem options go together
 // to one channel, saying what it changed.
 func (achan *achan_param_s) settleModemOptions(channel int) {
-	switch achan.modem_type {
+	switch achan.ModemType {
 	case MODEM_EAS, MODEM_AIS:
 		// For AIS we will accept only a good CRC without any fixup attempts.
 		// Even with that, there are still a lot of CRC false matches with random noise.
-		var name = dwutil.IfThenElse(achan.modem_type == MODEM_EAS, "EAS", "AIS")
+		var name = dwutil.IfThenElse(achan.ModemType == MODEM_EAS, "EAS", "AIS")
 
 		if achan.fix_bits != RETRY_NONE {
 			logrus.WithFields(logrus.Fields{
@@ -61,13 +61,13 @@ func (achan *achan_param_s) settleModemOptions(channel int) {
 		//
 		// The transmitter reads this too, so it has to be settled before
 		// either end is set up.
-		if achan.v26_alternative == V26_UNSPECIFIED {
+		if achan.V26Alternative == V26_UNSPECIFIED {
 			logrus.WithField("channel", channel).Warn("Two incompatible versions of 2400 bps QPSK are available; " +
 				"use the 'V26A' modem option for compatibility with direwolf <= 1.5, or 'V26B' for MFJ-2400 " +
 				"(-j and -J on the command line for channel 0; see the Dire Wolf User Guide and 2400-4800-PSK-for-APRS-Packet-Radio.pdf). " +
 				"Defaulting to MFJ-2400 compatibility mode")
 
-			achan.v26_alternative = V26_DEFAULT
+			achan.V26Alternative = V26_DEFAULT
 		}
 
 		achan.forbidPSKDecimation(channel)
@@ -84,12 +84,12 @@ func (achan *achan_param_s) settleModemOptions(channel int) {
 // implemented for it.  Complain, rather than silently ignoring, when the
 // configuration asked for decimation.
 func (achan *achan_param_s) forbidPSKDecimation(channel int) {
-	if achan.decimate > 1 {
+	if achan.Decimate > 1 {
 		logrus.WithFields(logrus.Fields{
 			"channel":  channel,
-			"decimate": achan.decimate,
+			"decimate": achan.Decimate,
 		}).Warn("Decimation is not supported for PSK, ignoring")
 	}
 
-	achan.decimate = 1
+	achan.Decimate = 1
 }

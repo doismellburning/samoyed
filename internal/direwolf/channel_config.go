@@ -100,7 +100,7 @@ type achan_param_s struct {
 
 	xmitTiming // Transmit timing.
 
-	modem_type modem_t
+	ModemType modem_t
 
 	/* Usual AFSK. */
 	/* Baseband signal. Not used yet. */
@@ -131,7 +131,7 @@ type achan_param_s struct {
 	il2p_crc    bool // true to append trailing CRC after IL2P frame.  Default true.
 	il2p_rx_crc bool // true to expect, and check, a trailing CRC on received IL2P frames.  Default true.
 
-	v26_alternative v26_e
+	V26Alternative v26_e
 
 	// Original implementation used alternative A for 2400 bbps PSK.
 	// Years later, we discover that MFJ-2400 used alternative B.
@@ -139,7 +139,7 @@ type achan_param_s struct {
 	// Default to MFJ compatible and print warning if user did not
 	// pick one explicitly.
 
-	dtmf_decode dtmf_decode_t
+	DTMFDecode dtmf_decode_t
 
 	/* Originally the DTMF ("Touch Tone") decoder was always */
 	/* enabled because it took a negligible amount of CPU. */
@@ -151,25 +151,25 @@ type achan_param_s struct {
 	/* and process as APRStt.  Someday we might want to separate */
 	/* these but for now, we have a single off/on. */
 
-	decimate int /* Reduce AFSK sample rate by this factor to */
+	Decimate int /* Reduce AFSK sample rate by this factor to */
 	/* decrease computational requirements. */
 
-	upsample int /* Upsample by this factor for G3RUH. */
+	Upsample int /* Upsample by this factor for G3RUH. */
 
-	mark_freq  int /* Two tones for AFSK modulation, in Hz. */
-	space_freq int /* Standard tones are 1200 and 2200 for 1200 baud. */
+	MarkFreq  int /* Two tones for AFSK modulation, in Hz. */
+	SpaceFreq int /* Standard tones are 1200 and 2200 for 1200 baud. */
 
-	baud int /* Data bits per second. */
+	Baud int /* Data bits per second. */
 	/* Standard rates are 1200 for VHF and 300 for HF. */
 	/* This should really be called bits per second. */
 
 	/* Next 3 come from config file or command line. */
 
-	profiles string /* zero or more of ABC etc, optional + */
+	Profiles string /* zero or more of ABC etc, optional + */
 
-	num_freq int /* Number of different frequency pairs for decoders. */
+	NumFreq int /* Number of different frequency pairs for decoders. */
 
-	offset int /* Spacing between filter frequencies. */
+	Offset int /* Spacing between filter frequencies. */
 
 	/* How many demodulators and slicers these come to is the Demodulator's. */
 
@@ -420,7 +420,7 @@ func (c *RadioConfig) connectedModeAllowed(channel int) bool {
 func (c *RadioConfig) describeChannel(channel int) string {
 	switch c.chan_medium[channel] {
 	case MEDIUM_RADIO:
-		return fmt.Sprintf("Radio, %d bps", c.achan[channel].baud)
+		return fmt.Sprintf("Radio, %d bps", c.achan[channel].Baud)
 	case MEDIUM_NETTNC:
 		return "Network TNC"
 	case MediumSerialTNC:
@@ -456,11 +456,11 @@ func (c *RadioConfig) mapPort(channel int) nodemap.Port {
 
 		port.Mode = achan.layer2_xmit.String()
 
-		var modulation, bitsPerSymbol, known = mapModulation(achan.modem_type)
+		var modulation, bitsPerSymbol, known = mapModulation(achan.ModemType)
 		if known {
 			port.Modulation = modulation
-			port.Bitrate = positiveInt32(achan.baud)
-			port.Baud = positiveInt32(achan.baud / bitsPerSymbol)
+			port.Bitrate = positiveInt32(achan.Baud)
+			port.Baud = positiveInt32(achan.Baud / bitsPerSymbol)
 		}
 	case MEDIUM_AXUDP:
 		port.LinkType = nodemap.LinkInternet
