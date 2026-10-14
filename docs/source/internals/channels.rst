@@ -141,7 +141,9 @@ References
 ----------
 
 * `Dire Wolf's src/direwolf.h <https://github.com/wb2osz/direwolf/blob/master/src/direwolf.h>`__ - where the channel limits come from
-* `internal/direwolf/channel_config.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/channel_config.go>`__ - the media
+* `internal/phy/medium.go <https://github.com/doismellburning/samoyed/blob/main/internal/phy/medium.go>`__ - the media, as ``phy.Medium``
+* `internal/direwolf/channel_config.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/channel_config.go>`__ -
+  ``chan_medium``, and the ``MEDIUM_*`` names for the media
 * `internal/direwolf/direwolf_h.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/direwolf_h.go>`__
   and `internal/phy/consts.go <https://github.com/doismellburning/samoyed/blob/main/internal/phy/consts.go>`__ - the channel limits
 * `internal/direwolf/config.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/config.go>`__ -

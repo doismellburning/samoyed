@@ -7,17 +7,15 @@ import (
 	"github.com/doismellburning/samoyed/internal/ptt"
 )
 
-// Type of communication medium associated with the channel.
-
-type medium_e int
+type medium_e = phy.Medium
 
 const (
-	MEDIUM_NONE     medium_e = iota // Channel is not valid for use.
-	MEDIUM_RADIO                    // Internal modem for radio.
-	MEDIUM_IGATE                    // Access IGate as ordinary channel.
-	MEDIUM_NETTNC                   // Remote network TNC.  (new in 1.8)
-	MediumSerialTNC                 // Local serial TNC.  (new in 1.8)
-	MEDIUM_AXUDP                    // AX.25 over UDP to other nodes.
+	MEDIUM_NONE     = phy.MediumNone
+	MEDIUM_RADIO    = phy.MediumRadio
+	MEDIUM_IGATE    = phy.MediumIGate
+	MEDIUM_NETTNC   = phy.MediumNetTNC
+	MediumSerialTNC = phy.MediumSerialTNC
+	MEDIUM_AXUDP    = phy.MediumAXUDP
 )
 
 type sanity_t = phy.Sanity
