@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
@@ -144,7 +145,7 @@ type IGate struct {
 	 */
 	audioConfig *RadioConfig
 	config      *igate_config_s
-	digiConfig  *DigipeaterConfig
+	digiConfig  *digipeater.Config
 	filter      *pfilter.PacketFilter
 
 	// recFrame is where a packet from APRS-IS for ICHANNEL goes, as
@@ -247,7 +248,7 @@ type igateHeard interface {
 func NewIGate(
 	audioConfig *RadioConfig,
 	igateConfig *igate_config_s,
-	digiConfig *DigipeaterConfig,
+	digiConfig *digipeater.Config,
 	filter *pfilter.PacketFilter,
 	heard igateHeard,
 	recFrame frameReceiver,

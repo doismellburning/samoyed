@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package digipeater
 
 /*------------------------------------------------------------------
  *
@@ -40,6 +43,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dedupe"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/phy"
@@ -50,26 +54,26 @@ import (
  * Information required for digipeating.
  *
  * The configuration file reader fills in this information
- * and it is passed to NewDigipeater at application start up time.
+ * and it is passed to New at application start up time.
  */
 
 // DefaultDedupe is how many seconds a packet is remembered for, so as not to
 // digipeat a duplicate of it, when the configuration doesn't say.
 const DefaultDedupe = 30
 
-// DigipeaterPreempt is what preemptive digipeating does with the unused
+// Preempt is what preemptive digipeating does with the unused
 // digipeaters ahead of the one that matched us.
-type DigipeaterPreempt int
+type Preempt int
 
 const (
-	PreemptOff DigipeaterPreempt = iota
+	PreemptOff Preempt = iota
 	PreemptDrop
 	PreemptMark
 	PreemptTrace
 )
 
-// DigipeaterConfig is the APRS digipeater's configuration.
-type DigipeaterConfig struct {
+// Config is the APRS digipeater's configuration.
+type Config struct {
 	DedupeTime int /* Don't digipeat duplicate packets */
 	/* within this number of seconds. */
 
@@ -77,31 +81,36 @@ type DigipeaterConfig struct {
 	 * Rules for each of the [from_chan][to_chan] combinations.
 	 */
 
-	Alias [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]*regexp.Regexp
+	Alias [phy.MaxTotalChans][phy.MaxTotalChans]*regexp.Regexp
 
-	Wide [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]*regexp.Regexp
+	Wide [phy.MaxTotalChans][phy.MaxTotalChans]*regexp.Regexp
 
-	Enabled [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]bool
+	Enabled [phy.MaxTotalChans][phy.MaxTotalChans]bool
 
-	Preempt [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]DigipeaterPreempt
+	Preempt [phy.MaxTotalChans][phy.MaxTotalChans]Preempt
 
 	// ATGP is an ugly hack for the specific need of ATGP which needs more that 8 digipeaters.
 	// DO NOT put this in the User Guide.  On a need to know basis.
 
-	ATGP [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]string
+	ATGP [phy.MaxTotalChans][phy.MaxTotalChans]string
 
-	FilterStr [MAX_TOTAL_CHANS + 1][MAX_TOTAL_CHANS + 1]string
+	FilterStr [phy.MaxTotalChans + 1][phy.MaxTotalChans + 1]string
 	// NULL or optional Packet Filter strings such as "t/m".
 	// Notice the size of arrays is one larger than normal.
 	// That extra position is for the IGate.
 
-	Regen [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]bool // Regenerate packet.
+	Regen [phy.MaxTotalChans][phy.MaxTotalChans]bool // Regenerate packet.
 	// Sort of like digipeating but passed along unchanged.
 }
 
-// DigipeaterPort is what a digipeater needs to know of each channel it might
+// FrameSender is where a digipeater hands each packet it repeats, to be
+// transmitted on the channel at the priority (dwcore.PrioHigh or
+// dwcore.PrioLow).
+type FrameSender func(channel int, prio int, pp *ax25.Packet)
+
+// Port is what a digipeater needs to know of each channel it might
 // hear on or transmit to: our callsign there, and what kind of medium it is.
-type DigipeaterPort struct {
+type Port struct {
 	MyCall string
 	Medium phy.Medium
 }
@@ -110,17 +119,17 @@ type DigipeaterPort struct {
 // the duplicate suppression it shares with APRStt object reports, and a count
 // of packets digipeated for each combination of from/to channel.
 type Digipeater struct {
-	ports    [MAX_TOTAL_CHANS]DigipeaterPort
-	config   *DigipeaterConfig
+	ports    [phy.MaxTotalChans]Port
+	config   *Config
 	filter   *pfilter.PacketFilter
 	dedupe   *dedupe.Service
-	transmit frameSender // Where digipeated packets go; nil to drop them.
-	count    [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
+	transmit FrameSender // Where digipeated packets go; nil to drop them.
+	count    [phy.MaxTotalChans][phy.MaxTotalChans]int
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	NewDigipeater
+ * Name:	New
  *
  * Purpose:	Initialize with stuff from configuration file.
  *
@@ -141,12 +150,12 @@ type Digipeater struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewDigipeater(
-	ports [MAX_TOTAL_CHANS]DigipeaterPort,
-	p_digi_config *DigipeaterConfig,
+func New(
+	ports [phy.MaxTotalChans]Port,
+	p_digi_config *Config,
 	filter *pfilter.PacketFilter,
 	onRemember func(channel int, pp *ax25.Packet),
-	transmit frameSender,
+	transmit FrameSender,
 ) *Digipeater {
 	var d = new(Digipeater)
 	d.ports = ports
@@ -191,7 +200,7 @@ func (d *Digipeater) Remember(channel int, pp *ax25.Packet) {
 
 func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Network or serial TNC is OK for UI frames where we don't care about timing.
-	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
+	if from_chan < 0 || from_chan >= phy.MaxTotalChans ||
 		(d.ports[from_chan].Medium != phy.MediumRadio &&
 			d.ports[from_chan].Medium != phy.MediumNetTNC &&
 			d.ports[from_chan].Medium != phy.MediumSerialTNC &&
@@ -238,7 +247,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 *
 	 */
 
-	for to_chan := range MAX_TOTAL_CHANS {
+	for to_chan := range phy.MaxTotalChans {
 		if d.config.Enabled[from_chan][to_chan] {
 			if to_chan == from_chan {
 				var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
@@ -250,7 +259,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 				if result != nil {
 					d.dedupe.Remember(to_chan, pp)
 					if d.transmit != nil {
-						d.transmit(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
+						d.transmit(to_chan, dwcore.PrioHigh, result) //  High priority queue.
 					}
 
 					d.count[from_chan][to_chan]++
@@ -265,7 +274,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 * These are lower priority
 	 */
 
-	for to_chan := range MAX_TOTAL_CHANS {
+	for to_chan := range phy.MaxTotalChans {
 		if d.config.Enabled[from_chan][to_chan] {
 			if to_chan != from_chan {
 				var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
@@ -277,7 +286,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 				if result != nil {
 					d.dedupe.Remember(to_chan, pp)
 					if d.transmit != nil {
-						d.transmit(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
+						d.transmit(to_chan, dwcore.PrioLow, result) // Low priority queue.
 					}
 
 					d.count[from_chan][to_chan]++
@@ -311,14 +320,14 @@ func (d *Digipeater) Regen(from_chan int, pp *ax25.Packet) {
 		packet_t result;
 	*/
 
-	dwutil.Assert(from_chan >= 0 && from_chan < MAX_TOTAL_CHANS)
+	dwutil.Assert(from_chan >= 0 && from_chan < phy.MaxTotalChans)
 
-	for to_chan := range MAX_TOTAL_CHANS {
+	for to_chan := range phy.MaxTotalChans {
 		if d.config.Regen[from_chan][to_chan] {
 			var result = pp.Dup()
 			if result != nil && d.transmit != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
-				d.transmit(to_chan, TQ_PRIO_1_LO, result)
+				d.transmit(to_chan, dwcore.PrioLow, result)
 			}
 		}
 	}
@@ -379,7 +388,7 @@ func (d *Digipeater) match(
 	alias *regexp.Regexp,
 	wide *regexp.Regexp,
 	to_chan int,
-	preempt DigipeaterPreempt,
+	preempt Preempt,
 	atgp string,
 	filter_str string,
 ) *ax25.Packet {

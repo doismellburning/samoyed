@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/pfilter"
@@ -137,7 +138,7 @@ func setupIGate(t *testing.T) (*IGate, net.Conn) {
 	igateConfig.tx_limit_5 = IGATE_TX_LIMIT_5_DEFAULT
 	igateConfig.igmsp = 1
 
-	var digiConfig = new(DigipeaterConfig)
+	var digiConfig = new(digipeater.Config)
 
 	var heardDB = mheard.New(0)
 

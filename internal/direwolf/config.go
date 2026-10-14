@@ -34,6 +34,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/coordconvutil"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -891,8 +892,8 @@ type parseState struct {
 	keyword string // original (not uppercased) keyword token
 
 	audio *RadioConfig
-	digi  *DigipeaterConfig
-	cdigi *ConnectedDigipeaterConfig
+	digi  *digipeater.Config
+	cdigi *digipeater.ConnectedConfig
 	tt    *tt_config_s
 	igate *igate_config_s
 	misc  *misc_config_s
@@ -1219,8 +1220,8 @@ func (ps *parseState) readLegacy(r io.Reader, name string) {
 // file can override them.  It reports what the file drew, for a caller that
 // wants to act on it - see the --config-check option in DirewolfMain.
 func config_init(fname string, p_audio_config *RadioConfig,
-	p_digi_config *DigipeaterConfig,
-	p_cdigi_config *ConnectedDigipeaterConfig,
+	p_digi_config *digipeater.Config,
+	p_cdigi_config *digipeater.ConnectedConfig,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
 	p_misc_config *misc_config_s,
@@ -1309,7 +1310,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 	p_audio_config.chan_medium[0] = MEDIUM_RADIO
 
-	p_digi_config.DedupeTime = DefaultDedupe
+	p_digi_config.DedupeTime = digipeater.DefaultDedupe
 
 	p_tt_config.gateway_enabled = 0
 
@@ -3498,12 +3499,12 @@ func handleDIGIPEAT(ps *parseState) error {
 	ps.digi.Wide[from_chan][to_chan] = r
 
 	ps.digi.Enabled[from_chan][to_chan] = true
-	ps.digi.Preempt[from_chan][to_chan] = PreemptOff
+	ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptOff
 
 	t = ps.split(false)
 	if t != "" {
 		if strings.EqualFold(t, "OFF") {
-			ps.digi.Preempt[from_chan][to_chan] = PreemptOff
+			ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptOff
 			t = ps.split(false)
 		} else if strings.EqualFold(t, "DROP") {
 			ps.errorf(
@@ -3511,7 +3512,7 @@ func handleDIGIPEAT(ps *parseState) error {
 				ps.line,
 			)
 
-			ps.digi.Preempt[from_chan][to_chan] = PreemptDrop
+			ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptDrop
 			t = ps.split(false)
 		} else if strings.EqualFold(t, "MARK") {
 			ps.errorf(
@@ -3519,10 +3520,10 @@ func handleDIGIPEAT(ps *parseState) error {
 				ps.line,
 			)
 
-			ps.digi.Preempt[from_chan][to_chan] = PreemptMark
+			ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptMark
 			t = ps.split(false)
 		} else if (strings.EqualFold(t, "TRACE")) || (strings.HasPrefix(strings.ToUpper(t), "PREEMPT")) {
-			ps.digi.Preempt[from_chan][to_chan] = PreemptTrace
+			ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptTrace
 			t = ps.split(false)
 		} else if strings.HasPrefix(strings.ToUpper(t), "ATGP=") {
 			ps.digi.ATGP[from_chan][to_chan] = t[5:]
@@ -3554,7 +3555,7 @@ func handleDEDUPE(ps *parseState) error {
 	if n >= 0 && n < 600 {
 		ps.digi.DedupeTime = n
 	} else {
-		ps.digi.DedupeTime = DefaultDedupe
+		ps.digi.DedupeTime = digipeater.DefaultDedupe
 
 		ps.errorf("line %d: Unreasonable value for dedupe time. Using %d", ps.line, ps.digi.DedupeTime)
 	}

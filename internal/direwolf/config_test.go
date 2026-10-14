@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -217,8 +218,8 @@ func Test_IsNoCall(t *testing.T) {
 // reported while doing so.
 type configs struct {
 	audio *RadioConfig
-	digi  *DigipeaterConfig
-	cdigi *ConnectedDigipeaterConfig
+	digi  *digipeater.Config
+	cdigi *digipeater.ConnectedConfig
 	tt    *tt_config_s
 	igate *igate_config_s
 	misc  *misc_config_s
@@ -264,8 +265,8 @@ func parseConfigWith(t *testing.T, pattern string, content string, symbolTable s
 
 	var c = configs{
 		audio:  new(RadioConfig),
-		digi:   new(DigipeaterConfig),
-		cdigi:  new(ConnectedDigipeaterConfig),
+		digi:   new(digipeater.Config),
+		cdigi:  new(digipeater.ConnectedConfig),
 		tt:     new(tt_config_s),
 		igate:  new(igate_config_s),
 		misc:   new(misc_config_s),
@@ -681,8 +682,8 @@ func Test_config_init_modem_directive(t *testing.T) {
 			require.NoError(t, tmpFile.Close())
 
 			var audioConfig = new(RadioConfig)
-			var digiConfig DigipeaterConfig
-			var cdigiConfig ConnectedDigipeaterConfig
+			var digiConfig digipeater.Config
+			var cdigiConfig digipeater.ConnectedConfig
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
@@ -730,8 +731,8 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 			require.NoError(t, tmpFile.Close())
 
 			var audioConfig = new(RadioConfig)
-			var digiConfig DigipeaterConfig
-			var cdigiConfig ConnectedDigipeaterConfig
+			var digiConfig digipeater.Config
+			var cdigiConfig digipeater.ConnectedConfig
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
@@ -775,8 +776,8 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 			require.NoError(t, tmpFile.Close())
 
 			var audioConfig = new(RadioConfig)
-			var digiConfig DigipeaterConfig
-			var cdigiConfig ConnectedDigipeaterConfig
+			var digiConfig digipeater.Config
+			var cdigiConfig digipeater.ConnectedConfig
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
@@ -1525,7 +1526,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "no DEDUPE leaves the default",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DefaultDedupe, c.digi.DedupeTime)
+					a.Equal(digipeater.DefaultDedupe, c.digi.DedupeTime)
 				},
 			},
 			{
@@ -1539,7 +1540,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "an unreasonable time falls back to the default",
 				config: "DEDUPE 600\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DefaultDedupe, c.digi.DedupeTime)
+					a.Equal(digipeater.DefaultDedupe, c.digi.DedupeTime)
 					a.Contains(c.output, "Unreasonable value for dedupe time")
 				},
 			},
@@ -1547,14 +1548,14 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a negative time falls back to the default",
 				config: "DEDUPE -1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DefaultDedupe, c.digi.DedupeTime)
+					a.Equal(digipeater.DefaultDedupe, c.digi.DedupeTime)
 				},
 			},
 			{
 				name:   "a missing time does not eat the next line",
 				config: "DEDUPE\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DefaultDedupe, c.digi.DedupeTime)
+					a.Equal(digipeater.DefaultDedupe, c.digi.DedupeTime)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -1580,7 +1581,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 					a.True(c.digi.Enabled[0][1])
 					a.NotNil(c.digi.Alias[0][1])
 					a.NotNil(c.digi.Wide[0][1])
-					a.Equal(PreemptOff, c.digi.Preempt[0][1])
+					a.Equal(digipeater.PreemptOff, c.digi.Preempt[0][1])
 				},
 			},
 			{
@@ -1594,21 +1595,21 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "TRACE asks for preemptive digipeating",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ TRACE\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(PreemptTrace, c.digi.Preempt[0][1])
+					a.Equal(digipeater.PreemptTrace, c.digi.Preempt[0][1])
 				},
 			},
 			{
 				name:   "PREEMPT is the same thing under a better name",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ PREEMPT\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(PreemptTrace, c.digi.Preempt[0][1])
+					a.Equal(digipeater.PreemptTrace, c.digi.Preempt[0][1])
 				},
 			},
 			{
 				name:   "DROP is accepted and discouraged",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ DROP\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(PreemptDrop, c.digi.Preempt[0][1])
+					a.Equal(digipeater.PreemptDrop, c.digi.Preempt[0][1])
 					a.Contains(c.output, "DROP option is discouraged")
 				},
 			},
@@ -1616,7 +1617,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "MARK is accepted and discouraged",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ MARK\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(PreemptMark, c.digi.Preempt[0][1])
+					a.Equal(digipeater.PreemptMark, c.digi.Preempt[0][1])
 					a.Contains(c.output, "MARK option is discouraged")
 				},
 			},

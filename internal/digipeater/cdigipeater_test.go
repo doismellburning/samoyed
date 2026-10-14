@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package digipeater
 
 // The connected mode digipeater: a station asks to be repeated by naming us,
 // or one of our aliases, in the next unused digipeater field, and we put our
@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
@@ -27,24 +28,26 @@ const (
 
 // setupCDigipeater points a connected mode digipeater at two radio channels
 // with our callsign on each, and returns what it sends.
-func setupCDigipeater(t *testing.T) (*ConnectedDigipeater, *ConnectedDigipeaterConfig, *frameRecorder) {
+func setupCDigipeater(t *testing.T) (*Connected, *ConnectedConfig, *frameRecorder) {
 	t.Helper()
 
-	var ports [MAX_TOTAL_CHANS]DigipeaterPort
-	ports[cdigiFromChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumRadio}
-	ports[cdigiToChan] = DigipeaterPort{MyCall: "Q2TEST", Medium: phy.MediumRadio}
+	var ports [phy.MaxTotalChans]Port
+	ports[cdigiFromChan] = Port{MyCall: "Q1TEST", Medium: phy.MediumRadio}
+	ports[cdigiToChan] = Port{MyCall: "Q2TEST", Medium: phy.MediumRadio}
 
-	var cdigiConfig = new(ConnectedDigipeaterConfig)
+	var cdigiConfig = new(ConnectedConfig)
 
 	var tx = new(frameRecorder)
 
-	return NewConnectedDigipeater(ports, cdigiConfig, new(pfilter.PacketFilter), tx.send), cdigiConfig, tx
+	return NewConnected(ports, cdigiConfig, new(pfilter.PacketFilter), tx.send), cdigiConfig, tx
 }
 
 // A station that named us as its next digipeater is repeated, with the
 // callsign of the channel we transmit on put in place of the one it asked for
 // and marked as used.
 func TestCDigipeatMatchExplicitCall(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
@@ -63,6 +66,8 @@ func TestCDigipeatMatchExplicitCall(t *testing.T) {
 // An alias is the other way of asking: a pattern the configuration gives for
 // names we also answer to.
 func TestCDigipeatMatchAlias(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,WIDE1-1:hello", true)
@@ -78,6 +83,8 @@ func TestCDigipeatMatchAlias(t *testing.T) {
 
 // An alias that does not match is somebody else's business.
 func TestCDigipeatMatchAliasNoMatch(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q5TEST:hello", true)
@@ -91,6 +98,8 @@ func TestCDigipeatMatchAliasNoMatch(t *testing.T) {
 // With no alias configured there is nothing to match against, and the alias
 // pattern must not be looked at at all - it will not have been set up.
 func TestCDigipeatMatchNoAlias(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q5TEST:hello", true)
@@ -101,6 +110,8 @@ func TestCDigipeatMatchNoAlias(t *testing.T) {
 
 // A frame with no digipeater path is not asking to be repeated by anyone.
 func TestCDigipeatMatchNoDigipeaters(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST:hello", true)
@@ -111,6 +122,8 @@ func TestCDigipeatMatchNoDigipeaters(t *testing.T) {
 
 // A path whose every entry has been used has been all the way round already.
 func TestCDigipeatMatchPathExhausted(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST*:hello", true)
@@ -122,6 +135,8 @@ func TestCDigipeatMatchPathExhausted(t *testing.T) {
 // CFILTER is how the configuration narrows what a channel pair will repeat,
 // and it is consulted before the address is even looked at.
 func TestCDigipeatMatchFilterRejects(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
@@ -131,6 +146,8 @@ func TestCDigipeatMatchFilterRejects(t *testing.T) {
 }
 
 func TestCDigipeatMatchFilterAccepts(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, _, _ = setupCDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
@@ -141,6 +158,8 @@ func TestCDigipeatMatchFilterAccepts(t *testing.T) {
 
 // A filter that cannot be understood says so, and nothing is repeated through
 // it - a filter that silently passed everything would be worse than none.
+//
+//nolint:paralleltest // Serial: watches logrus's global logger through a test hook.
 func TestCDigipeatMatchFilterError(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
@@ -162,6 +181,8 @@ func TestCDigipeatMatchFilterError(t *testing.T) {
 // Repeating on the channel it came in on is the ordinary case, and the frame
 // goes out at high priority - it is somebody's connected session waiting.
 func TestCDigipeaterSameChannel(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, cdigiConfig, tx = setupCDigipeater(t)
 
 	cdigiConfig.Enabled[cdigiFromChan][cdigiFromChan] = true
@@ -171,7 +192,7 @@ func TestCDigipeaterSameChannel(t *testing.T) {
 
 	cdigi.Digipeat(cdigiFromChan, pp)
 
-	var sent = tx.take(cdigiFromChan, TQ_PRIO_0_HI)
+	var sent = tx.take(cdigiFromChan, dwcore.PrioHigh)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
 	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST*:", sent.FormatAddrs())
 
@@ -182,6 +203,8 @@ func TestCDigipeaterSameChannel(t *testing.T) {
 // is the one belonging to the channel it goes out on, not the one it came in
 // on.
 func TestCDigipeaterCrossChannel(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, cdigiConfig, tx = setupCDigipeater(t)
 
 	cdigiConfig.Enabled[cdigiFromChan][cdigiToChan] = true
@@ -191,9 +214,9 @@ func TestCDigipeaterCrossChannel(t *testing.T) {
 
 	cdigi.Digipeat(cdigiFromChan, pp)
 
-	assert.Nil(t, tx.take(cdigiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
+	assert.Nil(t, tx.take(cdigiFromChan, dwcore.PrioHigh), "it should not have gone out on the channel it arrived on")
 
-	var sent = tx.take(cdigiToChan, TQ_PRIO_0_HI)
+	var sent = tx.take(cdigiToChan, dwcore.PrioHigh)
 	require.NotNil(t, sent, "the repeated frame was not queued for the other channel")
 	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", sent.FormatAddrs())
 
@@ -203,6 +226,8 @@ func TestCDigipeaterCrossChannel(t *testing.T) {
 // A channel pair with no CDIGIPEAT line repeats nothing, however the frame is
 // addressed.
 func TestCDigipeaterNotEnabled(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, _, tx = setupCDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
@@ -217,6 +242,8 @@ func TestCDigipeaterNotEnabled(t *testing.T) {
 
 // Connected mode is only allowed on channels with an internal modem, so
 // anything else arriving here is a mistake worth saying out loud.
+//
+//nolint:paralleltest // Serial: watches logrus's global logger through a test hook.
 func TestCDigipeaterInvalidChannel(t *testing.T) {
 	var cdigi, _, _ = setupCDigipeater(t)
 
@@ -229,7 +256,7 @@ func TestCDigipeaterInvalidChannel(t *testing.T) {
 
 	t.Cleanup(hook.Reset)
 
-	for _, channel := range []int{-1, 2, MAX_RADIO_CHANS} {
+	for _, channel := range []int{-1, 2, phy.MaxRadioChans} {
 		hook.Reset()
 
 		cdigi.Digipeat(channel, pp)
@@ -245,6 +272,8 @@ func TestCDigipeaterInvalidChannel(t *testing.T) {
 // A network TNC channel carries connected mode too, so it digipeats like a
 // radio channel rather than being turned away as invalid.
 func TestCDigipeaterNetworkTNCChannel(t *testing.T) {
+	t.Parallel()
+
 	var cdigi, cdigiConfig, tx = setupCDigipeater(t)
 
 	cdigi.ports[cdigiFromChan].Medium = phy.MediumNetTNC
@@ -255,19 +284,21 @@ func TestCDigipeaterNetworkTNCChannel(t *testing.T) {
 
 	cdigi.Digipeat(cdigiFromChan, pp)
 
-	assert.NotNil(t, tx.take(cdigiFromChan, TQ_PRIO_0_HI), "a network TNC channel should digipeat")
+	assert.NotNil(t, tx.take(cdigiFromChan, dwcore.PrioHigh), "a network TNC channel should digipeat")
 	assert.Equal(t, 1, cdigi.GetCount(cdigiFromChan, cdigiFromChan))
 }
 
-func TestNewConnectedDigipeater(t *testing.T) {
-	var ports [MAX_TOTAL_CHANS]DigipeaterPort
-	ports[cdigiFromChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumRadio}
+func TestNewConnected(t *testing.T) {
+	t.Parallel()
 
-	var cdigiConfig = new(ConnectedDigipeaterConfig)
+	var ports [phy.MaxTotalChans]Port
+	ports[cdigiFromChan] = Port{MyCall: "Q1TEST", Medium: phy.MediumRadio}
+
+	var cdigiConfig = new(ConnectedConfig)
 
 	var filter = new(pfilter.PacketFilter)
 
-	var cdigi = NewConnectedDigipeater(ports, cdigiConfig, filter, nil)
+	var cdigi = NewConnected(ports, cdigiConfig, filter, nil)
 
 	assert.Equal(t, ports, cdigi.ports)
 	assert.Same(t, cdigiConfig, cdigi.config)

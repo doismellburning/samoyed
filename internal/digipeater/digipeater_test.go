@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-package direwolf
+package digipeater
 
 // digipeat_match, which decides whether a single frame should be repeated, is
 // covered thoroughly by the tests ported from Dire Wolf.  What is here is the
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
@@ -60,24 +61,24 @@ func (r *frameRecorder) take(channel int, prio int) *ax25.Packet {
 
 // setupDigipeater points a new APRS digipeater at two radio channels with our
 // callsign on each, and returns what it sends.
-func setupDigipeater(t *testing.T) (*Digipeater, *DigipeaterConfig, *frameRecorder) {
+func setupDigipeater(t *testing.T) (*Digipeater, *Config, *frameRecorder) {
 	t.Helper()
 
-	var ports [MAX_TOTAL_CHANS]DigipeaterPort
-	ports[digiFromChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumRadio}
-	ports[digiToChan] = DigipeaterPort{MyCall: "Q2TEST", Medium: phy.MediumRadio}
+	var ports [phy.MaxTotalChans]Port
+	ports[digiFromChan] = Port{MyCall: "Q1TEST", Medium: phy.MediumRadio}
+	ports[digiToChan] = Port{MyCall: "Q2TEST", Medium: phy.MediumRadio}
 
-	var digiConfig = new(DigipeaterConfig)
+	var digiConfig = new(Config)
 	digiConfig.DedupeTime = 30
 
 	var tx = new(frameRecorder)
 
-	return NewDigipeater(ports, digiConfig, new(pfilter.PacketFilter), nil, tx.send), digiConfig, tx
+	return New(ports, digiConfig, new(pfilter.PacketFilter), nil, tx.send), digiConfig, tx
 }
 
 // enableDigipeat turns on digipeating from digiFromChan to the given channel,
 // with the usual WIDEn-n handling.
-func enableDigipeat(digiConfig *DigipeaterConfig, to int) {
+func enableDigipeat(digiConfig *Config, to int) {
 	digiConfig.Enabled[digiFromChan][to] = true
 	digiConfig.Alias[digiFromChan][to] = regexp.MustCompile("^WIDE[4-7]-[1-7]|CITYD$")
 	digiConfig.Wide[digiFromChan][to] = regexp.MustCompile("^WIDE[1-7]-[1-7]$")
@@ -88,6 +89,8 @@ func enableDigipeat(digiConfig *DigipeaterConfig, to int) {
 // at high priority: every digipeater that heard it is supposed to transmit at
 // once, so that one packet time clears the packet out of the area.
 func TestDigipeaterSameChannel(t *testing.T) {
+	t.Parallel()
+
 	var digi, digiConfig, tx = setupDigipeater(t)
 
 	enableDigipeat(digiConfig, digiFromChan)
@@ -97,7 +100,7 @@ func TestDigipeaterSameChannel(t *testing.T) {
 
 	digi.Digipeat(digiFromChan, pp)
 
-	var sent = tx.take(digiFromChan, TQ_PRIO_0_HI)
+	var sent = tx.take(digiFromChan, dwcore.PrioHigh)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
 	assert.Equal(t, "Q3TEST>APDW17,Q1TEST*,WIDE2-1:", sent.FormatAddrs())
 
@@ -107,6 +110,8 @@ func TestDigipeaterSameChannel(t *testing.T) {
 // Cross-band repeating is the second pass, and goes out at low priority: the
 // other channel's listeners have not heard it yet, so there is no rush.
 func TestDigipeaterCrossChannel(t *testing.T) {
+	t.Parallel()
+
 	var digi, digiConfig, tx = setupDigipeater(t)
 
 	enableDigipeat(digiConfig, digiToChan)
@@ -116,9 +121,9 @@ func TestDigipeaterCrossChannel(t *testing.T) {
 
 	digi.Digipeat(digiFromChan, pp)
 
-	assert.Nil(t, tx.take(digiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
+	assert.Nil(t, tx.take(digiFromChan, dwcore.PrioHigh), "it should not have gone out on the channel it arrived on")
 
-	var sent = tx.take(digiToChan, TQ_PRIO_1_LO)
+	var sent = tx.take(digiToChan, dwcore.PrioLow)
 	require.NotNil(t, sent, "the repeated frame was not queued for the other channel")
 	assert.Equal(t, "Q3TEST>APDW17,Q2TEST*,WIDE2-1:", sent.FormatAddrs(),
 		"the callsign of the channel it goes out on should have been used")
@@ -129,6 +134,8 @@ func TestDigipeaterCrossChannel(t *testing.T) {
 // Repeating a frame is what makes it a duplicate of itself: the same frame
 // heard again by another route is not repeated a second time.
 func TestDigipeaterRemembersWhatItRepeated(t *testing.T) {
+	t.Parallel()
+
 	var digi, digiConfig, tx = setupDigipeater(t)
 
 	enableDigipeat(digiConfig, digiFromChan)
@@ -138,7 +145,7 @@ func TestDigipeaterRemembersWhatItRepeated(t *testing.T) {
 
 	digi.Digipeat(digiFromChan, pp)
 
-	require.NotNil(t, tx.take(digiFromChan, TQ_PRIO_0_HI))
+	require.NotNil(t, tx.take(digiFromChan, dwcore.PrioHigh))
 
 	assert.True(t, digi.dedupe.Check(digiFromChan, pp),
 		"the repeated frame was not remembered, so the next copy of it would go out too")
@@ -147,6 +154,8 @@ func TestDigipeaterRemembersWhatItRepeated(t *testing.T) {
 // A channel pair with no DIGIPEAT line repeats nothing, however the frame is
 // addressed.
 func TestDigipeaterNotEnabled(t *testing.T) {
+	t.Parallel()
+
 	var digi, _, tx = setupDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
@@ -160,6 +169,8 @@ func TestDigipeaterNotEnabled(t *testing.T) {
 // A frame that is not asking to be repeated is not repeated, and does not
 // count.
 func TestDigipeaterNothingToDo(t *testing.T) {
+	t.Parallel()
+
 	var digi, digiConfig, tx = setupDigipeater(t)
 
 	enableDigipeat(digiConfig, digiFromChan)
@@ -169,12 +180,14 @@ func TestDigipeaterNothingToDo(t *testing.T) {
 
 	digi.Digipeat(digiFromChan, pp)
 
-	assert.Nil(t, tx.take(digiFromChan, TQ_PRIO_0_HI))
+	assert.Nil(t, tx.take(digiFromChan, dwcore.PrioHigh))
 	assert.Zero(t, digi.GetCount(digiFromChan, digiFromChan))
 }
 
 // A channel that cannot have been the source of a frame is a mistake worth
 // saying out loud.
+//
+//nolint:paralleltest // Serial: watches logrus's global logger through a test hook.
 func TestDigipeaterInvalidChannel(t *testing.T) {
 	var digi, _, _ = setupDigipeater(t)
 
@@ -185,7 +198,7 @@ func TestDigipeaterInvalidChannel(t *testing.T) {
 
 	t.Cleanup(hook.Reset)
 
-	for _, channel := range []int{-1, MAX_TOTAL_CHANS} {
+	for _, channel := range []int{-1, phy.MaxTotalChans} {
 		hook.Reset()
 
 		digi.Digipeat(channel, pp)
@@ -200,14 +213,16 @@ func TestDigipeaterInvalidChannel(t *testing.T) {
 
 // A serial TNC's channel is heard as a radio's is, so what arrives on it can
 // be digipeated onto a radio channel.
+//
+//nolint:paralleltest // Serial: watches logrus's global logger through a test hook.
 func TestDigipeaterFromSerialTNC(t *testing.T) {
-	const serialChan = MAX_RADIO_CHANS
+	const serialChan = phy.MaxRadioChans
 
-	var ports [MAX_TOTAL_CHANS]DigipeaterPort
-	ports[digiToChan] = DigipeaterPort{MyCall: "Q2TEST", Medium: phy.MediumRadio}
-	ports[serialChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumSerialTNC}
+	var ports [phy.MaxTotalChans]Port
+	ports[digiToChan] = Port{MyCall: "Q2TEST", Medium: phy.MediumRadio}
+	ports[serialChan] = Port{MyCall: "Q1TEST", Medium: phy.MediumSerialTNC}
 
-	var digiConfig = new(DigipeaterConfig)
+	var digiConfig = new(Config)
 	digiConfig.DedupeTime = 30
 	digiConfig.Enabled[serialChan][digiToChan] = true
 	digiConfig.Alias[serialChan][digiToChan] = regexp.MustCompile("^WIDE[4-7]-[1-7]|CITYD$")
@@ -216,7 +231,7 @@ func TestDigipeaterFromSerialTNC(t *testing.T) {
 
 	var tx = new(frameRecorder)
 
-	var digi = NewDigipeater(ports, digiConfig, new(pfilter.PacketFilter), nil, tx.send)
+	var digi = New(ports, digiConfig, new(pfilter.PacketFilter), nil, tx.send)
 
 	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
 	require.NotNil(t, pp)
@@ -231,7 +246,7 @@ func TestDigipeaterFromSerialTNC(t *testing.T) {
 		assert.NotContains(t, entry.Message, "Did not expect to receive on invalid channel")
 	}
 
-	var sent = tx.take(digiToChan, TQ_PRIO_1_LO)
+	var sent = tx.take(digiToChan, dwcore.PrioLow)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
 	assert.Equal(t, "Q3TEST>APDW17,Q2TEST*,WIDE2-1:", sent.FormatAddrs())
 }
@@ -239,6 +254,8 @@ func TestDigipeaterFromSerialTNC(t *testing.T) {
 // Regeneration sends the frame on again exactly as it arrived, rather than
 // digipeating it - a separate option, for a separate purpose.
 func TestDigiRegen(t *testing.T) {
+	t.Parallel()
+
 	var digi, digiConfig, tx = setupDigipeater(t)
 
 	digiConfig.Regen[digiFromChan][digiToChan] = true
@@ -248,7 +265,7 @@ func TestDigiRegen(t *testing.T) {
 
 	digi.Regen(digiFromChan, pp)
 
-	var sent = tx.take(digiToChan, TQ_PRIO_1_LO)
+	var sent = tx.take(digiToChan, dwcore.PrioLow)
 	require.NotNil(t, sent, "nothing was regenerated")
 	assert.Equal(t, "Q3TEST>APDW17,WIDE2-2:", sent.FormatAddrs(),
 		"a regenerated frame goes out exactly as it arrived")
@@ -256,6 +273,8 @@ func TestDigiRegen(t *testing.T) {
 
 // Without the option nothing is regenerated.
 func TestDigiRegenDisabled(t *testing.T) {
+	t.Parallel()
+
 	var digi, _, tx = setupDigipeater(t)
 
 	var pp = ax25.FromText("Q3TEST>APDW17,WIDE2-2:>hello", true)
@@ -266,16 +285,18 @@ func TestDigiRegenDisabled(t *testing.T) {
 	assert.Empty(t, tx.sent, "a frame was regenerated with regeneration disabled")
 }
 
-func TestNewDigipeater(t *testing.T) {
-	var ports [MAX_TOTAL_CHANS]DigipeaterPort
-	ports[digiFromChan] = DigipeaterPort{MyCall: "Q1TEST", Medium: phy.MediumRadio}
+func TestNew(t *testing.T) {
+	t.Parallel()
 
-	var digiConfig = new(DigipeaterConfig)
+	var ports [phy.MaxTotalChans]Port
+	ports[digiFromChan] = Port{MyCall: "Q1TEST", Medium: phy.MediumRadio}
+
+	var digiConfig = new(Config)
 	digiConfig.DedupeTime = 30
 
 	var filter = new(pfilter.PacketFilter)
 
-	var digi = NewDigipeater(ports, digiConfig, filter, nil, nil)
+	var digi = New(ports, digiConfig, filter, nil, nil)
 
 	assert.Equal(t, ports, digi.ports)
 	assert.Same(t, digiConfig, digi.config)
@@ -287,6 +308,8 @@ func TestNewDigipeater(t *testing.T) {
 // APRStt object reports reach for the digipeater whether or not startup has
 // got that far.
 func TestDigipeaterRememberNil(t *testing.T) {
+	t.Parallel()
+
 	var pp = ax25.FromText("Q3TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
@@ -297,6 +320,8 @@ func TestDigipeaterRememberNil(t *testing.T) {
 
 // What an APRStt object report remembers, the digipeater will not repeat.
 func TestDigipeaterRemember(t *testing.T) {
+	t.Parallel()
+
 	var digi, digiConfig, tx = setupDigipeater(t)
 
 	enableDigipeat(digiConfig, digiFromChan)
@@ -307,6 +332,6 @@ func TestDigipeaterRemember(t *testing.T) {
 	digi.Remember(digiFromChan, pp)
 	digi.Digipeat(digiFromChan, pp)
 
-	assert.Nil(t, tx.take(digiFromChan, TQ_PRIO_0_HI))
+	assert.Nil(t, tx.take(digiFromChan, dwcore.PrioHigh))
 	assert.Zero(t, digi.GetCount(digiFromChan, digiFromChan))
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -173,7 +174,7 @@ func setupIGateFromServer(t *testing.T) *IGate {
 	// Nothing reads what it queues: each run has a queue of its own.
 	var tq = newTestTransmitQueue(audioConfig)
 
-	return NewIGate(audioConfig, igateConfig, new(DigipeaterConfig), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, nil, tq.Append, 0)
+	return NewIGate(audioConfig, igateConfig, new(digipeater.Config), pfilter.New(igateConfig.max_digi_hops, nil, heardDB, 0), heardDB, nil, tq.Append, 0)
 }
 
 // fuzzAGWServer returns a server with a client attached as client 0, by way of

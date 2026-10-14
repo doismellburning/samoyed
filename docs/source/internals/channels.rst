@@ -154,7 +154,7 @@ References
 * `internal/direwolf/kiss_frame.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/kiss_frame.go>`__ - KISS client transmit check
 * `internal/direwolf/server.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/server.go>`__ - AGW port list and connected-mode check
 * `internal/direwolf/beacon.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/beacon.go>`__ - beacon ``MYCALL`` choice
-* `internal/direwolf/digipeater.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/digipeater.go>`__
-  and `internal/direwolf/cdigipeater.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/cdigipeater.go>`__ - the digipeaters' receive checks
+* `internal/digipeater/digipeater.go <https://github.com/doismellburning/samoyed/blob/main/internal/digipeater/digipeater.go>`__
+  and `internal/digipeater/cdigipeater.go <https://github.com/doismellburning/samoyed/blob/main/internal/digipeater/cdigipeater.go>`__ - the digipeaters' receive checks
 * `internal/direwolf/direwolf.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/direwolf.go>`__ -
   ``app_process_rec_packet``, which hands received frames on

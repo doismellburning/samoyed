@@ -2,6 +2,7 @@ package direwolf
 
 import (
 	"github.com/doismellburning/samoyed/internal/axudp"
+	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/ptt"
@@ -364,11 +365,11 @@ const DEFAULT_FULLDUP = false // false = half duplex
 
 // digipeaterPorts is our callsign and the medium of each channel, as the
 // digipeaters need them.
-func (c *RadioConfig) digipeaterPorts() [MAX_TOTAL_CHANS]DigipeaterPort {
-	var ports [MAX_TOTAL_CHANS]DigipeaterPort
+func (c *RadioConfig) digipeaterPorts() [MAX_TOTAL_CHANS]digipeater.Port {
+	var ports [MAX_TOTAL_CHANS]digipeater.Port
 
 	for channel := range MAX_TOTAL_CHANS {
-		ports[channel] = DigipeaterPort{MyCall: c.mycall[channel], Medium: c.chan_medium[channel]}
+		ports[channel] = digipeater.Port{MyCall: c.mycall[channel], Medium: c.chan_medium[channel]}
 	}
 
 	return ports

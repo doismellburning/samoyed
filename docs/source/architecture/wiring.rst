@@ -43,8 +43,8 @@ Dashed arrows are connections made after construction rather than at it.
        agw [label="AGWServer"];
        link [label="AX25Link\ndata link state machine"];
        igate [label="IGate"];
-       digi [label="Digipeater"];
-       cdigi [label="ConnectedDigipeater"];
+       digi [label="digipeater.Digipeater\nAPRS"];
+       cdigi [label="digipeater.Connected\nconnected mode"];
        kiss [label="KissHandler"];
        kissnet [label="KISS TCP, serial,\npseudo terminal"];
        apps [label="clientApps"];
@@ -132,7 +132,8 @@ Dashed arrows are connections made after construction rather than at it.
    }
 
 The diagram leaves out what is plain configuration
-(the parsed configuration file and the debug options)
+(the parsed configuration file and the debug options,
+and the ``digipeater.Port`` for each channel that ``RadioConfig.digipeaterPorts`` takes from it for the digipeaters)
 and the services with only one user,
 which ``DirewolfMain`` hands over in the same way:
 the heard list (``mheard``) to the packet filter, the IGate, the beacon service and the received packet handler;
@@ -239,8 +240,13 @@ References
   ``kissnet.go`` (``KissNetService.Start``),
   ``aprs_tt.go`` (``NewTTGateway``),
   ``beacon.go`` (``NewBeaconService``, ``beaconIGate``),
-  ``audio.go`` (``AudioDevices.setAudioLevel``)
+  ``audio.go`` (``AudioDevices.setAudioLevel``),
+  ``channel_config.go`` (``RadioConfig.digipeaterPorts``)
   and ``recv.go`` (``recv_init``, ``recv_process``).
 - ``internal/ptt/ptt.go``: ``New``,
   handed each channel's configuration by ``RadioConfig.pttChannels`` (``internal/direwolf/channel_config.go``).
+- The digipeaters' constructors, and what they take,
+  in ``internal/digipeater``:
+  ``digipeater.go`` (``New``, ``Port``, ``FrameSender``)
+  and ``cdigipeater.go`` (``NewConnected``).
 - ``AGENTS.md``, the "Dependencies" section.

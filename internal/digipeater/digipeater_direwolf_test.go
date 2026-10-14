@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package digipeater
 
 import (
 	"regexp"
@@ -85,6 +88,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	}
 }
 
+//nolint:paralleltest // Serial: keeps its state in package-level variables.
 func Test_Digipeater(t *testing.T) {
 	digipeaterTestMyCall = "WB2OSZ-9"
 
