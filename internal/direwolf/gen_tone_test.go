@@ -5,10 +5,12 @@ package direwolf
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -88,12 +90,17 @@ func TestPutBitWithUnknownModemSendsNothing(t *testing.T) {
 	var tg = NewToneGenerator(0, audioConfig, 100, sink)
 
 	var output = testutils.CaptureOutput(t, func() {
+		var oldLogOutput = logrus.StandardLogger().Out
+		logrus.SetOutput(os.Stdout)
+
+		defer logrus.SetOutput(oldLogOutput)
+
 		tg.PutBit(1)
 		tg.PutBit(0)
 	})
 
 	assert.Equal(t, 0, sink.puts, "nothing should have been sent")
-	assert.Equal(t, 1, strings.Count(output, "INTERNAL ERROR"), "the error should be reported once: %s", output)
+	assert.Equal(t, 1, strings.Count(output, "Internal error: tone generator can't modulate"), "the error should be reported once: %s", output)
 }
 
 // At a sample rate that isn't a multiple of 1000, the sample count for a

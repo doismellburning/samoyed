@@ -229,7 +229,6 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 		audio.chan_medium[1] = MEDIUM_RADIO
 	}
 
-	text_color_set(DW_COLOR_INFO)
 	fmt.Printf("%d samples per second.  %d bits per sample.  %d audio channels.\n",
 		audio.adev[0].samples_per_sec,
 		audio.adev[0].bits_per_sample,
@@ -290,7 +289,6 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 		/* process_rec_frame, below, is called. */
 	}
 
-	text_color_set(DW_COLOR_INFO)
 	fmt.Printf("\n\n")
 
 	if EXPERIMENT_G {
@@ -340,8 +338,7 @@ func (s *readerSampleSource) GetByte(_ int) int {
 	s.remaining--
 
 	if errors.Is(err, io.EOF) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unexpected end of file.\n")
+		logrus.Error("Unexpected end of file")
 
 		return (-1)
 	}
@@ -387,9 +384,8 @@ func (s *atestSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcor
 		heard = pp.AddrWithSSID(h)
 	}
 
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("\n")
-	dw_printf("DECODED[%d] ", s.packetsDecoded)
+	fmt.Printf("\n")
+	fmt.Printf("DECODED[%d] ", s.packetsDecoded)
 
 	/* Insert time stamp relative to start of file. */
 
@@ -397,10 +393,10 @@ func (s *atestSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcor
 	var minutes = int(sec / 60.)
 	sec -= float64(minutes * 60)
 
-	dw_printf("%d:%06.3f ", minutes, sec)
+	fmt.Printf("%d:%06.3f ", minutes, sec)
 
 	if h != ax25.Source {
-		dw_printf("Digipeater ")
+		fmt.Printf("Digipeater ")
 	}
 
 	var alevel_text = alevel.Text()
@@ -420,55 +416,46 @@ func (s *atestSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcor
 
 	switch fec_type {
 	case fec_type_fx25:
-		dw_printf("%s audio level = %s   FX.25  %s\n", heard, alevel_text, spectrum)
+		fmt.Printf("%s audio level = %s   FX.25  %s\n", heard, alevel_text, spectrum)
 	case fec_type_il2p:
-		dw_printf("%s audio level = %s   IL2P  %s\n", heard, alevel_text, spectrum)
+		fmt.Printf("%s audio level = %s   IL2P  %s\n", heard, alevel_text, spectrum)
 	default:
 		//case fec_type_none:
 		if s.audio.achan[channel].fix_bits == RETRY_NONE && !s.audio.achan[channel].passall {
 			// No fix_bits or passall specified.
-			dw_printf("%s audio level = %s     %s\n", heard, alevel_text, spectrum)
+			fmt.Printf("%s audio level = %s     %s\n", heard, alevel_text, spectrum)
 		} else {
 			dwutil.Assert(retries >= RETRY_NONE && retries <= BitFixPassall) // validate array index.
-			dw_printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retries.String(), spectrum)
+			fmt.Printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retries.String(), spectrum)
 		}
 	}
 
-	// Display non-APRS packets in a different color.
-
 	// Display channel with subchannel/slice if applicable.
-
-	if pp.IsAPRS() {
-		text_color_set(DW_COLOR_REC)
-	} else {
-		text_color_set(DW_COLOR_DEBUG)
-	}
 
 	var numSubchan, numSlicers = s.receiver.Layout(channel)
 
 	if numSubchan > 1 && numSlicers == 1 {
-		dw_printf("[%d.%d] ", channel, subchan)
+		fmt.Printf("[%d.%d] ", channel, subchan)
 	} else if numSubchan == 1 && numSlicers > 1 {
-		dw_printf("[%d.%d] ", channel, slice)
+		fmt.Printf("[%d.%d] ", channel, slice)
 	} else if numSubchan > 1 && numSlicers > 1 {
-		dw_printf("[%d.%d.%d] ", channel, subchan, slice)
+		fmt.Printf("[%d.%d.%d] ", channel, subchan, slice)
 	} else {
-		dw_printf("[%d] ", channel)
+		fmt.Printf("[%d] ", channel)
 	}
 
-	dw_printf("%s", stemp) /* stations followed by : */
+	fmt.Printf("%s", stemp) /* stations followed by : */
 	ax25.SafePrint(info, false)
-	dw_printf("\n")
+	fmt.Printf("\n")
 
 	/*
 	 * -h option for hexadecimal display.  (new in 1.6)
 	 */
 
 	if s.hexDisplay {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("------\n")
+		fmt.Printf("------\n")
 		pp.HexDump()
-		dw_printf("------\n")
+		fmt.Printf("------\n")
 	}
 
 	/*
@@ -516,8 +503,6 @@ func (s *atestSink) DCDChange(channel int, state int) {
 	if s.debugDCD > 0 {
 		var t = float64(s.sampleNumber) / float64(s.audio.adev[0].samples_per_sec)
 
-		text_color_set(DW_COLOR_INFO)
-
 		if state != 0 {
 			//sec1 = t;
 			//min1 = (int)(sec1 / 60.);
@@ -535,7 +520,7 @@ func (s *atestSink) DCDChange(channel int, state int) {
 			var min2 = (int)(sec2 / 60.)
 			sec2 -= float64(min2 * 60)
 
-			dw_printf("DCD[%d]  %d:%06.3f - %d:%06.3f =  %3.0f\n", channel, min1, sec1, min2, sec2, (t-s.dcdStartSeconds[channel])*1000.)
+			fmt.Printf("DCD[%d]  %d:%06.3f - %d:%06.3f =  %3.0f\n", channel, min1, sec1, min2, sec2, (t-s.dcdStartSeconds[channel])*1000.)
 		}
 	}
 }
