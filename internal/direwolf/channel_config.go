@@ -61,11 +61,6 @@ const (
 
 const V26_DEFAULT = phy.V26Default
 
-const (
-	DTMF_DECODE_OFF = phy.DTMFDecodeOff
-	DTMF_DECODE_ON  = phy.DTMFDecodeOn
-)
-
 /* Properties for each radio channel, common to receive and transmit. */
 /* Can be different for each radio channel. */
 

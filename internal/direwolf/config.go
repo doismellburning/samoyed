@@ -2438,7 +2438,7 @@ func handleDTMF(ps *parseState) error {
 		return fmt.Errorf("line %d: DTMF can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	ps.audio.achan[ps.channel].DTMFDecode = DTMF_DECODE_ON
+	ps.audio.achan[ps.channel].DTMFDecode = true
 
 	return nil
 }
@@ -4812,7 +4812,7 @@ func handleTTOBJ(ps *parseState) error {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("Debug TTOBJ r=%d, x=%d, app=%d, ig=%d\n", r, x, app, ig);
 
-	ps.audio.achan[r].DTMFDecode = DTMF_DECODE_ON
+	ps.audio.achan[r].DTMFDecode = true
 	ps.tt.gateway_enabled = 1
 	ps.tt.obj_recv_chan = r
 	ps.tt.obj_xmit_chan = x

@@ -20,14 +20,6 @@ const (
 
 const V26Default = V26B
 
-// DTMFDecoding says whether a channel listens for DTMF ("Touch Tone").
-type DTMFDecoding int
-
-const (
-	DTMFDecodeOff DTMFDecoding = iota
-	DTMFDecodeOn
-)
-
 /*
  * Standard for AFSK on VHF FM.
  * Reversing mark and space makes no difference because
@@ -70,7 +62,7 @@ type ModemConfig struct {
 	// Default to MFJ compatible and print warning if user did not
 	// pick one explicitly.
 
-	DTMFDecode DTMFDecoding
+	DTMFDecode bool // Listen for DTMF ("Touch Tone").
 
 	/* Originally the DTMF ("Touch Tone") decoder was always */
 	/* enabled because it took a negligible amount of CPU. */

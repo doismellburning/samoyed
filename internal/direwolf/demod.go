@@ -318,7 +318,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 
 		dw_printf(", Tx %s", layer2Xmit)
 
-		if modem.DTMFDecode != DTMF_DECODE_OFF {
+		if modem.DTMFDecode {
 			dw_printf(", DTMF decoder enabled")
 		}
 
@@ -523,7 +523,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			dw_printf(", compatible with earlier direwolf")
 		}
 
-		if modem.DTMFDecode != DTMF_DECODE_OFF {
+		if modem.DTMFDecode {
 			dw_printf(", DTMF decoder enabled")
 		}
 
@@ -576,7 +576,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 
 		dw_printf(", Tx %s", layer2Xmit)
 
-		if modem.DTMFDecode != DTMF_DECODE_OFF {
+		if modem.DTMFDecode {
 			dw_printf(", DTMF decoder enabled")
 		}
 
@@ -624,7 +624,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 
 		dw_printf(", Tx %s", layer2Xmit)
 
-		if modem.DTMFDecode != DTMF_DECODE_OFF {
+		if modem.DTMFDecode {
 			dw_printf(", DTMF decoder enabled")
 		}
 
@@ -719,7 +719,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 				modem.Upsample)
 			dw_printf(", Tx %s", layer2Xmit)
 
-			if modem.DTMFDecode != DTMF_DECODE_OFF {
+			if modem.DTMFDecode {
 				dw_printf(", DTMF decoder enabled")
 			}
 

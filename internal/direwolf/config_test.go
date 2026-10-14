@@ -1724,22 +1724,22 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "the decoder is off by default",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DTMF_DECODE_OFF, c.audio.achan[0].DTMFDecode)
+					a.False(c.audio.achan[0].DTMFDecode)
 				},
 			},
 			{
 				name:   "the directive enables the decoder",
 				config: "DTMF\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DTMF_DECODE_ON, c.audio.achan[0].DTMFDecode)
+					a.True(c.audio.achan[0].DTMFDecode)
 				},
 			},
 			{
 				name:   "it enables the decoder on the current channel only",
 				config: "ACHANNELS 2\nCHANNEL 1\nDTMF\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(DTMF_DECODE_OFF, c.audio.achan[0].DTMFDecode)
-					a.Equal(DTMF_DECODE_ON, c.audio.achan[1].DTMFDecode)
+					a.False(c.audio.achan[0].DTMFDecode)
+					a.True(c.audio.achan[1].DTMFDecode)
 				},
 			},
 		},
@@ -4391,7 +4391,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 					a.Equal(1, c.tt.gateway_enabled)
 					a.Equal(0, c.tt.obj_recv_chan)
 					a.Equal(1, c.tt.obj_xmit_chan)
-					a.Equal(DTMF_DECODE_ON, c.audio.achan[0].DTMFDecode)
+					a.True(c.audio.achan[0].DTMFDecode)
 				},
 			},
 			{
