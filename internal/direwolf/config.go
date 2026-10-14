@@ -2208,11 +2208,11 @@ func (ps *parseState) applyModem(settings ModemSettings) error {
 		return fmt.Errorf("line %d: Missing data transmission speed for MODEM command", ps.line)
 	}
 
-	var modemErr = achan.setModem(settings.Speed)
+	var modemErr = achan.SetBitrate(settings.Speed)
 
 	var rate, rateErr = strconv.Atoi(settings.Speed) // Not if it was AIS or EAS.
 	if modemErr != nil {
-		_ = achan.setModem(strconv.Itoa(DEFAULT_BAUD))
+		_ = achan.SetBitrate(strconv.Itoa(DEFAULT_BAUD))
 
 		ps.errorf("line %d: Unreasonable data rate. Using %d bits per second", ps.line, DEFAULT_BAUD)
 	} else if rateErr == nil && !slices.Contains([]int{300, 1200, 2400, 4800, 9600, 19200}, rate) {

@@ -3,7 +3,10 @@
 
 package direwolf
 
-import "github.com/doismellburning/samoyed/internal/dwutil"
+import (
+	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
+)
 
 // settleModemOptions applies, to each radio channel, the rules about which
 // modem options go together, so that the configuration is final before any
@@ -20,7 +23,8 @@ func settleModemOptions(pa *RadioConfig) {
 }
 
 // settleModemOptions applies the rules about which modem options go together
-// to one channel, saying what it changed.
+// to one channel, saying what it changed: the modem's own, and that EAS and
+// AIS take a frame only as it came.
 func (achan *achan_param_s) settleModemOptions(channel int) {
 	switch achan.ModemType {
 	case MODEM_EAS, MODEM_AIS:
@@ -42,49 +46,25 @@ func (achan *achan_param_s) settleModemOptions(channel int) {
 			achan.passall = false
 		}
 
-	case MODEM_QPSK:
-		// In versions 1.4 and 1.5, V.26 "Alternative A" was used.
-		// years later, I discover that the MFJ-2400 used "Alternative B."
-		// It looks like the other two manufacturers use the same but we
-		// can't be sure until we find one for compatibility testing.
-		// In version 1.6 we add a choice for the user.
-		// If neither one was explicitly specified, print a message and take
-		// a default.  My current thinking is that we default to direwolf <= 1.5
-		// compatible for version 1.6 and MFJ compatible after that.
-		//
-		// The transmitter reads this too, so it has to be settled before
-		// either end is set up.
-		if achan.V26Alternative == V26_UNSPECIFIED {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Two incompatible versions of 2400 bps QPSK are now available.\n")
-			dw_printf("For compatibility with direwolf <= 1.5, use 'V26A' modem option in config file.\n")
-			dw_printf("For compatibility MFJ-2400 use 'V26B' modem option in config file.\n")
-			dw_printf("Command line options -j and -J can be used for channel 0.\n")
-			dw_printf("For more information, read the Dire Wolf User Guide and\n")
-			dw_printf("2400-4800-PSK-for-APRS-Packet-Radio.pdf.\n")
-			dw_printf("The default is now MFJ-2400 compatibility mode.\n")
-
-			achan.V26Alternative = V26_DEFAULT
-		}
-
-		achan.forbidPSKDecimation(channel)
-
-	case MODEM_8PSK, MODEM_BPSK:
-		achan.forbidPSKDecimation(channel)
-
 	default:
 	}
-}
 
-// forbidPSKDecimation turns decimation off for a PSK channel.  PSK is always
-// demodulated at the full sample rate; the decimating path was never
-// implemented for it.  Complain, rather than silently ignoring, when the
-// configuration asked for decimation.
-func (achan *achan_param_s) forbidPSKDecimation(channel int) {
-	if achan.Decimate > 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Channel %d: Decimation is not supported for PSK - ignoring.\n", channel)
+	var settled = achan.Settle()
+
+	if settled.V26Defaulted {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"hint": "For compatibility with direwolf <= 1.5, use 'V26A' modem option in config file. " +
+				"For compatibility MFJ-2400 use 'V26B' modem option in config file. " +
+				"Command line options -j and -J can be used for channel 0. " +
+				"For more information, read the Dire Wolf User Guide and 2400-4800-PSK-for-APRS-Packet-Radio.pdf.",
+		}).Warn("Two incompatible versions of 2400 bps QPSK are now available. The default is now MFJ-2400 compatibility mode.")
 	}
 
-	achan.Decimate = 1
+	if settled.DecimationDropped > 1 {
+		logrus.WithFields(logrus.Fields{
+			"channel":  channel,
+			"decimate": settled.DecimationDropped,
+		}).Warn("Decimation is not supported for PSK - ignoring")
+	}
 }

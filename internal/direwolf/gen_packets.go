@@ -542,7 +542,7 @@ func AddGenPacketsModemFlags(fs *pflag.FlagSet) *GenPacketsModemFlags {
 
 // apply sets up achan from the options, once they have been parsed.
 func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
-	var err = f.modem.apply(achan)
+	var err = f.modem.apply(&achan.ModemConfig)
 	if err != nil {
 		return err
 	}
@@ -580,8 +580,8 @@ func (f *GenPacketsModemFlags) apply(achan *achan_param_s) error {
 		logrus.WithField("bitrate", achan.Baud).Info("Data rate set")
 	}
 
-	// The demodulator falls back on a default V.26 alternative, with a warning;
-	// gen_packets makes the recording, so insists on being told.
+	// Settling the modem options falls back on a default V.26 alternative,
+	// with a warning; gen_packets makes the recording, so insists on being told.
 	if achan.ModemType == MODEM_QPSK && achan.V26Alternative == V26_UNSPECIFIED {
 		return errors.New("either -j or -J must be specified when using 2400 bps QPSK")
 	}

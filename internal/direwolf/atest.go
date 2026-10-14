@@ -161,7 +161,7 @@ func NewAtest(opts *AtestOptions) (*Atest, error) {
 	audio.recv_ber = opts.BitErrorRate
 
 	if opts.Modem != nil {
-		var modemErr = opts.Modem.apply(&audio.achan[0])
+		var modemErr = opts.Modem.apply(&audio.achan[0].ModemConfig)
 		if modemErr != nil {
 			return nil, modemErr
 		}

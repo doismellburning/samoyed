@@ -343,7 +343,7 @@ x = Silence FX.25 information.`)
 		audio_config.adev[0].bits_per_sample = *bitsPerSample
 	}
 
-	var modemErr = modemFlags.apply(&audio_config.achan[0])
+	var modemErr = modemFlags.apply(&audio_config.achan[0].ModemConfig)
 	if modemErr == nil {
 		modemErr = layer2Flags.apply(&audio_config.achan[0])
 	}

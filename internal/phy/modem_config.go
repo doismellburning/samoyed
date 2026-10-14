@@ -3,6 +3,12 @@
 
 package phy
 
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
+
 // V26 is which of the two incompatible flavours of V.26 QPSK a channel speaks.
 type V26 int
 
@@ -97,4 +103,143 @@ type ModemConfig struct {
 	Offset int /* Spacing between filter frequencies. */
 
 	/* How many demodulators and slicers these come to is the Demodulator's. */
+}
+
+// SetBitrate sets up the modem for a -B option or a MODEM line's speed: a bit rate,
+// which brings the usual modem for that rate, or AIS or EAS, which name one.
+// The modem's tones go with it, and so does the demodulator profile, unless
+// the channel was AFSK and stays AFSK.  The modem is left alone if bitrate is no
+// good.
+//
+//	300 implies 1600/1800 AFSK, for HF SSB.
+//	1200 implies 1200/2200 AFSK.
+//	2400 implies V.26 QPSK.
+//	4800 implies V.27 8PSK.
+//	9600 and up implies G3RUH baseband scrambled.
+func (m *ModemConfig) SetBitrate(bitrate string) error {
+	if strings.EqualFold(bitrate, "AIS") {
+		m.ModemType = AIS
+		m.Baud = 9600
+		m.MarkFreq = 0
+		m.SpaceFreq = 0
+		m.Profiles = ""
+
+		return nil
+	}
+
+	if strings.EqualFold(bitrate, "EAS") {
+		m.ModemType = EAS
+		m.Baud = 521 // Actually 520.83 but we have an integer field here.
+		// Will make more precise in afsk demod init.
+		m.MarkFreq = 2083  // Actually 2083.3 - logic 1.
+		m.SpaceFreq = 1563 // Actually 1562.5 - logic 0.
+		m.Profiles = "A"
+
+		return nil
+	}
+
+	var baud, err = strconv.Atoi(bitrate)
+	if err != nil {
+		return fmt.Errorf("invalid bitrate (should be an integer or 'AIS' or 'EAS'): %s", bitrate)
+	}
+
+	if baud < MinBaud || baud > MaxBaud {
+		return fmt.Errorf("use a more reasonable bit rate in range of %d - %d", MinBaud, MaxBaud)
+	}
+
+	m.Baud = baud
+
+	// The profile belongs to the modem it was chosen for.  AFSK keeps an
+	// AFSK one, and every other modem starts afresh.
+	if baud < 1800 && m.ModemType != AFSK {
+		m.Profiles = ""
+	}
+
+	switch {
+	case baud < 600:
+		m.ModemType = AFSK
+		m.MarkFreq = 1600
+		m.SpaceFreq = 1800
+	case baud < 1800:
+		m.ModemType = AFSK
+		m.MarkFreq = DefaultMarkFreq
+		m.SpaceFreq = DefaultSpaceFreq
+	case baud < 3600:
+		m.ModemType = QPSK
+		m.MarkFreq = 0
+		m.SpaceFreq = 0
+		m.Profiles = ""
+	case baud < 7200:
+		m.ModemType = PSK8
+		m.MarkFreq = 0
+		m.SpaceFreq = 0
+		m.Profiles = ""
+	default:
+		m.ModemType = Scramble
+		m.MarkFreq = 0
+		m.SpaceFreq = 0
+		m.Profiles = ""
+	}
+
+	return nil
+}
+
+// Settled is what Settle changed, for the caller to report.
+type Settled struct {
+	// V26Defaulted is set when no V.26 alternative had been chosen for
+	// 2400 bps QPSK, and V26Default was taken.
+	V26Defaulted bool
+
+	// DecimationDropped is the decimation asked for on a PSK channel, which
+	// has no decimating path, and so was turned off; 0 when there was none.
+	DecimationDropped int
+}
+
+// Settle applies the rules about which of the modem's options go together, so
+// that the configuration is final before any modem - receive or transmit - is
+// set up from it, and says what it changed.
+func (m *ModemConfig) Settle() Settled {
+	var settled Settled
+
+	switch m.ModemType {
+	case QPSK:
+		// In versions 1.4 and 1.5, V.26 "Alternative A" was used.
+		// years later, I discover that the MFJ-2400 used "Alternative B."
+		// It looks like the other two manufacturers use the same but we
+		// can't be sure until we find one for compatibility testing.
+		// In version 1.6 we add a choice for the user.
+		// If neither one was explicitly specified, print a message and take
+		// a default.  My current thinking is that we default to direwolf <= 1.5
+		// compatible for version 1.6 and MFJ compatible after that.
+		//
+		// The transmitter reads this too, so it has to be settled before
+		// either end is set up.
+		if m.V26Alternative == V26Unspecified {
+			m.V26Alternative = V26Default
+			settled.V26Defaulted = true
+		}
+
+		settled.DecimationDropped = m.forbidPSKDecimation()
+
+	case PSK8, BPSK:
+		settled.DecimationDropped = m.forbidPSKDecimation()
+
+	default:
+	}
+
+	return settled
+}
+
+// forbidPSKDecimation turns decimation off for a PSK channel, returning the
+// decimation it turned off, if any.  PSK is always demodulated at the full
+// sample rate; the decimating path was never implemented for it.
+func (m *ModemConfig) forbidPSKDecimation() int {
+	var dropped = 0
+	if m.Decimate > 1 {
+		dropped = m.Decimate
+	}
+
+	m.Decimate = 1
+
+	return dropped
 }
