@@ -166,6 +166,13 @@ so the order of construction follows the arrows:
    The AGW server is made here,
    so that the transmit service can show its clients each frame sent,
    but only started once the transmit threads are running.
+   It binds its port when it is made,
+   so a port already in use is reported before the server starts,
+   rather than once it is running.
+   With the port disabled or taken,
+   or when ``-x`` only sends calibration tones,
+   there is no AGW server:
+   what it would have been handed takes a nil one as having no clients.
 #. The ``XmitService``, which starts a transmit thread per radio channel.
 #. The IGate and the two digipeaters,
    then the ``AX25Link``, the KISS handler and its transports,

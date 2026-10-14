@@ -6,6 +6,7 @@ package direwolf
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -16,6 +17,8 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -897,4 +900,78 @@ func TestHandleClientCommand_V_QueuesFrameViaDigipeaters(t *testing.T) {
 	require.NotNil(t, pp, "frame via digipeaters not queued")
 	assert.Equal(t, "Q1TEST>Q2TEST,Q3TEST,WIDE2-1:", pp.FormatAddrs())
 	assert.Equal(t, []byte("hello"), pp.Info())
+}
+
+// The port is bound by the constructor, and Addr says which one was got.
+func TestNewAGWServerListens(t *testing.T) {
+	var s, err = NewAGWServer(t.Context(), "127.0.0.1:0", nil, new(misc_config_s), nil, nil, 0)
+	require.NoError(t, err)
+
+	t.Cleanup(s.Close)
+
+	require.NotNil(t, s.Addr())
+
+	var conn, dialErr = new(net.Dialer).DialContext(t.Context(), "tcp", s.Addr().String())
+	require.NoError(t, dialErr, "the port should be bound before anything is started")
+
+	conn.Close()
+}
+
+// Two things cannot have the same port, and the one that loses says so before
+// anything starts, rather than sitting there looking ready for clients.
+func TestNewAGWServerListenFails(t *testing.T) {
+	// Every address, as a configured port is bound: see TestKissNetListenFails.
+	var listener, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp", ":0")
+	require.NoError(t, listenErr)
+
+	defer listener.Close()
+
+	var taken = fmt.Sprintf(":%d", addrPort(listener.Addr()))
+
+	var s, err = NewAGWServer(t.Context(), taken, nil, new(misc_config_s), nil, nil, 0)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "AGW "+taken)
+	assert.Nil(t, s)
+}
+
+// A server that is made but never started gives its port up when closed, and
+// cannot be started after that; closing a nil one, as for an interface never
+// set up, does nothing.
+func TestAGWServerCloseGivesUpThePortOfAServerNeverStarted(t *testing.T) {
+	var s, err = NewAGWServer(t.Context(), "127.0.0.1:0", nil, new(misc_config_s), nil, nil, 0)
+	require.NoError(t, err)
+
+	s.Close()
+
+	// The listener itself says it is closed, rather than this binding the port
+	// again: something else could take a port given up, however briefly.
+	var _, acceptErr = s.listener.Accept()
+	require.ErrorIs(t, acceptErr, net.ErrClosed)
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	s.Start(t.Context())
+
+	require.NotNil(t, hook.LastEntry())
+	assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
+	assert.Contains(t, hook.LastEntry().Message, "after Close")
+
+	var nilServer *AGWServer
+
+	nilServer.Close()
+}
+
+// A server put together by hand, as most tests here do, has no listener, and
+// starting, closing or asking where it listens does nothing rather than
+// panicking.
+func TestAGWServerWithoutAListener(t *testing.T) {
+	var s = new(AGWServer)
+
+	assert.Nil(t, s.Addr())
+
+	s.Start(t.Context())
+	s.Close()
 }

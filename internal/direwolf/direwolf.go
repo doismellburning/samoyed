@@ -548,8 +548,21 @@ x = Silence FX.25 information.`)
 	// The AGW server is made here, so the transmit service can be told to
 	// show it each frame sent, but only started further down, once the
 	// transmit service is taking what its clients queue off the transmit
-	// queue.
-	var agwServer = NewAGWServer(audio_config, misc_config, dataLinkQueue, transmitQueue, d_a_opt)
+	// queue.  Without one - disabled, its port taken, or only sending
+	// calibration tones, which exits before anything is started - agwServer
+	// is nil, which everything it is handed to takes as no clients.
+	var agwServer *AGWServer
+
+	if misc_config.agwpe_port == 0 {
+		logrus.Info("Disabled AGW network client port")
+	} else if *transmitCalibration == "" {
+		var agwErr error
+
+		agwServer, agwErr = NewAGWServer(ctx, fmt.Sprintf(":%d", misc_config.agwpe_port), audio_config, misc_config, dataLinkQueue, transmitQueue, d_a_opt)
+		if agwErr != nil {
+			logrus.WithError(agwErr).Error("Unable to listen for AGW client applications")
+		}
+	}
 
 	// Each frame sent is shown on the web interface, if there is one, and to
 	// the AGW clients monitoring.
@@ -711,7 +724,16 @@ x = Silence FX.25 information.`)
 
 	// The connected-mode link layer, after the AGW server whose clients it
 	// tells about the links they asked for.
-	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, agwServer, transmitQueue, d_c_opt)
+	//
+	// Without an AGW server it is handed no clients at all: a nil
+	// *AGWServer would arrive as a linkClients that is not nil, past
+	// NewAX25Link's own stand-in for there being none.
+	var linkClientApps linkClients
+	if agwServer != nil {
+		linkClientApps = agwServer
+	}
+
+	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, linkClientApps, transmitQueue, d_c_opt)
 	var metricsListening = metrics_init(ctx, audio_config, misc_config)
 	var kissNetSvc, kissNetErr = NewKissNetService(ctx, misc_config, kissNetAddrs(misc_config), d_n_opt)
 	if kissNetErr != nil {

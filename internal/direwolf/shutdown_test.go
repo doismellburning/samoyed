@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,7 +57,9 @@ func requirePortFree(t *testing.T, port int) {
 }
 
 func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
-	var port = freeTCPPort(t)
+	var listener, _ = testutils.Listen(t)
+
+	var port = addrPort(listener.Addr())
 
 	// The listener attaches the probe connection waitUntilListening makes to
 	// this server, and no cmdListenThread is running here to notice it go away
@@ -81,7 +84,7 @@ func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
 	go func() {
 		defer close(stopped)
 
-		s.connectListenThread(ctx, port)
+		s.connectListenThread(ctx, listener)
 	}()
 
 	waitUntilListening(t, port)
