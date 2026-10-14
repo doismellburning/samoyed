@@ -23,6 +23,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/pfilter"
+	"github.com/doismellburning/samoyed/internal/ptt"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/doismellburning/samoyed/internal/waypoint"
@@ -519,7 +520,7 @@ x = Silence FX.25 information.`)
 	 * Push to Talk (PTT) control.
 	 */
 
-	var pttControl, pttErr = NewPTT(audio_config, layer2Receiver.MuteInput, dataLinkQueue.ChannelBusy, d_o_opt)
+	var pttControl, pttErr = ptt.New(audio_config.pttChannels(), layer2Receiver.MuteInput, dataLinkQueue.ChannelBusy, d_o_opt)
 	td.add(pttControl.Term) // Which does nothing if there is no PTT.
 	stopIfCancelled(ctx, td)
 

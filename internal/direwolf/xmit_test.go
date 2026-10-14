@@ -343,7 +343,7 @@ func setupXmitTransmission(t *testing.T) (*XmitService, *TransmitQueue) {
 	audioConfig.achan[channel].baud = 1200
 	audioConfig.achan[channel].mark_freq = 1200
 	audioConfig.achan[channel].space_freq = 2200
-	audioConfig.achan[channel].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_NONE
+	audioConfig.achan[channel].octrl[OCTYPE_PTT].Method = PTT_METHOD_NONE
 
 	var tq = newTestTransmitQueue(audioConfig)
 

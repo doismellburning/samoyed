@@ -200,7 +200,7 @@ type xmitQueue interface {
  *
  *
  * Outputs:	Returns a new XmitService with required information set up.
- *		The PTT hardware is set up beforehand, by NewPTT.
+ *		The PTT hardware is set up beforehand, by ptt.New.
  *
  * Description:	Start up xmit_thread(s) to actually send the packets
  *		at the appropriate time.
