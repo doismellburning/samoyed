@@ -183,8 +183,12 @@ type gpiodOutputLine interface {
 // Its methods are safe to call on a nil *PTT, which does nothing: DCD and the
 // connected indicator reach for it whether or not startup has got that far.
 type PTT struct {
-	audioConfig *RadioConfig
-	debugLevel  int
+	// channels is each radio channel's configuration: PTT's own copy, as it
+	// fills in a GPIO line's node name and turns off an output it could not
+	// open.
+	channels [MAX_RADIO_CHANS]pttChannelConfig
+
+	debugLevel int
 
 	// muteInput silences a channel's received audio, or stops silencing it,
 	// so a half duplex channel doesn't hear its own transmissions; nil for
@@ -235,7 +239,7 @@ type PTT struct {
  *
  * Purpose:    	Open serial port(s) used for PTT signals and set to proper state.
  *
- * Inputs:	audio_config_p		- Structure with communication parameters.
+ * Inputs:	channels		- Each radio channel's configuration.
  *
  *		    for each channel we have:
  *
@@ -291,15 +295,21 @@ type PTT struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity outputType, busy bool), debug int) (*PTT, error) {
-	return newPTT(audio_config_p, muteInput, channelBusy, debug, defaultGPIOSysfsDir)
+func NewPTT(channels [MAX_RADIO_CHANS]pttChannelConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity outputType, busy bool), debug int) (*PTT, error) {
+	return newPTT(channels, muteInput, channelBusy, debug, defaultGPIOSysfsDir)
 }
 
 // newPTT is NewPTT with the root of the sysfs GPIO interface given, so that a
 // test can supply a fake one.
-func newPTT(audio_config_p *RadioConfig, muteInput func(channel int, mute bool), channelBusy func(channel int, activity outputType, busy bool), debug int, gpioSysfsDir string) (*PTT, error) {
+func newPTT(
+	channels [MAX_RADIO_CHANS]pttChannelConfig,
+	muteInput func(channel int, mute bool),
+	channelBusy func(channel int, activity outputType, busy bool),
+	debug int,
+	gpioSysfsDir string,
+) (*PTT, error) {
 	var p = new(PTT)
-	p.audioConfig = audio_config_p
+	p.channels = channels
 	p.muteInput = muteInput
 	p.channelBusy = channelBusy
 	p.debugLevel = debug
@@ -389,7 +399,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
-	if p.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
+	if !p.channels[channel].radio {
 		logrus.WithFields(logrus.Fields{
 			"output":  octypeName(ot),
 			"channel": channel,
@@ -407,7 +417,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	// I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
 
 	// #ifndef TEST
-	if ot == OCTYPE_PTT && !p.audioConfig.achan[channel].fulldup && p.muteInput != nil {
+	if ot == OCTYPE_PTT && !p.channels[channel].fullDuplex && p.muteInput != nil {
 		p.muteInput(channel, ptt_signal != 0)
 	}
 	// #endif
@@ -425,20 +435,20 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	 * Inverted output?
 	 */
 
-	if p.audioConfig.achan[channel].octrl[ot].ptt_invert {
+	if p.channels[channel].outputs[ot].ptt_invert {
 		ptt = 1 - ptt
 	}
 
-	if p.audioConfig.achan[channel].octrl[ot].ptt_invert2 {
+	if p.channels[channel].outputs[ot].ptt_invert2 {
 		ptt2 = 1 - ptt2
 	}
 
 	/*
 	 * Using serial port?
 	 */
-	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_SERIAL &&
+	if p.channels[channel].outputs[ot].ptt_method == PTT_METHOD_SERIAL &&
 		p.fd[channel][ot] != nil {
-		switch p.audioConfig.achan[channel].octrl[ot].ptt_line {
+		switch p.channels[channel].outputs[ot].ptt_line {
 		case PTT_LINE_RTS:
 			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_RTS, ptt != 0)
 		case PTT_LINE_DTR:
@@ -450,7 +460,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 		 * Second serial port control line?  Typically driven with opposite phase but could be in phase.
 		 */
 
-		switch p.audioConfig.achan[channel].octrl[ot].ptt_line2 {
+		switch p.channels[channel].outputs[ot].ptt_line2 {
 		case PTT_LINE_RTS:
 			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_RTS, ptt2 != 0)
 		case PTT_LINE_DTR:
@@ -464,8 +474,8 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	 * Using GPIO?
 	 */
 
-	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.audioConfig.achan[channel].octrl[ot].out_gpio_name)
+	if p.channels[channel].outputs[ot].ptt_method == PTT_METHOD_GPIO {
+		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.channels[channel].outputs[ot].out_gpio_name)
 
 		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0) //nolint:gosec
 		if err != nil {
@@ -483,13 +493,13 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 		var _, writeErr = fd.WriteString(stemp)
 		if writeErr != nil {
 			logrus.WithError(writeErr).WithFields(logrus.Fields{
-				"gpio":   p.audioConfig.achan[channel].octrl[ot].out_gpio_num,
+				"gpio":   p.channels[channel].outputs[ot].out_gpio_num,
 				"output": octypeName(ot),
 			}).Error("Error setting GPIO")
 		}
 	}
 
-	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
+	if p.channels[channel].outputs[ot].ptt_method == PTT_METHOD_GPIOD {
 		if p.gpiodLine[channel][ot] != nil {
 			var err = p.gpiodLine[channel][ot].SetValue(ptt)
 			if err != nil {
@@ -499,8 +509,8 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 				}).Error("Error setting GPIOD")
 			} else if p.debugLevel >= 1 {
 				logrus.WithFields(logrus.Fields{
-					"chip":  p.audioConfig.achan[channel].octrl[ot].out_gpio_name,
-					"line":  p.audioConfig.achan[channel].octrl[ot].out_gpio_num,
+					"chip":  p.channels[channel].outputs[ot].out_gpio_name,
+					"line":  p.channels[channel].outputs[ot].out_gpio_num,
 					"state": ptt,
 				}).Debug("Set GPIOD line")
 			}
@@ -511,7 +521,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	 * Using parallel printer port?
 	 */
 
-	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_LPT &&
+	if p.channels[channel].outputs[ot].ptt_method == PTT_METHOD_LPT &&
 		p.fd[channel][ot] != nil {
 		p.fd[channel][ot].Seek(LPT_IO_ADDR, io.SeekStart)
 
@@ -526,9 +536,9 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 		}
 
 		if ptt != 0 {
-			lpt_data[0] |= byte(1 << p.audioConfig.achan[channel].octrl[ot].ptt_lpt_bit)
+			lpt_data[0] |= byte(1 << p.channels[channel].outputs[ot].ptt_lpt_bit)
 		} else {
-			lpt_data[0] &= ^byte(1 << p.audioConfig.achan[channel].octrl[ot].ptt_lpt_bit)
+			lpt_data[0] &= ^byte(1 << p.channels[channel].outputs[ot].ptt_lpt_bit)
 		}
 
 		p.fd[channel][ot].Seek(LPT_IO_ADDR, io.SeekStart)
@@ -546,7 +556,7 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	 * Using hamlib?
 	 */
 
-	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_HAMLIB {
+	if p.channels[channel].outputs[ot].ptt_method == PTT_METHOD_HAMLIB {
 		if p.rig[channel][ot] != nil {
 			var onoff = goHamlib.RIG_PTT_OFF
 			if ptt != 0 {
@@ -572,9 +582,9 @@ func (p *PTT) set(ot outputType, channel int, ptt_signal int) {
 	 * Using CM108 USB Audio adapter GPIO?
 	 */
 
-	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_CM108 {
-		var err = cm108.SetGPIOPin(p.audioConfig.achan[channel].octrl[ot].ptt_device,
-			p.audioConfig.achan[channel].octrl[ot].out_gpio_num, ptt)
+	if p.channels[channel].outputs[ot].ptt_method == PTT_METHOD_CM108 {
+		var err = cm108.SetGPIOPin(p.channels[channel].outputs[ot].ptt_device,
+			p.channels[channel].outputs[ot].out_gpio_num, ptt)
 		if err != nil {
 			logrus.WithError(err).WithFields(logrus.Fields{
 				"output":  octypeName(ot),
@@ -630,7 +640,7 @@ func (p *PTT) GetInput(it int, channel int) int {
 		return -1 /* Not set up, so no method. */
 	}
 
-	if p.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
+	if !p.channels[channel].radio {
 		logrus.WithFields(logrus.Fields{
 			"input":   it,
 			"channel": channel,
@@ -639,8 +649,8 @@ func (p *PTT) GetInput(it int, channel int) int {
 		return -1
 	}
 
-	if p.audioConfig.achan[channel].ictrl[it].method == PTT_METHOD_GPIO {
-		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.audioConfig.achan[channel].ictrl[it].in_gpio_name)
+	if p.channels[channel].inputs[it].method == PTT_METHOD_GPIO {
+		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.channels[channel].inputs[it].in_gpio_name)
 
 		// No need to check access first: this runs on every transmit attempt,
 		// export_gpio checked it at startup, and the open below reports the
@@ -656,7 +666,7 @@ func (p *PTT) GetInput(it int, channel int) int {
 
 		var _, readErr = fd.Read(vtemp)
 		if readErr != nil {
-			logrus.WithError(readErr).WithField("gpio", p.audioConfig.achan[channel].ictrl[it].in_gpio_num).Error("Error getting GPIO value")
+			logrus.WithError(readErr).WithField("gpio", p.channels[channel].inputs[it].in_gpio_num).Error("Error getting GPIO value")
 		}
 
 		fd.Close()
@@ -665,13 +675,13 @@ func (p *PTT) GetInput(it int, channel int) int {
 		if parseErr != nil {
 			logrus.WithError(parseErr).WithFields(logrus.Fields{
 				"value": string(vtemp),
-				"gpio":  p.audioConfig.achan[channel].ictrl[it].in_gpio_num,
+				"gpio":  p.channels[channel].inputs[it].in_gpio_num,
 			}).Error("Error parsing value read from GPIO")
 
 			return -1
 		}
 
-		if !p.audioConfig.achan[channel].ictrl[it].invert {
+		if !p.channels[channel].inputs[it].invert {
 			if v == 0 {
 				return 0
 			} else {
@@ -719,7 +729,7 @@ func (p *PTT) Term() {
 	defer p.mu.Unlock()
 
 	for n := range MAX_RADIO_CHANS {
-		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
+		if p.channels[n].radio {
 			for ot := range outputTypes() {
 				p.set(ot, n, 0)
 			}
@@ -727,7 +737,7 @@ func (p *PTT) Term() {
 	}
 
 	for n := range MAX_RADIO_CHANS {
-		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
+		if p.channels[n].radio {
 			for ot := range outputTypes() {
 				if p.fd[n][ot] != nil {
 					p.fd[n][ot].Close()
@@ -738,7 +748,7 @@ func (p *PTT) Term() {
 	}
 
 	for n := range MAX_RADIO_CHANS {
-		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
+		if p.channels[n].radio {
 			for ot := range outputTypes() {
 				if p.gpiodLine[n][ot] != nil {
 					p.gpiodLine[n][ot].Close()
@@ -749,7 +759,7 @@ func (p *PTT) Term() {
 	}
 
 	for n := range MAX_RADIO_CHANS {
-		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
+		if p.channels[n].radio {
 			for ot := range outputTypes() {
 				if p.rig[n][ot] != nil {
 					p.rig[n][ot].Close()   //nolint:errcheck
@@ -781,21 +791,19 @@ func (p *PTT) init() error {
 // setup does the work of init, stopping at the first failure.  Call init
 // rather than this: it is the one that tidies up after a failure.
 func (p *PTT) setup() error {
-	var audio_config_p = p.audioConfig
-
 	for ch := range MAX_RADIO_CHANS {
 		for ot := range outputTypes() {
 			if p.debugLevel >= 2 {
 				logrus.WithFields(logrus.Fields{
 					"channel": ch,
 					"output":  octypeName(ot),
-					"method":  audio_config_p.achan[ch].octrl[ot].ptt_method,
-					"device":  audio_config_p.achan[ch].octrl[ot].ptt_device,
-					"line":    audio_config_p.achan[ch].octrl[ot].ptt_line,
-					"name":    audio_config_p.achan[ch].octrl[ot].out_gpio_name,
-					"gpio":    audio_config_p.achan[ch].octrl[ot].out_gpio_num,
-					"lpt_bit": audio_config_p.achan[ch].octrl[ot].ptt_lpt_bit,
-					"invert":  audio_config_p.achan[ch].octrl[ot].ptt_invert,
+					"method":  p.channels[ch].outputs[ot].ptt_method,
+					"device":  p.channels[ch].outputs[ot].ptt_device,
+					"line":    p.channels[ch].outputs[ot].ptt_line,
+					"name":    p.channels[ch].outputs[ot].out_gpio_name,
+					"gpio":    p.channels[ch].outputs[ot].out_gpio_num,
+					"lpt_bit": p.channels[ch].outputs[ot].ptt_lpt_bit,
+					"invert":  p.channels[ch].outputs[ot].ptt_invert,
 				}).Debug("Output control configuration")
 			}
 		}
@@ -809,26 +817,26 @@ func (p *PTT) setup() error {
 	 */
 
 	for ch := range MAX_RADIO_CHANS {
-		if audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
+		if p.channels[ch].radio {
 			for ot := range outputTypes() {
-				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_SERIAL {
+				if p.channels[ch].outputs[ot].ptt_method == PTT_METHOD_SERIAL {
 					/* Translate Windows device name into Linux name. */
 					/* COM1 -> /dev/ttyS0, etc. */
-					if strings.HasPrefix(strings.ToUpper(audio_config_p.achan[ch].octrl[ot].ptt_device), "COM") {
-						var n, _ = strconv.Atoi(audio_config_p.achan[ch].octrl[ot].ptt_device[3:])
+					if strings.HasPrefix(strings.ToUpper(p.channels[ch].outputs[ot].ptt_device), "COM") {
+						var n, _ = strconv.Atoi(p.channels[ch].outputs[ot].ptt_device[3:])
 
-						var windowsName = audio_config_p.achan[ch].octrl[ot].ptt_device
+						var windowsName = p.channels[ch].outputs[ot].ptt_device
 
 						if n < 1 {
 							n = 1
 						}
 
-						audio_config_p.achan[ch].octrl[ot].ptt_device = fmt.Sprintf("/dev/ttyS%d", n-1)
+						p.channels[ch].outputs[ot].ptt_device = fmt.Sprintf("/dev/ttyS%d", n-1)
 
 						logrus.WithFields(logrus.Fields{
 							"output": octypeName(ot),
 							"from":   windowsName,
-							"to":     audio_config_p.achan[ch].octrl[ot].ptt_device,
+							"to":     p.channels[ch].outputs[ot].ptt_device,
 						}).Info("Converted device to Linux equivalent")
 					}
 					/* Can't open the same device more than once so we */
@@ -840,14 +848,14 @@ func (p *PTT) setup() error {
 					var same_device_used = false
 
 					for j := ch; j >= 0; j-- {
-						if audio_config_p.chan_medium[j] == MEDIUM_RADIO {
+						if p.channels[j].radio {
 							var k outputType = NUM_OCTYPES - 1
 							if j == ch {
 								k = ot - 1
 							}
 
 							for ; k >= 0; k-- {
-								if audio_config_p.achan[ch].octrl[ot].ptt_device == audio_config_p.achan[j].octrl[k].ptt_device {
+								if p.channels[ch].outputs[ot].ptt_device == p.channels[j].outputs[k].ptt_device {
 									fd = p.fd[j][k]
 									same_device_used = true
 								}
@@ -859,19 +867,19 @@ func (p *PTT) setup() error {
 						/* O_NONBLOCK added in version 0.9. */
 						/* Was hanging with some USB-serial adapters. */
 						/* https://bugs.launchpad.net/ubuntu/+source/linux/+bug/661321/comments/12 */
-						fd, openErr = os.Open(audio_config_p.achan[ch].octrl[ot].ptt_device)
+						fd, openErr = os.Open(p.channels[ch].outputs[ot].ptt_device)
 					}
 
 					if openErr == nil {
 						p.fd[ch][ot] = fd
 					} else {
 						logrus.WithError(openErr).WithFields(logrus.Fields{
-							"device":  audio_config_p.achan[ch].octrl[ot].ptt_device,
+							"device":  p.channels[ch].outputs[ot].ptt_device,
 							"channel": ch,
 						}).Error("Can't open device for PTT control")
 						/* Don't try using it later if device open failed. */
 
-						audio_config_p.achan[ch].octrl[ot].ptt_method = PTT_METHOD_NONE
+						p.channels[ch].outputs[ot].ptt_method = PTT_METHOD_NONE
 					}
 
 					/*
@@ -895,15 +903,15 @@ func (p *PTT) setup() error {
 	var using_gpio = false
 
 	for ch := range MAX_RADIO_CHANS {
-		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
+		if p.channels[ch].radio {
 			for ot := range outputTypes() {
-				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
+				if p.channels[ch].outputs[ot].ptt_method == PTT_METHOD_GPIO {
 					using_gpio = true
 				}
 			}
 
 			for ot := range NUM_ICTYPES {
-				if audio_config_p.achan[ch].ictrl[ot].method == PTT_METHOD_GPIO {
+				if p.channels[ch].inputs[ot].method == PTT_METHOD_GPIO {
 					using_gpio = true
 				}
 			}
@@ -918,12 +926,12 @@ func (p *PTT) setup() error {
 	}
 	// GPIOD
 	for ch := range MAX_RADIO_CHANS {
-		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
+		if p.channels[ch].radio {
 			for ot := range outputTypes() {
-				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
-					var chip_name = audio_config_p.achan[ch].octrl[ot].out_gpio_name
-					var line_number = audio_config_p.achan[ch].octrl[ot].out_gpio_num
-					var initialState = dwutil.IfThenElse(audio_config_p.achan[ch].octrl[ot].ptt_invert, 1, 0) // Using "invert" as initial state means we always start "off"
+				if p.channels[ch].outputs[ot].ptt_method == PTT_METHOD_GPIOD {
+					var chip_name = p.channels[ch].outputs[ot].out_gpio_name
+					var line_number = p.channels[ch].outputs[ot].out_gpio_num
+					var initialState = dwutil.IfThenElse(p.channels[ch].outputs[ot].ptt_invert, 1, 0) // Using "invert" as initial state means we always start "off"
 
 					var line, lineErr = RequestGPIODLine(chip_name, line_number, initialState)
 					if lineErr != nil {
@@ -951,11 +959,11 @@ func (p *PTT) setup() error {
 	 */
 
 	for ch := range MAX_RADIO_CHANS {
-		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
+		if p.channels[ch].radio {
 			// output control type, PTT, DCD, CON, ...
 			for ot := range outputTypes() {
-				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-					var exportErr = p.exportGPIO(ch, int(ot), audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
+				if p.channels[ch].outputs[ot].ptt_method == PTT_METHOD_GPIO {
+					var exportErr = p.exportGPIO(ch, int(ot), p.channels[ch].outputs[ot].ptt_invert, 1)
 					if exportErr != nil {
 						return fmt.Errorf("channel %d %s: %w", ch, octypeName(ot), exportErr)
 					}
@@ -963,8 +971,8 @@ func (p *PTT) setup() error {
 			}
 			// input control type
 			for it := range NUM_ICTYPES {
-				if audio_config_p.achan[ch].ictrl[it].method == PTT_METHOD_GPIO {
-					var exportErr = p.exportGPIO(ch, it, audio_config_p.achan[ch].ictrl[it].invert, 0)
+				if p.channels[ch].inputs[it].method == PTT_METHOD_GPIO {
+					var exportErr = p.exportGPIO(ch, it, p.channels[ch].inputs[it].invert, 0)
 					if exportErr != nil {
 						return fmt.Errorf("channel %d input %d: %w", ch, it, exportErr)
 					}
@@ -982,9 +990,9 @@ func (p *PTT) setup() error {
 	 */
 
 	for ch := range MAX_RADIO_CHANS {
-		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
+		if p.channels[ch].radio {
 			for ot := range outputTypes() {
-				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_LPT {
+				if p.channels[ch].outputs[ot].ptt_method == PTT_METHOD_LPT {
 					/* Can't open the same device more than once so we */
 					/* need more logic to look for the case of multiple radio */
 					/* channels using different pins of the LPT port. */
@@ -993,14 +1001,14 @@ func (p *PTT) setup() error {
 					var same_device_used = false
 
 					for j := ch; j >= 0; j-- {
-						if audio_config_p.chan_medium[j] == MEDIUM_RADIO {
+						if p.channels[j].radio {
 							var k outputType = NUM_OCTYPES - 1
 							if j == ch {
 								k = ot - 1
 							}
 
 							for ; k >= 0; k-- {
-								if audio_config_p.achan[ch].octrl[ot].ptt_device == audio_config_p.achan[j].octrl[k].ptt_device {
+								if p.channels[ch].outputs[ot].ptt_device == p.channels[j].outputs[k].ptt_device {
 									fd = p.fd[j][k]
 									same_device_used = true
 								}
@@ -1024,7 +1032,7 @@ func (p *PTT) setup() error {
 
 						/* Don't try using it later if device open failed. */
 
-						audio_config_p.achan[ch].octrl[ot].ptt_method = PTT_METHOD_NONE
+						p.channels[ch].outputs[ot].ptt_method = PTT_METHOD_NONE
 					}
 
 					/*
@@ -1038,11 +1046,11 @@ func (p *PTT) setup() error {
 	} /* For each channel. */
 
 	for ch := range MAX_RADIO_CHANS {
-		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
+		if p.channels[ch].radio {
 			for ot := range outputTypes() {
-				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_HAMLIB {
+				if p.channels[ch].outputs[ot].ptt_method == PTT_METHOD_HAMLIB {
 					if ot == OCTYPE_PTT {
-						if audio_config_p.achan[ch].octrl[ot].ptt_model == -1 {
+						if p.channels[ch].outputs[ot].ptt_model == -1 {
 							logrus.WithField("hint", `Run "rigctl --list" for a list of model numbers.`).
 								Error("Hamlib error: AUTO rig model detection is not supported. Specify the model number explicitly.")
 
@@ -1051,10 +1059,10 @@ func (p *PTT) setup() error {
 
 						var r = &goHamlib.Rig{} //nolint:exhaustruct_v5
 
-						var initErr = r.Init(goHamlib.RigModelID(audio_config_p.achan[ch].octrl[ot].ptt_model))
+						var initErr = r.Init(goHamlib.RigModelID(p.channels[ch].outputs[ot].ptt_model))
 						if initErr != nil {
 							logrus.WithError(initErr).WithFields(logrus.Fields{
-								"model": audio_config_p.achan[ch].octrl[ot].ptt_model,
+								"model": p.channels[ch].outputs[ot].ptt_model,
 								"hint":  `Run "rigctl --list" for a list of model numbers.`,
 							}).Error("Hamlib error: Unknown rig model")
 
@@ -1062,7 +1070,7 @@ func (p *PTT) setup() error {
 						}
 
 						var port = goHamlib.Port{ //nolint:exhaustruct_v5
-							Portname:  audio_config_p.achan[ch].octrl[ot].ptt_device,
+							Portname:  p.channels[ch].outputs[ot].ptt_device,
 							Databits:  8,
 							Stopbits:  1,
 							Parity:    goHamlib.ParityNone,
@@ -1074,16 +1082,16 @@ func (p *PTT) setup() error {
 						// radio model but 38400 was needed.  Add an option for the configuration
 						// file to override the hamlib default speed.
 
-						if audio_config_p.achan[ch].octrl[ot].ptt_model == 2 {
+						if p.channels[ch].outputs[ot].ptt_model == 2 {
 							// Model 2 is rigctld network control, not a serial port.
 							port.RigPortType = goHamlib.RigPortNetwork
 						} else {
 							port.RigPortType = goHamlib.RigPortSerial
 
-							if audio_config_p.achan[ch].octrl[ot].ptt_rate > 0 {
-								logrus.WithField("rate", audio_config_p.achan[ch].octrl[ot].ptt_rate).
+							if p.channels[ch].outputs[ot].ptt_rate > 0 {
+								logrus.WithField("rate", p.channels[ch].outputs[ot].ptt_rate).
 									Info("User configuration overriding hamlib CAT control speed")
-								port.Baudrate = audio_config_p.achan[ch].octrl[ot].ptt_rate
+								port.Baudrate = p.channels[ch].outputs[ot].ptt_rate
 							}
 						}
 
@@ -1136,14 +1144,14 @@ func (p *PTT) setup() error {
 	 */
 
 	for ch := range MAX_RADIO_CHANS {
-		if audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
+		if p.channels[ch].radio {
 			for ot := range outputTypes() {
-				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_CM108 {
-					var device = audio_config_p.achan[ch].octrl[ot].ptt_device
+				if p.channels[ch].outputs[ot].ptt_method == PTT_METHOD_CM108 {
+					var device = p.channels[ch].outputs[ot].ptt_device
 
 					logrus.WithFields(logrus.Fields{
 						"device":  device,
-						"gpio":    audio_config_p.achan[ch].octrl[ot].out_gpio_num,
+						"gpio":    p.channels[ch].outputs[ot].out_gpio_num,
 						"channel": ch,
 						"output":  octypeName(ot),
 					}).Info("Using CM108 GPIO for output control")
@@ -1172,8 +1180,8 @@ func (p *PTT) setup() error {
 	/* Why doesn't it transmit?  Probably forgot to specify PTT option. */
 
 	for ch := range MAX_RADIO_CHANS {
-		if audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
-			if audio_config_p.achan[ch].octrl[OCTYPE_PTT].ptt_method == PTT_METHOD_NONE {
+		if p.channels[ch].radio {
+			if p.channels[ch].outputs[OCTYPE_PTT].ptt_method == PTT_METHOD_NONE {
 				logrus.WithFields(logrus.Fields{
 					"channel": ch,
 					"hint":    voxAdvice,
@@ -1313,11 +1321,11 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 	var gpio_name string
 
 	if direction > 0 {
-		gpio_num = p.audioConfig.achan[ch].octrl[ot].out_gpio_num
-		gpio_name = p.audioConfig.achan[ch].octrl[ot].out_gpio_name
+		gpio_num = p.channels[ch].outputs[ot].out_gpio_num
+		gpio_name = p.channels[ch].outputs[ot].out_gpio_name
 	} else {
-		gpio_num = p.audioConfig.achan[ch].ictrl[ot].in_gpio_num
-		gpio_name = p.audioConfig.achan[ch].ictrl[ot].in_gpio_name
+		gpio_num = p.channels[ch].inputs[ot].in_gpio_num
+		gpio_name = p.channels[ch].inputs[ot].in_gpio_name
 	}
 
 	var gpio_export_path = p.gpioSysfsDir + "/export"
@@ -1452,9 +1460,9 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 	// Remember it: everything that drives or reads the line afterwards builds
 	// its path from the node name, not from the number.
 	if direction > 0 {
-		p.audioConfig.achan[ch].octrl[ot].out_gpio_name = gpio_name
+		p.channels[ch].outputs[ot].out_gpio_name = gpio_name
 	} else {
-		p.audioConfig.achan[ch].ictrl[ot].in_gpio_name = gpio_name
+		p.channels[ch].inputs[ot].in_gpio_name = gpio_name
 	}
 
 	if p.debugLevel >= 2 {
@@ -1526,24 +1534,22 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
  */
 
 func PTTTestMain() error {
-	var my_audio_config RadioConfig
+	var channels [MAX_RADIO_CHANS]pttChannelConfig
 
-	my_audio_config.adev[0].num_channels = 2
-
-	my_audio_config.chan_medium[0] = MEDIUM_RADIO
-	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
+	channels[0].radio = true
+	channels[0].outputs[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
 	// TODO: device should be command line argument.
-	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_device = "COM3"
-	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
+	channels[0].outputs[OCTYPE_PTT].ptt_device = "COM3"
+	channels[0].outputs[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
 
-	my_audio_config.chan_medium[1] = MEDIUM_RADIO
-	my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
-	my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_device = "COM3"
-	my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_DTR
+	channels[1].radio = true
+	channels[1].outputs[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
+	channels[1].outputs[OCTYPE_PTT].ptt_device = "COM3"
+	channels[1].outputs[OCTYPE_PTT].ptt_line = PTT_LINE_DTR
 
 	/* initialize - both off */
 
-	var p, initErr = NewPTT(&my_audio_config, nil, nil, 0)
+	var p, initErr = NewPTT(channels, nil, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1577,9 +1583,9 @@ func PTTTestMain() error {
 
 	/* Same thing again but invert RTS. */
 
-	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_invert = true
+	channels[0].outputs[OCTYPE_PTT].ptt_invert = true
 
-	p, initErr = NewPTT(&my_audio_config, nil, nil, 0)
+	p, initErr = NewPTT(channels, nil, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1612,15 +1618,14 @@ func PTTTestMain() error {
 
 	// #if __arm__
 
-	my_audio_config = RadioConfig{} //nolint:exhaustruct_v5
-	my_audio_config.adev[0].num_channels = 1
-	my_audio_config.chan_medium[0] = MEDIUM_RADIO
-	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
-	my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
+	channels = [MAX_RADIO_CHANS]pttChannelConfig{}
+	channels[0].radio = true
+	channels[0].outputs[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
+	channels[0].outputs[OCTYPE_PTT].out_gpio_num = 25
 
-	logrus.WithField("gpio", my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num).Info("Try GPIO a few times")
+	logrus.WithField("gpio", channels[0].outputs[OCTYPE_PTT].out_gpio_num).Info("Try GPIO a few times")
 
-	p, initErr = NewPTT(&my_audio_config, nil, nil, 0)
+	p, initErr = NewPTT(channels, nil, nil, 0)
 	if initErr != nil {
 		return initErr
 	}
