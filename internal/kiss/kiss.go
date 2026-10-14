@@ -27,8 +27,10 @@
 //	_5	FullDuplex	Full Duplex.  Transmit immediately without
 //				waiting for channel to be clear.
 //	_6	SetHardware	TNC specific.
-//	_C	XKISS extension - not supported.
-//	_E	XKISS extension - not supported.
+//	_C	ACKMODE data	XKISS extension: a two byte frame ID,
+//				then an AX.25 frame in raw format.
+//				The TNC acknowledges it once sent.
+//	_E	XKISS poll	Not supported.
 //	FF	Return		Exit KISS mode.  Ignored.
 //
 // Messages sent to client application:
@@ -36,9 +38,12 @@
 //	_0	Data Frame	Received AX.25 frame in raw format.
 //	_6	SetHardware	TNC specific.
 //				Usually a response to a query.
+//	_C	ACKMODE ack	The frame ID of an ACKMODE data frame,
+//				alone, once that frame has been sent.
 //
 // An extended form, to handle multiple TNCs on a single serial port, is
-// described in http://he.fi/pub/oh7lzb/bpq/multi-kiss.pdf but not supported.
+// described in http://he.fi/pub/oh7lzb/bpq/multi-kiss.pdf.  Only its ACKMODE
+// data frames are supported.
 package kiss
 
 import (
@@ -57,7 +62,7 @@ const (
 	CmdTxTail      = 4
 	CmdFullDuplex  = 5
 	CmdSetHardware = 6
-	CmdXKissData   = 12 // Not supported. http://he.fi/pub/oh7lzb/bpq/multi-kiss.pdf
+	CmdXKissData   = 12 // ACKMODE data, and its acknowledgement. http://he.fi/pub/oh7lzb/bpq/multi-kiss.pdf
 	CmdXKissPoll   = 14 // Not supported.
 	CmdEndKiss     = 15
 )

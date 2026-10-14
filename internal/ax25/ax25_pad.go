@@ -245,6 +245,11 @@ const SSIDLastMask = 0x01
 type Packet struct {
 	release_time time.Time /* When to release from the SATgate mode delay queue. */
 
+	// Called once the frame has gone out over the air, for a client that
+	// asked to be told (KISS ACKMODE); nil for nobody to tell.  Not carried
+	// over by Dup: the copy is a different transmission.
+	onTransmitted func()
+
 	nextp *Packet /* Pointer to next in queue. */
 
 	num_addr int /* Number of addresses in frame. */
@@ -755,7 +760,8 @@ func (this_p *Packet) Dup() *Packet {
 	var dup = new(Packet)
 
 	*dup = *this_p
-	dup.nextp = nil // The copy is in no queue.
+	dup.nextp = nil         // The copy is in no queue.
+	dup.onTransmitted = nil // Nor is it the transmission anyone asked to hear about.
 
 	return (dup)
 }
@@ -1863,6 +1869,25 @@ func (this_p *Packet) SetReleaseTime(release_time time.Time) {
 
 func (this_p *Packet) ReleaseTime() time.Time {
 	return (this_p.release_time)
+}
+
+// SetOnTransmitted arranges for f to be called once the frame has been
+// transmitted, by whoever transmits it.  A frame that is dropped instead never
+// calls it.
+func (this_p *Packet) SetOnTransmitted(f func()) {
+	this_p.onTransmitted = f
+}
+
+// Transmitted says the frame has been transmitted, calling what
+// SetOnTransmitted arranged, if anything.  It does so at most once, however
+// many times it is told.
+func (this_p *Packet) Transmitted() {
+	var f = this_p.onTransmitted
+	this_p.onTransmitted = nil
+
+	if f != nil {
+		f()
+	}
 }
 
 /*------------------------------------------------------------------------------

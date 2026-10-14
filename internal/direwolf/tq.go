@@ -361,6 +361,10 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 			tq.onTransmit(channel, pp)
 		}
 
+		// Handed on is as far as it goes from here, so as transmitted as
+		// we will ever see it.
+		pp.Transmitted()
+
 		return
 	}
 

@@ -402,14 +402,41 @@ func Test_HexEmpty(t *testing.T) {
 	assert.Contains(t, output, "no hexadecimal digits")
 }
 
-// Test_XKISS covers polling; data is the other XKISS command.
+// An ACKMODE frame without its two byte ID is malformed.
 //
 //nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
-func Test_XKISSData(t *testing.T) {
-	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.CmdXKissData, kiss.FEND}, false)
+func Test_ACKMODEWithoutID(t *testing.T) {
+	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.CmdXKissData, 0x12, kiss.FEND}, false)
 
 	assert.Equal(t, 1, problems)
-	assert.Contains(t, output, "Command 12 (XKISS data) is an XKISS extension, which is not supported.")
+	assert.Contains(t, output, "ACKMODE data needs a two byte frame ID, but only 1 byte follows")
+}
+
+// From a client, an ACKMODE frame is the ID and then the AX.25 frame.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
+func Test_ACKMODEData(t *testing.T) {
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
+	var msg = append([]byte{kiss.CmdXKissData, 0x12, 0x34}, pp.FrameData()...)
+
+	var output, problems = dumpCaptureOutput(t, kiss.Encapsulate(msg), false)
+
+	assert.Equal(t, 0, problems)
+	assert.Contains(t, output, "ACKMODE frame ID 0x1234 - acknowledge when transmitted.")
+	assert.Contains(t, output, "Q1TEST>Q2TEST")
+}
+
+// From the TNC, an ACKMODE frame is the ID alone: that frame has gone.
+//
+//nolint:paralleltest // Serial: swaps os.Stdout, which is process-wide.
+func Test_ACKMODEAcknowledgement(t *testing.T) {
+	var output, problems = dumpCaptureOutput(t, []byte{kiss.FEND, kiss.CmdXKissData, 0x12, 0x34, kiss.FEND}, false)
+
+	assert.Equal(t, 0, problems)
+	assert.Contains(t, output, "command 12 (ACKMODE)")
+	assert.Contains(t, output, "ACKMODE frame ID 0x1234 - an acknowledgement")
 }
 
 func TestMain(m *testing.M) {

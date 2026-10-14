@@ -74,7 +74,7 @@ func rawTerminal(t *testing.T, f *os.File) {
 func startKissPTListener(ctx context.Context, t *testing.T, debug int) (*KissPT, *os.File, <-chan struct{}) {
 	t.Helper()
 
-	var kp = newKissPT(setupKissProcessMsg(t), debug)
+	var kp = newKissPT(setupKissHandler(ctx, t), debug)
 
 	kp.openPT()
 
