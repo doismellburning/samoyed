@@ -98,13 +98,26 @@ func New() *Data {
 	// Some shenanigans to map this all to the right data types...
 	// Could probably do something with fancy struct tagging etc. but this is at least better than parsing with strcmp
 
+	var parsed, parseErr = FromYAML(data)
+	if parseErr != nil {
+		logrus.WithField("file", fp.Name()).WithError(parseErr).Error("Error parsing deviceid file")
+
+		return d
+	}
+
+	return parsed
+}
+
+// FromYAML returns the tables held in data, the contents of a tocalls.yaml
+// file, for a program that has them from somewhere other than a data file.
+func FromYAML(data []byte) (*Data, error) {
+	var d = new(Data)
+
 	var deviceidConfig map[string]any
 
 	var unmarshallErr = yaml.Unmarshal(data, &deviceidConfig)
 	if unmarshallErr != nil {
-		logrus.WithField("file", fp.Name()).WithError(unmarshallErr).Error("Error parsing deviceid file")
-
-		return d
+		return d, unmarshallErr
 	}
 
 	var miceSection, _ = deviceidConfig["mice"].([]any)
@@ -170,7 +183,7 @@ func New() *Data {
 		return strings.Compare(a.tocall, b.tocall)
 	})
 
-	return d
+	return d, nil
 }
 
 /*------------------------------------------------------------------

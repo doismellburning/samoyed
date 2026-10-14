@@ -47,3 +47,9 @@ html_static_path = ["_static"]
 html_logo = "_static/logo.png"
 html_favicon = "_static/favicon.png"
 html_show_sourcelink = False
+
+# The in-browser APRS tool (`make web` at the top of the repository) is
+# published alongside the docs, at /aprs/.  It's left out, rather than failing
+# the build, if it hasn't been built - CI builds it first.
+_web = pathlib.Path(__file__).parent.parent.parent / "dist" / "web"
+html_extra_path = [str(_web)] if _web.is_dir() else []

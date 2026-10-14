@@ -4,6 +4,7 @@
 package symbols
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -115,4 +116,16 @@ func TestListSkipsSymbolsOffTheTable(t *testing.T) {
 	var output = testutils.CaptureOutput(t, sd.List)
 
 	assert.NotContains(t, output, "Off the")
+}
+
+func TestFromReader(t *testing.T) {
+	t.Parallel()
+
+	var sd = FromReader(strings.NewReader(strings.Join([]string{
+		"Some preamble that is not a symbol line",
+		"Qs = Q1TEST Ship",
+		"",
+	}, "\n")))
+
+	assert.Equal(t, "Q1TEST Ship", sd.Description('Q', 's'))
 }
