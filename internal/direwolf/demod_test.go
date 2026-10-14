@@ -85,7 +85,7 @@ func TestDemodInitCapsProfileLetters(t *testing.T) {
 
 	t.Cleanup(hook.Reset)
 
-	var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+	var d = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 
 	assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
 	assert.Equal(t, "ABDEABDEA", d.profiles)
@@ -121,7 +121,7 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 
 		var hook = test.NewGlobal()
 
-		var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+		var d = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 
 		assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
 		assert.Equal(t, tc.want, d.profiles)
@@ -142,7 +142,7 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
-	var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+	var d = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 
 	var done = make(chan struct{})
 
