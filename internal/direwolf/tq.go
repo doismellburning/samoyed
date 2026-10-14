@@ -33,10 +33,6 @@ const TQ_NUM_PRIO = 2 /* Number of priorities. */
 const TQ_PRIO_0_HI = dwcore.PrioHigh
 const TQ_PRIO_1_LO = dwcore.PrioLow
 
-// frameSender is where a packet to transmit goes: TransmitQueue.Append, or a
-// stand-in for it.
-type frameSender func(channel int, prio int, pp *ax25.Packet)
-
 // clientTransmitQueue is what a client application's frames are queued on to
 // be transmitted, and what it asks how much is still waiting: the KISS
 // handler's TXBUF query counts bytes there, and the AGW server's 'y' query

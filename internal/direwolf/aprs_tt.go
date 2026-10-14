@@ -284,7 +284,7 @@ type TTGateway struct {
 
 	// transmit is where an audible response goes, to be transmitted, or nil to
 	// drop it.
-	transmit frameSender
+	transmit dwcore.FrameSender
 }
 
 /*------------------------------------------------------------------
@@ -324,7 +324,7 @@ func NewTTGateway(
 	remember func(channel int, pp *ax25.Packet),
 	toIGate igateSender,
 	recFrame frameReceiver,
-	transmit frameSender,
+	transmit dwcore.FrameSender,
 	audioLevel dwcore.AudioLevelFunc,
 	debug int,
 ) *TTGateway {

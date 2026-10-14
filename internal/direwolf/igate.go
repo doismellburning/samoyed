@@ -154,7 +154,7 @@ type IGate struct {
 
 	// transmit is where a packet from APRS-IS for a radio channel goes, to be
 	// transmitted, or nil to drop it.
-	transmit frameSender
+	transmit dwcore.FrameSender
 
 	// heard records who has been heard from APRS-IS, and how many of a
 	// message sender's positions are still to be passed along to RF.  Nil
@@ -252,7 +252,7 @@ func NewIGate(
 	filter *pfilter.PacketFilter,
 	heard igateHeard,
 	recFrame frameReceiver,
-	transmit frameSender,
+	transmit dwcore.FrameSender,
 	debugLevel int,
 ) *IGate {
 	var ig = &IGate{ //nolint:exhaustruct_v5

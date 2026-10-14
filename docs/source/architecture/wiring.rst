@@ -87,7 +87,7 @@ Dashed arrows are connections made after construction rather than at it.
        agw -> tq [label="clientTransmitQueue"];
 
        igate -> dlq [label="RecFrame"];
-       igate -> tq [label="Append\n(frameSender)"];
+       igate -> tq [label="Append\n(dwcore.FrameSender)"];
        digi -> igate [label="rememberDigipeated"];
        digi -> tq [label="Append"];
        cdigi -> tq [label="Append"];
@@ -216,7 +216,7 @@ The shapes in the diagram follow the dependency conventions in ``AGENTS.md``:
 
 - A component that makes one call is handed a function,
   typed for what it does with it:
-  ``frameReceiver``, ``frameSender``, ``igateSender``, ``seizeConfirmer``.
+  ``frameReceiver``, ``dwcore.FrameSender``, ``igateSender``, ``seizeConfirmer``.
 - A component that makes several calls is handed a small interface,
   declared beside it and holding only those calls:
   ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``.
@@ -231,7 +231,7 @@ References
   in ``internal/direwolf``:
   ``multi_modem.go`` (``multi_modem_init``, ``ReceiveSink``, ``radioSink``),
   ``dlq.go`` (``frameReceiver``, ``seizeConfirmer``),
-  ``tq.go`` (``NewTransmitQueue``, ``frameSender``, ``clientTransmitQueue``, ``SetIGate``),
+  ``tq.go`` (``NewTransmitQueue``, ``clientTransmitQueue``, ``SetIGate``),
   ``xmit.go`` (``NewXmitService``, ``xmitQueue``),
   ``ax25_link.go`` (``NewAX25Link``, ``linkClients``, ``linkTransmitter``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
@@ -247,6 +247,8 @@ References
   handed each channel's configuration by ``RadioConfig.pttChannels`` (``internal/direwolf/channel_config.go``).
 - The digipeaters' constructors, and what they take,
   in ``internal/digipeater``:
-  ``digipeater.go`` (``New``, ``Port``, ``FrameSender``)
+  ``digipeater.go`` (``New``, ``Port``)
   and ``cdigipeater.go`` (``NewConnected``).
+- ``internal/dwcore/dwcore.go``: ``FrameSender``,
+  shared by everything that hands the transmit queue a frame.
 - ``AGENTS.md``, the "Dependencies" section.

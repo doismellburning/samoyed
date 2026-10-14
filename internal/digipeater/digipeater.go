@@ -103,11 +103,6 @@ type Config struct {
 	// Sort of like digipeating but passed along unchanged.
 }
 
-// FrameSender is where a digipeater hands each packet it repeats, to be
-// transmitted on the channel at the priority (dwcore.PrioHigh or
-// dwcore.PrioLow).
-type FrameSender func(channel int, prio int, pp *ax25.Packet)
-
 // Port is what a digipeater needs to know of each channel it might
 // hear on or transmit to: our callsign there, and what kind of medium it is.
 type Port struct {
@@ -123,7 +118,7 @@ type Digipeater struct {
 	config   *Config
 	filter   *pfilter.PacketFilter
 	dedupe   *dedupe.Service
-	transmit FrameSender // Where digipeated packets go; nil to drop them.
+	transmit dwcore.FrameSender // Where digipeated packets go; nil to drop them.
 	count    [phy.MaxTotalChans][phy.MaxTotalChans]int
 }
 
@@ -155,7 +150,7 @@ func New(
 	p_digi_config *Config,
 	filter *pfilter.PacketFilter,
 	onRemember func(channel int, pp *ax25.Packet),
-	transmit FrameSender,
+	transmit dwcore.FrameSender,
 ) *Digipeater {
 	var d = new(Digipeater)
 	d.ports = ports

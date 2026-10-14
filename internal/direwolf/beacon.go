@@ -47,11 +47,11 @@ type BeaconService struct {
 	miscConfig        *misc_config_s
 	igateConfig       *igate_config_s
 	gps               *dwgps.GPS
-	logger            *aprslog.Logger // Where "-dttt" logs tracker beacons, or nil.
-	heardCounter      heardCounter    // Counts the stations heard recently; nil for none.
-	igate             beaconIGate     // Where SENDTO_IGATE beacons go, and the source of IGate statistics; nil for none.
-	recFrame          frameReceiver   // Where SENDTO_RECV beacons go, as though received; nil to drop them.
-	transmit          frameSender     // Where beacons for a channel go, to be transmitted; nil to drop them.
+	logger            *aprslog.Logger    // Where "-dttt" logs tracker beacons, or nil.
+	heardCounter      heardCounter       // Counts the stations heard recently; nil for none.
+	igate             beaconIGate        // Where SENDTO_IGATE beacons go, and the source of IGate statistics; nil for none.
+	recFrame          frameReceiver      // Where SENDTO_RECV beacons go, as though received; nil to drop them.
+	transmit          dwcore.FrameSender // Where beacons for a channel go, to be transmitted; nil to drop them.
 	trackerDebugLevel int
 }
 
@@ -103,7 +103,7 @@ func NewBeaconService(
 	heard heardCounter,
 	ig beaconIGate,
 	recFrame frameReceiver,
-	transmit frameSender,
+	transmit dwcore.FrameSender,
 ) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct_v5
 		modemConfig:  pmodem,

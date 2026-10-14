@@ -70,7 +70,7 @@ type Connected struct {
 	ports    [phy.MaxTotalChans]Port
 	config   *ConnectedConfig
 	filter   *pfilter.PacketFilter
-	transmit FrameSender // Where digipeated packets go; nil to drop them.
+	transmit dwcore.FrameSender // Where digipeated packets go; nil to drop them.
 	count    [phy.MaxRadioChans][phy.MaxRadioChans]int
 }
 
@@ -93,7 +93,7 @@ type Connected struct {
  *
  *------------------------------------------------------------------------------*/
 
-func NewConnected(ports [phy.MaxTotalChans]Port, p_cdigi_config *ConnectedConfig, filter *pfilter.PacketFilter, transmit FrameSender) *Connected {
+func NewConnected(ports [phy.MaxTotalChans]Port, p_cdigi_config *ConnectedConfig, filter *pfilter.PacketFilter, transmit dwcore.FrameSender) *Connected {
 	var d = new(Connected)
 	d.ports = ports
 	d.config = p_cdigi_config
