@@ -146,6 +146,7 @@ same direwolf instance.
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"slices"
@@ -173,6 +174,28 @@ type KissNetService struct {
 	started      atomic.Bool
 }
 
+// KissNetAddr is an address for the KISS TCP service to listen on, and the
+// radio channel that port carries (-1 for all).
+type KissNetAddr struct {
+	Addr    string
+	Channel int
+}
+
+// kissNetAddrs is where mc says the KISS TCP service listens: every address
+// on each port configured with KISSPORT, leaving out those of 0, which are
+// disabled.
+func kissNetAddrs(mc *misc_config_s) []KissNetAddr {
+	var addrs []KissNetAddr
+
+	for i := range MAX_KISS_TCP_PORTS {
+		if mc.kiss_port[i] != 0 {
+			addrs = append(addrs, KissNetAddr{Addr: fmt.Sprintf(":%d", mc.kiss_port[i]), Channel: mc.kiss_chan[i]})
+		}
+	}
+
+	return addrs
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        NewKissNetService
@@ -181,52 +204,105 @@ type KissNetService struct {
  *		an application such as Xastir or APRSIS32.
  *		This is called once from the main program.
  *
- * Inputs:	mc.kiss_port	- TCP port for server.
- *				  0 means disable.  New in version 1.2.
+ * Inputs:	mc		- Configuration, for KISSCOPY.
+ *
+ *		addrs		- Where to listen, and the radio channel each
+ *				  carries.  None means no KISS over TCP.
  *
  *		debug		- Print information flowing from and to
  *				  clients.
  *
- * Outputs:
+ * Returns:	The service, listening on each address it could bind,
+ *		and an error naming any it could not.  One port that is
+ *		already in use doesn't stop the rest, so the service is
+ *		returned, and usable, either way.
  *
- * Description:	Nothing listens until Start is called.
+ * Description:	The ports are bound here, so a failure is known before
+ *		anything starts, and Addrs says which ports were got;
+ *		nobody is let in until Start is called.  ctx bounds only
+ *		the binding: the ports are given up when the context
+ *		Start was given is cancelled, or by Close if the service
+ *		is never started.
  *
  *--------------------------------------------------------------------*/
 
-func NewKissNetService(mc *misc_config_s, debug int) *KissNetService {
+func NewKissNetService(ctx context.Context, mc *misc_config_s, addrs []KissNetAddr, debug int) (*KissNetService, error) {
 	var kns = new(KissNetService)
 	kns.miscConfigP = mc
 	kns.debug = debug
 	kns.pollInterval = kissnetPollInterval
 
-	for i := range MAX_KISS_TCP_PORTS {
-		if mc.kiss_port[i] != 0 {
-			var kps = new(kissport_status_s)
+	var errs []error
 
-			kps.tcp_port = mc.kiss_port[i]
-			kps.channel = mc.kiss_chan[i]
+	for _, addr := range addrs {
+		logrus.WithField("address", addr.Addr).Debug("Binding to port")
 
-			// Add to list.
-			kps.pnext = kns.allPorts
-			kns.allPorts = kps
+		var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", addr.Addr)
+		if listenErr != nil {
+			errs = append(errs, fmt.Errorf("KISS TCP %s: %w", addr.Addr, listenErr))
+
+			continue
+		}
+
+		var kps = new(kissport_status_s)
+
+		kps.listener = listener
+		kps.channel = addr.Channel
+
+		kps.tcp_port = addrPort(listener.Addr())
+
+		// Add to list.
+		kps.pnext = kns.allPorts
+		kns.allPorts = kps
+	}
+
+	return kns, errors.Join(errs...)
+}
+
+// Addrs is where the service is listening, in the order the addresses were
+// given, leaving out any that could not be bound.
+func (kns *KissNetService) Addrs() []net.Addr {
+	var addrs []net.Addr
+
+	for kps := kns.allPorts; kps != nil; kps = kps.pnext {
+		if kps.listener != nil {
+			addrs = append(addrs, kps.listener.Addr())
 		}
 	}
 
-	return kns
+	slices.Reverse(addrs) // The list is newest first.
+
+	return addrs
 }
 
-// Start listens on each configured port until ctx is cancelled, handing what
+// Close gives up the ports of a service that was never started, which would
+// otherwise hold them until the process exits, and stops it ever starting.  A
+// started service gives its ports up when Start's context is cancelled, and
+// Close leaves it be.
+func (kns *KissNetService) Close() {
+	if !kns.started.CompareAndSwap(false, true) {
+		return
+	}
+
+	for kps := kns.allPorts; kps != nil; kps = kps.pnext {
+		if kps.listener != nil {
+			kps.listener.Close()
+		}
+	}
+}
+
+// Start accepts clients on each port until ctx is cancelled, handing what
 // each client sends to handler.  For each port it
 // starts goroutines to listen for a connection from a client application, and
 // for commands from each client, so the caller doesn't block while we wait for
 // these.  Anything the goroutines read, such as debug, must be set before
 // calling it.
 //
-// Starting it again would try to bind every port a second time, so a second
-// Start is complained about and ignored.
+// Starting it again would have two goroutines accepting on every port, so a
+// second Start, like one after Close, is complained about and ignored.
 func (kns *KissNetService) Start(ctx context.Context, handler *KissHandler) {
 	if !kns.started.CompareAndSwap(false, true) {
-		logrus.Error("KISS TCP service started twice; ignoring the second start")
+		logrus.Error("KISS TCP service started twice, or after Close; ignoring this start")
 
 		return
 	}
@@ -554,13 +630,6 @@ func (kns *KissNetService) initOne(ctx context.Context, kps *kissport_status_s) 
 		kps.kf[client] = new(kiss.Collector)
 	}
 
-	if kps.tcp_port == 0 {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Disabled KISS network client port.\n")
-
-		return
-	}
-
 	// Hang up on whoever is attached when we are asked to stop.
 	context.AfterFunc(ctx, kps.stop)
 
@@ -585,7 +654,8 @@ func (kns *KissNetService) initOne(ctx context.Context, kps *kissport_status_s) 
  *
  * Purpose:     Wait for a connection request from an application.
  *
- * Inputs:	arg		- KISS port status block.
+ * Inputs:	kps		- KISS port status block, whose listener is
+ *				  already bound.
  *
  * Outputs:	client_sock	- File descriptor for communicating with client app.
  *
@@ -597,13 +667,7 @@ func (kns *KissNetService) initOne(ctx context.Context, kps *kissport_status_s) 
  *--------------------------------------------------------------------*/
 
 func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kissport_status_s) {
-	logrus.WithField("tcp_port", kps.tcp_port).Debug("Binding to port")
-	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", kps.tcp_port))
-	if listenErr != nil {
-		logrus.WithError(listenErr).WithField("tcp_port", kps.tcp_port).Error("connectListenThread: Listen failed")
-
-		return
-	}
+	var listener = kps.listener
 
 	// As in server.go: Go's net package sets SO_REUSEADDR on a Unix TCP
 	// listener for us, and setting it through TCPListener.File puts the

@@ -200,6 +200,9 @@ The handler copies a client's data frames to the TCP clients with KISSCOPY,
 so it is made after the ``KissNetService`` and handed it.
 The service is handed the handler when it is started (``KissNetService.Start``),
 rather than when it is made.
+It binds its ports when it is made, though,
+so a port already in use is reported before the service starts,
+rather than once it is running.
 
 **The audio devices and the demodulators.**
 Each audio device's statistics report its channels' received audio levels,
@@ -237,7 +240,7 @@ References
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
   ``kiss_frame.go`` (``NewKissHandler``),
-  ``kissnet.go`` (``KissNetService.Start``),
+  ``kissnet.go`` (``NewKissNetService``, ``KissNetService.Start``),
   ``aprs_tt.go`` (``NewTTGateway``),
   ``beacon.go`` (``NewBeaconService``, ``beaconIGate``),
   ``audio.go`` (``AudioDevices.setAudioLevel``),

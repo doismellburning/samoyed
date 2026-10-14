@@ -713,7 +713,10 @@ x = Silence FX.25 information.`)
 	// tells about the links they asked for.
 	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, agwServer, transmitQueue, d_c_opt)
 	var metricsListening = metrics_init(ctx, audio_config, misc_config)
-	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
+	var kissNetSvc, kissNetErr = NewKissNetService(ctx, misc_config, kissNetAddrs(misc_config), d_n_opt)
+	if kissNetErr != nil {
+		logrus.WithError(kissNetErr).Error("Unable to listen for KISS TCP client applications")
+	}
 
 	// All three KISS transports hand what their clients send to the same
 	// handler, which copies data frames to the TCP clients with KISSCOPY.

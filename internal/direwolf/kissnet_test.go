@@ -13,7 +13,6 @@ package direwolf
 // wait on - so a test of the sending path keeps clear of them.
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"testing"
@@ -95,17 +94,13 @@ func newAttachedKissNet(t *testing.T, channel int, copyBetweenClients bool, numC
 }
 
 // startKissNet brings up a real KISS TCP service, with its listening
-// goroutines, carrying the given radio channel (-1 for all).
+// goroutines, carrying the given radio channel (-1 for all) on whichever
+// loopback port was free, and hands back that port.
 func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	t.Helper()
 
-	var port = freeTCPPort(t)
-
-	var mc = new(misc_config_s)
-	mc.kiss_port[0] = port
-	mc.kiss_chan[0] = channel
-
-	var kns = NewKissNetService(mc, 0)
+	var kns, err = NewKissNetService(t.Context(), new(misc_config_s), []KissNetAddr{{Addr: "127.0.0.1:0", Channel: channel}}, 0)
+	require.NoError(t, err)
 
 	// A client's reader polls for it to attach; not every real second,
 	// though, which would cost each test here most of one.
@@ -113,15 +108,14 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 
 	kns.Start(t.Context(), NewKissHandler(kissTestRadioConfig(), new(XmitService), nil, kns))
 
-	return kns, port
+	return kns, addrPort(kns.Addrs()[0])
 }
 
 // dialKissNet attaches a client application to a running service, and hands
 // back its connection together with the client slot the service put it in.
 //
-// Dialling is retried until the port is bound, so there is no need to wait for
-// the listener separately - and no probe connection taking a client slot that
-// the test then has to work around.
+// The port is bound before the service starts, so the dial needs no waiting
+// for, but whoever accepts it gets round to attaching it in their own time.
 func dialKissNet(t *testing.T, kns *KissNetService, port int) (net.Conn, int) {
 	t.Helper()
 
@@ -397,23 +391,32 @@ func TestKissNetDebugPrints(t *testing.T) {
 // A KISS TCP port of 0 is how the configuration says "no KISS over TCP", and
 // nothing is bound.
 func TestKissNetDisabled(t *testing.T) {
-	var kns = new(KissNetService)
-	kns.miscConfigP = new(misc_config_s)
+	var mc = new(misc_config_s)
 
-	var kps = new(kissport_status_s)
-	kps.channel = -1
+	assert.Empty(t, kissNetAddrs(mc))
 
-	var output = testutils.CaptureOutput(t, func() { kns.initOne(t.Context(), kps) })
+	var kns, err = NewKissNetService(t.Context(), mc, kissNetAddrs(mc), 0)
 
-	assert.Contains(t, output, "Disabled KISS network client port")
+	require.NoError(t, err)
+	assert.Empty(t, kns.Addrs())
 }
 
-// Starting the service twice would try to bind its ports again, so the second
-// start is refused, and says so rather than failing to bind.
-func TestKissNetStartedTwiceComplains(t *testing.T) {
-	var kns, port = startKissNet(t, -1)
+// Each configured port is listened on, carrying its own channel, and those of
+// 0 are left out.
+func TestKissNetAddrs(t *testing.T) {
+	var mc = new(misc_config_s)
+	mc.kiss_port[0] = 8001
+	mc.kiss_chan[0] = -1
+	mc.kiss_port[2] = 8002
+	mc.kiss_chan[2] = 1
 
-	waitUntilListening(t, port)
+	assert.Equal(t, []KissNetAddr{{Addr: ":8001", Channel: -1}, {Addr: ":8002", Channel: 1}}, kissNetAddrs(mc))
+}
+
+// Starting the service twice would have two goroutines accepting on each port,
+// so the second start is refused, and says so.
+func TestKissNetStartedTwiceComplains(t *testing.T) {
+	var kns, _ = startKissNet(t, -1)
 
 	var hook = test.NewGlobal()
 
@@ -421,8 +424,7 @@ func TestKissNetStartedTwiceComplains(t *testing.T) {
 
 	kns.Start(t.Context(), kns.handler)
 
-	// Only the errors: the probe waitUntilListening made may still be being
-	// reported as a client attaching.
+	// Only the errors: the first start may still be saying what it is doing.
 	var errs []string
 
 	for _, entry := range hook.AllEntries() {
@@ -435,54 +437,57 @@ func TestKissNetStartedTwiceComplains(t *testing.T) {
 	assert.Contains(t, errs[0], "started twice")
 }
 
-// Two things cannot have the same port, and the one that loses says so rather
-// than sitting there looking attached.
+// Two things cannot have the same port, and the one that loses says so before
+// anything starts, rather than sitting there looking attached - while a port
+// that is free is still listened on.
 func TestKissNetListenFails(t *testing.T) {
-	// Every address, as the service itself binds, rather than loopback: with
-	// SO_REUSEADDR - which Go sets on a TCP listener - the BSDs, macOS among
-	// them, let a bind of every address succeed alongside a bind of one of
-	// them.  Taking the same thing the service will ask for is what makes the
-	// bind below fail on every platform rather than only on Linux.
+	// Every address, as the service binds a configured port, rather than
+	// loopback: with SO_REUSEADDR - which Go sets on a TCP listener - the
+	// BSDs, macOS among them, let a bind of every address succeed alongside a
+	// bind of one of them.  Taking the same thing the service will ask for is
+	// what makes the bind below fail on every platform rather than only on
+	// Linux.
 	var listener, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp", ":0")
 	require.NoError(t, listenErr)
 
 	defer listener.Close()
 
-	var kps = new(kissport_status_s)
-	kps.tcp_port = listener.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert // A TCP listener has a TCP address.
-	kps.channel = -1
+	var taken = fmt.Sprintf(":%d", addrPort(listener.Addr()))
 
-	var kns = new(KissNetService)
-	kns.miscConfigP = new(misc_config_s)
+	var kns, err = NewKissNetService(t.Context(), new(misc_config_s),
+		[]KissNetAddr{{Addr: taken, Channel: -1}, {Addr: "127.0.0.1:0", Channel: -1}}, 0)
+
+	require.NotNil(t, kns)
+
+	t.Cleanup(kns.Close)
+
+	require.Error(t, err, "nothing was said about the port that could not be bound")
+	assert.Contains(t, err.Error(), "KISS TCP "+taken)
+	assert.Len(t, kns.Addrs(), 1, "the port that was free should still be listened on")
+}
+
+// A service that is made but never started gives its ports up when closed,
+// and cannot be started after that.
+func TestKissNetCloseGivesUpThePortsOfAServiceNeverStarted(t *testing.T) {
+	var kns, err = NewKissNetService(t.Context(), new(misc_config_s), []KissNetAddr{{Addr: "127.0.0.1:0", Channel: -1}}, 0)
+	require.NoError(t, err)
+
+	kns.Close()
+
+	// The listener itself says it is closed, rather than this binding the port
+	// again: something else could take a port given up, however briefly.
+	var _, acceptErr = kns.allPorts.listener.Accept()
+	require.ErrorIs(t, acceptErr, net.ErrClosed)
 
 	var hook = test.NewGlobal()
 
 	t.Cleanup(hook.Reset)
 
-	// In a goroutine, so that a bind which somehow succeeds fails this test
-	// rather than leaving it in the accept loop until the whole run times
-	// out, which is how the loopback address above showed up.
-	var ctx, cancel = context.WithCancel(t.Context())
+	kns.Start(t.Context(), nil)
 
-	defer cancel()
-
-	var done = make(chan struct{})
-
-	go func() {
-		defer close(done)
-
-		kns.connectListenThread(ctx, kps)
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-		t.Fatal("connectListenThread did not give up although the port was taken")
-	}
-
-	var entry = hook.LastEntry()
-	require.NotNil(t, entry, "nothing was said about the port that could not be bound")
-	assert.Contains(t, entry.Message, "Listen failed")
+	require.NotNil(t, hook.LastEntry())
+	assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
+	assert.Contains(t, hook.LastEntry().Message, "after Close")
 }
 
 // The end-to-end tests below exercise commands that are answered rather than
