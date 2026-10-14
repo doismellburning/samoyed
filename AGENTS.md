@@ -70,7 +70,7 @@
 
 ### Pitfalls
 
-* Code paths that can run during config-file validation (before the rest of startup init has run, e.g. `pfilter_validate` from `handleFILTER`/`handleCFILTER`) must not lean on state that another subsystem's init sets. Prefer handing them what they need - `pfilter_validate` evaluates with a zero `PacketFilter`, which has no IGate configuration - and where one still reads a global config pointer, guard it with a nil check and a safe default
+* Code paths that can run during config-file validation (before the rest of startup init has run, e.g. `pfilter_validate` from `handleFILTER`/`handleCFILTER`) must not lean on state that another subsystem's init sets. Hand them what they need instead - `pfilter_validate` evaluates with a zero `PacketFilter`, which has no IGate configuration
 * When refactoring per-channel globals (arrays indexed by channel) into a per-channel struct accessed via a pointer array/map, guard lookups (e.g. `s_foo[channel]`) and any field/method access on the result against `nil` - a channel that was never attached, or whose connection has since dropped, can legitimately be `nil`
 * When an `int` from config or the CLI is stored into a fixed-width field of a C-derived binary struct (e.g. the `int32`/`int16` fields of a `.WAV` or KISS/AX.25 header), validate that it fits *before* converting, including derived fields (a byte rate is a sample rate times a frame size, so overflows sooner) - an out-of-range value otherwise wraps silently, and `gosec`'s integer-overflow check doesn't catch it
 
