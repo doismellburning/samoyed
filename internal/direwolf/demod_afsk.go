@@ -558,40 +558,24 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 
 				// The normalized values should be around -0.5 to +0.5 so the difference
 				// should work out to be around -1 to +1.
-				// This is important because nudge_pll uses the demod_out amplitude to assign
-				// a quality or confidence score to the symbol.
 
 				var demod_out = m_norm - s_norm
 
 				// Tested and it looks good.  Range of about -1 to +1.
 				//printf ("JWL DEBUG demod A with agc = %6.2f\n", demod_out);
 
-				nudge_pll_afsk(channel, subchannel, 0, demod_out, D, 1.0)
+				nudge_pll_afsk(channel, subchannel, 0, demod_out, D)
 			} else {
 				// Multiple slice case.
 				// Rather than trying to find the best threshold location, use multiple
 				// slicer thresholds in parallel.
 				// The best slicing point will vary from packet to packet but should
 				// remain about the same for a given packet.
-
-				// We are not performing the AGC step here but still want the envelope
-				// for calculating the confidence level (or quality) of the sample.
-				D.m_peak, D.m_valley, _ = agc(m_amp, D.agc_fast_attack, D.agc_slow_decay, D.m_peak, D.m_valley)
-				D.s_peak, D.s_valley, _ = agc(s_amp, D.agc_fast_attack, D.agc_slow_decay, D.s_peak, D.s_valley)
-
 				for slice := range D.num_slicers {
+					// Biased one way or the other depending on the space gain.
 					var demod_out = m_amp - s_amp*afskSpaceGain[slice]
 
-					var amp = 0.5 * (D.m_peak - D.m_valley + (D.s_peak-D.s_valley)*afskSpaceGain[slice])
-					if amp < 0.0000001 {
-						amp = 1 // avoid divide by zero with no signal.
-					}
-
-					// Tested and it looks good.  Range of about -1 to +1 relative to amp.
-					// Biased one way or the other depending on the space gain.
-					//printf ("JWL DEBUG demod A with slicer %d: %6.2f / %6.2f = %6.2f\n", slice, demod_out, amp, demod_out/amp);
-
-					nudge_pll_afsk(channel, subchannel, slice, demod_out, D, amp)
+					nudge_pll_afsk(channel, subchannel, slice, demod_out, D)
 				}
 			}
 		}
@@ -638,7 +622,7 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 				// Tested and it looks good.  Range roughly -1 to +1.
 				//printf ("JWL DEBUG demod B single = %6.2f\n", demod_out);
 
-				nudge_pll_afsk(channel, subchannel, 0, demod_out, D, 1.0)
+				nudge_pll_afsk(channel, subchannel, 0, demod_out, D)
 			} else {
 				// This would be useful for HF SSB where a tuning error
 				// would shift the frequency.  Multiple slicing points would
@@ -656,7 +640,7 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 
 					//printf ("JWL DEBUG demod B slice %d, offset = %6.3f, demod_out = %6.2f\n", slice, offset, demod_out);
 
-					nudge_pll_afsk(channel, subchannel, slice, demod_out, D, 1.0)
+					nudge_pll_afsk(channel, subchannel, slice, demod_out, D)
 				}
 			}
 		}
@@ -726,7 +710,7 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
  * because this happens for each transition from the demodulator.
  */
 
-func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D *demodulator_state_s, amplitude float64) {
+func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D *demodulator_state_s) {
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
 	// Wraps on overflow, as the PLL relies on.  (C does the add as unsigned because
@@ -738,12 +722,6 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 
 	if D.slicer[slice].data_clock_pll < 0 && D.slicer[slice].prev_d_c_pll > 0 {
 		/* Overflow - this is where we sample. */
-		// Assign it a confidence level or quality, 0 to 100, based on the amplitude.
-		// Those very close to 0 are suspect.  We'll get back to this later.
-		var quality = int(math.Abs(float64(demod_out)) * 100.0 / float64(amplitude))
-		if quality > 100 {
-			quality = 100
-		}
 
 		/*
 			#if DEBUG5
@@ -765,17 +743,13 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 			#endif
 		*/
 
-		// #if 1
+		// TODO: new feature to measure data speed error, as 9600 and PSK do.
+		// Unlike them, this neither counts symbols nor sums the nudges (see
+		// below), so the HDLC receiver never sees a symbol count above 0 and
+		// records a speed error of 0, as Dire Wolf does for AFSK.
 		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
-		D.receiver.RecBit(from, dwutil.IfThenElse(demod_out > 0, 1, 0), false, quality)
-		/*
-			#else  // TODO: new feature to measure data speed error.
-			// Maybe hdlc_rec_bit could provide indication when frame starts.
-				  hdlc_rec_bit_new (channel, subchannel, slice, demod_out > 0, 0, quality,
-						&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count));
-				  D.slicer[slice].pll_symbol_count++;
-			#endif
-		*/
+		D.receiver.RecBit(from, demod_out > 0, false,
+			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		pll_dcd_each_symbol2(DCD_CONFIG_AFSK, D, channel, subchannel, slice)
 	}
 

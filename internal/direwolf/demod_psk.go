@@ -516,52 +516,6 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 	D.alevel_mark_peak = -1
 	D.alevel_space_peak = -1
-
-	/*
-		#if 0
-			// QPSK - CSV format to make plot.
-
-			printf ("Phase shift degrees, bit 0, quality 0, bit 1, quality 1\n");
-			for (int degrees = 0; degrees <= 360; degrees++) {
-			  float a = degrees * math.Pi * 2./ 360.;
-			  int bit_quality[3];
-
-			  int new_gray = phase_shift_to_symbol (a, 2, bit_quality);
-
-			  float offset = 3 * 1.5;
-			  printf ("%d, ", degrees);
-			  printf ("%.3f, ", offset + (new_gray & 1)); offset -= 1.5;
-			  printf ("%.3f, ", offset + (bit_quality[0] / 100.)); offset -= 1.5;
-			  printf ("%.3f, ", offset + ((new_gray >> 1) & 1)); offset -= 1.5;
-			  printf ("%.3f\n", offset + (bit_quality[1] / 100.));
-			}
-		#endif
-	*/
-
-	/*
-	   #if 0
-
-	   	// 8-PSK - CSV format to make plot.
-
-	   	printf ("Phase shift degrees,  bit 0, quality 0, bit 1, quality 1, bit 2, quality 2\n");
-	   	for (int degrees = 0; degrees <= 360; degrees++) {
-	   	  float a = degrees * math.Pi * 2./ 360.;
-	   	  int bit_quality[3];
-
-	   	  int new_gray = phase_shift_to_symbol (a, 3, bit_quality);
-
-	   	  float offset = 5 * 1.5;
-	   	  printf ("%d, ", degrees);
-	   	  printf ("%.3f, ", offset + (new_gray & 1)); offset -= 1.5;
-	   	  printf ("%.3f, ", offset + (bit_quality[0] / 100.)); offset -= 1.5;
-	   	  printf ("%.3f, ", offset + ((new_gray >> 1) & 1)); offset -= 1.5;
-	   	  printf ("%.3f, ", offset + (bit_quality[1] / 100.)); offset -= 1.5;
-	   	  printf ("%.3f, ", offset + ((new_gray >> 2) & 1)); offset -= 1.5;
-	   	  printf ("%.3f\n", offset + (bit_quality[2] / 100.));
-	   	}
-
-	   #endif
-	*/
 } /* demod_psk_init */
 
 /*-------------------------------------------------------------------
@@ -574,13 +528,11 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
  *
  *		bits_per_symbol	- 1 for BPSK, 2 for QPSK, 3 for 8PSK.
  *
- * Outputs:	bit_quality[]	- Value of 0 (at threshold) to 100 (perfect) for each bit.
- *
  * Returns:	1-3 bit symbol value in Gray code.
  *
  *--------------------------------------------------------------------*/
 
-func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality []int) int {
+func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int) int {
 	// Number of different symbol states.
 	dwutil.Assert(bits_per_symbol == 1 || bits_per_symbol == 2 || bits_per_symbol == 3)
 	var N = 1 << bits_per_symbol
@@ -604,7 +556,7 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 	dwutil.Assert(i >= 0 && i < N)
 	dwutil.Assert(f >= -0.001 && f <= 1.001)
 
-	// Interpolate between the ideal angles to get a level of certainty.
+	// Interpolate between the ideal angles.
 	var result = 0
 
 	for b := range bits_per_symbol {
@@ -618,12 +570,10 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 		default:
 			demod = float64((phase_to_gray_v27[i]>>b)&1)*(1.0-f) + float64((phase_to_gray_v27[(i+1)&7]>>b)&1)*f
 		}
-		// Slice to get boolean value and quality measurement.
+		// Slice to get boolean value.
 		if demod >= 0.5 {
 			result |= 1 << b
 		}
-
-		bit_quality[b] = int(math.Round(100.0 * 2.0 * math.Abs(float64(demod)-0.5)))
 	}
 
 	return (result)
@@ -642,10 +592,7 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
  *		sam	- One sample of audio.
  *			  Should be in range of -32768 .. 32767.
  *
- * Outputs:	For each recovered data bit, we call:
- *
- *			  hdlc_rec (channel etc., demodulated_bit, quality);
- *
+ * Outputs:	Hands each recovered data bit to D.receiver,
  *		to decode HDLC frames from the stream of bits.
  *
  * Returns:	None
@@ -723,22 +670,21 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 		var delta = a - D.u.psk.delay_line[D.u.psk.boffs]
 
 		var gray int
-		var bit_quality [3]int
 
 		switch D.modem_type {
 		case MODEM_BPSK:
-			gray = phase_shift_to_symbol(delta, 1, bit_quality[:]) // BPSK
+			gray = phase_shift_to_symbol(delta, 1) // BPSK
 		case MODEM_QPSK:
 			if D.u.psk.v26_alt == V26_B {
-				gray = phase_shift_to_symbol(delta+(-math.Pi/4), 2, bit_quality[:]) // MFJ compatible
+				gray = phase_shift_to_symbol(delta+(-math.Pi/4), 2) // MFJ compatible
 			} else {
-				gray = phase_shift_to_symbol(delta, 2, bit_quality[:]) // Classic
+				gray = phase_shift_to_symbol(delta, 2) // Classic
 			}
 		default:
-			gray = phase_shift_to_symbol(delta, 3, bit_quality[:]) // 8-PSK
+			gray = phase_shift_to_symbol(delta, 3) // 8-PSK
 		}
 
-		nudge_pll_psk(channel, subchannel, slice, gray, D, bit_quality[:])
+		nudge_pll_psk(channel, subchannel, slice, gray, D)
 
 		D.u.psk.lo_phase += D.u.psk.lo_step
 	} else {
@@ -756,27 +702,26 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 		var Q = convolve(D.u.psk.Q_raw[:], D.u.psk.lp_filter[:], D.u.psk.lp_filter_taps)
 
 		var gray int
-		var bit_quality [3]int
 		var delta = float64(math.Atan2(float64(I), float64(Q)))
 
 		switch D.modem_type {
 		case MODEM_BPSK:
-			gray = phase_shift_to_symbol(delta+float64(math.Pi/2), 1, bit_quality[:]) // BPSK
+			gray = phase_shift_to_symbol(delta+float64(math.Pi/2), 1) // BPSK
 		case MODEM_QPSK:
 			if D.u.psk.v26_alt == V26_B {
-				gray = phase_shift_to_symbol(delta+float64(math.Pi/2), 2, bit_quality[:]) // MFJ compatible
+				gray = phase_shift_to_symbol(delta+float64(math.Pi/2), 2) // MFJ compatible
 			} else {
-				gray = phase_shift_to_symbol(delta+float64(3*math.Pi/4), 2, bit_quality[:]) // Classic
+				gray = phase_shift_to_symbol(delta+float64(3*math.Pi/4), 2) // Classic
 			}
 		default:
-			gray = phase_shift_to_symbol(delta+(3*math.Pi/2), 3, bit_quality[:])
+			gray = phase_shift_to_symbol(delta+(3*math.Pi/2), 3)
 		}
 
-		nudge_pll_psk(channel, subchannel, slice, gray, D, bit_quality[:])
+		nudge_pll_psk(channel, subchannel, slice, gray, D)
 	}
 } /* end demod_psk_process_sample */
 
-func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *demodulator_state_s, bit_quality []int) {
+func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *demodulator_state_s) {
 	/*
 	 * Finally, a PLL is used to sample near the centers of the data bits.
 	 *
@@ -817,23 +762,23 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 		case MODEM_BPSK:
 			var gray = demod_bits
 
-			D.receiver.RecBitNew(from, gray&1, false, bit_quality[0],
+			D.receiver.RecBit(from, gray&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		case MODEM_QPSK:
 			var gray = demod_bits
 
-			D.receiver.RecBitNew(from, (gray>>1)&1, false, bit_quality[1],
+			D.receiver.RecBit(from, (gray>>1)&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			D.receiver.RecBitNew(from, gray&1, false, bit_quality[0],
+			D.receiver.RecBit(from, gray&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		default:
 			var gray = demod_bits
 
-			D.receiver.RecBitNew(from, (gray>>2)&1, false, bit_quality[2],
+			D.receiver.RecBit(from, (gray>>2)&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			D.receiver.RecBitNew(from, (gray>>1)&1, false, bit_quality[1],
+			D.receiver.RecBit(from, (gray>>1)&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			D.receiver.RecBitNew(from, gray&1, false, bit_quality[0],
+			D.receiver.RecBit(from, gray&1 == 1, false,
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		}
 

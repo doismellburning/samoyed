@@ -859,7 +859,7 @@ func (r *Layer2Receiver) toMultiModem(from dwcore.SlicerID, pp *ax25.Packet, rxI
 
 /***********************************************************************************
  *
- * Name:	hdlc_rec_bit
+ * Name:	Layer2Receiver.RecBit
  *
  * Purpose:	Extract HDLC frames from a stream of bits.
  *
@@ -867,30 +867,24 @@ func (r *Layer2Receiver) toMultiModem(from dwcore.SlicerID, pp *ax25.Packet, rxI
  *			  demodulator (subchannel) of which channel.
  *
  *		raw 	- One bit from the demodulator.
- *			  should be 0 or 1.
  *
  *		is_scrambled - Is the data scrambled?
  *
- *		descram_state - Current descrambler state.  (not used - remove)
- *				Not so fast - plans to add new parameter.  PSK already provides it.
- *
+ *		pll_nudge_total, pll_symbol_count - The slicer's PLL
+ *			  counters, from which the HDLC receiver works out
+ *			  each frame's speed error, and which it resets at
+ *			  each frame's start.
  *
  * Description:	This is called once for each received bit.
- *		For each valid frame, process_rec_frame()
- *		is called for further processing.
+ *		It goes to the slicer's EAS receiver, or to its HDLC,
+ *		FX.25 and IL2P receivers, each of which hands any valid
+ *		frame it finds to its sink.
  *
  ***********************************************************************************/
 
-func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw int, is_scrambled bool, not_used_remove int) {
-	var dummyll int64
-	var dummy int
-	r.RecBitNew(from, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
-}
-
-func (r *Layer2Receiver) RecBitNew(from dwcore.SlicerID, _raw int, is_scrambled bool, not_used_remove int,
+func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled bool,
 	pll_nudge_total *int64, pll_symbol_count *int) {
 	var channel = from.Channel
-	var raw = _raw != 0
 
 	// -e option can be used to artificially introduce the desired
 	// Bit Error Rate (BER) for testing.
@@ -910,7 +904,7 @@ func (r *Layer2Receiver) RecBitNew(from dwcore.SlicerID, _raw int, is_scrambled 
 	// EAS does not use HDLC.
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
-		s.eas.RecBit(dwutil.IfThenElse(raw, 1, 0), not_used_remove)
+		s.eas.RecBit(raw)
 
 		return
 	}
