@@ -256,6 +256,8 @@ func commands() []command {
 		{names: []string{"INFO", "I"}, help: "About this node", run: (*Node).info},
 		{names: []string{"PORTS", "P"}, help: "List the ports", run: (*Node).ports},
 		{names: []string{"MHEARD", "MH"}, help: "List the stations heard", run: (*Node).mheard},
+		{names: []string{"NODES", "N"}, help: "List the nodes known", run: (*Node).noNetROM},
+		{names: []string{"ROUTES", "R"}, help: "List the routes known", run: (*Node).noNetROM},
 	}
 }
 
@@ -348,6 +350,14 @@ func (n *Node) mheard(key linkKey, _ []string) bool {
 	}
 
 	n.send(key, []byte(b.String()))
+
+	return true
+}
+
+// noNetROM answers the commands that list what NET/ROM knows, of which
+// there is nothing yet.
+func (n *Node) noNetROM(key linkKey, _ []string) bool {
+	n.send(key, []byte(n.prompt()+"This node does not do NET/ROM yet\r"))
 
 	return true
 }

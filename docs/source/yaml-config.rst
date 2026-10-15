@@ -264,6 +264,10 @@ These are the keys under ``samoyed``:
         List the stations most recently heard over the radio,
         with the channel each was last heard on and how long ago.
 
+    ``NODES`` (``N``), ``ROUTES`` (``R``)
+        Say that the node does not do NET/ROM yet,
+        rather than that the command is invalid.
+
     A line of more than 256 characters is ignored.
 
     .. code:: yaml

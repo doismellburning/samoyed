@@ -432,7 +432,9 @@ func TestHelp(t *testing.T) {
 				"  HELP, H, ? - List the commands\r"+
 				"  INFO, I - About this node\r"+
 				"  PORTS, P - List the ports\r"+
-				"  MHEARD, MH - List the stations heard\r", link.output())
+				"  MHEARD, MH - List the stations heard\r"+
+				"  NODES, N - List the nodes known\r"+
+				"  ROUTES, R - List the routes known\r", link.output())
 		})
 	}
 }
@@ -511,4 +513,20 @@ func TestMHeardNothing(t *testing.T) {
 	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("MHEARD\r"))
 
 	assert.Equal(t, "SAMNOD:Q1TEST-7} Heard:\r", link.output())
+}
+
+func TestNodesAndRoutes(t *testing.T) {
+	t.Parallel()
+
+	for _, command := range []string{"NODES", "n", "ROUTES", "r"} {
+		t.Run(command, func(t *testing.T) {
+			t.Parallel()
+
+			var n, link = connected(t)
+
+			n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte(command+"\r"))
+
+			assert.Equal(t, "SAMNOD:Q1TEST-7} This node does not do NET/ROM yet\r", link.output())
+		})
+	}
 }
