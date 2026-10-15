@@ -43,12 +43,20 @@ type Config struct {
 	// Alias is a second name the node answers to, or empty for none.
 	Alias string
 
-	// Channels are the channels the node accepts connections on.
-	Channels []int
+	// Ports are the channels the node accepts connections on.
+	Ports []Port
 
 	// InfoMessage is what INFO tells a user about the node, or empty for a
 	// line saying what it is.  It may run to several lines.
 	InfoMessage string
+}
+
+// Port is a channel the node accepts connections on.
+type Port struct {
+	Channel int
+
+	// Description is what PORTS says the channel is.
+	Description string
 }
 
 // linkKey identifies a link the node is answering, as the data link does.
@@ -103,11 +111,11 @@ func New(config Config, link DataLink, client int) *Node {
 // Start registers the node's callsign, and its alias if it has one, for
 // incoming connections on each of its channels.
 func (n *Node) Start() {
-	for _, channel := range n.config.Channels {
-		n.link.RegisterCallsign(n.config.Address, channel, n.client)
+	for _, port := range n.config.Ports {
+		n.link.RegisterCallsign(n.config.Address, port.Channel, n.client)
 
 		if n.config.Alias != "" {
-			n.link.RegisterCallsign(n.config.Alias, channel, n.client)
+			n.link.RegisterCallsign(n.config.Alias, port.Channel, n.client)
 		}
 	}
 }
@@ -231,6 +239,7 @@ func commands() []command {
 		{names: []string{"BYE", "B", "QUIT", "Q"}, help: "Disconnect", run: (*Node).bye},
 		{names: []string{"HELP", "H", "?"}, help: "List the commands", run: (*Node).help},
 		{names: []string{"INFO", "I"}, help: "About this node", run: (*Node).info},
+		{names: []string{"PORTS", "P"}, help: "List the ports", run: (*Node).ports},
 	}
 }
 
@@ -287,6 +296,21 @@ func (n *Node) info(key linkKey, _ []string) bool {
 	text = strings.TrimRight(text, "\r")
 
 	n.send(key, []byte(n.prompt()+text+"\r"))
+
+	return true
+}
+
+// ports lists the ports, by channel number.
+func (n *Node) ports(key linkKey, _ []string) bool {
+	var b strings.Builder
+
+	b.WriteString(n.prompt() + "Ports:\r")
+
+	for _, port := range n.config.Ports {
+		fmt.Fprintf(&b, "  %2d %s\r", port.Channel, port.Description)
+	}
+
+	n.send(key, []byte(b.String()))
 
 	return true
 }

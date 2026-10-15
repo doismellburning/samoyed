@@ -256,6 +256,10 @@ These are the keys under ``samoyed``:
     ``INFO`` (``I``)
         Say what ``infoMessage`` says.
 
+    ``PORTS`` (``P``)
+        List the channels the node listens on, by number,
+        and what sort of channel each is.
+
     A line of more than 256 characters is ignored.
 
     .. code:: yaml

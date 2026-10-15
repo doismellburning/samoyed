@@ -748,10 +748,15 @@ x = Silence FX.25 information.`)
 
 		nodeClients = nodeShell
 
+		var channels = make([]int, 0, len(nodeConfig.Ports))
+		for _, port := range nodeConfig.Ports {
+			channels = append(channels, port.Channel)
+		}
+
 		logrus.WithFields(logrus.Fields{
 			"node":     nodeConfig.Address,
 			"alias":    nodeConfig.Alias,
-			"channels": nodeConfig.Channels,
+			"channels": channels,
 		}).Info("Node shell ready")
 	}
 

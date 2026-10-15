@@ -377,7 +377,12 @@ legacy: |
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, node.Config{Address: "Q1TEST-7", Alias: "SAMNOD", Channels: []int{0, 10}, InfoMessage: "Test node\nin a test\n"}, mustNodeConfig(t, c.audio, got))
+		assert.Equal(t, node.Config{
+			Address:     "Q1TEST-7",
+			Alias:       "SAMNOD",
+			Ports:       []node.Port{{Channel: 0, Description: "Radio, 1200 bps"}, {Channel: 10, Description: "AXUDP"}},
+			InfoMessage: "Test node\nin a test\n",
+		}, mustNodeConfig(t, c.audio, got))
 	})
 
 	t.Run("the node listens on the channels it is given", func(t *testing.T) {
@@ -386,7 +391,7 @@ legacy: |
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, node.Config{Address: "Q1TEST", Alias: "", Channels: []int{10}, InfoMessage: ""}, mustNodeConfig(t, c.audio, got))
+		assert.Equal(t, node.Config{Address: "Q1TEST", Alias: "", Ports: []node.Port{{Channel: 10, Description: "AXUDP"}}, InfoMessage: ""}, mustNodeConfig(t, c.audio, got))
 	})
 
 	// Regression test: the default channels were settled while the file was
@@ -400,7 +405,20 @@ legacy: |
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, []int{0, 1}, mustNodeConfig(t, c.audio, got).Channels)
+		assert.Equal(t, []node.Port{{Channel: 0, Description: "Radio, 1200 bps"}, {Channel: 1, Description: "Radio, 1200 bps"}}, mustNodeConfig(t, c.audio, got).Ports)
+	})
+
+	// Regression test: a port's description was settled while the file was
+	// read, so it had the speed the file gave rather than -B's.
+	t.Run("the node's ports are described as the command line leaves them", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		c.audio.achan[0].baud = 9600
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, []node.Port{{Channel: 0, Description: "Radio, 9600 bps"}}, mustNodeConfig(t, c.audio, got).Ports)
 	})
 
 	// Regression test: a channel given explicitly was checked while the file
@@ -417,7 +435,7 @@ legacy: |
 
 		var config, err = c.audio.nodeConfig(got)
 		require.NoError(t, err)
-		assert.Equal(t, []int{0, 1}, config.Channels)
+		assert.Equal(t, []int{0, 1}, []int{config.Ports[0].Channel, config.Ports[1].Channel})
 	})
 
 	t.Run("the node can't listen on a channel that is not there", func(t *testing.T) {
@@ -435,7 +453,10 @@ legacy: |
 	t.Run("the node can listen on a channel the legacy block makes", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "node: {address: Q1TEST, channels: [8]}\nlegacy: |\n  NCHANNEL 8 127.0.0.1 8001\n")
 		assert.Zero(t, c.errors, c.output)
-		assert.True(t, c.misc.node.IsJust())
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, []node.Port{{Channel: 8, Description: "Network TNC"}}, mustNodeConfig(t, c.audio, got).Ports)
 	})
 
 	t.Run("no node unless asked for", func(t *testing.T) {

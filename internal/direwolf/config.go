@@ -2199,7 +2199,8 @@ func (c *RadioConfig) connectedModeChannels() []int {
 }
 
 // nodeConfig is the node shell's configuration for settings, with the
-// channels as they are now, or what is wrong with them.
+// channels as they are now - and what they are, since the command line can
+// change that too: -B sets channel 0's speed - or what is wrong with them.
 func (c *RadioConfig) nodeConfig(settings nodeSettings) (node.Config, error) {
 	var channels = settings.channels
 	if channels == nil {
@@ -2215,10 +2216,15 @@ func (c *RadioConfig) nodeConfig(settings nodeSettings) (node.Config, error) {
 		}
 	}
 
+	var ports = make([]node.Port, 0, len(channels))
+	for _, channel := range channels {
+		ports = append(ports, node.Port{Channel: channel, Description: c.describeChannel(channel)})
+	}
+
 	return node.Config{
 		Address:     settings.address,
 		Alias:       settings.alias,
-		Channels:    slices.Clone(channels),
+		Ports:       ports,
 		InfoMessage: settings.infoMessage,
 	}, nil
 }

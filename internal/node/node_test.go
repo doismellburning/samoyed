@@ -82,12 +82,48 @@ func (f *fakeLink) reset() {
 	f.sent = nil
 }
 
+// testConfig is the configuration of a node with an alias on testChannel,
+// changed by each of options.
+func testConfig(options ...func(*Config)) Config {
+	var config = Config{
+		Address:     nodeCall,
+		Alias:       nodeAlias,
+		Ports:       []Port{{Channel: testChannel, Description: "Radio"}},
+		InfoMessage: "",
+	}
+
+	for _, option := range options {
+		option(&config)
+	}
+
+	return config
+}
+
+func withoutAlias(config *Config) {
+	config.Alias = ""
+}
+
+func onChannels(channels ...int) func(*Config) {
+	return func(config *Config) {
+		config.Ports = nil
+		for _, c := range channels {
+			config.Ports = append(config.Ports, Port{Channel: c, Description: fmt.Sprintf("Port %d", c)})
+		}
+	}
+}
+
+func withInfoMessage(info string) func(*Config) {
+	return func(config *Config) {
+		config.InfoMessage = info
+	}
+}
+
 // connected makes a node with a user connected to it, and the greeting
 // already forgotten.
 func connected(t *testing.T) (*Node, *fakeLink) {
 	t.Helper()
 
-	return connectedWith(t, Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}, InfoMessage: ""})
+	return connectedWith(t, testConfig())
 }
 
 // connectedWith is connected, for a node configured as config.
@@ -107,7 +143,7 @@ func TestStartRegistersCallsignAndAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{0, 2}, InfoMessage: ""}, link, testClient)
+	var n = New(testConfig(onChannels(0, 2)), link, testClient)
 
 	n.Start()
 
@@ -118,7 +154,7 @@ func TestStartWithoutAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: "", Channels: []int{0}, InfoMessage: ""}, link, testClient)
+	var n = New(testConfig(withoutAlias, onChannels(0)), link, testClient)
 
 	n.Start()
 
@@ -129,7 +165,7 @@ func TestGreeting(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}, InfoMessage: ""}, link, testClient)
+	var n = New(testConfig(), link, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 
@@ -141,7 +177,7 @@ func TestGreetingWithoutAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: "", Channels: []int{testChannel}, InfoMessage: ""}, link, testClient)
+	var n = New(testConfig(withoutAlias), link, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 
@@ -154,7 +190,7 @@ func TestAnswersFromTheCallsignConnectedTo(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}, InfoMessage: ""}, link, testClient)
+	var n = New(testConfig(), link, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeAlias, true)
 	n.RecConnData(testChannel, testClient, userCall, nodeAlias, ax25.PIDNoLayer3, []byte("XYZZY\r"))
@@ -167,7 +203,7 @@ func TestOutgoingLinkIsNotASession(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: "", Channels: []int{testChannel}, InfoMessage: ""}, link, testClient)
+	var n = New(testConfig(withoutAlias), link, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, false)
 	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("XYZZY\r"))
@@ -387,7 +423,8 @@ func TestHelp(t *testing.T) {
 			assert.Equal(t, "SAMNOD:Q1TEST-7} Commands:\r"+
 				"  BYE, B, QUIT, Q - Disconnect\r"+
 				"  HELP, H, ? - List the commands\r"+
-				"  INFO, I - About this node\r", link.output())
+				"  INFO, I - About this node\r"+
+				"  PORTS, P - List the ports\r", link.output())
 		})
 	}
 }
@@ -406,11 +443,24 @@ func TestInfo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			var n, link = connectedWith(t, Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}, InfoMessage: tc.info})
+			var n, link = connectedWith(t, testConfig(withInfoMessage(tc.info)))
 
 			n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("i\r"))
 
 			assert.Equal(t, tc.want, link.output())
 		})
 	}
+}
+
+func TestPorts(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connectedWith(t, testConfig(onChannels(0, testChannel, 10)))
+
+	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("p\r"))
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Ports:\r"+
+		"   0 Port 0\r"+
+		"   1 Port 1\r"+
+		"  10 Port 10\r", link.output())
 }
