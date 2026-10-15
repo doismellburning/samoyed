@@ -8,8 +8,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,6 +84,11 @@ func (f *fakeLink) reset() {
 	f.sent = nil
 }
 
+// noneHeard is HeardStations for when nothing has been heard.
+func noneHeard(int) []mheard.Heard {
+	return nil
+}
+
 // testConfig is the configuration of a node with an alias on testChannel,
 // changed by each of options.
 func testConfig(options ...func(*Config)) Config {
@@ -131,7 +138,7 @@ func connectedWith(t *testing.T, config Config) (*Node, *fakeLink) {
 	t.Helper()
 
 	var link = new(fakeLink)
-	var n = New(config, link, testClient)
+	var n = New(config, link, noneHeard, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 	link.reset()
@@ -143,7 +150,7 @@ func TestStartRegistersCallsignAndAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(onChannels(0, 2)), link, testClient)
+	var n = New(testConfig(onChannels(0, 2)), link, noneHeard, testClient)
 
 	n.Start()
 
@@ -154,7 +161,7 @@ func TestStartWithoutAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(withoutAlias, onChannels(0)), link, testClient)
+	var n = New(testConfig(withoutAlias, onChannels(0)), link, noneHeard, testClient)
 
 	n.Start()
 
@@ -165,7 +172,7 @@ func TestGreeting(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(), link, testClient)
+	var n = New(testConfig(), link, noneHeard, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 
@@ -177,7 +184,7 @@ func TestGreetingWithoutAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(withoutAlias), link, testClient)
+	var n = New(testConfig(withoutAlias), link, noneHeard, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 
@@ -190,7 +197,7 @@ func TestAnswersFromTheCallsignConnectedTo(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(), link, testClient)
+	var n = New(testConfig(), link, noneHeard, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeAlias, true)
 	n.RecConnData(testChannel, testClient, userCall, nodeAlias, ax25.PIDNoLayer3, []byte("XYZZY\r"))
@@ -203,7 +210,7 @@ func TestOutgoingLinkIsNotASession(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(withoutAlias), link, testClient)
+	var n = New(testConfig(withoutAlias), link, noneHeard, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, false)
 	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("XYZZY\r"))
@@ -424,7 +431,8 @@ func TestHelp(t *testing.T) {
 				"  BYE, B, QUIT, Q - Disconnect\r"+
 				"  HELP, H, ? - List the commands\r"+
 				"  INFO, I - About this node\r"+
-				"  PORTS, P - List the ports\r", link.output())
+				"  PORTS, P - List the ports\r"+
+				"  MHEARD, MH - List the stations heard\r", link.output())
 		})
 	}
 }
@@ -463,4 +471,44 @@ func TestPorts(t *testing.T) {
 		"   0 Port 0\r"+
 		"   1 Port 1\r"+
 		"  10 Port 10\r", link.output())
+}
+
+func TestMHeard(t *testing.T) {
+	t.Parallel()
+
+	var now = time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC)
+
+	var link = new(fakeLink)
+
+	var asked int
+
+	var n = New(testConfig(), link, func(limit int) []mheard.Heard {
+		asked = limit
+
+		return []mheard.Heard{
+			{Callsign: "Q3TEST-15", Channel: 10, Hops: 0, LastHeard: now.Add(-5 * time.Second)},
+			{Callsign: "Q4TEST", Channel: 0, Hops: 2, LastHeard: now.Add(-(26*time.Hour + 3*time.Minute + 4*time.Second))},
+		}
+	}, testClient)
+	n.now = func() time.Time { return now }
+
+	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
+	link.reset()
+
+	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("mh\r"))
+
+	assert.Equal(t, maxHeard, asked)
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Heard:\r"+
+		"  Q3TEST-15 10 0:00:05\r"+
+		"  Q4TEST     0 26:03:04\r", link.output())
+}
+
+func TestMHeardNothing(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("MHEARD\r"))
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Heard:\r", link.output())
 }

@@ -260,6 +260,10 @@ These are the keys under ``samoyed``:
         List the channels the node listens on, by number,
         and what sort of channel each is.
 
+    ``MHEARD`` (``MH``)
+        List the stations most recently heard over the radio,
+        with the channel each was last heard on and how long ago.
+
     A line of more than 256 characters is ignored.
 
     .. code:: yaml

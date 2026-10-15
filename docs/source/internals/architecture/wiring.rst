@@ -141,7 +141,7 @@ The diagram leaves out what is plain configuration
 and the ``digipeater.Port`` for each channel that ``RadioConfig.digipeaterPorts`` takes from it for the digipeaters)
 and the services with only one user,
 which ``DirewolfMain`` hands over in the same way:
-the heard list (``mheard``) to the packet filter, the IGate, the beacon service and the received packet handler;
+the heard list (``mheard``) to the packet filter, the IGate, the beacon service, the received packet handler and the node shell;
 the packet filter to the IGate and the digipeaters;
 the APRS log to the beacon service and the received packet handler;
 the GPS to the beacon service and the waypoint sender;
