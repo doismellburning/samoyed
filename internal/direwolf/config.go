@@ -2115,7 +2115,7 @@ func (ps *parseState) applyMYCALL(call string) error {
 
 // applyNODE checks the node shell's settings and turns it on.
 func (ps *parseState) applyNODE(settings NodeSettings) error {
-	var address, ok = nodeAddress(settings.Address)
+	var address, ok = node.Address(settings.Address)
 	if !ok {
 		return fmt.Errorf("line %d: Invalid address %q for node", ps.line, settings.Address)
 	}
@@ -2123,7 +2123,7 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 	var alias string
 
 	if settings.Alias != "" {
-		alias, ok = nodeAddress(settings.Alias)
+		alias, ok = node.Address(settings.Alias)
 		if !ok {
 			return fmt.Errorf("line %d: Invalid alias %q for node", ps.line, settings.Alias)
 		}
@@ -2227,22 +2227,6 @@ func (c *RadioConfig) nodeConfig(settings nodeSettings) (node.Config, error) {
 		Ports:       ports,
 		InfoMessage: settings.infoMessage,
 	}, nil
-}
-
-// nodeAddress is addr written as the data link writes addresses - upper case,
-// with no SSID when it is 0 - which is how it must be for the data link to
-// recognise a connection to it.  ok is false if it is not a valid address.
-func nodeAddress(addr string) (string, bool) {
-	var call, ssid, _, ok = ax25.ParseAddr(-1, strings.ToUpper(addr), ax25.AddrStrictNoStar)
-	if !ok || call == "" {
-		return "", false
-	}
-
-	if ssid != 0 {
-		call += fmt.Sprintf("-%d", ssid)
-	}
-
-	return call, true
 }
 
 // dropEASProfile clears the demodulator profile EAS brings with it, for a

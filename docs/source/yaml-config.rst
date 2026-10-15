@@ -250,6 +250,13 @@ These are the keys under ``samoyed``:
     ``BYE`` (``B``, ``QUIT``, ``Q``)
         Disconnect.
 
+    ``CONNECT`` (``C``) *port* *callsign*
+        Connect onward, from the node's callsign, to the station on that channel.
+        The channel can be left out when the node has only one.
+        Typing a line before it connects gives up on it.
+        Once connected, everything sent goes to and from the station as it is;
+        when the station disconnects, the user is back at the node.
+
     ``HELP`` (``H``, ``?``)
         List the commands.
 
