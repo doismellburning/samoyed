@@ -221,6 +221,37 @@ These are the keys under ``samoyed``:
                 - {ax25addr: Q1TEST-2, host: node.example.org, port: 10093, broadcast: true}
                 - {ax25addr: Q2TEST, host: 192.0.2.2, port: 93}
 
+``node``
+    A node shell:
+    a station that connects to the node's callsign or alias gets a command prompt.
+    This has no equivalent in Dire Wolf's format.
+    It has:
+
+    ``address``
+        The node's address: its callsign, with any SSID.
+
+    ``alias``
+        Optionally, a second name the node answers to,
+        such as a short mnemonic for where it is.
+
+    ``channels``
+        The channels it accepts connections on.
+        Left out, it is every channel connected mode can be used on:
+        radio channels, network and serial TNCs, and AXUDP ports.
+
+    The node answers each line it is sent,
+    heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
+    ``BYE`` (or ``B``, ``QUIT``, ``Q``) disconnects.
+    A line of more than 256 characters is ignored.
+
+    .. code:: yaml
+
+        samoyed:
+          node:
+            address: Q1TEST-7
+            alias: SAMNOD
+            channels: [0, 10]
+
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as
     though they were a file of their own - so a channel setting there needs its
