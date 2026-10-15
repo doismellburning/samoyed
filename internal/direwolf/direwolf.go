@@ -774,7 +774,7 @@ x = Silence FX.25 information.`)
 	var nodeClients linkClients
 
 	if nodeConfig, ok := nodeConfig.Get(); ok {
-		var nodeShell = node.New(nodeConfig, dataLinkQueue, nodeClient)
+		var nodeShell = node.New(nodeConfig, dataLinkQueue, mheardDB.HeardRF, nodeClient)
 		nodeShell.Start()
 
 		nodeClients = nodeShell

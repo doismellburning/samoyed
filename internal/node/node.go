@@ -16,8 +16,10 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/mheard"
 )
 
 // maxLineLen is the longest command line the shell will hold on to.  Anyone
@@ -81,13 +83,24 @@ type session struct {
 	leaving bool
 }
 
+// maxHeard is the most stations MH lists.
+const maxHeard = 20
+
+// HeardStations lists up to limit stations heard over the radio, most
+// recently heard first.  (*mheard.DB).HeardRF is one.
+type HeardStations func(limit int) []mheard.Heard
+
 // Node is the node shell.
 type Node struct {
 	config Config
 	link   DataLink
+	heard  HeardStations
 
 	// client is the client number the data link knows the node by.
 	client int
+
+	// now is the time, which a test can stop.
+	now func() time.Time
 
 	// mu guards sessions.  The data link calls in on its own goroutine;
 	// the lock keeps the node safe from any other caller too.
@@ -95,14 +108,16 @@ type Node struct {
 	sessions map[linkKey]*session
 }
 
-// New makes a node that talks to link as client.  Nothing is registered with
-// the data link until Start.
-func New(config Config, link DataLink, client int) *Node {
+// New makes a node that talks to link as client, and lists the stations heard
+// says it has heard.  Nothing is registered with the data link until Start.
+func New(config Config, link DataLink, heard HeardStations, client int) *Node {
 	var n = new(Node)
 
 	n.config = config
 	n.link = link
+	n.heard = heard
 	n.client = client
+	n.now = time.Now
 	n.sessions = make(map[linkKey]*session)
 
 	return n
@@ -240,6 +255,7 @@ func commands() []command {
 		{names: []string{"HELP", "H", "?"}, help: "List the commands", run: (*Node).help},
 		{names: []string{"INFO", "I"}, help: "About this node", run: (*Node).info},
 		{names: []string{"PORTS", "P"}, help: "List the ports", run: (*Node).ports},
+		{names: []string{"MHEARD", "MH"}, help: "List the stations heard", run: (*Node).mheard},
 	}
 }
 
@@ -308,6 +324,27 @@ func (n *Node) ports(key linkKey, _ []string) bool {
 
 	for _, port := range n.config.Ports {
 		fmt.Fprintf(&b, "  %2d %s\r", port.Channel, port.Description)
+	}
+
+	n.send(key, []byte(b.String()))
+
+	return true
+}
+
+// mheard lists the stations most recently heard over the radio, with the
+// port each was heard on and how long ago.
+func (n *Node) mheard(key linkKey, _ []string) bool {
+	var b strings.Builder
+
+	b.WriteString(n.prompt() + "Heard:\r")
+
+	var now = n.now()
+
+	for _, h := range n.heard(maxHeard) {
+		var ago = max(0, now.Sub(h.LastHeard)).Round(time.Second)
+
+		fmt.Fprintf(&b, "  %-9s %2d %d:%02d:%02d\r", h.Callsign, h.Channel,
+			int(ago.Hours()), int(ago.Minutes())%60, int(ago.Seconds())%60)
 	}
 
 	n.send(key, []byte(b.String()))
