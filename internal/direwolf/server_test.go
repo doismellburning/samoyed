@@ -1045,6 +1045,75 @@ func TestCmdListenThread_HangUpMidHeaderIsAnError(t *testing.T) {
 	assert.ErrorIs(t, hook.LastEntry().Data[logrus.ErrorKey].(error), io.ErrUnexpectedEOF) //nolint:forcetypeassert // The test fails either way.
 }
 
+// A client refused for an oversized data length is hung up on, and the slot
+// it held is served again for whoever takes it next.  The thread used to give
+// up altogether here, leaving the slot looking free to the listener but with
+// nothing reading from it, so a remote client could put every slot out of
+// use one at a time.
+func TestCmdListenThread_KeepsServingTheSlotAfterAnOversizedDataLength(t *testing.T) {
+	var s = new(AGWServer)
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	var ctx, cancel = context.WithCancel(t.Context())
+	var done = make(chan struct{})
+
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+
+	var server1, client1 = net.Pipe()
+
+	t.Cleanup(func() { client1.Close() })
+
+	s.clientAccepted(0, server1)
+
+	go func() {
+		defer close(done)
+
+		s.cmdListenThread(ctx, 0)
+	}()
+
+	var oversized = new(agwpe.Header)
+	oversized.DataKind = 'K'
+	oversized.DataLen = agwMaxDataLen + 1
+
+	require.NoError(t, client1.SetDeadline(time.Now().Add(5*time.Second)))
+	require.NoError(t, binary.Write(client1, binary.LittleEndian, oversized))
+
+	require.Eventually(t, func() bool { return s.clientConn(0) == nil },
+		5*time.Second, 10*time.Millisecond, "the refused client was not hung up on")
+
+	require.Len(t, hook.AllEntries(), 1)
+	assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
+	assert.Equal(t, 0, hook.LastEntry().Data["client"])
+	assert.Contains(t, hook.LastEntry().Data, logrus.ErrorKey)
+
+	var server2, client2 = net.Pipe()
+
+	t.Cleanup(func() { client2.Close() })
+
+	s.clientAccepted(0, server2)
+
+	// Nothing reading from the slot leaves the write blocked, so the deadline
+	// turns that into a failure rather than a hang.
+	require.NoError(t, client2.SetDeadline(time.Now().Add(5*time.Second)))
+
+	var version = new(agwpe.Header)
+	version.DataKind = 'R'
+
+	require.NoError(t, binary.Write(client2, binary.LittleEndian, version),
+		"nothing is reading from the slot")
+
+	var reply, err = readReplyFrom(client2)
+
+	require.NoError(t, err)
+	assert.Equal(t, byte('R'), reply.Header.DataKind)
+}
+
 // Taking on a client is logged at Info, once, as is the accept loop getting
 // ready for each one - which on startup says the port is open.
 func TestConnectListenThread_AttachingAClientIsLoggedOnce(t *testing.T) {
