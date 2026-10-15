@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,7 +57,9 @@ func requirePortFree(t *testing.T, port int) {
 }
 
 func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
-	var port = freeTCPPort(t)
+	var listener, _ = testutils.Listen(t)
+
+	var port = addrPort(listener.Addr())
 
 	// The listener attaches the probe connection waitUntilListening makes to
 	// this server, and no cmdListenThread is running here to notice it go away
@@ -81,7 +84,7 @@ func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
 	go func() {
 		defer close(stopped)
 
-		s.connectListenThread(ctx, port)
+		s.connectListenThread(ctx, listener)
 	}()
 
 	waitUntilListening(t, port)
@@ -98,25 +101,27 @@ func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
 }
 
 func TestKissNetServiceStopsWhenCancelled(t *testing.T) {
-	var port = freeTCPPort(t)
-
-	var mc = new(misc_config_s)
-	mc.kiss_port[0] = port
-	mc.kiss_chan[0] = -1
-
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	NewKissNetService(mc, 0).Start(ctx, NewKissHandler(new(RadioConfig), new(XmitService), nil, nil))
+	var kns, err = NewKissNetService(ctx, new(misc_config_s), []KissNetAddr{{Addr: "127.0.0.1:0", Channel: -1}}, 0)
+	require.NoError(t, err)
 
-	waitUntilListening(t, port)
+	kns.Start(ctx, NewKissHandler(new(RadioConfig), new(XmitService), nil, nil))
+
+	var port = addrPort(kns.Addrs()[0])
 
 	// An attached client is what the per-client read threads are blocked on,
 	// so it is how we can tell they noticed the cancellation rather than only
-	// the thread doing the accepting.
+	// the thread doing the accepting.  It has to be attached, not just dialled,
+	// before the cancelling: one still in the accept queue is hung up on by
+	// the listener closing, which says nothing about the read threads.
 	var client, dialErr = new(net.Dialer).DialContext(ctx, "tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	require.NoError(t, dialErr)
 
 	defer client.Close()
+
+	require.Eventually(t, func() bool { return kns.allPorts.clientConn(0) != nil },
+		5*time.Second, 10*time.Millisecond, "the client never attached")
 
 	cancel()
 

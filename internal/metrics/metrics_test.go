@@ -134,7 +134,7 @@ func TestSetAudioLevelDoesNotAllocate(t *testing.T) {
 	assert.InDelta(t, 0, allocs, 0, "SetAudioLevel must not allocate")
 }
 
-func TestStartReportsBindFailureSynchronously(t *testing.T) {
+func TestNewServerReportsBindFailure(t *testing.T) {
 	t.Parallel()
 
 	// Regression: the bind used to happen inside the goroutine, so the caller
@@ -152,20 +152,23 @@ func TestStartReportsBindFailureSynchronously(t *testing.T) {
 
 	var port = blocker.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert
 
-	var errCh, startErr = Start(t.Context(), port)
+	var server, err = NewServer(t.Context(), ":"+strconv.Itoa(port))
 
-	require.Error(t, startErr, "a port already in use must fail before Start returns")
-	assert.Nil(t, errCh)
+	require.Error(t, err, "a port already in use must fail before anything starts")
+	assert.Nil(t, server)
 }
 
-func TestStartServesMetrics(t *testing.T) {
+func TestServerServesMetrics(t *testing.T) {
 	t.Parallel()
 
-	var port = freePort(t)
+	var server, err = NewServer(t.Context(), "127.0.0.1:0")
+	require.NoError(t, err)
 
-	var errCh, startErr = Start(t.Context(), port)
+	var port = server.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert
 
-	require.NoError(t, startErr)
+	// Bound before anything is served, so the request below needs no
+	// waiting for.
+	var errCh = server.Start(t.Context())
 	require.NotNil(t, errCh)
 
 	var client = &http.Client{Timeout: 5 * time.Second} //nolint:exhaustruct_v5
@@ -186,17 +189,20 @@ func TestStartServesMetrics(t *testing.T) {
 	assert.Contains(t, string(body), "samoyed_")
 }
 
-// freePort returns a port that was free a moment ago.  Start takes a port
-// rather than returning the one it bound, so a test has to guess.
-func freePort(t *testing.T) int {
-	t.Helper()
+// A server that is made but never started gives its port up when closed, and
+// starting it after that serves nothing.
+func TestServerCloseGivesUpThePortOfAServerNeverStarted(t *testing.T) {
+	t.Parallel()
 
-	var l, err = new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	var server, err = NewServer(t.Context(), "127.0.0.1:0")
 	require.NoError(t, err)
 
-	var port = l.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert
+	server.Close()
 
-	require.NoError(t, l.Close())
+	// The listener itself says it is closed, rather than this binding the port
+	// again: something else could take a port given up, however briefly.
+	var _, acceptErr = server.listener.Accept()
+	require.ErrorIs(t, acceptErr, net.ErrClosed)
 
-	return port
+	assert.ErrorIs(t, <-server.Start(t.Context()), http.ErrServerClosed)
 }

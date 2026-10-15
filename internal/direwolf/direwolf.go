@@ -4,6 +4,7 @@ package direwolf
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -543,13 +544,32 @@ x = Silence FX.25 information.`)
 	 * unless WEBPORT is set.
 	 */
 
-	var webHub = webui_init(ctx, audio_config, misc_config)
+	var webHub *webui.Hub
+
+	if misc_config.web_port == 0 {
+		logrus.Debug("Web interface disabled")
+	} else {
+		webHub = webui_init(ctx, audio_config, fmt.Sprintf(":%d", misc_config.web_port))
+	}
 
 	// The AGW server is made here, so the transmit service can be told to
 	// show it each frame sent, but only started further down, once the
 	// transmit service is taking what its clients queue off the transmit
-	// queue.
-	var agwServer = NewAGWServer(audio_config, misc_config, dataLinkQueue, transmitQueue, d_a_opt)
+	// queue.  Without one - disabled, its port taken, or only sending
+	// calibration tones, which exits before anything is started - agwServer
+	// is nil, which everything it is handed to takes as no clients.
+	var agwServer *AGWServer
+
+	if misc_config.agwpe_port == 0 {
+		logrus.Info("Disabled AGW network client port")
+	} else if *transmitCalibration == "" {
+		var agwErr error
+
+		agwServer, agwErr = NewAGWServer(ctx, fmt.Sprintf(":%d", misc_config.agwpe_port), audio_config, misc_config, dataLinkQueue, transmitQueue, d_a_opt)
+		if agwErr != nil {
+			logrus.WithError(agwErr).Error("Unable to listen for AGW client applications")
+		}
+	}
 
 	// Each frame sent is shown on the web interface, if there is one, and to
 	// the AGW clients monitoring.
@@ -711,9 +731,28 @@ x = Silence FX.25 information.`)
 
 	// The connected-mode link layer, after the AGW server whose clients it
 	// tells about the links they asked for.
-	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, agwServer, transmitQueue, d_c_opt)
-	var metricsListening = metrics_init(ctx, audio_config, misc_config)
-	var kissNetSvc = NewKissNetService(misc_config, d_n_opt)
+	//
+	// Without an AGW server it is handed no clients at all: a nil
+	// *AGWServer would arrive as a linkClients that is not nil, past
+	// NewAX25Link's own stand-in for there being none.
+	var linkClientApps linkClients
+	if agwServer != nil {
+		linkClientApps = agwServer
+	}
+
+	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, linkClientApps, transmitQueue, d_c_opt)
+	var metricsAddr net.Addr // Where the endpoint is listening, if it is.
+
+	if misc_config.metrics_port == 0 {
+		logrus.Info("Disabled Prometheus metrics endpoint")
+	} else {
+		metricsAddr = metrics_init(ctx, audio_config, fmt.Sprintf(":%d", misc_config.metrics_port))
+	}
+
+	var kissNetSvc, kissNetErr = NewKissNetService(ctx, misc_config, kissNetAddrs(misc_config), d_n_opt)
+	if kissNetErr != nil {
+		logrus.WithError(kissNetErr).Error("Unable to listen for KISS TCP client applications")
+	}
 
 	// All three KISS transports hand what their clients send to the same
 	// handler, which copies data frames to the TCP clients with KISSCOPY.
@@ -722,18 +761,14 @@ x = Silence FX.25 information.`)
 	kissNetSvc.Start(ctx, kissHandler)
 
 	if misc_config.dns_sd_enabled {
-		var ports = new(announce.Ports)
-		ports.KISS = misc_config.kiss_port[:]
-		ports.AGW = misc_config.agwpe_port
+		var ports = listeningPorts(kissNetSvc, agwServer)
 
 		// Only if it started: webui_init hands back no hub if it didn't.
 		if webHub != nil {
 			ports.Web = misc_config.web_port
 		}
 
-		if metricsListening {
-			ports.Metrics = misc_config.metrics_port
-		}
+		ports.Metrics = addrPort(metricsAddr)
 
 		announce.Announce(ctx, announce.Services(misc_config.dns_sd_name, ports))
 	}
@@ -1471,4 +1506,20 @@ func mheardPosition(A *aprs.Decoded) (maybe.Maybe[float64], maybe.Maybe[float64]
 	}
 
 	return A.Lat, A.Lon
+}
+
+// listeningPorts is the KISS TCP and AGW ports there are to announce: those
+// the services are listening on, leaving out any that could not be bound, as
+// well as any never configured, so that nobody is sent to a port that is not
+// being served.  A nil agw has none.
+func listeningPorts(kissNet *KissNetService, agw *AGWServer) *announce.Ports {
+	var ports = new(announce.Ports)
+
+	for _, addr := range kissNet.Addrs() {
+		ports.KISS = append(ports.KISS, addrPort(addr))
+	}
+
+	ports.AGW = addrPort(agw.Addr())
+
+	return ports
 }

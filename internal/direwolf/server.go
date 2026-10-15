@@ -186,8 +186,9 @@ type AGWServer struct {
 	// consults it for every frame.
 	debug int
 
-	// port is the TCP port Start listens on, or 0 for none.
-	port int
+	// listener is what the constructor bound; only connectListenThread
+	// accepts on it.
+	listener net.Listener
 
 	// started keeps Start to one run.
 	started atomic.Bool
@@ -245,11 +246,14 @@ type agwClient struct {
  * Purpose:     Set up a server to listen for connection requests from
  *		an application such as Xastir, once Start is called.
  *
- * Inputs:	mc.agwpe_port	- TCP port for server.
- *				  Main program has default of 8000 but allows
- *				  an alternative to be specified on the command line
+ * Inputs:	addr		- Where to listen: every address on the
+ *				  configured port, which the main program
+ *				  defaults to 8000, or "127.0.0.1:0" for any
+ *				  free one.  A port of 0 disables the server
+ *				  (new in version 1.2), so the main program
+ *				  makes none.
  *
- *				0 means disable.  New in version 1.2.
+ *		mc.agwpe_logins	- Credentials a client must log in with.
  *
  *		queue		- Where clients' frames to transmit go; nil to
  *				  drop them.
@@ -257,20 +261,28 @@ type agwClient struct {
  *		debug		- "-d a" level: print the messages flowing to and
  *				  from clients.
  *
- * Description:	Nothing is started here: Start does that.  So a server can
- *		be made, and handed to what tells it about frames and
- *		links, before any client is let in.
+ * Returns:	The server, or an error if addr could not be bound.
+ *		The methods the rest of the program calls do nothing on
+ *		a nil server, so it can be handed one either way.
+ *
+ * Description:	The port is bound here, so a failure is known before
+ *		anything starts, and Addr says which port was got; nothing
+ *		else is started here: Start does that.  So a server can be
+ *		made, and handed to what tells it about frames and links,
+ *		before any client is let in.  ctx bounds only the
+ *		binding: the port is given up when the context Start was
+ *		given is cancelled, or by Close if the server is never
+ *		started.
  *
  *--------------------------------------------------------------------*/
 
-func NewAGWServer(audio_config_p *RadioConfig, mc *misc_config_s, dataLink agwDataLink, queue clientTransmitQueue, debug int) *AGWServer {
+func NewAGWServer(ctx context.Context, addr string, audio_config_p *RadioConfig, mc *misc_config_s, dataLink agwDataLink, queue clientTransmitQueue, debug int) (*AGWServer, error) {
 	var s = new(AGWServer)
 	s.audioConfigP = audio_config_p
 	s.dataLink = dataLink
 	s.queue = queue
 	s.logins = mc.agwpe_logins
 	s.debug = debug
-	s.port = mc.agwpe_port /* Usually 8000 but can be changed. */
 
 	/*
 	 * A new server starts with every client slot empty, and with none of the
@@ -278,11 +290,41 @@ func NewAGWServer(audio_config_p *RadioConfig, mc *misc_config_s, dataLink agwDa
 	 * zero value of the client table is.
 	 */
 
-	return s
+	logrus.WithField("address", addr).Debug("Binding to port")
+
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", addr)
+	if listenErr != nil {
+		return nil, fmt.Errorf("AGW %s: %w", addr, listenErr)
+	}
+
+	s.listener = listener
+
+	return s, nil
 }
 
-// Start says how the server is set up, and if it has a port starts at least
-// two goroutines until ctx is cancelled: one to listen for a connection from a
+// Addr is where the server is listening, or nil for a nil server.
+func (s *AGWServer) Addr() net.Addr {
+	if s == nil || s.listener == nil {
+		return nil
+	}
+
+	return s.listener.Addr()
+}
+
+// Close gives up the port of a server that was never started, which would
+// otherwise hold it until the process exits, and stops it ever starting.  A
+// started server gives its port up when Start's context is cancelled, and
+// Close leaves it be.  Like Start, it does nothing on a nil server.
+func (s *AGWServer) Close() {
+	if s == nil || !s.started.CompareAndSwap(false, true) || s.listener == nil {
+		return
+	}
+
+	s.listener.Close()
+}
+
+// Start says how the server is set up, and starts at least two goroutines
+// until ctx is cancelled: one to listen for a connection from a
 // client application, and one or more to listen for commands from each.  The
 // main application doesn't block while it waits for these.  Only the first
 // call does anything, and on a nil server not even that.
@@ -292,19 +334,17 @@ func (s *AGWServer) Start(ctx context.Context) {
 	}
 
 	if !s.started.CompareAndSwap(false, true) {
-		logrus.Error("AGW server started twice; ignoring the second start")
+		logrus.Error("AGW server started twice, or after Close; ignoring this start")
 
 		return
 	}
 
-	logrus.WithField("server_port", s.port).Debug("AGWServer.Start")
-
-	if s.port == 0 {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Disabled AGW network client port.\n")
-
+	// Only a server put together by hand, as tests do, has no listener.
+	if s.listener == nil {
 		return
 	}
+
+	logrus.WithField("address", s.listener.Addr()).Debug("AGWServer.Start")
 
 	if s.loginRequired() {
 		text_color_set(DW_COLOR_INFO)
@@ -315,7 +355,7 @@ func (s *AGWServer) Start(ctx context.Context) {
 	/*
 	 * This waits for a client to connect and attaches it to a free slot.
 	 */
-	go s.connectListenThread(ctx, s.port)
+	go s.connectListenThread(ctx, s.listener)
 
 	/*
 	 * These read messages from client when the client's slot holds a socket.
@@ -1046,9 +1086,7 @@ func (s *AGWServer) connectedModeAllowed(portx byte) bool {
  *
  * Purpose:     Wait for a connection request from an application.
  *
- * Inputs:	arg		- TCP port for server.
- *				  Main program has default of 8000 but allows
- *				  an alternative to be specified on the command line
+ * Inputs:	listener	- Already bound, by NewAGWServer.
  *
  * Outputs:	The accepted connection is attached to a free client slot.
  *
@@ -1059,15 +1097,8 @@ func (s *AGWServer) connectedModeAllowed(portx byte) bool {
  *
  *--------------------------------------------------------------------*/
 
-func (s *AGWServer) connectListenThread(ctx context.Context, server_port int) {
-	logrus.WithField("port", server_port).Debug("Binding to port")
-	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", server_port))
-	if listenErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("connect_listen_thread: Listen failed: %s", listenErr)
-
-		return
-	}
+func (s *AGWServer) connectListenThread(ctx context.Context, listener net.Listener) {
+	var server_port = addrPort(listener.Addr())
 
 	// Dire Wolf set SO_REUSEADDR here (its version 1.3, as suggested by
 	// G8BPQ) so that restarting the application straight away could bind the

@@ -163,9 +163,19 @@ so the order of construction follows the arrows:
    rather than queueing it.
 #. The tone generators and the PTT.
 #. The web interface and the AGW server.
+   The web interface binds its port as it is made;
+   with its port disabled, or taken, there is no hub,
+   and the frames that would have gone to it go nowhere.
    The AGW server is made here,
    so that the transmit service can show its clients each frame sent,
    but only started once the transmit threads are running.
+   It binds its port when it is made,
+   so a port already in use is reported before the server starts,
+   rather than once it is running.
+   With the port disabled or taken,
+   or when ``-x`` only sends calibration tones,
+   there is no AGW server:
+   what it would have been handed takes a nil one as having no clients.
 #. The ``XmitService``, which starts a transmit thread per radio channel.
 #. The IGate and the two digipeaters,
    then the ``AX25Link``, the KISS handler and its transports,
@@ -200,6 +210,9 @@ The handler copies a client's data frames to the TCP clients with KISSCOPY,
 so it is made after the ``KissNetService`` and handed it.
 The service is handed the handler when it is started (``KissNetService.Start``),
 rather than when it is made.
+It binds its ports when it is made, though,
+so a port already in use is reported before the service starts,
+rather than once it is running.
 
 **The audio devices and the demodulators.**
 Each audio device's statistics report its channels' received audio levels,
@@ -237,12 +250,14 @@ References
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
   ``kiss_frame.go`` (``NewKissHandler``),
-  ``kissnet.go`` (``KissNetService.Start``),
+  ``kissnet.go`` (``NewKissNetService``, ``KissNetService.Start``),
   ``aprs_tt.go`` (``NewTTGateway``),
   ``beacon.go`` (``NewBeaconService``, ``beaconIGate``),
   ``audio.go`` (``AudioDevices.setAudioLevel``),
   ``channel_config.go`` (``RadioConfig.digipeaterPorts``)
   and ``recv.go`` (``recv_init``, ``recv_process``).
+- ``internal/direwolf/webui_source.go``: ``webui_init``,
+  and ``internal/webui/server.go``: ``NewServer``.
 - ``internal/ptt/ptt.go``: ``New``,
   handed each channel's configuration by ``RadioConfig.pttChannels`` (``internal/direwolf/channel_config.go``).
 - The digipeaters' constructors, and what they take,

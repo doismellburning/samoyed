@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -201,4 +202,34 @@ func TestTeardownExitReleasesBeforeExiting(t *testing.T) {
 	require.GreaterOrEqual(t, stopped, 0, "the goroutines should have been stopped: %s", output)
 	require.GreaterOrEqual(t, released, 0, "the PTT should have been released: %s", output)
 	assert.Less(t, stopped, released, "the goroutines should be stopped before the PTT is released")
+}
+
+// DNS-SD announces the KISS TCP and AGW ports being listened on, and not a
+// configured one that could not be bound, nor an AGW server there is none of.
+func TestListeningPortsLeavesOutWhatIsNotListening(t *testing.T) {
+	// Every address, as a configured port is bound: see TestKissNetListenFails.
+	var taken, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp", ":0")
+	require.NoError(t, listenErr)
+
+	defer taken.Close()
+
+	var kns, err = NewKissNetService(t.Context(), new(misc_config_s), []KissNetAddr{
+		{Addr: fmt.Sprintf(":%d", addrPort(taken.Addr())), Channel: -1},
+		{Addr: "127.0.0.1:0", Channel: -1},
+	}, 0)
+	t.Cleanup(kns.Close)
+
+	require.Error(t, err)
+
+	var ports = listeningPorts(kns, nil)
+
+	assert.Equal(t, []int{addrPort(kns.Addrs()[0])}, ports.KISS, "only the port that was bound")
+	assert.Zero(t, ports.AGW, "no AGW server, so no AGW port")
+
+	var agw, agwErr = NewAGWServer(t.Context(), "127.0.0.1:0", nil, new(misc_config_s), nil, nil, 0)
+	require.NoError(t, agwErr)
+
+	t.Cleanup(agw.Close)
+
+	assert.Equal(t, addrPort(agw.Addr()), listeningPorts(kns, agw).AGW, "the port the AGW server was given")
 }

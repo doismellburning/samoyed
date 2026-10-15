@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
-	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -586,25 +586,34 @@ func TestHandleClientCommand_G_NilRadioConfig(t *testing.T) {
 func TestNewAGWServer_TakesTheDebugLevel(t *testing.T) {
 	var mc = new(misc_config_s)
 
-	assert.Equal(t, 2, NewAGWServer(nil, mc, nil, nil, 2).debug)
-	assert.Equal(t, 0, NewAGWServer(nil, mc, nil, nil, 0).debug)
+	for _, debug := range []int{2, 0} {
+		var s, err = NewAGWServer(t.Context(), "127.0.0.1:0", nil, mc, nil, nil, debug)
+		require.NoError(t, err)
+
+		t.Cleanup(s.Close)
+		assert.Equal(t, debug, s.debug)
+	}
 }
 
-// With no port configured, starting says the AGW port is disabled and lets
-// nobody in; starting again is refused, and says so, rather than starting
-// a second set of goroutines on the same port.
-func TestAGWServerStart_NoPortAndOnlyOnce(t *testing.T) {
-	var s = NewAGWServer(nil, new(misc_config_s), nil, nil, 0) /* agwpe_port 0. */
+// Starting again is refused, and says so, rather than starting a second set
+// of goroutines on the same port.
+func TestAGWServerStart_OnlyOnce(t *testing.T) {
+	// Already cancelled, so the goroutines the first start sets going return
+	// straight away, rather than outliving the test and writing to stdout
+	// while a later one has it captured.
+	var ctx, cancel = context.WithCancel(t.Context())
+	cancel()
 
-	var output = testutils.CaptureOutput(t, func() { s.Start(t.Context()) })
+	var s, err = NewAGWServer(t.Context(), "127.0.0.1:0", nil, new(misc_config_s), nil, nil, 0)
+	require.NoError(t, err)
 
-	assert.Contains(t, output, "Disabled AGW network client port")
+	s.Start(ctx)
 
 	var hook = test.NewGlobal()
 
 	t.Cleanup(hook.Reset)
 
-	s.Start(t.Context())
+	s.Start(ctx)
 
 	require.Len(t, hook.AllEntries(), 1)
 	assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)

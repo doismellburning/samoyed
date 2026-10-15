@@ -17,41 +17,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMetricsInitImplDisabledStartsNothing(t *testing.T) {
-	var port = freeTCPPort(t)
-
-	var audio = new(RadioConfig)
-	audio.chan_medium[0] = MEDIUM_RADIO
-
-	// Port 0 is "disabled": no endpoint, and nothing is pushed.
-	var mc = new(misc_config_s)
-	assert.False(t, metrics_init(t.Context(), audio, mc), "a disabled endpoint is not listening")
-
-	// Nothing should be listening on the port we picked either; the point is
-	// just that metrics_init returned without binding anything.
-	var dialer = new(net.Dialer)
-	dialer.Timeout = time.Second
-
-	var conn, err = dialer.DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
-	if err == nil {
-		_ = conn.Close()
-	}
-
-	assert.Error(t, err, "a disabled metrics endpoint listens nowhere")
-}
-
 func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
 	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
 	audio.chan_medium[1] = MEDIUM_NETTNC
 
-	var mc = new(misc_config_s)
-	mc.metrics_port = freeTCPPort(t)
-
 	var ctx, cancel = context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
-	assert.True(t, metrics_init(ctx, audio, mc), "the endpoint is listening")
+	var listening = metrics_init(ctx, audio, "127.0.0.1:0")
+	require.NotNil(t, listening, "the endpoint is listening")
+
+	var port = addrPort(listening)
 
 	assert.InDelta(t, 1, metricValue(t, "samoyed_channel_up", map[string]string{"channel": "0"}), 0,
 		"a radio channel is up")
@@ -62,7 +39,7 @@ func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
 
 	// The endpoint is bound before metrics_init returns, so it can be scraped
 	// straight away, and the seeded series for the radio channel are there.
-	var url = "http://127.0.0.1:" + strconv.Itoa(mc.metrics_port) + "/metrics"
+	var url = "http://127.0.0.1:" + strconv.Itoa(port) + "/metrics"
 
 	var req, reqErr = http.NewRequestWithContext(t.Context(), http.MethodGet, url, nil)
 	require.NoError(t, reqErr)
@@ -86,7 +63,7 @@ func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
 		var dialer = new(net.Dialer)
 		dialer.Timeout = 100 * time.Millisecond
 
-		var conn, err = dialer.DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", mc.metrics_port))
+		var conn, err = dialer.DialContext(t.Context(), "tcp", fmt.Sprintf("127.0.0.1:%d", port))
 		if err != nil {
 			return true
 		}
@@ -98,7 +75,7 @@ func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
 }
 
 func TestMetricsInitImplPortInUse(t *testing.T) {
-	// Hold the port ourselves, on all interfaces as metrics.Start binds, so
+	// Hold the port ourselves, on all interfaces as a configured port is bound, so
 	// that metrics_init's own bind fails.
 	var listener, err = new(net.ListenConfig).Listen(t.Context(), "tcp", ":0")
 	require.NoError(t, err)
@@ -111,15 +88,12 @@ func TestMetricsInitImplPortInUse(t *testing.T) {
 	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
 
-	var mc = new(misc_config_s)
-	mc.metrics_port = addr.Port
-
 	// A failure to bind is reported and metrics_init returns rather than
 	// panicking or claiming to be listening.
-	var started = true
+	var listening net.Addr
 
-	require.NotPanics(t, func() { started = metrics_init(t.Context(), audio, mc) })
-	assert.False(t, started, "an endpoint that failed to bind is not listening")
+	require.NotPanics(t, func() { listening = metrics_init(t.Context(), audio, fmt.Sprintf(":%d", addr.Port)) })
+	assert.Nil(t, listening, "an endpoint that failed to bind is not listening")
 
 	// The channel state was still pushed before the bind was attempted.
 	assert.InDelta(t, 1, metricValue(t, "samoyed_channel_up", map[string]string{"channel": "0"}), 0)

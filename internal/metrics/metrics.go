@@ -23,10 +23,10 @@ package metrics
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -270,23 +270,67 @@ const (
 	metricsShutdownTimeout = 5 * time.Second
 )
 
-// Start starts the Prometheus "/metrics" HTTP endpoint on port.  The listening
-// socket is bound before returning, so a failure to bind (a port already in
-// use, say) comes back as the error return rather than arriving later on the
-// channel - the caller can report "listening" without getting ahead of itself.
-// The returned channel receives a single error if and when the server stops.
-// Logging is the caller's responsibility.
-//
-// Cancelling ctx shuts the endpoint down, so the channel then reports
-// http.ErrServerClosed.
-func Start(ctx context.Context, port int) (<-chan error, error) {
-	var mux = http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
+// Server is the Prometheus "/metrics" HTTP endpoint.
+type Server struct {
+	listener net.Listener
 
-	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", port))
+	// started keeps Start to one run, and from running after Close.
+	started atomic.Bool
+}
+
+// NewServer binds addr for the endpoint, so a failure to bind (a port already
+// in use, say) comes back here, before anything starts - the caller can report
+// "listening" without getting ahead of itself.  An addr of "127.0.0.1:0" binds
+// any free port, which Addr then says.  ctx bounds only the binding: nothing
+// is served until Start is called, and the port is given up when the context
+// Start was given is cancelled.
+func NewServer(ctx context.Context, addr string) (*Server, error) {
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", addr)
 	if listenErr != nil {
 		return nil, listenErr
 	}
+
+	var s = new(Server)
+	s.listener = listener
+
+	return s, nil
+}
+
+// Addr is where the endpoint is listening.
+func (s *Server) Addr() net.Addr {
+	return s.listener.Addr()
+}
+
+// Close gives up the port of a server that was never started, which would
+// otherwise hold it until the process exits, and stops it ever starting.  A
+// started server gives its port up when Start's context is cancelled, and
+// Close leaves it be.
+func (s *Server) Close() {
+	if s.started.CompareAndSwap(false, true) {
+		s.listener.Close()
+	}
+}
+
+// Start serves the endpoint until ctx is cancelled.  The returned channel
+// receives a single error if and when the server stops.  Logging is the
+// caller's responsibility.
+//
+// Cancelling ctx shuts the endpoint down, so the channel then reports
+// http.ErrServerClosed.
+func (s *Server) Start(ctx context.Context) <-chan error {
+	var errCh = make(chan error, 1)
+
+	// Started already, or closed: there is nothing more to serve.
+	if !s.started.CompareAndSwap(false, true) {
+		errCh <- http.ErrServerClosed
+
+		return errCh
+	}
+
+	var mux = http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	var listener = s.listener
 
 	var server = new(http.Server)
 	server.Handler = mux
@@ -294,8 +338,6 @@ func Start(ctx context.Context, port int) (<-chan error, error) {
 	server.ReadTimeout = metricsReadTimeout
 	server.WriteTimeout = metricsWriteTimeout
 	server.IdleTimeout = metricsIdleTimeout
-
-	var errCh = make(chan error, 1)
 
 	go func() {
 		errCh <- server.Serve(listener)
@@ -313,5 +355,5 @@ func Start(ctx context.Context, port int) (<-chan error, error) {
 		_ = server.Shutdown(shutdownCtx)
 	})
 
-	return errCh, nil
+	return errCh
 }

@@ -5,6 +5,7 @@ package testutils
 
 import (
 	"net"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,5 +37,11 @@ func TestListenAndAccept(t *testing.T) {
 //nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func TestUnusedPort(t *testing.T) {
 	var _, err = new(net.Dialer).DialContext(t.Context(), "tcp4", net.JoinHostPort("127.0.0.1", UnusedPort(t)))
+	assert.Error(t, err)
+}
+
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
+func TestUnusedPortNumber(t *testing.T) {
+	var _, err = new(net.Dialer).DialContext(t.Context(), "tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(UnusedPortNumber(t))))
 	assert.Error(t, err)
 }
