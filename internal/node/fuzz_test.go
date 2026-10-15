@@ -16,7 +16,7 @@ import (
 
 // FuzzNode hands a connected session two frames of data, split anywhere, and
 // checks that every reply is headed as the node's should be, and that the
-// node hangs up at most once.
+// node hangs up on the user at most once.
 func FuzzNode(f *testing.F) {
 	f.Add([]byte("BYE\r"), []byte(""))
 	f.Add([]byte("XYZZY\r\nBY"), []byte("E\r"))
@@ -38,8 +38,16 @@ func FuzzNode(f *testing.F) {
 			}
 		}
 
-		if len(link.disconnects) > 1 {
-			t.Errorf("disconnected %d times", len(link.disconnects))
+		var hangUps = 0
+
+		for _, call := range link.disconnects {
+			if call == userCall {
+				hangUps++
+			}
+		}
+
+		if hangUps > 1 {
+			t.Errorf("hung up on the user %d times", hangUps)
 		}
 	})
 }

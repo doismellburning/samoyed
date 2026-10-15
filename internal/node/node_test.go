@@ -38,8 +38,17 @@ type sent struct {
 type fakeLink struct {
 	mu          sync.Mutex
 	registered  []string
+	connects    []sent
 	sent        []sent
+	pids        []int
 	disconnects []string
+}
+
+func (f *fakeLink) ConnectRequest(addrs [ax25.MaxAddrs]string, _ int, channel int, _ int, _ int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.connects = append(f.connects, sent{channel: channel, from: addrs[ax25.Source], to: addrs[ax25.Destination], data: ""})
 }
 
 func (f *fakeLink) RegisterCallsign(addr string, channel int, client int) {
@@ -56,9 +65,11 @@ func (f *fakeLink) DisconnectRequest(addrs [ax25.MaxAddrs]string, _ int, _ int, 
 	f.disconnects = append(f.disconnects, addrs[ax25.Destination])
 }
 
-func (f *fakeLink) XmitDataRequest(addrs [ax25.MaxAddrs]string, _ int, channel int, _ int, _ int, xdata []byte) {
+func (f *fakeLink) XmitDataRequest(addrs [ax25.MaxAddrs]string, _ int, channel int, _ int, pid int, xdata []byte) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	f.pids = append(f.pids, pid)
 
 	f.sent = append(f.sent, sent{channel: channel, from: addrs[ax25.Source], to: addrs[ax25.Destination], data: string(xdata)})
 }
@@ -82,6 +93,7 @@ func (f *fakeLink) reset() {
 	defer f.mu.Unlock()
 
 	f.sent = nil
+	f.pids = nil
 }
 
 // noneHeard is HeardStations for when nothing has been heard.
@@ -429,6 +441,7 @@ func TestHelp(t *testing.T) {
 
 			assert.Equal(t, "SAMNOD:Q1TEST-7} Commands:\r"+
 				"  BYE, B, QUIT, Q - Disconnect\r"+
+				"  CONNECT, C - Connect to a station: C [port] callsign\r"+
 				"  HELP, H, ? - List the commands\r"+
 				"  INFO, I - About this node\r"+
 				"  PORTS, P - List the ports\r"+
@@ -529,4 +542,343 @@ func TestNodesAndRoutes(t *testing.T) {
 			assert.Equal(t, "SAMNOD:Q1TEST-7} This node does not do NET/ROM yet\r", link.output())
 		})
 	}
+}
+
+const farCall = "Q3TEST"
+
+// typeLine sends what the user types, ended in CR.
+func typeLine(n *Node, line string) {
+	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte(line+"\r"))
+}
+
+// connectedOnward makes a node with a user connected to it, and through it
+// to farCall, and forgets all that was said on the way.
+func connectedOnward(t *testing.T) (*Node, *fakeLink) {
+	t.Helper()
+
+	var n, link = connected(t)
+
+	typeLine(n, "C "+farCall)
+	n.LinkEstablished(testChannel, testClient, farCall, nodeCall, false)
+	link.reset()
+
+	return n, link
+}
+
+func TestConnect(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	typeLine(n, "c q3test")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Trying Q3TEST on port 1\r", link.output())
+	assert.Equal(t, []sent{{channel: testChannel, from: nodeCall, to: farCall, data: ""}}, link.connects)
+
+	link.reset()
+	n.LinkEstablished(testChannel, testClient, farCall, nodeCall, false)
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Connected to Q3TEST\r", link.output())
+}
+
+// The node calls from its callsign even for a user who connected to its
+// alias.
+func TestConnectFromAlias(t *testing.T) {
+	t.Parallel()
+
+	var link = new(fakeLink)
+	var n = New(testConfig(), link, noneHeard, testClient)
+
+	n.LinkEstablished(testChannel, testClient, userCall, nodeAlias, true)
+	n.RecConnData(testChannel, testClient, userCall, nodeAlias, ax25.PIDNoLayer3, []byte("C Q3TEST\r"))
+
+	assert.Equal(t, []sent{{channel: testChannel, from: nodeCall, to: farCall, data: ""}}, link.connects)
+}
+
+func TestConnectOnPort(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connectedWith(t, testConfig(onChannels(testChannel, 10)))
+
+	typeLine(n, "C 10 Q3TEST-2")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Trying Q3TEST-2 on port 10\r", link.output())
+	assert.Equal(t, []sent{{channel: 10, from: nodeCall, to: "Q3TEST-2", data: ""}}, link.connects)
+}
+
+func TestConnectRefused(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		line, want string
+	}{
+		{"C", "Usage: C [port] callsign"},
+		{"C Q3TEST", "Usage: C [port] callsign"},
+		{"C 1 Q3TEST Q4TEST", "Usage: C [port] callsign"},
+		{"C one Q3TEST", "Usage: C [port] callsign"},
+		{"C 5 Q3TEST", "No port 5 - type P for the ports"},
+		{"C 1 Q3TEST-99", "Invalid callsign Q3TEST-99"},
+		{"C 1 Q1TEST-7", "That is this node"},
+		{"C 1 samnod", "That is this node"},
+		{"C 1 Q2TEST", "Busy - Q2TEST is already connected to this node"},
+	} {
+		t.Run(tc.line, func(t *testing.T) {
+			t.Parallel()
+
+			var n, link = connectedWith(t, testConfig(onChannels(testChannel, 10)))
+
+			typeLine(n, tc.line)
+
+			assert.Equal(t, "SAMNOD:Q1TEST-7} "+tc.want+"\r", link.output())
+			assert.Empty(t, link.connects)
+		})
+	}
+}
+
+// One downlink to a station at a time: the data link would take a second
+// for the first.
+func TestConnectBusy(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	const otherCall = "Q4TEST"
+
+	n.LinkEstablished(testChannel, testClient, otherCall, nodeCall, true)
+	typeLine(n, "C "+farCall)
+	link.reset()
+
+	n.RecConnData(testChannel, testClient, otherCall, nodeCall, ax25.PIDNoLayer3, []byte("C Q3TEST\r"))
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Busy - Q3TEST is already connected to this node\r", link.output())
+	assert.Len(t, link.connects, 1)
+}
+
+// What came after CONNECT in the same frame is not taken as cancelling it:
+// it was sent before the user could know what CONNECT would do.
+func TestConnectIgnoresRestOfFrame(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("C Q3TEST\rXYZZY\r"))
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Trying Q3TEST on port 1\r", link.output())
+	assert.Empty(t, link.disconnects)
+}
+
+// Regression test: what the user typed while the downlink came up went
+// nowhere, so there was no giving up on a station that was not there, short
+// of waiting for every retry to run out.
+func TestConnectCancelled(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	typeLine(n, "C "+farCall)
+	link.reset()
+
+	typeLine(n, "XYZZY")
+	typeLine(n, "XYZZY")
+
+	assert.Equal(t, []string{farCall}, link.disconnects)
+
+	n.LinkTerminated(testChannel, testClient, farCall, nodeCall, false)
+	typeLine(n, "XYZZY")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Gave up on Q3TEST\r"+invalidCommand, link.output())
+}
+
+func TestByeWhileConnecting(t *testing.T) {
+	t.Parallel()
+
+	for name, typed := range map[string][]string{
+		"at once":         {"BYE"},
+		"after giving up": {"XYZZY", "BYE"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var n, link = connected(t)
+
+			typeLine(n, "C "+farCall)
+
+			for _, line := range typed {
+				typeLine(n, line)
+			}
+
+			assert.Equal(t, []string{farCall, userCall}, link.disconnects)
+		})
+	}
+}
+
+// Regression test: part of a line sent after CONNECT, in the same frame, was
+// kept, and run into the first line typed back at the node.
+func TestConnectDropsPartLine(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("C Q3TEST\rXY"))
+	n.LinkTerminated(testChannel, testClient, farCall, nodeCall, true)
+	typeLine(n, "BYE")
+
+	assert.Equal(t, []string{userCall}, link.disconnects)
+}
+
+// Regression test: the data link says a link is established, as though the
+// far end had connected to us, when the far end resets it - which made a
+// downlink a session of its own, greeted as a user, and left it there.
+func TestDownlinkReset(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connectedOnward(t)
+
+	n.LinkEstablished(testChannel, testClient, farCall, nodeCall, true)
+	n.RecConnData(testChannel, testClient, farCall, nodeCall, ax25.PIDNoLayer3, []byte("BYE\r"))
+
+	assert.Equal(t, []sent{{channel: testChannel, from: nodeCall, to: userCall, data: "BYE\r"}}, link.sent)
+	assert.Empty(t, link.disconnects)
+
+	link.reset()
+	n.LinkTerminated(testChannel, testClient, farCall, nodeCall, false)
+	typeLine(n, "C "+farCall)
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Disconnected from Q3TEST\r"+
+		"SAMNOD:Q1TEST-7} Trying Q3TEST on port 1\r", link.output())
+}
+
+// A user's link reset while they are connected onward leaves them so.
+func TestUserResetWhileConnectedOnward(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connectedOnward(t)
+
+	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
+	typeLine(n, "hello")
+
+	assert.Equal(t, []sent{{channel: testChannel, from: nodeCall, to: farCall, data: "hello\r"}}, link.sent)
+}
+
+func TestConnectedPassesDataBothWays(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connectedOnward(t)
+
+	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("BYE\rhello"))
+	n.RecConnData(testChannel, testClient, farCall, nodeCall, ax25.PIDNoLayer3, []byte("hi there\r"))
+
+	assert.Equal(t, []sent{
+		{channel: testChannel, from: nodeCall, to: farCall, data: "BYE\rhello"},
+		{channel: testChannel, from: nodeCall, to: userCall, data: "hi there\r"},
+	}, link.sent)
+	assert.Empty(t, link.disconnects)
+}
+
+func TestDownlinkDisconnectReturnsToNode(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connectedOnward(t)
+
+	n.LinkTerminated(testChannel, testClient, farCall, nodeCall, false)
+	typeLine(n, "XYZZY")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Disconnected from Q3TEST\r"+invalidCommand, link.output())
+
+	// And the station can be connected to again.
+	link.reset()
+	typeLine(n, "C "+farCall)
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Trying Q3TEST on port 1\r", link.output())
+}
+
+func TestConnectFails(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		timeout bool
+		want    string
+	}{
+		{"no answer", true, "Failure with Q3TEST - no answer"},
+		{"refused", false, "Failure with Q3TEST - busy"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var n, link = connected(t)
+
+			typeLine(n, "C "+farCall)
+			link.reset()
+
+			n.LinkTerminated(testChannel, testClient, farCall, nodeCall, tc.timeout)
+			typeLine(n, "XYZZY")
+
+			assert.Equal(t, "SAMNOD:Q1TEST-7} "+tc.want+"\r"+invalidCommand, link.output())
+		})
+	}
+}
+
+// What a station that is not the node's to talk to sends is not taken for a
+// user's.
+func TestUnknownLinkIgnored(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	n.RecConnData(testChannel, testClient, farCall, nodeCall, ax25.PIDNoLayer3, []byte("BYE\r"))
+	n.LinkEstablished(testChannel, testClient, farCall, nodeCall, false)
+	n.LinkTerminated(testChannel, testClient, farCall, nodeCall, false)
+
+	assert.Empty(t, link.sent)
+	assert.Empty(t, link.disconnects)
+}
+
+// Regression test: part of a line typed while the downlink came up was kept,
+// and run into the first line typed back at the node.
+func TestPartLineWhileConnectingDropped(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	typeLine(n, "C "+farCall)
+	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("XY"))
+	n.LinkEstablished(testChannel, testClient, farCall, nodeCall, false)
+	n.LinkTerminated(testChannel, testClient, farCall, nodeCall, false)
+	typeLine(n, "BYE")
+
+	assert.Equal(t, []string{userCall}, link.disconnects)
+}
+
+// Regression test: a downlink given up on could still come up - the far
+// end's SABM crossing our DISC - and what it sent then reached the user,
+// back at the node.
+func TestCancelledDownlinkComingUpAnyway(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	typeLine(n, "C "+farCall)
+	typeLine(n, "XYZZY")
+	link.reset()
+
+	n.LinkEstablished(testChannel, testClient, farCall, nodeCall, true)
+	n.RecConnData(testChannel, testClient, farCall, nodeCall, ax25.PIDNoLayer3, []byte("hello\r"))
+
+	assert.Empty(t, link.output())
+	assert.Equal(t, []string{farCall, farCall}, link.disconnects)
+}
+
+// Regression test: the protocol ID of what crossed the bridge was dropped,
+// and everything sent on as plain text.
+func TestConnectedPassesPID(t *testing.T) {
+	t.Parallel()
+
+	const pidNetROM = 0xcf
+
+	var n, link = connectedOnward(t)
+
+	n.RecConnData(testChannel, testClient, userCall, nodeCall, pidNetROM, []byte("up"))
+	n.RecConnData(testChannel, testClient, farCall, nodeCall, pidNetROM, []byte("down"))
+
+	assert.Equal(t, []int{pidNetROM, pidNetROM}, link.pids)
 }
