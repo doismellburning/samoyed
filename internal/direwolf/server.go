@@ -1087,9 +1087,7 @@ func (s *AGWServer) connectedModeAllowed(portx byte) bool {
 		return int(portx) < MAX_RADIO_CHANS
 	}
 
-	var m = s.audioConfigP.chan_medium[portx]
-
-	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC || m == MediumSerialTNC || m == MEDIUM_AXUDP
+	return s.audioConfigP.connectedModeAllowed(int(portx))
 }
 
 /*-------------------------------------------------------------------

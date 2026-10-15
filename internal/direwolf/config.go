@@ -38,6 +38,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/touchtone"
@@ -164,6 +165,10 @@ type misc_config_s struct {
 
 	web_port int /* TCP Port number for the read-only web dashboard and map. */
 	/* 0 (default) disables it. */
+
+	// node is the node shell's settings, or Nothing (the default) for no
+	// node shell.
+	node maybe.Maybe[nodeSettings]
 
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.
@@ -2106,6 +2111,128 @@ func (ps *parseState) applyMYCALL(call string) error {
 	}
 
 	return nil
+}
+
+// applyNODE checks the node shell's settings and turns it on.
+func (ps *parseState) applyNODE(settings NodeSettings) error {
+	var address, ok = nodeAddress(settings.Address)
+	if !ok {
+		return fmt.Errorf("line %d: Invalid address %q for node", ps.line, settings.Address)
+	}
+
+	var alias string
+
+	if settings.Alias != "" {
+		alias, ok = nodeAddress(settings.Alias)
+		if !ok {
+			return fmt.Errorf("line %d: Invalid alias %q for node", ps.line, settings.Alias)
+		}
+
+		if alias == address {
+			return fmt.Errorf("line %d: Node alias %s is the same as its address", ps.line, alias)
+		}
+	}
+
+	var channels = settings.Channels
+
+	var listensOn = channels
+	if listensOn == nil {
+		listensOn = ps.audio.connectedModeChannels()
+	}
+
+	if len(listensOn) == 0 {
+		return fmt.Errorf("line %d: No channels for the node to listen on", ps.line)
+	}
+
+	// Whether connected mode can be used on each waits for nodeConfig,
+	// since the command line can still make one a radio channel.
+	for i, c := range channels {
+		if c < 0 || c >= MAX_TOTAL_CHANS {
+			return fmt.Errorf("line %d: Invalid channel %d for node. Must be in range of 0 to %d", ps.line, c, MAX_TOTAL_CHANS-1)
+		}
+
+		if slices.Contains(channels[:i], c) {
+			return fmt.Errorf("line %d: Node channel %d is given more than once", ps.line, c)
+		}
+	}
+
+	ps.misc.node = maybe.Just(nodeSettings{
+		address:  address,
+		alias:    alias,
+		channels: slices.Clone(channels),
+		line:     ps.line,
+	})
+
+	return nil
+}
+
+// nodeSettings is the node shell as the configuration file describes it.
+type nodeSettings struct {
+	address string
+	alias   string
+
+	// channels are the channels the node listens on, or nil for every
+	// channel connected mode can be used on.  The command line can still
+	// add one of those after the file is read, so which they are, and
+	// whether connected mode can be used on those given, waits for
+	// nodeConfig.
+	channels []int
+
+	// line is where the file gave these settings, for complaints.
+	line int
+}
+
+// connectedModeChannels are the channels connected mode can be used on.
+func (c *RadioConfig) connectedModeChannels() []int {
+	var channels []int
+
+	for channel := range MAX_TOTAL_CHANS {
+		if c.connectedModeAllowed(channel) {
+			channels = append(channels, channel)
+		}
+	}
+
+	return channels
+}
+
+// nodeConfig is the node shell's configuration for settings, with the
+// channels as they are now, or what is wrong with them.
+func (c *RadioConfig) nodeConfig(settings nodeSettings) (node.Config, error) {
+	var channels = settings.channels
+	if channels == nil {
+		channels = c.connectedModeChannels()
+	}
+
+	for _, channel := range channels {
+		if !c.connectedModeAllowed(channel) {
+			var none node.Config
+
+			return none, fmt.Errorf("line %d: Node can't listen on channel %d, which is not a channel connected mode can be used on",
+				settings.line, channel)
+		}
+	}
+
+	return node.Config{
+		Address:  settings.address,
+		Alias:    settings.alias,
+		Channels: slices.Clone(channels),
+	}, nil
+}
+
+// nodeAddress is addr written as the data link writes addresses - upper case,
+// with no SSID when it is 0 - which is how it must be for the data link to
+// recognise a connection to it.  ok is false if it is not a valid address.
+func nodeAddress(addr string) (string, bool) {
+	var call, ssid, _, ok = ax25.ParseAddr(-1, strings.ToUpper(addr), ax25.AddrStrictNoStar)
+	if !ok || call == "" {
+		return "", false
+	}
+
+	if ssid != 0 {
+		call += fmt.Sprintf("-%d", ssid)
+	}
+
+	return call, true
 }
 
 // dropEASProfile clears the demodulator profile EAS brings with it, for a

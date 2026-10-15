@@ -374,3 +374,16 @@ func (c *RadioConfig) digipeaterPorts() [MAX_TOTAL_CHANS]digipeater.Port {
 
 	return ports
 }
+
+// connectedModeAllowed reports whether AX.25 connected mode can be used on
+// channel: one that reaches the air, through our own modem, a network or
+// serial TNC, or AXUDP.
+func (c *RadioConfig) connectedModeAllowed(channel int) bool {
+	if channel < 0 || channel >= MAX_TOTAL_CHANS {
+		return false
+	}
+
+	var m = c.chan_medium[channel]
+
+	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC || m == MediumSerialTNC || m == MEDIUM_AXUDP
+}
