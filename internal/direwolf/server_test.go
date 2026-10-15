@@ -1044,3 +1044,57 @@ func TestCmdListenThread_HangUpMidHeaderIsAnError(t *testing.T) {
 	assert.Equal(t, 0, hook.LastEntry().Data["client"])
 	assert.ErrorIs(t, hook.LastEntry().Data[logrus.ErrorKey].(error), io.ErrUnexpectedEOF) //nolint:forcetypeassert // The test fails either way.
 }
+
+// Taking on a client is logged at Info, once, as is the accept loop getting
+// ready for each one - which on startup says the port is open.
+func TestConnectListenThread_AttachingAClientIsLoggedOnce(t *testing.T) {
+	var s, err = NewAGWServer(t.Context(), "127.0.0.1:0", nil, new(misc_config_s), nil, nil, 0)
+	require.NoError(t, err)
+
+	t.Cleanup(s.Close)
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	var ctx, cancel = context.WithCancel(t.Context())
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		s.connectListenThread(ctx, s.listener)
+	}()
+
+	var conn, dialErr = new(net.Dialer).DialContext(t.Context(), "tcp", s.Addr().String())
+	require.NoError(t, dialErr)
+
+	t.Cleanup(func() { conn.Close() })
+
+	require.Eventually(t, func() bool { return s.clientConn(0) != nil },
+		5*time.Second, 10*time.Millisecond, "the client was never attached")
+
+	cancel()
+	<-done
+
+	var entries = hook.AllEntries()
+	require.NotEmpty(t, entries)
+
+	var ready = entries[0]
+	assert.Equal(t, logrus.InfoLevel, ready.Level)
+	assert.Contains(t, ready.Message, "Ready to accept")
+	assert.Equal(t, 0, ready.Data["client"])
+
+	var attached []*logrus.Entry
+
+	for _, entry := range entries {
+		assert.Equal(t, logrus.InfoLevel, entry.Level, "logged at %v: %q", entry.Level, entry.Message)
+
+		if strings.Contains(entry.Message, "Attached") {
+			attached = append(attached, entry)
+		}
+	}
+
+	require.Len(t, attached, 1)
+	assert.Equal(t, 0, attached[0].Data["client"])
+}

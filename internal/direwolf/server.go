@@ -1122,8 +1122,8 @@ func (s *AGWServer) connectListenThread(ctx context.Context, listener net.Listen
 		var client = s.findFreeClient()
 
 		if client >= 0 {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Ready to accept AGW client application %d on port %d ...\n", client, server_port)
+			logrus.WithFields(logrus.Fields{"client": client, "port": server_port}).
+				Info("Ready to accept AGW client application")
 
 			var conn, acceptErr = listener.Accept()
 			if acceptErr != nil {
@@ -1131,7 +1131,7 @@ func (s *AGWServer) connectListenThread(ctx context.Context, listener net.Listen
 					return // We closed the listener ourselves on the way out.
 				}
 
-				dw_printf("Accept failed: %v\n", acceptErr)
+				logrus.WithError(acceptErr).Error("Accept failed")
 
 				continue
 			}
@@ -1148,8 +1148,8 @@ func (s *AGWServer) connectListenThread(ctx context.Context, listener net.Listen
 
 			s.clientAccepted(client, conn)
 
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("\nAttached to AGW client application %d...\n\n", client)
+			logrus.WithFields(logrus.Fields{"client": client, "address": conn.RemoteAddr()}).
+				Info("Attached to AGW client application")
 		} else if !dwutil.SleepSecCtx(ctx, 1) { /* wait then check again if more clients allowed. */
 			return
 		}
