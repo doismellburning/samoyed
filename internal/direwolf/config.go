@@ -2157,10 +2157,11 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 	}
 
 	ps.misc.node = maybe.Just(nodeSettings{
-		address:  address,
-		alias:    alias,
-		channels: slices.Clone(channels),
-		line:     ps.line,
+		address:     address,
+		alias:       alias,
+		channels:    slices.Clone(channels),
+		line:        ps.line,
+		infoMessage: settings.InfoMessage,
 	})
 
 	return nil
@@ -2180,6 +2181,8 @@ type nodeSettings struct {
 
 	// line is where the file gave these settings, for complaints.
 	line int
+
+	infoMessage string
 }
 
 // connectedModeChannels are the channels connected mode can be used on.
@@ -2213,9 +2216,10 @@ func (c *RadioConfig) nodeConfig(settings nodeSettings) (node.Config, error) {
 	}
 
 	return node.Config{
-		Address:  settings.address,
-		Alias:    settings.alias,
-		Channels: slices.Clone(channels),
+		Address:     settings.address,
+		Alias:       settings.alias,
+		Channels:    slices.Clone(channels),
+		InfoMessage: settings.infoMessage,
 	}, nil
 }
 

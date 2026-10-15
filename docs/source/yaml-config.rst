@@ -239,6 +239,10 @@ These are the keys under ``samoyed``:
         Left out, it is every channel connected mode can be used on:
         radio channels, network and serial TNCs, and AXUDP ports.
 
+    ``infoMessage``
+        What ``INFO`` says about the node.
+        Use ``|`` for several lines.
+
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
     Its commands are:
@@ -249,6 +253,9 @@ These are the keys under ``samoyed``:
     ``HELP`` (``H``, ``?``)
         List the commands.
 
+    ``INFO`` (``I``)
+        Say what ``infoMessage`` says.
+
     A line of more than 256 characters is ignored.
 
     .. code:: yaml
@@ -258,6 +265,8 @@ These are the keys under ``samoyed``:
             address: Q1TEST-7
             alias: SAMNOD
             channels: [0, 10]
+            infoMessage: |
+              Samoyed node at the club station.
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

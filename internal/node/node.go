@@ -45,6 +45,10 @@ type Config struct {
 
 	// Channels are the channels the node accepts connections on.
 	Channels []int
+
+	// InfoMessage is what INFO tells a user about the node, or empty for a
+	// line saying what it is.  It may run to several lines.
+	InfoMessage string
 }
 
 // linkKey identifies a link the node is answering, as the data link does.
@@ -226,6 +230,7 @@ func commands() []command {
 	return []command{
 		{names: []string{"BYE", "B", "QUIT", "Q"}, help: "Disconnect", run: (*Node).bye},
 		{names: []string{"HELP", "H", "?"}, help: "List the commands", run: (*Node).help},
+		{names: []string{"INFO", "I"}, help: "About this node", run: (*Node).info},
 	}
 }
 
@@ -264,6 +269,24 @@ func (n *Node) help(key linkKey, _ []string) bool {
 	}
 
 	n.send(key, []byte(b.String()))
+
+	return true
+}
+
+// info tells the user about the node.
+func (n *Node) info(key linkKey, _ []string) bool {
+	var text = n.config.InfoMessage
+	if text == "" {
+		text = n.identity() + " is a Samoyed node"
+	}
+
+	// However the configuration file ended its lines, a packet terminal
+	// wants CR.
+	text = strings.ReplaceAll(text, "\r\n", "\r")
+	text = strings.ReplaceAll(text, "\n", "\r")
+	text = strings.TrimRight(text, "\r")
+
+	n.send(key, []byte(n.prompt()+text+"\r"))
 
 	return true
 }

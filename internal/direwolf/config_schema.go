@@ -154,4 +154,7 @@ type NodeSettings struct {
 	// Channels are the channels the node accepts connections on.  Left
 	// out, it is every channel connected mode can be used on.
 	Channels []int `yaml:"channels"`
+
+	// InfoMessage is what the INFO command says about the node.
+	InfoMessage string `yaml:"infoMessage"`
 }

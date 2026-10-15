@@ -87,8 +87,15 @@ func (f *fakeLink) reset() {
 func connected(t *testing.T) (*Node, *fakeLink) {
 	t.Helper()
 
+	return connectedWith(t, Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}, InfoMessage: ""})
+}
+
+// connectedWith is connected, for a node configured as config.
+func connectedWith(t *testing.T, config Config) (*Node, *fakeLink) {
+	t.Helper()
+
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}}, link, testClient)
+	var n = New(config, link, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 	link.reset()
@@ -100,7 +107,7 @@ func TestStartRegistersCallsignAndAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{0, 2}}, link, testClient)
+	var n = New(Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{0, 2}, InfoMessage: ""}, link, testClient)
 
 	n.Start()
 
@@ -111,7 +118,7 @@ func TestStartWithoutAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: "", Channels: []int{0}}, link, testClient)
+	var n = New(Config{Address: nodeCall, Alias: "", Channels: []int{0}, InfoMessage: ""}, link, testClient)
 
 	n.Start()
 
@@ -122,7 +129,7 @@ func TestGreeting(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}}, link, testClient)
+	var n = New(Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}, InfoMessage: ""}, link, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 
@@ -134,7 +141,7 @@ func TestGreetingWithoutAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: "", Channels: []int{testChannel}}, link, testClient)
+	var n = New(Config{Address: nodeCall, Alias: "", Channels: []int{testChannel}, InfoMessage: ""}, link, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 
@@ -147,7 +154,7 @@ func TestAnswersFromTheCallsignConnectedTo(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}}, link, testClient)
+	var n = New(Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}, InfoMessage: ""}, link, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeAlias, true)
 	n.RecConnData(testChannel, testClient, userCall, nodeAlias, ax25.PIDNoLayer3, []byte("XYZZY\r"))
@@ -160,7 +167,7 @@ func TestOutgoingLinkIsNotASession(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(Config{Address: nodeCall, Alias: "", Channels: []int{testChannel}}, link, testClient)
+	var n = New(Config{Address: nodeCall, Alias: "", Channels: []int{testChannel}, InfoMessage: ""}, link, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, false)
 	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("XYZZY\r"))
@@ -379,7 +386,31 @@ func TestHelp(t *testing.T) {
 
 			assert.Equal(t, "SAMNOD:Q1TEST-7} Commands:\r"+
 				"  BYE, B, QUIT, Q - Disconnect\r"+
-				"  HELP, H, ? - List the commands\r", link.output())
+				"  HELP, H, ? - List the commands\r"+
+				"  INFO, I - About this node\r", link.output())
+		})
+	}
+}
+
+func TestInfo(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name, info, want string
+	}{
+		{"none", "", "SAMNOD:Q1TEST-7} SAMNOD:Q1TEST-7 is a Samoyed node\r"},
+		{"one line", "Test node", "SAMNOD:Q1TEST-7} Test node\r"},
+		{"LF lines", "Test node\nin a test\n", "SAMNOD:Q1TEST-7} Test node\rin a test\r"},
+		{"CR LF lines", "Test node\r\nin a test\r\n", "SAMNOD:Q1TEST-7} Test node\rin a test\r"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var n, link = connectedWith(t, Config{Address: nodeCall, Alias: nodeAlias, Channels: []int{testChannel}, InfoMessage: tc.info})
+
+			n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("i\r"))
+
+			assert.Equal(t, tc.want, link.output())
 		})
 	}
 }
