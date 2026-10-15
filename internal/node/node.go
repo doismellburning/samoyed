@@ -12,6 +12,8 @@ package node
 
 import (
 	"bytes"
+	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -205,21 +207,65 @@ func (s *session) take(data []byte) [][]byte {
 	return lines
 }
 
+// command is one of the shell's commands.
+type command struct {
+	// names are what the command can be typed as, the full name first.
+	names []string
+
+	// help says what it does, for HELP.
+	help string
+
+	// run carries it out for the user on the link key names, with the
+	// words typed after its name, and says whether the session is still
+	// there for another command.
+	run func(n *Node, key linkKey, args []string) bool
+}
+
+// commands are the shell's commands, in the order HELP lists them.
+func commands() []command {
+	return []command{
+		{names: []string{"BYE", "B", "QUIT", "Q"}, help: "Disconnect", run: (*Node).bye},
+		{names: []string{"HELP", "H", "?"}, help: "List the commands", run: (*Node).help},
+	}
+}
+
 // command carries out one command line, and says whether the session is
 // still there for another.
 func (n *Node) command(key linkKey, line string) bool {
 	var words = strings.Fields(line)
+	var name = strings.ToUpper(words[0])
 
-	switch strings.ToUpper(words[0]) {
-	case "B", "BYE", "Q", "QUIT":
-		n.disconnect(key)
-
-		return false
-	default:
-		n.send(key, []byte(n.prompt()+"Invalid command\r"))
-
-		return true
+	for _, c := range commands() {
+		if slices.Contains(c.names, name) {
+			return c.run(n, key, words[1:])
+		}
 	}
+
+	n.send(key, []byte(n.prompt()+"Invalid command - type ? for help\r"))
+
+	return true
+}
+
+// bye disconnects.
+func (n *Node) bye(key linkKey, _ []string) bool {
+	n.disconnect(key)
+
+	return false
+}
+
+// help lists the commands.
+func (n *Node) help(key linkKey, _ []string) bool {
+	var b strings.Builder
+
+	b.WriteString(n.prompt() + "Commands:\r")
+
+	for _, c := range commands() {
+		fmt.Fprintf(&b, "  %s - %s\r", strings.Join(c.names, ", "), c.help)
+	}
+
+	n.send(key, []byte(b.String()))
+
+	return true
 }
 
 // identity is how the node names itself: ALIAS:CALLSIGN, or the callsign

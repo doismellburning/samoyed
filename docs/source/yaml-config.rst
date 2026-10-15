@@ -241,7 +241,14 @@ These are the keys under ``samoyed``:
 
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
-    ``BYE`` (or ``B``, ``QUIT``, ``Q``) disconnects.
+    Its commands are:
+
+    ``BYE`` (``B``, ``QUIT``, ``Q``)
+        Disconnect.
+
+    ``HELP`` (``H``, ``?``)
+        List the commands.
+
     A line of more than 256 characters is ignored.
 
     .. code:: yaml
