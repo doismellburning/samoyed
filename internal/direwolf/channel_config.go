@@ -1,6 +1,8 @@
 package direwolf
 
 import (
+	"fmt"
+
 	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/il2p"
@@ -386,4 +388,22 @@ func (c *RadioConfig) connectedModeAllowed(channel int) bool {
 	var m = c.chan_medium[channel]
 
 	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC || m == MediumSerialTNC || m == MEDIUM_AXUDP
+}
+
+// describeChannel says what sort of channel channel is, for the node shell's
+// list of ports.  It is shown to anyone who connects, so it says no more than
+// that: not where a TNC is, nor what device it is on.
+func (c *RadioConfig) describeChannel(channel int) string {
+	switch c.chan_medium[channel] {
+	case MEDIUM_RADIO:
+		return fmt.Sprintf("Radio, %d bps", c.achan[channel].baud)
+	case MEDIUM_NETTNC:
+		return "Network TNC"
+	case MediumSerialTNC:
+		return "Serial TNC"
+	case MEDIUM_AXUDP:
+		return "AXUDP"
+	default:
+		return "Unknown"
+	}
 }
