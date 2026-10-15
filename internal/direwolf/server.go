@@ -118,6 +118,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -1121,8 +1122,8 @@ func (s *AGWServer) connectListenThread(ctx context.Context, listener net.Listen
 		var client = s.findFreeClient()
 
 		if client >= 0 {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Ready to accept AGW client application %d on port %d ...\n", client, server_port)
+			logrus.WithFields(logrus.Fields{"client": client, "port": server_port}).
+				Info("Ready to accept AGW client application")
 
 			var conn, acceptErr = listener.Accept()
 			if acceptErr != nil {
@@ -1130,7 +1131,7 @@ func (s *AGWServer) connectListenThread(ctx context.Context, listener net.Listen
 					return // We closed the listener ourselves on the way out.
 				}
 
-				dw_printf("Accept failed: %v\n", acceptErr)
+				logrus.WithError(acceptErr).Error("Accept failed")
 
 				continue
 			}
@@ -1147,8 +1148,8 @@ func (s *AGWServer) connectListenThread(ctx context.Context, listener net.Listen
 
 			s.clientAccepted(client, conn)
 
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("\nAttached to AGW client application %d...\n\n", client)
+			logrus.WithFields(logrus.Fields{"client": client, "address": conn.RemoteAddr()}).
+				Info("Attached to AGW client application")
 		} else if !dwutil.SleepSecCtx(ctx, 1) { /* wait then check again if more clients allowed. */
 			return
 		}
@@ -1308,9 +1309,17 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 				return
 			}
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nError getting message header from AGW client application %d: %s\n", client, readErr)
-			dw_printf("Closing connection.\n\n")
+			// binary.Read gives io.EOF only when not one byte of the header
+			// arrived: the client hung up between messages, as an ordinary
+			// client does when it has finished, or as one checking the port
+			// is there does straight away.
+			if errors.Is(readErr, io.EOF) {
+				logrus.WithField("client", client).Info("AGW client application disconnected")
+			} else {
+				logrus.WithField("client", client).WithError(readErr).
+					Error("Error getting message header from AGW client application; closing connection")
+			}
+
 			s.detachClient(client, conn)
 
 			continue
