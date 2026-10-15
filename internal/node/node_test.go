@@ -20,6 +20,8 @@ const (
 	nodeCall    = "Q1TEST-7"
 	nodeAlias   = "SAMNOD"
 	userCall    = "Q2TEST"
+
+	invalidCommand = "SAMNOD:Q1TEST-7} Invalid command - type ? for help\r"
 )
 
 // sent is a frame of data the node asked the data link to send.
@@ -173,7 +175,7 @@ func TestInvalidCommand(t *testing.T) {
 
 	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("XYZZY\r"))
 
-	assert.Equal(t, "SAMNOD:Q1TEST-7} Invalid command\r", link.output())
+	assert.Equal(t, invalidCommand, link.output())
 }
 
 func TestBye(t *testing.T) {
@@ -234,7 +236,7 @@ func TestLineEndings(t *testing.T) {
 
 			n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte(input))
 
-			assert.Equal(t, "SAMNOD:Q1TEST-7} Invalid command\r", link.output())
+			assert.Equal(t, invalidCommand, link.output())
 		})
 	}
 }
@@ -268,7 +270,7 @@ func TestSeveralLinesInOneFrame(t *testing.T) {
 
 	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("ONE\rTWO\r"))
 
-	assert.Equal(t, strings.Repeat("SAMNOD:Q1TEST-7} Invalid command\r", 2), link.output())
+	assert.Equal(t, strings.Repeat(invalidCommand, 2), link.output())
 }
 
 // A line too long to hold is dropped whole - none of it is taken as a
@@ -297,7 +299,7 @@ func TestLongestLineAccepted(t *testing.T) {
 
 	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte(strings.Repeat("X", maxLineLen)+"\r"))
 
-	assert.Equal(t, "SAMNOD:Q1TEST-7} Invalid command\r", link.output())
+	assert.Equal(t, invalidCommand, link.output())
 }
 
 func TestTerminatedSessionIsForgotten(t *testing.T) {
@@ -359,7 +361,25 @@ func TestOverlongLineAnsweredInTurn(t *testing.T) {
 
 	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte(input))
 
-	assert.Equal(t, "SAMNOD:Q1TEST-7} Invalid command\r"+
+	assert.Equal(t, invalidCommand+
 		"SAMNOD:Q1TEST-7} Line too long\r"+
-		"SAMNOD:Q1TEST-7} Invalid command\r", link.output())
+		invalidCommand, link.output())
+}
+
+func TestHelp(t *testing.T) {
+	t.Parallel()
+
+	for _, command := range []string{"HELP", "h", "?"} {
+		t.Run(command, func(t *testing.T) {
+			t.Parallel()
+
+			var n, link = connected(t)
+
+			n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte(command+"\r"))
+
+			assert.Equal(t, "SAMNOD:Q1TEST-7} Commands:\r"+
+				"  BYE, B, QUIT, Q - Disconnect\r"+
+				"  HELP, H, ? - List the commands\r", link.output())
+		})
+	}
 }

@@ -134,7 +134,7 @@ pids+=("$!")
 wait_for_tcp_port "$agw_b"
 
 python3 -I agw-client.py "$agw_b" Q1TEST-7 \
-	XYZZY 'SAMNOD:Q1TEST-7} Invalid command\r' \
+	XYZZY 'SAMNOD:Q1TEST-7} Invalid command - type ? for help\r' \
 	BYE disconnect
 
 python3 -I agw-client.py "$agw_b" SAMNOD \
