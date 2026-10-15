@@ -2161,6 +2161,7 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		alias:    alias,
 		channels: slices.Clone(channels),
 		line:     ps.line,
+		info:     settings.Info,
 	})
 
 	return nil
@@ -2180,6 +2181,8 @@ type nodeSettings struct {
 
 	// line is where the file gave these settings, for complaints.
 	line int
+
+	info string
 }
 
 // connectedModeChannels are the channels connected mode can be used on.
@@ -2216,6 +2219,7 @@ func (c *RadioConfig) nodeConfig(settings nodeSettings) (node.Config, error) {
 		Address:  settings.address,
 		Alias:    settings.alias,
 		Channels: slices.Clone(channels),
+		Info:     settings.info,
 	}, nil
 }
 

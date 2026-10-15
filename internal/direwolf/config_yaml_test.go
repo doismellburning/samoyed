@@ -372,12 +372,12 @@ legacy: |
 	})
 
 	t.Run("the node listens on every connected mode channel by default", func(t *testing.T) {
-		var c = parseYAMLConfig(t, "axudpPorts:\n  - {port: 20093, channel: 10}\nnode:\n  address: q1test-7\n  alias: samnod\n")
+		var c = parseYAMLConfig(t, "axudpPorts:\n  - {port: 20093, channel: 10}\nnode:\n  address: q1test-7\n  alias: samnod\n  info: |\n    Test node\n    in a test\n")
 		assert.Zero(t, c.errors, c.output)
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, node.Config{Address: "Q1TEST-7", Alias: "SAMNOD", Channels: []int{0, 10}}, mustNodeConfig(t, c.audio, got))
+		assert.Equal(t, node.Config{Address: "Q1TEST-7", Alias: "SAMNOD", Channels: []int{0, 10}, Info: "Test node\nin a test\n"}, mustNodeConfig(t, c.audio, got))
 	})
 
 	t.Run("the node listens on the channels it is given", func(t *testing.T) {
@@ -386,7 +386,7 @@ legacy: |
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, node.Config{Address: "Q1TEST", Alias: "", Channels: []int{10}}, mustNodeConfig(t, c.audio, got))
+		assert.Equal(t, node.Config{Address: "Q1TEST", Alias: "", Channels: []int{10}, Info: ""}, mustNodeConfig(t, c.audio, got))
 	})
 
 	// Regression test: the default channels were settled while the file was
