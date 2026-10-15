@@ -198,8 +198,20 @@ func (n *Node) LinkTerminated(channel int, _ int, remoteCall string, ownCall str
 		return
 	}
 
+	var s = n.sessions[key]
 	delete(n.sessions, key)
+
+	var down *linkKey
+	if s != nil {
+		down = s.downlink
+	}
+
 	n.mu.Unlock()
+
+	// A user who goes takes their downlink with them.
+	if down != nil {
+		n.disconnect(*down)
+	}
 }
 
 // RecConnData is handed what a station sent.  What a user sends the node is
@@ -213,7 +225,7 @@ func (n *Node) RecConnData(channel int, _ int, remoteCall string, ownCall string
 	n.mu.Lock()
 
 	if up, ok := n.downlinks[key]; ok {
-		var s = n.sessions[up]
+		var s = n.downlinkUserLocked(key)
 
 		// Not for a user who gave up on it, and is back at the node.
 		var forward = s != nil && !s.cancelled
@@ -466,16 +478,34 @@ func (n *Node) connectArgs(args []string) (int, string, string) {
 	return channel, call, ""
 }
 
+// downlinkUserLocked is the session of the user the downlink key names is
+// for, or nil if that user has gone.  The caller holds n.mu.
+func (n *Node) downlinkUserLocked(key linkKey) *session {
+	var up, ok = n.downlinks[key]
+	if !ok {
+		return nil
+	}
+
+	// A user who went and came back has a new session, which this
+	// downlink is not for.
+	var s = n.sessions[up]
+	if s == nil || s.downlink == nil || *s.downlink != key {
+		return nil
+	}
+
+	return s
+}
+
 // downlinkEstablished is told the downlink key names is up.
 func (n *Node) downlinkEstablished(key linkKey) {
 	n.mu.Lock()
 
-	var up, ok = n.downlinks[key]
+	var up, isDownlink = n.downlinks[key]
 
-	var s = n.sessions[up]
+	var s = n.downlinkUserLocked(key)
 
 	// Only the first time: the far end can reset it once it is up.
-	var announce = ok && s != nil && !s.connected && !s.cancelled
+	var announce = s != nil && !s.connected && !s.cancelled
 	if announce {
 		s.connected = true
 
@@ -485,8 +515,9 @@ func (n *Node) downlinkEstablished(key linkKey) {
 		s.overlong = false
 	}
 
-	// Given up on, but up anyway: the far end's SABM crossed our DISC.
-	var unwanted = ok && s != nil && s.cancelled
+	// Its user gave up on it, or went, while it was coming up - it can
+	// come up all the same, the far end's SABM crossing our DISC.
+	var unwanted = isDownlink && (s == nil || s.cancelled)
 
 	n.mu.Unlock()
 
@@ -505,9 +536,9 @@ func (n *Node) downlinkTerminated(key linkKey, timeout bool) {
 	n.mu.Lock()
 
 	var up = n.downlinks[key]
-	delete(n.downlinks, key)
+	var s = n.downlinkUserLocked(key)
 
-	var s = n.sessions[up]
+	delete(n.downlinks, key)
 
 	var wasConnected, cancelled bool
 

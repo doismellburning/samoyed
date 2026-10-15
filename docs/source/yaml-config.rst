@@ -255,7 +255,8 @@ These are the keys under ``samoyed``:
         The channel can be left out when the node has only one.
         Typing a line before it connects gives up on it.
         Once connected, everything sent goes to and from the station as it is;
-        when the station disconnects, the user is back at the node.
+        when the station disconnects, the user is back at the node,
+        and when the user disconnects, so does the station.
 
     ``HELP`` (``H``, ``?``)
         List the commands.

@@ -882,3 +882,62 @@ func TestConnectedPassesPID(t *testing.T) {
 
 	assert.Equal(t, []int{pidNetROM, pidNetROM}, link.pids)
 }
+
+func TestUserLeavingTakesDownlink(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connectedOnward(t)
+
+	n.LinkTerminated(testChannel, testClient, userCall, nodeCall, false)
+
+	assert.Equal(t, []string{farCall}, link.disconnects)
+
+	// When the downlink goes too, nobody is left to tell.
+	n.LinkTerminated(testChannel, testClient, farCall, nodeCall, false)
+
+	assert.Empty(t, link.output())
+}
+
+func TestUserLeavingWhileConnecting(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	typeLine(n, "C "+farCall)
+	link.reset()
+
+	n.LinkTerminated(testChannel, testClient, userCall, nodeCall, false)
+
+	assert.Equal(t, []string{farCall}, link.disconnects)
+
+	// The downlink may come up before the disconnect gets to it, which
+	// is no reason to tell anyone, or to leave it up.
+	n.LinkEstablished(testChannel, testClient, farCall, nodeCall, false)
+	n.RecConnData(testChannel, testClient, farCall, nodeCall, ax25.PIDNoLayer3, []byte("hello\r"))
+
+	assert.Empty(t, link.output())
+	assert.Equal(t, []string{farCall, farCall}, link.disconnects)
+}
+
+// A user who leaves and comes back while their old downlink is going down
+// is not handed what was meant for their old session.
+func TestUserReturningIsNotHandedOldDownlink(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connected(t)
+
+	typeLine(n, "C "+farCall)
+	n.LinkTerminated(testChannel, testClient, userCall, nodeCall, false)
+	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
+	link.reset()
+
+	n.LinkEstablished(testChannel, testClient, farCall, nodeCall, false)
+	n.RecConnData(testChannel, testClient, farCall, nodeCall, ax25.PIDNoLayer3, []byte("hello\r"))
+	n.LinkTerminated(testChannel, testClient, farCall, nodeCall, false)
+
+	assert.Empty(t, link.output())
+
+	// Back at the node, and free to connect again.
+	typeLine(n, "C "+farCall)
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Trying Q3TEST on port 1\r", link.output())
+}
