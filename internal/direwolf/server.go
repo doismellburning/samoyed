@@ -118,6 +118,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -1308,9 +1309,17 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 				return
 			}
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nError getting message header from AGW client application %d: %s\n", client, readErr)
-			dw_printf("Closing connection.\n\n")
+			// binary.Read gives io.EOF only when not one byte of the header
+			// arrived: the client hung up between messages, as an ordinary
+			// client does when it has finished, or as one checking the port
+			// is there does straight away.
+			if errors.Is(readErr, io.EOF) {
+				logrus.WithField("client", client).Info("AGW client application disconnected")
+			} else {
+				logrus.WithField("client", client).WithError(readErr).
+					Error("Error getting message header from AGW client application; closing connection")
+			}
+
 			s.detachClient(client, conn)
 
 			continue

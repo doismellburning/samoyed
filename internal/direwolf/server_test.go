@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -974,4 +975,72 @@ func TestAGWServerWithoutAListener(t *testing.T) {
 
 	s.Start(t.Context())
 	s.Close()
+}
+
+// --- A client going away ---
+
+// runCmdListenThread attaches conn to client slot 0 of s, runs its command
+// thread, and returns once something has detached it again and the thread has
+// stopped, with what was logged meanwhile.
+func runCmdListenThread(t *testing.T, s *AGWServer, conn net.Conn) *test.Hook {
+	t.Helper()
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	s.clientAccepted(0, conn)
+
+	var ctx, cancel = context.WithCancel(t.Context())
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		s.cmdListenThread(ctx, 0)
+	}()
+
+	require.Eventually(t, func() bool { return s.clientConn(0) == nil },
+		5*time.Second, 10*time.Millisecond, "the client was never detached")
+
+	cancel()
+	<-done
+
+	return hook
+}
+
+// A client that hangs up between messages has done nothing wrong: DAPPS, for
+// one, checks the AGW port is there by connecting and closing again every few
+// seconds.  That is an ordinary disconnect, not an error to report.
+func TestCmdListenThread_HangUpBetweenMessagesIsNotAnError(t *testing.T) {
+	var s = new(AGWServer)
+
+	var server, client = net.Pipe()
+	client.Close()
+
+	var hook = runCmdListenThread(t, s, server)
+
+	require.Len(t, hook.AllEntries(), 1)
+	assert.Equal(t, logrus.InfoLevel, hook.LastEntry().Level)
+	assert.Contains(t, hook.LastEntry().Message, "disconnected")
+	assert.Equal(t, 0, hook.LastEntry().Data["client"])
+}
+
+// One that hangs up partway through a header has, and is still reported.
+func TestCmdListenThread_HangUpMidHeaderIsAnError(t *testing.T) {
+	var s = new(AGWServer)
+
+	var server, client = net.Pipe()
+
+	go func() {
+		_, _ = client.Write([]byte{0, 0, 0})
+		client.Close()
+	}()
+
+	var hook = runCmdListenThread(t, s, server)
+
+	require.Len(t, hook.AllEntries(), 1)
+	assert.Equal(t, logrus.ErrorLevel, hook.LastEntry().Level)
+	assert.Equal(t, 0, hook.LastEntry().Data["client"])
+	assert.ErrorIs(t, hook.LastEntry().Data[logrus.ErrorKey].(error), io.ErrUnexpectedEOF) //nolint:forcetypeassert // The test fails either way.
 }
