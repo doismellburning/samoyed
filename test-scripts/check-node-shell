@@ -1,0 +1,143 @@
+#!/bin/bash
+
+# SPDX-FileCopyrightText: The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Two instances of samoyed-direwolf, joined by raw AFSK audio over UDP as in
+# check-udp-audio-connect.  A runs the node shell; an AGW client on B connects
+# to it over the air, by callsign and then by alias, and types at it.
+
+set -eu
+set -o pipefail
+
+source "$(dirname "$(realpath "$0")")/common"
+
+if ! command -v python3 > /dev/null; then
+	echo "FAIL: python3 not found, required for port allocation and the AGW client" >&2
+	exit 1
+fi
+
+goto_tmpdir
+
+pids=()
+
+# shellcheck disable=SC2317,SC2329 # cleanup is invoked indirectly via trap
+cleanup() {
+	local status=$?
+
+	if ((status != 0)); then
+		echo "--- FAILURE: dumping logs from $PWD for diagnosis ---" >&2
+
+		for log in direwolf-a.log direwolf-b.log; do
+			echo "--- $log ---" >&2
+			cat "$log" >&2 2> /dev/null || echo "(missing)" >&2
+		done
+	fi
+
+	for pid in "${pids[@]}"; do
+		kill "$pid" 2> /dev/null || true
+	done
+	wait 2> /dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+udp_a=$(free_port udp)
+udp_b=$(free_port udp "$udp_a")
+agw_b=$(free_port tcp "$udp_a" "$udp_b")
+
+cat > direwolf-a.yaml << EOF
+samoyed:
+  audioDevices:
+    - input: udp:$udp_a
+      output: udp:localhost:$udp_b
+  channels:
+    - {channel: 0, mycall: Q1TEST}
+  agwPort: 0
+  kissPorts: [{port: 0}]
+  node: {address: Q1TEST-7, alias: SAMNOD}
+EOF
+
+cat > direwolf-b.yaml << EOF
+samoyed:
+  audioDevices:
+    - input: udp:$udp_b
+      output: udp:localhost:$udp_a
+  channels:
+    - {channel: 0, mycall: Q2TEST}
+  agwPort: $agw_b
+  kissPorts: [{port: 0}]
+EOF
+
+# A minimal AGW client: connect from Q2TEST to the station named, check the
+# greeting, send each line after it, and check each reply - or, for BYE, that
+# the node hangs up.
+cat > agw-client.py << 'EOF'
+import socket
+import struct
+import sys
+
+HEADER = "<B3xBxBx10s10sI4x"
+
+
+def frame(kind, to=b"", data=b"", pid=0):
+    return struct.pack(HEADER, 0, ord(kind), pid, b"Q2TEST", to, len(data)) + data
+
+
+def read_exactly(sock, n):
+    buf = b""
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            sys.exit("FAIL: AGW server closed the connection")
+        buf += chunk
+    return buf
+
+
+def expect(sock, kind):
+    while True:
+        _, got, _, _, _, n = struct.unpack(HEADER, read_exactly(sock, 36))
+        data = read_exactly(sock, n)
+        print("<-", chr(got), data)
+        if chr(got) == kind:
+            return data
+
+
+def check(got, want):
+    if got != want:
+        sys.exit(f"FAIL: got {got!r}, want {want!r}")
+
+
+port, target = int(sys.argv[1]), sys.argv[2].encode()
+sock = socket.create_connection(("127.0.0.1", port))
+sock.settimeout(60)
+
+sock.sendall(frame("X"))
+expect(sock, "X")
+
+sock.sendall(frame("C", to=target))
+expect(sock, "C")
+check(expect(sock, "D"), b"SAMNOD:Q1TEST-7} Welcome to Samoyed\r")
+
+for line, want in zip(sys.argv[3::2], sys.argv[4::2]):
+    sock.sendall(frame("D", to=target, data=line.encode() + b"\r", pid=0xF0))
+    if want == "disconnect":
+        expect(sock, "d")
+    else:
+        check(expect(sock, "D"), want.encode().decode("unicode_escape").encode())
+EOF
+
+"$DIREWOLF" -c direwolf-a.yaml > direwolf-a.log 2>&1 &
+pids+=("$!")
+"$DIREWOLF" -c direwolf-b.yaml > direwolf-b.log 2>&1 &
+pids+=("$!")
+
+wait_for_tcp_port "$agw_b"
+
+python3 -I agw-client.py "$agw_b" Q1TEST-7 \
+	XYZZY 'SAMNOD:Q1TEST-7} Invalid command\r' \
+	BYE disconnect
+
+python3 -I agw-client.py "$agw_b" SAMNOD \
+	bye disconnect
+
+echo "PASS: an AGW client on one samoyed-direwolf used the node shell on another, over the air"
