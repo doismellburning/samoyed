@@ -856,6 +856,26 @@ func (link *AX25Link) get_link_handle(addrs [ax25.MaxAddrs]string, num_addr int,
 		}
 	}
 
+	// Frames from the radio find the first link between the two stations on
+	// the channel, whichever client it is for, so a second one for another
+	// client may never hear from the far end.
+	if client != -1 {
+		for q := link.listHead; q != nil; q = q.next {
+			if q.channel == channel && q.client != client &&
+				q.addrs[OWNCALL] == addrs[ax25.Source] && q.addrs[PEERCALL] == addrs[ax25.Destination] {
+				logrus.WithFields(logrus.Fields{
+					"channel":      channel,
+					"own":          addrs[ax25.Source],
+					"peer":         addrs[ax25.Destination],
+					"client":       client,
+					"other_client": q.client,
+				}).Warn("Another client application already has a link between these stations on this channel, which may get its frames instead")
+
+				break
+			}
+		}
+	}
+
 	// Create new data link state machine.
 
 	var p = new(ax25_dlsm_t)
@@ -1540,6 +1560,21 @@ func (link *AX25Link) dl_register_callsign(E *dlq_item_t) {
 			"channel":  E._chan,
 			"client":   E.client,
 		}).Debug("dl_register_callsign")
+	}
+
+	// Connections to a callsign go to whichever client registered it last,
+	// so two clients with the same one on a channel cannot both be reached.
+	for p := link.regCallsignList; p != nil; p = p.next {
+		if p.callsign == E.addrs[0] && p.channel == E._chan && p.client != E.client {
+			logrus.WithFields(logrus.Fields{
+				"call":         E.addrs[0],
+				"channel":      E._chan,
+				"client":       E.client,
+				"other_client": p.client,
+			}).Warn("Callsign is already registered on this channel by another client application, which may get its connections instead")
+
+			break
+		}
 	}
 
 	var r = new(reg_callsign_t)
