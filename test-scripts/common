@@ -42,3 +42,68 @@ function run_parallel() {
 	rm -rf "$logdir"
 	return $failed
 }
+
+# Picks a port in the range direwolf's config parser accepts (KISSPORT
+# requires MIN_IP_PORT_NUMBER..MAX_IP_PORT_NUMBER, see internal/direwolf/config.go), that
+# isn't already in use and isn't one of the ports already handed out earlier
+# by the calling script (passed in as arguments to exclude).  Takes the protocol
+# ("tcp" or "udp") to probe as its first argument, since the TCP and UDP
+# port namespaces are independent and a port free in one can be in use in
+# the other.  There's still a TOCTOU race against anything else grabbing the
+# port between us closing the probe socket and direwolf/kissutil binding it,
+# but that's an acceptable risk for a test script.
+free_port() {
+	local proto=$1
+	shift
+
+	python3 - "$proto" "$@" << 'EOF'
+import random
+import socket
+import sys
+
+proto = sys.argv[1]
+exclude = {int(p) for p in sys.argv[2:]}
+sock_type = socket.SOCK_STREAM if proto == "tcp" else socket.SOCK_DGRAM
+
+for _ in range(200):
+	port = random.randint(1024, 49151)
+	if port in exclude:
+		continue
+
+	probe = socket.socket(socket.AF_INET, sock_type)
+	try:
+		probe.bind(("127.0.0.1", port))
+	except OSError:
+		continue
+	finally:
+		probe.close()
+
+	print(port)
+	break
+else:
+	sys.exit("free_port: couldn't find a free port")
+EOF
+}
+
+# Each connection attempt is wrapped in its own subshell, so its fd 3 is
+# private and closes automatically when the subshell exits — nothing to
+# clean up in this shell. (An earlier version tried to `exec 3<&- 2>
+# /dev/null` here to close fd 3 "just in case"; since `exec` with no command
+# applies its redirections to the current shell, that `2> /dev/null`
+# silently and permanently redirected this whole script's stderr to
+# /dev/null the first time a port wasn't ready yet, swallowing every
+# diagnostic after it — including the FAIL message below. That's what made
+# failures look silent both locally and on GitHub's macOS runners.)
+wait_for_tcp_port() {
+	local port=$1
+	local deadline=$((SECONDS + 30))
+
+	while ! (exec 3<> "/dev/tcp/127.0.0.1/$port") 2> /dev/null; do
+		if ((SECONDS > deadline)); then
+			echo "FAIL: timed out waiting for TCP port $port" >&2
+			return 1
+		fi
+
+		sleep 0.2
+	done
+}
