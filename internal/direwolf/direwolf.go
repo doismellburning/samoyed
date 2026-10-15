@@ -24,6 +24,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/ptt"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -369,6 +370,21 @@ x = Silence FX.25 information.`)
 		fmt.Fprintf(os.Stderr, "%s\n", modemErr)
 		pflag.Usage()
 		os.Exit(1)
+	}
+
+	// The node shell's channels, now that the command line options that
+	// make or change channels have been applied.
+	var nodeConfig maybe.Maybe[node.Config]
+
+	if nodeSettings, ok := misc_config.node.Get(); ok {
+		var config, nodeErr = audio_config.nodeConfig(nodeSettings)
+		if nodeErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			fmt.Println(asSentence(nodeErr.Error()))
+			os.Exit(1)
+		}
+
+		nodeConfig = maybe.Just(config)
 	}
 
 	if *audioStatsInterval > 0 {
@@ -744,18 +760,33 @@ x = Silence FX.25 information.`)
 	 */
 	agwServer.Start(ctx)
 
-	// The connected-mode link layer, after the AGW server whose clients it
-	// tells about the links they asked for.
+	// The connected-mode link layer, after the AGW server and node shell
+	// whose links it tells them about.
 	//
-	// Without an AGW server it is handed no clients at all: a nil
+	// Without an AGW server it is handed no AGW clients at all: a nil
 	// *AGWServer would arrive as a linkClients that is not nil, past
-	// NewAX25Link's own stand-in for there being none.
-	var linkClientApps linkClients
+	// newLinkClientRouter's own stand-in for there being none.
+	var agwClients linkClients
 	if agwServer != nil {
-		linkClientApps = agwServer
+		agwClients = agwServer
 	}
 
-	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, linkClientApps, transmitQueue, d_c_opt)
+	var nodeClients linkClients
+
+	if nodeConfig, ok := nodeConfig.Get(); ok {
+		var nodeShell = node.New(nodeConfig, dataLinkQueue, nodeClient)
+		nodeShell.Start()
+
+		nodeClients = nodeShell
+
+		logrus.WithFields(logrus.Fields{
+			"node":     nodeConfig.Address,
+			"alias":    nodeConfig.Alias,
+			"channels": nodeConfig.Channels,
+		}).Info("Node shell ready")
+	}
+
+	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, newLinkClientRouter(agwClients, nodeClients), transmitQueue, d_c_opt)
 	var metricsAddr net.Addr // Where the endpoint is listening, if it is.
 
 	if misc_config.metrics_port == 0 {

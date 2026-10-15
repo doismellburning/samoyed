@@ -42,6 +42,8 @@ Dashed arrows are connections made after construction rather than at it.
        web [label="Web UI hub"];
        agw [label="AGWServer"];
        link [label="AX25Link\ndata link state machine"];
+       router [label="linkClientRouter"];
+       nodeshell [label="node.Node\nnode shell"];
        igate [label="IGate"];
        digi [label="digipeater.Digipeater\nAPRS"];
        cdigi [label="digipeater.Connected\nconnected mode"];
@@ -93,7 +95,10 @@ Dashed arrows are connections made after construction rather than at it.
        cdigi -> tq [label="Append"];
 
        link -> ptt [label="SetConnected"];
-       link -> agw [label="linkClients"];
+       link -> router [label="linkClients"];
+       router -> agw [label="linkClients\nAGW clients' links"];
+       router -> nodeshell [label="linkClients\nnodeClient's links"];
+       nodeshell -> dlq [label="node.DataLink"];
        link -> tq [label="linkTransmitter"];
 
        kiss -> xmit [label="timing setters"];
@@ -178,7 +183,8 @@ so the order of construction follows the arrows:
    what it would have been handed takes a nil one as having no clients.
 #. The ``XmitService``, which starts a transmit thread per radio channel.
 #. The IGate and the two digipeaters,
-   then the ``AX25Link``, the KISS handler and its transports,
+   then the node shell, if the configuration has one,
+   and the ``AX25Link``, the KISS handler and its transports,
    the APRStt gateway and the beacon service.
 #. The audio device goroutines (``recv_init``),
    and finally ``recv_process``,
@@ -232,8 +238,8 @@ The shapes in the diagram follow the dependency conventions in ``AGENTS.md``:
   ``frameReceiver``, ``dwcore.FrameSender``, ``igateSender``, ``seizeConfirmer``.
 - A component that makes several calls is handed a small interface,
   declared beside it and holding only those calls:
-  ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``.
-- ``*TransmitQueue``, ``*DataLinkQueue`` and ``*AGWServer`` satisfy those interfaces without knowing about them.
+  ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``, ``node.DataLink``.
+- ``*TransmitQueue``, ``*DataLinkQueue``, ``*AGWServer`` and ``*node.Node`` satisfy those interfaces without knowing about them.
 
 References
 ----------
@@ -247,6 +253,7 @@ References
   ``tq.go`` (``NewTransmitQueue``, ``clientTransmitQueue``, ``SetIGate``),
   ``xmit.go`` (``NewXmitService``, ``xmitQueue``),
   ``ax25_link.go`` (``NewAX25Link``, ``linkClients``, ``linkTransmitter``),
+  ``link_clients.go`` (``newLinkClientRouter``, ``nodeClient``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
   ``kiss_frame.go`` (``NewKissHandler``),
@@ -264,6 +271,7 @@ References
   in ``internal/digipeater``:
   ``digipeater.go`` (``New``, ``Port``)
   and ``cdigipeater.go`` (``NewConnected``).
+- ``internal/node/node.go``: ``New``, ``DataLink``.
 - ``internal/dwcore/dwcore.go``: ``FrameSender``,
   shared by everything that hands the transmit queue a frame.
 - ``AGENTS.md``, the "Dependencies" section.
