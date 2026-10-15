@@ -310,9 +310,23 @@ x = Silence FX.25 information.`)
 		// Checking the configuration file is the whole job here, so stop before
 		// the command line options below override any of it, and well before
 		// anything wants an audio device or a port.
-		reportConfigCheck(*configFileName, configResult.errors, configResult.warnings)
+		var configErrors = configResult.errors
 
-		if configResult.errors > 0 {
+		// What channels the node can listen on is only settled once the
+		// file has been read, so it is checked here rather than with the rest.
+		if nodeSettings, ok := misc_config.node.Get(); ok {
+			var _, nodeErr = audio_config.nodeConfig(nodeSettings)
+			if nodeErr != nil {
+				text_color_set(DW_COLOR_ERROR)
+				fmt.Println(asSentence(nodeErr.Error()))
+
+				configErrors++
+			}
+		}
+
+		reportConfigCheck(*configFileName, configErrors, configResult.warnings)
+
+		if configErrors > 0 {
 			os.Exit(1)
 		}
 
