@@ -9,6 +9,9 @@ package direwolf
 // cannot come to disagree about what a setting means.  Directives that have not
 // been given a YAML form yet can be written, as they would be in the older
 // format, in a "legacy" block.
+//
+// Everything sits under a top-level "samoyed" key, leaving the rest of the
+// file free for whatever else might one day want a place in it.
 
 import (
 	"bytes"
@@ -23,6 +26,12 @@ import (
 
 // ConfigFile is the whole of a YAML configuration file.
 type ConfigFile struct {
+	Samoyed *SamoyedConfig `yaml:"samoyed"`
+}
+
+// SamoyedConfig is the settings under a YAML configuration file's "samoyed"
+// key.
+type SamoyedConfig struct {
 	AudioDevices []AudioDeviceConfig `yaml:"audioDevices"`
 	Channels     []ChannelConfig     `yaml:"channels"`
 
@@ -99,12 +108,12 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 		return
 	}
 
-	var file = new(ConfigFile)
+	var doc = new(ConfigFile)
 
 	var decoder = yaml.NewDecoder(bytes.NewReader(content))
 	decoder.KnownFields(true)
 
-	var decodeErr = decoder.Decode(file)
+	var decodeErr = decoder.Decode(doc)
 	if errors.Is(decodeErr, io.EOF) {
 		return // An empty file, which leaves every default alone.
 	}
@@ -118,6 +127,10 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 			}
 		} else {
 			ps.errorf("config file %s: %v", name, decodeErr)
+		}
+
+		if !hasSamoyedKey(content) {
+			ps.errorf("config file %s: Settings go under a top-level \"samoyed\" key", name)
 		}
 
 		ps.fatal = true
@@ -152,7 +165,12 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 		return
 	}
 
-	var top = yamlKeys(yamlDocument(&root))
+	var file = doc.Samoyed
+	if file == nil {
+		return // Nothing under "samoyed", which leaves every default alone.
+	}
+
+	var top = yamlKeys(yamlKeys(yamlDocument(&root))["samoyed"].value)
 
 	ps.applyYAMLAudioDevices(file.AudioDevices, top["audioDevices"])
 	ps.applyYAMLChannels(file.Channels, top["channels"])
@@ -309,7 +327,7 @@ func (ps *parseState) applyYAMLChannels(channels []ChannelConfig, node yamlEntry
 }
 
 // applyYAMLPorts applies the network ports, whose keys in the file are top.
-func (ps *parseState) applyYAMLPorts(file *ConfigFile, top map[string]yamlEntry) {
+func (ps *parseState) applyYAMLPorts(file *SamoyedConfig, top map[string]yamlEntry) {
 	if file.AGWPort != nil {
 		ps.line = top["agwPort"].line(new(yaml.Node))
 		ps.reportIfError(ps.applyAGWPORT(*file.AGWPort))
@@ -324,6 +342,20 @@ func (ps *parseState) applyYAMLPorts(file *ConfigFile, top map[string]yamlEntry)
 		ps.line = yamlItem(top["axudpPorts"].value, i).Line
 		ps.reportIfError(ps.applyAXUDPPORT(port))
 	}
+}
+
+// hasSamoyedKey says whether content, as YAML, has a "samoyed" key at its top
+// level - one without is most likely laid out as it was before there was one.
+func hasSamoyedKey(content []byte) bool {
+	var root yaml.Node
+
+	if yaml.Unmarshal(content, &root) != nil {
+		return true // Not YAML at all, which is complaint enough.
+	}
+
+	var _, ok = yamlKeys(yamlDocument(&root))["samoyed"]
+
+	return ok
 }
 
 // reportIfError reports err, if there is one.
