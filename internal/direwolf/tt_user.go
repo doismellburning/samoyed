@@ -31,6 +31,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/doismellburning/samoyed/internal/version"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -392,8 +393,7 @@ func (u *ttUsers) heard(callsign string, ssid int, overlay rune, symbol rune, lo
 	 * are a future possibility.
 	 */
 	if callsign == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("APRStt tone sequence did not include callsign / object name.\n")
+		logrus.Error("APRStt tone sequence did not include callsign / object name")
 
 		return (TT_ERROR_NO_CALL)
 	}
@@ -632,8 +632,7 @@ func (u *ttUsers) dueReports(now time.Time) []string {
 
 func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	if first_time {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("[APRStt] %s\n", stemp)
+		fmt.Printf("[APRStt] %s\n", stemp)
 	}
 
 	/*
@@ -642,8 +641,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	var pp = ax25.FromText(stemp, true)
 
 	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\"%s\"\n", stemp)
+		logrus.WithField("report", stemp).Error("Couldn't make frame from APRStt object report")
 
 		return
 	}
@@ -972,7 +970,7 @@ func (u *ttUsers) setenv(i int) {
  *
  * Name:        dump
  *
- * Purpose:     Print information about known users for debugging.
+ * Purpose:     Log information about known users for debugging.
  *
  * Inputs:      None.
  *
@@ -986,25 +984,24 @@ func (u *ttUsers) dump() {
 
 	var now = time.Now()
 
-	dw_printf("call   ov suf lsthrd xmit nxt cor  lat    long freq     ctcss m comment\n")
-
 	for i := range MAX_TT_USERS {
 		if u.user[i].callsign != "" {
-			dw_printf("%-6s %c%c %-3s %6d %d %+6d %d %6.2f %7.2f %-10s %-3s %c %s\n",
-				u.user[i].callsign,
-				u.user[i].overlay,
-				u.user[i].symbol,
-				u.user[i].digit_suffix,
-				int(u.user[i].last_heard.Sub(now).Seconds()),
-				u.user[i].xmits,
-				int(u.user[i].next_xmit.Sub(now).Seconds()),
-				u.user[i].corral_slot,
-				u.user[i].latitude,
-				u.user[i].longitude,
-				u.user[i].freq,
-				u.user[i].ctcss,
-				u.user[i].mic_e,
-				u.user[i].comment)
+			logrus.WithFields(logrus.Fields{
+				"callsign":    u.user[i].callsign,
+				"overlay":     string(u.user[i].overlay),
+				"symbol":      string(u.user[i].symbol),
+				"suffix":      u.user[i].digit_suffix,
+				"last_heard":  int(u.user[i].last_heard.Sub(now).Seconds()),
+				"xmits":       u.user[i].xmits,
+				"next_xmit":   int(u.user[i].next_xmit.Sub(now).Seconds()),
+				"corral_slot": u.user[i].corral_slot,
+				"latitude":    u.user[i].latitude,
+				"longitude":   u.user[i].longitude,
+				"freq":        u.user[i].freq,
+				"ctcss":       u.user[i].ctcss,
+				"mic_e":       string(u.user[i].mic_e),
+				"comment":     u.user[i].comment,
+			}).Debug("APRStt user")
 		}
 	}
 }
