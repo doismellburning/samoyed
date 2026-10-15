@@ -88,6 +88,7 @@ to the application layer and the AX.25 data link state machine.
            beacon [label="Beacons with SENDTO=R\n(simulated reception)"];
            tt [label="APRStt gateway"];
            agw [label="AGW clients\nconnect, disconnect,\ndata, register"];
+           nodeshell [label="Node shell\ndisconnect, data, register"];
            ptt [label="PTT: channel busy"];
            xmit [label="Transmitter:\nseize confirm"];
        }
@@ -108,6 +109,7 @@ to the application layer and the AX.25 data link state machine.
        beacon -> dlq_frame;
        tt -> dlq_frame;
        agw -> dlq_req;
+       nodeshell -> dlq_req;
        ptt -> dlq_req;
        xmit -> dlq_req;
 
@@ -192,7 +194,7 @@ to the application layer and the AX.25 data link state machine.
        lmx -> states;
 
        tq [label="Transmit queue\n-> transmitter, modulator"];
-       agw_out [label="AGW clients"];
+       agw_out [label="AGW clients or node shell,\nby client number\n(linkClientRouter)"];
 
        states -> tq [label="frames to send"];
        states -> agw_out [label="link up and down,\nreceived data"];
@@ -226,7 +228,7 @@ One queue, two consumers
 
 Frames received over the air,
 frames from external TNCs and network sources such as AXUDP and the IGate,
-and requests from AGW clients
+and requests from AGW clients and the node shell
 all go onto the ``DataLinkQueue``.
 ``recv_process`` gives every received frame first to ``recPacketHandler.app_process_rec_packet``
 and then to ``lm_data_indication``,
