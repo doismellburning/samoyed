@@ -5,7 +5,8 @@
 
 # Two instances of samoyed-direwolf, joined by raw AFSK audio over UDP as in
 # check-udp-audio-connect.  A runs the node shell; an AGW client on B connects
-# to it over the air, by callsign and then by alias, and types at it.
+# to it over the air, by callsign and then by alias, types at it, and has it
+# connect onward to another station on B.
 
 set -eu
 set -o pipefail
@@ -68,22 +69,31 @@ samoyed:
   kissPorts: [{port: 0}]
 EOF
 
-# A minimal AGW client: connect from Q2TEST to the station named, check the
-# greeting, send each line after it, and check each reply - or, for BYE, that
-# the node hangs up.
-cat > agw-client.py << 'EOF'
+# A minimal AGW client on B, which is both Q2TEST and Q3TEST.  As Q2TEST it
+# connects to the node by the name given and uses it; as Q3TEST it is the
+# station the node connects Q2TEST onward to.  "short" leaves out all but the
+# greeting and BYE.
+cat > agw-client.py << 'PYTHON'
 import socket
 import struct
 import sys
 
 HEADER = "<B3xBxBx10s10sI4x"
+PROMPT = b"SAMNOD:Q1TEST-7} "
+
+port, node = int(sys.argv[1]), sys.argv[2].encode()
+short = sys.argv[3:] == ["short"]
+
+sock = socket.create_connection(("127.0.0.1", port))
+sock.settimeout(60)
 
 
-def frame(kind, to=b"", data=b"", pid=0):
-    return struct.pack(HEADER, 0, ord(kind), pid, b"Q2TEST", to, len(data)) + data
+def send(kind, frm, to=b"", data=b""):
+    pid = 0xF0 if kind == "D" else 0
+    sock.sendall(struct.pack(HEADER, 0, ord(kind), pid, frm, to, len(data)) + data)
 
 
-def read_exactly(sock, n):
+def read_exactly(n):
     buf = b""
     while len(buf) < n:
         chunk = sock.recv(n - len(buf))
@@ -93,38 +103,60 @@ def read_exactly(sock, n):
     return buf
 
 
-def expect(sock, kind):
+# Frames read while waiting for another.  Q2TEST's and Q3TEST's links run
+# side by side, so one's frames can turn up before the other's.
+pending = []
+
+
+def expect(kind, to, want=None):
+    """Wait for a frame of kind for our station to, and check its data."""
     while True:
-        _, got, _, _, _, n = struct.unpack(HEADER, read_exactly(sock, 36))
-        data = read_exactly(sock, n)
-        print("<-", chr(got), data)
-        if chr(got) == kind:
-            return data
+        for i, (got, got_to, data) in enumerate(pending):
+            if got == kind and got_to == to:
+                del pending[i]
+                if want is not None and data != want:
+                    sys.exit(f"FAIL: got {data!r}, want {want!r}")
+                return
+
+        _, got, _, _, got_to, n = struct.unpack(HEADER, read_exactly(36))
+        data = read_exactly(n)
+        print("<-", chr(got), got_to.rstrip(b"\0"), data)
+        pending.append((chr(got), got_to.rstrip(b"\0"), data))
 
 
-def check(got, want):
-    if got != want:
-        sys.exit(f"FAIL: got {got!r}, want {want!r}")
+def line(text):
+    send("D", b"Q2TEST", node, text + b"\r")
 
 
-port, target = int(sys.argv[1]), sys.argv[2].encode()
-sock = socket.create_connection(("127.0.0.1", port))
-sock.settimeout(60)
+send("X", b"Q2TEST")
+expect("X", b"")
+send("X", b"Q3TEST")
+expect("X", b"")
 
-sock.sendall(frame("X"))
-expect(sock, "X")
+send("C", b"Q2TEST", node)
+expect("C", b"Q2TEST")
+expect("D", b"Q2TEST", PROMPT + b"Welcome to Samoyed\r")
 
-sock.sendall(frame("C", to=target))
-expect(sock, "C")
-check(expect(sock, "D"), b"SAMNOD:Q1TEST-7} Welcome to Samoyed\r")
+if not short:
+    line(b"XYZZY")
+    expect("D", b"Q2TEST", PROMPT + b"Invalid command - type ? for help\r")
 
-for line, want in zip(sys.argv[3::2], sys.argv[4::2]):
-    sock.sendall(frame("D", to=target, data=line.encode() + b"\r", pid=0xF0))
-    if want == "disconnect":
-        expect(sock, "d")
-    else:
-        check(expect(sock, "D"), want.encode().decode("unicode_escape").encode())
-EOF
+    line(b"C Q3TEST")
+    expect("D", b"Q2TEST", PROMPT + b"Trying Q3TEST on port 0\r")
+    expect("C", b"Q3TEST")
+    expect("D", b"Q2TEST", PROMPT + b"Connected to Q3TEST\r")
+
+    line(b"hello from Q2TEST")
+    expect("D", b"Q3TEST", b"hello from Q2TEST\r")
+    send("D", b"Q3TEST", b"Q1TEST-7", b"hello from Q3TEST\r")
+    expect("D", b"Q2TEST", b"hello from Q3TEST\r")
+
+    send("d", b"Q3TEST", b"Q1TEST-7")
+    expect("D", b"Q2TEST", PROMPT + b"Disconnected from Q3TEST\r")
+
+line(b"BYE")
+expect("d", b"Q2TEST")
+PYTHON
 
 "$DIREWOLF" -c direwolf-a.yaml > direwolf-a.log 2>&1 &
 pids+=("$!")
@@ -133,11 +165,7 @@ pids+=("$!")
 
 wait_for_tcp_port "$agw_b"
 
-python3 -I agw-client.py "$agw_b" Q1TEST-7 \
-	XYZZY 'SAMNOD:Q1TEST-7} Invalid command - type ? for help\r' \
-	BYE disconnect
+python3 -I agw-client.py "$agw_b" Q1TEST-7
+python3 -I agw-client.py "$agw_b" SAMNOD short
 
-python3 -I agw-client.py "$agw_b" SAMNOD \
-	bye disconnect
-
-echo "PASS: an AGW client on one samoyed-direwolf used the node shell on another, over the air"
+echo "PASS: an AGW client on one samoyed-direwolf used the node shell on another over the air, and was connected onward"
