@@ -1354,13 +1354,16 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 		}
 
 		if n != int(cmd.Header.DataLen) || dataErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nError getting message data from AGW client application %d: %s\n", client, dataErr)
-			dw_printf("Tried to read %d bytes, got %d.\n", cmd.Header.DataLen, n)
-			dw_printf("Closing connection.\n\n")
+			logrus.WithFields(logrus.Fields{
+				"client":   client,
+				"expected": cmd.Header.DataLen,
+				"got":      n,
+			}).WithError(dataErr).
+				Error("Error getting message data from AGW client application; closing connection")
 			s.detachClient(client, conn)
 
-			return
+			// Wait for whoever takes the slot next, as for a bad header.
+			continue
 		}
 
 		/*
