@@ -571,3 +571,95 @@ func TestOutstandingFramesForNoLinkRepliesNone(t *testing.T) {
 
 	assert.Equal(t, []string{"0/2 Q1TEST>Q2TEST 0"}, clients.replies)
 }
+
+// warningsDuring runs fn and returns the warnings it logged.
+func warningsDuring(t *testing.T, fn func()) []string {
+	t.Helper()
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	fn()
+
+	var warnings []string
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Level == logrus.WarnLevel {
+			warnings = append(warnings, entry.Message)
+		}
+	}
+
+	return warnings
+}
+
+// sharedCall is the callsign the clients below both want.
+const sharedCall = "Q1TEST-7"
+
+// newRegisterRequest is a client application registering sharedCall.
+func newRegisterRequest(channel int, client int) *dlq_item_t {
+	var E = new(dlq_item_t)
+
+	E._type = DLQ_REGISTER_CALLSIGN
+	E._chan = channel
+	E.addrs[0] = sharedCall
+	E.num_addr = 1
+	E.client = client
+
+	return E
+}
+
+// newConnectRequest is a client application asking to connect from
+// sharedCall to Q3TEST.
+func newConnectRequest(channel int, client int) *dlq_item_t {
+	var E = new(dlq_item_t)
+
+	E._type = DLQ_CONNECT_REQUEST
+	E._chan = channel
+	E.addrs[OWNCALL] = sharedCall
+	E.addrs[PEERCALL] = "Q3TEST"
+	E.num_addr = 2
+	E.client = client
+
+	return E
+}
+
+// Regression test: a callsign another client had already registered on the
+// channel was taken without a word, though connections to it then go to one
+// client only - the node shell became unreachable once an AGW application
+// registered its callsign.
+func TestRegisteringATakenCallsignIsWarned(t *testing.T) {
+	var link = setupTestEnv(t)
+
+	var warnings = warningsDuring(t, func() {
+		link.dl_register_callsign(newRegisterRequest(1, nodeClient))
+		link.dl_register_callsign(newRegisterRequest(2, 0)) // Another channel.
+		link.dl_register_callsign(newRegisterRequest(1, nodeClient))
+	})
+	assert.Empty(t, warnings)
+
+	warnings = warningsDuring(t, func() {
+		link.dl_register_callsign(newRegisterRequest(1, 0))
+	})
+	assert.Equal(t, []string{"Callsign is already registered on this channel by another client application, which may get its connections instead"}, warnings)
+}
+
+// Regression test: a client asking to connect to a station another client
+// already has a link with, between the same two callsigns on the same
+// channel, got a second link without a word, though frames from the station
+// can only reach one of them.
+func TestSecondLinkBetweenTheSameStationsIsWarned(t *testing.T) {
+	var link = setupTestEnv(t)
+
+	var warnings = warningsDuring(t, func() {
+		link.dl_connect_request(newConnectRequest(1, 0))
+		link.dl_connect_request(newConnectRequest(1, 0)) // The same client again.
+		link.dl_connect_request(newConnectRequest(2, nodeClient))
+	})
+	assert.Empty(t, warnings)
+
+	warnings = warningsDuring(t, func() {
+		link.dl_connect_request(newConnectRequest(1, nodeClient))
+	})
+	assert.Equal(t, []string{"Another client application already has a link between these stations on this channel, which may get its frames instead"}, warnings)
+}
