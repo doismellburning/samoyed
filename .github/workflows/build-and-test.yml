@@ -210,6 +210,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # sphinx_last_updated_by_git reads each page's history
       - uses: actions/setup-go@v7  # The dependency graph comes from `go list`
         with:
           go-version: "1.27"
