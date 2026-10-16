@@ -38,7 +38,7 @@ jobs:
     needs: [generate_version]
     strategy:
       matrix:
-        runner:
+        runner: &runners
           - "ubuntu-latest"
           - "ubuntu-24.04-arm"
           - "macos-latest"
@@ -58,8 +58,7 @@ jobs:
     - run: "make cmds"
     - run: "make test"
     - run: "make coveragereport"
-    - run: "make check"
-    - name: "Ensure nothing got fixed (i.e. everything was already fine)"
+    - name: "Ensure the build and tests changed nothing"
       run: "git diff --quiet && git diff --cached --quiet"
     - name: "Set filename"
       run: 'echo "TARBALL_NAME=samoyed-${{env.SAMOYED_VERSION }}-${{ runner.os }}-${{ runner.arch }}.tgz" >> $GITHUB_ENV'
@@ -85,6 +84,26 @@ jobs:
         path: "${{ env.DEB_NAME }}"
         if-no-files-found: "error"
         compression-level: 0
+
+  # Linting needs nothing build_and_test builds, so it runs alongside it rather
+  # than adding its time to the end of each runner's build and test. It stays on
+  # every OS build_and_test uses, as golangci-lint only sees the build-tagged
+  # files for the one it runs on.
+  check:
+    strategy:
+      matrix:
+        runner: *runners
+    runs-on: "${{ matrix.runner }}"
+    steps:
+    - uses: "actions/checkout@v7"
+    - uses: "actions/setup-go@v7"
+      with:
+        go-version: "1.27"
+    - name: "Install dependencies"
+      run: "make setup"
+    - run: "make check"
+    - name: "Ensure nothing got fixed (i.e. everything was already fine)"
+      run: "git diff --quiet && git diff --cached --quiet"
 
   # Fuzzing is the same work whatever the runner, and it takes as long as it is
   # told to, so it gets jobs of its own on one OS rather than adding its time to
@@ -171,7 +190,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.ref == 'refs/heads/main' && needs.should_release.outputs.result == 'true')
-    needs: [generate_version, build_and_test, fuzz, race, should_release]
+    needs: [generate_version, build_and_test, check, fuzz, race, should_release]
     runs-on: "ubuntu-latest"
     permissions:
       contents: "write"
