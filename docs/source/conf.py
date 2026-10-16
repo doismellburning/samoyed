@@ -26,6 +26,7 @@ extensions = [
     "godeps",
     "sphinx_eu_ai_label",
     "sphinx_last_updated_by_git",
+    "sphinx_sitemap",
 ]
 
 # Label sections "page:Heading" rather than "Heading", so different pages can
@@ -48,3 +49,13 @@ html_static_path = ["_static"]
 html_logo = "_static/logo.png"
 html_favicon = "_static/favicon.png"
 html_show_sourcelink = False
+
+# Where the site is published (by the docs-deploy job), for the sitemap to give
+# absolute URLs.
+html_baseurl = "https://doismellburning.github.io/samoyed/"
+
+# -- Extension configuration -------------------------------------------------
+
+# The site is one unversioned language, so leave sphinx_sitemap's default
+# "{lang}{version}" prefix off the URLs.
+sitemap_url_scheme = "{link}"
