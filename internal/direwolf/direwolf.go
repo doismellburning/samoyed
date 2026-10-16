@@ -89,6 +89,7 @@ func DirewolfMain(ctx context.Context) { //nolint:funlen // Ported from Dire Wol
 	// text went to stdout is no use to anyone, and anything reading our stdout
 	// would lose the converted lines altogether - so put logrus on stdout too.
 	logrus.SetOutput(os.Stdout)
+	dwutil.SetLogFormat()
 
 	var audioStatsInterval = pflag.IntP("audio-stats-interval", "a", 0, "Audio statistics interval in seconds.  0 to disable.")
 	var configFileName = pflag.StringP("config-file", "c", "direwolf.conf", "Configuration file name.")
