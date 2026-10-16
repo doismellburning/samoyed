@@ -27,6 +27,7 @@ extensions = [
     "sphinx_eu_ai_label",
     "sphinx_last_updated_by_git",
     "sphinx_sitemap",
+    "sphinxext.opengraph",
 ]
 
 # Label sections "page:Heading" rather than "Heading", so different pages can
@@ -50,8 +51,8 @@ html_logo = "_static/logo.png"
 html_favicon = "_static/favicon.png"
 html_show_sourcelink = False
 
-# Where the site is published (by the docs-deploy job), for the sitemap to give
-# absolute URLs.
+# Where the site is published (by the docs-deploy job), for the sitemap and
+# OpenGraph tags to give absolute URLs.
 html_baseurl = "https://doismellburning.github.io/samoyed/"
 
 # -- Extension configuration -------------------------------------------------
@@ -59,3 +60,6 @@ html_baseurl = "https://doismellburning.github.io/samoyed/"
 # The site is one unversioned language, so leave sphinx_sitemap's default
 # "{lang}{version}" prefix off the URLs.
 sitemap_url_scheme = "{link}"
+
+ogp_site_url = html_baseurl
+ogp_image = "_static/logo.png"
