@@ -191,6 +191,19 @@ These are the keys under ``samoyed``:
         map with ``broadcast: true`` rather than to one node, like BPQ's
         ``BROADCAST`` lines.
 
+    ``automap``
+        ``true`` sends a frame for an address no map covers
+        back to wherever a datagram from that address last came from,
+        within the last hour,
+        like BPQ's ``AUTOADDMAP`` -
+        so long as that datagram came from the IP address of a host in ``maps``,
+        from any port.
+        A node reached through a mapped neighbour can then connect
+        without a map of its own.
+        Maps always win over what is learned,
+        and a learned node gets no broadcasts.
+        Off by default.
+
     Frames are sent with the RFC 1226 checksum appended; one on a received
     datagram is recognised and removed.  Datagrams are accepted from anyone,
     not only the nodes in ``maps``, so the port should not be open to the
@@ -203,6 +216,7 @@ These are the keys under ``samoyed``:
             - port: 10093
               channel: 10
               broadcast: [NODES]
+              automap: true
               maps:
                 - {ax25addr: Q1TEST-2, host: node.example.org, port: 10093, broadcast: true}
                 - {ax25addr: Q2TEST, host: 192.0.2.2, port: 93}

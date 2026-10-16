@@ -237,6 +237,35 @@ func TestAXUDPChannelSendUnrouted(t *testing.T) {
 	assert.Equal(t, "Q1TEST", entry.Data["dest"])
 }
 
+// With automap, a frame for a node no map covers goes back to the mapped host
+// it was heard from.
+func TestAXUDPChannelAutoMapRepliesToSender(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
+	var peer = newTestAXUDPPeer(t)
+
+	// The peer is mapped, but for another address.
+	var routes = noAXUDPRoutes()
+	routes.AutoMap = true
+	routes.Maps = []axudp.MapEntry{axudpTestMap(t, "Q9TEST", peer, false)}
+
+	var ac = openTestAXUDPChannel(t.Context(), t, routes, dlq.RecFrame)
+
+	var _, err = peer.WriteTo(axudp.AddCRC(newTestPacket(t).FrameData()), testAXUDPChannelAddr(t, ac)) // From Q2TEST.
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool { return dlq.Remove() != nil }, 10*time.Second, 10*time.Millisecond, "the frame never reached the received queue")
+
+	var reply = ax25.FromText("Q1TEST>Q2TEST:hello yourself", true)
+	require.NotNil(t, reply)
+
+	ac.sendPacket(axudpTestChannel, reply)
+
+	var frame, ok = axudp.StripCRC(readTestAXUDPDatagram(t, peer))
+	require.True(t, ok, "the datagram's checksum is wrong or missing")
+	assert.Equal(t, reply.FrameData(), frame)
+}
+
 // A channel that could not be opened discards what is sent on it.
 func TestAXUDPChannelSendPacketNoChannel(t *testing.T) {
 	var ac *AXUDPChannel

@@ -126,6 +126,10 @@ type AXUDPPortSettings struct {
 
 	// Maps say which node gets frames for which address.
 	Maps []axudp.MapSettings `yaml:"maps"`
+
+	// AutoMap sends frames for an address no map covers to wherever that
+	// address was last heard from, like BPQ's AUTOADDMAP.
+	AutoMap bool `yaml:"automap"`
 }
 
 // KISSPortSettings describes a KISS TCP port - KISSPORT.

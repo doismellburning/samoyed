@@ -28,10 +28,10 @@ import (
 // before trying again, so a socket that keeps failing does not spin.
 const axudpReadErrorDelay = time.Second
 
-// AXUDPChannel is one AXUDP channel's socket and routes.
+// AXUDPChannel is one AXUDP channel's socket and router.
 type AXUDPChannel struct {
 	channel int
-	routes  axudp.Routes
+	router  *axudp.Router
 	conn    *net.UDPConn
 	started atomic.Bool
 
@@ -88,7 +88,7 @@ func NewAXUDPChannel(ctx context.Context, channel int, port int, routes axudp.Ro
 
 	var ac = new(AXUDPChannel)
 	ac.channel = channel
-	ac.routes = routes
+	ac.router = axudp.NewRouter(routes)
 	ac.recFrame = recFrame
 	ac.conn = pc.(*net.UDPConn) //nolint:forcetypeassert // A UDP listener is a UDPConn.
 
@@ -181,6 +181,8 @@ func (ac *AXUDPChannel) receive(datagram []byte, from *net.UDPAddr) {
 		return
 	}
 
+	ac.router.Heard(frame, from)
+
 	var retries BitFixLevel
 
 	if ac.recFrame != nil {
@@ -201,7 +203,7 @@ func (ac *AXUDPChannel) sendPacket(channel int, pp *ax25.Packet) {
 	var frame = pp.FrameData()
 	var dest = axudp.ExtractDest(frame)
 
-	var entries = ac.routes.Route(dest)
+	var entries = ac.router.Route(dest)
 	if len(entries) == 0 {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
