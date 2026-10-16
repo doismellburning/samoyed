@@ -43,5 +43,5 @@ jobs:
     # govulncheck type-checks every package, and the cgo ones need their C
     # headers present to type-check at all.
     - name: "Install dependencies"
-      run: "make setup"
+      run: "./dev-setup.sh build"
     - run: "make vuln"
