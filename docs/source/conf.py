@@ -28,6 +28,7 @@ extensions = [
     "sphinx_last_updated_by_git",
     "sphinx_sitemap",
     "sphinxext.opengraph",
+    "sphinxext.rediraffe",
 ]
 
 # Label sections "page:Heading" rather than "Heading", so different pages can
@@ -63,3 +64,7 @@ sitemap_url_scheme = "{link}"
 
 ogp_site_url = html_baseurl
 ogp_image = "_static/logo.png"
+
+# Old page name -> new page name, so moving or renaming a page leaves a redirect
+# behind instead of a broken link.
+rediraffe_redirects: dict[str, str] = {}
