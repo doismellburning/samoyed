@@ -290,6 +290,7 @@ dependencies = [
     { name = "sphinx" },
     { name = "sphinx-autobuild" },
     { name = "sphinx-eu-ai-label" },
+    { name = "sphinx-last-updated-by-git" },
     { name = "sphinx-rtd-theme" },
     { name = "structlog" },
 ]
@@ -306,6 +307,7 @@ requires-dist = [
     { name = "sphinx", specifier = ">=9.1.0" },
     { name = "sphinx-autobuild", specifier = ">=2025.8.25" },
     { name = "sphinx-eu-ai-label", git = "https://github.com/doismellburning/sphinx-eu-ai-label" },
+    { name = "sphinx-last-updated-by-git", specifier = ">=0.3.8" },
     { name = "sphinx-rtd-theme", specifier = ">=3.1.0" },
     { name = "structlog" },
 ]
@@ -377,6 +379,18 @@ version = "0.1.0"
 source = { git = "https://github.com/doismellburning/sphinx-eu-ai-label#4e44a1397503a878cbcbcf9d99ea6c8faf518073" }
 dependencies = [
     { name = "sphinx" },
+]
+
+[[package]]
+name = "sphinx-last-updated-by-git"
+version = "0.3.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "sphinx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/03/fd/de1685b6dab173dff31da24e0d3b29f02873fc24a1cdbb7678721ddc8581/sphinx_last_updated_by_git-0.3.8.tar.gz", hash = "sha256:c145011f4609d841805b69a9300099fc02fed8f5bb9e5bcef77d97aea97b7761", size = 10785, upload-time = "2024-08-11T07:15:54.601Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/fb/e496f16fa11fbe2dbdd0b5e306ede153dfed050aae4766fc89d500720dc7/sphinx_last_updated_by_git-0.3.8-py3-none-any.whl", hash = "sha256:6382c8285ac1f222483a58569b78c0371af5e55f7fbf9c01e5e8a72d6fdfa499", size = 8580, upload-time = "2024-08-11T07:15:53.244Z" },
 ]
 
 [[package]]
