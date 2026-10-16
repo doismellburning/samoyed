@@ -17,41 +17,42 @@ Example
 
 .. code:: yaml
 
-    audioDevices:
-      - input: plughw:1,0
-        output: plughw:2,0
-        channels: 2
-        rate: 48000
+    samoyed:
+      audioDevices:
+        - input: plughw:1,0
+          output: plughw:2,0
+          channels: 2
+          rate: 48000
 
-    channels:
-      - channel: 0
-        mycall: Q1TEST-1
-        txdelay: 30
-        txtail: 15
-        modem:
-          speed: "1200"
-          tones: {mark: 1200, space: 2200}
-          decoders: {count: 3, offset: 30}
-        ptt:
-          method: serial
-          device: /dev/ttyUSB0
-          line: rts
-          line2: dtr
-          invert2: true
+      channels:
+        - channel: 0
+          mycall: Q1TEST-1
+          txdelay: 30
+          txtail: 15
+          modem:
+            speed: "1200"
+            tones: {mark: 1200, space: 2200}
+            decoders: {count: 3, offset: 30}
+          ptt:
+            method: serial
+            device: /dev/ttyUSB0
+            line: rts
+            line2: dtr
+            invert2: true
 
-      - channel: 1
-        mycall: Q1TEST-2
-        modem: {speed: "9600", type: g3ruh}
-        ptt: {method: gpio, pin: 25, invert: true}
-        il2ptx: {}
+        - channel: 1
+          mycall: Q1TEST-2
+          modem: {speed: "9600", type: g3ruh}
+          ptt: {method: gpio, pin: 25, invert: true}
+          il2ptx: {}
 
-    agwPort: 8000
-    kissPorts:
-      - port: 8001
-      - {port: 8002, channel: 1}
+      agwPort: 8000
+      kissPorts:
+        - port: 8001
+        - {port: 8002, channel: 1}
 
-    legacy: |
-      DIGIPEAT 0 0 ^WIDE[3-7]-[1-7]$|^TEST$ ^WIDE[12]-[12]$
+      legacy: |
+        DIGIPEAT 0 0 ^WIDE[3-7]-[1-7]$|^TEST$ ^WIDE[12]-[12]$
 
 That is the same configuration as:
 
@@ -84,6 +85,11 @@ same complaints, whichever way it is written.
 
 Reference
 ---------
+
+Every setting goes under a top-level ``samoyed`` key,
+leaving the rest of the file free for anything else that might one day want a place in it.
+A file with settings outside it is refused.
+These are the keys under ``samoyed``:
 
 ``audioDevices``
     A list of audio devices (``ADEVICE``, ``ACHANNELS``).  Each has ``input``,
@@ -192,13 +198,14 @@ Reference
 
     .. code:: yaml
 
-        axudpPorts:
-          - port: 10093
-            channel: 10
-            broadcast: [NODES]
-            maps:
-              - {ax25addr: Q1TEST-2, host: node.example.org, port: 10093, broadcast: true}
-              - {ax25addr: Q2TEST, host: 192.0.2.2, port: 93}
+        samoyed:
+          axudpPorts:
+            - port: 10093
+              channel: 10
+              broadcast: [NODES]
+              maps:
+                - {ax25addr: Q1TEST-2, host: node.example.org, port: 10093, broadcast: true}
+                - {ax25addr: Q2TEST, host: 192.0.2.2, port: 93}
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

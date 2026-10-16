@@ -4,16 +4,31 @@
 package direwolf
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// parseYAMLConfig runs config_init over content as a YAML configuration file.
+// parseYAMLConfig runs config_init over content, put under the top-level
+// "samoyed" key, as a YAML configuration file.  That key takes the first line,
+// so a line in content is a line further on in the file.
 func parseYAMLConfig(t *testing.T, content string) configs {
 	t.Helper()
 
-	return parseConfigNamed(t, "samoyed*.yaml", content)
+	return parseConfigNamed(t, "samoyed*.yaml", underSamoyed(content))
+}
+
+// underSamoyed puts content under a top-level "samoyed" key.
+func underSamoyed(content string) string {
+	var lines = strings.Split(strings.TrimPrefix(content, "\n"), "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = "  " + line
+		}
+	}
+
+	return "samoyed:\n" + strings.Join(lines, "\n")
 }
 
 // Each YAML configuration here says the same as the legacy one beside it, so
@@ -299,7 +314,7 @@ axudpPorts:
 		} {
 			var c = parseYAMLConfig(t, "axudpPorts:\n  - "+tc.entry+"\n")
 			assert.Equal(t, 1, c.errors, tc.name)
-			assert.Contains(t, c.output, "Line 2", tc.name)
+			assert.Contains(t, c.output, "Line 3", tc.name)
 			assert.Contains(t, c.output, tc.want, tc.name)
 			assert.NotContains(t, c.audio.chan_medium, MEDIUM_AXUDP, tc.name)
 		}
@@ -308,7 +323,7 @@ axudpPorts:
 	t.Run("an AXUDP port can't take a channel already in use", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "axudpPorts:\n  - {port: 20093, channel: 10}\n  - {port: 20094, channel: 10}\n")
 		assert.Equal(t, 1, c.errors)
-		assert.Contains(t, c.output, "Line 3")
+		assert.Contains(t, c.output, "Line 4")
 		assert.Contains(t, c.output, "already in use")
 		assert.Equal(t, 20093, c.audio.axudp_port[10])
 	})
@@ -338,7 +353,7 @@ legacy: |
 	})
 
 	t.Run("a .yml file is YAML too", func(t *testing.T) {
-		var c = parseConfigNamed(t, "samoyed*.yml", "channels:\n  - {channel: 0, mycall: Q1TEST}\n")
+		var c = parseConfigNamed(t, "samoyed*.yml", "samoyed:\n  channels:\n    - {channel: 0, mycall: Q1TEST}\n")
 		assert.Equal(t, "Q1TEST", c.audio.mycall[0])
 		assert.Zero(t, c.errors)
 	})
@@ -346,7 +361,7 @@ legacy: |
 	t.Run("a misspelt key is refused, not ignored", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "channels:\n  - channel: 0\n    mycal: Q1TEST\n")
 		assert.True(t, c.fatal)
-		assert.Contains(t, c.output, "line 3")
+		assert.Contains(t, c.output, "line 4")
 		assert.Contains(t, c.output, "mycal")
 		assert.True(t, IsNoCall(c.audio.mycall[0]))
 	})
@@ -354,25 +369,25 @@ legacy: |
 	t.Run("a value of the wrong type is refused", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0, txdelay: soon}\n")
 		assert.True(t, c.fatal)
-		assert.Contains(t, c.output, "line 2")
+		assert.Contains(t, c.output, "line 3")
 	})
 
 	t.Run("a complaint points at the setting's line", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "channels:\n  - channel: 0\n    mycall: Q1TEST\n    txdelay: 300\n")
 		assert.Equal(t, 1, c.errors)
-		assert.Contains(t, c.output, "Line 4: Invalid time for transmit delay")
+		assert.Contains(t, c.output, "Line 5: Invalid time for transmit delay")
 	})
 
 	t.Run("a complaint in the legacy block points at the file's line", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0}\nlegacy: |\n  AGWPORT 8010\n  BOGUS\n")
 		assert.Equal(t, 1, c.errors)
-		assert.Contains(t, c.output, "Unrecognized command 'BOGUS' on line 5")
+		assert.Contains(t, c.output, "Unrecognized command 'BOGUS' on line 6")
 	})
 
 	t.Run("a device defined in both places is refused", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "audioDevices:\n  - input: plughw:1,0\nlegacy: |\n  ADEVICE plughw:2,0\n")
 		assert.Equal(t, 1, c.errors)
-		assert.Contains(t, c.output, "ADEVICE0 can't be defined more than once. Line 4")
+		assert.Contains(t, c.output, "ADEVICE0 can't be defined more than once. Line 5")
 		assert.Equal(t, "plughw:1,0", c.audio.adev[0].adevice_in)
 	})
 
@@ -431,10 +446,10 @@ legacy: |
 	// it - settings, or even a mistake - went unnoticed.
 	t.Run("a second document is refused", func(t *testing.T) {
 		for _, rest := range []string{
-			"---\nchannels:\n  - {channel: 0, txdelay: 20}\n",
+			"---\nsamoyed:\n  channels:\n    - {channel: 0, txdelay: 20}\n",
 			"---\n: : :\n",
 		} {
-			var c = parseYAMLConfig(t, "channels:\n  - {channel: 0, mycall: Q1TEST}\n"+rest)
+			var c = parseConfigNamed(t, "samoyed*.yaml", "samoyed:\n  channels:\n    - {channel: 0, mycall: Q1TEST}\n"+rest)
 			assert.True(t, c.fatal, rest)
 			assert.True(t, IsNoCall(c.audio.mycall[0]), rest)
 		}
@@ -449,7 +464,7 @@ legacy: |
 
 		c = parseYAMLConfig(t, "channels:\n  - {channel: 0, mycall: \"\"}\n")
 		assert.Equal(t, 1, c.errors)
-		assert.Contains(t, c.output, "Missing value for MYCALL command on line 2")
+		assert.Contains(t, c.output, "Missing value for MYCALL command on line 3")
 
 		c = parseYAMLConfig(t, "channels:\n  - {channel: 0, ptt: {method: rig, model: auto, device: /dev/ttyS0, rate: -1}}\n")
 		assert.Equal(t, 1, c.errors)
@@ -461,9 +476,9 @@ legacy: |
 	t.Run("aliases and merges are followed", func(t *testing.T) {
 		var want = parseConfig(t, "MYCALL Q1TEST\nTXDELAY 20\n")
 
-		// An anchor has to come before its alias, and the top level has no
-		// spare key to put one under, so these anchor an earlier entry of
-		// the same list.  Applying an entry twice changes nothing.
+		// An anchor has to come before its alias, and there is no spare key
+		// to put one under, so these anchor an earlier entry of the same
+		// list.  Applying an entry twice changes nothing.
 		for _, content := range []string{
 			"channels:\n  - &base {channel: 0, mycall: Q1TEST, txdelay: 20}\n  - *base\n",
 			"channels:\n  - &base {channel: 0, mycall: Q1TEST}\n  - {<<: *base, txdelay: 20}\n",
@@ -477,8 +492,8 @@ legacy: |
 	t.Run("a port complaint points at the setting's line", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0}\nagwPort: 99\nkissPorts:\n  - port: 8011\n  - port: 99\n")
 		assert.Equal(t, 2, c.errors)
-		assert.Contains(t, c.output, "Line 3: Invalid port number for AGW")
-		assert.Contains(t, c.output, "Line 6: Invalid TCP port number for KISS")
+		assert.Contains(t, c.output, "Line 4: Invalid port number for AGW")
+		assert.Contains(t, c.output, "Line 7: Invalid TCP port number for KISS")
 	})
 
 	t.Run("an IL2P setting of the wrong type is refused", func(t *testing.T) {
@@ -501,8 +516,24 @@ legacy: |
 	})
 
 	t.Run("a file that is not YAML is refused", func(t *testing.T) {
-		var c = parseYAMLConfig(t, "MYCALL Q1TEST\n")
+		var c = parseConfigNamed(t, "samoyed*.yaml", "MYCALL Q1TEST\n")
 		assert.True(t, c.fatal)
 		assert.True(t, IsNoCall(c.audio.mycall[0]))
+	})
+
+	t.Run("settings outside the samoyed key are refused", func(t *testing.T) {
+		var c = parseConfigNamed(t, "samoyed*.yaml", "channels:\n  - {channel: 0, mycall: Q1TEST}\n")
+		assert.True(t, c.fatal)
+		assert.Contains(t, c.output, "line 1")
+		assert.Contains(t, c.output, `top-level "samoyed" key`)
+		assert.True(t, IsNoCall(c.audio.mycall[0]))
+	})
+
+	t.Run("an empty samoyed key changes nothing", func(t *testing.T) {
+		var want = parseConfig(t, "")
+		var got = parseConfigNamed(t, "samoyed*.yaml", "samoyed:\n")
+		assert.Zero(t, got.errors, got.output)
+		assert.Equal(t, want.audio, got.audio)
+		assert.Equal(t, want.misc, got.misc)
 	})
 }
