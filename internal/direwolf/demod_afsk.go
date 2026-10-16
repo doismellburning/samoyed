@@ -26,6 +26,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dsp"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/sirupsen/logrus"
 )
 
 var DCD_CONFIG_AFSK = GenericDCDConfig() //nolint:gochecknoglobals // Constant tuning, never written
@@ -271,8 +272,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		D.alevel_space_peak = -1
 
 	default:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid AFSK demodulator profile = %c\n", profile)
+		logrus.WithField("profile", string(profile)).Error("Invalid AFSK demodulator profile")
 		os.Exit(1)
 	}
 
@@ -321,13 +321,12 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		// The message is upsetting.  Can we handle this better?
 
 		if D.pre_filter_taps > MAX_FILTER_SIZE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Warning: Calculated pre filter size of %d is too large.\n", D.pre_filter_taps)
-			dw_printf("Decrease the audio sample rate or increase the decimation factor.\n")
-			dw_printf("You can use -D2 or -D3, on the command line, to down-sample the audio rate\n")
-			dw_printf("before demodulating.  This greatly decreases the CPU requirements with little\n")
-			dw_printf("impact on the decoding performance.  This is useful for a slow ARM processor,\n")
-			dw_printf("such as with a Raspberry Pi model 1.\n")
+			logrus.WithFields(logrus.Fields{
+				"size":            D.pre_filter_taps,
+				"max_filter_size": MAX_FILTER_SIZE,
+			}).Warn("Calculated pre filter size is too large; decrease the audio sample rate or increase the decimation factor " +
+				"(-D2 or -D3 on the command line down-samples the audio before demodulating, " +
+				"which greatly decreases the CPU requirements with little impact on decoding performance)")
 
 			D.pre_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
@@ -362,10 +361,10 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		TUNE("TUNE_LP_FILTER_TAPS", D.lp_filter_taps, "lp_filter_taps (RRC)", "%d")
 
 		if D.lp_filter_taps > MAX_FILTER_SIZE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Calculated RRC low pass filter size of %d is too large.\n", D.lp_filter_taps)
-			dw_printf("Decrease the audio sample rate or increase the decimation factor or\n")
-			dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n", MAX_FILTER_SIZE)
+			logrus.WithFields(logrus.Fields{
+				"size":            D.lp_filter_taps,
+				"max_filter_size": MAX_FILTER_SIZE,
+			}).Error("Calculated RRC low pass filter size is too large; decrease the audio sample rate, increase the decimation factor, or recompile with a larger MAX_FILTER_SIZE")
 			D.lp_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 
@@ -377,10 +376,10 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		TUNE("TUNE_LP_FILTER_TAPS", D.lp_filter_taps, "lp_filter_taps (FIR)", "%d")
 
 		if D.lp_filter_taps > MAX_FILTER_SIZE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Calculated FIR low pass filter size of %d is too large.\n", D.lp_filter_taps)
-			dw_printf("Decrease the audio sample rate or increase the decimation factor or\n")
-			dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n", MAX_FILTER_SIZE)
+			logrus.WithFields(logrus.Fields{
+				"size":            D.lp_filter_taps,
+				"max_filter_size": MAX_FILTER_SIZE,
+			}).Error("Calculated FIR low pass filter size is too large; decrease the audio sample rate, increase the decimation factor, or recompile with a larger MAX_FILTER_SIZE")
 			D.lp_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 

@@ -83,11 +83,12 @@ const audio_amplitude = 100 /* % of audio sample range. */
 // cancellation reaches the goroutines doing the work rather than only the
 // process itself.
 func DirewolfMain(ctx context.Context) { //nolint:funlen // Ported from Dire Wolf as one function
-	// logrus writes to stderr by default, while everything still going through
-	// dw_printf writes to stdout. Until the conversion is finished the two are
-	// halves of one console stream - a "Packet" entry on stderr whose packet
-	// text went to stdout is no use to anyone, and anything reading our stdout
-	// would lose the converted lines altogether - so put logrus on stdout too.
+	// logrus writes to stderr by default, while the monitor output - the packet
+	// text ax25.SafePrint writes, and the lines printed around it - goes to
+	// stdout. The two are halves of one console stream - a "Packet" entry on
+	// stderr whose packet text went to stdout is no use to anyone, and anything
+	// reading our stdout would lose the log entries altogether - so put logrus
+	// on stdout too.
 	logrus.SetOutput(os.Stdout)
 
 	var audioStatsInterval = pflag.IntP("audio-stats-interval", "a", 0, "Audio statistics interval in seconds.  0 to disable.")
@@ -350,7 +351,6 @@ x = Silence FX.25 information.`)
 	}
 
 	if modemErr != nil {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Fprintf(os.Stderr, "%s\n", modemErr)
 		pflag.Usage()
 		os.Exit(1)
@@ -465,7 +465,6 @@ x = Silence FX.25 information.`)
 
 	if err != nil {
 		logrus.WithError(err).Debug("AudioOpen failed")
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
 		_ = dwutil.SleepSecCtx(ctx, 5)
 		pflag.Usage()
@@ -617,17 +616,13 @@ x = Silence FX.25 information.`)
 			case 'p':
 				transmitCalibrationType = p // Set PTT only
 			default:
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Invalid option '%c' for -x. Must be a, m, s, or p.\n", p)
-				text_color_set(DW_COLOR_INFO)
 				td.exit(1)
 			}
 		}
 
 		if transmitCalibrationChannel < 0 || transmitCalibrationChannel >= MAX_RADIO_CHANS {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Invalid channel %d for -x. \n", transmitCalibrationChannel)
-			text_color_set(DW_COLOR_INFO)
 			td.exit(1)
 		}
 
@@ -639,17 +634,14 @@ x = Silence FX.25 information.`)
 				// is still the PTT test a receive-only station wants.
 				if transmitCalibrationType != 'p' &&
 					!audioDevices.transmitAvailable(ACHAN2ADEV(transmitCalibrationChannel)) {
-					text_color_set(DW_COLOR_ERROR)
 					fmt.Printf("Channel %d has no audio output device, so calibration tones cannot be sent.\n", transmitCalibrationChannel)
 					fmt.Printf("Use -x p to key PTT without audio.\n")
-					text_color_set(DW_COLOR_INFO)
 					td.exit(1)
 				}
 
 				var max_duration = 60
 				var n = audio_config.achan[transmitCalibrationChannel].baud * max_duration
 
-				text_color_set(DW_COLOR_INFO)
 				pttControl.SetPTT(transmitCalibrationChannel, true)
 
 				switch transmitCalibrationType {
@@ -688,19 +680,14 @@ x = Silence FX.25 information.`)
 				}
 
 				pttControl.SetPTT(transmitCalibrationChannel, false)
-				text_color_set(DW_COLOR_INFO)
 				stopIfCancelled(ctx, td)
 				td.exit(0)
 			} else {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("\nMark/Space frequencies not defined for channel %d. Cannot calibrate using this modem type.\n", transmitCalibrationChannel)
-				text_color_set(DW_COLOR_INFO)
 				td.exit(1)
 			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\nChannel %d is not configured as a radio channel.\n", transmitCalibrationChannel)
-			text_color_set(DW_COLOR_INFO)
 			td.exit(1)
 		}
 	}
@@ -824,8 +811,7 @@ x = Silence FX.25 information.`)
 	stopIfCancelled(ctx, td)
 
 	if waypointErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%v\n", waypointErr)
+		logrus.WithError(waypointErr).Error("Unable to start waypoint output")
 		td.exit(1)
 	}
 	waypointSender.SetDebug(d_w_opt)
@@ -1022,8 +1008,6 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		heard = pp.AddrWithSSID(h)
 	}
 
-	text_color_set(DW_COLOR_DEBUG)
-
 	// The HEARD line.
 
 	if !rh.quietHeard && alevel.Rec >= 0 { /* suppress if "-q h" option */
@@ -1133,12 +1117,6 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		if numSlicers > 1 {
 			logEntry = logEntry.WithField("slice", src.Slicer.Slice)
 		}
-
-		if pp.IsAPRS() {
-			text_color_set(DW_COLOR_REC)
-		} else {
-			text_color_set(DW_COLOR_DECODED)
-		}
 	}
 
 	logEntry = logEntry.WithField("addrs", stemp) /* stations followed by : */
@@ -1164,7 +1142,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		} else {
 			logEntry.Info("Packet ax25_safe_print below:")
 			ax25.SafePrint(pinfo, asciiOnly)
-			dw_printf("\n")
+			fmt.Println()
 		}
 	} else {
 		// for APRS we generally want to display non-ASCII to see UTF-8.
@@ -1174,7 +1152,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		// TODO: Might want to use d_u_opt for transmitted frames too.
 		logEntry.Info("Packet ax25_safe_print below:")
 		ax25.SafePrint(pinfo, asciiOnly)
-		dw_printf("\n")
+		fmt.Println()
 	}
 
 	// Also display in pure ASCII if non-ASCII characters and "-d u" option specified.
@@ -1193,7 +1171,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		if hasNonPrintable {
 			logrus.Debug("--debug u hexdump below:")
 			ax25.SafePrint(pinfo, true)
-			dw_printf("\n")
+			fmt.Println()
 		}
 	}
 
@@ -1433,7 +1411,6 @@ func (td *teardownList) run() {
 
 	td.ran = true
 
-	text_color_set(DW_COLOR_INFO)
 	logrus.Info("QRT")
 
 	// Stop the goroutines first, so that none of them is still using what is

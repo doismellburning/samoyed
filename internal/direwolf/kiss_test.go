@@ -21,7 +21,6 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
-	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -302,11 +301,11 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 	// is longer than the terminal will hold.
 	var got = drainKissFrame(t, client)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		kp.SendRecPacket(0, kiss.CmdDataFrame, frame)
 	})
 
-	assert.Contains(t, output, "Truncated")
+	assert.Contains(t, output, "truncated")
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
 	assert.Len(t, <-got, ax25.MaxPacketLen+3)
@@ -441,17 +440,17 @@ func TestKissPTClientHangingUpClosesTheTerminal(t *testing.T) {
 func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	var kp, client = startKissPT(t, 2)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		kp.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readKissFrame(t, client)
 	})
 
 	assert.Contains(t, output, "Packet content before adding KISS framing")
-	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
+	assert.Contains(t, output, `channel=1 direction=to function="Data frame"`)
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	output = testutils.CaptureOutput(t, func() {
+	output = captureKissLog(t, func() {
 		kp.prompt([]byte("\r\ncmd:"))
 
 		readKissText(t, client, len("\r\ncmd:"))

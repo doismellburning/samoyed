@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 // The TNC side of the KISS protocol - collecting frames from a client
@@ -24,11 +23,6 @@ const (
 	FROM_CLIENT fromto_t = 0
 	TO_CLIENT   fromto_t = 1
 )
-
-var FROMTO_PREFIX = map[fromto_t]string{
-	FROM_CLIENT: "<<<",
-	TO_CLIENT:   ">>>",
-}
 
 // This is used only for TCPKISS but it put in kissnet.h,
 // there would be a circular dependency between the two header files.
@@ -182,17 +176,20 @@ func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *kiss.Collecto
  *--------------------------------------------------------------------*/
 
 func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
+	logKissMessage(logrus.DebugLevel, fromto, special, pmsg)
+}
+
+// logKissMessage is kiss_debug_print at level: Error when the message comes
+// with a complaint about it, so the dump shows without -d k.
+func logKissMessage(level logrus.Level, fromto fromto_t, special string, pmsg []byte) {
 	var direction = []string{"from", "to"}
-	var prefix = []string{"<<<", ">>>"}
 	var function = []string{
 		"Data frame", "TXDELAY", "P", "SlotTime",
 		"TXtail", "FullDuplex", "SetHardware", "Invalid 7",
 		"Invalid 8", "Invalid 9", "Invalid 10", "Invalid 11",
 		"Invalid 12", "Invalid 13", "Invalid 14", "Return"}
 
-	text_color_set(DW_COLOR_DEBUG)
-
-	dw_printf("\n")
+	var entry = logrus.WithField("direction", direction[fromto])
 
 	if special == "" {
 		if len(pmsg) > 0 && pmsg[0] == kiss.FEND {
@@ -203,21 +200,25 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 		// What is left can be nothing at all - a message that was only an
 		// escaped FEND, say - and then there is no command byte to describe.
 		if len(pmsg) == 0 {
-			logrus.WithField("direction", direction[fromto]).Warn("Empty message for KISS client application")
+			entry.Warn("Empty message for KISS client application")
 
 			return
 		}
 
-		dw_printf("%s %s %s KISS client application, channel %d, total length = %d\n",
-			prefix[fromto], function[pmsg[0]&0xf], direction[fromto],
-			(pmsg[0]>>4)&0xf, len(pmsg))
+		entry = entry.WithFields(logrus.Fields{
+			"function": function[pmsg[0]&0xf],
+			"channel":  int(pmsg[0]>>4) & 0xf,
+			"length":   len(pmsg),
+		})
 	} else {
-		dw_printf("%s %s %s KISS client application, total length = %d\n",
-			prefix[fromto], special, direction[fromto],
-			len(pmsg))
+		entry = entry.WithFields(logrus.Fields{
+			"function": special,
+			"length":   len(pmsg),
+		})
 	}
 
-	dwutil.HexDump(pmsg)
+	entry.Log(level, "KISS client application message")
+	dwutil.LogHexDump(entry, level, pmsg)
 }
 
 // kissClientFrame is what goes to a client application for frame, heard on
@@ -227,8 +228,10 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 // long to send whole.
 func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport string) []byte {
 	if len(frame) > ax25.MaxPacketLen {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\n%s KISS buffer too small.  Truncated.\n\n", transport)
+		logrus.WithFields(logrus.Fields{
+			"transport": transport,
+			"length":    len(frame),
+		}).Error("KISS buffer too small, frame truncated")
 
 		frame = frame[:ax25.MaxPacketLen]
 	}
@@ -237,10 +240,9 @@ func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport st
 
 	if debug >= 2 {
 		/* AX.25 frame with the CRC removed. */
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("\n")
-		dw_printf("Packet content before adding KISS framing and any escapes:\n")
-		dwutil.HexDump(frame)
+		var entry = logrus.WithField("length", len(frame))
+		entry.Debug("Packet content before adding KISS framing and any escapes")
+		dwutil.LogHexDump(entry, logrus.DebugLevel, frame)
 	}
 
 	var buf = kiss.Encapsulate(stemp)
@@ -355,8 +357,7 @@ func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
 		}
 
 	case chunk.Err != nil:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS message exceeded maximum length.  Discarding it.\n")
+		logrus.Error("KISS message exceeded maximum length, discarded")
 
 	case chunk.Frame != nil:
 		if debug > 0 {
@@ -368,20 +369,18 @@ func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
 
 		if len(unwrapped) == 0 {
 			// FEND FESC FEND, say: no type byte, so nothing to act on.
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS frame from client application has nothing in it once unescaped.  Ignoring it.\n")
+			logrus.Error("KISS frame from client application empty once unescaped, ignored")
 
 			return
 		}
 
 		if debug >= 2 {
 			/* Append CRC to this and it goes out over the radio. */
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("\n")
-			dw_printf("Packet content after removing KISS framing and any escapes:\n")
 			/* Don't include the "type" indicator. */
 			/* It contains the radio channel and type should always be 0 here. */
-			dwutil.HexDump(unwrapped[1:])
+			var entry = logrus.WithField("length", len(unwrapped)-1)
+			entry.Debug("Packet content after removing KISS framing and any escapes")
+			dwutil.LogHexDump(entry, logrus.DebugLevel, unwrapped[1:])
 		}
 
 		h.processMsg(unwrapped, from)
@@ -475,19 +474,17 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 		// it to find out.  An in-range IGate channel is not MEDIUM_NONE.
 
 		if channel < 0 || channel >= MAX_TOTAL_CHANS || h.audioConfig.chan_medium[channel] == MEDIUM_NONE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid transmit channel %d from KISS client app.\n", channel)
-			dw_printf("\n")
-			dw_printf("Are you using AX.25 for Linux?  It might be trying to use a modified\n")
-			dw_printf("version of KISS which uses the channel field differently than the\n")
-			dw_printf("original KISS protocol specification.  The solution might be to use\n")
-			dw_printf("a command like \"kissparms -c 1 -p radio\" to set CRC none mode.\n")
-			dw_printf("Another way of doing this is pre-loading the \"kiss\" kernel module with CRC disabled:\n")
-			dw_printf("sudo /sbin/modprobe -q mkiss crc_force=1\n")
+			logrus.WithFields(logrus.Fields{
+				"channel": channel,
+				"hint": "Are you using AX.25 for Linux?  It might be trying to use a modified " +
+					"version of KISS which uses the channel field differently than the " +
+					"original KISS protocol specification.  The solution might be to use " +
+					"a command like 'kissparms -c 1 -p radio' to set CRC none mode.  " +
+					"Another way of doing this is pre-loading the kiss kernel module with CRC disabled: " +
+					"sudo /sbin/modprobe -q mkiss crc_force=1",
+			}).Error("Invalid transmit channel from KISS client application")
 
-			dw_printf("\n")
-			text_color_set(DW_COLOR_DEBUG)
-			kiss_debug_print(FROM_CLIENT, "", kiss_msg)
+			logKissMessage(logrus.ErrorLevel, FROM_CLIENT, "", kiss_msg)
 
 			return
 		}
@@ -496,8 +493,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 
 		var pp = ax25.FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ERROR - Invalid KISS data frame from client app.\n")
+			logrus.WithField("channel", channel).Error("Invalid KISS data frame from client application")
 		} else if h.queue != nil {
 			/* How can we determine if it is an original or repeated message? */
 			/* If there is at least one digipeater in the frame, AND */
@@ -514,135 +510,142 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 
 	case kiss.CmdTxDelay: /* 1 = TXDELAY */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for TXDELAY command.\n")
+			logMissingKissValue(channel, "TXDELAY")
 
 			return
 		}
 
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set TXDELAY = %d (*10mS units = %d mS), channel %d\n", kiss_msg[1], kiss_msg[1]*10, channel)
+		var entry = logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"txdelay": kiss_msg[1],
+			"ms":      int(kiss_msg[1]) * 10,
+		})
+		entry.Info("KISS protocol set TXDELAY")
 
 		if kiss_msg[1] < 10 || kiss_msg[1] >= 100 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Are you sure you want such an extreme value for TXDELAY?\n")
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
+			entry.WithField("hint", "Read the Dire Wolf User Guide, 'Radio Channel - Transmit Timing' section, to understand what this means").Warn("Extreme value for TXDELAY")
 		}
 
 		h.xmit.SetTxdelay(channel, int(kiss_msg[1]))
 
 	case kiss.CmdPersistence: /* 2 = Persistence */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for PERSISTENCE command.\n")
+			logMissingKissValue(channel, "PERSISTENCE")
 
 			return
 		}
 
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set Persistence = %d, channel %d\n", kiss_msg[1], channel)
+		var entry = logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"persist": kiss_msg[1],
+		})
+		entry.Info("KISS protocol set Persistence")
 
 		if kiss_msg[1] < 5 || kiss_msg[1] > 250 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Are you sure you want such an extreme value for PERSIST?\n")
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
+			entry.WithField("hint", "Read the Dire Wolf User Guide, 'Radio Channel - Transmit Timing' section, to understand what this means").Warn("Extreme value for PERSIST")
 		}
 
 		h.xmit.SetPersist(channel, int(kiss_msg[1]))
 
 	case kiss.CmdSlotTime: /* 3 = SlotTime */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for SLOTTIME command.\n")
+			logMissingKissValue(channel, "SLOTTIME")
 
 			return
 		}
 
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set SlotTime = %d (*10mS units = %d mS), channel %d\n", kiss_msg[1], kiss_msg[1]*10, channel)
+		var entry = logrus.WithFields(logrus.Fields{
+			"channel":  channel,
+			"slottime": kiss_msg[1],
+			"ms":       int(kiss_msg[1]) * 10,
+		})
+		entry.Info("KISS protocol set SlotTime")
 
 		if kiss_msg[1] < 2 || kiss_msg[1] > 50 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Are you sure you want such an extreme value for SLOTTIME?\n")
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
+			entry.WithField("hint", "Read the Dire Wolf User Guide, 'Radio Channel - Transmit Timing' section, to understand what this means").Warn("Extreme value for SLOTTIME")
 		}
 
 		h.xmit.SetSlottime(channel, int(kiss_msg[1]))
 
 	case kiss.CmdTxTail: /* 4 = TXtail */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for TXTAIL command.\n")
+			logMissingKissValue(channel, "TXTAIL")
 
 			return
 		}
 
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set TXtail = %d (*10mS units = %d mS), channel %d\n", kiss_msg[1], kiss_msg[1]*10, channel)
+		var entry = logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"txtail":  kiss_msg[1],
+			"ms":      int(kiss_msg[1]) * 10,
+		})
+		entry.Info("KISS protocol set TXtail")
 
 		if kiss_msg[1] < 5 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Setting TXTAIL so low is asking for trouble.  You probably don't want to do this.\n")
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
+			entry.WithField("hint", "Read the Dire Wolf User Guide, 'Radio Channel - Transmit Timing' section, to understand what this means").Warn("Setting TXTAIL so low is asking for trouble")
 		}
 
 		h.xmit.SetTxtail(channel, int(kiss_msg[1]))
 
 	case kiss.CmdFullDuplex: /* 5 = FullDuplex */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for FULLDUPLEX command.\n")
+			logMissingKissValue(channel, "FULLDUPLEX")
 
 			return
 		}
 		var val = kiss_msg[1] != 0
 
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set FullDuplex = %t, channel %d\n", val, channel)
+		logrus.WithFields(logrus.Fields{
+			"channel":     channel,
+			"full_duplex": val,
+		}).Info("KISS protocol set FullDuplex")
 		h.xmit.SetFulldup(channel, val)
 
 	case kiss.CmdSetHardware: /* 6 = TNC specific */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for SET HARDWARE command.\n")
+			logMissingKissValue(channel, "SET HARDWARE")
 
 			return
 		}
 
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set hardware \"%s\", channel %d\n", kiss_msg[1:], channel)
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"command": string(kiss_msg[1:]),
+		}).Info("KISS protocol set hardware")
 		kiss_set_hardware(channel, kiss_msg[1:], from, h.queue)
 
 	case kiss.CmdEndKiss: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol end KISS mode - Ignored.\n")
+		logrus.WithField("channel", channel).Info("KISS protocol end KISS mode ignored")
 
 	default:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS Invalid command %d\n", cmd)
-		kiss_debug_print(FROM_CLIENT, "", kiss_msg)
-
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Troubleshooting tip:\n")
-		dw_printf("Use \"-d kn\" option on direwolf command line to observe\n")
-		dw_printf("all communication with the client application.\n")
+		var hint = "Use the '-d kn' option on the direwolf command line to observe " +
+			"all communication with the client application"
 
 		if cmd == kiss.CmdXKissData || cmd == kiss.CmdXKissPoll {
-			dw_printf("\n")
-			dw_printf("It looks like you are trying to use the \"XKISS\" protocol which is not supported.\n")
-			dw_printf("Change your application settings to use standard \"KISS\" rather than some other variant.\n")
-			dw_printf("If you are using Winlink Express, configure like this:\n")
-			dw_printf("    Packet TNC Type:  KISS\n")
-			dw_printf("    Packet TNC Model:  NORMAL      -- Using ACKMODE will cause this error.\n")
-			dw_printf("\n")
+			hint += ".  It looks like you are trying to use the XKISS protocol, which is not supported.  " +
+				"Change your application settings to use standard KISS rather than some other variant.  " +
+				"If you are using Winlink Express, set Packet TNC Type to KISS " +
+				"and Packet TNC Model to NORMAL - using ACKMODE will cause this error"
 		}
+
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"command": cmd,
+			"hint":    hint,
+		}).Error("Invalid KISS command")
+		logKissMessage(logrus.ErrorLevel, FROM_CLIENT, "", kiss_msg)
 	}
 } /* end processMsg */
+
+// logMissingKissValue complains about a command from a KISS client, for
+// channel, that should have carried a value and didn't.
+func logMissingKissValue(channel int, command string) {
+	logrus.WithFields(logrus.Fields{
+		"channel": channel,
+		"command": command,
+	}).Error("Missing value for KISS command")
+}
 
 /*-------------------------------------------------------------------
  *
@@ -730,16 +733,20 @@ func kiss_set_hardware(channel int, command []byte, from kissClient, queue clien
 	if found {
 		if bytes.Equal(cmd, []byte("TNC")) { /* TNC - Identify software version. */
 			if len(value) > 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS Set Hardware TNC: Did not expect a parameter.\n")
+				logrus.WithFields(logrus.Fields{
+					"command":   "TNC",
+					"parameter": string(value),
+				}).Error("KISS Set Hardware query did not expect a parameter")
 			}
 
 			var response = fmt.Sprintf("DIREWOLF %d.%d", version.Major, version.Minor)
 			from.reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else if bytes.Equal(cmd, []byte("TXBUF")) { /* TXBUF - Number of bytes in transmit queue. */
 			if len(value) > 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS Set Hardware TXBUF: Did not expect a parameter.\n")
+				logrus.WithFields(logrus.Fields{
+					"command":   "TXBUF",
+					"parameter": string(value),
+				}).Error("KISS Set Hardware query did not expect a parameter")
 			}
 
 			var n = 0
@@ -750,11 +757,9 @@ func kiss_set_hardware(channel int, command []byte, from kissClient, queue clien
 			var response = fmt.Sprintf("TXBUF:%d", n)
 			from.reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS Set Hardware unrecognized command: %s.\n", cmd)
+			logrus.WithField("command", string(cmd)).Error("KISS Set Hardware unrecognized command")
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS Set Hardware \"%s\" expected the form COMMAND:[parameter[,parameter...]]\n", command)
+		logrus.WithField("command", string(command)).Error("KISS Set Hardware expected the form COMMAND:[parameter[,parameter...]]")
 	}
 } /* end kiss_set_hardware */

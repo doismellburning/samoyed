@@ -11,6 +11,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"math"
 	"strings"
 	"sync/atomic"
 	"unicode"
@@ -111,8 +112,7 @@ func demod_init(pa *RadioConfig) [MAX_RADIO_CHANS]*Demodulator {
 	for channel := MAX_RADIO_CHANS; channel < MAX_TOTAL_CHANS; channel++ {
 		// FIXME dw_printf ("-------- virtual channel loop %d \n", channel);
 		if channel == pa.igate_vchannel {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Channel %d: IGate virtual channel.\n", channel)
+			logrus.WithField("channel", channel).Info("IGate virtual channel")
 		}
 	}
 
@@ -169,22 +169,25 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				have_plus = 1
 
 				if i+1 != len(profileStr) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Channel %d: + option must appear at end of demodulator types \"%s\" \n",
-						channel, achan.profiles)
+					logrus.WithFields(logrus.Fields{
+						"channel":  channel,
+						"profiles": achan.profiles,
+					}).Error("+ option must appear at end of demodulator types")
 				}
 			} else if p == '-' {
 				have_plus = -1
 
 				if i+1 != len(profileStr) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Channel %d: - option must appear at end of demodulator types \"%s\" \n",
-						channel, achan.profiles)
+					logrus.WithFields(logrus.Fields{
+						"channel":  channel,
+						"profiles": achan.profiles,
+					}).Error("- option must appear at end of demodulator types")
 				}
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Channel %d: Demodulator types \"%s\" can contain only letters and + - characters.\n",
-					channel, achan.profiles)
+				logrus.WithFields(logrus.Fields{
+					"channel":  channel,
+					"profiles": achan.profiles,
+				}).Error("Demodulator types can contain only letters and + - characters")
 			}
 		}
 
@@ -282,15 +285,13 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		 */
 
 		if have_plus != 0 && achan.num_freq > 1 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Channel %d: Demodulator + option can't be combined with multiple frequencies.\n", channel)
+			logrus.WithField("channel", channel).Error("Demodulator + option can't be combined with multiple frequencies")
 			numSubchan = 1 // Will be set higher later.
 			achan.num_freq = 1
 		}
 
 		if num_letters > 1 && achan.num_freq > 1 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Channel %d: Multiple demodulator types can't be combined with multiple frequencies.\n", channel)
+			logrus.WithField("channel", channel).Error("Multiple demodulator types can't be combined with multiple frequencies")
 
 			achan.profiles = string(achan.profiles[0])
 			num_letters = 1
@@ -303,24 +304,22 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			}
 		}
 
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Channel %d: %d baud, AFSK %d & %d Hz, %s, %d sample rate",
-			channel, achan.baud,
-			achan.mark_freq, achan.space_freq,
-			achan.profiles,
-			samplesPerSec)
+		var fields = logrus.Fields{
+			"channel":      channel,
+			"baud":         achan.baud,
+			"mark":         achan.mark_freq,
+			"space":        achan.space_freq,
+			"profiles":     achan.profiles,
+			"sample_rate":  samplesPerSec,
+			"tx":           achan.layer2_xmit,
+			"dtmf_decoder": achan.dtmf_decode != DTMF_DECODE_OFF,
+		}
 
 		if achan.decimate != 1 {
-			dw_printf(" / %d", achan.decimate)
+			fields["decimate"] = achan.decimate
 		}
 
-		dw_printf(", Tx %s", achan.layer2_xmit)
-
-		if achan.dtmf_decode != DTMF_DECODE_OFF {
-			dw_printf(", DTMF decoder enabled")
-		}
-
-		dw_printf(".\n")
+		logrus.WithFields(fields).Info("AFSK demodulator")
 
 		/*
 		 * Initialize the demodulator(s).
@@ -342,15 +341,18 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			numSubchan = num_letters
 
 			if numSubchan != num_letters {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("INTERNAL ERROR, chan=%d, num_subchan(%d) != strlen(\"%s\")\n",
-					channel, numSubchan, achan.profiles)
+				logrus.WithFields(logrus.Fields{
+					"channel":     channel,
+					"num_subchan": numSubchan,
+					"profiles":    achan.profiles,
+				}).Error("INTERNAL ERROR: num_subchan != len(profiles)")
 			}
 
 			if achan.num_freq != 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1\n",
-					channel, achan.num_freq)
+				logrus.WithFields(logrus.Fields{
+					"channel":  channel,
+					"num_freq": achan.num_freq,
+				}).Error("INTERNAL ERROR: num_freq != 1")
 			}
 
 			for d := range numSubchan {
@@ -363,8 +365,13 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				var space = achan.space_freq
 
 				if numSubchan != 1 {
-					text_color_set(DW_COLOR_DEBUG)
-					dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
+					logrus.WithFields(logrus.Fields{
+						"channel": channel,
+						"subchan": d,
+						"profile": string(rune(profile)),
+						"mark":    mark,
+						"space":   space,
+					}).Info("AFSK subchannel")
 				}
 
 				demod_afsk_init(samplesPerSec/achan.decimate,
@@ -394,21 +401,25 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			 * One demodulator feeds multiple slicers, each a subchannel.
 			 */
 			if num_letters != 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1\n",
-					channel, just_letters)
+				logrus.WithFields(logrus.Fields{
+					"channel":  channel,
+					"profiles": just_letters,
+				}).Error("INTERNAL ERROR: len(profiles) != 1")
 			}
 
 			if achan.num_freq != 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1\n",
-					channel, achan.num_freq)
+				logrus.WithFields(logrus.Fields{
+					"channel":  channel,
+					"num_freq": achan.num_freq,
+				}).Error("INTERNAL ERROR: num_freq != 1")
 			}
 
 			if achan.num_freq != numSubchan {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != num_subchan(%d)\n",
-					channel, achan.num_freq, numSubchan)
+				logrus.WithFields(logrus.Fields{
+					"channel":     channel,
+					"num_freq":    achan.num_freq,
+					"num_subchan": numSubchan,
+				}).Error("INTERNAL ERROR: num_freq != num_subchan")
 			}
 
 			var D = &demodulator.states[0]
@@ -442,9 +453,10 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			 * Can be combined with multiple frequencies.
 			 */
 			if num_letters != 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1\n",
-					channel, achan.profiles)
+				logrus.WithFields(logrus.Fields{
+					"channel":  channel,
+					"profiles": achan.profiles,
+				}).Error("INTERNAL ERROR: len(profiles) != 1")
 			}
 
 			numSubchan = achan.num_freq
@@ -461,8 +473,13 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				var space = achan.space_freq + k
 
 				if achan.num_freq != 1 {
-					text_color_set(DW_COLOR_DEBUG)
-					dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
+					logrus.WithFields(logrus.Fields{
+						"channel": channel,
+						"subchan": d,
+						"profile": string(rune(profile)),
+						"mark":    mark,
+						"space":   space,
+					}).Info("AFSK subchannel")
 				}
 
 				demod_afsk_init(samplesPerSec/achan.decimate,
@@ -507,25 +524,15 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		achan.profiles = capProfiles(channel, achan.profiles)
 		numSubchan = len(achan.profiles)
 
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Channel %d: %d bps, QPSK, %s, %d sample rate",
-			channel, achan.baud,
-			achan.profiles,
-			samplesPerSec)
-
-		dw_printf(", Tx %s", achan.layer2_xmit)
-
-		if v26 == V26_B {
-			dw_printf(", compatible with MFJ-2400")
-		} else {
-			dw_printf(", compatible with earlier direwolf")
-		}
-
-		if achan.dtmf_decode != DTMF_DECODE_OFF {
-			dw_printf(", DTMF decoder enabled")
-		}
-
-		dw_printf(".\n")
+		logrus.WithFields(logrus.Fields{
+			"channel":         channel,
+			"bps":             achan.baud,
+			"profiles":        achan.profiles,
+			"sample_rate":     samplesPerSec,
+			"tx":              achan.layer2_xmit,
+			"compatible_with": dwutil.IfThenElse(v26 == V26_B, "MFJ-2400", "earlier direwolf"),
+			"dtmf_decoder":    achan.dtmf_decode != DTMF_DECODE_OFF,
+		}).Info("QPSK demodulator")
 
 		for d := range numSubchan {
 			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
@@ -566,19 +573,14 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		achan.profiles = capProfiles(channel, achan.profiles)
 		numSubchan = len(achan.profiles)
 
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Channel %d: %d bps, 8PSK, %s, %d sample rate",
-			channel, achan.baud,
-			achan.profiles,
-			samplesPerSec)
-
-		dw_printf(", Tx %s", achan.layer2_xmit)
-
-		if achan.dtmf_decode != DTMF_DECODE_OFF {
-			dw_printf(", DTMF decoder enabled")
-		}
-
-		dw_printf(".\n")
+		logrus.WithFields(logrus.Fields{
+			"channel":      channel,
+			"bps":          achan.baud,
+			"profiles":     achan.profiles,
+			"sample_rate":  samplesPerSec,
+			"tx":           achan.layer2_xmit,
+			"dtmf_decoder": achan.dtmf_decode != DTMF_DECODE_OFF,
+		}).Info("8PSK demodulator")
 
 		for d := range numSubchan {
 			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
@@ -614,19 +616,14 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 		achan.profiles = capProfiles(channel, achan.profiles)
 		numSubchan = len(achan.profiles)
 
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Channel %d: %d bps, BPSK, %s, %d sample rate",
-			channel, achan.baud,
-			achan.profiles,
-			samplesPerSec)
-
-		dw_printf(", Tx %s", achan.layer2_xmit)
-
-		if achan.dtmf_decode != DTMF_DECODE_OFF {
-			dw_printf(", DTMF decoder enabled")
-		}
-
-		dw_printf(".\n")
+		logrus.WithFields(logrus.Fields{
+			"channel":      channel,
+			"bps":          achan.baud,
+			"profiles":     achan.profiles,
+			"sample_rate":  samplesPerSec,
+			"tx":           achan.layer2_xmit,
+			"dtmf_decoder": achan.dtmf_decode != DTMF_DECODE_OFF,
+		}).Info("BPSK demodulator")
 
 		for d := range numSubchan {
 			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
@@ -707,21 +704,15 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			#endif
 			*/
 
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Channel %d: %d baud, %s, %s, %d sample rate x %d",
-				channel,
-				achan.baud,
-				dwutil.IfThenElse(achan.modem_type == MODEM_AIS, "AIS", "K9NG/G3RUH"),
-				achan.profiles,
-				samplesPerSec,
-				achan.upsample)
-			dw_printf(", Tx %s", achan.layer2_xmit)
-
-			if achan.dtmf_decode != DTMF_DECODE_OFF {
-				dw_printf(", DTMF decoder enabled")
-			}
-
-			dw_printf(".\n")
+			logrus.WithFields(logrus.Fields{
+				"channel":      channel,
+				"baud":         achan.baud,
+				"profiles":     achan.profiles,
+				"sample_rate":  samplesPerSec,
+				"upsample":     achan.upsample,
+				"tx":           achan.layer2_xmit,
+				"dtmf_decoder": achan.dtmf_decode != DTMF_DECODE_OFF,
+			}).Info(dwutil.IfThenElse(achan.modem_type == MODEM_AIS, "AIS demodulator", "K9NG/G3RUH demodulator"))
 
 			var D = &demodulator.states[0] // first subchannel
 
@@ -734,27 +725,27 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				numSlicers = MAX_SLICERS
 			}
 
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("The ratio of audio samples per sec (%d) to data rate in baud (%d) is %.1f\n",
-				samplesPerSec,
-				achan.baud,
-				ratio)
+			var ratioLog = logrus.WithFields(logrus.Fields{
+				"channel":     channel,
+				"sample_rate": samplesPerSec,
+				"baud":        achan.baud,
+				"ratio":       math.Round(ratio*10) / 10,
+			})
 
 			if ratio < 3 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("There is little hope of success with such a low ratio.  Use a higher sample rate.\n")
+				ratioLog.Error("Sample rate to baud ratio is too low for much hope of success; use a higher sample rate")
 			} else if ratio < 5 {
-				dw_printf("This is on the low side for best performance.  Can you use a higher sample rate?\n")
-
 				if samplesPerSec == 44100 {
-					dw_printf("For example, can you use 48000 rather than 44100?\n")
+					ratioLog.Warn("Sample rate to baud ratio is on the low side for best performance; can you use 48000 rather than 44100?")
+				} else {
+					ratioLog.Warn("Sample rate to baud ratio is on the low side for best performance; can you use a higher sample rate?")
 				}
 			} else if ratio < 6 {
-				dw_printf("Increasing the sample rate should improve decoder performance.\n")
+				ratioLog.Info("Increasing the sample rate should improve decoder performance")
 			} else if ratio > 15 {
-				dw_printf("Sample rate is more than adequate.  You might lower it if CPU load is a concern.\n")
+				ratioLog.Info("Sample rate is more than adequate; you might lower it if CPU load is a concern")
 			} else {
-				dw_printf("This is a suitable ratio for good performance.\n")
+				ratioLog.Info("Sample rate to baud ratio is suitable for good performance")
 			}
 
 			demod_9600_init(achan.modem_type,

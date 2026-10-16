@@ -867,12 +867,12 @@ outerLoop:
 // rtfm points at the documentation.  It is a trailer on someone else's
 // complaint rather than a complaint of its own, so it is not counted.
 func rtfm() {
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("See online documentation:\n")
-	dw_printf("    stable release:    https://github.com/wb2osz/direwolf/tree/master/doc\n")
-	dw_printf("    development version:    https://github.com/wb2osz/direwolf/tree/dev/doc\n")
-	dw_printf("    additional topics:    https://github.com/wb2osz/direwolf-doc\n")
-	dw_printf("    general APRS info:    https://how.aprs.works\n")
+	logrus.WithFields(logrus.Fields{
+		"stable_release":      "https://github.com/wb2osz/direwolf/tree/master/doc",
+		"development_version": "https://github.com/wb2osz/direwolf/tree/dev/doc",
+		"additional_topics":   "https://github.com/wb2osz/direwolf-doc",
+		"general_aprs_info":   "https://how.aprs.works",
+	}).Info("See online documentation")
 }
 
 // symbolCodes is the APRS symbol table, as far as the configuration needs it:
@@ -944,7 +944,7 @@ type configReport struct {
 func (ps *parseState) errorf(format string, a ...any) {
 	ps.nerrors++
 
-	ps.printProblem(fmt.Sprintf(format, a...))
+	ps.printProblem(logrus.ErrorLevel, fmt.Sprintf(format, a...))
 }
 
 // warnf reports something that parses but looks suspect.  Warnings are counted
@@ -953,7 +953,7 @@ func (ps *parseState) errorf(format string, a ...any) {
 func (ps *parseState) warnf(format string, a ...any) {
 	ps.nwarnings++
 
-	ps.printProblem(fmt.Sprintf(format, a...))
+	ps.printProblem(logrus.WarnLevel, fmt.Sprintf(format, a...))
 }
 
 // report prints a problem a handler returned, and counts it.  errors.Join
@@ -972,15 +972,14 @@ func (ps *parseState) report(err error) {
 
 	ps.nerrors++
 
-	ps.printProblem(err.Error())
+	ps.printProblem(logrus.ErrorLevel, err.Error())
 }
 
-// printProblem writes one complaint out for whoever wrote the configuration
-// file: a capital letter to start and a full stop to finish, unless the
-// complaint already ends in punctuation of its own.
-func (ps *parseState) printProblem(msg string) {
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("%s\n", asSentence(msg))
+// printProblem logs one complaint, at level, for whoever wrote the
+// configuration file: a capital letter to start and a full stop to finish,
+// unless the complaint already ends in punctuation of its own.
+func (ps *parseState) printProblem(level logrus.Level, msg string) {
+	logrus.StandardLogger().Log(level, asSentence(msg))
 }
 
 // asSentence renders an error string as a sentence.
@@ -1462,7 +1461,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 	 */
 	var absFilePath, absFilePathErr = filepath.Abs(fname)
 	if absFilePathErr != nil {
-		dw_printf("Error getting absolute path for config file %s: %s\n", fname, absFilePathErr)
+		logrus.WithError(absFilePathErr).WithField("file", fname).Error("Error getting absolute path for config file")
 		os.Exit(1)
 	}
 
@@ -1483,7 +1482,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		defer fp.Close()
 	}
 
-	dw_printf("\nReading config file %s\n", absFilePath)
+	logrus.WithField("file", absFilePath).Info("Reading config file")
 
 	if isYAMLConfig(absFilePath) {
 		ps.readYAML(fp, absFilePath)
@@ -4694,7 +4693,7 @@ func handleTTMACRO(ps *parseState) error {
 		// Each of those errors was reported and counted as it was found, so
 		// this says what became of the line rather than being a complaint of
 		// its own.
-		dw_printf("Line %d: Errors found in TTMACRO, skipping.\n", ps.line)
+		logrus.WithField("line", ps.line).Info("Errors found in TTMACRO, skipping")
 	}
 
 	return nil

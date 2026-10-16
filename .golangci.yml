@@ -71,6 +71,7 @@ linters:
         - "line"
         - "now"
         - "output"
+        - "profiles"
     gocritic:
       disabled-checks:
         - captLocal  # I agree, but I want to stay semi-consistent with upstream for now
@@ -90,7 +91,7 @@ linters:
         - generic
     gosec:
       excludes:
-        - "G104"  # Stop complaining about me not checking a fmt.Printf err via dw_printf...
+        - "G104"  # Unchecked errors, mostly from Close and fmt.Printf - errcheck is off for the same reason
         - "G404"  # Weak RNGs are fine for our uses here, certainly for now(!)
         - "G602"  # "slice index out of range" checks that *may* be valid but it's hard to tell - if they're not false positives, they're niche issues
     nestif:

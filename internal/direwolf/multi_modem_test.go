@@ -12,7 +12,8 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/il2p"
-	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -416,10 +417,17 @@ func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
 func TestProcessSampleWithoutDemodulatorSaysSo(t *testing.T) {
 	var m = new(MultiModem)
 
-	var ok bool
+	var hook = test.NewGlobal()
 
-	var output = testutils.CaptureOutput(t, func() { ok = m.ProcessSample(0) })
+	t.Cleanup(hook.Reset)
+
+	var ok = m.ProcessSample(0)
 
 	assert.False(t, ok)
-	assert.Contains(t, output, "Something is seriously wrong")
+
+	var entry = hook.LastEntry()
+
+	require.NotNil(t, entry)
+	assert.Equal(t, logrus.ErrorLevel, entry.Level)
+	assert.Contains(t, entry.Message, "Something is seriously wrong")
 }

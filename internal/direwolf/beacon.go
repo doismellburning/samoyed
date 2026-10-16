@@ -149,8 +149,7 @@ func NewBeaconService(
 				case BEACON_OBJECT:
 					/* Object name is required. */
 					if bs.miscConfig.beacon[j].objname == "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: OBJNAME is required for OBEACON.\n", bs.miscConfig.beacon[j].lineno)
+						logrus.WithField("line", bs.miscConfig.beacon[j].lineno).Error("Config file: OBJNAME is required for OBEACON")
 						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 						continue
@@ -161,8 +160,7 @@ func NewBeaconService(
 				case BEACON_POSITION:
 					/* Location is required. */
 					if bs.miscConfig.beacon[j].lat.IsNothing() || bs.miscConfig.beacon[j].lon.IsNothing() {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: Latitude and longitude are required.\n", bs.miscConfig.beacon[j].lineno)
+						logrus.WithField("line", bs.miscConfig.beacon[j].lineno).Error("Config file: Latitude and longitude are required")
 						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 						continue
@@ -171,11 +169,10 @@ func NewBeaconService(
 					/* INFO and INFOCMD are only for Custom Beacon. */
 
 					if bs.miscConfig.beacon[j].custom_info != "" || bs.miscConfig.beacon[j].custom_infocmd != "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: INFO or INFOCMD are allowed only for custom beacon.\n", bs.miscConfig.beacon[j].lineno)
-						dw_printf("INFO and INFOCMD allow you to specify contents of the Information field so it\n")
-						dw_printf("so it would not make sense to use these with other beacon types which construct\n")
-						dw_printf("the Information field. Perhaps you want to use COMMENT or COMMENTCMD option.\n")
+						logrus.WithFields(logrus.Fields{
+							"line": bs.miscConfig.beacon[j].lineno,
+							"hint": "other beacon types construct the Information field themselves, perhaps you want COMMENT or COMMENTCMD",
+						}).Error("Config file: INFO or INFOCMD are allowed only for custom beacon")
 						// bs.miscConfig.beacon[j].btype = BEACON_IGNORE;
 						continue
 					}
@@ -184,24 +181,21 @@ func NewBeaconService(
 					{
 						var fix = bs.gps.Read().Fix
 						if fix == dwgps.DWFIX_NOT_INIT {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Config file, line %d: GPS must be configured to use TBEACON.\n", bs.miscConfig.beacon[j].lineno)
+							logrus.WithFields(logrus.Fields{
+								"line": bs.miscConfig.beacon[j].lineno,
+								"hint": "specify GPSD for the gpsd daemon, or GPSNMEA for a serial port connection with exclusive use",
+							}).Error("Config file: GPS must be configured to use TBEACON")
 							bs.miscConfig.beacon[j].btype = BEACON_IGNORE
-
-							dw_printf("You must specify the source of the GPS data in your configuration file.\n")
-							dw_printf("It can be either GPSD, meaning the gpsd daemon, or GPSNMEA for\n")
-							dw_printf("for a serial port connection with exclusive use.\n")
 						}
 					}
 
 					/* INFO and INFOCMD are only for Custom Beacon. */
 
 					if bs.miscConfig.beacon[j].custom_info != "" || bs.miscConfig.beacon[j].custom_infocmd != "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: INFO or INFOCMD are allowed only for custom beacon.\n", bs.miscConfig.beacon[j].lineno)
-						dw_printf("INFO and INFOCMD allow you to specify contents of the Information field so it\n")
-						dw_printf("so it would not make sense to use these with other beacon types which construct\n")
-						dw_printf("the Information field. Perhaps you want to use COMMENT or COMMENTCMD option.\n")
+						logrus.WithFields(logrus.Fields{
+							"line": bs.miscConfig.beacon[j].lineno,
+							"hint": "other beacon types construct the Information field themselves, perhaps you want COMMENT or COMMENTCMD",
+						}).Error("Config file: INFO or INFOCMD are allowed only for custom beacon")
 						// bs.miscConfig.beacon[j].btype = BEACON_IGNORE;
 						continue
 					}
@@ -209,8 +203,7 @@ func NewBeaconService(
 				case BEACON_CUSTOM:
 					/* INFO or INFOCMD is required. */
 					if bs.miscConfig.beacon[j].custom_info == "" && bs.miscConfig.beacon[j].custom_infocmd == "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: INFO or INFOCMD is required for custom beacon.\n", bs.miscConfig.beacon[j].lineno)
+						logrus.WithField("line", bs.miscConfig.beacon[j].lineno).Error("Config file: INFO or INFOCMD is required for custom beacon")
 						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 						continue
@@ -221,9 +214,7 @@ func NewBeaconService(
 					if bs.igateConfig.t2_server_name == "" ||
 						bs.igateConfig.t2_login == "" ||
 						bs.igateConfig.t2_passcode == "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: Doesn't make sense to use IBEACON without IGate Configured.\n", bs.miscConfig.beacon[j].lineno)
-						dw_printf("IBEACON has been disabled.\n")
+						logrus.WithField("line", bs.miscConfig.beacon[j].lineno).Error("Config file: IBEACON makes no sense without an IGate configured, disabling it")
 
 						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
@@ -233,13 +224,17 @@ func NewBeaconService(
 				case BEACON_IGNORE:
 				}
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: MYCALL must be set for beacon on channel %d. \n", bs.miscConfig.beacon[j].lineno, channel)
+				logrus.WithFields(logrus.Fields{
+					"line":    bs.miscConfig.beacon[j].lineno,
+					"channel": channel,
+				}).Error("Config file: MYCALL must be set for beacon channel")
 				bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Invalid channel number %d for beacon. \n", bs.miscConfig.beacon[j].lineno, channel)
+			logrus.WithFields(logrus.Fields{
+				"line":    bs.miscConfig.beacon[j].lineno,
+				"channel": channel,
+			}).Error("Config file: Invalid channel number for beacon")
 			bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 		}
 	}
@@ -266,8 +261,7 @@ func NewBeaconService(
 
 		if slot, slotted := bp.slot.Get(); slotted {
 			if !IS_GOOD(bp.every) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: When using timeslots, there must be a whole number of beacon intervals per hour.\n", bp.lineno)
+				var requested = bp.every
 
 				// Try to make it valid by adjusting up or down.
 
@@ -299,8 +293,11 @@ func NewBeaconService(
 					}
 				}
 
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: Time between slotted beacons has been adjusted to %d seconds.\n", bp.lineno, bp.every)
+				logrus.WithFields(logrus.Fields{
+					"line":      bp.lineno,
+					"requested": requested,
+					"every":     bp.every,
+				}).Error("Config file: When using timeslots, there must be a whole number of beacon intervals per hour, adjusted time between slotted beacons")
 			}
 			/*
 			 * Determine when next slot time will arrive.
@@ -471,22 +468,24 @@ func (bs *BeaconService) thread(ctx context.Context) {
 			var my_speed_mph = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
 
 			if bs.trackerDebugLevel >= 1 {
-				var hms = now.Format("15:04:05")
-
-				text_color_set(DW_COLOR_DEBUG)
-
 				switch fix {
 				case dwgps.DWFIX_3D:
-					dw_printf("%s  3D, %s, %s, %s mph, %s\xc2\xb0, %s m\n", hms,
-						maybe.Format("%.6f", "unknown", gpsinfo.Lat), maybe.Format("%.6f", "unknown", gpsinfo.Lon),
-						maybe.Format("%.1f", "unknown", my_speed_mph), maybe.Format("%.0f", "unknown", gpsinfo.Track),
-						maybe.Format("%.1f", "unknown", gpsinfo.Altitude))
+					logrus.WithFields(logrus.Fields{
+						"lat":        maybe.Format("%.6f", "unknown", gpsinfo.Lat),
+						"lon":        maybe.Format("%.6f", "unknown", gpsinfo.Lon),
+						"speed_mph":  maybe.Format("%.1f", "unknown", my_speed_mph),
+						"course":     maybe.Format("%.0f", "unknown", gpsinfo.Track),
+						"altitude_m": maybe.Format("%.1f", "unknown", gpsinfo.Altitude),
+					}).Debug("Tracker GPS 3D fix")
 				case dwgps.DWFIX_2D:
-					dw_printf("%s  2D, %s, %s, %s mph, %s\xc2\xb0\n", hms,
-						maybe.Format("%.6f", "unknown", gpsinfo.Lat), maybe.Format("%.6f", "unknown", gpsinfo.Lon),
-						maybe.Format("%.1f", "unknown", my_speed_mph), maybe.Format("%.0f", "unknown", gpsinfo.Track))
+					logrus.WithFields(logrus.Fields{
+						"lat":       maybe.Format("%.6f", "unknown", gpsinfo.Lat),
+						"lon":       maybe.Format("%.6f", "unknown", gpsinfo.Lon),
+						"speed_mph": maybe.Format("%.1f", "unknown", my_speed_mph),
+						"course":    maybe.Format("%.0f", "unknown", gpsinfo.Track),
+					}).Debug("Tracker GPS 2D fix")
 				default:
-					dw_printf("%s  No GPS fix\n", hms)
+					logrus.Debug("Tracker GPS has no fix")
 				}
 			}
 
@@ -574,8 +573,7 @@ func (bs *BeaconService) thread(ctx context.Context) {
 					if bp.next.Before(now) {
 						bp.next = now.Add(time.Duration(bp.every) * time.Second)
 
-						text_color_set(DW_COLOR_INFO)
-						dw_printf("\nSystem clock appears to have jumped forward.  Beacon schedule updated.\n\n")
+						logrus.WithField("line", bp.lineno).Info("System clock appears to have jumped forward, beacon schedule updated")
 					}
 				}
 			} /* if time to send it */
@@ -659,8 +657,10 @@ func (bs *BeaconService) sbCalculateNextTime(
 	}
 
 	if bs.trackerDebugLevel >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("SmartBeaconing: Beacon Rate = %d seconds for %s MPH\n", beacon_rate, maybe.Format("%.1f", "unknown", current_speed_mph))
+		logrus.WithFields(logrus.Fields{
+			"rate_seconds": beacon_rate,
+			"speed_mph":    maybe.Format("%.1f", "unknown", current_speed_mph),
+		}).Debug("SmartBeaconing: Beacon rate")
 	}
 
 	var next_time = last_xmit_time.Add(time.Duration(beacon_rate) * time.Second)
@@ -675,8 +675,7 @@ func (bs *BeaconService) sbCalculateNextTime(
 
 		if change > turn_threshold && !now.Before(last_xmit_time.Add(time.Duration(bs.miscConfig.sb_turn_time)*time.Second)) {
 			if bs.trackerDebugLevel >= 2 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("SmartBeaconing: Send now for heading change of %.0f\n", change)
+				logrus.WithField("heading_change", math.Round(change)).Debug("SmartBeaconing: Send now for heading change")
 			}
 
 			next_time = now
@@ -783,8 +782,10 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 	}
 
 	if IsNoCall(mycall) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("MYCALL not set for beacon to chan %d in config file line %d.\n", bp.sendto_chan, bp.lineno)
+		logrus.WithFields(logrus.Fields{
+			"line":    bp.lineno,
+			"channel": bp.sendto_chan,
+		}).Error("MYCALL not set for beacon channel")
 
 		return
 	}
@@ -835,8 +836,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 		if k == nil {
 			super_comment += string(var_comment)
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("xBEACON, config file line %d, COMMENTCMD failure: %s.\n", bp.lineno, k)
+			logrus.WithError(k).WithField("line", bp.lineno).Error("xBEACON COMMENTCMD failure")
 		}
 	}
 
@@ -934,14 +934,12 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			if k == nil {
 				beacon_text += string(info_part)
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("CBEACON, config file line %d, INFOCMD failure: %s.\n", bp.lineno, k)
+				logrus.WithError(k).WithField("line", bp.lineno).Error("CBEACON INFOCMD failure")
 
 				beacon_text = "" // abort!
 			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Internal error. custom_info is null.\n")
+			logrus.WithField("line", bp.lineno).Error("Internal error: custom_info is null")
 
 			beacon_text = "" // abort!
 		}
@@ -980,8 +978,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 		/* Send to desired destination. */
 		switch bp.sendto_type {
 		case SENDTO_IGATE:
-			text_color_set(DW_COLOR_XMIT)
-			dw_printf("[ig] %s\n", beacon_text)
+			fmt.Printf("[ig] %s\n", beacon_text)
 
 			if bs.igate != nil {
 				bs.igate.sendRecPacket(-1, pp) // Channel -1 to avoid RF>IS filtering.
@@ -998,8 +995,9 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			}
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Failed to parse packet constructed from line %d.\n", bp.lineno)
-		dw_printf("%s\n", beacon_text)
+		logrus.WithFields(logrus.Fields{
+			"line":   bp.lineno,
+			"packet": beacon_text,
+		}).Error("Config file: Failed to parse beacon packet")
 	}
 } /* end send */
