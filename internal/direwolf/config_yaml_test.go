@@ -298,6 +298,12 @@ axudpPorts:
 		}
 	})
 
+	t.Run("an AXUDP port can learn routes", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "axudpPorts:\n  - {port: 20093, channel: 10, automap: true}\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.True(t, c.audio.axudp_routes[10].AutoMap)
+	})
+
 	t.Run("a bad AXUDP port is refused and claims no channel", func(t *testing.T) {
 		for _, tc := range []struct {
 			name, entry, want string

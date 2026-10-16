@@ -6,8 +6,10 @@ package axudp
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"sync"
@@ -294,8 +296,8 @@ func TestParseConfigBadYAML(t *testing.T) {
 func TestLookupMap(t *testing.T) {
 	t.Parallel()
 
-	var b = new(Bridge)
-	b.routes.Maps = []MapEntry{
+	var routes Routes
+	routes.Maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},   // no SSID — should match all SSIDs
 		{AX25Addr: "Q2TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil, Broadcast: false}, // with SSID — exact match only
 	}
@@ -318,7 +320,7 @@ func TestLookupMap(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		var entry, ok = b.routes.lookupMap(tc.dest)
+		var entry, ok = routes.lookupMap(tc.dest)
 		if ok != tc.wantFound {
 			t.Errorf("lookupMap(%q): found=%v want %v", tc.dest, ok, tc.wantFound)
 
@@ -337,13 +339,13 @@ func TestLookupMapExactBeforeWildcard(t *testing.T) {
 
 	// Wildcard entry is listed first; specific SSID entry is listed second.
 	// A lookup for Q1TEST-7 must return the specific entry, not the wildcard.
-	var b = new(Bridge)
-	b.routes.Maps = []MapEntry{
+	var routes Routes
+	routes.Maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},   // wildcard — listed first
 		{AX25Addr: "Q1TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil, Broadcast: false}, // specific SSID-7 — listed second
 	}
 
-	var entry, ok = b.routes.lookupMap("Q1TEST-7")
+	var entry, ok = routes.lookupMap("Q1TEST-7")
 	if !ok {
 		t.Fatal("lookupMap(Q1TEST-7): not found")
 	}
@@ -352,7 +354,7 @@ func TestLookupMapExactBeforeWildcard(t *testing.T) {
 	}
 
 	// Wildcard should still match when no exact entry exists.
-	var entry2, ok2 = b.routes.lookupMap("Q1TEST-3")
+	var entry2, ok2 = routes.lookupMap("Q1TEST-3")
 	if !ok2 {
 		t.Fatal("lookupMap(Q1TEST-3): not found via wildcard")
 	}
@@ -376,7 +378,8 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 	// the test frame below.  The udpConn is intentionally left nil so that any
 	// accidental call to sendAXUDP panics immediately.
 	var b = new(Bridge)
-	b.routes.Maps = []MapEntry{
+	b.router = NewRouter(noRoutes())
+	b.router.routes.Maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},
 	}
 
@@ -554,7 +557,8 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 
 	// Set up a bridge with a MAP entry routing Q1TEST to dstPkt.
 	var b = new(Bridge)
-	b.routes.Maps = []MapEntry{
+	b.router = NewRouter(noRoutes())
+	b.router.routes.Maps = []MapEntry{
 		{AX25Addr: "Q1TEST", Addr: dstAddr.String(), UDPAddr: dstAddr, Broadcast: false},
 	}
 	b.udpConn = srcUDP
@@ -849,6 +853,7 @@ func TestRoute(t *testing.T) {
 			{AX25Addr: "Q2TEST", Addr: "192.0.2.2:93", UDPAddr: nil, Broadcast: false},
 			{AX25Addr: "Q3TEST-1", Addr: "192.0.2.3:93", UDPAddr: nil, Broadcast: true},
 		},
+		AutoMap: false,
 	}
 
 	var addrs = func(entries []MapEntry) []string {
@@ -884,6 +889,7 @@ func TestRouteBroadcastWithNoBroadcastPeers(t *testing.T) {
 			// not sent to it just because the address matches.
 			{AX25Addr: "NODES", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: false},
 		},
+		AutoMap: false,
 	}
 
 	assert.Empty(t, routes.Route("NODES"))
@@ -910,11 +916,12 @@ func TestKISSBroadcastFansOut(t *testing.T) {
 
 	var b = new(Bridge)
 	b.udpConn = src
-	b.routes.Broadcast = []string{"NODES"}
+	b.router = NewRouter(noRoutes())
+	b.router.routes.Broadcast = []string{"NODES"}
 	for _, p := range peers {
 		var addr, ok = p.LocalAddr().(*net.UDPAddr)
 		require.True(t, ok)
-		b.routes.Maps = append(b.routes.Maps, MapEntry{AX25Addr: "Q1TEST", Addr: addr.String(), UDPAddr: addr, Broadcast: true})
+		b.router.routes.Maps = append(b.router.routes.Maps, MapEntry{AX25Addr: "Q1TEST", Addr: addr.String(), UDPAddr: addr, Broadcast: true})
 	}
 
 	var pp = ax25.FromText("Q1TEST>NODES:hello", true)
@@ -938,4 +945,278 @@ func TestKISSBroadcastFansOut(t *testing.T) {
 		require.True(t, ok, "peer %d: bad CRC", i)
 		assert.Equal(t, frame, got, "peer %d", i)
 	}
+}
+
+func TestParseConfigAutoMap(t *testing.T) {
+	t.Parallel()
+
+	var p = filepath.Join(t.TempDir(), "axudp.yaml")
+	require.NoError(t, os.WriteFile(p, []byte("automap: true\n"), 0600))
+
+	var routes, err = ParseConfig(p)
+	require.NoError(t, err)
+	assert.True(t, routes.AutoMap)
+}
+
+// frameFrom returns the AX.25 frame for the packet described by text, in the
+// monitor format, e.g. "Q2TEST>Q1TEST:hello".
+func frameFrom(t *testing.T, text string) []byte {
+	t.Helper()
+
+	var pp = ax25.FromText(text, true)
+	require.NotNil(t, pp)
+
+	return pp.FrameData()
+}
+
+// autoMapVia returns routes with AutoMap, mapping Q9TEST to each of hosts,
+// port 93, so that datagrams from them teach routes.
+func autoMapVia(t *testing.T, hosts ...string) Routes {
+	t.Helper()
+
+	var routes = Routes{Maps: nil, Broadcast: nil, AutoMap: true}
+	for i, host := range hosts {
+		var addr = net.UDPAddrFromAddrPort(netip.AddrPortFrom(netip.MustParseAddr(host), 93))
+		routes.Maps = append(routes.Maps, MapEntry{AX25Addr: fmt.Sprintf("Q9TEST-%d", i+1), Addr: addr.String(), UDPAddr: addr, Broadcast: false})
+	}
+
+	return routes
+}
+
+func TestExtractSource(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "Q2TEST-3", ExtractSource(frameFrom(t, "Q2TEST-3>Q1TEST:hello")))
+	assert.Empty(t, ExtractSource(frameFrom(t, "Q2TEST-3>Q1TEST:hello")[:13]))
+
+	// A datagram that is not a frame has no source to learn.
+	var junk = frameFrom(t, "Q2TEST>Q1TEST:hello")
+	junk[8] = '!' << 1
+	assert.Empty(t, ExtractSource(junk))
+
+	var gap = frameFrom(t, "Q2TEST>Q1TEST:hello")
+	gap[8] = ' ' << 1
+	assert.Empty(t, ExtractSource(gap))
+
+	var blank = frameFrom(t, "Q2TEST>Q1TEST:hello")
+	for i := 7; i < 13; i++ {
+		blank[i] = ' ' << 1
+	}
+	assert.Empty(t, ExtractSource(blank))
+}
+
+func TestRouterLearnsFromHeard(t *testing.T) {
+	t.Parallel()
+
+	var peer = net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.9:10093"))
+
+	var r = NewRouter(autoMapVia(t, "192.0.2.9", "192.0.2.10"))
+	assert.Empty(t, r.Route("Q2TEST-3"))
+
+	r.Heard(frameFrom(t, "Q2TEST-3>Q1TEST:hello"), peer)
+
+	var entries = r.Route("Q2TEST-3")
+	require.Len(t, entries, 1)
+	assert.Equal(t, peer, entries[0].UDPAddr)
+	assert.Equal(t, "192.0.2.9:10093", entries[0].Addr)
+
+	// Learned exactly, SSID and all.
+	assert.Empty(t, r.Route("Q2TEST"))
+	assert.Empty(t, r.Route("Q2TEST-4"))
+
+	// Heard again from somewhere else, frames follow it there.
+	var moved = net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.10:93"))
+	r.Heard(frameFrom(t, "Q2TEST-3>Q1TEST:hello"), moved)
+	entries = r.Route("Q2TEST-3")
+	require.Len(t, entries, 1)
+	assert.Equal(t, moved, entries[0].UDPAddr)
+}
+
+// TestRouterLearnsOnlyFromMappedHosts checks that only a datagram from a
+// mapped host's IP address teaches a route, whatever port it came from.
+func TestRouterLearnsOnlyFromMappedHosts(t *testing.T) {
+	t.Parallel()
+
+	var r = NewRouter(autoMapVia(t, "192.0.2.9"))
+
+	r.Heard(frameFrom(t, "Q2TEST>Q1TEST:hello"), net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.66:93")))
+	assert.Empty(t, r.Route("Q2TEST"))
+
+	var otherPort = net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.9:10093"))
+	r.Heard(frameFrom(t, "Q2TEST>Q1TEST:hello"), otherPort)
+
+	var entries = r.Route("Q2TEST")
+	require.Len(t, entries, 1)
+	assert.Equal(t, otherPort, entries[0].UDPAddr)
+
+	// The same host as an IPv4-mapped IPv6 address, as a dual-stack socket
+	// reports it.
+	r.Heard(frameFrom(t, "Q3TEST>Q1TEST:hello"), net.UDPAddrFromAddrPort(netip.MustParseAddrPort("[::ffff:192.0.2.9]:93")))
+	assert.Len(t, r.Route("Q3TEST"), 1)
+}
+
+func TestRouterLearnsNothingWithoutAutoMap(t *testing.T) {
+	t.Parallel()
+
+	var routes = autoMapVia(t, "192.0.2.9")
+	routes.AutoMap = false
+
+	var r = NewRouter(routes)
+	r.Heard(frameFrom(t, "Q2TEST>Q1TEST:hello"), net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.9:93")))
+
+	assert.Empty(t, r.Route("Q2TEST"))
+}
+
+func TestRouterIgnoresShortFrame(t *testing.T) {
+	t.Parallel()
+
+	var r = NewRouter(autoMapVia(t, "192.0.2.9"))
+	r.Heard(frameFrom(t, "Q2TEST>Q1TEST:hello")[:7], net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.9:93")))
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	assert.Empty(t, r.heard)
+}
+
+// TestRouterMapsWinOverHeard checks that a datagram claiming to be from an
+// address a map covers cannot divert that address's frames, even from a
+// mapped host.
+func TestRouterMapsWinOverHeard(t *testing.T) {
+	t.Parallel()
+
+	var mapped = net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.1:93"))
+	var other = net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.1:10093"))
+
+	var r = NewRouter(Routes{
+		Maps: []MapEntry{
+			{AX25Addr: "Q1TEST", Addr: mapped.String(), UDPAddr: mapped, Broadcast: false},
+			{AX25Addr: "Q2TEST-7", Addr: mapped.String(), UDPAddr: mapped, Broadcast: false},
+		},
+		Broadcast: nil,
+		AutoMap:   true,
+	})
+
+	// Exact and wildcard map entries alike.
+	for _, call := range []string{"Q1TEST", "Q1TEST-5", "Q2TEST-7"} {
+		r.Heard(frameFrom(t, call+">Q3TEST:hello"), other)
+
+		var entries = r.Route(call)
+		require.Len(t, entries, 1, call)
+		assert.Equal(t, mapped, entries[0].UDPAddr, call)
+	}
+
+	// Another SSID of an exact entry is not covered, so is learned.
+	r.Heard(frameFrom(t, "Q2TEST-8>Q3TEST:hello"), other)
+	var entries = r.Route("Q2TEST-8")
+	require.Len(t, entries, 1)
+	assert.Equal(t, other, entries[0].UDPAddr)
+}
+
+func TestRouterHeardGetsNoBroadcasts(t *testing.T) {
+	t.Parallel()
+
+	var routes = autoMapVia(t, "192.0.2.9")
+	routes.Broadcast = []string{"NODES"}
+
+	var r = NewRouter(routes)
+	r.Heard(frameFrom(t, "Q2TEST>NODES:hello"), net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.9:93")))
+
+	assert.Empty(t, r.Route("NODES"))
+
+	// Nor is a datagram claiming to come from a broadcast address learned.
+	r.Heard(frameFrom(t, "NODES>Q1TEST:hello"), net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.9:93")))
+	assert.Empty(t, r.Route("NODES"))
+}
+
+func TestRouterForgetsAfterTTL(t *testing.T) {
+	t.Parallel()
+
+	var now = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	var r = NewRouter(autoMapVia(t, "192.0.2.9"))
+	r.now = func() time.Time { return now }
+
+	r.Heard(frameFrom(t, "Q2TEST>Q1TEST:hello"), net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.9:93")))
+
+	now = now.Add(learnedRouteTTL)
+	assert.Len(t, r.Route("Q2TEST"), 1)
+
+	now = now.Add(time.Second)
+	assert.Empty(t, r.Route("Q2TEST"))
+}
+
+func TestRouterBoundsHeard(t *testing.T) {
+	t.Parallel()
+
+	var now = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	var r = NewRouter(autoMapVia(t, "192.0.2.9"))
+	r.now = func() time.Time { return now }
+
+	var peer = net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.9:93"))
+
+	// A callsign is at most 6 characters, so spread them over SSIDs too.
+	var call = func(i int) string {
+		return normaliseAX25Addr(fmt.Sprintf("Q%dT-%d", i/16, i%16))
+	}
+
+	for i := range maxLearnedRoutes + 1 {
+		r.Heard(frameFrom(t, call(i)+">Q1TEST:hello"), peer)
+		now = now.Add(time.Second)
+	}
+
+	r.mu.Lock()
+	assert.Len(t, r.heard, maxLearnedRoutes)
+	r.mu.Unlock()
+
+	// The oldest went to make room for the newest.
+	assert.Empty(t, r.Route(call(0)))
+	assert.Len(t, r.Route(call(1)), 1)
+	assert.Len(t, r.Route(call(maxLearnedRoutes)), 1)
+}
+
+// TestBridgeRepliesToUnmappedPeer checks that, with AutoMap, a frame from a
+// KISS client for an address no map covers goes back to wherever that address
+// was heard from over AXUDP, by way of a mapped host.
+func TestBridgeRepliesToUnmappedPeer(t *testing.T) {
+	t.Parallel()
+
+	var listen = func() *net.UDPConn {
+		var pkt, err = new(net.ListenConfig).ListenPacket(t.Context(), "udp", "127.0.0.1:0")
+		require.NoError(t, err)
+		t.Cleanup(func() { pkt.Close() })
+
+		var conn, ok = pkt.(*net.UDPConn)
+		require.True(t, ok)
+
+		return conn
+	}
+
+	var bridgeConn = listen()
+	var peer = listen()
+
+	// The peer's host is mapped, for another address on another port.
+	var b = NewBridge(autoMapVia(t, "127.0.0.1"), bridgeConn)
+	go func() { _ = b.RunUDPListener(t.Context()) }()
+
+	var _, err = peer.WriteTo(AddCRC(frameFrom(t, "Q2TEST>Q1TEST:hello")), bridgeConn.LocalAddr())
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool { return len(b.router.Route("Q2TEST")) > 0 }, 2*time.Second, 10*time.Millisecond)
+
+	var reply = frameFrom(t, "Q1TEST>Q2TEST:hello yourself")
+	var kc kiss.Collector
+	for _, byt := range kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, reply...)) {
+		recByte(&kc, byt, b)
+	}
+
+	require.NoError(t, peer.SetReadDeadline(time.Now().Add(2*time.Second)))
+
+	var buf = make([]byte, 4096)
+	var n, _, readErr = peer.ReadFromUDP(buf)
+	require.NoError(t, readErr)
+
+	var got, ok = StripCRC(buf[:n])
+	require.True(t, ok)
+	assert.Equal(t, reply, got)
 }

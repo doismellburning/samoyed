@@ -25,6 +25,7 @@ import (
 //
 // Config file (axudp.yaml):
 //
+//	automap: true
 //	broadcast: [NODES]
 //	maps:
 //	  - ax25addr: Q1TEST
@@ -38,6 +39,12 @@ import (
 // A frame for one of the broadcast addresses, such as NET/ROM's NODES, goes
 // to every map entry with broadcast: true, like BPQ's BROADCAST lines and
 // MAP ... B.
+//
+// With automap: true, a frame for an address no map covers goes back to
+// wherever a datagram from that address last came from, within the last hour,
+// like BPQ's AUTOADDMAP - so long as that was a mapped host, so a node reached
+// through a mapped neighbour can connect without a map of its own.  Map
+// entries always win over what is learned.
 
 func main() {
 	pflag.Usage = func() {
@@ -58,6 +65,7 @@ Usage:
   samoyed-axudp [--config <file>] [--udpport <n>] [--kissport <n>]
 
 Example config file (axudp.yaml):
+  automap: true
   broadcast: [NODES]
   maps:
     - ax25addr: Q1TEST-1
@@ -67,6 +75,10 @@ Example config file (axudp.yaml):
 
 A frame for a broadcast address, such as NET/ROM's NODES, goes to every
 map entry with broadcast: true.
+
+With automap: true, a frame for an address no map covers goes back to
+wherever a datagram from that address last came from, within the last hour,
+so long as that was the IP address of a mapped host.
 
 Example samoyed-direwolf config to connect via samoyed-axudp:
   CHANNEL 2
@@ -106,6 +118,9 @@ Flags:
 	fmt.Printf("samoyed-axudp: MAP table:\n")
 	for _, e := range routes.Maps {
 		fmt.Printf("  %s -> %s\n", e.AX25Addr, e.Addr)
+	}
+	if routes.AutoMap {
+		fmt.Printf("samoyed-axudp: automap on: replying to unmapped addresses via the mapped host they were heard from\n")
 	}
 
 	var udpAddr, resolveErr = net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", *udpPort))

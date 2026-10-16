@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"slices"
 	"strconv"
@@ -54,12 +55,18 @@ type Routes struct {
 	// whose frames go to every map entry marked Broadcast rather than to the
 	// one entry for that address, like BPQ's AXIP BROADCAST lines.
 	Broadcast []string
+
+	// AutoMap is whether a Router learns where to send frames for an address
+	// no map covers from the datagrams that address sends us, like BPQ's
+	// AUTOADDMAP.
+	AutoMap bool
 }
 
 // yamlConfig is the top-level structure of the axudp.yaml config file.
 type yamlConfig struct {
 	Broadcast []string      `yaml:"broadcast"`
 	Maps      []MapSettings `yaml:"maps"`
+	AutoMap   bool          `yaml:"automap"`
 }
 
 // ParseConfig reads a YAML config file from path and returns the routes it
@@ -78,7 +85,14 @@ func ParseConfig(path string) (Routes, error) {
 		return none, fmt.Errorf("parsing YAML config: %w", unmarshalErr)
 	}
 
-	return NewRoutes(cfg.Broadcast, cfg.Maps)
+	var routes, routesErr = NewRoutes(cfg.Broadcast, cfg.Maps)
+	if routesErr != nil {
+		return none, routesErr
+	}
+
+	routes.AutoMap = cfg.AutoMap
+
+	return routes, nil
 }
 
 // NewRoutes checks and normalises the broadcast addresses and maps, resolving
@@ -168,9 +182,38 @@ func ExtractDest(frame []byte) string {
 	return callstr
 }
 
+// ExtractSource extracts the source AX.25 address from a raw AX.25 frame,
+// the address after the destination.  Returns "" if the frame is too short,
+// or if the address is not a callsign: anyone can send us a datagram, and
+// not every one is a frame.
+func ExtractSource(frame []byte) string {
+	if len(frame) < 14 {
+		return ""
+	}
+
+	// A callsign is letters and digits, padded with trailing spaces.
+	var padding = false
+	for i, byt := range frame[7:13] {
+		var c = byt >> 1
+		switch {
+		case c == ' ':
+			if i == 0 {
+				return ""
+			}
+			padding = true
+		case padding:
+			return ""
+		case (c < 'A' || c > 'Z') && (c < '0' || c > '9'):
+			return ""
+		}
+	}
+
+	return ExtractDest(frame[7:])
+}
+
 // Bridge is the live state of the bridge.
 type Bridge struct {
-	routes  Routes
+	router  *Router
 	udpConn *net.UDPConn
 
 	mu      sync.Mutex
@@ -187,7 +230,7 @@ type Bridge struct {
 // level, so enabling that level is what makes the bridge verbose.
 func NewBridge(routes Routes, udpConn *net.UDPConn) *Bridge {
 	var b = new(Bridge)
-	b.routes = routes
+	b.router = NewRouter(routes)
 	b.udpConn = udpConn
 	b.acceptBackoff = defaultAcceptBackoff
 	b.maxAcceptBackoff = defaultMaxAcceptBackoff
@@ -214,7 +257,7 @@ func (b *Bridge) RunUDPListener(ctx context.Context) error {
 
 	var buf = make([]byte, MaxUDPPayload)
 	for ctx.Err() == nil {
-		var n, _, readErr = b.udpConn.ReadFromUDP(buf)
+		var n, from, readErr = b.udpConn.ReadFromUDP(buf)
 		if readErr != nil {
 			if ctx.Err() != nil {
 				return nil // We closed it ourselves on the way out.
@@ -258,6 +301,7 @@ func (b *Bridge) RunUDPListener(ctx context.Context) error {
 				"dest":  ExtractDest(ax25frame),
 			}).Trace("Received AXUDP datagram")
 		}
+		b.router.Heard(ax25frame, from)
 		b.broadcastKISS(ax25frame)
 	}
 
@@ -461,6 +505,144 @@ func (r *Routes) lookupMap(dest string) (MapEntry, bool) {
 	return MapEntry{}, false //nolint: exhaustruct_v5
 }
 
+// learnedRouteTTL is how long a Router remembers where an address was heard
+// from.  Each datagram from it starts the time again.
+const learnedRouteTTL = time.Hour
+
+// maxLearnedRoutes caps how many addresses a Router remembers, so that a
+// stream of datagrams claiming ever more callsigns costs bounded memory.
+const maxLearnedRoutes = 1024
+
+// heardPeer is where a Router last heard an address from, and when.
+type heardPeer struct {
+	addr *net.UDPAddr
+	seen time.Time
+}
+
+// Router says where an AX.25 frame sent over AXUDP goes: by its Routes, and,
+// if they have AutoMap, to wherever a destination they do not cover was last
+// heard from, by way of a mapped host.  It is safe for concurrent use.
+type Router struct {
+	routes Routes
+
+	// mappedHosts are the IP addresses of the map entries, the only ones
+	// learned routes may lead to.
+	mappedHosts map[netip.Addr]struct{}
+
+	// now is the clock learned routes are timed by.
+	now func() time.Time
+
+	mu    sync.Mutex
+	heard map[string]heardPeer
+}
+
+// NewRouter returns a Router for routes that has heard nothing yet.
+func NewRouter(routes Routes) *Router {
+	var r = new(Router)
+	r.routes = routes
+	r.mappedHosts = make(map[netip.Addr]struct{}, len(routes.Maps))
+	for _, e := range routes.Maps {
+		if e.UDPAddr != nil {
+			r.mappedHosts[e.UDPAddr.AddrPort().Addr().Unmap()] = struct{}{}
+		}
+	}
+	r.now = time.Now
+	r.heard = make(map[string]heardPeer)
+
+	return r
+}
+
+// Heard notes that frame arrived in a datagram from addr, so that, if the
+// routes have AutoMap, frames for its source address go back there.  Only a
+// datagram from the IP address of a mapped host counts, so frames can be sent
+// on only to a node we already trust - from any port, as a host need not send
+// from the port it is mapped on.  An address a map already covers is left to
+// the map: a datagram claiming to be from it cannot divert its frames.
+func (r *Router) Heard(frame []byte, from *net.UDPAddr) {
+	if !r.routes.AutoMap || from == nil {
+		return
+	}
+
+	if _, ok := r.mappedHosts[from.AddrPort().Addr().Unmap()]; !ok {
+		return
+	}
+
+	var src = ExtractSource(frame)
+	if src == "" || slices.Contains(r.routes.Broadcast, src) {
+		return
+	}
+
+	if _, ok := r.routes.lookupMap(src); ok {
+		return
+	}
+
+	var now = r.now()
+
+	r.mu.Lock()
+	var prev, known = r.heard[src]
+	if !known && len(r.heard) >= maxLearnedRoutes {
+		r.makeRoomLocked(now)
+	}
+	r.heard[src] = heardPeer{addr: from, seen: now}
+	r.mu.Unlock()
+
+	if !known || now.Sub(prev.seen) > learnedRouteTTL || prev.addr.AddrPort() != from.AddrPort() {
+		logrus.WithFields(logrus.Fields{
+			"ax25addr": src,
+			"peer":     from.String(),
+		}).Info("Learned AXUDP route")
+	}
+}
+
+// makeRoomLocked forgets the expired learned routes, or failing that the
+// oldest one.  r.mu must be held.
+func (r *Router) makeRoomLocked(now time.Time) {
+	var oldest string
+	var oldestSeen time.Time
+
+	for call, p := range r.heard {
+		if now.Sub(p.seen) > learnedRouteTTL {
+			delete(r.heard, call)
+
+			continue
+		}
+
+		if oldest == "" || p.seen.Before(oldestSeen) {
+			oldest = call
+			oldestSeen = p.seen
+		}
+	}
+
+	if len(r.heard) >= maxLearnedRoutes {
+		delete(r.heard, oldest)
+	}
+}
+
+// Route returns the MAP entries a frame for dest goes to: those its routes
+// give, or failing that, wherever dest was last heard from, if that was
+// recently enough.  An address heard from never gets broadcasts.
+func (r *Router) Route(dest string) []MapEntry {
+	var entries = r.routes.Route(dest)
+	if len(entries) > 0 || !r.routes.AutoMap || slices.Contains(r.routes.Broadcast, dest) {
+		return entries
+	}
+
+	r.mu.Lock()
+	var p, ok = r.heard[dest]
+	r.mu.Unlock()
+
+	if !ok || r.now().Sub(p.seen) > learnedRouteTTL {
+		return nil
+	}
+
+	return []MapEntry{{
+		AX25Addr:  dest,
+		Addr:      p.addr.String(),
+		UDPAddr:   p.addr,
+		Broadcast: false,
+	}}
+}
+
 // AddCRC appends the 2-byte AXUDP checksum to frame and returns the
 // result.  The checksum is CRC-CCITT (poly 0x1021, seed 0xFFFF, final XOR
 // 0xFFFF) over the frame bytes, appended little-endian.
@@ -585,7 +767,7 @@ func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 		}
 		if dest == "" {
 			logrus.Warn("Dropping AX.25 frame too short to extract a destination from")
-		} else if entries := b2.routes.Route(dest); len(entries) > 0 {
+		} else if entries := b2.router.Route(dest); len(entries) > 0 {
 			for _, entry := range entries {
 				b2.sendAXUDP(ax25frame, entry)
 			}
