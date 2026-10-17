@@ -176,6 +176,52 @@ jobs:
     - name: "Test with the race detector"
       run: "make race"
 
+  # One check that stands for every other job in this workflow, so branch
+  # protection can require it alone rather than each job by name, and a new job
+  # needs no change to the repository settings - only a line in `needs` or
+  # `UNGATED` below, which the first step insists on. `always()` makes it run -
+  # and fail - when a job it needs failed, rather than being skipped, which
+  # branch protection would count as passing. A job skipped by its own `if` is
+  # fine; one skipped because something it needs failed is caught through that
+  # failure, as every job is listed here.
+  all_checks:
+    if: "always()"
+    needs:
+    - "generate_version"
+    - "build_and_test"
+    - "check"
+    - "fuzz_targets"
+    - "fuzz_target"
+    - "fuzz"
+    - "race"
+    - "docs"
+    env:
+      # Jobs deliberately left out of needs, space-separated: they decide
+      # whether and what to publish on main, rather than check the change.
+      UNGATED: "should_release release docs-deploy"
+    runs-on: "ubuntu-latest"
+    steps:
+    - uses: "actions/checkout@v7"
+      with:
+        sparse-checkout: ".github/workflows"
+    # yq keeps each job name's comments attached, which stops them comparing
+    # equal, so hand jq the plain JSON to do the comparison.
+    - name: "Check every job is in needs or UNGATED"
+      run: |
+        missing=$(yq -o=json .github/workflows/build-and-test.yml | jq -r '
+          (.jobs | keys)
+          - ["all_checks"]
+          - .jobs.all_checks.needs
+          - (env.UNGATED | split(" "))
+          | join(" ")')
+        if [ -n "$missing" ]; then
+          echo "::error::Jobs in neither all_checks' needs nor UNGATED: $missing"
+          exit 1
+        fi
+    - name: "Fail if any job failed or was cancelled"
+      if: "contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')"
+      run: "exit 1"
+
   should_release:
     runs-on: "ubuntu-latest"
     outputs:
