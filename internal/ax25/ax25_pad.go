@@ -755,6 +755,7 @@ func (this_p *Packet) Dup() *Packet {
 	var dup = new(Packet)
 
 	*dup = *this_p
+	dup.nextp = nil // The copy is in no queue.
 
 	return (dup)
 }
