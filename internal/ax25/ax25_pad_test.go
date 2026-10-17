@@ -242,6 +242,7 @@ func TestSafeString(t *testing.T) {
 		{"not UTF-8", []byte{0xfe, 'a', 0xff, 0x80}, "<0xfe>a<0xff><0x80>", "<0xfe>a<0xff><0x80>"},
 		{"thorn", []byte("þ"), "þ", "<0xc3><0xbe>"},
 		{"euro", []byte("€"), "€", "<0xe2><0x82><0xac>"},
+		{"C1 control", []byte("\u009b2J"), "<0xc2><0x9b>2J", "<0xc2><0x9b>2J"},
 	}
 
 	for _, tc := range testCases {

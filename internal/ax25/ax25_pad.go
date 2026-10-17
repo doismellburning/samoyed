@@ -2787,6 +2787,7 @@ func safeString(info []byte, asciiOnly bool) string {
 
 		if (ch == utf8.RuneError && size == 1) || /* Not UTF-8, which never uses fe and ff. */
 			ch < ' ' || ch == 0x7f || /* Control codes and delete. */
+			(ch >= 0x80 && ch < 0xa0) || /* C1 control codes, such as CSI, which a terminal may obey. */
 			(ch == ' ' && i+size == len(info)) ||
 			(asciiOnly && ch >= 0x80) {
 			for _, b := range char {
