@@ -1849,7 +1849,14 @@ func (s *AGWServer) handleRadioPortsRequest(client int) {
 	} // for each channel
 
 	reply.Data = []byte(info.String())
-	reply.Header.DataLen = uint32(len(reply.Data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	var dataLen, lenErr = safecast.Convert[uint32](len(reply.Data))
+	if lenErr != nil {
+		logrus.WithFields(logrus.Fields{"client": client, "length": len(reply.Data)}).Error("Reply does not fit an AGW message")
+
+		return
+	}
+
+	reply.Header.DataLen = dataLen
 
 	s.sendToClient(client, reply)
 }
