@@ -1039,7 +1039,8 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 	var length = len(e)
 
 	if length >= 4 && length <= 10 {
-		var nstr = string(e[3]) + string(e[4])
+		// Normally two digits, but take the one there is in a field of four.
+		var nstr = e[3:min(length, 5)]
 
 		var nn, _ = strconv.Atoi(nstr)
 

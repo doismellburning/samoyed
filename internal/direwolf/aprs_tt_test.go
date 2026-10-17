@@ -108,3 +108,23 @@ func TestParseCommentLoneC(t *testing.T) {
 	})
 	assert.Empty(t, state.comment)
 }
+
+// A symbol field is normally AB, the table and two digits, but its length is
+// only checked to be at least four.  The second digit was read regardless, so
+// a field with only one panicked the gateway on a tone sequence anyone could
+// send.  Dire Wolf read the string's terminating NUL there and so took the one
+// digit as the number.
+func TestParseSymbolOneDigit(t *testing.T) {
+	var cfg tt_config_s
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	require.NotPanics(t, func() {
+		assert.Equal(t, 0, gw.parseSymbol(&state, "AB15"))
+	})
+	assert.Equal(t, rune('/'), state.symtabOrOverlay)
+	assert.Equal(t, rune(32+5), state.symbolCode)
+}
