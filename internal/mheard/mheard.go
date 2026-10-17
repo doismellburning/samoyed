@@ -668,6 +668,51 @@ func (mdb *DB) GetMSP(callsign string) int {
 	return (0)
 } /* end GetMSP */
 
+// Heard is a station heard over the radio.
+type Heard struct {
+	Callsign string
+
+	// Channel is where it was last heard.
+	Channel int
+
+	// Hops is the number of digipeaters it came through, the last time.
+	Hops int
+
+	// LastHeard is when it was last heard.
+	LastHeard time.Time
+}
+
+// HeardRF lists the stations heard over the radio, most recently heard first,
+// up to limit of them.
+func (mdb *DB) HeardRF(limit int) []Heard {
+	mdb.mu.RLock()
+
+	var heard = make([]Heard, 0, len(mdb.db))
+
+	for _, mptr := range mdb.db {
+		if !mptr.lastHeardRF.IsZero() {
+			heard = append(heard, Heard{
+				Callsign:  mptr.callsign,
+				Channel:   mptr.channel,
+				Hops:      mptr.numDigiHops,
+				LastHeard: mptr.lastHeardRF,
+			})
+		}
+	}
+
+	mdb.mu.RUnlock()
+
+	slices.SortFunc(heard, func(a, b Heard) int {
+		if c := b.LastHeard.Compare(a.LastHeard); c != 0 {
+			return c
+		}
+
+		return strings.Compare(a.Callsign, b.Callsign)
+	})
+
+	return heard[:max(0, min(limit, len(heard)))]
+}
+
 func (mdb *DB) dump() {
 	mdb.mu.RLock()
 	defer mdb.mu.RUnlock()

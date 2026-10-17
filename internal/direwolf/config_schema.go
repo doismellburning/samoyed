@@ -140,3 +140,24 @@ type KISSPortSettings struct {
 	// Channel, when given, restricts the port to that one radio channel.
 	Channel *int `yaml:"channel"`
 }
+
+// NodeSettings describes the node shell, which a station reaches by
+// connecting to Address or Alias.
+type NodeSettings struct {
+	// Address is the node's address: its callsign, with any SSID.
+	Address string `yaml:"address"`
+
+	// Alias is a second name the node answers to, such as a short
+	// mnemonic for where it is.  Left out, there is none.
+	Alias string `yaml:"alias"`
+
+	// Channels are the channels the node accepts connections on.  Left
+	// out, it is every channel connected mode can be used on.
+	Channels []int `yaml:"channels"`
+
+	// InfoMessage is what the INFO command says about the node.
+	InfoMessage string `yaml:"infoMessage"`
+
+	// ConnectMessage is what a station is told on connecting to the node.
+	ConnectMessage string `yaml:"connectMessage"`
+}

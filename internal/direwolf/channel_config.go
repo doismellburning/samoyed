@@ -1,6 +1,8 @@
 package direwolf
 
 import (
+	"fmt"
+
 	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/il2p"
@@ -373,4 +375,35 @@ func (c *RadioConfig) digipeaterPorts() [MAX_TOTAL_CHANS]digipeater.Port {
 	}
 
 	return ports
+}
+
+// connectedModeAllowed reports whether AX.25 connected mode can be used on
+// channel: one that reaches the air, through our own modem, a network or
+// serial TNC, or AXUDP.
+func (c *RadioConfig) connectedModeAllowed(channel int) bool {
+	if channel < 0 || channel >= MAX_TOTAL_CHANS {
+		return false
+	}
+
+	var m = c.chan_medium[channel]
+
+	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC || m == MediumSerialTNC || m == MEDIUM_AXUDP
+}
+
+// describeChannel says what sort of channel channel is, for the node shell's
+// list of ports.  It is shown to anyone who connects, so it says no more than
+// that: not where a TNC is, nor what device it is on.
+func (c *RadioConfig) describeChannel(channel int) string {
+	switch c.chan_medium[channel] {
+	case MEDIUM_RADIO:
+		return fmt.Sprintf("Radio, %d bps", c.achan[channel].baud)
+	case MEDIUM_NETTNC:
+		return "Network TNC"
+	case MediumSerialTNC:
+		return "Serial TNC"
+	case MEDIUM_AXUDP:
+		return "AXUDP"
+	default:
+		return "Unknown"
+	}
 }

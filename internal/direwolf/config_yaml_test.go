@@ -7,8 +7,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// mustNodeConfig is the node configuration for settings, which must be
+// one the channels allow.
+func mustNodeConfig(t *testing.T, audio *RadioConfig, settings nodeSettings) node.Config {
+	t.Helper()
+
+	var config, err = audio.nodeConfig(settings)
+	require.NoError(t, err)
+
+	return config
+}
 
 // parseYAMLConfig runs config_init over content, put under the top-level
 // "samoyed" key, as a YAML configuration file.  That key takes the first line,
@@ -356,6 +369,122 @@ legacy: |
 		assert.Equal(t, 1, c.errors)
 		assert.Contains(t, c.output, "already used by the AXUDP port for channel 10")
 		assert.Equal(t, MEDIUM_NONE, c.audio.chan_medium[11])
+	})
+
+	t.Run("the node listens on every connected mode channel by default", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "axudpPorts:\n  - {port: 20093, channel: 10}\n"+
+			"node:\n  address: q1test-7\n  alias: samnod\n  infoMessage: |\n    Test node\n    in a test\n  connectMessage: Welcome to the test node\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, node.Config{
+			Address:        "Q1TEST-7",
+			Alias:          "SAMNOD",
+			Ports:          []node.Port{{Channel: 0, Description: "Radio, 1200 bps"}, {Channel: 10, Description: "AXUDP"}},
+			InfoMessage:    "Test node\nin a test\n",
+			ConnectMessage: "Welcome to the test node",
+		}, mustNodeConfig(t, c.audio, got))
+	})
+
+	t.Run("the node listens on the channels it is given", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "axudpPorts:\n  - {port: 20093, channel: 10}\nnode: {address: Q1TEST-0, channels: [10]}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, node.Config{Address: "Q1TEST", Alias: "", Ports: []node.Port{{Channel: 10, Description: "AXUDP"}}, InfoMessage: "", ConnectMessage: ""}, mustNodeConfig(t, c.audio, got))
+	})
+
+	// Regression test: the default channels were settled while the file was
+	// read, so a channel the command line adds afterwards - -n 2 makes
+	// channel 1 a radio channel - went without the node.
+	t.Run("the node's default channels include those the command line adds", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		c.audio.chan_medium[1] = MEDIUM_RADIO
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, []node.Port{{Channel: 0, Description: "Radio, 1200 bps"}, {Channel: 1, Description: "Radio, 1200 bps"}}, mustNodeConfig(t, c.audio, got).Ports)
+	})
+
+	// Regression test: a port's description was settled while the file was
+	// read, so it had the speed the file gave rather than -B's.
+	t.Run("the node's ports are described as the command line leaves them", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		c.audio.achan[0].baud = 9600
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, []node.Port{{Channel: 0, Description: "Radio, 9600 bps"}}, mustNodeConfig(t, c.audio, got).Ports)
+	})
+
+	// Regression test: a channel given explicitly was checked while the file
+	// was read, so one the command line makes - -n 2 makes channel 1 a radio
+	// channel - was refused.
+	t.Run("the node can listen on a channel the command line makes", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST, channels: [0, 1]}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		c.audio.chan_medium[1] = MEDIUM_RADIO
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var config, err = c.audio.nodeConfig(got)
+		require.NoError(t, err)
+		assert.Equal(t, []int{0, 1}, []int{config.Ports[0].Channel, config.Ports[1].Channel})
+	})
+
+	t.Run("the node can't listen on a channel that is not there", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0, mycall: Q1TEST}\nnode: {address: Q1TEST, channels: [5]}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var _, err = c.audio.nodeConfig(got)
+		require.Error(t, err)
+		assert.Equal(t, "line 4: Node can't listen on channel 5, which is not a channel connected mode can be used on", err.Error())
+	})
+
+	t.Run("the node can listen on a channel the legacy block makes", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST, channels: [8]}\nlegacy: |\n  NCHANNEL 8 127.0.0.1 8001\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, []node.Port{{Channel: 8, Description: "Network TNC"}}, mustNodeConfig(t, c.audio, got).Ports)
+	})
+
+	t.Run("no node unless asked for", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0, mycall: Q1TEST}\n")
+		assert.True(t, c.misc.node.IsNothing())
+	})
+
+	t.Run("bad node settings are refused", func(t *testing.T) {
+		for _, tc := range []struct {
+			name, entry, want string
+		}{
+			{"no address", "{alias: SAMNOD}", "Invalid address"},
+			{"bad address", "{address: Q1TEST-99}", "Invalid address"},
+			{"bad alias", "{address: Q1TEST, alias: TOOLONGALIAS}", "Invalid alias"},
+			{"alias same as address", "{address: Q1TEST, alias: q1test}", "same as its address"},
+			{"channel out of range", "{address: Q1TEST, channels: [-1]}", "Invalid channel -1 for node"},
+			{"channel too big", "{address: Q1TEST, channels: [99]}", "Invalid channel 99 for node"},
+			{"channel twice", "{address: Q1TEST, channels: [0, 0]}", "more than once"},
+			{"no channels", "{address: Q1TEST, channels: []}", "No channels"},
+		} {
+			var c = parseYAMLConfig(t, "node: "+tc.entry+"\n")
+			assert.Equal(t, 1, c.errors, tc.name)
+			assert.Contains(t, c.output, "Line 2", tc.name)
+			assert.Contains(t, c.output, tc.want, tc.name)
+			assert.True(t, c.misc.node.IsNothing(), tc.name)
+		}
 	})
 
 	t.Run("a .yml file is YAML too", func(t *testing.T) {
