@@ -30,9 +30,9 @@ jobs:
     - name: "Generate Version"
       id: "version"
       run: |
-        export SAMOYED_VERSION=$(./version.sh)
+        SAMOYED_VERSION=$(./version.sh)
         echo "Version: $SAMOYED_VERSION"
-        echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_OUTPUT
+        echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> "$GITHUB_OUTPUT"
 
   build_and_test:
     needs: [generate_version]
@@ -51,7 +51,7 @@ jobs:
     - name: "Set Version"
       env:
         SAMOYED_VERSION: "${{ needs.generate_version.outputs.SAMOYED_VERSION }}"
-      run: echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_ENV
+      run: echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> "$GITHUB_ENV"
     # Each job installs only the dev-setup.sh groups it needs.
     - name: "Install dependencies"
       run: "./dev-setup.sh build test gpsd-apparmor"
@@ -63,7 +63,7 @@ jobs:
     - name: "Ensure the build and tests changed nothing"
       run: "git diff --quiet && git diff --cached --quiet"
     - name: "Set filename"
-      run: 'echo "TARBALL_NAME=samoyed-${{env.SAMOYED_VERSION }}-${{ runner.os }}-${{ runner.arch }}.tgz" >> $GITHUB_ENV'
+      run: 'echo "TARBALL_NAME=samoyed-${{env.SAMOYED_VERSION }}-${{ runner.os }}-${{ runner.arch }}.tgz" >> "$GITHUB_ENV"'
     - name: "Build tarball"
       run: "tar czvf \"$TARBALL_NAME\" dist/"
     - uses: "actions/upload-artifact@v7"
@@ -77,7 +77,7 @@ jobs:
       run: "make deb"
     - name: "Set deb filename"
       if: "runner.os == 'Linux'"
-      run: 'echo "DEB_NAME=samoyed-binary_${{ env.SAMOYED_VERSION }}_$(dpkg --print-architecture).deb" >> $GITHUB_ENV'
+      run: 'echo "DEB_NAME=samoyed-binary_${{ env.SAMOYED_VERSION }}_$(dpkg --print-architecture).deb" >> "$GITHUB_ENV"'
     - name: "Upload Debian package"
       if: "runner.os == 'Linux'"
       uses: "actions/upload-artifact@v7"
@@ -186,7 +186,7 @@ jobs:
         fetch-depth: 2
     - name: "Check if release is warranted"
       id: "check"
-      run: echo "result=$(./should-release.sh)" >> $GITHUB_OUTPUT
+      run: echo "result=$(./should-release.sh)" >> "$GITHUB_OUTPUT"
 
   release:
     if: |

@@ -8,6 +8,7 @@ CMDS = $(notdir $(wildcard ./cmd/*))
 COVERAGE_FILE = cover.out
 GOLANGCI_LINT_VERSION = v2.14.0
 GOVULNCHECK_VERSION = v1.8.0
+ACTIONLINT_VERSION = v1.7.12
 GOTEST_FLAGS = # Anything extra you'd like to pass to `go test`, e.g. `-v`
 
 .PHONY: all
@@ -106,7 +107,7 @@ perfilecoverage:
 
 
 .PHONY: check
-check: vet lint shellcheck reuse
+check: vet lint shellcheck actionlint reuse
 	go mod tidy -diff
 
 .PHONY: reuse
@@ -116,6 +117,18 @@ reuse:
 .PHONY: shellcheck
 shellcheck:
 	shellcheck --external-sources --exclude SC1091 $(SHELL_FILES)
+
+# Depending on the Makefile means an ACTIONLINT_VERSION bump reinstalls the binary
+# rather than leaving a stale one in place.
+./bin/actionlint: Makefile
+	rm -f $@
+	GOBIN=$(CURDIR)/bin go install github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
+
+# Checks the GitHub Actions workflows, including running shellcheck over their
+# `run:` scripts.
+.PHONY: actionlint
+actionlint: ./bin/actionlint
+	./bin/actionlint
 
 .PHONY: vet
 vet:
