@@ -160,8 +160,6 @@ Dire Wolf decodes over 1000 error-free frames from the
 [WA8LMF TNC Test CD](https://github.com/wb2osz/direwolf/tree/dev/doc/WA8LMF-TNC-Test-CD-Results.pdf),
 outperforming all hardware TNCs and first-generation soundcard modems.
 
-For Dire Wolf documentation, see the [Dire Wolf doc directory](https://github.com/wb2osz/direwolf/tree/master/doc).
-
 ## Further Reading
 
 - [Samoyed - An Amateur Radio Software Modem](https://radio.doismellburning.co.uk/projects/samoyed-an-amateur-radio-software-modem/) — project background
