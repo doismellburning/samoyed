@@ -1172,3 +1172,24 @@ func TestConnectListenThread_AttachingAClientIsLoggedOnce(t *testing.T) {
 	require.Len(t, attached, 1)
 	assert.Equal(t, 0, attached[0].Data["client"])
 }
+
+// A frame cut off before its PID has none to show, rather than a "-1".
+func TestMonDescMissingPID(t *testing.T) {
+	t.Parallel()
+
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
+
+	var whole = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, ax25.PIDNoLayer3, []byte("hello"))
+	require.NotNil(t, whole)
+
+	var _, desc = mon_desc(whole)
+	assert.Equal(t, "<UI pid=F0 Len=5 P=0 >", desc)
+
+	var pp = ax25.FromFrame(whole.FrameData()[:15], ax25.ALevel{Rec: 50, Mark: 50, Space: 50})
+	require.NotNil(t, pp)
+
+	_, desc = mon_desc(pp)
+	assert.Equal(t, "<UI pid=-- Len=0 P=0 >", desc)
+}

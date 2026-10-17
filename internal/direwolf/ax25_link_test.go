@@ -571,3 +571,28 @@ func TestOutstandingFramesForNoLinkRepliesNone(t *testing.T) {
 
 	assert.Equal(t, []string{"0/2 Q1TEST>Q2TEST 0"}, clients.replies)
 }
+
+// An I frame must have a PID.  One that stops before it is a protocol error,
+// and its information part - nothing at all - is not handed to the client as
+// though it were data with some PID.
+func TestIFrameWithoutPIDIgnored(t *testing.T) {
+	var link = setupTestEnv(t)
+
+	var S = establishConnection(t, link, "Q1TEST", "Q2TEST", 0)
+
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
+
+	var whole = ax25.IFrame(addrs, 2, ax25.CRCmd, ax25.Modulo8, 0, 0, 0, ax25.PIDNoLayer3, nil)
+	require.NotNil(t, whole)
+
+	var pp = ax25.FromFrame(whole.FrameData()[:15], ax25.ALevel{Rec: 50, Mark: 50, Space: 50})
+	require.NotNil(t, pp)
+	require.Equal(t, ax25.FrameTypeI, pp.FrameTypeOnly())
+
+	receiveFrame(t, link, pp, 0)
+
+	assert.Equal(t, 0, S.vr, "the I frame without a PID was accepted")
+	assert.False(t, S.acknowledge_pending)
+}
