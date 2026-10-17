@@ -876,7 +876,10 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			state.callsign, _ = touchtone.TwoKeyToText(tttemp, false)
 
 			tttemp = string(e[length-3]) + string(e[length-2])
-			var stemp, _ = touchtone.TwoKeyToText(tttemp, false)
+			var stemp, errs = touchtone.TwoKeyToText(tttemp, false)
+			if errs != 0 {
+				stemp = "\000"
+			}
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
 			state.symtabOrOverlay = rune(stemp[0])
