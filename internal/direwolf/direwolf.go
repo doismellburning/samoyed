@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -1180,22 +1181,10 @@ func (rh *recPacketHandler) app_process_rec_packet(
 
 	// Also display in pure ASCII if non-ASCII characters and "-d u" option specified.
 
-	if rh.dumpUTF8 {
-		var hasNonPrintable = false
-
-		for _, r := range pinfo {
-			if !unicode.IsPrint(rune(r)) {
-				hasNonPrintable = true
-
-				break
-			}
-		}
-
-		if hasNonPrintable {
-			logrus.Debug("--debug u hexdump below:")
-			ax25.SafePrint(pinfo, true)
-			dw_printf("\n")
-		}
+	if rh.dumpUTF8 && hasNonASCII(pinfo) {
+		logrus.Debug("--debug u hexdump below:")
+		ax25.SafePrint(pinfo, true)
+		dw_printf("\n")
 	}
 
 	/* Optional hex dump of packet. */
@@ -1493,6 +1482,13 @@ func countOf(n int, noun string) string {
 	}
 
 	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// hasNonASCII says whether an information field has any byte outside 7-bit
+// ASCII - the start or the rest of a UTF-8 sequence, say - and so is worth
+// showing again in hexadecimal for "-d u".
+func hasNonASCII(info []byte) bool {
+	return slices.ContainsFunc(info, func(b byte) bool { return b >= 0x80 })
 }
 
 // mheardPosition is the position the stations-heard list should record for a

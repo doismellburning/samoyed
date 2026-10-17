@@ -233,3 +233,25 @@ func TestListeningPortsLeavesOutWhatIsNotListening(t *testing.T) {
 
 	assert.Equal(t, addrPort(agw.Addr()), listeningPorts(kns, agw).AGW, "the port the AGW server was given")
 }
+
+// "-d u" shows an information field again in hexadecimal when it has
+// non-ASCII text in it.  Judging each byte as though it were a Latin-1
+// character missed most of UTF-8: both bytes of "ñ" (C3 B1) and of "°"
+// (C2 B0) are printable in Latin-1, so neither was ever dumped.
+func TestHasNonASCII(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		info string
+		want bool
+	}{
+		{"", false},
+		{"!4237.14N/07120.83W>Hello", false},
+		{"Hello\r", false},
+		{"mañana", true},
+		{"20°C", true},
+		{"Füße", true},
+	} {
+		assert.Equal(t, tc.want, hasNonASCII([]byte(tc.info)), "%q", tc.info)
+	}
+}
