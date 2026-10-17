@@ -47,6 +47,11 @@ As well as that, Samoyed also adds:
 - **IL2P CRC** — support for IL2P's Cyclic Redundancy Check for improved packet reconstruction, per the [IL2P Specification Draft v0.6](https://tarpn.net/t/il2p/il2p-specification_draft_v0-6.pdf)
 - **BPSK** — 300 bps Binary Phase Shift Keying, compatible with NinoTNC at 1500 Hz carrier (`MODEM 300 BPSK`)
 - **UDP audio output** — stream encoded audio to a remote host via UDP (`ADEVICE default udp:host:port`) for testing and experimentation
+- **YAML configuration** — an alternative to the line-at-a-time format, for configuration files named `*.yaml` or `*.yml`
+- **Config checking** — `--config-check` reports every problem in a configuration file without starting up
+- **Web interface** — a live dashboard and APRS map in the browser (`WEBPORT`)
+- **Prometheus metrics** — a `/metrics` endpoint (`METRICSPORT`), with a starter Grafana dashboard in `conf/`
+- **AGW login** — require a user name and password on the AGW port (`AGWLOGIN`)
 - ...and more underway!
 
 ## Installation
