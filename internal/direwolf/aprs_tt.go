@@ -1637,7 +1637,7 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
 
 	var length = len(e)
 
-	if e[1] == 'A' {
+	if strings.HasPrefix(e, "CA") {
 		state.comment, _ = touchtone.ASCII2DToText(e[2:], false)
 
 		return (0)

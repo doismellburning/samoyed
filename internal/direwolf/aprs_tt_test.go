@@ -77,3 +77,20 @@ func TestParseFieldsLoneA(t *testing.T) {
 		assert.Equal(t, TT_ERROR_INVALID_CALL, gw.parseFields(&state, "A#"))
 	})
 }
+
+// A field that is nothing but a C is an empty comment.  Its second character
+// was read to look for the enhanced comment format, and a tone sequence anyone
+// could send panicked the gateway.
+func TestParseCommentLoneC(t *testing.T) {
+	var cfg tt_config_s
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	require.NotPanics(t, func() {
+		assert.Equal(t, 0, gw.parseComment(&state, "C"))
+	})
+	assert.Empty(t, state.comment)
+}
