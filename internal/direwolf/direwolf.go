@@ -661,33 +661,17 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].mark_freq,
 						audio_config.achan[transmitCalibrationChannel].space_freq,
 						transmitCalibrationChannel)
-
-					for n > 0 && ctx.Err() == nil {
-						toneGenerators[transmitCalibrationChannel].PutBit(n & 1)
-						n--
-					}
 				case 'm': // "Mark" tone: -x m
 					fmt.Printf("\nSending mark calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
-
-					for n > 0 && ctx.Err() == nil {
-						toneGenerators[transmitCalibrationChannel].PutBit(1)
-
-						n--
-					}
 				case 's': // "Space" tone: -x s
 					fmt.Printf("\nSending space calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
-
-					for n > 0 && ctx.Err() == nil {
-						toneGenerators[transmitCalibrationChannel].PutBit(0)
-
-						n--
-					}
 				case 'p': // Silence - set PTT only: -x p
 					fmt.Printf("\nSending silence (Set PTT only) on channel %d.\nPress control-C to terminate.\n", transmitCalibrationChannel)
-					dwutil.SleepSecCtx(ctx, max_duration)
 				}
+
+				sendCalibration(ctx, toneGenerators[transmitCalibrationChannel], transmitCalibrationType, n, max_duration, audioDevices.wait)
 
 				pttControl.SetPTT(transmitCalibrationChannel, false)
 				text_color_set(DW_COLOR_INFO)
@@ -1366,6 +1350,34 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		}
 	}
 } /* end app_process_rec_packet */
+
+// sendCalibration sends what "-x" asks for on a channel whose PTT is keyed:
+// bits bits of tones - alternating for 'a', mark for 'm', space for 's' - or,
+// for 'p', silence for seconds.  It stops early if ctx is cancelled.
+//
+// Tones are played out through waitAudio before it returns, as the transmit
+// threads do at the end of a transmission, so that the PTT is not released
+// with the last of them still in a buffer.
+func sendCalibration(ctx context.Context, tg *ToneGenerator, mode rune, bits int, seconds int, waitAudio func(adev int)) {
+	if mode == 'p' {
+		_ = dwutil.SleepSecCtx(ctx, seconds) // A cancellation is the caller's to notice.
+
+		return
+	}
+
+	for n := bits; n > 0 && ctx.Err() == nil; n-- {
+		switch mode {
+		case 'm':
+			tg.PutBit(1)
+		case 's':
+			tg.PutBit(0)
+		default: // 'a'
+			tg.PutBit(n & 1)
+		}
+	}
+
+	waitAudio(tg.adevIndex)
+}
 
 // resetSignalsOnCancel puts the default disposition back on the stop signals
 // once ctx is cancelled.

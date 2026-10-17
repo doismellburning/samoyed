@@ -255,3 +255,29 @@ func TestHasNonASCII(t *testing.T) {
 		assert.Equal(t, tc.want, hasNonASCII([]byte(tc.info)), "%q", tc.info)
 	}
 }
+
+// "-x" sends its tones with the PTT keyed and releases it as soon as they
+// have been generated.  The last of them were left in the audio buffer, so
+// were played after the PTT dropped, or not at all; they have to be played
+// out first, as the transmit threads do at the end of a transmission.
+func TestSendCalibrationPlaysOutTheTonesBeforeReturning(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []rune{'a', 'm', 's'} {
+		var sink = new(putCountingSink)
+		var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+		var tg = NewToneGenerator(0, audioConfig, 100, sink)
+
+		var waited []int
+		var putsBeforeWait int
+
+		sendCalibration(t.Context(), tg, mode, 1200, 1, func(adev int) {
+			waited = append(waited, adev)
+			putsBeforeWait = sink.puts
+		})
+
+		assert.Equal(t, []int{0}, waited, "mode %c should play out its audio device once", mode)
+		assert.Positive(t, putsBeforeWait, "mode %c should generate its tones before playing them out", mode)
+		assert.Equal(t, sink.puts, putsBeforeWait, "mode %c should generate nothing after playing out", mode)
+	}
+}
