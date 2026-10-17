@@ -4,6 +4,7 @@
 package reedsolomon
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"slices"
@@ -167,6 +168,57 @@ func TestDecode_Uncorrectable(t *testing.T) {
 	assert.Greater(t, failures, 90)
 }
 
+// paddedBlock zero-pads tail at the front out to a whole block, as
+// il2p_decode_rs does with a short IL2P block.
+func paddedBlock(tb testing.TB, c *Codec, tail string) []byte {
+	tb.Helper()
+
+	var b, err = hex.DecodeString(tail)
+	require.NoError(tb, err)
+
+	return append(make([]byte, c.N()-len(b)), b...)
+}
+
+func isCodeword(c *Codec, block []byte) bool {
+	var k = c.N() - c.NRoots()
+
+	return slices.Equal(c.Encode(block[:k]), block[k:])
+}
+
+// Each of these blocks is too far from any codeword to correct, but the
+// decoder once reported it repaired (issue #790).
+func TestDecode_UncorrectableRegressions(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range map[string]struct {
+		fcr, nroots uint
+		tail        string
+	}{
+		// The syndromes are S0 != 0 and S1 = 0, which reduces the locator
+		// to 1: no errors to find, and none found.
+		"no locator for a non-zero syndrome": {0, 2, "1223403f0edeae13e49219c0f83240"},
+		// One "correction", leaving a block that still isn't a codeword.
+		"fcr0 corrected to a non-codeword": {0, 4, "5b613fde3c0d880cecef4101aad8b8b1c60a92ac"},
+		"fcr1 corrected to a non-codeword": {1, 4, "13308ddf2af52ca390487eb20c716b76d78ad451"},
+		// More corrections than NRoots()/2, the most the code can make.
+		"3 corrections with 4 parity symbols": {0, 4, "1589d0a711f8e74be32bc60f43d693de77f21d5f"},
+		"4 corrections with 6 parity symbols": {0, 6, "42302779d03b019d2aa7db2b7aa8fb5b29a53fbc"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var c, err = New(8, 0x11d, tc.fcr, 1, tc.nroots)
+			require.NoError(t, err)
+
+			var block = paddedBlock(t, c, tc.tail)
+			require.False(t, isCodeword(c, block))
+
+			var _, decodeErr = c.Decode(block, nil)
+			require.ErrorIs(t, decodeErr, ErrUncorrectable)
+		})
+	}
+}
+
 func TestDecode_BadArguments(t *testing.T) {
 	t.Parallel()
 
@@ -197,12 +249,8 @@ func TestEncode_WrongLengthPanics(t *testing.T) {
 }
 
 // FuzzDecode feeds the decoder arbitrary blocks, which is what it gets from
-// anyone on frequency.  The failure looked for is a panic.
-//
-// It does not check that a claimed success leaves a codeword behind: with
-// more errors than it can repair, the decoder occasionally "corrects" a block
-// into something that still is not one (see issue #790), so the FCS or CRC
-// the caller checks afterwards is what catches those.
+// anyone on frequency.  Whatever it accepts it must leave as a codeword,
+// having corrected no more symbols than the code can repair.
 func FuzzDecode(f *testing.F) {
 	var codecs = testCodecs(f)
 
@@ -230,5 +278,8 @@ func FuzzDecode(f *testing.F) {
 		for _, pos := range locs {
 			assert.True(t, pos >= 0 && pos < c.N(), "Corrected position %d is outside the block", pos)
 		}
+
+		assert.LessOrEqual(t, len(locs), c.NRoots()/2)
+		assert.True(t, isCodeword(c, block), "Decode accepted a block it did not leave as a codeword")
 	})
 }
