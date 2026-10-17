@@ -345,3 +345,17 @@ func TestSetInfoCutShortHeader(t *testing.T) {
 		assert.Equal(t, before, pp.FrameData())
 	}
 }
+
+func TestDupLeavesQueue(t *testing.T) {
+	t.Parallel()
+
+	// A copy is a new packet, in no queue: it must not still point at the
+	// original's next one, or adding it to a queue would bring that along.
+	var pp = MustFromText("Q1TEST>APDW17:>hello")
+	pp.SetNext(MustFromText("Q2TEST>APDW17:>hello"))
+
+	var dup = pp.Dup()
+	assert.Nil(t, dup.Next())
+	assert.NotNil(t, pp.Next())
+	assert.Equal(t, pp.FrameData(), dup.FrameData())
+}
