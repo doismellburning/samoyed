@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +45,7 @@ func TestMessageWriteRoundTrip(t *testing.T) {
 	var msg = new(Message)
 	msg.Header.DataKind = 'T'
 	msg.Header.PID = 0xF0
-	msg.Header.DataLen = uint32(len(payload)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	msg.Header.DataLen = safecast.RequireConvert[uint32](t, len(payload))
 	msg.Data = payload
 
 	var buf bytes.Buffer

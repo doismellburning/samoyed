@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/creack/pty"
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -53,7 +54,7 @@ func sendMonitored(t *testing.T, conn net.Conn, portx byte, frame []byte) {
 	var header = new(agwpe.Header)
 	header.Portx = portx
 	header.DataKind = 'K'
-	header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	header.DataLen = safecast.RequireConvert[uint32](t, len(data))
 
 	require.NoError(t, binary.Write(conn, binary.LittleEndian, header))
 
