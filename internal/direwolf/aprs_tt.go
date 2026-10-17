@@ -842,15 +842,13 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		state.callsign = e[1:4]
 
 		if length == 7 {
-			var tttemp = string(e[length-3]) + string(e[length-2])
-
-			var stemp, errs = touchtone.TwoKeyToText(tttemp, false)
-			if errs != 0 {
-				stemp = "\000"
+			var overlay, ok = twoKeyOverlay(string(e[length-3]) + string(e[length-2]))
+			if !ok {
+				return (TT_ERROR_INVALID_SYMBOL)
 			}
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
-			state.symtabOrOverlay = rune(stemp[0])
+			state.symtabOrOverlay = overlay
 
 			if g.debug > 0 {
 				logrus.WithFields(logrus.Fields{
