@@ -313,9 +313,11 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 
 		switch tq.audioConfig.chan_medium[channel] {
 		case MEDIUM_IGATE:
-			if tq.toIGate != nil {
-				tq.toIGate(channel, pp)
+			if tq.toIGate == nil {
+				return // Nowhere to hand it, so it hasn't gone.
 			}
+
+			tq.toIGate(channel, pp)
 		case MediumSerialTNC:
 			tq.serialTNCs[channel].sendPacket(channel, pp)
 		case MEDIUM_AXUDP:
@@ -323,6 +325,10 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 		default: // network TNC
 			tq.netTNCs[channel].sendPacket(channel, pp)
 		}
+
+		// Handed on is as far as it goes from here, so as transmitted as
+		// we will ever see it.
+		pp.Transmitted()
 
 		return
 	}

@@ -632,9 +632,16 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 			 * If destination is "MORSE" send as morse code.
 			 * If destination is "DTMF" send as Touch Tones.
 			 */
+
+			// Whether it went out, for a client waiting to hear.  Only
+			// speech can fail to; xmit_ax25_frames says so itself, for
+			// every frame it bundles with this one, and saying it again is
+			// harmless.
+			var transmitted = true
+
 			switch frame_flavor(pp) {
 			case FLAVOR_SPEECH:
-				xs.xmit_speech(ctx, channel, pp)
+				transmitted = xs.xmit_speech(ctx, channel, pp)
 
 			case FLAVOR_MORSE:
 				var ssid = pp.SSID(ax25.Destination)
@@ -681,6 +688,10 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 
 			default:
 				xs.xmit_ax25_frames(channel, prio, pp, 256)
+			}
+
+			if transmitted {
+				pp.Transmitted()
 			}
 		} else {
 			/*
@@ -838,6 +849,10 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 
 	var numframe = 0 /* Number of frames sent during this transmission. */
 
+	// Every frame in this transmission, to be told it has gone once the
+	// transmitter is off again: a KISS ACKMODE client is waiting to hear.
+	var sent = []*ax25.Packet{pp}
+
 	/*
 	 * Transmit the frame.
 	 */
@@ -889,6 +904,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 				}).Debug("xmit_thread: tq_remove returned")
 
 				nb = xs.send_one_frame(channel, prio, pp)
+				sent = append(sent, pp)
 
 				num_bits += nb
 				if nb > 0 {
@@ -976,6 +992,10 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	}).Debug("xmit_thread: Turn off PTT now")
 
 	xs.keyPTT(channel, false)
+
+	for _, p := range sent {
+		p.Transmitted()
+	}
 } /* end xmit_ax25_frames */
 
 /*-------------------------------------------------------------------
@@ -1116,7 +1136,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) {
+func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) bool {
 	/*
 	 * Print spoken packet.  Prefix by channel.
 	 */
@@ -1131,7 +1151,7 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) 
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Text-to-speech script has not been configured.\n")
 
-		return
+		return false
 	}
 
 	/*
@@ -1143,13 +1163,15 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *ax25.Packet) 
 	 * Invoke the speech-to-text script.
 	 */
 
-	xmit_speak_it(ctx, xs.p_modem.tts_script, c, string(pinfo))
+	var err = xmit_speak_it(ctx, xs.p_modem.tts_script, c, string(pinfo))
 
 	/*
 	 * Turn off transmitter.
 	 */
 
 	xs.keyPTT(c, false)
+
+	return err == nil
 } /* end xmit_speech */
 
 /* Broken out into separate function so configuration can validate it. */

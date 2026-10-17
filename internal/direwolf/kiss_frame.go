@@ -400,7 +400,8 @@ func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
  *		kiss_len	- Number of bytes including the command.
  *
  *		from		- The client application it came from.
- *				  "Set Hardware" can send it a response.
+ *				  "Set Hardware" can send it a response, and
+ *				  an ACKMODE data frame an acknowledgement.
  *
  *-----------------------------------------------------------------*/
 
@@ -415,6 +416,40 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 
 	var alevel ax25.ALevel
 	var cmd = kiss_msg[0] & 0xf
+
+	// Called once a data frame has been transmitted, for a client that asked
+	// to be told.
+	var onTransmitted func()
+
+	if cmd == kiss.CmdXKissData {
+		// ACKMODE: an ordinary data frame, but with a two byte ID in front of
+		// it, which goes back to the client, as a frame of its own with the
+		// same command, once the frame has gone out over the air.  That lets
+		// the client time its retries from when the frame was sent rather
+		// than from when it handed it over.
+		if len(kiss_msg) < 3 {
+			logrus.WithField("channel", channel).Error("KISS ACKMODE data frame is missing its frame ID.")
+
+			return
+		}
+
+		var id = bytes.Clone(kiss_msg[1:3])
+
+		// Told by the transmit thread, which mustn't wait on a client that
+		// has stopped reading: nothing would go out on the air meanwhile.
+		// So the acknowledgement makes its own way, and when two are ready
+		// together either may arrive first - the ID says which frame each is
+		// for.
+		onTransmitted = func() {
+			go from.reply(channel, kiss.CmdXKissData, id)
+		}
+
+		// From here on it is the data frame it carries - which is also what
+		// a KISSCOPY client gets, as it didn't ask for an acknowledgement,
+		// and may not know what to do with one.
+		cmd = kiss.CmdDataFrame
+		kiss_msg = append([]byte{kiss_msg[0]&0xf0 | cmd}, kiss_msg[3:]...)
+	}
 
 	switch cmd {
 	case kiss.CmdDataFrame: /* 0 = Data Frame */
@@ -499,6 +534,8 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR - Invalid KISS data frame from client app.\n")
 		} else if h.queue != nil {
+			pp.SetOnTransmitted(onTransmitted)
+
 			/* How can we determine if it is an original or repeated message? */
 			/* If there is at least one digipeater in the frame, AND */
 			/* that digipeater has been used, it should go out quickly thru */
@@ -632,14 +669,9 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 		dw_printf("Use \"-d kn\" option on direwolf command line to observe\n")
 		dw_printf("all communication with the client application.\n")
 
-		if cmd == kiss.CmdXKissData || cmd == kiss.CmdXKissPoll {
-			dw_printf("\n")
-			dw_printf("It looks like you are trying to use the \"XKISS\" protocol which is not supported.\n")
-			dw_printf("Change your application settings to use standard \"KISS\" rather than some other variant.\n")
-			dw_printf("If you are using Winlink Express, configure like this:\n")
-			dw_printf("    Packet TNC Type:  KISS\n")
-			dw_printf("    Packet TNC Model:  NORMAL      -- Using ACKMODE will cause this error.\n")
-			dw_printf("\n")
+		if cmd == kiss.CmdXKissPoll {
+			logrus.Error("It looks like you are trying to use the polled mode of the \"XKISS\" protocol, which is not supported.  " +
+				"Change your application settings to use standard \"KISS\", with or without ACKMODE.")
 		}
 	}
 } /* end processMsg */
