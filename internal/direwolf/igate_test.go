@@ -912,7 +912,15 @@ func TestIGateSatgateDelaysDirectPackets(t *testing.T) {
 
 	requireIGateSilent(t, server, "the packet went to the server without being delayed")
 
-	// The thread is what lets it go once its time has come.
+	// The thread is what lets it go once its time has come.  Bring that time
+	// forward, and have the thread look often, rather than waiting out the
+	// delay and the thread's usual second between looks.
+	ig.dpMutex.Lock()
+	ig.dpQueueHead.SetReleaseTime(time.Now().Add(-time.Second))
+	ig.dpMutex.Unlock()
+
+	ig.satgatePollInterval = 10 * time.Millisecond
+
 	var ctx, cancel = context.WithCancel(t.Context())
 
 	var done = make(chan struct{})

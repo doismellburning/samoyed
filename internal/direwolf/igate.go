@@ -175,6 +175,10 @@ type IGate struct {
 	// server before trying again.
 	retryInterval time.Duration
 
+	// satgatePollInterval is how often the SATgate delay thread checks
+	// whether the packet at the head of its queue is due.
+	satgatePollInterval time.Duration
+
 	dpMutex     sync.Mutex /* Critical section for delayed packet queue. */
 	dpQueueHead *ax25.Packet
 
@@ -265,6 +269,8 @@ func NewIGate(
 		heard:         heard,
 		debugLevel:    debugLevel,
 		retryInterval: IGATE_RETRY_INTERVAL,
+
+		satgatePollInterval: igateSatgatePollInterval,
 	}
 
 	ig.rx2ig.reset()
@@ -449,6 +455,10 @@ const MAX_HOSTS = 50
 // connection attempt before trying again, so that a server that is down is not
 // redialled in a tight loop.
 const IGATE_RETRY_INTERVAL = 10 * time.Second
+
+// igateSatgatePollInterval is how often the SATgate delay thread checks for a
+// delayed packet that is due, unless it is told otherwise before it is started.
+const igateSatgatePollInterval = time.Second
 
 // igate_dial makes a single connection attempt to an APRS-IS server, recording
 // the outcome.  Exactly one of the connect/failed-connect metrics moves per
@@ -1365,7 +1375,7 @@ func (ig *IGate) satgateDelayThread(ctx context.Context) {
 	var channel = 0 // TODO:  get receive channel somehow.
 	// only matters if multi channel with different names.
 
-	for dwutil.SleepSecCtx(ctx, 1) {
+	for dwutil.SleepCtx(ctx, ig.satgatePollInterval) {
 		ig.satgateReleaseDue(channel)
 	} /* until cancelled */
 } /* end satgateDelayThread */

@@ -72,6 +72,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
@@ -86,6 +87,10 @@ type KissSerial struct {
 	miscConfig *misc_config_s
 	handler    *KissHandler // Acts on what the client sends.
 	debug      int          /* Print information flowing from and to client. */
+
+	// pollInterval is how long to wait between looks for a device that
+	// isn't there yet, when kiss_serial_poll says to keep looking.
+	pollInterval time.Duration
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
@@ -119,6 +124,7 @@ func newKissSerial(mc *misc_config_s, handler *KissHandler, debug int) *KissSeri
 	ks.miscConfig = mc
 	ks.handler = handler
 	ks.debug = debug
+	ks.pollInterval = time.Duration(mc.kiss_serial_poll) * time.Second
 	ks.kf = new(kiss.Collector)
 
 	return ks
@@ -424,7 +430,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 			ks.closePort()
 		} else {
 			// Not open.  Wait for it to appear and try opening.
-			if !dwutil.SleepSecCtx(ctx, ks.miscConfig.kiss_serial_poll) {
+			if !dwutil.SleepCtx(ctx, ks.pollInterval) {
 				return 0, ctx.Err()
 			}
 

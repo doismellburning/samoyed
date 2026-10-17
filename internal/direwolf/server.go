@@ -142,6 +142,11 @@ const AGW_LOGIN_FIELD_LEN = 255
 // a buffer of that size, keeping a byte back.
 const agwMaxDataLen = ax25.MaxPacketLen - 1
 
+// agwPollInterval is how often a client's command thread checks whether a
+// client has attached to its slot, unless it is told otherwise before it is
+// started.
+const agwPollInterval = time.Second
+
 // agwDataLink is the data link state machine, as far as the AGW server needs
 // it: where its clients' connected mode requests go.  *DataLinkQueue is one.
 type agwDataLink interface {
@@ -186,6 +191,11 @@ type AGWServer struct {
 	// written again - so no lock, and none of the cost of one on a path that
 	// consults it for every frame.
 	debug int
+
+	// pollInterval is how long a client's command thread waits before
+	// checking again for a client in its empty slot.  Settled by the
+	// constructor, like debug.
+	pollInterval time.Duration
 
 	// listener is what the constructor bound; only connectListenThread
 	// accepts on it.
@@ -284,6 +294,7 @@ func NewAGWServer(ctx context.Context, addr string, audio_config_p *RadioConfig,
 	s.queue = queue
 	s.logins = mc.agwpe_logins
 	s.debug = debug
+	s.pollInterval = agwPollInterval
 
 	/*
 	 * A new server starts with every client slot empty, and with none of the
@@ -1276,7 +1287,7 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 
 	for ctx.Err() == nil {
 		for s.clientConn(client) == nil {
-			if !dwutil.SleepSecCtx(ctx, 1) { /* Not connected.  Try again later. */
+			if !dwutil.SleepCtx(ctx, s.pollInterval) { /* Not connected.  Try again later. */
 				return
 			}
 		}
