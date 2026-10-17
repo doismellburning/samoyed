@@ -419,6 +419,23 @@ func (s *AGWServer) SendRecPacket(channel int, pp *ax25.Packet, fbuf []byte) {
 		return
 	}
 
+	var port, portErr = agwPort(channel)
+	if portErr != nil {
+		logrus.WithError(portErr).Error("Cannot send a frame to AGW clients")
+
+		return
+	}
+
+	var dataLen, lenErr = safecast.Convert[uint32](len(fbuf) + 1)
+	if lenErr != nil {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"length":  len(fbuf),
+		}).Error("Received frame does not fit an AGW message")
+
+		return
+	}
+
 	/*
 	 * RAW format
 	 */
@@ -427,7 +444,7 @@ func (s *AGWServer) SendRecPacket(channel int, pp *ax25.Packet, fbuf []byte) {
 		if conn != nil {
 			var agwpe_msg = new(agwpe.Message)
 
-			agwpe_msg.Header.Portx = byte(channel) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+			agwpe_msg.Header.Portx = port
 
 			agwpe_msg.Header.DataKind = 'K'
 
@@ -437,12 +454,12 @@ func (s *AGWServer) SendRecPacket(channel int, pp *ax25.Packet, fbuf []byte) {
 			var callTo = pp.AddrWithSSID(ax25.Destination)
 			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
-			agwpe_msg.Header.DataLen = uint32(len(fbuf) + 1) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+			agwpe_msg.Header.DataLen = dataLen
 			agwpe_msg.Data = make([]byte, len(fbuf)+1)
 
 			/* Stick in extra byte for the "TNC" to use. */
 
-			agwpe_msg.Data[0] = byte(channel) << 4 //nolint:gosec // G115: unchecked narrowing conversion, see #294. Was 0.  Fixed in 1.8.
+			agwpe_msg.Data[0] = port << 4 // Was 0.  Fixed in 1.8.
 
 			copy(agwpe_msg.Data[1:], fbuf)
 
@@ -468,6 +485,13 @@ func (s *AGWServer) SendMonitored(channel int, pp *ax25.Packet, own_xmit int) {
 		return
 	}
 
+	var port, portErr = agwPort(channel)
+	if portErr != nil {
+		logrus.WithError(portErr).Error("Cannot send a frame to AGW clients")
+
+		return
+	}
+
 	/*
 	 * MONITOR format - 	'I' for information frames.
 	 *			'U' for unnumbered information.
@@ -480,7 +504,7 @@ func (s *AGWServer) SendMonitored(channel int, pp *ax25.Packet, own_xmit int) {
 		if conn != nil {
 			var agwpe_msg = new(agwpe.Message)
 
-			agwpe_msg.Header.Portx = byte(channel) //nolint:gosec // G115: unchecked narrowing conversion, see #294. datakind is added later.
+			agwpe_msg.Header.Portx = port // datakind is added later.
 
 			var callFrom = pp.AddrWithSSID(ax25.Source)
 			copy(agwpe_msg.Header.CallFrom[:], []byte(callFrom))
@@ -549,7 +573,17 @@ func (s *AGWServer) SendMonitored(channel int, pp *ax25.Packet, own_xmit int) {
 
 			agwpe_msg.Data = append(agwpe_msg.Data, 0) // add nul at end, included in length.
 			msg_data_len++
-			agwpe_msg.Header.DataLen = uint32(msg_data_len) //nolint:gosec // G115: unchecked narrowing conversion, see #294. TODO KG Just len(Data)
+			var dataLen, lenErr = safecast.Convert[uint32](msg_data_len) // TODO KG Just len(Data)
+			if lenErr != nil {
+				logrus.WithFields(logrus.Fields{
+					"channel": channel,
+					"length":  msg_data_len,
+				}).Error("Monitored frame does not fit an AGW message")
+
+				return
+			}
+
+			agwpe_msg.Header.DataLen = dataLen
 
 			if s.debug > 0 {
 				s.debugPrint(TO_CLIENT, client, agwpe_msg)
