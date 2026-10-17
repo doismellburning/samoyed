@@ -368,8 +368,11 @@ func SFrame(
 		this_p.frame_data[this_p.frame_len] = byte(ctrl & 0xff)
 		this_p.frame_len++
 
-		ctrl = pf & 1
-		ctrl |= nr << 1
+		ctrl = nr << 1
+		if pf != 0 {
+			ctrl |= 0x01
+		}
+
 		this_p.frame_data[this_p.frame_len] = byte(ctrl & 0xff)
 		this_p.frame_len++
 	}
