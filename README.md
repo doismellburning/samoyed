@@ -134,26 +134,10 @@ git clone https://github.com/doismellburning/samoyed
 cd samoyed
 make setup       # install build/test/lint dependencies
 make cmds        # build all binaries into dist/
-make test        # run the full test suite
+make all         # build and test everything
 ```
 
-## Development
-
-See [AGENTS.md](./AGENTS.md) for general development notes and style guidelines.
-
-Key `make` targets:
-
-| Target | Description |
-|--------|-------------|
-| `make setup` | Install the system dependencies needed by the targets below |
-| `make all` | Build everything and run all tests — run before committing |
-| `make cmds` | Build all binaries |
-| `make test` | Run the full test suite |
-| `make check` | Run linters (`vet`, `golangci-lint`, `shellcheck`, `reuse`) |
-| `make fix` | Auto-fix linting issues where possible |
-| `make vuln` | Check dependencies and the toolchain for reachable vulnerabilities |
-| `make coveragereport` | Show test coverage breakdown |
-| `make stats` | Show lines-of-code breakdown (C vs Go) |
+See [AGENTS.md](./AGENTS.md) for the main `make` targets, along with general development notes and style guidelines.
 
 ## Contributing
 
