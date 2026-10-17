@@ -579,7 +579,13 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
 		// dw_printf ("parse_fields () field = %s\n", e);
 		switch e[0] {
 		case 'A':
-			switch e[1] {
+			// A lone A is a malformed callsign, and parseCallsign says so.
+			var kind byte
+			if len(e) > 1 {
+				kind = e[1]
+			}
+
+			switch kind {
 			case 'A': /* AA object-name */
 				err = g.parseObjectName(state, e)
 				if err != 0 {
