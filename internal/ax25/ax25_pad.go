@@ -1709,17 +1709,42 @@ func (this_p *Packet) Info() []byte {
 	}
 } /* end Info */
 
+// SetInfo replaces the information part, which for a packet that isn't AX.25
+// is the whole frame, as it is for Info.
 func (this_p *Packet) SetInfo(new_info []byte) {
-	var old_info = this_p.Info()
-	this_p.frame_len -= len(old_info)
-
 	if len(new_info) > MaxInfoLen {
 		new_info = new_info[:MaxInfoLen]
 	}
 
-	copy(this_p.frame_data[this_p.InfoOffset():], new_info)
+	var offset = 0
 
-	this_p.frame_len += len(new_info)
+	if this_p.num_addr >= 2 {
+		if this_p.Control() < 0 {
+			logrus.Error("SetInfo: frame has no control byte, so no information part")
+
+			return
+		}
+
+		var end = this_p.frame_len
+
+		// An I or UI frame that stops just before its PID gets one, so the
+		// information part goes after it rather than in its place.
+		if this_p.NumPID() > 0 && this_p.PIDOffset() == end {
+			this_p.frame_data[end] = PIDNoLayer3
+			end++
+		}
+
+		// Any other gap - a second control byte, or the byte after an
+		// escape PID - has nothing sensible to fill it.
+		offset = this_p.InfoOffset()
+		if offset > end {
+			logrus.Error("SetInfo: frame stops part way through its control field or PID, so has no information part")
+
+			return
+		}
+	}
+
+	this_p.frame_len = offset + copy(this_p.frame_data[offset:], new_info)
 }
 
 /*------------------------------------------------------------------------------
