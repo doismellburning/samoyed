@@ -824,9 +824,10 @@ func sanity_check(buf []byte, bits_flipped phy.BitFixLevel, sanity_test phy.Sani
 
 	/*
 	 * The next two bytes should be 0x03 and 0xf0 for APRS.
+	 * The frame might end before them.
 	 */
 
-	if buf[alen] != 0x03 || buf[alen+1] != 0xf0 {
+	if len(buf) < alen+2 || buf[alen] != 0x03 || buf[alen+1] != 0xf0 {
 		return false
 	}
 
