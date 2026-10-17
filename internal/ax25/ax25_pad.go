@@ -901,11 +901,22 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 			}
 		}
 
-		var k, kErr = strconv.Atoi(sstr.String())
-		if kErr != nil {
-			log().WithError(kErr).Warn("Malformed SSID")
+		var k int
 
-			return out_addr, ssid, heard, false
+		if strictness.strict() {
+			var kErr error
+
+			k, kErr = strconv.Atoi(sstr.String())
+			if kErr != nil {
+				log().WithError(kErr).Warn("Malformed SSID")
+
+				return out_addr, ssid, heard, false
+			}
+		} else {
+			// Read it as Dire Wolf did, with atoi: the leading digits, if any,
+			// so an APRS-IS station's "-B" is SSID 0 rather than an error.
+			var rest = strings.TrimLeftFunc(sstr.String(), unicode.IsDigit)
+			k, _ = strconv.Atoi(strings.TrimSuffix(sstr.String(), rest))
 		}
 
 		if k < 0 || k > 15 {

@@ -172,3 +172,40 @@ func TestInsertAddrFullLengthFrame(t *testing.T) {
 	assert.True(t, short.InsertAddr(Repeater1, "Q2TEST"))
 	assert.Equal(t, "Q1TEST>APDW17,Q2TEST,WIDE2-2:", short.FormatAddrs())
 }
+
+func TestParseAddrLenientAlphanumericSSID(t *testing.T) {
+	t.Parallel()
+
+	// APRS-IS has stations, D-STAR gateways for instance, whose "SSID" is a
+	// letter.  Dire Wolf read it with atoi, which makes it 0, and kept the
+	// packet; strict checking still rejects it.  atoi makes nothing at all 0
+	// too, so a dash with no SSID after it is accepted the same way.
+	var testCases = []struct {
+		addr string
+		call string
+		ssid int
+	}{
+		{"Q1TEST-B", "Q1TEST", 0},
+		{"Q1TEST-1A", "Q1TEST", 1},
+		{"Q1TEST-12", "Q1TEST", 12},
+		{"Q1TEST-", "Q1TEST", 0},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.addr, func(t *testing.T) {
+			t.Parallel()
+
+			var call, ssid, _, ok = ParseAddr(Source, tc.addr, AddrLenient)
+			require.True(t, ok)
+			assert.Equal(t, tc.call, call)
+			assert.Equal(t, tc.ssid, ssid)
+
+			_, _, _, ok = ParseAddr(Source, tc.addr, AddrStrict)
+			assert.Equal(t, tc.addr == "Q1TEST-12", ok)
+		})
+	}
+
+	var pp = FromText("Q1TEST-B>APDW17,TCPIP,Q2TEST-2*:>hello", false)
+	require.NotNil(t, pp)
+	assert.Equal(t, "Q1TEST>APDW17,TCPIP,Q2TEST-2*:", pp.FormatAddrs())
+}
