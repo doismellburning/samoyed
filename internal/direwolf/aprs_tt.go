@@ -241,7 +241,7 @@ const MAX_MSG_LEN = 100
 // ttParseState holds temporary state accumulated during a single Sequence call.
 type ttParseState struct {
 	callsign        string /* really object name */
-	symtabOrOverlay rune
+	symtabOrOverlay byte
 	symbolCode      rune
 	locText         string
 	longitude       maybe.Maybe[float64]
@@ -473,7 +473,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	logrus.WithFields(logrus.Fields{
 		"callsign":  state.callsign,
 		"ssid":      state.ssid,
-		"symbol":    string([]rune{state.symtabOrOverlay, state.symbolCode}),
+		"symbol":    string([]rune{rune(state.symtabOrOverlay), state.symbolCode}),
 		"freq":      state.freq,
 		"ctcss":     state.ctcss,
 		"comment":   state.comment,
@@ -792,13 +792,13 @@ func checksum_not_ok(str string, length int, found rune) int {
 // twoKeyOverlay translates the two keys of a two key overlay.  Keys that
 // translate to nothing are no overlay at all.  Keys that translate only in
 // part give the character that did, as Dire Wolf took it.
-func twoKeyOverlay(keys string) (rune, bool) {
+func twoKeyOverlay(keys string) (byte, bool) {
 	var text, _ = touchtone.TwoKeyToText(keys, false)
 	if text == "" {
 		return 0, false
 	}
 
-	return rune(text[0]), true
+	return text[0], true
 }
 
 func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
@@ -860,7 +860,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			}
 		} else {
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
-			state.symtabOrOverlay = rune(e[length-2])
+			state.symtabOrOverlay = e[length-2]
 
 			if g.debug > 0 {
 				logrus.WithFields(logrus.Fields{
@@ -912,7 +912,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			state.callsign, _ = touchtone.TwoKeyToText(tttemp, false)
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
-			state.symtabOrOverlay = rune(e[length-2])
+			state.symtabOrOverlay = e[length-2]
 
 			if g.debug > 0 {
 				logrus.WithFields(logrus.Fields{
@@ -1080,7 +1080,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 				var stemp, errors = touchtone.TwoKeyToText(e[5:], false)
 				if errors == 0 {
 					state.symbolCode = rune(32 + nn)
-					state.symtabOrOverlay = rune(stemp[0])
+					state.symtabOrOverlay = stemp[0]
 
 					if g.debug > 0 {
 						logrus.WithFields(logrus.Fields{

@@ -59,7 +59,7 @@ type tt_user_s struct {
 	ssid int /* SSID to add. */
 	/* Default of 12 but not always. */
 
-	overlay rune /* Overlay character. Should be 0-9, A-Z. */
+	overlay byte /* Overlay character. Should be 0-9, A-Z. */
 	/* Could be / or \ for general object. */
 
 	symbol rune /* 'A' for traditional.  */
@@ -168,7 +168,7 @@ func newTTUsers(audioConfig *RadioConfig, ttConfig *tt_config_s) *ttUsers {
  *
  *----------------------------------------------------------------*/
 
-func (u *ttUsers) search(callsign string, overlay rune) int {
+func (u *ttUsers) search(callsign string, overlay byte) int {
 	/*
 	 * First, look for exact match to full call and overlay.
 	 */
@@ -382,7 +382,7 @@ func digit_suffix(callsign string) string {
  *
  *----------------------------------------------------------------*/
 
-func (u *ttUsers) heard(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude maybe.Maybe[float64],
+func (u *ttUsers) heard(callsign string, ssid int, overlay byte, symbol rune, loc_text string, latitude maybe.Maybe[float64],
 	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) int {
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("tt_user_heard (%s, %d, %c, %c, %s, ...)\n", callsign, ssid, overlay, symbol, loc_text);
@@ -411,7 +411,7 @@ func (u *ttUsers) heard(callsign string, ssid int, overlay rune, symbol rune, lo
 
 // record stores what heard was told about a user, schedules its object
 // report transmissions, and returns the report to send straight away.
-func (u *ttUsers) record(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude maybe.Maybe[float64],
+func (u *ttUsers) record(callsign string, ssid int, overlay byte, symbol rune, loc_text string, latitude maybe.Maybe[float64],
 	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) string {
 	u.mu.Lock()
 	defer u.mu.Unlock()
@@ -821,7 +821,7 @@ func (u *ttUsers) objectReportText(i int, first_time bool) string {
 
 	// info part of Object Report packet
 	stemp += aprs.EncodeObject(object_name, false, u.user[i].last_heard, olat, olong, oambig,
-		byte(u.user[i].overlay), byte(u.user[i].symbol), //nolint:gosec // G115: unchecked narrowing conversion, see #294
+		u.user[i].overlay, byte(u.user[i].symbol), //nolint:gosec // G115: unchecked narrowing conversion, see #294
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", /* PHGD */
 		maybe.Nothing[int](), maybe.Nothing[int](), /* Course/Speed */
 		freq,
