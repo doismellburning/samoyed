@@ -4,6 +4,7 @@
 package ax25
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -138,4 +139,36 @@ func Test_printableAddress(t *testing.T) {
 	var field = []byte{'Q' << 1, '1' << 1, 'T' << 1, 0x07 << 1, ' ' << 1, ' ' << 1}
 
 	assert.Equal(t, "Q1T.  ", printableAddress(field))
+}
+
+// fullLengthFrame returns a received APRS frame from Q1TEST to APDW17 via the
+// given digipeaters, padded out with information to MaxPacketLen.
+func fullLengthFrame(t *testing.T, via string) *Packet {
+	t.Helper()
+
+	var frame = MustFromText("Q1TEST>APDW17," + via + ":>").FrameData()
+	frame = append(frame, bytes.Repeat([]byte{'x'}, MaxPacketLen-len(frame))...)
+
+	var pp = FromFrame(frame, ALevel{Rec: 50, Mark: 50, Space: 50})
+	require.NotNil(t, pp)
+
+	return pp
+}
+
+func TestInsertAddrFullLengthFrame(t *testing.T) {
+	t.Parallel()
+
+	// The frame is already as long as a frame can be, so there is no room for
+	// another address.  A digipeater inserting its own call for tracing used
+	// to run off the end of the frame buffer.
+	var pp = fullLengthFrame(t, "WIDE2-2")
+
+	assert.False(t, pp.InsertAddr(Repeater1, "Q2TEST"))
+	assert.Equal(t, MaxPacketLen, pp.FrameLen())
+	assert.Equal(t, "Q1TEST>APDW17,WIDE2-2:", pp.FormatAddrs())
+	assert.NotPanics(t, func() { pp.Pack() })
+
+	var short = MustFromText("Q1TEST>APDW17,WIDE2-2:>")
+	assert.True(t, short.InsertAddr(Repeater1, "Q2TEST"))
+	assert.Equal(t, "Q1TEST>APDW17,Q2TEST,WIDE2-2:", short.FormatAddrs())
 }

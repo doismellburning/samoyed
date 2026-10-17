@@ -1133,12 +1133,14 @@ func (this_p *Packet) SetAddr(n int, ad string) {
  *
  * Assumption:	FromText or FromFrame was called first.
  *
- * Returns:	None.
+ * Returns:	True if the address was inserted, false if there was no room:
+ *		the frame already has the maximum number of addresses, or is
+ *		already as long as a frame can be.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func (this_p *Packet) InsertAddr(n int, ad string) {
+func (this_p *Packet) InsertAddr(n int, ad string) bool {
 	dwutil.Assert(n >= Repeater1 && n < MaxAddrs)
 
 	//dw_printf ("InsertAddr (%d, %s)\n", n, ad);
@@ -1148,10 +1150,22 @@ func (this_p *Packet) InsertAddr(n int, ad string) {
 	}
 
 	/* Don't do it if we already have the maximum number. */
-	/* Should probably return success/fail code but currently the caller doesn't care. */
 
 	if this_p.num_addr >= MaxAddrs {
-		return
+		return false
+	}
+
+	/* Nor if the frame is already as long as a frame can be. */
+	/* A received frame can be, with an information part longer than MaxInfoLen. */
+
+	if this_p.frame_len+7 > MaxPacketLen {
+		logrus.WithFields(logrus.Fields{
+			"position": n,
+			"address":  ad,
+			"length":   this_p.frame_len,
+		}).Warn("No room to insert address: frame is already the maximum length")
+
+		return false
 	}
 
 	this_p.clearLastAddrFlag()
@@ -1193,6 +1207,8 @@ func (this_p *Packet) InsertAddr(n int, ad string) {
 			"actual":   this_p.num_addr,
 		}).Error("Internal error: InsertAddr: unexpected number of addresses")
 	}
+
+	return true
 }
 
 /*------------------------------------------------------------------------------
