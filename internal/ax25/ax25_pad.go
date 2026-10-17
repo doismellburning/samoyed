@@ -159,6 +159,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
@@ -2742,34 +2743,46 @@ func (this_p *Packet) MultiModemCRC() uint16 {
 const MaxSafe = MaxInfoLen
 
 func SafePrint(info []byte, ascii_only bool) {
+	// TODO1.2: should return string rather printing to remove a race condition.
+	// safeString does; what is left is for callers to print it with the rest
+	// of their line.
+	fmt.Print(safeString(info, ascii_only))
+} /* end SafePrint */
+
+// safeString is what SafePrint prints.  It works a byte at a time, as
+// FromText reads the notation back: a byte that is not part of a valid
+// UTF-8 character, or any byte of a non-ASCII character when asciiOnly,
+// is shown in hexadecimal on its own.
+func safeString(info []byte, asciiOnly bool) string {
 	if len(info) > MaxSafe {
 		info = info[:MaxSafe]
 	}
 
 	var safe_str strings.Builder
-	var pstr = string(info)
 
-	for i, ch := range pstr {
-		if ch == ' ' && i == len(pstr)-1 {
-			fmt.Fprintf(&safe_str, "<0x%02x>", ch)
-		} else if ch < ' ' || ch == 0x7f || ch == 0xfe || ch == 0xff ||
-			(ascii_only && ch >= 0x80) {
-			/* Control codes and delete. */
-			/* UTF-8 does not use fe and ff except in a possible */
-			/* "Byte Order Mark" (BOM) at the beginning. */
-			fmt.Fprintf(&safe_str, "<0x%02x>", ch)
+	for i := 0; i < len(info); {
+		var ch, size = utf8.DecodeRune(info[i:])
+		var char = info[i : i+size]
+
+		if (ch == utf8.RuneError && size == 1) || /* Not UTF-8, which never uses fe and ff. */
+			ch < ' ' || ch == 0x7f || /* Control codes and delete. */
+			(ch == ' ' && i+size == len(info)) ||
+			(asciiOnly && ch >= 0x80) {
+			for _, b := range char {
+				fmt.Fprintf(&safe_str, "<0x%02x>", b)
+			}
 		} else {
 			/* Let everything else thru so we can handle UTF-8 */
 			/* Maybe we should have an option to display 0x80 */
 			/* and above as hexadecimal. */
-			safe_str.WriteRune(ch)
+			safe_str.Write(char)
 		}
+
+		i += size
 	}
 
-	// TODO1.2: should return string rather printing to remove a race condition.
-
-	fmt.Print(safe_str.String())
-} /* end SafePrint */
+	return safe_str.String()
+}
 
 /*------------------------------------------------------------------
  *
