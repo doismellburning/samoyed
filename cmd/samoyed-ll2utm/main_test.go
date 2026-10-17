@@ -11,37 +11,42 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Examples from ll2utm.c source, checked against direwolf Debian package
-
-func Example_main() { //nolint:testableexamples
-	os.Args = []string{"ll2utm"}
-
-	main()
-	// TODO Can we do a partial match in the style of Python doctests?
-}
-
-func Example_main_1() {
-	os.Args = []string{"ll2utm", "42.662139", "-71.365553"}
-
-	main()
-	// Output:
-	// UTM zone = 19, hemisphere = N, easting = 306130, northing = 4726010
-	// MGRS =  19TCH02  19TCH0626  19TCH061260  19TCH06132600  19TCH0613026009
-}
-
 func TestMain(m *testing.M) {
 	testutils.RunMainIfAsked(main)
 
 	os.Exit(m.Run())
 }
 
-func Example_main_southern() {
-	os.Args = []string{"ll2utm", "-33.8688", "151.2093"}
+// Examples from ll2utm.c source, checked against direwolf Debian package
+func Test_main(t *testing.T) {
+	t.Parallel()
 
-	main()
-	// Output:
-	// UTM zone = 56, hemisphere = S, easting = 334369, northing = 6250948
-	// MGRS =  56HLH35  56HLH3450  56HLH343509  56HLH34365094  56HLH3436850948
+	var testCases = map[string]struct {
+		args []string
+		want string
+	}{
+		"northern": {
+			[]string{"42.662139", "-71.365553"},
+			"UTM zone = 19, hemisphere = N, easting = 306130, northing = 4726010\n" +
+				"MGRS =  19TCH02  19TCH0626  19TCH061260  19TCH06132600  19TCH0613026009\n",
+		},
+		"southern": {
+			[]string{"-33.8688", "151.2093"},
+			"UTM zone = 56, hemisphere = S, easting = 334369, northing = 6250948\n" +
+				"MGRS =  56HLH35  56HLH3450  56HLH343509  56HLH34365094  56HLH3436850948\n",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var result = testutils.RunMain(t, "", tc.args...)
+
+			assert.Equal(t, 0, result.Status)
+			assert.Equal(t, tc.want, result.Output())
+		})
+	}
 }
 
 // UTM stops short of the poles, where MGRS carries on.
