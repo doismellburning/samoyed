@@ -783,6 +783,18 @@ func checksum_not_ok(str string, length int, found rune) int {
 	return (0)
 }
 
+// twoKeyOverlay translates the two keys of a two key overlay.  Keys that
+// translate to nothing are no overlay at all.  Keys that translate only in
+// part give the character that did, as Dire Wolf took it.
+func twoKeyOverlay(keys string) (rune, bool) {
+	var text, _ = touchtone.TwoKeyToText(keys, false)
+	if text == "" {
+		return 0, false
+	}
+
+	return rune(text[0]), true
+}
+
 func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 	if g.debug > 0 {
 		logrus.WithField("entry", e).Debug("APRStt parse callsign (starts with A then digit)")
@@ -875,11 +887,13 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 
 			state.callsign, _ = touchtone.TwoKeyToText(tttemp, false)
 
-			tttemp = string(e[length-3]) + string(e[length-2])
-			var stemp, _ = touchtone.TwoKeyToText(tttemp, false)
+			var overlay, ok = twoKeyOverlay(string(e[length-3]) + string(e[length-2]))
+			if !ok {
+				return (TT_ERROR_INVALID_SYMBOL)
+			}
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
-			state.symtabOrOverlay = rune(stemp[0])
+			state.symtabOrOverlay = overlay
 
 			if g.debug > 0 {
 				logrus.WithFields(logrus.Fields{

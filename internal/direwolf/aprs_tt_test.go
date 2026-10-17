@@ -43,3 +43,35 @@ func TestParseLocationRejectsOutOfRangeMaidenhead(t *testing.T) {
 	assert.True(t, state.latitude.IsNothing(), "position should be left alone")
 	assert.True(t, state.longitude.IsNothing(), "position should be left alone")
 }
+
+// A callsign in two key format can end in a two key overlay whose keys don't
+// translate to anything - "BA" is a letter key where a digit belongs, then a
+// stray letter.  TwoKeyToText's error count was ignored there, and its empty
+// result indexed, so a tone sequence anyone could send panicked the gateway.
+// There is no overlay to give it, so the field is rejected.
+func TestParseCallsignTwoKeyOverlayThatDoesNotTranslate(t *testing.T) {
+	var cfg tt_config_s
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	require.NotPanics(t, func() {
+		assert.Equal(t, TT_ERROR_INVALID_SYMBOL, gw.parseCallsign(&state, "A1234BA1"))
+	})
+}
+
+// Keys that translate only in part - "5Z" is a digit, then a letter that isn't
+// a column key - still give the character that did, as Dire Wolf took it.
+func TestParseCallsignTwoKeyOverlayThatPartlyTranslates(t *testing.T) {
+	var cfg tt_config_s
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	assert.Equal(t, 0, gw.parseCallsign(&state, "A12345Z5"))
+	assert.Equal(t, '5', state.symtabOrOverlay)
+}
