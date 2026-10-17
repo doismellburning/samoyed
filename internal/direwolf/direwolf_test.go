@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -279,5 +280,39 @@ func TestSendCalibrationPlaysOutTheTonesBeforeReturning(t *testing.T) {
 		assert.Equal(t, []int{0}, waited, "mode %c should play out its audio device once", mode)
 		assert.Positive(t, putsBeforeWait, "mode %c should generate its tones before playing them out", mode)
 		assert.Equal(t, sink.puts, putsBeforeWait, "mode %c should generate nothing after playing out", mode)
+	}
+}
+
+func TestParseTransmitCalibration(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		opt     string
+		mode    rune
+		channel int
+	}{
+		{"a", 'a', 0},
+		{"m1", 'm', 1},
+		{"2s", 's', 2},
+		{"p", 'p', 0},
+		{"3", 'a', 3},
+		{strconv.Itoa(MAX_RADIO_CHANS - 1), 'a', MAX_RADIO_CHANS - 1},
+	} {
+		var mode, channel, err = parseTransmitCalibration(tc.opt)
+		require.NoError(t, err, "%q", tc.opt)
+		assert.Equal(t, tc.mode, mode, "%q", tc.opt)
+		assert.Equal(t, tc.channel, channel, "%q", tc.opt)
+	}
+}
+
+// The channel number used to be counted up in an int with no limit, so a
+// long enough run of digits wrapped round to a channel that passed the range
+// check.  18446744073709551616 is 2^64, which wrapped to 0.
+func TestParseTransmitCalibrationRejectsWhatIsNotAChannel(t *testing.T) {
+	t.Parallel()
+
+	for _, opt := range []string{strconv.Itoa(MAX_RADIO_CHANS), "a99", "18446744073709551616", "18446744073709551617m", "x", "a1q"} {
+		var _, _, err = parseTransmitCalibration(opt)
+		assert.Error(t, err, "%q", opt)
 	}
 }

@@ -599,36 +599,10 @@ x = Silence FX.25 information.`)
 	 */
 
 	if *transmitCalibration != "" {
-		var transmitCalibrationType = ' '
-		var transmitCalibrationChannel int
-
-		for _, p := range *transmitCalibration {
-			switch p {
-			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				transmitCalibrationChannel = transmitCalibrationChannel*10 + int(p-'0')
-
-				if transmitCalibrationType == ' ' {
-					transmitCalibrationType = 'a'
-				}
-			case 'a':
-				transmitCalibrationType = p // Alternating tones
-			case 'm':
-				transmitCalibrationType = p // Mark tone
-			case 's':
-				transmitCalibrationType = p // Space tone
-			case 'p':
-				transmitCalibrationType = p // Set PTT only
-			default:
-				text_color_set(DW_COLOR_ERROR)
-				fmt.Printf("Invalid option '%c' for -x. Must be a, m, s, or p.\n", p)
-				text_color_set(DW_COLOR_INFO)
-				td.exit(1)
-			}
-		}
-
-		if transmitCalibrationChannel < 0 || transmitCalibrationChannel >= MAX_RADIO_CHANS {
+		var transmitCalibrationType, transmitCalibrationChannel, calibrationErr = parseTransmitCalibration(*transmitCalibration)
+		if calibrationErr != nil {
 			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Invalid channel %d for -x. \n", transmitCalibrationChannel)
+			fmt.Printf("%s\n", calibrationErr)
 			text_color_set(DW_COLOR_INFO)
 			td.exit(1)
 		}
@@ -1350,6 +1324,39 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		}
 	}
 } /* end app_process_rec_packet */
+
+// parseTransmitCalibration reads the "-x" option: a, m, s or p for what to
+// send, and a number, before or after, for the radio channel.  A number on
+// its own sends alternating tones.
+func parseTransmitCalibration(opt string) (rune, int, error) {
+	var mode = ' '
+	var channel int
+
+	for _, p := range opt {
+		switch p {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			// Stop counting once it is out of range, so that a long enough
+			// run of digits cannot wrap the count round into range again.
+			if channel < MAX_RADIO_CHANS {
+				channel = channel*10 + int(p-'0')
+			}
+
+			if mode == ' ' {
+				mode = 'a'
+			}
+		case 'a', 'm', 's', 'p':
+			mode = p
+		default:
+			return 0, 0, fmt.Errorf("invalid option '%c' for -x: must be a, m, s, or p", p)
+		}
+	}
+
+	if channel >= MAX_RADIO_CHANS {
+		return 0, 0, fmt.Errorf("invalid channel for -x %s", opt)
+	}
+
+	return mode, channel, nil
+}
 
 // sendCalibration sends what "-x" asks for on a channel whose PTT is keyed:
 // bits bits of tones - alternating for 'a', mark for 'm', space for 's' - or,
