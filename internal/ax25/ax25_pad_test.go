@@ -359,3 +359,18 @@ func TestDupLeavesQueue(t *testing.T) {
 	assert.NotNil(t, pp.Next())
 	assert.Equal(t, pp.FrameData(), dup.FrameData())
 }
+
+func TestHAndRRBadIndex(t *testing.T) {
+	t.Parallel()
+
+	// Like SSID and SetH, these report a bad index and carry on rather than
+	// bringing everything down.
+	var pp = MustFromText("Q1TEST>APDW17,WIDE2-2:>hello")
+
+	for _, n := range []int{-1, pp.NumAddr(), MaxAddrs} {
+		assert.NotPanics(t, func() {
+			assert.Equal(t, 0, pp.H(n))
+			assert.Equal(t, 0, pp.RR(n))
+		}, "index %d", n)
+	}
+}

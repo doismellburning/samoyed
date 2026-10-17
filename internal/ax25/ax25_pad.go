@@ -1542,17 +1542,13 @@ func (this_p *Packet) SetSSID(n int, ssid int) {
  * Inputs:	n	- Index of address.   Use the symbols
  *			  Destination, Source, AX25_REPEATER1, etc.
  *
- * Bugs:	No bounds checking is performed.  Be careful.
- *
  * Assumption:	FromText or FromFrame was called first.
  *
- * Returns:	True or false.
+ * Returns:	1 or 0.  0 for a bad index, after reporting it.
  *
  *------------------------------------------------------------------------------*/
 
 func (this_p *Packet) H(n int) int {
-	dwutil.Assert(n >= 0 && n < this_p.num_addr)
-
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSIDHMask) >> SSIDHShift)
 	} else {
@@ -1658,13 +1654,11 @@ func (this_p *Packet) FirstNotRepeated() int {
  *		n	- Index of address.   Use the symbols
  *			  Destination, Source, AX25_REPEATER1, etc.
  *
- * Returns:	0, 1, 2, or 3.
+ * Returns:	0, 1, 2, or 3.  0 for a bad index, after reporting it.
  *
  *------------------------------------------------------------------------------*/
 
 func (this_p *Packet) RR(n int) int {
-	dwutil.Assert(n >= 0 && n < this_p.num_addr)
-
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSIDRRMask) >> SSIDRRShift)
 	} else {
