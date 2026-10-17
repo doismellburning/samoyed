@@ -351,6 +351,21 @@ func isxdigit(b byte) bool {
 	return slices.Contains([]byte("0123456789abcdefABCDEF"), b)
 }
 
+// An address field holds 7-bit ASCII, so these, unlike their unicode
+// package namesakes, accept only ASCII letters and digits, as C's do.
+
+func isASCIIDigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
+func isASCIILower(r rune) bool {
+	return r >= 'a' && r <= 'z'
+}
+
+func isASCIIAlnum(r rune) bool {
+	return isASCIIDigit(r) || isASCIILower(r) || (r >= 'A' && r <= 'Z')
+}
+
 /*------------------------------------------------------------------------------
  *
  * Name:	New
@@ -853,7 +868,7 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 			return out_addr, ssid, heard, false
 		}
 
-		if !unicode.IsLetter(p) && !unicode.IsNumber(p) {
+		if !isASCIIAlnum(p) {
 			log().WithField("index", i).Warn("Address contains character other than letter or digit")
 
 			return out_addr, ssid, heard, false
@@ -861,7 +876,7 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 
 		out_addr += string(p)
 
-		if strictness.strict() && unicode.IsLower(p) {
+		if strictness.strict() && isASCIILower(p) {
 			// Exempt the "qA..." case because it was already mentioned.
 			if strictness != AddrStrictLowerCaseWarning || !strings.HasPrefix(in_addr, "qA") {
 				log().Warn("Address has lower case letters - it must be all upper case")
@@ -883,7 +898,7 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 	if len(in_addr) > 0 && in_addr[0] == '-' {
 		in_addr = in_addr[1:]
 		for i, p := range in_addr {
-			if !unicode.IsLetter(p) && !unicode.IsNumber(p) {
+			if !isASCIIAlnum(p) {
 				break
 			}
 
@@ -894,7 +909,7 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 			}
 
 			sstr.WriteRune(p)
-			if strictness.strict() && !unicode.IsDigit(p) {
+			if strictness.strict() && !isASCIIDigit(p) {
 				log().Warn("SSID must be digits")
 
 				return out_addr, ssid, heard, false
@@ -915,7 +930,7 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 		} else {
 			// Read it as Dire Wolf did, with atoi: the leading digits, if any,
 			// so an APRS-IS station's "-B" is SSID 0 rather than an error.
-			var rest = strings.TrimLeftFunc(sstr.String(), unicode.IsDigit)
+			var rest = strings.TrimLeftFunc(sstr.String(), isASCIIDigit)
 			k, _ = strconv.Atoi(strings.TrimSuffix(sstr.String(), rest))
 		}
 

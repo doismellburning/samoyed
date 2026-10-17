@@ -209,3 +209,19 @@ func TestParseAddrLenientAlphanumericSSID(t *testing.T) {
 	require.NotNil(t, pp)
 	assert.Equal(t, "Q1TEST>APDW17,TCPIP,Q2TEST-2*:", pp.FormatAddrs())
 }
+
+func TestParseAddrRejectsNonASCII(t *testing.T) {
+	t.Parallel()
+
+	// An address field holds 7-bit ASCII, so a letter or digit from beyond
+	// it can't be represented: it used to be accepted and then mangled,
+	// "QÄ1" going out as "QD 1".
+	for _, addr := range []string{"QÄ1", "Q²1", "Q1Ⅻ", "Q1TEST-¹", "Q1TEST-٣"} {
+		for _, strictness := range []AddrStrictness{AddrLenient, AddrStrict, AddrStrictNoStar, AddrStrictLowerCaseWarning} {
+			var _, _, _, ok = ParseAddr(Source, addr, strictness)
+			assert.False(t, ok, "%q accepted with strictness %d", addr, strictness)
+		}
+
+		assert.Nil(t, FromText(addr+">APDW17:>hello", true), addr)
+	}
+}
