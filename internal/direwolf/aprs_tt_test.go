@@ -75,3 +75,19 @@ func TestParseCallsignTwoKeyOverlayThatPartlyTranslates(t *testing.T) {
 	assert.Equal(t, 0, gw.parseCallsign(&state, "A12345Z5"))
 	assert.Equal(t, '5', state.symtabOrOverlay)
 }
+
+// A field that is nothing but an A is a callsign with nothing in it.  Its
+// second character was read to tell which kind of A field it was, and a tone
+// sequence anyone could send panicked the gateway.
+func TestParseFieldsLoneA(t *testing.T) {
+	var cfg tt_config_s
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	require.NotPanics(t, func() {
+		assert.Equal(t, TT_ERROR_INVALID_CALL, gw.parseFields(&state, "A#"))
+	})
+}
