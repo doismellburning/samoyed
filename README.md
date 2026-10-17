@@ -64,16 +64,53 @@ The `.deb` packages are recommended for Debian-based systems (Debian, Ubuntu, Ra
 sudo apt install ./samoyed-binary_*.deb
 ```
 
-## Usage
+## Quick start
 
-The primary binary is `samoyed-direwolf`. Run it with `--help` for a full list of options:
+`samoyed-direwolf` is the modem/TNC itself.
+It reads a configuration file — `direwolf.conf` in the current directory, or whatever `--config-file` names.
+A minimal one for a single 1200 bps channel on Linux, in Samoyed's [YAML format](https://doismellburning.github.io/samoyed/yaml-config.html) (for a file whose name ends in `.yaml` or `.yml`):
 
-```sh
-samoyed-direwolf --help
+```yaml
+samoyed:
+  audioDevices:
+    # Your soundcard - see `arecord -l`
+    - input: plughw:1,0
+  channels:
+    - channel: 0
+      # Your callsign
+      mycall: Q1TEST
+      modem:
+        speed: "1200"
+  agwPort: 8000
+  kissPorts:
+    - port: 8001
 ```
 
-For Samoyed's own features and recipes, see the [Samoyed documentation](https://doismellburning.github.io/samoyed/), in particular the [how-to guides](https://doismellburning.github.io/samoyed/how-to-guides.html).
-For everything else, the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) still applies — Samoyed aims for broad compatibility with Dire Wolf.
+That is equivalent to this, in Dire Wolf's format, which works too:
+
+```
+# Your soundcard - see `arecord -l`
+ADEVICE plughw:1,0
+CHANNEL 0
+# Your callsign
+MYCALL Q1TEST
+MODEM 1200
+AGWPORT 8000
+KISSPORT 8001
+```
+
+Check it, then start it:
+
+```sh
+samoyed-direwolf --config-file samoyed.yaml --config-check
+samoyed-direwolf --config-file samoyed.yaml
+```
+
+Run `samoyed-direwolf --help` for the full list of options.
+Dire Wolf's companion utilities come along too, each prefixed `samoyed-` (`samoyed-atest`, `samoyed-kissutil` and so on), with man pages in the `.deb`.
+
+For configuration, features and recipes, see the [Samoyed documentation](https://doismellburning.github.io/samoyed/), in particular the [how-to guides](https://doismellburning.github.io/samoyed/how-to-guides.html).
+Where it doesn't yet cover something, the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) should — Samoyed aims for broad compatibility with Dire Wolf.
 
 ## Building
 
