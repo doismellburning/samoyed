@@ -266,9 +266,11 @@ func TestSerialTNCStopsWhenCancelled(t *testing.T) {
 
 	cancel()
 
-	// Something to read gets the listener out of its read.
-	var _, writeErr = tnc.Write([]byte{0})
-	require.NoError(t, writeErr)
+	// Something to read gets the listener out of its read, if it got that far
+	// before the cancel.  If it didn't, it has already stopped and closed its
+	// end of the terminal, and macOS refuses the write - which is fine, as
+	// there is nothing left to wake.
+	_, _ = tnc.Write([]byte{0})
 
 	select {
 	case <-done:
