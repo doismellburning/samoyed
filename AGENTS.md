@@ -14,8 +14,8 @@
 
 * Update documentation in `docs/source` where appropriate
 * Write prose in `docs/source` with [semantic line breaks](https://sembr.org/): a new line after each sentence, and at clause boundaries where a sentence runs long, rather than wrapping at a fixed width. A diff then shows which sentence changed. Existing pages don't need reflowing just to match
-* `docs/source/architecture/receive-path.rst` diagrams how a received signal travels from an audio sample to the AX.25 data link state machine, naming the functions along the way. A change that renames, adds, removes or reroutes a step on that path - a demodulator, a frame receiver, a `DataLinkQueue` producer or item type, what `recv_process` or `app_process_rec_packet` hands a frame to - updates the page in the same PR
-* `docs/source/architecture/wiring.rst` diagrams how `DirewolfMain` builds the components and connects them, labelling each connection with the function or interface handed over. A change to that wiring - a component added or removed, a constructor taking a different dependency, a connection made after construction - updates the page in the same PR
+* `docs/source/internals/architecture/receive-path.rst` diagrams how a received signal travels from an audio sample to the AX.25 data link state machine, naming the functions along the way. A change that renames, adds, removes or reroutes a step on that path - a demodulator, a frame receiver, a `DataLinkQueue` producer or item type, what `recv_process` or `app_process_rec_packet` hands a frame to - updates the page in the same PR
+* `docs/source/internals/architecture/wiring.rst` diagrams how `DirewolfMain` builds the components and connects them, labelling each connection with the function or interface handed over. A change to that wiring - a component added or removed, a constructor taking a different dependency, a connection made after construction - updates the page in the same PR
 
 ## Git and PRs
 

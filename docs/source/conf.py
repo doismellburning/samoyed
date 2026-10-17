@@ -77,7 +77,11 @@ ogp_image = "_static/logo.png"
 
 # Old page name -> new page name, so moving or renaming a page leaves a redirect
 # behind instead of a broken link.
-rediraffe_redirects: dict[str, str] = {}
+rediraffe_redirects: dict[str, str] = {
+    "architecture": "internals/architecture",
+    "architecture/receive-path": "internals/architecture/receive-path",
+    "architecture/wiring": "internals/architecture/wiring",
+}
 
 
 def _drop_comments_from_markdown(app: Sphinx, doctree: nodes.document, docname: str) -> None:

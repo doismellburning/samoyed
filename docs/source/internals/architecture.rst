@@ -18,7 +18,7 @@ library, third-party packages and test-only imports are left out too.
 The graph is generated from ``go list`` every time the documentation is built,
 so it always matches the code it was built from.
 
-.. graphviz:: _generated/deps.dot
+.. graphviz:: /_generated/deps.dot
    :alt: Samoyed's internal package dependency graph
 
 Data flow
