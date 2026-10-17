@@ -60,6 +60,17 @@ func TestMainHelp(t *testing.T) {
 	require.Contains(t, result.Stderr, "Usage: direwolf")
 }
 
+// A time stamp format strftime cannot use is refused at startup.  It used to
+// be accepted, and every time stamp formatted from it came out blank.
+func TestMainRefusesAnUnusableTimestampFormat(t *testing.T) {
+	t.Parallel()
+
+	var result = testutils.RunMain(t, "", "-T", "%Q")
+
+	require.Equal(t, 1, result.Status, "stdout: %s\nstderr: %s", result.Stdout, result.Stderr)
+	require.Contains(t, result.Output(), "Unusable -T time stamp format")
+}
+
 // startDirewolf starts the command's main with a configuration that needs no
 // hardware.  Audio comes from its standard input, which nothing writes to, so
 // the receive loop has something to block on and the process stays up until it

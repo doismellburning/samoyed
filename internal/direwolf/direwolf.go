@@ -266,6 +266,16 @@ x = Silence FX.25 information.`)
 		}
 	}
 
+	// Each received or sent frame's time stamp is formatted from this, and an
+	// unusable one would leave all of them blank without a word.
+	if *timestampFormat != "" {
+		var _, timestampErr = strftime.New(*timestampFormat)
+		if timestampErr != nil {
+			logrus.WithError(timestampErr).WithField("format", *timestampFormat).Error("Unusable -T time stamp format")
+			os.Exit(1)
+		}
+	}
+
 	var input_file string
 
 	if len(pflag.Args()) > 0 {
