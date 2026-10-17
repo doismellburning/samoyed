@@ -161,7 +161,7 @@ x = Silence FX.25 information.`)
 
 	if *help {
 		pflag.Usage()
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	if *showVersion {
