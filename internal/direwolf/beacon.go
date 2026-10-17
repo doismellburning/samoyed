@@ -988,7 +988,8 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			}
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
-			var alevel ax25.ALevel
+			// No audio was heard, so there is no level to show or warn about.
+			var alevel = ax25.ALevel{Rec: -1, Mark: -1, Space: -1}
 			if bs.recFrame != nil {
 				bs.recFrame(dwcore.RadioSource(dwcore.SlicerID{Channel: bp.sendto_chan, Subchannel: 0, Slice: 0}), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, "")
 			}

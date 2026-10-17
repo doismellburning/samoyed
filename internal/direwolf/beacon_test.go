@@ -6,9 +6,11 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
@@ -66,4 +68,24 @@ func Test_trackerPosition_needs_more_than_a_fix(t *testing.T) {
 	gpsinfo.Fix = dwgps.DWFIX_NO_FIX
 	_, _, havePosition = trackerPosition(gpsinfo)
 	assert.False(t, havePosition, "a stale position without a fix is not a position")
+}
+
+// A beacon sent to be received as though from the radio has no audio level
+// to report.  It was handed a zero level, which is a real reading, so each
+// one was shown with an audio level of 0 and warned that the input level was
+// too low.  A negative level is what says there is none, as in Dire Wolf.
+func Test_BeaconSend_to_recv_has_no_audio_level(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
+	var bs, _ = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_info = ">Hello"
+	bs.miscConfig.beacon[0].sendto_type = SENDTO_RECV
+	bs.recFrame = dlq.RecFrame
+
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
+
+	var item = dlq.Remove()
+	require.NotNil(t, item)
+	assert.Equal(t, ax25.ALevel{Rec: -1, Mark: -1, Space: -1}, item.rxInfo.ALevel)
 }
