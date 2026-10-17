@@ -243,6 +243,12 @@ These are the keys under ``samoyed``:
         What ``INFO`` says about the node.
         Use ``|`` for several lines.
 
+    ``connectMessage``
+        What a station is told when it connects,
+        such as what the node is for and who runs it.
+        Left out, it is a short welcome.
+        Use ``|`` for several lines.
+
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
     Its commands are:
@@ -287,6 +293,9 @@ These are the keys under ``samoyed``:
             channels: [0, 10]
             infoMessage: |
               Samoyed node at the club station.
+            connectMessage: |
+              Welcome to the club node.
+              Type ? for a list of commands.
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

@@ -157,4 +157,7 @@ type NodeSettings struct {
 
 	// InfoMessage is what the INFO command says about the node.
 	InfoMessage string `yaml:"infoMessage"`
+
+	// ConnectMessage is what a station is told on connecting to the node.
+	ConnectMessage string `yaml:"connectMessage"`
 }

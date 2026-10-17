@@ -105,10 +105,11 @@ func noneHeard(int) []mheard.Heard {
 // changed by each of options.
 func testConfig(options ...func(*Config)) Config {
 	var config = Config{
-		Address:     nodeCall,
-		Alias:       nodeAlias,
-		Ports:       []Port{{Channel: testChannel, Description: "Radio"}},
-		InfoMessage: "",
+		Address:        nodeCall,
+		Alias:          nodeAlias,
+		Ports:          []Port{{Channel: testChannel, Description: "Radio"}},
+		InfoMessage:    "",
+		ConnectMessage: "",
 	}
 
 	for _, option := range options {
@@ -116,6 +117,12 @@ func testConfig(options ...func(*Config)) Config {
 	}
 
 	return config
+}
+
+func withConnectMessage(message string) func(*Config) {
+	return func(config *Config) {
+		config.ConnectMessage = message
+	}
 }
 
 func withoutAlias(config *Config) {
@@ -201,6 +208,29 @@ func TestGreetingWithoutAlias(t *testing.T) {
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 
 	assert.Equal(t, "Q1TEST-7} Welcome to Samoyed\r", link.output())
+}
+
+func TestConnectMessage(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name, message, want string
+	}{
+		{"one line", "Welcome to the club node", "SAMNOD:Q1TEST-7} Welcome to the club node\r"},
+		{"LF lines", "Welcome\nType ? for help\n", "SAMNOD:Q1TEST-7} Welcome\rType ? for help\r"},
+		{"CR LF lines", "Welcome\r\nType ? for help\r\n", "SAMNOD:Q1TEST-7} Welcome\rType ? for help\r"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var link = new(fakeLink)
+			var n = New(testConfig(withConnectMessage(tc.message)), link, noneHeard, testClient)
+
+			n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
+
+			assert.Equal(t, tc.want, link.output())
+		})
+	}
 }
 
 // A user who connected to the alias is answered from the alias, which is the

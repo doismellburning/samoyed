@@ -53,6 +53,10 @@ type Config struct {
 	// InfoMessage is what INFO tells a user about the node, or empty for a
 	// line saying what it is.  It may run to several lines.
 	InfoMessage string
+
+	// ConnectMessage is what a user is told on connecting, or empty for a
+	// welcome.  It may run to several lines.
+	ConnectMessage string
 }
 
 // Port is a channel the node accepts connections on.
@@ -180,7 +184,12 @@ func (n *Node) LinkEstablished(channel int, _ int, remoteCall string, ownCall st
 	n.mu.Unlock()
 
 	if !reset {
-		n.send(key, []byte(n.prompt()+"Welcome to Samoyed\r"))
+		var text = n.config.ConnectMessage
+		if text == "" {
+			text = "Welcome to Samoyed"
+		}
+
+		n.send(key, []byte(n.prompt()+terminalText(text)+"\r"))
 	}
 }
 
@@ -597,15 +606,19 @@ func (n *Node) info(key linkKey, _ *session, _ []string) bool {
 		text = n.identity() + " is a Samoyed node"
 	}
 
-	// However the configuration file ended its lines, a packet terminal
-	// wants CR.
-	text = strings.ReplaceAll(text, "\r\n", "\r")
-	text = strings.ReplaceAll(text, "\n", "\r")
-	text = strings.TrimRight(text, "\r")
-
-	n.send(key, []byte(n.prompt()+text+"\r"))
+	n.send(key, []byte(n.prompt()+terminalText(text)+"\r"))
 
 	return true
+}
+
+// terminalText is text from the configuration file with its lines ended in
+// CR, as a packet terminal wants, however the file ended them, and without a
+// last line ending.
+func terminalText(text string) string {
+	text = strings.ReplaceAll(text, "\r\n", "\r")
+	text = strings.ReplaceAll(text, "\n", "\r")
+
+	return strings.TrimRight(text, "\r")
 }
 
 // ports lists the ports, by channel number.
