@@ -289,3 +289,33 @@ func TestNothingReadPastEndOfFrame(t *testing.T) {
 	assert.Equal(t, FrameTypeI, iFrame.FrameTypeOnly())
 	assert.Equal(t, ModuloUnknown, iFrame.Modulo())
 }
+
+func TestSetInfoMissingPID(t *testing.T) {
+	t.Parallel()
+
+	// A UI frame that stops before its PID.  The information part used to be
+	// written a byte past the end, with the frame length not counting the
+	// gap, so the frame lost its last byte and gained a stray one.
+	var frame = append(slices.Clone(MustFromText("Q1TEST>APDW17:>").FrameData()[:14]), UIFrame)
+	var pp = FromFrame(frame, ALevel{Rec: 50, Mark: 50, Space: 50})
+	require.NotNil(t, pp)
+
+	pp.SetInfo([]byte("hello"))
+	assert.Equal(t, "hello", string(pp.Info()))
+	assert.Equal(t, PIDNoLayer3, pp.PID())
+	assert.Equal(t, 14+1+1+5, pp.FrameLen())
+}
+
+func TestSetInfoNotAX25(t *testing.T) {
+	t.Parallel()
+
+	// No address ends, so this isn't AX.25 and the whole frame is its
+	// information part, for setting as for getting.
+	var pp = FromFrame(bytes.Repeat([]byte{'x' &^ 1}, 20), ALevel{Rec: 50, Mark: 50, Space: 50})
+	require.NotNil(t, pp)
+	require.Equal(t, 0, pp.NumAddr())
+
+	pp.SetInfo([]byte("xyz"))
+	assert.Equal(t, "xyz", string(pp.FrameData()))
+	assert.Equal(t, "xyz", string(pp.Info()))
+}
