@@ -485,6 +485,40 @@ func Test_transmitAvailable(t *testing.T) {
 	})
 }
 
+// --- channelCanTransmit ---
+
+func Test_channelCanTransmit(t *testing.T) {
+	t.Run("no audio devices", func(t *testing.T) {
+		var d *AudioDevices
+
+		assert.False(t, d.channelCanTransmit(0))
+	})
+
+	t.Run("device open with no output", func(t *testing.T) {
+		var d, _ = setupAdev0()
+
+		assert.False(t, d.channelCanTransmit(0))
+		assert.False(t, d.channelCanTransmit(1))
+	})
+
+	t.Run("device with UDP output", func(t *testing.T) {
+		var d, dev = setupAdev0()
+		dev.udp_out_sock = &net.UDPConn{}
+
+		assert.True(t, d.channelCanTransmit(0))
+		assert.True(t, d.channelCanTransmit(1), "the other channel of the same device")
+		assert.False(t, d.channelCanTransmit(2), "a channel of another device")
+	})
+
+	t.Run("channel out of range", func(t *testing.T) {
+		var d, dev = setupAdev0()
+		dev.udp_out_sock = &net.UDPConn{}
+
+		assert.False(t, d.channelCanTransmit(-1))
+		assert.False(t, d.channelCanTransmit(MAX_RADIO_CHANS))
+	})
+}
+
 // Regression test for #671: an unusable sound device setting used to be an
 // assert whose message was the C boolean expression that failed, so a bad
 // ACHANNELS or ARATE gave a stack trace rather than a sentence naming the

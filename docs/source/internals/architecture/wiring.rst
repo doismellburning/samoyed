@@ -75,6 +75,7 @@ Dashed arrows are connections made after construction rather than at it.
        tones -> audio [label="AudioSink"];
        ptt -> l2r [label="MuteInput"];
        ptt -> dlq [label="ChannelBusy"];
+       ptt -> audio [label="channelCanTransmit\n(via pttChannels)"];
 
        xmit -> tq [label="xmitQueue"];
        xmit -> ptt [label="SetPTT"];
@@ -266,7 +267,8 @@ References
 - ``internal/direwolf/webui_source.go``: ``webui_init``,
   and ``internal/webui/server.go``: ``NewServer``.
 - ``internal/ptt/ptt.go``: ``New``,
-  handed each channel's configuration by ``RadioConfig.pttChannels`` (``internal/direwolf/channel_config.go``).
+  handed each channel's configuration by ``RadioConfig.pttChannels`` (``internal/direwolf/channel_config.go``),
+  which asks ``AudioDevices.channelCanTransmit`` (``audio.go``) whether each channel has an audio output.
 - The digipeaters' constructors, and what they take,
   in ``internal/digipeater``:
   ``digipeater.go`` (``New``, ``Port``)

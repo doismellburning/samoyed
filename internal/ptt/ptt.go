@@ -1182,9 +1182,10 @@ func (p *PTT) setup() error {
 	}
 
 	/* Why doesn't it transmit?  Probably forgot to specify PTT option. */
+	/* Not worth asking of a channel with no audio output: it can't transmit anyway. */
 
 	for ch := range phy.MaxRadioChans {
-		if p.channels[ch].Radio {
+		if p.channels[ch].Radio && !p.channels[ch].ReceiveOnly {
 			if p.channels[ch].Outputs[OutputPTT].Method == MethodNone {
 				logrus.WithFields(logrus.Fields{
 					"channel": ch,

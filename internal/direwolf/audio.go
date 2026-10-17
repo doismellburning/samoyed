@@ -527,6 +527,12 @@ func (d *AudioDevices) transmitAvailable(a int) bool {
 	return d.dev[a].outputStream != nil || d.dev[a].udp_out_sock != nil
 }
 
+// channelCanTransmit reports whether radio channel has anywhere to send
+// transmitted audio: transmitAvailable for the device behind it.
+func (d *AudioDevices) channelCanTransmit(channel int) bool {
+	return d.transmitAvailable(ACHAN2ADEV(channel))
+}
+
 // anyInputRequiresPortAudio reports whether any configured audio device needs
 // PortAudio to receive (i.e. is a soundcard rather than stdin or UDP).
 func anyInputRequiresPortAudio(pa *RadioConfig) bool {

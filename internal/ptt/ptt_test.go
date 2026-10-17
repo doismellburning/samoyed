@@ -1163,3 +1163,31 @@ func TestOutputTypesYieldsEachOutputInOrder(t *testing.T) {
 		break
 	}
 }
+
+// A radio channel with no PTT is told about VOX, as it may be relying on it -
+// but not when it has no audio output, as then it cannot transmit at all.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
+func TestPttInitVOXAdviceOnlyWhenTransmitting(t *testing.T) {
+	const message = "PTT not configured (OK if using VOX)"
+
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
+	cfg[0].Radio = true
+	cfg[1].Radio = true
+	cfg[1].ReceiveOnly = true
+
+	var hook = capturePTTLog(t)
+
+	var _, err = newPTT(*cfg, nil, nil, 0, t.TempDir())
+	require.NoError(t, err)
+
+	var channels []any
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Message == message {
+			channels = append(channels, entry.Data["channel"])
+		}
+	}
+
+	assert.Equal(t, []any{0}, channels, "only the channel that can transmit")
+}
