@@ -615,8 +615,9 @@ func (d *Digipeater) match(
 
 				// Insert own call at beginning and mark it used.
 
-				result.InsertAddr(ax25.Repeater1, mycall_xmit)
-				result.SetH(ax25.Repeater1)
+				if result.InsertAddr(ax25.Repeater1, mycall_xmit) {
+					result.SetH(ax25.Repeater1)
+				}
 
 				return (result)
 			}
@@ -646,8 +647,7 @@ func (d *Digipeater) match(
 
 			result.SetSSID(r, ssid-1) // should be at least 1
 
-			if pp.NumRepeaters() < ax25.MaxRepeaters {
-				result.InsertAddr(r, mycall_xmit)
+			if pp.NumRepeaters() < ax25.MaxRepeaters && result.InsertAddr(r, mycall_xmit) {
 				result.SetH(r)
 			}
 

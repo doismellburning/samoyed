@@ -2239,6 +2239,15 @@ func (link *AX25Link) lm_data_indication(E *dlq_item_t) {
 			var pid = E.pp.PID()
 			var info = E.pp.Info()
 
+			if pid < 0 {
+				logrus.WithFields(logrus.Fields{
+					"stream": S.stream_id,
+					"frame":  desc,
+				}).Error("AX.25 Protocol Error: I frame has no PID")
+
+				break
+			}
+
 			i_frame(S, cr, pf, nr, ns, pid, info)
 		}
 

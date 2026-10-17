@@ -9,6 +9,7 @@ package digipeater
 // each channel pair keeps, and the regeneration option.
 
 import (
+	"bytes"
 	"regexp"
 	"testing"
 	"time"
@@ -334,4 +335,51 @@ func TestDigipeaterRemember(t *testing.T) {
 
 	assert.Nil(t, tx.take(digiFromChan, dwcore.PrioHigh))
 	assert.Zero(t, digi.GetCount(digiFromChan, digiFromChan))
+}
+
+// A frame already as long as a frame can be has no room for our call, so it
+// is repeated without one, as when the via path is already full.  Inserting
+// it regardless used to run off the end of the frame buffer.
+func TestDigipeaterFullLengthFrame(t *testing.T) {
+	t.Parallel()
+
+	var digi, digiConfig, tx = setupDigipeater(t)
+
+	enableDigipeat(digiConfig, digiFromChan)
+
+	var frame = ax25.MustFromText("Q3TEST>APDW17,WIDE2-2:>").FrameData()
+	frame = append(frame, bytes.Repeat([]byte{'x'}, ax25.MaxPacketLen-len(frame))...)
+
+	var pp = ax25.FromFrame(frame, ax25.ALevel{Rec: 50, Mark: 50, Space: 50})
+	require.NotNil(t, pp)
+
+	digi.Digipeat(digiFromChan, pp)
+
+	var sent = tx.take(digiFromChan, dwcore.PrioHigh)
+	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
+	assert.Equal(t, "Q3TEST>APDW17,WIDE2-1:", sent.FormatAddrs())
+	assert.Len(t, sent.Pack(), ax25.MaxPacketLen)
+}
+
+// The ATGP hack inserts our call too, and with a full via path there is no
+// room for it.  The hop is then repeated without our call and left unused,
+// with its count decremented, just as WIDEn-N is when the path is full.  It
+// used to mark whatever was first in the path as used regardless.
+func TestDigipeaterATGPFullPath(t *testing.T) {
+	t.Parallel()
+
+	var digi, digiConfig, tx = setupDigipeater(t)
+
+	enableDigipeat(digiConfig, digiFromChan)
+	digiConfig.Wide[digiFromChan][digiFromChan] = regexp.MustCompile("^(WIDE|HOP)[1-7]-[1-7]$")
+	digiConfig.ATGP[digiFromChan][digiFromChan] = "HOP"
+
+	var pp = ax25.FromText("Q3TEST>APDW17,HOP7-7,Q4TEST,Q5TEST,Q6TEST,Q7TEST,Q8TEST,Q9TEST,Q0TEST:>hello", true)
+	require.NotNil(t, pp)
+
+	digi.Digipeat(digiFromChan, pp)
+
+	var sent = tx.take(digiFromChan, dwcore.PrioHigh)
+	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
+	assert.Equal(t, "Q3TEST>APDW17,HOP7-6,Q4TEST,Q5TEST,Q6TEST,Q7TEST,Q8TEST,Q9TEST,Q0TEST:", sent.FormatAddrs())
 }

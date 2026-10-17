@@ -645,12 +645,18 @@ func mon_desc(pp *ax25.Packet) (byte, string) {
 	// I, UI, XID, SREJ, TEST can have information part.
 	var pinfo = pp.Info()
 
+	// An I or UI frame cut off before its PID has none to show.
+	var pid_text = "--"
+	if pp.PID() >= 0 {
+		pid_text = fmt.Sprintf("%02X", pp.PID())
+	}
+
 	switch ftype {
 	case ax25.FrameTypeI:
-		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, pp.PID(), len(pinfo), pf_text, pf)
+		return 'I', fmt.Sprintf("<I S%d R%d pid=%s Len=%d %s=%d >", ns, nr, pid_text, len(pinfo), pf_text, pf)
 
 	case ax25.FrameTypeUUI:
-		return 'U', fmt.Sprintf("<UI pid=%02X Len=%d %s=%d >", pp.PID(), len(pinfo), pf_text, pf)
+		return 'U', fmt.Sprintf("<UI pid=%s Len=%d %s=%d >", pid_text, len(pinfo), pf_text, pf)
 
 	case ax25.FrameTypeSRR:
 		return 'S', fmt.Sprintf("<RR R%d %s=%d >", nr, pf_text, pf)
