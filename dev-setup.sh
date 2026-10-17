@@ -66,10 +66,11 @@ brew_install() {
 
 # The Go build uses cgo against hamlib/portaudio/etc., so these are needed even
 # for `make cmds`.
+# dpkg-dev provides the dpkg-shlibdeps `make deb` uses.
 install_build() {
     case "$OS" in
         Linux)
-            apt_install libudev-dev libhamlib-dev portaudio19-dev libavahi-client-dev libbsd-dev libgps-dev
+            apt_install libudev-dev libhamlib-dev portaudio19-dev libavahi-client-dev libbsd-dev libgps-dev dpkg-dev
             ;;
         Darwin)
             brew_install hamlib portaudio
