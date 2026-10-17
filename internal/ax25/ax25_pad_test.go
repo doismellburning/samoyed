@@ -223,3 +223,37 @@ func TestParseAddrRejectsNonASCII(t *testing.T) {
 		assert.Nil(t, FromText(addr+">APDW17:>hello", true), addr)
 	}
 }
+
+func TestSafeString(t *testing.T) {
+	t.Parallel()
+
+	var testCases = []struct {
+		name      string
+		info      []byte
+		utf8      string
+		asciiOnly string
+	}{
+		{"plain", []byte("hello"), "hello", "hello"},
+		{"control", []byte("a\rb"), "a<0x0d>b", "a<0x0d>b"},
+		{"trailing space", []byte("a "), "a<0x20>", "a<0x20>"},
+		{"not UTF-8", []byte{0xfe, 'a', 0xff, 0x80}, "<0xfe>a<0xff><0x80>", "<0xfe>a<0xff><0x80>"},
+		{"thorn", []byte("þ"), "þ", "<0xc3><0xbe>"},
+		{"euro", []byte("€"), "€", "<0xe2><0x82><0xac>"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.utf8, safeString(tc.info, false))
+			assert.Equal(t, tc.asciiOnly, safeString(tc.info, true))
+
+			// FromText reads the <0xNN> notation back as the bytes it stands for.
+			for _, s := range []string{tc.utf8, tc.asciiOnly} {
+				var pp = FromText("Q1TEST>APDW17:"+s, true)
+				require.NotNil(t, pp)
+				assert.Equal(t, tc.info, pp.Info(), s)
+			}
+		})
+	}
+}
