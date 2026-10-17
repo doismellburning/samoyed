@@ -250,7 +250,7 @@ type ttParseState struct {
 	comment         string
 	freq            string
 	ctcss           string
-	micE            rune
+	micE            byte
 	dao             [5]byte
 	ssid            int /* Default 12 for APRStt user. */
 }
@@ -1654,7 +1654,7 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
 	}
 
 	if length == 2 && unicode.IsDigit(rune(e[1])) {
-		state.micE = rune(e[1])
+		state.micE = e[1]
 
 		return (0)
 	}

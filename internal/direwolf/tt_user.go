@@ -108,7 +108,7 @@ type tt_user_s struct {
 	/* Comment sent in final object report includes */
 	/* other information besides this. */
 
-	mic_e rune /* Position status. */
+	mic_e byte /* Position status. */
 	/* Should be a character in range of '1' to '9' for */
 	/* the predefined status strings or '0' for none. */
 
@@ -383,7 +383,7 @@ func digit_suffix(callsign string) string {
  *----------------------------------------------------------------*/
 
 func (u *ttUsers) heard(callsign string, ssid int, overlay byte, symbol byte, loc_text string, latitude maybe.Maybe[float64],
-	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) int {
+	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e byte, dao string) int {
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("tt_user_heard (%s, %d, %c, %c, %s, ...)\n", callsign, ssid, overlay, symbol, loc_text);
 
@@ -412,7 +412,7 @@ func (u *ttUsers) heard(callsign string, ssid int, overlay byte, symbol byte, lo
 // record stores what heard was told about a user, schedules its object
 // report transmissions, and returns the report to send straight away.
 func (u *ttUsers) record(callsign string, ssid int, overlay byte, symbol byte, loc_text string, latitude maybe.Maybe[float64],
-	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) string {
+	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e byte, dao string) string {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
