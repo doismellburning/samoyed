@@ -73,7 +73,7 @@ func TestParseCallsignTwoKeyOverlayThatPartlyTranslates(t *testing.T) {
 	var state = newTTParseState()
 
 	assert.Equal(t, 0, gw.parseCallsign(&state, "A12345Z5"))
-	assert.Equal(t, '5', state.symtabOrOverlay)
+	assert.Equal(t, byte('5'), state.symtabOrOverlay)
 }
 
 // A three digit abbreviation can end in a two key overlay too.  One whose keys
@@ -94,7 +94,7 @@ func TestParseAbbreviationTwoKeyOverlay(t *testing.T) {
 
 	assert.Equal(t, 0, gw.parseCallsign(&state, "A1235Z1"), "part translates")
 	assert.Equal(t, "123", state.callsign)
-	assert.Equal(t, '5', state.symtabOrOverlay)
+	assert.Equal(t, byte('5'), state.symtabOrOverlay)
 }
 
 // A field that is nothing but an A is a callsign with nothing in it.  Its
@@ -146,6 +146,6 @@ func TestParseSymbolOneDigit(t *testing.T) {
 	require.NotPanics(t, func() {
 		assert.Equal(t, 0, gw.parseSymbol(&state, "AB15"))
 	})
-	assert.Equal(t, rune('/'), state.symtabOrOverlay)
-	assert.Equal(t, rune(32+5), state.symbolCode)
+	assert.Equal(t, byte('/'), state.symtabOrOverlay)
+	assert.Equal(t, byte(32+5), state.symbolCode)
 }
