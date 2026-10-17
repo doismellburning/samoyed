@@ -76,12 +76,12 @@ func TestIGateConnectThreadWaitsBeforeRedialling(t *testing.T) {
 
 	ig.config.t2_server_name = "127.0.0.1"
 	ig.config.t2_server_port = testutils.UnusedPortNumber(t)
-	ig.retryInterval = 200 * time.Millisecond
+	ig.retryInterval = 50 * time.Millisecond
 
 	var failedBefore = metricValue(t, failed, map[string]string{})
 
 	testutils.CaptureOutput(t, func() {
-		var ctx, cancel = context.WithTimeout(t.Context(), time.Second)
+		var ctx, cancel = context.WithTimeout(t.Context(), 250*time.Millisecond)
 		defer cancel()
 
 		ig.connectThread(ctx)
