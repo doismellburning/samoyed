@@ -705,3 +705,42 @@ func FuzzAGWHandleClientCommand(f *testing.F) {
 		}
 	})
 }
+
+// ttFuzzMaxSequence bounds what FuzzTTSequence tries.  A tone sequence is
+// capped at MAX_MSG_LEN buttons, but one in a received packet's info field is
+// not, so leave room for a few times that.
+const ttFuzzMaxSequence = 4 * MAX_MSG_LEN
+
+// FuzzTTSequence covers the APRStt gateway's parsing of a touch tone sequence.
+// Anyone on frequency reaches it with DTMF, and with any packet whose info
+// field starts with 't'.  The gateway stops once the sequence is parsed, as
+// the tone sequence tests have it do, so the user table and the responses are
+// left out.
+func FuzzTTSequence(f *testing.F) {
+	testutils.FuzzQuietly(f)
+
+	for _, testCase := range ttTestCases {
+		f.Add(testCase.toneseq)
+	}
+
+	// Each of these used to crash.
+	f.Add("A1234BA1#") // Two key overlay that doesn't translate.
+	f.Add("A#")        // Callsign field with nothing after the A.
+	f.Add("C#")        // Comment field with nothing after the C.
+	f.Add("AB15#")     // Symbol field with only one digit.
+
+	f.Fuzz(func(t *testing.T, msg string) {
+		// Both callers check for at least one character first.
+		if msg == "" || len(msg) > ttFuzzMaxSequence {
+			t.Skip()
+		}
+
+		var cfg tt_config_s
+		cfg.ttlocs = aprs_tt_test_config
+
+		var g = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+		g.runningTests = true
+
+		g.Sequence(t.Context(), 0, msg)
+	})
+}

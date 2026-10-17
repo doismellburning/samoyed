@@ -579,7 +579,13 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
 		// dw_printf ("parse_fields () field = %s\n", e);
 		switch e[0] {
 		case 'A':
-			switch e[1] {
+			// A lone A is a malformed callsign, and parseCallsign says so.
+			var kind byte
+			if len(e) > 1 {
+				kind = e[1]
+			}
+
+			switch kind {
 			case 'A': /* AA object-name */
 				err = g.parseObjectName(state, e)
 				if err != 0 {
@@ -783,6 +789,18 @@ func checksum_not_ok(str string, length int, found rune) int {
 	return (0)
 }
 
+// twoKeyOverlay translates the two keys of a two key overlay.  Keys that
+// translate to nothing are no overlay at all.  Keys that translate only in
+// part give the character that did, as Dire Wolf took it.
+func twoKeyOverlay(keys string) (rune, bool) {
+	var text, _ = touchtone.TwoKeyToText(keys, false)
+	if text == "" {
+		return 0, false
+	}
+
+	return rune(text[0]), true
+}
+
 func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 	if g.debug > 0 {
 		logrus.WithField("entry", e).Debug("APRStt parse callsign (starts with A then digit)")
@@ -824,15 +842,13 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		state.callsign = e[1:4]
 
 		if length == 7 {
-			var tttemp = string(e[length-3]) + string(e[length-2])
-
-			var stemp, errs = touchtone.TwoKeyToText(tttemp, false)
-			if errs != 0 {
-				stemp = "\000"
+			var overlay, ok = twoKeyOverlay(string(e[length-3]) + string(e[length-2]))
+			if !ok {
+				return (TT_ERROR_INVALID_SYMBOL)
 			}
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
-			state.symtabOrOverlay = rune(stemp[0])
+			state.symtabOrOverlay = overlay
 
 			if g.debug > 0 {
 				logrus.WithFields(logrus.Fields{
@@ -875,11 +891,13 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 
 			state.callsign, _ = touchtone.TwoKeyToText(tttemp, false)
 
-			tttemp = string(e[length-3]) + string(e[length-2])
-			var stemp, _ = touchtone.TwoKeyToText(tttemp, false)
+			var overlay, ok = twoKeyOverlay(string(e[length-3]) + string(e[length-2]))
+			if !ok {
+				return (TT_ERROR_INVALID_SYMBOL)
+			}
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
-			state.symtabOrOverlay = rune(stemp[0])
+			state.symtabOrOverlay = overlay
 
 			if g.debug > 0 {
 				logrus.WithFields(logrus.Fields{
@@ -1019,7 +1037,8 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 	var length = len(e)
 
 	if length >= 4 && length <= 10 {
-		var nstr = string(e[3]) + string(e[4])
+		// Normally two digits, but take the one there is in a field of four.
+		var nstr = e[3:min(length, 5)]
 
 		var nn, _ = strconv.Atoi(nstr)
 
@@ -1628,7 +1647,7 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
 
 	var length = len(e)
 
-	if e[1] == 'A' {
+	if strings.HasPrefix(e, "CA") {
 		state.comment, _ = touchtone.ASCII2DToText(e[2:], false)
 
 		return (0)
