@@ -1,28 +1,25 @@
 package main
 
 import (
-	"io"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestMain(m *testing.M) {
+	testutils.RunMainIfAsked(main)
+
+	os.Exit(m.Run())
+}
 
 // TODO Break down log2gpx into something easier to test...!
 // TODO Use a much less brittle test than "compare with exact Dire Wolf output"
-//
-//nolint:paralleltest // Serial: swaps os.Stdin, which is process-wide.
 func Test_log2gpx(t *testing.T) {
-	// Save original stdin/stdout
-	var oldStdin = os.Stdin
+	t.Parallel()
 
-	var oldStdout = os.Stdout
-
-	defer func() {
-		os.Stdin = oldStdin
-		os.Stdout = oldStdout
-	}()
-
-	// Create fake stdin
 	var input = strings.TrimSpace(`
 chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment
 0,1752183342,2025-07-10T21:35:42Z,XXXXX-12,XXXXX-12,198(105/99),0,0,XXXXX-12,/j,1,1,1,,,,,,"DireWolf, WB2OSZ",,,
@@ -31,43 +28,6 @@ chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,s
 0,1752183372,2025-07-10T21:36:12Z,XXXXX-12,XXXXX-12,198(100/104),0,0,XXXXX-12,/j,3,3,3,,,,,,"DireWolf, WB2OSZ",,,
 `)
 
-	var r, w, _ = os.Pipe()
-
-	os.Stdin = r
-
-	// Write input to pipe
-	go func() {
-		defer w.Close()
-
-		w.WriteString(input)
-	}()
-
-	// Capture stdout
-	var rOut, wOut, _ = os.Pipe()
-
-	os.Stdout = wOut
-
-	// Capture output in goroutine
-	var output strings.Builder
-
-	var done = make(chan bool)
-
-	go func() {
-		io.Copy(&output, rOut)
-
-		done <- true
-	}()
-
-	// Run log2gpx
-	os.Args = []string{"log2gpx"}
-
-	main()
-
-	// Close stdout and wait for capture to finish
-	wOut.Close()
-	<-done
-
-	// Check output
 	var expected = strings.TrimSpace(`
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <gpx version="1.1" creator="Dire Wolf">
@@ -98,7 +58,8 @@ chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,s
 </gpx>
 `)
 
-	if strings.TrimSpace(output.String()) != expected {
-		t.Errorf("Expected %q, got %q", expected, output.String())
-	}
+	var result = testutils.RunMain(t, input)
+
+	assert.Equal(t, 0, result.Status)
+	assert.Equal(t, expected, strings.TrimSpace(result.Output()))
 }

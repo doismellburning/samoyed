@@ -11,46 +11,36 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Examples from utm2ll.c source, checked against direwolf Debian package
-
-func Example_main() { //nolint:testableexamples
-	main()
-	// TODO Can we do a partial match in the style of Python doctests?
-}
-
-func Example_main_1() {
-	os.Args = []string{"utm2ll", "19T", "306130", "4726010"}
-
-	main()
-	// Output: from UTM, latitude = 42.662139, longitude = -71.365553
-}
-
-func Example_main_2() {
-	os.Args = []string{"utm2ll", "19TCH06132600"}
-
-	main()
-	// Output:
-	// from MGRS, latitude = 42.662049, longitude = -71.365550
-}
-
-func Example_main_3() {
-	os.Args = []string{"utm2ll", "19t", "306130", "4726010"} // Handle lowercase letter
-
-	main()
-	// Output: from UTM, latitude = 42.662139, longitude = -71.365553
-}
-
-func Example_main_southern() {
-	os.Args = []string{"utm2ll", "19C", "306130", "4726010"}
-
-	main()
-	// Output: from UTM, latitude = -47.590322, longitude = -71.578679
-}
-
 func TestMain(m *testing.M) {
 	testutils.RunMainIfAsked(main)
 
 	os.Exit(m.Run())
+}
+
+// Examples from utm2ll.c source, checked against direwolf Debian package
+func Test_main(t *testing.T) {
+	t.Parallel()
+
+	var testCases = map[string]struct {
+		args []string
+		want string
+	}{
+		"UTM":       {[]string{"19T", "306130", "4726010"}, "from UTM, latitude = 42.662139, longitude = -71.365553\n"},
+		"MGRS":      {[]string{"19TCH06132600"}, "from MGRS, latitude = 42.662049, longitude = -71.365550\n"},
+		"lowercase": {[]string{"19t", "306130", "4726010"}, "from UTM, latitude = 42.662139, longitude = -71.365553\n"},
+		"southern":  {[]string{"19C", "306130", "4726010"}, "from UTM, latitude = -47.590322, longitude = -71.578679\n"},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var result = testutils.RunMain(t, "", tc.args...)
+
+			assert.Equal(t, 0, result.Status)
+			assert.Equal(t, tc.want, result.Output())
+		})
+	}
 }
 
 // A position that can't be converted is reported, but isn't a usage error.
