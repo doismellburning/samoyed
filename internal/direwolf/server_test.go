@@ -989,6 +989,7 @@ func runCmdListenThread(t *testing.T, s *AGWServer, conn net.Conn) *test.Hook {
 
 	t.Cleanup(hook.Reset)
 
+	s.pollInterval = 10 * time.Millisecond
 	s.clientAccepted(0, conn)
 
 	var ctx, cancel = context.WithCancel(t.Context())
@@ -1052,6 +1053,10 @@ func TestCmdListenThread_HangUpMidHeaderIsAnError(t *testing.T) {
 // use one at a time.
 func TestCmdListenThread_KeepsServingTheSlotAfterAnOversizedDataLength(t *testing.T) {
 	var s = new(AGWServer)
+
+	// The thread waits for a client in an empty slot; don't wait the usual
+	// second for it to notice the second one.
+	s.pollInterval = 10 * time.Millisecond
 
 	var hook = test.NewGlobal()
 
