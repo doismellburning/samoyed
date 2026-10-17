@@ -33,19 +33,29 @@ $(DIST_DIR)/%: $(DIST_DIR) $(C_FILES) $(GO_FILES) ./cmd/%
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
 
+# Depends comes from what the binaries actually link. dpkg-shlibdeps won't run
+# without a debian/control, though it needs nothing from it, so it gets an empty
+# one beside the package root rather than in it. The statically linked commands
+# are left out, as objdump complains about them.
 .PHONY: deb
 deb: cmds
 	test -n "$(SAMOYED_VERSION)" || (echo "ERROR: SAMOYED_VERSION is not set" >&2; exit 1)
 	rm -rf $(DEB_STAGING)
-	mkdir -p $(DEB_STAGING)/DEBIAN $(DEB_STAGING)/usr/bin $(DEB_STAGING)/usr/share/man/man1
+	mkdir -p $(DEB_STAGING)/root/DEBIAN $(DEB_STAGING)/root/usr/bin $(DEB_STAGING)/root/usr/share/man/man1 $(DEB_STAGING)/debian
 	strip $(DIST_DIR)/*
-	cp $(DIST_DIR)/samoyed-* $(DEB_STAGING)/usr/bin/
-	cp man/*.1 $(DEB_STAGING)/usr/share/man/man1/
+	cp $(DIST_DIR)/samoyed-* $(DEB_STAGING)/root/usr/bin/
+	cp man/*.1 $(DEB_STAGING)/root/usr/share/man/man1/
+	touch $(DEB_STAGING)/debian/control
+	cd $(DEB_STAGING) && dpkg-shlibdeps -O \
+		$$(for f in root/usr/bin/samoyed-*; do readelf -l "$$f" | grep -q INTERP && echo "$$f"; done) \
+		| sed -n 's/^shlibs:Depends=//p' > depends
+	test -s $(DEB_STAGING)/depends || (echo "ERROR: dpkg-shlibdeps found no dependencies" >&2; exit 1)
 	grep -v '^#' packaging/debian/control.in \
 		| sed -e 's/@@VERSION@@/$(SAMOYED_VERSION)/g' \
 		      -e "s/@@ARCH@@/$$(dpkg --print-architecture)/g" \
-		> $(DEB_STAGING)/DEBIAN/control
-	dpkg-deb --build --root-owner-group $(DEB_STAGING) samoyed-binary_$(SAMOYED_VERSION)_$$(dpkg --print-architecture).deb
+		      -e "s|@@DEPENDS@@|$$(cat $(DEB_STAGING)/depends)|g" \
+		> $(DEB_STAGING)/root/DEBIAN/control
+	dpkg-deb --build --root-owner-group $(DEB_STAGING)/root samoyed-binary_$(SAMOYED_VERSION)_$$(dpkg --print-architecture).deb
 	rm -rf $(DEB_STAGING)
 
 .PHONY: test
