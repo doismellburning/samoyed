@@ -11,6 +11,7 @@ import (
 	"os/signal"
 
 	"github.com/doismellburning/samoyed/internal/axudp"
+	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
@@ -96,6 +97,8 @@ Flags:
 	var kissPort = pflag.Int("kissport", 8002, "TCP port for KISS clients (samoyed-direwolf NCHANNEL target)")
 	var verbose = pflag.Bool("verbose", false, "Log every packet sent and received")
 	pflag.Parse()
+
+	dwutil.SetLogFormat()
 
 	if *verbose {
 		// The per-packet entries are logged at Trace, and logrus defaults to

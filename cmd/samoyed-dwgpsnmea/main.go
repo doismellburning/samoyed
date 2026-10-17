@@ -25,6 +25,7 @@ func main() {
 	// debug level run asks for, alongside the report printed here.
 	logrus.SetOutput(os.Stdout)
 	logrus.SetLevel(logrus.TraceLevel)
+	dwutil.SetLogFormat()
 
 	var status = run(ctx, os.Args[1:], os.Stdout)
 
