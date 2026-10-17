@@ -2080,10 +2080,11 @@ func (this_p *Packet) FrameType() (cr CmdRes, desc string, pf int, nr int, ns in
 
 	if this_p.modulo == 0 && (c&3) == 1 && this_p.C2() != -1 {
 		this_p.modulo = Modulo128
-	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.frame_data[this_p.InfoOffset()] == 0xF0 {
-		this_p.modulo = Modulo128
-	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.frame_data[this_p.InfoOffset()] == 0x08 { // same for segments
-		this_p.modulo = Modulo128
+	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.InfoOffset() < this_p.frame_len {
+		switch this_p.frame_data[this_p.InfoOffset()] {
+		case PIDNoLayer3, PIDSegmentationFragment: // same for segments
+			this_p.modulo = Modulo128
+		}
 	}
 
 	var c2 int // I & S frames can have second Control byte.
@@ -2467,7 +2468,7 @@ func (this_p *Packet) Control() int {
 		return -1
 	}
 
-	if this_p.num_addr >= 2 {
+	if this_p.num_addr >= 2 && this_p.ControlOffset() < this_p.frame_len {
 		return int(this_p.frame_data[this_p.ControlOffset()])
 	}
 
@@ -2561,7 +2562,7 @@ func (this_p *Packet) PID() int {
 		return (-1)
 	}
 
-	if this_p.num_addr >= 2 {
+	if this_p.Control() >= 0 && this_p.PIDOffset() < this_p.frame_len {
 		return int(this_p.frame_data[this_p.PIDOffset()])
 	}
 

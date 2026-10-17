@@ -6,6 +6,7 @@ package ax25
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -256,4 +257,35 @@ func TestSafeString(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNothingReadPastEndOfFrame(t *testing.T) {
+	t.Parallel()
+
+	var addrs = MustFromText("Q1TEST>APDW17,WIDE2-2:>").FrameData()[:21]
+
+	// All address and no control byte.  This used to come out as an I frame,
+	// from the zero byte just past the end.
+	var noControl = FromFrame(addrs, ALevel{Rec: 50, Mark: 50, Space: 50})
+	require.NotNil(t, noControl)
+	assert.Equal(t, 3, noControl.NumAddr())
+	assert.Equal(t, -1, noControl.Control())
+	assert.Equal(t, FrameNotAX25, noControl.FrameTypeOnly())
+	assert.Equal(t, -1, noControl.PID())
+
+	// A UI frame that stops before its PID.
+	var noPID = FromFrame(append(slices.Clone(addrs), UIFrame), ALevel{Rec: 50, Mark: 50, Space: 50})
+	require.NotNil(t, noPID)
+	assert.Equal(t, FrameTypeUUI, noPID.FrameTypeOnly())
+	assert.Equal(t, -1, noPID.PID())
+	assert.False(t, noPID.IsAPRS())
+
+	// An I frame with no information part must not have its modulo guessed
+	// from whatever is left in the buffer after it.  Here that is a 0xf0,
+	// which is what the guess looks for.
+	var iFrame = FromFrame(append(slices.Clone(addrs), 0x00, PIDNoLayer3, PIDNoLayer3), ALevel{Rec: 50, Mark: 50, Space: 50})
+	require.NotNil(t, iFrame)
+	iFrame.SetInfo(nil)
+	assert.Equal(t, FrameTypeI, iFrame.FrameTypeOnly())
+	assert.Equal(t, ModuloUnknown, iFrame.Modulo())
 }
