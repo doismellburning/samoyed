@@ -6,6 +6,8 @@ Samoyed is a fully-featured software modem/TNC for packet radio.
 It supports AX.25 v2.2, FX.25, IL2P, APRS, multi-speed modems (300-9600 bps), digipeating, IGates, and more.
 Samoyed is a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
 
+**Documentation:** <https://doismellburning.github.io/samoyed/>
+
 > **Status:** Port functionally complete, but broad testing needed - consider this pre-release, and likely to contain bugs.
 > Please [file issues](https://github.com/doismellburning/samoyed/issues) if you encounter problems.
 
@@ -65,7 +67,8 @@ The primary binary is `samoyed-direwolf`. Run it with `--help` for a full list o
 samoyed-direwolf --help
 ```
 
-For more detail on configuration and features, see the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) — Samoyed aims for broad compatibility with Dire Wolf.
+For Samoyed's own features and recipes, see the [Samoyed documentation](https://doismellburning.github.io/samoyed/), in particular the [how-to guides](https://doismellburning.github.io/samoyed/how-to-guides.html).
+For everything else, the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) still applies — Samoyed aims for broad compatibility with Dire Wolf.
 
 ## Building
 
