@@ -4,7 +4,6 @@
 package direwolf
 
 import (
-	"encoding/binary"
 	"math"
 	"math/rand/v2"
 	"testing"
@@ -102,8 +101,8 @@ func generateFrames(t *testing.T, audioConfig *RadioConfig, frames []*ax25.Packe
 	require.Zero(t, len(sink.data)%2, "16 bit samples come in pairs of bytes")
 
 	var samples = make([]int, 0, len(sink.data)/2)
-	for i := 0; i < len(sink.data); i += 2 {
-		samples = append(samples, int(int16(binary.LittleEndian.Uint16(sink.data[i:])))) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	for _, sample := range decodeMono16(sink.data) {
+		samples = append(samples, int(sample))
 	}
 
 	return samples
