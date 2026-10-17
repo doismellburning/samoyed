@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -232,4 +233,86 @@ func TestListeningPortsLeavesOutWhatIsNotListening(t *testing.T) {
 	t.Cleanup(agw.Close)
 
 	assert.Equal(t, addrPort(agw.Addr()), listeningPorts(kns, agw).AGW, "the port the AGW server was given")
+}
+
+// "-d u" shows an information field again in hexadecimal when it has
+// non-ASCII text in it.  Judging each byte as though it were a Latin-1
+// character missed most of UTF-8: both bytes of "ñ" (C3 B1) and of "°"
+// (C2 B0) are printable in Latin-1, so neither was ever dumped.
+func TestHasNonASCII(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		info string
+		want bool
+	}{
+		{"", false},
+		{"!4237.14N/07120.83W>Hello", false},
+		{"Hello\r", false},
+		{"mañana", true},
+		{"20°C", true},
+		{"Füße", true},
+	} {
+		assert.Equal(t, tc.want, hasNonASCII([]byte(tc.info)), "%q", tc.info)
+	}
+}
+
+// "-x" sends its tones with the PTT keyed and releases it as soon as they
+// have been generated.  The last of them were left in the audio buffer, so
+// were played after the PTT dropped, or not at all; they have to be played
+// out first, as the transmit threads do at the end of a transmission.
+func TestSendCalibrationPlaysOutTheTonesBeforeReturning(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []rune{'a', 'm', 's'} {
+		var sink = new(putCountingSink)
+		var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+		var tg = NewToneGenerator(0, audioConfig, 100, sink)
+
+		var waited []int
+		var putsBeforeWait int
+
+		sendCalibration(t.Context(), tg, mode, 1200, 1, func(adev int) {
+			waited = append(waited, adev)
+			putsBeforeWait = sink.puts
+		})
+
+		assert.Equal(t, []int{0}, waited, "mode %c should play out its audio device once", mode)
+		assert.Positive(t, putsBeforeWait, "mode %c should generate its tones before playing them out", mode)
+		assert.Equal(t, sink.puts, putsBeforeWait, "mode %c should generate nothing after playing out", mode)
+	}
+}
+
+func TestParseTransmitCalibration(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		opt     string
+		mode    rune
+		channel int
+	}{
+		{"a", 'a', 0},
+		{"m1", 'm', 1},
+		{"2s", 's', 2},
+		{"p", 'p', 0},
+		{"3", 'a', 3},
+		{strconv.Itoa(MAX_RADIO_CHANS - 1), 'a', MAX_RADIO_CHANS - 1},
+	} {
+		var mode, channel, err = parseTransmitCalibration(tc.opt)
+		require.NoError(t, err, "%q", tc.opt)
+		assert.Equal(t, tc.mode, mode, "%q", tc.opt)
+		assert.Equal(t, tc.channel, channel, "%q", tc.opt)
+	}
+}
+
+// The channel number used to be counted up in an int with no limit, so a
+// long enough run of digits wrapped round to a channel that passed the range
+// check.  18446744073709551616 is 2^64, which wrapped to 0.
+func TestParseTransmitCalibrationRejectsWhatIsNotAChannel(t *testing.T) {
+	t.Parallel()
+
+	for _, opt := range []string{strconv.Itoa(MAX_RADIO_CHANS), "a99", "18446744073709551616", "18446744073709551617m", "x", "a1q"} {
+		var _, _, err = parseTransmitCalibration(opt)
+		assert.Error(t, err, "%q", opt)
+	}
 }

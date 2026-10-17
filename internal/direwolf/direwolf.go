@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -160,7 +161,7 @@ x = Silence FX.25 information.`)
 
 	if *help {
 		pflag.Usage()
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	if *showVersion {
@@ -262,6 +263,16 @@ x = Silence FX.25 information.`)
 				d_x_opt = 0 // Defaults to minimal info.  This silences.
 			default:
 			}
+		}
+	}
+
+	// Each received or sent frame's time stamp is formatted from this, and an
+	// unusable one would leave all of them blank without a word.
+	if *timestampFormat != "" {
+		var _, timestampErr = strftime.New(*timestampFormat)
+		if timestampErr != nil {
+			logrus.WithError(timestampErr).WithField("format", *timestampFormat).Error("Unusable -T time stamp format")
+			os.Exit(1)
 		}
 	}
 
@@ -598,36 +609,10 @@ x = Silence FX.25 information.`)
 	 */
 
 	if *transmitCalibration != "" {
-		var transmitCalibrationType = ' '
-		var transmitCalibrationChannel int
-
-		for _, p := range *transmitCalibration {
-			switch p {
-			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				transmitCalibrationChannel = transmitCalibrationChannel*10 + int(p-'0')
-
-				if transmitCalibrationType == ' ' {
-					transmitCalibrationType = 'a'
-				}
-			case 'a':
-				transmitCalibrationType = p // Alternating tones
-			case 'm':
-				transmitCalibrationType = p // Mark tone
-			case 's':
-				transmitCalibrationType = p // Space tone
-			case 'p':
-				transmitCalibrationType = p // Set PTT only
-			default:
-				text_color_set(DW_COLOR_ERROR)
-				fmt.Printf("Invalid option '%c' for -x. Must be a, m, s, or p.\n", p)
-				text_color_set(DW_COLOR_INFO)
-				td.exit(1)
-			}
-		}
-
-		if transmitCalibrationChannel < 0 || transmitCalibrationChannel >= MAX_RADIO_CHANS {
+		var transmitCalibrationType, transmitCalibrationChannel, calibrationErr = parseTransmitCalibration(*transmitCalibration)
+		if calibrationErr != nil {
 			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Invalid channel %d for -x. \n", transmitCalibrationChannel)
+			fmt.Printf("%s\n", calibrationErr)
 			text_color_set(DW_COLOR_INFO)
 			td.exit(1)
 		}
@@ -660,33 +645,17 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].mark_freq,
 						audio_config.achan[transmitCalibrationChannel].space_freq,
 						transmitCalibrationChannel)
-
-					for n > 0 && ctx.Err() == nil {
-						toneGenerators[transmitCalibrationChannel].PutBit(n & 1)
-						n--
-					}
 				case 'm': // "Mark" tone: -x m
 					fmt.Printf("\nSending mark calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
-
-					for n > 0 && ctx.Err() == nil {
-						toneGenerators[transmitCalibrationChannel].PutBit(1)
-
-						n--
-					}
 				case 's': // "Space" tone: -x s
 					fmt.Printf("\nSending space calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
-
-					for n > 0 && ctx.Err() == nil {
-						toneGenerators[transmitCalibrationChannel].PutBit(0)
-
-						n--
-					}
 				case 'p': // Silence - set PTT only: -x p
 					fmt.Printf("\nSending silence (Set PTT only) on channel %d.\nPress control-C to terminate.\n", transmitCalibrationChannel)
-					dwutil.SleepSecCtx(ctx, max_duration)
 				}
+
+				sendCalibration(ctx, toneGenerators[transmitCalibrationChannel], transmitCalibrationType, n, max_duration, audioDevices.wait)
 
 				pttControl.SetPTT(transmitCalibrationChannel, false)
 				text_color_set(DW_COLOR_INFO)
@@ -1180,22 +1149,10 @@ func (rh *recPacketHandler) app_process_rec_packet(
 
 	// Also display in pure ASCII if non-ASCII characters and "-d u" option specified.
 
-	if rh.dumpUTF8 {
-		var hasNonPrintable = false
-
-		for _, r := range pinfo {
-			if !unicode.IsPrint(rune(r)) {
-				hasNonPrintable = true
-
-				break
-			}
-		}
-
-		if hasNonPrintable {
-			logrus.Debug("--debug u hexdump below:")
-			ax25.SafePrint(pinfo, true)
-			dw_printf("\n")
-		}
+	if rh.dumpUTF8 && hasNonASCII(pinfo) {
+		logrus.Debug("--debug u hexdump below:")
+		ax25.SafePrint(pinfo, true)
+		dw_printf("\n")
 	}
 
 	/* Optional hex dump of packet. */
@@ -1378,6 +1335,67 @@ func (rh *recPacketHandler) app_process_rec_packet(
 	}
 } /* end app_process_rec_packet */
 
+// parseTransmitCalibration reads the "-x" option: a, m, s or p for what to
+// send, and a number, before or after, for the radio channel.  A number on
+// its own sends alternating tones.
+func parseTransmitCalibration(opt string) (rune, int, error) {
+	var mode = ' '
+	var channel int
+
+	for _, p := range opt {
+		switch p {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			// Stop counting once it is out of range, so that a long enough
+			// run of digits cannot wrap the count round into range again.
+			if channel < MAX_RADIO_CHANS {
+				channel = channel*10 + int(p-'0')
+			}
+
+			if mode == ' ' {
+				mode = 'a'
+			}
+		case 'a', 'm', 's', 'p':
+			mode = p
+		default:
+			return 0, 0, fmt.Errorf("invalid option '%c' for -x: must be a, m, s, or p", p)
+		}
+	}
+
+	if channel >= MAX_RADIO_CHANS {
+		return 0, 0, fmt.Errorf("invalid channel for -x %s", opt)
+	}
+
+	return mode, channel, nil
+}
+
+// sendCalibration sends what "-x" asks for on a channel whose PTT is keyed:
+// bits bits of tones - alternating for 'a', mark for 'm', space for 's' - or,
+// for 'p', silence for seconds.  It stops early if ctx is cancelled.
+//
+// Tones are played out through waitAudio before it returns, as the transmit
+// threads do at the end of a transmission, so that the PTT is not released
+// with the last of them still in a buffer.
+func sendCalibration(ctx context.Context, tg *ToneGenerator, mode rune, bits int, seconds int, waitAudio func(adev int)) {
+	if mode == 'p' {
+		_ = dwutil.SleepSecCtx(ctx, seconds) // A cancellation is the caller's to notice.
+
+		return
+	}
+
+	for n := bits; n > 0 && ctx.Err() == nil; n-- {
+		switch mode {
+		case 'm':
+			tg.PutBit(1)
+		case 's':
+			tg.PutBit(0)
+		default: // 'a'
+			tg.PutBit(n & 1)
+		}
+	}
+
+	waitAudio(tg.adevIndex)
+}
+
 // resetSignalsOnCancel puts the default disposition back on the stop signals
 // once ctx is cancelled.
 //
@@ -1493,6 +1511,13 @@ func countOf(n int, noun string) string {
 	}
 
 	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// hasNonASCII says whether an information field has any byte outside 7-bit
+// ASCII - the start or the rest of a UTF-8 sequence, say - and so is worth
+// showing again in hexadecimal for "-d u".
+func hasNonASCII(info []byte) bool {
+	return slices.ContainsFunc(info, func(b byte) bool { return b >= 0x80 })
 }
 
 // mheardPosition is the position the stations-heard list should record for a
