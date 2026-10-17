@@ -119,33 +119,10 @@ func (c *Codec) decode(data []byte, eras_pos []int, no_eras int) int {
 	var reg = make([]byte, nroots+1)
 	var loc = make([]int, nroots)
 
-	var synError int
 	var count int
 
-	// form the syndromes; i.e., evaluate data(x) at roots of g(x)
-	for i = range nroots {
-		s[i] = data[0]
-	}
-
-	for j = 1; j < nn; j++ {
-		for i = range nroots {
-			if s[i] == 0 {
-				s[i] = data[j]
-			} else {
-				s[i] = data[j] ^ c.alpha_to[c.modnn(int(c.index_of[s[i]])+(fcr+i)*prim)]
-			}
-		}
-	}
-
-	// Convert syndromes to index form, checking for nonzero condition
-	synError = 0
-	for i = range nroots {
-		synError |= int(s[i])
-		s[i] = c.index_of[s[i]]
-	}
-
 	// fprintf(stderr,"syn_error = %4x\n",syn_error);
-	if synError == 0 {
+	if !c.syndromes(data, s) {
 		// if syndrome is zero, data[] is a codeword and there are no
 		// errors to correct. So return data[] unmodified
 		count = 0
@@ -279,6 +256,17 @@ func (c *Codec) decode(data []byte, eras_pos []int, no_eras int) int {
 			degLambda = i
 		}
 	}
+
+	// A non-zero syndrome needs at least one error to explain it, and a
+	// locator of higher degree than the code can correct is a guess: Karn's
+	// decoder accepts either, so a block too damaged to repair could pass
+	// as clean or "corrected" (issue #790).
+	if degLambda == 0 || 2*degLambda > nroots+no_eras {
+		count = -1
+
+		goto finish
+	}
+
 	// Find roots of the error+erasure locator polynomial by Chien search
 	// memcpy(&reg[1],&lambda[1],NROOTS*sizeof(reg[0]));
 	copy(reg[1:nroots+1], lambda[1:nroots+1])
@@ -380,6 +368,14 @@ func (c *Codec) decode(data []byte, eras_pos []int, no_eras int) int {
 		}
 	}
 
+	// Even within the code's limit, a block past repair can yield a
+	// locator whose "corrections" don't land on a codeword, so check.
+	if c.syndromes(data, s) {
+		count = -1
+
+		goto finish
+	}
+
 finish:
 	if eras_pos != nil {
 		for i = range count {
@@ -388,4 +384,37 @@ finish:
 	}
 
 	return count
+}
+
+// syndromes evaluates data(x) at the roots of the generator polynomial into
+// s, in index form, and reports whether any of them is non-zero - that is,
+// whether data is not a codeword.
+func (c *Codec) syndromes(data []byte, s []byte) bool {
+	var nroots = int(c.nroots)
+	var fcr = int(c.fcr)
+	var prim = int(c.prim)
+
+	for i := range nroots {
+		s[i] = data[0]
+	}
+
+	for j := 1; j < int(c.nn); j++ {
+		for i := range nroots {
+			if s[i] == 0 {
+				s[i] = data[j]
+			} else {
+				s[i] = data[j] ^ c.alpha_to[c.modnn(int(c.index_of[s[i]])+(fcr+i)*prim)]
+			}
+		}
+	}
+
+	// Convert syndromes to index form, checking for nonzero condition
+	var synError byte
+
+	for i := range nroots {
+		synError |= s[i]
+		s[i] = c.index_of[s[i]]
+	}
+
+	return synError != 0
 }
