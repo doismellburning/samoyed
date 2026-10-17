@@ -7,7 +7,9 @@
 // The node is a client of the AX.25 data link, as an AGW application is.  It
 // registers its callsigns for incoming connections, is told when a link to
 // one of them comes up or goes down and what arrives on it, and asks the data
-// link to send its replies.
+// link to send its replies.  A user can also reach it, and it can connect a
+// user onward, over a connection other than one of its own AX.25 links - a
+// NET/ROM circuit, say - which is handed to it as a Conn.
 package node
 
 import (
@@ -67,12 +69,61 @@ type Port struct {
 	Description string
 }
 
+// Conn is a connection the node can talk to a user over, or connect a user
+// onward on, other than one of its own AX.25 links: a NET/ROM circuit, say.
+// Its methods may be called from any goroutine.
+type Conn interface {
+	// Send sends data to the far end.
+	Send(data []byte)
+
+	// Close disconnects.
+	Close()
+}
+
+// peer is one end of a conversation the node is part of: an AX.25 link it is
+// answering or has opened, or a Conn.  Each is comparable, so it can key the
+// node's maps.
+type peer interface {
+	// send sends data to the far end, with the protocol ID pid where that
+	// means anything.
+	send(n *Node, pid int, data []byte)
+
+	// disconnect ends the conversation.
+	disconnect(n *Node)
+
+	// name is who is at the far end, for messages.
+	name() string
+}
+
 // linkKey identifies a link the node is answering, as the data link does.
 type linkKey struct {
 	channel    int
 	ownCall    string
 	remoteCall string
 }
+
+func (k linkKey) send(n *Node, pid int, data []byte) {
+	n.link.XmitDataRequest(addrs(k), 2, k.channel, n.client, pid, data)
+}
+
+func (k linkKey) disconnect(n *Node) {
+	n.link.DisconnectRequest(addrs(k), 2, k.channel, n.client)
+}
+
+func (k linkKey) name() string { return k.remoteCall }
+
+// connPeer is a Conn the node talks over.  It is a pointer, so each is a peer
+// of its own however its far end is named.
+type connPeer struct {
+	conn   Conn
+	remote string
+}
+
+func (c *connPeer) send(_ *Node, _ int, data []byte) { c.conn.Send(data) }
+
+func (c *connPeer) disconnect(*Node) { c.conn.Close() }
+
+func (c *connPeer) name() string { return c.remote }
 
 // session is one connected user.
 type session struct {
@@ -90,7 +141,7 @@ type session struct {
 
 	// downlink is the link the user asked to be connected onward on, or
 	// nil when they are talking to the node.
-	downlink *linkKey
+	downlink peer
 
 	// connected says downlink is up, and what the user sends goes to it.
 	connected bool
@@ -122,11 +173,11 @@ type Node struct {
 	// own goroutine; the lock keeps the node safe from any other caller
 	// too.
 	mu       sync.Mutex
-	sessions map[linkKey]*session
+	sessions map[peer]*session
 
 	// downlinks are the links users have asked to be connected onward on,
 	// each to the user's own link.
-	downlinks map[linkKey]linkKey
+	downlinks map[peer]peer
 }
 
 // New makes a node that talks to link as client, and lists the stations heard
@@ -139,8 +190,8 @@ func New(config Config, link DataLink, heard HeardStations, client int) *Node {
 	n.heard = heard
 	n.client = client
 	n.now = time.Now
-	n.sessions = make(map[linkKey]*session)
-	n.downlinks = make(map[linkKey]linkKey)
+	n.sessions = make(map[peer]*session)
+	n.downlinks = make(map[peer]peer)
 
 	return n
 }
@@ -161,8 +212,11 @@ func (n *Node) Start() {
 // us gets a session and a greeting; a user we were connecting onward is told
 // they are through.
 func (n *Node) LinkEstablished(channel int, _ int, remoteCall string, ownCall string, incoming bool) {
-	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+	n.established(linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}, incoming)
+}
 
+// established is told the conversation with key is under way.
+func (n *Node) established(key peer, incoming bool) {
 	n.mu.Lock()
 
 	// A downlink the far end resets is said to be established as though
@@ -196,13 +250,27 @@ func (n *Node) LinkEstablished(channel int, _ int, remoteCall string, ownCall st
 // LinkTerminated is told a link has gone down.  A user's ends their session;
 // a downlink's returns its user to the node.
 func (n *Node) LinkTerminated(channel int, _ int, remoteCall string, ownCall string, timeout bool) {
-	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+	n.terminated(linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}, failureFor(timeout))
+}
 
+// failureFor says why a link that never came up failed: timeout says the
+// station never answered, rather than refusing.
+func failureFor(timeout bool) string {
+	if timeout {
+		return "no answer"
+	}
+
+	return "busy"
+}
+
+// terminated is told the conversation with key is over; why says why a
+// downlink that never came up failed.
+func (n *Node) terminated(key peer, why string) {
 	n.mu.Lock()
 
 	if _, ok := n.downlinks[key]; ok {
 		n.mu.Unlock()
-		n.downlinkTerminated(key, timeout)
+		n.downlinkTerminated(key, why)
 
 		return
 	}
@@ -210,7 +278,7 @@ func (n *Node) LinkTerminated(channel int, _ int, remoteCall string, ownCall str
 	var s = n.sessions[key]
 	delete(n.sessions, key)
 
-	var down *linkKey
+	var down peer
 	if s != nil {
 		down = s.downlink
 	}
@@ -219,7 +287,7 @@ func (n *Node) LinkTerminated(channel int, _ int, remoteCall string, ownCall str
 
 	// A user who goes takes their downlink with them.
 	if down != nil {
-		n.disconnect(*down)
+		n.disconnect(down)
 	}
 }
 
@@ -227,8 +295,11 @@ func (n *Node) LinkTerminated(channel int, _ int, remoteCall string, ownCall str
 // taken a line at a time; what they send once connected onward goes to the
 // downlink as it is, and what comes back on the downlink goes to them.
 func (n *Node) RecConnData(channel int, _ int, remoteCall string, ownCall string, pid int, data []byte) {
-	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+	n.received(linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}, pid, data)
+}
 
+// received is handed what key sent.
+func (n *Node) received(key peer, pid int, data []byte) {
 	var lines [][]byte
 
 	n.mu.Lock()
@@ -250,7 +321,7 @@ func (n *Node) RecConnData(channel int, _ int, remoteCall string, ownCall string
 	var s = n.sessions[key]
 
 	if s != nil && s.downlink != nil && s.connected {
-		var down = *s.downlink
+		var down = s.downlink
 		n.mu.Unlock()
 
 		n.forward(down, pid, data)
@@ -260,7 +331,7 @@ func (n *Node) RecConnData(channel int, _ int, remoteCall string, ownCall string
 
 	if s != nil && s.downlink != nil {
 		// Still coming up: a line typed now gives up on it.
-		var down = *s.downlink
+		var down = s.downlink
 
 		lines = s.take(data)
 
@@ -346,7 +417,7 @@ type command struct {
 	// session is s, with the words typed after its name.  It says whether
 	// to go on to whatever else the user has sent: not once they have
 	// asked to go, or to be connected onward.
-	run func(n *Node, key linkKey, s *session, args []string) bool
+	run func(n *Node, key peer, s *session, args []string) bool
 }
 
 // commands are the shell's commands, in the order HELP lists them.
@@ -365,7 +436,7 @@ func commands() []command {
 
 // command carries out one command line for the user on the link key names,
 // whose session is s, and says whether to go on to another.
-func (n *Node) command(key linkKey, s *session, line string) bool {
+func (n *Node) command(key peer, s *session, line string) bool {
 	var words = strings.Fields(line)
 	var name = strings.ToUpper(words[0])
 
@@ -381,7 +452,7 @@ func (n *Node) command(key linkKey, s *session, line string) bool {
 }
 
 // bye disconnects.
-func (n *Node) bye(key linkKey, s *session, _ []string) bool {
+func (n *Node) bye(key peer, s *session, _ []string) bool {
 	n.mu.Lock()
 	s.leaving = true
 	n.mu.Unlock()
@@ -405,7 +476,7 @@ func isBye(line []byte) bool {
 
 // connect connects the user onward, to the station named on the port named.
 // The port can be left out when there is only one.
-func (n *Node) connect(key linkKey, s *session, args []string) bool {
+func (n *Node) connect(key peer, s *session, args []string) bool {
 	var channel, call, problem = n.connectArgs(args)
 	if problem != "" {
 		n.send(key, []byte(n.prompt()+problem+"\r"))
@@ -431,7 +502,7 @@ func (n *Node) connect(key linkKey, s *session, args []string) bool {
 	}
 
 	n.downlinks[down] = key
-	s.downlink = &down
+	s.downlink = down
 	s.cancelled = false
 
 	// Anything after CONNECT in the frame was sent before the user could
@@ -489,7 +560,7 @@ func (n *Node) connectArgs(args []string) (int, string, string) {
 
 // downlinkUserLocked is the session of the user the downlink key names is
 // for, or nil if that user has gone.  The caller holds n.mu.
-func (n *Node) downlinkUserLocked(key linkKey) *session {
+func (n *Node) downlinkUserLocked(key peer) *session {
 	var up, ok = n.downlinks[key]
 	if !ok {
 		return nil
@@ -498,7 +569,7 @@ func (n *Node) downlinkUserLocked(key linkKey) *session {
 	// A user who went and came back has a new session, which this
 	// downlink is not for.
 	var s = n.sessions[up]
-	if s == nil || s.downlink == nil || *s.downlink != key {
+	if s == nil || s.downlink == nil || s.downlink != key {
 		return nil
 	}
 
@@ -506,7 +577,7 @@ func (n *Node) downlinkUserLocked(key linkKey) *session {
 }
 
 // downlinkEstablished is told the downlink key names is up.
-func (n *Node) downlinkEstablished(key linkKey) {
+func (n *Node) downlinkEstablished(key peer) {
 	n.mu.Lock()
 
 	var up, isDownlink = n.downlinks[key]
@@ -532,16 +603,16 @@ func (n *Node) downlinkEstablished(key linkKey) {
 
 	switch {
 	case announce:
-		n.send(up, []byte(n.prompt()+"Connected to "+key.remoteCall+"\r"))
+		n.send(up, []byte(n.prompt()+"Connected to "+key.name()+"\r"))
 	case unwanted:
 		n.disconnect(key)
 	}
 }
 
 // downlinkTerminated is told the downlink key names is down, which returns
-// its user to the node.  A downlink that never came up has failed: timeout
-// says the station never answered, rather than refusing.
-func (n *Node) downlinkTerminated(key linkKey, timeout bool) {
+// its user to the node.  A downlink that never came up has failed, for the
+// reason why gives.
+func (n *Node) downlinkTerminated(key peer, why string) {
 	n.mu.Lock()
 
 	var up = n.downlinks[key]
@@ -572,20 +643,18 @@ func (n *Node) downlinkTerminated(key linkKey, timeout bool) {
 
 	switch {
 	case cancelled:
-		message = "Gave up on " + key.remoteCall
+		message = "Gave up on " + key.name()
 	case wasConnected:
-		message = "Disconnected from " + key.remoteCall
-	case timeout:
-		message = "Failure with " + key.remoteCall + " - no answer"
+		message = "Disconnected from " + key.name()
 	default:
-		message = "Failure with " + key.remoteCall + " - busy"
+		message = "Failure with " + key.name() + " - " + why
 	}
 
 	n.send(up, []byte(n.prompt()+message+"\r"))
 }
 
 // help lists the commands.
-func (n *Node) help(key linkKey, _ *session, _ []string) bool {
+func (n *Node) help(key peer, _ *session, _ []string) bool {
 	var b strings.Builder
 
 	b.WriteString(n.prompt() + "Commands:\r")
@@ -600,7 +669,7 @@ func (n *Node) help(key linkKey, _ *session, _ []string) bool {
 }
 
 // info tells the user about the node.
-func (n *Node) info(key linkKey, _ *session, _ []string) bool {
+func (n *Node) info(key peer, _ *session, _ []string) bool {
 	var text = n.config.InfoMessage
 	if text == "" {
 		text = n.identity() + " is a Samoyed node"
@@ -622,7 +691,7 @@ func terminalText(text string) string {
 }
 
 // ports lists the ports, by channel number.
-func (n *Node) ports(key linkKey, _ *session, _ []string) bool {
+func (n *Node) ports(key peer, _ *session, _ []string) bool {
 	var b strings.Builder
 
 	b.WriteString(n.prompt() + "Ports:\r")
@@ -638,7 +707,7 @@ func (n *Node) ports(key linkKey, _ *session, _ []string) bool {
 
 // mheard lists the stations most recently heard over the radio, with the
 // port each was heard on and how long ago.
-func (n *Node) mheard(key linkKey, _ *session, _ []string) bool {
+func (n *Node) mheard(key peer, _ *session, _ []string) bool {
 	var b strings.Builder
 
 	b.WriteString(n.prompt() + "Heard:\r")
@@ -659,7 +728,7 @@ func (n *Node) mheard(key linkKey, _ *session, _ []string) bool {
 
 // noNetROM answers the commands that list what NET/ROM knows, of which
 // there is nothing yet.
-func (n *Node) noNetROM(key linkKey, _ *session, _ []string) bool {
+func (n *Node) noNetROM(key peer, _ *session, _ []string) bool {
 	n.send(key, []byte(n.prompt()+"This node does not do NET/ROM yet\r"))
 
 	return true
@@ -708,20 +777,48 @@ func addrs(key linkKey) [ax25.MaxAddrs]string {
 	return a
 }
 
-// send sends data to the user on the link key names.
-func (n *Node) send(key linkKey, data []byte) {
+// send sends data to the user key names.
+func (n *Node) send(key peer, data []byte) {
 	n.forward(key, ax25.PIDNoLayer3, data)
 }
 
-// forward sends data, with the protocol ID pid, on the link key names: what
-// crosses between a user and the station they are connected to goes as it
-// came.
-func (n *Node) forward(key linkKey, pid int, data []byte) {
-	n.link.XmitDataRequest(addrs(key), 2, key.channel, n.client, pid, data)
+// forward sends data, with the protocol ID pid, to key: what crosses between
+// a user and the station they are connected to goes as it came.
+func (n *Node) forward(key peer, pid int, data []byte) {
+	key.send(n, pid, data)
 }
 
-// disconnect ends the link key names.  The session goes when the data link
-// says the link has.
-func (n *Node) disconnect(key linkKey) {
-	n.link.DisconnectRequest(addrs(key), 2, key.channel, n.client)
+// disconnect ends the conversation with key.  The session goes when the far
+// end says it has.
+func (n *Node) disconnect(key peer) {
+	key.disconnect(n)
+}
+
+// Attached is a user's session on a Conn handed to the node with Attach.
+type Attached struct {
+	n *Node
+	p *connPeer
+}
+
+// Attach gives the user remote, on c, a session with the node, as one who
+// connected over AX.25 gets, greeting them.  What arrives on c is to be
+// handed to the result's Received, and c going to its Closed.
+func (n *Node) Attach(remote string, c Conn) *Attached {
+	var p = new(connPeer)
+	p.conn = c
+	p.remote = remote
+
+	n.established(p, true)
+
+	return &Attached{n: n, p: p}
+}
+
+// Received hands the node what the user sent.
+func (a *Attached) Received(data []byte) {
+	a.n.received(a.p, ax25.PIDNoLayer3, data)
+}
+
+// Closed tells the node the user's Conn has gone.
+func (a *Attached) Closed() {
+	a.n.terminated(a.p, "")
 }

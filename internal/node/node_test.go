@@ -971,3 +971,71 @@ func TestUserReturningIsNotHandedOldDownlink(t *testing.T) {
 	typeLine(n, "C "+farCall)
 	assert.Equal(t, "SAMNOD:Q1TEST-7} Trying Q3TEST on port 1\r", link.output())
 }
+
+// fakeConn is a Conn that remembers what it is sent.
+type fakeConn struct {
+	mu     sync.Mutex
+	sent   strings.Builder
+	closes int
+}
+
+func (c *fakeConn) Send(data []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.sent.Write(data)
+}
+
+func (c *fakeConn) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.closes++
+}
+
+func (c *fakeConn) output() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.sent.String()
+}
+
+func TestAttachedUser(t *testing.T) {
+	t.Parallel()
+
+	var link = new(fakeLink)
+	var n = New(testConfig(withInfoMessage("About us")), link, noneHeard, testClient)
+	var conn = new(fakeConn)
+
+	var a = n.Attach("Q3TEST", conn)
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Welcome to Samoyed\r", conn.output())
+	assert.Empty(t, link.output(), "nothing goes over the AX.25 data link")
+
+	a.Received([]byte("INFO\r"))
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Welcome to Samoyed\rSAMNOD:Q1TEST-7} About us\r", conn.output())
+
+	a.Received([]byte("BYE\r"))
+	assert.Equal(t, 1, conn.closes)
+
+	a.Closed()
+	a.Received([]byte("INFO\r"))
+	assert.NotContains(t, strings.TrimPrefix(conn.output(), "SAMNOD:Q1TEST-7} Welcome to Samoyed\rSAMNOD:Q1TEST-7} About us\r"), "About us", "a closed session is forgotten")
+}
+
+func TestAttachedUsersAreSeparate(t *testing.T) {
+	t.Parallel()
+
+	var n = New(testConfig(), new(fakeLink), noneHeard, testClient)
+	var one, two = new(fakeConn), new(fakeConn)
+
+	var a = n.Attach("Q3TEST", one)
+	var b = n.Attach("Q3TEST", two)
+
+	a.Received([]byte("B"))
+	b.Received([]byte("YE\r"))
+	assert.Zero(t, two.closes)
+	assert.Contains(t, two.output(), invalidCommand, "the same callsign twice is two users, each typing their own line")
+
+	a.Received([]byte("YE\r"))
+	assert.Equal(t, 1, one.closes)
+}
