@@ -112,6 +112,13 @@ Dire Wolf's companion utilities come along too, each prefixed `samoyed-` (`samoy
 For configuration, features and recipes, see the [Samoyed documentation](https://doismellburning.github.io/samoyed/), in particular the [how-to guides](https://doismellburning.github.io/samoyed/how-to-guides.html).
 Where it doesn't yet cover something, the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) should — Samoyed aims for broad compatibility with Dire Wolf.
 
+## Switching from Dire Wolf
+
+- **Configuration** — an existing `direwolf.conf` should work as it is; check it with `samoyed-direwolf --config-file direwolf.conf --config-check`
+- **Command names** — every program is prefixed `samoyed-` (`direwolf` becomes `samoyed-direwolf`, `atest` becomes `samoyed-atest`), so Samoyed can be installed alongside Dire Wolf
+- **Command-line options** — Dire Wolf's single-letter options still work, and each has a long form too (`-c` is also `--config-file`)
+- **Service setup** — the `.deb` installs the programs and their man pages only, so bring your own configuration file and systemd unit
+
 ## Building
 
 ### Prerequisites
