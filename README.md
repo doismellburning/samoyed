@@ -6,6 +6,8 @@ Samoyed is a fully-featured software modem/TNC for packet radio.
 It supports AX.25 v2.2, FX.25, IL2P, APRS, multi-speed modems (300-9600 bps), digipeating, IGates, and more.
 Samoyed is a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
 
+**Documentation:** <https://doismellburning.github.io/samoyed/>
+
 > **Status:** Port functionally complete, but broad testing needed - consider this pre-release, and likely to contain bugs.
 > Please [file issues](https://github.com/doismellburning/samoyed/issues) if you encounter problems.
 
@@ -45,6 +47,11 @@ As well as that, Samoyed also adds:
 - **IL2P CRC** — support for IL2P's Cyclic Redundancy Check for improved packet reconstruction, per the [IL2P Specification Draft v0.6](https://tarpn.net/t/il2p/il2p-specification_draft_v0-6.pdf)
 - **BPSK** — 300 bps Binary Phase Shift Keying, compatible with NinoTNC at 1500 Hz carrier (`MODEM 300 BPSK`)
 - **UDP audio output** — stream encoded audio to a remote host via UDP (`ADEVICE default udp:host:port`) for testing and experimentation
+- **YAML configuration** — an alternative to the line-at-a-time format, for configuration files named `*.yaml` or `*.yml`
+- **Config checking** — `--config-check` reports every problem in a configuration file without starting up
+- **Web interface** — a live dashboard and APRS map in the browser (`WEBPORT`)
+- **Prometheus metrics** — a `/metrics` endpoint (`METRICSPORT`), with a starter Grafana dashboard in `conf/`
+- **AGW login** — require a user name and password on the AGW port (`AGWLOGIN`)
 - ...and more underway!
 
 ## Installation
@@ -57,15 +64,60 @@ The `.deb` packages are recommended for Debian-based systems (Debian, Ubuntu, Ra
 sudo apt install ./samoyed-binary_*.deb
 ```
 
-## Usage
+## Quick start
 
-The primary binary is `samoyed-direwolf`. Run it with `--help` for a full list of options:
+`samoyed-direwolf` is the modem/TNC itself.
+It reads a configuration file — `direwolf.conf` in the current directory, or whatever `--config-file` names.
+A minimal one for a single 1200 bps channel on Linux, in Samoyed's [YAML format](https://doismellburning.github.io/samoyed/yaml-config.html) (for a file whose name ends in `.yaml` or `.yml`):
 
-```sh
-samoyed-direwolf --help
+```yaml
+samoyed:
+  audioDevices:
+    # Your soundcard - see `arecord -l`
+    - input: plughw:1,0
+  channels:
+    - channel: 0
+      # Your callsign
+      mycall: Q1TEST
+      modem:
+        speed: "1200"
+  agwPort: 8000
+  kissPorts:
+    - port: 8001
 ```
 
-For more detail on configuration and features, see the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) — Samoyed aims for broad compatibility with Dire Wolf.
+That is equivalent to this, in Dire Wolf's format, which works too:
+
+```
+# Your soundcard - see `arecord -l`
+ADEVICE plughw:1,0
+CHANNEL 0
+# Your callsign
+MYCALL Q1TEST
+MODEM 1200
+AGWPORT 8000
+KISSPORT 8001
+```
+
+Check it, then start it:
+
+```sh
+samoyed-direwolf --config-file samoyed.yaml --config-check
+samoyed-direwolf --config-file samoyed.yaml
+```
+
+Run `samoyed-direwolf --help` for the full list of options.
+Dire Wolf's companion utilities come along too, each prefixed `samoyed-` (`samoyed-atest`, `samoyed-kissutil` and so on), with man pages in the `.deb`.
+
+For configuration, features and recipes, see the [Samoyed documentation](https://doismellburning.github.io/samoyed/), in particular the [how-to guides](https://doismellburning.github.io/samoyed/how-to-guides.html).
+Where it doesn't yet cover something, the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) should — Samoyed aims for broad compatibility with Dire Wolf.
+
+## Switching from Dire Wolf
+
+- **Configuration** — an existing `direwolf.conf` should work as it is; check it with `samoyed-direwolf --config-file direwolf.conf --config-check`
+- **Command names** — every program is prefixed `samoyed-` (`direwolf` becomes `samoyed-direwolf`, `atest` becomes `samoyed-atest`), so Samoyed can be installed alongside Dire Wolf
+- **Command-line options** — Dire Wolf's single-letter options still work, and each has a long form too (`-c` is also `--config-file`)
+- **Service setup** — the `.deb` installs the programs and their man pages only, so bring your own configuration file and systemd unit
 
 ## Building
 
@@ -82,26 +134,10 @@ git clone https://github.com/doismellburning/samoyed
 cd samoyed
 make setup       # install build/test/lint dependencies
 make cmds        # build all binaries into dist/
-make test        # run the full test suite
+make all         # build and test everything
 ```
 
-## Development
-
-See [AGENTS.md](./AGENTS.md) for general development notes and style guidelines.
-
-Key `make` targets:
-
-| Target | Description |
-|--------|-------------|
-| `make setup` | Install the system dependencies needed by the targets below |
-| `make all` | Build everything and run all tests — run before committing |
-| `make cmds` | Build all binaries |
-| `make test` | Run the full test suite |
-| `make check` | Run linters (`vet`, `golangci-lint`, `shellcheck`, `reuse`) |
-| `make fix` | Auto-fix linting issues where possible |
-| `make vuln` | Check dependencies and the toolchain for reachable vulnerabilities |
-| `make coveragereport` | Show test coverage breakdown |
-| `make stats` | Show lines-of-code breakdown (C vs Go) |
+See [AGENTS.md](./AGENTS.md) for the main `make` targets, along with general development notes and style guidelines.
 
 ## Contributing
 
@@ -123,8 +159,6 @@ a modern software replacement for hardware TNCs, with outstanding receive perfor
 Dire Wolf decodes over 1000 error-free frames from the
 [WA8LMF TNC Test CD](https://github.com/wb2osz/direwolf/tree/dev/doc/WA8LMF-TNC-Test-CD-Results.pdf),
 outperforming all hardware TNCs and first-generation soundcard modems.
-
-For Dire Wolf documentation, see the [Dire Wolf doc directory](https://github.com/wb2osz/direwolf/tree/master/doc).
 
 ## Further Reading
 
