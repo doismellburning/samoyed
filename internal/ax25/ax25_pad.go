@@ -159,6 +159,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/fcs"
@@ -349,6 +350,21 @@ func (s AddrStrictness) strict() bool {
 
 func isxdigit(b byte) bool {
 	return slices.Contains([]byte("0123456789abcdefABCDEF"), b)
+}
+
+// An address field holds 7-bit ASCII, so these, unlike their unicode
+// package namesakes, accept only ASCII letters and digits, as C's do.
+
+func isASCIIDigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
+func isASCIILower(r rune) bool {
+	return r >= 'a' && r <= 'z'
+}
+
+func isASCIIAlnum(r rune) bool {
+	return isASCIIDigit(r) || isASCIILower(r) || (r >= 'A' && r <= 'Z')
 }
 
 /*------------------------------------------------------------------------------
@@ -739,6 +755,7 @@ func (this_p *Packet) Dup() *Packet {
 	var dup = new(Packet)
 
 	*dup = *this_p
+	dup.nextp = nil // The copy is in no queue.
 
 	return (dup)
 }
@@ -853,7 +870,7 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 			return out_addr, ssid, heard, false
 		}
 
-		if !unicode.IsLetter(p) && !unicode.IsNumber(p) {
+		if !isASCIIAlnum(p) {
 			log().WithField("index", i).Warn("Address contains character other than letter or digit")
 
 			return out_addr, ssid, heard, false
@@ -861,7 +878,7 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 
 		out_addr += string(p)
 
-		if strictness.strict() && unicode.IsLower(p) {
+		if strictness.strict() && isASCIILower(p) {
 			// Exempt the "qA..." case because it was already mentioned.
 			if strictness != AddrStrictLowerCaseWarning || !strings.HasPrefix(in_addr, "qA") {
 				log().Warn("Address has lower case letters - it must be all upper case")
@@ -883,7 +900,7 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 	if len(in_addr) > 0 && in_addr[0] == '-' {
 		in_addr = in_addr[1:]
 		for i, p := range in_addr {
-			if !unicode.IsLetter(p) && !unicode.IsNumber(p) {
+			if !isASCIIAlnum(p) {
 				break
 			}
 
@@ -894,18 +911,29 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 			}
 
 			sstr.WriteRune(p)
-			if strictness.strict() && !unicode.IsDigit(p) {
+			if strictness.strict() && !isASCIIDigit(p) {
 				log().Warn("SSID must be digits")
 
 				return out_addr, ssid, heard, false
 			}
 		}
 
-		var k, kErr = strconv.Atoi(sstr.String())
-		if kErr != nil {
-			log().WithError(kErr).Warn("Malformed SSID")
+		var k int
 
-			return out_addr, ssid, heard, false
+		if strictness.strict() {
+			var kErr error
+
+			k, kErr = strconv.Atoi(sstr.String())
+			if kErr != nil {
+				log().WithError(kErr).Warn("Malformed SSID")
+
+				return out_addr, ssid, heard, false
+			}
+		} else {
+			// Read it as Dire Wolf did, with atoi: the leading digits, if any,
+			// so an APRS-IS station's "-B" is SSID 0 rather than an error.
+			var rest = strings.TrimLeftFunc(sstr.String(), isASCIIDigit)
+			k, _ = strconv.Atoi(strings.TrimSuffix(sstr.String(), rest))
 		}
 
 		if k < 0 || k > 15 {
@@ -1133,12 +1161,14 @@ func (this_p *Packet) SetAddr(n int, ad string) {
  *
  * Assumption:	FromText or FromFrame was called first.
  *
- * Returns:	None.
+ * Returns:	True if the address was inserted, false if there was no room:
+ *		the frame already has the maximum number of addresses, or is
+ *		already as long as a frame can be.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func (this_p *Packet) InsertAddr(n int, ad string) {
+func (this_p *Packet) InsertAddr(n int, ad string) bool {
 	dwutil.Assert(n >= Repeater1 && n < MaxAddrs)
 
 	//dw_printf ("InsertAddr (%d, %s)\n", n, ad);
@@ -1148,10 +1178,22 @@ func (this_p *Packet) InsertAddr(n int, ad string) {
 	}
 
 	/* Don't do it if we already have the maximum number. */
-	/* Should probably return success/fail code but currently the caller doesn't care. */
 
 	if this_p.num_addr >= MaxAddrs {
-		return
+		return false
+	}
+
+	/* Nor if the frame is already as long as a frame can be. */
+	/* A received frame can be, with an information part longer than MaxInfoLen. */
+
+	if this_p.frame_len+7 > MaxPacketLen {
+		logrus.WithFields(logrus.Fields{
+			"position": n,
+			"address":  ad,
+			"length":   this_p.frame_len,
+		}).Warn("No room to insert address: frame is already the maximum length")
+
+		return false
 	}
 
 	this_p.clearLastAddrFlag()
@@ -1193,6 +1235,8 @@ func (this_p *Packet) InsertAddr(n int, ad string) {
 			"actual":   this_p.num_addr,
 		}).Error("Internal error: InsertAddr: unexpected number of addresses")
 	}
+
+	return true
 }
 
 /*------------------------------------------------------------------------------
@@ -1498,17 +1542,13 @@ func (this_p *Packet) SetSSID(n int, ssid int) {
  * Inputs:	n	- Index of address.   Use the symbols
  *			  Destination, Source, AX25_REPEATER1, etc.
  *
- * Bugs:	No bounds checking is performed.  Be careful.
- *
  * Assumption:	FromText or FromFrame was called first.
  *
- * Returns:	True or false.
+ * Returns:	1 or 0.  0 for a bad index, after reporting it.
  *
  *------------------------------------------------------------------------------*/
 
 func (this_p *Packet) H(n int) int {
-	dwutil.Assert(n >= 0 && n < this_p.num_addr)
-
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSIDHMask) >> SSIDHShift)
 	} else {
@@ -1614,13 +1654,11 @@ func (this_p *Packet) FirstNotRepeated() int {
  *		n	- Index of address.   Use the symbols
  *			  Destination, Source, AX25_REPEATER1, etc.
  *
- * Returns:	0, 1, 2, or 3.
+ * Returns:	0, 1, 2, or 3.  0 for a bad index, after reporting it.
  *
  *------------------------------------------------------------------------------*/
 
 func (this_p *Packet) RR(n int) int {
-	dwutil.Assert(n >= 0 && n < this_p.num_addr)
-
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSIDRRMask) >> SSIDRRShift)
 	} else {
@@ -1666,17 +1704,32 @@ func (this_p *Packet) Info() []byte {
 	}
 } /* end Info */
 
+// SetInfo replaces the information part, which for a packet that isn't AX.25
+// is the whole frame, as it is for Info.
 func (this_p *Packet) SetInfo(new_info []byte) {
-	var old_info = this_p.Info()
-	this_p.frame_len -= len(old_info)
-
 	if len(new_info) > MaxInfoLen {
 		new_info = new_info[:MaxInfoLen]
 	}
 
-	copy(this_p.frame_data[this_p.InfoOffset():], new_info)
+	var offset = 0
 
-	this_p.frame_len += len(new_info)
+	if this_p.num_addr >= 2 {
+		if this_p.Control() < 0 {
+			logrus.Error("SetInfo: frame has no control byte, so no information part")
+
+			return
+		}
+
+		// An I or UI frame that stops before its PID gets one, so the
+		// information part goes after it rather than in its place.
+		if this_p.NumPID() > 0 && this_p.PIDOffset() >= this_p.frame_len {
+			this_p.frame_data[this_p.PIDOffset()] = PIDNoLayer3
+		}
+
+		offset = this_p.InfoOffset()
+	}
+
+	this_p.frame_len = offset + copy(this_p.frame_data[offset:], new_info)
 }
 
 /*------------------------------------------------------------------------------
@@ -2037,10 +2090,11 @@ func (this_p *Packet) FrameType() (cr CmdRes, desc string, pf int, nr int, ns in
 
 	if this_p.modulo == 0 && (c&3) == 1 && this_p.C2() != -1 {
 		this_p.modulo = Modulo128
-	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.frame_data[this_p.InfoOffset()] == 0xF0 {
-		this_p.modulo = Modulo128
-	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.frame_data[this_p.InfoOffset()] == 0x08 { // same for segments
-		this_p.modulo = Modulo128
+	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.InfoOffset() < this_p.frame_len {
+		switch this_p.frame_data[this_p.InfoOffset()] {
+		case PIDNoLayer3, PIDSegmentationFragment: // same for segments
+			this_p.modulo = Modulo128
+		}
 	}
 
 	var c2 int // I & S frames can have second Control byte.
@@ -2424,7 +2478,7 @@ func (this_p *Packet) Control() int {
 		return -1
 	}
 
-	if this_p.num_addr >= 2 {
+	if this_p.num_addr >= 2 && this_p.ControlOffset() < this_p.frame_len {
 		return int(this_p.frame_data[this_p.ControlOffset()])
 	}
 
@@ -2518,7 +2572,7 @@ func (this_p *Packet) PID() int {
 		return (-1)
 	}
 
-	if this_p.num_addr >= 2 {
+	if this_p.Control() >= 0 && this_p.PIDOffset() < this_p.frame_len {
 		return int(this_p.frame_data[this_p.PIDOffset()])
 	}
 
@@ -2700,33 +2754,43 @@ func (this_p *Packet) MultiModemCRC() uint16 {
 const MaxSafe = MaxInfoLen
 
 func SafePrint(info []byte, ascii_only bool) {
+	// TODO1.2: should return string rather printing to remove a race condition.
+	fmt.Print(safeString(info, ascii_only))
+}
+
+// safeString is what SafePrint prints.  It works a byte at a time, as
+// FromText reads the notation back: a byte that is not part of a valid
+// UTF-8 character, or any byte of a non-ASCII character when ascii_only,
+// is shown in hexadecimal on its own.
+func safeString(info []byte, ascii_only bool) string {
 	if len(info) > MaxSafe {
 		info = info[:MaxSafe]
 	}
 
 	var safe_str strings.Builder
-	var pstr = string(info)
 
-	for i, ch := range pstr {
-		if ch == ' ' && i == len(pstr)-1 {
-			fmt.Fprintf(&safe_str, "<0x%02x>", ch)
-		} else if ch < ' ' || ch == 0x7f || ch == 0xfe || ch == 0xff ||
+	for i := 0; i < len(info); {
+		var ch, size = utf8.DecodeRune(info[i:])
+		var char = info[i : i+size]
+
+		if (ch == utf8.RuneError && size == 1) || /* Not UTF-8, which never uses fe and ff. */
+			ch < ' ' || ch == 0x7f || /* Control codes and delete. */
+			(ch == ' ' && i+size == len(info)) ||
 			(ascii_only && ch >= 0x80) {
-			/* Control codes and delete. */
-			/* UTF-8 does not use fe and ff except in a possible */
-			/* "Byte Order Mark" (BOM) at the beginning. */
-			fmt.Fprintf(&safe_str, "<0x%02x>", ch)
+			for _, b := range char {
+				fmt.Fprintf(&safe_str, "<0x%02x>", b)
+			}
 		} else {
 			/* Let everything else thru so we can handle UTF-8 */
 			/* Maybe we should have an option to display 0x80 */
 			/* and above as hexadecimal. */
-			safe_str.WriteRune(ch)
+			safe_str.Write(char)
 		}
+
+		i += size
 	}
 
-	// TODO1.2: should return string rather printing to remove a race condition.
-
-	fmt.Print(safe_str.String())
+	return safe_str.String()
 } /* end SafePrint */
 
 /*------------------------------------------------------------------
