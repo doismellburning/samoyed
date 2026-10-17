@@ -742,8 +742,26 @@ x = Silence FX.25 information.`)
 
 	var nodeClients linkClients
 
+	var netromNode *netromNode // Nil without NET/ROM.
+
+	if _, hasNetROM := misc_config.netrom.Get(); hasNetROM && nodeConfig.IsNothing() {
+		logrus.Error("NET/ROM needs the node block, for the node's address")
+		td.exit(1)
+	}
+
 	if nodeConfig, ok := nodeConfig.Get(); ok {
 		var nodeShell = node.New(nodeConfig, dataLinkQueue, mheardDB.HeardRF, nodeClient)
+
+		if netromSettings, hasNetROM := misc_config.netrom.Get(); hasNetROM {
+			var netromErr error
+
+			netromNode, netromErr = startNetROM(ctx, netromSettings, audio_config, nodeConfig, nodeShell, dataLinkQueue, transmitQueue.Append)
+			if netromErr != nil {
+				logrus.WithError(netromErr).Error("Could not start NET/ROM")
+				td.exit(1)
+			}
+		}
+
 		nodeShell.Start()
 
 		nodeClients = nodeShell
@@ -883,6 +901,7 @@ x = Silence FX.25 information.`)
 	recHandler.apps = clientApplications
 	recHandler.digipeater = aprsDigipeater
 	recHandler.connectedDigipeater = connectedDigipeater
+	recHandler.netrom = netromNode
 	recHandler.ttGateway = ttGateway
 	recHandler.dumpUTF8 = d_u_opt
 	recHandler.dumpPackets = d_p_opt
@@ -942,6 +961,7 @@ type recPacketHandler struct {
 
 	digipeater          *digipeater.Digipeater
 	connectedDigipeater *digipeater.Connected
+	netrom              *netromNode // Nil without NET/ROM.
 	ttGateway           *TTGateway
 
 	dumpUTF8    bool // "-d u": print UTF-8 in hexadecimal too.
@@ -1306,6 +1326,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 
 	/* Send to another application if connected. */
 	rh.apps.SendRecPacket(channel, pp)
+	rh.netrom.heardFrame(channel, pp)
 	webPublishReceived(rh.webHub, src, pp, decoded, alevel)
 
 	if rh.aisToObject && len(ais_obj_packet) != 0 {

@@ -23,6 +23,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/doismellburning/samoyed/internal/netrom"
 )
 
 // maxLineLen is the longest command line the shell will hold on to.  Anyone
@@ -115,15 +116,91 @@ func (k linkKey) name() string { return k.remoteCall }
 // connPeer is a Conn the node talks over.  It is a pointer, so each is a peer
 // of its own however its far end is named.
 type connPeer struct {
-	conn   Conn
+	mu     sync.Mutex
+	conn   Conn // Nil until a downlink's Conn is known.
+	closed bool // Close was asked for before conn was known.
 	remote string
 }
 
-func (c *connPeer) send(_ *Node, _ int, data []byte) { c.conn.Send(data) }
+func (c *connPeer) send(_ *Node, _ int, data []byte) {
+	c.mu.Lock()
+	var conn = c.conn
+	c.mu.Unlock()
 
-func (c *connPeer) disconnect(*Node) { c.conn.Close() }
+	if conn != nil {
+		conn.Send(data)
+	}
+}
+
+func (c *connPeer) disconnect(*Node) {
+	c.mu.Lock()
+	var conn = c.conn
+	c.closed = conn == nil
+	c.mu.Unlock()
+
+	if conn != nil {
+		conn.Close()
+	}
+}
 
 func (c *connPeer) name() string { return c.remote }
+
+// setConn sets the Conn a downlink travels on, once it is known, closing it
+// straight away if the downlink was given up on in the meantime.
+func (c *connPeer) setConn(conn Conn) {
+	c.mu.Lock()
+	c.conn = conn
+	var closed = c.closed
+	c.mu.Unlock()
+
+	if closed {
+		conn.Close()
+	}
+}
+
+// NetROM is the node's NET/ROM, as far as the shell needs it: it hears about
+// the AX.25 links that carry NET/ROM and what arrives on them, answers NODES
+// and ROUTES, and connects users onward to other nodes.  The shell calls it
+// without holding its own lock, possibly from the data link's goroutine, so
+// it must not wait on the shell.
+type NetROM interface {
+	// IsNeighbour says whether call, heard on channel, is a neighbour node
+	// rather than a user.
+	IsNeighbour(channel int, call string) bool
+
+	// LinkUp and LinkDown hear about a link that carries, or might carry,
+	// NET/ROM: one a neighbour opened, or one NET/ROM asked for itself.
+	LinkUp(channel int, ownCall string, remoteCall string, incoming bool)
+	LinkDown(channel int, ownCall string, remoteCall string, timeout bool)
+
+	// Packet takes a NET/ROM packet that arrived on a link.
+	Packet(channel int, ownCall string, remoteCall string, data []byte)
+
+	// Nodes and Neighbours are what NET/ROM knows, for NODES and ROUTES.
+	Nodes() []netrom.Destination
+	Neighbours() []netrom.Neighbour
+
+	// Knows says whether name, a callsign or an alias, is a node NET/ROM
+	// can connect to.
+	Knows(name string) bool
+
+	// Connect connects user onward to the node dest over NET/ROM, telling
+	// events how it goes, and returns the connection.
+	Connect(dest string, user string, events Downlink) Conn
+}
+
+// Downlink is told how a connection onward that NET/ROM makes is going.
+type Downlink interface {
+	// Connected says the far end answered.
+	Connected()
+
+	// Received hands over what the far end sent.
+	Received(data []byte)
+
+	// Closed says the connection has gone: failure says why one that never
+	// came up failed.
+	Closed(failure string)
+}
 
 // session is one connected user.
 type session struct {
@@ -178,6 +255,15 @@ type Node struct {
 	// downlinks are the links users have asked to be connected onward on,
 	// each to the user's own link.
 	downlinks map[peer]peer
+
+	// netrom is the node's NET/ROM, or nil for none.  It is set before
+	// Start and not changed after.
+	netrom NetROM
+}
+
+// SetNetROM gives the node NET/ROM.  It must be called before Start.
+func (n *Node) SetNetROM(nr NetROM) {
+	n.netrom = nr
 }
 
 // New makes a node that talks to link as client, and lists the stations heard
@@ -212,7 +298,28 @@ func (n *Node) Start() {
 // us gets a session and a greeting; a user we were connecting onward is told
 // they are through.
 func (n *Node) LinkEstablished(channel int, _ int, remoteCall string, ownCall string, incoming bool) {
-	n.established(linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}, incoming)
+	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+
+	// A link NET/ROM opened, or a neighbour node's, is NET/ROM's, and
+	// nobody's session.
+	if n.netrom != nil && !n.isUsers(key) && (!incoming || n.netrom.IsNeighbour(channel, remoteCall)) {
+		n.netrom.LinkUp(channel, ownCall, remoteCall, incoming)
+
+		return
+	}
+
+	n.established(key, incoming)
+}
+
+// isUsers says whether key is a user's link or a downlink of one.
+func (n *Node) isUsers(key linkKey) bool {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	var _, isSession = n.sessions[key]
+	var _, isDownlink = n.downlinks[key]
+
+	return isSession || isDownlink
 }
 
 // established is told the conversation with key is under way.
@@ -250,7 +357,15 @@ func (n *Node) established(key peer, incoming bool) {
 // LinkTerminated is told a link has gone down.  A user's ends their session;
 // a downlink's returns its user to the node.
 func (n *Node) LinkTerminated(channel int, _ int, remoteCall string, ownCall string, timeout bool) {
-	n.terminated(linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}, failureFor(timeout))
+	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+
+	if n.netrom != nil && !n.isUsers(key) {
+		n.netrom.LinkDown(channel, ownCall, remoteCall, timeout)
+
+		return
+	}
+
+	n.terminated(key, failureFor(timeout))
 }
 
 // failureFor says why a link that never came up failed: timeout says the
@@ -295,7 +410,42 @@ func (n *Node) terminated(key peer, why string) {
 // taken a line at a time; what they send once connected onward goes to the
 // downlink as it is, and what comes back on the downlink goes to them.
 func (n *Node) RecConnData(channel int, _ int, remoteCall string, ownCall string, pid int, data []byte) {
-	n.received(linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}, pid, data)
+	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+
+	if n.netrom != nil && pid == ax25.PIDNetROM && n.netromPacket(key) {
+		n.netrom.Packet(channel, ownCall, remoteCall, data)
+
+		return
+	}
+
+	n.received(key, pid, data)
+}
+
+// netromPacket says whether a NET/ROM packet on key is NET/ROM's: all of them
+// but those on a user's downlink, which go to the user as they are.  A node
+// that connected before it was known as a neighbour was given a session,
+// which it now loses, its link going to NET/ROM.
+func (n *Node) netromPacket(key linkKey) bool {
+	n.mu.Lock()
+
+	if _, isDownlink := n.downlinks[key]; isDownlink {
+		n.mu.Unlock()
+
+		return false
+	}
+
+	var s, isSession = n.sessions[key]
+	if isSession && s.downlink == nil {
+		delete(n.sessions, key)
+	}
+
+	n.mu.Unlock()
+
+	if isSession && s.downlink == nil {
+		n.netrom.LinkUp(key.channel, key.ownCall, key.remoteCall, true)
+	}
+
+	return !isSession || s.downlink == nil
 }
 
 // received is handed what key sent.
@@ -429,8 +579,8 @@ func commands() []command {
 		{names: []string{"INFO", "I"}, help: "About this node", run: (*Node).info},
 		{names: []string{"PORTS", "P"}, help: "List the ports", run: (*Node).ports},
 		{names: []string{"MHEARD", "MH"}, help: "List the stations heard", run: (*Node).mheard},
-		{names: []string{"NODES", "N"}, help: "List the nodes known", run: (*Node).noNetROM},
-		{names: []string{"ROUTES", "R"}, help: "List the routes known", run: (*Node).noNetROM},
+		{names: []string{"NODES", "N"}, help: "List the nodes known", run: (*Node).nodes},
+		{names: []string{"ROUTES", "R"}, help: "List the routes known", run: (*Node).routes},
 	}
 }
 
@@ -475,8 +625,13 @@ func isBye(line []byte) bool {
 }
 
 // connect connects the user onward, to the station named on the port named.
-// The port can be left out when there is only one.
+// The port can be left out when there is only one.  A node NET/ROM knows is
+// connected to over NET/ROM, by its callsign or alias alone.
 func (n *Node) connect(key peer, s *session, args []string) bool {
+	if n.netrom != nil && len(args) == 1 && n.netrom.Knows(args[0]) {
+		return n.connectNode(key, s, strings.ToUpper(args[0]))
+	}
+
 	var channel, call, problem = n.connectArgs(args)
 	if problem != "" {
 		n.send(key, []byte(n.prompt()+problem+"\r"))
@@ -726,12 +881,130 @@ func (n *Node) mheard(key peer, _ *session, _ []string) bool {
 	return true
 }
 
-// noNetROM answers the commands that list what NET/ROM knows, of which
-// there is nothing yet.
-func (n *Node) noNetROM(key peer, _ *session, _ []string) bool {
+// noNetROM answers the commands that list what NET/ROM knows, for a node
+// without NET/ROM.
+func (n *Node) noNetROM(key peer) bool {
 	n.send(key, []byte(n.prompt()+"This node does not do NET/ROM yet\r"))
 
 	return true
+}
+
+// nodes lists the nodes NET/ROM knows, or the routes to the one named.
+func (n *Node) nodes(key peer, _ *session, args []string) bool {
+	if n.netrom == nil {
+		return n.noNetROM(key)
+	}
+
+	var known = n.netrom.Nodes()
+
+	var b strings.Builder
+
+	if len(args) > 0 {
+		var i = slices.IndexFunc(known, func(d netrom.Destination) bool {
+			return strings.EqualFold(d.Call, args[0]) || (d.Alias != "" && strings.EqualFold(d.Alias, args[0]))
+		})
+		if i < 0 {
+			n.send(key, []byte(n.prompt()+"No such node "+strings.ToUpper(args[0])+"\r"))
+
+			return true
+		}
+
+		fmt.Fprintf(&b, "%sRoutes to %s:\r", n.prompt(), nodeName(known[i].Alias, known[i].Call))
+
+		for _, r := range known[i].Routes {
+			fmt.Fprintf(&b, "  %3d %d %2d %s\r", r.Quality, r.Obsolescence, r.Neighbour.Port, r.Neighbour.Call)
+		}
+
+		n.send(key, []byte(b.String()))
+
+		return true
+	}
+
+	b.WriteString(n.prompt() + "Nodes:\r")
+
+	// Four to a line, as other nodes list them.
+	for row := range slices.Chunk(known, 4) {
+		var line strings.Builder
+		for _, d := range row {
+			fmt.Fprintf(&line, "%-19s", nodeName(d.Alias, d.Call))
+		}
+
+		b.WriteString(strings.TrimRight(line.String(), " ") + "\r")
+	}
+
+	n.send(key, []byte(b.String()))
+
+	return true
+}
+
+// routes lists the neighbouring nodes.
+func (n *Node) routes(key peer, _ *session, _ []string) bool {
+	if n.netrom == nil {
+		return n.noNetROM(key)
+	}
+
+	var b strings.Builder
+
+	b.WriteString(n.prompt() + "Routes:\r")
+
+	for _, nb := range n.netrom.Neighbours() {
+		var locked = ""
+		if nb.Locked {
+			locked = " !"
+		}
+
+		fmt.Fprintf(&b, "  %2d %-19s %3d%s\r", nb.Port, nodeName(nb.Alias, nb.Call), nb.Quality, locked)
+	}
+
+	n.send(key, []byte(b.String()))
+
+	return true
+}
+
+// nodeName is how a node is named in lists: ALIAS:CALLSIGN, or the callsign
+// alone.
+func nodeName(alias string, call string) string {
+	if alias == "" {
+		return call
+	}
+
+	return alias + ":" + call
+}
+
+// connectNode connects the user onward to the node dest over NET/ROM.
+func (n *Node) connectNode(key peer, s *session, dest string) bool {
+	var down = new(connPeer)
+	down.remote = dest
+
+	n.mu.Lock()
+	n.downlinks[down] = key
+	s.downlink = down
+	s.cancelled = false
+	s.line = s.line[:0]
+	s.overlong = false
+	n.mu.Unlock()
+
+	n.send(key, []byte(n.prompt()+"Trying "+dest+"\r"))
+	down.setConn(n.netrom.Connect(dest, key.name(), netromDownlink{n: n, p: down}))
+
+	return false
+}
+
+// netromDownlink passes what happens on a NET/ROM connection onward to the
+// shell.
+type netromDownlink struct {
+	n *Node
+	p *connPeer
+}
+
+func (d netromDownlink) Connected()           { d.n.established(d.p, false) }
+func (d netromDownlink) Received(data []byte) { d.n.received(d.p, ax25.PIDNoLayer3, data) }
+func (d netromDownlink) Closed(failure string) {
+	if failure == "" {
+		failure = "busy"
+	}
+
+	d.n.terminated(d.p, failure)
 }
 
 // Address is addr written as the data link writes addresses - upper case,

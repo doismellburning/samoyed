@@ -48,6 +48,9 @@ type SamoyedConfig struct {
 	// Node, when given, runs the node shell.
 	Node *NodeSettings `yaml:"node"`
 
+	// NetROM, when given, gives the node NET/ROM.
+	NetROM *NetROMSettings `yaml:"netrom"`
+
 	// Legacy holds directives in the line-at-a-time format, read after
 	// everything else, for anything not yet given a YAML form.
 	Legacy string `yaml:"legacy"`
@@ -201,6 +204,11 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 	if file.Node != nil {
 		ps.line = top["node"].line(new(yaml.Node))
 		ps.reportIfError(ps.applyNODE(*file.Node))
+	}
+
+	if file.NetROM != nil {
+		ps.line = top["netrom"].line(new(yaml.Node))
+		ps.reportIfError(ps.applyNETROM(*file.NetROM))
 	}
 }
 

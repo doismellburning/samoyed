@@ -278,9 +278,15 @@ These are the keys under ``samoyed``:
         List the stations most recently heard over the radio,
         with the channel each was last heard on and how long ago.
 
-    ``NODES`` (``N``), ``ROUTES`` (``R``)
-        Say that the node does not do NET/ROM yet,
+    ``NODES`` (``N``) [*node*], ``ROUTES`` (``R``)
+        With ``netrom``, list the nodes NET/ROM knows, or the routes to one of them,
+        and the neighbouring nodes.
+        Without it, say that the node does not do NET/ROM yet,
         rather than that the command is invalid.
+
+    With ``netrom``, ``CONNECT`` (``C``) *node*, naming a node NET/ROM knows by callsign or alias,
+    connects onward over NET/ROM instead,
+    and a user can reach the node over NET/ROM as well as AX.25.
 
     A line of more than 256 characters is ignored.
 
@@ -296,6 +302,57 @@ These are the keys under ``samoyed``:
             connectMessage: |
               Welcome to the club node.
               Type ? for a list of commands.
+
+``netrom``
+    NET/ROM for the node (see :doc:`glossary/netrom`), which needs ``node``:
+    NET/ROM goes by the node's ``address`` and ``alias``.
+    This has no equivalent in Dire Wolf's format.
+    It has:
+
+    ``ports``
+        The channels NET/ROM runs on, from among the node's,
+        each with ``channel``,
+        ``quality`` (given to neighbours heard there, 0 to 255, 192 if left out)
+        and ``broadcast`` (whether NODES broadcasts are sent there, true if left out).
+
+    ``neighbours``
+        Neighbours configured at a fixed quality rather than learned from their broadcasts,
+        each with ``channel``, ``call``, ``alias`` and ``quality``.
+        Their routes never age out.
+
+    ``minQuality``, ``obsolescence``, ``minObsolescenceBroadcast``, ``broadcastInterval``
+        How routes are judged and aged:
+        the least quality worth keeping (50),
+        what a refreshed route's obsolescence count starts at (6),
+        the least count a route needs to be passed on in the node's own broadcasts (5),
+        and how often those go out (``30m``).
+
+    ``ttl``, ``window``, ``timeout``, ``retries``, ``ackDelay``, ``busyDelay``, ``idleTimeout``
+        The network and transport layers:
+        the hops a packet may make (16),
+        the transport window offered (4),
+        how long to wait for an acknowledgement before sending again (``120s``)
+        and how many times (3),
+        how long to hold an acknowledgement back in case data can carry it (``3s``),
+        how long to wait when the far end says it is busy (``180s``),
+        and how long a circuit may sit idle before it is closed (``15m``, ``0s`` for never).
+
+    Durations are written as Go durations, such as ``90s`` or ``1h``.
+
+    .. code:: yaml
+
+        samoyed:
+          node:
+            address: Q1TEST-7
+            alias: SAMNOD
+          netrom:
+            ports:
+              - channel: 0
+                quality: 192
+              - channel: 10
+                quality: 220
+            neighbours:
+              - {channel: 10, call: Q2TEST-2, alias: TWO, quality: 220}
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

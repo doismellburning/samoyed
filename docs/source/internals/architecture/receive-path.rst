@@ -89,6 +89,7 @@ to the application layer and the AX.25 data link state machine.
            tt [label="APRStt gateway"];
            agw [label="AGW clients\nconnect, disconnect,\ndata, register"];
            nodeshell [label="Node shell\ndisconnect, data, register"];
+           netrom_req [label="NET/ROM\nconnect, data"];
            ptt [label="PTT: channel busy"];
            xmit [label="Transmitter:\nseize confirm"];
        }
@@ -110,6 +111,7 @@ to the application layer and the AX.25 data link state machine.
        tt -> dlq_frame;
        agw -> dlq_req;
        nodeshell -> dlq_req;
+       netrom_req -> dlq_req;
        ptt -> dlq_req;
        xmit -> dlq_req;
 
@@ -144,6 +146,7 @@ to the application layer and the AX.25 data link state machine.
            aprsdec [label="aprs.Decoder\n-> APRS log, mheard, waypoints"];
            clients [label="KISS and AGW clients"];
            web [label="Web UI"];
+           nodes [label="NET/ROM\nnetromNode.heardFrame"];
            ichan [label="from ICHANNEL?\nyes: stop here", shape=diamond];
            ttq [label="DTMF, or\nstarts with 't'?", shape=diamond];
            ttseq [label="ttGateway.Sequence"];
@@ -157,6 +160,7 @@ to the application layer and the AX.25 data link state machine.
        app -> aprsdec [label="APRS"];
        app -> clients;
        app -> web;
+       app -> nodes [label="UI to NODES,\nPID 0xCF"];
        app -> ichan;
        ichan -> ttq [label="no"];
        ttq -> ttseq [label="yes"];
@@ -194,7 +198,7 @@ to the application layer and the AX.25 data link state machine.
        lmx -> states;
 
        tq [label="Transmit queue\n-> transmitter, modulator"];
-       agw_out [label="AGW clients or node shell,\nby client number\n(linkClientRouter)"];
+       agw_out [label="AGW clients or node shell,\nby client number\n(linkClientRouter);\nthe shell passes NET/ROM's\nlinks and PID 0xCF to netromNode"];
 
        states -> tq [label="frames to send"];
        states -> agw_out [label="link up and down,\nreceived data"];
@@ -233,6 +237,14 @@ all go onto the ``DataLinkQueue``.
 ``recv_process`` gives every received frame first to ``recPacketHandler.app_process_rec_packet``
 and then to ``lm_data_indication``,
 the entry point to the data link state machine.
+
+With NET/ROM, the node shell is handed the links NET/ROM uses too,
+since neighbours connect to the node's own callsign:
+it passes those links, and anything arriving with the NET/ROM PID,
+on to ``netromNode``,
+which also takes NODES broadcasts from ``app_process_rec_packet``.
+``netromNode`` does its work on a goroutine of its own,
+so both hand-offs only queue work for it.
 
 "Clean or FEC" in the diagram means a frame decoded without any bits fixed,
 or one received with FX.25 or IL2P forward error correction.

@@ -38,6 +38,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -169,6 +170,8 @@ type misc_config_s struct {
 	// node is the node shell's settings, or Nothing (the default) for no
 	// node shell.
 	node maybe.Maybe[nodeSettings]
+
+	netrom maybe.Maybe[netrom.Config] // The node's NET/ROM, if it has one.  YAML only.
 
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.

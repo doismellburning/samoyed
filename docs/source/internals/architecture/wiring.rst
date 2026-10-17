@@ -44,6 +44,7 @@ Dashed arrows are connections made after construction rather than at it.
        link [label="AX25Link\ndata link state machine"];
        router [label="linkClientRouter"];
        nodeshell [label="node.Node\nnode shell"];
+       netrom [label="netromNode\nNET/ROM"];
        igate [label="IGate"];
        digi [label="digipeater.Digipeater\nAPRS"];
        cdigi [label="digipeater.Connected\nconnected mode"];
@@ -99,6 +100,11 @@ Dashed arrows are connections made after construction rather than at it.
        router -> agw [label="linkClients\nAGW clients' links"];
        router -> nodeshell [label="linkClients\nnodeClient's links"];
        nodeshell -> dlq [label="node.DataLink"];
+       nodeshell -> netrom [label="node.NetROM"];
+       netrom -> nodeshell [label="Attach\n(circuit users)"];
+       netrom -> dlq [label="node.DataLink"];
+       netrom -> tq [label="Append\n(dwcore.FrameSender)"];
+       handler -> netrom [label="heardFrame"];
        link -> tq [label="linkTransmitter"];
 
        kiss -> xmit [label="timing setters"];
@@ -183,7 +189,7 @@ so the order of construction follows the arrows:
    what it would have been handed takes a nil one as having no clients.
 #. The ``XmitService``, which starts a transmit thread per radio channel.
 #. The IGate and the two digipeaters,
-   then the node shell, if the configuration has one,
+   then the node shell, if the configuration has one, with its NET/ROM,
    and the ``AX25Link``, the KISS handler and its transports,
    the APRStt gateway and the beacon service.
 #. The audio device goroutines (``recv_init``),
@@ -254,6 +260,7 @@ References
   ``xmit.go`` (``NewXmitService``, ``xmitQueue``),
   ``ax25_link.go`` (``NewAX25Link``, ``linkClients``, ``linkTransmitter``),
   ``link_clients.go`` (``newLinkClientRouter``, ``nodeClient``),
+  ``netrom_node.go`` (``startNetROM``, ``netromNode.heardFrame``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
   ``kiss_frame.go`` (``NewKissHandler``),
