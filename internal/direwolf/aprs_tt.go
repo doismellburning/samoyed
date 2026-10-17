@@ -242,7 +242,7 @@ const MAX_MSG_LEN = 100
 type ttParseState struct {
 	callsign        string /* really object name */
 	symtabOrOverlay byte
-	symbolCode      rune
+	symbolCode      byte
 	locText         string
 	longitude       maybe.Maybe[float64]
 	latitude        maybe.Maybe[float64]
@@ -473,7 +473,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	logrus.WithFields(logrus.Fields{
 		"callsign":  state.callsign,
 		"ssid":      state.ssid,
-		"symbol":    string([]rune{rune(state.symtabOrOverlay), state.symbolCode}),
+		"symbol":    string([]byte{state.symtabOrOverlay, state.symbolCode}),
 		"freq":      state.freq,
 		"ctcss":     state.ctcss,
 		"comment":   state.comment,
@@ -1051,7 +1051,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 		switch e[2] {
 		case '1':
 			state.symtabOrOverlay = '/'
-			state.symbolCode = rune(32 + nn)
+			state.symbolCode = byte(32 + nn)
 
 			if g.debug > 0 {
 				logrus.WithFields(logrus.Fields{
@@ -1064,7 +1064,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 
 		case '2':
 			state.symtabOrOverlay = '\\'
-			state.symbolCode = rune(32 + nn)
+			state.symbolCode = byte(32 + nn)
 
 			if g.debug > 0 {
 				logrus.WithFields(logrus.Fields{
@@ -1079,7 +1079,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 			if length >= 6 {
 				var stemp, errors = touchtone.TwoKeyToText(e[5:], false)
 				if errors == 0 {
-					state.symbolCode = rune(32 + nn)
+					state.symbolCode = byte(32 + nn)
 					state.symtabOrOverlay = stemp[0]
 
 					if g.debug > 0 {

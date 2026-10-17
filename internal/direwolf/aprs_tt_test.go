@@ -147,5 +147,5 @@ func TestParseSymbolOneDigit(t *testing.T) {
 		assert.Equal(t, 0, gw.parseSymbol(&state, "AB15"))
 	})
 	assert.Equal(t, byte('/'), state.symtabOrOverlay)
-	assert.Equal(t, rune(32+5), state.symbolCode)
+	assert.Equal(t, byte(32+5), state.symbolCode)
 }
