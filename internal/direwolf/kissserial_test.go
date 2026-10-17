@@ -70,6 +70,9 @@ func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*Kis
 	if mc.kiss_serial_poll == 0 {
 		ks.fd = serialport.Open(mc.kiss_serial_port, mc.kiss_serial_speed)
 		require.NotNil(t, ks.fd, "could not open %s", mc.kiss_serial_port)
+	} else {
+		// Polling counts whole seconds; there's no need to wait that long here.
+		ks.pollInterval = 10 * time.Millisecond
 	}
 
 	var done = make(chan struct{})
