@@ -44,7 +44,7 @@ func TestAX25FrameIsSentBetweenFlagsWithItsFCS(t *testing.T) {
 	assert.Equal(t, len(bits), sent, "the count returned should be the bits actually sent")
 
 	var frameFCS = fcs.Calc(fbuf)
-	var expected = append(append([]byte{}, fbuf...), byte(frameFCS)&0xff, byte(frameFCS>>8)&0xff) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	var expected = append(append([]byte{}, fbuf...), byte(frameFCS&0xff), byte((frameFCS>>8)&0xff))
 
 	assert.Equal(t, expected, testutils.HDLCFrameFromLevels(t, bits),
 		"the frame between the flags should be what was asked for, plus its FCS")
@@ -74,8 +74,8 @@ func TestAX25BadFCSSendsTheComplementOfTheRealOne(t *testing.T) {
 	var frameFCS = fcs.Calc(fbuf)
 
 	// The FCS is the last thing in the frame.
-	assert.Equal(t, []byte{byte(frameFCS) & 0xff, byte(frameFCS>>8) & 0xff}, goodData[len(goodData)-2:])   //nolint:gosec // G115: unchecked narrowing conversion, see #294
-	assert.Equal(t, []byte{byte(^frameFCS) & 0xff, byte((^frameFCS)>>8) & 0xff}, badData[len(badData)-2:]) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	assert.Equal(t, []byte{byte(frameFCS & 0xff), byte((frameFCS >> 8) & 0xff)}, goodData[len(goodData)-2:])
+	assert.Equal(t, []byte{byte(^frameFCS & 0xff), byte((^frameFCS >> 8) & 0xff)}, badData[len(badData)-2:])
 	assert.Equal(t, fbuf, badData[:len(badData)-2], "the frame itself should be unchanged")
 }
 

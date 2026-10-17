@@ -1117,7 +1117,7 @@ func TestLayer2SendFrameSendsAX25AsHDLC(t *testing.T) {
 
 	var fbuf = pp.Pack()
 	var frameFCS = fcs.Calc(fbuf)
-	var expected = append(append([]byte{}, fbuf...), byte(frameFCS)&0xff, byte(frameFCS>>8)&0xff) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	var expected = append(append([]byte{}, fbuf...), byte(frameFCS&0xff), byte((frameFCS>>8)&0xff))
 
 	assert.Equal(t, expected, testutils.HDLCFrameFromLevels(t, bits))
 }
