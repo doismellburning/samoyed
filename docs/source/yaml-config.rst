@@ -221,6 +221,73 @@ These are the keys under ``samoyed``:
                 - {ax25addr: Q1TEST-2, host: node.example.org, port: 10093, broadcast: true}
                 - {ax25addr: Q2TEST, host: 192.0.2.2, port: 93}
 
+``node``
+    A node shell:
+    a station that connects to the node's callsign or alias gets a command prompt.
+    This has no equivalent in Dire Wolf's format.
+    It has:
+
+    ``address``
+        The node's address: its callsign, with any SSID.
+
+    ``alias``
+        Optionally, a second name the node answers to,
+        such as a short mnemonic for where it is.
+
+    ``channels``
+        The channels it accepts connections on.
+        Left out, it is every channel connected mode can be used on:
+        radio channels, network and serial TNCs, and AXUDP ports.
+
+    ``info``
+        What ``INFO`` says about the node.
+        Use ``|`` for several lines.
+
+    The node answers each line it is sent,
+    heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
+    Its commands are:
+
+    ``BYE`` (``B``, ``QUIT``, ``Q``)
+        Disconnect.
+
+    ``CONNECT`` (``C``) *port* *callsign*
+        Connect onward, from the node's callsign, to the station on that channel.
+        The channel can be left out when the node has only one.
+        Typing a line before it connects gives up on it.
+        Once connected, everything sent goes to and from the station as it is;
+        when the station disconnects, the user is back at the node,
+        and when the user disconnects, so does the station.
+
+    ``HELP`` (``H``, ``?``)
+        List the commands.
+
+    ``INFO`` (``I``)
+        Say what ``info`` says.
+
+    ``PORTS`` (``P``)
+        List the channels the node listens on, by number,
+        and what sort of channel each is.
+
+    ``MHEARD`` (``MH``)
+        List the stations most recently heard over the radio,
+        with the channel each was last heard on and how long ago.
+
+    ``NODES`` (``N``), ``ROUTES`` (``R``)
+        Say that the node does not do NET/ROM yet,
+        rather than that the command is invalid.
+
+    A line of more than 256 characters is ignored.
+
+    .. code:: yaml
+
+        samoyed:
+          node:
+            address: Q1TEST-7
+            alias: SAMNOD
+            channels: [0, 10]
+            info: |
+              Samoyed node at the club station.
+
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as
     though they were a file of their own - so a channel setting there needs its
