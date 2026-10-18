@@ -238,6 +238,10 @@ type tt_config_s struct {
 
 const MAX_MSG_LEN = 100
 
+// ttMaxMacroDepth bounds how deep macros may expand within macros, so one
+// whose definition expands to itself fails rather than recursing forever.
+const ttMaxMacroDepth = 16
+
 // ttParseState holds temporary state accumulated during a single Sequence call.
 type ttParseState struct {
 	callsign        string /* really object name */
@@ -253,6 +257,7 @@ type ttParseState struct {
 	micE            byte
 	dao             [5]byte
 	ssid            int /* Default 12 for APRStt user. */
+	macroDepth      int /* Macros expanded within macros so far. */
 }
 
 func newTTParseState() ttParseState {
@@ -701,6 +706,16 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 			return (TT_ERROR_INTERNAL)
 		}
 
+		if state.macroDepth >= ttMaxMacroDepth {
+			logrus.WithFields(logrus.Fields{
+				"pattern":    g.config.ttlocs[ipat].pattern,
+				"definition": g.config.ttlocs[ipat].macro.definition,
+				"max_depth":  ttMaxMacroDepth,
+			}).Error("Touch tone macros expand too deep; does one expand to itself?")
+
+			return (TT_ERROR_INTERNAL)
+		}
+
 		/*
 		 * We found a match for the length and any fixed digits.
 		 * Substitute values in to the definition.
@@ -733,6 +748,9 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 		 */
 
 		logrus.WithField("sequence", stemp.String()).Debug("Macro after substitution")
+
+		state.macroDepth++
+		defer func() { state.macroDepth-- }()
 
 		return (g.parseFields(state, stemp.String()))
 	} else {

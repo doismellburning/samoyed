@@ -185,3 +185,21 @@ func TestParseLocationLoneB(t *testing.T) {
 	})
 	assert.Equal(t, "!TB !", string(state.dao[:]))
 }
+
+// A macro whose definition expands to itself recursed until the stack ran out,
+// which no recover catches.  The macros are the operator's, not what's heard
+// on frequency, but one wrong line in the config shouldn't take the gateway
+// down with the first tone sequence to match it.
+func TestExpandMacroThatExpandsToItself(t *testing.T) {
+	var cfg tt_config_s
+	cfg.ttlocs = []*ttloc_s{
+		{ttlocType: TTLOC_MACRO, pattern: "1", macro: macroTTLoc{definition: "1"}}, //nolint:exhaustruct_v5
+	}
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	assert.Equal(t, TT_ERROR_INTERNAL, gw.parseFields(&state, "1#"))
+}
