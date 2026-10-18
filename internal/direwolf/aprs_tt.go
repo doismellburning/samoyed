@@ -29,7 +29,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"os/exec"
 	"strconv"
 	"strings"
 	"unicode"
@@ -535,7 +534,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	var script_response string
 
 	if err == 0 && len(g.config.ttcmd) > 0 {
-		var _script_response, _ = dw_run_cmd(ctx, g.config.ttcmd, 1)
+		var _script_response, _ = dwutil.RunCmd(ctx, g.config.ttcmd, 1)
 		script_response = string(_script_response)
 	}
 
@@ -1785,42 +1784,6 @@ func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel, recFrame fr
 	} else {
 		logrus.WithField("packet", raw_tt_msg).Error("Could not convert touch tone message into APRS packet")
 	}
-}
-
-/*------------------------------------------------------------------
- *
- * Name:        dw_run_cmd
- *
- * Purpose:     Run a command and capture the output.
- *
- * Inputs:      cmd		- The command.
- *
- *		oneline		- 0 = Keep original line separators. Caller
- *					must deal with operating system differences.
- *				  1 = Change CR, LF, TAB to space so result
- *					is one line of text.
- *				  2 = Also remove any trailing whitespace.
- *
- * Description:	This is currently used for running a user-specified
- *		script to generate a custom speech response.
- *
- * Future:	There are potential other uses so it should probably
- *		be relocated to a file of other misc. utilities.
- *
- *----------------------------------------------------------------*/
-
-func dw_run_cmd(ctx context.Context, cmd string, oneline int) ([]byte, error) {
-	if oneline > 0 {
-		cmd = strings.ReplaceAll(cmd, "\r", " ")
-		cmd = strings.ReplaceAll(cmd, "\n", " ")
-		cmd = strings.ReplaceAll(cmd, "\t", " ")
-	}
-
-	if oneline > 1 {
-		cmd = strings.TrimSpace(cmd)
-	}
-
-	return exec.CommandContext(ctx, cmd).Output()
 }
 
 /* end aprs_tt.c */
