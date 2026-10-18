@@ -163,6 +163,8 @@ func describe(r modemResult, err error) string {
 
 // TestModemOptions pins down what each program makes of its modem options.
 // A program missing from want doesn't take the options at all.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestModemOptions(t *testing.T) {
 	// The programs that take modem options, by the name the table uses.
 	var tools = map[string]func(*testing.T, ...string) (modemResult, error){
@@ -521,6 +523,8 @@ func TestModemOptions(t *testing.T) {
 }
 
 // TestConfigModem pins down what a MODEM line in the configuration file gives.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestConfigModem(t *testing.T) {
 	var tests = []struct {
 		line string
@@ -555,6 +559,8 @@ func TestConfigModem(t *testing.T) {
 
 // TestDirewolfModemOptionsOverConfig checks what direwolf's options leave
 // of a modem the configuration file set up.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestDirewolfModemOptionsOverConfig(t *testing.T) {
 	var tests = []struct {
 		config string

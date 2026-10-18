@@ -26,6 +26,8 @@ import (
 // --- alldigits ---
 
 func Test_alldigits(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input string
@@ -42,6 +44,8 @@ func Test_alldigits(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.want, alldigits(tt.input))
 		})
 	}
@@ -50,6 +54,8 @@ func Test_alldigits(t *testing.T) {
 // --- alllettersorpm ---
 
 func Test_alllettersorpm(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input string
@@ -68,6 +74,8 @@ func Test_alllettersorpm(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.want, alllettersorpm(tt.input))
 		})
 	}
@@ -76,6 +84,8 @@ func Test_alllettersorpm(t *testing.T) {
 // --- parse_ll ---
 
 func Test_parse_ll(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input string
@@ -150,6 +160,8 @@ func Test_parse_ll(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var result, err = parse_ll(tt.input, tt.which, 0)
 			require.NoError(t, err)
 			assert.InDelta(t, tt.want, result, tt.delta)
@@ -160,6 +172,8 @@ func Test_parse_ll(t *testing.T) {
 // --- split ---
 
 func Test_split(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		input      string
@@ -177,6 +191,8 @@ func Test_split(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var ps = new(parseState)
 			ps.startLine(tt.input)
 
@@ -189,6 +205,8 @@ func Test_split(t *testing.T) {
 // --- IsNoCall ---
 
 func Test_IsNoCall(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		callsign string
@@ -207,6 +225,8 @@ func Test_IsNoCall(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.want, IsNoCall(tt.callsign))
 		})
 	}
@@ -305,36 +325,48 @@ func configFromString(t *testing.T, content string) (*RadioConfig, *misc_config_
 // --- parse_ll_maybe ---
 
 func Test_parse_ll_maybe(t *testing.T) {
+	t.Parallel()
+
 	// Regression test: parse_ll logged the ParseFloat error and carried on with
 	// the zero it returns, so "LAT=abc" read as a perfectly good 0 degrees and
 	// a beacon went out from Null Island.
 	// Regression test: parse_ll indexed str[0] before looking at its length, so
 	// "LAT=" in a beacon line panicked rather than being rejected.
 	t.Run("an empty coordinate is Nothing", func(t *testing.T) {
+		t.Parallel()
+
 		var ll, err = parse_ll_maybe("", LAT, 0)
 		require.Error(t, err)
 		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("a sign on its own is Nothing", func(t *testing.T) {
+		t.Parallel()
+
 		var ll, err = parse_ll_maybe("-", LON, 0)
 		require.Error(t, err)
 		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("unreadable degrees are Nothing", func(t *testing.T) {
+		t.Parallel()
+
 		var ll, err = parse_ll_maybe("abc", LAT, 0)
 		require.Error(t, err)
 		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("unreadable minutes are Nothing", func(t *testing.T) {
+		t.Parallel()
+
 		var ll, err = parse_ll_maybe("42^ab", LAT, 0)
 		require.Error(t, err)
 		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("a non-finite coordinate is Nothing", func(t *testing.T) {
+		t.Parallel()
+
 		var ll, err = parse_ll_maybe("NaN^0", LAT, 0)
 		require.Error(t, err)
 		assert.Equal(t, maybe.Nothing[float64](), ll)
@@ -345,18 +377,24 @@ func Test_parse_ll_maybe(t *testing.T) {
 	// and longitude are required" check and EncodePosition clamped it to
 	// "!9000.00N" - the station transmitted from the North Pole.
 	t.Run("an out-of-range latitude is Nothing", func(t *testing.T) {
+		t.Parallel()
+
 		var ll, err = parse_ll_maybe("200", LAT, 0)
 		require.Error(t, err)
 		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("an out-of-range longitude is Nothing", func(t *testing.T) {
+		t.Parallel()
+
 		var ll, err = parse_ll_maybe("181W", LON, 0)
 		require.Error(t, err)
 		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("the limits themselves are Just", func(t *testing.T) {
+		t.Parallel()
+
 		var lat, latErr = parse_ll_maybe("90N", LAT, 0)
 		require.NoError(t, latErr)
 		assert.InDelta(t, 90.0, maybe.FromJust(lat), 0.0001)
@@ -367,6 +405,8 @@ func Test_parse_ll_maybe(t *testing.T) {
 	})
 
 	t.Run("a readable coordinate is Just", func(t *testing.T) {
+		t.Parallel()
+
 		var lon, err = parse_ll_maybe("71.5W", LON, 0)
 		require.NoError(t, err)
 		assert.InDelta(t, -71.5, maybe.FromJust(lon), 0.0001)
@@ -375,6 +415,7 @@ func Test_parse_ll_maybe(t *testing.T) {
 
 // --- config_init beacon LAT and LONG ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_empty_lat(t *testing.T) {
 	t.Run("LAT= with no value does not panic", func(t *testing.T) {
 		assert.NotPanics(t, func() {
@@ -384,6 +425,7 @@ func Test_config_init_beacon_empty_lat(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_unreadable_interval(t *testing.T) {
 	// Regression test: parse_interval ignored the Atoi error and returned the
 	// zero alongside it, so EVERY=abc gave an interval of 0 seconds.  With a
@@ -404,6 +446,7 @@ func Test_config_init_beacon_unreadable_interval(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_out_of_range_interval(t *testing.T) {
 	t.Run("EVERY=0 keeps the default", func(t *testing.T) {
 		var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W EVERY=0\n")
@@ -417,6 +460,7 @@ func Test_config_init_beacon_out_of_range_interval(t *testing.T) {
 	})
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_non_finite_numbers(t *testing.T) {
 	// Regression test: ParseFloat happily reads "NaN" and "Inf", so a beacon
 	// option could hold a value no arithmetic survives.  int(NaN) is the
@@ -437,6 +481,7 @@ func Test_config_init_beacon_non_finite_numbers(t *testing.T) {
 	assert.Empty(t, aprs.FrequencySpec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_out_of_range_lat(t *testing.T) {
 	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=200 LONG=71W\n")
 
@@ -453,6 +498,7 @@ func Test_config_init_beacon_out_of_range_lat(t *testing.T) {
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_unparseable_lat_long(t *testing.T) {
 	// An unreadable coordinate must leave the beacon without a position, so
 	// that NewBeaconService rejects it rather than transmitting 0 degrees.
@@ -465,6 +511,7 @@ func Test_config_init_beacon_unparseable_lat_long(t *testing.T) {
 
 // --- config_init MYCALL directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_mycall(t *testing.T) {
 	t.Run("basic callsign stored on channel 0", func(t *testing.T) {
 		var cfg, _ = configFromString(t, "MYCALL Q1TEST\n")
@@ -512,6 +559,7 @@ func Test_config_init_mycall(t *testing.T) {
 
 // --- config_init case-insensitive keyword dispatch ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_keyword_case_insensitive(t *testing.T) {
 	t.Run("lowercase directive name works", func(t *testing.T) {
 		var cfg, _ = configFromString(t, "mycall Q1TEST\n")
@@ -526,6 +574,7 @@ func Test_config_init_keyword_case_insensitive(t *testing.T) {
 
 // --- config_init TXDELAY directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_txdelay(t *testing.T) {
 	t.Run("valid value stored", func(t *testing.T) {
 		var cfg, _ = configFromString(t, "TXDELAY 50\n")
@@ -548,6 +597,7 @@ func Test_config_init_txdelay(t *testing.T) {
 
 // --- config_init SLOTTIME directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_slottime(t *testing.T) {
 	t.Run("valid value stored", func(t *testing.T) {
 		var cfg, _ = configFromString(t, "SLOTTIME 20\n")
@@ -563,6 +613,7 @@ func Test_config_init_slottime(t *testing.T) {
 
 // --- config_init FRACK directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_frack(t *testing.T) {
 	t.Run("valid value stored", func(t *testing.T) {
 		var _, misc = configFromString(t, "FRACK 5\n")
@@ -577,6 +628,7 @@ func Test_config_init_frack(t *testing.T) {
 
 // --- config_init ADEVICE directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_adevice(t *testing.T) {
 	t.Run("single arg sets both in and out to same device", func(t *testing.T) {
 		var cfg, _ = configFromString(t, "ADEVICE hw:0,0\n")
@@ -623,6 +675,7 @@ func Test_config_init_adevice(t *testing.T) {
 
 // --- config_init CHANNEL directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_channel(t *testing.T) {
 	t.Run("CHANNEL 1 routes subsequent TXDELAY to channel 1", func(t *testing.T) {
 		// Need stereo ADEVICE so channel 1 is valid.
@@ -641,6 +694,8 @@ func Test_config_init_channel(t *testing.T) {
 // --- config_init MODEM directive ---
 
 func Test_config_init_modem_directive(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		configContent string
@@ -675,6 +730,8 @@ func Test_config_init_modem_directive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tmpFile, err := os.CreateTemp(t.TempDir(), "direwolf*.conf")
 			require.NoError(t, err)
 			_, err = tmpFile.WriteString(tt.configContent)
@@ -700,6 +757,8 @@ func Test_config_init_modem_directive(t *testing.T) {
 // --- config_init FILTER / CFILTER syntax validation ---
 
 func Test_config_init_filter_syntax_validation(t *testing.T) {
+	t.Parallel()
+
 	var tests = []struct {
 		name          string
 		configContent string
@@ -724,6 +783,8 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
 			require.NoError(t, err)
 			_, err = tmpFile.WriteString(tt.configContent)
@@ -750,6 +811,8 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 }
 
 func Test_config_init_cfilter_syntax_validation(t *testing.T) {
+	t.Parallel()
+
 	var tests = []struct {
 		name          string
 		configContent string
@@ -769,6 +832,8 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
 			require.NoError(t, err)
 			_, err = tmpFile.WriteString(tt.configContent)
@@ -796,6 +861,7 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 
 // --- config_init ADEVICE multi-digit suffix ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_adevice_multi_digit_suffix(t *testing.T) {
 	t.Run("ADEVICE11 two-digit suffix is parsed as 11 not 1", func(t *testing.T) {
 		// Regression test: handleADEVICE used string(ps.keyword[7]) which reads
@@ -813,6 +879,7 @@ func Test_config_init_adevice_multi_digit_suffix(t *testing.T) {
 
 // --- config_init CHANNEL non-numeric ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_channel_non_numeric(t *testing.T) {
 	t.Run("CHANNEL with non-numeric value is rejected", func(t *testing.T) {
 		// Regression test: CHANNEL used strconv.Atoi with ignored error; non-numeric
@@ -826,6 +893,7 @@ func Test_config_init_channel_non_numeric(t *testing.T) {
 
 // --- config_init AGWPORT directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_agwport(t *testing.T) {
 	t.Run("AGWPORT with non-numeric value is rejected without panic", func(t *testing.T) {
 		assert.NotPanics(t, func() {
@@ -841,6 +909,7 @@ func Test_config_init_agwport(t *testing.T) {
 
 // --- config_init AGWLOGIN directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_agwlogin(t *testing.T) {
 	t.Run("AGWLOGIN sets user name and password", func(t *testing.T) {
 		var _, misc = configFromString(t, "AGWLOGIN Q1TEST hunter2\n")
@@ -898,6 +967,7 @@ func Test_config_init_agwlogin(t *testing.T) {
 
 // --- config_init KISSPORT directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_kissport(t *testing.T) {
 	t.Run("KISSPORT with non-numeric value is rejected without panic", func(t *testing.T) {
 		assert.NotPanics(t, func() {
@@ -908,6 +978,7 @@ func Test_config_init_kissport(t *testing.T) {
 
 // --- config_init MODEM all-options success ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_modem_returns_success(t *testing.T) {
 	t.Run("MODEM with all options parsed successfully does not block subsequent directives", func(t *testing.T) {
 		// Regression test: handleMODEM returned true (error/stop) when all options
@@ -920,6 +991,7 @@ func Test_config_init_modem_returns_success(t *testing.T) {
 
 // --- config_init DNSSD directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_dnssd(t *testing.T) {
 	t.Run("DNSSD with non-numeric value is rejected and disabled", func(t *testing.T) {
 		var _, misc = configFromString(t, "DNSSD notanumber\n")
@@ -939,6 +1011,7 @@ func Test_config_init_dnssd(t *testing.T) {
 
 // --- config_init SENDTO non-numeric channel suffix ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_sendto_non_numeric(t *testing.T) {
 	t.Run("SENDTO=rXYZ with non-numeric channel suffix is rejected", func(t *testing.T) {
 		assert.NotPanics(t, func() {
@@ -961,6 +1034,7 @@ func Test_config_init_beacon_sendto_non_numeric(t *testing.T) {
 
 // --- config_init SENDTO beacon option (empty value) ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_sendto_empty(t *testing.T) {
 	t.Run("SENDTO= with empty value does not panic", func(t *testing.T) {
 		// Regression test: beacon_options accessed value[0] without first checking
@@ -974,6 +1048,7 @@ func Test_config_init_beacon_sendto_empty(t *testing.T) {
 
 // --- config_init beacon numeric options ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_unparseable_numbers(t *testing.T) {
 	// Regression test: the numeric beacon options ignored the ParseFloat error
 	// and stored the zero it returns, so a typo became a value rather than
@@ -993,6 +1068,7 @@ func Test_config_init_beacon_unparseable_numbers(t *testing.T) {
 	assert.Empty(t, aprs.FrequencySpec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_numbers_with_units(t *testing.T) {
 	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W ALT=100foot FREQ=146.52 TONE=100\n")
 
@@ -1004,6 +1080,7 @@ func Test_config_init_beacon_numbers_with_units(t *testing.T) {
 
 // --- config_init beacon line rejected part way through ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_rejected_line_does_not_leak(t *testing.T) {
 	// Regression test: a beacon line whose options don't parse does not count
 	// towards num_beacons, so the next beacon line is parsed into the same
@@ -1022,6 +1099,7 @@ func Test_config_init_beacon_rejected_line_does_not_leak(t *testing.T) {
 
 // --- config_init non-ASCII text ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_beacon_non_ascii_comment(t *testing.T) {
 	// Regression test: split turned each byte of a token into the character
 	// with that code, so a multi-byte UTF-8 character came out as several -
@@ -1034,6 +1112,7 @@ func Test_config_init_beacon_non_ascii_comment(t *testing.T) {
 
 // --- config_init PBEACON directive (no options) ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_pbeacon_no_options(t *testing.T) {
 	t.Run("PBEACON with no options does not panic", func(t *testing.T) {
 		// Regression test: handleXBEACON used ps.text[len("xBEACON")+1:] which
@@ -1047,6 +1126,7 @@ func Test_config_init_pbeacon_no_options(t *testing.T) {
 
 // --- config_init IL2PVERSION directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_il2pversion(t *testing.T) {
 	t.Run("0.6 by default", func(t *testing.T) {
 		var audio, _ = configFromString(t, "")
@@ -1081,6 +1161,7 @@ func Test_config_init_il2pversion(t *testing.T) {
 
 // --- config_init METRICSPORT directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_metricsport(t *testing.T) {
 	t.Run("valid value stored", func(t *testing.T) {
 		var _, misc = configFromString(t, "METRICSPORT 9099\n")
@@ -1117,6 +1198,7 @@ func Test_config_init_metricsport(t *testing.T) {
 
 // --- config_init WEBPORT directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_webport(t *testing.T) {
 	t.Run("valid value stored", func(t *testing.T) {
 		var _, misc = configFromString(t, "WEBPORT 8080\n")
@@ -1151,6 +1233,7 @@ func Test_config_init_webport(t *testing.T) {
 
 // --- config_init FIX_BITS directive ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_fix_bits(t *testing.T) {
 	t.Run("valid level stored", func(t *testing.T) {
 		var cfg, _ = configFromString(t, "FIX_BITS 1\n")
@@ -5053,6 +5136,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 	}
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_directives(t *testing.T) {
 	for keyword, cases := range directiveTests() {
 		t.Run(keyword, func(t *testing.T) {
@@ -5090,6 +5174,8 @@ func directivesTestedSeparately() map[string]string {
 }
 
 func Test_config_directive_coverage(t *testing.T) {
+	t.Parallel()
+
 	var tested = directivesTestedSeparately()
 	var table = directiveTests()
 
@@ -5143,6 +5229,7 @@ func packageTestSource(t *testing.T) string {
 
 // --- the tallies --config-check works from ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_tallies(t *testing.T) {
 	const clean = "ADEVICE plughw:1,0\nACHANNELS 1\nCHANNEL 0\nMYCALL Q1TEST-1\nMODEM 1200\nAGWPORT 8000\n"
 
@@ -5219,6 +5306,8 @@ func Test_config_init_tallies(t *testing.T) {
 // --- rendering a complaint for the person who wrote the config file ---
 
 func Test_asSentence(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		msg  string
@@ -5263,6 +5352,8 @@ func Test_asSentence(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.want, asSentence(tt.msg))
 		})
 	}
@@ -5270,6 +5361,7 @@ func Test_asSentence(t *testing.T) {
 
 // --- a file we could not read all of ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_unreadable_file_is_not_clean(t *testing.T) {
 	// Regression test: the scanner loop never looked at scanner.Err(), so a
 	// line too long for its buffer ended the parse without a word about it.
@@ -5285,6 +5377,7 @@ func Test_config_init_unreadable_file_is_not_clean(t *testing.T) {
 
 // --- diagnostics that used to print without being counted ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_counts_every_diagnostic(t *testing.T) {
 	// Regression test: these were reported with a bare dw_printf rather than
 	// through the error path, so they printed and the tallies stayed where they
@@ -5344,6 +5437,7 @@ func Test_config_init_counts_every_diagnostic(t *testing.T) {
 
 // --- a configuration the daemon cannot start on ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_fatal(t *testing.T) {
 	t.Run("ADEVICE with no device name is fatal, not merely wrong", func(t *testing.T) {
 		// Regression test: this used to exit on the spot.  It now reads on, so
@@ -5374,6 +5468,7 @@ func Test_config_init_fatal(t *testing.T) {
 
 // --- a TTERR method the address parser rejects ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_tterr_bad_method_is_counted(t *testing.T) {
 	// Regression test: the handler returned without a word of its own when
 	// ax25_parse_addr rejected the method, so --config-check printed a
@@ -5386,6 +5481,7 @@ func Test_config_init_tterr_bad_method_is_counted(t *testing.T) {
 
 // --- one bad digipeater path, one complaint ---
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_init_bad_via_path_counted_once(t *testing.T) {
 	// Regression test: check_via_path's own complaint was reported, and then
 	// the caller reported "invalid via path" on top of it, so one bad path came
@@ -5404,12 +5500,16 @@ func Test_config_init_bad_via_path_counted_once(t *testing.T) {
 // --- a coordinate that drew a complaint is not a coordinate ---
 
 func Test_parse_ll_maybe_rejects_what_it_complains_about(t *testing.T) {
+	t.Parallel()
+
 	// Regression test: these two complained and then handed back the number
 	// anyway, so a beacon went out from a plausible-looking place that nobody
 	// configured.  "42.5W" as a latitude is the worst of them: W is applied as
 	// though it were S before the hemisphere is checked, so the station
 	// transmitted from 42.5 degrees south.
 	t.Run("a hemisphere from the wrong axis is Nothing", func(t *testing.T) {
+		t.Parallel()
+
 		var ll, err = parse_ll_maybe("42.5W", LAT, 0)
 
 		require.Error(t, err)
@@ -5417,6 +5517,8 @@ func Test_parse_ll_maybe_rejects_what_it_complains_about(t *testing.T) {
 	})
 
 	t.Run("a longitude with a latitude hemisphere is Nothing", func(t *testing.T) {
+		t.Parallel()
+
 		var ll, err = parse_ll_maybe("71.5N", LON, 0)
 
 		require.Error(t, err)
@@ -5424,6 +5526,8 @@ func Test_parse_ll_maybe_rejects_what_it_complains_about(t *testing.T) {
 	})
 
 	t.Run("minutes that are not minutes are Nothing", func(t *testing.T) {
+		t.Parallel()
+
 		var ll, err = parse_ll_maybe("42^90", LAT, 0)
 
 		require.Error(t, err)
@@ -5449,6 +5553,8 @@ func (r *recordingSymbolCodes) ToTones(symtab byte, symbol byte) string {
 
 // The configuration looks symbols up in the table it is handed, both a
 // TTMACRO's symbol description and a beacon's.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestConfigLooksSymbolsUpInTheTableItIsGiven(t *testing.T) {
 	var table = new(recordingSymbolCodes)
 
@@ -5466,6 +5572,8 @@ func TestConfigLooksSymbolsUpInTheTableItIsGiven(t *testing.T) {
 
 // A serial TNC's channel stands in for a radio wherever a network TNC's does:
 // it can be digipeated to and from, filtered, and IGated.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestSCHANNELIsAcceptedWhereNCHANNELIs(t *testing.T) {
 	var c = parseConfig(t, `MYCALL Q1TEST
 SCHANNEL 10 /dev/ttyUSB0
