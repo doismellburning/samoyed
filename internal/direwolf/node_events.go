@@ -23,7 +23,7 @@ import (
 func newEvent(kind nodeevents.Kind, nodeCall string, now time.Time) nodeevents.Event {
 	return nodeevents.Event{
 		Time: now.UTC(), Kind: kind, Node: nodeCall,
-		Port: nil, Local: "", Remote: "", User: "", Incoming: false, Role: "", Error: "", Room: "",
+		Port: nil, Local: "", Remote: "", User: "", Incoming: false, Role: "", Error: "", Room: "", Number: 0, Type: "", From: "", To: "", At: "",
 		Destinations: 0, Neighbours: 0,
 	}
 }

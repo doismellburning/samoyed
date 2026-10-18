@@ -54,6 +54,13 @@ type SamoyedConfig struct {
 	// MQTT, when given, is where the node publishes its events.
 	MQTT *MQTTSettings `yaml:"mqtt"`
 
+	// BBS, when given, gives the node a BBS.
+	BBS *BBSSettings `yaml:"bbs"`
+
+	// DataDir is where what is kept from one run to the next lives: the
+	// BBS's messages, say.
+	DataDir *string `yaml:"dataDir"`
+
 	// Legacy holds directives in the line-at-a-time format, read after
 	// everything else, for anything not yet given a YAML form.
 	Legacy string `yaml:"legacy"`
@@ -217,6 +224,15 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 	if file.MQTT != nil {
 		ps.line = top["mqtt"].line(new(yaml.Node))
 		ps.reportIfError(ps.applyMQTT(*file.MQTT))
+	}
+
+	if file.DataDir != nil {
+		ps.misc.dataDir = *file.DataDir
+	}
+
+	if file.BBS != nil {
+		ps.line = top["bbs"].line(new(yaml.Node))
+		ps.reportIfError(ps.applyBBS(*file.BBS))
 	}
 }
 

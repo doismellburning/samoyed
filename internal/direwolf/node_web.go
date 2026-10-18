@@ -83,6 +83,10 @@ func (w *nodeWeb) routes() []webui.Route {
 		{Pattern: "POST /api/admin/neighbours", Handler: w.netromAction(adminLockNeighbour)},
 		{Pattern: "DELETE /api/admin/neighbours/{port}/{call}", Handler: w.netromAction(adminUnlockNeighbour)},
 		{Pattern: "POST /api/admin/chat/announce", Handler: w.action(adminChatAnnounce)},
+		{Pattern: "GET /api/admin/bbs/messages", Handler: w.bbsView(bbsMessages)},
+		{Pattern: "DELETE /api/admin/bbs/messages/{number}", Handler: w.bbsAdmin(adminKillBBSMessage)},
+		{Pattern: "GET /api/admin/bbs/partners", Handler: w.bbsView(bbsPartners)},
+		{Pattern: "POST /api/admin/bbs/partners/{call}/forward", Handler: w.bbsAdmin(adminForwardBBS)},
 	} {
 		r.Handler = webui.RequireToken(w.token, r.Handler)
 		routes = append(routes, r)

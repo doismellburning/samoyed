@@ -757,6 +757,11 @@ x = Silence FX.25 information.`)
 		td.exit(1)
 	}
 
+	if _, hasBBS := misc_config.bbs.Get(); hasBBS && nodeConfig.IsNothing() {
+		logrus.Error("The BBS needs the node block, to be reached through")
+		td.exit(1)
+	}
+
 	if nodeConfig, ok := nodeConfig.Get(); ok {
 		var nodeShell = node.New(nodeConfig, dataLinkQueue, mheardDB.HeardRF, nodeClient)
 
@@ -779,6 +784,14 @@ x = Silence FX.25 information.`)
 			var chatErr = nodeApps.addChat(nodeShell, chatConfig, nodeEvents, nodeConfig.Address)
 			if chatErr != nil {
 				logrus.WithError(chatErr).Error("Could not start the node's chat server")
+				td.exit(1)
+			}
+		}
+
+		if bbsSettings, hasBBS := misc_config.bbs.Get(); hasBBS {
+			var bbsErr = nodeApps.addBBS(ctx, bbsSettings, misc_config.dataDir, nodeConfig, nodeShell, netromNode, nodeEvents)
+			if bbsErr != nil {
+				logrus.WithError(bbsErr).Error("Could not start the node's BBS")
 				td.exit(1)
 			}
 		}

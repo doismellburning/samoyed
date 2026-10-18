@@ -3,8 +3,8 @@
 
 package direwolf
 
-// The node's applications, such as its chat server, and the goroutine they
-// run on.
+// The node's applications, such as its chat server and BBS, and the
+// goroutine they run on.
 //
 // An application is not safe for concurrent use, and the shell calls it from
 // whichever goroutine a user's data arrives on, so every call into one is
@@ -17,6 +17,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/bbs"
 	"github.com/doismellburning/samoyed/internal/chat"
 	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/doismellburning/samoyed/internal/nodeevents"
@@ -27,9 +28,10 @@ type nodeApps struct {
 	// do queues a function to run on the applications' goroutine.
 	do func(f func())
 
-	// chat is the chat server, or nil for none.  Only the applications'
-	// goroutine touches it.
+	// chat is the chat server, and bbs the BBS, or nil for none.  Only the
+	// applications' goroutine touches them.
 	chat *chat.Server
+	bbs  *bbs.BBS
 }
 
 // newNodeApps returns somewhere to run the node's applications: on nr's

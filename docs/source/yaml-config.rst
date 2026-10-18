@@ -436,7 +436,9 @@ These are the keys under ``samoyed``:
     ``circuit/up`` and ``circuit/down`` for a NET/ROM circuit,
     ``routes/changed`` when NET/ROM's routing table changes,
     ``heard`` for a station heard on a NET/ROM channel for the first time in a while,
-    and ``chat/join`` and ``chat/leave`` for a ``user`` joining or leaving a chat ``room``.
+    ``chat/join`` and ``chat/leave`` for a ``user`` joining or leaving a chat ``room``,
+    and ``bbs/message`` for a new BBS message,
+    with its ``number``, ``type``, ``from``, ``to`` and ``at``.
     ``status`` is retained, and is ``online`` while Samoyed is connected,
     and ``offline`` once it stops or, through the broker's last will, drops off.
     Events are published at most once,
@@ -448,6 +450,131 @@ These are the keys under ``samoyed``:
           mqtt:
             broker: tcp://localhost:1883
             topicPrefix: club
+
+``dataDir``
+    Where what is kept from one run to the next lives:
+    the BBS keeps its messages in ``bbs`` under it.
+    This has no equivalent in Dire Wolf's format.
+
+``bbs``
+    A BBS for the node, which needs ``node`` and ``dataDir``:
+    personal mail and bulletins,
+    read and written by users,
+    and forwarded to and from partner BBSes with :doc:`glossary/fbb`.
+    This has no equivalent in Dire Wolf's format.
+    It has:
+
+    ``call``
+        The BBS's own callsign, such as the node's with another SSID,
+        which stations and partners can connect to directly,
+        over AX.25 on any of the node's channels,
+        or with ``netrom``, over NET/ROM.
+        Left out, the BBS is reached only from the node's shell,
+        and goes by the node's address.
+
+    ``alias``, ``quality``
+        With ``netrom``, the alias and quality (200 if left out) the node advertises for ``call``
+        in its NODES broadcasts.
+
+    ``hroute``
+        Where the BBS is, hierarchically, such as ``#HANTS.GBR.EURO``,
+        for the ``R:`` lines it adds.
+
+    ``partners``
+        The BBSes it forwards with, each with:
+        ``call``;
+        ``node``, the NET/ROM node to connect to, which needs ``netrom``,
+        or else ``channel``, one of the node's, and ``via`` to connect to ``call`` over AX.25;
+        ``script``, lines to send once connected, to get from a node's shell to its BBS;
+        ``routes``, which mail goes this way
+        (a pattern matches an @ field with it as one of its parts, and ``*`` matches all);
+        ``bulletins``, whether bulletins go this way;
+        and ``interval``, how often to connect whether or not there is mail to send
+        (at least a minute, or left out for only when there is).
+
+    A user reaches the BBS with the ``BBS`` command in the node's shell,
+    and goes back to the node with ``B``.
+    The BBS starts each session with its SID, ``[SAMOYED-``\ *version*\ ``-B12FHM$]``,
+    then a greeting and its prompt, ``de`` *call*\ ``>``.
+    Its commands are:
+
+    ``L`` [*n*]
+        List the latest messages, or those from number *n* on.
+
+    ``LM``, ``LB``
+        List the user's personal mail, or the bulletins.
+
+    ``R`` *n* ...
+        Read messages.
+        Personal mail can be read by its sender and its addressee,
+        and bulletins by anyone.
+
+    ``S`` *call*\ [``@``\ *bbs*]
+        Send a personal message.
+        The BBS asks for a subject, then the text,
+        which ends with ``/EX`` (or Ctrl-Z) on a line of its own;
+        ``/ABORT`` gives up on it.
+
+    ``SB`` *to*\ ``@``\ *distribution*
+        Send a bulletin, such as ``SB ALL@GBR``.
+
+    ``K`` *n* ...
+        Kill messages the user sent, or personal mail sent to them.
+
+    ``I``
+        About the BBS.
+
+    ``B``
+        Leave.
+
+    A partner that connects and answers the BBS's SID with its own forwards there and then;
+    only the partners configured may.
+    The BBS connects to each partner in turn:
+    soon after mail for it arrives,
+    and every ``interval`` if one is set,
+    to collect any mail the partner has.
+    The two settle on the best protocol they share:
+    B1 (compressed, with a CRC),
+    B2 (Winlink's B2F messages, compressed),
+    plain B (compressed, without a CRC),
+    or FBB's uncompressed protocol.
+
+    Personal mail goes one way:
+    to the BBS it is addressed at, if that is a partner,
+    or else to the first partner whose ``routes`` match its @ field.
+    Bulletins go to every partner with ``bulletins: true`` whose ``routes`` match their distribution.
+    A message is never sent back to the partner it came from,
+    and mail for this BBS goes nowhere.
+    Each message forwarded gets an ``R:`` line on top saying when and where it passed through.
+
+    With the node's ``adminToken``, the admin API also has:
+
+    ``GET /api/admin/bbs/messages``
+        Every message but its text.
+
+    ``DELETE /api/admin/bbs/messages/``\ *number*
+        Kill a message.
+
+    ``GET /api/admin/bbs/partners``
+        How forwarding with each partner is going.
+
+    ``POST /api/admin/bbs/partners/``\ *call*\ ``/forward``
+        Connect to a partner now.
+
+    .. code:: yaml
+
+        samoyed:
+          dataDir: /var/lib/samoyed
+          bbs:
+            call: Q1TEST-1
+            alias: ONEBBS
+            hroute: "#HANTS.GBR.EURO"
+            partners:
+              - call: Q2TEST-1
+                node: TWOBBS
+                routes: ["*"]
+                bulletins: true
+                interval: 1h
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

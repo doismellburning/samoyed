@@ -198,7 +198,7 @@ to the application layer and the AX.25 data link state machine.
        lmx -> states;
 
        tq [label="Transmit queue\n-> transmitter, modulator"];
-       agw_out [label="AGW clients or node shell,\nby client number\n(linkClientRouter);\nthe shell passes NET/ROM's\nlinks and PID 0xCF to netromNode"];
+       agw_out [label="AGW clients or node shell,\nby client number\n(linkClientRouter);\nthe shell passes NET/ROM's\nlinks and PID 0xCF to netromNode,\nand its applications' links\nto them"];
 
        states -> tq [label="frames to send"];
        states -> agw_out [label="link up and down,\nreceived data"];
@@ -245,6 +245,11 @@ on to ``netromNode``,
 which also takes NODES broadcasts from ``app_process_rec_packet``.
 ``netromNode`` does its work on a goroutine of its own,
 so both hand-offs only queue work for it.
+The shell likewise passes the links of its applications -
+a station connected to the BBS's own callsign,
+or a link the BBS opened to a partner -
+to the application (``node.Service``, ``node.ConnectFrom``),
+which takes them on the same goroutine as NET/ROM's, or one of its own.
 
 "Clean or FEC" in the diagram means a frame decoded without any bits fixed,
 or one received with FX.25 or IL2P forward error correction.

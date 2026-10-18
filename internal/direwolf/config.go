@@ -177,6 +177,10 @@ type misc_config_s struct {
 
 	mqtt maybe.Maybe[mqttpub.Config] // Where to publish the node's events, if anywhere.  YAML only.
 
+	bbs maybe.Maybe[BBSSettings] // The node's BBS, if it has one.  YAML only.
+
+	dataDir string // Where what is kept from one run to the next lives, or "".  YAML only.
+
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.
 	// Unfortunately, most applications don't know how to deal with multi-radio TNCs.

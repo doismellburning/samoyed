@@ -48,7 +48,7 @@ Dashed arrows are connections made after construction rather than at it.
        nodeweb [label="nodeWeb\nnode views, admin API"];
        events [label="nodeevents.Bus"];
        mqtt [label="mqttpub\nMQTT publisher"];
-       nodeapps [label="nodeApps\nchat server"];
+       nodeapps [label="nodeApps\nchat server, BBS"];
        igate [label="IGate"];
        digi [label="digipeater.Digipeater\nAPRS"];
        cdigi [label="digipeater.Connected\nconnected mode"];
@@ -118,6 +118,8 @@ Dashed arrows are connections made after construction rather than at it.
        nodeshell -> nodeapps [label="node.Application\n(queued for NET/ROM's goroutine)"];
        nodeapps -> events [label="Publish"];
        nodeweb -> nodeapps [label="query"];
+       nodeapps -> nodeshell [label="ConnectFrom\nAddService"];
+       nodeapps -> netrom [label="Connect\nListen"];
        link -> tq [label="linkTransmitter"];
 
        kiss -> xmit [label="timing setters"];
@@ -205,7 +207,7 @@ so the order of construction follows the arrows:
 #. The ``XmitService``, which starts a transmit thread per radio channel.
 #. The IGate and the two digipeaters,
    then the node shell, if the configuration has one, with its NET/ROM,
-   its applications, such as the chat server,
+   its applications, such as the chat server and the BBS,
    the ``nodeevents.Bus`` they publish what they do on,
    and the MQTT publisher that takes from it,
    and the ``AX25Link``, the KISS handler and its transports,
@@ -291,7 +293,8 @@ References
 - ``internal/direwolf/webui_source.go``: ``webui_init``,
   and ``internal/webui/server.go``: ``NewServer``, ``Route``.
 - ``internal/direwolf/node_web.go``: ``newNodeWeb``, ``nodeWeb.routes``, ``nodeWeb.set``.
-- ``internal/direwolf/node_apps.go``: ``newNodeApps``, ``nodeApps.addChat``, ``queuedApp``.
+- ``internal/direwolf/node_apps.go``: ``newNodeApps``, ``nodeApps.addChat``, ``queuedApp``,
+  and ``node_bbs.go``: ``nodeApps.addBBS``.
 - ``internal/direwolf/node_events.go``: ``shellObserver``, ``mqtt_init``,
   and ``internal/nodeevents/nodeevents.go``: ``Bus``.
 - ``internal/ptt/ptt.go``: ``New``,
@@ -300,7 +303,8 @@ References
   in ``internal/digipeater``:
   ``digipeater.go`` (``New``, ``Port``)
   and ``cdigipeater.go`` (``NewConnected``).
-- ``internal/node/node.go``: ``New``, ``DataLink``, ``NetROM``, ``SetObserver``.
+- ``internal/node/node.go``: ``New``, ``DataLink``, ``NetROM``, ``SetObserver``, ``AddApplication``,
+  and ``services.go``: ``AddService``, ``ConnectFrom``.
 - ``internal/dwcore/dwcore.go``: ``FrameSender``,
   shared by everything that hands the transmit queue a frame.
 - ``AGENTS.md``, the "Dependencies" section.
