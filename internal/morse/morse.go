@@ -29,7 +29,7 @@ func TIME_UNITS_TO_MS(tu int, wpm int) float64 {
 }
 
 type morse_s struct {
-	ch  rune
+	ch  byte
 	enc string
 }
 
@@ -140,7 +140,7 @@ func Send(out SampleSink, sampleRate int, amplitude int, str string, wpm int, tx
 
 	// A byte at a time, as morse_units_str counts them.
 	for strIdx, p := range []byte(str) {
-		var i = morse_lookup(rune(p))
+		var i = morse_lookup(p)
 		if i >= 0 {
 			var enc = MORSE[i].enc
 			for encIdx, e := range enc {
@@ -299,7 +299,7 @@ func quietMs(out SampleSink, ms int) {
  *
  *--------------------------------------------------------------------*/
 
-func morse_lookup(ch rune) int {
+func morse_lookup(ch byte) int {
 	ch = ascii.ToUpper(ch)
 
 	for i, m := range MORSE {
@@ -330,7 +330,7 @@ func morse_lookup(ch rune) int {
  *
  *--------------------------------------------------------------------*/
 
-func morse_units_ch(ch rune) int {
+func morse_units_ch(ch byte) int {
 	var i = morse_lookup(ch)
 
 	if i < 0 {
@@ -374,7 +374,7 @@ func morse_units_str(str string) int {
 	var units = (len(str) - 1) * 3
 
 	for _, k := range []byte(str) {
-		units += morse_units_ch(rune(k))
+		units += morse_units_ch(k)
 	}
 
 	return (units)
