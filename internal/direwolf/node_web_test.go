@@ -36,7 +36,7 @@ func webNet(t *testing.T, token string) http.Handler {
 	go a.netrom.run(ctx)
 
 	var w = newNodeWeb(token)
-	w.set(&webNode{config: a.config, shell: a.shell, netrom: a.netrom, link: fakeLink{n: a}, heard: noneHeard})
+	w.set(&webNode{config: a.config, shell: a.shell, netrom: a.netrom, apps: nil, link: fakeLink{n: a}, heard: noneHeard})
 
 	return webui.Handler(webui.NewHub(), w.routes()...)
 }

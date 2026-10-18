@@ -773,9 +773,19 @@ x = Silence FX.25 information.`)
 			}
 		}
 
+		var nodeApps = newNodeApps(ctx, netromNode)
+
+		if chatConfig, hasChat := nodeChatConfig(misc_config).Get(); hasChat {
+			var chatErr = nodeApps.addChat(nodeShell, chatConfig, nodeEvents, nodeConfig.Address)
+			if chatErr != nil {
+				logrus.WithError(chatErr).Error("Could not start the node's chat server")
+				td.exit(1)
+			}
+		}
+
 		nodeShell.Start()
 
-		nodeWeb.set(&webNode{config: nodeConfig, shell: nodeShell, netrom: netromNode, link: dataLinkQueue, heard: mheardDB.HeardRF})
+		nodeWeb.set(&webNode{config: nodeConfig, shell: nodeShell, netrom: netromNode, apps: nodeApps, link: dataLinkQueue, heard: mheardDB.HeardRF})
 		mqtt_init(ctx, misc_config.mqtt, nodeEvents, nodeConfig.Address)
 
 		nodeClients = nodeShell

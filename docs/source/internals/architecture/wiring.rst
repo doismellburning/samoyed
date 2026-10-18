@@ -48,6 +48,7 @@ Dashed arrows are connections made after construction rather than at it.
        nodeweb [label="nodeWeb\nnode views, admin API"];
        events [label="nodeevents.Bus"];
        mqtt [label="mqttpub\nMQTT publisher"];
+       nodeapps [label="nodeApps\nchat server"];
        igate [label="IGate"];
        digi [label="digipeater.Digipeater\nAPRS"];
        cdigi [label="digipeater.Connected\nconnected mode"];
@@ -114,6 +115,9 @@ Dashed arrows are connections made after construction rather than at it.
        nodeshell -> events [label="SetObserver"];
        netrom -> events [label="Publish"];
        events -> mqtt [label="Subscribe"];
+       nodeshell -> nodeapps [label="node.Application\n(queued for NET/ROM's goroutine)"];
+       nodeapps -> events [label="Publish"];
+       nodeweb -> nodeapps [label="query"];
        link -> tq [label="linkTransmitter"];
 
        kiss -> xmit [label="timing setters"];
@@ -201,6 +205,7 @@ so the order of construction follows the arrows:
 #. The ``XmitService``, which starts a transmit thread per radio channel.
 #. The IGate and the two digipeaters,
    then the node shell, if the configuration has one, with its NET/ROM,
+   its applications, such as the chat server,
    the ``nodeevents.Bus`` they publish what they do on,
    and the MQTT publisher that takes from it,
    and the ``AX25Link``, the KISS handler and its transports,
@@ -286,6 +291,7 @@ References
 - ``internal/direwolf/webui_source.go``: ``webui_init``,
   and ``internal/webui/server.go``: ``NewServer``, ``Route``.
 - ``internal/direwolf/node_web.go``: ``newNodeWeb``, ``nodeWeb.routes``, ``nodeWeb.set``.
+- ``internal/direwolf/node_apps.go``: ``newNodeApps``, ``nodeApps.addChat``, ``queuedApp``.
 - ``internal/direwolf/node_events.go``: ``shellObserver``, ``mqtt_init``,
   and ``internal/nodeevents/nodeevents.go``: ``Bus``.
 - ``internal/ptt/ptt.go``: ``New``,

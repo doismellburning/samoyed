@@ -32,6 +32,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/axudp"
+	"github.com/doismellburning/samoyed/internal/chat"
 	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/coordconvutil"
 	"github.com/doismellburning/samoyed/internal/digipeater"
@@ -2162,6 +2163,11 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		}
 	}
 
+	var chatConfig, chatErr = chatConfigFor(settings.Chat)
+	if chatErr != nil {
+		return fmt.Errorf("line %d: %w", ps.line, chatErr)
+	}
+
 	ps.misc.node = maybe.Just(nodeSettings{
 		address:        address,
 		alias:          alias,
@@ -2170,6 +2176,7 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		infoMessage:    settings.InfoMessage,
 		connectMessage: settings.ConnectMessage,
 		adminToken:     settings.AdminToken,
+		chat:           chatConfig,
 	})
 
 	return nil
@@ -2196,6 +2203,9 @@ type nodeSettings struct {
 	// adminToken is the web admin API's bearer token, or "" for no admin
 	// API.
 	adminToken string
+
+	// chat is the chat server's configuration, or Nothing for none.
+	chat maybe.Maybe[chat.Config]
 }
 
 // connectedModeChannels are the channels connected mode can be used on.

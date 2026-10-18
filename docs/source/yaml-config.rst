@@ -253,6 +253,14 @@ These are the keys under ``samoyed``:
         A secret that lets the web interface's admin API act on the node (see below).
         Left out, there is no admin API.
 
+    ``chat``
+        A chat server, started with the ``CHAT`` command (see below),
+        with ``defaultRoom``, the room users start in (``General``),
+        and ``rateLines`` and ``rateWindow``,
+        how many lines a user may send in how long before the rest are turned away
+        (10 in ``30s``; ``rateLines: 0`` for no limit).
+        ``chat: {}`` gives one with the defaults.
+
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
     Its commands are:
@@ -292,13 +300,26 @@ These are the keys under ``samoyed``:
     connects onward over NET/ROM instead,
     and a user can reach the node over NET/ROM as well as AX.25.
 
+    With ``chat``, ``CHAT`` puts the user into a room of the node's chat server,
+    and sends each line they type to everyone else in it.
+    Rooms are the node's own, not linked to chat servers elsewhere.
+    A line starting with ``/`` is a command:
+    ``/join`` *room* moves to another room
+    (its name letters, digits, ``-`` and ``_``, up to sixteen of them),
+    ``/leave`` goes back to the room users start in,
+    ``/who`` [*room*] lists who is in a room, by default the user's own,
+    ``/rooms`` lists the rooms with anyone in them,
+    ``/msg`` *user* *text* sends a line to one user, wherever they are,
+    and ``/quit`` goes back to the node.
+
     A line of more than 256 characters is ignored.
 
     With the web interface on (``WEBPORT``, in ``legacy``),
     its Node tab shows the node's users, the stations it has heard,
     and with ``netrom`` its nodes, neighbours and circuits.
     The same views are JSON under ``/api/node/``:
-    ``info``, ``sessions``, ``heard``, ``nodes``, ``neighbours`` and ``circuits``.
+    ``info``, ``sessions``, ``heard``, ``nodes``, ``neighbours``, ``circuits``,
+    and ``chat``, the chat rooms with anyone in them, and who.
 
     With ``adminToken`` set,
     requests carrying it as ``Authorization: Bearer`` *token* can act on the node,
@@ -321,6 +342,9 @@ These are the keys under ``samoyed``:
     ``DELETE /api/admin/neighbours/``\ *port*\ ``/``\ *call*
         Unlock a neighbour, so its routes are learned and aged again.
 
+    ``POST /api/admin/chat/announce``
+        Send everyone in chat a line, given as JSON ``{"text": "Back in five minutes"}``.
+
     The web interface has no TLS of its own,
     so put it behind a proxy that has before setting ``adminToken`` on a port others can reach.
 
@@ -336,6 +360,7 @@ These are the keys under ``samoyed``:
             connectMessage: |
               Welcome to the club node.
               Type ? for a list of commands.
+            chat: {}
 
 ``netrom``
     NET/ROM for the node (see :doc:`glossary/netrom`), which needs ``node``:
@@ -410,7 +435,8 @@ These are the keys under ``samoyed``:
     ``link/up`` and ``link/down`` for a user's session, a downlink or a NET/ROM neighbour's link,
     ``circuit/up`` and ``circuit/down`` for a NET/ROM circuit,
     ``routes/changed`` when NET/ROM's routing table changes,
-    and ``heard`` for a station heard on a NET/ROM channel for the first time in a while.
+    ``heard`` for a station heard on a NET/ROM channel for the first time in a while,
+    and ``chat/join`` and ``chat/leave`` for a ``user`` joining or leaving a chat ``room``.
     ``status`` is retained, and is ``online`` while Samoyed is connected,
     and ``offline`` once it stops or, through the broker's last will, drops off.
     Events are published at most once,

@@ -10,7 +10,11 @@ package direwolf
 // step is where all the validation lives, so that another way of writing the
 // same settings down can share it rather than repeat it.
 
-import "github.com/doismellburning/samoyed/internal/axudp"
+import (
+	"time"
+
+	"github.com/doismellburning/samoyed/internal/axudp"
+)
 
 // AudioDeviceSettings describes an audio device - ADEVICE.
 type AudioDeviceSettings struct {
@@ -164,4 +168,18 @@ type NodeSettings struct {
 	// AdminToken is the bearer token the web interface's admin API wants;
 	// left out, there is no admin API.
 	AdminToken string `yaml:"adminToken"`
+
+	// Chat gives the node a chat server; left out, there is none.
+	Chat *ChatSettings `yaml:"chat"`
+}
+
+// ChatSettings describes the node's chat server.
+type ChatSettings struct {
+	// DefaultRoom is the room users start in; left out, "General".
+	DefaultRoom string `yaml:"defaultRoom"`
+
+	// RateLines is how many lines a user may send in RateWindow; left out,
+	// 10 in 30s.  0 is no limit.
+	RateLines  *int           `yaml:"rateLines"`
+	RateWindow *time.Duration `yaml:"rateWindow"`
 }

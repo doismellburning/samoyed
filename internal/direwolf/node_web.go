@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/chat"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/node"
@@ -33,6 +34,7 @@ type webNode struct {
 	config node.Config
 	shell  *node.Node
 	netrom *netromNode // Nil without NET/ROM.
+	apps   *nodeApps
 	link   node.DataLink
 	heard  node.HeardStations
 }
@@ -67,6 +69,7 @@ func (w *nodeWeb) routes() []webui.Route {
 		{Pattern: "GET /api/node/nodes", Handler: w.netromView(nodeNodes)},
 		{Pattern: "GET /api/node/neighbours", Handler: w.netromView(nodeNeighbours)},
 		{Pattern: "GET /api/node/circuits", Handler: w.netromView(nodeCircuits)},
+		{Pattern: "GET /api/node/chat", Handler: w.chatView()},
 	}
 
 	if w.token == "" {
@@ -79,6 +82,7 @@ func (w *nodeWeb) routes() []webui.Route {
 		{Pattern: "POST /api/admin/circuits/{id}/close", Handler: w.netromAction(adminCloseCircuit)},
 		{Pattern: "POST /api/admin/neighbours", Handler: w.netromAction(adminLockNeighbour)},
 		{Pattern: "DELETE /api/admin/neighbours/{port}/{call}", Handler: w.netromAction(adminUnlockNeighbour)},
+		{Pattern: "POST /api/admin/chat/announce", Handler: w.action(adminChatAnnounce)},
 	} {
 		r.Handler = webui.RequireToken(w.token, r.Handler)
 		routes = append(routes, r)
@@ -188,15 +192,20 @@ func (w *nodeWeb) netromAction(f func(n *netromNode, r *http.Request) error) htt
 	})
 }
 
-// query runs f on NET/ROM's goroutine and waits for it, giving up after
-// nodeQueryTimeout or when ctx is done.
+// query runs f on NET/ROM's goroutine and waits for it, as queryOn does.
 func (n *netromNode) query(ctx context.Context, f func()) error {
+	return queryOn(ctx, n.do, f)
+}
+
+// queryOn runs f with do, which queues it for another goroutine, and waits
+// for it, giving up after nodeQueryTimeout or when ctx is done.
+func queryOn(ctx context.Context, do func(func()), f func()) error {
 	var cctx, cancel = context.WithTimeout(ctx, nodeQueryTimeout)
 	defer cancel()
 
 	var done = make(chan struct{})
 
-	n.do(func() { f(); close(done) })
+	do(func() { f(); close(done) })
 
 	select {
 	case <-done:
@@ -477,4 +486,75 @@ func nodeAdminToken(misc *misc_config_s) string {
 	}
 
 	return settings.adminToken
+}
+
+// chatView lists the chat rooms and who is in them: none, without a chat
+// server.
+func (w *nodeWeb) chatView() http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		var n = w.node.Load()
+		if n == nil {
+			http.NotFound(rw, r)
+
+			return
+		}
+
+		var rooms = []chat.Room{}
+
+		if n.apps != nil {
+			var err = n.apps.query(r.Context(), func() {
+				if n.apps.chat != nil {
+					rooms = append(rooms, n.apps.chat.Rooms()...)
+				}
+			})
+			if err != nil {
+				http.Error(rw, "node busy", http.StatusServiceUnavailable)
+
+				return
+			}
+		}
+
+		webui.WriteJSON(rw, rooms)
+	})
+}
+
+// announceRequest is an announcement to everyone in chat.
+type announceRequest struct {
+	Text string `json:"text"`
+}
+
+func adminChatAnnounce(n *webNode, r *http.Request) error {
+	var req announceRequest
+
+	var err = decodeBody(r, &req)
+	if err != nil {
+		return err
+	}
+
+	var text = strings.TrimSpace(req.Text)
+	if text == "" || strings.ContainsAny(text, "\r\n") {
+		return errors.Join(errBadRequest, errors.New("an announcement is one line of text"))
+	}
+
+	if n.apps == nil {
+		return errNotFound
+	}
+
+	var found bool
+
+	var qerr = n.apps.query(r.Context(), func() {
+		found = n.apps.chat != nil
+		if found {
+			n.apps.chat.Announce(text)
+		}
+	})
+	if qerr != nil {
+		return qerr
+	}
+
+	if !found {
+		return errNotFound
+	}
+
+	return nil
 }

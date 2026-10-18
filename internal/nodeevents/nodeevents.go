@@ -25,6 +25,8 @@ const (
 	CircuitDown   Kind = "circuit/down"   // A NET/ROM circuit has gone.
 	RoutesChanged Kind = "routes/changed" // The NET/ROM routing table changed.
 	Heard         Kind = "heard"          // A station was heard, for the first time in a while.
+	ChatJoin      Kind = "chat/join"      // A user joined a chat room.
+	ChatLeave     Kind = "chat/leave"     // A user left a chat room.
 )
 
 // Event is something that happened on the node.  Which fields are set depends
@@ -42,6 +44,8 @@ type Event struct {
 	Incoming bool   `json:"incoming,omitempty"` // Whether the far end opened it.
 	Role     string `json:"role,omitempty"`     // For a link: "neighbour", "user" or "downlink".
 	Error    string `json:"error,omitempty"`    // Why a link or circuit went, if not in an orderly way.
+
+	Room string `json:"room,omitempty"` // For chat: the room.
 
 	Destinations int `json:"destinations,omitempty"` // For routes: how many nodes are known.
 	Neighbours   int `json:"neighbours,omitempty"`   // For routes: how many neighbours.
