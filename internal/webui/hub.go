@@ -106,7 +106,8 @@ type Station struct {
 // Channel describes one configured channel and how much has passed over it.
 type Channel struct {
 	Number      int    `json:"number"`
-	Description string `json:"description"` // e.g. "radio", "aprs-is", "network".
+	Description string `json:"description"`        // e.g. "radio", "aprs-is", "network".
+	Callsign    string `json:"callsign,omitempty"` // The station's own callsign on this channel, if it has one.
 	Received    int    `json:"rx"`
 	Transmitted int    `json:"tx"`
 }
@@ -161,8 +162,9 @@ func NewHub() *Hub {
 }
 
 // AddChannel declares a channel, so it shows up before anything has been heard
-// on it.
-func (h *Hub) AddChannel(number int, description string) {
+// on it.  Only c's Number, Description and Callsign are taken; the counts
+// start from nothing.
+func (h *Hub) AddChannel(c Channel) {
 	if h == nil {
 		return
 	}
@@ -170,7 +172,9 @@ func (h *Hub) AddChannel(number int, description string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	h.channel(number).Description = description
+	var ch = h.channel(c.Number)
+	ch.Description = c.Description
+	ch.Callsign = c.Callsign
 }
 
 // Publish records a packet and sends it to every open page.  A received packet

@@ -32,14 +32,22 @@ func TestAPIHandlers(t *testing.T) {
 	t.Parallel()
 
 	var hub, _ = newTestHub()
-	hub.AddChannel(0, "radio")
+	hub.AddChannel(Channel{Number: 0, Description: "radio", Callsign: "Q9TEST", Received: 0, Transmitted: 0})
 
 	var p = rx("Q1TEST")
 	// Whatever arrives over the air is data, however it is dressed up.
 	p.Comment = `<script>alert("x")</script>`
 	hub.Publish(p)
 
-	var h = Handler(hub)
+	var started = time.Now().Add(-90 * time.Second)
+
+	var h = Handler(hub, func() Status {
+		var s Status
+		s.Version = "2026.10.18"
+		s.Started = started
+
+		return s
+	})
 
 	t.Run("packets", func(t *testing.T) {
 		t.Parallel()
@@ -68,7 +76,20 @@ func TestAPIHandlers(t *testing.T) {
 
 		var got []Channel
 		require.NoError(t, json.Unmarshal(get(t, h, "/api/channels").Body.Bytes(), &got))
-		assert.Equal(t, []Channel{{Number: 0, Description: "radio", Received: 1, Transmitted: 0}}, got)
+		assert.Equal(t, []Channel{{Number: 0, Description: "radio", Callsign: "Q9TEST", Received: 1, Transmitted: 0}}, got)
+	})
+
+	t.Run("status", func(t *testing.T) {
+		t.Parallel()
+
+		var w = get(t, h, "/api/status")
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var got Status
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+		assert.Equal(t, "2026.10.18", got.Version)
+		assert.True(t, started.Equal(got.Started))
+		assert.GreaterOrEqual(t, got.UptimeSeconds, int64(90))
 	})
 
 	t.Run("security headers", func(t *testing.T) {
@@ -128,7 +149,7 @@ func TestStartServesEventsAndShutsDown(t *testing.T) {
 
 	var port = addr.Port
 
-	var errCh = server.Start(ctx)
+	var errCh = server.Start(ctx, nil)
 
 	var req, reqErr = http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/events", port), nil)
 	require.NoError(t, reqErr)
@@ -206,5 +227,5 @@ func TestServerCloseGivesUpThePortOfAServerNeverStarted(t *testing.T) {
 	var _, acceptErr = server.listener.Accept()
 	require.ErrorIs(t, acceptErr, net.ErrClosed)
 
-	assert.ErrorIs(t, <-server.Start(t.Context()), http.ErrServerClosed)
+	assert.ErrorIs(t, <-server.Start(t.Context(), nil), http.ErrServerClosed)
 }

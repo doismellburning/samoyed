@@ -330,6 +330,36 @@ func (ig *IGate) updateStats(update func(*igateStats)) {
 	update(&ig.stats)
 }
 
+// igateSnapshot is the IGate's connection state and counters as they stood at
+// one moment.
+type igateSnapshot struct {
+	connected bool
+	loggedIn  bool
+	stats     igateStats
+}
+
+// snapshot reads the connection state and the counters together, so that
+// they all come from the same side of a reconnection.
+func (ig *IGate) snapshot() igateSnapshot {
+	ig.mu.Lock()
+	defer ig.mu.Unlock()
+
+	var snap igateSnapshot
+	snap.connected = ig.sock != nil
+	snap.loggedIn = ig.okToSend
+	snap.stats = ig.stats
+
+	return snap
+}
+
+// configured says whether the IGate has the server, login and passcode it
+// needs: without them, start leaves it idle.
+func (ig *IGate) configured() bool {
+	return len(ig.config.t2_server_name) > 0 &&
+		len(ig.config.t2_login) > 0 &&
+		len(ig.config.t2_passcode) > 0
+}
+
 // connection returns the socket to the server, nil if there is none, and
 // whether the login sequence has finished on it - together, so that the two
 // cannot come from either side of a reconnection.
@@ -402,9 +432,7 @@ func (ig *IGate) start(ctx context.Context) {
 	/*
 	 * Continue only if we have server name, login, and passcode.
 	 */
-	if len(ig.config.t2_server_name) == 0 ||
-		len(ig.config.t2_login) == 0 ||
-		len(ig.config.t2_passcode) == 0 {
+	if !ig.configured() {
 		return
 	}
 

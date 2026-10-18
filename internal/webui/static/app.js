@@ -60,15 +60,35 @@
   let packets = []; // oldest first
   let paused = false;
   let pendingWhilePaused = 0;
+  // What the station last said about itself, and when by this page's own
+  // clock, so the uptime can tick on without trusting the two clocks to agree.
+  let status = null;
+  let statusAt = 0;
 
   // ---- Channels ----
+
+  function igateCard(ig) {
+    const [state, text] = ig.loggedIn ? ["up", "Logged in"]
+      : ig.connected ? ["connecting", "Logging in"] : ["down", "Not connected"];
+    const card = el("div", { class: "channel igate" },
+      el("div", { class: "label", text: `IGate · ${ig.server}` }),
+      el("div", { class: "figures" },
+        el("span", { class: "state", "data-state": state, text }),
+        el("span", {}, el("b", { text: String(ig.uplinkPackets) }), " up"),
+        el("span", {}, el("b", { text: String(ig.downlinkPackets) }), " down"),
+        el("span", {}, el("b", { text: String(ig.rfPackets) }), " to RF")));
+    if (ig.connectedAt) card.title = "Connected since " + new Date(ig.connectedAt).toLocaleString();
+    return card;
+  }
 
   function renderChannels() {
     const box = $("channels");
     box.replaceChildren();
+    if (status && status.igate) box.append(igateCard(status.igate));
     for (const c of [...channels.values()].sort((a, b) => a.number - b.number)) {
       box.append(el("div", { class: "channel" },
-        el("div", { class: "label", text: `Channel ${c.number} · ${c.description || "unknown"}` }),
+        el("div", { class: "label", text: `Channel ${c.number} · ${c.description || "unknown"}` +
+          (c.callsign ? ` · ${c.callsign}` : "") }),
         el("div", { class: "figures" },
           el("span", { class: "rx" }, el("b", { text: String(c.rx) }), " rx"),
           el("span", { class: "tx" }, el("b", { text: String(c.tx) }), " tx"))));
@@ -277,6 +297,39 @@
   $("tab-dashboard").addEventListener("click", () => selectTab("dashboard"));
   $("tab-map").addEventListener("click", () => selectTab("map"));
 
+  // ---- Station ----
+
+  function duration(s) {
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  function renderStatus() {
+    if (!status) return;
+    const up = status.uptimeSeconds + Math.floor((performance.now() - statusAt) / 1000);
+    const info = $("station-info");
+    info.textContent = (status.version ? `${status.version} · ` : "") + `up ${duration(up)}`;
+    info.title = "Started " + new Date(status.started).toLocaleString();
+  }
+
+  function setStationStatus(s) {
+    status = s;
+    statusAt = performance.now();
+    renderStatus();
+    renderChannels();
+  }
+
+  // The IGate's counts change without any event to say so.
+  async function refreshStatus() {
+    try {
+      setStationStatus(await getJSON("api/status"));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   // ---- Data ----
 
   function setStatus(state, text) {
@@ -297,7 +350,9 @@
   async function loadSnapshot() {
     queued = [];
     try {
-      const [ps, ss, cs] = await Promise.all([getJSON("api/packets"), getJSON("api/stations"), getJSON("api/channels")]);
+      const [ps, ss, cs, st] = await Promise.all([
+        getJSON("api/packets"), getJSON("api/stations"), getJSON("api/channels"), getJSON("api/status")]);
+      setStationStatus(st);
       packets = ps.slice(-MAX_PACKETS);
       stations.clear();
       for (const s of ss) stations.set(s.name, s);
@@ -355,6 +410,7 @@
     }
     pruneMarkers();
     renderStations();
+    refreshStatus();
   }, 10000);
   setInterval(() => { if (stationsDirty) renderStations(); }, 500);
 

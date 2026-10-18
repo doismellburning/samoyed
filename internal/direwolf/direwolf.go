@@ -85,6 +85,8 @@ const audio_amplitude = 100 /* % of audio sample range. */
 // cancellation reaches the goroutines doing the work rather than only the
 // process itself.
 func DirewolfMain(ctx context.Context) { //nolint:funlen // Ported from Dire Wolf as one function
+	var started = time.Now() // For the web interface's uptime.
+
 	// logrus writes to stderr by default, while everything still going through
 	// dw_printf writes to stdout. Until the conversion is finished the two are
 	// halves of one console stream - a "Packet" entry on stderr whose packet
@@ -581,17 +583,20 @@ x = Silence FX.25 information.`)
 	layer2Receiver.txInhibited = pttControl.TransmitInhibited
 
 	/*
-	 * Start the web interface before anything that can send or receive a
-	 * frame, so that both sides can be handed it.  Nil, and so a no-op,
-	 * unless WEBPORT is set.
+	 * Make the web interface's hub before anything that can send or receive
+	 * a frame, so that both sides can be handed it.  Nil, and so a no-op,
+	 * unless WEBPORT is set.  Its port is bound now, but only served once
+	 * the IGate it reports on has been made.
 	 */
 
 	var webHub *webui.Hub
 
+	var webServer *webui.Server
+
 	if misc_config.web_port == 0 {
 		logrus.Debug("Web interface disabled")
 	} else {
-		webHub = webui_init(ctx, audio_config, fmt.Sprintf(":%d", misc_config.web_port))
+		webHub, webServer = webui_init(ctx, audio_config, fmt.Sprintf(":%d", misc_config.web_port))
 	}
 
 	// The AGW server is made here, so the transmit service can be told to
@@ -721,6 +726,10 @@ x = Silence FX.25 information.`)
 	// IGate's channel before the services below are started.
 	transmitQueue.SetIGate(igate.sendRecPacket)
 	igate.start(ctx)
+
+	if webServer != nil {
+		webui_start(ctx, webServer, webStatus(started, igate))
+	}
 	stopIfCancelled(ctx, td)
 	var connectedDigipeater = digipeater.NewConnected(digipeaterPorts, &cdigi_config, packetFilter, transmitQueue.Append)
 
@@ -783,8 +792,9 @@ x = Silence FX.25 information.`)
 	if misc_config.dns_sd_enabled {
 		var ports = listeningPorts(kissNetSvc, agwServer)
 
-		// Only if it started: webui_init hands back no hub if it didn't.
-		if webHub != nil {
+		// Only if it started: webui_init hands back no server if it
+		// couldn't bind.
+		if webServer != nil {
 			ports.Web = misc_config.web_port
 		}
 
