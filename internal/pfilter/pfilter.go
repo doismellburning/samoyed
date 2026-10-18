@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ascii"
@@ -1099,7 +1098,7 @@ func filt_s(pf *pfstate_t) (int, error) {
 	var pri, alt, over string
 
 	var unacceptableChar = func(r rune) bool {
-		return !unicode.IsPrint(r) || r == '|' || r == '~'
+		return !ascii.IsPrint(r) || r == '|' || r == '~'
 	}
 
 	// First, separate the parts and do a strict syntax check.
@@ -1134,7 +1133,7 @@ func filt_s(pf *pfstate_t) (int, error) {
 				// Zero length is acceptable and is not the same as missing.
 
 				if strings.ContainsFunc(over, func(r rune) bool {
-					return !unicode.IsUpper(r) && !unicode.IsDigit(r) && r != '\\'
+					return !ascii.IsUpper(r) && !ascii.IsDigit(r) && r != '\\'
 				}) {
 					return -1, newFilterError(pf, "Symbol filter, overlay must be upper case letter, digit, or \\.")
 				}
