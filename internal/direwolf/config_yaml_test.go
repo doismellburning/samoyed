@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/node"
+	"github.com/doismellburning/samoyed/internal/nodemap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -459,6 +461,24 @@ legacy: |
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
 		assert.Equal(t, []node.Port{{Channel: 8, Description: "Network TNC"}}, mustNodeConfig(t, c.audio, got).Ports)
+	})
+
+	t.Run("the node is reported to the node map when asked", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node:\n  address: q1test-7\n  alias: samnod\n  map: {}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD"}), got.nodeMap)
+	})
+
+	t.Run("the node is not reported to the node map unless asked", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.True(t, got.nodeMap.IsNothing())
 	})
 
 	t.Run("no node unless asked for", func(t *testing.T) {

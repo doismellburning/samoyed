@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"slices"
@@ -26,6 +27,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/node"
+	"github.com/doismellburning/samoyed/internal/nodemap"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/ptt"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -77,6 +79,9 @@ import (
 const audio_amplitude = 100 /* % of audio sample range. */
 /* This translates to +-32k for 16 bit samples. */
 /* Currently no option to change this. */
+
+// nodeMapTimeout is how long a report to the node map may take.
+const nodeMapTimeout = 30 * time.Second
 
 // DirewolfMain is the main program.
 //
@@ -767,6 +772,16 @@ x = Silence FX.25 information.`)
 			"alias":    nodeConfig.Alias,
 			"channels": channels,
 		}).Info("Node shell ready")
+	}
+
+	// Reporting the node to the node map, if the node shell is configured to
+	// be reported.
+	var nodeMap = maybe.Bind(misc_config.node, func(s nodeSettings) maybe.Maybe[nodemap.Config] { return s.nodeMap })
+	if mapConfig, ok := nodeMap.Get(); ok {
+		var client = new(http.Client)
+		client.Timeout = nodeMapTimeout
+
+		go nodemap.New(mapConfig, client).Run(ctx)
 	}
 
 	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, newLinkClientRouter(agwClients, nodeClients), transmitQueue, d_c_opt)

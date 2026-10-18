@@ -249,6 +249,12 @@ These are the keys under ``samoyed``:
         Left out, it is a short welcome.
         Use ``|`` for several lines.
 
+    ``map``
+        Report the node to the `UK Packet Radio network map <https://nodes.ukpacketradio.network/>`_,
+        once at startup and every hour after.
+        Left out, the node is not reported.
+        ``map: {}`` reports it with nothing more than its callsign, its alias and that it runs Samoyed.
+
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
     Its commands are:
@@ -296,6 +302,7 @@ These are the keys under ``samoyed``:
             connectMessage: |
               Welcome to the club node.
               Type ? for a list of commands.
+            map: {}
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

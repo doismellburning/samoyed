@@ -39,6 +39,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/node"
+	"github.com/doismellburning/samoyed/internal/nodemap"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/touchtone"
@@ -2156,6 +2157,11 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		}
 	}
 
+	var nodeMap maybe.Maybe[nodemap.Config]
+	if settings.Map != nil {
+		nodeMap = maybe.Just(nodemap.Config{Address: address, Alias: alias})
+	}
+
 	ps.misc.node = maybe.Just(nodeSettings{
 		address:        address,
 		alias:          alias,
@@ -2163,6 +2169,7 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		line:           ps.line,
 		infoMessage:    settings.InfoMessage,
 		connectMessage: settings.ConnectMessage,
+		nodeMap:        nodeMap,
 	})
 
 	return nil
@@ -2185,6 +2192,10 @@ type nodeSettings struct {
 
 	infoMessage    string
 	connectMessage string
+
+	// nodeMap is what the node map is told about the node, if it is to be
+	// told anything.
+	nodeMap maybe.Maybe[nodemap.Config]
 }
 
 // connectedModeChannels are the channels connected mode can be used on.

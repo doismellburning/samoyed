@@ -160,4 +160,12 @@ type NodeSettings struct {
 
 	// ConnectMessage is what a station is told on connecting to the node.
 	ConnectMessage string `yaml:"connectMessage"`
+
+	// Map, when given, reports the node to the UK Packet Radio network
+	// map.
+	Map *NodeMapSettings `yaml:"map"`
 }
+
+// NodeMapSettings describes how the node is reported to the UK Packet Radio
+// network map.
+type NodeMapSettings struct{}
