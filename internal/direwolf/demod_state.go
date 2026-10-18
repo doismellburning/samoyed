@@ -25,7 +25,7 @@ type demodulator_state_s struct {
 
 	//	enum v26_e v26_alt;			// Which alternative when V.26.
 
-	profile rune // 'A', 'B', etc.	Upper case.
+	profile byte // 'A', 'B', etc.	Upper case.
 	// Only needed to see if we are using 'F' to take fast path.
 
 	pll_step_per_sample int32 // PLL is advanced by this much each audio sample.

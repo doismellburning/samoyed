@@ -371,7 +371,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 					achan.baud,
 					mark,
 					space,
-					rune(profile),
+					profile,
 					D)
 
 				if have_plus != 0 {
@@ -422,7 +422,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				achan.baud,
 				achan.mark_freq,
 				achan.space_freq,
-				rune(achan.profiles[0]),
+				achan.profiles[0],
 				D)
 
 			if have_plus != 0 {
@@ -468,7 +468,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				demod_afsk_init(samplesPerSec/achan.decimate,
 					achan.baud,
 					mark, space,
-					rune(profile),
+					profile,
 					D)
 
 				if have_plus != 0 {
@@ -540,7 +540,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				v26,
 				samplesPerSec,
 				achan.baud,
-				rune(profile),
+				profile,
 				D)
 
 			//text_color_set(DW_COLOR_DEBUG);
@@ -593,7 +593,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				achan.v26_alternative,
 				samplesPerSec,
 				achan.baud,
-				rune(profile),
+				profile,
 				D)
 
 			//text_color_set(DW_COLOR_DEBUG);
@@ -637,7 +637,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 				V26_UNSPECIFIED,
 				samplesPerSec,
 				achan.baud,
-				rune(profile),
+				profile,
 				D)
 
 			D.quick_attack = 0.080 * 0.2
