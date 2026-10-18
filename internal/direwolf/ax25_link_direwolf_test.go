@@ -27,112 +27,112 @@ import (
 
 func Test_AX25_Link(t *testing.T) {
 	// Link Establishment and Termination
-	TestAX25LinkConnectedBasic(t)
-	TestAX25LinkSABMEConnection(t)
-	TestAX25LinkConnectionRejectedWithDM(t)
-	TestAX25LinkDISCDisconnection(t)
-	TestAX25LinkDISCInDisconnectedState(t)
+	t.Run("TestAX25LinkConnectedBasic", TestAX25LinkConnectedBasic)
+	t.Run("TestAX25LinkSABMEConnection", TestAX25LinkSABMEConnection)
+	t.Run("TestAX25LinkConnectionRejectedWithDM", TestAX25LinkConnectionRejectedWithDM)
+	t.Run("TestAX25LinkDISCDisconnection", TestAX25LinkDISCDisconnection)
+	t.Run("TestAX25LinkDISCInDisconnectedState", TestAX25LinkDISCInDisconnectedState)
 
 	// Information Transfer
-	TestAX25LinkIFrameExchange(t)
-	TestAX25LinkRRResponse(t)
-	TestAX25LinkRNRFlowControl(t)
-	TestAX25LinkMultipleIFrames(t)
-	TestAX25LinkOutOfSequenceIFrame(t)
-	TestAX25LinkIFrameWithAck(t)
+	t.Run("TestAX25LinkIFrameExchange", TestAX25LinkIFrameExchange)
+	t.Run("TestAX25LinkRRResponse", TestAX25LinkRRResponse)
+	t.Run("TestAX25LinkRNRFlowControl", TestAX25LinkRNRFlowControl)
+	t.Run("TestAX25LinkMultipleIFrames", TestAX25LinkMultipleIFrames)
+	t.Run("TestAX25LinkOutOfSequenceIFrame", TestAX25LinkOutOfSequenceIFrame)
+	t.Run("TestAX25LinkIFrameWithAck", TestAX25LinkIFrameWithAck)
 
 	// Error Recovery
-	TestAX25LinkREJErrorRecovery(t)
+	t.Run("TestAX25LinkREJErrorRecovery", TestAX25LinkREJErrorRecovery)
 
 	// State Machine Transitions
-	TestAX25LinkIncomingSABM(t)
-	TestAX25LinkStateVariables(t)
-	TestAX25LinkDISCWhileConnected(t)
-	TestAX25LinkSABMWhileConnected(t)
-	TestAX25LinkDMAfterDISC(t)
-	TestAX25LinkSABMCollision(t)
-	TestAX25LinkTimerRecoveryState(t)
+	t.Run("TestAX25LinkIncomingSABM", TestAX25LinkIncomingSABM)
+	t.Run("TestAX25LinkStateVariables", TestAX25LinkStateVariables)
+	t.Run("TestAX25LinkDISCWhileConnected", TestAX25LinkDISCWhileConnected)
+	t.Run("TestAX25LinkSABMWhileConnected", TestAX25LinkSABMWhileConnected)
+	t.Run("TestAX25LinkDMAfterDISC", TestAX25LinkDMAfterDISC)
+	t.Run("TestAX25LinkSABMCollision", TestAX25LinkSABMCollision)
+	t.Run("TestAX25LinkTimerRecoveryState", TestAX25LinkTimerRecoveryState)
 
 	// SREJ (Selective Reject)
-	TestAX25LinkSREJFrame(t)
+	t.Run("TestAX25LinkSREJFrame", TestAX25LinkSREJFrame)
 
 	// Window Size
-	TestAX25LinkWindowSize(t)
-	TestAX25LinkWindowSizeMod128(t)
+	t.Run("TestAX25LinkWindowSize", TestAX25LinkWindowSize)
+	t.Run("TestAX25LinkWindowSizeMod128", TestAX25LinkWindowSizeMod128)
 
 	// FRMR Handling
-	TestAX25LinkFRMRResponse(t)
+	t.Run("TestAX25LinkFRMRResponse", TestAX25LinkFRMRResponse)
 
 	// P/F Bit Handling
-	TestAX25LinkPollResponse(t)
-	TestAX25LinkRRPoll(t)
+	t.Run("TestAX25LinkPollResponse", TestAX25LinkPollResponse)
+	t.Run("TestAX25LinkRRPoll", TestAX25LinkRRPoll)
 
 	// N(R) Validation
-	TestAX25LinkIsGoodNR(t)
+	t.Run("TestAX25LinkIsGoodNR", TestAX25LinkIsGoodNR)
 
 	// Timer Tests
-	TestAX25LinkT1Timer(t)
-	TestAX25LinkT3Timer(t)
-	TestAX25LinkT1PauseResume(t)
-	TestAX25LinkT1Expiry(t)
-	TestAX25LinkT3Expiry(t)
+	t.Run("TestAX25LinkT1Timer", TestAX25LinkT1Timer)
+	t.Run("TestAX25LinkT3Timer", TestAX25LinkT3Timer)
+	t.Run("TestAX25LinkT1PauseResume", TestAX25LinkT1PauseResume)
+	t.Run("TestAX25LinkT1Expiry", TestAX25LinkT1Expiry)
+	t.Run("TestAX25LinkT3Expiry", TestAX25LinkT3Expiry)
 
 	// Collision Tests
-	TestAX25LinkSABMDISCCollision(t)
-	TestAX25LinkUnexpectedUA(t)
+	t.Run("TestAX25LinkSABMDISCCollision", TestAX25LinkSABMDISCCollision)
+	t.Run("TestAX25LinkUnexpectedUA", TestAX25LinkUnexpectedUA)
 
 	// XID Tests
-	TestAX25LinkXIDParse(t)
-	TestAX25LinkXIDEncode(t)
-	TestAX25LinkXIDRoundtrip(t)
-	TestAX25LinkXIDFrameConnected(t)
+	t.Run("TestAX25LinkXIDParse", TestAX25LinkXIDParse)
+	t.Run("TestAX25LinkXIDEncode", TestAX25LinkXIDEncode)
+	t.Run("TestAX25LinkXIDRoundtrip", TestAX25LinkXIDRoundtrip)
+	t.Run("TestAX25LinkXIDFrameConnected", TestAX25LinkXIDFrameConnected)
 
 	// C/R Bit Encoding Tests
-	TestAX25LinkCommandFrameEncoding(t)
-	TestAX25LinkResponseFrameEncoding(t)
-	TestAX25LinkIFrameAsCommand(t)
-	TestAX25LinkSFrameCommandResponse(t)
+	t.Run("TestAX25LinkCommandFrameEncoding", TestAX25LinkCommandFrameEncoding)
+	t.Run("TestAX25LinkResponseFrameEncoding", TestAX25LinkResponseFrameEncoding)
+	t.Run("TestAX25LinkIFrameAsCommand", TestAX25LinkIFrameAsCommand)
+	t.Run("TestAX25LinkSFrameCommandResponse", TestAX25LinkSFrameCommandResponse)
 
 	// Sequence Number Tests
-	TestAX25LinkModulo8WrapAround(t)
-	TestAX25LinkModulo128WrapAround(t)
-	TestAX25LinkNSInWindow(t)
+	t.Run("TestAX25LinkModulo8WrapAround", TestAX25LinkModulo8WrapAround)
+	t.Run("TestAX25LinkModulo128WrapAround", TestAX25LinkModulo128WrapAround)
+	t.Run("TestAX25LinkNSInWindow", TestAX25LinkNSInWindow)
 
 	// Segmenter/Reassembler Tests
-	TestAX25LinkReassemblerInitialState(t)
-	TestAX25LinkFirstSegmentFlag(t)
-	TestAX25LinkV22SegmentationDataContent(t)
+	t.Run("TestAX25LinkReassemblerInitialState", TestAX25LinkReassemblerInitialState)
+	t.Run("TestAX25LinkFirstSegmentFlag", TestAX25LinkFirstSegmentFlag)
+	t.Run("TestAX25LinkV22SegmentationDataContent", TestAX25LinkV22SegmentationDataContent)
 
 	// Link Multiplexer Tests
-	TestAX25LinkMultipleConcurrentLinks(t)
-	TestAX25LinkIsolation(t)
-	TestAX25LinkChannelBusy(t)
+	t.Run("TestAX25LinkMultipleConcurrentLinks", TestAX25LinkMultipleConcurrentLinks)
+	t.Run("TestAX25LinkIsolation", TestAX25LinkIsolation)
+	t.Run("TestAX25LinkChannelBusy", TestAX25LinkChannelBusy)
 
 	// Frame Type Parsing Tests
-	TestAX25LinkFrameTypeParsing(t)
-	TestAX25LinkSFrameTypeParsing(t)
-	TestAX25LinkIFrameTypeParsing(t)
+	t.Run("TestAX25LinkFrameTypeParsing", TestAX25LinkFrameTypeParsing)
+	t.Run("TestAX25LinkSFrameTypeParsing", TestAX25LinkSFrameTypeParsing)
+	t.Run("TestAX25LinkIFrameTypeParsing", TestAX25LinkIFrameTypeParsing)
 
 	// Edge Case Tests
-	TestAX25LinkInvalidNR(t)
-	TestAX25LinkClearExceptionConditions(t)
-	TestAX25LinkRejectExceptionFlag(t)
+	t.Run("TestAX25LinkInvalidNR", TestAX25LinkInvalidNR)
+	t.Run("TestAX25LinkClearExceptionConditions", TestAX25LinkClearExceptionConditions)
+	t.Run("TestAX25LinkRejectExceptionFlag", TestAX25LinkRejectExceptionFlag)
 
 	// Retry and Version Tests
-	TestAX25LinkRetryCounter(t)
-	TestAX25LinkSetVersion20(t)
-	TestAX25LinkSetVersion22(t)
+	t.Run("TestAX25LinkRetryCounter", TestAX25LinkRetryCounter)
+	t.Run("TestAX25LinkSetVersion20", TestAX25LinkSetVersion20)
+	t.Run("TestAX25LinkSetVersion22", TestAX25LinkSetVersion22)
 
 	// Request Type Tests
-	TestAX25LinkConnectRequestTypes(t)
-	TestAX25LinkDisconnectRequestTypes(t)
+	t.Run("TestAX25LinkConnectRequestTypes", TestAX25LinkConnectRequestTypes)
+	t.Run("TestAX25LinkDisconnectRequestTypes", TestAX25LinkDisconnectRequestTypes)
 
 	// TEST/UI Frame Tests
-	TestAX25LinkTESTFrame(t)
-	TestAX25LinkUIFrameConnected(t)
+	t.Run("TestAX25LinkTESTFrame", TestAX25LinkTESTFrame)
+	t.Run("TestAX25LinkUIFrameConnected", TestAX25LinkUIFrameConnected)
 
 	// Statistics Tests
-	TestAX25LinkFrameCountStats(t)
+	t.Run("TestAX25LinkFrameCountStats", TestAX25LinkFrameCountStats)
 }
 
 // Helper to set up a fresh test environment
