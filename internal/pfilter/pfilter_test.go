@@ -111,6 +111,25 @@ func Test_pfilter_validate(t *testing.T) {
 	})
 }
 
+// Any ASCII punctuation separates a filter's type letter from its patterns,
+// as C's ispunct has it.  That takes in symbols such as '+' and '$', which
+// unicode.IsPunct leaves out (issue #1019).
+func Test_pfilter_separator(t *testing.T) {
+	t.Parallel()
+
+	var packetFilter = New(0, aprs.NewDecoderFromDataFiles(), nil, 0)
+
+	var pp = ax25.FromText("Q1TEST>APDW17:>Status", true)
+	require.NotNil(t, pp)
+
+	for _, filter := range []string{"b/Q1TEST", "b+Q2TEST+Q1TEST", "b$Q1TEST", "b~Q1TEST"} {
+		var result, err = packetFilter.Filter(0, 0, filter, pp, true)
+
+		require.NoError(t, err, "filter %q", filter)
+		assert.Equal(t, 1, result, "filter %q", filter)
+	}
+}
+
 // heardPosition is the position the stations-heard list records for a decoded
 // packet, as internal/direwolf's mheardPosition decides it: its location if it
 // is a position report, and nothing otherwise.

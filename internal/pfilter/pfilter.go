@@ -27,6 +27,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
@@ -612,7 +613,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		next_token(pf)
 
 		return result, err
-	} else if pf.token_str[0] == 'b' && unicode.IsPunct(rune(pf.token_str[1])) {
+	} else if pf.token_str[0] == 'b' && ascii.IsPunct(pf.token_str[1]) {
 		/* simple string matching */
 
 		/* b - budlist */
@@ -624,14 +625,14 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		if pf.debug >= 2 {
 			traceSpec(pf, result, addr)
 		}
-	} else if pf.token_str[0] == 'o' && unicode.IsPunct(rune(pf.token_str[1])) {
+	} else if pf.token_str[0] == 'o' && ascii.IsPunct(pf.token_str[1]) {
 		/* o - object or item name */
 		result, err = filt_bodgu(pf, pf.decoded.Name)
 
 		if pf.debug >= 2 {
 			traceSpec(pf, result, pf.decoded.Name)
 		}
-	} else if pf.token_str[0] == 'd' && unicode.IsPunct(rune(pf.token_str[1])) {
+	} else if pf.token_str[0] == 'd' && ascii.IsPunct(pf.token_str[1]) {
 		/* d - was digipeated by */
 		// Loop on all AX.25 digipeaters.
 		result = 0
@@ -652,7 +653,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 
 			traceSpec(pf, result, path)
 		}
-	} else if pf.token_str[0] == 'v' && unicode.IsPunct(rune(pf.token_str[1])) {
+	} else if pf.token_str[0] == 'v' && ascii.IsPunct(pf.token_str[1]) {
 		/* v - via not used */
 		// loop on all AX.25 digipeaters (mnemonic Via)
 		result = 0
@@ -674,7 +675,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 
 			traceSpec(pf, result, path)
 		}
-	} else if pf.token_str[0] == 'g' && unicode.IsPunct(rune(pf.token_str[1])) {
+	} else if pf.token_str[0] == 'g' && ascii.IsPunct(pf.token_str[1]) {
 		/* g - Addressee of message. e.g. "BLN*" for bulletins. */
 		if pf.decoded.MessageSubtype == aprs.MessageSubtypeMessage ||
 			pf.decoded.MessageSubtype == aprs.MessageSubtypeAck ||
@@ -694,7 +695,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 				traceSpec(pf, result, "not a message")
 			}
 		}
-	} else if pf.token_str[0] == 'u' && unicode.IsPunct(rune(pf.token_str[1])) {
+	} else if pf.token_str[0] == 'u' && ascii.IsPunct(pf.token_str[1]) {
 		/* u - unproto (AX.25 destination) */
 		/* Probably want to exclude mic-e types */
 		/* because destination is used for part of location. */
@@ -712,7 +713,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 				traceSpec(pf, result, "MIC-E packet type")
 			}
 		}
-	} else if pf.token_str[0] == 't' && unicode.IsPunct(rune(pf.token_str[1])) {
+	} else if pf.token_str[0] == 't' && ascii.IsPunct(pf.token_str[1]) {
 		/* t - packet type: position, weather, telemetry, etc. */
 		result, err = filt_t(pf)
 
@@ -725,7 +726,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 				traceSpec(pf, result, "empty info part")
 			}
 		}
-	} else if pf.token_str[0] == 'r' && unicode.IsPunct(rune(pf.token_str[1])) {
+	} else if pf.token_str[0] == 'r' && ascii.IsPunct(pf.token_str[1]) {
 		/* r - range */
 		/* range */
 		var sdist string
@@ -734,7 +735,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		if pf.debug >= 2 {
 			traceSpec(pf, result, sdist)
 		}
-	} else if pf.token_str[0] == 's' && unicode.IsPunct(rune(pf.token_str[1])) {
+	} else if pf.token_str[0] == 's' && ascii.IsPunct(pf.token_str[1]) {
 		/* s - symbol */
 		result, err = filt_s(pf)
 
@@ -747,7 +748,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 				traceSpec(pf, result, fmt.Sprintf("symbol %c with overlay %c", pf.decoded.SymbolCode, pf.decoded.SymbolTable))
 			}
 		}
-	} else if pf.token_str[0] == 'i' && unicode.IsPunct(rune(pf.token_str[1])) {
+	} else if pf.token_str[0] == 'i' && ascii.IsPunct(pf.token_str[1]) {
 		/* i - IGate messaging default */
 		/* IGatge messaging */
 		result, err = filt_i(pf)
