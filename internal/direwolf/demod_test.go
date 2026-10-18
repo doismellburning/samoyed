@@ -17,6 +17,8 @@ import (
 // demodulated at the full sample rate - and demod_init leaves the
 // configuration as it found it, settleModemOptions being where that is
 // reported and put right.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
 	for _, modemType := range []modem_t{MODEM_QPSK, MODEM_8PSK, MODEM_BPSK} {
 		var channel = 0
@@ -35,6 +37,8 @@ func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
 
 // demod_init sets up the demodulators from the modem options without
 // changing them: the rules about which go together are settleModemOptions'.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 	var channel = 0
 
@@ -61,6 +65,8 @@ func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 
 // AFSK, by contrast, does decimate.
 func TestDemodInitKeepsAFSKDecimation(t *testing.T) {
+	t.Parallel()
+
 	var channel = 1
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 48000)
 	audioConfig.achan[channel].decimate = 3
@@ -74,6 +80,8 @@ func TestDemodInitKeepsAFSKDecimation(t *testing.T) {
 // Regression test for #671: the demodulator types are one letter per
 // demodulator, and the demodulator state is MAX_SUBCHANS wide, so a longer
 // list used to walk off the end of it and hit an assert during startup.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestDemodInitCapsProfileLetters(t *testing.T) {
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
@@ -103,6 +111,8 @@ func TestDemodInitCapsProfileLetters(t *testing.T) {
 // The PSK modems take their profiles straight from the configuration rather
 // than through AFSK's normalising, so they need the same cap: an overlong list
 // for any of them used to abort startup on the subchannel index assert.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 	for _, tc := range []struct {
 		modemType modem_t
@@ -140,6 +150,8 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 // the audio thread is reading the flag for every sample, so the flag has to be
 // safe to share between them.  Run under -race.
 func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
 	var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
@@ -164,6 +176,8 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 // What NewDemodulator works out from a channel's settings, it keeps: the
 // configuration is left as the file and command line had it.
 func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 300, 1600, 1800, 48000)
 	audioConfig.achan[channel].num_freq = 3
@@ -185,6 +199,8 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 // demod_init builds a Demodulator for each radio channel, and none for a
 // channel that is not one.
 func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[0].num_freq = 1
 
@@ -199,6 +215,8 @@ func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
 // demodulator has more than one; a channel without one, whether not a radio
 // or out of range altogether, has one of each.
 func TestChannelLayout(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[0].num_freq = 1
 	audioConfig.achan[0].profiles = "AB+"

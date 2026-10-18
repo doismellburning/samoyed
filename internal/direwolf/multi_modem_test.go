@@ -40,6 +40,8 @@ func (discardReceiveSink) DCDChange(int, int) {}
 // is left behind when it runs again: neither a frame still waiting to be
 // picked nor the DC bias of the old audio turns up in what comes after.
 func TestMultiModemInitStartsAfresh(t *testing.T) {
+	t.Parallel()
+
 	// Two demodulators, so a frame waits to be compared rather than going
 	// straight through.
 	var audioConfig = newRecvTestRadioConfig(1)
@@ -79,6 +81,8 @@ func TestMultiModemInitStartsAfresh(t *testing.T) {
 // the demodulators ran three, which fails silently, and only on a
 // multi-decoder configuration.
 func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "ABA"
 	audioConfig.achan[0].num_freq = 1
@@ -95,6 +99,8 @@ func TestMultiModemInitSharesSubchannelCount(t *testing.T) {
 // --il2p-version option, so the IL2P receivers have to take their settings
 // from what they are given.
 func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].il2p_version = il2p.Version04
 	audioConfig.achan[0].il2p_crc = false
@@ -110,6 +116,8 @@ func TestMultiModemInitHandsIL2PItsChannelSettings(t *testing.T) {
 // was handed - atest's -dx, say - rather than whatever an earlier caller
 // asked for.
 func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "AB"
 	audioConfig.achan[0].num_freq = 1
@@ -128,6 +136,8 @@ func TestMultiModemInitHandsFX25ItsDebugLevel(t *testing.T) {
 // was handed - atest's -d2, say - rather than whatever an earlier caller
 // asked for.
 func TestMultiModemInitHandsIL2PItsDebugLevel(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "AB"
 	audioConfig.achan[0].num_freq = 1
@@ -174,6 +184,8 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 // neither the line decoder nor the HDLC, FX.25 or IL2P receivers should see
 // them.  Other channels have no EAS receiver at all.
 func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(2)
 	audioConfig.achan[0].num_freq = 1
 	audioConfig.achan[1].num_freq = 1
@@ -228,6 +240,8 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 // A frame a radio channel decodes goes on to where the sink was told, and
 // nowhere at all if it wasn't told anywhere.
 func TestRadioSinkHandsFramesOn(t *testing.T) {
+	t.Parallel()
+
 	var pp = ax25.FromText("Q1TEST>APRS:heard", true)
 	require.NotNil(t, pp)
 
@@ -251,6 +265,8 @@ func TestRadioSinkHandsFramesOn(t *testing.T) {
 
 // A radio channel's DCD output follows the data detected on it.
 func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
+	t.Parallel()
+
 	var set []string
 
 	var sink = new(radioSink)
@@ -268,6 +284,8 @@ func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
 // not a radio, say, which the audio statistics still ask about, or one that
 // transmit calibration keys - has heard nothing, and has nothing to mute.
 func TestReceiverChannelWithoutDemodulator(t *testing.T) {
+	t.Parallel()
+
 	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
 
 	var zero ax25.ALevel
@@ -278,6 +296,8 @@ func TestReceiverChannelWithoutDemodulator(t *testing.T) {
 
 // Muting a channel mutes its demodulator, and unmuting unmutes it.
 func TestMuteInputMutesTheChannelsDemodulator(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 
 	var r = multi_modem_init(audioConfig, 0, 0, new(discardReceiveSink))
@@ -292,6 +312,8 @@ func TestMuteInputMutesTheChannelsDemodulator(t *testing.T) {
 // A channel whose transmit inhibit input is set counts as busy, data or no
 // data, so nothing is transmitted on it.
 func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {
+	t.Parallel()
+
 	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
 
 	assert.False(t, r.DataDetectAny(0), "nothing heard and no inputs, so not busy")
@@ -319,6 +341,8 @@ func (s *dcdRecordingSink) DCDChange(channel int, state int) {
 // DCD indicator.  The DTMF decoder reports itself as subchannel
 // MAX_SUBCHANS, after the demodulators' subchannels.
 func TestDTMFButtonMakesChannelBusy(t *testing.T) {
+	t.Parallel()
+
 	var sink = new(dcdRecordingSink)
 	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
 
@@ -337,6 +361,8 @@ func TestDTMFButtonMakesChannelBusy(t *testing.T) {
 // transmit inhibit is set.  Were it held where it was while the channel is
 // inhibited, a packet ending under the inhibit would leave it lit.
 func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
+	t.Parallel()
+
 	var sink = new(dcdRecordingSink)
 	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
 	r.numSubchannel[0] = 1
@@ -359,6 +385,8 @@ func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
 // whether it is busy.  Under the race detector, this fails if the two are
 // not synchronised.
 func TestDCDChangeWhileTransmitterAsks(t *testing.T) {
+	t.Parallel()
+
 	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
 	r.numSubchannel[0] = 1
 
@@ -393,6 +421,8 @@ func (r *countingBitReceiver) DCDChange(dwcore.SlicerID, int) {}
 // What a demodulator demodulates goes to the receiver it was given - noise
 // decodes to bits like anything else.
 func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].num_freq = 1
 
@@ -413,6 +443,8 @@ func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
 // A channel whose demodulators can't be fed - here, it has none - says so,
 // for the receive thread to give up on its device and DirewolfMain to end the
 // run through the teardown, rather than ending the process itself.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestProcessSampleWithoutDemodulatorSaysSo(t *testing.T) {
 	var m = new(MultiModem)
 

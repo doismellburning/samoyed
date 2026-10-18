@@ -66,6 +66,8 @@ func buildWAVWithExtraChunks(t *testing.T) []byte {
 // level below it - and never set passall, leaving no way to ask atest for the
 // behaviour that value is named after.
 func Test_atest_fixBits(t *testing.T) {
+	t.Parallel()
+
 	var testCases = []struct {
 		arg     int
 		level   BitFixLevel
@@ -96,6 +98,8 @@ func Test_atest_fixBits(t *testing.T) {
 // Test_atest_newAtestRejects covers the options NewAtest turns down, which
 // used to be reported and exited on in the middle of parsing the command line.
 func Test_atest_newAtestRejects(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]func(*AtestOptions){
 		"fix bits":     func(o *AtestOptions) { o.FixBits = int(BitFixPassall) + 1 },
 		"il2p version": func(o *AtestOptions) { o.IL2PVersion = "0.5" },
@@ -104,6 +108,8 @@ func Test_atest_newAtestRejects(t *testing.T) {
 
 	for name, modify := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var opts = atestTestOptions()
 			modify(opts)
 
@@ -116,6 +122,8 @@ func Test_atest_newAtestRejects(t *testing.T) {
 // Test_atest_decodeWAVErrors checks that a file DecodeWAV can't make sense of
 // comes back as an error rather than ending the program.
 func Test_atest_decodeWAVErrors(t *testing.T) {
+	t.Parallel()
+
 	var atest, err = NewAtest(atestTestOptions())
 	require.NoError(t, err)
 
@@ -129,6 +137,8 @@ func Test_atest_decodeWAVErrors(t *testing.T) {
 
 	for name, data := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var _, err = atest.DecodeWAV(bytes.NewReader(data), name)
 			assert.Error(t, err)
 		})
@@ -137,6 +147,8 @@ func Test_atest_decodeWAVErrors(t *testing.T) {
 
 // Test_atest_decodeWAV decodes a file without going through the command line.
 func Test_atest_decodeWAV(t *testing.T) {
+	t.Parallel()
+
 	var atest, err = NewAtest(atestTestOptions())
 	require.NoError(t, err)
 
@@ -173,6 +185,8 @@ func withInt32At(wav []byte, offset int, v int32) []byte {
 // is reported as such, rather than whatever its missing fields make it look
 // like.
 func Test_atest_decodeWAVTruncatedFmt(t *testing.T) {
+	t.Parallel()
+
 	var atest, err = NewAtest(atestTestOptions())
 	require.NoError(t, err)
 
@@ -186,6 +200,8 @@ func Test_atest_decodeWAVTruncatedFmt(t *testing.T) {
 // negative size is an error, rather than decoding as no audio lasting a
 // negative time.
 func Test_atest_decodeWAVNegativeDataSize(t *testing.T) {
+	t.Parallel()
+
 	var atest, err = NewAtest(atestTestOptions())
 	require.NoError(t, err)
 
@@ -199,6 +215,8 @@ func Test_atest_decodeWAVNegativeDataSize(t *testing.T) {
 // can't work with is an error, as it is from the configuration file, rather
 // than something to divide by.
 func Test_atest_decodeWAVSampleRate(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]int32{
 		"zero":     0,
 		"negative": -8000,
@@ -208,6 +226,8 @@ func Test_atest_decodeWAVSampleRate(t *testing.T) {
 
 	for name, rate := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var atest, err = NewAtest(atestTestOptions())
 			require.NoError(t, err)
 

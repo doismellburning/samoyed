@@ -36,6 +36,8 @@ func newGenPacketsOptions() *GenPacketsOptions {
 }
 
 func Test_GenPackets_sendsWhatAtestDecodes(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		send func(t *testing.T, g *GenPackets)
 		want int
@@ -55,6 +57,8 @@ func Test_GenPackets_sendsWhatAtestDecodes(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var f = filepath.Join(t.TempDir(), "out.wav")
 
 			var g, err = NewGenPackets(newGenPacketsOptions(), f)
@@ -69,6 +73,8 @@ func Test_GenPackets_sendsWhatAtestDecodes(t *testing.T) {
 }
 
 func Test_GenPackets_noiseLosesSomeFrames(t *testing.T) {
+	t.Parallel()
+
 	var f = filepath.Join(t.TempDir(), "out.wav")
 
 	var g, err = NewGenPackets(newGenPacketsOptions(), f)
@@ -83,6 +89,8 @@ func Test_GenPackets_noiseLosesSomeFrames(t *testing.T) {
 }
 
 func Test_GenPackets_SendPacket_refusesWhatIsNotTNC2(t *testing.T) {
+	t.Parallel()
+
 	var g, err = NewGenPackets(newGenPacketsOptions(), filepath.Join(t.TempDir(), "out.wav"))
 	require.NoError(t, err)
 
@@ -92,6 +100,8 @@ func Test_GenPackets_SendPacket_refusesWhatIsNotTNC2(t *testing.T) {
 }
 
 func Test_GenPackets_SendVariableSpeed_refusesNoIncrement(t *testing.T) {
+	t.Parallel()
+
 	var g, err = NewGenPackets(newGenPacketsOptions(), filepath.Join(t.TempDir(), "out.wav"))
 	require.NoError(t, err)
 
@@ -101,6 +111,8 @@ func Test_GenPackets_SendVariableSpeed_refusesNoIncrement(t *testing.T) {
 }
 
 func Test_NewGenPackets_refusesBadOptions(t *testing.T) {
+	t.Parallel()
+
 	var testCases = map[string]struct {
 		change func(opts *GenPacketsOptions)
 		want   string
@@ -114,6 +126,8 @@ func Test_NewGenPackets_refusesBadOptions(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var opts = newGenPacketsOptions()
 			tc.change(opts)
 
@@ -124,6 +138,8 @@ func Test_NewGenPackets_refusesBadOptions(t *testing.T) {
 }
 
 func Test_NewGenPackets_refusesAFileItCannotCreate(t *testing.T) {
+	t.Parallel()
+
 	var _, err = NewGenPackets(newGenPacketsOptions(), filepath.Join(t.TempDir(), "missing", "out.wav"))
 	assert.Error(t, err)
 }
