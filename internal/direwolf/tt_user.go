@@ -22,9 +22,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -921,11 +921,11 @@ func (u *ttUsers) setenv(i int) {
 	var phonetics []string
 
 	for _, p := range u.user[i].callsign {
-		if unicode.IsUpper(p) {
+		if ascii.IsUpper(p) {
 			phonetics = append(phonetics, letters[p-'A'])
-		} else if unicode.IsLower(p) {
+		} else if ascii.IsLower(p) {
 			phonetics = append(phonetics, letters[p-'a'])
-		} else if unicode.IsDigit(p) {
+		} else if ascii.IsDigit(p) {
 			phonetics = append(phonetics, digits[p-'0'])
 		} else {
 			phonetics = append(phonetics, string(p))

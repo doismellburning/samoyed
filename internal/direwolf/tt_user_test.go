@@ -6,6 +6,7 @@ package direwolf
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -86,6 +87,30 @@ func TestDigitSuffixIgnoresNonASCIIDigits(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, digit_suffix("Q1TE ST"), digit_suffix("Q1TE\u0663ST")) // ARABIC-INDIC DIGIT THREE
+}
+
+// The phonetic spelling of a callsign indexes a table by letter or digit, so
+// only ASCII ones may reach it: 'À', which unicode.IsUpper accepts, indexed
+// past the end of the table of letters and panicked.
+//
+
+func TestSetenvSpellsOutOnlyASCII(t *testing.T) {
+	t.Setenv("TTCALLPH", "")
+
+	var my_audio_config RadioConfig
+
+	my_audio_config.mycall[0] = "Q1TEST-15"
+
+	var my_tt_config tt_config_s
+
+	my_tt_config.retain_time = 20
+
+	var users = newTTUsers(&my_audio_config, &my_tt_config)
+
+	users.user[0].callsign = "Q2À"
+	users.setenv(0)
+
+	assert.Equal(t, "Quebec Two À", os.Getenv("TTCALLPH"))
 }
 
 // The receive processing goroutine records users as their tone sequences

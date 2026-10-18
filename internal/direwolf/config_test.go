@@ -40,6 +40,7 @@ func Test_alldigits(t *testing.T) {
 		{"space present", "123 4", false},
 		{"symbol present", "123+4", false},
 		{"all letters", "ABCDE", false},
+		{"non-ASCII digit", "12\u0663", false}, // ARABIC-INDIC DIGIT THREE
 	}
 
 	for _, tt := range tests {
@@ -70,6 +71,7 @@ func Test_alllettersorpm(t *testing.T) {
 		{"digit present", "AB3C", false},
 		{"space present", "AB C", false},
 		{"symbol present", "AB*C", false},
+		{"non-ASCII letter", "AÀ", false},
 	}
 
 	for _, tt := range tests {

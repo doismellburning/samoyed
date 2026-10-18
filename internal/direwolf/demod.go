@@ -13,8 +13,8 @@ package direwolf
 import (
 	"strings"
 	"sync/atomic"
-	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -159,10 +159,10 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 
 		var profileStr = achan.profiles
 		for i, p := range profileStr {
-			if unicode.IsLower(p) {
-				justLettersBuilder.WriteRune(unicode.ToUpper(p))
+			if ascii.IsLower(p) {
+				justLettersBuilder.WriteRune(ascii.ToUpper(p))
 				num_letters++
-			} else if unicode.IsUpper(p) {
+			} else if ascii.IsUpper(p) {
 				justLettersBuilder.WriteRune(p)
 				num_letters++
 			} else if p == '+' {
