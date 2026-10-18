@@ -32,6 +32,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/doismellburning/samoyed/internal/aprstt"
 	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/axudp"
@@ -910,7 +911,7 @@ type parseState struct {
 	audio *RadioConfig
 	digi  *digipeater.Config
 	cdigi *digipeater.ConnectedConfig
-	tt    *Config
+	tt    *aprstt.Config
 	igate *igate_config_s
 	misc  *misc_config_s
 
@@ -1242,7 +1243,7 @@ func (ps *parseState) readLegacy(r io.Reader, name string) {
 func config_init(fname string, p_audio_config *RadioConfig,
 	p_digi_config *digipeater.Config,
 	p_cdigi_config *digipeater.ConnectedConfig,
-	p_tt_config *Config,
+	p_tt_config *aprstt.Config,
 	p_igate_config *igate_config_s,
 	p_misc_config *misc_config_s,
 	symbolTable symbolCodes) configReport {
@@ -1341,7 +1342,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 	p_tt_config.RetainTime = 80 * 60
 	p_tt_config.NumXmits = 6
-	dwutil.Assert(p_tt_config.NumXmits <= MaxXmits)
+	dwutil.Assert(p_tt_config.NumXmits <= aprstt.MaxXmits)
 	p_tt_config.XmitDelay[0] = 3 /* Before initial transmission. */
 	p_tt_config.XmitDelay[1] = 16
 	p_tt_config.XmitDelay[2] = 32
@@ -1361,12 +1362,12 @@ func config_init(fname string, p_audio_config *RadioConfig,
 	p_tt_config.Status[8] = "/emergency"
 	p_tt_config.Status[9] = "/custom 1"
 
-	for m := range ErrorCount {
+	for m := range aprstt.ErrorCount {
 		p_tt_config.Response[m].Method = "MORSE"
 		p_tt_config.Response[m].MText = "?"
 	}
 
-	p_tt_config.Response[ErrorOK].MText = "R"
+	p_tt_config.Response[aprstt.ErrorOK].MText = "R"
 
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
 	p_misc_config.metrics_port = 0 // Disabled by default.
@@ -4486,8 +4487,8 @@ func handleTTPOINT(ps *parseState) error {
 	 * TTPOINT   pattern  latitude  longitude
 	 */
 
-	var tl = new(Loc)
-	tl.Type = LocPoint
+	var tl = new(aprstt.Loc)
+	tl.Type = aprstt.LocPoint
 
 	// Pattern: B and digits
 
@@ -4536,8 +4537,8 @@ func handleTTVECTOR(ps *parseState) error {
 	 * TTVECTOR   pattern  latitude  longitude  scale  unit
 	 */
 
-	var tl = new(Loc)
-	tl.Type = LocVector
+	var tl = new(aprstt.Loc)
+	tl.Type = aprstt.LocVector
 	tl.Pattern = ""
 	tl.Vector.Lat = 0
 	tl.Vector.Lon = 0
@@ -4622,8 +4623,8 @@ func handleTTGRID(ps *parseState) error {
 	 * TTGRID   pattern  min-latitude  min-longitude  max-latitude  max-longitude
 	 */
 
-	var tl = new(Loc)
-	tl.Type = LocGrid
+	var tl = new(aprstt.Loc)
+	tl.Type = aprstt.LocGrid
 
 	// Pattern: B [digit] x... y...
 
@@ -4687,8 +4688,8 @@ func handleTTUTM(ps *parseState) error {
 	 * TTUTM   pattern  zone [ scale [ x-offset y-offset ] ]
 	 */
 
-	var tl = new(Loc)
-	tl.Type = LocUTM
+	var tl = new(aprstt.Loc)
+	tl.Type = aprstt.LocUTM
 	tl.UTM.Scale = 1
 
 	// Pattern: B [digit] x... y...
@@ -4782,13 +4783,13 @@ func handleTTUSNGMGRS(ps *parseState) error {
 	 * TTMGRS   pattern  zone_square
 	 */
 
-	var tl = new(Loc)
+	var tl = new(aprstt.Loc)
 
 	// TODO1.2: in progress...
 	if strings.EqualFold(ps.keyword, "TTMGRS") {
-		tl.Type = LocMGRS
+		tl.Type = aprstt.LocMGRS
 	} else {
-		tl.Type = LocUSNG
+		tl.Type = aprstt.LocUSNG
 	}
 
 	// Pattern: B [digit] x... y...
@@ -4862,8 +4863,8 @@ func handleTTMHEAD(ps *parseState) error {
 
 	// TODO1.3:  TTMHEAD needs testing.
 
-	var tl = new(Loc)
-	tl.Type = LocMHead
+	var tl = new(aprstt.Loc)
+	tl.Type = aprstt.LocMHead
 
 	// Pattern: B, optional additional button, some number of xxxx... for matching
 
@@ -4941,8 +4942,8 @@ func handleTTSATSQ(ps *parseState) error {
 
 	// TODO1.2:  TTSATSQ To be continued...
 
-	var tl = new(Loc)
-	tl.Type = LocSatSq
+	var tl = new(aprstt.Loc)
+	tl.Type = aprstt.LocSatSq
 
 	// Pattern: B, optional additional button, exactly xxxx for matching
 
@@ -4988,8 +4989,8 @@ func handleTTAMBIG(ps *parseState) error {
 
 	// TODO1.3:  TTAMBIG To be continued...
 
-	var tl = new(Loc)
-	tl.Type = LocAmbig
+	var tl = new(aprstt.Loc)
+	tl.Type = aprstt.LocAmbig
 
 	// Pattern: B, optional additional button, exactly x for matching
 
@@ -5047,8 +5048,8 @@ func handleTTMACRO(ps *parseState) error {
 	 *
 	 */
 
-	var tl = new(Loc)
-	tl.Type = LocMacro
+	var tl = new(aprstt.Loc)
+	tl.Type = aprstt.LocMacro
 
 	// Pattern: Any combination of digits, x, y, and z.
 	// Also make note of which letters are used in pattern and definition.
@@ -5401,8 +5402,8 @@ func handleTTERR(ps *parseState) error {
 	}
 
 	var msg_num = -1
-	for n := range ErrorCount {
-		if strings.EqualFold(t, ErrorName(n)) {
+	for n := range aprstt.ErrorCount {
+		if strings.EqualFold(t, aprstt.ErrorName(n)) {
 			msg_num = n
 
 			break
@@ -5440,7 +5441,7 @@ func handleTTERR(ps *parseState) error {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("Line %d: TTERR debug %d %s-%d \"%s\"\n", line, msg_num, method, ssid, t);
 
-	dwutil.Assert(msg_num >= 0 && msg_num < ErrorCount)
+	dwutil.Assert(msg_num >= 0 && msg_num < aprstt.ErrorCount)
 
 	ps.tt.Response[msg_num].Method = method
 

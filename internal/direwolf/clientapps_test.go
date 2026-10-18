@@ -6,10 +6,8 @@ package direwolf
 import (
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // What we hear goes to a client application on each KISS transport, as a data
@@ -50,33 +48,4 @@ func TestClientAppsSendRecPacketToNone(t *testing.T) {
 
 		apps.SendRecPacket(0, pp)
 	})
-}
-
-// The APRStt gateway sends its object reports to the client applications it
-// was handed, when configured to, as though it had heard them.
-func TestGatewaySendsObjectReportsToClientApps(t *testing.T) {
-	t.Parallel()
-
-	var cfg Config
-	cfg.ObjSendToApp = 1
-	cfg.ObjRecvChan = 0
-	cfg.ObjXmitChan = -1
-
-	var kns, clients = newAttachedKissNet(t, -1, false, 1)
-
-	var apps = new(clientApps)
-	apps.kissNet = kns
-
-	var gw = NewGateway(ttMyCalls(), &cfg, apps.SendRecPacket, nil, nil, nil, nil, nil, 0)
-
-	var report = "Q1TEST>APRS:;Q2TEST   *111111z4237.14N/07120.83W-"
-
-	var pp = ax25.FromText(report, true)
-	require.NotNil(t, pp)
-
-	gw.users.sendObjectReport(report, true)
-
-	assert.Equal(t,
-		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.Pack()...)),
-		readKissNetFrame(t, clients[0]))
 }

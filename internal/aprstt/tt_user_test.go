@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-package direwolf
+package aprstt
 
 import (
 	"fmt"
@@ -192,6 +192,31 @@ func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
 	}
 
 	var gw = NewGateway(ttMyCalls("Q1TEST"), &ttConfig, nil, nil, toIGate, nil, nil, nil, 0)
+
+	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
+	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
+
+	assert.Equal(t, []string{"1 Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W="}, sent)
+}
+
+// An object report goes to the client applications the gateway was handed,
+// when configured to, the first time only, on the channel it was heard on.
+func TestObjectReportGoesToTheClientApps(t *testing.T) {
+	t.Parallel()
+
+	var ttConfig Config
+
+	ttConfig.ObjSendToApp = 1
+	ttConfig.ObjRecvChan = 1
+	ttConfig.ObjXmitChan = -1
+
+	var sent []string
+
+	var toApps = func(channel int, pp *ax25.Packet) {
+		sent = append(sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
+	}
+
+	var gw = NewGateway(ttMyCalls("Q1TEST"), &ttConfig, toApps, nil, nil, nil, nil, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)

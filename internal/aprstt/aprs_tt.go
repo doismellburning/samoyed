@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package aprstt
 
 /*------------------------------------------------------------------
  *
@@ -49,6 +52,9 @@ import (
 
 /* Error codes for sending responses to user. */
 
+// The Error... codes are how a tone sequence fared, each with its own audible
+// response in Config.Response.
+
 const ErrorOK = 0             /* Success. */
 const ErrorDMsg = 1           /* D was first char of field.  Not implemented yet. */
 const ErrorInternal = 2       /* Internal error.  Shouldn't be here. */
@@ -64,6 +70,8 @@ const ErrorInvalidSatSq = 11  /* Satellite square must be 4 digits. */
 const ErrorSuffixNoCall = 12  /* No known callsign for suffix. */
 const ErrorCount = 13         /* Number of items above.  i.e. Last number plus 1. */
 
+// ErrorName is the name of response code errCode, as the TTERR configuration
+// command spells it.
 func ErrorName(errCode int) string { // TODO Fix the type
 	switch errCode {
 	case ErrorOK:
@@ -101,6 +109,7 @@ func ErrorName(errCode int) string { // TODO Fix the type
  * Configuration options for APRStt.
  */
 
+// MaxXmits is the most times an object report can be transmitted.
 const MaxXmits = 10
 
 const TT_MTEXT_LEN = 64
@@ -117,6 +126,7 @@ const APRSTT_DEFAULT_SYMBOL = 'A'
  * match and extracting fixed size groups of digits.
  */
 
+// LocType is the kind of location, or macro, a Loc describes.
 type LocType int
 
 const (
@@ -132,17 +142,20 @@ const (
 	LocAmbig
 )
 
+// PointLoc is a LocPoint's fixed position.
 type PointLoc struct {
 	Lat float64 /* Specific locations. */
 	Lon float64
 }
 
+// VectorLoc is the origin a LocVector's bearing and distance start from.
 type VectorLoc struct {
 	Lat   float64 /* For bearing/direction. */
 	Lon   float64
 	Scale float64 /* conversion to meters */
 }
 
+// GridLoc is the corners of a LocGrid's area.
 type GridLoc struct {
 	Lat0 float64 /* yyy all zeros. */
 	Lon0 float64 /* xxx */
@@ -150,6 +163,7 @@ type GridLoc struct {
 	Lon9 float64 /* xxx */
 }
 
+// UTMLoc is where a LocUTM's coordinates are measured from.
 type UTMLoc struct {
 	Scale   float64
 	XOffset float64
@@ -159,19 +173,24 @@ type UTMLoc struct {
 	Hemi    rune /* UTM Hemisphere, should be 'N' or 'S'. */
 }
 
+// MGRSLoc is a LocMGRS or LocUSNG's zone and square.
 type MGRSLoc struct {
 	Zone string /* Zone and square for USNG/MGRS */
 }
 
+// MHeadLoc is the start of a LocMHead's Maidenhead Locator.
 type MHeadLoc struct {
 	Prefix string /* should be 10, 6, or 4 digits to be */
 	/* prepended to the received sequence. */
 }
 
+// MacroLoc is what a LocMacro expands to.
 type MacroLoc struct {
 	Definition string
 }
 
+// Loc is a location format, or a macro, from the configuration file: the
+// pattern a field must match, and what to make of it.
 type Loc struct {
 	Type LocType
 
@@ -188,6 +207,8 @@ type Loc struct {
 	Macro  MacroLoc
 }
 
+// Config is the gateway's configuration, from the TT... configuration
+// commands.
 type Config struct {
 	GatewayEnabled int /* Send DTMF sequences to APRStt gateway. */
 
@@ -237,6 +258,7 @@ type Config struct {
  * on multiple channels at the same time.
  */
 
+// MaxMsgLen is the most buttons a tone sequence accumulates.
 const MaxMsgLen = 100
 
 // ttMaxMacroDepth bounds how deep macros may expand within macros, so one
@@ -292,6 +314,11 @@ func ttFieldByte(e string, i int) byte {
 	return 0
 }
 
+// FrameReceiver is where a received frame goes on its way to receive
+// processing: DataLinkQueue.RecFrame, in DirewolfMain.  The gateway hands it
+// each raw touch tone message, as though received.
+type FrameReceiver func(src dwcore.Source, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string)
+
 // ObjectReportSink is where the gateway sends an object report, with the
 // channel it concerns.
 type ObjectReportSink func(channel int, pp *ax25.Packet)
@@ -312,7 +339,7 @@ type Gateway struct {
 
 	// recFrame is where a raw touch tone message goes, as though received,
 	// or nil to drop it.
-	recFrame frameReceiver
+	recFrame FrameReceiver
 
 	// transmit is where an audible response goes, to be transmitted, or nil to
 	// drop it.
@@ -356,7 +383,7 @@ func NewGateway(
 	toApps ObjectReportSink,
 	remember ObjectReportSink,
 	toIGate ObjectReportSink,
-	recFrame frameReceiver,
+	recFrame FrameReceiver,
 	transmit dwcore.FrameSender,
 	audioLevel dwcore.AudioLevelFunc,
 	debug int,
@@ -1757,7 +1784,7 @@ func (g *Gateway) parseComment(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel, recFrame frameReceiver) {
+func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel, recFrame FrameReceiver) {
 	// Set source and dest to something valid to keep rest of processing happy.
 	// For lack of a better idea, make source "DTMF" to indicate where it came from.
 	// Application version might be useful in case we end up using different
