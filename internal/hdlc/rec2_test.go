@@ -30,3 +30,29 @@ func TestSanityCheckAPRSFrameEndsAfterControl(t *testing.T) {
 		assert.False(t, sanity_check(frame[:21], phy.BitFixSingle, phy.SanityAPRS))
 	})
 }
+
+// AX.25 addresses hold upper case letters and digits, padded with spaces.
+func TestSanityCheckAX25AddressCharacters(t *testing.T) {
+	t.Parallel()
+
+	var frame = func(dest string) []byte {
+		var f []byte
+		for _, addr := range []string{dest, "Q2TEST"} {
+			for k := range 6 {
+				f = append(f, addr[k]<<1)
+			}
+
+			f = append(f, 0x60)
+		}
+
+		f[13] |= 1 // The last address.
+
+		return append(f, 0x03, 0xf0)
+	}
+
+	assert.True(t, sanity_check(frame("Q1TEST"), phy.BitFixSingle, phy.SanityAX25))
+	assert.True(t, sanity_check(frame("Q1    "), phy.BitFixSingle, phy.SanityAX25))
+	assert.False(t, sanity_check(frame("q1TEST"), phy.BitFixSingle, phy.SanityAX25), "lower case")
+	assert.False(t, sanity_check(frame("Q1-EST"), phy.BitFixSingle, phy.SanityAX25), "punctuation")
+	assert.False(t, sanity_check(frame(" Q1TES"), phy.BitFixSingle, phy.SanityAX25), "leading space")
+}
