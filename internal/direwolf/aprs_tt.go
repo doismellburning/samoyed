@@ -398,7 +398,7 @@ func NewTTGateway(
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) Button(channel int, button rune) {
+func (g *TTGateway) Button(channel int, button byte) {
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// if (button != '.') {

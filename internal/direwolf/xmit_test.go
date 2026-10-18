@@ -1294,7 +1294,7 @@ func TestDTMFSendDecodesBack(t *testing.T) {
 
 		var x = decoder.Sample(float64(sam) / 16384.)
 		if x != ' ' && x != '.' {
-			heard.WriteRune(x)
+			heard.WriteByte(x)
 		}
 	}
 

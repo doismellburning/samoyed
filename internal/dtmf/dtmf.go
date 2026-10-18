@@ -61,9 +61,9 @@ type Decoder struct {
 	n             int /* Samples processed in this block. */
 	q1            [NUM_TONES]float64
 	q2            [NUM_TONES]float64
-	prevDec       rune
-	debounced     rune
-	prevDebounced rune
+	prevDec       byte
+	debounced     byte
+	prevDebounced byte
 	timeout       int
 }
 
@@ -142,7 +142,7 @@ func NewDecoder(channel int, sampleRate int, onDCD func(from dwcore.SlicerID, st
  *
  *----------------------------------------------------------------*/
 
-func (d *Decoder) Sample(input float64) rune {
+func (d *Decoder) Sample(input float64) byte {
 	for i := range NUM_TONES {
 		var q0 = input + d.q1[i]*d.coef[i] - d.q2[i]
 		d.q2[i] = d.q1[i]
@@ -216,10 +216,10 @@ func (d *Decoder) Sample(input float64) rune {
 		logrus.WithField("output", output).Trace("dtmf.Decoder.Sample tone outputs")
 	}
 
-	var decoded = ' '
+	var decoded = byte(' ')
 
 	if row >= 0 && col >= 0 {
-		decoded = rune(dtmfKeys[row*4+col])
+		decoded = dtmfKeys[row*4+col]
 	}
 
 	// Consider valid only if we get same twice in a row.
@@ -248,7 +248,7 @@ func (d *Decoder) Sample(input float64) rune {
 	// Return only new button pushes.
 	// Also report timeout after period of inactivity.
 
-	var ret = '.'
+	var ret = byte('.')
 
 	if d.debounced != d.prevDebounced {
 		if d.debounced != ' ' {

@@ -31,7 +31,7 @@ func Test_dtmf(t *testing.T) {
 			//x = decoder.Sample (dtmf * 0.001);
 
 			if x != ' ' && x != '.' {
-				result.WriteRune(x)
+				result.WriteByte(x)
 			}
 		}
 	}
