@@ -32,6 +32,8 @@ func assertObjectReport(t *testing.T, users *ttUsers, callsign string, firstTime
 }
 
 func Test_TTUser(t *testing.T) {
+	t.Parallel()
+
 	/* Fake audio config - All we care about is mycall for constructing object report packet. */
 
 	var my_audio_config RadioConfig
