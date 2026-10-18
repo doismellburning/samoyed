@@ -50,6 +50,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/doismellburning/samoyed/internal/morse"
+	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/xid"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
@@ -1040,9 +1041,14 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *ax25.Packet) int {
 
 		fmt.Printf("(%s)", desc)
 
+		var detail, decoded = netrom.Describe(pp)
 		if ftype == ax25.FrameTypeUXID {
-			var _, info2text, _ = xid.Parse(pinfo)
-			fmt.Printf(" %s\n", info2text)
+			_, detail, _ = xid.Parse(pinfo)
+			decoded = true
+		}
+
+		if decoded {
+			fmt.Printf(" %s\n", detail)
 		} else {
 			ax25.SafePrint(pinfo, !pp.IsAPRS())
 			fmt.Println()

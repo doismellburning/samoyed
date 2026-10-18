@@ -25,6 +25,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
 )
@@ -288,7 +289,10 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 
 		// Formated addresses.
 		var stemp = pp.FormatAddrs()
-		var pinfo = pp.Info()
+
+		// The radio transmit path decodes NET/ROM for the monitor in
+		// xmit.go, which a frame for a virtual channel never reaches.
+		var pinfo = netrom.MonitorInfo(pp, pp.Info())
 
 		// Where the packet is going, shown in front of it.
 		var to string

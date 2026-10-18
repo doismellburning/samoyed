@@ -324,3 +324,31 @@ func TestNetromAGWDataLink(t *testing.T) {
 	l.ClientCleanup(1)
 	assert.Equal(t, []string{"cleanup 1"}, dataLink.taken())
 }
+
+// A frame for a virtual channel is printed by the transmit queue itself,
+// never reaching the monitor code in xmit.go, and a NET/ROM node can sit on
+// one.
+//
+//nolint:paralleltest // Serial: captures os.Stdout.
+func TestTransmitQueueDecodesNetromOnAVirtualChannel(t *testing.T) {
+	const channel = MAX_RADIO_CHANS
+
+	var radio = new(RadioConfig)
+	radio.chan_medium[channel] = MEDIUM_NETTNC
+
+	var tq = newTestTransmitQueue(radio)
+
+	var frames, err = netrom.EncodeNodes("QNODEA", nil)
+	require.NoError(t, err)
+
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = netrom.NodesCallsign
+	addrs[ax25.Source] = "Q1TEST-7"
+
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, ax25.PIDNetROM, frames[0])
+	require.NotNil(t, pp)
+
+	var out = captureStdout(t, func() { tq.Append(channel, TQ_PRIO_1_LO, pp) })
+
+	assert.Contains(t, out, "NET/ROM NODES from QNODEA")
+}

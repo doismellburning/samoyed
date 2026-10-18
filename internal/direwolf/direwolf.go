@@ -1252,9 +1252,14 @@ func (rh *recPacketHandler) app_process_rec_packet(
 
 		logEntry = logEntry.WithField("desc", desc)
 
+		var detail, decoded = netrom.Describe(pp)
 		if ftype == ax25.FrameTypeUXID {
-			var _, info2text, _ = xid.Parse(pinfo)
-			logEntry.WithField("info", info2text).Info("Packet")
+			_, detail, _ = xid.Parse(pinfo)
+			decoded = true
+		}
+
+		if decoded {
+			logEntry.WithField("info", detail).Info("Packet")
 		} else {
 			logEntry.Info("Packet ax25_safe_print below:")
 			ax25.SafePrint(pinfo, asciiOnly)
