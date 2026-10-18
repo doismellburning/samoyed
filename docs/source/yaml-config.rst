@@ -260,6 +260,12 @@ These are the keys under ``samoyed``:
             Optionally, the base URL of the map's API,
             for a map other than the public one.
 
+        ``locator``
+            Optionally, the Maidenhead locator of where the node is,
+            such as ``IO91wm``,
+            which the map plots it at.
+            Left out, the map is not told where the node is.
+
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
     Its commands are:
@@ -307,7 +313,8 @@ These are the keys under ``samoyed``:
             connectMessage: |
               Welcome to the club node.
               Type ? for a list of commands.
-            map: {}
+            map:
+              locator: IO91wm
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

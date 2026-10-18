@@ -172,4 +172,8 @@ type NodeMapSettings struct {
 	// APIURL is the base URL of the map's API.  Left out, it is the public
 	// map's.
 	APIURL string `yaml:"apiUrl"`
+
+	// Locator is the Maidenhead locator of where the node is.  Left out,
+	// the map is not told.
+	Locator string `yaml:"locator"`
 }

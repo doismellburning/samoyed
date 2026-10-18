@@ -463,33 +463,6 @@ legacy: |
 		assert.Equal(t, []node.Port{{Channel: 8, Description: "Network TNC"}}, mustNodeConfig(t, c.audio, got).Ports)
 	})
 
-	t.Run("the node is reported to the node map when asked", func(t *testing.T) {
-		var c = parseYAMLConfig(t, "node:\n  address: q1test-7\n  alias: samnod\n  map: {}\n")
-		assert.Zero(t, c.errors, c.output)
-
-		var got, ok = c.misc.node.Get()
-		require.True(t, ok)
-		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: ""}), got.nodeMap)
-	})
-
-	t.Run("the node can be reported to another node map", func(t *testing.T) {
-		var c = parseYAMLConfig(t, "node:\n  address: Q1TEST\n  map: {apiUrl: 'http://localhost:8080'}\n")
-		assert.Zero(t, c.errors, c.output)
-
-		var got, ok = c.misc.node.Get()
-		require.True(t, ok)
-		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080"}), got.nodeMap)
-	})
-
-	t.Run("the node is not reported to the node map unless asked", func(t *testing.T) {
-		var c = parseYAMLConfig(t, "node: {address: Q1TEST}\n")
-		assert.Zero(t, c.errors, c.output)
-
-		var got, ok = c.misc.node.Get()
-		require.True(t, ok)
-		assert.True(t, got.nodeMap.IsNothing())
-	})
-
 	t.Run("no node unless asked for", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "channels:\n  - {channel: 0, mycall: Q1TEST}\n")
 		assert.True(t, c.misc.node.IsNothing())
@@ -510,6 +483,7 @@ legacy: |
 			{"node map URL not a URL", "{address: Q1TEST, map: {apiUrl: 'http://[::1'}}", "Invalid URL"},
 			{"node map URL not HTTP", "{address: Q1TEST, map: {apiUrl: 'ftp://map.example.org'}}", "Invalid URL"},
 			{"node map URL with no host", "{address: Q1TEST, map: {apiUrl: 'map.example.org'}}", "Invalid URL"},
+			{"node map locator not a locator", "{address: Q1TEST, map: {locator: IO9}}", "Invalid locator for the node map"},
 		} {
 			var c = parseYAMLConfig(t, "node: "+tc.entry+"\n")
 			assert.Equal(t, 1, c.errors, tc.name)
@@ -702,5 +676,49 @@ legacy: |
 		assert.Zero(t, got.errors, got.output)
 		assert.Equal(t, want.audio, got.audio)
 		assert.Equal(t, want.misc, got.misc)
+	})
+}
+
+func Test_config_yaml_node_map(t *testing.T) {
+	t.Run("the node is reported to the node map when asked", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node:\n  address: q1test-7\n  alias: samnod\n  map: {}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[nodemap.Location]()}), got.nodeMap)
+	})
+
+	t.Run("the node can be reported to another node map", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node:\n  address: Q1TEST\n  map: {apiUrl: 'http://localhost:8080'}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080", Location: maybe.Nothing[nodemap.Location]()}), got.nodeMap)
+	})
+
+	t.Run("the node map can be told where the node is", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node:\n  address: Q1TEST\n  map: {locator: IO91}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var config, _ = got.nodeMap.Get()
+		var location, located = config.Location.Get()
+		require.True(t, located)
+		assert.Equal(t, "IO91", location.Locator)
+		assert.InDelta(t, 51.5, location.Coords.Lat, 1e-9)
+		assert.InDelta(t, -1, location.Coords.Lon, 1e-9)
+	})
+
+	t.Run("the node is not reported to the node map unless asked", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.True(t, got.nodeMap.IsNothing())
 	})
 }

@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/latlong"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
 )
@@ -46,12 +48,42 @@ type Config struct {
 
 	// APIURL is the base URL of the map's API, or empty for DefaultURL's.
 	APIURL string
+
+	// Location is where the node is, if the map is to be told.
+	Location maybe.Maybe[Location]
 }
 
 // Report is the map's NodeData: what a node says about itself.
 type Report struct {
-	NodeAlias string   `json:"nodeAlias,omitempty"`
-	Software  Software `json:"software"`
+	NodeAlias string                `json:"nodeAlias,omitempty"`
+	Location  maybe.Maybe[Location] `json:"location,omitzero"`
+	Software  Software              `json:"software"`
+}
+
+// Location is where a node is: a Maidenhead locator, and the middle of the
+// square it names.
+type Location struct {
+	Locator string `json:"locator"`
+	Coords  LatLon `json:"coords"`
+}
+
+// LatLon is a position in degrees, north and east positive.
+type LatLon struct {
+	Lat float64 `json:"lat"`
+	Lon float64 `json:"lon"`
+}
+
+// LocationAt is the location locator, a Maidenhead locator such as IO91wm,
+// names, or what is wrong with it.
+func LocationAt(locator string) (Location, error) {
+	var lat, lon, err = latlong.FromGridSquare(locator)
+	if err != nil {
+		var none Location
+
+		return none, err
+	}
+
+	return Location{Locator: locator, Coords: LatLon{Lat: lat, Lon: lon}}, nil
 }
 
 // Software is what the node runs.
@@ -88,6 +120,7 @@ func New(config Config, client *http.Client) *Reporter {
 func (r *Reporter) Report() Report {
 	return Report{
 		NodeAlias: r.config.Alias,
+		Location:  r.config.Location,
 		Software:  Software{Name: softwareName, Version: version.Version},
 	}
 }

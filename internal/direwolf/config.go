@@ -2161,11 +2161,12 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 	var nodeMap maybe.Maybe[nodemap.Config]
 
 	if settings.Map != nil {
-		if !validNodeMapAPIURL(settings.Map.APIURL) {
-			return fmt.Errorf("line %d: Invalid URL %q for the node map. Must be an http or https URL", ps.line, settings.Map.APIURL)
+		var config, mapErr = ps.nodeMapConfig(address, alias, *settings.Map)
+		if mapErr != nil {
+			return mapErr
 		}
 
-		nodeMap = maybe.Just(nodemap.Config{Address: address, Alias: alias, APIURL: settings.Map.APIURL})
+		nodeMap = maybe.Just(config)
 	}
 
 	ps.misc.node = maybe.Just(nodeSettings{
@@ -2179,6 +2180,29 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 	})
 
 	return nil
+}
+
+// nodeMapConfig checks how the node at address, with alias, is to be
+// reported to the node map, and is what the map is to be told.
+func (ps *parseState) nodeMapConfig(address string, alias string, settings NodeMapSettings) (nodemap.Config, error) {
+	var none nodemap.Config
+
+	if !validNodeMapAPIURL(settings.APIURL) {
+		return none, fmt.Errorf("line %d: Invalid URL %q for the node map. Must be an http or https URL", ps.line, settings.APIURL)
+	}
+
+	var location maybe.Maybe[nodemap.Location]
+
+	if settings.Locator != "" {
+		var at, err = nodemap.LocationAt(settings.Locator)
+		if err != nil {
+			return none, fmt.Errorf("line %d: Invalid locator for the node map: %w", ps.line, err)
+		}
+
+		location = maybe.Just(at)
+	}
+
+	return nodemap.Config{Address: address, Alias: alias, APIURL: settings.APIURL, Location: location}, nil
 }
 
 // validNodeMapAPIURL says whether address is left out, for the public map, or

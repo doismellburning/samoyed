@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -60,14 +61,14 @@ func TestReport(t *testing.T) {
 	t.Run("with an alias", func(t *testing.T) {
 		t.Parallel()
 
-		var r = New(Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: ""}, http.DefaultClient)
-		assert.Equal(t, Report{NodeAlias: "SAMNOD", Software: Software{Name: "Samoyed", Version: ""}}, r.Report())
+		var r = New(Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[Location]()}, http.DefaultClient)
+		assert.Equal(t, Report{NodeAlias: "SAMNOD", Location: maybe.Nothing[Location](), Software: Software{Name: "Samoyed", Version: ""}}, r.Report())
 	})
 
 	t.Run("without an alias", func(t *testing.T) {
 		t.Parallel()
 
-		var r = New(Config{Address: "Q1TEST-7", Alias: "", APIURL: ""}, http.DefaultClient)
+		var r = New(Config{Address: "Q1TEST-7", Alias: "", APIURL: "", Location: maybe.Nothing[Location]()}, http.DefaultClient)
 		assert.Empty(t, r.Report().NodeAlias)
 	})
 }
@@ -78,13 +79,34 @@ func TestNew(t *testing.T) {
 	t.Run("reports to the public map by default", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Equal(t, DefaultURL, New(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, http.DefaultClient).url)
+		assert.Equal(t, DefaultURL, New(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location]()}, http.DefaultClient).url)
 	})
 
 	t.Run("reports to the map it is given", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Equal(t, "http://map.example.org", New(Config{Address: "Q1TEST", Alias: "", APIURL: "http://map.example.org"}, http.DefaultClient).url)
+		assert.Equal(t, "http://map.example.org", New(Config{Address: "Q1TEST", Alias: "", APIURL: "http://map.example.org", Location: maybe.Nothing[Location]()}, http.DefaultClient).url)
+	})
+}
+
+func TestLocationAt(t *testing.T) {
+	t.Parallel()
+
+	t.Run("is the middle of the square", func(t *testing.T) {
+		t.Parallel()
+
+		var location, err = LocationAt("IO91")
+		require.NoError(t, err)
+		assert.Equal(t, "IO91", location.Locator)
+		assert.InDelta(t, 51.5, location.Coords.Lat, 1e-9)
+		assert.InDelta(t, -1, location.Coords.Lon, 1e-9)
+	})
+
+	t.Run("is not a locator that is not one", func(t *testing.T) {
+		t.Parallel()
+
+		var _, err = LocationAt("IO9")
+		require.Error(t, err)
 	})
 }
 
@@ -95,7 +117,7 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[Location]()}, server)
 
 		require.NoError(t, r.send(t.Context()))
 
@@ -111,7 +133,7 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location]()}, server)
 
 		require.NoError(t, r.send(t.Context()))
 		assert.JSONEq(t, `{"software": {"name": "Samoyed"}}`, (<-requests).body)
@@ -121,17 +143,29 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: server.URL + "/"}, server.Client())
+		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: server.URL + "/", Location: maybe.Nothing[Location]()}, server.Client())
 
 		require.NoError(t, r.send(t.Context()))
 		assert.Equal(t, "/api/nodedata/Q1TEST", (<-requests).path)
+	})
+
+	t.Run("says where the node is", func(t *testing.T) {
+		t.Parallel()
+
+		var location = Location{Locator: "IO91", Coords: LatLon{Lat: 51.5, Lon: -1}}
+
+		var server, requests = fakeMap(t, http.StatusOK)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Just(location)}, server)
+
+		require.NoError(t, r.send(t.Context()))
+		assert.JSONEq(t, `{"location": {"locator": "IO91", "coords": {"lat": 51.5, "lon": -1}}, "software": {"name": "Samoyed"}}`, (<-requests).body)
 	})
 
 	t.Run("a refused report is an error", func(t *testing.T) {
 		t.Parallel()
 
 		var server, _ = fakeMap(t, http.StatusTooManyRequests)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location]()}, server)
 
 		var err = r.send(t.Context())
 		require.Error(t, err)
@@ -142,7 +176,7 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, _ = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location]()}, server)
 
 		server.Close()
 		require.Error(t, r.send(t.Context()))
@@ -156,7 +190,7 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location]()}, server)
 
 		var ctx, cancel = context.WithCancel(t.Context())
 
@@ -186,7 +220,7 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 
 		var server, _ = fakeMap(t, http.StatusInternalServerError)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location]()}, server)
 
 		var ctx, cancel = context.WithTimeout(t.Context(), 100*time.Millisecond)
 		defer cancel()
