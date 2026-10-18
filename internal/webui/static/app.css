@@ -188,3 +188,6 @@ tbody tr.fresh { animation: fresh 2s ease-out; }
 .popup h3 { margin: 0 0 4px; font: 600 14px var(--mono); }
 .popup p { margin: 2px 0; }
 .popup .muted { color: #666; }
+
+.node-title { margin: 0; padding: 8px 12px; font-weight: 600; }
+.node-panels { grid-auto-rows: minmax(200px, 1fr); }

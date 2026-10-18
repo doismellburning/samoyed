@@ -32,6 +32,7 @@ type fakeNet struct {
 type fakeNode struct {
 	net    *fakeNet
 	call   string
+	config node.Config
 	shell  *node.Node
 	netrom *netromNode
 }
@@ -106,12 +107,12 @@ func noneHeard(int) []mheard.Heard { return nil }
 func (f *fakeNet) add(call string, alias string) *fakeNode {
 	f.t.Helper()
 
-	var n = &fakeNode{net: f, call: call, shell: nil, netrom: nil}
-
 	var config = node.Config{
 		Address: call, Alias: alias, Ports: []node.Port{{Channel: 0, Description: "Test"}},
 		InfoMessage: "This is " + alias + ".", ConnectMessage: "",
 	}
+
+	var n = &fakeNode{net: f, call: call, config: config, shell: nil, netrom: nil}
 	n.shell = node.New(config, fakeLink{n: n}, noneHeard, nodeClient)
 
 	var cfg = netrom.DefaultConfig()
@@ -267,7 +268,9 @@ func TestNetROMIgnoresOtherFrames(t *testing.T) {
 	addrs[ax25.Repeater1] = "Q8TEST"
 	a.netrom.heardFrame(0, ax25.UFrame(addrs, 3, ax25.CRCmd, ax25.FrameTypeUUI, 0, ax25.PIDNetROM, frames[0]))
 
-	assert.Empty(t, a.netrom.work.take(), "only a NODES broadcast heard directly is taken in")
+	f.pump()
+	assert.Empty(t, a.netrom.router.Table().Destinations(), "only a NODES broadcast heard directly is taken in")
+	assert.False(t, a.netrom.Knows("OTHER"))
 
 	var none *netromNode
 	none.heardFrame(0, ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, ax25.PIDNetROM, frames[0]))

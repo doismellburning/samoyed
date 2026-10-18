@@ -1039,3 +1039,40 @@ func TestAttachedUsersAreSeparate(t *testing.T) {
 	a.Received([]byte("YE\r"))
 	assert.Equal(t, 1, one.closes)
 }
+
+func TestObserverAndSessions(t *testing.T) {
+	t.Parallel()
+
+	var link = new(fakeLink)
+	var n = New(testConfig(), link, noneHeard, testClient)
+
+	var mu sync.Mutex
+
+	var events []SessionEvent
+
+	n.SetObserver(func(e SessionEvent) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		events = append(events, e)
+	})
+
+	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
+	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("C Q3TEST\r"))
+	n.LinkEstablished(testChannel, testClient, "Q3TEST", nodeCall, false)
+
+	assert.Equal(t, []SessionInfo{{User: userCall, Channel: testChannel, Local: nodeCall, Downlink: "Q3TEST", Connected: true}}, n.Sessions())
+
+	n.LinkTerminated(testChannel, testClient, "Q3TEST", nodeCall, false)
+	n.LinkTerminated(testChannel, testClient, userCall, nodeCall, false)
+	assert.Empty(t, n.Sessions())
+
+	var kinds []SessionEventKind
+	for _, e := range events {
+		kinds = append(kinds, e.Kind)
+		assert.Equal(t, userCall, e.User)
+	}
+
+	assert.Equal(t, []SessionEventKind{SessionStarted, DownlinkUp, DownlinkDown, SessionEnded}, kinds)
+	assert.Equal(t, "Q3TEST", events[1].Downlink)
+}

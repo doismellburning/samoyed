@@ -51,6 +51,9 @@ type SamoyedConfig struct {
 	// NetROM, when given, gives the node NET/ROM.
 	NetROM *NetROMSettings `yaml:"netrom"`
 
+	// MQTT, when given, is where the node publishes its events.
+	MQTT *MQTTSettings `yaml:"mqtt"`
+
 	// Legacy holds directives in the line-at-a-time format, read after
 	// everything else, for anything not yet given a YAML form.
 	Legacy string `yaml:"legacy"`
@@ -209,6 +212,11 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 	if file.NetROM != nil {
 		ps.line = top["netrom"].line(new(yaml.Node))
 		ps.reportIfError(ps.applyNETROM(*file.NetROM))
+	}
+
+	if file.MQTT != nil {
+		ps.line = top["mqtt"].line(new(yaml.Node))
+		ps.reportIfError(ps.applyMQTT(*file.MQTT))
 	}
 }
 

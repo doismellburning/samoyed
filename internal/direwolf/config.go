@@ -38,6 +38,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/mqttpub"
 	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/doismellburning/samoyed/internal/pfilter"
@@ -172,6 +173,8 @@ type misc_config_s struct {
 	node maybe.Maybe[nodeSettings]
 
 	netrom maybe.Maybe[netrom.Config] // The node's NET/ROM, if it has one.  YAML only.
+
+	mqtt maybe.Maybe[mqttpub.Config] // Where to publish the node's events, if anywhere.  YAML only.
 
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.
@@ -2166,6 +2169,7 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		line:           ps.line,
 		infoMessage:    settings.InfoMessage,
 		connectMessage: settings.ConnectMessage,
+		adminToken:     settings.AdminToken,
 	})
 
 	return nil
@@ -2188,6 +2192,10 @@ type nodeSettings struct {
 
 	infoMessage    string
 	connectMessage string
+
+	// adminToken is the web admin API's bearer token, or "" for no admin
+	// API.
+	adminToken string
 }
 
 // connectedModeChannels are the channels connected mode can be used on.

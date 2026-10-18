@@ -24,8 +24,10 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/node"
+	"github.com/doismellburning/samoyed/internal/nodeevents"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/ptt"
 	"github.com/doismellburning/samoyed/internal/symbols"
@@ -588,10 +590,14 @@ x = Silence FX.25 information.`)
 
 	var webHub *webui.Hub
 
+	// The node's part of the interface is there from the start, and answers
+	// once the node is.
+	var nodeWeb = newNodeWeb(nodeAdminToken(misc_config))
+
 	if misc_config.web_port == 0 {
 		logrus.Debug("Web interface disabled")
 	} else {
-		webHub = webui_init(ctx, audio_config, fmt.Sprintf(":%d", misc_config.web_port))
+		webHub = webui_init(ctx, audio_config, fmt.Sprintf(":%d", misc_config.web_port), nodeWeb.routes()...)
 	}
 
 	// The AGW server is made here, so the transmit service can be told to
@@ -744,6 +750,8 @@ x = Silence FX.25 information.`)
 
 	var netromNode *netromNode // Nil without NET/ROM.
 
+	var nodeEvents *nodeevents.Bus // Nil without a node.
+
 	if _, hasNetROM := misc_config.netrom.Get(); hasNetROM && nodeConfig.IsNothing() {
 		logrus.Error("NET/ROM needs the node block, for the node's address")
 		td.exit(1)
@@ -752,10 +760,13 @@ x = Silence FX.25 information.`)
 	if nodeConfig, ok := nodeConfig.Get(); ok {
 		var nodeShell = node.New(nodeConfig, dataLinkQueue, mheardDB.HeardRF, nodeClient)
 
+		nodeEvents = nodeevents.NewBus(metrics.RecordNodeEventDropped)
+		nodeShell.SetObserver(shellObserver(nodeEvents, nodeConfig.Address))
+
 		if netromSettings, hasNetROM := misc_config.netrom.Get(); hasNetROM {
 			var netromErr error
 
-			netromNode, netromErr = startNetROM(ctx, netromSettings, audio_config, nodeConfig, nodeShell, dataLinkQueue, transmitQueue.Append)
+			netromNode, netromErr = startNetROM(ctx, netromSettings, audio_config, nodeConfig, nodeShell, dataLinkQueue, transmitQueue.Append, nodeEvents)
 			if netromErr != nil {
 				logrus.WithError(netromErr).Error("Could not start NET/ROM")
 				td.exit(1)
@@ -763,6 +774,9 @@ x = Silence FX.25 information.`)
 		}
 
 		nodeShell.Start()
+
+		nodeWeb.set(&webNode{config: nodeConfig, shell: nodeShell, netrom: netromNode, link: dataLinkQueue, heard: mheardDB.HeardRF})
+		mqtt_init(ctx, misc_config.mqtt, nodeEvents, nodeConfig.Address)
 
 		nodeClients = nodeShell
 

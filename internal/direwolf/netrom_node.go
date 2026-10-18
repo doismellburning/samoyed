@@ -28,8 +28,10 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
+	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/node"
+	"github.com/doismellburning/samoyed/internal/nodeevents"
 	"github.com/sirupsen/logrus"
 )
 
@@ -95,6 +97,13 @@ type netromNode struct {
 	// links are the AX.25 links to neighbours, by channel and neighbour.
 	links map[netrom.NeighbourKey]*neighbourLink
 
+	// events is told what happens; nil for nobody.
+	events *nodeevents.Bus
+
+	// heard is when each station was last heard on a NET/ROM port, so it is
+	// published as heard only the first time in a while.
+	heard map[netrom.NeighbourKey]time.Time
+
 	// snapshot is what the shell can read of the routing table from any
 	// goroutine, refreshed whenever the table changes.
 	snapMu     sync.Mutex
@@ -115,6 +124,7 @@ func newNetromNode(cfg netrom.Config, shell *node.Node, link node.DataLink, clie
 	n.shell = shell
 	n.work = newWorkQueue()
 	n.links = make(map[netrom.NeighbourKey]*neighbourLink)
+	n.heard = make(map[netrom.NeighbourKey]time.Time)
 	n.now = time.Now
 
 	var r, err = netrom.NewRouter(cfg, n, n.now())
@@ -164,6 +174,8 @@ func (n *netromNode) do(f func()) {
 // routerEvent logs what the Router says happened, keeping the shell's view of
 // the table up to date.
 func (n *netromNode) routerEvent(e netrom.Event) {
+	var ev = n.event(nodeevents.RoutesChanged)
+
 	switch e.Kind {
 	case netrom.EventRoutesChanged:
 		n.refresh()
@@ -171,11 +183,78 @@ func (n *netromNode) routerEvent(e netrom.Event) {
 			"destinations": len(n.nodes),
 			"neighbours":   len(n.neighbours),
 		}).Debug("NET/ROM routes changed")
+		metrics.SetNetROMDestinations(len(n.nodes))
+
+		ev.Destinations = len(n.nodes)
+		ev.Neighbours = len(n.neighbours)
 	case netrom.EventCircuitUp:
 		logrus.WithFields(logrus.Fields{"remote": e.Circuit.Remote, "user": e.Circuit.User}).Info("NET/ROM circuit up")
+
+		ev.Kind = nodeevents.CircuitUp
 	case netrom.EventCircuitDown:
 		logrus.WithFields(logrus.Fields{"remote": e.Circuit.Remote, "user": e.Circuit.User, "error": e.Err}).Info("NET/ROM circuit down")
+
+		ev.Kind = nodeevents.CircuitDown
+		ev.Error = failureText(e.Err)
 	}
+
+	if e.Kind != netrom.EventRoutesChanged {
+		metrics.SetNetROMCircuits(len(n.router.Circuits()))
+
+		ev.Local = e.Circuit.Local
+		ev.Remote = e.Circuit.Remote
+		ev.User = e.Circuit.User
+		ev.Incoming = e.Circuit.Incoming
+	}
+
+	n.events.Publish(ev)
+}
+
+// event returns an event of kind about this node, now.
+func (n *netromNode) event(kind nodeevents.Kind) nodeevents.Event {
+	return newEvent(kind, n.cfg.Call, n.now())
+}
+
+// linkEvent publishes a neighbour link coming up or going down.
+func (n *netromNode) linkEvent(kind nodeevents.Kind, key netrom.NeighbourKey, incoming bool, failure string) {
+	var ev = n.event(kind)
+	var port = key.Port
+	ev.Port = &port
+	ev.Local = n.cfg.Call
+	ev.Remote = key.Call
+	ev.Role = "neighbour"
+	ev.Incoming = incoming
+	ev.Error = failure
+	n.events.Publish(ev)
+}
+
+// heardQuiet is how long a station must go unheard to count as heard afresh.
+const heardQuiet = 15 * time.Minute
+
+// maxHeard is the most stations the heard map holds before it starts again.
+const maxHeard = 1000
+
+// heardStation notes a station heard directly, publishing it if it is the
+// first time in a while.  It runs on NET/ROM's goroutine.
+func (n *netromNode) heardStation(key netrom.NeighbourKey, now time.Time) {
+	var last, ok = n.heard[key]
+	if ok && now.Sub(last) < heardQuiet {
+		n.heard[key] = now
+
+		return
+	}
+
+	if len(n.heard) >= maxHeard {
+		clear(n.heard)
+	}
+
+	n.heard[key] = now
+
+	var ev = n.event(nodeevents.Heard)
+	var port = key.Port
+	ev.Port = &port
+	ev.Remote = key.Call
+	n.events.Publish(ev)
 }
 
 // refresh copies the routing table for the shell.  It runs on NET/ROM's
@@ -194,18 +273,41 @@ func (n *netromNode) refresh() {
 // from a station heard directly.  It is called on the receive goroutine for
 // every frame received; a nil netromNode takes none.
 func (n *netromNode) heardFrame(channel int, pp *ax25.Packet) {
-	if n == nil || pp.NumAddr() != 2 || pp.Control() != ax25.UIFrame || pp.PID() != ax25.PIDNetROM {
+	if n == nil || pp.NumAddr() < 2 {
 		return
 	}
 
-	if pp.AddrWithSSID(ax25.Destination) != netrom.NodesDestination {
+	var _, onPort = n.cfg.PortConfig(channel)
+	if !onPort {
+		return
+	}
+
+	// A frame that came by way of a digipeater was not heard from its sender.
+	var direct = pp.NumAddr() == 2 || pp.Heard() == ax25.Source
+
+	var nodes = pp.NumAddr() == 2 && pp.Control() == ax25.UIFrame && pp.PID() == ax25.PIDNetROM &&
+		pp.AddrWithSSID(ax25.Destination) == netrom.NodesDestination
+
+	if !direct {
 		return
 	}
 
 	var from = pp.AddrWithSSID(ax25.Source)
-	var info = append([]byte(nil), pp.Info()...)
 
-	n.do(func() { n.router.HeardNodes(channel, from, info, n.now()) })
+	var info []byte
+	if nodes {
+		info = append([]byte(nil), pp.Info()...)
+	}
+
+	n.do(func() {
+		var now = n.now()
+
+		n.heardStation(neighbourKey(channel, from), now)
+
+		if nodes {
+			n.router.HeardNodes(channel, from, info, now)
+		}
+	})
 }
 
 // SendPacket is the Router handing a packet to a neighbour, over the link to
@@ -289,6 +391,10 @@ func (n *netromNode) LinkUp(channel int, _ string, remoteCall string, incoming b
 			n.links[key] = l
 		}
 
+		if !l.up {
+			n.linkEvent(nodeevents.LinkUp, key, incoming, "")
+		}
+
 		l.up = true
 		l.everUp = true
 		l.incoming = l.incoming || incoming
@@ -313,6 +419,15 @@ func (n *netromNode) LinkDown(channel int, _ string, remoteCall string, timeout 
 		}
 
 		delete(n.links, key)
+
+		if l.everUp {
+			var failure string
+			if timeout {
+				failure = "timeout"
+			}
+
+			n.linkEvent(nodeevents.LinkDown, key, l.incoming, failure)
+		}
 
 		if !l.everUp && len(l.pending) > 0 {
 			logrus.WithFields(logrus.Fields{
@@ -460,7 +575,7 @@ func (u *circuitUser) Closed(*netrom.Circuit, error) {
 // the node's address and alias, and starts it running until ctx is cancelled.
 // It must be called before the shell starts.
 func startNetROM(ctx context.Context, cfg netrom.Config, audio *RadioConfig, nodeConfig node.Config, shell *node.Node,
-	link node.DataLink, sendUI dwcore.FrameSender,
+	link node.DataLink, sendUI dwcore.FrameSender, events *nodeevents.Bus,
 ) (*netromNode, error) {
 	var final, err = netromConfigFor(cfg, audio, nodeConfig)
 	if err != nil {
@@ -472,6 +587,7 @@ func startNetROM(ctx context.Context, cfg netrom.Config, audio *RadioConfig, nod
 		return nil, nerr
 	}
 
+	n.events = events
 	shell.SetNetROM(n)
 
 	go n.run(ctx)

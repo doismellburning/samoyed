@@ -70,6 +70,36 @@ var metricDedupeHits = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:e
 	Help: "Number of transmit duplicates suppressed by the digipeater dedupe logic.",
 }, []string{labelChannel})
 
+var metricNodeEventsDropped = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct_v5
+	Name: "samoyed_node_events_dropped_total",
+	Help: "Number of node events a watcher, such as the MQTT publisher, missed for falling behind.",
+})
+
+var metricNetROMCircuits = promauto.NewGauge(prometheus.GaugeOpts{ //nolint:exhaustruct_v5
+	Name: "samoyed_netrom_circuits",
+	Help: "Number of NET/ROM circuits open.",
+})
+
+var metricNetROMDestinations = promauto.NewGauge(prometheus.GaugeOpts{ //nolint:exhaustruct_v5
+	Name: "samoyed_netrom_destinations",
+	Help: "Number of NET/ROM nodes the routing table knows a way to.",
+})
+
+// RecordNodeEventDropped is called each time a watcher misses a node event.
+func RecordNodeEventDropped() {
+	metricNodeEventsDropped.Inc()
+}
+
+// SetNetROMCircuits records how many NET/ROM circuits are open.
+func SetNetROMCircuits(n int) {
+	metricNetROMCircuits.Set(float64(n))
+}
+
+// SetNetROMDestinations records how many nodes the routing table knows.
+func SetNetROMDestinations(n int) {
+	metricNetROMDestinations.Set(float64(n))
+}
+
 // RecordFrameReceived is called for every frame accepted with a valid FCS.
 // fecType should be "fx25" or "il2p" when forward error correction recovered
 // the frame, in which case corrected is the number of Reed-Solomon symbols

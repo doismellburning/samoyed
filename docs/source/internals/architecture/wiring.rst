@@ -45,6 +45,9 @@ Dashed arrows are connections made after construction rather than at it.
        router [label="linkClientRouter"];
        nodeshell [label="node.Node\nnode shell"];
        netrom [label="netromNode\nNET/ROM"];
+       nodeweb [label="nodeWeb\nnode views, admin API"];
+       events [label="nodeevents.Bus"];
+       mqtt [label="mqttpub\nMQTT publisher"];
        igate [label="IGate"];
        digi [label="digipeater.Digipeater\nAPRS"];
        cdigi [label="digipeater.Connected\nconnected mode"];
@@ -105,6 +108,12 @@ Dashed arrows are connections made after construction rather than at it.
        netrom -> dlq [label="node.DataLink"];
        netrom -> tq [label="Append\n(dwcore.FrameSender)"];
        handler -> netrom [label="heardFrame"];
+       web -> nodeweb [label="webui.Route"];
+       nodeweb -> nodeshell [label="Sessions"];
+       nodeweb -> netrom [label="query"];
+       nodeshell -> events [label="SetObserver"];
+       netrom -> events [label="Publish"];
+       events -> mqtt [label="Subscribe"];
        link -> tq [label="linkTransmitter"];
 
        kiss -> xmit [label="timing setters"];
@@ -174,7 +183,9 @@ so the order of construction follows the arrows:
    rather than queueing it.
 #. The tone generators and the PTT.
 #. The web interface and the AGW server.
-   The web interface binds its port as it is made;
+   The web interface binds its port as it is made,
+   with the node's routes (``nodeWeb``),
+   which answer 404 until the node shell is set going;
    with its port disabled, or taken, there is no hub,
    and the frames that would have gone to it go nowhere.
    The AGW server is made here,
@@ -190,6 +201,8 @@ so the order of construction follows the arrows:
 #. The ``XmitService``, which starts a transmit thread per radio channel.
 #. The IGate and the two digipeaters,
    then the node shell, if the configuration has one, with its NET/ROM,
+   the ``nodeevents.Bus`` they publish what they do on,
+   and the MQTT publisher that takes from it,
    and the ``AX25Link``, the KISS handler and its transports,
    the APRStt gateway and the beacon service.
 #. The audio device goroutines (``recv_init``),
@@ -271,14 +284,17 @@ References
   ``channel_config.go`` (``RadioConfig.digipeaterPorts``)
   and ``recv.go`` (``recv_init``, ``recv_process``).
 - ``internal/direwolf/webui_source.go``: ``webui_init``,
-  and ``internal/webui/server.go``: ``NewServer``.
+  and ``internal/webui/server.go``: ``NewServer``, ``Route``.
+- ``internal/direwolf/node_web.go``: ``newNodeWeb``, ``nodeWeb.routes``, ``nodeWeb.set``.
+- ``internal/direwolf/node_events.go``: ``shellObserver``, ``mqtt_init``,
+  and ``internal/nodeevents/nodeevents.go``: ``Bus``.
 - ``internal/ptt/ptt.go``: ``New``,
   handed each channel's configuration by ``RadioConfig.pttChannels`` (``internal/direwolf/channel_config.go``).
 - The digipeaters' constructors, and what they take,
   in ``internal/digipeater``:
   ``digipeater.go`` (``New``, ``Port``)
   and ``cdigipeater.go`` (``NewConnected``).
-- ``internal/node/node.go``: ``New``, ``DataLink``.
+- ``internal/node/node.go``: ``New``, ``DataLink``, ``NetROM``, ``SetObserver``.
 - ``internal/dwcore/dwcore.go``: ``FrameSender``,
   shared by everything that hands the transmit queue a frame.
 - ``AGENTS.md``, the "Dependencies" section.

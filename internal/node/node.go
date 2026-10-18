@@ -94,6 +94,10 @@ type peer interface {
 
 	// name is who is at the far end, for messages.
 	name() string
+
+	// where says the channel and the node's own address an AX.25 link is
+	// on, or -1 and "" for a Conn.
+	where() (int, string)
 }
 
 // linkKey identifies a link the node is answering, as the data link does.
@@ -112,6 +116,8 @@ func (k linkKey) disconnect(n *Node) {
 }
 
 func (k linkKey) name() string { return k.remoteCall }
+
+func (k linkKey) where() (int, string) { return k.channel, k.ownCall }
 
 // connPeer is a Conn the node talks over.  It is a pointer, so each is a peer
 // of its own however its far end is named.
@@ -144,6 +150,8 @@ func (c *connPeer) disconnect(*Node) {
 }
 
 func (c *connPeer) name() string { return c.remote }
+
+func (c *connPeer) where() (int, string) { return -1, "" }
 
 // setConn sets the Conn a downlink travels on, once it is known, closing it
 // straight away if the downlink was given up on in the meantime.
@@ -259,6 +267,93 @@ type Node struct {
 	// netrom is the node's NET/ROM, or nil for none.  It is set before
 	// Start and not changed after.
 	netrom NetROM
+
+	// observer is told what happens to sessions, or is nil.  It is set
+	// before Start and not changed after.
+	observer func(SessionEvent)
+}
+
+// SessionEventKind says what a SessionEvent is about.
+type SessionEventKind int
+
+const (
+	SessionStarted SessionEventKind = iota // A user connected to the node.
+	SessionEnded                           // A user went.
+	DownlinkUp                             // A user was connected onward.
+	DownlinkDown                           // A user's connection onward went, or failed.
+)
+
+// SessionEvent is something that happened to a user's session, for anyone
+// watching the node.
+type SessionEvent struct {
+	Kind SessionEventKind
+
+	// User is who the session is for, on Channel at Local, the address of
+	// the node's they connected to - or -1 and "" over a Conn.
+	User    string
+	Channel int
+	Local   string
+
+	// Downlink is who the user was connected onward to, and Failure why a
+	// connection onward that never came up failed.
+	Downlink string
+	Failure  string
+}
+
+// SetObserver has f told what happens to users' sessions, without the node's
+// lock held.  It must be called before Start.
+func (n *Node) SetObserver(f func(SessionEvent)) {
+	n.observer = f
+}
+
+// observe tells the observer, if there is one, what happened to the session
+// on key.
+func (n *Node) observe(kind SessionEventKind, key peer, downlink string, failure string) {
+	if n.observer == nil {
+		return
+	}
+
+	var channel, local = key.where()
+
+	n.observer(SessionEvent{Kind: kind, User: key.name(), Channel: channel, Local: local, Downlink: downlink, Failure: failure})
+}
+
+// SessionInfo is a user's session, as Sessions reports it.
+type SessionInfo struct {
+	User      string
+	Channel   int    // -1 over a Conn.
+	Local     string // The node's address the user connected to, or "" over a Conn.
+	Downlink  string // Who the user is connected onward to, or "".
+	Connected bool   // Whether the connection onward is up.
+}
+
+// Sessions reports every user's session.
+func (n *Node) Sessions() []SessionInfo {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	var list = make([]SessionInfo, 0, len(n.sessions))
+
+	for key, s := range n.sessions {
+		var channel, local = key.where()
+
+		var info = SessionInfo{User: key.name(), Channel: channel, Local: local, Downlink: "", Connected: s.connected}
+		if s.downlink != nil {
+			info.Downlink = s.downlink.name()
+		}
+
+		list = append(list, info)
+	}
+
+	slices.SortFunc(list, func(a, b SessionInfo) int {
+		if a.Channel != b.Channel {
+			return a.Channel - b.Channel
+		}
+
+		return strings.Compare(a.User, b.User)
+	})
+
+	return list
 }
 
 // SetNetROM gives the node NET/ROM.  It must be called before Start.
@@ -345,6 +440,8 @@ func (n *Node) established(key peer, incoming bool) {
 	n.mu.Unlock()
 
 	if !reset {
+		n.observe(SessionStarted, key, "", "")
+
 		var text = n.config.ConnectMessage
 		if text == "" {
 			text = "Welcome to Samoyed"
@@ -399,6 +496,10 @@ func (n *Node) terminated(key peer, why string) {
 	}
 
 	n.mu.Unlock()
+
+	if s != nil {
+		n.observe(SessionEnded, key, "", "")
+	}
 
 	// A user who goes takes their downlink with them.
 	if down != nil {
@@ -758,6 +859,7 @@ func (n *Node) downlinkEstablished(key peer) {
 
 	switch {
 	case announce:
+		n.observe(DownlinkUp, up, key.name(), "")
 		n.send(up, []byte(n.prompt()+"Connected to "+key.name()+"\r"))
 	case unwanted:
 		n.disconnect(key)
@@ -796,6 +898,8 @@ func (n *Node) downlinkTerminated(key peer, why string) {
 
 	var message string
 
+	var failure string
+
 	switch {
 	case cancelled:
 		message = "Gave up on " + key.name()
@@ -803,7 +907,10 @@ func (n *Node) downlinkTerminated(key peer, why string) {
 		message = "Disconnected from " + key.name()
 	default:
 		message = "Failure with " + key.name() + " - " + why
+		failure = why
 	}
+
+	n.observe(DownlinkDown, up, key.name(), failure)
 
 	n.send(up, []byte(n.prompt()+message+"\r"))
 }

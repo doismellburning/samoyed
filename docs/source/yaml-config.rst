@@ -249,6 +249,10 @@ These are the keys under ``samoyed``:
         Left out, it is a short welcome.
         Use ``|`` for several lines.
 
+    ``adminToken``
+        A secret that lets the web interface's admin API act on the node (see below).
+        Left out, there is no admin API.
+
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
     Its commands are:
@@ -289,6 +293,36 @@ These are the keys under ``samoyed``:
     and a user can reach the node over NET/ROM as well as AX.25.
 
     A line of more than 256 characters is ignored.
+
+    With the web interface on (``WEBPORT``, in ``legacy``),
+    its Node tab shows the node's users, the stations it has heard,
+    and with ``netrom`` its nodes, neighbours and circuits.
+    The same views are JSON under ``/api/node/``:
+    ``info``, ``sessions``, ``heard``, ``nodes``, ``neighbours`` and ``circuits``.
+
+    With ``adminToken`` set,
+    requests carrying it as ``Authorization: Bearer`` *token* can act on the node,
+    each answering 204 when it worked:
+
+    ``POST /api/admin/links/close``
+        Close one of the node's AX.25 links,
+        given as JSON ``{"port": 0, "local": "Q1TEST-7", "remote": "Q2TEST"}``.
+
+    ``POST /api/admin/nodes/broadcast``
+        Send NODES broadcasts now, rather than waiting for ``broadcastInterval``.
+
+    ``POST /api/admin/circuits/``\ *id*\ ``/close``
+        Close a NET/ROM circuit, by the ``id`` that ``circuits`` gives it.
+
+    ``POST /api/admin/neighbours``
+        Lock a NET/ROM neighbour at a fixed quality, as ``neighbours`` in ``netrom`` does,
+        given as JSON ``{"port": 0, "call": "Q2TEST", "alias": "TWO", "quality": 200}``.
+
+    ``DELETE /api/admin/neighbours/``\ *port*\ ``/``\ *call*
+        Unlock a neighbour, so its routes are learned and aged again.
+
+    The web interface has no TLS of its own,
+    so put it behind a proxy that has before setting ``adminToken`` on a port others can reach.
 
     .. code:: yaml
 
@@ -353,6 +387,41 @@ These are the keys under ``samoyed``:
                 quality: 220
             neighbours:
               - {channel: 10, call: Q2TEST-2, alias: TWO, quality: 220}
+
+``mqtt``
+    Publish what the node does to an MQTT broker, as JSON, which needs ``node``.
+    This has no equivalent in Dire Wolf's format.
+    It has:
+
+    ``broker``
+        The broker's URL, such as ``tcp://localhost:1883``, or ``ssl://`` for TLS.
+
+    ``username``, ``password``
+        Optionally, what to log in to the broker with.
+
+    ``clientId``
+        The client ID to connect with, which is ``samoyed-`` and the node's address if left out.
+
+    ``topicPrefix``
+        The first level of every topic (``samoyed``).
+
+    Each event goes to a topic under the prefix and the node's address,
+    such as ``samoyed/Q1TEST-7/link/up``:
+    ``link/up`` and ``link/down`` for a user's session, a downlink or a NET/ROM neighbour's link,
+    ``circuit/up`` and ``circuit/down`` for a NET/ROM circuit,
+    ``routes/changed`` when NET/ROM's routing table changes,
+    and ``heard`` for a station heard on a NET/ROM channel for the first time in a while.
+    ``status`` is retained, and is ``online`` while Samoyed is connected,
+    and ``offline`` once it stops or, through the broker's last will, drops off.
+    Events are published at most once,
+    and those that arrive while the broker cannot be reached are dropped.
+
+    .. code:: yaml
+
+        samoyed:
+          mqtt:
+            broker: tcp://localhost:1883
+            topicPrefix: club
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

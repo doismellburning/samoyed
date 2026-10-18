@@ -35,9 +35,22 @@ const (
 //go:embed static
 var staticFiles embed.FS
 
-// Handler returns the web interface's routes, reading from hub.
-func Handler(hub *Hub) http.Handler {
+// Route is a route served alongside the web interface's own, for a part of
+// Samoyed the interface does not know about - the node, say.
+type Route struct {
+	// Pattern is an http.ServeMux pattern, such as "GET /api/node/nodes".
+	Pattern string
+	Handler http.Handler
+}
+
+// Handler returns the web interface's routes, reading from hub, and the extra
+// routes given.
+func Handler(hub *Hub, extra ...Route) http.Handler {
 	var mux = http.NewServeMux()
+
+	for _, r := range extra {
+		mux.Handle(r.Pattern, r.Handler)
+	}
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(w, r, staticFiles, "static/index.html")
@@ -67,6 +80,7 @@ type Server struct {
 	// started keeps Start to one run, and from running after Close.
 	started atomic.Bool
 	hub     *Hub
+	extra   []Route
 }
 
 // NewServer binds addr for the web interface to hub, so that, as with
@@ -75,7 +89,7 @@ type Server struct {
 // says.  ctx bounds only the binding: nothing is served until Start is
 // called, and the port is given up when the context Start was given is
 // cancelled.
-func NewServer(ctx context.Context, addr string, hub *Hub) (*Server, error) {
+func NewServer(ctx context.Context, addr string, hub *Hub, extra ...Route) (*Server, error) {
 	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", addr)
 	if listenErr != nil {
 		return nil, listenErr
@@ -84,6 +98,7 @@ func NewServer(ctx context.Context, addr string, hub *Hub) (*Server, error) {
 	var s = new(Server)
 	s.listener = listener
 	s.hub = hub
+	s.extra = extra
 
 	return s, nil
 }
@@ -122,7 +137,7 @@ func (s *Server) Start(ctx context.Context) <-chan error {
 	var listener = s.listener
 
 	var server = new(http.Server)
-	server.Handler = Handler(s.hub)
+	server.Handler = Handler(s.hub, s.extra...)
 	server.ReadHeaderTimeout = readHeaderTimeout
 	server.ReadTimeout = readTimeout
 	server.WriteTimeout = writeTimeout
@@ -196,6 +211,11 @@ func serveEvents(w http.ResponseWriter, r *http.Request, hub *Hub) {
 			return
 		}
 	}
+}
+
+// WriteJSON sends v as a JSON response, as the web interface's own routes do.
+func WriteJSON(w http.ResponseWriter, v any) {
+	writeJSON(w, v)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

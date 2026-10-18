@@ -160,4 +160,8 @@ type NodeSettings struct {
 
 	// ConnectMessage is what a station is told on connecting to the node.
 	ConnectMessage string `yaml:"connectMessage"`
+
+	// AdminToken is the bearer token the web interface's admin API wants;
+	// left out, there is no admin API.
+	AdminToken string `yaml:"adminToken"`
 }

@@ -21,7 +21,7 @@ import (
 // Failing to start it returns nil, which webPublishReceived and
 // webPublishTransmitted take as nothing to do.  A port of 0 (the default)
 // disables it, so DirewolfMain doesn't call this, and has a nil hub too.
-func webui_init(ctx context.Context, audio *RadioConfig, addr string) *webui.Hub {
+func webui_init(ctx context.Context, audio *RadioConfig, addr string, extra ...webui.Route) *webui.Hub {
 	var hub = webui.NewHub()
 
 	for channel := range MAX_TOTAL_CHANS {
@@ -30,7 +30,7 @@ func webui_init(ctx context.Context, audio *RadioConfig, addr string) *webui.Hub
 		}
 	}
 
-	var server, serverErr = webui.NewServer(ctx, addr, hub)
+	var server, serverErr = webui.NewServer(ctx, addr, hub, extra...)
 	if serverErr != nil {
 		logrus.WithError(serverErr).WithField("address", addr).Error("Unable to start web interface")
 
