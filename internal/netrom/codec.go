@@ -36,6 +36,7 @@ const (
 	networkHeaderLen   = 15 // Origin, destination, TTL.
 	transportHeaderLen = 5
 	headerLen          = networkHeaderLen + transportHeaderLen
+	ttlOffset          = 14 // Of the time to live, in the network header.
 
 	nodesSignature  = 0xFF
 	nodesHeaderLen  = 1 + AliasLen

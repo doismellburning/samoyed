@@ -311,6 +311,20 @@ func (m *circuitManager) send(id circuitID, data []byte) error {
 	return err
 }
 
+// outstanding is how many of the client's segments on its circuit are
+// still to go out or be acknowledged, and whether it has the circuit.
+func (m *circuitManager) outstanding(id circuitID) (int, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var c = m.byID(id)
+	if c == nil {
+		return 0, false
+	}
+
+	return len(c.sendQueue) + len(c.ackQueue), true
+}
+
 // disconnect closes the client's circuit.  What has not been acknowledged
 // yet is abandoned.
 func (m *circuitManager) disconnect(id circuitID) error {

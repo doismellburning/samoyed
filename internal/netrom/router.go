@@ -167,6 +167,31 @@ func (r *router) addRoute(callsign string, alias string, neighbour string, quali
 	slices.SortStableFunc(d.routes, func(a, b routeEntry) int { return cmp.Compare(b.quality, a.quality) })
 }
 
+// heardFrom notes that a layer 3 frame from origin arrived through
+// neighbour, which is evidently a way back to it.  It keeps a route through
+// that neighbour fresh, or else adds one at quality 0: used if there is
+// nothing better, but never advertised, and never displacing one learned from
+// a broadcast.
+func (r *router) heardFrom(origin string, neighbour string) {
+	if strings.EqualFold(origin, r.myCall) {
+		return
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if d, ok := r.destinations[origin]; ok {
+		var i = slices.IndexFunc(d.routes, func(rt routeEntry) bool { return rt.neighbour == neighbour })
+		if i >= 0 {
+			d.routes[i].obsolescence = obsolescenceInit
+
+			return
+		}
+	}
+
+	r.addRoute(origin, "", neighbour, 0)
+}
+
 // age takes one from every route's obsolescence count, dropping those that
 // reach zero and destinations left with no routes.  It is called each time we
 // broadcast.
