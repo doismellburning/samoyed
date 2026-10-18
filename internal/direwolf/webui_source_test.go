@@ -32,6 +32,30 @@ func TestChannelDescription(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[string](), channelDescription(nil, 0))
 }
 
+// A channel is shown with the station's own callsign on it, unless that is a
+// placeholder.
+func TestWebChannelCarriesItsCallsign(t *testing.T) {
+	var audio = new(RadioConfig)
+	audio.chan_medium[0] = MEDIUM_RADIO
+	audio.mycall[0] = "Q1TEST-1"
+	audio.chan_medium[1] = MEDIUM_RADIO
+	audio.mycall[1] = "NOCALL"
+	audio.mycall[2] = "Q2TEST"
+
+	var want0 webui.Channel
+	want0.Number = 0
+	want0.Description = "radio"
+	want0.Callsign = "Q1TEST-1"
+
+	var want1 webui.Channel
+	want1.Number = 1
+	want1.Description = "radio"
+
+	assert.Equal(t, maybe.Just(want0), webChannel(audio, 0))
+	assert.Equal(t, maybe.Just(want1), webChannel(audio, 1))
+	assert.Equal(t, maybe.Nothing[webui.Channel](), webChannel(audio, 2))
+}
+
 // A received frame is shown with the kind of source it came from, and with
 // its audio level only when that was a radio's: anything else has no audio
 // to measure.

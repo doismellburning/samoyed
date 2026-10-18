@@ -40,7 +40,7 @@ func TestNilHubIsANoOp(t *testing.T) {
 
 	var h *Hub
 
-	h.AddChannel(0, "radio")
+	h.AddChannel(Channel{Number: 0, Description: "radio", Callsign: "Q1TEST", Received: 0, Transmitted: 0})
 	h.Publish(rx("Q1TEST"))
 
 	assert.Empty(t, h.Packets())
@@ -164,8 +164,9 @@ func TestChannelCounts(t *testing.T) {
 
 	var h, _ = newTestHub()
 
-	h.AddChannel(1, "aprs-is")
-	h.AddChannel(0, "radio")
+	h.AddChannel(Channel{Number: 1, Description: "aprs-is", Callsign: "", Received: 0, Transmitted: 0})
+	// Counts given to AddChannel are not taken.
+	h.AddChannel(Channel{Number: 0, Description: "radio", Callsign: "Q1TEST-1", Received: 7, Transmitted: 7})
 
 	h.Publish(rx("Q1TEST"))
 	h.Publish(rx("Q2TEST"))
@@ -175,8 +176,8 @@ func TestChannelCounts(t *testing.T) {
 	h.Publish(tx)
 
 	assert.Equal(t, []Channel{
-		{Number: 0, Description: "radio", Received: 2, Transmitted: 1},
-		{Number: 1, Description: "aprs-is", Received: 0, Transmitted: 0},
+		{Number: 0, Description: "radio", Callsign: "Q1TEST-1", Received: 2, Transmitted: 1},
+		{Number: 1, Description: "aprs-is", Callsign: "", Received: 0, Transmitted: 0},
 	}, h.Channels())
 }
 

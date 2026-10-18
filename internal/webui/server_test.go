@@ -32,7 +32,7 @@ func TestAPIHandlers(t *testing.T) {
 	t.Parallel()
 
 	var hub, _ = newTestHub()
-	hub.AddChannel(0, "radio")
+	hub.AddChannel(Channel{Number: 0, Description: "radio", Callsign: "Q9TEST", Received: 0, Transmitted: 0})
 
 	var p = rx("Q1TEST")
 	// Whatever arrives over the air is data, however it is dressed up.
@@ -68,7 +68,7 @@ func TestAPIHandlers(t *testing.T) {
 
 		var got []Channel
 		require.NoError(t, json.Unmarshal(get(t, h, "/api/channels").Body.Bytes(), &got))
-		assert.Equal(t, []Channel{{Number: 0, Description: "radio", Received: 1, Transmitted: 0}}, got)
+		assert.Equal(t, []Channel{{Number: 0, Description: "radio", Callsign: "Q9TEST", Received: 1, Transmitted: 0}}, got)
 	})
 
 	t.Run("security headers", func(t *testing.T) {

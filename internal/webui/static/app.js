@@ -68,7 +68,8 @@
     box.replaceChildren();
     for (const c of [...channels.values()].sort((a, b) => a.number - b.number)) {
       box.append(el("div", { class: "channel" },
-        el("div", { class: "label", text: `Channel ${c.number} · ${c.description || "unknown"}` }),
+        el("div", { class: "label", text: `Channel ${c.number} · ${c.description || "unknown"}` +
+          (c.callsign ? ` · ${c.callsign}` : "") }),
         el("div", { class: "figures" },
           el("span", { class: "rx" }, el("b", { text: String(c.rx) }), " rx"),
           el("span", { class: "tx" }, el("b", { text: String(c.tx) }), " tx"))));

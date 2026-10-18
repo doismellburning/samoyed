@@ -25,8 +25,8 @@ func webui_init(ctx context.Context, audio *RadioConfig, addr string) *webui.Hub
 	var hub = webui.NewHub()
 
 	for channel := range MAX_TOTAL_CHANS {
-		if description, ok := channelDescription(audio, channel).Get(); ok {
-			hub.AddChannel(channel, description)
+		if c, ok := webChannel(audio, channel).Get(); ok {
+			hub.AddChannel(c)
 		}
 	}
 
@@ -51,6 +51,22 @@ func webui_init(ctx context.Context, audio *RadioConfig, addr string) *webui.Hub
 	logrus.WithField("address", listening).Info("Web interface listening")
 
 	return hub
+}
+
+// webChannel describes a configured channel for the web interface, or Nothing
+// for one that isn't configured.
+func webChannel(audio *RadioConfig, channel int) maybe.Maybe[webui.Channel] {
+	return maybe.Fmap(func(description string) webui.Channel {
+		var c webui.Channel
+		c.Number = channel
+		c.Description = description
+
+		if !IsNoCall(audio.mycall[channel]) {
+			c.Callsign = audio.mycall[channel]
+		}
+
+		return c
+	}, channelDescription(audio, channel))
 }
 
 // channelDescription names what a configured channel is connected to, or

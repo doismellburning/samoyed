@@ -302,7 +302,8 @@ Add ``WEBPORT`` to your config file to serve a live dashboard and APRS map
     WEBPORT 8080
 
 Then open ``http://<station>:8080/``.
-The **Dashboard** tab shows each channel's received and transmitted packet counts,
+The **Dashboard** tab shows each channel's callsign
+and its received and transmitted packet counts,
 the stations heard in the last two hours,
 and packets as they arrive, with a filter and a pause button.
 The **Map** tab plots every station and APRS object that has sent a position;
