@@ -14,6 +14,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/aprslog"
+	"github.com/doismellburning/samoyed/internal/aprstt"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/mheard"
@@ -297,7 +298,7 @@ func setupRecvProcessTest(t *testing.T, frack int) (*recPacketHandler, *AX25Link
 	// out to the attached client applications too, of which there are none.
 	var handler = new(recPacketHandler)
 	handler.audioConfig = audioConfig
-	handler.ttConfig = new(tt_config_s)
+	handler.ttConfig = new(aprstt.Config)
 	handler.decoder = aprs.NewDecoderFromDataFiles()
 	handler.logger = aprslog.New(false, "")
 	handler.heard = mheard.New(0)

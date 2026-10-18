@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package aprstt
 
 /*------------------------------------------------------------------
  *
@@ -31,34 +34,33 @@ func assertObjectReport(t *testing.T, users *ttUsers, callsign string, firstTime
 	assert.Equal(t, expected, users.objectReportText(i, firstTime))
 }
 
+//nolint:paralleltest // Serial: heard sets the TT* environment variables for the TTCMD script.
 func Test_TTUser(t *testing.T) {
 	/* Fake audio config - All we care about is mycall for constructing object report packet. */
 
-	var my_audio_config RadioConfig
-
-	my_audio_config.mycall[0] = "WB20SZ-15"
+	var my_mycall = ttMyCalls("WB20SZ-15")
 
 	/* Fake TT gateway config. */
 
-	var my_tt_config tt_config_s
+	var my_tt_config Config
 
 	/* Don't care about the location translation here. */
 
-	my_tt_config.retain_time = 20 /* Normally 80 minutes. */
-	my_tt_config.num_xmits = 3
-	assert.LessOrEqual(t, my_tt_config.num_xmits, TT_MAX_XMITS)
-	my_tt_config.xmit_delay[0] = 3 /* Before initial transmission. */
-	my_tt_config.xmit_delay[1] = 5
-	my_tt_config.xmit_delay[2] = 5
+	my_tt_config.RetainTime = 20 /* Normally 80 minutes. */
+	my_tt_config.NumXmits = 3
+	assert.LessOrEqual(t, my_tt_config.NumXmits, MaxXmits)
+	my_tt_config.XmitDelay[0] = 3 /* Before initial transmission. */
+	my_tt_config.XmitDelay[1] = 5
+	my_tt_config.XmitDelay[2] = 5
 
-	my_tt_config.corral_lat = 42.61900
-	my_tt_config.corral_lon = -71.34717
-	my_tt_config.corral_offset = 0.02 / 60
-	my_tt_config.corral_ambiguity = 0
+	my_tt_config.CorralLat = 42.61900
+	my_tt_config.CorralLon = -71.34717
+	my_tt_config.CorralOffset = 0.02 / 60
+	my_tt_config.CorralAmbiguity = 0
 
-	my_tt_config.obj_xmit_via = "WIDE2-1"
+	my_tt_config.ObjXmitVia = "WIDE2-1"
 
-	var users = newTTUsers(&my_audio_config, &my_tt_config)
+	var users = newTTUsers(my_mycall, &my_tt_config)
 
 	// tt_user_heard (char *callsign, int ssid, char overlay, char symbol, char *loc_text, double latitude,
 	//              double longitude, int ambiguity, char *freq, char *ctcss, char *comment, char mic_e, char *dao);

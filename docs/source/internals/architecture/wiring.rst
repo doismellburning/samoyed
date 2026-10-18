@@ -50,7 +50,7 @@ Dashed arrows are connections made after construction rather than at it.
        kiss [label="KissHandler"];
        kissnet [label="KISS TCP, serial,\npseudo terminal"];
        apps [label="clientApps"];
-       tt [label="TTGateway\nAPRStt"];
+       tt [label="aprstt.Gateway\nAPRStt"];
        beacon [label="BeaconService"];
        recvthreads [label="recv_init\naudio device goroutines"];
        handler [label="recPacketHandler"];
@@ -111,7 +111,7 @@ Dashed arrows are connections made after construction rather than at it.
        apps -> agw;
        apps -> kissnet;
 
-       tt -> apps [label="object reports"];
+       tt -> apps [label="SendRecPacket"];
        tt -> digi [label="Remember"];
        tt -> igate [label="sendRecPacket"];
        tt -> dlq [label="RecFrame"];
@@ -140,7 +140,8 @@ Dashed arrows are connections made after construction rather than at it.
 
 The diagram leaves out what is plain configuration
 (the parsed configuration file and the debug options,
-and the ``digipeater.Port`` for each channel that ``RadioConfig.digipeaterPorts`` takes from it for the digipeaters)
+the ``digipeater.Port`` for each channel that ``RadioConfig.digipeaterPorts`` takes from it for the digipeaters,
+and each channel's callsign, which the APRStt gateway asks ``RadioConfig.myCall`` for)
 and the services with only one user,
 which ``DirewolfMain`` hands over in the same way:
 the heard list (``mheard``) to the packet filter, the IGate, the beacon service, the received packet handler and the node shell;
@@ -269,10 +270,9 @@ References
   ``igate.go`` (``NewIGate``, ``igateSender``),
   ``kiss_frame.go`` (``NewKissHandler``),
   ``kissnet.go`` (``NewKissNetService``, ``KissNetService.Start``),
-  ``aprs_tt.go`` (``NewTTGateway``),
   ``beacon.go`` (``NewBeaconService``, ``beaconIGate``),
   ``audio.go`` (``AudioDevices.setAudioLevel``),
-  ``channel_config.go`` (``RadioConfig.digipeaterPorts``)
+  ``channel_config.go`` (``RadioConfig.digipeaterPorts``, ``RadioConfig.myCall``)
   and ``recv.go`` (``recv_init``, ``recv_process``).
 - ``internal/direwolf/webui_source.go``: ``webui_init``, ``webui_start`` and ``webStatus``,
   and ``internal/webui/server.go``: ``NewServer`` and ``Server.Start``.
@@ -283,6 +283,8 @@ References
   in ``internal/digipeater``:
   ``digipeater.go`` (``New``, ``Port``)
   and ``cdigipeater.go`` (``NewConnected``).
+- ``internal/aprstt/aprs_tt.go``: ``NewGateway``,
+  and what it takes, ``ObjectReportSink`` and ``FrameReceiver``.
 - ``internal/node/node.go``: ``New``, ``DataLink``.
 - ``internal/dwcore/dwcore.go``: ``FrameSender``,
   shared by everything that hands the transmit queue a frame.

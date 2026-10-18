@@ -831,7 +831,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 
 	if bp.commentcmd != "" {
 		/* Run given command to get variable part of comment. */
-		var var_comment, k = dw_run_cmd(ctx, bp.commentcmd, 2)
+		var var_comment, k = dwutil.RunCmd(ctx, bp.commentcmd, 2)
 		if k == nil {
 			super_comment += string(var_comment)
 		} else {
@@ -930,7 +930,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps.GPSInfo
 			beacon_text += bp.custom_info
 		} else if bp.custom_infocmd != "" {
 			/* Run given command to obtain the info part for packet. */
-			var info_part, k = dw_run_cmd(ctx, bp.custom_infocmd, 2)
+			var info_part, k = dwutil.RunCmd(ctx, bp.custom_infocmd, 2)
 			if k == nil {
 				beacon_text += string(info_part)
 			} else {

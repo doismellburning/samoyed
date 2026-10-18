@@ -13,6 +13,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/aprslog"
+	"github.com/doismellburning/samoyed/internal/aprstt"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwcore"
@@ -124,14 +125,14 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	var handler = new(recPacketHandler)
 	handler.toIGate = ig.sendRecPacket
 	handler.audioConfig = audioConfig
-	handler.ttConfig = new(tt_config_s) // No touch tones.
+	handler.ttConfig = new(aprstt.Config) // No touch tones.
 	handler.decoder = aprs.NewDecoderFromDataFiles()
 	handler.logger = aprslog.New(false, "")
 	handler.heard = heardDB
 	handler.waypoints = ws
 	handler.digipeater = digipeater.New(audioConfig.digipeaterPorts(), digiConfig, filter, nil, nil)
 	handler.connectedDigipeater = digipeater.NewConnected(audioConfig.digipeaterPorts(), new(digipeater.ConnectedConfig), filter, nil)
-	handler.ttGateway = NewTTGateway(audioConfig, handler.ttConfig, nil, handler.digipeater.Remember, nil, nil, nil, nil, 0)
+	handler.ttGateway = aprstt.NewGateway(audioConfig.myCall, handler.ttConfig, nil, handler.digipeater.Remember, nil, nil, nil, nil, 0)
 
 	return &recPacketTest{handler: handler, audioConfig: audioConfig, waypoints: waypoints}
 }
@@ -331,7 +332,7 @@ func Test_app_process_rec_packet_from_igate_channel(t *testing.T) {
 func Test_app_process_rec_packet_dtmf(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
-	rt.handler.ttConfig.gateway_enabled = 1
+	rt.handler.ttConfig.GatewayEnabled = 1
 
 	var pp = ax25.FromText("DTMF>APRS:t2A22A#", true)
 
@@ -345,7 +346,7 @@ func Test_app_process_rec_packet_dtmf(t *testing.T) {
 func Test_app_process_rec_packet_simulated_dtmf(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
-	rt.handler.ttConfig.gateway_enabled = 1
+	rt.handler.ttConfig.GatewayEnabled = 1
 
 	var pp = ax25.FromText("DTMF>APRS:t2A22A#", true)
 

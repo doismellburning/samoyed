@@ -35,3 +35,16 @@ func TestPttChannelsReceiveOnly(t *testing.T) {
 		assert.Contains(t, asked, ch, "every channel is asked about")
 	}
 }
+
+// myCall is a channel's callsign, and none for a channel there can't be.
+func TestMyCall(t *testing.T) {
+	t.Parallel()
+
+	var c = new(RadioConfig)
+	c.mycall[1] = "Q1TEST-15"
+
+	assert.Equal(t, "Q1TEST-15", c.myCall(1))
+	assert.Empty(t, c.myCall(0))
+	assert.Empty(t, c.myCall(-1))
+	assert.Empty(t, c.myCall(MAX_TOTAL_CHANS))
+}

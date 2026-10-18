@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package aprstt
 
 import (
 	"fmt"
@@ -93,29 +96,27 @@ var ttTestCases = []ttTestCase{
 	{"18199242771558", "WB4APR", "12", "\\A", "", "", "39.5000", "-77.0000", "!TBA!"},
 }
 
-var aprs_tt_test_config = []*ttloc_s{
-	{ttlocType: TTLOC_POINT, pattern: "B01", point: pointTTLoc{lat: 12.25, lon: 56.25}},  //nolint:exhaustruct_v5
-	{ttlocType: TTLOC_POINT, pattern: "B988", point: pointTTLoc{lat: 12.50, lon: 56.50}}, //nolint:exhaustruct_v5
+var aprs_tt_test_config = []*Loc{
+	{Type: LocPoint, Pattern: "B01", Point: PointLoc{Lat: 12.25, Lon: 56.25}},  //nolint:exhaustruct_v5
+	{Type: LocPoint, Pattern: "B988", Point: PointLoc{Lat: 12.50, Lon: 56.50}}, //nolint:exhaustruct_v5
 
-	{ttlocType: TTLOC_VECTOR, pattern: "B5bbbdddd", vector: vectorTTLoc{lat: 53., lon: -1., scale: 1000.}}, //nolint:exhaustruct_v5 // km units
+	{Type: LocVector, Pattern: "B5bbbdddd", Vector: VectorLoc{Lat: 53., Lon: -1., Scale: 1000.}}, //nolint:exhaustruct_v5 // km units
 
 	// Hilltop Tower http://www.aprs.org/aprs-jamboree-2013.html
-	{ttlocType: TTLOC_VECTOR, pattern: "B5bbbddd", vector: vectorTTLoc{lat: 37 + 55.37/60., lon: -(81 + 7.86/60.), scale: 16.09344}}, //nolint:exhaustruct_v5 // .01 mile units
+	{Type: LocVector, Pattern: "B5bbbddd", Vector: VectorLoc{Lat: 37 + 55.37/60., Lon: -(81 + 7.86/60.), Scale: 16.09344}}, //nolint:exhaustruct_v5 // .01 mile units
 
-	{ttlocType: TTLOC_GRID, pattern: "B2xxyy", grid: gridTTLoc{lat0: 12.00, lon0: 56.00, //nolint:exhaustruct_v5
-		lat9: 12.99, lon9: 56.99}},
-	{ttlocType: TTLOC_GRID, pattern: "Byyyxxx", grid: gridTTLoc{lat0: 37 + 50./60.0, lon0: 81, //nolint:exhaustruct_v5
-		lat9: 37 + 59.99/60.0, lon9: 81 + 9.99/60.0}},
+	{Type: LocGrid, Pattern: "B2xxyy", Grid: GridLoc{Lat0: 12.00, Lon0: 56.00, //nolint:exhaustruct_v5
+		Lat9: 12.99, Lon9: 56.99}},
+	{Type: LocGrid, Pattern: "Byyyxxx", Grid: GridLoc{Lat0: 37 + 50./60.0, Lon0: 81, //nolint:exhaustruct_v5
+		Lat9: 37 + 59.99/60.0, Lon9: 81 + 9.99/60.0}},
 
-	{ttlocType: TTLOC_MHEAD, pattern: "BAxxxxxx", mhead: mheadTTLoc{prefix: "326129"}}, //nolint:exhaustruct_v5
+	{Type: LocMHead, Pattern: "BAxxxxxx", MHead: MHeadLoc{Prefix: "326129"}}, //nolint:exhaustruct_v5
 
-	{ttlocType: TTLOC_SATSQ, pattern: "BAxxxx"}, //nolint:exhaustruct_v5
+	{Type: LocSatSq, Pattern: "BAxxxx"}, //nolint:exhaustruct_v5
 
-	{ttlocType: TTLOC_MACRO, pattern: "xxyyy", macro: macroTTLoc{definition: "B9xx*AB166*AA2B4C5B3B0Ayyy"}},   //nolint:exhaustruct_v5
-	{ttlocType: TTLOC_MACRO, pattern: "xxxxzzzzzzzzzz", macro: macroTTLoc{definition: "BAxxxx*ACzzzzzzzzzz"}}, //nolint:exhaustruct_v5
+	{Type: LocMacro, Pattern: "xxyyy", Macro: MacroLoc{Definition: "B9xx*AB166*AA2B4C5B3B0Ayyy"}},   //nolint:exhaustruct_v5
+	{Type: LocMacro, Pattern: "xxxxzzzzzzzzzz", Macro: MacroLoc{Definition: "BAxxxx*ACzzzzzzzzzz"}}, //nolint:exhaustruct_v5
 }
-
-var gateway *TTGateway
 
 // fourDecimalPlaces renders a position for comparison against the expected
 // results above, which spell an absent one "Nothing".
@@ -125,7 +126,7 @@ func fourDecimalPlaces(m maybe.Maybe[float64]) string {
 	}, m)
 }
 
-func check_result(t *testing.T, testCase ttTestCase) {
+func check_result(t *testing.T, gateway *Gateway, testCase ttTestCase) {
 	t.Helper()
 
 	var state = gateway.lastParseState
@@ -149,15 +150,17 @@ func check_result(t *testing.T, testCase ttTestCase) {
 }
 
 func Test_APRS_TT(t *testing.T) {
-	var cfg tt_config_s
-	cfg.ttlocs = aprs_tt_test_config
-	gateway = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	t.Parallel()
+
+	var cfg Config
+	cfg.Locs = aprs_tt_test_config
+	var gateway = NewGateway(ttMyCalls(), &cfg, nil, nil, nil, nil, nil, nil, 0)
 	gateway.runningTests = true
 
 	for testNum, testCase := range ttTestCases {
-		dw_printf("\nTest case %d: %s\n", testNum, testCase.toneseq)
+		t.Logf("Test case %d: %s", testNum, testCase.toneseq)
 
 		gateway.Sequence(t.Context(), 0, testCase.toneseq)
-		check_result(t, testCase)
+		check_result(t, gateway, testCase)
 	}
 }
