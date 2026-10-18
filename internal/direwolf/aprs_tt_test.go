@@ -63,7 +63,9 @@ func TestParseCallsignTwoKeyOverlayThatDoesNotTranslate(t *testing.T) {
 }
 
 // Keys that translate only in part - "5Z" is a digit, then a letter that isn't
-// a column key - still give the character that did, as Dire Wolf took it.
+// a column key - were taken for the character that did, as Dire Wolf took
+// them, though a symbol field's overlay was rejected for the same keys.
+// Reject both, as for the callsign itself.
 func TestParseCallsignTwoKeyOverlayThatPartlyTranslates(t *testing.T) {
 	var cfg tt_config_s
 
@@ -72,14 +74,14 @@ func TestParseCallsignTwoKeyOverlayThatPartlyTranslates(t *testing.T) {
 
 	var state = newTTParseState()
 
-	assert.Equal(t, 0, gw.parseCallsign(&state, "A12345Z5"))
-	assert.Equal(t, byte('5'), state.symtabOrOverlay)
+	assert.Equal(t, TT_ERROR_INVALID_SYMBOL, gw.parseCallsign(&state, "A12345Z5"))
+	assert.Equal(t, byte(APRSTT_DEFAULT_SYMTAB), state.symtabOrOverlay)
 }
 
 // A three digit abbreviation can end in a two key overlay too.  One whose keys
 // translate to nothing - "1A" has no letter - became a NUL overlay, which
-// went out as the symbol table of the object report.  Reject it, as for a
-// callsign in two key format, and take what translates of the rest.
+// went out as the symbol table of the object report.  Reject it, and one that
+// translates only in part, as for a callsign in two key format.
 func TestParseAbbreviationTwoKeyOverlay(t *testing.T) {
 	var cfg tt_config_s
 
@@ -92,9 +94,7 @@ func TestParseAbbreviationTwoKeyOverlay(t *testing.T) {
 
 	state = newTTParseState()
 
-	assert.Equal(t, 0, gw.parseCallsign(&state, "A1235Z1"), "part translates")
-	assert.Equal(t, "123", state.callsign)
-	assert.Equal(t, byte('5'), state.symtabOrOverlay)
+	assert.Equal(t, TT_ERROR_INVALID_SYMBOL, gw.parseCallsign(&state, "A1235Z1"), "part translates")
 }
 
 // A field that is nothing but an A is a callsign with nothing in it.  Its

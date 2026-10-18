@@ -789,12 +789,11 @@ func checksum_not_ok(str string, length int, found rune) int {
 	return (0)
 }
 
-// twoKeyOverlay translates the two keys of a two key overlay.  Keys that
-// translate to nothing are no overlay at all.  Keys that translate only in
-// part give the character that did, as Dire Wolf took it.
+// twoKeyOverlay translates the keys of a two key overlay.  Keys that don't all
+// translate are no overlay at all, as for a callsign in two key format.
 func twoKeyOverlay(keys string) (byte, bool) {
-	var text, _ = touchtone.TwoKeyToText(keys, false)
-	if text == "" {
+	var text, errors = touchtone.TwoKeyToText(keys, false)
+	if errors != 0 || text == "" {
 		return 0, false
 	}
 
@@ -1098,10 +1097,10 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 
 		case '0':
 			if length >= 6 {
-				var stemp, errors = touchtone.TwoKeyToText(e[5:], false)
-				if errors == 0 {
+				var overlay, ok = twoKeyOverlay(e[5:])
+				if ok {
 					state.symbolCode = byte(32 + nn)
-					state.symtabOrOverlay = stemp[0]
+					state.symtabOrOverlay = overlay
 
 					if g.debug > 0 {
 						logrus.WithFields(logrus.Fields{
