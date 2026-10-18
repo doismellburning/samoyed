@@ -31,28 +31,50 @@ import (
 // beyond that is drained and discarded so the native code never blocks writing.
 const maxCapturedStderr = 64 * 1024
 
-// captureDrainTimeout bounds how long we wait for the end of the pipe once the
-// native call has finished and file descriptor 2 is back.  A variable so that
-// a test needn't wait it out.
-var captureDrainTimeout = 5 * time.Second
+// defaultCaptureDrainTimeout bounds how long we wait for the end of the pipe
+// once the native call has finished and file descriptor 2 is back.
+const defaultCaptureDrainTimeout = 5 * time.Second
 
 // captureStderrMu serialises captures, so that two of them can't restore each
 // other's saved descriptor.
 var captureStderrMu sync.Mutex
 
-// dupOntoStderrFn is dupOntoStderr, indirected so a test can make restoring
-// file descriptor 2 fail, which is otherwise not something we can provoke.
-var dupOntoStderrFn = dupOntoStderr
+// stderrCapture redirects file descriptor 2 for the length of a call; see
+// capture.
+type stderrCapture struct {
+	// dupOntoStderr points file descriptor 2 at the given descriptor.  A field
+	// so a test can make restoring file descriptor 2 fail, which is otherwise
+	// not something we can provoke.
+	dupOntoStderr func(fd int) error
 
-// captureStderrFD runs fn with file descriptor 2 redirected to a pipe and
-// returns whatever was written to it while it ran, up to maxCapturedStderr
-// bytes.  If the redirection can't be set up, fn still runs, with its output
-// going to the real stderr as usual, and "" is returned.
+	// drainTimeout bounds how long we wait for the end of the pipe once fn has
+	// finished and file descriptor 2 is back.  A field so a test needn't wait
+	// it out.
+	drainTimeout time.Duration
+}
+
+func newStderrCapture() *stderrCapture {
+	var c = new(stderrCapture)
+	c.dupOntoStderr = dupOntoStderr
+	c.drainTimeout = defaultCaptureDrainTimeout
+
+	return c
+}
+
+// captureStderrFD is capture with the real dup and the usual drain timeout.
+func captureStderrFD(fn func()) string {
+	return newStderrCapture().capture(fn)
+}
+
+// capture runs fn with file descriptor 2 redirected to a pipe and returns
+// whatever was written to it while it ran, up to maxCapturedStderr bytes.  If
+// the redirection can't be set up, fn still runs, with its output going to the
+// real stderr as usual, and "" is returned.
 //
 // Note that this affects the whole process for as long as fn runs, so keep fn
 // to the native call that needs quietening.  Samoyed's own output goes to
 // stdout (see dw_printf) and so is unaffected.
-func captureStderrFD(fn func()) string {
+func (c *stderrCapture) capture(fn func()) string {
 	captureStderrMu.Lock()
 	defer captureStderrMu.Unlock()
 
@@ -74,7 +96,7 @@ func captureStderrFD(fn func()) string {
 
 	defer reader.Close()
 
-	var redirectErr = dupOntoStderrFn(int(writer.Fd()))
+	var redirectErr = c.dupOntoStderr(int(writer.Fd()))
 	if redirectErr != nil {
 		_ = unix.Close(savedFD)
 		_ = writer.Close()
@@ -109,9 +131,9 @@ func captureStderrFD(fn func()) string {
 
 		restored = true
 
-		var err = dupOntoStderrFn(savedFD)
+		var err = c.dupOntoStderr(savedFD)
 		for errors.Is(err, unix.EINTR) {
-			err = dupOntoStderrFn(savedFD)
+			err = c.dupOntoStderr(savedFD)
 		}
 
 		if err != nil {
@@ -122,7 +144,7 @@ func captureStderrFD(fn func()) string {
 			// clear for one more attempt at putting the real stderr back.
 			_ = unix.Close(unix.Stderr)
 
-			if dupOntoStderrFn(savedFD) != nil {
+			if c.dupOntoStderr(savedFD) != nil {
 				// Leaving file descriptor 2 closed is a hazard of its own: the
 				// next file opened would be given it, and everything aimed at
 				// stderr would land in that file instead.  /dev/null at least
@@ -130,7 +152,7 @@ func captureStderrFD(fn func()) string {
 				// open below usually returns it directly.
 				var null, nullErr = unix.Open(os.DevNull, unix.O_WRONLY, 0)
 				if nullErr == nil && null != unix.Stderr {
-					_ = dupOntoStderrFn(null)
+					_ = c.dupOntoStderr(null)
 					_ = unix.Close(null)
 				}
 			}
@@ -149,7 +171,7 @@ func captureStderrFD(fn func()) string {
 	select {
 	case noise := <-captured:
 		return noise
-	case <-time.After(captureDrainTimeout):
+	case <-time.After(c.drainTimeout):
 		// The end of the pipe only comes once every copy of its write end is
 		// closed, and ours is not necessarily the only one: anything forked
 		// while file descriptor 2 was the pipe - PortAudio's JACK host API

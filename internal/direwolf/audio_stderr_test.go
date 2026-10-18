@@ -98,13 +98,8 @@ func TestCaptureStderrFDDrainsMoreThanItKeeps(t *testing.T) {
 // something is forked while file descriptor 2 is the pipe: the end of the pipe
 // never arrives, and waiting for it unconditionally would hang the process.
 func TestCaptureStderrFDGivesUpWhenSomethingElseHoldsThePipe(t *testing.T) {
-	var realTimeout = captureDrainTimeout
-
-	captureDrainTimeout = 100 * time.Millisecond
-
-	defer func() {
-		captureDrainTimeout = realTimeout
-	}()
+	var c = newStderrCapture()
+	c.drainTimeout = 100 * time.Millisecond
 
 	var before = stderrIdentity(t)
 
@@ -117,7 +112,7 @@ func TestCaptureStderrFDGivesUpWhenSomethingElseHoldsThePipe(t *testing.T) {
 	var done = make(chan string, 1)
 
 	go func() {
-		done <- captureStderrFD(func() {
+		done <- c.capture(func() {
 			// Stand in for the forked process: a copy of the write end that
 			// outlives the call.
 			leaked, leakErr = unix.Dup(unix.Stderr)
@@ -155,29 +150,24 @@ func TestCaptureStderrFDSurvivesAFailedRestore(t *testing.T) {
 
 	require.NoError(t, dupErr)
 
-	var realDupOntoStderr = dupOntoStderrFn
-
-	defer func() {
-		dupOntoStderrFn = realDupOntoStderr
-	}()
-
 	// Fail only the restore, so the capture itself is set up as usual.
 	var redirected bool
 
-	dupOntoStderrFn = func(fd int) error {
+	var c = newStderrCapture()
+	c.dupOntoStderr = func(fd int) error {
 		if redirected {
 			return unix.EBADF
 		}
 
 		redirected = true
 
-		return realDupOntoStderr(fd)
+		return dupOntoStderr(fd)
 	}
 
 	var done = make(chan string, 1)
 
 	go func() {
-		done <- captureStderrFD(func() {
+		done <- c.capture(func() {
 			var _, err = unix.Write(unix.Stderr, []byte(alsaNoise))
 			assert.NoError(t, err)
 		})
@@ -199,9 +189,7 @@ func TestCaptureStderrFDSurvivesAFailedRestore(t *testing.T) {
 
 	// It is /dev/null rather than the real stderr at this point, so put the
 	// real one back for the rest of the tests.
-	dupOntoStderrFn = realDupOntoStderr
-
-	require.NoError(t, realDupOntoStderr(savedStderr))
+	require.NoError(t, dupOntoStderr(savedStderr))
 	require.NoError(t, unix.Close(savedStderr))
 	assert.Equal(t, before, stderrIdentity(t))
 }
