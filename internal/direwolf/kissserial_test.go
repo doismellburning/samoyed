@@ -166,6 +166,8 @@ func readSerialText(t *testing.T, client *os.File, want int) string {
 // Without KISSPORT in the configuration there is no serial TNC at all, and
 // nothing for the sending path to write to.
 func TestKissSerialNoPortConfigured(t *testing.T) {
+	t.Parallel()
+
 	var ks = NewKissSerial(t.Context(), new(misc_config_s), nil, 0)
 
 	assert.Nil(t, ks.fd)
@@ -181,6 +183,8 @@ func TestKissSerialNoPortConfigured(t *testing.T) {
 // never sets one up - there is no KissSerial at all, and the receive paths
 // that send to it must not trip over that.
 func TestKissSerialNilSendRecPacket(t *testing.T) {
+	t.Parallel()
+
 	var ks *KissSerial
 
 	assert.NotPanics(t, func() {
@@ -190,6 +194,8 @@ func TestKissSerialNilSendRecPacket(t *testing.T) {
 
 // A device that is not there, and no polling asked for, is reported once and
 // then left alone - there is no listening goroutine to start.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestKissSerialDeviceNotThere(t *testing.T) {
 	var ks *KissSerial
 
@@ -205,6 +211,8 @@ func TestKissSerialDeviceNotThere(t *testing.T) {
 // A frame received over the radio reaches the client as KISS: the channel and
 // command in the first byte, then the frame, wrapped in FENDs.
 func TestKissSerialSendRecPacket(t *testing.T) {
+	t.Parallel()
+
 	var ks, client = openKissSerialPort(t, 0)
 
 	const channel = 2
@@ -221,6 +229,8 @@ func TestKissSerialSendRecPacket(t *testing.T) {
 // A port that has gone away cannot be written to, so it is given up rather
 // than written to again on the next received frame.  The closing is left to
 // the listening goroutine, which may be blocked reading the port.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 0)
 
@@ -251,6 +261,8 @@ func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 // The fake command prompt is text, not a KISS frame, so it goes out as it is,
 // with no framing or escaping added.
 func TestKissSerialPrompt(t *testing.T) {
+	t.Parallel()
+
 	var ks, client = openKissSerialPort(t, 0)
 
 	ks.prompt([]byte("\r\ncmd:"))
@@ -261,6 +273,8 @@ func TestKissSerialPrompt(t *testing.T) {
 // A frame longer than AX.25 allows is truncated rather than sent on: a client
 // that is told the frame was truncated and then handed the whole thing anyway
 // has been told a lie about bytes it cannot parse.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 0)
 
@@ -287,6 +301,8 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 // it and the frame is queued for transmission on the channel the KISS frame
 // names.
 func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
+	t.Parallel()
+
 	const channel = 0
 
 	var name, client = newTestSerialDevice(t)
@@ -315,6 +331,8 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 // things like "KISS ON\r" over and over until it gets an answer.  Answering
 // with a command prompt is what stops it.
 func TestKissSerialAnswersCommandModeNoise(t *testing.T) {
+	t.Parallel()
+
 	var name, client = newTestSerialDevice(t)
 
 	var mc = new(misc_config_s)
@@ -333,6 +351,8 @@ func TestKissSerialAnswersCommandModeNoise(t *testing.T) {
 // The far end going away leaves a port that can only report errors, so it is
 // given up rather than read from forever.
 func TestKissSerialReadErrorClosesThePort(t *testing.T) {
+	t.Parallel()
+
 	var name, client = newTestSerialDevice(t)
 
 	var mc = new(misc_config_s)
@@ -354,6 +374,8 @@ func TestKissSerialReadErrorClosesThePort(t *testing.T) {
 // Bluetooth is the reason for the polling option: the device turns up when the
 // far end connects, some time after we started, and we are expected to notice.
 func TestKissSerialPollsForTheDeviceToAppear(t *testing.T) {
+	t.Parallel()
+
 	var device = filepath.Join(t.TempDir(), "rfcomm0")
 
 	var mc = new(misc_config_s)
@@ -414,6 +436,8 @@ func TestKissSerialPollsForTheDeviceToAppear(t *testing.T) {
 // Nothing has turned up and nothing ever will: the polling loop waits between
 // looks rather than spinning, and a cancellation cuts that wait short.
 func TestKissSerialPollingStopsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = filepath.Join(t.TempDir(), "never-appears")
 	mc.kiss_serial_poll = 1
@@ -433,6 +457,8 @@ func TestKissSerialPollingStopsWhenCancelled(t *testing.T) {
 
 // With "-d k" the traffic is printed, so that a client application that is not
 // being understood can be looked at.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestKissSerialDebugPrints(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 2)
 
@@ -458,6 +484,8 @@ func TestKissSerialDebugPrints(t *testing.T) {
 // the writes, and neither may trip over the other - under -race this is the
 // regression test for the port handle being shared unguarded.
 func TestKissSerialSendWhileListening(t *testing.T) {
+	t.Parallel()
+
 	var name, client = newTestSerialDevice(t)
 
 	var mc = new(misc_config_s)

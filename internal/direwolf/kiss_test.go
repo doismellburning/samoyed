@@ -213,6 +213,8 @@ func readKissText(t *testing.T, client *os.File, want int) string {
 // A TNC nobody asked for should not be there: without -p there is no pseudo
 // terminal, and nothing for the sending path to write to.
 func TestKissPTNotEnabled(t *testing.T) {
+	t.Parallel()
+
 	var kp = NewKissPT(t.Context(), new(misc_config_s), nil, 0)
 
 	assert.Nil(t, kp.ptMaster(), "a pseudo terminal was opened although KISS pt was not enabled")
@@ -227,6 +229,8 @@ func TestKissPTNotEnabled(t *testing.T) {
 // The receive paths send to the pseudo terminal whether or not startup has got
 // as far as setting it up, so a TNC that was never built is a no-op too.
 func TestKissPTNilSendRecPacket(t *testing.T) {
+	t.Parallel()
+
 	var kp *KissPT
 
 	assert.NotPanics(t, func() {
@@ -238,6 +242,8 @@ func TestKissPTNilSendRecPacket(t *testing.T) {
 // otherwise mean editing the client application's configuration on every
 // restart.  The symlink is what saves that, so it has to point at the terminal
 // we actually opened.
+//
+//nolint:paralleltest // Serial: checks /tmp/kisstnc, the symlink every pseudo terminal KISS TNC shares.
 func TestKissPTSymlinkPointsAtTheTerminal(t *testing.T) {
 	var _, client = startKissPT(t, 0)
 
@@ -250,6 +256,8 @@ func TestKissPTSymlinkPointsAtTheTerminal(t *testing.T) {
 // A frame received over the radio reaches the client as KISS: the channel and
 // command in the first byte, then the frame, wrapped in FENDs.
 func TestKissPTSendRecPacket(t *testing.T) {
+	t.Parallel()
+
 	var kp, client = startKissPT(t, 0)
 
 	const channel = 3
@@ -266,6 +274,8 @@ func TestKissPTSendRecPacket(t *testing.T) {
 // FEND and FESC in the frame contents would otherwise look like framing to the
 // client, so they are escaped on the way out.
 func TestKissPTSendRecPacketEscapes(t *testing.T) {
+	t.Parallel()
+
 	var kp, client = startKissPT(t, 0)
 
 	var frame = []byte{kiss.FEND, 'a', kiss.FESC, 'b'}
@@ -280,6 +290,8 @@ func TestKissPTSendRecPacketEscapes(t *testing.T) {
 // The fake command prompt is text, not a KISS frame, so it goes out as it is,
 // with no framing or escaping added.
 func TestKissPTPrompt(t *testing.T) {
+	t.Parallel()
+
 	var kp, client = startKissPT(t, 0)
 
 	kp.prompt([]byte("\r\ncmd:"))
@@ -290,6 +302,8 @@ func TestKissPTPrompt(t *testing.T) {
 // A frame longer than AX.25 allows is truncated rather than sent on, and the
 // user is told, because silently passing it would hand the client something it
 // cannot parse.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestKissPTSendRecPacketTruncates(t *testing.T) {
 	var kp, client = startKissPT(t, 0)
 
@@ -316,6 +330,8 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 // into it and the frame is queued for transmission on the channel the KISS
 // frame names.
 func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
+	t.Parallel()
+
 	const channel = 0
 
 	var kp, client = startKissPT(t, 0)
@@ -339,6 +355,8 @@ func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 // things like "KISS ON\r" over and over until it gets an answer.  Answering
 // with a command prompt is what stops it.
 func TestKissPTAnswersCommandModeNoise(t *testing.T) {
+	t.Parallel()
+
 	var _, client = startKissPT(t, 0)
 
 	var _, writeErr = client.WriteString("KISS ON\r")
@@ -350,6 +368,8 @@ func TestKissPTAnswersCommandModeNoise(t *testing.T) {
 // "RESTART" is answered with a pair of FENDs instead - an empty KISS frame -
 // because that is what the applications sending it are waiting for.
 func TestKissPTAnswersRestart(t *testing.T) {
+	t.Parallel()
+
 	var _, client = startKissPT(t, 0)
 
 	var _, writeErr = client.WriteString("restart\r")
@@ -369,6 +389,8 @@ func TestKissPTAnswersRestart(t *testing.T) {
 // listening goroutine below stayed in its read for the life of the process,
 // however the context was cancelled.
 func TestKissPTStopsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
 	var ctx, cancel = context.WithCancel(t.Context())
 
 	var kp, client, done = startKissPTListener(ctx, t, 0)
@@ -395,6 +417,8 @@ func TestKissPTStopsWhenCancelled(t *testing.T) {
 // closePT is called from more than one place on the way out - the listening
 // goroutine has it registered twice over - so it has to cope with the terminal
 // already being gone.
+//
+//nolint:paralleltest // Serial: checks /tmp/kisstnc, the symlink every pseudo terminal KISS TNC shares.
 func TestKissPTCloseTwice(t *testing.T) {
 	var kp = newKissPT(nil, 0)
 
@@ -419,6 +443,8 @@ func TestKissPTCloseTwice(t *testing.T) {
 // A client that closes its end leaves the terminal unusable - a read of the
 // master gets EIO once no process holds the slave - so the TNC gives it up
 // rather than spinning on an error forever.
+//
+//nolint:paralleltest // Serial: checks /tmp/kisstnc, the symlink every pseudo terminal KISS TNC shares.
 func TestKissPTClientHangingUpClosesTheTerminal(t *testing.T) {
 	var kp, client, done = startKissPTListener(t.Context(), t, 0)
 
@@ -438,6 +464,8 @@ func TestKissPTClientHangingUpClosesTheTerminal(t *testing.T) {
 
 // With "-d k" the traffic in both directions is printed, so that a client
 // application that is not being understood can be looked at.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	var kp, client = startKissPT(t, 2)
 
@@ -465,6 +493,8 @@ func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 // under -race this is the regression test for the terminal being shared
 // unguarded between the two.
 func TestKissPTSendWhileListening(t *testing.T) {
+	t.Parallel()
+
 	var kp, client, done = startKissPTListener(t.Context(), t, 0)
 
 	var sent = make(chan struct{})

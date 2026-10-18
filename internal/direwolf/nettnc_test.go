@@ -105,6 +105,8 @@ func kissFrameFor(pp *ax25.Packet) []byte {
 
 // A TNC that is not there cannot be attached to, and says so rather than
 // leaving a channel that looks connected.
+//
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func TestNetTNCAttachRefused(t *testing.T) {
 	// A port nothing is listening on: one taken and given straight back.
 	var port = testutils.UnusedPortNumber(t)
@@ -117,6 +119,8 @@ func TestNetTNCAttachRefused(t *testing.T) {
 
 // Starting a TNC twice would have two goroutines splitting what it sends
 // between them, so the second start is refused, and says so.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestNetTNCStartedTwiceComplains(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
@@ -146,6 +150,8 @@ func TestNetTNCStartedTwiceComplains(t *testing.T) {
 // program is concerned, so it goes on the received queue against the NCHANNEL
 // number rather than the channel in the KISS frame.
 func TestNetTNCReceivedFrameReachesTheQueue(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var _, tnc, _ = attachTestNetTNC(t.Context(), t, dlq.RecFrame)
@@ -174,6 +180,8 @@ func TestNetTNCReceivedFrameReachesTheQueue(t *testing.T) {
 // Transmitting on an NCHANNEL means handing the frame to the TNC as KISS, with
 // the KISS channel set to 0 - the TNC has only the one radio.
 func TestNetTNCSendPacket(t *testing.T) {
+	t.Parallel()
+
 	var nt, tnc, _ = attachTestNetTNC(t.Context(), t, nil)
 
 	var pp = newTestPacket(t)
@@ -193,6 +201,8 @@ func TestNetTNCSendPacket(t *testing.T) {
 
 // A channel with no NCHANNEL configured has nowhere to send, and says so
 // rather than crashing on the nil that stands for "no TNC".
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCSendPacketNoTNC(t *testing.T) {
 	var nt *NetTNC
 
@@ -203,6 +213,8 @@ func TestNetTNCSendPacketNoTNC(t *testing.T) {
 
 // A TNC that has gone away is not connected either, even though we attached to
 // it once.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCSendPacketNotConnected(t *testing.T) {
 	var nt = new(NetTNC)
 	nt.host = "127.0.0.1"
@@ -214,6 +226,8 @@ func TestNetTNCSendPacketNotConnected(t *testing.T) {
 
 // A write that fails means the connection is no use any more, so it is given
 // up and the listening goroutine left to reattach.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCSendPacketWriteErrorClosesTheConnection(t *testing.T) {
 	// Straight to a NetTNC rather than through NewNetTNC, so that there is no
 	// listening goroutine to reattach behind the assertion below.
@@ -233,6 +247,8 @@ func TestNetTNCSendPacketWriteErrorClosesTheConnection(t *testing.T) {
 // A network TNC is somebody else's process, and it can restart.  Losing the
 // connection is not losing the channel: we attach again and carry on.
 func TestNetTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var _, tnc, conns = attachTestNetTNC(t.Context(), t, dlq.RecFrame)
@@ -255,6 +271,8 @@ func TestNetTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
 // stops the listening goroutine and hangs up on the TNC, rather than leaving a
 // goroutine blocked on a read of it forever.
 func TestNetTNCStopsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
 	var ctx, cancel = context.WithCancel(t.Context())
 
 	var _, tnc, _ = attachTestNetTNC(ctx, t, nil)
@@ -278,6 +296,8 @@ func TestNetTNCStopsWhenCancelled(t *testing.T) {
 // Everything before the opening FEND is noise from something that is not
 // speaking KISS, and is dropped rather than taken for frame contents.
 func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var pp = newTestPacket(t)
@@ -295,6 +315,8 @@ func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
 
 // FENDs with nothing between them are how some TNCs idle, and are not frames.
 func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var kf = new(kiss.Collector)
@@ -308,6 +330,8 @@ func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 
 // A frame too short to be AX.25 cannot be made into a packet, and is reported
 // rather than passed on as something the rest of the program has to cope with.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
@@ -326,6 +350,8 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 // FEND FESC FEND is a frame, but escapes nothing, so there is no type byte
 // once it is unescaped.  Three bytes from the far end of the network
 // connection used to take the whole program down, looking for one.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCFrameEmptyOnceUnescapedIsReported(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
@@ -344,6 +370,8 @@ func TestNetTNCFrameEmptyOnceUnescapedIsReported(t *testing.T) {
 // A TNC that never sends a FEND would otherwise fill the frame buffer without
 // limit, so the collecting stops at the maximum and says so - once, not once
 // for every byte past it.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 	var kf = new(kiss.Collector)
 
@@ -362,6 +390,8 @@ func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 // written to was one past the end of the buffer - which took the whole program
 // down, from anything on the far end of the network connection.  The overlong
 // frame is thrown away, and the collector is left ready for the next one.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
@@ -391,6 +421,8 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 // With the debug option the frames are printed in both the form they arrived
 // in and the form they were decoded to, so that a TNC that is not being
 // understood can be looked at.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCDebugPrints(t *testing.T) {
 	var kf = new(kiss.Collector)
 
@@ -406,6 +438,8 @@ func TestNetTNCDebugPrints(t *testing.T) {
 
 // NCHANNEL channels are attached to at start up, and the ones that are
 // something else are left alone.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 	var port, conns = newTestNetTNC(t.Context(), t)
 
@@ -430,6 +464,8 @@ func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 // A stop that arrives while a network TNC is being connected to cuts the
 // connection short, and NewNetTNCs goes back to its caller to tear down
 // rather than exiting as though the TNC could not be reached.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and relies on a port staying unused, which a parallel test could take.
 func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
 	var ctx, cancel = context.WithCancel(t.Context())
 	cancel()
@@ -465,6 +501,8 @@ func readFullFrom(conn net.Conn, buf []byte) error {
 
 // A packet queued for an NCHANNEL channel skips the radio queues and goes to
 // the network TNC the transmit queue was handed.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCTransmitQueueSendsToItsTNCs(t *testing.T) {
 	var nt, tnc, _ = attachTestNetTNC(t.Context(), t, nil)
 
