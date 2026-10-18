@@ -38,6 +38,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/coordconvutil"
 	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/hamlib"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/node"
@@ -2983,6 +2984,14 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 
 			octrl.Rate = *settings.Rate
 		}
+
+		// Hamlib is loaded at run time, so say now if it isn't there rather
+		// than when the first transmission goes unkeyed.
+		err := hamlib.Load()
+		if err != nil {
+			return fmt.Errorf("config file line %d: hamlib PTT is unavailable: %w", ps.line, err)
+		}
+
 		octrl.Method = PTT_METHOD_HAMLIB
 	case "cm108":
 		/* CM108 - GPIO of USB sound card. case, Linux and Windows only. */

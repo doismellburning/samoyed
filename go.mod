@@ -6,6 +6,7 @@ require (
 	github.com/brutella/dnssd v1.2.14
 	github.com/ccoveille/go-safecast/v2 v2.0.1
 	github.com/creack/pty v1.1.24
+	github.com/ebitengine/purego v0.11.2
 	github.com/golang/geo v0.0.0-20180826223333-635502111454
 	github.com/gordonklaus/portaudio v0.0.0-20250206071425-98a94950218b
 	github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b
@@ -17,7 +18,6 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/tzneal/coordconv v0.1.2
 	github.com/warthog618/go-gpiocdev v0.9.1
-	github.com/xylo04/goHamlib v0.0.0-20240309005711-30dd4ae13b38
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/sys v0.48.0
 	pgregory.net/rapid v1.3.0

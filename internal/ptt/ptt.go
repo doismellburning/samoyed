@@ -133,9 +133,9 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/hamlib"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
-	goHamlib "github.com/xylo04/goHamlib"
 	"golang.org/x/sys/unix"
 )
 
@@ -231,7 +231,7 @@ type PTT struct {
 	/* if using both RTS and DTR. */
 	fd [phy.MaxRadioChans][NumOutputTypes]*os.File
 
-	rig [phy.MaxRadioChans][NumOutputTypes]*goHamlib.Rig
+	rig [phy.MaxRadioChans][NumOutputTypes]*hamlib.Rig
 
 	/* GPIOD line handles, one per channel/output-type combination. */
 	gpiodLine [phy.MaxRadioChans][NumOutputTypes]gpiodOutputLine
@@ -562,12 +562,7 @@ func (p *PTT) set(ot OutputType, channel int, ptt_signal int) {
 
 	if p.channels[channel].Outputs[ot].Method == MethodHamlib {
 		if p.rig[channel][ot] != nil {
-			var onoff = goHamlib.RIG_PTT_OFF
-			if ptt != 0 {
-				onoff = goHamlib.RIG_PTT_ON
-			}
-
-			var retcode = p.rig[channel][ot].SetPtt(goHamlib.VFOCurrent, onoff)
+			var retcode = p.rig[channel][ot].SetPTT(ptt != 0)
 			if retcode != nil {
 				logrus.WithError(retcode).WithFields(logrus.Fields{
 					"channel": channel,
@@ -1061,45 +1056,31 @@ func (p *PTT) setup() error {
 							continue
 						}
 
-						var r = &goHamlib.Rig{} //nolint:exhaustruct_v5
-
-						var initErr = r.Init(goHamlib.RigModelID(p.channels[ch].Outputs[ot].Model))
+						var r, initErr = hamlib.NewRig(p.channels[ch].Outputs[ot].Model)
 						if initErr != nil {
 							logrus.WithError(initErr).WithFields(logrus.Fields{
 								"model": p.channels[ch].Outputs[ot].Model,
 								"hint":  `Run "rigctl --list" for a list of model numbers.`,
-							}).Error("Hamlib error: Unknown rig model")
+							}).Error("Hamlib error: Can't initialise rig")
 
 							continue
 						}
 
-						var port = goHamlib.Port{ //nolint:exhaustruct_v5
-							Portname:  p.channels[ch].Outputs[ot].Device,
-							Databits:  8,
-							Stopbits:  1,
-							Parity:    goHamlib.ParityNone,
-							Handshake: goHamlib.HandshakeNone,
-						}
+						var portErr = r.SetConf("rig_pathname", p.channels[ch].Outputs[ot].Device)
 
 						// Issue 290.
 						// We had a case where hamlib defaulted to 9600 baud for a particular
 						// radio model but 38400 was needed.  Add an option for the configuration
 						// file to override the hamlib default speed.
 
-						if p.channels[ch].Outputs[ot].Model == 2 {
-							// Model 2 is rigctld network control, not a serial port.
-							port.RigPortType = goHamlib.RigPortNetwork
-						} else {
-							port.RigPortType = goHamlib.RigPortSerial
+						// Model 2 is rigctld network control, not a serial port.
+						if portErr == nil && p.channels[ch].Outputs[ot].Model != 2 && p.channels[ch].Outputs[ot].Rate > 0 {
+							logrus.WithField("rate", p.channels[ch].Outputs[ot].Rate).
+								Info("User configuration overriding hamlib CAT control speed")
 
-							if p.channels[ch].Outputs[ot].Rate > 0 {
-								logrus.WithField("rate", p.channels[ch].Outputs[ot].Rate).
-									Info("User configuration overriding hamlib CAT control speed")
-								port.Baudrate = p.channels[ch].Outputs[ot].Rate
-							}
+							portErr = r.SetConf("serial_speed", strconv.Itoa(p.channels[ch].Outputs[ot].Rate))
 						}
 
-						var portErr = r.SetPort(port)
 						if portErr != nil {
 							logrus.WithError(portErr).WithField("channel", ch).Error("Hamlib error setting port")
 							r.Cleanup() //nolint:errcheck
