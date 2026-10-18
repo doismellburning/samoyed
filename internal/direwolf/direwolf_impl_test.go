@@ -13,6 +13,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/aprslog"
+	"github.com/doismellburning/samoyed/internal/aprstt"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/dwcore"
@@ -124,14 +125,14 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	var handler = new(recPacketHandler)
 	handler.toIGate = ig.sendRecPacket
 	handler.audioConfig = audioConfig
-	handler.ttConfig = new(Config) // No touch tones.
+	handler.ttConfig = new(aprstt.Config) // No touch tones.
 	handler.decoder = aprs.NewDecoderFromDataFiles()
 	handler.logger = aprslog.New(false, "")
 	handler.heard = heardDB
 	handler.waypoints = ws
 	handler.digipeater = digipeater.New(audioConfig.digipeaterPorts(), digiConfig, filter, nil, nil)
 	handler.connectedDigipeater = digipeater.NewConnected(audioConfig.digipeaterPorts(), new(digipeater.ConnectedConfig), filter, nil)
-	handler.ttGateway = NewGateway(audioConfig.myCall, handler.ttConfig, nil, handler.digipeater.Remember, nil, nil, nil, nil, 0)
+	handler.ttGateway = aprstt.NewGateway(audioConfig.myCall, handler.ttConfig, nil, handler.digipeater.Remember, nil, nil, nil, nil, 0)
 
 	return &recPacketTest{handler: handler, audioConfig: audioConfig, waypoints: waypoints}
 }

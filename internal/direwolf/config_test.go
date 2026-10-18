@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
+	"github.com/doismellburning/samoyed/internal/aprstt"
 	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -220,7 +221,7 @@ type configs struct {
 	audio *RadioConfig
 	digi  *digipeater.Config
 	cdigi *digipeater.ConnectedConfig
-	tt    *Config
+	tt    *aprstt.Config
 	igate *igate_config_s
 	misc  *misc_config_s
 
@@ -267,7 +268,7 @@ func parseConfigWith(t *testing.T, pattern string, content string, symbolTable s
 		audio:  new(RadioConfig),
 		digi:   new(digipeater.Config),
 		cdigi:  new(digipeater.ConnectedConfig),
-		tt:     new(Config),
+		tt:     new(aprstt.Config),
 		igate:  new(igate_config_s),
 		misc:   new(misc_config_s),
 		output: "",
@@ -684,7 +685,7 @@ func Test_config_init_modem_directive(t *testing.T) {
 			var audioConfig = new(RadioConfig)
 			var digiConfig digipeater.Config
 			var cdigiConfig digipeater.ConnectedConfig
-			var ttConfig Config
+			var ttConfig aprstt.Config
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
 
@@ -733,7 +734,7 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 			var audioConfig = new(RadioConfig)
 			var digiConfig digipeater.Config
 			var cdigiConfig digipeater.ConnectedConfig
-			var ttConfig Config
+			var ttConfig aprstt.Config
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
 
@@ -778,7 +779,7 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 			var audioConfig = new(RadioConfig)
 			var digiConfig digipeater.Config
 			var cdigiConfig digipeater.ConnectedConfig
-			var ttConfig Config
+			var ttConfig aprstt.Config
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
 
@@ -4019,7 +4020,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "TTAMBIG B3x\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Len(c.tt.Locs, 1)
-					a.Equal(LocAmbig, c.tt.Locs[0].Type)
+					a.Equal(aprstt.LocAmbig, c.tt.Locs[0].Type)
 					a.Equal("B3x", c.tt.Locs[0].Pattern)
 				},
 			},
@@ -4146,32 +4147,32 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a response method and text are stored against the message",
 				config: "TTERR BAD_CHECKSUM MORSE Checksum error\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("MORSE", c.tt.Response[ErrorBadChecksum].Method)
-					a.Equal("Checksum error", c.tt.Response[ErrorBadChecksum].MText)
+					a.Equal("MORSE", c.tt.Response[aprstt.ErrorBadChecksum].Method)
+					a.Equal("Checksum error", c.tt.Response[aprstt.ErrorBadChecksum].MText)
 				},
 			},
 			{
 				name:   "the defaults are a Morse question mark, and R for success",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("MORSE", c.tt.Response[ErrorBadChecksum].Method)
-					a.Equal("?", c.tt.Response[ErrorBadChecksum].MText)
-					a.Equal("R", c.tt.Response[ErrorOK].MText)
+					a.Equal("MORSE", c.tt.Response[aprstt.ErrorBadChecksum].Method)
+					a.Equal("?", c.tt.Response[aprstt.ErrorBadChecksum].MText)
+					a.Equal("R", c.tt.Response[aprstt.ErrorOK].MText)
 				},
 			},
 			{
 				name:   "SPEECH is the other method",
 				config: "TTERR NO_CALL SPEECH No call sign\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("SPEECH", c.tt.Response[ErrorNoCall].Method)
-					a.Equal("No call sign", c.tt.Response[ErrorNoCall].MText)
+					a.Equal("SPEECH", c.tt.Response[aprstt.ErrorNoCall].Method)
+					a.Equal("No call sign", c.tt.Response[aprstt.ErrorNoCall].MText)
 				},
 			},
 			{
 				name:   "the identifier and method are not case sensitive",
 				config: "TTERR no_call speech No call sign\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("SPEECH", c.tt.Response[ErrorNoCall].Method)
+					a.Equal("SPEECH", c.tt.Response[aprstt.ErrorNoCall].Method)
 				},
 			},
 			{
@@ -4185,8 +4186,8 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a method that is neither SPEECH nor MORSE leaves the default",
 				config: "TTERR NO_CALL FLAGS Some text\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("MORSE", c.tt.Response[ErrorNoCall].Method)
-					a.Equal("?", c.tt.Response[ErrorNoCall].MText)
+					a.Equal("MORSE", c.tt.Response[aprstt.ErrorNoCall].Method)
+					a.Equal("?", c.tt.Response[aprstt.ErrorNoCall].MText)
 					a.Contains(c.output, "must be SPEECH or MORSE")
 				},
 			},
@@ -4196,7 +4197,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a method too long to be an AX.25 address is rejected",
 				config: "TTERR NO_CALL SEMAPHORE Some text\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("?", c.tt.Response[ErrorNoCall].MText)
+					a.Equal("?", c.tt.Response[aprstt.ErrorNoCall].MText)
 					a.Contains(c.output, "Address is too long")
 				},
 			},
@@ -4204,7 +4205,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing response text leaves the default",
 				config: "TTERR NO_CALL SPEECH\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("?", c.tt.Response[ErrorNoCall].MText)
+					a.Equal("?", c.tt.Response[aprstt.ErrorNoCall].MText)
 					a.Contains(c.output, "Missing response text")
 				},
 			},
@@ -4222,7 +4223,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "TTGRID B2xxyy 37^50.00N 81^00.00W 37^59.99N 81^09.99W\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Len(c.tt.Locs, 1)
-					a.Equal(LocGrid, c.tt.Locs[0].Type)
+					a.Equal(aprstt.LocGrid, c.tt.Locs[0].Type)
 					a.Equal("B2xxyy", c.tt.Locs[0].Pattern)
 					a.InDelta(37.8333, c.tt.Locs[0].Grid.Lat0, 0.001)
 					a.InDelta(-81.0, c.tt.Locs[0].Grid.Lon0, 0.001)
@@ -4252,7 +4253,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "TTMACRO xxyyy B9xx*AB1yyy\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Len(c.tt.Locs, 1)
-					a.Equal(LocMacro, c.tt.Locs[0].Type)
+					a.Equal(aprstt.LocMacro, c.tt.Locs[0].Type)
 					a.Equal("xxyyy", c.tt.Locs[0].Pattern)
 					a.Equal("B9xx*AB1yyy", c.tt.Locs[0].Macro.Definition)
 				},
@@ -4319,7 +4320,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "TTMGRS B5xxxyyy 19TCG\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Len(c.tt.Locs, 1)
-					a.Equal(LocMGRS, c.tt.Locs[0].Type)
+					a.Equal(aprstt.LocMGRS, c.tt.Locs[0].Type)
 					a.Equal("19TCG", c.tt.Locs[0].MGRS.Zone)
 				},
 			},
@@ -4330,7 +4331,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "TTMHEAD B1xxxxxx\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Len(c.tt.Locs, 1)
-					a.Equal(LocMHead, c.tt.Locs[0].Type)
+					a.Equal(aprstt.LocMHead, c.tt.Locs[0].Type)
 					a.Equal("B1xxxxxx", c.tt.Locs[0].Pattern)
 					a.Empty(c.tt.Locs[0].MHead.Prefix)
 				},
@@ -4465,7 +4466,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "TTPOINT B01 37^55.37N 81^7.86W\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Len(c.tt.Locs, 1)
-					a.Equal(LocPoint, c.tt.Locs[0].Type)
+					a.Equal(aprstt.LocPoint, c.tt.Locs[0].Type)
 					a.Equal("B01", c.tt.Locs[0].Pattern)
 					a.InDelta(37.9228, c.tt.Locs[0].Point.Lat, 0.001)
 					a.InDelta(-81.1310, c.tt.Locs[0].Point.Lon, 0.001)
@@ -4517,7 +4518,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "TTSATSQ B2xxxx\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Len(c.tt.Locs, 1)
-					a.Equal(LocSatSq, c.tt.Locs[0].Type)
+					a.Equal(aprstt.LocSatSq, c.tt.Locs[0].Type)
 					a.Equal("B2xxxx", c.tt.Locs[0].Pattern)
 				},
 			},
@@ -4624,7 +4625,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "TTUSNG B5xxxyyy 19TCG\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Len(c.tt.Locs, 1)
-					a.Equal(LocUSNG, c.tt.Locs[0].Type)
+					a.Equal(aprstt.LocUSNG, c.tt.Locs[0].Type)
 					a.Equal("B5xxxyyy", c.tt.Locs[0].Pattern)
 					a.Equal("19TCG", c.tt.Locs[0].MGRS.Zone)
 				},
@@ -4675,7 +4676,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "TTUTM B6xxxyyy 19T 10 300000 4500000\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Len(c.tt.Locs, 1)
-					a.Equal(LocUTM, c.tt.Locs[0].Type)
+					a.Equal(aprstt.LocUTM, c.tt.Locs[0].Type)
 					a.Equal("B6xxxyyy", c.tt.Locs[0].Pattern)
 					a.Equal(19, c.tt.Locs[0].UTM.Zone)
 					a.InDelta(10.0, c.tt.Locs[0].UTM.Scale, 0.001)
@@ -4740,7 +4741,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "TTVECTOR B5bbbddd 37^55.37N 81^7.86W 0.01 mi\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Len(c.tt.Locs, 1)
-					a.Equal(LocVector, c.tt.Locs[0].Type)
+					a.Equal(aprstt.LocVector, c.tt.Locs[0].Type)
 					a.Equal("B5bbbddd", c.tt.Locs[0].Pattern)
 					a.InDelta(37.9228, c.tt.Locs[0].Vector.Lat, 0.001)
 					a.InDelta(16.09344, c.tt.Locs[0].Vector.Scale, 0.001)

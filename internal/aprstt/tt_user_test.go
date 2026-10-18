@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-package direwolf
+package aprstt
 
 import (
 	"fmt"
@@ -19,6 +19,8 @@ import (
 // the new message does not carry one - but the parse state started ambiguity
 // at 0, a perfectly real value meaning "omit no digits", so the guard never
 // fired and every ambiguity-less message silently reset it.
+//
+//nolint:paralleltest // Serial: heard sets the TT* environment variables for the TTCMD script.
 func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 	var my_mycall = ttMyCalls("Q1TEST-15")
 
@@ -50,6 +52,8 @@ func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 // the number from the front of.  strconv.ParseFloat wants the whole string to
 // be a number, so it failed, the error was ignored, and the object report
 // carried no frequency at all.
+//
+//nolint:paralleltest // Serial: heard sets the TT* environment variables for the TTCMD script.
 func TestObjectReportCarriesFrequency(t *testing.T) {
 	var my_mycall = ttMyCalls("Q1TEST-15")
 
@@ -73,6 +77,8 @@ func TestObjectReportCarriesFrequency(t *testing.T) {
 // TextToTwoKey passes any Unicode digit through, but only ASCII ones belong in
 // the suffix - another used to be narrowed to a byte and taken for a letter.
 func TestDigitSuffixIgnoresNonASCIIDigits(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, digit_suffix("Q1TEST"), digit_suffix("Q1TE\u0663ST")) // ARABIC-INDIC DIGIT THREE
 }
 
@@ -80,6 +86,8 @@ func TestDigitSuffixIgnoresNonASCIIDigits(t *testing.T) {
 // arrive, while the TTOBJ receive channel's audio goroutine polls the same
 // table, through Button's idle ticks, to send the object reports it has
 // scheduled.  Nothing ordered the two, so they raced on the table.
+//
+//nolint:paralleltest // Serial: heard sets the TT* environment variables for the TTCMD script.
 func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	var my_mycall = ttMyCalls("Q1TEST-15")
 
@@ -113,6 +121,8 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 // was told to remember transmissions with - the digipeater, in DirewolfMain -
 // so that hearing it again doesn't get it digipeated.
 func TestTransmittedObjectReportIsRemembered(t *testing.T) {
+	t.Parallel()
+
 	var ttConfig Config
 
 	ttConfig.ObjXmitChan = 0
@@ -142,6 +152,8 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 // An object report bound for APRS-IS goes to the IGate the gateway was
 // handed, the first time only, on the channel it was heard on.
 func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
+	t.Parallel()
+
 	var ttConfig Config
 
 	ttConfig.ObjSendToIG = 1
@@ -155,6 +167,31 @@ func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
 	}
 
 	var gw = NewGateway(ttMyCalls("Q1TEST"), &ttConfig, nil, nil, toIGate, nil, nil, nil, 0)
+
+	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
+	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
+
+	assert.Equal(t, []string{"1 Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W="}, sent)
+}
+
+// An object report goes to the client applications the gateway was handed,
+// when configured to, the first time only, on the channel it was heard on.
+func TestObjectReportGoesToTheClientApps(t *testing.T) {
+	t.Parallel()
+
+	var ttConfig Config
+
+	ttConfig.ObjSendToApp = 1
+	ttConfig.ObjRecvChan = 1
+	ttConfig.ObjXmitChan = -1
+
+	var sent []string
+
+	var toApps = func(channel int, pp *ax25.Packet) {
+		sent = append(sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
+	}
+
+	var gw = NewGateway(ttMyCalls("Q1TEST"), &ttConfig, toApps, nil, nil, nil, nil, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)

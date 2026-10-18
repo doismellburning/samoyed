@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package aprstt
 
 import (
 	"fmt"
@@ -115,8 +118,6 @@ var aprs_tt_test_config = []*Loc{
 	{Type: LocMacro, Pattern: "xxxxzzzzzzzzzz", Macro: MacroLoc{Definition: "BAxxxx*ACzzzzzzzzzz"}}, //nolint:exhaustruct_v5
 }
 
-var gateway *Gateway
-
 // fourDecimalPlaces renders a position for comparison against the expected
 // results above, which spell an absent one "Nothing".
 func fourDecimalPlaces(m maybe.Maybe[float64]) string {
@@ -125,7 +126,7 @@ func fourDecimalPlaces(m maybe.Maybe[float64]) string {
 	}, m)
 }
 
-func check_result(t *testing.T, testCase ttTestCase) {
+func check_result(t *testing.T, gateway *Gateway, testCase ttTestCase) {
 	t.Helper()
 
 	var state = gateway.lastParseState
@@ -149,15 +150,17 @@ func check_result(t *testing.T, testCase ttTestCase) {
 }
 
 func Test_APRS_TT(t *testing.T) {
+	t.Parallel()
+
 	var cfg Config
 	cfg.Locs = aprs_tt_test_config
-	gateway = NewGateway(ttMyCalls(), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	var gateway = NewGateway(ttMyCalls(), &cfg, nil, nil, nil, nil, nil, nil, 0)
 	gateway.runningTests = true
 
 	for testNum, testCase := range ttTestCases {
-		dw_printf("\nTest case %d: %s\n", testNum, testCase.toneseq)
+		t.Logf("Test case %d: %s", testNum, testCase.toneseq)
 
 		gateway.Sequence(t.Context(), 0, testCase.toneseq)
-		check_result(t, testCase)
+		check_result(t, gateway, testCase)
 	}
 }

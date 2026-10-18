@@ -17,6 +17,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/announce"
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/aprslog"
+	"github.com/doismellburning/samoyed/internal/aprstt"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/digipeater"
@@ -300,7 +301,7 @@ x = Silence FX.25 information.`)
 
 	var audio_config = new(RadioConfig)
 	var misc_config = new(misc_config_s)
-	var dw_tt_config Config
+	var dw_tt_config aprstt.Config
 	var digi_config digipeater.Config
 	var cdigi_config digipeater.ConnectedConfig
 	var igate_config igate_config_s
@@ -814,7 +815,7 @@ x = Silence FX.25 information.`)
 	 * client applications too.  Each audio device's receive thread makes the
 	 * touch tone decoders for its own channels, once receiving starts below.
 	 */
-	var ttGateway = NewGateway(audio_config.myCall, &dw_tt_config, clientApplications.SendRecPacket, aprsDigipeater.Remember, igate.sendRecPacket,
+	var ttGateway = aprstt.NewGateway(audio_config.myCall, &dw_tt_config, clientApplications.SendRecPacket, aprsDigipeater.Remember, igate.sendRecPacket,
 		dataLinkQueue.RecFrame, transmitQueue.Append, layer2Receiver.AudioLevel, aprstt_debug)
 
 	/*
@@ -932,7 +933,7 @@ type recPacketHandler struct {
 	// toIGate hands a received APRS packet to the IGate, for APRS-IS; nil
 	// for no IGate.
 	toIGate   igateSender
-	ttConfig  *Config
+	ttConfig  *aprstt.Config
 	decoder   *aprs.Decoder
 	webHub    *webui.Hub // Nil without a web interface.
 	logger    *aprslog.Logger
@@ -942,7 +943,7 @@ type recPacketHandler struct {
 
 	digipeater          *digipeater.Digipeater
 	connectedDigipeater *digipeater.Connected
-	ttGateway           *Gateway
+	ttGateway           *aprstt.Gateway
 
 	dumpUTF8    bool // "-d u": print UTF-8 in hexadecimal too.
 	dumpPackets bool // "-d p": dump each packet.

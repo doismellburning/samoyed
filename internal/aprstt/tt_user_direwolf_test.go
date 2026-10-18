@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package aprstt
 
 /*------------------------------------------------------------------
  *
@@ -31,6 +34,7 @@ func assertObjectReport(t *testing.T, users *ttUsers, callsign string, firstTime
 	assert.Equal(t, expected, users.objectReportText(i, firstTime))
 }
 
+//nolint:paralleltest // Serial: heard sets the TT* environment variables for the TTCMD script.
 func Test_TTUser(t *testing.T) {
 	/* Fake audio config - All we care about is mycall for constructing object report packet. */
 
