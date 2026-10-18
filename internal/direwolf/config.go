@@ -20,6 +20,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -39,6 +40,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/node"
+	"github.com/doismellburning/samoyed/internal/nodemap"
 	"github.com/doismellburning/samoyed/internal/pfilter"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/touchtone"
@@ -2156,6 +2158,17 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		}
 	}
 
+	var nodeMap maybe.Maybe[nodemap.Config]
+
+	if settings.Map != nil {
+		var config, mapErr = ps.nodeMapConfig(address, alias, *settings.Map)
+		if mapErr != nil {
+			return mapErr
+		}
+
+		nodeMap = maybe.Just(config)
+	}
+
 	ps.misc.node = maybe.Just(nodeSettings{
 		address:        address,
 		alias:          alias,
@@ -2163,9 +2176,52 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		line:           ps.line,
 		infoMessage:    settings.InfoMessage,
 		connectMessage: settings.ConnectMessage,
+		nodeMap:        nodeMap,
 	})
 
 	return nil
+}
+
+// nodeMapConfig checks how the node at address, with alias, is to be
+// reported to the node map, and is what the map is to be told.
+func (ps *parseState) nodeMapConfig(address string, alias string, settings NodeMapSettings) (nodemap.Config, error) {
+	var none nodemap.Config
+
+	if !validNodeMapAPIURL(settings.APIURL) {
+		return none, fmt.Errorf("line %d: Invalid URL %q for the node map. Must be an http or https URL", ps.line, settings.APIURL)
+	}
+
+	var location maybe.Maybe[nodemap.Location]
+
+	if settings.Locator != "" {
+		var at, err = nodemap.LocationAt(settings.Locator)
+		if err != nil {
+			return none, fmt.Errorf("line %d: Invalid locator for the node map: %w", ps.line, err)
+		}
+
+		location = maybe.Just(at)
+	}
+
+	return nodemap.Config{
+		Address:  address,
+		Alias:    alias,
+		APIURL:   settings.APIURL,
+		Location: location,
+		Contact:  settings.Contact,
+		Comment:  settings.Comment,
+	}, nil
+}
+
+// validNodeMapAPIURL says whether address is left out, for the public map, or
+// is somewhere a node map can be reached.
+func validNodeMapAPIURL(address string) bool {
+	if address == "" {
+		return true
+	}
+
+	var u, err = url.Parse(address)
+
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
 // nodeSettings is the node shell as the configuration file describes it.
@@ -2185,6 +2241,10 @@ type nodeSettings struct {
 
 	infoMessage    string
 	connectMessage string
+
+	// nodeMap is what the node map is told about the node, if it is to be
+	// told anything.
+	nodeMap maybe.Maybe[nodemap.Config]
 }
 
 // connectedModeChannels are the channels connected mode can be used on.

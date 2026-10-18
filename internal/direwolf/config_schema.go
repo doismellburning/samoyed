@@ -160,4 +160,26 @@ type NodeSettings struct {
 
 	// ConnectMessage is what a station is told on connecting to the node.
 	ConnectMessage string `yaml:"connectMessage"`
+
+	// Map, when given, reports the node to the UK Packet Radio network
+	// map.
+	Map *NodeMapSettings `yaml:"map"`
+}
+
+// NodeMapSettings describes how the node is reported to the UK Packet Radio
+// network map.
+type NodeMapSettings struct {
+	// APIURL is the base URL of the map's API.  Left out, it is the public
+	// map's.
+	APIURL string `yaml:"apiUrl"`
+
+	// Locator is the Maidenhead locator of where the node is.  Left out,
+	// the map is not told.
+	Locator string `yaml:"locator"`
+
+	// Contact is how to reach whoever runs the node.
+	Contact string `yaml:"contact"`
+
+	// Comment is a short note about the node.
+	Comment string `yaml:"comment"`
 }

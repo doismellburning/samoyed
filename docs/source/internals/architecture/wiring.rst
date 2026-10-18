@@ -187,6 +187,7 @@ so the order of construction follows the arrows:
 #. The ``XmitService``, which starts a transmit thread per radio channel.
 #. The IGate and the two digipeaters,
    then the node shell, if the configuration has one,
+   and its report to the node map (``nodemap.Reporter``), if the configuration asks for one,
    and the ``AX25Link``, the KISS handler and its transports,
    the APRStt gateway and the beacon service.
 #. The audio device goroutines (``recv_init``),
@@ -284,6 +285,7 @@ References
   ``digipeater.go`` (``New``, ``Port``)
   and ``cdigipeater.go`` (``NewConnected``).
 - ``internal/node/node.go``: ``New``, ``DataLink``.
+- ``internal/nodemap/nodemap.go``: ``New``, ``Reporter.Run``.
 - ``internal/dwcore/dwcore.go``: ``FrameSender``,
   shared by everything that hands the transmit queue a frame.
 - ``AGENTS.md``, the "Dependencies" section.

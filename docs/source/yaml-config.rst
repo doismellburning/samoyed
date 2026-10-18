@@ -249,6 +249,31 @@ These are the keys under ``samoyed``:
         Left out, it is a short welcome.
         Use ``|`` for several lines.
 
+    ``map``
+        Report the node to the `UK Packet Radio network map <https://nodes.ukpacketradio.network/>`_,
+        once at startup and every hour after.
+        Left out, the node is not reported.
+        ``map: {}`` reports it with nothing more than its callsign, its alias and that it runs Samoyed;
+        the settings below say more.
+        It has:
+
+        ``apiUrl``
+            Optionally, the base URL of the map's API,
+            for a map other than the public one.
+
+        ``locator``
+            Optionally, the Maidenhead locator of where the node is,
+            such as ``IO91wm``,
+            which the map plots it at.
+            Left out, the map is not told where the node is.
+
+        ``contact``
+            Optionally, how to reach whoever runs the node,
+            which the map shows to anyone.
+
+        ``comment``
+            Optionally, a short note about the node.
+
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
     Its commands are:
@@ -296,6 +321,9 @@ These are the keys under ``samoyed``:
             connectMessage: |
               Welcome to the club node.
               Type ? for a list of commands.
+            map:
+              locator: IO91wm
+              comment: Club node, 144.950 MHz
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as
