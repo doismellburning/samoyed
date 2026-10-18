@@ -390,6 +390,15 @@ func (c *RadioConfig) digipeaterPorts() [MAX_TOTAL_CHANS]digipeater.Port {
 	return ports
 }
 
+// myCall is our callsign on channel, or empty for a channel out of range.
+func (c *RadioConfig) myCall(channel int) string {
+	if channel < 0 || channel >= MAX_TOTAL_CHANS {
+		return ""
+	}
+
+	return c.mycall[channel]
+}
+
 // connectedModeAllowed reports whether AX.25 connected mode can be used on
 // channel: one that reaches the air, through our own modem, a network or
 // serial TNC, or AXUDP.

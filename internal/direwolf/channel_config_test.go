@@ -151,3 +151,16 @@ func TestMapPort(t *testing.T) {
 		assert.Equal(t, mapPortFor("10", nodemap.LinkInternet), c.mapPort(10))
 	})
 }
+
+// myCall is a channel's callsign, and none for a channel there can't be.
+func TestMyCall(t *testing.T) {
+	t.Parallel()
+
+	var c = new(RadioConfig)
+	c.mycall[1] = "Q1TEST-15"
+
+	assert.Equal(t, "Q1TEST-15", c.myCall(1))
+	assert.Empty(t, c.myCall(0))
+	assert.Empty(t, c.myCall(-1))
+	assert.Empty(t, c.myCall(MAX_TOTAL_CHANS))
+}

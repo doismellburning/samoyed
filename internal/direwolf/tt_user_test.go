@@ -23,9 +23,7 @@ import (
 func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 	t.Parallel()
 
-	var my_audio_config RadioConfig
-
-	my_audio_config.mycall[0] = "Q1TEST-15"
+	var my_mycall = ttMyCalls("Q1TEST-15")
 
 	var my_tt_config tt_config_s
 
@@ -33,7 +31,7 @@ func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 	my_tt_config.num_xmits = 1
 	my_tt_config.xmit_delay[0] = 3
 
-	var users = newTTUsers(&my_audio_config, &my_tt_config)
+	var users = newTTUsers(my_mycall, &my_tt_config)
 
 	require.Equal(t, 0, users.heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
 		maybe.Just(2), "", "", "", ' ', "!T99!"))
@@ -58,9 +56,7 @@ func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 func TestObjectReportCarriesFrequency(t *testing.T) {
 	t.Parallel()
 
-	var my_audio_config RadioConfig
-
-	my_audio_config.mycall[0] = "Q1TEST-15"
+	var my_mycall = ttMyCalls("Q1TEST-15")
 
 	var my_tt_config tt_config_s
 
@@ -68,7 +64,7 @@ func TestObjectReportCarriesFrequency(t *testing.T) {
 	my_tt_config.num_xmits = 1
 	my_tt_config.xmit_delay[0] = 3
 
-	var users = newTTUsers(&my_audio_config, &my_tt_config)
+	var users = newTTUsers(my_mycall, &my_tt_config)
 
 	require.Equal(t, 0, users.heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
 		maybe.Just(0), "146.955MHz", "074", "", ' ', ""))
@@ -97,15 +93,13 @@ func TestDigitSuffixIgnoresNonASCIIDigits(t *testing.T) {
 func TestSetenvSpellsOutOnlyASCII(t *testing.T) {
 	t.Setenv("TTCALLPH", "")
 
-	var my_audio_config RadioConfig
-
-	my_audio_config.mycall[0] = "Q1TEST-15"
+	var my_mycall = ttMyCalls("Q1TEST-15")
 
 	var my_tt_config tt_config_s
 
 	my_tt_config.retain_time = 20
 
-	var users = newTTUsers(&my_audio_config, &my_tt_config)
+	var users = newTTUsers(my_mycall, &my_tt_config)
 
 	users.user[0].callsign = "Q2À"
 	users.setenv(0)
@@ -120,9 +114,7 @@ func TestSetenvSpellsOutOnlyASCII(t *testing.T) {
 func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	t.Parallel()
 
-	var my_audio_config RadioConfig
-
-	my_audio_config.mycall[0] = "Q1TEST-15"
+	var my_mycall = ttMyCalls("Q1TEST-15")
 
 	var my_tt_config tt_config_s
 
@@ -130,7 +122,7 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	my_tt_config.num_xmits = 1
 	my_tt_config.obj_xmit_chan = -1 // Keep the reports off the transmit queue.
 
-	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, nil, nil, nil, nil, nil, 0)
+	var gw = NewTTGateway(my_mycall, &my_tt_config, nil, nil, nil, nil, nil, nil, 0)
 
 	var done = make(chan struct{})
 
@@ -156,8 +148,6 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 	t.Parallel()
 
-	var audioConfig = makeBeaconModemConfig()
-
 	var ttConfig tt_config_s
 
 	ttConfig.obj_xmit_chan = 0
@@ -176,7 +166,7 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 		transmitted = append(transmitted, fmt.Sprintf("%d %d %s%s", channel, prio, pp.FormatAddrs(), pp.Info()))
 	}
 
-	var gw = NewTTGateway(audioConfig, &ttConfig, nil, remember, nil, nil, transmit, nil, 0)
+	var gw = NewTTGateway(ttMyCalls("Q1TEST"), &ttConfig, nil, remember, nil, nil, transmit, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
 
@@ -188,8 +178,6 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 // handed, the first time only, on the channel it was heard on.
 func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
 	t.Parallel()
-
-	var audioConfig = makeBeaconModemConfig()
 
 	var ttConfig tt_config_s
 
@@ -203,7 +191,7 @@ func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
 		sent = append(sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
 	}
 
-	var gw = NewTTGateway(audioConfig, &ttConfig, nil, nil, toIGate, nil, nil, nil, 0)
+	var gw = NewTTGateway(ttMyCalls("Q1TEST"), &ttConfig, nil, nil, toIGate, nil, nil, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)

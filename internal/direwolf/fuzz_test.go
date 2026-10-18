@@ -754,13 +754,10 @@ func FuzzTTSequence(f *testing.F) {
 		cfg.num_xmits = 1
 		cfg.status[1] = "/off duty"
 
-		var audioConfig = new(RadioConfig)
-		audioConfig.mycall[0] = "Q1TEST"
-
 		var discard = func(int, *ax25.Packet) {}
 		var transmit = func(int, int, *ax25.Packet) {}
 
-		var g = NewTTGateway(audioConfig, &cfg, nil, discard, discard, nil, transmit, nil, 0)
+		var g = NewTTGateway(ttMyCalls("Q1TEST"), &cfg, nil, discard, discard, nil, transmit, nil, 0)
 
 		g.Sequence(t.Context(), 0, "A9A2B42A7A7C71#") // WB4APR/7
 		g.Sequence(t.Context(), 0, msg)

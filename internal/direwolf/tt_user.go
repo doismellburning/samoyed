@@ -122,16 +122,18 @@ type tt_user_s struct {
 // table to send the object reports it has scheduled, so mu guards user.
 // The reports are sent with it released.
 type ttUsers struct {
-	audioConfig *RadioConfig
-	ttConfig    *tt_config_s
-	apps        *clientApps // Where object reports go to client applications, or nil.
+	mycall   func(channel int) string // A channel's callsign, which object reports are sent from.
+	ttConfig *tt_config_s
+
+	// toApps sends an object report to the client applications, or is nil.
+	toApps objectReportSink
 
 	// remember is told each object report we transmit, so the digipeater
 	// doesn't repeat our own, or is nil.
-	remember func(channel int, pp *ax25.Packet)
+	remember objectReportSink
 
 	// toIGate sends an object report to APRS-IS, or is nil for no IGate.
-	toIGate igateSender
+	toIGate objectReportSink
 
 	// transmit is where an object report goes, to be transmitted, or is nil to
 	// drop it.
@@ -141,12 +143,12 @@ type ttUsers struct {
 	user [MAX_TT_USERS]tt_user_s
 }
 
-// newTTUsers makes an empty user table.  audioConfig supplies the mycall
-// object reports are sent from, and ttConfig when and where they are sent.
-func newTTUsers(audioConfig *RadioConfig, ttConfig *tt_config_s) *ttUsers {
+// newTTUsers makes an empty user table.  mycall gives the callsign object
+// reports are sent from, and ttConfig when and where they are sent.
+func newTTUsers(mycall func(channel int) string, ttConfig *tt_config_s) *ttUsers {
 	var u = new(ttUsers)
 
-	u.audioConfig = audioConfig
+	u.mycall = mycall
 	u.ttConfig = ttConfig
 
 	return u
@@ -658,8 +660,8 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	 * The other methods are reliable so we only want to send it once.
 	 */
 
-	if first_time && u.ttConfig.obj_send_to_app > 0 {
-		u.apps.SendRecPacket(u.ttConfig.obj_recv_chan, pp)
+	if first_time && u.ttConfig.obj_send_to_app > 0 && u.toApps != nil {
+		u.toApps(u.ttConfig.obj_recv_chan, pp)
 	}
 
 	if first_time && u.ttConfig.obj_send_to_ig > 0 {
@@ -677,7 +679,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 		}
 
 		if u.transmit != nil {
-			u.transmit(u.ttConfig.obj_xmit_chan, TQ_PRIO_1_LO, pp)
+			u.transmit(u.ttConfig.obj_xmit_chan, dwcore.PrioLow, pp)
 		}
 	}
 }
@@ -788,9 +790,9 @@ func (u *ttUsers) objectReportText(i int, first_time bool) string {
 
 	var stemp string
 	if u.ttConfig.obj_xmit_chan >= 0 {
-		stemp = u.audioConfig.mycall[u.ttConfig.obj_xmit_chan]
+		stemp = u.mycall(u.ttConfig.obj_xmit_chan)
 	} else {
-		stemp = u.audioConfig.mycall[u.ttConfig.obj_recv_chan]
+		stemp = u.mycall(u.ttConfig.obj_recv_chan)
 	}
 
 	stemp += ">"
