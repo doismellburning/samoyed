@@ -69,6 +69,8 @@ func asyncReply(conn net.Conn) <-chan *agwpe.Message {
 }
 
 func TestHandleClientCommand_R_VersionReply(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var client = setupClientPipe(t, s)
@@ -88,6 +90,8 @@ func TestHandleClientCommand_R_VersionReply(t *testing.T) {
 }
 
 func TestHandleClientCommand_k_TogglesRawFrames(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cmd = new(agwpe.Message)
@@ -101,6 +105,8 @@ func TestHandleClientCommand_k_TogglesRawFrames(t *testing.T) {
 }
 
 func TestHandleClientCommand_m_TogglesMonitorFrames(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cmd = new(agwpe.Message)
@@ -114,6 +120,8 @@ func TestHandleClientCommand_m_TogglesMonitorFrames(t *testing.T) {
 }
 
 func TestHandleClientCommand_g_PortCapabilitiesReply(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var client = setupClientPipe(t, s)
@@ -142,6 +150,8 @@ func TestHandleClientCommand_g_PortCapabilitiesReply(t *testing.T) {
 }
 
 func TestHandleClientCommand_G_NoPorts(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	s.audioConfigP = new(RadioConfig)
 
@@ -159,6 +169,8 @@ func TestHandleClientCommand_G_NoPorts(t *testing.T) {
 }
 
 func TestHandleClientCommand_G_RadioChannelMono(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg RadioConfig
@@ -180,6 +192,8 @@ func TestHandleClientCommand_G_RadioChannelMono(t *testing.T) {
 }
 
 func TestHandleClientCommand_y_EmptyQueueReturnsZero(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var client = setupClientPipe(t, s)
@@ -200,6 +214,8 @@ func TestHandleClientCommand_y_EmptyQueueReturnsZero(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	s.audioConfigP = new(RadioConfig)
 
@@ -221,6 +237,8 @@ func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg RadioConfig
@@ -259,6 +277,8 @@ func dlqAppended(q *DataLinkQueue, f func()) *dlq_item_t {
 // Before the bounds-check fix, data[0] could be read on an empty slice,
 // and the digipeater slice could go out of bounds.
 func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	s.audioConfigP = new(RadioConfig)
 	setupAGWTransmitQueue(t, s, s.audioConfigP)
@@ -278,6 +298,8 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 // Before the bounds-check fix, cmd.Data[1:cmd.Header.DataLen] would panic
 // when DataLen==0 or DataLen exceeded len(cmd.Data).
 func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	s.audioConfigP = new(RadioConfig)
 	setupAGWTransmitQueue(t, s, s.audioConfigP)
@@ -295,6 +317,8 @@ func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 // Before the fix, the invalid-numDigi else branch fell through to dlq.ConnectRequest,
 // silently treating the malformed frame as a direct connect.
 func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -329,6 +353,8 @@ func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
 // anything when Portx is not a radio channel.  Before the fix, the DLQ functions
 // would Assert-panic on channel >= MAX_RADIO_CHANS.
 func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -357,6 +383,8 @@ func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T
 // at the end of each transmitted packet. This null byte sat in the remote's input
 // buffer and appeared as a 0x00 prefix on the next received command.
 func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -391,6 +419,8 @@ func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 // command whose DataLen exceeds len(Data) is rejected without panicking or
 // enqueueing anything.
 func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -412,6 +442,8 @@ func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
 }
 
 func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -449,6 +481,8 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 }
 
 func TestConnectedModeAllowed_OutOfRange(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	s.audioConfigP = new(RadioConfig)
 
@@ -457,6 +491,8 @@ func TestConnectedModeAllowed_OutOfRange(t *testing.T) {
 }
 
 func TestConnectedModeAllowed_NilConfig_RadioRange(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	assert.True(t, s.connectedModeAllowed(0))
@@ -464,6 +500,8 @@ func TestConnectedModeAllowed_NilConfig_RadioRange(t *testing.T) {
 }
 
 func TestConnectedModeAllowed_NilConfig_NCHANNELRange(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	assert.False(t, s.connectedModeAllowed(MAX_RADIO_CHANS))
@@ -471,6 +509,8 @@ func TestConnectedModeAllowed_NilConfig_NCHANNELRange(t *testing.T) {
 
 // A caller with no server at all is judged as one with no configuration.
 func TestConnectedModeAllowed_NilServer(t *testing.T) {
+	t.Parallel()
+
 	var s *AGWServer
 
 	assert.True(t, s.connectedModeAllowed(0))
@@ -478,6 +518,8 @@ func TestConnectedModeAllowed_NilServer(t *testing.T) {
 }
 
 func TestConnectedModeAllowed_MediumRadio(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg RadioConfig
@@ -488,6 +530,8 @@ func TestConnectedModeAllowed_MediumRadio(t *testing.T) {
 }
 
 func TestConnectedModeAllowed_MediumNETTNC(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg RadioConfig
@@ -498,6 +542,8 @@ func TestConnectedModeAllowed_MediumNETTNC(t *testing.T) {
 }
 
 func TestConnectedModeAllowed_MediumSERTNC(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg RadioConfig
@@ -508,6 +554,8 @@ func TestConnectedModeAllowed_MediumSERTNC(t *testing.T) {
 }
 
 func TestConnectedModeAllowed_MediumAXUDP(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg RadioConfig
@@ -518,6 +566,8 @@ func TestConnectedModeAllowed_MediumAXUDP(t *testing.T) {
 }
 
 func TestConnectedModeAllowed_MediumIGate(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg RadioConfig
@@ -528,6 +578,8 @@ func TestConnectedModeAllowed_MediumIGate(t *testing.T) {
 }
 
 func TestConnectedModeAllowed_MediumNone(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg RadioConfig
@@ -538,6 +590,8 @@ func TestConnectedModeAllowed_MediumNone(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_NETTNCChannelReportsSuccess(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg RadioConfig
@@ -564,6 +618,8 @@ func TestHandleClientCommand_X_NETTNCChannelReportsSuccess(t *testing.T) {
 // no ports.  The struct allows a nil configuration and connectedModeAllowed
 // honours that, so this must not be the one place that falls over on it.
 func TestHandleClientCommand_G_NilRadioConfig(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	require.Nil(t, s.audioConfigP, "this test is about the nil case")
 
@@ -584,6 +640,8 @@ func TestHandleClientCommand_G_NilRadioConfig(t *testing.T) {
 // consult it, so the constructor is given it rather than having it set
 // afterwards.
 func TestNewAGWServer_TakesTheDebugLevel(t *testing.T) {
+	t.Parallel()
+
 	var mc = new(misc_config_s)
 
 	for _, debug := range []int{2, 0} {
@@ -597,6 +655,8 @@ func TestNewAGWServer_TakesTheDebugLevel(t *testing.T) {
 
 // Starting again is refused, and says so, rather than starting a second set
 // of goroutines on the same port.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestAGWServerStart_OnlyOnce(t *testing.T) {
 	// Already cancelled, so the goroutines the first start sets going return
 	// straight away, rather than outliving the test and writing to stdout
@@ -622,6 +682,8 @@ func TestAGWServerStart_OnlyOnce(t *testing.T) {
 
 // A nil server, as for an interface that was never set up, starts nothing.
 func TestAGWServerStart_Nil(t *testing.T) {
+	t.Parallel()
+
 	var s *AGWServer
 
 	s.Start(t.Context())
@@ -648,6 +710,8 @@ func radioChannelZero() *RadioConfig {
 }
 
 func TestHandleClientCommand_G_RadioChannelsStereo(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg = new(RadioConfig)
@@ -670,6 +734,8 @@ func TestHandleClientCommand_G_RadioChannelsStereo(t *testing.T) {
 }
 
 func TestHandleClientCommand_G_IGateAndNetTNC(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg = new(RadioConfig)
@@ -692,6 +758,8 @@ func TestHandleClientCommand_G_IGateAndNetTNC(t *testing.T) {
 }
 
 func TestHandleClientCommand_G_SerialTNC(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg = new(RadioConfig)
@@ -713,6 +781,8 @@ func TestHandleClientCommand_G_SerialTNC(t *testing.T) {
 }
 
 func TestHandleClientCommand_G_AXUDP(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var cfg = new(RadioConfig)
@@ -735,6 +805,8 @@ func TestHandleClientCommand_G_AXUDP(t *testing.T) {
 // 'H' (recently heard stations) is not implemented: nothing is sent back and
 // nothing is queued.
 func TestHandleClientCommand_H_DoesNothing(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -752,6 +824,8 @@ func TestHandleClientCommand_H_DoesNothing(t *testing.T) {
 
 // An unrecognised command is reported and otherwise ignored.
 func TestHandleClientCommand_UnknownCommandIgnored(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -781,6 +855,8 @@ func (c *writeCountingConn) Write(b []byte) (int, error) {
 }
 
 func TestHandleClientCommand_V_QueuesFrameWithPID(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
@@ -806,6 +882,8 @@ func TestHandleClientCommand_V_QueuesFrameWithPID(t *testing.T) {
 }
 
 func TestHandleClientCommand_V_TooShortForDigipeatersQueuesNothing(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
@@ -822,6 +900,8 @@ func TestHandleClientCommand_V_TooShortForDigipeatersQueuesNothing(t *testing.T)
 }
 
 func TestHandleClientCommand_V_BadAddressQueuesNothing(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
@@ -838,6 +918,8 @@ func TestHandleClientCommand_V_BadAddressQueuesNothing(t *testing.T) {
 }
 
 func TestHandleClientCommand_M_QueuesFrameWithPID(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
@@ -860,6 +942,8 @@ func TestHandleClientCommand_M_QueuesFrameWithPID(t *testing.T) {
 }
 
 func TestHandleClientCommand_M_BadAddressQueuesNothing(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
@@ -894,6 +978,8 @@ func rawAGWFrame(t *testing.T, monitor string) *agwpe.Message {
 
 // A raw frame that has already been digipeated goes out at high priority.
 func TestHandleClientCommand_K_UsedDigipeaterQueuesHighPriority(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
@@ -907,8 +993,12 @@ func TestHandleClientCommand_K_UsedDigipeaterQueuesHighPriority(t *testing.T) {
 
 // An original raw frame - unused digipeater, or none - goes out at low priority.
 func TestHandleClientCommand_K_OriginalQueuesLowPriority(t *testing.T) {
+	t.Parallel()
+
 	for _, monitor := range []string{"Q1TEST>Q2TEST,Q3TEST:hello", "Q1TEST>Q2TEST:hello"} {
 		t.Run(monitor, func(t *testing.T) {
+			t.Parallel()
+
 			var s = new(AGWServer)
 			var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
@@ -923,6 +1013,8 @@ func TestHandleClientCommand_K_OriginalQueuesLowPriority(t *testing.T) {
 }
 
 func TestHandleClientCommand_K_UndecodableFrameQueuesNothing(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
@@ -938,6 +1030,8 @@ func TestHandleClientCommand_K_UndecodableFrameQueuesNothing(t *testing.T) {
 }
 
 func TestHandleClientCommand_y_CountsQueuedFrames(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
@@ -960,6 +1054,8 @@ func TestHandleClientCommand_y_CountsQueuedFrames(t *testing.T) {
 
 // A port beyond the radio channels has no transmit queue, so reports zero.
 func TestHandleClientCommand_y_NonRadioPortReportsZero(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var client = setupClientPipe(t, s)
@@ -978,6 +1074,8 @@ func TestHandleClientCommand_y_NonRadioPortReportsZero(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_RegistersCallsign(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -999,6 +1097,8 @@ func TestHandleClientCommand_X_RegistersCallsign(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_ReplyCarriesPortAndCallsign(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var client = setupClientPipe(t, s)
@@ -1017,6 +1117,8 @@ func TestHandleClientCommand_X_ReplyCarriesPortAndCallsign(t *testing.T) {
 }
 
 func TestHandleClientCommand_x_UnregistersCallsign(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -1037,6 +1139,8 @@ func TestHandleClientCommand_x_UnregistersCallsign(t *testing.T) {
 }
 
 func TestHandleClientCommand_x_InvalidChannelUnregistersNothing(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -1052,8 +1156,12 @@ func TestHandleClientCommand_x_InvalidChannelUnregistersNothing(t *testing.T) {
 }
 
 func TestHandleClientCommand_Cc_ConnectWithoutDigipeaters(t *testing.T) {
+	t.Parallel()
+
 	for _, kind := range []byte{'C', 'c'} {
 		t.Run(string(kind), func(t *testing.T) {
+			t.Parallel()
+
 			var dlq = NewDataLinkQueue()
 
 			var s = new(AGWServer)
@@ -1081,6 +1189,8 @@ func TestHandleClientCommand_Cc_ConnectWithoutDigipeaters(t *testing.T) {
 
 // 'v' with no payload at all cannot say how many digipeaters there are.
 func TestHandleClientCommand_v_EmptyPayloadNoDLQAppend(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -1096,6 +1206,8 @@ func TestHandleClientCommand_v_EmptyPayloadNoDLQAppend(t *testing.T) {
 }
 
 func TestHandleClientCommand_v_PayloadTooShortForDigipeatersNoDLQAppend(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -1115,6 +1227,8 @@ func TestHandleClientCommand_v_PayloadTooShortForDigipeatersNoDLQAppend(t *testi
 // A data length other than what the digipeater count implies is complained
 // about, but the connection is still attempted.
 func TestHandleClientCommand_v_UnexpectedDataLenStillConnects(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -1140,6 +1254,8 @@ func TestHandleClientCommand_v_UnexpectedDataLenStillConnects(t *testing.T) {
 }
 
 func TestHandleClientCommand_d_RequestsDisconnect(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -1163,6 +1279,8 @@ func TestHandleClientCommand_d_RequestsDisconnect(t *testing.T) {
 }
 
 func TestHandleClientCommand_Y_RequestsOutstandingFrames(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)

@@ -17,6 +17,8 @@ import (
 // the erratum note there), so every successful first-try connect reported a
 // retry, and t3_expiry's keepalive poll did the same.  A link that worked
 // perfectly looked like a link in trouble.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestAX25LinkFirstTryConnectIsNotARetry(t *testing.T) {
 	const (
 		MY_CALL    = "Q1TEST"
@@ -63,6 +65,8 @@ func TestAX25LinkFirstTryConnectIsNotARetry(t *testing.T) {
 
 // TestAX25LinkT1ExpiryCountsARetry is the other half: a T1 expiry that actually
 // retransmits must be counted, or the metric would be uselessly always-zero.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestAX25LinkT1ExpiryCountsARetry(t *testing.T) {
 	const (
 		MY_CALL    = "Q1TEST"
@@ -97,6 +101,8 @@ func TestAX25LinkT1ExpiryCountsARetry(t *testing.T) {
 
 // TestAX25LinkT3ExpiryIsNotARetry guards the other SET_RC(S, 1) site: T3 is the
 // idle keepalive poll, not a retransmission of anything.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestAX25LinkT3ExpiryIsNotARetry(t *testing.T) {
 	const (
 		MY_CALL    = "Q1TEST"

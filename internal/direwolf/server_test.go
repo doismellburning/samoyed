@@ -58,12 +58,16 @@ func requireLogins(t *testing.T, pairs ...string) *AGWServer {
 }
 
 func TestLoginRequired(t *testing.T) {
+	t.Parallel()
+
 	assert.False(t, requireLogins(t).loginRequired(), "no credentials configured means no login")
 
 	assert.True(t, requireLogins(t, "Q1TEST", "hunter2").loginRequired())
 }
 
 func TestParseAGWLogin(t *testing.T) {
+	t.Parallel()
+
 	var user, password, ok = parseAGWLogin(loginFrame("Q1TEST", "hunter2").Data)
 	require.True(t, ok)
 	assert.Equal(t, "Q1TEST", user)
@@ -82,6 +86,8 @@ func TestParseAGWLogin(t *testing.T) {
 // terminator.  Stopping at the first NUL, rather than trimming trailing ones,
 // is what makes such a client able to log in.
 func TestParseAGWLogin_FieldsEndAtFirstNUL(t *testing.T) {
+	t.Parallel()
+
 	var data = make([]byte, 2*AGW_LOGIN_FIELD_LEN)
 	for i := range data {
 		data[i] = 0xAA /* Pad with something that is not NUL. */
@@ -97,6 +103,8 @@ func TestParseAGWLogin_FieldsEndAtFirstNUL(t *testing.T) {
 
 // A field with no terminator at all is taken whole rather than dropped.
 func TestParseAGWLogin_FieldWithoutTerminator(t *testing.T) {
+	t.Parallel()
+
 	var data = make([]byte, 2*AGW_LOGIN_FIELD_LEN)
 	var long = strings.Repeat("x", AGW_LOGIN_FIELD_LEN)
 	copy(data, long)
@@ -111,6 +119,8 @@ func TestParseAGWLogin_FieldWithoutTerminator(t *testing.T) {
 // The worked example from the AGWPE API documentation: a 510 byte information
 // part, user name "LU7DID" at offset 0 and password "LIZARD" at offset 255.
 func TestParseAGWLogin_SpecExample(t *testing.T) {
+	t.Parallel()
+
 	var data = make([]byte, 510)
 	copy(data, "LU7DID")
 	copy(data[255:], "LIZARD")
@@ -127,6 +137,8 @@ func TestParseAGWLogin_SpecExample(t *testing.T) {
 // Data longer than the two fields is still a login; the fields are where the
 // protocol puts them regardless of what follows.
 func TestParseAGWLogin_OversizedData(t *testing.T) {
+	t.Parallel()
+
 	var data = append(loginFrame("Q1TEST", "hunter2").Data, []byte("and then some")...)
 
 	var user, password, ok = parseAGWLogin(data)
@@ -136,6 +148,8 @@ func TestParseAGWLogin_OversizedData(t *testing.T) {
 }
 
 func TestHandleClientCommand_P_CorrectCredentialsLogIn(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
@@ -144,6 +158,8 @@ func TestHandleClientCommand_P_CorrectCredentialsLogIn(t *testing.T) {
 }
 
 func TestHandleClientCommand_P_WrongCredentialsDoNotLogIn(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter3"))
@@ -159,6 +175,8 @@ func TestHandleClientCommand_P_WrongCredentialsDoNotLogIn(t *testing.T) {
 // AGWPE accepts any one of the user name and password combinations it has been
 // given, so each set has to work in its own right.
 func TestHandleClientCommand_P_AnyConfiguredCredentialsLogIn(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2", "Q2TEST", "correct horse")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
@@ -173,6 +191,8 @@ func TestHandleClientCommand_P_AnyConfiguredCredentialsLogIn(t *testing.T) {
 // Credentials are matched as a pair, so one user's password does not open
 // another user's account.
 func TestHandleClientCommand_P_CredentialsDoNotCrossBetweenUsers(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2", "Q2TEST", "correct horse")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "correct horse"))
@@ -183,6 +203,8 @@ func TestHandleClientCommand_P_CredentialsDoNotCrossBetweenUsers(t *testing.T) {
 }
 
 func TestMatchLogin(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2", "Q2TEST", "correct horse")
 
 	var matched, accepted = s.matchLogin("Q2TEST", "correct horse")
@@ -197,6 +219,8 @@ func TestMatchLogin(t *testing.T) {
 // An accepted login is not permanent: getting it wrong afterwards takes it away
 // again, so a client cannot log in and then hand the socket to someone else.
 func TestHandleClientCommand_P_FailureAfterSuccessLogsOut(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
@@ -209,6 +233,8 @@ func TestHandleClientCommand_P_FailureAfterSuccessLogsOut(t *testing.T) {
 // A login we cannot read is a failed login like any other, so it takes an
 // earlier success away rather than leaving the socket authorized.
 func TestHandleClientCommand_P_MalformedFrameAfterSuccessLogsOut(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
@@ -225,6 +251,8 @@ func TestHandleClientCommand_P_MalformedFrameAfterSuccessLogsOut(t *testing.T) {
 }
 
 func TestHandleClientCommand_P_MalformedFrameDoesNotLogIn(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	// Shorter than the two fixed size fields, so there is nothing to compare.
@@ -240,6 +268,8 @@ func TestHandleClientCommand_P_MalformedFrameDoesNotLogIn(t *testing.T) {
 
 // Without AGWLOGIN, a login frame is silently ignored, as Dire Wolf does.
 func TestHandleClientCommand_P_IgnoredWhenNoLoginConfigured(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t)
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
@@ -248,6 +278,8 @@ func TestHandleClientCommand_P_IgnoredWhenNoLoginConfigured(t *testing.T) {
 }
 
 func TestHandleClientCommand_CommandsIgnoredUntilLoggedIn(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	var client = setupClientPipe(t, s)
@@ -276,6 +308,8 @@ func TestHandleClientCommand_CommandsIgnoredUntilLoggedIn(t *testing.T) {
 
 // Without AGWLOGIN nothing changes: commands work without any login at all.
 func TestHandleClientCommand_NoLoginConfiguredCommandsWork(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t)
 
 	var client = setupClientPipe(t, s)
@@ -359,6 +393,8 @@ func loopbackConns(t *testing.T) (net.Conn, net.Conn) {
 }
 
 func TestAgwClientIsLocal(t *testing.T) {
+	t.Parallel()
+
 	var server, _ = loopbackConns(t)
 	assert.True(t, agwClientIsLocal(server), "a real connection over the loopback interface")
 
@@ -386,6 +422,8 @@ func TestAgwClientIsLocal(t *testing.T) {
 // A client on this machine is exempt, as it is with AGWPE, and so may issue
 // commands without ever sending a login frame.
 func TestClientAccepted_LocalClientNeedsNoLogin(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	var server, client = loopbackConns(t)
@@ -403,6 +441,8 @@ func TestClientAccepted_LocalClientNeedsNoLogin(t *testing.T) {
 }
 
 func TestClientAccepted_RemoteClientMustLogIn(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.clientAccepted(0, connWithRemoteAddr(tcpAddr(t, "192.168.1.10")))
@@ -412,6 +452,8 @@ func TestClientAccepted_RemoteClientMustLogIn(t *testing.T) {
 
 // Without AGWLOGIN the exemption changes nothing, because nobody has to log in.
 func TestClientAccepted_NoLoginConfigured(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t)
 
 	s.clientAccepted(0, connWithRemoteAddr(tcpAddr(t, "192.168.1.10")))
@@ -423,6 +465,8 @@ func TestClientAccepted_NoLoginConfigured(t *testing.T) {
 // getting the credentials wrong does not cost it the access it never had to
 // ask for.
 func TestClientAccepted_LocalClientSurvivesAFailedLogin(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.clientAccepted(0, connWithRemoteAddr(tcpAddr(t, "127.0.0.1")))
@@ -443,6 +487,8 @@ func TestClientAccepted_LocalClientSurvivesAFailedLogin(t *testing.T) {
 // A remote client does not inherit the exemption of whoever held the slot
 // before it.
 func TestClientAccepted_ExemptionDoesNotOutlastTheLocalClient(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.clientAccepted(0, connWithRemoteAddr(tcpAddr(t, "127.0.0.1")))
@@ -478,6 +524,8 @@ func (c *watchingConn) RemoteAddr() net.Addr {
 // in quickly enough is let through on the strength of the previous holder's
 // login - a local one's, in particular.
 func TestClientAccepted_PublishesTheSocketLast(t *testing.T) {
+	t.Parallel()
+
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 	s.setLoggedIn(0) /* As a previous client would have left it. */
 
@@ -495,6 +543,8 @@ func TestClientAccepted_PublishesTheSocketLast(t *testing.T) {
 // Accepting a connection clears whatever the previous holder of the slot
 // switched on.
 func TestClientAccepted_ResetsMonitoringState(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	s.clients[0].sendRaw = true
 	s.clients[0].sendMonitor = true
@@ -527,6 +577,8 @@ func (c *nullConn) RemoteAddr() net.Addr        { return c.addr }
 // transmit paths walk the whole table for every frame that goes past.  Run
 // under -race, this fails if the table is not guarded.
 func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -585,6 +637,8 @@ func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
 // meant for the old connection takes the new client's links and registered
 // callsigns away, while its socket stays attached and it is told nothing.
 func TestDetachClient_StaleConnLeavesItsSuccessorAlone(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -607,6 +661,8 @@ func TestDetachClient_StaleConnLeavesItsSuccessorAlone(t *testing.T) {
 
 // The ordinary case still cleans up, of course.
 func TestDetachClient_AttachedConnIsCleanedUp(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -631,6 +687,8 @@ func TestDetachClient_AttachedConnIsCleanedUp(t *testing.T) {
 // only once its read returns; until then this is the one place that knows, and
 // dropping the error left it saying nothing at all.
 func TestSendToClient_WriteErrorDetachesTheClient(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var s = new(AGWServer)
@@ -713,6 +771,8 @@ func (c *gatedConn) writeCount() int {
 // thread is sending a 'T' own-transmitted monitor frame when the client's own
 // command thread answers it with an 'R'.  Refs #694.
 func TestAGWServer_ConcurrentWritesToAClientKeepTheirFraming(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
@@ -786,6 +846,8 @@ func (c *unreadableConn) Read(_ []byte) (int, error) {
 // The data length is the client's to choose, up to four gigabytes, so one that
 // is out of range is refused before anything is allocated or read for it.
 func TestReadCommandData_RefusesAnOversizedDataLength(t *testing.T) {
+	t.Parallel()
+
 	for _, dataLen := range []uint32{agwMaxDataLen + 1, math.MaxUint32} {
 		var cmd = new(agwpe.Message)
 		cmd.Header.DataKind = 'K'
@@ -804,6 +866,8 @@ func TestReadCommandData_RefusesAnOversizedDataLength(t *testing.T) {
 
 // The largest data length allowed is still read in full.
 func TestReadCommandData_AcceptsTheLargestDataLength(t *testing.T) {
+	t.Parallel()
+
 	var server, client = loopbackConns(t)
 
 	// Small enough to sit in the socket buffer whole, so it can be written
@@ -838,6 +902,8 @@ func (c *tricklingConn) Read(b []byte) (int, error) {
 // Data that arrives in pieces is read in full, rather than taken for a client
 // that stopped halfway through.
 func TestReadCommandData_ReadsDataThatArrivesInPieces(t *testing.T) {
+	t.Parallel()
+
 	var payload = []byte("Q1TEST>Q2TEST:hello")
 
 	var conn = new(tricklingConn)
@@ -857,6 +923,8 @@ func TestReadCommandData_ReadsDataThatArrivesInPieces(t *testing.T) {
 // A client that goes away partway through its data is still reported, along
 // with how much did arrive.
 func TestReadCommandData_ReportsDataCutShort(t *testing.T) {
+	t.Parallel()
+
 	var conn = new(tricklingConn)
 	conn.r = bytes.NewReader([]byte("Q1TEST"))
 
@@ -876,6 +944,8 @@ func TestReadCommandData_ReportsDataCutShort(t *testing.T) {
 // carries the source and destination, so the padding is not part of the
 // address.
 func TestHandleClientCommand_V_QueuesFrameViaDigipeaters(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
@@ -905,6 +975,8 @@ func TestHandleClientCommand_V_QueuesFrameViaDigipeaters(t *testing.T) {
 
 // The port is bound by the constructor, and Addr says which one was got.
 func TestNewAGWServerListens(t *testing.T) {
+	t.Parallel()
+
 	var s, err = NewAGWServer(t.Context(), "127.0.0.1:0", nil, new(misc_config_s), nil, nil, 0)
 	require.NoError(t, err)
 
@@ -921,6 +993,8 @@ func TestNewAGWServerListens(t *testing.T) {
 // Two things cannot have the same port, and the one that loses says so before
 // anything starts, rather than sitting there looking ready for clients.
 func TestNewAGWServerListenFails(t *testing.T) {
+	t.Parallel()
+
 	// Every address, as a configured port is bound: see TestKissNetListenFails.
 	var listener, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp", ":0")
 	require.NoError(t, listenErr)
@@ -939,6 +1013,8 @@ func TestNewAGWServerListenFails(t *testing.T) {
 // A server that is made but never started gives its port up when closed, and
 // cannot be started after that; closing a nil one, as for an interface never
 // set up, does nothing.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestAGWServerCloseGivesUpThePortOfAServerNeverStarted(t *testing.T) {
 	var s, err = NewAGWServer(t.Context(), "127.0.0.1:0", nil, new(misc_config_s), nil, nil, 0)
 	require.NoError(t, err)
@@ -969,6 +1045,8 @@ func TestAGWServerCloseGivesUpThePortOfAServerNeverStarted(t *testing.T) {
 // starting, closing or asking where it listens does nothing rather than
 // panicking.
 func TestAGWServerWithoutAListener(t *testing.T) {
+	t.Parallel()
+
 	var s = new(AGWServer)
 
 	assert.Nil(t, s.Addr())
@@ -1013,6 +1091,8 @@ func runCmdListenThread(t *testing.T, s *AGWServer, conn net.Conn) *test.Hook {
 // A client that hangs up between messages has done nothing wrong: DAPPS, for
 // one, checks the AGW port is there by connecting and closing again every few
 // seconds.  That is an ordinary disconnect, not an error to report.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestCmdListenThread_HangUpBetweenMessagesIsNotAnError(t *testing.T) {
 	var s = new(AGWServer)
 
@@ -1028,6 +1108,8 @@ func TestCmdListenThread_HangUpBetweenMessagesIsNotAnError(t *testing.T) {
 }
 
 // One that hangs up partway through a header has, and is still reported.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestCmdListenThread_HangUpMidHeaderIsAnError(t *testing.T) {
 	var s = new(AGWServer)
 
@@ -1051,6 +1133,8 @@ func TestCmdListenThread_HangUpMidHeaderIsAnError(t *testing.T) {
 // up altogether here, leaving the slot looking free to the listener but with
 // nothing reading from it, so a remote client could put every slot out of
 // use one at a time.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestCmdListenThread_KeepsServingTheSlotAfterAnOversizedDataLength(t *testing.T) {
 	var s = new(AGWServer)
 
@@ -1121,6 +1205,8 @@ func TestCmdListenThread_KeepsServingTheSlotAfterAnOversizedDataLength(t *testin
 
 // Taking on a client is logged at Info, once, as is the accept loop getting
 // ready for each one - which on startup says the port is open.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestConnectListenThread_AttachingAClientIsLoggedOnce(t *testing.T) {
 	var s, err = NewAGWServer(t.Context(), "127.0.0.1:0", nil, new(misc_config_s), nil, nil, 0)
 	require.NoError(t, err)

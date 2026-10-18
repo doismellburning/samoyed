@@ -38,6 +38,8 @@ func newNegotiationTestLink(link *AX25Link) *ax25_dlsm_t {
 // An XID command that specifies nothing should get back a complete set of
 // defaults, per the 2006 revision of the spec.
 func TestNegotiationResponseFillsInDefaults(t *testing.T) {
+	t.Parallel()
+
 	var link = setupTestEnv(t)
 
 	// Distinct from the 3000 mSec default so the two branches can be told apart.
@@ -67,6 +69,8 @@ func TestNegotiationResponseFillsInDefaults(t *testing.T) {
 // What the other station asks for is reduced to what we can manage, and the ack
 // timer and retries go the other way - we take the larger of the two.
 func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
+	t.Parallel()
+
 	var tests = []struct {
 		name       string
 		modulo     ax25.Modulo
@@ -78,6 +82,8 @@ func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			var link = setupTestEnv(t)
 
 			link.miscConfig.frack = 5
@@ -113,6 +119,8 @@ func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
 // that leaves a parameter out must not reset the running configuration to a
 // default, or to zero.
 func TestCompleteNegotiationKeepsWhatTheResponseOmits(t *testing.T) {
+	t.Parallel()
+
 	var link = setupTestEnv(t)
 
 	var S = newNegotiationTestLink(link)
@@ -134,6 +142,8 @@ func TestCompleteNegotiationKeepsWhatTheResponseOmits(t *testing.T) {
 // A response that specifies one parameter applies that one and leaves the rest,
 // including converting the acknowledge timer from mSec to a Duration.
 func TestCompleteNegotiationAppliesOnlyWhatTheResponseSpecifies(t *testing.T) {
+	t.Parallel()
+
 	var link = setupTestEnv(t)
 
 	var S = newNegotiationTestLink(link)
@@ -158,6 +168,8 @@ func TestCompleteNegotiationAppliesOnlyWhatTheResponseSpecifies(t *testing.T) {
 // Each is logged as a warning, except where negotiation_response has already
 // taken the lesser of what was asked and what we can do, which is just
 // negotiation. Regression test for issue #688.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 	var paths = []struct {
 		name    string
@@ -236,6 +248,8 @@ func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 // to the least there is rather than thrown wide: xid.Parse used to put 127 in
 // place of anything out of range, which complete_negotiation then narrowed to
 // the widest window the modulus allows.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 	var paths = []struct {
 		name  string
@@ -281,6 +295,8 @@ func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
 // Answering an XID command, what we send back is what we now run with, so the
 // two ends agree - not the nonsense the other station asked for.
 func TestNegotiationResponseSendsBackWhatItApplied(t *testing.T) {
+	t.Parallel()
+
 	var link = setupTestEnv(t)
 
 	var S = newNegotiationTestLink(link)
@@ -301,6 +317,8 @@ func TestNegotiationResponseSendsBackWhatItApplied(t *testing.T) {
 // A response that moves the link to modulo 8 but leaves the window size out
 // must not keep a window wider than modulo 8 can hold.
 func TestCompleteNegotiationNarrowsTheWindowToTheNewModulo(t *testing.T) {
+	t.Parallel()
+
 	var link = setupTestEnv(t)
 
 	var S = newNegotiationTestLink(link)
@@ -321,6 +339,8 @@ func TestCompleteNegotiationNarrowsTheWindowToTheNewModulo(t *testing.T) {
 // A response that moves the link to modulo 128 but leaves the I field length
 // out must not keep an N1 too small for V2.2 segmentation to send anything.
 func TestCompleteNegotiationRaisesN1ToTheNewModulo(t *testing.T) {
+	t.Parallel()
+
 	var link = setupTestEnv(t)
 
 	var S = newNegotiationTestLink(link)
@@ -342,6 +362,8 @@ func TestCompleteNegotiationRaisesN1ToTheNewModulo(t *testing.T) {
 // an operator who had set MYCALL and expected connected mode to work saw
 // nothing at all while the far end timed out.  Regression test for issue #665:
 // the frame is still ignored, and now says so.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestIgnoredConnectRequestIsLogged(t *testing.T) {
 	const (
 		MY_CALL    = "Q1TEST"
@@ -423,6 +445,8 @@ func newDataRequest(myCall string, theirCall string, channel int, data []byte) *
 // frame is too long for it, and the segmentation that follows cannot make
 // progress.  Refs #683.
 func TestDataRequestForALinkThatWasNeverConnected(t *testing.T) {
+	t.Parallel()
+
 	const (
 		MY_CALL    = "Q1TEST"
 		THEIR_CALL = "Q2TEST"
@@ -449,6 +473,8 @@ func TestDataRequestForALinkThatWasNeverConnected(t *testing.T) {
 // Segmenting data to fit either used to divide it into pieces of nothing,
 // for ever, or divide by zero.  Refs #683.
 func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
+	t.Parallel()
+
 	const (
 		MY_CALL    = "Q1TEST"
 		THEIR_CALL = "Q2TEST"
@@ -467,6 +493,8 @@ func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
 			var link = setupTestEnv(t)
 
 			var S = link.get_link_handle([ax25.MaxAddrs]string{OWNCALL: MY_CALL, PEERCALL: THEIR_CALL}, 2, CHANNEL, 0, true)
@@ -487,6 +515,8 @@ func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
 // A segment's header is the sender's to get wrong: a fragment with nothing in
 // it, or a first segment with no room for the PID it carries, is a protocol
 // error to report and throw away rather than read past the end of.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestDLDataIndicationShortSegments(t *testing.T) {
 	var firstSegment = []byte{0x82, 0xF0, 'H', 'i'}
 
@@ -524,6 +554,8 @@ func TestDLDataIndicationShortSegments(t *testing.T) {
 // A link coming up turns on its channel's connected indicator, and going down
 // turns it off again.
 func TestEnterNewStateSetsConnectedIndicator(t *testing.T) {
+	t.Parallel()
+
 	var set []string
 
 	var link = NewAX25Link(new(misc_config_s), func(channel int, on bool) {
@@ -556,6 +588,8 @@ func (r *recordingLinkClients) OutstandingFramesReply(channel int, client int, o
 
 // A client asking how much is waiting on a link that doesn't exist is told
 // nothing is, rather than left waiting for an answer.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestOutstandingFramesForNoLinkRepliesNone(t *testing.T) {
 	var clients = new(recordingLinkClients)
 	var link = NewAX25Link(new(misc_config_s), nil, clients, nil, 0)
@@ -576,6 +610,8 @@ func TestOutstandingFramesForNoLinkRepliesNone(t *testing.T) {
 // and its information part - nothing at all - is not handed to the client as
 // though it were data with some PID.
 func TestIFrameWithoutPIDIgnored(t *testing.T) {
+	t.Parallel()
+
 	var link = setupTestEnv(t)
 
 	var S = establishConnection(t, link, "Q1TEST", "Q2TEST", 0)
@@ -653,6 +689,8 @@ func newConnectRequest(channel int, client int) *dlq_item_t {
 // channel was taken without a word, though connections to it then go to one
 // client only - the node shell became unreachable once an AGW application
 // registered its callsign.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestRegisteringATakenCallsignIsWarned(t *testing.T) {
 	var link = setupTestEnv(t)
 
@@ -673,6 +711,8 @@ func TestRegisteringATakenCallsignIsWarned(t *testing.T) {
 // already has a link with, between the same two callsigns on the same
 // channel, got a second link without a word, though frames from the station
 // can only reach one of them.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestSecondLinkBetweenTheSameStationsIsWarned(t *testing.T) {
 	var link = setupTestEnv(t)
 
