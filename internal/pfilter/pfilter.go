@@ -260,14 +260,16 @@ func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.
 
 	/* Copy filter string, changing any control characters to spaces. */
 
-	pfstate.filter_str = filter
-	pfstate.filter_str = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
-			return ' '
-		} else {
-			return r
+	// Byte by byte, as strings.Map would turn any byte that isn't valid
+	// UTF-8 into U+FFFD.
+	var filterBytes = []byte(filter)
+	for i, b := range filterBytes {
+		if b < ' ' || b == 0x7f {
+			filterBytes[i] = ' '
 		}
-	}, pfstate.filter_str)
+	}
+
+	pfstate.filter_str = string(filterBytes)
 
 	pfstate.toBeParsed = pfstate.filter_str
 
@@ -413,7 +415,7 @@ func next_token(pf *pfstate_t) {
 		// At this point, toBeParsed isn't empty and doesn't start with a space
 		var s strings.Builder
 		for {
-			s.WriteRune(rune(pf.toBeParsed[0]))
+			s.WriteByte(pf.toBeParsed[0])
 			pf.toBeParsed = pf.toBeParsed[1:]
 
 			if len(pf.toBeParsed) == 0 || pf.toBeParsed[0] == ' ' {
