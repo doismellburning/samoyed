@@ -311,7 +311,7 @@
         [c.user], [c.remote], [c.state], [String(c.sent), "num"], [String(c.received), "num"]]));
       fillTable("node-sessions", sessions.map((u) => [
         [u.user], [u.channel === undefined ? "NET/ROM" : String(u.channel)], [u.local || "—"],
-        [u.downlink ? u.downlink + (u.connected ? "" : " (connecting)") : "—"]]));
+        [u.downlink ? u.downlink + (u.connected ? "" : " (connecting)") : (u.app || "—")]]));
     } catch (e) {
       console.error(e);
     }

@@ -241,13 +241,14 @@ type sessionJSON struct {
 	Local     string `json:"local,omitempty"`
 	Downlink  string `json:"downlink,omitempty"`
 	Connected bool   `json:"connected"`
+	App       string `json:"app,omitempty"`
 }
 
 func nodeSessions(n *webNode) any {
 	var out = []sessionJSON{}
 
 	for _, s := range n.shell.Sessions() {
-		var j = sessionJSON{User: s.User, Channel: nil, Local: s.Local, Downlink: s.Downlink, Connected: s.Connected}
+		var j = sessionJSON{User: s.User, Channel: nil, Local: s.Local, Downlink: s.Downlink, Connected: s.Connected, App: s.App}
 		if s.Channel >= 0 {
 			var channel = s.Channel
 			j.Channel = &channel

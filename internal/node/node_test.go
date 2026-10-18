@@ -1061,7 +1061,7 @@ func TestObserverAndSessions(t *testing.T) {
 	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("C Q3TEST\r"))
 	n.LinkEstablished(testChannel, testClient, "Q3TEST", nodeCall, false)
 
-	assert.Equal(t, []SessionInfo{{User: userCall, Channel: testChannel, Local: nodeCall, Downlink: "Q3TEST", Connected: true}}, n.Sessions())
+	assert.Equal(t, []SessionInfo{{User: userCall, Channel: testChannel, Local: nodeCall, Downlink: "Q3TEST", Connected: true, App: ""}}, n.Sessions())
 
 	n.LinkTerminated(testChannel, testClient, "Q3TEST", nodeCall, false)
 	n.LinkTerminated(testChannel, testClient, userCall, nodeCall, false)

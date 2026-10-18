@@ -210,6 +210,49 @@ type Downlink interface {
 	Closed(failure string)
 }
 
+// Sender is somewhere to send a user text.
+type Sender interface {
+	Send(data []byte)
+}
+
+// Application is something a user can start from the node's shell, by a
+// command of its own, such as a chat server.
+type Application interface {
+	// Name is the command that starts it, such as "CHAT".
+	Name() string
+
+	// Description says what it is, for HELP.
+	Description() string
+
+	// Open starts a session for user, sending to out.  The application
+	// calls exit when the user leaves it, to go back to the node.  Open is
+	// called without the node's lock held, and exit may be called from any
+	// goroutine, Open's own included.
+	Open(user string, out Sender, exit func()) AppSession
+}
+
+// AppSession is one user's time in an application.  Its methods are called
+// without the node's lock held.
+type AppSession interface {
+	// Input hands over what the user sent, as it came.
+	Input(data []byte)
+
+	// Close says the user has gone altogether.
+	Close()
+}
+
+// appRun is a user's time in an application, from the shell's side.
+type appRun struct {
+	name string
+
+	// session is what Open returned, or nil until it has.
+	session AppSession
+
+	// closed says the user went while Open was still under way, so the
+	// session it returns is to be closed at once.
+	closed bool
+}
+
 // session is one connected user.
 type session struct {
 	// line is what has arrived of the command being typed.
@@ -233,6 +276,9 @@ type session struct {
 
 	// cancelled says the user gave up on downlink before it came up.
 	cancelled bool
+
+	// app is the application the user is in, or nil.
+	app *appRun
 }
 
 // maxHeard is the most stations MH lists.
@@ -271,6 +317,10 @@ type Node struct {
 	// observer is told what happens to sessions, or is nil.  It is set
 	// before Start and not changed after.
 	observer func(SessionEvent)
+
+	// apps are the applications users can start, which are added before
+	// Start and not changed after.
+	apps []Application
 }
 
 // SessionEventKind says what a SessionEvent is about.
@@ -325,6 +375,7 @@ type SessionInfo struct {
 	Local     string // The node's address the user connected to, or "" over a Conn.
 	Downlink  string // Who the user is connected onward to, or "".
 	Connected bool   // Whether the connection onward is up.
+	App       string // The application the user is in, or "".
 }
 
 // Sessions reports every user's session.
@@ -337,9 +388,13 @@ func (n *Node) Sessions() []SessionInfo {
 	for key, s := range n.sessions {
 		var channel, local = key.where()
 
-		var info = SessionInfo{User: key.name(), Channel: channel, Local: local, Downlink: "", Connected: s.connected}
+		var info = SessionInfo{User: key.name(), Channel: channel, Local: local, Downlink: "", Connected: s.connected, App: ""}
 		if s.downlink != nil {
 			info.Downlink = s.downlink.name()
+		}
+
+		if s.app != nil {
+			info.App = s.app.name
 		}
 
 		list = append(list, info)
@@ -354,6 +409,12 @@ func (n *Node) Sessions() []SessionInfo {
 	})
 
 	return list
+}
+
+// AddApplication lets users start a, by its name.  It must be called before
+// Start, and a's name must not be one of the shell's own commands.
+func (n *Node) AddApplication(a Application) {
+	n.apps = append(n.apps, a)
 }
 
 // SetNetROM gives the node NET/ROM.  It must be called before Start.
@@ -491,11 +552,18 @@ func (n *Node) terminated(key peer, why string) {
 	delete(n.sessions, key)
 
 	var down peer
+	var app AppSession
+
 	if s != nil {
 		down = s.downlink
+		app = s.endAppLocked()
 	}
 
 	n.mu.Unlock()
+
+	if app != nil {
+		app.Close()
+	}
 
 	if s != nil {
 		n.observe(SessionEnded, key, "", "")
@@ -536,11 +604,20 @@ func (n *Node) netromPacket(key linkKey) bool {
 	}
 
 	var s, isSession = n.sessions[key]
+
+	var app AppSession
+
 	if isSession && s.downlink == nil {
 		delete(n.sessions, key)
+
+		app = s.endAppLocked()
 	}
 
 	n.mu.Unlock()
+
+	if app != nil {
+		app.Close()
+	}
 
 	if isSession && s.downlink == nil {
 		n.netrom.LinkUp(key.channel, key.ownCall, key.remoteCall, true)
@@ -570,6 +647,19 @@ func (n *Node) received(key peer, pid int, data []byte) {
 	}
 
 	var s = n.sessions[key]
+
+	if s != nil && s.app != nil {
+		// What arrives while the application is still being opened has
+		// nowhere to go yet.
+		var app = s.app.session
+		n.mu.Unlock()
+
+		if app != nil {
+			app.Input(data)
+		}
+
+		return
+	}
 
 	if s != nil && s.downlink != nil && s.connected {
 		var down = s.downlink
@@ -610,7 +700,7 @@ func (n *Node) received(key peer, pid int, data []byte) {
 
 	n.mu.Unlock()
 
-	for _, line := range lines {
+	for i, line := range lines {
 		if line == nil {
 			n.send(key, []byte(n.prompt()+"Line too long\r"))
 
@@ -618,8 +708,45 @@ func (n *Node) received(key peer, pid int, data []byte) {
 		}
 
 		if !n.command(key, s, string(line)) {
+			n.handOn(key, s, lines[i+1:])
+
 			return
 		}
+	}
+}
+
+// handOn gives an application the user has just started what else they sent
+// along with the command: the lines after it, and the start of the next.
+func (n *Node) handOn(key peer, s *session, lines [][]byte) {
+	n.mu.Lock()
+
+	if n.sessions[key] != s || s.app == nil || s.app.session == nil {
+		n.mu.Unlock()
+
+		return
+	}
+
+	var app = s.app.session
+
+	var rest []byte
+
+	for _, line := range lines {
+		if line != nil {
+			rest = append(append(rest, line...), '\r')
+		}
+	}
+
+	if !s.overlong {
+		rest = append(rest, s.line...)
+	}
+
+	s.line = s.line[:0]
+	s.overlong = false
+
+	n.mu.Unlock()
+
+	if len(rest) > 0 {
+		app.Input(rest)
 	}
 }
 
@@ -694,6 +821,12 @@ func (n *Node) command(key peer, s *session, line string) bool {
 	for _, c := range commands() {
 		if slices.Contains(c.names, name) {
 			return c.run(n, key, s, words[1:])
+		}
+	}
+
+	for _, a := range n.apps {
+		if strings.EqualFold(a.Name(), name) {
+			return n.startApp(key, s, a)
 		}
 	}
 
@@ -923,6 +1056,10 @@ func (n *Node) help(key peer, _ *session, _ []string) bool {
 
 	for _, c := range commands() {
 		fmt.Fprintf(&b, "  %s - %s\r", strings.Join(c.names, ", "), c.help)
+	}
+
+	for _, a := range n.apps {
+		fmt.Fprintf(&b, "  %s - %s\r", strings.ToUpper(a.Name()), a.Description())
 	}
 
 	n.send(key, []byte(b.String()))
@@ -1172,6 +1309,79 @@ func (n *Node) forward(key peer, pid int, data []byte) {
 // end says it has.
 func (n *Node) disconnect(key peer) {
 	key.disconnect(n)
+}
+
+// startApp puts the user into the application a.  Whatever else they sent
+// with the command is not for the node, so is not gone on to: received hands
+// it to the application instead.
+func (n *Node) startApp(key peer, s *session, a Application) bool {
+	var run = &appRun{name: strings.ToUpper(a.Name()), session: nil, closed: false}
+
+	n.mu.Lock()
+
+	// The user has asked to go, or NET/ROM has taken the link over.
+	if s.leaving || n.sessions[key] != s {
+		n.mu.Unlock()
+
+		return false
+	}
+
+	s.app = run
+	n.mu.Unlock()
+
+	var app = a.Open(key.name(), peerSender{n: n, key: key}, func() { n.leaveApp(key, s, run) })
+
+	n.mu.Lock()
+	run.session = app
+	var closed = run.closed
+	n.mu.Unlock()
+
+	if closed {
+		app.Close()
+	}
+
+	return false
+}
+
+// leaveApp brings the user back from the application run to the node.
+func (n *Node) leaveApp(key peer, s *session, run *appRun) {
+	n.mu.Lock()
+
+	var back = n.sessions[key] == s && s.app == run
+	if back {
+		s.app = nil
+	}
+
+	n.mu.Unlock()
+
+	if back {
+		n.send(key, []byte(n.prompt()+"Back at the node\r"))
+	}
+}
+
+// endAppLocked takes the user out of their application, if they are in one,
+// returning the session to close, or nil if there is none yet - Open having
+// not returned, and closing what it does instead.  n.mu must be held.
+func (s *session) endAppLocked() AppSession { //nolint:ireturn // Whatever the application opened.
+	if s.app == nil {
+		return nil
+	}
+
+	var run = s.app
+	s.app = nil
+	run.closed = true
+
+	return run.session
+}
+
+// peerSender sends to the user on key.
+type peerSender struct {
+	n   *Node
+	key peer
+}
+
+func (p peerSender) Send(data []byte) {
+	p.n.send(p.key, data)
 }
 
 // Attached is a user's session on a Conn handed to the node with Attach.
