@@ -91,7 +91,7 @@ func allDigits(s string) bool {
 func LatitudeToString(dlat float64, ambiguity int) string {
 	dlat = clampLat(dlat)
 
-	var hemi rune /* Hemisphere: N or S */
+	var hemi byte /* Hemisphere: N or S */
 
 	if dlat < 0 {
 		dlat = (-dlat)
@@ -160,7 +160,7 @@ func LatitudeToString(dlat float64, ambiguity int) string {
 func LongitudeToString(dlong float64, ambiguity int) string {
 	dlong = clampLon(dlong)
 
-	var hemi rune /* Hemisphere: E or W */
+	var hemi byte /* Hemisphere: E or W */
 
 	if dlong < 0 {
 		dlong = (-dlong)

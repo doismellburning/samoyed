@@ -672,7 +672,7 @@ func (d *Decoder) Print(A *Decoded) {
 
 		if lat, ok := A.Lat.Get(); ok {
 			var absll float64
-			var news rune
+			var news byte
 
 			if lat >= 0 {
 				absll = lat
@@ -689,7 +689,7 @@ func (d *Decoder) Print(A *Decoded) {
 
 		if lon, ok := A.Lon.Get(); ok {
 			var absll float64
-			var news rune
+			var news byte
 
 			if lon >= 0 {
 				absll = lon

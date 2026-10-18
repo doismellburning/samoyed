@@ -359,7 +359,7 @@ func TextToTwoKey(text string, quiet bool) (string, int) {
 
 // TODO:  need to test this.
 
-func letterToTwoDigits(c rune, quiet bool) (string, int) {
+func letterToTwoDigits(c byte, quiet bool) (string, int) {
 	var translate = ttTranslate()
 
 	var errors = 0
@@ -386,7 +386,7 @@ func letterToTwoDigits(c rune, quiet bool) (string, int) {
 
 	for row := 0; row < 10 && !found; row++ {
 		for col := 0; col < 4 && !found; col++ {
-			if c == translate[row][col] {
+			if rune(c) == translate[row][col] {
 				buttons = string(rune('0'+row)) + string(rune('1'+col))
 				found = true
 			}
@@ -1057,8 +1057,8 @@ const MAXMHPAIRS = 6
 
 type mhpairType struct {
 	position string
-	min_ch   rune
-	max_ch   rune
+	min_ch   byte
+	max_ch   byte
 }
 
 // ttMheadPairs describes each character pair of a Maidenhead locator.
@@ -1189,11 +1189,11 @@ func TextToMhead(text string, quiet bool) (string, int) {
 	}
 
 	for i := range np {
-		var t0 = rune(text[i*2])
-		var t1 = rune(text[i*2+1])
+		var t0 = ascii.ToUpper(text[i*2])
+		var t1 = ascii.ToUpper(text[i*2+1])
 
-		if ascii.ToUpper(t0) < mhpair[i].min_ch || ascii.ToUpper(t0) > mhpair[i].max_ch ||
-			ascii.ToUpper(t1) < mhpair[i].min_ch || ascii.ToUpper(t1) > mhpair[i].max_ch {
+		if t0 < mhpair[i].min_ch || t0 > mhpair[i].max_ch ||
+			t1 < mhpair[i].min_ch || t1 > mhpair[i].max_ch {
 			if !quiet {
 				logrus.WithFields(logrus.Fields{
 					"locator": text,

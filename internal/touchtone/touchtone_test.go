@@ -41,3 +41,20 @@ func TestTextToASCII2DNonASCII(t *testing.T) {
 	assert.Equal(t, 0, errors)
 	assert.Equal(t, "333131", buttons)
 }
+
+func TestTextToMheadLowerCase(t *testing.T) {
+	t.Parallel()
+
+	var buttons, errors = TextToMhead("em29qe78", true)
+	assert.Equal(t, 0, errors)
+	assert.Equal(t, "326129723278", buttons)
+}
+
+func TestTextToMheadNonASCII(t *testing.T) {
+	t.Parallel()
+
+	// "é" is two bytes, so this is two pairs whose first holds no letters.
+	var buttons, errors = TextToMhead("éM29", true)
+	assert.Equal(t, 1, errors)
+	assert.Empty(t, buttons)
+}

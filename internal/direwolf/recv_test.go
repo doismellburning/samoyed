@@ -197,7 +197,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 
 	var buttons []string
 
-	var onButton = func(channel int, button rune) {
+	var onButton = func(channel int, button byte) {
 		if button != '.' { // The decoder reporting no activity this period.
 			buttons = append(buttons, fmt.Sprintf("%d:%c", channel, button))
 		}
@@ -245,7 +245,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 
 	var buttons []string
 
-	var onButton = func(channel int, button rune) {
+	var onButton = func(channel int, button byte) {
 		if button != '.' { // The decoder reporting no activity this period.
 			buttons = append(buttons, fmt.Sprintf("%d:%c", channel, button))
 		}

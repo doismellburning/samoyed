@@ -134,7 +134,7 @@ var afskSpaceGain = func() [MAX_SUBCHANS]float64 { //nolint:gochecknoglobals // 
  *----------------------------------------------------------------*/
 
 func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
-	space_freq int, profile rune, D *demodulator_state_s) {
+	space_freq int, profile byte, D *demodulator_state_s) {
 	var samples_per_sec = float64(_samples_per_sec)
 	var baud = float64(_baud)
 

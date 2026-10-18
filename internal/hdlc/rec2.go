@@ -70,9 +70,9 @@ package hdlc
 
 import (
 	"fmt"
-	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -792,22 +792,21 @@ func sanity_check(buf []byte, bits_flipped phy.BitFixLevel, sanity_test phy.Sani
 	 */
 
 	for j := 0; j < alen; j += 7 {
-		var addr [7]rune
+		var addr [6]byte
 
-		addr[0] = rune(buf[j+0] >> 1)
-		addr[1] = rune(buf[j+1] >> 1)
-		addr[2] = rune(buf[j+2] >> 1)
-		addr[3] = rune(buf[j+3] >> 1)
-		addr[4] = rune(buf[j+4] >> 1)
-		addr[5] = rune(buf[j+5] >> 1)
-		addr[6] = 0
+		addr[0] = buf[j+0] >> 1
+		addr[1] = buf[j+1] >> 1
+		addr[2] = buf[j+2] >> 1
+		addr[3] = buf[j+3] >> 1
+		addr[4] = buf[j+4] >> 1
+		addr[5] = buf[j+5] >> 1
 
-		if (!unicode.IsUpper(addr[0]) && !unicode.IsDigit(addr[0])) ||
-			(!unicode.IsUpper(addr[1]) && !unicode.IsDigit(addr[1]) && addr[1] != ' ') ||
-			(!unicode.IsUpper(addr[2]) && !unicode.IsDigit(addr[2]) && addr[2] != ' ') ||
-			(!unicode.IsUpper(addr[3]) && !unicode.IsDigit(addr[3]) && addr[3] != ' ') ||
-			(!unicode.IsUpper(addr[4]) && !unicode.IsDigit(addr[4]) && addr[4] != ' ') ||
-			(!unicode.IsUpper(addr[5]) && !unicode.IsDigit(addr[5]) && addr[5] != ' ') {
+		if (!ascii.IsUpper(addr[0]) && !ascii.IsDigit(addr[0])) ||
+			(!ascii.IsUpper(addr[1]) && !ascii.IsDigit(addr[1]) && addr[1] != ' ') ||
+			(!ascii.IsUpper(addr[2]) && !ascii.IsDigit(addr[2]) && addr[2] != ' ') ||
+			(!ascii.IsUpper(addr[3]) && !ascii.IsDigit(addr[3]) && addr[3] != ' ') ||
+			(!ascii.IsUpper(addr[4]) && !ascii.IsDigit(addr[4]) && addr[4] != ' ') ||
+			(!ascii.IsUpper(addr[5]) && !ascii.IsDigit(addr[5]) && addr[5] != ' ') {
 			logrus.WithField("addr", string(addr[:])).Trace("sanity_check: FAILED.  Invalid characters in addresses")
 
 			return false

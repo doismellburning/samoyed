@@ -129,7 +129,7 @@ type sampleReceiver interface {
 	DCDChange(from dwcore.SlicerID, state int)
 }
 
-func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource, receiver sampleReceiver, onButton func(channel int, button rune)) <-chan int {
+func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource, receiver sampleReceiver, onButton func(channel int, button byte)) <-chan int {
 	// Buffered so that a failing device thread can report and finish even
 	// though nobody is listening any more.
 	var failed = make(chan int, MAX_ADEVS)
@@ -158,7 +158,7 @@ func recv_adev_thread(
 	failed chan<- int,
 	src SampleSource,
 	receiver sampleReceiver,
-	onButton func(channel int, button rune),
+	onButton func(channel int, button byte),
 ) {
 	/* This audio device can have one (mono) or two (stereo) channels. */
 	/* Find number of the first channel and number of channels. */

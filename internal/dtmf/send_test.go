@@ -44,7 +44,7 @@ func TestSendDecodesBack(t *testing.T) {
 	for _, sam := range out.samples {
 		var x = decoder.Sample(float64(sam) / 16384.)
 		if x != ' ' && x != '.' {
-			heard.WriteRune(x)
+			heard.WriteByte(x)
 		}
 	}
 
