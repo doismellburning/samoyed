@@ -15,6 +15,7 @@ package node
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -321,6 +322,16 @@ type Node struct {
 	// apps are the applications users can start, which are added before
 	// Start and not changed after.
 	apps []Application
+
+	// services are the applications stations can connect to directly, by
+	// their own callsigns, which are added before Start and not changed
+	// after.
+	services map[string]Service
+
+	// serviceSessions are the stations connected to a service, and
+	// appLinks the links applications opened, both guarded by mu.
+	serviceSessions map[linkKey]*appRun
+	appLinks        map[linkKey]*appLink
 }
 
 // SessionEventKind says what a SessionEvent is about.
@@ -400,6 +411,10 @@ func (n *Node) Sessions() []SessionInfo {
 		list = append(list, info)
 	}
 
+	for key, run := range n.serviceSessions {
+		list = append(list, SessionInfo{User: key.remoteCall, Channel: key.channel, Local: key.ownCall, Downlink: "", Connected: false, App: run.name})
+	}
+
 	slices.SortFunc(list, func(a, b SessionInfo) int {
 		if a.Channel != b.Channel {
 			return a.Channel - b.Channel
@@ -434,6 +449,9 @@ func New(config Config, link DataLink, heard HeardStations, client int) *Node {
 	n.now = time.Now
 	n.sessions = make(map[peer]*session)
 	n.downlinks = make(map[peer]peer)
+	n.services = make(map[string]Service)
+	n.serviceSessions = make(map[linkKey]*appRun)
+	n.appLinks = make(map[linkKey]*appLink)
 
 	return n
 }
@@ -447,6 +465,10 @@ func (n *Node) Start() {
 		if n.config.Alias != "" {
 			n.link.RegisterCallsign(n.config.Alias, port.Channel, n.client)
 		}
+
+		for _, call := range slices.Sorted(maps.Keys(n.services)) {
+			n.link.RegisterCallsign(call, port.Channel, n.client)
+		}
 	}
 }
 
@@ -455,6 +477,10 @@ func (n *Node) Start() {
 // they are through.
 func (n *Node) LinkEstablished(channel int, _ int, remoteCall string, ownCall string, incoming bool) {
 	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+
+	if n.applicationLinkUp(key, incoming) {
+		return
+	}
 
 	// A link NET/ROM opened, or a neighbour node's, is NET/ROM's, and
 	// nobody's session.
@@ -516,6 +542,10 @@ func (n *Node) established(key peer, incoming bool) {
 // a downlink's returns its user to the node.
 func (n *Node) LinkTerminated(channel int, _ int, remoteCall string, ownCall string, timeout bool) {
 	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+
+	if n.applicationLinkDown(key, timeout) {
+		return
+	}
 
 	if n.netrom != nil && !n.isUsers(key) {
 		n.netrom.LinkDown(channel, ownCall, remoteCall, timeout)
@@ -580,6 +610,10 @@ func (n *Node) terminated(key peer, why string) {
 // downlink as it is, and what comes back on the downlink goes to them.
 func (n *Node) RecConnData(channel int, _ int, remoteCall string, ownCall string, pid int, data []byte) {
 	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+
+	if n.applicationData(key, data) {
+		return
+	}
 
 	if n.netrom != nil && pid == ax25.PIDNetROM && n.netromPacket(key) {
 		n.netrom.Packet(channel, ownCall, remoteCall, data)

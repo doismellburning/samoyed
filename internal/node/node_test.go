@@ -42,13 +42,17 @@ type fakeLink struct {
 	sent        []sent
 	pids        []int
 	disconnects []string
+
+	// via are the digipeaters each connect was asked to go by.
+	via [][]string
 }
 
-func (f *fakeLink) ConnectRequest(addrs [ax25.MaxAddrs]string, _ int, channel int, _ int, _ int) {
+func (f *fakeLink) ConnectRequest(addrs [ax25.MaxAddrs]string, numAddr int, channel int, _ int, _ int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	f.connects = append(f.connects, sent{channel: channel, from: addrs[ax25.Source], to: addrs[ax25.Destination], data: ""})
+	f.via = append(f.via, addrs[ax25.Repeater1:numAddr])
 }
 
 func (f *fakeLink) RegisterCallsign(addr string, channel int, client int) {
