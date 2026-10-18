@@ -814,7 +814,7 @@ x = Silence FX.25 information.`)
 	 * client applications too.  Each audio device's receive thread makes the
 	 * touch tone decoders for its own channels, once receiving starts below.
 	 */
-	var ttGateway = NewTTGateway(audio_config, &dw_tt_config, clientApplications, aprsDigipeater.Remember, igate.sendRecPacket,
+	var ttGateway = NewTTGateway(audio_config.myCall, &dw_tt_config, clientApplications.SendRecPacket, aprsDigipeater.Remember, igate.sendRecPacket,
 		dataLinkQueue.RecFrame, transmitQueue.Append, layer2Receiver.AudioLevel, aprstt_debug)
 
 	/*

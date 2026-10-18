@@ -131,7 +131,7 @@ func setupRecPacketTest(t *testing.T) *recPacketTest {
 	handler.waypoints = ws
 	handler.digipeater = digipeater.New(audioConfig.digipeaterPorts(), digiConfig, filter, nil, nil)
 	handler.connectedDigipeater = digipeater.NewConnected(audioConfig.digipeaterPorts(), new(digipeater.ConnectedConfig), filter, nil)
-	handler.ttGateway = NewTTGateway(audioConfig, handler.ttConfig, nil, handler.digipeater.Remember, nil, nil, nil, nil, 0)
+	handler.ttGateway = NewTTGateway(audioConfig.myCall, handler.ttConfig, nil, handler.digipeater.Remember, nil, nil, nil, nil, 0)
 
 	return &recPacketTest{handler: handler, audioConfig: audioConfig, waypoints: waypoints}
 }

@@ -34,9 +34,7 @@ func assertObjectReport(t *testing.T, users *ttUsers, callsign string, firstTime
 func Test_TTUser(t *testing.T) {
 	/* Fake audio config - All we care about is mycall for constructing object report packet. */
 
-	var my_audio_config RadioConfig
-
-	my_audio_config.mycall[0] = "WB20SZ-15"
+	var my_mycall = ttMyCalls("WB20SZ-15")
 
 	/* Fake TT gateway config. */
 
@@ -58,7 +56,7 @@ func Test_TTUser(t *testing.T) {
 
 	my_tt_config.obj_xmit_via = "WIDE2-1"
 
-	var users = newTTUsers(&my_audio_config, &my_tt_config)
+	var users = newTTUsers(my_mycall, &my_tt_config)
 
 	// tt_user_heard (char *callsign, int ssid, char overlay, char symbol, char *loc_text, double latitude,
 	//              double longitude, int ambiguity, char *freq, char *ctcss, char *comment, char mic_e, char *dao);

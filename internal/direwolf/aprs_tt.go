@@ -39,6 +39,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
@@ -290,12 +291,16 @@ func ttFieldByte(e string, i int) byte {
 	return 0
 }
 
+// objectReportSink is where the gateway sends an object report, with the
+// channel it concerns.
+type objectReportSink func(channel int, pp *ax25.Packet)
+
 // TTGateway is the APRStt gateway. Construct one with NewTTGateway.
 type TTGateway struct {
 	config         *tt_config_s
 	debug          int
 	users          *ttUsers
-	msgStr         [MAX_RADIO_CHANS]string
+	msgStr         [phy.MaxRadioChans]string
 	pollPeriod     int
 	runningTests   bool
 	lastParseState ttParseState
@@ -319,10 +324,11 @@ type TTGateway struct {
  *
  * Purpose:     Initialize and return a new TTGateway.
  *
- * Inputs:      audioConfig	- Audio configuration, for the mycall of object reports.
+ * Inputs:      mycall	- A channel's callsign, which object reports are sent
+ *			  from.
  *		p	- Pointer to configuration options gathered by config.c.
- *		apps	- The client applications object reports go to, when
- *			  configured to; nil for none.
+ *		toApps	- Sends an object report to the client applications,
+ *			  when configured to; nil for none.
  *		remember - Called with each object report we transmit, and its
  *			  channel, so the digipeater doesn't repeat our own;
  *			  nil for nobody to tell.
@@ -344,11 +350,11 @@ type TTGateway struct {
  *----------------------------------------------------------------*/
 
 func NewTTGateway(
-	audioConfig *RadioConfig,
+	mycall func(channel int) string,
 	p *tt_config_s,
-	apps *clientApps,
-	remember func(channel int, pp *ax25.Packet),
-	toIGate igateSender,
+	toApps objectReportSink,
+	remember objectReportSink,
+	toIGate objectReportSink,
 	recFrame frameReceiver,
 	transmit dwcore.FrameSender,
 	audioLevel dwcore.AudioLevelFunc,
@@ -360,8 +366,8 @@ func NewTTGateway(
 	g.audioLevel = audioLevel
 	g.recFrame = recFrame
 	g.transmit = transmit
-	g.users = newTTUsers(audioConfig, p)
-	g.users.apps = apps
+	g.users = newTTUsers(mycall, p)
+	g.users.toApps = toApps
 	g.users.remember = remember
 	g.users.toIGate = toIGate
 	g.users.transmit = transmit
@@ -397,7 +403,7 @@ func NewTTGateway(
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) Button(channel int, button rune) {
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
 
 	// if (button != '.') {
 	//   dw_printf ("aprs_tt_button (%d, '%c')\n", channel, button);
@@ -562,7 +568,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	}
 
 	if g.transmit != nil {
-		g.transmit(channel, TQ_PRIO_0_HI, pp)
+		g.transmit(channel, dwcore.PrioHigh, pp)
 	}
 } /* end Sequence */
 
@@ -1779,7 +1785,7 @@ func raw_tt_data_to_app(channel int, msg string, alevel ax25.ALevel, recFrame fr
 		alevel.Space = -2
 
 		if recFrame != nil {
-			recFrame(dwcore.ChannelSource(dwcore.SourceDTMF, channel), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, "tt")
+			recFrame(dwcore.ChannelSource(dwcore.SourceDTMF, channel), pp, dwcore.RxInfo{ALevel: alevel, Retries: phy.BitFixNone, FEC: phy.FECNone}, "tt")
 		}
 	} else {
 		logrus.WithField("packet", raw_tt_msg).Error("Could not convert touch tone message into APRS packet")
