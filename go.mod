@@ -6,6 +6,7 @@ require (
 	github.com/brutella/dnssd v1.2.14
 	github.com/ccoveille/go-safecast/v2 v2.0.1
 	github.com/creack/pty v1.1.24
+	github.com/ebitengine/purego v0.11.2
 	github.com/golang/geo v0.0.0-20180826223333-635502111454
 	github.com/gordonklaus/portaudio v0.0.0-20250206071425-98a94950218b
 	github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b
