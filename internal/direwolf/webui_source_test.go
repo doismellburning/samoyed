@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"testing"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
@@ -89,4 +90,56 @@ func TestWebPublishReceivedSaysWhereTheFrameCameFrom(t *testing.T) {
 			assert.Equal(t, tc.audioLevel, got[0].AudioLevel)
 		})
 	}
+}
+
+// An IGate with no server to connect to isn't one, as far as the web interface
+// is concerned.
+func TestWebIGateStatusUnconfigured(t *testing.T) {
+	var ig, _ = setupIGate(t)
+
+	ig.config.t2_server_name = ""
+
+	assert.Equal(t, maybe.Nothing[webui.IGateStatus](), webIGateStatus(ig))
+	assert.Equal(t, maybe.Nothing[webui.IGateStatus](), webIGateStatus(nil))
+}
+
+func TestWebIGateStatus(t *testing.T) {
+	var ig, _ = setupIGate(t)
+
+	ig.config.t2_server_port = 14580
+
+	var connectedAt = time.Date(2026, 10, 18, 9, 0, 0, 0, time.UTC)
+
+	ig.updateStats(func(s *igateStats) {
+		s.connectedAt = connectedAt
+		s.uplinkPackets = 1
+		s.uplinkBytes = 2
+		s.downlinkPackets = 3
+		s.downlinkBytes = 4
+		s.rfXmitPackets = 5
+	})
+
+	var want webui.IGateStatus
+	want.Server = "localhost:14580"
+	want.Connected = true
+	want.LoggedIn = true
+	want.ConnectedAt = maybe.Just(connectedAt)
+	want.UplinkPackets = 1
+	want.UplinkBytes = 2
+	want.DownlinkPackets = 3
+	want.DownlinkBytes = 4
+	want.RFPackets = 5
+
+	assert.Equal(t, maybe.Just(want), webIGateStatus(ig))
+
+	// Once the connection drops, the time of the last attempt to connect is
+	// no longer the time of any connection, but the counts stand.
+	var conn, _ = ig.connection()
+	ig.dropConnection(conn)
+
+	want.Connected = false
+	want.LoggedIn = false
+	want.ConnectedAt = maybe.Nothing[time.Time]()
+
+	assert.Equal(t, maybe.Just(want), webIGateStatus(ig))
 }

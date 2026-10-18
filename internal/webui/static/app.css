@@ -107,6 +107,8 @@ main > section[hidden] { display: none; }
 .channel .rx { color: var(--rx); }
 .channel .tx { color: var(--tx); }
 .channel .figures b { font-size: 20px; font-weight: 600; }
+.igate .state[data-state="up"] { color: var(--rx); }
+.igate .state[data-state="down"] { color: var(--bad); }
 
 .panels {
   flex: 1;

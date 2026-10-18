@@ -306,11 +306,15 @@ The header shows the version of Samoyed the station is running
 and how long it has been up.
 The **Dashboard** tab shows each channel's callsign
 and its received and transmitted packet counts,
+how the IGate's connection to APRS-IS stands, if the station is an IGate,
+with how many packets it has passed up, received and gated to radio,
 the stations heard in the last two hours,
 and packets as they arrive, with a filter and a pause button.
 The **Map** tab plots every station and APRS object that has sent a position;
 select one for its latest comment.
 Selecting a station in the dashboard opens it on the map.
+The page's data is JSON from ``/api/packets``, ``/api/stations``, ``/api/channels`` and ``/api/status``,
+for anything else that wants it.
 
 Unlike the metrics counts, this shows everything the station receives,
 APRS-IS, network TNC and AX.UDP packets included,

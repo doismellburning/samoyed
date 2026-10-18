@@ -39,7 +39,7 @@ Dashed arrows are connections made after construction rather than at it.
        tones [label="ToneGenerators"];
        ptt [label="PTT"];
        xmit [label="XmitService\ntransmit threads"];
-       web [label="Web UI hub"];
+       web [label="Web interface\nhub and server"];
        agw [label="AGWServer"];
        link [label="AX25Link\ndata link state machine"];
        router [label="linkClientRouter"];
@@ -92,6 +92,7 @@ Dashed arrows are connections made after construction rather than at it.
        igate -> dlq [label="RecFrame"];
        igate -> tq [label="Append\n(dwcore.FrameSender)"];
        digi -> igate [label="rememberDigipeated"];
+       web -> igate [label="webStatus\n(at Start)", style=dashed];
        digi -> tq [label="Append"];
        cdigi -> tq [label="Append"];
 
@@ -169,7 +170,8 @@ so the order of construction follows the arrows:
    rather than queueing it.
 #. The tone generators and the PTT.
 #. The web interface and the AGW server.
-   The web interface binds its port as it is made;
+   The web interface binds its port as it is made,
+   but only starts serving once the IGate it reports on exists;
    with its port disabled, or taken, there is no hub,
    and the frames that would have gone to it go nowhere.
    The AGW server is made here,
@@ -221,6 +223,14 @@ It binds its ports when it is made, though,
 so a port already in use is reported before the service starts,
 rather than once it is running.
 
+**The web interface and the IGate.**
+The web interface's hub is handed to the transmit service and the received packet handler,
+which are made before the IGate,
+and its status page reports on the IGate's connection to APRS-IS.
+The hub and the server are made, and the port bound, before either;
+the server is handed the station's status (``webStatus``) when it is started (``webui.Server.Start``),
+once the IGate exists.
+
 **The audio devices and the demodulators.**
 Each audio device's statistics report its channels' received audio levels,
 which the demodulators keep,
@@ -264,8 +274,8 @@ References
   ``audio.go`` (``AudioDevices.setAudioLevel``),
   ``channel_config.go`` (``RadioConfig.digipeaterPorts``)
   and ``recv.go`` (``recv_init``, ``recv_process``).
-- ``internal/direwolf/webui_source.go``: ``webui_init``,
-  and ``internal/webui/server.go``: ``NewServer``.
+- ``internal/direwolf/webui_source.go``: ``webui_init``, ``webui_start`` and ``webStatus``,
+  and ``internal/webui/server.go``: ``NewServer`` and ``Server.Start``.
 - ``internal/ptt/ptt.go``: ``New``,
   handed each channel's configuration by ``RadioConfig.pttChannels`` (``internal/direwolf/channel_config.go``),
   which asks ``AudioDevices.channelCanTransmit`` (``audio.go``) whether each channel has an audio output.

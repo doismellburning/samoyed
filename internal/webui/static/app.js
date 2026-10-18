@@ -60,12 +60,31 @@
   let packets = []; // oldest first
   let paused = false;
   let pendingWhilePaused = 0;
+  // What the station last said about itself, and when by this page's own
+  // clock, so the uptime can tick on without trusting the two clocks to agree.
+  let status = null;
+  let statusAt = 0;
 
   // ---- Channels ----
+
+  function igateCard(ig) {
+    const [state, text] = ig.loggedIn ? ["up", "Logged in"]
+      : ig.connected ? ["connecting", "Logging in"] : ["down", "Not connected"];
+    const card = el("div", { class: "channel igate" },
+      el("div", { class: "label", text: `IGate · ${ig.server}` }),
+      el("div", { class: "figures" },
+        el("span", { class: "state", "data-state": state, text }),
+        el("span", {}, el("b", { text: String(ig.uplinkPackets) }), " up"),
+        el("span", {}, el("b", { text: String(ig.downlinkPackets) }), " down"),
+        el("span", {}, el("b", { text: String(ig.rfPackets) }), " to RF")));
+    if (ig.connectedAt) card.title = "Connected since " + new Date(ig.connectedAt).toLocaleString();
+    return card;
+  }
 
   function renderChannels() {
     const box = $("channels");
     box.replaceChildren();
+    if (status && status.igate) box.append(igateCard(status.igate));
     for (const c of [...channels.values()].sort((a, b) => a.number - b.number)) {
       box.append(el("div", { class: "channel" },
         el("div", { class: "label", text: `Channel ${c.number} · ${c.description || "unknown"}` +
@@ -280,11 +299,6 @@
 
   // ---- Station ----
 
-  // The uptime the station reported, and when, by this page's own clock, so
-  // it can tick on without asking again or trusting the two clocks to agree.
-  let status = null;
-  let statusAt = 0;
-
   function duration(s) {
     const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
     if (d > 0) return `${d}d ${h}h`;
@@ -304,6 +318,16 @@
     status = s;
     statusAt = performance.now();
     renderStatus();
+    renderChannels();
+  }
+
+  // The IGate's counts change without any event to say so.
+  async function refreshStatus() {
+    try {
+      setStationStatus(await getJSON("api/status"));
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   // ---- Data ----
@@ -386,7 +410,7 @@
     }
     pruneMarkers();
     renderStations();
-    renderStatus();
+    refreshStatus();
   }, 10000);
   setInterval(() => { if (stationsDirty) renderStations(); }, 500);
 
