@@ -22,11 +22,11 @@ import (
 func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 	var my_mycall = ttMyCalls("Q1TEST-15")
 
-	var my_tt_config tt_config_s
+	var my_tt_config Config
 
-	my_tt_config.retain_time = 20
-	my_tt_config.num_xmits = 1
-	my_tt_config.xmit_delay[0] = 3
+	my_tt_config.RetainTime = 20
+	my_tt_config.NumXmits = 1
+	my_tt_config.XmitDelay[0] = 3
 
 	var users = newTTUsers(my_mycall, &my_tt_config)
 
@@ -53,11 +53,11 @@ func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 func TestObjectReportCarriesFrequency(t *testing.T) {
 	var my_mycall = ttMyCalls("Q1TEST-15")
 
-	var my_tt_config tt_config_s
+	var my_tt_config Config
 
-	my_tt_config.retain_time = 20
-	my_tt_config.num_xmits = 1
-	my_tt_config.xmit_delay[0] = 3
+	my_tt_config.RetainTime = 20
+	my_tt_config.NumXmits = 1
+	my_tt_config.XmitDelay[0] = 3
 
 	var users = newTTUsers(my_mycall, &my_tt_config)
 
@@ -83,13 +83,13 @@ func TestDigitSuffixIgnoresNonASCIIDigits(t *testing.T) {
 func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	var my_mycall = ttMyCalls("Q1TEST-15")
 
-	var my_tt_config tt_config_s
+	var my_tt_config Config
 
-	my_tt_config.retain_time = 20
-	my_tt_config.num_xmits = 1
-	my_tt_config.obj_xmit_chan = -1 // Keep the reports off the transmit queue.
+	my_tt_config.RetainTime = 20
+	my_tt_config.NumXmits = 1
+	my_tt_config.ObjXmitChan = -1 // Keep the reports off the transmit queue.
 
-	var gw = NewTTGateway(my_mycall, &my_tt_config, nil, nil, nil, nil, nil, nil, 0)
+	var gw = NewGateway(my_mycall, &my_tt_config, nil, nil, nil, nil, nil, nil, 0)
 
 	var done = make(chan struct{})
 
@@ -113,9 +113,9 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 // was told to remember transmissions with - the digipeater, in DirewolfMain -
 // so that hearing it again doesn't get it digipeated.
 func TestTransmittedObjectReportIsRemembered(t *testing.T) {
-	var ttConfig tt_config_s
+	var ttConfig Config
 
-	ttConfig.obj_xmit_chan = 0
+	ttConfig.ObjXmitChan = 0
 
 	var remembered []string
 
@@ -131,7 +131,7 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 		transmitted = append(transmitted, fmt.Sprintf("%d %d %s%s", channel, prio, pp.FormatAddrs(), pp.Info()))
 	}
 
-	var gw = NewTTGateway(ttMyCalls("Q1TEST"), &ttConfig, nil, remember, nil, nil, transmit, nil, 0)
+	var gw = NewGateway(ttMyCalls("Q1TEST"), &ttConfig, nil, remember, nil, nil, transmit, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
 
@@ -142,11 +142,11 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 // An object report bound for APRS-IS goes to the IGate the gateway was
 // handed, the first time only, on the channel it was heard on.
 func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
-	var ttConfig tt_config_s
+	var ttConfig Config
 
-	ttConfig.obj_send_to_ig = 1
-	ttConfig.obj_recv_chan = 1
-	ttConfig.obj_xmit_chan = -1
+	ttConfig.ObjSendToIG = 1
+	ttConfig.ObjRecvChan = 1
+	ttConfig.ObjXmitChan = -1
 
 	var sent []string
 
@@ -154,7 +154,7 @@ func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
 		sent = append(sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
 	}
 
-	var gw = NewTTGateway(ttMyCalls("Q1TEST"), &ttConfig, nil, nil, toIGate, nil, nil, nil, 0)
+	var gw = NewGateway(ttMyCalls("Q1TEST"), &ttConfig, nil, nil, toIGate, nil, nil, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)

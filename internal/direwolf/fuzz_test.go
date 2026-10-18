@@ -709,7 +709,7 @@ func FuzzAGWHandleClientCommand(f *testing.F) {
 // ttFuzzMaxSequence bounds what FuzzTTSequence tries.  A tone sequence is
 // capped at MAX_MSG_LEN buttons, but one in a received packet's info field is
 // not, so leave room for a few times that.
-const ttFuzzMaxSequence = 4 * MAX_MSG_LEN
+const ttFuzzMaxSequence = 4 * MaxMsgLen
 
 // FuzzTTSequence covers the APRStt gateway's handling of a touch tone
 // sequence.  Anyone on frequency reaches it with DTMF, and with any packet
@@ -734,8 +734,8 @@ func FuzzTTSequence(f *testing.F) {
 	f.Add("1#")        // Macro that expands to itself.
 
 	var ttlocs = append(slices.Clone(aprs_tt_test_config),
-		&ttloc_s{ttlocType: TTLOC_POINT, pattern: "B", point: pointTTLoc{lat: 12.75, lon: 56.75}}, //nolint:exhaustruct_v5
-		&ttloc_s{ttlocType: TTLOC_MACRO, pattern: "1", macro: macroTTLoc{definition: "1"}},        //nolint:exhaustruct_v5
+		&Loc{Type: LocPoint, Pattern: "B", Point: PointLoc{Lat: 12.75, Lon: 56.75}}, //nolint:exhaustruct_v5
+		&Loc{Type: LocMacro, Pattern: "1", Macro: MacroLoc{Definition: "1"}},        //nolint:exhaustruct_v5
 	)
 
 	f.Fuzz(func(t *testing.T, msg string) {
@@ -744,19 +744,19 @@ func FuzzTTSequence(f *testing.F) {
 			t.Skip()
 		}
 
-		var cfg tt_config_s
-		cfg.ttlocs = ttlocs
-		cfg.obj_send_to_app = 1
-		cfg.obj_send_to_ig = 1
-		cfg.obj_xmit_via = "WIDE2-1"
-		cfg.retain_time = 80 * 60
-		cfg.num_xmits = 1
-		cfg.status[1] = "/off duty"
+		var cfg Config
+		cfg.Locs = ttlocs
+		cfg.ObjSendToApp = 1
+		cfg.ObjSendToIG = 1
+		cfg.ObjXmitVia = "WIDE2-1"
+		cfg.RetainTime = 80 * 60
+		cfg.NumXmits = 1
+		cfg.Status[1] = "/off duty"
 
 		var discard = func(int, *ax25.Packet) {}
 		var transmit = func(int, int, *ax25.Packet) {}
 
-		var g = NewTTGateway(ttMyCalls("Q1TEST"), &cfg, nil, discard, discard, nil, transmit, nil, 0)
+		var g = NewGateway(ttMyCalls("Q1TEST"), &cfg, nil, discard, discard, nil, transmit, nil, 0)
 
 		g.Sequence(t.Context(), 0, "A9A2B42A7A7C71#") // WB4APR/7
 		g.Sequence(t.Context(), 0, msg)

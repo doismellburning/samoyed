@@ -123,17 +123,17 @@ type tt_user_s struct {
 // The reports are sent with it released.
 type ttUsers struct {
 	mycall   func(channel int) string // A channel's callsign, which object reports are sent from.
-	ttConfig *tt_config_s
+	ttConfig *Config
 
 	// toApps sends an object report to the client applications, or is nil.
-	toApps objectReportSink
+	toApps ObjectReportSink
 
 	// remember is told each object report we transmit, so the digipeater
 	// doesn't repeat our own, or is nil.
-	remember objectReportSink
+	remember ObjectReportSink
 
 	// toIGate sends an object report to APRS-IS, or is nil for no IGate.
-	toIGate objectReportSink
+	toIGate ObjectReportSink
 
 	// transmit is where an object report goes, to be transmitted, or is nil to
 	// drop it.
@@ -145,7 +145,7 @@ type ttUsers struct {
 
 // newTTUsers makes an empty user table.  mycall gives the callsign object
 // reports are sent from, and ttConfig when and where they are sent.
-func newTTUsers(mycall func(channel int) string, ttConfig *tt_config_s) *ttUsers {
+func newTTUsers(mycall func(channel int) string, ttConfig *Config) *ttUsers {
 	var u = new(ttUsers)
 
 	u.mycall = mycall
@@ -380,7 +380,7 @@ func digit_suffix(callsign string) string {
  *		Last heard time is updated.
  *		Object Report transmission is scheduled.
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	0 for success or one of the Error... codes.
  *
  *----------------------------------------------------------------*/
 
@@ -397,7 +397,7 @@ func (u *ttUsers) heard(callsign string, ssid int, overlay byte, symbol byte, lo
 	if callsign == "" {
 		logrus.Error("APRStt tone sequence did not include callsign / object name")
 
-		return (TT_ERROR_NO_CALL)
+		return (ErrorNoCall)
 	}
 
 	var report = u.record(callsign, ssid, overlay, symbol, loc_text, latitude, longitude, ambiguity, freq, ctcss, comment, mic_e, dao)
@@ -517,7 +517,7 @@ func (u *ttUsers) record(callsign string, ssid int, overlay byte, symbol byte, l
 	 */
 	u.user[i].last_heard = time.Now()
 	u.user[i].xmits = 0
-	u.user[i].next_xmit = u.user[i].last_heard.Add(time.Duration(u.ttConfig.xmit_delay[0]) * time.Second)
+	u.user[i].next_xmit = u.user[i].last_heard.Add(time.Duration(u.ttConfig.XmitDelay[0]) * time.Second)
 
 	/*
 	 * Put properties into environment variables in preparation
@@ -566,7 +566,7 @@ func (u *ttUsers) dueReports(now time.Time) []string {
 		dwutil.Assert(i >= 0 && i < MAX_TT_USERS)
 
 		if u.user[i].callsign != "" {
-			if u.user[i].xmits < u.ttConfig.num_xmits && !u.user[i].next_xmit.After(now) {
+			if u.user[i].xmits < u.ttConfig.NumXmits && !u.user[i].next_xmit.After(now) {
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("tt_user_background()  now = %d\n", (int)now);
 				// tt_user_dump ();
@@ -574,9 +574,9 @@ func (u *ttUsers) dueReports(now time.Time) []string {
 
 				/* Increase count of number times this one was sent. */
 				u.user[i].xmits++
-				if u.user[i].xmits < u.ttConfig.num_xmits {
+				if u.user[i].xmits < u.ttConfig.NumXmits {
 					/* Schedule next one. */
-					u.user[i].next_xmit = u.user[i].next_xmit.Add(time.Duration(u.ttConfig.xmit_delay[u.user[i].xmits]) * time.Second)
+					u.user[i].next_xmit = u.user[i].next_xmit.Add(time.Duration(u.ttConfig.XmitDelay[u.user[i].xmits]) * time.Second)
 				}
 
 				// tt_user_dump ();
@@ -589,7 +589,7 @@ func (u *ttUsers) dueReports(now time.Time) []string {
 	 */
 	for i := range MAX_TT_USERS {
 		if u.user[i].callsign != "" {
-			if u.user[i].last_heard.Add(time.Duration(u.ttConfig.retain_time) * time.Second).Before(now) {
+			if u.user[i].last_heard.Add(time.Duration(u.ttConfig.RetainTime) * time.Second).Before(now) {
 				// dw_printf ("debug: purging expired user %d\n", i);
 				u.clear(i)
 			}
@@ -660,26 +660,26 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
 	 * The other methods are reliable so we only want to send it once.
 	 */
 
-	if first_time && u.ttConfig.obj_send_to_app > 0 && u.toApps != nil {
-		u.toApps(u.ttConfig.obj_recv_chan, pp)
+	if first_time && u.ttConfig.ObjSendToApp > 0 && u.toApps != nil {
+		u.toApps(u.ttConfig.ObjRecvChan, pp)
 	}
 
-	if first_time && u.ttConfig.obj_send_to_ig > 0 {
+	if first_time && u.ttConfig.ObjSendToIG > 0 {
 		// text_color_set(DW_COLOR_DEBUG);
 		// dw_printf ("xmit_object_report (): send to IGate\n");
 		if u.toIGate != nil {
-			u.toIGate(u.ttConfig.obj_recv_chan, pp)
+			u.toIGate(u.ttConfig.ObjRecvChan, pp)
 		}
 	}
 
-	if !first_time && u.ttConfig.obj_xmit_chan >= 0 {
+	if !first_time && u.ttConfig.ObjXmitChan >= 0 {
 		/* Remember it so we don't digipeat our own. */
 		if u.remember != nil {
-			u.remember(u.ttConfig.obj_xmit_chan, pp)
+			u.remember(u.ttConfig.ObjXmitChan, pp)
 		}
 
 		if u.transmit != nil {
-			u.transmit(u.ttConfig.obj_xmit_chan, dwcore.PrioLow, pp)
+			u.transmit(u.ttConfig.ObjXmitChan, dwcore.PrioLow, pp)
 		}
 	}
 }
@@ -728,9 +728,9 @@ func (u *ttUsers) objectReportText(i int, first_time bool) string {
 		/*
 		 * Use made up position in the corral.
 		 */
-		var c_lat = u.ttConfig.corral_lat     // Corral latitude.
-		var c_long = u.ttConfig.corral_lon    // Corral longitude.
-		var c_offs = u.ttConfig.corral_offset // Corral (latitude) offset.
+		var c_lat = u.ttConfig.CorralLat     // Corral latitude.
+		var c_long = u.ttConfig.CorralLon    // Corral longitude.
+		var c_offs = u.ttConfig.CorralOffset // Corral (latitude) offset.
 
 		olat = float64(c_lat - float64(u.user[i].corral_slot-1)*c_offs)
 		olong = float64(c_long)
@@ -766,11 +766,11 @@ func (u *ttUsers) objectReportText(i int, first_time bool) string {
 		}
 
 		// Insert "/" if status does not already begin with it.
-		if !strings.HasPrefix(u.ttConfig.status[u.user[i].mic_e-'0'], "/") {
+		if !strings.HasPrefix(u.ttConfig.Status[u.user[i].mic_e-'0'], "/") {
 			info_comment += "/"
 		}
 
-		info_comment += u.ttConfig.status[u.user[i].mic_e-'0']
+		info_comment += u.ttConfig.Status[u.user[i].mic_e-'0']
 	}
 
 	if u.user[i].dao != "" {
@@ -789,10 +789,10 @@ func (u *ttUsers) objectReportText(i int, first_time bool) string {
 	 */
 
 	var stemp string
-	if u.ttConfig.obj_xmit_chan >= 0 {
-		stemp = u.mycall(u.ttConfig.obj_xmit_chan)
+	if u.ttConfig.ObjXmitChan >= 0 {
+		stemp = u.mycall(u.ttConfig.ObjXmitChan)
 	} else {
-		stemp = u.mycall(u.ttConfig.obj_recv_chan)
+		stemp = u.mycall(u.ttConfig.ObjRecvChan)
 	}
 
 	stemp += ">"
@@ -804,9 +804,9 @@ func (u *ttUsers) objectReportText(i int, first_time bool) string {
 	 * Append via path, for transmission, if specified.
 	 */
 
-	if !first_time && u.ttConfig.obj_xmit_via != "" {
+	if !first_time && u.ttConfig.ObjXmitVia != "" {
 		stemp += ","
-		stemp += u.ttConfig.obj_xmit_via
+		stemp += u.ttConfig.ObjXmitVia
 	}
 
 	stemp += ":"
@@ -960,7 +960,7 @@ func (u *ttUsers) setenv(i int) {
 	os.Setenv("TTLOC", u.user[i].loc_text)
 
 	if u.user[i].mic_e >= '1' && u.user[i].mic_e <= '9' {
-		os.Setenv("TTSTATUS", u.ttConfig.status[u.user[i].mic_e-'0'])
+		os.Setenv("TTSTATUS", u.ttConfig.Status[u.user[i].mic_e-'0'])
 	} else {
 		os.Setenv("TTSTATUS", "")
 	}

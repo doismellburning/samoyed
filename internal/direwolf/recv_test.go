@@ -297,7 +297,7 @@ func setupRecvProcessTest(t *testing.T, frack int) (*recPacketHandler, *AX25Link
 	// out to the attached client applications too, of which there are none.
 	var handler = new(recPacketHandler)
 	handler.audioConfig = audioConfig
-	handler.ttConfig = new(tt_config_s)
+	handler.ttConfig = new(Config)
 	handler.decoder = aprs.NewDecoderFromDataFiles()
 	handler.logger = aprslog.New(false, "")
 	handler.heard = mheard.New(0)

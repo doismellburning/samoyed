@@ -50,18 +50,18 @@ func TestClientAppsSendRecPacketToNone(t *testing.T) {
 
 // The APRStt gateway sends its object reports to the client applications it
 // was handed, when configured to, as though it had heard them.
-func TestTTGatewaySendsObjectReportsToClientApps(t *testing.T) {
-	var cfg tt_config_s
-	cfg.obj_send_to_app = 1
-	cfg.obj_recv_chan = 0
-	cfg.obj_xmit_chan = -1
+func TestGatewaySendsObjectReportsToClientApps(t *testing.T) {
+	var cfg Config
+	cfg.ObjSendToApp = 1
+	cfg.ObjRecvChan = 0
+	cfg.ObjXmitChan = -1
 
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
 	var apps = new(clientApps)
 	apps.kissNet = kns
 
-	var gw = NewTTGateway(ttMyCalls(), &cfg, apps.SendRecPacket, nil, nil, nil, nil, nil, 0)
+	var gw = NewGateway(ttMyCalls(), &cfg, apps.SendRecPacket, nil, nil, nil, nil, nil, 0)
 
 	var report = "Q1TEST>APRS:;Q2TEST   *111111z4237.14N/07120.83W-"
 

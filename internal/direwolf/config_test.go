@@ -220,7 +220,7 @@ type configs struct {
 	audio *RadioConfig
 	digi  *digipeater.Config
 	cdigi *digipeater.ConnectedConfig
-	tt    *tt_config_s
+	tt    *Config
 	igate *igate_config_s
 	misc  *misc_config_s
 
@@ -267,7 +267,7 @@ func parseConfigWith(t *testing.T, pattern string, content string, symbolTable s
 		audio:  new(RadioConfig),
 		digi:   new(digipeater.Config),
 		cdigi:  new(digipeater.ConnectedConfig),
-		tt:     new(tt_config_s),
+		tt:     new(Config),
 		igate:  new(igate_config_s),
 		misc:   new(misc_config_s),
 		output: "",
@@ -684,7 +684,7 @@ func Test_config_init_modem_directive(t *testing.T) {
 			var audioConfig = new(RadioConfig)
 			var digiConfig digipeater.Config
 			var cdigiConfig digipeater.ConnectedConfig
-			var ttConfig tt_config_s
+			var ttConfig Config
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
 
@@ -733,7 +733,7 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 			var audioConfig = new(RadioConfig)
 			var digiConfig digipeater.Config
 			var cdigiConfig digipeater.ConnectedConfig
-			var ttConfig tt_config_s
+			var ttConfig Config
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
 
@@ -778,7 +778,7 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 			var audioConfig = new(RadioConfig)
 			var digiConfig digipeater.Config
 			var cdigiConfig digipeater.ConnectedConfig
-			var ttConfig tt_config_s
+			var ttConfig Config
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
 
@@ -4018,30 +4018,30 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern of exactly one x is stored",
 				config: "TTAMBIG B3x\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal(TTLOC_AMBIG, c.tt.ttlocs[0].ttlocType)
-					a.Equal("B3x", c.tt.ttlocs[0].pattern)
+					a.Len(c.tt.Locs, 1)
+					a.Equal(LocAmbig, c.tt.Locs[0].Type)
+					a.Equal("B3x", c.tt.Locs[0].Pattern)
 				},
 			},
 			{
 				name:   "no TTAMBIG means no touch tone locations",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 				},
 			},
 			{
 				name:   "the extra button is optional",
 				config: "TTAMBIG Bx\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
+					a.Len(c.tt.Locs, 1)
 				},
 			},
 			{
 				name:   "more than one x is rejected",
 				config: "TTAMBIG B3xx\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "must end with exactly one x")
 				},
 			},
@@ -4049,7 +4049,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern that does not begin with B is rejected",
 				config: "TTAMBIG C3x\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "must begin with upper case 'B'")
 				},
 			},
@@ -4057,7 +4057,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing pattern does not eat the next line",
 				config: "TTAMBIG\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4067,28 +4067,28 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "the command is the rest of the line",
 				config: "TTCMD /usr/local/bin/ttcmd --verbose\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("/usr/local/bin/ttcmd --verbose", c.tt.ttcmd)
+					a.Equal("/usr/local/bin/ttcmd --verbose", c.tt.Cmd)
 				},
 			},
 			{
 				name:   "no TTCMD means no command is run",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttcmd)
+					a.Empty(c.tt.Cmd)
 				},
 			},
 			{
 				name:   "a later line replaces the command",
 				config: "TTCMD /usr/local/bin/first\nTTCMD /usr/local/bin/second\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("/usr/local/bin/second", c.tt.ttcmd)
+					a.Equal("/usr/local/bin/second", c.tt.Cmd)
 				},
 			},
 			{
 				name:   "a missing command does not eat the next line",
 				config: "TTCMD\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttcmd)
+					a.Empty(c.tt.Cmd)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4098,18 +4098,18 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a latitude, longitude and offset are stored",
 				config: "TTCORRAL 42^37.14N 71^20.83W 0^0.30\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.InDelta(42.6190, c.tt.corral_lat, 0.001)
-					a.InDelta(-71.3472, c.tt.corral_lon, 0.001)
-					a.InDelta(0.005, c.tt.corral_offset, 0.001)
-					a.Equal(0, c.tt.corral_ambiguity)
+					a.InDelta(42.6190, c.tt.CorralLat, 0.001)
+					a.InDelta(-71.3472, c.tt.CorralLon, 0.001)
+					a.InDelta(0.005, c.tt.CorralOffset, 0.001)
+					a.Equal(0, c.tt.CorralAmbiguity)
 				},
 			},
 			{
 				name:   "no TTCORRAL leaves no corral",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Zero(c.tt.corral_lat)
-					a.Zero(c.tt.corral_lon)
+					a.Zero(c.tt.CorralLat)
+					a.Zero(c.tt.CorralLon)
 				},
 			},
 			{
@@ -4118,15 +4118,15 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a small whole number is an ambiguity, not an offset",
 				config: "TTCORRAL 42^37.14N 71^20.83W 2\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(2, c.tt.corral_ambiguity)
-					a.Zero(c.tt.corral_offset)
+					a.Equal(2, c.tt.CorralAmbiguity)
+					a.Zero(c.tt.CorralOffset)
 				},
 			},
 			{
 				name:   "a missing longitude does not eat the next line",
 				config: "TTCORRAL 42^37.14N\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Zero(c.tt.corral_lon)
+					a.Zero(c.tt.CorralLon)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4134,7 +4134,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing offset does not eat the next line",
 				config: "TTCORRAL 42^37.14N 71^20.83W\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Zero(c.tt.corral_offset)
+					a.Zero(c.tt.CorralOffset)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4146,32 +4146,32 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a response method and text are stored against the message",
 				config: "TTERR BAD_CHECKSUM MORSE Checksum error\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("MORSE", c.tt.response[TT_ERROR_BAD_CHECKSUM].method)
-					a.Equal("Checksum error", c.tt.response[TT_ERROR_BAD_CHECKSUM].mtext)
+					a.Equal("MORSE", c.tt.Response[ErrorBadChecksum].Method)
+					a.Equal("Checksum error", c.tt.Response[ErrorBadChecksum].MText)
 				},
 			},
 			{
 				name:   "the defaults are a Morse question mark, and R for success",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("MORSE", c.tt.response[TT_ERROR_BAD_CHECKSUM].method)
-					a.Equal("?", c.tt.response[TT_ERROR_BAD_CHECKSUM].mtext)
-					a.Equal("R", c.tt.response[TT_ERROR_OK].mtext)
+					a.Equal("MORSE", c.tt.Response[ErrorBadChecksum].Method)
+					a.Equal("?", c.tt.Response[ErrorBadChecksum].MText)
+					a.Equal("R", c.tt.Response[ErrorOK].MText)
 				},
 			},
 			{
 				name:   "SPEECH is the other method",
 				config: "TTERR NO_CALL SPEECH No call sign\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("SPEECH", c.tt.response[TT_ERROR_NO_CALL].method)
-					a.Equal("No call sign", c.tt.response[TT_ERROR_NO_CALL].mtext)
+					a.Equal("SPEECH", c.tt.Response[ErrorNoCall].Method)
+					a.Equal("No call sign", c.tt.Response[ErrorNoCall].MText)
 				},
 			},
 			{
 				name:   "the identifier and method are not case sensitive",
 				config: "TTERR no_call speech No call sign\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("SPEECH", c.tt.response[TT_ERROR_NO_CALL].method)
+					a.Equal("SPEECH", c.tt.Response[ErrorNoCall].Method)
 				},
 			},
 			{
@@ -4185,8 +4185,8 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a method that is neither SPEECH nor MORSE leaves the default",
 				config: "TTERR NO_CALL FLAGS Some text\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("MORSE", c.tt.response[TT_ERROR_NO_CALL].method)
-					a.Equal("?", c.tt.response[TT_ERROR_NO_CALL].mtext)
+					a.Equal("MORSE", c.tt.Response[ErrorNoCall].Method)
+					a.Equal("?", c.tt.Response[ErrorNoCall].MText)
 					a.Contains(c.output, "must be SPEECH or MORSE")
 				},
 			},
@@ -4196,7 +4196,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a method too long to be an AX.25 address is rejected",
 				config: "TTERR NO_CALL SEMAPHORE Some text\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("?", c.tt.response[TT_ERROR_NO_CALL].mtext)
+					a.Equal("?", c.tt.Response[ErrorNoCall].MText)
 					a.Contains(c.output, "Address is too long")
 				},
 			},
@@ -4204,7 +4204,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing response text leaves the default",
 				config: "TTERR NO_CALL SPEECH\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("?", c.tt.response[TT_ERROR_NO_CALL].mtext)
+					a.Equal("?", c.tt.Response[ErrorNoCall].MText)
 					a.Contains(c.output, "Missing response text")
 				},
 			},
@@ -4221,13 +4221,13 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern and the corners of the grid are stored",
 				config: "TTGRID B2xxyy 37^50.00N 81^00.00W 37^59.99N 81^09.99W\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal(TTLOC_GRID, c.tt.ttlocs[0].ttlocType)
-					a.Equal("B2xxyy", c.tt.ttlocs[0].pattern)
-					a.InDelta(37.8333, c.tt.ttlocs[0].grid.lat0, 0.001)
-					a.InDelta(-81.0, c.tt.ttlocs[0].grid.lon0, 0.001)
-					a.InDelta(37.9998, c.tt.ttlocs[0].grid.lat9, 0.001)
-					a.InDelta(-81.1665, c.tt.ttlocs[0].grid.lon9, 0.001)
+					a.Len(c.tt.Locs, 1)
+					a.Equal(LocGrid, c.tt.Locs[0].Type)
+					a.Equal("B2xxyy", c.tt.Locs[0].Pattern)
+					a.InDelta(37.8333, c.tt.Locs[0].Grid.Lat0, 0.001)
+					a.InDelta(-81.0, c.tt.Locs[0].Grid.Lon0, 0.001)
+					a.InDelta(37.9998, c.tt.Locs[0].Grid.Lat9, 0.001)
+					a.InDelta(-81.1665, c.tt.Locs[0].Grid.Lon9, 0.001)
 				},
 			},
 			{
@@ -4241,7 +4241,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing corner leaves no location and does not eat the next line",
 				config: "TTGRID B2xxyy 42N 71W 43N\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4251,34 +4251,34 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern and its expansion are stored",
 				config: "TTMACRO xxyyy B9xx*AB1yyy\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal(TTLOC_MACRO, c.tt.ttlocs[0].ttlocType)
-					a.Equal("xxyyy", c.tt.ttlocs[0].pattern)
-					a.Equal("B9xx*AB1yyy", c.tt.ttlocs[0].macro.definition)
+					a.Len(c.tt.Locs, 1)
+					a.Equal(LocMacro, c.tt.Locs[0].Type)
+					a.Equal("xxyyy", c.tt.Locs[0].Pattern)
+					a.Equal("B9xx*AB1yyy", c.tt.Locs[0].Macro.Definition)
 				},
 			},
 			{
 				name:   "no TTMACRO means no macros",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 				},
 			},
 			{
 				name:   "a callsign in braces is converted to tones",
 				config: "TTMACRO 911 B9AC{Q1TEST}\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.NotContains(c.tt.ttlocs[0].macro.definition, "{")
-					a.Contains(c.tt.ttlocs[0].macro.definition, "AC")
+					a.Len(c.tt.Locs, 1)
+					a.NotContains(c.tt.Locs[0].Macro.Definition, "{")
+					a.Contains(c.tt.Locs[0].Macro.Definition, "AC")
 				},
 			},
 			{
 				name:   "an object name in braces is converted to tones",
 				config: "TTMACRO 912 B9AA{FIRETRUCK}\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.NotContains(c.tt.ttlocs[0].macro.definition, "{")
+					a.Len(c.tt.Locs, 1)
+					a.NotContains(c.tt.Locs[0].Macro.Definition, "{")
 				},
 			},
 			{
@@ -4292,7 +4292,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern with unusable characters is reported and skipped",
 				config: "TTMACRO 9w1 B9\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "pattern can contain only digits")
 					a.Contains(c.output, "Errors found in TTMACRO, skipping")
 				},
@@ -4308,7 +4308,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing definition does not eat the next line",
 				config: "TTMACRO 911\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4318,9 +4318,9 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "the other name of the same handler asks for MGRS instead",
 				config: "TTMGRS B5xxxyyy 19TCG\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal(TTLOC_MGRS, c.tt.ttlocs[0].ttlocType)
-					a.Equal("19TCG", c.tt.ttlocs[0].mgrs.zone)
+					a.Len(c.tt.Locs, 1)
+					a.Equal(LocMGRS, c.tt.Locs[0].Type)
+					a.Equal("19TCG", c.tt.Locs[0].MGRS.Zone)
 				},
 			},
 		},
@@ -4329,32 +4329,32 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern of six digits' worth of x is stored",
 				config: "TTMHEAD B1xxxxxx\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal(TTLOC_MHEAD, c.tt.ttlocs[0].ttlocType)
-					a.Equal("B1xxxxxx", c.tt.ttlocs[0].pattern)
-					a.Empty(c.tt.ttlocs[0].mhead.prefix)
+					a.Len(c.tt.Locs, 1)
+					a.Equal(LocMHead, c.tt.Locs[0].Type)
+					a.Equal("B1xxxxxx", c.tt.Locs[0].Pattern)
+					a.Empty(c.tt.Locs[0].MHead.Prefix)
 				},
 			},
 			{
 				name:   "no TTMHEAD means no touch tone locations",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 				},
 			},
 			{
 				name:   "a prefix makes up the rest of the digits",
 				config: "TTMHEAD B1xxxxxx 326129\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal("326129", c.tt.ttlocs[0].mhead.prefix)
+					a.Len(c.tt.Locs, 1)
+					a.Equal("326129", c.tt.Locs[0].MHead.Prefix)
 				},
 			},
 			{
 				name:   "a pattern with anything but x after the button is rejected",
 				config: "TTMHEAD B1xxyyxx\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "only lower case x")
 				},
 			},
@@ -4362,7 +4362,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a prefix that is not 4, 6 or 10 digits is rejected",
 				config: "TTMHEAD B1xxxxxx 32612\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "prefix must be 4, 6, or 10 digits")
 				},
 			},
@@ -4370,7 +4370,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a prefix and pattern that do not add up to a locator are rejected",
 				config: "TTMHEAD B1xxxx 3261\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "total of 4, 6, 10, or 12 digits")
 				},
 			},
@@ -4378,7 +4378,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing pattern does not eat the next line",
 				config: "TTMHEAD\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4388,9 +4388,9 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a receive and transmit channel enable the gateway",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nTTOBJ 0 1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(1, c.tt.gateway_enabled)
-					a.Equal(0, c.tt.obj_recv_chan)
-					a.Equal(1, c.tt.obj_xmit_chan)
+					a.Equal(1, c.tt.GatewayEnabled)
+					a.Equal(0, c.tt.ObjRecvChan)
+					a.Equal(1, c.tt.ObjXmitChan)
 					a.Equal(DTMF_DECODE_ON, c.audio.achan[0].dtmf_decode)
 				},
 			},
@@ -4398,31 +4398,31 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "no TTOBJ leaves the gateway off",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(0, c.tt.gateway_enabled)
+					a.Equal(0, c.tt.GatewayEnabled)
 				},
 			},
 			{
 				name:   "APP and IG can be asked for instead of a channel",
 				config: "MYCALL Q1TEST\nTTOBJ 0 APP,IG\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(1, c.tt.obj_send_to_app)
-					a.Equal(1, c.tt.obj_send_to_ig)
-					a.Equal(-1, c.tt.obj_xmit_chan)
+					a.Equal(1, c.tt.ObjSendToApp)
+					a.Equal(1, c.tt.ObjSendToIG)
+					a.Equal(-1, c.tt.ObjXmitChan)
 				},
 			},
 			{
 				name:   "a via path is stored",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nTTOBJ 0 1 WIDE1-1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("WIDE1-1", c.tt.obj_xmit_via)
+					a.Equal("WIDE1-1", c.tt.ObjXmitVia)
 				},
 			},
 			{
 				name:   "an unusable via path is rejected but the rest of the line stands",
 				config: "MYCALL Q1TEST\nACHANNELS 2\nTTOBJ 0 1 WIDE1-1-1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(1, c.tt.gateway_enabled)
-					a.Empty(c.tt.obj_xmit_via)
+					a.Equal(1, c.tt.GatewayEnabled)
+					a.Empty(c.tt.ObjXmitVia)
 					a.Contains(c.output, "invalid via path")
 				},
 			},
@@ -4430,7 +4430,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a receive channel that is not a radio channel is rejected",
 				config: "MYCALL Q1TEST\nTTOBJ 1 0\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(0, c.tt.gateway_enabled)
+					a.Equal(0, c.tt.GatewayEnabled)
 					a.Contains(c.output, "DTMF receive channel 1 is not valid")
 				},
 			},
@@ -4438,7 +4438,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a transmit channel that is not a radio channel is rejected",
 				config: "MYCALL Q1TEST\nTTOBJ 0 1\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(0, c.tt.gateway_enabled)
+					a.Equal(0, c.tt.GatewayEnabled)
 					a.Contains(c.output, "transmit channel 1 is not valid")
 				},
 			},
@@ -4446,7 +4446,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "something that is neither a channel, APP nor IG is rejected",
 				config: "MYCALL Q1TEST\nTTOBJ 0 SOMEWHERE\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(0, c.tt.gateway_enabled)
+					a.Equal(0, c.tt.GatewayEnabled)
 					a.Contains(c.output, "Expected comma separated list")
 				},
 			},
@@ -4454,7 +4454,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing transmit destination does not eat the next line",
 				config: "TTOBJ 0\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(0, c.tt.gateway_enabled)
+					a.Equal(0, c.tt.GatewayEnabled)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4464,26 +4464,26 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern and its position are stored",
 				config: "TTPOINT B01 37^55.37N 81^7.86W\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal(TTLOC_POINT, c.tt.ttlocs[0].ttlocType)
-					a.Equal("B01", c.tt.ttlocs[0].pattern)
-					a.InDelta(37.9228, c.tt.ttlocs[0].point.lat, 0.001)
-					a.InDelta(-81.1310, c.tt.ttlocs[0].point.lon, 0.001)
+					a.Len(c.tt.Locs, 1)
+					a.Equal(LocPoint, c.tt.Locs[0].Type)
+					a.Equal("B01", c.tt.Locs[0].Pattern)
+					a.InDelta(37.9228, c.tt.Locs[0].Point.Lat, 0.001)
+					a.InDelta(-81.1310, c.tt.Locs[0].Point.Lon, 0.001)
 				},
 			},
 			{
 				name:   "no TTPOINT means no touch tone locations",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 				},
 			},
 			{
 				name:   "several points accumulate",
 				config: "TTPOINT B01 37^55.37N 81^7.86W\nTTPOINT B02 42N 71W\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 2)
-					a.Equal("B02", c.tt.ttlocs[1].pattern)
+					a.Len(c.tt.Locs, 2)
+					a.Equal("B02", c.tt.Locs[1].Pattern)
 				},
 			},
 			{
@@ -4491,7 +4491,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern that does not begin with B is reported",
 				config: "TTPOINT C01 42N 71W\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
+					a.Len(c.tt.Locs, 1)
 					a.Contains(c.output, "must begin with upper case 'B'")
 				},
 			},
@@ -4506,7 +4506,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing longitude leaves no location and does not eat the next line",
 				config: "TTPOINT B01 42N\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4516,30 +4516,30 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern of exactly four x is stored",
 				config: "TTSATSQ B2xxxx\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal(TTLOC_SATSQ, c.tt.ttlocs[0].ttlocType)
-					a.Equal("B2xxxx", c.tt.ttlocs[0].pattern)
+					a.Len(c.tt.Locs, 1)
+					a.Equal(LocSatSq, c.tt.Locs[0].Type)
+					a.Equal("B2xxxx", c.tt.Locs[0].Pattern)
 				},
 			},
 			{
 				name:   "no TTSATSQ means no touch tone locations",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 				},
 			},
 			{
 				name:   "the extra button is optional",
 				config: "TTSATSQ Bxxxx\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
+					a.Len(c.tt.Locs, 1)
 				},
 			},
 			{
 				name:   "a pattern with the wrong number of x is rejected",
 				config: "TTSATSQ B2xxx\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "must end with exactly xxxx")
 				},
 			},
@@ -4547,7 +4547,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern that does not begin with B is rejected",
 				config: "TTSATSQ C2xxxx\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "must begin with upper case 'B'")
 				},
 			},
@@ -4555,7 +4555,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing pattern does not eat the next line",
 				config: "TTSATSQ\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4567,29 +4567,29 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a status number and its text are stored",
 				config: "TTSTATUS 2 Emergency\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("Emergency", c.tt.status[2])
+					a.Equal("Emergency", c.tt.Status[2])
 				},
 			},
 			{
 				name:   "the defaults are the standard APRS statuses",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("/enroute", c.tt.status[2])
-					a.Empty(c.tt.status[0])
+					a.Equal("/enroute", c.tt.Status[2])
+					a.Empty(c.tt.Status[0])
 				},
 			},
 			{
 				name:   "the text is the rest of the line, trimmed",
 				config: "TTSTATUS 3   Out for lunch  \n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("Out for lunch", c.tt.status[3])
+					a.Equal("Out for lunch", c.tt.Status[3])
 				},
 			},
 			{
 				name:   "a status number outside 1 to 9 is rejected",
 				config: "TTSTATUS 0 Nothing\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.status[0])
+					a.Empty(c.tt.Status[0])
 					a.Contains(c.output, "must be in range of 1 to 9")
 				},
 			},
@@ -4597,7 +4597,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "an unreadable status number is rejected",
 				config: "TTSTATUS two Emergency\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("/enroute", c.tt.status[2])
+					a.Equal("/enroute", c.tt.Status[2])
 					a.Contains(c.output, "must be in range of 1 to 9")
 				},
 			},
@@ -4605,7 +4605,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing status text leaves the default",
 				config: "TTSTATUS 2\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("/enroute", c.tt.status[2])
+					a.Equal("/enroute", c.tt.Status[2])
 					a.Contains(c.output, "Missing status text")
 				},
 			},
@@ -4623,24 +4623,24 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern and zone square are stored",
 				config: "TTUSNG B5xxxyyy 19TCG\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal(TTLOC_USNG, c.tt.ttlocs[0].ttlocType)
-					a.Equal("B5xxxyyy", c.tt.ttlocs[0].pattern)
-					a.Equal("19TCG", c.tt.ttlocs[0].mgrs.zone)
+					a.Len(c.tt.Locs, 1)
+					a.Equal(LocUSNG, c.tt.Locs[0].Type)
+					a.Equal("B5xxxyyy", c.tt.Locs[0].Pattern)
+					a.Equal("19TCG", c.tt.Locs[0].MGRS.Zone)
 				},
 			},
 			{
 				name:   "no TTUSNG means no touch tone locations",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 				},
 			},
 			{
 				name:   "a pattern with a different number of x and y is rejected",
 				config: "TTUSNG B5xxyyy 19TCG\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "must have 1 to 5 x and same number y")
 				},
 			},
@@ -4648,7 +4648,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a zone square that cannot be converted is rejected",
 				config: "TTUSNG B5xxxyyy 99ZZZ\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "Invalid USNG/MGRS zone & square")
 				},
 			},
@@ -4656,7 +4656,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "anything after the zone square is reported and ignored",
 				config: "TTUSNG B5xxxyyy 19TCG extra\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
+					a.Len(c.tt.Locs, 1)
 					a.Contains(c.output, "Unexpected stuff at end ignored")
 				},
 			},
@@ -4664,7 +4664,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing zone square does not eat the next line",
 				config: "TTUSNG B5xxxyyy\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4674,20 +4674,20 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern, zone, scale and offsets are stored",
 				config: "TTUTM B6xxxyyy 19T 10 300000 4500000\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal(TTLOC_UTM, c.tt.ttlocs[0].ttlocType)
-					a.Equal("B6xxxyyy", c.tt.ttlocs[0].pattern)
-					a.Equal(19, c.tt.ttlocs[0].utm.lzone)
-					a.InDelta(10.0, c.tt.ttlocs[0].utm.scale, 0.001)
-					a.InDelta(300000.0, c.tt.ttlocs[0].utm.x_offset, 0.001)
-					a.InDelta(4500000.0, c.tt.ttlocs[0].utm.y_offset, 0.001)
+					a.Len(c.tt.Locs, 1)
+					a.Equal(LocUTM, c.tt.Locs[0].Type)
+					a.Equal("B6xxxyyy", c.tt.Locs[0].Pattern)
+					a.Equal(19, c.tt.Locs[0].UTM.Zone)
+					a.InDelta(10.0, c.tt.Locs[0].UTM.Scale, 0.001)
+					a.InDelta(300000.0, c.tt.Locs[0].UTM.XOffset, 0.001)
+					a.InDelta(4500000.0, c.tt.Locs[0].UTM.YOffset, 0.001)
 				},
 			},
 			{
 				name:   "no TTUTM means no touch tone locations",
 				config: "MYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 				},
 			},
 			{
@@ -4697,7 +4697,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a zone with no offsets is rejected as unconvertible",
 				config: "TTUTM B6xxxyyy 19T\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "Invalid UTM location")
 				},
 			},
@@ -4705,15 +4705,15 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "the southern hemisphere comes from the latitude band",
 				config: "TTUTM B6xxxyyy 19H 10 300000 4500000\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal('S', c.tt.ttlocs[0].utm.hemi)
+					a.Len(c.tt.Locs, 1)
+					a.Equal('S', c.tt.Locs[0].UTM.Hemi)
 				},
 			},
 			{
 				name:   "a pattern that does not begin with B leaves no location",
 				config: "TTUTM C6xxxyyy 19T 10 300000 4500000\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "must begin with upper case 'B'")
 				},
 			},
@@ -4721,7 +4721,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "an unreadable scale leaves no location",
 				config: "TTUTM B6xxxyyy 19T ten 300000 4500000\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "Invalid scale")
 				},
 			},
@@ -4729,7 +4729,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing zone does not eat the next line",
 				config: "TTUTM B6xxxyyy\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -4739,11 +4739,11 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a pattern, origin and scale are stored, with the scale in metres",
 				config: "TTVECTOR B5bbbddd 37^55.37N 81^7.86W 0.01 mi\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.Equal(TTLOC_VECTOR, c.tt.ttlocs[0].ttlocType)
-					a.Equal("B5bbbddd", c.tt.ttlocs[0].pattern)
-					a.InDelta(37.9228, c.tt.ttlocs[0].vector.lat, 0.001)
-					a.InDelta(16.09344, c.tt.ttlocs[0].vector.scale, 0.001)
+					a.Len(c.tt.Locs, 1)
+					a.Equal(LocVector, c.tt.Locs[0].Type)
+					a.Equal("B5bbbddd", c.tt.Locs[0].Pattern)
+					a.InDelta(37.9228, c.tt.Locs[0].Vector.Lat, 0.001)
+					a.InDelta(16.09344, c.tt.Locs[0].Vector.Scale, 0.001)
 				},
 			},
 			{
@@ -4757,8 +4757,8 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "an unrecognised unit falls back to miles",
 				config: "TTVECTOR B5bbbddd 42N 71W 1 furlongs\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Len(c.tt.ttlocs, 1)
-					a.InDelta(1609.344, c.tt.ttlocs[0].vector.scale, 0.001)
+					a.Len(c.tt.Locs, 1)
+					a.InDelta(1609.344, c.tt.Locs[0].Vector.Scale, 0.001)
 					a.Contains(c.output, "Unrecognized unit")
 				},
 			},
@@ -4766,7 +4766,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "an unreadable scale leaves no location",
 				config: "TTVECTOR B5bbbddd 42N 71W wide mi\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Contains(c.output, "Invalid scale")
 				},
 			},
@@ -4774,7 +4774,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				name:   "a missing unit leaves no location and does not eat the next line",
 				config: "TTVECTOR B5bbbddd 42N 71W 0.01\nMYCALL Q1TEST\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Empty(c.tt.ttlocs)
+					a.Empty(c.tt.Locs)
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
@@ -5457,8 +5457,8 @@ func TestConfigLooksSymbolsUpInTheTableItIsGiven(t *testing.T) {
 		"PBEACON delay=1 every=30 symbol=\"ambulance\"\n", table)
 
 	assert.Equal(t, []string{"fire truck", "ambulance"}, table.descriptions)
-	require.Len(t, c.tt.ttlocs, 1)
-	assert.Contains(t, c.tt.ttlocs[0].macro.definition, "</!>")
+	require.Len(t, c.tt.Locs, 1)
+	assert.Contains(t, c.tt.Locs[0].Macro.Definition, "</!>")
 	require.Equal(t, 1, c.misc.num_beacons)
 	assert.Equal(t, byte('/'), c.misc.beacon[0].symtab)
 	assert.Equal(t, byte('!'), c.misc.beacon[0].symbol)
