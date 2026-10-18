@@ -48,6 +48,15 @@ func Test_remove_checksum(t *testing.T) {
 			wantResult:  "",
 		},
 		{
+			// The checksum is over bytes, so a byte that isn't valid UTF-8
+			// counts as itself rather than as U+FFFD (issue #1019).
+			name:        "byte of 0x80 or above",
+			sent:        "$GPRMC,\xc0*A7",
+			wantErr:     false,
+			wantResult:  "$GPRMC,\xc0",
+			errContains: "",
+		},
+		{
 			name:        "wrong checksum",
 			sent:        "$GPRMC,001431.00,V,,,,,,,121015,,,N*00",
 			wantErr:     true,

@@ -31,6 +31,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/cm108"
@@ -356,7 +357,7 @@ var units = []*units_s{
 
 func alldigits(p string) bool {
 	return !strings.ContainsFunc(p, func(r rune) bool {
-		return !unicode.IsDigit(r)
+		return !ascii.IsDigit(r)
 	})
 }
 
@@ -364,7 +365,7 @@ func alldigits(p string) bool {
 
 func alllettersorpm(p string) bool {
 	return !strings.ContainsFunc(p, func(r rune) bool {
-		return !unicode.IsLetter(r) && r != '+' && r != '-'
+		return !ascii.IsAlpha(r) && r != '+' && r != '-'
 	})
 }
 
@@ -427,11 +428,11 @@ func parse_ll_maybe(str string, which parse_ll_which_e, line int) (maybe.Maybe[f
 	if len(stemp) >= 2 {
 		var lastChar = rune(stemp[len(stemp)-1])
 
-		if unicode.IsLetter(lastChar) {
+		if ascii.IsAlpha(lastChar) {
 			var hemi = lastChar
 			stemp = stemp[:len(stemp)-1]
 
-			hemi = unicode.ToUpper(hemi)
+			hemi = ascii.ToUpper(hemi)
 
 			if hemi == 'W' || hemi == 'S' {
 				sign = -sign
@@ -559,7 +560,7 @@ func parse_utm_zone(szone string) (rune, rune, int, error) {
 	var hemi = 'N' /* default */
 
 	var lastRune = rune(szone[len(szone)-1])
-	if unicode.IsLetter(lastRune) {
+	if ascii.IsAlpha(lastRune) {
 		szone = szone[:len(szone)-1]
 	} else {
 		lastRune = 0
@@ -576,7 +577,7 @@ func parse_utm_zone(szone string) (rune, rune, int, error) {
 			lzone = (-lzone)
 		}
 	} else {
-		lastRune = unicode.ToUpper(lastRune)
+		lastRune = ascii.ToUpper(lastRune)
 
 		latband = lastRune
 		if strings.ContainsRune("CDEFGHJKLMNPQRSTUVWX", lastRune) {
@@ -2558,11 +2559,11 @@ func (ps *parseState) oldStyleModem(t string) error {
 	t = ps.split(false)
 	if t != "" {
 		/* Look for some combination of letter(s) and + */
-		if unicode.IsLetter(rune(t[0])) || t[0] == '+' {
+		if ascii.IsAlpha(t[0]) || t[0] == '+' {
 			/* Here we only catch something other than letters and + mixed in. */
 			/* Later, we check for valid letters and no more than one letter if + specified. */
 			if strings.ContainsFunc(t, func(r rune) bool {
-				return !unicode.IsLetter(r) && r != '+' && r != '-'
+				return !ascii.IsAlpha(r) && r != '+' && r != '-'
 			}) {
 				ps.errorf("line %d: Demodulator type can only contain letters and + character", ps.line)
 			}
@@ -4127,7 +4128,7 @@ func handleTTPOINT(ps *parseState) error {
 	}
 
 	for _, j := range t[1:] {
-		if !unicode.IsDigit(j) {
+		if !ascii.IsDigit(j) {
 			ps.errorf("line %d: TTPOINT pattern must be B and digits only", ps.line)
 		}
 	}
@@ -4950,7 +4951,7 @@ func handleTTOBJ(ps *parseState) error {
 				/* Check for legacy compact form like "APPIG" or "AIG" accepted by the old parser. */
 				var isLegacy = true
 				for _, c := range part {
-					if !unicode.IsDigit(c) && !strings.ContainsRune("aApPiIgG", c) {
+					if !ascii.IsDigit(c) && !strings.ContainsRune("aApPiIgG", c) {
 						isLegacy = false
 
 						break
@@ -4963,7 +4964,7 @@ func handleTTOBJ(ps *parseState) error {
 							app = 1
 						case c == 'i' || c == 'I':
 							ig = 1
-						case unicode.IsDigit(c):
+						case ascii.IsDigit(c):
 							x = int(c - '0')
 							if x < 0 || x > MAX_TOTAL_CHANS-1 {
 								ps.errorf("config file: Transmit channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
@@ -5869,7 +5870,7 @@ func handleWAYPOINT(ps *parseState) error {
 
 	t = ps.split(true)
 	for _, c := range t {
-		switch unicode.ToUpper(c) {
+		switch ascii.ToUpper(c) {
 		case 'N':
 			ps.misc.waypoint_formats |= waypoint.FormatNMEAGeneric
 		case 'G':
@@ -6570,7 +6571,7 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) er
 			/* Defer processing in case overlay appears later. */
 			temp_symbol = value
 		} else if strings.EqualFold(keyword, "OVERLAY") {
-			if len(value) == 1 && (unicode.IsUpper(rune(value[0])) || unicode.IsDigit(rune(value[0]))) {
+			if len(value) == 1 && (ascii.IsUpper(value[0]) || ascii.IsDigit(value[0])) {
 				b.symtab = value[0]
 			} else {
 				ps.errorf("config file: Overlay must be one character in range of 0-9 or A-Z, upper case only, on line %d", ps.line)
@@ -6675,10 +6676,10 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) er
 	 */
 	if len(temp_symbol) > 0 {
 		if len(temp_symbol) == 2 &&
-			(temp_symbol[0] == '/' || temp_symbol[0] == '\\' || unicode.IsUpper(rune(temp_symbol[0])) || unicode.IsDigit(rune(temp_symbol[0]))) &&
+			(temp_symbol[0] == '/' || temp_symbol[0] == '\\' || ascii.IsUpper(temp_symbol[0]) || ascii.IsDigit(temp_symbol[0])) &&
 			temp_symbol[1] >= '!' && temp_symbol[1] <= '~' {
 			/* Explicit table and symbol. */
-			if unicode.IsUpper(rune(b.symtab)) || unicode.IsDigit(rune(b.symtab)) {
+			if ascii.IsUpper(b.symtab) || ascii.IsDigit(b.symtab) {
 				b.symbol = temp_symbol[1]
 			} else {
 				b.symtab = temp_symbol[0]

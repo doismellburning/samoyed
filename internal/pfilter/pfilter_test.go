@@ -111,6 +111,55 @@ func Test_pfilter_validate(t *testing.T) {
 	})
 }
 
+// Any ASCII punctuation separates a filter's type letter from its patterns,
+// as C's ispunct has it.  That takes in symbols such as '+' and '$', which
+// unicode.IsPunct leaves out (issue #1019).
+func Test_pfilter_separator(t *testing.T) {
+	t.Parallel()
+
+	var packetFilter = New(0, aprs.NewDecoderFromDataFiles(), nil, 0)
+
+	var pp = ax25.FromText("Q1TEST>APDW17:>Status", true)
+	require.NotNil(t, pp)
+
+	for _, filter := range []string{"b/Q1TEST", "b+Q2TEST+Q1TEST", "b$Q1TEST", "b~Q1TEST"} {
+		var result, err = packetFilter.Filter(0, 0, filter, pp, true)
+
+		require.NoError(t, err, "filter %q", filter)
+		assert.Equal(t, 1, result, "filter %q", filter)
+	}
+}
+
+// A filter is compared with the packet byte for byte, as Dire Wolf does it,
+// so a byte of 0x80 or above in an object name is matched by the same byte
+// in the filter rather than turned into U+FFFD on the way (issue #1019).
+func Test_pfilter_high_byte_object_name(t *testing.T) {
+	t.Parallel()
+
+	var packetFilter = New(0, aprs.NewDecoderFromDataFiles(), nil, 0)
+
+	var pp = ax25.FromText("Q1TEST>APDW17:;home\xc0    *111111z4237.14N/07120.83W-", true)
+	require.NotNil(t, pp)
+
+	var result, err = packetFilter.Filter(0, 0, "o/home\xc0", pp, true)
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, result)
+}
+
+// A symbol filter takes printable ASCII, and an overlay only an upper case
+// letter or digit.  'À' and '٣' are neither, though the unicode package takes
+// them for a printable upper case letter and a digit (issue #1019).
+func Test_pfilter_symbol_non_ascii(t *testing.T) {
+	t.Parallel()
+
+	for _, filter := range []string{"s/À", "s//À", "s/#/#/À", "s/#/#/٣", "s/\xc0"} {
+		require.Error(t, pfilter_validate(0, 0, filter, true), "filter %q", filter)
+	}
+
+	assert.NoError(t, pfilter_validate(0, 0, "s/#/#/A1", true))
+}
+
 // heardPosition is the position the stations-heard list records for a decoded
 // packet, as internal/direwolf's mheardPosition decides it: its location if it
 // is a position report, and nothing otherwise.

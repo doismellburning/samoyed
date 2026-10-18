@@ -29,6 +29,7 @@ func TestToTones(t *testing.T) {
 		{'A', '#', "AB0032A"}, // A is the first letter on the 2 key
 		{'S', '#', "AB0037D"}, // S is the fourth letter on the 7 key
 		{'9', '#', "AB0039"},  // A digit is its own key
+		{0xc0, '#', "AB203"},  // Not an overlay, though unicode.IsUpper takes it for À
 	} {
 		assert.Equal(t, tc.want, sd.ToTones(tc.symtab, tc.symbol), "%c%c", tc.symtab, tc.symbol)
 	}
@@ -63,6 +64,7 @@ func TestFromDestOrSrc(t *testing.T) {
 		{"GPSEnn", '!', "Q1TEST", "GPSE01", '\\', '!', true},
 		{"GPSxy in the primary table", '!', "Q1TEST", "GPSBL", '/', '+', true},
 		{"GPSxyz with a lower case overlay", '!', "Q1TEST", "GPSODa", '\\', '#', true},
+		{"GPSxyz with a high byte overlay", '!', "Q1TEST", "GPSOD\xc0", '\\', '#', true},
 		{"unknown xy", '!', "Q1TEST", "GPS???", 0, 0, false},
 		{"too short for xy", '!', "Q1TEST", "GPS", 0, 0, false},
 		{"Mic-E", '`', "Q1TEST", "GPSC43", 0, 0, false},
@@ -78,6 +80,24 @@ func TestFromDestOrSrc(t *testing.T) {
 			assert.Equal(t, string(tc.wantSymbol), string(symbol))
 		})
 	}
+}
+
+// Only upper case letters and digits are overlays.  A byte of 0x80 or above
+// is not, though unicode.IsUpper takes 0xC0 for À (issue #1019).
+func TestHighByteIsNotAnOverlay(t *testing.T) {
+	t.Parallel()
+
+	var sd = New()
+
+	var dest, ok = sd.IntoDest(0xc0, '#')
+	assert.False(t, ok)
+	assert.Equal(t, "GPS???", dest)
+
+	assert.Equal(t, sd.Description('?', '#'), sd.Description(0xc0, '#'))
+
+	var symtab, _, found = sd.CodeFromDescription(0xc0, "digi")
+	assert.True(t, found)
+	assert.NotEqual(t, byte(0xc0), symtab)
 }
 
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.

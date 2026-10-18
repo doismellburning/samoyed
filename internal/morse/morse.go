@@ -12,8 +12,8 @@ package morse
 
 import (
 	"math"
-	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/sirupsen/logrus"
 )
 
@@ -138,8 +138,9 @@ func Send(out SampleSink, sampleRate int, amplitude int, str string, wpm int, tx
 
 	quietMs(out, txdelay)
 
-	for strIdx, p := range str {
-		var i = morse_lookup(p)
+	// A byte at a time, as morse_units_str counts them.
+	for strIdx, p := range []byte(str) {
+		var i = morse_lookup(rune(p))
 		if i >= 0 {
 			var enc = MORSE[i].enc
 			for encIdx, e := range enc {
@@ -299,9 +300,7 @@ func quietMs(out SampleSink, ms int) {
  *--------------------------------------------------------------------*/
 
 func morse_lookup(ch rune) int {
-	if unicode.IsLower(ch) {
-		ch = unicode.ToUpper(ch)
-	}
+	ch = ascii.ToUpper(ch)
 
 	for i, m := range MORSE {
 		if ch == m.ch {
@@ -374,8 +373,8 @@ func morse_units_ch(ch rune) int {
 func morse_units_str(str string) int {
 	var units = (len(str) - 1) * 3
 
-	for _, k := range str {
-		units += morse_units_ch(k)
+	for _, k := range []byte(str) {
+		units += morse_units_ch(rune(k))
 	}
 
 	return (units)

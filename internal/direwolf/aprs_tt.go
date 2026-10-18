@@ -34,6 +34,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/coordconvutil"
 	"github.com/doismellburning/samoyed/internal/dwcore"
@@ -800,7 +801,7 @@ func checksum_not_ok(str string, length int, found rune) int {
 	var sum = 0
 
 	for _, c := range str {
-		if unicode.IsDigit(c) {
+		if ascii.IsDigit(c) {
 			sum += int(c - '0')
 		} else if c >= 'A' && c <= 'D' {
 			sum += int(c-'A') + 10
@@ -880,7 +881,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 	if (length == 6 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) &&
 		unicode.IsDigit(rune(e[4])) && unicode.IsDigit(rune(e[5]))) ||
 		(length == 7 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) &&
-			unicode.IsDigit(rune(e[4])) && unicode.IsUpper(rune(e[5])) && unicode.IsDigit(rune(e[6]))) {
+			ascii.IsDigit(e[4]) && ascii.IsUpper(e[5]) && ascii.IsDigit(e[6])) {
 		var cs_err = checksum_not_ok(e[1:length-1], length-2, rune(e[length-1]))
 
 		if cs_err != 0 {
@@ -934,7 +935,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			return (cs_err)
 		}
 
-		if unicode.IsUpper(rune(e[length-2])) {
+		if ascii.IsUpper(e[length-2]) {
 			var callsign, callOK = twoKeyCallsign(e[1 : length-3])
 			if !callOK {
 				return (TT_ERROR_INVALID_CALL)
@@ -1408,7 +1409,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			var y, _ = strconv.ParseFloat(ystr, 64)
 			var northing = y*float64(g.config.ttlocs[ipat].utm.scale) + float64(g.config.ttlocs[ipat].utm.y_offset)
 
-			if unicode.IsLetter(g.config.ttlocs[ipat].utm.latband) {
+			if ascii.IsAlpha(g.config.ttlocs[ipat].utm.latband) {
 				state.locText = fmt.Sprintf("%d%c %.0f %.0f", g.config.ttlocs[ipat].utm.lzone, g.config.ttlocs[ipat].utm.latband, easting, northing)
 			} else if g.config.ttlocs[ipat].utm.latband == '-' {
 				state.locText = fmt.Sprintf("%d %.0f %.0f", -g.config.ttlocs[ipat].utm.lzone, easting, northing)

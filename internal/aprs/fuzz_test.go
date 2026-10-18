@@ -73,6 +73,12 @@ func FuzzDecodeAPRS(f *testing.F) {
 	f.Add("Q1TEST>APDW17:!4903.50N/07201.75W-146.520MHz C100 -060 R25m!w\"<!")
 	f.Add("Q1TEST>APDW17:}Q2TEST>APDW17,TCPIP,Q1TEST*:>IO91SX/G Status")
 
+	// A byte of 0x80 or above where the decoder wants an upper case
+	// symbol table overlay or a printable data type indicator (issue #1019).
+	f.Add("Q1TEST>APDW17:`(_fn\"Oj\xc0")
+	f.Add("Q1TEST>APDW17:!\xc05L!!<*e7>7P[")
+	f.Add("Q1TEST>APDW17:\xa1Hello")
+
 	f.Fuzz(func(t *testing.T, monitor string) {
 		var pp = ax25.FromTextWithStrictness(monitor, ax25.AddrLenient)
 		if pp == nil {

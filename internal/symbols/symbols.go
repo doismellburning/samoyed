@@ -19,6 +19,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/sirupsen/logrus"
@@ -310,7 +311,7 @@ func New() *Data {
 
 	var GOOD_LINE = func(x string) bool {
 		return (len(x) > 6 &&
-			(x[COL1_OVERLAY] == '/' || x[COL1_OVERLAY] == '\\' || unicode.IsUpper(rune(x[COL1_OVERLAY])) || unicode.IsDigit(rune(x[COL1_OVERLAY]))) &&
+			(x[COL1_OVERLAY] == '/' || x[COL1_OVERLAY] == '\\' || ascii.IsUpper(x[COL1_OVERLAY]) || ascii.IsDigit(x[COL1_OVERLAY])) &&
 			x[COL2_SYMBOL] >= '!' &&
 			x[COL2_SYMBOL] <= '~' &&
 			x[COL3_SP] == ' ' &&
@@ -435,7 +436,7 @@ func (sd *Data) List() {
 				pt[index].xy, ' ',
 				index, tones,
 				s.description)
-		} else if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
+		} else if ascii.IsUpper(overlay) || ascii.IsDigit(overlay) {
 			if index >= len(at) {
 				warnOutOfRange(overlay, symbol, index, "alternate")
 
@@ -587,7 +588,7 @@ func (sd *Data) FromDestOrSrc(dti byte, src string, dest string) (byte, byte, bo
 			for nn := 1; nn <= 94; nn++ {
 				if xy == at[nn].xy {
 					var symtab byte = '\\' // Alternate
-					if unicode.IsUpper(rune(z)) || unicode.IsDigit(rune(z)) {
+					if ascii.IsUpper(z) || ascii.IsDigit(z) {
 						symtab = z
 					}
 
@@ -657,7 +658,7 @@ func (sd *Data) IntoDest(symtab byte, symbol byte) (string, bool) {
 	} else if symbol >= '!' && symbol <= '~' && symtab == '\\' {
 		/* Alternate Symbol table. */
 		return fmt.Sprintf("GPSE%02d", symbol-' '), true
-	} else if symbol >= '!' && symbol <= '~' && (unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab))) {
+	} else if symbol >= '!' && symbol <= '~' && (ascii.IsUpper(symtab) || ascii.IsDigit(symtab)) {
 		/* Alternate Symbol table with overlay. */
 		var at = alternateSymtab()
 
@@ -702,7 +703,7 @@ func (sd *Data) Description(symtab byte, symbol byte) string {
 	if symtab != '/' &&
 		symtab != '\\' &&
 		!unicode.IsDigit(rune(symtab)) &&
-		!unicode.IsUpper(rune(symtab)) {
+		!ascii.IsUpper(symtab) {
 		logrus.WithField("symtab", string(symtab)).
 			Error("Symbol table identifier is not '/' (primary), '\\' (alternate), or valid overlay character.")
 
@@ -777,7 +778,7 @@ func (sd *Data) CodeFromDescription(overlay byte, description string) (byte, byt
 
 	var at = alternateSymtab()
 
-	if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
+	if ascii.IsUpper(overlay) || ascii.IsDigit(overlay) {
 		for j, s := range at {
 			if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
 				return overlay, byte(j + ' '), true
@@ -847,7 +848,7 @@ func (sd *Data) CodeFromDescription(overlay byte, description string) (byte, byt
 func (sd *Data) ToTones(symtab byte, symbol byte) string {
 	if symtab == '/' {
 		return fmt.Sprintf("AB1%02d", symbol-' ')
-	} else if unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab)) {
+	} else if ascii.IsUpper(symtab) || ascii.IsDigit(symtab) {
 		var tt, _ = touchtone.TextToTwoKey(string(symtab), false)
 
 		return fmt.Sprintf("AB0%02d%s", symbol-' ', tt)

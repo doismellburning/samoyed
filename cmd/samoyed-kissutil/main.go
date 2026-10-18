@@ -29,6 +29,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
@@ -311,7 +312,7 @@ func process_input(stuff string) {
 	 * Lower case is a command (e.g.  Persistence or set Hardware).
 	 * Anything else, print explanation of what is expected.
 	 */
-	if unicode.IsUpper(rune(stuff[0])) || unicode.IsNumber(rune(stuff[0])) {
+	if ascii.IsUpper(stuff[0]) || ascii.IsDigit(stuff[0]) {
 		// Parse the "TNC2 monitor format" and convert to AX.25 frame.
 		var pp = ax25.FromText(stuff, true)
 		if pp != nil {
@@ -320,7 +321,7 @@ func process_input(stuff string) {
 		} else {
 			fmt.Printf("ERROR! Could not convert to AX.25 frame: %s\n", stuff)
 		}
-	} else if unicode.IsLower(rune(stuff[0])) {
+	} else if ascii.IsLower(stuff[0]) {
 		switch stuff[0] {
 		case 'd': // txDelay, 10ms units
 			var value = parse_number(stuff[1:], defaultTXDelay)

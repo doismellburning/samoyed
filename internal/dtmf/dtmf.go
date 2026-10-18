@@ -20,8 +20,8 @@ import (
 	"iter"
 	"math"
 	"strings"
-	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/phy"
@@ -286,7 +286,7 @@ func buttonSamples(button rune, ms int, sampleRate int) iter.Seq[float64] {
 	return func(yield func(float64) bool) {
 		var fa, fb int
 
-		var i = strings.IndexRune(dtmfKeys, unicode.ToUpper(button))
+		var i = strings.IndexRune(dtmfKeys, ascii.ToUpper(button))
 		if i >= 0 {
 			var tones = dtmfTones()
 

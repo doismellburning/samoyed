@@ -44,8 +44,9 @@ func Send(out SampleSink, sampleRate int, amplitude int, str string, speed int, 
 
 	pushButton(out, sampleRate, amplitude, ' ', txdelay)
 
-	for _, p := range str {
-		pushButton(out, sampleRate, amplitude, p, len_ms)
+	// A byte at a time, as Duration counts them.
+	for _, p := range []byte(str) {
+		pushButton(out, sampleRate, amplitude, rune(p), len_ms)
 		pushButton(out, sampleRate, amplitude, ' ', len_ms)
 	}
 
