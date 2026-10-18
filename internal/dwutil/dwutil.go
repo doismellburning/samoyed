@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os/exec"
 	"runtime"
 	"strings"
 	"time"
@@ -158,4 +159,27 @@ func CloseOnDone(ctx context.Context, c io.Closer) func() {
 			_ = c.Close()
 		}
 	}
+}
+
+// RunCmd runs cmd and returns what it writes to standard output.  It runs cmd
+// directly, not through a shell, so cmd names the program and nothing more.
+//
+// oneline 0 leaves cmd as it is; 1 turns any CR, LF or TAB in it into a space;
+// 2 also trims the whitespace from either end.
+//
+// TODO: Dire Wolf's dw_run_cmd ran cmd through a shell and tidied its output
+// this way, not the command, so a script's trailing newline didn't reach the
+// beacon comment or audible response it makes.
+func RunCmd(ctx context.Context, cmd string, oneline int) ([]byte, error) {
+	if oneline > 0 {
+		cmd = strings.ReplaceAll(cmd, "\r", " ")
+		cmd = strings.ReplaceAll(cmd, "\n", " ")
+		cmd = strings.ReplaceAll(cmd, "\t", " ")
+	}
+
+	if oneline > 1 {
+		cmd = strings.TrimSpace(cmd)
+	}
+
+	return exec.CommandContext(ctx, cmd).Output()
 }

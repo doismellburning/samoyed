@@ -4,12 +4,14 @@
 package dwutil
 
 import (
+	"os/exec"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAssert(t *testing.T) {
@@ -94,4 +96,25 @@ func TestLogHexDumpBelowLevel(t *testing.T) {
 	LogHexDump(logrus.NewEntry(logger), logrus.DebugLevel, []byte("Q1TEST"))
 
 	assert.Empty(t, hook.AllEntries())
+}
+
+func TestRunCmd(t *testing.T) {
+	t.Parallel()
+
+	var truePath, err = exec.LookPath("true")
+	if err != nil {
+		t.Skip("no true command available")
+	}
+
+	// "true" prints nothing; the trailing newline goes with oneline 2.
+	var out, runErr = RunCmd(t.Context(), truePath+"\n", 2)
+	require.NoError(t, runErr)
+	assert.Empty(t, out)
+}
+
+func TestRunCmdMissingCommand(t *testing.T) {
+	t.Parallel()
+
+	var _, err = RunCmd(t.Context(), "/nonexistent/q1test-cmd", 0)
+	assert.Error(t, err)
 }
