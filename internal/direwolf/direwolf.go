@@ -775,7 +775,7 @@ x = Silence FX.25 information.`)
 	igate.start(ctx)
 
 	if webServer != nil {
-		webui_start(ctx, webServer, webStatus(started, igate))
+		webui_start(ctx, webServer, webStatus(started, igate, netromNode))
 	}
 	stopIfCancelled(ctx, td)
 	var connectedDigipeater = digipeater.NewConnected(digipeaterPorts, &cdigi_config, packetFilter, transmitQueue.Append)

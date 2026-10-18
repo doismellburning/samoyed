@@ -308,6 +308,7 @@ The **Dashboard** tab shows each channel's callsign
 and its received and transmitted packet counts,
 how the IGate's connection to APRS-IS stands, if the station is an IGate,
 with how many packets it has passed up, received and gated to radio,
+the NET/ROM node's neighbours, routes and circuits, if it runs one,
 the stations heard in the last two hours,
 and packets as they arrive, with a filter and a pause button.
 The **Map** tab plots every station and APRS object that has sent a position;
@@ -563,6 +564,12 @@ and is closed if that client disconnects from the AGW port.
 ``test-scripts/check-netrom-connect`` starts two nodes on cross-wired UDP audio
 and drives a circuit between them in both directions,
 and doubles as a worked example of the AGW side.
+
+With :ref:`the web interface <how-to-guides:Watch a station in a web browser>` on,
+its dashboard shows the node's neighbours and whether the link to each is up,
+its routes with their quality and obsolescence count,
+and the circuits open through it;
+NET/ROM frames in its packet list read as they do in the monitor output.
 
 Running a node over AXUDP
 ~~~~~~~~~~~~~~~~~~~~~~~~~

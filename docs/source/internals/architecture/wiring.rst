@@ -98,6 +98,7 @@ Dashed arrows are connections made after construction rather than at it.
        igate -> tq [label="Append\n(dwcore.FrameSender)"];
        digi -> igate [label="rememberDigipeated"];
        web -> igate [label="webStatus\n(at Start)", style=dashed];
+       web -> netrom [label="webStatus\n(at Start)", style=dashed];
        digi -> tq [label="Append"];
        cdigi -> tq [label="Append"];
 
@@ -238,13 +239,14 @@ It binds its ports when it is made, though,
 so a port already in use is reported before the service starts,
 rather than once it is running.
 
-**The web interface and the IGate.**
+**The web interface, the IGate and the NET/ROM node.**
 The web interface's hub is handed to the transmit service and the received packet handler,
 which are made before the IGate,
-and its status page reports on the IGate's connection to APRS-IS.
+and its status page reports on the IGate's connection to APRS-IS
+and on the NET/ROM node's neighbours, routes and circuits.
 The hub and the server are made, and the port bound, before either;
 the server is handed the station's status (``webStatus``) when it is started (``webui.Server.Start``),
-once the IGate exists.
+once the IGate and the NET/ROM node exist.
 
 **The AGW server and the NET/ROM node.**
 The NET/ROM node tells the AGW clients about their circuits,
@@ -309,7 +311,8 @@ References
   ``digipeater.go`` (``New``, ``Port``)
   and ``cdigipeater.go`` (``NewConnected``).
 - ``internal/node/node.go``: ``New``, ``DataLink``.
-- ``internal/netrom/node.go``: ``New``, ``DataLink``, ``Reporter``, ``Node.Start``, ``Node.HeardUI``.
+- ``internal/netrom/node.go``: ``New``, ``DataLink``, ``Reporter``, ``Node.Start``, ``Node.HeardUI``,
+  and ``internal/netrom/status.go``: ``Node.Status``.
 - ``internal/nodemap/nodemap.go``: ``New``, ``Reporter.Run``.
 - ``internal/dwcore/dwcore.go``: ``FrameSender``,
   shared by everything that hands the transmit queue a frame.

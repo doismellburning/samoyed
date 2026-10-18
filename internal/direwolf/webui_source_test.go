@@ -10,6 +10,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -154,4 +155,53 @@ func TestWebIGateStatus(t *testing.T) {
 	want.ConnectedAt = maybe.Nothing[time.Time]()
 
 	assert.Equal(t, maybe.Just(want), webIGateStatus(ig))
+}
+
+// The web interface is told about the NET/ROM node, if there is one, as the
+// node sees itself.
+func TestWebNetROMStatus(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, maybe.Nothing[webui.NetROMStatus](), webNetROMStatus(nil))
+
+	var config = netrom.DefaultConfig()
+	config.Callsign = "Q1TEST-7"
+	config.Alias = "QNODEA"
+
+	var node = netrom.New(config, new(recordingAGWDataLink), func(int, int, *ax25.Packet) {}, new(recordingReporter), netrom.RealClock{}, netromClient)
+
+	var want webui.NetROMStatus
+	want.Callsign = "Q1TEST-7"
+	want.Alias = "QNODEA"
+	want.Neighbours = []webui.NetROMNeighbour{}
+	want.Destinations = []webui.NetROMDestination{}
+	want.Circuits = []webui.NetROMCircuit{}
+
+	assert.Equal(t, maybe.Just(want), webNetROMStatus(node), "lists that are empty, not missing")
+
+	var nodes = ax25.FromText("Q2TEST-7>NODES:x", true)
+	require.NotNil(t, nodes)
+	nodes.SetPID(ax25.PIDNetROM)
+	nodes.SetInfo(append([]byte{0xFF}, "QNODEB"...))
+	node.HeardUI(0, nodes)
+
+	require.True(t, node.Connect(0, 1, "Q1TEST", "QNODEB", ax25.PIDNetROM))
+
+	want.Neighbours = []webui.NetROMNeighbour{{Callsign: "Q2TEST-7", Link: "connecting", Failures: 0, Failing: false}}
+	want.Destinations = []webui.NetROMDestination{{
+		Callsign: "Q2TEST-7",
+		Alias:    "QNODEB",
+		Routes:   []webui.NetROMRoute{{Neighbour: "Q2TEST-7", Quality: int(netrom.DefaultQuality), Obsolescence: 6}},
+	}}
+	want.Circuits = []webui.NetROMCircuit{{
+		OwnCall:     "Q1TEST",
+		RemoteCall:  "QNODEB",
+		RemoteNode:  "Q2TEST-7",
+		User:        "Q1TEST",
+		Incoming:    false,
+		State:       "connecting",
+		Outstanding: 0,
+	}}
+
+	assert.Equal(t, maybe.Just(want), webNetROMStatus(node))
 }

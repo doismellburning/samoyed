@@ -15,6 +15,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/sirupsen/logrus"
@@ -63,13 +64,15 @@ func webui_start(ctx context.Context, server *webui.Server, status webui.StatusF
 }
 
 // webStatus reports the station's own state to the web interface: started is
-// when it started, and ig its IGate.
-func webStatus(started time.Time, ig *IGate) webui.StatusFunc {
+// when it started, ig its IGate and node its NET/ROM node, either of which may
+// be nil.
+func webStatus(started time.Time, ig *IGate, node *netrom.Node) webui.StatusFunc {
 	return func() webui.Status {
 		var s webui.Status
 		s.Version = version.Version
 		s.Started = started
 		s.IGate = webIGateStatus(ig)
+		s.NetROM = webNetROMStatus(node)
 
 		return s
 	}
@@ -171,6 +174,65 @@ func webIGateStatus(ig *IGate) maybe.Maybe[webui.IGateStatus] {
 	s.DownlinkPackets = snap.stats.downlinkPackets
 	s.DownlinkBytes = snap.stats.downlinkBytes
 	s.RFPackets = snap.stats.rfXmitPackets
+
+	return maybe.Just(s)
+}
+
+// webNetROMStatus describes node for the web interface, or Nothing if there
+// is no NET/ROM node.
+func webNetROMStatus(node *netrom.Node) maybe.Maybe[webui.NetROMStatus] {
+	if node == nil {
+		return maybe.Nothing[webui.NetROMStatus]()
+	}
+
+	var status = node.Status()
+
+	var s webui.NetROMStatus
+	s.Channel = status.Channel
+	s.Callsign = status.Callsign
+	s.Alias = status.Alias
+
+	// Empty rather than nil, so that the page gets a list either way.
+	s.Neighbours = make([]webui.NetROMNeighbour, 0, len(status.Neighbours))
+	for _, n := range status.Neighbours {
+		s.Neighbours = append(s.Neighbours, webui.NetROMNeighbour{
+			Callsign: n.Callsign,
+			Link:     n.Link,
+			Failures: n.Failures,
+			Failing:  n.Failing,
+		})
+	}
+
+	s.Destinations = make([]webui.NetROMDestination, 0, len(status.Destinations))
+	for _, d := range status.Destinations {
+		var routes = make([]webui.NetROMRoute, 0, len(d.Routes))
+		for _, rt := range d.Routes {
+			routes = append(routes, webui.NetROMRoute{
+				Neighbour:    rt.Neighbour,
+				Quality:      rt.Quality,
+				Obsolescence: rt.Obsolescence,
+			})
+		}
+
+		s.Destinations = append(s.Destinations, webui.NetROMDestination{
+			Callsign: d.Callsign,
+			Alias:    d.Alias,
+			Routes:   routes,
+		})
+	}
+
+	s.Circuits = make([]webui.NetROMCircuit, 0, len(status.Circuits))
+	for _, c := range status.Circuits {
+		s.Circuits = append(s.Circuits, webui.NetROMCircuit{
+			OwnCall:     c.OwnCall,
+			RemoteCall:  c.RemoteCall,
+			RemoteNode:  c.RemoteNode,
+			User:        c.User,
+			Incoming:    c.Incoming,
+			State:       c.State,
+			Outstanding: c.Outstanding,
+		})
+	}
 
 	return maybe.Just(s)
 }
