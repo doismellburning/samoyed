@@ -16,6 +16,8 @@ import (
 // --- parseALSADeviceName ---
 
 func Test_parseALSADeviceName(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input      string
 		wantCard   string
@@ -34,6 +36,8 @@ func Test_parseALSADeviceName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
 			var card, dev = parseALSADeviceName(tt.input)
 			assert.Equal(t, tt.wantCard, card)
 			assert.Equal(t, tt.wantDevNum, dev)
@@ -44,6 +48,8 @@ func Test_parseALSADeviceName(t *testing.T) {
 // --- parseALSACardsProc ---
 
 func Test_parseALSACardsProc(t *testing.T) {
+	t.Parallel()
+
 	// Typical /proc/asound/cards content with udev-assigned card IDs.
 	var content = ` 0 [PCH            ]: HDA-Intel - HDA Intel PCH
                       HDA Intel PCH at 0xb1240000 irq 142
@@ -60,6 +66,8 @@ func Test_parseALSACardsProc(t *testing.T) {
 }
 
 func Test_parseALSACardsProc_empty(t *testing.T) {
+	t.Parallel()
+
 	assert.Empty(t, parseALSACardsProc(""))
 }
 
@@ -96,6 +104,8 @@ func fakeALSACards(t *testing.T, content string) string {
 // as "USB AUDIO  CODEC: USB Audio (hw:2,0)" because it uses the hardware
 // description, not the udev-assigned ALSA card ID.
 func Test_matchPortAudioDeviceByName_udevCardID(t *testing.T) {
+	t.Parallel()
+
 	// Simulate the PortAudio device list on the user's machine.
 	var devices = []*portaudio.DeviceInfo{
 		makeDevice("HDA Intel PCH: ALC3234 Analog (hw:0,0)", 2, 2),
@@ -109,12 +119,16 @@ func Test_matchPortAudioDeviceByName_udevCardID(t *testing.T) {
  3 [FT991A         ]: USB Audio - USB Audio CODEC`
 
 	t.Run("FTDX10 resolves via card ID", func(t *testing.T) {
+		t.Parallel()
+
 		var dev = matchPortAudioDeviceByName("plughw:FTDX10,0", true, devices, fakeALSACards(t, cardsContent))
 		assert.NotNil(t, dev)
 		assert.Equal(t, "USB AUDIO  CODEC: USB Audio (hw:2,0)", dev.Name)
 	})
 
 	t.Run("FT991A resolves via card ID", func(t *testing.T) {
+		t.Parallel()
+
 		var dev = matchPortAudioDeviceByName("plughw:FT991A,0", true, devices, fakeALSACards(t, cardsContent))
 		assert.NotNil(t, dev)
 		assert.Equal(t, "USB Audio CODEC: USB Audio (hw:3,0)", dev.Name)
@@ -122,6 +136,8 @@ func Test_matchPortAudioDeviceByName_udevCardID(t *testing.T) {
 }
 
 func Test_matchPortAudioDeviceByName_exactMatch(t *testing.T) {
+	t.Parallel()
+
 	var devices = []*portaudio.DeviceInfo{
 		makeDevice("HDA Intel PCH: ALC3234 Analog (hw:0,0)", 2, 2),
 		makeDevice("USB AUDIO  CODEC: USB Audio (hw:2,0)", 2, 2),
@@ -133,6 +149,8 @@ func Test_matchPortAudioDeviceByName_exactMatch(t *testing.T) {
 }
 
 func Test_matchPortAudioDeviceByName_substrMatch(t *testing.T) {
+	t.Parallel()
+
 	var devices = []*portaudio.DeviceInfo{
 		makeDevice("Loopback: PCM (hw:0,0)", 2, 2),
 		makeDevice("Loopback: PCM (hw:0,1)", 2, 2),
@@ -144,6 +162,8 @@ func Test_matchPortAudioDeviceByName_substrMatch(t *testing.T) {
 }
 
 func Test_matchPortAudioDeviceByName_alsaStyleLoopback(t *testing.T) {
+	t.Parallel()
+
 	var devices = []*portaudio.DeviceInfo{
 		makeDevice("Loopback: PCM (hw:0,0)", 2, 2),
 		makeDevice("Loopback: PCM (hw:0,1)", 2, 2),
@@ -156,6 +176,8 @@ func Test_matchPortAudioDeviceByName_alsaStyleLoopback(t *testing.T) {
 }
 
 func Test_matchPortAudioDeviceByName_noMatch(t *testing.T) {
+	t.Parallel()
+
 	var cards = fakeALSACards(t, "")
 	var devices = []*portaudio.DeviceInfo{
 		makeDevice("HDA Intel PCH: ALC3234 Analog (hw:0,0)", 2, 2),
@@ -166,6 +188,8 @@ func Test_matchPortAudioDeviceByName_noMatch(t *testing.T) {
 }
 
 func Test_matchPortAudioDeviceByName_directionFilter(t *testing.T) {
+	t.Parallel()
+
 	// Two devices for the same ALSA card ID: one input-only, one output-only.
 	// This can happen with some USB audio interfaces.
 	var cards = fakeALSACards(t, " 2 [MYCARD         ]: USB-Audio - My Audio Device")

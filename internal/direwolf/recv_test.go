@@ -89,6 +89,8 @@ func samples16(samples []int16) []byte {
 // receiving, so the number of the device that failed has to reach whoever
 // started it.
 func TestRecvInitReportsTheDeviceWhoseInputFailed(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 
 	var receiver, src = setupRecvTest(t, audioConfig, silence16(2000))
@@ -106,6 +108,8 @@ func TestRecvInitReportsTheDeviceWhoseInputFailed(t *testing.T) {
 // Only devices the configuration defines get a thread; anything else would be
 // reading a device that was never opened.
 func TestRecvInitStartsNothingForAnUndefinedDevice(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.adev[0].defined = 0
 
@@ -123,6 +127,8 @@ func TestRecvInitStartsNothingForAnUndefinedDevice(t *testing.T) {
 // Shutting down is not an audio failure, so a cancelled thread finishes
 // without reporting one.
 func TestRecvAdevThreadStopsWhenCancelledWithoutReportingAFailure(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 
 	var receiver, _ = setupRecvTest(t, audioConfig, nil)
@@ -154,6 +160,8 @@ func TestRecvAdevThreadStopsWhenCancelledWithoutReportingAFailure(t *testing.T) 
 // A stereo device carries two radio channels, and each one has to get its own
 // side of the audio rather than both getting the same samples.
 func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(2)
 
 	// Left and right differ in sign, so the running average of each channel
@@ -180,6 +188,8 @@ func TestRecvAdevThreadFeedsEachChannelItsOwnSideOfTheAudio(t *testing.T) {
 // Touch tones are decoded, and each button passed on, only where DTMF decoding
 // is configured for the channel - as it is for the APRStt gateway.
 func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_ON
 
@@ -207,6 +217,8 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 // Decoding with nobody to pass the buttons on to just drops them, rather than
 // taking down the receive goroutine.
 func TestRecvAdevThreadDecodesTouchTonesForNobody(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_ON
 
@@ -224,6 +236,8 @@ func TestRecvAdevThreadDecodesTouchTonesForNobody(t *testing.T) {
 // And not otherwise: DTMF decoding off means nothing is passed on, no matter
 // what is on the air.
 func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_OFF
 
@@ -342,6 +356,8 @@ func startRecvProcess(t *testing.T, q *DataLinkQueue, link *AX25Link, rh *recPac
 // The queue is where the receive threads hand work over, so an item put on it
 // has to be dispatched to the handler for its type.
 func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var rh, link, tq = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
@@ -364,6 +380,8 @@ func TestRecvProcessDispatchesAQueuedItem(t *testing.T) {
 // recv_process is the only place the queue is served, so every kind of item
 // has to have somewhere to go from it.
 func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var rh, link, tq = setupRecvProcessTest(t, AX25_T1V_FRACK_DEFAULT)
@@ -408,6 +426,8 @@ func TestRecvProcessDispatchesEveryItemType(t *testing.T) {
 // Nothing on the queue and nothing to do is not an error - it happens whenever
 // a sender's wake-up outlives the item that prompted it - but it is worth
 // knowing about.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
 func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
@@ -446,6 +466,8 @@ func TestRecvProcessLogsASpuriousWakeUp(t *testing.T) {
 // timers: a link whose acknowledgement never comes gets nowhere unless T1 is
 // allowed to expire.
 func TestRecvProcessRunsTheLinkTimersWhileTheQueueIsEmpty(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	// One second of T1, so the retry does not hold the test up for long.

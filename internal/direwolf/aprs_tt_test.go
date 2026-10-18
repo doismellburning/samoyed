@@ -20,6 +20,8 @@ import (
 // silently stayed at wherever it already was and the caller was told the
 // sequence had parsed.
 func TestParseLocationRejectsOutOfRangeMaidenhead(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 	cfg.ttlocs = []*ttloc_s{
 		{ttlocType: TTLOC_MHEAD, pattern: "BAxxxx", mhead: mheadTTLoc{prefix: ""}}, //nolint:exhaustruct_v5
@@ -50,6 +52,8 @@ func TestParseLocationRejectsOutOfRangeMaidenhead(t *testing.T) {
 // result indexed, so a tone sequence anyone could send panicked the gateway.
 // There is no overlay to give it, so the field is rejected.
 func TestParseCallsignTwoKeyOverlayThatDoesNotTranslate(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 
 	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
@@ -67,6 +71,8 @@ func TestParseCallsignTwoKeyOverlayThatDoesNotTranslate(t *testing.T) {
 // them, though a symbol field's overlay was rejected for the same keys.
 // Reject both, as for the callsign itself.
 func TestParseCallsignTwoKeyOverlayThatPartlyTranslates(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 
 	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
@@ -83,6 +89,8 @@ func TestParseCallsignTwoKeyOverlayThatPartlyTranslates(t *testing.T) {
 // went out as the symbol table of the object report.  Reject it, and one that
 // translates only in part, as for a callsign in two key format.
 func TestParseAbbreviationTwoKeyOverlay(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 
 	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
@@ -101,6 +109,8 @@ func TestParseAbbreviationTwoKeyOverlay(t *testing.T) {
 // second character was read to tell which kind of A field it was, and a tone
 // sequence anyone could send panicked the gateway.
 func TestParseFieldsLoneA(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 
 	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
@@ -117,6 +127,8 @@ func TestParseFieldsLoneA(t *testing.T) {
 // was read to look for the enhanced comment format, and a tone sequence anyone
 // could send panicked the gateway.
 func TestParseCommentLoneC(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 
 	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
@@ -136,6 +148,8 @@ func TestParseCommentLoneC(t *testing.T) {
 // send.  Dire Wolf read the string's terminating NUL there and so took the one
 // digit as the number.
 func TestParseSymbolOneDigit(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 
 	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
@@ -154,6 +168,8 @@ func TestParseSymbolOneDigit(t *testing.T) {
 // letter - used to be taken for what did translate, and its object report sent
 // as though from a real user.  Reject it.
 func TestParseCallsignTwoKeyThatPartlyTranslates(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 
 	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
@@ -170,6 +186,8 @@ func TestParseCallsignTwoKeyThatPartlyTranslates(t *testing.T) {
 // anyone could send panicked the gateway.  Dire Wolf read the string's
 // terminating NUL there; a space keeps the DAO printable.
 func TestParseLocationLoneB(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 	cfg.ttlocs = []*ttloc_s{
 		{ttlocType: TTLOC_POINT, pattern: "B", point: pointTTLoc{lat: 12.25, lon: 56.25}}, //nolint:exhaustruct_v5
@@ -191,6 +209,8 @@ func TestParseLocationLoneB(t *testing.T) {
 // on frequency, but one wrong line in the config shouldn't take the gateway
 // down with the first tone sequence to match it.
 func TestExpandMacroThatExpandsToItself(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 	cfg.ttlocs = []*ttloc_s{
 		{ttlocType: TTLOC_MACRO, pattern: "1", macro: macroTTLoc{definition: "1"}}, //nolint:exhaustruct_v5

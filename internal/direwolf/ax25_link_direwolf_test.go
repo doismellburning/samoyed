@@ -26,113 +26,115 @@ import (
 )
 
 func Test_AX25_Link(t *testing.T) {
+	t.Parallel()
+
 	// Link Establishment and Termination
-	TestAX25LinkConnectedBasic(t)
-	TestAX25LinkSABMEConnection(t)
-	TestAX25LinkConnectionRejectedWithDM(t)
-	TestAX25LinkDISCDisconnection(t)
-	TestAX25LinkDISCInDisconnectedState(t)
+	t.Run("TestAX25LinkConnectedBasic", TestAX25LinkConnectedBasic)
+	t.Run("TestAX25LinkSABMEConnection", TestAX25LinkSABMEConnection)
+	t.Run("TestAX25LinkConnectionRejectedWithDM", TestAX25LinkConnectionRejectedWithDM)
+	t.Run("TestAX25LinkDISCDisconnection", TestAX25LinkDISCDisconnection)
+	t.Run("TestAX25LinkDISCInDisconnectedState", TestAX25LinkDISCInDisconnectedState)
 
 	// Information Transfer
-	TestAX25LinkIFrameExchange(t)
-	TestAX25LinkRRResponse(t)
-	TestAX25LinkRNRFlowControl(t)
-	TestAX25LinkMultipleIFrames(t)
-	TestAX25LinkOutOfSequenceIFrame(t)
-	TestAX25LinkIFrameWithAck(t)
+	t.Run("TestAX25LinkIFrameExchange", TestAX25LinkIFrameExchange)
+	t.Run("TestAX25LinkRRResponse", TestAX25LinkRRResponse)
+	t.Run("TestAX25LinkRNRFlowControl", TestAX25LinkRNRFlowControl)
+	t.Run("TestAX25LinkMultipleIFrames", TestAX25LinkMultipleIFrames)
+	t.Run("TestAX25LinkOutOfSequenceIFrame", TestAX25LinkOutOfSequenceIFrame)
+	t.Run("TestAX25LinkIFrameWithAck", TestAX25LinkIFrameWithAck)
 
 	// Error Recovery
-	TestAX25LinkREJErrorRecovery(t)
+	t.Run("TestAX25LinkREJErrorRecovery", TestAX25LinkREJErrorRecovery)
 
 	// State Machine Transitions
-	TestAX25LinkIncomingSABM(t)
-	TestAX25LinkStateVariables(t)
-	TestAX25LinkDISCWhileConnected(t)
-	TestAX25LinkSABMWhileConnected(t)
-	TestAX25LinkDMAfterDISC(t)
-	TestAX25LinkSABMCollision(t)
-	TestAX25LinkTimerRecoveryState(t)
+	t.Run("TestAX25LinkIncomingSABM", TestAX25LinkIncomingSABM)
+	t.Run("TestAX25LinkStateVariables", TestAX25LinkStateVariables)
+	t.Run("TestAX25LinkDISCWhileConnected", TestAX25LinkDISCWhileConnected)
+	t.Run("TestAX25LinkSABMWhileConnected", TestAX25LinkSABMWhileConnected)
+	t.Run("TestAX25LinkDMAfterDISC", TestAX25LinkDMAfterDISC)
+	t.Run("TestAX25LinkSABMCollision", TestAX25LinkSABMCollision)
+	t.Run("TestAX25LinkTimerRecoveryState", TestAX25LinkTimerRecoveryState)
 
 	// SREJ (Selective Reject)
-	TestAX25LinkSREJFrame(t)
+	t.Run("TestAX25LinkSREJFrame", TestAX25LinkSREJFrame)
 
 	// Window Size
-	TestAX25LinkWindowSize(t)
-	TestAX25LinkWindowSizeMod128(t)
+	t.Run("TestAX25LinkWindowSize", TestAX25LinkWindowSize)
+	t.Run("TestAX25LinkWindowSizeMod128", TestAX25LinkWindowSizeMod128)
 
 	// FRMR Handling
-	TestAX25LinkFRMRResponse(t)
+	t.Run("TestAX25LinkFRMRResponse", TestAX25LinkFRMRResponse)
 
 	// P/F Bit Handling
-	TestAX25LinkPollResponse(t)
-	TestAX25LinkRRPoll(t)
+	t.Run("TestAX25LinkPollResponse", TestAX25LinkPollResponse)
+	t.Run("TestAX25LinkRRPoll", TestAX25LinkRRPoll)
 
 	// N(R) Validation
-	TestAX25LinkIsGoodNR(t)
+	t.Run("TestAX25LinkIsGoodNR", TestAX25LinkIsGoodNR)
 
 	// Timer Tests
-	TestAX25LinkT1Timer(t)
-	TestAX25LinkT3Timer(t)
-	TestAX25LinkT1PauseResume(t)
-	TestAX25LinkT1Expiry(t)
-	TestAX25LinkT3Expiry(t)
+	t.Run("TestAX25LinkT1Timer", TestAX25LinkT1Timer)
+	t.Run("TestAX25LinkT3Timer", TestAX25LinkT3Timer)
+	t.Run("TestAX25LinkT1PauseResume", TestAX25LinkT1PauseResume)
+	t.Run("TestAX25LinkT1Expiry", TestAX25LinkT1Expiry)
+	t.Run("TestAX25LinkT3Expiry", TestAX25LinkT3Expiry)
 
 	// Collision Tests
-	TestAX25LinkSABMDISCCollision(t)
-	TestAX25LinkUnexpectedUA(t)
+	t.Run("TestAX25LinkSABMDISCCollision", TestAX25LinkSABMDISCCollision)
+	t.Run("TestAX25LinkUnexpectedUA", TestAX25LinkUnexpectedUA)
 
 	// XID Tests
-	TestAX25LinkXIDParse(t)
-	TestAX25LinkXIDEncode(t)
-	TestAX25LinkXIDRoundtrip(t)
-	TestAX25LinkXIDFrameConnected(t)
+	t.Run("TestAX25LinkXIDParse", TestAX25LinkXIDParse)
+	t.Run("TestAX25LinkXIDEncode", TestAX25LinkXIDEncode)
+	t.Run("TestAX25LinkXIDRoundtrip", TestAX25LinkXIDRoundtrip)
+	t.Run("TestAX25LinkXIDFrameConnected", TestAX25LinkXIDFrameConnected)
 
 	// C/R Bit Encoding Tests
-	TestAX25LinkCommandFrameEncoding(t)
-	TestAX25LinkResponseFrameEncoding(t)
-	TestAX25LinkIFrameAsCommand(t)
-	TestAX25LinkSFrameCommandResponse(t)
+	t.Run("TestAX25LinkCommandFrameEncoding", TestAX25LinkCommandFrameEncoding)
+	t.Run("TestAX25LinkResponseFrameEncoding", TestAX25LinkResponseFrameEncoding)
+	t.Run("TestAX25LinkIFrameAsCommand", TestAX25LinkIFrameAsCommand)
+	t.Run("TestAX25LinkSFrameCommandResponse", TestAX25LinkSFrameCommandResponse)
 
 	// Sequence Number Tests
-	TestAX25LinkModulo8WrapAround(t)
-	TestAX25LinkModulo128WrapAround(t)
-	TestAX25LinkNSInWindow(t)
+	t.Run("TestAX25LinkModulo8WrapAround", TestAX25LinkModulo8WrapAround)
+	t.Run("TestAX25LinkModulo128WrapAround", TestAX25LinkModulo128WrapAround)
+	t.Run("TestAX25LinkNSInWindow", TestAX25LinkNSInWindow)
 
 	// Segmenter/Reassembler Tests
-	TestAX25LinkReassemblerInitialState(t)
-	TestAX25LinkFirstSegmentFlag(t)
-	TestAX25LinkV22SegmentationDataContent(t)
+	t.Run("TestAX25LinkReassemblerInitialState", TestAX25LinkReassemblerInitialState)
+	t.Run("TestAX25LinkFirstSegmentFlag", TestAX25LinkFirstSegmentFlag)
+	t.Run("TestAX25LinkV22SegmentationDataContent", TestAX25LinkV22SegmentationDataContent)
 
 	// Link Multiplexer Tests
-	TestAX25LinkMultipleConcurrentLinks(t)
-	TestAX25LinkIsolation(t)
-	TestAX25LinkChannelBusy(t)
+	t.Run("TestAX25LinkMultipleConcurrentLinks", TestAX25LinkMultipleConcurrentLinks)
+	t.Run("TestAX25LinkIsolation", TestAX25LinkIsolation)
+	t.Run("TestAX25LinkChannelBusy", TestAX25LinkChannelBusy)
 
 	// Frame Type Parsing Tests
-	TestAX25LinkFrameTypeParsing(t)
-	TestAX25LinkSFrameTypeParsing(t)
-	TestAX25LinkIFrameTypeParsing(t)
+	t.Run("TestAX25LinkFrameTypeParsing", TestAX25LinkFrameTypeParsing)
+	t.Run("TestAX25LinkSFrameTypeParsing", TestAX25LinkSFrameTypeParsing)
+	t.Run("TestAX25LinkIFrameTypeParsing", TestAX25LinkIFrameTypeParsing)
 
 	// Edge Case Tests
-	TestAX25LinkInvalidNR(t)
-	TestAX25LinkClearExceptionConditions(t)
-	TestAX25LinkRejectExceptionFlag(t)
+	t.Run("TestAX25LinkInvalidNR", TestAX25LinkInvalidNR)
+	t.Run("TestAX25LinkClearExceptionConditions", TestAX25LinkClearExceptionConditions)
+	t.Run("TestAX25LinkRejectExceptionFlag", TestAX25LinkRejectExceptionFlag)
 
 	// Retry and Version Tests
-	TestAX25LinkRetryCounter(t)
-	TestAX25LinkSetVersion20(t)
-	TestAX25LinkSetVersion22(t)
+	t.Run("TestAX25LinkRetryCounter", TestAX25LinkRetryCounter)
+	t.Run("TestAX25LinkSetVersion20", TestAX25LinkSetVersion20)
+	t.Run("TestAX25LinkSetVersion22", TestAX25LinkSetVersion22)
 
 	// Request Type Tests
-	TestAX25LinkConnectRequestTypes(t)
-	TestAX25LinkDisconnectRequestTypes(t)
+	t.Run("TestAX25LinkConnectRequestTypes", TestAX25LinkConnectRequestTypes)
+	t.Run("TestAX25LinkDisconnectRequestTypes", TestAX25LinkDisconnectRequestTypes)
 
 	// TEST/UI Frame Tests
-	TestAX25LinkTESTFrame(t)
-	TestAX25LinkUIFrameConnected(t)
+	t.Run("TestAX25LinkTESTFrame", TestAX25LinkTESTFrame)
+	t.Run("TestAX25LinkUIFrameConnected", TestAX25LinkUIFrameConnected)
 
 	// Statistics Tests
-	TestAX25LinkFrameCountStats(t)
+	t.Run("TestAX25LinkFrameCountStats", TestAX25LinkFrameCountStats)
 }
 
 // Helper to set up a fresh test environment
@@ -224,6 +226,8 @@ func establishConnection(t *testing.T, link *AX25Link, myCall, theirCall string,
 // SABM/UA Exchange (Modulo 8)
 // Pokes at some of the state machine API in the style of recv_process from recv.go
 func TestAX25LinkConnectedBasic(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	// Setup
@@ -272,6 +276,8 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 
 // SABME/UA Exchange (Modulo 128)
 func TestAX25LinkSABMEConnection(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -303,6 +309,8 @@ func TestAX25LinkSABMEConnection(t *testing.T) {
 
 // Connection Rejected with DM
 func TestAX25LinkConnectionRejectedWithDM(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -329,6 +337,8 @@ func TestAX25LinkConnectionRejectedWithDM(t *testing.T) {
 
 // Normal DISC/UA Exchange
 func TestAX25LinkDISCDisconnection(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -369,6 +379,8 @@ func TestAX25LinkDISCDisconnection(t *testing.T) {
 
 // DISC in Disconnected State
 func TestAX25LinkDISCInDisconnectedState(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -405,6 +417,8 @@ func TestAX25LinkDISCInDisconnectedState(t *testing.T) {
 
 // I-Frame Reception
 func TestAX25LinkIFrameExchange(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -432,6 +446,8 @@ func TestAX25LinkIFrameExchange(t *testing.T) {
 
 // RR Acknowledgement
 func TestAX25LinkRRResponse(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -457,6 +473,8 @@ func TestAX25LinkRRResponse(t *testing.T) {
 
 // RNR Flow Control
 func TestAX25LinkRNRFlowControl(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -494,6 +512,8 @@ func TestAX25LinkRNRFlowControl(t *testing.T) {
 // REJ Reception handling
 // Note: Full retransmission testing requires having sent I-frames first
 func TestAX25LinkREJErrorRecovery(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -524,6 +544,8 @@ func TestAX25LinkREJErrorRecovery(t *testing.T) {
 
 // SABM Reception in Disconnected (incoming connection)
 func TestAX25LinkIncomingSABM(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -563,6 +585,8 @@ func TestAX25LinkIncomingSABM(t *testing.T) {
 
 // State variable management
 func TestAX25LinkStateVariables(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	// Test AX25MODULO function (doesn't need a connection)
@@ -615,6 +639,8 @@ func TestAX25LinkStateVariables(t *testing.T) {
 
 // Multiple sequential I-frame reception with V(R) tracking
 func TestAX25LinkMultipleIFrames(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -645,6 +671,8 @@ func TestAX25LinkMultipleIFrames(t *testing.T) {
 
 // Out-of-sequence I-frame sets reject_exception flag
 func TestAX25LinkOutOfSequenceIFrame(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -676,6 +704,8 @@ func TestAX25LinkOutOfSequenceIFrame(t *testing.T) {
 
 // I-frame with piggybacked acknowledgement updates V(A)
 func TestAX25LinkIFrameWithAck(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -707,6 +737,8 @@ func TestAX25LinkIFrameWithAck(t *testing.T) {
 
 // DISC reception while connected causes transition to disconnected
 func TestAX25LinkDISCWhileConnected(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -731,6 +763,8 @@ func TestAX25LinkDISCWhileConnected(t *testing.T) {
 
 // SABM while connected causes link reset
 func TestAX25LinkSABMWhileConnected(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -762,6 +796,8 @@ func TestAX25LinkSABMWhileConnected(t *testing.T) {
 
 // DM response also terminates awaiting release state
 func TestAX25LinkDMAfterDISC(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -796,6 +832,8 @@ func TestAX25LinkDMAfterDISC(t *testing.T) {
 
 // SABM collision - receive SABM while in awaiting connection state
 func TestAX25LinkSABMCollision(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -833,6 +871,8 @@ func TestAX25LinkSABMCollision(t *testing.T) {
 
 // Timer recovery state entry on receiving poll
 func TestAX25LinkTimerRecoveryState(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -864,6 +904,8 @@ func TestAX25LinkTimerRecoveryState(t *testing.T) {
 
 // SREJ frame handling
 func TestAX25LinkSREJFrame(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -904,6 +946,8 @@ func TestAX25LinkSREJFrame(t *testing.T) {
 
 // Window size check function
 func TestAX25LinkWindowSize(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -941,6 +985,8 @@ func TestAX25LinkWindowSize(t *testing.T) {
 
 // Modulo 128 window size
 func TestAX25LinkWindowSizeMod128(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -981,6 +1027,8 @@ func TestAX25LinkWindowSizeMod128(t *testing.T) {
 
 // FRMR reception causes fallback to v2.0
 func TestAX25LinkFRMRResponse(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1016,6 +1064,8 @@ func TestAX25LinkFRMRResponse(t *testing.T) {
 
 // Poll bit in I-frame requires response with F bit
 func TestAX25LinkPollResponse(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1042,6 +1092,8 @@ func TestAX25LinkPollResponse(t *testing.T) {
 
 // RR command with P=1 should get response
 func TestAX25LinkRRPoll(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1070,6 +1122,8 @@ func TestAX25LinkRRPoll(t *testing.T) {
 
 // Test N(R) validation function
 func TestAX25LinkIsGoodNR(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1118,6 +1172,8 @@ func TestAX25LinkIsGoodNR(t *testing.T) {
 
 // T1 timer start/stop
 func TestAX25LinkT1Timer(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1142,6 +1198,8 @@ func TestAX25LinkT1Timer(t *testing.T) {
 
 // T3 timer start/stop
 func TestAX25LinkT3Timer(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1163,6 +1221,8 @@ func TestAX25LinkT3Timer(t *testing.T) {
 
 // T1 pause/resume for channel busy
 func TestAX25LinkT1PauseResume(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1188,6 +1248,8 @@ func TestAX25LinkT1PauseResume(t *testing.T) {
 
 // Timer expiry functions can be called directly
 func TestAX25LinkT1Expiry(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1210,6 +1272,8 @@ func TestAX25LinkT1Expiry(t *testing.T) {
 
 // T3 expiry triggers poll
 func TestAX25LinkT3Expiry(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1233,6 +1297,8 @@ func TestAX25LinkT3Expiry(t *testing.T) {
 
 // SABM/DISC collision
 func TestAX25LinkSABMDISCCollision(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1260,6 +1326,8 @@ func TestAX25LinkSABMDISCCollision(t *testing.T) {
 
 // Unexpected UA in connected state triggers link reset
 func TestAX25LinkUnexpectedUA(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1292,6 +1360,8 @@ func TestAX25LinkUnexpectedUA(t *testing.T) {
 
 // XID frame parsing
 func TestAX25LinkXIDParse(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	// Test empty XID info
@@ -1307,6 +1377,8 @@ func TestAX25LinkXIDParse(t *testing.T) {
 
 // XID frame encoding
 func TestAX25LinkXIDEncode(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var param xid.Param
@@ -1330,6 +1402,8 @@ func TestAX25LinkXIDEncode(t *testing.T) {
 
 // XID roundtrip (encode then parse)
 func TestAX25LinkXIDRoundtrip(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var original xid.Param
@@ -1360,6 +1434,8 @@ func TestAX25LinkXIDRoundtrip(t *testing.T) {
 
 // XID frame reception in connected state
 func TestAX25LinkXIDFrameConnected(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1407,6 +1483,8 @@ func TestAX25LinkXIDFrameConnected(t *testing.T) {
 
 // Command frame has correct C/R bits
 func TestAX25LinkCommandFrameEncoding(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var addrs [ax25.MaxAddrs]string
@@ -1424,6 +1502,8 @@ func TestAX25LinkCommandFrameEncoding(t *testing.T) {
 
 // Response frame has correct C/R bits
 func TestAX25LinkResponseFrameEncoding(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var addrs [ax25.MaxAddrs]string
@@ -1441,6 +1521,8 @@ func TestAX25LinkResponseFrameEncoding(t *testing.T) {
 
 // I-frame as command
 func TestAX25LinkIFrameAsCommand(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var addrs [ax25.MaxAddrs]string
@@ -1457,6 +1539,8 @@ func TestAX25LinkIFrameAsCommand(t *testing.T) {
 
 // S-frame as command and response
 func TestAX25LinkSFrameCommandResponse(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var addrs [ax25.MaxAddrs]string
@@ -1486,6 +1570,8 @@ func TestAX25LinkSFrameCommandResponse(t *testing.T) {
 
 // Modulo 8 wrap-around
 func TestAX25LinkModulo8WrapAround(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1508,6 +1594,8 @@ func TestAX25LinkModulo8WrapAround(t *testing.T) {
 
 // Modulo 128 wrap-around
 func TestAX25LinkModulo128WrapAround(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1535,6 +1623,8 @@ func TestAX25LinkModulo128WrapAround(t *testing.T) {
 
 // N(S) in window check
 func TestAX25LinkNSInWindow(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1564,6 +1654,8 @@ func TestAX25LinkNSInWindow(t *testing.T) {
 
 // Reassembler initial state
 func TestAX25LinkReassemblerInitialState(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1580,6 +1672,8 @@ func TestAX25LinkReassemblerInitialState(t *testing.T) {
 
 // First segment with flag set
 func TestAX25LinkFirstSegmentFlag(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1604,6 +1698,8 @@ func TestAX25LinkFirstSegmentFlag(t *testing.T) {
 }
 
 func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1678,6 +1774,8 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 
 // Multiple concurrent links
 func TestAX25LinkMultipleConcurrentLinks(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	const CHANNEL = 0
@@ -1719,6 +1817,8 @@ func TestAX25LinkMultipleConcurrentLinks(t *testing.T) {
 
 // Link isolation - action on one link doesn't affect another
 func TestAX25LinkIsolation(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	const CHANNEL = 0
@@ -1756,6 +1856,8 @@ func TestAX25LinkIsolation(t *testing.T) {
 
 // Channel busy handling
 func TestAX25LinkChannelBusy(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1785,6 +1887,8 @@ func TestAX25LinkChannelBusy(t *testing.T) {
 
 // Frame type parsing
 func TestAX25LinkFrameTypeParsing(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var addrs [ax25.MaxAddrs]string
@@ -1826,6 +1930,8 @@ func TestAX25LinkFrameTypeParsing(t *testing.T) {
 
 // S-frame type parsing
 func TestAX25LinkSFrameTypeParsing(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var addrs [ax25.MaxAddrs]string
@@ -1855,6 +1961,8 @@ func TestAX25LinkSFrameTypeParsing(t *testing.T) {
 
 // I-frame type parsing
 func TestAX25LinkIFrameTypeParsing(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var addrs [ax25.MaxAddrs]string
@@ -1885,6 +1993,8 @@ func TestAX25LinkIFrameTypeParsing(t *testing.T) {
 
 // Invalid N(R) triggers error
 func TestAX25LinkInvalidNR(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1913,6 +2023,8 @@ func TestAX25LinkInvalidNR(t *testing.T) {
 
 // Clear exception conditions
 func TestAX25LinkClearExceptionConditions(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1940,6 +2052,8 @@ func TestAX25LinkClearExceptionConditions(t *testing.T) {
 
 // Reject exception flag behavior
 func TestAX25LinkRejectExceptionFlag(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -1980,6 +2094,8 @@ func TestAX25LinkRejectExceptionFlag(t *testing.T) {
 
 // Retry counter management
 func TestAX25LinkRetryCounter(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -2007,6 +2123,8 @@ func TestAX25LinkRetryCounter(t *testing.T) {
 
 // Set version 2.0
 func TestAX25LinkSetVersion20(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -2025,6 +2143,8 @@ func TestAX25LinkSetVersion20(t *testing.T) {
 
 // Set version 2.2
 func TestAX25LinkSetVersion22(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -2054,6 +2174,8 @@ func TestAX25LinkSetVersion22(t *testing.T) {
 
 // Connect request handling
 func TestAX25LinkConnectRequestTypes(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	const CHANNEL = 0
@@ -2077,6 +2199,8 @@ func TestAX25LinkConnectRequestTypes(t *testing.T) {
 
 // Disconnect request handling
 func TestAX25LinkDisconnectRequestTypes(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -2107,6 +2231,8 @@ func TestAX25LinkDisconnectRequestTypes(t *testing.T) {
 
 // TEST frame handling
 func TestAX25LinkTESTFrame(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -2135,6 +2261,8 @@ func TestAX25LinkTESTFrame(t *testing.T) {
 
 // UI frame handling in connected state
 func TestAX25LinkUIFrameConnected(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"
@@ -2162,6 +2290,8 @@ func TestAX25LinkUIFrameConnected(t *testing.T) {
 
 // Frame count statistics
 func TestAX25LinkFrameCountStats(t *testing.T) {
+	t.Parallel()
+
 	t.Helper()
 
 	var MY_CALL = "TEST1"

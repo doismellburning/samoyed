@@ -38,6 +38,8 @@ func newTestTransmitQueue(audioConfig *RadioConfig) *TransmitQueue {
 // which it previously never did, because nothing in the suite peeked while
 // another goroutine was appending.
 func TestTqPeekUnderConcurrentAppend(t *testing.T) {
+	t.Parallel()
+
 	const (
 		CHANNEL  = 0
 		PRIO     = TQ_PRIO_1_LO
@@ -128,6 +130,8 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 // standing guard over the flag is what keeps them both from coming back.
 // That makes this a make race test in practice rather than a make test one.
 func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
+	t.Parallel()
+
 	const (
 		PRIO      = TQ_PRIO_1_LO
 		CHANNELS  = MAX_RADIO_CHANS
@@ -209,6 +213,8 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 // This used to need a separate broadcast registered on the context, because
 // nothing else could reach a thread sitting in a condition variable wait.
 func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
 	const CHANNEL = 0
 
 	var audioConfig = new(RadioConfig)
@@ -243,6 +249,8 @@ func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 // TNC, before it had checked the channel was in range at all - so the request
 // the bounds check exists to reject panicked before reaching it.
 func TestTqAppendOutOfRangeChannel(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = new(RadioConfig)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 
@@ -260,6 +268,8 @@ func TestTqAppendOutOfRangeChannel(t *testing.T) {
 
 // A packet for the IGate's channel goes to the IGate the queue was handed,
 // not into a queue for a transmitter.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestAppendForTheIGateChannelGoesToTheIGate(t *testing.T) {
 	var audio = new(RadioConfig)
 	audio.chan_medium[MAX_RADIO_CHANS] = MEDIUM_IGATE

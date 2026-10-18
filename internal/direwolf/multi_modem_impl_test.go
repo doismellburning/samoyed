@@ -83,6 +83,7 @@ func multiModemImplPacket(t *testing.T, info string) *ax25.Packet {
 	return pp
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplSingleDecoderPassesStraightThrough(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 1, 1)
 
@@ -97,6 +98,7 @@ func TestMultiModemImplSingleDecoderPassesStraightThrough(t *testing.T) {
 	assert.Nil(t, m.candidates[0][0].packet_p, "nothing is kept to be picked later")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplNilPacketIgnored(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 2, 1)
 
@@ -107,6 +109,7 @@ func TestMultiModemImplNilPacketIgnored(t *testing.T) {
 	assert.Nil(t, m.candidates[0][0].packet_p)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplSingleDecoderErrorRateDrops(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 1, 1)
 	m.audioConfig.recv_error_rate = 100
@@ -117,6 +120,7 @@ func TestMultiModemImplSingleDecoderErrorRateDrops(t *testing.T) {
 	assert.Empty(t, sink.frames)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplMultipleDecodersHoldCandidate(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 2, 1)
 
@@ -136,6 +140,8 @@ func TestMultiModemImplMultipleDecodersHoldCandidate(t *testing.T) {
 
 // FEC beats plain AX.25, fewer corrections beat more, and the spectrum shows
 // what each decoder found.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplPickBestCandidatePrefersFEC(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 2, 2)
 
@@ -162,6 +168,8 @@ func TestMultiModemImplPickBestCandidatePrefersFEC(t *testing.T) {
 
 // The spectrum shows an FEC decoder's correction count as a digit only for
 // 0..9 - anything else is "+", rather than wrapping into some other character.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplSpectrumNegativeCorrections(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 2, 2)
 
@@ -175,6 +183,7 @@ func TestMultiModemImplSpectrumNegativeCorrections(t *testing.T) {
 	assert.Equal(t, "+___", sink.frames[0].spectrum)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplPickBestCandidatePrefersNoRetries(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 3, 1)
 
@@ -193,6 +202,8 @@ func TestMultiModemImplPickBestCandidatePrefersNoRetries(t *testing.T) {
 }
 
 // With equal effort, a frame that other decoders agree on wins.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplPickBestCandidatePrefersAgreement(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 3, 1)
 
@@ -210,6 +221,7 @@ func TestMultiModemImplPickBestCandidatePrefersAgreement(t *testing.T) {
 	assert.Equal(t, ":::", sink.frames[0].spectrum)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplPickBestCandidateErrorRateDrops(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 2, 1)
 	m.audioConfig.recv_error_rate = 100
@@ -226,6 +238,8 @@ func TestMultiModemImplPickBestCandidateErrorRateDrops(t *testing.T) {
 
 // The trace logging describes every candidate but changes nothing about the
 // pick.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplPickBestCandidateTrace(t *testing.T) {
 	var origLevel = logrus.GetLevel()
 	var origOut = logrus.StandardLogger().Out
@@ -258,6 +272,8 @@ func TestMultiModemImplPickBestCandidateTrace(t *testing.T) {
 
 // A frame waits processAge samples for others to turn up, then goes on.
 func TestMultiModemImplProcessSamplePicksAfterAge(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newRecvTestRadioConfig(1)
 	audioConfig.achan[0].profiles = "AB"
 	audioConfig.achan[0].num_freq = 1
@@ -289,6 +305,8 @@ func TestMultiModemImplProcessSamplePicksAfterAge(t *testing.T) {
 
 // Baud rates for QPSK and 8PSK are in bits, but the wait is in symbols.
 func TestMultiModemImplInitProcessAgeInSymbols(t *testing.T) {
+	t.Parallel()
+
 	var tests = []struct {
 		name      string
 		modemType modem_t
@@ -301,6 +319,8 @@ func TestMultiModemImplInitProcessAgeInSymbols(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var audioConfig = newRecvTestRadioConfig(1)
 			audioConfig.achan[0].modem_type = tc.modemType
 			audioConfig.achan[0].baud = tc.baud
@@ -343,6 +363,8 @@ func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.
 }
 
 func TestMultiModemImplRecFrameAX25(t *testing.T) {
+	t.Parallel()
+
 	var pp = multiModemImplRecFrame(t, MODEM_AFSK, multiModemImplPacket(t, "plain").Pack())
 
 	assert.Equal(t, "Q1TEST", pp.AddrWithSSID(ax25.Source))
@@ -350,6 +372,8 @@ func TestMultiModemImplRecFrameAX25(t *testing.T) {
 }
 
 func TestMultiModemImplRecFrameAIS(t *testing.T) {
+	t.Parallel()
+
 	var pp = multiModemImplRecFrame(t, MODEM_AIS, make([]byte, 21))
 
 	assert.Equal(t, "AIS", pp.AddrWithSSID(ax25.Source))
@@ -358,6 +382,8 @@ func TestMultiModemImplRecFrameAIS(t *testing.T) {
 }
 
 func TestMultiModemImplRecFrameEAS(t *testing.T) {
+	t.Parallel()
+
 	var pp = multiModemImplRecFrame(t, MODEM_EAS, []byte("ZCZC-WXR-RWT"))
 
 	assert.Equal(t, "EAS", pp.AddrWithSSID(ax25.Source))

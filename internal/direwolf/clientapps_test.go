@@ -15,6 +15,8 @@ import (
 // What we hear goes to a client application on each KISS transport, as a data
 // frame for the channel it was heard on.
 func TestClientAppsSendRecPacket(t *testing.T) {
+	t.Parallel()
+
 	var kns, netClients = newAttachedKissNet(t, -1, false, 1)
 	var kp, ptClient = startKissPT(t, 0)
 	var ks, serialClient = openKissSerialPort(t, 0)
@@ -37,6 +39,8 @@ func TestClientAppsSendRecPacket(t *testing.T) {
 
 // None of the client applications need be there, and nor need the lot of them.
 func TestClientAppsSendRecPacketToNone(t *testing.T) {
+	t.Parallel()
+
 	var pp = newTestPacket(t)
 
 	assert.NotPanics(t, func() {
@@ -51,6 +55,8 @@ func TestClientAppsSendRecPacketToNone(t *testing.T) {
 // The APRStt gateway sends its object reports to the client applications it
 // was handed, when configured to, as though it had heard them.
 func TestTTGatewaySendsObjectReportsToClientApps(t *testing.T) {
+	t.Parallel()
+
 	var cfg tt_config_s
 	cfg.obj_send_to_app = 1
 	cfg.obj_recv_chan = 0

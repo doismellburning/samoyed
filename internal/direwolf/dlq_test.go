@@ -13,12 +13,16 @@ import (
 )
 
 func TestCDataNew_Empty(t *testing.T) {
+	t.Parallel()
+
 	var cdata = NewCData(1, nil)
 
 	assert.Empty(t, cdata.data)
 }
 
 func TestCDataNew(t *testing.T) {
+	t.Parallel()
+
 	// Because sometimes I didn't manage to get the copy right(!)
 	var testData = []byte("badger")
 	var cdata = NewCData(1, testData)
@@ -31,6 +35,8 @@ func TestCDataNew(t *testing.T) {
 // or because its timeout fired - and there is then nobody to take a
 // wake-up off an unbuffered channel.  Refs #348.
 func TestDLQAppendDoesNotBlockWhenNobodyIsWaiting(t *testing.T) {
+	t.Parallel()
+
 	// Whether a sender finds itself alone is a matter of timing, so try
 	// the same thing a few times over.
 	for range 20 {
@@ -108,6 +114,8 @@ func TestDLQAppendDoesNotBlockWhenNobodyIsWaiting(t *testing.T) {
 // A wake-up belonging to an item that has since been removed must not cut
 // the next wait short, or a timer expiry gets skipped.
 func TestDLQStaleWakeUpDoesNotCutShortTheNextWait(t *testing.T) {
+	t.Parallel()
+
 	var q = NewDataLinkQueue()
 
 	q.appendItem(new(dlq_item_t))
@@ -125,6 +133,8 @@ func TestDLQStaleWakeUpDoesNotCutShortTheNextWait(t *testing.T) {
 // its life, so a cancellation has to reach it there rather than waiting for an
 // item that is never coming.
 func TestDLQWaitReturnsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
 	var q = NewDataLinkQueue()
 
 	var ctx, cancel = context.WithCancel(t.Context())

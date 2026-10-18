@@ -22,6 +22,8 @@ import (
 )
 
 func Test_is_message_message(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		infop string
@@ -111,6 +113,8 @@ func Test_is_message_message(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.want, is_message_message(tt.infop))
 		})
 	}
@@ -192,6 +196,8 @@ func requireIGateSilent(t *testing.T, server net.Conn, msgAndArgs ...any) {
 // A packet heard on the radio goes to the server with our own callsign
 // appended to the path after a "q construct" saying how it got there.
 func TestIGateSendRecPacket(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	var pp = ax25.FromText("Q2TEST>APDW17:=4237.14N/07120.83W#hello", true)
@@ -206,6 +212,8 @@ func TestIGateSendRecPacket(t *testing.T) {
 // An IGate that cannot transmit says qAO rather than qAR: it is receive-only,
 // and the distinction matters to the network.
 func TestIGateSendRecPacketReceiveOnly(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	ig.config.tx_chan = -1
@@ -222,6 +230,8 @@ func TestIGateSendRecPacketReceiveOnly(t *testing.T) {
 // at all - a packet is dropped rather than queued for a server we may never
 // reach.
 func TestIGateSendRecPacketNotReady(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	var conn, _ = ig.connection()
@@ -242,8 +252,12 @@ func TestIGateSendRecPacketNotReady(t *testing.T) {
 // These path entries are how a station says "do not put this on the internet",
 // and they are honoured in both directions.
 func TestIGateSendRecPacketPathSaysNo(t *testing.T) {
+	t.Parallel()
+
 	for _, via := range []string{"TCPIP", "TCPXX", "RFONLY", "NOGATE"} {
 		t.Run(via, func(t *testing.T) {
+			t.Parallel()
+
 			var ig, server = setupIGate(t)
 
 			var pp = ax25.FromText("Q2TEST>APDW17,"+via+":>hello", true)
@@ -259,6 +273,8 @@ func TestIGateSendRecPacketPathSaysNo(t *testing.T) {
 // A generic query is a request for every station in earshot to answer, which
 // is not something to put on the internet.
 func TestIGateSendRecPacketGenericQuery(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	var pp = ax25.FromText("Q2TEST>APDW17:?APRS?", true)
@@ -272,6 +288,8 @@ func TestIGateSendRecPacketGenericQuery(t *testing.T) {
 // A packet with nothing in the information part says nothing, and the servers
 // would only drop it.
 func TestIGateSendRecPacketEmptyInformation(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	var pp = ax25.FromText("Q2TEST>APDW17:", true)
@@ -285,6 +303,8 @@ func TestIGateSendRecPacketEmptyInformation(t *testing.T) {
 // A carriage return in the information part would look like the end of a
 // record to the server, so the packet is cut there.
 func TestIGateSendRecPacketCutAtCR(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	var pp = ax25.FromText("Q2TEST>APDW17:>before\rafter", true)
@@ -298,6 +318,8 @@ func TestIGateSendRecPacketCutAtCR(t *testing.T) {
 // A third party packet carries somebody else's packet inside it; the payload
 // is what goes to the server, not the wrapper.
 func TestIGateSendRecPacketThirdParty(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	var pp = ax25.FromText("Q3TEST>APDW17:}Q2TEST>APDW17,Q3TEST*:>inner", true)
@@ -311,6 +333,8 @@ func TestIGateSendRecPacketThirdParty(t *testing.T) {
 // FILTER on the channel-to-IGate pair is how the configuration narrows what
 // reaches the internet.
 func TestIGateSendRecPacketFiltered(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	ig.digiConfig.FilterStr[0][MAX_TOTAL_CHANS] = "b/Q9TEST"
@@ -326,6 +350,8 @@ func TestIGateSendRecPacketFiltered(t *testing.T) {
 // The same packet arriving again by another digipeated route is the same
 // packet: the servers drop duplicates, so there is no point sending them.
 func TestIGateDropsDuplicates(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	ig.config.rx2ig_dedupe_time = 30
@@ -345,6 +371,8 @@ func TestIGateDropsDuplicates(t *testing.T) {
 // With duplicate checking switched off - which is the default - the same
 // packet goes every time, so the servers can see the paths it took.
 func TestIGateDedupeDisabled(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	ig.config.rx2ig_dedupe_time = 0
@@ -363,6 +391,8 @@ func TestIGateDedupeDisabled(t *testing.T) {
 // A server we can no longer write to is given up, so that the connecting
 // thread makes a new one rather than us writing into a dead socket forever.
 func TestIGateSendMsgWriteErrorClosesTheConnection(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	require.NoError(t, server.Close())
@@ -384,6 +414,8 @@ func TestIGateSendMsgWriteErrorClosesTheConnection(t *testing.T) {
 // write failed - is neither counted as an uplink nor remembered for duplicate
 // checking, which would otherwise drop a later retransmission that might get
 // through.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and reads Prometheus's default registry.
 func TestIGateUplinkCountsOnlyWhatWasSent(t *testing.T) {
 	const uplinks = "samoyed_igate_uplink_packets_total"
 
@@ -433,6 +465,8 @@ func setupIGateToRadio(t *testing.T) (*IGate, *TransmitQueue) {
 // A packet from the server is transmitted wrapped as third party traffic,
 // with the via path it arrived with replaced by TCPIP and our own callsign.
 func TestIGateTransmitFromServer(t *testing.T) {
+	t.Parallel()
+
 	var ig, tq = setupIGateToRadio(t)
 
 	ig.maybeXmitPacketFromIGate([]byte("Q2TEST-1>APWW10,TCPIP*,qAC,T2TEST:>hello"), 0)
@@ -450,8 +484,12 @@ func TestIGateTransmitFromServer(t *testing.T) {
 // These path entries say the packet should not go to RF, and qAX says it came
 // from somewhere that did not identify itself properly.
 func TestIGateTransmitPathSaysNo(t *testing.T) {
+	t.Parallel()
+
 	for _, via := range []string{"qAX", "TCPXX", "RFONLY", "NOGATE"} {
 		t.Run(via, func(t *testing.T) {
+			t.Parallel()
+
 			var ig, tq = setupIGateToRadio(t)
 
 			ig.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,"+via+":>hello"), 0)
@@ -463,6 +501,8 @@ func TestIGateTransmitPathSaysNo(t *testing.T) {
 
 // Something the parser cannot make sense of is reported rather than passed on
 // as a frame that would not survive the trip.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGateTransmitUnparseable(t *testing.T) {
 	var ig, tq = setupIGateToRadio(t)
 
@@ -476,6 +516,8 @@ func TestIGateTransmitUnparseable(t *testing.T) {
 
 // IGFILTER on the IGate-to-channel pair narrows what is put on the air.
 func TestIGateTransmitFiltered(t *testing.T) {
+	t.Parallel()
+
 	var ig, tq = setupIGateToRadio(t)
 
 	ig.digiConfig.FilterStr[MAX_TOTAL_CHANS][0] = "b/Q9TEST"
@@ -489,6 +531,8 @@ func TestIGateTransmitFiltered(t *testing.T) {
 // position report even though the filter would otherwise drop it, so that the
 // recipient can see where the sender is.
 func TestIGateTransmitCourtesyPosition(t *testing.T) {
+	t.Parallel()
+
 	var ig, tq = setupIGateToRadio(t)
 
 	// A filter that passes nothing, so only the special case can get through.
@@ -511,6 +555,8 @@ func TestIGateTransmitCourtesyPosition(t *testing.T) {
 // Transmitting a message for a station is what arranges for its next position
 // to be passed along, and it is counted separately in the IGate statistics.
 func TestIGateTransmitMessageRemembersTheSender(t *testing.T) {
+	t.Parallel()
+
 	var ig, tq = setupIGateToRadio(t)
 
 	// The station has to have been heard for us to remember anything about it.
@@ -528,6 +574,8 @@ func TestIGateTransmitMessageRemembersTheSender(t *testing.T) {
 // With nothing to keep track of who has been heard, a message still goes out
 // to RF; there is just nobody to remember to pass a position along for.
 func TestIGateTransmitMessageWithoutAHeardDatabase(t *testing.T) {
+	t.Parallel()
+
 	var ig, tq = setupIGateToRadio(t)
 
 	ig.heard = nil
@@ -546,6 +594,8 @@ func TestIGateTransmitMessageWithoutAHeardDatabase(t *testing.T) {
 
 // The same packet again within the dedupe window is dropped: it has already
 // been on the air once.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGToTxAllowDropsDuplicates(t *testing.T) {
 	var ig, _ = setupIGate(t)
 
@@ -567,6 +617,8 @@ func TestIGToTxAllowDropsDuplicates(t *testing.T) {
 // The transmit history is remembered into by the digipeater from the receive
 // thread, by APRStt object reports from an audio thread, and by the IGate's own
 // APRS-IS to RF path, which also consults it.  Run under -race.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGToTxHistoryConcurrent(t *testing.T) {
 	var ig, _ = setupIGate(t)
 
@@ -598,6 +650,8 @@ func TestIGToTxHistoryConcurrent(t *testing.T) {
 // passes packets up - the radio receive thread, beacons, client applications
 // and the SATgate delay thread.  Run under -race.
 func TestRxToIgHistoryConcurrent(t *testing.T) {
+	t.Parallel()
+
 	var ig, _ = setupIGate(t)
 
 	ig.config.rx2ig_dedupe_time = 30
@@ -628,6 +682,8 @@ func TestRxToIgHistoryConcurrent(t *testing.T) {
 // socket up when the server goes away, while the connect thread's heartbeats
 // and packets heard on the radio are written to it, and the statistics beacon
 // reads the counters those bump.  Run under -race.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGateConnectionStateConcurrent(t *testing.T) {
 	var ig, server = setupIGate(t)
 
@@ -706,6 +762,8 @@ func TestIGateConnectionStateConcurrent(t *testing.T) {
 // A repeated "message" is a retry that did not get an ack, so it is not
 // treated as a duplicate to be suppressed.
 func TestIGToTxAllowKeepsDuplicateMessages(t *testing.T) {
+	t.Parallel()
+
 	var ig, _ = setupIGate(t)
 
 	var pp = ax25.FromText("Q2TEST>APWW10::Q3TEST   :Hello there", true)
@@ -718,6 +776,8 @@ func TestIGToTxAllowKeepsDuplicateMessages(t *testing.T) {
 
 // There are limits on how much the IGate may put on the air, over a minute
 // and over five, so that a busy server cannot swamp the channel.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGToTxAllowRateLimits(t *testing.T) {
 	var ig, _ = setupIGate(t)
 
@@ -743,6 +803,8 @@ func TestIGToTxAllowRateLimits(t *testing.T) {
 
 // The five minute limit is separate, and reached by packets that the one
 // minute limit has let through.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGToTxAllowFiveMinuteLimit(t *testing.T) {
 	var ig, _ = setupIGate(t)
 
@@ -767,6 +829,8 @@ func TestIGToTxAllowFiveMinuteLimit(t *testing.T) {
 // Messages get three times the limit: they are rare, deliberate, and it would
 // be a shame to drop one because of the repetitive traffic around it.
 func TestIGToTxAllowRaisesTheLimitForMessages(t *testing.T) {
+	t.Parallel()
+
 	var ig, _ = setupIGate(t)
 
 	ig.config.tx_limit_1 = 1
@@ -786,6 +850,8 @@ func TestIGToTxAllowRaisesTheLimitForMessages(t *testing.T) {
 // The limit is on what the IGate transmits, so frames the digipeater sent do
 // not count against it.
 func TestIGToTxAllowIgnoresDigipeatedFrames(t *testing.T) {
+	t.Parallel()
+
 	var ig, _ = setupIGate(t)
 
 	ig.config.tx_limit_1 = 1
@@ -805,6 +871,8 @@ func TestIGToTxAllowIgnoresDigipeatedFrames(t *testing.T) {
 // The dedupe history is a ring, so a packet falls out of it once enough
 // others have gone by.
 func TestIGToTxRememberWrapsAround(t *testing.T) {
+	t.Parallel()
+
 	var ig, _ = setupIGate(t)
 
 	ig.config.tx_limit_1 = 1000
@@ -827,6 +895,8 @@ func TestIGToTxRememberWrapsAround(t *testing.T) {
 
 // The counters behind the IGate statistics beacon.
 func TestIGateCounters(t *testing.T) {
+	t.Parallel()
+
 	var ig, _ = setupIGate(t)
 
 	assert.Equal(t, 0, ig.msgCount())
@@ -849,6 +919,8 @@ func TestIGateCounters(t *testing.T) {
 // when it is empty - while the delay thread looks at the head to see whether
 // anything is due.  This drives the delay thread's check directly: its
 // once-a-second sleep hides the race from the detector.  Run under -race.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGateSatgateQueueConcurrent(t *testing.T) {
 	var ig, _ = setupIGate(t)
 
@@ -892,6 +964,8 @@ func TestIGateSatgateQueueConcurrent(t *testing.T) {
 // SATgate mode holds back a packet heard directly from a satellite for a
 // while, so that a terrestrial digipeat of the same packet - which carries
 // more information about the path - gets to the server first.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGateSatgateDelaysDirectPackets(t *testing.T) {
 	var ig, server = setupIGate(t)
 
@@ -946,6 +1020,8 @@ func TestIGateSatgateDelaysDirectPackets(t *testing.T) {
 // released.  If the connection was dropped and remade in between, releasing it
 // during the new connection's login would make it the first thing the server
 // sees, so it is dropped, as it would have been had it just been heard.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGateSatgateWaitsForLogin(t *testing.T) {
 	var ig, _ = setupIGate(t)
 
@@ -974,6 +1050,8 @@ func TestIGateSatgateWaitsForLogin(t *testing.T) {
 // A packet that has already been through a digipeater was not heard directly,
 // so there is nothing to wait for.
 func TestIGateSatgateDoesNotDelayRepeatedPackets(t *testing.T) {
+	t.Parallel()
+
 	var ig, server = setupIGate(t)
 
 	t.Cleanup(func() { ig.dpQueueHead = nil })
@@ -992,6 +1070,8 @@ func TestIGateSatgateDoesNotDelayRepeatedPackets(t *testing.T) {
 
 // The delay queue keeps packets in the order they arrived, so that they reach
 // the server in the order they were heard.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGateSatgateQueueKeepsOrder(t *testing.T) {
 	var ig, _ = setupIGate(t)
 
@@ -1017,6 +1097,8 @@ func TestIGateSatgateQueueKeepsOrder(t *testing.T) {
 
 // "-d ig" and more of it prints what is happening at each stage, which is how
 // somebody works out why their packets are not showing up on aprs.fi.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGateDebugOutput(t *testing.T) {
 	var ig, server = setupIGate(t)
 
@@ -1042,6 +1124,8 @@ func TestIGateDebugOutput(t *testing.T) {
 }
 
 // The same for the other direction.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGateToRadioDebugOutput(t *testing.T) {
 	var ig, _ = setupIGateToRadio(t)
 
@@ -1071,6 +1155,8 @@ func TestIGateToRadioDebugOutput(t *testing.T) {
 }
 
 // The RF>IS side says why it dropped something too.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestIGateSendRecPacketDebugOutput(t *testing.T) {
 	var ig, _ = setupIGate(t)
 
@@ -1111,6 +1197,8 @@ func TestIGateSendRecPacketDebugOutput(t *testing.T) {
 // statics in Dire Wolf.  The port merged them into one package variable, and
 // because DirewolfMain starts the GPS after the IGate, the GPS's debug level
 // quietly became the IGate's too: "-di1 -dg0" left the IGate saying nothing.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNewGPSLeavesTheIGateDebugLevelAlone(t *testing.T) {
 	var ig, server = setupIGate(t)
 
@@ -1148,6 +1236,8 @@ func feedLines(r *igateLineReader, data []byte) []string {
 // without end (issue #866).  The reader now gives up on a line once it is
 // too long to be real, and picks up again after the next LF.
 func TestIGateLineReaderDiscardsAnOverlongLine(t *testing.T) {
+	t.Parallel()
+
 	var r = new(igateLineReader)
 
 	for range 100 * igateMaxLineLen {
@@ -1165,6 +1255,8 @@ func TestIGateLineReaderDiscardsAnOverlongLine(t *testing.T) {
 
 // The limit counts the CR LF that ends a line.
 func TestIGateLineReaderLimit(t *testing.T) {
+	t.Parallel()
+
 	var fits = append(bytes.Repeat([]byte("A"), igateMaxLineLen-2), '\r', '\n')
 	var tooLong = append(bytes.Repeat([]byte("A"), igateMaxLineLen-1), '\r', '\n')
 
@@ -1177,6 +1269,8 @@ func TestIGateLineReaderLimit(t *testing.T) {
 
 // A NUL becomes "<0x00>" in the line, and counts towards the limit as such.
 func TestIGateLineReaderNulCountsExpanded(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, []string{"a<0x00>b\n"}, feedLines(new(igateLineReader), []byte("a\x00b\n")))
 
 	// A couple of hundred bytes off the wire, but over the limit once expanded.
@@ -1187,6 +1281,8 @@ func TestIGateLineReaderNulCountsExpanded(t *testing.T) {
 // A packet from the server is counted and queued for transmission; a server
 // comment or an empty line is neither.
 func TestIGateProcessServerLine(t *testing.T) {
+	t.Parallel()
+
 	var ig, tq = setupIGateToRadio(t)
 
 	ig.audioConfig.igate_vchannel = -1
@@ -1209,6 +1305,8 @@ func TestIGateProcessServerLine(t *testing.T) {
 // End to end: after an over-long line from the server, the receive thread
 // still handles the next one.
 func TestIGateRecvThreadSurvivesAnOverlongLine(t *testing.T) {
+	t.Parallel()
+
 	var ig, _ = setupIGateToRadio(t)
 
 	ig.audioConfig.igate_vchannel = -1

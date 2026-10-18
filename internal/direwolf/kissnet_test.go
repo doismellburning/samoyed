@@ -196,6 +196,8 @@ func requireNothingToRead(t *testing.T, conn net.Conn, msgAndArgs ...any) {
 // A frame received over the radio goes out to the attached client as KISS,
 // with the radio channel in the top half of the first byte.
 func TestKissNetSendRecPacket(t *testing.T) {
+	t.Parallel()
+
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
 	const channel = 2
@@ -213,6 +215,8 @@ func TestKissNetSendRecPacket(t *testing.T) {
 // thinks it has a one-radio TNC - and passes on nothing from any other
 // channel.
 func TestKissNetSendRecPacketSingleChannelPort(t *testing.T) {
+	t.Parallel()
+
 	const channel = 1
 
 	var kns, clients = newAttachedKissNet(t, channel, false, 1)
@@ -228,6 +232,8 @@ func TestKissNetSendRecPacketSingleChannelPort(t *testing.T) {
 // A response to a command from one client goes to that client only, not to
 // everyone attached.
 func TestKissNetSendRecPacketToOneClient(t *testing.T) {
+	t.Parallel()
+
 	var kns, clients = newAttachedKissNet(t, -1, false, 2)
 
 	kissNetClient{kns: kns, kps: kns.allPorts, client: 1, conn: kns.allPorts.clientConn(1)}.reply(0, kiss.CmdSetHardware, []byte("TXBUF:0"))
@@ -244,6 +250,8 @@ func TestKissNetSendRecPacketToOneClient(t *testing.T) {
 // or the command prompt - is dropped rather than handed to the newcomer, who
 // never asked for it.
 func TestKissNetReplyNotToTheNextClientInTheSlot(t *testing.T) {
+	t.Parallel()
+
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 	var kps = kns.allPorts
 
@@ -265,6 +273,8 @@ func TestKissNetReplyNotToTheNextClientInTheSlot(t *testing.T) {
 
 // The fake command prompt goes out as it is - and says why, because it means
 // the application is treating us as an old TNC.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestKissNetPrompt(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
@@ -285,6 +295,8 @@ func TestKissNetPrompt(t *testing.T) {
 // A client that has gone away is hung up on rather than written to again on
 // every received frame.
 func TestKissNetSendRecPacketWriteErrorDetachesTheClient(t *testing.T) {
+	t.Parallel()
+
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
 	require.NoError(t, clients[0].Close())
@@ -302,6 +314,8 @@ func TestKissNetSendRecPacketWriteErrorDetachesTheClient(t *testing.T) {
 // KISSCOPY is for two applications sharing a TNC: what one of them transmits
 // is shown to the other, so that it can see the whole conversation.
 func TestKissNetCopyBetweenClients(t *testing.T) {
+	t.Parallel()
+
 	var kns, clients = newAttachedKissNet(t, -1, true, 2)
 
 	const channel = 1
@@ -319,6 +333,8 @@ func TestKissNetCopyBetweenClients(t *testing.T) {
 // A single-channel port shows the application channel 0 here too, and is not
 // sent anything from a channel it does not carry.
 func TestKissNetCopySingleChannelPort(t *testing.T) {
+	t.Parallel()
+
 	const channel = 1
 
 	var kns, clients = newAttachedKissNet(t, channel, true, 2)
@@ -331,6 +347,8 @@ func TestKissNetCopySingleChannelPort(t *testing.T) {
 
 // Without KISSCOPY nothing is passed between clients at all.
 func TestKissNetCopyDisabled(t *testing.T) {
+	t.Parallel()
+
 	var kns, clients = newAttachedKissNet(t, -1, false, 2)
 
 	kns.Copy([]byte{0x00, 'h', 'i'}, 0, kiss.CmdDataFrame, kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)})
@@ -340,6 +358,8 @@ func TestKissNetCopyDisabled(t *testing.T) {
 
 // A client that has gone away is hung up on here too.
 func TestKissNetCopyWriteErrorDetachesTheClient(t *testing.T) {
+	t.Parallel()
+
 	var kns, clients = newAttachedKissNet(t, -1, true, 2)
 
 	require.NoError(t, clients[1].Close())
@@ -354,6 +374,8 @@ func TestKissNetCopyWriteErrorDetachesTheClient(t *testing.T) {
 // Copying must not change the caller's frame: it goes on to be transmitted
 // after this, and the first byte here is rewritten per destination port.
 func TestKissNetCopyDoesNotModifyTheCallersFrame(t *testing.T) {
+	t.Parallel()
+
 	var kns, _ = newAttachedKissNet(t, -1, true, 2)
 
 	var msg = []byte{0x00, 'h', 'i'}
@@ -365,6 +387,8 @@ func TestKissNetCopyDoesNotModifyTheCallersFrame(t *testing.T) {
 
 // With the debug option the traffic to the client is printed, so that an
 // application that is not being understood can be looked at.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestKissNetDebugPrints(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
@@ -391,6 +415,8 @@ func TestKissNetDebugPrints(t *testing.T) {
 // A KISS TCP port of 0 is how the configuration says "no KISS over TCP", and
 // nothing is bound.
 func TestKissNetDisabled(t *testing.T) {
+	t.Parallel()
+
 	var mc = new(misc_config_s)
 
 	assert.Empty(t, kissNetAddrs(mc))
@@ -404,6 +430,8 @@ func TestKissNetDisabled(t *testing.T) {
 // Each configured port is listened on, carrying its own channel, and those of
 // 0 are left out.
 func TestKissNetAddrs(t *testing.T) {
+	t.Parallel()
+
 	var mc = new(misc_config_s)
 	mc.kiss_port[0] = 8001
 	mc.kiss_chan[0] = -1
@@ -415,6 +443,8 @@ func TestKissNetAddrs(t *testing.T) {
 
 // Starting the service twice would have two goroutines accepting on each port,
 // so the second start is refused, and says so.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestKissNetStartedTwiceComplains(t *testing.T) {
 	var kns, _ = startKissNet(t, -1)
 
@@ -441,6 +471,8 @@ func TestKissNetStartedTwiceComplains(t *testing.T) {
 // anything starts, rather than sitting there looking attached - while a port
 // that is free is still listened on.
 func TestKissNetListenFails(t *testing.T) {
+	t.Parallel()
+
 	// Every address, as the service binds a configured port, rather than
 	// loopback: with SO_REUSEADDR - which Go sets on a TCP listener - the
 	// BSDs, macOS among them, let a bind of every address succeed alongside a
@@ -468,6 +500,8 @@ func TestKissNetListenFails(t *testing.T) {
 
 // A service that is made but never started gives its ports up when closed,
 // and cannot be started after that.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestKissNetCloseGivesUpThePortsOfAServiceNeverStarted(t *testing.T) {
 	var kns, err = NewKissNetService(t.Context(), new(misc_config_s), []KissNetAddr{{Addr: "127.0.0.1:0", Channel: -1}}, 0)
 	require.NoError(t, err)
@@ -500,6 +534,8 @@ func TestKissNetCloseGivesUpThePortsOfAServiceNeverStarted(t *testing.T) {
 // The round trip: a client's command is collected from the socket, acted on,
 // and the answer written back to that same client.
 func TestKissNetClientCommandIsAnswered(t *testing.T) {
+	t.Parallel()
+
 	var kns, port = startKissNet(t, -1)
 
 	var conn, _ = dialKissNet(t, kns, port)
@@ -523,6 +559,8 @@ func TestKissNetClientCommandIsAnswered(t *testing.T) {
 // A service that lost its table on the way to the check would panic in the
 // listening goroutine instead, and take the test binary down with it.
 func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
+	t.Parallel()
+
 	const unconfigured = 5
 
 	var kns, port = startKissNet(t, unconfigured)
@@ -551,6 +589,8 @@ func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
 // An application that thinks it is driving an old command-mode TNC is
 // answered with a command prompt, which is what stops it asking.
 func TestKissNetAnswersCommandModeNoise(t *testing.T) {
+	t.Parallel()
+
 	var kns, port = startKissNet(t, -1)
 
 	var conn, _ = dialKissNet(t, kns, port)
@@ -569,6 +609,8 @@ func TestKissNetAnswersCommandModeNoise(t *testing.T) {
 // A client that disconnects is noticed and its slot given back, so that it -
 // or somebody else - can attach again without restarting us.
 func TestKissNetClientCanReattach(t *testing.T) {
+	t.Parallel()
+
 	var kns, port = startKissNet(t, -1)
 
 	var conn, slot = dialKissNet(t, kns, port)

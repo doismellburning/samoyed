@@ -27,6 +27,8 @@ func naiveConvolve(data, filter []float64, filter_size int) float64 {
 }
 
 func TestConvolveMatchesNaive(t *testing.T) {
+	t.Parallel()
+
 	var rng = rand.New(rand.NewPCG(1, 2))
 
 	// Cover every remainder modulo the unroll width, plus the empty filter.
@@ -47,6 +49,8 @@ func TestConvolveMatchesNaive(t *testing.T) {
 }
 
 func TestConvolveIgnoresTrailingElements(t *testing.T) {
+	t.Parallel()
+
 	// Only the first filter_size taps count, even when the slices are longer.
 	var data = []float64{1, 2, 3, 4, 5, 6, 7, 1000}
 	var filter = []float64{1, 1, 1, 1, 1, 1, 1, 1000}
@@ -142,6 +146,8 @@ func new9600TestRadioConfig(sampleRate int, profiles string, upsample int) *Radi
 // decodes back, however the samples are upsampled, and with one slicer or
 // several.
 func TestDemod9600RoundTrip(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name       string
 		sampleRate int
@@ -155,6 +161,8 @@ func TestDemod9600RoundTrip(t *testing.T) {
 		{"upsample 4", 44100, "-", 4},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var texts = []string{
 				"Q1TEST>Q2TEST:Hello at 9600 baud",
 				"Q1TEST>Q2TEST,WIDE1-1:>A second frame, somewhat longer than the first",
@@ -198,6 +206,8 @@ func TestDemod9600RoundTrip(t *testing.T) {
 
 // Silence decodes to nothing.
 func TestDemod9600Silence(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = new9600TestRadioConfig(48000, "-", 0)
 
 	var got, _ = demodulate9600(t, audioConfig, 0, make([]int, 48000/10))
@@ -207,6 +217,8 @@ func TestDemod9600Silence(t *testing.T) {
 
 // The upsampling factor is kept to what there are polyphase filters for.
 func TestDemod9600InitClampsUpsample(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		upsample int
 		want     int
@@ -253,6 +265,8 @@ func boolToFloat(b bool) float64 {
 
 // The slicing levels are spread evenly and symmetrically about zero.
 func TestSlicePoints(t *testing.T) {
+	t.Parallel()
+
 	for j := range MAX_SUBCHANS {
 		assert.InDelta(t, -slice_point[MAX_SUBCHANS-1-j], slice_point[j], 1e-12)
 	}
@@ -263,6 +277,8 @@ func TestSlicePoints(t *testing.T) {
 }
 
 func TestPushSample(t *testing.T) {
+	t.Parallel()
+
 	var buff = []float64{1, 2, 3, 4, 99}
 
 	push_sample(0, buff, 4)
@@ -273,6 +289,8 @@ func TestPushSample(t *testing.T) {
 // The AGC settles a steady square wave into the range -0.5 .. +0.5, whatever
 // its level and DC offset.
 func TestAGCNormalises(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		amplitude, offset float64
 	}{
@@ -304,6 +322,8 @@ func TestAGCNormalises(t *testing.T) {
 // With no spread between peak and valley yet, the AGC has nothing to scale
 // by and says nothing.
 func TestAGCWithNoSpread(t *testing.T) {
+	t.Parallel()
+
 	var peak, valley, out = agc(0, 0.08, 0.00012, 0, 0)
 
 	assert.Zero(t, peak)

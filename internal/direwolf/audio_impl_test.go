@@ -17,6 +17,8 @@ import (
 // --- audioRingBuffer ---
 
 func TestAudioImpl_ringBuffer_writeThenRead(t *testing.T) {
+	t.Parallel()
+
 	var rb = newAudioRingBuffer(8)
 
 	assert.True(t, rb.write([]byte{1, 2, 3}))
@@ -41,6 +43,8 @@ func TestAudioImpl_ringBuffer_writeThenRead(t *testing.T) {
 }
 
 func TestAudioImpl_ringBuffer_wrapsAround(t *testing.T) {
+	t.Parallel()
+
 	var rb = newAudioRingBuffer(8)
 	var dst = make([]byte, 8)
 
@@ -61,6 +65,8 @@ func TestAudioImpl_ringBuffer_wrapsAround(t *testing.T) {
 }
 
 func TestAudioImpl_ringBuffer_dropsOldestWhenFull(t *testing.T) {
+	t.Parallel()
+
 	var rb = newAudioRingBuffer(4)
 	var dst = make([]byte, 8)
 
@@ -75,6 +81,8 @@ func TestAudioImpl_ringBuffer_dropsOldestWhenFull(t *testing.T) {
 }
 
 func TestAudioImpl_ringBuffer_writeLargerThanBuffer(t *testing.T) {
+	t.Parallel()
+
 	var rb = newAudioRingBuffer(4)
 	var dst = make([]byte, 8)
 
@@ -88,6 +96,8 @@ func TestAudioImpl_ringBuffer_writeLargerThanBuffer(t *testing.T) {
 }
 
 func TestAudioImpl_ringBuffer_close(t *testing.T) {
+	t.Parallel()
+
 	var rb = newAudioRingBuffer(4)
 	var dst = make([]byte, 4)
 
@@ -108,6 +118,8 @@ func TestAudioImpl_ringBuffer_close(t *testing.T) {
 }
 
 func TestAudioImpl_ringBuffer_closeWakesBlockedReader(t *testing.T) {
+	t.Parallel()
+
 	var rb = newAudioRingBuffer(4)
 	var done = make(chan bool)
 
@@ -144,6 +156,8 @@ func setupSoundcardAdev0() (*AudioDevices, *adev_s) {
 }
 
 func TestAudioImpl_audioGet_soundcard(t *testing.T) {
+	t.Parallel()
+
 	var d, dev = setupSoundcardAdev0()
 
 	require.True(t, dev.inputRingBuf.write([]byte{10, 20, 30, 40}))
@@ -161,6 +175,8 @@ func TestAudioImpl_audioGet_soundcard(t *testing.T) {
 }
 
 func TestAudioImpl_audioGet_soundcardOverflow(t *testing.T) {
+	t.Parallel()
+
 	var d, dev = setupSoundcardAdev0()
 
 	// More than the ring buffer holds: the oldest bytes are lost, and
@@ -196,6 +212,7 @@ func setStdin(t *testing.T) (*os.File, *os.File) {
 	return r, w
 }
 
+//nolint:paralleltest // Serial: swaps os.Stdin, which is process-wide.
 func TestAudioImpl_audioOpen_stdin_audioGet(t *testing.T) {
 	var r, w = setStdin(t)
 
@@ -228,6 +245,8 @@ func TestAudioImpl_audioOpen_stdin_audioGet(t *testing.T) {
 // --- UDP input ---
 
 func TestAudioImpl_audioOpen_udpInput_audioGet(t *testing.T) {
+	t.Parallel()
+
 	// Port 0: let the system pick a free one.  The same name on the output
 	// side is the listening port copied over, not somewhere to transmit.
 	var pa = makeRadioConfig("udp:0", "udp:0")
@@ -269,6 +288,8 @@ func TestAudioImpl_audioOpen_udpInput_audioGet(t *testing.T) {
 }
 
 func TestAudioImpl_audioOpen_udpInput_badAddress(t *testing.T) {
+	t.Parallel()
+
 	var pa = makeRadioConfig("udp:Q1TEST", "stdin")
 
 	var _, openErr = AudioOpen(t.Context(), pa)
@@ -276,6 +297,8 @@ func TestAudioImpl_audioOpen_udpInput_badAddress(t *testing.T) {
 }
 
 func TestAudioImpl_audioOpen_udpInput_portInUse(t *testing.T) {
+	t.Parallel()
+
 	var busy, err = new(net.ListenConfig).ListenPacket(t.Context(), "udp", ":0")
 	require.NoError(t, err)
 
@@ -298,6 +321,8 @@ func TestAudioImpl_audioOpen_udpInput_portInUse(t *testing.T) {
 // silence would arrive in among what this test sends.  Put together the
 // device AudioOpen would have instead, less the goroutine.
 func TestAudioImpl_udpOutput_putFlushWaitClose(t *testing.T) {
+	t.Parallel()
+
 	var d = new(AudioDevices)
 
 	var listener, err = new(net.ListenConfig).ListenPacket(t.Context(), "udp", "127.0.0.1:0")
@@ -362,8 +387,12 @@ func TestAudioImpl_udpOutput_putFlushWaitClose(t *testing.T) {
 // A UDP output that can't be dialled leaves a defaulted output receive-only,
 // but is fatal when it was named for transmit.
 func TestAudioImpl_audioOpen_udpOutput_dialFails(t *testing.T) {
+	t.Parallel()
+
 	for _, specified := range []bool{false, true} {
 		t.Run(map[bool]string{false: "defaulted", true: "specified"}[specified], func(t *testing.T) {
+			t.Parallel()
+
 			// No port, so there is nothing to dial.
 			var pa = makeRadioConfig("stdin", "udp:Q1TEST")
 			pa.adev[0].adevice_out_specified = specified
@@ -385,6 +414,8 @@ func TestAudioImpl_audioOpen_udpOutput_dialFails(t *testing.T) {
 // A soundcard input that doesn't exist - or no PortAudio to find it with -
 // is fatal, as there is then nothing to receive from.
 func TestAudioImpl_audioOpen_missingInputDevice_isFatal(t *testing.T) {
+	t.Parallel()
+
 	var pa = makeRadioConfig(noSuchAudioDevice, noSuchAudioDevice)
 
 	var d, err = AudioOpen(t.Context(), pa)
@@ -394,11 +425,14 @@ func TestAudioImpl_audioOpen_missingInputDevice_isFatal(t *testing.T) {
 
 // Close with nothing open has nothing to do.
 func TestAudioImpl_audioClose_nothingOpen(t *testing.T) {
+	t.Parallel()
+
 	assert.NotPanics(t, new(AudioDevices).Close)
 }
 
 // --- Soundcard, on ALSA null devices ---
 
+//nolint:paralleltest // Serial: sets environment variables, which are process-wide.
 func TestAudioImpl_audioOpen_soundcard(t *testing.T) {
 	var tests = []struct {
 		name     string
@@ -471,6 +505,7 @@ func TestAudioImpl_audioOpen_soundcard(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Serial: sets environment variables, which are process-wide.
 func TestAudioImpl_audioOpen_soundcard_separateInputAndOutput(t *testing.T) {
 	nullSoundcards(t, "samoyed_null_in", "samoyed_null_out")
 
@@ -486,6 +521,8 @@ func TestAudioImpl_audioOpen_soundcard_separateInputAndOutput(t *testing.T) {
 
 // With a soundcard to receive from, an output device that isn't there costs
 // only the ability to transmit - unless it was named for transmit.
+//
+//nolint:paralleltest // Serial: sets environment variables, which are process-wide.
 func TestAudioImpl_audioOpen_soundcard_missingOutputDevice(t *testing.T) {
 	for _, specified := range []bool{false, true} {
 		t.Run(map[bool]string{false: "defaulted", true: "specified"}[specified], func(t *testing.T) {
@@ -512,6 +549,8 @@ func TestAudioImpl_audioOpen_soundcard_missingOutputDevice(t *testing.T) {
 // --- AudioOpen's other bookkeeping ---
 
 func TestAudioImpl_audioOpen_fillsInDefaults(t *testing.T) {
+	t.Parallel()
+
 	var pa = makeRadioConfig("stdin", "stdin")
 
 	openAudio(t, pa)
@@ -530,6 +569,8 @@ func TestAudioImpl_audioOpen_fillsInDefaults(t *testing.T) {
 }
 
 func TestAudioImpl_audioOpen_stdinDash(t *testing.T) {
+	t.Parallel()
+
 	var pa = makeRadioConfig("-", "-")
 
 	var d = openAudio(t, pa)
@@ -539,6 +580,8 @@ func TestAudioImpl_audioOpen_stdinDash(t *testing.T) {
 }
 
 func TestAudioImpl_audioOpen_udpInput_defaultPort(t *testing.T) {
+	t.Parallel()
+
 	// The default port is a fixed one, which something else may hold.
 	var probe, probeErr = new(net.ListenConfig).ListenPacket(t.Context(), "udp", ":"+strconv.Itoa(DEFAULT_UDP_AUDIO_PORT))
 	if probeErr != nil {

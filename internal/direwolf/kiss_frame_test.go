@@ -87,6 +87,8 @@ func setupKissProcessMsg(t *testing.T) *KissHandler {
 // handler was given, whichever transport it came by - here, one with no TCP
 // port of its own, such as the serial port.
 func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 
 	var peers, clients = newAttachedKissNet(t, -1, true, 1)
@@ -108,6 +110,8 @@ func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 // with no used digipeater in it - goes on the low priority queue behind
 // anything already being repeated.
 func Test_kiss_process_msg_data_frame(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
@@ -124,6 +128,8 @@ func Test_kiss_process_msg_data_frame(t *testing.T) {
 // A frame that has already been through a digipeater is somebody waiting on
 // air for it, so it jumps the queue.
 func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
@@ -139,6 +145,8 @@ func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
 // The channel is in the top half of the first byte, and a client asking for a
 // channel we do not have is the AX.25-for-Linux CRC mode problem, which gets
 // an explanation rather than a transmission.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -160,6 +168,8 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 // 12, and the hex dump that goes with the explanation had nothing left to show
 // once it skipped what it took for a leading FEND - it indexed past the end.
 // Any client of the KISS ports could send it.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_invalid_channel_escaped_fend_only(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -177,6 +187,8 @@ func Test_kiss_process_msg_invalid_channel_escaped_fend_only(t *testing.T) {
 
 // The debug print of a message has something to say even when there is nothing
 // of the message to print.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func Test_kiss_debug_print_empty(t *testing.T) {
 	for _, msg := range [][]byte{nil, {kiss.FEND}} {
 		var hook = test.NewGlobal()
@@ -192,6 +204,8 @@ func Test_kiss_debug_print_empty(t *testing.T) {
 // A KISS TCP port carrying a single radio channel ignores the channel in the
 // frame: the application thinks it has a one-radio TNC and always says 0.
 func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 
 	var kps = new(kissport_status_s)
@@ -210,6 +224,8 @@ func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
 // nibble, so nothing bounds it to the channel table.  The validity check used
 // to go on to ask whether an out-of-range channel was the IGate's - indexing
 // the table with the very channel it had just found to be out of range.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -232,6 +248,8 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 
 // Bytes that are not an AX.25 frame cannot be transmitted, and are reported
 // rather than passed on.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -247,6 +265,8 @@ func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 // The timing parameters are the rest of what a client sets up, and each is one
 // byte after the command.
 func Test_kiss_process_msg_timing_parameters(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 	var xs = h.xmit
 
@@ -267,6 +287,8 @@ func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 
 // A value nobody would want on purpose is applied, because the client asked,
 // but pointed at the part of the guide that explains what it means.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 	var xs = h.xmit
@@ -295,6 +317,8 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 
 // A parameter command with no parameter is a protocol error, and leaves the
 // setting alone rather than applying whatever happened to be next.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 	var xs = h.xmit
@@ -324,6 +348,8 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 
 // Leaving KISS mode is for a TNC that has another mode to go back to.  We
 // don't, so it is noted and ignored.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_end_kiss(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -339,6 +365,8 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 // A command we don't implement gets the troubleshooting tip, and the two
 // XKISS ones additionally say what the application should be configured as
 // instead.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -370,6 +398,8 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 // question-and-answer form fldigi established, which several applications
 // already speak.
 func Test_kiss_set_hardware_tnc_version(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 
 	var sent, from = recordingKissClient()
@@ -384,6 +414,8 @@ func Test_kiss_set_hardware_tnc_version(t *testing.T) {
 // TXBUF is the one an application actually wanted: how much is still waiting
 // to go out, so that it can throttle a long transmission.
 func Test_kiss_set_hardware_txbuf(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 
 	var sent, from = recordingKissClient()
@@ -407,6 +439,8 @@ func Test_kiss_set_hardware_txbuf(t *testing.T) {
 // A query with a parameter, a command we don't know, and one that isn't in the
 // COMMAND:parameter form at all all get complained about rather than guessed
 // at.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_set_hardware_malformed(t *testing.T) {
 	var sent, from = recordingKissClient()
 
@@ -448,6 +482,8 @@ func feedKissBytes(h *KissHandler, kf *kiss.Collector, debug int, data []byte) *
 }
 
 func Test_KissRecByte_whole_frame(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
@@ -464,6 +500,8 @@ func Test_KissRecByte_whole_frame(t *testing.T) {
 // lines of text.  Each one ending in a carriage return is answered with a
 // command prompt, which is what stops it trying.
 func Test_KissRecByte_command_prompt(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 
 	var kf = new(kiss.Collector)
@@ -478,10 +516,14 @@ func Test_KissRecByte_command_prompt(t *testing.T) {
 // "RESTART" and "RESET" get an empty KISS frame instead, which is what the
 // applications sending them are waiting for.
 func Test_KissRecByte_restart(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 
 	for _, word := range []string{"RESTART\r", "reset\r"} {
 		t.Run(word, func(t *testing.T) {
+			t.Parallel()
+
 			var kf = new(kiss.Collector)
 
 			var sent = feedKissBytes(h, kf, 0, []byte(word))
@@ -494,6 +536,8 @@ func Test_KissRecByte_restart(t *testing.T) {
 
 // With the debug option on, the noise before a frame is shown, so that a
 // client that is not being understood can be looked at.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_KissRecByte_noise_is_printed(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -509,6 +553,8 @@ func Test_KissRecByte_noise_is_printed(t *testing.T) {
 // FENDs with nothing between them are how some clients idle, and are not
 // frames.
 func Test_KissRecByte_empty_frames(t *testing.T) {
+	t.Parallel()
+
 	var h = setupKissProcessMsg(t)
 
 	var kf = new(kiss.Collector)
@@ -520,6 +566,8 @@ func Test_KissRecByte_empty_frames(t *testing.T) {
 
 // A client that never sends a closing FEND is told about once, not once for
 // every byte past the limit.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_KissRecByte_overlong_frame(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -536,6 +584,8 @@ func Test_KissRecByte_overlong_frame(t *testing.T) {
 // written to was one past the end of the buffer - which took the whole program
 // down, from anything that could talk to the KISS port.  The overlong frame is
 // thrown away, and the collector is left ready for the next one.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -561,6 +611,8 @@ func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 
 // With "-d kn" the frame is shown as it arrived and again as it was decoded,
 // which is the pair a protocol problem shows up in.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -582,6 +634,8 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 // is only forgotten by whoever still has the one that is current.
 
 func Test_kissport_status_attach_and_detach(t *testing.T) {
+	t.Parallel()
+
 	var kps = new(kissport_status_s)
 
 	assert.Nil(t, kps.clientConn(0))
@@ -607,6 +661,8 @@ func Test_kissport_status_attach_and_detach(t *testing.T) {
 // A read goroutine that notices its connection has gone must not clear a slot
 // that has since been given to a newer connection from the same client.
 func Test_kissport_status_detach_stale_connection(t *testing.T) {
+	t.Parallel()
+
 	var kps = new(kissport_status_s)
 
 	var older, otherEndOfOlder = net.Pipe()
@@ -628,6 +684,8 @@ func Test_kissport_status_detach_stale_connection(t *testing.T) {
 
 // Every slot taken means there is nowhere to put another client.
 func Test_kissport_status_all_clients_in_use(t *testing.T) {
+	t.Parallel()
+
 	var kps = new(kissport_status_s)
 
 	for c := range MAX_NET_CLIENTS {
@@ -644,6 +702,8 @@ func Test_kissport_status_all_clients_in_use(t *testing.T) {
 // A port that has been stopped hangs up on everyone, and a connection that was
 // already in the accept queue when it stopped is not attached after the fact.
 func Test_kissport_status_stop(t *testing.T) {
+	t.Parallel()
+
 	var kps = new(kissport_status_s)
 
 	var here, there = net.Pipe()
@@ -666,6 +726,8 @@ func Test_kissport_status_stop(t *testing.T) {
 // FEND FESC FEND is a frame, but escapes nothing, so there is no type byte
 // once it is unescaped.  Three bytes from any KISS client used to take the
 // whole program down, looking for one.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_KissRecByte_frame_empty_once_unescaped(t *testing.T) {
 	var h = setupKissProcessMsg(t)
 
@@ -682,6 +744,8 @@ func Test_KissRecByte_frame_empty_once_unescaped(t *testing.T) {
 // What goes to a client is the type byte - channel in the top nybble, command
 // in the bottom - then the frame, with KISS framing and escapes added.
 func Test_kissClientFrame(t *testing.T) {
+	t.Parallel()
+
 	var cases = []struct {
 		name    string
 		channel int
@@ -696,6 +760,8 @@ func Test_kissClientFrame(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, c.want, kissClientFrame(c.channel, c.cmd, c.frame, 0, "Test"))
 		})
 	}
@@ -703,6 +769,8 @@ func Test_kissClientFrame(t *testing.T) {
 
 // A frame longer than AX.25 allows is cut to length before it is framed, so
 // the client is sent what it was told it would get, and the user hears why.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kissClientFrame_truncates(t *testing.T) {
 	var frame = bytes.Repeat([]byte{'x'}, ax25.MaxPacketLen+10)
 

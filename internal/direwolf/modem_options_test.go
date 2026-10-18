@@ -12,6 +12,8 @@ import (
 
 // PSK has no decimating path, so decimation is ruled out for it, and said so
 // rather than done silently.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSettleModemOptionsRejectsPSKDecimation(t *testing.T) {
 	for _, modemType := range []modem_t{MODEM_QPSK, MODEM_8PSK, MODEM_BPSK} {
 		var channel = 0
@@ -28,6 +30,8 @@ func TestSettleModemOptionsRejectsPSKDecimation(t *testing.T) {
 
 // AFSK, by contrast, does decimate.
 func TestSettleModemOptionsKeepsAFSKDecimation(t *testing.T) {
+	t.Parallel()
+
 	var channel = 1
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 48000)
 	audioConfig.achan[channel].decimate = 3
@@ -38,6 +42,8 @@ func TestSettleModemOptionsKeepsAFSKDecimation(t *testing.T) {
 }
 
 // EAS and AIS take only a frame with a good CRC as it came.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSettleModemOptionsTurnsOffFixBitsForEASAndAIS(t *testing.T) {
 	for _, tc := range []struct {
 		modemType modem_t
@@ -64,6 +70,8 @@ func TestSettleModemOptionsTurnsOffFixBitsForEASAndAIS(t *testing.T) {
 
 // Other modems keep their bit fixing.
 func TestSettleModemOptionsKeepsFixBitsForAFSK(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[channel].fix_bits = RETRY_INVERT_SINGLE
@@ -77,6 +85,8 @@ func TestSettleModemOptionsKeepsFixBitsForAFSK(t *testing.T) {
 
 // The transmitter reads the V.26 alternative as well as the receiver, so it
 // is settled here, before either is set up, rather than by the demodulator.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSettleModemOptionsDefaultsV26Alternative(t *testing.T) {
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
@@ -97,6 +107,8 @@ func TestSettleModemOptionsDefaultsV26Alternative(t *testing.T) {
 
 // A channel with no radio on it has no modem options to settle.
 func TestSettleModemOptionsSkipsNonRadioChannels(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[1].modem_type = MODEM_QPSK
 

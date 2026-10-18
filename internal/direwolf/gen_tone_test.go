@@ -37,8 +37,12 @@ func (s *byteSink) Flush(int) int {
 // transmitting device, and a tone generator for every channel on it, mono
 // and stereo alike.
 func TestGenToneTestConfigGeneratesEveryChannel(t *testing.T) {
+	t.Parallel()
+
 	for _, numChannels := range []int{1, 2} {
 		t.Run(fmt.Sprintf("%d channels", numChannels), func(t *testing.T) {
+			t.Parallel()
+
 			var config = NewGenToneTestConfig(numChannels)
 
 			// AudioOpen only sets up an output buffer for a defined device.
@@ -84,6 +88,8 @@ func (s *putCountingSink) Flush(int) int { return 0 }
 // error, which the transmitter is told of once and otherwise carries on past,
 // sending nothing.  It runs mid-transmission, with the PTT keyed, so ending
 // the process there would leave the transmitter keyed.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestPutBitWithUnknownModemSendsNothing(t *testing.T) {
 	var sink = new(putCountingSink)
 	var audioConfig = newTestRadioConfig(0, MODEM_OFF, 1200, 1200, 2200, 44100)
@@ -107,6 +113,8 @@ func TestPutBitWithUnknownModemSendsNothing(t *testing.T) {
 // quiet period, such as Morse's txdelay and txtail, must not be truncated by
 // integer division (issue #762).
 func TestPutQuietMsRoundsAt44100(t *testing.T) {
+	t.Parallel()
+
 	var sink = new(byteSink)
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	var tg = NewToneGenerator(0, audioConfig, 50, sink)

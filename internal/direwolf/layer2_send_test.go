@@ -42,17 +42,12 @@ func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGe
 
 	var bits []int
 
-	toneGenCapture = func(channel int, data int) {
-		assert.Equal(t, hdlcSendTestChannel, channel, "bits should be sent on the channel they were asked for")
-
+	var s = NewLayer2Sender(hdlcSendTestChannel, audioConfig, toneGenerator, 0, 0)
+	s.bitSink = func(data int) {
 		bits = append(bits, data)
 	}
 
-	t.Cleanup(func() { toneGenCapture = nil })
-
-	fn(NewLayer2Sender(hdlcSendTestChannel, audioConfig, toneGenerator, 0, 0))
-
-	toneGenCapture = nil
+	fn(s)
 
 	return bits
 }
@@ -104,6 +99,8 @@ func newHDLCSendTestConfig(layer2 layer2_t) *RadioConfig {
 // the level whatever went before it left the line at, or its first bit is
 // received inverted.
 func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
+	t.Parallel()
+
 	// A frame and its FCS always hold an even number of zeros, so it takes
 	// a stuffed zero to leave the line at 1, where starting the codeblock
 	// afresh from 0 would show.
@@ -136,6 +133,8 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 // for it, and without when they don't, just as the IL2P sender itself does
 // when asked.
 func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
+	t.Parallel()
+
 	var pp = newHDLCSendTestPacket(t, 16)
 
 	var alone = map[bool][]int{}
@@ -166,6 +165,8 @@ func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
 // NRZI level alone, or an HDLC frame sent after it would start from the wrong
 // level and arrive with its first bit inverted.
 func TestIL2PLeavesTheNRZILevelForTheNextHDLCFrame(t *testing.T) {
+	t.Parallel()
+
 	// A stuffed zero leaves the line at 1 after this frame, where starting
 	// the next frame afresh from 0 would show.
 	var first = []byte{hdlcSixtyOne, 'Q', '1', 'T', 'E', 'S', 'T'}
@@ -199,6 +200,8 @@ func TestIL2PLeavesTheNRZILevelForTheNextHDLCFrame(t *testing.T) {
 // The EAS SAME serializer is not HDLC at all: bytes go out as they are, with
 // quiet periods around and between the repeats.
 func TestEASSendRepeatsTheMessageWithItsPreamble(t *testing.T) {
+	t.Parallel()
+
 	var toneGenerator = setupEASSendTest(t)
 
 	const (

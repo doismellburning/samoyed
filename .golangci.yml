@@ -26,9 +26,6 @@ linters:
       - path: _test\.go
         linters:
           - dupl  # Repeated setup and parallel table tests are normal in tests
-      - path: ^internal/direwolf/
-        linters:
-          - paralleltest  # Its tests still share stdout and logrus's global logger, see #972
   settings:
     dupl:
       threshold: 150  # The default; tighten later

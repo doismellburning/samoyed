@@ -49,6 +49,8 @@ func aisPositionReport(t *testing.T, rawSpeed int, rawCourse int) string {
 // transmitted as 82 degrees - a heading nobody reported.  Absence must
 // survive all the way into EncodeObject.
 func Test_ais_to_object_without_course_or_speed(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = aprs.NewDecoderFromDataFiles()
 
 	var sentence = aisPositionReport(t, 1023, 3600)
@@ -80,6 +82,8 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 // The same report with a course and speed still gets its data extension, so
 // the test above is not passing for want of anything to encode.
 func Test_ais_to_object_with_course_and_speed(t *testing.T) {
+	t.Parallel()
+
 	var aprsDecoder = aprs.NewDecoderFromDataFiles()
 
 	var sentence = aisPositionReport(t, 208, 900) // 20.8 knots, 90 degrees
@@ -104,6 +108,7 @@ func Test_ais_to_object_with_course_and_speed(t *testing.T) {
 
 // --- --config-check summary ---
 
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_reportConfigCheck(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -154,6 +159,8 @@ func Test_reportConfigCheck(t *testing.T) {
 // stations-heard list, so an object report can't overwrite where its sender is
 // (Dire Wolf issue 545).
 func TestMheardPosition(t *testing.T) {
+	t.Parallel()
+
 	var position = new(aprs.Decoder).Decode(ax25.FromText("Q1TEST>APDW17:!4237.14N/07120.83W#", true), true)
 	var lat, lon = mheardPosition(position)
 	assert.True(t, lat.IsJust())
@@ -177,6 +184,8 @@ const teardownExitEnv = "SAMOYED_TEST_TEARDOWN_EXIT"
 // the process, as a stop does.  Ending the process takes the test binary
 // with it, so the test runs a copy of itself to do it.
 func TestTeardownExitReleasesBeforeExiting(t *testing.T) {
+	t.Parallel()
+
 	if os.Getenv(teardownExitEnv) != "" {
 		var td = new(teardownList)
 		td.stop = func() { fmt.Println("stopped the goroutines") }
@@ -208,6 +217,8 @@ func TestTeardownExitReleasesBeforeExiting(t *testing.T) {
 // DNS-SD announces the KISS TCP and AGW ports being listened on, and not a
 // configured one that could not be bound, nor an AGW server there is none of.
 func TestListeningPortsLeavesOutWhatIsNotListening(t *testing.T) {
+	t.Parallel()
+
 	// Every address, as a configured port is bound: see TestKissNetListenFails.
 	var taken, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp", ":0")
 	require.NoError(t, listenErr)

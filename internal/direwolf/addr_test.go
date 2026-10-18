@@ -11,6 +11,8 @@ import (
 )
 
 func TestAddrPort(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 8001, addrPort(&net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8001, Zone: ""}))
 	assert.Equal(t, 0, addrPort(&net.UnixAddr{Name: "/nowhere", Net: "unix"}))
 	assert.Equal(t, 0, addrPort(nil))

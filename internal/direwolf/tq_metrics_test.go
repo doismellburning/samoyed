@@ -46,6 +46,8 @@ func newTestPacket(t *testing.T) *ax25.Packet {
 // The test hammers the lock while packets are being appended, which is what
 // puts an observer inside that window; a final-state assertion alone does not
 // find it, because by then every delayed publish has landed.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 	const (
 		CHANNEL   = 0
@@ -139,6 +141,8 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 // counter is state that can drift from the list it describes if a mutation
 // site forgets to maintain it.  Each assertion cross-checks the published depth
 // against an actual traversal, which is what catches drift.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestTxQueueDepthTracksDrain(t *testing.T) {
 	const (
 		CHANNEL  = 0
@@ -187,6 +191,8 @@ func TestTxQueueDepthTracksDrain(t *testing.T) {
 // the list, so it has to make the same distinction - otherwise ordinary
 // connected-mode acknowledgement reports a packet waiting when there is
 // nothing to send, and the gauge shows a backlog that does not exist.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestTxQueueDepthIgnoresSeizeMarker(t *testing.T) {
 	const (
 		CHANNEL = 0
@@ -230,6 +236,8 @@ func TestTxQueueDepthIgnoresSeizeMarker(t *testing.T) {
 // is one per channel and priority for the whole process, so a new, empty queue
 // has to clear it.  A gauge left at its old value would describe a queue that
 // no longer exists until the next enqueue.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestTxQueueDepthResetByNewQueue(t *testing.T) {
 	const (
 		CHANNEL = 0

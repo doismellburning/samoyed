@@ -12,6 +12,8 @@ import (
 
 // fcos256 and fsin256 take a phase whose top byte is the fraction of a turn.
 func TestFcos256Table(t *testing.T) {
+	t.Parallel()
+
 	assert.InDelta(t, 1.0, fcos256(0), 1e-12)
 	assert.InDelta(t, 0.0, fsin256(0), 1e-12)
 	assert.InDelta(t, 0.0, fcos256(64<<24), 1e-12)
@@ -21,6 +23,8 @@ func TestFcos256Table(t *testing.T) {
 
 // The space gains run geometrically from MIN_G to MAX_G.
 func TestAFSKSpaceGain(t *testing.T) {
+	t.Parallel()
+
 	assert.InDelta(t, MIN_G, afskSpaceGain[0], 1e-12)
 	assert.InDelta(t, MAX_G, afskSpaceGain[MAX_SUBCHANS-1], 1e-9)
 
@@ -34,6 +38,8 @@ func TestAFSKSpaceGain(t *testing.T) {
 // up at once - as tests running in parallel would - without racing over a
 // shared table.
 func TestDemodulatorInitsDoNotShareState(t *testing.T) {
+	t.Parallel()
+
 	var wg sync.WaitGroup
 
 	for range 2 {

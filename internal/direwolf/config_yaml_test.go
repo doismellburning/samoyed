@@ -48,6 +48,8 @@ func underSamoyed(content string) string {
 
 // Each YAML configuration here says the same as the legacy one beside it, so
 // both must come out as the same configuration, with the same complaints.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_yaml_matches_legacy(t *testing.T) {
 	var tests = []struct {
 		name   string
@@ -287,6 +289,7 @@ legacy: |
 	}
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_yaml(t *testing.T) {
 	t.Run("an AXUDP port makes its channel an AXUDP one", func(t *testing.T) {
 		var c = parseYAMLConfig(t, `
@@ -679,6 +682,7 @@ legacy: |
 	})
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_yaml_node_map(t *testing.T) {
 	t.Run("the node is reported to the node map when asked", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "node:\n  address: q1test-7\n  alias: samnod\n  map: {}\n")

@@ -31,6 +31,8 @@ func newTestRadioConfig(channel int, modemType modem_t, baud int, markFreq int, 
 }
 
 func TestNewToneGeneratorAFSK(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 	var baud = 1200
 	var markFreq = 1200
@@ -51,6 +53,8 @@ func TestNewToneGeneratorAFSK(t *testing.T) {
 }
 
 func TestNewToneGeneratorBPSK(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_BPSK, 2400, 0, 0, 44100)
 
@@ -65,6 +69,8 @@ func TestNewToneGeneratorBPSK(t *testing.T) {
 }
 
 func TestToneGeneratorsAreIndependentPerChannel(t *testing.T) {
+	t.Parallel()
+
 	var chan0 = 0
 	var chan1 = 1
 	var audioConfig = newTestRadioConfig(chan0, MODEM_AFSK, 1200, 1200, 2200, 44100)
@@ -88,6 +94,8 @@ func TestToneGeneratorsAreIndependentPerChannel(t *testing.T) {
 }
 
 func TestToneGeneratorSineTableFollowsAmplitude(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 
 	var full = NewToneGenerator(0, audioConfig, 100, nil)
@@ -127,6 +135,8 @@ func decodeMono16(data []byte) []int16 {
 }
 
 func TestToneGeneratorPutBitAFSK(t *testing.T) {
+	t.Parallel()
+
 	// 12000 samples/sec at 1200 baud is ten samples a bit.
 	var tg, sink, _ = newCapturingToneGenerator(MODEM_AFSK, 1200, 12000)
 
@@ -147,6 +157,8 @@ func TestToneGeneratorPutBitAFSK(t *testing.T) {
 }
 
 func TestToneGeneratorPutBitNegativeInsertsExtraTime(t *testing.T) {
+	t.Parallel()
+
 	var tg, sink, _ = newCapturingToneGenerator(MODEM_AFSK, 1200, 12000)
 
 	// -1 knocks a whole bit time off the accumulator first, so it
@@ -159,6 +171,8 @@ func TestToneGeneratorPutBitNegativeInsertsExtraTime(t *testing.T) {
 }
 
 func TestToneGeneratorPutBitEAS(t *testing.T) {
+	t.Parallel()
+
 	var tg, sink, _ = newCapturingToneGenerator(MODEM_EAS, 0, 48000)
 
 	assert.Equal(t, int(math.Floor((TICKS_PER_CYCLE/520.833333333333)+0.5)), tg.ticksPerBit)
@@ -180,6 +194,8 @@ func TestToneGeneratorPutBitEAS(t *testing.T) {
 }
 
 func TestToneGeneratorPutBitBPSK(t *testing.T) {
+	t.Parallel()
+
 	// 2400 baud at 24000 samples/sec is ten samples a symbol.
 	var tg, sink, _ = newCapturingToneGenerator(MODEM_BPSK, 2400, 24000)
 
@@ -198,6 +214,8 @@ func TestToneGeneratorPutBitBPSK(t *testing.T) {
 }
 
 func TestNewToneGeneratorQPSKAnd8PSK(t *testing.T) {
+	t.Parallel()
+
 	var qpsk, _, qcfg = newCapturingToneGenerator(MODEM_QPSK, 2400, 44100)
 
 	assert.Equal(t, 1800, qcfg.achan[0].mark_freq)
@@ -215,6 +233,8 @@ func TestNewToneGeneratorQPSKAnd8PSK(t *testing.T) {
 }
 
 func TestToneGeneratorPutBitQPSK(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name  string
 		alt   v26_e
@@ -224,6 +244,8 @@ func TestToneGeneratorPutBitQPSK(t *testing.T) {
 		{"V26B", V26_B, PHASE_SHIFT_45},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// 2400 bps is 1200 symbols/sec: ten samples a symbol at 12000.
 			var tg, sink, cfg = newCapturingToneGenerator(MODEM_QPSK, 2400, 12000)
 			cfg.achan[0].v26_alternative = tc.alt
@@ -246,6 +268,8 @@ func TestToneGeneratorPutBitQPSK(t *testing.T) {
 }
 
 func TestToneGeneratorPutBit8PSK(t *testing.T) {
+	t.Parallel()
+
 	// 3600 bps is 1200 symbols/sec: ten samples a symbol at 12000.
 	var tg, sink, _ = newCapturingToneGenerator(MODEM_8PSK, 3600, 12000)
 
@@ -264,6 +288,8 @@ func TestToneGeneratorPutBit8PSK(t *testing.T) {
 }
 
 func TestNewToneGeneratorBaseband(t *testing.T) {
+	t.Parallel()
+
 	for _, mt := range []modem_t{MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS} {
 		var tg, _, _ = newCapturingToneGenerator(mt, 9600, 48000)
 
@@ -274,6 +300,8 @@ func TestNewToneGeneratorBaseband(t *testing.T) {
 }
 
 func TestToneGeneratorPutBitBaseband(t *testing.T) {
+	t.Parallel()
+
 	var tg, sink, _ = newCapturingToneGenerator(MODEM_BASEBAND, 9600, 48000)
 
 	// Same as the previous bit (0), in the upper half of the cycle: hold
@@ -310,6 +338,8 @@ func TestToneGeneratorPutBitBaseband(t *testing.T) {
 }
 
 func TestToneGeneratorPutBitScrambles(t *testing.T) {
+	t.Parallel()
+
 	var tg, _, _ = newCapturingToneGenerator(MODEM_SCRAMBLE, 9600, 48000)
 
 	// With an empty shift register, the scrambler passes the first bits
@@ -328,6 +358,8 @@ func TestToneGeneratorPutBitScrambles(t *testing.T) {
 }
 
 func TestToneGeneratorPutBitIL2PNotScrambled(t *testing.T) {
+	t.Parallel()
+
 	var tg, _, cfg = newCapturingToneGenerator(MODEM_SCRAMBLE, 9600, 48000)
 	cfg.achan[0].layer2_xmit = LAYER2_IL2P
 
@@ -343,6 +375,8 @@ func TestToneGeneratorPutBitIL2PNotScrambled(t *testing.T) {
 }
 
 func TestToneGeneratorPutSampleFormats(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		name     string
 		channels int
@@ -363,6 +397,8 @@ func TestToneGeneratorPutSampleFormats(t *testing.T) {
 		{"clipped low", 1, 16, 0, -40000, []byte{0x01, 0x80}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			var audioConfig = newTestRadioConfig(tc.channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
 			audioConfig.adev[0].num_channels = tc.channels
 			audioConfig.adev[0].bits_per_sample = tc.bits
@@ -378,6 +414,8 @@ func TestToneGeneratorPutSampleFormats(t *testing.T) {
 }
 
 func TestToneGeneratorPutQuietMsAndFlush(t *testing.T) {
+	t.Parallel()
+
 	var tg, sink, _ = newCapturingToneGenerator(MODEM_AFSK, 1200, 8000)
 
 	tg.tonePhase = 12345
@@ -398,6 +436,8 @@ func TestToneGeneratorPutQuietMsAndFlush(t *testing.T) {
 }
 
 func TestNewSineTableClipsExcessiveAmplitude(t *testing.T) {
+	t.Parallel()
+
 	var table = newSineTable(200)
 
 	assert.Equal(t, int16(32767), table[64])
@@ -406,6 +446,8 @@ func TestNewSineTableClipsExcessiveAmplitude(t *testing.T) {
 }
 
 func TestGray2Phase(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, []uint{0, 1, 3, 2}, []uint{gray2phaseV26(0), gray2phaseV26(1), gray2phaseV26(2), gray2phaseV26(3)})
 
 	var got = make([]uint, 0, 8)
@@ -417,6 +459,8 @@ func TestGray2Phase(t *testing.T) {
 }
 
 func TestNewGenToneTestConfig(t *testing.T) {
+	t.Parallel()
+
 	var config = NewGenToneTestConfig(2)
 
 	assert.Equal(t, DEFAULT_ADEVICE, config.adev[0].adevice_in)
@@ -431,6 +475,8 @@ func TestNewGenToneTestConfig(t *testing.T) {
 }
 
 func TestNewToneGeneratorsAndSenderFunctions(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 12000)
 	var sink = new(byteSink)
 

@@ -19,6 +19,8 @@ import (
 // a failed attempt bumped both samoyed_igate_connects_total and
 // samoyed_igate_failed_connects_total, and the "successful connections" metric
 // was really an attempts counter.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry and relies on a port staying unused, which a parallel test could take.
 func TestIgateDialCountsOnlySuccessfulConnections(t *testing.T) {
 	const (
 		connects = "samoyed_igate_connects_total"
@@ -66,6 +68,8 @@ func TestIgateDialCountsOnlySuccessfulConnections(t *testing.T) {
 // connect thread only slept while it had a connection, so a server refusing
 // connections was redialled in a tight loop, each attempt bumping the
 // failed-connect counter.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, reads Prometheus's default registry and relies on a port staying unused, which a parallel test could take.
 func TestIGateConnectThreadWaitsBeforeRedialling(t *testing.T) {
 	const failed = "samoyed_igate_failed_connects_total"
 

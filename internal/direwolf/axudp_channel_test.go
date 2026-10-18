@@ -108,8 +108,12 @@ func assertNoTestAXUDPDatagram(t *testing.T, peer *net.UDPConn) {
 // A datagram from another node is a frame received on the AXUDP channel, with
 // or without the checksum most AXUDP implementations append.
 func TestAXUDPChannelReceivedFrameReachesTheQueue(t *testing.T) {
+	t.Parallel()
+
 	for _, withCRC := range []bool{true, false} {
 		t.Run(map[bool]string{true: "with CRC", false: "without CRC"}[withCRC], func(t *testing.T) {
+			t.Parallel()
+
 			var dlq = NewDataLinkQueue()
 
 			var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), dlq.RecFrame)
@@ -144,6 +148,8 @@ func TestAXUDPChannelReceivedFrameReachesTheQueue(t *testing.T) {
 
 // A datagram that is not an AX.25 frame is dropped, and the channel carries on.
 func TestAXUDPChannelUndecodableDatagramIsDropped(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), dlq.RecFrame)
@@ -170,6 +176,8 @@ func TestAXUDPChannelUndecodableDatagramIsDropped(t *testing.T) {
 
 // Sending goes to the node mapped for the destination, checksum appended.
 func TestAXUDPChannelSendPacket(t *testing.T) {
+	t.Parallel()
+
 	var peer = newTestAXUDPPeer(t)
 	var other = newTestAXUDPPeer(t)
 
@@ -194,6 +202,8 @@ func TestAXUDPChannelSendPacket(t *testing.T) {
 
 // A frame for a broadcast address goes to every node marked for broadcasts.
 func TestAXUDPChannelSendBroadcast(t *testing.T) {
+	t.Parallel()
+
 	var peers = []*net.UDPConn{newTestAXUDPPeer(t), newTestAXUDPPeer(t)}
 	var unmarked = newTestAXUDPPeer(t)
 
@@ -222,6 +232,8 @@ func TestAXUDPChannelSendBroadcast(t *testing.T) {
 }
 
 // A frame for somewhere nobody is mapped to goes nowhere, and says so.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestAXUDPChannelSendUnrouted(t *testing.T) {
 	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), nil)
 
@@ -240,6 +252,8 @@ func TestAXUDPChannelSendUnrouted(t *testing.T) {
 // With automap, a frame for a node no map covers goes back to the mapped host
 // it was heard from.
 func TestAXUDPChannelAutoMapRepliesToSender(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var peer = newTestAXUDPPeer(t)
@@ -267,6 +281,8 @@ func TestAXUDPChannelAutoMapRepliesToSender(t *testing.T) {
 }
 
 // A channel that could not be opened discards what is sent on it.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestAXUDPChannelSendPacketNoChannel(t *testing.T) {
 	var ac *AXUDPChannel
 
@@ -282,6 +298,8 @@ func TestAXUDPChannelSendPacketNoChannel(t *testing.T) {
 }
 
 // Starting twice would split what arrives between two readers.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestAXUDPChannelStartedTwiceComplains(t *testing.T) {
 	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), nil)
 
@@ -298,6 +316,8 @@ func TestAXUDPChannelStartedTwiceComplains(t *testing.T) {
 
 // Cancelling closes the socket, freeing the port.
 func TestAXUDPChannelStopsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
 	var ctx, cancel = context.WithCancel(t.Context())
 
 	var ac = openTestAXUDPChannel(ctx, t, noAXUDPRoutes(), nil)
@@ -320,6 +340,8 @@ func TestAXUDPChannelStopsWhenCancelled(t *testing.T) {
 // Two channels cannot share a port, and the second saying so is better than
 // silently hearing nothing.
 func TestAXUDPChannelPortInUse(t *testing.T) {
+	t.Parallel()
+
 	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), nil)
 
 	var port = testAXUDPChannelAddr(t, ac).Port
@@ -331,6 +353,8 @@ func TestAXUDPChannelPortInUse(t *testing.T) {
 
 // The transmit queue hands a packet for an AXUDP channel to that channel.
 func TestAXUDPChannelTransmitQueue(t *testing.T) {
+	t.Parallel()
+
 	var peer = newTestAXUDPPeer(t)
 
 	var routes = noAXUDPRoutes()
@@ -360,6 +384,8 @@ func TestAXUDPChannelTransmitQueue(t *testing.T) {
 // the data link goes straight out, and a seize is confirmed at once, there
 // being no radio channel to wait for.
 func TestAXUDPChannelConnectedMode(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var peer = newTestAXUDPPeer(t)
@@ -396,6 +422,8 @@ func TestAXUDPChannelConnectedMode(t *testing.T) {
 
 // Anyone who can reach the port can send junk, so turning it away is not
 // worth a warning each time.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestAXUDPChannelJunkIsNotWarnedAbout(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 
@@ -418,6 +446,8 @@ func TestAXUDPChannelJunkIsNotWarnedAbout(t *testing.T) {
 
 // Sending on a channel whose socket has been closed on the way out is not an
 // error worth reporting.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestAXUDPChannelSendAfterCloseIsQuiet(t *testing.T) {
 	var peer = newTestAXUDPPeer(t)
 

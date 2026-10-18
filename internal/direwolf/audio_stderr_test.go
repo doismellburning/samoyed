@@ -67,6 +67,7 @@ func captureStdout(t *testing.T, fn func()) string {
 	return string(out)
 }
 
+//nolint:paralleltest // Serial: redirects file descriptor 2, which is process-wide.
 func TestCaptureStderrFDCapturesNativeWrites(t *testing.T) {
 	var before = stderrIdentity(t)
 
@@ -79,6 +80,7 @@ func TestCaptureStderrFDCapturesNativeWrites(t *testing.T) {
 	assert.Equal(t, before, stderrIdentity(t), "stderr should have been restored")
 }
 
+//nolint:paralleltest // Serial: redirects file descriptor 2, which is process-wide.
 func TestCaptureStderrFDDrainsMoreThanItKeeps(t *testing.T) {
 	// More than a pipe will buffer, so this deadlocks if the reader stops
 	// reading once it has all it intends to keep.
@@ -97,14 +99,11 @@ func TestCaptureStderrFDDrainsMoreThanItKeeps(t *testing.T) {
 // where our copy of the pipe's write end isn't the only one, as happens when
 // something is forked while file descriptor 2 is the pipe: the end of the pipe
 // never arrives, and waiting for it unconditionally would hang the process.
+//
+//nolint:paralleltest // Serial: redirects file descriptor 2, which is process-wide.
 func TestCaptureStderrFDGivesUpWhenSomethingElseHoldsThePipe(t *testing.T) {
-	var realTimeout = captureDrainTimeout
-
-	captureDrainTimeout = 100 * time.Millisecond
-
-	defer func() {
-		captureDrainTimeout = realTimeout
-	}()
+	var c = newStderrCapture()
+	c.drainTimeout = 100 * time.Millisecond
 
 	var before = stderrIdentity(t)
 
@@ -117,7 +116,7 @@ func TestCaptureStderrFDGivesUpWhenSomethingElseHoldsThePipe(t *testing.T) {
 	var done = make(chan string, 1)
 
 	go func() {
-		done <- captureStderrFD(func() {
+		done <- c.capture(func() {
 			// Stand in for the forked process: a copy of the write end that
 			// outlives the call.
 			leaked, leakErr = unix.Dup(unix.Stderr)
@@ -146,6 +145,8 @@ func TestCaptureStderrFDGivesUpWhenSomethingElseHoldsThePipe(t *testing.T) {
 // stderr back fails: file descriptor 2 is then still the pipe's write end, and
 // unless that is released the reader never reaches the end of the pipe and the
 // capture waits for it forever.
+//
+//nolint:paralleltest // Serial: redirects file descriptor 2, which is process-wide.
 func TestCaptureStderrFDSurvivesAFailedRestore(t *testing.T) {
 	var before = stderrIdentity(t)
 
@@ -155,29 +156,24 @@ func TestCaptureStderrFDSurvivesAFailedRestore(t *testing.T) {
 
 	require.NoError(t, dupErr)
 
-	var realDupOntoStderr = dupOntoStderrFn
-
-	defer func() {
-		dupOntoStderrFn = realDupOntoStderr
-	}()
-
 	// Fail only the restore, so the capture itself is set up as usual.
 	var redirected bool
 
-	dupOntoStderrFn = func(fd int) error {
+	var c = newStderrCapture()
+	c.dupOntoStderr = func(fd int) error {
 		if redirected {
 			return unix.EBADF
 		}
 
 		redirected = true
 
-		return realDupOntoStderr(fd)
+		return dupOntoStderr(fd)
 	}
 
 	var done = make(chan string, 1)
 
 	go func() {
-		done <- captureStderrFD(func() {
+		done <- c.capture(func() {
 			var _, err = unix.Write(unix.Stderr, []byte(alsaNoise))
 			assert.NoError(t, err)
 		})
@@ -199,13 +195,12 @@ func TestCaptureStderrFDSurvivesAFailedRestore(t *testing.T) {
 
 	// It is /dev/null rather than the real stderr at this point, so put the
 	// real one back for the rest of the tests.
-	dupOntoStderrFn = realDupOntoStderr
-
-	require.NoError(t, realDupOntoStderr(savedStderr))
+	require.NoError(t, dupOntoStderr(savedStderr))
 	require.NoError(t, unix.Close(savedStderr))
 	assert.Equal(t, before, stderrIdentity(t))
 }
 
+//nolint:paralleltest // Serial: redirects file descriptor 2, which is process-wide.
 func TestCaptureStderrFDRestoresStderrAfterPanic(t *testing.T) {
 	var before = stderrIdentity(t)
 
@@ -218,6 +213,7 @@ func TestCaptureStderrFDRestoresStderrAfterPanic(t *testing.T) {
 	assert.Equal(t, before, stderrIdentity(t), "stderr should have been restored")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and redirects file descriptor 2.
 func TestQuietPortAudioHoldsBackNoiseUntilSomethingIsReported(t *testing.T) {
 	var d = new(AudioDevices)
 
@@ -257,6 +253,7 @@ func TestQuietPortAudioHoldsBackNoiseUntilSomethingIsReported(t *testing.T) {
 	assert.NotContains(t, out, "cannot find card")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and redirects file descriptor 2.
 func TestQuietPortAudioKeepsTheMostRecentNoise(t *testing.T) {
 	// Each call captures and remembers under one lock, so the noise left for
 	// printing is the latest, rather than whichever call happened to finish

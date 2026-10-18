@@ -20,6 +20,8 @@ import (
 // at 0, a perfectly real value meaning "omit no digits", so the guard never
 // fired and every ambiguity-less message silently reset it.
 func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
+	t.Parallel()
+
 	var my_audio_config RadioConfig
 
 	my_audio_config.mycall[0] = "Q1TEST-15"
@@ -53,6 +55,8 @@ func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 // be a number, so it failed, the error was ignored, and the object report
 // carried no frequency at all.
 func TestObjectReportCarriesFrequency(t *testing.T) {
+	t.Parallel()
+
 	var my_audio_config RadioConfig
 
 	my_audio_config.mycall[0] = "Q1TEST-15"
@@ -77,6 +81,8 @@ func TestObjectReportCarriesFrequency(t *testing.T) {
 // TextToTwoKey passes any Unicode digit through, but only ASCII ones belong in
 // the suffix - another used to be narrowed to a byte and taken for a letter.
 func TestDigitSuffixIgnoresNonASCIIDigits(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, digit_suffix("Q1TEST"), digit_suffix("Q1TE\u0663ST")) // ARABIC-INDIC DIGIT THREE
 }
 
@@ -85,6 +91,8 @@ func TestDigitSuffixIgnoresNonASCIIDigits(t *testing.T) {
 // table, through Button's idle ticks, to send the object reports it has
 // scheduled.  Nothing ordered the two, so they raced on the table.
 func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
+	t.Parallel()
+
 	var my_audio_config RadioConfig
 
 	my_audio_config.mycall[0] = "Q1TEST-15"
@@ -119,6 +127,8 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 // was told to remember transmissions with - the digipeater, in DirewolfMain -
 // so that hearing it again doesn't get it digipeated.
 func TestTransmittedObjectReportIsRemembered(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = makeBeaconModemConfig()
 
 	var ttConfig tt_config_s
@@ -150,6 +160,8 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 // An object report bound for APRS-IS goes to the IGate the gateway was
 // handed, the first time only, on the channel it was heard on.
 func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = makeBeaconModemConfig()
 
 	var ttConfig tt_config_s

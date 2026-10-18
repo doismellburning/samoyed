@@ -31,6 +31,8 @@ import (
 // skipped, leaving the device locked forever and every later transmission on
 // it blocked.
 func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 
 	var xs = new(XmitService)
@@ -52,6 +54,8 @@ func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
 // transmission.  Run under -race, this reports the two touching the timing at
 // once unless something orders them.
 func TestXmitTimingSetWhileTransmitting(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 
 	var xs = new(XmitService)
@@ -85,6 +89,8 @@ func TestXmitTimingSetWhileTransmitting(t *testing.T) {
 // air, and mute the receiver for the duration of a half-duplex transmission.
 // Frames queued for such a channel are thrown away instead.
 func TestDiscardUntransmittableEmptiesTheQueue(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 
 	var audioConfig = new(RadioConfig)
@@ -113,6 +119,8 @@ func TestDiscardUntransmittableEmptiesTheQueue(t *testing.T) {
 // session waiting for a confirmation that never comes, so the discard path
 // answers it too.
 func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var channel = 0
@@ -149,6 +157,8 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 // makes this test transmit instead of discard, and saidCannotTransmit stays
 // false.
 func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 
 	var audioConfig = new(RadioConfig)
@@ -183,6 +193,8 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 // wait, which nothing but a wake-up can reach.  Cancelling its context has to
 // be one of those wake-ups, or the thread runs until the process exits.
 func TestXmitThreadStopsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 
 	var audioConfig = new(RadioConfig)
@@ -219,6 +231,8 @@ func TestXmitThreadStopsWhenCancelled(t *testing.T) {
 // A transmit thread whose context is cancelled before it ever waits must not
 // then sit down and wait for a broadcast that has already been and gone.
 func TestXmitThreadStopsWhenCancelledBeforeStarting(t *testing.T) {
+	t.Parallel()
+
 	var channel = 0
 
 	var audioConfig = new(RadioConfig)
@@ -250,6 +264,8 @@ func TestXmitThreadStopsWhenCancelledBeforeStarting(t *testing.T) {
 // The transmit scheduler decides what can share a transmission with what, and
 // frame_flavor is where that decision starts.
 func TestFrameFlavor(t *testing.T) {
+	t.Parallel()
+
 	for _, c := range []struct {
 		name string
 		text string
@@ -263,6 +279,8 @@ func TestFrameFlavor(t *testing.T) {
 		{"DTMF", "Q1TEST>DTMF:hello", FLAVOR_DTMF},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
 			var pp = ax25.FromText(c.text, true)
 			require.NotNil(t, pp)
 
@@ -284,6 +302,8 @@ func TestFrameFlavor(t *testing.T) {
 // The priority a frame went out at is shown in the transmit line, so that a
 // log says which queue it came from.
 func TestPriorityToRune(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 'H', priorityToRune(TQ_PRIO_0_HI))
 	assert.Equal(t, 'L', priorityToRune(TQ_PRIO_1_LO))
 }
@@ -291,6 +311,8 @@ func TestPriorityToRune(t *testing.T) {
 // Timings are worked out in bits, because that is what the modulator counts,
 // and reported in milliseconds, because that is what the configuration is in.
 func TestBitsAndMilliseconds(t *testing.T) {
+	t.Parallel()
+
 	var xs = new(XmitService)
 	xs.bits_per_sec[0] = 1200
 
@@ -304,6 +326,8 @@ func TestBitsAndMilliseconds(t *testing.T) {
 // The transmit line can carry a timestamp, for a log that has to be lined up
 // against something else.
 func TestTimestampPrefix(t *testing.T) {
+	t.Parallel()
+
 	var xs = new(XmitService)
 	xs.p_modem = new(RadioConfig)
 
@@ -326,12 +350,6 @@ func setupXmitTransmission(t *testing.T) (*XmitService, *TransmitQueue) {
 
 	const channel = 0
 
-	var origToneGen = toneGenCapture
-
-	t.Cleanup(func() {
-		toneGenCapture = origToneGen
-	})
-
 	var audioConfig = new(RadioConfig)
 	audioConfig.adev[0].defined = 1
 	audioConfig.adev[0].num_channels = 1
@@ -347,13 +365,11 @@ func setupXmitTransmission(t *testing.T) (*XmitService, *TransmitQueue) {
 
 	var tq = newTestTransmitQueue(audioConfig)
 
-	// Sending a frame serialises it to bits; the capture takes them instead of
-	// the modulator.  The device itself still has to be there, though: the
-	// flushing and draining reach into it, and morse and DTMF go round the
-	// modulator straight to its output buffer.  With no stream attached, what
-	// lands in that buffer is discarded rather than played.
-	toneGenCapture = func(int, int) {}
-
+	// Sending a frame serialises it to bits; the sender's bit sink takes them
+	// instead of the modulator.  The device itself still has to be there,
+	// though: the flushing and draining reach into it, and morse and DTMF go
+	// round the modulator straight to its output buffer.  With no stream
+	// attached, what lands in that buffer is discarded rather than played.
 	var audio = new(AudioDevices)
 	audio.dev[0] = new(adev_s)
 	audio.dev[0].outbufSizeInBytes = 4096
@@ -366,12 +382,16 @@ func setupXmitTransmission(t *testing.T) (*XmitService, *TransmitQueue) {
 	xs.bits_per_sec[channel] = 1200
 	xs.audioOutAvailable[0] = true
 	xs.queue = tq
+	xs.layer2Senders[channel] = NewLayer2Sender(channel, audioConfig, xs.toneGenerators[channel], 0, 0)
+	xs.layer2Senders[channel].bitSink = func(int) {}
 
 	return xs, tq
 }
 
 // A frame going out is announced on the console, in the same form a received
 // one is shown in, so that a log reads as a conversation.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSendOneFrame(t *testing.T) {
 	var xs, _ = setupXmitTransmission(t)
 
@@ -388,6 +408,8 @@ func TestSendOneFrame(t *testing.T) {
 
 // Each frame sent is passed on, with its channel, to whatever the transmit
 // service was told to report them to - the web interface, in DirewolfMain.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSendOneFrameReportsWhatWasSent(t *testing.T) {
 	var xs, _ = setupXmitTransmission(t)
 
@@ -407,6 +429,8 @@ func TestSendOneFrameReportsWhatWasSent(t *testing.T) {
 
 // A connected mode frame is not self-explanatory the way an APRS one is, so
 // the frame type is spelled out.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSendOneFrameNonAPRS(t *testing.T) {
 	var xs, _ = setupXmitTransmission(t)
 
@@ -425,6 +449,8 @@ func TestSendOneFrameNonAPRS(t *testing.T) {
 
 // An XID frame's information field is a set of negotiated parameters, which
 // are shown decoded rather than as bytes.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSendOneFrameXID(t *testing.T) {
 	var xs, _ = setupXmitTransmission(t)
 
@@ -449,6 +475,8 @@ func TestSendOneFrameXID(t *testing.T) {
 // something to send: nothing goes on the air, and the data link state machine
 // is told the opportunity has arrived.
 func TestSendOneFrameNullFrame(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var xs, _ = setupXmitTransmission(t)
@@ -469,6 +497,8 @@ func TestSendOneFrameNullFrame(t *testing.T) {
 
 // "-x" sends deliberately corrupted frames, for testing a receiver.  At 100
 // per cent every frame is corrupted, and says so.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSendOneFrameDeliberateBadFCS(t *testing.T) {
 	var xs, _ = setupXmitTransmission(t)
 
@@ -484,6 +514,8 @@ func TestSendOneFrameDeliberateBadFCS(t *testing.T) {
 
 // "-d p" adds a hex dump of what went out, for comparing against what a
 // receiver made of it.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSendOneFrameDebugHexDump(t *testing.T) {
 	var xs, _ = setupXmitTransmission(t)
 
@@ -499,6 +531,8 @@ func TestSendOneFrameDebugHexDump(t *testing.T) {
 
 // A transmission is PTT on, a preamble, the frames, a postamble, PTT off - and
 // more than one frame can share it when the queue has more waiting.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitAX25FramesBundles(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -519,6 +553,8 @@ func TestXmitAX25FramesBundles(t *testing.T) {
 
 // A digipeated APRS frame gets a transmission to itself: bundling it behind
 // something else is what makes a digipeater step on the frames after it.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitAX25FramesDoesNotBundleDigipeated(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -539,6 +575,8 @@ func TestXmitAX25FramesDoesNotBundleDigipeated(t *testing.T) {
 
 // A limit of one frame per transmission is what the bundling rules ask for in
 // some cases, and it is respected whatever is waiting.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitAX25FramesRespectsMaxBundle(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -558,6 +596,8 @@ func TestXmitAX25FramesRespectsMaxBundle(t *testing.T) {
 
 // A frame waiting at high priority is taken before one at low priority, even
 // once the transmission is already under way.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitAX25FramesTakesHighPriorityFirst(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -585,6 +625,8 @@ func TestXmitAX25FramesTakesHighPriorityFirst(t *testing.T) {
 
 // A frame addressed to SPEECH is spoken rather than modulated, by a script the
 // configuration names.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitSpeech(t *testing.T) {
 	var xs, _ = setupXmitTransmission(t)
 
@@ -611,6 +653,8 @@ func TestXmitSpeech(t *testing.T) {
 
 // Without a script there is nothing to say it with, and keying the transmitter
 // to broadcast silence would be worse than saying so.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitSpeechWithoutAScript(t *testing.T) {
 	var xs, _ = setupXmitTransmission(t)
 
@@ -624,6 +668,8 @@ func TestXmitSpeechWithoutAScript(t *testing.T) {
 
 // A script that cannot be run is reported, along with where we looked for it,
 // because getting this wrong is a configuration mistake rather than a fault.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitSpeakItScriptFails(t *testing.T) {
 	var err error
 
@@ -638,6 +684,8 @@ func TestXmitSpeakItScriptFails(t *testing.T) {
 
 // An APRS frame being digipeated gets a transmission to itself, which is what
 // keeps a digipeater from stepping on the frames bundled behind it.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitNextDoesNotBundleBehindADigipeatedFrame(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -661,6 +709,8 @@ func TestXmitNextDoesNotBundleBehindADigipeatedFrame(t *testing.T) {
 
 // Anything else can share a transmission, so emptying the queue takes one
 // turn on the air rather than one per frame.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitNextBundlesOrdinaryFrames(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -683,6 +733,8 @@ func TestXmitNextBundlesOrdinaryFrames(t *testing.T) {
 // A channel with something being heard on it is waited for, rather than
 // talked over, until it clears.
 func TestWaitForClearChannelWaitsWhileBusy(t *testing.T) {
+	t.Parallel()
+
 	var xs, tq = setupXmitTransmission(t)
 
 	var asked = 0
@@ -707,6 +759,8 @@ func TestWaitForClearChannelWaitsWhileBusy(t *testing.T) {
 // stops straight away, and the frame is left on the queue rather than
 // discarded as though the channel had been busy for a minute.  Nor may the
 // loop around it go straight back for the same frame again.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -751,6 +805,8 @@ func TestXmitUntilEmptyStopsWaitingWhenCancelled(t *testing.T) {
 // The APRStt morse delay comes after the frame has left the queue, so
 // shutting down during it must not abandon the frame: it would be neither
 // sent nor left queued.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitNextSendsAPRSttMorseWhenCancelled(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -772,6 +828,8 @@ func TestXmitNextSendsAPRSttMorseWhenCancelled(t *testing.T) {
 // The audio output device is locked for the duration of a transmission, so
 // that two channels sharing a stereo device cannot talk over each other, and
 // released however the transmission ends.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -793,6 +851,8 @@ func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 // A frame addressed to MORSE is keyed rather than modulated, for a repeater
 // identification or a beacon somebody might be listening to by ear.  The
 // transmitter is keyed for the length of it, and let go after.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitMorse(t *testing.T) {
 	var xs, _ = setupXmitTransmission(t)
 
@@ -813,6 +873,8 @@ func TestXmitMorse(t *testing.T) {
 
 // A frame addressed to DTMF is sent as touch tones, which is how APRStt
 // answers back to a user pressing buttons.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitDTMF(t *testing.T) {
 	var xs, _ = setupXmitTransmission(t)
 
@@ -847,6 +909,8 @@ func timeXmitNext(t *testing.T, xs *XmitService, tq *TransmitQueue, text string)
 
 // The destination's SSID sets the speed: for morse it is half the words per
 // minute, and xmit_next is where that is worked out.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitNextMorseSpeedFromSSID(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -880,6 +944,8 @@ func TestXmitNextMorseSpeedFromSSID(t *testing.T) {
 // For DTMF the SSID is button presses per second, bounded at both ends: zero
 // means "use the default" and anything over ten is faster than a receiver can
 // follow.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 	var xs, tq = setupXmitTransmission(t)
 
@@ -932,9 +998,10 @@ func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 // but each sender has its own: sending on one channel must not change what
 // the next bit on another looks like.
 func TestLayer2SendersKeepTheirOwnLineLevel(t *testing.T) {
-	var other = NewLayer2Sender(1, nil, nil, 0, 0)
+	t.Parallel()
 
-	toneGenCapture = func(int, int) {}
+	var other = NewLayer2Sender(1, nil, nil, 0, 0)
+	other.bitSink = func(int) {}
 
 	other.line.WriteNRZI(false)
 
@@ -950,6 +1017,8 @@ func TestLayer2SendersKeepTheirOwnLineLevel(t *testing.T) {
 // Between frames the transmitter sends flags, so the receiver has something
 // to keep its clock on.
 func TestPreambleIsFlagsForAX25(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
 
 	var sent int
@@ -966,6 +1035,8 @@ func TestPreambleIsFlagsForAX25(t *testing.T) {
 // The last thing sent before the transmitter drops has to be pushed out
 // rather than left sitting in a buffer.
 func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
 
 	var sink = new(flushCountingSink)
@@ -999,6 +1070,8 @@ func (s *flushCountingSink) Flush(int) int {
 
 // IL2P has its own filler pattern, sent MSB first and without NRZI.
 func TestPreambleIsTheIL2PPatternForIL2P(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
 
 	var sent int
@@ -1013,6 +1086,8 @@ func TestPreambleIsTheIL2PPatternForIL2P(t *testing.T) {
 
 // An AX.25 channel sends the frame as HDLC, with nothing wrapped around it.
 func TestLayer2SendFrameSendsAX25AsHDLC(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
 	var pp = newHDLCSendTestPacket(t, 16)
 
@@ -1033,6 +1108,8 @@ func TestLayer2SendFrameSendsAX25AsHDLC(t *testing.T) {
 
 // An IL2P channel sends the frame wrapped up as IL2P instead.
 func TestLayer2SendFrameSendsIL2PWhenConfigured(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
 	audioConfig.achan[hdlcSendTestChannel].il2p_version = il2p.VersionCompat
 
@@ -1060,6 +1137,8 @@ func TestLayer2SendFrameSendsIL2PWhenConfigured(t *testing.T) {
 // IL2P cannot carry a frame beyond a certain size.  One that does not fit
 // still has to go out, as plain AX.25.
 func TestLayer2SendFrameFallsBackToAX25WhenIL2PCannotCarryTheFrame(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newHDLCSendTestConfig(LAYER2_IL2P)
 	audioConfig.achan[hdlcSendTestChannel].il2p_version = il2p.VersionCompat
 
@@ -1079,6 +1158,8 @@ func TestLayer2SendFrameFallsBackToAX25WhenIL2PCannotCarryTheFrame(t *testing.T)
 
 // An FX.25 channel wraps the frame in a codeblock with its correlation tag.
 func TestLayer2SendFrameSendsFX25WhenConfigured(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newHDLCSendTestConfig(LAYER2_FX25)
 	audioConfig.achan[hdlcSendTestChannel].fx25_strength = 1
 
@@ -1103,6 +1184,8 @@ func TestLayer2SendFrameSendsFX25WhenConfigured(t *testing.T) {
 // FX.25 can only wrap a frame up to a certain size.  A frame that does not
 // fit still has to go out, as plain AX.25.
 func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T) {
+	t.Parallel()
+
 	var audioConfig = newHDLCSendTestConfig(LAYER2_FX25)
 	audioConfig.achan[hdlcSendTestChannel].fx25_strength = 1
 
@@ -1123,16 +1206,22 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 // A sender reports on FX.25 at the debug level it was made with, so each
 // program that sends - samoyed-direwolf, samoyed-gen-packets - has its own.
 func TestLayer2SenderKeepsItsFX25DebugLevel(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 3, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 3, 0).fx25.Debug())
 }
 
 func TestLayer2SenderKeepsItsIL2PDebugLevel(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 2, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 0, 2).il2p.Debug())
 }
 
 // Morse goes through the channel's tone generator and its own audio config,
 // so it needs nothing another test left behind (issue #761).
 func TestMorseSendWithoutSharedRadioConfig(t *testing.T) {
+	t.Parallel()
+
 	const channel = 0
 	const sampleRate = 8000
 
@@ -1158,6 +1247,8 @@ func TestMorseSendWithoutSharedRadioConfig(t *testing.T) {
 // A channel with no tone generator still says how long the transmission would
 // have been, as xmit_thread holds the PTT for that long.
 func TestMorseSendWithoutToneGenerator(t *testing.T) {
+	t.Parallel()
+
 	// E is a single unit, which is 120 ms at 10 WPM.
 	assert.Equal(t, 300+120+250, morse_send(nil, 0, "E", 10, 300, 250))
 }
@@ -1165,12 +1256,16 @@ func TestMorseSendWithoutToneGenerator(t *testing.T) {
 // A channel with no tone generator still says how long the transmission would
 // have been, as xmit_thread holds the PTT for that long.
 func TestDTMFSendWithoutToneGenerator(t *testing.T) {
+	t.Parallel()
+
 	assert.Equal(t, 300+400+250, dtmf_send(nil, 0, "1234", 10, 300, 250))
 }
 
 // What dtmf_send puts through a channel's tone generator, a decoder on the
 // same channel reads back.
 func TestDTMFSendDecodesBack(t *testing.T) {
+	t.Parallel()
+
 	const channel = 0
 	const sampleRate = 8000
 

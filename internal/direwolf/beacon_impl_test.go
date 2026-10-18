@@ -59,6 +59,8 @@ func makeSBConfig() *misc_config_s {
 // heading_change tests
 
 func Test_heading_change(t *testing.T) {
+	t.Parallel()
+
 	var tests = []struct {
 		name string
 		a, b float64
@@ -78,6 +80,8 @@ func Test_heading_change(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.InDelta(t, tt.want, heading_change(tt.a, tt.b), 1e-9)
 		})
 	}
@@ -87,6 +91,8 @@ func Test_heading_change(t *testing.T) {
 // Fast and slow speed exact-rate cases are covered by property tests below.
 
 func Test_sbCalculateNextTime_mid_speed_proportional(t *testing.T) {
+	t.Parallel()
+
 	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	// At 30 MPH (between 5 and 60), rate = (30 * 60) / 30 = 60 seconds
@@ -99,6 +105,8 @@ func Test_sbCalculateNextTime_mid_speed_proportional(t *testing.T) {
 }
 
 func Test_sbCalculateNextTime_unknown_speed(t *testing.T) {
+	t.Parallel()
+
 	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	var lastXmit = now.Add(-2000 * time.Second)
@@ -111,6 +119,8 @@ func Test_sbCalculateNextTime_unknown_speed(t *testing.T) {
 }
 
 func Test_sbCalculateNextTime_unknown_course_no_corner_peg(t *testing.T) {
+	t.Parallel()
+
 	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	var lastXmit = now.Add(-20 * time.Second)
@@ -122,6 +132,8 @@ func Test_sbCalculateNextTime_unknown_course_no_corner_peg(t *testing.T) {
 }
 
 func Test_sbCalculateNextTime_corner_pegging(t *testing.T) {
+	t.Parallel()
+
 	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	// Last transmitted 20s ago (>= sb_turn_time of 15s)
@@ -134,6 +146,8 @@ func Test_sbCalculateNextTime_corner_pegging(t *testing.T) {
 }
 
 func Test_sbCalculateNextTime_corner_pegging_suppressed_too_soon(t *testing.T) {
+	t.Parallel()
+
 	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	// Last transmitted only 5s ago (< sb_turn_time of 15s), so no corner pegging
@@ -147,6 +161,8 @@ func Test_sbCalculateNextTime_corner_pegging_suppressed_too_soon(t *testing.T) {
 }
 
 func Test_sbCalculateNextTime_no_corner_peg_below_threshold(t *testing.T) {
+	t.Parallel()
+
 	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	var lastXmit = now.Add(-20 * time.Second)
@@ -161,6 +177,8 @@ func Test_sbCalculateNextTime_no_corner_peg_below_threshold(t *testing.T) {
 // NewBeaconService validation tests
 
 func Test_NewBeaconService_obeacon_without_objname_is_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = makeBeaconModemConfig()
 	var cfg = new(misc_config_s)
 	var igate = new(igate_config_s)
@@ -177,6 +195,8 @@ func Test_NewBeaconService_obeacon_without_objname_is_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_pbeacon_without_lat_lon_is_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = makeBeaconModemConfig()
 	var cfg = new(misc_config_s)
 	var igate = new(igate_config_s)
@@ -193,6 +213,8 @@ func Test_NewBeaconService_pbeacon_without_lat_lon_is_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_pbeacon_with_valid_lat_lon_not_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = makeBeaconModemConfig()
 	var cfg = new(misc_config_s)
 	var igate = new(igate_config_s)
@@ -210,6 +232,8 @@ func Test_NewBeaconService_pbeacon_with_valid_lat_lon_not_ignored(t *testing.T) 
 }
 
 func Test_NewBeaconService_cbeacon_without_custom_info_is_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = makeBeaconModemConfig()
 	var cfg = new(misc_config_s)
 	var igate = new(igate_config_s)
@@ -226,6 +250,8 @@ func Test_NewBeaconService_cbeacon_without_custom_info_is_ignored(t *testing.T) 
 }
 
 func Test_NewBeaconService_cbeacon_with_custom_info_not_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = makeBeaconModemConfig()
 	var cfg = new(misc_config_s)
 	var igate = new(igate_config_s)
@@ -242,6 +268,8 @@ func Test_NewBeaconService_cbeacon_with_custom_info_not_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_ibeacon_without_igate_config_is_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = makeBeaconModemConfig()
 	var cfg = new(misc_config_s)
 	var igate = new(igate_config_s) // empty — no IGate configured
@@ -257,6 +285,8 @@ func Test_NewBeaconService_ibeacon_without_igate_config_is_ignored(t *testing.T)
 }
 
 func Test_NewBeaconService_ibeacon_with_igate_config_not_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = makeBeaconModemConfig()
 	var cfg = new(misc_config_s)
 	var igate = makeBeaconIGateConfig()
@@ -272,6 +302,8 @@ func Test_NewBeaconService_ibeacon_with_igate_config_not_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_missing_mycall_is_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = new(RadioConfig)
 	modem.chan_medium[0] = MEDIUM_RADIO
 	// mycall[0] intentionally empty
@@ -292,6 +324,8 @@ func Test_NewBeaconService_missing_mycall_is_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_invalid_channel_medium_is_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = new(RadioConfig)
 	modem.chan_medium[0] = MEDIUM_NONE // not RADIO or NETTNC
 	modem.mycall[0] = "Q1TEST"
@@ -313,6 +347,8 @@ func Test_NewBeaconService_invalid_channel_medium_is_ignored(t *testing.T) {
 
 // A beacon can go out on an AXUDP channel, as on a network TNC's.
 func Test_NewBeaconService_axudp_channel_not_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = new(RadioConfig)
 	modem.chan_medium[MAX_RADIO_CHANS] = MEDIUM_AXUDP
 	modem.mycall[MAX_RADIO_CHANS] = "Q1TEST"
@@ -334,6 +370,8 @@ func Test_NewBeaconService_axudp_channel_not_ignored(t *testing.T) {
 
 // Likewise on a serial TNC's.
 func Test_NewBeaconService_serial_tnc_channel_not_ignored(t *testing.T) {
+	t.Parallel()
+
 	var modem = new(RadioConfig)
 	modem.chan_medium[MAX_RADIO_CHANS] = MediumSerialTNC
 	modem.mycall[MAX_RADIO_CHANS] = "Q1TEST"
@@ -354,6 +392,8 @@ func Test_NewBeaconService_serial_tnc_channel_not_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_sets_next_time_from_delay(t *testing.T) {
+	t.Parallel()
+
 	var modem = makeBeaconModemConfig()
 	var cfg = new(misc_config_s)
 	var igate = new(igate_config_s)
@@ -376,6 +416,8 @@ func Test_NewBeaconService_sets_next_time_from_delay(t *testing.T) {
 }
 
 func Test_NewBeaconService_slotted_beacon_adjusts_interval_if_not_IS_GOOD(t *testing.T) {
+	t.Parallel()
+
 	var modem = makeBeaconModemConfig()
 	var cfg = new(misc_config_s)
 	var igate = new(igate_config_s)
@@ -398,6 +440,8 @@ func Test_NewBeaconService_slotted_beacon_adjusts_interval_if_not_IS_GOOD(t *tes
 // Start tests
 
 func Test_BeaconService_Start_no_goroutine_if_all_ignored(t *testing.T) {
+	t.Parallel()
+
 	// Directly construct with all beacons set to BEACON_IGNORE; Start should not panic.
 	var cfg = new(misc_config_s)
 	cfg.num_beacons = 1
@@ -411,6 +455,8 @@ func Test_BeaconService_Start_no_goroutine_if_all_ignored(t *testing.T) {
 // SetDebug test
 
 func Test_BeaconService_SetDebug(t *testing.T) {
+	t.Parallel()
+
 	var bs = &BeaconService{} //nolint:exhaustruct_v5
 	bs.SetDebug(2)
 	assert.Equal(t, 2, bs.trackerDebugLevel)
@@ -420,6 +466,8 @@ func Test_BeaconService_SetDebug(t *testing.T) {
 
 // Property: IS_GOOD(x) iff 3600 is evenly divisible by x, for all x in [1, 3600].
 func Test_IS_GOOD_matches_modulo_oracle(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(t *rapid.T) {
 		var x = rapid.IntRange(1, 3600).Draw(t, "x")
 		assert.Equal(t, 3600%x == 0, IS_GOOD(x))
@@ -428,6 +476,8 @@ func Test_IS_GOOD_matches_modulo_oracle(t *testing.T) {
 
 // Property: heading_change result is always in [0, 180].
 func Test_heading_change_result_bounded(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(t *rapid.T) {
 		var a = rapid.Float64Range(0, 360).Draw(t, "a")
 		var b = rapid.Float64Range(0, 360).Draw(t, "b")
@@ -439,6 +489,8 @@ func Test_heading_change_result_bounded(t *testing.T) {
 
 // Property: heading_change(a, b) == heading_change(b, a) for all a, b.
 func Test_heading_change_symmetric(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(t *rapid.T) {
 		var a = rapid.Float64Range(0, 360).Draw(t, "a")
 		var b = rapid.Float64Range(0, 360).Draw(t, "b")
@@ -448,6 +500,8 @@ func Test_heading_change_symmetric(t *testing.T) {
 
 // Property: heading_change(a, a) == 0 for all a.
 func Test_heading_change_self_is_zero(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(t *rapid.T) {
 		var a = rapid.Float64Range(0, 360).Draw(t, "a")
 		assert.InDelta(t, 0.0, heading_change(a, a), 1e-9)
@@ -457,6 +511,8 @@ func Test_heading_change_self_is_zero(t *testing.T) {
 // Property: at speed strictly above sb_fast_speed with no turn, next time is
 // exactly last_xmit + sb_fast_rate (corner pegging cannot fire when course is unchanged).
 func Test_sbCalculateNextTime_fast_speed_rate_exact(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(t *rapid.T) {
 		var cfg = makeSBConfig()
 		var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct_v5
@@ -480,6 +536,8 @@ func Test_sbCalculateNextTime_fast_speed_rate_exact(t *testing.T) {
 // Property: at speed strictly below sb_slow_speed with no turn, next time is
 // exactly last_xmit + sb_slow_rate.
 func Test_sbCalculateNextTime_slow_speed_rate_exact(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(t *rapid.T) {
 		var cfg = makeSBConfig()
 		var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct_v5
@@ -501,6 +559,8 @@ func Test_sbCalculateNextTime_slow_speed_rate_exact(t *testing.T) {
 // Property: without a corner-peg trigger (same course), next time is always
 // within [last_xmit + sb_fast_rate, last_xmit + sb_slow_rate].
 func Test_sbCalculateNextTime_result_within_rate_bounds(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(t *rapid.T) {
 		var cfg = makeSBConfig()
 		var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct_v5
@@ -580,6 +640,8 @@ func beaconDefaultDest() string {
 }
 
 func Test_BeaconSend_position(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_POSITION
@@ -601,6 +663,8 @@ func Test_BeaconSend_position(t *testing.T) {
 }
 
 func Test_BeaconSend_position_with_explicit_addresses(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_POSITION
@@ -617,6 +681,8 @@ func Test_BeaconSend_position_with_explicit_addresses(t *testing.T) {
 }
 
 func Test_BeaconSend_position_without_a_position_sends_nothing(t *testing.T) {
+	t.Parallel()
+
 	// NewBeaconService refuses such a beacon, so this is only a backstop.
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_POSITION
@@ -627,6 +693,8 @@ func Test_BeaconSend_position_without_a_position_sends_nothing(t *testing.T) {
 }
 
 func Test_BeaconSend_object(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_OBJECT
@@ -642,6 +710,8 @@ func Test_BeaconSend_object(t *testing.T) {
 }
 
 func Test_BeaconSend_object_without_a_position_sends_nothing(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_OBJECT
 	bs.miscConfig.beacon[0].objname = "Q1OBJ"
@@ -652,6 +722,8 @@ func Test_BeaconSend_object_without_a_position_sends_nothing(t *testing.T) {
 }
 
 func Test_BeaconSend_custom_info(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_info = ">Hello from Q1TEST"
@@ -662,6 +734,8 @@ func Test_BeaconSend_custom_info(t *testing.T) {
 }
 
 func Test_BeaconSend_custom_without_info_sends_nothing(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 
@@ -671,6 +745,8 @@ func Test_BeaconSend_custom_without_info_sends_nothing(t *testing.T) {
 }
 
 func Test_BeaconSend_custom_infocmd_failure_sends_nothing(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_infocmd = "/nonexistent/q1test-infocmd"
@@ -681,6 +757,8 @@ func Test_BeaconSend_custom_infocmd_failure_sends_nothing(t *testing.T) {
 }
 
 func Test_BeaconSend_custom_infocmd_output_is_the_info(t *testing.T) {
+	t.Parallel()
+
 	// dw_run_cmd runs the command without a shell, so an argument-free command
 	// with predictable output is what is needed: "true" prints nothing.
 	var truePath, err = exec.LookPath("true")
@@ -698,6 +776,8 @@ func Test_BeaconSend_custom_infocmd_output_is_the_info(t *testing.T) {
 }
 
 func Test_BeaconSend_commentcmd_failure_keeps_fixed_comment(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_POSITION
@@ -712,6 +792,8 @@ func Test_BeaconSend_commentcmd_failure_keeps_fixed_comment(t *testing.T) {
 }
 
 func Test_BeaconSend_commentcmd_output_is_appended(t *testing.T) {
+	t.Parallel()
+
 	var truePath, err = exec.LookPath("true")
 	if err != nil {
 		t.Skip("no true command available")
@@ -739,6 +821,8 @@ func (c heardCounterByHops) Count(maxHops int, _ int) int {
 }
 
 func Test_BeaconSend_igate_status(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_IGATE
 
@@ -752,6 +836,8 @@ func Test_BeaconSend_igate_status(t *testing.T) {
 // The stations heard directly, within IGTXVIA's hop count and within the
 // most hops of all are counted separately.
 func Test_BeaconSend_igate_status_counts_stations_heard(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_IGATE
 	bs.igateConfig.max_digi_hops = 2
@@ -765,6 +851,8 @@ func Test_BeaconSend_igate_status_counts_stations_heard(t *testing.T) {
 }
 
 func Test_BeaconSend_tracker_with_a_3D_fix(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.logger = new(aprslog.Logger) // No path, so it writes nothing.
 	bs.SetDebug(3)
@@ -792,6 +880,8 @@ func Test_BeaconSend_tracker_with_a_3D_fix(t *testing.T) {
 // "-dttt" with no logger to write to still sends the beacon, rather than
 // tripping over the missing logger.
 func Test_BeaconSend_tracker_debug_without_a_logger(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.SetDebug(3)
 
@@ -810,6 +900,8 @@ func Test_BeaconSend_tracker_debug_without_a_logger(t *testing.T) {
 }
 
 func Test_BeaconSend_tracker_with_a_2D_fix_has_no_altitude(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 
 	var bp = &bs.miscConfig.beacon[0]
@@ -831,6 +923,8 @@ func Test_BeaconSend_tracker_with_a_2D_fix_has_no_altitude(t *testing.T) {
 }
 
 func Test_BeaconSend_no_channel_sends_nothing(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
@@ -842,6 +936,8 @@ func Test_BeaconSend_no_channel_sends_nothing(t *testing.T) {
 }
 
 func Test_BeaconSend_no_mycall_sends_nothing(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.modemConfig.mycall[0] = ""
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
@@ -853,6 +949,8 @@ func Test_BeaconSend_no_mycall_sends_nothing(t *testing.T) {
 }
 
 func Test_BeaconSend_unparseable_packet_sends_nothing(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
@@ -864,6 +962,8 @@ func Test_BeaconSend_unparseable_packet_sends_nothing(t *testing.T) {
 }
 
 func Test_BeaconSend_ichannel_uses_channel_0_call(t *testing.T) {
+	t.Parallel()
+
 	// An ICHANNEL beacon takes the call of channel 0.  The transmit queue
 	// hands it to the IGate, which silently drops it when not connected, so
 	// the only thing to check is that no radio channel was sent it.
@@ -895,6 +995,8 @@ func (*recordingBeaconIGate) uplinkCount() int   { return 3 }
 func (*recordingBeaconIGate) downlinkCount() int { return 4 }
 
 func Test_BeaconSend_to_igate_bypasses_transmit_queue(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
@@ -911,6 +1013,8 @@ func Test_BeaconSend_to_igate_bypasses_transmit_queue(t *testing.T) {
 
 // The IGate statistics beacon reports the counts of the IGate it was given.
 func Test_BeaconSend_igate_status_reports_the_igates_counts(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_IGATE
 	bs.igate = new(recordingBeaconIGate)
@@ -923,6 +1027,8 @@ func Test_BeaconSend_igate_status_reports_the_igates_counts(t *testing.T) {
 }
 
 func Test_BeaconSend_to_recv_is_simulated_reception(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var bs, tq = newSendTestBeaconService(t)
@@ -1009,6 +1115,8 @@ func runBeaconThreadUntilRescheduled(t *testing.T, bs *BeaconService, first time
 }
 
 func Test_BeaconThread_sends_a_due_beacon_then_waits(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	var bp = &bs.miscConfig.beacon[0]
 	bp.btype = BEACON_CUSTOM
@@ -1034,6 +1142,8 @@ func Test_BeaconThread_sends_a_due_beacon_then_waits(t *testing.T) {
 }
 
 func Test_BeaconThread_fixed_rate_tracker(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.SetDebug(1)
 
@@ -1065,6 +1175,8 @@ func Test_BeaconThread_fixed_rate_tracker(t *testing.T) {
 }
 
 func Test_BeaconThread_fixed_rate_tracker_without_position_keeps_schedule(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.SetDebug(1)
 
@@ -1087,6 +1199,8 @@ func Test_BeaconThread_fixed_rate_tracker_without_position_keeps_schedule(t *tes
 }
 
 func Test_BeaconThread_smartbeaconing_tracker(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.SetDebug(2)
 
@@ -1126,6 +1240,8 @@ func Test_BeaconThread_smartbeaconing_tracker(t *testing.T) {
 }
 
 func Test_BeaconThread_smartbeaconing_tracker_without_position_retries_soon(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 
 	bs.miscConfig.sb_configured = true
@@ -1151,6 +1267,8 @@ func Test_BeaconThread_smartbeaconing_tracker_without_position_retries_soon(t *t
 }
 
 func Test_BeaconThread_returns_when_cancelled_before_anything_is_due(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
@@ -1164,6 +1282,8 @@ func Test_BeaconThread_returns_when_cancelled_before_anything_is_due(t *testing.
 }
 
 func Test_BeaconService_Start_runs_thread(t *testing.T) {
+	t.Parallel()
+
 	var bs, tq = newSendTestBeaconService(t)
 	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
 	bs.miscConfig.beacon[0].custom_info = ">Hello"
@@ -1182,6 +1302,8 @@ func Test_BeaconService_Start_runs_thread(t *testing.T) {
 // More NewBeaconService validation tests
 
 func Test_NewBeaconService_tbeacon_without_gps_is_ignored(t *testing.T) {
+	t.Parallel()
+
 	var cfg = new(misc_config_s)
 	cfg.num_beacons = 1
 	cfg.beacon[0].btype = BEACON_TRACKER
@@ -1192,6 +1314,8 @@ func Test_NewBeaconService_tbeacon_without_gps_is_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_tbeacon_with_gps_not_ignored(t *testing.T) {
+	t.Parallel()
+
 	var gps = new(dwgps.GPS)
 	var gpsinfo = new(dwgps.GPSInfo)
 	gpsinfo.Fix = dwgps.DWFIX_NO_FIX
@@ -1207,6 +1331,8 @@ func Test_NewBeaconService_tbeacon_with_gps_not_ignored(t *testing.T) {
 }
 
 func Test_NewBeaconService_info_on_non_custom_beacons_is_only_complained_about(t *testing.T) {
+	t.Parallel()
+
 	var gps = new(dwgps.GPS)
 	var gpsinfo = new(dwgps.GPSInfo)
 	gpsinfo.Fix = dwgps.DWFIX_NO_FIX
@@ -1227,6 +1353,8 @@ func Test_NewBeaconService_info_on_non_custom_beacons_is_only_complained_about(t
 }
 
 func Test_NewBeaconService_obeacon_with_objname_and_position_not_ignored(t *testing.T) {
+	t.Parallel()
+
 	var cfg = new(misc_config_s)
 	cfg.num_beacons = 1
 	cfg.beacon[0].btype = BEACON_OBJECT
@@ -1239,6 +1367,8 @@ func Test_NewBeaconService_obeacon_with_objname_and_position_not_ignored(t *test
 }
 
 func Test_NewBeaconService_out_of_range_channels_use_channel_0_call(t *testing.T) {
+	t.Parallel()
+
 	var cfg = new(misc_config_s)
 	cfg.num_beacons = 3
 	cfg.beacon[0].btype = BEACON_CUSTOM
@@ -1256,6 +1386,8 @@ func Test_NewBeaconService_out_of_range_channels_use_channel_0_call(t *testing.T
 }
 
 func Test_NewBeaconService_slotted_beacon_schedule(t *testing.T) {
+	t.Parallel()
+
 	var tests = []struct {
 		name      string
 		every     int
@@ -1268,6 +1400,8 @@ func Test_NewBeaconService_slotted_beacon_schedule(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var cfg = new(misc_config_s)
 			cfg.num_beacons = 1
 			cfg.beacon[0].btype = BEACON_CUSTOM

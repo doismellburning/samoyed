@@ -84,6 +84,8 @@ func nextDLQItem(t *testing.T, dlq *DataLinkQueue) *dlq_item_t {
 // A TNC whose port is not there cannot be attached to, and says so rather than
 // leaving a channel that looks attached.
 func TestSerialTNCAttachFails(t *testing.T) {
+	t.Parallel()
+
 	var st, err = NewSerialTNC(serialTNCTestChannel, "/dev/there-is-no-such-serial-port", 9600, nil)
 
 	require.Error(t, err)
@@ -95,6 +97,8 @@ func TestSerialTNCAttachFails(t *testing.T) {
 // program is concerned, so it goes on the received queue against the SCHANNEL
 // number rather than the channel in the KISS frame.
 func TestSerialTNCReceivedFrameReachesTheQueue(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var device, tnc = newTestSerialDevice(t)
@@ -117,6 +121,8 @@ func TestSerialTNCReceivedFrameReachesTheQueue(t *testing.T) {
 
 // Starting a TNC twice would have two goroutines splitting what it sends
 // between them, so the second start is refused, and says so.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestSerialTNCStartedTwiceComplains(t *testing.T) {
 	var device, tnc = newTestSerialDevice(t)
 
@@ -143,6 +149,8 @@ func TestSerialTNCStartedTwiceComplains(t *testing.T) {
 // Transmitting on an SCHANNEL means handing the frame to the TNC as KISS, with
 // the KISS channel set to 0 - the TNC has only the one radio.
 func TestSerialTNCSendPacket(t *testing.T) {
+	t.Parallel()
+
 	var device, tnc = newTestSerialDevice(t)
 
 	var st, _, _ = startTestSerialTNC(t, device, nil, func() { tnc.Close() })
@@ -157,6 +165,8 @@ func TestSerialTNCSendPacket(t *testing.T) {
 // A channel with no TNC, or one whose TNC is not attached just now, has
 // nowhere to send to, so the packet is dropped with a word about why - and,
 // where there is no TNC to know it, which channel it was for.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestSerialTNCSendPacketNotAttached(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -184,6 +194,8 @@ func TestSerialTNCSendPacketNotAttached(t *testing.T) {
 // A port that has gone away cannot be written to, so it is given up rather
 // than written to again.  The closing is left to the listening goroutine,
 // which may be blocked reading the port.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestSerialTNCSendPacketWriteErrorGivesUpThePort(t *testing.T) {
 	var device, tnc = newTestSerialDevice(t)
 
@@ -217,6 +229,8 @@ func TestSerialTNCSendPacketWriteErrorGivesUpThePort(t *testing.T) {
 // back.  Losing it should not lose the channel: the listener reattaches, and
 // frames flow again.
 func TestSerialTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	// The listener reopens the TNC by name, so a link that can be pointed at
@@ -260,6 +274,8 @@ func TestSerialTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
 // Cancelling stops the listener at its next look - once the read it is
 // blocked in returns - and it lets go of the port on the way out.
 func TestSerialTNCStopsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
 	var device, tnc = newTestSerialDevice(t)
 
 	var st, cancel, done = startTestSerialTNC(t, device, nil, func() { tnc.Close() })
@@ -285,6 +301,8 @@ func TestSerialTNCStopsWhenCancelled(t *testing.T) {
 // Each SCHANNEL in the configuration gets a serial TNC attached to it, and no
 // other channel does.
 func TestNewSerialTNCsAttachesSerialChannels(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var device, tnc = newTestSerialDevice(t)
@@ -323,6 +341,8 @@ func TestNewSerialTNCsAttachesSerialChannels(t *testing.T) {
 
 // A packet queued for an SCHANNEL channel skips the radio queues and goes to
 // the serial TNC the transmit queue was handed.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSerialTNCTransmitQueueSendsToItsTNCs(t *testing.T) {
 	var device, tnc = newTestSerialDevice(t)
 
@@ -349,6 +369,8 @@ func TestSerialTNCTransmitQueueSendsToItsTNCs(t *testing.T) {
 // Connected mode works over a serial TNC as it does over a network TNC: a
 // frame from the data link goes straight out, and a seize is confirmed at
 // once, there being no radio channel of ours to wait for.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestSerialTNCConnectedMode(t *testing.T) {
 	var dlq = NewDataLinkQueue()
 

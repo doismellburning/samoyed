@@ -43,6 +43,8 @@ func openAudio(t *testing.T, pa *RadioConfig) *AudioDevices {
 }
 
 func Test_Flush_UDP_sendsBytes(t *testing.T) {
+	t.Parallel()
+
 	// Start a UDP listener to receive the audio output.
 	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -91,6 +93,8 @@ func makeRadioConfig(inName, outName string) *RadioConfig {
 }
 
 func Test_anyDeviceRequiresPortAudio(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		pa   *RadioConfig
@@ -150,12 +154,16 @@ func Test_anyDeviceRequiresPortAudio(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.want, anyDeviceRequiresPortAudio(tt.pa))
 		})
 	}
 }
 
 func Test_Flush_UDP_emptyBuffer_isNoop(t *testing.T) {
+	t.Parallel()
+
 	var d, dev = setupAdev0()
 	dev.udp_out_sock = &net.UDPConn{} // non-nil socket; must not be written to
 	dev.outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
@@ -167,6 +175,8 @@ func Test_Flush_UDP_emptyBuffer_isNoop(t *testing.T) {
 }
 
 func Test_udpSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
+	t.Parallel()
+
 	// Start a UDP listener to receive the keepalive silence.
 	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -261,6 +271,8 @@ func nullSoundcards(t *testing.T, names ...string) {
 // --- audioOutType ---
 
 func Test_audioOutType(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		inName    string
@@ -282,6 +294,8 @@ func Test_audioOutType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var pa = makeRadioConfig(tt.inName, tt.ouName)
 			pa.adev[0].adevice_out_specified = tt.specified
 
@@ -297,6 +311,8 @@ func Test_audioOutType(t *testing.T) {
 // "-" command line argument - is exactly that: it leaves "stdin" as the
 // output device name too, which is nothing we can transmit through.
 func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
+	t.Parallel()
+
 	var pa = makeRadioConfig("stdin", "stdin")
 	var d = openAudio(t, pa)
 
@@ -321,6 +337,8 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 // An output device we only defaulted to, and which turns out not to exist,
 // leaves the station receive-only rather than stopping it.
 func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
+	t.Parallel()
+
 	var pa = makeRadioConfig("stdin", noSuchAudioDevice)
 
 	var d = openAudio(t, pa)
@@ -332,6 +350,8 @@ func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
 // specifically, so not finding it is a configuration error, not a reason to
 // quietly transmit nothing.
 func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
+	t.Parallel()
+
 	var pa = makeRadioConfig("stdin", noSuchAudioDevice)
 	pa.adev[0].adevice_out_specified = true
 
@@ -342,6 +362,8 @@ func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
 // Naming standard input, or a UDP port to listen on, as the transmit device
 // is a configuration error too - neither can transmit.
 func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
+	t.Parallel()
+
 	var pa = makeRadioConfig("stdin", "stdin")
 	pa.adev[0].adevice_out_specified = true
 
@@ -353,6 +375,8 @@ func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
 // still running: that goroutine reads the device without a lock, so anything
 // that touches it afterwards would race with it.
 func Test_audioClose_waitsForUDPSilenceKeepalive(t *testing.T) {
+	t.Parallel()
+
 	var listener, err = new(net.ListenConfig).ListenPacket(t.Context(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
@@ -380,6 +404,8 @@ func Test_audioClose_waitsForUDPSilenceKeepalive(t *testing.T) {
 // reported at the interval its configuration asked for - AudioOpen hands the
 // device both, and there is nothing else to ask.
 func Test_GetByte_recordsStatisticsFromTheDevicesOwnSettings(t *testing.T) {
+	t.Parallel()
+
 	var pa = makeRadioConfig("udp:0", "stdin")
 	pa.adev[0].num_channels = 2
 	pa.adev[0].bits_per_sample = 16
@@ -425,6 +451,8 @@ func Test_GetByte_recordsStatisticsFromTheDevicesOwnSettings(t *testing.T) {
 // --- applyCommandLineAudioSource ---
 
 func Test_applyCommandLineAudioSource(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		ouName    string
@@ -439,6 +467,8 @@ func Test_applyCommandLineAudioSource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var pa = makeRadioConfig("plughw:1,0", tt.ouName)
 			pa.adev[0].adevice_out_specified = tt.specified
 
@@ -453,24 +483,34 @@ func Test_applyCommandLineAudioSource(t *testing.T) {
 // --- transmitAvailable ---
 
 func Test_transmitAvailable(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no audio devices", func(t *testing.T) {
+		t.Parallel()
+
 		var d *AudioDevices
 
 		assert.False(t, d.transmitAvailable(0))
 	})
 
 	t.Run("device that was never opened", func(t *testing.T) {
+		t.Parallel()
+
 		var d = new(AudioDevices)
 
 		assert.False(t, d.transmitAvailable(0))
 	})
 
 	t.Run("device open with no output", func(t *testing.T) {
+		t.Parallel()
+
 		var d, _ = setupAdev0()
 		assert.False(t, d.transmitAvailable(0))
 	})
 
 	t.Run("device with UDP output", func(t *testing.T) {
+		t.Parallel()
+
 		var d, dev = setupAdev0()
 		dev.udp_out_sock = &net.UDPConn{}
 
@@ -478,6 +518,8 @@ func Test_transmitAvailable(t *testing.T) {
 	})
 
 	t.Run("device number out of range", func(t *testing.T) {
+		t.Parallel()
+
 		var d, _ = setupAdev0()
 
 		assert.False(t, d.transmitAvailable(-1))
@@ -488,13 +530,19 @@ func Test_transmitAvailable(t *testing.T) {
 // --- channelCanTransmit ---
 
 func Test_channelCanTransmit(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no audio devices", func(t *testing.T) {
+		t.Parallel()
+
 		var d *AudioDevices
 
 		assert.False(t, d.channelCanTransmit(0))
 	})
 
 	t.Run("device open with no output", func(t *testing.T) {
+		t.Parallel()
+
 		var d, _ = setupAdev0()
 
 		assert.False(t, d.channelCanTransmit(0))
@@ -502,6 +550,8 @@ func Test_channelCanTransmit(t *testing.T) {
 	})
 
 	t.Run("device with UDP output", func(t *testing.T) {
+		t.Parallel()
+
 		var d, dev = setupAdev0()
 		dev.udp_out_sock = &net.UDPConn{}
 
@@ -511,6 +561,8 @@ func Test_channelCanTransmit(t *testing.T) {
 	})
 
 	t.Run("channel out of range", func(t *testing.T) {
+		t.Parallel()
+
 		var d, dev = setupAdev0()
 		dev.udp_out_sock = &net.UDPConn{}
 
@@ -524,6 +576,8 @@ func Test_channelCanTransmit(t *testing.T) {
 // ACHANNELS or ARATE gave a stack trace rather than a sentence naming the
 // directive.
 func Test_adev_param_validate(t *testing.T) {
+	t.Parallel()
+
 	var good = new(adev_param_s)
 	good.bits_per_sample = DEFAULT_BITS_PER_SAMPLE
 	good.num_channels = DEFAULT_NUM_CHANNELS
@@ -558,6 +612,8 @@ func Test_adev_param_validate(t *testing.T) {
 // Standard input running out is the end of the run rather than a failure,
 // but it is for DirewolfMain to end it, through the teardown: the device says
 // it has no more to give, and remembers that it ran out rather than failed.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and swaps os.Stdin.
 func TestStdinEndOfFileEndsInput(t *testing.T) {
 	var _, w = setStdin(t)
 
