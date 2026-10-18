@@ -59,6 +59,24 @@ func TestSendToASink(t *testing.T) {
 	assert.Greater(t, loudest, 32767*4/10)
 }
 
+// Send and Duration both take the text a byte at a time, as Dire Wolf does,
+// and anything not in the table - here each of the two bytes of 'À' - is
+// sent as a space.  Send used to take it a rune at a time while Duration
+// counted bytes, so the two disagreed (issue #1019).
+func TestSendNonASCII(t *testing.T) {
+	t.Parallel()
+
+	const sampleRate = 8000
+
+	var out = new(sampleRecorder)
+
+	Send(out, sampleRate, 50, "SÀS", 10, 0, 0)
+
+	var ms = Duration("SÀS", 10, 0, 0)
+	assert.InDelta(t, ms*sampleRate/1000, len(out.samples), float64(sampleRate)/100)
+	assert.Equal(t, Duration("S  S", 10, 0, 0), ms)
+}
+
 // At a sample rate that isn't a multiple of 1000, the sample count for a tone
 // must not be truncated by integer division (issue #762).  PutQuietMs, which
 // gives txdelay and txtail, is checked beside the tone generator in
