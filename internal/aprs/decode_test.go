@@ -1242,3 +1242,39 @@ func Test_decode_aprs_print_maidenhead_only(t *testing.T) {
 	assertMaybeInDelta(t, maybe.Just(51.5), A.Lat, 0.000001)
 	assertMaybeInDelta(t, maybe.Just(-1.0), A.Lon, 0.000001)
 }
+
+// A byte of 0x80 or above is no letter in APRS, but read as a rune it is a
+// Latin-1 code point: 0xC0 is À, which unicode.IsUpper accepts.  These put
+// one where the decoder wants an upper case letter (issue #1019).
+func Test_decode_aprs_high_byte(t *testing.T) {
+	t.Parallel()
+
+	var aprsDecoder = NewDecoderFromDataFiles()
+
+	var decode = func(info string) *Decoded {
+		var pp = ax25.FromText("Q1TEST>APDW17:"+info, true)
+		assert.NotNil(t, pp, "%q", info)
+
+		return aprsDecoder.Decode(pp, true)
+	}
+
+	t.Run("symbol table", func(t *testing.T) {
+		t.Parallel()
+
+		for _, info := range []string{
+			"`(_fn\"Oj\xc0",       // Mic-E
+			">IO91SX\xc0G Status", // 6 character Maidenhead locator
+			">IO91\xc0G Status",   // 4 character Maidenhead locator
+			"!\xc05L!!<*e7>7P[",   // Compressed
+		} {
+			assert.Equal(t, byte('/'), decode(info).SymbolTable, "%q", info)
+		}
+	})
+
+	t.Run("data type indicator", func(t *testing.T) {
+		t.Parallel()
+
+		var A = decode("\xa1Hello")
+		assert.Equal(t, "ERROR!!!  Unknown APRS Data Type Indicator: unprintable 0xa1", A.DataTypeDesc)
+	})
+}

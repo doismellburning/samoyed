@@ -32,6 +32,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/aprstelemetry"
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/deviceid"
 	"github.com/doismellburning/samoyed/internal/dwgps"
@@ -304,7 +305,7 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *D
 		return A
 	}
 
-	if unicode.IsPrint(rune(pinfo[0])) {
+	if ascii.IsPrint(pinfo[0]) {
 		A.DataTypeDesc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator \"%c\"", pinfo[0])
 	} else {
 		A.DataTypeDesc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator: unprintable 0x%02x", pinfo[0])
@@ -1560,7 +1561,7 @@ func aprsMicE(A *Decoded, telemetryState *aprstelemetry.State, deviceIDs *device
 	A.SymbolTable = p.SymTableId
 	A.SymbolCode = p.SymbolCode
 
-	if A.SymbolTable != '/' && A.SymbolTable != '\\' && !unicode.IsUpper(rune(A.SymbolTable)) && !unicode.IsDigit(rune(A.SymbolTable)) {
+	if A.SymbolTable != '/' && A.SymbolTable != '\\' && !ascii.IsUpper(A.SymbolTable) && !ascii.IsDigit(A.SymbolTable) {
 		if !A.quiet {
 			logrus.WithField("symbol_table", string(rune(A.SymbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 		}
@@ -1801,7 +1802,7 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 		// BLN9xxxxx	"group bulletin" has single digit group id and group name up to 5 characters.
 		if len(addressee) == 4 && unicode.IsDigit(rune(addressee[3])) {
 			A.DataTypeDesc = fmt.Sprintf("General Bulletin with identifier \"%s\"", addressee[3:])
-		} else if len(addressee) == 4 && unicode.IsUpper(rune(addressee[3])) {
+		} else if len(addressee) == 4 && ascii.IsUpper(addressee[3]) {
 			A.DataTypeDesc = fmt.Sprintf("Announcement with identifier \"%s\"", addressee[3:])
 		}
 
@@ -2344,7 +2345,7 @@ func aprsStatusReport(A *Decoded, info []byte) {
 		A.SymbolTable = pm6.SymTableId
 		A.SymbolCode = pm6.SymbolCode
 
-		if A.SymbolTable != '/' && A.SymbolTable != '\\' && !unicode.IsUpper(rune(A.SymbolTable)) && !unicode.IsDigit(rune(A.SymbolTable)) {
+		if A.SymbolTable != '/' && A.SymbolTable != '\\' && !ascii.IsUpper(A.SymbolTable) && !ascii.IsDigit(A.SymbolTable) {
 			if !A.quiet {
 				logrus.WithField("symbol_table", string(rune(A.SymbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 			}
@@ -2371,7 +2372,7 @@ func aprsStatusReport(A *Decoded, info []byte) {
 		A.SymbolTable = pm4.SymTableId
 		A.SymbolCode = pm4.SymbolCode
 
-		if A.SymbolTable != '/' && A.SymbolTable != '\\' && !unicode.IsUpper(rune(A.SymbolTable)) && !unicode.IsDigit(rune(A.SymbolTable)) {
+		if A.SymbolTable != '/' && A.SymbolTable != '\\' && !ascii.IsUpper(A.SymbolTable) && !ascii.IsDigit(A.SymbolTable) {
 			if !A.quiet {
 				logrus.WithField("symbol_table", string(rune(A.SymbolTable))).Warn("Invalid symbol table code, not one of / \\ A-Z 0-9")
 			}
@@ -3304,7 +3305,7 @@ func decodeCompressedPosition(A *Decoded, pcpos *compressedPositionData) {
 		A.Lon = maybe.Nothing[float64]()
 	}
 
-	if pcpos.SymTableId == '/' || pcpos.SymTableId == '\\' || unicode.IsUpper(rune(pcpos.SymTableId)) {
+	if pcpos.SymTableId == '/' || pcpos.SymTableId == '\\' || ascii.IsUpper(pcpos.SymTableId) {
 		/* primary or alternate or alternate with upper case overlay. */
 		A.SymbolTable = pcpos.SymTableId
 	} else if pcpos.SymTableId >= 'a' && pcpos.SymTableId <= 'j' {
@@ -4336,7 +4337,7 @@ func processComment(A *Decoded, telemetryState *aprstelemetry.State, commentData
 			} else if a == 'B' && unicode.IsDigit(rune(o)) {
 				A.APRSttLoc = fmt.Sprintf("APRStt location %c%c...", a, o)
 			}
-		} else if unicode.IsUpper(rune(d)) {
+		} else if ascii.IsUpper(d) {
 			/*
 			 * This adds one extra digit to each.  Dao adds extra digit like:
 			 *
@@ -4354,7 +4355,7 @@ func processComment(A *Decoded, telemetryState *aprstelemetry.State, commentData
 					return lon + float64(o-'0')/60000.0*aprsSign(lon)
 				}, A.Lon)
 			}
-		} else if unicode.IsLower(rune(d)) {
+		} else if ascii.IsLower(d) {
 			/*
 			 * This adds almost two extra digits to each like this:
 			 *

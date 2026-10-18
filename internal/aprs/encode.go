@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
@@ -18,7 +19,7 @@ import (
 // checkSymbol complains about a symbol table identifier or symbol code that
 // isn't valid APRS.  The position is still encoded, as Dire Wolf always did.
 func checkSymbol(symtab byte, symbol byte) {
-	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
+	if symtab != '/' && symtab != '\\' && !ascii.IsDigit(symtab) && !ascii.IsUpper(symtab) {
 		logrus.WithField("symtab", string(symtab)).Error("Symbol table identifier is not one of / \\ 0-9 A-Z")
 	}
 
