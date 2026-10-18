@@ -24,6 +24,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/hamlib"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/netrom"
@@ -39,7 +40,6 @@ import (
 	"github.com/lestrrat-go/strftime"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
-	goHamlib "github.com/xylo04/goHamlib"
 )
 
 /*------------------------------------------------------------------
@@ -302,7 +302,7 @@ x = Silence FX.25 information.`)
 	 * Possibly override some by command line options.
 	 */
 
-	goHamlib.SetDebugLevel(goHamlib.DebugLevel(d_h_opt))
+	hamlib.SetDebugLevel(d_h_opt)
 
 	var aprsSymbolData = symbols.New()
 	var aprsDecoder = aprs.NewDecoder(deviceid.New(), aprsSymbolData)

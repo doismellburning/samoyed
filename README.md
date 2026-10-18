@@ -144,7 +144,8 @@ Where it doesn't yet cover something, the [Dire Wolf documentation](https://gith
 
 ### Prerequisites
 
-[Go](https://go.dev/doc/install), plus a handful of system packages (hamlib, PortAudio, and friends).
+[Go](https://go.dev/doc/install), plus a handful of system packages (PortAudio and friends).
+Hamlib isn't needed to build - it's loaded at run time, and only CAT PTT needs it installed.
 On apt-based Linux and on macOS with Homebrew, `make setup` installs them for you; otherwise see
 [dev-setup.sh](./dev-setup.sh) for the package lists.
 

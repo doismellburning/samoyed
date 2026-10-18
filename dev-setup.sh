@@ -64,32 +64,35 @@ brew_install() {
     done
 }
 
-# The Go build uses cgo against hamlib and PortAudio, so these are
-# needed even for `make cmds`. dpkg-dev provides the dpkg-shlibdeps `make deb`
-# uses.
+# The Go build uses cgo against PortAudio, so it is needed even for `make cmds`.
+# dpkg-dev provides the dpkg-shlibdeps `make deb` uses. Hamlib isn't needed to
+# build: it's loaded at run time.
 install_build() {
     case "$OS" in
         Linux)
-            apt_install libhamlib-dev portaudio19-dev dpkg-dev
+            apt_install portaudio19-dev dpkg-dev
             ;;
         Darwin)
-            brew_install hamlib portaudio
+            brew_install portaudio
             ;;
     esac
 }
 
 # Dire Wolf provides `gen_packets`, which some tests use to check we parse what
 # Dire Wolf produces; morse2ascii decodes our Morse output; gpsd-clients
-# provides `gpsfake`, which feeds a real gpsd for the GPSD integration test.
+# provides `gpsfake`, which feeds a real gpsd for the GPSD integration test;
+# libhamlib-utils provides `rigctld` and `rigctl` for the Hamlib PTT tests, and
+# pulls in the Hamlib library itself under whichever package name the release
+# gives it (libhamlib4 or libhamlib4t64).
 install_test() {
     case "$OS" in
         Linux)
-            apt_install direwolf morse2ascii gpsd gpsd-clients
+            apt_install direwolf morse2ascii gpsd gpsd-clients libhamlib-utils
             ;;
         Darwin)
             # morse2ascii is not packaged for macOS, and gpsfake needs a pty-backed
             # fake serial device it can't provide there; those tests skip
-            brew_install direwolf
+            brew_install direwolf hamlib
             ;;
     esac
 }
