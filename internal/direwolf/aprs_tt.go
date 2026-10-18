@@ -264,6 +264,28 @@ func newTTParseState() ttParseState {
 	}
 }
 
+// setDAOKeys records the first two keys of location field e in the DAO, as
+// "!TB5!" for the standard bearing and range.  A field of one key has a space
+// for the second.
+func (s *ttParseState) setDAOKeys(e string) {
+	s.dao[2] = e[0]
+	s.dao[3] = ttFieldByte(e, 1)
+
+	if s.dao[3] == 0 {
+		s.dao[3] = ' '
+	}
+}
+
+// ttFieldByte is the key at index i of field e, or 0 past its end, as the
+// Dire Wolf parsers read C's terminating NUL there.
+func ttFieldByte(e string, i int) byte {
+	if i < len(e) {
+		return e[i]
+	}
+
+	return 0
+}
+
 // TTGateway is the APRStt gateway. Construct one with NewTTGateway.
 type TTGateway struct {
 	config         *tt_config_s
@@ -580,12 +602,7 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
 		switch e[0] {
 		case 'A':
 			// A lone A is a malformed callsign, and parseCallsign says so.
-			var kind byte
-			if len(e) > 1 {
-				kind = e[1]
-			}
-
-			switch kind {
+			switch ttFieldByte(e, 1) {
 			case 'A': /* AA object-name */
 				err = g.parseObjectName(state, e)
 				if err != 0 {
@@ -1264,8 +1281,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			/* It's not hardwired to always be B0n or B9nn.  */
 			/* This is a pretty good approximation. */
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 			if len(e) == 3 { /* probably B0n -->  !Tn ! */
 				state.dao[2] = e[2]
@@ -1306,8 +1322,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			state.longitude = maybe.Just(dwutil.R2D(lon0 + math.Atan2(math.Sin(bearing)*math.Sin(dist/R_M)*math.Cos(lat0),
 				math.Cos(dist/R_M)-math.Sin(lat0)*math.Sin(dwutil.D2R(latitude)))))
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_GRID:
 			if len(xstr) == 0 {
@@ -1354,8 +1369,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				"longitude":  state.longitude,
 			}).Debug("TTLOC_GRID LON")
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_UTM:
 			if len(xstr) == 0 {
@@ -1403,8 +1417,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				logrus.WithError(geoErr).Error("Conversion from UTM failed")
 			}
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_MGRS, TTLOC_USNG:
 			if len(xstr) == 0 {
@@ -1439,8 +1452,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				logrus.WithError(convertErr).Error("Conversion from MGRS/USNG failed")
 			}
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_MHEAD:
 			/* Combine prefix from configuration and digits from user. */
@@ -1476,8 +1488,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				state.longitude = maybe.Just(lon)
 			}
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_SATSQ:
 			if len(xstr) != 4 {
@@ -1503,8 +1514,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				state.longitude = maybe.Just(lon)
 			}
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_AMBIG:
 			if len(xstr) != 1 {

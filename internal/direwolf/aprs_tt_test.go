@@ -164,3 +164,24 @@ func TestParseCallsignTwoKeyThatPartlyTranslates(t *testing.T) {
 	assert.Equal(t, TT_ERROR_INVALID_CALL, gw.parseCallsign(&state, "A9A1A2A7A7C75"))
 	assert.Empty(t, state.callsign)
 }
+
+// A location pattern can be nothing but the B, and a field that is the same
+// matches it.  Its second character was read for the DAO, and a tone sequence
+// anyone could send panicked the gateway.  Dire Wolf read the string's
+// terminating NUL there; a space keeps the DAO printable.
+func TestParseLocationLoneB(t *testing.T) {
+	var cfg tt_config_s
+	cfg.ttlocs = []*ttloc_s{
+		{ttlocType: TTLOC_POINT, pattern: "B", point: pointTTLoc{lat: 12.25, lon: 56.25}}, //nolint:exhaustruct_v5
+	}
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	require.NotPanics(t, func() {
+		assert.Equal(t, 0, gw.parseLocation(&state, "B"))
+	})
+	assert.Equal(t, "!TB !", string(state.dao[:]))
+}
