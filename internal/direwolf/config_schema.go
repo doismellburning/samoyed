@@ -176,4 +176,10 @@ type NodeMapSettings struct {
 	// Locator is the Maidenhead locator of where the node is.  Left out,
 	// the map is not told.
 	Locator string `yaml:"locator"`
+
+	// Contact is how to reach whoever runs the node.
+	Contact string `yaml:"contact"`
+
+	// Comment is a short note about the node.
+	Comment string `yaml:"comment"`
 }

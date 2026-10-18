@@ -51,13 +51,21 @@ type Config struct {
 
 	// Location is where the node is, if the map is to be told.
 	Location maybe.Maybe[Location]
+
+	// Contact is how to reach whoever runs the node, or empty for nothing.
+	Contact string
+
+	// Comment is a short note about the node, or empty for none.
+	Comment string
 }
 
 // Report is the map's NodeData: what a node says about itself.
 type Report struct {
-	NodeAlias string                `json:"nodeAlias,omitempty"`
-	Location  maybe.Maybe[Location] `json:"location,omitzero"`
-	Software  Software              `json:"software"`
+	NodeAlias    string                `json:"nodeAlias,omitempty"`
+	Location     maybe.Maybe[Location] `json:"location,omitzero"`
+	Software     Software              `json:"software"`
+	Contact      string                `json:"contact,omitempty"`
+	SysopComment string                `json:"sysopComment,omitempty"`
 }
 
 // Location is where a node is: a Maidenhead locator, and the middle of the
@@ -119,9 +127,11 @@ func New(config Config, client *http.Client) *Reporter {
 // Report is what the node says about itself.
 func (r *Reporter) Report() Report {
 	return Report{
-		NodeAlias: r.config.Alias,
-		Location:  r.config.Location,
-		Software:  Software{Name: softwareName, Version: version.Version},
+		NodeAlias:    r.config.Alias,
+		Location:     r.config.Location,
+		Software:     Software{Name: softwareName, Version: version.Version},
+		Contact:      r.config.Contact,
+		SysopComment: r.config.Comment,
 	}
 }
 

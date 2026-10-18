@@ -2202,7 +2202,14 @@ func (ps *parseState) nodeMapConfig(address string, alias string, settings NodeM
 		location = maybe.Just(at)
 	}
 
-	return nodemap.Config{Address: address, Alias: alias, APIURL: settings.APIURL, Location: location}, nil
+	return nodemap.Config{
+		Address:  address,
+		Alias:    alias,
+		APIURL:   settings.APIURL,
+		Location: location,
+		Contact:  settings.Contact,
+		Comment:  settings.Comment,
+	}, nil
 }
 
 // validNodeMapAPIURL says whether address is left out, for the public map, or

@@ -686,7 +686,7 @@ func Test_config_yaml_node_map(t *testing.T) {
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[nodemap.Location]()}), got.nodeMap)
+		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[nodemap.Location](), Contact: "", Comment: ""}), got.nodeMap)
 	})
 
 	t.Run("the node can be reported to another node map", func(t *testing.T) {
@@ -695,7 +695,7 @@ func Test_config_yaml_node_map(t *testing.T) {
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080", Location: maybe.Nothing[nodemap.Location]()}), got.nodeMap)
+		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080", Location: maybe.Nothing[nodemap.Location](), Contact: "", Comment: ""}), got.nodeMap)
 	})
 
 	t.Run("the node map can be told where the node is", func(t *testing.T) {
@@ -711,6 +711,17 @@ func Test_config_yaml_node_map(t *testing.T) {
 		assert.Equal(t, "IO91", location.Locator)
 		assert.InDelta(t, 51.5, location.Coords.Lat, 1e-9)
 		assert.InDelta(t, -1, location.Coords.Lon, 1e-9)
+	})
+
+	t.Run("the node map can be told who to contact, with a comment", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node:\n  address: Q1TEST\n  map: {contact: sysop@example.org, comment: Club node}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var config, _ = got.nodeMap.Get()
+		assert.Equal(t, []string{"sysop@example.org", "Club node"}, []string{config.Contact, config.Comment})
 	})
 
 	t.Run("the node is not reported to the node map unless asked", func(t *testing.T) {
