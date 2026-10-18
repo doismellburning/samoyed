@@ -141,6 +141,10 @@ func Test_process_input_rejects(t *testing.T) {
 		"bad frame":       {"Q1TEST", "Could not convert to AX.25 frame"},
 		"bad command":     {"x 1", "Invalid command. Must be one of d p s t f h."},
 		"neither":         {"!", "Input, starting with upper case letter or digit"},
+		// Neither of these is a letter or digit, though unicode.IsUpper takes
+		// 0xC0 for À and unicode.IsNumber takes 0xB9 for ¹ (issue #1019).
+		"high byte letter": {"\xc0Q1TEST>APDW17:>Testing", "Input, starting with upper case letter or digit"},
+		"high byte number": {"\xb9Q1TEST>APDW17:>Testing", "Input, starting with upper case letter or digit"},
 	}
 
 	for name, tc := range testCases {

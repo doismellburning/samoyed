@@ -53,6 +53,7 @@ import (
 
 	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/agwpe"
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
 )
@@ -638,7 +639,7 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 			} else if b == XON {
 				fmt.Printf("%*s[R %.3f] <XON>\n", my_index*column_width, "", time.Since(start_time).Seconds())
 				busy[my_index].Store(false)
-			} else if unicode.IsPrint(rune(b)) {
+			} else if ascii.IsPrint(b) {
 				buffer = append(buffer, b)
 			} else {
 				var hex = fmt.Sprintf("<x%02x>", b)
