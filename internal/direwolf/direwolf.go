@@ -564,7 +564,7 @@ x = Silence FX.25 information.`)
 	 * Push to Talk (PTT) control.
 	 */
 
-	var pttControl, pttErr = ptt.New(audio_config.pttChannels(), layer2Receiver.MuteInput, dataLinkQueue.ChannelBusy, d_o_opt)
+	var pttControl, pttErr = ptt.New(audio_config.pttChannels(audioDevices.channelCanTransmit), layer2Receiver.MuteInput, dataLinkQueue.ChannelBusy, d_o_opt)
 	td.add(pttControl.Term) // Which does nothing if there is no PTT.
 	stopIfCancelled(ctx, td)
 
@@ -654,7 +654,7 @@ x = Silence FX.25 information.`)
 				// exactly that carrier deliberately, and plays no audio, so it
 				// is still the PTT test a receive-only station wants.
 				if transmitCalibrationType != 'p' &&
-					!audioDevices.transmitAvailable(ACHAN2ADEV(transmitCalibrationChannel)) {
+					!audioDevices.channelCanTransmit(transmitCalibrationChannel) {
 					text_color_set(DW_COLOR_ERROR)
 					fmt.Printf("Channel %d has no audio output device, so calibration tones cannot be sent.\n", transmitCalibrationChannel)
 					fmt.Printf("Use -x p to key PTT without audio.\n")

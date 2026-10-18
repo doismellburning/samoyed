@@ -126,6 +126,9 @@ type InputConfig struct {
 type ChannelConfig struct {
 	Radio      bool // The channel is a radio, so has lines to drive.
 	FullDuplex bool // Keep listening while transmitting.
-	Outputs    [NumOutputTypes]OutputConfig
-	Inputs     [NumInputTypes]InputConfig
+	// ReceiveOnly is set for a channel with no audio output to transmit
+	// through, so nothing to key a transmitter for.
+	ReceiveOnly bool
+	Outputs     [NumOutputTypes]OutputConfig
+	Inputs      [NumInputTypes]InputConfig
 }

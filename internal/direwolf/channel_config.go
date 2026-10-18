@@ -215,15 +215,17 @@ type achan_param_s struct {
 }
 
 // pttChannels is each radio channel's configuration, as the PTT needs it.
-func (c *RadioConfig) pttChannels() [MAX_RADIO_CHANS]ptt.ChannelConfig {
+// canTransmit says whether a channel has an audio output to transmit through.
+func (c *RadioConfig) pttChannels(canTransmit func(channel int) bool) [MAX_RADIO_CHANS]ptt.ChannelConfig {
 	var channels [MAX_RADIO_CHANS]ptt.ChannelConfig
 
 	for ch := range MAX_RADIO_CHANS {
 		channels[ch] = ptt.ChannelConfig{
-			Radio:      c.chan_medium[ch] == MEDIUM_RADIO,
-			FullDuplex: c.achan[ch].fulldup,
-			Outputs:    c.achan[ch].octrl,
-			Inputs:     c.achan[ch].ictrl,
+			Radio:       c.chan_medium[ch] == MEDIUM_RADIO,
+			FullDuplex:  c.achan[ch].fulldup,
+			ReceiveOnly: !canTransmit(ch),
+			Outputs:     c.achan[ch].octrl,
+			Inputs:      c.achan[ch].ictrl,
 		}
 	}
 
