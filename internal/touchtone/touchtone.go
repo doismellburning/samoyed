@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/sirupsen/logrus"
 )
 
@@ -196,7 +196,7 @@ func TextToMultipress(text string, quiet bool) (string, int) {
 	var errors = 0
 
 	for _, c := range text {
-		if unicode.IsDigit(c) {
+		if ascii.IsDigit(c) {
 			/* Count number of other characters assigned to this button. */
 			/* Press that number plus one more. */
 			var n = 1
@@ -219,10 +219,10 @@ func TextToMultipress(text string, quiet bool) (string, int) {
 				haveButtons = true
 			}
 		} else {
-			if unicode.IsUpper(c) {
+			if ascii.IsUpper(c) {
 
-			} else if unicode.IsLower(c) {
-				c = unicode.ToUpper(c)
+			} else if ascii.IsLower(c) {
+				c = ascii.ToUpper(c)
 			} else if c != ' ' {
 				errors++
 
@@ -294,14 +294,14 @@ func TextToTwoKey(text string, quiet bool) (string, int) {
 	var errors = 0
 
 	for _, c := range text {
-		if unicode.IsDigit(c) {
+		if ascii.IsDigit(c) {
 			/* Digit is single key press. */
 			buttons.WriteRune(c)
 		} else {
-			if unicode.IsUpper(c) {
+			if ascii.IsUpper(c) {
 
-			} else if unicode.IsLower(c) {
-				c = unicode.ToUpper(c)
+			} else if ascii.IsLower(c) {
+				c = ascii.ToUpper(c)
 			} else if c != ' ' {
 				errors++
 
@@ -366,11 +366,11 @@ func letterToTwoDigits(c rune, quiet bool) (string, int) {
 
 	var buttons string
 
-	if unicode.IsLower(c) {
-		c = unicode.ToUpper(c)
+	if ascii.IsLower(c) {
+		c = ascii.ToUpper(c)
 	}
 
-	if !unicode.IsUpper(c) {
+	if !ascii.IsUpper(c) {
 		errors++
 
 		if !quiet {
@@ -441,7 +441,7 @@ func TextToCall10(text string, quiet bool) (string, int) {
 	}
 
 	for _, t := range text {
-		if !unicode.IsLetter(t) && !unicode.IsDigit(t) {
+		if !ascii.IsAlpha(t) && !ascii.IsDigit(t) {
 			if !quiet {
 				logrus.WithField("callsign", text).Warn("Text to callsign 6+4: callsign can contain only letters and digits")
 			}
@@ -463,8 +463,8 @@ func TextToCall10(text string, quiet bool) (string, int) {
 	var buttons strings.Builder
 
 	for _, c := range padded {
-		if unicode.IsLower(c) {
-			c = unicode.ToUpper(c)
+		if ascii.IsLower(c) {
+			c = ascii.ToUpper(c)
 		}
 
 		/* Search in the translation table. */
@@ -549,7 +549,7 @@ func TextToSatsq(text string, quiet bool) (string, int) {
 		return "", errors
 	}
 
-	if !unicode.IsDigit(rune(text[2])) || !unicode.IsDigit(rune(text[3])) {
+	if !ascii.IsDigit(text[2]) || !ascii.IsDigit(text[3]) {
 		if !quiet {
 			logrus.WithField("gridsquare", text).Warn("Satellite gridsquare to DTMF: last two characters must be digits")
 		}
@@ -628,16 +628,16 @@ func TextToASCII2D(text string, quiet bool) (string, int) {
 	var errors = 0
 	var buttons strings.Builder
 
-	for _, c := range text {
-		/* "isprint()" might depend on locale so use brute force. */
-		if c < ' ' || c > '~' {
+	// Two digits per byte, as Dire Wolf has it, not per rune.
+	for _, c := range []byte(text) {
+		if !ascii.IsPrint(c) {
 			c = '?'
 		}
 
 		var n = c - 32
 
-		buttons.WriteRune((n / 10) + '0')
-		buttons.WriteRune((n % 10) + '0')
+		buttons.WriteByte((n / 10) + '0')
+		buttons.WriteByte((n % 10) + '0')
 	}
 
 	return buttons.String(), errors
@@ -669,7 +669,7 @@ func MultipressToText(buttons string, quiet bool) (string, int) {
 
 	for i := 0; i < len(buttons); i++ {
 		var c = rune(buttons[i])
-		if unicode.IsDigit(c) {
+		if ascii.IsDigit(c) {
 			/* Determine max that can occur in a row. */
 			/* = number of other characters assigned to this button + 1. */
 			var maxspan = 1
@@ -755,7 +755,7 @@ func TwoKeyToText(buttons string, quiet bool) (string, int) {
 
 	for i := 0; i < len(buttons); i++ {
 		var c = rune(buttons[i])
-		if unicode.IsDigit(c) {
+		if ascii.IsDigit(c) {
 			/* Letter (or space) if followed by ABCD. */
 			var row = c - '0'
 			var col = -1
@@ -905,7 +905,7 @@ func Call10ToText(buttons string, quiet bool) (string, int) {
 	}
 
 	for _, b := range buttons {
-		if !unicode.IsDigit(b) {
+		if !ascii.IsDigit(b) {
 			if !quiet {
 				logrus.WithField("buttons", buttons).Warn("Callsign 6+4 to text: encoded callsign can contain only digits")
 			}
@@ -988,7 +988,7 @@ func Call5SuffixToText(buttons string, quiet bool) (string, int) {
 	}
 
 	for _, b := range buttons {
-		if !unicode.IsDigit(b) {
+		if !ascii.IsDigit(b) {
 			if !quiet {
 				logrus.WithField("buttons", buttons).Warn("Callsign 3+2 suffix to text: encoded callsign can contain only digits")
 			}
@@ -1093,7 +1093,7 @@ func MheadToText(buttons string, quiet bool) (string, int) {
 	}
 
 	for _, b := range buttons {
-		if !unicode.IsDigit(b) {
+		if !ascii.IsDigit(b) {
 			if !quiet {
 				logrus.WithField("buttons", buttons).Warn("DTMF to Maidenhead locator: input can contain only digits")
 			}
@@ -1192,8 +1192,8 @@ func TextToMhead(text string, quiet bool) (string, int) {
 		var t0 = rune(text[i*2])
 		var t1 = rune(text[i*2+1])
 
-		if unicode.ToUpper(t0) < mhpair[i].min_ch || unicode.ToUpper(t0) > mhpair[i].max_ch ||
-			unicode.ToUpper(t1) < mhpair[i].min_ch || unicode.ToUpper(t1) > mhpair[i].max_ch {
+		if ascii.ToUpper(t0) < mhpair[i].min_ch || ascii.ToUpper(t0) > mhpair[i].max_ch ||
+			ascii.ToUpper(t1) < mhpair[i].min_ch || ascii.ToUpper(t1) > mhpair[i].max_ch {
 			if !quiet {
 				logrus.WithFields(logrus.Fields{
 					"locator": text,
@@ -1265,7 +1265,7 @@ func SatsqToText(buttons string, quiet bool) (string, int) {
 	}
 
 	for _, b := range buttons {
-		if !unicode.IsDigit(b) {
+		if !ascii.IsDigit(b) {
 			if !quiet {
 				logrus.WithField("buttons", buttons).Warn("DTMF to satellite gridsquare: input can contain only digits")
 			}
@@ -1315,7 +1315,7 @@ func ASCII2DToText(buttons string, quiet bool) (string, int) {
 		var c1 = rune(buttons[2*i])
 		var c2 = rune(buttons[2*i+1])
 
-		if unicode.IsDigit(c1) && unicode.IsDigit(c2) {
+		if ascii.IsDigit(c1) && ascii.IsDigit(c2) {
 			var n = (c1-'0')*10 + (c2 - '0')
 
 			text.WriteRune(n + 32)

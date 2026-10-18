@@ -78,12 +78,14 @@ func TestObjectReportCarriesFrequency(t *testing.T) {
 	assert.Contains(t, users.objectReportText(i, true), "146.955MHz T074 ")
 }
 
-// TextToTwoKey passes any Unicode digit through, but only ASCII ones belong in
-// the suffix - another used to be narrowed to a byte and taken for a letter.
+// Only ASCII digits belong in the suffix.  Another, such as an Arabic-Indic
+// one, used to be narrowed to a byte and taken for a letter; TextToTwoKey now
+// treats it as it does any other character that isn't a letter or digit, as
+// a space.
 func TestDigitSuffixIgnoresNonASCIIDigits(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, digit_suffix("Q1TEST"), digit_suffix("Q1TE\u0663ST")) // ARABIC-INDIC DIGIT THREE
+	assert.Equal(t, digit_suffix("Q1TE ST"), digit_suffix("Q1TE\u0663ST")) // ARABIC-INDIC DIGIT THREE
 }
 
 // The receive processing goroutine records users as their tone sequences
