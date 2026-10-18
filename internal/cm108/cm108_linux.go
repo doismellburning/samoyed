@@ -82,12 +82,16 @@ package cm108
  *---------------------------------------------------------------*/
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
+	"strings"
 
-	"github.com/jochenvg/go-udev"
 	"golang.org/x/sys/unix"
 )
 
@@ -209,45 +213,40 @@ const MAXX_THINGS = 60
  * Outputs:	things		- Array of items collected.
  *				  Corresponding sound device and HID are merged into one item.
  *
- * Returns:	The items collected, and an error if the underlying udev
- *		enumeration failed.
+ * Returns:	The items collected, and an error if sysfs could not be read.
  *
  *------------------------------------------------------------------*/
 
 func Inventory(max_things int) ([]*Thing, error) {
-	/*
-	 * First get a list of the USB audio devices.
-	 * This is based on the example in http://www.signal11.us/oss/udev/
-	 */
-	var u = udev.Udev{}
-	var e = u.NewEnumerate()
-	e.AddMatchSubsystem("sound")
-
-	var devices, devicesErr = e.Devices()
-	if devicesErr != nil {
-		return nil, fmt.Errorf("could not enumerate udev sound devices: %w", devicesErr)
-	}
-
-	/*
-	 * Then all of the USB HID.
-	 */
-	var e2 = u.NewEnumerate()
-	e2.AddMatchSubsystem("hidraw")
-
-	var hidDevices, hidDevicesErr = e2.Devices()
-	if hidDevicesErr != nil {
-		return nil, fmt.Errorf("could not enumerate udev hidraw devices: %w", hidDevicesErr)
-	}
-
-	return cm108_inventory_of(readUdevDevices(devices), readUdevDevices(hidDevices), max_things), nil
+	return inventoryFromSysfs("/sys", max_things)
 } /* end Inventory */
 
-// cm108Device is what the inventory needs to know of a udev device, read out
-// of udev up front so that the inventory can also be taken of devices that
+// inventoryFromSysfs does the work of Inventory against the sysfs mounted at
+// sysRoot, so that a test can hand it a tree of its own.
+func inventoryFromSysfs(sysRoot string, max_things int) ([]*Thing, error) {
+	/*
+	 * First get a list of the USB audio devices, then all of the USB HID.
+	 * Dire Wolf asked libudev for these; we read the same sysfs it does.
+	 */
+	var devices, devicesErr = readSysfsDevices(sysRoot, "sound")
+	if devicesErr != nil {
+		return nil, devicesErr
+	}
+
+	var hidDevices, hidDevicesErr = readSysfsDevices(sysRoot, "hidraw")
+	if hidDevicesErr != nil {
+		return nil, hidDevicesErr
+	}
+
+	return cm108_inventory_of(devices, hidDevices, max_things), nil
+}
+
+// cm108Device is what the inventory needs to know of a device, read out of
+// sysfs up front so that the inventory can also be taken of devices that
 // are not really there.
 type cm108Device struct {
 	devnode string
-	devpath string
+	devpath string // syspath without the sysfs mount point.
 	syspath string
 	id      string // Sound card name, from sysattr "id".
 	number  string // Sound card number, from sysattr "number".
@@ -262,35 +261,156 @@ type cm108USBDevice struct {
 	product   string
 }
 
-func readUdevDevices(devices []*udev.Device) []cm108Device {
-	var read = make([]cm108Device, 0, len(devices))
+// readSysfsDevices lists the devices of a subsystem from <sysRoot>/class, in
+// the order libudev would have enumerated them.  A subsystem with no class
+// directory (its driver not loaded, or no sysfs in a container) has no devices.
+func readSysfsDevices(sysRoot string, subsystem string) ([]cm108Device, error) {
+	var root, rootErr = filepath.EvalSymlinks(sysRoot)
+	if rootErr != nil {
+		return nil, fmt.Errorf("could not read sysfs at %s: %w", sysRoot, rootErr)
+	}
 
-	for _, dev := range devices {
+	var classDir = filepath.Join(root, "class", subsystem)
+
+	var entries, entriesErr = os.ReadDir(classDir)
+	if errors.Is(entriesErr, fs.ErrNotExist) {
+		return nil, nil
+	}
+
+	if entriesErr != nil {
+		return nil, fmt.Errorf("could not list %s: %w", classDir, entriesErr)
+	}
+
+	var read = make([]cm108Device, 0, len(entries))
+
+	for _, entry := range entries {
+		var syspath, syspathErr = filepath.EvalSymlinks(filepath.Join(classDir, entry.Name()))
+		if syspathErr != nil {
+			return nil, fmt.Errorf("could not resolve %s device %s: %w", subsystem, entry.Name(), syspathErr)
+		}
+
 		var d cm108Device
 
-		d.devnode = dev.Devnode()
-		d.devpath = dev.Devpath()
-		d.syspath = dev.Syspath()
-		d.id = dev.SysattrValue("id")
-		d.number = dev.SysattrValue("number")
-
-		var parentdev = dev.ParentWithSubsystemDevtype("usb", "usb_device")
-		if parentdev != nil {
-			d.usb = new(cm108USBDevice)
-			d.usb.devnode = parentdev.Devnode()
-			d.usb.idVendor = parentdev.SysattrValue("idVendor")
-			d.usb.idProduct = parentdev.SysattrValue("idProduct")
-			d.usb.product = parentdev.SysattrValue("product")
-		}
+		d.syspath = syspath
+		d.devpath = strings.TrimPrefix(syspath, root)
+		d.devnode = sysfsDevnode(syspath)
+		d.id = readSysattr(syspath, "id")
+		d.number = readSysattr(syspath, "number")
+		d.usb = findUSBDevice(root, syspath)
 
 		read = append(read, d)
 	}
 
-	return read
+	sort.Slice(read, func(i, j int) bool {
+		return sysfsEnumerationLess(read[i].syspath, read[j].syspath)
+	})
+
+	return read, nil
+}
+
+// sysfsEnumerationLess orders devices as libudev does: by syspath, except that
+// a sound card's controlC device comes after its siblings.  Either way a card
+// comes before the devices under it, which cm108_inventory_of relies on.
+func sysfsEnumerationLess(a string, b string) bool {
+	var cardA, controlA = soundCardOf(a)
+	var cardB, controlB = soundCardOf(b)
+
+	if cardA != cardB {
+		return cardA < cardB
+	}
+
+	if controlA != controlB {
+		return controlB
+	}
+
+	return a < b
+}
+
+// soundCardPath splits a syspath into the sound card it is, or is under, and
+// the rest.
+var soundCardPath = regexp.MustCompile(`^(.*/sound/card[^/]+)(/.*)?$`)
+
+// soundCardOf gives the syspath of the sound card a device is, or is under,
+// and whether it is the card's control device.  A path not under a sound card
+// is its own key.
+func soundCardOf(syspath string) (string, bool) {
+	var m = soundCardPath.FindStringSubmatch(syspath)
+	if m == nil {
+		return syspath, false
+	}
+
+	return m[1], strings.HasPrefix(m[2], "/controlC")
+}
+
+// findUSBDevice walks up from a device to the nearest USB device (as opposed to
+// a USB interface) above it, as libudev's
+// udev_device_get_parent_with_subsystem_devtype(dev, "usb", "usb_device") does.
+func findUSBDevice(root string, syspath string) *cm108USBDevice {
+	for dir := filepath.Dir(syspath); strings.HasPrefix(dir, root+"/"); dir = filepath.Dir(dir) {
+		var subsystem, linkErr = os.Readlink(filepath.Join(dir, "subsystem"))
+		if linkErr != nil || filepath.Base(subsystem) != "usb" {
+			continue
+		}
+
+		if readUevent(dir)["DEVTYPE"] != "usb_device" {
+			continue
+		}
+
+		var u = new(cm108USBDevice)
+		u.devnode = sysfsDevnode(dir)
+		u.idVendor = readSysattr(dir, "idVendor")
+		u.idProduct = readSysattr(dir, "idProduct")
+		u.product = readSysattr(dir, "product")
+
+		return u
+	}
+
+	return nil
+}
+
+// sysfsDevnode gives the /dev node of a device, from the DEVNAME in its
+// uevent, or "" if it has none (a sound card itself, for one).
+func sysfsDevnode(syspath string) string {
+	var name = readUevent(syspath)["DEVNAME"]
+	if name == "" {
+		return ""
+	}
+
+	return "/dev/" + name
+}
+
+// readUevent reads the KEY=value lines of a device's uevent file.
+func readUevent(syspath string) map[string]string {
+	var uevent = make(map[string]string)
+
+	var content, err = os.ReadFile(filepath.Join(syspath, "uevent")) //nolint:gosec // Reading sysfs is the point.
+	if err != nil {
+		return uevent
+	}
+
+	for line := range strings.SplitSeq(string(content), "\n") {
+		var key, value, found = strings.Cut(line, "=")
+		if found {
+			uevent[key] = value
+		}
+	}
+
+	return uevent
+}
+
+// readSysattr reads a device attribute with its trailing newline trimmed, as
+// libudev does, or "" if the device does not have it.
+func readSysattr(syspath string, name string) string {
+	var content, err = os.ReadFile(filepath.Join(syspath, name)) //nolint:gosec // Reading sysfs is the point.
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimRight(string(content), " \t\n\r")
 }
 
 // cm108_inventory_of does the work of Inventory on the devices of the
-// "sound" and "hidraw" subsystems, in udev's enumeration order.
+// "sound" and "hidraw" subsystems, in libudev's enumeration order.
 func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_things int) []*Thing {
 	var things []*Thing
 

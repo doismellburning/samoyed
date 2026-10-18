@@ -8,7 +8,6 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/golang/geo v0.0.0-20180826223333-635502111454
 	github.com/gordonklaus/portaudio v0.0.0-20250206071425-98a94950218b
-	github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b
 	github.com/lestrrat-go/strftime v1.2.0
 	github.com/pkg/term v1.1.0
 	github.com/prometheus/client_golang v1.24.1
@@ -26,7 +25,6 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/jkeiser/iter v0.0.0-20200628201005-c8aa0ae784d1 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/miekg/dns v1.1.61 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
