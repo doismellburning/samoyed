@@ -26,6 +26,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/doismellburning/samoyed/internal/nodemap"
 	"github.com/doismellburning/samoyed/internal/pfilter"
@@ -332,6 +333,16 @@ x = Silence FX.25 information.`)
 			}
 		}
 
+		// The same goes for the NET/ROM node's channel.
+		if netromSettings, ok := misc_config.netrom.Get(); ok {
+			var _, netromErr = audio_config.netromConfig(netromSettings, misc_config.node)
+			if netromErr != nil {
+				fmt.Println(asSentence(netromErr.Error()))
+
+				configErrors++
+			}
+		}
+
 		reportConfigCheck(*configFileName, configErrors, configResult.warnings)
 
 		if configErrors > 0 {
@@ -401,6 +412,24 @@ x = Silence FX.25 information.`)
 		}
 
 		nodeConfig = maybe.Just(config)
+	}
+
+	// The NET/ROM node's, likewise.
+	var netromConfig maybe.Maybe[netrom.Config]
+
+	if netromSettings, ok := misc_config.netrom.Get(); ok {
+		var config, netromErr = audio_config.netromConfig(netromSettings, misc_config.node)
+		if netromErr != nil {
+			fmt.Println(asSentence(netromErr.Error()))
+			os.Exit(1)
+		}
+
+		if misc_config.paclen < netrom.MaxFrame {
+			logrus.WithFields(logrus.Fields{"paclen": misc_config.paclen, "needed": netrom.MaxFrame}).
+				Warn("PACLEN is too small for NET/ROM: longer NET/ROM frames will be split and lost on an AX.25 v2.0 link")
+		}
+
+		netromConfig = maybe.Just(config)
 	}
 
 	if *audioStatsInterval > 0 {
@@ -609,15 +638,41 @@ x = Silence FX.25 information.`)
 	// is nil, which everything it is handed to takes as no clients.
 	var agwServer *AGWServer
 
+	// With a NET/ROM node, the AGW server's requests pass through it on the
+	// way to the data link, so that it can take the ones that are its own.
+	var agwDataLink agwDataLink = dataLinkQueue
+
+	var netromAGW *netromAGWDataLink
+	if netromConfig.IsJust() {
+		netromAGW = newNetromAGWDataLink(dataLinkQueue)
+		agwDataLink = netromAGW
+	}
+
 	if misc_config.agwpe_port == 0 {
 		logrus.Info("Disabled AGW network client port")
 	} else if *transmitCalibration == "" {
 		var agwErr error
 
-		agwServer, agwErr = NewAGWServer(ctx, fmt.Sprintf(":%d", misc_config.agwpe_port), audio_config, misc_config, dataLinkQueue, transmitQueue, d_a_opt)
+		agwServer, agwErr = NewAGWServer(ctx, fmt.Sprintf(":%d", misc_config.agwpe_port), audio_config, misc_config, agwDataLink, transmitQueue, d_a_opt)
 		if agwErr != nil {
 			logrus.WithError(agwErr).Error("Unable to listen for AGW client applications")
 		}
+	}
+
+	// The NET/ROM node tells the AGW clients about their circuits, and the
+	// AGW server hands it their requests through netromAGW, which so can
+	// only be given the node once both exist.  That is the cycle, and it is
+	// closed here, before the AGW server takes any clients.
+	var netromNode *netrom.Node
+
+	if config, ok := netromConfig.Get(); ok {
+		var circuitClients netrom.Reporter
+		if agwServer != nil {
+			circuitClients = agwServer
+		}
+
+		netromNode = netrom.New(config, dataLinkQueue, transmitQueue.Append, circuitClients, netrom.RealClock{}, netromClient)
+		netromAGW.node = netromNode
 	}
 
 	// Each frame sent is shown on the web interface, if there is one, and to
@@ -771,7 +826,15 @@ x = Silence FX.25 information.`)
 		go nodemap.New(mapConfig, client).Run(ctx)
 	}
 
-	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, newLinkClientRouter(agwClients, nodeClients), transmitQueue, d_c_opt)
+	var netromClients linkClients
+
+	if netromNode != nil {
+		netromNode.Start(ctx)
+
+		netromClients = netromNode
+	}
+
+	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, newLinkClientRouter(agwClients, nodeClients, netromClients), transmitQueue, d_c_opt)
 	var metricsAddr net.Addr // Where the endpoint is listening, if it is.
 
 	if misc_config.metrics_port == 0 {
@@ -894,6 +957,9 @@ x = Silence FX.25 information.`)
 	recHandler.apps = clientApplications
 	recHandler.digipeater = aprsDigipeater
 	recHandler.connectedDigipeater = connectedDigipeater
+	if netromNode != nil {
+		recHandler.netromHeard = netromNode.HeardUI
+	}
 	recHandler.ttGateway = ttGateway
 	recHandler.dumpUTF8 = d_u_opt
 	recHandler.dumpPackets = d_p_opt
@@ -954,6 +1020,11 @@ type recPacketHandler struct {
 	digipeater          *digipeater.Digipeater
 	connectedDigipeater *digipeater.Connected
 	ttGateway           *TTGateway
+
+	// netromHeard hands a received UI frame to the NET/ROM node, which
+	// takes the NODES broadcasts its neighbours send; nil for no NET/ROM
+	// node.
+	netromHeard func(channel int, pp *ax25.Packet)
 
 	dumpUTF8    bool // "-d u": print UTF-8 in hexadecimal too.
 	dumpPackets bool // "-d p": dump each packet.
@@ -1383,6 +1454,17 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		if channel < MAX_RADIO_CHANS {
 			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
 				rh.connectedDigipeater.Digipeat(channel, pp)
+			}
+		}
+
+		/*
+		 * NET/ROM routing broadcasts, on the same terms.  Everything else
+		 * NET/ROM reaches the node over connected-mode links, through the
+		 * data link.
+		 */
+		if rh.netromHeard != nil && pp.FrameTypeOnly() == ax25.FrameTypeUUI {
+			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
+				rh.netromHeard(channel, pp)
 			}
 		}
 	}

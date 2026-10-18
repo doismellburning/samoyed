@@ -509,3 +509,81 @@ attached over KISS, runs its own link layer: it sees the raw frames and sends
 its own UA, so connected mode there is configured in that software and never
 reaches the path described above.  Registering a callsign over the AGW port
 has no bearing on it.
+
+Run a NET/ROM node
+------------------
+
+A NET/ROM node advertises itself and the nodes it can reach in periodic ``NODES`` broadcasts,
+learns routes from the broadcasts it hears,
+and carries users' traffic over circuits that may cross several nodes.
+:doc:`glossary/netrom` describes how Samoyed implements the protocol.
+
+Configure one with a ``netrom`` block in a YAML configuration
+(the settings are listed in :doc:`yaml-config`):
+
+.. code:: yaml
+
+    samoyed:
+      channels:
+        - {channel: 0, mycall: Q1TEST}
+      netrom:
+        callsign: Q1TEST-7
+        alias: QNODEA
+        channel: 0
+
+The node's callsign is its own:
+it answers the links neighbouring nodes make to it,
+and makes links to them,
+so nothing else should use that callsign on that channel.
+A node shell may run alongside it, under a callsign and alias of its own.
+Leave ``PACLEN`` at its default of 256 or more:
+a NET/ROM frame travels in a single AX.25 frame,
+and Samoyed warns at startup if ``PACLEN`` is less.
+
+Applications use the node over the AGW port:
+
+* ``c`` (connect) with PID 0xCF,
+  from the user's callsign to a node's callsign or alias,
+  opens a circuit to that node.
+  Data can be sent with ``D`` straight away;
+  it waits until the circuit is up.
+  If there is no route to the node, or it will not take the circuit,
+  the client gets ``d`` (disconnected) back.
+* ``D`` sends data on the circuit, and ``d`` closes it,
+  naming the same two callsigns.
+  Data arriving on the circuit comes to the client with ``D``.
+  ``Y`` asks how much of what was sent has yet to go or be acknowledged,
+  as it does for an AX.25 link.
+* A client that registers the node's own callsign with ``X``
+  takes the circuits other nodes open to this one.
+  With no such client, they are refused.
+
+A circuit belongs to the client that opened or took it,
+and is closed if that client disconnects from the AGW port.
+``test-scripts/check-netrom-connect`` starts two nodes on cross-wired UDP audio
+and drives a circuit between them in both directions,
+and doubles as a worked example of the AGW side.
+
+Running a node over AXUDP
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The node's channel can be an AXUDP port,
+to reach other nodes over the internet.
+Send ``NODES`` broadcasts to every neighbour with ``broadcast: [NODES]``,
+and ``broadcast: true`` on each neighbour's map;
+map each neighbour by its node callsign, not its alias,
+since the links between nodes are addressed to their callsigns:
+
+.. code:: yaml
+
+    samoyed:
+      axudpPorts:
+        - port: 10093
+          channel: 10
+          broadcast: [NODES]
+          maps:
+            - {ax25addr: Q2TEST-7, host: node.example.org, port: 10093, broadcast: true}
+      netrom:
+        callsign: Q1TEST-7
+        alias: QNODEA
+        channel: 10

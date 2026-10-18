@@ -173,6 +173,10 @@ type misc_config_s struct {
 	// node shell.
 	node maybe.Maybe[nodeSettings]
 
+	// netrom is the NET/ROM node's settings, or Nothing (the default) for
+	// no NET/ROM node.
+	netrom maybe.Maybe[netromSettings]
+
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.
 	// Unfortunately, most applications don't know how to deal with multi-radio TNCs.

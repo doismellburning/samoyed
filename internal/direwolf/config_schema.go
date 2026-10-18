@@ -166,6 +166,38 @@ type NodeSettings struct {
 	Map *NodeMapSettings `yaml:"map"`
 }
 
+// NetROMSettings describes a NET/ROM node, which carries traffic between
+// nodes over circuits that may cross several of them.
+type NetROMSettings struct {
+	// Callsign is the node's AX.25 address, conventionally the station's
+	// callsign with an SSID of its own.
+	Callsign string `yaml:"callsign"`
+
+	// Alias is the short name, of up to six characters, other nodes know
+	// it by.
+	Alias string `yaml:"alias"`
+
+	// Channel is the channel the node runs on: a radio channel or an
+	// NCHANNEL.
+	Channel *int `yaml:"channel"`
+
+	// TTL is how many nodes a frame the node originates may cross.  Left
+	// out, it is 16.
+	TTL *int `yaml:"ttl"`
+
+	// NodesInterval is the number of seconds between NODES broadcasts.
+	// Left out, it is 3600.
+	NodesInterval *int `yaml:"nodesInterval"`
+
+	// Quality, from 0 to 255, is what the node assumes for its link to any
+	// neighbour it hears.  Left out, it is 192.
+	Quality *int `yaml:"quality"`
+
+	// MinQuality is the least quality a route is worth keeping at.  Left
+	// out, it is 10.
+	MinQuality *int `yaml:"minQuality"`
+}
+
 // NodeMapSettings describes how the node is reported to the UK Packet Radio
 // network map.
 type NodeMapSettings struct {

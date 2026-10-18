@@ -325,6 +325,52 @@ These are the keys under ``samoyed``:
               locator: IO91wm
               comment: Club node, 144.950 MHz
 
+``netrom``
+    A NET/ROM node (see :doc:`glossary/netrom`),
+    which learns routes from the nodes it hears and carries circuits between them.
+    The ``NETROM`` directive of the line-at-a-time format is not available:
+    a NET/ROM node is configured here only.
+    It has:
+
+    ``callsign``
+        The node's AX.25 address,
+        conventionally the station's callsign with an SSID of its own.
+        It must not be the node shell's address or alias on the same channel.
+
+    ``alias``
+        The short name, up to six letters, digits or ``#_&-/``,
+        other nodes know it by.
+
+    ``channel``
+        The channel it runs on:
+        any channel connected mode can be used on.
+
+    ``ttl``
+        Optionally, how many nodes a frame it originates may cross.
+        16 if left out.
+
+    ``nodesInterval``
+        Optionally, the seconds between its ``NODES`` broadcasts,
+        up to a week (604800).
+        3600 if left out.
+
+    ``quality``
+        Optionally, from 0 to 255,
+        the quality it gives the link to any neighbour it hears.
+        192 if left out.
+
+    ``minQuality``
+        Optionally, the least quality a route is worth keeping at.
+        10 if left out.
+
+    .. code:: yaml
+
+        samoyed:
+          netrom:
+            callsign: Q1TEST-7
+            alias: QNODEA
+            channel: 0
+
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as
     though they were a file of their own - so a channel setting there needs its
