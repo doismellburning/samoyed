@@ -77,7 +77,7 @@
 ### Parallel Tests
 
 * `paralleltest` wants every test and `t.Run` subtest to call `t.Parallel()`. One that touches something the whole process shares - capturing stdout or stdin, a logrus global hook or level, `t.Setenv`, a package-level variable, a port it expects to stay unused - stays serial, with `//nolint:paralleltest // Serial: <why>.` on the function. Go holds the parallel tests back until every serial one has finished, so the two never overlap
-* `internal/direwolf` is excluded for now, as its tests still share stdout and logrus's global logger throughout (#972)
+* Most of `internal/direwolf`'s serial tests are serial because they capture stdout or hook logrus's global logger. Handing the component a writer or logger of its own lets a test go parallel (#972)
 
 ### Test Callsigns
 
