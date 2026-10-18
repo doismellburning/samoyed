@@ -139,8 +139,7 @@ func newMultiModem(channel int, pa *RadioConfig, demodulator *Demodulator, recei
 
 	if pa.chan_medium[channel] == MEDIUM_RADIO {
 		if pa.achan[channel].baud <= 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Internal multi_modem_init error, channel=%d\n", channel)
+			logrus.WithField("channel", channel).Error("Internal multi_modem_init error: baud not set")
 			pa.achan[channel].baud = DEFAULT_BAUD
 		}
 
@@ -284,12 +283,13 @@ func (m *MultiModem) ProcessSample(audio_sample int) bool {
 
 	if numSubchan <= 0 || numSubchan > MAX_SUBCHANS ||
 		numSlicers <= 0 || numSlicers > MAX_SLICERS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR!  Something is seriously wrong in MultiModem.ProcessSample\n")
-		dw_printf("channel = %d, num_subchan = %d [max %d], num_slicers = %d [max %d]\n", channel,
-			numSubchan, MAX_SUBCHANS,
-			numSlicers, MAX_SLICERS)
-		dw_printf("Please report this message and include a copy of your configuration file.\n")
+		logrus.WithFields(logrus.Fields{
+			"channel":      channel,
+			"num_subchan":  numSubchan,
+			"max_subchans": MAX_SUBCHANS,
+			"num_slicers":  numSlicers,
+			"max_slicers":  MAX_SLICERS,
+		}).Error("Something is seriously wrong in MultiModem.ProcessSample; please report this and include a copy of your configuration file")
 
 		return false
 	}
@@ -331,8 +331,7 @@ func (m *MultiModem) processRecPacket(from dwcore.SlicerID, pp *ax25.Packet, rxI
 	dwutil.Assert(from.Channel == channel)
 
 	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unexpected internal problem in MultiModem.processRecPacket\n")
+		logrus.WithField("channel", channel).Error("Unexpected internal problem in MultiModem.processRecPacket")
 
 		return /* oops!  why would it fail? */
 	}
@@ -354,8 +353,10 @@ func (m *MultiModem) processRecPacket(from dwcore.SlicerID, pp *ax25.Packet, rxI
 			if float64(pa.recv_error_rate)/100.0 > r {
 				drop_it = true
 
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("Intentionally dropping incoming frame.  Recv Error rate = %d per cent.\n", pa.recv_error_rate)
+				logrus.WithFields(logrus.Fields{
+					"channel":         channel,
+					"recv_error_rate": pa.recv_error_rate,
+				}).Info("Intentionally dropping incoming frame")
 			}
 		}
 
@@ -535,8 +536,7 @@ func (m *MultiModem) pickBestCandidate() {
 	}
 
 	if best_score == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unexpected internal problem in pick_best_candidate.  How can best score be zero?\n")
+		logrus.WithField("channel", channel).Error("Unexpected internal problem in pick_best_candidate: best score is zero")
 	}
 
 	/*
@@ -567,8 +567,10 @@ func (m *MultiModem) pickBestCandidate() {
 		if float64(pa.recv_error_rate)/100.0 > r {
 			drop_it = true
 
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Intentionally dropping incoming frame.  Recv Error rate = %d per cent.\n", pa.recv_error_rate)
+			logrus.WithFields(logrus.Fields{
+				"channel":         channel,
+				"recv_error_rate": pa.recv_error_rate,
+			}).Info("Intentionally dropping incoming frame")
 		}
 	}
 
@@ -816,8 +818,7 @@ func (r *Layer2Receiver) recFrame(from dwcore.SlicerID, fbuf []byte, rxInfo dwco
 	case MODEM_AIS:
 		var nmea, err = ais.ToNMEA(fbuf)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%v\n", err)
+			logrus.WithError(err).WithField("channel", channel).Error("Unable to convert AIS frame to NMEA")
 
 			return
 		}

@@ -236,24 +236,24 @@ func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 
 	require.NoError(t, client.Close())
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 	})
 
 	assert.Contains(t, output, "Error sending KISS message to client application thru serial port")
 	assert.True(t, ks.failed, "the serial port was not given up after the write error")
 
-	output = testutils.CaptureOutput(t, func() {
+	output = captureKissLog(t, func() {
 		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 	})
 
 	assert.Empty(t, output, "the serial port was written to again after the write error")
 
-	output = testutils.CaptureOutput(t, func() {
+	output = captureKissLog(t, func() {
 		assert.True(t, ks.giveUpPortIfFailed())
 	})
 
-	assert.Contains(t, output, "Serial Port KISS write error. Closing connection.")
+	assert.Contains(t, output, "Serial port KISS write error, closing connection")
 	assert.Nil(t, ks.fd, "the listener did not close the failed serial port")
 	assert.False(t, ks.failed)
 }
@@ -287,11 +287,11 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	// is longer than the terminal will hold.
 	var got = drainKissFrame(t, client)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		ks.SendRecPacket(0, kiss.CmdDataFrame, frame)
 	})
 
-	assert.Contains(t, output, "Truncated")
+	assert.Contains(t, output, "truncated")
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
 	assert.Len(t, <-got, ax25.MaxPacketLen+3)
@@ -462,16 +462,16 @@ func TestKissSerialPollingStopsWhenCancelled(t *testing.T) {
 func TestKissSerialDebugPrints(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 2)
 
-	var output = testutils.CaptureOutput(t, func() {
+	var output = captureKissLog(t, func() {
 		ks.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readSerialKissFrame(t, client)
 	})
 
 	assert.Contains(t, output, "Packet content before adding KISS framing")
-	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
+	assert.Contains(t, output, `channel=1 direction=to function="Data frame"`)
 
-	output = testutils.CaptureOutput(t, func() {
+	output = captureKissLog(t, func() {
 		ks.prompt([]byte("\r\ncmd:"))
 	})
 

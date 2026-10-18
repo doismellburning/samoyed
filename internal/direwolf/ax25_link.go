@@ -4982,10 +4982,6 @@ func (link *AX25Link) dl_timer_expiry() {
  *
  *------------------------------------------------------------------------------*/
 
-// Make timer start, stop, expiry a different color to stand out.
-
-const DW_COLOR_DEBUG_TIMER = DW_COLOR_ERROR
-
 func t1_expiry(S *ax25_dlsm_t) {
 	if S.services.debugTimers {
 		var now = time.Now()

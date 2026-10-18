@@ -68,8 +68,11 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [M
 
 	for i := range MAX_TOTAL_CHANS {
 		if pa.chan_medium[i] == MEDIUM_NETTNC {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Channel %d: Network TNC %s %d\n", i, pa.nettnc_addr[i], pa.nettnc_port[i])
+			logrus.WithFields(logrus.Fields{
+				"channel": i,
+				"host":    pa.nettnc_addr[i],
+				"port":    pa.nettnc_port[i],
+			}).Info("Network TNC")
 
 			var nt, err = NewNetTNC(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i], recFrame)
 			if err != nil {
@@ -237,16 +240,23 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 		 */
 		var conn = nt.getSock()
 		if conn == nil {
-			text_color_set(DW_COLOR_ERROR)
 			// I'm using the term "attach" here, in an attempt to
 			// avoid confusion with the AX.25 connect.
-			dw_printf("Attempting to reattach to network TNC...\n")
+			logrus.WithFields(logrus.Fields{
+				"channel": channel,
+				"host":    nt.host,
+				"port":    nt.port,
+			}).Info("Attempting to reattach to network TNC")
 
 			var newConn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(nt.host, strconv.Itoa(nt.port)))
 			if connErr == nil {
 				nt.setSock(newConn)
 
-				dw_printf("Successfully reattached to network TNC.\n")
+				logrus.WithFields(logrus.Fields{
+					"channel": channel,
+					"host":    nt.host,
+					"port":    nt.port,
+				}).Info("Successfully reattached to network TNC")
 			} else if !dwutil.SleepCtx(ctx, nt.reattachDelay) {
 				return
 			}
@@ -267,8 +277,11 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 			}
 
 			if readErr != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Lost communication with network TNC. Will try to reattach.\n")
+				logrus.WithError(readErr).WithFields(logrus.Fields{
+					"channel": channel,
+					"host":    nt.host,
+					"port":    nt.port,
+				}).Error("Lost communication with network TNC; will try to reattach")
 				nt.closeSockIfCurrent(conn)
 
 				if !dwutil.SleepCtx(ctx, nt.reattachDelay) {
@@ -308,8 +321,7 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
 	var chunk = kc.Add(b)
 
 	if chunk.Err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS frame from %s exceeded maximum length.  Discarding it.\n", tnc.name)
+		logrus.WithFields(logrus.Fields{"channel": channel, "tnc": tnc.name}).Error("KISS frame exceeded maximum length; discarding it")
 
 		return
 	}
@@ -329,20 +341,19 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
 
 	if len(unwrapped) == 0 {
 		// FEND FESC FEND, say: no type byte, so nothing to pass on.
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS frame from %s has nothing in it once unescaped.  Ignoring it.\n", tnc.name)
+		logrus.WithFields(logrus.Fields{"channel": channel, "tnc": tnc.name}).Error("KISS frame has nothing in it once unescaped; ignoring it")
 
 		return
 	}
 
 	if debug >= 2 {
 		/* Append CRC to this and it goes out over the radio. */
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("\n")
-		dw_printf("Frame content after removing KISS framing and any escapes:\n")
+		var entry = logrus.WithField("channel", channel)
+
+		entry.Debug("Frame content after removing KISS framing and any escapes")
 		/* Don't include the "type" indicator. */
 		/* It contains the radio channel and type should always be 0 here. */
-		dwutil.HexDump(unwrapped[1:])
+		dwutil.LogHexDump(entry, logrus.DebugLevel, unwrapped[1:])
 	}
 
 	// Convert to packet object and send to received packet queue.
@@ -356,8 +367,7 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
 			recFrame(dwcore.ChannelSource(tnc.source, channel), pp, dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none}, tnc.spectrum)
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Failed to create packet object for KISS frame from channel %d %s.\n", channel, tnc.name)
+		logrus.WithFields(logrus.Fields{"channel": channel, "tnc": tnc.name}).Error("Failed to create packet object for KISS frame")
 	}
 }
 
@@ -382,16 +392,14 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
 
 func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) {
 	if nt == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Not connected to network TNC for channel %d. Discarding packet.\n", channel)
+		logrus.WithField("channel", channel).Error("Not connected to network TNC; discarding packet")
 
 		return
 	}
 
 	var conn = nt.getSock()
 	if conn == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Not connected to network TNC for channel %d. Discarding packet.\n", channel)
+		logrus.WithField("channel", channel).Error("Not connected to network TNC; discarding packet")
 
 		return
 	}
@@ -409,8 +417,7 @@ func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) {
 
 	var _, err = conn.Write(kiss_buff)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError %v sending packet to KISS Network TNC for channel %d.  Closing connection.\n\n", err, channel)
+		logrus.WithError(err).WithField("channel", channel).Error("Error sending packet to KISS network TNC; closing connection")
 		nt.closeSockIfCurrent(conn)
 	}
 

@@ -205,8 +205,7 @@ func (q *DataLinkQueue) RecFrame(src dwcore.Source, pp *ax25.Packet, rxInfo dwco
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL to include virtual channels.
 
 	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR:  dlq_rec_frame nil packet pointer. Please report this!\n")
+		logrus.WithField("channel", channel).Error("INTERNAL ERROR: dlq_rec_frame nil packet pointer. Please report this!")
 
 		return
 	}
@@ -757,8 +756,7 @@ func (q *DataLinkQueue) Remove() *dlq_item_t {
 
 func (q *DataLinkQueue) Delete(pitem *dlq_item_t) {
 	if pitem == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR: dlq_delete()  given nil pointer.\n")
+		logrus.Error("INTERNAL ERROR: dlq_delete given nil pointer")
 
 		return
 	}
@@ -823,15 +821,13 @@ func NewCData(pid int, data []byte) *cdata_t {
 
 func DeleteCData(cdata *cdata_t) {
 	if cdata == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR: cdata_delete()  given nil pointer.\n")
+		logrus.Error("INTERNAL ERROR: cdata_delete given nil pointer")
 
 		return
 	}
 
 	if cdata.magic != TXDATA_MAGIC {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR: cdata_delete()  given corrupted data.\n")
+		logrus.Error("INTERNAL ERROR: cdata_delete given corrupted data")
 
 		return
 	}
@@ -953,11 +949,12 @@ func (q *DataLinkQueue) appendItem(pnew *dlq_item_t) {
 	 */
 
 	if queue_length > 10 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Received frame queue is out of control. Length=%d.\n", queue_length)
-		dw_printf("Reader thread is probably frozen.\n")
-		dw_printf("This can be caused by using a pseudo terminal (direwolf -p) where another\n")
-		dw_printf("application is not reading the frames from the other side.\n")
+		logrus.WithFields(logrus.Fields{
+			"length": queue_length,
+			"hint": "Reader thread is probably frozen. " +
+				"This can be caused by using a pseudo terminal (direwolf -p) where another " +
+				"application is not reading the frames from the other side.",
+		}).Error("Received frame queue is out of control")
 	}
 } /* end appendItem */
 

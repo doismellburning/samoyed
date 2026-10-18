@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -627,6 +628,11 @@ func TestStdinEndOfFileEndsInput(t *testing.T) {
 	assert.False(t, d.inputEnded(0), "there was a byte still to read")
 
 	var output = testutils.CaptureOutput(t, func() {
+		var oldLogOutput = logrus.StandardLogger().Out
+		logrus.SetOutput(os.Stdout)
+
+		defer logrus.SetOutput(oldLogOutput)
+
 		assert.Equal(t, -1, d.GetByte(0))
 		assert.True(t, d.inputEnded(0), "standard input ran out")
 

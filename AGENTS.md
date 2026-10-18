@@ -55,9 +55,8 @@
 
 ### Logging
 
-* `dw_printf` (in `internal/direwolf/util.go`) is deprecated in favour of `logrus` - a `logrus` entry carries structured fields (`logrus.WithField("channel", channel).Info("Heard")`) instead of a line built up by successive `dw_printf` calls. Don't add new uses; converting the ones you find nearby while you're there is welcome. staticcheck won't flag them for you - it says nothing about a deprecated identifier used inside its own package
-* `go vet`/golangci-lint don't treat `dw_printf` as printf-style, so when touching an existing call check its verbs by hand (e.g. `%v`, not `%d`, for an `error`)
-* A converted entry's level follows how often it fires, not how interesting it is. `Debug` is for configuration and lifecycle - init, a port bound, a packet queued - and `Trace` for anything the signal drives: per audio sample, per bit, per byte, or several times per queue operation (the `try_decode` retry machinery, the `tq_*` lock tracing, the per-byte KISS/IGate/serial reads). Nothing in samoyed-direwolf enables `Trace` yet (see issue #645), so those entries are dormant there until it does
+* Log through `logrus`, with structured fields (`logrus.WithField("channel", channel).Info("Heard")`) rather than a line built up a piece at a time. Dire Wolf's `dw_printf` is gone; don't bring back a printf wrapper in its place. Output that is a command's product rather than a log - `samoyed-atest`'s decode report, the monitor lines around `ax25.SafePrint` - goes through `fmt`
+* An entry's level follows how often it fires, not how interesting it is. `Debug` is for configuration and lifecycle - init, a port bound, a packet queued - and `Trace` for anything the signal drives: per audio sample, per bit, per byte, or several times per queue operation (the `try_decode` retry machinery, the `tq_*` lock tracing, the per-byte KISS/IGate/serial reads). Nothing in samoyed-direwolf enables `Trace` yet (see issue #645), so those entries are dormant there until it does
 * logrus builds an entry's fields before it consults the level, so `logrus.WithField(k, expensive()).Trace(...)` pays for `expensive()` even when nothing will print it. Where the fields cost an allocation - a `fmt.Sprintf`, a `string(...)` conversion - and the site is hot, guard the block with `logrus.IsLevelEnabled(logrus.TraceLevel)` first
 
 ### Dependencies

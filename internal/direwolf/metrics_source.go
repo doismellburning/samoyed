@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/sirupsen/logrus"
 )
 
 // fecTypeLabel converts a fec_type_t into the Prometheus label value used for
@@ -88,8 +89,7 @@ func metrics_init(ctx context.Context, audio *RadioConfig, addr string) net.Addr
 
 	var server, serverErr = metrics.NewServer(ctx, addr)
 	if serverErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to start Prometheus metrics endpoint on %s: %v\n", addr, serverErr)
+		logrus.WithError(serverErr).WithField("addr", addr).Error("Unable to start Prometheus metrics endpoint")
 
 		return nil
 	}
@@ -101,13 +101,11 @@ func metrics_init(ctx context.Context, audio *RadioConfig, addr string) net.Addr
 	go func() {
 		var err = <-errCh
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Prometheus metrics endpoint on port %d stopped: %v\n", addrPort(listening), err)
+			logrus.WithError(err).WithField("port", addrPort(listening)).Error("Prometheus metrics endpoint stopped")
 		}
 	}()
 
-	text_color_set(DW_COLOR_INFO)
-	dw_printf("Prometheus metrics endpoint listening on port %d.\n", addrPort(listening))
+	logrus.WithField("port", addrPort(listening)).Info("Prometheus metrics endpoint listening")
 
 	return listening
 }
