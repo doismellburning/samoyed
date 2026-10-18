@@ -16,6 +16,8 @@ import (
 )
 
 func TestChannelDescription(t *testing.T) {
+	t.Parallel()
+
 	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
 	audio.chan_medium[1] = MEDIUM_IGATE
@@ -36,6 +38,8 @@ func TestChannelDescription(t *testing.T) {
 // A channel is shown with the station's own callsign on it, unless that is a
 // placeholder.
 func TestWebChannelCarriesItsCallsign(t *testing.T) {
+	t.Parallel()
+
 	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
 	audio.mycall[0] = "Q1TEST-1"
@@ -61,6 +65,8 @@ func TestWebChannelCarriesItsCallsign(t *testing.T) {
 // its audio level only when that was a radio's: anything else has no audio
 // to measure.
 func TestWebPublishReceivedSaysWhereTheFrameCameFrom(t *testing.T) {
+	t.Parallel()
+
 	var pp = ax25.FromText("Q1TEST>APRS:>hello", true)
 	require.NotNil(t, pp)
 
@@ -79,6 +85,8 @@ func TestWebPublishReceivedSaysWhereTheFrameCameFrom(t *testing.T) {
 		{dwcore.ChannelSource(dwcore.SourceSerialTNC, 1), "serial", maybe.Nothing[int]()},
 	} {
 		t.Run(tc.via, func(t *testing.T) {
+			t.Parallel()
+
 			var hub = webui.NewHub()
 
 			webPublishReceived(hub, tc.src, pp, nil, alevel)
@@ -95,6 +103,8 @@ func TestWebPublishReceivedSaysWhereTheFrameCameFrom(t *testing.T) {
 // An IGate with no server to connect to isn't one, as far as the web interface
 // is concerned.
 func TestWebIGateStatusUnconfigured(t *testing.T) {
+	t.Parallel()
+
 	var ig, _ = setupIGate(t)
 
 	ig.config.t2_server_name = ""
@@ -104,6 +114,8 @@ func TestWebIGateStatusUnconfigured(t *testing.T) {
 }
 
 func TestWebIGateStatus(t *testing.T) {
+	t.Parallel()
+
 	var ig, _ = setupIGate(t)
 
 	ig.config.t2_server_port = 14580

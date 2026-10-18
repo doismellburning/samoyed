@@ -30,6 +30,8 @@ import (
 // A run that nobody has asked to stop carries on: were stopIfCancelled to
 // clean up and exit here, the test binary would go with it.
 func Test_stopIfCancelled_carries_on_while_running(t *testing.T) {
+	t.Parallel()
+
 	stopIfCancelled(t.Context(), new(teardownList))
 }
 
@@ -38,6 +40,8 @@ func Test_stopIfCancelled_carries_on_while_running(t *testing.T) {
 // The teardown releases what was added to it, in the order it was added - so
 // the PTT, which startup acquires first, is released first - and does it only
 // once however often it is asked.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_teardown_releases_what_startup_acquired(t *testing.T) {
 	var td = new(teardownList)
 	var released []string
@@ -61,6 +65,8 @@ func Test_teardown_releases_what_startup_acquired(t *testing.T) {
 
 // A teardown with nothing added, as when startup stops before acquiring
 // anything, still says it is going.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_teardown_with_nothing_to_release(t *testing.T) {
 	var origLogOut = logrus.StandardLogger().Out
 
@@ -176,6 +182,7 @@ func goodLevel() ax25.ALevel {
 	return ax25.ALevel{Rec: 50, Mark: 50, Space: 50}
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_aprs_position(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -195,6 +202,7 @@ func Test_app_process_rec_packet_aprs_position(t *testing.T) {
 	assert.Equal(t, 1, heard, "the station should have been remembered as heard")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_object_name_is_waypoint(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -205,6 +213,7 @@ func Test_app_process_rec_packet_object_name_is_waypoint(t *testing.T) {
 	assert.Contains(t, rt.readWaypoint(t), "LEADER")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_heard_via_digipeater(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -217,6 +226,8 @@ func Test_app_process_rec_packet_heard_via_digipeater(t *testing.T) {
 }
 
 // Hearing WIDEn-0 most likely means hearing the station before it in the path.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_heard_via_wide(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -232,6 +243,7 @@ func Test_app_process_rec_packet_heard_via_wide(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_fec_and_retries(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -259,6 +271,7 @@ func Test_app_process_rec_packet_fec_and_retries(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_audio_levels(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -287,6 +300,7 @@ func Test_app_process_rec_packet_audio_levels(t *testing.T) {
 	assert.Contains(t, output, "subchan=serialtnc")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_quiet(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -301,6 +315,7 @@ func Test_app_process_rec_packet_quiet(t *testing.T) {
 	assert.Contains(t, output, "!4221.60N/07103.60W-Test")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_timestamp(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -315,6 +330,8 @@ func Test_app_process_rec_packet_timestamp(t *testing.T) {
 
 // A packet from the IGate's virtual channel is printed and passed to client
 // applications, and goes no further.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_from_igate_channel(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -328,6 +345,7 @@ func Test_app_process_rec_packet_from_igate_channel(t *testing.T) {
 	assert.Contains(t, output, "subchan=is")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_dtmf(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -342,6 +360,8 @@ func Test_app_process_rec_packet_dtmf(t *testing.T) {
 
 // A touch tone sequence can be simulated with a packet whose information
 // starts with 't'.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_simulated_dtmf(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -354,6 +374,7 @@ func Test_app_process_rec_packet_simulated_dtmf(t *testing.T) {
 	assert.Contains(t, output, "heard=DTMF")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_non_aprs(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -397,6 +418,8 @@ func Test_app_process_rec_packet_non_aprs(t *testing.T) {
 }
 
 // A frame with no AX.25 addresses at all has nobody to have been heard.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_no_addresses(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -411,6 +434,7 @@ func Test_app_process_rec_packet_no_addresses(t *testing.T) {
 	assert.Contains(t, output, "Heard")
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_ais_to_object(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -430,6 +454,8 @@ func Test_app_process_rec_packet_ais_to_object(t *testing.T) {
 
 // A received APRS packet goes to the IGate only if it can be trusted: heard
 // clean, or put right by FEC, but not mended by flipping bits.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_hands_trusted_APRS_to_the_IGate(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 
@@ -446,6 +472,7 @@ func Test_app_process_rec_packet_hands_trusted_APRS_to_the_IGate(t *testing.T) {
 	assert.Equal(t, []string{"0 >clean", "0 >fx25"}, toIGate)
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_app_process_rec_packet_multiple_subchannels(t *testing.T) {
 	var rt = setupRecPacketTest(t)
 

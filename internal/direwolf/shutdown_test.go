@@ -57,6 +57,8 @@ func requirePortFree(t *testing.T, port int) {
 }
 
 func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
 	var listener, _ = testutils.Listen(t)
 
 	var port = addrPort(listener.Addr())
@@ -101,6 +103,8 @@ func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
 }
 
 func TestKissNetServiceStopsWhenCancelled(t *testing.T) {
+	t.Parallel()
+
 	var ctx, cancel = context.WithCancel(t.Context())
 
 	var kns, err = NewKissNetService(ctx, new(misc_config_s), []KissNetAddr{{Addr: "127.0.0.1:0", Channel: -1}}, 0)

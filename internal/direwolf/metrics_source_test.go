@@ -67,6 +67,8 @@ func gatherMetricValue(name string, labels map[string]string) (float64, error) {
 }
 
 func TestFecTypeLabel(t *testing.T) {
+	t.Parallel()
+
 	require.Equal(t, "fx25", fecTypeLabel(fec_type_fx25))
 	require.Equal(t, "il2p", fecTypeLabel(fec_type_il2p))
 
@@ -80,6 +82,8 @@ func TestFecTypeLabel(t *testing.T) {
 // hdlc_rec2 forwards frames whose FCS check *failed*, flagged with BitFixPassall.
 // Those have neither a valid FCS nor any corrected bits, so they belong on
 // neither samoyed_frames_received_total nor samoyed_frames_bit_corrected_total.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestRecordRadioFrameExcludesPassall(t *testing.T) {
 	const channel = 0
 
@@ -116,6 +120,8 @@ func TestRecordRadioFrameExcludesPassall(t *testing.T) {
 // test: "retries" is a count of corrected Reed-Solomon symbols for FX.25 and
 // IL2P, so a valid frame can arrive carrying the same value that means PASSALL
 // without FEC.  Such a frame was dropped from every receive metric.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestRecordRadioFrameCountsFECFrameWithPassallCorrectionCount(t *testing.T) {
 	const channel = 1
 
@@ -141,6 +147,8 @@ func TestRecordRadioFrameCountsFECFrameWithPassallCorrectionCount(t *testing.T) 
 // TestIsRadioChannelReadsTheConfigItIsHanded checks that isRadioChannel answers
 // from the configuration it is given.
 func TestIsRadioChannelReadsTheConfigItIsHanded(t *testing.T) {
+	t.Parallel()
+
 	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
 	audio.chan_medium[1] = MEDIUM_NETTNC

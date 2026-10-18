@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
 	var audio = new(RadioConfig)
 	audio.chan_medium[0] = MEDIUM_RADIO
@@ -74,6 +75,7 @@ func TestMetricsInitImplServesAndMarksChannels(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond, "the endpoint stops listening once its context is cancelled")
 }
 
+//nolint:paralleltest // Serial: reads Prometheus's default registry, which is process-wide.
 func TestMetricsInitImplPortInUse(t *testing.T) {
 	// Hold the port ourselves, on all interfaces as a configured port is bound, so
 	// that metrics_init's own bind fails.
