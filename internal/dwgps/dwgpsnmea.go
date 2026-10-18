@@ -298,7 +298,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 			gps_msg = ""
 		default:
 			if len(gps_msg) < NMEA_MAX_LEN-1 {
-				gps_msg += string(ch)
+				gps_msg += string([]byte{ch}) // string(ch) would encode 0x80 and above as UTF-8
 			}
 		}
 	} /* while (1) */
@@ -330,9 +330,11 @@ func remove_checksum(sent string, quiet bool) (string, error) {
 		return "", errors.New("missing GPS checksum")
 	}
 
+	// Byte by byte: ranging over the string would give U+FFFD for any byte
+	// that isn't valid UTF-8.
 	var calculatedChecksum int64
-	for _, r := range msg[1:] {
-		calculatedChecksum ^= int64(r)
+	for _, b := range []byte(msg[1:]) {
+		calculatedChecksum ^= int64(b)
 	}
 
 	var checksum, _ = strconv.ParseInt(checksumStr, 16, 0)
