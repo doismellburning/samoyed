@@ -14,6 +14,8 @@ import (
 )
 
 func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var cfg = new(misc_config_s)
@@ -49,6 +51,8 @@ func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
 // out, and under SmartBeaconing that put the next attempt a whole slow_rate
 // away.
 func Test_trackerPosition_needs_more_than_a_fix(t *testing.T) {
+	t.Parallel()
+
 	var gpsinfo = new(dwgps.GPSInfo)
 
 	gpsinfo.Fix = dwgps.DWFIX_2D
@@ -75,6 +79,8 @@ func Test_trackerPosition_needs_more_than_a_fix(t *testing.T) {
 // one was shown with an audio level of 0 and warned that the input level was
 // too low.  A negative level is what says there is none, as in Dire Wolf.
 func Test_BeaconSend_to_recv_has_no_audio_level(t *testing.T) {
+	t.Parallel()
+
 	var dlq = NewDataLinkQueue()
 
 	var bs, _ = newSendTestBeaconService(t)
