@@ -18,7 +18,6 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/tzneal/coordconv v0.1.2
 	github.com/warthog618/go-gpiocdev v0.9.1
-	github.com/xylo04/goHamlib v0.0.0-20240309005711-30dd4ae13b38
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/sys v0.48.0
 	pgregory.net/rapid v1.3.0

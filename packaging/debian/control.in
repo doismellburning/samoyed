@@ -10,3 +10,4 @@ Description: Samoyed AX.25 digital radio software binaries
  dwgpsnmea, gen_packets, gen_tone, kissdump, kissutil,
  ll2utm, log2gpx, pftest, text2tt, tnctest, tt2text, ttcalc, utm2ll, walk96.
 Depends: @@DEPENDS@@
+Recommends: libhamlib4t64 | libhamlib4
