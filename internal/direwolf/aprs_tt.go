@@ -801,6 +801,20 @@ func twoKeyOverlay(keys string) (byte, bool) {
 	return text[0], true
 }
 
+// twoKeyCallsign translates a callsign in two key format.  Keys that don't all
+// translate are no callsign: what's left, such as the digits of a letter whose
+// column key went missing, would be taken for a different user.
+func twoKeyCallsign(keys string) (string, bool) {
+	var text, errors = touchtone.TwoKeyToText(keys, false)
+	if errors != 0 || text == "" {
+		logrus.WithField("keys", keys).Error("Touch tone callsign in two key format doesn't translate")
+
+		return "", false
+	}
+
+	return text, true
+}
+
 func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 	if g.debug > 0 {
 		logrus.WithField("entry", e).Debug("APRStt parse callsign (starts with A then digit)")
@@ -887,9 +901,12 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		}
 
 		if unicode.IsUpper(rune(e[length-2])) {
-			var tttemp = e[1 : length-3]
+			var callsign, callOK = twoKeyCallsign(e[1 : length-3])
+			if !callOK {
+				return (TT_ERROR_INVALID_CALL)
+			}
 
-			state.callsign, _ = touchtone.TwoKeyToText(tttemp, false)
+			state.callsign = callsign
 
 			var overlay, ok = twoKeyOverlay(string(e[length-3]) + string(e[length-2]))
 			if !ok {
@@ -908,8 +925,12 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 				}).Debug("Callsign in two key format (two key overlay)")
 			}
 		} else {
-			var tttemp = e[1 : length-2]
-			state.callsign, _ = touchtone.TwoKeyToText(tttemp, false)
+			var callsign, callOK = twoKeyCallsign(e[1 : length-2])
+			if !callOK {
+				return (TT_ERROR_INVALID_CALL)
+			}
+
+			state.callsign = callsign
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
 			state.symtabOrOverlay = e[length-2]

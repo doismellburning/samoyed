@@ -149,3 +149,18 @@ func TestParseSymbolOneDigit(t *testing.T) {
 	assert.Equal(t, byte('/'), state.symtabOrOverlay)
 	assert.Equal(t, byte(32+5), state.symbolCode)
 }
+
+// A callsign in two key format whose keys don't all translate - "1A" has no
+// letter - used to be taken for what did translate, and its object report sent
+// as though from a real user.  Reject it.
+func TestParseCallsignTwoKeyThatPartlyTranslates(t *testing.T) {
+	var cfg tt_config_s
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	assert.Equal(t, TT_ERROR_INVALID_CALL, gw.parseCallsign(&state, "A9A1A2A7A7C75"))
+	assert.Empty(t, state.callsign)
+}
