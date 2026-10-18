@@ -42,17 +42,12 @@ func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGe
 
 	var bits []int
 
-	toneGenCapture = func(channel int, data int) {
-		assert.Equal(t, hdlcSendTestChannel, channel, "bits should be sent on the channel they were asked for")
-
+	var s = NewLayer2Sender(hdlcSendTestChannel, audioConfig, toneGenerator, 0, 0)
+	s.bitSink = func(data int) {
 		bits = append(bits, data)
 	}
 
-	t.Cleanup(func() { toneGenCapture = nil })
-
-	fn(NewLayer2Sender(hdlcSendTestChannel, audioConfig, toneGenerator, 0, 0))
-
-	toneGenCapture = nil
+	fn(s)
 
 	return bits
 }

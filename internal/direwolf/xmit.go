@@ -1507,6 +1507,11 @@ type Layer2Sender struct {
 	audioConfig   *RadioConfig
 	toneGenerator *ToneGenerator // Where the bits go; nil for a channel with no radio.
 
+	// bitSink, when set, is given the bits a frame serializes to instead of
+	// the tone generator.  It is how a test sees what would have gone out over
+	// the air without an audio device to send it to.
+	bitSink func(data int)
+
 	line *linecode.Encoder // Puts the bits on the line, keeping its NRZI level.
 
 	hdlc *hdlc.Sender // Sends AX.25 frames, and the flags between them.
@@ -1530,6 +1535,24 @@ func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneG
 	s.eas = eas.NewSender(s.line)
 
 	return s
+}
+
+// putBit hands one bit to whatever is standing in for the modulator: the bit
+// sink if a test has set one, the sender's tone generator otherwise.
+func (s *Layer2Sender) putBit(data int) {
+	if s.bitSink != nil {
+		s.bitSink(data)
+
+		return
+	}
+
+	if s.toneGenerator == nil {
+		logrus.WithField("channel", s.channel).Error("Invalid channel for tone generation")
+
+		return
+	}
+
+	s.toneGenerator.PutBit(data)
 }
 
 // putQuietMs sends timeMs of silence.

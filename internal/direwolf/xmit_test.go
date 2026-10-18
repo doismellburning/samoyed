@@ -326,12 +326,6 @@ func setupXmitTransmission(t *testing.T) (*XmitService, *TransmitQueue) {
 
 	const channel = 0
 
-	var origToneGen = toneGenCapture
-
-	t.Cleanup(func() {
-		toneGenCapture = origToneGen
-	})
-
 	var audioConfig = new(RadioConfig)
 	audioConfig.adev[0].defined = 1
 	audioConfig.adev[0].num_channels = 1
@@ -347,13 +341,11 @@ func setupXmitTransmission(t *testing.T) (*XmitService, *TransmitQueue) {
 
 	var tq = newTestTransmitQueue(audioConfig)
 
-	// Sending a frame serialises it to bits; the capture takes them instead of
-	// the modulator.  The device itself still has to be there, though: the
-	// flushing and draining reach into it, and morse and DTMF go round the
-	// modulator straight to its output buffer.  With no stream attached, what
-	// lands in that buffer is discarded rather than played.
-	toneGenCapture = func(int, int) {}
-
+	// Sending a frame serialises it to bits; the sender's bit sink takes them
+	// instead of the modulator.  The device itself still has to be there,
+	// though: the flushing and draining reach into it, and morse and DTMF go
+	// round the modulator straight to its output buffer.  With no stream
+	// attached, what lands in that buffer is discarded rather than played.
 	var audio = new(AudioDevices)
 	audio.dev[0] = new(adev_s)
 	audio.dev[0].outbufSizeInBytes = 4096
@@ -366,6 +358,8 @@ func setupXmitTransmission(t *testing.T) (*XmitService, *TransmitQueue) {
 	xs.bits_per_sec[channel] = 1200
 	xs.audioOutAvailable[0] = true
 	xs.queue = tq
+	xs.layer2Senders[channel] = NewLayer2Sender(channel, audioConfig, xs.toneGenerators[channel], 0, 0)
+	xs.layer2Senders[channel].bitSink = func(int) {}
 
 	return xs, tq
 }
@@ -933,8 +927,7 @@ func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 // the next bit on another looks like.
 func TestLayer2SendersKeepTheirOwnLineLevel(t *testing.T) {
 	var other = NewLayer2Sender(1, nil, nil, 0, 0)
-
-	toneGenCapture = func(int, int) {}
+	other.bitSink = func(int) {}
 
 	other.line.WriteNRZI(false)
 
