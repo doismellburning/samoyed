@@ -49,48 +49,48 @@ import (
 
 /* Error codes for sending responses to user. */
 
-const TT_ERROR_OK = 0              /* Success. */
-const TT_ERROR_D_MSG = 1           /* D was first char of field.  Not implemented yet. */
-const TT_ERROR_INTERNAL = 2        /* Internal error.  Shouldn't be here. */
-const TT_ERROR_MACRO_NOMATCH = 3   /* No definition for digit sequence. */
-const TT_ERROR_BAD_CHECKSUM = 4    /* Bad checksum on call. */
-const TT_ERROR_INVALID_CALL = 5    /* Invalid callsign. */
-const TT_ERROR_INVALID_OBJNAME = 6 /* Invalid object name. */
-const TT_ERROR_INVALID_SYMBOL = 7  /* Invalid symbol specification. */
-const TT_ERROR_INVALID_LOC = 8     /* Invalid location. */
-const TT_ERROR_NO_CALL = 9         /* No call or object name included. */
-const TT_ERROR_INVALID_MHEAD = 10  /* Invalid Maidenhead Locator. */
-const TT_ERROR_INVALID_SATSQ = 11  /* Satellite square must be 4 digits. */
-const TT_ERROR_SUFFIX_NO_CALL = 12 /* No known callsign for suffix. */
-const TT_ERROR_MAXP1 = 13          /* Number of items above.  i.e. Last number plus 1. */
+const ErrorOK = 0             /* Success. */
+const ErrorDMsg = 1           /* D was first char of field.  Not implemented yet. */
+const ErrorInternal = 2       /* Internal error.  Shouldn't be here. */
+const ErrorMacroNoMatch = 3   /* No definition for digit sequence. */
+const ErrorBadChecksum = 4    /* Bad checksum on call. */
+const ErrorInvalidCall = 5    /* Invalid callsign. */
+const ErrorInvalidObjName = 6 /* Invalid object name. */
+const ErrorInvalidSymbol = 7  /* Invalid symbol specification. */
+const ErrorInvalidLoc = 8     /* Invalid location. */
+const ErrorNoCall = 9         /* No call or object name included. */
+const ErrorInvalidMHead = 10  /* Invalid Maidenhead Locator. */
+const ErrorInvalidSatSq = 11  /* Satellite square must be 4 digits. */
+const ErrorSuffixNoCall = 12  /* No known callsign for suffix. */
+const ErrorCount = 13         /* Number of items above.  i.e. Last number plus 1. */
 
-func ttErrorString(errCode int) string { // TODO Fix the type
+func ErrorName(errCode int) string { // TODO Fix the type
 	switch errCode {
-	case TT_ERROR_OK:
+	case ErrorOK:
 		return "OK"
-	case TT_ERROR_D_MSG:
+	case ErrorDMsg:
 		return "D_MSG"
-	case TT_ERROR_INTERNAL:
+	case ErrorInternal:
 		return "INTERNAL"
-	case TT_ERROR_MACRO_NOMATCH:
+	case ErrorMacroNoMatch:
 		return "MACRO_NOMATCH"
-	case TT_ERROR_BAD_CHECKSUM:
+	case ErrorBadChecksum:
 		return "BAD_CHECKSUM"
-	case TT_ERROR_INVALID_CALL:
+	case ErrorInvalidCall:
 		return "INVALID_CALL"
-	case TT_ERROR_INVALID_OBJNAME:
+	case ErrorInvalidObjName:
 		return "INVALID_OBJNAME"
-	case TT_ERROR_INVALID_SYMBOL:
+	case ErrorInvalidSymbol:
 		return "INVALID_SYMBOL"
-	case TT_ERROR_INVALID_LOC:
+	case ErrorInvalidLoc:
 		return "INVALID_LOC"
-	case TT_ERROR_NO_CALL:
+	case ErrorNoCall:
 		return "NO_CALL"
-	case TT_ERROR_INVALID_MHEAD:
+	case ErrorInvalidMHead:
 		return "INVALID_MHEAD"
-	case TT_ERROR_INVALID_SATSQ:
+	case ErrorInvalidSatSq:
 		return "INVALID_SATSQ"
-	case TT_ERROR_SUFFIX_NO_CALL:
+	case ErrorSuffixNoCall:
 		return "SUFFIX_NO_CALL"
 	default:
 		panic(fmt.Sprintf("Unknown errCode: %d", errCode))
@@ -101,7 +101,7 @@ func ttErrorString(errCode int) string { // TODO Fix the type
  * Configuration options for APRStt.
  */
 
-const TT_MAX_XMITS = 10
+const MaxXmits = 10
 
 const TT_MTEXT_LEN = 64
 
@@ -117,118 +117,118 @@ const APRSTT_DEFAULT_SYMBOL = 'A'
  * match and extracting fixed size groups of digits.
  */
 
-type ttlocTypeT int
+type LocType int
 
 const (
-	TTLOC_POINT ttlocTypeT = iota
-	TTLOC_VECTOR
-	TTLOC_GRID
-	TTLOC_UTM
-	TTLOC_MGRS
-	TTLOC_USNG
-	TTLOC_MACRO
-	TTLOC_MHEAD
-	TTLOC_SATSQ
-	TTLOC_AMBIG
+	LocPoint LocType = iota
+	LocVector
+	LocGrid
+	LocUTM
+	LocMGRS
+	LocUSNG
+	LocMacro
+	LocMHead
+	LocSatSq
+	LocAmbig
 )
 
-type pointTTLoc struct {
-	lat float64 /* Specific locations. */
-	lon float64
+type PointLoc struct {
+	Lat float64 /* Specific locations. */
+	Lon float64
 }
 
-type vectorTTLoc struct {
-	lat   float64 /* For bearing/direction. */
-	lon   float64
-	scale float64 /* conversion to meters */
+type VectorLoc struct {
+	Lat   float64 /* For bearing/direction. */
+	Lon   float64
+	Scale float64 /* conversion to meters */
 }
 
-type gridTTLoc struct {
-	lat0 float64 /* yyy all zeros. */
-	lon0 float64 /* xxx */
-	lat9 float64 /* yyy all nines. */
-	lon9 float64 /* xxx */
+type GridLoc struct {
+	Lat0 float64 /* yyy all zeros. */
+	Lon0 float64 /* xxx */
+	Lat9 float64 /* yyy all nines. */
+	Lon9 float64 /* xxx */
 }
 
-type utmTTLoc struct {
-	scale    float64
-	x_offset float64
-	y_offset float64
-	lzone    int  /* UTM zone, should be 1-60 */
-	latband  rune /* Latitude band if specified, otherwise space or - */
-	hemi     rune /* UTM Hemisphere, should be 'N' or 'S'. */
+type UTMLoc struct {
+	Scale   float64
+	XOffset float64
+	YOffset float64
+	Zone    int  /* UTM zone, should be 1-60 */
+	LatBand rune /* Latitude band if specified, otherwise space or - */
+	Hemi    rune /* UTM Hemisphere, should be 'N' or 'S'. */
 }
 
-type mgrsTTLoc struct {
-	zone string /* Zone and square for USNG/MGRS */
+type MGRSLoc struct {
+	Zone string /* Zone and square for USNG/MGRS */
 }
 
-type mheadTTLoc struct {
-	prefix string /* should be 10, 6, or 4 digits to be */
+type MHeadLoc struct {
+	Prefix string /* should be 10, 6, or 4 digits to be */
 	/* prepended to the received sequence. */
 }
 
-type macroTTLoc struct {
-	definition string
+type MacroLoc struct {
+	Definition string
 }
 
-type ttloc_s struct {
-	ttlocType ttlocTypeT
+type Loc struct {
+	Type LocType
 
-	pattern string /* e.g. B998, B5bbbdddd, B2xxyy, Byyyxxx, BAxxxx */
+	Pattern string /* e.g. B998, B5bbbdddd, B2xxyy, Byyyxxx, BAxxxx */
 	/* For macros, it should be all fixed digits, */
 	/* and the letters x, y, z.  e.g.  911, xxyyyz */
 
-	point  pointTTLoc
-	vector vectorTTLoc
-	grid   gridTTLoc
-	utm    utmTTLoc
-	mgrs   mgrsTTLoc
-	mhead  mheadTTLoc
-	macro  macroTTLoc
+	Point  PointLoc
+	Vector VectorLoc
+	Grid   GridLoc
+	UTM    UTMLoc
+	MGRS   MGRSLoc
+	MHead  MHeadLoc
+	Macro  MacroLoc
 }
 
-type tt_config_s struct {
-	gateway_enabled int /* Send DTMF sequences to APRStt gateway. */
+type Config struct {
+	GatewayEnabled int /* Send DTMF sequences to APRStt gateway. */
 
-	obj_recv_chan int /* Channel to listen for tones. */
+	ObjRecvChan int /* Channel to listen for tones. */
 
-	obj_xmit_chan int /* Channel to transmit object report. */
+	ObjXmitChan int /* Channel to transmit object report. */
 	/* -1 for none.  This could happen if we */
 	/* are only sending to application */
 	/* and/or IGate. */
 
-	obj_send_to_app int /* send to attached application(s). */
+	ObjSendToApp int /* send to attached application(s). */
 
-	obj_send_to_ig int /* send to IGate. */
+	ObjSendToIG int /* send to IGate. */
 
-	obj_xmit_via string
+	ObjXmitVia string
 	/* e.g.  empty or "WIDE2-1,WIDE1-1" */
 
-	retain_time int /* Seconds to keep information about a user. */
+	RetainTime int /* Seconds to keep information about a user. */
 
-	num_xmits int /* Number of times to transmit object report. */
+	NumXmits int /* Number of times to transmit object report. */
 
-	xmit_delay [TT_MAX_XMITS]int /* Delay between them. */
+	XmitDelay [MaxXmits]int /* Delay between them. */
 	/* e.g.  3 seconds before first transmission then */
 	/* delays of 16, 32, seconds etc. in between repeats. */
 
-	ttlocs []*ttloc_s
+	Locs []*Loc
 
-	corral_lat       float64 /* The "corral" for unknown locations. */
-	corral_lon       float64
-	corral_offset    float64
-	corral_ambiguity int
+	CorralLat       float64 /* The "corral" for unknown locations. */
+	CorralLon       float64
+	CorralOffset    float64
+	CorralAmbiguity int
 
-	status [10]string /* Up to 9 status messages. e.g.  "/enroute" */
+	Status [10]string /* Up to 9 status messages. e.g.  "/enroute" */
 	/* Position 0 means none and can't be changed. */
 
-	response [TT_ERROR_MAXP1]struct {
-		method string /* SPEECH or MORSE[-n] */
-		mtext  string /* Message text. */
+	Response [ErrorCount]struct {
+		Method string /* SPEECH or MORSE[-n] */
+		MText  string /* Message text. */
 	}
 
-	ttcmd string /* Command to generate custom audible response. */
+	Cmd string /* Command to generate custom audible response. */
 }
 
 /*
@@ -237,7 +237,7 @@ type tt_config_s struct {
  * on multiple channels at the same time.
  */
 
-const MAX_MSG_LEN = 100
+const MaxMsgLen = 100
 
 // ttMaxMacroDepth bounds how deep macros may expand within macros, so one
 // whose definition expands to itself fails rather than recursing forever.
@@ -292,13 +292,13 @@ func ttFieldByte(e string, i int) byte {
 	return 0
 }
 
-// objectReportSink is where the gateway sends an object report, with the
+// ObjectReportSink is where the gateway sends an object report, with the
 // channel it concerns.
-type objectReportSink func(channel int, pp *ax25.Packet)
+type ObjectReportSink func(channel int, pp *ax25.Packet)
 
-// TTGateway is the APRStt gateway. Construct one with NewTTGateway.
-type TTGateway struct {
-	config         *tt_config_s
+// Gateway is the APRStt gateway. Construct one with NewGateway.
+type Gateway struct {
+	config         *Config
 	debug          int
 	users          *ttUsers
 	msgStr         [phy.MaxRadioChans]string
@@ -321,9 +321,9 @@ type TTGateway struct {
 
 /*------------------------------------------------------------------
  *
- * Name:        NewTTGateway
+ * Name:        NewGateway
  *
- * Purpose:     Initialize and return a new TTGateway.
+ * Purpose:     Initialize and return a new Gateway.
  *
  * Inputs:      mycall	- A channel's callsign, which object reports are sent
  *			  from.
@@ -343,25 +343,25 @@ type TTGateway struct {
  *			  touch tone message to carry; nil for none.
  *		debug	- Debug printing control.
  *
- * Returns:     Pointer to new TTGateway.
+ * Returns:     Pointer to new Gateway.
  *
  * Description:	The main program needs to call this at application
  *		start up time after reading the configuration file.
  *
  *----------------------------------------------------------------*/
 
-func NewTTGateway(
+func NewGateway(
 	mycall func(channel int) string,
-	p *tt_config_s,
-	toApps objectReportSink,
-	remember objectReportSink,
-	toIGate objectReportSink,
+	p *Config,
+	toApps ObjectReportSink,
+	remember ObjectReportSink,
+	toIGate ObjectReportSink,
 	recFrame frameReceiver,
 	transmit dwcore.FrameSender,
 	audioLevel dwcore.AudioLevelFunc,
 	debug int,
-) *TTGateway {
-	var g = &TTGateway{debug: debug} //nolint:exhaustruct_v5
+) *Gateway {
+	var g = &Gateway{debug: debug} //nolint:exhaustruct_v5
 
 	g.config = p
 	g.audioLevel = audioLevel
@@ -403,7 +403,7 @@ func NewTTGateway(
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) Button(channel int, button byte) {
+func (g *Gateway) Button(channel int, button byte) {
 	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
 
 	// if (button != '.') {
@@ -416,7 +416,7 @@ func (g *TTGateway) Button(channel int, button byte) {
 		/* Timeout reset. */
 		g.msgStr[channel] = ""
 	} else if button != '.' && button != ' ' {
-		if len(g.msgStr[channel]) < MAX_MSG_LEN {
+		if len(g.msgStr[channel]) < MaxMsgLen {
 			g.msgStr[channel] += string(button)
 		}
 
@@ -442,7 +442,7 @@ func (g *TTGateway) Button(channel int, button byte) {
 		 * one channel so do this only for the one specified
 		 * in the TTOBJ command.
 		 */
-		if channel == g.config.obj_recv_chan {
+		if channel == g.config.ObjRecvChan {
 			g.pollPeriod++
 			if g.pollPeriod >= 39 {
 				g.pollPeriod = 0
@@ -482,7 +482,7 @@ func (g *TTGateway) Button(channel int, button byte) {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
+func (g *Gateway) Sequence(ctx context.Context, channel int, msg string) {
 	logrus.WithField("msg", msg).Debug("aprs_tt Sequence")
 
 	/*
@@ -540,8 +540,8 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	 */
 	var script_response string
 
-	if err == 0 && len(g.config.ttcmd) > 0 {
-		var _script_response, _ = dwutil.RunCmd(ctx, g.config.ttcmd, dwutil.CmdOneLine)
+	if err == 0 && len(g.config.Cmd) > 0 {
+		var _script_response, _ = dwutil.RunCmd(ctx, g.config.Cmd, dwutil.CmdOneLine)
 		script_response = string(_script_response)
 	}
 
@@ -553,12 +553,12 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	 * Anything from script, above, will override other predefined responses.
 	 */
 
-	var response = g.config.response[err].mtext
+	var response = g.config.Response[err].MText
 	if len(script_response) > 0 {
 		response = script_response
 	}
 
-	var audible_response = fmt.Sprintf("APRSTT>%s:%s", g.config.response[err].method, response)
+	var audible_response = fmt.Sprintf("APRSTT>%s:%s", g.config.Response[err].Method, response)
 
 	var pp = ax25.FromText(audible_response, false)
 
@@ -596,11 +596,11 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
  *
  *		"To iterate is human, to recurse divine."
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	0 for success or one of the Error... codes.
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
+func (g *Gateway) parseFields(state *ttParseState, msg string) int {
 	var fields = strings.FieldsFunc(msg, func(r rune) bool {
 		return strings.ContainsRune("*#", r)
 	})
@@ -653,7 +653,7 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
 		default:
 			logrus.WithField("field", e).Error("Touch tone field does not start with A, B, C, or digit")
 
-			return (TT_ERROR_D_MSG)
+			return (ErrorDMsg)
 		}
 	}
 
@@ -674,7 +674,7 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
  *				  APRStt message.
  *				  In this case, it should contain only digits.
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	0 for success or one of the Error... codes.
  *
  * Description:	Separate out the fields, perform substitution,
  *		call parseFields for processing.
@@ -684,7 +684,7 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
+func (g *Gateway) expandMacro(state *ttParseState, e string) int {
 	logrus.WithField("sequence", e).Debug("Macro tone sequence")
 
 	var xstr, ystr, zstr, _, _, ipat = g.findTTLocMatch(e)
@@ -697,29 +697,29 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 		// dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s\n", ipat, g.config.ttlocs[ipat].pattern, xstr, ystr, zstr, bstr, dstr);
 		logrus.WithFields(logrus.Fields{
 			"pattern_index": ipat,
-			"pattern":       g.config.ttlocs[ipat].pattern,
+			"pattern":       g.config.Locs[ipat].Pattern,
 			"x":             xstr,
 			"y":             ystr,
 			"z":             zstr,
-			"definition":    g.config.ttlocs[ipat].macro.definition,
+			"definition":    g.config.Locs[ipat].Macro.Definition,
 		}).Debug("Macro matched pattern")
 
-		if g.config.ttlocs[ipat].ttlocType != TTLOC_MACRO {
+		if g.config.Locs[ipat].Type != LocMacro {
 			/* Found match to a different type.  Really shouldn't be here. */
 			/* Print internal error message... */
 			logrus.WithField("pattern_index", ipat).Error("Internal error: expandMacro matched a pattern that is not a macro")
 
-			return (TT_ERROR_INTERNAL)
+			return (ErrorInternal)
 		}
 
 		if state.macroDepth >= ttMaxMacroDepth {
 			logrus.WithFields(logrus.Fields{
-				"pattern":    g.config.ttlocs[ipat].pattern,
-				"definition": g.config.ttlocs[ipat].macro.definition,
+				"pattern":    g.config.Locs[ipat].Pattern,
+				"definition": g.config.Locs[ipat].Macro.Definition,
 				"max_depth":  ttMaxMacroDepth,
 			}).Error("Touch tone macros expand too deep; does one expand to itself?")
 
-			return (TT_ERROR_INTERNAL)
+			return (ErrorInternal)
 		}
 
 		/*
@@ -729,7 +729,7 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 
 		var stemp strings.Builder
 
-		var definition = g.config.ttlocs[ipat].macro.definition
+		var definition = g.config.Locs[ipat].Macro.Definition
 		for i, d := range definition {
 			if i != len(definition)-1 {
 				if (d == 'x' || d == 'y' || d == 'z') && d == rune(definition[i+1]) {
@@ -764,7 +764,7 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 		/* Does not match any macro definitions. */
 		logrus.WithField("sequence", e).Error("Tone sequence did not match any pattern")
 
-		return (TT_ERROR_MACRO_NOMATCH)
+		return (ErrorMacroNoMatch)
 	}
 }
 
@@ -787,7 +787,7 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
  *					If you want a different symbol, use the new
  *					object name format and separate symbol specification.
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	0 for success or one of the Error... codes.
  *
  * Description:	We recognize 3 different formats:
  *
@@ -824,7 +824,7 @@ func checksum_not_ok(str string, length int, found rune) int {
 			"received": string(found),
 		}).Error("Bad touch tone checksum")
 
-		return (TT_ERROR_BAD_CHECKSUM)
+		return (ErrorBadChecksum)
 	}
 
 	return (0)
@@ -855,7 +855,7 @@ func twoKeyCallsign(keys string) (string, bool) {
 	return text, true
 }
 
-func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
+func (g *Gateway) parseCallsign(state *ttParseState, e string) int {
 	if g.debug > 0 {
 		logrus.WithField("entry", e).Debug("APRStt parse callsign (starts with A then digit)")
 	}
@@ -898,7 +898,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		if length == 7 {
 			var overlay, ok = twoKeyOverlay(string(e[length-3]) + string(e[length-2]))
 			if !ok {
-				return (TT_ERROR_INVALID_SYMBOL)
+				return (ErrorInvalidSymbol)
 			}
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
@@ -943,14 +943,14 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		if ascii.IsUpper(e[length-2]) {
 			var callsign, callOK = twoKeyCallsign(e[1 : length-3])
 			if !callOK {
-				return (TT_ERROR_INVALID_CALL)
+				return (ErrorInvalidCall)
 			}
 
 			state.callsign = callsign
 
 			var overlay, ok = twoKeyOverlay(string(e[length-3]) + string(e[length-2]))
 			if !ok {
-				return (TT_ERROR_INVALID_SYMBOL)
+				return (ErrorInvalidSymbol)
 			}
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
@@ -967,7 +967,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		} else {
 			var callsign, callOK = twoKeyCallsign(e[1 : length-2])
 			if !callOK {
-				return (TT_ERROR_INVALID_CALL)
+				return (ErrorInvalidCall)
 			}
 
 			state.callsign = callsign
@@ -990,7 +990,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 
 	logrus.WithField("entry", e).Error("Touch tone callsign not valid")
 
-	return (TT_ERROR_INVALID_CALL)
+	return (ErrorInvalidCall)
 }
 
 /*------------------------------------------------------------------
@@ -1008,7 +1008,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
  *
  *		state.ssid		- Cleared to remove the default of 12.
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	0 for success or one of the Error... codes.
  *
  * Description:	Data format
  *
@@ -1016,7 +1016,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
+func (g *Gateway) parseObjectName(state *ttParseState, e string) int {
 	if g.debug > 0 {
 		logrus.WithField("entry", e).Debug("APRStt parse object name (starts with AA)")
 	}
@@ -1050,7 +1050,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 
 	logrus.WithField("entry", e).Error("Touch tone object name not valid")
 
-	return (TT_ERROR_INVALID_OBJNAME)
+	return (ErrorInvalidObjName)
 } /* end parseObjectName */
 
 /*------------------------------------------------------------------
@@ -1068,7 +1068,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
  *
  * 		state.symbolCode
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	0 for success or one of the Error... codes.
  *
  * Description:	Data format
  *
@@ -1087,7 +1087,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
+func (g *Gateway) parseSymbol(state *ttParseState, e string) int {
 	if g.debug > 0 {
 		logrus.WithField("entry", e).Debug("APRStt parse symbol (starts with AB)")
 	}
@@ -1158,7 +1158,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 
 	logrus.WithField("entry", e).Error("Touch tone symbol not valid")
 
-	return (TT_ERROR_INVALID_SYMBOL)
+	return (ErrorInvalidSymbol)
 } /* end parseSymbol */
 
 /*------------------------------------------------------------------
@@ -1174,7 +1174,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
  *
  * Outputs:	state.callsign
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	0 for success or one of the Error... codes.
  *
  * Description:	We recognize 3 different formats:
  *
@@ -1186,7 +1186,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
+func (g *Gateway) parseAprstt3Call(state *ttParseState, e string) int {
 	dwutil.Assert(e[0] == 'A')
 	dwutil.Assert(e[1] == 'C')
 
@@ -1200,7 +1200,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 		if errors == 0 {
 			state.callsign = call
 		} else {
-			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
+			return (ErrorInvalidCall) /* Could not convert to text */
 		}
 	} else if len(e) == 2+5 {
 		var suffix, errs = touchtone.Call5SuffixToText(e[2:], true)
@@ -1223,14 +1223,14 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 				} else {
 					logrus.WithField("suffix", suffix).Error("Couldn't find full callsign for touch tone suffix")
 
-					return (TT_ERROR_SUFFIX_NO_CALL) /* Don't know this user. */
+					return (ErrorSuffixNoCall) /* Don't know this user. */
 				}
 			}
 		} else {
-			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
+			return (ErrorInvalidCall) /* Could not convert to text */
 		}
 	} else {
-		return (TT_ERROR_INVALID_CALL) /* Invalid length, not 2+ (10 ir 5) */
+		return (ErrorInvalidCall) /* Invalid length, not 2+ (10 ir 5) */
 	}
 
 	return (0)
@@ -1260,7 +1260,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
  *
  *		state.ambiguity
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	0 for success or one of the Error... codes.
  *
  * Description:	There are many different formats recognizable
  *		by total number of digits and sometimes the first digit.
@@ -1283,7 +1283,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 // R_M is the average radius of earth in meters.
 const R_M = 6371000.0
 
-func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
+func (g *Gateway) parseLocation(state *ttParseState, e string) int {
 	if g.debug > 0 {
 		logrus.WithField("entry", e).Debug("APRStt parse location (starts with B)")
 		// TODO: more detail later...
@@ -1295,11 +1295,11 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 	if ipat >= 0 {
 		// dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);
-		var ttloc_type = g.config.ttlocs[ipat].ttlocType
+		var ttloc_type = g.config.Locs[ipat].Type
 		switch ttloc_type {
-		case TTLOC_POINT:
-			state.latitude = maybe.Just(float64(g.config.ttlocs[ipat].point.lat))
-			state.longitude = maybe.Just(float64(g.config.ttlocs[ipat].point.lon))
+		case LocPoint:
+			state.latitude = maybe.Just(float64(g.config.Locs[ipat].Point.Lat))
+			state.longitude = maybe.Just(float64(g.config.Locs[ipat].Point.Lon))
 
 			/* Is it one of ten or a hundred positions? */
 			/* It's not hardwired to always be B0n or B9nn.  */
@@ -1317,7 +1317,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				state.dao[3] = e[3]
 			}
 
-		case TTLOC_VECTOR:
+		case LocVector:
 			if len(bstr) != 3 {
 				logrus.WithField("bearing", bstr).Error("Touch tone bearing should be 3 digits")
 				// return error code?
@@ -1328,10 +1328,10 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				// return error code?
 			}
 
-			var lat0 = dwutil.D2R(float64(g.config.ttlocs[ipat].vector.lat))
-			var lon0 = dwutil.D2R(float64(g.config.ttlocs[ipat].vector.lon))
+			var lat0 = dwutil.D2R(float64(g.config.Locs[ipat].Vector.Lat))
+			var lon0 = dwutil.D2R(float64(g.config.Locs[ipat].Vector.Lon))
 			var d, _ = strconv.ParseFloat(dstr, 64)
-			var dist = d * float64(g.config.ttlocs[ipat].vector.scale)
+			var dist = d * float64(g.config.Locs[ipat].Vector.Scale)
 			var b, _ = strconv.ParseFloat(bstr, 64)
 			var bearing = dwutil.D2R(b)
 
@@ -1348,7 +1348,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 			state.setDAOKeys(e)
 
-		case TTLOC_GRID:
+		case LocGrid:
 			if len(xstr) == 0 {
 				logrus.Error("Touch tone location missing X coordinate")
 
@@ -1361,8 +1361,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				ystr = "0"
 			}
 
-			var lat0 = float64(g.config.ttlocs[ipat].grid.lat0)
-			var lat9 = float64(g.config.ttlocs[ipat].grid.lat9)
+			var lat0 = float64(g.config.Locs[ipat].Grid.Lat0)
+			var lat9 = float64(g.config.Locs[ipat].Grid.Lat9)
 			var yrange = lat9 - lat0
 			var y, _ = strconv.ParseFloat(ystr, 64)
 			var user_y_max = math.Round(math.Pow(10., float64(len(ystr))) - 1.) // e.g. 999 for 3 digits
@@ -1377,8 +1377,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				"latitude":   state.latitude,
 			}).Debug("TTLOC_GRID LAT")
 
-			var lon0 = float64(g.config.ttlocs[ipat].grid.lon0)
-			var lon9 = float64(g.config.ttlocs[ipat].grid.lon9)
+			var lon0 = float64(g.config.Locs[ipat].Grid.Lon0)
+			var lon9 = float64(g.config.Locs[ipat].Grid.Lon9)
 			var xrange = lon9 - lon0
 			var x, _ = strconv.ParseFloat(xstr, 64)
 			var user_x_max = math.Round(math.Pow(10., float64(len(xstr))) - 1.)
@@ -1395,7 +1395,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 			state.setDAOKeys(e)
 
-		case TTLOC_UTM:
+		case LocUTM:
 			if len(xstr) == 0 {
 				logrus.Error("Touch tone location missing X coordinate")
 				/* Avoid divide by zero later.  Put in middle of range. */
@@ -1409,23 +1409,23 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			}
 
 			var x, _ = strconv.ParseFloat(xstr, 64)
-			var easting = x*float64(g.config.ttlocs[ipat].utm.scale) + float64(g.config.ttlocs[ipat].utm.x_offset)
+			var easting = x*float64(g.config.Locs[ipat].UTM.Scale) + float64(g.config.Locs[ipat].UTM.XOffset)
 
 			var y, _ = strconv.ParseFloat(ystr, 64)
-			var northing = y*float64(g.config.ttlocs[ipat].utm.scale) + float64(g.config.ttlocs[ipat].utm.y_offset)
+			var northing = y*float64(g.config.Locs[ipat].UTM.Scale) + float64(g.config.Locs[ipat].UTM.YOffset)
 
-			if ascii.IsAlpha(g.config.ttlocs[ipat].utm.latband) {
-				state.locText = fmt.Sprintf("%d%c %.0f %.0f", g.config.ttlocs[ipat].utm.lzone, g.config.ttlocs[ipat].utm.latband, easting, northing)
-			} else if g.config.ttlocs[ipat].utm.latband == '-' {
-				state.locText = fmt.Sprintf("%d %.0f %.0f", -g.config.ttlocs[ipat].utm.lzone, easting, northing)
+			if ascii.IsAlpha(g.config.Locs[ipat].UTM.LatBand) {
+				state.locText = fmt.Sprintf("%d%c %.0f %.0f", g.config.Locs[ipat].UTM.Zone, g.config.Locs[ipat].UTM.LatBand, easting, northing)
+			} else if g.config.Locs[ipat].UTM.LatBand == '-' {
+				state.locText = fmt.Sprintf("%d %.0f %.0f", -g.config.Locs[ipat].UTM.Zone, easting, northing)
 			} else {
-				state.locText = fmt.Sprintf("%d %.0f %.0f", g.config.ttlocs[ipat].utm.lzone, easting, northing)
+				state.locText = fmt.Sprintf("%d %.0f %.0f", g.config.Locs[ipat].UTM.Zone, easting, northing)
 			}
 
-			var hemi = coordconvutil.HemisphereFromRune(g.config.ttlocs[ipat].utm.hemi)
+			var hemi = coordconvutil.HemisphereFromRune(g.config.Locs[ipat].UTM.Hemi)
 
 			var utm = coordconv.UTMCoord{
-				Zone:       g.config.ttlocs[ipat].utm.lzone,
+				Zone:       g.config.Locs[ipat].UTM.Zone,
 				Hemisphere: hemi,
 				Easting:    easting,
 				Northing:   northing,
@@ -1443,7 +1443,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 			state.setDAOKeys(e)
 
-		case TTLOC_MGRS, TTLOC_USNG:
+		case LocMGRS, LocUSNG:
 			if len(xstr) == 0 {
 				logrus.Error("MGRS/USNG: Missing X (easting) coordinate")
 				/* Should not be possible to get here. Fake it and carry on. */
@@ -1456,7 +1456,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				ystr = "5"
 			}
 
-			var loc = g.config.ttlocs[ipat].mgrs.zone
+			var loc = g.config.Locs[ipat].MGRS.Zone
 			loc += xstr
 			loc += ystr
 
@@ -1478,18 +1478,18 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 			state.setDAOKeys(e)
 
-		case TTLOC_MHEAD:
+		case LocMHead:
 			/* Combine prefix from configuration and digits from user. */
-			var stemp = g.config.ttlocs[ipat].mhead.prefix
+			var stemp = g.config.Locs[ipat].MHead.Prefix
 			stemp += xstr
 
 			if len(stemp) != 4 && len(stemp) != 6 && len(stemp) != 10 && len(stemp) != 12 {
 				logrus.WithFields(logrus.Fields{
-					"prefix": g.config.ttlocs[ipat].mhead.prefix,
+					"prefix": g.config.Locs[ipat].MHead.Prefix,
 					"x":      xstr,
 				}).Error("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator")
 
-				return (TT_ERROR_INVALID_MHEAD)
+				return (ErrorInvalidMHead)
 			}
 
 			// text_color_set(DW_COLOR_DEBUG);
@@ -1505,7 +1505,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				if err != nil {
 					logrus.WithError(err).Error("Invalid touch tone grid square")
 
-					return (TT_ERROR_INVALID_MHEAD)
+					return (ErrorInvalidMHead)
 				}
 
 				state.latitude = maybe.Just(lat)
@@ -1514,11 +1514,11 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 			state.setDAOKeys(e)
 
-		case TTLOC_SATSQ:
+		case LocSatSq:
 			if len(xstr) != 4 {
 				logrus.WithField("x", xstr).Error("Expected 4 digits for the Satellite Square")
 
-				return (TT_ERROR_INVALID_SATSQ)
+				return (ErrorInvalidSatSq)
 			}
 
 			/* Convert 4 digits to usual AA99 form, then to location. */
@@ -1531,7 +1531,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				if err != nil {
 					logrus.WithError(err).Error("Invalid touch tone grid square")
 
-					return (TT_ERROR_INVALID_SATSQ)
+					return (ErrorInvalidSatSq)
 				}
 
 				state.latitude = maybe.Just(lat)
@@ -1540,11 +1540,11 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 			state.setDAOKeys(e)
 
-		case TTLOC_AMBIG:
+		case LocAmbig:
 			if len(xstr) != 1 {
 				logrus.WithField("x", xstr).Error("Expected 1 digit for the position ambiguity")
 
-				return (TT_ERROR_INVALID_LOC)
+				return (ErrorInvalidLoc)
 			}
 
 			var ambiguity, _ = strconv.Atoi(xstr)
@@ -1563,7 +1563,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 	/* Send reject sound. */
 
-	return (TT_ERROR_INVALID_LOC)
+	return (ErrorInvalidLoc)
 } /* end parseLocation */
 
 /*------------------------------------------------------------------
@@ -1592,12 +1592,12 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, string, int) {
+func (g *Gateway) findTTLocMatch(e string) (string, string, string, string, string, int) {
 	// debug dw_printf ("findTTLocMatch: e=%s\n", e);
 	var xstr, ystr, zstr, bstr, dstr string
 
-	for ipat := range len(g.config.ttlocs) {
-		var pattern = g.config.ttlocs[ipat].pattern
+	for ipat := range len(g.config.Locs) {
+		var pattern = g.config.Locs[ipat].Pattern
 		var length = len(pattern) /* Length of pattern we are trying to match. */
 
 		if len(e) == length {
@@ -1676,7 +1676,7 @@ func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, st
  * Outputs:	state.comment
  *		state.micE
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	0 for success or one of the Error... codes.
  *
  * Description:	We recognize these different formats:
  *
@@ -1696,7 +1696,7 @@ func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, st
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) parseComment(state *ttParseState, e string) int {
+func (g *Gateway) parseComment(state *ttParseState, e string) int {
 	dwutil.Assert(e[0] == 'C')
 
 	var length = len(e)

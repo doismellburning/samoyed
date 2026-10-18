@@ -910,7 +910,7 @@ type parseState struct {
 	audio *RadioConfig
 	digi  *digipeater.Config
 	cdigi *digipeater.ConnectedConfig
-	tt    *tt_config_s
+	tt    *Config
 	igate *igate_config_s
 	misc  *misc_config_s
 
@@ -1242,7 +1242,7 @@ func (ps *parseState) readLegacy(r io.Reader, name string) {
 func config_init(fname string, p_audio_config *RadioConfig,
 	p_digi_config *digipeater.Config,
 	p_cdigi_config *digipeater.ConnectedConfig,
-	p_tt_config *tt_config_s,
+	p_tt_config *Config,
 	p_igate_config *igate_config_s,
 	p_misc_config *misc_config_s,
 	symbolTable symbolCodes) configReport {
@@ -1333,40 +1333,40 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 	p_digi_config.DedupeTime = digipeater.DefaultDedupe
 
-	p_tt_config.gateway_enabled = 0
+	p_tt_config.GatewayEnabled = 0
 
 	/* Retention time and decay algorithm from 13 Feb 13 version of */
 	/* http://www.aprs.org/aprstt/aprstt-coding24.txt */
 	/* Reduced by transmit count by one.  An 8 minute delay in between transmissions seems awful long. */
 
-	p_tt_config.retain_time = 80 * 60
-	p_tt_config.num_xmits = 6
-	dwutil.Assert(p_tt_config.num_xmits <= TT_MAX_XMITS)
-	p_tt_config.xmit_delay[0] = 3 /* Before initial transmission. */
-	p_tt_config.xmit_delay[1] = 16
-	p_tt_config.xmit_delay[2] = 32
-	p_tt_config.xmit_delay[3] = 64
-	p_tt_config.xmit_delay[4] = 2 * 60
-	p_tt_config.xmit_delay[5] = 4 * 60
-	p_tt_config.xmit_delay[6] = 8 * 60 // not currently used.
+	p_tt_config.RetainTime = 80 * 60
+	p_tt_config.NumXmits = 6
+	dwutil.Assert(p_tt_config.NumXmits <= MaxXmits)
+	p_tt_config.XmitDelay[0] = 3 /* Before initial transmission. */
+	p_tt_config.XmitDelay[1] = 16
+	p_tt_config.XmitDelay[2] = 32
+	p_tt_config.XmitDelay[3] = 64
+	p_tt_config.XmitDelay[4] = 2 * 60
+	p_tt_config.XmitDelay[5] = 4 * 60
+	p_tt_config.XmitDelay[6] = 8 * 60 // not currently used.
 
-	p_tt_config.status[0] = ""
-	p_tt_config.status[1] = "/off duty"
-	p_tt_config.status[2] = "/enroute"
-	p_tt_config.status[3] = "/in service"
-	p_tt_config.status[4] = "/returning"
-	p_tt_config.status[5] = "/committed"
-	p_tt_config.status[6] = "/special"
-	p_tt_config.status[7] = "/priority"
-	p_tt_config.status[8] = "/emergency"
-	p_tt_config.status[9] = "/custom 1"
+	p_tt_config.Status[0] = ""
+	p_tt_config.Status[1] = "/off duty"
+	p_tt_config.Status[2] = "/enroute"
+	p_tt_config.Status[3] = "/in service"
+	p_tt_config.Status[4] = "/returning"
+	p_tt_config.Status[5] = "/committed"
+	p_tt_config.Status[6] = "/special"
+	p_tt_config.Status[7] = "/priority"
+	p_tt_config.Status[8] = "/emergency"
+	p_tt_config.Status[9] = "/custom 1"
 
-	for m := range TT_ERROR_MAXP1 {
-		p_tt_config.response[m].method = "MORSE"
-		p_tt_config.response[m].mtext = "?"
+	for m := range ErrorCount {
+		p_tt_config.Response[m].Method = "MORSE"
+		p_tt_config.Response[m].MText = "?"
 	}
 
-	p_tt_config.response[TT_ERROR_OK].mtext = "R"
+	p_tt_config.Response[ErrorOK].MText = "R"
 
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
 	p_misc_config.metrics_port = 0 // Disabled by default.
@@ -4452,24 +4452,24 @@ func handleTTCORRAL(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing latitude for TTCORRAL command", ps.line)
 	}
-	ps.tt.corral_lat = ps.parseLL(t, LAT)
+	ps.tt.CorralLat = ps.parseLL(t, LAT)
 
 	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing longitude for TTCORRAL command", ps.line)
 	}
-	ps.tt.corral_lon = ps.parseLL(t, LON)
+	ps.tt.CorralLon = ps.parseLL(t, LON)
 
 	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing offset-or-ambiguity for TTCORRAL command", ps.line)
 	}
-	ps.tt.corral_offset = ps.parseLL(t, LAT)
-	if ps.tt.corral_offset == 1 ||
-		ps.tt.corral_offset == 2 ||
-		ps.tt.corral_offset == 3 {
-		ps.tt.corral_ambiguity = int(ps.tt.corral_offset)
-		ps.tt.corral_offset = 0
+	ps.tt.CorralOffset = ps.parseLL(t, LAT)
+	if ps.tt.CorralOffset == 1 ||
+		ps.tt.CorralOffset == 2 ||
+		ps.tt.CorralOffset == 3 {
+		ps.tt.CorralAmbiguity = int(ps.tt.CorralOffset)
+		ps.tt.CorralOffset = 0
 	}
 
 	// dw_printf ("DEBUG: corral %f %f %f %d\n", p_tt_config.corral_lat,
@@ -4486,8 +4486,8 @@ func handleTTPOINT(ps *parseState) error {
 	 * TTPOINT   pattern  latitude  longitude
 	 */
 
-	var tl = new(ttloc_s)
-	tl.ttlocType = TTLOC_POINT
+	var tl = new(Loc)
+	tl.Type = LocPoint
 
 	// Pattern: B and digits
 
@@ -4495,7 +4495,7 @@ func handleTTPOINT(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTPOINT command", ps.line)
 	}
-	tl.pattern = t
+	tl.Pattern = t
 
 	if t[0] != 'B' {
 		ps.errorf("line %d: TTPOINT pattern must begin with upper case 'B'", ps.line)
@@ -4513,7 +4513,7 @@ func handleTTPOINT(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing latitude for TTPOINT command", ps.line)
 	}
-	tl.point.lat = ps.parseLL(t, LAT)
+	tl.Point.Lat = ps.parseLL(t, LAT)
 
 	// Longitude
 
@@ -4521,9 +4521,9 @@ func handleTTPOINT(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing longitude for TTPOINT command", ps.line)
 	}
-	tl.point.lon = ps.parseLL(t, LON)
+	tl.Point.Lon = ps.parseLL(t, LON)
 
-	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+	ps.tt.Locs = append(ps.tt.Locs, tl)
 
 	return nil
 }
@@ -4536,12 +4536,12 @@ func handleTTVECTOR(ps *parseState) error {
 	 * TTVECTOR   pattern  latitude  longitude  scale  unit
 	 */
 
-	var tl = new(ttloc_s)
-	tl.ttlocType = TTLOC_VECTOR
-	tl.pattern = ""
-	tl.vector.lat = 0
-	tl.vector.lon = 0
-	tl.vector.scale = 1
+	var tl = new(Loc)
+	tl.Type = LocVector
+	tl.Pattern = ""
+	tl.Vector.Lat = 0
+	tl.Vector.Lon = 0
+	tl.Vector.Scale = 1
 
 	// Pattern: B5bbbd...
 
@@ -4549,7 +4549,7 @@ func handleTTVECTOR(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTVECTOR command", ps.line)
 	}
-	tl.pattern = t
+	tl.Pattern = t
 
 	if t[0] != 'B' {
 		ps.errorf("line %d: TTVECTOR pattern must begin with upper case 'B'", ps.line)
@@ -4569,7 +4569,7 @@ func handleTTVECTOR(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing latitude for TTVECTOR command", ps.line)
 	}
-	tl.vector.lat = ps.parseLL(t, LAT)
+	tl.Vector.Lat = ps.parseLL(t, LAT)
 
 	// Longitude
 
@@ -4577,7 +4577,7 @@ func handleTTVECTOR(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing longitude for TTVECTOR command", ps.line)
 	}
-	tl.vector.lon = ps.parseLL(t, LON)
+	tl.Vector.Lon = ps.parseLL(t, LON)
 
 	// Longitude
 
@@ -4607,9 +4607,9 @@ func handleTTVECTOR(ps *parseState) error {
 		ps.errorf("line %d: Unrecognized unit for TTVECTOR command.  Using miles", ps.line)
 		meters = 1609.344
 	}
-	tl.vector.scale = scale * meters
+	tl.Vector.Scale = scale * meters
 
-	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+	ps.tt.Locs = append(ps.tt.Locs, tl)
 
 	return nil
 }
@@ -4622,8 +4622,8 @@ func handleTTGRID(ps *parseState) error {
 	 * TTGRID   pattern  min-latitude  min-longitude  max-latitude  max-longitude
 	 */
 
-	var tl = new(ttloc_s)
-	tl.ttlocType = TTLOC_GRID
+	var tl = new(Loc)
+	tl.Type = LocGrid
 
 	// Pattern: B [digit] x... y...
 
@@ -4631,7 +4631,7 @@ func handleTTGRID(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTGRID command", ps.line)
 	}
-	tl.pattern = t
+	tl.Pattern = t
 
 	if t[0] != 'B' {
 		ps.errorf("line %d: TTGRID pattern must begin with upper case 'B'", ps.line)
@@ -4648,7 +4648,7 @@ func handleTTGRID(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing minimum latitude for TTGRID command", ps.line)
 	}
-	tl.grid.lat0 = ps.parseLL(t, LAT)
+	tl.Grid.Lat0 = ps.parseLL(t, LAT)
 
 	// Minimum Longitude - all zeros in received data
 
@@ -4656,7 +4656,7 @@ func handleTTGRID(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing minimum longitude for TTGRID command", ps.line)
 	}
-	tl.grid.lon0 = ps.parseLL(t, LON)
+	tl.Grid.Lon0 = ps.parseLL(t, LON)
 
 	// Maximum Latitude - all nines in received data
 
@@ -4664,7 +4664,7 @@ func handleTTGRID(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing maximum latitude for TTGRID command", ps.line)
 	}
-	tl.grid.lat9 = ps.parseLL(t, LAT)
+	tl.Grid.Lat9 = ps.parseLL(t, LAT)
 
 	// Maximum Longitude - all nines in received data
 
@@ -4672,9 +4672,9 @@ func handleTTGRID(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing maximum longitude for TTGRID command", ps.line)
 	}
-	tl.grid.lon9 = ps.parseLL(t, LON)
+	tl.Grid.Lon9 = ps.parseLL(t, LON)
 
-	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+	ps.tt.Locs = append(ps.tt.Locs, tl)
 
 	return nil
 }
@@ -4687,9 +4687,9 @@ func handleTTUTM(ps *parseState) error {
 	 * TTUTM   pattern  zone [ scale [ x-offset y-offset ] ]
 	 */
 
-	var tl = new(ttloc_s)
-	tl.ttlocType = TTLOC_UTM
-	tl.utm.scale = 1
+	var tl = new(Loc)
+	tl.Type = LocUTM
+	tl.UTM.Scale = 1
 
 	// Pattern: B [digit] x... y...
 
@@ -4697,7 +4697,7 @@ func handleTTUTM(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTUTM command", ps.line)
 	}
-	tl.pattern = t
+	tl.Pattern = t
 
 	if t[0] != 'B' {
 		return fmt.Errorf("line %d: TTUTM pattern must begin with upper case 'B'", ps.line)
@@ -4716,7 +4716,7 @@ func handleTTUTM(ps *parseState) error {
 		return fmt.Errorf("line %d: Missing zone for TTUTM command", ps.line)
 	}
 
-	tl.utm.latband, tl.utm.hemi, tl.utm.lzone = ps.parseUTMZone(t)
+	tl.UTM.LatBand, tl.UTM.Hemi, tl.UTM.Zone = ps.parseUTMZone(t)
 
 	// Optional scale.
 
@@ -4727,7 +4727,7 @@ func handleTTUTM(ps *parseState) error {
 			return fmt.Errorf("line %d: Invalid scale \"%s\" for TTUTM command", ps.line, t)
 		}
 
-		tl.utm.scale = scaleVal
+		tl.UTM.Scale = scaleVal
 
 		// Optional x offset.
 
@@ -4738,7 +4738,7 @@ func handleTTUTM(ps *parseState) error {
 				return fmt.Errorf("line %d: Invalid x offset \"%s\" for TTUTM command", ps.line, t)
 			}
 
-			tl.utm.x_offset = xOffset
+			tl.UTM.XOffset = xOffset
 
 			// Optional y offset.
 
@@ -4749,7 +4749,7 @@ func handleTTUTM(ps *parseState) error {
 					return fmt.Errorf("line %d: Invalid y offset \"%s\" for TTUTM command", ps.line, t)
 				}
 
-				tl.utm.y_offset = yOffset
+				tl.UTM.YOffset = yOffset
 			}
 		}
 	}
@@ -4757,10 +4757,10 @@ func handleTTUTM(ps *parseState) error {
 	// Practice run to see if conversion might fail later with actual location.
 
 	var utm = coordconv.UTMCoord{
-		Zone:       tl.utm.lzone,
-		Hemisphere: coordconvutil.HemisphereFromRune(tl.utm.hemi),
-		Easting:    tl.utm.x_offset + 5*tl.utm.scale,
-		Northing:   tl.utm.y_offset + 5*tl.utm.scale,
+		Zone:       tl.UTM.Zone,
+		Hemisphere: coordconvutil.HemisphereFromRune(tl.UTM.Hemi),
+		Easting:    tl.UTM.XOffset + 5*tl.UTM.Scale,
+		Northing:   tl.UTM.YOffset + 5*tl.UTM.Scale,
 	}
 	var _, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 
@@ -4768,7 +4768,7 @@ func handleTTUTM(ps *parseState) error {
 		return fmt.Errorf("line %d: Invalid UTM location: \n%w", ps.line, geoErr)
 	}
 
-	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+	ps.tt.Locs = append(ps.tt.Locs, tl)
 
 	return nil
 }
@@ -4782,13 +4782,13 @@ func handleTTUSNGMGRS(ps *parseState) error {
 	 * TTMGRS   pattern  zone_square
 	 */
 
-	var tl = new(ttloc_s)
+	var tl = new(Loc)
 
 	// TODO1.2: in progress...
 	if strings.EqualFold(ps.keyword, "TTMGRS") {
-		tl.ttlocType = TTLOC_MGRS
+		tl.Type = LocMGRS
 	} else {
-		tl.ttlocType = TTLOC_USNG
+		tl.Type = LocUSNG
 	}
 
 	// Pattern: B [digit] x... y...
@@ -4797,7 +4797,7 @@ func handleTTUSNGMGRS(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTUSNG/TTMGRS command", ps.line)
 	}
-	tl.pattern = t
+	tl.Pattern = t
 
 	if t[0] != 'B' {
 		return fmt.Errorf("line %d: TTUSNG/TTMGRS pattern must begin with upper case 'B'", ps.line)
@@ -4826,13 +4826,13 @@ func handleTTUSNGMGRS(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing zone & square for TTUSNG/TTMGRS command", ps.line)
 	}
-	tl.mgrs.zone = t
+	tl.MGRS.Zone = t
 
 	// Try converting it rather do our own error checking.
 
-	var _, convertErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(tl.mgrs.zone)
+	var _, convertErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(tl.MGRS.Zone)
 	if convertErr != nil {
-		return fmt.Errorf("line %d: Invalid USNG/MGRS zone & square:  %s\n%w", ps.line, tl.mgrs.zone, convertErr)
+		return fmt.Errorf("line %d: Invalid USNG/MGRS zone & square:  %s\n%w", ps.line, tl.MGRS.Zone, convertErr)
 	}
 
 	// Should be the end.
@@ -4842,7 +4842,7 @@ func handleTTUSNGMGRS(ps *parseState) error {
 		ps.errorf("line %d: Unexpected stuff at end ignored:  %s", ps.line, t)
 	}
 
-	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+	ps.tt.Locs = append(ps.tt.Locs, tl)
 
 	return nil
 }
@@ -4862,8 +4862,8 @@ func handleTTMHEAD(ps *parseState) error {
 
 	// TODO1.3:  TTMHEAD needs testing.
 
-	var tl = new(ttloc_s)
-	tl.ttlocType = TTLOC_MHEAD
+	var tl = new(Loc)
+	tl.Type = LocMHead
 
 	// Pattern: B, optional additional button, some number of xxxx... for matching
 
@@ -4871,7 +4871,7 @@ func handleTTMHEAD(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTMHEAD command", ps.line)
 	}
-	tl.pattern = t
+	tl.Pattern = t
 
 	if t[0] != 'B' {
 		return fmt.Errorf("line %d: TTMHEAD pattern must begin with upper case 'B'", ps.line)
@@ -4904,7 +4904,7 @@ func handleTTMHEAD(ps *parseState) error {
 
 	t = ps.split(false)
 	if t != "" {
-		tl.mhead.prefix = t
+		tl.MHead.Prefix = t
 
 		if !alldigits(t) || (len(t) != 4 && len(t) != 6 && len(t) != 10) {
 			return fmt.Errorf("line %d: TTMHEAD prefix must be 4, 6, or 10 digits", ps.line)
@@ -4916,13 +4916,13 @@ func handleTTMHEAD(ps *parseState) error {
 		}
 	}
 
-	var k = len(tl.mhead.prefix) + count_x
+	var k = len(tl.MHead.Prefix) + count_x
 
 	if k != 4 && k != 6 && k != 10 && k != 12 {
 		return fmt.Errorf("line %d: TTMHEAD prefix and user data must have a total of 4, 6, 10, or 12 digits", ps.line)
 	}
 
-	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+	ps.tt.Locs = append(ps.tt.Locs, tl)
 
 	return nil
 }
@@ -4941,8 +4941,8 @@ func handleTTSATSQ(ps *parseState) error {
 
 	// TODO1.2:  TTSATSQ To be continued...
 
-	var tl = new(ttloc_s)
-	tl.ttlocType = TTLOC_SATSQ
+	var tl = new(Loc)
+	tl.Type = LocSatSq
 
 	// Pattern: B, optional additional button, exactly xxxx for matching
 
@@ -4950,7 +4950,7 @@ func handleTTSATSQ(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTSATSQ command", ps.line)
 	}
-	tl.pattern = t
+	tl.Pattern = t
 
 	if t[0] != 'B' {
 		return fmt.Errorf("line %d: TTSATSQ pattern must begin with upper case 'B'", ps.line)
@@ -4969,7 +4969,7 @@ func handleTTSATSQ(ps *parseState) error {
 		return fmt.Errorf("line %d: TTSATSQ pattern must end with exactly xxxx in lower case", ps.line)
 	}
 
-	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+	ps.tt.Locs = append(ps.tt.Locs, tl)
 
 	return nil
 }
@@ -4988,8 +4988,8 @@ func handleTTAMBIG(ps *parseState) error {
 
 	// TODO1.3:  TTAMBIG To be continued...
 
-	var tl = new(ttloc_s)
-	tl.ttlocType = TTLOC_AMBIG
+	var tl = new(Loc)
+	tl.Type = LocAmbig
 
 	// Pattern: B, optional additional button, exactly x for matching
 
@@ -4997,7 +4997,7 @@ func handleTTAMBIG(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTAMBIG command", ps.line)
 	}
-	tl.pattern = t
+	tl.Pattern = t
 
 	if t[0] != 'B' {
 		return fmt.Errorf("line %d: TTAMBIG pattern must begin with upper case 'B'", ps.line)
@@ -5016,7 +5016,7 @@ func handleTTAMBIG(ps *parseState) error {
 		return fmt.Errorf("line %d: TTAMBIG pattern must end with exactly one x in lower case", ps.line)
 	}
 
-	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+	ps.tt.Locs = append(ps.tt.Locs, tl)
 
 	return nil
 }
@@ -5047,8 +5047,8 @@ func handleTTMACRO(ps *parseState) error {
 	 *
 	 */
 
-	var tl = new(ttloc_s)
-	tl.ttlocType = TTLOC_MACRO
+	var tl = new(Loc)
+	tl.Type = LocMacro
 
 	// Pattern: Any combination of digits, x, y, and z.
 	// Also make note of which letters are used in pattern and definition.
@@ -5058,7 +5058,7 @@ func handleTTMACRO(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTMACRO command", ps.line)
 	}
-	tl.pattern = t
+	tl.Pattern = t
 
 	var p_count [3]int
 	var tt_error = 0
@@ -5085,7 +5085,7 @@ func handleTTMACRO(ps *parseState) error {
 	t = ps.split(true)
 	if t == "" {
 		ps.errorf("line %d: Missing definition for TTMACRO command", ps.line)
-		tl.macro.definition = "" // Don't die on null pointer later.
+		tl.Macro.Definition = "" // Don't die on null pointer later.
 
 		return nil
 	}
@@ -5244,11 +5244,11 @@ func handleTTMACRO(ps *parseState) error {
 	//dw_printf ("DEBUG Config Line %d: %s -> %s\n", line, t, otemp);
 
 	if tt_error == 0 {
-		tl.macro.definition = otemp.String()
+		tl.Macro.Definition = otemp.String()
 	}
 
 	if tt_error == 0 {
-		ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+		ps.tt.Locs = append(ps.tt.Locs, tl)
 	} else {
 		// Each of those errors was reported and counted as it was found, so
 		// this says what became of the line rather than being a complaint of
@@ -5368,17 +5368,17 @@ func handleTTOBJ(ps *parseState) error {
 	//dw_printf ("Debug TTOBJ r=%d, x=%d, app=%d, ig=%d\n", r, x, app, ig);
 
 	ps.audio.achan[r].dtmf_decode = DTMF_DECODE_ON
-	ps.tt.gateway_enabled = 1
-	ps.tt.obj_recv_chan = r
-	ps.tt.obj_xmit_chan = x
-	ps.tt.obj_send_to_app = app
-	ps.tt.obj_send_to_ig = ig
+	ps.tt.GatewayEnabled = 1
+	ps.tt.ObjRecvChan = r
+	ps.tt.ObjXmitChan = x
+	ps.tt.ObjSendToApp = app
+	ps.tt.ObjSendToIG = ig
 
 	t = ps.split(false)
 	if t != "" {
 		var hops, viaErr = check_via_path(t)
 		if hops >= 0 {
-			ps.tt.obj_xmit_via = t
+			ps.tt.ObjXmitVia = t
 		} else {
 			ps.report(invalidViaPath(ps.line, viaErr))
 		}
@@ -5401,8 +5401,8 @@ func handleTTERR(ps *parseState) error {
 	}
 
 	var msg_num = -1
-	for n := range TT_ERROR_MAXP1 {
-		if strings.EqualFold(t, ttErrorString(n)) {
+	for n := range ErrorCount {
+		if strings.EqualFold(t, ErrorName(n)) {
 			msg_num = n
 
 			break
@@ -5440,13 +5440,13 @@ func handleTTERR(ps *parseState) error {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("Line %d: TTERR debug %d %s-%d \"%s\"\n", line, msg_num, method, ssid, t);
 
-	dwutil.Assert(msg_num >= 0 && msg_num < TT_ERROR_MAXP1)
+	dwutil.Assert(msg_num >= 0 && msg_num < ErrorCount)
 
-	ps.tt.response[msg_num].method = method
+	ps.tt.Response[msg_num].Method = method
 
 	// TODO1.3: Need SSID too!
 
-	ps.tt.response[msg_num].mtext = t
+	ps.tt.Response[msg_num].MText = t
 
 	return nil
 }
@@ -5480,7 +5480,7 @@ func handleTTSTATUS(ps *parseState) error {
 
 	t = strings.TrimSpace(t)
 
-	ps.tt.status[status_num] = t
+	ps.tt.Status[status_num] = t
 
 	return nil
 }
@@ -5498,7 +5498,7 @@ func handleTTCMD(ps *parseState) error {
 		return fmt.Errorf("line %d: Missing command for TTCMD command", ps.line)
 	}
 
-	ps.tt.ttcmd = t
+	ps.tt.Cmd = t
 
 	return nil
 }
