@@ -35,8 +35,9 @@ const (
 //go:embed static
 var staticFiles embed.FS
 
-// Handler returns the web interface's routes, reading from hub.
-func Handler(hub *Hub) http.Handler {
+// Handler returns the web interface's routes, reading what has been heard from
+// hub and the station's own state from status.
+func Handler(hub *Hub, status StatusFunc) http.Handler {
 	var mux = http.NewServeMux()
 
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +53,9 @@ func Handler(hub *Hub) http.Handler {
 	})
 	mux.HandleFunc("GET /api/channels", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, hub.Channels())
+	})
+	mux.HandleFunc("GET /api/status", func(w http.ResponseWriter, r *http.Request) {
+		serveStatus(w, r, status, time.Now)
 	})
 	mux.HandleFunc("GET /events", func(w http.ResponseWriter, r *http.Request) {
 		serveEvents(w, r, hub)
@@ -103,13 +107,15 @@ func (s *Server) Close() {
 	}
 }
 
-// Start serves the web interface until ctx is cancelled.  The returned
+// Start serves the web interface, with the station's own state from status,
+// until ctx is cancelled.  status is handed over here rather than to NewServer
+// because some of what it reports on is made after the hub has to exist.  The returned
 // channel receives a single error if and when the server stops.  Logging is
 // the caller's responsibility.
 //
 // Cancelling ctx shuts the server down, event streams included, so the channel
 // then reports http.ErrServerClosed.
-func (s *Server) Start(ctx context.Context) <-chan error {
+func (s *Server) Start(ctx context.Context, status StatusFunc) <-chan error {
 	var errCh = make(chan error, 1)
 
 	// Started already, or closed: there is nothing more to serve.
@@ -122,7 +128,7 @@ func (s *Server) Start(ctx context.Context) <-chan error {
 	var listener = s.listener
 
 	var server = new(http.Server)
-	server.Handler = Handler(s.hub)
+	server.Handler = Handler(s.hub, status)
 	server.ReadHeaderTimeout = readHeaderTimeout
 	server.ReadTimeout = readTimeout
 	server.WriteTimeout = writeTimeout

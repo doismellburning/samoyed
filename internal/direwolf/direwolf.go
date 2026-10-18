@@ -85,6 +85,8 @@ const audio_amplitude = 100 /* % of audio sample range. */
 // cancellation reaches the goroutines doing the work rather than only the
 // process itself.
 func DirewolfMain(ctx context.Context) { //nolint:funlen // Ported from Dire Wolf as one function
+	var started = time.Now() // For the web interface's uptime.
+
 	// logrus writes to stderr by default, while everything still going through
 	// dw_printf writes to stdout. Until the conversion is finished the two are
 	// halves of one console stream - a "Packet" entry on stderr whose packet
@@ -591,7 +593,7 @@ x = Silence FX.25 information.`)
 	if misc_config.web_port == 0 {
 		logrus.Debug("Web interface disabled")
 	} else {
-		webHub = webui_init(ctx, audio_config, fmt.Sprintf(":%d", misc_config.web_port))
+		webHub = webui_init(ctx, audio_config, fmt.Sprintf(":%d", misc_config.web_port), started)
 	}
 
 	// The AGW server is made here, so the transmit service can be told to

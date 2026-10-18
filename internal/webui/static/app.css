@@ -74,7 +74,8 @@ button[aria-selected="true"], button[aria-pressed="true"] {
   color: #fff;
 }
 
-.status { margin-left: auto; font-size: 12px; color: var(--muted); }
+.station-info { margin-left: auto; font-size: 12px; color: var(--muted); }
+.status { font-size: 12px; color: var(--muted); }
 .status::before {
   content: "";
   display: inline-block;

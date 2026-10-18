@@ -278,6 +278,34 @@
   $("tab-dashboard").addEventListener("click", () => selectTab("dashboard"));
   $("tab-map").addEventListener("click", () => selectTab("map"));
 
+  // ---- Station ----
+
+  // The uptime the station reported, and when, by this page's own clock, so
+  // it can tick on without asking again or trusting the two clocks to agree.
+  let status = null;
+  let statusAt = 0;
+
+  function duration(s) {
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  function renderStatus() {
+    if (!status) return;
+    const up = status.uptimeSeconds + Math.floor((performance.now() - statusAt) / 1000);
+    const info = $("station-info");
+    info.textContent = (status.version ? `${status.version} · ` : "") + `up ${duration(up)}`;
+    info.title = "Started " + new Date(status.started).toLocaleString();
+  }
+
+  function setStationStatus(s) {
+    status = s;
+    statusAt = performance.now();
+    renderStatus();
+  }
+
   // ---- Data ----
 
   function setStatus(state, text) {
@@ -298,7 +326,9 @@
   async function loadSnapshot() {
     queued = [];
     try {
-      const [ps, ss, cs] = await Promise.all([getJSON("api/packets"), getJSON("api/stations"), getJSON("api/channels")]);
+      const [ps, ss, cs, st] = await Promise.all([
+        getJSON("api/packets"), getJSON("api/stations"), getJSON("api/channels"), getJSON("api/status")]);
+      setStationStatus(st);
       packets = ps.slice(-MAX_PACKETS);
       stations.clear();
       for (const s of ss) stations.set(s.name, s);
@@ -356,6 +386,7 @@
     }
     pruneMarkers();
     renderStations();
+    renderStatus();
   }, 10000);
   setInterval(() => { if (stationsDirty) renderStations(); }, 500);
 

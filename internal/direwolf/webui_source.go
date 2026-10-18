@@ -7,27 +7,38 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/doismellburning/samoyed/internal/webui"
 	"github.com/sirupsen/logrus"
 )
 
 // webui_init starts the web dashboard and map on addr - every address on the
 // port configured with WEBPORT - and returns the hub to publish frames to.
+// started is when the station started, for the uptime it shows.
 // Failing to start it returns nil, which webPublishReceived and
 // webPublishTransmitted take as nothing to do.  A port of 0 (the default)
 // disables it, so DirewolfMain doesn't call this, and has a nil hub too.
-func webui_init(ctx context.Context, audio *RadioConfig, addr string) *webui.Hub {
+func webui_init(ctx context.Context, audio *RadioConfig, addr string, started time.Time) *webui.Hub {
 	var hub = webui.NewHub()
 
 	for channel := range MAX_TOTAL_CHANS {
 		if c, ok := webChannel(audio, channel).Get(); ok {
 			hub.AddChannel(c)
 		}
+	}
+
+	var status = func() webui.Status {
+		var s webui.Status
+		s.Version = version.Version
+		s.Started = started
+
+		return s
 	}
 
 	var server, serverErr = webui.NewServer(ctx, addr, hub)
@@ -39,7 +50,7 @@ func webui_init(ctx context.Context, audio *RadioConfig, addr string) *webui.Hub
 
 	var listening = server.Addr()
 
-	var errCh = server.Start(ctx)
+	var errCh = server.Start(ctx, status)
 
 	go func() {
 		var err = <-errCh
