@@ -711,11 +711,13 @@ func FuzzAGWHandleClientCommand(f *testing.F) {
 // not, so leave room for a few times that.
 const ttFuzzMaxSequence = 4 * MAX_MSG_LEN
 
-// FuzzTTSequence covers the APRStt gateway's parsing of a touch tone sequence.
-// Anyone on frequency reaches it with DTMF, and with any packet whose info
-// field starts with 't'.  The gateway stops once the sequence is parsed, as
-// the tone sequence tests have it do, so the user table and the responses are
-// left out.
+// FuzzTTSequence covers the APRStt gateway's handling of a touch tone
+// sequence.  Anyone on frequency reaches it with DTMF, and with any packet
+// whose info field starts with 't'.  It goes past parsing to where the parsed
+// state is used: the user table, the APRStt 3 suffix lookup, the environment
+// for the TTCMD script, and the object reports for the client applications,
+// the IGate and the radio, which are stubbed.  A known user is heard first, so
+// that a suffix or an abbreviation has someone to find.
 func FuzzTTSequence(f *testing.F) {
 	testutils.FuzzQuietly(f)
 
@@ -728,6 +730,13 @@ func FuzzTTSequence(f *testing.F) {
 	f.Add("A#")        // Callsign field with nothing after the A.
 	f.Add("C#")        // Comment field with nothing after the C.
 	f.Add("AB15#")     // Symbol field with only one digit.
+	f.Add("B*A277#")   // Location field matching a pattern of a lone B.
+	f.Add("1#")        // Macro that expands to itself.
+
+	var ttlocs = append(slices.Clone(aprs_tt_test_config),
+		&ttloc_s{ttlocType: TTLOC_POINT, pattern: "B", point: pointTTLoc{lat: 12.75, lon: 56.75}}, //nolint:exhaustruct_v5
+		&ttloc_s{ttlocType: TTLOC_MACRO, pattern: "1", macro: macroTTLoc{definition: "1"}},        //nolint:exhaustruct_v5
+	)
 
 	f.Fuzz(func(t *testing.T, msg string) {
 		// Both callers check for at least one character first.
@@ -736,11 +745,26 @@ func FuzzTTSequence(f *testing.F) {
 		}
 
 		var cfg tt_config_s
-		cfg.ttlocs = aprs_tt_test_config
+		cfg.ttlocs = ttlocs
+		cfg.obj_send_to_app = 1
+		cfg.obj_send_to_ig = 1
+		cfg.obj_xmit_via = "WIDE2-1"
+		cfg.retain_time = 80 * 60
+		cfg.num_xmits = 1
+		cfg.status[1] = "/off duty"
 
-		var g = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
-		g.runningTests = true
+		var audioConfig = new(RadioConfig)
+		audioConfig.mycall[0] = "Q1TEST"
 
+		var discard = func(int, *ax25.Packet) {}
+		var transmit = func(int, int, *ax25.Packet) {}
+
+		var g = NewTTGateway(audioConfig, &cfg, nil, discard, discard, nil, transmit, nil, 0)
+
+		g.Sequence(t.Context(), 0, "A9A2B42A7A7C71#") // WB4APR/7
 		g.Sequence(t.Context(), 0, msg)
+
+		// The radio's reports are due straight away.
+		g.users.background()
 	})
 }

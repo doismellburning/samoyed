@@ -238,6 +238,10 @@ type tt_config_s struct {
 
 const MAX_MSG_LEN = 100
 
+// ttMaxMacroDepth bounds how deep macros may expand within macros, so one
+// whose definition expands to itself fails rather than recursing forever.
+const ttMaxMacroDepth = 16
+
 // ttParseState holds temporary state accumulated during a single Sequence call.
 type ttParseState struct {
 	callsign        string /* really object name */
@@ -253,6 +257,7 @@ type ttParseState struct {
 	micE            byte
 	dao             [5]byte
 	ssid            int /* Default 12 for APRStt user. */
+	macroDepth      int /* Macros expanded within macros so far. */
 }
 
 func newTTParseState() ttParseState {
@@ -262,6 +267,28 @@ func newTTParseState() ttParseState {
 		dao:             [5]byte{'!', 'T', ' ', ' ', '!'},
 		ssid:            12,
 	}
+}
+
+// setDAOKeys records the first two keys of location field e in the DAO, as
+// "!TB5!" for the standard bearing and range.  A field of one key has a space
+// for the second.
+func (s *ttParseState) setDAOKeys(e string) {
+	s.dao[2] = e[0]
+	s.dao[3] = ttFieldByte(e, 1)
+
+	if s.dao[3] == 0 {
+		s.dao[3] = ' '
+	}
+}
+
+// ttFieldByte is the key at index i of field e, or 0 past its end, as the
+// Dire Wolf parsers read C's terminating NUL there.
+func ttFieldByte(e string, i int) byte {
+	if i < len(e) {
+		return e[i]
+	}
+
+	return 0
 }
 
 // TTGateway is the APRStt gateway. Construct one with NewTTGateway.
@@ -580,12 +607,7 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
 		switch e[0] {
 		case 'A':
 			// A lone A is a malformed callsign, and parseCallsign says so.
-			var kind byte
-			if len(e) > 1 {
-				kind = e[1]
-			}
-
-			switch kind {
+			switch ttFieldByte(e, 1) {
 			case 'A': /* AA object-name */
 				err = g.parseObjectName(state, e)
 				if err != 0 {
@@ -684,6 +706,16 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 			return (TT_ERROR_INTERNAL)
 		}
 
+		if state.macroDepth >= ttMaxMacroDepth {
+			logrus.WithFields(logrus.Fields{
+				"pattern":    g.config.ttlocs[ipat].pattern,
+				"definition": g.config.ttlocs[ipat].macro.definition,
+				"max_depth":  ttMaxMacroDepth,
+			}).Error("Touch tone macros expand too deep; does one expand to itself?")
+
+			return (TT_ERROR_INTERNAL)
+		}
+
 		/*
 		 * We found a match for the length and any fixed digits.
 		 * Substitute values in to the definition.
@@ -716,6 +748,9 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 		 */
 
 		logrus.WithField("sequence", stemp.String()).Debug("Macro after substitution")
+
+		state.macroDepth++
+		defer func() { state.macroDepth-- }()
 
 		return (g.parseFields(state, stemp.String()))
 	} else {
@@ -789,16 +824,29 @@ func checksum_not_ok(str string, length int, found rune) int {
 	return (0)
 }
 
-// twoKeyOverlay translates the two keys of a two key overlay.  Keys that
-// translate to nothing are no overlay at all.  Keys that translate only in
-// part give the character that did, as Dire Wolf took it.
+// twoKeyOverlay translates the keys of a two key overlay.  Keys that don't all
+// translate are no overlay at all, as for a callsign in two key format.
 func twoKeyOverlay(keys string) (byte, bool) {
-	var text, _ = touchtone.TwoKeyToText(keys, false)
-	if text == "" {
+	var text, errors = touchtone.TwoKeyToText(keys, false)
+	if errors != 0 || text == "" {
 		return 0, false
 	}
 
 	return text[0], true
+}
+
+// twoKeyCallsign translates a callsign in two key format.  Keys that don't all
+// translate are no callsign: what's left, such as the digits of a letter whose
+// column key went missing, would be taken for a different user.
+func twoKeyCallsign(keys string) (string, bool) {
+	var text, errors = touchtone.TwoKeyToText(keys, false)
+	if errors != 0 || text == "" {
+		logrus.WithField("keys", keys).Error("Touch tone callsign in two key format doesn't translate")
+
+		return "", false
+	}
+
+	return text, true
 }
 
 func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
@@ -887,9 +935,12 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		}
 
 		if unicode.IsUpper(rune(e[length-2])) {
-			var tttemp = e[1 : length-3]
+			var callsign, callOK = twoKeyCallsign(e[1 : length-3])
+			if !callOK {
+				return (TT_ERROR_INVALID_CALL)
+			}
 
-			state.callsign, _ = touchtone.TwoKeyToText(tttemp, false)
+			state.callsign = callsign
 
 			var overlay, ok = twoKeyOverlay(string(e[length-3]) + string(e[length-2]))
 			if !ok {
@@ -908,8 +959,12 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 				}).Debug("Callsign in two key format (two key overlay)")
 			}
 		} else {
-			var tttemp = e[1 : length-2]
-			state.callsign, _ = touchtone.TwoKeyToText(tttemp, false)
+			var callsign, callOK = twoKeyCallsign(e[1 : length-2])
+			if !callOK {
+				return (TT_ERROR_INVALID_CALL)
+			}
+
+			state.callsign = callsign
 
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
 			state.symtabOrOverlay = e[length-2]
@@ -1077,10 +1132,10 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 
 		case '0':
 			if length >= 6 {
-				var stemp, errors = touchtone.TwoKeyToText(e[5:], false)
-				if errors == 0 {
+				var overlay, ok = twoKeyOverlay(e[5:])
+				if ok {
 					state.symbolCode = byte(32 + nn)
-					state.symtabOrOverlay = stemp[0]
+					state.symtabOrOverlay = overlay
 
 					if g.debug > 0 {
 						logrus.WithFields(logrus.Fields{
@@ -1244,8 +1299,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			/* It's not hardwired to always be B0n or B9nn.  */
 			/* This is a pretty good approximation. */
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 			if len(e) == 3 { /* probably B0n -->  !Tn ! */
 				state.dao[2] = e[2]
@@ -1286,8 +1340,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			state.longitude = maybe.Just(dwutil.R2D(lon0 + math.Atan2(math.Sin(bearing)*math.Sin(dist/R_M)*math.Cos(lat0),
 				math.Cos(dist/R_M)-math.Sin(lat0)*math.Sin(dwutil.D2R(latitude)))))
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_GRID:
 			if len(xstr) == 0 {
@@ -1334,8 +1387,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				"longitude":  state.longitude,
 			}).Debug("TTLOC_GRID LON")
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_UTM:
 			if len(xstr) == 0 {
@@ -1383,8 +1435,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				logrus.WithError(geoErr).Error("Conversion from UTM failed")
 			}
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_MGRS, TTLOC_USNG:
 			if len(xstr) == 0 {
@@ -1419,8 +1470,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				logrus.WithError(convertErr).Error("Conversion from MGRS/USNG failed")
 			}
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_MHEAD:
 			/* Combine prefix from configuration and digits from user. */
@@ -1456,8 +1506,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				state.longitude = maybe.Just(lon)
 			}
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_SATSQ:
 			if len(xstr) != 4 {
@@ -1483,8 +1532,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				state.longitude = maybe.Just(lon)
 			}
 
-			state.dao[2] = e[0]
-			state.dao[3] = e[1]
+			state.setDAOKeys(e)
 
 		case TTLOC_AMBIG:
 			if len(xstr) != 1 {

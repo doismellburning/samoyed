@@ -63,7 +63,9 @@ func TestParseCallsignTwoKeyOverlayThatDoesNotTranslate(t *testing.T) {
 }
 
 // Keys that translate only in part - "5Z" is a digit, then a letter that isn't
-// a column key - still give the character that did, as Dire Wolf took it.
+// a column key - were taken for the character that did, as Dire Wolf took
+// them, though a symbol field's overlay was rejected for the same keys.
+// Reject both, as for the callsign itself.
 func TestParseCallsignTwoKeyOverlayThatPartlyTranslates(t *testing.T) {
 	var cfg tt_config_s
 
@@ -72,14 +74,14 @@ func TestParseCallsignTwoKeyOverlayThatPartlyTranslates(t *testing.T) {
 
 	var state = newTTParseState()
 
-	assert.Equal(t, 0, gw.parseCallsign(&state, "A12345Z5"))
-	assert.Equal(t, byte('5'), state.symtabOrOverlay)
+	assert.Equal(t, TT_ERROR_INVALID_SYMBOL, gw.parseCallsign(&state, "A12345Z5"))
+	assert.Equal(t, byte(APRSTT_DEFAULT_SYMTAB), state.symtabOrOverlay)
 }
 
 // A three digit abbreviation can end in a two key overlay too.  One whose keys
 // translate to nothing - "1A" has no letter - became a NUL overlay, which
-// went out as the symbol table of the object report.  Reject it, as for a
-// callsign in two key format, and take what translates of the rest.
+// went out as the symbol table of the object report.  Reject it, and one that
+// translates only in part, as for a callsign in two key format.
 func TestParseAbbreviationTwoKeyOverlay(t *testing.T) {
 	var cfg tt_config_s
 
@@ -92,9 +94,7 @@ func TestParseAbbreviationTwoKeyOverlay(t *testing.T) {
 
 	state = newTTParseState()
 
-	assert.Equal(t, 0, gw.parseCallsign(&state, "A1235Z1"), "part translates")
-	assert.Equal(t, "123", state.callsign)
-	assert.Equal(t, byte('5'), state.symtabOrOverlay)
+	assert.Equal(t, TT_ERROR_INVALID_SYMBOL, gw.parseCallsign(&state, "A1235Z1"), "part translates")
 }
 
 // A field that is nothing but an A is a callsign with nothing in it.  Its
@@ -148,4 +148,58 @@ func TestParseSymbolOneDigit(t *testing.T) {
 	})
 	assert.Equal(t, byte('/'), state.symtabOrOverlay)
 	assert.Equal(t, byte(32+5), state.symbolCode)
+}
+
+// A callsign in two key format whose keys don't all translate - "1A" has no
+// letter - used to be taken for what did translate, and its object report sent
+// as though from a real user.  Reject it.
+func TestParseCallsignTwoKeyThatPartlyTranslates(t *testing.T) {
+	var cfg tt_config_s
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	assert.Equal(t, TT_ERROR_INVALID_CALL, gw.parseCallsign(&state, "A9A1A2A7A7C75"))
+	assert.Empty(t, state.callsign)
+}
+
+// A location pattern can be nothing but the B, and a field that is the same
+// matches it.  Its second character was read for the DAO, and a tone sequence
+// anyone could send panicked the gateway.  Dire Wolf read the string's
+// terminating NUL there; a space keeps the DAO printable.
+func TestParseLocationLoneB(t *testing.T) {
+	var cfg tt_config_s
+	cfg.ttlocs = []*ttloc_s{
+		{ttlocType: TTLOC_POINT, pattern: "B", point: pointTTLoc{lat: 12.25, lon: 56.25}}, //nolint:exhaustruct_v5
+	}
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	require.NotPanics(t, func() {
+		assert.Equal(t, 0, gw.parseLocation(&state, "B"))
+	})
+	assert.Equal(t, "!TB !", string(state.dao[:]))
+}
+
+// A macro whose definition expands to itself recursed until the stack ran out,
+// which no recover catches.  The macros are the operator's, not what's heard
+// on frequency, but one wrong line in the config shouldn't take the gateway
+// down with the first tone sequence to match it.
+func TestExpandMacroThatExpandsToItself(t *testing.T) {
+	var cfg tt_config_s
+	cfg.ttlocs = []*ttloc_s{
+		{ttlocType: TTLOC_MACRO, pattern: "1", macro: macroTTLoc{definition: "1"}}, //nolint:exhaustruct_v5
+	}
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, nil, nil, 0)
+	gw.runningTests = true
+
+	var state = newTTParseState()
+
+	assert.Equal(t, TT_ERROR_INTERNAL, gw.parseFields(&state, "1#"))
 }
