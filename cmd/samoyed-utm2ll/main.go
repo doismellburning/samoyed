@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/tzneal/coordconv"
 )
@@ -15,17 +15,16 @@ import (
 func main() {
 	if len(os.Args) == 4 {
 		// 3 command line arguments for UTM
-		var zlet rune
+		var zlet byte
 
 		var zoneStr = os.Args[1] // e.g. "19T" or just "19"
 		if len(zoneStr) > 0 {
 			var last = zoneStr[len(zoneStr)-1]
-			if (last >= 'A' && last <= 'Z') || (last >= 'a' && last <= 'z') {
-				zlet = rune(last)
+			if ascii.IsAlpha(last) {
+				zlet = ascii.ToUpper(last)
 				zoneStr = zoneStr[:len(zoneStr)-1]
 			}
 		}
-		zlet = unicode.ToUpper(zlet)
 
 		var zone, zoneErr = strconv.Atoi(zoneStr)
 		if zoneErr != nil {
@@ -37,7 +36,7 @@ func main() {
 		if zlet == 0 {
 			hemisphere = coordconv.HemisphereNorth
 		} else {
-			if !strings.ContainsRune("CDEFGHJKLMNPQRSTUVWX", zlet) {
+			if strings.IndexByte("CDEFGHJKLMNPQRSTUVWX", zlet) < 0 {
 				fmt.Printf("Latitudinal band must be one of CDEFGHJKLMNPQRSTUVWX.")
 				usage()
 			}
