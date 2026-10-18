@@ -6,6 +6,8 @@ package cm108
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,14 +53,14 @@ func TestCM108GoodDevice(t *testing.T) {
 	}
 }
 
-// The inventory comes from the host's udev, which in CI has no USB audio at
+// The inventory comes from the host's sysfs, which in CI has no USB audio at
 // all, so all we can say about it is that it is internally consistent.
 func TestInventoryIsConsistent(t *testing.T) {
 	t.Parallel()
 
 	var things, err = Inventory(MAXX_THINGS)
 	if err != nil {
-		t.Skipf("udev enumeration unavailable here: %v", err)
+		t.Skipf("sysfs unavailable here: %v", err)
 	}
 
 	assert.LessOrEqual(t, len(things), MAXX_THINGS)
@@ -79,7 +81,7 @@ func TestInventoryRespectsMaximum(t *testing.T) {
 
 	var things, err = Inventory(0)
 	if err != nil {
-		t.Skipf("udev enumeration unavailable here: %v", err)
+		t.Skipf("sysfs unavailable here: %v", err)
 	}
 
 	assert.Empty(t, things)
@@ -353,4 +355,179 @@ func TestFindPTTIn(t *testing.T) {
 		require.Error(t, err)
 		assert.Empty(t, ptt)
 	})
+}
+
+// fakeSysfs builds a sysfs tree in a temporary directory, laid out as the
+// kernel lays out the devices fakeCM108Devices describes, and returns its root.
+func fakeSysfs(t *testing.T) string {
+	t.Helper()
+
+	var root = t.TempDir()
+
+	var device = func(path string, subsystem string, attrs map[string]string) {
+		var dir = filepath.Join(root, "devices", path)
+		require.NoError(t, os.MkdirAll(dir, 0o750))
+		require.NoError(t, os.MkdirAll(filepath.Join(root, "bus", subsystem), 0o750))
+		require.NoError(t, os.Symlink(filepath.Join(root, "bus", subsystem), filepath.Join(dir, "subsystem")))
+
+		for name, value := range attrs {
+			require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(value+"\n"), 0o600))
+		}
+	}
+
+	var class = func(subsystem string, path string) {
+		var dir = filepath.Join(root, "class", subsystem)
+		require.NoError(t, os.MkdirAll(dir, 0o750))
+		require.NoError(t, os.Symlink(filepath.Join(root, "devices", path), filepath.Join(dir, filepath.Base(path))))
+	}
+
+	var usbDevice = func(path string, devname string, vid string, pid string, product string) {
+		device(path, "usb", map[string]string{
+			"uevent":    "DEVTYPE=usb_device\nDEVNAME=" + devname,
+			"idVendor":  vid,
+			"idProduct": pid,
+			"product":   product,
+		})
+	}
+
+	var soundCard = func(path string, number string, id string) {
+		var card = path + "/sound/card" + number
+		device(card, "sound", map[string]string{"uevent": "", "id": id, "number": number})
+		class("sound", card)
+
+		for _, node := range []string{"pcmC" + number + "D0c", "pcmC" + number + "D0p", "controlC" + number} {
+			device(card+"/"+node, "sound", map[string]string{"uevent": "MAJOR=116\nDEVNAME=snd/" + node})
+			class("sound", card+"/"+node)
+		}
+	}
+
+	var hidraw = func(path string, node string) {
+		device(path+"/hidraw/"+node, "hidraw", map[string]string{"uevent": "DEVNAME=" + node})
+		class("hidraw", path+"/hidraw/"+node)
+	}
+
+	const usb1 = "pci0000:00/0000:00:14.0/usb1"
+
+	// The root hub is a usb_device too, but further up than the one we want.
+	usbDevice(usb1, "bus/usb/001/001", "1d6b", "0002", "xHCI Host Controller")
+
+	usbDevice(usb1+"/1-1", "bus/usb/001/012", "0d8c", "000c", "C-Media USB Headphone Set")
+	device(usb1+"/1-1/1-1:1.0", "usb", map[string]string{"uevent": "DEVTYPE=usb_interface"})
+	soundCard(usb1+"/1-1/1-1:1.0", "1", "Device_1")
+	device(usb1+"/1-1/1-1:1.3/0003:0D8C:000C.0001", "hid", nil)
+	hidraw(usb1+"/1-1/1-1:1.3/0003:0D8C:000C.0001", "hidraw0")
+
+	usbDevice(usb1+"/1-2", "bus/usb/001/013", "08bb", "2904", "USB Audio CODEC")
+	device(usb1+"/1-2/1-2:1.0", "usb", map[string]string{"uevent": "DEVTYPE=usb_interface"})
+	soundCard(usb1+"/1-2/1-2:1.0", "2", "CODEC")
+	hidraw(usb1+"/1-2/1-2:1.3/0003:08BB:2904.0002", "hidraw2")
+
+	usbDevice(usb1+"/1-3", "bus/usb/001/014", "413c", "2010", "Dell USB Keyboard")
+	hidraw(usb1+"/1-3/1-3:1.0/0003:413C:2010.0003", "hidraw4")
+
+	// Onboard audio, not on USB at all.
+	device("pci0000:00/0000:00:1f.3", "pci", nil)
+	soundCard("pci0000:00/0000:00:1f.3", "3", "PCH")
+
+	// A sound device belonging to no card, and a HID that isn't USB.
+	device("virtual/sound/timer", "sound", map[string]string{"uevent": "DEVNAME=snd/timer"})
+	class("sound", "virtual/sound/timer")
+	hidraw("platform/i2c-q1test/0018:04F3:0001.0004", "hidraw9")
+
+	return root
+}
+
+func TestReadSysfsSoundDevices(t *testing.T) {
+	t.Parallel()
+
+	var root = fakeSysfs(t)
+
+	var devices, err = readSysfsDevices(root, "sound")
+	require.NoError(t, err)
+
+	var got = make([]string, 0, len(devices))
+	for _, d := range devices {
+		got = append(got, d.devpath)
+	}
+
+	// libudev's order: by syspath, but a card's control device after its siblings.
+	const card1 = "/devices/pci0000:00/0000:00:14.0/usb1/1-1/1-1:1.0/sound/card1"
+
+	const card2 = "/devices/pci0000:00/0000:00:14.0/usb1/1-2/1-2:1.0/sound/card2"
+
+	const card3 = "/devices/pci0000:00/0000:00:1f.3/sound/card3"
+
+	assert.Equal(t, []string{
+		card1, card1 + "/pcmC1D0c", card1 + "/pcmC1D0p", card1 + "/controlC1",
+		card2, card2 + "/pcmC2D0c", card2 + "/pcmC2D0p", card2 + "/controlC2",
+		card3, card3 + "/pcmC3D0c", card3 + "/pcmC3D0p", card3 + "/controlC3",
+		"/devices/virtual/sound/timer",
+	}, got)
+
+	var card = devices[0]
+	assert.Empty(t, card.devnode, "a card has no device node")
+	assert.Equal(t, "1", card.number)
+	assert.Equal(t, "Device_1", card.id)
+	assert.True(t, strings.HasSuffix(card.syspath, card1), card.syspath)
+
+	var pcm = devices[1]
+	assert.Equal(t, "/dev/snd/pcmC1D0c", pcm.devnode)
+	require.NotNil(t, pcm.usb)
+	assert.Equal(t, "/dev/bus/usb/001/012", pcm.usb.devnode, "the nearest USB device, not the root hub")
+	assert.Equal(t, "0d8c", pcm.usb.idVendor)
+	assert.Equal(t, "000c", pcm.usb.idProduct)
+	assert.Equal(t, "C-Media USB Headphone Set", pcm.usb.product)
+
+	assert.Nil(t, devices[9].usb, "onboard audio is not on USB")
+	assert.Equal(t, "/dev/snd/timer", devices[12].devnode)
+	assert.Nil(t, devices[12].usb)
+}
+
+func TestInventoryFromSysfs(t *testing.T) {
+	t.Parallel()
+
+	var root = fakeSysfs(t)
+
+	var things, err = inventoryFromSysfs(root, MAXX_THINGS)
+	require.NoError(t, err)
+
+	// Three nodes for each of the two USB cards, plus the keyboard.
+	require.Len(t, things, 7)
+
+	for i, node := range []string{"pcmC1D0c", "pcmC1D0p", "controlC1"} {
+		var thing = things[i]
+
+		assert.Equal(t, CMEDIA_VID, thing.VID)
+		assert.Equal(t, 0x000c, thing.PID)
+		assert.Equal(t, "1", thing.CardNumber)
+		assert.Equal(t, "Device_1", thing.CardName)
+		assert.Equal(t, "/dev/snd/"+node, thing.DevnodeSound)
+		assert.Equal(t, "/dev/hidraw0", thing.DevnodeHidraw, "HID merged in by USB device")
+	}
+
+	assert.Equal(t, "plughw:1,0", things[0].Plughw)
+
+	for _, thing := range things[3:6] {
+		assert.Equal(t, "2", thing.CardNumber)
+		assert.Equal(t, "/dev/hidraw2", thing.DevnodeHidraw)
+	}
+
+	var keyboard = things[6]
+	assert.Equal(t, 0x413c, keyboard.VID)
+	assert.Equal(t, "/dev/hidraw4", keyboard.DevnodeHidraw)
+	assert.Equal(t, "/devices/pci0000:00/0000:00:14.0/usb1/1-3/1-3:1.0/0003:413C:2010.0003/hidraw/hidraw4", keyboard.Devpath)
+
+	var ptt, pttErr = cm108_find_ptt_in(things, "plughw:Device_1,0")
+	require.NoError(t, pttErr)
+	assert.Equal(t, "/dev/hidraw0", ptt)
+}
+
+func TestInventoryFromSysfsWithoutClasses(t *testing.T) {
+	t.Parallel()
+
+	// No sound or hidraw driver loaded, as in a container.
+	var things, err = inventoryFromSysfs(t.TempDir(), MAXX_THINGS)
+
+	require.NoError(t, err)
+	assert.Empty(t, things)
 }
