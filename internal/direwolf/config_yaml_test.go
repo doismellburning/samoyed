@@ -469,7 +469,16 @@ legacy: |
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD"}), got.nodeMap)
+		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: ""}), got.nodeMap)
+	})
+
+	t.Run("the node can be reported to another node map", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node:\n  address: Q1TEST\n  map: {apiUrl: 'http://localhost:8080'}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080"}), got.nodeMap)
 	})
 
 	t.Run("the node is not reported to the node map unless asked", func(t *testing.T) {
@@ -498,6 +507,9 @@ legacy: |
 			{"channel too big", "{address: Q1TEST, channels: [99]}", "Invalid channel 99 for node"},
 			{"channel twice", "{address: Q1TEST, channels: [0, 0]}", "more than once"},
 			{"no channels", "{address: Q1TEST, channels: []}", "No channels"},
+			{"node map URL not a URL", "{address: Q1TEST, map: {apiUrl: 'http://[::1'}}", "Invalid URL"},
+			{"node map URL not HTTP", "{address: Q1TEST, map: {apiUrl: 'ftp://map.example.org'}}", "Invalid URL"},
+			{"node map URL with no host", "{address: Q1TEST, map: {apiUrl: 'map.example.org'}}", "Invalid URL"},
 		} {
 			var c = parseYAMLConfig(t, "node: "+tc.entry+"\n")
 			assert.Equal(t, 1, c.errors, tc.name)

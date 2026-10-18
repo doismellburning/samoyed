@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -25,8 +26,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// defaultURL is where the map is.
-const defaultURL = "https://nodes.ukpacketradio.network"
+// DefaultURL is where the map is.
+const DefaultURL = "https://nodes.ukpacketradio.network"
 
 // interval is how often the node reports.
 const interval = time.Hour
@@ -42,6 +43,9 @@ type Config struct {
 
 	// Alias is the node's alias, or empty for none.
 	Alias string
+
+	// APIURL is the base URL of the map's API, or empty for DefaultURL's.
+	APIURL string
 }
 
 // Report is the map's NodeData: what a node says about itself.
@@ -61,7 +65,7 @@ type Reporter struct {
 	config Config
 	client *http.Client
 
-	// url is where the map is, which a test can point elsewhere.
+	// url is where the map is.
 	url string
 }
 
@@ -72,7 +76,10 @@ func New(config Config, client *http.Client) *Reporter {
 
 	r.config = config
 	r.client = client
-	r.url = defaultURL
+	r.url = strings.TrimSuffix(config.APIURL, "/")
+	if r.url == "" {
+		r.url = DefaultURL
+	}
 
 	return r
 }

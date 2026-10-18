@@ -254,6 +254,11 @@ These are the keys under ``samoyed``:
         once at startup and every hour after.
         Left out, the node is not reported.
         ``map: {}`` reports it with nothing more than its callsign, its alias and that it runs Samoyed.
+        It has:
+
+        ``apiUrl``
+            Optionally, the base URL of the map's API,
+            for a map other than the public one.
 
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.

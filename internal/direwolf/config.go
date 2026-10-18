@@ -20,6 +20,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -2158,8 +2159,13 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 	}
 
 	var nodeMap maybe.Maybe[nodemap.Config]
+
 	if settings.Map != nil {
-		nodeMap = maybe.Just(nodemap.Config{Address: address, Alias: alias})
+		if !validNodeMapAPIURL(settings.Map.APIURL) {
+			return fmt.Errorf("line %d: Invalid URL %q for the node map. Must be an http or https URL", ps.line, settings.Map.APIURL)
+		}
+
+		nodeMap = maybe.Just(nodemap.Config{Address: address, Alias: alias, APIURL: settings.Map.APIURL})
 	}
 
 	ps.misc.node = maybe.Just(nodeSettings{
@@ -2173,6 +2179,18 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 	})
 
 	return nil
+}
+
+// validNodeMapAPIURL says whether address is left out, for the public map, or
+// is somewhere a node map can be reached.
+func validNodeMapAPIURL(address string) bool {
+	if address == "" {
+		return true
+	}
+
+	var u, err = url.Parse(address)
+
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
 // nodeSettings is the node shell as the configuration file describes it.

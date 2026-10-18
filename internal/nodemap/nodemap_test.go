@@ -49,10 +49,9 @@ func fakeMap(t *testing.T, status int) (*httptest.Server, <-chan received) {
 
 // reporterFor is a reporter for config that reports to server.
 func reporterFor(config Config, server *httptest.Server) *Reporter {
-	var r = New(config, server.Client())
-	r.url = server.URL
+	config.APIURL = server.URL
 
-	return r
+	return New(config, server.Client())
 }
 
 func TestReport(t *testing.T) {
@@ -61,15 +60,31 @@ func TestReport(t *testing.T) {
 	t.Run("with an alias", func(t *testing.T) {
 		t.Parallel()
 
-		var r = New(Config{Address: "Q1TEST-7", Alias: "SAMNOD"}, http.DefaultClient)
+		var r = New(Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: ""}, http.DefaultClient)
 		assert.Equal(t, Report{NodeAlias: "SAMNOD", Software: Software{Name: "Samoyed", Version: ""}}, r.Report())
 	})
 
 	t.Run("without an alias", func(t *testing.T) {
 		t.Parallel()
 
-		var r = New(Config{Address: "Q1TEST-7", Alias: ""}, http.DefaultClient)
+		var r = New(Config{Address: "Q1TEST-7", Alias: "", APIURL: ""}, http.DefaultClient)
 		assert.Empty(t, r.Report().NodeAlias)
+	})
+}
+
+func TestNew(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reports to the public map by default", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, DefaultURL, New(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, http.DefaultClient).url)
+	})
+
+	t.Run("reports to the map it is given", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Equal(t, "http://map.example.org", New(Config{Address: "Q1TEST", Alias: "", APIURL: "http://map.example.org"}, http.DefaultClient).url)
 	})
 }
 
@@ -80,7 +95,7 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST-7", Alias: "SAMNOD"}, server)
+		var r = reporterFor(Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: ""}, server)
 
 		require.NoError(t, r.send(t.Context()))
 
@@ -96,17 +111,27 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, server)
 
 		require.NoError(t, r.send(t.Context()))
 		assert.JSONEq(t, `{"software": {"name": "Samoyed"}}`, (<-requests).body)
+	})
+
+	t.Run("posts to a map at a URL ending in a slash", func(t *testing.T) {
+		t.Parallel()
+
+		var server, requests = fakeMap(t, http.StatusOK)
+		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: server.URL + "/"}, server.Client())
+
+		require.NoError(t, r.send(t.Context()))
+		assert.Equal(t, "/api/nodedata/Q1TEST", (<-requests).path)
 	})
 
 	t.Run("a refused report is an error", func(t *testing.T) {
 		t.Parallel()
 
 		var server, _ = fakeMap(t, http.StatusTooManyRequests)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, server)
 
 		var err = r.send(t.Context())
 		require.Error(t, err)
@@ -117,7 +142,7 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, _ = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, server)
 
 		server.Close()
 		require.Error(t, r.send(t.Context()))
@@ -131,7 +156,7 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, server)
 
 		var ctx, cancel = context.WithCancel(t.Context())
 
@@ -161,7 +186,7 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 
 		var server, _ = fakeMap(t, http.StatusInternalServerError)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: ""}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: ""}, server)
 
 		var ctx, cancel = context.WithTimeout(t.Context(), 100*time.Millisecond)
 		defer cancel()

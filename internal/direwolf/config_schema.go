@@ -168,4 +168,8 @@ type NodeSettings struct {
 
 // NodeMapSettings describes how the node is reported to the UK Packet Radio
 // network map.
-type NodeMapSettings struct{}
+type NodeMapSettings struct {
+	// APIURL is the base URL of the map's API.  Left out, it is the public
+	// map's.
+	APIURL string `yaml:"apiUrl"`
+}
