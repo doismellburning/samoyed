@@ -487,6 +487,11 @@ legacy: |
 			{"node map URL not HTTP", "{address: Q1TEST, map: {apiUrl: 'ftp://map.example.org'}}", "Invalid URL"},
 			{"node map URL with no host", "{address: Q1TEST, map: {apiUrl: 'map.example.org'}}", "Invalid URL"},
 			{"node map locator not a locator", "{address: Q1TEST, map: {locator: IO9}}", "Invalid locator for the node map"},
+			{"node map port channel out of range", "{address: Q1TEST, map: {ports: {99: {usage: Access}}}}", "Invalid channel 99 for the node map's ports"},
+			{"node map port link type unknown", "{address: Q1TEST, map: {ports: {0: {linkType: AXUDP}}}}", "Invalid link type"},
+			{"node map port frequency not positive", "{address: Q1TEST, map: {ports: {0: {freq: -1}}}}", "Invalid frequency -1 for channel 0"},
+			{"node map port baud not positive", "{address: Q1TEST, map: {ports: {0: {baud: 0}}}}", "Invalid baud 0 for channel 0"},
+			{"node map port bitrate too big", "{address: Q1TEST, map: {ports: {0: {bitrate: 2147483648}}}}", "Invalid bitrate 2147483648 for channel 0"},
 		} {
 			var c = parseYAMLConfig(t, "node: "+tc.entry+"\n")
 			assert.Equal(t, 1, c.errors, tc.name)
@@ -767,6 +772,96 @@ func Test_config_yaml_node_map(t *testing.T) {
 		require.Len(t, config.Ports, 1)
 		assert.Equal(t, "FSK", config.Ports[0].Modulation)
 		assert.Equal(t, maybe.Just[int32](9600), config.Ports[0].Bitrate)
+	})
+
+	t.Run("the node map's ports can be overridden setting by setting", func(t *testing.T) {
+		var c = parseYAMLConfig(t, `
+node:
+  address: Q1TEST
+  map:
+    ports:
+      0:
+        freq: 144950000
+        usage: Access
+        comment: Hilltop, vertical
+        modulation: GFSK
+      8:
+        linkType: PrivateNet
+        mode: AX.25
+        baud: 1200
+        bitrate: 1200
+legacy: |
+  NCHANNEL 8 127.0.0.1 8001
+`)
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var config, _ = c.audio.nodeMapConfig(got, mustNodeConfig(t, c.audio, got).Ports).Get()
+
+		var radio = mapPortFor("0", nodemap.LinkRF)
+		radio.Freq = maybe.Just[int64](144950000)
+		radio.Mode = "AX.25"
+		radio.Modulation = "GFSK"
+		radio.Baud = maybe.Just[int32](1200)
+		radio.Bitrate = maybe.Just[int32](1200)
+		radio.Usage = "Access"
+		radio.Comment = "Hilltop, vertical"
+
+		var tnc = mapPortFor("8", nodemap.LinkPrivateNet)
+		tnc.Mode = "AX.25"
+		tnc.Baud = maybe.Just[int32](1200)
+		tnc.Bitrate = maybe.Just[int32](1200)
+
+		assert.Equal(t, []nodemap.Port{radio, tnc}, config.Ports)
+	})
+
+	t.Run("a port can be left off the node map", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST, map: {ports: {0: {report: false}}}}\nlegacy: |\n  NCHANNEL 8 127.0.0.1 8001\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var config, _ = c.audio.nodeMapConfig(got, mustNodeConfig(t, c.audio, got).Ports).Get()
+		assert.Equal(t, []nodemap.Port{mapPortFor("8", nodemap.LinkRF)}, config.Ports)
+	})
+
+	t.Run("a port the node map is told about must be one the node listens on", func(t *testing.T) {
+		for _, tc := range []struct {
+			name  string
+			entry string
+		}{
+			{"of every channel", "{address: Q1TEST, map: {ports: {5: {usage: Access}}}}"},
+			{"of those given", "{address: Q1TEST, channels: [0], map: {ports: {5: {usage: Access}}}}"},
+		} {
+			var c = parseYAMLConfig(t, "node: "+tc.entry+"\n")
+			assert.Zero(t, c.errors, c.output)
+
+			var got, ok = c.misc.node.Get()
+			require.True(t, ok, tc.name)
+
+			var _, err = c.audio.nodeConfig(got)
+			require.Error(t, err, tc.name)
+			assert.Equal(t, "line 2: The node map can't be told about channel 5, which the node doesn't listen on", err.Error(), tc.name)
+		}
+	})
+
+	// The command line can make a channel after the file is read: -n 2
+	// makes channel 1 a radio channel.
+	t.Run("the node map can be told about a port the command line makes", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST, map: {ports: {1: {usage: Access}}}}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		c.audio.chan_medium[1] = MEDIUM_RADIO
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var config, _ = c.audio.nodeMapConfig(got, mustNodeConfig(t, c.audio, got).Ports).Get()
+		require.Len(t, config.Ports, 2)
+		assert.Equal(t, "Access", config.Ports[1].Usage)
 	})
 
 	t.Run("the node map is told nothing when the node is not reported", func(t *testing.T) {

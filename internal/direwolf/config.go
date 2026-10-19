@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"net"
 	"net/url"
@@ -2164,6 +2165,8 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 
 	var nodeMap maybe.Maybe[nodemap.Config]
 
+	var mapPorts map[int]nodeMapPort
+
 	if settings.Map != nil {
 		var config, mapErr = ps.nodeMapConfig(address, alias, *settings.Map)
 		if mapErr != nil {
@@ -2171,6 +2174,11 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		}
 
 		nodeMap = maybe.Just(config)
+
+		mapPorts, mapErr = ps.nodeMapPorts(settings.Map.Ports)
+		if mapErr != nil {
+			return mapErr
+		}
 	}
 
 	ps.misc.node = maybe.Just(nodeSettings{
@@ -2181,6 +2189,7 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		infoMessage:    settings.InfoMessage,
 		connectMessage: settings.ConnectMessage,
 		nodeMap:        nodeMap,
+		mapPorts:       mapPorts,
 	})
 
 	return nil
@@ -2217,6 +2226,90 @@ func (ps *parseState) nodeMapConfig(address string, alias string, settings NodeM
 	}, nil
 }
 
+// nodeMapPorts checks what the node map is to be told about the node's
+// ports, keyed by channel.  Whether the node listens on each waits for
+// nodeConfig, as the command line can still make one a channel.
+func (ps *parseState) nodeMapPorts(settings map[int]NodeMapPortSettings) (map[int]nodeMapPort, error) {
+	var ports = make(map[int]nodeMapPort, len(settings))
+
+	// In order, so the same file always gets the same complaint.
+	for _, channel := range slices.Sorted(maps.Keys(settings)) {
+		var port, err = ps.nodeMapPort(channel, settings[channel])
+		if err != nil {
+			return nil, err
+		}
+
+		ports[channel] = port
+	}
+
+	return ports, nil
+}
+
+// nodeMapPort checks what the node map is to be told about the node's port
+// for channel.
+func (ps *parseState) nodeMapPort(channel int, settings NodeMapPortSettings) (nodeMapPort, error) {
+	var none nodeMapPort
+
+	if channel < 0 || channel >= MAX_TOTAL_CHANS {
+		return none, fmt.Errorf("line %d: Invalid channel %d for the node map's ports. Must be in range of 0 to %d", ps.line, channel, MAX_TOTAL_CHANS-1)
+	}
+
+	var linkType maybe.Maybe[nodemap.LinkType]
+
+	if settings.LinkType != nil {
+		var parsed, ok = nodemap.ParseLinkType(*settings.LinkType)
+		if !ok {
+			return none, fmt.Errorf("line %d: Invalid link type %q for channel %d on the node map. Must be RF, PrivateNet, Internet or Other",
+				ps.line, *settings.LinkType, channel)
+		}
+
+		linkType = maybe.Just(parsed)
+	}
+
+	var freq = maybe.FromPointer(settings.Freq)
+	if f, ok := freq.Get(); ok && f <= 0 {
+		return none, fmt.Errorf("line %d: Invalid frequency %d for channel %d on the node map. Must be in Hz", ps.line, f, channel)
+	}
+
+	var baud, baudErr = ps.nodeMapRate("baud", channel, settings.Baud)
+	if baudErr != nil {
+		return none, baudErr
+	}
+
+	var bitrate, bitrateErr = ps.nodeMapRate("bitrate", channel, settings.Bitrate)
+	if bitrateErr != nil {
+		return none, bitrateErr
+	}
+
+	return nodeMapPort{
+		report:     settings.Report == nil || *settings.Report,
+		linkType:   linkType,
+		freq:       freq,
+		mode:       maybe.FromPointer(settings.Mode),
+		modulation: maybe.FromPointer(settings.Modulation),
+		baud:       baud,
+		bitrate:    bitrate,
+		usage:      settings.Usage,
+		comment:    settings.Comment,
+	}, nil
+}
+
+// nodeMapRate checks a rate, named name, the node map is to be told for
+// channel, if one is given.
+func (ps *parseState) nodeMapRate(name string, channel int, rate *int) (maybe.Maybe[int32], error) {
+	if rate == nil {
+		return maybe.Nothing[int32](), nil
+	}
+
+	var checked = positiveInt32(*rate)
+	if checked.IsNothing() {
+		return checked, fmt.Errorf("line %d: Invalid %s %d for channel %d on the node map. Must be in range of 1 to %d",
+			ps.line, name, *rate, channel, math.MaxInt32)
+	}
+
+	return checked, nil
+}
+
 // validNodeMapAPIURL says whether address is left out, for the public map, or
 // is somewhere a node map can be reached.
 func validNodeMapAPIURL(address string) bool {
@@ -2250,6 +2343,43 @@ type nodeSettings struct {
 	// nodeMap is what the node map is told about the node, if it is to be
 	// told anything, but for its ports, which wait for nodeMapConfig.
 	nodeMap maybe.Maybe[nodemap.Config]
+
+	// mapPorts, keyed by channel, are what the node map is told about a
+	// port in place of what the channel's configuration suggests.
+	mapPorts map[int]nodeMapPort
+}
+
+// nodeMapPort is what the node map is told about a port in place of what its
+// channel's configuration suggests.  Each setting given replaces the one
+// suggested, and the rest are left as they are.
+type nodeMapPort struct {
+	// report is whether the port is on the map at all.
+	report bool
+
+	linkType   maybe.Maybe[nodemap.LinkType]
+	freq       maybe.Maybe[int64]
+	mode       maybe.Maybe[string]
+	modulation maybe.Maybe[string]
+	baud       maybe.Maybe[int32]
+	bitrate    maybe.Maybe[int32]
+
+	// usage and comment are only ever given here, empty for none.
+	usage   string
+	comment string
+}
+
+// apply is port, with what o gives in place of what it had.
+func (o nodeMapPort) apply(port nodemap.Port) nodemap.Port {
+	port.LinkType = maybe.FromMaybe(port.LinkType, o.linkType)
+	port.Freq = o.freq.Or(port.Freq)
+	port.Mode = maybe.FromMaybe(port.Mode, o.mode)
+	port.Modulation = maybe.FromMaybe(port.Modulation, o.modulation)
+	port.Baud = o.baud.Or(port.Baud)
+	port.Bitrate = o.bitrate.Or(port.Bitrate)
+	port.Usage = o.usage
+	port.Comment = o.comment
+
+	return port
 }
 
 // connectedModeChannels are the channels connected mode can be used on.
@@ -2283,6 +2413,15 @@ func (c *RadioConfig) nodeConfig(settings nodeSettings) (node.Config, error) {
 		}
 	}
 
+	for _, channel := range slices.Sorted(maps.Keys(settings.mapPorts)) {
+		if !slices.Contains(channels, channel) {
+			var none node.Config
+
+			return none, fmt.Errorf("line %d: The node map can't be told about channel %d, which the node doesn't listen on",
+				settings.line, channel)
+		}
+	}
+
 	var ports = make([]node.Port, 0, len(channels))
 	for _, channel := range channels {
 		ports = append(ports, node.Port{Channel: channel, Description: c.describeChannel(channel)})
@@ -2299,12 +2438,23 @@ func (c *RadioConfig) nodeConfig(settings nodeSettings) (node.Config, error) {
 
 // nodeMapConfig is what the node map is told about the node settings
 // describes, with ports, its ports as nodeConfig left them, if the node is to
-// be reported at all.
+// be reported at all.  Each port is what its channel's configuration suggests,
+// with settings' overrides for it applied, unless they leave it off the map.
 func (c *RadioConfig) nodeMapConfig(settings nodeSettings, ports []node.Port) maybe.Maybe[nodemap.Config] {
 	return maybe.Fmap(func(config nodemap.Config) nodemap.Config {
 		config.Ports = make([]nodemap.Port, 0, len(ports))
 		for _, port := range ports {
-			config.Ports = append(config.Ports, c.mapPort(port.Channel))
+			var mapPort = c.mapPort(port.Channel)
+
+			if override, ok := settings.mapPorts[port.Channel]; ok {
+				if !override.report {
+					continue
+				}
+
+				mapPort = override.apply(mapPort)
+			}
+
+			config.Ports = append(config.Ports, mapPort)
 		}
 
 		return config

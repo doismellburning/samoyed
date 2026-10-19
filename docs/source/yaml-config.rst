@@ -280,6 +280,46 @@ These are the keys under ``samoyed``:
         ``comment``
             Optionally, a short note about the node.
 
+        ``ports``
+            Optionally, what the map is told about some of the node's ports,
+            keyed by channel number,
+            where that is not what the channel's configuration suggests,
+            or is more than it can.
+            Each setting given replaces the one suggested,
+            and the rest are left as they are.
+            Each channel must be one the node listens on.
+            Each has:
+
+            ``report``
+                ``false`` leaves the port off the map.
+
+            ``linkType``
+                ``RF``, ``PrivateNet``, ``Internet`` or ``Other``,
+                such as ``PrivateNet`` for an AXUDP port over a private network.
+
+            ``freq``
+                The port's frequency, in Hz, such as ``144950000``,
+                which the map works out the band from.
+                Without one, the map shows an RF port as having no known frequency.
+
+            ``mode``
+                The layer 2 protocol, such as ``AX.25`` or ``IL2P``.
+
+            ``modulation``
+                Such as ``AFSK``, ``FSK`` or ``QPSK``.
+
+            ``baud``
+                Symbols per second.
+
+            ``bitrate``
+                Bits per second.
+
+            ``usage``
+                What the port is for, such as ``Access`` or ``Backbone``.
+
+            ``comment``
+                A short note about the port.
+
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
     Its commands are:
@@ -329,7 +369,12 @@ These are the keys under ``samoyed``:
               Type ? for a list of commands.
             map:
               locator: IO91wm
-              comment: Club node, 144.950 MHz
+              comment: Club node
+              ports:
+                0:
+                  freq: 144950000
+                  usage: Access
+                  comment: Hilltop, vertical
 
 ``netrom``
     A NET/ROM node (see :doc:`glossary/netrom`),
