@@ -190,6 +190,8 @@ These are the keys under ``samoyed``:
         The destinations, such as NET/ROM's ``NODES``, whose frames go to every
         map with ``broadcast: true`` rather than to one node, like BPQ's
         ``BROADCAST`` lines.
+        With no map marked ``broadcast: true``, they go nowhere,
+        which the configuration is warned about when it is read.
 
     ``automap``
         ``true`` sends a frame for an address no map covers

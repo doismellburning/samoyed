@@ -249,6 +249,36 @@ func TestAXUDPChannelSendUnrouted(t *testing.T) {
 	assert.Equal(t, "Q1TEST", entry.Data["dest"])
 }
 
+// A broadcast with no map marked to get it goes nowhere, and says why.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
+func TestAXUDPChannelSendBroadcastUnmarked(t *testing.T) {
+	var peer = newTestAXUDPPeer(t)
+
+	var routes = noAXUDPRoutes()
+	routes.Broadcast = []string{"NODES"}
+	routes.Maps = []axudp.MapEntry{axudpTestMap(t, "Q1TEST", peer, false)}
+
+	var ac = openTestAXUDPChannel(t.Context(), t, routes, nil)
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	var pp = ax25.FromText("Q3TEST>NODES:hello", true)
+	require.NotNil(t, pp)
+
+	ac.sendPacket(axudpTestChannel, pp)
+
+	var entry = hook.LastEntry()
+	require.NotNil(t, entry)
+	assert.Equal(t, logrus.WarnLevel, entry.Level)
+	assert.Equal(t, "NODES", entry.Data["dest"])
+	assert.Contains(t, entry.Message, "no AXUDP map is marked broadcast")
+
+	assertNoTestAXUDPDatagram(t, peer)
+}
+
 // With automap, a frame for a node no map covers goes back to the mapped host
 // it was heard from.
 func TestAXUDPChannelAutoMapRepliesToSender(t *testing.T) {
