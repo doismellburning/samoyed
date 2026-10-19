@@ -214,4 +214,40 @@ type NodeMapSettings struct {
 
 	// Comment is a short note about the node.
 	Comment string `yaml:"comment"`
+
+	// Ports, keyed by channel, say what the map is told about the node's
+	// ports where that is not what the channel's configuration suggests,
+	// or is more than it can.
+	Ports map[int]NodeMapPortSettings `yaml:"ports"`
+}
+
+// NodeMapPortSettings describes one of the node's ports to the node map.  A
+// setting left out keeps what the channel's configuration suggests.
+type NodeMapPortSettings struct {
+	// Report, when false, leaves the port off the map.
+	Report *bool `yaml:"report"`
+
+	// LinkType is RF, PrivateNet, Internet or Other.
+	LinkType *string `yaml:"linkType"`
+
+	// Freq is the port's frequency, in Hz.
+	Freq *int64 `yaml:"freq"`
+
+	// Mode is the layer 2 protocol, such as AX.25 or IL2P.
+	Mode *string `yaml:"mode"`
+
+	// Modulation is such as AFSK, FSK or QPSK.
+	Modulation *string `yaml:"modulation"`
+
+	// Baud is symbols per second.
+	Baud *int `yaml:"baud"`
+
+	// Bitrate is bits per second.
+	Bitrate *int `yaml:"bitrate"`
+
+	// Usage is what the port is for, such as Access or Backbone.
+	Usage string `yaml:"usage"`
+
+	// Comment is a short note about the port.
+	Comment string `yaml:"comment"`
 }

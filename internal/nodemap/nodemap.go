@@ -57,6 +57,9 @@ type Config struct {
 
 	// Comment is a short note about the node, or empty for none.
 	Comment string
+
+	// Ports are the interfaces the node links over.
+	Ports []Port
 }
 
 // Report is the map's NodeData: what a node says about itself.
@@ -66,6 +69,7 @@ type Report struct {
 	Software     Software              `json:"software"`
 	Contact      string                `json:"contact,omitempty"`
 	SysopComment string                `json:"sysopComment,omitempty"`
+	Ports        []Port                `json:"ports,omitzero"`
 }
 
 // Location is where a node is: a Maidenhead locator, and the middle of the
@@ -92,6 +96,57 @@ func LocationAt(locator string) (Location, error) {
 	}
 
 	return Location{Locator: locator, Coords: LatLon{Lat: lat, Lon: lon}}, nil
+}
+
+// Port is an interface a node links over: for Samoyed, a channel.  Anything
+// not known is left out, for the map to treat as unknown.
+type Port struct {
+	// ID is what the map knows the port by.
+	ID string `json:"id"`
+
+	LinkType LinkType `json:"linkType"`
+
+	// Freq is the port's frequency, in Hz.
+	Freq maybe.Maybe[int64] `json:"freq,omitzero"`
+
+	// Mode is the layer 2 protocol, such as AX.25 or IL2P.
+	Mode string `json:"mode,omitempty"`
+
+	// Modulation is such as AFSK, FSK or QPSK.
+	Modulation string `json:"modulation,omitempty"`
+
+	// Baud is symbols per second.
+	Baud maybe.Maybe[int32] `json:"baud,omitzero"`
+
+	// Bitrate is bits per second.
+	Bitrate maybe.Maybe[int32] `json:"bitrate,omitzero"`
+
+	// Usage is what the port is for, such as Access or Backbone.
+	Usage string `json:"usage,omitempty"`
+
+	Comment string `json:"comment,omitempty"`
+}
+
+// LinkType is what sort of link a port is.
+type LinkType string
+
+const (
+	LinkRF         LinkType = "RF"
+	LinkPrivateNet LinkType = "PrivateNet"
+	LinkInternet   LinkType = "Internet"
+	LinkOther      LinkType = "Other"
+)
+
+// ParseLinkType is the link type name names, if it is one the map knows.
+func ParseLinkType(name string) (LinkType, bool) {
+	var linkType = LinkType(name)
+
+	switch linkType {
+	case LinkRF, LinkPrivateNet, LinkInternet, LinkOther:
+		return linkType, true
+	default:
+		return "", false
+	}
 }
 
 // Software is what the node runs.
@@ -132,6 +187,7 @@ func (r *Reporter) Report() Report {
 		Software:     Software{Name: softwareName, Version: version.Version},
 		Contact:      r.config.Contact,
 		SysopComment: r.config.Comment,
+		Ports:        r.config.Ports,
 	}
 }
 

@@ -107,6 +107,7 @@ func TestNetromConfig(t *testing.T) {
 		infoMessage:    "",
 		connectMessage: "",
 		nodeMap:        maybe.Nothing[nodemap.Config](),
+		mapPorts:       nil,
 	})
 
 	var testCases = []struct {
@@ -159,6 +160,7 @@ func TestNetromConfigShellOnEveryChannel(t *testing.T) {
 		infoMessage:    "",
 		connectMessage: "",
 		nodeMap:        maybe.Nothing[nodemap.Config](),
+		mapPorts:       nil,
 	})
 
 	var _, err = radio.netromConfig(testNetromSettings("Q1TEST-7", "QNODEA", 0), shell)
