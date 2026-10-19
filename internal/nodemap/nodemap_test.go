@@ -108,6 +108,31 @@ func TestParseLinkType(t *testing.T) {
 	}
 }
 
+func TestWhere(t *testing.T) {
+	t.Parallel()
+
+	t.Run("is the public map's page of nodes by default", func(t *testing.T) {
+		t.Parallel()
+
+		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, http.DefaultClient)
+		assert.Equal(t, "https://nodes.ukpacketradio.network/maps/packet", r.where())
+	})
+
+	t.Run("is the public map's page of nodes when its API is given", func(t *testing.T) {
+		t.Parallel()
+
+		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: DefaultURL + "/", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, http.DefaultClient)
+		assert.Equal(t, "https://nodes.ukpacketradio.network/maps/packet", r.where())
+	})
+
+	t.Run("is the API of any other map", func(t *testing.T) {
+		t.Parallel()
+
+		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080/", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, http.DefaultClient)
+		assert.Equal(t, "http://localhost:8080", r.where())
+	})
+}
+
 func TestLocationAt(t *testing.T) {
 	t.Parallel()
 

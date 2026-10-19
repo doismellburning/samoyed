@@ -252,6 +252,9 @@ These are the keys under ``samoyed``:
     ``map``
         Report the node to the `UK Packet Radio network map <https://nodes.ukpacketradio.network/>`_,
         once at startup and every hour after.
+        At startup, the log says where the node can be seen:
+        the public map's page of nodes,
+        or, with ``apiUrl`` given, that map's API.
         Left out, the node is not reported.
         ``map: {}`` reports it with nothing more than its callsign, its alias, that it runs Samoyed,
         and its ports: one for each of its channels, numbered as the channel is.

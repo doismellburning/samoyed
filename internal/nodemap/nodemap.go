@@ -31,6 +31,9 @@ import (
 // DefaultURL is where the map is.
 const DefaultURL = "https://nodes.ukpacketradio.network"
 
+// defaultMapPage is where on the map a reported node can be seen.
+const defaultMapPage = DefaultURL + "/maps/packet"
+
 // interval is how often the node reports.
 const interval = time.Hour
 
@@ -194,6 +197,11 @@ func (r *Reporter) Report() Report {
 // Run reports the node to the map now and every hour after, until ctx is
 // cancelled.  A report that fails is logged, and the next is sent as usual.
 func (r *Reporter) Run(ctx context.Context) {
+	logrus.WithFields(logrus.Fields{
+		"node": r.config.Address,
+		"map":  r.where(),
+	}).Info("Reporting the node to the node map")
+
 	for ctx.Err() == nil {
 		var err = r.send(ctx)
 
@@ -210,6 +218,17 @@ func (r *Reporter) Run(ctx context.Context) {
 			return
 		}
 	}
+}
+
+// where is where to see the node: the public map's page of nodes, or, for
+// another map, the API it is reported to, since that map's pages could be
+// anywhere.
+func (r *Reporter) where() string {
+	if r.url == DefaultURL {
+		return defaultMapPage
+	}
+
+	return r.url
 }
 
 // send sends the map one report.
