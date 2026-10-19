@@ -864,6 +864,27 @@ legacy: |
 		assert.Equal(t, "Access", config.Ports[1].Usage)
 	})
 
+	t.Run("the node map is told which layer 2 protocol each port sends", func(t *testing.T) {
+		for _, tc := range []struct {
+			channel string
+			want    string
+		}{
+			{"{channel: 0}", "AX.25"},
+			{"{channel: 0, fx25tx: 1}", "FX.25"},
+			{"{channel: 0, il2ptx: {}}", "IL2P"},
+		} {
+			var c = parseYAMLConfig(t, "channels:\n  - "+tc.channel+"\nnode: {address: Q1TEST, map: {}}\n")
+			assert.Zero(t, c.errors, c.output)
+
+			var got, ok = c.misc.node.Get()
+			require.True(t, ok, tc.channel)
+
+			var config, _ = c.audio.nodeMapConfig(got, mustNodeConfig(t, c.audio, got).Ports).Get()
+			require.Len(t, config.Ports, 1, tc.channel)
+			assert.Equal(t, tc.want, config.Ports[0].Mode, tc.channel)
+		}
+	})
+
 	t.Run("the node map is told nothing when the node is not reported", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "node: {address: Q1TEST}\n")
 		assert.Zero(t, c.errors, c.output)
