@@ -12,6 +12,7 @@ package node
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"slices"
 	"strconv"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/doismellburning/samoyed/internal/netrom"
 )
 
 // maxLineLen is the longest command line the shell will hold on to.  Anyone
@@ -106,11 +108,18 @@ const maxHeard = 20
 // recently heard first.  (*mheard.DB).HeardRF is one.
 type HeardStations func(limit int) []mheard.Heard
 
+// NetROMStatus is what the NET/ROM node knows now: the nodes it can reach
+// and the neighbours it reaches them through.  (*netrom.Node).Status is one.
+type NetROMStatus func() netrom.Status
+
 // Node is the node shell.
 type Node struct {
 	config Config
 	link   DataLink
 	heard  HeardStations
+
+	// netrom is the NET/ROM node NODES and ROUTES list, or nil for none.
+	netrom NetROMStatus
 
 	// client is the client number the data link knows the node by.
 	client int
@@ -129,14 +138,16 @@ type Node struct {
 	downlinks map[linkKey]linkKey
 }
 
-// New makes a node that talks to link as client, and lists the stations heard
-// says it has heard.  Nothing is registered with the data link until Start.
-func New(config Config, link DataLink, heard HeardStations, client int) *Node {
+// New makes a node that talks to link as client, lists the stations heard
+// says it has heard, and lists what the NET/ROM node netrom knows, which may
+// be nil for none.  Nothing is registered with the data link until Start.
+func New(config Config, link DataLink, heard HeardStations, netrom NetROMStatus, client int) *Node {
 	var n = new(Node)
 
 	n.config = config
 	n.link = link
 	n.heard = heard
+	n.netrom = netrom
 	n.client = client
 	n.now = time.Now
 	n.sessions = make(map[linkKey]*session)
@@ -358,8 +369,8 @@ func commands() []command {
 		{names: []string{"INFO", "I"}, help: "About this node", run: (*Node).info},
 		{names: []string{"PORTS", "P"}, help: "List the ports", run: (*Node).ports},
 		{names: []string{"MHEARD", "MH"}, help: "List the stations heard", run: (*Node).mheard},
-		{names: []string{"NODES", "N"}, help: "List the nodes known", run: (*Node).noNetROM},
-		{names: []string{"ROUTES", "R"}, help: "List the routes known", run: (*Node).noNetROM},
+		{names: []string{"NODES", "N"}, help: "List the nodes known: N [node] for its routes", run: (*Node).nodes},
+		{names: []string{"ROUTES", "R"}, help: "List the neighbouring nodes", run: (*Node).routes},
 	}
 }
 
@@ -657,10 +668,150 @@ func (n *Node) mheard(key linkKey, _ *session, _ []string) bool {
 	return true
 }
 
-// noNetROM answers the commands that list what NET/ROM knows, of which
-// there is nothing yet.
-func (n *Node) noNetROM(key linkKey, _ *session, _ []string) bool {
-	n.send(key, []byte(n.prompt()+"This node does not do NET/ROM yet\r"))
+// nodesPerLine is how many nodes NODES lists on a line.
+const nodesPerLine = 3
+
+// nodes lists the nodes NET/ROM can reach, by alias, or the routes to the
+// one named.
+func (n *Node) nodes(key linkKey, _ *session, args []string) bool {
+	if n.netrom == nil {
+		return n.noNetROM(key)
+	}
+
+	var status = n.netrom()
+
+	if len(args) > 0 {
+		n.nodeRoutes(key, status, args[0])
+
+		return true
+	}
+
+	// By alias, as other nodes list them, and those without one after, by
+	// callsign.
+	var destinations = slices.Clone(status.Destinations)
+	slices.SortFunc(destinations, func(a, b netrom.DestinationStatus) int {
+		return cmp.Or(cmp.Compare(noAlias(a), noAlias(b)), cmp.Compare(a.Alias, b.Alias), cmp.Compare(a.Callsign, b.Callsign))
+	})
+
+	var names = make([]string, 0, len(destinations))
+	for _, d := range destinations {
+		names = append(names, nodeName(d))
+	}
+
+	var b strings.Builder
+
+	b.WriteString(n.prompt() + "Nodes:\r")
+
+	for line := range slices.Chunk(names, nodesPerLine) {
+		for i, name := range line {
+			if i == len(line)-1 {
+				b.WriteString(name)
+			} else {
+				fmt.Fprintf(&b, "%-17s ", name)
+			}
+		}
+
+		b.WriteString("\r")
+	}
+
+	n.send(key, []byte(b.String()))
+
+	return true
+}
+
+// nodeRoutes lists the routes to the node named, by alias or callsign, best
+// first.
+func (n *Node) nodeRoutes(key linkKey, status netrom.Status, name string) {
+	var call, _ = Address(name)
+	name = strings.ToUpper(name)
+
+	var i = slices.IndexFunc(status.Destinations, func(d netrom.DestinationStatus) bool {
+		return d.Callsign == call || (d.Alias != "" && d.Alias == name)
+	})
+	if i < 0 {
+		n.send(key, []byte(n.prompt()+"No such node "+name+"\r"))
+
+		return
+	}
+
+	var d = status.Destinations[i]
+
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "%sRoutes to %s:\r", n.prompt(), nodeName(d))
+
+	for _, r := range d.Routes {
+		fmt.Fprintf(&b, "  %-9s quality %3d obsolescence %d\r", r.Neighbour, r.Quality, r.Obsolescence)
+	}
+
+	n.send(key, []byte(b.String()))
+}
+
+// noAlias is 1 for a node without an alias, which NODES lists after those
+// with one, and 0 otherwise.
+func noAlias(d netrom.DestinationStatus) int {
+	if d.Alias == "" {
+		return 1
+	}
+
+	return 0
+}
+
+// nodeName is how NODES names a node: ALIAS:CALLSIGN, or the callsign alone
+// when it has no alias.
+func nodeName(d netrom.DestinationStatus) string {
+	if d.Alias == "" {
+		return d.Callsign
+	}
+
+	return d.Alias + ":" + d.Callsign
+}
+
+// routes lists the NET/ROM node's neighbours, with whether the link to each
+// is up, what it is taken to be worth, and how many nodes can be reached
+// through it.
+func (n *Node) routes(key linkKey, _ *session, _ []string) bool {
+	if n.netrom == nil {
+		return n.noNetROM(key)
+	}
+
+	var status = n.netrom()
+
+	var b strings.Builder
+
+	b.WriteString(n.prompt() + "Routes:\r")
+
+	for _, nb := range status.Neighbours {
+		var count = 0
+
+		for _, d := range status.Destinations {
+			if slices.ContainsFunc(d.Routes, func(r netrom.RouteStatus) bool { return r.Neighbour == nb.Callsign }) {
+				count++
+			}
+		}
+
+		var nodes = "nodes"
+		if count == 1 {
+			nodes = "node"
+		}
+
+		var failing string
+		if nb.Failing {
+			failing = " failing"
+		}
+
+		fmt.Fprintf(&b, "  %-9s %-10s quality %3d %d %s%s\r", nb.Callsign, nb.Link, nb.Quality, count, nodes, failing)
+	}
+
+	n.send(key, []byte(b.String()))
+
+	return true
+}
+
+// noNetROM answers the commands that list what NET/ROM knows, when the node
+// runs no NET/ROM.
+func (n *Node) noNetROM(key linkKey) bool {
+	n.send(key, []byte(n.prompt()+"This node does not do NET/ROM\r"))
 
 	return true
 }

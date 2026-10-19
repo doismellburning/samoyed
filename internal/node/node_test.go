@@ -13,6 +13,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
+	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -158,7 +159,7 @@ func connectedWith(t *testing.T, config Config) (*Node, *fakeLink) {
 	t.Helper()
 
 	var link = new(fakeLink)
-	var n = New(config, link, noneHeard, testClient)
+	var n = New(config, link, noneHeard, nil, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 	link.reset()
@@ -170,7 +171,7 @@ func TestStartRegistersCallsignAndAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(onChannels(0, 2)), link, noneHeard, testClient)
+	var n = New(testConfig(onChannels(0, 2)), link, noneHeard, nil, testClient)
 
 	n.Start()
 
@@ -181,7 +182,7 @@ func TestStartWithoutAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(withoutAlias, onChannels(0)), link, noneHeard, testClient)
+	var n = New(testConfig(withoutAlias, onChannels(0)), link, noneHeard, nil, testClient)
 
 	n.Start()
 
@@ -192,7 +193,7 @@ func TestGreeting(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(), link, noneHeard, testClient)
+	var n = New(testConfig(), link, noneHeard, nil, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 
@@ -204,7 +205,7 @@ func TestGreetingWithoutAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(withoutAlias), link, noneHeard, testClient)
+	var n = New(testConfig(withoutAlias), link, noneHeard, nil, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 
@@ -225,7 +226,7 @@ func TestConnectMessage(t *testing.T) {
 			t.Parallel()
 
 			var link = new(fakeLink)
-			var n = New(testConfig(withConnectMessage(tc.message)), link, noneHeard, testClient)
+			var n = New(testConfig(withConnectMessage(tc.message)), link, noneHeard, nil, testClient)
 
 			n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 
@@ -240,7 +241,7 @@ func TestAnswersFromTheCallsignConnectedTo(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(), link, noneHeard, testClient)
+	var n = New(testConfig(), link, noneHeard, nil, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeAlias, true)
 	n.RecConnData(testChannel, testClient, userCall, nodeAlias, ax25.PIDNoLayer3, []byte("XYZZY\r"))
@@ -253,7 +254,7 @@ func TestOutgoingLinkIsNotASession(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(withoutAlias), link, noneHeard, testClient)
+	var n = New(testConfig(withoutAlias), link, noneHeard, nil, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, false)
 	n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte("XYZZY\r"))
@@ -477,8 +478,8 @@ func TestHelp(t *testing.T) {
 				"  INFO, I - About this node\r"+
 				"  PORTS, P - List the ports\r"+
 				"  MHEARD, MH - List the stations heard\r"+
-				"  NODES, N - List the nodes known\r"+
-				"  ROUTES, R - List the routes known\r", link.output())
+				"  NODES, N - List the nodes known: N [node] for its routes\r"+
+				"  ROUTES, R - List the neighbouring nodes\r", link.output())
 		})
 	}
 }
@@ -544,7 +545,7 @@ func TestMHeard(t *testing.T) {
 				Lon:        maybe.Nothing[float64](),
 			},
 		}
-	}, testClient)
+	}, nil, testClient)
 	n.now = func() time.Time { return now }
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
@@ -568,10 +569,10 @@ func TestMHeardNothing(t *testing.T) {
 	assert.Equal(t, "SAMNOD:Q1TEST-7} Heard:\r", link.output())
 }
 
-func TestNodesAndRoutes(t *testing.T) {
+func TestNodesAndRoutesWithoutNetROM(t *testing.T) {
 	t.Parallel()
 
-	for _, command := range []string{"NODES", "n", "ROUTES", "r"} {
+	for _, command := range []string{"NODES", "n", "N QNODEB", "ROUTES", "r"} {
 		t.Run(command, func(t *testing.T) {
 			t.Parallel()
 
@@ -579,9 +580,124 @@ func TestNodesAndRoutes(t *testing.T) {
 
 			n.RecConnData(testChannel, testClient, userCall, nodeCall, ax25.PIDNoLayer3, []byte(command+"\r"))
 
-			assert.Equal(t, "SAMNOD:Q1TEST-7} This node does not do NET/ROM yet\r", link.output())
+			assert.Equal(t, "SAMNOD:Q1TEST-7} This node does not do NET/ROM\r", link.output())
 		})
 	}
+}
+
+// testNetROM is what a NET/ROM node knows: five nodes, reached through three
+// neighbours, one of which is failing.
+func testNetROM() netrom.Status {
+	return netrom.Status{
+		Channel:  testChannel,
+		Callsign: nodeCall,
+		Alias:    nodeAlias,
+		Neighbours: []netrom.NeighbourStatus{
+			{Callsign: "Q2TEST-7", Link: "up", Quality: 192, Failures: 0, Failing: false},
+			{Callsign: "Q5TEST-7", Link: "down", Quality: 192, Failures: 2, Failing: true},
+			{Callsign: "Q6TEST-7", Link: "connecting", Quality: 100, Failures: 0, Failing: false},
+		},
+		Destinations: []netrom.DestinationStatus{
+			{Callsign: "Q2TEST-7", Alias: "QNODEB", Routes: []netrom.RouteStatus{
+				{Neighbour: "Q2TEST-7", Quality: 192, Obsolescence: 6},
+			}},
+			{Callsign: "Q3TEST-7", Alias: "QNODEC", Routes: []netrom.RouteStatus{
+				{Neighbour: "Q2TEST-7", Quality: 144, Obsolescence: 5},
+				{Neighbour: "Q5TEST-7", Quality: 100, Obsolescence: 4},
+			}},
+			{Callsign: "Q4TEST-7", Alias: "", Routes: []netrom.RouteStatus{
+				{Neighbour: "Q2TEST-7", Quality: 90, Obsolescence: 6},
+			}},
+			{Callsign: "Q5TEST-7", Alias: "AAA", Routes: []netrom.RouteStatus{
+				{Neighbour: "Q5TEST-7", Quality: 192, Obsolescence: 3},
+			}},
+			{Callsign: "Q6TEST-7", Alias: "QNODEF", Routes: []netrom.RouteStatus{
+				{Neighbour: "Q6TEST-7", Quality: 192, Obsolescence: 6},
+			}},
+		},
+		Circuits: nil,
+	}
+}
+
+// connectedWithNetROM is connected, for a node whose NET/ROM node knows
+// status.
+func connectedWithNetROM(t *testing.T, status netrom.Status) (*Node, *fakeLink) {
+	t.Helper()
+
+	var link = new(fakeLink)
+	var n = New(testConfig(), link, noneHeard, func() netrom.Status { return status }, testClient)
+
+	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
+	link.reset()
+
+	return n, link
+}
+
+func TestNodes(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connectedWithNetROM(t, testNetROM())
+
+	typeLine(n, "n")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Nodes:\r"+
+		"AAA:Q5TEST-7      QNODEB:Q2TEST-7   QNODEC:Q3TEST-7\r"+
+		"QNODEF:Q6TEST-7   Q4TEST-7\r", link.output())
+}
+
+func TestNodesNoneKnown(t *testing.T) {
+	t.Parallel()
+
+	var nothing netrom.Status
+
+	var n, link = connectedWithNetROM(t, nothing)
+
+	typeLine(n, "NODES")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Nodes:\r", link.output())
+}
+
+func TestNodeRoutes(t *testing.T) {
+	t.Parallel()
+
+	const want = "SAMNOD:Q1TEST-7} Routes to QNODEC:Q3TEST-7:\r" +
+		"  Q2TEST-7  quality 144 obsolescence 5\r" +
+		"  Q5TEST-7  quality 100 obsolescence 4\r"
+
+	for _, name := range []string{"QNODEC", "qnodec", "Q3TEST-7", "q3test-7"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var n, link = connectedWithNetROM(t, testNetROM())
+
+			typeLine(n, "N "+name)
+
+			assert.Equal(t, want, link.output())
+		})
+	}
+}
+
+func TestNodeRoutesUnknown(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connectedWithNetROM(t, testNetROM())
+
+	typeLine(n, "N qnodex")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} No such node QNODEX\r", link.output())
+}
+
+func TestRoutes(t *testing.T) {
+	t.Parallel()
+
+	var n, link = connectedWithNetROM(t, testNetROM())
+
+	typeLine(n, "R")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Routes:\r"+
+		"  Q2TEST-7  up         quality 192 3 nodes\r"+
+		"  Q5TEST-7  down       quality 192 2 nodes failing\r"+
+		"  Q6TEST-7  connecting quality 100 1 node\r", link.output())
 }
 
 const farCall = "Q3TEST"
@@ -627,7 +743,7 @@ func TestConnectFromAlias(t *testing.T) {
 	t.Parallel()
 
 	var link = new(fakeLink)
-	var n = New(testConfig(), link, noneHeard, testClient)
+	var n = New(testConfig(), link, noneHeard, nil, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeAlias, true)
 	n.RecConnData(testChannel, testClient, userCall, nodeAlias, ax25.PIDNoLayer3, []byte("C Q3TEST\r"))
