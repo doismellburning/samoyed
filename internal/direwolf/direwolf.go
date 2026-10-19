@@ -667,7 +667,14 @@ x = Silence FX.25 information.`)
 	// AGW server hands it their requests through netromAGW, which so can
 	// only be given the node once both exist.  That is the cycle, and it is
 	// closed here, before the AGW server takes any clients.
+	//
+	// A NET/ROM node sharing the node shell's address and alias shares its
+	// client number with the data link too, and reaches the data link, as
+	// the shell does, through sharedNode, which hands each of them its own
+	// links.
 	var netromNode *netrom.Node
+
+	var shared *sharedNode
 
 	if config, ok := netromConfig.Get(); ok {
 		var circuitClients netrom.Reporter
@@ -675,7 +682,16 @@ x = Silence FX.25 information.`)
 			circuitClients = agwServer
 		}
 
-		netromNode = netrom.New(config, dataLinkQueue, transmitQueue.Append, circuitClients, netrom.RealClock{}, netromClient)
+		var link netrom.DataLink = dataLinkQueue
+		var client = netromClient
+
+		if settings, _ := misc_config.netrom.Get(); settings.integrated {
+			shared = newSharedNode(dataLinkQueue, config.Channel, config.Callsign)
+			link = shared.netromLink()
+			client = nodeClient
+		}
+
+		netromNode = netrom.New(config, link, transmitQueue.Append, circuitClients, netrom.RealClock{}, client)
 		netromAGW.node = netromNode
 	}
 
@@ -802,10 +818,27 @@ x = Silence FX.25 information.`)
 	var nodeClients linkClients
 
 	if nodeConfig, ok := nodeConfig.Get(); ok {
-		var nodeShell = node.New(nodeConfig, dataLinkQueue, mheardDB.HeardRF, nil, nodeClient)
-		nodeShell.Start()
+		var link node.DataLink = dataLinkQueue
+		var netromStatus node.NetROMStatus
+
+		if shared != nil {
+			link = shared.shellLink()
+			netromStatus = netromNode.Status
+		}
+
+		var nodeShell = node.New(nodeConfig, link, mheardDB.HeardRF, netromStatus, nodeClient)
 
 		nodeClients = nodeShell
+
+		// Sharing its names with the NET/ROM node, the shell is told about
+		// its links by sharedNode, which can only be handed the two of them
+		// once both exist: that cycle is closed here, before either starts.
+		if shared != nil {
+			shared.attach(nodeShell, netromNode)
+			nodeClients = shared
+		}
+
+		nodeShell.Start()
 
 		var channels = make([]int, 0, len(nodeConfig.Ports))
 		for _, port := range nodeConfig.Ports {
@@ -838,7 +871,11 @@ x = Silence FX.25 information.`)
 	if netromNode != nil {
 		netromNode.Start(ctx)
 
-		netromClients = netromNode
+		// Sharing the shell's client number, it hears of its links through
+		// the shell's.
+		if shared == nil {
+			netromClients = netromNode
+		}
 	}
 
 	var ax25Link = NewAX25Link(misc_config, pttControl.SetConnected, newLinkClientRouter(agwClients, nodeClients, netromClients), transmitQueue, d_c_opt)

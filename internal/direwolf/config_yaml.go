@@ -48,7 +48,8 @@ type SamoyedConfig struct {
 	// Node, when given, runs the node shell.
 	Node *NodeSettings `yaml:"node"`
 
-	// NetROM, when given, runs a NET/ROM node.
+	// NetROM, when given, runs a NET/ROM node on a station without a node
+	// shell.  With one, NET/ROM is configured under Node.
 	NetROM *NetROMSettings `yaml:"netrom"`
 
 	// Legacy holds directives in the line-at-a-time format, read after

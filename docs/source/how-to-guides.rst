@@ -523,7 +523,8 @@ learns routes from the broadcasts it hears,
 and carries users' traffic over circuits that may cross several nodes.
 :doc:`glossary/netrom` describes how Samoyed implements the protocol.
 
-Configure one with a ``netrom`` block in a YAML configuration
+On a station without a node shell,
+configure one with a ``netrom`` block in a YAML configuration
 (the settings are listed in :doc:`yaml-config`):
 
 .. code:: yaml
@@ -540,7 +541,7 @@ The node's callsign is its own:
 it answers the links neighbouring nodes make to it,
 and makes links to them,
 so nothing else should use that callsign on that channel.
-A node shell may run alongside it, under a callsign and alias of its own.
+With a node shell, NET/ROM is configured with it instead, as below.
 Leave ``PACLEN`` at its default of 256 or more:
 a NET/ROM frame travels in a single AX.25 frame,
 and Samoyed warns at startup if ``PACLEN`` is less.
@@ -574,6 +575,48 @@ its dashboard shows the node's neighbours and whether the link to each is up,
 its routes with their quality and obsolescence count,
 and the circuits open through it;
 NET/ROM frames in its packet list read as they do in the monitor output.
+
+With the node shell
+~~~~~~~~~~~~~~~~~~~
+
+With a node shell, NET/ROM shares its callsign and alias,
+so that users and neighbouring nodes connect to one node,
+as they do to a BPQ or Linux node.
+Configure it under the node shell's ``node`` block (see :doc:`yaml-config`):
+
+.. code:: yaml
+
+    samoyed:
+      channels:
+        - {channel: 0, mycall: Q1TEST}
+      node:
+        address: Q1TEST-7
+        alias: QNODEA
+        netrom: {}
+
+NET/ROM takes the node's address as its callsign and the node's alias as its alias,
+which must be no more than six letters, digits or ``#_&-/``.
+Its ``channel`` can be left out when the node listens on only one;
+otherwise it must be one of the node's ``channels``.
+The other settings are those of the ``netrom`` block above.
+
+A station that connects to the node gets the shell's prompt.
+If the first thing it sends is a NET/ROM frame,
+to the node's address on the channel NET/ROM runs on,
+it is a neighbouring node,
+and the link is NET/ROM's from then on.
+NET/ROM runs on that one channel only,
+however many the shell listens on.
+The shell's ``NODES`` and ``ROUTES`` commands list the nodes NET/ROM can reach
+and the neighbours it reaches them through.
+Applications use NET/ROM over the AGW port as above,
+registering the node's address on NET/ROM's channel to take incoming circuits.
+Registering the node's alias,
+or its address on another channel,
+takes that name from the shell instead.
+``test-scripts/check-netrom-node`` runs two such nodes,
+drives a circuit between them,
+and has a user list one node from the other's shell.
 
 Running a node over AXUDP
 ~~~~~~~~~~~~~~~~~~~~~~~~~

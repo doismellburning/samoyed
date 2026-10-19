@@ -1,0 +1,361 @@
+#!/bin/bash
+
+# SPDX-FileCopyrightText: The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+set -eu
+set -o pipefail
+
+source "$(dirname "$(realpath "$0")")/common"
+
+if ! command -v python3 > /dev/null; then
+	echo "FAIL: python3 not found, required for port allocation and the AGW client" >&2
+	exit 1
+fi
+
+goto_tmpdir
+
+# Two samoyed-direwolf instances, each a node whose node shell and NET/ROM
+# share one address and alias, with channel 0's "audio" carried over UDP as
+# in check-netrom-connect.  Each node learns the other from its NODES
+# broadcasts; an AGW client on A opens a NET/ROM circuit to B, over a link
+# between the nodes that B's shell first greets as a user and then hands to
+# NET/ROM, and data goes both ways over it.  Then a user on B connects to A's
+# node shell over the air, and its NODES and ROUTES list B.
+#
+# Node A is Q1TEST-7 (alias QNODEA); node B is Q2TEST-7 (alias QNODEB).
+# The user opening the circuit is Q1TEST; the user of A's shell is Q3TEST.
+
+NODE_A="Q1TEST-7"
+NODE_B="Q2TEST-7"
+USER_A="Q1TEST"
+PAYLOAD=$(printf 'netrom payload from A. %.0s' {1..25})
+REPLY="reply from B"
+
+wait_for_log_line() {
+	local logfile=$1
+	local pattern=$2
+	local deadline=$((SECONDS + ${3:-60}))
+
+	while ! grep -q "$pattern" "$logfile" 2> /dev/null; do
+		if ((SECONDS > deadline)); then
+			echo "FAIL: timed out waiting for '$pattern' in $logfile" >&2
+			return 1
+		fi
+
+		sleep 0.2
+	done
+}
+
+pids=()
+
+# shellcheck disable=SC2317,SC2329 # cleanup is invoked indirectly via trap
+cleanup() {
+	local status=$?
+
+	if ((status != 0)); then
+		echo "--- FAILURE: dumping logs from $PWD for diagnosis ---" >&2
+
+		for log in direwolf-a.log direwolf-b.log agw-listen-b.log agw-connect-a.log shell-user-b.log; do
+			echo "--- $log ---" >&2
+			cat "$log" >&2 2> /dev/null || echo "(missing)" >&2
+		done
+	fi
+
+	for pid in "${pids[@]}"; do
+		kill "$pid" 2> /dev/null || true
+	done
+	wait 2> /dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# --- the AGW clients -------------------------------------------------------
+# The NET/ROM circuit client is check-netrom-connect's.
+
+cat > agwclient.py << 'EOF'
+import socket
+import struct
+import sys
+
+AGW_HEADER = struct.Struct("<BBBBBBBB10s10sI4s")
+PID_NETROM = 0xCF
+
+
+def frame(kind, *, port=0, pid=0, call_from="", call_to="", data=b""):
+	header = AGW_HEADER.pack(
+		port, 0, 0, 0,
+		ord(kind), 0, pid, 0,
+		call_from.encode(), call_to.encode(),
+		len(data), b"\0\0\0\0",
+	)
+
+	return header + data
+
+
+def read_frame(sock):
+	"""Read one AGW frame, or return None at end of stream."""
+	buf = b""
+	while len(buf) < AGW_HEADER.size:
+		chunk = sock.recv(AGW_HEADER.size - len(buf))
+		if not chunk:
+			return None
+		buf += chunk
+
+	fields = AGW_HEADER.unpack(buf)
+	kind = chr(fields[4])
+	call_from = fields[8].split(b"\0")[0].decode()
+	call_to = fields[9].split(b"\0")[0].decode()
+	length = fields[10]
+
+	data = b""
+	while len(data) < length:
+		chunk = sock.recv(length - len(data))
+		if not chunk:
+			break
+		data += chunk
+
+	return kind, call_from, call_to, data
+
+
+def log(*args):
+	print(*args, flush=True)
+
+
+def listen(port, node_call, expect, reply):
+	"""Take incoming circuits to node_call, await expect, answer reply,
+	then wait for the other end to close the circuit."""
+	with socket.create_connection(("127.0.0.1", port), timeout=120) as sock:
+		# Registering the node's own callsign is how a client offers to
+		# take the circuits that arrive for the node.
+		sock.sendall(frame("X", call_from=node_call))
+
+		received = b""
+		while True:
+			got = read_frame(sock)
+			if got is None:
+				sys.exit("listen: connection closed")
+
+			kind, call_from, call_to, data = got
+			if kind == "X":
+				if data != b"\x01":
+					sys.exit(f"listen: callsign registration refused for {node_call}")
+				log(f"registered {node_call}")
+			elif kind == "C":
+				log(f"connected: {call_from} -> {call_to}")
+			elif kind == "D":
+				received += data
+				log(f"{len(received)} of {len(expect)} bytes from {call_from}")
+				if len(received) >= len(expect.encode()):
+					if received != expect.encode():
+						sys.exit(f"listen: unexpected payload {received!r}")
+					log("PAYLOAD OK")
+					sock.sendall(frame("D", call_from=call_to, call_to=call_from, data=reply.encode()))
+			elif kind == "d":
+				log(f"disconnected: {call_from} -> {call_to}")
+				if received == expect.encode():
+					log("CLOSED OK")
+					return
+				sys.exit("listen: circuit closed before the payload arrived")
+
+
+def connect(port, own_call, node, payload, expect):
+	"""Open a NET/ROM circuit to node, send payload down it without waiting
+	for it to come up, await expect back, then close it."""
+	with socket.create_connection(("127.0.0.1", port), timeout=120) as sock:
+		sock.sendall(frame("c", pid=PID_NETROM, call_from=own_call, call_to=node))
+		sock.sendall(frame("D", call_from=own_call, call_to=node, data=payload.encode()))
+		log("circuit requested and payload sent")
+
+		received = b""
+		while True:
+			got = read_frame(sock)
+			if got is None:
+				sys.exit("connect: connection closed")
+
+			kind, call_from, call_to, data = got
+			if kind == "C":
+				log(f"connected: {call_from} -> {call_to}")
+			elif kind == "d":
+				sys.exit(f"connect: circuit refused or dropped ({call_from} -> {call_to})")
+			elif kind == "D":
+				received += data
+				if received == expect.encode():
+					log("REPLY OK")
+					break
+
+		sock.sendall(frame("d", call_from=own_call, call_to=node))
+
+		while True:
+			got = read_frame(sock)
+			if got is None:
+				sys.exit("connect: connection closed before the circuit was")
+			if got[0] == "d":
+				log("CLOSED OK")
+				return
+
+
+if __name__ == "__main__":
+	if sys.argv[1] == "listen":
+		listen(int(sys.argv[2]), sys.argv[3], sys.argv[4], sys.argv[5])
+	else:
+		connect(int(sys.argv[2]), sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
+EOF
+
+# A user of a node shell, connecting to it over plain AX.25, who checks that
+# NODES and ROUTES name the node given, then leaves.
+cat > shelluser.py << 'EOF'
+import socket
+import struct
+import sys
+
+HEADER = "<B3xBxBx10s10sI4x"
+
+port, user, node, prompt, other_alias, other_call = sys.argv[1:]
+user, node, prompt = user.encode(), node.encode(), prompt.encode() + b"} "
+
+sock = socket.create_connection(("127.0.0.1", int(port)))
+sock.settimeout(60)
+
+
+def send(kind, frm, to=b"", data=b""):
+	pid = 0xF0 if kind == "D" else 0
+	sock.sendall(struct.pack(HEADER, 0, ord(kind), pid, frm, to, len(data)) + data)
+
+
+def read_exactly(n):
+	buf = b""
+	while len(buf) < n:
+		chunk = sock.recv(n - len(buf))
+		if not chunk:
+			sys.exit("FAIL: AGW server closed the connection")
+		buf += chunk
+	return buf
+
+
+def expect(kind, starting=b"", containing=b"", to=user):
+	"""Wait for a frame of kind for to, and check its data."""
+	while True:
+		_, got, _, _, got_to, n = struct.unpack(HEADER, read_exactly(36))
+		data = read_exactly(n)
+		print("<-", chr(got), got_to.rstrip(b"\0"), data, flush=True)
+		if chr(got) != kind or got_to.rstrip(b"\0") != to:
+			continue
+		if not data.startswith(starting) or containing not in data:
+			sys.exit(f"FAIL: got {data!r}, want {starting!r} with {containing!r}")
+		return
+
+
+def line(text):
+	send("D", user, node, text + b"\r")
+
+
+send("X", user)
+expect("X", to=b"")
+
+send("C", user, node)
+expect("C")
+expect("D", prompt + b"Welcome to Samoyed\r")
+
+line(b"N")
+expect("D", prompt + b"Nodes:\r", f"{other_alias}:{other_call}".encode())
+print("NODES OK", flush=True)
+
+line(b"R")
+expect("D", prompt + b"Routes:\r", other_call.encode())
+print("ROUTES OK", flush=True)
+
+line(b"BYE")
+expect("d")
+EOF
+
+# --- port allocation -------------------------------------------------------
+
+udp_a=$(free_port udp)
+udp_b=$(free_port udp "$udp_a")
+agw_a=$(free_port tcp "$udp_a" "$udp_b")
+agw_b=$(free_port tcp "$udp_a" "$udp_b" "$agw_a")
+
+# --- config files ----------------------------------------------------------
+# As check-netrom-connect's, but with NET/ROM under the node shell, sharing
+# its address and alias.
+
+cat > direwolf-a.yaml << EOF
+samoyed:
+  audioDevices:
+    - input: udp:$udp_a
+      output: udp:localhost:$udp_b
+      rate: 48000
+  channels:
+    - {channel: 0, mycall: $USER_A, modem: {speed: "9600"}}
+  agwPort: $agw_a
+  kissPorts: [{port: 0}]
+  node:
+    address: $NODE_A
+    alias: QNODEA
+    netrom: {nodesInterval: 2, quality: 255}
+EOF
+
+cat > direwolf-b.yaml << EOF
+samoyed:
+  audioDevices:
+    - input: udp:$udp_b
+      output: udp:localhost:$udp_a
+      rate: 48000
+  channels:
+    - {channel: 0, mycall: Q2TEST, modem: {speed: "9600"}}
+  agwPort: $agw_b
+  kissPorts: [{port: 0}]
+  node:
+    address: $NODE_B
+    alias: QNODEB
+    netrom: {nodesInterval: 2, quality: 255}
+EOF
+
+# --- start the nodes -------------------------------------------------------
+
+"$DIREWOLF" -c direwolf-a.yaml > direwolf-a.log 2>&1 &
+pids+=("$!")
+"$DIREWOLF" -c direwolf-b.yaml > direwolf-b.log 2>&1 &
+pids+=("$!")
+
+wait_for_tcp_port "$agw_a"
+wait_for_tcp_port "$agw_b"
+
+wait_for_log_line direwolf-a.log "NET/ROM node started.*callsign=$NODE_A"
+wait_for_log_line direwolf-b.log "NET/ROM node started.*callsign=$NODE_B"
+
+# --- wait for each to learn the other --------------------------------------
+
+wait_for_log_line direwolf-a.log "$NODE_B>NODES"
+wait_for_log_line direwolf-b.log "$NODE_A>NODES"
+
+# --- a circuit, both ways --------------------------------------------------
+
+python3 -I agwclient.py listen "$agw_b" "$NODE_B" "$PAYLOAD" "$REPLY" > agw-listen-b.log 2>&1 &
+listener=$!
+pids+=("$listener")
+
+wait_for_log_line agw-listen-b.log "registered $NODE_B"
+
+python3 -I agwclient.py connect "$agw_a" "$USER_A" QNODEB "$PAYLOAD" "$REPLY" > agw-connect-a.log 2>&1 &
+connector=$!
+pids+=("$connector")
+
+if ! wait "$listener"; then
+	echo "FAIL: B did not receive the payload and the close over the NET/ROM circuit" >&2
+	exit 1
+fi
+
+if ! wait "$connector"; then
+	echo "FAIL: A did not receive the reply and the close over the NET/ROM circuit" >&2
+	exit 1
+fi
+
+# --- a user at A's node shell ----------------------------------------------
+
+if ! python3 -I shelluser.py "$agw_b" Q3TEST "$NODE_A" "QNODEA:$NODE_A" QNODEB "$NODE_B" > shell-user-b.log 2>&1; then
+	echo "FAIL: A's node shell did not list B in NODES and ROUTES" >&2
+	exit 1
+fi
+
+echo "PASS: two samoyed-direwolf nodes sharing their shells' names with NET/ROM learnt each other, carried a circuit both ways, and listed each other to a user"

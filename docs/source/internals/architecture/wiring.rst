@@ -18,6 +18,8 @@ and is labelled with what it is handed:
 a function, often a method value such as ``dataLinkQueue.RecFrame``,
 or a small interface declared beside the code that uses it.
 Dashed arrows are connections made after construction rather than at it.
+Dotted ones are made only when NET/ROM shares the node shell's names,
+in place of the plain ones between the same components.
 
 .. graphviz::
    :alt: The components DirewolfMain builds, and the functions and interfaces each is handed to reach the others
@@ -47,6 +49,7 @@ Dashed arrows are connections made after construction rather than at it.
        netrom [label="netrom.Node\nNET/ROM node"];
        netromagw [label="netromAGWDataLink"];
        nodemap [label="nodemap.Reporter\nnode map report"];
+       shared [label="sharedNode\nNET/ROM sharing\nthe shell's names"];
        igate [label="IGate"];
        digi [label="digipeater.Digipeater\nAPRS"];
        cdigi [label="digipeater.Connected\nconnected mode"];
@@ -118,6 +121,13 @@ Dashed arrows are connections made after construction rather than at it.
        netrom -> tq [label="Append\n(dwcore.FrameSender)"];
        netrom -> agw [label="netrom.Reporter"];
        nodemap -> netrom [label="Status\n(netromNeighbours)"];
+       router -> shared [label="linkClients\nnodeClient's links\n(instead, sharing names)", style=dotted];
+       shared -> nodeshell [label="linkClients\nusers' links\n(attach)", style=dashed];
+       shared -> netrom [label="linkClients\nneighbours' links\n(attach)", style=dashed];
+       nodeshell -> shared [label="node.DataLink\n(instead, sharing names)", style=dotted];
+       netrom -> shared [label="netrom.DataLink\n(instead, sharing names)", style=dotted];
+       shared -> dlq [label="node.DataLink", style=dotted];
+       nodeshell -> netrom [label="Status\n(node.NetROMStatus)", style=dotted];
        link -> tq [label="linkTransmitter"];
 
        kiss -> xmit [label="timing setters"];
@@ -277,6 +287,18 @@ through the ``netromAGWDataLink`` it was made with,
 which is given the node once the node exists,
 before the AGW server takes any clients.
 
+**The node shell, NET/ROM and sharedNode.**
+NET/ROM configured under the node shell shares the shell's address and alias,
+and its client number with the data link,
+which tells that client about the links of both.
+The two reach the data link through a ``sharedNode``,
+the shell by ``shellLink`` and NET/ROM by ``netromLink``,
+which hands each of them its own links' events in turn.
+So ``sharedNode`` is made before both,
+and given them (``attach``) once both exist,
+before the shell registers its names or NET/ROM starts.
+The shell is handed NET/ROM's ``Status`` for its ``NODES`` and ``ROUTES``.
+
 **The audio devices and the demodulators.**
 Each audio device's statistics report its channels' received audio levels,
 which the demodulators keep,
@@ -313,6 +335,7 @@ References
   ``ax25_link.go`` (``NewAX25Link``, ``linkClients``, ``linkTransmitter``),
   ``link_clients.go`` (``newLinkClientRouter``, ``nodeClient``, ``netromClient``),
   ``netrom.go`` (``netromAGWDataLink``),
+  ``shared_node.go`` (``newSharedNode``, ``sharedNode.attach``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
   ``kiss_frame.go`` (``NewKissHandler``),
@@ -331,7 +354,7 @@ References
   in ``internal/digipeater``:
   ``digipeater.go`` (``New``, ``Port``)
   and ``cdigipeater.go`` (``NewConnected``).
-- ``internal/node/node.go``: ``New``, ``DataLink``.
+- ``internal/node/node.go``: ``New``, ``DataLink``, ``NetROMStatus``.
 - ``internal/netrom/node.go``: ``New``, ``DataLink``, ``Reporter``, ``Node.Start``, ``Node.HeardUI``,
   and ``internal/netrom/status.go``: ``Node.Status``.
 - ``internal/nodemap/nodemap.go``: ``New``, ``Reporter.Run``,

@@ -2186,6 +2186,13 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 		}
 	}
 
+	if settings.NetROM != nil {
+		var err = ps.applyIntegratedNETROM(address, alias, listensOn, *settings.NetROM)
+		if err != nil {
+			return err
+		}
+	}
+
 	ps.misc.node = maybe.Just(nodeSettings{
 		address:        address,
 		alias:          alias,
