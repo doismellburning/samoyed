@@ -461,11 +461,33 @@ func ax25AddrBase(cs string) string {
 	return base
 }
 
+// IsBroadcast is whether dest is one of the broadcast addresses.
+func (r *Routes) IsBroadcast(dest string) bool {
+	return slices.Contains(r.Broadcast, dest)
+}
+
+// Problems describes whatever about the routes is allowed but is likely a
+// mistake: broadcast addresses with no map marked to get them, so they go
+// nowhere, or maps marked to get broadcasts with no broadcast addresses to
+// send them.
+func (r *Routes) Problems() []string {
+	var marked = slices.ContainsFunc(r.Maps, func(e MapEntry) bool { return e.Broadcast })
+
+	switch {
+	case len(r.Broadcast) > 0 && !marked:
+		return []string{fmt.Sprintf("broadcast addresses %s will go nowhere, as no map is marked broadcast", strings.Join(r.Broadcast, ", "))}
+	case len(r.Broadcast) == 0 && marked:
+		return []string{"maps are marked broadcast but there are no broadcast addresses, so they will get no broadcasts"}
+	}
+
+	return nil
+}
+
 // Route returns the MAP entries a frame for dest goes to: every entry marked
 // Broadcast if dest is a broadcast address, otherwise the one lookupMap finds,
 // if any.
 func (r *Routes) Route(dest string) []MapEntry {
-	if slices.Contains(r.Broadcast, dest) {
+	if r.IsBroadcast(dest) {
 		var entries []MapEntry
 		for _, e := range r.Maps {
 			if e.Broadcast {
@@ -616,6 +638,11 @@ func (r *Router) makeRoomLocked(now time.Time) {
 	if len(r.heard) >= maxLearnedRoutes {
 		delete(r.heard, oldest)
 	}
+}
+
+// IsBroadcast is whether dest is one of the routes' broadcast addresses.
+func (r *Router) IsBroadcast(dest string) bool {
+	return r.routes.IsBroadcast(dest)
 }
 
 // Route returns the MAP entries a frame for dest goes to: those its routes
@@ -771,6 +798,8 @@ func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 			for _, entry := range entries {
 				b2.sendAXUDP(ax25frame, entry)
 			}
+		} else if b2.router.IsBroadcast(dest) {
+			logrus.WithField("dest", dest).Warn("Dropping AX.25 frame for a broadcast address, as no MAP entry is marked broadcast")
 		} else {
 			logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
 		}

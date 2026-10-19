@@ -122,6 +122,9 @@ Flags:
 	for _, e := range routes.Maps {
 		fmt.Printf("  %s -> %s\n", e.AX25Addr, e.Addr)
 	}
+	for _, problem := range routes.Problems() {
+		fmt.Printf("samoyed-axudp: WARNING: %s\n", problem)
+	}
 	if routes.AutoMap {
 		fmt.Printf("samoyed-axudp: automap on: replying to unmapped addresses via the mapped host they were heard from\n")
 	}

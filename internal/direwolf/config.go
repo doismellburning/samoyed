@@ -2072,6 +2072,10 @@ func (ps *parseState) applyAXUDPPORT(settings AXUDPPortSettings) error {
 
 	routes.AutoMap = settings.AutoMap
 
+	for _, problem := range routes.Problems() {
+		ps.warnf("line %d: AXUDP port %d: %s", ps.line, settings.Port, problem)
+	}
+
 	// Claim the channel only once all of it has checked out, as NCHANNEL
 	// does: NewAXUDPChannels opens every MEDIUM_AXUDP channel and exits if
 	// it cannot.

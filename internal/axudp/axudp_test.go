@@ -895,6 +895,35 @@ func TestRouteBroadcastWithNoBroadcastPeers(t *testing.T) {
 	assert.Empty(t, routes.Route("NODES"))
 }
 
+func TestRoutesProblems(t *testing.T) {
+	t.Parallel()
+
+	var marked = MapEntry{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil, Broadcast: true}
+	var unmarked = MapEntry{AX25Addr: "Q2TEST", Addr: "192.0.2.2:93", UDPAddr: nil, Broadcast: false}
+
+	for _, tc := range []struct {
+		name      string
+		broadcast []string
+		maps      []MapEntry
+		want      string
+	}{
+		{"broadcasts and a marked map", []string{"NODES"}, []MapEntry{marked, unmarked}, ""},
+		{"neither", nil, []MapEntry{unmarked}, ""},
+		{"broadcasts but no marked map", []string{"NODES"}, []MapEntry{unmarked}, "NODES will go nowhere"},
+		{"broadcasts but no maps", []string{"NODES"}, nil, "NODES will go nowhere"},
+		{"a marked map but no broadcasts", nil, []MapEntry{marked}, "no broadcast addresses"},
+	} {
+		var routes = Routes{Broadcast: tc.broadcast, Maps: tc.maps, AutoMap: false}
+
+		var problems = routes.Problems()
+		if tc.want == "" {
+			assert.Empty(t, problems, tc.name)
+		} else if assert.Len(t, problems, 1, tc.name) {
+			assert.Contains(t, problems[0], tc.want, tc.name)
+		}
+	}
+}
+
 // TestKISSBroadcastFansOut checks that a frame from a KISS client for a
 // broadcast address reaches every peer marked for broadcasts.
 func TestKISSBroadcastFansOut(t *testing.T) {

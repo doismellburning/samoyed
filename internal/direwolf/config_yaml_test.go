@@ -316,6 +316,21 @@ axudpPorts:
 		}
 	})
 
+	t.Run("an AXUDP port with broadcasts but no map marked for them is warned about", func(t *testing.T) {
+		var c = parseYAMLConfig(t, `
+axudpPorts:
+  - port: 20093
+    channel: 10
+    broadcast: [NODES]
+    maps:
+      - {ax25addr: Q1TEST, host: 192.0.2.1, port: 93}
+`)
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, 1, c.warnings, c.output)
+		assert.Contains(t, c.output, "NODES will go nowhere, as no map is marked broadcast")
+		assert.Equal(t, MEDIUM_AXUDP, c.audio.chan_medium[10])
+	})
+
 	t.Run("an AXUDP port can learn routes", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "axudpPorts:\n  - {port: 20093, channel: 10, automap: true}\n")
 		assert.Zero(t, c.errors, c.output)

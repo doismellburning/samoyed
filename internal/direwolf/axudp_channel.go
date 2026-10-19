@@ -205,10 +205,15 @@ func (ac *AXUDPChannel) sendPacket(channel int, pp *ax25.Packet) {
 
 	var entries = ac.router.Route(dest)
 	if len(entries) == 0 {
+		var reason = "Dropping AX.25 frame with no AXUDP map entry for its destination"
+		if ac.router.IsBroadcast(dest) {
+			reason = "Dropping AX.25 frame for a broadcast address, as no AXUDP map is marked broadcast"
+		}
+
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
 			"dest":    dest,
-		}).Warn("Dropping AX.25 frame with no AXUDP map entry for its destination")
+		}).Warn(reason)
 
 		return
 	}
