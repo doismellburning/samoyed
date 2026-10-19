@@ -104,3 +104,81 @@ func TestStatusIGate(t *testing.T) {
 		})
 	}
 }
+
+// A station without a NET/ROM node says nothing about one; one with a node
+// describes it.
+func TestStatusNetROM(t *testing.T) {
+	t.Parallel()
+
+	var node NetROMStatus
+	node.Channel = 0
+	node.Callsign = "Q1TEST-7"
+	node.Alias = "QNODEA"
+	node.Neighbours = []NetROMNeighbour{{Callsign: "Q2TEST-7", Link: "up", Failures: 0, Failing: false}}
+	node.Destinations = []NetROMDestination{{
+		Callsign: "Q2TEST-7",
+		Alias:    "QNODEB",
+		Routes:   []NetROMRoute{{Neighbour: "Q2TEST-7", Quality: 192, Obsolescence: 6}},
+	}}
+	node.Circuits = []NetROMCircuit{{
+		OwnCall:     "Q1TEST",
+		RemoteCall:  "QNODEB",
+		RemoteNode:  "Q2TEST-7",
+		User:        "Q1TEST",
+		Incoming:    false,
+		State:       "connected",
+		Outstanding: 2,
+	}}
+
+	for _, tc := range []struct {
+		name   string
+		netrom maybe.Maybe[NetROMStatus]
+		want   any
+	}{
+		{"none", maybe.Nothing[NetROMStatus](), nil},
+		{"node", maybe.Just(node), map[string]any{
+			"channel":  float64(0),
+			"callsign": "Q1TEST-7",
+			"alias":    "QNODEA",
+			"neighbours": []any{map[string]any{
+				"callsign": "Q2TEST-7",
+				"link":     "up",
+				"failures": float64(0),
+				"failing":  false,
+			}},
+			"destinations": []any{map[string]any{
+				"callsign": "Q2TEST-7",
+				"alias":    "QNODEB",
+				"routes": []any{map[string]any{
+					"neighbour":    "Q2TEST-7",
+					"quality":      float64(192),
+					"obsolescence": float64(6),
+				}},
+			}},
+			"circuits": []any{map[string]any{
+				"ownCall":     "Q1TEST",
+				"remoteCall":  "QNODEB",
+				"remoteNode":  "Q2TEST-7",
+				"user":        "Q1TEST",
+				"incoming":    false,
+				"state":       "connected",
+				"outstanding": float64(2),
+			}},
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var w = statusRequest(t, func() Status {
+				var s Status
+				s.NetROM = tc.netrom
+
+				return s
+			}, time.Now())
+
+			var got map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+			assert.Equal(t, tc.want, got["netrom"])
+		})
+	}
+}

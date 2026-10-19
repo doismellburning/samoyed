@@ -44,6 +44,8 @@ Dashed arrows are connections made after construction rather than at it.
        link [label="AX25Link\ndata link state machine"];
        router [label="linkClientRouter"];
        nodeshell [label="node.Node\nnode shell"];
+       netrom [label="netrom.Node\nNET/ROM node"];
+       netromagw [label="netromAGWDataLink"];
        igate [label="IGate"];
        digi [label="digipeater.Digipeater\nAPRS"];
        cdigi [label="digipeater.Connected\nconnected mode"];
@@ -87,12 +89,16 @@ Dashed arrows are connections made after construction rather than at it.
        xmit -> tones;
 
        agw -> dlq [label="agwDataLink"];
+       agw -> netromagw [label="agwDataLink\n(instead, with a\nNET/ROM node)"];
+       netromagw -> dlq [label="agwDataLink"];
+       netromagw -> netrom [label="*netrom.Node", style=dashed];
        agw -> tq [label="clientTransmitQueue"];
 
        igate -> dlq [label="RecFrame"];
        igate -> tq [label="Append\n(dwcore.FrameSender)"];
        digi -> igate [label="rememberDigipeated"];
        web -> igate [label="webStatus\n(at Start)", style=dashed];
+       web -> netrom [label="webStatus\n(at Start)", style=dashed];
        digi -> tq [label="Append"];
        cdigi -> tq [label="Append"];
 
@@ -101,6 +107,10 @@ Dashed arrows are connections made after construction rather than at it.
        router -> agw [label="linkClients\nAGW clients' links"];
        router -> nodeshell [label="linkClients\nnodeClient's links"];
        nodeshell -> dlq [label="node.DataLink"];
+       router -> netrom [label="linkClients\nnetromClient's links"];
+       netrom -> dlq [label="netrom.DataLink"];
+       netrom -> tq [label="Append\n(dwcore.FrameSender)"];
+       netrom -> agw [label="netrom.Reporter"];
        link -> tq [label="linkTransmitter"];
 
        kiss -> xmit [label="timing setters"];
@@ -132,6 +142,7 @@ Dashed arrows are connections made after construction rather than at it.
        handler -> digi;
        handler -> cdigi;
        handler -> tt;
+       handler -> netrom [label="HeardUI\n(netromHeard)"];
 
        recvproc -> dlq [label="dataLinkSource"];
        recvproc -> link;
@@ -177,6 +188,9 @@ so the order of construction follows the arrows:
    The AGW server is made here,
    so that the transmit service can show its clients each frame sent,
    but only started once the transmit threads are running.
+   With a NET/ROM node,
+   the AGW server is handed a ``netromAGWDataLink`` in place of the ``DataLinkQueue``,
+   and the NET/ROM node is made straight after the server, which it reports to.
    It binds its port when it is made,
    so a port already in use is reported before the server starts,
    rather than once it is running.
@@ -188,6 +202,7 @@ so the order of construction follows the arrows:
 #. The IGate and the two digipeaters,
    then the node shell, if the configuration has one,
    and its report to the node map (``nodemap.Reporter``), if the configuration asks for one,
+   then the NET/ROM node is started, if there is one,
    and the ``AX25Link``, the KISS handler and its transports,
    the APRStt gateway and the beacon service.
 #. The audio device goroutines (``recv_init``),
@@ -224,13 +239,22 @@ It binds its ports when it is made, though,
 so a port already in use is reported before the service starts,
 rather than once it is running.
 
-**The web interface and the IGate.**
+**The web interface, the IGate and the NET/ROM node.**
 The web interface's hub is handed to the transmit service and the received packet handler,
 which are made before the IGate,
-and its status page reports on the IGate's connection to APRS-IS.
+and its status page reports on the IGate's connection to APRS-IS
+and on the NET/ROM node's neighbours, routes and circuits.
 The hub and the server are made, and the port bound, before either;
 the server is handed the station's status (``webStatus``) when it is started (``webui.Server.Start``),
-once the IGate exists.
+once the IGate and the NET/ROM node exist.
+
+**The AGW server and the NET/ROM node.**
+The NET/ROM node tells the AGW clients about their circuits,
+so it is made after the AGW server and handed it as a ``netrom.Reporter``.
+The AGW server hands the node the clients' NET/ROM requests,
+through the ``netromAGWDataLink`` it was made with,
+which is given the node once the node exists,
+before the AGW server takes any clients.
 
 **The audio devices and the demodulators.**
 Each audio device's statistics report its channels' received audio levels,
@@ -250,8 +274,9 @@ The shapes in the diagram follow the dependency conventions in ``AGENTS.md``:
   ``frameReceiver``, ``dwcore.FrameSender``, ``igateSender``, ``seizeConfirmer``.
 - A component that makes several calls is handed a small interface,
   declared beside it and holding only those calls:
-  ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``, ``node.DataLink``.
-- ``*TransmitQueue``, ``*DataLinkQueue``, ``*AGWServer`` and ``*node.Node`` satisfy those interfaces without knowing about them.
+  ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``, ``node.DataLink``,
+  ``netrom.DataLink``, ``netrom.Reporter``.
+- ``*TransmitQueue``, ``*DataLinkQueue``, ``*AGWServer``, ``*node.Node`` and ``*netrom.Node`` satisfy those interfaces without knowing about them.
 
 References
 ----------
@@ -265,7 +290,8 @@ References
   ``tq.go`` (``NewTransmitQueue``, ``clientTransmitQueue``, ``SetIGate``),
   ``xmit.go`` (``NewXmitService``, ``xmitQueue``),
   ``ax25_link.go`` (``NewAX25Link``, ``linkClients``, ``linkTransmitter``),
-  ``link_clients.go`` (``newLinkClientRouter``, ``nodeClient``),
+  ``link_clients.go`` (``newLinkClientRouter``, ``nodeClient``, ``netromClient``),
+  ``netrom.go`` (``netromAGWDataLink``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
   ``kiss_frame.go`` (``NewKissHandler``),
@@ -285,6 +311,8 @@ References
   ``digipeater.go`` (``New``, ``Port``)
   and ``cdigipeater.go`` (``NewConnected``).
 - ``internal/node/node.go``: ``New``, ``DataLink``.
+- ``internal/netrom/node.go``: ``New``, ``DataLink``, ``Reporter``, ``Node.Start``, ``Node.HeardUI``,
+  and ``internal/netrom/status.go``: ``Node.Status``.
 - ``internal/nodemap/nodemap.go``: ``New``, ``Reporter.Run``.
 - ``internal/dwcore/dwcore.go``: ``FrameSender``,
   shared by everything that hands the transmit queue a frame.

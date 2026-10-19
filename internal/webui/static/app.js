@@ -81,10 +81,21 @@
     return card;
   }
 
+  function netromCard(nr) {
+    const up = nr.neighbours.filter((n) => n.link === "up").length;
+    return el("div", { class: "channel netrom" },
+      el("div", { class: "label", text: `NET/ROM · ${nr.alias}:${nr.callsign} · channel ${nr.channel}` }),
+      el("div", { class: "figures" },
+        el("span", {}, el("b", { text: `${up}/${nr.neighbours.length}` }), " links up"),
+        el("span", {}, el("b", { text: String(nr.destinations.length) }), " nodes"),
+        el("span", {}, el("b", { text: String(nr.circuits.length) }), " circuits")));
+  }
+
   function renderChannels() {
     const box = $("channels");
     box.replaceChildren();
     if (status && status.igate) box.append(igateCard(status.igate));
+    if (status && status.netrom) box.append(netromCard(status.netrom));
     for (const c of [...channels.values()].sort((a, b) => a.number - b.number)) {
       box.append(el("div", { class: "channel" },
         el("div", { class: "label", text: `Channel ${c.number} · ${c.description || "unknown"}` +
@@ -102,6 +113,52 @@
       channels.set(p.channel, c);
     }
     c[p.dir === "tx" ? "tx" : "rx"]++;
+  }
+
+  // ---- NET/ROM ----
+
+  function netromTable(heads, rows, empty) {
+    if (rows.length === 0) return el("p", { class: "empty", text: empty });
+    return el("table", {},
+      el("thead", {}, el("tr", {}, ...heads.map(([text, cls]) => el("th", cls ? { class: cls, text } : { text })))),
+      el("tbody", {}, ...rows.map((cells) => el("tr", {}, ...cells.map(([text, cls]) =>
+        el("td", cls ? { class: cls, text: String(text) } : { text: String(text) }))))));
+  }
+
+  function renderNetrom() {
+    const panel = $("netrom");
+    const nr = status && status.netrom;
+    panel.hidden = !nr;
+    if (!nr) return;
+
+    const neighbours = nr.neighbours.map((n) => [
+      [n.callsign, "name"],
+      [n.failing ? `${n.link}, failing` : n.link, "state"],
+      [n.failures, "num"],
+    ]);
+    const routes = nr.destinations.flatMap((d) => d.routes.map((r, i) => [
+      [i === 0 ? d.callsign : "", "name"],
+      [i === 0 ? d.alias : "", "name"],
+      [r.neighbour, "name"],
+      [r.quality, "num"],
+      [r.obsolescence, "num"],
+    ]));
+    const circuits = nr.circuits.map((c) => [
+      [c.ownCall, "name"],
+      [c.incoming ? "←" : "→", ""],
+      [c.remoteCall, "name"],
+      [c.remoteNode, "name"],
+      [c.state, "state"],
+      [c.outstanding, "num"],
+    ]);
+
+    $("netrom-tables").replaceChildren(
+      el("div", {}, el("h3", { text: "Neighbours" }),
+        netromTable([["Callsign"], ["Link"], ["Failures", "num"]], neighbours, "No neighbours yet.")),
+      el("div", {}, el("h3", { text: "Routes" }),
+        netromTable([["Node"], ["Alias"], ["Via"], ["Quality", "num"], ["Obs", "num"]], routes, "No routes yet.")),
+      el("div", {}, el("h3", { text: "Circuits" }),
+        netromTable([["Ours"], [""], ["Theirs"], ["Node"], ["State"], ["Queued", "num"]], circuits, "No circuits open.")));
   }
 
   // ---- Stations ----
@@ -319,9 +376,11 @@
     statusAt = performance.now();
     renderStatus();
     renderChannels();
+    renderNetrom();
   }
 
-  // The IGate's counts change without any event to say so.
+  // The IGate's counts and the NET/ROM node's tables change without any
+  // event to say so.
   async function refreshStatus() {
     try {
       setStationStatus(await getJSON("api/status"));

@@ -7,15 +7,18 @@ import (
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/netrom"
 )
 
 // NewPacket describes a frame for the web interface.  A is its APRS decode, or
 // nil if it isn't APRS.  The caller fills in what only it knows: the channel,
-// and for a received frame where it came from and its audio level.
+// and for a received frame where it came from and its audio level.  A
+// NET/ROM frame's binary information field is shown decoded, as the monitor
+// output shows it.
 func NewPacket(pp *ax25.Packet, A *aprs.Decoded, direction Direction) Packet {
 	var p Packet
 	p.Direction = direction
-	p.Monitor = pp.FormatAddrs() + string(pp.Info())
+	p.Monitor = pp.FormatAddrs() + string(netrom.MonitorInfo(pp, pp.Info()))
 
 	if A == nil {
 		if pp.NumAddr() > 0 {

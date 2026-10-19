@@ -24,6 +24,10 @@ type Status struct {
 	// IGate is the IGate's connection to APRS-IS, or Nothing on a station
 	// that isn't an IGate.
 	IGate maybe.Maybe[IGateStatus] `json:"igate,omitzero"`
+
+	// NetROM is the NET/ROM node, or Nothing on a station that doesn't
+	// run one.
+	NetROM maybe.Maybe[NetROMStatus] `json:"netrom,omitzero"`
 }
 
 // IGateStatus is an IGate's connection to its APRS-IS server, and how much has
@@ -45,6 +49,58 @@ type IGateStatus struct {
 	DownlinkPackets int `json:"downlinkPackets"` // Received from the server.
 	DownlinkBytes   int `json:"downlinkBytes"`   // Received from the server, everything included.
 	RFPackets       int `json:"rfPackets"`       // Gated from the server to radio.
+}
+
+// NetROMStatus is a NET/ROM node: what it is, who its neighbours are, what
+// it can reach and the circuits it has open.
+type NetROMStatus struct {
+	Channel  int    `json:"channel"`
+	Callsign string `json:"callsign"`
+	Alias    string `json:"alias"`
+
+	Neighbours   []NetROMNeighbour   `json:"neighbours"`
+	Destinations []NetROMDestination `json:"destinations"`
+	Circuits     []NetROMCircuit     `json:"circuits"`
+}
+
+// NetROMNeighbour is a node the NET/ROM node has a link to, or a route
+// through.
+type NetROMNeighbour struct {
+	Callsign string `json:"callsign"`
+	Link     string `json:"link"` // "up", "connecting" or "down".
+
+	// Failures is how many times in a row a link to it has failed, and
+	// Failing that routes through it are being passed over for now.
+	Failures int  `json:"failures"`
+	Failing  bool `json:"failing"`
+}
+
+// NetROMDestination is a node in the routing table, with its routes best
+// first.
+type NetROMDestination struct {
+	Callsign string        `json:"callsign"`
+	Alias    string        `json:"alias"`
+	Routes   []NetROMRoute `json:"routes"`
+}
+
+// NetROMRoute is one way of reaching a destination: through a neighbour, at
+// a quality from 0 to 255, for as many more of the node's own broadcasts as
+// its obsolescence count says.
+type NetROMRoute struct {
+	Neighbour    string `json:"neighbour"`
+	Quality      int    `json:"quality"`
+	Obsolescence int    `json:"obsolescence"`
+}
+
+// NetROMCircuit is a circuit a client has open through the node.
+type NetROMCircuit struct {
+	OwnCall     string `json:"ownCall"`    // What the client calls this end.
+	RemoteCall  string `json:"remoteCall"` // What it calls the far end.
+	RemoteNode  string `json:"remoteNode"` // The node at the far end.
+	User        string `json:"user"`       // Whose circuit it is.
+	Incoming    bool   `json:"incoming"`
+	State       string `json:"state"`       // "connecting", "connected" or "disconnecting".
+	Outstanding int    `json:"outstanding"` // Segments still to go out or be acknowledged.
 }
 
 // StatusFunc reports the station's current Status.  It is called for each

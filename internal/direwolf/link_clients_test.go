@@ -44,11 +44,13 @@ func TestLinkClientRouter(t *testing.T) {
 
 	var agw = new(loggingLinkClients)
 	var node = new(loggingLinkClients)
-	var router = newLinkClientRouter(agw, node)
+	var netrom = new(loggingLinkClients)
+	var router = newLinkClientRouter(agw, node, netrom)
 
 	tellAll(router, 0)
 	tellAll(router, MAX_NET_CLIENTS-1)
 	tellAll(router, nodeClient)
+	tellAll(router, netromClient)
 
 	var want = func(client int) []string {
 		return []string{
@@ -61,16 +63,18 @@ func TestLinkClientRouter(t *testing.T) {
 
 	assert.Equal(t, append(want(0), want(MAX_NET_CLIENTS-1)...), agw.calls)
 	assert.Equal(t, want(nodeClient), node.calls)
+	assert.Equal(t, want(netromClient), netrom.calls)
 }
 
 func TestLinkClientRouterWithoutAGW(t *testing.T) {
 	t.Parallel()
 
 	var node = new(loggingLinkClients)
-	var router = newLinkClientRouter(nil, node)
+	var router = newLinkClientRouter(nil, node, nil)
 
 	tellAll(router, 0)
 	tellAll(router, nodeClient)
+	tellAll(router, netromClient)
 
 	assert.Len(t, node.calls, 4)
 }
@@ -79,10 +83,11 @@ func TestLinkClientRouterWithoutNode(t *testing.T) {
 	t.Parallel()
 
 	var agw = new(loggingLinkClients)
-	var router = newLinkClientRouter(agw, nil)
+	var router = newLinkClientRouter(agw, nil, nil)
 
 	tellAll(router, 0)
 	tellAll(router, nodeClient)
+	tellAll(router, netromClient)
 
-	assert.Len(t, agw.calls, 4)
+	assert.Len(t, agw.calls, 4, "nor the node shell's or the NET/ROM node's links")
 }

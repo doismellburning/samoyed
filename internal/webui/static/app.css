@@ -118,8 +118,16 @@ main > section[hidden] { display: none; }
   gap: 16px;
 }
 
+.panels:has(> .netrom:not([hidden])) { grid-template-rows: minmax(0, 2fr) minmax(0, 1fr); }
+.panel.netrom { grid-column: 1 / -1; }
+.panel.netrom[hidden] { display: none; }
+.netrom-tables { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; padding: 0 0 8px; }
+.netrom-tables > div { flex: 1 1 18em; min-width: 0; }
+.netrom-tables h3 { margin: 8px 12px 4px; font-size: 13px; font-weight: 500; }
+
 @media (max-width: 800px) {
   .panels { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(300px, 1fr); }
+  .panels:has(> .netrom:not([hidden])) { grid-template-rows: none; }
   #view-dashboard { overflow: auto; }
 }
 

@@ -89,6 +89,7 @@ to the application layer and the AX.25 data link state machine.
            tt [label="APRStt gateway"];
            agw [label="AGW clients\nconnect, disconnect,\ndata, register"];
            nodeshell [label="Node shell\ndisconnect, data, register"];
+           netrom_req [label="NET/ROM node\nconnect, data, register"];
            ptt [label="PTT: channel busy"];
            xmit [label="Transmitter:\nseize confirm"];
        }
@@ -110,6 +111,7 @@ to the application layer and the AX.25 data link state machine.
        tt -> dlq_frame;
        agw -> dlq_req;
        nodeshell -> dlq_req;
+       netrom_req -> dlq_req;
        ptt -> dlq_req;
        xmit -> dlq_req;
 
@@ -151,6 +153,7 @@ to the application layer and the AX.25 data link state machine.
            regen [label="APRS digipeater\nRegen"];
            digi [label="APRS digipeater\nDigipeat"];
            cdigi [label="Connected-mode digipeater"];
+           netrom_ui [label="NET/ROM node\nHeardUI: NODES broadcasts"];
        }
 
        app -> log;
@@ -164,6 +167,7 @@ to the application layer and the AX.25 data link state machine.
        ttq -> regen [label="no"];
        ttq -> digi [label="no; APRS,\nclean or FEC"];
        ttq -> cdigi [label="no; radio channel,\nclean or FEC"];
+       ttq -> netrom_ui [label="no; UI,\nclean or FEC"];
 
        subgraph cluster_dlsm {
            label="AX.25 v2.2 data link state machine";
@@ -194,7 +198,7 @@ to the application layer and the AX.25 data link state machine.
        lmx -> states;
 
        tq [label="Transmit queue\n-> transmitter, modulator"];
-       agw_out [label="AGW clients or node shell,\nby client number\n(linkClientRouter)"];
+       agw_out [label="AGW clients, node shell\nor NET/ROM node,\nby client number\n(linkClientRouter)"];
 
        states -> tq [label="frames to send"];
        states -> agw_out [label="link up and down,\nreceived data"];
@@ -228,7 +232,7 @@ One queue, two consumers
 
 Frames received over the air,
 frames from external TNCs and network sources such as AXUDP and the IGate,
-and requests from AGW clients and the node shell
+and requests from AGW clients, the node shell and the NET/ROM node
 all go onto the ``DataLinkQueue``.
 ``recv_process`` gives every received frame first to ``recPacketHandler.app_process_rec_packet``
 and then to ``lm_data_indication``,
@@ -236,7 +240,14 @@ the entry point to the data link state machine.
 
 "Clean or FEC" in the diagram means a frame decoded without any bits fixed,
 or one received with FX.25 or IL2P forward error correction.
-Only those are IGated or digipeated.
+Only those are IGated or digipeated,
+or handed to the NET/ROM node.
+
+The NET/ROM node is handed only UI frames from ``app_process_rec_packet``,
+for the ``NODES`` broadcasts among them.
+What its neighbours send it over their connected-mode links
+reaches it from the data link state machine instead,
+as it does the AGW clients and the node shell.
 
 ``app_process_rec_packet`` stops with a frame from the IGate channel
 once the client applications and the web interface have it.

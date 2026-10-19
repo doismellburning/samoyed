@@ -75,3 +75,18 @@ func TestNewPacketNotAPRS(t *testing.T) {
 	assert.Empty(t, p.Description)
 	assert.True(t, p.Position.IsNothing())
 }
+
+// A NET/ROM frame reads as text, not as its binary information field.
+func TestNewPacketNetROM(t *testing.T) {
+	t.Parallel()
+
+	var pp = ax25.FromText("Q1TEST-7>NODES:x", true)
+	require.NotNil(t, pp)
+	pp.SetPID(ax25.PIDNetROM)
+	pp.SetInfo(append([]byte{0xFF}, "QNODEA"...))
+
+	var p = NewPacket(pp, nil, Received)
+
+	assert.Equal(t, "Q1TEST-7", p.Station)
+	assert.Equal(t, "Q1TEST-7>NODES:NET/ROM NODES from QNODEA", p.Monitor)
+}
