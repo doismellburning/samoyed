@@ -436,10 +436,7 @@ func (c *RadioConfig) mapPort(channel int) nodemap.Port {
 	case MEDIUM_RADIO:
 		var achan = &c.achan[channel]
 
-		port.Mode = "AX.25"
-		if achan.layer2_xmit == LAYER2_IL2P {
-			port.Mode = "IL2P"
-		}
+		port.Mode = achan.layer2_xmit.String()
 
 		var modulation, bitsPerSymbol, known = mapModulation(achan.modem_type)
 		if known {

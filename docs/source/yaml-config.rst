@@ -259,7 +259,7 @@ These are the keys under ``samoyed``:
         ``map: {}`` reports it with nothing more than its callsign, its alias, that it runs Samoyed,
         and its ports: one for each of its channels, numbered as the channel is.
         A radio channel is reported as RF, with its modem's modulation, baud and bit rate,
-        and whether it sends AX.25 or IL2P.
+        and whether it sends AX.25, FX.25 or IL2P.
         A network or serial TNC is reported as RF, and nothing more,
         since its radio is out of sight;
         an AXUDP port is reported as Internet.

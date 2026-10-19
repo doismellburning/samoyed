@@ -103,7 +103,7 @@ func TestMapPort(t *testing.T) {
 		assert.Equal(t, "IL2P", c.mapPort(0).Mode)
 	})
 
-	t.Run("a radio channel transmitting FX.25 is AX.25", func(t *testing.T) {
+	t.Run("a radio channel transmitting FX.25 is FX.25", func(t *testing.T) {
 		t.Parallel()
 
 		var c = new(RadioConfig)
@@ -112,7 +112,7 @@ func TestMapPort(t *testing.T) {
 		c.achan[0].baud = 1200
 		c.achan[0].layer2_xmit = LAYER2_FX25
 
-		assert.Equal(t, "AX.25", c.mapPort(0).Mode)
+		assert.Equal(t, "FX.25", c.mapPort(0).Mode)
 	})
 
 	t.Run("a radio channel with no modem for linking says nothing of one", func(t *testing.T) {
