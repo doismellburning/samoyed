@@ -401,6 +401,12 @@ type ax25_dlsm_t struct {
 
 	rc int // Retry count.  Give up after n2.
 
+	uasOwed int // UAs that may still come for SABM(E)s we sent, beyond the one that connected us.
+	// A SABM(E) retried before the UA to an earlier one got back gets a UA of
+	// its own, and that is no reason to reset the link once it is up - but the
+	// other station reset its end when it heard the retry, so this only holds
+	// while nothing it sent before then has reached us.  See ua_frame.
+
 	vs int // 4.2.4.1. Send State Variable V(S)
 	// The send state variable exists within the TNC and is never sent.
 	// It contains the next sequential number to be assigned to the next
@@ -2448,6 +2454,10 @@ func i_frame(S *ax25_dlsm_t, cr ax25.CmdRes, p int, nr int, ns int, pid int, inf
 		}
 
 	case state_3_connected, state_4_timer_recovery:
+		// Sent before any UA still to come, so before the other station reset its
+		// end for our retried SABM(E); a UA after this must reset ours too.
+		S.uasOwed = 0
+
 		// Look carefully.  The original had two tiny differences between the two states.
 		// In the 2006 version, these differences no longer exist.
 		// Erratum: SDL asks: Is information field length <= N1 (paclen).
@@ -4052,6 +4062,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 
 		START_T3(S)
 		SET_RC(S, 0) // My enhancement.  See Erratum note in select_t1_value.
+		S.uasOwed = 0
 		enter_new_state(S, state_3_connected)
 
 	case state_1_awaiting_connection:
@@ -4152,6 +4163,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			SET_VA(S, 0)
 			SET_VR(S, 0)
 			SET_RC(S, 0) // My enhancement.  See Erratum note in select_t1_value.
+			S.uasOwed = 0
 			enter_new_state(S, state_3_connected)
 		}
 	}
@@ -4539,6 +4551,9 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 			SET_VR(S, 0)
 			select_t1_value(S)
 
+			// RC counts the SABM(E)s we sent, and the other station answers each one it hears.
+			S.uasOwed = S.rc - 1
+
 			// Erratum:  mdl_negotiate_request does not appear in the SDL flow chart.
 			// It is mentioned here:
 			//
@@ -4586,6 +4601,25 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 		}
 
 	case state_3_connected, state_4_timer_recovery:
+		// Not in the flow chart: a UA to a SABM(E) we retried before the UA to an
+		// earlier one got back is expected.  The other station reset its end when
+		// it heard the retry, but frames go each way in order, so if no I frame
+		// from it has arrived ahead of this UA, it had sent none, and the reset
+		// left it in step with us.  Resetting ours as well would throw away the
+		// I frames we have sent since.  Dire Wolf resets.
+		if f == 1 && S.uasOwed > 0 {
+			S.uasOwed--
+
+			if S.services.debugProtocolErrors {
+				logrus.WithFields(logrus.Fields{
+					"stream": S.stream_id,
+					"peer":   S.addrs[PEERCALL],
+				}).Debug("Ignoring UA to a retried SABM(E)")
+			}
+
+			break
+		}
+
 		if S.services.debugProtocolErrors {
 			logrus.WithFields(logrus.Fields{
 				"stream": S.stream_id,
@@ -4836,6 +4870,11 @@ func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 				if ok {
 					complete_negotiation(S, param)
 				}
+
+				// The other station heard our XID, sent once we were connected, so it
+				// had heard every SABM(E) before it, and their UAs are already in -
+				// so long as it queues its UAs and XID responses at the same priority.
+				S.uasOwed = 0
 
 				S.mdl_state = mdl_state_0_ready
 				STOP_TM201(S)
@@ -5676,6 +5715,12 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
  *------------------------------------------------------------------------------*/
 
 func check_i_frame_ackd(S *ax25_dlsm_t, nr int) {
+	// The other station has had I frames we sent once connected, so had heard
+	// every SABM(E) before them, and their UAs are already in.
+	if nr != S.va {
+		S.uasOwed = 0
+	}
+
 	if S.peer_receiver_busy {
 		SET_VA(S, nr)
 
