@@ -691,7 +691,7 @@ func Test_config_yaml_node_map(t *testing.T) {
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[nodemap.Location](), Contact: "", Comment: ""}), got.nodeMap)
+		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[nodemap.Location](), Contact: "", Comment: "", Ports: nil}), got.nodeMap)
 	})
 
 	t.Run("the node can be reported to another node map", func(t *testing.T) {
@@ -700,7 +700,11 @@ func Test_config_yaml_node_map(t *testing.T) {
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080", Location: maybe.Nothing[nodemap.Location](), Contact: "", Comment: ""}), got.nodeMap)
+		assert.Equal(
+			t,
+			maybe.Just(nodemap.Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080", Location: maybe.Nothing[nodemap.Location](), Contact: "", Comment: "", Ports: nil}),
+			got.nodeMap,
+		)
 	})
 
 	t.Run("the node map can be told where the node is", func(t *testing.T) {
@@ -727,6 +731,51 @@ func Test_config_yaml_node_map(t *testing.T) {
 
 		var config, _ = got.nodeMap.Get()
 		assert.Equal(t, []string{"sysop@example.org", "Club node"}, []string{config.Contact, config.Comment})
+	})
+
+	t.Run("the node map is told about the node's ports", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST, map: {}}\nlegacy: |\n  NCHANNEL 8 127.0.0.1 8001\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var config, reported = c.audio.nodeMapConfig(got, mustNodeConfig(t, c.audio, got).Ports).Get()
+		require.True(t, reported)
+
+		var radio = mapPortFor("0", nodemap.LinkRF)
+		radio.Mode = "AX.25"
+		radio.Modulation = "AFSK"
+		radio.Baud = maybe.Just[int32](1200)
+		radio.Bitrate = maybe.Just[int32](1200)
+
+		assert.Equal(t, []nodemap.Port{radio, mapPortFor("8", nodemap.LinkRF)}, config.Ports)
+	})
+
+	// The command line can change a channel after the file is read: -B
+	// sets channel 0's speed.
+	t.Run("the node map is told about the ports as the command line leaves them", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST, map: {}}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		require.NoError(t, c.audio.achan[0].setModem("9600"))
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var config, _ = c.audio.nodeMapConfig(got, mustNodeConfig(t, c.audio, got).Ports).Get()
+		require.Len(t, config.Ports, 1)
+		assert.Equal(t, "FSK", config.Ports[0].Modulation)
+		assert.Equal(t, maybe.Just[int32](9600), config.Ports[0].Bitrate)
+	})
+
+	t.Run("the node map is told nothing when the node is not reported", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+		assert.True(t, c.audio.nodeMapConfig(got, mustNodeConfig(t, c.audio, got).Ports).IsNothing())
 	})
 
 	t.Run("the node is not reported to the node map unless asked", func(t *testing.T) {

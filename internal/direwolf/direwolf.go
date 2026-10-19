@@ -404,6 +404,9 @@ x = Silence FX.25 information.`)
 	// make or change channels have been applied.
 	var nodeConfig maybe.Maybe[node.Config]
 
+	// What the node map is told, likewise, since that includes the ports.
+	var nodeMapConfig maybe.Maybe[nodemap.Config]
+
 	if nodeSettings, ok := misc_config.node.Get(); ok {
 		var config, nodeErr = audio_config.nodeConfig(nodeSettings)
 		if nodeErr != nil {
@@ -412,6 +415,7 @@ x = Silence FX.25 information.`)
 		}
 
 		nodeConfig = maybe.Just(config)
+		nodeMapConfig = audio_config.nodeMapConfig(nodeSettings, config.Ports)
 	}
 
 	// The NET/ROM node's, likewise.
@@ -818,8 +822,7 @@ x = Silence FX.25 information.`)
 
 	// Reporting the node to the node map, if the node shell is configured to
 	// be reported.
-	var nodeMap = maybe.Bind(misc_config.node, func(s nodeSettings) maybe.Maybe[nodemap.Config] { return s.nodeMap })
-	if mapConfig, ok := nodeMap.Get(); ok {
+	if mapConfig, ok := nodeMapConfig.Get(); ok {
 		var client = new(http.Client)
 		client.Timeout = nodeMapTimeout
 

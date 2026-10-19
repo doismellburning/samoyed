@@ -2,10 +2,14 @@ package direwolf
 
 import (
 	"fmt"
+	"math"
+	"strconv"
 
 	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/il2p"
+	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/nodemap"
 	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/doismellburning/samoyed/internal/ptt"
 )
@@ -408,4 +412,82 @@ func (c *RadioConfig) describeChannel(channel int) string {
 	default:
 		return "Unknown"
 	}
+}
+
+// mapPort is what the node map can be told about channel from its
+// configuration alone.  A radio channel is RF, with its modem's details; a
+// TNC's radio is out of sight, so all that is known is that it is RF; and an
+// AXUDP port could as well be over a private network as the Internet, so
+// Internet is only a guess.
+func (c *RadioConfig) mapPort(channel int) nodemap.Port {
+	var port = nodemap.Port{
+		ID:         strconv.Itoa(channel),
+		LinkType:   nodemap.LinkRF,
+		Freq:       maybe.Nothing[int64](),
+		Mode:       "",
+		Modulation: "",
+		Baud:       maybe.Nothing[int32](),
+		Bitrate:    maybe.Nothing[int32](),
+		Usage:      "",
+		Comment:    "",
+	}
+
+	switch c.chan_medium[channel] {
+	case MEDIUM_RADIO:
+		var achan = &c.achan[channel]
+
+		port.Mode = "AX.25"
+		if achan.layer2_xmit == LAYER2_IL2P {
+			port.Mode = "IL2P"
+		}
+
+		var modulation, bitsPerSymbol, known = mapModulation(achan.modem_type)
+		if known {
+			port.Modulation = modulation
+			port.Bitrate = positiveInt32(achan.baud)
+			port.Baud = positiveInt32(achan.baud / bitsPerSymbol)
+		}
+	case MEDIUM_AXUDP:
+		port.LinkType = nodemap.LinkInternet
+	case MEDIUM_NETTNC, MediumSerialTNC:
+		// RF, and nothing more is known.
+	case MEDIUM_NONE, MEDIUM_IGATE:
+		// Not a channel the node links over.
+	}
+
+	return port
+}
+
+// mapModulation is how the node map names modem's modulation, and how many
+// bits each symbol carries, for a modem a node links over.
+func mapModulation(modem modem_t) (string, int, bool) {
+	switch modem {
+	case MODEM_AFSK:
+		return "AFSK", 1, true
+	case MODEM_BASEBAND, MODEM_SCRAMBLE:
+		// G3RUH is FSK, and FSK is what other nodes call it on the map.
+		return "FSK", 1, true
+	case MODEM_BPSK:
+		return "BPSK", 1, true
+	case MODEM_QPSK:
+		return "QPSK", 2, true
+	case MODEM_8PSK:
+		return "8PSK", 3, true
+	case MODEM_16_QAM:
+		return "16QAM", 4, true
+	case MODEM_64_QAM:
+		return "64QAM", 6, true
+	default:
+		// AIS and EAS are not for linking, and OFF has no modem.
+		return "", 0, false
+	}
+}
+
+// positiveInt32 is n, if it is a rate worth reporting that fits an int32.
+func positiveInt32(n int) maybe.Maybe[int32] {
+	if n <= 0 || n > math.MaxInt32 {
+		return maybe.Nothing[int32]()
+	}
+
+	return maybe.Just(int32(n))
 }

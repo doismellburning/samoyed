@@ -2213,6 +2213,7 @@ func (ps *parseState) nodeMapConfig(address string, alias string, settings NodeM
 		Location: location,
 		Contact:  settings.Contact,
 		Comment:  settings.Comment,
+		Ports:    nil, // Left to RadioConfig.nodeMapConfig, once the channels are settled.
 	}, nil
 }
 
@@ -2247,7 +2248,7 @@ type nodeSettings struct {
 	connectMessage string
 
 	// nodeMap is what the node map is told about the node, if it is to be
-	// told anything.
+	// told anything, but for its ports, which wait for nodeMapConfig.
 	nodeMap maybe.Maybe[nodemap.Config]
 }
 
@@ -2294,6 +2295,20 @@ func (c *RadioConfig) nodeConfig(settings nodeSettings) (node.Config, error) {
 		InfoMessage:    settings.infoMessage,
 		ConnectMessage: settings.connectMessage,
 	}, nil
+}
+
+// nodeMapConfig is what the node map is told about the node settings
+// describes, with ports, its ports as nodeConfig left them, if the node is to
+// be reported at all.
+func (c *RadioConfig) nodeMapConfig(settings nodeSettings, ports []node.Port) maybe.Maybe[nodemap.Config] {
+	return maybe.Fmap(func(config nodemap.Config) nodemap.Config {
+		config.Ports = make([]nodemap.Port, 0, len(ports))
+		for _, port := range ports {
+			config.Ports = append(config.Ports, c.mapPort(port.Channel))
+		}
+
+		return config
+	}, settings.nodeMap)
 }
 
 // dropEASProfile clears the demodulator profile EAS brings with it, for a
