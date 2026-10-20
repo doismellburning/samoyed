@@ -55,6 +55,15 @@ with these differences and choices:
   rather than turning broadcasts off as in the protocol description.
 * **A malformed broadcast entry** is skipped,
   where netromd abandons the rest of the broadcast.
+* **One node, users and neighbours alike.**
+  Configured with the node shell,
+  NET/ROM shares the shell's callsign and alias.
+  A link made to the node is a neighbouring node's
+  if the first thing to arrive on it is a NET/ROM frame,
+  sent to the node's callsign on NET/ROM's channel,
+  and a user's otherwise;
+  a neighbour is greeted as a user is before that,
+  and NET/ROM ignores the greeting.
 * **Defaults**: a time to live of 16,
   a broadcast every hour,
   a quality of 192 for every neighbour,

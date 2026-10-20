@@ -23,14 +23,22 @@ const maxNetromNodesInterval = 7 * 24 * 60 * 60
 type netromSettings struct {
 	config netrom.Config
 
+	// integrated says the node shares the node shell's address and alias,
+	// rather than having its own.
+	integrated bool
+
 	// line is where the file gave these settings, for complaints.
 	line int
 }
 
-// applyNETROM checks the NET/ROM node's settings and turns it on.  Whether
-// its channel can carry NET/ROM waits for netromConfig, since the command
-// line can still make one a radio channel.
+// applyNETROM checks the settings of a NET/ROM node with a callsign and
+// alias of its own, for a station with no node shell, and turns it on.
+// Alongside the shell, NET/ROM shares its names, and is configured with it.
 func (ps *parseState) applyNETROM(settings NetROMSettings) error {
+	if ps.misc.node.IsJust() {
+		return fmt.Errorf("line %d: With a node, configure NET/ROM under it, where it shares the node's address and alias", ps.line)
+	}
+
 	var config = netrom.DefaultConfig()
 
 	var callsign, callErr = netrom.NormaliseCallsign(settings.Callsign)
@@ -51,6 +59,44 @@ func (ps *parseState) applyNETROM(settings NetROMSettings) error {
 		return fmt.Errorf("line %d: NET/ROM needs a channel", ps.line)
 	}
 
+	return ps.applyNETROMRouting(config, settings.NetROMRouting, false)
+}
+
+// applyIntegratedNETROM checks the settings of a NET/ROM node sharing the
+// node shell's address and alias, which listens on listensOn, and turns it
+// on.
+func (ps *parseState) applyIntegratedNETROM(address string, alias string, listensOn []int, settings NetROMRouting) error {
+	var config = netrom.DefaultConfig()
+
+	var callsign, callErr = netrom.NormaliseCallsign(address)
+	if callErr != nil {
+		return fmt.Errorf("line %d: Node address %s can't be a NET/ROM callsign: %w", ps.line, address, callErr)
+	}
+
+	config.Callsign = callsign
+
+	if alias == "" || !netrom.ValidAlias(alias) {
+		return fmt.Errorf("line %d: NET/ROM needs the node to have an alias of 1 to %d letters, digits or #_&-/", ps.line, netrom.AliasLen)
+	}
+
+	config.Alias = alias
+
+	if settings.Channel == nil {
+		if len(listensOn) != 1 {
+			return fmt.Errorf("line %d: NET/ROM needs a channel, as the node listens on more than one", ps.line)
+		}
+
+		settings.Channel = &listensOn[0]
+	}
+
+	return ps.applyNETROMRouting(config, settings, true)
+}
+
+// applyNETROMRouting checks the routing settings of a NET/ROM node named as
+// config says, and turns it on.  Whether its channel can carry NET/ROM
+// waits for netromConfig, since the command line can still make one a radio
+// channel.
+func (ps *parseState) applyNETROMRouting(config netrom.Config, settings NetROMRouting, integrated bool) error {
 	if *settings.Channel < 0 || *settings.Channel >= MAX_TOTAL_CHANS {
 		return fmt.Errorf("line %d: Invalid channel %d for NET/ROM. Must be in range of 0 to %d", ps.line, *settings.Channel, MAX_TOTAL_CHANS-1)
 	}
@@ -85,7 +131,7 @@ func (ps *parseState) applyNETROM(settings NetROMSettings) error {
 		config.NodesInterval = time.Duration(*settings.NodesInterval) * time.Second
 	}
 
-	ps.misc.netrom = maybe.Just(netromSettings{config: config, line: ps.line})
+	ps.misc.netrom = maybe.Just(netromSettings{config: config, integrated: integrated, line: ps.line})
 
 	return nil
 }
@@ -105,10 +151,9 @@ func netromByte(line int, name string, setting *int, least int, unset byte) (byt
 }
 
 // netromConfig is the NET/ROM node's configuration for settings, with the
-// channels as they are now, or what is wrong with it.  The node must not
-// share a callsign with the node shell, if there is one, on its channel:
-// whichever registered with the data link last would take the other's
-// incoming connections.
+// channels as they are now, or what is wrong with it.  One sharing the node
+// shell's names must be on one of the shell's channels, which is where the
+// shell answers for both.
 func (c *RadioConfig) netromConfig(settings netromSettings, shell maybe.Maybe[nodeSettings]) (netrom.Config, error) {
 	var none netrom.Config
 
@@ -119,24 +164,15 @@ func (c *RadioConfig) netromConfig(settings netromSettings, shell maybe.Maybe[no
 			settings.line, config.Channel)
 	}
 
-	if shellSettings, ok := shell.Get(); ok {
+	if shellSettings, ok := shell.Get(); ok && settings.integrated {
 		var channels = shellSettings.channels
 		if channels == nil {
 			channels = c.connectedModeChannels()
 		}
 
-		var shellNames = []string{shellSettings.address}
-		if shellSettings.alias != "" {
-			shellNames = append(shellNames, shellSettings.alias)
-		}
-
-		if slices.Contains(channels, config.Channel) {
-			for _, name := range []string{config.Callsign, config.Alias} {
-				if slices.Contains(shellNames, name) {
-					return none, fmt.Errorf("line %d: NET/ROM %s is also the node shell's name on channel %d. Give each its own",
-						settings.line, name, config.Channel)
-				}
-			}
+		if !slices.Contains(channels, config.Channel) {
+			return none, fmt.Errorf("line %d: NET/ROM can't run on channel %d, which the node does not listen on",
+				settings.line, config.Channel)
 		}
 	}
 

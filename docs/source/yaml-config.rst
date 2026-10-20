@@ -355,6 +355,19 @@ These are the keys under ``samoyed``:
             ``callsign``
                 The address it answers to, with any SSID, such as ``Q1TEST-3``.
 
+    ``netrom``
+        Run a NET/ROM node (see :doc:`glossary/netrom`)
+        under the node's own address and alias,
+        so that users and neighbouring nodes connect to the one node.
+        The node needs an alias of up to six letters, digits or ``#_&-/``,
+        which is what other nodes know it by.
+        ``netrom: {}`` runs it with the defaults.
+        It takes the settings of the top-level ``netrom`` block below
+        but ``callsign`` and ``alias``,
+        and its ``channel`` must be one the node listens on;
+        it can be left out if the node listens on only one.
+        A top-level ``netrom`` block is refused alongside ``node``.
+
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
     Its commands are:
@@ -384,9 +397,20 @@ These are the keys under ``samoyed``:
         List the stations most recently heard over the radio,
         with the channel each was last heard on and how long ago.
 
-    ``NODES`` (``N``), ``ROUTES`` (``R``)
-        Say that the node does not do NET/ROM yet,
-        rather than that the command is invalid.
+    ``NODES`` (``N``) *node*
+        List the nodes NET/ROM can reach, as ``ALIAS:CALLSIGN``;
+        with a node's alias or callsign, list the routes to it,
+        best first, with their quality and obsolescence count.
+
+    ``ROUTES`` (``R``)
+        List the neighbouring nodes,
+        whether the link to each is up,
+        the quality it gives that link,
+        and how many nodes are reached through it.
+
+    Without ``netrom``,
+    ``NODES`` and ``ROUTES`` say that the node does not do NET/ROM,
+    rather than that the command is invalid.
 
     A line of more than 256 characters is ignored.
 
@@ -413,7 +437,9 @@ These are the keys under ``samoyed``:
 
 ``netrom``
     A NET/ROM node (see :doc:`glossary/netrom`),
-    which learns routes from the nodes it hears and carries circuits between them.
+    which learns routes from the nodes it hears and carries circuits between them,
+    on a station without a node shell;
+    with one, configure NET/ROM under ``node`` instead.
     The ``NETROM`` directive of the line-at-a-time format is not available:
     a NET/ROM node is configured here only.
     It has:
@@ -421,7 +447,6 @@ These are the keys under ``samoyed``:
     ``callsign``
         The node's AX.25 address,
         conventionally the station's callsign with an SSID of its own.
-        It must not be the node shell's address or alias on the same channel.
 
     ``alias``
         The short name, up to six letters, digits or ``#_&-/``,

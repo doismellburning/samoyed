@@ -81,13 +81,84 @@ func Test_config_yaml_netrom(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
+func Test_config_yaml_netrom_with_node(t *testing.T) {
+	t.Run("sharing the node's names, on its one channel", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: q1test-7, alias: qnodea, netrom: {}}\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.True(t, c.misc.node.IsJust())
+
+		var got, ok = c.misc.netrom.Get()
+		require.True(t, ok)
+		assert.True(t, got.integrated)
+
+		var want = netrom.DefaultConfig()
+		want.Callsign = "Q1TEST-7"
+		want.Alias = "QNODEA"
+		assert.Equal(t, want, got.config)
+	})
+
+	t.Run("every setting", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node:\n  address: Q1TEST-7\n  alias: QNODEA\n  channels: [0, 1]\n  netrom:\n    channel: 1\n    ttl: 7\n    nodesInterval: 600\n    quality: 255\n    minQuality: 50\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.netrom.Get()
+		require.True(t, ok)
+		assert.Equal(t, 1, got.config.Channel)
+		assert.Equal(t, byte(7), got.config.TTL)
+		assert.Equal(t, 600*time.Second, got.config.NodesInterval)
+		assert.Equal(t, byte(255), got.config.Quality)
+		assert.Equal(t, byte(50), got.config.MinQuality)
+	})
+
+	for _, bad := range []string{
+		"node: {address: Q1TEST-7, netrom: {}}",
+		"node: {address: Q1TEST-7, alias: TOOLONGX, netrom: {}}",
+		"node: {address: Q1TEST-7, alias: QNODEA, channels: [0, 1], netrom: {}}",
+		"node: {address: Q1TEST-7, alias: QNODEA, netrom: {ttl: 0}}",
+		"node: {address: Q1TEST-7, alias: QNODEA, netrom: {callsign: Q1TEST-8}}",
+	} {
+		t.Run("refused: "+bad, func(t *testing.T) {
+			var c = parseYAMLConfig(t, bad+"\n")
+
+			assert.Equal(t, 1, c.errors, c.output)
+			assert.True(t, c.misc.netrom.IsNothing(), "nothing configured that nobody asked for")
+		})
+	}
+
+	t.Run("refused: NET/ROM of its own beside the node", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST, alias: SAMNOD}\nnetrom: {callsign: Q1TEST-7, alias: QNODEA, channel: 0}\n")
+
+		assert.Equal(t, 1, c.errors, c.output)
+		assert.True(t, c.misc.node.IsJust())
+		assert.True(t, c.misc.netrom.IsNothing())
+	})
+
+	t.Run("refused: NET/ROM with the node and on its own too", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST-7, alias: QNODEA, netrom: {}}\nnetrom: {callsign: Q1TEST-8, alias: QNODEB, channel: 0}\n")
+
+		assert.Equal(t, 1, c.errors, c.output)
+
+		var got, ok = c.misc.netrom.Get()
+		require.True(t, ok)
+		assert.True(t, got.integrated, "the first is kept")
+	})
+}
+
 func testNetromSettings(callsign string, alias string, channel int) netromSettings {
 	var config = netrom.DefaultConfig()
 	config.Callsign = callsign
 	config.Alias = alias
 	config.Channel = channel
 
-	return netromSettings{config: config, line: 3}
+	return netromSettings{config: config, integrated: false, line: 3}
+}
+
+func integratedNetromSettings(callsign string, alias string, channel int) netromSettings {
+	var settings = testNetromSettings(callsign, alias, channel)
+	settings.integrated = true
+
+	return settings
 }
 
 func TestNetromConfig(t *testing.T) {
@@ -120,10 +191,8 @@ func TestNetromConfig(t *testing.T) {
 		{"an AXUDP channel", testNetromSettings("Q1TEST-7", "QNODEA", MAX_RADIO_CHANS), maybe.Nothing[nodeSettings](), true},
 		{"an IGate channel", testNetromSettings("Q1TEST-7", "QNODEA", MAX_RADIO_CHANS+1), maybe.Nothing[nodeSettings](), false},
 		{"an unconfigured channel", testNetromSettings("Q1TEST-7", "QNODEA", 2), maybe.Nothing[nodeSettings](), false},
-		{"beside the node shell under names of its own", testNetromSettings("Q1TEST-7", "QNODEA", 0), shell, true},
-		{"the node shell's address", testNetromSettings("Q1TEST", "QNODEA", 0), shell, false},
-		{"the node shell's alias", testNetromSettings("Q1TEST-7", "SAMNOD", 0), shell, false},
-		{"the node shell's address on a channel the shell is not on", testNetromSettings("Q1TEST", "QNODEA", 1), shell, true},
+		{"sharing the node shell's names", integratedNetromSettings("Q1TEST", "SAMNOD", 0), shell, true},
+		{"sharing the node shell's names off its channels", integratedNetromSettings("Q1TEST", "SAMNOD", 1), shell, false},
 	}
 
 	for _, tc := range testCases {
@@ -145,12 +214,14 @@ func TestNetromConfig(t *testing.T) {
 }
 
 // A node shell listening on every channel connected mode can be used on, as
-// it does when given none, is on the NET/ROM node's channel too.
+// it does when given none, is on the NET/ROM node's channel too, the command
+// line's included.
 func TestNetromConfigShellOnEveryChannel(t *testing.T) {
 	t.Parallel()
 
 	var radio = new(RadioConfig)
 	radio.chan_medium[0] = MEDIUM_RADIO
+	radio.chan_medium[1] = MEDIUM_RADIO
 
 	var shell = maybe.Just(nodeSettings{
 		address:        "Q1TEST-7",
@@ -163,8 +234,11 @@ func TestNetromConfigShellOnEveryChannel(t *testing.T) {
 		mapPorts:       nil,
 	})
 
-	var _, err = radio.netromConfig(testNetromSettings("Q1TEST-7", "QNODEA", 0), shell)
-	assert.Error(t, err)
+	var settings = integratedNetromSettings("Q1TEST-7", "QNODEA", 1)
+
+	var config, err = radio.netromConfig(settings, shell)
+	require.NoError(t, err)
+	assert.Equal(t, settings.config, config)
 }
 
 // recordingAGWDataLink notes what reaches the data link.
