@@ -958,6 +958,16 @@ func (tq *TransmitQueue) Count(channel int, prio int, source string, dest string
 	return (n)
 } /* end Count */
 
+// Lengths is how many packets wait in each channel's queue at each priority,
+// all taken under the one lock so that they describe the same moment.  As with
+// Count, the null frame LMSeizeRequest queues is not a packet.
+func (tq *TransmitQueue) Lengths() [MAX_RADIO_CHANS][TQ_NUM_PRIO]int {
+	tq.mu.Lock()
+	defer tq.mu.Unlock()
+
+	return tq.length
+}
+
 // wakeLocked tells the channel's transmit thread that something was queued.
 // The caller holds mu, and has just put the packet on the list: raising the
 // wake-up under the same lock is what stops it racing the transmit thread's

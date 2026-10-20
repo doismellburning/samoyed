@@ -100,6 +100,7 @@ Dashed arrows are connections made after construction rather than at it.
        digi -> igate [label="rememberDigipeated"];
        web -> igate [label="webStatus\n(at Start)", style=dashed];
        web -> netrom [label="webStatus\n(at Start)", style=dashed];
+       web -> tq [label="webStatus\n(at Start)", style=dashed];
        digi -> tq [label="Append"];
        cdigi -> tq [label="Append"];
 
@@ -247,7 +248,8 @@ rather than once it is running.
 The web interface's hub is handed to the transmit service and the received packet handler,
 which are made before the IGate,
 and its status page reports on the IGate's connection to APRS-IS
-and on the NET/ROM node's neighbours, routes and circuits.
+and on the NET/ROM node's neighbours, routes and circuits,
+and the depth of the ``TransmitQueue`` (``TransmitQueue.Lengths``).
 The hub and the server are made, and the port bound, before either;
 the server is handed the station's status (``webStatus``) when it is started (``webui.Server.Start``),
 once the IGate and the NET/ROM node exist.

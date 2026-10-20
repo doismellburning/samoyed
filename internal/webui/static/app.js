@@ -96,13 +96,20 @@
     box.replaceChildren();
     if (status && status.igate) box.append(igateCard(status.igate));
     if (status && status.netrom) box.append(netromCard(status.netrom));
+    const queues = new Map(((status && status.queues) || []).map((q) => [q.channel, q]));
     for (const c of [...channels.values()].sort((a, b) => a.number - b.number)) {
+      const figures = el("div", { class: "figures" },
+        el("span", { class: "rx" }, el("b", { text: String(c.rx) }), " rx"),
+        el("span", { class: "tx" }, el("b", { text: String(c.tx) }), " tx"));
+      const q = queues.get(c.number);
+      if (q) {
+        figures.append(el("span", { class: "queued", title: `${q.high} high priority, ${q.low} low` },
+          el("b", { text: String(q.high + q.low) }), " queued"));
+      }
       box.append(el("div", { class: "channel" },
         el("div", { class: "label", text: `Channel ${c.number} · ${c.description || "unknown"}` +
           (c.callsign ? ` · ${c.callsign}` : "") }),
-        el("div", { class: "figures" },
-          el("span", { class: "rx" }, el("b", { text: String(c.rx) }), " rx"),
-          el("span", { class: "tx" }, el("b", { text: String(c.tx) }), " tx"))));
+        figures));
     }
   }
 
@@ -379,8 +386,8 @@
     renderNetrom();
   }
 
-  // The IGate's counts and the NET/ROM node's tables change without any
-  // event to say so.
+  // The IGate's counts, the NET/ROM node's tables and the transmit queues
+  // change without any event to say so.
   async function refreshStatus() {
     try {
       setStationStatus(await getJSON("api/status"));

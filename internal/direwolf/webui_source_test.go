@@ -205,3 +205,24 @@ func TestWebNetROMStatus(t *testing.T) {
 
 	assert.Equal(t, maybe.Just(want), webNetROMStatus(node))
 }
+
+// Only a radio channel has a transmit queue to show.
+func TestWebQueues(t *testing.T) {
+	t.Parallel()
+
+	var audio = new(RadioConfig)
+	audio.chan_medium[0] = MEDIUM_RADIO
+	audio.chan_medium[1] = MEDIUM_NETTNC
+	audio.chan_medium[2] = MEDIUM_RADIO
+
+	var lengths [MAX_RADIO_CHANS][TQ_NUM_PRIO]int
+	lengths[0][TQ_PRIO_0_HI] = 1
+	lengths[0][TQ_PRIO_1_LO] = 2
+	lengths[2][TQ_PRIO_1_LO] = 3
+
+	assert.Equal(t, []webui.QueueStatus{
+		{Channel: 0, High: 1, Low: 2},
+		{Channel: 2, High: 0, Low: 3},
+	}, webQueues(audio, lengths))
+	assert.Nil(t, webQueues(nil, lengths))
+}

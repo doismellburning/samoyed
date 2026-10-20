@@ -63,19 +63,56 @@ func webui_start(ctx context.Context, server *webui.Server, status webui.StatusF
 	logrus.WithField("address", listening).Info("Web interface listening")
 }
 
-// webStatus reports the station's own state to the web interface: started is
-// when it started, ig its IGate and node its NET/ROM node, either of which may
-// be nil.
-func webStatus(started time.Time, ig *IGate, node *netrom.Node) webui.StatusFunc {
+// webStatusSources is what the web interface's status is drawn from.  Any of
+// igate and netrom may be nil, for a station without one.
+type webStatusSources struct {
+	started time.Time
+	audio   *RadioConfig
+	igate   *IGate
+	netrom  *netrom.Node
+
+	// queueLengths is how much waits in each radio channel's transmit
+	// queue.
+	queueLengths func() [MAX_RADIO_CHANS][TQ_NUM_PRIO]int
+}
+
+// webStatus reports the station's own state to the web interface, from src.
+func webStatus(src *webStatusSources) webui.StatusFunc {
 	return func() webui.Status {
 		var s webui.Status
 		s.Version = version.Version
-		s.Started = started
-		s.IGate = webIGateStatus(ig)
-		s.NetROM = webNetROMStatus(node)
+		s.Started = src.started
+		s.IGate = webIGateStatus(src.igate)
+		s.NetROM = webNetROMStatus(src.netrom)
+		s.Queues = webQueues(src.audio, src.queueLengths())
 
 		return s
 	}
+}
+
+// webQueues describes the transmit queue of each radio channel for the web
+// interface.  Only a radio channel has one: frames for any other kind go
+// straight to whatever carries them.
+func webQueues(audio *RadioConfig, lengths [MAX_RADIO_CHANS][TQ_NUM_PRIO]int) []webui.QueueStatus {
+	if audio == nil {
+		return nil
+	}
+
+	var queues []webui.QueueStatus
+
+	for channel := range MAX_RADIO_CHANS {
+		if audio.chan_medium[channel] != MEDIUM_RADIO {
+			continue
+		}
+
+		queues = append(queues, webui.QueueStatus{
+			Channel: channel,
+			High:    lengths[channel][TQ_PRIO_0_HI],
+			Low:     lengths[channel][TQ_PRIO_1_LO],
+		})
+	}
+
+	return queues
 }
 
 // webChannel describes a configured channel for the web interface, or Nothing

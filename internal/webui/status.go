@@ -28,6 +28,19 @@ type Status struct {
 	// NetROM is the NET/ROM node, or Nothing on a station that doesn't
 	// run one.
 	NetROM maybe.Maybe[NetROMStatus] `json:"netrom,omitzero"`
+
+	// Queues is what is waiting to be sent on each radio channel, empty on
+	// a station with none.
+	Queues []QueueStatus `json:"queues,omitempty"`
+}
+
+// QueueStatus is how many packets are waiting to be sent on a radio channel,
+// at each priority: High for digipeated and expedited frames, Low for
+// everything else.
+type QueueStatus struct {
+	Channel int `json:"channel"`
+	High    int `json:"high"`
+	Low     int `json:"low"`
 }
 
 // IGateStatus is an IGate's connection to its APRS-IS server, and how much has

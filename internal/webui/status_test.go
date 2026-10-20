@@ -182,3 +182,23 @@ func TestStatusNetROM(t *testing.T) {
 		})
 	}
 }
+
+// Each radio channel's transmit queue is reported by priority.
+func TestStatusQueues(t *testing.T) {
+	t.Parallel()
+
+	var w = statusRequest(t, func() Status {
+		var s Status
+		s.Queues = []QueueStatus{{Channel: 1, High: 2, Low: 3}}
+
+		return s
+	}, time.Now())
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	assert.Equal(t, []any{map[string]any{
+		"channel": float64(1),
+		"high":    float64(2),
+		"low":     float64(3),
+	}}, got["queues"])
+}

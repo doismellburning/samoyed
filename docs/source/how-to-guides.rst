@@ -304,8 +304,9 @@ Add ``WEBPORT`` to your config file to serve a live dashboard and APRS map
 Then open ``http://<station>:8080/``.
 The header shows the version of Samoyed the station is running
 and how long it has been up.
-The **Dashboard** tab shows each channel's callsign
-and its received and transmitted packet counts,
+The **Dashboard** tab shows each channel's callsign,
+its received and transmitted packet counts,
+and, for a radio channel, how many packets are waiting to be sent,
 how the IGate's connection to APRS-IS stands, if the station is an IGate,
 with how many packets it has passed up, received and gated to radio,
 the NET/ROM node's neighbours, routes and circuits, if it runs one,
