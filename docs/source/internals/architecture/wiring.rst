@@ -74,6 +74,8 @@ Dashed arrows are connections made after construction rather than at it.
        tq -> axudp [label="AXUDPChannel\nper channel"];
        tq -> dlq [label="SeizeConfirm\n(seizeConfirmer)"];
        tq -> igate [label="sendRecPacket\n(igateSender)", style=dashed];
+       tq -> web [label="onTransmit\n(virtual channels)", style=dashed];
+       tq -> agw [label="onTransmit\n(virtual channels)", style=dashed];
 
        tones -> audio [label="AudioSink"];
        ptt -> l2r [label="MuteInput"];
@@ -238,6 +240,15 @@ and the transmit queue hands the IGate whatever is queued for the IGate's own ch
 The queue is made first,
 and handed the IGate's ``sendRecPacket`` with ``TransmitQueue.SetIGate`` once the IGate exists.
 
+**The transmit queue and the AGW server.**
+A frame for a channel with no transmit thread -
+the IGate's, a network or serial TNC's, an AXUDP one -
+is sent from the transmit queue itself,
+which tells the web interface and the AGW server of it (``onTransmit``)
+as the transmit service does for the radio channels.
+The AGW server is made with the queue, to queue its clients' frames on,
+so the queue is handed ``onTransmit`` with ``TransmitQueue.SetOnTransmit`` once the AGW server exists.
+
 **The KISS handler and the KISS TCP service.**
 The handler copies a client's data frames to the TCP clients with KISSCOPY,
 so it is made after the ``KissNetService`` and handed it.
@@ -297,7 +308,7 @@ References
   in ``internal/direwolf``:
   ``multi_modem.go`` (``multi_modem_init``, ``ReceiveSink``, ``radioSink``),
   ``dlq.go`` (``frameReceiver``, ``seizeConfirmer``),
-  ``tq.go`` (``NewTransmitQueue``, ``clientTransmitQueue``, ``SetIGate``),
+  ``tq.go`` (``NewTransmitQueue``, ``clientTransmitQueue``, ``SetIGate``, ``SetOnTransmit``),
   ``xmit.go`` (``NewXmitService``, ``xmitQueue``),
   ``ax25_link.go`` (``NewAX25Link``, ``linkClients``, ``linkTransmitter``),
   ``link_clients.go`` (``newLinkClientRouter``, ``nodeClient``, ``netromClient``),

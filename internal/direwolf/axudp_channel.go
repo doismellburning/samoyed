@@ -191,13 +191,14 @@ func (ac *AXUDPChannel) receive(datagram []byte, from *net.UDPAddr) {
 }
 
 // sendPacket sends pp to wherever the channel's routes say its destination
-// goes.  ac can be nil, for a channel that could not be opened, when the
-// packet is discarded.  pp remains the caller's.
-func (ac *AXUDPChannel) sendPacket(channel int, pp *ax25.Packet) {
+// goes, reporting whether it went to any of them.  ac can be nil, for a
+// channel that could not be opened, when the packet is discarded.  pp remains
+// the caller's.
+func (ac *AXUDPChannel) sendPacket(channel int, pp *ax25.Packet) bool {
 	if ac == nil {
 		logrus.WithField("channel", channel).Error("No AXUDP socket for channel; discarding packet")
 
-		return
+		return false
 	}
 
 	var frame = pp.FrameData()
@@ -215,10 +216,12 @@ func (ac *AXUDPChannel) sendPacket(channel int, pp *ax25.Packet) {
 			"dest":    dest,
 		}).Warn(reason)
 
-		return
+		return false
 	}
 
 	var datagram = axudp.AddCRC(frame)
+
+	var sent bool
 
 	for _, entry := range entries {
 		var _, err = ac.conn.WriteTo(datagram, entry.UDPAddr)
@@ -227,18 +230,24 @@ func (ac *AXUDPChannel) sendPacket(channel int, pp *ax25.Packet) {
 			// something may still be queueing on the way out.
 			logrus.WithField("channel", channel).Debug("AXUDP channel closed; discarding packet")
 
-			return
+			return sent
 		} else if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"channel": channel,
 				"peer":    entry.Addr,
 			}).WithError(err).Error("Could not send AXUDP datagram")
-		} else if logrus.IsLevelEnabled(logrus.TraceLevel) {
-			logrus.WithFields(logrus.Fields{
-				"channel": channel,
-				"length":  len(datagram),
-				"peer":    entry.Addr,
-			}).Trace("Sent AXUDP datagram")
+		} else {
+			sent = true
+
+			if logrus.IsLevelEnabled(logrus.TraceLevel) {
+				logrus.WithFields(logrus.Fields{
+					"channel": channel,
+					"length":  len(datagram),
+					"peer":    entry.Addr,
+				}).Trace("Sent AXUDP datagram")
+			}
 		}
 	}
+
+	return sent
 }

@@ -410,6 +410,64 @@ func TestAXUDPChannelTransmitQueue(t *testing.T) {
 	assert.Equal(t, want, frame)
 }
 
+// A packet the transmit queue sends on an AXUDP channel is reported as sent,
+// as one sent over the radio is, so the web interface and the AGW clients
+// monitoring see it.
+func TestAXUDPChannelTransmitIsReported(t *testing.T) {
+	t.Parallel()
+
+	var peer = newTestAXUDPPeer(t)
+
+	var routes = noAXUDPRoutes()
+	routes.Maps = []axudp.MapEntry{axudpTestMap(t, "Q1TEST", peer, false)}
+
+	var ac = openTestAXUDPChannel(t.Context(), t, routes, nil)
+
+	var audio = new(RadioConfig)
+	audio.chan_medium[axudpTestChannel] = MEDIUM_AXUDP
+
+	var channels [MAX_TOTAL_CHANS]*AXUDPChannel
+	channels[axudpTestChannel] = ac
+
+	var tq = NewTransmitQueue(audio, [MAX_TOTAL_CHANS]*NetTNC{}, [MAX_TOTAL_CHANS]*SerialTNC{}, channels, nil)
+
+	var reported []int
+
+	tq.SetOnTransmit(func(channel int, _ *ax25.Packet) {
+		reported = append(reported, channel)
+	})
+
+	tq.Append(axudpTestChannel, TQ_PRIO_1_LO, newTestPacket(t))
+
+	readTestAXUDPDatagram(t, peer)
+	assert.Equal(t, []int{axudpTestChannel}, reported)
+}
+
+// A packet an AXUDP channel has nowhere to send is not reported as sent.
+func TestAXUDPChannelUnroutedTransmitIsNotReported(t *testing.T) {
+	t.Parallel()
+
+	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), nil)
+
+	var audio = new(RadioConfig)
+	audio.chan_medium[axudpTestChannel] = MEDIUM_AXUDP
+
+	var channels [MAX_TOTAL_CHANS]*AXUDPChannel
+	channels[axudpTestChannel] = ac
+
+	var tq = NewTransmitQueue(audio, [MAX_TOTAL_CHANS]*NetTNC{}, [MAX_TOTAL_CHANS]*SerialTNC{}, channels, nil)
+
+	var reported []int
+
+	tq.SetOnTransmit(func(channel int, _ *ax25.Packet) {
+		reported = append(reported, channel)
+	})
+
+	tq.Append(axudpTestChannel, TQ_PRIO_1_LO, newTestPacket(t))
+
+	assert.Empty(t, reported)
+}
+
 // Connected mode works over AXUDP as it does over a network TNC: a frame from
 // the data link goes straight out, and a seize is confirmed at once, there
 // being no radio channel to wait for.

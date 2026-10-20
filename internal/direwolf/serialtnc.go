@@ -231,14 +231,14 @@ func (st *SerialTNC) listenThread(ctx context.Context) {
 
 // sendPacket sends pp to the TNC as a KISS frame.  A nil st - a channel with
 // no TNC - or one not attached just now drops the packet, saying so against
-// channel.  It does not free pp.
-func (st *SerialTNC) sendPacket(channel int, pp *ax25.Packet) {
+// channel.  It reports whether pp was sent, and does not free pp.
+func (st *SerialTNC) sendPacket(channel int, pp *ax25.Packet) bool {
 	var log = logrus.WithField("channel", channel)
 
 	if st == nil {
 		log.Error("Not attached to serial TNC; discarding packet")
 
-		return
+		return false
 	}
 
 	// The on-air frame behind a type byte of 0: a data frame, for the TNC's
@@ -251,12 +251,16 @@ func (st *SerialTNC) sendPacket(channel int, pp *ax25.Packet) {
 	if st.fd == nil || st.failed {
 		log.Error("Not attached to serial TNC; discarding packet")
 
-		return
+		return false
 	}
 
 	if serialport.Write(st.fd, frame) <= 0 {
 		log.WithField("device", st.device).Error("Error sending packet to serial TNC; closing it")
 
 		st.failed = true
+
+		return false
 	}
+
+	return true
 }
