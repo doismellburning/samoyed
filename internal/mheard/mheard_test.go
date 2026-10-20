@@ -23,11 +23,12 @@ func hear(t *testing.T, mdb *DB, channel int, monitor string) {
 	mdb.SaveRF(channel, pp, maybe.Nothing[float64](), maybe.Nothing[float64]())
 }
 
-// heardAt makes callsign last heard over the radio at when.
+// heardAt makes callsign heard over the radio at when, first and last.
 func heardAt(mdb *DB, callsign string, when time.Time) {
 	mdb.mu.Lock()
 	defer mdb.mu.Unlock()
 
+	mdb.db[callsign].firstHeardRF = when
 	mdb.db[callsign].lastHeardRF = when
 }
 
@@ -49,15 +50,44 @@ func TestHeardRF(t *testing.T) {
 	mdb.SaveIS("Q4TEST>APDW17,TCPIP*,qAC,T2TEST:four")
 
 	assert.Equal(t, []Heard{
-		{Callsign: "Q2TEST-1", Channel: 1, Hops: 1, LastHeard: now.Add(-time.Minute)},
-		{Callsign: "Q3TEST", Channel: 0, Hops: 0, LastHeard: now.Add(-time.Minute)},
-		{Callsign: "Q1TEST", Channel: 0, Hops: 0, LastHeard: now.Add(-time.Hour)},
+		{Callsign: "Q2TEST-1", Channel: 1, Hops: 1, Packets: 1, FirstHeard: now.Add(-time.Minute), LastHeard: now.Add(-time.Minute), Lat: maybe.Nothing[float64](), Lon: maybe.Nothing[float64]()},
+		{Callsign: "Q3TEST", Channel: 0, Hops: 0, Packets: 1, FirstHeard: now.Add(-time.Minute), LastHeard: now.Add(-time.Minute), Lat: maybe.Nothing[float64](), Lon: maybe.Nothing[float64]()},
+		{Callsign: "Q1TEST", Channel: 0, Hops: 0, Packets: 1, FirstHeard: now.Add(-time.Hour), LastHeard: now.Add(-time.Hour), Lat: maybe.Nothing[float64](), Lon: maybe.Nothing[float64]()},
 	}, mdb.HeardRF(10))
 
 	assert.Len(t, mdb.HeardRF(2), 2)
 	assert.Equal(t, "Q2TEST-1", mdb.HeardRF(1)[0].Callsign)
 	assert.Empty(t, mdb.HeardRF(0))
 	assert.Empty(t, mdb.HeardRF(-1))
+}
+
+func TestHeardRFCountsAndRemembers(t *testing.T) {
+	t.Parallel()
+
+	var mdb = New(0)
+
+	var before = time.Now()
+
+	// Heard from APRS-IS first, which is neither counted nor taken as
+	// first heard over the radio.
+	mdb.SaveIS("Q1TEST>APDW17,TCPIP*,qAC,T2TEST:zero")
+
+	hear(t, mdb, 0, "Q1TEST>APDW17:one")
+
+	var first = mdb.HeardRF(1)[0].FirstHeard
+	assert.False(t, first.Before(before))
+
+	var pp = ax25.FromText("Q1TEST>APDW17:two", true)
+	require.NotNil(t, pp)
+	mdb.SaveRF(1, pp, maybe.Just(51.5), maybe.Just(-1.0))
+
+	var got = mdb.HeardRF(1)[0]
+	assert.Equal(t, 2, got.Packets)
+	assert.Equal(t, first, got.FirstHeard, "first heard is kept")
+	assert.False(t, got.LastHeard.Before(first))
+	assert.Equal(t, 1, got.Channel)
+	assert.Equal(t, maybe.Just(51.5), got.Lat)
+	assert.Equal(t, maybe.Just(-1.0), got.Lon)
 }
 
 func TestHeardRFEmpty(t *testing.T) {

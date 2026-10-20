@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -531,8 +532,17 @@ func TestMHeard(t *testing.T) {
 		asked = limit
 
 		return []mheard.Heard{
-			{Callsign: "Q3TEST-15", Channel: 10, Hops: 0, LastHeard: now.Add(-5 * time.Second)},
-			{Callsign: "Q4TEST", Channel: 0, Hops: 2, LastHeard: now.Add(-(26*time.Hour + 3*time.Minute + 4*time.Second))},
+			{Callsign: "Q3TEST-15", Channel: 10, Hops: 0, Packets: 1, FirstHeard: time.Time{}, LastHeard: now.Add(-5 * time.Second), Lat: maybe.Nothing[float64](), Lon: maybe.Nothing[float64]()},
+			{
+				Callsign:   "Q4TEST",
+				Channel:    0,
+				Hops:       2,
+				Packets:    1,
+				FirstHeard: time.Time{},
+				LastHeard:  now.Add(-(26*time.Hour + 3*time.Minute + 4*time.Second)),
+				Lat:        maybe.Nothing[float64](),
+				Lon:        maybe.Nothing[float64](),
+			},
 		}
 	}, testClient)
 	n.now = func() time.Time { return now }

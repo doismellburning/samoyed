@@ -52,8 +52,12 @@ type station struct {
 
 	channel int // Most recent channel where heard.
 
+	countRF int // Number of times heard over the radio.
+
 	numDigiHops int // Number of digipeater hops before we heard it.
 	// over radio.  Zero when heard directly.
+
+	firstHeardRF time.Time // Timestamp when first heard over the radio.
 
 	lastHeardRF time.Time // Timestamp when last heard over the radio.
 
@@ -221,8 +225,10 @@ func (mdb *DB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float64], lo
 		mptr = new(station)
 		mptr.callsign = source
 		mptr.count = 1
+		mptr.countRF = 1
 		mptr.channel = channel
 		mptr.numDigiHops = hops
+		mptr.firstHeardRF = now
 		mptr.lastHeardRF = now
 		// Why did I not save the location for a position report here?
 
@@ -254,8 +260,15 @@ func (mdb *DB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float64], lo
 			}
 
 			mptr.count++
+			mptr.countRF++
 			mptr.channel = channel
 			mptr.numDigiHops = hops
+
+			// Heard from APRS-IS before now, perhaps.
+			if mptr.firstHeardRF.IsZero() {
+				mptr.firstHeardRF = now
+			}
+
 			mptr.lastHeardRF = now
 		}
 	}
@@ -678,8 +691,16 @@ type Heard struct {
 	// Hops is the number of digipeaters it came through, the last time.
 	Hops int
 
-	// LastHeard is when it was last heard.
-	LastHeard time.Time
+	// Packets is how many times it has been heard over the radio.
+	Packets int
+
+	// FirstHeard is when it was first heard, and LastHeard when it was last
+	// heard.
+	FirstHeard time.Time
+	LastHeard  time.Time
+
+	// Lat and Lon are where it last said it was, if it has.
+	Lat, Lon maybe.Maybe[float64]
 }
 
 // HeardRF lists the stations heard over the radio, most recently heard first,
@@ -692,10 +713,14 @@ func (mdb *DB) HeardRF(limit int) []Heard {
 	for _, mptr := range mdb.db {
 		if !mptr.lastHeardRF.IsZero() {
 			heard = append(heard, Heard{
-				Callsign:  mptr.callsign,
-				Channel:   mptr.channel,
-				Hops:      mptr.numDigiHops,
-				LastHeard: mptr.lastHeardRF,
+				Callsign:   mptr.callsign,
+				Channel:    mptr.channel,
+				Hops:       mptr.numDigiHops,
+				Packets:    mptr.countRF,
+				FirstHeard: mptr.firstHeardRF,
+				LastHeard:  mptr.lastHeardRF,
+				Lat:        mptr.dlat,
+				Lon:        mptr.dlon,
 			})
 		}
 	}

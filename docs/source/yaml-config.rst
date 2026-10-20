@@ -253,7 +253,8 @@ These are the keys under ``samoyed``:
 
     ``map``
         Report the node to the `UK Packet Radio network map <https://nodes.ukpacketradio.network/>`_,
-        once at startup and every hour after.
+        once at startup, again ten minutes later, once it has had a chance to hear its neighbours,
+        and every hour after.
         At startup, the log says where the node can be seen:
         the public map's page of nodes,
         or, with ``apiUrl`` given, that map's API.
@@ -265,6 +266,15 @@ These are the keys under ``samoyed``:
         A network or serial TNC is reported as RF, and nothing more,
         since its radio is out of sight;
         an AXUDP port is reported as Internet.
+        With a NET/ROM node on one of those ports,
+        each report also lists the neighbours it has a link up to at the time,
+        which the map draws as links between the nodes.
+        Each report also lists up to 100 of the stations most recently heard directly on those ports,
+        with how many times each has been heard, when it was first and last heard,
+        and where it last said it was, if it has.
+        A station heard only through a digipeater is left out,
+        since Samoyed does not keep which digipeaters it came through,
+        and the map would take it to have been heard directly.
         The settings below say more.
         It has:
 
@@ -277,6 +287,11 @@ These are the keys under ``samoyed``:
             such as ``IO91wm``,
             which the map plots it at.
             Left out, the map is not told where the node is.
+
+        ``asl``
+            Optionally, the height of the node's antenna above sea level, in metres,
+            from -500 to 9000.
+            It needs ``locator``.
 
         ``contact``
             Optionally, how to reach whoever runs the node,
@@ -324,6 +339,21 @@ These are the keys under ``samoyed``:
 
             ``comment``
                 A short note about the port.
+
+        ``aliases``
+            Optionally, the services the node offers besides itself,
+            such as a BBS or chat server that another program runs over AGW or KISS,
+            keyed by the alias each is known by:
+            up to six letters, digits or ``#_&-/``, such as ``SAMBBS``.
+            Samoyed cannot see what such a program offers,
+            so the map is told only what is listed here.
+            Each has:
+
+            ``service``
+                What it is, such as ``BBS`` or ``CHAT``.
+
+            ``callsign``
+                The address it answers to, with any SSID, such as ``Q1TEST-3``.
 
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.

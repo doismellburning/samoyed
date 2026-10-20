@@ -52,7 +52,7 @@ func fakeMap(t *testing.T, status int) (*httptest.Server, <-chan received) {
 func reporterFor(config Config, server *httptest.Server) *Reporter {
 	config.APIURL = server.URL
 
-	return New(config, server.Client())
+	return New(config, server.Client(), nil, nil)
 }
 
 func TestReport(t *testing.T) {
@@ -61,14 +61,28 @@ func TestReport(t *testing.T) {
 	t.Run("with an alias", func(t *testing.T) {
 		t.Parallel()
 
-		var r = New(Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, http.DefaultClient)
-		assert.Equal(t, Report{NodeAlias: "SAMNOD", Location: maybe.Nothing[Location](), Software: Software{Name: "Samoyed", Version: ""}, Contact: "", SysopComment: "", Ports: nil}, r.Report())
+		var r = New(Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, http.DefaultClient, nil, nil)
+		assert.Equal(
+			t,
+			Report{
+				NodeAlias:    "SAMNOD",
+				Location:     maybe.Nothing[Location](),
+				Software:     Software{Name: "Samoyed", Version: ""},
+				Contact:      "",
+				SysopComment: "",
+				Ports:        nil,
+				Neighbours:   nil,
+				Aliases:      nil,
+				MHeard:       nil,
+			},
+			r.Report(),
+		)
 	})
 
 	t.Run("without an alias", func(t *testing.T) {
 		t.Parallel()
 
-		var r = New(Config{Address: "Q1TEST-7", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, http.DefaultClient)
+		var r = New(Config{Address: "Q1TEST-7", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, http.DefaultClient, nil, nil)
 		assert.Empty(t, r.Report().NodeAlias)
 	})
 }
@@ -79,7 +93,11 @@ func TestNew(t *testing.T) {
 	t.Run("reports to the public map by default", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Equal(t, DefaultURL, New(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, http.DefaultClient).url)
+		assert.Equal(
+			t,
+			DefaultURL,
+			New(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, http.DefaultClient, nil, nil).url,
+		)
 	})
 
 	t.Run("reports to the map it is given", func(t *testing.T) {
@@ -88,7 +106,12 @@ func TestNew(t *testing.T) {
 		assert.Equal(
 			t,
 			"http://map.example.org",
-			New(Config{Address: "Q1TEST", Alias: "", APIURL: "http://map.example.org", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, http.DefaultClient).url,
+			New(
+				Config{Address: "Q1TEST", Alias: "", APIURL: "http://map.example.org", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil},
+				http.DefaultClient,
+				nil,
+				nil,
+			).url,
 		)
 	})
 }
@@ -114,21 +137,22 @@ func TestWhere(t *testing.T) {
 	t.Run("is the public map's page of nodes by default", func(t *testing.T) {
 		t.Parallel()
 
-		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, http.DefaultClient)
+		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, http.DefaultClient, nil, nil)
 		assert.Equal(t, "https://nodes.ukpacketradio.network/maps/packet", r.where())
 	})
 
 	t.Run("is the public map's page of nodes when its API is given", func(t *testing.T) {
 		t.Parallel()
 
-		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: DefaultURL + "/", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, http.DefaultClient)
+		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: DefaultURL + "/", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, http.DefaultClient, nil, nil)
 		assert.Equal(t, "https://nodes.ukpacketradio.network/maps/packet", r.where())
 	})
 
 	t.Run("is the API of any other map", func(t *testing.T) {
 		t.Parallel()
 
-		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080/", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, http.DefaultClient)
+		var config = Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080/", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}
+		var r = New(config, http.DefaultClient, nil, nil)
 		assert.Equal(t, "http://localhost:8080", r.where())
 	})
 }
@@ -161,7 +185,7 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, server)
+		var r = reporterFor(Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, server)
 
 		require.NoError(t, r.send(t.Context()))
 
@@ -177,7 +201,7 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, server)
 
 		require.NoError(t, r.send(t.Context()))
 		assert.JSONEq(t, `{"software": {"name": "Samoyed"}}`, (<-requests).body)
@@ -187,7 +211,7 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: server.URL + "/", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, server.Client())
+		var r = New(Config{Address: "Q1TEST", Alias: "", APIURL: server.URL + "/", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, server.Client(), nil, nil)
 
 		require.NoError(t, r.send(t.Context()))
 		assert.Equal(t, "/api/nodedata/Q1TEST", (<-requests).path)
@@ -196,13 +220,25 @@ func TestSend(t *testing.T) {
 	t.Run("says where the node is", func(t *testing.T) {
 		t.Parallel()
 
-		var location = Location{Locator: "IO91", Coords: LatLon{Lat: 51.5, Lon: -1}}
+		var location = Location{Locator: "IO91", Coords: LatLon{Lat: 51.5, Lon: -1}, ASL: maybe.Nothing[int32]()}
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Just(location), Contact: "", Comment: "", Ports: nil}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Just(location), Contact: "", Comment: "", Ports: nil, Aliases: nil}, server)
 
 		require.NoError(t, r.send(t.Context()))
 		assert.JSONEq(t, `{"location": {"locator": "IO91", "coords": {"lat": 51.5, "lon": -1}}, "software": {"name": "Samoyed"}}`, (<-requests).body)
+	})
+
+	t.Run("says how high the antenna is", func(t *testing.T) {
+		t.Parallel()
+
+		var location = Location{Locator: "IO91", Coords: LatLon{Lat: 51.5, Lon: -1}, ASL: maybe.Just[int32](120)}
+
+		var server, requests = fakeMap(t, http.StatusOK)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Just(location), Contact: "", Comment: "", Ports: nil, Aliases: nil}, server)
+
+		require.NoError(t, r.send(t.Context()))
+		assert.JSONEq(t, `{"location": {"locator": "IO91", "coords": {"lat": 51.5, "lon": -1}, "asl": 120}, "software": {"name": "Samoyed"}}`, (<-requests).body)
 	})
 
 	t.Run("says who to contact, with a comment", func(t *testing.T) {
@@ -217,6 +253,7 @@ func TestSend(t *testing.T) {
 			Contact:  "sysop@example.org",
 			Comment:  "Club node",
 			Ports:    nil,
+			Aliases:  nil,
 		}, server)
 
 		require.NoError(t, r.send(t.Context()))
@@ -252,7 +289,7 @@ func TestSend(t *testing.T) {
 		}
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: ports}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: ports, Aliases: nil}, server)
 
 		require.NoError(t, r.send(t.Context()))
 		assert.JSONEq(t, `{"software": {"name": "Samoyed"}, "ports": [
@@ -267,17 +304,87 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: []Port{}}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: []Port{}, Aliases: nil}, server)
 
 		require.NoError(t, r.send(t.Context()))
 		assert.JSONEq(t, `{"software": {"name": "Samoyed"}, "ports": []}`, (<-requests).body)
+	})
+
+	t.Run("lists the node's other services by alias", func(t *testing.T) {
+		t.Parallel()
+
+		var server, requests = fakeMap(t, http.StatusOK)
+		var r = reporterFor(Config{
+			Address:  "Q1TEST",
+			Alias:    "",
+			APIURL:   "",
+			Location: maybe.Nothing[Location](),
+			Contact:  "",
+			Comment:  "",
+			Ports:    nil,
+			Aliases:  map[string]Service{"SAMBBS": {Service: "BBS", Callsign: "Q1TEST-3"}},
+		}, server)
+
+		require.NoError(t, r.send(t.Context()))
+		assert.JSONEq(t, `{"software": {"name": "Samoyed"}, "aliases": {"SAMBBS": {"service": "BBS", "callsign": "Q1TEST-3"}}}`, (<-requests).body)
+	})
+
+	t.Run("lists the links to neighbours that are up as each report is made", func(t *testing.T) {
+		t.Parallel()
+
+		var links []NeighbourLink
+
+		var server, requests = fakeMap(t, http.StatusOK)
+		var config = Config{Address: "Q1TEST", Alias: "", APIURL: server.URL, Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}
+		var r = New(config, server.Client(), func() []NeighbourLink { return links }, nil)
+
+		require.NoError(t, r.send(t.Context()))
+		assert.JSONEq(t, `{"software": {"name": "Samoyed"}}`, (<-requests).body)
+
+		links = []NeighbourLink{{Node: "Q2TEST-7", Port: "0", Quality: maybe.Just[int32](192), Type: NeighbourNetROM}}
+
+		require.NoError(t, r.send(t.Context()))
+		assert.JSONEq(t, `{"software": {"name": "Samoyed"}, "neighbours": [{"node": "Q2TEST-7", "port": "0", "quality": 192, "type": "NetRom"}]}`, (<-requests).body)
+	})
+
+	t.Run("lists the stations heard as each report is made", func(t *testing.T) {
+		t.Parallel()
+
+		var heard []Heard
+
+		var server, requests = fakeMap(t, http.StatusOK)
+		var config = Config{Address: "Q1TEST", Alias: "", APIURL: server.URL, Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}
+		var r = New(config, server.Client(), nil, func() []Heard { return heard })
+
+		require.NoError(t, r.send(t.Context()))
+		assert.JSONEq(t, `{"software": {"name": "Samoyed"}}`, (<-requests).body)
+
+		var bst = time.FixedZone("BST", 60*60)
+
+		heard = []Heard{
+			{
+				Callsign:   "Q2TEST-7",
+				Port:       "0",
+				Packets:    maybe.Just[int64](42),
+				FirstHeard: Timestamp{Time: time.Date(2026, 9, 6, 7, 8, 9, 500, bst)},
+				LastHeard:  Timestamp{Time: time.Date(2026, 10, 20, 16, 46, 58, 0, time.UTC)},
+				Coords:     maybe.Just(LatLon{Lat: 51.5, Lon: -1}),
+			},
+			{Callsign: "Q3TEST", Port: "10", Packets: maybe.Nothing[int64](), FirstHeard: Timestamp{Time: time.Time{}}, LastHeard: Timestamp{Time: time.Time{}}, Coords: maybe.Nothing[LatLon]()},
+		}
+
+		require.NoError(t, r.send(t.Context()))
+		assert.JSONEq(t, `{"software": {"name": "Samoyed"}, "mheard": [
+			{"callsign": "Q2TEST-7", "port": "0", "packets": 42, "firstHeard": "2026-09-06 06:08:09", "lastHeard": "2026-10-20 16:46:58", "coords": {"lat": 51.5, "lon": -1}},
+			{"callsign": "Q3TEST", "port": "10"}
+		]}`, (<-requests).body)
 	})
 
 	t.Run("a refused report is an error", func(t *testing.T) {
 		t.Parallel()
 
 		var server, _ = fakeMap(t, http.StatusTooManyRequests)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, server)
 
 		var err = r.send(t.Context())
 		require.Error(t, err)
@@ -288,11 +395,19 @@ func TestSend(t *testing.T) {
 		t.Parallel()
 
 		var server, _ = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, server)
 
 		server.Close()
 		require.Error(t, r.send(t.Context()))
 	})
+}
+
+func TestWait(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, settle, wait(1), "the second report follows once the node has settled")
+	assert.Equal(t, interval, wait(2))
+	assert.Equal(t, interval, wait(3))
 }
 
 func TestRun(t *testing.T) {
@@ -302,7 +417,7 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 
 		var server, requests = fakeMap(t, http.StatusOK)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, server)
 
 		var ctx, cancel = context.WithCancel(t.Context())
 
@@ -332,7 +447,7 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 
 		var server, _ = fakeMap(t, http.StatusInternalServerError)
-		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil}, server)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Nothing[Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}, server)
 
 		var ctx, cancel = context.WithTimeout(t.Context(), 100*time.Millisecond)
 		defer cancel()

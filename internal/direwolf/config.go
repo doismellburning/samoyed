@@ -41,6 +41,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/doismellburning/samoyed/internal/nodemap"
 	"github.com/doismellburning/samoyed/internal/pfilter"
@@ -2199,6 +2200,14 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 	return nil
 }
 
+// minNodeMapASL and maxNodeMapASL bound the antenna heights, in metres above
+// sea level, the node map is told of: a little below the lowest land and a
+// little above the highest, to catch a height given in feet or mistyped.
+const (
+	minNodeMapASL = -500
+	maxNodeMapASL = 9000
+)
+
 // nodeMapConfig checks how the node at address, with alias, is to be
 // reported to the node map, and is what the map is to be told.
 func (ps *parseState) nodeMapConfig(address string, alias string, settings NodeMapSettings) (nodemap.Config, error) {
@@ -2219,6 +2228,28 @@ func (ps *parseState) nodeMapConfig(address string, alias string, settings NodeM
 		location = maybe.Just(at)
 	}
 
+	if settings.ASL != nil {
+		var asl = *settings.ASL
+
+		var at, located = location.Get()
+		if !located {
+			return none, fmt.Errorf("line %d: The node map's antenna height needs a locator", ps.line)
+		}
+
+		if asl < minNodeMapASL || asl > maxNodeMapASL {
+			return none, fmt.Errorf("line %d: Invalid antenna height %d for the node map. Must be in metres, in range of %d to %d",
+				ps.line, asl, minNodeMapASL, maxNodeMapASL)
+		}
+
+		at.ASL = maybe.Just(int32(asl))
+		location = maybe.Just(at)
+	}
+
+	var aliases, aliasesErr = ps.nodeMapAliases(settings.Aliases)
+	if aliasesErr != nil {
+		return none, aliasesErr
+	}
+
 	return nodemap.Config{
 		Address:  address,
 		Alias:    alias,
@@ -2227,7 +2258,46 @@ func (ps *parseState) nodeMapConfig(address string, alias string, settings NodeM
 		Contact:  settings.Contact,
 		Comment:  settings.Comment,
 		Ports:    nil, // Left to RadioConfig.nodeMapConfig, once the channels are settled.
+		Aliases:  aliases,
 	}, nil
+}
+
+// nodeMapAliases checks the services the node map is to be told the node
+// offers, keyed by alias.
+func (ps *parseState) nodeMapAliases(settings map[string]NodeMapServiceSettings) (map[string]nodemap.Service, error) {
+	if settings == nil {
+		return nil, nil //nolint:nilnil // No aliases is not an error.
+	}
+
+	var aliases = make(map[string]nodemap.Service, len(settings))
+
+	// In order, so the same file always gets the same complaint.
+	for _, alias := range slices.Sorted(maps.Keys(settings)) {
+		var service = settings[alias]
+
+		var upper = strings.ToUpper(alias)
+		if upper == "" || !netrom.ValidAlias(upper) {
+			return nil, fmt.Errorf("line %d: Invalid alias %q for a service on the node map. Must be 1 to %d letters, digits or #_&-/",
+				ps.line, alias, netrom.AliasLen)
+		}
+
+		if _, taken := aliases[upper]; taken {
+			return nil, fmt.Errorf("line %d: Alias %s is given more than once on the node map", ps.line, upper)
+		}
+
+		if strings.TrimSpace(service.Service) == "" {
+			return nil, fmt.Errorf("line %d: No service given for alias %s on the node map", ps.line, alias)
+		}
+
+		var callsign, ok = node.Address(service.Callsign)
+		if !ok {
+			return nil, fmt.Errorf("line %d: Invalid callsign %q for alias %s on the node map", ps.line, service.Callsign, alias)
+		}
+
+		aliases[upper] = nodemap.Service{Service: service.Service, Callsign: callsign}
+	}
+
+	return aliases, nil
 }
 
 // nodeMapPorts checks what the node map is to be told about the node's
