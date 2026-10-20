@@ -2199,6 +2199,14 @@ func (ps *parseState) applyNODE(settings NodeSettings) error {
 	return nil
 }
 
+// minNodeMapASL and maxNodeMapASL bound the antenna heights, in metres above
+// sea level, the node map is told of: a little below the lowest land and a
+// little above the highest, to catch a height given in feet or mistyped.
+const (
+	minNodeMapASL = -500
+	maxNodeMapASL = 9000
+)
+
 // nodeMapConfig checks how the node at address, with alias, is to be
 // reported to the node map, and is what the map is to be told.
 func (ps *parseState) nodeMapConfig(address string, alias string, settings NodeMapSettings) (nodemap.Config, error) {
@@ -2216,6 +2224,23 @@ func (ps *parseState) nodeMapConfig(address string, alias string, settings NodeM
 			return none, fmt.Errorf("line %d: Invalid locator for the node map: %w", ps.line, err)
 		}
 
+		location = maybe.Just(at)
+	}
+
+	if settings.ASL != nil {
+		var asl = *settings.ASL
+
+		var at, located = location.Get()
+		if !located {
+			return none, fmt.Errorf("line %d: The node map's antenna height needs a locator", ps.line)
+		}
+
+		if asl < minNodeMapASL || asl > maxNodeMapASL {
+			return none, fmt.Errorf("line %d: Invalid antenna height %d for the node map. Must be in metres, in range of %d to %d",
+				ps.line, asl, minNodeMapASL, maxNodeMapASL)
+		}
+
+		at.ASL = maybe.Just(int32(asl))
 		location = maybe.Just(at)
 	}
 

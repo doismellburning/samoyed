@@ -209,6 +209,10 @@ type NodeMapSettings struct {
 	// the map is not told.
 	Locator string `yaml:"locator"`
 
+	// ASL is the height of the node's antenna above sea level, in metres.
+	// It needs Locator.  Left out, the map is not told.
+	ASL *int `yaml:"asl"`
+
 	// Contact is how to reach whoever runs the node.
 	Contact string `yaml:"contact"`
 

@@ -502,6 +502,9 @@ legacy: |
 			{"node map URL not HTTP", "{address: Q1TEST, map: {apiUrl: 'ftp://map.example.org'}}", "Invalid URL"},
 			{"node map URL with no host", "{address: Q1TEST, map: {apiUrl: 'map.example.org'}}", "Invalid URL"},
 			{"node map locator not a locator", "{address: Q1TEST, map: {locator: IO9}}", "Invalid locator for the node map"},
+			{"node map antenna height with no locator", "{address: Q1TEST, map: {asl: 100}}", "antenna height needs a locator"},
+			{"node map antenna height too high", "{address: Q1TEST, map: {locator: IO91, asl: 9001}}", "Invalid antenna height 9001"},
+			{"node map antenna height too low", "{address: Q1TEST, map: {locator: IO91, asl: -501}}", "Invalid antenna height -501"},
 			{"node map port channel out of range", "{address: Q1TEST, map: {ports: {99: {usage: Access}}}}", "Invalid channel 99 for the node map's ports"},
 			{"node map port link type unknown", "{address: Q1TEST, map: {ports: {0: {linkType: AXUDP}}}}", "Invalid link type"},
 			{"node map port frequency not positive", "{address: Q1TEST, map: {ports: {0: {freq: -1}}}}", "Invalid frequency -1 for channel 0"},
@@ -740,6 +743,20 @@ func Test_config_yaml_node_map(t *testing.T) {
 		assert.Equal(t, "IO91", location.Locator)
 		assert.InDelta(t, 51.5, location.Coords.Lat, 1e-9)
 		assert.InDelta(t, -1, location.Coords.Lon, 1e-9)
+		assert.True(t, location.ASL.IsNothing())
+	})
+
+	t.Run("the node map can be told how high the antenna is", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node:\n  address: Q1TEST\n  map: {locator: IO91, asl: -2}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var config, _ = got.nodeMap.Get()
+		var location, located = config.Location.Get()
+		require.True(t, located)
+		assert.Equal(t, maybe.Just[int32](-2), location.ASL)
 	})
 
 	t.Run("the node map can be told who to contact, with a comment", func(t *testing.T) {

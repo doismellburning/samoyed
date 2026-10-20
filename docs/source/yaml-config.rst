@@ -278,6 +278,11 @@ These are the keys under ``samoyed``:
             which the map plots it at.
             Left out, the map is not told where the node is.
 
+        ``asl``
+            Optionally, the height of the node's antenna above sea level, in metres,
+            from -500 to 9000.
+            It needs ``locator``.
+
         ``contact``
             Optionally, how to reach whoever runs the node,
             which the map shows to anyone.

@@ -75,11 +75,14 @@ type Report struct {
 	Ports        []Port                `json:"ports,omitzero"`
 }
 
-// Location is where a node is: a Maidenhead locator, and the middle of the
-// square it names.
+// Location is where a node is: a Maidenhead locator, the middle of the
+// square it names, and how high its antenna is, if the map is to be told.
 type Location struct {
 	Locator string `json:"locator"`
 	Coords  LatLon `json:"coords"`
+
+	// ASL is the antenna's height above sea level, in metres.
+	ASL maybe.Maybe[int32] `json:"asl,omitzero"`
 }
 
 // LatLon is a position in degrees, north and east positive.
@@ -98,7 +101,7 @@ func LocationAt(locator string) (Location, error) {
 		return none, err
 	}
 
-	return Location{Locator: locator, Coords: LatLon{Lat: lat, Lon: lon}}, nil
+	return Location{Locator: locator, Coords: LatLon{Lat: lat, Lon: lon}, ASL: maybe.Nothing[int32]()}, nil
 }
 
 // Port is an interface a node links over: for Samoyed, a channel.  Anything

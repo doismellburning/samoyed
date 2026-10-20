@@ -196,13 +196,25 @@ func TestSend(t *testing.T) {
 	t.Run("says where the node is", func(t *testing.T) {
 		t.Parallel()
 
-		var location = Location{Locator: "IO91", Coords: LatLon{Lat: 51.5, Lon: -1}}
+		var location = Location{Locator: "IO91", Coords: LatLon{Lat: 51.5, Lon: -1}, ASL: maybe.Nothing[int32]()}
 
 		var server, requests = fakeMap(t, http.StatusOK)
 		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Just(location), Contact: "", Comment: "", Ports: nil}, server)
 
 		require.NoError(t, r.send(t.Context()))
 		assert.JSONEq(t, `{"location": {"locator": "IO91", "coords": {"lat": 51.5, "lon": -1}}, "software": {"name": "Samoyed"}}`, (<-requests).body)
+	})
+
+	t.Run("says how high the antenna is", func(t *testing.T) {
+		t.Parallel()
+
+		var location = Location{Locator: "IO91", Coords: LatLon{Lat: 51.5, Lon: -1}, ASL: maybe.Just[int32](120)}
+
+		var server, requests = fakeMap(t, http.StatusOK)
+		var r = reporterFor(Config{Address: "Q1TEST", Alias: "", APIURL: "", Location: maybe.Just(location), Contact: "", Comment: "", Ports: nil}, server)
+
+		require.NoError(t, r.send(t.Context()))
+		assert.JSONEq(t, `{"location": {"locator": "IO91", "coords": {"lat": 51.5, "lon": -1}, "asl": 120}, "software": {"name": "Samoyed"}}`, (<-requests).body)
 	})
 
 	t.Run("says who to contact, with a comment", func(t *testing.T) {
