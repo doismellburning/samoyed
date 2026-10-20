@@ -37,6 +37,12 @@ const defaultMapPage = DefaultURL + "/maps/packet"
 // interval is how often the node reports.
 const interval = time.Hour
 
+// settle is how long after the first report the second is sent.  The first
+// goes out as the node starts, before it has a link to any neighbour or has
+// heard anyone, so the second follows soon after, rather than an interval
+// later.
+const settle = 10 * time.Minute
+
 // softwareName is what the map is told the node runs.
 const softwareName = "Samoyed"
 
@@ -77,6 +83,7 @@ type Report struct {
 	Contact      string                `json:"contact,omitempty"`
 	SysopComment string                `json:"sysopComment,omitempty"`
 	Ports        []Port                `json:"ports,omitzero"`
+	Neighbours   []NeighbourLink       `json:"neighbours,omitzero"`
 	Aliases      map[string]Service    `json:"aliases,omitempty"`
 }
 
@@ -160,6 +167,26 @@ func ParseLinkType(name string) (LinkType, bool) {
 	}
 }
 
+// NeighbourLink is a link to a neighbouring node that is up.
+type NeighbourLink struct {
+	// Node is the neighbour's callsign, with any SSID.
+	Node string `json:"node"`
+
+	// Port is the ID of the port the link is over.
+	Port string `json:"port"`
+
+	// Quality, from 0 to 255, is what the link is taken to be worth.
+	Quality maybe.Maybe[int32] `json:"quality,omitzero"`
+
+	Type NeighbourType `json:"type"`
+}
+
+// NeighbourType is how a node knows of a neighbour.
+type NeighbourType string
+
+// NeighbourNetROM is a neighbour a node has a NET/ROM link to.
+const NeighbourNetROM NeighbourType = "NetRom"
+
 // Service is a service a node offers besides itself: what it is, such as
 // BBS or CHAT, and the callsign it answers to.
 type Service struct {
@@ -178,17 +205,23 @@ type Reporter struct {
 	config Config
 	client *http.Client
 
+	// neighbours is the node's links to its neighbours that are up now,
+	// or nil for a node that has none to tell of.
+	neighbours func() []NeighbourLink
+
 	// url is where the map is.
 	url string
 }
 
 // New makes a reporter that tells the map about the node config describes,
-// using client.
-func New(config Config, client *http.Client) *Reporter {
+// and its links to the neighbours that neighbours lists at the time of each
+// report, using client.  neighbours may be nil, for a node with none.
+func New(config Config, client *http.Client, neighbours func() []NeighbourLink) *Reporter {
 	var r = new(Reporter)
 
 	r.config = config
 	r.client = client
+	r.neighbours = neighbours
 	r.url = strings.TrimSuffix(config.APIURL, "/")
 	if r.url == "" {
 		r.url = DefaultURL
@@ -199,6 +232,11 @@ func New(config Config, client *http.Client) *Reporter {
 
 // Report is what the node says about itself.
 func (r *Reporter) Report() Report {
+	var neighbours []NeighbourLink
+	if r.neighbours != nil {
+		neighbours = r.neighbours()
+	}
+
 	return Report{
 		NodeAlias:    r.config.Alias,
 		Location:     r.config.Location,
@@ -206,19 +244,21 @@ func (r *Reporter) Report() Report {
 		Contact:      r.config.Contact,
 		SysopComment: r.config.Comment,
 		Ports:        r.config.Ports,
+		Neighbours:   neighbours,
 		Aliases:      r.config.Aliases,
 	}
 }
 
-// Run reports the node to the map now and every hour after, until ctx is
-// cancelled.  A report that fails is logged, and the next is sent as usual.
+// Run reports the node to the map now, again once it has settled, and every
+// hour after, until ctx is cancelled.  A report that fails is logged, and the
+// next is sent as usual.
 func (r *Reporter) Run(ctx context.Context) {
 	logrus.WithFields(logrus.Fields{
 		"node": r.config.Address,
 		"map":  r.where(),
 	}).Info("Reporting the node to the node map")
 
-	for ctx.Err() == nil {
+	for reports := 1; ctx.Err() == nil; reports++ {
 		var err = r.send(ctx)
 
 		switch {
@@ -230,10 +270,19 @@ func (r *Reporter) Run(ctx context.Context) {
 			logrus.WithField("node", r.config.Address).Debug("Reported the node to the node map")
 		}
 
-		if !dwutil.SleepCtx(ctx, interval) {
+		if !dwutil.SleepCtx(ctx, wait(reports)) {
 			return
 		}
 	}
+}
+
+// wait is how long to wait for the next report, after so many reports.
+func wait(reports int) time.Duration {
+	if reports == 1 {
+		return settle
+	}
+
+	return interval
 }
 
 // where is where to see the node: the public map's page of nodes, or, for

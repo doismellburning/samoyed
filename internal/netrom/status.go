@@ -29,6 +29,10 @@ type NeighbourStatus struct {
 	// Link is "up", "connecting" or "down".
 	Link string
 
+	// Quality, from 0 to 255, is what the node takes the link to it to be
+	// worth.
+	Quality int
+
 	// Failures is how many times in a row a link to it has failed.  Once
 	// that reaches neighbourFailLimit, Failing is set and routes through it
 	// are passed over until it is heard from again.
@@ -134,6 +138,7 @@ func (n *Node) Status() Status {
 		var nb NeighbourStatus
 		nb.Callsign = call
 		nb.Link = links[call].String()
+		nb.Quality = int(n.cfg.Quality)
 		nb.Failures = failures[call]
 		nb.Failing = nb.Failures >= neighbourFailLimit
 		s.Neighbours = append(s.Neighbours, nb)

@@ -46,6 +46,7 @@ Dashed arrows are connections made after construction rather than at it.
        nodeshell [label="node.Node\nnode shell"];
        netrom [label="netrom.Node\nNET/ROM node"];
        netromagw [label="netromAGWDataLink"];
+       nodemap [label="nodemap.Reporter\nnode map report"];
        igate [label="IGate"];
        digi [label="digipeater.Digipeater\nAPRS"];
        cdigi [label="digipeater.Connected\nconnected mode"];
@@ -111,6 +112,7 @@ Dashed arrows are connections made after construction rather than at it.
        netrom -> dlq [label="netrom.DataLink"];
        netrom -> tq [label="Append\n(dwcore.FrameSender)"];
        netrom -> agw [label="netrom.Reporter"];
+       nodemap -> netrom [label="Status\n(netromNeighbours)"];
        link -> tq [label="linkTransmitter"];
 
        kiss -> xmit [label="timing setters"];
@@ -202,6 +204,7 @@ so the order of construction follows the arrows:
 #. The IGate and the two digipeaters,
    then the node shell, if the configuration has one,
    and its report to the node map (``nodemap.Reporter``), if the configuration asks for one,
+   which asks the NET/ROM node, if there is one, which of its neighbours it has a link up to,
    then the NET/ROM node is started, if there is one,
    and the ``AX25Link``, the KISS handler and its transports,
    the APRStt gateway and the beacon service.
@@ -313,7 +316,8 @@ References
 - ``internal/node/node.go``: ``New``, ``DataLink``.
 - ``internal/netrom/node.go``: ``New``, ``DataLink``, ``Reporter``, ``Node.Start``, ``Node.HeardUI``,
   and ``internal/netrom/status.go``: ``Node.Status``.
-- ``internal/nodemap/nodemap.go``: ``New``, ``Reporter.Run``.
+- ``internal/nodemap/nodemap.go``: ``New``, ``Reporter.Run``,
+  and ``internal/direwolf/nodemap.go``: ``netromNeighbours``.
 - ``internal/dwcore/dwcore.go``: ``FrameSender``,
   shared by everything that hands the transmit queue a frame.
 - ``AGENTS.md``, the "Dependencies" section.

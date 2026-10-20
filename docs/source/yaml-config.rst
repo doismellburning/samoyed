@@ -253,7 +253,8 @@ These are the keys under ``samoyed``:
 
     ``map``
         Report the node to the `UK Packet Radio network map <https://nodes.ukpacketradio.network/>`_,
-        once at startup and every hour after.
+        once at startup, again ten minutes later, once it has had a chance to hear its neighbours,
+        and every hour after.
         At startup, the log says where the node can be seen:
         the public map's page of nodes,
         or, with ``apiUrl`` given, that map's API.
@@ -265,6 +266,9 @@ These are the keys under ``samoyed``:
         A network or serial TNC is reported as RF, and nothing more,
         since its radio is out of sight;
         an AXUDP port is reported as Internet.
+        With a NET/ROM node on one of those ports,
+        each report also lists the neighbours it has a link up to at the time,
+        which the map draws as links between the nodes.
         The settings below say more.
         It has:
 

@@ -35,7 +35,7 @@ func TestNodeStatus(t *testing.T) {
 	require.True(t, a.Send(0, 0, "Q1TEST", "QNODEB", []byte("hello")))
 
 	var s = a.Status()
-	assert.Equal(t, []NeighbourStatus{{Callsign: "Q2TEST-7", Link: "up", Failures: 0, Failing: false}}, s.Neighbours)
+	assert.Equal(t, []NeighbourStatus{{Callsign: "Q2TEST-7", Link: "up", Quality: int(DefaultQuality), Failures: 0, Failing: false}}, s.Neighbours)
 	assert.Equal(t, []DestinationStatus{{
 		Callsign: "Q2TEST-7",
 		Alias:    "QNODEB",
@@ -77,7 +77,7 @@ func TestNodeStatusConnectingNeighbour(t *testing.T) {
 
 	a.sendToNeighbour("Q2TEST-7", []byte("one"))
 
-	assert.Equal(t, []NeighbourStatus{{Callsign: "Q2TEST-7", Link: "connecting", Failures: 0, Failing: false}}, a.Status().Neighbours)
+	assert.Equal(t, []NeighbourStatus{{Callsign: "Q2TEST-7", Link: "connecting", Quality: int(DefaultQuality), Failures: 0, Failing: false}}, a.Status().Neighbours)
 }
 
 // A neighbour whose link keeps failing is shown as failing, even once its
@@ -96,5 +96,5 @@ func TestNodeStatusFailingNeighbour(t *testing.T) {
 
 	var s = a.Status()
 	assert.Empty(t, s.Destinations)
-	assert.Equal(t, []NeighbourStatus{{Callsign: "Q2TEST-7", Link: "down", Failures: 2, Failing: true}}, s.Neighbours)
+	assert.Equal(t, []NeighbourStatus{{Callsign: "Q2TEST-7", Link: "down", Quality: int(DefaultQuality), Failures: 2, Failing: true}}, s.Neighbours)
 }

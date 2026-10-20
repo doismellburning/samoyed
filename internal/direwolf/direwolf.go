@@ -826,7 +826,12 @@ x = Silence FX.25 information.`)
 		var client = new(http.Client)
 		client.Timeout = nodeMapTimeout
 
-		go nodemap.New(mapConfig, client).Run(ctx)
+		var neighbours func() []nodemap.NeighbourLink
+		if netromNode != nil {
+			neighbours = netromNeighbours(netromNode.Status, mapConfig.Ports)
+		}
+
+		go nodemap.New(mapConfig, client, neighbours).Run(ctx)
 	}
 
 	var netromClients linkClients
