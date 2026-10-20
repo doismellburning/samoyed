@@ -15,6 +15,13 @@ The packet modems follow the ITU modem standards:
 V.26 comes in alternatives A and B,
 and both ends need to agree on which.
 
+BPSK, at any bit rate, reverses the phase for each ``1`` bit.
+Samoyed eases each reversal through zero amplitude over the middle half of the symbol,
+rather than jumping the phase,
+which keeps the signal from splattering across neighbouring frequencies.
+The amplitude dip means the transmitter has to be linear:
+keep the audio level below where the ALC starts to act.
+
 References
 ----------
 

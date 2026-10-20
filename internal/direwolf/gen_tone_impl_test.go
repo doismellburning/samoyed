@@ -207,10 +207,15 @@ func TestToneGeneratorPutBitBPSK(t *testing.T) {
 
 	var before = tg.tonePhase
 
-	// A '1' flips the phase by 180 degrees before the samples go out.
+	assert.InDelta(t, 1.0, tg.bpskSign, 0)
+
+	// A '1' reverses the carrier by sweeping its amplitude through zero,
+	// leaving the phase accumulator to run on as usual.
 	tg.PutBit(1)
 	require.Len(t, sink.data, 40)
-	assert.Equal(t, before+PHASE_SHIFT_180+10*tg.f1ChangePerSample, tg.tonePhase)
+	assert.Equal(t, before+10*tg.f1ChangePerSample, tg.tonePhase)
+	assert.InDelta(t, -1.0, tg.bpskSign, 0)
+	assert.False(t, tg.bpskReversing)
 }
 
 func TestNewToneGeneratorQPSKAnd8PSK(t *testing.T) {

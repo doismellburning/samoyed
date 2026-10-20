@@ -81,6 +81,12 @@ type ToneGenerator struct {
 	saveBit int
 
 	prevDat int // Previous data bit.  Used for G3RUH style.
+
+	// BPSK sends a phase reversal by sweeping the carrier's amplitude
+	// from bpskSign to its opposite over the middle of a symbol, rather than
+	// jumping the phase 180 degrees, which would splatter.
+	bpskSign      float64 // +1 or -1: the carrier's sign between reversals.
+	bpskReversing bool    // The current symbol is a reversal.
 }
 
 /*------------------------------------------------------------------
@@ -143,6 +149,7 @@ func NewToneGenerator(channel int, audioConfig *RadioConfig, amp int, sink Audio
 		tg.samplesPerSymbol = float64(audioConfig.adev[a].samples_per_sec) / float64(audioConfig.achan[channel].baud)
 
 		tg.tonePhase = PHASE_SHIFT_45
+		tg.bpskSign = 1
 
 	case MODEM_QPSK:
 		audioConfig.achan[channel].mark_freq = 1800
@@ -401,10 +408,9 @@ func (tg *ToneGenerator) PutBit(dat int) {
 		dat &= 1 // Keep only LSB to be extra safe.
 
 		// For BPSK, each bit is one symbol.
-		// Bit 1 shifts phase by 180 degrees; bit 0 leaves phase unchanged.
-		if dat == 1 {
-			tg.tonePhase += PHASE_SHIFT_180
-		}
+		// Bit 1 reverses the phase; bit 0 leaves it unchanged.
+		// The reversal is shaped over the symbol in the sample loop below.
+		tg.bpskReversing = dat == 1
 	}
 
 	if audioConfig.achan[tg.channel].modem_type == MODEM_QPSK {
@@ -510,7 +516,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 		case MODEM_BPSK:
 			tg.tonePhase += tg.f1ChangePerSample
-			sam = int(tg.sineTable[(tg.tonePhase>>24)&0xff])
+			sam = int(tg.bpskEnvelope() * float64(tg.sineTable[(tg.tonePhase>>24)&0xff]))
 			tg.PutSample(sam)
 
 		case MODEM_QPSK:
@@ -598,7 +604,34 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 	tg.bitLenAcc -= tg.ticksPerBit
 
+	if tg.bpskReversing {
+		tg.bpskSign = -tg.bpskSign
+		tg.bpskReversing = false
+	}
+
 	tg.prevDat = dat // Only needed for G3RUH baseband/scrambled.
+}
+
+// bpskEnvelope is the BPSK carrier's amplitude for the sample about to go
+// out.  It holds at bpskSign, except over the middle half of a reversal's
+// symbol, where it follows half a cosine cycle from bpskSign to its opposite.
+// The envelope and its slope are then continuous, so the sidebands fall away
+// quickly instead of spreading across the band as an instant phase jump's
+// would.  Sweeping over the whole symbol, as PSK31 does, is cleaner still but
+// costs the demodulator too much: the carrier spends longer at low amplitude.
+// The envelope passes through zero mid-reversal, so the transmitter has to
+// be linear.
+func (tg *ToneGenerator) bpskEnvelope() float64 {
+	if !tg.bpskReversing {
+		return tg.bpskSign
+	}
+
+	// How far through the symbol this sample's midpoint is, 0 .. 1, then
+	// how far through the sweep across the middle half of it.
+	var frac = (float64(tg.bitLenAcc) + float64(tg.ticksPerSample)/2) / float64(tg.ticksPerBit)
+	frac = math.Min(math.Max(2*(frac-0.25), 0), 1)
+
+	return tg.bpskSign * math.Cos(math.Pi*frac)
 }
 
 func (tg *ToneGenerator) PutSample(sam int) {
