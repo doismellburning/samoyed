@@ -108,6 +108,12 @@ type TransmitQueue struct {
 	// a transmitter of ours - a network TNC or AXUDP one - is clear to send
 	// on, or is nil for nobody to tell.
 	seizeConfirm seizeConfirmer
+
+	// onTransmit is told each frame sent on a channel that goes somewhere
+	// other than a queue - the IGate, a network or serial TNC, AXUDP - as
+	// the transmit thread tells it of those it sends over the radio, or is
+	// nil.
+	onTransmit transmitReporter
 }
 
 /*-------------------------------------------------------------------
@@ -198,6 +204,17 @@ func tq_is_real_packet(pp *ax25.Packet) bool {
 // for its channel.
 func (tq *TransmitQueue) SetIGate(toIGate igateSender) {
 	tq.toIGate = toIGate
+}
+
+// SetOnTransmit hands the queue what to tell of each frame it sends on a
+// channel that goes somewhere other than a queue.  It must be called before
+// anything is queued: it is read without a lock.
+//
+// This is set after construction, rather than handed to NewTransmitQueue,
+// because what it tells includes the AGW server, which is itself built with
+// the queue, to queue its clients' frames on.
+func (tq *TransmitQueue) SetOnTransmit(onTransmit transmitReporter) {
+	tq.onTransmit = onTransmit
 }
 
 /*-------------------------------------------------------------------
@@ -315,17 +332,31 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 		ax25.SafePrint(pinfo, !pp.IsAPRS())
 		fmt.Println()
 
+		// Only a frame that went somewhere is reported as sent.  The IGate
+		// takes whatever it is handed, sending it on to APRS-IS if it can.
+		var sent bool
+
 		switch tq.audioConfig.chan_medium[channel] {
 		case MEDIUM_IGATE:
 			if tq.toIGate != nil {
 				tq.toIGate(channel, pp)
+
+				sent = true
 			}
 		case MediumSerialTNC:
-			tq.serialTNCs[channel].sendPacket(channel, pp)
+			sent = tq.serialTNCs[channel].sendPacket(channel, pp)
 		case MEDIUM_AXUDP:
-			tq.axudpChannels[channel].sendPacket(channel, pp)
+			sent = tq.axudpChannels[channel].sendPacket(channel, pp)
 		default: // network TNC
-			tq.netTNCs[channel].sendPacket(channel, pp)
+			sent = tq.netTNCs[channel].sendPacket(channel, pp)
+		}
+
+		if !sent {
+			return
+		}
+
+		if tq.onTransmit != nil {
+			tq.onTransmit(channel, pp)
 		}
 
 		return

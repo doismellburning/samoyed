@@ -139,7 +139,7 @@ type XmitService struct {
 	queue xmitQueue
 
 	// onTransmit is told each frame we send, and its channel, or is nil.
-	onTransmit func(channel int, pp *ax25.Packet)
+	onTransmit transmitReporter
 
 	// seizeConfirm tells the data link state machine that a channel's
 	// transmission opportunity has arrived, or is nil for nobody to tell.
@@ -157,6 +157,12 @@ type XmitService struct {
 	fx25Debug int
 	il2pDebug int
 }
+
+// transmitReporter is told each frame sent, and the channel it was sent on:
+// by the transmit threads for a radio channel, and by the transmit queue for
+// one that goes somewhere else.  DirewolfMain's passes each on to the web
+// interface and the AGW clients monitoring.
+type transmitReporter func(channel int, pp *ax25.Packet)
 
 // xmitQueue is what the transmit threads take frames from, and wait on when
 // there are none.  *TransmitQueue is one.
@@ -220,7 +226,7 @@ func NewXmitService(
 	queue xmitQueue,
 	setPTT func(channel int, on bool),
 	dataDetect func(channel int) bool,
-	onTransmit func(channel int, pp *ax25.Packet),
+	onTransmit transmitReporter,
 	seizeConfirm seizeConfirmer,
 	debug_xmit_packet bool,
 	fx25Debug int,

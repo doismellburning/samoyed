@@ -384,24 +384,24 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
  *
  * Outputs:	Packet is converted to KISS and send to network TNC.
  *
- * Returns:	none.
+ * Returns:	Whether the packet was sent.
  *
  * Description:	This does not free the packet object; caller is responsible.
  *
  *-----------------------------------------------------------------*/
 
-func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) {
+func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) bool {
 	if nt == nil {
 		logrus.WithField("channel", channel).Error("Not connected to network TNC; discarding packet")
 
-		return
+		return false
 	}
 
 	var conn = nt.getSock()
 	if conn == nil {
 		logrus.WithField("channel", channel).Error("Not connected to network TNC; discarding packet")
 
-		return
+		return false
 	}
 
 	// First, get the on-air frame format from packet object.
@@ -419,7 +419,11 @@ func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) {
 	if err != nil {
 		logrus.WithError(err).WithField("channel", channel).Error("Error sending packet to KISS network TNC; closing connection")
 		nt.closeSockIfCurrent(conn)
+
+		return false
 	}
 
 	// Do not free packet object;  caller will take care of it.
+
+	return true
 } /* end sendPacket */

@@ -686,6 +686,8 @@ x = Silence FX.25 information.`)
 		agwServer.SendMonitored(channel, pp, 1)
 	}
 
+	transmitQueue.SetOnTransmit(onTransmit)
+
 	/*
 	 * Start the transmit threads.
 	 */
