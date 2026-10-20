@@ -85,6 +85,7 @@ type Report struct {
 	Ports        []Port                `json:"ports,omitzero"`
 	Neighbours   []NeighbourLink       `json:"neighbours,omitzero"`
 	Aliases      map[string]Service    `json:"aliases,omitempty"`
+	MHeard       []Heard               `json:"mheard,omitzero"`
 }
 
 // Location is where a node is: a Maidenhead locator, the middle of the
@@ -187,6 +188,39 @@ type NeighbourType string
 // NeighbourNetROM is a neighbour a node has a NET/ROM link to.
 const NeighbourNetROM NeighbourType = "NetRom"
 
+// Heard is a station a node has heard.
+type Heard struct {
+	// Callsign is the station's callsign, with any SSID.
+	Callsign string `json:"callsign"`
+
+	// Port is the ID of the port it was last heard on.
+	Port string `json:"port"`
+
+	// Packets is how many times it has been heard.
+	Packets maybe.Maybe[int64] `json:"packets,omitzero"`
+
+	FirstHeard Timestamp `json:"firstHeard,omitzero"`
+	LastHeard  Timestamp `json:"lastHeard,omitzero"`
+
+	// Coords is where it last said it was, if it has.
+	Coords maybe.Maybe[LatLon] `json:"coords,omitzero"`
+}
+
+// Timestamp is a time as the map has it: UTC, to the second, as
+// 2006-01-02 15:04:05.
+type Timestamp struct {
+	time.Time
+}
+
+// timestampLayout is how the map writes a Timestamp.
+const timestampLayout = time.DateTime
+
+// MarshalJSON is t as the map has it.  It is MarshalJSON, not MarshalText,
+// so as to take the place of time.Time's own.
+func (t Timestamp) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.UTC().Format(timestampLayout)) //nolint:wrapcheck // A string always marshals.
+}
+
 // Service is a service a node offers besides itself: what it is, such as
 // BBS or CHAT, and the callsign it answers to.
 type Service struct {
@@ -209,19 +243,25 @@ type Reporter struct {
 	// or nil for a node that has none to tell of.
 	neighbours func() []NeighbourLink
 
+	// heard is the stations the node has heard, or nil for a node that
+	// does not keep track.
+	heard func() []Heard
+
 	// url is where the map is.
 	url string
 }
 
 // New makes a reporter that tells the map about the node config describes,
-// and its links to the neighbours that neighbours lists at the time of each
-// report, using client.  neighbours may be nil, for a node with none.
-func New(config Config, client *http.Client, neighbours func() []NeighbourLink) *Reporter {
+// its links to the neighbours that neighbours lists, and the stations heard
+// lists, each asked at the time of each report, using client.  neighbours and
+// heard may be nil, for a node with nothing to tell of.
+func New(config Config, client *http.Client, neighbours func() []NeighbourLink, heard func() []Heard) *Reporter {
 	var r = new(Reporter)
 
 	r.config = config
 	r.client = client
 	r.neighbours = neighbours
+	r.heard = heard
 	r.url = strings.TrimSuffix(config.APIURL, "/")
 	if r.url == "" {
 		r.url = DefaultURL
@@ -237,6 +277,11 @@ func (r *Reporter) Report() Report {
 		neighbours = r.neighbours()
 	}
 
+	var heard []Heard
+	if r.heard != nil {
+		heard = r.heard()
+	}
+
 	return Report{
 		NodeAlias:    r.config.Alias,
 		Location:     r.config.Location,
@@ -246,6 +291,7 @@ func (r *Reporter) Report() Report {
 		Ports:        r.config.Ports,
 		Neighbours:   neighbours,
 		Aliases:      r.config.Aliases,
+		MHeard:       heard,
 	}
 }
 

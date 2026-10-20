@@ -269,6 +269,12 @@ These are the keys under ``samoyed``:
         With a NET/ROM node on one of those ports,
         each report also lists the neighbours it has a link up to at the time,
         which the map draws as links between the nodes.
+        Each report also lists up to 100 of the stations most recently heard directly on those ports,
+        with how many times each has been heard, when it was first and last heard,
+        and where it last said it was, if it has.
+        A station heard only through a digipeater is left out,
+        since Samoyed does not keep which digipeaters it came through,
+        and the map would take it to have been heard directly.
         The settings below say more.
         It has:
 

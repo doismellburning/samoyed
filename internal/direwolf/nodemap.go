@@ -8,9 +8,14 @@ import (
 	"strconv"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/nodemap"
 )
+
+// mapHeardLimit is the most stations heard the node map is told of, most
+// recently heard first.
+const mapHeardLimit = 100
 
 // reportedPorts is the IDs of the ports the node map is told of.  Anything
 // else the map is told that names a port must name one of these, or it names
@@ -54,5 +59,40 @@ func netromNeighbours(status func() netrom.Status, ports []nodemap.Port) func() 
 		}
 
 		return links
+	}
+}
+
+// stationsHeard is, for the node map, the stations heardRF lists at the time
+// that were heard directly, on one of ports, most recently heard first.  The
+// heard list does not keep the digipeaters a station came through, and one
+// listed without them would be taken to have been heard directly, so a
+// station heard only through a digipeater is left out.
+func stationsHeard(heardRF func(limit int) []mheard.Heard, ports []nodemap.Port) func() []nodemap.Heard {
+	var reported = reportedPorts(ports)
+
+	return func() []nodemap.Heard {
+		var stations []nodemap.Heard
+
+		for _, h := range heardRF(math.MaxInt) {
+			if len(stations) >= mapHeardLimit {
+				break
+			}
+
+			var port = strconv.Itoa(h.Channel)
+			if h.Hops != 0 || !reported[port] {
+				continue
+			}
+
+			stations = append(stations, nodemap.Heard{
+				Callsign:   h.Callsign,
+				Port:       port,
+				Packets:    maybe.Just(int64(h.Packets)),
+				FirstHeard: nodemap.Timestamp{Time: h.FirstHeard},
+				LastHeard:  nodemap.Timestamp{Time: h.LastHeard},
+				Coords:     maybe.LiftA2(func(lat, lon float64) nodemap.LatLon { return nodemap.LatLon{Lat: lat, Lon: lon} }, h.Lat, h.Lon),
+			})
+		}
+
+		return stations
 	}
 }

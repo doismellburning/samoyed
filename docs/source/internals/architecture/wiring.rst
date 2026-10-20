@@ -156,7 +156,7 @@ The diagram leaves out what is plain configuration
 and the ``digipeater.Port`` for each channel that ``RadioConfig.digipeaterPorts`` takes from it for the digipeaters)
 and the services with only one user,
 which ``DirewolfMain`` hands over in the same way:
-the heard list (``mheard``) to the packet filter, the IGate, the beacon service, the received packet handler and the node shell;
+the heard list (``mheard``) to the packet filter, the IGate, the beacon service, the received packet handler, the node shell and its report to the node map;
 the packet filter to the IGate and the digipeaters;
 the APRS log to the beacon service and the received packet handler;
 the GPS to the beacon service and the waypoint sender;
@@ -205,6 +205,7 @@ so the order of construction follows the arrows:
    then the node shell, if the configuration has one,
    and its report to the node map (``nodemap.Reporter``), if the configuration asks for one,
    which asks the NET/ROM node, if there is one, which of its neighbours it has a link up to,
+   and the heard list which stations it has heard,
    then the NET/ROM node is started, if there is one,
    and the ``AX25Link``, the KISS handler and its transports,
    the APRStt gateway and the beacon service.
@@ -317,7 +318,7 @@ References
 - ``internal/netrom/node.go``: ``New``, ``DataLink``, ``Reporter``, ``Node.Start``, ``Node.HeardUI``,
   and ``internal/netrom/status.go``: ``Node.Status``.
 - ``internal/nodemap/nodemap.go``: ``New``, ``Reporter.Run``,
-  and ``internal/direwolf/nodemap.go``: ``netromNeighbours``.
+  and ``internal/direwolf/nodemap.go``: ``netromNeighbours``, ``stationsHeard``.
 - ``internal/dwcore/dwcore.go``: ``FrameSender``,
   shared by everything that hands the transmit queue a frame.
 - ``AGENTS.md``, the "Dependencies" section.

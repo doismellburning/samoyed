@@ -4,9 +4,12 @@
 package direwolf
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/netrom"
 	"github.com/doismellburning/samoyed/internal/nodemap"
 	"github.com/stretchr/testify/assert"
@@ -63,5 +66,83 @@ func TestNetROMNeighbours(t *testing.T) {
 		up = true
 
 		assert.Len(t, neighbours(), 1)
+	})
+}
+
+// heardOn is a station heard on channel through hops digipeaters.
+func heardOn(callsign string, channel int, hops int, when time.Time) mheard.Heard {
+	return mheard.Heard{
+		Callsign:   callsign,
+		Channel:    channel,
+		Hops:       hops,
+		Packets:    3,
+		FirstHeard: when.Add(-time.Hour),
+		LastHeard:  when,
+		Lat:        maybe.Nothing[float64](),
+		Lon:        maybe.Nothing[float64](),
+	}
+}
+
+func TestStationsHeard(t *testing.T) {
+	t.Parallel()
+
+	var ports = []nodemap.Port{mapPortFor("0", nodemap.LinkRF), mapPortFor("10", nodemap.LinkInternet)}
+	var now = time.Date(2026, 10, 20, 8, 0, 0, 0, time.UTC)
+
+	t.Run("lists the stations heard directly on the ports the map is told of", func(t *testing.T) {
+		t.Parallel()
+
+		var located = heardOn("Q2TEST-7", 0, 0, now)
+		located.Lat = maybe.Just(51.5)
+		located.Lon = maybe.Just(-1.0)
+
+		var heard = []mheard.Heard{
+			located,
+			heardOn("Q3TEST", 0, 1, now),  // Through a digipeater.
+			heardOn("Q4TEST", 1, 0, now),  // On a port the map is not told of.
+			heardOn("Q5TEST", 10, 0, now), // Missing its position.
+		}
+
+		var asked int
+
+		var stations = stationsHeard(func(limit int) []mheard.Heard {
+			asked = limit
+
+			return heard
+		}, ports)()
+
+		assert.Positive(t, asked)
+		assert.Equal(t, []nodemap.Heard{
+			{
+				Callsign:   "Q2TEST-7",
+				Port:       "0",
+				Packets:    maybe.Just[int64](3),
+				FirstHeard: nodemap.Timestamp{Time: now.Add(-time.Hour)},
+				LastHeard:  nodemap.Timestamp{Time: now},
+				Coords:     maybe.Just(nodemap.LatLon{Lat: 51.5, Lon: -1}),
+			},
+			{
+				Callsign:   "Q5TEST",
+				Port:       "10",
+				Packets:    maybe.Just[int64](3),
+				FirstHeard: nodemap.Timestamp{Time: now.Add(-time.Hour)},
+				LastHeard:  nodemap.Timestamp{Time: now},
+				Coords:     maybe.Nothing[nodemap.LatLon](),
+			},
+		}, stations)
+	})
+
+	t.Run("lists at most so many, most recently heard first", func(t *testing.T) {
+		t.Parallel()
+
+		var heard []mheard.Heard
+		for i := range mapHeardLimit + 10 {
+			heard = append(heard, heardOn(fmt.Sprintf("Q%dTEST", i), 0, 0, now.Add(-time.Duration(i)*time.Minute)))
+		}
+
+		var stations = stationsHeard(func(int) []mheard.Heard { return heard }, ports)()
+
+		assert.Len(t, stations, mapHeardLimit)
+		assert.Equal(t, "Q0TEST", stations[0].Callsign)
 	})
 }

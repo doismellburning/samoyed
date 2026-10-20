@@ -831,7 +831,7 @@ x = Silence FX.25 information.`)
 			neighbours = netromNeighbours(netromNode.Status, mapConfig.Ports)
 		}
 
-		go nodemap.New(mapConfig, client, neighbours).Run(ctx)
+		go nodemap.New(mapConfig, client, neighbours, stationsHeard(mheardDB.HeardRF, mapConfig.Ports)).Run(ctx)
 	}
 
 	var netromClients linkClients
