@@ -289,3 +289,26 @@ func TestAppendForTheIGateChannelGoesToTheIGate(t *testing.T) {
 
 	assert.Equal(t, []string{fmt.Sprintf("%d Q1TEST>APRS:hello", MAX_RADIO_CHANS)}, sent)
 }
+
+// Lengths counts the packets waiting on each channel at each priority, and
+// not the null frame a seize request queues.
+func TestTqLengths(t *testing.T) {
+	t.Parallel()
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[0] = MEDIUM_RADIO
+	audioConfig.chan_medium[1] = MEDIUM_RADIO
+
+	var tq = newTestTransmitQueue(audioConfig)
+
+	tq.LMSeizeRequest(0)
+	tq.Append(0, TQ_PRIO_0_HI, ax25.FromText("Q1TEST>APRS:>one", true))
+	tq.Append(1, TQ_PRIO_1_LO, ax25.FromText("Q1TEST>APRS:>two", true))
+	tq.Append(1, TQ_PRIO_1_LO, ax25.FromText("Q1TEST>APRS:>three", true))
+
+	var want [MAX_RADIO_CHANS][TQ_NUM_PRIO]int
+	want[0][TQ_PRIO_0_HI] = 1
+	want[1][TQ_PRIO_1_LO] = 2
+
+	assert.Equal(t, want, tq.Lengths())
+}

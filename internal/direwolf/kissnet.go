@@ -264,15 +264,50 @@ func NewKissNetService(ctx context.Context, mc *misc_config_s, addrs []KissNetAd
 func (kns *KissNetService) Addrs() []net.Addr {
 	var addrs []net.Addr
 
-	for kps := kns.allPorts; kps != nil; kps = kps.pnext {
+	for _, kps := range kns.ports() {
 		if kps.listener != nil {
 			addrs = append(addrs, kps.listener.Addr())
 		}
 	}
 
-	slices.Reverse(addrs) // The list is newest first.
-
 	return addrs
+}
+
+// ports is the service's ports in the order they were given.
+func (kns *KissNetService) ports() []*kissport_status_s {
+	var ports []*kissport_status_s
+	for kps := kns.allPorts; kps != nil; kps = kps.pnext {
+		ports = append(ports, kps)
+	}
+
+	slices.Reverse(ports) // The list is newest first.
+
+	return ports
+}
+
+// kissNetAttached is a client attached to one of the KISS TCP ports.
+type kissNetAttached struct {
+	port    int
+	channel int // The radio channel the port carries, -1 for all.
+	addr    net.Addr
+}
+
+// attachedClients is each client attached to the service, port by port in the
+// order the ports were given, or none for a nil service.
+func (kns *KissNetService) attachedClients() []kissNetAttached {
+	if kns == nil {
+		return nil
+	}
+
+	var attached []kissNetAttached
+
+	for _, kps := range kns.ports() {
+		for _, addr := range kps.clientAddrs() {
+			attached = append(attached, kissNetAttached{port: kps.tcp_port, channel: kps.channel, addr: addr})
+		}
+	}
+
+	return attached
 }
 
 // Close gives up the ports of a service that was never started, which would

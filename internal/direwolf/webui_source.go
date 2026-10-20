@@ -63,19 +63,101 @@ func webui_start(ctx context.Context, server *webui.Server, status webui.StatusF
 	logrus.WithField("address", listening).Info("Web interface listening")
 }
 
-// webStatus reports the station's own state to the web interface: started is
-// when it started, ig its IGate and node its NET/ROM node, either of which may
-// be nil.
-func webStatus(started time.Time, ig *IGate, node *netrom.Node) webui.StatusFunc {
+// webStatusSources is what the web interface's status is drawn from.  Any of
+// igate and netrom may be nil, for a station without one.
+type webStatusSources struct {
+	started time.Time
+	audio   *RadioConfig
+	igate   *IGate
+	netrom  *netrom.Node
+
+	// queueLengths is how much waits in each radio channel's transmit
+	// queue.
+	queueLengths func() [MAX_RADIO_CHANS][TQ_NUM_PRIO]int
+
+	// The servers client applications attach to, either of which may be
+	// nil.
+	agw     *AGWServer
+	kissNet *KissNetService
+}
+
+// webStatus reports the station's own state to the web interface, from src.
+func webStatus(src *webStatusSources) webui.StatusFunc {
 	return func() webui.Status {
 		var s webui.Status
 		s.Version = version.Version
-		s.Started = started
-		s.IGate = webIGateStatus(ig)
-		s.NetROM = webNetROMStatus(node)
+		s.Started = src.started
+		s.IGate = webIGateStatus(src.igate)
+		s.NetROM = webNetROMStatus(src.netrom)
+		s.Queues = webQueues(src.audio, src.queueLengths())
+		s.Clients = webClients(src.agw, src.kissNet)
 
 		return s
 	}
+}
+
+// webQueues describes the transmit queue of each radio channel for the web
+// interface.  Only a radio channel has one: frames for any other kind go
+// straight to whatever carries them.
+func webQueues(audio *RadioConfig, lengths [MAX_RADIO_CHANS][TQ_NUM_PRIO]int) []webui.QueueStatus {
+	if audio == nil {
+		return nil
+	}
+
+	var queues []webui.QueueStatus
+
+	for channel := range MAX_RADIO_CHANS {
+		if audio.chan_medium[channel] != MEDIUM_RADIO {
+			continue
+		}
+
+		queues = append(queues, webui.QueueStatus{
+			Channel: channel,
+			High:    lengths[channel][TQ_PRIO_0_HI],
+			Low:     lengths[channel][TQ_PRIO_1_LO],
+		})
+	}
+
+	return queues
+}
+
+// webClients describes the client applications attached to agw and kissNet
+// for the web interface.
+func webClients(agw *AGWServer, kissNet *KissNetService) []webui.ClientStatus {
+	var clients []webui.ClientStatus
+
+	var agwPort = addrPort(agw.Addr())
+
+	for _, c := range agw.attachedClients() {
+		var client webui.ClientStatus
+		client.Protocol = "agw"
+		client.Port = agwPort
+		client.Address = c.conn.RemoteAddr().String()
+		client.Raw = c.sendRaw
+		client.Monitor = c.sendMonitor
+
+		// One on this machine needs no login, so has none to report.
+		if agw.loginRequired() && !c.loginExempt {
+			client.LoggedIn = maybe.Just(c.loggedIn)
+		}
+
+		clients = append(clients, client)
+	}
+
+	for _, c := range kissNet.attachedClients() {
+		var client webui.ClientStatus
+		client.Protocol = "kiss"
+		client.Port = c.port
+		client.Address = c.addr.String()
+
+		if c.channel >= 0 {
+			client.Channel = maybe.Just(c.channel)
+		}
+
+		clients = append(clients, client)
+	}
+
+	return clients
 }
 
 // webChannel describes a configured channel for the web interface, or Nothing

@@ -100,6 +100,9 @@ Dashed arrows are connections made after construction rather than at it.
        digi -> igate [label="rememberDigipeated"];
        web -> igate [label="webStatus\n(at Start)", style=dashed];
        web -> netrom [label="webStatus\n(at Start)", style=dashed];
+       web -> tq [label="webStatus\n(at Start)", style=dashed];
+       web -> agw [label="webStatus\n(at Start)", style=dashed];
+       web -> kissnet [label="webStatus\n(at Start)", style=dashed];
        digi -> tq [label="Append"];
        cdigi -> tq [label="Append"];
 
@@ -184,7 +187,8 @@ so the order of construction follows the arrows:
 #. The tone generators and the PTT.
 #. The web interface and the AGW server.
    The web interface binds its port as it is made,
-   but only starts serving once the IGate it reports on exists;
+   but only starts serving once everything its status reports on exists,
+   after the KISS TCP service has started;
    with its port disabled, or taken, there is no hub,
    and the frames that would have gone to it go nowhere.
    The AGW server is made here,
@@ -243,14 +247,16 @@ It binds its ports when it is made, though,
 so a port already in use is reported before the service starts,
 rather than once it is running.
 
-**The web interface, the IGate and the NET/ROM node.**
+**The web interface and what it reports on.**
 The web interface's hub is handed to the transmit service and the received packet handler,
 which are made before the IGate,
-and its status page reports on the IGate's connection to APRS-IS
-and on the NET/ROM node's neighbours, routes and circuits.
-The hub and the server are made, and the port bound, before either;
+and its status page reports on the IGate's connection to APRS-IS,
+the NET/ROM node's neighbours, routes and circuits,
+the depth of the ``TransmitQueue`` (``TransmitQueue.Lengths``),
+and the clients attached to the AGW server and the KISS TCP service.
+The hub and the server are made, and the port bound, before any of them;
 the server is handed the station's status (``webStatus``) when it is started (``webui.Server.Start``),
-once the IGate and the NET/ROM node exist.
+once they all exist.
 
 **The AGW server and the NET/ROM node.**
 The NET/ROM node tells the AGW clients about their circuits,

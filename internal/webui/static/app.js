@@ -91,18 +91,45 @@
         el("span", {}, el("b", { text: String(nr.circuits.length) }), " circuits")));
   }
 
+  function clientLine(c) {
+    const parts = [`${c.protocol.toUpperCase()} ${c.port}`, c.address];
+    if (c.channel !== undefined) parts.push(`channel ${c.channel}`);
+    const wants = [c.monitor && "monitor", c.raw && "raw"].filter(Boolean);
+    if (wants.length) parts.push(wants.join(", "));
+    if (c.loggedIn !== undefined) parts.push(c.loggedIn ? "logged in" : "not logged in");
+    return el("li", { text: parts.join(" · ") });
+  }
+
+  function clientsCard(clients) {
+    const count = (protocol) => clients.filter((c) => c.protocol === protocol).length;
+    return el("div", { class: "channel clients" },
+      el("div", { class: "label", text: "Clients" }),
+      el("div", { class: "figures" },
+        el("span", {}, el("b", { text: String(count("agw")) }), " AGW"),
+        el("span", {}, el("b", { text: String(count("kiss")) }), " KISS")),
+      el("ul", {}, ...clients.map(clientLine)));
+  }
+
   function renderChannels() {
     const box = $("channels");
     box.replaceChildren();
     if (status && status.igate) box.append(igateCard(status.igate));
     if (status && status.netrom) box.append(netromCard(status.netrom));
+    if (status && status.clients) box.append(clientsCard(status.clients));
+    const queues = new Map(((status && status.queues) || []).map((q) => [q.channel, q]));
     for (const c of [...channels.values()].sort((a, b) => a.number - b.number)) {
+      const figures = el("div", { class: "figures" },
+        el("span", { class: "rx" }, el("b", { text: String(c.rx) }), " rx"),
+        el("span", { class: "tx" }, el("b", { text: String(c.tx) }), " tx"));
+      const q = queues.get(c.number);
+      if (q) {
+        figures.append(el("span", { class: "queued", title: `${q.high} high priority, ${q.low} low` },
+          el("b", { text: String(q.high + q.low) }), " queued"));
+      }
       box.append(el("div", { class: "channel" },
         el("div", { class: "label", text: `Channel ${c.number} · ${c.description || "unknown"}` +
           (c.callsign ? ` · ${c.callsign}` : "") }),
-        el("div", { class: "figures" },
-          el("span", { class: "rx" }, el("b", { text: String(c.rx) }), " rx"),
-          el("span", { class: "tx" }, el("b", { text: String(c.tx) }), " tx"))));
+        figures));
     }
   }
 
@@ -379,8 +406,8 @@
     renderNetrom();
   }
 
-  // The IGate's counts and the NET/ROM node's tables change without any
-  // event to say so.
+  // The IGate's counts, the NET/ROM node's tables, the transmit queues and
+  // the attached clients change without any event to say so.
   async function refreshStatus() {
     try {
       setStationStatus(await getJSON("api/status"));
