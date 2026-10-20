@@ -223,6 +223,20 @@ type NodeMapSettings struct {
 	// ports where that is not what the channel's configuration suggests,
 	// or is more than it can.
 	Ports map[int]NodeMapPortSettings `yaml:"ports"`
+
+	// Aliases, keyed by alias, are the services the node offers besides
+	// itself, such as a BBS that another program runs over AGW.
+	Aliases map[string]NodeMapServiceSettings `yaml:"aliases"`
+}
+
+// NodeMapServiceSettings describes a service the node offers to the node
+// map.
+type NodeMapServiceSettings struct {
+	// Service is what it is, such as BBS or CHAT.
+	Service string `yaml:"service"`
+
+	// Callsign is the address it answers to, with any SSID.
+	Callsign string `yaml:"callsign"`
 }
 
 // NodeMapPortSettings describes one of the node's ports to the node map.  A

@@ -330,6 +330,21 @@ These are the keys under ``samoyed``:
             ``comment``
                 A short note about the port.
 
+        ``aliases``
+            Optionally, the services the node offers besides itself,
+            such as a BBS or chat server that another program runs over AGW or KISS,
+            keyed by the alias each is known by:
+            up to six letters, digits or ``#_&-/``, such as ``SAMBBS``.
+            Samoyed cannot see what such a program offers,
+            so the map is told only what is listed here.
+            Each has:
+
+            ``service``
+                What it is, such as ``BBS`` or ``CHAT``.
+
+            ``callsign``
+                The address it answers to, with any SSID, such as ``Q1TEST-3``.
+
     The node answers each line it is sent,
     heading the reply with its alias and callsign, as ``SAMNOD:Q1TEST-7}``.
     Its commands are:

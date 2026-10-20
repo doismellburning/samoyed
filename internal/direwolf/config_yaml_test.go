@@ -505,6 +505,12 @@ legacy: |
 			{"node map antenna height with no locator", "{address: Q1TEST, map: {asl: 100}}", "antenna height needs a locator"},
 			{"node map antenna height too high", "{address: Q1TEST, map: {locator: IO91, asl: 9001}}", "Invalid antenna height 9001"},
 			{"node map antenna height too low", "{address: Q1TEST, map: {locator: IO91, asl: -501}}", "Invalid antenna height -501"},
+			{"node map alias empty", "{address: Q1TEST, map: {aliases: {'': {service: BBS, callsign: Q1TEST-3}}}}", "Invalid alias"},
+			{"node map alias too long", "{address: Q1TEST, map: {aliases: {SAMBBSX: {service: BBS, callsign: Q1TEST-3}}}}", "Invalid alias"},
+			{"node map alias with a space", "{address: Q1TEST, map: {aliases: {'SAM BB': {service: BBS, callsign: Q1TEST-3}}}}", "Invalid alias"},
+			{"node map alias twice", "{address: Q1TEST, map: {aliases: {SAMBBS: {service: BBS, callsign: Q1TEST-3}, sambbs: {service: BBS, callsign: Q1TEST-4}}}}", "more than once"},
+			{"node map alias with no service", "{address: Q1TEST, map: {aliases: {SAMBBS: {callsign: Q1TEST-3}}}}", "No service given for alias SAMBBS"},
+			{"node map alias with a bad callsign", "{address: Q1TEST, map: {aliases: {SAMBBS: {service: BBS, callsign: Q1TEST-99}}}}", "Invalid callsign"},
 			{"node map port channel out of range", "{address: Q1TEST, map: {ports: {99: {usage: Access}}}}", "Invalid channel 99 for the node map's ports"},
 			{"node map port link type unknown", "{address: Q1TEST, map: {ports: {0: {linkType: AXUDP}}}}", "Invalid link type"},
 			{"node map port frequency not positive", "{address: Q1TEST, map: {ports: {0: {freq: -1}}}}", "Invalid frequency -1 for channel 0"},
@@ -714,7 +720,11 @@ func Test_config_yaml_node_map(t *testing.T) {
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)
-		assert.Equal(t, maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[nodemap.Location](), Contact: "", Comment: "", Ports: nil}), got.nodeMap)
+		assert.Equal(
+			t,
+			maybe.Just(nodemap.Config{Address: "Q1TEST-7", Alias: "SAMNOD", APIURL: "", Location: maybe.Nothing[nodemap.Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}),
+			got.nodeMap,
+		)
 	})
 
 	t.Run("the node can be reported to another node map", func(t *testing.T) {
@@ -725,7 +735,7 @@ func Test_config_yaml_node_map(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(
 			t,
-			maybe.Just(nodemap.Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080", Location: maybe.Nothing[nodemap.Location](), Contact: "", Comment: "", Ports: nil}),
+			maybe.Just(nodemap.Config{Address: "Q1TEST", Alias: "", APIURL: "http://localhost:8080", Location: maybe.Nothing[nodemap.Location](), Contact: "", Comment: "", Ports: nil, Aliases: nil}),
 			got.nodeMap,
 		)
 	})
@@ -757,6 +767,20 @@ func Test_config_yaml_node_map(t *testing.T) {
 		var location, located = config.Location.Get()
 		require.True(t, located)
 		assert.Equal(t, maybe.Just[int32](-2), location.ASL)
+	})
+
+	t.Run("the node map can be told the node's other services", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node:\n  address: Q1TEST\n  map:\n    aliases:\n      sambbs: {service: BBS, callsign: q1test-3}\n      SAMCHT: {service: CHAT, callsign: Q1TEST-4}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.node.Get()
+		require.True(t, ok)
+
+		var config, _ = got.nodeMap.Get()
+		assert.Equal(t, map[string]nodemap.Service{
+			"SAMBBS": {Service: "BBS", Callsign: "Q1TEST-3"},
+			"SAMCHT": {Service: "CHAT", Callsign: "Q1TEST-4"},
+		}, config.Aliases)
 	})
 
 	t.Run("the node map can be told who to contact, with a comment", func(t *testing.T) {

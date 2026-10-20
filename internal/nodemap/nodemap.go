@@ -63,6 +63,10 @@ type Config struct {
 
 	// Ports are the interfaces the node links over.
 	Ports []Port
+
+	// Aliases are the services the node offers besides itself, such as a
+	// BBS, keyed by the alias each is known by.
+	Aliases map[string]Service
 }
 
 // Report is the map's NodeData: what a node says about itself.
@@ -73,6 +77,7 @@ type Report struct {
 	Contact      string                `json:"contact,omitempty"`
 	SysopComment string                `json:"sysopComment,omitempty"`
 	Ports        []Port                `json:"ports,omitzero"`
+	Aliases      map[string]Service    `json:"aliases,omitempty"`
 }
 
 // Location is where a node is: a Maidenhead locator, the middle of the
@@ -155,6 +160,13 @@ func ParseLinkType(name string) (LinkType, bool) {
 	}
 }
 
+// Service is a service a node offers besides itself: what it is, such as
+// BBS or CHAT, and the callsign it answers to.
+type Service struct {
+	Service  string `json:"service"`
+	Callsign string `json:"callsign"`
+}
+
 // Software is what the node runs.
 type Software struct {
 	Name    string `json:"name"`
@@ -194,6 +206,7 @@ func (r *Reporter) Report() Report {
 		Contact:      r.config.Contact,
 		SysopComment: r.config.Comment,
 		Ports:        r.config.Ports,
+		Aliases:      r.config.Aliases,
 	}
 }
 
