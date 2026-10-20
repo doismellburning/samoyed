@@ -10,6 +10,8 @@ package direwolf
 
 import (
 	"math"
+	"os"
+	"strconv"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/linecode"
@@ -81,6 +83,11 @@ type ToneGenerator struct {
 	saveBit int
 
 	prevDat int // Previous data bit.  Used for G3RUH style.
+
+	// For the PSK modems: the phase shift the current symbol started with,
+	// and how many samples of it have gone out so far.
+	symbolShift  uint
+	symbolSample int
 }
 
 /*------------------------------------------------------------------
@@ -402,9 +409,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 		// For BPSK, each bit is one symbol.
 		// Bit 1 shifts phase by 180 degrees; bit 0 leaves phase unchanged.
-		if dat == 1 {
-			tg.tonePhase += PHASE_SHIFT_180
-		}
+		tg.startSymbol(uint(dat) * PHASE_SHIFT_180)
 	}
 
 	if audioConfig.achan[tg.channel].modem_type == MODEM_QPSK {
@@ -438,10 +443,12 @@ func (tg *ToneGenerator) PutBit(dat int) {
 				  xmit_octant[channel] &= 0x7;
 			#else
 		*/
-		tg.tonePhase += symbol * PHASE_SHIFT_90
+		var shift = symbol * PHASE_SHIFT_90
 		if audioConfig.achan[tg.channel].v26_alternative == V26_B {
-			tg.tonePhase += PHASE_SHIFT_45
+			shift += PHASE_SHIFT_45
 		}
+
+		tg.startSymbol(shift)
 		//#endif
 		tg.bitCount++
 	}
@@ -462,7 +469,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 		var tribit = (tg.saveBit << 1) | dat
 
 		var symbol = gray2phaseV27(tribit)
-		tg.tonePhase += symbol * PHASE_SHIFT_45
+		tg.startSymbol(symbol * PHASE_SHIFT_45)
 
 		tg.saveBit = 0
 		tg.bitCount = 0
@@ -510,51 +517,15 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 		case MODEM_BPSK:
 			tg.tonePhase += tg.f1ChangePerSample
-			sam = int(tg.sineTable[(tg.tonePhase>>24)&0xff])
-			tg.PutSample(sam)
+			tg.PutSample(tg.pskSample())
 
 		case MODEM_QPSK:
 			tg.tonePhase += tg.f1ChangePerSample
-			/*
-				#if PSKIQ
-				#if 1  // blend JWL
-					      // remove loop invariant
-					      float old_i = ci[xmit_prev_octant[channel]];
-					      float old_q = sq[xmit_prev_octant[channel]];
-
-					      float new_i = ci[xmit_octant[channel]];
-					      float new_q = sq[xmit_octant[channel]];
-
-					      float b = blend / samples_per_symbol[channel];	// roughly 0 to 1
-					      blend++;
-					     // b = (b - 0.5) * 20 + 0.5;
-					     // if (b < 0) b = 0;
-					     // if (b > 1) b = 1;
-						// b = b > 0.5;
-						//b = 1;		// 78 decoded with this.
-									// only 39 without.
-
-					      //float blended_i = new_i * b + old_i * (1.0f - b);
-					      //float blended_q = new_q * b + old_q * (1.0f - b);
-
-					      float blended_i = interpol8 (old_i, new_i, b);
-					      float blended_q = interpol8 (old_q, new_q, b);
-
-					      sam = blended_i * sine_table[((tone_phase[channel] - PHASE_SHIFT_90) >> 24) & 0xff] +
-					            blended_q * sine_table[(tone_phase[channel] >> 24) & 0xff];
-				#else  // jump
-					      sam = ci[xmit_octant[channel]] * sine_table[((tone_phase[channel] - PHASE_SHIFT_90) >> 24) & 0xff] +
-					            sq[xmit_octant[channel]] * sine_table[(tone_phase[channel] >> 24) & 0xff];
-				#endif
-				#else
-			*/
-			sam = int(tg.sineTable[(tg.tonePhase>>24)&0xff])
-			tg.PutSample(sam)
+			tg.PutSample(tg.pskSample())
 
 		case MODEM_8PSK:
 			tg.tonePhase += tg.f1ChangePerSample
-			sam = int(tg.sineTable[(tg.tonePhase>>24)&0xff])
-			tg.PutSample(sam)
+			tg.PutSample(tg.pskSample())
 
 		case MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS:
 			if dat != tg.prevDat {
@@ -599,6 +570,36 @@ func (tg *ToneGenerator) PutBit(dat int) {
 	tg.bitLenAcc -= tg.ticksPerBit
 
 	tg.prevDat = dat // Only needed for G3RUH baseband/scrambled.
+}
+
+var pskAlpha = func() float64 {
+	var v, err = strconv.ParseFloat(os.Getenv("PSK_ALPHA"), 64)
+	if err != nil {
+		return 0
+	}
+	return v
+}()
+
+func (tg *ToneGenerator) startSymbol(shift uint) {
+	tg.tonePhase += shift
+	tg.symbolShift = shift
+	tg.symbolSample = 0
+}
+
+func (tg *ToneGenerator) pskSample() int {
+	var newv = float64(tg.sineTable[(tg.tonePhase>>24)&0xff])
+	var n = pskAlpha * tg.samplesPerSymbol
+	var bc = 1.0
+	if n > 0 {
+		bc = (float64(tg.symbolSample) + 0.5) / n
+	}
+	tg.symbolSample++
+	if bc >= 1 {
+		return int(newv)
+	}
+	var oldv = float64(tg.sineTable[((tg.tonePhase-tg.symbolShift)>>24)&0xff])
+	var w = 0.5 * (1 - math.Cos(bc*math.Pi))
+	return int(math.Round((1-w)*oldv + w*newv))
 }
 
 func (tg *ToneGenerator) PutSample(sam int) {
