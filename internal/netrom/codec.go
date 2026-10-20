@@ -51,6 +51,7 @@ const (
 	connAckLen      = headerLen + 1
 	connAckBPQLen   = connAckLen + 1
 	ssidSpareBits   = 0x60 // The two reserved bits of an SSID byte, set as AX.25 sets them.
+	endOfAddress    = 0x01 // Set on the network header's destination, the last of its addresses.
 	maxSSID         = 15
 	maxCallsignBase = 6
 )
@@ -245,6 +246,8 @@ func (f *Frame) encode() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("destination: %w", err)
 	}
+
+	b[len(b)-1] |= endOfAddress
 
 	b = append(b, f.ttl, f.index, f.id, f.txSeq, f.rxSeq, byte(f.opcode)&opcodeMask|f.flags&flagsMask)
 
@@ -442,7 +445,8 @@ func NormaliseCallsign(s string) (string, error) {
 
 // appendCall appends callsign as a seven-byte AX.25 address: six
 // characters shifted left one bit and space padded, then the SSID byte, with
-// neither the C nor the end-of-address bit set.
+// neither the C nor the end-of-address bit set.  A caller whose address ends
+// a run of them sets the latter itself.
 func appendCall(b []byte, callsign string) ([]byte, error) {
 	var base, ssid, err = parseCallsign(callsign)
 	if err != nil {
