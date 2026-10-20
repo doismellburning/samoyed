@@ -450,3 +450,25 @@ func TestSpecFrameForUsIgnoresTimeToLive(t *testing.T) {
 		})
 	}
 }
+
+// The network header holds the "Callsign of Origin Node (AX.25 shifted
+// format)" then the "Callsign of Destination Node (AX.25 shifted format
+// w/EOA bit)": the end-of-address bit is set on the destination's SSID byte
+// alone, as the Linux kernel sets it.  The callsigns a CONNECT REQUEST
+// carries have no such mark.
+func TestSpecEndOfAddressBit(t *testing.T) {
+	t.Parallel()
+
+	var req = testFrame(OpConnReq)
+	req.window = 4
+	req.user = "Q1TEST"
+	req.originNode = "Q1TEST-7"
+
+	var b, err = req.encode()
+	require.NoError(t, err)
+
+	assert.Equal(t, byte(0x6E), b[6], "origin: SSID 7, no end-of-address bit")
+	assert.Equal(t, byte(0x6F), b[13], "destination: SSID 7 and the end-of-address bit")
+	assert.Equal(t, byte(0x60), b[headerLen+1+6], "user: no end-of-address bit")
+	assert.Equal(t, byte(0x6E), b[headerLen+1+13], "originating node: no end-of-address bit")
+}

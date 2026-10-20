@@ -28,9 +28,13 @@ func concat(parts ...[]byte) []byte {
 	return bytes.Join(parts, nil)
 }
 
-// networkHeader() is Q1TEST-7 to Q2TEST-7 with a TTL of 16.
+// networkHeader() is Q1TEST-7 to Q2TEST-7 with a TTL of 16.  The
+// destination, the last address, has the end-of-address bit set.
 func networkHeader() []byte {
-	return concat(q1test7Addr(), q2test7Addr(), []byte{0x10})
+	var destination = q2test7Addr()
+	destination[6] |= 0x01
+
+	return concat(q1test7Addr(), destination, []byte{0x10})
 }
 
 // testFrame is a frame with that network header, for circuit 1/2.
