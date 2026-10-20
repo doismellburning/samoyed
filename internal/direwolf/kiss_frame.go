@@ -62,6 +62,22 @@ type kissport_status_s struct {
 	stopped bool
 }
 
+// clientAddrs is where each attached client is connected from.
+func (kps *kissport_status_s) clientAddrs() []net.Addr {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	var addrs []net.Addr
+
+	for _, conn := range kps.client_sock {
+		if conn != nil {
+			addrs = append(addrs, conn.RemoteAddr())
+		}
+	}
+
+	return addrs
+}
+
 // clientConn returns the currently connected socket for client, or nil if
 // not connected.
 func (kps *kissport_status_s) clientConn(client int) net.Conn {

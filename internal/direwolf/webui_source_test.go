@@ -226,3 +226,67 @@ func TestWebQueues(t *testing.T) {
 	}, webQueues(audio, lengths))
 	assert.Nil(t, webQueues(nil, lengths))
 }
+
+// Every client attached over AGW and KISS TCP is shown, with what it has asked
+// for, and with whether it has logged in only where it has to: not where it
+// connected from this machine.
+func TestWebClients(t *testing.T) {
+	t.Parallel()
+
+	var agw = requireLogins(t, "Q1TEST", "hunter2")
+	agw.clients[1].conn = connWithRemoteAddr(tcpAddr(t, "192.168.1.10"))
+	agw.clients[1].sendMonitor = true
+	agw.clients[2].conn = connWithRemoteAddr(tcpAddr(t, "192.168.1.13"))
+	agw.clients[2].loggedIn = true
+	agw.clients[0].conn = connWithRemoteAddr(tcpAddr(t, "127.0.0.1"))
+	agw.clients[0].loggedIn = true
+	agw.clients[0].loginExempt = true
+
+	// The service's list of ports is newest first.
+	var allChannels = new(kissport_status_s)
+	allChannels.tcp_port = 8001
+	allChannels.channel = -1
+	allChannels.client_sock[2] = connWithRemoteAddr(tcpAddr(t, "192.168.1.11"))
+
+	var oneChannel = new(kissport_status_s)
+	oneChannel.tcp_port = 8002
+	oneChannel.channel = 1
+	oneChannel.client_sock[0] = connWithRemoteAddr(tcpAddr(t, "192.168.1.12"))
+	oneChannel.pnext = allChannels
+
+	var kissNet = new(KissNetService)
+	kissNet.allPorts = oneChannel
+
+	var want = []webui.ClientStatus{
+		{Protocol: "agw", Port: 0, Address: "127.0.0.1:8000", Channel: maybe.Nothing[int](),
+			Raw: false, Monitor: false, LoggedIn: maybe.Nothing[bool]()},
+		{Protocol: "agw", Port: 0, Address: "192.168.1.10:8000", Channel: maybe.Nothing[int](),
+			Raw: false, Monitor: true, LoggedIn: maybe.Just(false)},
+		{Protocol: "agw", Port: 0, Address: "192.168.1.13:8000", Channel: maybe.Nothing[int](),
+			Raw: false, Monitor: false, LoggedIn: maybe.Just(true)},
+		{Protocol: "kiss", Port: 8001, Address: "192.168.1.11:8000", Channel: maybe.Nothing[int](),
+			Raw: false, Monitor: false, LoggedIn: maybe.Nothing[bool]()},
+		{Protocol: "kiss", Port: 8002, Address: "192.168.1.12:8000", Channel: maybe.Just(1),
+			Raw: false, Monitor: false, LoggedIn: maybe.Nothing[bool]()},
+	}
+
+	assert.Equal(t, want, webClients(agw, kissNet))
+}
+
+// Where no login is needed, nothing is said about one.
+func TestWebClientsWithoutALogin(t *testing.T) {
+	t.Parallel()
+
+	var agw = requireLogins(t)
+	agw.clients[0].conn = connWithRemoteAddr(tcpAddr(t, "192.168.1.10"))
+
+	var got = webClients(agw, nil)
+	require.Len(t, got, 1)
+	assert.Equal(t, maybe.Nothing[bool](), got[0].LoggedIn)
+}
+
+func TestWebClientsWithoutServers(t *testing.T) {
+	t.Parallel()
+
+	assert.Empty(t, webClients(nil, nil))
+}

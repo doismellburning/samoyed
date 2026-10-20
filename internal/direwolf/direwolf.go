@@ -621,7 +621,7 @@ x = Silence FX.25 information.`)
 	 * Make the web interface's hub before anything that can send or receive
 	 * a frame, so that both sides can be handed it.  Nil, and so a no-op,
 	 * unless WEBPORT is set.  Its port is bound now, but only served once
-	 * the IGate it reports on has been made.
+	 * what its status reports on has been made.
 	 */
 
 	var webHub *webui.Hub
@@ -778,16 +778,6 @@ x = Silence FX.25 information.`)
 	transmitQueue.SetIGate(igate.sendRecPacket)
 	igate.start(ctx)
 
-	if webServer != nil {
-		var webSources = new(webStatusSources)
-		webSources.started = started
-		webSources.audio = audio_config
-		webSources.igate = igate
-		webSources.netrom = netromNode
-		webSources.queueLengths = transmitQueue.Lengths
-
-		webui_start(ctx, webServer, webStatus(webSources))
-	}
 	stopIfCancelled(ctx, td)
 	var connectedDigipeater = digipeater.NewConnected(digipeaterPorts, &cdigi_config, packetFilter, transmitQueue.Append)
 
@@ -868,6 +858,22 @@ x = Silence FX.25 information.`)
 	var kissHandler = NewKissHandler(audio_config, xmitSvc, transmitQueue, kissNetSvc)
 
 	kissNetSvc.Start(ctx, kissHandler)
+
+	// Served only now that everything its status reports on exists: the
+	// IGate, the NET/ROM node, and the servers client applications attach
+	// to.
+	if webServer != nil {
+		var webSources = new(webStatusSources)
+		webSources.started = started
+		webSources.audio = audio_config
+		webSources.igate = igate
+		webSources.netrom = netromNode
+		webSources.queueLengths = transmitQueue.Lengths
+		webSources.agw = agwServer
+		webSources.kissNet = kissNetSvc
+
+		webui_start(ctx, webServer, webStatus(webSources))
+	}
 
 	if misc_config.dns_sd_enabled {
 		var ports = listeningPorts(kissNetSvc, agwServer)

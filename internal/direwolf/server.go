@@ -896,6 +896,27 @@ func (s *AGWServer) clientConn(client int) net.Conn {
 	return s.clients[client].conn
 }
 
+// attachedClients is a copy of the table's occupied slots, taken under one
+// lock, or none for a nil server.
+func (s *AGWServer) attachedClients() []agwClient {
+	if s == nil {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var attached []agwClient
+
+	for _, c := range s.clients {
+		if c.conn != nil {
+			attached = append(attached, c)
+		}
+	}
+
+	return attached
+}
+
 // clientWantingRaw returns client's socket if it has asked to be sent received
 // packets in raw form, and nil otherwise.  The socket and the answer come from
 // one look at the table, so a client cannot be sent a frame in a form it asked

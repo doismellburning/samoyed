@@ -91,11 +91,31 @@
         el("span", {}, el("b", { text: String(nr.circuits.length) }), " circuits")));
   }
 
+  function clientLine(c) {
+    const parts = [`${c.protocol.toUpperCase()} ${c.port}`, c.address];
+    if (c.channel !== undefined) parts.push(`channel ${c.channel}`);
+    const wants = [c.monitor && "monitor", c.raw && "raw"].filter(Boolean);
+    if (wants.length) parts.push(wants.join(", "));
+    if (c.loggedIn !== undefined) parts.push(c.loggedIn ? "logged in" : "not logged in");
+    return el("li", { text: parts.join(" · ") });
+  }
+
+  function clientsCard(clients) {
+    const count = (protocol) => clients.filter((c) => c.protocol === protocol).length;
+    return el("div", { class: "channel clients" },
+      el("div", { class: "label", text: "Clients" }),
+      el("div", { class: "figures" },
+        el("span", {}, el("b", { text: String(count("agw")) }), " AGW"),
+        el("span", {}, el("b", { text: String(count("kiss")) }), " KISS")),
+      el("ul", {}, ...clients.map(clientLine)));
+  }
+
   function renderChannels() {
     const box = $("channels");
     box.replaceChildren();
     if (status && status.igate) box.append(igateCard(status.igate));
     if (status && status.netrom) box.append(netromCard(status.netrom));
+    if (status && status.clients) box.append(clientsCard(status.clients));
     const queues = new Map(((status && status.queues) || []).map((q) => [q.channel, q]));
     for (const c of [...channels.values()].sort((a, b) => a.number - b.number)) {
       const figures = el("div", { class: "figures" },
@@ -386,8 +406,8 @@
     renderNetrom();
   }
 
-  // The IGate's counts, the NET/ROM node's tables and the transmit queues
-  // change without any event to say so.
+  // The IGate's counts, the NET/ROM node's tables, the transmit queues and
+  // the attached clients change without any event to say so.
   async function refreshStatus() {
     try {
       setStationStatus(await getJSON("api/status"));

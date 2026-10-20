@@ -202,3 +202,40 @@ func TestStatusQueues(t *testing.T) {
 		"low":     float64(3),
 	}}, got["queues"])
 }
+
+// An AGW client says what it has asked for and, where it has to log in,
+// whether it has; a KISS client says which channel its port carries, if only
+// one.
+func TestStatusClients(t *testing.T) {
+	t.Parallel()
+
+	var w = statusRequest(t, func() Status {
+		var s Status
+		s.Clients = []ClientStatus{
+			{Protocol: "agw", Port: 8000, Address: "192.168.1.10:40000", Channel: maybe.Nothing[int](),
+				Raw: true, Monitor: false, LoggedIn: maybe.Just(false)},
+			{Protocol: "kiss", Port: 8001, Address: "192.168.1.11:40001", Channel: maybe.Just(1),
+				Raw: false, Monitor: false, LoggedIn: maybe.Nothing[bool]()},
+		}
+
+		return s
+	}, time.Now())
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	assert.Equal(t, []any{
+		map[string]any{
+			"protocol": "agw",
+			"port":     float64(8000),
+			"address":  "192.168.1.10:40000",
+			"raw":      true,
+			"loggedIn": false,
+		},
+		map[string]any{
+			"protocol": "kiss",
+			"port":     float64(8001),
+			"address":  "192.168.1.11:40001",
+			"channel":  float64(1),
+		},
+	}, got["clients"])
+}

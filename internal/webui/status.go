@@ -32,6 +32,32 @@ type Status struct {
 	// Queues is what is waiting to be sent on each radio channel, empty on
 	// a station with none.
 	Queues []QueueStatus `json:"queues,omitempty"`
+
+	// Clients is the client applications attached over AGW and KISS TCP,
+	// empty on a station with none.
+	Clients []ClientStatus `json:"clients,omitempty"`
+}
+
+// ClientStatus is a client application attached to one of the station's
+// ports.
+type ClientStatus struct {
+	Protocol string `json:"protocol"` // "agw" or "kiss".
+	Port     int    `json:"port"`     // The station's port it is attached to.
+	Address  string `json:"address"`  // Where it is connected from, host:port.
+
+	// Channel is the radio channel a KISS port carries, or Nothing for a
+	// port that carries them all.
+	Channel maybe.Maybe[int] `json:"channel,omitzero"`
+
+	// Raw and Monitor say whether an AGW client has asked to be sent
+	// received frames, in raw and monitor form.
+	Raw     bool `json:"raw,omitempty"`
+	Monitor bool `json:"monitor,omitempty"`
+
+	// LoggedIn says whether an AGW client has logged in, or is Nothing
+	// where it needs no login: none is configured, or it connected from
+	// the station's own machine.
+	LoggedIn maybe.Maybe[bool] `json:"loggedIn,omitzero"`
 }
 
 // QueueStatus is how many packets are waiting to be sent on a radio channel,

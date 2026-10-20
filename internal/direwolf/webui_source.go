@@ -74,6 +74,11 @@ type webStatusSources struct {
 	// queueLengths is how much waits in each radio channel's transmit
 	// queue.
 	queueLengths func() [MAX_RADIO_CHANS][TQ_NUM_PRIO]int
+
+	// The servers client applications attach to, either of which may be
+	// nil.
+	agw     *AGWServer
+	kissNet *KissNetService
 }
 
 // webStatus reports the station's own state to the web interface, from src.
@@ -85,6 +90,7 @@ func webStatus(src *webStatusSources) webui.StatusFunc {
 		s.IGate = webIGateStatus(src.igate)
 		s.NetROM = webNetROMStatus(src.netrom)
 		s.Queues = webQueues(src.audio, src.queueLengths())
+		s.Clients = webClients(src.agw, src.kissNet)
 
 		return s
 	}
@@ -113,6 +119,45 @@ func webQueues(audio *RadioConfig, lengths [MAX_RADIO_CHANS][TQ_NUM_PRIO]int) []
 	}
 
 	return queues
+}
+
+// webClients describes the client applications attached to agw and kissNet
+// for the web interface.
+func webClients(agw *AGWServer, kissNet *KissNetService) []webui.ClientStatus {
+	var clients []webui.ClientStatus
+
+	var agwPort = addrPort(agw.Addr())
+
+	for _, c := range agw.attachedClients() {
+		var client webui.ClientStatus
+		client.Protocol = "agw"
+		client.Port = agwPort
+		client.Address = c.conn.RemoteAddr().String()
+		client.Raw = c.sendRaw
+		client.Monitor = c.sendMonitor
+
+		// One on this machine needs no login, so has none to report.
+		if agw.loginRequired() && !c.loginExempt {
+			client.LoggedIn = maybe.Just(c.loggedIn)
+		}
+
+		clients = append(clients, client)
+	}
+
+	for _, c := range kissNet.attachedClients() {
+		var client webui.ClientStatus
+		client.Protocol = "kiss"
+		client.Port = c.port
+		client.Address = c.addr.String()
+
+		if c.channel >= 0 {
+			client.Channel = maybe.Just(c.channel)
+		}
+
+		clients = append(clients, client)
+	}
+
+	return clients
 }
 
 // webChannel describes a configured channel for the web interface, or Nothing

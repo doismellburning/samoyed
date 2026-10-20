@@ -109,6 +109,7 @@ main > section[hidden] { display: none; }
 .channel .figures b { font-size: 20px; font-weight: 600; }
 .igate .state[data-state="up"] { color: var(--rx); }
 .igate .state[data-state="down"] { color: var(--bad); }
+.clients ul { margin: 4px 0 0; padding: 0; list-style: none; font-size: 12px; font-variant-numeric: tabular-nums; }
 
 .panels {
   flex: 1;
