@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -263,4 +264,48 @@ func TestTxQueueDepthResetByNewQueue(t *testing.T) {
 
 	assert.InDelta(t, 0, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"a new queue must clear the published depth too")
+}
+
+// TestVirtualChannelTransmitIsCounted checks that a frame sent on a channel
+// with no transmit thread - here the IGate's - counts towards the frames
+// transmitted metric, as one sent over the radio does.  The queue sends such
+// a frame itself, so the count the transmit thread keeps never saw it.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, and captures os.Stdout, both process-wide.
+func TestVirtualChannelTransmitIsCounted(t *testing.T) {
+	const CHANNEL = MAX_TOTAL_CHANS - 1
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[CHANNEL] = MEDIUM_IGATE
+
+	var tq = newTestTransmitQueue(audioConfig)
+	tq.SetIGate(func(int, *ax25.Packet) {})
+
+	var labels = map[string]string{"channel": strconv.Itoa(CHANNEL)}
+	var before = metricValue(t, "samoyed_frames_transmitted_total", labels)
+
+	testutils.CaptureOutput(t, func() { tq.Append(CHANNEL, TQ_PRIO_1_LO, newTestPacket(t)) })
+
+	assert.InDelta(t, before+1, metricValue(t, "samoyed_frames_transmitted_total", labels), 0)
+}
+
+// TestDiscardedVirtualChannelFrameIsNotCounted checks that a frame for a
+// channel whose network TNC is not connected, and so is discarded, does not
+// count towards the frames transmitted metric.
+//
+//nolint:paralleltest // Serial: reads Prometheus's default registry, and captures os.Stdout, both process-wide.
+func TestDiscardedVirtualChannelFrameIsNotCounted(t *testing.T) {
+	const CHANNEL = MAX_TOTAL_CHANS - 2
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[CHANNEL] = MEDIUM_NETTNC
+
+	var tq = newTestTransmitQueue(audioConfig)
+
+	var labels = map[string]string{"channel": strconv.Itoa(CHANNEL)}
+	var before = metricValue(t, "samoyed_frames_transmitted_total", labels)
+
+	testutils.CaptureOutput(t, func() { tq.Append(CHANNEL, TQ_PRIO_1_LO, newTestPacket(t)) })
+
+	assert.InDelta(t, before, metricValue(t, "samoyed_frames_transmitted_total", labels), 0)
 }

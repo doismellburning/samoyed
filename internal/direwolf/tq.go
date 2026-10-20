@@ -355,6 +355,8 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *ax25.Packet) {
 			return
 		}
 
+		metrics.RecordFrameTransmitted(channel)
+
 		if tq.onTransmit != nil {
 			tq.onTransmit(channel, pp)
 		}
