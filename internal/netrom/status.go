@@ -12,7 +12,7 @@ import (
 // Status is what a node is, and what it knows, at a moment: for showing to
 // someone, not for acting on.
 type Status struct {
-	Channel  int
+	Channels []int
 	Callsign string
 	Alias    string
 
@@ -104,7 +104,7 @@ func (s circuitState) String() string {
 // Status is the node as it is now.
 func (n *Node) Status() Status {
 	var s Status
-	s.Channel = n.cfg.Channel
+	s.Channels = slices.Clone(n.cfg.Channels)
 	s.Callsign = n.cfg.Callsign
 	s.Alias = n.cfg.Alias
 

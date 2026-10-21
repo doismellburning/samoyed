@@ -565,7 +565,8 @@ func (n *Node) connectArgs(user string, args []string) (linkKey, string, string)
 // nodeCircuit is the NET/ROM circuit to connect user to the node name names,
 // by alias or callsign, and what to call that node, if NET/ROM knows it.  The
 // user's own callsign is the circuit's own end, as the CONNECT REQUEST names
-// whose circuit it is.
+// whose circuit it is.  A circuit goes wherever the route to its node does,
+// whatever channel it is asked for on, so it is asked for on NET/ROM's first.
 func (n *Node) nodeCircuit(user string, name string) (linkKey, string, bool) {
 	var none linkKey
 
@@ -576,11 +577,11 @@ func (n *Node) nodeCircuit(user string, name string) (linkKey, string, bool) {
 	var status = n.netrom.Status()
 
 	var d, ok = findNode(status, name)
-	if !ok {
+	if !ok || len(status.Channels) == 0 {
 		return none, "", false
 	}
 
-	return linkKey{channel: status.Channel, ownCall: user, remoteCall: d.Callsign, circuit: true}, nodeName(d), true
+	return linkKey{channel: status.Channels[0], ownCall: user, remoteCall: d.Callsign, circuit: true}, nodeName(d), true
 }
 
 // downlinkUserLocked is the session of the user the downlink key names is

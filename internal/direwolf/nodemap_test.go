@@ -18,7 +18,7 @@ import (
 // netromStatus is a NET/ROM node's status with neighbours.
 func netromStatus(neighbours ...netrom.NeighbourStatus) func() netrom.Status {
 	return func() netrom.Status {
-		return netrom.Status{Channel: 0, Callsign: "Q1TEST-7", Alias: "QNODEA", Neighbours: neighbours, Destinations: nil, Circuits: nil}
+		return netrom.Status{Channels: []int{0}, Callsign: "Q1TEST-7", Alias: "QNODEA", Neighbours: neighbours, Destinations: nil, Circuits: nil}
 	}
 }
 

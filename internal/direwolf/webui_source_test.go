@@ -165,12 +165,14 @@ func TestWebNetROMStatus(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[webui.NetROMStatus](), webNetROMStatus(nil))
 
 	var config = netrom.DefaultConfig()
+	config.Channels = []int{0}
 	config.Callsign = "Q1TEST-7"
 	config.Alias = "QNODEA"
 
 	var node = netrom.New(config, new(recordingAGWDataLink), func(int, int, *ax25.Packet) {}, new(recordingReporter), netrom.RealClock{}, netromClient)
 
 	var want webui.NetROMStatus
+	want.Channels = []int{0}
 	want.Callsign = "Q1TEST-7"
 	want.Alias = "QNODEA"
 	want.Neighbours = []webui.NetROMNeighbour{}

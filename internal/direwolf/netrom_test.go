@@ -27,6 +27,7 @@ func Test_config_yaml_netrom(t *testing.T) {
 		require.True(t, ok)
 
 		var want = netrom.DefaultConfig()
+		want.Channels = []int{0}
 		want.Callsign = "Q1TEST-7"
 		want.Alias = "QNODEA"
 		assert.Equal(t, want, got.config)
@@ -38,7 +39,7 @@ func Test_config_yaml_netrom(t *testing.T) {
 
 		var got, ok = c.misc.netrom.Get()
 		require.True(t, ok)
-		assert.Equal(t, 1, got.config.Channel)
+		assert.Equal(t, []int{1}, got.config.Channels)
 		assert.Equal(t, byte(7), got.config.TTL)
 		assert.Equal(t, 600*time.Second, got.config.NodesInterval)
 		assert.Equal(t, byte(0), got.config.Quality, "0 is a quality like any other")
@@ -93,6 +94,7 @@ func Test_config_yaml_netrom_with_node(t *testing.T) {
 		assert.True(t, got.integrated)
 
 		var want = netrom.DefaultConfig()
+		want.Channels = []int{0}
 		want.Callsign = "Q1TEST-7"
 		want.Alias = "QNODEA"
 		assert.Equal(t, want, got.config)
@@ -104,7 +106,7 @@ func Test_config_yaml_netrom_with_node(t *testing.T) {
 
 		var got, ok = c.misc.netrom.Get()
 		require.True(t, ok)
-		assert.Equal(t, 1, got.config.Channel)
+		assert.Equal(t, []int{1}, got.config.Channels)
 		assert.Equal(t, byte(7), got.config.TTL)
 		assert.Equal(t, 600*time.Second, got.config.NodesInterval)
 		assert.Equal(t, byte(255), got.config.Quality)
@@ -149,7 +151,7 @@ func testNetromSettings(callsign string, alias string, channel int) netromSettin
 	var config = netrom.DefaultConfig()
 	config.Callsign = callsign
 	config.Alias = alias
-	config.Channel = channel
+	config.Channels = []int{channel}
 
 	return netromSettings{config: config, integrated: false, line: 3}
 }
@@ -336,6 +338,7 @@ func TestNetromAGWDataLink(t *testing.T) {
 	var reporter = new(recordingReporter)
 
 	var config = netrom.DefaultConfig()
+	config.Channels = []int{0}
 	config.Callsign = "Q1TEST-7"
 	config.Alias = "QNODEA"
 

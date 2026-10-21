@@ -111,7 +111,7 @@ func TestStatusNetROM(t *testing.T) {
 	t.Parallel()
 
 	var node NetROMStatus
-	node.Channel = 0
+	node.Channels = []int{0, 2}
 	node.Callsign = "Q1TEST-7"
 	node.Alias = "QNODEA"
 	node.Neighbours = []NetROMNeighbour{{Callsign: "Q2TEST-7", Link: "up", Failures: 0, Failing: false}}
@@ -137,7 +137,7 @@ func TestStatusNetROM(t *testing.T) {
 	}{
 		{"none", maybe.Nothing[NetROMStatus](), nil},
 		{"node", maybe.Just(node), map[string]any{
-			"channel":  float64(0),
+			"channels": []any{float64(0), float64(2)},
 			"callsign": "Q1TEST-7",
 			"alias":    "QNODEA",
 			"neighbours": []any{map[string]any{
