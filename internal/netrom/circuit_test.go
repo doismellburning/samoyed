@@ -85,6 +85,7 @@ type fakeOwner struct {
 	mu sync.Mutex
 
 	refuse  bool
+	channel int
 	client  int
 	ownCall string
 
@@ -103,11 +104,11 @@ func (o *fakeOwner) sendLayer3(f *Frame) {
 	o.outbox = append(o.outbox, f)
 }
 
-func (o *fakeOwner) acceptCircuit(string, string) (int, string, bool) {
+func (o *fakeOwner) acceptCircuit(string, string) (listener, string, bool) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
-	return o.client, o.ownCall, !o.refuse
+	return listener{client: o.client, channel: o.channel}, o.ownCall, !o.refuse
 }
 
 func (o *fakeOwner) circuitEstablished(c circuitID, incoming bool) {
@@ -219,7 +220,7 @@ func (p *pair) pump() {
 
 // userCircuit() is the circuit A's client opens to B.
 func userCircuit() circuitID {
-	return circuitID{client: 0, ownCall: "Q1TEST", remoteCall: "Q2TEST-7"}
+	return circuitID{channel: 0, client: 0, ownCall: "Q1TEST", remoteCall: "Q2TEST-7"}
 }
 
 // connected is a pair with a circuit from A's client to B's.
@@ -282,7 +283,7 @@ func TestNetromCircuitConnects(t *testing.T) {
 
 	assert.Equal(t, []circuitID{userCircuit()}, p.oa.established)
 	assert.Equal(t, []bool{false}, p.oa.incoming)
-	assert.Equal(t, []circuitID{{client: 1, ownCall: "Q2TEST-7", remoteCall: "Q1TEST"}}, p.ob.established)
+	assert.Equal(t, []circuitID{{channel: 0, client: 1, ownCall: "Q2TEST-7", remoteCall: "Q1TEST"}}, p.ob.established)
 	assert.Equal(t, []bool{true}, p.ob.incoming)
 }
 
@@ -558,7 +559,7 @@ func TestNetromCircuitConnectTimesOut(t *testing.T) {
 
 	var p = newPair(t)
 
-	var id = circuitID{client: 0, ownCall: "Q1TEST", remoteCall: "Q9TEST"}
+	var id = circuitID{channel: 0, client: 0, ownCall: "Q1TEST", remoteCall: "Q9TEST"}
 	require.NoError(t, p.a.connect(id, "Q9TEST"))
 
 	var req = p.oa.take()
@@ -642,6 +643,23 @@ func TestNetromCircuitRefusesADuplicateConnect(t *testing.T) {
 	assert.Empty(t, p.oa.terminated)
 }
 
+// Nor can it have two by the same callsigns on two channels: the far end
+// would take the second CONNECT REQUEST, from the same user at the same
+// node, for the first's replacement, and close the first.
+func TestNetromCircuitRefusesTheSameCircuitOnAnotherChannel(t *testing.T) {
+	t.Parallel()
+
+	var p = connectedPair(t)
+
+	var other = userCircuit()
+	other.channel = 3
+
+	require.ErrorIs(t, p.a.connect(other, "Q2TEST-7"), errCircuitOnOtherChannel)
+	assert.Len(t, p.a.circuits, 1)
+	assert.Empty(t, p.oa.take(), "nothing is sent")
+	assert.Empty(t, p.oa.terminated)
+}
+
 // When the far end loses a circuit without our hearing of it and its user
 // connects again, the new circuit has the same names as the old one.  The
 // old one goes, so that the client's commands reach the circuit that is
@@ -670,6 +688,30 @@ func TestNetromCircuitReplacesAStaleOne(t *testing.T) {
 	require.NoError(t, p.b.send(p.ob.established[1], []byte("to the new one")))
 	p.pump()
 	assert.Equal(t, []byte("to the new one"), p.oa.received())
+}
+
+// The stale circuit goes even when the client now takes incoming circuits
+// on another channel: it still knows the two by the same callsigns.
+func TestNetromCircuitReplacesAStaleOneOnAnotherChannel(t *testing.T) {
+	t.Parallel()
+
+	var p = connectedPair(t)
+
+	var restarted = newCircuitManager("Q1TEST-7", 16, p.oa, p.clock)
+	restarted.nextCircuit = 0x0200
+	p.a = restarted
+
+	p.ob.mu.Lock()
+	p.ob.channel = 3
+	p.ob.mu.Unlock()
+
+	require.NoError(t, p.a.connect(userCircuit(), "Q2TEST-7"))
+	p.pump()
+
+	require.Len(t, p.ob.established, 2)
+	assert.Equal(t, 3, p.ob.established[1].channel)
+	assert.Equal(t, []circuitID{p.ob.established[0]}, p.ob.terminated, "the old one is closed")
+	assert.Len(t, p.b.circuits, 1)
 }
 
 func TestNetromCircuitNegotiates(t *testing.T) {
