@@ -205,7 +205,7 @@ type NetROMRouting struct {
 	// Channels are the channels the node runs on, each a radio channel or
 	// an NCHANNEL.  It has one routing table across them all, a neighbour
 	// being a callsign on one of them.  Sharing the node shell's names, they
-	// can be left out if the shell listens on only one channel.
+	// must be among the shell's, and left out are all of them.
 	Channels []int `yaml:"channels"`
 
 	// TTL is how many nodes a frame the node originates may cross.  Left

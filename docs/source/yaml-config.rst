@@ -392,7 +392,7 @@ These are the keys under ``samoyed``:
         It takes the settings of the top-level ``netrom`` block below
         but ``callsign`` and ``alias``,
         and its ``channels`` must be ones the node listens on;
-        they can be left out if the node listens on only one.
+        left out, it runs on all of them.
         A top-level ``netrom`` block is refused alongside ``node``.
 
     The node answers each line it is sent,
