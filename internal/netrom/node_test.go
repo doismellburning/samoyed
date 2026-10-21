@@ -67,6 +67,9 @@ type fakeDataLink struct {
 	connects []string // Neighbours asked for.
 	frames   []string // Neighbours sent to.
 
+	connectChannels []int // The channel each connect was asked for on.
+	frameChannels   []int // The channel each frame was sent on.
+
 	registered []registration
 
 	// onXmit, if set, is called on each frame sent, outside the lock.
@@ -78,13 +81,14 @@ type fakeDataLink struct {
 	queue    [][]byte
 }
 
-func (l *fakeDataLink) ConnectRequest(addrs [ax25.MaxAddrs]string, _ int, _ int, client int, _ int) {
+func (l *fakeDataLink) ConnectRequest(addrs [ax25.MaxAddrs]string, _ int, channel int, client int, _ int) {
 	if client != testClient {
 		panic("the node must connect as its own client")
 	}
 
 	l.mu.Lock()
 	l.connects = append(l.connects, addrs[ax25.Destination])
+	l.connectChannels = append(l.connectChannels, channel)
 
 	var self, peer = l.self, l.peer
 	l.mu.Unlock()
@@ -98,7 +102,7 @@ func (l *fakeDataLink) ConnectRequest(addrs [ax25.MaxAddrs]string, _ int, _ int,
 	peer.LinkEstablished(0, testClient, addrs[ax25.Source], addrs[ax25.Destination], true)
 }
 
-func (l *fakeDataLink) XmitDataRequest(addrs [ax25.MaxAddrs]string, _ int, _ int, _ int, pid int, data []byte) {
+func (l *fakeDataLink) XmitDataRequest(addrs [ax25.MaxAddrs]string, _ int, channel int, _ int, pid int, data []byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -107,6 +111,7 @@ func (l *fakeDataLink) XmitDataRequest(addrs [ax25.MaxAddrs]string, _ int, _ int
 	}
 
 	l.frames = append(l.frames, addrs[ax25.Destination])
+	l.frameChannels = append(l.frameChannels, channel)
 	l.queue = append(l.queue, append([]byte(nil), data...))
 
 	if l.onXmit != nil {
@@ -304,6 +309,37 @@ func TestNodeConnectsToNeighbours(t *testing.T) {
 }
 
 // A neighbour connecting to us makes the link up for our traffic too.
+// A neighbour is reached on the channel it was heard on, and the data
+// link's reports of links on a channel the node is not on are nothing to it.
+func TestNodeReachesANeighbourOnItsChannel(t *testing.T) {
+	t.Parallel()
+
+	var a = newTestNode("Q1TEST-7", "QNODEA")
+	a.cfg.Channel = 2
+
+	var b = newTestNode("Q2TEST-7", "QNODEB")
+	b.broadcastNodes()
+
+	a.HeardUI(0, b.ui[0])
+
+	var _, ok = a.router.nextHop("Q2TEST-7")
+	require.False(t, ok, "heard on a channel A is not on")
+
+	a.HeardUI(2, b.ui[0])
+
+	var hop, _ = a.router.nextHop("Q2TEST-7")
+	assert.Equal(t, neighbour{channel: 2, callsign: "Q2TEST-7"}, hop)
+
+	a.sendToNeighbour(hop, []byte("one"))
+	assert.Equal(t, []int{2}, a.link.connectChannels)
+
+	a.LinkEstablished(0, testClient, "Q2TEST-7", "Q1TEST-7", false)
+	assert.Empty(t, a.link.frames, "not the link asked for")
+
+	a.LinkEstablished(2, testClient, "Q2TEST-7", "Q1TEST-7", false)
+	assert.Equal(t, []int{2}, a.link.frameChannels)
+}
+
 func TestNodeUsesAnIncomingLink(t *testing.T) {
 	t.Parallel()
 

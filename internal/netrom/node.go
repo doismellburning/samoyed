@@ -213,7 +213,7 @@ func (n *Node) broadcastNodes() {
 // anything to NET/ROM.  One that came through a digipeater is not from a
 // neighbour, and is ignored.
 func (n *Node) HeardUI(channel int, pp *ax25.Packet) {
-	if channel != n.cfg.Channel || pp.NumAddr() != 2 || pp.PID() != ax25.PIDNetROM {
+	if !n.onChannel(channel) || pp.NumAddr() != 2 || pp.PID() != ax25.PIDNetROM {
 		return
 	}
 
@@ -238,8 +238,8 @@ func (n *Node) HeardUI(channel int, pp *ax25.Packet) {
 
 // The data link reports on our links to neighbours.
 
-func (n *Node) LinkEstablished(_ int, _ int, remoteCall string, _ string, incoming bool) {
-	var nb, ok = n.neighbourOn(n.cfg.Channel, remoteCall)
+func (n *Node) LinkEstablished(channel int, _ int, remoteCall string, _ string, incoming bool) {
+	var nb, ok = n.neighbourOn(channel, remoteCall)
 	if !ok {
 		return
 	}
@@ -248,11 +248,11 @@ func (n *Node) LinkEstablished(_ int, _ int, remoteCall string, _ string, incomi
 
 	n.router.neighbourHeard(nb)
 
-	logrus.WithFields(logrus.Fields{"neighbour": remoteCall, "incoming": incoming, "pending": pending}).Debug("NET/ROM: link to neighbour up")
+	logrus.WithFields(logrus.Fields{"channel": channel, "neighbour": remoteCall, "incoming": incoming, "pending": pending}).Debug("NET/ROM: link to neighbour up")
 }
 
-func (n *Node) LinkTerminated(_ int, _ int, remoteCall string, _ string, timeout bool) {
-	var nb, ok = n.neighbourOn(n.cfg.Channel, remoteCall)
+func (n *Node) LinkTerminated(channel int, _ int, remoteCall string, _ string, timeout bool) {
+	var nb, ok = n.neighbourOn(channel, remoteCall)
 	if !ok {
 		return
 	}
@@ -263,15 +263,15 @@ func (n *Node) LinkTerminated(_ int, _ int, remoteCall string, _ string, timeout
 		n.router.neighbourFailed(nb)
 	}
 
-	logrus.WithFields(logrus.Fields{"neighbour": remoteCall, "timeout": timeout}).Debug("NET/ROM: link to neighbour down")
+	logrus.WithFields(logrus.Fields{"channel": channel, "neighbour": remoteCall, "timeout": timeout}).Debug("NET/ROM: link to neighbour down")
 }
 
-func (n *Node) RecConnData(_ int, _ int, remoteCall string, _ string, pid int, data []byte) {
+func (n *Node) RecConnData(channel int, _ int, remoteCall string, _ string, pid int, data []byte) {
 	if pid != ax25.PIDNetROM {
 		return
 	}
 
-	var nb, ok = n.neighbourOn(n.cfg.Channel, remoteCall)
+	var nb, ok = n.neighbourOn(channel, remoteCall)
 	if !ok {
 		return
 	}
@@ -297,16 +297,21 @@ func (n *Node) RecConnData(_ int, _ int, remoteCall string, _ string, pid int, d
 func (n *Node) OutstandingFramesReply(int, int, string, string, int) {}
 
 // neighbourOn is the neighbour that is call, as the data link writes it, on
-// channel.
+// channel, if that is one of the node's channels.
 func (n *Node) neighbourOn(channel int, call string) (neighbour, bool) {
 	var normalised, err = NormaliseCallsign(call)
-	if err != nil {
+	if err != nil || !n.onChannel(channel) {
 		var none neighbour
 
 		return none, false
 	}
 
 	return neighbour{channel: channel, callsign: normalised}, true
+}
+
+// onChannel says whether the node runs on channel.
+func (n *Node) onChannel(channel int) bool {
+	return channel == n.cfg.Channel
 }
 
 // linkTo returns the link to nb, making a record of it if there is none.
@@ -439,7 +444,7 @@ func (n *Node) sendToNeighbour(nb neighbour, data []byte) {
 		addrs[ax25.Source] = n.cfg.Callsign
 		addrs[ax25.Destination] = nb.callsign
 
-		n.link.ConnectRequest(addrs, 2, n.cfg.Channel, n.client, ax25.PIDNetROM)
+		n.link.ConnectRequest(addrs, 2, nb.channel, n.client, ax25.PIDNetROM)
 	}
 }
 
@@ -449,7 +454,7 @@ func (n *Node) xmit(nb neighbour, data []byte) {
 	addrs[ax25.Source] = n.cfg.Callsign
 	addrs[ax25.Destination] = nb.callsign
 
-	n.link.XmitDataRequest(addrs, 2, n.cfg.Channel, n.client, ax25.PIDNetROM, data)
+	n.link.XmitDataRequest(addrs, 2, nb.channel, n.client, ax25.PIDNetROM, data)
 }
 
 // The circuits ask the node, and report to it.
