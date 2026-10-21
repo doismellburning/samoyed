@@ -398,9 +398,19 @@
     info.title = "Started " + new Date(status.started).toLocaleString();
   }
 
+  // The tab says which station this is, so a page per station can be told
+  // apart: the NET/ROM node by its alias, or else the channels' callsigns.
+  function renderTitle() {
+    const nr = status && status.netrom;
+    const names = nr ? [`${nr.alias}:${nr.callsign}`]
+      : [...new Set([...channels.values()].map((c) => c.callsign).filter(Boolean))];
+    document.title = names.length ? `${names.join(", ")} · Samoyed` : "Samoyed";
+  }
+
   function setStationStatus(s) {
     status = s;
     statusAt = performance.now();
+    renderTitle();
     renderStatus();
     renderChannels();
     renderNetrom();
@@ -443,6 +453,7 @@
       stations.clear();
       for (const s of ss) stations.set(s.name, s);
       channels = new Map(cs.map((c) => [c.number, c]));
+      renderTitle();
 
       const pending = queued;
       queued = null;
