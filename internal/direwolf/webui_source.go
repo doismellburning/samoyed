@@ -278,6 +278,7 @@ func webNetROMStatus(node *netrom.Node) maybe.Maybe[webui.NetROMStatus] {
 	s.Neighbours = make([]webui.NetROMNeighbour, 0, len(status.Neighbours))
 	for _, n := range status.Neighbours {
 		s.Neighbours = append(s.Neighbours, webui.NetROMNeighbour{
+			Channel:  n.Channel,
 			Callsign: n.Callsign,
 			Link:     n.Link,
 			Failures: n.Failures,
@@ -290,6 +291,7 @@ func webNetROMStatus(node *netrom.Node) maybe.Maybe[webui.NetROMStatus] {
 		var routes = make([]webui.NetROMRoute, 0, len(d.Routes))
 		for _, rt := range d.Routes {
 			routes = append(routes, webui.NetROMRoute{
+				Channel:      rt.Channel,
 				Neighbour:    rt.Neighbour,
 				Quality:      rt.Quality,
 				Obsolescence: rt.Obsolescence,

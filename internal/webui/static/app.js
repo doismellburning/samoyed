@@ -160,6 +160,7 @@
     if (!nr) return;
 
     const neighbours = nr.neighbours.map((n) => [
+      [n.channel, "num"],
       [n.callsign, "name"],
       [n.failing ? `${n.link}, failing` : n.link, "state"],
       [n.failures, "num"],
@@ -168,6 +169,7 @@
       [i === 0 ? d.callsign : "", "name"],
       [i === 0 ? d.alias : "", "name"],
       [r.neighbour, "name"],
+      [r.channel, "num"],
       [r.quality, "num"],
       [r.obsolescence, "num"],
     ]));
@@ -182,9 +184,9 @@
 
     $("netrom-tables").replaceChildren(
       el("div", {}, el("h3", { text: "Neighbours" }),
-        netromTable([["Callsign"], ["Link"], ["Failures", "num"]], neighbours, "No neighbours yet.")),
+        netromTable([["Port", "num"], ["Callsign"], ["Link"], ["Failures", "num"]], neighbours, "No neighbours yet.")),
       el("div", {}, el("h3", { text: "Routes" }),
-        netromTable([["Node"], ["Alias"], ["Via"], ["Quality", "num"], ["Obs", "num"]], routes, "No routes yet.")),
+        netromTable([["Node"], ["Alias"], ["Via"], ["Port", "num"], ["Quality", "num"], ["Obs", "num"]], routes, "No routes yet.")),
       el("div", {}, el("h3", { text: "Circuits" }),
         netromTable([["Ours"], [""], ["Theirs"], ["Node"], ["State"], ["Queued", "num"]], circuits, "No circuits open.")));
   }
