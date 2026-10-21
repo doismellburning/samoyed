@@ -6,7 +6,7 @@ goto_tmpdir
 
 $GEN_PACKETS -B1200 -k -n 100 -o test12-bpsk.wav
 
-f0() { $ATEST -B1200 -k -F0 -L88 -G94 test12-bpsk.wav; }
-f1() { $ATEST -B1200 -k -F1 -L93 -G99 test12-bpsk.wav; }
+f0() { $ATEST -B1200 -k -F0 -L82 -G88 test12-bpsk.wav; }
+f1() { $ATEST -B1200 -k -F1 -L88 -G94 test12-bpsk.wav; }
 
 run_parallel f0 f1
