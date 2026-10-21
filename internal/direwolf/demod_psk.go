@@ -217,9 +217,23 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 		D.u.psk.delay_line_width_sym = 1.25
 
-		D.u.psk.coffs = int(math.Round((11.0 / 12.0) * samples_per_sec / float64(correct_baud)))
+		// Self correlation taps one symbol back, 45 degrees of the carrier
+		// either side, so they are about a quarter of a carrier cycle apart
+		// whatever the ratio of carrier to symbol rate.  QPSK and 8PSK place
+		// theirs as fractions of the symbol, which works only for the
+		// carrier and rates they were designed for.
+		var eighthCycle = samples_per_sec / (8 * float64(carrier_freq))
+
+		D.u.psk.coffs = int(math.Round(samples_per_sec/float64(correct_baud) - eighthCycle))
 		D.u.psk.boffs = int(math.Round(samples_per_sec / float64(correct_baud)))
-		D.u.psk.soffs = int(math.Round((13.0 / 12.0) * samples_per_sec / float64(correct_baud)))
+		D.u.psk.soffs = max(int(math.Round(samples_per_sec/float64(correct_baud)+eighthCycle)), D.u.psk.coffs+1)
+
+		var radiansPerSample = 2 * math.Pi * float64(carrier_freq) / samples_per_sec
+		var tapsPhase = radiansPerSample * float64(D.u.psk.soffs-D.u.psk.coffs)
+
+		D.u.psk.coffsCarrierPhase = math.Remainder(radiansPerSample*float64(D.u.psk.coffs), 2*math.Pi)
+		D.u.psk.tapsCos = math.Cos(tapsPhase)
+		D.u.psk.tapsInvSin = 1 / math.Sin(tapsPhase)
 	} else if modem_type == MODEM_QPSK {
 		dwutil.Assert(D.u.psk.v26_alt != V26_UNSPECIFIED)
 
@@ -441,6 +455,10 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 	// JWL experiment 11/7 - Should delay line be based on audio frequency?
 	D.u.psk.delay_line_taps = int(math.Round(float64(D.u.psk.delay_line_width_sym) * samples_per_sec / float64(correct_baud)))
 	D.u.psk.delay_line_taps = int(math.Round(float64(D.u.psk.delay_line_width_sym) * samples_per_sec / float64(correct_baud)))
+
+	// BPSK's soffs is a fraction of a carrier cycle past the symbol, not of
+	// the symbol, so at a high bit rate the delay line has to reach further.
+	D.u.psk.delay_line_taps = max(D.u.psk.delay_line_taps, D.u.psk.soffs+1)
 
 	D.u.psk.lp_filter_taps = int(math.Round(float64(D.u.psk.lp_filter_width_sym) * samples_per_sec / float64(correct_baud)))
 
@@ -712,7 +730,12 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 
 		switch D.modem_type {
 		case MODEM_BPSK:
-			gray = phase_shift_to_symbol(delta+float64(math.Pi/2), 1) // BPSK
+			// I and Q are the cos of the phase change plus the carrier's
+			// turn over the coffs and soffs delays.  Recover the sin from
+			// the two, whatever the carrier turns between the taps, then
+			// take the carrier's turn away.
+			var turned = math.Atan2((I*D.u.psk.tapsCos-Q)*D.u.psk.tapsInvSin, I)
+			gray = phase_shift_to_symbol(turned-D.u.psk.coffsCarrierPhase, 1) // BPSK
 		case MODEM_QPSK:
 			if D.u.psk.v26_alt == V26_B {
 				gray = phase_shift_to_symbol(delta+float64(math.Pi/2), 2) // MFJ compatible

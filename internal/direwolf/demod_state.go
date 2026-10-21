@@ -362,6 +362,17 @@ type demodulator_state_s struct {
 			coffs int /* to get cos component of previous symbol. */
 			soffs int /* to get sin component of previous symbol. */
 
+			// BPSK only: how far the carrier itself turns over the coffs
+			// delay, in radians from -pi to pi, to take away from the phase
+			// change self correlation measures.
+			coffsCarrierPhase float64
+
+			// BPSK only: the cos, and the reciprocal of the sin, of how far
+			// the carrier turns between the coffs and soffs taps, which
+			// rounding to whole samples leaves only roughly 90 degrees.
+			tapsCos    float64
+			tapsInvSin float64
+
 			delay_line_width_sym float64
 			delay_line_taps      int // In audio samples.
 
