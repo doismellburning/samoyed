@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -33,6 +34,8 @@ func fakeMain() {
 		var status, _ = strconv.Atoi(args[1])
 		fmt.Println("exiting")
 		os.Exit(status)
+	case "coverdir":
+		fmt.Println(os.Getenv(coverDirEnv))
 	case "hang":
 		fmt.Println("hanging")
 		time.Sleep(time.Hour)
@@ -89,6 +92,29 @@ func TestRunMain(t *testing.T) {
 		assert.Equal(t, 3, result.Status)
 		assert.Equal(t, "exiting\n", result.Stdout)
 	})
+}
+
+func TestCoverDirPerCommand(t *testing.T) {
+	var parent = t.TempDir()
+	t.Setenv(coverDirEnv, parent)
+
+	var first = strings.TrimSpace(RunMain(t, "", "coverdir").Stdout)
+
+	var process = StartMain(t, "coverdir")
+	process.Wait()
+
+	var second = strings.TrimSpace(process.Output())
+
+	// Each its own, so they can't trip over each other writing coverage.
+	assert.NotEqual(t, parent, first)
+	assert.NotEqual(t, parent, second)
+	assert.NotEqual(t, first, second)
+	assert.Equal(t, parent, filepath.Dir(first))
+	assert.Equal(t, parent, filepath.Dir(second))
+
+	// RunMain has tidied up its command's already.  StartMain's goes when
+	// the test ends.
+	assert.NoDirExists(t, first)
 }
 
 func TestStartMain(t *testing.T) {
