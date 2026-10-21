@@ -56,9 +56,10 @@ const (
 )
 
 var (
-	errTooManyCircuits = errors.New("too many NET/ROM circuits")
-	errNoCircuit       = errors.New("no such NET/ROM circuit")
-	errCircuitExists   = errors.New("the client already has that NET/ROM circuit")
+	errTooManyCircuits       = errors.New("too many NET/ROM circuits")
+	errNoCircuit             = errors.New("no such NET/ROM circuit")
+	errCircuitExists         = errors.New("the client already has that NET/ROM circuit")
+	errCircuitOnOtherChannel = errors.New("the client has a NET/ROM circuit by those callsigns on another channel")
 )
 
 type circuitState int
@@ -95,18 +96,22 @@ type circuitOwner interface {
 	sendLayer3(f *Frame)
 
 	// acceptCircuit decides whether to answer a CONNECT REQUEST addressed to
-	// this node, and if so which client to hand the circuit to and the
-	// callsign that client knows this end by.
-	acceptCircuit(user string, originNode string) (client int, ownCall string, ok bool)
+	// this node, and if so which client to hand the circuit to, on which
+	// channel, and the callsign it knows this end by.
+	acceptCircuit(user string, originNode string) (to listener, ownCall string, ok bool)
 
 	circuitEstablished(c circuitID, incoming bool)
 	circuitTerminated(c circuitID, timeout bool)
 	circuitData(c circuitID, data []byte)
 }
 
-// circuitID is how a circuit is known to its client: the client, the
-// callsign it uses for this end, and the one it uses for the other.
+// circuitID is how a circuit is known to its client: the channel the
+// client has it on, the client, the callsign it uses for this end, and the
+// one it uses for the other.  The channel is only what the client asked on,
+// or registered on to take incoming circuits, since a circuit is not on a
+// channel of its own: its frames go wherever the route to its far end does.
 type circuitID struct {
+	channel    int
 	client     int
 	ownCall    string
 	remoteCall string
@@ -267,6 +272,15 @@ func (m *circuitManager) connect(id circuitID, remoteNode string) error {
 			return
 		}
 
+		// Nor can it have one by the same names on another channel: to the
+		// far end the two would be the same user at the same node, and it
+		// would take the second for the first's replacement.
+		if m.byNames(id) != nil {
+			err = errCircuitOnOtherChannel
+
+			return
+		}
+
 		var c *circuit
 
 		c, err = m.newCircuit()
@@ -421,14 +435,14 @@ func (m *circuitManager) rx(f *Frame) {
 
 // incoming answers a CONNECT REQUEST for a new circuit.
 func (m *circuitManager) incoming(f *Frame) {
-	var client, ownCall, ok = m.owner.acceptCircuit(f.user, f.origin)
+	var to, ownCall, ok = m.owner.acceptCircuit(f.user, f.origin)
 	if !ok {
 		m.sendRefusal(f)
 
 		return
 	}
 
-	var id = circuitID{client: client, ownCall: ownCall, remoteCall: f.user}
+	var id = circuitID{channel: to.channel, client: to.client, ownCall: ownCall, remoteCall: f.user}
 
 	// The client would know this circuit by the same names as one it has
 	// already.  A new request from the same user at the same node means
@@ -436,8 +450,9 @@ func (m *circuitManager) incoming(f *Frame) {
 	// ACKNOWLEDGE went astray - so the old one goes, rather than leave the
 	// client's commands going to either at random.  From another node it is
 	// someone else, or a second session, and the client could not tell the
-	// two apart, so the new one is refused.
-	if existing := m.byID(id); existing != nil {
+	// two apart, so the new one is refused.  Whatever channel the old one is
+	// on, the client knows the two by the same callsigns.
+	if existing := m.byNames(id); existing != nil {
 		if existing.remoteNode != f.origin {
 			m.sendRefusal(f)
 
@@ -786,6 +801,18 @@ func (m *circuitManager) newCircuit() (*circuit, error) {
 func (m *circuitManager) byID(id circuitID) *circuit {
 	for _, c := range m.circuits {
 		if c.id == id && c.state != stateClosed {
+			return c
+		}
+	}
+
+	return nil
+}
+
+// byNames is the client's open circuit by id's callsigns, whatever channel
+// it is on.
+func (m *circuitManager) byNames(id circuitID) *circuit {
+	for _, c := range m.circuits {
+		if c.id.client == id.client && c.id.ownCall == id.ownCall && c.id.remoteCall == id.remoteCall && c.state != stateClosed {
 			return c
 		}
 	}

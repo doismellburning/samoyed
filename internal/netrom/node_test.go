@@ -691,5 +691,7 @@ func TestNodeStart(t *testing.T) {
 		t.Fatal("no NODES broadcast")
 	}
 
-	assert.NotPanics(t, func() { n.circuitData(circuitID{client: 0, ownCall: "Q1TEST", remoteCall: "Q2TEST"}, []byte("x")) })
+	assert.NotPanics(t, func() {
+		n.circuitData(circuitID{channel: 0, client: 0, ownCall: "Q1TEST", remoteCall: "Q2TEST"}, []byte("x"))
+	})
 }

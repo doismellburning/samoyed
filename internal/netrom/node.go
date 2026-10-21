@@ -19,6 +19,7 @@ package netrom
 // link is made.  Only NODES broadcasts go out as UI frames.
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"slices"
@@ -132,7 +133,14 @@ type Node struct {
 
 	mu        sync.Mutex
 	links     map[neighbour]*neighbourLink
-	listeners []int // Clients taking incoming circuits.
+	listeners []listener // Clients taking incoming circuits.
+}
+
+// listener is a client's registration of the node callsign on a channel,
+// to take incoming circuits there.
+type listener struct {
+	client  int
+	channel int
 }
 
 // New makes a node from cfg.  It reaches its neighbours through link, as
@@ -459,29 +467,38 @@ func (n *Node) xmit(nb neighbour, data []byte) {
 
 // The circuits ask the node, and report to it.
 
-func (n *Node) acceptCircuit(user string, originNode string) (int, string, bool) {
+// acceptCircuit hands an incoming circuit to the lowest numbered client
+// taking them, on the lowest numbered channel it registered on, so that the
+// choice is the same each time.
+func (n *Node) acceptCircuit(user string, originNode string) (listener, string, bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	if len(n.listeners) == 0 {
 		logrus.WithFields(logrus.Fields{"user": user, "node": originNode}).Info("NET/ROM: refusing circuit - no client has registered the node callsign")
 
-		return 0, "", false
+		var none listener
+
+		return none, "", false
 	}
 
-	return slices.Min(n.listeners), n.cfg.Callsign, true
+	var first = slices.MinFunc(n.listeners, func(a, b listener) int {
+		return cmp.Or(cmp.Compare(a.client, b.client), cmp.Compare(a.channel, b.channel))
+	})
+
+	return first, n.cfg.Callsign, true
 }
 
 func (n *Node) circuitEstablished(c circuitID, incoming bool) {
-	n.clients.LinkEstablished(n.cfg.Channel, c.client, c.remoteCall, c.ownCall, incoming)
+	n.clients.LinkEstablished(c.channel, c.client, c.remoteCall, c.ownCall, incoming)
 }
 
 func (n *Node) circuitTerminated(c circuitID, timeout bool) {
-	n.clients.LinkTerminated(n.cfg.Channel, c.client, c.remoteCall, c.ownCall, timeout)
+	n.clients.LinkTerminated(c.channel, c.client, c.remoteCall, c.ownCall, timeout)
 }
 
 func (n *Node) circuitData(c circuitID, data []byte) {
-	n.clients.RecConnData(n.cfg.Channel, c.client, c.remoteCall, c.ownCall, ax25.PIDNetROM, data)
+	n.clients.RecConnData(c.channel, c.client, c.remoteCall, c.ownCall, ax25.PIDNetROM, data)
 }
 
 // What client applications ask of the node.  Each reports whether the
@@ -499,8 +516,9 @@ func (n *Node) Register(channel int, client int, call string) bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	if !slices.Contains(n.listeners, client) {
-		n.listeners = append(n.listeners, client)
+	var l = listener{client: client, channel: channel}
+	if !slices.Contains(n.listeners, l) {
+		n.listeners = append(n.listeners, l)
 	}
 
 	return true
@@ -515,7 +533,8 @@ func (n *Node) Unregister(channel int, client int, call string) bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	n.listeners = slices.DeleteFunc(n.listeners, func(c int) bool { return c == client })
+	var gone = listener{client: client, channel: channel}
+	n.listeners = slices.DeleteFunc(n.listeners, func(l listener) bool { return l == gone })
 
 	return true
 }
@@ -533,9 +552,9 @@ func (n *Node) Connect(channel int, client int, ownCall string, remoteCall strin
 		return false
 	}
 
-	var id = circuitID{client: client, ownCall: ownCall, remoteCall: remoteCall}
+	var id = circuitID{channel: channel, client: client, ownCall: ownCall, remoteCall: remoteCall}
 
-	var log = logrus.WithFields(logrus.Fields{"client": client, "user": ownCall, "destination": remoteCall})
+	var log = logrus.WithFields(logrus.Fields{"channel": channel, "client": client, "user": ownCall, "destination": remoteCall})
 
 	var _, err = NormaliseCallsign(ownCall)
 	if err != nil {
@@ -565,6 +584,13 @@ func (n *Node) Connect(channel int, client int, ownCall string, remoteCall strin
 		log.Info("NET/ROM: circuit already open")
 
 		return true
+	case errors.Is(connectErr, errCircuitOnOtherChannel):
+		// That one carries on, and this one is refused: the client asked
+		// for what it cannot have, which is no fault of ours.
+		log.Info("NET/ROM: circuit already open on another channel")
+		n.circuitTerminated(id, false)
+
+		return true
 	case connectErr != nil:
 		log.WithError(connectErr).Error("NET/ROM: cannot open circuit")
 		n.circuitTerminated(id, false)
@@ -581,14 +607,14 @@ func (n *Node) Connect(channel int, client int, ownCall string, remoteCall strin
 // callsigns on the node's channel.
 func (n *Node) Send(channel int, client int, ownCall string, remoteCall string, data []byte) bool {
 	return channel == n.cfg.Channel &&
-		n.circuits.send(circuitID{client: client, ownCall: ownCall, remoteCall: remoteCall}, data) == nil
+		n.circuits.send(circuitID{channel: channel, client: client, ownCall: ownCall, remoteCall: remoteCall}, data) == nil
 }
 
 // Disconnect closes the client's circuit, if it has one by those
 // callsigns on the node's channel.
 func (n *Node) Disconnect(channel int, client int, ownCall string, remoteCall string) bool {
 	return channel == n.cfg.Channel &&
-		n.circuits.disconnect(circuitID{client: client, ownCall: ownCall, remoteCall: remoteCall}) == nil
+		n.circuits.disconnect(circuitID{channel: channel, client: client, ownCall: ownCall, remoteCall: remoteCall}) == nil
 }
 
 // Outstanding answers, through the Reporter, how many of the client's
@@ -600,7 +626,7 @@ func (n *Node) Outstanding(channel int, client int, ownCall string, remoteCall s
 		return false
 	}
 
-	var count, ok = n.circuits.outstanding(circuitID{client: client, ownCall: ownCall, remoteCall: remoteCall})
+	var count, ok = n.circuits.outstanding(circuitID{channel: channel, client: client, ownCall: ownCall, remoteCall: remoteCall})
 	if !ok {
 		return false
 	}
@@ -618,5 +644,5 @@ func (n *Node) ClientGone(client int) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	n.listeners = slices.DeleteFunc(n.listeners, func(c int) bool { return c == client })
+	n.listeners = slices.DeleteFunc(n.listeners, func(l listener) bool { return l.client == client })
 }
