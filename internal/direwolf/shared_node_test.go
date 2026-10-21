@@ -16,6 +16,7 @@ import (
 
 const (
 	sharedChannel       = 1
+	sharedOtherChannel  = 3 // NET/ROM's other channel.
 	sharedClient        = 7
 	sharedNodeCall      = "Q1TEST-7"
 	sharedUserCall      = "Q2TEST"
@@ -30,7 +31,7 @@ func newTestSharedNode() (*sharedNode, *recordingAGWDataLink, *loggingLinkClient
 	var shell = new(loggingLinkClients)
 	var netrom = new(loggingLinkClients)
 
-	var s = newSharedNode(link, sharedChannel, sharedNodeCall)
+	var s = newSharedNode(link, []int{sharedChannel, sharedOtherChannel}, sharedNodeCall)
 	s.attach(shell, noLinkClients{}, netrom)
 
 	return s, link, shell, netrom
@@ -231,9 +232,28 @@ func TestSharedNodeRegistration(t *testing.T) {
 	assert.Equal(t, []string{"register Q1TEST-7 1 7"}, link.taken(), "the shell registers for both")
 }
 
-// A neighbour can only reach NET/ROM on its own channel: one connecting on
+// A neighbour connecting on any of NET/ROM's channels is handed over.
+func TestSharedNodeNeighbourConnectsOnAnotherChannel(t *testing.T) {
+	t.Parallel()
+
+	var s, _, shell, netrom = newTestSharedNode()
+
+	s.LinkEstablished(sharedOtherChannel, sharedClient, sharedNeighbourCall, sharedNodeCall, true)
+	s.RecConnData(sharedOtherChannel, sharedClient, sharedNeighbourCall, sharedNodeCall, ax25.PIDNetROM, []byte("l3"))
+
+	assert.Equal(t, []string{
+		"established 3 7 Q3TEST-7 Q1TEST-7 true",
+		"terminated 3 7 Q3TEST-7 Q1TEST-7 false",
+	}, shell.calls)
+	assert.Equal(t, []string{
+		"established 3 7 Q3TEST-7 Q1TEST-7 true",
+		"data 3 7 Q3TEST-7 Q1TEST-7 207 \"l3\"",
+	}, netrom.calls)
+}
+
+// A neighbour can only reach NET/ROM on its own channels: one connecting on
 // another of the shell's channels is the shell's, whatever it sends.
-func TestSharedNodeNetROMOnlyOnItsChannel(t *testing.T) {
+func TestSharedNodeNetROMOnlyOnItsChannels(t *testing.T) {
 	t.Parallel()
 
 	var s, _, shell, netrom = newTestSharedNode()
@@ -294,7 +314,7 @@ func TestSharedNodeShellOpensCircuit(t *testing.T) {
 	t.Parallel()
 
 	var link = new(recordingAGWDataLink)
-	var s = newSharedNode(link, sharedChannel, sharedNodeCall)
+	var s = newSharedNode(link, []int{sharedChannel}, sharedNodeCall)
 
 	var config = netrom.DefaultConfig()
 	config.Channels = []int{sharedChannel}

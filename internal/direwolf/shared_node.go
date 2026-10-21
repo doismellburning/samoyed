@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
@@ -25,7 +26,7 @@ import (
 // A link either of them asks for is its own.  A link made to the node is the
 // shell's to begin with, so a user is greeted straight away, until something
 // arrives on it: if that is a NET/ROM frame (PID 0xCF), on a link to NET/ROM's
-// callsign on its channel, the link is a neighbour's, and passes to the
+// callsign on one of its channels, the link is a neighbour's, and passes to the
 // NET/ROM node, the shell forgetting it; anything else, and it is the shell's
 // for good.  A neighbour is so greeted as a user is, and NET/ROM ignores the
 // greeting.  NET/ROM asking for such a link before anything has arrived on it
@@ -38,12 +39,12 @@ import (
 type sharedNode struct {
 	link node.DataLink
 
-	// netromChannel is the one channel NET/ROM runs on, and netromCall the
+	// netromChannels are the channels NET/ROM runs on, and netromCall the
 	// callsign it sends from.  The shell can listen on other channels, and
 	// answers to the alias too, where a link is the shell's whatever arrives
 	// on it.
-	netromChannel int
-	netromCall    string
+	netromChannels []int
+	netromCall     string
 
 	// mu guards what follows.
 	mu sync.Mutex
@@ -86,11 +87,11 @@ type sharedLink struct {
 }
 
 // newSharedNode stands between link and a shell and NET/ROM node sharing
-// their names, NET/ROM running on netromChannel as netromCall.
-func newSharedNode(link node.DataLink, netromChannel int, netromCall string) *sharedNode {
+// their names, NET/ROM running on netromChannels as netromCall.
+func newSharedNode(link node.DataLink, netromChannels []int, netromCall string) *sharedNode {
 	var s = new(sharedNode)
 	s.link = link
-	s.netromChannel = netromChannel
+	s.netromChannels = slices.Clone(netromChannels)
 	s.netromCall = netromCall
 	s.shell = noLinkClients{}
 	s.netrom = noLinkClients{}
@@ -177,9 +178,9 @@ func (s *sharedNode) clientFor(owner linkOwner) linkClients { //nolint:ireturn /
 }
 
 // isNetROMLink says whether key is a link NET/ROM could have: to its
-// callsign, on its channel.
+// callsign, on one of its channels.
 func (s *sharedNode) isNetROMLink(key sharedLinkKey) bool {
-	return key.channel == s.netromChannel && key.ownCall == s.netromCall
+	return slices.Contains(s.netromChannels, key.channel) && key.ownCall == s.netromCall
 }
 
 // ownerOf is who link key belongs to: the shell, if it is none of theirs,
