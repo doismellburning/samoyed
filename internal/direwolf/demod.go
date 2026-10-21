@@ -159,11 +159,22 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 
 		var profileStr = achan.profiles
 		for i, p := range profileStr {
-			if ascii.IsLower(p) {
-				justLettersBuilder.WriteRune(ascii.ToUpper(p))
-				num_letters++
-			} else if ascii.IsUpper(p) {
-				justLettersBuilder.WriteRune(p)
+			if ascii.IsAlpha(p) {
+				var letter = ascii.ToUpper(p)
+
+				// demod_afsk_init knows only these; leave anything else out
+				// rather than have it stop the program.
+				if !strings.ContainsRune("ABDE", letter) {
+					logrus.WithFields(logrus.Fields{
+						"channel":  channel,
+						"profiles": achan.profiles,
+						"profile":  string(letter),
+					}).Error("Unknown AFSK demodulator type; ignoring it")
+
+					continue
+				}
+
+				justLettersBuilder.WriteRune(letter)
 				num_letters++
 			} else if p == '+' {
 				have_plus = 1

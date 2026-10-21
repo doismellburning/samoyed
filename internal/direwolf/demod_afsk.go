@@ -21,7 +21,6 @@ package direwolf
 
 import (
 	"math"
-	"os"
 
 	"github.com/doismellburning/samoyed/internal/dsp"
 	"github.com/doismellburning/samoyed/internal/dwcore"
@@ -130,7 +129,7 @@ var afskSpaceGain = func() [MAX_SUBCHANS]float64 { //nolint:gochecknoglobals // 
  * Returns:     None.
  *
  * Bugs:	This doesn't do much error checking so don't give it
- *		anything crazy.
+ *		anything crazy.  The caller checks the profile.
  *
  *----------------------------------------------------------------*/
 
@@ -272,8 +271,8 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		D.alevel_space_peak = -1
 
 	default:
-		logrus.WithField("profile", string(profile)).Error("Invalid AFSK demodulator profile")
-		os.Exit(1)
+		// NewDemodulator leaves out the profiles this doesn't know.
+		panic("INTERNAL ERROR: invalid AFSK demodulator profile " + string(profile))
 	}
 
 	TUNE("TUNE_PRE_BAUD", D.prefilter_baud, "prefilter_baud", "%.3f")
