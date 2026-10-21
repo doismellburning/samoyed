@@ -153,7 +153,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 	if modem_type == MODEM_BPSK {
 		correct_baud = bps // 1 bit per symbol
-		carrier_freq = 1800
+		carrier_freq = bpskCarrierFreq
 
 		switch ascii.ToUpper(profile) { //nolint:dupl // Per-modem profile tables, kept parallel to upstream
 		case 'L': /* Self correlation technique. */
@@ -167,8 +167,8 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		case 'M': /* Self correlation technique. */
-			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
-			D.u.psk.prefilter_baud = 1.3
+			D.u.psk.use_prefilter = 1    /* Add a bandpass filter. */
+			D.u.psk.prefilter_baud = 1.0 // was 1.3, which reached below 0 Hz at 1200 baud on a 1500 Hz carrier; BPSK's main lobe spans +-baud
 			D.u.psk.pre_filter_width_sym = 1.497
 			D.u.psk.pre_window = dsp.WindowCosine
 

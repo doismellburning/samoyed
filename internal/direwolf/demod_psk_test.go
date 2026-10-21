@@ -4,10 +4,12 @@
 package direwolf
 
 import (
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"testing"
 
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,7 +67,8 @@ func decodeBPSK(t *testing.T, wav string, baud int, profile string) int {
 // that mixes with a local oscillator, profile N, as the noise rises.  Its
 // taps used to be placed as fractions of a symbol, which put them in
 // quadrature only for some ratios of carrier to symbol rate; at 1200 bit/s
-// and 1800 Hz it decoded 26 of these 50 frames to N's 40.
+// it decoded 26 of these 50 frames to N's 40 at 1800 Hz, and 18 to N's 39 at
+// 1500 Hz.
 func TestBPSKSelfCorrelationKeepsUpWithLocalOscillator(t *testing.T) {
 	t.Parallel()
 
@@ -75,6 +78,26 @@ func TestBPSKSelfCorrelationKeepsUpWithLocalOscillator(t *testing.T) {
 	var mixed = decodeBPSK(t, wav, 1200, "N")
 
 	assert.GreaterOrEqual(t, correlated, mixed-5, "profile M decoded %d, profile N %d", correlated, mixed)
+}
+
+// Every BPSK demodulator profile, at each rate, decodes every frame of a
+// clean signal from the BPSK modulator.
+func TestBPSKRoundTripEveryProfile(t *testing.T) {
+	t.Parallel()
+
+	const frames = 5
+
+	for _, baud := range []int{300, 1200} {
+		var wav = genBPSKPackets(t, baud, 44100, frames, false)
+
+		for _, profile := range []string{"L", "M", "N", "O"} {
+			t.Run(fmt.Sprintf("%d/%s", baud, profile), func(t *testing.T) {
+				t.Parallel()
+
+				assert.Equal(t, frames, decodeBPSK(t, wav, baud, profile))
+			})
+		}
+	}
 }
 
 // The self correlating BPSK demodulators' second tap is a fraction of a
@@ -97,5 +120,26 @@ func TestBPSKDelayLineReachesBothTaps(t *testing.T) {
 			assert.Less(t, D.u.psk.soffs, D.u.psk.delay_line_taps, "%d bit/s, %d samples a second", bps, samplesPerSec)
 			assert.Less(t, D.u.psk.coffs, D.u.psk.soffs, "%d bit/s, %d samples a second", bps, samplesPerSec)
 		}
+	}
+}
+
+// The BPSK demodulators' bandpass filters fit below the carrier at each of
+// the NinoTNC's rates.  Profile M's used to reach below 0 Hz at 1200 bit/s
+// once the carrier moved to 1500 Hz.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
+func TestBPSKPrefilterFitsBelowCarrier(t *testing.T) {
+	for _, baud := range []int{300, 1200} {
+		var audioConfig = newTestRadioConfig(0, MODEM_BPSK, baud, 0, 0, 44100)
+		audioConfig.achan[0].num_freq = 1
+		audioConfig.achan[0].profiles = "LMNO"
+
+		var hook = test.NewGlobal()
+
+		NewDemodulator(0, audioConfig.achan[0], 44100)
+
+		assert.Nil(t, lastEntryWithMessage(hook, "Prefilter range doesn't make sense"), "at %d baud", baud)
+
+		hook.Reset()
 	}
 }
