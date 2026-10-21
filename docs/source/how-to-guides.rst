@@ -640,12 +640,12 @@ configure one with a ``netrom`` block in a YAML configuration
       netrom:
         callsign: Q1TEST-7
         alias: QNODEA
-        channel: 0
+        channels: [0]
 
 The node's callsign is its own:
 it answers the links neighbouring nodes make to it,
 and makes links to them,
-so nothing else should use that callsign on that channel.
+so nothing else should use that callsign on its channels.
 With a node shell, NET/ROM is configured with it instead, as below.
 Leave ``PACLEN`` at its default of 256 or more:
 a NET/ROM frame travels in a single AX.25 frame,
@@ -701,8 +701,8 @@ Configure it under the node shell's ``node`` block (see :doc:`yaml-config`):
 
 NET/ROM takes the node's address as its callsign and the node's alias as its alias,
 which must be no more than six letters, digits or ``#_&-/``.
-Its ``channel`` can be left out when the node listens on only one;
-otherwise it must be one of the node's ``channels``.
+Its ``channels`` can be left out when the node listens on only one;
+otherwise they must be among the node's ``channels``.
 The other settings are those of the ``netrom`` block above.
 
 A station that connects to the node gets the shell's prompt.
@@ -745,4 +745,4 @@ since the links between nodes are addressed to their callsigns:
       netrom:
         callsign: Q1TEST-7
         alias: QNODEA
-        channel: 10
+        channels: [10]
