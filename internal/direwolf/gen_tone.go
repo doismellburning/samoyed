@@ -24,6 +24,11 @@ import (
 
 const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
 
+// bpskCarrierFreq is the BPSK carrier, in Hz, at every bit rate: the tone
+// the NinoTNC's PSK modes use, per its mode table at
+// https://tarpn.net/t/nino-tnc/n9600a/n9600a_operation.html.
+const bpskCarrierFreq = 1500
+
 const PHASE_SHIFT_180 = (uint(128) << 24)
 const PHASE_SHIFT_90 = (uint(64) << 24)
 const PHASE_SHIFT_45 = (uint(32) << 24)
@@ -139,7 +144,7 @@ func NewToneGenerator(channel int, audioConfig *RadioConfig, amp int, sink Audio
 
 	switch audioConfig.achan[channel].modem_type {
 	case MODEM_BPSK:
-		audioConfig.achan[channel].mark_freq = 1800
+		audioConfig.achan[channel].mark_freq = bpskCarrierFreq
 		audioConfig.achan[channel].space_freq = audioConfig.achan[channel].mark_freq // Not Used.
 
 		// 1 bit per symbol, so symbol time equals bit time

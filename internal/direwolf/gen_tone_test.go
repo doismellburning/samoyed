@@ -221,3 +221,42 @@ func TestBPSKSpectrumIsContained(t *testing.T) {
 	t.Logf("power more than %d Hz from the carrier: %.1f dB", 2*baud, ratioDB)
 	assert.Less(t, ratioDB, -30.0)
 }
+
+// goertzelPower is the power in samples at freq, for a signal sampled at
+// samplesPerSec.
+func goertzelPower(samples []int16, freq float64, samplesPerSec int) float64 {
+	var coeff = 2 * math.Cos(2*math.Pi*freq/float64(samplesPerSec))
+	var s1, s2 float64
+
+	for _, x := range samples {
+		var s0 = float64(x) + coeff*s1 - s2
+		s2 = s1
+		s1 = s0
+	}
+
+	return s1*s1 + s2*s2 - coeff*s1*s2
+}
+
+// BPSK's carrier is the 1500 Hz the NinoTNC's PSK modes use, at every bit
+// rate.
+func TestBPSKCarrierIsNinoTNCs(t *testing.T) {
+	t.Parallel()
+
+	for _, baud := range []int{300, 1200} {
+		t.Run(strconv.Itoa(baud), func(t *testing.T) {
+			t.Parallel()
+
+			var samplesPerSec = 48000
+			var tg, sink, _ = newCapturingToneGenerator(MODEM_BPSK, baud, samplesPerSec)
+
+			// No reversals: a steady carrier.
+			for range baud / 10 {
+				tg.PutBit(0)
+			}
+
+			var samples = decodeMono16(sink.data)
+
+			assert.Greater(t, goertzelPower(samples, 1500, samplesPerSec), 100*goertzelPower(samples, 1800, samplesPerSec))
+		})
+	}
+}

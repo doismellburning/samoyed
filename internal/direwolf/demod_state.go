@@ -328,9 +328,10 @@ type demodulator_state_s struct {
 			use_prefilter int // True to enable it.
 
 			prefilter_baud float64 // Cutoff frequencies, as fraction of baud rate, beyond tones used.
-			// In the case of PSK, we use only a single tone of 1800 Hz.
-			// If we were using 2400 bps (= 1200 baud), this would be
-			// the fraction of 1200 for the cutoff below and above 1800.
+			// In the case of PSK, we use only a single tone: 1800 Hz, or
+			// bpskCarrierFreq for BPSK.  If we were using 2400 bps QPSK
+			// (= 1200 baud), this would be the fraction of 1200 for the
+			// cutoff below and above 1800.
 
 			pre_filter_width_sym float64 /* Length in number of symbol times. */
 
@@ -361,6 +362,17 @@ type demodulator_state_s struct {
 			boffs int /* symbol length based on sample rate and baud. */
 			coffs int /* to get cos component of previous symbol. */
 			soffs int /* to get sin component of previous symbol. */
+
+			// BPSK only: how far the carrier itself turns over the coffs
+			// delay, in radians from -pi to pi, to take away from the phase
+			// change self correlation measures.
+			coffsCarrierPhase float64
+
+			// BPSK only: the cos, and the reciprocal of the sin, of how far
+			// the carrier turns between the coffs and soffs taps, which
+			// rounding to whole samples leaves only roughly 90 degrees.
+			tapsCos    float64
+			tapsInvSin float64
 
 			delay_line_width_sym float64
 			delay_line_taps      int // In audio samples.

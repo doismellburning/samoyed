@@ -2657,7 +2657,7 @@ func (ps *parseState) applyModem(settings ModemSettings) error {
 
 	switch strings.ToLower(settings.Type) {
 	case "":
-	case "bpsk": /* Force BPSK modem (1 bit/symbol, carrier 1800 Hz). */
+	case "bpsk": /* Force BPSK modem (1 bit/symbol, carrier 1500 Hz). */
 		achan.dropEASProfile()
 		achan.modem_type = MODEM_BPSK
 		achan.mark_freq = 0

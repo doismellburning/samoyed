@@ -7,6 +7,6 @@ goto_tmpdir
 $GEN_PACKETS -B300 -k -n 100 -o test300-bpsk.wav
 
 f0() { $ATEST -B300 -k -F0 -L77 -G81 test300-bpsk.wav; }
-f1() { $ATEST -B300 -k -F1 -L81 -G85 test300-bpsk.wav; }
+f1() { $ATEST -B300 -k -F1 -L83 -G87 test300-bpsk.wav; }
 
 run_parallel f0 f1

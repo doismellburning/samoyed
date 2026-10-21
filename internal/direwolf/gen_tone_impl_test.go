@@ -61,9 +61,9 @@ func TestNewToneGeneratorBPSK(t *testing.T) {
 	var tg = NewToneGenerator(channel, audioConfig, 100, nil)
 
 	require.NotNil(t, tg)
-	// BPSK forces mark_freq to 1800 and mirrors it into space_freq.
-	assert.Equal(t, 1800, audioConfig.achan[channel].mark_freq)
-	assert.Equal(t, 1800, audioConfig.achan[channel].space_freq)
+	// BPSK forces mark_freq to its carrier and mirrors it into space_freq.
+	assert.Equal(t, bpskCarrierFreq, audioConfig.achan[channel].mark_freq)
+	assert.Equal(t, bpskCarrierFreq, audioConfig.achan[channel].space_freq)
 	assert.Equal(t, tg.f1ChangePerSample, tg.f2ChangePerSample)
 	assert.Equal(t, PHASE_SHIFT_45, tg.tonePhase)
 }
