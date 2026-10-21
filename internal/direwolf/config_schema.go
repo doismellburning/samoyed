@@ -202,10 +202,11 @@ type NetROMSettings struct {
 // NetROMRouting describes how a NET/ROM node routes, whether it has a
 // callsign and alias of its own or shares the node shell's.
 type NetROMRouting struct {
-	// Channel is the channel the node runs on: a radio channel or an
-	// NCHANNEL.  Sharing the node shell's names, it can be left out if the
-	// shell listens on only one channel.
-	Channel *int `yaml:"channel"`
+	// Channels are the channels the node runs on, each a radio channel or
+	// an NCHANNEL.  It has one routing table across them all, a neighbour
+	// being a callsign on one of them.  Sharing the node shell's names, they
+	// can be left out if the shell listens on only one channel.
+	Channels []int `yaml:"channels"`
 
 	// TTL is how many nodes a frame the node originates may cross.  Left
 	// out, it is 16.

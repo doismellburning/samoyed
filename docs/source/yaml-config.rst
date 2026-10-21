@@ -387,8 +387,8 @@ These are the keys under ``samoyed``:
         ``netrom: {}`` runs it with the defaults.
         It takes the settings of the top-level ``netrom`` block below
         but ``callsign`` and ``alias``,
-        and its ``channel`` must be one the node listens on;
-        it can be left out if the node listens on only one.
+        and its ``channels`` must be ones the node listens on;
+        they can be left out if the node listens on only one.
         A top-level ``netrom`` block is refused alongside ``node``.
 
     The node answers each line it is sent,
@@ -483,9 +483,13 @@ These are the keys under ``samoyed``:
         The short name, up to six letters, digits or ``#_&-/``,
         other nodes know it by.
 
-    ``channel``
-        The channel it runs on:
-        any channel connected mode can be used on.
+    ``channels``
+        The channels it runs on,
+        each any channel connected mode can be used on.
+        It keeps one routing table across them all,
+        sends its ``NODES`` broadcasts on each,
+        and takes a neighbour to be a callsign on one of them,
+        so it can route between, say, a radio channel and an AXUDP link.
 
     ``ttl``
         Optionally, how many nodes a frame it originates may cross.
@@ -511,7 +515,7 @@ These are the keys under ``samoyed``:
           netrom:
             callsign: Q1TEST-7
             alias: QNODEA
-            channel: 0
+            channels: [0]
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

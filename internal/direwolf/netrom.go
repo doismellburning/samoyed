@@ -55,8 +55,8 @@ func (ps *parseState) applyNETROM(settings NetROMSettings) error {
 
 	config.Alias = alias
 
-	if settings.Channel == nil {
-		return fmt.Errorf("line %d: NET/ROM needs a channel", ps.line)
+	if len(settings.Channels) == 0 {
+		return fmt.Errorf("line %d: NET/ROM needs channels", ps.line)
 	}
 
 	return ps.applyNETROMRouting(config, settings.NetROMRouting, false)
@@ -81,27 +81,33 @@ func (ps *parseState) applyIntegratedNETROM(address string, alias string, listen
 
 	config.Alias = alias
 
-	if settings.Channel == nil {
+	if len(settings.Channels) == 0 {
 		if len(listensOn) != 1 {
-			return fmt.Errorf("line %d: NET/ROM needs a channel, as the node listens on more than one", ps.line)
+			return fmt.Errorf("line %d: NET/ROM needs channels, as the node listens on more than one", ps.line)
 		}
 
-		settings.Channel = &listensOn[0]
+		settings.Channels = listensOn
 	}
 
 	return ps.applyNETROMRouting(config, settings, true)
 }
 
 // applyNETROMRouting checks the routing settings of a NET/ROM node named as
-// config says, and turns it on.  Whether its channel can carry NET/ROM
+// config says, and turns it on.  Whether its channels can carry NET/ROM
 // waits for netromConfig, since the command line can still make one a radio
 // channel.
 func (ps *parseState) applyNETROMRouting(config netrom.Config, settings NetROMRouting, integrated bool) error {
-	if *settings.Channel < 0 || *settings.Channel >= MAX_TOTAL_CHANS {
-		return fmt.Errorf("line %d: Invalid channel %d for NET/ROM. Must be in range of 0 to %d", ps.line, *settings.Channel, MAX_TOTAL_CHANS-1)
+	for i, c := range settings.Channels {
+		if c < 0 || c >= MAX_TOTAL_CHANS {
+			return fmt.Errorf("line %d: Invalid channel %d for NET/ROM. Must be in range of 0 to %d", ps.line, c, MAX_TOTAL_CHANS-1)
+		}
+
+		if slices.Contains(settings.Channels[:i], c) {
+			return fmt.Errorf("line %d: NET/ROM channel %d is given more than once", ps.line, c)
+		}
 	}
 
-	config.Channels = []int{*settings.Channel}
+	config.Channels = slices.Clone(settings.Channels)
 
 	var err error
 
@@ -152,8 +158,8 @@ func netromByte(line int, name string, setting *int, least int, unset byte) (byt
 
 // netromConfig is the NET/ROM node's configuration for settings, with the
 // channels as they are now, or what is wrong with it.  One sharing the node
-// shell's names must be on one of the shell's channels, which is where the
-// shell answers for both.
+// shell's names must be on the shell's channels, which is where the shell
+// answers for both.
 func (c *RadioConfig) netromConfig(settings netromSettings, shell maybe.Maybe[nodeSettings]) (netrom.Config, error) {
 	var none netrom.Config
 
