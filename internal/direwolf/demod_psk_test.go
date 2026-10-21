@@ -5,10 +5,16 @@ package direwolf
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"strconv"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
+	"github.com/doismellburning/samoyed/internal/hdlc"
+	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
@@ -142,4 +148,135 @@ func TestBPSKPrefilterFitsBelowCarrier(t *testing.T) {
 
 		hook.Reset()
 	}
+}
+
+// A BPSK symbol with the same phase as the one before is a 1, and one with
+// the phase reversed a 0, as the NinoTNC sends IL2P.
+func TestBPSKNoPhaseChangeIsOne(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, 1, phase_shift_to_symbol(0, 1))
+	assert.Equal(t, 0, phase_shift_to_symbol(math.Pi, 1))
+}
+
+// newBPSKTestRadioConfig is a BPSK channel at baud, sending with layer2, and
+// demodulating with profile.
+func newBPSKTestRadioConfig(baud int, layer2 phy.Layer2, profile string) *RadioConfig {
+	var audioConfig = newTestRadioConfig(0, MODEM_BPSK, baud, 0, 0, 44100)
+	audioConfig.adev[0].defined = 1
+	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].profiles = profile
+	audioConfig.achan[0].fix_bits = RETRY_NONE
+	audioConfig.achan[0].layer2_xmit = layer2
+	audioConfig.achan[0].il2p_max_fec = 1
+	audioConfig.achan[0].il2p_crc = true
+	audioConfig.achan[0].fx25_strength = 16
+
+	return audioConfig
+}
+
+// What the tone generator sends over BPSK, as AX.25, FX.25 or IL2P, the
+// demodulator decodes back, at each of the NinoTNC's rates.
+func TestBPSKLayer2RoundTrip(t *testing.T) {
+	t.Parallel()
+
+	for _, layer2 := range []phy.Layer2{LAYER2_AX25, LAYER2_FX25, LAYER2_IL2P} {
+		for _, baud := range []int{300, 1200} {
+			t.Run(fmt.Sprintf("%v/%d", layer2, baud), func(t *testing.T) {
+				t.Parallel()
+
+				var texts, frames = afskTestFrames(t, 2)
+
+				var samples = generateFrames(t, newBPSKTestRadioConfig(baud, layer2, "N"), frames)
+
+				var got, _ = demodulateFrames(t, newBPSKTestRadioConfig(baud, layer2, "N"), samples)
+
+				require.Len(t, got, len(texts))
+
+				for i, pp := range got {
+					assert.Equal(t, texts[i], pp.FormatAddrs()+string(pp.Info()))
+				}
+			})
+		}
+	}
+}
+
+// ninoAX25Bits is the bits the NinoTNC sends, one a symbol, for AX.25 frame
+// pp over BPSK, with flags either side: 1 where the phase holds, 0 where it
+// reverses.  Its recordings, at
+// https://github.com/ninocarrillo/modem-test-audio, show it G3RUH scrambles
+// HDLC's NRZI line and sends the result as the phase itself.
+func ninoAX25Bits(pp *ax25.Packet) []bool {
+	var levels []int
+
+	var line = linecode.NewEncoder(func(level int) { levels = append(levels, level) })
+	var sender = hdlc.NewSender(line, 0)
+
+	sender.SendFlags(32)
+	sender.SendFrame(pp.Pack(), false)
+	sender.SendFlags(16)
+
+	var scrambler linecode.Scrambler
+
+	var bits = make([]bool, 0, len(levels))
+	var phase = 0
+
+	for _, level := range levels {
+		var next = scrambler.Scramble(level)
+		bits = append(bits, next == phase)
+		phase = next
+	}
+
+	return bits
+}
+
+// BPSK sends AX.25 as the NinoTNC does, symbol for symbol.
+func TestBPSKSendsAX25AsNinoTNC(t *testing.T) {
+	t.Parallel()
+
+	var _, frames = afskTestFrames(t, 1)
+
+	var tg, _, _ = newCapturingToneGenerator(MODEM_BPSK, 1200, 48000)
+
+	var got []bool
+
+	var line = linecode.NewEncoder(func(level int) {
+		var before = tg.bpskSign
+
+		tg.PutBit(level)
+
+		got = append(got, tg.bpskSign == before)
+	})
+	var sender = hdlc.NewSender(line, 0)
+
+	sender.SendFlags(32)
+	sender.SendFrame(frames[0].Pack(), false)
+	sender.SendFlags(16)
+
+	assert.Equal(t, ninoAX25Bits(frames[0]), got)
+}
+
+// BPSK receives AX.25 as the NinoTNC sends it.
+func TestBPSKReceivesAX25FromNinoTNC(t *testing.T) {
+	t.Parallel()
+
+	var texts, frames = afskTestFrames(t, 1)
+
+	var sink = new(recordingReceiveSink)
+	var receiver = multi_modem_init(newBPSKTestRadioConfig(1200, LAYER2_AX25, "N"), 0, 0, sink)
+
+	var nudgeTotal int64
+	var symbolCount int
+
+	for _, bit := range ninoAX25Bits(frames[0]) {
+		// The scrambled flag as the BPSK demodulator passes it.
+		receiver.RecBit(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, bit, lineScrambled(MODEM_BPSK), &nudgeTotal, &symbolCount)
+	}
+
+	for range 2 * receiver.modems[0].processAge {
+		receiver.ProcessSample(0, 0)
+	}
+
+	require.Len(t, sink.frames, 1)
+	assert.Equal(t, texts[0], sink.frames[0].FormatAddrs()+string(sink.frames[0].Info()))
 }

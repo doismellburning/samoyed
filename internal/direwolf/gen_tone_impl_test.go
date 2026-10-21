@@ -197,11 +197,12 @@ func TestToneGeneratorPutBitBPSK(t *testing.T) {
 	t.Parallel()
 
 	// 2400 baud at 24000 samples/sec is ten samples a symbol.
-	var tg, sink, _ = newCapturingToneGenerator(MODEM_BPSK, 2400, 24000)
+	var tg, sink, cfg = newCapturingToneGenerator(MODEM_BPSK, 2400, 24000)
+	cfg.achan[0].layer2_xmit = LAYER2_IL2P // Bits as they are, not scrambled.
 
 	var start = tg.tonePhase
 
-	tg.PutBit(0)
+	tg.PutBit(1)
 	require.Len(t, sink.data, 20)
 	assert.Equal(t, start+10*tg.f1ChangePerSample, tg.tonePhase)
 
@@ -209,9 +210,9 @@ func TestToneGeneratorPutBitBPSK(t *testing.T) {
 
 	assert.InDelta(t, 1.0, tg.bpskSign, 0)
 
-	// A '1' reverses the carrier by sweeping its amplitude through zero,
+	// A '0' reverses the carrier by sweeping its amplitude through zero,
 	// leaving the phase accumulator to run on as usual.
-	tg.PutBit(1)
+	tg.PutBit(0)
 	require.Len(t, sink.data, 40)
 	assert.Equal(t, before+10*tg.f1ChangePerSample, tg.tonePhase)
 	assert.InDelta(t, -1.0, tg.bpskSign, 0)

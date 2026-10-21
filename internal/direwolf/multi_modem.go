@@ -601,6 +601,10 @@ func (m *MultiModem) pickBestCandidate() {
 type slicerReceivers struct {
 	line linecode.Decoder
 
+	// BPSK only: the phase, as a line level, rebuilt from the bits saying
+	// where it reversed.
+	bpskLevel bool
+
 	hdlc *hdlc.Receiver
 	fx25 *fx25.Receiver
 	il2p *il2p.Receiver
@@ -718,7 +722,7 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {
 					var from = dwcore.SlicerID{Channel: ch, Subchannel: sub, Slice: slice}
-					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
+					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, lineScrambled(pa.achan[ch].modem_type))
 				}
 			}
 		}
@@ -910,6 +914,21 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 		return
 	}
 
+	// BPSK's bits say whether the phase held (1) or reversed (0) since the
+	// last symbol.  IL2P takes them as they are.  AX.25 and FX.25 come as
+	// the NinoTNC sends them, G3RUH scrambled with the phase as the line
+	// level, so rebuild the level, which flips where the phase reverses.
+	// Which way up it starts doesn't matter to NRZI.
+	var il2pBit = raw
+
+	if r.audio.achan[channel].modem_type == MODEM_BPSK {
+		if !raw {
+			s.bpskLevel = !s.bpskLevel
+		}
+
+		raw = s.bpskLevel
+	}
+
 	/*
 	 * Using NRZI encoding,
 	 *   A '0' bit is represented by an inversion since previous bit.
@@ -923,7 +942,7 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 
 	if r.audio.achan[channel].modem_type != MODEM_AIS {
 		s.fx25.RecBit(dwutil.IfThenElse(dbit, 1, 0))
-		s.il2p.RecBit(dwutil.IfThenElse(raw, 1, 0)) // Note: skip NRZI.
+		s.il2p.RecBit(dwutil.IfThenElse(il2pBit, 1, 0)) // Note: skip NRZI.
 	}
 
 	s.hdlc.RecBit(raw, dbit, is_scrambled, pll_nudge_total, pll_symbol_count)

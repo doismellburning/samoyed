@@ -247,16 +247,34 @@ func TestBPSKCarrierIsNinoTNCs(t *testing.T) {
 			t.Parallel()
 
 			var samplesPerSec = 48000
-			var tg, sink, _ = newCapturingToneGenerator(MODEM_BPSK, baud, samplesPerSec)
+			var tg, sink, cfg = newCapturingToneGenerator(MODEM_BPSK, baud, samplesPerSec)
+			cfg.achan[0].layer2_xmit = LAYER2_IL2P // Bits as they are, not scrambled.
 
 			// No reversals: a steady carrier.
 			for range baud / 10 {
-				tg.PutBit(0)
+				tg.PutBit(1)
 			}
 
 			var samples = decodeMono16(sink.data)
 
 			assert.Greater(t, goertzelPower(samples, 1500, samplesPerSec), 100*goertzelPower(samples, 1800, samplesPerSec))
 		})
+	}
+}
+
+// BPSK sends IL2P as the NinoTNC does: the phase reverses for a 0 bit, and
+// holds for a 1.
+func TestBPSKIL2PReversesOnZero(t *testing.T) {
+	t.Parallel()
+
+	var tg, _, cfg = newCapturingToneGenerator(MODEM_BPSK, 300, 48000)
+	cfg.achan[0].layer2_xmit = LAYER2_IL2P
+
+	for _, bit := range []int{0, 1, 1, 0, 0, 1, 0} {
+		var before = tg.bpskSign
+
+		tg.PutBit(bit)
+
+		assert.Equal(t, bit == 0, tg.bpskSign != before, "bit %d", bit)
 	}
 }

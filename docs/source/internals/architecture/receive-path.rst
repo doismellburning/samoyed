@@ -35,8 +35,8 @@ to the application layer and the AX.25 data link state machine.
            g96 [label="demod_9600_process_sample"];
            pll [label="nudge_pll_*\nper-slicer clock recovery,\none call per bit"];
            dcd [label="pll_dcd_each_symbol2\n-> Layer2Receiver.DCDChange"];
-           l2 [label="Layer2Receiver.RecBit\nBER injection, per-slicer receivers"];
-           line [label="linecode.Decoder.Decode\nNRZI, G3RUH descrambling"];
+           l2 [label="Layer2Receiver.RecBit\nBER injection, per-slicer receivers,\nBPSK phase changes back to a level"];
+           line [label="linecode.Decoder.Decode\nNRZI, G3RUH descrambling\n(9600 baud and BPSK)"];
            eas [label="eas.Receiver.RecBit"];
            il2p [label="il2p.Receiver.RecBit"];
            fx25 [label="fx25.Receiver.RecBit\nReed-Solomon"];

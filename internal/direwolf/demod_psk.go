@@ -85,7 +85,8 @@ var DCD_CONFIG_PSK = &DCDConfig{
 	} }
 */
 
-var phase_to_gray_bpsk = [2]int{0, 1}
+// BPSK holds the phase for a 1 and reverses it for a 0, as the NinoTNC does.
+var phase_to_gray_bpsk = [2]int{1, 0}
 var phase_to_gray_v26 = [4]int{0, 1, 3, 2}
 var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
 
@@ -791,7 +792,7 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 		case MODEM_BPSK:
 			var gray = demod_bits
 
-			D.receiver.RecBit(from, gray&1 == 1, false,
+			D.receiver.RecBit(from, gray&1 == 1, lineScrambled(D.modem_type),
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		case MODEM_QPSK:
 			var gray = demod_bits

@@ -49,6 +49,12 @@ const (
 	MODEM_BPSK     = phy.BPSK
 )
 
+// lineScrambled says whether a modem's AX.25 line is G3RUH scrambled: 9600
+// baud's is, and BPSK's, as the NinoTNC sends it.
+func lineScrambled(modemType modem_t) bool {
+	return modemType == MODEM_SCRAMBLE || modemType == MODEM_BPSK
+}
+
 type layer2_t = phy.Layer2
 
 const (
