@@ -93,7 +93,7 @@ type IGateStatus struct {
 // NetROMStatus is a NET/ROM node: what it is, who its neighbours are, what
 // it can reach and the circuits it has open.
 type NetROMStatus struct {
-	Channel  int    `json:"channel"`
+	Channels []int  `json:"channels"`
 	Callsign string `json:"callsign"`
 	Alias    string `json:"alias"`
 

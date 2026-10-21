@@ -297,7 +297,7 @@ func TestSharedNodeShellOpensCircuit(t *testing.T) {
 	var s = newSharedNode(link, sharedChannel, sharedNodeCall)
 
 	var config = netrom.DefaultConfig()
-	config.Channel = sharedChannel
+	config.Channels = []int{sharedChannel}
 	config.Callsign = sharedNodeCall
 	config.Alias = sharedNodeAlias
 

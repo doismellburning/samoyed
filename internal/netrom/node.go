@@ -41,7 +41,7 @@ const (
 
 // Config is a node's settings.
 type Config struct {
-	Channel       int           // The channel the node runs on.
+	Channels      []int         // The channels the node runs on.
 	Callsign      string        // The node's AX.25 address, as NormaliseCallsign gives it.
 	Alias         string        // The short name other nodes know it by.
 	TTL           byte          // How many nodes a frame it originates may cross.
@@ -54,7 +54,7 @@ type Config struct {
 // settings to start from.
 func DefaultConfig() Config {
 	return Config{
-		Channel:       0,
+		Channels:      nil,
 		Callsign:      "",
 		Alias:         "",
 		TTL:           DefaultTTL,
@@ -150,6 +150,7 @@ type listener struct {
 func New(cfg Config, link DataLink, send dwcore.FrameSender, clients Reporter, clock Clock, client int) *Node {
 	var n = new(Node)
 	n.cfg = cfg
+	n.cfg.Channels = slices.Clone(cfg.Channels)
 	n.router = newRouter(cfg.Callsign, cfg.Quality, cfg.MinQuality)
 	n.circuits = newCircuitManager(cfg.Callsign, cfg.TTL, n, clock)
 	n.link = link
@@ -165,15 +166,17 @@ func New(cfg Config, link DataLink, send dwcore.FrameSender, clients Reporter, c
 	return n
 }
 
-// Start registers the node's callsign with the data link, so that its
-// neighbours can connect to it, and broadcasts NODES now and every interval
-// after until ctx is cancelled.
+// Start registers the node's callsign with the data link on each of its
+// channels, so that its neighbours can connect to it, and broadcasts NODES
+// now and every interval after until ctx is cancelled.
 func (n *Node) Start(ctx context.Context) {
-	n.link.RegisterCallsign(n.cfg.Callsign, n.cfg.Channel, n.client)
+	for _, channel := range n.cfg.Channels {
+		n.link.RegisterCallsign(n.cfg.Callsign, channel, n.client)
+	}
 
 	go n.run(ctx)
 
-	logrus.WithFields(logrus.Fields{"channel": n.cfg.Channel, "callsign": n.cfg.Callsign, "alias": n.cfg.Alias}).Info("NET/ROM node started")
+	logrus.WithFields(logrus.Fields{"channels": n.cfg.Channels, "callsign": n.cfg.Callsign, "alias": n.cfg.Alias}).Info("NET/ROM node started")
 }
 
 // run broadcasts NODES now and every interval after, until ctx is cancelled.
@@ -191,8 +194,10 @@ func (n *Node) run(ctx context.Context) {
 	}
 }
 
-// broadcastNodes tells the neighbours what this node can reach, then ages
-// the routing table.
+// broadcastNodes tells the neighbours on each channel what this node can
+// reach, then ages the routing table.  Every channel hears the same: a route
+// is offered back even to the neighbours it goes through, who ignore it,
+// as split horizon has them do.
 func (n *Node) broadcastNodes() {
 	var frames, err = EncodeNodes(n.cfg.Alias, n.router.broadcastEntries())
 	if err != nil {
@@ -205,16 +210,18 @@ func (n *Node) broadcastNodes() {
 	addrs[ax25.Destination] = NodesCallsign
 	addrs[ax25.Source] = n.cfg.Callsign
 
-	for _, info := range frames {
-		var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, ax25.PIDNetROM, info)
-		if pp != nil {
-			n.send(n.cfg.Channel, dwcore.PrioLow, pp)
+	for _, channel := range n.cfg.Channels {
+		for _, info := range frames {
+			var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, ax25.PIDNetROM, info)
+			if pp != nil {
+				n.send(channel, dwcore.PrioLow, pp)
+			}
 		}
 	}
 
 	n.router.age()
 
-	logrus.WithFields(logrus.Fields{"channel": n.cfg.Channel, "frames": len(frames)}).Debug("NET/ROM: NODES broadcast")
+	logrus.WithFields(logrus.Fields{"channels": n.cfg.Channels, "frames": len(frames)}).Debug("NET/ROM: NODES broadcast")
 }
 
 // HeardUI takes a received UI frame, which is a NODES broadcast if it is
@@ -319,7 +326,7 @@ func (n *Node) neighbourOn(channel int, call string) (neighbour, bool) {
 
 // onChannel says whether the node runs on channel.
 func (n *Node) onChannel(channel int) bool {
-	return channel == n.cfg.Channel
+	return slices.Contains(n.cfg.Channels, channel)
 }
 
 // linkTo returns the link to nb, making a record of it if there is none.
@@ -504,10 +511,10 @@ func (n *Node) circuitData(c circuitID, data []byte) {
 // What client applications ask of the node.  Each reports whether the
 // request was the node's to handle; anything else is plain AX.25.
 
-// Register takes a client's registration of the node callsign on the
-// node's channel, which is how a client offers to take incoming circuits.
-// It is not passed on to the data link, where the node itself answers for
-// that callsign.
+// Register takes a client's registration of the node callsign on one of
+// the node's channels, which is how a client offers to take incoming
+// circuits, hearing of them on that channel.  It is not passed on to the
+// data link, where the node itself answers for that callsign.
 func (n *Node) Register(channel int, client int, call string) bool {
 	if !n.isNodeCall(channel, call) {
 		return false
@@ -542,13 +549,15 @@ func (n *Node) Unregister(channel int, client int, call string) bool {
 func (n *Node) isNodeCall(channel int, call string) bool {
 	var normalised, err = NormaliseCallsign(call)
 
-	return err == nil && channel == n.cfg.Channel && normalised == n.cfg.Callsign
+	return err == nil && n.onChannel(channel) && normalised == n.cfg.Callsign
 }
 
 // Connect opens a circuit for a connect request with the NET/ROM PID on
-// the node's channel.  The destination may be a node's callsign or alias.
+// one of the node's channels, which the client then has the circuit on,
+// whichever channel its frames go out on.  The destination may be a node's
+// callsign or alias.
 func (n *Node) Connect(channel int, client int, ownCall string, remoteCall string, pid int) bool {
-	if channel != n.cfg.Channel || pid != ax25.PIDNetROM {
+	if !n.onChannel(channel) || pid != ax25.PIDNetROM {
 		return false
 	}
 
@@ -604,25 +613,26 @@ func (n *Node) Connect(channel int, client int, ownCall string, remoteCall strin
 }
 
 // Send sends data on the client's circuit, if it has one by those
-// callsigns on the node's channel.
+// callsigns on one of the node's channels.
 func (n *Node) Send(channel int, client int, ownCall string, remoteCall string, data []byte) bool {
-	return channel == n.cfg.Channel &&
+	return n.onChannel(channel) &&
 		n.circuits.send(circuitID{channel: channel, client: client, ownCall: ownCall, remoteCall: remoteCall}, data) == nil
 }
 
 // Disconnect closes the client's circuit, if it has one by those
-// callsigns on the node's channel.
+// callsigns on one of the node's channels.
 func (n *Node) Disconnect(channel int, client int, ownCall string, remoteCall string) bool {
-	return channel == n.cfg.Channel &&
+	return n.onChannel(channel) &&
 		n.circuits.disconnect(circuitID{channel: channel, client: client, ownCall: ownCall, remoteCall: remoteCall}) == nil
 }
 
 // Outstanding answers, through the Reporter, how many of the client's
 // frames on its circuit by those callsigns are still to go out or be
-// acknowledged, if it has such a circuit on the node's channel.  A client
-// pacing itself by the answer keeps the circuit's queue from growing.
+// acknowledged, if it has such a circuit on one of the node's channels.  A
+// client pacing itself by the answer keeps the circuit's queue from
+// growing.
 func (n *Node) Outstanding(channel int, client int, ownCall string, remoteCall string) bool {
-	if channel != n.cfg.Channel {
+	if !n.onChannel(channel) {
 		return false
 	}
 

@@ -84,7 +84,8 @@
   function netromCard(nr) {
     const up = nr.neighbours.filter((n) => n.link === "up").length;
     return el("div", { class: "channel netrom" },
-      el("div", { class: "label", text: `NET/ROM · ${nr.alias}:${nr.callsign} · channel ${nr.channel}` }),
+      el("div", { class: "label", text: `NET/ROM · ${nr.alias}:${nr.callsign} · ` +
+        `${nr.channels.length === 1 ? "channel" : "channels"} ${nr.channels.join(", ")}` }),
       el("div", { class: "figures" },
         el("span", {}, el("b", { text: `${up}/${nr.neighbours.length}` }), " links up"),
         el("span", {}, el("b", { text: String(nr.destinations.length) }), " nodes"),

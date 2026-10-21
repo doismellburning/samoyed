@@ -17,7 +17,7 @@ func TestNodeStatusEmpty(t *testing.T) {
 	var a = newTestNode("Q1TEST-7", "QNODEA")
 
 	var s = a.Status()
-	assert.Equal(t, 0, s.Channel)
+	assert.Equal(t, []int{0}, s.Channels)
 	assert.Equal(t, "Q1TEST-7", s.Callsign)
 	assert.Equal(t, "QNODEA", s.Alias)
 	assert.Empty(t, s.Neighbours)

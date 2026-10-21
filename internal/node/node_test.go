@@ -589,7 +589,7 @@ func TestNodesAndRoutesWithoutNetROM(t *testing.T) {
 // neighbours, one of which is failing.
 func testNetROM() netrom.Status {
 	return netrom.Status{
-		Channel:  testChannel,
+		Channels: []int{testChannel},
 		Callsign: nodeCall,
 		Alias:    nodeAlias,
 		Neighbours: []netrom.NeighbourStatus{

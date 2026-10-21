@@ -270,7 +270,7 @@ func webNetROMStatus(node *netrom.Node) maybe.Maybe[webui.NetROMStatus] {
 	var status = node.Status()
 
 	var s webui.NetROMStatus
-	s.Channel = status.Channel
+	s.Channels = status.Channels
 	s.Callsign = status.Callsign
 	s.Alias = status.Alias
 

@@ -23,17 +23,19 @@ type recordingReporter struct {
 	mu sync.Mutex
 
 	established []string
+	estChannels []int // The channel each circuit was reported established on.
 	terminated  []string
 	data        [][]byte
 	pids        []int
 	outstanding []int
 }
 
-func (r *recordingReporter) LinkEstablished(_ int, _ int, remoteCall string, _ string, _ bool) {
+func (r *recordingReporter) LinkEstablished(channel int, _ int, remoteCall string, _ string, _ bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.established = append(r.established, remoteCall)
+	r.estChannels = append(r.estChannels, channel)
 }
 
 func (r *recordingReporter) LinkTerminated(_ int, _ int, remoteCall string, _ string, _ bool) {
@@ -151,6 +153,7 @@ func (l *fakeDataLink) deliver() int {
 
 func testConfig(callsign string, alias string) Config {
 	var cfg = DefaultConfig()
+	cfg.Channels = []int{0}
 	cfg.Callsign = callsign
 	cfg.Alias = alias
 
@@ -162,9 +165,10 @@ func testConfig(callsign string, alias string) Config {
 type testNode struct {
 	*Node
 
-	link *fakeDataLink
-	agw  *recordingReporter
-	ui   []*ax25.Packet
+	link       *fakeDataLink
+	agw        *recordingReporter
+	ui         []*ax25.Packet
+	uiChannels []int // The channel each UI frame went out on.
 }
 
 func newTestNode(callsign string, alias string) *testNode {
@@ -173,8 +177,9 @@ func newTestNode(callsign string, alias string) *testNode {
 	tn.link.selfCall = callsign
 	tn.agw = new(recordingReporter)
 
-	tn.Node = New(testConfig(callsign, alias), tn.link, func(_ int, _ int, pp *ax25.Packet) {
+	tn.Node = New(testConfig(callsign, alias), tn.link, func(channel int, _ int, pp *ax25.Packet) {
 		tn.ui = append(tn.ui, pp)
+		tn.uiChannels = append(tn.uiChannels, channel)
 	}, tn.agw, new(fakeClock), testClient)
 
 	return tn
@@ -225,6 +230,34 @@ func TestNodeBroadcasts(t *testing.T) {
 	assert.Equal(t, "Q1TEST-7", pp.AddrWithSSID(ax25.Source))
 	assert.Equal(t, ax25.PIDNetROM, pp.PID())
 	assert.Equal(t, append([]byte{0xFF}, "QNODEA"...), pp.Info())
+}
+
+// A node on several channels broadcasts on each, hears broadcasts on any of
+// them and nothing on any other.
+func TestNodeBroadcastsOnEachChannel(t *testing.T) {
+	t.Parallel()
+
+	var a = newTestNode("Q1TEST-7", "QNODEA")
+	a.cfg.Channels = []int{0, 3}
+
+	a.broadcastNodes()
+	assert.Equal(t, []int{0, 3}, a.uiChannels)
+
+	var b = newTestNode("Q2TEST-7", "QNODEB")
+	b.broadcastNodes()
+
+	var c = newTestNode("Q3TEST-7", "QNODEC")
+	c.broadcastNodes()
+
+	a.HeardUI(3, b.ui[0])
+	a.HeardUI(1, c.ui[0])
+
+	var hop, ok = a.router.nextHop("Q2TEST-7")
+	require.True(t, ok)
+	assert.Equal(t, neighbour{channel: 3, callsign: "Q2TEST-7"}, hop)
+
+	_, ok = a.router.nextHop("Q3TEST-7")
+	assert.False(t, ok, "heard on a channel A is not on")
 }
 
 func TestNodeHearsBroadcasts(t *testing.T) {
@@ -315,7 +348,7 @@ func TestNodeReachesANeighbourOnItsChannel(t *testing.T) {
 	t.Parallel()
 
 	var a = newTestNode("Q1TEST-7", "QNODEA")
-	a.cfg.Channel = 2
+	a.cfg.Channels = []int{2}
 
 	var b = newTestNode("Q2TEST-7", "QNODEB")
 	b.broadcastNodes()
@@ -551,6 +584,37 @@ func TestNodeCircuitEndToEnd(t *testing.T) {
 	assert.Equal(t, []string{"Q1TEST"}, b.agw.terminated)
 }
 
+// A client registered on one of the node's channels takes incoming
+// circuits there, and one asking on another of them has its circuit there.
+func TestNodeCircuitOnTheClientsChannel(t *testing.T) {
+	t.Parallel()
+
+	var a, b = joinedNodes(t)
+	a.cfg.Channels = []int{0, 4}
+	b.cfg.Channels = []int{0, 5}
+
+	assert.False(t, b.Register(1, 1, "Q2TEST-7"), "not one of B's channels")
+	require.True(t, b.Register(5, 1, "Q2TEST-7"))
+
+	require.True(t, a.Connect(4, 0, "Q1TEST", "QNODEB", ax25.PIDNetROM))
+	exchange(t, a, b)
+
+	assert.Equal(t, []int{4}, a.agw.estChannels)
+	assert.Equal(t, []int{5}, b.agw.estChannels)
+
+	require.Len(t, a.Status().Circuits, 1)
+	assert.Equal(t, 4, a.Status().Circuits[0].Channel, "its status says so too")
+	require.Len(t, b.Status().Circuits, 1)
+	assert.Equal(t, 5, b.Status().Circuits[0].Channel)
+
+	assert.False(t, a.Send(0, 0, "Q1TEST", "QNODEB", []byte("x")), "the circuit is on channel 4")
+	require.True(t, a.Send(4, 0, "Q1TEST", "QNODEB", []byte("hello B")))
+	exchange(t, a, b)
+
+	assert.Equal(t, [][]byte{[]byte("hello B")}, b.agw.data)
+	assert.Equal(t, []int{0}, a.link.frameChannels[:1], "the neighbour is still on channel 0")
+}
+
 // Asking again for a circuit the client has already leaves it be, rather
 // than telling the client it has gone.
 func TestNodeDuplicateConnect(t *testing.T) {
@@ -673,14 +737,20 @@ func TestNodeStart(t *testing.T) {
 
 	var broadcasts = make(chan sent, 4)
 
-	var n = New(testConfig("Q1TEST-7", "QNODEA"), link, func(_ int, prio int, pp *ax25.Packet) {
+	var cfg = testConfig("Q1TEST-7", "QNODEA")
+	cfg.Channels = []int{0, 2}
+
+	var n = New(cfg, link, func(_ int, prio int, pp *ax25.Packet) {
 		broadcasts <- sent{prio: prio, pp: pp}
 	}, nil, new(fakeClock), testClient)
 
 	n.Start(t.Context())
 
 	link.mu.Lock()
-	assert.Equal(t, []registration{{addr: "Q1TEST-7", channel: 0, client: testClient}}, link.registered)
+	assert.Equal(t, []registration{
+		{addr: "Q1TEST-7", channel: 0, client: testClient},
+		{addr: "Q1TEST-7", channel: 2, client: testClient},
+	}, link.registered, "on each channel")
 	link.mu.Unlock()
 
 	select {

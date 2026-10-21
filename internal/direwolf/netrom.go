@@ -101,7 +101,7 @@ func (ps *parseState) applyNETROMRouting(config netrom.Config, settings NetROMRo
 		return fmt.Errorf("line %d: Invalid channel %d for NET/ROM. Must be in range of 0 to %d", ps.line, *settings.Channel, MAX_TOTAL_CHANS-1)
 	}
 
-	config.Channel = *settings.Channel
+	config.Channels = []int{*settings.Channel}
 
 	var err error
 
@@ -159,9 +159,11 @@ func (c *RadioConfig) netromConfig(settings netromSettings, shell maybe.Maybe[no
 
 	var config = settings.config
 
-	if !c.connectedModeAllowed(config.Channel) {
-		return none, fmt.Errorf("line %d: NET/ROM can't run on channel %d, which is not a channel connected mode can be used on",
-			settings.line, config.Channel)
+	for _, channel := range config.Channels {
+		if !c.connectedModeAllowed(channel) {
+			return none, fmt.Errorf("line %d: NET/ROM can't run on channel %d, which is not a channel connected mode can be used on",
+				settings.line, channel)
+		}
 	}
 
 	if shellSettings, ok := shell.Get(); ok && settings.integrated {
@@ -170,9 +172,11 @@ func (c *RadioConfig) netromConfig(settings netromSettings, shell maybe.Maybe[no
 			channels = c.connectedModeChannels()
 		}
 
-		if !slices.Contains(channels, config.Channel) {
-			return none, fmt.Errorf("line %d: NET/ROM can't run on channel %d, which the node does not listen on",
-				settings.line, config.Channel)
+		for _, channel := range config.Channels {
+			if !slices.Contains(channels, channel) {
+				return none, fmt.Errorf("line %d: NET/ROM can't run on channel %d, which the node does not listen on",
+					settings.line, channel)
+			}
 		}
 	}
 

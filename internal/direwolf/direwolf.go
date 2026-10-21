@@ -708,7 +708,7 @@ x = Silence FX.25 information.`)
 		var client = netromClient
 
 		if settings, _ := misc_config.netrom.Get(); settings.integrated {
-			shared = newSharedNode(dataLinkQueue, config.Channel, config.Callsign)
+			shared = newSharedNode(dataLinkQueue, config.Channels[0], config.Callsign)
 			link = shared.netromLink()
 			client = nodeClient
 			circuitClients = shared.circuitReporter(nodeClient, agwCircuitClients)
