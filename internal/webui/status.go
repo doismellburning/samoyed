@@ -103,8 +103,9 @@ type NetROMStatus struct {
 }
 
 // NetROMNeighbour is a node the NET/ROM node has a link to, or a route
-// through.
+// through, on a channel.
 type NetROMNeighbour struct {
+	Channel  int    `json:"channel"`
 	Callsign string `json:"callsign"`
 	Link     string `json:"link"` // "up", "connecting" or "down".
 
@@ -122,10 +123,11 @@ type NetROMDestination struct {
 	Routes   []NetROMRoute `json:"routes"`
 }
 
-// NetROMRoute is one way of reaching a destination: through a neighbour, at
-// a quality from 0 to 255, for as many more of the node's own broadcasts as
-// its obsolescence count says.
+// NetROMRoute is one way of reaching a destination: through a neighbour on
+// a channel, at a quality from 0 to 255, for as many more of the node's own
+// broadcasts as its obsolescence count says.
 type NetROMRoute struct {
+	Channel      int    `json:"channel"`
 	Neighbour    string `json:"neighbour"`
 	Quality      int    `json:"quality"`
 	Obsolescence int    `json:"obsolescence"`
@@ -133,6 +135,7 @@ type NetROMRoute struct {
 
 // NetROMCircuit is a circuit a client has open through the node.
 type NetROMCircuit struct {
+	Channel     int    `json:"channel"`    // What the client has it on.
 	OwnCall     string `json:"ownCall"`    // What the client calls this end.
 	RemoteCall  string `json:"remoteCall"` // What it calls the far end.
 	RemoteNode  string `json:"remoteNode"` // The node at the far end.

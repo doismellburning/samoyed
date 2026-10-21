@@ -676,8 +676,9 @@ and drives a circuit between them in both directions,
 and doubles as a worked example of the AGW side.
 
 With :ref:`the web interface <how-to-guides:Watch a station in a web browser>` on,
-its dashboard shows the node's neighbours and whether the link to each is up,
-its routes with their quality and obsolescence count,
+its dashboard shows the node's neighbours, each with its port,
+and whether the link to each is up,
+its routes with the port each goes out on, their quality and obsolescence count,
 and the circuits open through it;
 NET/ROM frames in its packet list read as they do in the monitor output.
 

@@ -160,6 +160,7 @@
     if (!nr) return;
 
     const neighbours = nr.neighbours.map((n) => [
+      [n.channel, "num"],
       [n.callsign, "name"],
       [n.failing ? `${n.link}, failing` : n.link, "state"],
       [n.failures, "num"],
@@ -167,11 +168,13 @@
     const routes = nr.destinations.flatMap((d) => d.routes.map((r, i) => [
       [i === 0 ? d.callsign : "", "name"],
       [i === 0 ? d.alias : "", "name"],
+      [r.channel, "num"],
       [r.neighbour, "name"],
       [r.quality, "num"],
       [r.obsolescence, "num"],
     ]));
     const circuits = nr.circuits.map((c) => [
+      [c.channel, "num"],
       [c.ownCall, "name"],
       [c.incoming ? "←" : "→", ""],
       [c.remoteCall, "name"],
@@ -182,11 +185,11 @@
 
     $("netrom-tables").replaceChildren(
       el("div", {}, el("h3", { text: "Neighbours" }),
-        netromTable([["Callsign"], ["Link"], ["Failures", "num"]], neighbours, "No neighbours yet.")),
+        netromTable([["Port", "num"], ["Callsign"], ["Link"], ["Failures", "num"]], neighbours, "No neighbours yet.")),
       el("div", {}, el("h3", { text: "Routes" }),
-        netromTable([["Node"], ["Alias"], ["Via"], ["Quality", "num"], ["Obs", "num"]], routes, "No routes yet.")),
+        netromTable([["Node"], ["Alias"], ["Port", "num"], ["Via"], ["Quality", "num"], ["Obs", "num"]], routes, "No routes yet.")),
       el("div", {}, el("h3", { text: "Circuits" }),
-        netromTable([["Ours"], [""], ["Theirs"], ["Node"], ["State"], ["Queued", "num"]], circuits, "No circuits open.")));
+        netromTable([["Port", "num"], ["Ours"], [""], ["Theirs"], ["Node"], ["State"], ["Queued", "num"]], circuits, "No circuits open.")));
   }
 
   // ---- Stations ----

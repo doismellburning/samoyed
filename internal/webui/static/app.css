@@ -124,7 +124,7 @@ main > section[hidden] { display: none; }
 .panel.netrom { grid-column: 1 / -1; }
 .panel.netrom[hidden] { display: none; }
 .netrom-tables { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; padding: 0 0 8px; }
-.netrom-tables > div { flex: 1 1 18em; min-width: 0; }
+.netrom-tables > div { flex: 1 1 18em; min-width: 0; overflow-x: auto; }
 .netrom-tables h3 { margin: 8px 12px 4px; font-size: 13px; font-weight: 500; }
 
 @media (max-width: 800px) {
