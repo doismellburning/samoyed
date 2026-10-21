@@ -15,15 +15,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// netromStatus is a NET/ROM node's status on channel, with neighbours.
-func netromStatus(channel int, neighbours ...netrom.NeighbourStatus) func() netrom.Status {
+// netromStatus is a NET/ROM node's status with neighbours.
+func netromStatus(neighbours ...netrom.NeighbourStatus) func() netrom.Status {
 	return func() netrom.Status {
-		return netrom.Status{Channel: channel, Callsign: "Q1TEST-7", Alias: "QNODEA", Neighbours: neighbours, Destinations: nil, Circuits: nil}
+		return netrom.Status{Channel: 0, Callsign: "Q1TEST-7", Alias: "QNODEA", Neighbours: neighbours, Destinations: nil, Circuits: nil}
 	}
 }
 
-func neighbour(callsign string, link string) netrom.NeighbourStatus {
-	return netrom.NeighbourStatus{Channel: 0, Callsign: callsign, Link: link, Quality: 192, Failures: 0, Failing: false}
+func neighbour(channel int, callsign string, link string) netrom.NeighbourStatus {
+	return netrom.NeighbourStatus{Channel: channel, Callsign: callsign, Link: link, Quality: 192, Failures: 0, Failing: false}
 }
 
 func TestNetROMNeighbours(t *testing.T) {
@@ -34,18 +34,34 @@ func TestNetROMNeighbours(t *testing.T) {
 	t.Run("lists the links that are up", func(t *testing.T) {
 		t.Parallel()
 
-		var status = netromStatus(10, neighbour("Q2TEST-7", "up"), neighbour("Q3TEST-7", "connecting"), neighbour("Q4TEST-7", "down"), neighbour("Q5TEST-7", "up"))
+		var status = netromStatus(
+			neighbour(10, "Q2TEST-7", "up"),
+			neighbour(10, "Q3TEST-7", "connecting"),
+			neighbour(10, "Q4TEST-7", "down"),
+			neighbour(0, "Q5TEST-7", "up"),
+		)
 
 		assert.Equal(t, []nodemap.NeighbourLink{
 			{Node: "Q2TEST-7", Port: "10", Quality: maybe.Just[int32](192), Type: nodemap.NeighbourNetROM},
-			{Node: "Q5TEST-7", Port: "10", Quality: maybe.Just[int32](192), Type: nodemap.NeighbourNetROM},
+			{Node: "Q5TEST-7", Port: "0", Quality: maybe.Just[int32](192), Type: nodemap.NeighbourNetROM},
 		}, netromNeighbours(status, ports)())
 	})
 
 	t.Run("lists none on a port the map is not told of", func(t *testing.T) {
 		t.Parallel()
 
-		assert.Empty(t, netromNeighbours(netromStatus(1, neighbour("Q2TEST-7", "up")), ports)())
+		assert.Empty(t, netromNeighbours(netromStatus(neighbour(1, "Q2TEST-7", "up")), ports)())
+	})
+
+	t.Run("lists each neighbour on its own port", func(t *testing.T) {
+		t.Parallel()
+
+		var status = netromStatus(neighbour(0, "Q2TEST-7", "up"), neighbour(1, "Q2TEST-7", "up"), neighbour(10, "Q2TEST-7", "up"))
+
+		assert.Equal(t, []nodemap.NeighbourLink{
+			{Node: "Q2TEST-7", Port: "0", Quality: maybe.Just[int32](192), Type: nodemap.NeighbourNetROM},
+			{Node: "Q2TEST-7", Port: "10", Quality: maybe.Just[int32](192), Type: nodemap.NeighbourNetROM},
+		}, netromNeighbours(status, ports)())
 	})
 
 	t.Run("asks again for each report", func(t *testing.T) {
@@ -55,10 +71,10 @@ func TestNetROMNeighbours(t *testing.T) {
 
 		var neighbours = netromNeighbours(func() netrom.Status {
 			if up {
-				return netromStatus(0, neighbour("Q2TEST-7", "up"))()
+				return netromStatus(neighbour(0, "Q2TEST-7", "up"))()
 			}
 
-			return netromStatus(0)()
+			return netromStatus()()
 		}, ports)
 
 		assert.Empty(t, neighbours())

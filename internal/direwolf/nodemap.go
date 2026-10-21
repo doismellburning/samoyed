@@ -30,23 +30,17 @@ func reportedPorts(ports []nodemap.Port) map[string]bool {
 }
 
 // netromNeighbours is, for the node map, the NET/ROM node's links to its
-// neighbours that are up, as status has them at the time, over whichever of
-// ports the node runs on.
+// neighbours that are up, as status has them at the time, each over the
+// port of the channel the neighbour is on, if that is one of ports.
 func netromNeighbours(status func() netrom.Status, ports []nodemap.Port) func() []nodemap.NeighbourLink {
 	var reported = reportedPorts(ports)
 
 	return func() []nodemap.NeighbourLink {
-		var s = status()
-
-		var port = strconv.Itoa(s.Channel)
-		if !reported[port] {
-			return nil
-		}
-
 		var links []nodemap.NeighbourLink
 
-		for _, nb := range s.Neighbours {
-			if nb.Link != "up" {
+		for _, nb := range status().Neighbours {
+			var port = strconv.Itoa(nb.Channel)
+			if nb.Link != "up" || !reported[port] {
 				continue
 			}
 
