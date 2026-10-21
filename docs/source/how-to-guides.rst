@@ -726,8 +726,10 @@ and has a user list one node from the other's shell.
 Running a node over AXUDP
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The node's channel can be an AXUDP port,
-to reach other nodes over the internet.
+One of the node's channels can be an AXUDP port,
+to reach other nodes over the internet;
+with a radio channel beside it,
+the node routes between the two.
 Send ``NODES`` broadcasts to every neighbour with ``broadcast: [NODES]``,
 and ``broadcast: true`` on each neighbour's map;
 map each neighbour by its node callsign, not its alias,
@@ -736,6 +738,8 @@ since the links between nodes are addressed to their callsigns:
 .. code:: yaml
 
     samoyed:
+      channels:
+        - {channel: 0, mycall: Q1TEST}
       axudpPorts:
         - port: 10093
           channel: 10
@@ -745,4 +749,4 @@ since the links between nodes are addressed to their callsigns:
       netrom:
         callsign: Q1TEST-7
         alias: QNODEA
-        channels: [10]
+        channels: [0, 10]

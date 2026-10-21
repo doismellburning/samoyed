@@ -34,6 +34,13 @@ with these differences and choices:
   as the Linux kernel does.
   Such a route is used only if there is nothing better,
   and never broadcast.
+* **One routing table across several channels.**
+  A node can run on several channels,
+  sending its ``NODES`` broadcasts on each.
+  A neighbour is a callsign on a channel,
+  as the Linux kernel has it a callsign on a device,
+  so the same callsign heard on two channels is two neighbours,
+  each a route of its own.
 * **A failing neighbour is passed over.**
   After two failed attempts in a row to link to a neighbour,
   routes through it are skipped until it is heard from again.
@@ -60,7 +67,7 @@ with these differences and choices:
   NET/ROM shares the shell's callsign and alias.
   A link made to the node is a neighbouring node's
   if the first thing to arrive on it is a NET/ROM frame,
-  sent to the node's callsign on NET/ROM's channel,
+  sent to the node's callsign on one of NET/ROM's channels,
   and a user's otherwise;
   a neighbour is greeted as a user is before that,
   and NET/ROM ignores the greeting.
@@ -90,7 +97,8 @@ References
 * The Linux kernel's NET/ROM implementation, as of v6.6:
   `net/netrom <https://github.com/torvalds/linux/tree/v6.6/net/netrom>`__
   and `include/net/netrom.h <https://github.com/torvalds/linux/blob/v6.6/include/net/netrom.h>`__:
-  the timers, routes learned from traffic, and the BPQ extensions.
+  the timers, routes learned from traffic, the BPQ extensions,
+  and a neighbour identified by its callsign and device (``nr_neigh_get_dev`` in ``nr_route.c``).
 * netromd, the routing daemon in ax25tools:
   `ax25tools/netrom <https://github.com/ve7fet/linuxax25/tree/master/ax25tools/netrom>`__:
   trivial loops, the broadcast threshold and malformed entries.
