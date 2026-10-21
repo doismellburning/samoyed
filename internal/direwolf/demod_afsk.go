@@ -111,6 +111,65 @@ var afskSpaceGain = func() [MAX_SLICERS]float64 { //nolint:gochecknoglobals // B
 	return gain
 }()
 
+// FIR filter kernel, like convolve, for a symmetric filter:
+// filter[j] == filter[filterSize-1-j], as every linear-phase filter is, and as
+// isSymmetric checks.  Each pair of samples the same distance from the middle
+// is added before its one multiply, so only the first half of filter, and the
+// middle tap of an odd-sized one, is read.
+//
+// Eight sums rather than convolve's four, over eight-element subslices so the
+// compiler can drop the bounds checks: without both, it is no faster than
+// convolve.
+func convolveSymmetric(data, filter []float64, filterSize int) float64 {
+	var half = filterSize / 2
+
+	var lo = data[:half]
+	var hi = data[filterSize-half : filterSize] // hi[half-1-j] pairs with lo[j].
+	var f = filter[:half]
+
+	var s0, s1, s2, s3, s4, s5, s6, s7 float64
+
+	var j = 0
+	for ; j+8 <= half; j += 8 {
+		var l = lo[j : j+8 : j+8]
+		var h = hi[half-j-8 : half-j : half-j]
+		var g = f[j : j+8 : j+8]
+
+		s0 += g[0] * (l[0] + h[7])
+		s1 += g[1] * (l[1] + h[6])
+		s2 += g[2] * (l[2] + h[5])
+		s3 += g[3] * (l[3] + h[4])
+		s4 += g[4] * (l[4] + h[3])
+		s5 += g[5] * (l[5] + h[2])
+		s6 += g[6] * (l[6] + h[1])
+		s7 += g[7] * (l[7] + h[0])
+	}
+
+	for ; j < half; j++ {
+		s0 += f[j] * (lo[j] + hi[half-1-j])
+	}
+
+	if filterSize%2 == 1 {
+		s1 += filter[half] * data[half]
+	}
+
+	return ((s0 + s1) + (s2 + s3)) + ((s4 + s5) + (s6 + s7))
+}
+
+// isSymmetric says whether filter is the same read from either end, tap for
+// tap, as convolveSymmetric needs it to be.
+func isSymmetric(filter []float64) bool {
+	var n = len(filter)
+
+	for j := range n / 2 {
+		if filter[j] != filter[n-1-j] {
+			return false
+		}
+	}
+
+	return true
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        demod_afsk_init
@@ -388,6 +447,12 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		var fc = float64(baud) * D.lpf_baud / samples_per_sec
 		dsp.Lowpass(fc, D.lp_filter[:D.lp_filter_taps], D.lp_window)
 	}
+
+	// demod_afsk_process_sample convolves with these using convolveSymmetric,
+	// which reads only the first half of each.  The windows used here keep
+	// them exactly symmetric; some others, such as Hamming, would not.
+	dwutil.Assert(D.use_prefilter == 0 || isSymmetric(D.pre_filter[:D.pre_filter_taps]))
+	dwutil.Assert(isSymmetric(D.lp_filter[:D.lp_filter_taps]))
 } /* demod_afsk_init */
 
 /*-------------------------------------------------------------------
@@ -505,7 +570,7 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			//	Cleaner & simpler than earlier 'A' thru 'E'
 			if D.use_prefilter != 0 {
 				push_sample(fsam, D.raw_cb[:], D.pre_filter_taps)
-				fsam = convolve(D.raw_cb[:], D.pre_filter[:], D.pre_filter_taps)
+				fsam = convolveSymmetric(D.raw_cb[:], D.pre_filter[:], D.pre_filter_taps)
 			}
 
 			push_sample(fsam*fcos256(D.u.afsk.m_osc_phase), D.u.afsk.m_I_raw[:], D.lp_filter_taps)
@@ -516,12 +581,12 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			push_sample(fsam*fsin256(D.u.afsk.s_osc_phase), D.u.afsk.s_Q_raw[:], D.lp_filter_taps)
 			D.u.afsk.s_osc_phase += D.u.afsk.s_osc_delta
 
-			var m_I = convolve(D.u.afsk.m_I_raw[:], D.lp_filter[:], D.lp_filter_taps)
-			var m_Q = convolve(D.u.afsk.m_Q_raw[:], D.lp_filter[:], D.lp_filter_taps)
+			var m_I = convolveSymmetric(D.u.afsk.m_I_raw[:], D.lp_filter[:], D.lp_filter_taps)
+			var m_Q = convolveSymmetric(D.u.afsk.m_Q_raw[:], D.lp_filter[:], D.lp_filter_taps)
 			var m_amp = float64(math.Hypot(float64(m_I), float64(m_Q)))
 
-			var s_I = convolve(D.u.afsk.s_I_raw[:], D.lp_filter[:], D.lp_filter_taps)
-			var s_Q = convolve(D.u.afsk.s_Q_raw[:], D.lp_filter[:], D.lp_filter_taps)
+			var s_I = convolveSymmetric(D.u.afsk.s_I_raw[:], D.lp_filter[:], D.lp_filter_taps)
+			var s_Q = convolveSymmetric(D.u.afsk.s_Q_raw[:], D.lp_filter[:], D.lp_filter_taps)
 			var s_amp = float64(math.Hypot(float64(s_I), float64(s_Q)))
 
 			/*
@@ -588,15 +653,15 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			// New - Convert frequency to a value proportional to frequency.
 			if D.use_prefilter != 0 {
 				push_sample(fsam, D.raw_cb[:], D.pre_filter_taps)
-				fsam = convolve(D.raw_cb[:], D.pre_filter[:], D.pre_filter_taps)
+				fsam = convolveSymmetric(D.raw_cb[:], D.pre_filter[:], D.pre_filter_taps)
 			}
 
 			push_sample(fsam*fcos256(D.u.afsk.c_osc_phase), D.u.afsk.c_I_raw[:], D.lp_filter_taps)
 			push_sample(fsam*fsin256(D.u.afsk.c_osc_phase), D.u.afsk.c_Q_raw[:], D.lp_filter_taps)
 			D.u.afsk.c_osc_phase += D.u.afsk.c_osc_delta
 
-			var c_I = convolve(D.u.afsk.c_I_raw[:], D.lp_filter[:], D.lp_filter_taps)
-			var c_Q = convolve(D.u.afsk.c_Q_raw[:], D.lp_filter[:], D.lp_filter_taps)
+			var c_I = convolveSymmetric(D.u.afsk.c_I_raw[:], D.lp_filter[:], D.lp_filter_taps)
+			var c_Q = convolveSymmetric(D.u.afsk.c_Q_raw[:], D.lp_filter[:], D.lp_filter_taps)
 
 			var phase = float64(math.Atan2(float64(c_Q), float64(c_I)))
 
