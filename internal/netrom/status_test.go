@@ -75,7 +75,7 @@ func TestNodeStatusConnectingNeighbour(t *testing.T) {
 
 	var a = newTestNode("Q1TEST-7", "QNODEA")
 
-	a.sendToNeighbour("Q2TEST-7", []byte("one"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("one"))
 
 	assert.Equal(t, []NeighbourStatus{{Callsign: "Q2TEST-7", Link: "connecting", Quality: int(DefaultQuality), Failures: 0, Failing: false}}, a.Status().Neighbours)
 }

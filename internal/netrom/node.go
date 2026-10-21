@@ -131,8 +131,8 @@ type Node struct {
 	client  int // What the data link knows the node's own links by.
 
 	mu        sync.Mutex
-	links     map[string]*neighbourLink // By neighbour callsign.
-	listeners []int                     // Clients taking incoming circuits.
+	links     map[neighbour]*neighbourLink
+	listeners []int // Clients taking incoming circuits.
 }
 
 // New makes a node from cfg.  It reaches its neighbours through link, as
@@ -147,7 +147,7 @@ func New(cfg Config, link DataLink, send dwcore.FrameSender, clients Reporter, c
 	n.link = link
 	n.send = send
 	n.client = client
-	n.links = make(map[string]*neighbourLink)
+	n.links = make(map[neighbour]*neighbourLink)
 
 	n.clients = clients
 	if n.clients == nil {
@@ -233,24 +233,34 @@ func (n *Node) HeardUI(channel int, pp *ax25.Packet) {
 		return
 	}
 
-	n.router.heardNodes(from, nodes)
+	n.router.heardNodes(neighbour{channel: channel, callsign: from}, nodes)
 }
 
 // The data link reports on our links to neighbours.
 
 func (n *Node) LinkEstablished(_ int, _ int, remoteCall string, _ string, incoming bool) {
-	var pending = n.linkUp(remoteCall)
+	var nb, ok = n.neighbourOn(n.cfg.Channel, remoteCall)
+	if !ok {
+		return
+	}
 
-	n.router.neighbourHeard(remoteCall)
+	var pending = n.linkUp(nb)
+
+	n.router.neighbourHeard(nb)
 
 	logrus.WithFields(logrus.Fields{"neighbour": remoteCall, "incoming": incoming, "pending": pending}).Debug("NET/ROM: link to neighbour up")
 }
 
 func (n *Node) LinkTerminated(_ int, _ int, remoteCall string, _ string, timeout bool) {
-	n.linkDown(remoteCall)
+	var nb, ok = n.neighbourOn(n.cfg.Channel, remoteCall)
+	if !ok {
+		return
+	}
+
+	n.linkDown(nb)
 
 	if timeout {
-		n.router.neighbourFailed(remoteCall)
+		n.router.neighbourFailed(nb)
 	}
 
 	logrus.WithFields(logrus.Fields{"neighbour": remoteCall, "timeout": timeout}).Debug("NET/ROM: link to neighbour down")
@@ -261,16 +271,16 @@ func (n *Node) RecConnData(_ int, _ int, remoteCall string, _ string, pid int, d
 		return
 	}
 
-	var neighbour, callErr = NormaliseCallsign(remoteCall)
-	if callErr != nil {
+	var nb, ok = n.neighbourOn(n.cfg.Channel, remoteCall)
+	if !ok {
 		return
 	}
 
-	n.router.neighbourHeard(neighbour)
+	n.router.neighbourHeard(nb)
 
 	var f, err = DecodeFrame(data)
 	if err != nil {
-		logrus.WithError(err).WithField("neighbour", neighbour).Debug("NET/ROM: ignoring undecodable frame")
+		logrus.WithError(err).WithField("neighbour", nb.callsign).Debug("NET/ROM: ignoring undecodable frame")
 
 		return
 	}
@@ -279,20 +289,33 @@ func (n *Node) RecConnData(_ int, _ int, remoteCall string, _ string, pid int, d
 	// which may be somewhere no broadcast has told us of yet: a neighbour
 	// that connects before we hear its NODES, or a node further off that
 	// is not advertised.  Without this, the answer would have nowhere to go.
-	n.router.heardFrom(f.origin, neighbour)
+	n.router.heardFrom(f.origin, nb)
 
 	n.route(f, data)
 }
 
 func (n *Node) OutstandingFramesReply(int, int, string, string, int) {}
 
-// linkTo returns the link to neighbour, making a record of it if there is
-// none.  n.mu must be held.
-func (n *Node) linkTo(neighbour string) *neighbourLink {
-	var l, ok = n.links[neighbour]
+// neighbourOn is the neighbour that is call, as the data link writes it, on
+// channel.
+func (n *Node) neighbourOn(channel int, call string) (neighbour, bool) {
+	var normalised, err = NormaliseCallsign(call)
+	if err != nil {
+		var none neighbour
+
+		return none, false
+	}
+
+	return neighbour{channel: channel, callsign: normalised}, true
+}
+
+// linkTo returns the link to nb, making a record of it if there is none.
+// n.mu must be held.
+func (n *Node) linkTo(nb neighbour) *neighbourLink {
+	var l, ok = n.links[nb]
 	if !ok {
 		l = new(neighbourLink)
-		n.links[neighbour] = l
+		n.links[nb] = l
 	}
 
 	return l
@@ -302,40 +325,29 @@ func (n *Node) linkTo(neighbour string) *neighbourLink {
 // saying how much that was.  It sends with the lock held, so that a frame
 // sent to the neighbour meanwhile cannot get ahead of those waiting; the
 // data link only queues them.
-func (n *Node) linkUp(neighbour string) int {
-	var call, err = NormaliseCallsign(neighbour)
-	if err != nil {
-		return 0
-	}
-
+func (n *Node) linkUp(nb neighbour) int {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	var l = n.linkTo(call)
+	var l = n.linkTo(nb)
 	l.state = neighbourUp
 
 	var pending = l.pending
 	l.pending = nil
 
 	for _, data := range pending {
-		n.xmit(call, data)
+		n.xmit(nb, data)
 	}
 
 	return len(pending)
 }
 
-// linkDown marks the link to neighbour down, dropping what was waiting for
-// it.
-func (n *Node) linkDown(neighbour string) {
-	var call, err = NormaliseCallsign(neighbour)
-	if err != nil {
-		return
-	}
-
+// linkDown marks the link to nb down, dropping what was waiting for it.
+func (n *Node) linkDown(nb neighbour) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	var l = n.linkTo(call)
+	var l = n.linkTo(nb)
 	l.state = neighbourDown
 	l.pending = nil
 }
@@ -396,20 +408,20 @@ func (n *Node) sendLayer3(f *Frame) {
 	n.sendToNeighbour(neighbour, data)
 }
 
-// sendToNeighbour sends a layer 3 frame over the link to neighbour.  If the
-// link is not up, the frame waits while it is made: the data link would
-// throw away data for a link we have asked for and it has not yet made.
-func (n *Node) sendToNeighbour(neighbour string, data []byte) {
+// sendToNeighbour sends a layer 3 frame over the link to nb.  If the link
+// is not up, the frame waits while it is made: the data link would throw
+// away data for a link we have asked for and it has not yet made.
+func (n *Node) sendToNeighbour(nb neighbour, data []byte) {
 	n.mu.Lock()
 
-	var l = n.linkTo(neighbour)
+	var l = n.linkTo(nb)
 
 	var state = l.state
 
 	switch state {
 	case neighbourUp:
 		// With the lock held, as linkUp sends, to keep the order.
-		n.xmit(neighbour, data)
+		n.xmit(nb, data)
 	case neighbourDown:
 		l.state = neighbourConnecting
 
@@ -425,17 +437,17 @@ func (n *Node) sendToNeighbour(neighbour string, data []byte) {
 	if state == neighbourDown {
 		var addrs [ax25.MaxAddrs]string
 		addrs[ax25.Source] = n.cfg.Callsign
-		addrs[ax25.Destination] = neighbour
+		addrs[ax25.Destination] = nb.callsign
 
 		n.link.ConnectRequest(addrs, 2, n.cfg.Channel, n.client, ax25.PIDNetROM)
 	}
 }
 
 // xmit hands a frame to the data link for a link that is up.
-func (n *Node) xmit(neighbour string, data []byte) {
+func (n *Node) xmit(nb neighbour, data []byte) {
 	var addrs [ax25.MaxAddrs]string
 	addrs[ax25.Source] = n.cfg.Callsign
-	addrs[ax25.Destination] = neighbour
+	addrs[ax25.Destination] = nb.callsign
 
 	n.link.XmitDataRequest(addrs, 2, n.cfg.Channel, n.client, ax25.PIDNetROM, data)
 }

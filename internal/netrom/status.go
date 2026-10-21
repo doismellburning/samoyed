@@ -104,39 +104,43 @@ func (n *Node) Status() Status {
 	s.Callsign = n.cfg.Callsign
 	s.Alias = n.cfg.Alias
 
-	var failures map[string]int
+	var failures map[neighbour]int
 
-	s.Destinations, failures = n.router.status()
+	var routes []neighbour
+
+	s.Destinations, routes, failures = n.router.status()
 	s.Circuits = n.circuits.status()
 
-	var links = make(map[string]linkState)
+	var links = make(map[neighbour]linkState)
 
 	n.mu.Lock()
-	for call, l := range n.links {
-		links[call] = l.state
+	for nb, l := range n.links {
+		links[nb] = l.state
 	}
 	n.mu.Unlock()
 
 	// A neighbour is anything with a link, or a route through it, or a
 	// failure count - each of which can outlast the others.
-	var neighbours = make(map[string]bool)
-	for call := range links {
-		neighbours[call] = true
+	var neighbours = make(map[neighbour]bool)
+	for nb := range links {
+		neighbours[nb] = true
 	}
 
-	for call := range failures {
-		neighbours[call] = true
+	for nb := range failures {
+		neighbours[nb] = true
 	}
 
-	for _, d := range s.Destinations {
-		for _, rt := range d.Routes {
-			neighbours[rt.Neighbour] = true
-		}
+	for _, nb := range routes {
+		neighbours[nb] = true
 	}
 
-	for _, call := range slices.Sorted(maps.Keys(neighbours)) {
+	var sorted = slices.SortedFunc(maps.Keys(neighbours), func(a, b neighbour) int {
+		return cmp.Or(cmp.Compare(a.callsign, b.callsign), cmp.Compare(a.channel, b.channel))
+	})
+
+	for _, call := range sorted {
 		var nb NeighbourStatus
-		nb.Callsign = call
+		nb.Callsign = call.callsign
 		nb.Link = links[call].String()
 		nb.Quality = int(n.cfg.Quality)
 		nb.Failures = failures[call]
@@ -147,13 +151,15 @@ func (n *Node) Status() Status {
 	return s
 }
 
-// status is the routing table, in callsign order, and the neighbours'
-// failure counts.
-func (r *router) status() ([]DestinationStatus, map[string]int) {
+// status is the routing table, in callsign order, the neighbours its
+// routes go through, and the neighbours' failure counts.
+func (r *router) status() ([]DestinationStatus, []neighbour, map[neighbour]int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	var destinations = make([]DestinationStatus, 0, len(r.destinations))
+
+	var neighbours []neighbour
 
 	for _, d := range r.destinations {
 		var ds DestinationStatus
@@ -162,10 +168,12 @@ func (r *router) status() ([]DestinationStatus, map[string]int) {
 
 		for _, rt := range d.routes {
 			ds.Routes = append(ds.Routes, RouteStatus{
-				Neighbour:    rt.neighbour,
+				Neighbour:    rt.neighbour.callsign,
 				Quality:      int(rt.quality),
 				Obsolescence: rt.obsolescence,
 			})
+
+			neighbours = append(neighbours, rt.neighbour)
 		}
 
 		destinations = append(destinations, ds)
@@ -173,7 +181,7 @@ func (r *router) status() ([]DestinationStatus, map[string]int) {
 
 	slices.SortFunc(destinations, func(a, b DestinationStatus) int { return cmp.Compare(a.Callsign, b.Callsign) })
 
-	return destinations, maps.Clone(r.failures)
+	return destinations, neighbours, maps.Clone(r.failures)
 }
 
 // status is the circuits that are open or on their way, for showing.
