@@ -229,7 +229,7 @@ func TestNodeHearsBroadcasts(t *testing.T) {
 
 	var hop, ok = a.router.nextHop("Q2TEST-7")
 	require.True(t, ok)
-	assert.Equal(t, "Q2TEST-7", hop)
+	assert.Equal(t, nbr("Q2TEST-7"), hop)
 
 	_, ok = b.router.nextHop("Q1TEST-7")
 	assert.True(t, ok)
@@ -270,20 +270,20 @@ func TestNodeConnectsToNeighbours(t *testing.T) {
 
 	var a = newTestNode("Q1TEST-7", "QNODEA")
 
-	a.sendToNeighbour("Q2TEST-7", []byte("one"))
-	a.sendToNeighbour("Q2TEST-7", []byte("two"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("one"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("two"))
 	assert.Equal(t, []string{"Q2TEST-7"}, a.link.connects)
 	assert.Empty(t, a.link.frames, "nothing sent before the link is up")
 
 	a.LinkEstablished(0, testClient, "Q2TEST-7", "Q1TEST-7", false)
 	assert.Equal(t, [][]byte{[]byte("one"), []byte("two")}, a.link.queue, "then what was waiting, in order")
 
-	a.sendToNeighbour("Q2TEST-7", []byte("three"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("three"))
 	assert.Len(t, a.link.connects, 1)
 	assert.Len(t, a.link.frames, 3)
 
 	a.LinkTerminated(0, testClient, "Q2TEST-7", "Q1TEST-7", false)
-	a.sendToNeighbour("Q2TEST-7", []byte("four"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("four"))
 	assert.Len(t, a.link.connects, 2, "and again once it has gone down")
 	assert.Len(t, a.link.frames, 3)
 
@@ -296,7 +296,7 @@ func TestNodeConnectsToNeighbours(t *testing.T) {
 	}
 
 	for range 2 * maxPending {
-		a.sendToNeighbour("Q2TEST-7", []byte("x"))
+		a.sendToNeighbour(nbr("Q2TEST-7"), []byte("x"))
 	}
 
 	a.LinkEstablished(0, testClient, "Q2TEST-7", "Q1TEST-7", false)
@@ -310,7 +310,7 @@ func TestNodeUsesAnIncomingLink(t *testing.T) {
 	var a = newTestNode("Q1TEST-7", "QNODEA")
 
 	a.LinkEstablished(0, testClient, "Q2TEST-7", "Q1TEST-7", true)
-	a.sendToNeighbour("Q2TEST-7", []byte("one"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("one"))
 
 	assert.Empty(t, a.link.connects)
 	assert.Len(t, a.link.frames, 1)
@@ -404,7 +404,7 @@ func TestNodeAnswersANodeItHasNotHeardBroadcast(t *testing.T) {
 
 	var hop, ok = b.router.nextHop("Q1TEST-7")
 	require.True(t, ok)
-	assert.Equal(t, "Q1TEST-7", hop)
+	assert.Equal(t, nbr("Q1TEST-7"), hop)
 
 	assert.Empty(t, b.router.broadcastEntries(), "but a route learned so is not advertised as though a broadcast had told of it")
 }
@@ -460,8 +460,8 @@ func TestNodeSendsWhatWasWaitingFirst(t *testing.T) {
 
 	var a = newTestNode("Q1TEST-7", "QNODEA")
 
-	a.sendToNeighbour("Q2TEST-7", []byte("one"))
-	a.sendToNeighbour("Q2TEST-7", []byte("two"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("one"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("two"))
 
 	var sentDuring = make(chan struct{})
 
@@ -470,7 +470,7 @@ func TestNodeSendsWhatWasWaitingFirst(t *testing.T) {
 	a.link.onXmit = func() {
 		once.Do(func() {
 			go func() {
-				a.sendToNeighbour("Q2TEST-7", []byte("three"))
+				a.sendToNeighbour(nbr("Q2TEST-7"), []byte("three"))
 				close(sentDuring)
 			}()
 

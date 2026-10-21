@@ -23,6 +23,11 @@ func entry(callsign string, alias string, neighbour string, quality byte) NodesE
 	return NodesEntry{callsign: callsign, alias: alias, neighbour: neighbour, quality: quality}
 }
 
+// nbr is the neighbour call on channel 0.
+func nbr(call string) neighbour {
+	return neighbour{channel: 0, callsign: call}
+}
+
 func TestNetromPathQuality(t *testing.T) {
 	t.Parallel()
 
@@ -39,15 +44,15 @@ func TestNetromRouterLearnsFromBroadcast(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 192, 10)
 
-	r.heardNodes("Q2TEST-7", nodesFrom("QNODEB", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200)))
+	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200)))
 
 	var hop, ok = r.nextHop("Q2TEST-7")
 	require.True(t, ok)
-	assert.Equal(t, "Q2TEST-7", hop)
+	assert.Equal(t, nbr("Q2TEST-7"), hop)
 
 	hop, ok = r.nextHop("Q3TEST-7")
 	require.True(t, ok)
-	assert.Equal(t, "Q2TEST-7", hop)
+	assert.Equal(t, nbr("Q2TEST-7"), hop)
 
 	assert.Equal(t, []NodesEntry{
 		entry("Q2TEST-7", "QNODEB", "Q2TEST-7", 192),
@@ -73,7 +78,7 @@ func TestNetromRouterIgnores(t *testing.T) {
 
 			var r = newRouter("Q1TEST-7", 192, 10)
 
-			r.heardNodes("Q2TEST-7", nodesFrom("QNODEB", tc.entry))
+			r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB", tc.entry))
 
 			var _, ok = r.nextHop(tc.entry.callsign)
 			assert.False(t, ok, "should not have a route to %s", tc.entry.callsign)
@@ -88,7 +93,7 @@ func TestNetromRouterMinimumQuality(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 192, 150)
 
-	r.heardNodes("Q2TEST-7", nodesFrom("QNODEB",
+	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB",
 		entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200), // 150 for us: kept.
 		entry("Q4TEST-7", "QNODED", "Q4TEST-7", 199), // 149 for us: dropped.
 	))
@@ -107,7 +112,7 @@ func TestNetromRouterIgnoresItsOwnBroadcast(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 192, 10)
 
-	r.heardNodes("Q1TEST-7", nodesFrom("QNODEA", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200)))
+	r.heardNodes(nbr("Q1TEST-7"), nodesFrom("QNODEA", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200)))
 
 	assert.Empty(t, r.broadcastEntries())
 }
@@ -119,7 +124,7 @@ func TestNetromRouterAgesRoutes(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 192, 10)
 
-	r.heardNodes("Q2TEST-7", nodesFrom("QNODEB"))
+	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB"))
 
 	for range obsolescenceInit - minBroadcastObsolescence {
 		r.age()
@@ -140,7 +145,7 @@ func TestNetromRouterAgesRoutes(t *testing.T) {
 	_, ok = r.nextHop("Q2TEST-7")
 	assert.False(t, ok, "gone once the count runs out")
 
-	r.heardNodes("Q2TEST-7", nodesFrom("QNODEB"))
+	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB"))
 	_, ok = r.nextHop("Q2TEST-7")
 	assert.True(t, ok, "and back when heard again")
 }
@@ -160,11 +165,11 @@ func TestNetromRoutersDoNotKeepADeadDestinationAlive(t *testing.T) {
 	var a = newRouter("Q1TEST-7", 192, 10)
 	var b = newRouter("Q2TEST-7", 192, 10)
 
-	a.heardNodes("Q3TEST-7", nodesFrom("QNODEC"))
+	a.heardNodes(nbr("Q3TEST-7"), nodesFrom("QNODEC"))
 
 	var exchange = func() {
-		b.heardNodes("Q1TEST-7", nodesFrom("QNODEA", a.broadcastEntries()...))
-		a.heardNodes("Q2TEST-7", nodesFrom("QNODEB", b.broadcastEntries()...))
+		b.heardNodes(nbr("Q1TEST-7"), nodesFrom("QNODEA", a.broadcastEntries()...))
+		a.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB", b.broadcastEntries()...))
 		a.age()
 		b.age()
 	}
@@ -173,7 +178,7 @@ func TestNetromRoutersDoNotKeepADeadDestinationAlive(t *testing.T) {
 
 	var hop, ok = b.nextHop("Q3TEST-7")
 	require.True(t, ok, "B learns C through A")
-	assert.Equal(t, "Q1TEST-7", hop)
+	assert.Equal(t, nbr("Q1TEST-7"), hop)
 
 	for range 2 * obsolescenceInit {
 		exchange()
@@ -197,17 +202,17 @@ func TestNetromRouterKeepsTheBestRoutes(t *testing.T) {
 	var r = newRouter("Q1TEST-7", 255, 10)
 
 	for i, q := range []byte{100, 200, 150} {
-		r.heardNodes(fmt.Sprintf("Q%dTEST", i+2), nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", q)))
+		r.heardNodes(nbr(fmt.Sprintf("Q%dTEST", i+2)), nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", q)))
 	}
 
 	var hop, _ = r.nextHop("Q9TEST")
-	assert.Equal(t, "Q3TEST", hop, "the best route is used")
+	assert.Equal(t, nbr("Q3TEST"), hop, "the best route is used")
 
-	r.heardNodes("Q5TEST", nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 50)))
+	r.heardNodes(nbr("Q5TEST"), nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 50)))
 	assert.Len(t, r.destinations["Q9TEST"].routes, maxRoutes)
 	assert.NotContains(t, neighboursOf(r, "Q9TEST"), "Q5TEST", "a worse fourth is not kept")
 
-	r.heardNodes("Q6TEST", nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 250)))
+	r.heardNodes(nbr("Q6TEST"), nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 250)))
 	assert.Equal(t, []string{"Q6TEST", "Q3TEST", "Q4TEST"}, neighboursOf(r, "Q9TEST"), "a better one displaces the worst")
 }
 
@@ -218,8 +223,8 @@ func TestNetromRouterUpdatesARoute(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 255, 10)
 
-	r.heardNodes("Q2TEST", nodesFrom("", entry("Q9TEST", "", "Q9TEST", 200)))
-	r.heardNodes("Q2TEST", nodesFrom("", entry("Q9TEST", "", "Q9TEST", 100)))
+	r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 200)))
+	r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 100)))
 
 	require.Len(t, r.destinations["Q9TEST"].routes, 1)
 	assert.Equal(t, byte(100), r.destinations["Q9TEST"].routes[0].quality)
@@ -230,23 +235,48 @@ func TestNetromRouterPassesOverAFailingNeighbour(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 255, 10)
 
-	r.heardNodes("Q2TEST", nodesFrom("", entry("Q9TEST", "", "Q9TEST", 200)))
-	r.heardNodes("Q3TEST", nodesFrom("", entry("Q9TEST", "", "Q9TEST", 100)))
+	r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 200)))
+	r.heardNodes(nbr("Q3TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 100)))
 
-	r.neighbourFailed("Q2TEST")
+	r.neighbourFailed(nbr("Q2TEST"))
 
 	var hop, _ = r.nextHop("Q9TEST")
-	assert.Equal(t, "Q2TEST", hop, "one failure is not enough")
+	assert.Equal(t, nbr("Q2TEST"), hop, "one failure is not enough")
 
-	r.neighbourFailed("Q2TEST")
-
-	hop, _ = r.nextHop("Q9TEST")
-	assert.Equal(t, "Q3TEST", hop)
-
-	r.neighbourHeard("Q2TEST")
+	r.neighbourFailed(nbr("Q2TEST"))
 
 	hop, _ = r.nextHop("Q9TEST")
-	assert.Equal(t, "Q2TEST", hop)
+	assert.Equal(t, nbr("Q3TEST"), hop)
+
+	r.neighbourHeard(nbr("Q2TEST"))
+
+	hop, _ = r.nextHop("Q9TEST")
+	assert.Equal(t, nbr("Q2TEST"), hop)
+}
+
+// A callsign heard on two channels is two neighbours, each a route of its
+// own, and failing on one channel does not pass over the other.
+func TestNetromRouterNeighbourIsCallsignOnAChannel(t *testing.T) {
+	t.Parallel()
+
+	var r = newRouter("Q1TEST-7", 255, 10)
+
+	var on0 = neighbour{channel: 0, callsign: "Q2TEST"}
+	var on1 = neighbour{channel: 1, callsign: "Q2TEST"}
+
+	r.heardNodes(on0, nodesFrom("", entry("Q9TEST", "", "Q9TEST", 200)))
+	r.heardNodes(on1, nodesFrom("", entry("Q9TEST", "", "Q9TEST", 100)))
+
+	require.Len(t, r.destinations["Q9TEST"].routes, 2)
+
+	var hop, _ = r.nextHop("Q9TEST")
+	assert.Equal(t, on0, hop, "the better of the two")
+
+	r.neighbourFailed(on0)
+	r.neighbourFailed(on0)
+
+	hop, _ = r.nextHop("Q9TEST")
+	assert.Equal(t, on1, hop, "the same callsign on the other channel")
 }
 
 func TestNetromRouterResolves(t *testing.T) {
@@ -254,7 +284,7 @@ func TestNetromRouterResolves(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 192, 10)
 
-	r.heardNodes("Q2TEST-7", nodesFrom("QNODEB"))
+	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB"))
 
 	for _, name := range []string{"Q2TEST-7", "q2test-7", "QNODEB", "qnodeb"} {
 		var call, ok = r.resolve(name)
@@ -274,7 +304,7 @@ func TestNetromRouterIsBounded(t *testing.T) {
 	var r = newRouter("Q1TEST-7", 255, 10)
 
 	for i := range maxDestinations + 10 {
-		r.heardNodes(fmt.Sprintf("Q%dTEST-%d", i%10, i%16), nodesFrom("", entry(fmt.Sprintf("Q%05d", i), "", "Q9TEST", 200)))
+		r.heardNodes(nbr(fmt.Sprintf("Q%dTEST-%d", i%10, i%16)), nodesFrom("", entry(fmt.Sprintf("Q%05d", i), "", "Q9TEST", 200)))
 	}
 
 	assert.LessOrEqual(t, len(r.destinations), maxDestinations)
@@ -283,7 +313,7 @@ func TestNetromRouterIsBounded(t *testing.T) {
 func neighboursOf(r *router, callsign string) []string {
 	var out []string
 	for _, rt := range r.destinations[callsign].routes {
-		out = append(out, rt.neighbour)
+		out = append(out, rt.neighbour.callsign)
 	}
 
 	return out
@@ -297,13 +327,13 @@ func TestRouterAdvertisesTheRouteItWouldUse(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 255, 10)
 
-	r.heardNodes("Q4TEST", nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 200)))
+	r.heardNodes(nbr("Q4TEST"), nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 200)))
 
 	for range obsolescenceInit - minBroadcastObsolescence + 1 {
 		r.age()
 	}
 
-	r.heardNodes("Q5TEST", nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 150)))
+	r.heardNodes(nbr("Q5TEST"), nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 150)))
 
 	var advertised = func() string {
 		for _, e := range r.broadcastEntries() {
@@ -317,10 +347,10 @@ func TestRouterAdvertisesTheRouteItWouldUse(t *testing.T) {
 
 	assert.Equal(t, "Q5TEST", advertised(), "the fresh route, while the better one ages")
 
-	r.heardNodes("Q4TEST", nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 200)))
+	r.heardNodes(nbr("Q4TEST"), nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 200)))
 	assert.Equal(t, "Q4TEST", advertised(), "the better one, once refreshed")
 
-	r.neighbourFailed("Q4TEST")
-	r.neighbourFailed("Q4TEST")
+	r.neighbourFailed(nbr("Q4TEST"))
+	r.neighbourFailed(nbr("Q4TEST"))
 	assert.Equal(t, "Q5TEST", advertised(), "not through a neighbour that keeps failing")
 }

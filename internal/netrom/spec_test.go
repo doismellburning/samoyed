@@ -294,7 +294,7 @@ func TestSpecDirectRouteTakesThePathQuality(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 77, 0)
 
-	r.heardNodes("Q2TEST-7", nodesFrom("QNODEB", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 255)))
+	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 255)))
 
 	require.Len(t, r.destinations["Q2TEST-7"].routes, 1)
 	assert.Equal(t, byte(77), r.destinations["Q2TEST-7"].routes[0].quality)
@@ -310,7 +310,7 @@ func TestSpecMinimumQualityZero(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 192, 0)
 
-	r.heardNodes("Q2TEST-7", nodesFrom("QNODEB",
+	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB",
 		entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 1), // (192 + 128) / 256 = 1.
 		entry("Q4TEST-7", "QNODED", "Q4TEST-7", 0),
 	))
@@ -330,12 +330,12 @@ func TestSpecQualityZeroRoutesAreNotBroadcast(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 192, 10)
 
-	r.heardNodes("Q2TEST-7", nodesFrom("QNODEB"))
-	r.heardFrom("Q9TEST", "Q2TEST-7")
+	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB"))
+	r.heardFrom("Q9TEST", nbr("Q2TEST-7"))
 
 	var hop, ok = r.nextHop("Q9TEST")
 	require.True(t, ok, "usable")
-	assert.Equal(t, "Q2TEST-7", hop)
+	assert.Equal(t, nbr("Q2TEST-7"), hop)
 
 	for _, e := range r.broadcastEntries() {
 		assert.NotEqual(t, "Q9TEST", e.callsign, "but not advertised")
@@ -351,21 +351,21 @@ func TestSpecFullTableStillUpdates(t *testing.T) {
 
 	var r = newRouter("Q1TEST-7", 255, 10)
 
-	r.heardNodes("Q2TEST", nodesFrom("", entry("Q9TEST", "", "Q9TEST", 100)))
+	r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 100)))
 
 	for i := len(r.destinations); i < maxDestinations; i++ {
-		r.heardNodes("Q2TEST", nodesFrom("", entry(fmt.Sprintf("Q%05d", i), "", "Q9TEST", 200)))
+		r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry(fmt.Sprintf("Q%05d", i), "", "Q9TEST", 200)))
 	}
 
 	require.Len(t, r.destinations, maxDestinations)
 
-	r.heardNodes("Q2TEST", nodesFrom("", entry("Q8TEST", "", "Q8TEST", 200)))
+	r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry("Q8TEST", "", "Q8TEST", 200)))
 	assert.NotContains(t, r.destinations, "Q8TEST", "no new destination")
 
-	r.heardNodes("Q3TEST", nodesFrom("", entry("Q9TEST", "", "Q9TEST", 250)))
+	r.heardNodes(nbr("Q3TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 250)))
 	assert.Equal(t, []string{"Q3TEST", "Q2TEST"}, neighboursOf(r, "Q9TEST"), "but a known one gains a route")
 
-	r.heardNodes("Q2TEST", nodesFrom("", entry("Q9TEST", "", "Q9TEST", 50)))
+	r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 50)))
 	assert.Equal(t, byte(50), r.destinations["Q9TEST"].routes[1].quality, "and a route is updated")
 }
 
@@ -384,7 +384,7 @@ func TestSpecObsolescence(t *testing.T) {
 
 		var r = newRouter("Q1TEST-7", 192, 10)
 
-		r.heardNodes("Q2TEST-7", nodesFrom("QNODEB"))
+		r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB"))
 
 		for range obsolescenceInit - 1 {
 			r.age()
@@ -405,13 +405,13 @@ func TestSpecObsolescence(t *testing.T) {
 
 		var r = newRouter("Q1TEST-7", 192, 10)
 
-		r.heardNodes("Q2TEST-7", nodesFrom("QNODEB", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200)))
+		r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200)))
 
 		for range obsolescenceInit - 1 {
 			r.age()
 		}
 
-		r.heardFrom("Q3TEST-7", "Q2TEST-7")
+		r.heardFrom("Q3TEST-7", nbr("Q2TEST-7"))
 
 		var route = r.destinations["Q3TEST-7"].routes[0]
 		assert.Equal(t, obsolescenceInit, route.obsolescence)
