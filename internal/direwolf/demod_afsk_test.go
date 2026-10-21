@@ -21,15 +21,16 @@ func TestFcos256Table(t *testing.T) {
 	assert.InDelta(t, -1.0, fcos256(128<<24), 1e-12)
 }
 
-// The space gains run geometrically from MIN_G to MAX_G.
+// The space gains run geometrically from MIN_G to MAX_G, one per slicer.
 func TestAFSKSpaceGain(t *testing.T) {
 	t.Parallel()
 
+	assert.Len(t, afskSpaceGain, MAX_SLICERS)
 	assert.InDelta(t, MIN_G, afskSpaceGain[0], 1e-12)
-	assert.InDelta(t, MAX_G, afskSpaceGain[MAX_SUBCHANS-1], 1e-9)
+	assert.InDelta(t, MAX_G, afskSpaceGain[MAX_SLICERS-1], 1e-9)
 
 	var ratio = afskSpaceGain[1] / afskSpaceGain[0]
-	for j := 2; j < MAX_SUBCHANS; j++ {
+	for j := 2; j < MAX_SLICERS; j++ {
 		assert.InDelta(t, ratio, afskSpaceGain[j]/afskSpaceGain[j-1], 1e-12)
 	}
 }

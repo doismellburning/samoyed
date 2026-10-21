@@ -122,6 +122,43 @@ func TestDemodInitCapsProfileLetters(t *testing.T) {
 	assert.Equal(t, "ABDEABDEA", entry.Data["using"])
 }
 
+// An AFSK demodulator type that doesn't exist used to get past the check for
+// letters and reach demod_afsk_init, which exited.  It is reported and left
+// out, and a list left with no letters gets the usual default.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
+func TestDemodInitIgnoresUnknownAFSKProfiles(t *testing.T) {
+	for _, tc := range []struct {
+		profiles string
+		want     string
+	}{
+		{"C", "A+"},
+		{"C-", "A"},
+		{"AC", "A"},
+		{"zb+", "B+"},
+	} {
+		var channel = 0
+		var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
+		audioConfig.achan[channel].num_freq = 1
+		audioConfig.achan[channel].profiles = tc.profiles
+
+		var hook = test.NewGlobal()
+
+		var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+
+		assert.Equal(t, tc.want, d.profiles, tc.profiles)
+
+		var entry = lastEntryWithMessage(hook, "Unknown AFSK demodulator type; ignoring it")
+
+		require.NotNil(t, entry, "an unknown demodulator type must be reported")
+		assert.Equal(t, logrus.ErrorLevel, entry.Level)
+		assert.Equal(t, channel, entry.Data["channel"])
+		assert.Equal(t, tc.profiles, entry.Data["profiles"])
+
+		hook.Reset()
+	}
+}
+
 // The PSK modems take their profiles straight from the configuration rather
 // than through AFSK's normalising, so they need the same cap: an overlong list
 // for any of them used to abort startup on the subchannel index assert.
