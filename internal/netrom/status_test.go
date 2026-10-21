@@ -35,11 +35,11 @@ func TestNodeStatus(t *testing.T) {
 	require.True(t, a.Send(0, 0, "Q1TEST", "QNODEB", []byte("hello")))
 
 	var s = a.Status()
-	assert.Equal(t, []NeighbourStatus{{Callsign: "Q2TEST-7", Link: "up", Quality: int(DefaultQuality), Failures: 0, Failing: false}}, s.Neighbours)
+	assert.Equal(t, []NeighbourStatus{{Channel: 0, Callsign: "Q2TEST-7", Link: "up", Quality: int(DefaultQuality), Failures: 0, Failing: false}}, s.Neighbours)
 	assert.Equal(t, []DestinationStatus{{
 		Callsign: "Q2TEST-7",
 		Alias:    "QNODEB",
-		Routes:   []RouteStatus{{Neighbour: "Q2TEST-7", Quality: int(DefaultQuality), Obsolescence: obsolescenceInit}},
+		Routes:   []RouteStatus{{Channel: 0, Neighbour: "Q2TEST-7", Quality: int(DefaultQuality), Obsolescence: obsolescenceInit}},
 	}}, s.Destinations)
 	assert.Equal(t, []CircuitStatus{{
 		OwnCall:     "Q1TEST",
@@ -69,6 +69,26 @@ func TestNodeStatus(t *testing.T) {
 	assert.Empty(t, a.Status().Circuits, "a closed circuit is not shown")
 }
 
+// The same callsign on two channels is two neighbours, in callsign order
+// then channel, and a route says which of them it goes through.
+func TestNodeStatusNeighbourChannels(t *testing.T) {
+	t.Parallel()
+
+	var a = newTestNode("Q1TEST-7", "QNODEA")
+
+	a.sendToNeighbour(neighbour{channel: 3, callsign: "Q2TEST-7"}, []byte("one"))
+	a.router.heardNodes(neighbour{channel: 1, callsign: "Q2TEST-7"}, nodesFrom("QNODEB"))
+
+	var s = a.Status()
+	assert.Equal(t, []NeighbourStatus{
+		{Channel: 1, Callsign: "Q2TEST-7", Link: "down", Quality: int(DefaultQuality), Failures: 0, Failing: false},
+		{Channel: 3, Callsign: "Q2TEST-7", Link: "connecting", Quality: int(DefaultQuality), Failures: 0, Failing: false},
+	}, s.Neighbours)
+
+	require.Len(t, s.Destinations, 1)
+	assert.Equal(t, []RouteStatus{{Channel: 1, Neighbour: "Q2TEST-7", Quality: int(DefaultQuality), Obsolescence: obsolescenceInit}}, s.Destinations[0].Routes)
+}
+
 // A neighbour with a link on its way, and no routes, is still a neighbour.
 func TestNodeStatusConnectingNeighbour(t *testing.T) {
 	t.Parallel()
@@ -77,7 +97,7 @@ func TestNodeStatusConnectingNeighbour(t *testing.T) {
 
 	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("one"))
 
-	assert.Equal(t, []NeighbourStatus{{Callsign: "Q2TEST-7", Link: "connecting", Quality: int(DefaultQuality), Failures: 0, Failing: false}}, a.Status().Neighbours)
+	assert.Equal(t, []NeighbourStatus{{Channel: 0, Callsign: "Q2TEST-7", Link: "connecting", Quality: int(DefaultQuality), Failures: 0, Failing: false}}, a.Status().Neighbours)
 }
 
 // A neighbour whose link keeps failing is shown as failing, even once its
@@ -96,5 +116,5 @@ func TestNodeStatusFailingNeighbour(t *testing.T) {
 
 	var s = a.Status()
 	assert.Empty(t, s.Destinations)
-	assert.Equal(t, []NeighbourStatus{{Callsign: "Q2TEST-7", Link: "down", Quality: int(DefaultQuality), Failures: 2, Failing: true}}, s.Neighbours)
+	assert.Equal(t, []NeighbourStatus{{Channel: 0, Callsign: "Q2TEST-7", Link: "down", Quality: int(DefaultQuality), Failures: 2, Failing: true}}, s.Neighbours)
 }

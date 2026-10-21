@@ -23,7 +23,7 @@ func netromStatus(channel int, neighbours ...netrom.NeighbourStatus) func() netr
 }
 
 func neighbour(callsign string, link string) netrom.NeighbourStatus {
-	return netrom.NeighbourStatus{Callsign: callsign, Link: link, Quality: 192, Failures: 0, Failing: false}
+	return netrom.NeighbourStatus{Channel: 0, Callsign: callsign, Link: link, Quality: 192, Failures: 0, Failing: false}
 }
 
 func TestNetROMNeighbours(t *testing.T) {
