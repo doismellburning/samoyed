@@ -275,7 +275,7 @@ func TestNetromConfigOnTheShellsChannels(t *testing.T) {
 }
 
 // A node shell listening on every channel connected mode can be used on, as
-// it does when given none, is on the NET/ROM node's channel too, the command
+// it does when given none, is on the NET/ROM node's channels too, the command
 // line's included.
 func TestNetromConfigShellOnEveryChannel(t *testing.T) {
 	t.Parallel()
@@ -404,7 +404,7 @@ func TestNetromAGWDataLink(t *testing.T) {
 	var l = newNetromAGWDataLink(dataLink)
 	l.node = netrom.New(config, dataLink, func(int, int, *ax25.Packet) {}, reporter, netrom.RealClock{}, netromClient)
 
-	// A connect with the NET/ROM PID on the node's channel is the node's.
+	// A connect with the NET/ROM PID on one of the node's channels is the node's.
 	l.ConnectRequest(addrs("Q1TEST", "QNODEB"), 2, 0, 1, ax25.PIDNetROM)
 	assert.Empty(t, dataLink.taken())
 

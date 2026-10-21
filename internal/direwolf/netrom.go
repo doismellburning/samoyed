@@ -192,8 +192,8 @@ func (c *RadioConfig) netromConfig(settings netromSettings, shell maybe.Maybe[no
 }
 
 // netromAGWDataLink is the data link as the AGW server sees it when there is
-// a NET/ROM node: what is the node's - a connect with the NET/ROM PID on its
-// channel, data for, disconnection of and outstanding frames on a client's
+// a NET/ROM node: what is the node's - a connect with the NET/ROM PID on one
+// of its channels, data for, disconnection of and outstanding frames on a client's
 // circuits, registration of the node's callsign, a client going away - goes
 // to the node, and everything else to the data link as before.
 type netromAGWDataLink struct {

@@ -333,7 +333,7 @@ x = Silence FX.25 information.`)
 			}
 		}
 
-		// The same goes for the NET/ROM node's channel.
+		// The same goes for the NET/ROM node's channels.
 		if netromSettings, ok := misc_config.netrom.Get(); ok {
 			var _, netromErr = audio_config.netromConfig(netromSettings, misc_config.node)
 			if netromErr != nil {
