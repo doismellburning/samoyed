@@ -87,7 +87,7 @@ func Test_config_yaml_netrom(t *testing.T) {
 
 //nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_yaml_netrom_with_node(t *testing.T) {
-	t.Run("sharing the node's names, on its one channel", func(t *testing.T) {
+	t.Run("sharing the node's names, on its channels", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "node: {address: q1test-7, alias: qnodea, netrom: {}}\n")
 		assert.Zero(t, c.errors, c.output)
 		assert.True(t, c.misc.node.IsJust())
@@ -97,10 +97,22 @@ func Test_config_yaml_netrom_with_node(t *testing.T) {
 		assert.True(t, got.integrated)
 
 		var want = netrom.DefaultConfig()
-		want.Channels = []int{0}
 		want.Callsign = "Q1TEST-7"
 		want.Alias = "QNODEA"
-		assert.Equal(t, want, got.config)
+		assert.Equal(t, want, got.config, "the channels are left for netromConfig")
+
+		var config, err = c.audio.netromConfig(got, c.misc.node)
+		require.NoError(t, err)
+		assert.Equal(t, []int{0}, config.Channels, "the node's")
+	})
+
+	t.Run("sharing the node's names, on all its several channels", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST-7, alias: QNODEA, channels: [0, 1], netrom: {}}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.netrom.Get()
+		require.True(t, ok)
+		assert.Empty(t, got.config.Channels, "the channels are left for netromConfig")
 	})
 
 	t.Run("every setting", func(t *testing.T) {
@@ -120,7 +132,6 @@ func Test_config_yaml_netrom_with_node(t *testing.T) {
 	for _, bad := range []string{
 		"node: {address: Q1TEST-7, netrom: {}}",
 		"node: {address: Q1TEST-7, alias: TOOLONGX, netrom: {}}",
-		"node: {address: Q1TEST-7, alias: QNODEA, channels: [0, 1], netrom: {}}",
 		"node: {address: Q1TEST-7, alias: QNODEA, netrom: {ttl: 0}}",
 		"node: {address: Q1TEST-7, alias: QNODEA, netrom: {callsign: Q1TEST-8}}",
 	} {
@@ -203,6 +214,7 @@ func TestNetromConfig(t *testing.T) {
 		{"several channels, one it can't use", testNetromSettings("Q1TEST-7", "QNODEA", 0, MAX_RADIO_CHANS+1), maybe.Nothing[nodeSettings](), false},
 		{"sharing the node shell's names on several of its channels", integratedNetromSettings("Q1TEST", "SAMNOD", MAX_RADIO_CHANS, 0), shell, true},
 		{"sharing the node shell's names, one off its channels", integratedNetromSettings("Q1TEST", "SAMNOD", 0, 1), shell, false},
+		{"with no channels", testNetromSettings("Q1TEST-7", "QNODEA"), maybe.Nothing[nodeSettings](), false},
 	}
 
 	for _, tc := range testCases {
@@ -219,6 +231,45 @@ func TestNetromConfig(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.settings.config, config)
+		})
+	}
+}
+
+// Sharing the node shell's names and given no channels, NET/ROM runs on all
+// the shell's.
+func TestNetromConfigOnTheShellsChannels(t *testing.T) {
+	t.Parallel()
+
+	var radio = new(RadioConfig)
+	radio.chan_medium[0] = MEDIUM_RADIO
+	radio.chan_medium[1] = MEDIUM_RADIO
+	radio.chan_medium[MAX_RADIO_CHANS] = MEDIUM_AXUDP
+
+	for _, tc := range []struct {
+		name     string
+		channels []int
+		want     []int
+	}{
+		{"some", []int{MAX_RADIO_CHANS, 0}, []int{MAX_RADIO_CHANS, 0}},
+		{"every channel connected mode can be used on", nil, []int{0, 1, MAX_RADIO_CHANS}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var shell = maybe.Just(nodeSettings{
+				address:        "Q1TEST-7",
+				alias:          "QNODEA",
+				channels:       tc.channels,
+				line:           1,
+				infoMessage:    "",
+				connectMessage: "",
+				nodeMap:        maybe.Nothing[nodemap.Config](),
+				mapPorts:       nil,
+			})
+
+			var config, err = radio.netromConfig(integratedNetromSettings("Q1TEST-7", "QNODEA"), shell)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, config.Channels)
 		})
 	}
 }

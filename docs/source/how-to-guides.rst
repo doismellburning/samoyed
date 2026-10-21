@@ -671,21 +671,19 @@ Configure it under the node shell's ``node`` block (see :doc:`yaml-config`):
 
 NET/ROM takes the node's address as its callsign and the node's alias as its alias,
 which must be no more than six letters, digits or ``#_&-/``.
-Its ``channels`` can be left out when the node listens on only one;
-otherwise they must be among the node's ``channels``.
+Its ``channels`` must be among the node's;
+left out, it runs on all of them.
 The other settings are those of the ``netrom`` block above.
 
 A station that connects to the node gets the shell's prompt.
 If the first thing it sends is a NET/ROM frame,
-to the node's address on the channel NET/ROM runs on,
+to the node's address on one of the channels NET/ROM runs on,
 it is a neighbouring node,
 and the link is NET/ROM's from then on.
-NET/ROM runs on that one channel only,
-however many the shell listens on.
 The shell's ``NODES`` and ``ROUTES`` commands list the nodes NET/ROM can reach
 and the neighbours it reaches them through.
 Applications use NET/ROM over the AGW port as above,
-registering the node's address on NET/ROM's channel to take incoming circuits.
+registering the node's address on one of NET/ROM's channels to take incoming circuits.
 Registering the node's alias,
 or its address on another channel,
 takes that name from the shell instead.
