@@ -593,26 +593,26 @@ func testNetROM() netrom.Status {
 		Callsign: nodeCall,
 		Alias:    nodeAlias,
 		Neighbours: []netrom.NeighbourStatus{
-			{Callsign: "Q2TEST-7", Link: "up", Quality: 192, Failures: 0, Failing: false},
-			{Callsign: "Q5TEST-7", Link: "down", Quality: 192, Failures: 2, Failing: true},
-			{Callsign: "Q6TEST-7", Link: "connecting", Quality: 100, Failures: 0, Failing: false},
+			{Channel: 0, Callsign: "Q2TEST-7", Link: "up", Quality: 192, Failures: 0, Failing: false},
+			{Channel: 0, Callsign: "Q5TEST-7", Link: "down", Quality: 192, Failures: 2, Failing: true},
+			{Channel: 0, Callsign: "Q6TEST-7", Link: "connecting", Quality: 100, Failures: 0, Failing: false},
 		},
 		Destinations: []netrom.DestinationStatus{
 			{Callsign: "Q2TEST-7", Alias: "QNODEB", Routes: []netrom.RouteStatus{
-				{Neighbour: "Q2TEST-7", Quality: 192, Obsolescence: 6},
+				{Channel: 0, Neighbour: "Q2TEST-7", Quality: 192, Obsolescence: 6},
 			}},
 			{Callsign: "Q3TEST-7", Alias: "QNODEC", Routes: []netrom.RouteStatus{
-				{Neighbour: "Q2TEST-7", Quality: 144, Obsolescence: 5},
-				{Neighbour: "Q5TEST-7", Quality: 100, Obsolescence: 4},
+				{Channel: 0, Neighbour: "Q2TEST-7", Quality: 144, Obsolescence: 5},
+				{Channel: 0, Neighbour: "Q5TEST-7", Quality: 100, Obsolescence: 4},
 			}},
 			{Callsign: "Q4TEST-7", Alias: "", Routes: []netrom.RouteStatus{
-				{Neighbour: "Q2TEST-7", Quality: 90, Obsolescence: 6},
+				{Channel: 0, Neighbour: "Q2TEST-7", Quality: 90, Obsolescence: 6},
 			}},
 			{Callsign: "Q5TEST-7", Alias: "AAA", Routes: []netrom.RouteStatus{
-				{Neighbour: "Q5TEST-7", Quality: 192, Obsolescence: 3},
+				{Channel: 0, Neighbour: "Q5TEST-7", Quality: 192, Obsolescence: 3},
 			}},
 			{Callsign: "Q6TEST-7", Alias: "QNODEF", Routes: []netrom.RouteStatus{
-				{Neighbour: "Q6TEST-7", Quality: 192, Obsolescence: 6},
+				{Channel: 0, Neighbour: "Q6TEST-7", Quality: 192, Obsolescence: 6},
 			}},
 		},
 		Circuits: nil,
