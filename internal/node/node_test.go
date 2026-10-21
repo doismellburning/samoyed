@@ -586,7 +586,8 @@ func TestNodesAndRoutesWithoutNetROM(t *testing.T) {
 }
 
 // testNetROM is what a NET/ROM node knows: five nodes, reached through three
-// neighbours, one of which is failing.
+// neighbours on two ports, one of which is failing, and a fourth neighbour
+// that is the first's callsign on the other port, which reaches none.
 func testNetROM() netrom.Status {
 	return netrom.Status{
 		Channels: []int{testChannel},
@@ -594,8 +595,9 @@ func testNetROM() netrom.Status {
 		Alias:    nodeAlias,
 		Neighbours: []netrom.NeighbourStatus{
 			{Channel: 0, Callsign: "Q2TEST-7", Link: "up", Quality: 192, Failures: 0, Failing: false},
+			{Channel: 2, Callsign: "Q2TEST-7", Link: "down", Quality: 192, Failures: 0, Failing: false},
 			{Channel: 0, Callsign: "Q5TEST-7", Link: "down", Quality: 192, Failures: 2, Failing: true},
-			{Channel: 0, Callsign: "Q6TEST-7", Link: "connecting", Quality: 100, Failures: 0, Failing: false},
+			{Channel: 2, Callsign: "Q6TEST-7", Link: "connecting", Quality: 100, Failures: 0, Failing: false},
 		},
 		Destinations: []netrom.DestinationStatus{
 			{Callsign: "Q2TEST-7", Alias: "QNODEB", Routes: []netrom.RouteStatus{
@@ -612,7 +614,7 @@ func testNetROM() netrom.Status {
 				{Channel: 0, Neighbour: "Q5TEST-7", Quality: 192, Obsolescence: 3},
 			}},
 			{Callsign: "Q6TEST-7", Alias: "QNODEF", Routes: []netrom.RouteStatus{
-				{Channel: 0, Neighbour: "Q6TEST-7", Quality: 192, Obsolescence: 6},
+				{Channel: 2, Neighbour: "Q6TEST-7", Quality: 192, Obsolescence: 6},
 			}},
 		},
 		Circuits: nil,
@@ -723,8 +725,8 @@ func TestNodeRoutes(t *testing.T) {
 	t.Parallel()
 
 	const want = "SAMNOD:Q1TEST-7} Routes to QNODEC:Q3TEST-7:\r" +
-		"  Q2TEST-7  quality 144 obsolescence 5\r" +
-		"  Q5TEST-7  quality 100 obsolescence 4\r"
+		"   0 Q2TEST-7  quality 144 obsolescence 5\r" +
+		"   0 Q5TEST-7  quality 100 obsolescence 4\r"
 
 	for _, name := range []string{"QNODEC", "qnodec", "Q3TEST-7", "q3test-7"} {
 		t.Run(name, func(t *testing.T) {
@@ -757,9 +759,10 @@ func TestRoutes(t *testing.T) {
 	typeLine(n, "R")
 
 	assert.Equal(t, "SAMNOD:Q1TEST-7} Routes:\r"+
-		"  Q2TEST-7  up         quality 192 3 nodes\r"+
-		"  Q5TEST-7  down       quality 192 2 nodes failing\r"+
-		"  Q6TEST-7  connecting quality 100 1 node\r", link.output())
+		"   0 Q2TEST-7  up         quality 192 3 nodes\r"+
+		"   2 Q2TEST-7  down       quality 192 0 nodes\r"+
+		"   0 Q5TEST-7  down       quality 192 2 nodes failing\r"+
+		"   2 Q6TEST-7  connecting quality 100 1 node\r", link.output())
 }
 
 const farCall = "Q3TEST"

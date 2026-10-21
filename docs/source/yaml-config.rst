@@ -435,10 +435,11 @@ These are the keys under ``samoyed``:
     ``NODES`` (``N``) *node*
         List the nodes NET/ROM can reach, as ``ALIAS:CALLSIGN``;
         with a node's alias or callsign, list the routes to it,
-        best first, with their quality and obsolescence count.
+        best first, with the port of the neighbour each goes through,
+        its quality and its obsolescence count.
 
     ``ROUTES`` (``R``)
-        List the neighbouring nodes,
+        List the neighbouring nodes, each with its port,
         whether the link to each is up,
         the quality it gives that link,
         and how many nodes are reached through it.
