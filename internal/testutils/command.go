@@ -33,6 +33,11 @@ const raceWarning = "WARNING: DATA RACE"
 //nolint:gochecknoglobals // A variable so that these helpers' own tests can see one time out.
 var ProcessTimeout = 30 * time.Second
 
+// coverDirEnv names the directory a binary built with -cover writes its
+// coverage to as it exits.  go test sets it for the test binary, so a command
+// run from one, as RunMain runs it, finds it too.
+const coverDirEnv = "GOCOVERDIR"
+
 // runMainEnv, when set, has a test binary that calls RunMainIfAsked run main
 // with the arguments it holds, JSON-encoded, instead of its tests.
 const runMainEnv = "SAMOYED_TESTUTILS_RUN_MAIN"
@@ -76,6 +81,62 @@ func encodeArgs(t *testing.T, args []string) string {
 	return string(encoded)
 }
 
+// childCoverDir gives a command its own coverage directory, inside the test
+// binary's, returning what to add to its environment and a func that moves
+// what it wrote up into the test binary's directory once it has exited, so
+// that its coverage still counts.
+//
+// Commands sharing the test binary's directory would race to write the same
+// meta-data file there.  The runtime names its temporary copy after the time
+// alone, which on macOS comes in whole microseconds, so two commands exiting
+// together can pick the same name, and the loser prints "error: coverage
+// meta-data emit failed" amid the output the test is checking.
+//
+// Not running under go test -cover, there is nothing to do.
+func childCoverDir(t *testing.T) ([]string, func()) {
+	t.Helper()
+
+	var parent = os.Getenv(coverDirEnv)
+	if parent == "" {
+		return nil, func() {}
+	}
+
+	var dir, dirErr = os.MkdirTemp(parent, "child") //nolint:usetesting // Inside parent, so the files can be renamed into it.
+	require.NoError(t, dirErr)
+
+	var collect = func() {
+		var entries, readErr = os.ReadDir(dir)
+		if readErr != nil {
+			t.Errorf("Reading the command's coverage: %v", readErr)
+
+			return
+		}
+
+		for _, entry := range entries {
+			// A command killed while writing leaves its temporary file
+			// behind, which is no use to anyone.
+			if strings.HasPrefix(entry.Name(), "tmp.") {
+				continue
+			}
+
+			// The meta-data file is the same for every run of the binary,
+			// so replacing another's copy changes nothing.
+			var renameErr = os.Rename( //nolint:gosec // G703: go test set GOCOVERDIR.
+				filepath.Join(dir, entry.Name()), filepath.Join(parent, entry.Name()))
+			if renameErr != nil {
+				t.Errorf("Keeping the command's coverage: %v", renameErr)
+			}
+		}
+
+		var removeErr = os.RemoveAll(dir) //nolint:gosec // G703: Made by MkdirTemp above.
+		if removeErr != nil {
+			t.Errorf("Tidying up the command's coverage: %v", removeErr)
+		}
+	}
+
+	return []string{coverDirEnv + "=" + dir}, collect
+}
+
 // Result is what a command did, as RunMain saw it.
 type Result struct {
 	Stdout string
@@ -98,8 +159,11 @@ func RunMain(t *testing.T, stdin string, args ...string) Result {
 	var ctx, cancel = context.WithTimeout(t.Context(), ProcessTimeout)
 	defer cancel()
 
+	var coverEnv, collectCoverage = childCoverDir(t)
+
 	var cmd = exec.CommandContext(ctx, os.Args[0]) //nolint:gosec // Running ourselves.
 	cmd.Env = append(os.Environ(), runMainEnv+"="+encodeArgs(t, args))
+	cmd.Env = append(cmd.Env, coverEnv...)
 	cmd.Stdin = strings.NewReader(stdin)
 
 	var stdout, stderr bytes.Buffer
@@ -108,6 +172,8 @@ func RunMain(t *testing.T, stdin string, args ...string) Result {
 	cmd.Stderr = &stderr
 
 	var runErr = cmd.Run()
+
+	collectCoverage()
 
 	// Killed for taking too long, it has an exit status, but not one that
 	// says anything about what it was doing.
@@ -170,8 +236,11 @@ func start(t *testing.T, env []string, binary string, args ...string) *Process {
 
 	var ctx, cancel = context.WithTimeout(context.Background(), ProcessTimeout)
 
+	var coverEnv, collectCoverage = childCoverDir(t)
+
 	var cmd = exec.CommandContext(ctx, binary, args...) //nolint:gosec // The command under test.
 	cmd.Env = append(os.Environ(), env...)
+	cmd.Env = append(cmd.Env, coverEnv...)
 
 	var stdinReader, stdinWriter, stdinErr = os.Pipe()
 	require.NoError(t, stdinErr)
@@ -217,6 +286,7 @@ func start(t *testing.T, env []string, binary string, args ...string) *Process {
 		cancel()
 		p.Wait()
 		stdinWriter.Close()
+		collectCoverage()
 
 		p.outputMu.Lock()
 		defer p.outputMu.Unlock()
