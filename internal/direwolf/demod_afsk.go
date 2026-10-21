@@ -94,16 +94,17 @@ const MIN_G = 0.5
 const MAX_G = 4.0
 
 // afskSpaceGain is the gain applied to the space tone at each slicer, spaced
-// geometrically from MIN_G to MAX_G.
+// geometrically from MIN_G to MAX_G.  It is indexed by slicer, so it is
+// MAX_SLICERS long.
 // Starting with version 1.2, try using multiple slicing points instead of the
 // traditional AGC.
-var afskSpaceGain = func() [MAX_SUBCHANS]float64 { //nolint:gochecknoglobals // Built once from constants, then only read
-	var gain [MAX_SUBCHANS]float64
+var afskSpaceGain = func() [MAX_SLICERS]float64 { //nolint:gochecknoglobals // Built once from constants, then only read
+	var gain [MAX_SLICERS]float64
 
 	gain[0] = MIN_G
 
-	var step = math.Pow(10.0, math.Log10(MAX_G/MIN_G)/(MAX_SUBCHANS-1))
-	for j := 1; j < MAX_SUBCHANS; j++ {
+	var step = math.Pow(10.0, math.Log10(MAX_G/MIN_G)/(MAX_SLICERS-1))
+	for j := 1; j < MAX_SLICERS; j++ {
 		gain[j] = gain[j-1] * step
 	}
 
