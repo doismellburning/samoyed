@@ -78,11 +78,12 @@ func BenchmarkConvolve(b *testing.B) {
 	_ = sink
 }
 
-// generate9600 has the tone generator send each of frames as G3RUH (scrambled
-// baseband) at baud, sampled at sampleRate, and returns the 16 bit samples it
-// makes.
-func generate9600(t *testing.T, audioConfig *RadioConfig, channel int, frames []*ax25.Packet) []int {
+// generateFrames has the tone generator send each of frames with the modem
+// audioConfig sets up for channel 0, and returns the 16 bit samples it makes.
+func generateFrames(t *testing.T, audioConfig *RadioConfig, frames []*ax25.Packet) []int {
 	t.Helper()
+
+	const channel = 0
 
 	var sink = new(byteSink)
 
@@ -108,11 +109,13 @@ func generate9600(t *testing.T, audioConfig *RadioConfig, channel int, frames []
 	return samples
 }
 
-// demodulate9600 runs samples through the demodulators set up for
-// audioConfig, and returns the frames they hand on and the receiver that
+// demodulateFrames runs samples through the demodulators audioConfig sets up
+// for channel 0, and returns the frames they hand on and the receiver that
 // holds the demodulators.
-func demodulate9600(t *testing.T, audioConfig *RadioConfig, channel int, samples []int) ([]*ax25.Packet, *Layer2Receiver) {
+func demodulateFrames(t *testing.T, audioConfig *RadioConfig, samples []int) ([]*ax25.Packet, *Layer2Receiver) {
 	t.Helper()
+
+	const channel = 0
 
 	var sink = new(recordingReceiveSink)
 
@@ -177,10 +180,10 @@ func TestDemod9600RoundTrip(t *testing.T) {
 				frames = append(frames, pp)
 			}
 
-			var samples = generate9600(t, new9600TestRadioConfig(tc.sampleRate, tc.profiles, tc.upsample), 0, frames)
+			var samples = generateFrames(t, new9600TestRadioConfig(tc.sampleRate, tc.profiles, tc.upsample), frames)
 
 			var audioConfig = new9600TestRadioConfig(tc.sampleRate, tc.profiles, tc.upsample)
-			var got, receiver = demodulate9600(t, audioConfig, 0, samples)
+			var got, receiver = demodulateFrames(t, audioConfig, samples)
 
 			require.Len(t, got, len(texts))
 
@@ -210,7 +213,7 @@ func TestDemod9600Silence(t *testing.T) {
 
 	var audioConfig = new9600TestRadioConfig(48000, "-", 0)
 
-	var got, _ = demodulate9600(t, audioConfig, 0, make([]int, 48000/10))
+	var got, _ = demodulateFrames(t, audioConfig, make([]int, 48000/10))
 
 	assert.Empty(t, got)
 }
