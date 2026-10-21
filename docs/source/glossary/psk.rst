@@ -15,9 +15,11 @@ The packet modems follow the ITU modem standards:
 V.26 comes in alternatives A and B,
 and both ends need to agree on which.
 
-BPSK, at any bit rate, reverses the phase for each ``1`` bit
-of a 1500 Hz carrier,
-the tone the NinoTNC's PSK modes use.
+BPSK uses a 1500 Hz carrier at any bit rate,
+and puts bits on it as the NinoTNC's PSK modes do.
+IL2P reverses the phase for each ``0`` bit and holds it for each ``1``.
+AX.25 and FX.25 are G3RUH scrambled, as at 9600 baud,
+and the scrambled line level is the phase itself.
 Samoyed eases each reversal through zero amplitude over the middle half of the symbol,
 rather than jumping the phase,
 which keeps the signal from splattering across neighbouring frequencies.

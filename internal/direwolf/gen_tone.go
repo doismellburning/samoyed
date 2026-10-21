@@ -409,14 +409,27 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 	// TODO: change to switch instead of if if if
 
+	// Would be logical to have MODEM_BASEBAND for IL2P rather than checking here.  But...
+	// That would mean putting in at least 3 places and testing all rather than just one.
+	if lineScrambled(audioConfig.achan[tg.channel].modem_type) &&
+		audioConfig.achan[tg.channel].layer2_xmit != LAYER2_IL2P {
+		dat = tg.scrambler.Scramble(dat & 1)
+	}
+
 	if audioConfig.achan[tg.channel].modem_type == MODEM_BPSK {
 		dat &= 1 // Keep only LSB to be extra safe.
 
-		// For BPSK, each bit is one symbol.
-		// Bit 0 reverses the phase; bit 1 leaves it unchanged, as the
-		// NinoTNC does.
+		// For BPSK, each bit is one symbol, sent as the NinoTNC does.
+		// IL2P's bit 0 reverses the phase; bit 1 leaves it unchanged.
+		// AX.25 and FX.25 are G3RUH scrambled, and the scrambled line
+		// level is the phase itself, so it reverses when the level
+		// changes.
 		// The reversal is shaped over the symbol in the sample loop below.
-		tg.bpskReversing = dat == 0
+		if audioConfig.achan[tg.channel].layer2_xmit == LAYER2_IL2P {
+			tg.bpskReversing = dat == 0
+		} else {
+			tg.bpskReversing = dat != tg.prevDat
+		}
 	}
 
 	if audioConfig.achan[tg.channel].modem_type == MODEM_QPSK {
@@ -480,12 +493,6 @@ func (tg *ToneGenerator) PutBit(dat int) {
 		tg.bitCount = 0
 	}
 
-	// Would be logical to have MODEM_BASEBAND for IL2P rather than checking here.  But...
-	// That would mean putting in at least 3 places and testing all rather than just one.
-	if audioConfig.achan[tg.channel].modem_type == MODEM_SCRAMBLE &&
-		audioConfig.achan[tg.channel].layer2_xmit != LAYER2_IL2P {
-		dat = tg.scrambler.Scramble(dat)
-	}
 	/*
 		#if PSKIQ
 			int blend = 1;
