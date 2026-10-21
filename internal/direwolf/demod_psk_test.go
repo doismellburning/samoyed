@@ -5,10 +5,12 @@ package direwolf
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"strconv"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
@@ -141,5 +143,55 @@ func TestBPSKPrefilterFitsBelowCarrier(t *testing.T) {
 		assert.Nil(t, lastEntryWithMessage(hook, "Prefilter range doesn't make sense"), "at %d baud", baud)
 
 		hook.Reset()
+	}
+}
+
+// A BPSK symbol with the same phase as the one before is a 1, and one with
+// the phase reversed a 0, as the NinoTNC sends IL2P.
+func TestBPSKNoPhaseChangeIsOne(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, 1, phase_shift_to_symbol(0, 1))
+	assert.Equal(t, 0, phase_shift_to_symbol(math.Pi, 1))
+}
+
+// newBPSKTestRadioConfig is a BPSK channel at baud, sending with layer2, and
+// demodulating with profile.
+func newBPSKTestRadioConfig(baud int, layer2 phy.Layer2, profile string) *RadioConfig {
+	var audioConfig = newTestRadioConfig(0, MODEM_BPSK, baud, 0, 0, 44100)
+	audioConfig.adev[0].defined = 1
+	audioConfig.achan[0].num_freq = 1
+	audioConfig.achan[0].profiles = profile
+	audioConfig.achan[0].fix_bits = RETRY_NONE
+	audioConfig.achan[0].layer2_xmit = layer2
+	audioConfig.achan[0].il2p_max_fec = 1
+	audioConfig.achan[0].il2p_crc = true
+
+	return audioConfig
+}
+
+// What the tone generator sends over BPSK, as AX.25 or as IL2P, the
+// demodulator decodes back, at each of the NinoTNC's rates.
+func TestBPSKLayer2RoundTrip(t *testing.T) {
+	t.Parallel()
+
+	for _, layer2 := range []phy.Layer2{LAYER2_AX25, LAYER2_IL2P} {
+		for _, baud := range []int{300, 1200} {
+			t.Run(fmt.Sprintf("%v/%d", layer2, baud), func(t *testing.T) {
+				t.Parallel()
+
+				var texts, frames = afskTestFrames(t, 2)
+
+				var samples = generateFrames(t, newBPSKTestRadioConfig(baud, layer2, "N"), frames)
+
+				var got, _ = demodulateFrames(t, newBPSKTestRadioConfig(baud, layer2, "N"), samples)
+
+				require.Len(t, got, len(texts))
+
+				for i, pp := range got {
+					assert.Equal(t, texts[i], pp.FormatAddrs()+string(pp.Info()))
+				}
+			})
+		}
 	}
 }

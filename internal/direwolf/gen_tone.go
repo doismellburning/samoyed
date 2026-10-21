@@ -413,9 +413,10 @@ func (tg *ToneGenerator) PutBit(dat int) {
 		dat &= 1 // Keep only LSB to be extra safe.
 
 		// For BPSK, each bit is one symbol.
-		// Bit 1 reverses the phase; bit 0 leaves it unchanged.
+		// Bit 0 reverses the phase; bit 1 leaves it unchanged, as the
+		// NinoTNC does.
 		// The reversal is shaped over the symbol in the sample loop below.
-		tg.bpskReversing = dat == 1
+		tg.bpskReversing = dat == 0
 	}
 
 	if audioConfig.achan[tg.channel].modem_type == MODEM_QPSK {

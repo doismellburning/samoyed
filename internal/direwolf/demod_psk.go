@@ -85,7 +85,8 @@ var DCD_CONFIG_PSK = &DCDConfig{
 	} }
 */
 
-var phase_to_gray_bpsk = [2]int{0, 1}
+// BPSK holds the phase for a 1 and reverses it for a 0, as the NinoTNC does.
+var phase_to_gray_bpsk = [2]int{1, 0}
 var phase_to_gray_v26 = [4]int{0, 1, 3, 2}
 var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
 
