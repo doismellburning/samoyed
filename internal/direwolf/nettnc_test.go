@@ -270,6 +270,45 @@ func TestNetTNCSendPacketWriteErrorClosesTheConnection(t *testing.T) {
 	assert.Nil(t, nt.getSock(), "the connection was not given up after the write failed")
 }
 
+// A TNC that stops reading leaves a packet nowhere to go once the socket
+// buffers fill.  sendPacket runs on whoever is transmitting - the digipeater,
+// a beacon, a client's handler - so rather than leave them waiting for ever,
+// it gives up on the TNC after a while, and the listening goroutine reattaches.
+func TestNetTNCSendPacketGivesUpOnATNCThatStopsReading(t *testing.T) {
+	t.Parallel()
+
+	var nt, _, conns = attachTestNetTNC(t.Context(), t, nil)
+
+	nt.writeTimeout = 50 * time.Millisecond
+
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = "Q1TEST"
+	addrs[ax25.Source] = "Q2TEST"
+
+	// As big as a frame gets, so the buffers fill in fewer of them.
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUTEST, 0, 0, []byte(strings.Repeat("x", ax25.MaxInfoLen)))
+	require.NotNil(t, pp)
+
+	// The fake TNC never reads its end, so sooner or later a send can't go.
+	var gaveUp = make(chan struct{})
+
+	go func() {
+		defer close(gaveUp)
+
+		for nt.sendPacket(nettncTestChannel, pp) {
+		}
+	}()
+
+	select {
+	case <-gaveUp:
+	case <-time.After(20 * time.Second):
+		t.Fatal("sending to a TNC that stopped reading never gave up")
+	}
+
+	// Given up on, and attached to afresh.
+	nextTestNetTNCConn(t, conns)
+}
+
 // A network TNC is somebody else's process, and it can restart.  Losing the
 // connection is not losing the channel: we attach again and carry on.
 func TestNetTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
