@@ -316,11 +316,12 @@ func netTNC() kissTNC {
 	return kissTNC{source: dwcore.SourceNetTNC, name: "network TNC", spectrum: "Network TNC"}
 }
 
-// tncRecByte takes one byte from an external KISS TNC, and passes each frame
-// it completes to recFrame - as though it came from a radio channel, the one
-// the TNC is attached to, whatever channel the frame itself names.
-// Anything outside a frame is not ours to answer, so it's ignored.  With no
-// recFrame, frames are dropped.
+// tncRecByte takes one byte from an external KISS TNC, and passes each data
+// frame it completes to recFrame - as though it came from a radio channel, the
+// one the TNC is attached to, whatever port the frame itself names.
+// Any other command - a reply to SETHARDWARE, say - carries no received
+// packet, so it's dropped.  Anything outside a frame is not ours to answer, so
+// it's ignored.  With no recFrame, frames are dropped.
 func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC, recFrame frameReceiver) {
 	var chunk = kc.Add(b)
 
@@ -350,13 +351,22 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
 		return
 	}
 
+	// The lower nybble of the type byte is the command; the upper one, the
+	// port, is not ours to go by.
+	var command = unwrapped[0] & 0x0f
+	if command != kiss.CmdDataFrame {
+		logrus.WithFields(logrus.Fields{"channel": channel, "tnc": tnc.name, "command": command}).Debug("KISS frame from TNC is not a data frame; ignoring it")
+
+		return
+	}
+
 	if debug >= 2 {
 		/* Append CRC to this and it goes out over the radio. */
 		var entry = logrus.WithField("channel", channel)
 
 		entry.Debug("Frame content after removing KISS framing and any escapes")
 		/* Don't include the "type" indicator. */
-		/* It contains the radio channel and type should always be 0 here. */
+		/* It contains the port, and the command, which is always data here. */
 		dwutil.LogHexDump(entry, logrus.DebugLevel, unwrapped[1:])
 	}
 
