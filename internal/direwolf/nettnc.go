@@ -74,11 +74,13 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [M
 
 	for i := range MAX_TOTAL_CHANS {
 		if pa.chan_medium[i] == MEDIUM_NETTNC {
-			logrus.WithFields(logrus.Fields{
+			var log = logrus.WithFields(logrus.Fields{
 				"channel": i,
 				"host":    pa.nettnc_addr[i],
 				"port":    pa.nettnc_port[i],
-			}).Info("Network TNC")
+			})
+
+			log.Info("Network TNC")
 
 			var nt, err = NewNetTNC(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i], recFrame)
 			if err != nil {
@@ -88,6 +90,7 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [M
 					return tncs
 				}
 
+				log.WithError(err).Error("Could not attach to network TNC")
 				os.Exit(1)
 			}
 
