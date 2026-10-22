@@ -66,6 +66,9 @@ type NetTNC struct {
  *
  *		recFrame        - Where frames from the TNCs go; nil to drop them.
  *
+ *		debug           - "-d n" count: 1 shows each KISS frame as it
+ *				  arrives, 2 also what is left once unwrapped.
+ *
  * Returns:	The TNC attached to each NCHANNEL channel, nil for every
  *		other channel.  Exits if one cannot be reached; if
  *		cancelled part way, returns those attached so far.
@@ -75,7 +78,7 @@ type NetTNC struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [MAX_TOTAL_CHANS]*NetTNC {
+func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver, debug int) [MAX_TOTAL_CHANS]*NetTNC {
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
 	for i := range MAX_TOTAL_CHANS {
@@ -88,7 +91,7 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [M
 
 			log.Info("Network TNC")
 
-			var nt, err = NewNetTNC(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i], recFrame)
+			var nt, err = NewNetTNC(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i], recFrame, debug)
 			if err != nil {
 				// A stop that cut the connection short is not a failure to
 				// connect: go back and let the caller tear down.
@@ -134,13 +137,15 @@ func dialNetTNC(ctx context.Context, host string, port int, timeout time.Duratio
  *
  *		recFrame - Where frames from the TNC go; nil to drop them.
  *
+ *		debug	- "-d n" count, as for NewNetTNCs.
+ *
  * Returns:	The attached TNC, or the error connecting to it.
  *
  * Description:	Nothing is read from the TNC until Start is called.
  *
  *--------------------------------------------------------------------*/
 
-func NewNetTNC(ctx context.Context, channel int, host string, port int, recFrame frameReceiver) (*NetTNC, error) {
+func NewNetTNC(ctx context.Context, channel int, host string, port int, recFrame frameReceiver, debug int) (*NetTNC, error) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	var conn, connErr = dialNetTNC(ctx, host, port, nettncDialTimeout)
@@ -156,6 +161,7 @@ func NewNetTNC(ctx context.Context, channel int, host string, port int, recFrame
 	nt.writeTimeout = nettncWriteTimeout
 	nt.dialTimeout = nettncDialTimeout
 	nt.recFrame = recFrame
+	nt.debug = debug
 	nt.setSock(conn)
 
 	return nt, nil
@@ -354,7 +360,9 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
 	if debug > 0 {
 		/* As received over the wire from the TNC. */
 		// May include escaped characters.  What about FEND?
-		// FIXME: make it say which TNC.
+		// The dump below names the channel in the KISS frame, which the TNC
+		// chooses, so say first which TNC, and which of our channels, it is.
+		logrus.WithFields(logrus.Fields{"channel": channel, "tnc": tnc.name}).Debug("KISS frame from external TNC")
 		kiss_debug_print(FROM_CLIENT, "", chunk.Frame)
 	}
 

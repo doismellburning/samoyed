@@ -12,6 +12,7 @@ package direwolf
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,7 +38,7 @@ const serialTNCTestChannel = 4
 func startTestSerialTNC(t *testing.T, device string, recFrame frameReceiver, closeFarEnd func()) (*SerialTNC, context.CancelFunc, <-chan struct{}) {
 	t.Helper()
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, recFrame)
+	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, recFrame, 0)
 	require.NoError(t, err)
 
 	st.reattachDelay = 10 * time.Millisecond
@@ -86,7 +87,7 @@ func nextDLQItem(t *testing.T, dlq *DataLinkQueue) *dlq_item_t {
 func TestSerialTNCAttachFails(t *testing.T) {
 	t.Parallel()
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, "/dev/there-is-no-such-serial-port", 9600, nil)
+	var st, err = NewSerialTNC(serialTNCTestChannel, "/dev/there-is-no-such-serial-port", 9600, nil, 0)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "/dev/there-is-no-such-serial-port")
@@ -119,6 +120,45 @@ func TestSerialTNCReceivedFrameReachesTheQueue(t *testing.T) {
 	assert.Equal(t, pp.FrameData(), item.pp.FrameData())
 }
 
+// With "-d k" the frames from a serial TNC are printed in both the form they
+// arrived in and the form they were decoded to, saying which TNC they came
+// from, so that a TNC that is not being understood can be looked at.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func TestSerialTNCDebugPrints(t *testing.T) {
+	var dlq = NewDataLinkQueue()
+
+	var device, tnc = newTestSerialDevice(t)
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[serialTNCTestChannel] = MediumSerialTNC
+	audioConfig.serialTNCDevice[serialTNCTestChannel] = device
+	audioConfig.serialTNCBaud[serialTNCTestChannel] = 9600
+
+	var ctx, cancel = context.WithCancel(t.Context())
+
+	// The listener cannot be interrupted mid-read, so stop it, and let go of
+	// the port, by hanging up the far end once it has been cancelled.
+	t.Cleanup(func() {
+		cancel()
+		tnc.Close()
+	})
+
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
+		NewSerialTNCs(ctx, audioConfig, dlq.RecFrame, 2)
+
+		var _, writeErr = tnc.Write(kissFrameFor(newTestPacket(t)))
+		require.NoError(t, writeErr)
+
+		// Everything is printed before the frame is passed on.
+		nextDLQItem(t, dlq)
+	})
+
+	assert.Contains(t, output, fmt.Sprintf(`msg="KISS frame from external TNC" channel=%d tnc="serial TNC"`, serialTNCTestChannel))
+	assert.Contains(t, output, `direction=from function="Data frame"`)
+	assert.Contains(t, output, "Frame content after removing KISS framing")
+}
+
 // Starting a TNC twice would have two goroutines splitting what it sends
 // between them, so the second start is refused, and says so.
 //
@@ -126,7 +166,7 @@ func TestSerialTNCReceivedFrameReachesTheQueue(t *testing.T) {
 func TestSerialTNCStartedTwiceComplains(t *testing.T) {
 	var device, tnc = newTestSerialDevice(t)
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, nil)
+	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, nil, 0)
 	require.NoError(t, err)
 
 	st.started.Store(true)
@@ -199,7 +239,7 @@ func TestSerialTNCSendPacketNotAttached(t *testing.T) {
 func TestSerialTNCSendPacketWriteErrorGivesUpThePort(t *testing.T) {
 	var device, tnc = newTestSerialDevice(t)
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, nil)
+	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, nil, 0)
 	require.NoError(t, err)
 
 	t.Cleanup(st.closePort)
@@ -315,7 +355,7 @@ func TestNewSerialTNCsAttachesSerialChannels(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	var tncs = NewSerialTNCs(ctx, audioConfig, dlq.RecFrame)
+	var tncs = NewSerialTNCs(ctx, audioConfig, dlq.RecFrame, 0)
 
 	// The listener cannot be interrupted mid-read, so stop it, and let go of
 	// the port, by hanging up the far end once it has been cancelled.
