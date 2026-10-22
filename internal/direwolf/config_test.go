@@ -2283,6 +2283,8 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				config: "ICHANNEL six\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Equal(-1, c.audio.igate_vchannel)
+					a.Contains(c.output, "Channel number must be numeric for ICHANNEL command")
+					a.NotContains(c.output, "in range of")
 				},
 			},
 			{
@@ -3033,6 +3035,8 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 					for channel := range MAX_TOTAL_CHANS {
 						a.NotEqual(MEDIUM_NETTNC, c.audio.chan_medium[channel])
 					}
+					a.Contains(c.output, "Channel number must be numeric for NCHANNEL command")
+					a.NotContains(c.output, "in range of")
 				},
 			},
 			{
@@ -3161,6 +3165,8 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 					for channel := range MAX_TOTAL_CHANS {
 						a.NotEqual(MediumSerialTNC, c.audio.chan_medium[channel])
 					}
+					a.Contains(c.output, "Channel number must be numeric for SCHANNEL command")
+					a.NotContains(c.output, "in range of")
 				},
 			},
 			{

@@ -1910,7 +1910,11 @@ func handleICHANNEL(ps *parseState) error {
 		return fmt.Errorf("line %d: Missing virtual channel number for ICHANNEL command", ps.line)
 	}
 
-	var ichan, _ = strconv.Atoi(t)
+	var ichan, ichanErr = strconv.Atoi(t)
+	if ichanErr != nil {
+		return fmt.Errorf("line %d: Channel number must be numeric for ICHANNEL command", ps.line)
+	}
+
 	if ichan >= MAX_RADIO_CHANS && ichan < MAX_TOTAL_CHANS {
 		if ps.audio.chan_medium[ichan] == MEDIUM_NONE {
 			ps.audio.chan_medium[ichan] = MEDIUM_IGATE
@@ -1950,7 +1954,11 @@ func handleNCHANNEL(ps *parseState) error {
 
 	var t = ps.split(false)
 	if t != "" {
-		var channel, _ = strconv.Atoi(t)
+		var channel, channelErr = strconv.Atoi(t)
+		if channelErr != nil {
+			return fmt.Errorf("line %d: Channel number must be numeric for NCHANNEL command", ps.line)
+		}
+
 		settings.Channel = &channel
 	}
 
@@ -2020,7 +2028,11 @@ func handleSCHANNEL(ps *parseState) error {
 		return fmt.Errorf("line %d: Missing virtual channel number for SCHANNEL command", ps.line)
 	}
 
-	var channel, _ = strconv.Atoi(t)
+	var channel, channelErr = strconv.Atoi(t)
+	if channelErr != nil {
+		return fmt.Errorf("line %d: Channel number must be numeric for SCHANNEL command", ps.line)
+	}
+
 	if channel < MAX_RADIO_CHANS || channel >= MAX_TOTAL_CHANS {
 		return fmt.Errorf("line %d: SCHANNEL number must be in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 	}
