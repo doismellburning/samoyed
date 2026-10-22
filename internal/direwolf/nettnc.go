@@ -29,6 +29,11 @@ import (
 // it is started.
 const nettncReattachDelay = 5 * time.Second
 
+// nettncWriteTimeout is how long sending a packet to a NetTNC waits for a TNC
+// that has stopped reading before giving up on it.  Packets for an NCHANNEL
+// skip the transmit queue, so the wait is on whoever is transmitting.
+const nettncWriteTimeout = 10 * time.Second
+
 type NetTNC struct {
 	channel       int // NCHANNEL channel number frames from the TNC are received on.
 	host          string
@@ -36,6 +41,7 @@ type NetTNC struct {
 	mu            sync.Mutex    // Guards sock, since listenThread and sendPacket access it from different goroutines.
 	sock          net.Conn      // Socket handle or file descriptor. nil for invalid.
 	reattachDelay time.Duration // Between attempts to reattach.
+	writeTimeout  time.Duration // How long sending a packet waits on the TNC before giving up on it.
 	started       atomic.Bool
 	debug         int
 	recFrame      frameReceiver // Where frames from the TNC go, or nil to drop them.
@@ -134,6 +140,7 @@ func NewNetTNC(ctx context.Context, channel int, host string, port int, recFrame
 	nt.host = host
 	nt.port = port
 	nt.reattachDelay = nettncReattachDelay
+	nt.writeTimeout = nettncWriteTimeout
 	nt.recFrame = recFrame
 	nt.setSock(conn)
 
@@ -415,7 +422,14 @@ func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) bool {
 
 	var kiss_buff = kiss.Encapsulate(frame_buff)
 
-	var _, err = conn.Write(kiss_buff)
+	// We're on the transmitting caller's goroutine, so a TNC that has stopped
+	// reading mustn't hold it up for ever: once the deadline passes, the
+	// write fails, and the connection is given up like any other that fails.
+	var err = conn.SetWriteDeadline(time.Now().Add(nt.writeTimeout))
+	if err == nil {
+		_, err = conn.Write(kiss_buff)
+	}
+
 	if err != nil {
 		logrus.WithError(err).WithField("channel", channel).Error("Error sending packet to KISS network TNC; closing connection")
 		nt.closeSockIfCurrent(conn)
