@@ -591,8 +591,13 @@ x = Silence FX.25 information.`)
 	}
 
 	// Likewise a channel can be AX.25 over UDP to other nodes.
-	var axudpChannels = NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame)
+	var axudpChannels, axudpErr = NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
+
+	if axudpErr != nil {
+		logrus.WithError(axudpErr).Error("Could not open AXUDP channel")
+		td.exit(1)
+	}
 
 	// What everything with a packet to send - KISS, AGW, beacon, digipeater,
 	// IGate, APRStt, the connected-mode link - hands it to, and the transmit

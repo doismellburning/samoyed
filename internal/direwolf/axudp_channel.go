@@ -11,8 +11,8 @@ package direwolf
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -42,9 +42,10 @@ type AXUDPChannel struct {
 
 // NewAXUDPChannels opens the socket for every AXUDP channel in pa and starts
 // listening on it, until ctx is cancelled.  It returns the channel for each
-// AXUDP channel number, nil for every other.  It exits if a socket cannot be
-// opened; if cancelled part way, it returns those opened so far.
-func NewAXUDPChannels(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [MAX_TOTAL_CHANS]*AXUDPChannel {
+// AXUDP channel number, nil for every other, or the error if a socket cannot
+// be opened; if cancelled part way, it returns those opened so far.  The
+// channels opened before an error keep listening until ctx is cancelled.
+func NewAXUDPChannels(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) ([MAX_TOTAL_CHANS]*AXUDPChannel, error) {
 	var channels [MAX_TOTAL_CHANS]*AXUDPChannel
 
 	for i := range MAX_TOTAL_CHANS {
@@ -59,12 +60,13 @@ func NewAXUDPChannels(ctx context.Context, pa *RadioConfig, recFrame frameReceiv
 
 		var ac, err = NewAXUDPChannel(ctx, i, pa.axudp_port[i], pa.axudp_routes[i], recFrame)
 		if err != nil {
+			// A stop that cut the opening short is not a failure to open: go
+			// back and let the caller tear down.
 			if ctx.Err() != nil {
-				return channels
+				return channels, nil //nolint:nilerr // A stop is not a failure to open.
 			}
 
-			logrus.WithField("channel", i).WithError(err).Error("Could not open AXUDP channel")
-			os.Exit(1)
+			return channels, fmt.Errorf("channel %d: %w", i, err)
 		}
 
 		ac.Start(ctx)
@@ -72,7 +74,7 @@ func NewAXUDPChannels(ctx context.Context, pa *RadioConfig, recFrame frameReceiv
 		channels[i] = ac
 	}
 
-	return channels
+	return channels, nil
 }
 
 // NewAXUDPChannel opens the UDP socket for channel on port, sending by routes,

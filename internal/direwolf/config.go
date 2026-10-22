@@ -2107,8 +2107,8 @@ func (ps *parseState) applyAXUDPPORT(settings AXUDPPortSettings) error {
 	}
 
 	// Claim the channel only once all of it has checked out, as NCHANNEL
-	// does: NewAXUDPChannels opens every MEDIUM_AXUDP channel and exits if
-	// it cannot.
+	// does: NewAXUDPChannels opens every MEDIUM_AXUDP channel and fails
+	// startup if it cannot.
 	ps.audio.chan_medium[channel] = MEDIUM_AXUDP
 	ps.audio.axudp_port[channel] = settings.Port
 	ps.audio.axudp_routes[channel] = routes

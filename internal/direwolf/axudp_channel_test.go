@@ -8,6 +8,7 @@ package direwolf
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -379,6 +380,25 @@ func TestAXUDPChannelPortInUse(t *testing.T) {
 	var second, err = NewAXUDPChannel(t.Context(), axudpTestChannel+1, port, noAXUDPRoutes(), nil)
 	require.Error(t, err)
 	assert.Nil(t, second)
+}
+
+// An AXUDP channel whose socket cannot be opened is an error for the caller
+// to act on, not the end of the process.
+func TestNewAXUDPChannelsReturnsErrorWhenPortInUse(t *testing.T) {
+	t.Parallel()
+
+	var ac = openTestAXUDPChannel(t.Context(), t, noAXUDPRoutes(), nil)
+
+	var audio = new(RadioConfig)
+	audio.chan_medium[axudpTestChannel+1] = MEDIUM_AXUDP
+	audio.axudp_port[axudpTestChannel+1] = testAXUDPChannelAddr(t, ac).Port
+	audio.axudp_routes[axudpTestChannel+1] = noAXUDPRoutes()
+
+	var channels, err = NewAXUDPChannels(t.Context(), audio, nil)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), fmt.Sprintf("channel %d", axudpTestChannel+1))
+	assert.Nil(t, channels[axudpTestChannel+1])
 }
 
 // The transmit queue hands a packet for an AXUDP channel to that channel.
