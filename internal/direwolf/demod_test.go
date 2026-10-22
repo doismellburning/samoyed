@@ -28,7 +28,8 @@ func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
 		audioConfig.achan[channel].decimate = 3
 		audioConfig.achan[channel].num_freq = 1
 
-		demod_init(audioConfig)
+		var _, initErr = demod_init(audioConfig)
+		require.NoError(t, initErr)
 
 		for _, entry := range hook.AllEntries() {
 			assert.NotContains(t, entry.Data, "decimate")
@@ -52,7 +53,8 @@ func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 	eas.achan[channel].fix_bits = RETRY_INVERT_SINGLE
 	eas.achan[channel].passall = true
 
-	demod_init(eas)
+	var _, easErr = demod_init(eas)
+	require.NoError(t, easErr)
 
 	assert.Equal(t, RETRY_INVERT_SINGLE, eas.achan[channel].fix_bits)
 	assert.True(t, eas.achan[channel].passall)
@@ -64,7 +66,8 @@ func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 
 	t.Cleanup(hook.Reset)
 
-	demod_init(qpsk)
+	var _, qpskErr = demod_init(qpsk)
+	require.NoError(t, qpskErr)
 
 	var compatibleWith any
 
@@ -87,7 +90,8 @@ func TestDemodInitKeepsAFSKDecimation(t *testing.T) {
 	audioConfig.achan[channel].decimate = 3
 	audioConfig.achan[channel].num_freq = 1
 
-	demod_init(audioConfig)
+	var _, initErr = demod_init(audioConfig)
+	require.NoError(t, initErr)
 
 	assert.Equal(t, 3, audioConfig.achan[channel].decimate)
 }
@@ -108,7 +112,8 @@ func TestDemodInitCapsProfileLetters(t *testing.T) {
 
 	t.Cleanup(hook.Reset)
 
-	var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+	var d, dErr = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+	require.NoError(t, dErr)
 
 	assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
 	assert.Equal(t, "ABDEABDEA", d.profiles)
@@ -144,7 +149,8 @@ func TestDemodInitIgnoresUnknownAFSKProfiles(t *testing.T) {
 
 		var hook = test.NewGlobal()
 
-		var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+		var d, dErr = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+		require.NoError(t, dErr)
 
 		assert.Equal(t, tc.want, d.profiles, tc.profiles)
 
@@ -182,7 +188,8 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 
 		var hook = test.NewGlobal()
 
-		var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+		var d, dErr = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+		require.NoError(t, dErr)
 
 		assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
 		assert.Equal(t, tc.want, d.profiles)
@@ -204,7 +211,8 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 
 	var channel = 0
 	var audioConfig = newTestRadioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
-	var d = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+	var d, dErr = NewDemodulator(channel, audioConfig.achan[channel], 44100)
+	require.NoError(t, dErr)
 
 	var done = make(chan struct{})
 
@@ -236,7 +244,10 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 
 	var before = audioConfig.achan[channel]
 
-	var d = demod_init(audioConfig)[channel]
+	var demodulators, demodulatorsErr = demod_init(audioConfig)
+	require.NoError(t, demodulatorsErr)
+
+	var d = demodulators[channel]
 	require.NotNil(t, d)
 	assert.Equal(t, "AB+", d.profiles)
 	assert.Equal(t, 2, d.NumSubchan(), "+ can't be combined with multiple frequencies, so one per letter")
@@ -254,7 +265,8 @@ func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
 	audioConfig.achan[0].num_freq = 1
 
-	var demodulators = demod_init(audioConfig)
+	var demodulators, demodulatorsErr = demod_init(audioConfig)
+	require.NoError(t, demodulatorsErr)
 
 	require.NotNil(t, demodulators[0])
 	assert.Equal(t, 0, demodulators[0].channel)
@@ -271,7 +283,8 @@ func TestChannelLayout(t *testing.T) {
 	audioConfig.achan[0].num_freq = 1
 	audioConfig.achan[0].profiles = "AB+"
 
-	var receiver = multi_modem_init(audioConfig, 0, 0, new(discardReceiveSink))
+	var receiver, receiverErr = multi_modem_init(audioConfig, 0, 0, new(discardReceiveSink))
+	require.NoError(t, receiverErr)
 
 	var numSubchan, numSlicers = receiver.Layout(0)
 	assert.Equal(t, 2, numSubchan)

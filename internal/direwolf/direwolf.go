@@ -562,7 +562,11 @@ x = Silence FX.25 information.`)
 	var sink = new(radioSink)
 	sink.recFrame = dataLinkQueue.RecFrame
 
-	var layer2Receiver = multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
+	var layer2Receiver, layer2ReceiverErr = multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
+	if layer2ReceiverErr != nil {
+		logrus.WithError(layer2ReceiverErr).Error("Could not set up demodulators")
+		td.exit(1)
+	}
 
 	// The audio statistics report each channel's level, which the
 	// demodulators keep.  Nothing reads a device until recv_init, below.

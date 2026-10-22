@@ -119,7 +119,8 @@ func demodulateFrames(t *testing.T, audioConfig *RadioConfig, samples []int) ([]
 
 	var sink = new(recordingReceiveSink)
 
-	var receiver = multi_modem_init(audioConfig, 0, 0, sink)
+	var receiver, receiverErr = multi_modem_init(audioConfig, 0, 0, sink)
+	require.NoError(t, receiverErr)
 
 	for _, sam := range samples {
 		receiver.ProcessSample(channel, sam)

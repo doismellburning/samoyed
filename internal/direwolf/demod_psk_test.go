@@ -121,12 +121,27 @@ func TestBPSKDelayLineReachesBothTaps(t *testing.T) {
 			}
 
 			var D = new(demodulator_state_s)
-			demod_psk_init(MODEM_BPSK, V26_UNSPECIFIED, samplesPerSec, bps, 'L', D)
+			require.NoError(t, demod_psk_init(MODEM_BPSK, V26_UNSPECIFIED, samplesPerSec, bps, 'L', D))
 
 			assert.Less(t, D.u.psk.soffs, D.u.psk.delay_line_taps, "%d bit/s, %d samples a second", bps, samplesPerSec)
 			assert.Less(t, D.u.psk.coffs, D.u.psk.soffs, "%d bit/s, %d samples a second", bps, samplesPerSec)
 		}
 	}
+}
+
+// A bit rate so low that the bandpass filter would need more taps than
+// there is room for is an error for the caller to act on, not the end of the
+// process.  At 150 bit/s and 44100 samples a second, profile O's prefilter is
+// too long while its delay line and low pass filter still fit.
+func TestPSKPrefilterTooLargeIsAnError(t *testing.T) {
+	t.Parallel()
+
+	var D = new(demodulator_state_s)
+
+	var err = demod_psk_init(MODEM_BPSK, V26_UNSPECIFIED, 44100, 150, 'O', D)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "pre filter")
 }
 
 // The BPSK demodulators' bandpass filters fit below the carrier at each of
@@ -142,7 +157,8 @@ func TestBPSKPrefilterFitsBelowCarrier(t *testing.T) {
 
 		var hook = test.NewGlobal()
 
-		NewDemodulator(0, audioConfig.achan[0], 44100)
+		var _, initErr = NewDemodulator(0, audioConfig.achan[0], 44100)
+		require.NoError(t, initErr)
 
 		assert.Nil(t, lastEntryWithMessage(hook, "Prefilter range doesn't make sense"), "at %d baud", baud)
 
@@ -263,7 +279,8 @@ func TestBPSKReceivesAX25FromNinoTNC(t *testing.T) {
 	var texts, frames = afskTestFrames(t, 1)
 
 	var sink = new(recordingReceiveSink)
-	var receiver = multi_modem_init(newBPSKTestRadioConfig(1200, LAYER2_AX25, "N"), 0, 0, sink)
+	var receiver, receiverErr = multi_modem_init(newBPSKTestRadioConfig(1200, LAYER2_AX25, "N"), 0, 0, sink)
+	require.NoError(t, receiverErr)
 
 	var nudgeTotal int64
 	var symbolCount int

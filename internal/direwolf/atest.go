@@ -246,7 +246,12 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 	 * Initialize the AFSK demodulator and HDLC decoder.
 	 * Needs to be done for each file because they could have different sample rates.
 	 */
-	a.sink.receiver = multi_modem_init(audio, a.fx25Debug, a.il2pDebug, a.sink)
+	var receiver, receiverErr = multi_modem_init(audio, a.fx25Debug, a.il2pDebug, a.sink)
+	if receiverErr != nil {
+		return AtestFileResult{}, fmt.Errorf("could not set up demodulators: %w", receiverErr)
+	}
+
+	a.sink.receiver = receiver
 
 	a.sink.packetsDecoded = 0
 
