@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
@@ -433,6 +434,49 @@ func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 	}
 
 	assert.Nil(t, dlq.Remove(), "an empty KISS frame was taken for a received frame")
+}
+
+// A TNC answers commands too - a SETHARDWARE reply, say - and those frames
+// carry something other than a received packet, even when their contents
+// would pass for one.  Only data frames are passed on.
+func TestNetTNCCommandFramesAreNotPassedOn(t *testing.T) {
+	t.Parallel()
+
+	var pp = newTestPacket(t)
+
+	for _, cmd := range []byte{kiss.CmdTxDelay, kiss.CmdSetHardware, kiss.CmdXKissData, kiss.CmdEndKiss} {
+		var dlq = NewDataLinkQueue()
+
+		var kf = new(kiss.Collector)
+
+		for _, b := range kiss.Encapsulate(append([]byte{cmd}, pp.FrameData()...)) {
+			tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+		}
+
+		assert.Nil(t, dlq.Remove(), "a KISS frame with command %#x was passed on as a received packet", cmd)
+	}
+}
+
+// The port in the type byte's upper nybble is not ours to go by: whatever it
+// says, a data frame is taken as received on the channel the TNC is attached
+// to.
+func TestNetTNCDataFrameOnAnotherPortIsPassedOn(t *testing.T) {
+	t.Parallel()
+
+	var dlq = NewDataLinkQueue()
+
+	var pp = newTestPacket(t)
+
+	var kf = new(kiss.Collector)
+
+	for _, b := range kiss.Encapsulate(append([]byte{0x10 | kiss.CmdDataFrame}, pp.FrameData()...)) {
+		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+	}
+
+	var item = dlq.Remove()
+	require.NotNil(t, item, "a data frame for port 1 was not passed on")
+	assert.Equal(t, pp.FrameData(), item.pp.FrameData())
+	assert.Equal(t, dwcore.ChannelSource(dwcore.SourceNetTNC, nettncTestChannel), item.src)
 }
 
 // A frame too short to be AX.25 cannot be made into a packet, and is reported
