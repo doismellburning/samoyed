@@ -293,6 +293,7 @@ samoyed:
     address: $NODE_A
     alias: QNODEA
     netrom: {nodesInterval: 2, quality: 255}
+  legacy: "FRACK 10"
 EOF
 
 cat > direwolf-b.yaml << EOF
@@ -309,6 +310,7 @@ samoyed:
     address: $NODE_B
     alias: QNODEB
     netrom: {nodesInterval: 2, quality: 255}
+  legacy: "FRACK 10"
 EOF
 
 # --- start the nodes -------------------------------------------------------

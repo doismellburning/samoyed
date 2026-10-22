@@ -279,6 +279,13 @@ agw_b=$(free_port tcp "$udp_a" "$udp_b" "$agw_a")
 # is sent as fast as it is generated rather than in real time, and at 1200
 # baud a window of full-sized INFO frames is more audio than the receiving
 # socket's buffer holds, so the receiver loses it.
+#
+# FRACK, the AX.25 T1 retry interval, is raised from its default of 3s.  The
+# "air" here is two demodulators keeping up with a 48kHz stream each, and on a
+# loaded CI runner a SABME can take over 4s to be answered.  A retry sent
+# before the UA arrives draws a second UA, which per AX.25 resets the link
+# once it is up, throwing away the first frames sent on it - the NET/ROM
+# CONNECT REQUEST among them, which NET/ROM resends only after its own 120s.
 
 cat > direwolf-a.yaml << EOF
 samoyed:
@@ -291,6 +298,7 @@ samoyed:
   agwPort: $agw_a
   kissPorts: [{port: 0}]
   netrom: {callsign: $NODE_A, alias: QNODEA, channel: 0, nodesInterval: 2, quality: 255}
+  legacy: "FRACK 10"
 EOF
 
 cat > direwolf-b.yaml << EOF
@@ -304,6 +312,7 @@ samoyed:
   agwPort: $agw_b
   kissPorts: [{port: 0}]
   netrom: {callsign: $NODE_B, alias: QNODEB, channel: 0, nodesInterval: 2, quality: 255}
+  legacy: "FRACK 10"
 EOF
 
 # --- start the nodes -------------------------------------------------------
