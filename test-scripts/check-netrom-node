@@ -276,8 +276,8 @@ agw_a=$(free_port tcp "$udp_a" "$udp_b")
 agw_b=$(free_port tcp "$udp_a" "$udp_b" "$agw_a")
 
 # --- config files ----------------------------------------------------------
-# As check-netrom-connect's, but with NET/ROM under the node shell, sharing
-# its address and alias.
+# As check-netrom-connect's, raised FRACK and all (see there for why), but
+# with NET/ROM under the node shell, sharing its address and alias.
 
 cat > direwolf-a.yaml << EOF
 samoyed:
@@ -293,6 +293,7 @@ samoyed:
     address: $NODE_A
     alias: QNODEA
     netrom: {nodesInterval: 2, quality: 255}
+  legacy: "FRACK 10"
 EOF
 
 cat > direwolf-b.yaml << EOF
@@ -309,6 +310,7 @@ samoyed:
     address: $NODE_B
     alias: QNODEB
     netrom: {nodesInterval: 2, quality: 255}
+  legacy: "FRACK 10"
 EOF
 
 # --- start the nodes -------------------------------------------------------
