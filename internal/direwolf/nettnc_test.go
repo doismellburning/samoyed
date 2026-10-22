@@ -332,6 +332,46 @@ func TestNetTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
 	}, 10*time.Second, 10*time.Millisecond, "nothing was heard on the reattached connection")
 }
 
+// A TNC that goes away part way through a frame takes that frame with it.
+// What it had sent of it must not be glued to the start of whatever the
+// reattached connection sends, which would turn the new connection's opening
+// FEND into the close of a truncated frame and its first whole frame into
+// noise.
+func TestNetTNCReattachDiscardsAPartialFrame(t *testing.T) {
+	t.Parallel()
+
+	var dlq = NewDataLinkQueue()
+
+	var _, tnc, conns = attachTestNetTNC(t.Context(), t, dlq.RecFrame)
+
+	var pp = newTestPacket(t)
+	var frame = kissFrameFor(pp)
+
+	var _, partialErr = tnc.Write(frame[:len(frame)-5])
+	require.NoError(t, partialErr)
+
+	// TCP delivers the partial frame ahead of the end of the stream, so it is
+	// read and collected before the listener notices the TNC has gone.
+	require.NoError(t, tnc.Close())
+
+	var reattached = nextTestNetTNCConn(t, conns)
+
+	var _, writeErr = reattached.Write(frame)
+	require.NoError(t, writeErr)
+
+	var item *dlq_item_t
+
+	require.Eventually(t, func() bool {
+		item = dlq.Remove()
+
+		return item != nil
+	}, 10*time.Second, 10*time.Millisecond, "nothing was heard on the reattached connection")
+
+	require.NotNil(t, item.pp)
+	assert.Equal(t, pp.FrameData(), item.pp.FrameData(), "the frame heard was not the one the reattached TNC sent")
+	assert.Nil(t, dlq.Remove(), "more than one frame was heard")
+}
+
 // The channel goes away with the rest of the program: a cancelled context
 // stops the listening goroutine and hangs up on the TNC, rather than leaving a
 // goroutine blocked on a read of it forever.

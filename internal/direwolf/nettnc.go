@@ -227,7 +227,7 @@ func (nt *NetTNC) closeSockIfCurrent(conn net.Conn) {
 func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
-	var kstate kiss.Collector // State machine to gather a KISS frame.
+	var kstate = new(kiss.Collector) // State machine to gather a KISS frame.
 
 	defer nt.closeSock()
 
@@ -248,6 +248,10 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 			var newConn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(nt.host, strconv.Itoa(nt.port)))
 			if connErr == nil {
 				nt.setSock(newConn)
+
+				// Whatever was left of a frame when the last connection went
+				// is gone for good; don't prepend it to this one's first.
+				kstate = new(kiss.Collector) // Start with clean state.
 
 				logrus.WithFields(logrus.Fields{
 					"channel": channel,
@@ -291,7 +295,7 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 			for j := range n {
 				// Separate the byte stream into KISS frame(s) and make it
 				// look like this came from a radio channel.
-				tncRecByte(&kstate, buf[j], nt.debug, channel, netTNC(), nt.recFrame)
+				tncRecByte(kstate, buf[j], nt.debug, channel, netTNC(), nt.recFrame)
 			}
 		} // nt.sock != nil
 	} // until cancelled
