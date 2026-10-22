@@ -785,6 +785,18 @@ func Test_config_init_unresolvable_path_is_fatal(t *testing.T) {
 	assert.Contains(t, output, "Could not get absolute path for configuration file direwolf.conf")
 }
 
+// A configuration file that cannot be opened is fatal to startup, but
+// reported to the caller rather than ending the process.
+func Test_config_init_missing_file_is_fatal(t *testing.T) {
+	t.Parallel()
+
+	var report = config_init(filepath.Join(t.TempDir(), "no-such.conf"), new(RadioConfig), new(digipeater.Config),
+		new(digipeater.ConnectedConfig), new(tt_config_s), new(igate_config_s), new(misc_config_s), new(symbols.Data))
+
+	assert.True(t, report.fatal)
+	assert.Equal(t, 1, report.errors)
+}
+
 // --- config_init FILTER / CFILTER syntax validation ---
 
 func Test_config_init_filter_syntax_validation(t *testing.T) {

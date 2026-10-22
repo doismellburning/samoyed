@@ -1493,10 +1493,13 @@ func config_init(fname string, p_audio_config *RadioConfig,
 			fpErr,
 		)
 		rtfm()
-		os.Exit(1)
-	} else {
-		defer fp.Close()
+
+		ps.fatal = true
+
+		return configReport{errors: ps.nerrors, warnings: ps.nwarnings, fatal: ps.fatal}
 	}
+
+	defer fp.Close()
 
 	logrus.WithField("file", absFilePath).Info("Reading config file")
 
