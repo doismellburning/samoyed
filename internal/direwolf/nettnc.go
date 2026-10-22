@@ -34,6 +34,11 @@ const nettncReattachDelay = 5 * time.Second
 // skip the transmit queue, so the wait is on whoever is transmitting.
 const nettncWriteTimeout = 10 * time.Second
 
+// nettncDialTimeout is how long a NetTNC waits for a TNC to answer an attempt
+// to attach, rather than the minutes the operating system would otherwise
+// give a host that silently drops what we send it.
+const nettncDialTimeout = 10 * time.Second
+
 type NetTNC struct {
 	channel       int // NCHANNEL channel number frames from the TNC are received on.
 	host          string
@@ -42,6 +47,7 @@ type NetTNC struct {
 	sock          net.Conn      // Socket handle or file descriptor. nil for invalid.
 	reattachDelay time.Duration // Between attempts to reattach.
 	writeTimeout  time.Duration // How long sending a packet waits on the TNC before giving up on it.
+	dialTimeout   time.Duration // How long each attempt to reattach may take.
 	started       atomic.Bool
 	debug         int
 	recFrame      frameReceiver // Where frames from the TNC go, or nil to drop them.
@@ -103,6 +109,15 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [M
 	return tncs
 }
 
+// dialNetTNC attaches to the network TNC at host and port, giving up once
+// timeout has passed or ctx is cancelled, whichever comes first.
+func dialNetTNC(ctx context.Context, host string, port int, timeout time.Duration) (net.Conn, error) {
+	var dialer = new(net.Dialer)
+	dialer.Timeout = timeout
+
+	return dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        NewNetTNC
@@ -128,7 +143,7 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [M
 func NewNetTNC(ctx context.Context, channel int, host string, port int, recFrame frameReceiver) (*NetTNC, error) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
-	var conn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	var conn, connErr = dialNetTNC(ctx, host, port, nettncDialTimeout)
 	if connErr != nil {
 		return nil, connErr
 	}
@@ -139,6 +154,7 @@ func NewNetTNC(ctx context.Context, channel int, host string, port int, recFrame
 	nt.port = port
 	nt.reattachDelay = nettncReattachDelay
 	nt.writeTimeout = nettncWriteTimeout
+	nt.dialTimeout = nettncDialTimeout
 	nt.recFrame = recFrame
 	nt.setSock(conn)
 
@@ -248,7 +264,7 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 				"port":    nt.port,
 			}).Info("Attempting to reattach to network TNC")
 
-			var newConn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(nt.host, strconv.Itoa(nt.port)))
+			var newConn, connErr = dialNetTNC(ctx, nt.host, nt.port, nt.dialTimeout)
 			if connErr == nil {
 				nt.setSock(newConn)
 
