@@ -840,21 +840,7 @@ func (tq *TransmitQueue) Remove(channel int, prio int) *ax25.Packet {
 	}
 	tq.mu.Lock()
 
-	var result_p *ax25.Packet
-
-	if tq.head[channel][prio] == nil {
-		result_p = nil
-	} else {
-		result_p = tq.head[channel][prio]
-		tq.head[channel][prio] = result_p.Next()
-		result_p.SetNext(nil)
-
-		if tq_is_real_packet(result_p) {
-			tq.length[channel][prio]--
-		}
-	}
-
-	metrics.SetTxQueueDepth(channel, prio, tq.length[channel][prio])
+	var result_p = tq.removeHeadLocked(channel, prio)
 
 	tq.mu.Unlock()
 
@@ -877,6 +863,87 @@ func (tq *TransmitQueue) Remove(channel int, prio int) *ax25.Packet {
 	*/
 	return (result_p)
 } /* end Remove */
+
+// removeHeadLocked is Remove's unlinking, for callers that already hold mu:
+// it takes the packet at the head of the queue, if there is one, and
+// publishes the depth left.
+func (tq *TransmitQueue) removeHeadLocked(channel int, prio int) *ax25.Packet {
+	var pp = tq.head[channel][prio]
+
+	if pp != nil {
+		tq.head[channel][prio] = pp.Next()
+		pp.SetNext(nil)
+
+		if tq_is_real_packet(pp) {
+			tq.length[channel][prio]--
+		}
+	}
+
+	metrics.SetTxQueueDepth(channel, prio, tq.length[channel][prio])
+
+	return pp
+}
+
+// RemoveIf takes the packet at the head of the queue if eligible says it may
+// go, and reports whether there was a packet there to ask about.  Checking
+// and taking it under the one lock is what makes it safe beside Withdraw: a
+// Peek and then a Remove could straddle a Withdraw that took the packet
+// peeked at, so that Remove took one nobody had checked, or nothing at all.
+func (tq *TransmitQueue) RemoveIf(channel int, prio int, eligible func(pp *ax25.Packet) bool) (*ax25.Packet, bool) {
+	tq.mu.Lock()
+	defer tq.mu.Unlock()
+
+	var head = tq.head[channel][prio]
+
+	if head == nil {
+		return nil, false
+	}
+
+	if !eligible(head) {
+		return nil, true
+	}
+
+	return tq.removeHeadLocked(channel, prio), true
+}
+
+// Withdraw takes out of a channel's queues, at both priorities, every packet
+// stale reports is no longer worth sending - one the data link state machine
+// queued that events have since overtaken.  The transmit thread takes a
+// packet off the queue only once the channel is clear to send it, so one
+// still waiting for that can be withdrawn.
+func (tq *TransmitQueue) Withdraw(channel int, stale func(pp *ax25.Packet) bool) {
+	if channel < 0 || channel >= MAX_RADIO_CHANS {
+		return // Never queued here: LMDataRequest hands these straight on.
+	}
+
+	tq.mu.Lock()
+	defer tq.mu.Unlock()
+
+	for prio := range TQ_NUM_PRIO {
+		var prev *ax25.Packet // The last packet kept, or nil while there is none.
+
+		for pp := tq.head[channel][prio]; pp != nil; {
+			var next = pp.Next()
+
+			if tq_is_real_packet(pp) && stale(pp) {
+				if prev == nil {
+					tq.head[channel][prio] = next
+				} else {
+					prev.SetNext(next)
+				}
+
+				pp.SetNext(nil)
+				tq.length[channel][prio]--
+			} else {
+				prev = pp
+			}
+
+			pp = next
+		}
+
+		metrics.SetTxQueueDepth(channel, prio, tq.length[channel][prio])
+	}
+}
 
 /*-------------------------------------------------------------------
  *

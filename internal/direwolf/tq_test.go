@@ -6,6 +6,7 @@ package direwolf
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -358,4 +359,84 @@ func TestAppendForTheIGateChannelWithoutAnIGateHasNotGone(t *testing.T) {
 	testutils.CaptureOutput(t, func() { tq.Append(MAX_RADIO_CHANS, TQ_PRIO_1_LO, pp) })
 
 	assert.False(t, gone)
+}
+
+// drainForTest empties one queue, naming each packet by its information
+// part, or "(seize)" for LMSeizeRequest's null frame.
+func drainForTest(tq *TransmitQueue, channel int, prio int) []string {
+	var names []string
+
+	for pp := tq.Remove(channel, prio); pp != nil; pp = tq.Remove(channel, prio) {
+		if pp.IsNullFrame() {
+			names = append(names, "(seize)")
+		} else {
+			names = append(names, string(pp.Info()))
+		}
+	}
+
+	return names
+}
+
+// Withdraw takes every packet it is told is stale, wherever it is in either
+// queue, and leaves the rest - LMSeizeRequest's null frame among them - in
+// order, with the depth counted to match.
+func TestTqWithdrawTakesOnlyStalePackets(t *testing.T) {
+	t.Parallel()
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[0] = MEDIUM_RADIO
+
+	var tq = newTestTransmitQueue(audioConfig)
+
+	tq.Append(0, TQ_PRIO_1_LO, ax25.FromText("Q1TEST>APRS:stale head", true))
+	tq.LMSeizeRequest(0)
+	tq.Append(0, TQ_PRIO_1_LO, ax25.FromText("Q1TEST>APRS:keep one", true))
+	tq.Append(0, TQ_PRIO_1_LO, ax25.FromText("Q1TEST>APRS:stale middle", true))
+	tq.Append(0, TQ_PRIO_1_LO, ax25.FromText("Q1TEST>APRS:keep two", true))
+	tq.Append(0, TQ_PRIO_1_LO, ax25.FromText("Q1TEST>APRS:stale tail", true))
+	tq.Append(0, TQ_PRIO_0_HI, ax25.FromText("Q1TEST>APRS:stale only", true))
+
+	tq.Withdraw(0, func(pp *ax25.Packet) bool {
+		return strings.HasPrefix(string(pp.Info()), "stale")
+	})
+
+	var want [MAX_RADIO_CHANS][TQ_NUM_PRIO]int
+	want[0][TQ_PRIO_1_LO] = 2
+
+	assert.Equal(t, want, tq.Lengths())
+	assert.Empty(t, drainForTest(tq, 0, TQ_PRIO_0_HI))
+	assert.Equal(t, []string{"(seize)", "keep one", "keep two"}, drainForTest(tq, 0, TQ_PRIO_1_LO))
+}
+
+// RemoveIf takes the head only when it is eligible, and says whether there
+// was a head to ask about, so a caller can tell "not this one" from "none".
+func TestTqRemoveIf(t *testing.T) {
+	t.Parallel()
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[0] = MEDIUM_RADIO
+
+	var tq = newTestTransmitQueue(audioConfig)
+
+	var no = func(*ax25.Packet) bool { return false }
+
+	var yes = func(*ax25.Packet) bool { return true }
+
+	var pp, waiting = tq.RemoveIf(0, TQ_PRIO_1_LO, yes)
+	assert.Nil(t, pp)
+	assert.False(t, waiting, "an empty queue has nothing waiting")
+
+	var first = ax25.FromText("Q1TEST>APRS:first", true)
+	tq.Append(0, TQ_PRIO_1_LO, first)
+	tq.Append(0, TQ_PRIO_1_LO, ax25.FromText("Q1TEST>APRS:second", true))
+
+	pp, waiting = tq.RemoveIf(0, TQ_PRIO_1_LO, no)
+	assert.Nil(t, pp)
+	assert.True(t, waiting)
+	assert.Equal(t, 2, tq.Lengths()[0][TQ_PRIO_1_LO], "an ineligible head stays queued")
+
+	pp, waiting = tq.RemoveIf(0, TQ_PRIO_1_LO, yes)
+	assert.Same(t, first, pp)
+	assert.True(t, waiting)
+	assert.Equal(t, []string{"second"}, drainForTest(tq, 0, TQ_PRIO_1_LO))
 }
