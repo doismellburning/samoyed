@@ -4,10 +4,14 @@
 package direwolf
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/netrom"
+	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -27,7 +31,7 @@ func newTestSharedNode() (*sharedNode, *recordingAGWDataLink, *loggingLinkClient
 	var netrom = new(loggingLinkClients)
 
 	var s = newSharedNode(link, sharedChannel, sharedNodeCall)
-	s.attach(shell, netrom)
+	s.attach(shell, noLinkClients{}, netrom)
 
 	return s, link, shell, netrom
 }
@@ -244,4 +248,107 @@ func TestSharedNodeNetROMOnlyOnItsChannel(t *testing.T) {
 		"data 2 7 Q3TEST-7 Q1TEST-7 207 \"l3\"",
 	}, shell.calls)
 	assert.Empty(t, netrom.calls)
+}
+
+func TestSharedNodeCircuitReporter(t *testing.T) {
+	t.Parallel()
+
+	const agwClient = 3
+
+	var s, _, _, _ = newTestSharedNode()
+	var shellCircuits = new(loggingLinkClients)
+	var agw = new(loggingLinkClients)
+
+	s.attach(noLinkClients{}, shellCircuits, noLinkClients{})
+
+	var r = s.circuitReporter(sharedClient, agw)
+
+	r.LinkEstablished(sharedChannel, sharedClient, sharedNeighbourCall, sharedUserCall, false)
+	r.RecConnData(sharedChannel, sharedClient, sharedNeighbourCall, sharedUserCall, ax25.PIDNetROM, []byte("hi"))
+	r.LinkTerminated(sharedChannel, agwClient, sharedNeighbourCall, sharedUserCall, true)
+
+	assert.Equal(t, []string{
+		"established 1 7 Q3TEST-7 Q2TEST false",
+		"data 1 7 Q3TEST-7 Q2TEST 207 \"hi\"",
+	}, shellCircuits.calls, "the shell's circuits are the shell's")
+	assert.Equal(t, []string{
+		"terminated 1 3 Q3TEST-7 Q2TEST true",
+	}, agw.calls, "the rest are the AGW clients'")
+}
+
+func TestSharedNodeCircuitReporterWithoutAGW(t *testing.T) {
+	t.Parallel()
+
+	var s, _, _, _ = newTestSharedNode()
+
+	var r = s.circuitReporter(sharedClient, nil)
+
+	assert.NotPanics(t, func() {
+		r.LinkTerminated(sharedChannel, 3, sharedNeighbourCall, sharedUserCall, true)
+	})
+}
+
+// A user of the shell connects to a node NET/ROM knows over a circuit, which
+// the NET/ROM node opens through its neighbour, and reports to the shell.
+func TestSharedNodeShellOpensCircuit(t *testing.T) {
+	t.Parallel()
+
+	var link = new(recordingAGWDataLink)
+	var s = newSharedNode(link, sharedChannel, sharedNodeCall)
+
+	var config = netrom.DefaultConfig()
+	config.Channel = sharedChannel
+	config.Callsign = sharedNodeCall
+	config.Alias = sharedNodeAlias
+
+	var netromNode = netrom.New(config, s.netromLink(), func(int, int, *ax25.Packet) {}, s.circuitReporter(sharedClient, nil), netrom.RealClock{}, sharedClient)
+
+	var shell = node.New(node.Config{
+		Address:        sharedNodeCall,
+		Alias:          sharedNodeAlias,
+		Ports:          []node.Port{{Channel: sharedChannel, Description: "AXUDP"}},
+		InfoMessage:    "",
+		ConnectMessage: "",
+	}, s.shellLink(), nil, netromNode, sharedClient)
+
+	s.attach(shell, shell.Circuits(), netromNode)
+
+	// The neighbour says it is a node, and so reachable.
+	var nodes, nodesErr = netrom.EncodeNodes("QNODEB", nil)
+	require.NoError(t, nodesErr)
+
+	var broadcast [ax25.MaxAddrs]string
+	broadcast[ax25.Destination] = netrom.NodesCallsign
+	broadcast[ax25.Source] = sharedNeighbourCall
+
+	var pp = ax25.UFrame(broadcast, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, ax25.PIDNetROM, nodes[0])
+	require.NotNil(t, pp)
+	netromNode.HeardUI(sharedChannel, pp)
+
+	s.LinkEstablished(sharedChannel, sharedClient, sharedUserCall, sharedNodeCall, true)
+	link.taken()
+
+	s.RecConnData(sharedChannel, sharedClient, sharedUserCall, sharedNodeCall, ax25.PIDNoLayer3, []byte("C QNODEB\r"))
+
+	assert.Equal(t, []string{
+		`data 1 7 Q1TEST-7>Q2TEST "QNODEA:Q1TEST-7} Trying QNODEB:Q3TEST-7\r"`,
+		"connect 1 7 Q1TEST-7>Q3TEST-7 0xcf",
+	}, link.taken(), "the NET/ROM node links to its neighbour to open the circuit")
+
+	// The link up, the CONNECT REQUEST goes over it.
+	s.LinkEstablished(sharedChannel, sharedClient, sharedNeighbourCall, sharedNodeCall, false)
+
+	var calls = link.taken()
+	require.Len(t, calls, 1)
+	assert.True(t, strings.HasPrefix(calls[0], "data 1 7 Q1TEST-7>Q3TEST-7 "), calls[0])
+
+	require.Len(t, netromNode.Status().Circuits, 1)
+	assert.Equal(t, sharedUserCall, netromNode.Status().Circuits[0].User, "the circuit is the user's")
+
+	// The user going takes the circuit with them; one still connecting
+	// goes without a word to the far end.
+	s.LinkTerminated(sharedChannel, sharedClient, sharedUserCall, sharedNodeCall, false)
+
+	assert.Empty(t, netromNode.Status().Circuits)
+	assert.Empty(t, link.taken())
 }

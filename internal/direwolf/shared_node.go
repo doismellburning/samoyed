@@ -30,6 +30,11 @@ import (
 // for good.  A neighbour is so greeted as a user is, and NET/ROM ignores the
 // greeting.  NET/ROM asking for such a link before anything has arrived on it
 // takes it over likewise.
+//
+// The shell connects its users onward to other nodes over NET/ROM circuits,
+// which the NET/ROM node reports to whoever holds them: sharedNode's
+// circuitReporter hands the shell's to the shell, and the AGW clients' to
+// them.
 type sharedNode struct {
 	link node.DataLink
 
@@ -49,6 +54,9 @@ type sharedNode struct {
 	// read under mu.
 	shell  linkClients
 	netrom linkClients
+
+	// shellCircuits is told about the shell's circuits.
+	shellCircuits linkClients
 
 	links map[sharedLinkKey]*sharedLink
 }
@@ -86,19 +94,68 @@ func newSharedNode(link node.DataLink, netromChannel int, netromCall string) *sh
 	s.netromCall = netromCall
 	s.shell = noLinkClients{}
 	s.netrom = noLinkClients{}
+	s.shellCircuits = noLinkClients{}
 	s.links = make(map[sharedLinkKey]*sharedLink)
 
 	return s
 }
 
-// attach hands the shared node the shell and the NET/ROM node, which closes
-// the cycle.
-func (s *sharedNode) attach(shell linkClients, netrom linkClients) {
+// attach hands the shared node the shell, what to tell about the shell's
+// circuits, and the NET/ROM node, which closes the cycle.
+func (s *sharedNode) attach(shell linkClients, shellCircuits linkClients, netrom linkClients) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.shell = shell
+	s.shellCircuits = shellCircuits
 	s.netrom = netrom
+}
+
+// circuitReporter is what the NET/ROM node reports circuits to: those of
+// shellClient, the shell's client number, go to the shell, and the rest to
+// agw, which may be nil for no AGW clients.
+func (s *sharedNode) circuitReporter(shellClient int, agw linkClients) *sharedNodeCircuits {
+	var r = new(sharedNodeCircuits)
+	r.shared = s
+	r.shellClient = shellClient
+	r.agw = orNoLinkClients(agw)
+
+	return r
+}
+
+// sharedNodeCircuits is a netrom.Reporter handing each circuit's events to
+// the shell or the AGW clients, by whose circuit it is.
+type sharedNodeCircuits struct {
+	shared      *sharedNode
+	shellClient int
+	agw         linkClients
+}
+
+func (r *sharedNodeCircuits) clientFor(client int) linkClients { //nolint:ireturn // choosing between them is the point
+	if client != r.shellClient {
+		return r.agw
+	}
+
+	r.shared.mu.Lock()
+	defer r.shared.mu.Unlock()
+
+	return r.shared.shellCircuits
+}
+
+func (r *sharedNodeCircuits) LinkEstablished(channel int, client int, remoteCall string, ownCall string, incoming bool) {
+	r.clientFor(client).LinkEstablished(channel, client, remoteCall, ownCall, incoming)
+}
+
+func (r *sharedNodeCircuits) LinkTerminated(channel int, client int, remoteCall string, ownCall string, timeout bool) {
+	r.clientFor(client).LinkTerminated(channel, client, remoteCall, ownCall, timeout)
+}
+
+func (r *sharedNodeCircuits) RecConnData(channel int, client int, remoteCall string, ownCall string, pid int, data []byte) {
+	r.clientFor(client).RecConnData(channel, client, remoteCall, ownCall, pid, data)
+}
+
+func (r *sharedNodeCircuits) OutstandingFramesReply(channel int, client int, ownCall string, remoteCall string, count int) {
+	r.clientFor(client).OutstandingFramesReply(channel, client, ownCall, remoteCall, count)
 }
 
 // clients are the shell and the NET/ROM node, together.
