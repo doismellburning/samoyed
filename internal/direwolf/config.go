@@ -1475,8 +1475,10 @@ func config_init(fname string, p_audio_config *RadioConfig,
 	 */
 	var absFilePath, absFilePathErr = filepath.Abs(fname)
 	if absFilePathErr != nil {
-		logrus.WithError(absFilePathErr).WithField("file", fname).Error("Error getting absolute path for config file")
-		os.Exit(1)
+		ps.errorf("could not get absolute path for configuration file %s: %s", fname, absFilePathErr)
+		ps.fatal = true
+
+		return configReport{errors: ps.nerrors, warnings: ps.nwarnings, fatal: ps.fatal}
 	}
 
 	var fp, fpErr = os.Open(absFilePath) //nolint:gosec
