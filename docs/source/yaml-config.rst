@@ -375,9 +375,17 @@ These are the keys under ``samoyed``:
     ``BYE`` (``B``, ``QUIT``, ``Q``)
         Disconnect.
 
-    ``CONNECT`` (``C``) *port* *callsign*
+    ``CONNECT`` (``C``) *port* *callsign*, or ``CONNECT`` *node*
         Connect onward, from the node's callsign, to the station on that channel.
         The channel can be left out when the node has only one.
+        With no channel, and a node that ``NODES`` lists, by alias or callsign,
+        connect to that node over a NET/ROM circuit instead,
+        however many nodes lie between,
+        as BPQ's ``C`` *node* does.
+        Naming a channel is always a station on it:
+        ``C 6 NPRNOD`` asks for an AX.25 link to ``NPRNOD`` itself,
+        which over AXUDP needs a map for ``NPRNOD``,
+        where ``C NPRNOD`` reaches it through whichever neighbour NET/ROM routes by.
         Typing a line before it connects gives up on it.
         Once connected, everything sent goes to and from the station as it is;
         when the station disconnects, the user is back at the node,

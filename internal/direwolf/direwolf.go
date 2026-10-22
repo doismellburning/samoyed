@@ -671,16 +671,19 @@ x = Silence FX.25 information.`)
 	// A NET/ROM node sharing the node shell's address and alias shares its
 	// client number with the data link too, and reaches the data link, as
 	// the shell does, through sharedNode, which hands each of them its own
-	// links.
+	// links.  The shell's circuits are reported to the shell, through
+	// sharedNode too, and only the AGW clients' to the AGW server.
 	var netromNode *netrom.Node
 
 	var shared *sharedNode
 
 	if config, ok := netromConfig.Get(); ok {
-		var circuitClients netrom.Reporter
+		var agwCircuitClients linkClients
 		if agwServer != nil {
-			circuitClients = agwServer
+			agwCircuitClients = agwServer
 		}
+
+		var circuitClients netrom.Reporter = agwCircuitClients
 
 		var link netrom.DataLink = dataLinkQueue
 		var client = netromClient
@@ -689,6 +692,7 @@ x = Silence FX.25 information.`)
 			shared = newSharedNode(dataLinkQueue, config.Channel, config.Callsign)
 			link = shared.netromLink()
 			client = nodeClient
+			circuitClients = shared.circuitReporter(nodeClient, agwCircuitClients)
 		}
 
 		netromNode = netrom.New(config, link, transmitQueue.Append, circuitClients, netrom.RealClock{}, client)
@@ -819,22 +823,23 @@ x = Silence FX.25 information.`)
 
 	if nodeConfig, ok := nodeConfig.Get(); ok {
 		var link node.DataLink = dataLinkQueue
-		var netromStatus node.NetROMStatus
+		var nodeNetROM node.NetROM
 
 		if shared != nil {
 			link = shared.shellLink()
-			netromStatus = netromNode.Status
+			nodeNetROM = netromNode
 		}
 
-		var nodeShell = node.New(nodeConfig, link, mheardDB.HeardRF, netromStatus, nodeClient)
+		var nodeShell = node.New(nodeConfig, link, mheardDB.HeardRF, nodeNetROM, nodeClient)
 
 		nodeClients = nodeShell
 
 		// Sharing its names with the NET/ROM node, the shell is told about
-		// its links by sharedNode, which can only be handed the two of them
-		// once both exist: that cycle is closed here, before either starts.
+		// its links and circuits by sharedNode, which can only be handed the
+		// two of them once both exist: that cycle is closed here, before
+		// either starts.
 		if shared != nil {
-			shared.attach(nodeShell, netromNode)
+			shared.attach(nodeShell, nodeShell.Circuits(), netromNode)
 			nodeClients = shared
 		}
 

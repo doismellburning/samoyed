@@ -624,13 +624,75 @@ func testNetROM() netrom.Status {
 func connectedWithNetROM(t *testing.T, status netrom.Status) (*Node, *fakeLink) {
 	t.Helper()
 
+	var n, link, _ = connectedWithNetROMOn(t, testConfig(), status)
+
+	return n, link
+}
+
+// fakeNetROM is a NetROM that knows status, and remembers what circuits it is
+// asked to open, send on and close.
+type fakeNetROM struct {
+	status netrom.Status
+
+	// refuse says Connect takes the circuit for none of its own.
+	refuse bool
+
+	mu          sync.Mutex
+	connects    []sent
+	sent        []sent
+	disconnects []string
+}
+
+func (f *fakeNetROM) Status() netrom.Status {
+	return f.status
+}
+
+func (f *fakeNetROM) Connect(channel int, _ int, ownCall string, remoteCall string, pid int) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if pid != ax25.PIDNetROM {
+		panic("circuit asked for with the wrong PID")
+	}
+
+	f.connects = append(f.connects, sent{channel: channel, from: ownCall, to: remoteCall, data: ""})
+
+	return !f.refuse
+}
+
+func (f *fakeNetROM) Send(channel int, _ int, ownCall string, remoteCall string, data []byte) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.sent = append(f.sent, sent{channel: channel, from: ownCall, to: remoteCall, data: string(data)})
+
+	return true
+}
+
+func (f *fakeNetROM) Disconnect(_ int, _ int, _ string, remoteCall string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.disconnects = append(f.disconnects, remoteCall)
+
+	return true
+}
+
+// connectedWithNetROMOn is connectedWithNetROM, for a node configured as
+// config, also giving its NET/ROM node.
+func connectedWithNetROMOn(t *testing.T, config Config, status netrom.Status) (*Node, *fakeLink, *fakeNetROM) {
+	t.Helper()
+
 	var link = new(fakeLink)
-	var n = New(testConfig(), link, noneHeard, func() netrom.Status { return status }, testClient)
+	var nr = new(fakeNetROM)
+	nr.status = status
+
+	var n = New(config, link, noneHeard, nr, testClient)
 
 	n.LinkEstablished(testChannel, testClient, userCall, nodeCall, true)
 	link.reset()
 
-	return n, link
+	return n, link, nr
 }
 
 func TestNodes(t *testing.T) {
@@ -1096,4 +1158,238 @@ func TestUserReturningIsNotHandedOldDownlink(t *testing.T) {
 	// Back at the node, and free to connect again.
 	typeLine(n, "C "+farCall)
 	assert.Equal(t, "SAMNOD:Q1TEST-7} Trying Q3TEST on port 1\r", link.output())
+}
+
+// farNode is a node NET/ROM knows, reached through a neighbour.
+const (
+	farNode     = "Q3TEST-7"
+	farNodeName = "QNODEC:Q3TEST-7"
+)
+
+// connectedOverCircuit makes a node with a user connected to it, and through
+// it over a circuit to farNode, and forgets all that was said on the way.
+func connectedOverCircuit(t *testing.T) (*Node, *fakeLink, *fakeNetROM) {
+	t.Helper()
+
+	var n, link, nr = connectedWithNetROMOn(t, testConfig(), testNetROM())
+
+	typeLine(n, "C "+farNode)
+	n.Circuits().LinkEstablished(testChannel, testClient, farNode, userCall, false)
+	link.reset()
+
+	return n, link, nr
+}
+
+func TestConnectToNode(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"QNODEC", "qnodec", "Q3TEST-7", "q3test-7"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var n, link, nr = connectedWithNetROMOn(t, testConfig(), testNetROM())
+
+			typeLine(n, "C "+name)
+
+			assert.Equal(t, "SAMNOD:Q1TEST-7} Trying QNODEC:Q3TEST-7\r", link.output())
+			assert.Equal(t, []sent{{channel: testChannel, from: userCall, to: farNode, data: ""}}, nr.connects)
+			assert.Empty(t, link.connects)
+
+			link.reset()
+			n.Circuits().LinkEstablished(testChannel, testClient, farNode, userCall, false)
+
+			assert.Equal(t, "SAMNOD:Q1TEST-7} Connected to QNODEC:Q3TEST-7\r", link.output())
+		})
+	}
+}
+
+// Naming the port asks for a station on it, even one that is a node too.
+func TestConnectToNodeOnPort(t *testing.T) {
+	t.Parallel()
+
+	var n, link, nr = connectedWithNetROMOn(t, testConfig(), testNetROM())
+
+	typeLine(n, "C 1 QNODEC")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Trying QNODEC on port 1\r", link.output())
+	assert.Equal(t, []sent{{channel: testChannel, from: nodeCall, to: "QNODEC", data: ""}}, link.connects)
+	assert.Empty(t, nr.connects)
+}
+
+// A name NET/ROM does not know is a station on the only port, as it is
+// without NET/ROM.
+func TestConnectToStationNotNode(t *testing.T) {
+	t.Parallel()
+
+	var n, link, nr = connectedWithNetROMOn(t, testConfig(), testNetROM())
+
+	typeLine(n, "C Q9TEST")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Trying Q9TEST on port 1\r", link.output())
+	assert.Equal(t, []sent{{channel: testChannel, from: nodeCall, to: "Q9TEST", data: ""}}, link.connects)
+	assert.Empty(t, nr.connects)
+}
+
+func TestConnectNoSuchNode(t *testing.T) {
+	t.Parallel()
+
+	var n, link, nr = connectedWithNetROMOn(t, testConfig(onChannels(testChannel, 10)), testNetROM())
+
+	typeLine(n, "C q9test")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} No such node Q9TEST - C port callsign for a station\r", link.output())
+	assert.Empty(t, link.connects)
+	assert.Empty(t, nr.connects)
+}
+
+// A user connected to both the node's callsign and its alias can have one
+// circuit to a node: NET/ROM knows it by their callsign alone.
+func TestConnectToNodeBusy(t *testing.T) {
+	t.Parallel()
+
+	var n, link, nr = connectedWithNetROMOn(t, testConfig(), testNetROM())
+
+	n.LinkEstablished(testChannel, testClient, userCall, nodeAlias, true)
+	typeLine(n, "C QNODEC")
+	link.reset()
+
+	n.RecConnData(testChannel, testClient, userCall, nodeAlias, ax25.PIDNoLayer3, []byte("C QNODEC\r"))
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Busy - you already have a circuit to QNODEC:Q3TEST-7\r", link.output())
+	assert.Len(t, nr.connects, 1)
+}
+
+func TestCircuitPassesDataBothWays(t *testing.T) {
+	t.Parallel()
+
+	var n, link, nr = connectedOverCircuit(t)
+
+	typeLine(n, "BYE")
+	n.Circuits().RecConnData(testChannel, testClient, farNode, userCall, ax25.PIDNetROM, []byte("hi there\r"))
+
+	assert.Equal(t, []sent{{channel: testChannel, from: userCall, to: farNode, data: "BYE\r"}}, nr.sent)
+
+	// As plain text to the user, not as the NET/ROM frame it travelled in.
+	assert.Equal(t, []sent{{channel: testChannel, from: nodeCall, to: userCall, data: "hi there\r"}}, link.sent)
+	assert.Equal(t, []int{ax25.PIDNoLayer3}, link.pids)
+	assert.Empty(t, link.disconnects)
+}
+
+func TestCircuitFails(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		timeout bool
+		want    string
+	}{
+		{"no answer", true, "Failure with QNODEC:Q3TEST-7 - no answer"},
+		{"refused", false, "Failure with QNODEC:Q3TEST-7 - busy"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var n, link, _ = connectedWithNetROMOn(t, testConfig(), testNetROM())
+
+			typeLine(n, "C QNODEC")
+			link.reset()
+
+			n.Circuits().LinkTerminated(testChannel, testClient, farNode, userCall, tc.timeout)
+			typeLine(n, "XYZZY")
+
+			assert.Equal(t, "SAMNOD:Q1TEST-7} "+tc.want+"\r"+invalidCommand, link.output())
+		})
+	}
+}
+
+// A circuit the NET/ROM node will not take at all fails at once.
+func TestCircuitNotNetROMs(t *testing.T) {
+	t.Parallel()
+
+	var n, link, nr = connectedWithNetROMOn(t, testConfig(), testNetROM())
+	nr.refuse = true
+
+	typeLine(n, "C QNODEC")
+	typeLine(n, "XYZZY")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Trying QNODEC:Q3TEST-7\r"+
+		"SAMNOD:Q1TEST-7} Failure with QNODEC:Q3TEST-7 - busy\r"+invalidCommand, link.output())
+}
+
+func TestCircuitDisconnectReturnsToNode(t *testing.T) {
+	t.Parallel()
+
+	var n, link, _ = connectedOverCircuit(t)
+
+	n.Circuits().LinkTerminated(testChannel, testClient, farNode, userCall, false)
+	typeLine(n, "XYZZY")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Disconnected from QNODEC:Q3TEST-7\r"+invalidCommand, link.output())
+}
+
+func TestCircuitCancelled(t *testing.T) {
+	t.Parallel()
+
+	var n, link, nr = connectedWithNetROMOn(t, testConfig(), testNetROM())
+
+	typeLine(n, "C QNODEC")
+	typeLine(n, "XYZZY")
+
+	assert.Equal(t, []string{farNode}, nr.disconnects)
+	assert.Empty(t, link.disconnects)
+
+	link.reset()
+	n.Circuits().LinkTerminated(testChannel, testClient, farNode, userCall, false)
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Gave up on QNODEC:Q3TEST-7\r", link.output())
+}
+
+func TestUserLeavingTakesCircuit(t *testing.T) {
+	t.Parallel()
+
+	var n, link, nr = connectedOverCircuit(t)
+
+	n.LinkTerminated(testChannel, testClient, userCall, nodeCall, false)
+
+	assert.Equal(t, []string{farNode}, nr.disconnects)
+	assert.Empty(t, link.disconnects)
+
+	n.Circuits().LinkTerminated(testChannel, testClient, farNode, userCall, false)
+
+	assert.Empty(t, link.output())
+}
+
+// A circuit and an AX.25 link between the same callsigns are not the same
+// downlink.
+func TestCircuitIsNotALink(t *testing.T) {
+	t.Parallel()
+
+	var n, link, nr = connectedOverCircuit(t)
+
+	n.LinkTerminated(testChannel, testClient, farNode, userCall, false)
+	n.RecConnData(testChannel, testClient, farNode, userCall, ax25.PIDNoLayer3, []byte("hello\r"))
+	typeLine(n, "hi")
+
+	assert.Empty(t, link.output())
+	assert.Equal(t, []sent{{channel: testChannel, from: userCall, to: farNode, data: "hi\r"}}, nr.sent)
+}
+
+func TestHelpWithNetROM(t *testing.T) {
+	t.Parallel()
+
+	var n, link, _ = connectedWithNetROMOn(t, testConfig(), testNetROM())
+
+	typeLine(n, "?")
+
+	assert.Contains(t, link.output(), "  CONNECT, C - Connect to a station: C [port] callsign, or a node: C node\r")
+}
+
+func TestConnectUsageWithNetROM(t *testing.T) {
+	t.Parallel()
+
+	var n, link, _ = connectedWithNetROMOn(t, testConfig(), testNetROM())
+
+	typeLine(n, "C")
+
+	assert.Equal(t, "SAMNOD:Q1TEST-7} Usage: C [port] callsign, or C node\r", link.output())
 }

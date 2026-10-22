@@ -69,11 +69,16 @@ type Port struct {
 	Description string
 }
 
-// linkKey identifies a link the node is answering, as the data link does.
+// linkKey identifies a link the node is answering, as the data link does,
+// or a NET/ROM circuit it has opened for a user, as the NET/ROM node does.
 type linkKey struct {
 	channel    int
 	ownCall    string
 	remoteCall string
+
+	// circuit says this is a NET/ROM circuit, whose own end is the user's
+	// callsign and far end a node's, rather than an AX.25 link.
+	circuit bool
 }
 
 // session is one connected user.
@@ -94,6 +99,10 @@ type session struct {
 	// nil when they are talking to the node.
 	downlink *linkKey
 
+	// downlinkName is what the user is told downlink goes to: the station's
+	// callsign, or a node's alias and callsign.
+	downlinkName string
+
 	// connected says downlink is up, and what the user sends goes to it.
 	connected bool
 
@@ -108,9 +117,16 @@ const maxHeard = 20
 // recently heard first.  (*mheard.DB).HeardRF is one.
 type HeardStations func(limit int) []mheard.Heard
 
-// NetROMStatus is what the NET/ROM node knows now: the nodes it can reach
-// and the neighbours it reaches them through.  (*netrom.Node).Status is one.
-type NetROMStatus func() netrom.Status
+// NetROM is the NET/ROM node, as far as the node needs it: what it knows
+// now - the nodes it can reach and the neighbours it reaches them through -
+// and the circuits a user can be connected onward over.  The node is told
+// what happens on its circuits through Circuits.  *netrom.Node is one.
+type NetROM interface {
+	Status() netrom.Status
+	Connect(channel int, client int, ownCall string, remoteCall string, pid int) bool
+	Send(channel int, client int, ownCall string, remoteCall string, data []byte) bool
+	Disconnect(channel int, client int, ownCall string, remoteCall string) bool
+}
 
 // Node is the node shell.
 type Node struct {
@@ -118,8 +134,9 @@ type Node struct {
 	link   DataLink
 	heard  HeardStations
 
-	// netrom is the NET/ROM node NODES and ROUTES list, or nil for none.
-	netrom NetROMStatus
+	// netrom is the NET/ROM node NODES and ROUTES list, and CONNECT
+	// reaches other nodes through, or nil for none.
+	netrom NetROM
 
 	// client is the client number the data link knows the node by.
 	client int
@@ -139,9 +156,10 @@ type Node struct {
 }
 
 // New makes a node that talks to link as client, lists the stations heard
-// says it has heard, and lists what the NET/ROM node netrom knows, which may
-// be nil for none.  Nothing is registered with the data link until Start.
-func New(config Config, link DataLink, heard HeardStations, netrom NetROMStatus, client int) *Node {
+// says it has heard, and lists and connects through the NET/ROM node netrom,
+// which may be nil for none.  Nothing is registered with the data link until
+// Start.
+func New(config Config, link DataLink, heard HeardStations, netrom NetROM, client int) *Node {
 	var n = new(Node)
 
 	n.config = config
@@ -172,7 +190,7 @@ func (n *Node) Start() {
 // us gets a session and a greeting; a user we were connecting onward is told
 // they are through.
 func (n *Node) LinkEstablished(channel int, _ int, remoteCall string, ownCall string, incoming bool) {
-	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall, circuit: false}
 
 	n.mu.Lock()
 
@@ -207,7 +225,7 @@ func (n *Node) LinkEstablished(channel int, _ int, remoteCall string, ownCall st
 // LinkTerminated is told a link has gone down.  A user's ends their session;
 // a downlink's returns its user to the node.
 func (n *Node) LinkTerminated(channel int, _ int, remoteCall string, ownCall string, timeout bool) {
-	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall, circuit: false}
 
 	n.mu.Lock()
 
@@ -238,8 +256,11 @@ func (n *Node) LinkTerminated(channel int, _ int, remoteCall string, ownCall str
 // taken a line at a time; what they send once connected onward goes to the
 // downlink as it is, and what comes back on the downlink goes to them.
 func (n *Node) RecConnData(channel int, _ int, remoteCall string, ownCall string, pid int, data []byte) {
-	var key = linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall}
+	n.received(linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall, circuit: false}, pid, data)
+}
 
+// received is RecConnData for the link or circuit key names.
+func (n *Node) received(key linkKey, pid int, data []byte) {
 	var lines [][]byte
 
 	n.mu.Lock()
@@ -252,6 +273,12 @@ func (n *Node) RecConnData(channel int, _ int, remoteCall string, ownCall string
 		n.mu.Unlock()
 
 		if forward {
+			// A circuit's data is the user's own, whatever the PID it
+			// travelled under between the nodes.
+			if key.circuit {
+				pid = ax25.PIDNoLayer3
+			}
+
 			n.forward(up, pid, data)
 		}
 
@@ -361,10 +388,15 @@ type command struct {
 }
 
 // commands are the shell's commands, in the order HELP lists them.
-func commands() []command {
+func (n *Node) commands() []command {
+	var connectHelp = "Connect to a station: C [port] callsign"
+	if n.netrom != nil {
+		connectHelp += ", or a node: C node"
+	}
+
 	return []command{
 		{names: byeNames(), help: "Disconnect", run: (*Node).bye},
-		{names: []string{"CONNECT", "C"}, help: "Connect to a station: C [port] callsign", run: (*Node).connect},
+		{names: []string{"CONNECT", "C"}, help: connectHelp, run: (*Node).connect},
 		{names: []string{"HELP", "H", "?"}, help: "List the commands", run: (*Node).help},
 		{names: []string{"INFO", "I"}, help: "About this node", run: (*Node).info},
 		{names: []string{"PORTS", "P"}, help: "List the ports", run: (*Node).ports},
@@ -380,7 +412,7 @@ func (n *Node) command(key linkKey, s *session, line string) bool {
 	var words = strings.Fields(line)
 	var name = strings.ToUpper(words[0])
 
-	for _, c := range commands() {
+	for _, c := range n.commands() {
 		if slices.Contains(c.names, name) {
 			return c.run(n, key, s, words[1:])
 		}
@@ -414,17 +446,17 @@ func isBye(line []byte) bool {
 	return len(words) > 0 && slices.Contains(byeNames(), strings.ToUpper(words[0]))
 }
 
-// connect connects the user onward, to the station named on the port named.
-// The port can be left out when there is only one.
+// connect connects the user onward: to the station named on the port named,
+// or, with no port, over a NET/ROM circuit to the node named.  The port can
+// be left out for a station when there is only one, and the name is not a
+// node's.
 func (n *Node) connect(key linkKey, s *session, args []string) bool {
-	var channel, call, problem = n.connectArgs(args)
+	var down, name, problem = n.connectArgs(key.remoteCall, args)
 	if problem != "" {
 		n.send(key, []byte(n.prompt()+problem+"\r"))
 
 		return true
 	}
-
-	var down = linkKey{channel: channel, ownCall: n.config.Address, remoteCall: call}
 
 	n.mu.Lock()
 
@@ -436,13 +468,19 @@ func (n *Node) connect(key linkKey, s *session, args []string) bool {
 
 	if isUser || isDownlink {
 		n.mu.Unlock()
-		n.send(key, []byte(n.prompt()+"Busy - "+call+" is already connected to this node\r"))
+		var busy = "Busy - " + name + " is already connected to this node"
+		if down.circuit {
+			busy = "Busy - you already have a circuit to " + name
+		}
+
+		n.send(key, []byte(n.prompt()+busy+"\r"))
 
 		return true
 	}
 
 	n.downlinks[down] = key
 	s.downlink = &down
+	s.downlinkName = name
 	s.cancelled = false
 
 	// Anything after CONNECT in the frame was sent before the user could
@@ -451,51 +489,98 @@ func (n *Node) connect(key linkKey, s *session, args []string) bool {
 	s.overlong = false
 	n.mu.Unlock()
 
-	n.send(key, []byte(fmt.Sprintf("%sTrying %s on port %d\r", n.prompt(), call, channel)))
-	n.link.ConnectRequest(addrs(down), 2, down.channel, n.client, ax25.PIDNoLayer3)
+	if !down.circuit {
+		n.send(key, []byte(fmt.Sprintf("%sTrying %s on port %d\r", n.prompt(), name, down.channel)))
+		n.link.ConnectRequest(addrs(down), 2, down.channel, n.client, ax25.PIDNoLayer3)
+
+		return false
+	}
+
+	n.send(key, []byte(n.prompt()+"Trying "+name+"\r"))
+
+	// The NET/ROM node says how it went through Circuits, unless the
+	// circuit was not its to open at all.
+	if !n.netrom.Connect(down.channel, n.client, down.ownCall, down.remoteCall, ax25.PIDNetROM) {
+		n.downlinkTerminated(down, false)
+	}
 
 	return false
 }
 
-// connectArgs makes sense of what was typed after CONNECT: the channel and the
-// callsign to connect to, or what is wrong with them.
-func (n *Node) connectArgs(args []string) (int, string, string) {
-	const usage = "Usage: C [port] callsign"
+// connectArgs makes sense of what was typed after CONNECT by user: the link
+// or circuit to connect them on, and what to call where it goes, or what is
+// wrong with them.
+func (n *Node) connectArgs(user string, args []string) (linkKey, string, string) {
+	var usage = "Usage: C [port] callsign"
+	if n.netrom != nil {
+		usage += ", or C node"
+	}
+
+	var none linkKey
 
 	var channel int
 
 	switch len(args) {
 	case 1:
+		if down, name, ok := n.nodeCircuit(user, args[0]); ok {
+			return down, name, ""
+		}
+
 		if len(n.config.Ports) != 1 {
-			return 0, "", usage
+			if n.netrom != nil {
+				return none, "", "No such node " + strings.ToUpper(args[0]) + " - C port callsign for a station"
+			}
+
+			return none, "", usage
 		}
 
 		channel = n.config.Ports[0].Channel
 	case 2:
 		var number, err = strconv.Atoi(args[0])
 		if err != nil {
-			return 0, "", usage
+			return none, "", usage
 		}
 
 		if !slices.ContainsFunc(n.config.Ports, func(p Port) bool { return p.Channel == number }) {
-			return 0, "", fmt.Sprintf("No port %d - type P for the ports", number)
+			return none, "", fmt.Sprintf("No port %d - type P for the ports", number)
 		}
 
 		channel = number
 	default:
-		return 0, "", usage
+		return none, "", usage
 	}
 
 	var call, ok = Address(args[len(args)-1])
 	if !ok {
-		return 0, "", "Invalid callsign " + args[len(args)-1]
+		return none, "", "Invalid callsign " + args[len(args)-1]
 	}
 
 	if call == n.config.Address || call == n.config.Alias {
-		return 0, "", "That is this node"
+		return none, "", "That is this node"
 	}
 
-	return channel, call, ""
+	return linkKey{channel: channel, ownCall: n.config.Address, remoteCall: call, circuit: false}, call, ""
+}
+
+// nodeCircuit is the NET/ROM circuit to connect user to the node name names,
+// by alias or callsign, and what to call that node, if NET/ROM knows it.  The
+// user's own callsign is the circuit's own end, as the CONNECT REQUEST names
+// whose circuit it is.
+func (n *Node) nodeCircuit(user string, name string) (linkKey, string, bool) {
+	var none linkKey
+
+	if n.netrom == nil {
+		return none, "", false
+	}
+
+	var status = n.netrom.Status()
+
+	var d, ok = findNode(status, name)
+	if !ok {
+		return none, "", false
+	}
+
+	return linkKey{channel: status.Channel, ownCall: user, remoteCall: d.Callsign, circuit: true}, nodeName(d), true
 }
 
 // downlinkUserLocked is the session of the user the downlink key names is
@@ -526,8 +611,12 @@ func (n *Node) downlinkEstablished(key linkKey) {
 
 	// Only the first time: the far end can reset it once it is up.
 	var announce = s != nil && !s.connected && !s.cancelled
+
+	var name string
+
 	if announce {
 		s.connected = true
+		name = s.downlinkName
 
 		// What the user sends goes to the station as it is from here, so
 		// part of a line typed while it came up is no command.
@@ -543,7 +632,7 @@ func (n *Node) downlinkEstablished(key linkKey) {
 
 	switch {
 	case announce:
-		n.send(up, []byte(n.prompt()+"Connected to "+key.remoteCall+"\r"))
+		n.send(up, []byte(n.prompt()+"Connected to "+name+"\r"))
 	case unwanted:
 		n.disconnect(key)
 	}
@@ -562,9 +651,12 @@ func (n *Node) downlinkTerminated(key linkKey, timeout bool) {
 
 	var wasConnected, cancelled bool
 
+	var name string
+
 	if s != nil {
-		wasConnected, cancelled = s.connected, s.cancelled
+		wasConnected, cancelled, name = s.connected, s.cancelled, s.downlinkName
 		s.downlink = nil
+		s.downlinkName = ""
 		s.connected = false
 		s.cancelled = false
 
@@ -583,13 +675,13 @@ func (n *Node) downlinkTerminated(key linkKey, timeout bool) {
 
 	switch {
 	case cancelled:
-		message = "Gave up on " + key.remoteCall
+		message = "Gave up on " + name
 	case wasConnected:
-		message = "Disconnected from " + key.remoteCall
+		message = "Disconnected from " + name
 	case timeout:
-		message = "Failure with " + key.remoteCall + " - no answer"
+		message = "Failure with " + name + " - no answer"
 	default:
-		message = "Failure with " + key.remoteCall + " - busy"
+		message = "Failure with " + name + " - busy"
 	}
 
 	n.send(up, []byte(n.prompt()+message+"\r"))
@@ -601,7 +693,7 @@ func (n *Node) help(key linkKey, _ *session, _ []string) bool {
 
 	b.WriteString(n.prompt() + "Commands:\r")
 
-	for _, c := range commands() {
+	for _, c := range n.commands() {
 		fmt.Fprintf(&b, "  %s - %s\r", strings.Join(c.names, ", "), c.help)
 	}
 
@@ -678,7 +770,7 @@ func (n *Node) nodes(key linkKey, _ *session, args []string) bool {
 		return n.noNetROM(key)
 	}
 
-	var status = n.netrom()
+	var status = n.netrom.Status()
 
 	if len(args) > 0 {
 		n.nodeRoutes(key, status, args[0])
@@ -722,19 +814,12 @@ func (n *Node) nodes(key linkKey, _ *session, args []string) bool {
 // nodeRoutes lists the routes to the node named, by alias or callsign, best
 // first.
 func (n *Node) nodeRoutes(key linkKey, status netrom.Status, name string) {
-	var call, _ = Address(name)
-	name = strings.ToUpper(name)
-
-	var i = slices.IndexFunc(status.Destinations, func(d netrom.DestinationStatus) bool {
-		return d.Callsign == call || (d.Alias != "" && d.Alias == name)
-	})
-	if i < 0 {
-		n.send(key, []byte(n.prompt()+"No such node "+name+"\r"))
+	var d, ok = findNode(status, name)
+	if !ok {
+		n.send(key, []byte(n.prompt()+"No such node "+strings.ToUpper(name)+"\r"))
 
 		return
 	}
-
-	var d = status.Destinations[i]
 
 	var b strings.Builder
 
@@ -745,6 +830,23 @@ func (n *Node) nodeRoutes(key linkKey, status netrom.Status, name string) {
 	}
 
 	n.send(key, []byte(b.String()))
+}
+
+// findNode is the node in status named name, by alias or callsign.
+func findNode(status netrom.Status, name string) (netrom.DestinationStatus, bool) {
+	var call, _ = Address(name)
+	name = strings.ToUpper(name)
+
+	var i = slices.IndexFunc(status.Destinations, func(d netrom.DestinationStatus) bool {
+		return d.Callsign == call || (d.Alias != "" && d.Alias == name)
+	})
+	if i < 0 {
+		var none netrom.DestinationStatus
+
+		return none, false
+	}
+
+	return status.Destinations[i], true
 }
 
 // noAlias is 1 for a node without an alias, which NODES lists after those
@@ -775,7 +877,7 @@ func (n *Node) routes(key linkKey, _ *session, _ []string) bool {
 		return n.noNetROM(key)
 	}
 
-	var status = n.netrom()
+	var status = n.netrom.Status()
 
 	var b strings.Builder
 
@@ -866,13 +968,57 @@ func (n *Node) send(key linkKey, data []byte) {
 
 // forward sends data, with the protocol ID pid, on the link key names: what
 // crosses between a user and the station they are connected to goes as it
-// came.
+// came.  A circuit has no PID of its own to give it.
 func (n *Node) forward(key linkKey, pid int, data []byte) {
+	if key.circuit {
+		n.netrom.Send(key.channel, n.client, key.ownCall, key.remoteCall, data)
+
+		return
+	}
+
 	n.link.XmitDataRequest(addrs(key), 2, key.channel, n.client, pid, data)
 }
 
-// disconnect ends the link key names.  The session goes when the data link
-// says the link has.
+// disconnect ends the link or circuit key names.  The session goes when the
+// data link says the link has, and a downlink when whichever has it says so.
 func (n *Node) disconnect(key linkKey) {
+	if key.circuit {
+		n.netrom.Disconnect(key.channel, n.client, key.ownCall, key.remoteCall)
+
+		return
+	}
+
 	n.link.DisconnectRequest(addrs(key), 2, key.channel, n.client)
 }
+
+// Circuits is told what happens on the NET/ROM circuits the node opens for
+// its users, as the node itself is told about its links: hand it to the
+// NET/ROM node to report them to.
+func (n *Node) Circuits() CircuitEvents {
+	return CircuitEvents{n: n}
+}
+
+// CircuitEvents is what the NET/ROM node tells the node about the circuits
+// it opened for its users.  It has the methods netrom.Reporter asks for.
+type CircuitEvents struct {
+	n *Node
+}
+
+func circuitKey(channel int, remoteCall string, ownCall string) linkKey {
+	return linkKey{channel: channel, ownCall: ownCall, remoteCall: remoteCall, circuit: true}
+}
+
+func (c CircuitEvents) LinkEstablished(channel int, _ int, remoteCall string, ownCall string, _ bool) {
+	c.n.downlinkEstablished(circuitKey(channel, remoteCall, ownCall))
+}
+
+func (c CircuitEvents) LinkTerminated(channel int, _ int, remoteCall string, ownCall string, timeout bool) {
+	c.n.downlinkTerminated(circuitKey(channel, remoteCall, ownCall), timeout)
+}
+
+func (c CircuitEvents) RecConnData(channel int, _ int, remoteCall string, ownCall string, pid int, data []byte) {
+	c.n.received(circuitKey(channel, remoteCall, ownCall), pid, data)
+}
+
+// OutstandingFramesReply is an answer to a question the node never asks.
+func (CircuitEvents) OutstandingFramesReply(int, int, string, string, int) {}

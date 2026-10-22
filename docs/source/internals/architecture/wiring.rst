@@ -127,7 +127,10 @@ in place of the plain ones between the same components.
        nodeshell -> shared [label="node.DataLink\n(instead, sharing names)", style=dotted];
        netrom -> shared [label="netrom.DataLink\n(instead, sharing names)", style=dotted];
        shared -> dlq [label="node.DataLink", style=dotted];
-       nodeshell -> netrom [label="Status\n(node.NetROMStatus)", style=dotted];
+       nodeshell -> netrom [label="node.NetROM\nStatus and circuits", style=dotted];
+       netrom -> shared [label="netrom.Reporter\n(circuitReporter,\ninstead, sharing names)", style=dotted];
+       shared -> nodeshell [label="linkClients\nthe shell's circuits\n(Circuits, attach)", style=dashed];
+       shared -> agw [label="linkClients\nAGW clients' circuits", style=dotted];
        link -> tq [label="linkTransmitter"];
 
        kiss -> xmit [label="timing setters"];
@@ -297,7 +300,14 @@ which hands each of them its own links' events in turn.
 So ``sharedNode`` is made before both,
 and given them (``attach``) once both exist,
 before the shell registers its names or NET/ROM starts.
-The shell is handed NET/ROM's ``Status`` for its ``NODES`` and ``ROUTES``.
+The shell is handed the NET/ROM node as a ``node.NetROM``,
+for its ``NODES`` and ``ROUTES``,
+and for the circuits ``CONNECT`` opens to other nodes.
+The NET/ROM node reports circuits to ``sharedNode``'s ``circuitReporter``
+in place of the AGW server,
+which hands the shell's circuits to the shell's ``Circuits``,
+given it in ``attach`` too,
+and the AGW clients' to the AGW server.
 
 **The audio devices and the demodulators.**
 Each audio device's statistics report its channels' received audio levels,
