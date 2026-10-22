@@ -140,10 +140,7 @@ func NewBeaconService(
 			channel = 0 // For ICHANNEL, use channel 0 call.
 		}
 
-		if bs.modemConfig.chan_medium[channel] == MEDIUM_RADIO ||
-			bs.modemConfig.chan_medium[channel] == MEDIUM_NETTNC ||
-			bs.modemConfig.chan_medium[channel] == MediumSerialTNC ||
-			bs.modemConfig.chan_medium[channel] == MEDIUM_AXUDP {
+		if bs.modemConfig.chan_medium[channel].CarriesAX25() {
 			if !IsNoCall(bs.modemConfig.mycall[channel]) {
 				switch bs.miscConfig.beacon[j].btype {
 				case BEACON_OBJECT:

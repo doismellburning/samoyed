@@ -397,9 +397,7 @@ func (c *RadioConfig) connectedModeAllowed(channel int) bool {
 		return false
 	}
 
-	var m = c.chan_medium[channel]
-
-	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC || m == MediumSerialTNC || m == MEDIUM_AXUDP
+	return c.chan_medium[channel].CarriesAX25()
 }
 
 // describeChannel says what sort of channel channel is, for the node shell's

@@ -195,11 +195,7 @@ func (d *Digipeater) Remember(channel int, pp *ax25.Packet) {
 
 func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	// Network or serial TNC is OK for UI frames where we don't care about timing.
-	if from_chan < 0 || from_chan >= phy.MaxTotalChans ||
-		(d.ports[from_chan].Medium != phy.MediumRadio &&
-			d.ports[from_chan].Medium != phy.MediumNetTNC &&
-			d.ports[from_chan].Medium != phy.MediumSerialTNC &&
-			d.ports[from_chan].Medium != phy.MediumAXUDP) {
+	if from_chan < 0 || from_chan >= phy.MaxTotalChans || !d.ports[from_chan].Medium.CarriesAX25() {
 		logrus.WithField("channel", from_chan).Error("APRS digipeater: Did not expect to receive on invalid channel")
 
 		// Saying so and then carrying on meant indexing the per-channel
