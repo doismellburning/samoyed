@@ -111,6 +111,19 @@ type IL2PTXSettings struct {
 	CRC *bool `yaml:"crc"`
 }
 
+// NetworkTNCSettings describes a network TNC: a virtual channel whose frames
+// go to and come from a KISS TNC over TCP - NCHANNEL.
+type NetworkTNCSettings struct {
+	// Channel is the virtual channel.
+	Channel *int `yaml:"channel"`
+
+	// Host is the TNC's hostname or IP address.
+	Host string `yaml:"host"`
+
+	// Port is the TNC's KISS TCP port.
+	Port *int `yaml:"port"`
+}
+
 // AXUDPPortSettings describes an AXUDP port: a virtual channel whose frames
 // go to and come from other nodes as UDP datagrams.
 type AXUDPPortSettings struct {

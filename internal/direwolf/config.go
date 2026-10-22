@@ -1946,12 +1946,36 @@ func handleNCHANNEL(ps *parseState) error {
 	 *
 	 * FIXME: Can't set mycall for nchannel.
 	 */
+	var settings = new(NetworkTNCSettings)
+
 	var t = ps.split(false)
-	if t == "" {
+	if t != "" {
+		var channel, _ = strconv.Atoi(t)
+		settings.Channel = &channel
+	}
+
+	settings.Host = ps.split(false)
+
+	t = ps.split(false)
+	if t != "" {
+		var port, err = strconv.Atoi(t)
+		if err != nil {
+			return fmt.Errorf("line %d: Invalid TCP port number \"%s\" for NCHANNEL command. Must be in range %d to %d", ps.line, t, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
+		}
+
+		settings.Port = &port
+	}
+
+	return ps.applyNCHANNEL(*settings)
+}
+
+// applyNCHANNEL checks a network TNC and makes its channel a network TNC one.
+func (ps *parseState) applyNCHANNEL(settings NetworkTNCSettings) error {
+	if settings.Channel == nil {
 		return fmt.Errorf("line %d: Missing virtual channel number for NCHANNEL command", ps.line)
 	}
 
-	var nchan, _ = strconv.Atoi(t)
+	var nchan = *settings.Channel
 	if nchan < MAX_RADIO_CHANS || nchan >= MAX_TOTAL_CHANS {
 		return fmt.Errorf("line %d: NCHANNEL number must be in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 	}
@@ -1959,26 +1983,24 @@ func handleNCHANNEL(ps *parseState) error {
 		return fmt.Errorf("line %d: NCHANNEL can't use channel %d because it is already in use", ps.line, nchan)
 	}
 
-	var addr = ps.split(false)
-	if addr == "" {
+	if settings.Host == "" {
 		return fmt.Errorf("line %d: Missing network TNC address for NCHANNEL command", ps.line)
 	}
 
-	t = ps.split(false)
-	if t == "" {
+	if settings.Port == nil {
 		return fmt.Errorf("line %d: Missing network TNC TCP port for NCHANNEL command", ps.line)
 	}
-	var n, nErr = strconv.Atoi(t)
-	if nErr != nil || n < MIN_IP_PORT_NUMBER || n > MAX_IP_PORT_NUMBER {
-		return fmt.Errorf("line %d: Invalid TCP port number \"%s\" for NCHANNEL command. Must be in range %d to %d", ps.line, t, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
+	var port = *settings.Port
+	if port < MIN_IP_PORT_NUMBER || port > MAX_IP_PORT_NUMBER {
+		return fmt.Errorf("line %d: Invalid TCP port number \"%d\" for NCHANNEL command. Must be in range %d to %d", ps.line, port, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
 	}
 
-	// Claim the channel only once the whole line has parsed: NewNetTNCs
+	// Claim the channel only once all of it has checked out: NewNetTNCs
 	// attaches to every MEDIUM_NETTNC channel and exits if it cannot, so a
-	// half-read line would otherwise take the program down at startup.
+	// half-checked one would otherwise take the program down at startup.
 	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
-	ps.audio.nettnc_addr[nchan] = addr
-	ps.audio.nettnc_port[nchan] = n
+	ps.audio.nettnc_addr[nchan] = settings.Host
+	ps.audio.nettnc_port[nchan] = port
 
 	return nil
 }
