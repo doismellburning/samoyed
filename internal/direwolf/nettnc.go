@@ -55,10 +55,10 @@ type NetTNC struct {
  *
  * Inputs:	ctx             - Stops the listening threads when cancelled.
  *
- *		pa              - Address of structure of type RadioConfig.
+ *		pa              - Radio configuration, giving each channel's
+ *				  medium and, for NCHANNEL, its host and port.
  *
- *		debug ? TBD
- *
+ *		recFrame        - Where frames from the TNCs go; nil to drop them.
  *
  * Returns:	The TNC attached to each NCHANNEL channel, nil for every
  *		other channel.  Exits if one cannot be reached; if
@@ -106,20 +106,15 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver) [M
  *
  * Purpose:      Attach to one Network KISS TNC.
  *
- * Inputs:	channel	- channel number from NCHANNEL configuration.
+ * Inputs:	ctx	- Abandons connecting when cancelled.
+ *
+ *		channel	- channel number from NCHANNEL configuration.
  *
  *		host	- Host name or IP address.  Often "localhost".
  *
  *		port	- TCP port number.  Typically 8001.
  *
  *		recFrame - Where frames from the TNC go; nil to drop them.
- *
- *		init_func - Call this function after establishing communication //
- *			with the TNC.  We put it here, so that it can be done//
- *			again automatically if the TNC disappears and we//
- *			reattach to it.//
- *			It must return 0 for success.//
- *			Can be nil if not needed.//
  *
  * Returns:	The attached TNC, or the error connecting to it.
  *
@@ -143,13 +138,6 @@ func NewNetTNC(ctx context.Context, channel int, host string, port int, recFrame
 	nt.writeTimeout = nettncWriteTimeout
 	nt.recFrame = recFrame
 	nt.setSock(conn)
-
-	// TNC initialization if specified.
-
-	//	if (s_tnc_init_func != nil) {
-	//	  e = (*s_tnc_init_func)();
-	//	  return (e);
-	//	}
 
 	return nt, nil
 }
@@ -226,11 +214,13 @@ func (nt *NetTNC) closeSockIfCurrent(conn net.Conn) {
  * Purpose:     Listen for anything from TNC and process it.
  *		Reconnect if something goes wrong and we got disconnected.
  *
- * Inputs:	channel	- Channel number.
+ * Inputs:	ctx	- Stops listening, and hangs up, when cancelled.
+ *		channel	- Channel number.
  *		nt.host, nt.port	- Host & port for re-connection.
  *
  * Outputs:	nt.sock - Socket for communicating with TNC.
- *				  Will be nil if not connected.
+ *				  Will be nil if not connected, and is
+ *				  closed and cleared on return.
  *
  *--------------------------------------------------------------------*/
 
@@ -339,7 +329,7 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
 
 	if debug > 0 {
 		/* As received over the wire from the TNC. */
-		// May include escapted characters.  What about FEND?
+		// May include escaped characters.  What about FEND?
 		// FIXME: make it say which TNC.
 		kiss_debug_print(FROM_CLIENT, "", chunk.Frame)
 	}
@@ -387,13 +377,12 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
  * Inputs:	nt	- Network TNC, or nil if the channel has none.
  *		channel	- Channel number from NCHANNEL configuration.
  *		pp	- Packet object.
- *		b	- A byte from the input stream.
  *
- * Outputs:	Packet is converted to KISS and send to network TNC.
+ * Outputs:	Packet is converted to KISS and sent to network TNC.
+ *		On a write error, the connection is closed, for
+ *		listenThread to reattach.
  *
  * Returns:	Whether the packet was sent.
- *
- * Description:	This does not free the packet object; caller is responsible.
  *
  *-----------------------------------------------------------------*/
 
@@ -436,8 +425,6 @@ func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) bool {
 
 		return false
 	}
-
-	// Do not free packet object;  caller will take care of it.
 
 	return true
 } /* end sendPacket */
