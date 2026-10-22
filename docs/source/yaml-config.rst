@@ -166,11 +166,34 @@ These are the keys under ``samoyed``:
     order, like successive ``KISSPORT`` lines, so ``port: 0`` first drops the
     default port 8001.
 
+``networkTNCs``
+    Network TNCs (``NCHANNEL``):
+    KISS TNCs reached over TCP,
+    each a virtual channel of its own.
+    Each has:
+
+    ``channel``
+        The virtual channel, outside the radio channels' range, and not
+        otherwise in use.
+
+    ``host``
+        The TNC's hostname or IP address.
+
+    ``port``
+        The TNC's KISS TCP port.
+
+    .. code:: yaml
+
+        samoyed:
+          networkTNCs:
+            - {channel: 6, host: 192.0.2.1, port: 8001}
+
 ``axudpPorts``
     AXUDP ports: AX.25 frames to and from other nodes (BPQ, XRouter, another
-    Samoyed, ...) as UDP datagrams, each port a virtual channel of its own, as
-    ``NCHANNEL`` makes one for a network TNC.  These have no equivalent in Dire
-    Wolf's format.  Each has:
+    Samoyed, ...) as UDP datagrams,
+    each port a virtual channel of its own, like a network TNC.
+    These have no equivalent in Dire Wolf's format.
+    Each has:
 
     ``port``
         The local UDP port, listened on and sent from.

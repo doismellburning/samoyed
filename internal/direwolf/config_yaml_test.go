@@ -255,6 +255,16 @@ channels:
 			yaml:   "agwPort: 99\nkissPorts:\n  - port: 99\n  - {port: 8011, channel: 99}\n",
 		},
 		{
+			name:   "network TNCs",
+			legacy: "NCHANNEL 6 192.0.2.1 8001\nNCHANNEL 7 localhost 8002\n",
+			yaml:   "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001}\n  - {channel: 7, host: localhost, port: 8002}\n",
+		},
+		{
+			name:   "a network TNC on a channel in use is refused the same way",
+			legacy: "NCHANNEL 6 192.0.2.1 8001\nNCHANNEL 6 localhost 8002\n",
+			yaml:   "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001}\n  - {channel: 6, host: localhost, port: 8002}\n",
+		},
+		{
 			name:   "a missing PTT device is refused the same way",
 			legacy: "PTT RIG 101\n",
 			yaml:   "channels:\n  - {channel: 0, ptt: {method: rig, model: \"101\"}}\n",
@@ -287,6 +297,48 @@ legacy: |
 			assert.Equal(t, want.fatal, got.fatal)
 		})
 	}
+}
+
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
+func Test_config_yaml_network_TNCs(t *testing.T) {
+	t.Run("a network TNC makes its channel a network TNC one", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001}\n  - {channel: 7, host: localhost, port: 8002}\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, MEDIUM_NETTNC, c.audio.chan_medium[6])
+		assert.Equal(t, "192.0.2.1", c.audio.nettnc_addr[6])
+		assert.Equal(t, 8001, c.audio.nettnc_port[6])
+		assert.Equal(t, MEDIUM_NETTNC, c.audio.chan_medium[7])
+		assert.Equal(t, "localhost", c.audio.nettnc_addr[7])
+		assert.Equal(t, 8002, c.audio.nettnc_port[7])
+	})
+
+	t.Run("a bad network TNC is refused and claims no channel", func(t *testing.T) {
+		for _, tc := range []struct {
+			name, entry, want string
+		}{
+			{"no channel", "{host: 192.0.2.1, port: 8001}", "Missing virtual channel number"},
+			{"radio channel", "{channel: 0, host: 192.0.2.1, port: 8001}", "must be in range"},
+			{"channel out of range", "{channel: 99, host: 192.0.2.1, port: 8001}", "must be in range"},
+			{"no host", "{channel: 6, port: 8001}", "Missing network TNC address"},
+			{"no port", "{channel: 6, host: 192.0.2.1}", "Missing network TNC TCP port"},
+			{"port out of range", "{channel: 6, host: 192.0.2.1, port: 70000}", "Invalid TCP port number \\\"70000"},
+		} {
+			var c = parseYAMLConfig(t, "networkTNCs:\n  - "+tc.entry+"\n")
+			assert.Equal(t, 1, c.errors, tc.name)
+			assert.Contains(t, c.output, "Line 3", tc.name)
+			assert.Contains(t, c.output, tc.want, tc.name)
+			assert.NotContains(t, c.audio.chan_medium, MEDIUM_NETTNC, tc.name)
+		}
+	})
+
+	t.Run("a network TNC can't take a channel already in use", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001}\n  - {channel: 6, host: 192.0.2.2, port: 8002}\n")
+		assert.Equal(t, 1, c.errors)
+		assert.Contains(t, c.output, "Line 4")
+		assert.Contains(t, c.output, "already in use")
+		assert.Equal(t, "192.0.2.1", c.audio.nettnc_addr[6])
+		assert.Equal(t, 8001, c.audio.nettnc_port[6])
+	})
 }
 
 //nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.

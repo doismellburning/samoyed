@@ -43,7 +43,7 @@ the rest are *virtual* channels.
      - ``ICHANNEL`` - APRS-IS, offered to client applications as a port
      - 6 to 15
    * - ``MEDIUM_NETTNC``
-     - ``NCHANNEL`` - a remote TNC reached by KISS over TCP
+     - ``NCHANNEL``, or ``networkTNCs`` in the :doc:`../yaml-config` - a remote TNC reached by KISS over TCP
      - 6 to 15
    * - ``MediumSerialTNC``
      - ``SCHANNEL`` - a TNC reached by KISS over a serial port
@@ -148,7 +148,7 @@ References
   and `internal/phy/consts.go <https://github.com/doismellburning/samoyed/blob/main/internal/phy/consts.go>`__ - the channel limits
 * `internal/direwolf/config.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/config.go>`__ -
   ``ICHANNEL``, ``NCHANNEL``, ``SCHANNEL``, the AXUDP port checks, ``DIGIPEAT``, ``REGEN``, ``CDIGIPEAT``, ``FILTER``, ``CFILTER``, ``TTOBJ``, ``IGTXVIA`` and the IGate ``MYCALL`` checks
-* `internal/direwolf/config_yaml.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/config_yaml.go>`__ - ``axudpPorts``
+* `internal/direwolf/config_yaml.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/config_yaml.go>`__ - ``networkTNCs`` and ``axudpPorts``
 * `internal/direwolf/tq.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/tq.go>`__ -
   ``TransmitQueue.Append``, ``LMDataRequest`` and ``LMSeizeRequest``
 * `internal/direwolf/kiss_frame.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/kiss_frame.go>`__ - KISS client transmit check
