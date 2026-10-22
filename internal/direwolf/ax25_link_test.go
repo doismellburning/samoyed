@@ -871,3 +871,51 @@ func TestLinkResetToV20ResendsUnacknowledgedFrames(t *testing.T) {
 
 	assert.Equal(t, want, queued)
 }
+
+// A SABME retry that T1 queued while the channel was busy is still waiting
+// for it to clear when the UA answering the first SABME arrives.  Sent after
+// the link is up, the far end takes it for a link reset, and its UA to it
+// then resets ours; if it had already sent data, the first I frame we send
+// acknowledges data it no longer counts as sent, so it resets the link again.
+// The UA has to withdraw it.
+func TestUAWithdrawsAConnectRetryStillQueued(t *testing.T) {
+	t.Parallel()
+
+	const myCall = "Q1TEST-7"
+
+	const theirCall = "Q2TEST-7"
+
+	const channel = 0
+
+	var radio = new(RadioConfig)
+	radio.chan_medium[channel] = MEDIUM_RADIO
+
+	var tq = newTestTransmitQueue(radio)
+	var link = setupTestEnvV22(t)
+	link.queue = tq
+
+	initiateConnect(t, link, myCall, theirCall, channel)
+
+	var first = tq.Remove(channel, TQ_PRIO_1_LO)
+	require.NotNil(t, first, "the first SABME should have been queued")
+	require.Equal(t, ax25.FrameTypeUSABME, first.FrameTypeOnly())
+
+	t1_expiry(link.listHead)
+	require.Equal(t, 1, tq.Count(channel, TQ_PRIO_1_LO, myCall, theirCall, false), "T1 should have queued a retry")
+
+	var addrs [ax25.MaxAddrs]string
+	addrs[OWNCALL] = theirCall
+	addrs[PEERCALL] = myCall
+	receiveFrame(t, link, ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil), channel)
+	require.Equal(t, state_3_connected, link.listHead.state)
+
+	var sent []ax25.FrameType
+
+	for _, prio := range []int{TQ_PRIO_0_HI, TQ_PRIO_1_LO} {
+		for pp := tq.Remove(channel, prio); pp != nil; pp = tq.Remove(channel, prio) {
+			sent = append(sent, pp.FrameTypeOnly())
+		}
+	}
+
+	assert.Equal(t, []ax25.FrameType{ax25.FrameTypeUXID}, sent, "only the XID negotiation should be left to send")
+}

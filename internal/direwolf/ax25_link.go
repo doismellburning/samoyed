@@ -289,19 +289,23 @@ func (noLinkClients) LinkTerminated(int, int, string, string, bool)        {}
 func (noLinkClients) RecConnData(int, int, string, string, int, []byte)    {}
 func (noLinkClients) OutstandingFramesReply(int, int, string, string, int) {}
 
-// linkTransmitter is where the link's frames go to be transmitted, and where
-// it asks for a channel to be seized before sending.  *TransmitQueue is one.
+// linkTransmitter is where the link's frames go to be transmitted, where it
+// asks for a channel to be seized before sending, and where it withdraws
+// frames still waiting to go that events have overtaken.  *TransmitQueue is
+// one.
 type linkTransmitter interface {
 	LMDataRequest(channel int, prio int, pp *ax25.Packet)
 	LMSeizeRequest(channel int)
+	Withdraw(channel int, stale func(pp *ax25.Packet) bool)
 }
 
 // noLinkTransmitter is the linkTransmitter for when there is nowhere to send
 // frames: it drops them, and never grants a seize.
 type noLinkTransmitter struct{}
 
-func (noLinkTransmitter) LMDataRequest(int, int, *ax25.Packet) {}
-func (noLinkTransmitter) LMSeizeRequest(int)                   {}
+func (noLinkTransmitter) LMDataRequest(int, int, *ax25.Packet)     {}
+func (noLinkTransmitter) LMSeizeRequest(int)                       {}
+func (noLinkTransmitter) Withdraw(int, func(pp *ax25.Packet) bool) {}
 
 /*
  * AX.25 data link state machine.
@@ -4453,6 +4457,29 @@ func dm_frame(S *ax25_dlsm_t, f int) {
  *
  *------------------------------------------------------------------------------*/
 
+// withdraw_connect_retries takes back any SABM or SABME for this link that
+// T1 queued as a retry and that is still waiting for a clear channel, now
+// that a UA has answered an earlier one.
+//
+// That happens whenever T1 runs out before the UA arrives - a slow far end,
+// or a busy channel - and the retry then waits behind the far end's own
+// transmission, the one carrying the UA.  Sent once we are connected, the
+// far end takes it for a link reset and sets its sequence numbers back to 0.
+// Its UA to the retry then reaches us connected, where it is unexpected and
+// resets our end too; and if the far end had already sent data, as a node
+// greeting a caller has, the first I frame we send acknowledges data it no
+// longer counts as sent, an N(R) error that makes it reset the link again.
+// Our I frames in flight are lost along the way.
+func withdraw_connect_retries(S *ax25_dlsm_t) {
+	S.services.queue.Withdraw(S.channel, func(pp *ax25.Packet) bool {
+		var frameType = pp.FrameTypeOnly()
+
+		return (frameType == ax25.FrameTypeUSABM || frameType == ax25.FrameTypeUSABME) &&
+			pp.AddrWithSSID(ax25.Source) == S.addrs[OWNCALL] &&
+			pp.AddrWithSSID(ax25.Destination) == S.addrs[PEERCALL]
+	})
+}
+
 func ua_frame(S *ax25_dlsm_t, f int) {
 	switch S.state {
 	case state_0_disconnected:
@@ -4553,6 +4580,8 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 			// respond with an FRMR of the XID command and the default version 2.0 parameters will
 			// be used. If the other station is using version 2.2 or better, it will respond with an XID
 			// response.
+
+			withdraw_connect_retries(S)
 
 			if S.state == state_5_awaiting_v22_connection {
 				mdl_negotiate_request(S)

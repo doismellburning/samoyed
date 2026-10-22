@@ -874,6 +874,45 @@ func (tq *TransmitQueue) Remove(channel int, prio int) *ax25.Packet {
 	return (result_p)
 } /* end Remove */
 
+// Withdraw takes out of a channel's queues, at both priorities, every packet
+// stale reports is no longer worth sending - one the data link state machine
+// queued that events have since overtaken.  The transmit thread takes a
+// packet off the queue only once the channel is clear to send it, so one
+// still waiting for that can be withdrawn.
+func (tq *TransmitQueue) Withdraw(channel int, stale func(pp *ax25.Packet) bool) {
+	if channel < 0 || channel >= MAX_RADIO_CHANS {
+		return // Never queued here: LMDataRequest hands these straight on.
+	}
+
+	tq.mu.Lock()
+	defer tq.mu.Unlock()
+
+	for prio := range TQ_NUM_PRIO {
+		var prev *ax25.Packet // The last packet kept, or nil while there is none.
+
+		for pp := tq.head[channel][prio]; pp != nil; {
+			var next = pp.Next()
+
+			if tq_is_real_packet(pp) && stale(pp) {
+				if prev == nil {
+					tq.head[channel][prio] = next
+				} else {
+					prev.SetNext(next)
+				}
+
+				pp.SetNext(nil)
+				tq.length[channel][prio]--
+			} else {
+				prev = pp
+			}
+
+			pp = next
+		}
+
+		metrics.SetTxQueueDepth(channel, prio, tq.length[channel][prio])
+	}
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        Peek
