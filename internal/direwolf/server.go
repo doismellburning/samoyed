@@ -1728,11 +1728,7 @@ func (s *AGWServer) handleRadioPortsRequest(client int) {
 	var count = 0
 
 	for j := range MAX_TOTAL_CHANS {
-		if cfg.chan_medium[j] == MEDIUM_RADIO ||
-			cfg.chan_medium[j] == MEDIUM_IGATE ||
-			cfg.chan_medium[j] == MEDIUM_NETTNC ||
-			cfg.chan_medium[j] == MediumSerialTNC ||
-			cfg.chan_medium[j] == MEDIUM_AXUDP {
+		if cfg.chan_medium[j].CarriesAX25() || cfg.chan_medium[j] == MEDIUM_IGATE {
 			count++
 		}
 	}

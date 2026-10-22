@@ -1574,10 +1574,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 		/* When IGate is enabled, all radio channels must have a callsign associated. */
 
-		if len(ps.igate.t2_login) > 0 &&
-			(ps.audio.chan_medium[i] == MEDIUM_RADIO || ps.audio.chan_medium[i] == MEDIUM_NETTNC ||
-				ps.audio.chan_medium[i] == MediumSerialTNC ||
-				ps.audio.chan_medium[i] == MEDIUM_AXUDP) {
+		if len(ps.igate.t2_login) > 0 && ps.audio.chan_medium[i].CarriesAX25() {
 			if IsNoCall(ps.audio.mycall[i]) {
 				ps.errorf("config file: MYCALL must be set for receive channel %d before Rx IGate is allowed", i)
 
@@ -1598,9 +1595,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 	if len(ps.igate.t2_login) > 0 {
 		for j := range MAX_TOTAL_CHANS {
-			if ps.audio.chan_medium[j] == MEDIUM_RADIO || ps.audio.chan_medium[j] == MEDIUM_NETTNC ||
-				ps.audio.chan_medium[j] == MediumSerialTNC ||
-				ps.audio.chan_medium[j] == MEDIUM_AXUDP {
+			if ps.audio.chan_medium[j].CarriesAX25() {
 				if ps.digi.FilterStr[MAX_TOTAL_CHANS][j] == "" {
 					ps.digi.FilterStr[MAX_TOTAL_CHANS][j] = "i/180"
 				}
@@ -3882,10 +3877,7 @@ func handleDIGIPEAT(ps *parseState) error {
 
 	// Channels specified must be radio channels, network or serial TNCs, or AXUDP.
 
-	if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO &&
-		ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC &&
-		ps.audio.chan_medium[from_chan] != MediumSerialTNC &&
-		ps.audio.chan_medium[from_chan] != MEDIUM_AXUDP {
+	if !ps.audio.chan_medium[from_chan].CarriesAX25() {
 		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 	}
 
@@ -3903,10 +3895,7 @@ func handleDIGIPEAT(ps *parseState) error {
 		return fmt.Errorf("config file: TO-channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
 	}
 
-	if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO &&
-		ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC &&
-		ps.audio.chan_medium[to_chan] != MediumSerialTNC &&
-		ps.audio.chan_medium[to_chan] != MEDIUM_AXUDP {
+	if !ps.audio.chan_medium[to_chan].CarriesAX25() {
 		return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 	}
 
@@ -4183,10 +4172,7 @@ func handleFILTER(ps *parseState) error {
 			return fmt.Errorf("config file: Filter FROM-channel must be in range of 0 to %d or \"IG\" on line %d", MAX_TOTAL_CHANS-1, ps.line)
 		}
 
-		if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO &&
-			ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC &&
-			ps.audio.chan_medium[from_chan] != MediumSerialTNC &&
-			ps.audio.chan_medium[from_chan] != MEDIUM_AXUDP {
+		if !ps.audio.chan_medium[from_chan].CarriesAX25() {
 			return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 		}
 
@@ -4219,10 +4205,7 @@ func handleFILTER(ps *parseState) error {
 			return fmt.Errorf("config file: Filter TO-channel must be in range of 0 to %d or \"IG\" on line %d", MAX_TOTAL_CHANS-1, ps.line)
 		}
 
-		if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO &&
-			ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC &&
-			ps.audio.chan_medium[to_chan] != MediumSerialTNC &&
-			ps.audio.chan_medium[to_chan] != MEDIUM_AXUDP {
+		if !ps.audio.chan_medium[to_chan].CarriesAX25() {
 			return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 		}
 
@@ -5188,10 +5171,7 @@ func handleTTOBJ(ps *parseState) error {
 					ps.errorf("config file: Transmit channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
 					x = -1
 					whereToValid = false
-				} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
-					ps.audio.chan_medium[x] != MEDIUM_NETTNC &&
-					ps.audio.chan_medium[x] != MediumSerialTNC &&
-					ps.audio.chan_medium[x] != MEDIUM_AXUDP {
+				} else if !ps.audio.chan_medium[x].CarriesAX25() {
 					ps.errorf("config file, line %d: TTOBJ transmit channel %d is not valid", ps.line, x)
 					x = -1
 					whereToValid = false
@@ -5219,10 +5199,7 @@ func handleTTOBJ(ps *parseState) error {
 								ps.errorf("config file: Transmit channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
 								x = -1
 								whereToValid = false
-							} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
-								ps.audio.chan_medium[x] != MEDIUM_NETTNC &&
-								ps.audio.chan_medium[x] != MediumSerialTNC &&
-								ps.audio.chan_medium[x] != MEDIUM_AXUDP {
+							} else if !ps.audio.chan_medium[x].CarriesAX25() {
 								ps.errorf("config file, line %d: TTOBJ transmit channel %d is not valid", ps.line, x)
 								x = -1
 								whereToValid = false
