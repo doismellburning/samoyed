@@ -144,6 +144,20 @@ func TestPSKPrefilterTooLargeIsAnError(t *testing.T) {
 	assert.Contains(t, err.Error(), "pre filter")
 }
 
+// Likewise a delay line too long to fit.  At 100 bit/s and 44100 samples a
+// second, profile L, which has no prefilter, needs one, while its low pass
+// filter still fits.
+func TestPSKDelayLineTooLargeIsAnError(t *testing.T) {
+	t.Parallel()
+
+	var D = new(demodulator_state_s)
+
+	var err = demod_psk_init(MODEM_BPSK, V26_UNSPECIFIED, 44100, 100, 'L', D)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "delay line")
+}
+
 // The BPSK demodulators' bandpass filters fit below the carrier at each of
 // the NinoTNC's rates.  Profile M's used to reach below 0 Hz at 1200 bit/s
 // once the carrier moved to 1500 Hz.

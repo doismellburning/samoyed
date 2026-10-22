@@ -480,11 +480,8 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 	}
 
 	if D.u.psk.delay_line_taps > MAX_FILTER_SIZE {
-		logrus.WithFields(logrus.Fields{
-			"size":            D.u.psk.delay_line_taps,
-			"max_filter_size": MAX_FILTER_SIZE,
-		}).Error("Calculated delay line size is too large; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE")
-		os.Exit(1)
+		return fmt.Errorf("calculated delay line size %d is larger than the maximum %d; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE",
+			D.u.psk.delay_line_taps, MAX_FILTER_SIZE)
 	}
 
 	if D.u.psk.lp_filter_taps > MAX_FILTER_SIZE {
