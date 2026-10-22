@@ -582,8 +582,13 @@ x = Silence FX.25 information.`)
 	}
 
 	// Or a serial TNC.  (also new in 1.8)
-	var serialTNCs = NewSerialTNCs(ctx, audio_config, dataLinkQueue.RecFrame, d_k_opt)
+	var serialTNCs, serialTNCErr = NewSerialTNCs(ctx, audio_config, dataLinkQueue.RecFrame, d_k_opt)
 	stopIfCancelled(ctx, td)
+
+	if serialTNCErr != nil {
+		logrus.WithError(serialTNCErr).Error("Could not attach to serial TNC")
+		td.exit(1)
+	}
 
 	// Likewise a channel can be AX.25 over UDP to other nodes.
 	var axudpChannels = NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame)

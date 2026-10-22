@@ -2060,8 +2060,8 @@ func handleSCHANNEL(ps *parseState) error {
 	}
 
 	// Claim the channel only once the whole line has parsed, as NCHANNEL
-	// does: NewSerialTNCs attaches to every MediumSerialTNC channel and exits
-	// if it cannot.
+	// does: NewSerialTNCs attaches to every MediumSerialTNC channel and fails
+	// startup if it cannot.
 	ps.audio.chan_medium[channel] = MediumSerialTNC
 	ps.audio.serialTNCDevice[channel] = device
 	ps.audio.serialTNCBaud[channel] = baud

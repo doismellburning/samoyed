@@ -3203,7 +3203,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				},
 			},
 			// NewSerialTNCs attaches to every MediumSerialTNC channel at startup
-			// and exits if it cannot, so a line that is rejected must not leave
+			// and fails if it cannot, so a line that is rejected must not leave
 			// one behind.
 			{
 				name:   "a missing device leaves the channel alone",
