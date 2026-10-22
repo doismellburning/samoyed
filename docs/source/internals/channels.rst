@@ -59,6 +59,18 @@ Radio channel numbers follow the audio devices, so they can have gaps:
 a mono device 0 and a stereo device 1 give channels 0, 2 and 3.
 A virtual channel can't claim a number another channel already has.
 
+An external TNC can have several radios of its own, each a KISS port on it.
+``NCHANNEL chan addr port [kissport]`` and ``SCHANNEL chan device [baud [kissport]]``
+say which of those ports the channel is, from 0 to 15, and 0 if left out.
+Frames sent on the channel go to that port,
+and frames from the TNC's other ports are dropped rather than taken as the channel's,
+with a warning for the first one dropped.
+Each ``NCHANNEL`` and ``SCHANNEL`` has a connection of its own to its TNC,
+so several ``NCHANNEL`` lines can share a TNC only if it sends what it hears to every client,
+and two ``SCHANNEL`` lines can't share a serial device at all:
+each would read part of what the TNC sends.
+The second one naming a device is refused.
+
 Samoyed keeps one IGate channel number, ``igate_vchannel``,
 so it can recognise frames that came from APRS-IS without searching every channel.
 
@@ -151,6 +163,9 @@ References
 * `internal/direwolf/config_yaml.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/config_yaml.go>`__ - ``networkTNCs`` and ``axudpPorts``
 * `internal/direwolf/tq.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/tq.go>`__ -
   ``TransmitQueue.Append``, ``LMDataRequest`` and ``LMSeizeRequest``
+* `internal/direwolf/nettnc.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/nettnc.go>`__
+  and `internal/direwolf/serialtnc.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/serialtnc.go>`__ -
+  the network and serial TNCs, and the KISS port each sends to and takes frames from
 * `internal/direwolf/kiss_frame.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/kiss_frame.go>`__ - KISS client transmit check
 * `internal/direwolf/server.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/server.go>`__ - AGW port list and connected-mode check
 * `internal/direwolf/beacon.go <https://github.com/doismellburning/samoyed/blob/main/internal/direwolf/beacon.go>`__ - beacon ``MYCALL`` choice

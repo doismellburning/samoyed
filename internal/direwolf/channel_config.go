@@ -318,11 +318,15 @@ type RadioConfig struct {
 
 	nettnc_port [MAX_TOTAL_CHANS]int // Network TNC TCP port.
 
+	nettncKISSPort [MAX_TOTAL_CHANS]int // KISS port, 0 to 15, on the network TNC.
+
 	// Applies only to serial TNC type channels.
 
 	serialTNCDevice [MAX_TOTAL_CHANS]string // Serial TNC device name.
 
 	serialTNCBaud [MAX_TOTAL_CHANS]int // Serial TNC baud rate.
+
+	serialTNCKISSPort [MAX_TOTAL_CHANS]int // KISS port, 0 to 15, on the serial TNC.
 
 	// Applies only to AXUDP channels.
 

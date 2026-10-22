@@ -122,6 +122,11 @@ type NetworkTNCSettings struct {
 
 	// Port is the TNC's KISS TCP port.
 	Port *int `yaml:"port"`
+
+	// KISSPort is the KISS port on the TNC, 0 to 15: frames are sent to it,
+	// and frames from the TNC's other KISS ports are dropped.  Left out, it
+	// is 0.
+	KISSPort int `yaml:"kissPort"`
 }
 
 // AXUDPPortSettings describes an AXUDP port: a virtual channel whose frames

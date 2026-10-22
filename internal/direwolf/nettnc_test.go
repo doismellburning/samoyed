@@ -104,14 +104,21 @@ func nextTestNetTNCConn(t *testing.T, conns <-chan net.Conn) net.Conn {
 	}
 }
 
-// attachTestNetTNC attaches channel nettncTestChannel to a fake network TNC,
-// and hands back our end and the TNC's end of the connection.
+// attachTestNetTNC attaches channel nettncTestChannel to KISS port 0 of a fake
+// network TNC, and hands back our end and the TNC's end of the connection.
 func attachTestNetTNC(ctx context.Context, t *testing.T, recFrame frameReceiver) (*NetTNC, net.Conn, <-chan net.Conn) {
+	t.Helper()
+
+	return attachTestNetTNCPort(ctx, t, 0, recFrame)
+}
+
+// attachTestNetTNCPort is attachTestNetTNC for KISS port kissPort on the TNC.
+func attachTestNetTNCPort(ctx context.Context, t *testing.T, kissPort int, recFrame frameReceiver) (*NetTNC, net.Conn, <-chan net.Conn) {
 	t.Helper()
 
 	var port, conns = newTestNetTNC(ctx, t)
 
-	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port, recFrame, 0)
+	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port, kissPort, recFrame, 0)
 	require.NoError(t, err)
 
 	// Reattaching after the TNC goes away waits between attempts; not the
@@ -137,7 +144,7 @@ func TestNetTNCAttachRefused(t *testing.T) {
 	// A port nothing is listening on: one taken and given straight back.
 	var port = testutils.UnusedPortNumber(t)
 
-	var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, nil, 0)
+	var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, 0, nil, 0)
 
 	require.Error(t, err)
 	assert.Nil(t, nt)
@@ -204,7 +211,7 @@ func TestNetTNCReceivedFrameReachesTheQueue(t *testing.T) {
 }
 
 // Transmitting on an NCHANNEL means handing the frame to the TNC as KISS, with
-// the KISS channel set to 0 - the TNC has only the one radio.
+// the KISS port set to 0 unless the channel was configured with another.
 func TestNetTNCSendPacket(t *testing.T) {
 	t.Parallel()
 
@@ -223,6 +230,64 @@ func TestNetTNCSendPacket(t *testing.T) {
 	require.NoError(t, readErr)
 
 	assert.Equal(t, want, got)
+}
+
+// A multi-port TNC is told which of its ports a frame is for in the high
+// nibble of the type byte, so a channel configured for KISS port 3 sends 0x30.
+func TestNetTNCSendPacketToKISSPort(t *testing.T) {
+	t.Parallel()
+
+	var nt, tnc, _ = attachTestNetTNCPort(t.Context(), t, 3, nil)
+
+	var pp = newTestPacket(t)
+
+	require.True(t, nt.sendPacket(nettncTestChannel, pp))
+
+	require.NoError(t, tnc.SetReadDeadline(time.Now().Add(10*time.Second)))
+
+	var want = kiss.Encapsulate(append([]byte{0x30}, pp.FrameData()...))
+	var got = make([]byte, len(want))
+
+	require.NoError(t, readFullFrom(tnc, got))
+
+	assert.Equal(t, want, got)
+}
+
+// Only the configured KISS port's frames are the channel's: one from port 0
+// of a multi-port TNC belongs to another of its radios, and is dropped, while
+// one from port 3 is received.
+func TestNetTNCReceivesOnlyItsKISSPort(t *testing.T) {
+	t.Parallel()
+
+	var dlq = NewDataLinkQueue()
+
+	var _, tnc, _ = attachTestNetTNCPort(t.Context(), t, 3, dlq.RecFrame)
+
+	var other = ax25.FromText("Q2TEST>APRS:other port", true)
+	require.NotNil(t, other)
+
+	var ours = ax25.FromText("Q1TEST>APRS:our port", true)
+	require.NotNil(t, ours)
+
+	// Port 0's frame goes first, so if it weren't dropped it would be the
+	// one taken off the queue.
+	var stream = kiss.Encapsulate(append([]byte{0x00}, other.FrameData()...))
+	stream = append(stream, kiss.Encapsulate(append([]byte{0x30}, ours.FrameData()...))...)
+
+	var _, writeErr = tnc.Write(stream)
+	require.NoError(t, writeErr)
+
+	var item *dlq_item_t
+
+	require.Eventually(t, func() bool {
+		item = dlq.Remove()
+
+		return item != nil
+	}, 10*time.Second, 10*time.Millisecond, "the frame from KISS port 3 never reached the received queue")
+
+	require.NotNil(t, item.pp)
+	assert.Equal(t, ours.FrameData(), item.pp.FrameData())
+	assert.Nil(t, dlq.Remove(), "a frame from another KISS port was received")
 }
 
 // A channel with no NCHANNEL configured has nowhere to send, and says so
@@ -413,7 +478,7 @@ func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	for _, b := range append([]byte("cmd:\r\n"), kissFrameFor(pp)...) {
-		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(0), dlq.RecFrame)
 	}
 
 	var item = dlq.Remove()
@@ -430,7 +495,7 @@ func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	for _, b := range []byte{kiss.FEND, kiss.FEND, kiss.FEND, kiss.FEND} {
-		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(0), dlq.RecFrame)
 	}
 
 	assert.Nil(t, dlq.Remove(), "an empty KISS frame was taken for a received frame")
@@ -450,17 +515,58 @@ func TestNetTNCCommandFramesAreNotPassedOn(t *testing.T) {
 		var kf = new(kiss.Collector)
 
 		for _, b := range kiss.Encapsulate(append([]byte{cmd}, pp.FrameData()...)) {
-			tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+			tncRecByte(kf, b, 0, nettncTestChannel, netTNC(0), dlq.RecFrame)
 		}
 
 		assert.Nil(t, dlq.Remove(), "a KISS frame with command %#x was passed on as a received packet", cmd)
 	}
 }
 
-// The port in the type byte's upper nybble is not ours to go by: whatever it
-// says, a data frame is taken as received on the channel the TNC is attached
-// to.
-func TestNetTNCDataFrameOnAnotherPortIsPassedOn(t *testing.T) {
+// Before KISS ports could be chosen, frames from every port were taken as the
+// channel's, so a channel set up before then for a TNC that labels its frames
+// with another port would quietly stop hearing anything.  The first frame
+// dropped for that is a warning naming the port it came from; the rest are
+// not, so a busy port that isn't ours doesn't fill the log.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
+func TestNetTNCWarnsOnceAboutAnotherPort(t *testing.T) {
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	var dlq = NewDataLinkQueue()
+
+	var kf = new(kiss.Collector)
+
+	var tnc = netTNC(0)
+
+	var frame = kiss.Encapsulate(append([]byte{0x20 | kiss.CmdDataFrame}, newTestPacket(t).FrameData()...))
+
+	for range 3 {
+		for _, b := range frame {
+			tncRecByte(kf, b, 0, nettncTestChannel, tnc, dlq.RecFrame)
+		}
+	}
+
+	assert.Nil(t, dlq.Remove(), "a frame from another KISS port was passed on")
+
+	var warnings []*logrus.Entry
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Level == logrus.WarnLevel {
+			warnings = append(warnings, entry)
+		}
+	}
+
+	require.Len(t, warnings, 1, "want one warning for three frames from another port")
+	assert.Equal(t, 2, warnings[0].Data["kissPort"])
+	assert.Equal(t, 0, warnings[0].Data["ourKISSPort"])
+}
+
+// A data frame for the TNC's KISS port that is ours is taken as received on
+// the channel the TNC is attached to, whichever port that is - the command and
+// port checks don't get in each other's way.
+func TestNetTNCDataFrameOnOurPortIsPassedOn(t *testing.T) {
 	t.Parallel()
 
 	var dlq = NewDataLinkQueue()
@@ -470,11 +576,11 @@ func TestNetTNCDataFrameOnAnotherPortIsPassedOn(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	for _, b := range kiss.Encapsulate(append([]byte{0x10 | kiss.CmdDataFrame}, pp.FrameData()...)) {
-		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(1), dlq.RecFrame)
 	}
 
 	var item = dlq.Remove()
-	require.NotNil(t, item, "a data frame for port 1 was not passed on")
+	require.NotNil(t, item, "a data frame for our port 1 was not passed on")
 	assert.Equal(t, pp.FrameData(), item.pp.FrameData())
 	assert.Equal(t, dwcore.ChannelSource(dwcore.SourceNetTNC, nettncTestChannel), item.src)
 }
@@ -490,7 +596,7 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 
 	var output = captureLogOutput(t, logrus.InfoLevel, func() {
 		for _, b := range kiss.Encapsulate([]byte{0, 'n', 'o', 't', ' ', 'a', 'x', '2', '5'}) {
-			tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+			tncRecByte(kf, b, 0, nettncTestChannel, netTNC(0), dlq.RecFrame)
 		}
 	})
 
@@ -511,7 +617,7 @@ func TestNetTNCFrameEmptyOnceUnescapedIsReported(t *testing.T) {
 
 	var output = captureLogOutput(t, logrus.InfoLevel, func() {
 		for _, b := range []byte{kiss.FEND, kiss.FESC, kiss.FEND} {
-			tncRecByte(kf, b, 2, nettncTestChannel, netTNC(), dlq.RecFrame)
+			tncRecByte(kf, b, 2, nettncTestChannel, netTNC(0), dlq.RecFrame)
 		}
 	})
 
@@ -528,10 +634,10 @@ func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	var output = captureLogOutput(t, logrus.InfoLevel, func() {
-		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(), nil)
+		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(0), nil)
 
 		for range kiss.MaxFrameLen + 10 {
-			tncRecByte(kf, 'x', 0, nettncTestChannel, netTNC(), nil)
+			tncRecByte(kf, 'x', 0, nettncTestChannel, netTNC(0), nil)
 		}
 	})
 
@@ -550,13 +656,13 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 	var kf = new(kiss.Collector)
 
 	var output = captureLogOutput(t, logrus.InfoLevel, func() {
-		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(0), dlq.RecFrame)
 
 		for range kiss.MaxFrameLen + 10 {
-			tncRecByte(kf, 'x', 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+			tncRecByte(kf, 'x', 0, nettncTestChannel, netTNC(0), dlq.RecFrame)
 		}
 
-		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+		tncRecByte(kf, kiss.FEND, 0, nettncTestChannel, netTNC(0), dlq.RecFrame)
 	})
 
 	assert.Contains(t, output, "KISS frame exceeded maximum length; discarding it")
@@ -564,7 +670,7 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 
 	// And a well formed frame after it still gets through.
 	for _, b := range kissFrameFor(newTestPacket(t)) {
-		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(), dlq.RecFrame)
+		tncRecByte(kf, b, 0, nettncTestChannel, netTNC(0), dlq.RecFrame)
 	}
 
 	assert.NotNil(t, dlq.Remove())
@@ -581,7 +687,7 @@ func TestNetTNCDebugPrints(t *testing.T) {
 	var port, conns = newTestNetTNC(t.Context(), t)
 
 	var output = captureLogOutput(t, logrus.DebugLevel, func() {
-		var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, dlq.RecFrame, 2)
+		var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, 0, dlq.RecFrame, 2)
 		require.NoError(t, err)
 
 		nt.Start(t.Context())
@@ -610,16 +716,18 @@ func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 	audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
 	audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
 	audioConfig.nettnc_port[nettncTestChannel] = port
+	audioConfig.nettncKISSPort[nettncTestChannel] = 2
 
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
 	var output = captureLogOutput(t, logrus.InfoLevel, func() { tncs = NewNetTNCs(t.Context(), audioConfig, nil, 0) })
 
-	assert.Contains(t, output, fmt.Sprintf(`msg="Network TNC" channel=%d host=127.0.0.1 port=%d`, nettncTestChannel, port))
+	assert.Contains(t, output, fmt.Sprintf(`msg="Network TNC" channel=%d host=127.0.0.1 kissPort=2 port=%d`, nettncTestChannel, port))
 
 	nextTestNetTNCConn(t, conns)
 
-	assert.NotNil(t, tncs[nettncTestChannel])
+	require.NotNil(t, tncs[nettncTestChannel])
+	assert.Equal(t, 2, tncs[nettncTestChannel].tnc.port)
 	assert.Nil(t, tncs[0], "a radio channel should not have been attached to as a network TNC")
 }
 

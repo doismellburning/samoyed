@@ -310,6 +310,13 @@ func Test_config_yaml_network_TNCs(t *testing.T) {
 		assert.Equal(t, MEDIUM_NETTNC, c.audio.chan_medium[7])
 		assert.Equal(t, "localhost", c.audio.nettnc_addr[7])
 		assert.Equal(t, 8002, c.audio.nettnc_port[7])
+		assert.Equal(t, 0, c.audio.nettncKISSPort[6], "the KISS port defaults to 0")
+	})
+
+	t.Run("a network TNC's KISS port is the one given", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001, kissPort: 3}\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, 3, c.audio.nettncKISSPort[6])
 	})
 
 	t.Run("a bad network TNC is refused and claims no channel", func(t *testing.T) {
@@ -322,6 +329,7 @@ func Test_config_yaml_network_TNCs(t *testing.T) {
 			{"no host", "{channel: 6, port: 8001}", "Missing network TNC address"},
 			{"no port", "{channel: 6, host: 192.0.2.1}", "Missing network TNC TCP port"},
 			{"port out of range", "{channel: 6, host: 192.0.2.1, port: 70000}", "Invalid TCP port number \\\"70000"},
+			{"KISS port out of range", "{channel: 6, host: 192.0.2.1, port: 8001, kissPort: 16}", "Invalid KISS port 16"},
 		} {
 			var c = parseYAMLConfig(t, "networkTNCs:\n  - "+tc.entry+"\n")
 			assert.Equal(t, 1, c.errors, tc.name)

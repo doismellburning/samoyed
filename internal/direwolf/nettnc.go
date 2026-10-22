@@ -43,6 +43,7 @@ type NetTNC struct {
 	channel       int // NCHANNEL channel number frames from the TNC are received on.
 	host          string
 	port          int
+	tnc           kissTNC       // Which TNC this is, and which of its KISS ports is ours.
 	mu            sync.Mutex    // Guards sock, since listenThread and sendPacket access it from different goroutines.
 	sock          net.Conn      // Socket handle or file descriptor. nil for invalid.
 	reattachDelay time.Duration // Between attempts to reattach.
@@ -84,14 +85,15 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver, de
 	for i := range MAX_TOTAL_CHANS {
 		if pa.chan_medium[i] == MEDIUM_NETTNC {
 			var log = logrus.WithFields(logrus.Fields{
-				"channel": i,
-				"host":    pa.nettnc_addr[i],
-				"port":    pa.nettnc_port[i],
+				"channel":  i,
+				"host":     pa.nettnc_addr[i],
+				"port":     pa.nettnc_port[i],
+				"kissPort": pa.nettncKISSPort[i],
 			})
 
 			log.Info("Network TNC")
 
-			var nt, err = NewNetTNC(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i], recFrame, debug)
+			var nt, err = NewNetTNC(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i], pa.nettncKISSPort[i], recFrame, debug)
 			if err != nil {
 				// A stop that cut the connection short is not a failure to
 				// connect: go back and let the caller tear down.
@@ -135,6 +137,9 @@ func dialNetTNC(ctx context.Context, host string, port int, timeout time.Duratio
  *
  *		port	- TCP port number.  Typically 8001.
  *
+ *		kissPort - KISS port on the TNC, 0 to 15: what frames are sent
+ *			  to, and the only one whose frames are taken.
+ *
  *		recFrame - Where frames from the TNC go; nil to drop them.
  *
  *		debug	- "-d n" count, as for NewNetTNCs.
@@ -145,8 +150,9 @@ func dialNetTNC(ctx context.Context, host string, port int, timeout time.Duratio
  *
  *--------------------------------------------------------------------*/
 
-func NewNetTNC(ctx context.Context, channel int, host string, port int, recFrame frameReceiver, debug int) (*NetTNC, error) {
+func NewNetTNC(ctx context.Context, channel int, host string, port int, kissPort int, recFrame frameReceiver, debug int) (*NetTNC, error) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(kissPort >= 0 && kissPort < kissPortCount)
 
 	var conn, connErr = dialNetTNC(ctx, host, port, nettncDialTimeout)
 	if connErr != nil {
@@ -157,6 +163,7 @@ func NewNetTNC(ctx context.Context, channel int, host string, port int, recFrame
 	nt.channel = channel
 	nt.host = host
 	nt.port = port
+	nt.tnc = netTNC(kissPort)
 	nt.reattachDelay = nettncReattachDelay
 	nt.writeTimeout = nettncWriteTimeout
 	nt.dialTimeout = nettncDialTimeout
@@ -320,30 +327,50 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 			for j := range n {
 				// Separate the byte stream into KISS frame(s) and make it
 				// look like this came from a radio channel.
-				tncRecByte(kstate, buf[j], nt.debug, channel, netTNC(), nt.recFrame)
+				tncRecByte(kstate, buf[j], nt.debug, channel, nt.tnc, nt.recFrame)
 			}
 		} // nt.sock != nil
 	} // until cancelled
 }
 
-// kissTNC says which sort of external KISS TNC tncRecByte is reading from.
+// kissPortCount is how many KISS ports a TNC can have: the port is the high
+// nibble of a KISS frame's type byte.
+const kissPortCount = 16
+
+// kissTNC says which sort of external KISS TNC tncRecByte is reading from,
+// and which of its KISS ports is ours.  Make one per TNC, with netTNC or
+// serialTNC, and keep it: it remembers whether the TNC has been heard on a
+// port that isn't ours.
 type kissTNC struct {
 	source   dwcore.SourceKind // What its frames are received as coming from.
 	name     string            // As messages name it.
 	spectrum string            // As the received queue shows it.
+	port     int               // The KISS port on the TNC, 0 to 15.
+
+	// otherPortHeard is set once a frame from another of the TNC's KISS
+	// ports has been dropped, so only the first such drop is a warning.
+	otherPortHeard *atomic.Bool
 }
 
-// netTNC describes a KISS TNC reached over TCP, for NCHANNEL.
-func netTNC() kissTNC {
-	return kissTNC{source: dwcore.SourceNetTNC, name: "network TNC", spectrum: "Network TNC"}
+// netTNC describes a KISS TNC reached over TCP, for NCHANNEL, of which we
+// use KISS port kissPort.
+func netTNC(kissPort int) kissTNC {
+	return kissTNC{source: dwcore.SourceNetTNC, name: "network TNC", spectrum: "Network TNC", port: kissPort, otherPortHeard: new(atomic.Bool)}
+}
+
+// typeByte is the KISS type byte for a data frame sent to the TNC's port.
+func (tnc kissTNC) typeByte() byte {
+	return byte((tnc.port << 4) & 0xf0)
 }
 
 // tncRecByte takes one byte from an external KISS TNC, and passes each data
 // frame it completes to recFrame - as though it came from a radio channel, the
-// one the TNC is attached to, whatever port the frame itself names.
-// Any other command - a reply to SETHARDWARE, say - carries no received
-// packet, so it's dropped.  Anything outside a frame is not ours to answer, so
-// it's ignored.  With no recFrame, frames are dropped.
+// one the TNC is attached to.  Any other command - a reply to SETHARDWARE,
+// say - carries no received packet, so it's dropped.  Only frames from the
+// TNC's KISS port that is ours are taken; those from its other ports are
+// another channel's, or nobody's, so they're dropped too.  Anything outside a
+// frame is not ours to answer, so it's ignored.  With no recFrame, frames are
+// dropped.
 func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC, recFrame frameReceiver) {
 	var chunk = kc.Add(b)
 
@@ -375,11 +402,35 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
 		return
 	}
 
-	// The lower nybble of the type byte is the command; the upper one, the
-	// port, is not ours to go by.
+	// The lower nybble of the type byte is the command, the upper one the port.
 	var command = unwrapped[0] & 0x0f
 	if command != kiss.CmdDataFrame {
 		logrus.WithFields(logrus.Fields{"channel": channel, "tnc": tnc.name, "command": command}).Debug("KISS frame from TNC is not a data frame; ignoring it")
+
+		return
+	}
+
+	var framePort = int(unwrapped[0] >> 4)
+	if framePort != tnc.port {
+		// Before KISS ports could be chosen, every port was taken as the
+		// channel's, so a channel that used to work and now hears nothing
+		// is likely set up for the wrong port: say so, once.  After that,
+		// a busy port that isn't ours would fill the log, so it's Trace.
+		if !tnc.otherPortHeard.Swap(true) {
+			logrus.WithFields(logrus.Fields{
+				"channel":     channel,
+				"tnc":         tnc.name,
+				"kissPort":    framePort,
+				"ourKISSPort": tnc.port,
+			}).Warn("Dropping KISS frames from another port on the TNC; give the channel that KISS port if they should be heard here")
+		} else if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithFields(logrus.Fields{
+				"channel":     channel,
+				"tnc":         tnc.name,
+				"kissPort":    framePort,
+				"ourKISSPort": tnc.port,
+			}).Trace("Dropping KISS frame from another port on the TNC")
+		}
 
 		return
 	}
@@ -390,12 +441,12 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
 
 		entry.Debug("Frame content after removing KISS framing and any escapes")
 		/* Don't include the "type" indicator. */
-		/* It contains the port, and the command, which is always data here. */
+		/* It contains our KISS port, and the command, which is always data here. */
 		dwutil.LogHexDump(entry, logrus.DebugLevel, unwrapped[1:])
 	}
 
 	// Convert to packet object and send to received packet queue.
-	// Note that we use channel associated with the TNC, not channel in KISS frame.
+	// Note that we use channel associated with the TNC, not the KISS port.
 
 	var alevel ax25.ALevel
 	var pp = ax25.FromFrame(unwrapped[1:], alevel)
@@ -442,10 +493,10 @@ func (nt *NetTNC) sendPacket(channel int, pp *ax25.Packet) bool {
 	}
 
 	// First, get the on-air frame format from packet object.
-	// Prepend 0 byte for KISS command and channel.
+	// Prepend the type byte: a data frame, for our KISS port on the TNC.
 	var fbuf = pp.FrameData()
 
-	var frame_buff = []byte{0} // For now, set channel to 0.
+	var frame_buff = []byte{nt.tnc.typeByte()}
 	frame_buff = append(frame_buff, fbuf...)
 
 	// Next, encapsulate into KISS frame with surrounding FENDs and any escapes.

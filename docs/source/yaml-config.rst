@@ -182,6 +182,11 @@ These are the keys under ``samoyed``:
     ``port``
         The TNC's KISS TCP port.
 
+    ``kissPort``
+        The KISS port on the TNC, 0 to 15, and 0 if left out.
+        Frames are sent to it,
+        and frames from the TNC's other KISS ports are dropped.
+
     .. code:: yaml
 
         samoyed:
