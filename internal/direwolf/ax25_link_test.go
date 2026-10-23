@@ -728,3 +728,146 @@ func TestSecondLinkBetweenTheSameStationsIsWarned(t *testing.T) {
 	})
 	assert.Equal(t, []string{"Another client application already has a link between these stations on this channel, which may get its frames instead"}, warnings)
 }
+
+// establishedLinkClients counts the connect indications the link layer gives
+// a client, and ignores the rest.
+type establishedLinkClients struct {
+	noLinkClients
+
+	established int
+}
+
+func (c *establishedLinkClients) LinkEstablished(int, int, string, string, bool) {
+	c.established++
+}
+
+// A SABM(E) on a link that is already up resets it.  The AX.25 2.2 SDL, and
+// Dire Wolf, throw away whatever was sent and not yet acknowledged, and
+// whatever was still waiting to go, and tell the client the link was
+// established afresh.  When the SABM(E) is just the other station's retry,
+// because our UA was slow to reach it, that loses the first thing we said - a
+// node's greeting, say - and leaves a plain AX.25 client with a second connect
+// indication and nothing else.  Like the Linux kernel's AX.25, we put the
+// unacknowledged frames back at the front of the queue and send them again
+// from N(S) 0, so there is nothing lost to tell the client about.  Refs #1052.
+func TestLinkResetResendsUnacknowledgedFrames(t *testing.T) {
+	t.Parallel()
+
+	const (
+		myCall    = "Q3TEST"
+		theirCall = "Q4TEST"
+		channel   = 1
+	)
+
+	var miscConfig = new(misc_config_s)
+	miscConfig.paclen = AX25_N1_PACLEN_DEFAULT
+	miscConfig.retry = AX25_N2_RETRY_DEFAULT
+	miscConfig.frack = AX25_T1V_FRACK_DEFAULT
+	miscConfig.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
+	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
+
+	var clients = new(establishedLinkClients)
+	var link = NewAX25Link(miscConfig, nil, clients, newTestTransmitQueue(new(RadioConfig)), 1)
+
+	var S = establishConnection(t, link, myCall, theirCall, channel)
+
+	require.Equal(t, 1, clients.established)
+
+	// The transmitter is ready for whatever the link has to send.
+	var seize = new(dlq_item_t)
+	seize._chan = channel
+
+	for _, data := range []string{"one", "two", "three"} {
+		link.dl_data_request(newDataRequest(myCall, theirCall, channel, []byte(data)))
+	}
+
+	link.lm_seize_confirm(seize)
+	require.Equal(t, 3, S.vs, "all three should have been sent")
+
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = myCall
+	addrs[ax25.Source] = theirCall
+
+	// The other end acknowledges the first.
+	receiveFrame(t, link, ax25.SFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeSRR, ax25.Modulo8, 1, 0, nil), channel)
+	require.Equal(t, 1, S.va)
+
+	// And something else is waiting to go.
+	link.dl_data_request(newDataRequest(myCall, theirCall, channel, []byte("four")))
+
+	receiveFrame(t, link, ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil), channel)
+
+	assert.Equal(t, state_3_connected, S.state)
+	assert.Equal(t, 0, S.vs)
+	assert.Equal(t, 0, S.va)
+	assert.Equal(t, 0, S.vr)
+
+	for ns, txdata := range S.txdata_by_ns {
+		assert.Nil(t, txdata, "nothing should be left as sent with N(S) %d", ns)
+	}
+
+	var queued []string
+	for txdata := S.i_frame_queue; txdata != nil; txdata = txdata.next {
+		queued = append(queued, string(txdata.data[:txdata.len]))
+	}
+
+	assert.Equal(t, []string{"two", "three", "four"}, queued,
+		"the unacknowledged frames should go again, ahead of what had not been sent")
+	assert.Equal(t, 1, clients.established, "nothing was lost, so there is no new connection to report")
+
+	link.lm_seize_confirm(seize)
+
+	assert.Equal(t, 3, S.vs, "they should be sent again from N(S) 0")
+	require.NotNil(t, S.txdata_by_ns[0])
+	assert.Equal(t, "two", string(S.txdata_by_ns[0].data[:S.txdata_by_ns[0].len]))
+}
+
+// A SABM in timer recovery takes a v2.2 link back to v2.0, and so from
+// modulo 128 to modulo 8.  The unacknowledged frames are numbered in the old
+// sequence space, so re-queuing them must happen before the change: walking
+// from V(A) to a V(S) of 8 or more in modulo 8 never gets there.  Refs #1052.
+func TestLinkResetToV20ResendsUnacknowledgedFrames(t *testing.T) {
+	t.Parallel()
+
+	const (
+		myCall    = "Q3TEST"
+		theirCall = "Q4TEST"
+		channel   = 1
+	)
+
+	var link = setupTestEnvV22(t)
+
+	var S = establishConnection(t, link, myCall, theirCall, channel)
+
+	require.Equal(t, ax25.Modulo128, S.modulo)
+
+	var want []string
+
+	for ns := 2; ns < 12; ns++ {
+		var data = fmt.Sprintf("frame %d", ns)
+		S.txdata_by_ns[ns] = NewCData(int(ax25.PIDNoLayer3), []byte(data))
+
+		want = append(want, data)
+	}
+
+	S.va = 2
+	S.vs = 12
+	S.state = state_4_timer_recovery
+
+	var addrs [ax25.MaxAddrs]string
+	addrs[ax25.Destination] = myCall
+	addrs[ax25.Source] = theirCall
+
+	runWithTimeout(t, "a SABM in timer recovery", func() {
+		receiveFrame(t, link, ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUSABM, 1, 0, nil), channel)
+	})
+
+	assert.Equal(t, ax25.Modulo8, S.modulo)
+
+	var queued []string
+	for txdata := S.i_frame_queue; txdata != nil; txdata = txdata.next {
+		queued = append(queued, string(txdata.data[:txdata.len]))
+	}
+
+	assert.Equal(t, want, queued)
+}
