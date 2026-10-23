@@ -84,3 +84,59 @@ func TestXIDParseTruncatedInfo(t *testing.T) {
 	assert.Equal(t, maybe.Just(4), param.WindowSizeRx)
 	assert.Equal(t, maybe.Nothing[int](), param.AckTimer)
 }
+
+// LinBPQ with L2Compress enabled ends its XID command with parameter 16, a
+// flag asking for its own L2 compression, which has no value and so a length
+// of 0.  Parse insisted every parameter be 1 to 4 bytes long, so it logged an
+// error on every connection from such a node and gave up on whatever followed.
+// A parameter we don't decode is skipped whatever its length; the ones we do
+// decode are still held to 1 to 4 bytes.
+func TestXIDParseSkipsUnknownParameters(t *testing.T) {
+	t.Parallel()
+
+	// As built by L2SENDXID in LinBPQ's L2Code.c.
+	var bpq = []byte{
+		FI_Format_Indicator, GI_Group_Identifier, 0x00, 0x12,
+		PI_Classes_of_Procedures, 2, 0x00, 0x21,
+		PI_HDLC_Optional_Functions, 3, 0x22, 0xa4, 0x86,
+		PI_I_Field_Length_Rx, 2, 0x08, 0x00,
+		PI_Window_Size_Rx, 1, 7,
+		16, 0,
+	}
+
+	var param, desc, status = Parse(bpq)
+	assert.True(t, status)
+	assert.Equal(t, "REJ modulo-8 I-Field-Length-Rx=256 Window-Size-Rx=7 ", desc)
+	assert.Equal(t, maybe.Just(256), param.IFieldLengthRx)
+	assert.Equal(t, maybe.Just(7), param.WindowSizeRx)
+
+	for _, tc := range []struct {
+		name    string
+		info    []byte
+		retries maybe.Maybe[int]
+	}{
+		{
+			"unknown, no value",
+			[]byte{FI_Format_Indicator, GI_Group_Identifier, 0, 5, 16, 0, PI_Retries, 1, 6},
+			maybe.Just(6),
+		},
+		{
+			"unknown, longer than 4 bytes",
+			[]byte{FI_Format_Indicator, GI_Group_Identifier, 0, 10, 99, 5, 1, 2, 3, 4, 5, PI_Retries, 1, 6},
+			maybe.Just(6),
+		},
+		{
+			"known, no value",
+			[]byte{FI_Format_Indicator, GI_Group_Identifier, 0, 5, PI_Ack_Timer, 0, PI_Retries, 1, 6},
+			maybe.Nothing[int](),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var param, _, status = Parse(tc.info)
+			assert.True(t, status)
+			assert.Equal(t, tc.retries, param.Retries)
+		})
+	}
+}
