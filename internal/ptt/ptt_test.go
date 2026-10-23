@@ -642,8 +642,10 @@ func captureSerialControlLines(t *testing.T, p *PTT) *[]serialLineChange {
 
 	var changes = new([]serialLineChange)
 
-	p.serialControl = func(_ int, bit int, on bool) {
+	p.serialControl = func(_ int, bit int, on bool) error {
 		*changes = append(*changes, serialLineChange{bit: bit, on: on})
+
+		return nil
 	}
 
 	return changes
@@ -823,11 +825,13 @@ func TestPttTermWaitsForSet(t *testing.T) {
 	var release = make(chan struct{})
 	var held atomic.Bool
 
-	p.serialControl = func(int, int, bool) {
+	p.serialControl = func(int, int, bool) error {
 		if held.CompareAndSwap(false, true) {
 			close(inSet)
 			<-release
 		}
+
+		return nil
 	}
 
 	var setDone = make(chan struct{})
@@ -1190,4 +1194,64 @@ func TestPttInitVOXAdviceOnlyWhenTransmitting(t *testing.T) {
 	}
 
 	assert.Equal(t, []any{0}, channels, "only the channel that can transmit")
+}
+
+// serialPortEnv names a real serial port for TestSetSerialControlLineRealPort
+// to drive.  Neither a pseudo terminal nor a plain file has modem control
+// lines, so nothing else can show the ioctls working; and a test that keyed
+// whatever happened to be on /dev/ttyS0 could key a transmitter, so the port
+// has to be asked for.
+const serialPortEnv = "SAMOYED_TEST_SERIAL_PORT"
+
+// Opening a serial port raises RTS and DTR, so a PTT on either is keyed until
+// something lowers it again.  Both lines go each way, and the port reads back
+// what was asked for.
+func TestSetSerialControlLineRealPort(t *testing.T) {
+	t.Parallel()
+
+	var device = os.Getenv(serialPortEnv)
+	if device == "" {
+		t.Skipf("set %s to a serial port whose control lines are safe to drive", serialPortEnv)
+	}
+
+	var port, err = os.OpenFile(device, os.O_RDONLY|unix.O_NONBLOCK, 0) //nolint:gosec // G304: the port the tester asked for
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = port.Close() })
+
+	var fd = int(port.Fd())
+
+	for _, line := range []int{unix.TIOCM_RTS, unix.TIOCM_DTR} {
+		for _, on := range []bool{false, true, false} {
+			require.NoError(t, setSerialControlLine(fd, line, on))
+
+			var lines, getErr = unix.IoctlGetInt(fd, unix.TIOCMGET)
+			require.NoError(t, getErr)
+			assert.Equal(t, on, lines&line != 0, "line 0x%x after asking for %v", line, on)
+		}
+	}
+}
+
+// A control line that won't move may be a transmitter left keyed, so the
+// failure is logged rather than dropped.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
+func TestPttSetRealSerialLineFailureLogged(t *testing.T) {
+	var p, _ = openTestPTTSerialPort(t, LineRTS, LineNone)
+
+	p.serialControl = func(int, int, bool) error {
+		return unix.EIO
+	}
+
+	var hook = capturePTTLog(t)
+
+	p.Set(OutputPTT, 0, 1)
+
+	var entry = pttLogEntry(t, hook, "Can't set serial port control line")
+	assert.Equal(t, logrus.ErrorLevel, entry.Level)
+	var loggedErr, isErr = entry.Data[logrus.ErrorKey].(error)
+	require.True(t, isErr, "the failure is logged as an error")
+	require.ErrorIs(t, loggedErr, unix.EIO)
+	assert.Equal(t, 0, entry.Data["channel"])
+	assert.Equal(t, true, entry.Data["on"])
 }
