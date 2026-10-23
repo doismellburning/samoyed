@@ -3067,7 +3067,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 			// Regression test: the handler marked the channel MEDIUM_NETTNC and
 			// stored the address before it had read the port, so a line that was
 			// then rejected left a network TNC channel behind with port 0.
-			// NewNetTNCs attaches to every such channel at startup and exits if it
+			// NewNetTNCs attaches to every such channel at startup and fails if it
 			// cannot, so a typo took the whole program down.
 			{
 				name:   "a missing port leaves the channel alone",

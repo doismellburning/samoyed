@@ -573,8 +573,13 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	var netTNCs = NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame, d_n_opt)
+	var netTNCs, netTNCErr = NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame, d_n_opt)
 	stopIfCancelled(ctx, td)
+
+	if netTNCErr != nil {
+		logrus.WithError(netTNCErr).Error("Could not attach to network TNC")
+		td.exit(1)
+	}
 
 	// Or a serial TNC.  (also new in 1.8)
 	var serialTNCs = NewSerialTNCs(ctx, audio_config, dataLinkQueue.RecFrame, d_k_opt)

@@ -2004,8 +2004,8 @@ func (ps *parseState) applyNCHANNEL(settings NetworkTNCSettings) error {
 	}
 
 	// Claim the channel only once all of it has checked out: NewNetTNCs
-	// attaches to every MEDIUM_NETTNC channel and exits if it cannot, so a
-	// half-checked one would otherwise take the program down at startup.
+	// attaches to every MEDIUM_NETTNC channel and fails startup if it cannot,
+	// so a half-checked one would otherwise take the program down.
 	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
 	ps.audio.nettnc_addr[nchan] = settings.Host
 	ps.audio.nettnc_port[nchan] = port

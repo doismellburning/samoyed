@@ -14,8 +14,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -613,7 +611,12 @@ func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
-	var output = captureLogOutput(t, logrus.InfoLevel, func() { tncs = NewNetTNCs(t.Context(), audioConfig, nil, 0) })
+	var output = captureLogOutput(t, logrus.InfoLevel, func() {
+		var err error
+
+		tncs, err = NewNetTNCs(t.Context(), audioConfig, nil, 0)
+		require.NoError(t, err)
+	})
 
 	assert.Contains(t, output, fmt.Sprintf(`msg="Network TNC" channel=%d host=127.0.0.1 port=%d`, nettncTestChannel, port))
 
@@ -625,7 +628,7 @@ func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 
 // A stop that arrives while a network TNC is being connected to cuts the
 // connection short, and NewNetTNCs goes back to its caller to tear down
-// rather than exiting as though the TNC could not be reached.
+// rather than failing as though the TNC could not be reached.
 //
 //nolint:paralleltest // Serial: captures os.Stdout and relies on a port staying unused, which a parallel test could take.
 func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
@@ -639,51 +642,34 @@ func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
 
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
-	testutils.CaptureOutput(t, func() { tncs = NewNetTNCs(ctx, audioConfig, nil, 0) })
+	var err error
 
+	testutils.CaptureOutput(t, func() { tncs, err = NewNetTNCs(ctx, audioConfig, nil, 0) })
+
+	require.NoError(t, err, "a connection cut short is not a failure to connect")
 	assert.Nil(t, tncs[nettncTestChannel], "a connection cut short should not have been attached")
 }
 
-// nettncAttachExitEnv, when set to a port, has
-// TestNetTNCInitSaysWhyItCouldNotAttach attach to a network TNC there and exit
-// the test binary when it cannot, rather than run the test.
-const nettncAttachExitEnv = "SAMOYED_TEST_NETTNC_ATTACH_EXIT_PORT"
-
-// A network TNC that cannot be reached at start up ends the program, and the
-// last thing it logs says which and why, rather than leaving the reader with
-// nothing after "Network TNC".  Ending the process takes the test binary with
-// it, so the test runs a copy of itself to do it.
+// A network TNC that cannot be reached is an error for the caller to act on,
+// not the end of the process.
 //
-//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
-func TestNetTNCInitSaysWhyItCouldNotAttach(t *testing.T) {
-	if portEnv := os.Getenv(nettncAttachExitEnv); portEnv != "" {
-		var port, err = strconv.Atoi(portEnv)
-		require.NoError(t, err)
+//nolint:paralleltest // Serial: captures os.Stdout and relies on a port staying unused, which a parallel test could take.
+func TestNetTNCInitReturnsErrorWhenUnreachable(t *testing.T) {
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
+	audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
+	audioConfig.nettnc_port[nettncTestChannel] = testutils.UnusedPortNumber(t)
 
-		var audioConfig = new(RadioConfig)
-		audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
-		audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
-		audioConfig.nettnc_port[nettncTestChannel] = port
+	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
-		NewNetTNCs(t.Context(), audioConfig, nil, 0)
+	var err error
 
-		return
-	}
+	testutils.CaptureOutput(t, func() { tncs, err = NewNetTNCs(t.Context(), audioConfig, nil, 0) })
 
-	var port = testutils.UnusedPortNumber(t)
-
-	var cmd = exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestNetTNCInitSaysWhyItCouldNotAttach$") //nolint:gosec // G204: our own test binary.
-	cmd.Env = append(os.Environ(), fmt.Sprintf("%s=%d", nettncAttachExitEnv, port))
-
-	var out, err = cmd.CombinedOutput()
-	var output = string(out)
-
-	var exitErr *exec.ExitError
-	require.ErrorAs(t, err, &exitErr, "the copy should have exited with a failure: %s", output)
-	assert.Equal(t, 1, exitErr.ExitCode())
-	assert.Contains(t, output, `level=error msg="Could not attach to network TNC"`)
-	assert.Contains(t, output, fmt.Sprintf("channel=%d", nettncTestChannel))
-	assert.Contains(t, output, "connection refused")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), fmt.Sprintf("channel %d", nettncTestChannel))
+	assert.Contains(t, err.Error(), "connection refused")
+	assert.Nil(t, tncs[nettncTestChannel])
 }
 
 // readFullFrom fills buf from conn, which a single Read is not obliged to do.
