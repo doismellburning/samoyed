@@ -527,11 +527,12 @@ as though it were another radio:
 
 .. code::
 
-    NCHANNEL chan addr port
+    NCHANNEL chan addr port [kissport]
 
 ``chan`` is the channel number,
 ``addr`` the TNC's host name or IP address,
-and ``port`` its KISS TCP port.
+``port`` its KISS TCP port,
+and ``kissport``, if given, which of the TNC's KISS ports to use.
 The channel has to be a virtual one, 6 to 15,
 since 0 to 5 are kept for radio channels whether or not there is audio for them,
 and it can't be one another ``NCHANNEL``, ``SCHANNEL``, ``ICHANNEL`` or AXUDP port has already taken.
@@ -553,13 +554,27 @@ which takes KISS clients on port 8002 by default:
 
     NCHANNEL 10 localhost 8002
 
-Frames are sent to the TNC on KISS port 0,
+Frames are sent to the TNC on its KISS port ``kissport``, 0 to 15 and 0 if left out,
 whatever the channel's number is here.
-Frames from the TNC are taken as this channel's,
-whatever KISS port they name -
-so a TNC that has several ports of its own,
+Only frames from that KISS port are taken as this channel's;
+those from the TNC's other ports are dropped,
+and the first one dropped is logged as a warning naming the port it came from.
+Another ``samoyed-direwolf`` or Dire Wolf labels its frames with the radio channel they were heard on,
+so pointing at one whose radio is channel 1 takes ``kissport`` 1.
+
+A TNC that has several ports of its own,
 such as another ``samoyed-direwolf`` with more than one channel,
-has everything it hears arrive on the one channel.
+takes an ``NCHANNEL`` line for each port you want:
+
+.. code::
+
+    NCHANNEL 10 radio.example.org 8001 0
+    NCHANNEL 11 radio.example.org 8001 1
+
+Each line makes a connection of its own to the TNC,
+so this needs a TNC that sends what it hears to every client,
+as ``samoyed-direwolf`` and Dire Wolf do;
+one that takes only a single client can only be one channel.
 
 Packets for the channel go straight to the TNC rather than into the transmit queue,
 so Samoyed applies no ``TXDELAY``, ``PERSIST``, ``SLOTTIME`` or ``DWAIT`` to them,

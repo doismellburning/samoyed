@@ -1935,7 +1935,7 @@ func handleICHANNEL(ps *parseState) error {
 // handleNCHANNEL handles the NCHANNEL keyword.
 func handleNCHANNEL(ps *parseState) error {
 	/*
-	 * NCHANNEL chan addr port			- Define Network TNC virtual channel.
+	 * NCHANNEL chan addr port [kissport]		- Define Network TNC virtual channel.
 	 *
 	 *	This allows a client application to talk to to an external TNC over TCP KISS
 	 *	by using a channel number outside the normal range for modems.
@@ -1944,9 +1944,9 @@ func handleNCHANNEL(ps *parseState) error {
 	 *	chan = direwolf channel.
 	 *	addr = hostname or IP address of network TNC.
 	 *	port = KISS TCP port on network TNC.
-	 *
-	 *	Future: Might allow selection of channel on the network TNC.
-	 *	For now, ignore incoming and set to 0 for outgoing.
+	 *	kissport = KISS port, 0 to 15, on the network TNC; 0 if not given.
+	 *		Frames are sent to it, and frames from the TNC's other
+	 *		KISS ports are dropped.
 	 *
 	 * FIXME: Can't set mycall for nchannel.
 	 */
@@ -1973,6 +1973,13 @@ func handleNCHANNEL(ps *parseState) error {
 
 		settings.Port = &port
 	}
+
+	var kissPort, kissPortErr = ps.parseExternalKISSPort("NCHANNEL")
+	if kissPortErr != nil {
+		return kissPortErr
+	}
+
+	settings.KISSPort = kissPort
 
 	return ps.applyNCHANNEL(*settings)
 }
@@ -2003,23 +2010,46 @@ func (ps *parseState) applyNCHANNEL(settings NetworkTNCSettings) error {
 		return fmt.Errorf("line %d: Invalid TCP port number \"%d\" for NCHANNEL command. Must be in range %d to %d", ps.line, port, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
 	}
 
+	if settings.KISSPort < 0 || settings.KISSPort >= kissPortCount {
+		return fmt.Errorf("line %d: Invalid KISS port %d for NCHANNEL command. Must be in range 0 to %d", ps.line, settings.KISSPort, kissPortCount-1)
+	}
+
 	// Claim the channel only once all of it has checked out: NewNetTNCs
 	// attaches to every MEDIUM_NETTNC channel and exits if it cannot, so a
 	// half-checked one would otherwise take the program down at startup.
 	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
 	ps.audio.nettnc_addr[nchan] = settings.Host
 	ps.audio.nettnc_port[nchan] = port
+	ps.audio.nettncKISSPort[nchan] = settings.KISSPort
 
 	return nil
 }
 
+// parseExternalKISSPort reads the optional KISS port, 0 to 15, that ends an
+// NCHANNEL or SCHANNEL line (command), which says which port on a multi-port
+// TNC the channel is.  It is 0 if not given.
+func (ps *parseState) parseExternalKISSPort(command string) (int, error) {
+	var t = ps.split(false)
+	if t == "" {
+		return 0, nil
+	}
+
+	var kissPort, err = strconv.Atoi(t)
+	if err != nil || kissPort < 0 || kissPort >= kissPortCount {
+		return 0, fmt.Errorf("line %d: Invalid KISS port \"%s\" for %s command. Must be in range 0 to %d", ps.line, t, command, kissPortCount-1)
+	}
+
+	return kissPort, nil
+}
+
 // handleSCHANNEL handles the SCHANNEL keyword:
 //
-//	SCHANNEL channel device [baud]
+//	SCHANNEL channel device [baud [kissport]]
 //
 // which makes channel, a virtual one outside the radio channels' range, a KISS
 // TNC on the serial port device, at baud bits per second (9600 if not given).
-// Frames to and from it use KISS channel 0, whatever channel it is here.
+// Frames to it go to KISS port kissport (0 to 15, and 0 if not given), and
+// frames from its other KISS ports are dropped, whatever channel it is here.
 //
 // FIXME: Can't set MYCALL for an SCHANNEL.
 func handleSCHANNEL(ps *parseState) error {
@@ -2045,6 +2075,14 @@ func handleSCHANNEL(ps *parseState) error {
 		return fmt.Errorf("line %d: Missing serial TNC device for SCHANNEL command", ps.line)
 	}
 
+	// Two channels can't share a serial port: each would read part of what
+	// the TNC sends, and both write to it unsynchronised.
+	for c := range MAX_TOTAL_CHANS {
+		if ps.audio.chan_medium[c] == MediumSerialTNC && ps.audio.serialTNCDevice[c] == device {
+			return fmt.Errorf("line %d: SCHANNEL can't use serial TNC device %s because channel %d already does", ps.line, device, c)
+		}
+	}
+
 	var baud = 9600
 
 	t = ps.split(false)
@@ -2055,8 +2093,20 @@ func handleSCHANNEL(ps *parseState) error {
 		case 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200:
 			baud = n
 		default:
-			ps.errorf("line %d: Unsupported data rate \"%s\" for SCHANNEL command.  Using %d.", ps.line, t, baud)
+			// Not a warning and a default: the KISS port comes after the
+			// baud rate, so "SCHANNEL 10 /dev/ttyUSB0 3" meant for port 3
+			// would otherwise quietly run on port 0.
+			return fmt.Errorf(
+				"line %d: Unsupported data rate \"%s\" for SCHANNEL command.  It must be one of 1200, 2400, 4800, 9600, 19200, 38400, 57600 or 115200, and comes before any KISS port",
+				ps.line,
+				t,
+			)
 		}
+	}
+
+	var kissPort, kissPortErr = ps.parseExternalKISSPort("SCHANNEL")
+	if kissPortErr != nil {
+		return kissPortErr
 	}
 
 	// Claim the channel only once the whole line has parsed, as NCHANNEL
@@ -2065,6 +2115,7 @@ func handleSCHANNEL(ps *parseState) error {
 	ps.audio.chan_medium[channel] = MediumSerialTNC
 	ps.audio.serialTNCDevice[channel] = device
 	ps.audio.serialTNCBaud[channel] = baud
+	ps.audio.serialTNCKISSPort[channel] = kissPort
 
 	return nil
 }

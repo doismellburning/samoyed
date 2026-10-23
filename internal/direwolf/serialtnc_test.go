@@ -18,7 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwcore"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -28,8 +30,8 @@ import (
 
 const serialTNCTestChannel = 4
 
-// startTestSerialTNC attaches channel serialTNCTestChannel to the serial TNC
-// on device, and starts listening to it, until the test ends.  It hands back
+// startTestSerialTNC attaches channel serialTNCTestChannel to KISS port 0 of
+// the serial TNC on device, and starts listening to it, until the test ends.  It hands back
 // a channel that is closed once the listening goroutine has finished.
 //
 // The port cannot be closed out from under a blocked read, so the goroutine is
@@ -38,7 +40,15 @@ const serialTNCTestChannel = 4
 func startTestSerialTNC(t *testing.T, device string, recFrame frameReceiver, closeFarEnd func()) (*SerialTNC, context.CancelFunc, <-chan struct{}) {
 	t.Helper()
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, recFrame, 0)
+	return startTestSerialTNCPort(t, device, 0, recFrame, closeFarEnd)
+}
+
+// startTestSerialTNCPort is startTestSerialTNC for KISS port kissPort on the
+// TNC.
+func startTestSerialTNCPort(t *testing.T, device string, kissPort int, recFrame frameReceiver, closeFarEnd func()) (*SerialTNC, context.CancelFunc, <-chan struct{}) {
+	t.Helper()
+
+	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, kissPort, recFrame, 0)
 	require.NoError(t, err)
 
 	st.reattachDelay = 10 * time.Millisecond
@@ -87,7 +97,7 @@ func nextDLQItem(t *testing.T, dlq *DataLinkQueue) *dlq_item_t {
 func TestSerialTNCAttachFails(t *testing.T) {
 	t.Parallel()
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, "/dev/there-is-no-such-serial-port", 9600, nil, 0)
+	var st, err = NewSerialTNC(serialTNCTestChannel, "/dev/there-is-no-such-serial-port", 9600, 0, nil, 0)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "/dev/there-is-no-such-serial-port")
@@ -166,7 +176,7 @@ func TestSerialTNCDebugPrints(t *testing.T) {
 func TestSerialTNCStartedTwiceComplains(t *testing.T) {
 	var device, tnc = newTestSerialDevice(t)
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, nil, 0)
+	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, 0, nil, 0)
 	require.NoError(t, err)
 
 	st.started.Store(true)
@@ -187,7 +197,7 @@ func TestSerialTNCStartedTwiceComplains(t *testing.T) {
 }
 
 // Transmitting on an SCHANNEL means handing the frame to the TNC as KISS, with
-// the KISS channel set to 0 - the TNC has only the one radio.
+// the KISS port set to 0 unless the channel was configured with another.
 func TestSerialTNCSendPacket(t *testing.T) {
 	t.Parallel()
 
@@ -200,6 +210,55 @@ func TestSerialTNCSendPacket(t *testing.T) {
 	st.sendPacket(serialTNCTestChannel, pp)
 
 	assert.Equal(t, kissFrameFor(pp), readSerialKissFrame(t, tnc))
+}
+
+// A multi-port TNC is told which of its ports a frame is for in the high
+// nibble of the type byte, so a channel configured for KISS port 3 sends 0x30.
+func TestSerialTNCSendPacketToKISSPort(t *testing.T) {
+	t.Parallel()
+
+	var device, tnc = newTestSerialDevice(t)
+
+	var st, _, _ = startTestSerialTNCPort(t, device, 3, nil, func() { tnc.Close() })
+
+	var pp = newTestPacket(t)
+
+	require.True(t, st.sendPacket(serialTNCTestChannel, pp))
+
+	assert.Equal(t, kiss.Encapsulate(append([]byte{0x30}, pp.FrameData()...)), readSerialKissFrame(t, tnc))
+}
+
+// Only the configured KISS port's frames are the channel's: one from port 0
+// of a multi-port TNC belongs to another of its radios, and is dropped, while
+// one from port 3 is received.
+func TestSerialTNCReceivesOnlyItsKISSPort(t *testing.T) {
+	t.Parallel()
+
+	var dlq = NewDataLinkQueue()
+
+	var device, tnc = newTestSerialDevice(t)
+
+	startTestSerialTNCPort(t, device, 3, dlq.RecFrame, func() { tnc.Close() })
+
+	var other = ax25.FromText("Q2TEST>APRS:other port", true)
+	require.NotNil(t, other)
+
+	var ours = ax25.FromText("Q1TEST>APRS:our port", true)
+	require.NotNil(t, ours)
+
+	// Port 0's frame goes first, so if it weren't dropped it would be the
+	// one taken off the queue.
+	var stream = kiss.Encapsulate(append([]byte{0x00}, other.FrameData()...))
+	stream = append(stream, kiss.Encapsulate(append([]byte{0x30}, ours.FrameData()...))...)
+
+	var _, writeErr = tnc.Write(stream)
+	require.NoError(t, writeErr)
+
+	var item = nextDLQItem(t, dlq)
+
+	require.NotNil(t, item.pp)
+	assert.Equal(t, ours.FrameData(), item.pp.FrameData())
+	assert.Nil(t, dlq.Remove(), "a frame from another KISS port was received")
 }
 
 // A channel with no TNC, or one whose TNC is not attached just now, has
@@ -239,7 +298,7 @@ func TestSerialTNCSendPacketNotAttached(t *testing.T) {
 func TestSerialTNCSendPacketWriteErrorGivesUpThePort(t *testing.T) {
 	var device, tnc = newTestSerialDevice(t)
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, nil, 0)
+	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, 0, nil, 0)
 	require.NoError(t, err)
 
 	t.Cleanup(st.closePort)

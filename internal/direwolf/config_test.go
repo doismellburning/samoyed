@@ -3095,6 +3095,43 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				},
 			},
 			{
+				name:   "the KISS port defaults to 0",
+				config: "NCHANNEL 6 localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NETTNC, c.audio.chan_medium[6])
+					a.Zero(c.audio.nettncKISSPort[6])
+					a.Zero(c.errors)
+				},
+			},
+			{
+				name:   "a KISS port is stored",
+				config: "NCHANNEL 6 localhost 8001 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NETTNC, c.audio.chan_medium[6])
+					a.Equal(3, c.audio.nettncKISSPort[6])
+					a.Zero(c.errors)
+				},
+			},
+			{
+				name:   "a KISS port beyond 15 leaves the channel alone",
+				config: "NCHANNEL 6 localhost 8001 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+					a.Equal(1, c.errors)
+					a.Contains(c.output, `Invalid KISS port \"16\" for NCHANNEL command`)
+				},
+			},
+			{
+				name:   "an unreadable KISS port leaves the channel alone",
+				config: "NCHANNEL 6 localhost 8001 three\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+					a.Equal(1, c.errors)
+				},
+			},
+			{
 				name:   "a missing address leaves the channel alone",
 				config: "NCHANNEL 6\n",
 				check: func(a *assert.Assertions, c configs) {
@@ -3123,21 +3160,78 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				},
 			},
 			{
-				name:   "an unsupported baud rate falls back to 9600",
+				name:   "an unsupported baud rate is refused",
 				config: "SCHANNEL 6 /dev/ttyUSB0 12345\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
-					a.Equal(9600, c.audio.serialTNCBaud[6])
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
 					a.Equal(1, c.errors)
 					a.Contains(c.output, `Unsupported data rate \"12345\" for SCHANNEL command`)
 				},
 			},
 			{
-				name:   "an unreadable baud rate falls back to 9600",
+				name:   "an unreadable baud rate is refused",
 				config: "SCHANNEL 6 /dev/ttyUSB0 fast\n",
 				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Equal(1, c.errors)
+				},
+			},
+			{
+				// The KISS port comes after the baud rate, so a lone 3 is a
+				// baud rate - and taking it as 9600 would run on port 0.
+				name:   "a KISS port given without a baud rate is refused rather than ignored",
+				config: "SCHANNEL 6 /dev/ttyUSB0 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Equal(1, c.errors)
+					a.Contains(c.output, "comes before any KISS port")
+				},
+			},
+			{
+				name:   "two serial TNCs can't share a device",
+				config: "SCHANNEL 6 /dev/ttyUSB0 9600 0\nSCHANNEL 7 /dev/ttyUSB0 9600 1\n",
+				check: func(a *assert.Assertions, c configs) {
 					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
-					a.Equal(9600, c.audio.serialTNCBaud[6])
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[7])
+					a.Equal(1, c.errors)
+					a.Contains(c.output, "because channel 6 already does")
+				},
+			},
+			{
+				name:   "the KISS port defaults to 0",
+				config: "SCHANNEL 6 /dev/ttyUSB0 19200\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
+					a.Zero(c.audio.serialTNCKISSPort[6])
+					a.Zero(c.errors)
+				},
+			},
+			{
+				name:   "a KISS port after the baud rate is stored",
+				config: "SCHANNEL 6 /dev/ttyUSB0 19200 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
+					a.Equal(19200, c.audio.serialTNCBaud[6])
+					a.Equal(3, c.audio.serialTNCKISSPort[6])
+					a.Zero(c.errors)
+				},
+			},
+			{
+				name:   "a KISS port beyond 15 leaves the channel alone",
+				config: "SCHANNEL 6 /dev/ttyUSB0 9600 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Empty(c.audio.serialTNCDevice[6])
+					a.Equal(1, c.errors)
+					a.Contains(c.output, `Invalid KISS port \"16\" for SCHANNEL command`)
+				},
+			},
+			{
+				name:   "an unreadable KISS port leaves the channel alone",
+				config: "SCHANNEL 6 /dev/ttyUSB0 9600 three\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Empty(c.audio.serialTNCDevice[6])
 					a.Equal(1, c.errors)
 				},
 			},

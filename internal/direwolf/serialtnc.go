@@ -22,9 +22,10 @@ import (
 // unless it is told otherwise before it is started.
 const serialTNCReattachDelay = 30 * time.Second
 
-// serialTNC describes a KISS TNC on a serial port, for SCHANNEL.
-func serialTNC() kissTNC {
-	return kissTNC{source: dwcore.SourceSerialTNC, name: "serial TNC", spectrum: "Serial TNC"}
+// serialTNC describes a KISS TNC on a serial port, for SCHANNEL, of which we
+// use KISS port kissPort.
+func serialTNC(kissPort int) kissTNC {
+	return kissTNC{source: dwcore.SourceSerialTNC, name: "serial TNC", spectrum: "Serial TNC", port: kissPort, otherPortHeard: new(atomic.Bool)}
 }
 
 // SerialTNC is a KISS TNC on a serial port, standing in for a radio channel.
@@ -32,6 +33,7 @@ type SerialTNC struct {
 	channel       int // SCHANNEL channel number frames from the TNC are received on.
 	device        string
 	baud          int
+	tnc           kissTNC       // Which TNC this is, and which of its KISS ports is ours.
 	reattachDelay time.Duration // Before trying to reattach.
 	started       atomic.Bool
 	debug         int
@@ -66,11 +68,16 @@ func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiv
 			continue
 		}
 
-		var log = logrus.WithFields(logrus.Fields{"channel": i, "device": audio.serialTNCDevice[i], "baud": audio.serialTNCBaud[i]})
+		var log = logrus.WithFields(logrus.Fields{
+			"channel":  i,
+			"device":   audio.serialTNCDevice[i],
+			"baud":     audio.serialTNCBaud[i],
+			"kissPort": audio.serialTNCKISSPort[i],
+		})
 
 		log.Debug("Serial TNC")
 
-		var st, err = NewSerialTNC(i, audio.serialTNCDevice[i], audio.serialTNCBaud[i], recFrame, debug)
+		var st, err = NewSerialTNC(i, audio.serialTNCDevice[i], audio.serialTNCBaud[i], audio.serialTNCKISSPort[i], recFrame, debug)
 		if err != nil {
 			log.WithError(err).Error("Could not attach to serial TNC")
 			os.Exit(1)
@@ -84,12 +91,14 @@ func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiv
 	return tncs
 }
 
-// NewSerialTNC attaches channel, an SCHANNEL one, to the KISS TNC on the
-// serial port device, at baud bits per second.  Frames from it go to recFrame,
-// or are dropped if that is nil.  debug is the "-d k" count, as for
+// NewSerialTNC attaches channel, an SCHANNEL one, to KISS port kissPort (0 to
+// 15) of the KISS TNC on the serial port device, at baud bits per second.
+// Frames from that port go to recFrame, or are dropped if that is nil; those
+// from the TNC's other ports are dropped.  debug is the "-d k" count, as for
 // NewSerialTNCs.  Nothing is read from the TNC until Start is called.
-func NewSerialTNC(channel int, device string, baud int, recFrame frameReceiver, debug int) (*SerialTNC, error) {
+func NewSerialTNC(channel int, device string, baud int, kissPort int, recFrame frameReceiver, debug int) (*SerialTNC, error) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+	dwutil.Assert(kissPort >= 0 && kissPort < kissPortCount)
 
 	var fd = serialport.Open(device, baud)
 	if fd == nil {
@@ -100,6 +109,7 @@ func NewSerialTNC(channel int, device string, baud int, recFrame frameReceiver, 
 	st.channel = channel
 	st.device = device
 	st.baud = baud
+	st.tnc = serialTNC(kissPort)
 	st.reattachDelay = serialTNCReattachDelay
 	st.recFrame = recFrame
 	st.debug = debug
@@ -227,7 +237,7 @@ func (st *SerialTNC) listenThread(ctx context.Context) {
 
 		// Separate the byte stream into KISS frames, each received as though
 		// heard on the channel.
-		tncRecByte(collector, ch, st.debug, st.channel, serialTNC(), st.recFrame)
+		tncRecByte(collector, ch, st.debug, st.channel, st.tnc, st.recFrame)
 	}
 }
 
@@ -243,9 +253,9 @@ func (st *SerialTNC) sendPacket(channel int, pp *ax25.Packet) bool {
 		return false
 	}
 
-	// The on-air frame behind a type byte of 0: a data frame, for the TNC's
-	// only radio, KISS channel 0.
-	var frame = kiss.Encapsulate(append([]byte{0}, pp.FrameData()...))
+	// The on-air frame behind a type byte saying it is a data frame, for our
+	// KISS port on the TNC.
+	var frame = kiss.Encapsulate(append([]byte{st.tnc.typeByte()}, pp.FrameData()...))
 
 	st.mu.Lock()
 	defer st.mu.Unlock()
