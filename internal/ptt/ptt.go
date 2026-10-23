@@ -889,7 +889,10 @@ func (p *PTT) setup() error {
 						/* O_NONBLOCK added in version 0.9. */
 						/* Was hanging with some USB-serial adapters. */
 						/* https://bugs.launchpad.net/ubuntu/+source/linux/+bug/661321/comments/12 */
-						fd, openErr = os.Open(p.channels[ch].Outputs[ot].Device)
+						// Without it, open waits for the modem to report
+						// carrier, which a PTT interface never does - macOS's
+						// /dev/tty.* devices always wait.
+						fd, openErr = os.OpenFile(p.channels[ch].Outputs[ot].Device, os.O_RDONLY|unix.O_NONBLOCK, 0)
 					}
 
 					if openErr == nil {

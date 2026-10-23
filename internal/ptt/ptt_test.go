@@ -1255,3 +1255,45 @@ func TestPttSetRealSerialLineFailureLogged(t *testing.T) {
 	assert.Equal(t, 0, entry.Data["channel"])
 	assert.Equal(t, true, entry.Data["on"])
 }
+
+// Opening a serial port can wait for the modem to report carrier: macOS's
+// /dev/tty.* callin devices do, and so does any port without CLOCAL set.  A
+// USB interface like the Digirig never reports it, so the port is opened
+// without waiting, as Dire Wolf does.  A FIFO with nobody writing to it waits
+// to open in the same way, and stands in for such a port here.
+func TestSerialPortOpenDoesNotWaitForCarrier(t *testing.T) {
+	t.Parallel()
+
+	var device = filepath.Join(t.TempDir(), "tty")
+	require.NoError(t, unix.Mkfifo(device, 0o600))
+
+	var cfg = new([phy.MaxRadioChans]ChannelConfig)
+	cfg[0].Radio = true
+	cfg[0].Outputs[OutputPTT].Method = MethodSerial
+	cfg[0].Outputs[OutputPTT].Device = device
+	cfg[0].Outputs[OutputPTT].Line = LineRTS
+
+	var opened = make(chan *PTT, 1)
+
+	go func() {
+		var p, err = newPTT(*cfg, nil, nil, 0, t.TempDir())
+		assert.NoError(t, err)
+
+		opened <- p
+	}()
+
+	select {
+	case p := <-opened:
+		require.NotNil(t, p)
+		t.Cleanup(p.Term)
+		assert.NotNil(t, p.fd[0][OutputPTT], "the serial port was not opened")
+	case <-time.After(5 * time.Second):
+		// Let the stuck open go, so the test binary can exit.
+		var writer, err = os.OpenFile(device, os.O_WRONLY, 0) //nolint:gosec // G304: the test's own FIFO
+		if err == nil {
+			t.Cleanup(func() { _ = writer.Close() })
+		}
+
+		require.Fail(t, "opening the serial port waited for carrier")
+	}
+}
