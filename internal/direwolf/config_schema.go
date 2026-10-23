@@ -122,6 +122,10 @@ type NetworkTNCSettings struct {
 
 	// Port is the TNC's KISS TCP port.
 	Port *int `yaml:"port"`
+
+	// MyCall is the channel's own MYCALL.  Left out, the channel takes the
+	// MYCALL every channel without one of its own gets.
+	MyCall string `yaml:"mycall"`
 }
 
 // AXUDPPortSettings describes an AXUDP port: a virtual channel whose frames
@@ -143,6 +147,9 @@ type AXUDPPortSettings struct {
 	// AutoMap sends frames for an address no map covers to wherever that
 	// address was last heard from, like BPQ's AUTOADDMAP.
 	AutoMap bool `yaml:"automap"`
+
+	// MyCall is the channel's own MYCALL, as for a network TNC.
+	MyCall string `yaml:"mycall"`
 }
 
 // KISSPortSettings describes a KISS TCP port - KISSPORT.

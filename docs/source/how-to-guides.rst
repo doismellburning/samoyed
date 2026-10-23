@@ -575,10 +575,12 @@ it tries to reattach every 5 seconds until it succeeds,
 logging each attempt;
 packets for the channel meanwhile are discarded, with an error logged for each.
 
-The channel can't be given a ``MYCALL`` of its own,
+In this format the channel can't be given a ``MYCALL`` of its own,
 as ``CHANNEL`` only selects a radio channel.
 It takes the first ``MYCALL`` in the file,
 which every channel without a callsign of its own gets.
+The YAML configuration's ``networkTNCs`` entries take a ``mycall`` of their own
+(see :doc:`yaml-config`).
 
 Once the ``NCHANNEL`` line has been read,
 the channel can be used much as a radio channel is:
