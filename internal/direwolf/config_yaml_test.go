@@ -299,6 +299,66 @@ legacy: |
 	}
 }
 
+// A network TNC's or an AXUDP port's channel can be given a MYCALL of its own
+// in its entry - there's no way to in the legacy format, which only gives a
+// virtual channel the MYCALL every channel without one gets.
+//
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
+func Test_config_yaml_virtual_channel_mycall(t *testing.T) {
+	t.Run("a network TNC and an AXUDP port each have their own", func(t *testing.T) {
+		var c = parseYAMLConfig(t, `
+channels:
+  - {channel: 0, mycall: Q2TEST}
+networkTNCs:
+  - {channel: 6, host: 192.0.2.1, port: 8001, mycall: q1test-1}
+axudpPorts:
+  - {port: 20093, channel: 10, mycall: Q1TEST-2}
+`)
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, "Q2TEST", c.audio.mycall[0])
+		assert.Equal(t, "Q1TEST-1", c.audio.mycall[6], "a network TNC's own, in upper case")
+		assert.Equal(t, "Q1TEST-2", c.audio.mycall[10])
+	})
+
+	t.Run("one left out takes the MYCALL every channel without one gets", func(t *testing.T) {
+		var c = parseYAMLConfig(t, `
+channels:
+  - {channel: 0, mycall: Q2TEST}
+networkTNCs:
+  - {channel: 6, host: 192.0.2.1, port: 8001}
+`)
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, "Q2TEST", c.audio.mycall[6])
+	})
+
+	t.Run("a MYCALL in the legacy block doesn't overwrite a channel's own", func(t *testing.T) {
+		var c = parseYAMLConfig(t, `
+networkTNCs:
+  - {channel: 6, host: 192.0.2.1, port: 8001, mycall: Q1TEST-1}
+legacy: |
+  MYCALL Q2TEST
+`)
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, "Q2TEST", c.audio.mycall[0])
+		assert.Equal(t, "Q1TEST-1", c.audio.mycall[6])
+	})
+
+	t.Run("an invalid one is refused and claims no channel", func(t *testing.T) {
+		for _, tc := range []struct {
+			name, content string
+			channel       int
+		}{
+			{"network TNC", "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001, mycall: \"not a call\"}\n", 6},
+			{"AXUDP port", "axudpPorts:\n  - {port: 20093, channel: 10, mycall: \"not a call\"}\n", 10},
+		} {
+			var c = parseYAMLConfig(t, tc.content)
+			assert.Equal(t, 1, c.errors, tc.name)
+			assert.Contains(t, c.output, "Invalid mycall", tc.name)
+			assert.Equal(t, MEDIUM_NONE, c.audio.chan_medium[tc.channel], tc.name)
+		}
+	})
+}
+
 //nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_yaml_network_TNCs(t *testing.T) {
 	t.Run("a network TNC makes its channel a network TNC one", func(t *testing.T) {

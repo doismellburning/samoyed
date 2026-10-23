@@ -2003,11 +2003,20 @@ func (ps *parseState) applyNCHANNEL(settings NetworkTNCSettings) error {
 		return fmt.Errorf("line %d: Invalid TCP port number \"%d\" for NCHANNEL command. Must be in range %d to %d", ps.line, port, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
 	}
 
+	var mycall, mycallErr = ps.channelMYCALL(settings.MyCall, "network TNC")
+	if mycallErr != nil {
+		return mycallErr
+	}
+
 	// Claim the channel only once all of it has checked out: NewNetTNCs
 	// attaches to every MEDIUM_NETTNC channel and exits if it cannot, so a
 	// half-checked one would otherwise take the program down at startup.
 	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
 	ps.audio.nettnc_addr[nchan] = settings.Host
+
+	if mycall != "" {
+		ps.audio.mycall[nchan] = mycall
+	}
 	ps.audio.nettnc_port[nchan] = port
 
 	return nil
@@ -2106,12 +2115,21 @@ func (ps *parseState) applyAXUDPPORT(settings AXUDPPortSettings) error {
 		ps.warnf("line %d: AXUDP port %d: %s", ps.line, settings.Port, problem)
 	}
 
+	var mycall, mycallErr = ps.channelMYCALL(settings.MyCall, "AXUDP port")
+	if mycallErr != nil {
+		return mycallErr
+	}
+
 	// Claim the channel only once all of it has checked out, as NCHANNEL
 	// does: NewAXUDPChannels opens every MEDIUM_AXUDP channel and exits if
 	// it cannot.
 	ps.audio.chan_medium[channel] = MEDIUM_AXUDP
 	ps.audio.axudp_port[channel] = settings.Port
 	ps.audio.axudp_routes[channel] = routes
+
+	if mycall != "" {
+		ps.audio.mycall[channel] = mycall
+	}
 
 	return nil
 }
@@ -2129,15 +2147,38 @@ func handleMYCALL(ps *parseState) error {
 	return ps.applyMYCALL(t)
 }
 
-// applyMYCALL sets the station callsign for the current channel, and for any
-// other channel that does not have one yet.
-func (ps *parseState) applyMYCALL(call string) error {
+// normalMYCALL is call as a MYCALL is kept - in upper case, silently - and
+// whether it is a valid one.
+func normalMYCALL(call string) (string, bool) {
 	/* Silently force upper case. */
 	/* Might change to warning someday. */
 	call = strings.ToUpper(call)
 
 	var _, _, _, ok = ax25.ParseAddr(-1, call, ax25.AddrStrictNoStar)
 
+	return call, ok
+}
+
+// channelMYCALL checks the mycall a virtual channel's YAML entry gives it, for
+// a what such as "network TNC".  Left out, it is "", and the channel takes its
+// MYCALL as any channel without one of its own does.
+func (ps *parseState) channelMYCALL(call string, what string) (string, error) {
+	if call == "" {
+		return "", nil
+	}
+
+	var normal, ok = normalMYCALL(call)
+	if !ok {
+		return "", fmt.Errorf("line %d: Invalid mycall %q for %s", ps.line, call, what)
+	}
+
+	return normal, nil
+}
+
+// applyMYCALL sets the station callsign for the current channel, and for any
+// other channel that does not have one yet.
+func (ps *parseState) applyMYCALL(call string) error {
+	var normal, ok = normalMYCALL(call)
 	if !ok {
 		return fmt.Errorf("config file: Invalid value for MYCALL command on line %d", ps.line)
 	}
@@ -2147,7 +2188,7 @@ func (ps *parseState) applyMYCALL(call string) error {
 
 	for c := range MAX_TOTAL_CHANS {
 		if c == ps.channel || IsNoCall(ps.audio.mycall[c]) {
-			ps.audio.mycall[c] = call
+			ps.audio.mycall[c] = normal
 		}
 	}
 
