@@ -519,6 +519,77 @@ its own UA, so connected mode there is configured in that software and never
 reaches the path described above.  Registering a callsign over the AGW port
 has no bearing on it.
 
+Use a network KISS TNC as a channel
+-----------------------------------
+
+``NCHANNEL`` makes a TNC reached by KISS over TCP one of Samoyed's channels,
+as though it were another radio:
+
+.. code::
+
+    NCHANNEL chan addr port
+
+``chan`` is the channel number,
+``addr`` the TNC's host name or IP address,
+and ``port`` its KISS TCP port.
+The channel has to be a virtual one, 6 to 15,
+since 0 to 5 are kept for radio channels whether or not there is audio for them,
+and it can't be one another ``NCHANNEL``, ``SCHANNEL``, ``ICHANNEL`` or AXUDP port has already taken.
+
+For example,
+to share the radio of another ``samoyed-direwolf``
+by connecting to its ``KISSPORT`` (8001 unless it says otherwise):
+
+.. code::
+
+    MYCALL Q1TEST
+    NCHANNEL 10 radio.example.org 8001
+    DIGIPEAT 10 10 ^WIDE[3-7]-[1-7]$|^TEST$ ^WIDE[12]-[12]$
+
+or to reach AXUDP nodes through ``samoyed-axudp``,
+which takes KISS clients on port 8002 by default:
+
+.. code::
+
+    NCHANNEL 10 localhost 8002
+
+Frames are sent to the TNC on KISS port 0,
+whatever the channel's number is here.
+Frames from the TNC are taken as this channel's,
+whatever KISS port they name -
+so a TNC that has several ports of its own,
+such as another ``samoyed-direwolf`` with more than one channel,
+has everything it hears arrive on the one channel.
+
+Packets for the channel go straight to the TNC rather than into the transmit queue,
+so Samoyed applies no ``TXDELAY``, ``PERSIST``, ``SLOTTIME`` or ``DWAIT`` to them,
+and does not wait for the channel to be clear:
+getting on the air is left to the TNC, with its own settings.
+Connected mode works over the channel too,
+which is treated as clear to send whenever a link wants it.
+
+Samoyed connects to every ``NCHANNEL`` TNC at startup,
+and exits if one can't be reached.
+If the connection drops later,
+it tries to reattach every 5 seconds until it succeeds,
+logging each attempt;
+packets for the channel meanwhile are discarded, with an error logged for each.
+
+The channel can't be given a ``MYCALL`` of its own,
+as ``CHANNEL`` only selects a radio channel.
+It takes the first ``MYCALL`` in the file,
+which every channel without a callsign of its own gets.
+
+Once the ``NCHANNEL`` line has been read,
+the channel can be used much as a radio channel is:
+``DIGIPEAT``, ``FILTER`` and a beacon's ``SENDTO`` can name it,
+the IGate gates what is heard on it,
+and ``IGTXVIA`` can make it the IGate's transmit channel.
+``DIGIPEAT``, ``FILTER`` and ``SENDTO`` check the channel as they are read,
+so a line naming it has to come after the ``NCHANNEL``,
+or it is reported as naming a channel that is not valid.
+``CDIGIPEAT``, ``CFILTER`` and ``REGEN`` take radio channels only.
+
 Run a NET/ROM node
 ------------------
 
