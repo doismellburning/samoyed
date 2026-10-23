@@ -199,7 +199,7 @@ func receiveFrame(t *testing.T, link *AX25Link, pp *ax25.Packet, channel int) {
 }
 
 // Helper to establish a connection (SABM/UA exchange)
-func establishConnection(t *testing.T, link *AX25Link, myCall, theirCall string, channel int) *ax25_dlsm_t { //nolint:unparam
+func establishConnection(t *testing.T, link *AX25Link, myCall, theirCall string, channel int) *ax25_dlsm_t {
 	t.Helper()
 
 	initiateConnect(t, link, myCall, theirCall, channel)

@@ -4118,6 +4118,16 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var pp = ax25.UFrame(S.addrs, S.num_addr, res, ax25.FrameTypeUUA, f, nopid, nil)
 			S.services.queue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 
+			// Implementation difference: on a reset, the SDL discards the I frame queue when V(S) != V(A),
+			// and gives the client a fresh connect indication, leaving layer 3 to recover what was lost.
+			// Like the Linux kernel's AX.25 (ax25_requeue_frames), we instead put the unacknowledged
+			// frames back on the queue, to be sent again from N(S) 0 once the sequence numbers are reset
+			// below.  Nothing is lost, so the client has nothing to be told.
+			// A SABM(E) retried because our UA was slow would otherwise throw away whatever the
+			// client sent first.  See issue #1052.
+			// This walks V(A) to V(S), so it must come before a change of version changes the modulo.
+			requeueIFrames(S)
+
 			// State 3 & 4 handling are the same except for this one difference.
 			if S.state == state_4_timer_recovery {
 				if extended {
@@ -4134,13 +4144,6 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 					"stream": S.stream_id,
 					"state":  S.state,
 				}).Debug("AX.25 Protocol Error F: Data Link reset, i.e. SABM(E) received")
-			}
-
-			if S.vs != S.va {
-				discard_i_queue(S)
-				// dl connect indication
-				var incoming = true
-				S.services.clients.LinkEstablished(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], incoming)
 			}
 
 			STOP_T1(S)
@@ -6127,6 +6130,36 @@ func discard_i_queue(S *ax25_dlsm_t) {
 		DeleteCData(t)
 	}
 } /* end discard_i_queue */
+
+// requeueIFrames puts the I frames that have been sent but not acknowledged,
+// V(A) up to V(S), back at the front of the I frame queue in order, so they go
+// again once a link reset has set the sequence numbers back to 0.
+func requeueIFrames(S *ax25_dlsm_t) {
+	var head *cdata_t
+	var tail *cdata_t
+
+	for ns := S.va; ns != S.vs; ns = AX25MODULO(ns+1, S.modulo) {
+		var txdata = S.txdata_by_ns[ns]
+		S.txdata_by_ns[ns] = nil
+
+		if txdata == nil {
+			continue
+		}
+
+		if tail == nil {
+			head = txdata
+		} else {
+			tail.next = txdata
+		}
+
+		tail = txdata
+	}
+
+	if tail != nil {
+		tail.next = S.i_frame_queue
+		S.i_frame_queue = head
+	}
+}
 
 /*------------------------------------------------------------------------------
  *
