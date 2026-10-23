@@ -140,15 +140,33 @@ import (
 )
 
 // setSerialControlLine sets or clears one of a serial port's control lines.
-func setSerialControlLine(fd int, bit int, on bool) {
-	var stuff, _ = unix.IoctlGetInt(fd, unix.TIOCMGET)
+//
+// TIOCMBIS and TIOCMBIC take a pointer to the bits to change, so this needs
+// IoctlSetPointerInt: IoctlSetInt hands the kernel the bits themselves as the
+// address, which it rejects with EFAULT, leaving the line wherever opening the
+// port put it - and opening a port raises RTS and DTR.
+func setSerialControlLine(fd int, bit int, on bool) error {
+	var req uint = unix.TIOCMBIC
 	if on {
-		stuff |= bit
-	} else {
-		stuff &= ^bit
+		req = unix.TIOCMBIS
 	}
 
-	unix.IoctlSetInt(fd, unix.TIOCMSET, stuff)
+	return unix.IoctlSetPointerInt(fd, req, bit)
+}
+
+// setSerialLine drives one control line of the serial port behind channel's
+// output ot.  A failure is logged rather than returned: Set has nobody to hand
+// it to, and a line that can't be driven may well be a transmitter left keyed.
+func (p *PTT) setSerialLine(channel int, ot OutputType, bit int, on bool) {
+	var err = p.serialControl(int(p.fd[channel][ot].Fd()), bit, on)
+	if err != nil {
+		logrus.WithError(err).WithFields(logrus.Fields{
+			"channel": channel,
+			"output":  octypeName(ot),
+			"device":  p.channels[channel].Outputs[ot].Device,
+			"on":      on,
+		}).Error("Can't set serial port control line")
+	}
 }
 
 const LPT_IO_ADDR = 0x378
@@ -217,8 +235,8 @@ type PTT struct {
 	// is a field rather than always setSerialControlLine so that a test can
 	// see which line was driven and at what level: neither a pseudo terminal
 	// nor a plain file has modem control lines, and the ioctls simply fail on
-	// them, which is why their result is ignored.
-	serialControl func(fd int, bit int, on bool)
+	// them.
+	serialControl func(fd int, bit int, on bool) error
 
 	// mu guards the handles below.  Set reads them from the transmit and
 	// receive threads while Term, run by the shutdown path, closes and
@@ -454,9 +472,9 @@ func (p *PTT) set(ot OutputType, channel int, ptt_signal int) {
 		p.fd[channel][ot] != nil {
 		switch p.channels[channel].Outputs[ot].Line {
 		case LineRTS:
-			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_RTS, ptt != 0)
+			p.setSerialLine(channel, ot, unix.TIOCM_RTS, ptt != 0)
 		case LineDTR:
-			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_DTR, ptt != 0)
+			p.setSerialLine(channel, ot, unix.TIOCM_DTR, ptt != 0)
 		case LineNone:
 		}
 
@@ -466,9 +484,9 @@ func (p *PTT) set(ot OutputType, channel int, ptt_signal int) {
 
 		switch p.channels[channel].Outputs[ot].Line2 {
 		case LineRTS:
-			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_RTS, ptt2 != 0)
+			p.setSerialLine(channel, ot, unix.TIOCM_RTS, ptt2 != 0)
 		case LineDTR:
-			p.serialControl(int(p.fd[channel][ot].Fd()), unix.TIOCM_DTR, ptt2 != 0)
+			p.setSerialLine(channel, ot, unix.TIOCM_DTR, ptt2 != 0)
 		case LineNone:
 		}
 		/* else neither one */
