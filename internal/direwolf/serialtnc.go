@@ -55,9 +55,10 @@ type SerialTNC struct {
 
 // NewSerialTNCs attaches a SerialTNC to each SCHANNEL channel in audio, and
 // starts it listening until ctx is cancelled, its frames going to recFrame.
+// debug is the "-d k" count, which shows the frames as they arrive.
 // It returns the TNC for each such channel, and nil for every other.  It is
 // called once at startup, and exits if a TNC's port cannot be opened.
-func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiver) [MAX_TOTAL_CHANS]*SerialTNC {
+func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiver, debug int) [MAX_TOTAL_CHANS]*SerialTNC {
 	var tncs [MAX_TOTAL_CHANS]*SerialTNC
 
 	for i := range MAX_TOTAL_CHANS {
@@ -69,7 +70,7 @@ func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiv
 
 		log.Debug("Serial TNC")
 
-		var st, err = NewSerialTNC(i, audio.serialTNCDevice[i], audio.serialTNCBaud[i], recFrame)
+		var st, err = NewSerialTNC(i, audio.serialTNCDevice[i], audio.serialTNCBaud[i], recFrame, debug)
 		if err != nil {
 			log.WithError(err).Error("Could not attach to serial TNC")
 			os.Exit(1)
@@ -85,9 +86,9 @@ func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiv
 
 // NewSerialTNC attaches channel, an SCHANNEL one, to the KISS TNC on the
 // serial port device, at baud bits per second.  Frames from it go to recFrame,
-// or are dropped if that is nil.  Nothing is read from the TNC until Start is
-// called.
-func NewSerialTNC(channel int, device string, baud int, recFrame frameReceiver) (*SerialTNC, error) {
+// or are dropped if that is nil.  debug is the "-d k" count, as for
+// NewSerialTNCs.  Nothing is read from the TNC until Start is called.
+func NewSerialTNC(channel int, device string, baud int, recFrame frameReceiver, debug int) (*SerialTNC, error) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	var fd = serialport.Open(device, baud)
@@ -101,6 +102,7 @@ func NewSerialTNC(channel int, device string, baud int, recFrame frameReceiver) 
 	st.baud = baud
 	st.reattachDelay = serialTNCReattachDelay
 	st.recFrame = recFrame
+	st.debug = debug
 	st.fd = fd
 
 	return st, nil

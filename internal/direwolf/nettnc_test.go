@@ -111,7 +111,7 @@ func attachTestNetTNC(ctx context.Context, t *testing.T, recFrame frameReceiver)
 
 	var port, conns = newTestNetTNC(ctx, t)
 
-	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port, recFrame)
+	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port, recFrame, 0)
 	require.NoError(t, err)
 
 	// Reattaching after the TNC goes away waits between attempts; not the
@@ -137,7 +137,7 @@ func TestNetTNCAttachRefused(t *testing.T) {
 	// A port nothing is listening on: one taken and given straight back.
 	var port = testutils.UnusedPortNumber(t)
 
-	var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, nil)
+	var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, nil, 0)
 
 	require.Error(t, err)
 	assert.Nil(t, nt)
@@ -570,20 +570,30 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 	assert.NotNil(t, dlq.Remove())
 }
 
-// With the debug option the frames are printed in both the form they arrived
-// in and the form they were decoded to, so that a TNC that is not being
-// understood can be looked at.
+// With "-d n" the frames from a network TNC are printed in both the form they
+// arrived in and the form they were decoded to, saying which TNC they came
+// from, so that a TNC that is not being understood can be looked at.
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestNetTNCDebugPrints(t *testing.T) {
-	var kf = new(kiss.Collector)
+	var dlq = NewDataLinkQueue()
+
+	var port, conns = newTestNetTNC(t.Context(), t)
 
 	var output = captureLogOutput(t, logrus.DebugLevel, func() {
-		for _, b := range kissFrameFor(newTestPacket(t)) {
-			tncRecByte(kf, b, 2, nettncTestChannel, netTNC(), nil)
-		}
+		var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, dlq.RecFrame, 2)
+		require.NoError(t, err)
+
+		nt.Start(t.Context())
+
+		var _, writeErr = nextTestNetTNCConn(t, conns).Write(kissFrameFor(newTestPacket(t)))
+		require.NoError(t, writeErr)
+
+		// Everything is printed before the frame is passed on.
+		require.Eventually(t, func() bool { return dlq.Remove() != nil }, 10*time.Second, 10*time.Millisecond)
 	})
 
+	assert.Contains(t, output, fmt.Sprintf(`msg="KISS frame from external TNC" channel=%d tnc="network TNC"`, nettncTestChannel))
 	assert.Contains(t, output, `direction=from function="Data frame"`)
 	assert.Contains(t, output, "Frame content after removing KISS framing")
 }
@@ -603,7 +613,7 @@ func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
-	var output = captureLogOutput(t, logrus.InfoLevel, func() { tncs = NewNetTNCs(t.Context(), audioConfig, nil) })
+	var output = captureLogOutput(t, logrus.InfoLevel, func() { tncs = NewNetTNCs(t.Context(), audioConfig, nil, 0) })
 
 	assert.Contains(t, output, fmt.Sprintf(`msg="Network TNC" channel=%d host=127.0.0.1 port=%d`, nettncTestChannel, port))
 
@@ -629,7 +639,7 @@ func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
 
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
-	testutils.CaptureOutput(t, func() { tncs = NewNetTNCs(ctx, audioConfig, nil) })
+	testutils.CaptureOutput(t, func() { tncs = NewNetTNCs(ctx, audioConfig, nil, 0) })
 
 	assert.Nil(t, tncs[nettncTestChannel], "a connection cut short should not have been attached")
 }
@@ -655,7 +665,7 @@ func TestNetTNCInitSaysWhyItCouldNotAttach(t *testing.T) {
 		audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
 		audioConfig.nettnc_port[nettncTestChannel] = port
 
-		NewNetTNCs(t.Context(), audioConfig, nil)
+		NewNetTNCs(t.Context(), audioConfig, nil, 0)
 
 		return
 	}
