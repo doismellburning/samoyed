@@ -29,6 +29,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -364,6 +365,14 @@ type AudioDevices struct {
 	// PortAudio itself, so each open that initializes it needs exactly one
 	// Terminate.
 	portaudioHeld bool
+
+	// continuousOutput keeps each soundcard output stream running from open
+	// to close, as Dire Wolf's PortAudio backend does on macOS, rather than
+	// starting it for each transmission and draining it in wait.  Starting
+	// and draining a CoreAudio stream both take long enough to hold PTT on
+	// well past the end of the audio (issue #1111).  Elsewhere Dire Wolf
+	// drains, as samoyed does without this.
+	continuousOutput bool
 
 	// backendNoise holds what the native audio libraries most recently wrote
 	// to stderr from underneath PortAudio, until something goes wrong that it
@@ -810,7 +819,8 @@ func (d *AudioDevices) openSoundcardOutput(a int, pa *RadioConfig, name string, 
 	 * Soundcard - blocking write mode.
 	 * Flush fills the typed output buffer and calls Write() to
 	 * send it to PortAudio. The stream is started lazily on first write
-	 * and stopped in wait to avoid underflows during idle periods.
+	 * and stopped in wait to avoid underflows during idle periods -
+	 * unless continuousOutput, which starts it here and leaves it running.
 	 */
 
 	if !portaudioReady {
@@ -890,11 +900,29 @@ func (d *AudioDevices) openSoundcardOutput(a int, pa *RadioConfig, name string, 
 		return nil
 	}
 
-	// Output stream is opened but NOT started here.
+	// Otherwise the output stream is opened but NOT started here.
 	// It will be started lazily on first write in Flush
 	// and stopped in wait, to avoid underflows during idle periods.
+	if d.continuousOutput {
+		d.startOutput(a)
+	}
 
 	return nil
+}
+
+// startOutput starts audio device a's output stream, reporting whether it
+// could.
+func (d *AudioDevices) startOutput(a int) bool {
+	var err = d.dev[a].outputStream.Start()
+	if err != nil {
+		logrus.WithError(err).WithField("adev", a).Error("Could not start audio output stream")
+
+		return false
+	}
+
+	d.dev[a].outputStarted = true
+
+	return true
 }
 
 // openDevice opens audio device a, as pa describes it, for receiving and,
@@ -1148,7 +1176,14 @@ func fillAudioDefaults(pa *RadioConfig) {
  *----------------------------------------------------------------*/
 
 func AudioOpen(ctx context.Context, pa *RadioConfig) (*AudioDevices, error) {
+	return audioOpen(ctx, pa, runtime.GOOS == "darwin")
+}
+
+// audioOpen is AudioOpen with the choice of continuousOutput given, so that a
+// test can try either on any platform.
+func audioOpen(ctx context.Context, pa *RadioConfig, continuousOutput bool) (*AudioDevices, error) {
 	var d = new(AudioDevices)
+	d.continuousOutput = continuousOutput
 
 	// If AudioOpen fails, close whatever it had opened so far, and give back
 	// the PortAudio initialization so it stays correctly paired with
@@ -1469,19 +1504,22 @@ func (d *AudioDevices) Flush(a int) int {
 		}
 	}
 
-	// Start the output stream lazily on first write.
-	if !d.dev[a].outputStarted {
-		var err = d.dev[a].outputStream.Start()
-		if err != nil {
-			logrus.WithError(err).WithField("adev", a).Error("Could not start audio output stream")
-
-			return -1
-		}
-
-		d.dev[a].outputStarted = true
+	// Start the output stream lazily on first write, or again after a
+	// write error stopped it.
+	if !d.dev[a].outputStarted && !d.startOutput(a) {
+		return -1
 	}
 
 	var err = d.dev[a].outputStream.Write()
+	if d.continuousOutput && errors.Is(err, portaudio.OutputUnderflowed) {
+		// A stream left running between transmissions has nothing to play
+		// while idle, and says so on the next write.  The write itself
+		// still went through.
+		logrus.WithField("adev", a).Debug("Audio output underflowed while idle")
+
+		err = nil
+	}
+
 	if err != nil {
 		logrus.WithError(err).WithField("adev", a).Error("Audio output write error")
 
@@ -1589,6 +1627,13 @@ func (d *AudioDevices) wait(a int) {
 
 	// For UDP output, packets are sent immediately on flush — nothing more to do.
 	if d.dev[a].udp_out_sock != nil {
+		return
+	}
+
+	// A stream that runs continuously isn't drained either: xmit's own
+	// timing, from the number of bits sent, decides when PTT goes off, as
+	// it does in Dire Wolf.  TXTAIL covers what is still queued.
+	if d.continuousOutput {
 		return
 	}
 
