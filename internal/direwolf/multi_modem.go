@@ -630,7 +630,7 @@ func newSlicerReceivers(r *Layer2Receiver, from dwcore.SlicerID, scrambled bool)
 	var s = new(slicerReceivers)
 	s.hdlc = hdlc.NewReceiver(newHDLCConfig(achan), from, scrambled, &s.line, r.AudioLevel, r.recFrame)
 	s.fx25 = fx25.NewReceiver(from, r.fx25Debug, r.AudioLevel, r.recFrame)
-	s.il2p = il2p.NewReceiver(from, achan.il2p_version, achan.il2p_crc, r.il2pDebug, r.AudioLevel, r.recPacket)
+	s.il2p = il2p.NewReceiver(from, achan.il2p_version, achan.il2p_rx_crc, r.il2pDebug, r.AudioLevel, r.recPacket)
 
 	if achan.modem_type == MODEM_EAS {
 		s.eas = eas.NewReceiver(from, r.AudioLevel, r.recFrame)

@@ -175,6 +175,36 @@ func Test_main_debugsFEC(t *testing.T) {
 	}
 }
 
+// Test_main_il2pCRC checks --il2p-crc against Dire Wolf's IL2P, which carries
+// no trailing CRC: expecting one, nothing gets through.
+func Test_main_il2pCRC(t *testing.T) {
+	t.Parallel()
+
+	var f = filepath.Join(t.TempDir(), "il2p.wav")
+
+	var cmd = exec.CommandContext(t.Context(), "gen_packets", "-I", "1", "-o", f) //nolint:gosec
+	require.NoError(t, cmd.Run())
+
+	var testCases = map[string]struct {
+		args []string
+		want string
+	}{
+		"CRC not expected": {nil, "4 packets decoded"},
+		"CRC expected":     {[]string{"--il2p-crc"}, "0 packets decoded"},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var result = testutils.RunMain(t, "", append(tc.args, f)...)
+
+			assert.Equal(t, 0, result.Status, result.Output())
+			assert.Contains(t, result.Output(), tc.want)
+		})
+	}
+}
+
 func Test_main_badArguments(t *testing.T) {
 	t.Parallel()
 

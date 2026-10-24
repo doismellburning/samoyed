@@ -276,7 +276,7 @@ func (F *Receiver) RecBit(dbit int) {
 		{
 			// Compute encoded payload size (includes parity symbols).
 			var version = F.version
-			var _, fec_level, payload_len = il2p_get_header_attributes(F.uhdr[:])
+			var hdr_type, fec_level, payload_len = il2p_get_header_attributes(F.uhdr[:])
 			var max_fec = il2p_rx_max_fec(version, fec_level)
 			var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
 
@@ -299,12 +299,9 @@ func (F *Receiver) RecBit(dbit int) {
 
 			// Validate trailing CRC if we collected one.
 			if pp != nil && F.crc {
-				var frame_data = pp.FrameData()
-				if !il2p_crc_check(frame_data, F.scrc[:]) {
-					if F.debug >= 1 {
-						F.logEntry().Debug("IL2P trailing CRC mismatch")
-					}
-					pp = nil
+				pp = il2pCRCPacket(pp, hdr_type, F.scrc[:])
+				if pp == nil && F.debug >= 1 {
+					F.logEntry().Debug("IL2P trailing CRC mismatch")
 				}
 			}
 

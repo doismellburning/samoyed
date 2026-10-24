@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/dwcore"
+	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -201,4 +203,189 @@ func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 			assert.Equal(t, encodedCRC[:], b[len(b)-IL2P_CRC_ENCODED_SIZE:])
 		})
 	}
+}
+
+// A type 1 header cannot represent every AX.25 frame exactly - AX.25 v1 C bits,
+// with both set, come back as a command - and a trailing CRC computed over the
+// original would then fail against what the receiver rebuilds.  FromText makes
+// such a frame whenever there is no digipeater path.
+func TestIL2PCRCLossyType1Header(t *testing.T) {
+	t.Parallel()
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello world", true)
+	require.NotNil(t, pp)
+
+	var _, e = il2p_type_1_header(pp, 1)
+	require.GreaterOrEqual(t, e, 0, "frame should fit a type 1 header")
+
+	t.Run("codec", func(t *testing.T) {
+		t.Parallel()
+
+		var encoded, n = il2p_encode_frame(pp, Version06, 1, true)
+		require.Positive(t, n)
+
+		// A receiver may check the CRC only against the frame it rebuilds, so
+		// the frame must go in a header that rebuilds it exactly.
+		var uhdr, e = il2p_clarify_header(encoded[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY], 0)
+		require.GreaterOrEqual(t, e, 0)
+		assert.Equal(t, 0, GET_HDR_TYPE(uhdr))
+
+		var pp2 = il2p_decode_frame(encoded[:n], Version06, 0)
+		require.NotNil(t, pp2)
+		assert.Equal(t, pp.FrameData(), pp2.FrameData())
+	})
+
+	t.Run("loopback", func(t *testing.T) {
+		t.Parallel()
+
+		var recorder = il2pLoopback(t, Version06)
+
+		require.Positive(t, recorder.sender.SendFrame(pp, Version06, 1, true, 0))
+		recorder.flush()
+
+		var received = recorder.take()
+		require.Len(t, received, 1)
+		assert.Equal(t, []byte("hello world"), received[0].info)
+	})
+}
+
+// The type 0 fallback is only for frames a type 1 header would change: one it
+// represents exactly keeps the more compact header.
+func TestIL2PCRCKeepsExactType1Header(t *testing.T) {
+	t.Parallel()
+
+	var addrs [ax25.MaxAddrs]string
+	addrs[0] = "Q1TEST"
+	addrs[1] = "Q2TEST"
+
+	var pp = ax25.UFrame(addrs, 2, ax25.CRCmd, ax25.FrameTypeUUI, 0, 0xF0, []byte("hello world"))
+	require.NotNil(t, pp)
+
+	var encoded, n = il2p_encode_frame(pp, Version06, 1, true)
+	require.Positive(t, n)
+
+	var uhdr, e = il2p_clarify_header(encoded[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY], 0)
+	require.GreaterOrEqual(t, e, 0)
+	assert.Equal(t, 1, GET_HDR_TYPE(uhdr))
+}
+
+// Whether a receiver expects a trailing CRC is its own setting: nothing in the
+// frame says whether one follows, so one that expects it hears only stations
+// that send it, and one that doesn't hears everyone, without the check.
+func TestIL2PCRCReceiveSetting(t *testing.T) {
+	t.Parallel()
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello world", true)
+	require.NotNil(t, pp)
+
+	var testData = []struct {
+		name     string
+		txCRC    bool
+		rxCRC    bool
+		received bool
+	}{
+		{"CRC to CRC", true, true, true},
+		{"CRC to no CRC", true, false, true},
+		{"no CRC to no CRC", false, false, true},
+		{"no CRC to CRC", false, true, false},
+	}
+
+	for _, testDatum := range testData {
+		t.Run(testDatum.name, func(t *testing.T) {
+			t.Parallel()
+
+			var received int
+
+			var rx = NewReceiver(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, Version06, testDatum.rxCRC, 0,
+				func(int, int) ax25.ALevel { return ax25.ALevel{Rec: 0, Mark: 0, Space: 0} },
+				func(dwcore.SlicerID, *ax25.Packet, dwcore.RxInfo) { received++ })
+
+			var sender = NewSender(linecode.NewEncoder(rx.RecBit), 0, 0)
+			require.Positive(t, sender.SendFrame(pp, Version06, 1, testDatum.txCRC, 0))
+
+			// Whatever follows the frame on the air, which a receiver expecting
+			// a CRC takes for one.
+			for range 64 {
+				rx.RecBit(0)
+			}
+
+			if testDatum.received {
+				assert.Equal(t, 1, received)
+			} else {
+				assert.Zero(t, received)
+			}
+		})
+	}
+}
+
+// The CRC covers the AX.25 frame before IL2P translation, and a sender may use
+// a type 1 header for a frame it cannot represent exactly - QtSoundModem sends
+// AX.25 v1 C bits that way - so the CRC matches the frame as it was sent, not
+// as a type 1 header rebuilds it.
+func TestIL2PCRCOverUntranslatedFrame(t *testing.T) {
+	t.Parallel()
+
+	for _, text := range []string{"Q1TEST>Q2TEST:hello world", "Q1TEST>Q2TEST:"} {
+		t.Run(text, func(t *testing.T) {
+			t.Parallel()
+
+			var pp = ax25.FromText(text, true)
+			require.NotNil(t, pp)
+
+			// Without a CRC, this frame gets a type 1 header.
+			var encoded, n = il2p_encode_frame(pp, Version06, 1)
+			require.Positive(t, n)
+
+			var uhdr, e = il2p_clarify_header(encoded[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY], 0)
+			require.GreaterOrEqual(t, e, 0)
+			require.Equal(t, 1, GET_HDR_TYPE(uhdr))
+
+			var crc = il2p_crc_encode(il2p_crc_calc(pp.FrameData()))
+			var frame = append(encoded[:n:n], crc[:]...)
+
+			var pp2 = il2p_decode_frame(frame, Version06, 0)
+			require.NotNil(t, pp2)
+			assert.Equal(t, pp.FrameData(), pp2.FrameData())
+		})
+	}
+}
+
+// Trying the C bits the type 1 header loses is no licence to accept a CRC
+// that matches none of them.
+func TestIL2PCRCOverUntranslatedFrameStillChecked(t *testing.T) {
+	t.Parallel()
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello world", true)
+	require.NotNil(t, pp)
+
+	var encoded, n = il2p_encode_frame(pp, Version06, 1)
+	require.Positive(t, n)
+
+	var crc = il2p_crc_encode(il2p_crc_calc(pp.FrameData()) ^ 0x0100)
+	var frame = append(encoded[:n:n], crc[:]...)
+
+	assert.Nil(t, il2p_decode_frame(frame, Version06, 0))
+}
+
+// The same, through the bit receiver.
+func TestIL2PCRCOverUntranslatedFrameReceived(t *testing.T) {
+	t.Parallel()
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello world", true)
+	require.NotNil(t, pp)
+
+	var recorder = il2pLoopback(t, Version06)
+
+	// A type 1 header, then the CRC of the frame as it was before translation.
+	require.Positive(t, recorder.sender.SendFrame(pp, Version06, 1, false, 0))
+
+	for _, b := range il2p_crc_encode(il2p_crc_calc(pp.FrameData())) {
+		recorder.sender.sendByteMSBFirst(int(b), 0)
+	}
+
+	recorder.flush()
+
+	var received = recorder.take()
+	require.Len(t, received, 1)
+	assert.Equal(t, []byte("hello world"), received[0].info)
 }

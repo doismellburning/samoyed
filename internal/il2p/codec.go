@@ -33,6 +33,10 @@ import (
  *		max_fec	- 1 to send maximum FEC size rather than automatic.
  *			  Only consulted for Version04.
  *
+ *		crc	- true to append the trailing CRC.  A frame that a
+ *			  type 1 header would not rebuild exactly then gets
+ *			  a type 0 header, so the CRC still matches.
+ *
  * Outputs:	iout	- Encoded result, excluding the 3 byte sync word.
  *			  Caller should provide  IL2P_MAX_PACKET_SIZE  bytes.
  *
@@ -57,6 +61,12 @@ func il2p_encode_frame(pp *ax25.Packet, version Version, max_fec int, crc ...boo
 
 	// Can a type 1 header be used?
 	var hdr, e = il2p_type_1_header(pp, fec_level)
+
+	// The receiver checks the CRC against the frame it rebuilds from the
+	// header, so only use a type 1 header that rebuilds this frame exactly.
+	if e >= 0 && appendCRC && !il2pType1RoundTrips(pp, hdr) {
+		e = -1
+	}
 
 	if e >= 0 {
 		var outbuf = new(bytes.Buffer)
@@ -151,6 +161,22 @@ func il2p_encode_frame(pp *ax25.Packet, version Version, max_fec int, crc ...boo
 	return nil, -1
 }
 
+// il2pType1RoundTrips reports whether hdr, a type 1 header made from pp,
+// rebuilds pp exactly.  It cannot always: AX.25 v1 C bits (both set or both
+// clear) come back as a command or response, for instance.
+func il2pType1RoundTrips(pp *ax25.Packet, hdr []byte) bool {
+	var rebuilt = il2p_decode_header_type_1(hdr, 0)
+	if rebuilt == nil {
+		return false
+	}
+
+	if len(pp.Info()) > 0 {
+		rebuilt.SetInfo(pp.Info())
+	}
+
+	return bytes.Equal(rebuilt.FrameData(), pp.FrameData())
+}
+
 /*-------------------------------------------------------------
  *
  * Name:	il2p_decode_frame
@@ -188,7 +214,7 @@ func il2p_decode_frame(irec []byte, version Version, debug int) *ax25.Packet {
 
 	// Determine if trailing CRC is present by computing the encoded payload size
 	// and checking if there are extra bytes beyond it.
-	var _, fec_level, payload_len = il2p_get_header_attributes(uhdr)
+	var hdr_type, fec_level, payload_len = il2p_get_header_attributes(uhdr)
 	var max_fec = il2p_rx_max_fec(version, fec_level)
 	var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
 
@@ -204,13 +230,9 @@ func il2p_decode_frame(irec []byte, version Version, debug int) *ax25.Packet {
 
 	// Validate CRC if present.
 	if pp != nil && crc_bytes != nil {
-		var frame_data = pp.FrameData()
-		if !il2p_crc_check(frame_data, crc_bytes) {
-			if debug >= 1 {
-				logrus.Debug("IL2P trailing CRC mismatch")
-			}
-
-			return nil
+		pp = il2pCRCPacket(pp, hdr_type, crc_bytes)
+		if pp == nil && debug >= 1 {
+			logrus.Debug("IL2P trailing CRC mismatch")
 		}
 	}
 

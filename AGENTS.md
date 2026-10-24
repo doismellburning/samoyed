@@ -7,6 +7,7 @@
 * `make test` runs the full test suite and should always pass
 * `make check` runs assorted linters and should always pass
 * `make fuzz` runs each `Fuzz*` target for `FUZZTIME` (30s by default; `FUZZ_PKGS`/`FUZZ_TARGET` narrow it, and CI gives each target its own runner) - the decoders are what anyone on frequency can reach, so a new one deserves a target; its seed corpus runs as an ordinary test under `make test` either way
+* [ninocarrillo/modem-test-audio](https://github.com/ninocarrillo/modem-test-audio) has NinoTNC recordings - AX.25, IL2P (`IL2P`) and IL2P with the trailing CRC (`IL2Pc`), single, burst, multiple and with added noise - which make a good check of a demodulator or IL2P change against real hardware's output: run `samoyed-atest` over them (`-B 300`, `-B 9600`, or `-B 4800 -g` for the AFSK 300, GFSK 9600 and GFSK 4800 files; `--il2p-crc` for `IL2Pc`) and compare with `main` and Dire Wolf's `atest`. It is about 1.2GB and deliberately not vendored, so clone it into a scratch directory rather than the repository
 * `make fix` will attempt assorted auto-fixes and also do a partial lint run and is worth running after every change
 * Claude Code on the web sessions run `.claude/hooks/session-start.sh`, which does `make setup` and a little container-specific fixing-up, so a fresh session can build, test and lint without further ceremony
 
