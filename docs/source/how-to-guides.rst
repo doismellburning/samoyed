@@ -752,4 +752,10 @@ since the links between nodes are addressed to their callsigns:
       netrom:
         callsign: Q1TEST-7
         alias: QNODEA
-        channels: [0, 10]
+        channels:
+          0:
+          10: {quality: 255}
+
+Giving the AXUDP channel a higher ``quality`` than the radio channel
+makes a node reachable both ways go over the internet,
+rather than whichever was heard first.

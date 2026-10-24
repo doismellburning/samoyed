@@ -193,12 +193,14 @@ type NetROMSettings struct {
 	// it by.  Beside a node shell it is the shell's alias, and is left out.
 	Alias string `yaml:"alias"`
 
-	// Channels are the channels the node runs on, each a radio channel or
-	// an NCHANNEL.  It has one routing table across them all, a neighbour
-	// being a callsign on one of them.  Left out, they are the node shell's
-	// channels, or without one every channel connected mode can be used
-	// on.  Beside a node shell they must be among the shell's.
-	Channels []int `yaml:"channels"`
+	// Channels, keyed by channel, are the channels the node runs on, each a
+	// radio channel or an NCHANNEL, with what to use on each in place of
+	// the settings below.  It has one routing table across them all, a
+	// neighbour being a callsign on one of them.  Left out, they are the
+	// node shell's channels, or without one every channel connected mode
+	// can be used on, with the settings below.  Beside a node shell they
+	// must be among the shell's.
+	Channels map[int]NetROMChannelSettings `yaml:"channels"`
 
 	// TTL is how many nodes a frame the node originates may cross.  Left
 	// out, it is 16.
@@ -215,6 +217,15 @@ type NetROMSettings struct {
 	// MinQuality is the least quality a route is worth keeping at.  Left
 	// out, it is 10.
 	MinQuality *int `yaml:"minQuality"`
+}
+
+// NetROMChannelSettings describes a NET/ROM node's use of one of its
+// channels.  A setting left out, or the whole of them, keeps the node's own.
+type NetROMChannelSettings struct {
+	// Quality, from 0 to 255, is what the node assumes for its link to a
+	// neighbour it hears on the channel, so that a fast channel can be
+	// preferred to a slow one.
+	Quality *int `yaml:"quality"`
 }
 
 // NodeMapSettings describes how the node is reported to the UK Packet Radio

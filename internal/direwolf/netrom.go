@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -60,17 +61,29 @@ func (ps *parseState) applyNETROM(settings NetROMSettings) error {
 		return fmt.Errorf("line %d: No channels for NET/ROM to run on. Leave channels out to run on all of them", ps.line)
 	}
 
-	for i, c := range settings.Channels {
+	// A channel given twice is refused by the YAML parser, as any
+	// duplicate key is, though only when spelt the same both times: 0
+	// and 0x0 are two keys to it, and the last wins.
+	for _, c := range slices.Sorted(maps.Keys(settings.Channels)) {
 		if c < 0 || c >= MAX_TOTAL_CHANS {
 			return fmt.Errorf("line %d: Invalid channel %d for NET/ROM. Must be in range of 0 to %d", ps.line, c, MAX_TOTAL_CHANS-1)
 		}
 
-		if slices.Contains(settings.Channels[:i], c) {
-			return fmt.Errorf("line %d: NET/ROM channel %d is given more than once", ps.line, c)
+		config.Channels = append(config.Channels, c)
+
+		if q := settings.Channels[c].Quality; q != nil {
+			var quality, qErr = netromByte(ps.line, fmt.Sprintf("quality for channel %d", c), q, 0, 0)
+			if qErr != nil {
+				return qErr
+			}
+
+			if config.ChannelQuality == nil {
+				config.ChannelQuality = make(map[int]byte)
+			}
+
+			config.ChannelQuality[c] = quality
 		}
 	}
-
-	config.Channels = slices.Clone(settings.Channels)
 
 	config.TTL, err = netromByte(ps.line, "ttl", settings.TTL, 1, config.TTL)
 	if err != nil {
