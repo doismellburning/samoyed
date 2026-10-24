@@ -5675,3 +5675,65 @@ IGLOGIN Q1TEST 12345
 	assert.Equal(t, "t/m", c.digi.FilterStr[0][10])
 	assert.Equal(t, "i/180", c.digi.FilterStr[MAX_TOTAL_CHANS][10], "an IGate should only pass on to the serial TNC what is near it")
 }
+
+// --- PSK demodulator filters too big to fit ---
+
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
+func Test_config_init_psk_filter_too_large(t *testing.T) {
+	// Regression test: demod_psk_init finds that a filter needs more taps than
+	// there is room for, but only when the daemon starts, so --config-check
+	// called a file clean that the daemon then refused.  At 150 bit/s and
+	// 44100 samples a second, BPSK profile O's prefilter needs 592 taps.
+	var tests = []struct {
+		name       string
+		config     string
+		wantErrors int
+	}{
+		{
+			name:       "profile O at 150 bit/s",
+			config:     "ARATE 44100\nCHANNEL 0\nMYCALL Q1TEST-1\nMODEM 150 BPSK O\n",
+			wantErrors: 1,
+		},
+		{
+			// The sample rate is on a line after the bit rate.
+			name:       "ARATE after MODEM",
+			config:     "CHANNEL 0\nMYCALL Q1TEST-1\nMODEM 150 BPSK O\nADEVICE plughw:1,0\nARATE 44100\n",
+			wantErrors: 1,
+		},
+		{
+			// Of the default LMNO, only O's prefilter is too long at
+			// 150 bit/s.
+			name:       "default profiles at 150 bit/s",
+			config:     "ARATE 44100\nCHANNEL 0\nMYCALL Q1TEST-1\nMODEM 150 BPSK\n",
+			wantErrors: 1,
+		},
+		{
+			name:       "profile O at 300 bit/s fits",
+			config:     "ARATE 44100\nCHANNEL 0\nMYCALL Q1TEST-1\nMODEM 300 BPSK O\n",
+			wantErrors: 0,
+		},
+		{
+			// No V26A or V26B, which demod_psk_init can't do without.
+			name:       "QPSK fits",
+			config:     "ARATE 44100\nCHANNEL 0\nMYCALL Q1TEST-1\nMODEM 2400\n",
+			wantErrors: 0,
+		},
+		{
+			name:       "8PSK fits",
+			config:     "ARATE 44100\nCHANNEL 0\nMYCALL Q1TEST-1\nMODEM 4800\n",
+			wantErrors: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c = parseConfig(t, tt.config)
+
+			assert.Equal(t, tt.wantErrors, c.errors, "config_init said:\n%s", c.output)
+
+			if tt.wantErrors > 0 {
+				assert.Contains(t, c.output, "Channel 0, profile O: calculated pre filter size 592")
+			}
+		})
+	}
+}
