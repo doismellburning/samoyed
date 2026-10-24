@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +24,7 @@ func buildWAVWithExtraChunks(t *testing.T) []byte {
 
 	writeChunk := func(id string, payload []byte) {
 		body.WriteString(id)
-		binary.Write(&body, binary.LittleEndian, int32(len(payload))) //nolint:errcheck,gosec // G115: unchecked narrowing conversion, see #294
+		binary.Write(&body, binary.LittleEndian, safecast.RequireConvert[int32](t, len(payload))) //nolint:errcheck // Writing to a bytes.Buffer cannot fail.
 		body.Write(payload)
 
 		if len(payload)%2 != 0 {
@@ -53,7 +54,7 @@ func buildWAVWithExtraChunks(t *testing.T) []byte {
 
 	var wav bytes.Buffer
 	wav.WriteString("RIFF")
-	binary.Write(&wav, binary.LittleEndian, int32(4+body.Len())) //nolint:errcheck,gosec // G115: unchecked narrowing conversion, see #294
+	binary.Write(&wav, binary.LittleEndian, safecast.RequireConvert[int32](t, 4+body.Len())) //nolint:errcheck // Writing to a bytes.Buffer cannot fail.
 	wav.WriteString("WAVE")
 	wav.Write(body.Bytes())
 
@@ -174,9 +175,13 @@ const (
 )
 
 // withInt32At returns a copy of wav with v written at offset.
-func withInt32At(wav []byte, offset int, v int32) []byte {
+func withInt32At(t *testing.T, wav []byte, offset int, v int32) []byte {
+	t.Helper()
+
 	var out = bytes.Clone(wav)
-	binary.LittleEndian.PutUint32(out[offset:], uint32(v)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+
+	var _, err = binary.Encode(out[offset:], binary.LittleEndian, v)
+	require.NoError(t, err)
 
 	return out
 }
@@ -205,7 +210,7 @@ func Test_atest_decodeWAVNegativeDataSize(t *testing.T) {
 	var atest, err = NewAtest(atestTestOptions())
 	require.NoError(t, err)
 
-	var wav = withInt32At(buildWAVWithExtraChunks(t), extraChunksDataSizeOffset, -2)
+	var wav = withInt32At(t, buildWAVWithExtraChunks(t), extraChunksDataSizeOffset, -2)
 
 	var _, decodeErr = atest.DecodeWAV(bytes.NewReader(wav), "negative.wav")
 	assert.Error(t, decodeErr)
@@ -231,7 +236,7 @@ func Test_atest_decodeWAVSampleRate(t *testing.T) {
 			var atest, err = NewAtest(atestTestOptions())
 			require.NoError(t, err)
 
-			var wav = withInt32At(buildWAVWithExtraChunks(t), extraChunksSampleRateOffset, rate)
+			var wav = withInt32At(t, buildWAVWithExtraChunks(t), extraChunksSampleRateOffset, rate)
 
 			var _, decodeErr = atest.DecodeWAV(bytes.NewReader(wav), name+".wav")
 			assert.ErrorContains(t, decodeErr, "sample rate")

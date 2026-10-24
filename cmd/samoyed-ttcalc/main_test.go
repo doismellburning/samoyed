@@ -10,6 +10,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -99,7 +100,7 @@ func sendRaw(t *testing.T, conn net.Conn, channel byte, data []byte) {
 	var header = new(agwpe.Header)
 	header.Portx = channel
 	header.DataKind = 'K'
-	header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	header.DataLen = safecast.RequireConvert[uint32](t, len(data))
 
 	require.NoError(t, binary.Write(conn, binary.LittleEndian, header))
 

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/digipeater"
@@ -330,11 +331,11 @@ const linkFuzzMaxScript = 2048
 type linkFuzzScript []byte
 
 func (s linkFuzzScript) frame(cr byte, body ...byte) linkFuzzScript {
-	return append(append(s, linkOpFrame|cr<<3, byte(len(body))), body...) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	return append(append(s, linkOpFrame|cr<<3, safecast.MustConvert[byte](len(body))), body...)
 }
 
 func (s linkFuzzScript) data(data string) linkFuzzScript {
-	return append(append(s, linkOpData, byte(len(data))), data...) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	return append(append(s, linkOpData, safecast.MustConvert[byte](len(data))), data...)
 }
 
 func (s linkFuzzScript) busy(dcd bool, on bool) linkFuzzScript {
@@ -555,7 +556,7 @@ func agwFuzzMessage(tb testing.TB, kind byte, port byte, from string, to string,
 	msg.Header.PID = 0xf0
 	copy(msg.Header.CallFrom[:], from)
 	copy(msg.Header.CallTo[:], to)
-	msg.Header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	msg.Header.DataLen = safecast.RequireConvert[uint32](tb, len(data))
 	msg.Data = data
 
 	var buf bytes.Buffer
@@ -568,7 +569,7 @@ func agwFuzzMessage(tb testing.TB, kind byte, port byte, from string, to string,
 
 // agwFuzzDigis is the digipeater part of a 'V' or 'v' message's data.
 func agwFuzzDigis(digis ...string) []byte {
-	var data = []byte{byte(len(digis))} //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	var data = []byte{safecast.MustConvert[byte](len(digis))}
 
 	for _, digi := range digis {
 		var field [10]byte
@@ -694,7 +695,7 @@ func FuzzAGWHandleClientCommand(f *testing.F) {
 			cmd.Header.CallFrom[len(cmd.Header.CallFrom)-1] = 0
 			cmd.Header.CallTo[len(cmd.Header.CallTo)-1] = 0
 
-			cmd.Header.DataLen = uint32(min(int(cmd.Header.DataLen), r.Len())) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+			cmd.Header.DataLen = min(cmd.Header.DataLen, safecast.RequireConvert[uint32](t, r.Len()))
 			if cmd.Header.DataLen > 0 {
 				cmd.Data = make([]byte, cmd.Header.DataLen)
 				io.ReadFull(r, cmd.Data) //nolint:errcheck // Sized to what is there.

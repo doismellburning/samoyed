@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/sirupsen/logrus"
@@ -33,7 +34,7 @@ func loginFrame(user string, password string) *agwpe.Message {
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'P'
-	cmd.Header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	cmd.Header.DataLen = safecast.MustConvert[uint32](len(data))
 	cmd.Data = data
 
 	return cmd
@@ -243,7 +244,7 @@ func TestHandleClientCommand_P_MalformedFrameAfterSuccessLogsOut(t *testing.T) {
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'P'
 	cmd.Data = []byte("Q1TEST\x00hunter2")
-	cmd.Header.DataLen = uint32(len(cmd.Data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	cmd.Header.DataLen = safecast.RequireConvert[uint32](t, len(cmd.Data))
 
 	s.handleClientCommand(0, cmd)
 
@@ -259,7 +260,7 @@ func TestHandleClientCommand_P_MalformedFrameDoesNotLogIn(t *testing.T) {
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'P'
 	cmd.Data = []byte("Q1TEST\x00hunter2")
-	cmd.Header.DataLen = uint32(len(cmd.Data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	cmd.Header.DataLen = safecast.RequireConvert[uint32](t, len(cmd.Data))
 
 	s.handleClientCommand(0, cmd)
 
@@ -478,7 +479,7 @@ func TestClientAccepted_LocalClientSurvivesAFailedLogin(t *testing.T) {
 	var malformed = new(agwpe.Message)
 	malformed.Header.DataKind = 'P'
 	malformed.Data = []byte("Q1TEST\x00hunter2")
-	malformed.Header.DataLen = uint32(len(malformed.Data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	malformed.Header.DataLen = safecast.RequireConvert[uint32](t, len(malformed.Data))
 
 	s.handleClientCommand(0, malformed)
 	assert.True(t, s.isLoggedIn(0), "malformed frame")
@@ -911,7 +912,7 @@ func TestReadCommandData_ReadsDataThatArrivesInPieces(t *testing.T) {
 
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'K'
-	cmd.Header.DataLen = uint32(len(payload)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	cmd.Header.DataLen = safecast.RequireConvert[uint32](t, len(payload))
 
 	var n, err = readCommandData(conn, cmd)
 
@@ -963,7 +964,7 @@ func TestHandleClientCommand_V_QueuesFrameViaDigipeaters(t *testing.T) {
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 	cmd.Data = data
-	cmd.Header.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	cmd.Header.DataLen = safecast.RequireConvert[uint32](t, len(data))
 
 	s.handleClientCommand(0, cmd)
 

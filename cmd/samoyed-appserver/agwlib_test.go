@@ -6,6 +6,7 @@ package main
 import (
 	"testing"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
@@ -37,7 +38,7 @@ func fromTNC(kind byte, channel byte, callFrom agwpe.Callsign, callTo agwpe.Call
 	h.Portx = channel
 	h.CallFrom = callFrom
 	h.CallTo = callTo
-	h.DataLen = uint32(len(data)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	h.DataLen = safecast.MustConvert[uint32](len(data))
 
 	return &AGWPECommand{Header: h, Data: []byte(data)}
 }

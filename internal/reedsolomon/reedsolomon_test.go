@@ -10,6 +10,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -97,7 +98,7 @@ func TestDecode_CorrectsErrors(t *testing.T) {
 
 			var positions = rng.Perm(c.N())[:c.NRoots()/2]
 			for _, pos := range positions {
-				block[pos] ^= byte(1 + rng.Intn(255)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+				block[pos] ^= safecast.RequireConvert[byte](t, 1+rng.Intn(255))
 			}
 
 			var locs, err = c.Decode(block, nil)
@@ -125,7 +126,7 @@ func TestDecode_CorrectsErasures(t *testing.T) {
 
 			var positions = rng.Perm(c.N())[:c.NRoots()]
 			for _, pos := range positions {
-				block[pos] ^= byte(1 + rng.Intn(255)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+				block[pos] ^= safecast.RequireConvert[byte](t, 1+rng.Intn(255))
 			}
 
 			var _, err = c.Decode(block, positions)
@@ -150,7 +151,7 @@ func TestDecode_Uncorrectable(t *testing.T) {
 		var original = slices.Clone(block)
 
 		for _, pos := range rng.Perm(c.N())[:c.NRoots()] {
-			block[pos] ^= byte(1 + rng.Intn(255)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+			block[pos] ^= safecast.RequireConvert[byte](t, 1+rng.Intn(255))
 		}
 
 		var _, decodeErr = c.Decode(block, nil)

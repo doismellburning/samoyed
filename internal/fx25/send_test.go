@@ -40,7 +40,7 @@ func TestFX25FrameIsSentAsTagDataAndCheck(t *testing.T) {
 
 	var expected []byte
 	for k := range 8 {
-		expected = append(expected, byte(ctagValue>>(k*8))) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+		expected = append(expected, byte((ctagValue>>(k*8))&0xff))
 	}
 
 	expected = append(expected, data...)

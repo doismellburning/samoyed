@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -614,7 +615,7 @@ func TestMainRegistersOnEachPort(t *testing.T) {
 
 	var reply = new(agwpe.Header)
 	reply.DataKind = 'G'
-	reply.DataLen = uint32(len(ports)) //nolint:gosec // G115: unchecked narrowing conversion, see #294
+	reply.DataLen = safecast.RequireConvert[uint32](t, len(ports))
 
 	require.NoError(t, binary.Write(tnc, binary.LittleEndian, reply))
 
