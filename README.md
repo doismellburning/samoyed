@@ -9,7 +9,12 @@ Samoyed is a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
 **Documentation:** <https://doismellburning.github.io/samoyed/>
 
 > **Status:** Port functionally complete, but broad testing needed - consider this pre-release, and likely to contain bugs.
-> Please [file issues](https://github.com/doismellburning/samoyed/issues) if you encounter problems.
+> The automated tests run against audio files and loopback rather than real radios, so reports are most useful on:
+> on-air use with real soundcards and radios;
+> PTT methods (serial RTS/DTR, CM108, GPIO, hamlib);
+> macOS;
+> and interoperability with other TNCs and with KISS/AGW applications.
+> Please [file issues](https://github.com/doismellburning/samoyed/issues) if you encounter problems - or if it works, which is worth knowing too.
 
 ## Why Samoyed?
 
