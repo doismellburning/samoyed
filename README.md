@@ -18,7 +18,14 @@ Samoyed is a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
 
 ## Why Samoyed?
 
-Dire Wolf is a mature, capable piece of software written in C. Samoyed is (currently) a near-straight port to Go, motivated by:
+[Dire Wolf](https://github.com/wb2osz/direwolf), by John Langner WB2OSZ, is a mature, capable piece of software written in C:
+a modern software replacement for hardware TNCs, with outstanding receive performance.
+It decodes over 1000 error-free frames from the
+[WA8LMF TNC Test CD](https://github.com/wb2osz/direwolf/tree/dev/doc/WA8LMF-TNC-Test-CD-Results.pdf),
+outperforming all hardware TNCs and first-generation soundcard modems.
+Those are Dire Wolf's results: Samoyed's demodulators are ported from Dire Wolf's, but Samoyed doesn't publish figures of its own yet.
+
+Samoyed is (currently) a near-straight port to Go, motivated by:
 
 - **Better tooling** — Go's testing, linting, and static analysis ecosystem, as well as the stdlib
 - **Simpler builds** — no cmake, no preprocessor conditionals for test infrastructure
@@ -159,15 +166,6 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 | arm64 Linux | Supported |
 | macOS | Supported |
 | Windows | TBD (depends on demand / testability) |
-
-## About Dire Wolf
-
-Samoyed is based on [Dire Wolf](https://github.com/wb2osz/direwolf) by John Langner WB2OSZ —
-a modern software replacement for hardware TNCs, with outstanding receive performance.
-Dire Wolf decodes over 1000 error-free frames from the
-[WA8LMF TNC Test CD](https://github.com/wb2osz/direwolf/tree/dev/doc/WA8LMF-TNC-Test-CD-Results.pdf),
-outperforming all hardware TNCs and first-generation soundcard modems.
-Those are Dire Wolf's results: Samoyed's demodulators are ported from Dire Wolf's, but Samoyed doesn't publish figures of its own yet.
 
 ## Further Reading
 
