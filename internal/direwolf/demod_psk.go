@@ -59,8 +59,8 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"fmt"
 	"math"
-	"os"
 
 	"github.com/doismellburning/samoyed/internal/ascii"
 	"github.com/doismellburning/samoyed/internal/dsp"
@@ -127,14 +127,14 @@ var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
  *
  * Outputs:	D.ms_filter_size
  *
- * Returns:     None.
+ * Returns:     An error if the filters it works out would be too large.
  *
  * Bugs:	This doesn't do much error checking so don't give it
  *		anything crazy.
  *
  *----------------------------------------------------------------*/
 
-func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps int, profile byte, D *demodulator_state_s) {
+func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps int, profile byte, D *demodulator_state_s) error {
 	var samples_per_sec = float64(_samples_per_sec)
 
 	*D = demodulator_state_s{} //nolint:exhaustruct_v5
@@ -474,27 +474,18 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 	TUNE("TUNE_LP_FILTER_TAPS", D.u.psk.lp_filter_taps, "lp_filter_taps (FIR)", "%d")
 
 	if D.u.psk.pre_filter_taps > MAX_FILTER_SIZE {
-		logrus.WithFields(logrus.Fields{
-			"size":            D.u.psk.pre_filter_taps,
-			"max_filter_size": MAX_FILTER_SIZE,
-		}).Error("Calculated pre filter size is too large; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE")
-		os.Exit(1)
+		return fmt.Errorf("calculated pre filter size %d is larger than the maximum %d; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE",
+			D.u.psk.pre_filter_taps, MAX_FILTER_SIZE)
 	}
 
 	if D.u.psk.delay_line_taps > MAX_FILTER_SIZE {
-		logrus.WithFields(logrus.Fields{
-			"size":            D.u.psk.delay_line_taps,
-			"max_filter_size": MAX_FILTER_SIZE,
-		}).Error("Calculated delay line size is too large; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE")
-		os.Exit(1)
+		return fmt.Errorf("calculated delay line size %d is larger than the maximum %d; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE",
+			D.u.psk.delay_line_taps, MAX_FILTER_SIZE)
 	}
 
 	if D.u.psk.lp_filter_taps > MAX_FILTER_SIZE {
-		logrus.WithFields(logrus.Fields{
-			"size":            D.u.psk.lp_filter_taps,
-			"max_filter_size": MAX_FILTER_SIZE,
-		}).Error("Calculated low pass filter size is too large; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE")
-		os.Exit(1)
+		return fmt.Errorf("calculated low pass filter size %d is larger than the maximum %d; decrease the audio sample rate, increase the baud rate, or recompile with a larger MAX_FILTER_SIZE",
+			D.u.psk.lp_filter_taps, MAX_FILTER_SIZE)
 	}
 
 	/*
@@ -541,6 +532,8 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 	D.alevel_mark_peak = -1
 	D.alevel_space_peak = -1
+
+	return nil
 } /* demod_psk_init */
 
 /*-------------------------------------------------------------------

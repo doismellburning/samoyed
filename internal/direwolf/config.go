@@ -1475,8 +1475,10 @@ func config_init(fname string, p_audio_config *RadioConfig,
 	 */
 	var absFilePath, absFilePathErr = filepath.Abs(fname)
 	if absFilePathErr != nil {
-		logrus.WithError(absFilePathErr).WithField("file", fname).Error("Error getting absolute path for config file")
-		os.Exit(1)
+		ps.errorf("could not get absolute path for configuration file %s: %s", fname, absFilePathErr)
+		ps.fatal = true
+
+		return configReport{errors: ps.nerrors, warnings: ps.nwarnings, fatal: ps.fatal}
 	}
 
 	var fp, fpErr = os.Open(absFilePath) //nolint:gosec
@@ -1491,10 +1493,13 @@ func config_init(fname string, p_audio_config *RadioConfig,
 			fpErr,
 		)
 		rtfm()
-		os.Exit(1)
-	} else {
-		defer fp.Close()
+
+		ps.fatal = true
+
+		return configReport{errors: ps.nerrors, warnings: ps.nwarnings, fatal: ps.fatal}
 	}
+
+	defer fp.Close()
 
 	logrus.WithField("file", absFilePath).Info("Reading config file")
 
@@ -2004,8 +2009,8 @@ func (ps *parseState) applyNCHANNEL(settings NetworkTNCSettings) error {
 	}
 
 	// Claim the channel only once all of it has checked out: NewNetTNCs
-	// attaches to every MEDIUM_NETTNC channel and exits if it cannot, so a
-	// half-checked one would otherwise take the program down at startup.
+	// attaches to every MEDIUM_NETTNC channel and fails startup if it cannot,
+	// so a half-checked one would otherwise take the program down.
 	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
 	ps.audio.nettnc_addr[nchan] = settings.Host
 	ps.audio.nettnc_port[nchan] = port
@@ -2060,8 +2065,8 @@ func handleSCHANNEL(ps *parseState) error {
 	}
 
 	// Claim the channel only once the whole line has parsed, as NCHANNEL
-	// does: NewSerialTNCs attaches to every MediumSerialTNC channel and exits
-	// if it cannot.
+	// does: NewSerialTNCs attaches to every MediumSerialTNC channel and fails
+	// startup if it cannot.
 	ps.audio.chan_medium[channel] = MediumSerialTNC
 	ps.audio.serialTNCDevice[channel] = device
 	ps.audio.serialTNCBaud[channel] = baud
@@ -2107,8 +2112,8 @@ func (ps *parseState) applyAXUDPPORT(settings AXUDPPortSettings) error {
 	}
 
 	// Claim the channel only once all of it has checked out, as NCHANNEL
-	// does: NewAXUDPChannels opens every MEDIUM_AXUDP channel and exits if
-	// it cannot.
+	// does: NewAXUDPChannels opens every MEDIUM_AXUDP channel and fails
+	// startup if it cannot.
 	ps.audio.chan_medium[channel] = MEDIUM_AXUDP
 	ps.audio.axudp_port[channel] = settings.Port
 	ps.audio.axudp_routes[channel] = routes

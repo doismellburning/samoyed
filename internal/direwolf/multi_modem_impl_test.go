@@ -279,7 +279,8 @@ func TestMultiModemImplProcessSamplePicksAfterAge(t *testing.T) {
 	audioConfig.achan[0].num_freq = 1
 
 	var sink = new(multiModemImplSink)
-	var receiver = multi_modem_init(audioConfig, 0, 0, sink)
+	var receiver, receiverErr = multi_modem_init(audioConfig, 0, 0, sink)
+	require.NoError(t, receiverErr)
 
 	var m = receiver.modems[0]
 	require.Equal(t, 3*44100/1200, m.processAge)
@@ -327,7 +328,8 @@ func TestMultiModemImplInitProcessAgeInSymbols(t *testing.T) {
 			audioConfig.achan[0].mark_freq = 1800
 			audioConfig.achan[0].space_freq = 0
 
-			var receiver = multi_modem_init(audioConfig, 0, 0, new(multiModemImplSink))
+			var receiver, receiverErr = multi_modem_init(audioConfig, 0, 0, new(multiModemImplSink))
+			require.NoError(t, receiverErr)
 
 			assert.Equal(t, PROCESS_AFTER_BITS*44100/tc.symbols, receiver.modems[0].processAge)
 		})

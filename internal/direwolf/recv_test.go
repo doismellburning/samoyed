@@ -53,7 +53,8 @@ func newRecvTestRadioConfig(numChannels int) *RadioConfig {
 func setupRecvTest(t *testing.T, audioConfig *RadioConfig, samples []byte) (*Layer2Receiver, *readerSampleSource) {
 	t.Helper()
 
-	var receiver = multi_modem_init(audioConfig, 0, 0, new(radioSink))
+	var receiver, receiverErr = multi_modem_init(audioConfig, 0, 0, new(radioSink))
+	require.NoError(t, receiverErr)
 
 	return receiver, newReaderSampleSource(bytes.NewReader(samples), len(samples))
 }

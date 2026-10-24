@@ -145,7 +145,8 @@ func TestSerialTNCDebugPrints(t *testing.T) {
 	})
 
 	var output = captureLogOutput(t, logrus.DebugLevel, func() {
-		NewSerialTNCs(ctx, audioConfig, dlq.RecFrame, 2)
+		var _, err = NewSerialTNCs(ctx, audioConfig, dlq.RecFrame, 2)
+		require.NoError(t, err)
 
 		var _, writeErr = tnc.Write(kissFrameFor(newTestPacket(t)))
 		require.NoError(t, writeErr)
@@ -355,7 +356,7 @@ func TestNewSerialTNCsAttachesSerialChannels(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	var tncs = NewSerialTNCs(ctx, audioConfig, dlq.RecFrame, 0)
+	var tncs, err = NewSerialTNCs(ctx, audioConfig, dlq.RecFrame, 0)
 
 	// The listener cannot be interrupted mid-read, so stop it, and let go of
 	// the port, by hanging up the far end once it has been cancelled.
@@ -364,6 +365,7 @@ func TestNewSerialTNCsAttachesSerialChannels(t *testing.T) {
 		tnc.Close()
 	})
 
+	require.NoError(t, err)
 	require.NotNil(t, tncs[serialTNCTestChannel])
 
 	for channel, st := range tncs {
@@ -377,6 +379,25 @@ func TestNewSerialTNCsAttachesSerialChannels(t *testing.T) {
 	require.NoError(t, writeErr)
 
 	assert.Equal(t, serialTNCTestChannel, nextDLQItem(t, dlq)._chan)
+}
+
+// A serial TNC whose port cannot be opened is an error for the caller to act
+// on, not the end of the process.
+func TestNewSerialTNCsReturnsErrorWhenPortWontOpen(t *testing.T) {
+	t.Parallel()
+
+	var device = filepath.Join(t.TempDir(), "no-such-device")
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[serialTNCTestChannel] = MediumSerialTNC
+	audioConfig.serialTNCDevice[serialTNCTestChannel] = device
+	audioConfig.serialTNCBaud[serialTNCTestChannel] = 9600
+
+	var tncs, err = NewSerialTNCs(t.Context(), audioConfig, nil, 0)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), device)
+	assert.Nil(t, tncs[serialTNCTestChannel])
 }
 
 // A packet queued for an SCHANNEL channel skips the radio queues and goes to

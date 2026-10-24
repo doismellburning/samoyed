@@ -11,6 +11,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"fmt"
 	"math"
 	"strings"
 	"sync/atomic"
@@ -96,12 +97,17 @@ func capProfiles(channel int, profiles string) string {
 
 // demod_init builds a Demodulator for each radio channel, and returns them;
 // a channel that is not a radio has none.
-func demod_init(pa *RadioConfig) [MAX_RADIO_CHANS]*Demodulator {
+func demod_init(pa *RadioConfig) ([MAX_RADIO_CHANS]*Demodulator, error) {
 	var demodulators [MAX_RADIO_CHANS]*Demodulator
 
 	for channel := range MAX_RADIO_CHANS {
 		if pa.chan_medium[channel] == MEDIUM_RADIO {
-			demodulators[channel] = NewDemodulator(channel, pa.achan[channel], pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
+			var demodulator, err = NewDemodulator(channel, pa.achan[channel], pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
+			if err != nil {
+				return [MAX_RADIO_CHANS]*Demodulator{}, err
+			}
+
+			demodulators[channel] = demodulator
 		}
 
 		// FIXME dw_printf ("-------- end of loop for chn %d \n", channel);
@@ -116,7 +122,7 @@ func demod_init(pa *RadioConfig) [MAX_RADIO_CHANS]*Demodulator {
 		}
 	}
 
-	return demodulators
+	return demodulators, nil
 } /* end demod_init */
 
 // NewDemodulator sets up the demodulators for a radio channel, from achan, its
@@ -124,7 +130,7 @@ func demod_init(pa *RadioConfig) [MAX_RADIO_CHANS]*Demodulator {
 // them - how many subchannels and slicers, the normalised profiles, the
 // decimation and upsampling ratios - it keeps: achan is its own copy, and the
 // configuration is left as it was.
-func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodulator { //nolint:funlen // Ported from Dire Wolf as one function
+func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demodulator, error) { //nolint:funlen // Ported from Dire Wolf as one function
 	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	var demodulator = new(Demodulator)
@@ -554,12 +560,15 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			//dw_printf ("About to call demod_psk_init for Q-PSK case, modem_type=%d, profile='%c'\n",
 			//	achan.modem_type, profile);
 
-			demod_psk_init(achan.modem_type,
+			var pskErr = demod_psk_init(achan.modem_type,
 				v26,
 				samplesPerSec,
 				achan.baud,
 				profile,
 				D)
+			if pskErr != nil {
+				return nil, fmt.Errorf("channel %d, profile %c: %w", channel, profile, pskErr)
+			}
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Returned from demod_psk_init\n");
@@ -602,12 +611,15 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			//dw_printf ("About to call demod_psk_init for 8-PSK case, modem_type=%d, profile='%c'\n",
 			//	achan.modem_type, profile);
 
-			demod_psk_init(achan.modem_type,
+			var pskErr = demod_psk_init(achan.modem_type,
 				achan.v26_alternative,
 				samplesPerSec,
 				achan.baud,
 				profile,
 				D)
+			if pskErr != nil {
+				return nil, fmt.Errorf("channel %d, profile %c: %w", channel, profile, pskErr)
+			}
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Returned from demod_psk_init\n");
@@ -641,12 +653,15 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 			var D = &demodulator.states[d]
 			var profile = achan.profiles[d]
 
-			demod_psk_init(achan.modem_type,
+			var pskErr = demod_psk_init(achan.modem_type,
 				V26_UNSPECIFIED,
 				samplesPerSec,
 				achan.baud,
 				profile,
 				D)
+			if pskErr != nil {
+				return nil, fmt.Errorf("channel %d, profile %c: %w", channel, profile, pskErr)
+			}
 
 			D.quick_attack = 0.080 * 0.2
 			D.sluggish_decay = 0.00012 * 0.2
@@ -785,7 +800,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) *Demodu
 	demodulator.decimate = achan.decimate
 	demodulator.upsample = achan.upsample
 
-	return demodulator
+	return demodulator, nil
 }
 
 // setReceiver makes r where every subchannel of d hands its bits.

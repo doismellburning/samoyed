@@ -10,8 +10,8 @@ package direwolf
 
 import (
 	"context"
+	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -70,15 +70,17 @@ type NetTNC struct {
  *				  arrives, 2 also what is left once unwrapped.
  *
  * Returns:	The TNC attached to each NCHANNEL channel, nil for every
- *		other channel.  Exits if one cannot be reached; if
- *		cancelled part way, returns those attached so far.
+ *		other channel, or the error if one cannot be reached; if
+ *		cancelled part way, returns those attached so far.  The
+ *		TNCs attached before an error keep listening until ctx is
+ *		cancelled.
  *
  * Description:	Called once at direwolf application start up time.
  *		Calls NewNetTNC for each NCHANNEL configuration item.
  *
  *--------------------------------------------------------------------*/
 
-func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver, debug int) [MAX_TOTAL_CHANS]*NetTNC {
+func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver, debug int) ([MAX_TOTAL_CHANS]*NetTNC, error) {
 	var tncs [MAX_TOTAL_CHANS]*NetTNC
 
 	for i := range MAX_TOTAL_CHANS {
@@ -96,11 +98,10 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver, de
 				// A stop that cut the connection short is not a failure to
 				// connect: go back and let the caller tear down.
 				if ctx.Err() != nil {
-					return tncs
+					return tncs, nil //nolint:nilerr // A stop is not a failure to connect.
 				}
 
-				log.WithError(err).Error("Could not attach to network TNC")
-				os.Exit(1)
+				return tncs, fmt.Errorf("channel %d: %w", i, err)
 			}
 
 			nt.Start(ctx)
@@ -109,7 +110,7 @@ func NewNetTNCs(ctx context.Context, pa *RadioConfig, recFrame frameReceiver, de
 		}
 	}
 
-	return tncs
+	return tncs, nil
 }
 
 // dialNetTNC attaches to the network TNC at host and port, giving up once

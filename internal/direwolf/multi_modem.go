@@ -220,8 +220,11 @@ func (s *radioSink) DCDChange(channel int, state int) {
  *
  *------------------------------------------------------------------------------*/
 
-func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink ReceiveSink) *Layer2Receiver {
-	var demodulators = demod_init(pa)
+func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink ReceiveSink) (*Layer2Receiver, error) {
+	var demodulators, err = demod_init(pa)
+	if err != nil {
+		return nil, err
+	}
 
 	var receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, il2pDebug, sink)
 
@@ -231,7 +234,7 @@ func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink Receiv
 		}
 	}
 
-	return receiver
+	return receiver, nil
 }
 
 /*------------------------------------------------------------------------------

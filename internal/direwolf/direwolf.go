@@ -562,7 +562,11 @@ x = Silence FX.25 information.`)
 	var sink = new(radioSink)
 	sink.recFrame = dataLinkQueue.RecFrame
 
-	var layer2Receiver = multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
+	var layer2Receiver, layer2ReceiverErr = multi_modem_init(audio_config, d_x_opt, d_2_opt, sink)
+	if layer2ReceiverErr != nil {
+		logrus.WithError(layer2ReceiverErr).Error("Could not set up demodulators")
+		td.exit(1)
+	}
 
 	// The audio statistics report each channel's level, which the
 	// demodulators keep.  Nothing reads a device until recv_init, below.
@@ -573,16 +577,31 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	var netTNCs = NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame, d_n_opt)
+	var netTNCs, netTNCErr = NewNetTNCs(ctx, audio_config, dataLinkQueue.RecFrame, d_n_opt)
 	stopIfCancelled(ctx, td)
+
+	if netTNCErr != nil {
+		logrus.WithError(netTNCErr).Error("Could not attach to network TNC")
+		td.exit(1)
+	}
 
 	// Or a serial TNC.  (also new in 1.8)
-	var serialTNCs = NewSerialTNCs(ctx, audio_config, dataLinkQueue.RecFrame, d_k_opt)
+	var serialTNCs, serialTNCErr = NewSerialTNCs(ctx, audio_config, dataLinkQueue.RecFrame, d_k_opt)
 	stopIfCancelled(ctx, td)
 
+	if serialTNCErr != nil {
+		logrus.WithError(serialTNCErr).Error("Could not attach to serial TNC")
+		td.exit(1)
+	}
+
 	// Likewise a channel can be AX.25 over UDP to other nodes.
-	var axudpChannels = NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame)
+	var axudpChannels, axudpErr = NewAXUDPChannels(ctx, audio_config, dataLinkQueue.RecFrame)
 	stopIfCancelled(ctx, td)
+
+	if axudpErr != nil {
+		logrus.WithError(axudpErr).Error("Could not open AXUDP channel")
+		td.exit(1)
+	}
 
 	// What everything with a packet to send - KISS, AGW, beacon, digipeater,
 	// IGate, APRStt, the connected-mode link - hands it to, and the transmit

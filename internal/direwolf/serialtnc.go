@@ -3,7 +3,6 @@ package direwolf
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -56,9 +55,10 @@ type SerialTNC struct {
 // NewSerialTNCs attaches a SerialTNC to each SCHANNEL channel in audio, and
 // starts it listening until ctx is cancelled, its frames going to recFrame.
 // debug is the "-d k" count, which shows the frames as they arrive.
-// It returns the TNC for each such channel, and nil for every other.  It is
-// called once at startup, and exits if a TNC's port cannot be opened.
-func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiver, debug int) [MAX_TOTAL_CHANS]*SerialTNC {
+// It returns the TNC for each such channel, and nil for every other, or the
+// error if a TNC's port cannot be opened; the TNCs attached before it keep
+// listening until ctx is cancelled.  It is called once at startup.
+func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiver, debug int) ([MAX_TOTAL_CHANS]*SerialTNC, error) {
 	var tncs [MAX_TOTAL_CHANS]*SerialTNC
 
 	for i := range MAX_TOTAL_CHANS {
@@ -66,14 +66,11 @@ func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiv
 			continue
 		}
 
-		var log = logrus.WithFields(logrus.Fields{"channel": i, "device": audio.serialTNCDevice[i], "baud": audio.serialTNCBaud[i]})
-
-		log.Debug("Serial TNC")
+		logrus.WithFields(logrus.Fields{"channel": i, "device": audio.serialTNCDevice[i], "baud": audio.serialTNCBaud[i]}).Debug("Serial TNC")
 
 		var st, err = NewSerialTNC(i, audio.serialTNCDevice[i], audio.serialTNCBaud[i], recFrame, debug)
 		if err != nil {
-			log.WithError(err).Error("Could not attach to serial TNC")
-			os.Exit(1)
+			return tncs, err
 		}
 
 		st.Start(ctx)
@@ -81,7 +78,7 @@ func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiv
 		tncs[i] = st
 	}
 
-	return tncs
+	return tncs, nil
 }
 
 // NewSerialTNC attaches channel, an SCHANNEL one, to the KISS TNC on the

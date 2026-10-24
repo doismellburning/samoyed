@@ -756,6 +756,47 @@ func Test_config_init_modem_directive(t *testing.T) {
 	}
 }
 
+// A configuration file whose absolute path cannot be worked out - here
+// because the working directory has gone - is fatal to startup, but reported
+// to the caller rather than ending the process.
+//
+//nolint:paralleltest // Serial: changes the working directory.
+func Test_config_init_unresolvable_path_is_fatal(t *testing.T) {
+	var dir = t.TempDir()
+
+	t.Chdir(dir)
+	require.NoError(t, os.Remove(dir))
+
+	var _, absErr = filepath.Abs("direwolf.conf")
+	if absErr == nil {
+		t.Skip("getcwd still answers once the working directory has gone here, as it can on macOS")
+	}
+
+	var c configs
+
+	var output = captureLogOutput(t, logrus.ErrorLevel, func() {
+		var report = config_init("direwolf.conf", new(RadioConfig), new(digipeater.Config), new(digipeater.ConnectedConfig),
+			new(tt_config_s), new(igate_config_s), new(misc_config_s), new(symbols.Data))
+		c.errors, c.fatal = report.errors, report.fatal
+	})
+
+	assert.True(t, c.fatal)
+	assert.Equal(t, 1, c.errors)
+	assert.Contains(t, output, "Could not get absolute path for configuration file direwolf.conf")
+}
+
+// A configuration file that cannot be opened is fatal to startup, but
+// reported to the caller rather than ending the process.
+func Test_config_init_missing_file_is_fatal(t *testing.T) {
+	t.Parallel()
+
+	var report = config_init(filepath.Join(t.TempDir(), "no-such.conf"), new(RadioConfig), new(digipeater.Config),
+		new(digipeater.ConnectedConfig), new(tt_config_s), new(igate_config_s), new(misc_config_s), new(symbols.Data))
+
+	assert.True(t, report.fatal)
+	assert.Equal(t, 1, report.errors)
+}
+
 // --- config_init FILTER / CFILTER syntax validation ---
 
 func Test_config_init_filter_syntax_validation(t *testing.T) {
@@ -3067,7 +3108,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 			// Regression test: the handler marked the channel MEDIUM_NETTNC and
 			// stored the address before it had read the port, so a line that was
 			// then rejected left a network TNC channel behind with port 0.
-			// NewNetTNCs attaches to every such channel at startup and exits if it
+			// NewNetTNCs attaches to every such channel at startup and fails if it
 			// cannot, so a typo took the whole program down.
 			{
 				name:   "a missing port leaves the channel alone",
@@ -3203,7 +3244,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 				},
 			},
 			// NewSerialTNCs attaches to every MediumSerialTNC channel at startup
-			// and exits if it cannot, so a line that is rejected must not leave
+			// and fails if it cannot, so a line that is rejected must not leave
 			// one behind.
 			{
 				name:   "a missing device leaves the channel alone",
