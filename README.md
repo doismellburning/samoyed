@@ -161,6 +161,7 @@ a modern software replacement for hardware TNCs, with outstanding receive perfor
 Dire Wolf decodes over 1000 error-free frames from the
 [WA8LMF TNC Test CD](https://github.com/wb2osz/direwolf/tree/dev/doc/WA8LMF-TNC-Test-CD-Results.pdf),
 outperforming all hardware TNCs and first-generation soundcard modems.
+Those are Dire Wolf's results: Samoyed's demodulators are ported from Dire Wolf's, but Samoyed doesn't publish figures of its own yet.
 
 ## Further Reading
 
