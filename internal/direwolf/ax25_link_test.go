@@ -1249,3 +1249,51 @@ func TestUAAfterAcknowledgementInTimerRecoveryResetsTheLink(t *testing.T) {
 
 	assert.Equal(t, state_1_awaiting_connection, sA.state, "A ignored an unexpected UA")
 }
+
+// exchange delivers what each end sends to the other, giving each the channel
+// when it asks, until neither has anything more to send.
+func exchange(t *testing.T, a *linkEnd, b *linkEnd) {
+	t.Helper()
+
+	for range 100 {
+		a.grantSeize()
+		b.grantSeize()
+
+		var fromA, fromB = a.tx.take(), b.tx.take()
+		if len(fromA) == 0 && len(fromB) == 0 {
+			return
+		}
+
+		b.deliver(t, fromA...)
+		a.deliver(t, fromB...)
+	}
+
+	t.Fatal("the link never went quiet")
+}
+
+// Regression test: when an unexpected UA made us reset the link, the I frames
+// we had sent and not had acknowledged were lost.  Here B, a node, greets A as
+// soon as it connects and before it hears A's retried SABME, so the UA to
+// that retry has to reset A's end.  B hears A's reply straight after the
+// retry, acknowledging a greeting B has just put back to send again, and
+// takes it as an N(R) error; the reply never reached B's client.  As when the
+// other station resets the link, what we sent goes again - and, as there, the
+// other station may then take some of it twice.
+func TestUnexpectedUAResetResendsUnacknowledgedFrames(t *testing.T) {
+	t.Parallel()
+
+	var a, b, _, retry = connectWithARetriedSABME(t)
+
+	b.send(a, "WELCOME")
+	a.deliver(t, b.tx.take()...)
+	a.grantSeize()
+	require.Equal(t, [][]byte{[]byte("WELCOME")}, a.clients.received)
+
+	a.send(b, "BYE")
+	b.deliver(t, retry)
+	b.deliver(t, a.tx.take()...)
+
+	exchange(t, a, b)
+
+	assert.Equal(t, [][]byte{[]byte("BYE")}, b.clients.received)
+}
