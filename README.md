@@ -2,6 +2,11 @@
 
 # Samoyed
 
+[![Build and test](https://github.com/doismellburning/samoyed/actions/workflows/build-and-test.yml/badge.svg?branch=main)](https://github.com/doismellburning/samoyed/actions/workflows/build-and-test.yml?query=branch%3Amain)
+[![Latest release](https://img.shields.io/github/v/release/doismellburning/samoyed?include_prereleases&sort=semver)](https://github.com/doismellburning/samoyed/releases)
+[![Documentation](https://img.shields.io/badge/docs-github.io-blue)](https://doismellburning.github.io/samoyed/)
+[![Licence: AGPL-3.0-or-later](https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue)](#license)
+
 Samoyed is a fully-featured software modem/TNC for packet radio.
 It supports AX.25 v2.2, FX.25, IL2P, APRS, multi-speed modems (300-9600 bps), digipeating, IGates, and more.
 Samoyed is a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
