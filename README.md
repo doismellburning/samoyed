@@ -52,6 +52,8 @@ As well as that, Samoyed also adds:
 - **Web interface** — a live dashboard and APRS map in the browser (`WEBPORT`)
 - **Prometheus metrics** — a `/metrics` endpoint (`METRICSPORT`), with a starter Grafana dashboard in `conf/`
 - **AGW login** — require a user name and password on the AGW port (`AGWLOGIN`)
+- **NET/ROM node** — `NODES` broadcasts, learned routes and multi-hop circuits, optionally behind a node shell that users connect to by callsign or alias (see [Run a NET/ROM node](https://doismellburning.github.io/samoyed/how-to-guides/#run-a-net-rom-node))
+- **AXUDP** — `samoyed-axudp` bridges a KISS port to remote nodes speaking AX.25 over UDP ([RFC 1226](https://www.rfc-editor.org/rfc/rfc1226))
 - ...and more underway!
 
 ## Installation
