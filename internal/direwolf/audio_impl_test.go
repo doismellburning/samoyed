@@ -505,6 +505,45 @@ func TestAudioImpl_audioOpen_soundcard(t *testing.T) {
 	}
 }
 
+// With continuousOutput, as on macOS, the output stream starts on open and
+// runs until Close: wait sends what is left without draining the stream.
+//
+//nolint:paralleltest // Serial: sets environment variables, which are process-wide.
+func TestAudioImpl_audioOpen_soundcard_continuousOutput(t *testing.T) {
+	nullSoundcards(t, nullSoundcard)
+
+	var d, err = audioOpen(t.Context(), makeRadioConfig(nullSoundcard, nullSoundcard), true)
+	require.NoError(t, err)
+
+	t.Cleanup(d.Close)
+
+	var dev = d.dev[0]
+
+	require.NotNil(t, dev.outputStream)
+	assert.True(t, dev.outputStarted, "the output stream starts on open")
+
+	for i := range dev.outbufSizeInBytes {
+		assert.Equal(t, 0, d.Put(0, uint8(i)))
+	}
+
+	assert.Zero(t, dev.outbufLen, "a full buffer flushes itself")
+
+	assert.Equal(t, 0, d.Put(0, 0))
+	d.wait(0)
+	assert.Zero(t, dev.outbufLen)
+	assert.True(t, dev.outputStarted, "wait leaves the stream running")
+
+	// And the next transmission goes out on the same stream.
+	assert.Equal(t, 0, d.Put(0, 0))
+	d.wait(0)
+	assert.Zero(t, dev.outbufLen)
+	assert.True(t, dev.outputStarted)
+
+	d.Close()
+	assert.Nil(t, dev.outputStream)
+	assert.False(t, dev.outputStarted)
+}
+
 //nolint:paralleltest // Serial: sets environment variables, which are process-wide.
 func TestAudioImpl_audioOpen_soundcard_separateInputAndOutput(t *testing.T) {
 	nullSoundcards(t, "samoyed_null_in", "samoyed_null_out")
