@@ -30,7 +30,7 @@ It decodes over 1000 error-free frames from the
 outperforming all hardware TNCs and first-generation soundcard modems.
 Those are Dire Wolf's results: Samoyed's demodulators are ported from Dire Wolf's, but Samoyed doesn't publish figures of its own yet.
 
-Samoyed is (currently) a near-straight port to Go, motivated by:
+Samoyed started as a near-straight port to Go, and has since moved on: much of the code has been reworked, and it has [features of its own](#features). The port was motivated by:
 
 - **Better tooling** — Go's testing, linting, and static analysis ecosystem, as well as the stdlib
 - **Simpler builds** — no cmake, no preprocessor conditionals for test infrastructure
