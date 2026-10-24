@@ -87,7 +87,7 @@ sudo apt install ./samoyed-binary_*.deb
 
 `samoyed-direwolf` is the modem/TNC itself.
 It reads a configuration file — `direwolf.conf` in the current directory, or whatever `--config-file` names.
-A minimal one for a single 1200 bps channel on Linux, in Samoyed's [YAML format](https://doismellburning.github.io/samoyed/yaml-config.html) (for a file whose name ends in `.yaml` or `.yml`):
+A minimal one for a single 1200 bps channel on Linux, in Samoyed's [YAML format](https://doismellburning.github.io/samoyed/yaml-config/) (for a file whose name ends in `.yaml` or `.yml`):
 
 ```yaml
 samoyed:
@@ -128,7 +128,7 @@ samoyed-direwolf --config-file samoyed.yaml
 Run `samoyed-direwolf --help` for the full list of options.
 Dire Wolf's companion utilities come along too, each prefixed `samoyed-` (`samoyed-atest`, `samoyed-kissutil` and so on), with man pages in the `.deb`.
 
-For configuration, features and recipes, see the [Samoyed documentation](https://doismellburning.github.io/samoyed/), in particular the [how-to guides](https://doismellburning.github.io/samoyed/how-to-guides.html).
+For configuration, features and recipes, see the [Samoyed documentation](https://doismellburning.github.io/samoyed/), in particular the [how-to guides](https://doismellburning.github.io/samoyed/how-to-guides/).
 Where it doesn't yet cover something, the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) should — Samoyed aims for broad compatibility with Dire Wolf.
 
 ## Switching from Dire Wolf
