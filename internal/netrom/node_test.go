@@ -260,6 +260,46 @@ func TestNodeBroadcastsOnEachChannel(t *testing.T) {
 	assert.False(t, ok, "heard on a channel A is not on")
 }
 
+// A node on two channels takes each neighbour's link to be worth what its
+// channel is configured for, so a destination both neighbours reach is
+// reached through the better channel.
+func TestNodePrefersBetterChannel(t *testing.T) {
+	t.Parallel()
+
+	var cfg = testConfig("Q1TEST-7", "QNODEA")
+	cfg.Channels = []int{0, 3}
+	cfg.ChannelQuality = map[int]byte{3: 255}
+
+	var a = new(testNode)
+	a.link = new(fakeDataLink)
+	a.agw = new(recordingReporter)
+	a.Node = New(cfg, a.link, func(int, int, *ax25.Packet) {}, a.agw, new(fakeClock), testClient)
+
+	var b = newTestNode("Q2TEST-7", "QNODEB")
+	var c = newTestNode("Q3TEST-7", "QNODEC")
+	var d = newTestNode("Q4TEST-7", "QNODED")
+
+	d.broadcastNodes()
+	b.HeardUI(0, d.ui[0])
+	c.HeardUI(0, d.ui[0])
+	b.broadcastNodes()
+	c.broadcastNodes()
+
+	// B, on the default quality's channel, first.
+	a.HeardUI(0, b.ui[0])
+	a.HeardUI(3, c.ui[0])
+
+	var hop, ok = a.router.nextHop("Q4TEST-7")
+	require.True(t, ok)
+	assert.Equal(t, neighbour{channel: 3, callsign: "Q3TEST-7"}, hop)
+
+	var s = a.Status()
+	assert.Equal(t, []NeighbourStatus{
+		{Channel: 0, Callsign: "Q2TEST-7", Link: "down", Quality: int(DefaultQuality), Failures: 0, Failing: false},
+		{Channel: 3, Callsign: "Q3TEST-7", Link: "down", Quality: 255, Failures: 0, Failing: false},
+	}, s.Neighbours)
+}
+
 func TestNodeHearsBroadcasts(t *testing.T) {
 	t.Parallel()
 

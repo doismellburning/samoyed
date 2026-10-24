@@ -22,6 +22,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -46,8 +47,13 @@ type Config struct {
 	Alias         string        // The short name other nodes know it by.
 	TTL           byte          // How many nodes a frame it originates may cross.
 	NodesInterval time.Duration // Between NODES broadcasts.
-	Quality       byte          // Assumed for the link to any neighbour.
+	Quality       byte          // Assumed for the link to any neighbour, unless ChannelQuality says otherwise.
 	MinQuality    byte          // Below which a route is not worth keeping.
+
+	// ChannelQuality, by channel, is what to assume instead of Quality for
+	// the link to a neighbour on that channel, as netromd's default quality
+	// is per port: a slow radio channel can be worth less than a fast one.
+	ChannelQuality map[int]byte
 }
 
 // DefaultConfig is a configuration with the defaults filled in, for the
@@ -61,7 +67,19 @@ func DefaultConfig() Config {
 		NodesInterval: DefaultNodesInterval,
 		Quality:       DefaultQuality,
 		MinQuality:    DefaultMinQuality,
+
+		ChannelQuality: nil,
 	}
+}
+
+// LinkQuality is what the node assumes for the link to a neighbour on
+// channel.
+func (c Config) LinkQuality(channel int) byte {
+	if q, ok := c.ChannelQuality[channel]; ok {
+		return q
+	}
+
+	return c.Quality
 }
 
 // MaxFrame is the longest layer 3 frame the node sends: the headers and a
@@ -151,7 +169,8 @@ func New(cfg Config, link DataLink, send dwcore.FrameSender, clients Reporter, c
 	var n = new(Node)
 	n.cfg = cfg
 	n.cfg.Channels = slices.Clone(cfg.Channels)
-	n.router = newRouter(cfg.Callsign, cfg.Quality, cfg.MinQuality)
+	n.cfg.ChannelQuality = maps.Clone(cfg.ChannelQuality)
+	n.router = newRouter(cfg.Callsign, n.cfg.LinkQuality, cfg.MinQuality)
 	n.circuits = newCircuitManager(cfg.Callsign, cfg.TTL, n, clock)
 	n.link = link
 	n.send = send

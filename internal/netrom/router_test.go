@@ -28,6 +28,11 @@ func nbr(call string) neighbour {
 	return neighbour{channel: 0, callsign: call}
 }
 
+// everyChannel is a link quality of q whatever the channel.
+func everyChannel(q byte) qualityByChannel {
+	return func(int) byte { return q }
+}
+
 func TestNetromPathQuality(t *testing.T) {
 	t.Parallel()
 
@@ -42,7 +47,7 @@ func TestNetromPathQuality(t *testing.T) {
 func TestNetromRouterLearnsFromBroadcast(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 192, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(192), 10)
 
 	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200)))
 
@@ -58,6 +63,39 @@ func TestNetromRouterLearnsFromBroadcast(t *testing.T) {
 		entry("Q2TEST-7", "QNODEB", "Q2TEST-7", 192),
 		entry("Q3TEST-7", "QNODEC", "Q2TEST-7", 150),
 	}, r.broadcastEntries())
+}
+
+// The link quality is the channel's, so a destination heard through two
+// channels is best reached through the better channel, whichever was heard
+// first.
+func TestNetromRouterPrefersBetterChannel(t *testing.T) {
+	t.Parallel()
+
+	var cfg = DefaultConfig()
+	cfg.Quality = 192
+	cfg.ChannelQuality = map[int]byte{1: 100, 2: 255}
+
+	var radio = neighbour{channel: 1, callsign: "Q2TEST-7"}
+	var axudp = neighbour{channel: 2, callsign: "Q3TEST-7"}
+
+	for _, order := range [][]neighbour{{radio, axudp}, {axudp, radio}} {
+		var r = newRouter("Q1TEST-7", cfg.LinkQuality, 10)
+
+		for _, from := range order {
+			r.heardNodes(from, nodesFrom("QNODE", entry("Q4TEST-7", "QNODED", "Q4TEST-7", 200)))
+		}
+
+		var hop, ok = r.nextHop("Q4TEST-7")
+		require.True(t, ok)
+		assert.Equal(t, axudp, hop, "heard in order %v", order)
+
+		var routes, _ = r.status()
+		require.Len(t, routes, 3)
+		assert.Equal(t, []RouteStatus{
+			{Channel: 2, Neighbour: "Q3TEST-7", Quality: int(pathQuality(255, 200)), Obsolescence: obsolescenceInit},
+			{Channel: 1, Neighbour: "Q2TEST-7", Quality: int(pathQuality(100, 200)), Obsolescence: obsolescenceInit},
+		}, routes[2].Routes)
+	}
 }
 
 func TestNetromRouterIgnores(t *testing.T) {
@@ -76,7 +114,7 @@ func TestNetromRouterIgnores(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			var r = newRouter("Q1TEST-7", 192, 10)
+			var r = newRouter("Q1TEST-7", everyChannel(192), 10)
 
 			r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB", tc.entry))
 
@@ -91,7 +129,7 @@ func TestNetromRouterIgnores(t *testing.T) {
 func TestNetromRouterMinimumQuality(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 192, 150)
+	var r = newRouter("Q1TEST-7", everyChannel(192), 150)
 
 	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB",
 		entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200), // 150 for us: kept.
@@ -110,7 +148,7 @@ func TestNetromRouterMinimumQuality(t *testing.T) {
 func TestNetromRouterIgnoresItsOwnBroadcast(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 192, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(192), 10)
 
 	r.heardNodes(nbr("Q1TEST-7"), nodesFrom("QNODEA", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200)))
 
@@ -122,7 +160,7 @@ func TestNetromRouterIgnoresItsOwnBroadcast(t *testing.T) {
 func TestNetromRouterAgesRoutes(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 192, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(192), 10)
 
 	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB"))
 
@@ -162,8 +200,8 @@ func TestNetromRouterAgesRoutes(t *testing.T) {
 func TestNetromRoutersDoNotKeepADeadDestinationAlive(t *testing.T) {
 	t.Parallel()
 
-	var a = newRouter("Q1TEST-7", 192, 10)
-	var b = newRouter("Q2TEST-7", 192, 10)
+	var a = newRouter("Q1TEST-7", everyChannel(192), 10)
+	var b = newRouter("Q2TEST-7", everyChannel(192), 10)
 
 	a.heardNodes(nbr("Q3TEST-7"), nodesFrom("QNODEC"))
 
@@ -199,7 +237,7 @@ func TestNetromRoutersDoNotKeepADeadDestinationAlive(t *testing.T) {
 func TestNetromRouterKeepsTheBestRoutes(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 255, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(255), 10)
 
 	for i, q := range []byte{100, 200, 150} {
 		r.heardNodes(nbr(fmt.Sprintf("Q%dTEST", i+2)), nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", q)))
@@ -221,7 +259,7 @@ func TestNetromRouterKeepsTheBestRoutes(t *testing.T) {
 func TestNetromRouterUpdatesARoute(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 255, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(255), 10)
 
 	r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 200)))
 	r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 100)))
@@ -233,7 +271,7 @@ func TestNetromRouterUpdatesARoute(t *testing.T) {
 func TestNetromRouterPassesOverAFailingNeighbour(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 255, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(255), 10)
 
 	r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 200)))
 	r.heardNodes(nbr("Q3TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 100)))
@@ -259,7 +297,7 @@ func TestNetromRouterPassesOverAFailingNeighbour(t *testing.T) {
 func TestNetromRouterNeighbourIsCallsignOnAChannel(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 255, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(255), 10)
 
 	var on0 = neighbour{channel: 0, callsign: "Q2TEST"}
 	var on1 = neighbour{channel: 1, callsign: "Q2TEST"}
@@ -282,7 +320,7 @@ func TestNetromRouterNeighbourIsCallsignOnAChannel(t *testing.T) {
 func TestNetromRouterResolves(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 192, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(192), 10)
 
 	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB"))
 
@@ -301,7 +339,7 @@ func TestNetromRouterResolves(t *testing.T) {
 func TestNetromRouterIsBounded(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 255, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(255), 10)
 
 	for i := range maxDestinations + 10 {
 		r.heardNodes(nbr(fmt.Sprintf("Q%dTEST-%d", i%10, i%16)), nodesFrom("", entry(fmt.Sprintf("Q%05d", i), "", "Q9TEST", 200)))
@@ -325,7 +363,7 @@ func neighboursOf(r *router, callsign string) []string {
 func TestRouterAdvertisesTheRouteItWouldUse(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 255, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(255), 10)
 
 	r.heardNodes(nbr("Q4TEST"), nodesFrom("", entry("Q9TEST", "QNODEZ", "Q9TEST", 200)))
 

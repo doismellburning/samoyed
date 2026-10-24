@@ -56,12 +56,17 @@ type destination struct {
 	routes   []routeEntry
 }
 
+// qualityByChannel is what a node assumes for its link to a neighbour it
+// hears on channel.
+type qualityByChannel func(channel int) byte
+
 // router is a node's routing table, learned from the NODES broadcasts
 // its neighbours send.  These rules are what keep a NET/ROM network's routes
 // from going round in circles:
 //
 //   - The neighbour a broadcast came from is reachable directly, at the
-//     quality configured for our link to it.
+//     quality configured for our link to it - which is for the channel it was
+//     heard on, so that a fast channel can be preferred to a slow one.
 //   - A destination it advertises is reachable through it, at a quality that
 //     is the product of the two - (link quality * advertised quality + 128) /
 //     256 - so every hop makes a route worse and a long way round loses to a
@@ -79,14 +84,14 @@ type router struct {
 	mu sync.Mutex
 
 	myCall      string
-	linkQuality byte // What we assume for a link to any neighbour we hear.
+	linkQuality qualityByChannel
 	minQuality  byte
 
 	destinations map[string]*destination
 	failures     map[neighbour]int // Consecutive failures per neighbour.
 }
 
-func newRouter(myCall string, linkQuality byte, minQuality byte) *router {
+func newRouter(myCall string, linkQuality qualityByChannel, minQuality byte) *router {
 	var r = new(router)
 	r.myCall = myCall
 	r.linkQuality = linkQuality
@@ -115,7 +120,9 @@ func (r *router) heardNodes(from neighbour, n *Nodes) {
 
 	delete(r.failures, from)
 
-	r.addRoute(from.callsign, n.alias, from, r.linkQuality)
+	var linkQuality = r.linkQuality(from.channel)
+
+	r.addRoute(from.callsign, n.alias, from, linkQuality)
 
 	for _, e := range n.entries {
 		switch {
@@ -130,7 +137,7 @@ func (r *router) heardNodes(from neighbour, n *Nodes) {
 			// one channel through us on another is going a long way
 			// round.
 		default:
-			var quality = pathQuality(r.linkQuality, e.quality)
+			var quality = pathQuality(linkQuality, e.quality)
 			if quality >= r.minQuality && quality > 0 {
 				r.addRoute(e.callsign, e.alias, from, quality)
 			}
