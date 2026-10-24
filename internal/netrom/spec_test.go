@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -278,7 +279,7 @@ func TestSpecRouteQualityFormula(t *testing.T) {
 	for broadcast := range 256 {
 		for path := range 256 {
 			var want = (broadcast*path + 128) / 256
-			require.Equal(t, byte(want), pathQuality(byte(path), byte(broadcast)), //nolint:gosec // G115: want is at most 254
+			require.Equal(t, safecast.RequireConvert[byte](t, want), pathQuality(byte(path), byte(broadcast)),
 				"broadcast %d, path %d", broadcast, path)
 		}
 	}
