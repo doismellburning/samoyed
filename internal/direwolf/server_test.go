@@ -712,6 +712,127 @@ func TestSendToClient_WriteErrorDetachesTheClient(t *testing.T) {
 	assert.Equal(t, DLQ_CLIENT_CLEANUP, item._type)
 }
 
+// --- Link messages ---
+
+// recordingConn keeps everything written to it.
+type recordingConn struct {
+	nullConn
+
+	mu      sync.Mutex
+	written []byte
+}
+
+func (c *recordingConn) Write(b []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.written = append(c.written, b...)
+
+	return len(b), nil
+}
+
+func (c *recordingConn) bytes() []byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return bytes.Clone(c.written)
+}
+
+// recordingAGWClient returns a server with a recording connection attached as
+// client 0.
+func recordingAGWClient(t *testing.T) (*AGWServer, *recordingConn) {
+	t.Helper()
+
+	var s = new(AGWServer)
+	s.dataLink = NewDataLinkQueue()
+
+	var conn = new(recordingConn)
+	conn.addr = tcpAddr(t, "127.0.0.1")
+
+	s.clientAccepted(0, conn)
+
+	return s, conn
+}
+
+// A port is a channel, and so fits the four bits SendRecPacket shifts it into.
+func TestAgwPort(t *testing.T) {
+	t.Parallel()
+
+	for _, channel := range []int{0, 1, MAX_TOTAL_CHANS - 1} {
+		var port, err = agwPort(channel)
+		require.NoError(t, err, "channel %d", channel)
+		assert.Equal(t, channel, int(port))
+		assert.Equal(t, channel, int(port<<4)>>4, "channel %d loses bits in the TNC byte", channel)
+	}
+
+	for _, channel := range []int{-1, MAX_TOTAL_CHANS, 255, 256} {
+		var _, err = agwPort(channel)
+		assert.Error(t, err, "channel %d", channel)
+	}
+}
+
+func TestNewLinkMessage_FillsTheHeader(t *testing.T) {
+	t.Parallel()
+
+	var data = []byte("*** CONNECTED With Station Q2TEST-1\r\x00")
+
+	var msg, err = newLinkMessage(3, 'C', "Q2TEST-1", "Q1TEST", data)
+	require.NoError(t, err)
+
+	assert.Equal(t, byte(3), msg.Header.Portx)
+	assert.Equal(t, byte('C'), msg.Header.DataKind)
+	assert.Equal(t, "Q2TEST-1", msg.Header.CallFrom.String())
+	assert.Equal(t, "Q1TEST", msg.Header.CallTo.String())
+	assert.Equal(t, safecast.RequireConvert[uint32](t, len(data)), msg.Header.DataLen)
+	assert.Equal(t, data, msg.Data)
+}
+
+func TestNewLinkMessage_RejectsAChannelThatIsNotAPort(t *testing.T) {
+	t.Parallel()
+
+	var msg, err = newLinkMessage(MAX_TOTAL_CHANS, 'C', "Q2TEST", "Q1TEST", nil)
+	require.Error(t, err)
+	assert.Nil(t, msg)
+}
+
+// The 'Y' reply comes from our end, about the station at the other, and
+// carries the count as a little-endian uint32.
+func TestOutstandingFramesReply_SendsTheCount(t *testing.T) {
+	t.Parallel()
+
+	var s, conn = recordingAGWClient(t)
+
+	s.OutstandingFramesReply(2, 0, "Q1TEST", "Q2TEST", 7)
+
+	var r = bytes.NewReader(conn.bytes())
+
+	var header agwpe.Header
+	require.NoError(t, binary.Read(r, binary.LittleEndian, &header))
+
+	assert.Equal(t, byte(2), header.Portx)
+	assert.Equal(t, byte('Y'), header.DataKind)
+	assert.Equal(t, "Q1TEST", header.CallFrom.String())
+	assert.Equal(t, "Q2TEST", header.CallTo.String())
+	require.Equal(t, uint32(4), header.DataLen)
+
+	var count uint32
+	require.NoError(t, binary.Read(r, binary.LittleEndian, &count))
+	assert.Equal(t, uint32(7), count)
+	assert.Zero(t, r.Len(), "more was sent than the one message")
+}
+
+// A notice for a channel that isn't a port is dropped rather than sent with a
+// port number that names some other channel.
+func TestLinkEstablished_SendsNothingForAChannelThatIsNotAPort(t *testing.T) {
+	t.Parallel()
+
+	var s, conn = recordingAGWClient(t)
+
+	s.LinkEstablished(MAX_TOTAL_CHANS, 0, "Q2TEST", "Q1TEST", true)
+
+	assert.Empty(t, conn.bytes())
+}
+
 // --- Writes to one client from more than one goroutine ---
 
 // gatedConn records everything written to it.  The first write it is given -
