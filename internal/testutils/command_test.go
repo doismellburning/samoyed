@@ -181,6 +181,9 @@ func TestStart(t *testing.T) {
 // to see it fail.
 const timeoutEnv = "SAMOYED_TESTUTILS_TIMEOUT"
 
+// timeoutLengthEnv is the ProcessTimeout TestTimingOut gives the helper.
+const timeoutLengthEnv = "SAMOYED_TESTUTILS_TIMEOUT_LENGTH"
+
 func TestTimingOut(t *testing.T) {
 	t.Parallel()
 
@@ -189,7 +192,10 @@ func TestTimingOut(t *testing.T) {
 		t.Skip("Only run by TestTimeoutFailsTheTest")
 	}
 
-	ProcessTimeout = 100 * time.Millisecond
+	var timeout, parseErr = time.ParseDuration(os.Getenv(timeoutLengthEnv))
+	require.NoError(t, parseErr)
+
+	ProcessTimeout = timeout
 
 	switch helper {
 	case "RunMain":
@@ -214,15 +220,45 @@ func TestTimeoutFailsTheTest(t *testing.T) {
 		t.Run(helper, func(t *testing.T) {
 			t.Parallel()
 
-			var cmd = exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestTimingOut$", "-test.v") //nolint:gosec // Running ourselves.
-			cmd.Env = append(os.Environ(), timeoutEnv+"="+helper)
+			var out = runTimingOut(t, helper, "100ms")
 
-			var out, err = cmd.CombinedOutput()
-
-			var exitErr *exec.ExitError
-			require.ErrorAs(t, err, &exitErr, "the test should have failed:\n%s", out)
 			assert.Contains(t, string(out), "The command didn't finish within 100ms")
 			assert.Contains(t, string(out), "hanging", "and shows what it printed")
 		})
 	}
+}
+
+// A timeout counts from when the command starts, not from when the helper was
+// called, so one that has run out by the time the command is started - as a
+// short one can on a busy machine - still reports the command as not
+// finishing, rather than failing to start it.
+func TestTimeoutBeforeStartFailsTheTest(t *testing.T) {
+	t.Parallel()
+
+	for _, helper := range []string{"RunMain", "StartMain"} {
+		t.Run(helper, func(t *testing.T) {
+			t.Parallel()
+
+			var out = runTimingOut(t, helper, "1ns")
+
+			assert.Contains(t, string(out), "The command didn't finish within 1ns")
+			assert.NotContains(t, string(out), "context deadline exceeded")
+		})
+	}
+}
+
+// runTimingOut runs TestTimingOut, which should fail, on helper with a
+// ProcessTimeout of timeout, and hands back what it printed.
+func runTimingOut(t *testing.T, helper string, timeout string) []byte {
+	t.Helper()
+
+	var cmd = exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestTimingOut$", "-test.v") //nolint:gosec // Running ourselves.
+	cmd.Env = append(os.Environ(), timeoutEnv+"="+helper, timeoutLengthEnv+"="+timeout)
+
+	var out, err = cmd.CombinedOutput()
+
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr, "the test should have failed:\n%s", out)
+
+	return out
 }

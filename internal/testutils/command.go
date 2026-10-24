@@ -33,6 +33,30 @@ const raceWarning = "WARNING: DATA RACE"
 //nolint:gochecknoglobals // A variable so that these helpers' own tests can see one time out.
 var ProcessTimeout = 30 * time.Second
 
+// startTimed starts cmd, which was made with the context cancel cancels, and
+// cancels it once the command has had ProcessTimeout.  The clock starts once
+// the command has: a deadline set when the context was made could pass, on a
+// busy machine, before the command was started at all, and Start would refuse
+// to start it rather than it being seen to time out.
+//
+// timedOut, called once the command has exited, says whether it was killed for
+// taking too long.  Asking stops the clock, so a command that exited, or was
+// killed some other way, in time doesn't count as timing out afterwards.
+func startTimed(cancel context.CancelFunc, cmd *exec.Cmd) (func() bool, error) {
+	var startErr = cmd.Start()
+	if startErr != nil {
+		return nil, startErr
+	}
+
+	var timer = time.AfterFunc(ProcessTimeout, cancel)
+
+	// Stop is false once the timer has fired, whether or not cancel has run
+	// yet - so too the second time it is asked.
+	var timedOut = sync.OnceValue(func() bool { return !timer.Stop() })
+
+	return timedOut, nil
+}
+
 // coverDirEnv names the directory a binary built with -cover writes its
 // coverage to as it exits.  go test sets it for the test binary, so a command
 // run from one, as RunMain runs it, finds it too.
@@ -156,7 +180,7 @@ func (r Result) Output() string {
 func RunMain(t *testing.T, stdin string, args ...string) Result {
 	t.Helper()
 
-	var ctx, cancel = context.WithTimeout(t.Context(), ProcessTimeout)
+	var ctx, cancel = context.WithCancel(t.Context())
 	defer cancel()
 
 	var coverEnv, collectCoverage = childCoverDir(t)
@@ -171,13 +195,16 @@ func RunMain(t *testing.T, stdin string, args ...string) Result {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	var runErr = cmd.Run()
+	var timedOut, startErr = startTimed(cancel, cmd)
+	require.NoError(t, startErr)
+
+	var runErr = cmd.Wait()
 
 	collectCoverage()
 
 	// Killed for taking too long, it has an exit status, but not one that
 	// says anything about what it was doing.
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+	if timedOut() {
 		require.FailNow(t, fmt.Sprintf("The command didn't finish within %s", ProcessTimeout), "Its output:\n%s%s", stdout.String(), stderr.String())
 	}
 
@@ -207,11 +234,11 @@ type Process struct {
 	outputMu sync.Mutex
 	output   strings.Builder
 
-	ctx      context.Context //nolint:containedctx // The command's own, to tell a timeout from a kill.
-	cmd      *exec.Cmd
-	once     sync.Once
-	status   int
-	timedOut bool
+	cmd         *exec.Cmd
+	hasTimedOut func() bool
+	once        sync.Once
+	status      int
+	timedOut    bool
 }
 
 // Start runs binary with args, and hands back the running process.  It is
@@ -234,7 +261,7 @@ func StartMain(t *testing.T, args ...string) *Process {
 func start(t *testing.T, env []string, binary string, args ...string) *Process {
 	t.Helper()
 
-	var ctx, cancel = context.WithTimeout(context.Background(), ProcessTimeout)
+	var ctx, cancel = context.WithCancel(context.Background())
 
 	var coverEnv, collectCoverage = childCoverDir(t)
 
@@ -253,7 +280,8 @@ func start(t *testing.T, env []string, binary string, args ...string) *Process {
 	cmd.Stdout = outputWriter
 	cmd.Stderr = outputWriter
 
-	require.NoError(t, cmd.Start())
+	var hasTimedOut, startErr = startTimed(cancel, cmd)
+	require.NoError(t, startErr)
 
 	// The command has its own copies now.  Letting go of ours means the
 	// command's exit is the end of its output.
@@ -265,8 +293,8 @@ func start(t *testing.T, env []string, binary string, args ...string) *Process {
 	var p = new(Process)
 	p.Stdin = stdinWriter
 	p.lines = lines
-	p.ctx = ctx
 	p.cmd = cmd
+	p.hasTimedOut = hasTimedOut
 
 	go func() {
 		defer close(lines)
@@ -359,7 +387,7 @@ func (p *Process) Wait() int {
 
 		_ = p.cmd.Wait()
 		p.status = p.cmd.ProcessState.ExitCode()
-		p.timedOut = errors.Is(p.ctx.Err(), context.DeadlineExceeded)
+		p.timedOut = p.hasTimedOut()
 	})
 
 	return p.status
