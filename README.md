@@ -144,7 +144,8 @@ make cmds        # build all binaries into dist/
 make all         # build and test everything
 ```
 
-See [AGENTS.md](./AGENTS.md) for the main `make` targets, along with general development notes and style guidelines.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) before sending a change.
+[AGENTS.md](./AGENTS.md) - written for people as much as for agents - lists the main `make` targets, along with general development notes and style guidelines.
 
 ## Contributing
 
