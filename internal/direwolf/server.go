@@ -501,7 +501,7 @@ func (s *AGWServer) SendMonitored(channel int, pp *ax25.Packet, own_xmit int) {
 	 */
 	for client := range MAX_NET_CLIENTS {
 		var conn = s.clientWantingMonitor(client)
-		if conn != nil {
+		if conn != nil { //nolint:nestif
 			var agwpe_msg = new(agwpe.Message)
 
 			agwpe_msg.Header.Portx = port // datakind is added later.
@@ -1245,7 +1245,7 @@ func (s *AGWServer) connectListenThread(ctx context.Context, listener net.Listen
 	for ctx.Err() == nil {
 		var client = s.findFreeClient()
 
-		if client >= 0 {
+		if client >= 0 { //nolint:nestif
 			logrus.WithFields(logrus.Fields{"client": client, "port": server_port}).
 				Info("Ready to accept AGW client application")
 
@@ -2148,7 +2148,7 @@ func (s *AGWServer) handleConnectRequest(client int, cmd *agwpe.Message) {
 
 	var num_calls = 2 /* 2 plus any digipeaters. */
 
-	if cmd.Header.DataKind == 'v' {
+	if cmd.Header.DataKind == 'v' { //nolint:nestif
 		if len(cmd.Data) < 1 {
 			logrus.WithField("client", client).Error("AGW connect via has invalid payload: too short")
 

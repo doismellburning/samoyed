@@ -420,7 +420,7 @@ func (u *ttUsers) record(callsign string, ssid int, overlay byte, symbol byte, l
 	 * Is it someone new or a returning user?
 	 */
 	var i = u.search(callsign, overlay)
-	if i == -1 {
+	if i == -1 { //nolint:nestif
 		/*
 		 * New person.  Create new table entry with all available information.
 		 */

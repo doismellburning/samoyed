@@ -153,7 +153,7 @@ func newKissSerial(mc *misc_config_s, handler *KissHandler, debug int) *KissSeri
 func NewKissSerial(ctx context.Context, mc *misc_config_s, handler *KissHandler, debug int) *KissSerial {
 	var ks = newKissSerial(mc, handler, debug)
 
-	if mc.kiss_serial_port != "" {
+	if mc.kiss_serial_port != "" { //nolint:nestif
 		if mc.kiss_serial_poll == 0 {
 			// Normal case, try to open the serial port at start up time.
 			// Nothing else is running yet, so there is no lock to take.
@@ -373,7 +373,7 @@ func (ks *KissSerial) giveUpPortIfFailed() bool {
 // whatever gets that number next.  A port that says nothing therefore holds
 // this goroutine until it does, or until the process exits.
 func (ks *KissSerial) get(ctx context.Context) (byte, error) {
-	if ks.miscConfig.kiss_serial_poll == 0 {
+	if ks.miscConfig.kiss_serial_poll == 0 { //nolint:nestif
 		/*
 		 * Normal case, was opened at start up time.
 		 */
@@ -415,7 +415,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
 
 		var fd, _ = ks.port()
 
-		if fd != nil {
+		if fd != nil { //nolint:nestif
 			// Open, try to read.
 			var ch, err = serialport.Get1(fd)
 

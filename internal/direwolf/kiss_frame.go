@@ -784,7 +784,7 @@ func logMissingKissValue(channel int, command string) {
 func kiss_set_hardware(channel int, command []byte, from kissClient, queue clientTransmitQueue) {
 	var cmd, value, found = bytes.Cut(command, []byte{':'})
 
-	if found {
+	if found { //nolint:nestif
 		if bytes.Equal(cmd, []byte("TNC")) { /* TNC - Identify software version. */
 			if len(value) > 0 {
 				logrus.WithFields(logrus.Fields{

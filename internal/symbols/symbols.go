@@ -425,7 +425,7 @@ func (sd *Data) List() {
 
 		var tones = sd.ToTones(overlay, symbol)
 
-		if overlay == '/' {
+		if overlay == '/' { //nolint:nestif
 			if index >= len(pt) {
 				warnOutOfRange(overlay, symbol, index, "primary")
 
@@ -528,7 +528,7 @@ func (sd *Data) FromDestOrSrc(dti byte, src string, dest string) (byte, byte, bo
 	 * This part does not apply to MIC-E format because the destination
 	 * is used to encode latitude and other information.
 	 */
-	if dti != '\'' && dti != '`' {
+	if dti != '\'' && dti != '`' { //nolint:nestif
 		/*
 		 * For GPSCnn, nn is the index into the primary symbol table.
 		 */

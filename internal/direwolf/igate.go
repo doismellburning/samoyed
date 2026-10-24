@@ -519,7 +519,7 @@ func (ig *IGate) connectThread(ctx context.Context) {
 		/*
 		 * Connect to IGate server if not currently connected.
 		 */
-		if current, _ := ig.connection(); current == nil {
+		if current, _ := ig.connection(); current == nil { //nolint:nestif
 			var conn, connErr = igate_dial(ctx, server_name, ig.config.t2_server_port)
 			ig.updateStats(func(s *igateStats) { s.connectedAt = time.Now() })
 
@@ -1198,7 +1198,7 @@ func (ig *IGate) processServerLine(message []byte) {
 	 * W1CLA-1>APVR30,TCPIP*,qAC,T2TOKYO3:;IRLP-4942*141503z4218.46NI07108.24W0446325-146IDLE    <0x20>
 	 */
 
-	if len(message) == 0 {
+	if len(message) == 0 { //nolint:nestif
 		/*
 		 * Discard if zero length.
 		 */
@@ -1611,7 +1611,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 		}
 	}
 
-	if !msp_special_case {
+	if !msp_special_case { //nolint:nestif
 		if ig.digiConfig.FilterStr[MAX_TOTAL_CHANS][to_chan] != "" {
 			var result, err = ig.filter.Filter(MAX_TOTAL_CHANS, to_chan, ig.digiConfig.FilterStr[MAX_TOTAL_CHANS][to_chan], pp3, true)
 			if err != nil {
@@ -1686,7 +1686,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	 *	-> Bypass the duplicate suppression.
 	 *	-> Raise the rate limiting value.
 	 */
-	if ig.igToTxAllow(pp3, to_chan) {
+	if ig.igToTxAllow(pp3, to_chan) { //nolint:nestif
 		var radio = fmt.Sprintf("%s>%s%d%d%s:}%s",
 			ig.audioConfig.mycall[to_chan],
 			version.Tocall, version.Major, version.Minor,
@@ -2202,7 +2202,7 @@ func (ig *IGate) igToTxAllow(pp *ax25.Packet, channel int) bool {
 	/* Consider transmissions on this channel only by either digi or IGate. */
 
 	for j := range IG2TX_HISTORY_MAX {
-		if ig.ig2tx.entries[j].checksum == int(crc) && ig.ig2tx.entries[j].channel == channel && !ig.ig2tx.entries[j].timeStamp.Before(now.Add(-IG2TX_DEDUPE_TIME)) {
+		if ig.ig2tx.entries[j].checksum == int(crc) && ig.ig2tx.entries[j].channel == channel && !ig.ig2tx.entries[j].timeStamp.Before(now.Add(-IG2TX_DEDUPE_TIME)) { //nolint:nestif
 			/* We have a duplicate within some time period. */
 			if is_message_message(string(pinfo)) {
 				/* I think I want to avoid the duplicate suppression for "messages." */

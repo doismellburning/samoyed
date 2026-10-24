@@ -110,7 +110,7 @@ func (s *Stats) Record(adev int, nchan int, nsamp int, interval int) {
 	 * more clues if nothing is being decoded.
 	 */
 
-	if s.lastTime.IsZero() {
+	if s.lastTime.IsZero() { //nolint:nestif
 		s.lastTime = time.Now()
 		s.sampleCount = 0
 		s.errorCount = 0

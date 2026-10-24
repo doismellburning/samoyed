@@ -515,7 +515,7 @@ func parse_primary(pf *pfstate_t) (int, error) {
 	var result int
 	var err error
 
-	if pf.token_type == TOKEN_LPAREN { //nolint:staticcheck
+	if pf.token_type == TOKEN_LPAREN { //nolint:nestif,staticcheck
 		next_token(pf)
 		result, err = parse_expr(pf)
 
@@ -600,7 +600,7 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 
 	/* undocumented: can use 0 or 1 for testing. */
 
-	if pf.token_str == "0" {
+	if pf.token_str == "0" { //nolint:nestif
 		result = 0
 	} else if pf.token_str == "1" {
 		result = 1
@@ -1105,7 +1105,7 @@ func filt_s(pf *pfstate_t) (int, error) {
 
 	var parts = strings.Split(cp, sep)
 
-	if len(parts) > 0 {
+	if len(parts) > 0 { //nolint:nestif
 		pri = parts[0]
 
 		// Zero length is acceptable if alternate symbol(s) specified.  Will check that later.
@@ -1179,7 +1179,7 @@ func filt_s(pf *pfstate_t) (int, error) {
 
 	// Look for Alternate symbols.
 
-	if strings.Contains(alt, string(rune(pf.decoded.SymbolCode))) {
+	if strings.Contains(alt, string(rune(pf.decoded.SymbolCode))) { //nolint:nestif
 		// We have a match but that might not be enough.
 		// We must see if there was an overlay part specified.
 		if len(parts) > 2 {
@@ -1344,7 +1344,7 @@ func filt_i(pf *pfstate_t) (int, error) {
 		return -1, newFilterError(pf, "Missing time limit for IGate message filter.")
 	}
 
-	if len(parts) > 1 {
+	if len(parts) > 1 { //nolint:nestif
 		if len(parts[1]) > 0 {
 			var maxhopsErr error
 			maxhops, maxhopsErr = strconv.Atoi(parts[1])
@@ -1487,7 +1487,7 @@ func filt_i(pf *pfstate_t) (int, error) {
 func newFilterError(pf *pfstate_t, msg string) error {
 	var intro string
 
-	if pf.from_chan == phy.MaxTotalChans {
+	if pf.from_chan == phy.MaxTotalChans { //nolint:nestif
 		if pf.to_chan == phy.MaxTotalChans {
 			intro = "filter[IG,IG]: "
 		} else {

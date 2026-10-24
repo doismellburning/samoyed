@@ -91,8 +91,6 @@ linters:
         - "G104"  # Unchecked errors, mostly from Close and fmt.Printf - errcheck is off for the same reason
         - "G404"  # Weak RNGs are fine for our uses here, certainly for now(!)
         - "G602"  # "slice index out of range" checks that *may* be valid but it's hard to tell - if they're not false positives, they're niche issues
-    nestif:
-      min-complexity: 100  # There's lots of upstream complexity, so let's soft-disable this
     revive:
       rules:
         - name: "var-naming"

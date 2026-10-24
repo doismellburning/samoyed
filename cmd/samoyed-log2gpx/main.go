@@ -41,7 +41,7 @@ func main() {
 	/*
 	 * Read files listed or stdin if none.
 	 */
-	if len(os.Args) == 1 {
+	if len(os.Args) == 1 { //nolint:nestif
 		read_csv(os.Stdin)
 	} else {
 		for i, arg := range os.Args {
@@ -200,7 +200,7 @@ func read_csv(fp *os.File) {
 		 * Save only if we have valid data.
 		 * (Some packets don't contain a position.)
 		 */
-		if len(pisotime) > 0 &&
+		if len(pisotime) > 0 && //nolint:nestif
 			len(pname) > 0 &&
 			len(platitude) > 0 &&
 			len(plongitude) > 0 {
@@ -342,7 +342,7 @@ func process_things(first int, last int) {
 		}
 	}
 
-	if moved {
+	if moved { //nolint:nestif
 		/*
 		 * Generate track for moving thing.
 		 */

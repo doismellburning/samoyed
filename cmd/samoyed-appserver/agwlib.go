@@ -157,7 +157,7 @@ func tnc_listen_thread() {
 		/*
 		 * Connect to TNC if not currently connected.
 		 */
-		if s_tnc_sock == nil {
+		if s_tnc_sock == nil { //nolint:nestif
 			// I'm using the term "attach" here, in an attempt to
 			// avoid confusion with the AX.25 connect.
 			fmt.Printf("Attempting to reattach to network TNC...\n")

@@ -117,7 +117,7 @@ func matchPortAudioDeviceByName(name string, forInput bool, devices []*portaudio
 	// Extract card name and device number from the config, then match against
 	// the card name prefix and (hw:X,Dev) pattern in PortAudio device names.
 	var cardName, devNum = parseALSADeviceName(name)
-	if cardName != "" {
+	if cardName != "" { //nolint:nestif
 		// First try matching by card name substring in PortAudio device names.
 		// This covers the common case where the ALSA card name matches part of
 		// the PortAudio description (e.g. "Loopback" appearing in "Loopback: PCM (hw:0,1)").

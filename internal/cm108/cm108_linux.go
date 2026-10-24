@@ -421,7 +421,7 @@ func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_thi
 	for _, dev := range devices {
 		var devnode = dev.devnode
 
-		if devnode == "" {
+		if devnode == "" { //nolint:nestif
 			// I'm not happy with this but couldn't figure out how
 			// to get attributes from one level up from the pcmC?D?? node.
 			cardDevpath = dev.syspath
@@ -468,7 +468,7 @@ func cm108_inventory_of(devices []cm108Device, hidDevices []cm108Device, max_thi
 	 */
 	for _, dev := range hidDevices {
 		var devnode = dev.devnode
-		if devnode != "" {
+		if devnode != "" { //nolint:nestif
 			var parentdev = dev.usb
 			if parentdev != nil {
 				var vid int

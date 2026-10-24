@@ -629,7 +629,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 	}).Debug("xmit_thread: tq_remove returned")
 	// Shouldn't have nil here but be careful.
 
-	if pp != nil {
+	if pp != nil { //nolint:nestif
 		if ok {
 			/*
 			 * Channel is clear and we have lock on output device.
@@ -1435,7 +1435,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 	 */
 	var n = 0
 
-	if !fulldup {
+	if !fulldup { //nolint:nestif
 	start_over_again:
 
 		for xs.channelBusy(channel) {

@@ -211,7 +211,7 @@ func (mdb *DB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float64], lo
 
 	mdb.mu.Lock()
 	var mptr = mdb.db[source]
-	if mptr == nil {
+	if mptr == nil { //nolint:nestif
 		/*
 		 * Not heard before.  Add it.
 		 */
@@ -589,7 +589,7 @@ func (mdb *DB) WasRecentlyNearby(role string, callsign string, timeLimitMinutes 
 	var stationLat, haveStationLat = mptr.dlat.Get()
 	var stationLon, haveStationLon = mptr.dlon.Get()
 
-	if haveTarget && haveStationLat && haveStationLon {
+	if haveTarget && haveStationLat && haveStationLon { //nolint:nestif
 		var dist = latlong.DistanceKm(stationLat, stationLon, targetLat, targetLon)
 
 		if dist > limitKm {

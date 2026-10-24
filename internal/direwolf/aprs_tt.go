@@ -407,7 +407,7 @@ func (g *TTGateway) Button(channel int, button byte) {
 
 	// TODO:  Might make more sense to put timeout here rather in the dtmf decoder.
 
-	if button == '$' {
+	if button == '$' { //nolint:nestif
 		/* Timeout reset. */
 		g.msgStr[channel] = ""
 	} else if button != '.' && button != ' ' {
@@ -684,7 +684,7 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 
 	var xstr, ystr, zstr, _, _, ipat = g.findTTLocMatch(e)
 
-	if ipat >= 0 {
+	if ipat >= 0 { //nolint:nestif
 		// Why did we print b & d here?
 		// Documentation says only x, y, z can be used with macros.
 		// Only those 3 are processed below.
@@ -878,7 +878,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 	 * Another part of application will try to find corresponding full call.
 	 */
 
-	if (length == 6 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) &&
+	if (length == 6 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) && //nolint:nestif
 		unicode.IsDigit(rune(e[4])) && unicode.IsDigit(rune(e[5]))) ||
 		(length == 7 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) &&
 			ascii.IsDigit(e[4]) && ascii.IsUpper(e[5]) && ascii.IsDigit(e[6])) {
@@ -928,7 +928,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 	 * Callsign in two key format.
 	 */
 
-	if length >= 7 && length <= 24 {
+	if length >= 7 && length <= 24 { //nolint:nestif
 		var cs_err = checksum_not_ok(e[1:length-1], length-2, rune(e[length-1]))
 
 		if cs_err != 0 {
@@ -1025,7 +1025,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 	 * Object name in two key format.
 	 */
 
-	if length >= 2+1 && length <= 30 {
+	if length >= 2+1 && length <= 30 { //nolint:nestif
 		var _callsign, errors = touchtone.TwoKeyToText(e[2:], false)
 		if errors == 0 {
 			state.callsign = _callsign
@@ -1092,7 +1092,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 
 	var length = len(e)
 
-	if length >= 4 && length <= 10 {
+	if length >= 4 && length <= 10 { //nolint:nestif
 		// Normally two digits, but take the one there is in a field of four.
 		var nstr = e[3:min(length, 5)]
 
@@ -1189,7 +1189,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 		logrus.WithField("entry", e).Debug("APRStt parse QIKcom-2 / APRStt 3 ten digit call or five digit suffix (starts with AC)")
 	}
 
-	if len(e) == 2+10 {
+	if len(e) == 2+10 { //nolint:nestif
 		var call, errors = touchtone.Call10ToText(e[2:], true)
 
 		if errors == 0 {
@@ -1288,7 +1288,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 	var xstr, ystr, _, bstr, dstr, ipat = g.findTTLocMatch(e)
 
-	if ipat >= 0 {
+	if ipat >= 0 { //nolint:nestif
 		// dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);
 		var ttloc_type = g.config.ttlocs[ipat].ttlocType
 		switch ttloc_type {
@@ -1595,7 +1595,7 @@ func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, st
 		var pattern = g.config.ttlocs[ipat].pattern
 		var length = len(pattern) /* Length of pattern we are trying to match. */
 
-		if len(e) == length {
+		if len(e) == length { //nolint:nestif
 			var match = true
 			xstr = ""
 			ystr = ""

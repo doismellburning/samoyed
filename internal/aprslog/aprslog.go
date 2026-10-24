@@ -69,7 +69,7 @@ func New(daily_names bool, path string) *Logger {
 		return pl
 	}
 
-	if pl.dailyNames {
+	if pl.dailyNames { //nolint:nestif
 		// Original strategy.  Automatic daily file names.
 		var stat, statErr = os.Stat(path)
 		if statErr == nil {
@@ -135,7 +135,7 @@ func (pl *Logger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, alevel ax
 
 	var now = time.Now().UTC()
 
-	if pl.dailyNames {
+	if pl.dailyNames { //nolint:nestif
 		// Original strategy.  Automatic daily file names.
 
 		// Generate the file name from current date, UTC.
@@ -217,7 +217,7 @@ func (pl *Logger) Write(channel int, A *aprs.Decoded, pp *ax25.Packet, alevel ax
 
 	// Add line to file if it is now open.
 
-	if pl.logFp != nil {
+	if pl.logFp != nil { //nolint:nestif
 		var itime = now.Format("2006-01-02T15:04:05Z")
 
 		/* Who are we hearing?   Original station or digipeater? */

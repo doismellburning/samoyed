@@ -431,7 +431,7 @@ func parse_ll_maybe(str string, which parse_ll_which_e, line int) (maybe.Maybe[f
 	/*
 	 * Process any hemisphere on the end.
 	 */
-	if len(stemp) >= 2 {
+	if len(stemp) >= 2 { //nolint:nestif
 		var lastChar = rune(stemp[len(stemp)-1])
 
 		if ascii.IsAlpha(lastChar) {
@@ -574,7 +574,7 @@ func parse_utm_zone(szone string) (rune, rune, int, error) {
 
 	var lzone, _ = strconv.Atoi(szone)
 
-	if lastRune == 0 {
+	if lastRune == 0 { //nolint:nestif
 		/* Number is not followed by letter something else.  */
 		/* Allow negative number to mean south. */
 		if lzone < 0 {
@@ -1885,7 +1885,7 @@ func handleCHANNEL(ps *parseState) error {
 
 // applyCHANNEL makes n the radio channel that later channel settings apply to.
 func (ps *parseState) applyCHANNEL(n int) error {
-	if n >= 0 && n < MAX_RADIO_CHANS {
+	if n >= 0 && n < MAX_RADIO_CHANS { //nolint:nestif
 		ps.channel = n
 
 		if ps.audio.chan_medium[n] != MEDIUM_RADIO {
@@ -2707,7 +2707,7 @@ func (ps *parseState) applyModem(settings ModemSettings) error {
 		ps.errorf("line %d: Unrecognized modem type for MODEM: %s", ps.line, settings.Type)
 	}
 
-	if settings.Tones != nil {
+	if settings.Tones != nil { //nolint:nestif
 		achan.mark_freq = settings.Tones.Mark
 		achan.space_freq = settings.Tones.Space
 
@@ -2842,7 +2842,7 @@ func (ps *parseState) oldStyleModem(t string) error {
 	/* New feature in 0.9 - Optional filter profile(s). */
 
 	t = ps.split(false)
-	if t != "" {
+	if t != "" { //nolint:nestif
 		/* Look for some combination of letter(s) and + */
 		if ascii.IsAlpha(t[0]) || t[0] == '+' {
 			/* Here we only catch something other than letters and + mixed in. */
@@ -2864,7 +2864,7 @@ func (ps *parseState) oldStyleModem(t string) error {
 
 	/* New feature in 0.9 - optional number of decoders and frequency offset between. */
 
-	if t != "" {
+	if t != "" { //nolint:nestif
 		n, _ = strconv.Atoi(t)
 		if n < 1 || n > MAX_SUBCHANS {
 			ps.errorf("line %d: Number of demodulators is out of range. Using 3", ps.line)
@@ -3393,7 +3393,7 @@ func handleTXINH(ps *parseState) error {
 		return fmt.Errorf("config file line %d: Missing input type name for %s command", ps.line, itname)
 	}
 
-	if strings.EqualFold(t, "GPIO") {
+	if strings.EqualFold(t, "GPIO") { //nolint:nestif
 		/* TODO KG
 		#if __WIN32__
 			      text_color_set(DW_COLOR_ERROR);
@@ -4003,7 +4003,7 @@ func handleDIGIPEAT(ps *parseState) error {
 	ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptOff
 
 	t = ps.split(false)
-	if t != "" {
+	if t != "" { //nolint:nestif
 		if strings.EqualFold(t, "OFF") {
 			ps.digi.Preempt[from_chan][to_chan] = digipeater.PreemptOff
 			t = ps.split(false)
@@ -4655,7 +4655,7 @@ func handleTTUTM(ps *parseState) error {
 	// Optional scale.
 
 	t = ps.split(false)
-	if t != "" {
+	if t != "" { //nolint:nestif
 		var scaleVal, scaleErr = strconv.ParseFloat(t, 64)
 		if scaleErr != nil {
 			return fmt.Errorf("line %d: Invalid scale \"%s\" for TTUTM command", ps.line, t)
@@ -5033,7 +5033,7 @@ func handleTTMACRO(ps *parseState) error {
 	tmp = strings.TrimSpace(tmp)
 
 	for len(tmp) != 0 {
-		if strings.HasPrefix(tmp, "AC{") {
+		if strings.HasPrefix(tmp, "AC{") { //nolint:nestif
 			// Convert to fixed length 10 digit callsign.
 			tmp = tmp[3:]
 			var stemp strings.Builder
@@ -5235,7 +5235,7 @@ func handleTTOBJ(ps *parseState) error {
 
 	for part := range strings.SplitSeq(t, ",") {
 		part = strings.TrimSpace(part)
-		if strings.EqualFold(part, "APP") || strings.EqualFold(part, "A") {
+		if strings.EqualFold(part, "APP") || strings.EqualFold(part, "A") { //nolint:nestif
 			app = 1
 		} else if strings.EqualFold(part, "IG") || strings.EqualFold(part, "I") {
 			ig = 1
@@ -5461,7 +5461,7 @@ func handleIGSERVER(ps *parseState) error {
 	 * Use net.SplitHostPort to correctly handle bracketed IPv6 addresses like [::1]:8080.
 	 */
 
-	if strings.Contains(t, ":") {
+	if strings.Contains(t, ":") { //nolint:nestif
 		var hostname, portStr, splitErr = net.SplitHostPort(t)
 		if splitErr == nil {
 			ps.igate.t2_server_name = hostname
@@ -5924,7 +5924,7 @@ func (ps *parseState) applyKISSPORT(settings KISSPortSettings) error {
 
 	// "KISSPORT 0" is used to remove the default entry.
 
-	if tcp_port == 0 {
+	if tcp_port == 0 { //nolint:nestif
 		ps.misc.kiss_port[0] = 0 // Should all be wiped out?
 	} else {
 		// Try to find an empty slot.
@@ -6111,7 +6111,7 @@ func handleGPSD(ps *parseState) error {
 	ps.misc.gpsd_port = DEFAULT_GPSD_PORT
 
 	var t = ps.split(false)
-	if t != "" {
+	if t != "" { //nolint:nestif
 		ps.misc.gpsd_host = t
 
 		t = ps.split(false)
@@ -6150,7 +6150,7 @@ func handleWAYPOINT(ps *parseState) error {
 	/* If there is a ':' in the name, split it into hostname:udpportnum. */
 	/* Otherwise assume it is serial port name. */
 
-	if strings.Contains(t, ":") {
+	if strings.Contains(t, ":") { //nolint:nestif
 		var hostname, portStr, _ = strings.Cut(t, ":")
 
 		var port, _ = strconv.Atoi(portStr)
@@ -6267,7 +6267,7 @@ func handleXBEACON(ps *parseState) error {
 
 	// TODO: maybe add proportional pathing so multiple beacon timing does not need to be manually constructed?
 	// http://www.aprs.org/newN/ProportionalPathing.txt
-	if ps.misc.num_beacons < MAX_BEACONS {
+	if ps.misc.num_beacons < MAX_BEACONS { //nolint:nestif
 		/* A beacon line whose options don't parse leaves num_beacons alone, so
 		 * the next beacon line reuses this array slot.  Start it blank rather
 		 * than inheriting whatever the rejected line managed to set. */
@@ -6660,7 +6660,7 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) er
 		*/
 
 		// end
-		if strings.EqualFold(keyword, "DELAY") {
+		if strings.EqualFold(keyword, "DELAY") { //nolint:nestif
 			var n, intervalErr = parse_interval(keyword, value, ps.line)
 			if intervalErr != nil {
 				ps.report(intervalErr)
@@ -6941,7 +6941,7 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) er
 	/*
 	 * Convert UTM coordinates to lat / long.
 	 */
-	if len(zone) > 0 || easting.IsJust() || northing.IsJust() {
+	if len(zone) > 0 || easting.IsJust() || northing.IsJust() { //nolint:nestif
 		var east, eastKnown = easting.Get()
 		var north, northKnown = northing.Get()
 
@@ -6976,7 +6976,7 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) er
 	 *	overlay=S symbol="/-"
 	 * We should complain if overlay used with symtab other than \.
 	 */
-	if len(temp_symbol) > 0 {
+	if len(temp_symbol) > 0 { //nolint:nestif
 		if len(temp_symbol) == 2 &&
 			(temp_symbol[0] == '/' || temp_symbol[0] == '\\' || ascii.IsUpper(temp_symbol[0]) || ascii.IsDigit(temp_symbol[0])) &&
 			temp_symbol[1] >= '!' && temp_symbol[1] <= '~' {
@@ -7001,7 +7001,7 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) er
 
 	/* Check is here because could be using default channel when SENDTO= is not specified. */
 
-	if b.sendto_type == SENDTO_XMIT {
+	if b.sendto_type == SENDTO_XMIT { //nolint:nestif
 		if b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS {
 			ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, b.sendto_chan)
 

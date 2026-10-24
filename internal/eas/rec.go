@@ -89,7 +89,7 @@ func (s *Receiver) RecBit(raw bool) {
 
 	var done = false
 
-	if s.easAcc == PREAMBLE_ZCZC {
+	if s.easAcc == PREAMBLE_ZCZC { //nolint:nestif
 		//dw_printf ("ZCZC\n");
 		s.olen = 0
 		s.easGathering = true

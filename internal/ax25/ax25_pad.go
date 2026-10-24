@@ -903,7 +903,7 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 
 	var sstr strings.Builder
 
-	if len(in_addr) > 0 && in_addr[0] == '-' {
+	if len(in_addr) > 0 && in_addr[0] == '-' { //nolint:nestif
 		in_addr = in_addr[1:]
 		for i, p := range in_addr {
 			if !isASCIIAlnum(p) {
@@ -2143,7 +2143,7 @@ func (this_p *Packet) FrameType() (cr CmdRes, desc string, pf int, nr int, ns in
 	var cr_text string
 	var pf_text string
 
-	if dst_c != 0 {
+	if dst_c != 0 { //nolint:nestif
 		if src_c != 0 {
 			cr = CR11
 			cr_text = "cc=11"
@@ -2165,7 +2165,7 @@ func (this_p *Packet) FrameType() (cr CmdRes, desc string, pf int, nr int, ns in
 		}
 	}
 
-	if (c & 1) == 0 {
+	if (c & 1) == 0 { //nolint:nestif
 		// Information 			rrr p sss 0		or	sssssss 0  rrrrrrr p
 		if this_p.modulo == Modulo128 {
 			ns = (c >> 1) & 0x7f
@@ -2299,7 +2299,7 @@ func (this_p *Packet) FrameType() (cr CmdRes, desc string, pf int, nr int, ns in
 // TODO: use FrameType() instead.
 
 func ctrlToText(c int) string {
-	if (c & 1) == 0 {
+	if (c & 1) == 0 { //nolint:nestif
 		return fmt.Sprintf("I frame: n(r)=%d, p=%d, n(s)=%d", (c>>5)&7, (c>>4)&1, (c>>1)&7)
 	} else if (c & 0xf) == 0x01 {
 		return fmt.Sprintf("S frame RR: n(r)=%d, p/f=%d", (c>>5)&7, (c>>4)&1)
@@ -2335,7 +2335,7 @@ func ctrlToText(c int) string {
 /* Text description of protocol id octet. */
 
 func pidToText(p int) string {
-	if (p & 0x30) == 0x10 {
+	if (p & 0x30) == 0x10 { //nolint:nestif
 		return "AX.25 layer 3 implemented."
 	} else if (p & 0x30) == 0x20 {
 		return "AX.25 layer 3 implemented."

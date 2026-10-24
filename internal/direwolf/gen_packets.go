@@ -465,7 +465,7 @@ func newWAVFileSink(w *wav.Writer) *wavFileSink {
  *----------------------------------------------------------------*/
 
 func (sink *wavFileSink) Put(_ int, c uint8) int {
-	if sink.addNoise {
+	if sink.addNoise { //nolint:nestif
 		if !sink.sample16Pending {
 			sink.sample16 = int16(c) /* save lower byte. */
 			sink.sample16Pending = true

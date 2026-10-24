@@ -119,7 +119,7 @@ func compressedPosition(symtab byte, symbol byte, dlat float64, dlong float64,
 	var g = maybe.FromMaybe(0, gain)
 	var knots = maybe.FromMaybe(0, speed)
 
-	if knots > 0 {
+	if knots > 0 { //nolint:nestif
 		var c int
 
 		if degrees, known := course.Get(); known {

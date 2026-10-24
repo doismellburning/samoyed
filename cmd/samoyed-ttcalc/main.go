@@ -98,7 +98,7 @@ func main() {
 		 * Print it.
 		 */
 
-		if mon_cmd.DataKind == 'K' {
+		if mon_cmd.DataKind == 'K' { //nolint:nestif
 			var channel = mon_cmd.Portx
 
 			// The first byte is the KISS command byte, and the AX.25 frame

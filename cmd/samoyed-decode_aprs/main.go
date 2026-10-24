@@ -106,7 +106,7 @@ func decodeAPRSLine(aprsDecoder *aprs.Decoder, line string) {
 
 	line = strings.TrimLeft(line, " ")
 
-	if hexLineRegexp.MatchString(line) {
+	if hexLineRegexp.MatchString(line) { //nolint:nestif
 		// Documented input format is "DE AD BE EF"
 		// Go's hex.DecodeString will decode "DEADBEEF"
 		// So, let's just strip spaces and use that!

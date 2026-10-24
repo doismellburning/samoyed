@@ -248,7 +248,7 @@ func UFrame(addrs [MaxAddrs]string, num_addr int, cr CmdRes, ftype FrameType, pf
 		this_p.frame_len++
 	}
 
-	if i {
+	if i { //nolint:nestif
 		if len(info) > 0 {
 			if len(info) > MaxInfoLen {
 				logrus.WithField("length", len(info)).Error("Internal error: UFrame: invalid information field length for U frame")
@@ -377,7 +377,7 @@ func SFrame(
 		this_p.frame_len++
 	}
 
-	if ftype == FrameTypeSSREJ {
+	if ftype == FrameTypeSSREJ { //nolint:nestif
 		if len(info) > 0 {
 			if len(info) > MaxInfoLen {
 				logrus.WithField("length", len(info)).Error("Internal error: SFrame: invalid information field length for SREJ frame")

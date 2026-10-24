@@ -1614,7 +1614,7 @@ func (d *AudioDevices) wait(a int) {
 
 func (d *AudioDevices) Close() {
 	for a := range MAX_ADEVS {
-		if d.dev[a] != nil && (d.dev[a].inputStream != nil || d.dev[a].outputStream != nil || d.dev[a].udp_sock != nil || d.dev[a].udp_out_sock != nil) {
+		if d.dev[a] != nil && (d.dev[a].inputStream != nil || d.dev[a].outputStream != nil || d.dev[a].udp_sock != nil || d.dev[a].udp_out_sock != nil) { //nolint:nestif
 			d.wait(a)
 
 			if d.dev[a].inputStream != nil {

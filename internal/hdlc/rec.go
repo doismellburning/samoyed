@@ -114,7 +114,7 @@ func (s *Receiver) RecBit(raw bool, dbit bool, is_scrambled bool,
 
 	s.rawBits.AppendBit(dwutil.IfThenElse[byte](raw, 1, 0))
 
-	if s.patDet == 0x7e {
+	if s.patDet == 0x7e { //nolint:nestif
 		s.rawBits.Chop8()
 
 		/*

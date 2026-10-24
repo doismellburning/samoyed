@@ -202,7 +202,7 @@ func (f *ModemFlags) apply(achan *achan_param_s) error {
 		}
 	}
 
-	if f.receive {
+	if f.receive { //nolint:nestif
 		// Needs to be after -B, -j, -J.
 		if *f.profile != "" {
 			achan.profiles = *f.profile

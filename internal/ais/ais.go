@@ -158,7 +158,7 @@ func get_field_lat(base []byte, start uint, length uint) maybe.Maybe[float64] {
 	// Message type 27 uses lower resolution, 17 bits rather than 27.
 	// It encodes minutes/10 rather than normal minutes/10000.
 	var n = get_field_signed(base, start, length)
-	if length == 17 {
+	if length == 17 { //nolint:nestif
 		if n == 91*600 {
 			return maybe.Nothing[float64]()
 		} else {
@@ -178,7 +178,7 @@ func get_field_lon(base []byte, start uint, length uint) maybe.Maybe[float64] {
 	// Message type 27 uses lower resolution, 18 bits rather than 28.
 	// It encodes minutes/10 rather than normal minutes/10000.
 	var n = get_field_signed(base, start, length)
-	if length == 18 {
+	if length == 18 { //nolint:nestif
 		if n == 181*600 {
 			return maybe.Nothing[float64]()
 		} else {
@@ -201,7 +201,7 @@ func get_field_speed(base []byte, start uint, length uint) maybe.Maybe[float64] 
 	// Message type 27 uses lower resolution, 6 bits rather than 10.
 	// It encodes minutes/10 rather than normal minutes/10000.
 	var n = get_field(base, start, length)
-	if length == 6 {
+	if length == 6 { //nolint:nestif
 		if n == 63 {
 			return maybe.Nothing[float64]()
 		} else {
@@ -222,7 +222,7 @@ func get_field_course(base []byte, start uint, length uint) maybe.Maybe[float64]
 	// Message type 27 uses lower resolution, 9 bits rather than 12.
 	// It encodes degrees rather than normal degrees/10.
 	var n = get_field(base, start, length)
-	if length == 9 {
+	if length == 9 { //nolint:nestif
 		if n == 360 {
 			return maybe.Nothing[float64]()
 		} else {

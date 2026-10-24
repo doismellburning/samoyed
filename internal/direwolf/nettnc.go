@@ -262,7 +262,7 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 		 * Re-attach to TNC if not currently attached.
 		 */
 		var conn = nt.getSock()
-		if conn == nil {
+		if conn == nil { //nolint:nestif
 			// I'm using the term "attach" here, in an attempt to
 			// avoid confusion with the AX.25 connect.
 			logrus.WithFields(logrus.Fields{

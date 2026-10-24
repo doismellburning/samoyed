@@ -239,7 +239,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 */
 
 	for to_chan := range phy.MaxTotalChans {
-		if d.config.Enabled[from_chan][to_chan] {
+		if d.config.Enabled[from_chan][to_chan] { //nolint:nestif
 			if to_chan == from_chan {
 				var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
 					d.ports[to_chan].MyCall,
@@ -266,7 +266,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 	 */
 
 	for to_chan := range phy.MaxTotalChans {
-		if d.config.Enabled[from_chan][to_chan] {
+		if d.config.Enabled[from_chan][to_chan] { //nolint:nestif
 			if to_chan != from_chan {
 				var result = d.match(from_chan, pp, d.ports[from_chan].MyCall,
 					d.ports[to_chan].MyCall,
@@ -585,7 +585,7 @@ func (d *Digipeater) match(
 	 * For the wide pattern, we check the ssid and decrement it.
 	 */
 
-	if wide.MatchString(repeater) {
+	if wide.MatchString(repeater) { //nolint:nestif
 		// Special hack added for ATGP to behave like some combination of options in some old TNC
 		// so the via path does not continue to grow and exceed the 8 available positions.
 		// The strange thing about this is that the used up digipeater is left there but

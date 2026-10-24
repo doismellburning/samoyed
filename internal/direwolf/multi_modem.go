@@ -438,7 +438,7 @@ func (m *MultiModem) pickBestCandidate() {
 
 		/* Build the spectrum display. */
 
-		if m.candidates[j][k].packet_p == nil {
+		if m.candidates[j][k].packet_p == nil { //nolint:nestif
 			spectrum[n] = '_'
 		} else if m.candidates[j][k].rxInfo.FEC != fec_type_none { // FX.25 or IL2P
 			// FIXME: using retries both as an enum and later int too.

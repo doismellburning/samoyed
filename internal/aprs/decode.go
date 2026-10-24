@@ -535,7 +535,7 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *D
 	 *		protocol spec, end of Chapter 20.
 	 */
 
-	if A.SymbolTable == ' ' || A.SymbolCode == ' ' {
+	if A.SymbolTable == ' ' || A.SymbolCode == ' ' { //nolint:nestif
 		// A symbol on a "message" makes no sense and confuses people.
 		// Third party too.  Set from the payload.
 		// Maybe eliminate for a couple others.
@@ -666,7 +666,7 @@ func (d *Decoder) Print(A *Decoded) {
 
 	stemp = ""
 
-	if A.Lat.IsJust() || A.Lon.IsJust() {
+	if A.Lat.IsJust() || A.Lon.IsJust() { //nolint:nestif
 		var s_lat, s_lon string
 		// Have location but it is possible one part is invalid.
 
@@ -790,7 +790,7 @@ func (d *Decoder) Print(A *Decoded) {
 
 	A.Comment = strings.TrimSpace(A.Comment)
 
-	if len(A.Comment) > 0 {
+	if len(A.Comment) > 0 { //nolint:nestif
 		ax25.SafePrint([]byte(A.Comment), false)
 		fmt.Println()
 
@@ -903,7 +903,7 @@ func aprsLLPos(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 	var ll_bytes, llErr = binary.Decode(info, binary.NativeEndian, &p)
 	var compressed_bytes, compressedErr = binary.Decode(info, binary.NativeEndian, &q)
 
-	if positionIsHumanReadable(info, 1) { /* Human-readable location. */
+	if positionIsHumanReadable(info, 1) { /* Human-readable location. */ //nolint:nestif
 		if llErr != nil {
 			warnShortPosition(A, info)
 
@@ -1039,7 +1039,7 @@ func aprsLLPosTime(A *Decoded, telemetryState *aprstelemetry.State, info []byte)
 
 	getTimestamp(A, h.Timestamp) // Only checked, not kept.
 
-	if positionIsHumanReadable(info, headerBytes) { /* Human-readable location. */
+	if positionIsHumanReadable(info, headerBytes) { /* Human-readable location. */ //nolint:nestif
 		if llErr != nil {
 			warnShortPosition(A, info)
 
@@ -1469,7 +1469,7 @@ func aprsMicE(A *Decoded, telemetryState *aprstelemetry.State, deviceIDs *device
 
 	var lon maybe.Maybe[float64]
 
-	if offset && ch >= 118 && ch <= 127 {
+	if offset && ch >= 118 && ch <= 127 { //nolint:nestif
 		lon = maybe.Just(float64(ch - 118)) /* 0 - 9 degrees */
 	} else if !offset && ch >= 38 && ch <= 127 {
 		lon = maybe.Just(float64(ch-38) + 10) /* 10 - 99 degrees */
@@ -1500,7 +1500,7 @@ func aprsMicE(A *Decoded, telemetryState *aprstelemetry.State, deviceIDs *device
 	 * or anything else to corrupt the message.
 	 */
 
-	if degrees, ok := lon.Get(); ok {
+	if degrees, ok := lon.Get(); ok { //nolint:nestif
 		ch = p.Lon[1]
 
 		if ch >= 88 && ch <= 97 {
@@ -1795,7 +1795,7 @@ func aprsMessage(A *Decoded, telemetryState *aprstelemetry.State, info []byte, q
 	/*
 	 * Addressee starting with BLN or NWS is a bulletin.
 	 */
-	if len(addressee) >= 3 && bytes.HasPrefix(addressee, []byte("BLN")) {
+	if len(addressee) >= 3 && bytes.HasPrefix(addressee, []byte("BLN")) { //nolint:nestif
 		// Interpret 3 cases of identifiers.
 		// BLN9	"general bulletin" has a single digit.
 		// BLNX	"announcement" has a single uppercase letter.
@@ -2064,7 +2064,7 @@ func aprsObject(A *Decoded, telemetryState *aprstelemetry.State, info []byte) {
 
 	getTimestamp(A, h.Timestamp) // Only checked, not kept.
 
-	if positionIsHumanReadable(info, headerBytes) { /* Human-readable location. */
+	if positionIsHumanReadable(info, headerBytes) { /* Human-readable location. */ //nolint:nestif
 		if objectPosErr != nil {
 			warnShortPosition(A, info)
 
@@ -2326,7 +2326,7 @@ func aprsStatusReport(A *Decoded, info []byte) {
 	/*
 	 * Do we have format with time?
 	 */
-	if unicode.IsDigit(rune(pt.ZTime[0])) &&
+	if unicode.IsDigit(rune(pt.ZTime[0])) && //nolint:nestif
 		unicode.IsDigit(rune(pt.ZTime[1])) &&
 		unicode.IsDigit(rune(pt.ZTime[2])) &&
 		unicode.IsDigit(rune(pt.ZTime[3])) &&
@@ -2401,7 +2401,7 @@ func aprsStatusReport(A *Decoded, info []byte) {
 	 * Last 3 characters can represent beam heading and ERP.
 	 */
 
-	if len(A.Comment) >= 3 {
+	if len(A.Comment) >= 3 { //nolint:nestif
 		var hp = A.Comment[len(A.Comment)-3:]
 
 		if hp[0] == '^' {
@@ -2506,7 +2506,7 @@ func aprsGeneralQuery(A *Decoded, info []byte) {
 	after = bytes.TrimSpace(after)
 
 	var parts = bytes.Split(after, []byte{','})
-	if len(parts) == 3 {
+	if len(parts) == 3 { //nolint:nestif
 		var lat, latErr = strconv.ParseFloat(string(parts[0]), 64)
 
 		if latErr != nil || lat < -90 || lat > 90 {
@@ -2661,7 +2661,7 @@ func aprsTelemetry(A *Decoded, telemetryState *aprstelemetry.State, info []byte,
  *------------------------------------------------------------------*/
 
 func aprsUserDefined(A *Decoded, info []byte) {
-	if bytes.HasPrefix(info, []byte("{tt")) || // Historical.
+	if bytes.HasPrefix(info, []byte("{tt")) || //nolint:nestif // Historical.
 		bytes.HasPrefix(info, []byte("{DT")) { // Official after registering {D*
 		aprsRawTouchTone(A, info)
 	} else if bytes.HasPrefix(info, []byte("{mc")) || // Historical.
@@ -2867,7 +2867,7 @@ func weatherData(A *Decoded, wdata []byte) {
 	// '/', and three digits of speed.
 	const windDataExtensionBytes = 7
 
-	if len(wp) >= windDataExtensionBytes && wp[3] == '/' {
+	if len(wp) >= windDataExtensionBytes && wp[3] == '/' { //nolint:nestif
 		var n int
 
 		var count, _ = fmt.Sscanf(string(wp[:3]), "%3d", &n) // TODO KG I *think* this works right but I'd be lying if I said I trusted it... TODO Test better
@@ -4158,7 +4158,7 @@ func processComment(A *Decoded, telemetryState *aprstelemetry.State, commentData
 	 * If that fails, try to obtain from object name.
 	 */
 
-	if match := std_freq_re.FindSubmatchIndex(commentData); match != nil {
+	if match := std_freq_re.FindSubmatchIndex(commentData); match != nil { //nolint:nestif
 		var sftemp = commentData[match[2]:match[3]]
 		var smtemp = commentData[match[4]:match[5]]
 
@@ -4230,7 +4230,7 @@ func processComment(A *Decoded, telemetryState *aprstelemetry.State, commentData
 
 	var keep_going = true
 	for keep_going {
-		if match := std_tone_re.FindSubmatchIndex(commentData); match != nil {
+		if match := std_tone_re.FindSubmatchIndex(commentData); match != nil { //nolint:nestif
 			var sttemp = commentData[match[2]:match[3]] /* includes leading letter */
 
 			// Try to convert from integer to proper value.
@@ -4318,7 +4318,7 @@ func processComment(A *Decoded, telemetryState *aprstelemetry.State, commentData
 	 *	'abc123R/'123}FFF.FFFMHztext.../A=123456...!DAO! Mv
 	 */
 
-	if match := dao_re.FindSubmatchIndex(commentData); match != nil {
+	if match := dao_re.FindSubmatchIndex(commentData); match != nil { //nolint:nestif
 		var d = commentData[match[0]+1]
 		var a = commentData[match[0]+2]
 		var o = commentData[match[0]+3]
@@ -4439,7 +4439,7 @@ func processComment(A *Decoded, telemetryState *aprstelemetry.State, commentData
 	 * standardized format.
 	 * Don't complain if we have already found a valid value.
 	 */
-	if match := bad_freq_re.FindSubmatchIndex(commentData); match != nil && A.Freq.IsNothing() {
+	if match := bad_freq_re.FindSubmatchIndex(commentData); match != nil && A.Freq.IsNothing() { //nolint:nestif
 		var bad = commentData[match[0]:match[1]]
 
 		var x, _ = strconv.ParseFloat(string(bad), 64)
@@ -4463,7 +4463,7 @@ func processComment(A *Decoded, telemetryState *aprstelemetry.State, commentData
 		}
 	}
 
-	if match := bad_tone_re.FindSubmatchIndex(commentData); match != nil && A.Tone.IsNothing() {
+	if match := bad_tone_re.FindSubmatchIndex(commentData); match != nil && A.Tone.IsNothing() { //nolint:nestif
 		var bad1 = commentData[match[4]:match[5]] /* original 99.9 or 999.9 format or one of 67 77 100 123 */
 
 		var bad2 = string(bad1) /* 99.9 or 999.9 format.  ".0" appended for special cases. */

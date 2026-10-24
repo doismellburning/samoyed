@@ -239,7 +239,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 			// Start of new sentence.
 			gps_msg = string(ch)
 		case '\r', '\n':
-			if len(gps_msg) >= 6 && gps_msg[0] == '$' {
+			if len(gps_msg) >= 6 && gps_msg[0] == '$' { //nolint:nestif
 				if debug >= 3 {
 					logrus.WithField("sentence", gps_msg).Trace("GPSNMEA: Sentence")
 				}
@@ -441,7 +441,7 @@ func ParseGPRMC(sentence string, quiet bool) *GPRMCResult {
 		return result
 	}
 
-	if len(plat) > 0 && len(pns) > 0 {
+	if len(plat) > 0 && len(pns) > 0 { //nolint:nestif
 		var lat, latErr = latlong.LatitudeFromNMEA(plat, pns[0])
 		if latErr != nil {
 			if !quiet {
@@ -464,7 +464,7 @@ func ParseGPRMC(sentence string, quiet bool) *GPRMCResult {
 		return result
 	}
 
-	if len(plon) > 0 && len(pew) > 0 {
+	if len(plon) > 0 && len(pew) > 0 { //nolint:nestif
 		var lon, lonErr = latlong.LongitudeFromNMEA(plon, pew[0])
 		if lonErr != nil {
 			if !quiet {
@@ -617,7 +617,7 @@ func ParseGPGGA(sentence string, quiet bool) *GPGGAResult {
 		return result
 	}
 
-	if len(plat) > 0 && len(pns) > 0 {
+	if len(plat) > 0 && len(pns) > 0 { //nolint:nestif
 		var lat, latErr = latlong.LatitudeFromNMEA(plat, pns[0])
 		if latErr != nil {
 			if !quiet {
@@ -640,7 +640,7 @@ func ParseGPGGA(sentence string, quiet bool) *GPGGAResult {
 		return result
 	}
 
-	if len(plon) > 0 && len(pew) > 0 {
+	if len(plon) > 0 && len(pew) > 0 { //nolint:nestif
 		var lon, lonErr = latlong.LongitudeFromNMEA(plon, pew[0])
 		if lonErr != nil {
 			if !quiet {
@@ -670,7 +670,7 @@ func ParseGPGGA(sentence string, quiet bool) *GPGGAResult {
 	 * of altitude or an empty field.
 	 */
 
-	if altitudeFound {
+	if altitudeFound { //nolint:nestif
 		if len(paltitude) > 0 {
 			/* ParseFloat accepts "NaN" and "inf", neither of which survives
 			 * the conversion to the integer feet of an /A= field. */

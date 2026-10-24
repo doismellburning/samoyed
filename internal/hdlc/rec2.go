@@ -534,7 +534,7 @@ func try_decode(block *rrbb.Buffer, config *Config, sink dwcore.FrameSink, from 
 		/* Get the value for the current bit */
 		var raw = block.Bit(i) > 0
 		/* If swap two sep mode , swap the bit if needed */
-		if retry_conf_retry == phy.BitFixTwoSep {
+		if retry_conf_retry == phy.BitFixTwoSep { //nolint:nestif
 			if is_sep_bit_modified(i, retry_conf) {
 				raw = !raw
 			}
@@ -561,7 +561,7 @@ func try_decode(block *rrbb.Buffer, config *Config, sink dwcore.FrameSink, from 
 
 		var dbit = H2.line.Decode(raw, H2.is_scrambled)
 
-		if dbit {
+		if dbit { //nolint:nestif
 			H2.pat_det |= 0x80
 			/* Valid data will never have 7 one bits in a row: exit. */
 			if H2.pat_det == 0xfe {
@@ -624,7 +624,7 @@ func try_decode(block *rrbb.Buffer, config *Config, sink dwcore.FrameSink, from 
 		}).Trace("try_decode")
 	}
 
-	if H2.olen == 0 && H2.frame_len >= MinFrameLen {
+	if H2.olen == 0 && H2.frame_len >= MinFrameLen { //nolint:nestif
 		if retry_conf_type == RETRY_TYPE_NONE && logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithFields(logrus.Fields{
 				"frame_len": H2.frame_len,

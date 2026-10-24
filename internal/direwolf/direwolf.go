@@ -316,7 +316,7 @@ x = Silence FX.25 information.`)
 
 	var configResult = config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config, aprsSymbolData)
 
-	if *configCheck {
+	if *configCheck { //nolint:nestif
 		// Checking the configuration file is the whole job here, so stop before
 		// the command line options below override any of it, and well before
 		// anything wants an audio device or a port.
@@ -448,7 +448,7 @@ x = Silence FX.25 information.`)
 
 	// temp - only xmit errors.
 
-	if *errorRateStr != "" {
+	if *errorRateStr != "" { //nolint:nestif
 		var e = *errorRateStr
 		if e[0] == 'r' || e[0] == 'R' {
 			var E_rx_opt, _ = strconv.Atoi(e[1:])
@@ -745,7 +745,7 @@ x = Silence FX.25 information.`)
 	 * A leading or trailing number is the channel.
 	 */
 
-	if *transmitCalibration != "" {
+	if *transmitCalibration != "" { //nolint:nestif
 		var transmitCalibrationType, transmitCalibrationChannel, calibrationErr = parseTransmitCalibration(*transmitCalibration)
 		if calibrationErr != nil {
 			fmt.Printf("%s\n", calibrationErr)
@@ -1210,7 +1210,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 
 	// The HEARD line.
 
-	if !rh.quietHeard && alevel.Rec >= 0 { /* suppress if "-q h" option */
+	if !rh.quietHeard && alevel.Rec >= 0 { /* suppress if "-q h" option */ //nolint:nestif
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		if channel != rh.audioConfig.igate_vchannel { // suppress if from ICHANNEL
 			var logEntry = logrus.WithField("heard", heard)
@@ -1385,7 +1385,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 
 	var decoded *aprs.Decoded // For the web interface; nil unless it is APRS.
 
-	if pp.IsAPRS() {
+	if pp.IsAPRS() { //nolint:nestif
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
 		var A = rh.decoder.Decode(pp, rh.quietDecode)
@@ -1496,7 +1496,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 	 * sequences with BEACON sendto=R0 for testing.
 	 */
 
-	if src.Kind == dwcore.SourceDTMF {
+	if src.Kind == dwcore.SourceDTMF { //nolint:nestif
 		if rh.ttConfig.gateway_enabled > 0 && len(pinfo) >= 2 {
 			rh.ttGateway.Sequence(ctx, channel, string(pinfo[1:]))
 		}

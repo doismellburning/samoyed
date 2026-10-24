@@ -795,7 +795,7 @@ func (link *AX25Link) get_link_handle(addrs [ax25.MaxAddrs]string, num_addr int,
 
 	// Look for existing.
 
-	if client == -1 { // from the radio.
+	if client == -1 { //nolint:nestif // from the radio.
 		// address order is reversed for compare.
 		for p := link.listHead; p != nil; p = p.next {
 			if p.channel == channel &&
@@ -1768,7 +1768,7 @@ func (link *AX25Link) dl_client_cleanup(E *dlq_item_t) {
 	for S != nil {
 		// Look for corruption or double freeing.
 
-		if S.client == E.client {
+		if S.client == E.client { //nolint:nestif
 			if link.debugStats {
 				logrus.WithFields(logrus.Fields{
 					"stream":  S.stream_id,
@@ -1906,7 +1906,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
 	}
 
 	// See example in dl_data_request.
-	if S.ra_buff == nil {
+	if S.ra_buff == nil { //nolint:nestif
 		// Ready state.
 		if pid != ax25.PIDSegmentationFragment {
 			S.services.clients.RecConnData(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], pid, dataBytes)
@@ -2456,7 +2456,7 @@ func i_frame(S *ax25_dlsm_t, cr ax25.CmdRes, p int, nr int, ns int, pid int, inf
 		// that the other end will be doing the same.  With v2.2, the XID frame can be
 		// used to negotiate a maximum info length but with v2.0, there is no way for the
 		// other end to know our paclen value.
-		if len(info) <= ax25.MaxInfoLen {
+		if len(info) <= ax25.MaxInfoLen { //nolint:nestif
 			if is_good_nr(S, nr) {
 				// Erratum?
 				// I wonder if this difference is intentional or if only one place was
@@ -2659,7 +2659,7 @@ func SABME_or_SABM(S *ax25_dlsm_t) dlsm_state_e {
  *------------------------------------------------------------------------------*/
 
 func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
-	if ns == S.vr {
+	if ns == S.vr { //nolint:nestif
 		// The receive sequence number, N(S), is the same as what we were expecting, V(R).
 		// Send it to the application and increment the next expected.
 		// It is possible that this was resent and we tucked away others with the following
@@ -3127,7 +3127,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 	// Multi-SREJ - Use info part for additional sequence number(s) instead of sending separate SREJ for each.
 
-	if S.srej_enable == xid.SREJMulti && count > 1 {
+	if S.srej_enable == xid.SREJMulti && count > 1 { //nolint:nestif
 		var info []byte
 
 		for i := 1; i < count; i++ { // skip first one
@@ -3321,7 +3321,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr ax25.CmdRes, pf int, nr int) {
 	case state_4_timer_recovery:
 		S.peer_receiver_busy = !ready
 
-		if cr == ax25.CRRes && pf == 1 {
+		if cr == ax25.CRRes && pf == 1 { //nolint:nestif
 			// RR/RNR Response with F==1.
 			if S.services.debugRetry {
 				logrus.WithFields(logrus.Fields{
@@ -3565,7 +3565,7 @@ func rej_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, nr int) {
 	case state_4_timer_recovery:
 		S.peer_receiver_busy = false
 
-		if cr == ax25.CRRes && pf == 1 {
+		if cr == ax25.CRRes && pf == 1 { //nolint:nestif
 			STOP_T1(S)
 			select_t1_value(S)
 
@@ -3819,7 +3819,7 @@ func srej_frame(S *ax25_dlsm_t, cr ax25.CmdRes, f int, nr int, info []byte) { //
 		STOP_T1(S)
 		select_t1_value(S)
 
-		if is_good_nr(S, nr) {
+		if is_good_nr(S, nr) { //nolint:nestif
 			if f > 0 { // f=1 means ack up thru previous sequence.
 				// Erratum:  2006 version tests "P".  Original has "F."
 				SET_VA(S, nr)
@@ -4467,7 +4467,7 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 		}
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
-		if f == 1 {
+		if f == 1 { //nolint:nestif
 			if S.layer_3_initiated {
 				var _v = "v2.0"
 				if S.state == state_5_awaiting_v22_connection {
@@ -4802,7 +4802,7 @@ func ui_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int) {
 func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 	switch S.mdl_state {
 	case mdl_state_0_ready:
-		if cr == ax25.CRCmd {
+		if cr == ax25.CRCmd { //nolint:nestif
 			if pf == 1 {
 				// Take parameters sent by other station.
 				// Generally we take minimum of what he wants and what I can do.
@@ -4828,7 +4828,7 @@ func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 		}
 
 	case mdl_state_1_negotiating:
-		if cr == ax25.CRRes {
+		if cr == ax25.CRRes { //nolint:nestif
 			if pf == 1 {
 				// Got expected response.  Copy into my working parameters.
 				var param, _, ok = xid.Parse(info)
@@ -5076,7 +5076,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 		enter_new_state(S, state_4_timer_recovery)
 
 	case state_4_timer_recovery:
-		if S.rc == S.n2_retry {
+		if S.rc == S.n2_retry { //nolint:nestif
 			// Erratum: 2006 version, page 103, is missing yes/no labels on decision blocks.
 			if S.va != S.vs {
 				if S.services.debugProtocolErrors {
@@ -5465,7 +5465,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25.FrameType, f int) {
 	// Only for RR, RNR, I.
 	// See sequence of events in transmit_enquiry comments.
 
-	if f == 1 && (frame_type == ax25.FrameTypeSRR || frame_type == ax25.FrameTypeSRNR || frame_type == ax25.FrameTypeI) {
+	if f == 1 && (frame_type == ax25.FrameTypeSRR || frame_type == ax25.FrameTypeSRNR || frame_type == ax25.FrameTypeI) { //nolint:nestif
 		if S.own_receiver_busy {
 			// I'm busy.
 			var pp = ax25.SFrame(S.addrs, S.num_addr, cr, ax25.FrameTypeSRNR, S.modulo, nr, f, nil)
@@ -5817,7 +5817,7 @@ func select_t1_value(S *ax25_dlsm_t) {
 
 	// TODO: come back and revisit this.
 
-	if S.rc == 0 {
+	if S.rc == 0 { //nolint:nestif
 		if S.t1_remaining_when_last_stopped >= 0 { // Negative means invalid, don't use it.
 			// This is an IIR low pass filter.
 			// Algebraically equivalent to version in AX.25 protocol spec but I think the
@@ -6343,7 +6343,7 @@ func negotiation_response(S *ax25_dlsm_t, param *xid.Param) {
 	// In theory extended mode can have window size of 127 but
 	// I'm limiting it to 63 for the reason mentioned in the SREJ logic.
 
-	if window, ok := param.WindowSizeRx.Get(); ok {
+	if window, ok := param.WindowSizeRx.Get(); ok { //nolint:nestif
 		if param.Modulo == ax25.Modulo128 {
 			param.WindowSizeRx = maybe.Just(min(window, AX25_K_MAXFRAME_EXTENDED_MAX))
 		} else {

@@ -678,7 +678,7 @@ func (tg *ToneGenerator) PutSample(sam int) {
 		sam = 32767
 	}
 
-	if audioConfig.adev[a].num_channels == 1 {
+	if audioConfig.adev[a].num_channels == 1 { //nolint:nestif
 		/* Mono */
 		if audioConfig.adev[a].bits_per_sample == 8 {
 			tg.sink.Put(a, uint8(((sam+32768)>>8)&0xff))

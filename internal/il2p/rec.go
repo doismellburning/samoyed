@@ -153,7 +153,7 @@ func (F *Receiver) RecBit(dbit int) {
 
 	case IL2P_HEADER: // Gathering the header.
 		F.bc++
-		if F.bc == 8 { // full byte has been collected.
+		if F.bc == 8 { //nolint:nestif // full byte has been collected.
 			F.bc = 0
 			if !F.polarity {
 				F.shdr[F.hc] = byte(F.acc & 0xff)
@@ -226,7 +226,7 @@ func (F *Receiver) RecBit(dbit int) {
 
 	case IL2P_PAYLOAD: // Gathering the payload, if any.
 		F.bc++
-		if F.bc == 8 { // full byte has been collected.
+		if F.bc == 8 { //nolint:nestif // full byte has been collected.
 			F.bc = 0
 			if !F.polarity {
 				F.spayload[F.pc] = byte(F.acc & 0xff)

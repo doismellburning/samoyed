@@ -724,7 +724,7 @@ func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kisspor
 	for ctx.Err() == nil {
 		var client = kps.findFreeClient()
 
-		if client >= 0 {
+		if client >= 0 { //nolint:nestif
 			logrus.WithFields(logrus.Fields{
 				"tcp_port": kps.tcp_port,
 				"client":   client,

@@ -171,7 +171,7 @@ func send(g *direwolf.GenPackets, files []string, noisyPacketCount int, packetCo
 	 * "-n" option is ignored in this case.
 	 */
 
-	if len(files) > 0 {
+	if len(files) > 0 { //nolint:nestif
 		if len(files) > 1 {
 			fmt.Printf("Warning: File(s) beyond the first are ignored.\n")
 		}

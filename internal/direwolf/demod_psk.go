@@ -666,7 +666,7 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 		fsam = convolve(D.u.psk.audio_in[:], D.u.psk.pre_filter[:], D.u.psk.pre_filter_taps)
 	}
 
-	if D.u.psk.psk_use_lo != 0 {
+	if D.u.psk.psk_use_lo != 0 { //nolint:nestif
 		/*
 		 * Mix with local oscillator to obtain phase.
 		 * The absolute phase doesn't matter.

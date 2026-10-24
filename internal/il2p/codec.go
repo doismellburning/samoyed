@@ -68,7 +68,7 @@ func il2p_encode_frame(pp *ax25.Packet, version Version, max_fec int, crc ...boo
 		e = -1
 	}
 
-	if e >= 0 {
+	if e >= 0 { //nolint:nestif
 		var outbuf = new(bytes.Buffer)
 
 		var scrambled = il2p_scramble_block(hdr)
@@ -262,7 +262,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, version Version, s
 	var hdr_type, fec_level, payload_len = il2p_get_header_attributes(uhdr)
 	var max_fec = il2p_rx_max_fec(version, fec_level)
 
-	if hdr_type == 1 {
+	if hdr_type == 1 { //nolint:nestif
 		// Header type 1.  Any payload is the AX.25 Information part.
 		var pp = il2p_decode_header_type_1(uhdr, *symbols_corrected)
 		if pp == nil {

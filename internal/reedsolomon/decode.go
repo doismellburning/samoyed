@@ -209,7 +209,7 @@ func (c *Codec) decode(data []byte, eras_pos []int, no_eras int) int {
 		}
 
 		discrR = c.index_of[discrR] // Index form
-		if int(discrR) == A0 {
+		if int(discrR) == A0 {      //nolint:nestif
 			// 2 lines below: B(x) <-- x*B(x)
 			// memmove(&b[1],b,NROOTS*sizeof(b[0]));
 			copy(b[1:nroots+1], b[0:nroots])

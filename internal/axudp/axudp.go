@@ -783,7 +783,7 @@ func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 			"type_byte": fmt.Sprintf("0x%02x", typeByte),
 		}).Trace("KISS frame complete")
 	}
-	if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == kiss.CmdDataFrame {
+	if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == kiss.CmdDataFrame { //nolint:nestif
 		var ax25frame = unwrapped[1:]
 		var dest = ExtractDest(ax25frame)
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {

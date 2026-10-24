@@ -578,7 +578,7 @@ func (p *PTT) set(ot OutputType, channel int, ptt_signal int) {
 	 * Using hamlib?
 	 */
 
-	if p.channels[channel].Outputs[ot].Method == MethodHamlib {
+	if p.channels[channel].Outputs[ot].Method == MethodHamlib { //nolint:nestif
 		if p.rig[channel][ot] != nil {
 			var onoff = goHamlib.RIG_PTT_OFF
 			if ptt != 0 {
@@ -671,7 +671,7 @@ func (p *PTT) GetInput(it int, channel int) int {
 		return -1
 	}
 
-	if p.channels[channel].Inputs[it].Method == MethodGPIO {
+	if p.channels[channel].Inputs[it].Method == MethodGPIO { //nolint:nestif
 		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.channels[channel].Inputs[it].GPIOName)
 
 		// No need to check access first: this runs on every transmit attempt,
@@ -839,7 +839,7 @@ func (p *PTT) setup() error {
 	 */
 
 	for ch := range phy.MaxRadioChans {
-		if p.channels[ch].Radio {
+		if p.channels[ch].Radio { //nolint:nestif
 			for ot := range OutputTypes() {
 				if p.channels[ch].Outputs[ot].Method == MethodSerial {
 					/* Translate Windows device name into Linux name. */
@@ -951,7 +951,7 @@ func (p *PTT) setup() error {
 	}
 	// GPIOD
 	for ch := range phy.MaxRadioChans {
-		if p.channels[ch].Radio {
+		if p.channels[ch].Radio { //nolint:nestif
 			for ot := range OutputTypes() {
 				if p.channels[ch].Outputs[ot].Method == MethodGPIOD {
 					var chip_name = p.channels[ch].Outputs[ot].GPIOName
@@ -984,7 +984,7 @@ func (p *PTT) setup() error {
 	 */
 
 	for ch := range phy.MaxRadioChans {
-		if p.channels[ch].Radio {
+		if p.channels[ch].Radio { //nolint:nestif
 			// output control type, PTT, DCD, CON, ...
 			for ot := range OutputTypes() {
 				if p.channels[ch].Outputs[ot].Method == MethodGPIO {
@@ -1015,7 +1015,7 @@ func (p *PTT) setup() error {
 	 */
 
 	for ch := range phy.MaxRadioChans {
-		if p.channels[ch].Radio {
+		if p.channels[ch].Radio { //nolint:nestif
 			for ot := range OutputTypes() {
 				if p.channels[ch].Outputs[ot].Method == MethodLPT {
 					/* Can't open the same device more than once so we */
@@ -1071,7 +1071,7 @@ func (p *PTT) setup() error {
 	} /* For each channel. */
 
 	for ch := range phy.MaxRadioChans {
-		if p.channels[ch].Radio {
+		if p.channels[ch].Radio { //nolint:nestif
 			for ot := range OutputTypes() {
 				if p.channels[ch].Outputs[ot].Method == MethodHamlib {
 					if ot == OutputPTT {
@@ -1169,7 +1169,7 @@ func (p *PTT) setup() error {
 	 */
 
 	for ch := range phy.MaxRadioChans {
-		if p.channels[ch].Radio {
+		if p.channels[ch].Radio { //nolint:nestif
 			for ot := range OutputTypes() {
 				if p.channels[ch].Outputs[ot].Method == MethodCM108 {
 					var device = p.channels[ch].Outputs[ot].Device

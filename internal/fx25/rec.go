@@ -223,7 +223,7 @@ func (F *Receiver) processRSBlock() {
 		derrors = -1
 	}
 
-	if derrors >= 0 { // -1 for failure.  >= 0 for success, number of bytes corrected.
+	if derrors >= 0 { //nolint:nestif // -1 for failure.  >= 0 for success, number of bytes corrected.
 		if F.debug >= 2 {
 			F.logEntry().WithFields(logrus.Fields{
 				"errors":    derrors,

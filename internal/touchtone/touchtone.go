@@ -196,7 +196,7 @@ func TextToMultipress(text string, quiet bool) (string, int) {
 	var errors = 0
 
 	for _, c := range text {
-		if ascii.IsDigit(c) {
+		if ascii.IsDigit(c) { //nolint:nestif
 			/* Count number of other characters assigned to this button. */
 			/* Press that number plus one more. */
 			var n = 1
@@ -294,7 +294,7 @@ func TextToTwoKey(text string, quiet bool) (string, int) {
 	var errors = 0
 
 	for _, c := range text {
-		if ascii.IsDigit(c) {
+		if ascii.IsDigit(c) { //nolint:nestif
 			/* Digit is single key press. */
 			buttons.WriteRune(c)
 		} else {
@@ -669,7 +669,7 @@ func MultipressToText(buttons string, quiet bool) (string, int) {
 
 	for i := 0; i < len(buttons); i++ {
 		var c = rune(buttons[i])
-		if ascii.IsDigit(c) {
+		if ascii.IsDigit(c) { //nolint:nestif
 			/* Determine max that can occur in a row. */
 			/* = number of other characters assigned to this button + 1. */
 			var maxspan = 1
@@ -755,7 +755,7 @@ func TwoKeyToText(buttons string, quiet bool) (string, int) {
 
 	for i := 0; i < len(buttons); i++ {
 		var c = rune(buttons[i])
-		if ascii.IsDigit(c) {
+		if ascii.IsDigit(c) { //nolint:nestif
 			/* Letter (or space) if followed by ABCD. */
 			var row = c - '0'
 			var col = -1
@@ -833,7 +833,7 @@ func twoDigitsToLetter(buttons string, quiet bool) (string, int) {
 	var c1 = buttons[0]
 	var c2 = buttons[1]
 
-	if c1 >= '2' && c1 <= '9' {
+	if c1 >= '2' && c1 <= '9' { //nolint:nestif
 		if c2 >= '1' && c2 <= '4' {
 			var row = c1 - '0'
 			var col = c2 - '1'

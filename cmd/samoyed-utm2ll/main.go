@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	if len(os.Args) == 4 {
+	if len(os.Args) == 4 { //nolint:nestif
 		// 3 command line arguments for UTM
 		var zlet byte
 

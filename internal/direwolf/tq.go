@@ -1071,7 +1071,7 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 	var pp = tq.head[channel][prio]
 
 	for pp != nil {
-		if pp.NumAddr() >= ax25.MinAddrs {
+		if pp.NumAddr() >= ax25.MinAddrs { //nolint:nestif
 			// Consider only real packets.
 			var count_it = 1
 

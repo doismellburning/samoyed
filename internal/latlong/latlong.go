@@ -122,7 +122,7 @@ func LatitudeToString(dlat float64, ambiguity int) string {
 
 	var slat = fmt.Appendf(nil, "%02d%s%c", ideg, smin, hemi)
 
-	if ambiguity >= 1 {
+	if ambiguity >= 1 { //nolint:nestif
 		slat[6] = ' '
 		if ambiguity >= 2 {
 			slat[5] = ' '
@@ -191,7 +191,7 @@ func LongitudeToString(dlong float64, ambiguity int) string {
 	 * Blanking longitude digits is not necessary but I do it
 	 * because it makes things clearer.
 	 */
-	if ambiguity >= 1 {
+	if ambiguity >= 1 { //nolint:nestif
 		slong[7] = ' '
 		if ambiguity >= 2 {
 			slong[6] = ' '

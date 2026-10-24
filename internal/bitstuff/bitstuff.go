@@ -157,7 +157,7 @@ func Unstuff(in []byte) ([]byte, error) {
 				return nil, fmt.Errorf("%w at byte %d", ErrSevenOnes, i)
 			}
 
-			if dbit != 0 {
+			if dbit != 0 { //nolint:nestif
 				oacc >>= 1
 				oacc |= 0x80
 			} else {

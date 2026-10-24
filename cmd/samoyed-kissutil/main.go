@@ -567,7 +567,7 @@ func kissutil_kiss_process_msg(kiss_msg []byte) {
 	switch cmd {
 	case kiss.CmdDataFrame: /* 0 = Data Frame */
 		var pp = ax25.FromFrame(kiss_msg[1:], alevel)
-		if pp == nil {
+		if pp == nil { //nolint:nestif
 			fmt.Printf("ERROR - Invalid KISS data frame from TNC.\n")
 		} else {
 			var prefix string // Channel and optional timestamp.

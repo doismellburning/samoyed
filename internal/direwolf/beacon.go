@@ -140,7 +140,7 @@ func NewBeaconService(
 			channel = 0 // For ICHANNEL, use channel 0 call.
 		}
 
-		if bs.modemConfig.chan_medium[channel].CarriesAX25() {
+		if bs.modemConfig.chan_medium[channel].CarriesAX25() { //nolint:nestif
 			if !IsNoCall(bs.modemConfig.mycall[channel]) {
 				switch bs.miscConfig.beacon[j].btype {
 				case BEACON_OBJECT:
@@ -256,7 +256,7 @@ func NewBeaconService(
 		 * If timeslots, there must be a full number of beacon intervals per hour.
 		 */
 
-		if slot, slotted := bp.slot.Get(); slotted {
+		if slot, slotted := bp.slot.Get(); slotted { //nolint:nestif
 			if !IS_GOOD(bp.every) {
 				var requested = bp.every
 
@@ -459,7 +459,7 @@ func (bs *BeaconService) thread(ctx context.Context) {
 		 */
 		var gpsinfo dwgps.GPSInfo
 
-		if number_of_tbeacons > 0 {
+		if number_of_tbeacons > 0 { //nolint:nestif
 			gpsinfo = bs.gps.Read()
 			var fix = gpsinfo.Fix
 			var my_speed_mph = maybe.Fmap(dwutil.DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
@@ -519,7 +519,7 @@ func (bs *BeaconService) thread(ctx context.Context) {
 				continue
 			}
 
-			if !bp.next.After(now) {
+			if !bp.next.After(now) { //nolint:nestif
 				/* Send the beacon. */
 				bs.send(ctx, j, &gpsinfo)
 

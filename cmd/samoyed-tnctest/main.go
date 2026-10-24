@@ -374,7 +374,7 @@ func process_rec_data(my_index int, data string) {
 	data = strings.TrimSpace(data) // Remove trailing \r
 	var before, after, _ = strings.Cut(data, " ")
 
-	if strings.HasPrefix(after, "send") {
+	if strings.HasPrefix(after, "send") { //nolint:nestif
 		if my_index > 0 {
 			var expected = int(last_rec_seq[my_index].Add(1))
 
@@ -788,7 +788,7 @@ func tnc_reset(from int, to int) {
 func tnc_send_data(from int, to int, data string) {
 	fmt.Printf("%*s[T %.3f] %s\n", from*column_width, "", time.Since(start_time).Seconds(), data)
 
-	if tnctest_using_tcp[from] {
+	if tnctest_using_tcp[from] { //nolint:nestif
 		var header agwpe.Header
 
 		header.DataKind = 'D'

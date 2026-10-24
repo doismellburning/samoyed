@@ -300,7 +300,7 @@ func (ts *State) DataOriginal(station string, info string, quiet bool) (string, 
 			//}
 		}
 
-		if n == numAnalog {
+		if n == numAnalog { //nolint:nestif
 			// We expect to have 8 digits of 0 and 1.
 			// Anything left over is a comment.
 			if len(p) < 8 {

@@ -165,7 +165,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 
 		var profileStr = achan.profiles
 		for i, p := range profileStr {
-			if ascii.IsAlpha(p) {
+			if ascii.IsAlpha(p) { //nolint:nestif
 				var letter = ascii.ToUpper(p)
 
 				// demod_afsk_init knows only these; leave anything else out
@@ -346,7 +346,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 
 		// TODO1.3: revisit this logic now that it is less restrictive.
 
-		if num_letters > 1 {
+		if num_letters > 1 { //nolint:nestif
 			/*
 			 * Multiple letters, usually for 1200 baud.
 			 * Each one corresponds to a demodulator and subchannel.
@@ -698,7 +698,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			 * Set reasonable upsample ratio if user did not override.
 			 */
 
-			if achan.upsample == 0 {
+			if achan.upsample == 0 { //nolint:nestif
 				if ratio < 4 {
 					// This is extreme.
 					// No one should be using a sample rate this low but
@@ -758,7 +758,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 				"ratio":       math.Round(ratio*10) / 10,
 			})
 
-			if ratio < 3 {
+			if ratio < 3 { //nolint:nestif
 				ratioLog.Error("Sample rate to baud ratio is too low for much hope of success; use a higher sample rate")
 			} else if ratio < 5 {
 				if samplesPerSec == 44100 {
