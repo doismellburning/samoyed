@@ -166,12 +166,15 @@ func main() {
 				if replyWriteErr == nil {
 					replyWriteErr = binary.Write(server_sock, binary.LittleEndian, hdr)
 				}
+
 				if replyWriteErr == nil {
 					_, replyWriteErr = server_sock.Write([]byte{0x0})
 				}
+
 				if replyWriteErr == nil {
 					_, replyWriteErr = server_sock.Write(reply_bytes)
 				}
+
 				if replyWriteErr != nil {
 					fmt.Printf("Write error, %v, sending reply.\n", replyWriteErr)
 					os.Exit(1)

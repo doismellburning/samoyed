@@ -40,12 +40,15 @@ func parseALSADeviceName(name string) (cardName string, devNum int) {
 // map from ALSA card ID (e.g. "FTDX10") to card number.
 func parseALSACardsProc(content string) map[string]int {
 	var result = make(map[string]int)
+
 	for line := range strings.SplitSeq(content, "\n") {
 		var trimmed = strings.TrimSpace(line)
+
 		var bracketStart = strings.Index(trimmed, "[")
 		if bracketStart < 0 {
 			continue
 		}
+
 		var bracketEnd = strings.Index(trimmed, "]")
 		if bracketEnd <= bracketStart {
 			continue
@@ -53,10 +56,12 @@ func parseALSACardsProc(content string) map[string]int {
 		var numStr = strings.TrimSpace(trimmed[:bracketStart])
 		var cardID = strings.TrimSpace(trimmed[bracketStart+1 : bracketEnd])
 		var num int
+
 		var _, sscanfErr = fmt.Sscanf(numStr, "%d", &num)
 		if sscanfErr != nil {
 			continue
 		}
+
 		result[cardID] = num
 	}
 
@@ -104,6 +109,7 @@ func matchPortAudioDeviceByName(name string, forInput bool, devices []*portaudio
 	for _, dev := range devices {
 		if devMatchesDirection(dev) {
 			var nameLower = strings.ToLower(name)
+
 			var devLower = strings.ToLower(dev.Name)
 			if strings.Contains(devLower, nameLower) || strings.Contains(nameLower, devLower) {
 				return dev
@@ -125,10 +131,12 @@ func matchPortAudioDeviceByName(name string, forInput bool, devices []*portaudio
 			if !devMatchesDirection(dev) {
 				continue
 			}
+
 			var devLower = strings.ToLower(dev.Name)
 			if !strings.Contains(devLower, strings.ToLower(cardName)) {
 				continue
 			}
+
 			if devNum >= 0 {
 				var target = fmt.Sprintf(",%d)", devNum)
 				if strings.Contains(dev.Name, target) {
@@ -147,6 +155,7 @@ func matchPortAudioDeviceByName(name string, forInput bool, devices []*portaudio
 				if !devMatchesDirection(dev) {
 					continue
 				}
+
 				if devNum >= 0 {
 					var target = fmt.Sprintf("(hw:%d,%d)", cardNum, devNum)
 					if strings.Contains(dev.Name, target) {

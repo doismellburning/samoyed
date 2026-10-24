@@ -258,6 +258,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 			// printf ("server %d, portx = %d\n", my_index, mon_cmd.portx);
 			use_chan = int(mon_cmd.Portx)
 			var alevel ax25.ALevel
+
 			var pp = ax25.FromFrame(data[1:mon_cmd.DataLen], alevel)
 			if pp == nil {
 				fmt.Printf("Client %d got invalid AX.25 frame from %s.\n", my_index, description)

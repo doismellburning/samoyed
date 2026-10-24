@@ -26,13 +26,16 @@ import (
 // readReplyFrom reads one agwpe.Message (header + data) from conn.
 func readReplyFrom(conn net.Conn) (*agwpe.Message, error) {
 	var hdr agwpe.Header
+
 	err := binary.Read(conn, binary.LittleEndian, &hdr)
 	if err != nil {
 		return nil, err
 	}
+
 	var msg = &agwpe.Message{Header: hdr, Data: nil}
 	if hdr.DataLen > 0 {
 		msg.Data = make([]byte, hdr.DataLen)
+
 		_, err = io.ReadFull(conn, msg.Data)
 		if err != nil {
 			return nil, err
@@ -48,6 +51,7 @@ func setupClientPipe(t *testing.T, s *AGWServer) net.Conn {
 	t.Helper()
 	var server, client = net.Pipe()
 	s.clients[0].conn = server
+
 	t.Cleanup(func() {
 		server.Close()
 		client.Close()
@@ -61,6 +65,7 @@ func setupClientPipe(t *testing.T, s *AGWServer) net.Conn {
 // net.Pipe's unbuffered writes.
 func asyncReply(conn net.Conn) <-chan *agwpe.Message {
 	var ch = make(chan *agwpe.Message, 1)
+
 	go func() {
 		msg, _ := readReplyFrom(conn)
 		ch <- msg
@@ -971,6 +976,7 @@ func rawAGWFrame(t *testing.T, monitor string) *agwpe.Message {
 	var cmd = new(agwpe.Message)
 	cmd.Header.DataKind = 'K'
 	cmd.Header.Portx = 0
+
 	cmd.Data = append([]byte{0}, pp.Pack()...)
 	cmd.Header.DataLen = safecast.RequireConvert[uint32](t, len(cmd.Data))
 

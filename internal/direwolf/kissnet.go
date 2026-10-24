@@ -408,7 +408,6 @@ func (kns *KissNetService) sendOn(kps *kissport_status_s, client int, conn net.C
 	// Previously all channels were sent to everyone.
 	// We now have tcp ports which carry only a single radio channel.
 	// The application will see KISS channel 0 regardless of the radio channel.
-
 	var portChannel int
 
 	if kps.channel == -1 { //nolint:staticcheck
@@ -664,6 +663,7 @@ func (kns *KissNetService) initOne(ctx context.Context, kps *kissport_status_s) 
 		"tcp_port": kps.tcp_port,
 		"channel":  kps.channel,
 	}).Debug("kissnet_init")
+
 	for client := range MAX_NET_CLIENTS {
 		kps.client_sock[client] = nil
 		kps.kf[client] = new(kiss.Collector)

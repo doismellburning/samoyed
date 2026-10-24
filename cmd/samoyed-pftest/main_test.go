@@ -153,6 +153,7 @@ func Test_run_verboseExplainsTheDecision(t *testing.T) {
 	// The filter engine explains itself through logrus, at Trace, which main
 	// turns on for a verbose run.
 	var savedLevel = logrus.GetLevel()
+
 	logrus.SetLevel(logrus.TraceLevel)
 	t.Cleanup(func() { logrus.SetLevel(savedLevel) })
 

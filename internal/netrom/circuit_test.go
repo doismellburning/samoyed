@@ -404,6 +404,7 @@ func TestNetromCircuitBoundsReassembly(t *testing.T) {
 	var c = p.b.byID(p.ob.established[0])
 
 	var chunk = bytes.Repeat([]byte{'z'}, maxInfo)
+
 	for ns := range 12 {
 		var f = p.b.frame(c, OpInfo)
 		f.index, f.id = c.myIndex, c.myID
@@ -411,6 +412,7 @@ func TestNetromCircuitBoundsReassembly(t *testing.T) {
 		f.flags = FlagMore
 		f.info = chunk
 		c.vl = byte(ns) // Keep the window open for the test.
+
 		p.b.rx(f)
 	}
 

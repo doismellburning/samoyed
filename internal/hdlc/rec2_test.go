@@ -37,6 +37,7 @@ func TestSanityCheckAX25AddressCharacters(t *testing.T) {
 
 	var frame = func(dest string) []byte {
 		var f []byte
+
 		for _, addr := range []string{dest, "Q2TEST"} {
 			for k := range 6 {
 				f = append(f, addr[k]<<1)

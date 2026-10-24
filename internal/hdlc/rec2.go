@@ -385,6 +385,7 @@ func try_to_fix_quick_now(block *rrbb.Buffer, config *Config, sink dwcore.FrameS
 	retry_cfg.sep.bit_idx_c = -1
 
 	logrus.WithField("len", length).Trace("Try flipping TWO SEPARATED BITS")
+
 	length = block.Len()
 	for i := range length - 2 {
 		retry_cfg.sep.bit_idx_a = i
@@ -530,6 +531,7 @@ func try_decode(block *rrbb.Buffer, config *Config, sink dwcore.FrameSink, from 
 	if retry_conf_type == RETRY_TYPE_NONE {
 		logrus.WithField("blen", blen).Trace("try_decode")
 	}
+
 	for i := 1; i < blen; i++ {
 		/* Get the value for the current bit */
 		var raw = block.Bit(i) > 0

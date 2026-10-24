@@ -271,7 +271,6 @@ func (ks *KissSerial) write(buf []byte) {
 	 *	      command> change CNCB0 EmuOverrun=yes
 	 *	      command> change CNCA0 EmuBR=yes
 	 */
-
 	ks.mu.Lock()
 	defer ks.mu.Unlock()
 

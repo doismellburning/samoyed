@@ -364,6 +364,7 @@ axudpPorts:
 
 		var routes = c.audio.axudp_routes[10]
 		assert.Equal(t, []string{"NODES"}, routes.Broadcast)
+
 		if assert.Len(t, routes.Maps, 2) {
 			assert.Equal(t, "Q1TEST-1", routes.Maps[0].AX25Addr)
 			assert.Equal(t, "192.0.2.1:93", routes.Maps[0].Addr)

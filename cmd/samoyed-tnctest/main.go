@@ -648,6 +648,7 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 
 			if string(buffer) == "cmd:" {
 				done = true
+
 				have_cmd_prompt[my_index].Store(true)
 			} else {
 				have_cmd_prompt[my_index].Store(false)

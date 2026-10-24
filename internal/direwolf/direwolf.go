@@ -140,7 +140,9 @@ x = FX.25 increase verbose level.`)
 h = Heard line with the audio level.
 d = Description of APRS packets.
 x = Silence FX.25 information.`)
+
 	pflag.IntP("text-color", "t", 0, "Ignored; text colors are not supported.")
+
 	_ = pflag.CommandLine.MarkDeprecated("text-color", "it has no effect")
 	var printUTF8Test = pflag.BoolP("print-utf8-test", "u", false, "Print UTF-8 test string and exit.")
 	var logDir = pflag.StringP("log-dir", "l", "", "Directory name for log files.")
@@ -546,7 +548,9 @@ x = Silence FX.25 information.`)
 	if err != nil {
 		logrus.WithError(err).Debug("AudioOpen failed")
 		fmt.Printf("Pointless to continue without audio device.\n")
+
 		_ = dwutil.SleepSecCtx(ctx, 5)
+
 		pflag.Usage()
 		os.Exit(1)
 	}
@@ -1006,6 +1010,7 @@ x = Silence FX.25 information.`)
 		logrus.WithError(waypointErr).Error("Unable to start waypoint output")
 		td.exit(1)
 	}
+
 	waypointSender.SetDebug(d_w_opt)
 
 	/*
@@ -1040,10 +1045,12 @@ x = Silence FX.25 information.`)
 	recHandler.waypoints = waypointSender
 	recHandler.apps = clientApplications
 	recHandler.digipeater = aprsDigipeater
+
 	recHandler.connectedDigipeater = connectedDigipeater
 	if netromNode != nil {
 		recHandler.netromHeard = netromNode.HeardUI
 	}
+
 	recHandler.ttGateway = ttGateway
 	recHandler.dumpUTF8 = d_u_opt
 	recHandler.dumpPackets = d_p_opt
@@ -1261,6 +1268,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 					})
 				}
 			}
+
 			logEntry.Info("Heard")
 		}
 	}
@@ -1314,6 +1322,7 @@ func (rh *recPacketHandler) app_process_rec_packet(
 		if numSubchan > 1 {
 			logEntry = logEntry.WithField("subchan", src.Slicer.Subchannel)
 		}
+
 		if numSlicers > 1 {
 			logEntry = logEntry.WithField("slice", src.Slicer.Slice)
 		}

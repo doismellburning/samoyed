@@ -17,6 +17,7 @@ func DiscardLogrus(tb testing.TB) {
 	tb.Helper()
 
 	var saved = logrus.StandardLogger().Out
+
 	logrus.SetOutput(io.Discard)
 
 	tb.Cleanup(func() { logrus.SetOutput(saved) })

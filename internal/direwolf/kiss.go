@@ -270,6 +270,7 @@ func (kp *KissPT) write(master *os.File, buf []byte) {
 // before the listening goroutine starts, so it takes no lock.
 func (kp *KissPT) openPT() {
 	logrus.Debug("KissPT.openPT")
+
 	var ptmx, pts, err = pty.Open()
 	if err != nil {
 		logrus.WithError(err).Error("Could not create pseudo terminal for KISS TNC")
@@ -465,6 +466,7 @@ func (kp *KissPT) get(ctx context.Context) (byte, error) {
 		if n > 0 {
 			return ch[0], nil
 		}
+
 		if err != nil {
 			logrus.WithError(err).WithField("device", kp.slave.Name()).Error("Error receiving KISS message from client application, closing")
 
@@ -540,6 +542,7 @@ func (kp *KissPT) listenThread(ctx context.Context) {
 		if err != nil {
 			return
 		}
+
 		kp.handler.RecByte(kp.kf, ch, kp.debug, kp)
 	}
 }

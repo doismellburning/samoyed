@@ -190,6 +190,7 @@ func TestSharedNodeNetROMTakesUndecidedLink(t *testing.T) {
 	var s, link, shell, netrom = newTestSharedNode()
 
 	s.LinkEstablished(sharedChannel, sharedClient, sharedNeighbourCall, sharedNodeCall, true)
+
 	shell.calls = nil
 
 	s.netromLink().ConnectRequest(sharedAddrs(sharedNeighbourCall), 2, sharedChannel, sharedClient, ax25.PIDNetROM)

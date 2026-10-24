@@ -539,7 +539,6 @@ func (d *Decoder) decode(pp *ax25.Packet, quiet bool, third_party_src string) *D
 		// A symbol on a "message" makes no sense and confuses people.
 		// Third party too.  Set from the payload.
 		// Maybe eliminate for a couple others.
-
 		if pinfo[0] != ':' && pinfo[0] != '}' {
 			if d.symbols != nil { // TODO KG Consider some sort of debug message on an else?
 				var symtab, symbol, ok = d.symbols.FromDestOrSrc(pinfo[0], A.Src, A.Dest)
@@ -1509,6 +1508,7 @@ func aprsMicE(A *Decoded, telemetryState *aprstelemetry.State, deviceIDs *device
 			lon = maybe.Just(degrees + float64((ch-38)+10)/60.0) /* 10 - 59 minutes */
 		} else {
 			lon = maybe.Nothing[float64]()
+
 			if !A.quiet {
 				logrus.WithField("found", fmt.Sprintf("0x%02x", ch)).Warn("Invalid character for MIC-E longitude minutes")
 			}
@@ -1525,6 +1525,7 @@ func aprsMicE(A *Decoded, telemetryState *aprstelemetry.State, deviceIDs *device
 				lon = maybe.Just(minutes + float64((ch-28)+0)/6000.0) /* 0 - 99 hundredths of minutes*/
 			} else {
 				lon = maybe.Nothing[float64]()
+
 				if !A.quiet {
 					logrus.WithField("found", fmt.Sprintf("0x%02x", ch)).Warn("Invalid character for MIC-E longitude hundredths of minutes")
 				}
@@ -2536,6 +2537,7 @@ func aprsGeneralQuery(A *Decoded, info []byte) {
 
 			return
 		}
+
 		logrus.WithFields(logrus.Fields{
 			"lat":    lat,
 			"lon":    lon,

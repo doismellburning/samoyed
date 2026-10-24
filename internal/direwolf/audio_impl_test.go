@@ -355,6 +355,7 @@ func TestAudioImpl_udpOutput_putFlushWaitClose(t *testing.T) {
 	assert.Equal(t, 0, d.dev[0].outbufLen)
 
 	var buf = make([]byte, UDP_AUDIO_OUT_BUF_MAXLEN)
+
 	require.NoError(t, listener.SetReadDeadline(time.Now().Add(2*time.Second)))
 
 	var n int
@@ -381,6 +382,7 @@ func TestAudioImpl_udpOutput_putFlushWaitClose(t *testing.T) {
 	default:
 		t.Error("Close did not tell the silence keepalive to stop")
 	}
+
 	assert.False(t, d.transmitAvailable(0))
 }
 

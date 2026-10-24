@@ -127,7 +127,6 @@ func (F *Receiver) logEntry() *logrus.Entry {
 
 func (F *Receiver) RecBit(dbit int) {
 	// Accumulate most recent 24 bits received.  Most recent is LSB.
-
 	F.acc = ((F.acc << 1) | uint(dbit&1)) & 0x00ffffff
 
 	// State machine to look for sync word then gather appropriate number of header and payload bytes.
@@ -238,7 +237,6 @@ func (F *Receiver) RecBit(dbit int) {
 
 			if F.pc == F.eplen {
 				// TODO?: for symmetry it seems like we should clarify the payload before combining.
-
 				if F.crc {
 					F.cc = 0
 					F.state = IL2P_CRC
@@ -249,7 +247,6 @@ func (F *Receiver) RecBit(dbit int) {
 		}
 
 	case IL2P_CRC: // Gathering 4 trailing CRC bytes.
-
 		F.bc++
 		if F.bc == 8 { // full byte has been collected.
 			F.bc = 0
@@ -260,6 +257,7 @@ func (F *Receiver) RecBit(dbit int) {
 				F.scrc[F.cc] = byte(^F.acc & 0xff)
 				F.cc++
 			}
+
 			if F.cc == IL2P_CRC_ENCODED_SIZE {
 				F.state = IL2P_DECODE
 			}
@@ -307,7 +305,6 @@ func (F *Receiver) RecBit(dbit int) {
 
 			if pp != nil {
 				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
-
 				F.sink(F.from, pp, dwcore.RxInfo{ALevel: F.audioLevel(F.from.Channel, F.from.Subchannel), Retries: phy.BitFixLevel(F.corrected), FEC: phy.FECIL2P})
 			}
 		} // end block for local variables.

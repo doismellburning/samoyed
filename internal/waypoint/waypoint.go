@@ -138,6 +138,7 @@ func NewSender(ctx context.Context, config *Config, gps *dwgps.GPS) (*Sender, er
 		if udpRequested {
 			requested = append(requested, "UDP "+net.JoinHostPort(config.UDPHostname, strconv.Itoa(config.UDPPort)))
 		}
+
 		if serialRequested {
 			requested = append(requested, "serial port "+config.SerialPort)
 		}

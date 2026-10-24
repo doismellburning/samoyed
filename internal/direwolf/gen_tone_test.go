@@ -100,6 +100,7 @@ func TestPutBitWithUnknownModemSendsNothing(t *testing.T) {
 
 	var output = testutils.CaptureOutput(t, func() {
 		var oldLogOutput = logrus.StandardLogger().Out
+
 		logrus.SetOutput(os.Stdout)
 
 		defer logrus.SetOutput(oldLogOutput)

@@ -1767,7 +1767,6 @@ func (link *AX25Link) dl_client_cleanup(E *dlq_item_t) {
 	var S = link.listHead
 	for S != nil {
 		// Look for corruption or double freeing.
-
 		if S.client == E.client {
 			if link.debugStats {
 				logrus.WithFields(logrus.Fields{
@@ -6423,6 +6422,7 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid.Param) {
 		if S.n1_paclen != length {
 			warnXIDOutOfRange(S, "i_field_length_rx", length, S.n1_paclen)
 		}
+
 		param.IFieldLengthRx = maybe.Just(S.n1_paclen)
 	} else {
 		S.n1_paclen = min(max(S.n1_paclen, n1Min), AX25_N1_PACLEN_MAX)
@@ -6433,11 +6433,13 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid.Param) {
 	if S.modulo == ax25.Modulo128 {
 		kMin, kMax = AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX
 	}
+
 	if window, ok := param.WindowSizeRx.Get(); ok {
 		S.k_maxframe = min(max(window, kMin), kMax)
 		if S.k_maxframe != window {
 			warnXIDOutOfRange(S, "window_size_rx", window, S.k_maxframe)
 		}
+
 		param.WindowSizeRx = maybe.Just(S.k_maxframe)
 	} else {
 		S.k_maxframe = min(max(S.k_maxframe, kMin), kMax)

@@ -210,6 +210,7 @@ func (mdb *DB) SaveRF(channel int, pp *ax25.Packet, lat maybe.Maybe[float64], lo
 	}
 
 	mdb.mu.Lock()
+
 	var mptr = mdb.db[source]
 	if mptr == nil {
 		/*
@@ -353,6 +354,7 @@ func (mdb *DB) SaveIS(ptext string) {
 	*/
 
 	mdb.mu.Lock()
+
 	var mptr = mdb.db[source]
 	if mptr == nil {
 		/*
@@ -473,11 +475,13 @@ func (mdb *DB) Count(maxHops int, timeLimit int) int {
 	var count = 0
 
 	mdb.mu.RLock()
+
 	for _, p := range mdb.db {
 		if !p.lastHeardRF.Before(since) && p.numDigiHops <= maxHops {
 			count++
 		}
 	}
+
 	mdb.mu.RUnlock()
 
 	if mdb.debug == 1 {

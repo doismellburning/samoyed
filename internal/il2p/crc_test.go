@@ -111,6 +111,7 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 		// Encoded should be 4 bytes longer than without CRC.
 		var encodedNoCRC, enc_len_no_crc = il2p_encode_frame(pp, Version04, max_fec)
 		assert.Equal(t, enc_len_no_crc+IL2P_CRC_ENCODED_SIZE, enc_len)
+
 		_ = encodedNoCRC
 
 		// Decode should succeed with CRC.
@@ -139,6 +140,7 @@ func TestIL2PCRCMismatchLoggedAtDebugLevel(t *testing.T) {
 	copy(encoded[len(encoded)-IL2P_CRC_ENCODED_SIZE:], wrongCRC[:])
 
 	var savedLevel = logrus.GetLevel()
+
 	logrus.SetLevel(logrus.DebugLevel)
 	t.Cleanup(func() { logrus.SetLevel(savedLevel) })
 
@@ -147,6 +149,7 @@ func TestIL2PCRCMismatchLoggedAtDebugLevel(t *testing.T) {
 
 	var mismatches = func() int {
 		var n = 0
+
 		for _, entry := range hook.AllEntries() {
 			if entry.Message == "IL2P trailing CRC mismatch" {
 				n++

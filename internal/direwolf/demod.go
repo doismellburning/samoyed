@@ -181,6 +181,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 				}
 
 				justLettersBuilder.WriteRune(letter)
+
 				num_letters++
 			} else if p == '+' {
 				have_plus = 1
@@ -303,6 +304,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 
 		if have_plus != 0 && achan.num_freq > 1 {
 			logrus.WithField("channel", channel).Error("Demodulator + option can't be combined with multiple frequencies")
+
 			numSubchan = 1 // Will be set higher later.
 			achan.num_freq = 1
 		}

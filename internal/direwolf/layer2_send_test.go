@@ -114,6 +114,7 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 	var alone = testutils.LineLevels(func(line *linecode.Encoder) {
 		aloneLen = fx25.NewSender(line, 0, 0).SendFrame(fbuf, 16)
 	})
+
 	require.Positive(t, aloneLen)
 
 	var beforeLen int
@@ -153,6 +154,7 @@ func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
 		alone[crc] = testutils.LineLevels(func(line *linecode.Encoder) {
 			sentAlone = il2p.NewSender(line, 0, 0).SendFrame(pp, il2p.VersionCompat, 0, crc, 0)
 		})
+
 		require.Positive(t, sentAlone)
 
 		assert.Equal(t, alone[crc], bits, "il2p_crc = %v", crc)

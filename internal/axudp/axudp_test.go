@@ -56,6 +56,7 @@ func TestAddCRC(t *testing.T) {
 
 	// CRC is at the end as a LE uint16 and must equal FCSCalc(frame).
 	var want = fcs.Calc(frame)
+
 	var crc = uint16(got[len(frame)]) | uint16(got[len(frame)+1])<<8
 	if crc != want {
 		t.Errorf("AddCRC: crc=0x%04x want 0x%04x", crc, want)
@@ -112,6 +113,7 @@ func TestParseConfig(t *testing.T) {
     host: 192.0.2.2
     port: 20093
 `
+
 	var writeErr = os.WriteFile(p, []byte(content), 0600)
 	if writeErr != nil {
 		t.Fatal(writeErr)
@@ -121,19 +123,24 @@ func TestParseConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseConfig: unexpected error: %v", err)
 	}
+
 	var entries = routes.Maps
 	if len(entries) != 2 {
 		t.Fatalf("ParseConfig: want 2 entries, got %d", len(entries))
 	}
+
 	if entries[0].AX25Addr != "Q1TEST" {
 		t.Errorf("entries[0].AX25Addr = %q, want %q", entries[0].AX25Addr, "Q1TEST")
 	}
+
 	if entries[0].Addr != "192.0.2.1:93" {
 		t.Errorf("entries[0].Addr = %q, want %q", entries[0].Addr, "192.0.2.1:93")
 	}
+
 	if entries[1].AX25Addr != "Q2TEST-7" {
 		t.Errorf("entries[1].AX25Addr = %q, want %q", entries[1].AX25Addr, "Q2TEST-7")
 	}
+
 	if entries[1].Addr != "192.0.2.2:20093" {
 		t.Errorf("entries[1].Addr = %q, want %q", entries[1].Addr, "192.0.2.2:20093")
 	}
@@ -160,14 +167,17 @@ func TestParseConfigNormalisesAX25Addr(t *testing.T) {
 			var dir = t.TempDir()
 			var p = filepath.Join(dir, "axudp.yaml")
 			var content = "maps:\n  - ax25addr: " + tc.ax25addr + "\n    host: 192.0.2.1\n    port: 93\n"
+
 			var writeErr = os.WriteFile(p, []byte(content), 0600)
 			if writeErr != nil {
 				t.Fatal(writeErr)
 			}
+
 			var entries, err = ParseConfig(p)
 			if err != nil {
 				t.Fatalf("ParseConfig: unexpected error: %v", err)
 			}
+
 			if entries.Maps[0].AX25Addr != tc.wantNorm {
 				t.Errorf("AX25Addr = %q, want %q", entries.Maps[0].AX25Addr, tc.wantNorm)
 			}
@@ -185,6 +195,7 @@ func TestParseConfigResolvesUDPAddr(t *testing.T) {
     host: 192.0.2.1
     port: 93
 `
+
 	var writeErr = os.WriteFile(p, []byte(content), 0600)
 	if writeErr != nil {
 		t.Fatal(writeErr)
@@ -194,9 +205,11 @@ func TestParseConfigResolvesUDPAddr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseConfig: unexpected error: %v", err)
 	}
+
 	if entries.Maps[0].UDPAddr == nil {
 		t.Fatal("ParseConfig: UDPAddr is nil, expected resolved address")
 	}
+
 	if entries.Maps[0].UDPAddr.String() != "192.0.2.1:93" {
 		t.Errorf("UDPAddr = %q, want %q", entries.Maps[0].UDPAddr.String(), "192.0.2.1:93")
 	}
@@ -266,10 +279,12 @@ func TestParseConfigValidation(t *testing.T) {
 
 			var dir = t.TempDir()
 			var p = filepath.Join(dir, "axudp.yaml")
+
 			var writeErr = os.WriteFile(p, []byte(tc.content), 0600)
 			if writeErr != nil {
 				t.Fatal(writeErr)
 			}
+
 			var _, err = ParseConfig(p)
 			if err == nil {
 				t.Errorf("ParseConfig: expected error for %s, got nil", tc.name)
@@ -283,10 +298,12 @@ func TestParseConfigBadYAML(t *testing.T) {
 
 	var dir = t.TempDir()
 	var p = filepath.Join(dir, "axudp.yaml")
+
 	var writeErr = os.WriteFile(p, []byte("{ not valid yaml: ["), 0600)
 	if writeErr != nil {
 		t.Fatal(writeErr)
 	}
+
 	var _, err = ParseConfig(p)
 	if err == nil {
 		t.Error("ParseConfig: expected error for malformed YAML, got nil")
@@ -326,6 +343,7 @@ func TestLookupMap(t *testing.T) {
 
 			continue
 		}
+
 		if ok && entry.Addr != tc.wantAddr {
 			t.Errorf("lookupMap(%q): addr=%q want %q", tc.dest, entry.Addr, tc.wantAddr)
 		}
@@ -349,6 +367,7 @@ func TestLookupMapExactBeforeWildcard(t *testing.T) {
 	if !ok {
 		t.Fatal("lookupMap(Q1TEST-7): not found")
 	}
+
 	if entry.Addr != "192.0.2.2:93" {
 		t.Errorf("lookupMap(Q1TEST-7): got addr %q, want specific entry 192.0.2.2:93 (exact match must beat wildcard)", entry.Addr)
 	}
@@ -358,6 +377,7 @@ func TestLookupMapExactBeforeWildcard(t *testing.T) {
 	if !ok2 {
 		t.Fatal("lookupMap(Q1TEST-3): not found via wildcard")
 	}
+
 	if entry2.Addr != "192.0.2.1:93" {
 		t.Errorf("lookupMap(Q1TEST-3): got addr %q, want wildcard entry 192.0.2.1:93", entry2.Addr)
 	}
@@ -399,6 +419,7 @@ func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
 	var padLen = kiss.MaxFrameLen - 1 - 1 - len(ax25Dest)
 	var content []byte
 	content = append(content, kiss.CmdDataFrame) // type byte
+
 	content = append(content, ax25Dest...)
 	for range padLen {
 		content = append(content, 0x41)
@@ -438,10 +459,12 @@ func TestKISSOverflowDiscarded(t *testing.T) {
 	// kiss.MaxFrameLen data bytes is enough to trigger the overflow condition.
 	var buf []byte
 	buf = append(buf, kiss.FEND)
+
 	buf = append(buf, kiss.CmdDataFrame)
 	for range kiss.MaxFrameLen {
 		buf = append(buf, 0x41)
 	}
+
 	buf = append(buf, kiss.FEND)
 
 	var hook = test.NewGlobal()
@@ -503,9 +526,11 @@ type singleReadConn struct {
 func (c *singleReadConn) Read(b []byte) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	if c.done {
 		return 0, io.EOF
 	}
+
 	c.done = true
 
 	return copy(b, c.data), io.EOF
@@ -535,6 +560,7 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 		t.Fatal("dstPkt is not a *net.UDPConn")
 	}
 	var dstLocalAddr = dstUDP.LocalAddr()
+
 	var dstAddr, dstAddrOK = dstLocalAddr.(*net.UDPAddr)
 	if !dstAddrOK {
 		t.Fatal("dstPkt local addr is not a *net.UDPAddr")
@@ -568,6 +594,7 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 	fconn.data = kissframe
 
 	var done = make(chan struct{})
+
 	go func() {
 		b.handleKISSClient(t.Context(), fconn)
 		close(done)
@@ -585,10 +612,12 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 		t.Fatal(setErr)
 	}
 	var rxBuf = make([]byte, 4096)
+
 	var n, _, rxErr = dstUDP.ReadFromUDP(rxBuf)
 	if rxErr != nil {
 		t.Fatalf("no AXUDP datagram received — bytes from final read were dropped: %v", rxErr)
 	}
+
 	if n == 0 {
 		t.Fatal("received empty AXUDP datagram")
 	}
@@ -653,6 +682,7 @@ func TestRunUDPListenerReturnsOnReadError(t *testing.T) {
 		if runErr == nil {
 			t.Fatal("RunUDPListener returned nil error after the socket was closed")
 		}
+
 		if !errors.Is(runErr, net.ErrClosed) {
 			t.Errorf("RunUDPListener returned %v, want an error wrapping net.ErrClosed", runErr)
 		}
@@ -687,6 +717,7 @@ func TestRunKISSServerReturnsOnListenerClose(t *testing.T) {
 		if runErr == nil {
 			t.Fatal("RunKISSServer returned nil error after the listener was closed")
 		}
+
 		if !errors.Is(runErr, net.ErrClosed) {
 			t.Errorf("RunKISSServer returned %v, want an error wrapping net.ErrClosed", runErr)
 		}
@@ -776,16 +807,20 @@ func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
 
 	// Dial returning does not mean Accept has run, so wait for registration.
 	var deadline = time.Now().Add(2 * time.Second)
+
 	for {
 		b.mu.Lock()
 		var registered = len(b.clients)
 		b.mu.Unlock()
+
 		if registered == 1 {
 			break
 		}
+
 		if time.Now().After(deadline) {
 			t.Fatalf("accepted connection was not registered as a client (have %d)", registered)
 		}
+
 		time.Sleep(time.Millisecond)
 	}
 
@@ -798,10 +833,12 @@ func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
 		t.Fatal(setErr)
 	}
 	var rxBuf = make([]byte, 256)
+
 	var n, rxErr = client.Read(rxBuf)
 	if rxErr != nil {
 		t.Fatalf("accepted client received no broadcast: %v", rxErr)
 	}
+
 	var want = kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, ax25frame...))
 	if string(rxBuf[:n]) != string(want) {
 		t.Errorf("client received %x, want %x", rxBuf[:n], want)
@@ -947,9 +984,11 @@ func TestKISSBroadcastFansOut(t *testing.T) {
 	b.udpConn = src
 	b.router = NewRouter(noRoutes())
 	b.router.routes.Broadcast = []string{"NODES"}
+
 	for _, p := range peers {
 		var addr, ok = p.LocalAddr().(*net.UDPAddr)
 		require.True(t, ok)
+
 		b.router.routes.Maps = append(b.router.routes.Maps, MapEntry{AX25Addr: "Q1TEST", Addr: addr.String(), UDPAddr: addr, Broadcast: true})
 	}
 
@@ -1004,6 +1043,7 @@ func autoMapVia(t *testing.T, hosts ...string) Routes {
 	t.Helper()
 
 	var routes = Routes{Maps: nil, Broadcast: nil, AutoMap: true}
+
 	for i, host := range hosts {
 		var addr = net.UDPAddrFromAddrPort(netip.AddrPortFrom(netip.MustParseAddr(host), 93))
 		routes.Maps = append(routes.Maps, MapEntry{AX25Addr: fmt.Sprintf("Q9TEST-%d", i+1), Addr: addr.String(), UDPAddr: addr, Broadcast: false})
@@ -1031,6 +1071,7 @@ func TestExtractSource(t *testing.T) {
 	for i := 7; i < 13; i++ {
 		blank[i] = ' ' << 1
 	}
+
 	assert.Empty(t, ExtractSource(blank))
 }
 
@@ -1104,6 +1145,7 @@ func TestRouterIgnoresShortFrame(t *testing.T) {
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	assert.Empty(t, r.heard)
 }
 
@@ -1168,9 +1210,11 @@ func TestRouterForgetsAfterTTL(t *testing.T) {
 	r.Heard(frameFrom(t, "Q2TEST>Q1TEST:hello"), net.UDPAddrFromAddrPort(netip.MustParseAddrPort("192.0.2.9:93")))
 
 	now = now.Add(learnedRouteTTL)
+
 	assert.Len(t, r.Route("Q2TEST"), 1)
 
 	now = now.Add(time.Second)
+
 	assert.Empty(t, r.Route("Q2TEST"))
 }
 
@@ -1191,6 +1235,7 @@ func TestRouterBoundsHeard(t *testing.T) {
 
 	for i := range maxLearnedRoutes + 1 {
 		r.Heard(frameFrom(t, call(i)+">Q1TEST:hello"), peer)
+
 		now = now.Add(time.Second)
 	}
 
@@ -1234,6 +1279,7 @@ func TestBridgeRepliesToUnmappedPeer(t *testing.T) {
 	require.Eventually(t, func() bool { return len(b.router.Route("Q2TEST")) > 0 }, 2*time.Second, 10*time.Millisecond)
 
 	var reply = frameFrom(t, "Q1TEST>Q2TEST:hello yourself")
+
 	var kc kiss.Collector
 	for _, byt := range kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, reply...)) {
 		recByte(&kc, byt, b)

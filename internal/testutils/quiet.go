@@ -25,6 +25,7 @@ func FuzzQuietly(tb testing.TB) {
 
 	tb.Cleanup(func() {
 		os.Stdout = saved
+
 		devNull.Close()
 	})
 

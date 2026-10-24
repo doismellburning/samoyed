@@ -1621,7 +1621,6 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 			if result != 1 {
 				// Previously there was a debug message here about the packet being dropped by filtering.
 				// This is now handled better by the "-df" command line option for filtering details.
-
 				return
 			}
 		}
@@ -1716,7 +1715,6 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 			if isMessage && ig.heard != nil {
 				// We transmitted a "message."  Telemetry metadata is excluded.
 				// Remember to pass along address of the sender later.
-
 				ig.heard.SetMSP(string(src), ig.config.igmsp)
 			}
 

@@ -81,7 +81,6 @@ func (s *Receiver) RecBit(raw bool) {
 	//dw_printf ("slice %d = %d\n", s.from.Slice, raw);
 
 	// Accumulate most recent 64 bits.
-
 	s.easAcc >>= 1
 	if raw {
 		s.easAcc |= 0x8000000000000000

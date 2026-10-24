@@ -32,6 +32,7 @@ func fakeMain() {
 		fmt.Fprintln(os.Stderr, strings.Join(args[1:], " "))
 	case "exit":
 		var status, _ = strconv.Atoi(args[1])
+
 		fmt.Println("exiting")
 		os.Exit(status)
 	case "coverdir":
@@ -253,6 +254,7 @@ func runTimingOut(t *testing.T, helper string, timeout string) []byte {
 	t.Helper()
 
 	var cmd = exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestTimingOut$", "-test.v") //nolint:gosec // Running ourselves.
+
 	cmd.Env = append(os.Environ(), timeoutEnv+"="+helper, timeoutLengthEnv+"="+timeout)
 
 	var out, err = cmd.CombinedOutput()

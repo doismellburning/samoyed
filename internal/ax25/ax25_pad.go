@@ -917,6 +917,7 @@ func ParseAddr(position int, in_addr string, strictness AddrStrictness) (string,
 			}
 
 			sstr.WriteRune(p)
+
 			if strictness.strict() && !isASCIIDigit(p) {
 				log().Warn("SSID must be digits")
 
@@ -1307,7 +1308,6 @@ func (this_p *Packet) RemoveAddr(n int) {
 
 func (this_p *Packet) NumAddr() int {
 	/* Use cached value if already set. */
-
 	if this_p.num_addr >= 0 {
 		return this_p.num_addr
 	}
@@ -1951,7 +1951,6 @@ func (this_p *Packet) FormatAddrs() string {
 	/* New in 0.9. */
 	/* Don't get upset if no addresses.  */
 	/* This will allow packets that do not comply to AX.25 format. */
-
 	if this_p.num_addr == 0 {
 		return ""
 	}
@@ -2009,7 +2008,6 @@ func (this_p *Packet) FormatAddrs() string {
 func (this_p *Packet) FormatViaPath() string {
 	/* Don't get upset if no addresses.  */
 	/* This will allow packets that do not comply to AX.25 format. */
-
 	if this_p.num_addr == 0 {
 		return ""
 	}
@@ -2023,6 +2021,7 @@ func (this_p *Packet) FormatViaPath() string {
 		}
 
 		result.WriteString(this_p.AddrWithSSID(i))
+
 		if i == heard {
 			result.WriteString("*")
 		}
@@ -2557,7 +2556,6 @@ func (this_p *Packet) C2() int {
 func (this_p *Packet) SetPID(pid byte) {
 	// Some applications set this to 0 which is an error.
 	// Change 0 to 0xF0 meaning no layer 3 protocol.
-
 	if pid == 0 {
 		pid = PIDNoLayer3
 	}
@@ -2602,7 +2600,6 @@ func (this_p *Packet) SetPID(pid byte) {
 func (this_p *Packet) PID() int {
 	// TODO: handle 2 control byte case.
 	// TODO: sanity check: is it I or UI frame?
-
 	if this_p.frame_len == 0 {
 		return (-1)
 	}

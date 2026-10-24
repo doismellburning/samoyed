@@ -262,6 +262,7 @@ func New(config Config, client *http.Client, neighbours func() []NeighbourLink, 
 	r.client = client
 	r.neighbours = neighbours
 	r.heard = heard
+
 	r.url = strings.TrimSuffix(config.APIURL, "/")
 	if r.url == "" {
 		r.url = DefaultURL

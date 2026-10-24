@@ -708,7 +708,6 @@ const hdlcRecRandMax int32 = 0x7fffffff
 func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, il2pDebug int, sink ReceiveSink) *Layer2Receiver {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("NewLayer2Receiver (%p) \n", pa);
-
 	var r = new(Layer2Receiver)
 	r.audio = pa
 	r.fx25Debug = fx25Debug

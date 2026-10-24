@@ -210,6 +210,7 @@ func TextToMultipress(text string, quiet bool) (string, int) {
 
 			if haveButtons && lastButton == row+'0' {
 				buttons.WriteRune('A')
+
 				lastButton = 'A'
 			}
 
@@ -244,6 +245,7 @@ func TextToMultipress(text string, quiet bool) (string, int) {
 						/* Stick in 'A' if previous character used same button. */
 						if haveButtons && lastButton == rune(row+'0') {
 							buttons.WriteRune('A')
+
 							lastButton = 'A'
 						}
 
@@ -321,6 +323,7 @@ func TextToTwoKey(text string, quiet bool) (string, int) {
 					if c == translate[row][col] {
 						buttons.WriteRune(rune(row + '0'))
 						buttons.WriteRune(rune(col + 'A'))
+
 						found = true
 					}
 				}
@@ -475,6 +478,7 @@ func TextToCall10(text string, quiet bool) (string, int) {
 			for col := 0; col < 4 && !found; col++ {
 				if c == call10encoding[row][col] {
 					buttons.WriteRune(rune('0' + row))
+
 					packed = packed*4 + col /* base 4 to binary */
 					found = true
 				}
@@ -1116,11 +1120,13 @@ func MheadToText(buttons string, quiet bool) (string, int) {
 
 			t2, e2 = twoDigitsToLetter(buttons, quiet)
 			text.WriteString(t2)
+
 			errors += e2
 			buttons = buttons[2:]
 
 			t2, e2 = twoDigitsToLetter(buttons, quiet)
 			text.WriteString(t2)
+
 			errors += e2
 			buttons = buttons[2:]
 		} else {

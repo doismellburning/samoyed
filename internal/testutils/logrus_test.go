@@ -19,6 +19,7 @@ func TestDiscardLogrusPutsTheOutputBack(t *testing.T) {
 	var buf bytes.Buffer
 
 	var saved = logrus.StandardLogger().Out
+
 	logrus.SetOutput(&buf)
 
 	t.Cleanup(func() { logrus.SetOutput(saved) })

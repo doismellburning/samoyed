@@ -491,6 +491,7 @@ func FuzzAX25Link(f *testing.F) {
 		}
 
 		var link = fuzzLinkReset(cfg, v22, agw)
+
 		dlq.RegisterCallsign("Q1TEST", 0, 0)
 		fuzzLinkDrain(dlq, link)
 

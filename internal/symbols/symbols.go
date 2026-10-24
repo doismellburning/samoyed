@@ -375,7 +375,6 @@ func (sd *Data) List() {
 	// entry per row would prefix each one with a timestamp and level and leave the
 	// tables unreadable. Anything that is a diagnostic - a symbol we can't place in
 	// a table - is a logrus entry.
-
 	fmt.Print("\n")
 
 	var pt = primarySymtab()
@@ -699,7 +698,6 @@ func (sd *Data) Description(symtab byte, symbol byte) string {
 	//	/	for symbol from primary table
 	//	\	for symbol from alternate table
 	//	0-9,A-Z	for alternate symbol table with overlay character
-
 	if symtab != '/' &&
 		symtab != '\\' &&
 		!unicode.IsDigit(rune(symtab)) &&
@@ -743,6 +741,7 @@ func (sd *Data) Description(symtab byte, symbol byte) string {
 		return pt[symbol-' '].description
 	} else {
 		var at = alternateSymtab()
+
 		var description = at[symbol-' '].description
 		if symtab != '\\' {
 			description += " w/overlay "
@@ -775,7 +774,6 @@ func (sd *Data) CodeFromDescription(overlay byte, description string) (byte, byt
 	 * first try the alternate symbol table.
 	 * If that fails should we give up or ignore the overlay and keep trying?
 	 */
-
 	var at = alternateSymtab()
 
 	if ascii.IsUpper(overlay) || ascii.IsDigit(overlay) {

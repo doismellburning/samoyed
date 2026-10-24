@@ -670,6 +670,7 @@ func (q *DataLinkQueue) WaitWhileEmpty(ctx context.Context, timeout time.Time) b
 
 	if is_empty {
 		logrus.Trace("dlq_wait_while_empty: prepare to SLEEP...")
+
 		if !timeout.IsZero() {
 			// KG: pthread_cond_timedwait in Go...
 			var timer = time.NewTimer(time.Until(timeout))

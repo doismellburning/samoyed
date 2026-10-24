@@ -867,6 +867,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	if nb > 0 {
 		numframe++
 	}
+
 	logrus.WithFields(logrus.Fields{
 		"t":        time.Since(time_ptt),
 		"nb":       nb,
@@ -914,6 +915,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 				if nb > 0 {
 					numframe++
 				}
+
 				logrus.WithFields(logrus.Fields{
 					"t":        time.Since(time_ptt),
 					"nb":       nb,

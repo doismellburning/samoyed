@@ -249,6 +249,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 					d.config.FilterStr[from_chan][to_chan])
 				if result != nil {
 					d.dedupe.Remember(to_chan, pp)
+
 					if d.transmit != nil {
 						d.transmit(to_chan, dwcore.PrioHigh, result) //  High priority queue.
 					}
@@ -276,6 +277,7 @@ func (d *Digipeater) Digipeat(from_chan int, pp *ax25.Packet) {
 					d.config.FilterStr[from_chan][to_chan])
 				if result != nil {
 					d.dedupe.Remember(to_chan, pp)
+
 					if d.transmit != nil {
 						d.transmit(to_chan, dwcore.PrioLow, result) // Low priority queue.
 					}
@@ -310,7 +312,6 @@ func (d *Digipeater) Regen(from_chan int, pp *ax25.Packet) {
 	/*
 		packet_t result;
 	*/
-
 	dwutil.Assert(from_chan >= 0 && from_chan < phy.MaxTotalChans)
 
 	for to_chan := range phy.MaxTotalChans {

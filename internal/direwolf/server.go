@@ -573,6 +573,7 @@ func (s *AGWServer) SendMonitored(channel int, pp *ax25.Packet, own_xmit int) {
 
 			agwpe_msg.Data = append(agwpe_msg.Data, 0) // add nul at end, included in length.
 			msg_data_len++
+
 			var dataLen, lenErr = safecast.Convert[uint32](msg_data_len) // TODO KG Just len(Data)
 			if lenErr != nil {
 				logrus.WithFields(logrus.Fields{
@@ -1417,7 +1418,6 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 		var stopClose = dwutil.CloseOnDone(ctx, conn)
 
 		var readErr = binary.Read(conn, binary.LittleEndian, &cmd.Header)
-
 		if readErr != nil {
 			stopClose()
 
@@ -1849,6 +1849,7 @@ func (s *AGWServer) handleRadioPortsRequest(client int) {
 	} // for each channel
 
 	reply.Data = []byte(info.String())
+
 	var dataLen, lenErr = safecast.Convert[uint32](len(reply.Data))
 	if lenErr != nil {
 		logrus.WithFields(logrus.Fields{"client": client, "length": len(reply.Data)}).Error("Reply does not fit an AGW message")

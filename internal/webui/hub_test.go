@@ -88,6 +88,7 @@ func TestStationKeepsEarlierPositionSymbolAndComment(t *testing.T) {
 	h.Publish(first)
 
 	*now = now.Add(time.Minute)
+
 	h.Publish(rx("Q1TEST")) // A status, say: no position, symbol or comment.
 
 	var stations = h.Stations()
@@ -122,7 +123,9 @@ func TestStationsMostRecentFirstAndExpire(t *testing.T) {
 	var h, now = newTestHub()
 
 	h.Publish(rx("Q1TEST"))
+
 	*now = now.Add(time.Hour)
+
 	h.Publish(rx("Q2TEST"))
 
 	var stations = h.Stations()
@@ -144,11 +147,17 @@ func TestStationTableEvictsLeastRecentlyHeard(t *testing.T) {
 	h.maxStations = 2
 
 	h.Publish(rx("Q1TEST"))
+
 	*now = now.Add(time.Second)
+
 	h.Publish(rx("Q2TEST"))
+
 	*now = now.Add(time.Second)
+
 	h.Publish(rx("Q1TEST"))
+
 	*now = now.Add(time.Second)
+
 	h.Publish(rx("Q3TEST"))
 
 	var names []string

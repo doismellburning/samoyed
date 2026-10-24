@@ -105,7 +105,6 @@ const FENCE = 0x55 // to detect buffer overflow.
 // as Layer2Receiver.fx25Busy relies on, during delivery.
 func (F *Receiver) RecBit(dbit int) {
 	// State machine to identify correlation tag then gather appropriate number of data and check bytes.
-
 	switch F.state {
 	case FX_TAG:
 		F.accum >>= 1

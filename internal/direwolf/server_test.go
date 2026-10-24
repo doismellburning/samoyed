@@ -93,6 +93,7 @@ func TestParseAGWLogin_FieldsEndAtFirstNUL(t *testing.T) {
 	for i := range data {
 		data[i] = 0xAA /* Pad with something that is not NUL. */
 	}
+
 	copy(data, "Q1TEST\x00")
 	copy(data[AGW_LOGIN_FIELD_LEN:], "hunter2\x00")
 
@@ -364,9 +365,11 @@ func loopbackConns(t *testing.T) (net.Conn, net.Conn) {
 
 	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", "127.0.0.1:0")
 	require.NoError(t, listenErr)
+
 	defer listener.Close()
 
 	var accepted = make(chan net.Conn, 1)
+
 	go func() {
 		var conn, _ = listener.Accept()
 		accepted <- conn
@@ -413,6 +416,7 @@ func TestAgwClientIsLocal(t *testing.T) {
 	assert.False(t, agwClientIsLocal(nil))
 
 	var pipeEnd, otherEnd = net.Pipe()
+
 	t.Cleanup(func() {
 		pipeEnd.Close()
 		otherEnd.Close()
@@ -1072,11 +1076,13 @@ func TestHandleClientCommand_V_QueuesFrameViaDigipeaters(t *testing.T) {
 	var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
 
 	var data = []byte{2}
+
 	for _, digi := range []string{"Q3TEST", "WIDE2-1"} {
 		var field [10]byte
 		copy(field[:], digi)
 		data = append(data, field[:]...)
 	}
+
 	data = append(data, "hello"...)
 
 	var cmd = new(agwpe.Message)

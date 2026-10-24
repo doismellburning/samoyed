@@ -48,6 +48,7 @@ func captureStdout(t *testing.T, fn func()) string {
 
 	defer func() {
 		os.Stdout = oldStdout
+
 		logrus.SetOutput(oldLogOutput)
 	}()
 
@@ -61,6 +62,7 @@ func captureStdout(t *testing.T, fn func()) string {
 	fn()
 
 	os.Stdout = oldStdout
+
 	logrus.SetOutput(oldLogOutput)
 
 	require.NoError(t, writer.Close())

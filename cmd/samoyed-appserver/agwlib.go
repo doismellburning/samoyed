@@ -446,6 +446,7 @@ func agwlib_D_send_connected_data(channel byte, pid byte, call_from agwpe.Callsi
 	h.PID = pid // Normally 0xF0 but other special cases are possible.
 	h.CallFrom = call_from
 	h.CallTo = call_to
+
 	var dataLen, lenErr = safecast.Convert[uint32](len(data))
 	if lenErr != nil {
 		return fmt.Errorf("%d bytes of data is too long for an AGW message: %w", len(data), lenErr)

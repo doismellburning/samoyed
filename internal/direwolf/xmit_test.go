@@ -33,6 +33,7 @@ func captureXmitLog(t *testing.T, f func()) string {
 
 	return testutils.CaptureOutput(t, func() {
 		var oldLogOutput = logrus.StandardLogger().Out
+
 		logrus.SetOutput(os.Stdout)
 
 		defer logrus.SetOutput(oldLogOutput)
@@ -257,6 +258,7 @@ func TestXmitThreadStopsWhenCancelledBeforeStarting(t *testing.T) {
 	var ctx, cancel = context.WithCancel(t.Context())
 
 	var tq = newTestTransmitQueue(audioConfig)
+
 	cancel()
 
 	var xs = new(XmitService)

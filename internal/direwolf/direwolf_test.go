@@ -196,6 +196,7 @@ func TestTeardownExitReleasesBeforeExiting(t *testing.T) {
 	}
 
 	var cmd = exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestTeardownExitReleasesBeforeExiting$") //nolint:gosec // G204: our own test binary.
+
 	cmd.Env = append(os.Environ(), teardownExitEnv+"=1")
 
 	var out, err = cmd.CombinedOutput()

@@ -120,6 +120,7 @@ func (ac *AXUDPChannel) listen(ctx context.Context) {
 	var buf = make([]byte, axudp.MaxUDPPayload)
 	for ctx.Err() == nil {
 		var n, from, err = ac.conn.ReadFromUDP(buf)
+
 		if ctx.Err() != nil {
 			return // We closed it ourselves on the way out.
 		}

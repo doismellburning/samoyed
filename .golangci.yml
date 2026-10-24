@@ -20,7 +20,6 @@ linters:
     - "varnamelen"  # Noble intent, but we're inheriting lots of short variable names, and I'd like to stay close to upstream at first
     - "wrapcheck"  # Error wrapping is the least of my concerns
     - "wsl"  # Avoid deprecation warning from enabling all
-    - "wsl_v5"  # KG 2026-02-26 I don't have concrete data but it feels like wsl is giving me spurious edits/breakages - it might not be wsl, it might be something else, but it only started being an issue once I enabled wsl, so I'm disabling it again for the foreseeable
   exclusions:
     rules:
       - path: _test\.go

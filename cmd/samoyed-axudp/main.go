@@ -96,6 +96,7 @@ Flags:
 	var udpPort = pflag.Int("udpport", 20093, "UDP port to listen on (and source from)")
 	var kissPort = pflag.Int("kissport", 8002, "TCP port for KISS clients (samoyed-direwolf NCHANNEL target)")
 	var verbose = pflag.Bool("verbose", false, "Log every packet sent and received")
+
 	pflag.Parse()
 
 	dwutil.SetLogFormat()
@@ -119,12 +120,15 @@ Flags:
 
 	fmt.Printf("samoyed-axudp: WARNING: this is beta software; behaviour may change in future releases\n")
 	fmt.Printf("samoyed-axudp: MAP table:\n")
+
 	for _, e := range routes.Maps {
 		fmt.Printf("  %s -> %s\n", e.AX25Addr, e.Addr)
 	}
+
 	for _, problem := range routes.Problems() {
 		fmt.Printf("samoyed-axudp: WARNING: %s\n", problem)
 	}
+
 	if routes.AutoMap {
 		fmt.Printf("samoyed-axudp: automap on: replying to unmapped addresses via the mapped host they were heard from\n")
 	}
@@ -140,6 +144,7 @@ Flags:
 		fmt.Fprintf(os.Stderr, "samoyed-axudp: UDP listen on port %d: %v\n", *udpPort, listenErr)
 		os.Exit(1)
 	}
+
 	fmt.Printf("samoyed-axudp: AXUDP listening on UDP port %d\n", *udpPort)
 
 	var kissLn, kissListenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", *kissPort))
@@ -147,6 +152,7 @@ Flags:
 		fmt.Fprintf(os.Stderr, "samoyed-axudp: TCP listen on port %d: %v\n", *kissPort, kissListenErr)
 		os.Exit(1)
 	}
+
 	fmt.Printf("samoyed-axudp: KISS TCP server listening on port %d\n", *kissPort)
 
 	var b = axudp.NewBridge(routes, udpConn)

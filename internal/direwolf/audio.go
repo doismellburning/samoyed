@@ -772,6 +772,7 @@ func (d *AudioDevices) openUDPOutput(ctx context.Context, a int, pa *RadioConfig
 	 * UDP output - dial to the specified host:port and send audio packets.
 	 */
 	var outAddr = name[4:] // skip "udp:"
+
 	var udpOutConn, dialErr = new(net.Dialer).DialContext(ctx, "udp", outAddr)
 	if dialErr != nil {
 		logrus.WithError(dialErr).WithField("address", outAddr).Error("Could not connect to UDP output address")
@@ -812,7 +813,6 @@ func (d *AudioDevices) openSoundcardOutput(a int, pa *RadioConfig, name string, 
 	 * send it to PortAudio. The stream is started lazily on first write
 	 * and stopped in wait to avoid underflows during idle periods.
 	 */
-
 	if !portaudioReady {
 		// PortAudio would not initialize, which we reported above.
 		if audioOutputRequired(&pa.adev[a]) {

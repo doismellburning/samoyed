@@ -228,6 +228,7 @@ func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 				assert.Equal(t, tc.wantWindow, S.k_maxframe)
 
 				var warnings []*logrus.Entry
+
 				for _, entry := range hook.AllEntries() {
 					if entry.Level == logrus.WarnLevel {
 						warnings = append(warnings, entry)

@@ -230,6 +230,7 @@ func (ps *parseState) applyYAMLAudioDevices(devices []AudioDeviceConfig, node ya
 		}
 
 		ps.line = item.Line
+
 		var err = ps.applyADEVICE(device.AudioDeviceSettings)
 		if err != nil {
 			ps.report(err)

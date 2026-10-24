@@ -43,7 +43,6 @@ type openSink func(config *direwolf.RadioConfig) (direwolf.AudioSink, func())
 func genTone(open openSink) {
 	/* to sound card */
 	/* one channel.  2 times:  one second of each tone. */
-
 	var config = direwolf.NewGenToneTestConfig(1)
 
 	var sink, closeSink = open(config)

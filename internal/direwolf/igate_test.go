@@ -770,9 +770,11 @@ func TestIGateConnectionStateConcurrent(t *testing.T) {
 		case <-sendDone:
 		case <-time.After(10 * time.Second):
 			assert.Fail(t, "the closed connection was never given up")
+
 			if conn, _ := ig.connection(); conn != nil {
 				ig.dropConnection(conn)
 			}
+
 			<-sendDone
 		}
 

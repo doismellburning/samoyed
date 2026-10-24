@@ -119,7 +119,6 @@ func cm108_print_inventory(things []*cm108.Thing) {
 	/////////////////////////////////////////////
 	//                Linux
 	/////////////////////////////////////////////
-
 	fmt.Printf("    VID  PID   %-*s %-*s %-*s %-*s %-*s %-*s\n", len(things[0].Product), "Product",
 		len(things[0].DevnodeSound), "Sound",
 		len(things[0].Plughw)/5, "ADEVICE",

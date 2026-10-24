@@ -269,7 +269,6 @@ func (d *Data) FromMicE(comment string) (string, maybe.Maybe[string]) {
 				(comment[0] == '`' || comment[0] == '\'') && // prefix ` or '
 				strings.HasSuffix(comment, m.suffix)) { // suffix
 			// Remove any prefix/suffix and return what remains.
-
 			var trimmed = comment[1:]
 			trimmed = trimmed[:len(trimmed)-len(m.suffix)]
 

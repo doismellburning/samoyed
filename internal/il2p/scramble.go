@@ -61,6 +61,7 @@ func il2p_scramble_block(in []byte) []byte {
 	var ob = 0          // Index to output byte.
 
 	var om byte = 0x80 // Output bit mask;
+
 	for ib := range in {
 		for im := byte(0x80); im != 0; im >>= 1 {
 			var s = scramble_bit(dwutil.IfThenElse(((in[ib]&im) != 0), 1, 0), &tx_lfsr_state)

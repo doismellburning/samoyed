@@ -60,6 +60,7 @@ func direwolfModemOptionsOver(t *testing.T, config string, args ...string) (mode
 	var fs = pflag.NewFlagSet("direwolf", pflag.ContinueOnError)
 	var modem = AddModemFlags(fs, true)
 	var layer2 = addLayer2TxFlags(fs, "IL2PVERSION")
+
 	var parseErr = fs.Parse(args)
 	if parseErr != nil {
 		return modemResult{}, parseErr
@@ -80,6 +81,7 @@ func atestModemOptions(t *testing.T, args ...string) (modemResult, error) {
 	var audio = atestDefaultAudio()
 	var fs = pflag.NewFlagSet("atest", pflag.ContinueOnError)
 	var f = AddModemFlags(fs, true)
+
 	var parseErr = fs.Parse(args)
 	if parseErr != nil {
 		return modemResult{}, parseErr
@@ -100,6 +102,7 @@ func genPacketsModemOptions(t *testing.T, args ...string) (modemResult, error) {
 	var audio = genPacketsDefaultAudio()
 	var fs = pflag.NewFlagSet("gen_packets", pflag.ContinueOnError)
 	var f = AddGenPacketsModemFlags(fs)
+
 	var parseErr = fs.Parse(args)
 	if parseErr != nil {
 		return modemResult{}, parseErr

@@ -468,6 +468,7 @@ func (n *Node) connect(key linkKey, s *session, args []string) bool {
 
 	if isUser || isDownlink {
 		n.mu.Unlock()
+
 		var busy = "Busy - " + name + " is already connected to this node"
 		if down.circuit {
 			busy = "Busy - you already have a circuit to " + name

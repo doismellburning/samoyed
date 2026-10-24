@@ -519,6 +519,7 @@ func pfilterTraceEntries(t *testing.T, f func()) []*logrus.Entry {
 	t.Helper()
 
 	var savedLevel = logrus.GetLevel()
+
 	logrus.SetLevel(logrus.TraceLevel)
 	t.Cleanup(func() { logrus.SetLevel(savedLevel) })
 

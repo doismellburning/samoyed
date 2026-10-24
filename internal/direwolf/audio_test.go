@@ -74,6 +74,7 @@ func Test_Flush_UDP_sendsBytes(t *testing.T) {
 
 	// Receive and verify the packet contents.
 	var buf = make([]byte, UDP_AUDIO_OUT_BUF_MAXLEN)
+
 	require.NoError(t, listener.SetReadDeadline(time.Now().Add(time.Second)))
 
 	var n int
@@ -201,6 +202,7 @@ func Test_udpSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
 
 	go func() {
 		defer close(done)
+
 		d.udpSilenceKeepalive(t.Context(), 0, stop)
 	}()
 
@@ -209,6 +211,7 @@ func Test_udpSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
 	// datagram would show up as a too-large read rather than being silently
 	// truncated by ReadFrom.
 	var buf = make([]byte, UDP_AUDIO_OUT_BUF_MAXLEN*2)
+
 	require.NoError(t, listener.SetReadDeadline(time.Now().Add(time.Second)))
 
 	var n int
@@ -629,6 +632,7 @@ func TestStdinEndOfFileEndsInput(t *testing.T) {
 
 	var output = testutils.CaptureOutput(t, func() {
 		var oldLogOutput = logrus.StandardLogger().Out
+
 		logrus.SetOutput(os.Stdout)
 
 		defer logrus.SetOutput(oldLogOutput)

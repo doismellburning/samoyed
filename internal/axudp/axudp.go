@@ -80,6 +80,7 @@ func ParseConfig(path string) (Routes, error) {
 	}
 
 	var cfg yamlConfig
+
 	var unmarshalErr = yaml.Unmarshal(data, &cfg)
 	if unmarshalErr != nil {
 		return none, fmt.Errorf("parsing YAML config: %w", unmarshalErr)
@@ -139,14 +140,17 @@ func newMapEntry(m MapSettings) (MapEntry, error) {
 	if ax25addr == "" {
 		return none, errors.New("ax25addr is empty")
 	}
+
 	if m.Host == "" {
 		return none, errors.New("host is empty")
 	}
+
 	if m.Port < 1 || m.Port > 65535 {
 		return none, fmt.Errorf("port %d out of range (1-65535)", m.Port)
 	}
 
 	var addr = net.JoinHostPort(m.Host, strconv.Itoa(m.Port))
+
 	var udpAddr, resolveErr = net.ResolveUDPAddr("udp", addr)
 	if resolveErr != nil {
 		return none, fmt.Errorf("resolving %s: %w", addr, resolveErr)
@@ -193,6 +197,7 @@ func ExtractSource(frame []byte) string {
 
 	// A callsign is letters and digits, padded with trailing spaces.
 	var padding = false
+
 	for i, byt := range frame[7:13] {
 		var c = byt >> 1
 		switch {
@@ -200,6 +205,7 @@ func ExtractSource(frame []byte) string {
 			if i == 0 {
 				return ""
 			}
+
 			padding = true
 		case padding:
 			return ""
@@ -301,6 +307,7 @@ func (b *Bridge) RunUDPListener(ctx context.Context) error {
 				"dest":  ExtractDest(ax25frame),
 			}).Trace("Received AXUDP datagram")
 		}
+
 		b.router.Heard(ax25frame, from)
 		b.broadcastKISS(ax25frame)
 	}
@@ -386,11 +393,13 @@ func (b *Bridge) addClient(c net.Conn) {
 func (b *Bridge) removeClient(c net.Conn) {
 	b.mu.Lock()
 	var next []net.Conn
+
 	for _, cl := range b.clients {
 		if cl != c {
 			next = append(next, cl)
 		}
 	}
+
 	b.clients = next
 	b.mu.Unlock()
 }
@@ -444,6 +453,7 @@ func (b *Bridge) broadcastKISS(ax25frame []byte) {
 
 			continue
 		}
+
 		var _, writeErr = c.Write(kissframe)
 		if writeErr != nil {
 			// Close the connection to unblock the read goroutine in
@@ -489,6 +499,7 @@ func (r *Routes) Problems() []string {
 func (r *Routes) Route(dest string) []MapEntry {
 	if r.IsBroadcast(dest) {
 		var entries []MapEntry
+
 		for _, e := range r.Maps {
 			if e.Broadcast {
 				entries = append(entries, e)
@@ -562,12 +573,14 @@ type Router struct {
 func NewRouter(routes Routes) *Router {
 	var r = new(Router)
 	r.routes = routes
+
 	r.mappedHosts = make(map[netip.Addr]struct{}, len(routes.Maps))
 	for _, e := range routes.Maps {
 		if e.UDPAddr != nil {
 			r.mappedHosts[e.UDPAddr.AddrPort().Addr().Unmap()] = struct{}{}
 		}
 	}
+
 	r.now = time.Now
 	r.heard = make(map[string]heardPeer)
 
@@ -601,10 +614,12 @@ func (r *Router) Heard(frame []byte, from *net.UDPAddr) {
 	var now = r.now()
 
 	r.mu.Lock()
+
 	var prev, known = r.heard[src]
 	if !known && len(r.heard) >= maxLearnedRoutes {
 		r.makeRoomLocked(now)
 	}
+
 	r.heard[src] = heardPeer{addr: from, seen: now}
 	r.mu.Unlock()
 
@@ -688,6 +703,7 @@ func StripCRC(pkt []byte) ([]byte, bool) {
 	}
 	var frame = pkt[:len(pkt)-2]
 	var want = fcs.Calc(frame)
+
 	var got = uint16(pkt[len(pkt)-2]) | uint16(pkt[len(pkt)-1])<<8
 	if got != want {
 		return nil, false
@@ -700,6 +716,7 @@ func StripCRC(pkt []byte) ([]byte, bool) {
 // A CRC-CCITT checksum is always appended (per RFC 1226 / AXUDP convention).
 func (b *Bridge) sendAXUDP(ax25frame []byte, entry MapEntry) {
 	var pkt = AddCRC(ax25frame)
+
 	var n, writeErr = b.udpConn.WriteTo(pkt, entry.UDPAddr)
 	if writeErr != nil {
 		logrus.WithField("dest", entry.Addr).WithError(writeErr).Error("Could not send AXUDP datagram")
@@ -778,13 +795,16 @@ func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 		if len(unwrapped) > 0 {
 			typeByte = unwrapped[0]
 		}
+
 		logrus.WithFields(logrus.Fields{
 			"bytes":     len(unwrapped),
 			"type_byte": fmt.Sprintf("0x%02x", typeByte),
 		}).Trace("KISS frame complete")
 	}
+
 	if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == kiss.CmdDataFrame {
 		var ax25frame = unwrapped[1:]
+
 		var dest = ExtractDest(ax25frame)
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithFields(logrus.Fields{
@@ -792,6 +812,7 @@ func recByte(kc *kiss.Collector, b byte, b2 *Bridge) {
 				"bytes": len(ax25frame),
 			}).Trace("Forwarding AX.25 frame via AXUDP")
 		}
+
 		if dest == "" {
 			logrus.Warn("Dropping AX.25 frame too short to extract a destination from")
 		} else if entries := b2.router.Route(dest); len(entries) > 0 {

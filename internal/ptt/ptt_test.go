@@ -590,10 +590,12 @@ func capturePTTLog(t *testing.T) *test.Hook {
 	t.Helper()
 
 	var savedLevel = logrus.GetLevel()
+
 	logrus.SetLevel(logrus.DebugLevel)
 	t.Cleanup(func() { logrus.SetLevel(savedLevel) })
 
 	var savedHooks = logrus.StandardLogger().ReplaceHooks(make(logrus.LevelHooks))
+
 	t.Cleanup(func() { logrus.StandardLogger().ReplaceHooks(savedHooks) })
 
 	return test.NewGlobal()

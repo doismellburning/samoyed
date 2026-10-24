@@ -326,6 +326,7 @@ func TestNetromNodesSplitsIntoFrames(t *testing.T) {
 
 		var nodes, decodeErr = DecodeNodes(frame)
 		require.NoError(t, decodeErr)
+
 		got = append(got, nodes.entries...)
 	}
 

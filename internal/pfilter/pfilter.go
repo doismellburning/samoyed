@@ -296,6 +296,7 @@ func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *ax25.
 
 	var result int
 	var err error
+
 	if pfstate.token_type == TOKEN_EOL {
 		/* Empty filter means reject all. */
 		result = 0
@@ -988,8 +989,8 @@ func filt_r(pf *pfstate_t) (int, string, error) {
 	if len(parts) < 1 {
 		return -1, "", newFilterError(pf, "Missing latitude for Range filter.")
 	}
-	var dlat, dlatErr = strconv.ParseFloat(parts[0], 64)
 
+	var dlat, dlatErr = strconv.ParseFloat(parts[0], 64)
 	if dlatErr != nil {
 		return -1, "", newFilterError(pf, "Invalid latitude for Range filter.")
 	}
@@ -997,8 +998,8 @@ func filt_r(pf *pfstate_t) (int, string, error) {
 	if len(parts) < 2 {
 		return -1, "", newFilterError(pf, "Missing longitude for Range filter.")
 	}
-	var dlon, dlonErr = strconv.ParseFloat(parts[1], 64)
 
+	var dlon, dlonErr = strconv.ParseFloat(parts[1], 64)
 	if dlonErr != nil {
 		return -1, "", newFilterError(pf, "Invalid longitude for Range filter.")
 	}
@@ -1006,8 +1007,8 @@ func filt_r(pf *pfstate_t) (int, string, error) {
 	if len(parts) < 3 {
 		return -1, "", newFilterError(pf, "Missing distance for Range filter.")
 	}
-	var ddist, ddistErr = strconv.ParseFloat(parts[2], 64)
 
+	var ddist, ddistErr = strconv.ParseFloat(parts[2], 64)
 	if ddistErr != nil {
 		return -1, "", newFilterError(pf, "Invalid distance for Range filter.")
 	}
@@ -1335,8 +1336,8 @@ func filt_i(pf *pfstate_t) (int, error) {
 
 	if len(parts) > 0 && len(parts[0]) > 0 {
 		var heardtimeErr error
-		heardtime, heardtimeErr = strconv.Atoi(parts[0])
 
+		heardtime, heardtimeErr = strconv.Atoi(parts[0])
 		if heardtimeErr != nil {
 			return -1, newFilterError(pf, "Invalid time limit for IGate message filter.")
 		}
@@ -1347,8 +1348,8 @@ func filt_i(pf *pfstate_t) (int, error) {
 	if len(parts) > 1 {
 		if len(parts[1]) > 0 {
 			var maxhopsErr error
-			maxhops, maxhopsErr = strconv.Atoi(parts[1])
 
+			maxhops, maxhopsErr = strconv.Atoi(parts[1])
 			if maxhopsErr != nil {
 				return -1, newFilterError(pf, "Invalid max digipeater hops for IGate message filter.")
 			}
@@ -1358,7 +1359,6 @@ func filt_i(pf *pfstate_t) (int, error) {
 
 		if len(parts) > 2 && len(parts[2]) > 0 {
 			var dlatValue, dlatErr = strconv.ParseFloat(parts[2], 64)
-
 			if dlatErr != nil {
 				return -1, newFilterError(pf, "Invalid latitude for IGate message filter.")
 			}
@@ -1367,7 +1367,6 @@ func filt_i(pf *pfstate_t) (int, error) {
 
 			if len(parts) > 3 && len(parts[3]) > 0 {
 				var dlonValue, dlonErr = strconv.ParseFloat(parts[3], 64)
-
 				if dlonErr != nil {
 					return -1, newFilterError(pf, "Invalid longitude for IGate message filter.")
 				}
@@ -1379,7 +1378,6 @@ func filt_i(pf *pfstate_t) (int, error) {
 
 			if len(parts) > 4 && len(parts[4]) > 0 {
 				var kmValue, kmErr = strconv.ParseFloat(parts[4], 64)
-
 				if kmErr != nil {
 					return -1, newFilterError(pf, "Invalid distance, in km, for IGate message filter.")
 				}

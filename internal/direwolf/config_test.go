@@ -303,6 +303,7 @@ func parseConfigWith(t *testing.T, pattern string, content string, symbolTable s
 		// samoyed-direwolf sends logrus to stdout alongside everything else,
 		// so do the same here: what config_init logs belongs in the output too.
 		var oldLogOutput = logrus.StandardLogger().Out
+
 		logrus.SetOutput(os.Stdout)
 
 		defer logrus.SetOutput(oldLogOutput)
@@ -3112,6 +3113,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 					for channel := range MAX_TOTAL_CHANS {
 						a.NotEqual(MEDIUM_NETTNC, c.audio.chan_medium[channel])
 					}
+
 					a.Contains(c.output, "Channel number must be numeric for NCHANNEL command")
 					a.NotContains(c.output, "in range of")
 				},
@@ -3242,6 +3244,7 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 					for channel := range MAX_TOTAL_CHANS {
 						a.NotEqual(MediumSerialTNC, c.audio.chan_medium[channel])
 					}
+
 					a.Contains(c.output, "Channel number must be numeric for SCHANNEL command")
 					a.NotContains(c.output, "in range of")
 				},

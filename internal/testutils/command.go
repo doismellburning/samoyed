@@ -186,6 +186,7 @@ func RunMain(t *testing.T, stdin string, args ...string) Result {
 	var coverEnv, collectCoverage = childCoverDir(t)
 
 	var cmd = exec.CommandContext(ctx, os.Args[0]) //nolint:gosec // Running ourselves.
+
 	cmd.Env = append(os.Environ(), runMainEnv+"="+encodeArgs(t, args))
 	cmd.Env = append(cmd.Env, coverEnv...)
 	cmd.Stdin = strings.NewReader(stdin)
@@ -266,6 +267,7 @@ func start(t *testing.T, env []string, binary string, args ...string) *Process {
 	var coverEnv, collectCoverage = childCoverDir(t)
 
 	var cmd = exec.CommandContext(ctx, binary, args...) //nolint:gosec // The command under test.
+
 	cmd.Env = append(os.Environ(), env...)
 	cmd.Env = append(cmd.Env, coverEnv...)
 

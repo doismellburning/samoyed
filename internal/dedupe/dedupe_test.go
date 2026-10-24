@@ -54,6 +54,7 @@ func Test_dedupe_check_expired_not_duplicate(t *testing.T) {
 	if idx < 0 {
 		idx = HISTORY_MAX - 1
 	}
+
 	ds.history[idx].time_stamp = time.Now().Add(-1 * time.Hour)
 
 	assert.False(t, ds.Check(0, pp), "expired entry should not be considered a duplicate")

@@ -838,6 +838,7 @@ func (tq *TransmitQueue) Remove(channel int, prio int) *ax25.Packet {
 			"prio":    prio,
 		}).Trace("tq_remove: enter critical section")
 	}
+
 	tq.mu.Lock()
 
 	var result_p *ax25.Packet
@@ -970,6 +971,7 @@ func (tq *TransmitQueue) Count(channel int, prio int, source string, dest string
 			"bytes":   bytes,
 		}).Trace("tq_count")
 	}
+
 	if prio == -1 {
 		return (tq.Count(channel, TQ_PRIO_0_HI, source, dest, bytes) + tq.Count(channel, TQ_PRIO_1_LO, source, dest, bytes))
 	}
@@ -1054,7 +1056,6 @@ func (tq *TransmitQueue) isEmptyLocked(channel int) bool {
 // the gauge describing a queue depth that never existed.
 func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest string, bytes bool) int {
 	// Array bounds check.  FIXME: TODO:  should have internal error instead of dying.
-
 	if channel < 0 || channel >= MAX_RADIO_CHANS || prio < 0 || prio >= TQ_NUM_PRIO {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
@@ -1080,6 +1081,7 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 				if logrus.IsLevelEnabled(logrus.TraceLevel) {
 					logrus.WithField("frame_source", frame_source).Trace("tq_count: compare to frame source")
 				}
+
 				if source != frame_source {
 					count_it = 0
 				}
@@ -1090,6 +1092,7 @@ func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest 
 				if logrus.IsLevelEnabled(logrus.TraceLevel) {
 					logrus.WithField("frame_dest", frame_dest).Trace("tq_count: compare to frame destination")
 				}
+
 				if dest != frame_dest {
 					count_it = 0
 				}

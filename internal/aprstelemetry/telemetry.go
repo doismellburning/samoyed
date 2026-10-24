@@ -281,7 +281,6 @@ func (ts *State) DataOriginal(station string, info string, quiet bool) (string, 
 		if n < numAnalog {
 			if len(p) > 0 {
 				// Likewise an analog value that will not parse.
-
 				var f, err = strconv.ParseFloat(p, 64)
 				if err == nil {
 					araw[n] = maybe.Just(f)
@@ -392,7 +391,6 @@ func (ts *State) DataBase91(station string, cdata string) string {
 	for n := 0; n < numAnalog+1 && 2*n < len(cdata); n++ {
 		// An invalid base 91 character leaves this value unknown; taking an
 		// absent value apart would invent telemetry readings.
-
 		var v, ok = base91Pair(cdata[2*n], cdata[2*n+1]).Get()
 		if !ok {
 			continue
@@ -630,6 +628,7 @@ func formatData(pm *stationMetadata, seq maybe.Maybe[int], araw [numAnalog]maybe
 			var fndp = max(z, max(pm.coeffNDP[n][coeffB]+ndp[n], pm.coeffNDP[n][coeffC]))
 
 			fmt.Fprintf(&output, "%.*f", fndp, fval)
+
 			if len(pm.unit[n]) > 0 {
 				output.WriteString(" ")
 				output.WriteString(pm.unit[n])
@@ -650,6 +649,7 @@ func formatData(pm *stationMetadata, seq maybe.Maybe[int], araw [numAnalog]maybe
 			var dval = dwutil.IfThenElse(pm.sense[n], raw, 1-raw)
 
 			output.WriteString(strconv.Itoa(dval))
+
 			if len(pm.unit[numAnalog+n]) > 0 {
 				output.WriteString(" ")
 				output.WriteString(pm.unit[numAnalog+n])

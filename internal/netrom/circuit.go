@@ -504,6 +504,7 @@ func (m *circuitManager) rxConnecting(c *circuit, f *Frame) {
 	}
 
 	var id = c.id
+
 	m.later(func() { m.owner.circuitEstablished(id, false) })
 }
 
@@ -625,6 +626,7 @@ func (m *circuitManager) deliverPiece(c *circuit, data []byte) {
 	}
 
 	var id = c.id
+
 	m.later(func() { m.owner.circuitData(id, data) })
 }
 
@@ -743,6 +745,7 @@ func (m *circuitManager) close(c *circuit, timeout bool) {
 	}
 
 	var id = c.id
+
 	m.later(func() { m.owner.circuitTerminated(id, timeout) })
 }
 

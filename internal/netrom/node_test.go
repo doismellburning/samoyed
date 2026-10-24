@@ -341,11 +341,13 @@ func TestNodeForwards(t *testing.T) {
 	assert.Equal(t, byte(4), sent.ttl, "a hop older")
 
 	f.ttl = 1
+
 	route()
 	assert.Len(t, a.link.frames, 1, "but not once its time is up")
 
 	f.ttl = 5
 	f.destination = "Q9TEST"
+
 	route()
 	assert.Len(t, a.link.frames, 1, "nor where there is no route")
 }

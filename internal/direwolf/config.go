@@ -806,7 +806,6 @@ func (ps *parseState) split(rest_of_line bool) string {
 	 * Get next part, separated by whitespace, keeping spaces within quotes.
 	 * Quotation marks inside need to be doubled.
 	 */
-
 	var rest = strings.TrimSpace(ps.unsplit)
 
 	var token strings.Builder
@@ -822,6 +821,7 @@ outerLoop:
 			if in_quotes {
 				if parsedLen+1 < len(rest) && rest[parsedLen+1] == '"' {
 					token.WriteByte(c)
+
 					parsedLen++
 				} else {
 					in_quotes = false
@@ -1994,6 +1994,7 @@ func (ps *parseState) applyNCHANNEL(settings NetworkTNCSettings) error {
 	if nchan < MAX_RADIO_CHANS || nchan >= MAX_TOTAL_CHANS {
 		return fmt.Errorf("line %d: NCHANNEL number must be in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 	}
+
 	if ps.audio.chan_medium[nchan] != MEDIUM_NONE {
 		return fmt.Errorf("line %d: NCHANNEL can't use channel %d because it is already in use", ps.line, nchan)
 	}
@@ -2005,6 +2006,7 @@ func (ps *parseState) applyNCHANNEL(settings NetworkTNCSettings) error {
 	if settings.Port == nil {
 		return fmt.Errorf("line %d: Missing network TNC TCP port for NCHANNEL command", ps.line)
 	}
+
 	var port = *settings.Port
 	if port < MIN_IP_PORT_NUMBER || port > MAX_IP_PORT_NUMBER {
 		return fmt.Errorf("line %d: Invalid TCP port number \"%d\" for NCHANNEL command. Must be in range %d to %d", ps.line, port, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
@@ -2043,6 +2045,7 @@ func handleSCHANNEL(ps *parseState) error {
 	if channel < MAX_RADIO_CHANS || channel >= MAX_TOTAL_CHANS {
 		return fmt.Errorf("line %d: SCHANNEL number must be in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 	}
+
 	if ps.audio.chan_medium[channel] != MEDIUM_NONE {
 		return fmt.Errorf("line %d: SCHANNEL can't use channel %d because it is already in use", ps.line, channel)
 	}
@@ -2090,6 +2093,7 @@ func (ps *parseState) applyAXUDPPORT(settings AXUDPPortSettings) error {
 	if channel < MAX_RADIO_CHANS || channel >= MAX_TOTAL_CHANS {
 		return fmt.Errorf("line %d: AXUDP port channel must be in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 	}
+
 	if ps.audio.chan_medium[channel] != MEDIUM_NONE {
 		return fmt.Errorf("line %d: AXUDP port can't use channel %d because it is already in use", ps.line, channel)
 	}
@@ -3268,6 +3272,7 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 
 			octrl.Rate = *settings.Rate
 		}
+
 		octrl.Method = PTT_METHOD_HAMLIB
 	case "cm108":
 		/* CM108 - GPIO of USB sound card. case, Linux and Windows only. */
@@ -3277,7 +3282,6 @@ func (ps *parseState) applyOutputControl(ot outputType, settings OutputControlSe
 			// We would need to keep track of what is currently there, change one bit, in our local
 			// copy of the status and then write out the byte for all of the pins.
 			// Let's keep it simple with just PTT for the first stab at this.
-
 			return fmt.Errorf("config file line %d: PTT CM108 option is only valid for PTT, not %s", ps.line, otname)
 		}
 
@@ -3409,6 +3413,7 @@ func handleTXINH(ps *parseState) error {
 		if gpioErr != nil {
 			return fmt.Errorf("config file line %d: GPIO number must be numeric for %s", ps.line, itname)
 		}
+
 		if gpio < 0 {
 			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].GPIONum = -1 * gpio
 			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].Invert = true
@@ -3774,6 +3779,7 @@ func handleFX25AUTO(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: Count must be numeric for FX25AUTO command. Keeping %d", ps.line, ps.audio.fx25_auto_enable)
 	}
+
 	if n >= 0 && n < 20 {
 		ps.audio.fx25_auto_enable = n
 	} else {
@@ -4053,6 +4059,7 @@ func handleDEDUPE(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: Time must be numeric for DEDUPE command. Keeping %d", ps.line, ps.digi.DedupeTime)
 	}
+
 	if n >= 0 && n < 600 {
 		ps.digi.DedupeTime = n
 	} else {
@@ -4381,23 +4388,25 @@ func handleTTCORRAL(ps *parseState) error {
 	 *
 	 * TTCORRAL  latitude  longitude  offset-or-ambiguity
 	 */
-
 	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing latitude for TTCORRAL command", ps.line)
 	}
+
 	ps.tt.corral_lat = ps.parseLL(t, LAT)
 
 	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing longitude for TTCORRAL command", ps.line)
 	}
+
 	ps.tt.corral_lon = ps.parseLL(t, LON)
 
 	t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing offset-or-ambiguity for TTCORRAL command", ps.line)
 	}
+
 	ps.tt.corral_offset = ps.parseLL(t, LAT)
 	if ps.tt.corral_offset == 1 ||
 		ps.tt.corral_offset == 2 ||
@@ -4419,7 +4428,6 @@ func handleTTPOINT(ps *parseState) error {
 	 *
 	 * TTPOINT   pattern  latitude  longitude
 	 */
-
 	var tl = new(ttloc_s)
 	tl.ttlocType = TTLOC_POINT
 
@@ -4429,6 +4437,7 @@ func handleTTPOINT(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTPOINT command", ps.line)
 	}
+
 	tl.pattern = t
 
 	if t[0] != 'B' {
@@ -4447,6 +4456,7 @@ func handleTTPOINT(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing latitude for TTPOINT command", ps.line)
 	}
+
 	tl.point.lat = ps.parseLL(t, LAT)
 
 	// Longitude
@@ -4455,6 +4465,7 @@ func handleTTPOINT(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing longitude for TTPOINT command", ps.line)
 	}
+
 	tl.point.lon = ps.parseLL(t, LON)
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
@@ -4469,7 +4480,6 @@ func handleTTVECTOR(ps *parseState) error {
 	 *
 	 * TTVECTOR   pattern  latitude  longitude  scale  unit
 	 */
-
 	var tl = new(ttloc_s)
 	tl.ttlocType = TTLOC_VECTOR
 	tl.pattern = ""
@@ -4483,14 +4493,17 @@ func handleTTVECTOR(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTVECTOR command", ps.line)
 	}
+
 	tl.pattern = t
 
 	if t[0] != 'B' {
 		ps.errorf("line %d: TTVECTOR pattern must begin with upper case 'B'", ps.line)
 	}
+
 	if !strings.HasPrefix(t[1:], "5bbb") {
 		ps.errorf("line %d: TTVECTOR pattern would normally contain \"5bbb\"", ps.line)
 	}
+
 	for j := 1; j < len(t); j++ {
 		if !unicode.IsDigit(rune(t[j])) && t[j] != 'b' && t[j] != 'd' {
 			ps.errorf("line %d: TTVECTOR pattern must contain only B, digits, b, and d", ps.line)
@@ -4503,6 +4516,7 @@ func handleTTVECTOR(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing latitude for TTVECTOR command", ps.line)
 	}
+
 	tl.vector.lat = ps.parseLL(t, LAT)
 
 	// Longitude
@@ -4511,6 +4525,7 @@ func handleTTVECTOR(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing longitude for TTVECTOR command", ps.line)
 	}
+
 	tl.vector.lon = ps.parseLL(t, LON)
 
 	// Longitude
@@ -4519,6 +4534,7 @@ func handleTTVECTOR(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing scale for TTVECTOR command", ps.line)
 	}
+
 	var scale, scaleErr = strconv.ParseFloat(t, 64)
 	if scaleErr != nil {
 		return fmt.Errorf("line %d: Invalid scale \"%s\" for TTVECTOR command", ps.line, t)
@@ -4537,10 +4553,13 @@ func handleTTVECTOR(ps *parseState) error {
 			meters = units[j].meters
 		}
 	}
+
 	if meters == 0 {
 		ps.errorf("line %d: Unrecognized unit for TTVECTOR command.  Using miles", ps.line)
+
 		meters = 1609.344
 	}
+
 	tl.vector.scale = scale * meters
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
@@ -4555,7 +4574,6 @@ func handleTTGRID(ps *parseState) error {
 	 *
 	 * TTGRID   pattern  min-latitude  min-longitude  max-latitude  max-longitude
 	 */
-
 	var tl = new(ttloc_s)
 	tl.ttlocType = TTLOC_GRID
 
@@ -4565,11 +4583,13 @@ func handleTTGRID(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTGRID command", ps.line)
 	}
+
 	tl.pattern = t
 
 	if t[0] != 'B' {
 		ps.errorf("line %d: TTGRID pattern must begin with upper case 'B'", ps.line)
 	}
+
 	for j := 1; j < len(t); j++ {
 		if !unicode.IsDigit(rune(t[j])) && t[j] != 'x' && t[j] != 'y' {
 			ps.errorf("line %d: TTGRID pattern must be B, optional digit, xxx, yyy", ps.line)
@@ -4582,6 +4602,7 @@ func handleTTGRID(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing minimum latitude for TTGRID command", ps.line)
 	}
+
 	tl.grid.lat0 = ps.parseLL(t, LAT)
 
 	// Minimum Longitude - all zeros in received data
@@ -4590,6 +4611,7 @@ func handleTTGRID(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing minimum longitude for TTGRID command", ps.line)
 	}
+
 	tl.grid.lon0 = ps.parseLL(t, LON)
 
 	// Maximum Latitude - all nines in received data
@@ -4598,6 +4620,7 @@ func handleTTGRID(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing maximum latitude for TTGRID command", ps.line)
 	}
+
 	tl.grid.lat9 = ps.parseLL(t, LAT)
 
 	// Maximum Longitude - all nines in received data
@@ -4606,6 +4629,7 @@ func handleTTGRID(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing maximum longitude for TTGRID command", ps.line)
 	}
+
 	tl.grid.lon9 = ps.parseLL(t, LON)
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
@@ -4620,7 +4644,6 @@ func handleTTUTM(ps *parseState) error {
 	 *
 	 * TTUTM   pattern  zone [ scale [ x-offset y-offset ] ]
 	 */
-
 	var tl = new(ttloc_s)
 	tl.ttlocType = TTLOC_UTM
 	tl.utm.scale = 1
@@ -4631,11 +4654,13 @@ func handleTTUTM(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTUTM command", ps.line)
 	}
+
 	tl.pattern = t
 
 	if t[0] != 'B' {
 		return fmt.Errorf("line %d: TTUTM pattern must begin with upper case 'B'", ps.line)
 	}
+
 	for j := 1; j < len(t); j++ {
 		if !unicode.IsDigit(rune(t[j])) && t[j] != 'x' && t[j] != 'y' {
 			ps.errorf("line %d: TTUTM pattern must be B, optional digit, xxx, yyy", ps.line)
@@ -4696,8 +4721,8 @@ func handleTTUTM(ps *parseState) error {
 		Easting:    tl.utm.x_offset + 5*tl.utm.scale,
 		Northing:   tl.utm.y_offset + 5*tl.utm.scale,
 	}
-	var _, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 
+	var _, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 	if geoErr != nil {
 		return fmt.Errorf("line %d: Invalid UTM location: \n%w", ps.line, geoErr)
 	}
@@ -4715,7 +4740,6 @@ func handleTTUSNGMGRS(ps *parseState) error {
 	 * TTUSNG   pattern  zone_square
 	 * TTMGRS   pattern  zone_square
 	 */
-
 	var tl = new(ttloc_s)
 
 	// TODO1.2: in progress...
@@ -4731,6 +4755,7 @@ func handleTTUSNGMGRS(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTUSNG/TTMGRS command", ps.line)
 	}
+
 	tl.pattern = t
 
 	if t[0] != 'B' {
@@ -4738,18 +4763,22 @@ func handleTTUSNGMGRS(ps *parseState) error {
 	}
 	var num_x = 0
 	var num_y = 0
+
 	for j := 1; j < len(t); j++ {
 		if !unicode.IsDigit(rune(t[j])) && t[j] != 'x' && t[j] != 'y' {
 			ps.errorf("line %d: TTUSNG/TTMGRS pattern must be B, optional digit, xxx, yyy", ps.line)
 			// Bail out somehow.  continue would match inner for.
 		}
+
 		if t[j] == 'x' {
 			num_x++
 		}
+
 		if t[j] == 'y' {
 			num_y++
 		}
 	}
+
 	if num_x < 1 || num_x > 5 || num_x != num_y {
 		return fmt.Errorf("line %d: TTUSNG/TTMGRS must have 1 to 5 x and same number y", ps.line)
 	}
@@ -4760,6 +4789,7 @@ func handleTTUSNGMGRS(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing zone & square for TTUSNG/TTMGRS command", ps.line)
 	}
+
 	tl.mgrs.zone = t
 
 	// Try converting it rather do our own error checking.
@@ -4795,7 +4825,6 @@ func handleTTMHEAD(ps *parseState) error {
 	 */
 
 	// TODO1.3:  TTMHEAD needs testing.
-
 	var tl = new(ttloc_s)
 	tl.ttlocType = TTLOC_MHEAD
 
@@ -4805,6 +4834,7 @@ func handleTTMHEAD(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTMHEAD command", ps.line)
 	}
+
 	tl.pattern = t
 
 	if t[0] != 'B' {
@@ -4822,6 +4852,7 @@ func handleTTMHEAD(ps *parseState) error {
 
 	var count_x = 0
 	var count_other = 0
+
 	for k := j; k < len(t); k++ {
 		if t[k] == 'x' {
 			count_x++
@@ -4874,7 +4905,6 @@ func handleTTSATSQ(ps *parseState) error {
 	 */
 
 	// TODO1.2:  TTSATSQ To be continued...
-
 	var tl = new(ttloc_s)
 	tl.ttlocType = TTLOC_SATSQ
 
@@ -4884,6 +4914,7 @@ func handleTTSATSQ(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTSATSQ command", ps.line)
 	}
+
 	tl.pattern = t
 
 	if t[0] != 'B' {
@@ -4921,7 +4952,6 @@ func handleTTAMBIG(ps *parseState) error {
 	 */
 
 	// TODO1.3:  TTAMBIG To be continued...
-
 	var tl = new(ttloc_s)
 	tl.ttlocType = TTLOC_AMBIG
 
@@ -4931,6 +4961,7 @@ func handleTTAMBIG(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTAMBIG command", ps.line)
 	}
+
 	tl.pattern = t
 
 	if t[0] != 'B' {
@@ -4980,7 +5011,6 @@ func handleTTMACRO(ps *parseState) error {
 	 *		These provide automatic conversion from plain text to the TT encoding.
 	 *
 	 */
-
 	var tl = new(ttloc_s)
 	tl.ttlocType = TTLOC_MACRO
 
@@ -4992,6 +5022,7 @@ func handleTTMACRO(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing pattern for TTMACRO command", ps.line)
 	}
+
 	tl.pattern = t
 
 	var p_count [3]int
@@ -5000,6 +5031,7 @@ func handleTTMACRO(ps *parseState) error {
 	for j := range len(t) {
 		if !strings.ContainsRune("0123456789ABCDxyz", rune(t[j])) {
 			ps.errorf("line %d: TTMACRO pattern can contain only digits, A, B, C, D, and lower case x, y, or z", ps.line)
+
 			tt_error++
 
 			break
@@ -5019,6 +5051,7 @@ func handleTTMACRO(ps *parseState) error {
 	t = ps.split(true)
 	if t == "" {
 		ps.errorf("line %d: Missing definition for TTMACRO command", ps.line)
+
 		tl.macro.definition = "" // Don't die on null pointer later.
 
 		return nil
@@ -5036,11 +5069,13 @@ func handleTTMACRO(ps *parseState) error {
 		if strings.HasPrefix(tmp, "AC{") {
 			// Convert to fixed length 10 digit callsign.
 			tmp = tmp[3:]
+
 			var stemp strings.Builder
 			for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
 				stemp.WriteString(string(tmp[0]))
 				tmp = tmp[1:]
 			}
+
 			if len(tmp) > 0 && tmp[0] == '}' {
 				var ttemp, errs = touchtone.TextToCall10(stemp.String(), false)
 				if errs == 0 {
@@ -5049,28 +5084,33 @@ func handleTTMACRO(ps *parseState) error {
 					otemp.WriteString("AC" + ttemp)
 				} else {
 					ps.errorf("line %d: AC{%s} could not be converted to tones for callsign", ps.line, stemp.String())
+
 					tt_error++
 				}
+
 				tmp = tmp[1:]
 			} else {
 				ps.errorf("line %d: AC{... is missing matching } in TTMACRO definition", ps.line)
+
 				tt_error++
 			}
 		} else if strings.HasPrefix(tmp, "AA{") {
 			// Convert to object name.
-
 			tmp = tmp[3:]
+
 			var sb strings.Builder
 			for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
 				sb.WriteByte(tmp[0])
 				tmp = tmp[1:]
 			}
+
 			var stemp = sb.String()
 			if len(tmp) > 0 && tmp[0] == '}' {
 				if len(stemp) > 9 {
 					ps.errorf("line %d: Object name %s has been truncated to 9 characters", ps.line, stemp)
 					stemp = stemp[:9]
 				}
+
 				var ttemp, errs = touchtone.TextToTwoKey(stemp, false)
 				if errs == 0 {
 					//text_color_set(DW_COLOR_DEBUG);
@@ -5078,29 +5118,33 @@ func handleTTMACRO(ps *parseState) error {
 					otemp.WriteString("AA" + ttemp)
 				} else {
 					ps.errorf("line %d: AA{%s} could not be converted to tones for object name", ps.line, stemp)
+
 					tt_error++
 				}
+
 				tmp = tmp[1:]
 			} else {
 				ps.errorf("line %d: AA{... is missing matching } in TTMACRO definition", ps.line)
+
 				tt_error++
 			}
 		} else if strings.HasPrefix(tmp, "AB{") {
 			// Attempt conversion from description to symbol code.
-
 			tmp = tmp[3:]
+
 			var stemp strings.Builder
 			for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
 				stemp.WriteString(string(tmp[0]))
 				tmp = tmp[1:]
 			}
+
 			if len(tmp) > 0 && tmp[0] == '}' {
 				// First try to find something matching the description.
-
 				var symtab, symbol, ok = ps.symbols.CodeFromDescription(' ', stemp.String())
 
 				if !ok {
 					ps.errorf("line %d: Couldn't convert \"%s\" to APRS symbol code.  Using default", ps.line, stemp.String())
+
 					symtab = '\\' // Alternate
 					symbol = 'A'  // Box
 				}
@@ -5113,20 +5157,23 @@ func handleTTMACRO(ps *parseState) error {
 				//dw_printf ("DEBUG config file Line %d: AB{%s} -> %s\n", line, stemp, ttemp);
 
 				otemp.WriteString(ttemp)
+
 				tmp = tmp[1:]
 			} else {
 				ps.errorf("line %d: AB{... is missing matching } in TTMACRO definition", ps.line)
+
 				tt_error++
 			}
 		} else if strings.HasPrefix(tmp, "CA{") {
 			// Convert to enhanced comment that can contain any ASCII character.
-
 			tmp = tmp[3:]
+
 			var stemp strings.Builder
 			for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
 				stemp.WriteString(string(tmp[0]))
 				tmp = tmp[1:]
 			}
+
 			if len(tmp) > 0 && tmp[0] == '}' {
 				var ttemp, errs = touchtone.TextToASCII2D(stemp.String(), false)
 				if errs == 0 {
@@ -5135,11 +5182,14 @@ func handleTTMACRO(ps *parseState) error {
 					otemp.WriteString("CA" + ttemp)
 				} else {
 					ps.errorf("line %d: CA{%s} could not be converted to tones for enhanced comment", ps.line, stemp.String())
+
 					tt_error++
 				}
+
 				tmp = tmp[1:]
 			} else {
 				ps.errorf("line %d: CA{... is missing matching } in TTMACRO definition", ps.line)
+
 				tt_error++
 			}
 		} else if strings.ContainsRune("0123456789ABCD*#xyz", rune(tmp[0])) {
@@ -5147,6 +5197,7 @@ func handleTTMACRO(ps *parseState) error {
 			tmp = tmp[1:]
 		} else {
 			ps.errorf("line %d: TTMACRO definition can contain only 0-9, A, B, C, D, *, #, x, y, z", ps.line)
+
 			tt_error++
 			tmp = tmp[1:]
 		}
@@ -5169,6 +5220,7 @@ func handleTTMACRO(ps *parseState) error {
 		if p_count[j] > 0 && d_count[j] == 0 {
 			ps.errorf("line %d: '%c' is in TTMACRO pattern but is not used in definition", ps.line, 'x'+j)
 		}
+
 		if d_count[j] > 0 && p_count[j] == 0 {
 			ps.errorf("line %d: '%c' is referenced in TTMACRO definition but does not appear in the pattern", ps.line, 'x'+j)
 		}
@@ -5202,7 +5254,6 @@ func handleTTOBJ(ps *parseState) error {
 	 *
 	 *	whereto is any combination of transmit channel, APP, IG.
 	 */
-
 	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing DTMF receive channel for TTOBJ command", ps.line)
@@ -5245,6 +5296,7 @@ func handleTTOBJ(ps *parseState) error {
 				x = chanNum
 				if x < 0 || x > MAX_TOTAL_CHANS-1 {
 					ps.errorf("config file: Transmit channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
+
 					x = -1
 					whereToValid = false
 				} else if !ps.audio.chan_medium[x].CarriesAX25() {
@@ -5255,6 +5307,7 @@ func handleTTOBJ(ps *parseState) error {
 			} else {
 				/* Check for legacy compact form like "APPIG" or "AIG" accepted by the old parser. */
 				var isLegacy = true
+
 				for _, c := range part {
 					if !ascii.IsDigit(c) && !strings.ContainsRune("aApPiIgG", c) {
 						isLegacy = false
@@ -5262,6 +5315,7 @@ func handleTTOBJ(ps *parseState) error {
 						break
 					}
 				}
+
 				if isLegacy {
 					for _, c := range part {
 						switch {
@@ -5273,6 +5327,7 @@ func handleTTOBJ(ps *parseState) error {
 							x = int(c - '0')
 							if x < 0 || x > MAX_TOTAL_CHANS-1 {
 								ps.errorf("config file: Transmit channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
+
 								x = -1
 								whereToValid = false
 							} else if !ps.audio.chan_medium[x].CarriesAX25() {
@@ -5284,6 +5339,7 @@ func handleTTOBJ(ps *parseState) error {
 					}
 				} else {
 					ps.errorf("config file, line %d: Expected comma separated list with some combination of transmit channel, APP, and IG", ps.line)
+
 					whereToValid = false
 				}
 			}
@@ -5328,13 +5384,13 @@ func handleTTERR(ps *parseState) error {
 	 *
 	 * TTERR  msg_id  method  text...
 	 */
-
 	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing message identifier for TTERR command", ps.line)
 	}
 
 	var msg_num = -1
+
 	for n := range TT_ERROR_MAXP1 {
 		if strings.EqualFold(t, ttErrorString(n)) {
 			msg_num = n
@@ -5342,6 +5398,7 @@ func handleTTERR(ps *parseState) error {
 			break
 		}
 	}
+
 	if msg_num < 0 {
 		ps.errorf("line %d: Invalid message identifier for TTERR command", ps.line)
 		// pick one of ...
@@ -5392,7 +5449,6 @@ func handleTTSTATUS(ps *parseState) error {
 	 *
 	 * TTSTATUS  status_id  text...
 	 */
-
 	var t = ps.split(false)
 	if t == "" {
 		return fmt.Errorf("line %d: Missing status number for TTSTATUS command", ps.line)
@@ -5642,6 +5698,7 @@ func handleIGTXLIMIT(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: Five minute limit must be numeric for IGTXLIMIT command. Keeping %d", ps.line, ps.igate.tx_limit_5)
 	}
+
 	if n < 1 {
 		ps.igate.tx_limit_5 = 1
 	} else if n <= IGATE_TX_LIMIT_5_MAX {
@@ -5668,6 +5725,7 @@ func handleIGMSP(ps *parseState) error {
 		if nErr != nil {
 			return fmt.Errorf("line %d: Number of times must be numeric for IGMSP command. Keeping %d", ps.line, ps.igate.igmsp)
 		}
+
 		if n >= 0 && n <= 10 {
 			ps.igate.igmsp = n
 		} else {
@@ -5725,6 +5783,7 @@ func handleAGWPORT(ps *parseState) error {
 	if t == "" {
 		return fmt.Errorf("line %d: Missing port number for AGWPORT command", ps.line)
 	}
+
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
 		return fmt.Errorf("line %d: Invalid port number \"%s\" for AGWPORT command", ps.line, t)
@@ -6106,7 +6165,6 @@ func handleGPSD(ps *parseState) error {
 	 *
 	 * GPSD [ host [ port ] ]
 	 */
-
 	ps.misc.gpsd_host = "localhost"
 	ps.misc.gpsd_port = DEFAULT_GPSD_PORT
 
@@ -6120,6 +6178,7 @@ func handleGPSD(ps *parseState) error {
 			if nErr != nil {
 				return fmt.Errorf("line %d: Port number must be numeric for GPSD. Using default of %d", ps.line, ps.misc.gpsd_port)
 			}
+
 			if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 				ps.misc.gpsd_port = n
 			} else {
@@ -6249,7 +6308,6 @@ func handleBEACON(ps *parseState) error {
 	 *
 	 * Original handcrafted style.  Removed in version 1.0.
 	 */
-
 	return fmt.Errorf("config file, line %d: Old style 'BEACON' has been replaced with new commands.\nUse PBEACON, OBEACON, TBEACON, or CBEACON instead", ps.line)
 }
 
@@ -6496,6 +6554,7 @@ func handleMAXV22(ps *parseState) error {
 	if nErr != nil {
 		return fmt.Errorf("line %d: MAXV22 number must be numeric. Ignoring this line", ps.line)
 	}
+
 	if n >= 0 && n <= AX25_N2_RETRY_MAX {
 		ps.misc.maxv22 = n
 	} else {
@@ -6720,11 +6779,13 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) er
 
 					continue
 				}
+
 				if n < 0 || n >= MAX_TOTAL_CHANS {
 					ps.errorf("config file, line %d: Simulated receive on channel %d is not valid", ps.line, n)
 
 					continue
 				}
+
 				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
 					ps.errorf("config file, line %d: Simulated receive on channel %d is not valid", ps.line, n)
 
@@ -6740,11 +6801,13 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) er
 
 					continue
 				}
+
 				if n < 0 || n >= MAX_TOTAL_CHANS {
 					ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, n)
 
 					continue
 				}
+
 				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
 					ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, n)
 
@@ -6760,11 +6823,13 @@ func beacon_options(b *beacon_s, ps *parseState, p_audio_config *RadioConfig) er
 
 					continue
 				}
+
 				if n < 0 || n >= MAX_TOTAL_CHANS {
 					ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, n)
 
 					continue
 				}
+
 				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
 					ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, n)
 

@@ -266,6 +266,7 @@ func get_field_string(base []byte, start uint, length uint) string {
 		panic(fmt.Sprintf("AIS six-bit ASCII string is %d bits, not a multiple of 6", length))
 	}
 	var sb strings.Builder
+
 	var nc = length / 6 // Number of characters.
 	for i := range nc {
 		sb.WriteByte(get_field_ascii(base, start+i*6, 6))

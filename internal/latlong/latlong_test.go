@@ -511,6 +511,7 @@ func TestNMEARoundTrip(t *testing.T) {
 			// Convert back
 			lat, latErr := LatitudeFromNMEA(latStr, latHem[0])
 			require.NoError(t, latErr)
+
 			lon, lonErr := LongitudeFromNMEA(lonStr, lonHem[0])
 			require.NoError(t, lonErr)
 

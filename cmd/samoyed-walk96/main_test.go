@@ -43,6 +43,7 @@ func fakeTNC(t *testing.T) *os.File {
 	t.Cleanup(func() {
 		tnc.Close()
 		tnc = oldTNC
+
 		master.Close()
 	})
 
