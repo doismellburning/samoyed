@@ -312,3 +312,50 @@ func TestTqLengths(t *testing.T) {
 
 	assert.Equal(t, want, tq.Lengths())
 }
+
+// A packet for a channel that isn't a radio is handed on rather than queued,
+// and that is as transmitted as it gets here, so whoever is waiting to hear
+// is told.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func TestAppendForTheIGateChannelSaysItHasGone(t *testing.T) {
+	var audio = new(RadioConfig)
+	audio.chan_medium[MAX_RADIO_CHANS] = MEDIUM_IGATE
+
+	var tq = newTestTransmitQueue(audio)
+
+	tq.SetIGate(func(_ int, _ *ax25.Packet) {})
+
+	var pp = ax25.FromText("Q1TEST>APRS:hello", true)
+	require.NotNil(t, pp)
+
+	var gone = false
+
+	pp.SetOnTransmitted(func() { gone = true })
+
+	testutils.CaptureOutput(t, func() { tq.Append(MAX_RADIO_CHANS, TQ_PRIO_1_LO, pp) })
+
+	assert.True(t, gone)
+}
+
+// With no IGate to hand it to, a packet for the IGate's channel goes nowhere,
+// so it isn't said to have gone.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func TestAppendForTheIGateChannelWithoutAnIGateHasNotGone(t *testing.T) {
+	var audio = new(RadioConfig)
+	audio.chan_medium[MAX_RADIO_CHANS] = MEDIUM_IGATE
+
+	var tq = newTestTransmitQueue(audio)
+
+	var pp = ax25.FromText("Q1TEST>APRS:hello", true)
+	require.NotNil(t, pp)
+
+	var gone = false
+
+	pp.SetOnTransmitted(func() { gone = true })
+
+	testutils.CaptureOutput(t, func() { tq.Append(MAX_RADIO_CHANS, TQ_PRIO_1_LO, pp) })
+
+	assert.False(t, gone)
+}

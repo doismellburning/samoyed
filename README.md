@@ -71,6 +71,7 @@ As well as that, Samoyed also adds:
 - **AGW login** — require a user name and password on the AGW port (`AGWLOGIN`)
 - **NET/ROM node** — `NODES` broadcasts, learned routes and multi-hop circuits, optionally behind a node shell that users connect to by callsign or alias (see [Run a NET/ROM node](https://doismellburning.github.io/samoyed/how-to-guides/#run-a-net-rom-node))
 - **AXUDP** — `samoyed-axudp` bridges a KISS port to remote nodes speaking AX.25 over UDP ([RFC 1226](https://www.rfc-editor.org/rfc/rfc1226))
+- **KISS ACKMODE** — a KISS client can ask for each frame to be acknowledged once it has actually been transmitted, as Winlink Express's `ACKMODE` TNC model does
 - ...and more underway!
 
 ## Installation

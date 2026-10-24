@@ -5,10 +5,13 @@ package direwolf
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"net"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
@@ -100,11 +103,19 @@ func kissTestRadioConfig() *RadioConfig {
 func setupKissProcessMsg(t *testing.T) *KissHandler {
 	t.Helper()
 
+	return setupKissHandler(t.Context(), t)
+}
+
+// setupKissHandler is setupKissProcessMsg for a test with a context of its
+// own, which stops the handler's goroutines.
+func setupKissHandler(ctx context.Context, t *testing.T) *KissHandler {
+	t.Helper()
+
 	var audioConfig = kissTestRadioConfig()
 
 	var tq = newTestTransmitQueue(audioConfig)
 
-	return NewKissHandler(audioConfig, new(XmitService), tq, nil)
+	return NewKissHandler(ctx, audioConfig, new(XmitService), tq, nil)
 }
 
 // With KISSCOPY, a data frame a client sends is shown to the TCP clients the
@@ -389,8 +400,8 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 	assert.Contains(t, output, "end KISS mode ignored")
 }
 
-// A command we don't implement gets the troubleshooting tip, and the two
-// XKISS ones additionally say what the application should be configured as
+// A command we don't implement gets the troubleshooting tip, and XKISS
+// polling additionally says what the application should be configured as
 // instead.
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
@@ -409,17 +420,163 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	assert.NotContains(t, output, "XKISS")
 
 	output = captureKissLog(t, func() {
-		h.processMsg([]byte{kiss.CmdXKissData}, from)
-	})
-
-	assert.Contains(t, output, "XKISS protocol, which is not supported")
-	assert.Contains(t, output, "Winlink Express")
-
-	output = captureKissLog(t, func() {
 		h.processMsg([]byte{kiss.CmdXKissPoll}, from)
 	})
 
 	assert.Contains(t, output, "XKISS protocol, which is not supported")
+	assert.Contains(t, output, "with or without ACKMODE")
+}
+
+// replyingClient is a kissClient that hands each reply over replies, from
+// whichever goroutine sends it.
+type replyingClient struct {
+	replies chan sentToClient
+}
+
+func (c replyingClient) reply(channel int, cmd int, frame []byte) {
+	c.replies <- sentToClient{channel: channel, cmd: cmd, body: frame, prompt: false}
+}
+
+func (c replyingClient) prompt(_ []byte) {}
+
+func (c replyingClient) radioChannel(frameChannel int) int {
+	return frameChannel
+}
+
+// ackmodeFrame is an ACKMODE data frame for channel, with frame ID id, carrying
+// pp.
+func ackmodeFrame(channel int, id []byte, pp *ax25.Packet) []byte {
+	var msg = []byte{byte((channel<<4)&0xf0) | kiss.CmdXKissData}
+	msg = append(msg, id...)
+
+	return append(msg, pp.FrameData()...)
+}
+
+// An ACKMODE data frame is queued like any other, and its ID goes back to the
+// client that sent it - once the frame has been transmitted, not when it is
+// queued.
+func Test_kiss_process_msg_ackmode(t *testing.T) {
+	t.Parallel()
+
+	var h = setupKissProcessMsg(t)
+
+	var from = replyingClient{replies: make(chan sentToClient, 1)}
+
+	var pp = newTestPacket(t)
+
+	h.processMsg(ackmodeFrame(1, []byte{0x12, 0x34}, pp), from)
+
+	assert.Empty(t, from.replies, "nothing has been transmitted yet")
+
+	var tq, ok = h.queue.(*TransmitQueue)
+	require.True(t, ok)
+
+	var queued = tq.Remove(1, TQ_PRIO_1_LO)
+	require.NotNil(t, queued)
+	assert.Equal(t, pp.FrameData(), queued.FrameData(), "the ID should not be part of the frame")
+
+	queued.Transmitted()
+
+	select {
+	case reply := <-from.replies:
+		assert.Equal(t, sentToClient{channel: 1, cmd: kiss.CmdXKissData, body: []byte{0x12, 0x34}, prompt: false}, reply)
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "no acknowledgement")
+	}
+}
+
+// The transmit thread is what says a frame has gone, so a client that has
+// stopped reading mustn't hold it up: nothing else would go out meanwhile.
+func Test_kiss_process_msg_ackmode_does_not_wait_for_the_client(t *testing.T) {
+	t.Parallel()
+
+	var h = setupKissProcessMsg(t)
+
+	var from = replyingClient{replies: make(chan sentToClient)} // Nobody reads it until the end.
+
+	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, newTestPacket(t)), from)
+
+	var tq, ok = h.queue.(*TransmitQueue)
+	require.True(t, ok)
+
+	var queued = tq.Remove(0, TQ_PRIO_1_LO)
+	require.NotNil(t, queued)
+
+	var done = make(chan struct{})
+
+	go func() {
+		queued.Transmitted()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "Transmitted waited for a client that isn't reading")
+	}
+
+	<-from.replies // Let the acknowledgement go.
+}
+
+// An ordinary data frame asks for no acknowledgement, so it gets none.
+func Test_kiss_process_msg_data_frame_not_acknowledged(t *testing.T) {
+	t.Parallel()
+
+	var h = setupKissProcessMsg(t)
+
+	var sent, from = recordingKissClient()
+
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, newTestPacket(t).FrameData()...), from)
+
+	var tq, ok = h.queue.(*TransmitQueue)
+	require.True(t, ok)
+
+	var queued = tq.Remove(0, TQ_PRIO_1_LO)
+	require.NotNil(t, queued)
+
+	queued.Transmitted()
+
+	assert.Empty(t, *sent)
+}
+
+// An ACKMODE frame too short to hold its ID has nothing to send and nothing
+// to acknowledge.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func Test_kiss_process_msg_ackmode_without_id(t *testing.T) {
+	var h = setupKissProcessMsg(t)
+
+	var sent, from = recordingKissClient()
+
+	var output = captureKissLog(t, func() {
+		h.processMsg([]byte{kiss.CmdXKissData, 0x12}, from)
+	})
+
+	assert.Contains(t, output, "KISS ACKMODE data frame is missing its frame ID.")
+	assert.Equal(t, 0, h.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+	assert.Empty(t, *sent)
+}
+
+// With KISSCOPY, an ACKMODE frame is shown to the other TCP clients as an
+// ordinary data frame: they didn't ask for an acknowledgement, and the ID is
+// not part of the AX.25 frame.
+func Test_kiss_process_msg_ackmode_copies_as_data_frame(t *testing.T) {
+	t.Parallel()
+
+	var h = setupKissProcessMsg(t)
+
+	var peers, clients = newAttachedKissNet(t, -1, true, 1)
+
+	h.peers = peers
+
+	var pp = newTestPacket(t)
+	var _, from = recordingKissClient()
+
+	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, pp), from)
+
+	assert.Equal(t,
+		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
+		readKissNetFrame(t, clients[0]))
 }
 
 // "Set hardware" is the one command with an answer: the human readable
@@ -813,4 +970,98 @@ func Test_kissClientFrame_truncates(t *testing.T) {
 
 	// FEND, the type indicator, the frame, FEND - and 'x' needs no escaping.
 	assert.Len(t, got, ax25.MaxPacketLen+3)
+}
+
+// An ACKMODE frame for a channel that can't transmit is shown as the client
+// sent it, ID and all, not as the data frame it carries.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func Test_kiss_process_msg_ackmode_invalid_channel_shows_what_was_sent(t *testing.T) {
+	var h = setupKissProcessMsg(t)
+
+	var _, from = recordingKissClient()
+
+	var msg = ackmodeFrame(8, []byte{0x12, 0x34}, newTestPacket(t))
+
+	var output = captureKissLog(t, func() {
+		h.processMsg(msg, from)
+	})
+
+	assert.Contains(t, output, "Invalid transmit channel from KISS client application")
+	assert.Contains(t, output, "function=ACKMODE")
+	assert.Contains(t, output, fmt.Sprintf("length=%d", len(msg)))
+}
+
+// One client's acknowledgements arrive in the order its frames went, however
+// many are ready at once.
+func Test_kiss_acks_in_order(t *testing.T) {
+	t.Parallel()
+
+	var acks = newKissAcks(t.Context())
+
+	var from = replyingClient{replies: make(chan sentToClient, 3)}
+
+	for id := range byte(3) {
+		acks.send(from, 0, []byte{0, id})
+	}
+
+	for id := range byte(3) {
+		select {
+		case reply := <-from.replies:
+			assert.Equal(t, []byte{0, id}, reply.body)
+		case <-time.After(5 * time.Second):
+			require.Fail(t, "no acknowledgement", "id %d", id)
+		}
+	}
+}
+
+// A client that has stopped reading gets only so many acknowledgements
+// waiting for it; the rest are dropped rather than piling up.  That is said
+// once, however many go, and how many went is said once it catches up.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func Test_kiss_acks_dropped_for_a_client_not_reading(t *testing.T) {
+	const tooMany = 3
+
+	var acks = newKissAcks(t.Context())
+
+	var from = replyingClient{replies: make(chan sentToClient)} // Nobody reads it, for now.
+
+	var queued = func() int {
+		acks.mu.Lock()
+		defer acks.mu.Unlock()
+
+		var queue, running = acks.pending[from]
+		if !running {
+			return -1
+		}
+
+		return len(queue.acks)
+	}
+
+	var output = captureKissLog(t, func() {
+		// The first is taken by the goroutine, which then waits on the
+		// client; the queue behind it fills, and then there are too many.
+		acks.send(from, 0, []byte{0, 0})
+
+		require.Eventually(t, func() bool { return queued() == 0 },
+			5*time.Second, time.Millisecond, "the first should have been taken to send")
+
+		for range maxPendingKissAcks + tooMany {
+			acks.send(from, 0, []byte{0, 1})
+		}
+
+		assert.Equal(t, maxPendingKissAcks, queued())
+
+		for range maxPendingKissAcks + 1 { // The client catches up.
+			<-from.replies
+		}
+
+		require.Eventually(t, func() bool { return queued() == -1 },
+			5*time.Second, time.Millisecond, "the goroutine should finish once there is nothing left")
+	})
+
+	assert.Equal(t, 1, strings.Count(output, "isn't reading its ACKMODE acknowledgements"))
+	assert.Contains(t, output, "has caught up with its ACKMODE acknowledgements")
+	assert.Contains(t, output, fmt.Sprintf("dropped=%d", tooMany))
 }

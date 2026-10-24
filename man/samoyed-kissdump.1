@@ -19,6 +19,9 @@ For each frame it undoes the KISS framing, shows the command byte and port
 number, decodes the AX.25 header (addresses, digipeater path with the H bits,
 control and PID), and hands the information field to the APRS decoder where the
 frame is APRS.
+An ACKMODE frame (command 0x0C) is shown with its two-byte frame ID, followed by
+the AX.25 frame when a client sent it, or alone when it is the TNC's
+acknowledgement that the frame has been transmitted.
 
 Malformed input is reported rather than skipped, since that is usually what is
 being chased: an unterminated frame, a bad escape sequence, a frame too short

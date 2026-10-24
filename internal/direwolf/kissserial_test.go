@@ -65,7 +65,7 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*KissSerial, <-chan struct{}) {
 	t.Helper()
 
-	var ks = newKissSerial(mc, setupKissProcessMsg(t), 0)
+	var ks = newKissSerial(mc, setupKissHandler(ctx, t), 0)
 
 	if mc.kiss_serial_poll == 0 {
 		ks.fd = serialport.Open(mc.kiss_serial_port, mc.kiss_serial_speed)

@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -203,7 +204,7 @@ func logKissMessage(level logrus.Level, fromto fromto_t, special string, pmsg []
 		"Data frame", "TXDELAY", "P", "SlotTime",
 		"TXtail", "FullDuplex", "SetHardware", "Invalid 7",
 		"Invalid 8", "Invalid 9", "Invalid 10", "Invalid 11",
-		"Invalid 12", "Invalid 13", "Invalid 14", "Return"}
+		"ACKMODE", "Invalid 13", "Invalid 14", "Return"}
 
 	var entry = logrus.WithField("direction", direction[fromto])
 
@@ -280,18 +281,21 @@ type KissHandler struct {
 	xmit        *XmitService        // The transmit timing a client may change.
 	queue       clientTransmitQueue // Where a client's data frames go, and what TXBUF reports on; nil to drop them.
 	peers       *KissNetService     // The TCP clients KISSCOPY copies a data frame to, or nil.
+	acks        *kissAcks           // Sends the ACKMODE acknowledgements for a client's frames.
 }
 
 // NewKissHandler builds a KissHandler that checks a client's data frames
 // against audioConfig before they are put on queue, applies its timing
 // commands to xmit, and with KISSCOPY copies its data frames to the clients of
-// peers.
-func NewKissHandler(audioConfig *RadioConfig, xmit *XmitService, queue clientTransmitQueue, peers *KissNetService) *KissHandler {
+// peers.  The goroutines that send a client its ACKMODE acknowledgements stop
+// when ctx is cancelled.
+func NewKissHandler(ctx context.Context, audioConfig *RadioConfig, xmit *XmitService, queue clientTransmitQueue, peers *KissNetService) *KissHandler {
 	var h = new(KissHandler)
 	h.audioConfig = audioConfig
 	h.xmit = xmit
 	h.queue = queue
 	h.peers = peers
+	h.acks = newKissAcks(ctx)
 
 	return h
 }
@@ -415,7 +419,8 @@ func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
  *		kiss_len	- Number of bytes including the command.
  *
  *		from		- The client application it came from.
- *				  "Set Hardware" can send it a response.
+ *				  "Set Hardware" can send it a response, and
+ *				  an ACKMODE data frame an acknowledgement.
  *
  *-----------------------------------------------------------------*/
 
@@ -430,6 +435,39 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 
 	var alevel ax25.ALevel
 	var cmd = kiss_msg[0] & 0xf
+
+	// Called once a data frame has been transmitted, for a client that asked
+	// to be told.
+	var onTransmitted func()
+
+	// What the client sent, for showing it as it came, before an ACKMODE
+	// frame is turned into the data frame it carries.
+	var received = kiss_msg
+
+	if cmd == kiss.CmdXKissData {
+		// ACKMODE: an ordinary data frame, but with a two byte ID in front of
+		// it, which goes back to the client, as a frame of its own with the
+		// same command, once the frame has gone out over the air.  That lets
+		// the client time its retries from when the frame was sent rather
+		// than from when it handed it over.
+		if len(kiss_msg) < 3 {
+			logrus.WithField("channel", channel).Error("KISS ACKMODE data frame is missing its frame ID.")
+
+			return
+		}
+
+		var id = bytes.Clone(kiss_msg[1:3])
+
+		onTransmitted = func() {
+			h.acks.send(from, channel, id)
+		}
+
+		// From here on it is the data frame it carries - which is also what
+		// a KISSCOPY client gets, as it didn't ask for an acknowledgement,
+		// and may not know what to do with one.
+		cmd = kiss.CmdDataFrame
+		kiss_msg = append([]byte{kiss_msg[0]&0xf0 | cmd}, kiss_msg[3:]...)
+	}
 
 	switch cmd {
 	case kiss.CmdDataFrame: /* 0 = Data Frame */
@@ -500,7 +538,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 					"sudo /sbin/modprobe -q mkiss crc_force=1",
 			}).Error("Invalid transmit channel from KISS client application")
 
-			logKissMessage(logrus.ErrorLevel, FROM_CLIENT, "", kiss_msg)
+			logKissMessage(logrus.ErrorLevel, FROM_CLIENT, "", received)
 
 			return
 		}
@@ -511,6 +549,8 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 		if pp == nil {
 			logrus.WithField("channel", channel).Error("Invalid KISS data frame from client application")
 		} else if h.queue != nil {
+			pp.SetOnTransmitted(onTransmitted)
+
 			/* How can we determine if it is an original or repeated message? */
 			/* If there is at least one digipeater in the frame, AND */
 			/* that digipeater has been used, it should go out quickly thru */
@@ -638,11 +678,9 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 		var hint = "Use the '-d kn' option on the direwolf command line to observe " +
 			"all communication with the client application"
 
-		if cmd == kiss.CmdXKissData || cmd == kiss.CmdXKissPoll {
-			hint += ".  It looks like you are trying to use the XKISS protocol, which is not supported.  " +
-				"Change your application settings to use standard KISS rather than some other variant.  " +
-				"If you are using Winlink Express, set Packet TNC Type to KISS " +
-				"and Packet TNC Model to NORMAL - using ACKMODE will cause this error"
+		if cmd == kiss.CmdXKissPoll {
+			hint += ".  It looks like you are trying to use the polled mode of the XKISS protocol, which is not supported.  " +
+				"Change your application settings to use standard KISS, with or without ACKMODE"
 		}
 
 		logrus.WithFields(logrus.Fields{

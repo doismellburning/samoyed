@@ -1316,3 +1316,84 @@ func TestDTMFSendDecodesBack(t *testing.T) {
 
 	assert.Equal(t, "159D*#", heard.String())
 }
+
+// Every frame in a transmission is told it has gone once the transmitter is
+// let go, and not before: a KISS ACKMODE client times its retries from that.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func TestXmitAX25FramesSaysWhenEachFrameHasGone(t *testing.T) {
+	var xs, tq = setupXmitTransmission(t)
+
+	var keyed = false
+
+	xs.setPTT = func(_ int, on bool) { keyed = on }
+
+	var gone []string
+
+	var first = ax25.FromText("Q1TEST>Q2TEST:first", true)
+	require.NotNil(t, first)
+	first.SetOnTransmitted(func() {
+		assert.False(t, keyed, "told before the transmitter was let go")
+
+		gone = append(gone, "first")
+	})
+
+	var second = ax25.FromText("Q1TEST>Q2TEST:second", true)
+	require.NotNil(t, second)
+	second.SetOnTransmitted(func() {
+		assert.False(t, keyed, "told before the transmitter was let go")
+
+		gone = append(gone, "second")
+	})
+
+	tq.Append(0, TQ_PRIO_1_LO, second)
+
+	testutils.CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 7) })
+
+	assert.Equal(t, []string{"first", "second"}, gone)
+}
+
+// Morse is transmitted too, by a path of its own, and says so the same way.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func TestXmitNextSaysWhenMorseHasGone(t *testing.T) {
+	var xs, tq = setupXmitTransmission(t)
+
+	xs.timing[0].fulldup = true
+
+	var pp = ax25.FromText("Q1TEST>MORSE-10:E", true)
+	require.NotNil(t, pp)
+
+	var gone = false
+
+	pp.SetOnTransmitted(func() { gone = true })
+
+	tq.Append(0, TQ_PRIO_1_LO, pp)
+
+	testutils.CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
+
+	assert.True(t, gone)
+}
+
+// Speech with no script to say it with doesn't go out, so it isn't said to
+// have.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func TestXmitNextSpeechWithoutAScriptHasNotGone(t *testing.T) {
+	var xs, tq = setupXmitTransmission(t)
+
+	xs.timing[0].fulldup = true
+
+	var pp = ax25.FromText("Q1TEST>SPEECH:Hello there", true)
+	require.NotNil(t, pp)
+
+	var gone = false
+
+	pp.SetOnTransmitted(func() { gone = true })
+
+	tq.Append(0, TQ_PRIO_1_LO, pp)
+
+	testutils.CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
+
+	assert.False(t, gone)
+}
