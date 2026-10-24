@@ -165,12 +165,14 @@ func TestWebNetROMStatus(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[webui.NetROMStatus](), webNetROMStatus(nil))
 
 	var config = netrom.DefaultConfig()
+	config.Channels = []int{0, 2}
 	config.Callsign = "Q1TEST-7"
 	config.Alias = "QNODEA"
 
 	var node = netrom.New(config, new(recordingAGWDataLink), func(int, int, *ax25.Packet) {}, new(recordingReporter), netrom.RealClock{}, netromClient)
 
 	var want webui.NetROMStatus
+	want.Channels = []int{0, 2}
 	want.Callsign = "Q1TEST-7"
 	want.Alias = "QNODEA"
 	want.Neighbours = []webui.NetROMNeighbour{}
@@ -183,15 +185,15 @@ func TestWebNetROMStatus(t *testing.T) {
 	require.NotNil(t, nodes)
 	nodes.SetPID(ax25.PIDNetROM)
 	nodes.SetInfo(append([]byte{0xFF}, "QNODEB"...))
-	node.HeardUI(0, nodes)
+	node.HeardUI(2, nodes)
 
 	require.True(t, node.Connect(0, 1, "Q1TEST", "QNODEB", ax25.PIDNetROM))
 
-	want.Neighbours = []webui.NetROMNeighbour{{Callsign: "Q2TEST-7", Link: "connecting", Failures: 0, Failing: false}}
+	want.Neighbours = []webui.NetROMNeighbour{{Channel: 2, Callsign: "Q2TEST-7", Link: "connecting", Failures: 0, Failing: false}}
 	want.Destinations = []webui.NetROMDestination{{
 		Callsign: "Q2TEST-7",
 		Alias:    "QNODEB",
-		Routes:   []webui.NetROMRoute{{Neighbour: "Q2TEST-7", Quality: int(netrom.DefaultQuality), Obsolescence: 6}},
+		Routes:   []webui.NetROMRoute{{Channel: 2, Neighbour: "Q2TEST-7", Quality: int(netrom.DefaultQuality), Obsolescence: 6}},
 	}}
 	want.Circuits = []webui.NetROMCircuit{{
 		OwnCall:     "Q1TEST",

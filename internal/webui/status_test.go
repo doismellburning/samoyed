@@ -111,14 +111,14 @@ func TestStatusNetROM(t *testing.T) {
 	t.Parallel()
 
 	var node NetROMStatus
-	node.Channel = 0
+	node.Channels = []int{0, 2}
 	node.Callsign = "Q1TEST-7"
 	node.Alias = "QNODEA"
-	node.Neighbours = []NetROMNeighbour{{Callsign: "Q2TEST-7", Link: "up", Failures: 0, Failing: false}}
+	node.Neighbours = []NetROMNeighbour{{Channel: 2, Callsign: "Q2TEST-7", Link: "up", Failures: 0, Failing: false}}
 	node.Destinations = []NetROMDestination{{
 		Callsign: "Q2TEST-7",
 		Alias:    "QNODEB",
-		Routes:   []NetROMRoute{{Neighbour: "Q2TEST-7", Quality: 192, Obsolescence: 6}},
+		Routes:   []NetROMRoute{{Channel: 2, Neighbour: "Q2TEST-7", Quality: 192, Obsolescence: 6}},
 	}}
 	node.Circuits = []NetROMCircuit{{
 		OwnCall:     "Q1TEST",
@@ -137,10 +137,11 @@ func TestStatusNetROM(t *testing.T) {
 	}{
 		{"none", maybe.Nothing[NetROMStatus](), nil},
 		{"node", maybe.Just(node), map[string]any{
-			"channel":  float64(0),
+			"channels": []any{float64(0), float64(2)},
 			"callsign": "Q1TEST-7",
 			"alias":    "QNODEA",
 			"neighbours": []any{map[string]any{
+				"channel":  float64(2),
 				"callsign": "Q2TEST-7",
 				"link":     "up",
 				"failures": float64(0),
@@ -150,6 +151,7 @@ func TestStatusNetROM(t *testing.T) {
 				"callsign": "Q2TEST-7",
 				"alias":    "QNODEB",
 				"routes": []any{map[string]any{
+					"channel":      float64(2),
 					"neighbour":    "Q2TEST-7",
 					"quality":      float64(192),
 					"obsolescence": float64(6),

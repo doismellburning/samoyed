@@ -93,7 +93,7 @@ type IGateStatus struct {
 // NetROMStatus is a NET/ROM node: what it is, who its neighbours are, what
 // it can reach and the circuits it has open.
 type NetROMStatus struct {
-	Channel  int    `json:"channel"`
+	Channels []int  `json:"channels"`
 	Callsign string `json:"callsign"`
 	Alias    string `json:"alias"`
 
@@ -103,8 +103,9 @@ type NetROMStatus struct {
 }
 
 // NetROMNeighbour is a node the NET/ROM node has a link to, or a route
-// through.
+// through, on a channel.
 type NetROMNeighbour struct {
+	Channel  int    `json:"channel"`
 	Callsign string `json:"callsign"`
 	Link     string `json:"link"` // "up", "connecting" or "down".
 
@@ -122,10 +123,11 @@ type NetROMDestination struct {
 	Routes   []NetROMRoute `json:"routes"`
 }
 
-// NetROMRoute is one way of reaching a destination: through a neighbour, at
-// a quality from 0 to 255, for as many more of the node's own broadcasts as
-// its obsolescence count says.
+// NetROMRoute is one way of reaching a destination: through a neighbour on
+// a channel, at a quality from 0 to 255, for as many more of the node's own
+// broadcasts as its obsolescence count says.
 type NetROMRoute struct {
+	Channel      int    `json:"channel"`
 	Neighbour    string `json:"neighbour"`
 	Quality      int    `json:"quality"`
 	Obsolescence int    `json:"obsolescence"`

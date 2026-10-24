@@ -387,8 +387,8 @@ These are the keys under ``samoyed``:
         ``netrom: {}`` runs it with the defaults.
         It takes the settings of the top-level ``netrom`` block below
         but ``callsign`` and ``alias``,
-        and its ``channel`` must be one the node listens on;
-        it can be left out if the node listens on only one.
+        and its ``channels`` must be ones the node listens on;
+        left out, it runs on all of them.
         A top-level ``netrom`` block is refused alongside ``node``.
 
     The node answers each line it is sent,
@@ -431,10 +431,11 @@ These are the keys under ``samoyed``:
     ``NODES`` (``N``) *node*
         List the nodes NET/ROM can reach, as ``ALIAS:CALLSIGN``;
         with a node's alias or callsign, list the routes to it,
-        best first, with their quality and obsolescence count.
+        best first, with the port of the neighbour each goes through,
+        its quality and its obsolescence count.
 
     ``ROUTES`` (``R``)
-        List the neighbouring nodes,
+        List the neighbouring nodes, each with its port,
         whether the link to each is up,
         the quality it gives that link,
         and how many nodes are reached through it.
@@ -483,9 +484,13 @@ These are the keys under ``samoyed``:
         The short name, up to six letters, digits or ``#_&-/``,
         other nodes know it by.
 
-    ``channel``
-        The channel it runs on:
-        any channel connected mode can be used on.
+    ``channels``
+        The channels it runs on,
+        each any channel connected mode can be used on.
+        It keeps one routing table across them all,
+        sends its ``NODES`` broadcasts on each,
+        and takes a neighbour to be a callsign on one of them,
+        so it can route between, say, a radio channel and an AXUDP link.
 
     ``ttl``
         Optionally, how many nodes a frame it originates may cross.
@@ -511,7 +516,7 @@ These are the keys under ``samoyed``:
           netrom:
             callsign: Q1TEST-7
             alias: QNODEA
-            channel: 0
+            channels: [0]
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as
