@@ -534,7 +534,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			//#if __arm__
 			//	        strlcpy (achan.profiles, "R", sizeof(achan.profiles));
 			//#else
-			achan.profiles = "PQRS"
+			achan.profiles = defaultPSKProfiles(MODEM_QPSK)
 			//#endif
 		}
 
@@ -586,7 +586,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			//#if __arm__
 			//	        strlcpy (achan.profiles, "V", sizeof(achan.profiles));
 			//#else
-			achan.profiles = "TUVW"
+			achan.profiles = defaultPSKProfiles(MODEM_8PSK)
 			//#endif
 		}
 
@@ -633,7 +633,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 
 	case MODEM_BPSK:
 		if achan.profiles == "" {
-			achan.profiles = "LMNO"
+			achan.profiles = defaultPSKProfiles(MODEM_BPSK)
 		}
 
 		achan.profiles = capProfiles(channel, achan.profiles)

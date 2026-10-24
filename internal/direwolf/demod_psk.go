@@ -59,6 +59,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -89,6 +90,60 @@ var DCD_CONFIG_PSK = &DCDConfig{
 var phase_to_gray_bpsk = [2]int{1, 0}
 var phase_to_gray_v26 = [4]int{0, 1, 3, 2}
 var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
+
+// defaultPSKProfiles is the demodulator profiles a PSK channel runs when the
+// configuration names none.
+func defaultPSKProfiles(modemType modem_t) string {
+	switch modemType {
+	case MODEM_QPSK:
+		return "PQRS"
+	case MODEM_8PSK:
+		return "TUVW"
+	case MODEM_BPSK:
+		return "LMNO"
+	default:
+		return ""
+	}
+}
+
+// checkPSKFilterSizes sets up, on scratch state, each demodulator a PSK
+// channel would run at samplesPerSec, so that one whose filters wouldn't fit
+// is found when the configuration is checked rather than when the daemon
+// starts.  It returns one error per profile that wouldn't fit, joined, and
+// nil for a channel that isn't PSK.
+func (achan *achan_param_s) checkPSKFilterSizes(channel int, samplesPerSec int) error {
+	var profiles = defaultPSKProfiles(achan.modem_type)
+	if profiles == "" {
+		return nil
+	}
+
+	if achan.profiles != "" {
+		profiles = achan.profiles
+	}
+
+	// NewDemodulator runs only the first MAX_SUBCHANS, and says so itself.
+	profiles = profiles[:min(len(profiles), MAX_SUBCHANS)]
+
+	// Only QPSK reads it, and settleModemOptions picks this when the
+	// configuration doesn't.  It doesn't change any filter's size.
+	var v26 = achan.v26_alternative
+	if achan.modem_type == MODEM_QPSK && v26 == V26_UNSPECIFIED {
+		v26 = V26_DEFAULT
+	}
+
+	var D = new(demodulator_state_s)
+
+	var errs []error
+
+	for _, profile := range []byte(profiles) {
+		var err = demod_psk_init(achan.modem_type, v26, samplesPerSec, achan.baud, profile, D)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("channel %d, profile %c: %w", channel, profile, err))
+		}
+	}
+
+	return errors.Join(errs...)
+}
 
 /* Might replace this with faster, lower precision, approximation someday if it does not harm results. */
 

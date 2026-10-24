@@ -1610,6 +1610,20 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		}
 	}
 
+	// A PSK demodulator's filters are sized from the bit rate and the sample
+	// rate, which are set on different lines, so check they fit only once
+	// both are known.
+	for channel := range MAX_RADIO_CHANS {
+		if ps.audio.chan_medium[channel] == MEDIUM_RADIO {
+			var samplesPerSec = ps.audio.adev[ACHAN2ADEV(channel)].samples_per_sec
+
+			var err = ps.audio.achan[channel].checkPSKFilterSizes(channel, samplesPerSec)
+			if err != nil {
+				ps.report(err)
+			}
+		}
+	}
+
 	// Terrible hack.  But what can we do?
 
 	if ps.misc.maxv22 < 0 {
