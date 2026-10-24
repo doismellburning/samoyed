@@ -4627,6 +4627,14 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 			}).Debug("AX.25 Protocol Error C: Unexpected UA")
 		}
 
+		// Implementation difference: as for a reset the other station asks for with
+		// a SABM(E), put what we sent and have not had acknowledged back on the queue,
+		// to go again from N(S) 0, rather than lose it once V(S) and V(A) are reset.
+		// With nothing lost, the client has nothing to be told when the UA comes.
+		requeueIFrames(S)
+		SET_VS(S, 0)
+		SET_VA(S, 0)
+
 		establish_data_link(S)
 		S.layer_3_initiated = false
 
