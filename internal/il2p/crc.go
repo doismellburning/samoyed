@@ -4,7 +4,12 @@
 //nolint:gochecknoglobals
 package il2p
 
-import "github.com/doismellburning/samoyed/internal/fcs"
+import (
+	"slices"
+
+	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/fcs"
+)
 
 /*-------------------------------------------------------------
  *
@@ -125,4 +130,44 @@ func il2p_crc_check(frame_data []byte, encoded_crc []byte) bool {
 	var received = il2p_crc_decode(encoded_crc)
 
 	return expected == received
+}
+
+// il2pCRCPacket checks a received trailing CRC against pp, which was rebuilt
+// from an IL2P header of type hdrType, and returns the packet the CRC vouches
+// for, or nil if it vouches for none.
+//
+// The CRC covers the AX.25 frame as it was before IL2P translation.  A type 1
+// header carries a single C bit, so a sender that uses one for a frame with
+// AX.25 v1 C bits (both set or both clear) - as QtSoundModem does - sends a CRC
+// that the rebuilt frame cannot match.  Rather than drop such a frame, try the
+// CRC against each combination of the two C bits, and hand on the frame as it
+// was sent.  That is three more chances for a frame Reed-Solomon decoding got
+// wrong to match by accident, so about 4 in 65536 rather than 1.
+func il2pCRCPacket(pp *ax25.Packet, hdrType int, encodedCRC []byte) *ax25.Packet {
+	var frame = pp.FrameData()
+	if il2p_crc_check(frame, encodedCRC) {
+		return pp
+	}
+
+	// A type 1 header holds exactly a destination and a source.
+	const destC, srcC = ax25.Destination*7 + 6, ax25.Source*7 + 6
+
+	if hdrType != 1 || len(frame) <= srcC {
+		return nil
+	}
+
+	var candidate = slices.Clone(frame)
+
+	for _, bits := range [][2]byte{{ax25.SSIDHMask, ax25.SSIDHMask}, {0, 0}, {ax25.SSIDHMask, 0}, {0, ax25.SSIDHMask}} {
+		candidate[destC] = frame[destC]&^ax25.SSIDHMask | bits[0]
+		candidate[srcC] = frame[srcC]&^ax25.SSIDHMask | bits[1]
+
+		if il2p_crc_check(candidate, encodedCRC) {
+			var alevel ax25.ALevel
+
+			return ax25.FromFrame(candidate, alevel)
+		}
+	}
+
+	return nil
 }

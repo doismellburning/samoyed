@@ -214,7 +214,7 @@ func il2p_decode_frame(irec []byte, version Version, debug int) *ax25.Packet {
 
 	// Determine if trailing CRC is present by computing the encoded payload size
 	// and checking if there are extra bytes beyond it.
-	var _, fec_level, payload_len = il2p_get_header_attributes(uhdr)
+	var hdr_type, fec_level, payload_len = il2p_get_header_attributes(uhdr)
 	var max_fec = il2p_rx_max_fec(version, fec_level)
 	var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
 
@@ -230,13 +230,9 @@ func il2p_decode_frame(irec []byte, version Version, debug int) *ax25.Packet {
 
 	// Validate CRC if present.
 	if pp != nil && crc_bytes != nil {
-		var frame_data = pp.FrameData()
-		if !il2p_crc_check(frame_data, crc_bytes) {
-			if debug >= 1 {
-				logrus.Debug("IL2P trailing CRC mismatch")
-			}
-
-			return nil
+		pp = il2pCRCPacket(pp, hdr_type, crc_bytes)
+		if pp == nil && debug >= 1 {
+			logrus.Debug("IL2P trailing CRC mismatch")
 		}
 	}
 

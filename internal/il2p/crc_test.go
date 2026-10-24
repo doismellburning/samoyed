@@ -317,3 +317,75 @@ func TestIL2PCRCReceiveSetting(t *testing.T) {
 		})
 	}
 }
+
+// The CRC covers the AX.25 frame before IL2P translation, and a sender may use
+// a type 1 header for a frame it cannot represent exactly - QtSoundModem sends
+// AX.25 v1 C bits that way - so the CRC matches the frame as it was sent, not
+// as a type 1 header rebuilds it.
+func TestIL2PCRCOverUntranslatedFrame(t *testing.T) {
+	t.Parallel()
+
+	for _, text := range []string{"Q1TEST>Q2TEST:hello world", "Q1TEST>Q2TEST:"} {
+		t.Run(text, func(t *testing.T) {
+			t.Parallel()
+
+			var pp = ax25.FromText(text, true)
+			require.NotNil(t, pp)
+
+			// Without a CRC, this frame gets a type 1 header.
+			var encoded, n = il2p_encode_frame(pp, Version06, 1)
+			require.Positive(t, n)
+
+			var uhdr, e = il2p_clarify_header(encoded[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY], 0)
+			require.GreaterOrEqual(t, e, 0)
+			require.Equal(t, 1, GET_HDR_TYPE(uhdr))
+
+			var crc = il2p_crc_encode(il2p_crc_calc(pp.FrameData()))
+			var frame = append(encoded[:n:n], crc[:]...)
+
+			var pp2 = il2p_decode_frame(frame, Version06, 0)
+			require.NotNil(t, pp2)
+			assert.Equal(t, pp.FrameData(), pp2.FrameData())
+		})
+	}
+}
+
+// Trying the C bits the type 1 header loses is no licence to accept a CRC
+// that matches none of them.
+func TestIL2PCRCOverUntranslatedFrameStillChecked(t *testing.T) {
+	t.Parallel()
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello world", true)
+	require.NotNil(t, pp)
+
+	var encoded, n = il2p_encode_frame(pp, Version06, 1)
+	require.Positive(t, n)
+
+	var crc = il2p_crc_encode(il2p_crc_calc(pp.FrameData()) ^ 0x0100)
+	var frame = append(encoded[:n:n], crc[:]...)
+
+	assert.Nil(t, il2p_decode_frame(frame, Version06, 0))
+}
+
+// The same, through the bit receiver.
+func TestIL2PCRCOverUntranslatedFrameReceived(t *testing.T) {
+	t.Parallel()
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello world", true)
+	require.NotNil(t, pp)
+
+	var recorder = il2pLoopback(t, Version06)
+
+	// A type 1 header, then the CRC of the frame as it was before translation.
+	require.Positive(t, recorder.sender.SendFrame(pp, Version06, 1, false, 0))
+
+	for _, b := range il2p_crc_encode(il2p_crc_calc(pp.FrameData())) {
+		recorder.sender.sendByteMSBFirst(int(b), 0)
+	}
+
+	recorder.flush()
+
+	var received = recorder.take()
+	require.Len(t, received, 1)
+	assert.Equal(t, []byte("hello world"), received[0].info)
+}
