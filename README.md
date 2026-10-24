@@ -2,6 +2,11 @@
 
 # Samoyed
 
+[![Build and test](https://github.com/doismellburning/samoyed/actions/workflows/build-and-test.yml/badge.svg?branch=main)](https://github.com/doismellburning/samoyed/actions/workflows/build-and-test.yml?query=branch%3Amain)
+[![Latest release](https://img.shields.io/github/v/release/doismellburning/samoyed?include_prereleases&sort=semver)](https://github.com/doismellburning/samoyed/releases)
+[![Documentation](https://img.shields.io/badge/docs-github.io-blue)](https://doismellburning.github.io/samoyed/)
+[![Licence: AGPL-3.0-or-later](https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue)](#license)
+
 Samoyed is a fully-featured software modem/TNC for packet radio.
 It supports AX.25 v2.2, FX.25, IL2P, APRS, multi-speed modems (300-9600 bps), digipeating, IGates, and more.
 Samoyed is a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
@@ -9,11 +14,23 @@ Samoyed is a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
 **Documentation:** <https://doismellburning.github.io/samoyed/>
 
 > **Status:** Port functionally complete, but broad testing needed - consider this pre-release, and likely to contain bugs.
-> Please [file issues](https://github.com/doismellburning/samoyed/issues) if you encounter problems.
+> The automated tests run against audio files and loopback rather than real radios, so reports are most useful on:
+> on-air use with real soundcards and radios;
+> PTT methods (serial RTS/DTR, CM108, GPIO, hamlib);
+> macOS;
+> and interoperability with other TNCs and with KISS/AGW applications.
+> Please [file issues](https://github.com/doismellburning/samoyed/issues) if you encounter problems - or if it works, which is worth knowing too.
 
 ## Why Samoyed?
 
-Dire Wolf is a mature, capable piece of software written in C. Samoyed is (currently) a near-straight port to Go, motivated by:
+[Dire Wolf](https://github.com/wb2osz/direwolf), by John Langner WB2OSZ, is a mature, capable piece of software written in C:
+a modern software replacement for hardware TNCs, with outstanding receive performance.
+It decodes over 1000 error-free frames from the
+[WA8LMF TNC Test CD](https://github.com/wb2osz/direwolf/tree/dev/doc/WA8LMF-TNC-Test-CD-Results.pdf),
+outperforming all hardware TNCs and first-generation soundcard modems.
+Those are Dire Wolf's results: Samoyed's demodulators are ported from Dire Wolf's, but Samoyed doesn't publish figures of its own yet.
+
+Samoyed started as a near-straight port to Go, and has since moved on: much of the code has been reworked, and it has [features of its own](#features). The port was motivated by:
 
 - **Better tooling** — Go's testing, linting, and static analysis ecosystem, as well as the stdlib
 - **Simpler builds** — no cmake, no preprocessor conditionals for test infrastructure
@@ -52,6 +69,8 @@ As well as that, Samoyed also adds:
 - **Web interface** — a live dashboard and APRS map in the browser (`WEBPORT`)
 - **Prometheus metrics** — a `/metrics` endpoint (`METRICSPORT`), with a starter Grafana dashboard in `conf/`
 - **AGW login** — require a user name and password on the AGW port (`AGWLOGIN`)
+- **NET/ROM node** — `NODES` broadcasts, learned routes and multi-hop circuits, optionally behind a node shell that users connect to by callsign or alias (see [Run a NET/ROM node](https://doismellburning.github.io/samoyed/how-to-guides/#run-a-net-rom-node))
+- **AXUDP** — `samoyed-axudp` bridges a KISS port to remote nodes speaking AX.25 over UDP ([RFC 1226](https://www.rfc-editor.org/rfc/rfc1226))
 - ...and more underway!
 
 ## Installation
@@ -68,7 +87,7 @@ sudo apt install ./samoyed-binary_*.deb
 
 `samoyed-direwolf` is the modem/TNC itself.
 It reads a configuration file — `direwolf.conf` in the current directory, or whatever `--config-file` names.
-A minimal one for a single 1200 bps channel on Linux, in Samoyed's [YAML format](https://doismellburning.github.io/samoyed/yaml-config.html) (for a file whose name ends in `.yaml` or `.yml`):
+A minimal one for a single 1200 bps channel on Linux, in Samoyed's [YAML format](https://doismellburning.github.io/samoyed/yaml-config/) (for a file whose name ends in `.yaml` or `.yml`):
 
 ```yaml
 samoyed:
@@ -109,7 +128,7 @@ samoyed-direwolf --config-file samoyed.yaml
 Run `samoyed-direwolf --help` for the full list of options.
 Dire Wolf's companion utilities come along too, each prefixed `samoyed-` (`samoyed-atest`, `samoyed-kissutil` and so on), with man pages in the `.deb`.
 
-For configuration, features and recipes, see the [Samoyed documentation](https://doismellburning.github.io/samoyed/), in particular the [how-to guides](https://doismellburning.github.io/samoyed/how-to-guides.html).
+For configuration, features and recipes, see the [Samoyed documentation](https://doismellburning.github.io/samoyed/), in particular the [how-to guides](https://doismellburning.github.io/samoyed/how-to-guides/).
 Where it doesn't yet cover something, the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) should — Samoyed aims for broad compatibility with Dire Wolf.
 
 ## Switching from Dire Wolf
@@ -137,7 +156,8 @@ make cmds        # build all binaries into dist/
 make all         # build and test everything
 ```
 
-See [AGENTS.md](./AGENTS.md) for the main `make` targets, along with general development notes and style guidelines.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) before sending a change.
+[AGENTS.md](./AGENTS.md) - written for people as much as for agents - lists the main `make` targets, along with general development notes and style guidelines.
 
 ## Contributing
 
@@ -151,14 +171,6 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 | arm64 Linux | Supported |
 | macOS | Supported |
 | Windows | TBD (depends on demand / testability) |
-
-## About Dire Wolf
-
-Samoyed is based on [Dire Wolf](https://github.com/wb2osz/direwolf) by John Langner WB2OSZ —
-a modern software replacement for hardware TNCs, with outstanding receive performance.
-Dire Wolf decodes over 1000 error-free frames from the
-[WA8LMF TNC Test CD](https://github.com/wb2osz/direwolf/tree/dev/doc/WA8LMF-TNC-Test-CD-Results.pdf),
-outperforming all hardware TNCs and first-generation soundcard modems.
 
 ## Further Reading
 
