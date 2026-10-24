@@ -231,20 +231,36 @@ func Parse(info []byte) (*Param, string, bool) {
 
 		i++
 
-		if plen < 1 || plen > 4 {
-			logrus.WithFields(logrus.Fields{
-				"parameter": pind,
-				"length":    plen,
-			}).Error("XID error: Parameter length is not 1 thru 4")
-
-			return result, desc, true // got this far.
-		}
-
 		if i+int(plen) > len(info) {
 			logrus.WithFields(logrus.Fields{
 				"parameter": pind,
 				"length":    plen,
 			}).Error("XID error: Parameter runs past the end of the info field")
+
+			return result, desc, true // got this far.
+		}
+
+		// Skip anything we don't recognize, whatever its length.  LinBPQ
+		// asks for its own L2 compression with parameter 16 and no value.
+		switch pind {
+		case PI_Classes_of_Procedures, PI_HDLC_Optional_Functions, PI_I_Field_Length_Rx,
+			PI_Window_Size_Rx, PI_Ack_Timer, PI_Retries:
+		default:
+			logrus.WithFields(logrus.Fields{
+				"parameter": pind,
+				"length":    plen,
+			}).Debug("XID: Skipping unrecognized parameter")
+
+			i += int(plen)
+
+			continue
+		}
+
+		if plen < 1 || plen > 4 {
+			logrus.WithFields(logrus.Fields{
+				"parameter": pind,
+				"length":    plen,
+			}).Error("XID error: Parameter length is not 1 thru 4")
 
 			return result, desc, true // got this far.
 		}
@@ -363,8 +379,6 @@ func Parse(info []byte) (*Param, string, bool) {
 			result.Retries = maybe.Just(pval)
 
 			desc += fmt.Sprintf("Retries=%d ", pval)
-
-		default: // Ignore anything we don't recognize.
 		}
 	}
 
