@@ -105,7 +105,7 @@ func openKissSerialPort(t *testing.T, debug int) (*KissSerial, *os.File) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var ks = newKissSerial(mc, setupKissProcessMsg(t), debug)
+	var ks = newKissSerial(mc, setupKissHandler(t.Context(), t), debug)
 
 	t.Cleanup(ks.closePort)
 
@@ -310,7 +310,7 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var ks, _ = startKissSerial(t.Context(), t, mc)
+	startKissSerial(t.Context(), t, mc)
 
 	var pp = newTestPacket(t)
 
@@ -318,11 +318,16 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 		[]byte{byte(channel<<4 | kiss.CmdDataFrame)}, pp.FrameData()...)))
 	require.NoError(t, writeErr)
 
-	// TransmitQueue.Count rather than TransmitQueue.Peek: the queue is being filled by the
-	// listening goroutine, and only TransmitQueue.Count reads it under the lock.
-	assert.Eventually(t, func() bool {
-		return ks.handler.queue.Count(channel, TQ_PRIO_1_LO, "", "", false) > 0
-	}, 5*time.Second, 10*time.Millisecond, "the frame from the KISS client was not queued for transmission")
+	// The client's bytes are handled in order, so the answer to a TXBUF query
+	// after the frame counts it if it was queued.
+	_, writeErr = client.Write(kiss.Encapsulate(append([]byte{byte(channel<<4 | kiss.CmdSetHardware)}, []byte("TXBUF:")...)))
+	require.NoError(t, writeErr)
+
+	var answer = kiss.Unwrap(readSerialKissFrame(t, client))
+	require.NotEmpty(t, answer)
+
+	assert.Equal(t, byte(kiss.CmdSetHardware), answer[0]&0xf)
+	assert.NotEqual(t, "TXBUF:0", string(answer[1:]), "the frame from the KISS client was not queued for transmission")
 
 	require.NoError(t, client.Close())
 }

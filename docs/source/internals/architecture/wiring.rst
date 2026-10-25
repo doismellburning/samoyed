@@ -54,6 +54,7 @@ in place of the plain ones between the same components.
        digi [label="digipeater.Digipeater\nAPRS"];
        cdigi [label="digipeater.Connected\nconnected mode"];
        kiss [label="KissHandler"];
+       kissadapter [label="kissHandlerTNCAdapter"];
        kissnet [label="KISS TCP, serial,\npseudo terminal"];
        apps [label="clientApps"];
        tt [label="aprstt.Gateway\nAPRStt"];
@@ -133,8 +134,9 @@ in place of the plain ones between the same components.
        shared -> agw [label="linkClients\nAGW clients' circuits", style=dotted];
        link -> tq [label="linkTransmitter"];
 
-       kiss -> xmit [label="timing setters"];
-       kiss -> tq [label="clientTransmitQueue"];
+       kiss -> kissadapter [label="kissHandlerTNC"];
+       kissadapter -> xmit [label="timing setters"];
+       kissadapter -> tq [label="clientTransmitQueue"];
        kiss -> kissnet [label="KISSCOPY peers"];
        kissnet -> kiss [label="client bytes\n(at Start)", style=dashed];
 
@@ -329,8 +331,12 @@ The shapes in the diagram follow the dependency conventions in ``AGENTS.md``:
 - A component that makes several calls is handed a small interface,
   declared beside it and holding only those calls:
   ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``, ``node.DataLink``,
-  ``netrom.DataLink``, ``netrom.Reporter``.
+  ``netrom.DataLink``, ``netrom.Reporter``, ``kissHandlerTNC``.
 - ``*TransmitQueue``, ``*DataLinkQueue``, ``*AGWServer``, ``*node.Node`` and ``*netrom.Node`` satisfy those interfaces without knowing about them.
+- ``kissHandlerTNCAdapter`` is the KISS handler's ``kissHandlerTNC``:
+  it puts a client's frames on the ``clientTransmitQueue`` it is handed
+  and its timing commands to the ``XmitService``,
+  so that the handler needs neither.
 
 References
 ----------
@@ -349,7 +355,8 @@ References
   ``shared_node.go`` (``newSharedNode``, ``sharedNode.attach``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
-  ``kiss_frame.go`` (``NewKissHandler``),
+  ``kiss_frame.go`` (``NewKissHandler``, ``kissHandlerTNC``),
+  ``kiss_handler_tnc.go`` (``newKissHandlerTNC``),
   ``kissnet.go`` (``NewKissNetService``, ``KissNetService.Start``),
   ``beacon.go`` (``NewBeaconService``, ``beaconIGate``),
   ``audio.go`` (``AudioDevices.setAudioLevel``),
