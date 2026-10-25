@@ -143,6 +143,12 @@ func setupTestEnv(t *testing.T) *AX25Link {
 
 	var tq = newTestTransmitQueue(new(RadioConfig))
 
+	return NewAX25Link(newTestMiscConfig(0), nil, nil, tq, 1) // Default: don't try v2.2 (for most tests)
+}
+
+// newTestMiscConfig has the connected mode defaults, sending at most maxv22
+// SABMEs before falling back to v2.0.
+func newTestMiscConfig(maxv22 int) *misc_config_s {
 	var miscConfig = new(misc_config_s)
 	// Set proper defaults for connected mode
 	miscConfig.paclen = AX25_N1_PACLEN_DEFAULT
@@ -150,9 +156,9 @@ func setupTestEnv(t *testing.T) *AX25Link {
 	miscConfig.frack = AX25_T1V_FRACK_DEFAULT
 	miscConfig.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
 	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
-	miscConfig.maxv22 = 0 // Default: don't try v2.2 (for most tests)
+	miscConfig.maxv22 = maxv22
 
-	return NewAX25Link(miscConfig, nil, nil, tq, 1)
+	return miscConfig
 }
 
 // Helper to set up environment with v2.2 support enabled
@@ -161,16 +167,7 @@ func setupTestEnvV22(t *testing.T) *AX25Link {
 
 	var tq = newTestTransmitQueue(new(RadioConfig))
 
-	var miscConfig = new(misc_config_s)
-	// Set proper defaults for connected mode
-	miscConfig.paclen = AX25_N1_PACLEN_DEFAULT
-	miscConfig.retry = AX25_N2_RETRY_DEFAULT
-	miscConfig.frack = AX25_T1V_FRACK_DEFAULT
-	miscConfig.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
-	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
-	miscConfig.maxv22 = 3 // Enable v2.2
-
-	return NewAX25Link(miscConfig, nil, nil, tq, 1)
+	return NewAX25Link(newTestMiscConfig(3), nil, nil, tq, 1) // Enable v2.2
 }
 
 // Helper to initiate a connect request
