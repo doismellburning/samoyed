@@ -1401,3 +1401,73 @@ func TestMonDescMissingPID(t *testing.T) {
 	_, desc = mon_desc(pp)
 	assert.Equal(t, "<UI pid=-- Len=0 P=0 >", desc)
 }
+
+// inp3RIF returns an INP3 routing information frame as its specification
+// lays one out: a 0xFF signature where a layer 3 frame would have its
+// origin's first byte, then a route to Q1TEST whose target time has a NUL
+// for its high byte.  Nothing between an AGW client and the air may treat it
+// as a C string.
+func inp3RIF() []byte {
+	return []byte{
+		0xff,
+		'Q' << 1, '1' << 1, 'T' << 1, 'E' << 1, 'S' << 1, 'T' << 1, 0x60,
+		1,          // Hops.
+		0x00, 0x2a, // Target time.
+		0x00, // No options.
+	}
+}
+
+func TestHandleClientCommand_VM_KeepINP3Intact(t *testing.T) {
+	t.Parallel()
+
+	for _, kind := range []byte{'V', 'M'} {
+		t.Run(string(kind), func(t *testing.T) {
+			t.Parallel()
+
+			var s = new(AGWServer)
+			var tq = setupAGWTransmitQueue(t, s, radioChannelZero())
+
+			var cmd = new(agwpe.Message)
+			cmd.Header.DataKind = kind
+			cmd.Header.PID = ax25.PIDNetROM
+			copy(cmd.Header.CallFrom[:], "Q1TEST")
+			copy(cmd.Header.CallTo[:], "Q2TEST")
+
+			cmd.Data = inp3RIF()
+			if kind == 'V' {
+				cmd.Data = append([]byte{0}, inp3RIF()...) /* No digipeaters. */
+			}
+
+			cmd.Header.DataLen = safecast.RequireConvert[uint32](t, len(cmd.Data))
+
+			s.handleClientCommand(0, cmd)
+
+			var pp = tq.Remove(0, TQ_PRIO_1_LO)
+			require.NotNil(t, pp)
+			assert.Equal(t, ax25.PIDNetROM, pp.PID())
+			assert.Equal(t, inp3RIF(), pp.Info())
+		})
+	}
+}
+
+// A monitoring client is sent the information field as it is, not
+// netrom.Describe's description of it.
+func TestSendMonitored_KeepsINP3Intact(t *testing.T) {
+	t.Parallel()
+
+	var s = new(AGWServer)
+	s.clients[0].sendMonitor = true
+
+	var replies = asyncReply(setupClientPipe(t, s))
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:", true)
+	require.NotNil(t, pp)
+	pp.SetPID(ax25.PIDNetROM)
+	pp.SetInfo(inp3RIF())
+
+	s.SendMonitored(0, pp, 0)
+
+	var reply = <-replies
+	require.NotNil(t, reply)
+	assert.True(t, bytes.HasSuffix(reply.Data, append(inp3RIF(), '\r', 0)), "%q", reply.Data)
+}
