@@ -458,7 +458,7 @@ func (c kissNetClient) attached() bool {
 	return c.conn != nil && c.kps.clientConn(c.client) == c.conn
 }
 
-func (c kissNetClient) reply(channel int, cmd int, frame []byte) {
+func (c kissNetClient) Reply(channel int, cmd int, frame []byte) {
 	if !c.attached() {
 		return
 	}
@@ -466,7 +466,7 @@ func (c kissNetClient) reply(channel int, cmd int, frame []byte) {
 	c.kns.sendOn(c.kps, c.client, c.conn, channel, cmd, frame)
 }
 
-func (c kissNetClient) prompt(text []byte) {
+func (c kissNetClient) Prompt(text []byte) {
 	if !c.attached() {
 		return
 	}
@@ -491,7 +491,7 @@ func (c kissNetClient) prompt(text []byte) {
 	c.kns.write(c.kps, c.client, c.conn, text)
 }
 
-func (c kissNetClient) radioChannel(frameChannel int) int {
+func (c kissNetClient) RadioChannel(frameChannel int) int {
 	if c.kps.channel != -1 {
 		// Ignore channel from KISS and substitute radio channel for that KISS TCP port.
 		return c.kps.channel

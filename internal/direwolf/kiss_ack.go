@@ -115,6 +115,6 @@ func (a *kissAcks) drain(ctx context.Context, client kissClient) {
 
 		a.mu.Unlock()
 
-		client.reply(next.channel, kiss.CmdXKissData, next.id)
+		client.Reply(next.channel, kiss.CmdXKissData, next.id)
 	}
 }

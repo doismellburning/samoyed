@@ -365,16 +365,16 @@ func NewKissHandler(ctx context.Context, tnc kissHandlerTNC, copyToPeers kissCop
 // kissClient is the client application a message came from, by whichever
 // transport, and where any answer to it goes.
 type kissClient interface {
-	// reply sends frame, of type cmd for radio channel, to this client alone.
-	reply(channel int, cmd int, frame []byte)
+	// Reply sends frame, of type cmd for radio channel, to this client alone.
+	Reply(channel int, cmd int, frame []byte)
 
-	// prompt sends text as it is, not as a KISS frame, to appease a client
+	// Prompt sends text as it is, not as a KISS frame, to appease a client
 	// that thinks it is driving a traditional TNC in command mode.
-	prompt(text []byte)
+	Prompt(text []byte)
 
-	// radioChannel is the radio channel a message from this client is for,
+	// RadioChannel is the radio channel a message from this client is for,
 	// given the one its KISS type byte names.
-	radioChannel(frameChannel int) int
+	RadioChannel(frameChannel int) int
 }
 
 func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
@@ -391,9 +391,9 @@ func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
 		if chunk.EndOfLine {
 			if strings.EqualFold("restart\r", string(chunk.Noise)) ||
 				strings.EqualFold("reset\r", string(chunk.Noise)) {
-				from.prompt([]byte("\xc0\xc0"))
+				from.Prompt([]byte("\xc0\xc0"))
 			} else {
-				from.prompt([]byte("\r\ncmd:"))
+				from.Prompt([]byte("\r\ncmd:"))
 			}
 		}
 
@@ -452,7 +452,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 	// We can have KISS TCP ports which convey only a single radio channel.
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.
 	// Normally, though, the radio channel is the one the KISS frame names.
-	var channel = from.radioChannel(int(kiss_msg[0]>>4) & 0xf)
+	var channel = from.RadioChannel(int(kiss_msg[0]>>4) & 0xf)
 
 	var alevel ax25.ALevel
 	var cmd = kiss_msg[0] & 0xf
@@ -732,7 +732,7 @@ func logMissingKissValue(channel int, command string) {
  *				  This is the tricky part.  We can have any combination of
  *				  serial port, pseudo terminal, and multiple TCP clients.
  *				  We need to send the response to same place where query came
- *				  from, which is what from's reply does.
+ *				  from, which is what from's Reply does.
  *
  *		tnc		- The TNC whose transmit queue TXBUF reports on.
  *
@@ -807,7 +807,7 @@ func kiss_set_hardware(channel int, command []byte, from kissClient, tnc kissHan
 			}
 
 			var response = fmt.Sprintf("DIREWOLF %d.%d", version.Major, version.Minor)
-			from.reply(channel, kiss.CmdSetHardware, []byte(response))
+			from.Reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else if bytes.Equal(cmd, []byte("TXBUF")) { /* TXBUF - Number of bytes in transmit queue. */
 			if len(value) > 0 {
 				logrus.WithFields(logrus.Fields{
@@ -817,7 +817,7 @@ func kiss_set_hardware(channel int, command []byte, from kissClient, tnc kissHan
 			}
 
 			var response = fmt.Sprintf("TXBUF:%d", tnc.QueuedBytes(channel))
-			from.reply(channel, kiss.CmdSetHardware, []byte(response))
+			from.Reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else {
 			logrus.WithField("command", string(cmd)).Error("KISS Set Hardware unrecognized command")
 		}

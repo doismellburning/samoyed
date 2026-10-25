@@ -222,11 +222,11 @@ func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, frame []byte) {
 // The pseudo terminal has one client at the far end, which is where an answer
 // to anything it sends goes.
 
-func (kp *KissPT) reply(channel int, cmd int, frame []byte) {
+func (kp *KissPT) Reply(channel int, cmd int, frame []byte) {
 	kp.SendRecPacket(channel, cmd, frame)
 }
 
-func (kp *KissPT) prompt(text []byte) {
+func (kp *KissPT) Prompt(text []byte) {
 	var master = kp.ptMaster()
 	if master == nil {
 		return
@@ -239,7 +239,7 @@ func (kp *KissPT) prompt(text []byte) {
 	kp.write(master, text)
 }
 
-func (kp *KissPT) radioChannel(frameChannel int) int {
+func (kp *KissPT) RadioChannel(frameChannel int) int {
 	return frameChannel
 }
 

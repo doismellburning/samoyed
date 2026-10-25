@@ -293,7 +293,7 @@ func TestKissPTPrompt(t *testing.T) {
 
 	var kp, client = startKissPT(t, 0)
 
-	kp.prompt([]byte("\r\ncmd:"))
+	kp.Prompt([]byte("\r\ncmd:"))
 
 	assert.Equal(t, "\r\ncmd:", readKissText(t, client, len("\r\ncmd:")))
 }
@@ -484,7 +484,7 @@ func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
 	output = captureKissLog(t, func() {
-		kp.prompt([]byte("\r\ncmd:"))
+		kp.Prompt([]byte("\r\ncmd:"))
 
 		readKissText(t, client, len("\r\ncmd:"))
 	})

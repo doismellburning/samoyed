@@ -28,11 +28,11 @@ func kissTestRadioConfig() *RadioConfig {
 // the tests that care only what the TNC makes of what it sends.
 type quietKissClient struct{}
 
-func (quietKissClient) reply(int, int, []byte) {}
+func (quietKissClient) Reply(int, int, []byte) {}
 
-func (quietKissClient) prompt([]byte) {}
+func (quietKissClient) Prompt([]byte) {}
 
-func (quietKissClient) radioChannel(frameChannel int) int { return frameChannel }
+func (quietKissClient) RadioChannel(frameChannel int) int { return frameChannel }
 
 // handleKissMsg hands h msg, a KISS frame without its framing, as though from
 // had sent it.

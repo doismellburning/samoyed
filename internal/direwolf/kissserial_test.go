@@ -265,7 +265,7 @@ func TestKissSerialPrompt(t *testing.T) {
 
 	var ks, client = openKissSerialPort(t, 0)
 
-	ks.prompt([]byte("\r\ncmd:"))
+	ks.Prompt([]byte("\r\ncmd:"))
 
 	assert.Equal(t, "\r\ncmd:", readSerialText(t, client, len("\r\ncmd:")))
 }
@@ -477,7 +477,7 @@ func TestKissSerialDebugPrints(t *testing.T) {
 	assert.Contains(t, output, `channel=1 direction=to function="Data frame"`)
 
 	output = captureKissLog(t, func() {
-		ks.prompt([]byte("\r\ncmd:"))
+		ks.Prompt([]byte("\r\ncmd:"))
 	})
 
 	assert.Contains(t, output, "Fake command prompt")
