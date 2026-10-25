@@ -291,7 +291,7 @@ which is given the node once the node exists,
 before the AGW server takes any clients.
 
 **The node shell, NET/ROM and sharedNode.**
-NET/ROM configured under the node shell shares the shell's address and alias,
+NET/ROM configured beside the node shell shares the shell's address and alias,
 and its client number with the data link,
 which tells that client about the links of both.
 The two reach the data link through a ``sharedNode``,

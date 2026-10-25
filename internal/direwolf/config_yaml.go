@@ -51,8 +51,8 @@ type SamoyedConfig struct {
 	// Node, when given, runs the node shell.
 	Node *NodeSettings `yaml:"node"`
 
-	// NetROM, when given, runs a NET/ROM node on a station without a node
-	// shell.  With one, NET/ROM is configured under Node.
+	// NetROM, when given, runs a NET/ROM node, sharing the node shell's
+	// address and alias if there is one.
 	NetROM *NetROMSettings `yaml:"netrom"`
 
 	// Legacy holds directives in the line-at-a-time format, read after
@@ -211,7 +211,10 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 		ps.reportIfError(ps.applyNODE(*file.Node))
 	}
 
-	if file.NetROM != nil {
+	// After the node, whose address and alias NET/ROM shares.  A node that
+	// was refused has been complained of already, and NET/ROM can't tell
+	// what it would have shared.
+	if file.NetROM != nil && (file.Node == nil || ps.misc.node.IsJust()) {
 		ps.line = top["netrom"].line(new(yaml.Node))
 		ps.reportIfError(ps.applyNETROM(*file.NetROM))
 	}

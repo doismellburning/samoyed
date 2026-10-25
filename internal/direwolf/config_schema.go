@@ -177,35 +177,27 @@ type NodeSettings struct {
 	// Map, when given, reports the node to the UK Packet Radio network
 	// map.
 	Map *NodeMapSettings `yaml:"map"`
-
-	// NetROM, when given, runs a NET/ROM node under the node's own address
-	// and alias, so that users and neighbouring nodes connect to the one
-	// node.
-	NetROM *NetROMRouting `yaml:"netrom"`
 }
 
-// NetROMSettings describes a NET/ROM node on a station without a node shell,
-// which carries traffic between nodes over circuits that may cross several of
-// them.  With a node shell, NET/ROM is configured with it.
+// NetROMSettings describes a NET/ROM node, which carries traffic between
+// nodes over circuits that may cross several of them.  Beside a node shell it
+// shares the shell's address and alias, so that users and neighbouring nodes
+// connect to the one node.
 type NetROMSettings struct {
-	NetROMRouting `yaml:",inline"`
-
 	// Callsign is the node's AX.25 address, conventionally the station's
-	// callsign with an SSID of its own.
+	// callsign with an SSID of its own.  Beside a node shell it is the
+	// shell's address, and is left out.
 	Callsign string `yaml:"callsign"`
 
 	// Alias is the short name, of up to six characters, other nodes know
-	// it by.
+	// it by.  Beside a node shell it is the shell's alias, and is left out.
 	Alias string `yaml:"alias"`
-}
 
-// NetROMRouting describes how a NET/ROM node routes, whether it has a
-// callsign and alias of its own or shares the node shell's.
-type NetROMRouting struct {
 	// Channels are the channels the node runs on, each a radio channel or
 	// an NCHANNEL.  It has one routing table across them all, a neighbour
-	// being a callsign on one of them.  Sharing the node shell's names, they
-	// must be among the shell's, and left out are all of them.
+	// being a callsign on one of them.  Left out, they are the node shell's
+	// channels, or without one every channel connected mode can be used
+	// on.  Beside a node shell they must be among the shell's.
 	Channels []int `yaml:"channels"`
 
 	// TTL is how many nodes a frame the node originates may cross.  Left
