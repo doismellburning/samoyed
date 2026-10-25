@@ -186,11 +186,16 @@ These are the keys under ``samoyed``:
     ``port``
         The TNC's KISS TCP port.
 
+    ``mycall``
+        The channel's own ``MYCALL``.
+        Left out, the channel takes the one every channel without its own gets.
+        The legacy format has no way to give a virtual channel one.
+
     .. code:: yaml
 
         samoyed:
           networkTNCs:
-            - {channel: 6, host: 192.0.2.1, port: 8001}
+            - {channel: 6, host: 192.0.2.1, port: 8001, mycall: Q1TEST-1}
 
 ``axudpPorts``
     AXUDP ports: AX.25 frames to and from other nodes (BPQ, XRouter, another
@@ -232,6 +237,9 @@ These are the keys under ``samoyed``:
         Maps always win over what is learned,
         and a learned node gets no broadcasts.
         Off by default.
+
+    ``mycall``
+        The channel's own ``MYCALL``, as for ``networkTNCs``.
 
     Frames are sent with the RFC 1226 checksum appended; one on a received
     datagram is recognised and removed.  Datagrams are accepted from anyone,
