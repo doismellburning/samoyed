@@ -134,6 +134,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type fromto_t int
+
+const (
+	FROM_CLIENT fromto_t = 0
+	TO_CLIENT   fromto_t = 1
+)
+
 // AGW_LOGIN_FIELD_LEN is the size of each of the two fields, user name and
 // password, in the data of an "Application Login" frame.  Both are NUL padded.
 const AGW_LOGIN_FIELD_LEN = 255

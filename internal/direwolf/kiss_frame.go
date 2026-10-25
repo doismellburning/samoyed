@@ -16,13 +16,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type fromto_t int
-
-const (
-	FROM_CLIENT fromto_t = 0
-	TO_CLIENT   fromto_t = 1
-)
-
 /*-------------------------------------------------------------------
  *
  * Name:        kiss_debug_print
