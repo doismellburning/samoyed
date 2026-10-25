@@ -232,6 +232,62 @@ An audio *input* device is also still required: there is nothing to do without
 one, so Samoyed stops if it cannot be opened.
 
 
+Receive from an RTL-SDR
+-----------------------
+
+Samoyed can take its audio from an RTL-SDR dongle served by ``rtl_tcp``,
+FM demodulating it itself,
+so there is no need to pipe ``rtl_fm`` in.
+One dongle receives up to two frequencies at once,
+each on its own channel,
+as long as they are within about 900 kHz of each other.
+
+Start ``rtl_tcp`` on the machine the dongle is plugged into
+(``apt install rtl-sdr`` on Debian and Ubuntu):
+
+.. code::
+
+    $ rtl_tcp -a 127.0.0.1
+
+Then name it as an audio device's input in a :doc:`YAML configuration <yaml-config>`,
+with an ``sdr`` block giving a frequency in MHz for each of the device's channels:
+
+.. code:: yaml
+
+    samoyed:
+      audioDevices:
+        - input: rtl_tcp:127.0.0.1:1234
+          rate: 48000
+          sdr:
+            frequencies: [144.800, 144.950]
+            gain: 40
+            ppm: 0
+
+      channels:
+        - channel: 0
+          mycall: Q1TEST
+          modem: {speed: "1200"}
+        - channel: 1
+          modem: {speed: "9600"}
+
+``gain`` is the tuner gain in dB;
+leave it out for the tuner's automatic gain control.
+``ppm`` corrects the dongle's oscillator,
+which on a cheap dongle can be some tens of parts per million out:
+that is a couple of kHz at 144 MHz,
+which costs decodes at 9600 bps.
+``rtl_test -p`` measures it.
+
+The demodulated audio is flat, without de-emphasis,
+which is what the 9600 bps demodulator wants
+and the 1200 bps one copes with.
+
+An SDR device only receives, so its channels can't transmit
+(see `Receive without an audio output device`_).
+There is no line-at-a-time form of the ``sdr`` settings,
+so ``ADEVICE rtl_tcp:...`` in a ``direwolf.conf`` is refused.
+
+
 Run two instances talking to each other via ALSA loopback (Linux)
 -----------------------------------------------------------------
 

@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/sdr"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -76,6 +78,21 @@ type AudioDeviceConfig struct {
 
 	// Rate is the sample rate, in samples per second.
 	Rate *int `yaml:"rate"`
+
+	// SDR tunes the SDR an rtl_tcp: input receives from.
+	SDR *SDRConfig `yaml:"sdr"`
+}
+
+// SDRConfig is how to tune an SDR.
+type SDRConfig struct {
+	// Frequencies has a frequency, in MHz, for each audio channel.
+	Frequencies []float64 `yaml:"frequencies"`
+
+	// Gain is the tuner gain in dB; left out, the tuner sets its own.
+	Gain *float64 `yaml:"gain"`
+
+	// PPM corrects the receiver's frequency, in parts per million.
+	PPM *int `yaml:"ppm"`
 }
 
 // ChannelConfig is a radio channel.
@@ -254,7 +271,75 @@ func (ps *parseState) applyYAMLAudioDevices(devices []AudioDeviceConfig, node ya
 			ps.line = keys["rate"].line(item)
 			ps.reportIfError(ps.applyARATE(*device.Rate))
 		}
+
+		if defined && device.SDR != nil {
+			ps.line = keys["sdr"].line(item)
+			ps.applySDR(*device.SDR, device.Channels != nil)
+		}
 	}
+}
+
+// maxSDRFrequencies is how many frequencies one SDR receives: one for each
+// channel an audio device has.
+const maxSDRFrequencies = 2
+
+// applySDR sets how to tune the SDR the current audio device receives from,
+// and gives the device a channel for each frequency - which, if
+// channelsGiven, the device's channels had better already agree with.
+func (ps *parseState) applySDR(config SDRConfig, channelsGiven bool) {
+	var adev = &ps.audio.adev[ps.adevice]
+
+	ps.sdrGiven[ps.adevice] = true
+
+	if !audioNameIsRTLTCP(adev.adevice_in) {
+		ps.errorf("line %d: sdr is for an audio device whose input is %shost:port, not %s", ps.line, rtlTCPPrefix, adev.adevice_in)
+
+		return
+	}
+
+	var n = len(config.Frequencies)
+	if n == 0 || n > maxSDRFrequencies {
+		ps.errorf("line %d: sdr needs 1 to %d frequencies, one for each audio channel, not %d", ps.line, maxSDRFrequencies, n)
+
+		return
+	}
+
+	if channelsGiven && adev.num_channels != n {
+		ps.errorf("line %d: sdr has %d frequencies for an audio device with %d channels", ps.line, n, adev.num_channels)
+
+		return
+	}
+
+	if config.Gain != nil {
+		var err = sdr.CheckGain(*config.Gain)
+		if err != nil {
+			ps.errorf("line %d: sdr %s", ps.line, err)
+
+			return
+		}
+	}
+
+	if config.PPM != nil {
+		var err = sdr.CheckFrequencyCorrection(*config.PPM)
+		if err != nil {
+			ps.errorf("line %d: sdr %s", ps.line, err)
+
+			return
+		}
+	}
+
+	var params sdrParams
+
+	for _, mhz := range config.Frequencies {
+		params.frequencies = append(params.frequencies, mhz*1e6)
+	}
+
+	params.gain = maybe.FromPointer(config.Gain)
+	params.ppm = maybe.FromMaybe(0, maybe.FromPointer(config.PPM))
+
+	adev.sdr = maybe.Just(params)
+
+	ps.reportIfError(ps.applyACHANNELS(n))
 }
 
 // applyYAMLChannels applies the radio channels, whose entries in the file are

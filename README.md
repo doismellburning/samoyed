@@ -63,6 +63,7 @@ As well as that, Samoyed also adds:
 
 - **IL2P CRC** — support for IL2P's Cyclic Redundancy Check for improved packet reconstruction, per the [IL2P Specification Draft v0.6](https://tarpn.net/t/il2p/il2p-specification_draft_v0-6.pdf)
 - **BPSK** — 300 and 1200 bps Binary Phase Shift Keying, compatible with the NinoTNC's BPSK modes for AX.25 and IL2P alike (`MODEM 300 BPSK` or `MODEM 1200 BPSK`, with `IL2PTX` for IL2P, which sends the CRC by default)
+- **RTL-SDR input** — receive up to two frequencies from one dongle through `rtl_tcp`, FM demodulated by Samoyed itself, with no soundcard or `rtl_fm` (see [Receive from an RTL-SDR](https://doismellburning.github.io/samoyed/how-to-guides/#receive-from-an-rtl-sdr))
 - **UDP audio output** — stream encoded audio to a remote host via UDP (`ADEVICE default udp:host:port`) for testing and experimentation
 - **YAML configuration** — an alternative to the line-at-a-time format, for configuration files named `*.yaml` or `*.yml`
 - **Config checking** — `--config-check` reports every problem in a configuration file without starting up

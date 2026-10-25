@@ -38,6 +38,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/audiostats"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/gordonklaus/portaudio"
 	"github.com/sirupsen/logrus"
 )
@@ -48,6 +49,7 @@ const (
 	AUDIO_IN_TYPE_SOUNDCARD audio_in_type_e = iota
 	AUDIO_IN_TYPE_SDR_UDP
 	AUDIO_IN_TYPE_STDIN
+	AUDIO_IN_TYPE_RTLTCP
 )
 
 type adev_param_s struct {
@@ -75,6 +77,8 @@ type adev_param_s struct {
 	samples_per_sec int /* Audio sampling rate.  Typically 11025, 22050, 44100, or 48000. */
 	bits_per_sample int /* 8 (unsigned char) or 16 (signed short). */
 
+	// sdr is how to tune an SDR, for a device receiving from one.
+	sdr maybe.Maybe[sdrParams]
 }
 
 // validate reports a sound device configuration that the tone generator, the
@@ -324,6 +328,9 @@ type adev_s struct {
 	// UDP socket for SDR input
 	udp_sock *net.UDPConn
 
+	// The SDR an rtl_tcp device receives from, which fills inputRingBuf.
+	sdr *sdrReceiver
+
 	// UDP connection for audio output
 	udp_out_sock net.Conn
 
@@ -469,7 +476,7 @@ const (
 // Call this before AudioOpen rewrites the input name, so that the input and
 // output names can still be compared.
 func audioOutType(ad *adev_param_s) audio_out_type_e {
-	if audioNameIsStdin(ad.adevice_out) {
+	if audioNameIsStdin(ad.adevice_out) || audioNameIsRTLTCP(ad.adevice_out) {
 		return AUDIO_OUT_TYPE_NONE
 	}
 
@@ -535,7 +542,7 @@ func (d *AudioDevices) channelCanTransmit(channel int) bool {
 }
 
 // anyInputRequiresPortAudio reports whether any configured audio device needs
-// PortAudio to receive (i.e. is a soundcard rather than stdin or UDP).
+// PortAudio to receive (i.e. is a soundcard rather than stdin, UDP or an SDR).
 func anyInputRequiresPortAudio(pa *RadioConfig) bool {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined == 0 {
@@ -543,7 +550,7 @@ func anyInputRequiresPortAudio(pa *RadioConfig) bool {
 		}
 
 		var inName = pa.adev[a].adevice_in
-		if !audioNameIsStdin(inName) && !audioNameIsUDP(inName) {
+		if !audioNameIsStdin(inName) && !audioNameIsUDP(inName) && !audioNameIsRTLTCP(inName) {
 			return true
 		}
 	}
@@ -955,6 +962,10 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, p
 		}
 	}
 
+	if audioNameIsRTLTCP(pa.adev[a].adevice_in) {
+		d.dev[a].g_audio_in_type = AUDIO_IN_TYPE_RTLTCP
+	}
+
 	/* Let user know what is going on. */
 
 	/* If not specified, the device names should be "default". */
@@ -1025,6 +1036,12 @@ func (d *AudioDevices) openDevice(ctx context.Context, a int, pa *RadioConfig, p
 	case AUDIO_IN_TYPE_STDIN:
 		/* Do we need to adjust any properties of stdin? */
 		d.dev[a].inbufSizeInBytes = 1024
+
+	case AUDIO_IN_TYPE_RTLTCP:
+		var err = d.openRTLTCPInput(ctx, a, pa, audio_in_name, bufSizeInBytes)
+		if err != nil {
+			return err
+		}
 
 	default:
 		logrus.WithField("type", d.dev[a].g_audio_in_type).Error("Internal error, invalid audio_in_type")
@@ -1255,16 +1272,23 @@ func (d *AudioDevices) GetByte(a int) int {
 	 * Soundcard - PortAudio callback mode.
 	 * Audio data is written to the ring buffer by the callback.
 	 * We just read one byte from it here.
+	 *
+	 * An SDR's receiver fills the ring buffer just the same.
 	 */
-	case AUDIO_IN_TYPE_SOUNDCARD:
+	case AUDIO_IN_TYPE_SOUNDCARD, AUDIO_IN_TYPE_RTLTCP:
 		dwutil.Assert(d.dev[a].inputRingBuf != nil)
 
 		// Check for overflow (data was dropped in the callback)
 		if d.dev[a].inputRingBuf.checkOverflow() {
+			var hint = "If receiving is fine and strange things happen when transmitting, " +
+				"it is probably RF energy getting into your audio or digital wiring"
+			if d.dev[a].g_audio_in_type == AUDIO_IN_TYPE_RTLTCP {
+				hint = "The demodulators are not keeping up: try fewer modems on this device's channels"
+			}
+
 			logrus.WithFields(logrus.Fields{
 				"adev": a,
-				"hint": "If receiving is fine and strange things happen when transmitting, " +
-					"it is probably RF energy getting into your audio or digital wiring",
+				"hint": hint,
 			}).Error("Audio input overflow, some samples lost")
 
 			d.dev[a].recordRead(a, 0)
@@ -1614,7 +1638,7 @@ func (d *AudioDevices) wait(a int) {
 
 func (d *AudioDevices) Close() {
 	for a := range MAX_ADEVS {
-		if d.dev[a] != nil && (d.dev[a].inputStream != nil || d.dev[a].outputStream != nil || d.dev[a].udp_sock != nil || d.dev[a].udp_out_sock != nil) {
+		if d.dev[a] != nil && (d.dev[a].inputStream != nil || d.dev[a].outputStream != nil || d.dev[a].udp_sock != nil || d.dev[a].udp_out_sock != nil || d.dev[a].sdr != nil) {
 			d.wait(a)
 
 			if d.dev[a].inputStream != nil {
@@ -1632,6 +1656,12 @@ func (d *AudioDevices) Close() {
 
 				d.dev[a].outputStream.Close()
 				d.dev[a].outputStream = nil
+			}
+
+			// Stop the SDR filling its ring buffer before closing that.
+			if d.dev[a].sdr != nil {
+				d.dev[a].sdr.stop()
+				d.dev[a].sdr = nil
 			}
 
 			// Then close ring buffers

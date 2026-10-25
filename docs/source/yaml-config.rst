@@ -98,6 +98,21 @@ These are the keys under ``samoyed``:
     sample rate (``ARATE``).  A device's number is its position in the list,
     unless it gives one with ``device``.
 
+    An ``input`` of ``rtl_tcp:host:port`` receives from an RTL-SDR served by
+    ``rtl_tcp``, which needs an ``sdr`` block, with no line-at-a-time equivalent:
+
+    ``frequencies``
+        A frequency in MHz for each of the device's channels, one or two of
+        them, which sets ``channels``.
+
+    ``gain``
+        The tuner gain in dB.  Left out, the tuner sets its own.
+
+    ``ppm``
+        The correction for the dongle's oscillator, in parts per million.
+
+    See :doc:`how-to-guides` for an example.
+
 ``channels``
     A list of radio channels.  Each needs ``channel``, its number, and may have:
 
