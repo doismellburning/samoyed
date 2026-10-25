@@ -396,9 +396,11 @@ func TestTqWithdrawTakesOnlyStalePackets(t *testing.T) {
 	tq.Append(0, TQ_PRIO_1_LO, ax25.FromText("Q1TEST>APRS:stale tail", true))
 	tq.Append(0, TQ_PRIO_0_HI, ax25.FromText("Q1TEST>APRS:stale only", true))
 
-	tq.Withdraw(0, func(pp *ax25.Packet) bool {
+	var withdrawn = tq.Withdraw(0, func(pp *ax25.Packet) bool {
 		return strings.HasPrefix(string(pp.Info()), "stale")
 	})
+
+	assert.Equal(t, 4, withdrawn)
 
 	var want [MAX_RADIO_CHANS][TQ_NUM_PRIO]int
 	want[0][TQ_PRIO_1_LO] = 2

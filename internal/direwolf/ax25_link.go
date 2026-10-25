@@ -296,16 +296,16 @@ func (noLinkClients) OutstandingFramesReply(int, int, string, string, int) {}
 type linkTransmitter interface {
 	LMDataRequest(channel int, prio int, pp *ax25.Packet)
 	LMSeizeRequest(channel int)
-	Withdraw(channel int, stale func(pp *ax25.Packet) bool)
+	Withdraw(channel int, stale func(pp *ax25.Packet) bool) int
 }
 
 // noLinkTransmitter is the linkTransmitter for when there is nowhere to send
 // frames: it drops them, and never grants a seize.
 type noLinkTransmitter struct{}
 
-func (noLinkTransmitter) LMDataRequest(int, int, *ax25.Packet)     {}
-func (noLinkTransmitter) LMSeizeRequest(int)                       {}
-func (noLinkTransmitter) Withdraw(int, func(pp *ax25.Packet) bool) {}
+func (noLinkTransmitter) LMDataRequest(int, int, *ax25.Packet)         {}
+func (noLinkTransmitter) LMSeizeRequest(int)                           {}
+func (noLinkTransmitter) Withdraw(int, func(pp *ax25.Packet) bool) int { return 0 }
 
 /*
  * AX.25 data link state machine.
@@ -404,6 +404,12 @@ type ax25_dlsm_t struct {
 	// "MAXFRAME" or "EMAXFRAME" parameter in configuration file.
 
 	rc int // Retry count.  Give up after n2.
+
+	uasOwed int // UAs that may still come for SABM(E)s we sent, beyond the one that connected us.
+	// A SABM(E) retried before the UA to an earlier one got back gets a UA of
+	// its own, and that is no reason to reset the link once it is up - but the
+	// other station reset its end when it heard the retry, so this only holds
+	// while nothing it sent before then has reached us.  See ua_frame.
 
 	vs int // 4.2.4.1. Send State Variable V(S)
 	// The send state variable exists within the TNC and is never sent.
@@ -586,6 +592,13 @@ func SET_VS(S *ax25_dlsm_t, n int) {
 // transmitted data, and everything preceding it, from S.txdata_by_ns[].
 
 func SET_VA(S *ax25_dlsm_t, n int) {
+	// The other station has had I frames we sent once connected, so had heard
+	// every SABM(E) before them, and their UAs are already in.  (Or the link is
+	// being reset, and none are owed anyway.)
+	if n != S.va {
+		S.uasOwed = 0
+	}
+
 	S.va = (n)
 
 	var pc, _, __LINE__, _ = runtime.Caller(1)
@@ -2452,6 +2465,10 @@ func i_frame(S *ax25_dlsm_t, cr ax25.CmdRes, p int, nr int, ns int, pid int, inf
 		}
 
 	case state_3_connected, state_4_timer_recovery:
+		// Sent before any UA still to come, so before the other station reset its
+		// end for our retried SABM(E); a UA after this must reset ours too.
+		S.uasOwed = 0
+
 		// Look carefully.  The original had two tiny differences between the two states.
 		// In the 2006 version, these differences no longer exist.
 		// Erratum: SDL asks: Is information field length <= N1 (paclen).
@@ -4056,6 +4073,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 
 		START_T3(S)
 		SET_RC(S, 0) // My enhancement.  See Erratum note in select_t1_value.
+		S.uasOwed = 0
 		enter_new_state(S, state_3_connected)
 
 	case state_1_awaiting_connection:
@@ -4156,6 +4174,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			SET_VA(S, 0)
 			SET_VR(S, 0)
 			SET_RC(S, 0) // My enhancement.  See Erratum note in select_t1_value.
+			S.uasOwed = 0
 			enter_new_state(S, state_3_connected)
 		}
 	}
@@ -4470,8 +4489,10 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 // greeting a caller has, the first I frame we send acknowledges data it no
 // longer counts as sent, an N(R) error that makes it reset the link again.
 // Our I frames in flight are lost along the way.
-func withdraw_connect_retries(S *ax25_dlsm_t) {
-	S.services.queue.Withdraw(S.channel, func(pp *ax25.Packet) bool {
+//
+// It returns how many it took back, none of which the far end will answer.
+func withdraw_connect_retries(S *ax25_dlsm_t) int {
+	return S.services.queue.Withdraw(S.channel, func(pp *ax25.Packet) bool {
 		var frameType = pp.FrameTypeOnly()
 
 		return (frameType == ax25.FrameTypeUSABM || frameType == ax25.FrameTypeUSABME) &&
@@ -4581,7 +4602,11 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 			// be used. If the other station is using version 2.2 or better, it will respond with an XID
 			// response.
 
-			withdraw_connect_retries(S)
+			var withdrawn = withdraw_connect_retries(S)
+
+			// RC counts the SABM(E)s we queued, and the other station answers each
+			// one it hears - but not the ones we have just taken back unsent.
+			S.uasOwed = max(S.rc-1-withdrawn, 0)
 
 			if S.state == state_5_awaiting_v22_connection {
 				mdl_negotiate_request(S)
@@ -4615,12 +4640,39 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 		}
 
 	case state_3_connected, state_4_timer_recovery:
+		// Not in the flow chart: a UA to a SABM(E) we retried before the UA to an
+		// earlier one got back is expected.  The other station reset its end when
+		// it heard the retry, but frames go each way in order, so if no I frame
+		// from it has arrived ahead of this UA, it had sent none, and the reset
+		// left it in step with us.  Resetting ours as well would throw away the
+		// I frames we have sent since.  Dire Wolf resets.
+		if f == 1 && S.uasOwed > 0 {
+			S.uasOwed--
+
+			if S.services.debugProtocolErrors {
+				logrus.WithFields(logrus.Fields{
+					"stream": S.stream_id,
+					"peer":   S.addrs[PEERCALL],
+				}).Debug("Ignoring UA to a retried SABM(E)")
+			}
+
+			break
+		}
+
 		if S.services.debugProtocolErrors {
 			logrus.WithFields(logrus.Fields{
 				"stream": S.stream_id,
 				"state":  S.state,
 			}).Debug("AX.25 Protocol Error C: Unexpected UA")
 		}
+
+		// Implementation difference: as for a reset the other station asks for with
+		// a SABM(E), put what we sent and have not had acknowledged back on the queue,
+		// to go again from N(S) 0, rather than lose it once V(S) and V(A) are reset.
+		// With nothing lost, the client has nothing to be told when the UA comes.
+		requeueIFrames(S)
+		SET_VS(S, 0)
+		SET_VA(S, 0)
 
 		establish_data_link(S)
 		S.layer_3_initiated = false
@@ -4865,6 +4917,11 @@ func xid_frame(S *ax25_dlsm_t, cr ax25.CmdRes, pf int, info []byte) {
 				if ok {
 					complete_negotiation(S, param)
 				}
+
+				// The other station heard our XID, sent once we were connected, so it
+				// had heard every SABM(E) before it, and their UAs are already in -
+				// so long as it queues its UAs and XID responses at the same priority.
+				S.uasOwed = 0
 
 				S.mdl_state = mdl_state_0_ready
 				STOP_TM201(S)

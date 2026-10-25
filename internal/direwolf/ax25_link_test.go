@@ -759,15 +759,8 @@ func TestLinkResetResendsUnacknowledgedFrames(t *testing.T) {
 		channel   = 1
 	)
 
-	var miscConfig = new(misc_config_s)
-	miscConfig.paclen = AX25_N1_PACLEN_DEFAULT
-	miscConfig.retry = AX25_N2_RETRY_DEFAULT
-	miscConfig.frack = AX25_T1V_FRACK_DEFAULT
-	miscConfig.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
-	miscConfig.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
-
 	var clients = new(establishedLinkClients)
-	var link = NewAX25Link(miscConfig, nil, clients, newTestTransmitQueue(new(RadioConfig)), 1)
+	var link = NewAX25Link(newTestMiscConfig(0), nil, clients, newTestTransmitQueue(new(RadioConfig)), 1)
 
 	var S = establishConnection(t, link, myCall, theirCall, channel)
 
@@ -918,4 +911,389 @@ func TestUAWithdrawsAConnectRetryStillQueued(t *testing.T) {
 	}
 
 	assert.Equal(t, []ax25.FrameType{ax25.FrameTypeUXID}, sent, "only the XID negotiation should be left to send")
+}
+
+// recordingTransmitter keeps the frames a link sends, for a test to deliver
+// to the other end, and notes when it asks for the channel.
+type recordingTransmitter struct {
+	frames      []*ax25.Packet
+	seizeWanted bool
+}
+
+func (r *recordingTransmitter) LMDataRequest(_ int, _ int, pp *ax25.Packet) {
+	r.frames = append(r.frames, pp)
+}
+
+func (r *recordingTransmitter) LMSeizeRequest(int) {
+	r.seizeWanted = true
+}
+
+// Withdraw takes back what stale says is overtaken from what has not yet been
+// handed over by take, as a transmit queue does from what is still waiting
+// for a clear channel.
+func (r *recordingTransmitter) Withdraw(_ int, stale func(pp *ax25.Packet) bool) int {
+	var kept []*ax25.Packet
+
+	for _, pp := range r.frames {
+		if !stale(pp) {
+			kept = append(kept, pp)
+		}
+	}
+
+	var withdrawn = len(r.frames) - len(kept)
+
+	r.frames = kept
+
+	return withdrawn
+}
+
+// take hands over what has been sent since it was last called.
+func (r *recordingTransmitter) take() []*ax25.Packet {
+	var frames = r.frames
+
+	r.frames = nil
+
+	return frames
+}
+
+// receivingLinkClients keeps the connected mode data a link hands up.
+type receivingLinkClients struct {
+	noLinkClients
+
+	received [][]byte
+}
+
+func (r *receivingLinkClients) RecConnData(_ int, _ int, _ string, _ string, _ int, data []byte) {
+	r.received = append(r.received, data)
+}
+
+// linkEnd is one station of a simulated link, whose frames reach the other
+// end only when the test delivers them.
+type linkEnd struct {
+	call    string
+	link    *AX25Link
+	tx      *recordingTransmitter
+	clients *receivingLinkClients
+}
+
+// newLinkEnd is a station that sends at most maxv22 SABMEs before falling back
+// to v2.0.
+func newLinkEnd(call string, maxv22 int) *linkEnd {
+	var end = new(linkEnd)
+
+	end.call = call
+	end.tx = new(recordingTransmitter)
+	end.clients = new(receivingLinkClients)
+
+	end.link = NewAX25Link(newTestMiscConfig(maxv22), nil, end.clients, end.tx, 0)
+
+	return end
+}
+
+// deliver hands frames to the end as the radio would: as bytes, so it has to
+// work out the modulo for itself.
+func (end *linkEnd) deliver(t *testing.T, frames ...*ax25.Packet) {
+	t.Helper()
+
+	for _, sent := range frames {
+		var pp = ax25.FromFrame(sent.FrameData(), ax25.ALevel{Rec: 50, Mark: 50, Space: 50})
+		require.NotNil(t, pp)
+
+		receiveFrame(t, end.link, pp, 0)
+	}
+}
+
+// send has the end's client application send data to peer, and the end
+// transmit it once it has the channel.
+func (end *linkEnd) send(peer *linkEnd, data string) {
+	end.link.dl_data_request(newDataRequest(end.call, peer.call, 0, []byte(data)))
+	end.grantSeize()
+}
+
+// grantSeize gives the end the channel, if it has asked for it.
+func (end *linkEnd) grantSeize() {
+	if !end.tx.seizeWanted {
+		return
+	}
+
+	end.tx.seizeWanted = false
+
+	var E = new(dlq_item_t)
+	E._chan = 0
+	end.link.lm_seize_confirm(E)
+}
+
+// listeningCall is the callsign newListeningLinkEnd's station answers to.
+const listeningCall = "Q2TEST-7"
+
+// newListeningLinkEnd is a v2.0 station whose callsign is registered, so it
+// accepts connections.
+func newListeningLinkEnd(t *testing.T) *linkEnd {
+	t.Helper()
+
+	var end = newLinkEnd(listeningCall, 0)
+
+	var register = new(dlq_item_t)
+	register._type = DLQ_REGISTER_CALLSIGN
+	register.addrs[0] = listeningCall
+	end.link.dl_register_callsign(register)
+
+	return end
+}
+
+// connectWithARetriedSABME has A connect to B, sending its SABME again
+// before the UA to the first gets back.  B has heard only the first, and A is
+// connected on its UA; the retry is returned for the test to deliver.
+func connectWithARetriedSABME(t *testing.T) (*linkEnd, *linkEnd, *ax25_dlsm_t, *ax25.Packet) {
+	t.Helper()
+
+	var a = newLinkEnd("Q1TEST-7", AX25_N2_RETRY_DEFAULT/3) // maxv22 as config.go defaults it.
+	var b = newListeningLinkEnd(t)
+
+	initiateConnect(t, a.link, a.call, b.call, 0)
+
+	var sA = a.link.listHead
+	require.NotNil(t, sA)
+	require.Equal(t, state_5_awaiting_v22_connection, sA.state)
+
+	t1_expiry(sA)
+
+	var sabmes = a.tx.take()
+	require.Len(t, sabmes, 2)
+
+	b.deliver(t, sabmes[0])
+	a.deliver(t, b.tx.take()...) // UA
+
+	require.Equal(t, state_3_connected, sA.state)
+	require.Equal(t, ax25.Modulo128, sA.modulo)
+
+	return a, b, sA, sabmes[1]
+}
+
+// Regression test: a SABME retried before the UA to the first one arrived
+// got a UA of its own, and when that arrived, after the link was up and
+// data was flowing, the initiator took it as unexpected and reset the link.
+// The reset threw away the I frames on both sides, and a NET/ROM CONN ACK
+// with them.  The UA answers a SABME we sent ourselves, so is no reason to
+// reset anything.
+func TestUAToARetriedSABMEDoesNotResetTheLink(t *testing.T) {
+	t.Parallel()
+
+	var a, b, sA, retry = connectWithARetriedSABME(t)
+
+	a.send(b, "CONN REQ")
+
+	// B hears the retry, then everything A sent once it was connected - an
+	// XID command and the data - and answers the data.
+	b.deliver(t, retry)
+	b.deliver(t, a.tx.take()...)
+	require.Equal(t, [][]byte{[]byte("CONN REQ")}, b.clients.received)
+
+	b.send(a, "CONN ACK")
+
+	var sB = b.link.listHead
+	require.NotNil(t, sB)
+	assert.Equal(t, ax25.Modulo128, sB.modulo)
+
+	// A hears the UA to its retry, the XID response and B's data.
+	a.deliver(t, b.tx.take()...)
+	a.grantSeize()
+
+	assert.Equal(t, state_3_connected, sA.state, "the UA to the retried SABME reset the link")
+	assert.Equal(t, ax25.Modulo128, sA.modulo)
+	assert.Equal(t, [][]byte{[]byte("CONN ACK")}, a.clients.received)
+	assert.Equal(t, 1, sA.va, "B's acknowledgement of CONN REQ was lost")
+	assert.Equal(t, 0, sA.uasOwed, "the XID response says no more UAs are coming")
+
+	for _, pp := range a.tx.take() {
+		assert.NotEqual(t, ax25.FrameTypeUSABME, pp.FrameTypeOnly(), "A re-established the link")
+	}
+}
+
+// When B has sent data before it hears the retried SABME, the reset that
+// retry makes at B's end puts it out of step with A, which has had that data.
+// The UA to the retry comes after the data, so A can tell, and has to reset
+// its end too.
+func TestUAToARetriedSABMEAfterDataResetsTheLink(t *testing.T) {
+	t.Parallel()
+
+	var a, b, sA, retry = connectWithARetriedSABME(t)
+
+	b.send(a, "WELCOME")
+	b.deliver(t, retry)
+
+	a.deliver(t, b.tx.take()...) // WELCOME, then the UA to the retry.
+	require.Equal(t, [][]byte{[]byte("WELCOME")}, a.clients.received)
+
+	assert.Equal(t, state_5_awaiting_v22_connection, sA.state, "A stayed connected after B reset its end")
+
+	var sabmes = a.tx.take()
+	require.NotEmpty(t, sabmes)
+	assert.Equal(t, ax25.FrameTypeUSABME, sabmes[len(sabmes)-1].FrameTypeOnly())
+}
+
+// A UA is only let through for a retry the other station may yet answer.  On
+// a v2.0 link there is no XID to say they have all arrived, so the other
+// station acknowledging our data has to: here the retry was lost, and a UA
+// after that acknowledgement is unexpected, and resets the link as before.
+func TestUAAfterAcknowledgedDataResetsTheLink(t *testing.T) {
+	t.Parallel()
+
+	var a = newLinkEnd("Q1TEST-7", 0)
+	var b = newListeningLinkEnd(t)
+
+	initiateConnect(t, a.link, a.call, b.call, 0)
+
+	var sA = a.link.listHead
+	require.NotNil(t, sA)
+	require.Equal(t, state_1_awaiting_connection, sA.state)
+
+	t1_expiry(sA)
+
+	var sabms = a.tx.take()
+	require.Len(t, sabms, 2)
+
+	b.deliver(t, sabms[0]) // The retry is lost.
+	var ua = b.tx.take()
+	a.deliver(t, ua...)
+
+	require.Equal(t, state_3_connected, sA.state)
+	require.Equal(t, ax25.Modulo8, sA.modulo)
+
+	a.send(b, "UPLOAD")
+	b.deliver(t, a.tx.take()...)
+	require.Equal(t, [][]byte{[]byte("UPLOAD")}, b.clients.received)
+
+	var seize = new(dlq_item_t)
+	b.link.lm_seize_confirm(seize) // B acknowledges.
+	a.deliver(t, b.tx.take()...)
+	require.Equal(t, 1, sA.va)
+
+	a.deliver(t, ua...) // Unexpected now.
+
+	assert.Equal(t, state_1_awaiting_connection, sA.state, "A ignored an unexpected UA")
+}
+
+// A retry that T1 queued but that was still waiting for a clear channel when
+// the UA came is taken back unsent, so no UA will come for it, and none may be
+// let through on its account: a UA after that is unexpected, and resets the
+// link as before.
+func TestUAWithdrawnRetryIsNotOwedAUA(t *testing.T) {
+	t.Parallel()
+
+	var a = newLinkEnd("Q1TEST-7", AX25_N2_RETRY_DEFAULT/3) // maxv22 as config.go defaults it.
+	var b = newListeningLinkEnd(t)
+
+	initiateConnect(t, a.link, a.call, b.call, 0)
+
+	var sA = a.link.listHead
+	require.NotNil(t, sA)
+
+	var first = a.tx.take() // Sent.
+
+	t1_expiry(sA) // The retry waits for a clear channel.
+
+	b.deliver(t, first...)
+	var ua = b.tx.take()
+	a.deliver(t, ua...)
+
+	require.Equal(t, state_3_connected, sA.state)
+
+	for _, pp := range a.tx.take() {
+		require.NotEqual(t, ax25.FrameTypeUSABME, pp.FrameTypeOnly(), "the retry should have been withdrawn")
+	}
+
+	assert.Equal(t, 0, sA.uasOwed)
+
+	a.deliver(t, ua...) // Unexpected now.
+
+	assert.Equal(t, state_5_awaiting_v22_connection, sA.state, "A ignored an unexpected UA")
+}
+
+// Not every acknowledgement goes through check_i_frame_ackd: in timer
+// recovery, the response to our poll sets V(A) itself.  It ends the allowance
+// all the same, and a UA after it is unexpected.
+func TestUAAfterAcknowledgementInTimerRecoveryResetsTheLink(t *testing.T) {
+	t.Parallel()
+
+	var a = newLinkEnd("Q1TEST-7", 0)
+	var b = newListeningLinkEnd(t)
+
+	initiateConnect(t, a.link, a.call, b.call, 0)
+
+	var sA = a.link.listHead
+	require.NotNil(t, sA)
+
+	t1_expiry(sA)
+
+	var sabms = a.tx.take()
+	require.Len(t, sabms, 2)
+
+	b.deliver(t, sabms[0]) // The retry is lost.
+	var ua = b.tx.take()
+	a.deliver(t, ua...)
+
+	require.Equal(t, state_3_connected, sA.state)
+
+	a.send(b, "UPLOAD")
+	b.deliver(t, a.tx.take()...)
+
+	t1_expiry(sA) // No acknowledgement yet, so A polls.
+	require.Equal(t, state_4_timer_recovery, sA.state)
+
+	b.deliver(t, a.tx.take()...)
+	a.deliver(t, b.tx.take()...)
+	require.Equal(t, 1, sA.va)
+
+	a.deliver(t, ua...) // Unexpected now.
+
+	assert.Equal(t, state_1_awaiting_connection, sA.state, "A ignored an unexpected UA")
+}
+
+// exchange delivers what each end sends to the other, giving each the channel
+// when it asks, until neither has anything more to send.
+func exchange(t *testing.T, a *linkEnd, b *linkEnd) {
+	t.Helper()
+
+	for range 100 {
+		a.grantSeize()
+		b.grantSeize()
+
+		var fromA, fromB = a.tx.take(), b.tx.take()
+		if len(fromA) == 0 && len(fromB) == 0 {
+			return
+		}
+
+		b.deliver(t, fromA...)
+		a.deliver(t, fromB...)
+	}
+
+	t.Fatal("the link never went quiet")
+}
+
+// Regression test: when an unexpected UA made us reset the link, the I frames
+// we had sent and not had acknowledged were lost.  Here B, a node, greets A as
+// soon as it connects and before it hears A's retried SABME, so the UA to
+// that retry has to reset A's end.  B hears A's reply straight after the
+// retry, acknowledging a greeting B has just put back to send again, and
+// takes it as an N(R) error; the reply never reached B's client.  As when the
+// other station resets the link, what we sent goes again - and, as there, the
+// other station may then take some of it twice.
+func TestUnexpectedUAResetResendsUnacknowledgedFrames(t *testing.T) {
+	t.Parallel()
+
+	var a, b, _, retry = connectWithARetriedSABME(t)
+
+	b.send(a, "WELCOME")
+	a.deliver(t, b.tx.take()...)
+	a.grantSeize()
+	require.Equal(t, [][]byte{[]byte("WELCOME")}, a.clients.received)
+
+	a.send(b, "BYE")
+	b.deliver(t, retry)
+	b.deliver(t, a.tx.take()...)
+
+	exchange(t, a, b)
+
+	assert.Equal(t, [][]byte{[]byte("BYE")}, b.clients.received)
 }
