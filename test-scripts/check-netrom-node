@@ -292,7 +292,7 @@ samoyed:
   node:
     address: $NODE_A
     alias: QNODEA
-    netrom: {nodesInterval: 2, quality: 255}
+  netrom: {nodesInterval: 2, quality: 255}
   legacy: "FRACK 10"
 EOF
 
@@ -309,7 +309,7 @@ samoyed:
   node:
     address: $NODE_B
     alias: QNODEB
-    netrom: {nodesInterval: 2, quality: 255}
+  netrom: {nodesInterval: 2, quality: 255}
   legacy: "FRACK 10"
 EOF
 

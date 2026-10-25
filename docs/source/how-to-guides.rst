@@ -628,9 +628,9 @@ learns routes from the broadcasts it hears,
 and carries users' traffic over circuits that may cross several nodes.
 :doc:`glossary/netrom` describes how Samoyed implements the protocol.
 
-On a station without a node shell,
-configure one with a ``netrom`` block in a YAML configuration
-(the settings are listed in :doc:`yaml-config`):
+Configure one with a ``netrom`` block in a YAML configuration
+(the settings are listed in :doc:`yaml-config`).
+On a station without a node shell, it needs a callsign and alias of its own:
 
 .. code:: yaml
 
@@ -640,13 +640,16 @@ configure one with a ``netrom`` block in a YAML configuration
       netrom:
         callsign: Q1TEST-7
         alias: QNODEA
-        channels: [0]
 
+Left out, ``channels`` is every channel connected mode can be used on,
+so on a station with more than one radio channel,
+give it to keep the node, and its ``NODES`` broadcasts,
+off the ones that aren't for it, such as an APRS channel.
 The node's callsign is its own:
 it answers the links neighbouring nodes make to it,
 and makes links to them,
 so nothing else should use that callsign on its channels.
-With a node shell, NET/ROM is configured with it instead, as below.
+With a node shell, NET/ROM shares the shell's instead, as below.
 Leave ``PACLEN`` at its default of 256 or more:
 a NET/ROM frame travels in a single AX.25 frame,
 and Samoyed warns at startup if ``PACLEN`` is less.
@@ -688,7 +691,7 @@ With the node shell
 With a node shell, NET/ROM shares its callsign and alias,
 so that users and neighbouring nodes connect to one node,
 as they do to a BPQ or Linux node.
-Configure it under the node shell's ``node`` block (see :doc:`yaml-config`):
+The ``netrom`` block then leaves out ``callsign`` and ``alias``:
 
 .. code:: yaml
 
@@ -698,13 +701,13 @@ Configure it under the node shell's ``node`` block (see :doc:`yaml-config`):
       node:
         address: Q1TEST-7
         alias: QNODEA
-        netrom: {}
+      netrom: {}
 
 NET/ROM takes the node's address as its callsign and the node's alias as its alias,
-which must be no more than six letters, digits or ``#_&-/``.
+which must be no more than six characters, any SSID included.
 Its ``channels`` must be among the node's;
 left out, it runs on all of them.
-The other settings are those of the ``netrom`` block above.
+The other settings are as above.
 
 A station that connects to the node gets the shell's prompt.
 If the first thing it sends is a NET/ROM frame,
