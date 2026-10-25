@@ -88,7 +88,11 @@ Not implemented:
   routes entered by hand,
   and neighbours reached through digipeaters:
   a broadcast that arrived through a digipeater is ignored.
-* INP3 routing.
+* INP3 routing,
+  TheNetNode's Internode Protocol,
+  with which nodes measure their links and exchange routes.
+  The monitor describes INP3's routing information frames and RTT probes,
+  but the node neither sends them nor acts on them.
 * An inactivity timeout:
   an idle circuit stays open until one end closes it.
 
@@ -107,3 +111,7 @@ References
   `ax25tools/netrom <https://github.com/ve7fet/linuxax25/tree/master/ax25tools/netrom>`__:
   trivial loops, the broadcast threshold and malformed entries,
   and a default quality for each port (``bcast_config_load_ports`` in ``netromd.c``).
+* `A New Routing Specification for Packet Radio Datagram Networks <https://wiki.oarc.uk/_media/packet%253Ainternodeprotocolnp.pdf>`__
+  (Andreas Gal, DB7KG, TheNetNode group, hosted by OARC):
+  INP3's routing information frames, their alias and IP address options,
+  and the RTT probe and its flags.

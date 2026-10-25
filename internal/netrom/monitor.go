@@ -31,9 +31,23 @@ func Describe(pp *ax25.Packet) (string, bool) {
 		return describeNodes(nodes), true
 	}
 
+	// No layer 3 frame starts with 0xFF, which cannot be in a callsign.
+	if len(info) > 0 && info[0] == rifSignature {
+		var entries, err = DecodeRIF(info)
+		if err != nil {
+			return "", false
+		}
+
+		return describeRIF(entries), true
+	}
+
 	var f, err = DecodeFrame(info)
 	if err != nil {
 		return "", false
+	}
+
+	if text, ok := describeRTT(f); ok {
+		return text, true
 	}
 
 	return describeFrame(f), true

@@ -6,6 +6,7 @@ package netrom
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,6 +63,28 @@ func FuzzDecode(f *testing.F) {
 			}
 
 			require.Equal(t, n.entries, entries)
+		}
+	})
+}
+
+// FuzzDescribe covers the monitor's description of NET/ROM and INP3, which
+// is made of whatever any station sends with PID 0xCF.
+func FuzzDescribe(f *testing.F) {
+	f.Add(rif(rip(f, "Q1TEST-7", 1, 25, rifOption(rifOptAlias, []byte("QNODEA")...), rifOption(rifOptIPv4, 44, 1, 2, 3, 32))))
+	f.Add(rttProbe(f, "1234 $N"))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) > ax25.MaxInfoLen {
+			return // No AX.25 frame carries it.
+		}
+
+		for _, dest := range []string{NodesCallsign, "Q2TEST-7"} {
+			var pp = monitorPacket(t, dest, dest == NodesCallsign, ax25.PIDNetROM, data)
+
+			var text, ok = Describe(pp)
+			if !ok {
+				require.Empty(t, text)
+			}
 		}
 	})
 }
