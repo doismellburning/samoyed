@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package kisstnc
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 
 // The KISS command set is what a client application uses to drive the TNC:
 // data frames to transmit, and the timing parameters that decide when they go
-// out.  KissHandler.processMsg is where a frame with its escapes already removed is
+// out.  Handler.processMsg is where a frame with its escapes already removed is
 // acted on, so it can be driven directly, with a recording stand-in for the
 // function that answers the client.
 
@@ -58,7 +58,7 @@ type sentToClient struct {
 	prompt  bool
 }
 
-// recordingClient is a kissClient that keeps what it is sent, so a test can
+// recordingClient is a Client that keeps what it is sent, so a test can
 // see what the TNC would have answered.
 type recordingClient struct {
 	sent *[]sentToClient
@@ -107,7 +107,7 @@ type tncTiming struct {
 	fulldup                            bool
 }
 
-// recordingTNC is a kissHandlerTNC that keeps what it is asked to do, so a
+// recordingTNC is a TNC that keeps what it is asked to do, so a
 // test can see what the handler made of a client's messages.  Channels 0 and 1
 // are the ones it has, and queued is what it says is waiting to go out.
 type recordingTNC struct {
@@ -178,14 +178,14 @@ func (r *recordingTNC) take(channel int, urgent bool) *ax25.Packet {
 	return nil
 }
 
-// setupKissProcessMsg hands back a KissHandler for the KISS tests to drive,
+// setupKissProcessMsg hands back a Handler for the KISS tests to drive,
 // and the recording TNC it hands what it is asked to do.
-func setupKissProcessMsg(t *testing.T) (*KissHandler, *recordingTNC) {
+func setupKissProcessMsg(t *testing.T) (*Handler, *recordingTNC) {
 	t.Helper()
 
 	var tnc = newRecordingTNC()
 
-	return NewKissHandler(t.Context(), tnc, nil), tnc
+	return NewHandler(t.Context(), tnc, nil), tnc
 }
 
 // copiedFrame is a data frame the handler had copied to the other clients.
@@ -193,15 +193,15 @@ type copiedFrame struct {
 	msg     []byte
 	channel int
 	cmd     int
-	from    kissClient
+	from    Client
 }
 
-// recordingCopier keeps what its Copy, a kissCopier, is asked to copy.
+// recordingCopier keeps what its Copy, a Copier, is asked to copy.
 type recordingCopier struct {
 	copied []copiedFrame
 }
 
-func (r *recordingCopier) Copy(msg []byte, channel int, cmd int, from kissClient) {
+func (r *recordingCopier) Copy(msg []byte, channel int, cmd int, from Client) {
 	r.copied = append(r.copied, copiedFrame{msg: msg, channel: channel, cmd: cmd, from: from})
 }
 
@@ -335,7 +335,7 @@ func Test_kiss_debug_print_empty(t *testing.T) {
 		var hook = test.NewGlobal()
 		t.Cleanup(hook.Reset)
 
-		kiss_debug_print(FROM_CLIENT, "", msg)
+		DebugPrint(FromClient, "", msg)
 
 		require.NotNil(t, hook.LastEntry(), "message %v", msg)
 		assert.Equal(t, "Empty message for KISS client application", hook.LastEntry().Message)
@@ -509,7 +509,7 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	assert.Contains(t, output, "with or without ACKMODE")
 }
 
-// replyingClient is a kissClient that hands each reply over replies, from
+// replyingClient is a Client that hands each reply over replies, from
 // whichever goroutine sends it.
 type replyingClient struct {
 	replies chan sentToClient
@@ -678,14 +678,14 @@ func Test_kiss_set_hardware_txbuf(t *testing.T) {
 
 	var sent, from = recordingKissClient()
 
-	kiss_set_hardware(0, []byte("TXBUF:"), from, tnc)
+	setHardware(0, []byte("TXBUF:"), from, tnc)
 
 	require.Len(t, *sent, 1)
 	assert.Equal(t, "TXBUF:0", string((*sent)[0].body))
 
 	tnc.queued = 42
 
-	kiss_set_hardware(0, []byte("TXBUF:"), from, tnc)
+	setHardware(0, []byte("TXBUF:"), from, tnc)
 
 	require.Len(t, *sent, 2)
 	assert.Equal(t, "TXBUF:42", string((*sent)[1].body))
@@ -710,7 +710,7 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 	} {
 		t.Run(c.command, func(t *testing.T) {
 			var output = captureKissLog(t, func() {
-				kiss_set_hardware(0, []byte(c.command), from, newRecordingTNC())
+				setHardware(0, []byte(c.command), from, newRecordingTNC())
 			})
 
 			assert.Contains(t, output, c.expect)
@@ -726,7 +726,7 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 
 // feedKissBytes hands the bytes to the collector one at a time, as a
 // transport does, and returns whatever was sent back to the client.
-func feedKissBytes(h *KissHandler, kf *kiss.Collector, debug int, data []byte) *[]sentToClient {
+func feedKissBytes(h *Handler, kf *kiss.Collector, debug int, data []byte) *[]sentToClient {
 	var sent, from = recordingKissClient()
 
 	for _, b := range data {
@@ -923,7 +923,7 @@ func Test_kissClientFrame(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, c.want, kissClientFrame(c.channel, c.cmd, c.frame, 0, "Test"))
+			assert.Equal(t, c.want, ClientFrame(c.channel, c.cmd, c.frame, 0, "Test"))
 		})
 	}
 }
@@ -938,7 +938,7 @@ func Test_kissClientFrame_truncates(t *testing.T) {
 	var got []byte
 
 	var output = captureKissLog(t, func() {
-		got = kissClientFrame(0, kiss.CmdDataFrame, frame, 0, "Test")
+		got = ClientFrame(0, kiss.CmdDataFrame, frame, 0, "Test")
 	})
 
 	assert.Contains(t, output, "KISS buffer too small, frame truncated")

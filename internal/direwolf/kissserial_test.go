@@ -23,6 +23,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/doismellburning/samoyed/internal/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -236,20 +237,20 @@ func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 
 	require.NoError(t, client.Close())
 
-	var output = captureKissLog(t, func() {
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
 		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 	})
 
 	assert.Contains(t, output, "Error sending KISS message to client application thru serial port")
 	assert.True(t, ks.failed, "the serial port was not given up after the write error")
 
-	output = captureKissLog(t, func() {
+	output = captureLogOutput(t, logrus.DebugLevel, func() {
 		ks.SendRecPacket(0, kiss.CmdDataFrame, []byte("hello"))
 	})
 
 	assert.Empty(t, output, "the serial port was written to again after the write error")
 
-	output = captureKissLog(t, func() {
+	output = captureLogOutput(t, logrus.DebugLevel, func() {
 		assert.True(t, ks.giveUpPortIfFailed())
 	})
 
@@ -287,7 +288,7 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	// is longer than the terminal will hold.
 	var got = drainKissFrame(t, client)
 
-	var output = captureKissLog(t, func() {
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
 		ks.SendRecPacket(0, kiss.CmdDataFrame, frame)
 	})
 
@@ -467,7 +468,7 @@ func TestKissSerialPollingStopsWhenCancelled(t *testing.T) {
 func TestKissSerialDebugPrints(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 2)
 
-	var output = captureKissLog(t, func() {
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
 		ks.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readSerialKissFrame(t, client)
@@ -476,7 +477,7 @@ func TestKissSerialDebugPrints(t *testing.T) {
 	assert.Contains(t, output, "Packet content before adding KISS framing")
 	assert.Contains(t, output, `channel=1 direction=to function="Data frame"`)
 
-	output = captureKissLog(t, func() {
+	output = captureLogOutput(t, logrus.DebugLevel, func() {
 		ks.Prompt([]byte("\r\ncmd:"))
 	})
 

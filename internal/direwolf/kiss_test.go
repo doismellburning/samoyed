@@ -21,6 +21,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -315,7 +316,7 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 	// is longer than the terminal will hold.
 	var got = drainKissFrame(t, client)
 
-	var output = captureKissLog(t, func() {
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
 		kp.SendRecPacket(0, kiss.CmdDataFrame, frame)
 	})
 
@@ -473,7 +474,7 @@ func TestKissPTClientHangingUpClosesTheTerminal(t *testing.T) {
 func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	var kp, client = startKissPT(t, 2)
 
-	var output = captureKissLog(t, func() {
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
 		kp.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readKissFrame(t, client)
@@ -483,7 +484,7 @@ func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	assert.Contains(t, output, `channel=1 direction=to function="Data frame"`)
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	output = captureKissLog(t, func() {
+	output = captureLogOutput(t, logrus.DebugLevel, func() {
 		kp.Prompt([]byte("\r\ncmd:"))
 
 		readKissText(t, client, len("\r\ncmd:"))

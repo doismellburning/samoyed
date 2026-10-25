@@ -6,7 +6,7 @@ package direwolf
 import "github.com/doismellburning/samoyed/internal/ax25"
 
 // kissHandlerTNCAdapter is the TNC a KISS client application drives through a
-// KissHandler: the transmit queue its data frames go on, the channel table
+// kisstnc.Handler: the transmit queue its data frames go on, the channel table
 // they are checked against, and the transmit timing its commands change.
 type kissHandlerTNCAdapter struct {
 	*XmitService
@@ -15,7 +15,7 @@ type kissHandlerTNCAdapter struct {
 	queue       clientTransmitQueue // Where a client's data frames go, and what TXBUF reports on; nil to drop them.
 }
 
-// newKissHandlerTNC hands a KissHandler the channels of audioConfig to transmit on,
+// newKissHandlerTNC hands a kisstnc.Handler the channels of audioConfig to transmit on,
 // through queue, with the timing in xmit.  With no queue, a client's frames
 // are dropped and TXBUF reports an empty queue.
 func newKissHandlerTNC(audioConfig *RadioConfig, xmit *XmitService, queue clientTransmitQueue) kissHandlerTNCAdapter {

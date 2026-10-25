@@ -76,6 +76,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/doismellburning/samoyed/internal/serialport"
 	"github.com/pkg/term"
 	"github.com/sirupsen/logrus"
@@ -85,8 +86,8 @@ import (
 // the frame being decoded from it, and the configuration it was set up with.
 type KissSerial struct {
 	miscConfig *misc_config_s
-	handler    *KissHandler // Acts on what the client sends.
-	debug      int          /* Print information flowing from and to client. */
+	handler    *kisstnc.Handler // Acts on what the client sends.
+	debug      int              /* Print information flowing from and to client. */
 
 	// pollInterval is how long to wait between looks for a device that
 	// isn't there yet, when kiss_serial_poll says to keep looking.
@@ -119,7 +120,7 @@ type KissSerial struct {
 }
 
 // newKissSerial builds a KissSerial for mc with nothing opened or started.
-func newKissSerial(mc *misc_config_s, handler *KissHandler, debug int) *KissSerial {
+func newKissSerial(mc *misc_config_s, handler *kisstnc.Handler, debug int) *KissSerial {
 	var ks = new(KissSerial)
 	ks.miscConfig = mc
 	ks.handler = handler
@@ -150,7 +151,7 @@ func newKissSerial(mc *misc_config_s, handler *KissHandler, debug int) *KissSeri
  *
  *--------------------------------------------------------------------*/
 
-func NewKissSerial(ctx context.Context, mc *misc_config_s, handler *KissHandler, debug int) *KissSerial {
+func NewKissSerial(ctx context.Context, mc *misc_config_s, handler *kisstnc.Handler, debug int) *KissSerial {
 	var ks = newKissSerial(mc, handler, debug)
 
 	if mc.kiss_serial_port != "" {
@@ -220,7 +221,7 @@ func (ks *KissSerial) SendRecPacket(channel int, kiss_cmd int, frame []byte) {
 		return
 	}
 
-	ks.write(kissClientFrame(channel, kiss_cmd, frame, ks.debug, "Serial Port"))
+	ks.write(kisstnc.ClientFrame(channel, kiss_cmd, frame, ks.debug, "Serial Port"))
 } /* SendRecPacket */
 
 // The serial port has one client at the far end, which is where an answer to
@@ -237,7 +238,7 @@ func (ks *KissSerial) Prompt(text []byte) {
 	}
 
 	if ks.debug > 0 {
-		kiss_debug_print(TO_CLIENT, "Fake command prompt", text)
+		kisstnc.DebugPrint(kisstnc.ToClient, "Fake command prompt", text)
 	}
 
 	ks.write(text)
@@ -465,7 +466,7 @@ func (ks *KissSerial) get(ctx context.Context) (byte, error) {
  * Inputs:	ks.fd
  *
  * Description:	Reads bytes from the serial port KISS client app and
- *		sends them to the KissHandler for processing, which
+ *		sends them to the kisstnc.Handler for processing, which
  *		all 3 KISS interfaces share: serial port, pseudo terminal,
  *		and TCP.
  *

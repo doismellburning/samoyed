@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -105,7 +106,7 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	// though, which would cost each test here most of one.
 	kns.pollInterval = 10 * time.Millisecond
 
-	kns.Start(t.Context(), NewKissHandler(t.Context(), newKissHandlerTNC(kissTestRadioConfig(), new(XmitService), nil), kns.Copy))
+	kns.Start(t.Context(), kisstnc.NewHandler(t.Context(), newKissHandlerTNC(kissTestRadioConfig(), new(XmitService), nil), kns.Copy))
 
 	return kns, addrPort(kns.Addrs()[0])
 }
@@ -277,7 +278,7 @@ func TestKissNetReplyNotToTheNextClientInTheSlot(t *testing.T) {
 func TestKissNetPrompt(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
-	var output = captureKissLog(t, func() {
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
 		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.Prompt([]byte("\r\ncmd:"))
 	})
 
@@ -394,7 +395,7 @@ func TestKissNetDebugPrints(t *testing.T) {
 	// newAttachedKissNet starts no goroutines, so the level can be set directly.
 	kns.debug = 2
 
-	var output = captureKissLog(t, func() {
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
 		kns.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readKissNetFrame(t, clients[0])
@@ -404,7 +405,7 @@ func TestKissNetDebugPrints(t *testing.T) {
 	assert.Contains(t, output, `channel=1 direction=to function="Data frame"`)
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	output = captureKissLog(t, func() {
+	output = captureLogOutput(t, logrus.DebugLevel, func() {
 		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.Prompt([]byte("\r\ncmd:"))
 	})
 
@@ -645,7 +646,7 @@ func TestKissNetCopiesAHandlersDataFrames(t *testing.T) {
 			var peers, clients = newAttachedKissNet(t, -1, true, 1)
 
 			var tnc = setupKissHandlerTNC(t)
-			var h = NewKissHandler(t.Context(), tnc, peers.Copy)
+			var h = kisstnc.NewHandler(t.Context(), tnc, peers.Copy)
 
 			var pp = newTestPacket(t)
 
@@ -759,7 +760,7 @@ func TestKissNetPortChannelOverridesTheFrame(t *testing.T) {
 	t.Parallel()
 
 	var tnc = setupKissHandlerTNC(t)
-	var h = NewKissHandler(t.Context(), tnc, nil)
+	var h = kisstnc.NewHandler(t.Context(), tnc, nil)
 
 	var kps = new(kissport_status_s)
 	kps.channel = 1
@@ -779,7 +780,7 @@ func TestKissNetPortChannelOverridesTheFrame(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func TestKissNetPortChannelOutOfRange(t *testing.T) {
-	var h = NewKissHandler(t.Context(), setupKissHandlerTNC(t), nil)
+	var h = kisstnc.NewHandler(t.Context(), setupKissHandlerTNC(t), nil)
 
 	var kps = new(kissport_status_s)
 	kps.channel = MAX_TOTAL_CHANS

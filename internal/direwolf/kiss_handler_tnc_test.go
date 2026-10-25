@@ -9,12 +9,13 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // kissTestRadioConfig is the channel table the KISS tests hand to
-// the KissHandler, to check a transmit
+// the kisstnc.Handler, to check a transmit
 // request against: channels 0 and 1 are radios, and nothing else is set up.
 func kissTestRadioConfig() *RadioConfig {
 	var audioConfig = new(RadioConfig)
@@ -36,7 +37,7 @@ func (quietKissClient) RadioChannel(frameChannel int) int { return frameChannel 
 
 // handleKissMsg hands h msg, a KISS frame without its framing, as though from
 // had sent it.
-func handleKissMsg(h *KissHandler, msg []byte, from kissClient) {
+func handleKissMsg(h *kisstnc.Handler, msg []byte, from kisstnc.Client) {
 	var kc kiss.Collector
 
 	for _, b := range kiss.Encapsulate(msg) {
@@ -44,7 +45,7 @@ func handleKissMsg(h *KissHandler, msg []byte, from kissClient) {
 	}
 }
 
-// setupKissHandlerTNC hands back the TNC a KissHandler drives, over the
+// setupKissHandlerTNC hands back the TNC a kisstnc.Handler drives, over the
 // channel table kissTestRadioConfig lays out, with transmit settings and a
 // transmit queue of its own.
 func setupKissHandlerTNC(t *testing.T) kissHandlerTNCAdapter {
@@ -55,13 +56,13 @@ func setupKissHandlerTNC(t *testing.T) kissHandlerTNCAdapter {
 	return newKissHandlerTNC(audioConfig, new(XmitService), newTestTransmitQueue(audioConfig))
 }
 
-// setupKissHandler hands back a KissHandler over the TNC setupKissHandlerTNC
+// setupKissHandler hands back a kisstnc.Handler over the TNC setupKissHandlerTNC
 // lays out, for the transports' tests to give their clients' bytes to.  ctx
 // stops the handler's goroutines.
-func setupKissHandler(ctx context.Context, t *testing.T) *KissHandler {
+func setupKissHandler(ctx context.Context, t *testing.T) *kisstnc.Handler {
 	t.Helper()
 
-	return NewKissHandler(ctx, setupKissHandlerTNC(t), nil)
+	return kisstnc.NewHandler(ctx, setupKissHandlerTNC(t), nil)
 }
 
 // An original goes on the low priority queue behind anything already being

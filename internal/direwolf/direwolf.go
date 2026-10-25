@@ -26,6 +26,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/hamlib"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/mheard"
 	"github.com/doismellburning/samoyed/internal/netrom"
@@ -919,7 +920,7 @@ x = Silence FX.25 information.`)
 
 	// All three KISS transports hand what their clients send to the same
 	// handler, which copies data frames to the TCP clients with KISSCOPY.
-	var kissHandler = NewKissHandler(ctx, newKissHandlerTNC(audio_config, xmitSvc, transmitQueue), kissNetSvc.Copy)
+	var kissHandler = kisstnc.NewHandler(ctx, newKissHandlerTNC(audio_config, xmitSvc, transmitQueue), kissNetSvc.Copy)
 
 	kissNetSvc.Start(ctx, kissHandler)
 

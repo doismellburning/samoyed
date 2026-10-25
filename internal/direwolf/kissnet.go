@@ -156,6 +156,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/sirupsen/logrus"
 )
 
@@ -168,7 +169,7 @@ const kissnetPollInterval = time.Second
 // Each TCP port has its own status block in a linked list.
 type KissNetService struct {
 	miscConfigP  *misc_config_s
-	handler      *KissHandler // Acts on what a client sends; set by Start.
+	handler      *kisstnc.Handler // Acts on what a client sends; set by Start.
 	allPorts     *kissport_status_s
 	debug        int           /* Print information flowing from and to client. */
 	pollInterval time.Duration // For a client to attach, or a slot to come free.
@@ -336,7 +337,7 @@ func (kns *KissNetService) Close() {
 //
 // Starting it again would have two goroutines accepting on every port, so a
 // second Start, like one after Close, is complained about and ignored.
-func (kns *KissNetService) Start(ctx context.Context, handler *KissHandler) {
+func (kns *KissNetService) Start(ctx context.Context, handler *kisstnc.Handler) {
 	if !kns.started.CompareAndSwap(false, true) {
 		logrus.Error("KISS TCP service started twice, or after Close; ignoring this start")
 
@@ -423,7 +424,7 @@ func (kns *KissNetService) sendOn(kps *kissport_status_s, client int, conn net.C
 		return
 	}
 
-	kns.write(kps, client, conn, kissClientFrame(portChannel, cmd, frame, kns.debug, "TCP"))
+	kns.write(kps, client, conn, kisstnc.ClientFrame(portChannel, cmd, frame, kns.debug, "TCP"))
 }
 
 // write sends buf, already framed or the fake command prompt, to client
@@ -486,7 +487,7 @@ func (c kissNetClient) Prompt(text []byte) {
 	}).Warn("Something unexpected from KISS TCP client application")
 
 	if c.kns.debug > 0 {
-		kiss_debug_print(TO_CLIENT, "Fake command prompt", text)
+		kisstnc.DebugPrint(kisstnc.ToClient, "Fake command prompt", text)
 	}
 
 	c.kns.write(c.kps, c.client, c.conn, text)
@@ -530,7 +531,7 @@ func (c kissNetClient) RadioChannel(frameChannel int) int {
  *
  *--------------------------------------------------------------------*/
 
-func (kns *KissNetService) Copy(msg []byte, channel int, cmd int, from kissClient) {
+func (kns *KissNetService) Copy(msg []byte, channel int, cmd int, from kisstnc.Client) {
 	if kns == nil {
 		return // No TCP clients to copy to.
 	}
@@ -544,7 +545,7 @@ func (kns *KissNetService) Copy(msg []byte, channel int, cmd int, from kissClien
 			var conn = kps.clientConn(client)
 
 			// To all but origin.
-			if conn != nil && from != kissClient(kissNetClient{kns: kns, kps: kps, client: client, conn: conn}) {
+			if conn != nil && from != kisstnc.Client(kissNetClient{kns: kns, kps: kps, client: client, conn: conn}) {
 				// msg[0] is the channel and command it came with; sendOn
 				// works out what this client's port shows instead.
 				kns.sendOn(kps, client, conn, channel, cmd, msg[1:])
@@ -643,7 +644,7 @@ func (kns *KissNetService) listenThread(ctx context.Context, kps *kissport_statu
 	// Built once per connection, rather than for every byte.
 	var lastConn net.Conn
 
-	var from kissClient
+	var from kisstnc.Client
 
 	for {
 		var ch, conn, frame, ok = kns.get(ctx, kps, client)
