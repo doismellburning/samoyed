@@ -105,7 +105,7 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	// though, which would cost each test here most of one.
 	kns.pollInterval = 10 * time.Millisecond
 
-	kns.Start(t.Context(), NewKissHandler(t.Context(), newKissHandlerTNC(kissTestRadioConfig(), new(XmitService), nil), kns))
+	kns.Start(t.Context(), NewKissHandler(t.Context(), newKissHandlerTNC(kissTestRadioConfig(), new(XmitService), nil), kns.Copy))
 
 	return kns, addrPort(kns.Addrs()[0])
 }
@@ -623,4 +623,38 @@ func TestKissNetClientCanReattach(t *testing.T) {
 	var _, reattachedSlot = dialKissNet(t, kns, port)
 
 	assert.GreaterOrEqual(t, reattachedSlot, 0, "a client could not attach again")
+}
+
+// With KISSCOPY, a data frame a client sends is shown to the TCP clients the
+// handler was given, whichever transport it came by - here, one with no TCP
+// port of its own, such as the serial port.  An ACKMODE frame is shown to them
+// as the ordinary data frame it carries.
+func TestKissNetCopiesAHandlersDataFrames(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name string
+		cmd  []byte
+	}{
+		{"data frame", []byte{kiss.CmdDataFrame}},
+		{"ACKMODE", []byte{kiss.CmdXKissData, 0x12, 0x34}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			var peers, clients = newAttachedKissNet(t, -1, true, 1)
+
+			var tnc = setupKissHandlerTNC(t)
+			var h = NewKissHandler(t.Context(), tnc, peers.Copy)
+
+			var pp = newTestPacket(t)
+
+			handleKissMsg(h, append(c.cmd, pp.FrameData()...), quietKissClient{})
+
+			assert.Equal(t,
+				kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
+				readKissNetFrame(t, clients[0]))
+			assert.Equal(t, 1, tnc.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+		})
+	}
 }

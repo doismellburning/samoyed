@@ -179,27 +179,61 @@ func setupKissProcessMsg(t *testing.T) (*KissHandler, *recordingTNC) {
 	return NewKissHandler(t.Context(), tnc, nil), tnc
 }
 
-// With KISSCOPY, a data frame a client sends is shown to the TCP clients the
-// handler was given, whichever transport it came by - here, one with no TCP
-// port of its own, such as the serial port.
+// copiedFrame is a data frame the handler had copied to the other clients.
+type copiedFrame struct {
+	msg     []byte
+	channel int
+	cmd     int
+	from    kissClient
+}
+
+// recordingCopier keeps what its Copy, a kissCopier, is asked to copy.
+type recordingCopier struct {
+	copied []copiedFrame
+}
+
+func (r *recordingCopier) Copy(msg []byte, channel int, cmd int, from kissClient) {
+	r.copied = append(r.copied, copiedFrame{msg: msg, channel: channel, cmd: cmd, from: from})
+}
+
+// A data frame a client sends is copied to the other clients - KISSCOPY - as
+// well as transmitted, with the channel and command the handler made of it
+// and the client it came from, so as not to be copied back.
 func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 	t.Parallel()
 
 	var h, tnc = setupKissProcessMsg(t)
 
-	var peers, clients = newAttachedKissNet(t, -1, true, 1)
+	var peers = new(recordingCopier)
 
-	h.peers = peers
+	h.copyToPeers = peers.Copy
 
 	var pp = newTestPacket(t)
 	var _, from = recordingKissClient()
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
+	var msg = append([]byte{0x10 | kiss.CmdDataFrame}, pp.FrameData()...)
 
-	assert.Equal(t,
-		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
-		readKissNetFrame(t, clients[0]))
-	assert.Equal(t, 1, tnc.count(0, false))
+	h.processMsg(msg, from)
+
+	assert.Equal(t, []copiedFrame{{msg: msg, channel: 1, cmd: kiss.CmdDataFrame, from: from}}, peers.copied)
+	assert.Equal(t, 1, tnc.count(1, false))
+}
+
+// Nor is anything but a data frame copied.
+func Test_kiss_process_msg_copies_only_data_frames(t *testing.T) {
+	t.Parallel()
+
+	var h, _ = setupKissProcessMsg(t)
+
+	var peers = new(recordingCopier)
+
+	h.copyToPeers = peers.Copy
+
+	var _, from = recordingKissClient()
+
+	h.processMsg([]byte{kiss.CmdTxDelay, 30}, from)
+
+	assert.Empty(t, peers.copied)
 }
 
 // A data frame from the client is a frame to transmit, and an original - one
@@ -602,7 +636,7 @@ func Test_kiss_process_msg_ackmode_without_id(t *testing.T) {
 	assert.Empty(t, *sent)
 }
 
-// With KISSCOPY, an ACKMODE frame is shown to the other TCP clients as an
+// With KISSCOPY, an ACKMODE frame is copied to the other clients as an
 // ordinary data frame: they didn't ask for an acknowledgement, and the ID is
 // not part of the AX.25 frame.
 func Test_kiss_process_msg_ackmode_copies_as_data_frame(t *testing.T) {
@@ -610,18 +644,18 @@ func Test_kiss_process_msg_ackmode_copies_as_data_frame(t *testing.T) {
 
 	var h, _ = setupKissProcessMsg(t)
 
-	var peers, clients = newAttachedKissNet(t, -1, true, 1)
+	var peers = new(recordingCopier)
 
-	h.peers = peers
+	h.copyToPeers = peers.Copy
 
 	var pp = newTestPacket(t)
 	var _, from = recordingKissClient()
 
 	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, pp), from)
 
-	assert.Equal(t,
-		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
-		readKissNetFrame(t, clients[0]))
+	require.Len(t, peers.copied, 1)
+	assert.Equal(t, append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), peers.copied[0].msg)
+	assert.Equal(t, kiss.CmdDataFrame, peers.copied[0].cmd)
 }
 
 // "Set hardware" is the one command with an answer: the human readable

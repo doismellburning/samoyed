@@ -294,23 +294,28 @@ type kissHandlerTNC interface {
 	SetFulldup(channel int, value bool)
 }
 
+// kissCopier shows msg, a data frame from a client for channel with command
+// cmd, to the other clients that want a copy - KISSCOPY - but not to from, the
+// client it came from.
+type kissCopier func(msg []byte, channel int, cmd int, from kissClient)
+
 // KissHandler acts on what a KISS client application sends the TNC, whichever
 // transport it arrives by - TCP, the serial port or the pseudo terminal - so
 // each of them hands its client's bytes to the same one.
 type KissHandler struct {
-	tnc   kissHandlerTNC  // Where a client's frames and timing commands go.
-	peers *KissNetService // The TCP clients KISSCOPY copies a data frame to, or nil.
-	acks  *kissAcks       // Sends the ACKMODE acknowledgements for a client's frames.
+	tnc         kissHandlerTNC // Where a client's frames and timing commands go.
+	copyToPeers kissCopier     // Where KISSCOPY copies a data frame, or nil.
+	acks        *kissAcks      // Sends the ACKMODE acknowledgements for a client's frames.
 }
 
 // NewKissHandler builds a KissHandler that hands a client's data frames and
-// timing commands to tnc, and with KISSCOPY copies its data frames to the
-// clients of peers.  The goroutines that send a client its ACKMODE
+// timing commands to tnc, and copies its data frames with copyToPeers, which
+// may be nil.  The goroutines that send a client its ACKMODE
 // acknowledgements stop when ctx is cancelled.
-func NewKissHandler(ctx context.Context, tnc kissHandlerTNC, peers *KissNetService) *KissHandler {
+func NewKissHandler(ctx context.Context, tnc kissHandlerTNC, copyToPeers kissCopier) *KissHandler {
 	var h = new(KissHandler)
 	h.tnc = tnc
-	h.peers = peers
+	h.copyToPeers = copyToPeers
 	h.acks = newKissAcks(ctx)
 
 	return h
@@ -489,7 +494,9 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 	case kiss.CmdDataFrame: /* 0 = Data Frame */
 		// The copies carry the channel and command we have already
 		// determined, rather than the first byte as it came.
-		h.peers.Copy(kiss_msg, channel, int(cmd), from)
+		if h.copyToPeers != nil {
+			h.copyToPeers(kiss_msg, channel, int(cmd), from)
+		}
 
 		/* Note July 2017: There is a variant of of KISS, called SMACK, that assumes */
 		/* a TNC can never have more than 8 channels.  http://symek.de/g/smack.html */

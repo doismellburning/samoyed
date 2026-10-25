@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/kiss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,6 +22,26 @@ func kissTestRadioConfig() *RadioConfig {
 	audioConfig.chan_medium[1] = MEDIUM_RADIO
 
 	return audioConfig
+}
+
+// quietKissClient is a client application that drops whatever it is sent, for
+// the tests that care only what the TNC makes of what it sends.
+type quietKissClient struct{}
+
+func (quietKissClient) reply(int, int, []byte) {}
+
+func (quietKissClient) prompt([]byte) {}
+
+func (quietKissClient) radioChannel(frameChannel int) int { return frameChannel }
+
+// handleKissMsg hands h msg, a KISS frame without its framing, as though from
+// had sent it.
+func handleKissMsg(h *KissHandler, msg []byte, from kissClient) {
+	var kc kiss.Collector
+
+	for _, b := range kiss.Encapsulate(msg) {
+		h.RecByte(&kc, b, 0, from)
+	}
 }
 
 // setupKissHandlerTNC hands back the TNC a KissHandler drives, over the
