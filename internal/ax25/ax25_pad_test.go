@@ -398,3 +398,17 @@ func TestTransmitted(t *testing.T) {
 	pp.Transmitted()
 	assert.Equal(t, 1, told)
 }
+
+// A packet formats as its monitor text, not as the struct behind it with
+// every byte of its frame buffer, mostly unused - which is how logrus
+// rendered one as a log field.
+func TestPacketString(t *testing.T) {
+	t.Parallel()
+
+	var pp = FromText("Q1TEST-1>Q2TEST,WIDE2-1:hello", true)
+	require.NotNil(t, pp)
+
+	assert.Equal(t, "Q1TEST-1>Q2TEST,WIDE2-1:hello", pp.String())
+	assert.Equal(t, "Q1TEST-1>Q2TEST,WIDE2-1:hello", fmt.Sprint(pp))
+	assert.Equal(t, "<nil>", (*Packet)(nil).String())
+}
