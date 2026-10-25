@@ -170,6 +170,7 @@ type xmitQueue interface {
 	WaitWhileEmpty(ctx context.Context, channel int)
 	Peek(channel int, prio int) *ax25.Packet
 	Remove(channel int, prio int) *ax25.Packet
+	RemoveIf(channel int, prio int, eligible func(pp *ax25.Packet) bool) (*ax25.Packet, bool)
 }
 
 /*-------------------------------------------------------------------
@@ -454,6 +455,14 @@ func frame_flavor(pp *ax25.Packet) flavor_t {
 
 	return (FLAVOR_OTHER)
 } /* end frame_flavor */
+
+// bundleable reports whether a frame may follow another in the same
+// transmission: speech, morse, DTMF and digipeated APRS go on their own.
+func bundleable(pp *ax25.Packet) bool {
+	var flavor = frame_flavor(pp)
+
+	return flavor == FLAVOR_APRS_NEW || flavor == FLAVOR_OTHER
+}
 
 /*-------------------------------------------------------------------
  *
@@ -881,49 +890,46 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *ax25.Packet, 
 	var done = false
 	for numframe < max_bundle && !done {
 		/*
-		 * Peek at what is available.
-		 * Don't remove from queue yet because it might not be eligible.
+		 * Take what is next, if it is eligible.
+		 * The check and the removal are one step, as the data link
+		 * state machine can withdraw a frame from the queue meanwhile.
 		 */
-		prio = TQ_PRIO_1_LO
+		prio = TQ_PRIO_0_HI
 
-		pp = xs.queue.Peek(channel, TQ_PRIO_0_HI)
-		if pp != nil {
-			prio = TQ_PRIO_0_HI
-		} else {
-			pp = xs.queue.Peek(channel, TQ_PRIO_1_LO)
+		var waiting bool
+
+		pp, waiting = xs.queue.RemoveIf(channel, prio, bundleable)
+		if !waiting {
+			prio = TQ_PRIO_1_LO
+			pp, _ = xs.queue.RemoveIf(channel, prio, bundleable)
 		}
 
-		if pp != nil {
-			switch frame_flavor(pp) {
-			default:
-				done = true // not eligible for bundling.
+		if pp == nil {
+			done = true // Nothing left, or not eligible for bundling.
 
-			case FLAVOR_APRS_NEW, FLAVOR_OTHER:
-				pp = xs.queue.Remove(channel, prio)
-				logrus.WithFields(logrus.Fields{
-					"t":       time.Since(time_ptt),
-					"channel": channel,
-					"prio":    prio,
-					"pp":      pp,
-				}).Debug("xmit_thread: tq_remove returned")
-
-				nb = xs.send_one_frame(channel, prio, pp)
-				sent = append(sent, pp)
-
-				num_bits += nb
-				if nb > 0 {
-					numframe++
-				}
-				logrus.WithFields(logrus.Fields{
-					"t":        time.Since(time_ptt),
-					"nb":       nb,
-					"num_bits": num_bits,
-					"numframe": numframe,
-				}).Debug("xmit_thread: bundled frame sent")
-			}
-		} else {
-			done = true
+			continue
 		}
+
+		logrus.WithFields(logrus.Fields{
+			"t":       time.Since(time_ptt),
+			"channel": channel,
+			"prio":    prio,
+			"pp":      pp,
+		}).Debug("xmit_thread: tq_remove returned")
+
+		nb = xs.send_one_frame(channel, prio, pp)
+		sent = append(sent, pp)
+
+		num_bits += nb
+		if nb > 0 {
+			numframe++
+		}
+		logrus.WithFields(logrus.Fields{
+			"t":        time.Since(time_ptt),
+			"nb":       nb,
+			"num_bits": num_bits,
+			"numframe": numframe,
+		}).Debug("xmit_thread: bundled frame sent")
 	}
 
 	/*
