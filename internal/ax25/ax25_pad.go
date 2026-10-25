@@ -1710,6 +1710,17 @@ func (this_p *Packet) Info() []byte {
 	}
 } /* end Info */
 
+// String is the packet in monitor format, addresses then information part, so
+// that fmt and logrus render a packet as text rather than as the struct, frame
+// buffer and all.
+func (this_p *Packet) String() string {
+	if this_p == nil {
+		return "<nil>"
+	}
+
+	return this_p.FormatAddrs() + string(this_p.Info())
+}
+
 // SetInfo replaces the information part, which for a packet that isn't AX.25
 // is the whole frame, as it is for Info.
 func (this_p *Packet) SetInfo(new_info []byte) {
