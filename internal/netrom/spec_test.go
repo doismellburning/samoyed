@@ -292,7 +292,7 @@ func TestSpecRouteQualityFormula(t *testing.T) {
 func TestSpecDirectRouteTakesThePathQuality(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 77, 0)
+	var r = newRouter("Q1TEST-7", everyChannel(77), 0)
 
 	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 255)))
 
@@ -308,7 +308,7 @@ func TestSpecDirectRouteTakesThePathQuality(t *testing.T) {
 func TestSpecMinimumQualityZero(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 192, 0)
+	var r = newRouter("Q1TEST-7", everyChannel(192), 0)
 
 	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB",
 		entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 1), // (192 + 128) / 256 = 1.
@@ -328,7 +328,7 @@ func TestSpecMinimumQualityZero(t *testing.T) {
 func TestSpecQualityZeroRoutesAreNotBroadcast(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 192, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(192), 10)
 
 	r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB"))
 	r.heardFrom("Q9TEST", nbr("Q2TEST-7"))
@@ -349,7 +349,7 @@ func TestSpecQualityZeroRoutesAreNotBroadcast(t *testing.T) {
 func TestSpecFullTableStillUpdates(t *testing.T) {
 	t.Parallel()
 
-	var r = newRouter("Q1TEST-7", 255, 10)
+	var r = newRouter("Q1TEST-7", everyChannel(255), 10)
 
 	r.heardNodes(nbr("Q2TEST"), nodesFrom("", entry("Q9TEST", "", "Q9TEST", 100)))
 
@@ -382,7 +382,7 @@ func TestSpecObsolescence(t *testing.T) {
 	t.Run("a route lasts six scans without a refresh", func(t *testing.T) {
 		t.Parallel()
 
-		var r = newRouter("Q1TEST-7", 192, 10)
+		var r = newRouter("Q1TEST-7", everyChannel(192), 10)
 
 		r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB"))
 
@@ -403,7 +403,7 @@ func TestSpecObsolescence(t *testing.T) {
 	t.Run("traffic over a route renews it", func(t *testing.T) {
 		t.Parallel()
 
-		var r = newRouter("Q1TEST-7", 192, 10)
+		var r = newRouter("Q1TEST-7", everyChannel(192), 10)
 
 		r.heardNodes(nbr("Q2TEST-7"), nodesFrom("QNODEB", entry("Q3TEST-7", "QNODEC", "Q3TEST-7", 200)))
 

@@ -71,9 +71,13 @@ with these differences and choices:
   and a user's otherwise;
   a neighbour is greeted as a user is before that,
   and NET/ROM ignores the greeting.
+* **Quality per channel.**
+  The quality of the link to a neighbour is the one configured for the channel it was heard on,
+  as netromd's is per port,
+  so a destination heard over two channels is reached over the better one.
 * **Defaults**: a time to live of 16,
   a broadcast every hour,
-  a quality of 192 for every neighbour,
+  a quality of 192 for every neighbour on a channel not given one of its own,
   and a minimum quality of 10.
 
 Not implemented:
@@ -101,4 +105,5 @@ References
   and a neighbour identified by its callsign and device (``nr_neigh_get_dev`` in ``nr_route.c``).
 * netromd, the routing daemon in ax25tools:
   `ax25tools/netrom <https://github.com/ve7fet/linuxax25/tree/master/ax25tools/netrom>`__:
-  trivial loops, the broadcast threshold and malformed entries.
+  trivial loops, the broadcast threshold and malformed entries,
+  and a default quality for each port (``bcast_config_load_ports`` in ``netromd.c``).

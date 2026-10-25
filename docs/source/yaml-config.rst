@@ -483,6 +483,7 @@ These are the keys under ``samoyed``:
 
     ``channels``
         Optionally, the channels it runs on,
+        a map from each channel to its settings,
         each any channel connected mode can be used on,
         and with a ``node`` block, one the node listens on.
         It keeps one routing table across them all,
@@ -491,7 +492,18 @@ These are the keys under ``samoyed``:
         so it can route between, say, a radio channel and an AXUDP link.
         Left out, it runs on all the node's channels,
         or without a ``node`` block,
-        on every channel connected mode can be used on.
+        on every channel connected mode can be used on,
+        with the settings below.
+        A channel's settings, used there in place of the ones below,
+        can be left out, as can the whole of them.
+        Each may have:
+
+        ``quality``
+            From 0 to 255,
+            the quality it gives the link to a neighbour heard on that channel.
+            A route's quality is its link's times what the neighbour advertised,
+            so a destination reachable over two channels is reached over the better one:
+            a fast AXUDP link, say, rather than a 1200 baud radio channel.
 
     ``ttl``
         Optionally, how many nodes a frame it originates may cross.
@@ -504,7 +516,8 @@ These are the keys under ``samoyed``:
 
     ``quality``
         Optionally, from 0 to 255,
-        the quality it gives the link to any neighbour it hears.
+        the quality it gives the link to any neighbour it hears
+        on a channel that does not give its own.
         192 if left out.
 
     ``minQuality``
@@ -517,7 +530,9 @@ These are the keys under ``samoyed``:
           netrom:
             callsign: Q1TEST-7
             alias: QNODEA
-            channels: [0]
+            channels:
+              0:
+              2: {quality: 255}
 
 ``legacy``
     Directives in Dire Wolf's format, one per line, read after everything else as

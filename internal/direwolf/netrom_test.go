@@ -20,7 +20,7 @@ import (
 //nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func Test_config_yaml_netrom(t *testing.T) {
 	t.Run("a node with the defaults", func(t *testing.T) {
-		var c = parseYAMLConfig(t, "netrom: {callsign: q1test-7, alias: qnodea, channels: [0]}\n")
+		var c = parseYAMLConfig(t, "netrom: {callsign: q1test-7, alias: qnodea, channels: {0: {}}}\n")
 		assert.Zero(t, c.errors, c.output)
 
 		var got, ok = c.misc.netrom.Get()
@@ -34,20 +34,34 @@ func Test_config_yaml_netrom(t *testing.T) {
 	})
 
 	t.Run("every setting", func(t *testing.T) {
-		var c = parseYAMLConfig(t, "netrom:\n  callsign: Q1TEST-7\n  alias: QNODEA\n  channels: [1, 0]\n  ttl: 7\n  nodesInterval: 600\n  quality: 0\n  minQuality: 50\n")
+		var c = parseYAMLConfig(t, "netrom:\n  callsign: Q1TEST-7\n  alias: QNODEA\n  channels: {1: {}, 0: {}}\n  ttl: 7\n  nodesInterval: 600\n  quality: 0\n  minQuality: 50\n")
 		assert.Zero(t, c.errors, c.output)
 
 		var got, ok = c.misc.netrom.Get()
 		require.True(t, ok)
-		assert.Equal(t, []int{1, 0}, got.config.Channels)
+		assert.Equal(t, []int{0, 1}, got.config.Channels, "in order")
 		assert.Equal(t, byte(7), got.config.TTL)
 		assert.Equal(t, 600*time.Second, got.config.NodesInterval)
 		assert.Equal(t, byte(0), got.config.Quality, "0 is a quality like any other")
 		assert.Equal(t, byte(50), got.config.MinQuality)
 	})
 
+	t.Run("a quality for each channel", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "netrom:\n  callsign: Q1TEST-7\n  alias: QNODEA\n  quality: 100\n"+
+			"  channels:\n    1: {quality: 255}\n    2: {quality: 0}\n    0:\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.netrom.Get()
+		require.True(t, ok)
+		assert.Equal(t, map[int]byte{1: 255, 2: 0}, got.config.ChannelQuality)
+		assert.Equal(t, []int{0, 1, 2}, got.config.Channels)
+		assert.Equal(t, byte(100), got.config.LinkQuality(0), "the node's, for a channel that does not say")
+		assert.Equal(t, byte(255), got.config.LinkQuality(1))
+		assert.Equal(t, byte(0), got.config.LinkQuality(2), "0 is a quality like any other")
+	})
+
 	t.Run("a channel a NET/ROM node can't use yet is left for netromConfig", func(t *testing.T) {
-		var c = parseYAMLConfig(t, fmt.Sprintf("netrom: {callsign: Q1TEST-7, alias: QNODEA, channels: [%d]}\n", MAX_TOTAL_CHANS-1))
+		var c = parseYAMLConfig(t, fmt.Sprintf("netrom: {callsign: Q1TEST-7, alias: QNODEA, channels: {%d: {}}}\n", MAX_TOTAL_CHANS-1))
 		assert.Zero(t, c.errors, c.output)
 		assert.True(t, c.misc.netrom.IsJust())
 	})
@@ -72,22 +86,26 @@ func Test_config_yaml_netrom(t *testing.T) {
 	})
 
 	for _, bad := range []string{
-		"{alias: QNODEA, channels: [0]}",
-		"{callsign: Q1TEST-77, alias: QNODEA, channels: [0]}",
-		"{callsign: Q1TEST-7, channels: [0]}",
-		"{callsign: Q1TEST-7, alias: TOOLONGX, channels: [0]}",
-		"{callsign: Q1TEST-7, alias: 'Q N', channels: [0]}",
-		"{callsign: Q1TEST-7, alias: QNODEA, channels: []}",
-		"{callsign: Q1TEST-7, alias: QNODEA, channels: [-1]}",
-		"{callsign: Q1TEST-7, alias: QNODEA, channels: [0, 1, 0]}",
+		"{alias: QNODEA, channels: {0: {}}}",
+		"{callsign: Q1TEST-77, alias: QNODEA, channels: {0: {}}}",
+		"{callsign: Q1TEST-7, channels: {0: {}}}",
+		"{callsign: Q1TEST-7, alias: TOOLONGX, channels: {0: {}}}",
+		"{callsign: Q1TEST-7, alias: 'Q N', channels: {0: {}}}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {}}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {-1: {}}}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {0: {}, 1: {}, 0: {}}}",
 		"{callsign: Q1TEST-7, alias: QNODEA, channel: 0}",
-		fmt.Sprintf("{callsign: Q1TEST-7, alias: QNODEA, channels: [%d]}", MAX_TOTAL_CHANS),
-		"{callsign: Q1TEST-7, alias: QNODEA, channels: [0], ttl: 0}",
-		"{callsign: Q1TEST-7, alias: QNODEA, channels: [0], ttl: 256}",
-		"{callsign: Q1TEST-7, alias: QNODEA, channels: [0], nodesInterval: 0}",
-		"{callsign: Q1TEST-7, alias: QNODEA, channels: [0], nodesInterval: 10000000000}",
-		"{callsign: Q1TEST-7, alias: QNODEA, channels: [0], quality: -1}",
-		"{callsign: Q1TEST-7, alias: QNODEA, channels: [0], minQuality: 300}",
+		fmt.Sprintf("{callsign: Q1TEST-7, alias: QNODEA, channels: {%d: {}}}", MAX_TOTAL_CHANS),
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {0: {}}, ttl: 0}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {0: {}}, ttl: 256}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {0: {}}, nodesInterval: 0}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {0: {}}, nodesInterval: 10000000000}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {0: {}}, quality: -1}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {0: {}}, minQuality: 300}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {0: {quality: 256}}}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {0: {quality: -1}}}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: {0: {minQuality: 100}}}",
+		"{callsign: Q1TEST-7, alias: QNODEA, channels: [0]}",
 	} {
 		t.Run("refused: "+bad, func(t *testing.T) {
 			var c = parseYAMLConfig(t, "netrom: "+bad+"\n")
@@ -140,7 +158,7 @@ func Test_config_yaml_netrom_with_node(t *testing.T) {
 
 	t.Run("every setting", func(t *testing.T) {
 		var c = parseYAMLConfig(t, "node:\n  address: Q1TEST-7\n  alias: QNODEA\n  channels: [0, 1]\n"+
-			"netrom:\n  channels: [1]\n  ttl: 7\n  nodesInterval: 600\n  quality: 255\n  minQuality: 50\n")
+			"netrom:\n  channels: {1: {}}\n  ttl: 7\n  nodesInterval: 600\n  quality: 255\n  minQuality: 50\n")
 		assert.Zero(t, c.errors, c.output)
 
 		var got, ok = c.misc.netrom.Get()
@@ -152,6 +170,19 @@ func Test_config_yaml_netrom_with_node(t *testing.T) {
 		assert.Equal(t, byte(50), got.config.MinQuality)
 	})
 
+	t.Run("a quality for one of the node's channels", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST-7, alias: QNODEA}\nnetrom: {quality: 100, channels: {0: {quality: 255}}}\n")
+		assert.Zero(t, c.errors, c.output)
+
+		var got, ok = c.misc.netrom.Get()
+		require.True(t, ok)
+
+		var config, err = c.audio.netromConfig(got, c.misc.node)
+		require.NoError(t, err)
+		assert.Equal(t, []int{0}, config.Channels)
+		assert.Equal(t, byte(255), config.LinkQuality(0))
+	})
+
 	for _, bad := range []string{
 		"{address: Q1TEST-7}\nnetrom: {}",
 		"{address: Q1TEST-7, alias: TOOLONGX}\nnetrom: {}",
@@ -160,8 +191,8 @@ func Test_config_yaml_netrom_with_node(t *testing.T) {
 		"{address: Q1TEST-7, alias: QNODEA}\nnetrom: {callsign: Q1TEST-7}",
 		"{address: Q1TEST-7, alias: QNODEA}\nnetrom: {callsign: Q1TEST-8}",
 		"{address: Q1TEST-7, alias: QNODEA}\nnetrom: {alias: QNODEB}",
-		"{address: Q1TEST, alias: SAMNOD}\nnetrom: {callsign: Q1TEST-7, alias: QNODEA, channels: [0]}",
-		"{address: Q1TEST-7, alias: QNODEA}\nnetrom: {channels: []}",
+		"{address: Q1TEST, alias: SAMNOD}\nnetrom: {callsign: Q1TEST-7, alias: QNODEA, channels: {0: {}}}",
+		"{address: Q1TEST-7, alias: QNODEA}\nnetrom: {channels: {}}",
 		"{address: Q1TEST-7, alias: QNODEA, netrom: {}}",
 	} {
 		t.Run("refused: "+bad, func(t *testing.T) {
@@ -175,7 +206,7 @@ func Test_config_yaml_netrom_with_node(t *testing.T) {
 	// Whether the channels are the node's waits for netromConfig, whose
 	// complaint names the netrom block's line, not the node's.
 	t.Run("off the node's channels, refused by netromConfig", func(t *testing.T) {
-		var c = parseYAMLConfig(t, "node: {address: Q1TEST-7, alias: QNODEA, channels: [0]}\nnetrom: {channels: [1]}\n")
+		var c = parseYAMLConfig(t, "node: {address: Q1TEST-7, alias: QNODEA, channels: [0]}\nnetrom: {channels: {1: {}}}\n")
 		assert.Zero(t, c.errors, c.output)
 
 		var got, ok = c.misc.netrom.Get()

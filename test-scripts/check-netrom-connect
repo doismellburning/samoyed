@@ -297,7 +297,7 @@ samoyed:
     - {channel: 0, mycall: $USER_A, modem: {speed: "9600"}}
   agwPort: $agw_a
   kissPorts: [{port: 0}]
-  netrom: {callsign: $NODE_A, alias: QNODEA, channels: [0], nodesInterval: 2, quality: 255}
+  netrom: {callsign: $NODE_A, alias: QNODEA, channels: {0: {quality: 255}}, nodesInterval: 2}
   legacy: "FRACK 10"
 EOF
 
@@ -311,7 +311,7 @@ samoyed:
     - {channel: 0, mycall: Q2TEST, modem: {speed: "9600"}}
   agwPort: $agw_b
   kissPorts: [{port: 0}]
-  netrom: {callsign: $NODE_B, alias: QNODEB, channels: [0], nodesInterval: 2, quality: 255}
+  netrom: {callsign: $NODE_B, alias: QNODEB, channels: {0: {quality: 255}}, nodesInterval: 2}
   legacy: "FRACK 10"
 EOF
 
