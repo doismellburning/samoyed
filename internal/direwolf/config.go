@@ -45,6 +45,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/node"
 	"github.com/doismellburning/samoyed/internal/nodemap"
 	"github.com/doismellburning/samoyed/internal/pfilter"
+	"github.com/doismellburning/samoyed/internal/sdr"
 	"github.com/doismellburning/samoyed/internal/symbols"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/doismellburning/samoyed/internal/waypoint"
@@ -915,6 +916,10 @@ type parseState struct {
 	// symbols is where a symbol given by description is looked up.
 	symbols symbolCodes
 
+	// sdrGiven marks each audio device whose sdr settings the file gave,
+	// even ones that were refused, so it is told only once what is wrong.
+	sdrGiven [MAX_ADEVS]bool
+
 	// Tallies of what the file turned out to be like, for the caller to act on.
 	// An error means the configuration is wrong - a directive that could not be
 	// obeyed, or was obeyed only by falling back to a default.  A warning means
@@ -1458,6 +1463,8 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		misc:    p_misc_config,
 		symbols: symbolTable,
 
+		sdrGiven: [MAX_ADEVS]bool{},
+
 		nerrors:   0,
 		nwarnings: 0,
 		fatal:     false,
@@ -1610,6 +1617,8 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		}
 	}
 
+	ps.checkSDRDevices()
+
 	// A PSK demodulator's filters are sized from the bit rate and the sample
 	// rate, which are set on different lines, so check they fit only once
 	// both are known.
@@ -1632,6 +1641,47 @@ func config_init(fname string, p_audio_config *RadioConfig,
 
 	return configReport{errors: ps.nerrors, warnings: ps.nwarnings, fatal: ps.fatal}
 } /* end config_init */
+
+// checkSDRDevices reports each audio device that receives from an SDR without
+// saying how to tune it, or whose frequencies one receiver can't cover.  The
+// sample rate they are checked at can come after the frequencies, so this
+// waits for the end of the file.
+func (ps *parseState) checkSDRDevices() {
+	for a := range MAX_ADEVS {
+		var adev = &ps.audio.adev[a]
+		if adev.defined == 0 || !audioNameIsRTLTCP(adev.adevice_in) {
+			continue
+		}
+
+		var params, ok = adev.sdr.Get()
+		if !ok && ps.sdrGiven[a] {
+			continue
+		}
+
+		if !ok {
+			ps.errorf("config file: Audio device %d, %s, needs an sdr block to say what to receive, which only a YAML configuration has", a, adev.adevice_in)
+
+			continue
+		}
+
+		if len(params.frequencies) != adev.num_channels {
+			ps.errorf("config file: Audio device %d, %s, has %d audio channels but %d sdr frequencies",
+				a, adev.adevice_in, adev.num_channels, len(params.frequencies))
+
+			continue
+		}
+
+		var rate = adev.samples_per_sec
+		if rate == 0 {
+			rate = DEFAULT_SAMPLES_PER_SEC
+		}
+
+		var _, err = sdr.NewTuning(params.frequencies, rate)
+		if err != nil {
+			ps.errorf("config file: Audio device %d, %s: %s", a, adev.adevice_in, err)
+		}
+	}
+}
 
 // handleADEVICE handles the ADEVICE[n] keyword.
 func handleADEVICE(ps *parseState) error {

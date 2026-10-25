@@ -1016,3 +1016,93 @@ legacy: |
 		assert.True(t, got.nodeMap.IsNothing())
 	})
 }
+
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
+func Test_config_yaml_sdr(t *testing.T) {
+	t.Run("gives a channel for each frequency", func(t *testing.T) {
+		var c = parseYAMLConfig(t, `
+audioDevices:
+  - input: rtl_tcp:localhost:1234
+    rate: 48000
+    sdr: {frequencies: [144.800, 144.950], gain: 40.2, ppm: -3}
+`)
+		require.Zero(t, c.errors, c.output)
+
+		var adev = c.audio.adev[0]
+		assert.Equal(t, 2, adev.num_channels)
+		assert.Equal(t, MEDIUM_RADIO, c.audio.chan_medium[1])
+
+		var params, ok = adev.sdr.Get()
+		require.True(t, ok)
+		assert.InDeltaSlice(t, []float64{144_800_000, 144_950_000}, params.frequencies, 1e-3)
+		assert.Equal(t, maybe.Just(40.2), params.gain)
+		assert.Equal(t, -3, params.ppm)
+	})
+
+	t.Run("defaults to automatic gain and no correction", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "audioDevices:\n  - {input: \"rtl_tcp:localhost:1234\", sdr: {frequencies: [144.8]}}\n")
+		require.Zero(t, c.errors, c.output)
+
+		var params, ok = c.audio.adev[0].sdr.Get()
+		require.True(t, ok)
+		assert.True(t, params.gain.IsNothing())
+		assert.Zero(t, params.ppm)
+		assert.Equal(t, 1, c.audio.adev[0].num_channels)
+	})
+
+	var refused = map[string]struct {
+		content string
+		want    string
+	}{
+		"not an SDR": {
+			"audioDevices:\n  - {input: \"plughw:1,0\", sdr: {frequencies: [144.8]}}\n",
+			"sdr is for an audio device whose input is rtl_tcp:host:port",
+		},
+		"no frequencies": {
+			"audioDevices:\n  - {input: \"rtl_tcp:localhost:1234\", sdr: {}}\n",
+			"sdr needs 1 to 2 frequencies",
+		},
+		"too many frequencies": {
+			"audioDevices:\n  - {input: \"rtl_tcp:localhost:1234\", sdr: {frequencies: [144.8, 144.9, 145.0]}}\n",
+			"sdr needs 1 to 2 frequencies",
+		},
+		"channels disagree": {
+			"audioDevices:\n  - {input: \"rtl_tcp:localhost:1234\", channels: 1, sdr: {frequencies: [144.8, 144.9]}}\n",
+			"sdr has 2 frequencies for an audio device with 1 channels",
+		},
+		"too far apart": {
+			"audioDevices:\n  - {input: \"rtl_tcp:localhost:1234\", sdr: {frequencies: [144.8, 146.8]}}\n",
+			"which is as wide as one receiver goes",
+		},
+		"no sdr block": {
+			"audioDevices:\n  - {input: \"rtl_tcp:localhost:1234\"}\n",
+			"needs an sdr block",
+		},
+		"gain out of range": {
+			"audioDevices:\n  - {input: \"rtl_tcp:localhost:1234\", sdr: {frequencies: [144.8], gain: -5}}\n",
+			"gain -5 dB is out of range",
+		},
+		"ppm out of range": {
+			"audioDevices:\n  - {input: \"rtl_tcp:localhost:1234\", sdr: {frequencies: [144.8], ppm: 5000}}\n",
+			"frequency correction 5000 ppm is out of range",
+		},
+		"legacy block changes the channels": {
+			"audioDevices:\n  - {input: \"rtl_tcp:localhost:1234\", sdr: {frequencies: [144.8, 144.9]}}\nlegacy: |\n  ACHANNELS 1\n",
+			"has 1 audio channels but 2 sdr frequencies",
+		},
+	}
+
+	for name, tc := range refused {
+		t.Run(name, func(t *testing.T) {
+			var c = parseYAMLConfig(t, tc.content)
+			assert.Equal(t, 1, c.errors, c.output)
+			assert.Contains(t, c.output, tc.want)
+		})
+	}
+
+	t.Run("a legacy file can't say what to receive", func(t *testing.T) {
+		var c = parseConfig(t, "ADEVICE rtl_tcp:localhost:1234\n")
+		assert.Equal(t, 1, c.errors, c.output)
+		assert.Contains(t, c.output, "only a YAML configuration has")
+	})
+}

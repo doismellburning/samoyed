@@ -25,7 +25,7 @@ to the application layer and the AX.25 data link state machine.
            label="recv_adev_thread - one goroutine per audio device";
            style=rounded;
 
-           src [label="AudioDevices\nsound card (PortAudio), SDR over UDP, stdin"];
+           src [label="AudioDevices\nsound card (PortAudio), SDR over UDP, stdin,\nrtl_tcp (receiveSDR: sdr.Channelizer\nmixes, decimates, FM demodulates)"];
            get [label="demod_get_sample"];
            dtmf [label="dtmf.Decoder.Sample\n-> onButton (ttGateway.Button)"];
            mm [label="Layer2Receiver.ProcessSample\n-> MultiModem.ProcessSample\nDC average, fan out to subchannels"];
