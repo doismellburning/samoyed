@@ -184,6 +184,34 @@ naming a bit inversion that worked, and are left out of the frame metrics
 described below.
 
 
+Pick the right sound card without a sound server (Linux)
+---------------------------------------------------------
+
+With no ``ADEVICE``, Samoyed opens the system's default audio device.
+On macOS and Windows that is the device named in the sound settings,
+and on Linux with PulseAudio, PipeWire or JACK running it is the one chosen in the sound server.
+
+Linux without a sound server has no such choice to follow.
+ALSA's ``default`` comes from ``defaults.pcm.card 0`` in ``alsa.conf``,
+so it is card 0 whatever card 0 happens to be -
+on a headless Raspberry Pi with a USB radio interface, the headphone jack.
+Samoyed still opens the default, but warns at startup when another card could do the job:
+
+.. code::
+
+    level=warning msg="No sound server, so the default audio device is ALSA card 0; set ADEVICE if your radio is on another card" direction=transmit others="plughw:1,0"
+
+If your radio is on one of the cards listed, name it:
+
+.. code::
+
+    ADEVICE plughw:1,0
+
+``aplay -l`` and ``arecord -l`` list the cards and their numbers.
+A card's number can change between boots when there are several USB devices,
+so a name such as ``plughw:CODEC,0`` (from the bracketed ID in ``/proc/asound/cards``) is steadier.
+
+
 Receive without an audio output device
 --------------------------------------
 
