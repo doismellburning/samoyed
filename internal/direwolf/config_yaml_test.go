@@ -876,7 +876,7 @@ func Test_config_yaml_node_map(t *testing.T) {
 		var c = parseYAMLConfig(t, "node: {address: Q1TEST, map: {}}\n")
 		assert.Zero(t, c.errors, c.output)
 
-		require.NoError(t, c.audio.achan[0].setModem("9600"))
+		require.NoError(t, c.audio.achan[0].SetBitrate("9600"))
 
 		var got, ok = c.misc.node.Get()
 		require.True(t, ok)

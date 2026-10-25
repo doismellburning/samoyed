@@ -65,7 +65,7 @@ func direwolfModemOptionsOver(t *testing.T, config string, args ...string) (mode
 		return modemResult{}, parseErr
 	}
 
-	var err = modem.apply(&audio.achan[0])
+	var err = modem.apply(&audio.achan[0].ModemConfig)
 	if err == nil {
 		err = layer2.apply(&audio.achan[0])
 	}
@@ -85,7 +85,7 @@ func atestModemOptions(t *testing.T, args ...string) (modemResult, error) {
 		return modemResult{}, parseErr
 	}
 
-	var err = f.apply(&audio.achan[0])
+	var err = f.apply(&audio.achan[0].ModemConfig)
 	if err == nil {
 		atestSingleSlicer(&audio.achan[0])
 	}

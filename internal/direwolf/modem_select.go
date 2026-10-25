@@ -8,91 +8,12 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
-
-// setModem sets up achan for a -B option or a MODEM line's speed: a bit rate,
-// which brings the usual modem for that rate, or AIS or EAS, which name one.
-// The modem's tones go with it, and so does the demodulator profile, unless
-// the channel was AFSK and stays AFSK.  achan is left alone if bitrate is no
-// good.
-//
-//	300 implies 1600/1800 AFSK, for HF SSB.
-//	1200 implies 1200/2200 AFSK.
-//	2400 implies V.26 QPSK.
-//	4800 implies V.27 8PSK.
-//	9600 and up implies G3RUH baseband scrambled.
-func (achan *achan_param_s) setModem(bitrate string) error {
-	if strings.EqualFold(bitrate, "AIS") {
-		achan.ModemType = MODEM_AIS
-		achan.Baud = 9600
-		achan.MarkFreq = 0
-		achan.SpaceFreq = 0
-		achan.Profiles = ""
-
-		return nil
-	}
-
-	if strings.EqualFold(bitrate, "EAS") {
-		achan.ModemType = MODEM_EAS
-		achan.Baud = 521 // Actually 520.83 but we have an integer field here.
-		// Will make more precise in afsk demod init.
-		achan.MarkFreq = 2083  // Actually 2083.3 - logic 1.
-		achan.SpaceFreq = 1563 // Actually 1562.5 - logic 0.
-		achan.Profiles = "A"
-
-		return nil
-	}
-
-	var baud, err = strconv.Atoi(bitrate)
-	if err != nil {
-		return fmt.Errorf("invalid bitrate (should be an integer or 'AIS' or 'EAS'): %s", bitrate)
-	}
-
-	if baud < MIN_BAUD || baud > MAX_BAUD {
-		return fmt.Errorf("use a more reasonable bit rate in range of %d - %d", MIN_BAUD, MAX_BAUD)
-	}
-
-	achan.Baud = baud
-
-	// The profile belongs to the modem it was chosen for.  AFSK keeps an
-	// AFSK one, and every other modem starts afresh.
-	if baud < 1800 && achan.ModemType != MODEM_AFSK {
-		achan.Profiles = ""
-	}
-
-	switch {
-	case baud < 600:
-		achan.ModemType = MODEM_AFSK
-		achan.MarkFreq = 1600
-		achan.SpaceFreq = 1800
-	case baud < 1800:
-		achan.ModemType = MODEM_AFSK
-		achan.MarkFreq = DEFAULT_MARK_FREQ
-		achan.SpaceFreq = DEFAULT_SPACE_FREQ
-	case baud < 3600:
-		achan.ModemType = MODEM_QPSK
-		achan.MarkFreq = 0
-		achan.SpaceFreq = 0
-		achan.Profiles = ""
-	case baud < 7200:
-		achan.ModemType = MODEM_8PSK
-		achan.MarkFreq = 0
-		achan.SpaceFreq = 0
-		achan.Profiles = ""
-	default:
-		achan.ModemType = MODEM_SCRAMBLE
-		achan.MarkFreq = 0
-		achan.SpaceFreq = 0
-		achan.Profiles = ""
-	}
-
-	return nil
-}
 
 // ModemFlags are the command line options that choose a channel's modem:
 // -B, -g, -k, -j and -J, and for a program that receives, the demodulator's
@@ -141,10 +62,10 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	return f
 }
 
-// apply sets up achan from the options, once they have been parsed.
-func (f *ModemFlags) apply(achan *achan_param_s) error {
+// apply sets up modem from the options, once they have been parsed.
+func (f *ModemFlags) apply(modem *phy.ModemConfig) error {
 	if f.fs.Changed("bitrate") {
-		var err = achan.setModem(*f.bitrate)
+		var err = modem.SetBitrate(*f.bitrate)
 		if err != nil {
 			return err
 		}
@@ -153,59 +74,59 @@ func (f *ModemFlags) apply(achan *achan_param_s) error {
 	if *f.g3ruh {
 		// Force G3RUH mode, overriding default for speed.
 		//   Example:   -B 2400 -g
-		achan.ModemType = MODEM_SCRAMBLE
-		achan.MarkFreq = 0
-		achan.SpaceFreq = 0
-		achan.Profiles = ""
+		modem.ModemType = MODEM_SCRAMBLE
+		modem.MarkFreq = 0
+		modem.SpaceFreq = 0
+		modem.Profiles = ""
 	}
 
 	if *f.bpsk {
 		// Force BPSK mode, overriding default for speed.
 		//   Example:   -B 300 -k
-		achan.ModemType = MODEM_BPSK
-		achan.MarkFreq = 0
-		achan.SpaceFreq = 0
-		achan.Profiles = ""
+		modem.ModemType = MODEM_BPSK
+		modem.MarkFreq = 0
+		modem.SpaceFreq = 0
+		modem.Profiles = ""
 	}
 
 	// We have two different incompatible flavors of V.26.
 	if *f.direwolf15compat {
 		// V.26 compatible with earlier versions of direwolf.
 		//   Example:   -B 2400 -j    or simply   -j
-		achan.V26Alternative = V26_A
-		achan.ModemType = MODEM_QPSK
-		achan.MarkFreq = 0
-		achan.SpaceFreq = 0
-		achan.Baud = 2400
-		achan.Profiles = ""
+		modem.V26Alternative = V26_A
+		modem.ModemType = MODEM_QPSK
+		modem.MarkFreq = 0
+		modem.SpaceFreq = 0
+		modem.Baud = 2400
+		modem.Profiles = ""
 	}
 
 	if *f.mfj2400compat {
 		// V.26 compatible with MFJ and maybe others.
 		//   Example:   -B 2400 -J     or simply   -J
-		achan.V26Alternative = V26_B
-		achan.ModemType = MODEM_QPSK
-		achan.MarkFreq = 0
-		achan.SpaceFreq = 0
-		achan.Baud = 2400
-		achan.Profiles = ""
+		modem.V26Alternative = V26_B
+		modem.ModemType = MODEM_QPSK
+		modem.MarkFreq = 0
+		modem.SpaceFreq = 0
+		modem.Baud = 2400
+		modem.Profiles = ""
 	}
 
 	// After -j and -J, which bring a rate of their own.
 	if f.fs.Changed("bitrate") {
-		if achan.ModemType == MODEM_QPSK && achan.Baud != 2400 {
-			logrus.WithField("bitrate", achan.Baud).Warn("Bit rate should be the standard 2400 for QPSK")
+		if modem.ModemType == MODEM_QPSK && modem.Baud != 2400 {
+			logrus.WithField("bitrate", modem.Baud).Warn("Bit rate should be the standard 2400 for QPSK")
 		}
 
-		if achan.ModemType == MODEM_8PSK && achan.Baud != 4800 {
-			logrus.WithField("bitrate", achan.Baud).Warn("Bit rate should be the standard 4800 for 8PSK")
+		if modem.ModemType == MODEM_8PSK && modem.Baud != 4800 {
+			logrus.WithField("bitrate", modem.Baud).Warn("Bit rate should be the standard 4800 for 8PSK")
 		}
 	}
 
 	if f.receive {
 		// Needs to be after -B, -j, -J.
 		if *f.profile != "" {
-			achan.Profiles = *f.profile
+			modem.Profiles = *f.profile
 		}
 
 		if f.fs.Changed("decimate") {
@@ -214,7 +135,7 @@ func (f *ModemFlags) apply(achan *achan_param_s) error {
 			}
 
 			// Reduce audio sampling rate to reduce CPU requirements.
-			achan.Decimate = *f.decimate
+			modem.Decimate = *f.decimate
 		}
 
 		if f.fs.Changed("upsample") {
@@ -225,17 +146,17 @@ func (f *ModemFlags) apply(achan *achan_param_s) error {
 			// Increase G3RUH audio sampling rate to improve performance.
 			// The value is normally determined automatically based on audio
 			// sample rate and baud.  This allows override for experimentation.
-			achan.Upsample = *f.upsample
+			modem.Upsample = *f.upsample
 		}
 	}
 
 	if f.anyChanged() {
 		logrus.WithFields(logrus.Fields{
-			"bitrate":  achan.Baud,
-			"modem":    achan.ModemType,
-			"mark":     achan.MarkFreq,
-			"space":    achan.SpaceFreq,
-			"profiles": achan.Profiles,
+			"bitrate":  modem.Baud,
+			"modem":    modem.ModemType,
+			"mark":     modem.MarkFreq,
+			"space":    modem.SpaceFreq,
+			"profiles": modem.Profiles,
 		}).Info("Modem set from the command line")
 	}
 
