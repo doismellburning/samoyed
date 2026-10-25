@@ -84,6 +84,16 @@ func recordingKissClient() (*[]sentToClient, recordingClient) {
 	return sent, recordingClient{sent: sent}
 }
 
+// newKissTestPacket is a frame for a client to send.
+func newKissTestPacket(t *testing.T) *ax25.Packet {
+	t.Helper()
+
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
+	return pp
+}
+
 // tncTransmission is a frame the handler asked the TNC to transmit.
 type tncTransmission struct {
 	channel int
@@ -207,7 +217,7 @@ func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 
 	h.copyToPeers = peers.Copy
 
-	var pp = newTestPacket(t)
+	var pp = newKissTestPacket(t)
 	var _, from = recordingKissClient()
 
 	var msg = append([]byte{0x10 | kiss.CmdDataFrame}, pp.FrameData()...)
@@ -332,50 +342,35 @@ func Test_kiss_debug_print_empty(t *testing.T) {
 	}
 }
 
-// A KISS TCP port carrying a single radio channel ignores the channel in the
-// frame: the application thinks it has a one-radio TNC and always says 0.
-func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
+// singleChannelClient is a client whose messages are all for one radio
+// channel, whatever their frames say - as on a KISS TCP port that carries one.
+type singleChannelClient struct {
+	recordingClient
+
+	channel int
+}
+
+func (c singleChannelClient) RadioChannel(int) int {
+	return c.channel
+}
+
+// The radio channel a frame is for is the one its client says, which need
+// not be the one in the frame: an application that thinks it has a one-radio
+// TNC always says 0.
+func Test_kiss_process_msg_client_channel_overrides_the_frame(t *testing.T) {
 	t.Parallel()
 
 	var h, tnc = setupKissProcessMsg(t)
 
-	var kps = new(kissport_status_s)
-	kps.channel = 1
+	var _, from = recordingKissClient()
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), singleChannelClient{recordingClient: from, channel: 1})
 
-	assert.Equal(t, 1, tnc.count(1, false), "the port's channel should have been used")
+	assert.Equal(t, 1, tnc.count(1, false), "the client's channel should have been used")
 	assert.Equal(t, 0, tnc.count(0, false))
-}
-
-// A KISS TCP port's channel comes from the configuration rather than a
-// nibble, so nothing bounds it to the channel table.  The validity check used
-// to go on to ask whether an out-of-range channel was the IGate's - indexing
-// the table with the very channel it had just found to be out of range.
-//
-//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
-func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
-	var h, _ = setupKissProcessMsg(t)
-
-	var kps = new(kissport_status_s)
-	kps.channel = MAX_TOTAL_CHANS
-
-	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
-	require.NotNil(t, pp)
-
-	var output string
-
-	assert.NotPanics(t, func() {
-		output = captureKissLog(t, func() {
-			h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
-		})
-	})
-
-	assert.Contains(t, output, "Invalid transmit channel from KISS client application")
-	assert.Contains(t, output, "channel=16")
 }
 
 // Bytes that are not an AX.25 frame cannot be transmitted, and are reported
@@ -549,7 +544,7 @@ func Test_kiss_process_msg_ackmode(t *testing.T) {
 
 	var from = replyingClient{replies: make(chan sentToClient, 1)}
 
-	var pp = newTestPacket(t)
+	var pp = newKissTestPacket(t)
 
 	h.processMsg(ackmodeFrame(1, []byte{0x12, 0x34}, pp), from)
 
@@ -578,7 +573,7 @@ func Test_kiss_process_msg_ackmode_does_not_wait_for_the_client(t *testing.T) {
 
 	var from = replyingClient{replies: make(chan sentToClient)} // Nobody reads it until the end.
 
-	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, newTestPacket(t)), from)
+	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, newKissTestPacket(t)), from)
 
 	var queued = tnc.take(0, false)
 	require.NotNil(t, queued)
@@ -607,7 +602,7 @@ func Test_kiss_process_msg_data_frame_not_acknowledged(t *testing.T) {
 
 	var sent, from = recordingKissClient()
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, newTestPacket(t).FrameData()...), from)
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, newKissTestPacket(t).FrameData()...), from)
 
 	var queued = tnc.take(0, false)
 	require.NotNil(t, queued)
@@ -647,7 +642,7 @@ func Test_kiss_process_msg_ackmode_copies_as_data_frame(t *testing.T) {
 
 	h.copyToPeers = peers.Copy
 
-	var pp = newTestPacket(t)
+	var pp = newKissTestPacket(t)
 	var _, from = recordingKissClient()
 
 	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, pp), from)
@@ -962,7 +957,7 @@ func Test_kiss_process_msg_ackmode_invalid_channel_shows_what_was_sent(t *testin
 
 	var _, from = recordingKissClient()
 
-	var msg = ackmodeFrame(8, []byte{0x12, 0x34}, newTestPacket(t))
+	var msg = ackmodeFrame(8, []byte{0x12, 0x34}, newKissTestPacket(t))
 
 	var output = captureKissLog(t, func() {
 		h.processMsg(msg, from)

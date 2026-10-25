@@ -752,3 +752,48 @@ func Test_kissport_status_stop(t *testing.T) {
 
 	assert.False(t, kps.attachClient(0, late), "a stopped port should not take on a new client")
 }
+
+// A KISS TCP port carrying a single radio channel ignores the channel in the
+// frame: the application thinks it has a one-radio TNC and always says 0.
+func TestKissNetPortChannelOverridesTheFrame(t *testing.T) {
+	t.Parallel()
+
+	var tnc = setupKissHandlerTNC(t)
+	var h = NewKissHandler(t.Context(), tnc, nil)
+
+	var kps = new(kissport_status_s)
+	kps.channel = 1
+
+	var pp = newTestPacket(t)
+
+	handleKissMsg(h, append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
+
+	assert.Equal(t, 1, tnc.queue.Count(1, TQ_PRIO_1_LO, "", "", false), "the port's channel should have been used")
+	assert.Equal(t, 0, tnc.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+}
+
+// A KISS TCP port's channel comes from the configuration rather than a
+// nibble, so nothing bounds it to the channel table.  The validity check used
+// to go on to ask whether an out-of-range channel was the IGate's - indexing
+// the table with the very channel it had just found to be out of range.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func TestKissNetPortChannelOutOfRange(t *testing.T) {
+	var h = NewKissHandler(t.Context(), setupKissHandlerTNC(t), nil)
+
+	var kps = new(kissport_status_s)
+	kps.channel = MAX_TOTAL_CHANS
+
+	var pp = newTestPacket(t)
+
+	var output string
+
+	assert.NotPanics(t, func() {
+		output = captureLogOutput(t, logrus.DebugLevel, func() {
+			handleKissMsg(h, append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
+		})
+	})
+
+	assert.Contains(t, output, "Invalid transmit channel from KISS client application")
+	assert.Contains(t, output, "channel=16")
+}
