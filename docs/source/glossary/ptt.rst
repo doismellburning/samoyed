@@ -16,6 +16,12 @@ or a CAT command through Hamlib.
 Its counterpart is DCD, data carrier detect,
 which says the channel is busy so a transmission should wait.
 
+Samoyed loads Hamlib as it reads the configuration, rather than being built against it,
+so CAT PTT needs the Hamlib 4 library installed
+(``libhamlib4`` or ``libhamlib4t64`` on Debian and Ubuntu, ``brew install hamlib`` on macOS).
+Without it, a ``PTT RIG`` line is reported as an error,
+and the rest of the configuration still applies.
+
 References
 ----------
 
