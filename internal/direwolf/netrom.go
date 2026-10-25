@@ -55,17 +55,18 @@ func (ps *parseState) applyNETROM(settings NetROMSettings) error {
 
 	config.Alias = alias
 
-	if settings.Channel == nil {
-		return fmt.Errorf("line %d: NET/ROM needs a channel", ps.line)
+	if len(settings.Channels) == 0 {
+		return fmt.Errorf("line %d: NET/ROM needs channels", ps.line)
 	}
 
 	return ps.applyNETROMRouting(config, settings.NetROMRouting, false)
 }
 
 // applyIntegratedNETROM checks the settings of a NET/ROM node sharing the
-// node shell's address and alias, which listens on listensOn, and turns it
-// on.
-func (ps *parseState) applyIntegratedNETROM(address string, alias string, listensOn []int, settings NetROMRouting) error {
+// node shell's address and alias, and turns it on.  Given no channels, it
+// runs on all the shell's, which netromConfig fills in, since the command
+// line can still add to them.
+func (ps *parseState) applyIntegratedNETROM(address string, alias string, settings NetROMRouting) error {
 	var config = netrom.DefaultConfig()
 
 	var callsign, callErr = netrom.NormaliseCallsign(address)
@@ -81,27 +82,31 @@ func (ps *parseState) applyIntegratedNETROM(address string, alias string, listen
 
 	config.Alias = alias
 
-	if settings.Channel == nil {
-		if len(listensOn) != 1 {
-			return fmt.Errorf("line %d: NET/ROM needs a channel, as the node listens on more than one", ps.line)
-		}
-
-		settings.Channel = &listensOn[0]
+	// Left out, the channels are all the shell's; given, there must be some,
+	// as for the shell's own.
+	if settings.Channels != nil && len(settings.Channels) == 0 {
+		return fmt.Errorf("line %d: No channels for NET/ROM to run on. Leave channels out to run on all the node's", ps.line)
 	}
 
 	return ps.applyNETROMRouting(config, settings, true)
 }
 
 // applyNETROMRouting checks the routing settings of a NET/ROM node named as
-// config says, and turns it on.  Whether its channel can carry NET/ROM
+// config says, and turns it on.  Whether its channels can carry NET/ROM
 // waits for netromConfig, since the command line can still make one a radio
 // channel.
 func (ps *parseState) applyNETROMRouting(config netrom.Config, settings NetROMRouting, integrated bool) error {
-	if *settings.Channel < 0 || *settings.Channel >= MAX_TOTAL_CHANS {
-		return fmt.Errorf("line %d: Invalid channel %d for NET/ROM. Must be in range of 0 to %d", ps.line, *settings.Channel, MAX_TOTAL_CHANS-1)
+	for i, c := range settings.Channels {
+		if c < 0 || c >= MAX_TOTAL_CHANS {
+			return fmt.Errorf("line %d: Invalid channel %d for NET/ROM. Must be in range of 0 to %d", ps.line, c, MAX_TOTAL_CHANS-1)
+		}
+
+		if slices.Contains(settings.Channels[:i], c) {
+			return fmt.Errorf("line %d: NET/ROM channel %d is given more than once", ps.line, c)
+		}
 	}
 
-	config.Channel = *settings.Channel
+	config.Channels = slices.Clone(settings.Channels)
 
 	var err error
 
@@ -152,17 +157,12 @@ func netromByte(line int, name string, setting *int, least int, unset byte) (byt
 
 // netromConfig is the NET/ROM node's configuration for settings, with the
 // channels as they are now, or what is wrong with it.  One sharing the node
-// shell's names must be on one of the shell's channels, which is where the
-// shell answers for both.
+// shell's names must be on the shell's channels, which is where the shell
+// answers for both, and given none runs on all of them.
 func (c *RadioConfig) netromConfig(settings netromSettings, shell maybe.Maybe[nodeSettings]) (netrom.Config, error) {
 	var none netrom.Config
 
 	var config = settings.config
-
-	if !c.connectedModeAllowed(config.Channel) {
-		return none, fmt.Errorf("line %d: NET/ROM can't run on channel %d, which is not a channel connected mode can be used on",
-			settings.line, config.Channel)
-	}
 
 	if shellSettings, ok := shell.Get(); ok && settings.integrated {
 		var channels = shellSettings.channels
@@ -170,9 +170,26 @@ func (c *RadioConfig) netromConfig(settings netromSettings, shell maybe.Maybe[no
 			channels = c.connectedModeChannels()
 		}
 
-		if !slices.Contains(channels, config.Channel) {
-			return none, fmt.Errorf("line %d: NET/ROM can't run on channel %d, which the node does not listen on",
-				settings.line, config.Channel)
+		for _, channel := range config.Channels {
+			if !slices.Contains(channels, channel) {
+				return none, fmt.Errorf("line %d: NET/ROM can't run on channel %d, which the node does not listen on",
+					settings.line, channel)
+			}
+		}
+
+		if len(config.Channels) == 0 {
+			config.Channels = slices.Clone(channels)
+		}
+	}
+
+	if len(config.Channels) == 0 {
+		return none, fmt.Errorf("line %d: NET/ROM has no channels to run on", settings.line)
+	}
+
+	for _, channel := range config.Channels {
+		if !c.connectedModeAllowed(channel) {
+			return none, fmt.Errorf("line %d: NET/ROM can't run on channel %d, which is not a channel connected mode can be used on",
+				settings.line, channel)
 		}
 	}
 
@@ -180,8 +197,8 @@ func (c *RadioConfig) netromConfig(settings netromSettings, shell maybe.Maybe[no
 }
 
 // netromAGWDataLink is the data link as the AGW server sees it when there is
-// a NET/ROM node: what is the node's - a connect with the NET/ROM PID on its
-// channel, data for, disconnection of and outstanding frames on a client's
+// a NET/ROM node: what is the node's - a connect with the NET/ROM PID on one
+// of its channels, data for, disconnection of and outstanding frames on a client's
 // circuits, registration of the node's callsign, a client going away - goes
 // to the node, and everything else to the data link as before.
 type netromAGWDataLink struct {

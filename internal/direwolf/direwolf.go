@@ -333,7 +333,7 @@ x = Silence FX.25 information.`)
 			}
 		}
 
-		// The same goes for the NET/ROM node's channel.
+		// The same goes for the NET/ROM node's channels.
 		if netromSettings, ok := misc_config.netrom.Get(); ok {
 			var _, netromErr = audio_config.netromConfig(netromSettings, misc_config.node)
 			if netromErr != nil {
@@ -708,7 +708,7 @@ x = Silence FX.25 information.`)
 		var client = netromClient
 
 		if settings, _ := misc_config.netrom.Get(); settings.integrated {
-			shared = newSharedNode(dataLinkQueue, config.Channel, config.Callsign)
+			shared = newSharedNode(dataLinkQueue, config.Channels, config.Callsign)
 			link = shared.netromLink()
 			client = nodeClient
 			circuitClients = shared.circuitReporter(nodeClient, agwCircuitClients)

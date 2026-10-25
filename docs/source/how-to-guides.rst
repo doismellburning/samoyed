@@ -640,12 +640,12 @@ configure one with a ``netrom`` block in a YAML configuration
       netrom:
         callsign: Q1TEST-7
         alias: QNODEA
-        channel: 0
+        channels: [0]
 
 The node's callsign is its own:
 it answers the links neighbouring nodes make to it,
 and makes links to them,
-so nothing else should use that callsign on that channel.
+so nothing else should use that callsign on its channels.
 With a node shell, NET/ROM is configured with it instead, as below.
 Leave ``PACLEN`` at its default of 256 or more:
 a NET/ROM frame travels in a single AX.25 frame,
@@ -676,8 +676,9 @@ and drives a circuit between them in both directions,
 and doubles as a worked example of the AGW side.
 
 With :ref:`the web interface <how-to-guides:Watch a station in a web browser>` on,
-its dashboard shows the node's neighbours and whether the link to each is up,
-its routes with their quality and obsolescence count,
+its dashboard shows the node's neighbours, each with its port,
+and whether the link to each is up,
+its routes with the port each goes out on, their quality and obsolescence count,
 and the circuits open through it;
 NET/ROM frames in its packet list read as they do in the monitor output.
 
@@ -701,23 +702,22 @@ Configure it under the node shell's ``node`` block (see :doc:`yaml-config`):
 
 NET/ROM takes the node's address as its callsign and the node's alias as its alias,
 which must be no more than six letters, digits or ``#_&-/``.
-Its ``channel`` can be left out when the node listens on only one;
-otherwise it must be one of the node's ``channels``.
+Its ``channels`` must be among the node's;
+left out, it runs on all of them.
 The other settings are those of the ``netrom`` block above.
 
 A station that connects to the node gets the shell's prompt.
 If the first thing it sends is a NET/ROM frame,
-to the node's address on the channel NET/ROM runs on,
+to the node's address on one of the channels NET/ROM runs on,
 it is a neighbouring node,
 and the link is NET/ROM's from then on.
-NET/ROM runs on that one channel only,
-however many the shell listens on.
 The shell's ``NODES`` and ``ROUTES`` commands list the nodes NET/ROM can reach
 and the neighbours it reaches them through.
 Applications use NET/ROM over the AGW port as above,
-registering the node's address on NET/ROM's channel to take incoming circuits.
+registering the node's address on one of NET/ROM's channels to take incoming circuits.
 Registering the node's alias,
-or its address on another channel,
+or, where NET/ROM is given fewer channels than the node listens on,
+its address on one of the others,
 takes that name from the shell instead.
 ``test-scripts/check-netrom-node`` runs two such nodes,
 drives a circuit between them,
@@ -726,8 +726,10 @@ and has a user list one node from the other's shell.
 Running a node over AXUDP
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The node's channel can be an AXUDP port,
-to reach other nodes over the internet.
+One of the node's channels can be an AXUDP port,
+to reach other nodes over the internet;
+with a radio channel beside it,
+the node routes between the two.
 Send ``NODES`` broadcasts to every neighbour with ``broadcast: [NODES]``,
 and ``broadcast: true`` on each neighbour's map;
 map each neighbour by its node callsign, not its alias,
@@ -736,6 +738,8 @@ since the links between nodes are addressed to their callsigns:
 .. code:: yaml
 
     samoyed:
+      channels:
+        - {channel: 0, mycall: Q1TEST}
       axudpPorts:
         - port: 10093
           channel: 10
@@ -745,4 +749,4 @@ since the links between nodes are addressed to their callsigns:
       netrom:
         callsign: Q1TEST-7
         alias: QNODEA
-        channel: 10
+        channels: [0, 10]

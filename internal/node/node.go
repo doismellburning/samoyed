@@ -565,7 +565,8 @@ func (n *Node) connectArgs(user string, args []string) (linkKey, string, string)
 // nodeCircuit is the NET/ROM circuit to connect user to the node name names,
 // by alias or callsign, and what to call that node, if NET/ROM knows it.  The
 // user's own callsign is the circuit's own end, as the CONNECT REQUEST names
-// whose circuit it is.
+// whose circuit it is.  A circuit goes wherever the route to its node does,
+// whatever channel it is asked for on, so it is asked for on NET/ROM's first.
 func (n *Node) nodeCircuit(user string, name string) (linkKey, string, bool) {
 	var none linkKey
 
@@ -576,11 +577,11 @@ func (n *Node) nodeCircuit(user string, name string) (linkKey, string, bool) {
 	var status = n.netrom.Status()
 
 	var d, ok = findNode(status, name)
-	if !ok {
+	if !ok || len(status.Channels) == 0 {
 		return none, "", false
 	}
 
-	return linkKey{channel: status.Channel, ownCall: user, remoteCall: d.Callsign, circuit: true}, nodeName(d), true
+	return linkKey{channel: status.Channels[0], ownCall: user, remoteCall: d.Callsign, circuit: true}, nodeName(d), true
 }
 
 // downlinkUserLocked is the session of the user the downlink key names is
@@ -812,7 +813,7 @@ func (n *Node) nodes(key linkKey, _ *session, args []string) bool {
 }
 
 // nodeRoutes lists the routes to the node named, by alias or callsign, best
-// first.
+// first, each with the port of the neighbour it goes through.
 func (n *Node) nodeRoutes(key linkKey, status netrom.Status, name string) {
 	var d, ok = findNode(status, name)
 	if !ok {
@@ -826,7 +827,7 @@ func (n *Node) nodeRoutes(key linkKey, status netrom.Status, name string) {
 	fmt.Fprintf(&b, "%sRoutes to %s:\r", n.prompt(), nodeName(d))
 
 	for _, r := range d.Routes {
-		fmt.Fprintf(&b, "  %-9s quality %3d obsolescence %d\r", r.Neighbour, r.Quality, r.Obsolescence)
+		fmt.Fprintf(&b, "  %2d %-9s quality %3d obsolescence %d\r", r.Channel, r.Neighbour, r.Quality, r.Obsolescence)
 	}
 
 	n.send(key, []byte(b.String()))
@@ -869,9 +870,10 @@ func nodeName(d netrom.DestinationStatus) string {
 	return d.Alias + ":" + d.Callsign
 }
 
-// routes lists the NET/ROM node's neighbours, with whether the link to each
-// is up, what it is taken to be worth, and how many nodes can be reached
-// through it.
+// routes lists the NET/ROM node's neighbours, each with its port, as BPQ
+// does, whether the link to it is up, what it is taken to be worth, and how
+// many nodes can be reached through it.  The same callsign on two ports is
+// two neighbours.
 func (n *Node) routes(key linkKey, _ *session, _ []string) bool {
 	if n.netrom == nil {
 		return n.noNetROM(key)
@@ -887,7 +889,7 @@ func (n *Node) routes(key linkKey, _ *session, _ []string) bool {
 		var count = 0
 
 		for _, d := range status.Destinations {
-			if slices.ContainsFunc(d.Routes, func(r netrom.RouteStatus) bool { return r.Neighbour == nb.Callsign }) {
+			if slices.ContainsFunc(d.Routes, func(r netrom.RouteStatus) bool { return r.Channel == nb.Channel && r.Neighbour == nb.Callsign }) {
 				count++
 			}
 		}
@@ -902,7 +904,7 @@ func (n *Node) routes(key linkKey, _ *session, _ []string) bool {
 			failing = " failing"
 		}
 
-		fmt.Fprintf(&b, "  %-9s %-10s quality %3d %d %s%s\r", nb.Callsign, nb.Link, nb.Quality, count, nodes, failing)
+		fmt.Fprintf(&b, "  %2d %-9s %-10s quality %3d %d %s%s\r", nb.Channel, nb.Callsign, nb.Link, nb.Quality, count, nodes, failing)
 	}
 
 	n.send(key, []byte(b.String()))

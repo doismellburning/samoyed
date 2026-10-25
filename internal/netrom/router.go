@@ -33,10 +33,18 @@ const (
 	maxDestinations = 1000
 )
 
+// neighbour is a node we hear directly: a callsign on a channel.  The same
+// callsign heard on two channels is two neighbours, as it is to BPQ and to
+// Linux, each a way of its own to whatever it can reach.
+type neighbour struct {
+	channel  int
+	callsign string
+}
+
 // routeEntry is one way of reaching a destination: through a neighbour, at a
 // quality, for as long as its obsolescence count lasts.
 type routeEntry struct {
-	neighbour    string
+	neighbour    neighbour
 	quality      byte
 	obsolescence int
 }
@@ -75,7 +83,7 @@ type router struct {
 	minQuality  byte
 
 	destinations map[string]*destination
-	failures     map[string]int // Consecutive failures per neighbour.
+	failures     map[neighbour]int // Consecutive failures per neighbour.
 }
 
 func newRouter(myCall string, linkQuality byte, minQuality byte) *router {
@@ -84,7 +92,7 @@ func newRouter(myCall string, linkQuality byte, minQuality byte) *router {
 	r.linkQuality = linkQuality
 	r.minQuality = minQuality
 	r.destinations = make(map[string]*destination)
-	r.failures = make(map[string]int)
+	r.failures = make(map[neighbour]int)
 
 	return r
 }
@@ -96,31 +104,35 @@ func pathQuality(linkQuality byte, advertised byte) byte {
 	return byte(((int(linkQuality)*int(advertised) + 128) / 256) & 0xFF)
 }
 
-// heardNodes updates the table from a NODES broadcast that neighbour sent.
-func (r *router) heardNodes(neighbour string, n *Nodes) {
-	if strings.EqualFold(neighbour, r.myCall) {
+// heardNodes updates the table from a NODES broadcast that from sent.
+func (r *router) heardNodes(from neighbour, n *Nodes) {
+	if strings.EqualFold(from.callsign, r.myCall) {
 		return
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	delete(r.failures, neighbour)
+	delete(r.failures, from)
 
-	r.addRoute(neighbour, n.alias, neighbour, r.linkQuality)
+	r.addRoute(from.callsign, n.alias, from, r.linkQuality)
 
 	for _, e := range n.entries {
 		switch {
 		case strings.EqualFold(e.callsign, r.myCall):
 			// A route to ourselves is no use to us.
-		case strings.EqualFold(e.callsign, neighbour):
+		case strings.EqualFold(e.callsign, from.callsign):
 			// The neighbour itself is reachable directly, as above.
 		case strings.EqualFold(e.neighbour, r.myCall):
-			// Split horizon: the neighbour's way there is through us.
+			// Split horizon: the neighbour's way there is through us.  A
+			// broadcast names no channel, so this is through us on any
+			// of them, which is near enough: a neighbour reaching us on
+			// one channel through us on another is going a long way
+			// round.
 		default:
 			var quality = pathQuality(r.linkQuality, e.quality)
 			if quality >= r.minQuality && quality > 0 {
-				r.addRoute(e.callsign, e.alias, neighbour, quality)
+				r.addRoute(e.callsign, e.alias, from, quality)
 			}
 		}
 	}
@@ -129,7 +141,7 @@ func (r *router) heardNodes(neighbour string, n *Nodes) {
 // addRoute records that callsign is reachable through neighbour at quality,
 // refreshing the route if there is one through that neighbour already.
 // r.mu must be held.
-func (r *router) addRoute(callsign string, alias string, neighbour string, quality byte) {
+func (r *router) addRoute(callsign string, alias string, neighbour neighbour, quality byte) {
 	var d, ok = r.destinations[callsign]
 	if !ok {
 		if len(r.destinations) >= maxDestinations {
@@ -172,7 +184,7 @@ func (r *router) addRoute(callsign string, alias string, neighbour string, quali
 // that neighbour fresh, or else adds one at quality 0: used if there is
 // nothing better, but never advertised, and never displacing one learned from
 // a broadcast.
-func (r *router) heardFrom(origin string, neighbour string) {
+func (r *router) heardFrom(origin string, neighbour neighbour) {
 	if strings.EqualFold(origin, r.myCall) {
 		return
 	}
@@ -215,7 +227,7 @@ func (r *router) age() {
 // neighbourFailed notes that a link to neighbour could not be made or was
 // lost.  Once it has failed neighbourFailLimit times in a row, routes
 // through it are passed over until it is heard from again.
-func (r *router) neighbourFailed(neighbour string) {
+func (r *router) neighbourFailed(neighbour neighbour) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -223,7 +235,7 @@ func (r *router) neighbourFailed(neighbour string) {
 }
 
 // neighbourHeard notes that neighbour is evidently working again.
-func (r *router) neighbourHeard(neighbour string) {
+func (r *router) neighbourHeard(neighbour neighbour) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -254,13 +266,15 @@ func (r *router) resolve(name string) (string, bool) {
 
 // nextHop returns the neighbour to send traffic for callsign to: that of its
 // best route through a neighbour that has not been failing.
-func (r *router) nextHop(callsign string) (string, bool) {
+func (r *router) nextHop(callsign string) (neighbour, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	var d, ok = r.destinations[callsign]
 	if !ok {
-		return "", false
+		var none neighbour
+
+		return none, false
 	}
 
 	for _, rt := range d.routes {
@@ -269,7 +283,9 @@ func (r *router) nextHop(callsign string) (string, bool) {
 		}
 	}
 
-	return "", false
+	var none neighbour
+
+	return none, false
 }
 
 // broadcastEntries is what we tell our neighbours we can reach: for each
@@ -297,7 +313,7 @@ func (r *router) broadcastEntries() []NodesEntry {
 		entries = append(entries, NodesEntry{
 			callsign:  d.callsign,
 			alias:     d.alias,
-			neighbour: best.neighbour,
+			neighbour: best.neighbour.callsign,
 			quality:   best.quality,
 		})
 	}

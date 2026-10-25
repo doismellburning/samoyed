@@ -23,17 +23,19 @@ type recordingReporter struct {
 	mu sync.Mutex
 
 	established []string
+	estChannels []int // The channel each circuit was reported established on.
 	terminated  []string
 	data        [][]byte
 	pids        []int
 	outstanding []int
 }
 
-func (r *recordingReporter) LinkEstablished(_ int, _ int, remoteCall string, _ string, _ bool) {
+func (r *recordingReporter) LinkEstablished(channel int, _ int, remoteCall string, _ string, _ bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.established = append(r.established, remoteCall)
+	r.estChannels = append(r.estChannels, channel)
 }
 
 func (r *recordingReporter) LinkTerminated(_ int, _ int, remoteCall string, _ string, _ bool) {
@@ -67,6 +69,9 @@ type fakeDataLink struct {
 	connects []string // Neighbours asked for.
 	frames   []string // Neighbours sent to.
 
+	connectChannels []int // The channel each connect was asked for on.
+	frameChannels   []int // The channel each frame was sent on.
+
 	registered []registration
 
 	// onXmit, if set, is called on each frame sent, outside the lock.
@@ -78,13 +83,14 @@ type fakeDataLink struct {
 	queue    [][]byte
 }
 
-func (l *fakeDataLink) ConnectRequest(addrs [ax25.MaxAddrs]string, _ int, _ int, client int, _ int) {
+func (l *fakeDataLink) ConnectRequest(addrs [ax25.MaxAddrs]string, _ int, channel int, client int, _ int) {
 	if client != testClient {
 		panic("the node must connect as its own client")
 	}
 
 	l.mu.Lock()
 	l.connects = append(l.connects, addrs[ax25.Destination])
+	l.connectChannels = append(l.connectChannels, channel)
 
 	var self, peer = l.self, l.peer
 	l.mu.Unlock()
@@ -98,7 +104,7 @@ func (l *fakeDataLink) ConnectRequest(addrs [ax25.MaxAddrs]string, _ int, _ int,
 	peer.LinkEstablished(0, testClient, addrs[ax25.Source], addrs[ax25.Destination], true)
 }
 
-func (l *fakeDataLink) XmitDataRequest(addrs [ax25.MaxAddrs]string, _ int, _ int, _ int, pid int, data []byte) {
+func (l *fakeDataLink) XmitDataRequest(addrs [ax25.MaxAddrs]string, _ int, channel int, _ int, pid int, data []byte) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -107,6 +113,7 @@ func (l *fakeDataLink) XmitDataRequest(addrs [ax25.MaxAddrs]string, _ int, _ int
 	}
 
 	l.frames = append(l.frames, addrs[ax25.Destination])
+	l.frameChannels = append(l.frameChannels, channel)
 	l.queue = append(l.queue, append([]byte(nil), data...))
 
 	if l.onXmit != nil {
@@ -146,6 +153,7 @@ func (l *fakeDataLink) deliver() int {
 
 func testConfig(callsign string, alias string) Config {
 	var cfg = DefaultConfig()
+	cfg.Channels = []int{0}
 	cfg.Callsign = callsign
 	cfg.Alias = alias
 
@@ -157,9 +165,10 @@ func testConfig(callsign string, alias string) Config {
 type testNode struct {
 	*Node
 
-	link *fakeDataLink
-	agw  *recordingReporter
-	ui   []*ax25.Packet
+	link       *fakeDataLink
+	agw        *recordingReporter
+	ui         []*ax25.Packet
+	uiChannels []int // The channel each UI frame went out on.
 }
 
 func newTestNode(callsign string, alias string) *testNode {
@@ -168,8 +177,9 @@ func newTestNode(callsign string, alias string) *testNode {
 	tn.link.selfCall = callsign
 	tn.agw = new(recordingReporter)
 
-	tn.Node = New(testConfig(callsign, alias), tn.link, func(_ int, _ int, pp *ax25.Packet) {
+	tn.Node = New(testConfig(callsign, alias), tn.link, func(channel int, _ int, pp *ax25.Packet) {
 		tn.ui = append(tn.ui, pp)
+		tn.uiChannels = append(tn.uiChannels, channel)
 	}, tn.agw, new(fakeClock), testClient)
 
 	return tn
@@ -222,6 +232,34 @@ func TestNodeBroadcasts(t *testing.T) {
 	assert.Equal(t, append([]byte{0xFF}, "QNODEA"...), pp.Info())
 }
 
+// A node on several channels broadcasts on each, hears broadcasts on any of
+// them and nothing on any other.
+func TestNodeBroadcastsOnEachChannel(t *testing.T) {
+	t.Parallel()
+
+	var a = newTestNode("Q1TEST-7", "QNODEA")
+	a.cfg.Channels = []int{0, 3}
+
+	a.broadcastNodes()
+	assert.Equal(t, []int{0, 3}, a.uiChannels)
+
+	var b = newTestNode("Q2TEST-7", "QNODEB")
+	b.broadcastNodes()
+
+	var c = newTestNode("Q3TEST-7", "QNODEC")
+	c.broadcastNodes()
+
+	a.HeardUI(3, b.ui[0])
+	a.HeardUI(1, c.ui[0])
+
+	var hop, ok = a.router.nextHop("Q2TEST-7")
+	require.True(t, ok)
+	assert.Equal(t, neighbour{channel: 3, callsign: "Q2TEST-7"}, hop)
+
+	_, ok = a.router.nextHop("Q3TEST-7")
+	assert.False(t, ok, "heard on a channel A is not on")
+}
+
 func TestNodeHearsBroadcasts(t *testing.T) {
 	t.Parallel()
 
@@ -229,7 +267,7 @@ func TestNodeHearsBroadcasts(t *testing.T) {
 
 	var hop, ok = a.router.nextHop("Q2TEST-7")
 	require.True(t, ok)
-	assert.Equal(t, "Q2TEST-7", hop)
+	assert.Equal(t, nbr("Q2TEST-7"), hop)
 
 	_, ok = b.router.nextHop("Q1TEST-7")
 	assert.True(t, ok)
@@ -270,20 +308,20 @@ func TestNodeConnectsToNeighbours(t *testing.T) {
 
 	var a = newTestNode("Q1TEST-7", "QNODEA")
 
-	a.sendToNeighbour("Q2TEST-7", []byte("one"))
-	a.sendToNeighbour("Q2TEST-7", []byte("two"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("one"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("two"))
 	assert.Equal(t, []string{"Q2TEST-7"}, a.link.connects)
 	assert.Empty(t, a.link.frames, "nothing sent before the link is up")
 
 	a.LinkEstablished(0, testClient, "Q2TEST-7", "Q1TEST-7", false)
 	assert.Equal(t, [][]byte{[]byte("one"), []byte("two")}, a.link.queue, "then what was waiting, in order")
 
-	a.sendToNeighbour("Q2TEST-7", []byte("three"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("three"))
 	assert.Len(t, a.link.connects, 1)
 	assert.Len(t, a.link.frames, 3)
 
 	a.LinkTerminated(0, testClient, "Q2TEST-7", "Q1TEST-7", false)
-	a.sendToNeighbour("Q2TEST-7", []byte("four"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("four"))
 	assert.Len(t, a.link.connects, 2, "and again once it has gone down")
 	assert.Len(t, a.link.frames, 3)
 
@@ -296,7 +334,7 @@ func TestNodeConnectsToNeighbours(t *testing.T) {
 	}
 
 	for range 2 * maxPending {
-		a.sendToNeighbour("Q2TEST-7", []byte("x"))
+		a.sendToNeighbour(nbr("Q2TEST-7"), []byte("x"))
 	}
 
 	a.LinkEstablished(0, testClient, "Q2TEST-7", "Q1TEST-7", false)
@@ -304,13 +342,44 @@ func TestNodeConnectsToNeighbours(t *testing.T) {
 }
 
 // A neighbour connecting to us makes the link up for our traffic too.
+// A neighbour is reached on the channel it was heard on, and the data
+// link's reports of links on a channel the node is not on are nothing to it.
+func TestNodeReachesANeighbourOnItsChannel(t *testing.T) {
+	t.Parallel()
+
+	var a = newTestNode("Q1TEST-7", "QNODEA")
+	a.cfg.Channels = []int{2}
+
+	var b = newTestNode("Q2TEST-7", "QNODEB")
+	b.broadcastNodes()
+
+	a.HeardUI(0, b.ui[0])
+
+	var _, ok = a.router.nextHop("Q2TEST-7")
+	require.False(t, ok, "heard on a channel A is not on")
+
+	a.HeardUI(2, b.ui[0])
+
+	var hop, _ = a.router.nextHop("Q2TEST-7")
+	assert.Equal(t, neighbour{channel: 2, callsign: "Q2TEST-7"}, hop)
+
+	a.sendToNeighbour(hop, []byte("one"))
+	assert.Equal(t, []int{2}, a.link.connectChannels)
+
+	a.LinkEstablished(0, testClient, "Q2TEST-7", "Q1TEST-7", false)
+	assert.Empty(t, a.link.frames, "not the link asked for")
+
+	a.LinkEstablished(2, testClient, "Q2TEST-7", "Q1TEST-7", false)
+	assert.Equal(t, []int{2}, a.link.frameChannels)
+}
+
 func TestNodeUsesAnIncomingLink(t *testing.T) {
 	t.Parallel()
 
 	var a = newTestNode("Q1TEST-7", "QNODEA")
 
 	a.LinkEstablished(0, testClient, "Q2TEST-7", "Q1TEST-7", true)
-	a.sendToNeighbour("Q2TEST-7", []byte("one"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("one"))
 
 	assert.Empty(t, a.link.connects)
 	assert.Len(t, a.link.frames, 1)
@@ -404,7 +473,7 @@ func TestNodeAnswersANodeItHasNotHeardBroadcast(t *testing.T) {
 
 	var hop, ok = b.router.nextHop("Q1TEST-7")
 	require.True(t, ok)
-	assert.Equal(t, "Q1TEST-7", hop)
+	assert.Equal(t, nbr("Q1TEST-7"), hop)
 
 	assert.Empty(t, b.router.broadcastEntries(), "but a route learned so is not advertised as though a broadcast had told of it")
 }
@@ -460,8 +529,8 @@ func TestNodeSendsWhatWasWaitingFirst(t *testing.T) {
 
 	var a = newTestNode("Q1TEST-7", "QNODEA")
 
-	a.sendToNeighbour("Q2TEST-7", []byte("one"))
-	a.sendToNeighbour("Q2TEST-7", []byte("two"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("one"))
+	a.sendToNeighbour(nbr("Q2TEST-7"), []byte("two"))
 
 	var sentDuring = make(chan struct{})
 
@@ -470,7 +539,7 @@ func TestNodeSendsWhatWasWaitingFirst(t *testing.T) {
 	a.link.onXmit = func() {
 		once.Do(func() {
 			go func() {
-				a.sendToNeighbour("Q2TEST-7", []byte("three"))
+				a.sendToNeighbour(nbr("Q2TEST-7"), []byte("three"))
 				close(sentDuring)
 			}()
 
@@ -513,6 +582,37 @@ func TestNodeCircuitEndToEnd(t *testing.T) {
 
 	assert.Equal(t, []string{"QNODEB"}, a.agw.terminated)
 	assert.Equal(t, []string{"Q1TEST"}, b.agw.terminated)
+}
+
+// A client registered on one of the node's channels takes incoming
+// circuits there, and one asking on another of them has its circuit there.
+func TestNodeCircuitOnTheClientsChannel(t *testing.T) {
+	t.Parallel()
+
+	var a, b = joinedNodes(t)
+	a.cfg.Channels = []int{0, 4}
+	b.cfg.Channels = []int{0, 5}
+
+	assert.False(t, b.Register(1, 1, "Q2TEST-7"), "not one of B's channels")
+	require.True(t, b.Register(5, 1, "Q2TEST-7"))
+
+	require.True(t, a.Connect(4, 0, "Q1TEST", "QNODEB", ax25.PIDNetROM))
+	exchange(t, a, b)
+
+	assert.Equal(t, []int{4}, a.agw.estChannels)
+	assert.Equal(t, []int{5}, b.agw.estChannels)
+
+	require.Len(t, a.Status().Circuits, 1)
+	assert.Equal(t, 4, a.Status().Circuits[0].Channel, "its status says so too")
+	require.Len(t, b.Status().Circuits, 1)
+	assert.Equal(t, 5, b.Status().Circuits[0].Channel)
+
+	assert.False(t, a.Send(0, 0, "Q1TEST", "QNODEB", []byte("x")), "the circuit is on channel 4")
+	require.True(t, a.Send(4, 0, "Q1TEST", "QNODEB", []byte("hello B")))
+	exchange(t, a, b)
+
+	assert.Equal(t, [][]byte{[]byte("hello B")}, b.agw.data)
+	assert.Equal(t, []int{0}, a.link.frameChannels[:1], "the neighbour is still on channel 0")
 }
 
 // Asking again for a circuit the client has already leaves it be, rather
@@ -637,14 +737,20 @@ func TestNodeStart(t *testing.T) {
 
 	var broadcasts = make(chan sent, 4)
 
-	var n = New(testConfig("Q1TEST-7", "QNODEA"), link, func(_ int, prio int, pp *ax25.Packet) {
+	var cfg = testConfig("Q1TEST-7", "QNODEA")
+	cfg.Channels = []int{0, 2}
+
+	var n = New(cfg, link, func(_ int, prio int, pp *ax25.Packet) {
 		broadcasts <- sent{prio: prio, pp: pp}
 	}, nil, new(fakeClock), testClient)
 
 	n.Start(t.Context())
 
 	link.mu.Lock()
-	assert.Equal(t, []registration{{addr: "Q1TEST-7", channel: 0, client: testClient}}, link.registered)
+	assert.Equal(t, []registration{
+		{addr: "Q1TEST-7", channel: 0, client: testClient},
+		{addr: "Q1TEST-7", channel: 2, client: testClient},
+	}, link.registered, "on each channel")
 	link.mu.Unlock()
 
 	select {
@@ -655,5 +761,191 @@ func TestNodeStart(t *testing.T) {
 		t.Fatal("no NODES broadcast")
 	}
 
-	assert.NotPanics(t, func() { n.circuitData(circuitID{client: 0, ownCall: "Q1TEST", remoteCall: "Q2TEST"}, []byte("x")) })
+	assert.NotPanics(t, func() {
+		n.circuitData(circuitID{channel: 0, client: 0, ownCall: "Q1TEST", remoteCall: "Q2TEST"}, []byte("x"))
+	})
+}
+
+// mesh stands in for the data link and the radio between several nodes,
+// each on channels of its own: a station is reached by its callsign on a
+// channel, and a UI frame sent on a channel is heard by every other node on
+// it.
+type mesh struct {
+	mu sync.Mutex
+
+	nodes map[neighbour]*testNode // Each node, on each of its channels.
+
+	frames []meshFrame
+	ui     []meshUI
+}
+
+type meshFrame struct {
+	channel int
+	from    string
+	to      string
+	data    []byte
+}
+
+type meshUI struct {
+	channel int
+	from    *testNode
+	pp      *ax25.Packet
+}
+
+// meshLink is the data link as one node on the mesh sees it.
+type meshLink struct {
+	mesh *mesh
+}
+
+func (l meshLink) ConnectRequest(addrs [ax25.MaxAddrs]string, _ int, channel int, _ int, _ int) {
+	var m = l.mesh
+
+	m.mu.Lock()
+	var self = m.nodes[neighbour{channel: channel, callsign: addrs[ax25.Source]}]
+	var peer = m.nodes[neighbour{channel: channel, callsign: addrs[ax25.Destination]}]
+	m.mu.Unlock()
+
+	if self == nil || peer == nil {
+		return
+	}
+
+	self.LinkEstablished(channel, testClient, addrs[ax25.Destination], addrs[ax25.Source], false)
+	peer.LinkEstablished(channel, testClient, addrs[ax25.Source], addrs[ax25.Destination], true)
+}
+
+func (l meshLink) XmitDataRequest(addrs [ax25.MaxAddrs]string, _ int, channel int, _ int, _ int, data []byte) {
+	l.mesh.mu.Lock()
+	defer l.mesh.mu.Unlock()
+
+	l.mesh.frames = append(l.mesh.frames, meshFrame{channel: channel, from: addrs[ax25.Source], to: addrs[ax25.Destination], data: slices.Clone(data)})
+}
+
+func (l meshLink) RegisterCallsign(string, int, int) {}
+
+// add puts a node on the mesh, on channels.
+func (m *mesh) add(callsign string, alias string, channels ...int) *testNode {
+	var tn = new(testNode)
+	tn.agw = new(recordingReporter)
+
+	var cfg = testConfig(callsign, alias)
+	cfg.Channels = channels
+
+	tn.Node = New(cfg, meshLink{mesh: m}, func(channel int, _ int, pp *ax25.Packet) {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+
+		m.ui = append(m.ui, meshUI{channel: channel, from: tn, pp: pp})
+	}, tn.agw, new(fakeClock), testClient)
+
+	for _, channel := range channels {
+		m.nodes[neighbour{channel: channel, callsign: callsign}] = tn
+	}
+
+	return tn
+}
+
+// deliver hands each node what has been sent to it, saying how much that
+// was.
+func (m *mesh) deliver() int {
+	m.mu.Lock()
+	var frames, ui = m.frames, m.ui
+	m.frames, m.ui = nil, nil
+
+	var hearers = make(map[int][]*testNode)
+	for nb, tn := range m.nodes {
+		hearers[nb.channel] = append(hearers[nb.channel], tn)
+	}
+
+	var to = make([]*testNode, len(frames))
+	for i, f := range frames {
+		to[i] = m.nodes[neighbour{channel: f.channel, callsign: f.to}]
+	}
+	m.mu.Unlock()
+
+	for _, u := range ui {
+		for _, tn := range hearers[u.channel] {
+			if tn != u.from {
+				tn.HeardUI(u.channel, u.pp)
+			}
+		}
+	}
+
+	for i, f := range frames {
+		if to[i] != nil {
+			to[i].RecConnData(f.channel, testClient, f.from, f.to, ax25.PIDNetROM, f.data)
+		}
+	}
+
+	return len(frames) + len(ui)
+}
+
+// settle delivers until the mesh falls quiet.
+func (m *mesh) settle(t *testing.T) {
+	t.Helper()
+
+	for range 100 {
+		if m.deliver() == 0 {
+			return
+		}
+	}
+
+	t.Fatal("the mesh never went quiet")
+}
+
+// A node on two channels routes between them: A and B share one channel,
+// B and C another, and A learns of C through B, and holds a circuit to it
+// that carries data both ways.
+func TestNodeRoutesBetweenChannels(t *testing.T) {
+	t.Parallel()
+
+	var m = new(mesh)
+	m.nodes = make(map[neighbour]*testNode)
+
+	var a = m.add("Q1TEST-7", "QNODEA", 0)
+	var b = m.add("Q2TEST-7", "QNODEB", 0, 1)
+	var c = m.add("Q3TEST-7", "QNODEC", 1)
+
+	// C's broadcast reaches B, and B's then reach A and C.
+	for range 2 {
+		c.broadcastNodes()
+		b.broadcastNodes()
+		a.broadcastNodes()
+		m.settle(t)
+	}
+
+	var hop, ok = a.router.nextHop("Q3TEST-7")
+	require.True(t, ok, "A learns of C")
+	assert.Equal(t, neighbour{channel: 0, callsign: "Q2TEST-7"}, hop, "through B, on the channel they share")
+
+	hop, ok = c.router.nextHop("Q1TEST-7")
+	require.True(t, ok, "and C of A")
+	assert.Equal(t, neighbour{channel: 1, callsign: "Q2TEST-7"}, hop)
+
+	require.True(t, c.Register(1, 1, "Q3TEST-7"))
+
+	require.True(t, a.Connect(0, 0, "Q1TEST", "QNODEC", ax25.PIDNetROM))
+	m.settle(t)
+
+	assert.Equal(t, []string{"QNODEC"}, a.agw.established)
+	assert.Equal(t, []string{"Q1TEST"}, c.agw.established)
+	assert.Equal(t, []int{1}, c.agw.estChannels, "where C's client registered")
+
+	require.True(t, a.Send(0, 0, "Q1TEST", "QNODEC", []byte("hello C")))
+	require.True(t, c.Send(1, 1, "Q3TEST-7", "Q1TEST", []byte("hello A")))
+	m.settle(t)
+
+	assert.Equal(t, [][]byte{[]byte("hello C")}, c.agw.data)
+	assert.Equal(t, [][]byte{[]byte("hello A")}, a.agw.data)
+
+	var bs = b.Status()
+	assert.Equal(t, []NeighbourStatus{
+		{Channel: 0, Callsign: "Q1TEST-7", Link: "up", Quality: int(DefaultQuality), Failures: 0, Failing: false},
+		{Channel: 1, Callsign: "Q3TEST-7", Link: "up", Quality: int(DefaultQuality), Failures: 0, Failing: false},
+	}, bs.Neighbours, "B has a link on each channel")
+
+	require.True(t, a.Disconnect(0, 0, "Q1TEST", "QNODEC"))
+	m.settle(t)
+
+	assert.Equal(t, []string{"QNODEC"}, a.agw.terminated)
+	assert.Equal(t, []string{"Q1TEST"}, c.agw.terminated)
 }

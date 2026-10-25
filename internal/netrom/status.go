@@ -12,18 +12,20 @@ import (
 // Status is what a node is, and what it knows, at a moment: for showing to
 // someone, not for acting on.
 type Status struct {
-	Channel  int
+	Channels []int
 	Callsign string
 	Alias    string
 
-	Neighbours   []NeighbourStatus   // In callsign order.
+	Neighbours   []NeighbourStatus   // In callsign order, then channel.
 	Destinations []DestinationStatus // In callsign order.
-	Circuits     []CircuitStatus     // In order of their own callsign, then the far end's.
+	Circuits     []CircuitStatus     // In order of their own callsign, then the far end's, then channel.
 }
 
 // NeighbourStatus is a neighbour: a node we have a link to, or a route
-// through.
+// through, on a channel.  The same callsign on two channels is two
+// neighbours.
 type NeighbourStatus struct {
+	Channel  int
 	Callsign string
 
 	// Link is "up", "connecting" or "down".
@@ -48,8 +50,10 @@ type DestinationStatus struct {
 	Routes   []RouteStatus
 }
 
-// RouteStatus is one way of reaching a destination.
+// RouteStatus is one way of reaching a destination: through the neighbour
+// Neighbour on Channel.
 type RouteStatus struct {
+	Channel      int
 	Neighbour    string
 	Quality      int
 	Obsolescence int
@@ -57,6 +61,7 @@ type RouteStatus struct {
 
 // CircuitStatus is a client's circuit.
 type CircuitStatus struct {
+	Channel    int    // What the client has it on.
 	OwnCall    string // What the client calls this end.
 	RemoteCall string // What it calls the far end.
 	RemoteNode string // The node at the far end.
@@ -100,43 +105,48 @@ func (s circuitState) String() string {
 // Status is the node as it is now.
 func (n *Node) Status() Status {
 	var s Status
-	s.Channel = n.cfg.Channel
+	s.Channels = slices.Clone(n.cfg.Channels)
 	s.Callsign = n.cfg.Callsign
 	s.Alias = n.cfg.Alias
 
-	var failures map[string]int
+	var failures map[neighbour]int
 
 	s.Destinations, failures = n.router.status()
 	s.Circuits = n.circuits.status()
 
-	var links = make(map[string]linkState)
+	var links = make(map[neighbour]linkState)
 
 	n.mu.Lock()
-	for call, l := range n.links {
-		links[call] = l.state
+	for nb, l := range n.links {
+		links[nb] = l.state
 	}
 	n.mu.Unlock()
 
 	// A neighbour is anything with a link, or a route through it, or a
 	// failure count - each of which can outlast the others.
-	var neighbours = make(map[string]bool)
-	for call := range links {
-		neighbours[call] = true
+	var neighbours = make(map[neighbour]bool)
+	for nb := range links {
+		neighbours[nb] = true
 	}
 
-	for call := range failures {
-		neighbours[call] = true
+	for nb := range failures {
+		neighbours[nb] = true
 	}
 
 	for _, d := range s.Destinations {
 		for _, rt := range d.Routes {
-			neighbours[rt.Neighbour] = true
+			neighbours[neighbour{channel: rt.Channel, callsign: rt.Neighbour}] = true
 		}
 	}
 
-	for _, call := range slices.Sorted(maps.Keys(neighbours)) {
+	var sorted = slices.SortedFunc(maps.Keys(neighbours), func(a, b neighbour) int {
+		return cmp.Or(cmp.Compare(a.callsign, b.callsign), cmp.Compare(a.channel, b.channel))
+	})
+
+	for _, call := range sorted {
 		var nb NeighbourStatus
-		nb.Callsign = call
+		nb.Channel = call.channel
+		nb.Callsign = call.callsign
 		nb.Link = links[call].String()
 		nb.Quality = int(n.cfg.Quality)
 		nb.Failures = failures[call]
@@ -149,7 +159,7 @@ func (n *Node) Status() Status {
 
 // status is the routing table, in callsign order, and the neighbours'
 // failure counts.
-func (r *router) status() ([]DestinationStatus, map[string]int) {
+func (r *router) status() ([]DestinationStatus, map[neighbour]int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -162,7 +172,8 @@ func (r *router) status() ([]DestinationStatus, map[string]int) {
 
 		for _, rt := range d.routes {
 			ds.Routes = append(ds.Routes, RouteStatus{
-				Neighbour:    rt.neighbour,
+				Channel:      rt.neighbour.channel,
+				Neighbour:    rt.neighbour.callsign,
 				Quality:      int(rt.quality),
 				Obsolescence: rt.obsolescence,
 			})
@@ -189,6 +200,7 @@ func (m *circuitManager) status() []CircuitStatus {
 		}
 
 		circuits = append(circuits, CircuitStatus{
+			Channel:     c.id.channel,
 			OwnCall:     c.id.ownCall,
 			RemoteCall:  c.id.remoteCall,
 			RemoteNode:  c.remoteNode,
@@ -200,7 +212,7 @@ func (m *circuitManager) status() []CircuitStatus {
 	}
 
 	slices.SortFunc(circuits, func(a, b CircuitStatus) int {
-		return cmp.Or(cmp.Compare(a.OwnCall, b.OwnCall), cmp.Compare(a.RemoteCall, b.RemoteCall))
+		return cmp.Or(cmp.Compare(a.OwnCall, b.OwnCall), cmp.Compare(a.RemoteCall, b.RemoteCall), cmp.Compare(a.Channel, b.Channel))
 	})
 
 	return circuits
