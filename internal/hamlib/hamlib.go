@@ -78,6 +78,12 @@ func libraryNames() []string {
 // load opens the first of names that it can and binds the functions this
 // package uses.
 func load(names []string) (*library, error) {
+	// purego's Dlopen and Dlsym make the dlerror call that explains a failure
+	// separately from the call that failed, and dlerror's state is per OS
+	// thread, so a goroutine moved between the two gets an empty message.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	var handle uintptr
 	var openErrs []string
 

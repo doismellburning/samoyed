@@ -4,7 +4,10 @@
 package hamlib
 
 import (
+	"fmt"
 	"math"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -75,6 +78,40 @@ func TestLoadMissingLibrary(t *testing.T) {
 	assert.Contains(t, err.Error(), "libsamoyed-no-such-hamlib.so.0")
 	assert.Contains(t, err.Error(), "install Hamlib")
 	assert.NotContains(t, err.Error(), "\n", "one line, so it reads as one complaint")
+}
+
+// TestLoadMissingLibraryConcurrently runs load from many goroutines at once, so
+// that the scheduler is likely to move one to another OS thread between
+// purego's dlopen and dlerror calls.  dlerror's state is per thread, so a
+// moved goroutine used to get an empty error message.
+func TestLoadMissingLibraryConcurrently(t *testing.T) {
+	t.Parallel()
+
+	const goroutines = 64
+
+	const iterations = 50
+
+	var wg sync.WaitGroup
+
+	var errs = make(chan string, goroutines*iterations)
+
+	for range goroutines {
+		wg.Go(func() {
+			for range iterations {
+				var _, err = load([]string{"libsamoyed-no-such-hamlib.so.0"})
+				if err == nil || !strings.Contains(err.Error(), "libsamoyed-no-such-hamlib.so.0") {
+					errs <- fmt.Sprint(err)
+				}
+			}
+		})
+	}
+
+	wg.Wait()
+	close(errs)
+
+	if len(errs) > 0 {
+		assert.Fail(t, "dlopen error lost", "%d of %d loads, e.g. %s", len(errs), goroutines*iterations, <-errs)
+	}
 }
 
 func TestError(t *testing.T) {
