@@ -161,15 +161,15 @@ func CloseOnDone(ctx context.Context, c io.Closer) func() {
 	}
 }
 
-// RunCmd runs cmd and returns what it writes to standard output.  It runs cmd
-// directly, not through a shell, so cmd names the program and nothing more.
+// RunCmd runs cmd, a shell command line, and returns what it writes to
+// standard output.
 //
 // oneline 0 leaves cmd as it is; 1 turns any CR, LF or TAB in it into a space;
 // 2 also trims the whitespace from either end.
 //
-// TODO: Dire Wolf's dw_run_cmd ran cmd through a shell and tidied its output
-// this way, not the command, so a script's trailing newline didn't reach the
-// beacon comment or audible response it makes.
+// TODO: Dire Wolf's dw_run_cmd tidied the command's output this way, not the
+// command, so a script's trailing newline didn't reach the beacon comment or
+// audible response it makes.
 func RunCmd(ctx context.Context, cmd string, oneline int) ([]byte, error) {
 	if oneline > 0 {
 		cmd = strings.ReplaceAll(cmd, "\r", " ")
@@ -181,5 +181,5 @@ func RunCmd(ctx context.Context, cmd string, oneline int) ([]byte, error) {
 		cmd = strings.TrimSpace(cmd)
 	}
 
-	return exec.CommandContext(ctx, cmd).Output()
+	return exec.CommandContext(ctx, "/bin/sh", "-c", cmd).Output() //nolint:gosec // G204: the command is the operator's own, from the configuration file.
 }

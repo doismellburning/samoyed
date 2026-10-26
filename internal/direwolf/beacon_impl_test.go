@@ -759,8 +759,7 @@ func Test_BeaconSend_custom_infocmd_failure_sends_nothing(t *testing.T) {
 func Test_BeaconSend_custom_infocmd_output_is_the_info(t *testing.T) {
 	t.Parallel()
 
-	// dwutil.RunCmd runs the command without a shell, so an argument-free command
-	// with predictable output is what is needed: "true" prints nothing.
+	// "true" prints nothing, so the info part is empty.
 	var truePath, err = exec.LookPath("true")
 	if err != nil {
 		t.Skip("no true command available")

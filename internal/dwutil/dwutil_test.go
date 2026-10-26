@@ -112,6 +112,17 @@ func TestRunCmd(t *testing.T) {
 	assert.Empty(t, out)
 }
 
+// A command is a shell command line, as Dire Wolf's popen took it, so it can
+// pass arguments to the program it runs: COMMENTCMD="date +%H%M", say.  It
+// used to be taken whole as the program's name.
+func TestRunCmdPassesArguments(t *testing.T) {
+	t.Parallel()
+
+	var out, err = RunCmd(t.Context(), "echo Q1TEST Q2TEST", 0)
+	require.NoError(t, err)
+	assert.Equal(t, "Q1TEST Q2TEST\n", string(out))
+}
+
 func TestRunCmdMissingCommand(t *testing.T) {
 	t.Parallel()
 
