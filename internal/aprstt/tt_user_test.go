@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-package direwolf
+package aprstt
 
 import (
 	"fmt"
@@ -23,17 +23,15 @@ import (
 func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 	t.Parallel()
 
-	var my_audio_config RadioConfig
+	var my_mycall = ttMyCalls("Q1TEST-15")
 
-	my_audio_config.mycall[0] = "Q1TEST-15"
+	var my_tt_config Config
 
-	var my_tt_config tt_config_s
+	my_tt_config.RetainTime = 20
+	my_tt_config.NumXmits = 1
+	my_tt_config.XmitDelay[0] = 3
 
-	my_tt_config.retain_time = 20
-	my_tt_config.num_xmits = 1
-	my_tt_config.xmit_delay[0] = 3
-
-	var users = newTTUsers(&my_audio_config, &my_tt_config)
+	var users = newTTUsers(my_mycall, &my_tt_config)
 
 	require.Equal(t, 0, users.heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
 		maybe.Just(2), "", "", "", ' ', "!T99!"))
@@ -58,17 +56,15 @@ func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 func TestObjectReportCarriesFrequency(t *testing.T) {
 	t.Parallel()
 
-	var my_audio_config RadioConfig
+	var my_mycall = ttMyCalls("Q1TEST-15")
 
-	my_audio_config.mycall[0] = "Q1TEST-15"
+	var my_tt_config Config
 
-	var my_tt_config tt_config_s
+	my_tt_config.RetainTime = 20
+	my_tt_config.NumXmits = 1
+	my_tt_config.XmitDelay[0] = 3
 
-	my_tt_config.retain_time = 20
-	my_tt_config.num_xmits = 1
-	my_tt_config.xmit_delay[0] = 3
-
-	var users = newTTUsers(&my_audio_config, &my_tt_config)
+	var users = newTTUsers(my_mycall, &my_tt_config)
 
 	require.Equal(t, 0, users.heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
 		maybe.Just(0), "146.955MHz", "074", "", ' ', ""))
@@ -97,15 +93,13 @@ func TestDigitSuffixIgnoresNonASCIIDigits(t *testing.T) {
 func TestSetenvSpellsOutOnlyASCII(t *testing.T) {
 	t.Setenv("TTCALLPH", "")
 
-	var my_audio_config RadioConfig
+	var my_mycall = ttMyCalls("Q1TEST-15")
 
-	my_audio_config.mycall[0] = "Q1TEST-15"
+	var my_tt_config Config
 
-	var my_tt_config tt_config_s
+	my_tt_config.RetainTime = 20
 
-	my_tt_config.retain_time = 20
-
-	var users = newTTUsers(&my_audio_config, &my_tt_config)
+	var users = newTTUsers(my_mycall, &my_tt_config)
 
 	users.user[0].callsign = "Q2À"
 	users.setenv(0)
@@ -120,17 +114,15 @@ func TestSetenvSpellsOutOnlyASCII(t *testing.T) {
 func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 	t.Parallel()
 
-	var my_audio_config RadioConfig
+	var my_mycall = ttMyCalls("Q1TEST-15")
 
-	my_audio_config.mycall[0] = "Q1TEST-15"
+	var my_tt_config Config
 
-	var my_tt_config tt_config_s
+	my_tt_config.RetainTime = 20
+	my_tt_config.NumXmits = 1
+	my_tt_config.ObjXmitChan = -1 // Keep the reports off the transmit queue.
 
-	my_tt_config.retain_time = 20
-	my_tt_config.num_xmits = 1
-	my_tt_config.obj_xmit_chan = -1 // Keep the reports off the transmit queue.
-
-	var gw = NewTTGateway(&my_audio_config, &my_tt_config, nil, nil, nil, nil, nil, nil, 0)
+	var gw = NewGateway(my_mycall, &my_tt_config, nil, nil, nil, nil, nil, nil, 0)
 
 	var done = make(chan struct{})
 
@@ -156,11 +148,9 @@ func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
 func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 	t.Parallel()
 
-	var audioConfig = makeBeaconModemConfig()
+	var ttConfig Config
 
-	var ttConfig tt_config_s
-
-	ttConfig.obj_xmit_chan = 0
+	ttConfig.ObjXmitChan = 0
 
 	var remembered []string
 
@@ -176,7 +166,7 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 		transmitted = append(transmitted, fmt.Sprintf("%d %d %s%s", channel, prio, pp.FormatAddrs(), pp.Info()))
 	}
 
-	var gw = NewTTGateway(audioConfig, &ttConfig, nil, remember, nil, nil, transmit, nil, 0)
+	var gw = NewGateway(ttMyCalls("Q1TEST"), &ttConfig, nil, remember, nil, nil, transmit, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
 
@@ -189,13 +179,11 @@ func TestTransmittedObjectReportIsRemembered(t *testing.T) {
 func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
 	t.Parallel()
 
-	var audioConfig = makeBeaconModemConfig()
+	var ttConfig Config
 
-	var ttConfig tt_config_s
-
-	ttConfig.obj_send_to_ig = 1
-	ttConfig.obj_recv_chan = 1
-	ttConfig.obj_xmit_chan = -1
+	ttConfig.ObjSendToIG = 1
+	ttConfig.ObjRecvChan = 1
+	ttConfig.ObjXmitChan = -1
 
 	var sent []string
 
@@ -203,7 +191,32 @@ func TestObjectReportForAPRSISGoesToTheIGate(t *testing.T) {
 		sent = append(sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
 	}
 
-	var gw = NewTTGateway(audioConfig, &ttConfig, nil, nil, toIGate, nil, nil, nil, 0)
+	var gw = NewGateway(ttMyCalls("Q1TEST"), &ttConfig, nil, nil, toIGate, nil, nil, nil, 0)
+
+	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
+	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
+
+	assert.Equal(t, []string{"1 Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W="}, sent)
+}
+
+// An object report goes to the client applications the gateway was handed,
+// when configured to, the first time only, on the channel it was heard on.
+func TestObjectReportGoesToTheClientApps(t *testing.T) {
+	t.Parallel()
+
+	var ttConfig Config
+
+	ttConfig.ObjSendToApp = 1
+	ttConfig.ObjRecvChan = 1
+	ttConfig.ObjXmitChan = -1
+
+	var sent []string
+
+	var toApps = func(channel int, pp *ax25.Packet) {
+		sent = append(sent, fmt.Sprintf("%d %s%s", channel, pp.FormatAddrs(), pp.Info()))
+	}
+
+	var gw = NewGateway(ttMyCalls("Q1TEST"), &ttConfig, toApps, nil, nil, nil, nil, nil, 0)
 
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", true)
 	gw.users.sendObjectReport("Q1TEST>APDW17:;Q2TEST   *111111z4237.14N/07120.83W=", false)
