@@ -765,7 +765,10 @@ func TestWaitForClearChannelWaitsWhileBusy(t *testing.T) {
 
 	tq.Append(0, TQ_PRIO_0_HI, newTestPacket(t)) // So no random wait.
 
-	assert.True(t, xs.wait_for_clear_channel(t.Context(), 0, 0, 255, false))
+	var timing = new(xmitTiming)
+	timing.persist = 255
+
+	assert.True(t, xs.wait_for_clear_channel(t.Context(), 0, *timing))
 	assert.GreaterOrEqual(t, asked, 3, "the channel should have been asked about until it cleared")
 
 	xs.audio.outputMu[ACHAN2ADEV(0)].Unlock() // Which a clear channel leaves locked.

@@ -58,27 +58,6 @@ import (
 
 const MORSE_DEFAULT_WPM = 10
 
-// xmitTiming is one channel's transmit timing: what the configuration file
-// set, unless a client application has since changed it.
-type xmitTiming struct {
-	slottime int /* Slot time in 10 mS units for persistence algorithm. */
-
-	persist int /* Sets probability for transmitting after each */
-	/* slot time delay.  Transmit if a random number */
-	/* in range of 0 - 255 <= persist value.  */
-	/* Otherwise wait another slot time and try again. */
-
-	txdelay int /* After turning on the transmitter, */
-	/* send "flags" for txdelay * 10 mS. */
-
-	txtail int /* Amount of time to keep transmitting after we */
-	/* are done sending the data.  This is to avoid */
-	/* dropping PTT too soon and chopping off the end */
-	/* of the frame.  Again 10 mS units. */
-
-	fulldup bool /* Full duplex if true. */
-}
-
 /*
  * XmitService holds all transmit state.
  * Each channel can have different timing values.
@@ -259,13 +238,7 @@ func NewXmitService(
 
 	for j := range MAX_RADIO_CHANS {
 		xs.bits_per_sec[j] = p_modem.achan[j].baud
-		xs.timing[j] = xmitTiming{
-			slottime: p_modem.achan[j].slottime,
-			persist:  p_modem.achan[j].persist,
-			txdelay:  p_modem.achan[j].txdelay,
-			txtail:   p_modem.achan[j].txtail,
-			fulldup:  p_modem.achan[j].fulldup,
-		}
+		xs.timing[j] = p_modem.achan[j].xmitTiming
 	}
 
 	logrus.Debug("xmit_init: about to create threads")
@@ -608,7 +581,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 	 * Otherwise, wait a random amount of time, in hopes of minimizing collisions.
 	 */
 	var timing = xs.channelTiming(channel)
-	var ok = xs.wait_for_clear_channel(ctx, channel, timing.slottime, timing.persist, timing.fulldup)
+	var ok = xs.wait_for_clear_channel(ctx, channel, timing)
 
 	if ok {
 		// Corresponding lock is in wait_for_clear_channel.  Releasing it with
@@ -1433,7 +1406,7 @@ func dtmf_send(toneGenerator *ToneGenerator, channel int, str string, speed int,
 const WAIT_TIMEOUT_MS = 60 * 1000
 const WAIT_CHECK_EVERY_MS = 10
 
-func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, slottime int, persist int, fulldup bool) bool {
+func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, timing xmitTiming) bool {
 	/*
 	 * For full duplex we skip the channel busy check and random wait.
 	 * We still need to wait if operating in stereo and the other audio
@@ -1441,7 +1414,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 	 */
 	var n = 0
 
-	if !fulldup {
+	if !timing.fulldup {
 	start_over_again:
 
 		for xs.channelBusy(channel) {
@@ -1462,8 +1435,8 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 		 * turn around fast enough when using squelch and VOX.
 		 */
 
-		if xs.p_modem.achan[channel].dwait > 0 {
-			if !dwutil.SleepCtx(ctx, time.Duration(xs.p_modem.achan[channel].dwait)*10*time.Millisecond) {
+		if timing.dwait > 0 {
+			if !dwutil.SleepCtx(ctx, time.Duration(timing.dwait)*10*time.Millisecond) {
 				return false
 			}
 		}
@@ -1477,7 +1450,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 		 * Proceed to transmit sooner if anything shows up in high priority queue.
 		 */
 		for xs.queue.Peek(channel, TQ_PRIO_0_HI) == nil {
-			if !dwutil.SleepCtx(ctx, time.Duration(slottime)*10*time.Millisecond) {
+			if !dwutil.SleepCtx(ctx, time.Duration(timing.slottime)*10*time.Millisecond) {
 				return false
 			}
 
@@ -1486,7 +1459,7 @@ func (xs *XmitService) wait_for_clear_channel(ctx context.Context, channel int, 
 			}
 
 			var r = rand.Int() & 0xff
-			if r <= persist {
+			if r <= timing.persist {
 				break
 			}
 		}
