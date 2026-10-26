@@ -7,6 +7,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/touchtone"
 	"github.com/stretchr/testify/assert"
@@ -222,4 +223,27 @@ func TestExpandMacroThatExpandsToItself(t *testing.T) {
 	var state = newTTParseState()
 
 	assert.Equal(t, TT_ERROR_INTERNAL, gw.parseFields(&state, "1#"))
+}
+
+// A TTCMD script's output is the audible response, made one line as Dire Wolf
+// made it: its newline used to go into the response frame as it was.
+func TestSequenceResponseFromScriptIsOneLine(t *testing.T) {
+	t.Parallel()
+
+	var cfg tt_config_s
+	cfg.obj_xmit_chan = -1
+	cfg.ttcmd = "echo Q1TEST"
+	cfg.response[TT_ERROR_OK].method = "SPEECH"
+
+	var responses []string
+
+	var transmit = func(_ int, _ int, pp *ax25.Packet) {
+		responses = append(responses, pp.FormatAddrs()+string(pp.Info()))
+	}
+
+	var gw = NewTTGateway(new(RadioConfig), &cfg, nil, nil, nil, nil, transmit, nil, 0)
+
+	gw.Sequence(t.Context(), 0, "A9A2B42A7A7C71#") // WB4APR/7
+
+	assert.Equal(t, []string{"APRSTT>SPEECH:Q1TEST "}, responses)
 }

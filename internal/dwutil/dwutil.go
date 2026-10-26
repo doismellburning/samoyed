@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os/exec"
 	"runtime"
 	"strings"
 	"time"
@@ -158,4 +159,40 @@ func CloseOnDone(ctx context.Context, c io.Closer) func() {
 			_ = c.Close()
 		}
 	}
+}
+
+// CmdOutput says how RunCmd tidies what a command writes.
+type CmdOutput int
+
+const (
+	// CmdAsWritten leaves the output as the command wrote it.
+	CmdAsWritten CmdOutput = iota
+
+	// CmdOneLine turns each CR, LF and TAB into a space, so the output is
+	// one line.
+	CmdOneLine
+
+	// CmdOneLineTrimmed is CmdOneLine with the spaces at the end trimmed
+	// off - where the newline a line ends with went, for one.
+	CmdOneLineTrimmed
+)
+
+// RunCmd runs cmd, a shell command line, and returns what it writes to
+// standard output, tidied as tidy says.
+func RunCmd(ctx context.Context, cmd string, tidy CmdOutput) ([]byte, error) {
+	var out, err = exec.CommandContext(ctx, "/bin/sh", "-c", cmd).Output() //nolint:gosec // G204: the command is the operator's own, from the configuration file.
+
+	if tidy >= CmdOneLine {
+		for i, c := range out {
+			if c == '\r' || c == '\n' || c == '\t' {
+				out[i] = ' '
+			}
+		}
+	}
+
+	if tidy >= CmdOneLineTrimmed {
+		out = bytes.TrimRight(out, " ")
+	}
+
+	return out, err
 }

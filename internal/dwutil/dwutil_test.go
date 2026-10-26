@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAssert(t *testing.T) {
@@ -94,4 +95,43 @@ func TestLogHexDumpBelowLevel(t *testing.T) {
 	LogHexDump(logrus.NewEntry(logger), logrus.DebugLevel, []byte("Q1TEST"))
 
 	assert.Empty(t, hook.AllEntries())
+}
+
+// A command's output comes back as it was written, or as one line: Dire Wolf
+// turned each CR, LF and TAB into a space, and could trim the trailing spaces
+// that left.  It used to tidy the command instead, and hand the output back
+// with its newline, which then ended up in the beacon or audible response.
+func TestRunCmdTidiesOutput(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		tidy CmdOutput
+		want string
+	}{
+		{CmdAsWritten, "Q1\tTEST\r\n"},
+		{CmdOneLine, "Q1 TEST  "},
+		{CmdOneLineTrimmed, "Q1 TEST"},
+	} {
+		var out, err = RunCmd(t.Context(), `printf 'Q1\tTEST\r\n'`, tc.tidy)
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, string(out), "tidy %d", tc.tidy)
+	}
+}
+
+// A command is a shell command line, as Dire Wolf's popen took it, so it can
+// pass arguments to the program it runs: COMMENTCMD="date +%H%M", say.  It
+// used to be taken whole as the program's name.
+func TestRunCmdPassesArguments(t *testing.T) {
+	t.Parallel()
+
+	var out, err = RunCmd(t.Context(), "echo Q1TEST Q2TEST", CmdAsWritten)
+	require.NoError(t, err)
+	assert.Equal(t, "Q1TEST Q2TEST\n", string(out))
+}
+
+func TestRunCmdMissingCommand(t *testing.T) {
+	t.Parallel()
+
+	var _, err = RunCmd(t.Context(), "/nonexistent/q1test-cmd", CmdAsWritten)
+	assert.Error(t, err)
 }
