@@ -161,25 +161,38 @@ func CloseOnDone(ctx context.Context, c io.Closer) func() {
 	}
 }
 
+// CmdOutput says how RunCmd tidies what a command writes.
+type CmdOutput int
+
+const (
+	// CmdAsWritten leaves the output as the command wrote it.
+	CmdAsWritten CmdOutput = iota
+
+	// CmdOneLine turns each CR, LF and TAB into a space, so the output is
+	// one line.
+	CmdOneLine
+
+	// CmdOneLineTrimmed is CmdOneLine with the spaces at the end trimmed
+	// off - where the newline a line ends with went, for one.
+	CmdOneLineTrimmed
+)
+
 // RunCmd runs cmd, a shell command line, and returns what it writes to
-// standard output.
-//
-// oneline 0 leaves cmd as it is; 1 turns any CR, LF or TAB in it into a space;
-// 2 also trims the whitespace from either end.
-//
-// TODO: Dire Wolf's dw_run_cmd tidied the command's output this way, not the
-// command, so a script's trailing newline didn't reach the beacon comment or
-// audible response it makes.
-func RunCmd(ctx context.Context, cmd string, oneline int) ([]byte, error) {
-	if oneline > 0 {
-		cmd = strings.ReplaceAll(cmd, "\r", " ")
-		cmd = strings.ReplaceAll(cmd, "\n", " ")
-		cmd = strings.ReplaceAll(cmd, "\t", " ")
+// standard output, tidied as tidy says.
+func RunCmd(ctx context.Context, cmd string, tidy CmdOutput) ([]byte, error) {
+	var out, err = exec.CommandContext(ctx, "/bin/sh", "-c", cmd).Output() //nolint:gosec // G204: the command is the operator's own, from the configuration file.
+
+	if tidy >= CmdOneLine {
+		for i, c := range out {
+			if c == '\r' || c == '\n' || c == '\t' {
+				out[i] = ' '
+			}
+		}
 	}
 
-	if oneline > 1 {
-		cmd = strings.TrimSpace(cmd)
+	if tidy >= CmdOneLineTrimmed {
+		out = bytes.TrimRight(out, " ")
 	}
 
-	return exec.CommandContext(ctx, "/bin/sh", "-c", cmd).Output() //nolint:gosec // G204: the command is the operator's own, from the configuration file.
+	return out, err
 }

@@ -774,6 +774,20 @@ func Test_BeaconSend_custom_infocmd_output_is_the_info(t *testing.T) {
 	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+":", sentBeacon(t, tq))
 }
 
+// A script's output is its last line's newline and all, but only the line
+// belongs in the packet.
+func Test_BeaconSend_custom_infocmd_output_is_one_line(t *testing.T) {
+	t.Parallel()
+
+	var bs, tq = newSendTestBeaconService(t)
+	bs.miscConfig.beacon[0].btype = BEACON_CUSTOM
+	bs.miscConfig.beacon[0].custom_infocmd = "echo '>Q2TEST status'"
+
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
+
+	assert.Equal(t, "Q1TEST>"+beaconDefaultDest()+":>Q2TEST status", sentBeacon(t, tq))
+}
+
 func Test_BeaconSend_commentcmd_failure_keeps_fixed_comment(t *testing.T) {
 	t.Parallel()
 
@@ -809,6 +823,24 @@ func Test_BeaconSend_commentcmd_output_is_appended(t *testing.T) {
 	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
 
 	assert.True(t, strings.HasSuffix(sentBeacon(t, tq), "-fixed"))
+}
+
+// As for INFOCMD, only the line a COMMENTCMD prints is appended.
+func Test_BeaconSend_commentcmd_output_is_one_line(t *testing.T) {
+	t.Parallel()
+
+	var bs, tq = newSendTestBeaconService(t)
+	var bp = &bs.miscConfig.beacon[0]
+	bp.btype = BEACON_POSITION
+	bp.lat = maybe.Just(42.5)
+	bp.lon = maybe.Just(-71.25)
+	bp.comment = "fixed"
+	bp.commentcmd = "echo ' more'"
+
+	bs.send(t.Context(), 0, new(dwgps.GPSInfo))
+
+	var sent = sentBeacon(t, tq)
+	assert.True(t, strings.HasSuffix(sent, "-fixed more"), sent)
 }
 
 // heardCounterByHops counts however many stations it was told it had heard

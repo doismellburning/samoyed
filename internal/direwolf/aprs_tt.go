@@ -535,7 +535,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	var script_response string
 
 	if err == 0 && len(g.config.ttcmd) > 0 {
-		var _script_response, _ = dwutil.RunCmd(ctx, g.config.ttcmd, 1)
+		var _script_response, _ = dwutil.RunCmd(ctx, g.config.ttcmd, dwutil.CmdOneLine)
 		script_response = string(_script_response)
 	}
 

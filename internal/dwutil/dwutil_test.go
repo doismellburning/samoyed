@@ -4,7 +4,6 @@
 package dwutil
 
 import (
-	"os/exec"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
@@ -98,18 +97,25 @@ func TestLogHexDumpBelowLevel(t *testing.T) {
 	assert.Empty(t, hook.AllEntries())
 }
 
-func TestRunCmd(t *testing.T) {
+// A command's output comes back as it was written, or as one line: Dire Wolf
+// turned each CR, LF and TAB into a space, and could trim the trailing spaces
+// that left.  It used to tidy the command instead, and hand the output back
+// with its newline, which then ended up in the beacon or audible response.
+func TestRunCmdTidiesOutput(t *testing.T) {
 	t.Parallel()
 
-	var truePath, err = exec.LookPath("true")
-	if err != nil {
-		t.Skip("no true command available")
+	for _, tc := range []struct {
+		tidy CmdOutput
+		want string
+	}{
+		{CmdAsWritten, "Q1\tTEST\r\n"},
+		{CmdOneLine, "Q1 TEST  "},
+		{CmdOneLineTrimmed, "Q1 TEST"},
+	} {
+		var out, err = RunCmd(t.Context(), `printf 'Q1\tTEST\r\n'`, tc.tidy)
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, string(out), "tidy %d", tc.tidy)
 	}
-
-	// "true" prints nothing; the trailing newline goes with oneline 2.
-	var out, runErr = RunCmd(t.Context(), truePath+"\n", 2)
-	require.NoError(t, runErr)
-	assert.Empty(t, out)
 }
 
 // A command is a shell command line, as Dire Wolf's popen took it, so it can
@@ -118,7 +124,7 @@ func TestRunCmd(t *testing.T) {
 func TestRunCmdPassesArguments(t *testing.T) {
 	t.Parallel()
 
-	var out, err = RunCmd(t.Context(), "echo Q1TEST Q2TEST", 0)
+	var out, err = RunCmd(t.Context(), "echo Q1TEST Q2TEST", CmdAsWritten)
 	require.NoError(t, err)
 	assert.Equal(t, "Q1TEST Q2TEST\n", string(out))
 }
@@ -126,6 +132,6 @@ func TestRunCmdPassesArguments(t *testing.T) {
 func TestRunCmdMissingCommand(t *testing.T) {
 	t.Parallel()
 
-	var _, err = RunCmd(t.Context(), "/nonexistent/q1test-cmd", 0)
+	var _, err = RunCmd(t.Context(), "/nonexistent/q1test-cmd", CmdAsWritten)
 	assert.Error(t, err)
 }
