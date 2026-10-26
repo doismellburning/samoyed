@@ -1210,6 +1210,20 @@ func AudioOpen(ctx context.Context, pa *RadioConfig) (*AudioDevices, error) {
 
 	fillAudioDefaults(pa)
 
+	if portaudioReady {
+		var devices []*portaudio.DeviceInfo
+
+		var err = d.quietPortAudio(func() error {
+			var e error
+			devices, e = portaudio.Devices()
+
+			return e
+		})
+		if err == nil {
+			warnAboutALSADefaultCard(pa, devices)
+		}
+	}
+
 	/*
 	 * Open audio device(s).
 	 */
