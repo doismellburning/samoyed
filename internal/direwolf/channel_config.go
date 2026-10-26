@@ -98,6 +98,8 @@ type achan_param_s struct {
 
 	// What else should be moved out of structure and enlarged when NETTNC is implemented.  ???
 
+	xmitTiming // Transmit timing.
+
 	modem_type modem_t
 
 	/* Usual AFSK. */
@@ -195,9 +197,12 @@ type achan_param_s struct {
 	octrl [NUM_OCTYPES]ptt.OutputConfig
 
 	ictrl [NUM_ICTYPES]ptt.InputConfig
+}
 
-	/* Transmit timing. */
-
+// xmitTiming is one channel's transmit timing.  The configuration file sets
+// it, and the XmitService takes a copy at startup that a client application
+// can then change.
+type xmitTiming struct {
 	dwait int /* First wait extra time for receiver squelch. */
 	/* Default 0 units of 10 mS each . */
 
@@ -222,7 +227,6 @@ type achan_param_s struct {
 	/* because we're not quite sure when the soundcard audio stops. */
 
 	fulldup bool /* Full Duplex. */
-
 }
 
 // pttChannels is each radio channel's configuration, as the PTT needs it.
