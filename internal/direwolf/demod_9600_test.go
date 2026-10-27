@@ -86,7 +86,7 @@ func generateFrames(t *testing.T, audioConfig *RadioConfig, frames []*ax25.Packe
 
 	var sink = new(byteSink)
 
-	var sender = NewLayer2Sender(channel, audioConfig, NewToneGenerator(channel, audioConfig, 50, sink), 0, 0)
+	var sender = NewLayer2Sender(channel, audioConfig.achan[channel].layer2Config, NewToneGenerator(channel, audioConfig, 50, sink), 0, 0)
 
 	sender.SendPreamblePostamble(32, false)
 

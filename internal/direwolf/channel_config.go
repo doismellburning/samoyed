@@ -96,36 +96,13 @@ type achan_param_s struct {
 
 	// What else should be moved out of structure and enlarged when NETTNC is implemented.  ???
 
-	xmitTiming // Transmit timing.
+	xmitTiming   // Transmit timing.
+	layer2Config // Layer 2 protocol and its FEC.
 
 	// The modem: its type, tones, speed and demodulator profiles.
 	phy.ModemConfig
 
-	layer2_xmit layer2_t
-
-	// IL2P - New for version 1.7.
-	// New layer 2 with FEC.  Much less overhead than FX.25 but no longer backward compatible.
-	// Only applies to transmit.
-	// Listening for FEC sync word should add negligible overhead so
-	// we leave reception enabled all the time as we do with FX.25.
-	// TODO:  FX.25 should probably be put here rather than global for all channels.
-
-	fx25_strength int // Strength of FX.25 FEC.
-	// 16, 23, 64 for specific number of parity symbols.
-	// 1 for automatic selection based on frame size.
-
-	il2p_max_fec int // 1 for max FEC length, 0 for automatic based on size.
-	// Only consulted when speaking v0.4; v0.6 always uses max FEC.
-
-	il2p_version il2p.Version // IL2P protocol version spoken on this channel.
-
-	il2p_invert_polarity int // 1 means invert on transmit.  Receive handles either automatically.
-
-	il2p_crc    bool // true to append trailing CRC after IL2P frame.  Default true.
-	il2p_rx_crc bool // true to expect, and check, a trailing CRC on received IL2P frames.  Default true.
-
 	/* These are for dealing with imperfect frames. */
-
 	fix_bits BitFixLevel /* Level of effort to recover from */
 	/* a bad FCS on the frame. */
 	/* 0 = no effort */
@@ -148,6 +125,34 @@ type achan_param_s struct {
 	octrl [NUM_OCTYPES]ptt.OutputConfig
 
 	ictrl [NUM_ICTYPES]ptt.InputConfig
+}
+
+// layer2Config is the layer 2 protocol a channel sends, and how it sends and
+// receives IL2P.  The IL2P version and receive CRC apply to receiving too; the
+// rest is for transmit only, as we listen for AX.25, FX.25 and IL2P all at once.
+type layer2Config struct {
+	layer2_xmit layer2_t
+
+	// IL2P - New for version 1.7.
+	// New layer 2 with FEC.  Much less overhead than FX.25 but no longer backward compatible.
+	// Only applies to transmit.
+	// Listening for FEC sync word should add negligible overhead so
+	// we leave reception enabled all the time as we do with FX.25.
+	// TODO:  FX.25 should probably be put here rather than global for all channels.
+
+	fx25_strength int // Strength of FX.25 FEC.
+	// 16, 23, 64 for specific number of parity symbols.
+	// 1 for automatic selection based on frame size.
+
+	il2p_max_fec int // 1 for max FEC length, 0 for automatic based on size.
+	// Only consulted when speaking v0.4; v0.6 always uses max FEC.
+
+	il2p_version il2p.Version // IL2P protocol version spoken on this channel.
+
+	il2p_invert_polarity int // 1 means invert on transmit.  Receive handles either automatically.
+
+	il2p_crc    bool // true to append trailing CRC after IL2P frame.  Default true.
+	il2p_rx_crc bool // true to expect, and check, a trailing CRC on received IL2P frames.  Default true.
 }
 
 // xmitTiming is one channel's transmit timing.  The configuration file sets

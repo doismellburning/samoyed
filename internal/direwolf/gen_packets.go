@@ -161,7 +161,7 @@ func NewGenPackets(opts *GenPacketsOptions, outputFile string) (*GenPackets, err
 
 	g.layer2Senders = make([]*Layer2Sender, MAX_RADIO_CHANS)
 	for c := range g.layer2Senders {
-		g.layer2Senders[c] = NewLayer2Sender(c, audio, nil, fx25Debug, il2pDebug)
+		g.layer2Senders[c] = NewLayer2Sender(c, audio.achan[c].layer2Config, nil, fx25Debug, il2pDebug)
 	}
 
 	g.setTones()

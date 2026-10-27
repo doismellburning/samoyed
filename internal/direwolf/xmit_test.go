@@ -398,7 +398,7 @@ func setupXmitTransmission(t *testing.T) (*XmitService, *TransmitQueue) {
 	xs.bits_per_sec[channel] = 1200
 	xs.audioOutAvailable[0] = true
 	xs.queue = tq
-	xs.layer2Senders[channel] = NewLayer2Sender(channel, audioConfig, xs.toneGenerators[channel], 0, 0)
+	xs.layer2Senders[channel] = NewLayer2Sender(channel, audioConfig.achan[channel].layer2Config, xs.toneGenerators[channel], 0, 0)
 	xs.layer2Senders[channel].bitSink = func(int) {}
 
 	return xs, tq
@@ -1019,12 +1019,12 @@ func TestXmitNextDTMFSpeedFromSSID(t *testing.T) {
 func TestLayer2SendersKeepTheirOwnLineLevel(t *testing.T) {
 	t.Parallel()
 
-	var other = NewLayer2Sender(1, nil, nil, 0, 0)
+	var other = NewLayer2Sender(1, plainAX25(), nil, 0, 0)
 	other.bitSink = func(int) {}
 
 	other.line.WriteNRZI(false)
 
-	var bits = captureBits(t, nil, func(s *Layer2Sender) {
+	var bits = captureBits(t, plainAX25(), func(s *Layer2Sender) {
 		s.line.WriteNRZI(false)
 		s.line.WriteNRZI(true)
 	})
@@ -1042,7 +1042,7 @@ func TestPreambleIsFlagsForAX25(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+	var bits = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 		sent = s.SendPreamblePostamble(4, false)
 	})
 
@@ -1064,7 +1064,7 @@ func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBitsWithToneGenerator(t, audioConfig, toneGenerator, func(s *Layer2Sender) {
+	var bits = captureBitsWithToneGenerator(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, toneGenerator, func(s *Layer2Sender) {
 		sent = s.SendPreamblePostamble(2, true)
 	})
 
@@ -1095,7 +1095,7 @@ func TestPreambleIsTheIL2PPatternForIL2P(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+	var bits = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 		sent = s.SendPreamblePostamble(3, false)
 	})
 
@@ -1112,7 +1112,7 @@ func TestLayer2SendFrameSendsAX25AsHDLC(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+	var bits = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 		sent = s.SendFrame(pp, false)
 	})
 
@@ -1136,7 +1136,7 @@ func TestLayer2SendFrameSendsIL2PWhenConfigured(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+	var bits = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 		sent = s.SendFrame(pp, false)
 	})
 
@@ -1164,11 +1164,11 @@ func TestLayer2SendFrameFallsBackToAX25WhenIL2PCannotCarryTheFrame(t *testing.T)
 	// One byte more of information part than IL2P can encode.
 	var pp = newHDLCSendTestPacket(t, 1024)
 
-	var viaIL2P = captureBits(t, audioConfig, func(s *Layer2Sender) {
+	var viaIL2P = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 		s.SendFrame(pp, false)
 	})
 
-	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
+	var asAX25 = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 		s.hdlc.SendFrame(pp.Pack(), false)
 	})
 
@@ -1186,13 +1186,13 @@ func TestLayer2SendFrameSendsFX25WhenConfigured(t *testing.T) {
 
 	var sent int
 
-	var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+	var bits = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 		sent = s.SendFrame(pp, false)
 	})
 
 	assert.Equal(t, len(bits), sent)
 
-	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
+	var asAX25 = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 		s.hdlc.SendFrame(pp.Pack(), false)
 	})
 
@@ -1211,11 +1211,11 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 	// Comfortably more than the largest FX.25 codeblock carries.
 	var pp = newHDLCSendTestPacket(t, fx25.MaxData)
 
-	var viaFX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
+	var viaFX25 = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 		s.SendFrame(pp, false)
 	})
 
-	var asAX25 = captureBits(t, audioConfig, func(s *Layer2Sender) {
+	var asAX25 = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 		s.hdlc.SendFrame(pp.Pack(), false)
 	})
 
@@ -1227,13 +1227,13 @@ func TestLayer2SendFrameFallsBackToAX25WhenFX25CannotCarryTheFrame(t *testing.T)
 func TestLayer2SenderKeepsItsFX25DebugLevel(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, 3, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 3, 0).fx25.Debug())
+	assert.Equal(t, 3, NewLayer2Sender(hdlcSendTestChannel, plainAX25(), nil, 3, 0).fx25.Debug())
 }
 
 func TestLayer2SenderKeepsItsIL2PDebugLevel(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, 2, NewLayer2Sender(hdlcSendTestChannel, nil, nil, 0, 2).il2p.Debug())
+	assert.Equal(t, 2, NewLayer2Sender(hdlcSendTestChannel, plainAX25(), nil, 0, 2).il2p.Debug())
 }
 
 // Morse goes through the channel's tone generator and its own audio config,

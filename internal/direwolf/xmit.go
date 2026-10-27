@@ -361,7 +361,7 @@ func (xs *XmitService) channelTiming(channel int) xmitTiming {
 // own xmit_thread asks for it, so there is nothing to lock.
 func (xs *XmitService) layer2Sender(channel int) *Layer2Sender {
 	if xs.layer2Senders[channel] == nil {
-		xs.layer2Senders[channel] = NewLayer2Sender(channel, xs.p_modem, xs.toneGenerators[channel], xs.fx25Debug, xs.il2pDebug)
+		xs.layer2Senders[channel] = NewLayer2Sender(channel, xs.p_modem.achan[channel].layer2Config, xs.toneGenerators[channel], xs.fx25Debug, xs.il2pDebug)
 	}
 
 	return xs.layer2Senders[channel]
@@ -1505,7 +1505,7 @@ func (xs *XmitService) msToBits(ms, ch int) int {
 // at a time.
 type Layer2Sender struct {
 	channel       int
-	audioConfig   *RadioConfig
+	layer2        layer2Config
 	toneGenerator *ToneGenerator // Where the bits go; nil for a channel with no radio.
 
 	// bitSink, when set, is given the bits a frame serializes to instead of
@@ -1522,12 +1522,12 @@ type Layer2Sender struct {
 }
 
 // NewLayer2Sender makes a Layer2Sender for channel, sending the layer 2
-// protocol audioConfig says to use there to toneGenerator, with FX.25's
-// debug level at fx25Debug and IL2P's at il2pDebug.
-func NewLayer2Sender(channel int, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fx25Debug int, il2pDebug int) *Layer2Sender {
+// protocol layer2 says to use there to toneGenerator, with FX.25's debug level
+// at fx25Debug and IL2P's at il2pDebug.
+func NewLayer2Sender(channel int, layer2 layer2Config, toneGenerator *ToneGenerator, fx25Debug int, il2pDebug int) *Layer2Sender {
 	var s = new(Layer2Sender)
 	s.channel = channel
-	s.audioConfig = audioConfig
+	s.layer2 = layer2
 	s.toneGenerator = toneGenerator
 	s.line = linecode.NewEncoder(s.putBit)
 	s.hdlc = hdlc.NewSender(s.line, channel)
@@ -1613,20 +1613,18 @@ func (s *Layer2Sender) flush() {
  *--------------------------------------------------------------*/
 
 func (s *Layer2Sender) SendFrame(pp *ax25.Packet, badFCS bool) int {
-	var achan = &s.audioConfig.achan[s.channel]
-
-	if achan.layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
-		var n = s.il2p.SendFrame(pp, achan.il2p_version, achan.il2p_max_fec, achan.il2p_crc, achan.il2p_invert_polarity)
+	if s.layer2.layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
+		var n = s.il2p.SendFrame(pp, s.layer2.il2p_version, s.layer2.il2p_max_fec, s.layer2.il2p_crc, s.layer2.il2p_invert_polarity)
 		if n > 0 {
 			return n
 		}
 
 		logrus.WithField("channel", s.channel).Warn("Unable to send IL2P frame.  Falling back to regular AX.25.")
 		// Not sure if we should fall back to AX.25 or not here.
-	} else if achan.layer2_xmit == LAYER2_FX25 {
+	} else if s.layer2.layer2_xmit == LAYER2_FX25 {
 		var fbuf = pp.Pack()
 
-		var n = s.fx25.SendFrame(fbuf, achan.fx25_strength)
+		var n = s.fx25.SendFrame(fbuf, s.layer2.fx25_strength)
 		if n > 0 {
 			return n
 		}
@@ -1679,12 +1677,10 @@ func (s *Layer2Sender) SendPreamblePostamble(nbytes int, finish bool) int {
 	// For AX.25, it is the 01111110 "flag" pattern with NRZI and no bit stuffing.
 	// For IL2P, it is 01010101 without NRZI.
 
-	var achan = &s.audioConfig.achan[s.channel]
-
 	var sent int
 
-	if achan.layer2_xmit == LAYER2_IL2P {
-		sent = s.il2p.SendPreamble(nbytes, achan.il2p_invert_polarity)
+	if s.layer2.layer2_xmit == LAYER2_IL2P {
+		sent = s.il2p.SendPreamble(nbytes, s.layer2.il2p_invert_polarity)
 	} else {
 		sent = s.hdlc.SendFlags(nbytes)
 	}
