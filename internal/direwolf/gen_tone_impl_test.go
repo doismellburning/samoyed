@@ -490,7 +490,7 @@ func TestNewToneGeneratorsAndSenderFunctions(t *testing.T) {
 	require.NotNil(t, toneGenerators[0])
 	assert.Nil(t, toneGenerators[1], "only radio channels get a tone generator")
 
-	var sender = NewLayer2Sender(0, audioConfig, toneGenerators[0], 0, 0)
+	var sender = NewLayer2Sender(0, audioConfig.achan[0].layer2Config, toneGenerators[0], 0, 0)
 
 	sender.putBit(1)
 	assert.Len(t, sink.data, 20)
@@ -505,7 +505,7 @@ func TestNewToneGeneratorsAndSenderFunctions(t *testing.T) {
 	assert.Equal(t, 1, sink.flushes)
 
 	// A sender without a tone generator reports and ignores it.
-	var noTone = NewLayer2Sender(1, audioConfig, toneGenerators[1], 0, 0)
+	var noTone = NewLayer2Sender(1, audioConfig.achan[1].layer2Config, toneGenerators[1], 0, 0)
 
 	noTone.putBit(1)
 	noTone.putQuietMs(10)

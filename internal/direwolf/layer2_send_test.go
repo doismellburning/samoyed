@@ -26,23 +26,31 @@ const (
 	hdlcSixtyOne byte = 0x3f
 )
 
+// plainAX25 is the layer 2 configuration of a channel sending plain AX.25:
+// the zero value.
+func plainAX25() layer2Config {
+	var layer2 layer2Config
+
+	return layer2
+}
+
 // captureBits collects the bits sent to the modulator while fn runs, handing
 // fn a new Layer2Sender so the stream starts from a known place.
-func captureBits(t *testing.T, audioConfig *RadioConfig, fn func(s *Layer2Sender)) []int {
+func captureBits(t *testing.T, layer2 layer2Config, fn func(s *Layer2Sender)) []int {
 	t.Helper()
 
-	return captureBitsWithToneGenerator(t, audioConfig, nil, fn)
+	return captureBitsWithToneGenerator(t, layer2, nil, fn)
 }
 
 // captureBitsWithToneGenerator is captureBits for a sender that sends to
 // toneGenerator, for what goes to it other than bits: the quiet periods, and
 // the flush.
-func captureBitsWithToneGenerator(t *testing.T, audioConfig *RadioConfig, toneGenerator *ToneGenerator, fn func(s *Layer2Sender)) []int {
+func captureBitsWithToneGenerator(t *testing.T, layer2 layer2Config, toneGenerator *ToneGenerator, fn func(s *Layer2Sender)) []int {
 	t.Helper()
 
 	var bits []int
 
-	var s = NewLayer2Sender(hdlcSendTestChannel, audioConfig, toneGenerator, 0, 0)
+	var s = NewLayer2Sender(hdlcSendTestChannel, layer2, toneGenerator, 0, 0)
 	s.bitSink = func(data int) {
 		bits = append(bits, data)
 	}
@@ -118,7 +126,7 @@ func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
 
 	var beforeLen int
 
-	var bits = captureBits(t, nil, func(s *Layer2Sender) {
+	var bits = captureBits(t, plainAX25(), func(s *Layer2Sender) {
 		beforeLen = s.hdlc.SendFrame(before, false)
 		s.fx25.SendFrame(fbuf, 16)
 	})
@@ -144,7 +152,7 @@ func TestIL2PSendFrameFollowsTheChannelsCRCSetting(t *testing.T) {
 		audioConfig.achan[hdlcSendTestChannel].il2p_version = il2p.VersionCompat
 		audioConfig.achan[hdlcSendTestChannel].il2p_crc = crc
 
-		var bits = captureBits(t, audioConfig, func(s *Layer2Sender) {
+		var bits = captureBits(t, audioConfig.achan[hdlcSendTestChannel].layer2Config, func(s *Layer2Sender) {
 			s.SendFrame(pp, false)
 		})
 
@@ -174,7 +182,7 @@ func TestIL2PLeavesTheNRZILevelForTheNextHDLCFrame(t *testing.T) {
 
 	var pp = newHDLCSendTestPacket(t, 16)
 
-	var withoutIL2P = captureBits(t, nil, func(s *Layer2Sender) {
+	var withoutIL2P = captureBits(t, plainAX25(), func(s *Layer2Sender) {
 		s.hdlc.SendFrame(first, false)
 		s.hdlc.SendFrame(second, false)
 	})
@@ -182,7 +190,7 @@ func TestIL2PLeavesTheNRZILevelForTheNextHDLCFrame(t *testing.T) {
 	for _, polarity := range []int{0, 1} {
 		var firstLen, il2pLen int
 
-		var withIL2P = captureBits(t, nil, func(s *Layer2Sender) {
+		var withIL2P = captureBits(t, plainAX25(), func(s *Layer2Sender) {
 			firstLen = s.hdlc.SendFrame(first, false)
 			il2pLen = s.il2p.SendFrame(pp, il2p.VersionCompat, 0, false, polarity)
 			s.hdlc.SendFrame(second, false)
@@ -215,7 +223,7 @@ func TestEASSendRepeatsTheMessageWithItsPreamble(t *testing.T) {
 
 	var elapsed int
 
-	var bits = captureBitsWithToneGenerator(t, nil, toneGenerator, func(s *Layer2Sender) {
+	var bits = captureBitsWithToneGenerator(t, plainAX25(), toneGenerator, func(s *Layer2Sender) {
 		elapsed = s.sendEAS(message, repeat, txdelay, txtail)
 	})
 
