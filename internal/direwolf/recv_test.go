@@ -41,7 +41,7 @@ func newRecvTestRadioConfig(numChannels int) *RadioConfig {
 		audioConfig.achan[c].baud = 1200
 		audioConfig.achan[c].mark_freq = 1200
 		audioConfig.achan[c].space_freq = 2200
-		audioConfig.achan[c].dtmf_decode = DTMF_DECODE_OFF
+		audioConfig.achan[c].dtmf_decode = false
 	}
 
 	return audioConfig
@@ -193,7 +193,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 	t.Parallel()
 
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_ON
+	audioConfig.achan[0].dtmf_decode = true
 
 	var receiver, src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
@@ -222,7 +222,7 @@ func TestRecvAdevThreadDecodesTouchTonesForNobody(t *testing.T) {
 	t.Parallel()
 
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_ON
+	audioConfig.achan[0].dtmf_decode = true
 
 	var receiver, src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
@@ -241,7 +241,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 	t.Parallel()
 
 	var audioConfig = newRecvTestRadioConfig(1)
-	audioConfig.achan[0].dtmf_decode = DTMF_DECODE_OFF
+	audioConfig.achan[0].dtmf_decode = false
 
 	var receiver, src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 

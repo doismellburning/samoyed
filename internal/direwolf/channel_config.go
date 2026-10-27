@@ -73,13 +73,6 @@ const (
 
 const V26_DEFAULT = V26_B
 
-type dtmf_decode_t int
-
-const (
-	DTMF_DECODE_OFF dtmf_decode_t = iota
-	DTMF_DECODE_ON
-)
-
 /* Properties for each radio channel, common to receive and transmit. */
 /* Can be different for each radio channel. */
 
@@ -139,7 +132,7 @@ type achan_param_s struct {
 	// Default to MFJ compatible and print warning if user did not
 	// pick one explicitly.
 
-	dtmf_decode dtmf_decode_t
+	dtmf_decode bool // Listen for DTMF ("Touch Tone").
 
 	/* Originally the DTMF ("Touch Tone") decoder was always */
 	/* enabled because it took a negligible amount of CPU. */

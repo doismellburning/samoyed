@@ -329,7 +329,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			"profiles":     achan.profiles,
 			"sample_rate":  samplesPerSec,
 			"tx":           achan.layer2_xmit,
-			"dtmf_decoder": achan.dtmf_decode != DTMF_DECODE_OFF,
+			"dtmf_decoder": achan.dtmf_decode,
 		}
 
 		if achan.decimate != 1 {
@@ -548,7 +548,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			"sample_rate":     samplesPerSec,
 			"tx":              achan.layer2_xmit,
 			"compatible_with": dwutil.IfThenElse(v26 == V26_B, "MFJ-2400", "earlier direwolf"),
-			"dtmf_decoder":    achan.dtmf_decode != DTMF_DECODE_OFF,
+			"dtmf_decoder":    achan.dtmf_decode,
 		}).Info("QPSK demodulator")
 
 		for d := range numSubchan {
@@ -599,7 +599,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			"profiles":     achan.profiles,
 			"sample_rate":  samplesPerSec,
 			"tx":           achan.layer2_xmit,
-			"dtmf_decoder": achan.dtmf_decode != DTMF_DECODE_OFF,
+			"dtmf_decoder": achan.dtmf_decode,
 		}).Info("8PSK demodulator")
 
 		for d := range numSubchan {
@@ -645,7 +645,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 			"profiles":     achan.profiles,
 			"sample_rate":  samplesPerSec,
 			"tx":           achan.layer2_xmit,
-			"dtmf_decoder": achan.dtmf_decode != DTMF_DECODE_OFF,
+			"dtmf_decoder": achan.dtmf_decode,
 		}).Info("BPSK demodulator")
 
 		for d := range numSubchan {
@@ -737,7 +737,7 @@ func NewDemodulator(channel int, achan achan_param_s, samplesPerSec int) (*Demod
 				"sample_rate":  samplesPerSec,
 				"upsample":     achan.upsample,
 				"tx":           achan.layer2_xmit,
-				"dtmf_decoder": achan.dtmf_decode != DTMF_DECODE_OFF,
+				"dtmf_decoder": achan.dtmf_decode,
 			}).Info(dwutil.IfThenElse(achan.modem_type == MODEM_AIS, "AIS demodulator", "K9NG/G3RUH demodulator"))
 
 			var D = &demodulator.states[0] // first subchannel
