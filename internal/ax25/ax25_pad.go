@@ -153,6 +153,7 @@ package ax25
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -169,6 +170,14 @@ import (
 const MaxRepeaters = 8
 const MinAddrs = 2  /* Destination & Source. */
 const MaxAddrs = 10 /* Destination, Source, 8 digipeaters. */
+
+// ErrBadAddrIndex is returned by the address mutators for a position the
+// packet has no address at.
+var ErrBadAddrIndex = errors.New("address index out of range")
+
+// ErrNoRoom is returned by SetAddr when appending an address would take the
+// packet past MaxAddrs or MaxPacketLen.
+var ErrNoRoom = errors.New("no room for another address")
 
 const Destination = 0 /* Address positions in frame. */
 const Source = 1
@@ -532,7 +541,13 @@ func FromTextWithStrictness(monitor string, strictness AddrStrictness) *Packet {
 		return (nil)
 	}
 
-	this_p.SetAddr(Source, addrTemp)
+	var err = this_p.SetAddr(Source, addrTemp)
+	if err != nil {
+		logrus.WithError(err).WithField("monitor", monitor).Warn("Failed to create packet from text: cannot set source address")
+
+		return (nil)
+	}
+
 	this_p.SetH(Source) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
 	this_p.SetSSID(Source, ssidTemp)
 
@@ -551,7 +566,13 @@ func FromTextWithStrictness(monitor string, strictness AddrStrictness) *Packet {
 		return (nil)
 	}
 
-	this_p.SetAddr(Destination, addrTemp)
+	err = this_p.SetAddr(Destination, addrTemp)
+	if err != nil {
+		logrus.WithError(err).WithField("monitor", monitor).Warn("Failed to create packet from text: cannot set destination address")
+
+		return (nil)
+	}
+
 	this_p.SetH(Destination) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
 	this_p.SetSSID(Destination, ssidTemp)
 
@@ -598,7 +619,13 @@ func FromTextWithStrictness(monitor string, strictness AddrStrictness) *Packet {
 			return (nil)
 		}
 
-		this_p.SetAddr(k, addrTemp)
+		err = this_p.SetAddr(k, addrTemp)
+		if err != nil {
+			logrus.WithError(err).WithField("monitor", monitor).Warn("Failed to create packet from text: cannot add digipeater address")
+
+			return (nil)
+		}
+
 		this_p.SetSSID(k, ssidTemp)
 
 		// Does it have an "*" at the end?
@@ -1091,12 +1118,16 @@ func (this_p *Packet) UnwrapThirdParty() *Packet {
  *
  * TODO:  	FromText could use this.
  *
- * Returns:	None.
+ * Returns:	An error, leaving the packet unchanged, if n is neither an
+ *		existing address nor one past the last, or if there is no
+ *		room to add a new one.
  *
  *------------------------------------------------------------------------------*/
 
-func (this_p *Packet) SetAddr(n int, ad string) {
-	dwutil.Assert(n >= 0 && n < MaxAddrs)
+func (this_p *Packet) SetAddr(n int, ad string) error {
+	if n < 0 || n > this_p.num_addr || n >= MaxAddrs {
+		return fmt.Errorf("SetAddr: position %d with %d addresses: %w", n, this_p.num_addr, ErrBadAddrIndex)
+	}
 
 	//dw_printf ("SetAddr (%d, %s) num_addr=%d\n", n, ad, this_p.num_addr);
 
@@ -1126,23 +1157,27 @@ func (this_p *Packet) SetAddr(n int, ad string) {
 		}
 
 		this_p.SetSSID(n, ssidTemp)
-	} else if n == this_p.num_addr {
+	} else {
 		//dw_printf ("SetAddr , appending case\n");
 		/*
 		 * One beyond last position, process as insert.
 		 */
-		this_p.InsertAddr(n, ad)
-	} else {
-		logrus.WithFields(logrus.Fields{
-			"position": n,
-			"address":  ad,
-		}).Error("Internal error: SetAddr: bad position")
+		var inserted, err = this_p.InsertAddr(n, ad)
+		if err != nil {
+			return err
+		}
+
+		if !inserted {
+			return fmt.Errorf("SetAddr: position %d: %w", n, ErrNoRoom)
+		}
 	}
 
 	//dw_printf ("------\n");
 	//dw_printf ("dump after SetAddr (%d, %s)\n", n, ad);
 	//HexDump (this_p);
 	//dw_printf ("------\n");
+
+	return nil
 }
 
 /*------------------------------------------------------------------------------
@@ -1159,23 +1194,27 @@ func (this_p *Packet) SetAddr(n int, ad string) {
  *			W1ABC>TEST,WB2OSZ-1*,WIDE3-2
  *
  * Inputs:	n	- Index of address.   Use the symbols
- *			  Destination, Source, AX25_REPEATER1, etc.
+ *			  AX25_REPEATER1, AX25_REPEATER2, etc.
+ *
+ *			  Must be a repeater position no greater than the
+ *			  number of addresses, which appends.
  *
  *		ad	- Address with optional dash and substation id.
- *
- * Bugs:	Little validity or bounds checking is performed.  Be careful.
  *
  * Assumption:	FromText or FromFrame was called first.
  *
  * Returns:	True if the address was inserted, false if there was no room:
  *		the frame already has the maximum number of addresses, or is
  *		already as long as a frame can be.
+ *		An error, leaving the packet unchanged, if n is out of range.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func (this_p *Packet) InsertAddr(n int, ad string) bool {
-	dwutil.Assert(n >= Repeater1 && n < MaxAddrs)
+func (this_p *Packet) InsertAddr(n int, ad string) (bool, error) {
+	if n < Repeater1 || n > this_p.num_addr || n >= MaxAddrs {
+		return false, fmt.Errorf("InsertAddr: position %d with %d addresses: %w", n, this_p.num_addr, ErrBadAddrIndex)
+	}
 
 	//dw_printf ("InsertAddr (%d, %s)\n", n, ad);
 
@@ -1186,7 +1225,7 @@ func (this_p *Packet) InsertAddr(n int, ad string) bool {
 	/* Don't do it if we already have the maximum number. */
 
 	if this_p.num_addr >= MaxAddrs {
-		return false
+		return false, nil
 	}
 
 	/* Nor if the frame is already as long as a frame can be. */
@@ -1199,7 +1238,7 @@ func (this_p *Packet) InsertAddr(n int, ad string) bool {
 			"length":   this_p.frame_len,
 		}).Warn("No room to insert address: frame is already the maximum length")
 
-		return false
+		return false, nil
 	}
 
 	this_p.clearLastAddrFlag()
@@ -1242,7 +1281,7 @@ func (this_p *Packet) InsertAddr(n int, ad string) bool {
 		}).Error("Internal error: InsertAddr: unexpected number of addresses")
 	}
 
-	return true
+	return true, nil
 }
 
 /*------------------------------------------------------------------------------
@@ -1254,18 +1293,19 @@ func (this_p *Packet) InsertAddr(n int, ad string) bool {
  *
  * Inputs:	n	- Index of address.   Use the symbols
  *			  AX25_REPEATER1, AX25_REPEATER2, etc.
- *
- * Bugs:	Little validity or bounds checking is performed.  Be careful.
+ *			  Must be an existing repeater address.
  *
  * Assumption:	FromText or FromFrame was called first.
  *
- * Returns:	None.
+ * Returns:	An error, leaving the packet unchanged, if n is out of range.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func (this_p *Packet) RemoveAddr(n int) {
-	dwutil.Assert(n >= Repeater1 && n < MaxAddrs)
+func (this_p *Packet) RemoveAddr(n int) error {
+	if n < Repeater1 || n >= this_p.num_addr {
+		return fmt.Errorf("RemoveAddr: position %d with %d addresses: %w", n, this_p.num_addr, ErrBadAddrIndex)
+	}
 
 	/* Shift those beyond to fill this position. */
 
@@ -1288,6 +1328,8 @@ func (this_p *Packet) RemoveAddr(n int) {
 			"actual":   this_p.num_addr,
 		}).Error("Internal error: RemoveAddr: unexpected number of addresses")
 	}
+
+	return nil
 }
 
 /*------------------------------------------------------------------------------

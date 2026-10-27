@@ -270,7 +270,13 @@ func (d *Connected) match(from_chan int, pp *ax25.Packet, mycall_rec string, myc
 
 		/* If using multiple radio channels, they could have different calls. */
 
-		result.SetAddr(r, mycall_xmit)
+		var err = result.SetAddr(r, mycall_xmit)
+		if err != nil {
+			logrus.WithError(err).Error("Internal error: not digipeating")
+
+			return nil
+		}
+
 		result.SetH(r)
 
 		return (result)
@@ -283,7 +289,13 @@ func (d *Connected) match(from_chan int, pp *ax25.Packet, mycall_rec string, myc
 		if alias.MatchString(repeater) {
 			var result = pp.Dup()
 
-			result.SetAddr(r, mycall_xmit)
+			var err = result.SetAddr(r, mycall_xmit)
+			if err != nil {
+				logrus.WithError(err).Error("Internal error: not digipeating")
+
+				return nil
+			}
+
 			result.SetH(r)
 
 			return (result)

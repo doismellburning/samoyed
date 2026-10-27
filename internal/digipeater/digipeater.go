@@ -454,7 +454,13 @@ func (d *Digipeater) match(
 
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
-		result.SetAddr(r, mycall_xmit)
+		var err = result.SetAddr(r, mycall_xmit)
+		if err != nil {
+			logrus.WithError(err).Error("Internal error: not digipeating")
+
+			return nil
+		}
+
 		result.SetH(r)
 
 		return (result)
@@ -504,7 +510,13 @@ func (d *Digipeater) match(
 	if alias.MatchString(repeater) {
 		var result = pp.Dup()
 
-		result.SetAddr(r, mycall_xmit)
+		var err = result.SetAddr(r, mycall_xmit)
+		if err != nil {
+			logrus.WithError(err).Error("Internal error: not digipeating")
+
+			return nil
+		}
+
 		result.SetH(r)
 
 		return (result)
@@ -529,7 +541,13 @@ func (d *Digipeater) match(
 			if repeater2 == mycall_rec || alias.MatchString(repeater2) {
 				var result = pp.Dup()
 
-				result.SetAddr(r2, mycall_xmit)
+				var err = result.SetAddr(r2, mycall_xmit)
+				if err != nil {
+					logrus.WithError(err).Error("Internal error: not digipeating")
+
+					return nil
+				}
+
 				result.SetH(r2)
 
 				switch preempt {
@@ -538,7 +556,13 @@ func (d *Digipeater) match(
 					logrus.Warn("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.")
 
 					for r2 > ax25.Repeater1 {
-						result.RemoveAddr(r2 - 1)
+						var err = result.RemoveAddr(r2 - 1)
+						if err != nil {
+							logrus.WithError(err).Error("Internal error: not digipeating")
+
+							return nil
+						}
+
 						r2--
 					}
 				case PreemptMark: // TODO: deprecate this option.  Result is misleading.
@@ -561,7 +585,13 @@ func (d *Digipeater) match(
 				// PREEMPT which is more descriptive?
 				default:
 					for r2 > ax25.Repeater1 && result.H(r2-1) == 0 {
-						result.RemoveAddr(r2 - 1)
+						var err = result.RemoveAddr(r2 - 1)
+						if err != nil {
+							logrus.WithError(err).Error("Internal error: not digipeating")
+
+							return nil
+						}
+
 						r2--
 					}
 				}
@@ -597,7 +627,12 @@ func (d *Digipeater) match(
 				// First, remove any already used digipeaters.
 
 				for result.NumAddr() >= 3 && result.H(ax25.Repeater1) == 1 {
-					result.RemoveAddr(ax25.Repeater1)
+					var err = result.RemoveAddr(ax25.Repeater1)
+					if err != nil {
+						logrus.WithError(err).Error("Internal error: not digipeating")
+
+						return nil
+					}
 
 					r--
 				}
@@ -611,7 +646,14 @@ func (d *Digipeater) match(
 
 				// Insert own call at beginning and mark it used.
 
-				if result.InsertAddr(ax25.Repeater1, mycall_xmit) {
+				var inserted, err = result.InsertAddr(ax25.Repeater1, mycall_xmit)
+				if err != nil {
+					logrus.WithError(err).Error("Internal error: not digipeating")
+
+					return nil
+				}
+
+				if inserted {
 					result.SetH(ax25.Repeater1)
 				}
 
@@ -632,7 +674,13 @@ func (d *Digipeater) match(
 		if ssid == 1 {
 			var result = pp.Dup()
 
-			result.SetAddr(r, mycall_xmit)
+			var err = result.SetAddr(r, mycall_xmit)
+			if err != nil {
+				logrus.WithError(err).Error("Internal error: not digipeating")
+
+				return nil
+			}
+
 			result.SetH(r)
 
 			return (result)
@@ -643,8 +691,17 @@ func (d *Digipeater) match(
 
 			result.SetSSID(r, ssid-1) // should be at least 1
 
-			if pp.NumRepeaters() < ax25.MaxRepeaters && result.InsertAddr(r, mycall_xmit) {
-				result.SetH(r)
+			if pp.NumRepeaters() < ax25.MaxRepeaters {
+				var inserted, err = result.InsertAddr(r, mycall_xmit)
+				if err != nil {
+					logrus.WithError(err).Error("Internal error: not digipeating")
+
+					return nil
+				}
+
+				if inserted {
+					result.SetH(r)
+				}
 			}
 
 			return (result)

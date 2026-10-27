@@ -164,14 +164,93 @@ func TestInsertAddrFullLengthFrame(t *testing.T) {
 	// to run off the end of the frame buffer.
 	var pp = fullLengthFrame(t, "WIDE2-2")
 
-	assert.False(t, pp.InsertAddr(Repeater1, "Q2TEST"))
+	var inserted, err = pp.InsertAddr(Repeater1, "Q2TEST")
+	require.NoError(t, err)
+	assert.False(t, inserted)
 	assert.Equal(t, MaxPacketLen, pp.FrameLen())
 	assert.Equal(t, "Q1TEST>APDW17,WIDE2-2:", pp.FormatAddrs())
 	assert.NotPanics(t, func() { pp.Pack() })
 
 	var short = MustFromText("Q1TEST>APDW17,WIDE2-2:>")
-	assert.True(t, short.InsertAddr(Repeater1, "Q2TEST"))
+	inserted, err = short.InsertAddr(Repeater1, "Q2TEST")
+	require.NoError(t, err)
+	assert.True(t, inserted)
 	assert.Equal(t, "Q1TEST>APDW17,Q2TEST,WIDE2-2:", short.FormatAddrs())
+}
+
+func TestAddrMutatorsRejectPositionPastAddresses(t *testing.T) {
+	t.Parallel()
+
+	// The mutators used to check the position against MaxAddrs only, so one
+	// past the packet's own addresses shifted from beyond the end of the frame
+	// and panicked.  Now they report it and leave the packet alone, so a
+	// digipeater can decline rather than transmit a half-edited frame.
+	const text = "Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#"
+
+	var cases = []struct {
+		name   string
+		mutate func(pp *Packet) error
+	}{
+		{"InsertAddr past end", func(pp *Packet) error {
+			var _, err = pp.InsertAddr(MaxAddrs-1, "Q2TEST")
+
+			return err
+		}},
+		{"InsertAddr before repeaters", func(pp *Packet) error {
+			var _, err = pp.InsertAddr(Source, "Q2TEST")
+
+			return err
+		}},
+		{"SetAddr past end", func(pp *Packet) error { return pp.SetAddr(MaxAddrs-1, "Q2TEST") }},
+		{"SetAddr negative", func(pp *Packet) error { return pp.SetAddr(-1, "Q2TEST") }},
+		{"RemoveAddr at end", func(pp *Packet) error { return pp.RemoveAddr(3) }},
+		{"RemoveAddr past end", func(pp *Packet) error { return pp.RemoveAddr(MaxAddrs - 1) }},
+		{"RemoveAddr source", func(pp *Packet) error { return pp.RemoveAddr(Source) }},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var pp = MustFromText(text)
+			var before = slices.Clone(pp.FrameData())
+
+			var err error
+
+			require.NotPanics(t, func() { err = tc.mutate(pp) })
+			require.ErrorIs(t, err, ErrBadAddrIndex)
+			assert.Equal(t, before, pp.FrameData())
+			assert.Equal(t, 3, pp.NumAddr())
+		})
+	}
+}
+
+func TestAddrMutatorsAcceptPositionOnePastAddresses(t *testing.T) {
+	t.Parallel()
+
+	// One past the last address appends.
+	var pp = MustFromText("Q1TEST>APDW17,WIDE1-1:>")
+
+	var inserted, err = pp.InsertAddr(3, "Q2TEST")
+	require.NoError(t, err)
+	assert.True(t, inserted)
+	assert.Equal(t, "Q1TEST>APDW17,WIDE1-1,Q2TEST:", pp.FormatAddrs())
+
+	require.NoError(t, pp.SetAddr(4, "Q3TEST"))
+	assert.Equal(t, "Q1TEST>APDW17,WIDE1-1,Q2TEST,Q3TEST:", pp.FormatAddrs())
+
+	require.NoError(t, pp.RemoveAddr(4))
+	assert.Equal(t, "Q1TEST>APDW17,WIDE1-1,Q2TEST:", pp.FormatAddrs())
+}
+
+func TestSetAddrAppendWithNoRoom(t *testing.T) {
+	t.Parallel()
+
+	var pp = fullLengthFrame(t, "WIDE2-2")
+	var before = slices.Clone(pp.FrameData())
+
+	require.ErrorIs(t, pp.SetAddr(pp.NumAddr(), "Q2TEST"), ErrNoRoom)
+	assert.Equal(t, before, pp.FrameData())
 }
 
 func TestParseAddrLenientAlphanumericSSID(t *testing.T) {
