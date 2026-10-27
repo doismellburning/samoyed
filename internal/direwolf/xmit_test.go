@@ -372,11 +372,11 @@ func setupXmitTransmission(t *testing.T) (*XmitService, *TransmitQueue) {
 	audioConfig.adev[0].samples_per_sec = 44100
 	audioConfig.adev[0].bits_per_sample = 16
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
-	audioConfig.achan[channel].modem_type = MODEM_AFSK
+	audioConfig.achan[channel].ModemType = MODEM_AFSK
 	audioConfig.achan[channel].layer2_xmit = LAYER2_AX25
-	audioConfig.achan[channel].baud = 1200
-	audioConfig.achan[channel].mark_freq = 1200
-	audioConfig.achan[channel].space_freq = 2200
+	audioConfig.achan[channel].Baud = 1200
+	audioConfig.achan[channel].MarkFreq = 1200
+	audioConfig.achan[channel].SpaceFreq = 2200
 	audioConfig.achan[channel].octrl[OCTYPE_PTT].Method = PTT_METHOD_NONE
 
 	var tq = newTestTransmitQueue(audioConfig)

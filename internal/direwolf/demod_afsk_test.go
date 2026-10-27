@@ -75,9 +75,9 @@ type afskTestCase struct {
 func (tc afskTestCase) radioConfig() *RadioConfig {
 	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, tc.baud, tc.mark, tc.space, tc.sampleRate)
 	audioConfig.adev[0].defined = 1
-	audioConfig.achan[0].num_freq = 1
-	audioConfig.achan[0].profiles = tc.profiles
-	audioConfig.achan[0].decimate = tc.decimate
+	audioConfig.achan[0].NumFreq = 1
+	audioConfig.achan[0].Profiles = tc.profiles
+	audioConfig.achan[0].Decimate = tc.decimate
 	audioConfig.achan[0].fix_bits = RETRY_NONE
 
 	return audioConfig

@@ -1281,17 +1281,17 @@ func config_init(fname string, p_audio_config *RadioConfig,
 	// MAX_RADIO_CHANS for achan[]
 	// Maybe achan should be renamed to radiochan to make it clearer.
 	for channel := range MAX_RADIO_CHANS {
-		p_audio_config.achan[channel].modem_type = MODEM_AFSK
-		p_audio_config.achan[channel].v26_alternative = V26_UNSPECIFIED
-		p_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ   /* -m option */
-		p_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ /* -s option */
-		p_audio_config.achan[channel].baud = DEFAULT_BAUD             /* -b option */
+		p_audio_config.achan[channel].ModemType = MODEM_AFSK
+		p_audio_config.achan[channel].V26Alternative = V26_UNSPECIFIED
+		p_audio_config.achan[channel].MarkFreq = DEFAULT_MARK_FREQ   /* -m option */
+		p_audio_config.achan[channel].SpaceFreq = DEFAULT_SPACE_FREQ /* -s option */
+		p_audio_config.achan[channel].Baud = DEFAULT_BAUD            /* -b option */
 
 		/* None.  Will set default later based on other factors. */
-		p_audio_config.achan[channel].profiles = ""
+		p_audio_config.achan[channel].Profiles = ""
 
-		p_audio_config.achan[channel].num_freq = 1
-		p_audio_config.achan[channel].offset = 0
+		p_audio_config.achan[channel].NumFreq = 1
+		p_audio_config.achan[channel].Offset = 0
 
 		p_audio_config.achan[channel].layer2_xmit = LAYER2_AX25
 		p_audio_config.achan[channel].il2p_max_fec = 1
@@ -2641,8 +2641,8 @@ func (c *RadioConfig) nodeMapConfig(settings nodeSettings, ports []node.Port) ma
 // MODEM option that swaps EAS for another modem, which should have its own
 // default instead.
 func (achan *achan_param_s) dropEASProfile() {
-	if achan.modem_type == MODEM_EAS {
-		achan.profiles = ""
+	if achan.ModemType == MODEM_EAS {
+		achan.Profiles = ""
 	}
 }
 
@@ -2739,11 +2739,11 @@ func (ps *parseState) applyModem(settings ModemSettings) error {
 		return fmt.Errorf("line %d: Missing data transmission speed for MODEM command", ps.line)
 	}
 
-	var modemErr = achan.setModem(settings.Speed)
+	var modemErr = achan.SetBitrate(settings.Speed)
 
 	var rate, rateErr = strconv.Atoi(settings.Speed) // Not if it was AIS or EAS.
 	if modemErr != nil {
-		_ = achan.setModem(strconv.Itoa(DEFAULT_BAUD))
+		_ = achan.SetBitrate(strconv.Itoa(DEFAULT_BAUD))
 
 		ps.errorf("line %d: Unreasonable data rate. Using %d bits per second", ps.line, DEFAULT_BAUD)
 	} else if rateErr == nil && !slices.Contains([]int{300, 1200, 2400, 4800, 9600, 19200}, rate) {
@@ -2754,76 +2754,76 @@ func (ps *parseState) applyModem(settings ModemSettings) error {
 	case "":
 	case "bpsk": /* Force BPSK modem (1 bit/symbol, carrier 1500 Hz). */
 		achan.dropEASProfile()
-		achan.modem_type = MODEM_BPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
+		achan.ModemType = MODEM_BPSK
+		achan.MarkFreq = 0
+		achan.SpaceFreq = 0
 	case "g3ruh": /* Force G3RUH modem regardless of default for speed. New in 1.6. */
 		achan.dropEASProfile()
-		achan.modem_type = MODEM_SCRAMBLE
-		achan.mark_freq = 0
-		achan.space_freq = 0
+		achan.ModemType = MODEM_SCRAMBLE
+		achan.MarkFreq = 0
+		achan.SpaceFreq = 0
 	default:
 		ps.errorf("line %d: Unrecognized modem type for MODEM: %s", ps.line, settings.Type)
 	}
 
 	if settings.Tones != nil {
-		achan.mark_freq = settings.Tones.Mark
-		achan.space_freq = settings.Tones.Space
+		achan.MarkFreq = settings.Tones.Mark
+		achan.SpaceFreq = settings.Tones.Space
 
 		achan.dropEASProfile()
 
-		if achan.mark_freq == 0 && achan.space_freq == 0 {
-			achan.modem_type = MODEM_SCRAMBLE
+		if achan.MarkFreq == 0 && achan.SpaceFreq == 0 {
+			achan.ModemType = MODEM_SCRAMBLE
 		} else {
-			achan.modem_type = MODEM_AFSK
+			achan.ModemType = MODEM_AFSK
 
-			if achan.mark_freq < 300 || achan.mark_freq > 5000 {
-				achan.mark_freq = DEFAULT_MARK_FREQ
+			if achan.MarkFreq < 300 || achan.MarkFreq > 5000 {
+				achan.MarkFreq = DEFAULT_MARK_FREQ
 
-				ps.errorf("line %d: Unreasonable mark tone frequency. Using %d instead", ps.line, achan.mark_freq)
+				ps.errorf("line %d: Unreasonable mark tone frequency. Using %d instead", ps.line, achan.MarkFreq)
 			}
 
-			if achan.space_freq < 300 || achan.space_freq > 5000 {
-				achan.space_freq = DEFAULT_SPACE_FREQ
+			if achan.SpaceFreq < 300 || achan.SpaceFreq > 5000 {
+				achan.SpaceFreq = DEFAULT_SPACE_FREQ
 
-				ps.errorf("line %d: Unreasonable space tone frequency. Using %d instead", ps.line, achan.space_freq)
+				ps.errorf("line %d: Unreasonable space tone frequency. Using %d instead", ps.line, achan.SpaceFreq)
 			}
 		}
 	}
 
 	if settings.Decoders != nil {
-		achan.num_freq = settings.Decoders.Count
-		achan.offset = settings.Decoders.Offset
+		achan.NumFreq = settings.Decoders.Count
+		achan.Offset = settings.Decoders.Offset
 
-		if achan.num_freq < 1 || achan.num_freq > MAX_SUBCHANS {
+		if achan.NumFreq < 1 || achan.NumFreq > MAX_SUBCHANS {
 			ps.errorf("line %d: Number of demodulators is out of range. Using 3", ps.line)
 
-			achan.num_freq = 3
+			achan.NumFreq = 3
 		}
 
-		if achan.offset < 5 ||
-			float64(achan.offset) > math.Abs(float64(achan.mark_freq-achan.space_freq))/2 {
+		if achan.Offset < 5 ||
+			float64(achan.Offset) > math.Abs(float64(achan.MarkFreq-achan.SpaceFreq))/2 {
 			ps.errorf("line %d: Offset between demodulators is unreasonable. Using 50 Hz", ps.line)
 
-			achan.offset = 50
+			achan.Offset = 50
 		}
 	}
 
 	switch strings.ToLower(settings.V26) {
 	case "":
 	case "a", "b": /* a is compatible with direwolf versions <= 1.5, b with MFJ-2400.  New in 1.6. */
-		if achan.modem_type != MODEM_QPSK || achan.baud != 2400 {
+		if achan.ModemType != MODEM_QPSK || achan.Baud != 2400 {
 			return fmt.Errorf("line %d: V26%s option can only be used with 2400 bps PSK", ps.line, strings.ToUpper(settings.V26))
 		}
 
-		achan.v26_alternative = dwutil.IfThenElse(strings.EqualFold(settings.V26, "a"), V26_A, V26_B)
+		achan.V26Alternative = dwutil.IfThenElse(strings.EqualFold(settings.V26, "a"), V26_A, V26_B)
 	default:
 		return fmt.Errorf("line %d: V.26 alternative must be a or b, not %s", ps.line, settings.V26)
 	}
 
 	if settings.Divide != nil {
 		if *settings.Divide >= 1 && *settings.Divide <= 8 {
-			achan.decimate = *settings.Divide
+			achan.Decimate = *settings.Divide
 		} else {
 			ps.errorf("line %d: Ignoring unreasonable sample rate division factor of %d", ps.line, *settings.Divide)
 		}
@@ -2831,7 +2831,7 @@ func (ps *parseState) applyModem(settings ModemSettings) error {
 
 	if settings.Upsample != nil {
 		if *settings.Upsample >= 1 && *settings.Upsample <= 4 {
-			achan.upsample = *settings.Upsample
+			achan.Upsample = *settings.Upsample
 		} else {
 			ps.errorf("line %d: Ignoring unreasonable upsample ratio of %d", ps.line, *settings.Upsample)
 		}
@@ -2839,7 +2839,7 @@ func (ps *parseState) applyModem(settings ModemSettings) error {
 
 	if settings.Profiles != "" {
 		// Will be validated later.
-		achan.profiles = settings.Profiles
+		achan.Profiles = settings.Profiles
 	}
 
 	/* A later place catches disallowed combination of + and @. */
@@ -2861,11 +2861,11 @@ func (ps *parseState) oldStyleModem(t string) error {
 	/* Of course the MIC and SPKR connections won't */
 	/* have enough bandwidth so radios must be modified. */
 	if n >= 300 && n <= 5000 {
-		ps.audio.achan[ps.channel].mark_freq = n
+		ps.audio.achan[ps.channel].MarkFreq = n
 	} else {
-		ps.audio.achan[ps.channel].mark_freq = DEFAULT_MARK_FREQ
+		ps.audio.achan[ps.channel].MarkFreq = DEFAULT_MARK_FREQ
 
-		ps.errorf("line %d: Unreasonable mark tone frequency. Using %d", ps.line, ps.audio.achan[ps.channel].mark_freq)
+		ps.errorf("line %d: Unreasonable mark tone frequency. Using %d", ps.line, ps.audio.achan[ps.channel].MarkFreq)
 	}
 
 	/* Get space frequency */
@@ -2877,24 +2877,24 @@ func (ps *parseState) oldStyleModem(t string) error {
 
 	n, _ = strconv.Atoi(t)
 	if n >= 300 && n <= 5000 {
-		ps.audio.achan[ps.channel].space_freq = n
+		ps.audio.achan[ps.channel].SpaceFreq = n
 	} else {
-		ps.audio.achan[ps.channel].space_freq = DEFAULT_SPACE_FREQ
+		ps.audio.achan[ps.channel].SpaceFreq = DEFAULT_SPACE_FREQ
 
-		ps.errorf("line %d: Unreasonable space tone frequency. Using %d", ps.line, ps.audio.achan[ps.channel].space_freq)
+		ps.errorf("line %d: Unreasonable space tone frequency. Using %d", ps.line, ps.audio.achan[ps.channel].SpaceFreq)
 	}
 
 	/* Gently guide users toward new format. */
 
-	if ps.audio.achan[ps.channel].baud == 1200 &&
-		ps.audio.achan[ps.channel].mark_freq == 1200 &&
-		ps.audio.achan[ps.channel].space_freq == 2200 {
+	if ps.audio.achan[ps.channel].Baud == 1200 &&
+		ps.audio.achan[ps.channel].MarkFreq == 1200 &&
+		ps.audio.achan[ps.channel].SpaceFreq == 2200 {
 		ps.errorf("line %d: The AFSK frequencies can be omitted when using the 1200 baud default 1200:2200", ps.line)
 	}
 
-	if ps.audio.achan[ps.channel].baud == 300 &&
-		ps.audio.achan[ps.channel].mark_freq == 1600 &&
-		ps.audio.achan[ps.channel].space_freq == 1800 {
+	if ps.audio.achan[ps.channel].Baud == 300 &&
+		ps.audio.achan[ps.channel].MarkFreq == 1600 &&
+		ps.audio.achan[ps.channel].SpaceFreq == 1800 {
 		ps.errorf("line %d: The AFSK frequencies can be omitted when using the 300 baud default 1600:1800", ps.line)
 	}
 
@@ -2912,10 +2912,10 @@ func (ps *parseState) oldStyleModem(t string) error {
 				ps.errorf("line %d: Demodulator type can only contain letters and + character", ps.line)
 			}
 
-			ps.audio.achan[ps.channel].profiles = t
+			ps.audio.achan[ps.channel].Profiles = t
 
 			t = ps.split(false)
-			if len(ps.audio.achan[ps.channel].profiles) > 1 && t != "" {
+			if len(ps.audio.achan[ps.channel].Profiles) > 1 && t != "" {
 				return fmt.Errorf("line %d: Can't combine multiple demodulator types and multiple frequencies", ps.line)
 			}
 		}
@@ -2931,25 +2931,25 @@ func (ps *parseState) oldStyleModem(t string) error {
 			n = 3
 		}
 
-		ps.audio.achan[ps.channel].num_freq = n
+		ps.audio.achan[ps.channel].NumFreq = n
 
 		t = ps.split(false)
 		if t != "" {
 			n, _ = strconv.Atoi(t)
-			if n < 5 || n > int(math.Abs(float64(ps.audio.achan[ps.channel].mark_freq-ps.audio.achan[ps.channel].space_freq))/2) {
+			if n < 5 || n > int(math.Abs(float64(ps.audio.achan[ps.channel].MarkFreq-ps.audio.achan[ps.channel].SpaceFreq))/2) {
 				ps.errorf("line %d: Unreasonable value for offset between modems.  Using 50 Hz", ps.line)
 
 				n = 50
 			}
 
-			ps.audio.achan[ps.channel].offset = n
+			ps.audio.achan[ps.channel].Offset = n
 
 			ps.errorf("line %d: New style for multiple demodulators is %d@%d", ps.line,
-				ps.audio.achan[ps.channel].num_freq, ps.audio.achan[ps.channel].offset)
+				ps.audio.achan[ps.channel].NumFreq, ps.audio.achan[ps.channel].Offset)
 		} else {
 			ps.errorf("line %d: Missing frequency offset between modems.  Using 50 Hz", ps.line)
 
-			ps.audio.achan[ps.channel].offset = 50
+			ps.audio.achan[ps.channel].Offset = 50
 		}
 	}
 
@@ -2969,7 +2969,7 @@ func handleDTMF(ps *parseState) error {
 		return fmt.Errorf("line %d: DTMF can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	ps.audio.achan[ps.channel].dtmf_decode = DTMF_DECODE_ON
+	ps.audio.achan[ps.channel].DTMFDecode = DTMF_DECODE_ON
 
 	return nil
 }
@@ -5368,7 +5368,7 @@ func handleTTOBJ(ps *parseState) error {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("Debug TTOBJ r=%d, x=%d, app=%d, ig=%d\n", r, x, app, ig);
 
-	ps.audio.achan[r].dtmf_decode = DTMF_DECODE_ON
+	ps.audio.achan[r].DTMFDecode = DTMF_DECODE_ON
 	ps.tt.GatewayEnabled = 1
 	ps.tt.ObjRecvChan = r
 	ps.tt.ObjXmitChan = x

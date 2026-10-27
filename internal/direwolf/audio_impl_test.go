@@ -227,7 +227,7 @@ func TestAudioImpl_audioOpen_stdin_audioGet(t *testing.T) {
 	// Defaults are filled in for everything that wasn't given.
 	assert.Equal(t, DEFAULT_SAMPLES_PER_SEC, pa.adev[0].samples_per_sec)
 	assert.Equal(t, DEFAULT_BITS_PER_SAMPLE, pa.adev[0].bits_per_sample)
-	assert.Equal(t, DEFAULT_BAUD, pa.achan[0].baud)
+	assert.Equal(t, DEFAULT_BAUD, pa.achan[0].Baud)
 
 	var _, err = w.Write([]byte{0x11, 0x22, 0x33, 0x44})
 	require.NoError(t, err)
@@ -562,9 +562,9 @@ func TestAudioImpl_audioOpen_fillsInDefaults(t *testing.T) {
 	// Every radio channel's modem defaults are filled in, not just those of
 	// the devices that are defined.
 	for channel := range MAX_RADIO_CHANS {
-		assert.Equal(t, DEFAULT_MARK_FREQ, pa.achan[channel].mark_freq)
-		assert.Equal(t, DEFAULT_SPACE_FREQ, pa.achan[channel].space_freq)
-		assert.Equal(t, DEFAULT_BAUD, pa.achan[channel].baud)
+		assert.Equal(t, DEFAULT_MARK_FREQ, pa.achan[channel].MarkFreq)
+		assert.Equal(t, DEFAULT_SPACE_FREQ, pa.achan[channel].SpaceFreq)
+		assert.Equal(t, DEFAULT_BAUD, pa.achan[channel].Baud)
 	}
 }
 

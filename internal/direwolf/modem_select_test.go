@@ -30,14 +30,14 @@ type modemResult struct {
 
 func modemResultOf(a *achan_param_s) modemResult {
 	return modemResult{
-		baud:     a.baud,
-		modem:    a.modem_type,
-		mark:     a.mark_freq,
-		space:    a.space_freq,
-		profiles: a.profiles,
-		v26:      a.v26_alternative,
-		decimate: a.decimate,
-		upsample: a.upsample,
+		baud:     a.Baud,
+		modem:    a.ModemType,
+		mark:     a.MarkFreq,
+		space:    a.SpaceFreq,
+		profiles: a.Profiles,
+		v26:      a.V26Alternative,
+		decimate: a.Decimate,
+		upsample: a.Upsample,
 		layer2:   a.layer2_xmit,
 		fx25:     a.fx25_strength,
 		il2pFEC:  a.il2p_max_fec,
@@ -65,7 +65,7 @@ func direwolfModemOptionsOver(t *testing.T, config string, args ...string) (mode
 		return modemResult{}, parseErr
 	}
 
-	var err = modem.apply(&audio.achan[0])
+	var err = modem.apply(&audio.achan[0].ModemConfig)
 	if err == nil {
 		err = layer2.apply(&audio.achan[0])
 	}
@@ -85,7 +85,7 @@ func atestModemOptions(t *testing.T, args ...string) (modemResult, error) {
 		return modemResult{}, parseErr
 	}
 
-	var err = f.apply(&audio.achan[0])
+	var err = f.apply(&audio.achan[0].ModemConfig)
 	if err == nil {
 		atestSingleSlicer(&audio.achan[0])
 	}

@@ -78,8 +78,8 @@ func TestMapPort(t *testing.T) {
 		} {
 			var c = new(RadioConfig)
 			c.chan_medium[1] = MEDIUM_RADIO
-			c.achan[1].modem_type = tc.modem
-			c.achan[1].baud = int(tc.bitrate)
+			c.achan[1].ModemType = tc.modem
+			c.achan[1].Baud = int(tc.bitrate)
 
 			var want = mapPortFor("1", nodemap.LinkRF)
 			want.Mode = "AX.25"
@@ -96,8 +96,8 @@ func TestMapPort(t *testing.T) {
 
 		var c = new(RadioConfig)
 		c.chan_medium[0] = MEDIUM_RADIO
-		c.achan[0].modem_type = MODEM_AFSK
-		c.achan[0].baud = 1200
+		c.achan[0].ModemType = MODEM_AFSK
+		c.achan[0].Baud = 1200
 		c.achan[0].layer2_xmit = LAYER2_IL2P
 
 		assert.Equal(t, "IL2P", c.mapPort(0).Mode)
@@ -108,8 +108,8 @@ func TestMapPort(t *testing.T) {
 
 		var c = new(RadioConfig)
 		c.chan_medium[0] = MEDIUM_RADIO
-		c.achan[0].modem_type = MODEM_AFSK
-		c.achan[0].baud = 1200
+		c.achan[0].ModemType = MODEM_AFSK
+		c.achan[0].Baud = 1200
 		c.achan[0].layer2_xmit = LAYER2_FX25
 
 		assert.Equal(t, "FX.25", c.mapPort(0).Mode)
@@ -121,8 +121,8 @@ func TestMapPort(t *testing.T) {
 		for _, modem := range []modem_t{MODEM_AIS, MODEM_EAS, MODEM_OFF} {
 			var c = new(RadioConfig)
 			c.chan_medium[0] = MEDIUM_RADIO
-			c.achan[0].modem_type = modem
-			c.achan[0].baud = 9600
+			c.achan[0].ModemType = modem
+			c.achan[0].Baud = 9600
 
 			var want = mapPortFor("0", nodemap.LinkRF)
 			want.Mode = "AX.25"

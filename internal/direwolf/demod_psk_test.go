@@ -166,12 +166,12 @@ func TestPSKDelayLineTooLargeIsAnError(t *testing.T) {
 func TestBPSKPrefilterFitsBelowCarrier(t *testing.T) {
 	for _, baud := range []int{300, 1200} {
 		var audioConfig = newTestRadioConfig(0, MODEM_BPSK, baud, 0, 0, 44100)
-		audioConfig.achan[0].num_freq = 1
-		audioConfig.achan[0].profiles = "LMNO"
+		audioConfig.achan[0].NumFreq = 1
+		audioConfig.achan[0].Profiles = "LMNO"
 
 		var hook = test.NewGlobal()
 
-		var _, initErr = NewDemodulator(0, audioConfig.achan[0], 44100)
+		var _, initErr = NewDemodulator(0, audioConfig.achan[0].ModemConfig, audioConfig.achan[0].layer2_xmit, 44100)
 		require.NoError(t, initErr)
 
 		assert.Nil(t, lastEntryWithMessage(hook, "Prefilter range doesn't make sense"), "at %d baud", baud)
@@ -194,8 +194,8 @@ func TestBPSKNoPhaseChangeIsOne(t *testing.T) {
 func newBPSKTestRadioConfig(baud int, layer2 phy.Layer2, profile string) *RadioConfig {
 	var audioConfig = newTestRadioConfig(0, MODEM_BPSK, baud, 0, 0, 44100)
 	audioConfig.adev[0].defined = 1
-	audioConfig.achan[0].num_freq = 1
-	audioConfig.achan[0].profiles = profile
+	audioConfig.achan[0].NumFreq = 1
+	audioConfig.achan[0].Profiles = profile
 	audioConfig.achan[0].fix_bits = RETRY_NONE
 	audioConfig.achan[0].layer2_xmit = layer2
 	audioConfig.achan[0].il2p_max_fec = 1

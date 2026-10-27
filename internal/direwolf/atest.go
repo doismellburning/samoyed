@@ -167,7 +167,7 @@ func NewAtest(opts *AtestOptions) (*Atest, error) {
 	audio.recv_ber = opts.BitErrorRate
 
 	if opts.Modem != nil {
-		var modemErr = opts.Modem.apply(&audio.achan[0])
+		var modemErr = opts.Modem.apply(&audio.achan[0].ModemConfig)
 		if modemErr != nil {
 			return nil, modemErr
 		}
@@ -549,16 +549,16 @@ func atestDefaultAudio() *RadioConfig {
 	audio.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
 
 	for channel := range MAX_RADIO_CHANS {
-		audio.achan[channel].modem_type = MODEM_AFSK
+		audio.achan[channel].ModemType = MODEM_AFSK
 
-		audio.achan[channel].mark_freq = DEFAULT_MARK_FREQ
-		audio.achan[channel].space_freq = DEFAULT_SPACE_FREQ
-		audio.achan[channel].baud = DEFAULT_BAUD
+		audio.achan[channel].MarkFreq = DEFAULT_MARK_FREQ
+		audio.achan[channel].SpaceFreq = DEFAULT_SPACE_FREQ
+		audio.achan[channel].Baud = DEFAULT_BAUD
 
-		audio.achan[channel].profiles = "A"
+		audio.achan[channel].Profiles = "A"
 
-		audio.achan[channel].num_freq = 1
-		audio.achan[channel].offset = 0
+		audio.achan[channel].NumFreq = 1
+		audio.achan[channel].Offset = 0
 
 		audio.achan[channel].fix_bits = RETRY_NONE
 
@@ -575,9 +575,9 @@ func atestDefaultAudio() *RadioConfig {
 // That is how atest has always decoded them, and what the expected decode
 // counts in test-scripts were measured with.
 func atestSingleSlicer(achan *achan_param_s) {
-	if achan.profiles == "" && (achan.modem_type == MODEM_SCRAMBLE || achan.modem_type == MODEM_AIS) {
-		achan.profiles = "-"
+	if achan.Profiles == "" && (achan.ModemType == MODEM_SCRAMBLE || achan.ModemType == MODEM_AIS) {
+		achan.Profiles = "-"
 
-		logrus.WithField("profiles", achan.profiles).Info("Decoding with a single slicer")
+		logrus.WithField("profiles", achan.Profiles).Info("Decoding with a single slicer")
 	}
 }

@@ -138,18 +138,18 @@ func newMultiModem(channel int, pa *RadioConfig, demodulator *Demodulator, recei
 	m.sink = sink
 
 	if pa.chan_medium[channel] == MEDIUM_RADIO {
-		if pa.achan[channel].baud <= 0 {
+		if pa.achan[channel].Baud <= 0 {
 			logrus.WithField("channel", channel).Error("Internal multi_modem_init error: baud not set")
-			pa.achan[channel].baud = DEFAULT_BAUD
+			pa.achan[channel].Baud = DEFAULT_BAUD
 		}
 
-		var real_baud = pa.achan[channel].baud
-		if pa.achan[channel].modem_type == MODEM_QPSK {
-			real_baud = pa.achan[channel].baud / 2
+		var real_baud = pa.achan[channel].Baud
+		if pa.achan[channel].ModemType == MODEM_QPSK {
+			real_baud = pa.achan[channel].Baud / 2
 		}
 
-		if pa.achan[channel].modem_type == MODEM_8PSK {
-			real_baud = pa.achan[channel].baud / 3
+		if pa.achan[channel].ModemType == MODEM_8PSK {
+			real_baud = pa.achan[channel].Baud / 3
 		}
 
 		m.processAge = PROCESS_AFTER_BITS * pa.adev[ACHAN2ADEV(channel)].samples_per_sec / real_baud
@@ -619,7 +619,7 @@ func newHDLCConfig(achan *achan_param_s) hdlc.Config {
 	return hdlc.Config{
 		FixBits:    achan.fix_bits,
 		Passall:    achan.passall,
-		AIS:        achan.modem_type == MODEM_AIS,
+		AIS:        achan.ModemType == MODEM_AIS,
 		SanityTest: achan.sanity_test,
 	}
 }
@@ -632,7 +632,7 @@ func newSlicerReceivers(r *Layer2Receiver, from dwcore.SlicerID, scrambled bool)
 	s.fx25 = fx25.NewReceiver(from, r.fx25Debug, r.AudioLevel, r.recFrame)
 	s.il2p = il2p.NewReceiver(from, achan.il2p_version, achan.il2p_rx_crc, r.il2pDebug, r.AudioLevel, r.recPacket)
 
-	if achan.modem_type == MODEM_EAS {
+	if achan.ModemType == MODEM_EAS {
 		s.eas = eas.NewReceiver(from, r.AudioLevel, r.recFrame)
 	}
 
@@ -725,7 +725,7 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {
 					var from = dwcore.SlicerID{Channel: ch, Subchannel: sub, Slice: slice}
-					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, lineScrambled(pa.achan[ch].modem_type))
+					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, lineScrambled(pa.achan[ch].ModemType))
 				}
 			}
 		}
@@ -821,7 +821,7 @@ func (r *Layer2Receiver) recFrame(from dwcore.SlicerID, fbuf []byte, rxInfo dwco
 
 	var pp *ax25.Packet
 
-	switch pa.achan[channel].modem_type {
+	switch pa.achan[channel].ModemType {
 	case MODEM_AIS:
 		var nmea, err = ais.ToNMEA(fbuf)
 		if err != nil {
@@ -911,7 +911,7 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 
 	// EAS does not use HDLC.
 
-	if r.audio.achan[channel].modem_type == MODEM_EAS {
+	if r.audio.achan[channel].ModemType == MODEM_EAS {
 		s.eas.RecBit(raw)
 
 		return
@@ -924,7 +924,7 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 	// Which way up it starts doesn't matter to NRZI.
 	var il2pBit = raw
 
-	if r.audio.achan[channel].modem_type == MODEM_BPSK {
+	if r.audio.achan[channel].ModemType == MODEM_BPSK {
 		if !raw {
 			s.bpskLevel = !s.bpskLevel
 		}
@@ -943,7 +943,7 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 	// After BER insertion, NRZI, and any descrambling, feed into FX.25 decoder as well.
 	// Don't waste time on this if AIS.  EAS does not get this far.
 
-	if r.audio.achan[channel].modem_type != MODEM_AIS {
+	if r.audio.achan[channel].ModemType != MODEM_AIS {
 		s.fx25.RecBit(dwutil.IfThenElse(dbit, 1, 0))
 		s.il2p.RecBit(dwutil.IfThenElse(il2pBit, 1, 0)) // Note: skip NRZI.
 	}
