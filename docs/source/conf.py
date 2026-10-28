@@ -70,7 +70,10 @@ sitemap_url_scheme = "{link}"
 # are left out of the llms.txt Markdown rather than failing the build.
 llms_txt_suppress_unknown_node_warnings = ["graphviz"]
 
-llms_txt_description = "Samoyed is a software modem/TNC for packet radio, and a Go port of Dire Wolf."
+llms_txt_description = (
+    "Samoyed is a soundcard modem, software TNC and NET/ROM node for amateur packet radio,"
+    " written in Go, that started as a port of Dire Wolf."
+)
 
 ogp_site_url = html_baseurl
 ogp_image = "_static/logo.png"

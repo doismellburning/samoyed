@@ -7,9 +7,9 @@
 [![Documentation](https://img.shields.io/badge/docs-github.io-blue)](https://doismellburning.github.io/samoyed/)
 [![Licence: AGPL-3.0-or-later](https://img.shields.io/badge/licence-AGPL--3.0--or--later-blue)](#license)
 
-Samoyed is a fully-featured software modem/TNC for packet radio.
-It supports AX.25 v2.2, FX.25, IL2P, APRS, multi-speed modems (300-9600 bps), digipeating, IGates, and more.
-Samoyed is a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
+Samoyed is a soundcard modem, software TNC and NET/ROM node for amateur packet radio, written in Go.
+It supports AX.25 v2.2, FX.25, IL2P, APRS, 300-9600 bps AFSK, PSK and G3RUH modems, digipeating, IGates, KISS and AGW interfaces, a web dashboard, Prometheus metrics, and more.
+Samoyed started as a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
 
 **Documentation:** <https://doismellburning.github.io/samoyed/>
 
