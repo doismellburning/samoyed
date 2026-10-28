@@ -1210,6 +1210,127 @@ func TestUAWithdrawnRetryIsNotOwedAUA(t *testing.T) {
 	assert.Equal(t, state_5_awaiting_v22_connection, sA.state, "A ignored an unexpected UA")
 }
 
+// refuseFrom is what a v2.0 station that won't take a SABME sends to each
+// one it hears: a DM, or an FRMR, with F=1.
+func refuseFrom(peer *linkEnd, frameType ax25.FrameType) *ax25.Packet {
+	var addrs [ax25.MaxAddrs]string
+	addrs[OWNCALL] = listeningCall
+	addrs[PEERCALL] = peer.call
+
+	var info []byte
+	if frameType == ax25.FrameTypeUFRMR {
+		info = []byte{0, 0, 0}
+	}
+
+	return ax25.UFrame(addrs, 2, ax25.CRRes, frameType, 1, 0, info)
+}
+
+// fallBackWithARetriedSABME has A try v2.2 with a station that only speaks
+// v2.0, sending its SABME again before the refusal of the first gets back.
+// The refusal has A fall back to v2.0 and send SABM.
+func fallBackWithARetriedSABME(t *testing.T, refusal ax25.FrameType) (*linkEnd, *ax25_dlsm_t) {
+	t.Helper()
+
+	var a = newLinkEnd("Q1TEST-7", AX25_N2_RETRY_DEFAULT/3) // maxv22 as config.go defaults it.
+
+	initiateConnect(t, a.link, a.call, listeningCall, 0)
+
+	var sA = a.link.listHead
+	require.NotNil(t, sA)
+	require.Equal(t, state_5_awaiting_v22_connection, sA.state)
+
+	t1_expiry(sA)
+	require.Len(t, a.tx.take(), 2, "both SABMEs should have been sent")
+
+	a.deliver(t, refuseFrom(a, refusal))
+	require.Equal(t, state_1_awaiting_connection, sA.state)
+	require.Equal(t, ax25.Modulo8, sA.modulo)
+
+	var sabm = a.tx.take()
+	require.Len(t, sabm, 1)
+	require.Equal(t, ax25.FrameTypeUSABM, sabm[0].FrameTypeOnly())
+
+	return a, sA
+}
+
+// Regression test (#1126): a v2.0 station answers each SABME it hears with a
+// DM, so a SABME retried before the DM to the first one got back gets a DM of
+// its own.  The first had A fall back to v2.0, and A took the second for a
+// refusal of its SABM, and gave up on a station that would have accepted it.
+func TestDMToARetriedSABMEDoesNotEndTheV20Fallback(t *testing.T) {
+	t.Parallel()
+
+	var a, sA = fallBackWithARetriedSABME(t, ax25.FrameTypeUDM)
+
+	a.deliver(t, refuseFrom(a, ax25.FrameTypeUDM)) // To the retried SABME.
+	require.Equal(t, state_1_awaiting_connection, sA.state, "the DM to the retried SABME ended the fallback")
+
+	var addrs [ax25.MaxAddrs]string
+	addrs[OWNCALL] = listeningCall
+	addrs[PEERCALL] = a.call
+	a.deliver(t, ax25.UFrame(addrs, 2, ax25.CRRes, ax25.FrameTypeUUA, 1, 0, nil)) // To the SABM.
+
+	assert.Equal(t, state_3_connected, sA.state)
+	assert.Equal(t, ax25.Modulo8, sA.modulo)
+}
+
+// Only the refusals owed for SABMEs are let through: one more after them
+// refuses the SABM, and disconnects as before.
+func TestDMAfterTheRetriedSABMEsRefusesTheSABM(t *testing.T) {
+	t.Parallel()
+
+	var a, sA = fallBackWithARetriedSABME(t, ax25.FrameTypeUDM)
+
+	a.deliver(t, refuseFrom(a, ax25.FrameTypeUDM)) // To the retried SABME.
+	a.deliver(t, refuseFrom(a, ax25.FrameTypeUDM)) // To the SABM.
+
+	assert.Equal(t, state_0_disconnected, sA.state, "A ignored the refusal of its SABM")
+}
+
+// A station that refuses SABME with FRMR does so for the retry too.  FRMR
+// leaves state 1 alone in any case, but it settles what that retry was owed,
+// so a DM after it still refuses the SABM.
+func TestFRMRToARetriedSABMEIsCountedAgainstWhatIsOwed(t *testing.T) {
+	t.Parallel()
+
+	var a, sA = fallBackWithARetriedSABME(t, ax25.FrameTypeUFRMR)
+
+	a.deliver(t, refuseFrom(a, ax25.FrameTypeUFRMR)) // To the retried SABME.
+	require.Equal(t, state_1_awaiting_connection, sA.state)
+
+	a.deliver(t, refuseFrom(a, ax25.FrameTypeUDM)) // To the SABM.
+
+	assert.Equal(t, state_0_disconnected, sA.state, "A ignored the refusal of its SABM")
+}
+
+// A retry still waiting for a clear channel when the first SABME is refused
+// is taken back unsent, so is owed no refusal: a DM after the fallback
+// refuses the SABM.
+func TestDMWithdrawsAConnectRetryStillQueued(t *testing.T) {
+	t.Parallel()
+
+	var a = newLinkEnd("Q1TEST-7", AX25_N2_RETRY_DEFAULT/3) // maxv22 as config.go defaults it.
+
+	initiateConnect(t, a.link, a.call, listeningCall, 0)
+
+	var sA = a.link.listHead
+	require.NotNil(t, sA)
+	require.Len(t, a.tx.take(), 1) // Sent.
+
+	t1_expiry(sA) // The retry waits for a clear channel.
+
+	a.deliver(t, refuseFrom(a, ax25.FrameTypeUDM))
+	require.Equal(t, state_1_awaiting_connection, sA.state)
+
+	var queued = a.tx.take()
+	require.Len(t, queued, 1, "the retried SABME should have been withdrawn")
+	require.Equal(t, ax25.FrameTypeUSABM, queued[0].FrameTypeOnly())
+
+	a.deliver(t, refuseFrom(a, ax25.FrameTypeUDM))
+
+	assert.Equal(t, state_0_disconnected, sA.state, "A ignored the refusal of its SABM")
+}
+
 // Not every acknowledgement goes through check_i_frame_ackd: in timer
 // recovery, the response to our poll sets V(A) itself.  It ends the allowance
 // all the same, and a UA after it is unexpected.

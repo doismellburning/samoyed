@@ -411,6 +411,11 @@ type ax25_dlsm_t struct {
 	// other station reset its end when it heard the retry, so this only holds
 	// while nothing it sent before then has reached us.  See ua_frame.
 
+	refusalsOwed int // DMs or FRMRs that may still come for SABMEs we sent, beyond the one that had us fall back to v2.0.
+	// A station that only speaks v2.0 refuses each SABME it hears, so a SABME
+	// retried before the refusal of an earlier one got back is refused too, and
+	// that refusal is no answer to the SABM we sent on falling back.  See dm_frame.
+
 	vs int // 4.2.4.1. Send State Variable V(S)
 	// The send state variable exists within the TNC and is never sent.
 	// It contains the next sequential number to be assigned to the next
@@ -2334,7 +2339,7 @@ func (link *AX25Link) lm_data_indication(E *dlq_item_t) {
 		ua_frame(S, pf)
 
 	case ax25.FrameTypeUFRMR: // Frame Reject
-		frmr_frame(S)
+		frmr_frame(S, pf)
 
 	case ax25.FrameTypeUUI: // Unnumbered Information
 		ui_frame(S, cr, pf)
@@ -4330,6 +4335,22 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 		// Do nothing.
 
 	case state_1_awaiting_connection:
+		// Not in the flow chart: a DM to a SABME we retried before the refusal of an
+		// earlier one got back is expected, and is no refusal of our SABM.  Dire
+		// Wolf disconnects.
+		if f == 1 && S.refusalsOwed > 0 {
+			S.refusalsOwed--
+
+			if S.services.debugProtocolErrors {
+				logrus.WithFields(logrus.Fields{
+					"stream": S.stream_id,
+					"peer":   S.addrs[PEERCALL],
+				}).Debug("Ignoring DM to a retried SABME")
+			}
+
+			break
+		}
+
 		if f == 1 {
 			discard_i_queue(S)
 			// dl disconnect *indication*
@@ -4425,13 +4446,28 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 
 			set_version_2_0(S)
 
-			establish_data_link(S)
-			S.layer_3_initiated = true
-			enter_new_state(S, state_1_awaiting_connection)
+			fall_back_to_v2_0(S)
 		}
 		// #endif
 	}
 } /* end dm_frame */
+
+// fall_back_to_v2_0 sends SABM, now that the other station has refused a
+// SABME, and awaits its answer.
+//
+// The other station refuses every SABME it hears, so those we retried before
+// the refusal got back will be refused too: RC counts the SABMEs we queued,
+// less the ones still waiting for a clear channel, which are taken back
+// unsent.  Their refusals are owed, and are not refusals of the SABM.
+func fall_back_to_v2_0(S *ax25_dlsm_t) {
+	var withdrawn = withdraw_connect_retries(S)
+	var owed = max(S.rc-1-withdrawn, 0)
+
+	establish_data_link(S)
+	S.refusalsOwed = owed
+	S.layer_3_initiated = true
+	enter_new_state(S, state_1_awaiting_connection)
+}
 
 /*------------------------------------------------------------------------------
  *
@@ -4478,7 +4514,7 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 
 // withdraw_connect_retries takes back any SABM or SABME for this link that
 // T1 queued as a retry and that is still waiting for a clear channel, now
-// that a UA has answered an earlier one.
+// that a UA has answered an earlier one, or a DM or FRMR refused it.
 //
 // That happens whenever T1 runs out before the UA arrives - a slow far end,
 // or a busy channel - and the retry then waits behind the far end's own
@@ -4724,10 +4760,17 @@ func ua_frame(S *ax25_dlsm_t, f int) {
  *
  *------------------------------------------------------------------------------*/
 
-func frmr_frame(S *ax25_dlsm_t) {
+func frmr_frame(S *ax25_dlsm_t, f int) {
 	switch S.state {
-	case state_0_disconnected, state_1_awaiting_connection, state_2_awaiting_release:
+	case state_0_disconnected, state_2_awaiting_release:
 		// Ignore it.  Keep current state.
+
+	case state_1_awaiting_connection:
+		// Ignore it.  Keep current state.  But one that answers a SABME we retried
+		// is no longer owed, so a DM after it is a refusal of our SABM.
+		if f == 1 && S.refusalsOwed > 0 {
+			S.refusalsOwed--
+		}
 
 	case state_3_connected, state_4_timer_recovery:
 		if S.services.debugProtocolErrors {
@@ -4754,11 +4797,9 @@ func frmr_frame(S *ax25_dlsm_t) {
 
 		set_version_2_0(S) // Erratum: Need to force v2.0.  This is not in flow chart.
 
-		establish_data_link(S)
-		S.layer_3_initiated = true // Erratum?  I don't understand the difference here.
+		fall_back_to_v2_0(S) // Sets layer_3_initiated.
+		// Erratum?  I don't understand the difference here.
 		// State 1 clears it.  State 5 sets it.  Why not the same?
-
-		enter_new_state(S, state_1_awaiting_connection)
 	}
 
 	// part of state machine for the XID negotiation.
@@ -5376,6 +5417,9 @@ func establish_data_link(S *ax25_dlsm_t) {
 	var nopid = 0
 
 	clear_exception_conditions(S)
+
+	// A fresh attempt; no refusal of an earlier one is owed.  fall_back_to_v2_0 says otherwise.
+	S.refusalsOwed = 0
 
 	// Erratum:  We have an off-by-one error here.
 	// Flow chart shows setting RC to 0 and we end up sending SAMB(e) 11 times when N2 (RETRY) is 10.
