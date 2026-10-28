@@ -67,6 +67,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dsp"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -209,7 +210,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 	if modem_type == MODEM_BPSK {
 		correct_baud = bps // 1 bit per symbol
-		carrier_freq = bpskCarrierFreq
+		carrier_freq = phy.BPSKCarrierFreq
 
 		switch ascii.ToUpper(profile) { //nolint:dupl // Per-modem profile tables, kept parallel to upstream
 		case 'L': /* Self correlation technique. */

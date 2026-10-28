@@ -11,6 +11,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,8 +63,8 @@ func TestNewToneGeneratorBPSK(t *testing.T) {
 
 	require.NotNil(t, tg)
 	// BPSK forces mark_freq to its carrier and mirrors it into space_freq.
-	assert.Equal(t, bpskCarrierFreq, audioConfig.achan[channel].MarkFreq)
-	assert.Equal(t, bpskCarrierFreq, audioConfig.achan[channel].SpaceFreq)
+	assert.Equal(t, phy.BPSKCarrierFreq, audioConfig.achan[channel].MarkFreq)
+	assert.Equal(t, phy.BPSKCarrierFreq, audioConfig.achan[channel].SpaceFreq)
 	assert.Equal(t, tg.f1ChangePerSample, tg.f2ChangePerSample)
 	assert.Equal(t, PHASE_SHIFT_45, tg.tonePhase)
 }

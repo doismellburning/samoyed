@@ -329,7 +329,7 @@ type demodulator_state_s struct {
 
 			prefilter_baud float64 // Cutoff frequencies, as fraction of baud rate, beyond tones used.
 			// In the case of PSK, we use only a single tone: 1800 Hz, or
-			// bpskCarrierFreq for BPSK.  If we were using 2400 bps QPSK
+			// phy.BPSKCarrierFreq for BPSK.  If we were using 2400 bps QPSK
 			// (= 1200 baud), this would be the fraction of 1200 for the
 			// cutoff below and above 1800.
 

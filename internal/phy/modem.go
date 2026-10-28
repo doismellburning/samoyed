@@ -58,3 +58,8 @@ func (m Modem) String() string {
 func (m Modem) LineScrambled() bool {
 	return m == Scramble || m == BPSK
 }
+
+// BPSKCarrierFreq is the BPSK carrier, in Hz, at every bit rate: the tone
+// the NinoTNC's PSK modes use, per its mode table at
+// https://tarpn.net/t/nino-tnc/n9600a/n9600a_operation.html.
+const BPSKCarrierFreq = 1500
