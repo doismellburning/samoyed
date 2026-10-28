@@ -1628,7 +1628,7 @@ func config_init(fname string, p_audio_config *RadioConfig,
 		if ps.audio.chan_medium[channel] == MEDIUM_RADIO {
 			var samplesPerSec = ps.audio.adev[ACHAN2ADEV(channel)].samples_per_sec
 
-			var err = ps.audio.achan[channel].checkPSKFilterSizes(channel, samplesPerSec)
+			var err = checkPSKFilterSizes(channel, ps.audio.achan[channel].ModemConfig, samplesPerSec)
 			if err != nil {
 				ps.report(err)
 			}
