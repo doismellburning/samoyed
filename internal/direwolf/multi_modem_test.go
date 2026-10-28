@@ -442,7 +442,7 @@ func TestDemodulatorHandsBitsToItsReceiver(t *testing.T) {
 	require.NoError(t, layer2Err)
 
 	var receiver = new(countingBitReceiver)
-	layer2.demods[0].setReceiver(receiver)
+	layer2.demods[0].SetReceiver(receiver)
 
 	var rng = rand.New(rand.NewPCG(1, 2))
 

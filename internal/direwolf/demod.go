@@ -48,10 +48,10 @@ type Demodulator struct {
 	muted  atomic.Bool
 }
 
-// bitReceiver is what a demodulator hands each bit it demodulates to, and
+// BitReceiver is what a demodulator hands each bit it demodulates to, and
 // tells when it starts or stops detecting data on a slicer.
 // *Layer2Receiver is one.
-type bitReceiver interface {
+type BitReceiver interface {
 	RecBit(from dwcore.SlicerID, raw bool, isScrambled bool, pllNudgeTotal *int64, pllSymbolCount *int)
 	DCDChange(from dwcore.SlicerID, state int)
 }
@@ -763,10 +763,10 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 	return demodulator, nil
 }
 
-// setReceiver makes r where every subchannel of d hands its bits.  It is set
+// SetReceiver makes r where every subchannel of d hands its bits.  It is set
 // once d is built, rather than handed to NewDemodulator, to break a cycle: the
 // Layer2Receiver that receives the bits is itself built from the demodulators.
-func (d *Demodulator) setReceiver(r bitReceiver) {
+func (d *Demodulator) SetReceiver(r BitReceiver) {
 	for sub := range d.states {
 		d.states[sub].receiver = r
 	}

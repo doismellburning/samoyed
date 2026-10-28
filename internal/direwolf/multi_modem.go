@@ -288,7 +288,7 @@ func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink Receiv
 
 	for _, d := range demodulators {
 		if d != nil {
-			d.setReceiver(receiver)
+			d.SetReceiver(receiver)
 		}
 	}
 

@@ -24,7 +24,7 @@ type demodulator_state_s struct {
 
 	// receiver is where the bits demodulated go, and is told when data
 	// starts and stops being detected.  multi_modem_init sets it.
-	receiver bitReceiver
+	receiver BitReceiver
 
 	//	enum v26_e v26_alt;			// Which alternative when V.26.
 
