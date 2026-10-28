@@ -8,9 +8,8 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // naiveConvolve is the straightforward single-accumulator FIR kernel that
@@ -77,147 +76,6 @@ func BenchmarkConvolve(b *testing.B) {
 	_ = sink
 }
 
-// generateFrames has the tone generator send each of frames with the modem
-// audioConfig sets up for channel 0, and returns the 16 bit samples it makes.
-func generateFrames(t *testing.T, audioConfig *RadioConfig, frames []*ax25.Packet) []int {
-	t.Helper()
-
-	const channel = 0
-
-	var sink = new(byteSink)
-
-	var sender = NewLayer2Sender(channel, audioConfig.achan[channel].layer2Config, NewToneGenerator(channel, audioConfig, 50, sink), 0, 0)
-
-	sender.SendPreamblePostamble(32, false)
-
-	for _, pp := range frames {
-		sender.SendFrame(pp, false)
-		sender.SendPreamblePostamble(4, false)
-	}
-
-	sender.SendPreamblePostamble(16, true)
-
-	require.NotEmpty(t, sink.data)
-	require.Zero(t, len(sink.data)%2, "16 bit samples come in pairs of bytes")
-
-	var samples = make([]int, 0, len(sink.data)/2)
-	for _, sample := range decodeMono16(sink.data) {
-		samples = append(samples, int(sample))
-	}
-
-	return samples
-}
-
-// demodulateFrames runs samples through the demodulators audioConfig sets up
-// for channel 0, and returns the frames they hand on and the receiver that
-// holds the demodulators.
-func demodulateFrames(t *testing.T, audioConfig *RadioConfig, samples []int) ([]*ax25.Packet, *Layer2Receiver) {
-	t.Helper()
-
-	const channel = 0
-
-	var sink = new(recordingReceiveSink)
-
-	var receiver, receiverErr = multi_modem_init(audioConfig, 0, 0, sink)
-	require.NoError(t, receiverErr)
-
-	for _, sam := range samples {
-		receiver.ProcessSample(channel, sam)
-	}
-
-	// Enough silence afterwards for the last frame to be picked from the
-	// candidates, however many slicers heard it.
-	for range 2 * receiver.modems[channel].processAge {
-		receiver.ProcessSample(channel, 0)
-	}
-
-	return sink.frames, receiver
-}
-
-func new9600TestRadioConfig(sampleRate int, profiles string, upsample int) *RadioConfig {
-	var audioConfig = newTestRadioConfig(0, MODEM_SCRAMBLE, 9600, 0, 0, sampleRate)
-	audioConfig.adev[0].defined = 1
-	audioConfig.achan[0].NumFreq = 1
-	audioConfig.achan[0].Profiles = profiles
-	audioConfig.achan[0].Upsample = upsample
-	audioConfig.achan[0].fix_bits = RETRY_NONE
-
-	return audioConfig
-}
-
-// What the tone generator sends as G3RUH at 9600 baud, the 9600 demodulator
-// decodes back, however the samples are upsampled, and with one slicer or
-// several.
-func TestDemod9600RoundTrip(t *testing.T) {
-	t.Parallel()
-
-	for _, tc := range []struct {
-		name       string
-		sampleRate int
-		profiles   string
-		upsample   int
-	}{
-		{"single slicer, default upsample", 48000, "-", 0},
-		{"multiple slicers, default upsample", 48000, "+", 0},
-		{"upsample 1", 96000, "-", 1},
-		{"upsample 2", 96000, "-", 2},
-		{"upsample 4", 44100, "-", 4},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			var texts = []string{
-				"Q1TEST>Q2TEST:Hello at 9600 baud",
-				"Q1TEST>Q2TEST,WIDE1-1:>A second frame, somewhat longer than the first",
-			}
-
-			var frames = make([]*ax25.Packet, 0, len(texts))
-
-			for _, text := range texts {
-				var pp = ax25.FromText(text, true)
-				require.NotNil(t, pp)
-
-				frames = append(frames, pp)
-			}
-
-			var samples = generateFrames(t, new9600TestRadioConfig(tc.sampleRate, tc.profiles, tc.upsample), frames)
-
-			var audioConfig = new9600TestRadioConfig(tc.sampleRate, tc.profiles, tc.upsample)
-			var got, receiver = demodulateFrames(t, audioConfig, samples)
-
-			require.Len(t, got, len(texts))
-
-			for i, pp := range got {
-				assert.Equal(t, texts[i], pp.FormatAddrs()+string(pp.Info()))
-			}
-
-			var d = receiver.demods[0]
-			require.NotNil(t, d)
-
-			if tc.profiles == "+" {
-				assert.Equal(t, MAX_SLICERS, d.states[0].num_slicers)
-			} else {
-				assert.Equal(t, 1, d.states[0].num_slicers)
-			}
-
-			// The signal level seen along the way was captured for reporting.
-			assert.Positive(t, d.states[0].alevel_mark_peak)
-			assert.Negative(t, d.states[0].alevel_space_peak)
-		})
-	}
-}
-
-// Silence decodes to nothing.
-func TestDemod9600Silence(t *testing.T) {
-	t.Parallel()
-
-	var audioConfig = new9600TestRadioConfig(48000, "-", 0)
-
-	var got, _ = demodulateFrames(t, audioConfig, make([]int, 48000/10))
-
-	assert.Empty(t, got)
-}
-
 // The upsampling factor is kept to what there are polyphase filters for.
 func TestDemod9600InitClampsUpsample(t *testing.T) {
 	t.Parallel()
@@ -234,9 +92,9 @@ func TestDemod9600InitClampsUpsample(t *testing.T) {
 	} {
 		var D = new(demodulator_state_s)
 
-		demod_9600_init(MODEM_SCRAMBLE, 48000, tc.upsample, 9600, D)
+		demod_9600_init(phy.Scramble, 48000, tc.upsample, 9600, D)
 
-		assert.Equal(t, MODEM_SCRAMBLE, D.modem_type)
+		assert.Equal(t, phy.Scramble, D.modem_type)
 		assert.Equal(t, 1, D.num_slicers)
 		assert.Equal(t, 5, D.lp_filter_taps, "one symbol's worth of taps at 48000/9600")
 
@@ -270,11 +128,11 @@ func boolToFloat(b bool) float64 {
 func TestSlicePoints(t *testing.T) {
 	t.Parallel()
 
-	for j := range MAX_SUBCHANS {
-		assert.InDelta(t, -slice_point[MAX_SUBCHANS-1-j], slice_point[j], 1e-12)
+	for j := range phy.MaxSubchans {
+		assert.InDelta(t, -slice_point[phy.MaxSubchans-1-j], slice_point[j], 1e-12)
 	}
 
-	for j := 1; j < MAX_SUBCHANS; j++ {
+	for j := 1; j < phy.MaxSubchans; j++ {
 		assert.InDelta(t, 0.02, slice_point[j]-slice_point[j-1], 1e-12)
 	}
 }

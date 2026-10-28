@@ -12,6 +12,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/il2p"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -488,4 +489,151 @@ func TestMultiModemWithoutADemodulatorHasNoLayout(t *testing.T) {
 	var numSubchan, numSlicers = m.layout()
 	assert.Zero(t, numSubchan)
 	assert.Zero(t, numSlicers)
+}
+
+// PSK has no decimating path, so a PSK channel configured to decimate is
+// demodulated at the full sample rate - and demod_init leaves the
+// configuration as it found it, settleModemOptions being where that is
+// reported and put right.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
+func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
+	var hook = testutils.CaptureLogrus(t)
+
+	for _, modemType := range []modem_t{MODEM_QPSK, MODEM_8PSK, MODEM_BPSK} {
+		var channel = 0
+		var audioConfig = newTestRadioConfig(channel, modemType, 2400, 0, 0, 44100)
+		audioConfig.achan[channel].Decimate = 3
+		audioConfig.achan[channel].NumFreq = 1
+
+		var _, initErr = demod_init(audioConfig)
+		require.NoError(t, initErr)
+
+		for _, entry := range hook.AllEntries() {
+			assert.NotContains(t, entry.Data, "decimate")
+		}
+
+		hook.Reset()
+
+		assert.Equal(t, 3, audioConfig.achan[channel].Decimate)
+	}
+}
+
+// demod_init sets up the demodulators from the modem options without
+// changing them: the rules about which go together are settleModemOptions'.
+//
+//nolint:paralleltest // Serial: records logrus's global logger through a hook.
+func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
+	var channel = 0
+
+	var eas = newTestRadioConfig(channel, MODEM_EAS, 521, 2083, 1563, 44100)
+	eas.achan[channel].NumFreq = 1
+	eas.achan[channel].fix_bits = RETRY_INVERT_SINGLE
+	eas.achan[channel].passall = true
+
+	var _, easErr = demod_init(eas)
+	require.NoError(t, easErr)
+
+	assert.Equal(t, RETRY_INVERT_SINGLE, eas.achan[channel].fix_bits)
+	assert.True(t, eas.achan[channel].passall)
+
+	var qpsk = newTestRadioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
+	qpsk.achan[channel].NumFreq = 1
+
+	var hook = testutils.CaptureLogrus(t)
+
+	var _, qpskErr = demod_init(qpsk)
+	require.NoError(t, qpskErr)
+
+	var compatibleWith any
+
+	for _, entry := range hook.AllEntries() {
+		if entry.Message == "QPSK demodulator" {
+			compatibleWith = entry.Data["compatible_with"]
+		}
+	}
+
+	assert.Equal(t, "MFJ-2400", compatibleWith, "an unsettled V.26 alternative still gets the default")
+	assert.Equal(t, V26_UNSPECIFIED, qpsk.achan[channel].V26Alternative)
+}
+
+// AFSK, by contrast, does decimate.
+func TestDemodInitKeepsAFSKDecimation(t *testing.T) {
+	t.Parallel()
+
+	var channel = 1
+	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 48000)
+	audioConfig.achan[channel].Decimate = 3
+	audioConfig.achan[channel].NumFreq = 1
+
+	var _, initErr = demod_init(audioConfig)
+	require.NoError(t, initErr)
+
+	assert.Equal(t, 3, audioConfig.achan[channel].Decimate)
+}
+
+// What NewDemodulator works out from a channel's settings, it keeps: the
+// configuration is left as the file and command line had it.
+func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
+	t.Parallel()
+
+	var channel = 0
+	var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 300, 1600, 1800, 48000)
+	audioConfig.achan[channel].NumFreq = 3
+	audioConfig.achan[channel].Offset = 30
+	audioConfig.achan[channel].Profiles = "ab+"
+
+	var before = audioConfig.achan[channel]
+
+	var demodulators, demodulatorsErr = demod_init(audioConfig)
+	require.NoError(t, demodulatorsErr)
+
+	var d = demodulators[channel]
+	require.NotNil(t, d)
+	assert.Equal(t, "AB+", d.profiles)
+	assert.Equal(t, 2, d.NumSubchan(), "+ can't be combined with multiple frequencies, so one per letter")
+	assert.Equal(t, MAX_SLICERS, d.NumSlicers())
+	assert.Equal(t, 3, d.decimate, "300 baud at 48000 samples per second decimates")
+
+	assert.Equal(t, before, audioConfig.achan[channel])
+}
+
+// demod_init builds a Demodulator for each radio channel, and none for a
+// channel that is not one.
+func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
+	t.Parallel()
+
+	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	audioConfig.achan[0].NumFreq = 1
+
+	var demodulators, demodulatorsErr = demod_init(audioConfig)
+	require.NoError(t, demodulatorsErr)
+
+	require.NotNil(t, demodulators[0])
+	assert.Equal(t, 0, demodulators[0].channel)
+	assert.Nil(t, demodulators[1])
+}
+
+// A received frame's subchannel and slicer are shown only where the channel's
+// demodulator has more than one; a channel without one, whether not a radio
+// or out of range altogether, has one of each.
+func TestChannelLayout(t *testing.T) {
+	t.Parallel()
+
+	var audioConfig = newTestRadioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+	audioConfig.achan[0].NumFreq = 1
+	audioConfig.achan[0].Profiles = "AB+"
+
+	var receiver, receiverErr = multi_modem_init(audioConfig, 0, 0, new(discardReceiveSink))
+	require.NoError(t, receiverErr)
+
+	var numSubchan, numSlicers = receiver.Layout(0)
+	assert.Equal(t, 2, numSubchan)
+	assert.Equal(t, MAX_SLICERS, numSlicers)
+
+	for _, channel := range []int{1, MAX_RADIO_CHANS, -1} {
+		numSubchan, numSlicers = receiver.Layout(channel)
+		assert.Equal(t, 1, numSubchan, "channel %d", channel)
+		assert.Equal(t, 1, numSlicers, "channel %d", channel)
+	}
 }
