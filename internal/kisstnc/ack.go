@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package kisstnc
 
 import (
 	"context"
@@ -42,18 +42,17 @@ type kissAcks struct {
 	ctx context.Context //nolint:containedctx // Handed to each client's goroutine as it starts.
 
 	// mu guards pending.  A client has an entry exactly while its goroutine
-	// is running, holding what is still to be sent to it.  kissClient values
-	// are compared as map keys, which every transport's is fit for: a
-	// pointer, or kissNetClient, whose connection is one.
+	// is running, holding what is still to be sent to it.  Client values
+	// are compared as map keys, which is why a Client must be comparable.
 	mu      sync.Mutex
-	pending map[kissClient]*kissAckQueue
+	pending map[Client]*kissAckQueue
 }
 
 // newKissAcks makes a kissAcks whose goroutines stop when ctx is cancelled.
 func newKissAcks(ctx context.Context) *kissAcks {
 	var a = new(kissAcks)
 	a.ctx = ctx
-	a.pending = make(map[kissClient]*kissAckQueue)
+	a.pending = make(map[Client]*kissAckQueue)
 
 	return a
 }
@@ -61,7 +60,7 @@ func newKissAcks(ctx context.Context) *kissAcks {
 // send has id, the ID of an ACKMODE frame to client for channel, acknowledged
 // as soon as client will take it, after any acknowledgements still waiting
 // for it.  It never waits for client itself.
-func (a *kissAcks) send(client kissClient, channel int, id []byte) {
+func (a *kissAcks) send(client Client, channel int, id []byte) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -93,7 +92,7 @@ func (a *kissAcks) send(client kissClient, channel int, id []byte) {
 
 // drain sends client what is waiting for it, one at a time, until there is
 // nothing left or ctx is cancelled.
-func (a *kissAcks) drain(ctx context.Context, client kissClient) {
+func (a *kissAcks) drain(ctx context.Context, client Client) {
 	for {
 		a.mu.Lock()
 
@@ -115,6 +114,6 @@ func (a *kissAcks) drain(ctx context.Context, client kissClient) {
 
 		a.mu.Unlock()
 
-		client.reply(next.channel, kiss.CmdXKissData, next.id)
+		client.Reply(next.channel, kiss.CmdXKissData, next.id)
 	}
 }

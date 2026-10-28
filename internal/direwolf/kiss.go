@@ -65,6 +65,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -74,7 +75,7 @@ import (
 type KissPT struct {
 	debug int /* Print information flowing from and to client. */
 
-	handler *KissHandler // Acts on what the client sends.
+	handler *kisstnc.Handler // Acts on what the client sends.
 
 	// kf is the accumulated KISS frame and state of the decoder.  Only the
 	// listening goroutine touches it once that is running.
@@ -105,7 +106,7 @@ type KissPT struct {
 const TMP_KISSTNC_SYMLINK = "/tmp/kisstnc"
 
 // newKissPT builds a KissPT with nothing opened or started.
-func newKissPT(handler *KissHandler, debug int) *KissPT {
+func newKissPT(handler *kisstnc.Handler, debug int) *KissPT {
 	var kp = new(KissPT)
 	kp.handler = handler
 	kp.debug = debug
@@ -134,7 +135,7 @@ func newKissPT(handler *KissHandler, debug int) *KissPT {
  *
  *--------------------------------------------------------------------*/
 
-func NewKissPT(ctx context.Context, mc *misc_config_s, handler *KissHandler, debug int) *KissPT {
+func NewKissPT(ctx context.Context, mc *misc_config_s, handler *kisstnc.Handler, debug int) *KissPT {
 	var kp = newKissPT(handler, debug)
 
 	if mc.enable_kiss_pt {
@@ -216,30 +217,30 @@ func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, frame []byte) {
 		return
 	}
 
-	kp.write(master, kissClientFrame(channel, kiss_cmd, frame, kp.debug, "Pseudo Terminal"))
+	kp.write(master, kisstnc.ClientFrame(channel, kiss_cmd, frame, kp.debug, "Pseudo Terminal"))
 } /* SendRecPacket */
 
 // The pseudo terminal has one client at the far end, which is where an answer
 // to anything it sends goes.
 
-func (kp *KissPT) reply(channel int, cmd int, frame []byte) {
+func (kp *KissPT) Reply(channel int, cmd int, frame []byte) {
 	kp.SendRecPacket(channel, cmd, frame)
 }
 
-func (kp *KissPT) prompt(text []byte) {
+func (kp *KissPT) Prompt(text []byte) {
 	var master = kp.ptMaster()
 	if master == nil {
 		return
 	}
 
 	if kp.debug > 0 {
-		kiss_debug_print(TO_CLIENT, "Fake command prompt", text)
+		kisstnc.DebugPrint(kisstnc.ToClient, "Fake command prompt", text)
 	}
 
 	kp.write(master, text)
 }
 
-func (kp *KissPT) radioChannel(frameChannel int) int {
+func (kp *KissPT) RadioChannel(frameChannel int) int {
 	return frameChannel
 }
 
@@ -484,7 +485,7 @@ func (kp *KissPT) get(ctx context.Context) (byte, error) {
  * Purpose:     Read messages from pseudo terminal KISS client application.
  *
  * Description:	Reads bytes from the KISS client app and
- *		sends them to the KissHandler for processing.
+ *		sends them to the kisstnc.Handler for processing.
  *
  *--------------------------------------------------------------------*/
 

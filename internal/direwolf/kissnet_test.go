@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -105,7 +106,7 @@ func startKissNet(t *testing.T, channel int) (*KissNetService, int) {
 	// though, which would cost each test here most of one.
 	kns.pollInterval = 10 * time.Millisecond
 
-	kns.Start(t.Context(), NewKissHandler(t.Context(), kissTestRadioConfig(), new(XmitService), nil, kns))
+	kns.Start(t.Context(), kisstnc.NewHandler(t.Context(), newKissHandlerTNC(kissTestRadioConfig(), new(XmitService), nil), kns.Copy))
 
 	return kns, addrPort(kns.Addrs()[0])
 }
@@ -235,7 +236,7 @@ func TestKissNetSendRecPacketToOneClient(t *testing.T) {
 
 	var kns, clients = newAttachedKissNet(t, -1, false, 2)
 
-	kissNetClient{kns: kns, kps: kns.allPorts, client: 1, conn: kns.allPorts.clientConn(1)}.reply(0, kiss.CmdSetHardware, []byte("TXBUF:0"))
+	kissNetClient{kns: kns, kps: kns.allPorts, client: 1, conn: kns.allPorts.clientConn(1)}.Reply(0, kiss.CmdSetHardware, []byte("TXBUF:0"))
 
 	assert.Equal(t,
 		kiss.Encapsulate(append([]byte{kiss.CmdSetHardware}, []byte("TXBUF:0")...)),
@@ -264,8 +265,8 @@ func TestKissNetReplyNotToTheNextClientInTheSlot(t *testing.T) {
 	var server, newcomer = connectedTCPPair(t)
 	require.True(t, kps.attachClient(0, server))
 
-	asker.reply(0, kiss.CmdSetHardware, []byte("TNC:DIREWOLF"))
-	asker.prompt([]byte("\r\ncmd:"))
+	asker.Reply(0, kiss.CmdSetHardware, []byte("TNC:DIREWOLF"))
+	asker.Prompt([]byte("\r\ncmd:"))
 
 	requireNothingToRead(t, newcomer, "the newcomer was sent an answer to a question it never asked")
 }
@@ -277,8 +278,8 @@ func TestKissNetReplyNotToTheNextClientInTheSlot(t *testing.T) {
 func TestKissNetPrompt(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
-	var output = captureKissLog(t, func() {
-		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
+		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.Prompt([]byte("\r\ncmd:"))
 	})
 
 	assert.Contains(t, output, "Is client app treating this like an old TNC with command mode?")
@@ -394,7 +395,7 @@ func TestKissNetDebugPrints(t *testing.T) {
 	// newAttachedKissNet starts no goroutines, so the level can be set directly.
 	kns.debug = 2
 
-	var output = captureKissLog(t, func() {
+	var output = captureLogOutput(t, logrus.DebugLevel, func() {
 		kns.SendRecPacket(1, kiss.CmdDataFrame, []byte("hello"))
 
 		readKissNetFrame(t, clients[0])
@@ -404,8 +405,8 @@ func TestKissNetDebugPrints(t *testing.T) {
 	assert.Contains(t, output, `channel=1 direction=to function="Data frame"`)
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	output = captureKissLog(t, func() {
-		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.prompt([]byte("\r\ncmd:"))
+	output = captureLogOutput(t, logrus.DebugLevel, func() {
+		kissNetClient{kns: kns, kps: kns.allPorts, client: 0, conn: kns.allPorts.clientConn(0)}.Prompt([]byte("\r\ncmd:"))
 	})
 
 	assert.Contains(t, output, "Fake command prompt")
@@ -564,7 +565,7 @@ func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
 
 	var kns, port = startKissNet(t, unconfigured)
 
-	require.Equal(t, MEDIUM_NONE, kns.handler.audioConfig.chan_medium[unconfigured])
+	require.Equal(t, MEDIUM_NONE, kissTestRadioConfig().chan_medium[unconfigured])
 
 	var conn, _ = dialKissNet(t, kns, port)
 
@@ -623,4 +624,177 @@ func TestKissNetClientCanReattach(t *testing.T) {
 	var _, reattachedSlot = dialKissNet(t, kns, port)
 
 	assert.GreaterOrEqual(t, reattachedSlot, 0, "a client could not attach again")
+}
+
+// With KISSCOPY, a data frame a client sends is shown to the TCP clients the
+// handler was given, whichever transport it came by - here, one with no TCP
+// port of its own, such as the serial port.  An ACKMODE frame is shown to them
+// as the ordinary data frame it carries.
+func TestKissNetCopiesAHandlersDataFrames(t *testing.T) {
+	t.Parallel()
+
+	for _, c := range []struct {
+		name string
+		cmd  []byte
+	}{
+		{"data frame", []byte{kiss.CmdDataFrame}},
+		{"ACKMODE", []byte{kiss.CmdXKissData, 0x12, 0x34}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			var peers, clients = newAttachedKissNet(t, -1, true, 1)
+
+			var tnc = setupKissHandlerTNC(t)
+			var h = kisstnc.NewHandler(t.Context(), tnc, peers.Copy)
+
+			var pp = newTestPacket(t)
+
+			handleKissMsg(h, append(c.cmd, pp.FrameData()...), quietKissClient{})
+
+			assert.Equal(t,
+				kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
+				readKissNetFrame(t, clients[0]))
+			assert.Equal(t, 1, tnc.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+		})
+	}
+}
+
+// The per-client bookkeeping for KISS over TCP: a client's connection and the
+// frame collector that goes with it are handed out together, and a connection
+// is only forgotten by whoever still has the one that is current.
+
+func Test_kissport_status_attach_and_detach(t *testing.T) {
+	t.Parallel()
+
+	var kps = new(kissport_status_s)
+
+	assert.Nil(t, kps.clientConn(0))
+	assert.Equal(t, 0, kps.findFreeClient())
+
+	var here, there = net.Pipe()
+
+	t.Cleanup(func() { here.Close(); there.Close() })
+
+	require.True(t, kps.attachClient(0, here))
+
+	assert.Same(t, here, kps.clientConn(0))
+	assert.Equal(t, 1, kps.findFreeClient(), "the next client should get the next slot")
+
+	var conn, frame = kps.connAndFrame(0)
+	assert.Same(t, here, conn)
+	assert.NotNil(t, frame, "a newly attached client needs a frame collector")
+
+	assert.True(t, kps.detachClientIfCurrent(0, here))
+	assert.Nil(t, kps.clientConn(0))
+}
+
+// A read goroutine that notices its connection has gone must not clear a slot
+// that has since been given to a newer connection from the same client.
+func Test_kissport_status_detach_stale_connection(t *testing.T) {
+	t.Parallel()
+
+	var kps = new(kissport_status_s)
+
+	var older, otherEndOfOlder = net.Pipe()
+	var newer, otherEndOfNewer = net.Pipe()
+
+	t.Cleanup(func() {
+		older.Close()
+		otherEndOfOlder.Close()
+		newer.Close()
+		otherEndOfNewer.Close()
+	})
+
+	require.True(t, kps.attachClient(0, older))
+	require.True(t, kps.attachClient(0, newer))
+
+	assert.False(t, kps.detachClientIfCurrent(0, older), "the stale connection was not the current one")
+	assert.Same(t, newer, kps.clientConn(0), "the newer connection was cleared by the older one going away")
+}
+
+// Every slot taken means there is nowhere to put another client.
+func Test_kissport_status_all_clients_in_use(t *testing.T) {
+	t.Parallel()
+
+	var kps = new(kissport_status_s)
+
+	for c := range MAX_NET_CLIENTS {
+		var here, there = net.Pipe()
+
+		t.Cleanup(func() { here.Close(); there.Close() })
+
+		require.True(t, kps.attachClient(c, here))
+	}
+
+	assert.Equal(t, -1, kps.findFreeClient())
+}
+
+// A port that has been stopped hangs up on everyone, and a connection that was
+// already in the accept queue when it stopped is not attached after the fact.
+func Test_kissport_status_stop(t *testing.T) {
+	t.Parallel()
+
+	var kps = new(kissport_status_s)
+
+	var here, there = net.Pipe()
+
+	t.Cleanup(func() { here.Close(); there.Close() })
+
+	require.True(t, kps.attachClient(0, here))
+
+	kps.stop()
+
+	assert.Nil(t, kps.clientConn(0))
+
+	var late, otherEndOfLate = net.Pipe()
+
+	t.Cleanup(func() { late.Close(); otherEndOfLate.Close() })
+
+	assert.False(t, kps.attachClient(0, late), "a stopped port should not take on a new client")
+}
+
+// A KISS TCP port carrying a single radio channel ignores the channel in the
+// frame: the application thinks it has a one-radio TNC and always says 0.
+func TestKissNetPortChannelOverridesTheFrame(t *testing.T) {
+	t.Parallel()
+
+	var tnc = setupKissHandlerTNC(t)
+	var h = kisstnc.NewHandler(t.Context(), tnc, nil)
+
+	var kps = new(kissport_status_s)
+	kps.channel = 1
+
+	var pp = newTestPacket(t)
+
+	handleKissMsg(h, append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
+
+	assert.Equal(t, 1, tnc.queue.Count(1, TQ_PRIO_1_LO, "", "", false), "the port's channel should have been used")
+	assert.Equal(t, 0, tnc.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+}
+
+// A KISS TCP port's channel comes from the configuration rather than a
+// nibble, so nothing bounds it to the channel table.  The validity check used
+// to go on to ask whether an out-of-range channel was the IGate's - indexing
+// the table with the very channel it had just found to be out of range.
+//
+//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
+func TestKissNetPortChannelOutOfRange(t *testing.T) {
+	var h = kisstnc.NewHandler(t.Context(), setupKissHandlerTNC(t), nil)
+
+	var kps = new(kissport_status_s)
+	kps.channel = MAX_TOTAL_CHANS
+
+	var pp = newTestPacket(t)
+
+	var output string
+
+	assert.NotPanics(t, func() {
+		output = captureLogOutput(t, logrus.DebugLevel, func() {
+			handleKissMsg(h, append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
+		})
+	})
+
+	assert.Contains(t, output, "Invalid transmit channel from KISS client application")
+	assert.Contains(t, output, "channel=16")
 }

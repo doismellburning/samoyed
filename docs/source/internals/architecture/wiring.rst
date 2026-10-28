@@ -53,7 +53,8 @@ in place of the plain ones between the same components.
        igate [label="IGate"];
        digi [label="digipeater.Digipeater\nAPRS"];
        cdigi [label="digipeater.Connected\nconnected mode"];
-       kiss [label="KissHandler"];
+       kiss [label="kisstnc.Handler"];
+       kissadapter [label="kissHandlerTNCAdapter"];
        kissnet [label="KISS TCP, serial,\npseudo terminal"];
        apps [label="clientApps"];
        tt [label="aprstt.Gateway\nAPRStt"];
@@ -133,9 +134,10 @@ in place of the plain ones between the same components.
        shared -> agw [label="linkClients\nAGW clients' circuits", style=dotted];
        link -> tq [label="linkTransmitter"];
 
-       kiss -> xmit [label="timing setters"];
-       kiss -> tq [label="clientTransmitQueue"];
-       kiss -> kissnet [label="KISSCOPY peers"];
+       kiss -> kissadapter [label="kisstnc.TNC"];
+       kissadapter -> xmit [label="timing setters"];
+       kissadapter -> tq [label="clientTransmitQueue"];
+       kiss -> kissnet [label="KISSCOPY peers\n(kisstnc.Copier)"];
        kissnet -> kiss [label="client bytes\n(at Start)", style=dashed];
 
        apps -> agw;
@@ -265,7 +267,7 @@ so the queue is handed ``onTransmit`` with ``TransmitQueue.SetOnTransmit`` once 
 
 **The KISS handler and the KISS TCP service.**
 The handler copies a client's data frames to the TCP clients with KISSCOPY,
-so it is made after the ``KissNetService`` and handed it.
+so it is made after the ``KissNetService`` and handed its ``Copy``, as the ``kisstnc.Copier``.
 The service is handed the handler when it is started (``KissNetService.Start``),
 rather than when it is made.
 It binds its ports when it is made, though,
@@ -325,12 +327,17 @@ The shapes in the diagram follow the dependency conventions in ``AGENTS.md``:
 
 - A component that makes one call is handed a function,
   typed for what it does with it:
-  ``frameReceiver``, ``dwcore.FrameSender``, ``igateSender``, ``seizeConfirmer``.
+  ``frameReceiver``, ``dwcore.FrameSender``, ``igateSender``, ``seizeConfirmer``, ``kisstnc.Copier``.
 - A component that makes several calls is handed a small interface,
   declared beside it and holding only those calls:
   ``linkClients``, ``linkTransmitter``, ``clientTransmitQueue``, ``xmitQueue``, ``agwDataLink``, ``node.DataLink``,
-  ``netrom.DataLink``, ``netrom.Reporter``.
+  ``netrom.DataLink``, ``netrom.Reporter``,
+  ``kisstnc.TNC``.
 - ``*TransmitQueue``, ``*DataLinkQueue``, ``*AGWServer``, ``*node.Node`` and ``*netrom.Node`` satisfy those interfaces without knowing about them.
+- ``kissHandlerTNCAdapter`` is the KISS handler's ``kisstnc.TNC``:
+  it puts a client's frames on the ``clientTransmitQueue`` it is handed
+  and its timing commands to the ``XmitService``,
+  so that the handler needs neither.
 
 References
 ----------
@@ -349,7 +356,7 @@ References
   ``shared_node.go`` (``newSharedNode``, ``sharedNode.attach``),
   ``server.go`` (``NewAGWServer``, ``agwDataLink``),
   ``igate.go`` (``NewIGate``, ``igateSender``),
-  ``kiss_frame.go`` (``NewKissHandler``),
+  ``kiss_handler_tnc.go`` (``newKissHandlerTNC``),
   ``kissnet.go`` (``NewKissNetService``, ``KissNetService.Start``),
   ``beacon.go`` (``NewBeaconService``, ``beaconIGate``),
   ``audio.go`` (``AudioDevices.setAudioLevel``),
@@ -371,6 +378,7 @@ References
   and ``internal/netrom/status.go``: ``Node.Status``.
 - ``internal/nodemap/nodemap.go``: ``New``, ``Reporter.Run``,
   and ``internal/direwolf/nodemap.go``: ``netromNeighbours``, ``stationsHeard``.
+- ``internal/kisstnc/handler.go``: ``NewHandler``, ``TNC`` and ``Copier``.
 - ``internal/dwcore/dwcore.go``: ``FrameSender``,
   shared by everything that hands the transmit queue a frame.
 - ``AGENTS.md``, the "Dependencies" section.

@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
@@ -110,7 +111,7 @@ func TestKissNetServiceStopsWhenCancelled(t *testing.T) {
 	var kns, err = NewKissNetService(ctx, new(misc_config_s), []KissNetAddr{{Addr: "127.0.0.1:0", Channel: -1}}, 0)
 	require.NoError(t, err)
 
-	kns.Start(ctx, NewKissHandler(ctx, new(RadioConfig), new(XmitService), nil, nil))
+	kns.Start(ctx, kisstnc.NewHandler(ctx, newKissHandlerTNC(new(RadioConfig), new(XmitService), nil), nil))
 
 	var port = addrPort(kns.Addrs()[0])
 

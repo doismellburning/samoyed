@@ -1,13 +1,11 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package kisstnc
 
 import (
 	"bytes"
-	"context"
 	"fmt"
-	"net"
 	"os"
 	"strings"
 	"testing"
@@ -24,7 +22,7 @@ import (
 
 // The KISS command set is what a client application uses to drive the TNC:
 // data frames to transmit, and the timing parameters that decide when they go
-// out.  KissHandler.processMsg is where a frame with its escapes already removed is
+// out.  Handler.processMsg is where a frame with its escapes already removed is
 // acted on, so it can be driven directly, with a recording stand-in for the
 // function that answers the client.
 
@@ -60,21 +58,21 @@ type sentToClient struct {
 	prompt  bool
 }
 
-// recordingClient is a kissClient that keeps what it is sent, so a test can
+// recordingClient is a Client that keeps what it is sent, so a test can
 // see what the TNC would have answered.
 type recordingClient struct {
 	sent *[]sentToClient
 }
 
-func (c recordingClient) reply(channel int, cmd int, frame []byte) {
+func (c recordingClient) Reply(channel int, cmd int, frame []byte) {
 	*c.sent = append(*c.sent, sentToClient{channel: channel, cmd: cmd, body: frame, prompt: false})
 }
 
-func (c recordingClient) prompt(text []byte) {
+func (c recordingClient) Prompt(text []byte) {
 	*c.sent = append(*c.sent, sentToClient{channel: 0, cmd: 0, body: text, prompt: true})
 }
 
-func (c recordingClient) radioChannel(frameChannel int) int {
+func (c recordingClient) RadioChannel(frameChannel int) int {
 	return frameChannel
 }
 
@@ -86,59 +84,165 @@ func recordingKissClient() (*[]sentToClient, recordingClient) {
 	return sent, recordingClient{sent: sent}
 }
 
-// kissTestRadioConfig is the channel table the KISS tests hand to
-// the KissHandler, to check a transmit
-// request against: channels 0 and 1 are radios, and nothing else is set up.
-func kissTestRadioConfig() *RadioConfig {
-	var audioConfig = new(RadioConfig)
-	audioConfig.chan_medium[0] = MEDIUM_RADIO
-	audioConfig.chan_medium[1] = MEDIUM_RADIO
-
-	return audioConfig
-}
-
-// setupKissProcessMsg hands back a KissHandler for the KISS tests to drive,
-// with the channel table kissTestRadioConfig lays out, and transmit settings
-// and a transmit queue of its own to put data frames on.
-func setupKissProcessMsg(t *testing.T) *KissHandler {
+// newKissTestPacket is a frame for a client to send.
+func newKissTestPacket(t *testing.T) *ax25.Packet {
 	t.Helper()
 
-	return setupKissHandler(t.Context(), t)
+	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
+	return pp
 }
 
-// setupKissHandler is setupKissProcessMsg for a test with a context of its
-// own, which stops the handler's goroutines.
-func setupKissHandler(ctx context.Context, t *testing.T) *KissHandler {
+// tncTransmission is a frame the handler asked the TNC to transmit.
+type tncTransmission struct {
+	channel int
+	urgent  bool
+	pp      *ax25.Packet
+}
+
+// tncTiming is the transmit timing a client set for a channel.
+type tncTiming struct {
+	txdelay, persist, slottime, txtail int
+	fulldup                            bool
+}
+
+// recordingTNC is a TNC that keeps what it is asked to do, so a
+// test can see what the handler made of a client's messages.  Channels 0 and 1
+// are the ones it has, and queued is what it says is waiting to go out.
+type recordingTNC struct {
+	transmitted []tncTransmission
+	timing      map[int]*tncTiming
+	queued      int
+}
+
+func newRecordingTNC() *recordingTNC {
+	var r = new(recordingTNC)
+	r.timing = make(map[int]*tncTiming)
+
+	return r
+}
+
+func (r *recordingTNC) Transmit(channel int, urgent bool, pp *ax25.Packet) {
+	r.transmitted = append(r.transmitted, tncTransmission{channel: channel, urgent: urgent, pp: pp})
+}
+
+func (r *recordingTNC) QueuedBytes(int) int { return r.queued }
+
+func (r *recordingTNC) ChannelValid(channel int) bool { return channel == 0 || channel == 1 }
+
+// timingFor is the timing set for channel so far.
+func (r *recordingTNC) timingFor(channel int) *tncTiming {
+	if r.timing[channel] == nil {
+		r.timing[channel] = new(tncTiming)
+	}
+
+	return r.timing[channel]
+}
+
+func (r *recordingTNC) SetTxdelay(channel, value int)  { r.timingFor(channel).txdelay = value }
+func (r *recordingTNC) SetPersist(channel, value int)  { r.timingFor(channel).persist = value }
+func (r *recordingTNC) SetSlottime(channel, value int) { r.timingFor(channel).slottime = value }
+func (r *recordingTNC) SetTxtail(channel, value int)   { r.timingFor(channel).txtail = value }
+func (r *recordingTNC) SetFulldup(channel int, value bool) {
+	r.timingFor(channel).fulldup = value
+}
+
+// count is how many frames went to channel, urgent or not as asked.
+func (r *recordingTNC) count(channel int, urgent bool) int {
+	var n = 0
+
+	for _, x := range r.transmitted {
+		if x.channel == channel && x.urgent == urgent {
+			n++
+		}
+	}
+
+	return n
+}
+
+// countOn is how many frames went to channel at all.
+func (r *recordingTNC) countOn(channel int) int {
+	return r.count(channel, false) + r.count(channel, true)
+}
+
+// take is the first frame that went to channel, urgent or not as asked, or
+// nil if none did.
+func (r *recordingTNC) take(channel int, urgent bool) *ax25.Packet {
+	for _, x := range r.transmitted {
+		if x.channel == channel && x.urgent == urgent {
+			return x.pp
+		}
+	}
+
+	return nil
+}
+
+// setupKissProcessMsg hands back a Handler for the KISS tests to drive,
+// and the recording TNC it hands what it is asked to do.
+func setupKissProcessMsg(t *testing.T) (*Handler, *recordingTNC) {
 	t.Helper()
 
-	var audioConfig = kissTestRadioConfig()
+	var tnc = newRecordingTNC()
 
-	var tq = newTestTransmitQueue(audioConfig)
-
-	return NewKissHandler(ctx, audioConfig, new(XmitService), tq, nil)
+	return NewHandler(t.Context(), tnc, nil), tnc
 }
 
-// With KISSCOPY, a data frame a client sends is shown to the TCP clients the
-// handler was given, whichever transport it came by - here, one with no TCP
-// port of its own, such as the serial port.
+// copiedFrame is a data frame the handler had copied to the other clients.
+type copiedFrame struct {
+	msg     []byte
+	channel int
+	cmd     int
+	from    Client
+}
+
+// recordingCopier keeps what its Copy, a Copier, is asked to copy.
+type recordingCopier struct {
+	copied []copiedFrame
+}
+
+func (r *recordingCopier) Copy(msg []byte, channel int, cmd int, from Client) {
+	r.copied = append(r.copied, copiedFrame{msg: msg, channel: channel, cmd: cmd, from: from})
+}
+
+// A data frame a client sends is copied to the other clients - KISSCOPY - as
+// well as transmitted, with the channel and command the handler made of it
+// and the client it came from, so as not to be copied back.
 func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
-	var peers, clients = newAttachedKissNet(t, -1, true, 1)
+	var peers = new(recordingCopier)
 
-	h.peers = peers
+	h.copyToPeers = peers.Copy
 
-	var pp = newTestPacket(t)
+	var pp = newKissTestPacket(t)
 	var _, from = recordingKissClient()
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
+	var msg = append([]byte{0x10 | kiss.CmdDataFrame}, pp.FrameData()...)
 
-	assert.Equal(t,
-		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
-		readKissNetFrame(t, clients[0]))
-	assert.Equal(t, 1, h.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+	h.processMsg(msg, from)
+
+	assert.Equal(t, []copiedFrame{{msg: msg, channel: 1, cmd: kiss.CmdDataFrame, from: from}}, peers.copied)
+	assert.Equal(t, 1, tnc.count(1, false))
+}
+
+// Nor is anything but a data frame copied.
+func Test_kiss_process_msg_copies_only_data_frames(t *testing.T) {
+	t.Parallel()
+
+	var h, _ = setupKissProcessMsg(t)
+
+	var peers = new(recordingCopier)
+
+	h.copyToPeers = peers.Copy
+
+	var _, from = recordingKissClient()
+
+	h.processMsg([]byte{kiss.CmdTxDelay, 30}, from)
+
+	assert.Empty(t, peers.copied)
 }
 
 // A data frame from the client is a frame to transmit, and an original - one
@@ -147,7 +251,7 @@ func Test_kiss_process_msg_copies_to_its_peers(t *testing.T) {
 func Test_kiss_process_msg_data_frame(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 
@@ -156,8 +260,8 @@ func Test_kiss_process_msg_data_frame(t *testing.T) {
 
 	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
 
-	assert.Equal(t, 1, h.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
-	assert.Equal(t, 0, h.queue.Count(0, TQ_PRIO_0_HI, "", "", false))
+	assert.Equal(t, 1, tnc.count(0, false))
+	assert.Equal(t, 0, tnc.count(0, true))
 }
 
 // A frame that has already been through a digipeater is somebody waiting on
@@ -165,7 +269,7 @@ func Test_kiss_process_msg_data_frame(t *testing.T) {
 func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 
@@ -174,7 +278,7 @@ func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
 
 	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), from)
 
-	assert.Equal(t, 1, h.queue.Count(0, TQ_PRIO_0_HI, "", "", false))
+	assert.Equal(t, 1, tnc.count(0, true))
 }
 
 // The channel is in the top half of the first byte, and a client asking for a
@@ -183,7 +287,7 @@ func Test_kiss_process_msg_repeated_frame_is_high_priority(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_invalid_channel(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 
@@ -197,7 +301,7 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	assert.Contains(t, output, "Invalid transmit channel from KISS client application")
 	assert.Contains(t, output, "channel=8")
 	assert.Contains(t, output, "kissparms -c 1 -p radio")
-	assert.Equal(t, 0, h.queue.Count(8, -1, "", "", false))
+	assert.Equal(t, 0, tnc.countOn(8))
 }
 
 // A frame whose only content is an escaped FEND reads as a request for channel
@@ -207,7 +311,7 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_invalid_channel_escaped_fend_only(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 	var kc kiss.Collector
@@ -231,57 +335,42 @@ func Test_kiss_debug_print_empty(t *testing.T) {
 		var hook = test.NewGlobal()
 		t.Cleanup(hook.Reset)
 
-		kiss_debug_print(FROM_CLIENT, "", msg)
+		DebugPrint(FromClient, "", msg)
 
 		require.NotNil(t, hook.LastEntry(), "message %v", msg)
 		assert.Equal(t, "Empty message for KISS client application", hook.LastEntry().Message)
 	}
 }
 
-// A KISS TCP port carrying a single radio channel ignores the channel in the
-// frame: the application thinks it has a one-radio TNC and always says 0.
-func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
-	t.Parallel()
+// singleChannelClient is a client whose messages are all for one radio
+// channel, whatever their frames say - as on a KISS TCP port that carries one.
+type singleChannelClient struct {
+	recordingClient
 
-	var h = setupKissProcessMsg(t)
-
-	var kps = new(kissport_status_s)
-	kps.channel = 1
-
-	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
-	require.NotNil(t, pp)
-
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
-
-	assert.Equal(t, 1, h.queue.Count(1, TQ_PRIO_1_LO, "", "", false), "the port's channel should have been used")
-	assert.Equal(t, 0, h.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+	channel int
 }
 
-// A KISS TCP port's channel comes from the configuration rather than a
-// nibble, so nothing bounds it to the channel table.  The validity check used
-// to go on to ask whether an out-of-range channel was the IGate's - indexing
-// the table with the very channel it had just found to be out of range.
-//
-//nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
-func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+func (c singleChannelClient) RadioChannel(int) int {
+	return c.channel
+}
 
-	var kps = new(kissport_status_s)
-	kps.channel = MAX_TOTAL_CHANS
+// The radio channel a frame is for is the one its client says, which need
+// not be the one in the frame: an application that thinks it has a one-radio
+// TNC always says 0.
+func Test_kiss_process_msg_client_channel_overrides_the_frame(t *testing.T) {
+	t.Parallel()
+
+	var h, tnc = setupKissProcessMsg(t)
+
+	var _, from = recordingKissClient()
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var output string
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), singleChannelClient{recordingClient: from, channel: 1})
 
-	assert.NotPanics(t, func() {
-		output = captureKissLog(t, func() {
-			h.processMsg(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), kissNetClient{kns: nil, kps: kps, client: 0, conn: nil})
-		})
-	})
-
-	assert.Contains(t, output, "Invalid transmit channel from KISS client application")
-	assert.Contains(t, output, "channel=16")
+	assert.Equal(t, 1, tnc.count(1, false), "the client's channel should have been used")
+	assert.Equal(t, 0, tnc.count(0, false))
 }
 
 // Bytes that are not an AX.25 frame cannot be transmitted, and are reported
@@ -289,7 +378,7 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 
@@ -305,8 +394,7 @@ func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
-	var xs = h.xmit
+	var h, tnc = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 
@@ -316,11 +404,7 @@ func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 	h.processMsg([]byte{kiss.CmdTxTail, 10}, from)
 	h.processMsg([]byte{kiss.CmdFullDuplex, 1}, from)
 
-	assert.Equal(t, 30, xs.timing[0].txdelay)
-	assert.Equal(t, 63, xs.timing[0].persist)
-	assert.Equal(t, 10, xs.timing[0].slottime)
-	assert.Equal(t, 10, xs.timing[0].txtail)
-	assert.True(t, xs.timing[0].fulldup)
+	assert.Equal(t, tncTiming{txdelay: 30, persist: 63, slottime: 10, txtail: 10, fulldup: true}, *tnc.timingFor(0))
 }
 
 // A value nobody would want on purpose is applied, because the client asked,
@@ -328,8 +412,7 @@ func Test_kiss_process_msg_timing_parameters(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
-	var h = setupKissProcessMsg(t)
-	var xs = h.xmit
+	var h, tnc = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 
@@ -350,7 +433,7 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 	}
 
 	// Applied all the same.
-	assert.Equal(t, 200, xs.timing[0].txdelay)
+	assert.Equal(t, 200, tnc.timingFor(0).txdelay)
 }
 
 // A parameter command with no parameter is a protocol error, and leaves the
@@ -358,8 +441,7 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_missing_parameter(t *testing.T) {
-	var h = setupKissProcessMsg(t)
-	var xs = h.xmit
+	var h, tnc = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 
@@ -381,7 +463,7 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 		})
 	}
 
-	assert.Equal(t, 0, xs.timing[0].txdelay)
+	assert.Empty(t, tnc.timing)
 }
 
 // Leaving KISS mode is for a TNC that has another mode to go back to.  We
@@ -389,7 +471,7 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_end_kiss(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 
@@ -406,7 +488,7 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 
@@ -427,19 +509,19 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	assert.Contains(t, output, "with or without ACKMODE")
 }
 
-// replyingClient is a kissClient that hands each reply over replies, from
+// replyingClient is a Client that hands each reply over replies, from
 // whichever goroutine sends it.
 type replyingClient struct {
 	replies chan sentToClient
 }
 
-func (c replyingClient) reply(channel int, cmd int, frame []byte) {
+func (c replyingClient) Reply(channel int, cmd int, frame []byte) {
 	c.replies <- sentToClient{channel: channel, cmd: cmd, body: frame, prompt: false}
 }
 
-func (c replyingClient) prompt(_ []byte) {}
+func (c replyingClient) Prompt(_ []byte) {}
 
-func (c replyingClient) radioChannel(frameChannel int) int {
+func (c replyingClient) RadioChannel(frameChannel int) int {
 	return frameChannel
 }
 
@@ -458,20 +540,17 @@ func ackmodeFrame(channel int, id []byte, pp *ax25.Packet) []byte {
 func Test_kiss_process_msg_ackmode(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var from = replyingClient{replies: make(chan sentToClient, 1)}
 
-	var pp = newTestPacket(t)
+	var pp = newKissTestPacket(t)
 
 	h.processMsg(ackmodeFrame(1, []byte{0x12, 0x34}, pp), from)
 
 	assert.Empty(t, from.replies, "nothing has been transmitted yet")
 
-	var tq, ok = h.queue.(*TransmitQueue)
-	require.True(t, ok)
-
-	var queued = tq.Remove(1, TQ_PRIO_1_LO)
+	var queued = tnc.take(1, false)
 	require.NotNil(t, queued)
 	assert.Equal(t, pp.FrameData(), queued.FrameData(), "the ID should not be part of the frame")
 
@@ -490,16 +569,13 @@ func Test_kiss_process_msg_ackmode(t *testing.T) {
 func Test_kiss_process_msg_ackmode_does_not_wait_for_the_client(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var from = replyingClient{replies: make(chan sentToClient)} // Nobody reads it until the end.
 
-	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, newTestPacket(t)), from)
+	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, newKissTestPacket(t)), from)
 
-	var tq, ok = h.queue.(*TransmitQueue)
-	require.True(t, ok)
-
-	var queued = tq.Remove(0, TQ_PRIO_1_LO)
+	var queued = tnc.take(0, false)
 	require.NotNil(t, queued)
 
 	var done = make(chan struct{})
@@ -522,16 +598,13 @@ func Test_kiss_process_msg_ackmode_does_not_wait_for_the_client(t *testing.T) {
 func Test_kiss_process_msg_data_frame_not_acknowledged(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var sent, from = recordingKissClient()
 
-	h.processMsg(append([]byte{kiss.CmdDataFrame}, newTestPacket(t).FrameData()...), from)
+	h.processMsg(append([]byte{kiss.CmdDataFrame}, newKissTestPacket(t).FrameData()...), from)
 
-	var tq, ok = h.queue.(*TransmitQueue)
-	require.True(t, ok)
-
-	var queued = tq.Remove(0, TQ_PRIO_1_LO)
+	var queued = tnc.take(0, false)
 	require.NotNil(t, queued)
 
 	queued.Transmitted()
@@ -544,7 +617,7 @@ func Test_kiss_process_msg_data_frame_not_acknowledged(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_ackmode_without_id(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var sent, from = recordingKissClient()
 
@@ -553,30 +626,30 @@ func Test_kiss_process_msg_ackmode_without_id(t *testing.T) {
 	})
 
 	assert.Contains(t, output, "KISS ACKMODE data frame is missing its frame ID.")
-	assert.Equal(t, 0, h.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+	assert.Equal(t, 0, tnc.count(0, false))
 	assert.Empty(t, *sent)
 }
 
-// With KISSCOPY, an ACKMODE frame is shown to the other TCP clients as an
+// With KISSCOPY, an ACKMODE frame is copied to the other clients as an
 // ordinary data frame: they didn't ask for an acknowledgement, and the ID is
 // not part of the AX.25 frame.
 func Test_kiss_process_msg_ackmode_copies_as_data_frame(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
-	var peers, clients = newAttachedKissNet(t, -1, true, 1)
+	var peers = new(recordingCopier)
 
-	h.peers = peers
+	h.copyToPeers = peers.Copy
 
-	var pp = newTestPacket(t)
+	var pp = newKissTestPacket(t)
 	var _, from = recordingKissClient()
 
 	h.processMsg(ackmodeFrame(0, []byte{0x12, 0x34}, pp), from)
 
-	assert.Equal(t,
-		kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)),
-		readKissNetFrame(t, clients[0]))
+	require.Len(t, peers.copied, 1)
+	assert.Equal(t, append([]byte{kiss.CmdDataFrame}, pp.FrameData()...), peers.copied[0].msg)
+	assert.Equal(t, kiss.CmdDataFrame, peers.copied[0].cmd)
 }
 
 // "Set hardware" is the one command with an answer: the human readable
@@ -585,7 +658,7 @@ func Test_kiss_process_msg_ackmode_copies_as_data_frame(t *testing.T) {
 func Test_kiss_set_hardware_tnc_version(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	var sent, from = recordingKissClient()
 
@@ -601,24 +674,21 @@ func Test_kiss_set_hardware_tnc_version(t *testing.T) {
 func Test_kiss_set_hardware_txbuf(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var tnc = newRecordingTNC()
 
 	var sent, from = recordingKissClient()
 
-	kiss_set_hardware(0, []byte("TXBUF:"), from, h.queue)
+	setHardware(0, []byte("TXBUF:"), from, tnc)
 
 	require.Len(t, *sent, 1)
 	assert.Equal(t, "TXBUF:0", string((*sent)[0].body))
 
-	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
-	require.NotNil(t, pp)
+	tnc.queued = 42
 
-	h.queue.Append(0, TQ_PRIO_1_LO, pp)
-
-	kiss_set_hardware(0, []byte("TXBUF:"), from, h.queue)
+	setHardware(0, []byte("TXBUF:"), from, tnc)
 
 	require.Len(t, *sent, 2)
-	assert.NotEqual(t, "TXBUF:0", string((*sent)[1].body), "a queued frame should count towards TXBUF")
+	assert.Equal(t, "TXBUF:42", string((*sent)[1].body))
 }
 
 // A query with a parameter, a command we don't know, and one that isn't in the
@@ -640,7 +710,7 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 	} {
 		t.Run(c.command, func(t *testing.T) {
 			var output = captureKissLog(t, func() {
-				kiss_set_hardware(0, []byte(c.command), from, nil)
+				setHardware(0, []byte(c.command), from, newRecordingTNC())
 			})
 
 			assert.Contains(t, output, c.expect)
@@ -656,7 +726,7 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 
 // feedKissBytes hands the bytes to the collector one at a time, as a
 // transport does, and returns whatever was sent back to the client.
-func feedKissBytes(h *KissHandler, kf *kiss.Collector, debug int, data []byte) *[]sentToClient {
+func feedKissBytes(h *Handler, kf *kiss.Collector, debug int, data []byte) *[]sentToClient {
 	var sent, from = recordingKissClient()
 
 	for _, b := range data {
@@ -669,7 +739,7 @@ func feedKissBytes(h *KissHandler, kf *kiss.Collector, debug int, data []byte) *
 func Test_KissRecByte_whole_frame(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
@@ -678,7 +748,7 @@ func Test_KissRecByte_whole_frame(t *testing.T) {
 
 	feedKissBytes(h, kf, 0, kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)))
 
-	assert.Equal(t, 1, h.queue.Count(0, TQ_PRIO_1_LO, "", "", false))
+	assert.Equal(t, 1, tnc.count(0, false))
 }
 
 // An application that thinks it is talking to an old command-mode TNC sends
@@ -687,7 +757,7 @@ func Test_KissRecByte_whole_frame(t *testing.T) {
 func Test_KissRecByte_command_prompt(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	var kf = new(kiss.Collector)
 
@@ -703,7 +773,7 @@ func Test_KissRecByte_command_prompt(t *testing.T) {
 func Test_KissRecByte_restart(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	for _, word := range []string{"RESTART\r", "reset\r"} {
 		t.Run(word, func(t *testing.T) {
@@ -724,7 +794,7 @@ func Test_KissRecByte_restart(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_KissRecByte_noise_is_printed(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	var kf = new(kiss.Collector)
 
@@ -740,13 +810,13 @@ func Test_KissRecByte_noise_is_printed(t *testing.T) {
 func Test_KissRecByte_empty_frames(t *testing.T) {
 	t.Parallel()
 
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var kf = new(kiss.Collector)
 
 	feedKissBytes(h, kf, 0, []byte{kiss.FEND, kiss.FEND, kiss.FEND, kiss.FEND})
 
-	assert.Equal(t, 0, h.queue.Count(0, -1, "", "", false))
+	assert.Equal(t, 0, tnc.countOn(0))
 }
 
 // A client that never sends a closing FEND is told about once, not once for
@@ -754,7 +824,7 @@ func Test_KissRecByte_empty_frames(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_KissRecByte_overlong_frame(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	var kf = new(kiss.Collector)
 
@@ -772,7 +842,7 @@ func Test_KissRecByte_overlong_frame(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var kf = new(kiss.Collector)
 
@@ -783,7 +853,7 @@ func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 	})
 
 	assert.Contains(t, output, "KISS message exceeded maximum length, discarded")
-	assert.Equal(t, 0, h.queue.Count(0, -1, "", "", false), "a fragment of the overlong frame was acted on")
+	assert.Equal(t, 0, tnc.countOn(0), "a fragment of the overlong frame was acted on")
 
 	// And a well formed frame after it still gets through.
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
@@ -791,7 +861,7 @@ func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 
 	feedKissBytes(h, kf, 0, kiss.Encapsulate(append([]byte{kiss.CmdDataFrame}, pp.FrameData()...)))
 
-	assert.Equal(t, 1, h.queue.Count(0, -1, "", "", false))
+	assert.Equal(t, 1, tnc.countOn(0))
 }
 
 // With "-d kn" the frame is shown as it arrived and again as it was decoded,
@@ -799,7 +869,7 @@ func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	var pp = ax25.FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
@@ -814,107 +884,13 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 	assert.Contains(t, output, "Packet content after removing KISS framing")
 }
 
-// The per-client bookkeeping for KISS over TCP: a client's connection and the
-// frame collector that goes with it are handed out together, and a connection
-// is only forgotten by whoever still has the one that is current.
-
-func Test_kissport_status_attach_and_detach(t *testing.T) {
-	t.Parallel()
-
-	var kps = new(kissport_status_s)
-
-	assert.Nil(t, kps.clientConn(0))
-	assert.Equal(t, 0, kps.findFreeClient())
-
-	var here, there = net.Pipe()
-
-	t.Cleanup(func() { here.Close(); there.Close() })
-
-	require.True(t, kps.attachClient(0, here))
-
-	assert.Same(t, here, kps.clientConn(0))
-	assert.Equal(t, 1, kps.findFreeClient(), "the next client should get the next slot")
-
-	var conn, frame = kps.connAndFrame(0)
-	assert.Same(t, here, conn)
-	assert.NotNil(t, frame, "a newly attached client needs a frame collector")
-
-	assert.True(t, kps.detachClientIfCurrent(0, here))
-	assert.Nil(t, kps.clientConn(0))
-}
-
-// A read goroutine that notices its connection has gone must not clear a slot
-// that has since been given to a newer connection from the same client.
-func Test_kissport_status_detach_stale_connection(t *testing.T) {
-	t.Parallel()
-
-	var kps = new(kissport_status_s)
-
-	var older, otherEndOfOlder = net.Pipe()
-	var newer, otherEndOfNewer = net.Pipe()
-
-	t.Cleanup(func() {
-		older.Close()
-		otherEndOfOlder.Close()
-		newer.Close()
-		otherEndOfNewer.Close()
-	})
-
-	require.True(t, kps.attachClient(0, older))
-	require.True(t, kps.attachClient(0, newer))
-
-	assert.False(t, kps.detachClientIfCurrent(0, older), "the stale connection was not the current one")
-	assert.Same(t, newer, kps.clientConn(0), "the newer connection was cleared by the older one going away")
-}
-
-// Every slot taken means there is nowhere to put another client.
-func Test_kissport_status_all_clients_in_use(t *testing.T) {
-	t.Parallel()
-
-	var kps = new(kissport_status_s)
-
-	for c := range MAX_NET_CLIENTS {
-		var here, there = net.Pipe()
-
-		t.Cleanup(func() { here.Close(); there.Close() })
-
-		require.True(t, kps.attachClient(c, here))
-	}
-
-	assert.Equal(t, -1, kps.findFreeClient())
-}
-
-// A port that has been stopped hangs up on everyone, and a connection that was
-// already in the accept queue when it stopped is not attached after the fact.
-func Test_kissport_status_stop(t *testing.T) {
-	t.Parallel()
-
-	var kps = new(kissport_status_s)
-
-	var here, there = net.Pipe()
-
-	t.Cleanup(func() { here.Close(); there.Close() })
-
-	require.True(t, kps.attachClient(0, here))
-
-	kps.stop()
-
-	assert.Nil(t, kps.clientConn(0))
-
-	var late, otherEndOfLate = net.Pipe()
-
-	t.Cleanup(func() { late.Close(); otherEndOfLate.Close() })
-
-	assert.False(t, kps.attachClient(0, late), "a stopped port should not take on a new client")
-}
-
 // FEND FESC FEND is a frame, but escapes nothing, so there is no type byte
 // once it is unescaped.  Three bytes from any KISS client used to take the
 // whole program down, looking for one.
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_KissRecByte_frame_empty_once_unescaped(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, tnc = setupKissProcessMsg(t)
 
 	var kf = new(kiss.Collector)
 
@@ -923,7 +899,7 @@ func Test_KissRecByte_frame_empty_once_unescaped(t *testing.T) {
 	})
 
 	assert.Contains(t, output, "empty once unescaped")
-	assert.Equal(t, 0, h.queue.Count(0, -1, "", "", false))
+	assert.Equal(t, 0, tnc.countOn(0))
 }
 
 // What goes to a client is the type byte - channel in the top nybble, command
@@ -947,7 +923,7 @@ func Test_kissClientFrame(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, c.want, kissClientFrame(c.channel, c.cmd, c.frame, 0, "Test"))
+			assert.Equal(t, c.want, ClientFrame(c.channel, c.cmd, c.frame, 0, "Test"))
 		})
 	}
 }
@@ -962,7 +938,7 @@ func Test_kissClientFrame_truncates(t *testing.T) {
 	var got []byte
 
 	var output = captureKissLog(t, func() {
-		got = kissClientFrame(0, kiss.CmdDataFrame, frame, 0, "Test")
+		got = ClientFrame(0, kiss.CmdDataFrame, frame, 0, "Test")
 	})
 
 	assert.Contains(t, output, "KISS buffer too small, frame truncated")
@@ -977,11 +953,11 @@ func Test_kissClientFrame_truncates(t *testing.T) {
 //
 //nolint:paralleltest // Serial: captures os.Stdout, which is process-wide.
 func Test_kiss_process_msg_ackmode_invalid_channel_shows_what_was_sent(t *testing.T) {
-	var h = setupKissProcessMsg(t)
+	var h, _ = setupKissProcessMsg(t)
 
 	var _, from = recordingKissClient()
 
-	var msg = ackmodeFrame(8, []byte{0x12, 0x34}, newTestPacket(t))
+	var msg = ackmodeFrame(8, []byte{0x12, 0x34}, newKissTestPacket(t))
 
 	var output = captureKissLog(t, func() {
 		h.processMsg(msg, from)

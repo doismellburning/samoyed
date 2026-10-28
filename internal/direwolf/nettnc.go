@@ -21,6 +21,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/kisstnc"
 	"github.com/sirupsen/logrus"
 )
 
@@ -364,7 +365,7 @@ func tncRecByte(kc *kiss.Collector, b byte, debug int, channel int, tnc kissTNC,
 		// The dump below names the channel in the KISS frame, which the TNC
 		// chooses, so say first which TNC, and which of our channels, it is.
 		logrus.WithFields(logrus.Fields{"channel": channel, "tnc": tnc.name}).Debug("KISS frame from external TNC")
-		kiss_debug_print(FROM_CLIENT, "", chunk.Frame)
+		kisstnc.DebugPrint(kisstnc.FromClient, "", chunk.Frame)
 	}
 
 	var unwrapped = kiss.Unwrap(chunk.Frame)

@@ -1,15 +1,13 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
 
-// The TNC side of the KISS protocol - collecting frames from a client
-// application and acting on them.  The framing itself is in internal/kiss.
+package kisstnc
 
 import (
 	"bytes"
 	"context"
 	"fmt"
-	"net"
 	"strings"
-	"sync"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -18,170 +16,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type fromto_t int
+// Direction is which way a message between the TNC and a client application
+// is going.
+type Direction int
 
 const (
-	FROM_CLIENT fromto_t = 0
-	TO_CLIENT   fromto_t = 1
+	FromClient Direction = 0 // From the client application to the TNC.
+	ToClient   Direction = 1 // From the TNC to the client application.
 )
-
-// This is used only for TCPKISS but it put in kissnet.h,
-// there would be a circular dependency between the two header files.
-// Each KISS TCP port has its own status block.
-
-type kissport_status_s struct {
-	pnext *kissport_status_s // To next in list.
-
-	arg2 int //nolint:unused // temp for passing second arg into
-	// kissnet_listen_thread
-
-	tcp_port int // default 8001; the one listener is bound to.
-
-	listener net.Listener // Bound by NewKissNetService; only connectListenThread accepts on it.
-
-	channel int // Radio channel for this tcp port.
-	// -1 for all.
-
-	// mu guards client_sock and kf below, which are read and written from
-	// connectListenThread (accepting new connections), listenThread/get
-	// (reading from a connected client and detecting disconnection), and
-	// SendRecPacket/Copy (writing to connected clients). Once those
-	// goroutines are running, always go through the kissport_status_s
-	// methods below rather than touching these fields directly. The one
-	// exception is initOne, which sets them directly during single-threaded
-	// startup, before any goroutine that shares mu exists.
-	mu sync.Mutex
-
-	client_sock [MAX_NET_CLIENTS]net.Conn
-
-	kf [MAX_NET_CLIENTS]*kiss.Collector
-	/* Accumulated KISS frame and state of decoder. */
-
-	// Set by stop, and guarded by mu along with everything above, so that a
-	// connection accepted at the same moment cannot be attached after the
-	// hanging up has been and gone.
-	stopped bool
-}
-
-// clientAddrs is where each attached client is connected from.
-func (kps *kissport_status_s) clientAddrs() []net.Addr {
-	kps.mu.Lock()
-	defer kps.mu.Unlock()
-
-	var addrs []net.Addr
-
-	for _, conn := range kps.client_sock {
-		if conn != nil {
-			addrs = append(addrs, conn.RemoteAddr())
-		}
-	}
-
-	return addrs
-}
-
-// clientConn returns the currently connected socket for client, or nil if
-// not connected.
-func (kps *kissport_status_s) clientConn(client int) net.Conn {
-	kps.mu.Lock()
-	defer kps.mu.Unlock()
-
-	return kps.client_sock[client]
-}
-
-// attachClient installs conn as client's socket, along with a freshly reset
-// decoder state, atomically with respect to clientConn/detachClientIfCurrent.
-// This ensures listenThread can never observe a "live" socket for client
-// paired with decoder state left over from a previous connection, or from
-// another client's slot.
-//
-// It returns false, having attached nothing, once the port has been stopped:
-// the connection is then the caller's to close.  A connection completed by the
-// kernel sits in the listening socket's accept queue whether or not anybody is
-// still listening, so this can be the first anyone hears of it.
-func (kps *kissport_status_s) attachClient(client int, conn net.Conn) bool {
-	kps.mu.Lock()
-	defer kps.mu.Unlock()
-
-	if kps.stopped {
-		return false
-	}
-
-	kps.kf[client] = new(kiss.Collector)
-	kps.client_sock[client] = conn
-
-	return true
-}
-
-// detachClientIfCurrent clears client's socket, but only if it still equals
-// conn. This guards against a goroutine which detected an error/EOF on a
-// now-stale conn racing with, and clobbering, a newer connection that
-// connectListenThread has already installed in the same slot. Returns
-// whether it cleared the slot.
-func (kps *kissport_status_s) detachClientIfCurrent(client int, conn net.Conn) bool {
-	kps.mu.Lock()
-	defer kps.mu.Unlock()
-
-	if kps.client_sock[client] != conn {
-		return false
-	}
-
-	kps.client_sock[client] = nil
-
-	return true
-}
-
-// findFreeClient returns the index of the first client slot with no
-// connected socket, or -1 if all are in use.
-func (kps *kissport_status_s) findFreeClient() int {
-	kps.mu.Lock()
-	defer kps.mu.Unlock()
-
-	for c := range MAX_NET_CLIENTS {
-		if kps.client_sock[c] == nil {
-			return c
-		}
-	}
-
-	return -1
-}
-
-// stop hangs up on every attached client and refuses any further attachment.
-//
-// A client whose TNC is shutting down should find its connection closed there
-// and then, rather than holding one that will never say anything again; and
-// the per-client read goroutines only close the socket they are actually
-// blocked on, which leaves a client that connected while one of them was
-// between reads still attached.
-func (kps *kissport_status_s) stop() {
-	kps.mu.Lock()
-	defer kps.mu.Unlock()
-
-	kps.stopped = true
-
-	for c := range MAX_NET_CLIENTS {
-		if kps.client_sock[c] != nil {
-			kps.client_sock[c].Close()
-			kps.client_sock[c] = nil
-		}
-	}
-}
-
-// connAndFrame returns client's currently connected socket (or nil) together
-// with its decoder state, fetched under a single lock/unlock. Callers that
-// need to pair a connection with its decoder state (e.g. before reading a
-// byte from it) must use this rather than clientConn/frame separately: two
-// independently-locked calls could observe an attachClient in between them,
-// pairing a conn with a *kiss.Collector that belongs to a different connection.
-func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *kiss.Collector) {
-	kps.mu.Lock()
-	defer kps.mu.Unlock()
-
-	return kps.client_sock[client], kps.kf[client]
-}
 
 /*-------------------------------------------------------------------
  *
- * Name:        kiss_debug_print
+ * Name:        DebugPrint
  *
  * Purpose:     Print message to/from client for debugging.
  *
@@ -192,14 +38,14 @@ func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *kiss.Collecto
  *
  *--------------------------------------------------------------------*/
 
-func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
+func DebugPrint(fromto Direction, special string, pmsg []byte) {
 	logKissMessage(logrus.DebugLevel, fromto, special, pmsg)
 }
 
-// logKissMessage is kiss_debug_print at level: Error when the message comes
+// logKissMessage is DebugPrint at level: Error when the message comes
 // with a complaint about it, so the dump shows without -d k.
-func logKissMessage(level logrus.Level, fromto fromto_t, special string, pmsg []byte) {
-	var direction = []string{"from", "to"}
+func logKissMessage(level logrus.Level, fromto Direction, special string, pmsg []byte) {
+	var direction = map[Direction]string{FromClient: "from", ToClient: "to"}
 	var function = []string{
 		"Data frame", "TXDELAY", "P", "SlotTime",
 		"TXtail", "FullDuplex", "SetHardware", "Invalid 7",
@@ -238,12 +84,12 @@ func logKissMessage(level logrus.Level, fromto fromto_t, special string, pmsg []
 	dwutil.LogHexDump(entry, level, pmsg)
 }
 
-// kissClientFrame is what goes to a client application for frame, heard on
+// ClientFrame is what goes to a client application for frame, heard on
 // channel or answering one of the client's commands: the type byte, made of
 // channel and cmd, then the frame, with the KISS framing and escapes added.
 // transport names the kind of connection, for the complaint about a frame too
 // long to send whole.
-func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport string) []byte {
+func ClientFrame(channel int, cmd int, frame []byte, debug int, transport string) []byte {
 	if len(frame) > ax25.MaxPacketLen {
 		logrus.WithFields(logrus.Fields{
 			"transport": transport,
@@ -267,37 +113,78 @@ func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport st
 	/* This has KISS framing and escapes for sending to client app. */
 
 	if debug > 0 {
-		kiss_debug_print(TO_CLIENT, "", buf)
+		DebugPrint(ToClient, "", buf)
 	}
 
 	return buf
 }
 
-// KissHandler acts on what a KISS client application sends the TNC, whichever
-// transport it arrives by - TCP, the serial port or the pseudo terminal - so
-// each of them hands its client's bytes to the same one.
-type KissHandler struct {
-	audioConfig *RadioConfig        // Which channels a client may transmit on.
-	xmit        *XmitService        // The transmit timing a client may change.
-	queue       clientTransmitQueue // Where a client's data frames go, and what TXBUF reports on; nil to drop them.
-	peers       *KissNetService     // The TCP clients KISSCOPY copies a data frame to, or nil.
-	acks        *kissAcks           // Sends the ACKMODE acknowledgements for a client's frames.
+// TNC is the TNC a KISS client application drives: where its data frames
+// go, and the transmit timing its commands change.
+type TNC interface {
+	// Transmit queues pp to go out on channel, ahead of the originals waiting
+	// if it is urgent.
+	Transmit(channel int, urgent bool, pp *ax25.Packet)
+
+	// QueuedBytes is how many bytes of frames are waiting to go out on
+	// channel, for the TXBUF query.
+	QueuedBytes(channel int) int
+
+	// ChannelValid reports whether channel is one a client may transmit on.
+	ChannelValid(channel int) bool
+
+	SetTxdelay(channel, value int)
+	SetPersist(channel, value int)
+	SetSlottime(channel, value int)
+	SetTxtail(channel, value int)
+	SetFulldup(channel int, value bool)
 }
 
-// NewKissHandler builds a KissHandler that checks a client's data frames
-// against audioConfig before they are put on queue, applies its timing
-// commands to xmit, and with KISSCOPY copies its data frames to the clients of
-// peers.  The goroutines that send a client its ACKMODE acknowledgements stop
-// when ctx is cancelled.
-func NewKissHandler(ctx context.Context, audioConfig *RadioConfig, xmit *XmitService, queue clientTransmitQueue, peers *KissNetService) *KissHandler {
-	var h = new(KissHandler)
-	h.audioConfig = audioConfig
-	h.xmit = xmit
-	h.queue = queue
-	h.peers = peers
+// Copier shows msg, a data frame from a client for channel with command
+// cmd, to the other clients that want a copy - KISSCOPY - but not to from, the
+// client it came from.
+type Copier func(msg []byte, channel int, cmd int, from Client)
+
+// Handler acts on what a KISS client application sends the TNC, whichever
+// transport it arrives by - TCP, the serial port or the pseudo terminal - so
+// each of them hands its client's bytes to the same one.
+type Handler struct {
+	tnc         TNC       // Where a client's frames and timing commands go.
+	copyToPeers Copier    // Where KISSCOPY copies a data frame, or nil.
+	acks        *kissAcks // Sends the ACKMODE acknowledgements for a client's frames.
+}
+
+// NewHandler builds a Handler that hands a client's data frames and
+// timing commands to tnc, and copies its data frames with copyToPeers, which
+// may be nil.  The goroutines that send a client its ACKMODE
+// acknowledgements stop when ctx is cancelled.
+func NewHandler(ctx context.Context, tnc TNC, copyToPeers Copier) *Handler {
+	var h = new(Handler)
+	h.tnc = tnc
+	h.copyToPeers = copyToPeers
 	h.acks = newKissAcks(ctx)
 
 	return h
+}
+
+// Client is the client application a message came from, by whichever
+// transport, and where any answer to it goes.
+//
+// A Client must be comparable, and equal only to the same client: the
+// ACKMODE acknowledgements are queued per client, keyed by it, and KISSCOPY
+// leaves out the client a frame came from by comparing with it.  A pointer, or
+// a struct of comparable fields that identify the connection, will do.
+type Client interface {
+	// Reply sends frame, of type cmd for radio channel, to this client alone.
+	Reply(channel int, cmd int, frame []byte)
+
+	// Prompt sends text as it is, not as a KISS frame, to appease a client
+	// that thinks it is driving a traditional TNC in command mode.
+	Prompt(text []byte)
+
+	// RadioChannel is the radio channel a message from this client is for,
+	// given the one its KISS type byte names.
+	RadioChannel(frameChannel int) int
 }
 
 /*-------------------------------------------------------------------
@@ -341,38 +228,27 @@ func NewKissHandler(ctx context.Context, audioConfig *RadioConfig, xmit *XmitSer
  * Let's try to keep it happy by sending back a command prompt.
  */
 
-// kissClient is the client application a message came from, by whichever
-// transport, and where any answer to it goes.
-type kissClient interface {
-	// reply sends frame, of type cmd for radio channel, to this client alone.
-	reply(channel int, cmd int, frame []byte)
-
-	// prompt sends text as it is, not as a KISS frame, to appease a client
-	// that thinks it is driving a traditional TNC in command mode.
-	prompt(text []byte)
-
-	// radioChannel is the radio channel a message from this client is for,
-	// given the one its KISS type byte names.
-	radioChannel(frameChannel int) int
-}
-
-func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
-	from kissClient) {
+// RecByte acts on ch, the next byte from client application from, with kf
+// holding the frame collected from it so far: a whole frame is acted on, and
+// text between frames is answered with a command prompt.  debug is the "-d k"
+// level, which shows what the client sent.
+func (h *Handler) RecByte(kf *kiss.Collector, ch byte, debug int,
+	from Client) {
 	var chunk = kf.Add(ch)
 
 	switch {
 	case chunk.Noise != nil:
 		if debug > 0 {
-			kiss_debug_print(FROM_CLIENT, "Rejected Noise", chunk.Noise)
+			DebugPrint(FromClient, "Rejected Noise", chunk.Noise)
 		}
 
 		/* Try to appease client app by sending something back. */
 		if chunk.EndOfLine {
 			if strings.EqualFold("restart\r", string(chunk.Noise)) ||
 				strings.EqualFold("reset\r", string(chunk.Noise)) {
-				from.prompt([]byte("\xc0\xc0"))
+				from.Prompt([]byte("\xc0\xc0"))
 			} else {
-				from.prompt([]byte("\r\ncmd:"))
+				from.Prompt([]byte("\r\ncmd:"))
 			}
 		}
 
@@ -382,7 +258,7 @@ func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
 	case chunk.Frame != nil:
 		if debug > 0 {
 			/* As received over the wire from client app. */
-			kiss_debug_print(FROM_CLIENT, "", chunk.Frame)
+			DebugPrint(FromClient, "", chunk.Frame)
 		}
 
 		var unwrapped = kiss.Unwrap(chunk.Frame)
@@ -426,12 +302,12 @@ func (h *KissHandler) RecByte(kf *kiss.Collector, ch byte, debug int,
 
 // This is used only by the TNC side.
 
-func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
+func (h *Handler) processMsg(kiss_msg []byte, from Client) {
 	// New in 1.7:
 	// We can have KISS TCP ports which convey only a single radio channel.
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.
 	// Normally, though, the radio channel is the one the KISS frame names.
-	var channel = from.radioChannel(int(kiss_msg[0]>>4) & 0xf)
+	var channel = from.RadioChannel(int(kiss_msg[0]>>4) & 0xf)
 
 	var alevel ax25.ALevel
 	var cmd = kiss_msg[0] & 0xf
@@ -473,7 +349,9 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 	case kiss.CmdDataFrame: /* 0 = Data Frame */
 		// The copies carry the channel and command we have already
 		// determined, rather than the first byte as it came.
-		h.peers.Copy(kiss_msg, channel, int(cmd), from)
+		if h.copyToPeers != nil {
+			h.copyToPeers(kiss_msg, channel, int(cmd), from)
+		}
 
 		/* Note July 2017: There is a variant of of KISS, called SMACK, that assumes */
 		/* a TNC can never have more than 8 channels.  http://symek.de/g/smack.html */
@@ -523,11 +401,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 
 		/* Verify that the radio channel number is valid. */
 		/* Any sort of medium should be OK here. */
-		// Dire Wolf also excused MEDIUM_IGATE here, which could only ever
-		// matter for an out-of-range channel - and indexed chan_medium with
-		// it to find out.  An in-range IGate channel is not MEDIUM_NONE.
-
-		if channel < 0 || channel >= MAX_TOTAL_CHANS || h.audioConfig.chan_medium[channel] == MEDIUM_NONE {
+		if !h.tnc.ChannelValid(channel) {
 			logrus.WithFields(logrus.Fields{
 				"channel": channel,
 				"hint": "Are you using AX.25 for Linux?  It might be trying to use a modified " +
@@ -538,7 +412,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 					"sudo /sbin/modprobe -q mkiss crc_force=1",
 			}).Error("Invalid transmit channel from KISS client application")
 
-			logKissMessage(logrus.ErrorLevel, FROM_CLIENT, "", received)
+			logKissMessage(logrus.ErrorLevel, FromClient, "", received)
 
 			return
 		}
@@ -548,7 +422,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 		var pp = ax25.FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {
 			logrus.WithField("channel", channel).Error("Invalid KISS data frame from client application")
-		} else if h.queue != nil {
+		} else {
 			pp.SetOnTransmitted(onTransmitted)
 
 			/* How can we determine if it is an original or repeated message? */
@@ -556,12 +430,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			/* that digipeater has been used, it should go out quickly thru */
 			/* the high priority queue. */
 			/* Otherwise, it is an original for the low priority queue. */
-			if pp.NumRepeaters() >= 1 &&
-				pp.H(ax25.Repeater1) > 0 {
-				h.queue.Append(channel, TQ_PRIO_0_HI, pp)
-			} else {
-				h.queue.Append(channel, TQ_PRIO_1_LO, pp)
-			}
+			h.tnc.Transmit(channel, pp.NumRepeaters() >= 1 && pp.H(ax25.Repeater1) > 0, pp)
 		}
 
 	case kiss.CmdTxDelay: /* 1 = TXDELAY */
@@ -582,7 +451,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			entry.WithField("hint", "Read the Dire Wolf User Guide, 'Radio Channel - Transmit Timing' section, to understand what this means").Warn("Extreme value for TXDELAY")
 		}
 
-		h.xmit.SetTxdelay(channel, int(kiss_msg[1]))
+		h.tnc.SetTxdelay(channel, int(kiss_msg[1]))
 
 	case kiss.CmdPersistence: /* 2 = Persistence */
 		if len(kiss_msg) < 2 {
@@ -601,7 +470,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			entry.WithField("hint", "Read the Dire Wolf User Guide, 'Radio Channel - Transmit Timing' section, to understand what this means").Warn("Extreme value for PERSIST")
 		}
 
-		h.xmit.SetPersist(channel, int(kiss_msg[1]))
+		h.tnc.SetPersist(channel, int(kiss_msg[1]))
 
 	case kiss.CmdSlotTime: /* 3 = SlotTime */
 		if len(kiss_msg) < 2 {
@@ -621,7 +490,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			entry.WithField("hint", "Read the Dire Wolf User Guide, 'Radio Channel - Transmit Timing' section, to understand what this means").Warn("Extreme value for SLOTTIME")
 		}
 
-		h.xmit.SetSlottime(channel, int(kiss_msg[1]))
+		h.tnc.SetSlottime(channel, int(kiss_msg[1]))
 
 	case kiss.CmdTxTail: /* 4 = TXtail */
 		if len(kiss_msg) < 2 {
@@ -641,7 +510,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			entry.WithField("hint", "Read the Dire Wolf User Guide, 'Radio Channel - Transmit Timing' section, to understand what this means").Warn("Setting TXTAIL so low is asking for trouble")
 		}
 
-		h.xmit.SetTxtail(channel, int(kiss_msg[1]))
+		h.tnc.SetTxtail(channel, int(kiss_msg[1]))
 
 	case kiss.CmdFullDuplex: /* 5 = FullDuplex */
 		if len(kiss_msg) < 2 {
@@ -655,7 +524,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			"channel":     channel,
 			"full_duplex": val,
 		}).Info("KISS protocol set FullDuplex")
-		h.xmit.SetFulldup(channel, val)
+		h.tnc.SetFulldup(channel, val)
 
 	case kiss.CmdSetHardware: /* 6 = TNC specific */
 		if len(kiss_msg) < 2 {
@@ -668,7 +537,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			"channel": channel,
 			"command": string(kiss_msg[1:]),
 		}).Info("KISS protocol set hardware")
-		kiss_set_hardware(channel, kiss_msg[1:], from, h.queue)
+		setHardware(channel, kiss_msg[1:], from, h.tnc)
 
 	case kiss.CmdEndKiss: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
@@ -688,7 +557,7 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 			"command": cmd,
 			"hint":    hint,
 		}).Error("Invalid KISS command")
-		logKissMessage(logrus.ErrorLevel, FROM_CLIENT, "", kiss_msg)
+		logKissMessage(logrus.ErrorLevel, FromClient, "", kiss_msg)
 	}
 } /* end processMsg */
 
@@ -703,7 +572,7 @@ func logMissingKissValue(channel int, command string) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        kiss_set_hardware
+ * Name:        setHardware
  *
  * Purpose:     Process the "set hardware" command.
  *
@@ -718,10 +587,9 @@ func logMissingKissValue(channel int, command string) {
  *				  This is the tricky part.  We can have any combination of
  *				  serial port, pseudo terminal, and multiple TCP clients.
  *				  We need to send the response to same place where query came
- *				  from, which is what from's reply does.
+ *				  from, which is what from's Reply does.
  *
- *		queue		- The transmit queue TXBUF reports on; nil for
- *				  one that is always empty.
+ *		tnc		- The TNC whose transmit queue TXBUF reports on.
  *
  *
  * Description:	This is new in version 1.5.  "Set hardware" was previously ignored.
@@ -781,7 +649,7 @@ func logMissingKissValue(channel int, command string) {
  *
  *--------------------------------------------------------------------*/
 
-func kiss_set_hardware(channel int, command []byte, from kissClient, queue clientTransmitQueue) {
+func setHardware(channel int, command []byte, from Client, tnc TNC) {
 	var cmd, value, found = bytes.Cut(command, []byte{':'})
 
 	if found {
@@ -794,7 +662,7 @@ func kiss_set_hardware(channel int, command []byte, from kissClient, queue clien
 			}
 
 			var response = fmt.Sprintf("DIREWOLF %d.%d", version.Major, version.Minor)
-			from.reply(channel, kiss.CmdSetHardware, []byte(response))
+			from.Reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else if bytes.Equal(cmd, []byte("TXBUF")) { /* TXBUF - Number of bytes in transmit queue. */
 			if len(value) > 0 {
 				logrus.WithFields(logrus.Fields{
@@ -803,17 +671,12 @@ func kiss_set_hardware(channel int, command []byte, from kissClient, queue clien
 				}).Error("KISS Set Hardware query did not expect a parameter")
 			}
 
-			var n = 0
-			if queue != nil {
-				n = queue.Count(channel, -1, "", "", true)
-			}
-
-			var response = fmt.Sprintf("TXBUF:%d", n)
-			from.reply(channel, kiss.CmdSetHardware, []byte(response))
+			var response = fmt.Sprintf("TXBUF:%d", tnc.QueuedBytes(channel))
+			from.Reply(channel, kiss.CmdSetHardware, []byte(response))
 		} else {
 			logrus.WithField("command", string(cmd)).Error("KISS Set Hardware unrecognized command")
 		}
 	} else {
 		logrus.WithField("command", string(command)).Error("KISS Set Hardware expected the form COMMAND:[parameter[,parameter...]]")
 	}
-} /* end kiss_set_hardware */
+} /* end setHardware */
