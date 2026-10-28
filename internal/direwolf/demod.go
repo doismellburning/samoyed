@@ -783,6 +783,22 @@ func (d *Demodulator) NumSlicers() int {
 	return d.numSlicers
 }
 
+// Channel is the radio channel the demodulator listens on.
+func (d *Demodulator) Channel() int {
+	return d.channel
+}
+
+// Muted says whether the channel's input is being silenced, as Mute left it.
+func (d *Demodulator) Muted() bool {
+	return d.muted.Load()
+}
+
+// Decimate is the decimation the demodulator settled on: how many audio
+// samples AFSK averages into one.  Below 2 means none.
+func (d *Demodulator) Decimate() int {
+	return d.decimate
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        Demodulator.ProcessSample

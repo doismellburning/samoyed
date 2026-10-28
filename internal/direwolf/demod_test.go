@@ -159,3 +159,23 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 
 	<-done
 }
+
+// A channel's demodulator types are kept upper case, with the + saying to
+// use several slicers left on the end.
+func TestNewDemodulatorNormalisesProfiles(t *testing.T) {
+	t.Parallel()
+
+	var modem phy.ModemConfig
+	modem.ModemType = phy.AFSK
+	modem.Baud = 300
+	modem.MarkFreq = 1600
+	modem.SpaceFreq = 1800
+	modem.NumFreq = 3
+	modem.Offset = 30
+	modem.Profiles = "ab+"
+
+	var d, dErr = NewDemodulator(0, modem, phy.Layer2AX25, 48000)
+	require.NoError(t, dErr)
+
+	assert.Equal(t, "AB+", d.profiles)
+}

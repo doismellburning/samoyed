@@ -143,14 +143,15 @@ func TestDemod9600RoundTrip(t *testing.T) {
 			require.NotNil(t, d)
 
 			if tc.profiles == "+" {
-				assert.Equal(t, MAX_SLICERS, d.states[0].num_slicers)
+				assert.Equal(t, MAX_SLICERS, d.NumSlicers())
 			} else {
-				assert.Equal(t, 1, d.states[0].num_slicers)
+				assert.Equal(t, 1, d.NumSlicers())
 			}
 
 			// The signal level seen along the way was captured for reporting.
-			assert.Positive(t, d.states[0].alevel_mark_peak)
-			assert.Negative(t, d.states[0].alevel_space_peak)
+			var level = d.AudioLevel(0)
+			assert.Positive(t, level.Mark)
+			assert.Negative(t, level.Space)
 		})
 	}
 }
@@ -248,8 +249,8 @@ func TestDemodAFSKRoundTrip(t *testing.T) {
 			var d = receiver.demods[0]
 			require.NotNil(t, d)
 
-			assert.Equal(t, tc.wantSlicers, d.states[0].num_slicers)
-			assert.Equal(t, tc.wantDecimate, d.decimate)
+			assert.Equal(t, tc.wantSlicers, d.NumSlicers())
+			assert.Equal(t, tc.wantDecimate, d.Decimate())
 		})
 	}
 }

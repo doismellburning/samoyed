@@ -316,10 +316,10 @@ func TestMuteInputMutesTheChannelsDemodulator(t *testing.T) {
 	require.NoError(t, rErr)
 
 	r.MuteInput(0, true)
-	assert.True(t, r.demods[0].muted.Load())
+	assert.True(t, r.demods[0].Muted())
 
 	r.MuteInput(0, false)
-	assert.False(t, r.demods[0].muted.Load())
+	assert.False(t, r.demods[0].Muted())
 }
 
 // A channel whose transmit inhibit input is set counts as busy, data or no
@@ -590,10 +590,9 @@ func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 
 	var d = demodulators[channel]
 	require.NotNil(t, d)
-	assert.Equal(t, "AB+", d.profiles)
 	assert.Equal(t, 2, d.NumSubchan(), "+ can't be combined with multiple frequencies, so one per letter")
 	assert.Equal(t, MAX_SLICERS, d.NumSlicers())
-	assert.Equal(t, 3, d.decimate, "300 baud at 48000 samples per second decimates")
+	assert.Equal(t, 3, d.Decimate(), "300 baud at 48000 samples per second decimates")
 
 	assert.Equal(t, before, audioConfig.achan[channel])
 }
@@ -610,7 +609,7 @@ func TestDemodInitBuildsRadioChannelsOnly(t *testing.T) {
 	require.NoError(t, demodulatorsErr)
 
 	require.NotNil(t, demodulators[0])
-	assert.Equal(t, 0, demodulators[0].channel)
+	assert.Equal(t, 0, demodulators[0].Channel())
 	assert.Nil(t, demodulators[1])
 }
 
