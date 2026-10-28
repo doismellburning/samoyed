@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package demod
 
 import (
 	"math"
@@ -80,7 +80,7 @@ func TestBPSKPrefilterFitsBelowCarrier(t *testing.T) {
 		modem.NumFreq = 1
 		modem.Profiles = "LMNO"
 
-		var _, initErr = NewDemodulator(0, modem, phy.Layer2AX25, 44100)
+		var _, initErr = New(0, modem, phy.Layer2AX25, 44100)
 		require.NoError(t, initErr)
 
 		assert.Nil(t, testutils.LastEntryWithMessage(hook, "Prefilter range doesn't make sense"), "at %d baud", baud)

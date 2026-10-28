@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/ax25"
+	"github.com/doismellburning/samoyed/internal/demod"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/eas"
 	"github.com/doismellburning/samoyed/internal/il2p"
@@ -298,7 +299,7 @@ func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
 func TestReceiverChannelWithoutDemodulator(t *testing.T) {
 	t.Parallel()
 
-	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*demod.Demodulator{}, 0, 0, new(discardReceiveSink))
 
 	var zero ax25.ALevel
 
@@ -327,7 +328,7 @@ func TestMuteInputMutesTheChannelsDemodulator(t *testing.T) {
 func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {
 	t.Parallel()
 
-	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*demod.Demodulator{}, 0, 0, new(discardReceiveSink))
 
 	assert.False(t, r.DataDetectAny(0), "nothing heard and no inputs, so not busy")
 
@@ -357,7 +358,7 @@ func TestDTMFButtonMakesChannelBusy(t *testing.T) {
 	t.Parallel()
 
 	var sink = new(dcdRecordingSink)
-	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*demod.Demodulator{}, 0, 0, sink)
 
 	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: MAX_SUBCHANS, Slice: 0}, 1)
 
@@ -377,7 +378,7 @@ func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
 	t.Parallel()
 
 	var sink = new(dcdRecordingSink)
-	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*demod.Demodulator{}, 0, 0, sink)
 	r.numSubchannel[0] = 1
 
 	var inhibited = false
@@ -400,7 +401,7 @@ func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
 func TestDCDChangeWhileTransmitterAsks(t *testing.T) {
 	t.Parallel()
 
-	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
+	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*demod.Demodulator{}, 0, 0, new(discardReceiveSink))
 	r.numSubchannel[0] = 1
 
 	var done = make(chan struct{})
@@ -478,7 +479,7 @@ func TestProcessSampleWithoutDemodulatorSaysSo(t *testing.T) {
 }
 
 // A channel with no radio has no demodulator, and its MultiModem knows it: a
-// nil *Demodulator mustn't turn into a demodulator that isn't there.
+// nil *demod.Demodulator mustn't turn into a demodulator that isn't there.
 func TestMultiModemWithoutADemodulatorHasNoLayout(t *testing.T) {
 	t.Parallel()
 
@@ -572,7 +573,7 @@ func TestDemodInitKeepsAFSKDecimation(t *testing.T) {
 	assert.Equal(t, 3, audioConfig.achan[channel].Decimate)
 }
 
-// What NewDemodulator works out from a channel's settings, it keeps: the
+// What demod.New works out from a channel's settings, it keeps: the
 // configuration is left as the file and command line had it.
 func TestDemodInitLeavesDerivedValuesOutOfConfig(t *testing.T) {
 	t.Parallel()

@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package demod
 
 // #define DEBUG1 1     /* display debugging info */
 
@@ -332,7 +335,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		D.alevel_space_peak = -1
 
 	default:
-		// NewDemodulator leaves out the profiles this doesn't know.
+		// New leaves out the profiles this doesn't know.
 		panic("INTERNAL ERROR: invalid AFSK demodulator profile " + string(profile))
 	}
 

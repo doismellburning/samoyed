@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package demod
 
 import (
 	"github.com/doismellburning/samoyed/internal/dsp"
@@ -23,7 +26,7 @@ type demodulator_state_s struct {
 	modem_type phy.Modem // MODEM_AFSK, MODEM_8PSK, etc.
 
 	// receiver is where the bits demodulated go, and is told when data
-	// starts and stops being detected.  multi_modem_init sets it.
+	// starts and stops being detected.  Demodulator.SetReceiver sets it.
 	receiver BitReceiver
 
 	//	enum v26_e v26_alt;			// Which alternative when V.26.

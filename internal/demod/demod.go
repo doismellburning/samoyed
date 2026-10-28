@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package demod
 
 /*------------------------------------------------------------------
  *
@@ -28,7 +31,7 @@ import (
 // A Demodulator is one radio channel's receive side: the state of each of its
 // subchannels' demodulators, and whether its input is muted while it transmits.
 //
-// NewDemodulator works out its layout - how many subchannels and slicers, and
+// New works out its layout - how many subchannels and slicers, and
 // at what sample rate - from a copy of the channel's settings, and keeps it,
 // rather than writing it back into the configuration.
 //
@@ -82,13 +85,13 @@ func capProfiles(channel int, profiles string) string {
 	return profiles[:phy.MaxSubchans]
 }
 
-// NewDemodulator sets up the demodulators for a radio channel, from its modem
+// New sets up the demodulators for a radio channel, from its modem
 // settings and the sample rate of its audio device; layer2Xmit, how the channel
 // frames what it sends, is only for the summary it logs.  What it works out
 // from them - how many subchannels and slicers, the normalised profiles, the
 // decimation and upsampling ratios - it keeps: modem is its own copy, and the
 // configuration is left as it was.
-func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, samplesPerSec int) (*Demodulator, error) { //nolint:funlen // Ported from Dire Wolf as one function
+func New(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, samplesPerSec int) (*Demodulator, error) { //nolint:funlen // Ported from Dire Wolf as one function
 	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
 
 	var demodulator = new(Demodulator)
@@ -764,7 +767,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 }
 
 // SetReceiver makes r where every subchannel of d hands its bits.  It is set
-// once d is built, rather than handed to NewDemodulator, to break a cycle: the
+// once d is built, rather than handed to New, to break a cycle: the
 // Layer2Receiver that receives the bits is itself built from the demodulators.
 func (d *Demodulator) SetReceiver(r BitReceiver) {
 	for sub := range d.states {

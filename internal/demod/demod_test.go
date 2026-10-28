@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package direwolf
+package demod
 
 import (
 	"testing"
@@ -31,7 +31,7 @@ func TestDemodInitCapsProfileLetters(t *testing.T) {
 
 	var hook = testutils.CaptureLogrus(t)
 
-	var d, dErr = NewDemodulator(channel, modem, phy.Layer2AX25, 44100)
+	var d, dErr = New(channel, modem, phy.Layer2AX25, 44100)
 	require.NoError(t, dErr)
 
 	assert.Equal(t, phy.MaxSubchans, d.NumSubchan())
@@ -72,7 +72,7 @@ func TestDemodInitIgnoresUnknownAFSKProfiles(t *testing.T) {
 		modem.NumFreq = 1
 		modem.Profiles = tc.profiles
 
-		var d, dErr = NewDemodulator(channel, modem, phy.Layer2AX25, 44100)
+		var d, dErr = New(channel, modem, phy.Layer2AX25, 44100)
 		require.NoError(t, dErr)
 
 		assert.Equal(t, tc.want, d.profiles, tc.profiles)
@@ -113,7 +113,7 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 		modem.Profiles = tc.profiles
 		require.Greater(t, len(tc.profiles), phy.MaxSubchans)
 
-		var d, dErr = NewDemodulator(channel, modem, phy.Layer2AX25, 44100)
+		var d, dErr = New(channel, modem, phy.Layer2AX25, 44100)
 		require.NoError(t, dErr)
 
 		assert.Equal(t, phy.MaxSubchans, d.NumSubchan())
@@ -140,7 +140,7 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 	modem.Baud = 1200
 	modem.MarkFreq = 1200
 	modem.SpaceFreq = 2200
-	var d, dErr = NewDemodulator(channel, modem, phy.Layer2AX25, 44100)
+	var d, dErr = New(channel, modem, phy.Layer2AX25, 44100)
 	require.NoError(t, dErr)
 
 	var done = make(chan struct{})
@@ -162,7 +162,7 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 
 // A channel's demodulator types are kept upper case, with the + saying to
 // use several slicers left on the end.
-func TestNewDemodulatorNormalisesProfiles(t *testing.T) {
+func TestNewNormalisesProfiles(t *testing.T) {
 	t.Parallel()
 
 	var modem phy.ModemConfig
@@ -174,7 +174,7 @@ func TestNewDemodulatorNormalisesProfiles(t *testing.T) {
 	modem.Offset = 30
 	modem.Profiles = "ab+"
 
-	var d, dErr = NewDemodulator(0, modem, phy.Layer2AX25, 48000)
+	var d, dErr = New(0, modem, phy.Layer2AX25, 48000)
 	require.NoError(t, dErr)
 
 	assert.Equal(t, "AB+", d.profiles)

@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package demod
 
 //#define DEBUG1 1	/* display debugging info */
 
@@ -122,7 +125,7 @@ func CheckPSKFilterSizes(channel int, modem phy.ModemConfig, samplesPerSec int) 
 		profiles = modem.Profiles
 	}
 
-	// NewDemodulator runs only the first phy.MaxSubchans, and says so itself.
+	// New runs only the first phy.MaxSubchans, and says so itself.
 	profiles = profiles[:min(len(profiles), phy.MaxSubchans)]
 
 	// Only QPSK reads it, and settleModemOptions picks this when the
