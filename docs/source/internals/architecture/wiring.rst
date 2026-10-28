@@ -128,8 +128,8 @@ in place of the plain ones between the same components.
        netrom -> shared [label="netrom.DataLink\n(instead, sharing names)", style=dotted];
        shared -> dlq [label="node.DataLink", style=dotted];
        nodeshell -> netrom [label="node.NetROM\nStatus and circuits", style=dotted];
-       netrom -> shared [label="netrom.Reporter\n(circuitReporter,\ninstead, sharing names)", style=dotted];
-       shared -> nodeshell [label="linkClients\nthe shell's circuits\n(Circuits, attach)", style=dashed];
+       netrom -> shared [label="netrom.Reporter\n(circuitReporter, a linkClientRouter,\ninstead, sharing names)", style=dotted];
+       shared -> nodeshell [label="linkClients\nnodeClient's circuits\n(Circuits, attach)", style=dashed];
        shared -> agw [label="linkClients\nAGW clients' circuits", style=dotted];
        link -> tq [label="linkTransmitter"];
 
@@ -305,8 +305,10 @@ The shell is handed the NET/ROM node as a ``node.NetROM``,
 for its ``NODES`` and ``ROUTES``,
 and for the circuits ``CONNECT`` opens to other nodes.
 The NET/ROM node reports circuits to ``sharedNode``'s ``circuitReporter``
-in place of the AGW server,
-which hands the shell's circuits to the shell's ``Circuits``,
+in place of the AGW server.
+That is a ``linkClientRouter``, as the data link's is,
+so circuits and links go by client number alike:
+``nodeClient``'s circuits to the shell's ``Circuits``,
 given it in ``attach`` too,
 and the AGW clients' to the AGW server.
 

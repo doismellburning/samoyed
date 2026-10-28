@@ -112,51 +112,46 @@ func (s *sharedNode) attach(shell linkClients, shellCircuits linkClients, netrom
 	s.netrom = netrom
 }
 
-// circuitReporter is what the NET/ROM node reports circuits to: those of
-// shellClient, the shell's client number, go to the shell, and the rest to
-// agw, which may be nil for no AGW clients.
-func (s *sharedNode) circuitReporter(shellClient int, agw linkClients) *sharedNodeCircuits {
-	var r = new(sharedNodeCircuits)
-	r.shared = s
-	r.shellClient = shellClient
-	r.agw = orNoLinkClients(agw)
+// circuitReporter is what the NET/ROM node reports circuits to: routed by
+// client number as links are, so the shell's, nodeClient's, go to the shell,
+// and the AGW clients' to agw, which may be nil for there being none.  No
+// circuit is netromClient's: sharing the shell's names, the NET/ROM node is
+// nodeClient too.
+func (s *sharedNode) circuitReporter(agw linkClients) *linkClientRouter {
+	var shell = new(sharedNodeShellCircuits)
+	shell.shared = s
 
-	return r
+	return newLinkClientRouter(agw, shell, nil)
 }
 
-// sharedNodeCircuits is a netrom.Reporter handing each circuit's events to
-// the shell or the AGW clients, by whose circuit it is.
-type sharedNodeCircuits struct {
-	shared      *sharedNode
-	shellClient int
-	agw         linkClients
+// sharedNodeShellCircuits tells the shell about its circuits, through
+// whatever attach was handed for them, which comes after the NET/ROM node
+// reporting them is made.
+type sharedNodeShellCircuits struct {
+	shared *sharedNode
 }
 
-func (r *sharedNodeCircuits) clientFor(client int) linkClients { //nolint:ireturn // choosing between them is the point
-	if client != r.shellClient {
-		return r.agw
-	}
+func (c *sharedNodeShellCircuits) circuits() linkClients { //nolint:ireturn // whatever attach was handed
+	c.shared.mu.Lock()
+	defer c.shared.mu.Unlock()
 
-	r.shared.mu.Lock()
-	defer r.shared.mu.Unlock()
-
-	return r.shared.shellCircuits
+	return c.shared.shellCircuits
 }
 
-func (r *sharedNodeCircuits) LinkEstablished(channel int, client int, remoteCall string, ownCall string, incoming bool) {
-	r.clientFor(client).LinkEstablished(channel, client, remoteCall, ownCall, incoming)
+func (c *sharedNodeShellCircuits) LinkEstablished(channel int, client int, remoteCall string, ownCall string, incoming bool) {
+	c.circuits().LinkEstablished(channel, client, remoteCall, ownCall, incoming)
 }
 
-func (r *sharedNodeCircuits) LinkTerminated(channel int, client int, remoteCall string, ownCall string, timeout bool) {
-	r.clientFor(client).LinkTerminated(channel, client, remoteCall, ownCall, timeout)
+func (c *sharedNodeShellCircuits) LinkTerminated(channel int, client int, remoteCall string, ownCall string, timeout bool) {
+	c.circuits().LinkTerminated(channel, client, remoteCall, ownCall, timeout)
 }
 
-func (r *sharedNodeCircuits) RecConnData(channel int, client int, remoteCall string, ownCall string, pid int, data []byte) {
-	r.clientFor(client).RecConnData(channel, client, remoteCall, ownCall, pid, data)
+func (c *sharedNodeShellCircuits) RecConnData(channel int, client int, remoteCall string, ownCall string, pid int, data []byte) {
+	c.circuits().RecConnData(channel, client, remoteCall, ownCall, pid, data)
 }
 
-func (r *sharedNodeCircuits) OutstandingFramesReply(channel int, client int, ownCall string, remoteCall string, count int) {
-	r.clientFor(client).OutstandingFramesReply(channel, client, ownCall, remoteCall, count)
+func (c *sharedNodeShellCircuits) OutstandingFramesReply(channel int, client int, ownCall string, remoteCall string, count int) {
+	c.circuits().OutstandingFramesReply(channel, client, ownCall, remoteCall, count)
 }
 
 // clients are the shell and the NET/ROM node, together.

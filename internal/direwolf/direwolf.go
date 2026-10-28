@@ -712,7 +712,7 @@ x = Silence FX.25 information.`)
 			shared = newSharedNode(dataLinkQueue, config.Channels, config.Callsign)
 			link = shared.netromLink()
 			client = nodeClient
-			circuitClients = shared.circuitReporter(nodeClient, agwCircuitClients)
+			circuitClients = shared.circuitReporter(agwCircuitClients)
 		}
 
 		netromNode = netrom.New(config, link, transmitQueue.Append, circuitClients, netrom.RealClock{}, client)

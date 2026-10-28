@@ -16,8 +16,8 @@ import (
 
 const (
 	sharedChannel       = 1
-	sharedOtherChannel  = 3 // NET/ROM's other channel.
-	sharedClient        = 7
+	sharedOtherChannel  = 3          // NET/ROM's other channel.
+	sharedClient        = nodeClient // As DirewolfMain gives the shared node.
 	sharedNodeCall      = "Q1TEST-7"
 	sharedUserCall      = "Q2TEST"
 	sharedNeighbourCall = "Q3TEST-7"
@@ -57,10 +57,10 @@ func TestSharedNodeUser(t *testing.T) {
 	s.LinkTerminated(sharedChannel, sharedClient, sharedUserCall, sharedNodeCall, false)
 
 	assert.Equal(t, []string{
-		"established 1 7 Q2TEST Q1TEST-7 true",
-		"data 1 7 Q2TEST Q1TEST-7 240 \"N\\r\"",
-		"data 1 7 Q2TEST Q1TEST-7 207 \"later\"",
-		"terminated 1 7 Q2TEST Q1TEST-7 false",
+		"established 1 3 Q2TEST Q1TEST-7 true",
+		"data 1 3 Q2TEST Q1TEST-7 240 \"N\\r\"",
+		"data 1 3 Q2TEST Q1TEST-7 207 \"later\"",
+		"terminated 1 3 Q2TEST Q1TEST-7 false",
 	}, shell.calls, "a user's link is the shell's, whatever arrives on it after the first")
 	assert.Empty(t, netrom.calls)
 }
@@ -77,15 +77,15 @@ func TestSharedNodeNeighbourConnects(t *testing.T) {
 	s.LinkTerminated(sharedChannel, sharedClient, sharedNeighbourCall, sharedNodeCall, true)
 
 	assert.Equal(t, []string{
-		"established 1 7 Q3TEST-7 Q1TEST-7 true",
-		"terminated 1 7 Q3TEST-7 Q1TEST-7 false",
+		"established 1 3 Q3TEST-7 Q1TEST-7 true",
+		"terminated 1 3 Q3TEST-7 Q1TEST-7 false",
 	}, shell.calls, "the shell greets it, then forgets it")
 	assert.Equal(t, []string{
-		"established 1 7 Q3TEST-7 Q1TEST-7 true",
-		"data 1 7 Q3TEST-7 Q1TEST-7 207 \"l3\"",
-		"data 1 7 Q3TEST-7 Q1TEST-7 240 \"text\"",
-		"established 1 7 Q3TEST-7 Q1TEST-7 true",
-		"terminated 1 7 Q3TEST-7 Q1TEST-7 true",
+		"established 1 3 Q3TEST-7 Q1TEST-7 true",
+		"data 1 3 Q3TEST-7 Q1TEST-7 207 \"l3\"",
+		"data 1 3 Q3TEST-7 Q1TEST-7 240 \"text\"",
+		"established 1 3 Q3TEST-7 Q1TEST-7 true",
+		"terminated 1 3 Q3TEST-7 Q1TEST-7 true",
 	}, netrom.calls)
 }
 
@@ -122,14 +122,14 @@ func TestSharedNodeNetROMConnects(t *testing.T) {
 	s.LinkTerminated(sharedChannel, sharedClient, sharedNeighbourCall, sharedNodeCall, true)
 
 	assert.Equal(t, []string{
-		"connect 1 7 Q1TEST-7>Q3TEST-7 0xcf",
-		"data 1 7 Q1TEST-7>Q3TEST-7 \"out\"",
+		"connect 1 3 Q1TEST-7>Q3TEST-7 0xcf",
+		"data 1 3 Q1TEST-7>Q3TEST-7 \"out\"",
 	}, link.taken())
 	assert.Empty(t, shell.calls)
 	assert.Equal(t, []string{
-		"established 1 7 Q3TEST-7 Q1TEST-7 false",
-		"data 1 7 Q3TEST-7 Q1TEST-7 207 \"in\"",
-		"terminated 1 7 Q3TEST-7 Q1TEST-7 true",
+		"established 1 3 Q3TEST-7 Q1TEST-7 false",
+		"data 1 3 Q3TEST-7 Q1TEST-7 207 \"in\"",
+		"terminated 1 3 Q3TEST-7 Q1TEST-7 true",
 	}, netrom.calls)
 }
 
@@ -145,12 +145,12 @@ func TestSharedNodeShellConnectsOnward(t *testing.T) {
 	shellLink.DisconnectRequest(sharedAddrs(sharedNeighbourCall), 2, sharedChannel, sharedClient)
 
 	assert.Equal(t, []string{
-		"connect 1 7 Q1TEST-7>Q3TEST-7 0xf0",
-		"disconnect 1 7 Q1TEST-7>Q3TEST-7",
+		"connect 1 3 Q1TEST-7>Q3TEST-7 0xf0",
+		"disconnect 1 3 Q1TEST-7>Q3TEST-7",
 	}, link.taken())
 	assert.Equal(t, []string{
-		"established 1 7 Q3TEST-7 Q1TEST-7 false",
-		"data 1 7 Q3TEST-7 Q1TEST-7 207 \"raw\"",
+		"established 1 3 Q3TEST-7 Q1TEST-7 false",
+		"data 1 3 Q3TEST-7 Q1TEST-7 207 \"raw\"",
 	}, shell.calls, "a link the shell made is its own, whatever arrives on it")
 	assert.Empty(t, netrom.calls)
 }
@@ -166,7 +166,7 @@ func TestSharedNodeShellCannotTakeNetROMLink(t *testing.T) {
 	s.shellLink().ConnectRequest(sharedAddrs(sharedNeighbourCall), 2, sharedChannel, sharedClient, ax25.PIDNoLayer3)
 
 	assert.Empty(t, link.taken())
-	assert.Equal(t, []string{"terminated 1 7 Q3TEST-7 Q1TEST-7 false"}, shell.calls)
+	assert.Equal(t, []string{"terminated 1 3 Q3TEST-7 Q1TEST-7 false"}, shell.calls)
 }
 
 func TestSharedNodeNetROMCannotTakeUserLink(t *testing.T) {
@@ -180,7 +180,7 @@ func TestSharedNodeNetROMCannotTakeUserLink(t *testing.T) {
 	s.netromLink().ConnectRequest(sharedAddrs(sharedNeighbourCall), 2, sharedChannel, sharedClient, ax25.PIDNetROM)
 
 	assert.Empty(t, link.taken())
-	assert.Equal(t, []string{"terminated 1 7 Q3TEST-7 Q1TEST-7 false"}, netrom.calls)
+	assert.Equal(t, []string{"terminated 1 3 Q3TEST-7 Q1TEST-7 false"}, netrom.calls)
 }
 
 // A neighbour that has connected but not yet sent anything is NET/ROM's as
@@ -197,10 +197,10 @@ func TestSharedNodeNetROMTakesUndecidedLink(t *testing.T) {
 	s.RecConnData(sharedChannel, sharedClient, sharedNeighbourCall, sharedNodeCall, ax25.PIDNetROM, []byte("l3"))
 
 	assert.Empty(t, link.taken(), "no second connect for a link that is up")
-	assert.Equal(t, []string{"terminated 1 7 Q3TEST-7 Q1TEST-7 false"}, shell.calls)
+	assert.Equal(t, []string{"terminated 1 3 Q3TEST-7 Q1TEST-7 false"}, shell.calls)
 	assert.Equal(t, []string{
-		"established 1 7 Q3TEST-7 Q1TEST-7 true",
-		"data 1 7 Q3TEST-7 Q1TEST-7 207 \"l3\"",
+		"established 1 3 Q3TEST-7 Q1TEST-7 true",
+		"data 1 3 Q3TEST-7 Q1TEST-7 207 \"l3\"",
 	}, netrom.calls)
 }
 
@@ -215,8 +215,8 @@ func TestSharedNodeNetROMNotOnAlias(t *testing.T) {
 	s.RecConnData(sharedChannel, sharedClient, sharedNeighbourCall, sharedNodeAlias, ax25.PIDNetROM, []byte("l3"))
 
 	assert.Equal(t, []string{
-		"established 1 7 Q3TEST-7 QNODEA true",
-		"data 1 7 Q3TEST-7 QNODEA 207 \"l3\"",
+		"established 1 3 Q3TEST-7 QNODEA true",
+		"data 1 3 Q3TEST-7 QNODEA 207 \"l3\"",
 	}, shell.calls)
 	assert.Empty(t, netrom.calls)
 }
@@ -229,7 +229,7 @@ func TestSharedNodeRegistration(t *testing.T) {
 	s.netromLink().RegisterCallsign(sharedNodeCall, sharedChannel, sharedClient)
 	s.shellLink().RegisterCallsign(sharedNodeCall, sharedChannel, sharedClient)
 
-	assert.Equal(t, []string{"register Q1TEST-7 1 7"}, link.taken(), "the shell registers for both")
+	assert.Equal(t, []string{"register Q1TEST-7 1 3"}, link.taken(), "the shell registers for both")
 }
 
 // A neighbour connecting on any of NET/ROM's channels is handed over.
@@ -242,12 +242,12 @@ func TestSharedNodeNeighbourConnectsOnAnotherChannel(t *testing.T) {
 	s.RecConnData(sharedOtherChannel, sharedClient, sharedNeighbourCall, sharedNodeCall, ax25.PIDNetROM, []byte("l3"))
 
 	assert.Equal(t, []string{
-		"established 3 7 Q3TEST-7 Q1TEST-7 true",
-		"terminated 3 7 Q3TEST-7 Q1TEST-7 false",
+		"established 3 3 Q3TEST-7 Q1TEST-7 true",
+		"terminated 3 3 Q3TEST-7 Q1TEST-7 false",
 	}, shell.calls)
 	assert.Equal(t, []string{
-		"established 3 7 Q3TEST-7 Q1TEST-7 true",
-		"data 3 7 Q3TEST-7 Q1TEST-7 207 \"l3\"",
+		"established 3 3 Q3TEST-7 Q1TEST-7 true",
+		"data 3 3 Q3TEST-7 Q1TEST-7 207 \"l3\"",
 	}, netrom.calls)
 }
 
@@ -264,8 +264,8 @@ func TestSharedNodeNetROMOnlyOnItsChannels(t *testing.T) {
 	s.RecConnData(otherChannel, sharedClient, sharedNeighbourCall, sharedNodeCall, ax25.PIDNetROM, []byte("l3"))
 
 	assert.Equal(t, []string{
-		"established 2 7 Q3TEST-7 Q1TEST-7 true",
-		"data 2 7 Q3TEST-7 Q1TEST-7 207 \"l3\"",
+		"established 2 3 Q3TEST-7 Q1TEST-7 true",
+		"data 2 3 Q3TEST-7 Q1TEST-7 207 \"l3\"",
 	}, shell.calls)
 	assert.Empty(t, netrom.calls)
 }
@@ -273,7 +273,7 @@ func TestSharedNodeNetROMOnlyOnItsChannels(t *testing.T) {
 func TestSharedNodeCircuitReporter(t *testing.T) {
 	t.Parallel()
 
-	const agwClient = 3
+	const agwClient = 0
 
 	var s, _, _, _ = newTestSharedNode()
 	var shellCircuits = new(loggingLinkClients)
@@ -281,19 +281,20 @@ func TestSharedNodeCircuitReporter(t *testing.T) {
 
 	s.attach(noLinkClients{}, shellCircuits, noLinkClients{})
 
-	var r = s.circuitReporter(sharedClient, agw)
+	var r = s.circuitReporter(agw)
 
 	r.LinkEstablished(sharedChannel, sharedClient, sharedNeighbourCall, sharedUserCall, false)
 	r.RecConnData(sharedChannel, sharedClient, sharedNeighbourCall, sharedUserCall, ax25.PIDNetROM, []byte("hi"))
 	r.LinkTerminated(sharedChannel, agwClient, sharedNeighbourCall, sharedUserCall, true)
+	r.LinkTerminated(sharedChannel, netromClient, sharedNeighbourCall, sharedUserCall, true)
 
 	assert.Equal(t, []string{
-		"established 1 7 Q3TEST-7 Q2TEST false",
-		"data 1 7 Q3TEST-7 Q2TEST 207 \"hi\"",
+		"established 1 3 Q3TEST-7 Q2TEST false",
+		"data 1 3 Q3TEST-7 Q2TEST 207 \"hi\"",
 	}, shellCircuits.calls, "the shell's circuits are the shell's")
 	assert.Equal(t, []string{
-		"terminated 1 3 Q3TEST-7 Q2TEST true",
-	}, agw.calls, "the rest are the AGW clients'")
+		"terminated 1 0 Q3TEST-7 Q2TEST true",
+	}, agw.calls, "the AGW clients' are theirs, and NET/ROM has none of its own")
 }
 
 func TestSharedNodeCircuitReporterWithoutAGW(t *testing.T) {
@@ -301,10 +302,10 @@ func TestSharedNodeCircuitReporterWithoutAGW(t *testing.T) {
 
 	var s, _, _, _ = newTestSharedNode()
 
-	var r = s.circuitReporter(sharedClient, nil)
+	var r = s.circuitReporter(nil)
 
 	assert.NotPanics(t, func() {
-		r.LinkTerminated(sharedChannel, 3, sharedNeighbourCall, sharedUserCall, true)
+		r.LinkTerminated(sharedChannel, 0, sharedNeighbourCall, sharedUserCall, true)
 	})
 }
 
@@ -321,7 +322,7 @@ func TestSharedNodeShellOpensCircuit(t *testing.T) {
 	config.Callsign = sharedNodeCall
 	config.Alias = sharedNodeAlias
 
-	var netromNode = netrom.New(config, s.netromLink(), func(int, int, *ax25.Packet) {}, s.circuitReporter(sharedClient, nil), netrom.RealClock{}, sharedClient)
+	var netromNode = netrom.New(config, s.netromLink(), func(int, int, *ax25.Packet) {}, s.circuitReporter(nil), netrom.RealClock{}, sharedClient)
 
 	var shell = node.New(node.Config{
 		Address:        sharedNodeCall,
@@ -351,8 +352,8 @@ func TestSharedNodeShellOpensCircuit(t *testing.T) {
 	s.RecConnData(sharedChannel, sharedClient, sharedUserCall, sharedNodeCall, ax25.PIDNoLayer3, []byte("C QNODEB\r"))
 
 	assert.Equal(t, []string{
-		`data 1 7 Q1TEST-7>Q2TEST "QNODEA:Q1TEST-7} Trying QNODEB:Q3TEST-7\r"`,
-		"connect 1 7 Q1TEST-7>Q3TEST-7 0xcf",
+		`data 1 3 Q1TEST-7>Q2TEST "QNODEA:Q1TEST-7} Trying QNODEB:Q3TEST-7\r"`,
+		"connect 1 3 Q1TEST-7>Q3TEST-7 0xcf",
 	}, link.taken(), "the NET/ROM node links to its neighbour to open the circuit")
 
 	// The link up, the CONNECT REQUEST goes over it.
@@ -360,7 +361,7 @@ func TestSharedNodeShellOpensCircuit(t *testing.T) {
 
 	var calls = link.taken()
 	require.Len(t, calls, 1)
-	assert.True(t, strings.HasPrefix(calls[0], "data 1 7 Q1TEST-7>Q3TEST-7 "), calls[0])
+	assert.True(t, strings.HasPrefix(calls[0], "data 1 3 Q1TEST-7>Q3TEST-7 "), calls[0])
 
 	require.Len(t, netromNode.Status().Circuits, 1)
 	assert.Equal(t, sharedUserCall, netromNode.Status().Circuits[0].User, "the circuit is the user's")
