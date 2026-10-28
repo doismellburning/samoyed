@@ -6,6 +6,8 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/hdlc"
+	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/nodemap"
 	"github.com/stretchr/testify/assert"
@@ -36,6 +38,38 @@ func TestPttChannelsReceiveOnly(t *testing.T) {
 	for ch := range MAX_RADIO_CHANS {
 		assert.Contains(t, asked, ch, "every channel is asked about")
 	}
+}
+
+// Each channel's receive settings come from that channel, and its sample rate
+// from its own device: channel 2 is the first channel of the second device.
+func TestReceiveChannels(t *testing.T) {
+	t.Parallel()
+
+	var c = new(RadioConfig)
+	c.adev[0].samples_per_sec = 44100
+	c.adev[1].samples_per_sec = 48000
+	c.chan_medium[2] = MEDIUM_RADIO
+	c.achan[2].ModemType = MODEM_AIS
+	c.achan[2].Baud = 9600
+	c.achan[2].fix_bits = RETRY_INVERT_SINGLE
+	c.achan[2].passall = true
+	c.achan[2].sanity_test = SANITY_AX25
+	c.achan[2].il2p_version = il2p.Version04
+	c.achan[2].il2p_rx_crc = true
+
+	var channels = c.receiveChannels()
+
+	assert.False(t, channels[0].radio)
+	assert.Equal(t, 44100, channels[0].samplesPerSec)
+
+	var got = channels[2]
+	assert.True(t, got.radio)
+	assert.Equal(t, MODEM_AIS, got.modemType)
+	assert.Equal(t, 9600, got.baud)
+	assert.Equal(t, 48000, got.samplesPerSec)
+	assert.Equal(t, hdlc.Config{FixBits: RETRY_INVERT_SINGLE, Passall: true, AIS: true, SanityTest: SANITY_AX25}, got.hdlc)
+	assert.Equal(t, il2p.Version04, got.il2pVersion)
+	assert.True(t, got.il2pRxCRC)
 }
 
 // mapPortFor is a port for the node map with only id and linkType known.

@@ -291,13 +291,21 @@ func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
 	assert.Equal(t, []string{"1=true", "1=false"}, set)
 }
 
+// newBareLayer2Receiver makes a Layer2Receiver for an empty configuration,
+// with no demodulators, handing what it hears to sink.
+func newBareLayer2Receiver(sink ReceiveSink) *Layer2Receiver {
+	var config = new(RadioConfig)
+
+	return NewLayer2Receiver(config.receiveChannels(), config.receiveFaults(), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
+}
+
 // A channel with no demodulator - the other side of a stereo device that is
 // not a radio, say, which the audio statistics still ask about, or one that
 // transmit calibration keys - has heard nothing, and has nothing to mute.
 func TestReceiverChannelWithoutDemodulator(t *testing.T) {
 	t.Parallel()
 
-	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
+	var r = newBareLayer2Receiver(new(discardReceiveSink))
 
 	var zero ax25.ALevel
 
@@ -326,7 +334,7 @@ func TestMuteInputMutesTheChannelsDemodulator(t *testing.T) {
 func TestDataDetectAnyHonoursTransmitInhibit(t *testing.T) {
 	t.Parallel()
 
-	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
+	var r = newBareLayer2Receiver(new(discardReceiveSink))
 
 	assert.False(t, r.DataDetectAny(0), "nothing heard and no inputs, so not busy")
 
@@ -356,7 +364,7 @@ func TestDTMFButtonMakesChannelBusy(t *testing.T) {
 	t.Parallel()
 
 	var sink = new(dcdRecordingSink)
-	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
+	var r = newBareLayer2Receiver(sink)
 
 	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: MAX_SUBCHANS, Slice: 0}, 1)
 
@@ -376,7 +384,7 @@ func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
 	t.Parallel()
 
 	var sink = new(dcdRecordingSink)
-	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, sink)
+	var r = newBareLayer2Receiver(sink)
 	r.numSubchannel[0] = 1
 
 	var inhibited = false
@@ -399,7 +407,7 @@ func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
 func TestDCDChangeWhileTransmitterAsks(t *testing.T) {
 	t.Parallel()
 
-	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(discardReceiveSink))
+	var r = newBareLayer2Receiver(new(discardReceiveSink))
 	r.numSubchannel[0] = 1
 
 	var done = make(chan struct{})

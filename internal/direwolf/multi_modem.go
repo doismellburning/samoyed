@@ -114,10 +114,13 @@ const PROCESS_AFTER_BITS = 3
 // and, by way of the HDLC, FX.25 and IL2P decoders, hands it frames.
 type MultiModem struct {
 	channel     int
-	audioConfig *RadioConfig
 	demodulator *Demodulator    // nil for a channel that is not a radio.
 	receiver    *Layer2Receiver // Asked whether FX.25 is mid-block.
 	sink        ReceiveSink     // Where the frames it picks go.
+
+	// frameDropPercent is the probability, in per cent, of dropping each
+	// frame it picks, for testing.
+	frameDropPercent int
 
 	candidates [MAX_SUBCHANS][MAX_SLICERS]candidate_t
 
@@ -127,32 +130,35 @@ type MultiModem struct {
 	dcAverage float64
 }
 
-// newMultiModem builds the MultiModem for a channel, which hands what it
-// picks to sink.  demodulator is nil for a channel that is not a radio.
-func newMultiModem(channel int, pa *RadioConfig, demodulator *Demodulator, receiver *Layer2Receiver, sink ReceiveSink) *MultiModem {
+// newMultiModem builds the MultiModem for a channel configured as config,
+// which hands what it picks to sink, dropping frameDropPercent per cent of it.
+// demodulator is nil for a channel that is not a radio.
+func newMultiModem(channel int, config receiveChannel, frameDropPercent int, demodulator *Demodulator, receiver *Layer2Receiver, sink ReceiveSink) *MultiModem {
 	var m = new(MultiModem)
 	m.channel = channel
-	m.audioConfig = pa
+	m.frameDropPercent = frameDropPercent
 	m.demodulator = demodulator
 	m.receiver = receiver
 	m.sink = sink
 
-	if pa.chan_medium[channel] == MEDIUM_RADIO {
-		if pa.achan[channel].Baud <= 0 {
+	if config.radio {
+		var baud = config.baud
+		if baud <= 0 {
 			logrus.WithField("channel", channel).Error("Internal multi_modem_init error: baud not set")
-			pa.achan[channel].Baud = DEFAULT_BAUD
+
+			baud = DEFAULT_BAUD
 		}
 
-		var real_baud = pa.achan[channel].Baud
-		if pa.achan[channel].ModemType == MODEM_QPSK {
-			real_baud = pa.achan[channel].Baud / 2
+		var real_baud = baud
+		if config.modemType == MODEM_QPSK {
+			real_baud = baud / 2
 		}
 
-		if pa.achan[channel].ModemType == MODEM_8PSK {
-			real_baud = pa.achan[channel].Baud / 3
+		if config.modemType == MODEM_8PSK {
+			real_baud = baud / 3
 		}
 
-		m.processAge = PROCESS_AFTER_BITS * pa.adev[ACHAN2ADEV(channel)].samples_per_sec / real_baud
+		m.processAge = PROCESS_AFTER_BITS * config.samplesPerSec / real_baud
 	}
 
 	return m
@@ -226,7 +232,7 @@ func multi_modem_init(pa *RadioConfig, fx25Debug int, il2pDebug int, sink Receiv
 		return nil, err
 	}
 
-	var receiver = NewLayer2Receiver(pa, demodulators, fx25Debug, il2pDebug, sink)
+	var receiver = NewLayer2Receiver(pa.receiveChannels(), pa.receiveFaults(), demodulators, fx25Debug, il2pDebug, sink)
 
 	for _, d := range demodulators {
 		if d != nil {
@@ -329,7 +335,6 @@ func (m *MultiModem) ProcessSample(audio_sample int) bool {
 // pickBestCandidate.
 func (m *MultiModem) processRecPacket(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo) {
 	var channel = m.channel
-	var pa = m.audioConfig
 
 	dwutil.Assert(from.Channel == channel)
 
@@ -350,15 +355,15 @@ func (m *MultiModem) processRecPacket(from dwcore.SlicerID, pp *ax25.Packet, rxI
 		!m.receiver.fx25Busy(channel) {
 		var drop_it = false
 
-		if pa.recv_error_rate != 0 {
+		if m.frameDropPercent != 0 {
 			var r = float64(rand.Int63n(1<<53)) / (1 << 53) // Random, 0.0 to 1.0
 
-			if float64(pa.recv_error_rate)/100.0 > r {
+			if float64(m.frameDropPercent)/100.0 > r {
 				drop_it = true
 
 				logrus.WithFields(logrus.Fields{
 					"channel":         channel,
-					"recv_error_rate": pa.recv_error_rate,
+					"recv_error_rate": m.frameDropPercent,
 				}).Info("Intentionally dropping incoming frame")
 			}
 		}
@@ -425,7 +430,6 @@ func (m *MultiModem) layout() (int, int) {
 
 func (m *MultiModem) pickBestCandidate() {
 	var channel = m.channel
-	var pa = m.audioConfig
 
 	var numSubchan, numSlicers = m.layout()
 	var num_bars = max(numSlicers, 1) * numSubchan
@@ -564,15 +568,15 @@ func (m *MultiModem) pickBestCandidate() {
 
 	var drop_it = false
 
-	if pa.recv_error_rate != 0 {
+	if m.frameDropPercent != 0 {
 		var r = float64(rand.Int63n(1<<53)) / (1 << 53) // Random, 0.0 to 1.0
 
-		if float64(pa.recv_error_rate)/100.0 > r {
+		if float64(m.frameDropPercent)/100.0 > r {
 			drop_it = true
 
 			logrus.WithFields(logrus.Fields{
 				"channel":         channel,
-				"recv_error_rate": pa.recv_error_rate,
+				"recv_error_rate": m.frameDropPercent,
 			}).Info("Intentionally dropping incoming frame")
 		}
 	}
@@ -614,25 +618,15 @@ type slicerReceivers struct {
 	eas  *eas.Receiver // nil unless the channel is EAS.
 }
 
-// newHDLCConfig takes what the HDLC receiver needs from a channel's settings.
-func newHDLCConfig(achan *achan_param_s) hdlc.Config {
-	return hdlc.Config{
-		FixBits:    achan.fix_bits,
-		Passall:    achan.passall,
-		AIS:        achan.ModemType == MODEM_AIS,
-		SanityTest: achan.sanity_test,
-	}
-}
-
 func newSlicerReceivers(r *Layer2Receiver, from dwcore.SlicerID, scrambled bool) *slicerReceivers {
-	var achan = &r.audio.achan[from.Channel]
+	var config = &r.channels[from.Channel]
 
 	var s = new(slicerReceivers)
-	s.hdlc = hdlc.NewReceiver(newHDLCConfig(achan), from, scrambled, &s.line, r.AudioLevel, r.recFrame)
+	s.hdlc = hdlc.NewReceiver(config.hdlc, from, scrambled, &s.line, r.AudioLevel, r.recFrame)
 	s.fx25 = fx25.NewReceiver(from, r.fx25Debug, r.AudioLevel, r.recFrame)
-	s.il2p = il2p.NewReceiver(from, achan.il2p_version, achan.il2p_rx_crc, r.il2pDebug, r.AudioLevel, r.recPacket)
+	s.il2p = il2p.NewReceiver(from, config.il2pVersion, config.il2pRxCRC, r.il2pDebug, r.AudioLevel, r.recPacket)
 
-	if achan.ModemType == MODEM_EAS {
+	if config.modemType == MODEM_EAS {
 		s.eas = eas.NewReceiver(from, r.AudioLevel, r.recFrame)
 	}
 
@@ -660,7 +654,9 @@ type Layer2Receiver struct {
 	dcdMu        sync.Mutex
 	compositeDCD [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
 
-	audio     *RadioConfig
+	channels     [MAX_RADIO_CHANS]receiveChannel // Each channel's configuration.
+	bitErrorRate float64                         // The probability of inverting each bit, for testing.
+
 	fx25Debug int // FX.25's debug level, for every slicer's FX.25 receiver.
 	il2pDebug int // IL2P's debug level, for every slicer's IL2P receiver.
 	sink      ReceiveSink
@@ -689,7 +685,9 @@ const hdlcRecRandMax int32 = 0x7fffffff
  *
  * Purpose:	Call once at the beginning to initialize.
  *
- * Inputs:	pa	- Audio configuration.
+ * Inputs:	channels - Each channel's configuration.
+ *
+ *		faults	- The errors to introduce on purpose, for testing.
  *
  *		demods	- Each radio channel's demodulators, which say how
  *			  many subchannels it has; nil for any other channel.
@@ -705,12 +703,10 @@ const hdlcRecRandMax int32 = 0x7fffffff
  *
  ***********************************************************************************/
 
-func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, il2pDebug int, sink ReceiveSink) *Layer2Receiver {
-	//text_color_set(DW_COLOR_DEBUG);
-	//dw_printf ("NewLayer2Receiver (%p) \n", pa);
-
+func NewLayer2Receiver(channels [MAX_RADIO_CHANS]receiveChannel, faults receiveFaults, demods [MAX_RADIO_CHANS]*Demodulator, fx25Debug int, il2pDebug int, sink ReceiveSink) *Layer2Receiver {
 	var r = new(Layer2Receiver)
-	r.audio = pa
+	r.channels = channels
+	r.bitErrorRate = faults.bitErrorRate
 	r.fx25Debug = fx25Debug
 	r.il2pDebug = il2pDebug
 	r.sink = sink
@@ -725,14 +721,14 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {
 					var from = dwcore.SlicerID{Channel: ch, Subchannel: sub, Slice: slice}
-					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, lineScrambled(pa.achan[ch].ModemType))
+					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, lineScrambled(channels[ch].modemType))
 				}
 			}
 		}
 	}
 
 	for ch, d := range demods {
-		r.modems[ch] = newMultiModem(ch, pa, d, r, sink)
+		r.modems[ch] = newMultiModem(ch, channels[ch], faults.frameDropPercent, d, r, sink)
 	}
 
 	return r
@@ -815,13 +811,11 @@ func (r *Layer2Receiver) recFrame(from dwcore.SlicerID, fbuf []byte, rxInfo dwco
 	dwutil.Assert(from.Subchannel >= 0 && from.Subchannel < MAX_SUBCHANS)
 	dwutil.Assert(from.Slice >= 0 && from.Slice < MAX_SLICERS)
 
-	var pa = r.audio
-
 	// Special encapsulation for AIS & EAS so they can be treated normally pretty much everywhere else.
 
 	var pp *ax25.Packet
 
-	switch pa.achan[channel].ModemType {
+	switch r.channels[channel].modemType {
 	case MODEM_AIS:
 		var nmea, err = ais.ToNMEA(fbuf)
 		if err != nil {
@@ -897,12 +891,12 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 	// -e option can be used to artificially introduce the desired
 	// Bit Error Rate (BER) for testing.
 
-	if r.audio.recv_ber != 0 {
+	if r.bitErrorRate != 0 {
 		var p = float64(r.rand()) / float64(hdlcRecRandMax) // calculate as double to preserve all 31 bits.
-		if r.audio.recv_ber > p {
+		if r.bitErrorRate > p {
 			// FIXME
 			//text_color_set(DW_COLOR_DEBUG);
-			//dw_printf ("hdlc_rec_bit randomly clobber bit, ber = %.6f\n", r.audio.recv_ber);
+			//dw_printf ("hdlc_rec_bit randomly clobber bit, ber = %.6f\n", r.bitErrorRate);
 			raw = !raw
 		}
 	}
@@ -911,7 +905,7 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 
 	// EAS does not use HDLC.
 
-	if r.audio.achan[channel].ModemType == MODEM_EAS {
+	if r.channels[channel].modemType == MODEM_EAS {
 		s.eas.RecBit(raw)
 
 		return
@@ -924,7 +918,7 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 	// Which way up it starts doesn't matter to NRZI.
 	var il2pBit = raw
 
-	if r.audio.achan[channel].ModemType == MODEM_BPSK {
+	if r.channels[channel].modemType == MODEM_BPSK {
 		if !raw {
 			s.bpskLevel = !s.bpskLevel
 		}
@@ -943,7 +937,7 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 	// After BER insertion, NRZI, and any descrambling, feed into FX.25 decoder as well.
 	// Don't waste time on this if AIS.  EAS does not get this far.
 
-	if r.audio.achan[channel].ModemType != MODEM_AIS {
+	if r.channels[channel].modemType != MODEM_AIS {
 		s.fx25.RecBit(dwutil.IfThenElse(dbit, 1, 0))
 		s.il2p.RecBit(dwutil.IfThenElse(il2pBit, 1, 0)) // Note: skip NRZI.
 	}
