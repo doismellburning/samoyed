@@ -7,6 +7,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/digipeater"
+	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/nodemap"
@@ -98,11 +99,24 @@ type achan_param_s struct {
 
 	xmitTiming   // Transmit timing.
 	layer2Config // Layer 2 protocol and its FEC.
+	hdlcRxConfig // Recovering frames with a bad FCS.
 
 	// The modem: its type, tones, speed and demodulator profiles.
 	phy.ModemConfig
 
-	/* These are for dealing with imperfect frames. */
+	/* Additional properties for transmit. */
+	/* Originally we had control outputs only for PTT. */
+	/* In version 1.2, we generalize this to allow others such as DCD. */
+	/* In version 1.4 we add CON for connected to another station. */
+	/* Index following structure by one of these: */
+	octrl [NUM_OCTYPES]ptt.OutputConfig
+
+	ictrl [NUM_ICTYPES]ptt.InputConfig
+}
+
+// hdlcRxConfig is how hard a channel's HDLC receivers try to recover a frame
+// that arrives with a bad FCS, and what they let through.
+type hdlcRxConfig struct {
 	fix_bits BitFixLevel /* Level of effort to recover from */
 	/* a bad FCS on the frame. */
 	/* 0 = no effort */
@@ -114,17 +128,6 @@ type achan_param_s struct {
 	/* Must look like APRS, AX.25, or anything. */
 
 	passall bool /* Allow thru even with bad CRC. */
-
-	/* Additional properties for transmit. */
-
-	/* Originally we had control outputs only for PTT. */
-	/* In version 1.2, we generalize this to allow others such as DCD. */
-	/* In version 1.4 we add CON for connected to another station. */
-	/* Index following structure by one of these: */
-
-	octrl [NUM_OCTYPES]ptt.OutputConfig
-
-	ictrl [NUM_ICTYPES]ptt.InputConfig
 }
 
 // layer2Config is the layer 2 protocol a channel sends, and how it sends and
@@ -201,6 +204,61 @@ func (c *RadioConfig) pttChannels(canTransmit func(channel int) bool) [MAX_RADIO
 	}
 
 	return channels
+}
+
+// receiveChannel is one channel's configuration, as its layer 2 receivers and
+// MultiModem need it.
+type receiveChannel struct {
+	radio         bool         // Whether the channel is a radio, rather than a network TNC or the like.
+	modemType     modem_t      // AIS, EAS and BPSK each take their bits differently.
+	baud          int          // Data bits per second.
+	samplesPerSec int          // The channel's audio device's sample rate.
+	hdlc          hdlc.Config  // What its HDLC receivers do with a bad FCS.
+	il2pVersion   il2p.Version // The IL2P version it listens for.
+	il2pRxCRC     bool         // Whether IL2P frames carry a trailing CRC to check.
+}
+
+// receiveChannels is each radio channel's configuration, as the receive side
+// needs it.
+func (c *RadioConfig) receiveChannels() [MAX_RADIO_CHANS]receiveChannel {
+	var channels [MAX_RADIO_CHANS]receiveChannel
+
+	for ch := range MAX_RADIO_CHANS {
+		var achan = &c.achan[ch]
+
+		channels[ch] = receiveChannel{
+			radio:         c.chan_medium[ch] == MEDIUM_RADIO,
+			modemType:     achan.ModemType,
+			baud:          achan.Baud,
+			samplesPerSec: c.adev[ACHAN2ADEV(ch)].samples_per_sec,
+			hdlc: hdlc.Config{
+				FixBits:    achan.fix_bits,
+				Passall:    achan.passall,
+				AIS:        achan.ModemType == MODEM_AIS,
+				SanityTest: achan.sanity_test,
+			},
+			il2pVersion: achan.il2p_version,
+			il2pRxCRC:   achan.il2p_rx_crc,
+		}
+	}
+
+	return channels
+}
+
+// receiveFaults are the errors the receive side introduces on purpose, for
+// testing how well what is downstream copes.
+type receiveFaults struct {
+	bitErrorRate     float64 // The probability of inverting each bit a demodulator hands over.
+	frameDropPercent int     // The probability, in per cent, of dropping each frame decoded.
+}
+
+// receiveFaults is the errors the configuration asks the receive side to
+// introduce.
+func (c *RadioConfig) receiveFaults() receiveFaults {
+	return receiveFaults{
+		bitErrorRate:     c.recv_ber,
+		frameDropPercent: c.recv_error_rate,
+	}
 }
 
 // RadioConfig is the configuration of the radio channels: the sound devices

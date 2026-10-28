@@ -61,7 +61,6 @@ func newMultiModemImplTest(t *testing.T, numSubchan int, numSlicers int) (*Multi
 
 	var m = new(MultiModem)
 	m.channel = 0
-	m.audioConfig = new(RadioConfig)
 	m.demodulator = d
 	m.sink = sink
 
@@ -112,7 +111,7 @@ func TestMultiModemImplNilPacketIgnored(t *testing.T) {
 //nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplSingleDecoderErrorRateDrops(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 1, 1)
-	m.audioConfig.recv_error_rate = 100
+	m.frameDropPercent = 100
 
 	var alevel ax25.ALevel
 	m.processRecPacket(multiModemImplFrom(0, 0), multiModemImplPacket(t, "dropped"), dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
@@ -224,7 +223,7 @@ func TestMultiModemImplPickBestCandidatePrefersAgreement(t *testing.T) {
 //nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
 func TestMultiModemImplPickBestCandidateErrorRateDrops(t *testing.T) {
 	var m, sink = newMultiModemImplTest(t, 2, 1)
-	m.audioConfig.recv_error_rate = 100
+	m.frameDropPercent = 100
 
 	var alevel ax25.ALevel
 	m.processRecPacket(multiModemImplFrom(0, 0), multiModemImplPacket(t, "a"), dwcore.RxInfo{ALevel: alevel, Retries: RETRY_NONE, FEC: fec_type_none})
@@ -344,7 +343,7 @@ func multiModemImplRecFrame(t *testing.T, modemType modem_t, fbuf []byte) *ax25.
 	var audioConfig = new(RadioConfig)
 	audioConfig.achan[0].ModemType = modemType
 
-	var receiver = NewLayer2Receiver(audioConfig, [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(multiModemImplSink))
+	var receiver = NewLayer2Receiver(audioConfig.receiveChannels(), audioConfig.receiveFaults(), [MAX_RADIO_CHANS]*Demodulator{}, 0, 0, new(multiModemImplSink))
 
 	var got *ax25.Packet
 

@@ -195,6 +195,10 @@ so the order of construction follows the arrows:
    which almost everything feeds.
 #. The demodulators (``multi_modem_init``),
    handed a ``radioSink`` that passes their frames to the ``DataLinkQueue``.
+   The ``Layer2Receiver`` behind them is handed only each channel's receive settings
+   (``RadioConfig.receiveChannels``)
+   and the errors to introduce for testing (``RadioConfig.receiveFaults``),
+   not the whole configuration.
 #. The network TNCs, the serial TNCs and the AXUDP channels.
    Their listeners start straight away and can hand the queue frames at once.
 #. The ``TransmitQueue``,
@@ -353,7 +357,8 @@ References
   ``kissnet.go`` (``NewKissNetService``, ``KissNetService.Start``),
   ``beacon.go`` (``NewBeaconService``, ``beaconIGate``),
   ``audio.go`` (``AudioDevices.setAudioLevel``),
-  ``channel_config.go`` (``RadioConfig.digipeaterPorts``, ``RadioConfig.myCall``)
+  ``channel_config.go`` (``RadioConfig.digipeaterPorts``, ``RadioConfig.myCall``,
+  ``RadioConfig.receiveChannels``, ``RadioConfig.receiveFaults``)
   and ``recv.go`` (``recv_init``, ``recv_process``).
 - ``internal/direwolf/webui_source.go``: ``webui_init``, ``webui_start`` and ``webStatus``,
   and ``internal/webui/server.go``: ``NewServer`` and ``Server.Start``.
