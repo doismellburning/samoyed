@@ -107,12 +107,12 @@ func defaultPSKProfiles(modemType phy.Modem) string {
 	}
 }
 
-// checkPSKFilterSizes sets up, on scratch state, each demodulator a PSK
+// CheckPSKFilterSizes sets up, on scratch state, each demodulator a PSK
 // channel with these modem settings would run at samplesPerSec, so that one
 // whose filters wouldn't fit is found when the configuration is checked
 // rather than when the daemon starts.  It returns one error per profile that wouldn't fit, joined, and
 // nil for a channel that isn't PSK.
-func checkPSKFilterSizes(channel int, modem phy.ModemConfig, samplesPerSec int) error {
+func CheckPSKFilterSizes(channel int, modem phy.ModemConfig, samplesPerSec int) error {
 	var profiles = defaultPSKProfiles(modem.ModemType)
 	if profiles == "" {
 		return nil
