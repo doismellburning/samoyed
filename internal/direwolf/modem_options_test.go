@@ -6,6 +6,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +27,7 @@ func TestSettleModemOptionsRejectsPSKDecimation(t *testing.T) {
 
 		settleModemOptions(audioConfig)
 
-		var entry = lastEntryWithMessage(hook, "Decimation is not supported for PSK, ignoring")
+		var entry = testutils.LastEntryWithMessage(hook, "Decimation is not supported for PSK, ignoring")
 
 		require.NotNil(t, entry)
 		assert.Equal(t, logrus.WarnLevel, entry.Level)
@@ -72,7 +73,7 @@ func TestSettleModemOptionsTurnsOffFixBitsForEASAndAIS(t *testing.T) {
 		settleModemOptions(audioConfig)
 
 		for _, message := range []string{"FIX_BITS option has been turned off", "PASSALL option has been turned off"} {
-			var entry = lastEntryWithMessage(hook, message)
+			var entry = testutils.LastEntryWithMessage(hook, message)
 
 			require.NotNil(t, entry, message)
 			assert.Equal(t, channel, entry.Data["channel"])

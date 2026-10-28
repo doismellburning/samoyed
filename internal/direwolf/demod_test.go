@@ -4,12 +4,10 @@
 package direwolf
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -115,7 +113,7 @@ func TestDemodInitCapsProfileLetters(t *testing.T) {
 	assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
 	assert.Equal(t, "ABDEABDEA", d.profiles)
 
-	var entry = lastEntryWithMessage(hook, "More demodulator types than there are demodulators")
+	var entry = testutils.LastEntryWithMessage(hook, "More demodulator types than there are demodulators")
 
 	require.NotNil(t, entry, "using fewer demodulator types than asked for must be reported")
 	assert.Equal(t, logrus.ErrorLevel, entry.Level)
@@ -151,7 +149,7 @@ func TestDemodInitIgnoresUnknownAFSKProfiles(t *testing.T) {
 
 		assert.Equal(t, tc.want, d.profiles, tc.profiles)
 
-		var entry = lastEntryWithMessage(hook, "Unknown AFSK demodulator type; ignoring it")
+		var entry = testutils.LastEntryWithMessage(hook, "Unknown AFSK demodulator type; ignoring it")
 
 		require.NotNil(t, entry, "an unknown demodulator type must be reported")
 		assert.Equal(t, logrus.ErrorLevel, entry.Level)
@@ -191,7 +189,7 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 		assert.Equal(t, MAX_SUBCHANS, d.NumSubchan())
 		assert.Equal(t, tc.want, d.profiles)
 
-		var entry = lastEntryWithMessage(hook, "More demodulator types than there are demodulators")
+		var entry = testutils.LastEntryWithMessage(hook, "More demodulator types than there are demodulators")
 
 		require.NotNil(t, entry, "an overlong PSK profile list must be reported")
 		assert.Equal(t, logrus.ErrorLevel, entry.Level)
@@ -292,18 +290,4 @@ func TestChannelLayout(t *testing.T) {
 		assert.Equal(t, 1, numSubchan, "channel %d", channel)
 		assert.Equal(t, 1, numSlicers, "channel %d", channel)
 	}
-}
-
-// lastEntryWithMessage returns the last entry hook saw with message, or nil if
-// there was none: other entries can follow the one a test is after.
-func lastEntryWithMessage(hook *test.Hook, message string) *logrus.Entry {
-	var entries = hook.AllEntries()
-
-	for _, entry := range slices.Backward(entries) {
-		if entry.Message == message {
-			return entry
-		}
-	}
-
-	return nil
 }
