@@ -725,7 +725,7 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {
 					var from = dwcore.SlicerID{Channel: ch, Subchannel: sub, Slice: slice}
-					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, lineScrambled(pa.achan[ch].ModemType))
+					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, pa.achan[ch].ModemType.LineScrambled())
 				}
 			}
 		}

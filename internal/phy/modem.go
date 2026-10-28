@@ -52,3 +52,9 @@ func (m Modem) String() string {
 		return fmt.Sprintf("modem_t(%d)", int(m))
 	}
 }
+
+// LineScrambled says whether the modem's AX.25 line is G3RUH scrambled: 9600
+// baud's is, and BPSK's, as the NinoTNC sends it.
+func (m Modem) LineScrambled() bool {
+	return m == Scramble || m == BPSK
+}

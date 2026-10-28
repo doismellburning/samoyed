@@ -301,7 +301,7 @@ func TestBPSKReceivesAX25FromNinoTNC(t *testing.T) {
 
 	for _, bit := range ninoAX25Bits(frames[0]) {
 		// The scrambled flag as the BPSK demodulator passes it.
-		receiver.RecBit(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, bit, lineScrambled(MODEM_BPSK), &nudgeTotal, &symbolCount)
+		receiver.RecBit(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, bit, MODEM_BPSK.LineScrambled(), &nudgeTotal, &symbolCount)
 	}
 
 	for range 2 * receiver.modems[0].processAge {

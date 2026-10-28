@@ -411,7 +411,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 	// Would be logical to have MODEM_BASEBAND for IL2P rather than checking here.  But...
 	// That would mean putting in at least 3 places and testing all rather than just one.
-	if lineScrambled(audioConfig.achan[tg.channel].ModemType) &&
+	if audioConfig.achan[tg.channel].ModemType.LineScrambled() &&
 		audioConfig.achan[tg.channel].layer2_xmit != LAYER2_IL2P {
 		dat = tg.scrambler.Scramble(dat & 1)
 	}
