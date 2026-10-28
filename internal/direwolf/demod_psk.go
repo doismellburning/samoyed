@@ -94,13 +94,13 @@ var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
 
 // defaultPSKProfiles is the demodulator profiles a PSK channel runs when the
 // configuration names none.
-func defaultPSKProfiles(modemType modem_t) string {
+func defaultPSKProfiles(modemType phy.Modem) string {
 	switch modemType {
-	case MODEM_QPSK:
+	case phy.QPSK:
 		return "PQRS"
-	case MODEM_8PSK:
+	case phy.PSK8:
 		return "TUVW"
-	case MODEM_BPSK:
+	case phy.BPSK:
 		return "LMNO"
 	default:
 		return ""
@@ -122,14 +122,14 @@ func checkPSKFilterSizes(channel int, modem phy.ModemConfig, samplesPerSec int) 
 		profiles = modem.Profiles
 	}
 
-	// NewDemodulator runs only the first MAX_SUBCHANS, and says so itself.
-	profiles = profiles[:min(len(profiles), MAX_SUBCHANS)]
+	// NewDemodulator runs only the first phy.MaxSubchans, and says so itself.
+	profiles = profiles[:min(len(profiles), phy.MaxSubchans)]
 
 	// Only QPSK reads it, and settleModemOptions picks this when the
 	// configuration doesn't.  It doesn't change any filter's size.
 	var v26 = modem.V26Alternative
-	if modem.ModemType == MODEM_QPSK && v26 == V26_UNSPECIFIED {
-		v26 = V26_DEFAULT
+	if modem.ModemType == phy.QPSK && v26 == phy.V26Unspecified {
+		v26 = phy.V26Default
 	}
 
 	var D = new(demodulator_state_s)
@@ -190,7 +190,7 @@ func checkPSKFilterSizes(channel int, modem phy.ModemConfig, samplesPerSec int) 
  *
  *----------------------------------------------------------------*/
 
-func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps int, profile byte, D *demodulator_state_s) error {
+func demod_psk_init(modem_type phy.Modem, v26_alt phy.V26, _samples_per_sec int, bps int, profile byte, D *demodulator_state_s) error {
 	var samples_per_sec = float64(_samples_per_sec)
 
 	*D = demodulator_state_s{} //nolint:exhaustruct_v5
@@ -208,7 +208,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 	var correct_baud int // baud is not same as bits/sec here!
 	var carrier_freq int
 
-	if modem_type == MODEM_BPSK {
+	if modem_type == phy.BPSK {
 		correct_baud = bps // 1 bit per symbol
 		carrier_freq = phy.BPSKCarrierFreq
 
@@ -291,8 +291,8 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		D.u.psk.coffsCarrierPhase = math.Remainder(radiansPerSample*float64(D.u.psk.coffs), 2*math.Pi)
 		D.u.psk.tapsCos = math.Cos(tapsPhase)
 		D.u.psk.tapsInvSin = 1 / math.Sin(tapsPhase)
-	} else if modem_type == MODEM_QPSK {
-		dwutil.Assert(D.u.psk.v26_alt != V26_UNSPECIFIED)
+	} else if modem_type == phy.QPSK {
+		dwutil.Assert(D.u.psk.v26_alt != phy.V26Unspecified)
 
 		correct_baud = bps / 2
 		carrier_freq = 1800
@@ -706,8 +706,8 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int) int {
 func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulator_state_s) {
 	var slice = 0 // Would it make sense to have more than one?
 
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
+	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
+	dwutil.Assert(subchannel >= 0 && subchannel < phy.MaxSubchans)
 
 	/* Scale to nice number for plotting during debug. */
 
@@ -746,10 +746,10 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 		var gray int
 
 		switch D.modem_type {
-		case MODEM_BPSK:
+		case phy.BPSK:
 			gray = phase_shift_to_symbol(delta, 1) // BPSK
-		case MODEM_QPSK:
-			if D.u.psk.v26_alt == V26_B {
+		case phy.QPSK:
+			if D.u.psk.v26_alt == phy.V26B {
 				gray = phase_shift_to_symbol(delta+(-math.Pi/4), 2) // MFJ compatible
 			} else {
 				gray = phase_shift_to_symbol(delta, 2) // Classic
@@ -779,15 +779,15 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 		var delta = float64(math.Atan2(float64(I), float64(Q)))
 
 		switch D.modem_type {
-		case MODEM_BPSK:
+		case phy.BPSK:
 			// I and Q are the cos of the phase change plus the carrier's
 			// turn over the coffs and soffs delays.  Recover the sin from
 			// the two, whatever the carrier turns between the taps, then
 			// take the carrier's turn away.
 			var turned = math.Atan2((I*D.u.psk.tapsCos-Q)*D.u.psk.tapsInvSin, I)
 			gray = phase_shift_to_symbol(turned-D.u.psk.coffsCarrierPhase, 1) // BPSK
-		case MODEM_QPSK:
-			if D.u.psk.v26_alt == V26_B {
+		case phy.QPSK:
+			if D.u.psk.v26_alt == phy.V26B {
 				gray = phase_shift_to_symbol(delta+float64(math.Pi/2), 2) // MFJ compatible
 			} else {
 				gray = phase_shift_to_symbol(delta+float64(3*math.Pi/4), 2) // Classic
@@ -838,12 +838,12 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
 
 		switch D.modem_type {
-		case MODEM_BPSK:
+		case phy.BPSK:
 			var gray = demod_bits
 
 			D.receiver.RecBit(from, gray&1 == 1, D.modem_type.LineScrambled(),
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-		case MODEM_QPSK:
+		case phy.QPSK:
 			var gray = demod_bits
 
 			D.receiver.RecBit(from, (gray>>1)&1 == 1, false,

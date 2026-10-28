@@ -25,6 +25,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dsp"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -95,16 +96,16 @@ const MAX_G = 4.0
 
 // afskSpaceGain is the gain applied to the space tone at each slicer, spaced
 // geometrically from MIN_G to MAX_G.  It is indexed by slicer, so it is
-// MAX_SLICERS long.
+// phy.MaxSlicers long.
 // Starting with version 1.2, try using multiple slicing points instead of the
 // traditional AGC.
-var afskSpaceGain = func() [MAX_SLICERS]float64 { //nolint:gochecknoglobals // Built once from constants, then only read
-	var gain [MAX_SLICERS]float64
+var afskSpaceGain = func() [phy.MaxSlicers]float64 { //nolint:gochecknoglobals // Built once from constants, then only read
+	var gain [phy.MaxSlicers]float64
 
 	gain[0] = MIN_G
 
-	var step = math.Pow(10.0, math.Log10(MAX_G/MIN_G)/(MAX_SLICERS-1))
-	for j := 1; j < MAX_SLICERS; j++ {
+	var step = math.Pow(10.0, math.Log10(MAX_G/MIN_G)/(phy.MaxSlicers-1))
+	for j := 1; j < phy.MaxSlicers; j++ {
 		gain[j] = gain[j-1] * step
 	}
 
@@ -541,8 +542,8 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			static int seq = 0;			// for log file name
 		#endif
 	*/
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	dwutil.Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
+	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
+	dwutil.Assert(subchannel >= 0 && subchannel < phy.MaxSubchans)
 
 	/*
 	 * Filters use last 'filter_taps' samples.

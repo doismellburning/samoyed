@@ -17,6 +17,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dsp"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,11 +34,11 @@ var DCD_CONFIG_9600 = &DCDConfig{ //nolint:gochecknoglobals // Constant tuning, 
 // symmetrically about zero.
 // Version 1.2: Experiment with different slicing levels.
 // Really didn't help that much because we should have a symmetrical signal.
-var slice_point = func() [MAX_SUBCHANS]float64 { //nolint:gochecknoglobals // Built once from constants, then only read
-	var points [MAX_SUBCHANS]float64
+var slice_point = func() [phy.MaxSubchans]float64 { //nolint:gochecknoglobals // Built once from constants, then only read
+	var points [phy.MaxSubchans]float64
 
 	for j := range points {
-		points[j] = 0.02 * float64(j-0.5*(MAX_SUBCHANS-1))
+		points[j] = 0.02 * float64(j-0.5*(phy.MaxSubchans-1))
 	}
 
 	return points
@@ -138,7 +139,7 @@ func agc(in, fast_attack, slow_decay float64, inPeak, inValley float64) (float64
  *
  *----------------------------------------------------------------*/
 
-func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int, baud int, D *demodulator_state_s) {
+func demod_9600_init(modem_type phy.Modem, original_sample_rate int, upsample int, baud int, D *demodulator_state_s) {
 	if upsample < 1 {
 		upsample = 1
 	}
@@ -377,8 +378,8 @@ func demod_9600_process_sample(channel int, sam int, upsample int, D *demodulato
 	*/
 	var subchan = 0
 
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
+	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
+	dwutil.Assert(subchan >= 0 && subchan < phy.MaxSubchans)
 
 	/* Scale to nice number for convenience. */
 	/* Consistent with the AFSK demodulator, we'd like to use */
