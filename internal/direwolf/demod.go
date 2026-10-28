@@ -60,20 +60,6 @@ type bitReceiver interface {
 // received audio level to the metrics endpoint: ~10Hz at a 44.1kHz sample rate.
 const audioLevelDecimation = 4410
 
-/*------------------------------------------------------------------
- *
- * Name:        demod_init
- *
- * Purpose:     Initialize the demodulator(s) used for reception.
- *
- * Inputs:      pa		- Pointer to RadioConfig structure with
- *				  various parameters for the modem(s).
- *
- * Bugs:	This doesn't do much error checking so don't give it
- *		anything crazy.
- *
- *----------------------------------------------------------------*/
-
 // capProfiles limits a channel's demodulator types to the number of
 // demodulators there is room for.  Each letter is a demodulator of its own and
 // the demodulator state is a fixed MAX_SUBCHANS wide, so a longer list would run
@@ -95,36 +81,6 @@ func capProfiles(channel int, profiles string) string {
 
 	return profiles[:MAX_SUBCHANS]
 }
-
-// demod_init builds a Demodulator for each radio channel, and returns them;
-// a channel that is not a radio has none.
-func demod_init(pa *RadioConfig) ([MAX_RADIO_CHANS]*Demodulator, error) {
-	var demodulators [MAX_RADIO_CHANS]*Demodulator
-
-	for channel := range MAX_RADIO_CHANS {
-		if pa.chan_medium[channel] == MEDIUM_RADIO {
-			var demodulator, err = NewDemodulator(channel, pa.achan[channel].ModemConfig, pa.achan[channel].layer2_xmit, pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
-			if err != nil {
-				return [MAX_RADIO_CHANS]*Demodulator{}, err
-			}
-
-			demodulators[channel] = demodulator
-		}
-
-		// FIXME dw_printf ("-------- end of loop for chn %d \n", channel);
-	} /* for chan ... */
-
-	// Now the virtual channels.  FIXME:  could be single loop.
-
-	for channel := MAX_RADIO_CHANS; channel < MAX_TOTAL_CHANS; channel++ {
-		// FIXME dw_printf ("-------- virtual channel loop %d \n", channel);
-		if channel == pa.igate_vchannel {
-			logrus.WithField("channel", channel).Info("IGate virtual channel")
-		}
-	}
-
-	return demodulators, nil
-} /* end demod_init */
 
 // NewDemodulator sets up the demodulators for a radio channel, from its modem
 // settings and the sample rate of its audio device; layer2Xmit, how the channel
