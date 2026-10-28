@@ -10,6 +10,7 @@ package hamlib
 
 import (
 	"bufio"
+	"bytes"
 	"net"
 	"os/exec"
 	"strconv"
@@ -39,6 +40,10 @@ type rigctldClient struct {
 // two FILEs sharing the descriptor, then close), and a client accepted in
 // between gets the reused descriptor closed under it - the rig under test,
 // connecting straight after a probe that hung up, failed rig_open that way.
+//
+// rigctld runs at its most verbose, and a test that fails logs what it said:
+// with Hamlib 4.7.2 on macOS, rig_set_ptt has failed with RIG_EIO straight
+// after a successful rig_open, and rigctld's log is the way to see why.
 func startRigctld(t *testing.T) (string, *rigctldClient) {
 	t.Helper()
 
@@ -55,12 +60,23 @@ func startRigctld(t *testing.T) (string, *rigctldClient) {
 	require.NoError(t, l.Close())
 
 	var cmd = exec.CommandContext(t.Context(), rigctld, //nolint:gosec // G204: rigctld from PATH, with our own arguments.
-		"-m", strconv.Itoa(dummyModel), "-P", "RIG", "-T", "127.0.0.1", "-t", strconv.Itoa(port))
+		"-m", strconv.Itoa(dummyModel), "-P", "RIG", "-T", "127.0.0.1", "-t", strconv.Itoa(port), "-vvvvv")
+
+	// One writer for both, so exec copies them in a single goroutine, and the
+	// buffer is only read once Wait has returned.
+	var output = new(bytes.Buffer)
+	cmd.Stdout = output
+	cmd.Stderr = output
+
 	require.NoError(t, cmd.Start())
 
 	t.Cleanup(func() {
 		cmd.Process.Kill() //nolint:errcheck
 		cmd.Wait()         //nolint:errcheck
+
+		if t.Failed() {
+			t.Logf("rigctld output:\n%s", output)
+		}
 	})
 
 	var addr = net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
