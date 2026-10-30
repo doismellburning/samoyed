@@ -1,0 +1,110 @@
+#!/bin/bash
+
+set -eu
+set -o pipefail
+
+source "$(dirname "$(realpath "$0")")/common"
+
+repo=$(dirname "$(realpath "$0")")/..
+
+if ! command -v python3 > /dev/null; then
+	echo "FAIL: python3 not found, required by free_port() for port allocation" >&2
+	exit 1
+fi
+
+if ! command -v go > /dev/null; then
+	echo "FAIL: go not found, required to run internal/agwclient's live test" >&2
+	exit 1
+fi
+
+goto_tmpdir
+
+# Two samoyed-direwolf instances on cross-wired UDP audio, as in
+# check-udp-audio-connect, and internal/agwclient's live test talking to each
+# over AGW: B accepts a connection from A, data goes both ways, and A hangs
+# up.  It checks the client against a real AGW server, where its own tests
+# use a fake one.
+
+pids=()
+
+# shellcheck disable=SC2317,SC2329 # cleanup is invoked indirectly via trap
+cleanup() {
+	local status=$?
+
+	if ((status != 0)); then
+		echo "--- FAILURE: dumping logs from $PWD for diagnosis ---" >&2
+
+		for log in direwolf-a.log direwolf-b.log; do
+			echo "--- $log ---" >&2
+			cat "$log" >&2 2> /dev/null || echo "(missing)" >&2
+		done
+	fi
+
+	for pid in "${pids[@]}"; do
+		kill "$pid" 2> /dev/null || true
+	done
+	wait 2> /dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# --- port allocation -------------------------------------------------------
+
+udp_a=$(free_port udp)
+udp_b=$(free_port udp "$udp_a")
+agw_a=$(free_port tcp "$udp_a" "$udp_b")
+agw_b=$(free_port tcp "$udp_a" "$udp_b" "$agw_a")
+
+# --- config files ----------------------------------------------------------
+# A KISS port of 0 turns off the default KISS listener (8001), which would
+# otherwise collide between the two instances.
+#
+# As in check-netrom-connect: the 9600 baud modem keeps a window of frames'
+# audio small enough for the receiving UDP socket's buffer, and FRACK is
+# raised so a loaded CI runner's slow answer to a SABM doesn't draw a retry
+# that resets the link once it is up.
+
+cat > direwolf-a.yaml << EOF
+samoyed:
+  audioDevices:
+    - input: udp:$udp_a
+      output: udp:localhost:$udp_b
+      rate: 48000
+  channels:
+    - {channel: 0, mycall: Q1TEST, modem: {speed: "9600"}}
+  agwPort: $agw_a
+  kissPorts: [{port: 0}]
+  legacy: "FRACK 10"
+EOF
+
+cat > direwolf-b.yaml << EOF
+samoyed:
+  audioDevices:
+    - input: udp:$udp_b
+      output: udp:localhost:$udp_a
+      rate: 48000
+  channels:
+    - {channel: 0, mycall: Q2TEST, modem: {speed: "9600"}}
+  agwPort: $agw_b
+  kissPorts: [{port: 0}]
+  legacy: "FRACK 10"
+EOF
+
+# --- start the TNCs --------------------------------------------------------
+
+"$DIREWOLF" -c direwolf-a.yaml > direwolf-a.log 2>&1 &
+pids+=("$!")
+"$DIREWOLF" -c direwolf-b.yaml > direwolf-b.log 2>&1 &
+pids+=("$!")
+
+wait_for_tcp_port "$agw_a"
+wait_for_tcp_port "$agw_b"
+
+# --- run the client's live test against them -------------------------------
+
+if ! (cd "$repo" && AGWCLIENT_LIVE_A="127.0.0.1:$agw_a" AGWCLIENT_LIVE_B="127.0.0.1:$agw_b" \
+	go test -count=1 -tags agwlive -run '^TestLive$' -v ./internal/agwclient/); then
+	echo "FAIL: internal/agwclient's live test failed against two samoyed-direwolf instances" >&2
+	exit 1
+fi
+
+echo "PASS: internal/agwclient connected, carried data both ways and disconnected through two samoyed-direwolf instances"
