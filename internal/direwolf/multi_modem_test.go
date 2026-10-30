@@ -475,3 +475,17 @@ func TestProcessSampleWithoutDemodulatorSaysSo(t *testing.T) {
 	assert.Equal(t, logrus.ErrorLevel, entry.Level)
 	assert.Contains(t, entry.Message, "Something is seriously wrong")
 }
+
+// A channel with no radio has no demodulator, and its MultiModem knows it: a
+// nil *Demodulator mustn't turn into a demodulator that isn't there.
+func TestMultiModemWithoutADemodulatorHasNoLayout(t *testing.T) {
+	t.Parallel()
+
+	var m = newMultiModem(1, new(RadioConfig), nil, nil, new(discardReceiveSink))
+
+	assert.Nil(t, m.demodulator)
+
+	var numSubchan, numSlicers = m.layout()
+	assert.Zero(t, numSubchan)
+	assert.Zero(t, numSlicers)
+}

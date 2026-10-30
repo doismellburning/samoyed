@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +21,7 @@ import (
 //
 //nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestDemodInitIgnoresPSKDecimation(t *testing.T) {
-	var hook = test.NewGlobal()
+	var hook = testutils.CaptureLogrus(t)
 
 	for _, modemType := range []modem_t{MODEM_QPSK, MODEM_8PSK, MODEM_BPSK} {
 		var channel = 0
@@ -62,9 +63,7 @@ func TestDemodInitLeavesModemOptionsAlone(t *testing.T) {
 	var qpsk = newTestRadioConfig(channel, MODEM_QPSK, 2400, 0, 0, 44100)
 	qpsk.achan[channel].NumFreq = 1
 
-	var hook = test.NewGlobal()
-
-	t.Cleanup(hook.Reset)
+	var hook = testutils.CaptureLogrus(t)
 
 	var _, qpskErr = demod_init(qpsk)
 	require.NoError(t, qpskErr)
@@ -108,9 +107,7 @@ func TestDemodInitCapsProfileLetters(t *testing.T) {
 	audioConfig.achan[channel].Profiles = "ABDEABDEABDE"
 	require.Greater(t, len(audioConfig.achan[channel].Profiles), MAX_SUBCHANS)
 
-	var hook = test.NewGlobal()
-
-	t.Cleanup(hook.Reset)
+	var hook = testutils.CaptureLogrus(t)
 
 	var d, dErr = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 	require.NoError(t, dErr)
@@ -133,6 +130,8 @@ func TestDemodInitCapsProfileLetters(t *testing.T) {
 //
 //nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestDemodInitIgnoresUnknownAFSKProfiles(t *testing.T) {
+	var hook = testutils.CaptureLogrus(t)
+
 	for _, tc := range []struct {
 		profiles string
 		want     string
@@ -146,8 +145,6 @@ func TestDemodInitIgnoresUnknownAFSKProfiles(t *testing.T) {
 		var audioConfig = newTestRadioConfig(channel, MODEM_AFSK, 1200, 1200, 2200, 44100)
 		audioConfig.achan[channel].NumFreq = 1
 		audioConfig.achan[channel].Profiles = tc.profiles
-
-		var hook = test.NewGlobal()
 
 		var d, dErr = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 		require.NoError(t, dErr)
@@ -171,6 +168,8 @@ func TestDemodInitIgnoresUnknownAFSKProfiles(t *testing.T) {
 //
 //nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
+	var hook = testutils.CaptureLogrus(t)
+
 	for _, tc := range []struct {
 		modemType modem_t
 		profiles  string
@@ -185,8 +184,6 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 		audioConfig.achan[channel].NumFreq = 1
 		audioConfig.achan[channel].Profiles = tc.profiles
 		require.Greater(t, len(tc.profiles), MAX_SUBCHANS)
-
-		var hook = test.NewGlobal()
 
 		var d, dErr = NewDemodulator(channel, audioConfig.achan[channel].ModemConfig, audioConfig.achan[channel].layer2_xmit, 44100)
 		require.NoError(t, dErr)

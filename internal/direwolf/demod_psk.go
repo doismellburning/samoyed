@@ -67,6 +67,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/dsp"
 	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/dwutil"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -107,18 +108,18 @@ func defaultPSKProfiles(modemType modem_t) string {
 }
 
 // checkPSKFilterSizes sets up, on scratch state, each demodulator a PSK
-// channel would run at samplesPerSec, so that one whose filters wouldn't fit
-// is found when the configuration is checked rather than when the daemon
-// starts.  It returns one error per profile that wouldn't fit, joined, and
+// channel with these modem settings would run at samplesPerSec, so that one
+// whose filters wouldn't fit is found when the configuration is checked
+// rather than when the daemon starts.  It returns one error per profile that wouldn't fit, joined, and
 // nil for a channel that isn't PSK.
-func (achan *achan_param_s) checkPSKFilterSizes(channel int, samplesPerSec int) error {
-	var profiles = defaultPSKProfiles(achan.ModemType)
+func checkPSKFilterSizes(channel int, modem phy.ModemConfig, samplesPerSec int) error {
+	var profiles = defaultPSKProfiles(modem.ModemType)
 	if profiles == "" {
 		return nil
 	}
 
-	if achan.Profiles != "" {
-		profiles = achan.Profiles
+	if modem.Profiles != "" {
+		profiles = modem.Profiles
 	}
 
 	// NewDemodulator runs only the first MAX_SUBCHANS, and says so itself.
@@ -126,8 +127,8 @@ func (achan *achan_param_s) checkPSKFilterSizes(channel int, samplesPerSec int) 
 
 	// Only QPSK reads it, and settleModemOptions picks this when the
 	// configuration doesn't.  It doesn't change any filter's size.
-	var v26 = achan.V26Alternative
-	if achan.ModemType == MODEM_QPSK && v26 == V26_UNSPECIFIED {
+	var v26 = modem.V26Alternative
+	if modem.ModemType == MODEM_QPSK && v26 == V26_UNSPECIFIED {
 		v26 = V26_DEFAULT
 	}
 
@@ -136,7 +137,7 @@ func (achan *achan_param_s) checkPSKFilterSizes(channel int, samplesPerSec int) 
 	var errs []error
 
 	for _, profile := range []byte(profiles) {
-		var err = demod_psk_init(achan.ModemType, v26, samplesPerSec, achan.Baud, profile, D)
+		var err = demod_psk_init(modem.ModemType, v26, samplesPerSec, modem.Baud, profile, D)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("channel %d, profile %c: %w", channel, profile, err))
 		}
@@ -209,7 +210,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 	if modem_type == MODEM_BPSK {
 		correct_baud = bps // 1 bit per symbol
-		carrier_freq = bpskCarrierFreq
+		carrier_freq = phy.BPSKCarrierFreq
 
 		switch ascii.ToUpper(profile) { //nolint:dupl // Per-modem profile tables, kept parallel to upstream
 		case 'L': /* Self correlation technique. */
@@ -840,7 +841,7 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 		case MODEM_BPSK:
 			var gray = demod_bits
 
-			D.receiver.RecBit(from, gray&1 == 1, lineScrambled(D.modem_type),
+			D.receiver.RecBit(from, gray&1 == 1, D.modem_type.LineScrambled(),
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		case MODEM_QPSK:
 			var gray = demod_bits

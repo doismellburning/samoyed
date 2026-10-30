@@ -581,7 +581,7 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 	if D.slicer[slice].prev_d_c_pll > 1000000000 && D.slicer[slice].data_clock_pll < -1000000000 {
 		/* Overflow.  Was large positive, wrapped around, now large negative. */
 		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
-		D.receiver.RecBit(from, demod_out_f > 0, lineScrambled(D.modem_type),
+		D.receiver.RecBit(from, demod_out_f > 0, D.modem_type.LineScrambled(),
 			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		D.slicer[slice].pll_symbol_count++
 

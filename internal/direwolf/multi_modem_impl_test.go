@@ -47,13 +47,26 @@ func (s *multiModemImplSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxI
 
 func (s *multiModemImplSink) DCDChange(int, int) {}
 
+// fakeDemodulator reports whatever layout a test gives it, including ones no
+// real demodulator has, and takes no notice of the audio.
+type fakeDemodulator struct {
+	numSubchan int
+	numSlicers int
+}
+
+func (d *fakeDemodulator) ProcessSample(int, int) {}
+
+func (d *fakeDemodulator) NumSubchan() int { return d.numSubchan }
+
+func (d *fakeDemodulator) NumSlicers() int { return d.numSlicers }
+
 // newMultiModemImplTest builds a MultiModem for channel 0 whose demodulator
 // reports the given layout, with no HDLC receiver behind it, so no FX.25
 // reception is ever in progress.
 func newMultiModemImplTest(t *testing.T, numSubchan int, numSlicers int) (*MultiModem, *multiModemImplSink) {
 	t.Helper()
 
-	var d = new(Demodulator)
+	var d = new(fakeDemodulator)
 	d.numSubchan = numSubchan
 	d.numSlicers = numSlicers
 

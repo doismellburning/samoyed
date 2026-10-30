@@ -13,6 +13,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/linecode"
+	"github.com/doismellburning/samoyed/internal/phy"
 	"github.com/sirupsen/logrus"
 )
 
@@ -23,11 +24,6 @@ import (
  */
 
 const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
-
-// bpskCarrierFreq is the BPSK carrier, in Hz, at every bit rate: the tone
-// the NinoTNC's PSK modes use, per its mode table at
-// https://tarpn.net/t/nino-tnc/n9600a/n9600a_operation.html.
-const bpskCarrierFreq = 1500
 
 const PHASE_SHIFT_180 = (uint(128) << 24)
 const PHASE_SHIFT_90 = (uint(64) << 24)
@@ -144,7 +140,7 @@ func NewToneGenerator(channel int, audioConfig *RadioConfig, amp int, sink Audio
 
 	switch audioConfig.achan[channel].ModemType {
 	case MODEM_BPSK:
-		audioConfig.achan[channel].MarkFreq = bpskCarrierFreq
+		audioConfig.achan[channel].MarkFreq = phy.BPSKCarrierFreq
 		audioConfig.achan[channel].SpaceFreq = audioConfig.achan[channel].MarkFreq // Not Used.
 
 		// 1 bit per symbol, so symbol time equals bit time
@@ -411,7 +407,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 	// Would be logical to have MODEM_BASEBAND for IL2P rather than checking here.  But...
 	// That would mean putting in at least 3 places and testing all rather than just one.
-	if lineScrambled(audioConfig.achan[tg.channel].ModemType) &&
+	if audioConfig.achan[tg.channel].ModemType.LineScrambled() &&
 		audioConfig.achan[tg.channel].layer2_xmit != LAYER2_IL2P {
 		dat = tg.scrambler.Scramble(dat & 1)
 	}

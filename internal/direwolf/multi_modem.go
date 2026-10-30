@@ -115,9 +115,9 @@ const PROCESS_AFTER_BITS = 3
 type MultiModem struct {
 	channel     int
 	audioConfig *RadioConfig
-	demodulator *Demodulator    // nil for a channel that is not a radio.
-	receiver    *Layer2Receiver // Asked whether FX.25 is mid-block.
-	sink        ReceiveSink     // Where the frames it picks go.
+	demodulator channelDemodulator // nil for a channel that is not a radio.
+	receiver    *Layer2Receiver    // Asked whether FX.25 is mid-block.
+	sink        ReceiveSink        // Where the frames it picks go.
 
 	candidates [MAX_SUBCHANS][MAX_SLICERS]candidate_t
 
@@ -127,13 +127,27 @@ type MultiModem struct {
 	dcAverage float64
 }
 
+// channelDemodulator is what a MultiModem asks of its channel's demodulator:
+// to take each audio sample, and how many subchannels and slicers it has.
+// *Demodulator is one.
+type channelDemodulator interface {
+	ProcessSample(subchan int, sam int)
+	NumSubchan() int
+	NumSlicers() int
+}
+
 // newMultiModem builds the MultiModem for a channel, which hands what it
 // picks to sink.  demodulator is nil for a channel that is not a radio.
 func newMultiModem(channel int, pa *RadioConfig, demodulator *Demodulator, receiver *Layer2Receiver, sink ReceiveSink) *MultiModem {
 	var m = new(MultiModem)
 	m.channel = channel
 	m.audioConfig = pa
-	m.demodulator = demodulator
+	// Only a real one: a nil *Demodulator would make an interface that isn't
+	// nil, and the MultiModem tells a channel with no radio by nil.
+	if demodulator != nil {
+		m.demodulator = demodulator
+	}
+
 	m.receiver = receiver
 	m.sink = sink
 
@@ -725,7 +739,7 @@ func NewLayer2Receiver(pa *RadioConfig, demods [MAX_RADIO_CHANS]*Demodulator, fx
 			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {
 					var from = dwcore.SlicerID{Channel: ch, Subchannel: sub, Slice: slice}
-					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, lineScrambled(pa.achan[ch].ModemType))
+					r.slicer[ch][sub][slice] = newSlicerReceivers(r, from, pa.achan[ch].ModemType.LineScrambled())
 				}
 			}
 		}
