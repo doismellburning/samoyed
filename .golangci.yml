@@ -40,6 +40,27 @@ linters:
           deny:
             - pkg: invalid
               desc: Dummy deny because we need a non-empty list
+        # The BBS and its AGW client talk to the TNC over AGW, like any other
+        # AGW application, so they keep out of the rest of Samoyed: nothing
+        # changed inside samoyed-direwolf can break them except through AGW,
+        # and they could be moved out of the repository wholesale.  The longest
+        # matching prefix wins, so the allowed packages are exempt from the
+        # deny on internal/ as a whole.
+        bbs:
+          files:
+            - "**/internal/bbs/**"
+            - "**/internal/agwclient/**"
+            - "**/cmd/samoyed-bbs/**"
+          list-mode: lax
+          allow:
+            - github.com/doismellburning/samoyed/internal/agwclient
+            - github.com/doismellburning/samoyed/internal/agwpe
+            - github.com/doismellburning/samoyed/internal/bbs
+            - github.com/doismellburning/samoyed/internal/dwutil
+            - github.com/doismellburning/samoyed/internal/maybe
+          deny:
+            - pkg: github.com/doismellburning/samoyed/internal
+              desc: The BBS and internal/agwclient reach the rest of Samoyed over AGW only
     exhaustive:
       default-signifies-exhaustive: true  # Soften the check for now...
     funlen:
