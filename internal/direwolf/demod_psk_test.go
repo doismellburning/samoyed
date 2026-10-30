@@ -15,7 +15,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/hdlc"
 	"github.com/doismellburning/samoyed/internal/linecode"
 	"github.com/doismellburning/samoyed/internal/phy"
-	"github.com/sirupsen/logrus/hooks/test"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -164,12 +164,12 @@ func TestPSKDelayLineTooLargeIsAnError(t *testing.T) {
 //
 //nolint:paralleltest // Serial: records logrus's global logger through a hook.
 func TestBPSKPrefilterFitsBelowCarrier(t *testing.T) {
+	var hook = testutils.CaptureLogrus(t)
+
 	for _, baud := range []int{300, 1200} {
 		var audioConfig = newTestRadioConfig(0, MODEM_BPSK, baud, 0, 0, 44100)
 		audioConfig.achan[0].NumFreq = 1
 		audioConfig.achan[0].Profiles = "LMNO"
-
-		var hook = test.NewGlobal()
 
 		var _, initErr = NewDemodulator(0, audioConfig.achan[0].ModemConfig, audioConfig.achan[0].layer2_xmit, 44100)
 		require.NoError(t, initErr)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Nothing logged while a test is discarding reaches the output it had before,
@@ -31,4 +32,23 @@ func TestDiscardLogrusPutsTheOutputBack(t *testing.T) {
 
 	assert.Empty(t, buf.String())
 	assert.Same(t, &buf, logrus.StandardLogger().Out)
+}
+
+// What is logged while a test captures it is recorded, and once the test is
+// done the logger has only the hooks it had before.
+//
+//nolint:paralleltest // Serial: changes logrus's global logger.
+func TestCaptureLogrusPutsTheHooksBack(t *testing.T) {
+	var before = len(logrus.StandardLogger().Hooks[logrus.InfoLevel])
+
+	t.Run("capturing", func(t *testing.T) { //nolint:paralleltest // Serial: changes logrus's global logger.
+		var hook = CaptureLogrus(t)
+
+		logrus.Info("captured")
+
+		require.Len(t, hook.AllEntries(), 1)
+		assert.Equal(t, "captured", hook.LastEntry().Message)
+	})
+
+	assert.Len(t, logrus.StandardLogger().Hooks[logrus.InfoLevel], before)
 }
