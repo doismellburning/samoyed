@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later AND AGPL-3.0-or-later
+
+package demod
 
 /*------------------------------------------------------------------
  *
@@ -28,7 +31,7 @@ import (
 // A Demodulator is one radio channel's receive side: the state of each of its
 // subchannels' demodulators, and whether its input is muted while it transmits.
 //
-// NewDemodulator works out its layout - how many subchannels and slicers, and
+// New works out its layout - how many subchannels and slicers, and
 // at what sample rate - from a copy of the channel's settings, and keeps it,
 // rather than writing it back into the configuration.
 //
@@ -36,7 +39,7 @@ import (
 // by PTT.Set on the transmit thread, hence atomic.
 type Demodulator struct {
 	channel   int
-	modemType modem_t
+	modemType phy.Modem
 
 	profiles   string // Normalised: one letter per demodulator, then any "+".
 	numSubchan int    // How many demodulators.
@@ -44,14 +47,14 @@ type Demodulator struct {
 	decimate   int    // AFSK: how many samples are averaged into one.
 	upsample   int    // G3RUH and AIS: how many samples each is made into.
 
-	states [MAX_SUBCHANS]demodulator_state_s // One per subchannel.
+	states [phy.MaxSubchans]demodulator_state_s // One per subchannel.
 	muted  atomic.Bool
 }
 
-// bitReceiver is what a demodulator hands each bit it demodulates to, and
+// BitReceiver is what a demodulator hands each bit it demodulates to, and
 // tells when it starts or stops detecting data on a slicer.
 // *Layer2Receiver is one.
-type bitReceiver interface {
+type BitReceiver interface {
 	RecBit(from dwcore.SlicerID, raw bool, isScrambled bool, pllNudgeTotal *int64, pllSymbolCount *int)
 	DCDChange(from dwcore.SlicerID, state int)
 }
@@ -60,28 +63,14 @@ type bitReceiver interface {
 // received audio level to the metrics endpoint: ~10Hz at a 44.1kHz sample rate.
 const audioLevelDecimation = 4410
 
-/*------------------------------------------------------------------
- *
- * Name:        demod_init
- *
- * Purpose:     Initialize the demodulator(s) used for reception.
- *
- * Inputs:      pa		- Pointer to RadioConfig structure with
- *				  various parameters for the modem(s).
- *
- * Bugs:	This doesn't do much error checking so don't give it
- *		anything crazy.
- *
- *----------------------------------------------------------------*/
-
 // capProfiles limits a channel's demodulator types to the number of
 // demodulators there is room for.  Each letter is a demodulator of its own and
-// the demodulator state is a fixed MAX_SUBCHANS wide, so a longer list would run
+// the demodulator state is a fixed phy.MaxSubchans wide, so a longer list would run
 // off the end of it - which Dire Wolf left to an assert over the subchannel
 // index, taking the whole program down at startup.  Say which channel asked
 // for what instead, and use as many as there are.
 func capProfiles(channel int, profiles string) string {
-	if len(profiles) <= MAX_SUBCHANS {
+	if len(profiles) <= phy.MaxSubchans {
 		return profiles
 	}
 
@@ -89,51 +78,21 @@ func capProfiles(channel int, profiles string) string {
 		"channel":   channel,
 		"profiles":  profiles,
 		"requested": len(profiles),
-		"available": MAX_SUBCHANS,
-		"using":     profiles[:MAX_SUBCHANS],
+		"available": phy.MaxSubchans,
+		"using":     profiles[:phy.MaxSubchans],
 	}).Error("More demodulator types than there are demodulators")
 
-	return profiles[:MAX_SUBCHANS]
+	return profiles[:phy.MaxSubchans]
 }
 
-// demod_init builds a Demodulator for each radio channel, and returns them;
-// a channel that is not a radio has none.
-func demod_init(pa *RadioConfig) ([MAX_RADIO_CHANS]*Demodulator, error) {
-	var demodulators [MAX_RADIO_CHANS]*Demodulator
-
-	for channel := range MAX_RADIO_CHANS {
-		if pa.chan_medium[channel] == MEDIUM_RADIO {
-			var demodulator, err = NewDemodulator(channel, pa.achan[channel].ModemConfig, pa.achan[channel].layer2_xmit, pa.adev[ACHAN2ADEV(channel)].samples_per_sec)
-			if err != nil {
-				return [MAX_RADIO_CHANS]*Demodulator{}, err
-			}
-
-			demodulators[channel] = demodulator
-		}
-
-		// FIXME dw_printf ("-------- end of loop for chn %d \n", channel);
-	} /* for chan ... */
-
-	// Now the virtual channels.  FIXME:  could be single loop.
-
-	for channel := MAX_RADIO_CHANS; channel < MAX_TOTAL_CHANS; channel++ {
-		// FIXME dw_printf ("-------- virtual channel loop %d \n", channel);
-		if channel == pa.igate_vchannel {
-			logrus.WithField("channel", channel).Info("IGate virtual channel")
-		}
-	}
-
-	return demodulators, nil
-} /* end demod_init */
-
-// NewDemodulator sets up the demodulators for a radio channel, from its modem
+// New sets up the demodulators for a radio channel, from its modem
 // settings and the sample rate of its audio device; layer2Xmit, how the channel
 // frames what it sends, is only for the summary it logs.  What it works out
 // from them - how many subchannels and slicers, the normalised profiles, the
 // decimation and upsampling ratios - it keeps: modem is its own copy, and the
 // configuration is left as it was.
-func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, samplesPerSec int) (*Demodulator, error) { //nolint:funlen // Ported from Dire Wolf as one function
-	dwutil.Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+func New(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, samplesPerSec int) (*Demodulator, error) { //nolint:funlen // Ported from Dire Wolf as one function
+	dwutil.Assert(channel >= 0 && channel < phy.MaxRadioChans)
 
 	var demodulator = new(Demodulator)
 	demodulator.channel = channel
@@ -152,9 +111,9 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 	var numSlicers = 1
 
 	switch modem.ModemType {
-	case MODEM_OFF:
+	case phy.Off:
 
-	case MODEM_AFSK, MODEM_EAS:
+	case phy.AFSK, phy.EAS:
 		/*
 		 * Tear apart the profile and put it back together in a normalized form:
 		 *	- At least one letter, supply suitable default if necessary.
@@ -331,7 +290,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			"profiles":     modem.Profiles,
 			"sample_rate":  samplesPerSec,
 			"tx":           layer2Xmit,
-			"dtmf_decoder": modem.DTMFDecode != DTMF_DECODE_OFF,
+			"dtmf_decoder": modem.DTMFDecode != phy.DTMFDecodeOff,
 		}
 
 		if modem.Decimate != 1 {
@@ -375,7 +334,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			}
 
 			for d := range numSubchan {
-				dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
+				dwutil.Assert(d >= 0 && d < phy.MaxSubchans)
 
 				var D = &demodulator.states[d]
 
@@ -403,8 +362,8 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 				if have_plus != 0 {
 					/* I'm not happy about putting this hack here. */
 					/* should pass in as a parameter rather than adding on later. */
-					numSlicers = MAX_SLICERS
-					D.num_slicers = MAX_SLICERS
+					numSlicers = phy.MaxSlicers
+					D.num_slicers = phy.MaxSlicers
 				}
 
 				/* For signal level reporting, we want a longer term view. */
@@ -446,7 +405,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			/* I'm not happy about putting this hack here. */
 			/* This belongs in demod_afsk_init but it doesn't have access to the audio config. */
 
-			numSlicers = MAX_SLICERS
+			numSlicers = phy.MaxSlicers
 
 			demod_afsk_init(samplesPerSec/modem.Decimate,
 				modem.Baud,
@@ -458,8 +417,8 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			if have_plus != 0 {
 				/* I'm not happy about putting this hack here. */
 				/* should pass in as a parameter rather than adding on later. */
-				numSlicers = MAX_SLICERS
-				D.num_slicers = MAX_SLICERS
+				numSlicers = phy.MaxSlicers
+				D.num_slicers = phy.MaxSlicers
 			}
 
 			/* For signal level reporting, we want a longer term view. */
@@ -481,7 +440,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			numSubchan = modem.NumFreq
 
 			for d := range modem.NumFreq {
-				dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
+				dwutil.Assert(d >= 0 && d < phy.MaxSubchans)
 
 				var D = &demodulator.states[d]
 
@@ -510,8 +469,8 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 				if have_plus != 0 {
 					/* I'm not happy about putting this hack here. */
 					/* should pass in as a parameter rather than adding on later. */
-					numSlicers = MAX_SLICERS
-					D.num_slicers = MAX_SLICERS
+					numSlicers = phy.MaxSlicers
+					D.num_slicers = phy.MaxSlicers
 				}
 
 				/* For signal level reporting, we want a longer term view. */
@@ -521,13 +480,13 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			} /* for each freq pair */
 		}
 
-	case MODEM_QPSK: // New for 1.4
+	case phy.QPSK: // New for 1.4
 		// settleModemOptions has normally picked one already.  Without
 		// it, e.g. in a test, take the same default but leave the
 		// configuration alone.
 		var v26 = modem.V26Alternative
-		if v26 == V26_UNSPECIFIED {
-			v26 = V26_DEFAULT
+		if v26 == phy.V26Unspecified {
+			v26 = phy.V26Default
 		}
 
 		// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
@@ -536,7 +495,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			//#if __arm__
 			//	        strlcpy (achan.profiles, "R", sizeof(achan.profiles));
 			//#else
-			modem.Profiles = defaultPSKProfiles(MODEM_QPSK)
+			modem.Profiles = defaultPSKProfiles(phy.QPSK)
 			//#endif
 		}
 
@@ -549,12 +508,12 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			"profiles":        modem.Profiles,
 			"sample_rate":     samplesPerSec,
 			"tx":              layer2Xmit,
-			"compatible_with": dwutil.IfThenElse(v26 == V26_B, "MFJ-2400", "earlier direwolf"),
-			"dtmf_decoder":    modem.DTMFDecode != DTMF_DECODE_OFF,
+			"compatible_with": dwutil.IfThenElse(v26 == phy.V26B, "MFJ-2400", "earlier direwolf"),
+			"dtmf_decoder":    modem.DTMFDecode != phy.DTMFDecodeOff,
 		}).Info("QPSK demodulator")
 
 		for d := range numSubchan {
-			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
+			dwutil.Assert(d >= 0 && d < phy.MaxSubchans)
 			var D = &demodulator.states[d]
 			var profile = modem.Profiles[d]
 
@@ -582,13 +541,14 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			D.sluggish_decay = 0.00012 * 0.2
 		}
 
-	case MODEM_8PSK: // New for 1.4
+	//nolint:dupl // Per-modem setup, kept parallel to upstream
+	case phy.PSK8: // New for 1.4
 		// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
 		if modem.Profiles == "" {
 			//#if __arm__
 			//	        strlcpy (achan.profiles, "V", sizeof(achan.profiles));
 			//#else
-			modem.Profiles = defaultPSKProfiles(MODEM_8PSK)
+			modem.Profiles = defaultPSKProfiles(phy.PSK8)
 			//#endif
 		}
 
@@ -601,11 +561,11 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			"profiles":     modem.Profiles,
 			"sample_rate":  samplesPerSec,
 			"tx":           layer2Xmit,
-			"dtmf_decoder": modem.DTMFDecode != DTMF_DECODE_OFF,
+			"dtmf_decoder": modem.DTMFDecode != phy.DTMFDecodeOff,
 		}).Info("8PSK demodulator")
 
 		for d := range numSubchan {
-			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
+			dwutil.Assert(d >= 0 && d < phy.MaxSubchans)
 			var D = &demodulator.states[d]
 			var profile = modem.Profiles[d]
 
@@ -633,9 +593,10 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			D.sluggish_decay = 0.00012 * 0.2
 		}
 
-	case MODEM_BPSK:
+	//nolint:dupl // Per-modem setup, kept parallel to upstream
+	case phy.BPSK:
 		if modem.Profiles == "" {
-			modem.Profiles = defaultPSKProfiles(MODEM_BPSK)
+			modem.Profiles = defaultPSKProfiles(phy.BPSK)
 		}
 
 		modem.Profiles = capProfiles(channel, modem.Profiles)
@@ -647,16 +608,16 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			"profiles":     modem.Profiles,
 			"sample_rate":  samplesPerSec,
 			"tx":           layer2Xmit,
-			"dtmf_decoder": modem.DTMFDecode != DTMF_DECODE_OFF,
+			"dtmf_decoder": modem.DTMFDecode != phy.DTMFDecodeOff,
 		}).Info("BPSK demodulator")
 
 		for d := range numSubchan {
-			dwutil.Assert(d >= 0 && d < MAX_SUBCHANS)
+			dwutil.Assert(d >= 0 && d < phy.MaxSubchans)
 			var D = &demodulator.states[d]
 			var profile = modem.Profiles[d]
 
 			var pskErr = demod_psk_init(modem.ModemType,
-				V26_UNSPECIFIED,
+				phy.V26Unspecified,
 				samplesPerSec,
 				modem.Baud,
 				profile,
@@ -739,8 +700,8 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 				"sample_rate":  samplesPerSec,
 				"upsample":     modem.Upsample,
 				"tx":           layer2Xmit,
-				"dtmf_decoder": modem.DTMFDecode != DTMF_DECODE_OFF,
-			}).Info(dwutil.IfThenElse(modem.ModemType == MODEM_AIS, "AIS demodulator", "K9NG/G3RUH demodulator"))
+				"dtmf_decoder": modem.DTMFDecode != phy.DTMFDecodeOff,
+			}).Info(dwutil.IfThenElse(modem.ModemType == phy.AIS, "AIS demodulator", "K9NG/G3RUH demodulator"))
 
 			var D = &demodulator.states[0] // first subchannel
 
@@ -750,7 +711,7 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			if strings.Contains(modem.Profiles, "+") {
 				/* I'm not happy about putting this hack here. */
 				/* This belongs in demod_9600_init but it doesn't have access to the audio config. */
-				numSlicers = MAX_SLICERS
+				numSlicers = phy.MaxSlicers
 			}
 
 			var ratioLog = logrus.WithFields(logrus.Fields{
@@ -784,8 +745,8 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 			if strings.Contains(modem.Profiles, "+") {
 				/* I'm not happy about putting this hack here. */
 				/* should pass in as a parameter rather than adding on later. */
-				numSlicers = MAX_SLICERS
-				D.num_slicers = MAX_SLICERS
+				numSlicers = phy.MaxSlicers
+				D.num_slicers = phy.MaxSlicers
 			}
 
 			/* For signal level reporting, we want a longer term view. */
@@ -805,10 +766,10 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 	return demodulator, nil
 }
 
-// setReceiver makes r where every subchannel of d hands its bits.  It is set
-// once d is built, rather than handed to NewDemodulator, to break a cycle: the
+// SetReceiver makes r where every subchannel of d hands its bits.  It is set
+// once d is built, rather than handed to New, to break a cycle: the
 // Layer2Receiver that receives the bits is itself built from the demodulators.
-func (d *Demodulator) setReceiver(r bitReceiver) {
+func (d *Demodulator) SetReceiver(r BitReceiver) {
 	for sub := range d.states {
 		d.states[sub].receiver = r
 	}
@@ -825,78 +786,20 @@ func (d *Demodulator) NumSlicers() int {
 	return d.numSlicers
 }
 
-/*------------------------------------------------------------------
- *
- * Name:        demod_get_sample
- *
- * Purpose:     Get one audio sample from the specified sound input source.
- *
- * Inputs:	a	- Index for audio device.  0 = first.
- *
- * Returns:     -32768 .. 32767 for a valid audio sample.
- *              256*256 for end of file or other error.
- *
- * Inputs:	a	- Audio device number.
- *
- *		bits_per_sample	- That device's, 8 or 16, so we know
- *				  whether to read 1 or 2 bytes from audio stream.
- *
- *		src	- Where the sample data comes from.
- *
- * Description:	Grab 1 or two bytes depending on data source.
- *
- *		When processing stereo, the caller will call this
- *		at twice the normal rate to obtain alternating left
- *		and right samples.
- *
- *----------------------------------------------------------------*/
-
-const FSK_READ_ERR = (256 * 256)
-
-// A SampleSource is where the audio the demodulators work on comes from: one
-// byte of sample data at a time, or -1 when there is no more.
-//
-// AudioDevices is the one a running Samoyed uses; samoyed-atest reads a
-// .WAV file instead, and a test hands over bytes of its own.
-type SampleSource interface {
-	GetByte(adev int) int
+// Channel is the radio channel the demodulator listens on.
+func (d *Demodulator) Channel() int {
+	return d.channel
 }
 
-func demod_get_sample(a int, bits_per_sample int, src SampleSource) int {
-	dwutil.Assert(bits_per_sample == 8 || bits_per_sample == 16)
+// Muted says whether the channel's input is being silenced, as Mute left it.
+func (d *Demodulator) Muted() bool {
+	return d.muted.Load()
+}
 
-	// TODO KG Originally this was a C signed short with the comment "short to force sign extension" - forcing via int16 seems to do the right thing...
-	var sam int16
-
-	if bits_per_sample == 8 {
-		var x1 = src.GetByte(a)
-		if x1 < 0 {
-			return (FSK_READ_ERR)
-		}
-
-		dwutil.Assert(x1 >= 0 && x1 <= 255)
-
-		/* Scale 0..255 into -32k..+32k */
-
-		sam = (int16(byte(x1&0xff)) - 128) * 256
-	} else {
-		var x1 = src.GetByte(a) /* lower byte first */
-		if x1 < 0 {
-			return (FSK_READ_ERR)
-		}
-
-		var x2 = src.GetByte(a)
-		if x2 < 0 {
-			return (FSK_READ_ERR)
-		}
-
-		dwutil.Assert(x1 >= 0 && x1 <= 255)
-		dwutil.Assert(x2 >= 0 && x2 <= 255)
-
-		sam = int16(byte(x2&0xff))<<8 | int16(byte(x1&0xff))
-	}
-
-	return int(sam)
+// Decimate is the decimation the demodulator settled on: how many audio
+// samples AFSK averages into one.  Below 2 means none.
+func (d *Demodulator) Decimate() int {
+	return d.decimate
 }
 
 /*-------------------------------------------------------------------
@@ -952,7 +855,7 @@ func (d *Demodulator) Mute(mute bool) {
 // ProcessSample hands one audio sample, in the range -32768 to 32767, to the
 // subchannel's demodulator.
 func (d *Demodulator) ProcessSample(subchan int, sam int) {
-	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
+	dwutil.Assert(subchan >= 0 && subchan < phy.MaxSubchans)
 
 	var channel = d.channel
 
@@ -1003,12 +906,12 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 	 */
 
 	switch d.modemType {
-	case MODEM_OFF:
+	case phy.Off:
 
 		// Might have channel only listening to DTMF for APRStt gateway.
 		// Don't waste CPU time running a demodulator here.
 
-	case MODEM_AFSK, MODEM_EAS:
+	case phy.AFSK, phy.EAS:
 		if d.decimate > 1 {
 			D.decimate_sum += sam
 
@@ -1025,7 +928,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 			demod_afsk_process_sample(channel, subchan, sam, D)
 		}
 
-	case MODEM_QPSK, MODEM_8PSK, MODEM_BPSK:
+	case phy.QPSK, phy.PSK8, phy.BPSK:
 		// Decimation would probably work but hasn't been thought about or
 		// tested yet, so PSK is always demodulated at the full sample rate.
 		demod_psk_process_sample(channel, subchan, sam, D)
@@ -1048,7 +951,7 @@ func (d *Demodulator) ProcessSample(subchan int, sam int) {
 // AudioLevel reports the received audio level the subchannel's demodulator
 // has seen, and for AFSK its mark and space amplitudes.
 func (d *Demodulator) AudioLevel(subchan int) ax25.ALevel {
-	dwutil.Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
+	dwutil.Assert(subchan >= 0 && subchan < phy.MaxSubchans)
 
 	/* We have to consider two different cases here. */
 	/* N demodulators, each with own slicer and HDLC decoder. */
@@ -1066,11 +969,11 @@ func (d *Demodulator) AudioLevel(subchan int) ax25.ALevel {
 	alevel.Rec = int((D.alevel_rec_peak-D.alevel_rec_valley)*50.0 + 0.5)
 
 	switch d.modemType {
-	case MODEM_AFSK, MODEM_EAS:
+	case phy.AFSK, phy.EAS:
 		/* For AFSK, we have mark and space amplitudes. */
 		alevel.Mark = (int)((D.alevel_mark_peak)*100.0 + 0.5)
 		alevel.Space = (int)((D.alevel_space_peak)*100.0 + 0.5)
-	case MODEM_QPSK, MODEM_8PSK, MODEM_BPSK:
+	case phy.QPSK, phy.PSK8, phy.BPSK:
 		alevel.Mark = -1
 		alevel.Space = -1
 	default:
