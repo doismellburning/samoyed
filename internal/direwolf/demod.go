@@ -805,7 +805,9 @@ func NewDemodulator(channel int, modem phy.ModemConfig, layer2Xmit phy.Layer2, s
 	return demodulator, nil
 }
 
-// setReceiver makes r where every subchannel of d hands its bits.
+// setReceiver makes r where every subchannel of d hands its bits.  It is set
+// once d is built, rather than handed to NewDemodulator, to break a cycle: the
+// Layer2Receiver that receives the bits is itself built from the demodulators.
 func (d *Demodulator) setReceiver(r bitReceiver) {
 	for sub := range d.states {
 		d.states[sub].receiver = r
