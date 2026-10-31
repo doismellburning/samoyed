@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"time"
 )
 
@@ -188,14 +189,22 @@ type errReader struct{ err error }
 
 func (e errReader) Read([]byte) (int, error) { return 0, e.err }
 
-// Write writes each line to w, ending each with CR.
+// Write writes each line to w, ending each with CR, all in one write: over
+// AX.25 that lets them share frames, where a write per line would be a frame
+// per line.
 func Write(w io.Writer, lines ...string) error {
-	for _, line := range lines {
-		var _, err = io.WriteString(w, line+"\r")
-		if err != nil {
-			return err
-		}
+	if len(lines) == 0 {
+		return nil
 	}
 
-	return nil
+	var buf strings.Builder
+
+	for _, line := range lines {
+		buf.WriteString(line)
+		buf.WriteByte('\r')
+	}
+
+	var _, err = io.WriteString(w, buf.String())
+
+	return err
 }
