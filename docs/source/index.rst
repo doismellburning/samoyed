@@ -90,6 +90,17 @@ Where this site doesn't yet cover something,
    installation
    quickstart
 
+Usage
+-----
+
+* :doc:`usage` - Samoyed as a complete packet node
+
+.. toctree::
+   :caption: Usage
+   :hidden:
+
+   usage
+
 Using Samoyed
 -------------
 

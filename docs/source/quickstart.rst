@@ -131,3 +131,8 @@ and ``SupplementaryGroups`` gives that user the sound card and serial ports
 (see :ref:`installation:Permissions on Linux`).
 ``systemctl stop`` unkeys the transmitter on the way out
 (see :ref:`how-to-guides:Stop it without leaving the rig keyed`).
+
+Next
+----
+
+:doc:`usage` describes the ways Samoyed fits into a station.
