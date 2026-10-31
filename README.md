@@ -85,6 +85,10 @@ The `.deb` packages are recommended for Debian-based systems (Debian, Ubuntu, Ra
 sudo apt install ./samoyed-binary_*.deb
 ```
 
+Both carry the APRS data files (`tocalls.yaml`, which names the device behind a packet, and `symbols-new.txt`).
+The `.deb` installs them to `/usr/share/samoyed`, beside rather than over Dire Wolf's `/usr/share/direwolf`; a tarball has them in `data/`, found when Samoyed is run from the directory it was unpacked into.
+Samoyed looks in the current directory, `data/`, `/usr/local/share/samoyed` and `/usr/share/samoyed`, and not in Dire Wolf's directories.
+
 ## Quick start
 
 `samoyed-direwolf` is the modem/TNC itself.

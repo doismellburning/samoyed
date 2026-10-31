@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-// OpenDataFile opens one of the data files Dire Wolf ships in data/, such as
+// OpenDataFile opens one of the data files Samoyed ships in data/, such as
 // tocalls.yaml or symbols-new.txt, from the first of the usual places it is
 // found. The error names every location tried.
 func OpenDataFile(name string) (*os.File, error) {
@@ -17,13 +17,11 @@ func OpenDataFile(name string) (*os.File, error) {
 		".",          // Current working directory
 		"data",       // Windows with CMake
 		"../../data", // Source tree, e.g. running tests from internal/<pkg>/ or cmd/<name>/
-		"/usr/local/share/direwolf",
-		"/usr/share/direwolf",
-		// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458
-		// Adding the /opt/local tree since macports typically installs there.  Users might want their
-		// INSTALLDIR (see Makefile.macosx) to mirror that.  If so, then we need to search the /opt/local
-		// path as well.
-		"/opt/local/share/direwolf",
+		// Where the .deb installs them. Dire Wolf's own directories aren't
+		// searched: an installed Dire Wolf's copies may be older, and Samoyed
+		// ships its own.
+		"/usr/local/share/samoyed",
+		"/usr/share/samoyed",
 	}
 
 	var searched = make([]string, 0, len(dirs))

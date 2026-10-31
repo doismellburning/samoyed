@@ -268,8 +268,7 @@ func alternateSymtab() []entry {
  *
  *		Windows version:  File must be in current working directory.
  *
- *		Linux version: Search order is current working directory
- *			then /usr/share/direwolf directory.
+ *		Linux version: Search order is as dwutil.OpenDataFile's.
  *
  *------------------------------------------------------------------*/
 
