@@ -13,6 +13,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/aprs"
 	"github.com/doismellburning/samoyed/internal/aprstt"
+	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/digipeater"
 	"github.com/doismellburning/samoyed/internal/il2p"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -3087,6 +3088,17 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 					a.Equal(MEDIUM_NETTNC, c.audio.chan_medium[6])
 					a.Equal("localhost", c.audio.nettnc_addr[6])
 					a.Equal(8001, c.audio.nettnc_port[6])
+				},
+			},
+			{
+				name:   "samoyed-axudp's example config is accepted",
+				config: axudp.ExampleDirewolfConfig,
+				check: func(a *assert.Assertions, c configs) {
+					a.Zero(c.errors)
+					a.Equal(MEDIUM_NETTNC, c.audio.chan_medium[10])
+					a.Equal("localhost", c.audio.nettnc_addr[10])
+					a.Equal(8002, c.audio.nettnc_port[10])
+					a.Equal("Q1TEST", c.audio.mycall[10])
 				},
 			},
 			{

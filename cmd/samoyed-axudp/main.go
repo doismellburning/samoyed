@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/doismellburning/samoyed/internal/axudp"
 	"github.com/doismellburning/samoyed/internal/dwutil"
@@ -47,6 +48,18 @@ import (
 // through a mapped neighbour can connect without a map of its own.  Map
 // entries always win over what is learned.
 
+// indent prefixes each line of text with two spaces, to set it out in the help.
+func indent(text string) string {
+	var lines = strings.SplitAfter(text, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = "  " + line
+		}
+	}
+
+	return strings.Join(lines, "")
+}
+
 func main() {
 	pflag.Usage = func() {
 		fmt.Fprintf(pflag.CommandLine.Output(), `samoyed-axudp [BETA] - AXUDP bridge for samoyed-direwolf
@@ -81,13 +94,11 @@ With automap: true, a frame for an address no map covers goes back to
 wherever a datagram from that address last came from, within the last hour,
 so long as that was the IP address of a mapped host.
 
-Example samoyed-direwolf config to connect via samoyed-axudp:
-  CHANNEL 2
-  MYCALL Q1TEST
-  NCHANNEL 2 localhost 8002
-
+Example samoyed-direwolf config to connect via samoyed-axudp, as virtual
+channel 10 (NCHANNEL takes 6 to 15), with the MYCALL applying to it:
+%s
 Flags:
-`)
+`, indent(axudp.ExampleDirewolfConfig))
 		pflag.PrintDefaults()
 	}
 

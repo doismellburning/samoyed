@@ -25,6 +25,14 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+// ExampleDirewolfConfig is a samoyed-direwolf config fragment that reaches
+// AXUDP nodes through samoyed-axudp on its default KISS port, as virtual
+// channel 10: NCHANNEL takes only 6 to 15, and the first MYCALL in a file
+// applies to every channel.
+const ExampleDirewolfConfig = `MYCALL Q1TEST
+NCHANNEL 10 localhost 8002
+`
+
 // MapEntry holds one MAP line from the config.
 type MapEntry struct {
 	AX25Addr string       // AX.25 address, i.e. callsign and optional SSID, e.g. "Q1TEST" or "Q1TEST-1"
