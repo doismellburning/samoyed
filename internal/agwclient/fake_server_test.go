@@ -36,8 +36,15 @@ type fakeServer struct {
 	registered chan int // Each port registered, on any connection
 	accepted   chan struct{}
 
-	mu   sync.Mutex
-	conn net.Conn
+	mu     sync.Mutex
+	conn   net.Conn
+	closed bool // The test has ended, so no connection is to be served
+
+	// done is closed when the test ends, and serving waits for serving to
+	// stop: a reply it goes on to log after the test has finished would race
+	// with the test finishing.
+	done    chan struct{}
+	serving sync.WaitGroup
 }
 
 func newFakeServer(t *testing.T) *fakeServer {
@@ -59,10 +66,18 @@ func newFakeServer(t *testing.T) *fakeServer {
 	s.logins = make(chan *agwpe.Message, 16)
 	s.registered = make(chan int, 64)
 	s.accepted = make(chan struct{}, 16)
+	s.done = make(chan struct{})
 
 	t.Cleanup(func() {
+		close(s.done)
 		_ = ln.Close()
+
+		s.mu.Lock()
+		s.closed = true
+		s.mu.Unlock()
+
 		s.dropConnection()
+		s.serving.Wait()
 	})
 
 	return s
@@ -72,22 +87,40 @@ func (s *fakeServer) addr() string { return s.ln.Addr().String() }
 
 // start serves connections, one at a time, until the test ends.
 func (s *fakeServer) start() {
-	go func() {
+	s.serving.Go(func() {
 		for {
 			var conn, err = s.ln.Accept()
 			if err != nil {
 				return
 			}
 
+			// One accepted as the test ends would otherwise be left open,
+			// with nothing to close it and serve reading from it forever.
 			s.mu.Lock()
+			if s.closed {
+				s.mu.Unlock()
+				_ = conn.Close()
+
+				return
+			}
+
 			s.conn = conn
 			s.mu.Unlock()
 
-			s.accepted <- struct{}{}
+			deliver(s, s.accepted, struct{}{})
 
 			s.serve(conn)
 		}
-	}()
+	})
+}
+
+// deliver hands v to the test on ch, unless the test has ended and is no
+// longer taking anything from it.
+func deliver[T any](s *fakeServer, ch chan<- T, v T) {
+	select {
+	case ch <- v:
+	case <-s.done:
+	}
 }
 
 func (s *fakeServer) serve(conn net.Conn) {
@@ -99,7 +132,7 @@ func (s *fakeServer) serve(conn net.Conn) {
 
 		switch msg.Header.DataKind {
 		case kindLogin:
-			s.logins <- msg
+			deliver(s, s.logins, msg)
 		case kindVersion:
 			var data = binary.LittleEndian.AppendUint32(nil, 2005)
 			s.reply(conn, 0, kindVersion, "", "", binary.LittleEndian.AppendUint32(data, 127))
@@ -107,16 +140,16 @@ func (s *fakeServer) serve(conn net.Conn) {
 			s.reply(conn, 0, kindPorts, "", "", []byte(s.portsReply))
 		case kindRegister:
 			s.reply(conn, int(msg.Header.Portx), kindRegister, msg.Header.CallFrom.String(), "", []byte{s.registerOK})
-			s.registered <- int(msg.Header.Portx)
+			deliver(s, s.registered, int(msg.Header.Portx))
 		case kindOutstanding:
-			s.got <- msg
+			deliver(s, s.got, msg)
 
 			if s.answerY.Load() {
 				var count = binary.LittleEndian.AppendUint32(nil, s.outstanding.Load())
 				s.reply(conn, int(msg.Header.Portx), kindOutstanding, msg.Header.CallFrom.String(), msg.Header.CallTo.String(), count)
 			}
 		default:
-			s.got <- msg
+			deliver(s, s.got, msg)
 		}
 	}
 }
