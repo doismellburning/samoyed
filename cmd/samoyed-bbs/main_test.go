@@ -4,10 +4,19 @@
 package main
 
 import (
+	"encoding/binary"
+	"errors"
+	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"testing"
+	"time"
 
+	"github.com/ccoveille/go-safecast/v2"
+	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,7 +75,8 @@ func TestNothingToServe(t *testing.T) {
 	var result = testutils.RunMain(t, "", "-c", writeConfig(t))
 
 	assert.Equal(t, 1, result.Status)
-	assert.Contains(t, result.Output(), "Use --console CALL")
+	assert.Contains(t, result.Output(), "no agw block")
+	assert.Contains(t, result.Output(), "use --console CALL")
 }
 
 func TestConsoleRefusesABadCall(t *testing.T) {
@@ -109,4 +119,124 @@ func TestConsoleWithAnUnopenableStore(t *testing.T) {
 
 	assert.Equal(t, 1, result.Status)
 	assert.Contains(t, result.Output(), "message store")
+}
+
+// readTNC reads one frame the BBS sent to the TNC.
+func readTNC(t *testing.T, conn net.Conn) *agwpe.Message {
+	t.Helper()
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(10*time.Second)))
+
+	var msg = new(agwpe.Message)
+
+	require.NoError(t, binary.Read(conn, binary.LittleEndian, &msg.Header))
+
+	msg.Data = make([]byte, msg.Header.DataLen)
+
+	var _, err = io.ReadFull(conn, msg.Data)
+	require.NoError(t, err)
+
+	return msg
+}
+
+// writeTNC sends the BBS a frame as the TNC.
+func writeTNC(t *testing.T, conn net.Conn, kind byte, from string, to string, data []byte) {
+	t.Helper()
+
+	var msg = new(agwpe.Message)
+
+	msg.Header.DataKind = kind
+	copy(msg.Header.CallFrom[:], from)
+	copy(msg.Header.CallTo[:], to)
+	msg.Header.DataLen = safecast.RequireConvert[uint32](t, len(data))
+	msg.Data = data
+
+	var _, err = msg.Write(conn, binary.LittleEndian)
+	if !errors.Is(err, net.ErrClosed) {
+		require.NoError(t, err)
+	}
+}
+
+// readTNCUntil reads frames from the BBS until one of kind whose data
+// contains want, answering every outstanding frames question with 0.
+func readTNCUntil(t *testing.T, conn net.Conn, kind byte, want string) *agwpe.Message {
+	t.Helper()
+
+	for {
+		var msg = readTNC(t, conn)
+
+		if msg.Header.DataKind == 'Y' {
+			writeTNC(t, conn, 'Y', msg.Header.CallFrom.String(), msg.Header.CallTo.String(), binary.LittleEndian.AppendUint32(nil, 0))
+
+			continue
+		}
+
+		if msg.Header.DataKind == kind && strings.Contains(string(msg.Data), want) {
+			return msg
+		}
+	}
+}
+
+// readText reads what the BBS sends the station, frame by frame, until it
+// includes want, and returns all of it.
+func readText(t *testing.T, conn net.Conn, want string) string {
+	t.Helper()
+
+	var text strings.Builder
+
+	for !strings.Contains(text.String(), want) {
+		text.Write(readTNCUntil(t, conn, 'D', "").Data)
+	}
+
+	return text.String()
+}
+
+// The BBS registers its callsign with the AGW server, and serves a station
+// that connects through it.
+func TestServingOverAGW(t *testing.T) {
+	t.Parallel()
+
+	var ln, port = testutils.Listen(t)
+
+	var dir = t.TempDir()
+	var file = filepath.Join(dir, "samoyed-bbs.yaml")
+
+	require.NoError(t, os.WriteFile(file, []byte("call: Q1BBS\nstore: "+filepath.Join(dir, "bbs.db")+"\nagw:\n  addr: 127.0.0.1:"+port+"\n"), 0o600))
+
+	var p = testutils.StartMain(t, "-c", file)
+	var tnc = testutils.Accept(t, ln)
+
+	assert.Equal(t, byte('R'), readTNC(t, tnc).Header.DataKind)
+	writeTNC(t, tnc, 'R', "", "", make([]byte, 8))
+
+	assert.Equal(t, byte('G'), readTNC(t, tnc).Header.DataKind)
+	writeTNC(t, tnc, 'G', "", "", []byte("1;Port1 first soundcard mono;"))
+
+	var reg = readTNC(t, tnc)
+	assert.Equal(t, byte('X'), reg.Header.DataKind)
+	assert.Equal(t, "Q1BBS", reg.Header.CallFrom.String())
+	writeTNC(t, tnc, 'X', "Q1BBS", "", []byte{1})
+
+	p.WaitFor(t, "Connected to AGW server")
+
+	// A station connects, is greeted, lists the messages and leaves.
+	writeTNC(t, tnc, 'C', "Q2TEST", "Q1BBS", []byte("*** CONNECTED To Station Q2TEST\r\x00"))
+
+	var greeting = readText(t, tnc, "de Q1BBS>")
+	assert.Contains(t, greeting, "Welcome to Q1BBS, a Samoyed BBS.\r[SAMBBS-0.0-$]\r")
+
+	writeTNC(t, tnc, 'D', "Q2TEST", "Q1BBS", []byte("L\r"))
+	readText(t, tnc, "No messages.")
+
+	writeTNC(t, tnc, 'D', "Q2TEST", "Q1BBS", []byte("B\r"))
+	readText(t, tnc, "73")
+
+	var hangUp = readTNCUntil(t, tnc, 'd', "")
+	assert.Equal(t, "Q2TEST", hangUp.Header.CallTo.String())
+
+	writeTNC(t, tnc, 'd', "Q2TEST", "Q1BBS", []byte("*** DISCONNECTED From Station Q2TEST\r\x00"))
+	p.WaitFor(t, "End session")
+
+	p.Signal(t, syscall.SIGTERM)
+	assert.Equal(t, 0, p.Wait())
 }
