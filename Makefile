@@ -1,5 +1,8 @@
 DIST_DIR = dist
 DEB_STAGING = .deb-staging
+# The data files read at run time (see dwutil.OpenDataFile), which the .deb
+# and the release tarballs ship alongside the binaries
+DATA_FILES = data/tocalls.yaml data/symbols-new.txt
 C_FILES = $(shell find * -name \*.c)
 GO_FILES = $(shell find * -name \*.go)
 SHELL_FILES = $(shell grep -rIl '^\#!.*sh' * .claude)
@@ -50,10 +53,11 @@ $(DIST_DIR):
 deb: cmds
 	test -n "$(SAMOYED_VERSION)" || (echo "ERROR: SAMOYED_VERSION is not set" >&2; exit 1)
 	rm -rf $(DEB_STAGING)
-	mkdir -p $(DEB_STAGING)/root/DEBIAN $(DEB_STAGING)/root/usr/bin $(DEB_STAGING)/root/usr/share/man/man1 $(DEB_STAGING)/debian
+	mkdir -p $(DEB_STAGING)/root/DEBIAN $(DEB_STAGING)/root/usr/bin $(DEB_STAGING)/root/usr/share/man/man1 $(DEB_STAGING)/root/usr/share/samoyed $(DEB_STAGING)/debian
 	strip $(DIST_DIR)/*
 	cp $(DIST_DIR)/samoyed-* $(DEB_STAGING)/root/usr/bin/
 	cp man/*.1 $(DEB_STAGING)/root/usr/share/man/man1/
+	cp $(DATA_FILES) $(DEB_STAGING)/root/usr/share/samoyed/
 	touch $(DEB_STAGING)/debian/control
 	cd $(DEB_STAGING) && dpkg-shlibdeps -O \
 		$$(for f in root/usr/bin/samoyed-*; do readelf -l "$$f" | grep -q INTERP && echo "$$f"; done) \
@@ -66,6 +70,13 @@ deb: cmds
 		> $(DEB_STAGING)/root/DEBIAN/control
 	dpkg-deb --build --root-owner-group $(DEB_STAGING)/root samoyed-binary_$(SAMOYED_VERSION)_$$(dpkg --print-architecture).deb
 	rm -rf $(DEB_STAGING)
+
+# The release tarball: the binaries, and the data files in data/, where
+# dwutil.OpenDataFile finds them when run from the directory it unpacks into.
+.PHONY: tarball
+tarball: cmds
+	test -n "$(TARBALL_NAME)" || (echo "ERROR: TARBALL_NAME is not set" >&2; exit 1)
+	tar czvf "$(TARBALL_NAME)" $(DIST_DIR)/ $(DATA_FILES)
 
 .PHONY: test
 test: gotest test-scripts
