@@ -817,7 +817,7 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 		// records a speed error of 0, as Dire Wolf does for AFSK.
 		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
 		D.receiver.RecBit(from, demod_out > 0, false,
-			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
+			&D.slicer[slice].pll)
 		pll_dcd_each_symbol2(DCD_CONFIG_AFSK, D, channel, subchannel, slice)
 	}
 
@@ -833,7 +833,7 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 		} else {
 			D.slicer[slice].data_clock_pll = int32(float64(D.slicer[slice].data_clock_pll) * D.pll_searching_inertia)
 		}
-		// TODO:	  D.slicer[slice].pll_nudge_total += (int64_t)((signed int)(D.slicer[slice].data_clock_pll)) - (int64_t)before;
+		// TODO:	  D.slicer[slice].pll.NudgeTotal += (int64_t)((signed int)(D.slicer[slice].data_clock_pll)) - (int64_t)before;
 	}
 
 	/*

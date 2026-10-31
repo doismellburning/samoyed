@@ -154,7 +154,7 @@ func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
 	}()
 
 	for range 1000 {
-		d.ProcessSample(0, 1000)
+		d.processSubchanSample(0, 1000)
 	}
 
 	<-done

@@ -55,8 +55,8 @@ type Demodulator struct {
 // tells when it starts or stops detecting data on a slicer.
 // *Layer2Receiver is one.
 type BitReceiver interface {
-	RecBit(from dwcore.SlicerID, raw bool, isScrambled bool, pllNudgeTotal *int64, pllSymbolCount *int)
-	DCDChange(from dwcore.SlicerID, state int)
+	RecBit(from dwcore.SlicerID, raw bool, isScrambled bool, pll *dwcore.PLLStats)
+	DCDChange(from dwcore.SlicerID, on bool)
 }
 
 // audioLevelDecimation is how many audio samples pass between pushes of the
@@ -852,9 +852,17 @@ func (d *Demodulator) Mute(mute bool) {
 	d.muted.Store(mute)
 }
 
-// ProcessSample hands one audio sample, in the range -32768 to 32767, to the
-// subchannel's demodulator.
-func (d *Demodulator) ProcessSample(subchan int, sam int) {
+// ProcessSample hands one audio sample, in the range -32768 to 32767, to each
+// of the channel's demodulators.
+func (d *Demodulator) ProcessSample(sam int) {
+	for subchan := range d.numSubchan {
+		d.processSubchanSample(subchan, sam)
+	}
+}
+
+// processSubchanSample hands one audio sample to one subchannel's
+// demodulator.
+func (d *Demodulator) processSubchanSample(subchan int, sam int) {
 	dwutil.Assert(subchan >= 0 && subchan < phy.MaxSubchans)
 
 	var channel = d.channel

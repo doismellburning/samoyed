@@ -29,7 +29,7 @@ func (s *recordingReceiveSink) RecFrame(_ dwcore.SlicerID, pp *ax25.Packet, _ dw
 	s.frames = append(s.frames, pp)
 }
 
-func (s *recordingReceiveSink) DCDChange(int, int) {}
+func (s *recordingReceiveSink) DCDChange(int, bool) {}
 
 // discardReceiveSink is a ReceiveSink that ignores whatever it is told.
 type discardReceiveSink struct{}
@@ -37,7 +37,7 @@ type discardReceiveSink struct{}
 func (discardReceiveSink) RecFrame(dwcore.SlicerID, *ax25.Packet, dwcore.RxInfo, string) {
 }
 
-func (discardReceiveSink) DCDChange(int, int) {}
+func (discardReceiveSink) DCDChange(int, bool) {}
 
 // What multi_modem_init set up before - for atest, the file it decoded last -
 // is left behind when it runs again: neither a frame still waiting to be
@@ -182,13 +182,12 @@ func BenchmarkLayer2ReceiveBit(b *testing.B) {
 
 	var from = dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}
 
-	var pllNudgeTotal int64
-	var pllSymbolCount int
+	var pll dwcore.PLLStats
 
 	b.ResetTimer()
 
 	for i := range b.N {
-		receiver.RecBit(from, bits[i%len(bits)], false, &pllNudgeTotal, &pllSymbolCount)
+		receiver.RecBit(from, bits[i%len(bits)], false, &pll)
 	}
 }
 
@@ -230,14 +229,13 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 	s.fx25 = nil
 	s.il2p = nil
 
-	var pllNudgeTotal int64
-	var pllSymbolCount int
+	var pll dwcore.PLLStats
 
 	// The SAME preamble, then "NNNN", the end of message, least significant
 	// bit first.
 	for _, b := range []byte{0xab, 0xab, 0xab, 0xab, 'N', 'N', 'N', 'N'} {
 		for i := range 8 {
-			receiver.RecBit(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0}, (b>>i)&1 == 1, false, &pllNudgeTotal, &pllSymbolCount)
+			receiver.RecBit(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0}, (b>>i)&1 == 1, false, &pll)
 		}
 	}
 
@@ -245,7 +243,7 @@ func TestLayer2ReceiverSendsEASBitsOnlyToTheEASReceiver(t *testing.T) {
 
 	// "NNNN" ends on a 0, which is also where an untouched line decoder
 	// starts, so end on a 1 that the decoder would remember if it saw it.
-	receiver.RecBit(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0}, true, false, &pllNudgeTotal, &pllSymbolCount)
+	receiver.RecBit(dwcore.SlicerID{Channel: 1, Subchannel: 0, Slice: 0}, true, false, &pll)
 
 	assert.False(t, s.line.PrevRaw(), "the line decoder should not have been given any bits")
 }
@@ -287,8 +285,8 @@ func TestRadioSinkDCDChangeSetsDCD(t *testing.T) {
 		set = append(set, fmt.Sprintf("%d=%t", channel, on))
 	}
 
-	sink.DCDChange(1, 1)
-	sink.DCDChange(1, 0)
+	sink.DCDChange(1, true)
+	sink.DCDChange(1, false)
 
 	assert.Equal(t, []string{"1=true", "1=false"}, set)
 }
@@ -346,8 +344,8 @@ type dcdRecordingSink struct {
 	changes []string
 }
 
-func (s *dcdRecordingSink) DCDChange(channel int, state int) {
-	s.changes = append(s.changes, fmt.Sprintf("%d=%d", channel, state))
+func (s *dcdRecordingSink) DCDChange(channel int, on bool) {
+	s.changes = append(s.changes, fmt.Sprintf("%d=%t", channel, on))
 }
 
 // A touch-tone button being held makes its channel busy, as a packet being
@@ -360,15 +358,15 @@ func TestDTMFButtonMakesChannelBusy(t *testing.T) {
 	var sink = new(dcdRecordingSink)
 	var r = NewLayer2Receiver(new(RadioConfig), [MAX_RADIO_CHANS]*demod.Demodulator{}, 0, 0, sink)
 
-	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: MAX_SUBCHANS, Slice: 0}, 1)
+	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: MAX_SUBCHANS, Slice: 0}, true)
 
 	assert.True(t, r.DataDetectAny(0), "a button is held, so busy")
 	assert.False(t, r.DataDetectAny(1), "another channel hears no button")
 
-	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: MAX_SUBCHANS, Slice: 0}, 0)
+	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: MAX_SUBCHANS, Slice: 0}, false)
 
 	assert.False(t, r.DataDetectAny(0), "the button is released, so not busy")
-	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
+	assert.Equal(t, []string{"0=true", "0=false"}, sink.changes)
 }
 
 // The DCD indicator shows the data heard on a channel, whether or not its
@@ -385,13 +383,13 @@ func TestDCDFollowsDataUnderTransmitInhibit(t *testing.T) {
 
 	r.txInhibited = func(int) bool { return inhibited }
 
-	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, 1)
+	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, true)
 
 	inhibited = true
 
-	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, 0)
+	r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, false)
 
-	assert.Equal(t, []string{"0=1", "0=0"}, sink.changes)
+	assert.Equal(t, []string{"0=true", "0=false"}, sink.changes)
 	assert.True(t, r.DataDetectAny(0), "still inhibited, so still busy")
 }
 
@@ -410,7 +408,7 @@ func TestDCDChangeWhileTransmitterAsks(t *testing.T) {
 		defer close(done)
 
 		for i := range 1000 {
-			r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, i&1)
+			r.DCDChange(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, i&1 == 1)
 		}
 	}()
 
@@ -428,9 +426,9 @@ type countingBitReceiver struct {
 	bits int
 }
 
-func (r *countingBitReceiver) RecBit(dwcore.SlicerID, bool, bool, *int64, *int) { r.bits++ }
+func (r *countingBitReceiver) RecBit(dwcore.SlicerID, bool, bool, *dwcore.PLLStats) { r.bits++ }
 
-func (r *countingBitReceiver) DCDChange(dwcore.SlicerID, int) {}
+func (r *countingBitReceiver) DCDChange(dwcore.SlicerID, bool) {}
 
 // What a demodulator demodulates goes to the receiver it was given - noise
 // decodes to bits like anything else.

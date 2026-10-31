@@ -132,7 +132,7 @@ type MultiModem struct {
 // to take each audio sample, and how many subchannels and slicers it has.
 // *demod.Demodulator is one.
 type channelDemodulator interface {
-	ProcessSample(subchan int, sam int)
+	ProcessSample(sam int)
 	NumSubchan() int
 	NumSlicers() int
 }
@@ -187,8 +187,8 @@ type ReceiveSink interface {
 	RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcore.RxInfo, spectrum string)
 
 	// DCDChange reports that the decoders for a channel have collectively
-	// started (state 1) or stopped (state 0) seeing data.
-	DCDChange(channel int, state int)
+	// started (on) or stopped (not on) seeing data.
+	DCDChange(channel int, on bool)
 }
 
 // radioSink is the ReceiveSink for a channel with a radio on the end of it.
@@ -207,9 +207,9 @@ func (s *radioSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxInfo dwcor
 	}
 }
 
-func (s *radioSink) DCDChange(channel int, state int) {
+func (s *radioSink) DCDChange(channel int, on bool) {
 	if s.setDCD != nil {
-		s.setDCD(channel, state != 0)
+		s.setDCD(channel, on)
 	}
 }
 
@@ -360,9 +360,7 @@ func (m *MultiModem) ProcessSample(audio_sample int) bool {
 	/* 1.2: We can feed one demodulator but end up with multiple outputs. */
 
 	/* Send same thing to all. */
-	for d := range numSubchan {
-		m.demodulator.ProcessSample(d, audio_sample)
-	}
+	m.demodulator.ProcessSample(audio_sample)
 
 	for subchan := range numSubchan {
 		for slice := range numSlicers {
@@ -937,7 +935,7 @@ func (r *Layer2Receiver) toMultiModem(from dwcore.SlicerID, pp *ax25.Packet, rxI
  *
  *		is_scrambled - Is the data scrambled?
  *
- *		pll_nudge_total, pll_symbol_count - The slicer's PLL
+ *		pll	- The slicer's PLL
  *			  counters, from which the HDLC receiver works out
  *			  each frame's speed error, and which it resets at
  *			  each frame's start.
@@ -949,8 +947,7 @@ func (r *Layer2Receiver) toMultiModem(from dwcore.SlicerID, pp *ax25.Packet, rxI
  *
  ***********************************************************************************/
 
-func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled bool,
-	pll_nudge_total *int64, pll_symbol_count *int) {
+func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled bool, pll *dwcore.PLLStats) {
 	var channel = from.Channel
 
 	// -e option can be used to artificially introduce the desired
@@ -1007,7 +1004,7 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 		s.il2p.RecBit(dwutil.IfThenElse(il2pBit, 1, 0)) // Note: skip NRZI.
 	}
 
-	s.hdlc.RecBit(raw, dbit, is_scrambled, pll_nudge_total, pll_symbol_count)
+	s.hdlc.RecBit(raw, dbit, is_scrambled, pll)
 }
 
 /***********************************************************************************
@@ -1072,7 +1069,7 @@ func (r *Layer2Receiver) fx25Busy(channel int) bool {
  *				SPECIAL CASE --> MAX_SUBCHANS for DTMF decoder.
  *			  Slice - slicer number, 0 .. MAX_SLICERS - 1.
  *
- *		state		1 for active, 0 for not.
+ *		on		Whether the slicer now hears data.
  *
  * Returns:	None.  Use hdlc_rec_data_detect_any to retrieve result.
  *
@@ -1084,7 +1081,7 @@ func (r *Layer2Receiver) fx25Busy(channel int) bool {
  *
  *--------------------------------------------------------------------*/
 
-func (r *Layer2Receiver) DCDChange(from dwcore.SlicerID, state int) {
+func (r *Layer2Receiver) DCDChange(from dwcore.SlicerID, on bool) {
 	var channel = from.Channel
 
 	/*
@@ -1096,7 +1093,7 @@ func (r *Layer2Receiver) DCDChange(from dwcore.SlicerID, state int) {
 
 	r.dcdMu.Lock()
 	var old = r.dataDetected(channel)
-	r.compositeDCD[channel][from.Subchannel][from.Slice] = state != 0
+	r.compositeDCD[channel][from.Subchannel][from.Slice] = on
 	var now = r.dataDetected(channel)
 	r.dcdMu.Unlock()
 
@@ -1105,13 +1102,8 @@ func (r *Layer2Receiver) DCDChange(from dwcore.SlicerID, state int) {
 	// DCD.  Only this channel's receive thread changes its DCD, so the
 	// changes reach the sink in order.
 	if now != old {
-		var newVal = 0
-		if now {
-			newVal = 1
-		}
-
-		r.sink.DCDChange(channel, newVal)
-		metrics.SetDCD(channel, newVal != 0)
+		r.sink.DCDChange(channel, now)
+		metrics.SetDCD(channel, now)
 	}
 }
 

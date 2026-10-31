@@ -30,6 +30,15 @@ type RxInfo struct {
 // hearing, which a receiver delivers each frame with.
 type AudioLevelFunc func(channel int, subchannel int) ax25.ALevel
 
+// PLLStats is how far a slicer's clock recovery has had to nudge its PLL, and
+// over how many symbols, since the HDLC receiver last reset them: enough to
+// work out how fast or slow the sender's clock runs.  The demodulator adds to
+// it, and the HDLC receiver reads and resets it at each frame.
+type PLLStats struct {
+	NudgeTotal  int64 // Sum of DPLL nudge amounts.
+	SymbolCount int   // Number of symbols NudgeTotal accumulated over.
+}
+
 // FrameSink takes each frame a receiver extracts, without its FCS, with the
 // slicer that heard it and how.
 type FrameSink func(from SlicerID, frame []byte, rxInfo RxInfo)

@@ -5,6 +5,7 @@ package demod
 
 import (
 	"github.com/doismellburning/samoyed/internal/dsp"
+	"github.com/doismellburning/samoyed/internal/dwcore"
 	"github.com/doismellburning/samoyed/internal/phy"
 )
 
@@ -185,8 +186,7 @@ type demodulator_state_s struct {
 		prev_d_c_pll int32 // Previous value of above, before
 		// incrementing, to detect overflows.
 
-		pll_symbol_count int   // Number symbols during time nudge_total is accumulated.
-		pll_nudge_total  int64 // Sum of DPLL nudge amounts.
+		pll dwcore.PLLStats // How much the PLL has been nudged, for the sender's clock error.
 		// Both of these are cleared at start of frame.
 		// At end of frame, we can see if incoming
 		// baud rate is a little off.
