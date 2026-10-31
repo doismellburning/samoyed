@@ -79,22 +79,54 @@ and the full `feature list <https://github.com/doismellburning/samoyed#features>
 Pre-built binaries and ``.deb`` packages are on the
 `releases page <https://github.com/doismellburning/samoyed/releases>`__.
 
-These pages pick up from there:
+The rest of this site picks up from there.
+
+Where it doesn't yet cover something,
+`the Dire Wolf documentation <https://github.com/wb2osz/direwolf/tree/master/doc>`__ should provide a useful baseline.
+
+Using Samoyed
+-------------
+
+For running Samoyed.
 
 * :doc:`how-to-guides` - recipes for particular jobs, from checking a configuration file to running a NET/ROM node
 * :doc:`yaml-config` - Samoyed's YAML configuration format, an alternative to Dire Wolf's line-at-a-time one
-* :doc:`internals` - how parts of Samoyed work inside, for anyone changing the code
-* :doc:`glossary` - the protocols and systems Samoyed implements, with pointers to their specifications
-
-Where these don't yet cover something,
-`the Dire Wolf documentation <https://github.com/wb2osz/direwolf/tree/master/doc>`__ should provide a useful baseline.
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :caption: Using Samoyed
    :hidden:
 
    how-to-guides
    yaml-config
-   internals
+
+Reference
+---------
+
+* :doc:`glossary` - the protocols and systems Samoyed implements, with pointers to their specifications
+
+.. toctree::
+   :caption: Reference
+   :hidden:
+
    glossary
+
+Working on Samoyed
+------------------
+
+For anyone changing the code, or wondering why a configuration is refused.
+
+* :doc:`internals` - how parts of Samoyed work inside
+
+.. toctree::
+   :caption: Working on Samoyed
+   :hidden:
+
+   internals
+
+.. toctree::
+   :caption: Project links
+   :hidden:
+
+   Samoyed on GitHub <https://github.com/doismellburning/samoyed>
+   Releases <https://github.com/doismellburning/samoyed/releases>
+   Issue tracker <https://github.com/doismellburning/samoyed/issues>
