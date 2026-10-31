@@ -65,6 +65,7 @@ type Config struct {
 	Call string
 
 	// Ports are the server ports to register Call on, counting from 0.
+	// With none, Call is registered on every port the server has.
 	Ports []int
 
 	// PacLen is the most data sent in one frame to the server.
@@ -367,7 +368,7 @@ func (c *Client) session(ctx context.Context) (bool, error) {
 	var cn = newConn(netConn)
 	defer cn.close()
 
-	var ports, backlog, startErr = c.startup(cn)
+	var ports, registered, backlog, startErr = c.startup(cn)
 	if startErr != nil {
 		return false, startErr
 	}
@@ -385,7 +386,7 @@ func (c *Client) session(ctx context.Context) (bool, error) {
 	logrus.WithFields(logrus.Fields{
 		"addr":  c.cfg.Addr,
 		"call":  c.cfg.Call,
-		"ports": c.cfg.Ports,
+		"ports": registered,
 	}).Info("Connected to AGW server")
 
 	for _, msg := range backlog {
@@ -400,88 +401,81 @@ func (c *Client) session(ctx context.Context) (bool, error) {
 	return true, readErr
 }
 
-// startup makes the requests a new connection begins with - login, version,
-// ports, and registering the callsign on each port - and waits for their
-// answers.  Anything else that arrives meanwhile is returned to be dealt with
-// once the connection is up.
-func (c *Client) startup(cn *conn) ([]PortInfo, []*agwpe.Message, error) {
+// startup makes the requests a new connection begins with and waits for their
+// answers: login, version and ports first, then registering the callsign on
+// each port, which can only be done once the ports are known when the client
+// is to register on all of them.  Anything else that arrives meanwhile is
+// returned to be dealt with once the connection is up.
+func (c *Client) startup(cn *conn) ([]PortInfo, []int, []*agwpe.Message, error) {
 	var deadlineErr = cn.netConn.SetDeadline(time.Now().Add(c.cfg.StartupTimeout))
 	if deadlineErr != nil {
-		return nil, nil, fmt.Errorf("setting AGW startup deadline: %w", deadlineErr)
+		return nil, nil, nil, fmt.Errorf("setting AGW startup deadline: %w", deadlineErr)
 	}
 
-	var requests, requestErr = c.startupRequests()
-	if requestErr != nil {
-		return nil, nil, requestErr
+	var introErr = c.sendIntro(cn)
+	if introErr != nil {
+		return nil, nil, nil, introErr
 	}
 
-	for _, msg := range requests {
-		var err = writeFrame(cn.netConn, msg)
-		if err != nil {
-			return nil, nil, err
-		}
+	var ports, backlog, portsErr = c.awaitIntro(cn)
+	if portsErr != nil {
+		return nil, nil, nil, portsErr
 	}
 
-	var ports, backlog, replyErr = c.startupReplies(cn)
-	if replyErr != nil {
-		return nil, nil, replyErr
+	var register, registerErr = c.portsToRegister(ports)
+	if registerErr != nil {
+		return nil, nil, nil, registerErr
+	}
+
+	var more, regErr = c.register(cn, register)
+	if regErr != nil {
+		return nil, nil, nil, regErr
 	}
 
 	var clearErr = cn.netConn.SetDeadline(time.Time{})
 	if clearErr != nil {
-		return nil, nil, fmt.Errorf("clearing AGW startup deadline: %w", clearErr)
+		return nil, nil, nil, fmt.Errorf("clearing AGW startup deadline: %w", clearErr)
 	}
 
-	return ports, backlog, nil
+	return ports, register, append(backlog, more...), nil
 }
 
-// startupRequests builds the frames a new connection begins with.
-func (c *Client) startupRequests() ([]*agwpe.Message, error) {
-	var requests []*agwpe.Message
-
+// sendIntro sends the login, if there is one, and asks for the server's
+// version and ports.
+func (c *Client) sendIntro(cn *conn) error {
 	if login, ok := c.cfg.Login.Get(); ok {
 		var msg, err = loginFrame(login.User, login.Password)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			err = writeFrame(cn.netConn, msg)
 		}
 
-		requests = append(requests, msg)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, kind := range []byte{kindVersion, kindPorts} {
 		var msg, err = newFrame(0, kind, "", "", nil)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			err = writeFrame(cn.netConn, msg)
 		}
 
-		requests = append(requests, msg)
-	}
-
-	for _, port := range c.cfg.Ports {
-		var msg, err = newFrame(port, kindRegister, c.cfg.Call, "", nil)
 		if err != nil {
-			return nil, err
+			return err
 		}
-
-		requests = append(requests, msg)
 	}
 
-	return requests, nil
+	return nil
 }
 
-// startupReplies waits for the answers to startupRequests.
-func (c *Client) startupReplies(cn *conn) ([]PortInfo, []*agwpe.Message, error) {
+// awaitIntro waits for the answers to sendIntro's version and ports requests.
+func (c *Client) awaitIntro(cn *conn) ([]PortInfo, []*agwpe.Message, error) {
 	var gotVersion = false
-	var ports []PortInfo
 	var gotPorts = false
-	var unregistered = make(map[int]bool)
+	var ports []PortInfo
 	var backlog []*agwpe.Message
 
-	for _, port := range c.cfg.Ports {
-		unregistered[port] = true
-	}
-
-	for !gotVersion || !gotPorts || len(unregistered) > 0 {
+	for !gotVersion || !gotPorts {
 		var msg, err = readFrame(cn.netConn, c.cfg.MaxData)
 		if err != nil {
 			if !gotVersion {
@@ -490,7 +484,7 @@ func (c *Client) startupReplies(cn *conn) ([]PortInfo, []*agwpe.Message, error) 
 				return nil, nil, fmt.Errorf("no reply from AGW server to the version request (is a login needed, or the wrong one given?): %w", err)
 			}
 
-			return nil, nil, fmt.Errorf("waiting for AGW server's startup replies: %w", err)
+			return nil, nil, fmt.Errorf("waiting for AGW server's port information: %w", err)
 		}
 
 		switch msg.Header.DataKind {
@@ -507,30 +501,81 @@ func (c *Client) startupReplies(cn *conn) ([]PortInfo, []*agwpe.Message, error) 
 
 			gotPorts = true
 
-		case kindRegister:
-			var port = int(msg.Header.Portx)
-			if !unregistered[port] {
-				continue
-			}
-
-			if len(msg.Data) < 1 || msg.Data[0] != 1 {
-				return nil, nil, fmt.Errorf("AGW server refused to register %s on port %d", c.cfg.Call, port)
-			}
-
-			delete(unregistered, port)
-
 		default:
 			backlog = append(backlog, msg)
 		}
 	}
 
+	return ports, backlog, nil
+}
+
+// portsToRegister is the configured ports, each of which the server must
+// have, or with none configured, every port the server has.
+func (c *Client) portsToRegister(ports []PortInfo) ([]int, error) {
+	if len(c.cfg.Ports) == 0 {
+		var all = make([]int, 0, len(ports))
+
+		for _, p := range ports {
+			all = append(all, p.Number)
+		}
+
+		return all, nil
+	}
+
 	for _, want := range c.cfg.Ports {
 		if !slices.ContainsFunc(ports, func(p PortInfo) bool { return p.Number == want }) {
-			return nil, nil, fmt.Errorf("AGW server has no port %d (it has %v)", want, ports)
+			return nil, fmt.Errorf("AGW server has no port %d (it has %v)", want, ports)
 		}
 	}
 
-	return ports, backlog, nil
+	return c.cfg.Ports, nil
+}
+
+// register registers the callsign on each of ports, and waits for the server
+// to say each has taken.
+func (c *Client) register(cn *conn, ports []int) ([]*agwpe.Message, error) {
+	var unregistered = make(map[int]bool)
+
+	for _, port := range ports {
+		var msg, err = newFrame(port, kindRegister, c.cfg.Call, "", nil)
+		if err == nil {
+			err = writeFrame(cn.netConn, msg)
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		unregistered[port] = true
+	}
+
+	var backlog []*agwpe.Message
+
+	for len(unregistered) > 0 {
+		var msg, err = readFrame(cn.netConn, c.cfg.MaxData)
+		if err != nil {
+			return nil, fmt.Errorf("waiting for AGW server to register %s: %w", c.cfg.Call, err)
+		}
+
+		if msg.Header.DataKind != kindRegister {
+			backlog = append(backlog, msg)
+
+			continue
+		}
+
+		var port = int(msg.Header.Portx)
+		if !unregistered[port] {
+			continue
+		}
+
+		if len(msg.Data) < 1 || msg.Data[0] != 1 {
+			return nil, fmt.Errorf("AGW server refused to register %s on port %d", c.cfg.Call, port)
+		}
+
+		delete(unregistered, port)
+	}
+
+	return backlog, nil
 }
 
 // up records cn as the connection in use.

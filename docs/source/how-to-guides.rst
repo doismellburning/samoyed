@@ -600,7 +600,9 @@ answers connections and responds to commands:
 
 It attaches to the AGW port (``--hostname`` and ``--port``, defaulting to
 ``localhost`` and ``8000``, so ``AGWPORT`` must not be disabled), asks the TNC
-what radio channels it has, and registers the callsign on each of them.  From
+what radio channels it has, and registers the callsign on each of them.
+If the TNC isn't up yet, or goes away later,
+it keeps trying to attach until it is back.  From
 then on a SABM addressed to ``Q1TEST`` on any channel gets a UA, and the
 connected station is talking to the appserver rather than to Samoyed itself.
 It is meant as a starting point for your own application; any AGW client that

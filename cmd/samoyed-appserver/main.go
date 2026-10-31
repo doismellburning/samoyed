@@ -10,175 +10,30 @@
  *		It processes commands from other radio stations and responds.
  *
  *---------------------------------------------------------------*/
-//nolint:gochecknoglobals
 package main
 
 import (
-	"bytes"
+	"context"
 	"fmt"
+	"net"
 	"os"
+	"os/signal"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
-	"sync"
+	"syscall"
 	"time"
-	"unicode"
 
-	"github.com/doismellburning/samoyed/internal/agwpe"
-	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/agwclient"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
+	"golang.org/x/sync/errgroup"
 )
 
-var mycall agwpe.Callsign /* Callsign, with SSID, for the application. */
-/* Future?  Could have multiple applications, on the same */
-/* radio channel, each with its own SSID. */
+const AX25_MAX_INFO_LEN = 2048 // Duplicated from C to avoid cgo
 
-var tnc_hostname = "localhost" /* DNS host name or IPv4 address. */
-/* Some of the code is there for IPv6 but */
-/* needs more work. */
-
-var tnc_port = "8000" /* a TCP port number  */
-
-/*
- * Maintain information about connections from users which we will call "sessions."
- * It should be possible to have multiple users connected at the same time.
- *
- * This allows a "who" command to see who is currently connected and a place to keep
- * possible state information for each user.
- *
- * Each combination of channel & callsign is a separate session.
- * The same user (callsign), on a different channel, is a different session.
- */
-
-type sessionKey struct {
-	channel byte
-	addr    agwpe.Callsign
-}
-
-type session struct {
-	sessionKey // Radio channel & callsign of other station.
-
-	localCall agwpe.Callsign // Callsign of ours the other station connected to.  Might be an alias.
-
-	loginTime time.Time // Time when connection established.
-
-	// mu guards everything below it.  The main loop (poll) and the agwlib
-	// callback goroutine (the agw_cb_* functions, dispatched by the thread
-	// agwlib_init starts) both read and write these.
-	mu sync.Mutex
-
-	// For the timing test.
-	// Send specified number of frames, optional length.
-	// When finished summarize with statistics.
-
-	ttStartTime time.Time
-	ttCount     int // Number to send.
-	ttLength    int // Bytes in info part.
-	ttNext      int // Next sequence to send.
-
-	// txQueueLen is how many frames the TNC still holds for this station, as
-	// of the last 'Y' reply.  Nothing until one has arrived, which is not the
-	// same as an empty queue: mistaking it for one disconnects a station
-	// before its farewell has gone out.
-	txQueueLen maybe.Maybe[int]
-
-	// byeDeadline is set when the user says "bye".  The main loop disconnects
-	// once the transmit queue has drained - so we know the farewell arrived -
-	// or once the deadline passes, whichever comes first.  Nothing when no
-	// disconnect is pending.
-	byeDeadline maybe.Maybe[time.Time]
-}
-
-// byeDrainTimeout caps how long a pending "bye" waits for the other station to
-// acknowledge the farewell before we disconnect regardless.
-const byeDrainTimeout = 10 * time.Second
-
-// appServer.sessions is read and written both from the main loop (poll)
-// and from the agwlib callback goroutine (agw_cb_* functions started by agwlib_init),
-// so all access must go through mu.
-type appServer struct {
-	mu       sync.RWMutex
-	sessions map[sessionKey]*session
-}
-
-func newAppServer() *appServer {
-	var srv = new(appServer)
-
-	srv.sessions = make(map[sessionKey]*session)
-
-	return srv
-}
-
-var srv = newAppServer()
-
-// findSession looks up an existing session, returning nil if there isn't one.
-func (srv *appServer) findSession(channel byte, addr agwpe.Callsign) *session {
-	srv.mu.RLock()
-	defer srv.mu.RUnlock()
-
-	return srv.sessions[sessionKey{channel: channel, addr: addr}]
-}
-
-// getOrCreateSession returns the existing session for channel/addr, creating one if necessary.
-// localCall is the callsign of ours that the other station connected to.
-func (srv *appServer) getOrCreateSession(channel byte, addr agwpe.Callsign, localCall agwpe.Callsign) *session {
-	var key = sessionKey{channel: channel, addr: addr}
-
-	srv.mu.Lock()
-	defer srv.mu.Unlock()
-
-	if s, ok := srv.sessions[key]; ok {
-		return s
-	}
-
-	var s = new(session)
-
-	s.sessionKey = key
-	s.localCall = localCall
-	s.loginTime = time.Now()
-
-	srv.sessions[key] = s
-
-	return s
-}
-
-func (srv *appServer) removeSession(channel byte, addr agwpe.Callsign) {
-	srv.mu.Lock()
-	defer srv.mu.Unlock()
-
-	delete(srv.sessions, sessionKey{channel: channel, addr: addr})
-}
-
-// snapshotSessions returns a copy of the current sessions, safe to iterate without
-// holding srv.mu.
-func (srv *appServer) snapshotSessions() []*session {
-	srv.mu.RLock()
-	defer srv.mu.RUnlock()
-
-	var sessions = make([]*session, 0, len(srv.sessions))
-
-	for _, s := range srv.sessions {
-		sessions = append(sessions, s)
-	}
-
-	return sessions
-}
-
-// sortedSessions returns the current sessions in a stable order, for display purposes.
-func (srv *appServer) sortedSessions() []*session {
-	var sessions = srv.snapshotSessions()
-
-	sort.Slice(sessions, func(i, j int) bool {
-		if sessions[i].channel != sessions[j].channel {
-			return sessions[i].channel < sessions[j].channel
-		}
-
-		return string(sessions[i].addr[:]) < string(sessions[j].addr[:])
-	})
-
-	return sessions
-}
+// maxCallLen is the longest callsign an AGW frame can carry.
+const maxCallLen = 9
 
 /*------------------------------------------------------------------
  *
@@ -194,9 +49,9 @@ func main() {
 	/*
 	 * Extract command line args.
 	 */
-	var _tnc_hostname = pflag.StringP("hostname", "h", "localhost", "TNC Hostname.")
+	var tncHostname = pflag.StringP("hostname", "h", "localhost", "TNC Hostname.")
 
-	var _tnc_port = pflag.StringP("port", "p", "8000", "TNC Port.")
+	var tncPort = pflag.StringP("port", "p", "8000", "TNC Port.")
 
 	var help = pflag.Bool("help", false, "Display help text.")
 
@@ -216,326 +71,65 @@ func main() {
 		os.Exit(0)
 	}
 
-	tnc_hostname = *_tnc_hostname
-	tnc_port = *_tnc_port
-
 	if len(pflag.Args()) != 1 {
 		fmt.Fprintf(os.Stderr, "Exactly one argument required (MYCALL) - got %s\n", pflag.Args())
 		os.Exit(1)
 	}
 
-	var _mycall = pflag.Arg(0)
-	if len(_mycall) > len(mycall) {
-		fmt.Fprintf(os.Stderr, "Callsign %s too long (maximum length %d)\n", _mycall, len(mycall))
+	var mycall = strings.ToUpper(pflag.Arg(0))
+	if len(mycall) > maxCallLen {
+		fmt.Fprintf(os.Stderr, "Callsign %s too long (maximum length %d)\n", mycall, maxCallLen)
 		os.Exit(1)
 	}
 
-	copy(mycall[:], []byte(strings.ToUpper(pflag.Arg(0))))
+	var ctx, stop = signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 
-	/*
-	 * Establish a TCP socket to the network TNC.
-	 * It starts up a thread, which listens for messages from the TNC,
-	 * and calls the corresponding agw_cb_... callback functions.
-	 *
-	 * After attaching to the TNC, the specified init function is called.
-	 * We pass it to the library, rather than doing it here, so it can
-	 * repeated automatically if the TNC goes away and comes back again.
-	 * We need to reestablish what it knows about the application.
-	 */
-	var initErr = agwlib_init(tnc_hostname, tnc_port, agwlib_G_ask_port_information)
-	if initErr != nil {
-		fmt.Printf("Could not attach to network TNC %s:%s: %s.\n", tnc_hostname, tnc_port, initErr)
+	var runErr = run(ctx, net.JoinHostPort(*tncHostname, *tncPort), mycall)
+
+	stop()
+
+	if runErr != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", runErr)
 		os.Exit(1)
-	}
-	/*
-	 * Send command to ask what channels are available.
-	 * The response will be handled by agw_cb_G_port_information.
-	 */
-	// FIXME:  Need to do this again if we lose TNC and reattach to it.
-	///   should happen automatically now.   agwlib_G_ask_port_information ();
-	for {
-		time.Sleep(1 * time.Second) // other places based on 1 second assumption.
-		srv.poll()
 	}
 } /* end main */
 
-func (srv *appServer) poll() {
-	for _, s := range srv.snapshotSessions() {
-		s.poll()
+// run attaches to the TNC at addr, registers mycall on every port it has, and
+// serves the stations that connect until ctx is cancelled.  A TNC that isn't
+// there yet, or goes away, is waited for.
+func run(ctx context.Context, addr string, mycall string) error {
+	var cfg = new(agwclient.Config)
+
+	cfg.Addr = addr
+	cfg.Call = mycall
+	cfg.Ports = nil // Every port the TNC has.
+
+	// One reply line, or one timing test frame, is one frame to the TNC;
+	// the TNC splits anything longer than its own PACLEN.
+	cfg.PacLen = AX25_MAX_INFO_LEN
+	cfg.HighWater = 16
+
+	var client = agwclient.New(*cfg)
+	var srv = newAppServer()
+
+	logrus.WithFields(logrus.Fields{"addr": addr, "call": mycall}).Info("Attaching to network TNC")
+
+	var group, groupCtx = errgroup.WithContext(ctx)
+
+	group.Go(func() error { return client.Run(groupCtx) })
+	group.Go(func() error { return srv.serve(groupCtx, client.Accept) })
+
+	var err = group.Wait()
+	if err != nil {
+		return fmt.Errorf("serving connections: %w", err)
 	}
+
+	return nil
 }
 
-// poll advances this session's background work, once per main-loop tick.
-// Anything that has to wait for the other station belongs here rather than in a
-// command handler: the handlers run on the agwlib listener goroutine, which is
-// shared by every session on every channel, so blocking one blocks them all.
-func (s *session) poll() {
-	s.mu.Lock()
-	var timingTest = s.ttCount != 0
-	var goodbye = s.byeDeadline.IsJust()
-	s.mu.Unlock()
-
-	if !timingTest && !goodbye {
-		return
-	}
-
-	// The answer comes back as a 'Y' frame on the listener goroutine and lands
-	// in s.txQueueLen; give it a moment to arrive.
-	agwlib_Y_outstanding_frames_for_station(s.channel, s.localCall, s.addr)
-	time.Sleep(10 * time.Millisecond)
-
-	if timingTest {
-		s.pollTimingTest()
-	}
-
-	if goodbye {
-		s.pollBye()
-	}
-}
-
-// pollBye disconnects a station that said "bye", once everything we sent it has
-// been acknowledged - or once it is clear that it never will be.
-func (s *session) pollBye() {
-	s.mu.Lock()
-
-	var deadline, pending = s.byeDeadline.Get()
-	if !pending {
-		s.mu.Unlock()
-
-		return
-	}
-
-	// Only a queue length the TNC has actually reported counts as drained.
-	var drained = s.txQueueLen == maybe.Just(0)
-
-	if !drained && time.Now().Before(deadline) {
-		s.mu.Unlock()
-
-		return // farewell not acknowledged yet.
-	}
-
-	s.byeDeadline = maybe.Nothing[time.Time]()
-
-	s.mu.Unlock()
-
-	agwlib_d_disconnect(s.channel, s.localCall, s.addr)
-}
-
-func (s *session) pollTimingTest() {
-	s.mu.Lock()
-
-	// Unlike the disconnect, the test reads an unreported queue as empty, which
-	// is what it did before there was anything else to read: the worst that
-	// costs it is a first second of frames sent without flow control.
-	var queued = maybe.FromMaybe(0, s.txQueueLen)
-
-	if s.ttNext <= s.ttCount {
-		if queued > 128 {
-			s.mu.Unlock()
-
-			return // enough queued up for now.
-		}
-
-		var rem = s.ttCount - s.ttNext + 1 // remaining to send.
-		if rem > 64 {
-			rem = 64 // add no more than 64 at a time.
-		}
-
-		var first = s.ttNext
-
-		var length = s.ttLength
-
-		s.ttNext += rem
-
-		// Don't hold the lock while writing to the TNC: the listener goroutine
-		// needs it to record the 'Y' replies, and a socket write can block.
-		s.mu.Unlock()
-
-		for n := range rem {
-			agwlib_D_send_connected_data(s.channel, 0xF0, s.localCall, s.addr, timingTestFrame(first+n, length))
-		}
-
-		return
-	}
-
-	// All done queuing up the packets.
-	// Wait until they have all been sent and ack'ed by other end.
-	if queued > 0 {
-		s.mu.Unlock()
-
-		return // not done yet.
-	}
-
-	var elapsed = time.Since(s.ttStartTime).Seconds()
-	if elapsed <= 0 {
-		elapsed = 0.001 // avoid divide by 0
-	}
-
-	var byte_count = s.ttCount * s.ttLength
-
-	s.ttCount = 0 // all done.
-
-	s.mu.Unlock()
-
-	var summary = fmt.Sprintf("%d bytes in %.1f seconds, %.0f bytes/sec, efficiency %.0f%% at 1200, %.0f%% at 9600.\r",
-		byte_count, elapsed, float64(byte_count)/elapsed,
-		float64(byte_count)*8*100/elapsed/1200,
-		float64(byte_count)*8*100/elapsed/9600)
-
-	agwlib_D_send_connected_data(s.channel, 0xF0, s.localCall, s.addr, []byte(summary))
-}
-
-// timingTestFrame builds one frame of the timing test: the sequence number
-// followed by enough repeating alphanumeric filler to reach length bytes.
-func timingTestFrame(seq int, length int) []byte {
-	var c = 'a'
-
-	var stuff = fmt.Sprintf("%06d ", seq)
-	for k := len(stuff); k < length-1; k++ {
-		stuff += string(c)
-
-		c++
-		if c == 'z'+1 {
-			c = 'A'
-		}
-
-		if c == 'Z'+1 {
-			c = '0'
-		}
-
-		if c == '9'+1 {
-			c = 'a'
-		}
-	}
-
-	stuff += "\r"
-
-	return []byte(stuff)
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        agw_cb_C_connection_received
- *
- * Purpose:     Callback for the "connection received" command from the TNC.
- *
- * Inputs:	chan		- Radio channel, first is 0.
- *
- *		call_from	- Address of other station.
- *
- *		call_to		- Callsign I responded to.  (could be an alias.)
- *
- *		data_len	- Length of data field.
- *
- *		data		- Should look something like this for incoming:
- *					*** CONNECTED to Station xxx\r
- *
- * Description:	Add to the sessions table.
- *
- *--------------------------------------------------------------------*/
-
-/*-------------------------------------------------------------------
- *
- * Name:        on_C_connection_received
- *
- * Purpose:     Callback for the "connection received" command from the TNC.
- *
- * Inputs:	chan		- Radio channel, first is 0.
- *
- *		call_from	- Address of other station.
- *
- *		call_to		- My call.
- *				  In the case of an incoming connect request (i.e. to
- *				  a server) this is the callsign I responded to.
- *				  It is possible to define additional aliases and respond
- *				  to any one of them.  It would be possible to have a server
- *				  that responds to multiple names and behaves differently
- *				  depending on the name.
- *
- *		incoming	- true(1) if other station made connect request.
- *				  false(0) if I made request and other statio accepted.
- *
- *		data		- Should look something like this for incoming:
- *					*** CONNECTED to Station xxx\r
- *				  and this for my request being accepted:
- *					*** CONNECTED With Station xxx\r
- *
- *		session_id	- Session id to be used in data transfer and
- *				  other control functions related to this connection.
- *				  Think of it like a file handle.  Once it is open
- *				  we usually don't care about the name anymore and
- *				  and just refer to the handle.  This is used to
- *				  keep track of multiple connections at the same
- *				  time.  e.g. a server could be handling multiple
- *				  clients at once on the same or different channels.
- *
- * Description:	Add to the table of clients.
- *
- *--------------------------------------------------------------------*/
-
-// old void agw_cb_C_connection_received (int chan, char *call_from, char *call_to, int data_len, char *data)
-func on_C_connection_received(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign, incoming bool, data []byte) { //nolint:unparam
-	srv.getOrCreateSession(channel, call_from, call_to)
-
-	fmt.Printf("Begin session %d,%s: %s\n", channel, call_from, data)
-
-	// Send greeting.
-
-	var greeting = "Welcome!  Type ? for list of commands or HELP <command> for details.\r"
-
-	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-} /* end agw_cb_C_connection_received */
-
-/*-------------------------------------------------------------------
- *
- * Name:        agw_cb_d_disconnected
- *
- * Purpose:     Process the "disconnected" command from the TNC.
- *
- * Inputs:	chan		- Radio channel.
- *
- *		call_from	- Address of other station.
- *
- *		call_to		- Callsign I responded to.  (could be aliases.)
- *
- *		data_len	- Length of data field.
- *
- *		data		- Should look something like one of these:
- *					*** DISCONNECTED RETRYOUT With xxx\r
- *					*** DISCONNECTED From Station xxx\r
- *
- * Description:	Remove from the sessions table.
- *
- *--------------------------------------------------------------------*/
-
-func agw_cb_d_disconnected(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign, data []byte) { //nolint:unparam
-	var dataStr = strings.TrimSpace(string(data))
-
-	fmt.Printf("End session %d,%s: %s\n", channel, call_from, dataStr)
-
-	srv.removeSession(channel, call_from)
-} /* end agw_cb_d_disconnected */
-
-/*-------------------------------------------------------------------
- *
- * Name:        agw_cb_D_connected_data
- *
- * Purpose:     Process "connected ax.25 data" from the TNC.
- *
- * Inputs:	chan		- Radio channel.
- *
- *		addr		- Address of other station.
- *
- *		msg		- What the user sent us.  Probably a command.
- *
- * Global In:	tnc_sock	- Socket for TNC.
- *
- * Description:	Remove from the session table.
- *
- *--------------------------------------------------------------------*/
-
-// commandHandler implements one connected-mode user command (e.g. "who", "bye").
-type commandHandler func(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, rest []byte)
+// commandHandler implements one connected-mode user command (e.g. "who",
+// "bye").  It reports whether the session carries on afterwards.
+type commandHandler func(ctx context.Context, s *session, rest string) bool
 
 // command is one user command, along with what "?" and "HELP" say about it.
 type command struct {
@@ -618,73 +212,21 @@ func lookupCommand(name string) *command {
 	return nil
 }
 
-func agw_cb_D_connected_data(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign, data []byte) {
-	var s = srv.findSession(channel, call_from)
-
-	var dataStr = strings.TrimSpace(string(data))
-
-	// TODO: Should timestamp to all output.
-
-	if s == nil {
-		// Uh oh. Data from some station when not connected.
-		fmt.Printf("Internal error.  Incoming data, no corresponding session: %d,%s: %s\n", channel, call_from, dataStr)
-
-		return
-	}
-
-	fmt.Printf("%d,%s: %s\n", channel, call_from, dataStr)
-
-	// Process the command from user.
-	// A terminal ends the line with a carriage return, and some send a line
-	// feed too; neither is part of the command or of its arguments.
-
-	var _pcmd, rest, _ = BytesCut(bytes.TrimSpace(data), ' ')
-
-	var pcmd = string(_pcmd)
-	if pcmd == "" {
-		var greeting = "Type ? for list of commands or HELP <command> for details.\r"
-
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-
-		return
-	}
-
-	var cmd = lookupCommand(strings.ToLower(pcmd))
-	if cmd == nil {
-		// command not recognized.
-		var greeting = "Invalid command. Type ? for list of commands or HELP <command> for details.\r"
-
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-
-		return
-	}
-
-	cmd.handler(s, channel, call_to, call_from, rest)
-} /* end agw_cb_D_connected_data */
-
-// sendLines sends one connected-mode frame per line, each ending with the
-// carriage return AX.25 terminals expect.
-func sendLines(channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, lines []string) {
-	for _, line := range lines {
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(line+"\r"))
-	}
-}
-
 // loginTimeFormat renders a login time for "who".  UTC, because the stations
 // listed are not necessarily in the same time zone as the one reading it, and
 // packet operators think in UTC anyway.
 const loginTimeFormat = "2006-01-02 15:04:05Z"
 
 // cmd_who lists people currently logged in.
-func cmd_who(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, rest []byte) {
+func cmd_who(_ context.Context, s *session, _ string) bool {
 	var lines = []string{fmt.Sprintf("%-7s %-7s %-9s %s", "Session", "Channel", "User", "Since")}
 
-	for n, other := range srv.sortedSessions() {
+	for n, other := range s.srv.sortedSessions() {
 		lines = append(lines, fmt.Sprintf("%-7d %-7d %-9s %s",
-			n, other.channel, other.addr, other.loginTime.UTC().Format(loginTimeFormat)))
+			n, other.link.Port(), other.link.Remote(), other.loginTime.UTC().Format(loginTimeFormat)))
 	}
 
-	sendLines(channel, call_to, call_from, lines)
+	return s.send(lines...)
 }
 
 // maxTestCount caps the frames one TEST may ask for.  The test transmits for as
@@ -694,84 +236,122 @@ func cmd_who(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.C
 const maxTestCount = 1000
 
 // cmd_test runs a timing test: send the specified number of frames with optional length.
-func cmd_test(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, rest []byte) {
-	var _pcount, rest2, _ = BytesCut(rest, ' ')
-
-	var pcount = string(_pcount)
-
-	var _plength, _, _ = BytesCut(rest2, ' ')
-
-	var plength = string(_plength)
+// The station that asked waits for it to finish; nobody else does.
+func cmd_test(ctx context.Context, s *session, rest string) bool {
+	var fields = strings.Fields(rest)
 
 	var count = 1
 
-	if pcount != "" {
+	if len(fields) > 0 {
 		var countErr error
 
-		count, countErr = strconv.Atoi(pcount)
+		count, countErr = strconv.Atoi(fields[0])
 		if countErr != nil || count < 1 || count > maxTestCount {
-			sendLines(channel, call_to, call_from,
-				[]string{fmt.Sprintf("TEST: %s is not a frame count between 1 and %d.  Type HELP TEST.", pcount, maxTestCount)})
-
-			return
+			return s.send(fmt.Sprintf("TEST: %s is not a frame count between 1 and %d.  Type HELP TEST.", fields[0], maxTestCount))
 		}
 	}
 
 	var length = 256
 
-	if plength != "" {
+	if len(fields) > 1 {
 		var lengthErr error
 
-		length, lengthErr = strconv.Atoi(plength)
+		length, lengthErr = strconv.Atoi(fields[1])
 		if lengthErr != nil {
-			sendLines(channel, call_to, call_from, []string{fmt.Sprintf("TEST: %s is not a frame length.  Type HELP TEST.", plength)})
-
-			return
+			return s.send(fmt.Sprintf("TEST: %s is not a frame length.  Type HELP TEST.", fields[1]))
 		}
 
-		if length < 16 {
-			length = 16
-		}
+		length = min(max(length, 16), AX25_MAX_INFO_LEN)
+	}
 
-		if length > AX25_MAX_INFO_LEN {
-			length = AX25_MAX_INFO_LEN
+	if !s.send(fmt.Sprintf("Sending %d frame(s) of %d bytes; summary to follow.", count, length)) {
+		return false
+	}
+
+	var start = time.Now()
+
+	for n := 1; n <= count; n++ {
+		var _, err = s.link.Write(timingTestFrame(n, length))
+		if err != nil {
+			return false
 		}
 	}
 
-	s.mu.Lock()
+	// Wait until they have all been sent and ack'ed by other end.
+	var drainErr = s.link.Drain(ctx)
+	if drainErr != nil {
+		return false
+	}
 
-	s.ttStartTime = time.Now()
-	s.ttNext = 1
-	s.ttLength = length
-	s.ttCount = count
+	var elapsed = time.Since(start).Seconds()
+	if elapsed <= 0 {
+		elapsed = 0.001 // avoid divide by 0
+	}
 
-	s.mu.Unlock()
+	var byte_count = count * length
 
-	// Say so: the frames themselves start arriving a second later, from the
-	// main loop, and until now nothing told the user anything had begun.
-	sendLines(channel, call_to, call_from, []string{fmt.Sprintf("Sending %d frame(s) of %d bytes; summary to follow.", count, length)})
+	return s.send(fmt.Sprintf("%d bytes in %.1f seconds, %.0f bytes/sec, efficiency %.0f%% at 1200, %.0f%% at 9600.",
+		byte_count, elapsed, float64(byte_count)/elapsed,
+		float64(byte_count)*8*100/elapsed/1200,
+		float64(byte_count)*8*100/elapsed/9600))
 }
 
-// cmd_bye says farewell and hands the disconnect to the main loop, which waits
-// for the outgoing queue to drain before pulling the link down.  We are on the
-// listener goroutine here, and every session on every channel shares it, so
-// waiting for anything at all would freeze the lot of them.
-func cmd_bye(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, rest []byte) {
-	var farewell = "Thank you folks for kindly droppin' in.  Y'all come on back now, ya hear?\r"
+// timingTestFrame builds one frame of the timing test: the sequence number
+// followed by enough repeating alphanumeric filler to reach length bytes.
+func timingTestFrame(seq int, length int) []byte {
+	var c = 'a'
 
-	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(farewell))
+	var stuff = fmt.Sprintf("%06d ", seq)
+	for k := len(stuff); k < length-1; k++ {
+		stuff += string(c)
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+		c++
+		if c == 'z'+1 {
+			c = 'A'
+		}
 
-	s.byeDeadline = maybe.Just(time.Now().Add(byeDrainTimeout))
+		if c == 'Z'+1 {
+			c = '0'
+		}
+
+		if c == '9'+1 {
+			c = 'a'
+		}
+	}
+
+	stuff += "\r"
+
+	return []byte(stuff)
+}
+
+// cmd_bye says farewell, waits for it to be acknowledged - or for
+// byeDrainTimeout, whichever comes first - so it isn't cut off, and hangs up.
+func cmd_bye(ctx context.Context, s *session, _ string) bool {
+	if !s.send("Thank you folks for kindly droppin' in.  Y'all come on back now, ya hear?") {
+		return false
+	}
+
+	var drainCtx, cancel = context.WithTimeout(ctx, s.srv.byeDrainTimeout)
+	defer cancel()
+
+	var drainErr = s.link.Drain(drainCtx)
+	if drainErr != nil {
+		logrus.WithError(drainErr).WithField("station", s.link.Remote()).Info("Farewell not acknowledged; disconnecting anyway")
+	}
+
+	var closeErr = s.link.Close()
+	if closeErr != nil {
+		logrus.WithError(closeErr).WithField("station", s.link.Remote()).Info("Disconnecting")
+	}
+
+	return false
 }
 
 // cmd_help lists the commands, or describes the one named.
-func cmd_help(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.Callsign, rest []byte) {
-	var _topic, _, _ = BytesCut(bytes.TrimSpace(rest), ' ')
+func cmd_help(_ context.Context, s *session, rest string) bool {
+	var topic, _, _ = strings.Cut(strings.TrimSpace(rest), " ")
 
-	var topic = strings.ToLower(string(_topic))
+	topic = strings.ToLower(topic)
 
 	var topicCommand = lookupCommand(topic)
 
@@ -792,116 +372,5 @@ func cmd_help(s *session, channel byte, call_to agwpe.Callsign, call_from agwpe.
 		lines = []string{fmt.Sprintf("No such command: %s.  Type ? for the list.", topic)}
 	}
 
-	sendLines(channel, call_to, call_from, lines)
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        agw_cb_G_port_information
- *
- * Purpose:     Process the port information "radio channels available" response from the TNC.
- *
- *
- * Inputs:	num_chan_avail		- Number of radio channels available.
- *
- *		chan_descriptions	- Array of string pointers to form "Port99 description".
- *					  Port1 is channel 0.
- *
- *--------------------------------------------------------------------*/
-
-func agw_cb_G_port_information(num_chan_avail int, chan_descriptions []string) {
-	fmt.Printf("TNC has %d radio channel(s) available:\n", num_chan_avail)
-
-	for n := range num_chan_avail {
-		var p = chan_descriptions[n]
-
-		// Expecting something like this:  "Port1 first soundcard mono"
-		// That came from the TNC, so check it before trusting it.
-
-		var port, desc, _ = strings.Cut(p, " ")
-
-		if len(port) <= len("Port") || !strings.EqualFold(port[:len("Port")], "Port") {
-			fmt.Printf("Radio channel description not in expected format: %s\n", p)
-
-			continue
-		}
-
-		// Atoi on its own would also take a sign, as in "Port+3".
-		var digits = port[len("Port"):]
-
-		var number, numberErr = strconv.Atoi(digits)
-		if numberErr != nil || strings.ContainsFunc(digits, func(r rune) bool { return !unicode.IsDigit(r) }) {
-			fmt.Printf("Radio channel description not in expected format: %s\n", p)
-
-			continue
-		}
-
-		// "Port1" is our channel 0.
-		if number < 1 || number > MAX_TOTAL_CHANS {
-			fmt.Printf("Radio channel number is out of bounds: %s\n", p)
-
-			continue
-		}
-
-		var channel = byte(number - 1)
-
-		fmt.Printf("  Channel %d: %s\n", channel, desc)
-
-		// Later? Use 'g' to get speed and maybe other properties?
-		// Though I'm not sure why we would care here.
-
-		/*
-		 * Send command to register my callsign for incoming connect requests.
-		 */
-
-		agwlib_X_register_callsign(channel, mycall)
-	}
-} /* end agw_cb_G_port_information */
-
-/*-------------------------------------------------------------------
- *
- * Name:        agw_cb_Y_outstanding_frames_for_station
- *
- * Purpose:     Process the "disconnected" command from the TNC.
- *
- * Inputs:	chan		- Radio channel.
- *
- *		call_from	- Should be my call.
- *
- *		call_to		- Callsign of other station.
- *
- *		frame_count
- *
- * Description:	Remove from the sessions table.
- *
- *--------------------------------------------------------------------*/
-
-func agw_cb_Y_outstanding_frames_for_station(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign, frame_count int) { //nolint:unparam
-	var s = srv.findSession(channel, call_to)
-
-	if s == nil {
-		fmt.Printf("Oops!  Did not expect to be here.\n")
-
-		return
-	}
-
-	fmt.Printf("debug ----------------------> session %d,%s, callback Y outstanding frame_count %d\n", channel, call_to, frame_count)
-
-	// Update the transmit queue length
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.txQueueLen = maybe.Just(frame_count)
-} /* end agw_cb_Y_outstanding_frames_for_station */
-
-// BytesCut is strings.Cut for []bytes.
-func BytesCut(s []byte, b byte) ([]byte, []byte, bool) { //nolint:unparam
-	var i = bytes.Index(s, []byte{b})
-
-	if i >= 0 {
-		return s[:i], s[i+1:], true
-	}
-
-	return s, nil, false
+	return s.send(lines...)
 }
