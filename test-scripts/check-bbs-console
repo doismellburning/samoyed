@@ -1,0 +1,77 @@
+#!/bin/bash
+
+set -eu
+set -o pipefail
+
+source "$(dirname "$(realpath "$0")")/common"
+
+BBS="${BBS:-$(dirname "$(realpath "$0")")/../dist/samoyed-bbs}"
+
+goto_tmpdir
+
+# Two console sessions with samoyed-bbs against the same message store: the
+# first sends two messages and kills one, the second finds the other still
+# there and the killed one gone.
+
+cat > samoyed-bbs.yaml << EOF
+call: Q1BBS
+store: $PWD/bbs.db
+EOF
+
+"$BBS" -c samoyed-bbs.yaml --config-check
+
+"$BBS" -c samoyed-bbs.yaml --console Q2TEST > first.log 2>&1 << 'EOF'
+SP Q1TEST
+Kept
+This one stays.
+/EX
+SB ALL
+Killed
+This one goes.
+/EX
+L
+K 2
+B
+EOF
+
+"$BBS" -c samoyed-bbs.yaml --console Q1TEST > second.log 2>&1 << 'EOF'
+L
+R 1
+R 2
+B
+EOF
+
+expect() {
+	local log=$1
+	local want=$2
+
+	if ! grep -qF -- "$want" "$log"; then
+		echo "FAIL: expected '$want' in $log:" >&2
+		cat "$log" >&2
+		exit 1
+	fi
+}
+
+refuse() {
+	local log=$1
+	local unwanted=$2
+
+	if grep -qF -- "$unwanted" "$log"; then
+		echo "FAIL: did not expect '$unwanted' in $log:" >&2
+		cat "$log" >&2
+		exit 1
+	fi
+}
+
+expect first.log "[SAMBBS-0.0-\$]"
+expect first.log "Message 1 saved, ID 1_Q1BBS."
+expect first.log "Message 2 saved, ID 2_Q1BBS."
+expect first.log "Message 2 killed."
+expect first.log "73, and thanks for calling."
+
+expect second.log "Kept"
+refuse second.log "Killed"
+expect second.log "This one stays."
+expect second.log "No message 2."
+
+echo "PASS: samoyed-bbs kept messages between console sessions, and forgot the killed one"

@@ -154,11 +154,12 @@ func (r *Reader) fill(ctx context.Context) error {
 // readWithDeadline reads src, giving up once ctx is done, which a read
 // deadline in the past makes a blocked read do at once.  The deadline is set
 // only after ctx is done, so ctx.Err() says why by the time the read returns.
+//
+// A source can refuse a deadline - net.Pipe does once its far end has closed -
+// which means only that the read can't be cut short, so it goes ahead anyway
+// and says what has become of the source.
 func readWithDeadline(ctx context.Context, src deadlineReader, buf []byte) (int, error) {
-	var clearErr = src.SetReadDeadline(time.Time{})
-	if clearErr != nil {
-		return 0, clearErr
-	}
+	_ = src.SetReadDeadline(time.Time{})
 
 	var stop = context.AfterFunc(ctx, func() { _ = src.SetReadDeadline(time.Unix(1, 0)) })
 	defer stop()

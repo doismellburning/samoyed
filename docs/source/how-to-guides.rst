@@ -926,3 +926,17 @@ since the links between nodes are addressed to their callsigns:
 Giving the AXUDP channel a higher ``quality`` than the radio channel
 makes a node reachable both ways go over the internet,
 rather than whichever was heard first.
+
+Try out the BBS
+---------------
+
+``samoyed-bbs`` keeps messages for users to list, read and send.
+For now it serves only a session on its own console,
+which needs nothing but a configuration file naming the BBS and its message database:
+
+.. code::
+
+    $ printf 'call: Q1BBS\nstore: bbs.db\n' > samoyed-bbs.yaml
+    $ samoyed-bbs --console Q1TEST
+
+:doc:`bbs` describes the configuration and the commands.

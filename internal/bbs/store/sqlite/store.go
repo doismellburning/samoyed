@@ -28,7 +28,7 @@ var migrations embed.FS
 
 var (
 	// ErrDuplicateBID says a message's ID has been seen before.
-	ErrDuplicateBID = errors.New("message ID already seen")
+	ErrDuplicateBID = mail.ErrDuplicateBID
 
 	// ErrNoSuchMessage says there is no message with that number.
 	ErrNoSuchMessage = errors.New("no such message")

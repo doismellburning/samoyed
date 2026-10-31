@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A bulletin sent with an ID of its own keeps it, upper-cased, and the same ID
+# can't be used twice.
+@session Q2TEST
+< de Q1BBS>
+> SB ALL $123_q3bbs
+< Title:
+> News
+< Enter the message.  End it with /EX or Ctrl-Z on a line of its own.
+> First line.
+> Last line.^Z
+< Message 1 saved, ID 123_Q3BBS.
+< de Q1BBS>
+> SB ALL $123_Q3BBS
+< Title:
+> News again
+< Enter the message.  End it with /EX or Ctrl-Z on a line of its own.
+> /ex
+< That message ID has been seen before, so the message wasn't saved.
+< de Q1BBS>
+
+# The Ctrl-Z ended the last line of text, which is kept.
+> R 1
+< Msg #1  B  ID 123_Q3BBS
+< From:  Q2TEST
+< To:    ALL
+< Date:  31-Oct-26 12:34Z
+< Title: News
+<
+< First line.
+< Last line.
+<
+< de Q1BBS>
+
+# An empty message is fine, and a range lists just those in it.
+> ST Q1TEST@Q1BBS.#77.GBR
+< Title:
+>
+< Enter the message.  End it with /EX or Ctrl-Z on a line of its own.
+> /EX
+< Message 2 saved, ID 2_Q1BBS.
+< de Q1BBS>
+> L 2-2
+< Msg#  TS Size  To     @BBS     From      Date   Title
+< 2     TN     0 Q1TEST Q1BBS.#77.GBR Q2TEST    31-Oct
+< de Q1BBS>
+> L< Q2TEST
+< Msg#  TS Size  To     @BBS     From      Date   Title
+< 2     TN     0 Q1TEST Q1BBS.#77.GBR Q2TEST    31-Oct
+< 1     BN    23 ALL             Q2TEST    31-Oct News
+< de Q1BBS>
