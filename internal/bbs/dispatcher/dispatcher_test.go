@@ -1,0 +1,221 @@
+// SPDX-FileCopyrightText: 2026 The Samoyed Authors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package dispatcher
+
+import (
+	"context"
+	"io"
+	"net"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/doismellburning/samoyed/internal/bbs/lines"
+	"github.com/doismellburning/samoyed/internal/bbs/shell"
+	"github.com/doismellburning/samoyed/internal/bbs/transport"
+	"github.com/doismellburning/samoyed/internal/bbs/transport/memt"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// echo is a shell that answers each line by repeating it, and says bye to BYE.
+type echo struct{ peer transport.Peer }
+
+func (e *echo) Start() []shell.Action { return []shell.Action{shell.Prompt{Text: "de Q1BBS>"}} }
+
+func (e *echo) Line(_ context.Context, line string) []shell.Action {
+	if line == "BYE" {
+		return []shell.Action{shell.Output{Lines: []string{"73"}}, shell.Disconnect{}}
+	}
+
+	return []shell.Action{shell.Output{Lines: []string{e.peer.Call + " said " + line}}, shell.Prompt{Text: "de Q1BBS>"}}
+}
+
+func testConfig() Config {
+	var cfg = new(Config)
+
+	cfg.Banner = []string{"Welcome to Q1BBS."}
+	cfg.SID = "[SAMBBS-0.0-$]"
+	cfg.IdleTimeout = 5 * time.Second
+	cfg.MaxLineLen = 32
+
+	return *cfg
+}
+
+// start serves a session from Q2TEST with cfg, and returns the station's end
+// of it, a reader of what the BBS sends, and Serve's result to come.
+func start(t *testing.T, cfg Config) (net.Conn, *lines.Reader, <-chan error) {
+	t.Helper()
+
+	var s, station = memt.Pair(transport.Peer{Call: "Q2TEST", Kind: transport.Memory, Authenticated: false})
+
+	t.Cleanup(func() { _ = station.Close() })
+
+	var d = New(cfg, func(peer transport.Peer) *echo { return &echo{peer: peer} })
+	var result = make(chan error, 1)
+
+	go func() { result <- d.Serve(t.Context(), s) }()
+
+	return station, lines.NewReader(station, 1024), result
+}
+
+func expect(t *testing.T, r *lines.Reader, want ...string) {
+	t.Helper()
+
+	for _, w := range want {
+		var ctx, cancel = context.WithTimeout(t.Context(), 5*time.Second)
+
+		var got, err = r.ReadLine(ctx)
+
+		cancel()
+		require.NoError(t, err, "waiting for %q", w)
+		assert.Equal(t, w, got)
+	}
+}
+
+func say(t *testing.T, station net.Conn, line string) {
+	t.Helper()
+
+	var _, err = station.Write([]byte(line + "\r"))
+	require.NoError(t, err)
+}
+
+func result(t *testing.T, ch <-chan error) error {
+	t.Helper()
+
+	select {
+	case err := <-ch:
+		return err
+	case <-time.After(5 * time.Second):
+		t.Fatal("session did not end")
+
+		return nil
+	}
+}
+
+func TestASession(t *testing.T) {
+	t.Parallel()
+
+	var station, r, done = start(t, testConfig())
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+
+	say(t, station, "L")
+	expect(t, r, "Q2TEST said L", "de Q1BBS>")
+
+	say(t, station, "BYE")
+	expect(t, r, "73")
+
+	require.NoError(t, result(t, done))
+
+	var _, err = r.ReadLine(t.Context())
+	require.ErrorIs(t, err, io.EOF, "the session is closed")
+}
+
+func TestASIDIsTurnedAway(t *testing.T) {
+	t.Parallel()
+
+	var station, r, done = start(t, testConfig())
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+
+	say(t, station, "[FBB-7.0-ABFHM$]")
+	expect(t, r, "This BBS doesn't forward mail yet.  73.")
+
+	require.NoError(t, result(t, done))
+}
+
+func TestASIDLaterIsJustALine(t *testing.T) {
+	t.Parallel()
+
+	var station, r, _ = start(t, testConfig())
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+
+	say(t, station, "L")
+	expect(t, r, "Q2TEST said L", "de Q1BBS>")
+
+	say(t, station, "[FBB-7.0-ABFHM$]")
+	expect(t, r, "Q2TEST said [FBB-7.0-ABFHM$]")
+}
+
+func TestTheStationLeaving(t *testing.T) {
+	t.Parallel()
+
+	var station, r, done = start(t, testConfig())
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	require.NoError(t, station.Close())
+
+	require.NoError(t, result(t, done))
+}
+
+func TestIdleTimeout(t *testing.T) {
+	t.Parallel()
+
+	var cfg = testConfig()
+	cfg.IdleTimeout = 50 * time.Millisecond
+
+	var _, r, done = start(t, cfg)
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>", "Nothing heard for 50ms, so disconnecting.  73.")
+
+	require.NoError(t, result(t, done))
+}
+
+func TestOverlongLine(t *testing.T) {
+	t.Parallel()
+
+	var station, r, done = start(t, testConfig())
+
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+
+	go func() { _, _ = station.Write([]byte(strings.Repeat("x", 100))) }()
+
+	expect(t, r, "That line was too long, so disconnecting.  73.")
+	require.ErrorIs(t, result(t, done), lines.ErrLineTooLong)
+}
+
+func TestShuttingDown(t *testing.T) {
+	t.Parallel()
+
+	var s, station = memt.Pair(transport.Peer{Call: "Q2TEST", Kind: transport.Memory, Authenticated: false})
+
+	t.Cleanup(func() { _ = station.Close() })
+
+	var ctx, cancel = context.WithCancel(t.Context())
+	var d = New(testConfig(), func(peer transport.Peer) *echo { return &echo{peer: peer} })
+	var done = make(chan error, 1)
+
+	go func() { done <- d.Serve(ctx, s) }()
+
+	expect(t, lines.NewReader(station, 1024), "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	cancel()
+
+	require.NoError(t, result(t, done))
+}
+
+func TestAStationGoneBeforeTheGreeting(t *testing.T) {
+	t.Parallel()
+
+	var s, station = memt.Pair(transport.Peer{Call: "Q2TEST", Kind: transport.Memory, Authenticated: false})
+
+	require.NoError(t, station.Close())
+
+	var d = New(testConfig(), func(peer transport.Peer) *echo { return &echo{peer: peer} })
+
+	require.Error(t, d.Serve(t.Context(), s), "nobody there to greet")
+}
+
+func TestIsSID(t *testing.T) {
+	t.Parallel()
+
+	for _, sid := range []string{"[FBB-7.0-ABFHM$]", "[BPQ-6.0.24.1-B1FIHJM$]", "[SAMBBS-0.0-$]", "[MBL-5.14-H$]"} {
+		assert.True(t, IsSID(sid), sid)
+	}
+
+	for _, line := range []string{"", "L", "[FBB]", "FBB-7.0-ABFHM$", "[FBB-7.0-ABFHM$] extra", "[a b-1-$]"} {
+		assert.False(t, IsSID(line), line)
+	}
+}
