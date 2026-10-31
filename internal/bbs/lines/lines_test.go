@@ -261,3 +261,19 @@ func FuzzReadLine(f *testing.F) {
 		t.Fatal("never reached the end of the input")
 	})
 }
+
+// TestReadLineSeesTheFarEndHangUp covers a deadline source that refuses a new
+// deadline once its far end has closed, as net.Pipe's does: the reader used to
+// take the refusal as the read failing, and never got to the io.EOF behind it.
+func TestReadLineSeesTheFarEndHangUp(t *testing.T) {
+	t.Parallel()
+
+	var bbs, station = net.Pipe()
+
+	t.Cleanup(func() { _ = bbs.Close() })
+
+	require.NoError(t, station.Close())
+
+	var _, err = NewReader(bbs, DefaultMaxLen).ReadLine(t.Context())
+	require.ErrorIs(t, err, io.EOF)
+}
