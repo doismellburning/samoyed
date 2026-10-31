@@ -27,6 +27,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/agwpe"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -477,7 +478,7 @@ func timingTestFrame(seq int, length int) []byte {
 func on_C_connection_received(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign, incoming bool, data []byte) { //nolint:unparam
 	srv.getOrCreateSession(channel, call_from, call_to)
 
-	fmt.Printf("Begin session %d,%s: %s\n", channel, call_from, data)
+	logrus.WithFields(logrus.Fields{"channel": channel, "station": call_from}).Info("Begin session")
 
 	// Send greeting.
 
@@ -511,7 +512,7 @@ func on_C_connection_received(channel byte, call_from agwpe.Callsign, call_to ag
 func agw_cb_d_disconnected(channel byte, call_from agwpe.Callsign, call_to agwpe.Callsign, data []byte) { //nolint:unparam
 	var dataStr = strings.TrimSpace(string(data))
 
-	fmt.Printf("End session %d,%s: %s\n", channel, call_from, dataStr)
+	logrus.WithFields(logrus.Fields{"channel": channel, "station": call_from, "reason": dataStr}).Info("End session")
 
 	srv.removeSession(channel, call_from)
 } /* end agw_cb_d_disconnected */
@@ -632,7 +633,7 @@ func agw_cb_D_connected_data(channel byte, call_from agwpe.Callsign, call_to agw
 		return
 	}
 
-	fmt.Printf("%d,%s: %s\n", channel, call_from, dataStr)
+	logrus.WithFields(logrus.Fields{"channel": channel, "station": call_from, "line": dataStr}).Debug("Received")
 
 	// Process the command from user.
 	// A terminal ends the line with a carriage return, and some send a line
