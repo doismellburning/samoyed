@@ -33,7 +33,7 @@ That puts every program in ``/usr/bin``, each prefixed ``samoyed-``,
 along with their man pages,
 and the data files in ``/usr/share/samoyed``.
 It installs no configuration file and no service:
-the `quick start <https://github.com/doismellburning/samoyed#quick-start>`__ covers the first.
+:doc:`quickstart` covers both.
 
 From a tarball,
 copy the programs from ``dist/`` to somewhere on your ``PATH``,
@@ -102,4 +102,4 @@ Checking it
     $ samoyed-direwolf --version
 
 prints the version and the commit it was built from.
-Then carry on with the `quick start <https://github.com/doismellburning/samoyed#quick-start>`__.
+Then carry on with :doc:`quickstart`.

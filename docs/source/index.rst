@@ -74,9 +74,9 @@ Getting started
 ---------------
 
 * :doc:`installation` - packages, tarballs, building from source, and device permissions
+* :doc:`quickstart` - a first configuration, connecting an application, and running it as a service
 
 The `README <https://github.com/doismellburning/samoyed#readme>`__ also covers
-a `quick start <https://github.com/doismellburning/samoyed#quick-start>`__ with a minimal configuration,
 `switching from Dire Wolf <https://github.com/doismellburning/samoyed#switching-from-dire-wolf>`__,
 and the full `feature list <https://github.com/doismellburning/samoyed#features>`__.
 
@@ -88,6 +88,7 @@ Where this site doesn't yet cover something,
    :hidden:
 
    installation
+   quickstart
 
 Using Samoyed
 -------------
