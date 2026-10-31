@@ -139,6 +139,12 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 		return
 	}
 
+	// Unlike Dire Wolf's format, a YAML configuration has no audio device it
+	// didn't ask for: one with no audioDevices - a station whose channels are
+	// all TNCs, say - has no radio channels, rather than whatever the default
+	// soundcard turns out to be.
+	ps.dropDefaultAudioDevice()
+
 	var doc = new(ConfigFile)
 
 	var decoder = yaml.NewDecoder(bytes.NewReader(content))
@@ -146,7 +152,7 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 
 	var decodeErr = decoder.Decode(doc)
 	if errors.Is(decodeErr, io.EOF) {
-		return // An empty file, which leaves every default alone.
+		return // An empty file, which leaves every other default alone.
 	}
 
 	if decodeErr != nil {
@@ -198,7 +204,7 @@ func (ps *parseState) readYAML(r io.Reader, name string) {
 
 	var file = doc.Samoyed
 	if file == nil {
-		return // Nothing under "samoyed", which leaves every default alone.
+		return // Nothing under "samoyed", which leaves every other default alone.
 	}
 
 	var top = yamlKeys(yamlKeys(yamlDocument(&root))["samoyed"].value)
@@ -253,6 +259,15 @@ func (ps *parseState) applyYAMLAudioDevices(devices []AudioDeviceConfig, node ya
 		}
 
 		ps.line = item.Line
+
+		// ADEVICE none is how Dire Wolf's format turns its default device
+		// off; here there is none to turn off.
+		if audioNameIsNone(device.Input) {
+			ps.errorf("line %d: An audio device's input can't be none; leave audioDevices out for no audio device", ps.line)
+
+			continue
+		}
+
 		var err = ps.applyADEVICE(device.AudioDeviceSettings)
 		if err != nil {
 			ps.report(err)

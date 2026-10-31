@@ -28,10 +28,49 @@ func mustNodeConfig(t *testing.T, audio *RadioConfig, settings nodeSettings) nod
 // parseYAMLConfig runs config_init over content, put under the top-level
 // "samoyed" key, as a YAML configuration file.  That key takes the first line,
 // so a line in content is a line further on in the file.
+//
+// A YAML configuration has no audio device it doesn't name, so content that
+// names none gets the default soundcard, as a legacy configuration would have
+// it - most of these are about a radio channel's settings, not where its
+// audio comes from.  parseYAMLConfigAsWritten leaves it out.
 func parseYAMLConfig(t *testing.T, content string) configs {
 	t.Helper()
 
+	return parseYAMLConfigAsWritten(t, withDefaultAudioDevice(content))
+}
+
+// parseYAMLConfigAsWritten is parseYAMLConfig without the default soundcard.
+func parseYAMLConfigAsWritten(t *testing.T, content string) configs {
+	t.Helper()
+
 	return parseConfigNamed(t, "samoyed*.yaml", underSamoyed(content))
+}
+
+// withDefaultAudioDevice adds the default soundcard to YAML content that names
+// no audio device.  It goes at the end, so that every line of content stays
+// where it was.
+func withDefaultAudioDevice(content string) string {
+	if strings.Contains(content, "audioDevices:") || strings.Contains(content, "ADEVICE") {
+		return content
+	}
+
+	if content != "" && !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+
+	return content + "audioDevices:\n  - input: default\n"
+}
+
+// withDefaultLegacyAudioDevice names the default soundcard, as
+// withDefaultAudioDevice does for a YAML configuration, in a legacy one that
+// names no audio device - where it is the default anyway, but named, as it is
+// in the YAML.
+func withDefaultLegacyAudioDevice(content string, yamlContent string) string {
+	if withDefaultAudioDevice(yamlContent) == yamlContent {
+		return content
+	}
+
+	return content + "ADEVICE default\n"
 }
 
 // underSamoyed puts content under a top-level "samoyed" key.
@@ -112,9 +151,10 @@ channels:
 		},
 		{
 			name:   "second audio device by number",
-			legacy: "ADEVICE1 plughw:3,0\nCHANNEL 2\nMYCALL Q1TEST\n",
+			legacy: "ADEVICE default\nADEVICE1 plughw:3,0\nCHANNEL 2\nMYCALL Q1TEST\n",
 			yaml: `
 audioDevices:
+  - input: default
   - device: 1
     input: plughw:3,0
 channels:
@@ -327,7 +367,7 @@ legacy: |
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var want = parseConfig(t, tt.legacy)
+			var want = parseConfig(t, withDefaultLegacyAudioDevice(tt.legacy, tt.yaml))
 			var got = parseYAMLConfig(t, tt.yaml)
 
 			assert.Equal(t, want.audio, got.audio)
@@ -369,6 +409,29 @@ func Test_config_yaml_network_TNCs(t *testing.T) {
 			assert.Contains(t, c.output, tc.want, tc.name)
 			assert.NotContains(t, c.audio.chan_medium, MEDIUM_NETTNC, tc.name)
 		}
+	})
+
+	t.Run("with no audioDevices, network TNCs are the only channels", func(t *testing.T) {
+		var c = parseYAMLConfigAsWritten(t, "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001}\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, 0, c.audio.adev[0].defined)
+		assert.Equal(t, MEDIUM_NONE, c.audio.chan_medium[0])
+		assert.Equal(t, MEDIUM_NETTNC, c.audio.chan_medium[6])
+	})
+
+	t.Run("an audio device's input can't be none", func(t *testing.T) {
+		var c = parseYAMLConfigAsWritten(t, "audioDevices:\n  - input: none\n")
+		assert.Equal(t, 1, c.errors, c.output)
+		assert.Contains(t, c.output, "leave audioDevices out for no audio device")
+		assert.Equal(t, 0, c.audio.adev[0].defined)
+		assert.Equal(t, MEDIUM_NONE, c.audio.chan_medium[0])
+	})
+
+	t.Run("the legacy block can still define the first audio device", func(t *testing.T) {
+		var c = parseYAMLConfigAsWritten(t, "legacy: |\n  ADEVICE plughw:1,0\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, 1, c.audio.adev[0].defined)
+		assert.Equal(t, MEDIUM_RADIO, c.audio.chan_medium[0])
 	})
 
 	t.Run("a network TNC can't take a channel already in use", func(t *testing.T) {
@@ -666,7 +729,7 @@ legacy: |
 	})
 
 	t.Run("a .yml file is YAML too", func(t *testing.T) {
-		var c = parseConfigNamed(t, "samoyed*.yml", "samoyed:\n  channels:\n    - {channel: 0, mycall: Q1TEST}\n")
+		var c = parseConfigNamed(t, "samoyed*.yml", "samoyed:\n  audioDevices:\n    - input: default\n  channels:\n    - {channel: 0, mycall: Q1TEST}\n")
 		assert.Equal(t, "Q1TEST", c.audio.mycall[0])
 		assert.Zero(t, c.errors)
 	})
@@ -787,7 +850,7 @@ legacy: |
 	// Regression test: an entry written as an alias, or merging in another,
 	// had no keys to be found, so it was said to have no channel number.
 	t.Run("aliases and merges are followed", func(t *testing.T) {
-		var want = parseConfig(t, "MYCALL Q1TEST\nTXDELAY 20\n")
+		var want = parseConfig(t, "MYCALL Q1TEST\nTXDELAY 20\nADEVICE default\n")
 
 		// An anchor has to come before its alias, and there is no spare key
 		// to put one under, so these anchor an earlier entry of the same
@@ -843,8 +906,11 @@ legacy: |
 		assert.True(t, IsNoCall(c.audio.mycall[0]))
 	})
 
-	t.Run("an empty samoyed key changes nothing", func(t *testing.T) {
+	t.Run("an empty samoyed key changes nothing but the default audio device", func(t *testing.T) {
 		var want = parseConfig(t, "")
+		want.audio.adev[0].defined = 0
+		want.audio.chan_medium[0] = MEDIUM_NONE
+
 		var got = parseConfigNamed(t, "samoyed*.yaml", "samoyed:\n")
 		assert.Zero(t, got.errors, got.output)
 		assert.Equal(t, want.audio, got.audio)

@@ -473,12 +473,52 @@ func Test_applyCommandLineAudioSource(t *testing.T) {
 			var pa = makeRadioConfig("plughw:1,0", tt.ouName)
 			pa.adev[0].adevice_out_specified = tt.specified
 
-			applyCommandLineAudioSource(&pa.adev[0], "stdin")
+			require.NoError(t, applyCommandLineAudioSource(&pa.adev[0], "stdin"))
 
 			assert.Equal(t, "stdin", pa.adev[0].adevice_in)
 			assert.Equal(t, tt.wantOut, pa.adev[0].adevice_out)
 		})
 	}
+}
+
+// "ADEVICE none", or a YAML configuration with no audioDevices, leaves no
+// device for a command line source to stand in for.
+func Test_applyCommandLineAudioSource_noAudioDevice(t *testing.T) {
+	t.Parallel()
+
+	for _, none := range []bool{true, false} {
+		var pa = new(RadioConfig)
+		pa.adev[0].none = none
+
+		var err = applyCommandLineAudioSource(&pa.adev[0], "stdin")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no audio device")
+		assert.Empty(t, pa.adev[0].adevice_in)
+	}
+}
+
+// --- ADEVICE none ---
+
+// With no audio device, there is nothing to open, nothing to receive from and
+// nothing to transmit through - and none of that is an error.
+func Test_AudioOpen_none(t *testing.T) {
+	t.Parallel()
+
+	var pa = new(RadioConfig)
+	pa.adev[0].none = true
+
+	assert.False(t, anyDeviceRequiresPortAudio(pa))
+
+	var d = openAudio(t, pa)
+
+	assert.False(t, d.portaudioHeld)
+
+	for channel := range MAX_RADIO_CHANS {
+		assert.False(t, d.channelCanTransmit(channel), "channel %d", channel)
+	}
+
+	var failed = recv_init(t.Context(), pa, d, nil, nil)
+	assert.Empty(t, failed, "no receive thread to report")
 }
 
 // --- transmitAvailable ---

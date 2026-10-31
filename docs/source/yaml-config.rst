@@ -98,6 +98,13 @@ These are the keys under ``samoyed``:
     sample rate (``ARATE``).  A device's number is its position in the list,
     unless it gives one with ``device``.
 
+    Unlike Dire Wolf's format,
+    which opens the default sound card when it names no ``ADEVICE``,
+    a YAML configuration has only the audio devices listed here.
+    Leave ``audioDevices`` out for a station whose channels are all TNCs,
+    and so has no radio channel;
+    list ``input: default`` for the default sound card.
+
     An ``input`` of ``rtl_tcp:host:port`` receives from an RTL-SDR served by
     ``rtl_tcp``, which needs an ``sdr`` block, with no line-at-a-time equivalent:
 

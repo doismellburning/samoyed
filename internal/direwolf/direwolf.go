@@ -375,6 +375,13 @@ x = Silence FX.25 information.`)
 			os.Exit(1)
 		}
 
+		// There is no device for -n to describe, and its second channel
+		// would be a radio channel with nothing behind it.
+		if audio_config.adev[0].defined == 0 {
+			logrus.Error("-n option, number of audio channels, can't be used with a configuration that has no audio device")
+			os.Exit(1)
+		}
+
 		audio_config.adev[0].num_channels = *audioChannels
 		if *audioChannels == 2 {
 			audio_config.chan_medium[1] = MEDIUM_RADIO
@@ -490,7 +497,11 @@ x = Silence FX.25 information.`)
 	}
 
 	if input_file != "" {
-		applyCommandLineAudioSource(&audio_config.adev[0], input_file)
+		var sourceErr = applyCommandLineAudioSource(&audio_config.adev[0], input_file)
+		if sourceErr != nil {
+			logrus.WithError(sourceErr).Error("Conflicting audio device configuration")
+			os.Exit(1)
+		}
 	}
 
 	audio_config.recv_ber = *bitErrorRate
