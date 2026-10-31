@@ -931,12 +931,13 @@ Try out the BBS
 ---------------
 
 ``samoyed-bbs`` keeps messages for users to list, read and send.
-For now it serves only a session on its own console,
-which needs nothing but a configuration file naming the BBS and its message database:
+Stations reach it over the air through ``samoyed-direwolf``'s AGW port,
+and a session on its own console
+needs nothing but a configuration file naming the BBS and its message database:
 
 .. code::
 
     $ printf 'call: Q1BBS\nstore: bbs.db\n' > samoyed-bbs.yaml
     $ samoyed-bbs --console Q1TEST
 
-:doc:`bbs` describes the configuration and the commands.
+:doc:`bbs` describes putting it on the air, the configuration and the commands.

@@ -277,3 +277,27 @@ func TestReadLineSeesTheFarEndHangUp(t *testing.T) {
 	var _, err = NewReader(bbs, DefaultMaxLen).ReadLine(t.Context())
 	require.ErrorIs(t, err, io.EOF)
 }
+
+// writes records each Write it is given.
+type writes struct{ calls []string }
+
+func (w *writes) Write(p []byte) (int, error) {
+	w.calls = append(w.calls, string(p))
+
+	return len(p), nil
+}
+
+// TestWriteSendsLinesTogether covers a listing going out a line per write,
+// which over AGW is a frame per line: lines written together go in one write,
+// for the transport to pack into as few frames as it can.
+func TestWriteSendsLinesTogether(t *testing.T) {
+	t.Parallel()
+
+	var w = new(writes)
+
+	require.NoError(t, Write(w, "one", "two", "three"))
+	assert.Equal(t, []string{"one\rtwo\rthree\r"}, w.calls)
+
+	require.NoError(t, Write(w))
+	assert.Len(t, w.calls, 1, "nothing to write, so no write")
+}

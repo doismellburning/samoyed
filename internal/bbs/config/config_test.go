@@ -97,3 +97,94 @@ func TestValidCall(t *testing.T) {
 		assert.False(t, ValidCall(call), call)
 	}
 }
+
+// env is an environment with just the variables given.
+func env(vars map[string]string) func(name string) (string, bool) {
+	return func(name string) (string, bool) {
+		var value, ok = vars[name]
+
+		return value, ok
+	}
+}
+
+func TestParseAGW(t *testing.T) {
+	t.Parallel()
+
+	var cfg, err = ParseWithEnv([]byte(`
+call: Q1BBS
+store: bbs.db
+agw:
+  addr: localhost:8000
+  user: Q1BBS
+  passwordEnv: BBS_AGW_PASSWORD
+  ports: [0, 2]
+  paclen: 256
+  highWater: 4
+`), env(map[string]string{"BBS_AGW_PASSWORD": "correct horse"}))
+	require.NoError(t, err)
+
+	var client, ok = cfg.AGWClient().Get()
+	require.True(t, ok)
+
+	assert.Equal(t, "localhost:8000", client.Addr)
+	assert.Equal(t, "Q1BBS", client.Call)
+	assert.Equal(t, []int{0, 2}, client.Ports)
+	assert.Equal(t, 256, client.PacLen)
+	assert.Equal(t, uint32(4), client.HighWater)
+
+	var login, hasLogin = client.Login.Get()
+	require.True(t, hasLogin)
+	assert.Equal(t, "Q1BBS", login.User)
+	assert.Equal(t, "correct horse", login.Password, "the password comes from the environment")
+}
+
+func TestParseAGWDefaults(t *testing.T) {
+	t.Parallel()
+
+	var cfg, err = ParseWithEnv([]byte("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\n"), env(nil))
+	require.NoError(t, err)
+
+	var client, ok = cfg.AGWClient().Get()
+	require.True(t, ok)
+
+	assert.Empty(t, client.Ports, "every port the server has")
+	assert.True(t, client.Login.IsNothing())
+}
+
+func TestParseWithoutAGW(t *testing.T) {
+	t.Parallel()
+
+	var cfg, err = ParseWithEnv([]byte("call: Q1BBS\nstore: bbs.db\n"), env(nil))
+	require.NoError(t, err)
+	assert.True(t, cfg.AGWClient().IsNothing())
+}
+
+func TestParseAGWProblems(t *testing.T) {
+	t.Parallel()
+
+	var _, err = ParseWithEnv([]byte(`
+call: Q1BBS
+store: bbs.db
+agw:
+  addr: localhost
+  user: Q1BBS
+  ports: [0, 256]
+  paclen: 4096
+`), env(nil))
+	require.Error(t, err)
+
+	for _, want := range []string{
+		`agw.addr: "localhost" is not a host:port`,
+		"agw.passwordEnv: a user name needs the variable its password is in",
+		"agw.ports: 256 is not a port from 0 to 255",
+		"agw.paclen: 4096 is not from 1 to 2048",
+	} {
+		assert.Contains(t, err.Error(), want)
+	}
+
+	var _, unsetErr = ParseWithEnv([]byte("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\n  passwordEnv: NOT_SET\n"), env(nil))
+	require.ErrorContains(t, unsetErr, "agw.passwordEnv: NOT_SET is not set")
+
+	var _, negativeErr = ParseWithEnv([]byte("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\n  highWater: -1\n"), env(nil))
+	require.Error(t, negativeErr)
+}

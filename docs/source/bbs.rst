@@ -11,10 +11,9 @@ BBS
 users leave personal messages for each other and bulletins for everyone,
 and list, read and kill them.
 It is early days.
-For now the BBS serves only its own console -
-a session on the terminal it was started from, as a given callsign -
+Stations reach it over the air through an AGW server, such as ``samoyed-direwolf``,
+and it can also run a session on its own console,
 so it can be tried, and its messages looked after, without a radio.
-Stations reaching it over the air come next.
 
 Running it
 ----------
@@ -48,6 +47,45 @@ The console is trusted:
 whoever is at it runs the BBS,
 so it can read and kill anyone's messages.
 
+On the air
+----------
+
+Given an ``agw`` block, ``samoyed-bbs`` attaches to an AGW server,
+registers its callsign on the server's ports,
+and serves each station that connects to that callsign:
+
+.. code:: yaml
+
+    call: Q1BBS
+    store: /var/lib/samoyed-bbs/bbs.db
+    agw:
+      addr: localhost:8000
+
+.. code::
+
+    $ samoyed-bbs -c samoyed-bbs.yaml
+
+For ``samoyed-direwolf``, the address is its ``AGWPORT``, 8000 unless it says otherwise.
+If it has an ``AGWLOGIN``, give the BBS the same user name,
+and its password in an environment variable,
+so that the password itself isn't in the BBS's file:
+
+.. code:: yaml
+
+    agw:
+      addr: localhost:8000
+      user: Q1BBS
+      passwordEnv: BBS_AGW_PASSWORD
+
+The BBS waits for the AGW server if it isn't up yet,
+and attaches again if it goes away and comes back.
+It waits for what it last sent a station to be acknowledged before hanging up,
+so a farewell, or the end of a long message, isn't cut off.
+
+Stations connect to the BBS's own callsign.
+A node on the same ``samoyed-direwolf`` can't connect a user to the BBS on the same channel without transmitting:
+a callsign registered over AGW only takes connections arriving from the radio.
+
 Configuration
 -------------
 
@@ -70,6 +108,36 @@ Configuration
 ``idleTimeout``
     How long a station may say nothing before it is disconnected, such as ``5m``.
     Left out, ten minutes.
+
+``agw``
+    The AGW server stations reach the BBS through.
+    Left out, the BBS can only be used from its console.
+    It has:
+
+    ``addr``
+        The server's ``host:port``.
+
+    ``user``
+        Optionally, the user name to log in with,
+        for a server that wants a login.
+
+    ``passwordEnv``
+        The environment variable the password is in.
+        Needed with ``user``.
+
+    ``ports``
+        Optionally, the server's ports to take connections on, counting from 0,
+        such as ``[0]``.
+        Left out, every port the server has.
+
+    ``paclen``
+        Optionally, the most the BBS sends the server at a time, in bytes,
+        from 1 to 2048.
+        Matching the TNC's own ``PACLEN`` keeps frames full.
+
+    ``highWater``
+        Optionally, how many of a station's frames may be unacknowledged before the BBS waits to send more,
+        so a long message doesn't flood the TNC's transmit queue.
 
 ``--config-check`` reports every problem in the file at once,
 and its exit status is 1 if there are any,

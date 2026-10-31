@@ -1,0 +1,248 @@
+#!/bin/bash
+
+set -eu
+set -o pipefail
+
+source "$(dirname "$(realpath "$0")")/common"
+
+BBS="${BBS:-$(dirname "$(realpath "$0")")/../dist/samoyed-bbs}"
+
+# BBS_BIG_MESSAGE=1 sends a 50 KB message rather than a 5 KB one, which takes
+# about a minute over the air here.
+if [[ ${BBS_BIG_MESSAGE:-} == 1 ]]; then
+	body_bytes=50000
+else
+	body_bytes=5000
+fi
+
+if ! command -v python3 > /dev/null; then
+	echo "FAIL: python3 not found, required for port allocation and the AGW client" >&2
+	exit 1
+fi
+
+goto_tmpdir
+
+# Two samoyed-direwolf instances on cross-wired UDP audio, as in
+# check-udp-audio-connect, with samoyed-bbs attached to B as Q2BBS.  A station
+# on A connects over the air, sends a long message and reads it back, then
+# hangs up.  B's TNC is then restarted, and the station comes back to find the
+# message still there once the BBS has reattached.
+
+pids=()
+tnc_b_pid=
+
+# shellcheck disable=SC2317,SC2329 # cleanup is invoked indirectly via trap
+cleanup() {
+	local status=$?
+
+	if ((status != 0)); then
+		echo "--- FAILURE: dumping logs from $PWD for diagnosis ---" >&2
+
+		for log in direwolf-a.log direwolf-b.log bbs.log station.log station-again.log; do
+			echo "--- $log ---" >&2
+			cat "$log" >&2 2> /dev/null || echo "(missing)" >&2
+		done
+	fi
+
+	for pid in "${pids[@]}" $tnc_b_pid; do
+		kill "$pid" 2> /dev/null || true
+	done
+	wait 2> /dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# Waits for at least $3 (default 1) occurrences of $2 in $1.
+wait_for_log_line() {
+	local logfile=$1
+	local pattern=$2
+	local mincount=${3:-1}
+	local deadline=$((SECONDS + 60))
+
+	while (($(grep -c "$pattern" "$logfile" 2> /dev/null || true) < mincount)); do
+		if ((SECONDS > deadline)); then
+			echo "FAIL: timed out waiting for '$pattern' (x$mincount) in $logfile" >&2
+			return 1
+		fi
+
+		sleep 0.2
+	done
+}
+
+# --- the station on A ------------------------------------------------------
+# Connects from Q1TEST to Q2BBS through A's AGW port and sends each line in
+# turn once the answer to the one before has arrived.  "send" sends a
+# message of the given size and reads it back; "list" checks it is still
+# there.
+
+cat > station.py << 'EOF'
+import socket
+import struct
+import sys
+
+AGW_HEADER = struct.Struct("<BBBBBBBB10s10sI4s")
+
+
+def frame(kind, data=b""):
+	return AGW_HEADER.pack(0, 0, 0, 0, ord(kind), 0, 0xF0, 0, b"Q1TEST", b"Q2BBS", len(data), b"\0\0\0\0") + data
+
+
+def read_frame(sock):
+	buf = b""
+	while len(buf) < AGW_HEADER.size:
+		chunk = sock.recv(AGW_HEADER.size - len(buf))
+		if not chunk:
+			sys.exit("connection to the TNC closed")
+		buf += chunk
+
+	fields = AGW_HEADER.unpack(buf)
+	data = b""
+	while len(data) < fields[10]:
+		chunk = sock.recv(fields[10] - len(data))
+		if not chunk:
+			sys.exit("connection to the TNC closed")
+		data += chunk
+
+	return chr(fields[4]), data
+
+
+def log(*args):
+	print(*args, flush=True)
+
+
+def main(port, mode, body_bytes):
+	line = "The quick brown fox jumps over the lazy dog, 0123456789."
+	body = [f"{n:05d} {line}" for n in range(body_bytes // (len(line) + 7))]
+
+	with socket.create_connection(("127.0.0.1", port), timeout=300) as sock:
+		received = b""
+
+		def await_text(want):
+			nonlocal received
+			while want.encode() not in received:
+				kind, data = read_frame(sock)
+				if kind == "D":
+					received += data
+				elif kind == "d":
+					sys.exit(f"disconnected while waiting for {want!r}; got {received[-500:]!r}")
+			got, received = received, b""
+			log(f"got {want!r}")
+			return got
+
+		def say(text, want):
+			sock.sendall(frame("D", (text + "\r").encode()))
+			return await_text(want)
+
+		sock.sendall(frame("C"))
+		await_text("de Q2BBS>")
+
+		if mode == "send":
+			say("SP Q1TEST", "Title:")
+			say("Big", "Enter the message")
+			for text in body:
+				sock.sendall(frame("D", (text + "\r").encode()))
+			say("/EX", "Message 1 saved")
+			say("L", "Big")
+
+			read = say("R 1", body[-1]).decode()
+			missing = [text for text in body if text not in read]
+			if missing:
+				sys.exit(f"{len(missing)} of {len(body)} lines didn't come back, the first {missing[0]!r}")
+			log(f"read back all {len(body)} lines")
+		else:
+			say("L", "Big")
+
+		say("B", "73")
+
+		while True:
+			kind, _ = read_frame(sock)
+			if kind == "d":
+				log("HUNG UP OK")
+				return
+
+
+main(int(sys.argv[1]), sys.argv[2], int(sys.argv[3]))
+EOF
+
+# --- port allocation -------------------------------------------------------
+
+udp_a=$(free_port udp)
+udp_b=$(free_port udp "$udp_a")
+agw_a=$(free_port tcp "$udp_a" "$udp_b")
+agw_b=$(free_port tcp "$udp_a" "$udp_b" "$agw_a")
+
+# --- config files ----------------------------------------------------------
+# As in check-appserver: the 9600 baud modem keeps a window of frames' audio
+# small enough for the receiving UDP socket's buffer, and FRACK is raised so a
+# loaded CI runner's slow answer to a SABM doesn't draw a retry that resets the
+# link once it is up.
+
+for side in a b; do
+	if [[ $side == a ]]; then
+		in=$udp_a out=$udp_b agw=$agw_a call=Q1TEST
+	else
+		in=$udp_b out=$udp_a agw=$agw_b call=Q2TEST
+	fi
+
+	cat > "direwolf-$side.yaml" << EOF
+samoyed:
+  audioDevices:
+    - input: udp:$in
+      output: udp:localhost:$out
+      rate: 48000
+  channels:
+    - {channel: 0, mycall: $call, modem: {speed: "9600"}}
+  agwPort: $agw
+  kissPorts: [{port: 0}]
+  legacy: "FRACK 10"
+EOF
+done
+
+cat > samoyed-bbs.yaml << EOF
+call: Q2BBS
+store: $PWD/bbs.db
+agw:
+  addr: 127.0.0.1:$agw_b
+  paclen: 256
+EOF
+
+# --- start the TNCs and the BBS --------------------------------------------
+
+"$DIREWOLF" -c direwolf-a.yaml > direwolf-a.log 2>&1 &
+pids+=("$!")
+"$DIREWOLF" -c direwolf-b.yaml > direwolf-b.log 2>&1 &
+tnc_b_pid=$!
+
+wait_for_tcp_port "$agw_a"
+wait_for_tcp_port "$agw_b"
+
+"$BBS" -c samoyed-bbs.yaml > bbs.log 2>&1 &
+pids+=("$!")
+
+wait_for_log_line bbs.log "Connected to AGW server"
+
+# --- send a message, and read it back --------------------------------------
+
+if ! python3 -I station.py "$agw_a" send "$body_bytes" > station.log 2>&1; then
+	echo "FAIL: the station's session with samoyed-bbs did not go as expected" >&2
+	exit 1
+fi
+
+wait_for_log_line bbs.log "End session"
+
+# --- restart B's TNC, and come back ----------------------------------------
+
+kill "$tnc_b_pid"
+wait "$tnc_b_pid" 2> /dev/null || true
+
+"$DIREWOLF" -c direwolf-b.yaml >> direwolf-b.log 2>&1 &
+tnc_b_pid=$!
+
+wait_for_tcp_port "$agw_b"
+wait_for_log_line bbs.log "Connected to AGW server" 2
+
+if ! python3 -I station.py "$agw_a" list 0 > station-again.log 2>&1; then
+	echo "FAIL: the station's second session, after B's TNC restarted, did not go as expected" >&2
+	exit 1
+fi
+
+echo "PASS: samoyed-bbs took and gave back a $body_bytes byte message over the air, and was still there after its TNC restarted"

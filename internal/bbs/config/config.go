@@ -10,11 +10,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/agwclient"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -38,7 +41,43 @@ type Config struct {
 	// IdleTimeout is how long a station may say nothing before it is
 	// disconnected.  Left out, ten minutes.
 	IdleTimeout time.Duration `yaml:"idleTimeout"`
+
+	// AGW, if given, is the AGW server stations reach the BBS through.
+	AGW *AGW `yaml:"agw"`
 }
+
+// AGW is the AGW server stations reach the BBS through, such as
+// samoyed-direwolf's AGWPORT.
+type AGW struct {
+	// Addr is the server's host:port.
+	Addr string `yaml:"addr"`
+
+	// User, if given, is the user name to log in with, for a server that
+	// wants a login (samoyed-direwolf's AGWLOGIN).
+	User string `yaml:"user"`
+
+	// PasswordEnv names the environment variable holding the password, so
+	// that the password itself is never in the file.
+	PasswordEnv string `yaml:"passwordEnv"`
+
+	// Ports are the server ports to take connections on, counting from 0.
+	// Left out, every port the server has.
+	Ports []int `yaml:"ports"`
+
+	// PacLen is the most data sent to the server at a time.  Left out,
+	// agwclient's default.
+	PacLen int `yaml:"paclen"`
+
+	// HighWater is how many frames may be unacknowledged before writing
+	// waits.  Left out, agwclient's default.
+	HighWater uint32 `yaml:"highWater"`
+
+	// password is what PasswordEnv held when the file was read.
+	password string
+}
+
+// MaxPacLen is the most data an AX.25 frame can carry.
+const MaxPacLen = 2048
 
 // DefaultIdleTimeout is how long a station may stay idle unless the
 // configuration says otherwise.
@@ -63,8 +102,14 @@ func Load(path string) (Config, error) {
 	return Parse(data)
 }
 
-// Parse reads and checks a configuration.
+// Parse reads and checks a configuration, taking any password from the
+// environment.
 func Parse(data []byte) (Config, error) {
+	return ParseWithEnv(data, os.LookupEnv)
+}
+
+// ParseWithEnv is Parse, looking environment variables up with lookupEnv.
+func ParseWithEnv(data []byte, lookupEnv func(name string) (string, bool)) (Config, error) {
 	var cfg = new(Config)
 
 	var decoder = yaml.NewDecoder(bytes.NewReader(data))
@@ -77,7 +122,7 @@ func Parse(data []byte) (Config, error) {
 
 	cfg.Call = strings.ToUpper(strings.TrimSpace(cfg.Call))
 
-	var validErr = cfg.validate()
+	var validErr = cfg.validate(lookupEnv)
 	if validErr != nil {
 		return Config{}, validErr
 	}
@@ -98,7 +143,8 @@ func Parse(data []byte) (Config, error) {
 }
 
 // validate checks everything that must be right, returning every problem.
-func (c Config) validate() error {
+// It also takes the AGW password from the environment.
+func (c Config) validate(lookupEnv func(name string) (string, bool)) error {
 	var problems []error
 
 	if !ValidCall(c.Call) {
@@ -113,7 +159,69 @@ func (c Config) validate() error {
 		problems = append(problems, fmt.Errorf("idleTimeout: %v is negative", c.IdleTimeout))
 	}
 
+	if c.AGW != nil {
+		problems = append(problems, c.AGW.validate(lookupEnv)...)
+	}
+
 	return errors.Join(problems...)
+}
+
+// validate checks the AGW settings, and takes the password from the
+// environment.
+func (a *AGW) validate(lookupEnv func(name string) (string, bool)) []error {
+	var problems []error
+
+	var _, _, addrErr = net.SplitHostPort(a.Addr)
+	if addrErr != nil {
+		problems = append(problems, fmt.Errorf("agw.addr: %q is not a host:port", a.Addr))
+	}
+
+	if a.User != "" && a.PasswordEnv == "" {
+		problems = append(problems, errors.New("agw.passwordEnv: a user name needs the variable its password is in"))
+	}
+
+	if a.PasswordEnv != "" {
+		var password, ok = lookupEnv(a.PasswordEnv)
+		if !ok {
+			problems = append(problems, fmt.Errorf("agw.passwordEnv: %s is not set", a.PasswordEnv))
+		}
+
+		a.password = password
+	}
+
+	for _, port := range a.Ports {
+		if port < 0 || port > 255 {
+			problems = append(problems, fmt.Errorf("agw.ports: %d is not a port from 0 to 255", port))
+		}
+	}
+
+	if a.PacLen < 0 || a.PacLen > MaxPacLen {
+		problems = append(problems, fmt.Errorf("agw.paclen: %d is not from 1 to %d", a.PacLen, MaxPacLen))
+	}
+
+	return problems
+}
+
+// AGWClient is the agwclient configuration for the BBS, if it has an AGW
+// server.
+func (c Config) AGWClient() maybe.Maybe[agwclient.Config] {
+	if c.AGW == nil {
+		return maybe.Nothing[agwclient.Config]()
+	}
+
+	var cfg = new(agwclient.Config)
+
+	cfg.Addr = c.AGW.Addr
+	cfg.Call = c.Call
+	cfg.Ports = c.AGW.Ports
+	cfg.PacLen = c.AGW.PacLen
+	cfg.HighWater = c.AGW.HighWater
+
+	if c.AGW.User != "" {
+		cfg.Login = maybe.Just(agwclient.Credentials{User: c.AGW.User, Password: c.AGW.password})
+	}
+
+	return maybe.Just(*cfg)
 }
 
 // BannerLines is the banner a line at a time.
