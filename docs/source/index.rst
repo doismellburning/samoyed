@@ -110,6 +110,17 @@ Reference
 
    glossary
 
+Getting help
+------------
+
+* :doc:`support` - where to ask, and what to put in a bug report
+
+.. toctree::
+   :caption: Getting help
+   :hidden:
+
+   support
+
 Working on Samoyed
 ------------------
 
