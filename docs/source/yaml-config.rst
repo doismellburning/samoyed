@@ -201,11 +201,19 @@ These are the keys under ``samoyed``:
     ``port``
         The TNC's KISS TCP port.
 
+    ``txdelay``, ``persist``, ``slottime``, ``txtail``
+        Optional channel access settings,
+        as ``NCHANNEL``'s ``TXDELAY=``, ``PERSIST=``, ``SLOTTIME=`` and ``TXTAIL=`` take them:
+        each 0 to 255, in the units of its KISS command,
+        and sent to the TNC as one on attaching and on each reattach.
+        One left out is not sent.
+
     .. code:: yaml
 
         samoyed:
           networkTNCs:
             - {channel: 6, host: 192.0.2.1, port: 8001}
+            - {channel: 7, host: localhost, port: 8002, txdelay: 30, persist: 63, slottime: 10}
 
 ``serialTNCs``
     Serial TNCs (``SCHANNEL``):
@@ -225,11 +233,16 @@ These are the keys under ``samoyed``:
         1200, 2400, 4800, 9600, 19200, 38400, 57600 or 115200.
         Left out, it is 9600.
 
+    ``txdelay``, ``persist``, ``slottime``, ``txtail``
+        Optional channel access settings,
+        as for ``networkTNCs``.
+
     .. code:: yaml
 
         samoyed:
           serialTNCs:
             - {channel: 10, device: /dev/ttyACM0, baud: 57600}
+            - {channel: 11, device: /dev/ttyUSB0, persist: 63, slottime: 10}
 
 ``axudpPorts``
     AXUDP ports: AX.25 frames to and from other nodes (BPQ, XRouter, another

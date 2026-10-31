@@ -188,6 +188,25 @@ func NewTransmitQueue(
 	return tq
 }
 
+// SetTNCChannelAccess hands the channel access settings in access that are
+// Just to channel's external TNC - the one a network or serial TNC channel's
+// frames go to - to send on to it.  Any other channel has no TNC to tell, so
+// it is ignored: a radio channel's timing is the transmit thread's.
+func (tq *TransmitQueue) SetTNCChannelAccess(channel int, access TNCChannelAccess) {
+	if channel < 0 || channel >= MAX_TOTAL_CHANS {
+		return
+	}
+
+	switch tq.audioConfig.chan_medium[channel] {
+	case MEDIUM_NETTNC:
+		tq.netTNCs[channel].SetChannelAccess(access)
+	case MediumSerialTNC:
+		tq.serialTNCs[channel].SetChannelAccess(access)
+	case MEDIUM_NONE, MEDIUM_RADIO, MEDIUM_IGATE, MEDIUM_AXUDP:
+		// No external TNC.
+	}
+}
+
 // tq_is_real_packet reports whether a queue entry is a real packet rather than
 // LMSeizeRequest's null wake-up frame, matching countLocked's own test.
 func tq_is_real_packet(pp *ax25.Packet) bool {

@@ -135,6 +135,7 @@ in place of the plain ones between the same components.
 
        kiss -> xmit [label="timing setters"];
        kiss -> tq [label="clientTransmitQueue"];
+       kiss -> tq [label="SetTNCChannelAccess\n(tncChannelAccessSetter)"];
        kiss -> kissnet [label="KISSCOPY peers"];
        kissnet -> kiss [label="client bytes\n(at Start)", style=dashed];
 
@@ -197,9 +198,14 @@ so the order of construction follows the arrows:
    handed a ``radioSink`` that passes their frames to the ``DataLinkQueue``.
 #. The network TNCs, the serial TNCs and the AXUDP channels.
    Their listeners start straight away and can hand the queue frames at once.
+   Each TNC is handed its channel access settings from the configuration,
+   which it sends on attaching and on each reattach.
 #. The ``TransmitQueue``,
    which sends a packet for a network TNC, serial TNC or AXUDP channel straight there
    rather than queueing it.
+   It also passes a KISS client's channel access settings for a TNC's channel on to that TNC
+   (``TransmitQueue.SetTNCChannelAccess``),
+   which the KISS handler is handed.
 #. The tone generators and the PTT.
 #. The web interface and the AGW server.
    The web interface binds its port as it is made,

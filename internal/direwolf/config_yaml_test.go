@@ -265,9 +265,29 @@ channels:
 			yaml:   "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001}\n  - {channel: 7, host: localhost, port: 8002}\n",
 		},
 		{
+			name:   "a network TNC's channel access settings",
+			legacy: "NCHANNEL 6 192.0.2.1 8001 TXDELAY=30 PERSIST=63 SLOTTIME=10 TXTAIL=5\nNCHANNEL 7 localhost 8002 PERSIST=63\n",
+			yaml:   "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001, txdelay: 30, persist: 63, slottime: 10, txtail: 5}\n  - {channel: 7, host: localhost, port: 8002, persist: 63}\n",
+		},
+		{
+			name:   "an out-of-range network TNC setting is refused the same way",
+			legacy: "NCHANNEL 6 192.0.2.1 8001 SLOTTIME=300\n",
+			yaml:   "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001, slottime: 300}\n",
+		},
+		{
 			name:   "a network TNC on a channel in use is refused the same way",
 			legacy: "NCHANNEL 6 192.0.2.1 8001\nNCHANNEL 6 localhost 8002\n",
 			yaml:   "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001}\n  - {channel: 6, host: localhost, port: 8002}\n",
+		},
+		{
+			name:   "a serial TNC's channel access settings",
+			legacy: "SCHANNEL 10 /dev/ttyACM0 57600 TXDELAY=30 PERSIST=63 SLOTTIME=10 TXTAIL=5\nSCHANNEL 11 /dev/ttyUSB0 PERSIST=63\n",
+			yaml:   "serialTNCs:\n  - {channel: 10, device: /dev/ttyACM0, baud: 57600, txdelay: 30, persist: 63, slottime: 10, txtail: 5}\n  - {channel: 11, device: /dev/ttyUSB0, persist: 63}\n",
+		},
+		{
+			name:   "an out-of-range serial TNC setting is refused the same way",
+			legacy: "SCHANNEL 10 /dev/ttyACM0 SLOTTIME=300\n",
+			yaml:   "serialTNCs:\n  - {channel: 10, device: /dev/ttyACM0, slottime: 300}\n",
 		},
 		{
 			name:   "serial TNCs",

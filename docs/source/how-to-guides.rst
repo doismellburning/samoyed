@@ -684,6 +684,34 @@ getting on the air is left to the TNC, with its own settings.
 Connected mode works over the channel too,
 which is treated as clear to send whenever a link wants it.
 
+Some TNCs take their channel access settings from the host instead:
+the `NinoTNC <https://tarpn.net/t/nino-tnc/n9600a/n9600a_operation.html>`__
+expects KISS commands to set its slot time and persistence,
+and `pdn-soundmodem <https://github.com/packet-net/pdn-soundmodem/blob/main/docs/reference/config.md>`__
+has no other way to set any of them.
+Give the settings after the port, as ``KEYWORD=value``,
+in the units their KISS commands carry -
+10 ms for the times, and a chance out of 256 for ``PERSIST`` -
+each 0 to 255:
+
+.. code::
+
+    NCHANNEL 10 localhost 8001 TXDELAY=30 PERSIST=63 SLOTTIME=10 TXTAIL=5
+
+Samoyed sends each one given to the TNC as a KISS command,
+on KISS port 0 like the frames,
+when it attaches to the TNC and again each time it reattaches.
+One left out is not sent, so the TNC keeps its own value for it.
+``SCHANNEL``, for a TNC on a serial port, takes the same settings after its device and optional baud rate:
+
+.. code::
+
+    SCHANNEL 11 /dev/ttyACM0 57600 TXDELAY=30 PERSIST=63 SLOTTIME=10
+
+A KISS client's own ``TXDELAY``, ``PERSIST``, ``SLOTTIME`` and ``TXTAIL`` for the channel are passed on to the TNC too, on KISS port 0,
+and replace the configured ones from then on,
+including when Samoyed reattaches to the TNC.
+
 Samoyed connects to every ``NCHANNEL`` TNC at startup,
 and exits if one can't be reached.
 If the connection drops later,

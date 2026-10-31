@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/dwcore"
+	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
@@ -38,7 +40,15 @@ const serialTNCTestChannel = 4
 func startTestSerialTNC(t *testing.T, device string, recFrame frameReceiver, closeFarEnd func()) (*SerialTNC, context.CancelFunc, <-chan struct{}) {
 	t.Helper()
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, recFrame, 0)
+	return startTestSerialTNCWith(t, device, noChannelAccess(), recFrame, closeFarEnd)
+}
+
+// startTestSerialTNCWith is startTestSerialTNC for a TNC with channel access
+// settings to send it.
+func startTestSerialTNCWith(t *testing.T, device string, access TNCChannelAccess, recFrame frameReceiver, closeFarEnd func()) (*SerialTNC, context.CancelFunc, <-chan struct{}) {
+	t.Helper()
+
+	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, access, recFrame, 0)
 	require.NoError(t, err)
 
 	st.reattachDelay = 10 * time.Millisecond
@@ -87,7 +97,7 @@ func nextDLQItem(t *testing.T, dlq *DataLinkQueue) *dlq_item_t {
 func TestSerialTNCAttachFails(t *testing.T) {
 	t.Parallel()
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, "/dev/there-is-no-such-serial-port", 9600, nil, 0)
+	var st, err = NewSerialTNC(serialTNCTestChannel, "/dev/there-is-no-such-serial-port", 9600, noChannelAccess(), nil, 0)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "/dev/there-is-no-such-serial-port")
@@ -167,7 +177,7 @@ func TestSerialTNCDebugPrints(t *testing.T) {
 func TestSerialTNCStartedTwiceComplains(t *testing.T) {
 	var device, tnc = newTestSerialDevice(t)
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, nil, 0)
+	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, noChannelAccess(), nil, 0)
 	require.NoError(t, err)
 
 	st.started.Store(true)
@@ -240,7 +250,7 @@ func TestSerialTNCSendPacketNotAttached(t *testing.T) {
 func TestSerialTNCSendPacketWriteErrorGivesUpThePort(t *testing.T) {
 	var device, tnc = newTestSerialDevice(t)
 
-	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, nil, 0)
+	var st, err = NewSerialTNC(serialTNCTestChannel, device, 9600, noChannelAccess(), nil, 0)
 	require.NoError(t, err)
 
 	t.Cleanup(st.closePort)
@@ -460,4 +470,107 @@ func TestSerialTNCConnectedMode(t *testing.T) {
 	require.NotNil(t, item, "the seize was not confirmed")
 	assert.Equal(t, DLQ_SEIZE_CONFIRM, item._type)
 	assert.Equal(t, serialTNCTestChannel, item._chan)
+}
+
+// readSerialKissFrames reads n KISS frames from what we sent the TNC, end to
+// end.
+func readSerialKissFrames(t *testing.T, tnc *os.File, n int) []byte {
+	t.Helper()
+
+	var got []byte
+
+	for range n {
+		got = append(got, readSerialKissFrame(t, tnc)...)
+	}
+
+	return got
+}
+
+// The configured settings are the first thing a serial TNC hears on being
+// attached, and it hears them again on being reattached, a KISS client's
+// change since included.  The change itself goes straight to the TNC.
+func TestSerialTNCSendsChannelAccessOnAttachAndReattach(t *testing.T) {
+	t.Parallel()
+
+	var device = filepath.Join(t.TempDir(), "tnc")
+
+	var first, firstTNC = newTestSerialDevice(t)
+	require.NoError(t, os.Symlink(first, device))
+
+	var second, secondTNC = newTestSerialDevice(t)
+
+	var st, _, _ = startTestSerialTNCWith(t, device, testChannelAccess(), nil, func() { secondTNC.Close() })
+
+	assert.Equal(t, testChannelAccess().kissFrames(), readSerialKissFrames(t, firstTNC, 4))
+
+	var update TNCChannelAccess
+	update.SlotTime = maybe.Just[byte](20)
+
+	st.SetChannelAccess(update)
+
+	assert.Equal(t, kissCommandFrame(kiss.CmdSlotTime, 20), readSerialKissFrame(t, firstTNC))
+
+	var firstPort, _ = st.port()
+
+	var next = device + ".next"
+	require.NoError(t, os.Symlink(second, next))
+	require.NoError(t, os.Rename(next, device))
+
+	require.NoError(t, firstTNC.Close())
+
+	require.Eventually(t, func() bool {
+		var port, _ = st.port()
+
+		return port != nil && port != firstPort
+	}, 10*time.Second, 10*time.Millisecond, "the listener never reattached to the serial TNC")
+
+	var want = testChannelAccess()
+	want.SlotTime = maybe.Just[byte](20)
+
+	assert.Equal(t, want.kissFrames(), readSerialKissFrames(t, secondTNC, 4))
+}
+
+// A KISS client's settings for a serial TNC's channel go to that TNC through
+// the transmit queue, which knows which channels have one.
+func TestSerialTNCTransmitQueuePassesOnChannelAccess(t *testing.T) {
+	t.Parallel()
+
+	var device, tnc = newTestSerialDevice(t)
+
+	var st, _, _ = startTestSerialTNC(t, device, nil, func() { tnc.Close() })
+
+	var audioConfig = new(RadioConfig)
+	audioConfig.chan_medium[serialTNCTestChannel] = MediumSerialTNC
+
+	var tncs [MAX_TOTAL_CHANS]*SerialTNC
+	tncs[serialTNCTestChannel] = st
+
+	var tq = NewTransmitQueue(audioConfig, [MAX_TOTAL_CHANS]*NetTNC{}, tncs, [MAX_TOTAL_CHANS]*AXUDPChannel{}, nil)
+
+	var update TNCChannelAccess
+	update.TXDelay = maybe.Just[byte](25)
+
+	tq.SetTNCChannelAccess(serialTNCTestChannel, update)
+
+	assert.Equal(t, kissCommandFrame(kiss.CmdTxDelay, 25), readSerialKissFrame(t, tnc))
+}
+
+// A change made while the TNC is away is kept for when it is reattached, and
+// a channel with no TNC ignores it.
+func TestSerialTNCChannelAccessWhileNotAttached(t *testing.T) {
+	t.Parallel()
+
+	var st = new(SerialTNC)
+	st.channel = serialTNCTestChannel
+
+	var update TNCChannelAccess
+	update.Persist = maybe.Just[byte](100)
+
+	st.SetChannelAccess(update)
+
+	assert.Equal(t, update, st.access)
+
+	var none *SerialTNC
+
+	none.SetChannelAccess(update)
 }

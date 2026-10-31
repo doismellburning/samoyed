@@ -114,6 +114,10 @@ type IL2PTXSettings struct {
 // NetworkTNCSettings describes a network TNC: a virtual channel whose frames
 // go to and come from a KISS TNC over TCP - NCHANNEL.
 type NetworkTNCSettings struct {
+	// The channel access settings sent to the TNC on attaching to it; any
+	// left out are left to the TNC.
+	TNCChannelAccessSettings `yaml:",inline"`
+
 	// Channel is the virtual channel.
 	Channel *int `yaml:"channel"`
 
@@ -127,6 +131,10 @@ type NetworkTNCSettings struct {
 // SerialTNCSettings describes a serial TNC: a virtual channel whose frames go
 // to and come from a KISS TNC on a serial port - SCHANNEL.
 type SerialTNCSettings struct {
+	// The channel access settings sent to the TNC on attaching to it; any
+	// left out are left to the TNC.
+	TNCChannelAccessSettings `yaml:",inline"`
+
 	// Channel is the virtual channel.
 	Channel *int `yaml:"channel"`
 

@@ -3191,6 +3191,62 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
 				},
 			},
+			{
+				name:   "channel access settings for the TNC are stored",
+				config: "NCHANNEL 6 localhost 8001 TXDELAY=30 persist=63 SlotTime=10 TXTAIL=0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Zero(c.errors, c.output)
+					a.Equal(MEDIUM_NETTNC, c.audio.chan_medium[6])
+					a.Equal(TNCChannelAccess{
+						TXDelay:  maybe.Just[byte](30),
+						Persist:  maybe.Just[byte](63),
+						SlotTime: maybe.Just[byte](10),
+						TXTail:   maybe.Just[byte](0),
+					}, c.audio.tncChannelAccess[6])
+				},
+			},
+			{
+				name:   "channel access settings not given are not set",
+				config: "NCHANNEL 6 localhost 8001 PERSIST=63\n",
+				check: func(a *assert.Assertions, c configs) {
+					var want TNCChannelAccess
+					want.Persist = maybe.Just[byte](63)
+
+					a.Equal(want, c.audio.tncChannelAccess[6])
+				},
+			},
+			{
+				name:   "an out-of-range channel access setting leaves the channel alone",
+				config: "NCHANNEL 6 localhost 8001 TXDELAY=256\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Contains(c.output, "TXDELAY for NCHANNEL command must be in range 0 to 255")
+				},
+			},
+			{
+				name:   "an unknown option leaves the channel alone",
+				config: "NCHANNEL 6 localhost 8001 DWAIT=5\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Contains(c.output, `Unknown option \"DWAIT\" for NCHANNEL command`)
+				},
+			},
+			{
+				name:   "an option that isn't KEYWORD=value leaves the channel alone",
+				config: "NCHANNEL 6 localhost 8001 TXDELAY\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Contains(c.output, "Expected KEYWORD=value")
+				},
+			},
+			{
+				name:   "an unreadable setting leaves the channel alone",
+				config: "NCHANNEL 6 localhost 8001 TXDELAY=long\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Contains(c.output, "must be numeric")
+				},
+			},
 		},
 		"SCHANNEL": {
 			{
@@ -3210,6 +3266,51 @@ func directiveTests() map[string][]directiveCase { //nolint:funlen // One big te
 					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
 					a.Equal(9600, c.audio.serialTNCBaud[6])
 					a.Zero(c.errors)
+				},
+			},
+			{
+				name:   "channel access settings follow the baud rate",
+				config: "SCHANNEL 6 /dev/ttyUSB0 57600 TXDELAY=30 SLOTTIME=10\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Zero(c.errors, c.output)
+					a.Equal(MediumSerialTNC, c.audio.chan_medium[6])
+					a.Equal(57600, c.audio.serialTNCBaud[6])
+
+					var want TNCChannelAccess
+					want.TXDelay = maybe.Just[byte](30)
+					want.SlotTime = maybe.Just[byte](10)
+
+					a.Equal(want, c.audio.tncChannelAccess[6])
+				},
+			},
+			{
+				name:   "channel access settings can stand in for the baud rate",
+				config: "SCHANNEL 6 /dev/ttyUSB0 PERSIST=63 TXTAIL=5\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Zero(c.errors, c.output)
+					a.Equal(9600, c.audio.serialTNCBaud[6])
+
+					var want TNCChannelAccess
+					want.Persist = maybe.Just[byte](63)
+					want.TXTail = maybe.Just[byte](5)
+
+					a.Equal(want, c.audio.tncChannelAccess[6])
+				},
+			},
+			{
+				name:   "a bad channel access setting leaves the channel alone",
+				config: "SCHANNEL 6 /dev/ttyUSB0 9600 PERSIST=-1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Contains(c.output, "PERSIST for SCHANNEL command must be in range 0 to 255")
+				},
+			},
+			{
+				name:   "a second baud rate is not a setting",
+				config: "SCHANNEL 6 /dev/ttyUSB0 9600 19200\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Contains(c.output, "Expected KEYWORD=value")
 				},
 			},
 			{

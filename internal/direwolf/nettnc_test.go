@@ -109,7 +109,7 @@ func attachTestNetTNC(ctx context.Context, t *testing.T, recFrame frameReceiver)
 
 	var port, conns = newTestNetTNC(ctx, t)
 
-	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port, recFrame, 0)
+	var nt, err = NewNetTNC(ctx, nettncTestChannel, "127.0.0.1", port, noChannelAccess(), recFrame, 0)
 	require.NoError(t, err)
 
 	// Reattaching after the TNC goes away waits between attempts; not the
@@ -135,7 +135,7 @@ func TestNetTNCAttachRefused(t *testing.T) {
 	// A port nothing is listening on: one taken and given straight back.
 	var port = testutils.UnusedPortNumber(t)
 
-	var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, nil, 0)
+	var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, noChannelAccess(), nil, 0)
 
 	require.Error(t, err)
 	assert.Nil(t, nt)
@@ -579,7 +579,7 @@ func TestNetTNCDebugPrints(t *testing.T) {
 	var port, conns = newTestNetTNC(t.Context(), t)
 
 	var output = captureLogOutput(t, logrus.DebugLevel, func() {
-		var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, dlq.RecFrame, 2)
+		var nt, err = NewNetTNC(t.Context(), nettncTestChannel, "127.0.0.1", port, noChannelAccess(), dlq.RecFrame, 2)
 		require.NoError(t, err)
 
 		nt.Start(t.Context())

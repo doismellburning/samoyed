@@ -36,8 +36,9 @@ type SerialTNC struct {
 	debug         int
 	recFrame      frameReceiver // Where frames from the TNC go, or nil to drop them.
 
-	// mu guards fd and failed, which listenThread (reading and reattaching)
-	// and sendPacket (writing, from the transmit path) share.
+	// mu guards fd, failed and access, which listenThread (reading and
+	// reattaching), sendPacket (writing, from the transmit path) and
+	// SetChannelAccess (from a KISS client) share.
 	//
 	// As with KissSerial, a *term.Term is a bare descriptor that nothing
 	// stops being used after it is closed, so only the listening goroutine
@@ -50,6 +51,11 @@ type SerialTNC struct {
 	// port itself - the listening goroutine may be blocked reading it - so it
 	// stops writing to it and leaves the closing to the listener.
 	failed bool
+
+	// access is the channel access settings the TNC is given each time it is
+	// attached: those from the configuration, as a KISS client has since
+	// changed them.
+	access TNCChannelAccess
 }
 
 // NewSerialTNCs attaches a SerialTNC to each SCHANNEL channel in audio, and
@@ -68,7 +74,7 @@ func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiv
 
 		logrus.WithFields(logrus.Fields{"channel": i, "device": audio.serialTNCDevice[i], "baud": audio.serialTNCBaud[i]}).Debug("Serial TNC")
 
-		var st, err = NewSerialTNC(i, audio.serialTNCDevice[i], audio.serialTNCBaud[i], recFrame, debug)
+		var st, err = NewSerialTNC(i, audio.serialTNCDevice[i], audio.serialTNCBaud[i], audio.tncChannelAccess[i], recFrame, debug)
 		if err != nil {
 			return tncs, err
 		}
@@ -82,10 +88,12 @@ func NewSerialTNCs(ctx context.Context, audio *RadioConfig, recFrame frameReceiv
 }
 
 // NewSerialTNC attaches channel, an SCHANNEL one, to the KISS TNC on the
-// serial port device, at baud bits per second.  Frames from it go to recFrame,
-// or are dropped if that is nil.  debug is the "-d k" count, as for
-// NewSerialTNCs.  Nothing is read from the TNC until Start is called.
-func NewSerialTNC(channel int, device string, baud int, recFrame frameReceiver, debug int) (*SerialTNC, error) {
+// serial port device, at baud bits per second, and sends it the channel access
+// settings in access that are given - as it does again on each reattach.
+// Frames from it go to recFrame, or are dropped if that is nil.  debug is the
+// "-d k" count, as for NewSerialTNCs.  Nothing is read from the TNC until
+// Start is called.
+func NewSerialTNC(channel int, device string, baud int, access TNCChannelAccess, recFrame frameReceiver, debug int) (*SerialTNC, error) {
 	dwutil.Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	var fd = serialport.Open(device, baud)
@@ -100,7 +108,13 @@ func NewSerialTNC(channel int, device string, baud int, recFrame frameReceiver, 
 	st.reattachDelay = serialTNCReattachDelay
 	st.recFrame = recFrame
 	st.debug = debug
-	st.fd = fd
+	st.access = access
+
+	if !st.attach(fd) {
+		st.closePort()
+
+		return nil, fmt.Errorf("could not send channel access settings to the channel %d serial TNC on %s", channel, device)
+	}
 
 	return st, nil
 }
@@ -131,13 +145,64 @@ func (st *SerialTNC) port() (*term.Term, bool) {
 	return st.fd, st.failed
 }
 
-// setPort installs fd as the open serial port.
-func (st *SerialTNC) setPort(fd *term.Term) {
+// attach installs fd as the open serial port, and sends the TNC its channel
+// access settings, under the one lock so that a KISS client's change to them
+// cannot be overtaken by the older ones.  It reports whether that went well;
+// if not, the port is marked failed, for the listening goroutine to close.
+func (st *SerialTNC) attach(fd *term.Term) bool {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 
 	st.fd = fd
 	st.failed = false
+
+	return st.writeChannelAccessLocked(st.access)
+}
+
+// writeChannelAccessLocked sends access's settings to the TNC, with mu held
+// and the port open, and reports whether that went well, marking the port
+// failed if not.
+func (st *SerialTNC) writeChannelAccessLocked(access TNCChannelAccess) bool {
+	var frames = access.kissFrames()
+	if len(frames) == 0 {
+		return true
+	}
+
+	var log = logrus.WithFields(access.logFields()).WithField("channel", st.channel)
+
+	if serialport.Write(st.fd, frames) <= 0 {
+		log.Error("Error sending channel access settings to serial TNC; closing it")
+
+		st.failed = true
+
+		return false
+	}
+
+	log.Info("Sent channel access settings to serial TNC")
+
+	return true
+}
+
+// SetChannelAccess changes the TNC's channel access settings that are Just in
+// update, sending them to it now if it is attached, and each time it is
+// reattached.  A nil st - a channel with no TNC - ignores it.
+func (st *SerialTNC) SetChannelAccess(update TNCChannelAccess) {
+	if st == nil {
+		return
+	}
+
+	st.mu.Lock()
+	defer st.mu.Unlock()
+
+	st.access = st.access.updatedBy(update)
+
+	if st.fd == nil || st.failed {
+		logrus.WithFields(update.logFields()).WithField("channel", st.channel).Info("Not attached to serial TNC just now; will send it the channel access settings on reattaching")
+
+		return
+	}
+
+	st.writeChannelAccessLocked(update)
 }
 
 // closePort closes the serial port, if it is open, and forgets it.  Only the
@@ -198,11 +263,18 @@ func (st *SerialTNC) listenThread(ctx context.Context) {
 				continue
 			}
 
-			st.setPort(fd)
-
 			collector = new(kiss.Collector) // Start with clean state.
 
 			log.Info("Successfully reattached to serial TNC")
+
+			if !st.attach(fd) {
+				// The next lap closes the port; give the TNC a moment first.
+				if !dwutil.SleepCtx(ctx, st.reattachDelay) {
+					return
+				}
+
+				continue
+			}
 		}
 
 		var ch, err = serialport.Get1(fd)

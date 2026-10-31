@@ -115,7 +115,7 @@ func setupKissHandler(ctx context.Context, t *testing.T) *KissHandler {
 
 	var tq = newTestTransmitQueue(audioConfig)
 
-	return NewKissHandler(ctx, audioConfig, new(XmitService), tq, nil)
+	return NewKissHandler(ctx, audioConfig, new(XmitService), tq, tq.SetTNCChannelAccess, nil)
 }
 
 // With KISSCOPY, a data frame a client sends is shown to the TCP clients the

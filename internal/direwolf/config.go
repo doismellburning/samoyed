@@ -2018,6 +2018,9 @@ func handleNCHANNEL(ps *parseState) error {
 	 *	addr = hostname or IP address of network TNC.
 	 *	port = KISS TCP port on network TNC.
 	 *
+	 *	Any of TXDELAY=n, PERSIST=n, SLOTTIME=n and TXTAIL=n can follow,
+	 *	each sent to the TNC as a KISS command on attaching to it.
+	 *
 	 *	Future: Might allow selection of channel on the network TNC.
 	 *	For now, ignore incoming and set to 0 for outgoing.
 	 *
@@ -2045,6 +2048,13 @@ func handleNCHANNEL(ps *parseState) error {
 		}
 
 		settings.Port = &port
+	}
+
+	for t = ps.split(false); t != ""; t = ps.split(false) {
+		var err = settings.parseOption(ps.line, "NCHANNEL", t)
+		if err != nil {
+			return err
+		}
 	}
 
 	return ps.applyNCHANNEL(*settings)
@@ -2076,23 +2086,30 @@ func (ps *parseState) applyNCHANNEL(settings NetworkTNCSettings) error {
 		return fmt.Errorf("line %d: Invalid TCP port number \"%d\" for NCHANNEL command. Must be in range %d to %d", ps.line, port, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
 	}
 
+	var access, accessErr = settings.channelAccess(ps.line, "NCHANNEL")
+	if accessErr != nil {
+		return accessErr
+	}
+
 	// Claim the channel only once all of it has checked out: NewNetTNCs
 	// attaches to every MEDIUM_NETTNC channel and fails startup if it cannot,
 	// so a half-checked one would otherwise take the program down.
 	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
 	ps.audio.nettnc_addr[nchan] = settings.Host
 	ps.audio.nettnc_port[nchan] = port
+	ps.audio.tncChannelAccess[nchan] = access
 
 	return nil
 }
 
 // handleSCHANNEL handles the SCHANNEL keyword:
 //
-//	SCHANNEL channel device [baud]
+//	SCHANNEL channel device [baud] [TXDELAY=n] [PERSIST=n] [SLOTTIME=n] [TXTAIL=n]
 //
 // which makes channel, a virtual one outside the radio channels' range, a KISS
 // TNC on the serial port device, at baud bits per second (9600 if not given).
-// Frames to and from it use KISS channel 0, whatever channel it is here.
+// Frames to and from it use KISS channel 0, whatever channel it is here.  Any
+// channel access settings given are sent to the TNC on attaching to it.
 //
 // FIXME: Can't set MYCALL for an SCHANNEL.
 func handleSCHANNEL(ps *parseState) error {
@@ -2112,13 +2129,24 @@ func handleSCHANNEL(ps *parseState) error {
 
 	var unreadableBaud = ""
 
+	// The speed is optional, so the token after the device may already be
+	// the first channel access option.
 	t = ps.split(false)
-	if t != "" {
+	if t != "" && !strings.Contains(t, "=") {
 		var baud, err = strconv.Atoi(t)
 		if err != nil {
 			unreadableBaud = t
 		} else {
 			settings.Baud = &baud
+		}
+
+		t = ps.split(false)
+	}
+
+	for ; t != ""; t = ps.split(false) {
+		var err = settings.parseOption(ps.line, "SCHANNEL", t)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -2167,12 +2195,18 @@ func (ps *parseState) applySCHANNEL(settings SerialTNCSettings) error {
 		}
 	}
 
+	var access, accessErr = settings.channelAccess(ps.line, "SCHANNEL")
+	if accessErr != nil {
+		return accessErr
+	}
+
 	// Claim the channel only once all of it has checked out, as NCHANNEL
 	// does: NewSerialTNCs attaches to every MediumSerialTNC channel and fails
 	// startup if it cannot.
 	ps.audio.chan_medium[channel] = MediumSerialTNC
 	ps.audio.serialTNCDevice[channel] = settings.Device
 	ps.audio.serialTNCBaud[channel] = baud
+	ps.audio.tncChannelAccess[channel] = access
 
 	return nil
 }
