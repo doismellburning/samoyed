@@ -452,10 +452,13 @@ func TestRun(t *testing.T) {
 		var ctx, cancel = context.WithTimeout(t.Context(), 100*time.Millisecond)
 		defer cancel()
 
-		// Returns once cancelled, not when the report fails.
-		var start = time.Now()
+		// Returns once cancelled, not when the report fails. Measured against
+		// the context's own deadline: a time.Now() taken after WithTimeout
+		// starts the clock late, so Run could return a shade under 100ms
+		// after it.
+		var deadline, _ = ctx.Deadline()
 
 		r.Run(ctx)
-		assert.GreaterOrEqual(t, time.Since(start), 100*time.Millisecond)
+		assert.False(t, time.Now().Before(deadline), "Run returned before its context's deadline")
 	})
 }
