@@ -73,18 +73,33 @@ Features
 Getting started
 ---------------
 
-The `README <https://github.com/doismellburning/samoyed#readme>`__ covers
-`installation <https://github.com/doismellburning/samoyed#installation>`__,
-a `quick start <https://github.com/doismellburning/samoyed#quick-start>`__ with a minimal configuration,
+* :doc:`installation` - packages, tarballs, building from source, and device permissions
+* :doc:`quickstart` - a first configuration, connecting an application, and running it as a service
+
+The `README <https://github.com/doismellburning/samoyed#readme>`__ also covers
 `switching from Dire Wolf <https://github.com/doismellburning/samoyed#switching-from-dire-wolf>`__,
 and the full `feature list <https://github.com/doismellburning/samoyed#features>`__.
-Pre-built binaries and ``.deb`` packages are on the
-`releases page <https://github.com/doismellburning/samoyed/releases>`__.
 
-The rest of this site picks up from there.
-
-Where it doesn't yet cover something,
+Where this site doesn't yet cover something,
 `the Dire Wolf documentation <https://github.com/wb2osz/direwolf/tree/master/doc>`__ should provide a useful baseline.
+
+.. toctree::
+   :caption: Getting started
+   :hidden:
+
+   installation
+   quickstart
+
+Usage
+-----
+
+* :doc:`usage` - Samoyed as a complete packet node, on top of an external modem, or as the modem under another packet stack
+
+.. toctree::
+   :caption: Usage
+   :hidden:
+
+   usage
 
 Using Samoyed
 -------------
