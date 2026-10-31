@@ -279,6 +279,11 @@ type RadioConfig struct {
 
 	serialTNCBaud [MAX_TOTAL_CHANS]int // Serial TNC baud rate.
 
+	// Applies to network and serial TNC channels alike: the channel access
+	// settings sent to the TNC each time it is attached.
+
+	tncChannelAccess [MAX_TOTAL_CHANS]TNCChannelAccess
+
 	// Applies only to AXUDP channels.
 
 	axudp_port   [MAX_TOTAL_CHANS]int          // Local UDP port.

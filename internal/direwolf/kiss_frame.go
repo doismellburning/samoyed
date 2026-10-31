@@ -14,6 +14,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ax25"
 	"github.com/doismellburning/samoyed/internal/dwutil"
 	"github.com/doismellburning/samoyed/internal/kiss"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
 )
@@ -277,23 +278,26 @@ func kissClientFrame(channel int, cmd int, frame []byte, debug int, transport st
 // transport it arrives by - TCP, the serial port or the pseudo terminal - so
 // each of them hands its client's bytes to the same one.
 type KissHandler struct {
-	audioConfig *RadioConfig        // Which channels a client may transmit on.
-	xmit        *XmitService        // The transmit timing a client may change.
-	queue       clientTransmitQueue // Where a client's data frames go, and what TXBUF reports on; nil to drop them.
-	peers       *KissNetService     // The TCP clients KISSCOPY copies a data frame to, or nil.
-	acks        *kissAcks           // Sends the ACKMODE acknowledgements for a client's frames.
+	audioConfig *RadioConfig           // Which channels a client may transmit on.
+	xmit        *XmitService           // The transmit timing a client may change.
+	queue       clientTransmitQueue    // Where a client's data frames go, and what TXBUF reports on; nil to drop them.
+	toTNC       tncChannelAccessSetter // Passes a client's channel access settings on to an external TNC's channel; nil to drop them.
+	peers       *KissNetService        // The TCP clients KISSCOPY copies a data frame to, or nil.
+	acks        *kissAcks              // Sends the ACKMODE acknowledgements for a client's frames.
 }
 
 // NewKissHandler builds a KissHandler that checks a client's data frames
 // against audioConfig before they are put on queue, applies its timing
-// commands to xmit, and with KISSCOPY copies its data frames to the clients of
+// commands to xmit - and, for a channel with an external TNC, passes them on
+// to toTNC - and with KISSCOPY copies its data frames to the clients of
 // peers.  The goroutines that send a client its ACKMODE acknowledgements stop
 // when ctx is cancelled.
-func NewKissHandler(ctx context.Context, audioConfig *RadioConfig, xmit *XmitService, queue clientTransmitQueue, peers *KissNetService) *KissHandler {
+func NewKissHandler(ctx context.Context, audioConfig *RadioConfig, xmit *XmitService, queue clientTransmitQueue, toTNC tncChannelAccessSetter, peers *KissNetService) *KissHandler {
 	var h = new(KissHandler)
 	h.audioConfig = audioConfig
 	h.xmit = xmit
 	h.queue = queue
+	h.toTNC = toTNC
 	h.peers = peers
 	h.acks = newKissAcks(ctx)
 
@@ -584,6 +588,10 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 
 		h.xmit.SetTxdelay(channel, int(kiss_msg[1]))
 
+		var access TNCChannelAccess
+		access.TXDelay = maybe.Just(kiss_msg[1])
+		h.forwardToTNC(channel, access)
+
 	case kiss.CmdPersistence: /* 2 = Persistence */
 		if len(kiss_msg) < 2 {
 			logMissingKissValue(channel, "PERSISTENCE")
@@ -602,6 +610,10 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 		}
 
 		h.xmit.SetPersist(channel, int(kiss_msg[1]))
+
+		var access TNCChannelAccess
+		access.Persist = maybe.Just(kiss_msg[1])
+		h.forwardToTNC(channel, access)
 
 	case kiss.CmdSlotTime: /* 3 = SlotTime */
 		if len(kiss_msg) < 2 {
@@ -623,6 +635,10 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 
 		h.xmit.SetSlottime(channel, int(kiss_msg[1]))
 
+		var access TNCChannelAccess
+		access.SlotTime = maybe.Just(kiss_msg[1])
+		h.forwardToTNC(channel, access)
+
 	case kiss.CmdTxTail: /* 4 = TXtail */
 		if len(kiss_msg) < 2 {
 			logMissingKissValue(channel, "TXTAIL")
@@ -642,6 +658,10 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 		}
 
 		h.xmit.SetTxtail(channel, int(kiss_msg[1]))
+
+		var access TNCChannelAccess
+		access.TXTail = maybe.Just(kiss_msg[1])
+		h.forwardToTNC(channel, access)
 
 	case kiss.CmdFullDuplex: /* 5 = FullDuplex */
 		if len(kiss_msg) < 2 {
@@ -691,6 +711,14 @@ func (h *KissHandler) processMsg(kiss_msg []byte, from kissClient) {
 		logKissMessage(logrus.ErrorLevel, FROM_CLIENT, "", kiss_msg)
 	}
 } /* end processMsg */
+
+// forwardToTNC passes a client's channel access settings on, for a channel
+// whose transmitting is an external TNC's to do.
+func (h *KissHandler) forwardToTNC(channel int, access TNCChannelAccess) {
+	if h.toTNC != nil {
+		h.toTNC(channel, access)
+	}
+}
 
 // logMissingKissValue complains about a command from a KISS client, for
 // channel, that should have carried a value and didn't.
