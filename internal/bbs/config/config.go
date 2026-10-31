@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/agwclient"
+	"github.com/doismellburning/samoyed/internal/bbs/mail"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"go.yaml.in/yaml/v3"
 )
@@ -25,6 +26,11 @@ import (
 type Config struct {
 	// Call is the BBS's callsign, with any SSID.
 	Call string `yaml:"call"`
+
+	// HRoute is the rest of the BBS's hierarchical address, after its
+	// callsign: where it is, most specific first, such as "#77.GBR.EURO".
+	// Optional; the R: line it puts on messages says it.
+	HRoute string `yaml:"hroute"`
 
 	// Store is the path of the message database, which is created if it
 	// isn't there.
@@ -121,6 +127,7 @@ func ParseWithEnv(data []byte, lookupEnv func(name string) (string, bool)) (Conf
 	}
 
 	cfg.Call = strings.ToUpper(strings.TrimSpace(cfg.Call))
+	cfg.HRoute = strings.ToUpper(strings.TrimSpace(cfg.HRoute))
 
 	var validErr = cfg.validate(lookupEnv)
 	if validErr != nil {
@@ -149,6 +156,10 @@ func (c Config) validate(lookupEnv func(name string) (string, bool)) error {
 
 	if !ValidCall(c.Call) {
 		problems = append(problems, fmt.Errorf("call: %q is not a callsign, with an optional SSID from 0 to 15", c.Call))
+	}
+
+	if c.HRoute != "" && !mail.ValidHRoute(c.HRoute) {
+		problems = append(problems, fmt.Errorf("hroute: %q is not a hierarchical address, such as #77.GBR.EURO", c.HRoute))
 	}
 
 	if strings.TrimSpace(c.Store) == "" {
@@ -227,4 +238,13 @@ func (c Config) AGWClient() maybe.Maybe[agwclient.Config] {
 // BannerLines is the banner a line at a time.
 func (c Config) BannerLines() []string {
 	return strings.Split(strings.TrimRight(c.Banner, "\n"), "\n")
+}
+
+// HRouteMaybe is HRoute, or Nothing if it isn't given.
+func (c Config) HRouteMaybe() maybe.Maybe[string] {
+	if c.HRoute == "" {
+		return maybe.Nothing[string]()
+	}
+
+	return maybe.Just(c.HRoute)
 }

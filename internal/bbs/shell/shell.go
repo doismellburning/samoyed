@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
@@ -53,6 +54,13 @@ type Config struct {
 
 	// Prompt is what the user is prompted with for each command.
 	Prompt string
+
+	// HRoute is the rest of the BBS's hierarchical address, such as
+	// "#77.GBR.EURO", for the R: line it puts on messages sent here.
+	HRoute maybe.Maybe[string]
+
+	// Now is the time, for the R: line.  Left nil, it is time.Now.
+	Now func() time.Time
 }
 
 // state is what the machine is waiting for.
@@ -142,7 +150,9 @@ func (m *Machine) command(ctx context.Context, line string) []Action {
 	case "L>":
 		return m.list(ctx, "", func(q *mail.ListQuery) { q.To = maybe.Just(args) })
 	case "R":
-		return m.read(ctx, args)
+		return m.read(ctx, args, false)
+	case "RH":
+		return m.read(ctx, args, true)
 	case "S", "SP":
 		return m.send(mail.Personal, args)
 	case "SB":
@@ -165,7 +175,7 @@ func helpLines() []string {
 		"LM         List messages to you.",
 		"LB, LP     List bulletins, or personal messages.",
 		"L< call    List messages from call.  L> call: to call.",
-		"R n        Read message n.  R n m ... reads several.",
+		"R n        Read message n.  R n m ... reads several; RH n shows headers.",
 		"S call     Send a personal message (SP too); SB area for a bulletin,",
 		"           ST for NTS traffic.  Add @bbs for one elsewhere, $bid for an ID.",
 		"K n        Kill message n.",
@@ -250,8 +260,9 @@ func parseRange(args string) (int, maybe.Maybe[int], error) {
 	return lowest, maybe.Just(highest), nil
 }
 
-// read shows each message numbered in args.
-func (m *Machine) read(ctx context.Context, args string) []Action {
+// read shows each message numbered in args, with its R: lines in full if
+// headers, or otherwise reduced to the BBSes it came through.
+func (m *Machine) read(ctx context.Context, args string, headers bool) []Action {
 	var fields = strings.Fields(args)
 	if len(fields) == 0 {
 		return m.say("Read which message?  R n")
@@ -260,13 +271,13 @@ func (m *Machine) read(ctx context.Context, args string) []Action {
 	var lines []string
 
 	for _, field := range fields {
-		lines = append(lines, m.readOne(ctx, field)...)
+		lines = append(lines, m.readOne(ctx, field, headers)...)
 	}
 
 	return m.say(lines...)
 }
 
-func (m *Machine) readOne(ctx context.Context, field string) []string {
+func (m *Machine) readOne(ctx context.Context, field string, headers bool) []string {
 	var n, convErr = strconv.Atoi(field)
 	if convErr != nil {
 		return []string{fmt.Sprintf("%q is not a message number.", field)}
@@ -293,12 +304,23 @@ func (m *Machine) readOne(ctx context.Context, field string) []string {
 		"To:    " + msg.To.String(),
 		"Date:  " + msg.Created.Format("02-Jan-06 15:04Z"),
 		"Title: " + msg.Title,
-		"",
 	}
 
-	var body = strings.TrimSuffix(string(msg.Body), "\r")
+	var rlines, rest = mail.SplitRLines(msg.Body)
 
-	lines = append(lines, strings.Split(body, "\r")...)
+	switch {
+	case headers:
+		lines = append(lines, rlines...)
+	case len(rlines) > 0:
+		lines = append(lines, "Path:  "+strings.Join(mail.Path(msg.Body), " "))
+	}
+
+	lines = append(lines, "")
+
+	var body = strings.TrimSuffix(string(rest), "\r")
+	if body != "" || len(rest) > 0 {
+		lines = append(lines, strings.Split(body, "\r")...)
+	}
 
 	return append(lines, "")
 }
@@ -377,7 +399,7 @@ func (m *Machine) bodyLine(ctx context.Context, line string) []Action {
 		body.WriteString(l + "\r")
 	}
 
-	d.message.Body = []byte(body.String())
+	d.message.Body = mail.PrependRLine([]byte(body.String()), m.rline())
 
 	var stored, err = m.box.Accept(ctx, d.message, m.cfg.Call)
 	if errors.Is(err, mail.ErrDuplicateBID) {
@@ -434,4 +456,21 @@ func (m *Machine) killOne(ctx context.Context, field string) string {
 	}
 
 	return fmt.Sprintf("Message %d killed.", n)
+}
+
+// rline is the R: line for a message taken now.
+func (m *Machine) rline() mail.RLine {
+	var now = time.Now
+
+	if m.cfg.Now != nil {
+		now = m.cfg.Now
+	}
+
+	var r = new(mail.RLine)
+
+	r.When = now().UTC()
+	r.BBS = baseCall(m.cfg.Call)
+	r.HRoute = m.cfg.HRoute
+
+	return *r
 }

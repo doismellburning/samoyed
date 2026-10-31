@@ -147,7 +147,7 @@ func render(actions []Action) []string {
 func newSession(box mailbox, call string, sysop bool) *Machine {
 	var peer = transport.Peer{Call: call, Kind: transport.Memory, Authenticated: sysop}
 
-	return New(peer, box, Config{Call: "Q1BBS", Prompt: "de Q1BBS>"})
+	return New(peer, box, Config{Call: "Q1BBS-3", Prompt: "de Q1BBS>", HRoute: maybe.Just("#77.GBR.EURO"), Now: testTime})
 }
 
 // runTranscript plays a transcript against one mailbox.  "> " lines are typed

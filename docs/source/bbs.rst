@@ -93,6 +93,12 @@ Configuration
     The BBS's callsign, with an optional SSID from 0 to 15.
     Messages sent here get their IDs from it.
 
+``hroute``
+    Optionally, where the BBS is,
+    as the rest of its hierarchical address after its callsign,
+    most specific first, such as ``#77.GBR.EURO``.
+    It goes in the ``R:`` line the BBS puts on each message it takes.
+
 ``store``
     The path of the message database, which is created if it isn't there.
 
@@ -156,6 +162,8 @@ Commands
 ``R n``
     Read message ``n``, or several: ``R 1 2 3``.
     Reading a personal message to you marks it read.
+    The BBSes a message has come through are shown as its path;
+    ``RH n`` shows their ``R:`` lines in full.
 
 ``S call``
     Send a personal message (``SP`` does the same).
@@ -179,3 +187,23 @@ Commands
 
 Bulletins are for everyone to read.
 Personal messages and traffic are seen only by whoever they are from or to.
+
+Addresses and R: lines
+----------------------
+
+An address after the ``@`` is hierarchical:
+the BBS, then where it is, most specific first,
+as in ``Q1TEST@Q1BBS.#77.GBR.EURO``.
+A bulletin's is the area it is for, such as ``ALL@GBR``.
+
+Each BBS a message passes through puts a line at the top of it,
+saying when it took the message and which BBS it is:
+
+.. code::
+
+    R:261101/0905Z @:Q1BBS.#77.GBR.EURO
+
+That is the form this BBS writes.
+It hasn't yet been checked against what FBB, BPQ and XRouter write and expect,
+so it may change;
+it reads other BBSes' lines leniently, needing only the date, the time and the BBS's callsign.

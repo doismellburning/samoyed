@@ -192,7 +192,7 @@ func newDispatcher(cfg config.Config, store *sqlite.Store) *dispatcher.Dispatche
 	dcfg.IdleTimeout = cfg.IdleTimeout
 	dcfg.MaxLineLen = lines.DefaultMaxLen
 
-	var scfg = shell.Config{Call: cfg.Call, Prompt: cfg.Prompt}
+	var scfg = shell.Config{Call: cfg.Call, Prompt: cfg.Prompt, HRoute: cfg.HRouteMaybe(), Now: nil}
 
 	return dispatcher.New(*dcfg, func(peer transport.Peer) *shell.Machine {
 		return shell.New(peer, store, scfg)
