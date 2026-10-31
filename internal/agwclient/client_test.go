@@ -74,6 +74,21 @@ func TestStartupRegistersEachPort(t *testing.T) {
 	assert.Equal(t, 1, link.Port())
 }
 
+func TestStartupRegistersOnEveryPortWithNoneConfigured(t *testing.T) {
+	t.Parallel()
+
+	var s = newFakeServer(t)
+	s.portsReply = "2;Port1 first soundcard mono;Port11 Network TNC;"
+	s.start()
+
+	var cfg = testConfig(s)
+	cfg.Ports = nil
+
+	runClient(t, cfg)
+
+	assert.ElementsMatch(t, []int{0, 10}, []int{<-s.registered, <-s.registered})
+}
+
 func TestStartupLogsIn(t *testing.T) {
 	t.Parallel()
 
