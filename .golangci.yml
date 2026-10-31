@@ -58,6 +58,8 @@ linters:
             - github.com/doismellburning/samoyed/internal/bbs
             - github.com/doismellburning/samoyed/internal/dwutil
             - github.com/doismellburning/samoyed/internal/maybe
+            - github.com/doismellburning/samoyed/internal/testutils
+            - github.com/doismellburning/samoyed/internal/version
           deny:
             - pkg: github.com/doismellburning/samoyed/internal
               desc: The BBS and internal/agwclient reach the rest of Samoyed over AGW only

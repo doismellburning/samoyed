@@ -93,6 +93,7 @@ For running Samoyed.
 
 * :doc:`how-to-guides` - recipes for particular jobs, from checking a configuration file to running a NET/ROM node
 * :doc:`yaml-config` - Samoyed's YAML configuration format, an alternative to Dire Wolf's line-at-a-time one
+* :doc:`bbs` - ``samoyed-bbs``, a packet bulletin board, in its early days
 
 .. toctree::
    :caption: Using Samoyed
@@ -100,6 +101,7 @@ For running Samoyed.
 
    how-to-guides
    yaml-config
+   bbs
 
 Reference
 ---------
