@@ -49,7 +49,9 @@ as ``samoyed-direwolf`` would from a receiver.
     ...
     DECODED[1] 0:00.507 Q1TEST audio level = 50(14/14)
     [0] Q1TEST>APDW17:>Hello from Samoyed
-    ...
+
+
+    1 from hello.wav
     1 packets decoded in 0.016 seconds.  32.1 x realtime
 
 Features

@@ -3,6 +3,7 @@ package direwolf
 import (
 	"bytes"
 	"encoding/binary"
+	"strings"
 	"testing"
 
 	"github.com/ccoveille/go-safecast/v2"
@@ -158,6 +159,23 @@ func Test_atest_decodeWAV(t *testing.T) {
 
 	assert.Equal(t, 0, result.PacketsDecoded)
 	assert.InDelta(t, 0.1, result.Seconds, 1e-9)
+}
+
+// Test_atest_decodeWAVSummary checks that a file's report ends with just its
+// packet count, as Dire Wolf's atest does, and not the per-subchannel tables
+// of an experiment that nothing fills in.
+//
+//nolint:paralleltest // Serial: captures stdout.
+func Test_atest_decodeWAVSummary(t *testing.T) {
+	var atest, err = NewAtest(atestTestOptions())
+	require.NoError(t, err)
+
+	var out = captureStdout(t, func() {
+		var _, decodeErr = atest.DecodeWAV(bytes.NewReader(buildWAVWithExtraChunks(t)), "extra_chunks.wav")
+		require.NoError(t, decodeErr)
+	})
+
+	assert.True(t, strings.HasSuffix(out, "\n\n0 from extra_chunks.wav\n"), "output was %q", out)
 }
 
 // atestTestOptions are atest's options with nothing given on the command line.

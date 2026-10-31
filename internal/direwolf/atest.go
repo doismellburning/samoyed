@@ -43,7 +43,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"strings"
 	"unicode"
@@ -55,9 +54,6 @@ import (
 	"github.com/doismellburning/samoyed/internal/wav"
 	"github.com/sirupsen/logrus"
 )
-
-const EXPERIMENT_G = true
-const EXPERIMENT_H = true
 
 /*
  * atestFixBits maps the -F argument onto a fix_bits level and the PASSALL flag.
@@ -212,9 +208,6 @@ func (a *Atest) DecodeFile(name string) (AtestFileResult, error) {
 
 // DecodeWAV decodes a .WAV file from r, calling it name in what it reports.
 func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error) {
-	var count [MAX_SUBCHANS]int // Experiments G and H
-	var space_gain [MAX_SUBCHANS]float64
-
 	var format, dataSize, err = wav.ReadHeader(r)
 	if err != nil {
 		return AtestFileResult{}, fmt.Errorf("WAV file error: %w", err)
@@ -301,19 +294,6 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 	}
 
 	fmt.Printf("\n\n")
-
-	if EXPERIMENT_G {
-		for j := range MAX_SUBCHANS {
-			var db = 20.0 * math.Log10(space_gain[j])
-			fmt.Printf("%+.1f dB, %d\n", db, count[j])
-		}
-	}
-
-	if EXPERIMENT_H {
-		for j := range MAX_SUBCHANS {
-			fmt.Printf("%d\n", count[j])
-		}
-	}
 
 	fmt.Printf("%d from %s\n", a.sink.packetsDecoded, name)
 
