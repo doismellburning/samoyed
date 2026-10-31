@@ -99,6 +99,10 @@ const (
 // ErrBadAddress says an address couldn't be read.
 var ErrBadAddress = errors.New("bad address")
 
+// ErrDuplicateBID says a message's ID has been seen before, so the message
+// is one already taken.
+var ErrDuplicateBID = errors.New("message ID already seen")
+
 // Address is who a message is for: a callsign or bulletin area, and
 // optionally the BBS, or distribution, after an @.
 type Address struct {
