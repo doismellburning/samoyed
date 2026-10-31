@@ -77,9 +77,8 @@ As well as that, Samoyed also adds:
 
 ## Installation
 
-Pre-built binaries are available on the [GitHub Releases page](https://github.com/doismellburning/samoyed/releases), including tarballs and `.deb` packages.
-
-The `.deb` packages are recommended for Debian-based systems (Debian, Ubuntu, Raspberry Pi OS, etc.) and can be installed with:
+Pre-built `.deb` packages and tarballs are on the [GitHub Releases page](https://github.com/doismellburning/samoyed/releases).
+On a Debian-based system (Debian, Ubuntu, Raspberry Pi OS, etc.):
 
 ```sh
 sudo apt install ./samoyed-binary_*.deb
@@ -89,53 +88,21 @@ Both carry the APRS data files (`tocalls.yaml`, which names the device behind a 
 The `.deb` installs them to `/usr/share/samoyed`, beside rather than over Dire Wolf's `/usr/share/direwolf`; a tarball has them in `data/`, found when Samoyed is run from the directory it was unpacked into.
 Samoyed looks in the current directory, `data/`, `/usr/local/share/samoyed` and `/usr/share/samoyed`, and not in Dire Wolf's directories.
 
+See [Installation](https://doismellburning.github.io/samoyed/installation/) for tarballs, building from source, and device permissions.
+
 ## Quick start
 
-`samoyed-direwolf` is the modem/TNC itself.
-It reads a configuration file — `direwolf.conf` in the current directory, or whatever `--config-file` names.
-A minimal one for a single 1200 bps channel on Linux, in Samoyed's [YAML format](https://doismellburning.github.io/samoyed/yaml-config/) (for a file whose name ends in `.yaml` or `.yml`):
-
-```yaml
-samoyed:
-  audioDevices:
-    # Your soundcard - see `arecord -l`
-    - input: plughw:1,0
-  channels:
-    - channel: 0
-      # Your callsign
-      mycall: Q1TEST
-      modem:
-        speed: "1200"
-  agwPort: 8000
-  kissPorts:
-    - port: 8001
-```
-
-That is equivalent to this, in Dire Wolf's format, which works too:
-
-```
-# Your soundcard - see `arecord -l`
-ADEVICE plughw:1,0
-CHANNEL 0
-# Your callsign
-MYCALL Q1TEST
-MODEM 1200
-AGWPORT 8000
-KISSPORT 8001
-```
-
-Check it, then start it:
+`samoyed-direwolf` is the modem/TNC itself, and reads a configuration file — `direwolf.conf`, or whatever `--config-file` names.
+An existing Dire Wolf configuration works; check it, then start it:
 
 ```sh
-samoyed-direwolf --config-file samoyed.yaml --config-check
-samoyed-direwolf --config-file samoyed.yaml
+samoyed-direwolf --config-file direwolf.conf --config-check
+samoyed-direwolf --config-file direwolf.conf
 ```
 
-Run `samoyed-direwolf --help` for the full list of options.
-Dire Wolf's companion utilities come along too, each prefixed `samoyed-` (`samoyed-atest`, `samoyed-kissutil` and so on), with man pages in the `.deb`.
-
-For configuration, features and recipes, see the [Samoyed documentation](https://doismellburning.github.io/samoyed/), in particular the [how-to guides](https://doismellburning.github.io/samoyed/how-to-guides/).
-Where it doesn't yet cover something, the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) should — Samoyed aims for broad compatibility with Dire Wolf.
+[Quick start](https://doismellburning.github.io/samoyed/quickstart/) has a minimal configuration, connecting an application, and running it as a service;
+[Usage](https://doismellburning.github.io/samoyed/usage/) covers running Samoyed as a complete packet node, over an external modem, or under another packet stack.
+Where the [Samoyed documentation](https://doismellburning.github.io/samoyed/) doesn't yet cover something, the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) should — Samoyed aims for broad compatibility with Dire Wolf.
 
 ## Switching from Dire Wolf
 
