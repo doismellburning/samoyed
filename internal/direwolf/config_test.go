@@ -677,6 +677,59 @@ func Test_config_init_adevice(t *testing.T) {
 	})
 }
 
+// --- config_init ADEVICE none ---
+
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
+func Test_config_init_adevice_none(t *testing.T) {
+	t.Run("leaves no audio device and no radio channel", func(t *testing.T) {
+		var c = parseConfig(t, "ADEVICE none\nNCHANNEL 6 192.0.2.1 8001\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.True(t, c.audio.adev[0].none)
+		assert.Equal(t, 0, c.audio.adev[0].defined)
+
+		for channel := range MAX_RADIO_CHANS {
+			assert.NotEqual(t, MEDIUM_RADIO, c.audio.chan_medium[channel], "channel %d", channel)
+		}
+
+		assert.Equal(t, MEDIUM_NETTNC, c.audio.chan_medium[6])
+	})
+
+	t.Run("in any case", func(t *testing.T) {
+		var c = parseConfig(t, "ADEVICE NONE\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.True(t, c.audio.adev[0].none)
+		assert.Equal(t, MEDIUM_NONE, c.audio.chan_medium[0])
+	})
+
+	t.Run("takes back a stereo device's second channel too", func(t *testing.T) {
+		var c = parseConfig(t, "ACHANNELS 2\nADEVICE none\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, MEDIUM_NONE, c.audio.chan_medium[0])
+		assert.Equal(t, MEDIUM_NONE, c.audio.chan_medium[1])
+	})
+
+	var refused = map[string]struct {
+		content, want string
+	}{
+		"an output device":        {"ADEVICE none plughw:1,0\n", "can't have an output device"},
+		"defined twice":           {"ADEVICE none\nADEVICE plughw:1,0\n", "can't be defined more than once"},
+		"ACHANNELS after it":      {"ADEVICE none\nACHANNELS 2\n", "ACHANNELS can't be used for audio device 0"},
+		"PAIDEVICE after it":      {"ADEVICE none\nPAIDEVICE Some Sound Card\n", "PAIDEVICE can't be used"},
+		"PAODEVICE after it":      {"ADEVICE none\nPAODEVICE Some Sound Card\n", "PAODEVICE can't be used"},
+		"channel settings for it": {"ADEVICE none\nCHANNEL 0\n", "Channel number 0 is not valid"},
+		"defined over a real one": {"ADEVICE plughw:1,0\nADEVICE none\n", "can't be defined more than once"},
+	}
+
+	for name, tc := range refused {
+		t.Run(name, func(t *testing.T) {
+			var c = parseConfig(t, tc.content)
+			assert.Equal(t, 1, c.errors, c.output)
+			assert.Contains(t, c.output, tc.want)
+			assert.NotEqual(t, MEDIUM_RADIO, c.audio.chan_medium[1])
+		})
+	}
+}
+
 // --- config_init CHANNEL directive ---
 
 //nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.

@@ -256,8 +256,10 @@ away:
     PAODEVICE Some Sound Card       # Likewise
     ADEVICE - default               # Read standard input, transmit on the default device
 
-An audio *input* device is also still required: there is nothing to do without
-one, so Samoyed stops if it cannot be opened.
+An audio *input* device named, or defaulted to, is also still required:
+Samoyed stops if it cannot be opened.
+A station with no radio channel of its own says so with ``ADEVICE none`` instead
+(see `Run with no audio device`_).
 
 
 Receive from an RTL-SDR
@@ -734,6 +736,51 @@ so a line naming it has to come after the ``NCHANNEL``,
 or it is reported as naming a channel that is not valid.
 ``CDIGIPEAT``, ``CFILTER`` and ``REGEN`` take radio channels only.
 
+Run with no audio device
+------------------------
+
+A station whose channels are all TNCs -
+``NCHANNEL``, ``SCHANNEL`` or AXUDP,
+such as a node in front of a hardware TNC -
+has no radio channel of its own,
+and so no use for a sound card.
+Say so with ``ADEVICE none``:
+
+.. code::
+
+    ADEVICE none
+    MYCALL Q1TEST
+    NCHANNEL 10 localhost 8001
+
+Samoyed then opens no audio device,
+and logs
+
+.. code::
+
+    No audio device, so there are no radio channels
+
+where it would otherwise open one.
+Channel 0 is no longer a radio channel,
+so nothing demodulates, keys a transmitter or is transmitted on it,
+and a line naming it - a beacon without a ``SENDTO``, say -
+is reported as naming a channel that is not valid.
+
+A :doc:`yaml-config` needs no such line:
+it has no audio device it doesn't list under ``audioDevices``,
+so one that leaves ``audioDevices`` out already has no radio channel:
+
+.. code:: yaml
+
+    samoyed:
+      networkTNCs:
+        - {channel: 10, host: localhost, port: 8001}
+
+``ADEVICE none`` has no output device,
+and nothing that describes an audio device can follow it:
+``ACHANNELS``, ``PAIDEVICE``, ``PAODEVICE``, ``CHANNEL 0`` and its settings,
+and the ``-n`` option and audio source on the command line,
+are all refused.
+
 Run a NET/ROM node
 ------------------
 
@@ -749,6 +796,8 @@ On a station without a node shell, it needs a callsign and alias of its own:
 .. code:: yaml
 
     samoyed:
+      audioDevices:
+        - input: default
       channels:
         - {channel: 0, mycall: Q1TEST}
       netrom:
@@ -810,6 +859,8 @@ The ``netrom`` block then leaves out ``callsign`` and ``alias``:
 .. code:: yaml
 
     samoyed:
+      audioDevices:
+        - input: default
       channels:
         - {channel: 0, mycall: Q1TEST}
       node:
@@ -855,6 +906,8 @@ since the links between nodes are addressed to their callsigns:
 .. code:: yaml
 
     samoyed:
+      audioDevices:
+        - input: default
       channels:
         - {channel: 0, mycall: Q1TEST}
       axudpPorts:

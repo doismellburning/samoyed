@@ -1706,6 +1706,7 @@ func parseADEVICE(ps *parseState) (AudioDeviceSettings, error) {
 	 *			ADEVICE	   plughw:2,0  plughw:3,0		-- different in/out for a channel or channel pair.
 	 *			ADEVICE1   udp:7355  default			-- input from SDR via UDP; output to soundcard.
 	 *			ADEVICE    default   udp:localhost:7355		-- input from soundcard; output via UDP.
+	 *			ADEVICE    none				-- no audio device, so no radio channels.
 	 *
 	 *	New in 1.8: Ability to map to another audio device.
 	 *	This allows multiple modems (i.e. data speeds) on the same audio interface.
@@ -1782,8 +1783,12 @@ func (ps *parseState) applyADEVICE(settings AudioDeviceSettings) error {
 	// Overriding the default for adevice 0 is ok.
 	// In that case defined was 2.  That's why we check for 1, not just non-zero.
 
-	if ps.audio.adev[ps.adevice].defined == 1 { // 1 means defined by user.
+	if ps.audio.adev[ps.adevice].defined == 1 || ps.audio.adev[ps.adevice].none { // 1 means defined by user.
 		return fmt.Errorf("config file: ADEVICE%d can't be defined more than once. Line %d", ps.adevice, ps.line)
+	}
+
+	if audioNameIsNone(settings.Input) {
+		return ps.applyNoAudioDevice(settings)
 	}
 
 	ps.audio.adev[ps.adevice].defined = 1
@@ -1799,6 +1804,54 @@ func (ps *parseState) applyADEVICE(settings AudioDeviceSettings) error {
 		// Different audio devices for receive and transmit.
 		ps.audio.adev[ps.adevice].adevice_out = settings.Output
 		ps.audio.adev[ps.adevice].adevice_out_specified = true
+	}
+
+	return nil
+}
+
+// applyNoAudioDevice records that the current audio device is deliberately
+// absent - "ADEVICE none" - for a station whose channels are all network or
+// serial TNCs.  The device is left undefined, so nothing opens it, and its
+// channels are no longer radio channels, so nothing demodulates or transmits
+// on them.
+func (ps *parseState) applyNoAudioDevice(settings AudioDeviceSettings) error {
+	if settings.Output != "" {
+		return fmt.Errorf("config file: ADEVICE%d none can't have an output device, %s, on line %d", ps.adevice, settings.Output, ps.line)
+	}
+
+	var adev = &ps.audio.adev[ps.adevice]
+	adev.defined = 0
+	adev.none = true
+
+	var first = ADEVFIRSTCHAN(ps.adevice)
+	for channel := first; channel < first+2; channel++ {
+		if ps.audio.chan_medium[channel] == MEDIUM_RADIO {
+			ps.audio.chan_medium[channel] = MEDIUM_NONE
+		}
+	}
+
+	return nil
+}
+
+// dropDefaultAudioDevice undoes the audio device config_init gives device 0
+// by default, leaving no device and so no radio channel until one is defined.
+func (ps *parseState) dropDefaultAudioDevice() {
+	if ps.audio.adev[0].defined != 2 { // 2 means defined by default.
+		return
+	}
+
+	ps.audio.adev[0].defined = 0
+
+	for channel := range 2 {
+		ps.audio.chan_medium[ADEVFIRSTCHAN(0)+channel] = MEDIUM_NONE
+	}
+}
+
+// errIfNoAudioDevice reports a setting, named by keyword, that needs an audio
+// device when the current one is "ADEVICE none".
+func (ps *parseState) errIfNoAudioDevice(keyword string) error {
+	if ps.audio.adev[ps.adevice].none {
+		return fmt.Errorf("line %d: %s can't be used for audio device %d, which is ADEVICE none", ps.line, keyword, ps.adevice)
 	}
 
 	return nil
@@ -1822,6 +1875,11 @@ func handlePAIDEVICE(ps *parseState) error {
 	var t = ps.split(true)
 	if t == "" {
 		return fmt.Errorf("config file: Missing name of audio device for PAIDEVICE command on line %d", ps.line)
+	}
+
+	var noneErr = ps.errIfNoAudioDevice("PAIDEVICE")
+	if noneErr != nil {
+		return noneErr
 	}
 
 	ps.audio.adev[ps.adevice].defined = 1
@@ -1852,6 +1910,11 @@ func handlePAODEVICE(ps *parseState) error {
 	var t = ps.split(true)
 	if t == "" {
 		return fmt.Errorf("config file: Missing name of audio device for PAODEVICE command on line %d", ps.line)
+	}
+
+	var noneErr = ps.errIfNoAudioDevice("PAODEVICE")
+	if noneErr != nil {
+		return noneErr
 	}
 
 	ps.audio.adev[ps.adevice].defined = 1
@@ -1908,6 +1971,12 @@ func handleACHANNELS(ps *parseState) error {
 
 // applyACHANNELS sets the number of audio channels for the current device.
 func (ps *parseState) applyACHANNELS(n int) error {
+	// Either number would make a radio channel with no device behind it.
+	var noneErr = ps.errIfNoAudioDevice("ACHANNELS")
+	if noneErr != nil {
+		return noneErr
+	}
+
 	if n == 1 || n == 2 {
 		ps.audio.adev[ps.adevice].num_channels = n
 

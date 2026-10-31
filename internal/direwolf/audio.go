@@ -79,6 +79,12 @@ type adev_param_s struct {
 
 	// sdr is how to tune an SDR, for a device receiving from one.
 	sdr maybe.Maybe[sdrParams]
+
+	// none is set by "ADEVICE none": there is deliberately no audio device
+	// here, so none of its channels is a radio channel.  The device is left
+	// undefined, and this tells it apart from one that was merely never
+	// mentioned.
+	none bool
 }
 
 // validate reports a sound device configuration that the tone generator, the
@@ -450,6 +456,12 @@ func audioNameIsStdin(name string) bool {
 	return strings.EqualFold(name, "stdin") || name == "-"
 }
 
+// audioNameIsNone reports whether an audio device name asks for no audio
+// device at all - a station whose channels are all network or serial TNCs.
+func audioNameIsNone(name string) bool {
+	return strings.EqualFold(name, "none")
+}
+
 // audioNameIsUDP reports whether an audio device name is a UDP specification.
 func audioNameIsUDP(name string) bool {
 	return strings.HasPrefix(strings.ToLower(name), "udp:")
@@ -511,12 +523,23 @@ func audioOutputRequired(ad *adev_param_s) bool {
 // for transmit - so "samoyed-direwolf -" does not go looking for the default
 // soundcard to transmit through, while "ADEVICE plughw:1,0 plughw:2,0" keeps
 // transmitting on plughw:2,0.
-func applyCommandLineAudioSource(ad *adev_param_s, name string) {
+//
+// A configuration with no audio device - "ADEVICE none", or a YAML one with
+// no audioDevices - has no device for the source to stand in for, and the two
+// contradict each other, so that is an error rather than a quiet choice
+// between them.
+func applyCommandLineAudioSource(ad *adev_param_s, name string) error {
+	if ad.defined == 0 {
+		return fmt.Errorf("audio source %q given on the command line, but the configuration has no audio device", name)
+	}
+
 	ad.adevice_in = name
 
 	if !ad.adevice_out_specified && strings.EqualFold(ad.adevice_out, DEFAULT_ADEVICE) {
 		ad.adevice_out = name
 	}
+
+	return nil
 }
 
 // transmitAvailable reports whether audio device a has anywhere to send
@@ -1228,13 +1251,22 @@ func AudioOpen(ctx context.Context, pa *RadioConfig) (*AudioDevices, error) {
 	 * Open audio device(s).
 	 */
 
+	var opened = 0
+
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined != 0 {
 			var err = d.openDevice(ctx, a, pa, portaudioReady)
 			if err != nil {
 				return nil, err
 			}
+
+			opened++
 		}
+	}
+
+	// "ADEVICE none" leaves nothing to open, which is what it asked for.
+	if opened == 0 {
+		logrus.Info("No audio device, so there are no radio channels")
 	}
 
 	openSucceeded = true
