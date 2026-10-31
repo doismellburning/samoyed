@@ -47,6 +47,9 @@ type SamoyedConfig struct {
 	// NetworkTNCs are the network TNCs, each its own virtual channel.
 	NetworkTNCs []NetworkTNCSettings `yaml:"networkTNCs"` //nolint:tagliatelle // "TNC" is an acronym, and tagliatelle splits it as "TnC".
 
+	// SerialTNCs are the serial TNCs, each its own virtual channel.
+	SerialTNCs []SerialTNCSettings `yaml:"serialTNCs"` //nolint:tagliatelle // "TNC" is an acronym, and tagliatelle splits it as "TnC".
+
 	// AXUDPPorts are the AXUDP ports, each its own virtual channel.
 	AXUDPPorts []AXUDPPortSettings `yaml:"axudpPorts"`
 
@@ -456,6 +459,11 @@ func (ps *parseState) applyYAMLPorts(file *SamoyedConfig, top map[string]yamlEnt
 	for i, tnc := range file.NetworkTNCs {
 		ps.line = yamlItem(top["networkTNCs"].value, i).Line
 		ps.reportIfError(ps.applyNCHANNEL(tnc))
+	}
+
+	for i, tnc := range file.SerialTNCs {
+		ps.line = yamlItem(top["serialTNCs"].value, i).Line
+		ps.reportIfError(ps.applySCHANNEL(tnc))
 	}
 
 	for i, port := range file.AXUDPPorts {

@@ -270,6 +270,21 @@ channels:
 			yaml:   "networkTNCs:\n  - {channel: 6, host: 192.0.2.1, port: 8001}\n  - {channel: 6, host: localhost, port: 8002}\n",
 		},
 		{
+			name:   "serial TNCs",
+			legacy: "SCHANNEL 10 /dev/ttyACM0 57600\nSCHANNEL 11 /dev/ttyUSB0\n",
+			yaml:   "serialTNCs:\n  - {channel: 10, device: /dev/ttyACM0, baud: 57600}\n  - {channel: 11, device: /dev/ttyUSB0}\n",
+		},
+		{
+			name:   "a serial TNC on a channel in use is refused the same way",
+			legacy: "SCHANNEL 10 /dev/ttyACM0\nSCHANNEL 10 /dev/ttyUSB0\n",
+			yaml:   "serialTNCs:\n  - {channel: 10, device: /dev/ttyACM0}\n  - {channel: 10, device: /dev/ttyUSB0}\n",
+		},
+		{
+			name:   "an unsupported serial TNC speed is refused the same way",
+			legacy: "SCHANNEL 10 /dev/ttyACM0 1234\n",
+			yaml:   "serialTNCs:\n  - {channel: 10, device: /dev/ttyACM0, baud: 1234}\n",
+		},
+		{
 			name:   "a missing PTT device is refused the same way",
 			legacy: "PTT RIG 101\n",
 			yaml:   "channels:\n  - {channel: 0, ptt: {method: rig, model: \"101\"}}\n",
@@ -343,6 +358,54 @@ func Test_config_yaml_network_TNCs(t *testing.T) {
 		assert.Contains(t, c.output, "already in use")
 		assert.Equal(t, "192.0.2.1", c.audio.nettnc_addr[6])
 		assert.Equal(t, 8001, c.audio.nettnc_port[6])
+	})
+}
+
+//nolint:paralleltest // Serial: captures os.Stdout and changes logrus's global logger.
+func Test_config_yaml_serial_TNCs(t *testing.T) {
+	t.Run("a serial TNC makes its channel a serial TNC one", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "serialTNCs:\n  - {channel: 10, device: /dev/ttyACM0, baud: 57600}\n  - {channel: 11, device: /dev/ttyUSB0}\n")
+		assert.Zero(t, c.errors, c.output)
+		assert.Equal(t, MediumSerialTNC, c.audio.chan_medium[10])
+		assert.Equal(t, "/dev/ttyACM0", c.audio.serialTNCDevice[10])
+		assert.Equal(t, 57600, c.audio.serialTNCBaud[10])
+		assert.Equal(t, MediumSerialTNC, c.audio.chan_medium[11])
+		assert.Equal(t, "/dev/ttyUSB0", c.audio.serialTNCDevice[11])
+		assert.Equal(t, 9600, c.audio.serialTNCBaud[11])
+	})
+
+	t.Run("a bad serial TNC is refused and claims no channel", func(t *testing.T) {
+		for _, tc := range []struct {
+			name, entry, want string
+		}{
+			{"no channel", "{device: /dev/ttyACM0}", "Missing virtual channel number"},
+			{"radio channel", "{channel: 0, device: /dev/ttyACM0}", "must be in range"},
+			{"channel out of range", "{channel: 99, device: /dev/ttyACM0}", "must be in range"},
+			{"no device", "{channel: 10, baud: 57600}", "Missing serial TNC device"},
+		} {
+			var c = parseYAMLConfig(t, "serialTNCs:\n  - "+tc.entry+"\n")
+			assert.Equal(t, 1, c.errors, tc.name)
+			assert.Contains(t, c.output, "Line 3", tc.name)
+			assert.Contains(t, c.output, tc.want, tc.name)
+			assert.NotContains(t, c.audio.chan_medium, MediumSerialTNC, tc.name)
+		}
+	})
+
+	t.Run("an unsupported speed is refused and the default used", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "serialTNCs:\n  - {channel: 10, device: /dev/ttyACM0, baud: 1234}\n")
+		assert.Equal(t, 1, c.errors)
+		assert.Contains(t, c.output, "Line 3")
+		assert.Contains(t, c.output, "Unsupported data rate \\\"1234")
+		assert.Equal(t, 9600, c.audio.serialTNCBaud[10])
+	})
+
+	t.Run("a serial TNC can't take a channel already in use", func(t *testing.T) {
+		var c = parseYAMLConfig(t, "networkTNCs:\n  - {channel: 10, host: 192.0.2.1, port: 8001}\nserialTNCs:\n  - {channel: 10, device: /dev/ttyACM0}\n")
+		assert.Equal(t, 1, c.errors)
+		assert.Contains(t, c.output, "Line 5")
+		assert.Contains(t, c.output, "already in use")
+		assert.Equal(t, MEDIUM_NETTNC, c.audio.chan_medium[10])
+		assert.Empty(t, c.audio.serialTNCDevice[10])
 	})
 }
 

@@ -207,6 +207,30 @@ These are the keys under ``samoyed``:
           networkTNCs:
             - {channel: 6, host: 192.0.2.1, port: 8001}
 
+``serialTNCs``
+    Serial TNCs (``SCHANNEL``):
+    KISS TNCs on a serial port,
+    each a virtual channel of its own.
+    Each has:
+
+    ``channel``
+        The virtual channel, outside the radio channels' range, and not
+        otherwise in use.
+
+    ``device``
+        The serial port the TNC is on.
+
+    ``baud``
+        The serial port's speed:
+        1200, 2400, 4800, 9600, 19200, 38400, 57600 or 115200.
+        Left out, it is 9600.
+
+    .. code:: yaml
+
+        samoyed:
+          serialTNCs:
+            - {channel: 10, device: /dev/ttyACM0, baud: 57600}
+
 ``axudpPorts``
     AXUDP ports: AX.25 frames to and from other nodes (BPQ, XRouter, another
     Samoyed, ...) as UDP datagrams,
