@@ -1,0 +1,190 @@
+#!/bin/bash
+
+set -eu
+set -o pipefail
+
+source "$(dirname "$(realpath "$0")")/common"
+
+APPSERVER="${APPSERVER:-$(dirname "$(realpath "$0")")/../dist/samoyed-appserver}"
+
+if ! command -v python3 > /dev/null; then
+	echo "FAIL: python3 not found, required for port allocation and the AGW client" >&2
+	exit 1
+fi
+
+goto_tmpdir
+
+# Two samoyed-direwolf instances on cross-wired UDP audio, as in
+# check-udp-audio-connect, with samoyed-appserver attached to B as Q2TEST.  A
+# station on A connects to it over the air, asks WHO, runs a short TEST, and
+# says BYE; the appserver should answer each and then hang up.
+
+pids=()
+
+# shellcheck disable=SC2317,SC2329 # cleanup is invoked indirectly via trap
+cleanup() {
+	local status=$?
+
+	if ((status != 0)); then
+		echo "--- FAILURE: dumping logs from $PWD for diagnosis ---" >&2
+
+		for log in direwolf-a.log direwolf-b.log appserver.log station.log; do
+			echo "--- $log ---" >&2
+			cat "$log" >&2 2> /dev/null || echo "(missing)" >&2
+		done
+	fi
+
+	for pid in "${pids[@]}"; do
+		kill "$pid" 2> /dev/null || true
+	done
+	wait 2> /dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+wait_for_log_line() {
+	local logfile=$1
+	local pattern=$2
+	local deadline=$((SECONDS + 30))
+
+	while ! grep -q "$pattern" "$logfile" 2> /dev/null; do
+		if ((SECONDS > deadline)); then
+			echo "FAIL: timed out waiting for '$pattern' in $logfile" >&2
+			return 1
+		fi
+
+		sleep 0.2
+	done
+}
+
+# --- the station on A ------------------------------------------------------
+# Connects from Q1TEST to Q2TEST through A's AGW port, sends each command in
+# turn once the answer to the one before has arrived, and expects the link to
+# be hung up after BYE.
+
+cat > station.py << 'EOF'
+import socket
+import struct
+import sys
+
+AGW_HEADER = struct.Struct("<BBBBBBBB10s10sI4s")
+
+
+def frame(kind, *, call_from="", call_to="", data=b""):
+	return AGW_HEADER.pack(0, 0, 0, 0, ord(kind), 0, 0xF0, 0, call_from.encode(), call_to.encode(), len(data), b"\0\0\0\0") + data
+
+
+def read_frame(sock):
+	buf = b""
+	while len(buf) < AGW_HEADER.size:
+		chunk = sock.recv(AGW_HEADER.size - len(buf))
+		if not chunk:
+			sys.exit("connection to the TNC closed")
+		buf += chunk
+
+	fields = AGW_HEADER.unpack(buf)
+	data = b""
+	while len(data) < fields[10]:
+		chunk = sock.recv(fields[10] - len(data))
+		if not chunk:
+			sys.exit("connection to the TNC closed")
+		data += chunk
+
+	return chr(fields[4]), data
+
+
+def log(*args):
+	print(*args, flush=True)
+
+
+def main(port):
+	with socket.create_connection(("127.0.0.1", port), timeout=120) as sock:
+		sock.sendall(frame("C", call_from="Q1TEST", call_to="Q2TEST"))
+
+		received = b""
+
+		def await_text(want):
+			nonlocal received
+			while want.encode() not in received:
+				kind, data = read_frame(sock)
+				if kind == "D":
+					received += data
+				elif kind == "d":
+					sys.exit(f"disconnected while waiting for {want!r}; got {received!r}")
+			log(f"got {want!r}")
+			received = b""
+
+		await_text("Welcome!")
+
+		for command, want in [("who", "Q1TEST"), ("test 3 64", "bytes/sec"), ("bye", "come on back")]:
+			sock.sendall(frame("D", call_from="Q1TEST", call_to="Q2TEST", data=(command + "\r").encode()))
+			await_text(want)
+
+		while True:
+			kind, data = read_frame(sock)
+			if kind == "d":
+				log("HUNG UP OK")
+				return
+
+
+main(int(sys.argv[1]))
+EOF
+
+# --- port allocation -------------------------------------------------------
+
+udp_a=$(free_port udp)
+udp_b=$(free_port udp "$udp_a")
+agw_a=$(free_port tcp "$udp_a" "$udp_b")
+agw_b=$(free_port tcp "$udp_a" "$udp_b" "$agw_a")
+
+# --- config files ----------------------------------------------------------
+# As in check-agwclient: the 9600 baud modem keeps a window of frames' audio
+# small enough for the receiving UDP socket's buffer, and FRACK is raised so a
+# loaded CI runner's slow answer to a SABM doesn't draw a retry that resets the
+# link once it is up.
+
+for side in a b; do
+	if [[ $side == a ]]; then
+		in=$udp_a out=$udp_b agw=$agw_a call=Q1TEST
+	else
+		in=$udp_b out=$udp_a agw=$agw_b call=Q2TEST
+	fi
+
+	cat > "direwolf-$side.yaml" << EOF
+samoyed:
+  audioDevices:
+    - input: udp:$in
+      output: udp:localhost:$out
+      rate: 48000
+  channels:
+    - {channel: 0, mycall: $call, modem: {speed: "9600"}}
+  agwPort: $agw
+  kissPorts: [{port: 0}]
+  legacy: "FRACK 10"
+EOF
+done
+
+# --- start the TNCs and the appserver --------------------------------------
+
+"$DIREWOLF" -c direwolf-a.yaml > direwolf-a.log 2>&1 &
+pids+=("$!")
+"$DIREWOLF" -c direwolf-b.yaml > direwolf-b.log 2>&1 &
+pids+=("$!")
+
+wait_for_tcp_port "$agw_a"
+wait_for_tcp_port "$agw_b"
+
+"$APPSERVER" -h 127.0.0.1 -p "$agw_b" Q2TEST > appserver.log 2>&1 &
+pids+=("$!")
+
+wait_for_log_line appserver.log "Channel 0:"
+
+# --- the station's session -------------------------------------------------
+
+if ! python3 -I station.py "$agw_a" > station.log 2>&1; then
+	echo "FAIL: the station's session with samoyed-appserver did not go as expected" >&2
+	exit 1
+fi
+
+wait_for_log_line appserver.log "End session"
+
+echo "PASS: samoyed-appserver answered WHO, TEST and BYE from a station over the air, then hung up"
