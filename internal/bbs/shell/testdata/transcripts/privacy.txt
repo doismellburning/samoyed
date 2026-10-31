@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Q2TEST sends a personal message to Q1TEST, and a bulletin.
+@session Q2TEST
+< de Q1BBS>
+> SP Q1TEST
+< Title:
+> Private
+< Enter the message.  End it with /EX or Ctrl-Z on a line of its own.
+> For Q1TEST only.
+> /EX
+< Message 1 saved, ID 1_Q1BBS.
+< de Q1BBS>
+> SB ALL@WW
+< Title:
+> News
+< Enter the message.  End it with /EX or Ctrl-Z on a line of its own.
+> For everyone.
+> ^Z
+< Message 2 saved, ID 2_Q1BBS.
+< de Q1BBS>
+
+# Anyone else sees the bulletin, but not the personal message, and can kill
+# neither.
+@session Q3TEST
+< de Q1BBS>
+> L
+< Msg#  TS Size  To     @BBS     From      Date   Title
+< 2     BN    14 ALL    WW       Q2TEST    31-Oct News
+< de Q1BBS>
+> R 1
+< No message 1.
+< de Q1BBS>
+> K 1 2
+< No message 1.
+< Message 2 isn't yours to kill.
+< de Q1BBS>
+
+# The addressee, on any SSID, sees it; reading it marks it read, and they
+# can kill it.
+@session Q1TEST-5
+< de Q1BBS>
+> LM
+< Msg#  TS Size  To     @BBS     From      Date   Title
+< 1     PN    17 Q1TEST          Q2TEST    31-Oct Private
+< de Q1BBS>
+> R 1
+< Msg #1  P  ID 1_Q1BBS
+< From:  Q2TEST
+< To:    Q1TEST
+< Date:  31-Oct-26 12:34Z
+< Title: Private
+<
+< For Q1TEST only.
+<
+< de Q1BBS>
+> LM
+< Msg#  TS Size  To     @BBS     From      Date   Title
+< 1     PY    17 Q1TEST          Q2TEST    31-Oct Private
+< de Q1BBS>
+> K 1
+< Message 1 killed.
+< de Q1BBS>
+> R 1
+< No message 1.
+< de Q1BBS>
+
+# The sysop sees everything, and can kill anything.
+@session Q9TEST sysop
+< de Q1BBS>
+> L> ALL
+< Msg#  TS Size  To     @BBS     From      Date   Title
+< 2     BN    14 ALL    WW       Q2TEST    31-Oct News
+< de Q1BBS>
+> K 2
+< Message 2 killed.
+< de Q1BBS>
+> L
+< No messages.
+< de Q1BBS>

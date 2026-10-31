@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Help, and what each kind of mistake gets.
+@session Q2TEST
+< de Q1BBS>
+>
+< de Q1BBS>
+> ?
+< B          Bye: disconnect.
+< H or ?     This help.
+< L          List messages; L n lists from number n up, L n-m from n to m.
+< LM         List messages to you.
+< LB, LP     List bulletins, or personal messages.
+< L< call    List messages from call.  L> call: to call.
+< R n        Read message n.  R n m ... reads several.
+< S call     Send a personal message (SP too); SB area for a bulletin,
+<            ST for NTS traffic.  Add @bbs for one elsewhere, $bid for an ID.
+< K n        Kill message n.
+< de Q1BBS>
+> WOMBAT now
+< Unknown command "WOMBAT".  Type H for help.
+< de Q1BBS>
+> L x
+< "x" is not a message number
+< de Q1BBS>
+> L 5-2
+< "5-2" is not a message number range
+< de Q1BBS>
+> LB
+< No messages.
+< de Q1BBS>
+> R
+< Read which message?  R n
+< de Q1BBS>
+> R x 7
+< "x" is not a message number.
+< No message 7.
+< de Q1BBS>
+> K
+< Kill which message?  K n
+< de Q1BBS>
+> K x
+< "x" is not a message number.
+< de Q1BBS>
+> S
+< Send to whom?  S call, or SB area for a bulletin.
+< de Q1BBS>
+> S Q1-TEST
+< "Q1-TEST" is not an address.
+< de Q1BBS>
+> S Q1TEST 123
+< "123" is not a $BID of up to 12 characters.
+< de Q1BBS>
+> S Q1TEST $1234567890123
+< "$1234567890123" is not a $BID of up to 12 characters.
+< de Q1BBS>
+> S Q1TEST
+< Title:
+> 123456789012345678901234567890123456789012345678901234567890123456789012345678901
+< Titles are at most 80 characters.  Title:
+> Shorter
+< Enter the message.  End it with /EX or Ctrl-Z on a line of its own.
+> /EX
+< Message 1 saved, ID 1_Q1BBS.
+< de Q1BBS>
+> BYE
+< 73, and thanks for calling.
+< *** disconnected
