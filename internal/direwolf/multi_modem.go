@@ -132,7 +132,7 @@ type MultiModem struct {
 // to take each audio sample, and how many subchannels and slicers it has.
 // *demod.Demodulator is one.
 type channelDemodulator interface {
-	ProcessSample(subchan int, sam int)
+	ProcessSample(sam int)
 	NumSubchan() int
 	NumSlicers() int
 }
@@ -360,9 +360,7 @@ func (m *MultiModem) ProcessSample(audio_sample int) bool {
 	/* 1.2: We can feed one demodulator but end up with multiple outputs. */
 
 	/* Send same thing to all. */
-	for d := range numSubchan {
-		m.demodulator.ProcessSample(d, audio_sample)
-	}
+	m.demodulator.ProcessSample(audio_sample)
 
 	for subchan := range numSubchan {
 		for slice := range numSlicers {

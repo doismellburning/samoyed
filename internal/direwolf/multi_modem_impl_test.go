@@ -55,7 +55,7 @@ type fakeDemodulator struct {
 	numSlicers int
 }
 
-func (d *fakeDemodulator) ProcessSample(int, int) {}
+func (d *fakeDemodulator) ProcessSample(int) {}
 
 func (d *fakeDemodulator) NumSubchan() int { return d.numSubchan }
 
