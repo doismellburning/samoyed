@@ -24,8 +24,8 @@ func TestDecoderSetsDCD(t *testing.T) {
 
 	var dcd []string
 
-	var decoder = NewDecoder(channel, sampleRate, func(from dwcore.SlicerID, state int) {
-		var entry = fmt.Sprintf("%d/%d/%d=%d", from.Channel, from.Subchannel, from.Slice, state)
+	var decoder = NewDecoder(channel, sampleRate, func(from dwcore.SlicerID, on bool) {
+		var entry = fmt.Sprintf("%d/%d/%d=%t", from.Channel, from.Subchannel, from.Slice, on)
 		if len(dcd) == 0 || dcd[len(dcd)-1] != entry {
 			dcd = append(dcd, entry)
 		}
@@ -39,8 +39,8 @@ func TestDecoderSetsDCD(t *testing.T) {
 		decoder.Sample(0)
 	}
 
-	var on = fmt.Sprintf("%d/%d/0=1", channel, phy.MaxSubchans)
-	var off = fmt.Sprintf("%d/%d/0=0", channel, phy.MaxSubchans)
+	var on = fmt.Sprintf("%d/%d/0=true", channel, phy.MaxSubchans)
+	var off = fmt.Sprintf("%d/%d/0=false", channel, phy.MaxSubchans)
 
 	require.Contains(t, dcd, on, "hearing the button should raise DCD")
 	assert.Equal(t, off, dcd[len(dcd)-1], "letting it go should drop DCD again")

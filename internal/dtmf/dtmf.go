@@ -52,7 +52,7 @@ type Decoder struct {
 
 	// onDCD is told when a button starts or stops being heard, for the
 	// channel's DCD indicator, or is nil when there is nobody to tell.
-	onDCD func(from dwcore.SlicerID, state int)
+	onDCD func(from dwcore.SlicerID, on bool)
 
 	sampleRate int /* Samples per sec.  Typ. 44100, 8000, etc. */
 	blockSize  int /* Number of samples to process in one block. */
@@ -75,8 +75,8 @@ type Decoder struct {
  *
  * Inputs:      channel		- Radio channel number, for the DCD indicator.
  *
- *		onDCD		- Told when a button starts (state 1) or stops
- *				  (0) being heard, as subchannel phy.MaxSubchans of
+ *		onDCD		- Told when a button starts (on) or stops
+ *				  (not) being heard, as subchannel phy.MaxSubchans of
  *				  the channel; nil for nobody to tell.
  *
  *		sampleRate	- Audio sample frequency, typically
@@ -88,7 +88,7 @@ type Decoder struct {
  *
  *----------------------------------------------------------------*/
 
-func NewDecoder(channel int, sampleRate int, onDCD func(from dwcore.SlicerID, state int)) *Decoder {
+func NewDecoder(channel int, sampleRate int, onDCD func(from dwcore.SlicerID, on bool)) *Decoder {
 	logrus.WithField("channel", channel).Debug("dtmf.NewDecoder")
 
 	var d = new(Decoder)
@@ -228,13 +228,8 @@ func (d *Decoder) Sample(input float64) byte {
 		d.debounced = decoded
 
 		// Update Data Carrier Detect Indicator.
-		var _tmpIntBool = 0
-		if decoded != ' ' {
-			_tmpIntBool = 1
-		}
-
 		if d.onDCD != nil {
-			d.onDCD(dwcore.SlicerID{Channel: d.channel, Subchannel: phy.MaxSubchans, Slice: 0}, _tmpIntBool)
+			d.onDCD(dwcore.SlicerID{Channel: d.channel, Subchannel: phy.MaxSubchans, Slice: 0}, decoded != ' ')
 		}
 
 		/* Reset timeout timer. */

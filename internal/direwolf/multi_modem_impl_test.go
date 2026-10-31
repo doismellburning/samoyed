@@ -46,7 +46,7 @@ func (s *multiModemImplSink) RecFrame(from dwcore.SlicerID, pp *ax25.Packet, rxI
 	s.frames = append(s.frames, f)
 }
 
-func (s *multiModemImplSink) DCDChange(int, int) {}
+func (s *multiModemImplSink) DCDChange(int, bool) {}
 
 // fakeDemodulator reports whatever layout a test gives it, including ones no
 // real demodulator has, and takes no notice of the audio.

@@ -510,11 +510,11 @@ type atestSink struct {
 	dcdStartSeconds  [MAX_RADIO_CHANS]float64
 }
 
-func (s *atestSink) DCDChange(channel int, state int) {
+func (s *atestSink) DCDChange(channel int, on bool) {
 	if s.debugDCD > 0 {
 		var t = float64(s.sampleNumber) / float64(s.audio.adev[0].samples_per_sec)
 
-		if state != 0 {
+		if on {
 			//sec1 = t;
 			//min1 = (int)(sec1 / 60.);
 			//sec1 -= min1 * 60;

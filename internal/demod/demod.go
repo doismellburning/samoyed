@@ -56,7 +56,7 @@ type Demodulator struct {
 // *Layer2Receiver is one.
 type BitReceiver interface {
 	RecBit(from dwcore.SlicerID, raw bool, isScrambled bool, pll *dwcore.PLLStats)
-	DCDChange(from dwcore.SlicerID, state int)
+	DCDChange(from dwcore.SlicerID, on bool)
 }
 
 // audioLevelDecimation is how many audio samples pass between pushes of the

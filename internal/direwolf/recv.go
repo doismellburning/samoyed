@@ -127,7 +127,7 @@ type sampleReceiver interface {
 	// channel can't be fed at all.
 	ProcessSample(channel int, sample int) bool
 
-	DCDChange(from dwcore.SlicerID, state int)
+	DCDChange(from dwcore.SlicerID, on bool)
 }
 
 func recv_init(ctx context.Context, pa *RadioConfig, src SampleSource, receiver sampleReceiver, onButton func(channel int, button byte)) <-chan int {
