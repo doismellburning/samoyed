@@ -126,12 +126,14 @@ Working on Samoyed
 
 For anyone changing the code, or wondering why a configuration is refused.
 
+* :doc:`contributing` - getting set up, and where the project's conventions are written down
 * :doc:`internals` - how parts of Samoyed work inside
 
 .. toctree::
    :caption: Working on Samoyed
    :hidden:
 
+   contributing
    internals
 
 .. toctree::
