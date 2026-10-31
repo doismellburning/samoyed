@@ -229,8 +229,137 @@ so give them all:
 This is from pdn-soundmodem's documentation,
 and hasn't been tried with Samoyed.
 
+Samoyed under another packet stack
+----------------------------------
+
+.. graphviz::
+
+    digraph extstack {
+        rankdir=TB;
+        node [shape=box, style="rounded,filled", fillcolor="#e8f0fe", fontname="sans-serif"];
+        edge [fontname="sans-serif", fontsize=10];
+        stack [label="Packet stack\n(LinBPQ, XRouter, Linux AX.25)", fillcolor="#f1f3f4"];
+        subgraph cluster_samoyed {
+            label="samoyed-direwolf"; fontname="sans-serif"; style=rounded;
+            modem [label="Modem"];
+        }
+        radio [label="Sound card and radio", fillcolor="#f1f3f4"];
+        stack -> modem [label=" KISS over TCP\n or a pseudo-terminal"];
+        modem -> radio;
+    }
+
+Here Samoyed is just the modem,
+and another program - LinBPQ, XRouter, the Linux kernel's AX.25 -
+runs the link layer, the node and its applications,
+reaching Samoyed as it would a hardware KISS TNC.
+Samoyed puts frames on the air as they arrive,
+with its own ``TXDELAY``, ``PERSIST`` and so on,
+and passes up everything it hears.
+
+KISS over TCP is the usual way in.
+``KISSPORT port`` listens on ``port`` for every channel,
+KISS port *n* being Samoyed's channel *n*;
+``KISSPORT port chan`` gives one channel a port of its own,
+where it is KISS port 0 whatever its number here.
+Samoyed listens on 8001 for every channel unless ``KISSPORT 0`` turns that off,
+so for a stack that wants one TCP port per radio:
+
+.. code::
+
+    ADEVICE plughw:1,0
+    CHANNEL 0
+    MYCALL Q1TEST
+    MODEM 1200
+    PTT /dev/ttyUSB0 RTS
+    KISSPORT 0
+    KISSPORT 8001 0
+    AGWPORT 0
+
+``AGWPORT 0`` turns the AGW port off,
+which nothing needs here,
+and keeps it out of the way of a stack that runs an AGW server of its own on the same machine.
+Samoyed's KISS and AGW ports listen on every network interface, with no authentication,
+so keep them behind a firewall if the machine is reachable from elsewhere.
+
+Don't give Samoyed a node shell, NET/ROM, or an AGW application registered
+with the same callsign as the stack on the same channel:
+both would answer a station connecting to it.
+
+LinBPQ
+~~~~~~
+
+A LinBPQ ``PORT`` reaches a KISS TNC over TCP
+with ``TYPE=ASYNC``, ``PROTOCOL=KISS``, and ``IPADDR`` and ``TCPPORT`` in place of a serial port:
+
+.. code::
+
+    PORT
+     ID=Samoyed 1200
+     TYPE=ASYNC
+     PROTOCOL=KISS
+     IPADDR=127.0.0.1
+     TCPPORT=8001
+     KISSOPTIONS=ACKMODE
+    ENDPORT
+
+LinBPQ's documentation recommends ``KISSOPTIONS=ACKMODE`` wherever the TNC handles it,
+which Samoyed does (see :doc:`glossary/kiss`).
+This is from LinBPQ's documentation,
+and hasn't been tried with Samoyed.
+
+XRouter
+~~~~~~~
+
+XRouter reaches a KISS TNC over TCP through an ``INTERFACE`` of ``TYPE=TCP``,
+with ``IOADDR`` the address and ``INTNUM`` the port,
+and a ``PORT`` that uses it:
+
+.. code::
+
+    INTERFACE=10
+     ID=Samoyed KISS over TCP
+     TYPE=TCP
+     PROTOCOL=KISS
+     MTU=1500
+     IOADDR=127.0.0.1
+     INTNUM=8001
+    ENDINTERFACE
+
+    PORT=8
+     ID=Samoyed 1200
+     INTERFACENUM=10
+    ENDPORT
+
+One write-up found XRouter dropping the connection after five minutes with nothing sent,
+then reconnecting straight away.
+This is from that write-up,
+and hasn't been tried with Samoyed.
+
+Linux kernel AX.25
+~~~~~~~~~~~~~~~~~~
+
+Started with ``-p``, ``samoyed-direwolf`` also offers KISS on a pseudo-terminal,
+linked from ``/tmp/kisstnc``,
+which ``kissattach`` turns into a kernel AX.25 interface
+for the port named ``radio`` in ``/etc/ax25/axports``:
+
+.. code::
+
+    $ samoyed-direwolf -c samoyed.conf -p &
+    $ sudo kissattach /tmp/kisstnc radio
+    $ sudo kissparms -c 1 -p radio
+
+The kernel starts its KISS driver in a mode that sets bits in the KISS port byte of the first frames it sends,
+which Samoyed takes for a channel it doesn't have.
+``kissparms -c 1`` turns that off before anything is sent;
+loading the driver with ``modprobe mkiss crc_force=1`` does the same.
+
+To link a stack's node to others over the internet rather than the air,
+:doc:`yaml-config` has Samoyed's own AXUDP ports,
+which LinBPQ and XRouter both speak.
+
 References
-~~~~~~~~~~
+----------
 
 * `NinoTNC N9600A operation <https://tarpn.net/t/nino-tnc/n9600a/n9600a_operation.html>`__ -
   57600 baud; the ``MODE`` switches and ``SETHW``; the ``TXDELAY`` potentiometer; ``SLOTTIME`` and ``PPERSIST`` from the host, and their defaults
@@ -239,3 +368,9 @@ References
 * `pdn-soundmodem <https://github.com/packet-net/pdn-soundmodem>`__ and its
   `configuration reference <https://github.com/packet-net/pdn-soundmodem/blob/main/docs/reference/config.md>`__ -
   ``kissPort``, ``bind``, ``subChannel``, per-modem ``port``, and channel access from the host
+* `BPQ32 configuration file <https://www.cantab.net/users/john.wiseman/Documents/BPQCFGFile.html>`__ -
+  ``TYPE=ASYNC`` with ``IPADDR`` and ``TCPPORT`` for KISS over TCP, and ``KISSOPTIONS=ACKMODE``
+* `OARC wiki: XRouter with Direwolf <https://wiki.oarc.uk/packet:xrpi-direwolf>`__ -
+  the ``INTERFACE`` and ``PORT`` blocks, and the inactivity timeout
+* `kissparms(8) <https://manpages.debian.org/ax25-tools/kissparms.8.en.html>`__ -
+  ``-c`` to set the CRC mode

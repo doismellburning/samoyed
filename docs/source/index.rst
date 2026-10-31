@@ -93,7 +93,7 @@ Where this site doesn't yet cover something,
 Usage
 -----
 
-* :doc:`usage` - Samoyed as a complete packet node, or on top of an external modem
+* :doc:`usage` - Samoyed as a complete packet node, on top of an external modem, or as the modem under another packet stack
 
 .. toctree::
    :caption: Usage
