@@ -124,6 +124,20 @@ type NetworkTNCSettings struct {
 	Port *int `yaml:"port"`
 }
 
+// SerialTNCSettings describes a serial TNC: a virtual channel whose frames go
+// to and come from a KISS TNC on a serial port - SCHANNEL.
+type SerialTNCSettings struct {
+	// Channel is the virtual channel.
+	Channel *int `yaml:"channel"`
+
+	// Device is the serial port the TNC is on, such as /dev/ttyACM0.
+	Device string `yaml:"device"`
+
+	// Baud is the serial port's speed in bits per second.  Left out, it is
+	// 9600.
+	Baud *int `yaml:"baud"`
+}
+
 // AXUDPPortSettings describes an AXUDP port: a virtual channel whose frames
 // go to and come from other nodes as UDP datagrams.
 type AXUDPPortSettings struct {

@@ -2096,16 +2096,55 @@ func (ps *parseState) applyNCHANNEL(settings NetworkTNCSettings) error {
 //
 // FIXME: Can't set MYCALL for an SCHANNEL.
 func handleSCHANNEL(ps *parseState) error {
+	var settings = new(SerialTNCSettings)
+
 	var t = ps.split(false)
-	if t == "" {
+	if t != "" {
+		var channel, channelErr = strconv.Atoi(t)
+		if channelErr != nil {
+			return fmt.Errorf("line %d: Channel number must be numeric for SCHANNEL command", ps.line)
+		}
+
+		settings.Channel = &channel
+	}
+
+	settings.Device = ps.split(false)
+
+	var unreadableBaud = ""
+
+	t = ps.split(false)
+	if t != "" {
+		var baud, err = strconv.Atoi(t)
+		if err != nil {
+			unreadableBaud = t
+		} else {
+			settings.Baud = &baud
+		}
+	}
+
+	var err = ps.applySCHANNEL(*settings)
+
+	// An unreadable speed is reported here, with the token as written, once
+	// the rest has checked out - applySCHANNEL would have only a number to
+	// show, and has used the default in its place.
+	if err == nil && unreadableBaud != "" {
+		ps.errorf("line %d: Unsupported data rate \"%s\" for SCHANNEL command.  Using %d.", ps.line, unreadableBaud, defaultSerialTNCBaud)
+	}
+
+	return err
+}
+
+// defaultSerialTNCBaud is a serial TNC's speed when none is given.
+const defaultSerialTNCBaud = 9600
+
+// applySCHANNEL checks a serial TNC and makes its channel a serial TNC one.
+// An unsupported speed is reported, and the default used in its place.
+func (ps *parseState) applySCHANNEL(settings SerialTNCSettings) error {
+	if settings.Channel == nil {
 		return fmt.Errorf("line %d: Missing virtual channel number for SCHANNEL command", ps.line)
 	}
 
-	var channel, channelErr = strconv.Atoi(t)
-	if channelErr != nil {
-		return fmt.Errorf("line %d: Channel number must be numeric for SCHANNEL command", ps.line)
-	}
-
+	var channel = *settings.Channel
 	if channel < MAX_RADIO_CHANS || channel >= MAX_TOTAL_CHANS {
 		return fmt.Errorf("line %d: SCHANNEL number must be in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 	}
@@ -2113,30 +2152,26 @@ func handleSCHANNEL(ps *parseState) error {
 		return fmt.Errorf("line %d: SCHANNEL can't use channel %d because it is already in use", ps.line, channel)
 	}
 
-	var device = ps.split(false)
-	if device == "" {
+	if settings.Device == "" {
 		return fmt.Errorf("line %d: Missing serial TNC device for SCHANNEL command", ps.line)
 	}
 
-	var baud = 9600
+	var baud = defaultSerialTNCBaud
 
-	t = ps.split(false)
-	if t != "" {
-		var n, _ = strconv.Atoi(t)
-
-		switch n {
+	if settings.Baud != nil {
+		switch *settings.Baud {
 		case 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200:
-			baud = n
+			baud = *settings.Baud
 		default:
-			ps.errorf("line %d: Unsupported data rate \"%s\" for SCHANNEL command.  Using %d.", ps.line, t, baud)
+			ps.errorf("line %d: Unsupported data rate \"%d\" for SCHANNEL command.  Using %d.", ps.line, *settings.Baud, baud)
 		}
 	}
 
-	// Claim the channel only once the whole line has parsed, as NCHANNEL
+	// Claim the channel only once all of it has checked out, as NCHANNEL
 	// does: NewSerialTNCs attaches to every MediumSerialTNC channel and fails
 	// startup if it cannot.
 	ps.audio.chan_medium[channel] = MediumSerialTNC
-	ps.audio.serialTNCDevice[channel] = device
+	ps.audio.serialTNCDevice[channel] = settings.Device
 	ps.audio.serialTNCBaud[channel] = baud
 
 	return nil
