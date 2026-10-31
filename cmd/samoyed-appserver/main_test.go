@@ -1,11 +1,10 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//nolint:gochecknoglobals
 package main
 
 import (
-	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -15,341 +14,233 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/ccoveille/go-safecast/v2"
+	"github.com/doismellburning/samoyed/internal/agwclient"
 	"github.com/doismellburning/samoyed/internal/agwpe"
-	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// fakeTNC stands in for the socket to the TNC: agwlib writes frames into it and
-// a test reads them back out to see what the appserver said.
-type fakeTNC struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
+// fakeLink stands in for an AX.25 link: a test types into it as the station
+// would, and reads back what the appserver sent.
+type fakeLink struct {
+	remote string
+	port   int
+
+	in  chan []byte // From the station; closed when it disconnects
+	out chan string // Each write from the appserver
+
+	// drain, if set, is what Drain does; otherwise it returns at once.
+	drain func(ctx context.Context) error
+
+	mu      sync.Mutex
+	pending []byte
+	drains  int
+	closed  bool
 }
 
-func (f *fakeTNC) Write(p []byte) (int, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func newFakeLink(remote string) *fakeLink {
+	var l = new(fakeLink)
 
-	return f.buf.Write(p)
+	l.remote = remote
+	l.in = make(chan []byte, 16)
+	l.out = make(chan string, 2048)
+
+	return l
 }
 
-func (f *fakeTNC) Read(p []byte) (int, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (l *fakeLink) ReadContext(ctx context.Context, p []byte) (int, error) {
+	l.mu.Lock()
 
-	return f.buf.Read(p)
+	if len(l.pending) > 0 {
+		var n = copy(p, l.pending)
+		l.pending = l.pending[n:]
+		l.mu.Unlock()
+
+		return n, nil
+	}
+
+	l.mu.Unlock()
+
+	select {
+	case data, ok := <-l.in:
+		if !ok {
+			return 0, io.EOF
+		}
+
+		l.mu.Lock()
+		defer l.mu.Unlock()
+
+		var n = copy(p, data)
+		l.pending = append(l.pending, data[n:]...)
+
+		return n, nil
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	}
 }
 
-func (f *fakeTNC) Close() error                       { return nil }
-func (f *fakeTNC) LocalAddr() net.Addr                { return nil }
-func (f *fakeTNC) RemoteAddr() net.Addr               { return nil }
-func (f *fakeTNC) SetDeadline(_ time.Time) error      { return nil }
-func (f *fakeTNC) SetReadDeadline(_ time.Time) error  { return nil }
-func (f *fakeTNC) SetWriteDeadline(_ time.Time) error { return nil }
+func (l *fakeLink) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
-// tncFrame is one AGWPE frame the appserver sent towards the TNC.
-type tncFrame struct {
-	kind     byte
-	channel  byte
-	callFrom agwpe.Callsign
-	callTo   agwpe.Callsign
-	data     string
+	if l.closed {
+		return 0, agwclient.ErrLinkClosed
+	}
+
+	l.out <- string(p)
+
+	return len(p), nil
 }
 
-// frames drains and decodes everything written to the TNC so far.
-func (f *fakeTNC) frames(t *testing.T) []tncFrame {
+func (l *fakeLink) Drain(ctx context.Context) error {
+	l.mu.Lock()
+	l.drains++
+	var drain = l.drain
+	l.mu.Unlock()
+
+	if drain != nil {
+		return drain(ctx)
+	}
+
+	return nil
+}
+
+func (l *fakeLink) Close() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.closed = true
+
+	return nil
+}
+
+func (l *fakeLink) Remote() string { return l.remote }
+func (l *fakeLink) Port() int      { return l.port }
+
+func (l *fakeLink) isClosed() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.closed
+}
+
+func (l *fakeLink) drainCount() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	return l.drains
+}
+
+// say sends text from the station.
+func (l *fakeLink) say(text string) {
+	l.in <- []byte(text)
+}
+
+// expect reads what the appserver sends until something contains want, and
+// returns all of it.
+func (l *fakeLink) expect(t *testing.T, want string) string {
 	t.Helper()
 
-	var frames []tncFrame
+	var got strings.Builder
 
 	for {
-		var h = new(agwpe.Header)
+		select {
+		case text := <-l.out:
+			got.WriteString(text)
 
-		var readErr = binary.Read(f, binary.LittleEndian, h)
-		if errors.Is(readErr, io.EOF) {
-			return frames
-		}
-
-		if readErr != nil {
-			t.Fatalf("Could not decode frame header: %s", readErr)
-		}
-
-		var data = make([]byte, h.DataLen)
-		if h.DataLen > 0 {
-			var _, dataErr = io.ReadFull(f, data)
-			if dataErr != nil {
-				t.Fatalf("Could not read %d bytes of frame data: %s", h.DataLen, dataErr)
+			if strings.Contains(text, want) {
+				return got.String()
 			}
-		}
-
-		frames = append(frames, tncFrame{
-			kind:     h.DataKind,
-			channel:  h.Portx,
-			callFrom: h.CallFrom,
-			callTo:   h.CallTo,
-			data:     string(data),
-		})
-	}
-}
-
-// sentText joins the text of the connected-data frames, for asserting on what
-// the user would have seen.
-func sentText(frames []tncFrame) string {
-	var parts []string
-
-	for _, f := range frames {
-		if f.kind == 'D' {
-			parts = append(parts, f.data)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timed out waiting for %q; got %q", want, got.String())
 		}
 	}
-
-	return strings.Join(parts, "")
 }
 
-// hasDisconnect reports whether the appserver asked the TNC to take the link
-// down ('d', "Disconnect").
-func hasDisconnect(frames []tncFrame) bool {
-	for _, f := range frames {
-		if f.kind == 'd' {
-			return true
-		}
-	}
-
-	return false
-}
-
-func testCallsign(call string) agwpe.Callsign {
-	var c agwpe.Callsign
-
-	copy(c[:], call)
-
-	return c
-}
-
-var (
-	testMyCall    = testCallsign("Q1TEST")
-	testTheirCall = testCallsign("Q2TEST")
-)
-
-// newTestServer points the appserver globals at a fake TNC and an empty session
-// table, restoring them when the test finishes.
-func newTestServer(t *testing.T) *fakeTNC {
+// startSession serves a station on l, as serve would, and waits for its
+// greeting.  The returned channel is closed when the session ends.
+func startSession(t *testing.T, srv *appServer, l *fakeLink) <-chan struct{} {
 	t.Helper()
 
-	var tnc = new(fakeTNC)
+	var done = make(chan struct{})
 
-	var oldSock, oldSrv, oldMycall = s_tnc_sock, srv, mycall
+	go func() {
+		defer close(done)
+		srv.handle(t.Context(), l)
+	}()
 
-	s_tnc_sock = tnc
-	srv = newAppServer()
-	mycall = testMyCall
+	l.expect(t, "Welcome!")
 
 	t.Cleanup(func() {
-		s_tnc_sock = oldSock
-		srv = oldSrv
-		mycall = oldMycall
+		select {
+		case <-done:
+		default:
+			close(l.in)
+			<-done
+		}
 	})
 
-	return tnc
+	return done
 }
 
-// connect runs an incoming connection through the callbacks, as the listener
-// goroutine would, and returns the resulting session.
-func connect(t *testing.T, tnc *fakeTNC) *session {
+func waitDone(t *testing.T, done <-chan struct{}) {
 	t.Helper()
 
-	on_C_connection_received(0, testTheirCall, testMyCall, true, []byte("*** CONNECTED To Station Q2TEST\r"))
-
-	tnc.frames(t) // Discard the greeting.
-
-	var s = srv.findSession(0, testTheirCall)
-	if s == nil {
-		t.Fatal("Connecting did not create a session")
-	}
-
-	return s
-}
-
-// send delivers a command from the other station, as the listener goroutine
-// would, and returns what the appserver sent back.
-func send(t *testing.T, tnc *fakeTNC, command string) []tncFrame {
-	t.Helper()
-
-	agw_cb_D_connected_data(0, testTheirCall, testMyCall, []byte(command))
-
-	return tnc.frames(t)
-}
-
-// TestByeDoesNotBlockTheListener covers the "bye" that used to sleep for ten
-// seconds inside the callback, freezing every other session on the TNC with it.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
-func TestByeDoesNotBlockTheListener(t *testing.T) {
-	var tnc = newTestServer(t)
-
-	connect(t, tnc)
-
-	var start = time.Now()
-
-	var frames = send(t, tnc, "bye")
-
-	if elapsed := time.Since(start); elapsed > time.Second {
-		t.Errorf("bye blocked the listener goroutine for %s; it must not block at all", elapsed)
-	}
-
-	if !strings.Contains(sentText(frames), "come on back") {
-		t.Errorf("bye did not send a farewell, got %q", sentText(frames))
-	}
-
-	if hasDisconnect(frames) {
-		t.Error("bye disconnected before the farewell could be acknowledged")
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("session did not end")
 	}
 }
 
-// TestByeDisconnectsOnceTheFarewellIsAcknowledged covers the other half: the
-// main loop must still pull the link down, once the queue has drained.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
-func TestByeDisconnectsOnceTheFarewellIsAcknowledged(t *testing.T) {
-	var tnc = newTestServer(t)
-
-	var s = connect(t, tnc)
-
-	send(t, tnc, "bye")
-
-	// Still waiting for the farewell to be acknowledged.
-	agw_cb_Y_outstanding_frames_for_station(0, testMyCall, testTheirCall, 2)
-	s.poll()
-
-	if hasDisconnect(tnc.frames(t)) {
-		t.Error("Disconnected while frames were still queued for the station")
-	}
-
-	// Queue drained.
-	agw_cb_Y_outstanding_frames_for_station(0, testMyCall, testTheirCall, 0)
-	s.poll()
-
-	if !hasDisconnect(tnc.frames(t)) {
-		t.Error("Did not disconnect once the farewell had been acknowledged")
-	}
-
-	// And only the once.
-	s.poll()
-
-	if hasDisconnect(tnc.frames(t)) {
-		t.Error("Disconnected a second time")
-	}
-}
-
-// TestByeWaitsForTheTNCToAnswer covers a drain check that read a queue length
-// the TNC had not reported yet.  Nothing asks the TNC about a station until it
-// has something to wait for, so the first check after "bye" saw the zero the
-// field started at, mistook it for an empty queue, and cut the farewell off.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
-func TestByeWaitsForTheTNCToAnswer(t *testing.T) {
-	var tnc = newTestServer(t)
-
-	var s = connect(t, tnc)
-
-	send(t, tnc, "bye")
-
-	// The 'Y' reply has not arrived, so nothing is known about the queue yet.
-	s.poll()
-
-	if hasDisconnect(tnc.frames(t)) {
-		t.Error("Disconnected before the TNC had said anything about the queue")
-	}
-}
-
-// TestByeDisconnectsWhenTheStationStopsAcknowledging checks we do not wait for
-// a drain that is never going to come.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
-func TestByeDisconnectsWhenTheStationStopsAcknowledging(t *testing.T) {
-	var tnc = newTestServer(t)
-
-	var s = connect(t, tnc)
-
-	send(t, tnc, "bye")
-
-	agw_cb_Y_outstanding_frames_for_station(0, testMyCall, testTheirCall, 3)
-
-	s.mu.Lock()
-	s.byeDeadline = maybe.Just(time.Now().Add(-time.Second))
-	s.mu.Unlock()
-
-	s.poll()
-
-	if !hasDisconnect(tnc.frames(t)) {
-		t.Error("Did not disconnect after the drain timeout expired")
-	}
-}
-
-// TestHelpListsTheCommands covers the "?" that the greeting points at, which
-// used to answer "Help not yet available."
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestHelpListsTheCommands(t *testing.T) {
-	var tnc = newTestServer(t)
+	t.Parallel()
 
-	connect(t, tnc)
+	var l = newFakeLink("Q2TEST")
+	startSession(t, newAppServer(), l)
 
 	for _, command := range []string{"?", "help", "HELP"} {
-		var got = sentText(send(t, tnc, command))
+		l.say(command + "\r")
 
-		if strings.Contains(got, "not yet available") {
-			t.Errorf("%q still has no help: %q", command, got)
-		}
+		var got = l.expect(t, "Type HELP <command> for details.")
 
 		for _, c := range userCommands() {
-			if !strings.Contains(got, c.usage) {
-				t.Errorf("%q did not list %q, got %q", command, c.usage, got)
-			}
+			assert.Contains(t, got, c.usage, "%q should list %q", command, c.usage)
 		}
 	}
 }
 
-// TestHelpDescribesOneCommand covers "HELP <command>".
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestHelpDescribesOneCommand(t *testing.T) {
-	var tnc = newTestServer(t)
+	t.Parallel()
 
-	connect(t, tnc)
+	var l = newFakeLink("Q2TEST")
+	startSession(t, newAppServer(), l)
 
 	for _, c := range userCommands() {
-		var got = sentText(send(t, tnc, "help "+c.name))
+		l.say("help " + c.name + "\r")
+
+		var got = l.expect(t, c.detail[len(c.detail)-1])
 
 		for _, line := range c.detail {
-			if !strings.Contains(got, line) {
-				t.Errorf("HELP %s did not say %q, got %q", c.name, line, got)
-			}
+			assert.Contains(t, got, line, "HELP %s", c.name)
 		}
 	}
 }
 
-// TestHelpRejectsAnUnknownCommand checks we say so rather than silently
-// printing nothing.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestHelpRejectsAnUnknownCommand(t *testing.T) {
-	var tnc = newTestServer(t)
+	t.Parallel()
 
-	connect(t, tnc)
+	var l = newFakeLink("Q2TEST")
+	startSession(t, newAppServer(), l)
 
-	var got = sentText(send(t, tnc, "help wombat"))
-
-	if !strings.Contains(got, "No such command: wombat") {
-		t.Errorf("HELP for an unknown command said %q", got)
-	}
+	l.say("help wombat\r")
+	l.expect(t, "No such command: wombat")
 }
 
 // TestEveryCommandIsDocumented guards against a command being added to the
@@ -368,192 +259,266 @@ func TestEveryCommandIsDocumented(t *testing.T) {
 	}
 }
 
+func TestEmptyLineGetsAHint(t *testing.T) {
+	t.Parallel()
+
+	var l = newFakeLink("Q2TEST")
+	startSession(t, newAppServer(), l)
+
+	l.say("\r")
+	l.expect(t, "Type ? for list of commands")
+}
+
+func TestInvalidCommand(t *testing.T) {
+	t.Parallel()
+
+	var l = newFakeLink("Q2TEST")
+	startSession(t, newAppServer(), l)
+
+	l.say("wombat\r")
+	l.expect(t, "Invalid command.")
+}
+
 // TestWhoShowsLoginTimes covers the Since column, which used to be the literal
 // string "[time later]" even though the login time was right there.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestWhoShowsLoginTimes(t *testing.T) {
-	var tnc = newTestServer(t)
+	t.Parallel()
 
-	var s = connect(t, tnc)
+	var srv = newAppServer()
 
-	var got = sentText(send(t, tnc, "who"))
+	var other = newFakeLink("Q3TEST")
+	other.port = 1
+	startSession(t, srv, other)
 
-	if strings.Contains(got, "[time later]") {
-		t.Errorf("who still has a placeholder where the login time goes: %q", got)
-	}
+	var l = newFakeLink("Q2TEST")
+	startSession(t, srv, l)
 
-	var want = s.loginTime.UTC().Format(loginTimeFormat)
-	if !strings.Contains(got, want) {
-		t.Errorf("who did not show the login time %q, got %q", want, got)
-	}
+	l.say("who\r")
 
-	if !strings.Contains(got, testTheirCall.String()) {
-		t.Errorf("who did not list the connected station, got %q", got)
+	var got = l.expect(t, "Q3TEST")
+
+	assert.Contains(t, got, "Q2TEST")
+	assert.NotContains(t, got, "[time later]")
+
+	for _, s := range srv.sortedSessions() {
+		assert.Contains(t, got, s.loginTime.UTC().Format(loginTimeFormat))
 	}
 }
 
 // TestCommandsIgnoreTheLineEnding covers a terminal that ends the line the way
 // terminals do: the carriage return used to be parsed as part of the command,
 // or of its last argument, so "who\r" was an invalid command.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
 func TestCommandsIgnoreTheLineEnding(t *testing.T) {
-	var tnc = newTestServer(t)
+	t.Parallel()
 
-	connect(t, tnc)
+	for name, said := range map[string][]string{
+		"CR":                   {"who\r"},
+		"CRLF":                 {"who\r\n"},
+		"LF":                   {"who\n"},
+		"LF in a later frame":  {"who\r", "\n"},
+		"line over two frames": {"wh", "o\r"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	for _, ending := range []string{"\r", "\r\n", "\n", ""} {
-		var got = sentText(send(t, tnc, "who"+ending))
+			var l = newFakeLink("Q2TEST")
+			startSession(t, newAppServer(), l)
 
-		if strings.Contains(got, "Invalid command") {
-			t.Errorf("who%q was rejected: %q", ending, got)
-		}
+			for _, text := range said {
+				l.say(text)
+			}
 
-		if !strings.Contains(got, "Session") {
-			t.Errorf("who%q did not list the sessions: %q", ending, got)
-		}
+			l.say("help wombat\r")
+
+			var got = l.expect(t, "No such command: wombat")
+
+			assert.Contains(t, got, "Session")
+			assert.NotContains(t, got, "Invalid command")
+			assert.NotContains(t, got, "Type ? for list", "a CRLF is one line ending, not two")
+		})
 	}
 }
 
-// TestTestAcknowledgesTheRequest covers a "test" that used to start sending
-// without telling the user anything had happened.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
-func TestTestAcknowledgesTheRequest(t *testing.T) {
-	var tnc = newTestServer(t)
+func TestTimingTest(t *testing.T) {
+	t.Parallel()
 
-	var s = connect(t, tnc)
+	var l = newFakeLink("Q2TEST")
+	startSession(t, newAppServer(), l)
 
-	var got = sentText(send(t, tnc, "test 3 64"))
+	l.say("test 3 64\r")
 
-	if !strings.Contains(got, "3 frame(s) of 64 bytes") {
-		t.Errorf("test did not say what it was about to send, got %q", got)
+	l.expect(t, "Sending 3 frame(s) of 64 bytes")
+
+	for n := 1; n <= 3; n++ {
+		var frame = l.expect(t, "\r")
+		assert.Len(t, frame, 64)
+		assert.True(t, strings.HasPrefix(frame, strconv.Itoa(1000000 + n)[1:]+" "), "frame %d is %q", n, frame)
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	var got = l.expect(t, "bytes/sec")
+	assert.Equal(t, 1, l.drainCount(), "waits for the frames to be acknowledged before the summary")
 
-	if s.ttCount != 3 || s.ttLength != 64 {
-		t.Errorf("test set count %d length %d, wanted 3 and 64", s.ttCount, s.ttLength)
-	}
-}
-
-// TestTestRejectsAnUnreadableCount checks that a typo is reported rather than
-// quietly setting the count to zero and doing nothing.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
-func TestTestRejectsAnUnreadableCount(t *testing.T) {
-	var tnc = newTestServer(t)
-
-	var s = connect(t, tnc)
-
-	var got = sentText(send(t, tnc, "test wombat"))
-
-	if !strings.Contains(got, "not a frame count") {
-		t.Errorf("test with a bad count said %q", got)
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.ttCount != 0 {
-		t.Errorf("A rejected test still started, count %d", s.ttCount)
-	}
-}
-
-// TestTestRejectsTooManyFrames checks the cap on how much air one station can
-// ask for: any positive int used to be accepted, and the main loop would have
-// kept feeding the channel for as long as the station stayed connected.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
-func TestTestRejectsTooManyFrames(t *testing.T) {
-	var tnc = newTestServer(t)
-
-	var s = connect(t, tnc)
-
-	var got = sentText(send(t, tnc, "test "+strconv.Itoa(maxTestCount+1)))
-
-	if !strings.Contains(got, "not a frame count") {
-		t.Errorf("test with an excessive count said %q", got)
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.ttCount != 0 {
-		t.Errorf("A rejected test still started, count %d", s.ttCount)
-	}
-}
-
-// TestTimingTestSummaryIsInSeconds covers a summary that used to print the
-// elapsed time with %d on a time.Duration - so "3 bytes in 21015042 seconds",
-// the nanosecond count, followed by rates derived from a one-nanosecond run.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
-func TestTimingTestSummaryIsInSeconds(t *testing.T) {
-	var tnc = newTestServer(t)
-
-	var s = connect(t, tnc)
-
-	send(t, tnc, "test 1 64")
-
-	// First tick queues the frame, second sees the queue drained and reports.
-	s.poll()
-	agw_cb_Y_outstanding_frames_for_station(0, testMyCall, testTheirCall, 0)
-	s.poll()
-
-	var got = sentText(tnc.frames(t))
-
-	var summary = regexp.MustCompile(`64 bytes in ([0-9.]+) seconds, ([0-9]+) bytes/sec`).FindStringSubmatch(got)
-	if summary == nil {
-		t.Fatalf("No timing test summary in %q", got)
-	}
+	// The summary used to print the elapsed time with %d on a
+	// time.Duration: "192 bytes in 21015042 seconds", the nanosecond count.
+	var summary = regexp.MustCompile(`192 bytes in ([0-9.]+) seconds, ([0-9]+) bytes/sec`).FindStringSubmatch(got)
+	require.NotNil(t, summary, "no summary in %q", got)
 
 	var seconds, parseErr = strconv.ParseFloat(summary[1], 64)
-	if parseErr != nil {
-		t.Fatalf("Elapsed time %q does not parse: %s", summary[1], parseErr)
-	}
-
-	if seconds > 60 {
-		t.Errorf("Summary reported %s seconds for a test that took a moment; those look like nanoseconds", summary[1])
-	}
+	require.NoError(t, parseErr)
+	assert.Less(t, seconds, 60.0)
 
 	var rate, rateErr = strconv.ParseFloat(summary[2], 64)
-	if rateErr != nil {
-		t.Fatalf("Rate %q does not parse: %s", summary[2], rateErr)
-	}
+	require.NoError(t, rateErr)
+	assert.Positive(t, rate)
+}
 
-	if rate <= 0 {
-		t.Errorf("Summary reported a rate of %s bytes/sec", summary[2])
+func TestTimingTestClampsTheLength(t *testing.T) {
+	t.Parallel()
+
+	var l = newFakeLink("Q2TEST")
+	startSession(t, newAppServer(), l)
+
+	l.say("test 1 5\r")
+	l.expect(t, "1 frame(s) of 16 bytes")
+	assert.Len(t, l.expect(t, "\r"), 16)
+}
+
+func TestTimingTestRejectsBadArguments(t *testing.T) {
+	t.Parallel()
+
+	for command, want := range map[string]string{
+		"test wombat":                          "not a frame count",
+		"test 0":                               "not a frame count",
+		"test " + strconv.Itoa(maxTestCount+1): "not a frame count",
+		"test 3 wombat":                        "not a frame length",
+	} {
+		t.Run(command, func(t *testing.T) {
+			t.Parallel()
+
+			var l = newFakeLink("Q2TEST")
+			startSession(t, newAppServer(), l)
+
+			l.say(command + "\r")
+			l.expect(t, want)
+
+			// Nothing was sent: the next thing out answers the next command.
+			l.say("help wombat\r")
+			assert.NotContains(t, l.expect(t, "No such command"), "Sending")
+			assert.Zero(t, l.drainCount())
+		})
 	}
 }
 
-// The main loop's poll only asks the TNC about sessions with something
-// waiting on the answer - here, a goodbye.
-//
-//nolint:paralleltest // Serial: sets the command's package-level state.
-func TestPollAsksAboutSessionsWithWorkInHand(t *testing.T) {
-	var tnc = newTestServer(t)
+func TestByeWaitsForTheFarewellThenHangsUp(t *testing.T) {
+	t.Parallel()
 
-	connect(t, tnc)
+	var l = newFakeLink("Q2TEST")
+	var drained = make(chan struct{})
 
-	srv.poll()
-	assert.Empty(t, tnc.frames(t), "nothing to ask about yet")
-
-	send(t, tnc, "bye")
-
-	srv.poll()
-
-	var asked bool
-
-	for _, f := range tnc.frames(t) {
-		if f.kind == 'Y' && f.callTo == testTheirCall {
-			asked = true
+	l.drain = func(ctx context.Context) error {
+		select {
+		case <-drained:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 
-	assert.True(t, asked, "should ask how much is still to go to the station")
+	var srv = newAppServer()
+	var done = startSession(t, srv, l)
+
+	l.say("bye\r")
+	l.expect(t, "come on back")
+
+	assert.Eventually(t, func() bool { return l.drainCount() == 1 }, 5*time.Second, time.Millisecond)
+	assert.False(t, l.isClosed(), "hung up before the farewell was acknowledged")
+
+	close(drained)
+	waitDone(t, done)
+
+	assert.True(t, l.isClosed())
+	assert.Empty(t, srv.sortedSessions())
+}
+
+// TestByeHangsUpWhenTheStationStopsAcknowledging checks we do not wait for a
+// drain that is never going to come.
+func TestByeHangsUpWhenTheStationStopsAcknowledging(t *testing.T) {
+	t.Parallel()
+
+	var l = newFakeLink("Q2TEST")
+
+	l.drain = func(ctx context.Context) error {
+		<-ctx.Done()
+
+		return ctx.Err()
+	}
+
+	var srv = newAppServer()
+	srv.byeDrainTimeout = 50 * time.Millisecond
+
+	var done = startSession(t, srv, l)
+
+	l.say("bye\r")
+	waitDone(t, done)
+
+	assert.True(t, l.isClosed())
+}
+
+// TestOneStationWaitingHoldsUpNoOther covers what the shared callback
+// goroutine used to get wrong: anything one station waited for - a "bye"
+// sleeping until its farewell went out - froze every other session too.
+func TestOneStationWaitingHoldsUpNoOther(t *testing.T) {
+	t.Parallel()
+
+	var srv = newAppServer()
+
+	var slow = newFakeLink("Q3TEST")
+	var release = make(chan struct{})
+
+	slow.drain = func(ctx context.Context) error {
+		select {
+		case <-release:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	t.Cleanup(func() { close(release) })
+
+	startSession(t, srv, slow)
+
+	slow.say("test 1 16\r")
+	slow.expect(t, "Sending 1 frame(s)")
+
+	var l = newFakeLink("Q2TEST")
+	startSession(t, srv, l)
+
+	l.say("who\r")
+	l.expect(t, "Q3TEST")
+}
+
+func TestSessionEndsWhenTheStationLeaves(t *testing.T) {
+	t.Parallel()
+
+	var srv = newAppServer()
+	var l = newFakeLink("Q2TEST")
+	var done = startSession(t, srv, l)
+
+	close(l.in)
+	waitDone(t, done)
+
+	assert.Empty(t, srv.sortedSessions())
+}
+
+func TestOverlongLineEndsTheSession(t *testing.T) {
+	t.Parallel()
+
+	var l = newFakeLink("Q2TEST")
+	var done = startSession(t, newAppServer(), l)
+
+	l.say(strings.Repeat("x", maxLineLen+1))
+	waitDone(t, done)
 }
 
 func TestMain(m *testing.M) {
@@ -562,9 +527,8 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
 func TestMainRefusesBadArguments(t *testing.T) {
-	var gone = testutils.UnusedPort(t)
+	t.Parallel()
 
 	var testCases = map[string]struct {
 		args []string
@@ -572,12 +536,13 @@ func TestMainRefusesBadArguments(t *testing.T) {
 	}{
 		"no callsign":   {nil, "Exactly one argument required (MYCALL)"},
 		"two callsigns": {[]string{"Q1TEST", "Q2TEST"}, "Exactly one argument required (MYCALL)"},
-		"long callsign": {[]string{"Q1TESTTOOLONG"}, "Callsign Q1TESTTOOLONG too long"},
-		"no TNC":        {[]string{"-h", "127.0.0.1", "-p", gone, "Q1TEST"}, "Could not attach to network TNC"},
+		"long callsign": {[]string{"Q1TESTLONG"}, "Callsign Q1TESTLONG too long"},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			var result = testutils.RunMain(t, "", tc.args...)
 
 			assert.Equal(t, 1, result.Status)
@@ -595,9 +560,79 @@ func TestMainHelp(t *testing.T) {
 	assert.Contains(t, result.Output(), "Simple application server for connected mode AX.25")
 }
 
+// A TNC that isn't there yet is waited for, rather than given up on.
+//
+//nolint:paralleltest // Serial: relies on a port staying unused, which a parallel test could take.
+func TestMainWaitsForTheTNC(t *testing.T) {
+	var gone = testutils.UnusedPort(t)
+
+	var p = testutils.StartMain(t, "-h", "127.0.0.1", "-p", gone, "Q1TEST")
+
+	p.WaitFor(t, "Lost AGW server connection")
+	p.WaitFor(t, "Lost AGW server connection") // And tries again.
+
+	p.Signal(t, syscall.SIGTERM)
+	assert.Equal(t, 0, p.Wait())
+}
+
+// readTNC reads one frame the appserver sent to the TNC.
+func readTNC(t *testing.T, conn net.Conn) *agwpe.Message {
+	t.Helper()
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(10*time.Second)))
+
+	var msg = new(agwpe.Message)
+
+	require.NoError(t, binary.Read(conn, binary.LittleEndian, &msg.Header))
+
+	msg.Data = make([]byte, msg.Header.DataLen)
+
+	var _, err = io.ReadFull(conn, msg.Data)
+	require.NoError(t, err)
+
+	return msg
+}
+
+// readTNCKind reads frames the appserver sent to the TNC until one of kind,
+// answering any outstanding frames questions on the way with 0.
+func readTNCKind(t *testing.T, conn net.Conn, kind byte) *agwpe.Message {
+	t.Helper()
+
+	for {
+		var msg = readTNC(t, conn)
+
+		if msg.Header.DataKind == kind {
+			return msg
+		}
+
+		if msg.Header.DataKind == 'Y' {
+			writeTNC(t, conn, msg.Header.Portx, 'Y', msg.Header.CallFrom.String(), msg.Header.CallTo.String(), binary.LittleEndian.AppendUint32(nil, 0))
+		}
+	}
+}
+
+// writeTNC sends the appserver a frame as the TNC.
+func writeTNC(t *testing.T, conn net.Conn, port byte, kind byte, from string, to string, data []byte) {
+	t.Helper()
+
+	var msg = new(agwpe.Message)
+
+	msg.Header.Portx = port
+	msg.Header.DataKind = kind
+	copy(msg.Header.CallFrom[:], from)
+	copy(msg.Header.CallTo[:], to)
+	msg.Header.DataLen = safecast.RequireConvert[uint32](t, len(data))
+	msg.Data = data
+
+	var _, err = msg.Write(conn, binary.LittleEndian)
+	if !errors.Is(err, net.ErrClosed) {
+		require.NoError(t, err)
+	}
+}
+
 // On attaching to the TNC, main asks what ports it has, and registers its
-// callsign on each.
-func TestMainRegistersOnEachPort(t *testing.T) {
+// callsign on each; then a station connecting gets served.
+func TestMainRegistersOnEachPortAndServes(t *testing.T) {
 	t.Parallel()
 
 	var ln, port = testutils.Listen(t)
@@ -606,28 +641,39 @@ func TestMainRegistersOnEachPort(t *testing.T) {
 
 	var tnc = testutils.Accept(t, ln)
 
-	var h = new(agwpe.Header)
+	assert.Equal(t, byte('R'), readTNC(t, tnc).Header.DataKind)
+	writeTNC(t, tnc, 0, 'R', "", "", binary.LittleEndian.AppendUint32(binary.LittleEndian.AppendUint32(nil, 2005), 127))
 
-	require.NoError(t, binary.Read(tnc, binary.LittleEndian, h))
-	assert.Equal(t, byte('G'), h.DataKind)
+	assert.Equal(t, byte('G'), readTNC(t, tnc).Header.DataKind)
+	writeTNC(t, tnc, 0, 'G', "", "", []byte("2;Port1 first;Port2 second;"))
 
-	var ports = "2;Port1 first;Port2 second;"
+	for _, want := range []byte{0, 1} {
+		var reg = readTNC(t, tnc)
 
-	var reply = new(agwpe.Header)
-	reply.DataKind = 'G'
-	reply.DataLen = safecast.RequireConvert[uint32](t, len(ports))
+		assert.Equal(t, byte('X'), reg.Header.DataKind)
+		assert.Equal(t, want, reg.Header.Portx)
+		assert.Equal(t, "Q1TEST", reg.Header.CallFrom.String(), "the callsign should be upper cased")
 
-	require.NoError(t, binary.Write(tnc, binary.LittleEndian, reply))
+		writeTNC(t, tnc, reg.Header.Portx, 'X', "Q1TEST", "", []byte{1})
+	}
 
-	var _, writeErr = tnc.Write([]byte(ports))
-	require.NoError(t, writeErr)
+	// A station connects on the second port, asks who is on, and leaves.
+	writeTNC(t, tnc, 1, 'C', "Q2TEST", "Q1TEST", []byte("*** CONNECTED To Station Q2TEST\r\x00"))
+	assert.Contains(t, string(readTNCKind(t, tnc, 'D').Data), "Welcome!")
 
-	require.NoError(t, binary.Read(tnc, binary.LittleEndian, h))
-	assert.Equal(t, byte('X'), h.DataKind)
-	assert.Equal(t, byte(0), h.Portx)
-	assert.Equal(t, testMyCall, h.CallFrom, "the callsign should be upper cased")
+	writeTNC(t, tnc, 1, 'D', "Q2TEST", "Q1TEST", []byte("who\r"))
 
-	require.NoError(t, binary.Read(tnc, binary.LittleEndian, h))
-	assert.Equal(t, byte('X'), h.DataKind)
-	assert.Equal(t, byte(1), h.Portx, "and on the second port too")
+	var who = readTNCKind(t, tnc, 'D')
+	for !strings.Contains(string(who.Data), "Q2TEST") {
+		who = readTNCKind(t, tnc, 'D')
+	}
+
+	assert.Equal(t, byte(1), who.Header.Portx)
+	assert.Equal(t, "Q2TEST", who.Header.CallTo.String())
+
+	writeTNC(t, tnc, 1, 'D', "Q2TEST", "Q1TEST", []byte("bye\r"))
+	assert.Contains(t, string(readTNCKind(t, tnc, 'D').Data), "come on back")
+
+	var hangUp = readTNCKind(t, tnc, 'd')
+	assert.Equal(t, "Q2TEST", hangUp.Header.CallTo.String())
 }

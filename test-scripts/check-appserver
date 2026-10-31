@@ -176,7 +176,7 @@ wait_for_tcp_port "$agw_b"
 "$APPSERVER" -h 127.0.0.1 -p "$agw_b" Q2TEST > appserver.log 2>&1 &
 pids+=("$!")
 
-wait_for_log_line appserver.log "Channel 0:"
+wait_for_log_line appserver.log "Connected to AGW server"
 
 # --- the station's session -------------------------------------------------
 

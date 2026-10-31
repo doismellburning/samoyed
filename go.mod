@@ -18,6 +18,7 @@ require (
 	github.com/tzneal/coordconv v0.1.2
 	github.com/warthog618/go-gpiocdev v0.9.1
 	go.yaml.in/yaml/v3 v3.0.5
+	golang.org/x/sync v0.21.0
 	golang.org/x/sys v0.48.0
 	pgregory.net/rapid v1.3.0
 )
@@ -35,7 +36,6 @@ require (
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
 	golang.org/x/mod v0.18.0 // indirect
 	golang.org/x/net v0.60.0 // indirect
-	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
