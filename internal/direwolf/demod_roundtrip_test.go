@@ -500,12 +500,11 @@ func TestBPSKReceivesAX25FromNinoTNC(t *testing.T) {
 	var receiver, receiverErr = multi_modem_init(newBPSKTestRadioConfig(1200, LAYER2_AX25, "N"), 0, 0, sink)
 	require.NoError(t, receiverErr)
 
-	var nudgeTotal int64
-	var symbolCount int
+	var pll dwcore.PLLStats
 
 	for _, bit := range ninoAX25Bits(frames[0]) {
 		// The scrambled flag as the BPSK demodulator passes it.
-		receiver.RecBit(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, bit, MODEM_BPSK.LineScrambled(), &nudgeTotal, &symbolCount)
+		receiver.RecBit(dwcore.SlicerID{Channel: 0, Subchannel: 0, Slice: 0}, bit, MODEM_BPSK.LineScrambled(), &pll)
 	}
 
 	for range 2 * receiver.modems[0].processAge {

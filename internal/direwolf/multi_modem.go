@@ -935,7 +935,7 @@ func (r *Layer2Receiver) toMultiModem(from dwcore.SlicerID, pp *ax25.Packet, rxI
  *
  *		is_scrambled - Is the data scrambled?
  *
- *		pll_nudge_total, pll_symbol_count - The slicer's PLL
+ *		pll	- The slicer's PLL
  *			  counters, from which the HDLC receiver works out
  *			  each frame's speed error, and which it resets at
  *			  each frame's start.
@@ -947,8 +947,7 @@ func (r *Layer2Receiver) toMultiModem(from dwcore.SlicerID, pp *ax25.Packet, rxI
  *
  ***********************************************************************************/
 
-func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled bool,
-	pll_nudge_total *int64, pll_symbol_count *int) {
+func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled bool, pll *dwcore.PLLStats) {
 	var channel = from.Channel
 
 	// -e option can be used to artificially introduce the desired
@@ -1005,7 +1004,7 @@ func (r *Layer2Receiver) RecBit(from dwcore.SlicerID, raw bool, is_scrambled boo
 		s.il2p.RecBit(dwutil.IfThenElse(il2pBit, 1, 0)) // Note: skip NRZI.
 	}
 
-	s.hdlc.RecBit(raw, dbit, is_scrambled, pll_nudge_total, pll_symbol_count)
+	s.hdlc.RecBit(raw, dbit, is_scrambled, pll)
 }
 
 /***********************************************************************************

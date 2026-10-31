@@ -96,8 +96,7 @@ func NewReceiver(config Config, from dwcore.SlicerID, scrambled bool, line *line
 
 // RecBit takes one bit as the demodulator heard it, and the data bit the
 // slicer's line decoder made of it.
-func (s *Receiver) RecBit(raw bool, dbit bool, is_scrambled bool,
-	pll_nudge_total *int64, pll_symbol_count *int) {
+func (s *Receiver) RecBit(raw bool, dbit bool, is_scrambled bool, pll *dwcore.PLLStats) {
 	/*
 	 * Octets are sent LSB first.
 	 * Shift the most recent 8 bits thru the pattern detector.
@@ -189,12 +188,12 @@ func (s *Receiver) RecBit(raw bool, dbit bool, is_scrambled bool,
 		*/
 		if s.rawBits.Len() >= MinFrameLen*8 {
 			//JWL - end of frame
-			var speed_error float64    // in percentage.
-			if *pll_symbol_count > 0 { // avoid divde by 0.
+			var speed_error float64  // in percentage.
+			if pll.SymbolCount > 0 { // avoid divde by 0.
 				// TODO:
 				// Fudged to get +-2.0 with gen_packets -b 1224 & 1176.
 				// Also initialized the symbol counter to -1.
-				speed_error = float64(*pll_nudge_total)*100./(256.*256.*256.*256.)/float64(*pll_symbol_count) + 0.02
+				speed_error = float64(pll.NudgeTotal)*100./(256.*256.*256.*256.)/float64(pll.SymbolCount) + 0.02
 
 				// std	      dw_printf ("DEBUG: total %lld, count %d\n", *pll_nudge_total, *pll_symbol_count);
 				// mingw
@@ -217,8 +216,8 @@ func (s *Receiver) RecBit(raw bool, dbit bool, is_scrambled bool,
 			s.rawBits = rrbb.New(s.from, is_scrambled, descramState, prevDescram) /* Allocate a new one. */
 		} else {
 			//JWL - start of frame
-			*pll_nudge_total = 0
-			*pll_symbol_count = -1 // comes out better than using 0.
+			pll.NudgeTotal = 0
+			pll.SymbolCount = -1 // comes out better than using 0.
 
 			var descramState, prevDescram = s.line.State()
 			s.rawBits.Clear(is_scrambled, descramState, prevDescram)

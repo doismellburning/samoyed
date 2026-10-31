@@ -845,26 +845,26 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 			var gray = demod_bits
 
 			D.receiver.RecBit(from, gray&1 == 1, D.modem_type.LineScrambled(),
-				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
+				&D.slicer[slice].pll)
 		case phy.QPSK:
 			var gray = demod_bits
 
 			D.receiver.RecBit(from, (gray>>1)&1 == 1, false,
-				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
+				&D.slicer[slice].pll)
 			D.receiver.RecBit(from, gray&1 == 1, false,
-				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
+				&D.slicer[slice].pll)
 		default:
 			var gray = demod_bits
 
 			D.receiver.RecBit(from, (gray>>2)&1 == 1, false,
-				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
+				&D.slicer[slice].pll)
 			D.receiver.RecBit(from, (gray>>1)&1 == 1, false,
-				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
+				&D.slicer[slice].pll)
 			D.receiver.RecBit(from, gray&1 == 1, false,
-				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
+				&D.slicer[slice].pll)
 		}
 
-		D.slicer[slice].pll_symbol_count++
+		D.slicer[slice].pll.SymbolCount++
 		pll_dcd_each_symbol2(DCD_CONFIG_PSK, D, channel, subchannel, slice)
 	}
 
@@ -887,7 +887,7 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 			D.slicer[slice].data_clock_pll = int32(math.Floor(float64(D.slicer[slice].data_clock_pll) * float64(D.pll_searching_inertia)))
 		}
 
-		D.slicer[slice].pll_nudge_total += (int64)(D.slicer[slice].data_clock_pll) - int64(before)
+		D.slicer[slice].pll.NudgeTotal += (int64)(D.slicer[slice].data_clock_pll) - int64(before)
 	}
 
 	/*

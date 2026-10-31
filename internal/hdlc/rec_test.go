@@ -46,13 +46,11 @@ func TestHDLCReceiverHandsFramesToItsSink(t *testing.T) {
 			got = append(got, hdlcRecTestDelivery{from, append([]byte{}, frame...), rxInfo})
 		})
 
-	var pllNudgeTotal int64
-
-	var pllSymbolCount int
+	var pll dwcore.PLLStats
 
 	var sender = NewSender(linecode.NewEncoder(func(level int) {
 		var raw = level != 0
-		rx.RecBit(raw, line.Decode(raw, false), false, &pllNudgeTotal, &pllSymbolCount)
+		rx.RecBit(raw, line.Decode(raw, false), false, &pll)
 	}), 1)
 
 	var addrs [ax25.MaxAddrs]string

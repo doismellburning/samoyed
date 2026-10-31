@@ -586,8 +586,8 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 		/* Overflow.  Was large positive, wrapped around, now large negative. */
 		var from = dwcore.SlicerID{Channel: channel, Subchannel: subchannel, Slice: slice}
 		D.receiver.RecBit(from, demod_out_f > 0, D.modem_type.LineScrambled(),
-			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-		D.slicer[slice].pll_symbol_count++
+			&D.slicer[slice].pll)
+		D.slicer[slice].pll.SymbolCount++
 
 		pll_dcd_each_symbol2(DCD_CONFIG_9600, D, channel, subchannel, slice)
 	}
@@ -609,7 +609,7 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 			D.slicer[slice].data_clock_pll = int32(float64(D.slicer[slice].data_clock_pll)*D.pll_searching_inertia + target*(1.0-D.pll_searching_inertia))
 		}
 
-		D.slicer[slice].pll_nudge_total += int64(D.slicer[slice].data_clock_pll) - int64(before)
+		D.slicer[slice].pll.NudgeTotal += int64(D.slicer[slice].data_clock_pll) - int64(before)
 	}
 
 	/* TODO KG

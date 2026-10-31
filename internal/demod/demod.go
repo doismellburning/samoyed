@@ -55,7 +55,7 @@ type Demodulator struct {
 // tells when it starts or stops detecting data on a slicer.
 // *Layer2Receiver is one.
 type BitReceiver interface {
-	RecBit(from dwcore.SlicerID, raw bool, isScrambled bool, pllNudgeTotal *int64, pllSymbolCount *int)
+	RecBit(from dwcore.SlicerID, raw bool, isScrambled bool, pll *dwcore.PLLStats)
 	DCDChange(from dwcore.SlicerID, state int)
 }
 

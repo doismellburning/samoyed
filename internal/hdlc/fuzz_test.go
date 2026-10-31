@@ -84,14 +84,12 @@ func fuzzReceive(tb testing.TB, stream []byte, settings byte) int {
 			ax25.FromFrame(frame, rxInfo.ALevel)
 		})
 
-	var pllNudgeTotal int64
-
-	var pllSymbolCount int
+	var pll dwcore.PLLStats
 
 	for _, b := range stream {
 		for i := range 8 {
 			var raw = b&(1<<i) != 0
-			rx.RecBit(raw, line.Decode(raw, scrambled), scrambled, &pllNudgeTotal, &pllSymbolCount)
+			rx.RecBit(raw, line.Decode(raw, scrambled), scrambled, &pll)
 		}
 	}
 
