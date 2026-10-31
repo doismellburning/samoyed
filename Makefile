@@ -11,6 +11,14 @@ GOVULNCHECK_VERSION = v1.8.0
 ACTIONLINT_VERSION = v1.7.12
 GOTEST_FLAGS = # Anything extra you'd like to pass to `go test`, e.g. `-v`
 
+# CI works the version out once and hands it to every job, so they all agree;
+# a local build works out its own rather than calling itself !UNKNOWN!. Simply
+# expanded, as version.sh's timestamp would otherwise differ between uses, and
+# empty (so !UNKNOWN! after all) outside a git checkout.
+ifeq ($(origin SAMOYED_VERSION),undefined)
+SAMOYED_VERSION := $(shell ./version.sh 2>/dev/null)
+endif
+
 .PHONY: all
 all: $(CMDS) test
 

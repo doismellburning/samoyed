@@ -10,4 +10,10 @@ set -euo pipefail
 # "The upstream_version must contain only alphanumerics and the characters . + - ~ (full stop, plus, hyphen, tilde) and should start with a digit."
 
 # Year.Month.Day.EpochSeconds-Commit
-echo "$(date -u +%Y.%m.%d.%s)"-"$(git rev-parse --short HEAD)"
+#
+# Each part is worked out on its own, so that set -e stops the script, with
+# nothing printed, when one fails - outside a git checkout, say - rather than
+# printing a version with a part missing.
+date=$(date -u +%Y.%m.%d.%s)
+commit=$(git rev-parse --short HEAD)
+echo "$date-$commit"
