@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
+	"github.com/doismellburning/samoyed/internal/bbs/routing"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -279,7 +280,7 @@ func TestReopening(t *testing.T) {
 
 	var version int
 	require.NoError(t, again.db.QueryRowContext(t.Context(), "PRAGMA user_version").Scan(&version))
-	assert.Equal(t, 1, version, "migrations aren't applied twice")
+	assert.Equal(t, 2, version, "migrations aren't applied twice")
 }
 
 func TestOpenRefusesANewerSchema(t *testing.T) {
@@ -310,4 +311,147 @@ func TestOpenFailsOnABadPath(t *testing.T) {
 
 	var _, err = Open(t.Context(), filepath.Join(t.TempDir(), "no", "such", "dir", "bbs.db"))
 	require.Error(t, err)
+}
+
+func forwardTo(partners ...string) routing.Decision {
+	return routing.Decision{Local: false, Partners: partners, Held: maybe.Nothing[string]()}
+}
+
+func TestAcceptRoutedQueuesForEachPartner(t *testing.T) {
+	t.Parallel()
+
+	var s, _ = openTest(t)
+
+	var personal, err = s.AcceptRouted(t.Context(), message("Q2TEST", "Q1TEST@Q6BBS.GBR.EURO", mail.Personal, "Away"), testBBS, forwardTo("Q3BBS"))
+	require.NoError(t, err)
+	assert.Equal(t, mail.New, personal.Status)
+
+	var bulletin = message("Q2TEST", "ALL@GBR", mail.Bulletin, "News")
+	bulletin.MID = maybe.Just("7_Q2BBS")
+
+	var news, newsErr = s.AcceptRouted(t.Context(), bulletin, testBBS, routing.Decision{Local: true, Partners: []string{"Q3BBS", "Q4BBS"}, Held: maybe.Nothing[string]()})
+	require.NoError(t, newsErr)
+
+	var _, localErr = s.Accept(t.Context(), message("Q2TEST", "Q1TEST", mail.Personal, "Here"), testBBS)
+	require.NoError(t, localErr)
+
+	var forQ3, q3Err = s.QueueFor(t.Context(), "q3bbs")
+	require.NoError(t, q3Err)
+	assert.Equal(t, []int{personal.Number, news.Number}, forQ3, "oldest first")
+
+	var forQ4, q4Err = s.QueueFor(t.Context(), "Q4BBS")
+	require.NoError(t, q4Err)
+	assert.Equal(t, []int{news.Number}, forQ4)
+
+	var forNobody, nobodyErr = s.QueueFor(t.Context(), "Q9BBS")
+	require.NoError(t, nobodyErr)
+	assert.Empty(t, forNobody)
+}
+
+func TestAcceptRoutedHolds(t *testing.T) {
+	t.Parallel()
+
+	var s, _ = openTest(t)
+
+	var held, err = s.AcceptRouted(t.Context(), message("Q2TEST", "Q1TEST@Q6BBS", mail.Personal, "Lost"), testBBS,
+		routing.Decision{Local: false, Partners: nil, Held: maybe.Just("no partner covers Q6BBS")})
+	require.NoError(t, err)
+	assert.Equal(t, mail.Held, held.Status)
+
+	var got, getErr = s.Get(t.Context(), held.Number)
+	require.NoError(t, getErr)
+	assert.Equal(t, mail.Held, maybe.FromJust(got).Status)
+}
+
+func TestForwardingFinishesPersonalMail(t *testing.T) {
+	t.Parallel()
+
+	var s, _ = openTest(t)
+
+	var m, err = s.AcceptRouted(t.Context(), message("Q2TEST", "Q1TEST@Q6BBS", mail.Personal, "Away"), testBBS, forwardTo("Q3BBS"))
+	require.NoError(t, err)
+
+	require.NoError(t, s.MarkForwarded(t.Context(), m.Number, "Q3BBS"))
+
+	var got, _ = s.Get(t.Context(), m.Number)
+	assert.Equal(t, mail.Forwarded, maybe.FromJust(got).Status, "sent on, with nobody left to send it to")
+
+	var queue, _ = s.QueueFor(t.Context(), "Q3BBS")
+	assert.Empty(t, queue)
+
+	require.ErrorIs(t, s.MarkForwarded(t.Context(), m.Number, "Q3BBS"), ErrNoSuchMessage, "only once")
+}
+
+func TestForwardingKeepsABulletinsStatus(t *testing.T) {
+	t.Parallel()
+
+	var s, _ = openTest(t)
+
+	var m, err = s.AcceptRouted(t.Context(), message("Q2TEST", "ALL@GBR", mail.Bulletin, "News"), testBBS,
+		routing.Decision{Local: true, Partners: []string{"Q3BBS", "Q4BBS"}, Held: maybe.Nothing[string]()})
+	require.NoError(t, err)
+
+	require.NoError(t, s.MarkForwarded(t.Context(), m.Number, "Q3BBS"))
+	require.NoError(t, s.MarkRefused(t.Context(), m.Number, "Q4BBS"))
+
+	var got, _ = s.Get(t.Context(), m.Number)
+	assert.Equal(t, mail.New, maybe.FromJust(got).Status, "a bulletin is kept here to be read")
+}
+
+func TestARefusalStillFinishesPersonalMail(t *testing.T) {
+	t.Parallel()
+
+	var s, _ = openTest(t)
+
+	var m, err = s.AcceptRouted(t.Context(), message("Q2TEST", "Q1TEST@Q6BBS", mail.Personal, "Away"), testBBS, forwardTo("Q3BBS"))
+	require.NoError(t, err)
+
+	require.NoError(t, s.MarkRefused(t.Context(), m.Number, "Q3BBS"))
+
+	var got, _ = s.Get(t.Context(), m.Number)
+	assert.Equal(t, mail.Forwarded, maybe.FromJust(got).Status, "a partner that already has it is as good as one that took it")
+}
+
+func TestKilledMessagesLeaveTheQueue(t *testing.T) {
+	t.Parallel()
+
+	var s, _ = openTest(t)
+
+	var m, err = s.AcceptRouted(t.Context(), message("Q2TEST", "Q1TEST@Q6BBS", mail.Personal, "Away"), testBBS, forwardTo("Q3BBS"))
+	require.NoError(t, err)
+	require.NoError(t, s.SetStatus(t.Context(), m.Number, mail.Killed))
+
+	var queue, _ = s.QueueFor(t.Context(), "Q3BBS")
+	assert.Empty(t, queue)
+
+	require.NoError(t, s.MarkForwarded(t.Context(), m.Number, "Q3BBS"))
+
+	var got, _ = s.Get(t.Context(), m.Number)
+	assert.Equal(t, mail.Killed, maybe.FromJust(got).Status, "still killed")
+}
+
+func TestMigratingAVersion1Store(t *testing.T) {
+	t.Parallel()
+
+	var s, file = openTest(t)
+
+	var _, err = s.Accept(t.Context(), message("Q2TEST", "Q1TEST", mail.Personal, "Old"), testBBS)
+	require.NoError(t, err)
+
+	// Back to how version 1 left it.
+	var _, dropErr = s.db.ExecContext(t.Context(), "DROP TABLE forward_queue; PRAGMA user_version = 1")
+	require.NoError(t, dropErr)
+	require.NoError(t, s.Close())
+
+	var again, openErr = Open(t.Context(), file)
+	require.NoError(t, openErr)
+
+	t.Cleanup(func() { _ = again.Close() })
+
+	var queue, queueErr = again.QueueFor(t.Context(), "Q3BBS")
+	require.NoError(t, queueErr, "the queue is there after migrating")
+	assert.Empty(t, queue)
+
+	var got, _ = again.Get(t.Context(), 1)
+	assert.Equal(t, "Old", maybe.FromJust(got).Title, "and the old messages are kept")
 }
