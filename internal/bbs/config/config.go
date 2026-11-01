@@ -37,7 +37,7 @@ type Config struct {
 	Store string `yaml:"store"`
 
 	// Banner is what a station is greeted with.  Left out, it says which
-	// BBS this is.
+	// BBS this is, and that it is experimental.
 	Banner string `yaml:"banner"`
 
 	// Prompt is what a user is prompted with for each command.  Left out,
@@ -135,7 +135,7 @@ func ParseWithEnv(data []byte, lookupEnv func(name string) (string, bool)) (Conf
 	}
 
 	if cfg.Banner == "" {
-		cfg.Banner = "Welcome to " + cfg.Call + ", a Samoyed BBS."
+		cfg.Banner = "Welcome to " + cfg.Call + ", a Samoyed BBS (experimental)."
 	}
 
 	if cfg.Prompt == "" {

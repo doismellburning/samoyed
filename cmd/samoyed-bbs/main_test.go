@@ -46,7 +46,8 @@ func TestHelp(t *testing.T) {
 	var result = testutils.RunMain(t, "", "--help")
 
 	assert.Equal(t, 0, result.Status)
-	assert.Contains(t, result.Output(), "packet BBS")
+	assert.Contains(t, result.Output(), "packet BBS (experimental)")
+	assert.Contains(t, result.Output(), "don't rely on it for mail that matters")
 }
 
 func TestConfigCheck(t *testing.T) {
@@ -55,6 +56,7 @@ func TestConfigCheck(t *testing.T) {
 	var good = testutils.RunMain(t, "", "-c", writeConfig(t), "--config-check")
 	assert.Equal(t, 0, good.Status)
 	assert.Contains(t, good.Output(), "is OK")
+	assert.NotContains(t, good.Output(), "experimental", "a check is for scripts, so says only how the file is")
 
 	var badFile = filepath.Join(t.TempDir(), "bad.yaml")
 	require.NoError(t, os.WriteFile(badFile, []byte("call: Q1BBS-16\n"), 0o600))
@@ -96,10 +98,11 @@ func TestConsoleSessions(t *testing.T) {
 	var first = testutils.RunMain(t, "SP Q1TEST\nHello\nHello there.\n/EX\nL\nB\n", "-c", file, "--console", "q2test")
 
 	assert.Equal(t, 0, first.Status)
-	assert.Contains(t, first.Output(), "Welcome to Q1BBS, a Samoyed BBS.\n[SAMBBS-0.0-$]\nde Q1BBS>\n")
+	assert.Contains(t, first.Output(), "Welcome to Q1BBS, a Samoyed BBS (experimental).\n[SAMBBS-0.0-$]\nde Q1BBS>\n")
 	assert.Contains(t, first.Output(), "Message 1 saved, ID 1_Q1BBS.")
 	assert.Contains(t, first.Output(), "Q1TEST          Q2TEST")
 	assert.NotContains(t, first.Output(), "Begin session", "the console is kept for the session unless asked")
+	assert.Contains(t, first.Output(), "samoyed-bbs is experimental", "but it is warned the BBS is experimental")
 
 	// The message is still there for the next session.
 	var second = testutils.RunMain(t, "R 1\n", "-c", file, "--console", "Q1TEST", "-v")
@@ -218,12 +221,13 @@ func TestServingOverAGW(t *testing.T) {
 	writeTNC(t, tnc, 'X', "Q1BBS", "", []byte{1})
 
 	p.WaitFor(t, "Connected to AGW server")
+	assert.Contains(t, p.Output(), "samoyed-bbs is experimental")
 
 	// A station connects, is greeted, lists the messages and leaves.
 	writeTNC(t, tnc, 'C', "Q2TEST", "Q1BBS", []byte("*** CONNECTED To Station Q2TEST\r\x00"))
 
 	var greeting = readText(t, tnc, "de Q1BBS>")
-	assert.Contains(t, greeting, "Welcome to Q1BBS, a Samoyed BBS.\r[SAMBBS-0.0-$]\r")
+	assert.Contains(t, greeting, "Welcome to Q1BBS, a Samoyed BBS (experimental).\r[SAMBBS-0.0-$]\r")
 
 	writeTNC(t, tnc, 'D', "Q2TEST", "Q1BBS", []byte("L\r"))
 	readText(t, tnc, "No messages.")

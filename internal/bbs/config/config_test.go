@@ -43,7 +43,7 @@ func TestParseDefaults(t *testing.T) {
 	var cfg, err = Parse([]byte("call: Q1BBS\nstore: bbs.db\n"))
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"Welcome to Q1BBS, a Samoyed BBS."}, cfg.BannerLines())
+	assert.Equal(t, []string{"Welcome to Q1BBS, a Samoyed BBS (experimental)."}, cfg.BannerLines())
 	assert.Equal(t, "de Q1BBS>", cfg.Prompt)
 	assert.Equal(t, DefaultIdleTimeout, cfg.IdleTimeout)
 	assert.True(t, cfg.HRouteMaybe().IsNothing())
