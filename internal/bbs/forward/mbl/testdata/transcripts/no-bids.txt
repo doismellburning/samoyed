@@ -8,5 +8,6 @@
 > F>
 < SP Q1TEST @ Q2BBS < Q9TEST
 > NO
+> Q2BBS>
 < *** DONE
 < *** disconnected

@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Calling a partner and refusing what it offers: having made the connection,
+# this side follows its NO with F>, as LinBPQ does, not its prompt.
+@seen 40_Q2BBS
+@calling
+> [BPQ-6.0.26.1-IHJM$]
+> de Q2BBS>
+< [SAMBBS-0.0-H$]
+> >
+< F>
+> SP Q1TEST @ Q1BBS < Q9TEST $40_Q2BBS
+< NO
+< F>
+> *** DONE
+< *** disconnected

@@ -3,7 +3,8 @@
 
 # Handed the turn, this side offers what is queued for the partner: one is
 # wanted, one isn't, and a killed one isn't offered at all.  A message is
-# forwarded once the partner prompts after it.
+# forwarded once the partner prompts after it, and the next is offered once
+# the partner prompts after its NO.
 @queued SP Q1TEST @ Q2BBS.GBR.EURO < Q9TEST $5_Q1BBS
 @queued SB ALL @ GBR < Q9TEST
 @queued SP Q3TEST @ Q2BBS < Q9TEST
@@ -21,6 +22,7 @@
 > Q2BBS>
 < SB ALL @ GBR < Q9TEST $2_Q1BBS
 > NO
+> Q2BBS>
 < *** DONE
 < *** disconnected
 @check accepted=0 forwarded=1 refused=1 pending=1
