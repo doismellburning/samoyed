@@ -13,7 +13,7 @@ BBS
     Expect missing features, and changes - to its configuration, to what it sends other BBSes,
     and to its message database - without notice,
     and don't rely on it for mail that matters.
-    In particular, it doesn't forward in FBB's batched protocol yet, nor reach partners over TCP,
+    In particular, it doesn't reach partners over TCP yet, nor forward compressed,
     and its forwarding has been tried against LinBPQ alone, not yet FBB or XRouter (see below).
     It says so when it starts, in ``--help``, and in the banner it greets stations with.
 
@@ -126,6 +126,13 @@ Configuration
 ``idleTimeout``
     How long a station may say nothing before it is disconnected, such as ``5m``.
     Left out, ten minutes.
+
+``fbb``
+    ``true`` to forward in FBB's protocol with partners that can, as described under Forwarding below,
+    by claiming ``F`` in this BBS's system ID.
+    Left out, the BBS forwards in the MBL/RLI style with every partner:
+    it forwards in FBB's protocol only uncompressed so far,
+    and LinBPQ turns that away.
 
 ``agw``
     The AGW server stations reach the BBS through.
@@ -322,13 +329,52 @@ and sending its system ID, such as ``[FBB-7.0-ABFHM$]``, as its first line.
 A station that isn't one of the ``partners`` is turned away.
 As with users, the callsign is only the station's word for who it is.
 
-The two then forward one message at a time, in the plain MBL/RLI style
-that BBSes without FBB's batched protocol use,
-and that those with it fall back to with a BBS that doesn't claim it:
-this BBS's system ID, ``[SAMBBS-0.0-H$]``, says it understands hierarchical addresses (``H``) and message IDs (``$``),
-but not FBB's protocol (``F``).
-The partner sends first.
-It offers each message with a line such as::
+This BBS's system ID, ``[SAMBBS-0.0-H$]``,
+says it understands hierarchical addresses (``H``) and message IDs (``$``),
+and with ``fbb: true``, ``[SAMBBS-0.0-FH$]``, FBB's protocol (``F``) too.
+With a partner that claims ``F`` as well, the two forward in FBB's protocol;
+otherwise in the plain MBL/RLI style.
+Whichever made the connection sends first.
+
+FBB's protocol
+~~~~~~~~~~~~~~
+
+Mail goes in blocks.
+The side sending offers up to five messages at once, in a proposal such as::
+
+    FB P Q2TEST Q1BBS.#77.GBR.EURO Q1TEST 123_Q2BBS 1345
+    FB B Q2TEST GBR ALL 124_Q2BBS 512
+    F> 3A
+
+each line the message's type, sender, ``@``, addressee, ID and size,
+and the last a checksum.
+The other side answers with a sign for each:
+``+`` for one it wants,
+``-`` for one it has seen or can't take,
+``=`` for one it wants later,
+as in ``FS +-``,
+and the messages it wants follow,
+each its title, its text and a Ctrl-Z.
+Then the other side takes its turn, with its own proposal,
+or ``FF`` if it has nothing;
+either says it had everything sent to it,
+and only then is that marked forwarded.
+A side with nothing to send after ``FF`` says ``FQ``, which ends the exchange.
+A proposal stops short of about 10KB of messages, though it always offers one.
+
+That is the protocol as F6FBB's documentation describes it,
+uncompressed;
+compressed forwarding is still to come.
+LinBPQ 6.0.26.1 doesn't take it uncompressed:
+offered it, it logs "Uncompressed Blocked Forwarding is no longer supported",
+and hangs up,
+so ``fbb`` is for partners running FBB itself, and is off unless it is set.
+
+MBL/RLI style
+~~~~~~~~~~~~~
+
+With a partner that doesn't claim ``F``, mail goes one message at a time.
+The side sending offers each message with a line such as::
 
     SP Q1TEST @ Q1BBS.#77.GBR.EURO < Q2TEST $123_Q2BBS
 
@@ -350,7 +396,6 @@ though never back to the partner it came from.
 That is the exchange as seen forwarding with LinBPQ both ways.
 FBB and XRouter haven't been tried yet,
 so it may change.
-FBB's batched protocol is still to come.
 
 Calling partners
 ----------------
@@ -400,3 +445,7 @@ References
 
 - LinBPQ 6.0.26.1, as forwarded with:
   https://www.cantab.net/users/john.wiseman/Downloads/Beta/
+- F6FBB, "FBB forward protocol", appendix 9 of FBB's documentation:
+  https://www.qsl.net/pe1nmb/bbs/fbb/docfwpro.htm
+- F6FBB, "Compressed forward protocol", FBB's documentation, for the checksum:
+  https://www.qsl.net/pe1nmb/bbs/fbb/docfwcom.htm

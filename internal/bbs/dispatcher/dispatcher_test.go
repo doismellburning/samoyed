@@ -330,7 +330,9 @@ func TestDrive(t *testing.T) {
 		var d = New(testConfig(), func(peer transport.Peer) *echo { return &echo{peer: peer} })
 		var done = make(chan error, 1)
 
-		go func() { done <- d.Drive(t.Context(), s, lines.NewReader(s, 64), &forwarding{theirs: sid.Ours(0, 0)}) }()
+		go func() {
+			done <- d.Drive(t.Context(), s, lines.NewReader(s, 64), &forwarding{theirs: sid.Ours(0, 0, false)})
+		}()
 
 		return station, lines.NewReader(station, 1024), done
 	}

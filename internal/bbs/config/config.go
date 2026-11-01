@@ -50,6 +50,12 @@ type Config struct {
 	// disconnected.  Left out, ten minutes.
 	IdleTimeout time.Duration `yaml:"idleTimeout"`
 
+	// FBB is whether to forward in FBB's protocol with partners that can.
+	// Left out, it doesn't: LinBPQ, for one, takes FBB's protocol only
+	// compressed, which this BBS can't do yet, and turns away a BBS
+	// offering it uncompressed.
+	FBB bool `yaml:"fbb"`
+
 	// AGW, if given, is the AGW server stations reach the BBS through.
 	AGW *AGW `yaml:"agw"`
 
@@ -384,6 +390,11 @@ func (c Config) AGWClient() maybe.Maybe[agwclient.Config] {
 // BannerLines is the banner a line at a time.
 func (c Config) BannerLines() []string {
 	return strings.Split(strings.TrimRight(c.Banner, "\n"), "\n")
+}
+
+// UseFBB is whether to forward in FBB's protocol with partners that can.
+func (c Config) UseFBB() bool {
+	return c.FBB
 }
 
 // HRouteMaybe is HRoute, or Nothing if it isn't given.

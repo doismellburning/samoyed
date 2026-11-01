@@ -66,10 +66,15 @@ func TestHas(t *testing.T) {
 func TestOurs(t *testing.T) {
 	t.Parallel()
 
-	var ours = Ours(1, 2)
+	var ours = Ours(1, 2, true)
 
-	assert.Equal(t, "[SAMBBS-1.2-H$]", ours.String())
-	assert.False(t, ours.Has(FlagFBB), "no FBB batched forwarding yet")
+	assert.Equal(t, "[SAMBBS-1.2-FH$]", ours.String())
+	assert.True(t, ours.Has(FlagFBB))
+
+	var mblOnly = Ours(1, 2, false)
+
+	assert.Equal(t, "[SAMBBS-1.2-H$]", mblOnly.String())
+	assert.False(t, mblOnly.Has(FlagFBB))
 }
 
 func TestNegotiate(t *testing.T) {
@@ -78,13 +83,9 @@ func TestNegotiate(t *testing.T) {
 	var withBIDs, _ = Parse("[FBB-7.0-ABFHM$]")
 	var without, _ = Parse("[OLD-1.0-H]")
 
-	assert.Equal(t, Mode{BIDs: true, FBB: false}, Negotiate(Ours(0, 0), withBIDs), "this BBS doesn't claim F yet")
-	assert.Equal(t, Mode{BIDs: false, FBB: false}, Negotiate(Ours(0, 0), without))
-
-	var fbbToo = SID{Name: "SAMBBS", Version: "0.0", Flags: "FH$"}
-
-	assert.Equal(t, Mode{BIDs: true, FBB: true}, Negotiate(fbbToo, withBIDs))
-	assert.Equal(t, Mode{BIDs: false, FBB: false}, Negotiate(fbbToo, without))
+	assert.Equal(t, Mode{BIDs: true, FBB: true}, Negotiate(Ours(0, 0, true), withBIDs))
+	assert.Equal(t, Mode{BIDs: false, FBB: false}, Negotiate(Ours(0, 0, true), without), "they don't claim F")
+	assert.Equal(t, Mode{BIDs: true, FBB: false}, Negotiate(Ours(0, 0, false), withBIDs), "this BBS doesn't")
 }
 
 func FuzzParse(f *testing.F) {

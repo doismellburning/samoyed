@@ -77,9 +77,15 @@ func (s SID) String() string {
 }
 
 // Ours is this BBS's system ID, for the given version: hierarchical
-// addresses and BIDs, and forwarding in plain MBL/RLI style.
-func Ours(major, minor int) SID {
-	return SID{Name: "SAMBBS", Version: fmt.Sprintf("%d.%d", major, minor), Flags: string([]rune{FlagHierarchical, FlagBID})}
+// addresses and BIDs, and FBB's protocol if fbb says so, MBL/RLI style
+// forwarding otherwise.
+func Ours(major, minor int, fbb bool) SID {
+	var flags = []rune{FlagHierarchical, FlagBID}
+	if fbb {
+		flags = append([]rune{FlagFBB}, flags...)
+	}
+
+	return SID{Name: "SAMBBS", Version: fmt.Sprintf("%d.%d", major, minor), Flags: string(flags)}
 }
 
 // Mode is what two BBSes that have swapped SIDs agree to do.

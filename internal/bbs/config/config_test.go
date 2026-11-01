@@ -331,3 +331,15 @@ partners:
 		assert.Contains(t, err.Error(), want)
 	}
 }
+
+func TestParseFBB(t *testing.T) {
+	t.Parallel()
+
+	var byDefault, err = Parse([]byte("call: Q1BBS\nstore: bbs.db\n"))
+	require.NoError(t, err)
+	assert.False(t, byDefault.UseFBB(), "off unless turned on")
+
+	var on, onErr = Parse([]byte("call: Q1BBS\nstore: bbs.db\nfbb: true\n"))
+	require.NoError(t, onErr)
+	assert.True(t, on.UseFBB())
+}

@@ -170,7 +170,7 @@ func (s *fakeStore) tally() string {
 }
 
 func testConfig() Config {
-	return Config{Call: "Q1BBS-1", HRoute: maybe.Just("#77.GBR.EURO"), Prompt: "de Q1BBS>", SID: sid.Ours(0, 0), Now: testTime}
+	return Config{Call: "Q1BBS-1", HRoute: maybe.Just("#77.GBR.EURO"), Prompt: "de Q1BBS>", SID: sid.Ours(0, 0, false), Now: testTime}
 }
 
 // render turns actions into the lines a transcript expects: output as it is,
@@ -315,7 +315,7 @@ func TestLongTitlesAreCut(t *testing.T) {
 	t.Parallel()
 
 	var st = newFakeStore()
-	var m = NewAnswering("Q2BBS", sid.Ours(0, 0), st, testConfig())
+	var m = NewAnswering("Q2BBS", sid.Ours(0, 0, false), st, testConfig())
 
 	m.Line(t.Context(), "SP Q1TEST < Q9TEST")
 	m.Line(t.Context(), strings.Repeat("x", 100))
@@ -338,9 +338,9 @@ func FuzzMachine(f *testing.F) {
 
 		var m *Machine
 		if answering {
-			m = NewAnswering("Q2BBS", sid.Ours(0, 0), st, testConfig())
+			m = NewAnswering("Q2BBS", sid.Ours(0, 0, false), st, testConfig())
 		} else {
-			m = NewCalling("Q2BBS", sid.Ours(0, 0), st, testConfig())
+			m = NewCalling("Q2BBS", sid.Ours(0, 0, false), st, testConfig())
 		}
 
 		m.Start(t.Context())
