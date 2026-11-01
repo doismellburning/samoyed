@@ -545,3 +545,54 @@ func TestMigratingAVersion2StoreKeepsTheQueue(t *testing.T) {
 	require.NoError(t, failErr)
 	assert.Equal(t, []int{m.Number}, held, "and can hold mail now")
 }
+
+func TestForwardEntriesAndTotals(t *testing.T) {
+	t.Parallel()
+
+	var s, _ = openTest(t)
+
+	var bulletin, err = s.AcceptRouted(t.Context(), message("Q2TEST", "ALL@GBR", mail.Bulletin, "News"), testBBS,
+		routing.Decision{Local: true, Partners: []string{"Q4BBS", "Q3BBS", "Q5BBS"}, Held: maybe.Nothing[string]()})
+	require.NoError(t, err)
+
+	var personal, personalErr = s.AcceptRouted(t.Context(), message("Q2TEST", "Q1TEST@Q6BBS", mail.Personal, "Away"), testBBS, forwardTo("Q3BBS"))
+	require.NoError(t, personalErr)
+
+	var killed, killedErr = s.AcceptRouted(t.Context(), message("Q2TEST", "Q1TEST@Q6BBS", mail.Personal, "Gone"), testBBS, forwardTo("Q3BBS"))
+	require.NoError(t, killedErr)
+	require.NoError(t, s.SetStatus(t.Context(), killed.Number, mail.Killed))
+
+	require.NoError(t, s.MarkForwarded(t.Context(), bulletin.Number, "Q3BBS"))
+	require.NoError(t, s.MarkRefused(t.Context(), bulletin.Number, "Q4BBS"))
+
+	var _, failErr = s.RecordFailedAttempt(t.Context(), "Q5BBS", 1)
+	require.NoError(t, failErr)
+
+	var tried = maybe.Just(time.Date(2026, 10, 31, 12, 34, 56, 0, time.UTC))
+
+	var entries, entriesErr = s.ForwardEntries(t.Context(), bulletin.Number)
+	require.NoError(t, entriesErr)
+	assert.Equal(t, []mail.ForwardEntry{
+		{Msg: bulletin.Number, Partner: "Q3BBS", State: mail.ForwardDone, Attempts: 1, LastTry: tried},
+		{Msg: bulletin.Number, Partner: "Q4BBS", State: mail.ForwardRefused, Attempts: 1, LastTry: tried},
+		{Msg: bulletin.Number, Partner: "Q5BBS", State: mail.ForwardHeld, Attempts: 1, LastTry: tried},
+	}, entries, "by partner")
+
+	var waiting, waitingErr = s.ForwardEntries(t.Context(), personal.Number)
+	require.NoError(t, waitingErr)
+	assert.Equal(t, []mail.ForwardEntry{
+		{Msg: personal.Number, Partner: "Q3BBS", State: mail.ForwardPending, Attempts: 0, LastTry: maybe.Nothing[time.Time]()},
+	}, waiting, "not tried yet")
+
+	var none, noneErr = s.ForwardEntries(t.Context(), 99)
+	require.NoError(t, noneErr)
+	assert.Empty(t, none)
+
+	var totals, totalsErr = s.ForwardTotals(t.Context())
+	require.NoError(t, totalsErr)
+	assert.Equal(t, []mail.PartnerTotals{
+		{Partner: "Q3BBS", Pending: 1, Forwarded: 1, Refused: 0, Held: 0, LastTry: tried},
+		{Partner: "Q4BBS", Pending: 0, Forwarded: 0, Refused: 1, Held: 0, LastTry: tried},
+		{Partner: "Q5BBS", Pending: 0, Forwarded: 0, Refused: 0, Held: 1, LastTry: tried},
+	}, totals, "a killed message isn't counted as waiting")
+}
