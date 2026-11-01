@@ -4,9 +4,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -106,19 +110,84 @@ func everything() mail.ListQuery {
 	return *q
 }
 
-// farEnd is the calling BBS's end of an in-memory session.
+// farEnd is the calling BBS's end of an in-memory session.  Its writes are
+// buffered, as a real link's are: a net.Pipe write waits for the far end to
+// read all of it, so two BBSes each saying something at once - an FBB
+// proposal sent with a SID, met by a refusal - would wait on each other for
+// ever.
 type farEnd struct {
 	net.Conn
 
-	peer transport.Peer
+	peer   transport.Peer
+	writes chan []byte
+	done   chan struct{}
+
+	mu   sync.Mutex
+	sent bytes.Buffer
 }
 
-func (f farEnd) Peer() transport.Peer { return f.peer }
+func newFarEnd(conn net.Conn, peer transport.Peer) *farEnd {
+	var f = new(farEnd)
+
+	f.Conn = conn
+	f.peer = peer
+	f.writes = make(chan []byte, 256)
+	f.done = make(chan struct{})
+
+	go func() {
+		defer close(f.done)
+
+		for b := range f.writes {
+			_, _ = conn.Write(b) // A write after the far end has gone is lost, as on air
+		}
+	}()
+
+	return f
+}
+
+func (f *farEnd) Write(b []byte) (int, error) {
+	f.mu.Lock()
+	f.sent.Write(b)
+	f.mu.Unlock()
+
+	f.writes <- bytes.Clone(b)
+
+	return len(b), nil
+}
+
+func (f *farEnd) Close() error {
+	close(f.writes)
+
+	var err = f.Conn.Close()
+
+	<-f.done
+
+	return err
+}
+
+func (f *farEnd) Peer() transport.Peer { return f.peer }
+
+// said is everything the calling BBS sent.
+func (f *farEnd) said() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.sent.String()
+}
 
 // callWith has caller connect to answerer over an in-memory link, run
 // script, and forward with it as the calling side, until one of them hangs
 // up; it returns what came of the call.
 func callWith(t *testing.T, caller bbs, answerer bbs, steps ...script.Step) error {
+	t.Helper()
+
+	var _, err = callSaid(t, caller, answerer, steps...)
+
+	return err
+}
+
+// callSaid is callWith, also returning everything the caller sent.
+func callSaid(t *testing.T, caller bbs, answerer bbs, steps ...script.Step) (string, error) {
 	t.Helper()
 
 	var ctx, cancel = context.WithTimeout(t.Context(), 10*time.Second)
@@ -141,15 +210,15 @@ func callWith(t *testing.T, caller bbs, answerer bbs, steps ...script.Step) erro
 		},
 	}
 
-	var callerSide = farEnd{Conn: station, peer: transport.Peer{Call: answerer.cfg.Call, Kind: transport.Memory, Authenticated: false}}
+	var callerSide = newFarEnd(station, transport.Peer{Call: answerer.cfg.Call, Kind: transport.Memory, Authenticated: false})
 	var callerDispatcher = newDispatcher(caller.cfg, newMailbox(caller.cfg, caller.store, nil), nil)
 
 	var err = forwardWith(ctx, callerSide, callerDispatcher, newMailbox(caller.cfg, caller.store, nil), caller.cfg, partner)
 
-	require.NoError(t, station.Close())
+	require.NoError(t, callerSide.Close())
 	require.NoError(t, <-served)
 
-	return err
+	return callerSide.said(), err
 }
 
 // call is callWith, for a call that should go well.
@@ -317,4 +386,50 @@ func TestCallTargets(t *testing.T) {
 	var q1 = newBBS(t, "call: Q1BBS\nagw:\n  addr: localhost:8000\npartners:\n  - call: Q2BBS-3\n    connect: {every: 15m}\n  - call: Q3BBS\n")
 
 	assert.Equal(t, []scheduler.Target{{Partner: "Q2BBS", Every: 15 * time.Minute}}, callTargets(q1.cfg))
+}
+
+func TestForwardingManyMessagesInFBB(t *testing.T) {
+	t.Parallel()
+
+	var q1 = newBBS(t, "call: Q1BBS\nfbb: true\npartners:\n  - call: Q2BBS\n    covers: [\"*\"]\n    floods: [\"*\"]\n")
+	var q2 = newBBS(t, "call: Q2BBS\nfbb: true\npartners:\n  - call: Q1BBS\n    covers: [\"*\"]\n    floods: [\"*\"]\n")
+
+	for i := range 7 {
+		q2.send(t, mail.Personal, "Q1TEST@Q1BBS", fmt.Sprintf("Message %d", i+1))
+	}
+
+	q1.send(t, mail.Bulletin, "ALL@GBR", "Back")
+
+	var said, err = callSaid(t, q2, q1)
+
+	require.NoError(t, err)
+	assert.Contains(t, said, "[SAMBBS-0.0-FH$]")
+	assert.Equal(t, 7, strings.Count(said, "FB P "), "in FBB's protocol")
+	assert.Equal(t, 2, strings.Count(said, "F> "), "two proposals: five, then two")
+
+	for i := range 7 {
+		assert.Equal(t, []string{"Q1BBS", "Q2BBS"}, mail.Path(q1.byTitle(t, fmt.Sprintf("Message %d", i+1)).Body))
+	}
+
+	assert.Equal(t, []string{"Q2BBS", "Q1BBS"}, mail.Path(q2.byTitle(t, "Back").Body), "and the other way")
+	assert.Empty(t, q2.queueFor(t, "Q1BBS"))
+	assert.Empty(t, q1.queueFor(t, "Q2BBS"))
+}
+
+func TestFBBNeedsBothSides(t *testing.T) {
+	t.Parallel()
+
+	// Q1BBS would, but Q2BBS, calling it, is left as it comes: MBL/RLI.
+	var q1 = newBBS(t, "call: Q1BBS\nfbb: true\npartners:\n  - call: Q2BBS\n    covers: [\"*\"]\n")
+	var q2 = newBBS(t, "call: Q2BBS\npartners:\n  - call: Q1BBS\n    covers: [\"*\"]\n")
+
+	q2.send(t, mail.Personal, "Q1TEST@Q1BBS", "Plainly")
+
+	var said, err = callSaid(t, q2, q1)
+
+	require.NoError(t, err)
+	assert.Contains(t, said, "[SAMBBS-0.0-H$]", "no F claimed")
+	assert.Contains(t, said, "SP Q1TEST @ Q1BBS < Q9TEST", "so in MBL/RLI style")
+	assert.NotContains(t, said, "FB ")
+	assert.Equal(t, "Plainly", q1.byTitle(t, "Plainly").Title)
 }

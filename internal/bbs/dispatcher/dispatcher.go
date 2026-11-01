@@ -26,7 +26,7 @@ import (
 // Machine is what a session drives: the user shell, or a forwarding
 // exchange.
 type Machine interface {
-	Start() []action.Action
+	Start(ctx context.Context) []action.Action
 	Line(ctx context.Context, line string) []action.Action
 }
 
@@ -100,7 +100,7 @@ func (d *Dispatcher) serve(ctx context.Context, s transport.Session, peer transp
 		return writeErr
 	}
 
-	var _, startErr = perform(s, m.Start())
+	var _, startErr = perform(s, m.Start(ctx))
 	if startErr != nil {
 		return startErr
 	}
@@ -152,7 +152,7 @@ func (d *Dispatcher) forward(ctx context.Context, s transport.Session, reader *l
 // Serve uses it once it knows what the session is; a session this BBS
 // opened is driven with it from the start, reading through reader.
 func (d *Dispatcher) Drive(ctx context.Context, s transport.Session, reader *lines.Reader, m Machine) error {
-	var done, err = perform(s, m.Start())
+	var done, err = perform(s, m.Start(ctx))
 	if err != nil || done {
 		return err
 	}

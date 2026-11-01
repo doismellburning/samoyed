@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A proposal whose checksum doesn't add up is refused, and the session ends;
+# one without a checksum is taken as it is.
+@answering
+> FB P Q2TEST Q1BBS Q1TEST 40_Q2BBS 7
+> F> 00
+< *** Checksum error
+< *** disconnected

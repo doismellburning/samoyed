@@ -24,7 +24,9 @@ import (
 // echo is a shell that answers each line by repeating it, and says bye to BYE.
 type echo struct{ peer transport.Peer }
 
-func (e *echo) Start() []action.Action { return []action.Action{action.Prompt{Text: "de Q1BBS>"}} }
+func (e *echo) Start(context.Context) []action.Action {
+	return []action.Action{action.Prompt{Text: "de Q1BBS>"}}
+}
 
 func (e *echo) Line(_ context.Context, line string) []action.Action {
 	if line == "BYE" {
@@ -132,7 +134,7 @@ func TestASIDIsTurnedAway(t *testing.T) {
 // with, and hangs up when it says *** DONE.
 type forwarding struct{ theirs sid.SID }
 
-func (f *forwarding) Start() []action.Action {
+func (f *forwarding) Start(context.Context) []action.Action {
 	return []action.Action{action.Output{Lines: []string{"forwarding with " + f.theirs.Name}}}
 }
 
@@ -328,7 +330,9 @@ func TestDrive(t *testing.T) {
 		var d = New(testConfig(), func(peer transport.Peer) *echo { return &echo{peer: peer} })
 		var done = make(chan error, 1)
 
-		go func() { done <- d.Drive(t.Context(), s, lines.NewReader(s, 64), &forwarding{theirs: sid.Ours(0, 0)}) }()
+		go func() {
+			done <- d.Drive(t.Context(), s, lines.NewReader(s, 64), &forwarding{theirs: sid.Ours(0, 0, false)})
+		}()
 
 		return station, lines.NewReader(station, 1024), done
 	}

@@ -30,8 +30,7 @@ const (
 	// such as Q1BBS.#77.GBR.EURO.
 	FlagHierarchical = 'H'
 
-	// FlagFBB says the BBS can forward in FBB's batched protocol.  This
-	// one doesn't yet, so doesn't say so.
+	// FlagFBB says the BBS can forward in FBB's batched protocol.
 	FlagFBB = 'F'
 )
 
@@ -78,9 +77,15 @@ func (s SID) String() string {
 }
 
 // Ours is this BBS's system ID, for the given version: hierarchical
-// addresses and BIDs, and forwarding in plain MBL/RLI style.
-func Ours(major, minor int) SID {
-	return SID{Name: "SAMBBS", Version: fmt.Sprintf("%d.%d", major, minor), Flags: string([]rune{FlagHierarchical, FlagBID})}
+// addresses and BIDs, and FBB's protocol if fbb says so, MBL/RLI style
+// forwarding otherwise.
+func Ours(major, minor int, fbb bool) SID {
+	var flags = []rune{FlagHierarchical, FlagBID}
+	if fbb {
+		flags = append([]rune{FlagFBB}, flags...)
+	}
+
+	return SID{Name: "SAMBBS", Version: fmt.Sprintf("%d.%d", major, minor), Flags: string(flags)}
 }
 
 // Mode is what two BBSes that have swapped SIDs agree to do.
@@ -88,9 +93,16 @@ type Mode struct {
 	// BIDs says both use $BIDs, so a message is offered with its own and
 	// refused if the other side has had it.
 	BIDs bool
+
+	// FBB says both forward in FBB's batched protocol, so they do, rather
+	// than in plain MBL/RLI style.
+	FBB bool
 }
 
 // Negotiate is what ours and theirs agree to do: whatever both can.
 func Negotiate(ours, theirs SID) Mode {
-	return Mode{BIDs: ours.Has(FlagBID) && theirs.Has(FlagBID)}
+	return Mode{
+		BIDs: ours.Has(FlagBID) && theirs.Has(FlagBID),
+		FBB:  ours.Has(FlagFBB) && theirs.Has(FlagFBB),
+	}
 }

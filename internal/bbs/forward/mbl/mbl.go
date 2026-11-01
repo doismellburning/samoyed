@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/bbs/action"
+	"github.com/doismellburning/samoyed/internal/bbs/forward"
 	"github.com/doismellburning/samoyed/internal/bbs/forward/sid"
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -105,9 +106,8 @@ const (
 	statePrompt
 	stateRefused
 
-	// Calling, before the exchange begins: the other side's SID and
-	// prompt, then its prompt again once it has ours.
-	stateGreeting
+	// Calling, before the exchange begins: the other side's prompt once it
+	// has this BBS's SID.
 	stateSIDTaken
 )
 
@@ -119,9 +119,6 @@ type Machine struct {
 	store   store
 	cfg     Config
 	state   state
-
-	// heardSID is whether the calling side has had the other's SID.
-	heardSID bool
 
 	// turns is how many turns at sending this side has had.
 	turns int
@@ -147,13 +144,15 @@ func NewAnswering(partner string, theirs sid.SID, st store, cfg Config) *Machine
 	return m
 }
 
-// NewCalling is the session for a partner this BBS has connected to: it waits
-// for the other side's SID and prompt, sends its own, and then sends first.
-func NewCalling(partner string, st store, cfg Config) *Machine {
+// NewCalling is the session for a partner this BBS has connected to, once
+// the partner has sent its SID, theirs, and prompted (see forward.Calling):
+// it sends this BBS's SID, and then sends first.
+func NewCalling(partner string, theirs sid.SID, st store, cfg Config) *Machine {
 	var m = newMachine(partner, st, cfg)
 
 	m.calling = true
-	m.state = stateGreeting
+	m.mode = sid.Negotiate(cfg.SID, theirs)
+	m.state = stateSIDTaken
 
 	return m
 }
@@ -169,10 +168,10 @@ func newMachine(partner string, st store, cfg Config) *Machine {
 }
 
 // Start is what to send when the session begins: for the answering side, its
-// prompt, taking the partner's SID.
-func (m *Machine) Start() []action.Action {
+// prompt, taking the partner's SID; for the calling side, its SID.
+func (m *Machine) Start(context.Context) []action.Action {
 	if m.calling {
-		return nil
+		return []action.Action{action.Output{Lines: []string{m.cfg.SID.String()}}}
 	}
 
 	return []action.Action{m.prompt()}
@@ -181,8 +180,6 @@ func (m *Machine) Start() []action.Action {
 // Line acts on one line from the partner.
 func (m *Machine) Line(ctx context.Context, line string) []action.Action {
 	switch m.state {
-	case stateGreeting:
-		return m.greeting(line)
 	case stateSIDTaken:
 		if isPrompt(line) {
 			return m.startTurn(ctx)
@@ -218,31 +215,6 @@ func (m *Machine) now() time.Time {
 	}
 
 	return time.Now()
-}
-
-// greeting waits, on calling, for the other side's SID and then its prompt,
-// and answers with this BBS's SID.  Something that prompts without a SID
-// isn't a BBS that forwards.
-func (m *Machine) greeting(line string) []action.Action {
-	var theirs, sidErr = sid.Parse(strings.TrimSpace(line))
-	if sidErr == nil {
-		m.mode = sid.Negotiate(m.cfg.SID, theirs)
-		m.heardSID = true
-
-		return nil
-	}
-
-	if !isPrompt(line) {
-		return nil
-	}
-
-	if !m.heardSID {
-		return []action.Action{action.Disconnect{}}
-	}
-
-	m.state = stateSIDTaken
-
-	return []action.Action{action.Output{Lines: []string{m.cfg.SID.String()}}}
 }
 
 // proposal acts on a line while receiving: a message offered, the turn handed
@@ -464,11 +436,9 @@ func isReady(line string) bool {
 	return isPrompt(line) || strings.EqualFold(strings.TrimSpace(line), handOver)
 }
 
-// isPrompt says whether line is a BBS's prompt, which ends in >.
+// isPrompt says whether line is a BBS's prompt.
 func isPrompt(line string) bool {
-	var text = strings.TrimSpace(line)
-
-	return strings.HasSuffix(text, ">") && !strings.EqualFold(text, handOver)
+	return forward.IsPrompt(line)
 }
 
 // baseCall is a callsign without its SSID, upper-cased.

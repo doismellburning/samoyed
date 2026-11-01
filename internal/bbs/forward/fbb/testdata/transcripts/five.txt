@@ -1,0 +1,34 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A proposal offers at most five messages: the sixth waits for the next.
+# Messages deferred (=) are not offered again this session, and messages the
+# partner refuses or rejects are marked so.
+@queued P Q9TEST Q2BBS Q1TEST 10_Q1BBS
+@queued P Q9TEST Q2BBS Q1TEST 11_Q1BBS
+@queued P Q9TEST Q2BBS Q1TEST 12_Q1BBS
+@queued P Q9TEST Q2BBS Q1TEST 13_Q1BBS
+@queued P Q9TEST Q2BBS Q1TEST 14_Q1BBS
+@queued P Q9TEST Q2BBS Q1TEST 15_Q1BBS
+@answering
+> FF
+< FB P Q9TEST Q2BBS Q1TEST 10_Q1BBS 44
+< FB P Q9TEST Q2BBS Q1TEST 11_Q1BBS 44
+< FB P Q9TEST Q2BBS Q1TEST 12_Q1BBS 44
+< FB P Q9TEST Q2BBS Q1TEST 13_Q1BBS 44
+< FB P Q9TEST Q2BBS Q1TEST 14_Q1BBS 44
+< F> BA
+> FS -R=HE
+@check accepted=0 forwarded=0 refused=4 pending=2
+> FF
+< FB P Q9TEST Q2BBS Q1TEST 15_Q1BBS 44
+< F> EF
+> FS +
+< Title 6
+< R:261031/1200Z @:Q1BBS.#77.GBR.EURO
+< Body 6.
+< ^Z
+> FF
+< FQ
+< *** disconnected
+@check accepted=0 forwarded=1 refused=4 pending=1

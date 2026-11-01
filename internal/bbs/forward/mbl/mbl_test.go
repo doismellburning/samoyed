@@ -170,7 +170,7 @@ func (s *fakeStore) tally() string {
 }
 
 func testConfig() Config {
-	return Config{Call: "Q1BBS-1", HRoute: maybe.Just("#77.GBR.EURO"), Prompt: "de Q1BBS>", SID: sid.Ours(0, 0), Now: testTime}
+	return Config{Call: "Q1BBS-1", HRoute: maybe.Just("#77.GBR.EURO"), Prompt: "de Q1BBS>", SID: sid.Ours(0, 0, false), Now: testTime}
 }
 
 // render turns actions into the lines a transcript expects: output as it is,
@@ -202,7 +202,8 @@ func render(actions []action.Action) []string {
 //	@broken            makes the store fail from here on
 //	@answering SID     starts the session for a partner that has connected
 //	                   and sent SID
-//	@calling           starts the session for a partner this BBS called
+//	@calling SID       starts the session for a partner this BBS called,
+//	                   once it has greeted this side with SID and a prompt
 //	@check TALLY       checks the store's tally (see fakeStore.tally)
 //
 // Blank lines and lines starting # are ignored.
@@ -242,10 +243,13 @@ func runTranscript(t *testing.T, file string) {
 			require.NoError(t, err)
 
 			m = NewAnswering("Q2BBS-1", theirs, st, testConfig())
-			got = append(got, render(m.Start())...)
+			got = append(got, render(m.Start(t.Context()))...)
 		case directive == "@calling":
-			m = NewCalling("Q2BBS-1", st, testConfig())
-			got = append(got, render(m.Start())...)
+			var theirs, err = sid.Parse(arg)
+			require.NoError(t, err)
+
+			m = NewCalling("Q2BBS-1", theirs, st, testConfig())
+			got = append(got, render(m.Start(t.Context()))...)
 		case directive == "@check":
 			assert.Equal(t, strings.Join(want, "\n"), strings.Join(got, "\n"), "before %s", line)
 			assert.Equal(t, arg, st.tally(), line)
@@ -288,7 +292,7 @@ func TestReceivedMessagesAreStampedAndAttributed(t *testing.T) {
 	var theirs, _ = sid.Parse("[FBB-7.0-ABFHM$]")
 	var m = NewAnswering("q2bbs-1", theirs, st, testConfig())
 
-	m.Start()
+	m.Start(t.Context())
 
 	for _, line := range []string{"SB ALL @ GBR < Q9TEST $77_Q3BBS", "News", "R:261031/0800Z @:Q3BBS.GBR.EURO", "Hello.", "/EX"} {
 		m.Line(t.Context(), line)
@@ -311,7 +315,7 @@ func TestLongTitlesAreCut(t *testing.T) {
 	t.Parallel()
 
 	var st = newFakeStore()
-	var m = NewAnswering("Q2BBS", sid.Ours(0, 0), st, testConfig())
+	var m = NewAnswering("Q2BBS", sid.Ours(0, 0, false), st, testConfig())
 
 	m.Line(t.Context(), "SP Q1TEST < Q9TEST")
 	m.Line(t.Context(), strings.Repeat("x", 100))
@@ -334,12 +338,12 @@ func FuzzMachine(f *testing.F) {
 
 		var m *Machine
 		if answering {
-			m = NewAnswering("Q2BBS", sid.Ours(0, 0), st, testConfig())
+			m = NewAnswering("Q2BBS", sid.Ours(0, 0, false), st, testConfig())
 		} else {
-			m = NewCalling("Q2BBS", st, testConfig())
+			m = NewCalling("Q2BBS", sid.Ours(0, 0, false), st, testConfig())
 		}
 
-		m.Start()
+		m.Start(t.Context())
 
 		for line := range strings.SplitSeq(input, "\n") {
 			for _, a := range m.Line(t.Context(), line) {

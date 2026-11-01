@@ -3,9 +3,7 @@
 
 # A partner that hands the turn back after its own: this side has had its
 # second turn, so ends the exchange rather than handing over again.
-@calling
-> [FBB-7.0-ABFHM$]
-> Q2BBS>
+@calling [FBB-7.0-ABFHM$]
 < [SAMBBS-0.0-H$]
 > Q2BBS>
 < F>

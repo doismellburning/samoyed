@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Calling a partner, as in FBB's documentation: this side's SID and first
+# proposal straight away; the partner wants the first and third messages and
+# sends its own proposal, which says it had them; this side, with nothing
+# more, says FF, and the partner, with nothing either, FQ.
+@queued P Q9TEST Q2BBS.#12.GBR.EURO Q1TEST 5_Q1BBS
+@queued P Q8TEST Q2BBS Q7TEST 6_Q1BBS
+@queued B Q9TEST GBR ALL 7_Q1BBS
+@calling
+< [SAMBBS-0.0-FH$]
+< FB P Q9TEST Q2BBS.#12.GBR.EURO Q1TEST 5_Q1BBS 44
+< FB P Q8TEST Q2BBS Q7TEST 6_Q1BBS 44
+< FB B Q9TEST GBR ALL 7_Q1BBS 44
+< F> A8
+> FS +-+
+< Title 1
+< R:261031/1200Z @:Q1BBS.#77.GBR.EURO
+< Body 1.
+< ^Z
+< Title 3
+< R:261031/1200Z @:Q1BBS.#77.GBR.EURO
+< Body 3.
+< ^Z
+@check accepted=0 forwarded=0 refused=1 pending=2
+> FB P Q2TEST Q1BBS Q1TEST 40_Q2BBS 7
+> F> 29
+< FS +
+@check accepted=0 forwarded=2 refused=1 pending=0
+> Back to you
+> Hi.^Z
+< FF
+> FQ
+< *** disconnected
+@check accepted=1 forwarded=2 refused=1 pending=0

@@ -20,6 +20,8 @@ import (
 	"github.com/doismellburning/samoyed/internal/agwclient"
 	"github.com/doismellburning/samoyed/internal/bbs/config"
 	"github.com/doismellburning/samoyed/internal/bbs/dispatcher"
+	"github.com/doismellburning/samoyed/internal/bbs/forward"
+	"github.com/doismellburning/samoyed/internal/bbs/forward/fbb"
 	"github.com/doismellburning/samoyed/internal/bbs/forward/mbl"
 	"github.com/doismellburning/samoyed/internal/bbs/forward/sid"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
@@ -276,19 +278,50 @@ func forwardConfig(cfg config.Config) mbl.Config {
 		prompt += ">"
 	}
 
-	return mbl.Config{Call: cfg.Call, HRoute: cfg.HRouteMaybe(), Prompt: prompt, SID: sid.Ours(version.Major, version.Minor), Now: nil}
+	return mbl.Config{Call: cfg.Call, HRoute: cfg.HRouteMaybe(), Prompt: prompt, SID: ourSID(cfg), Now: nil}
+}
+
+// fbbConfig is how this BBS forwards in FBB's protocol.
+func fbbConfig(cfg config.Config) fbb.Config {
+	return fbb.Config{Call: cfg.Call, HRoute: cfg.HRouteMaybe(), SID: ourSID(cfg), Now: nil}
+}
+
+// ourSID is this BBS's system ID, which claims FBB's protocol unless the
+// configuration says not to.
+func ourSID(cfg config.Config) sid.SID {
+	return sid.Ours(version.Major, version.Minor, cfg.UseFBB())
+}
+
+// forwarder is the machine to forward with partner, who sent theirs: in
+// FBB's protocol if both sides can, otherwise in MBL/RLI style.
+func forwarder(cfg config.Config, mailbox routedStore, partner string, theirs sid.SID, calling bool) forward.Machine { //nolint:ireturn // choosing between them is the point
+	var useFBB = sid.Negotiate(ourSID(cfg), theirs).FBB
+
+	logrus.WithFields(logrus.Fields{"partner": partner, "theirs": theirs.String(), "fbb": useFBB}).Info("Forwarding protocol chosen")
+
+	if useFBB {
+		if calling {
+			return fbb.NewCalling(partner, mailbox, fbbConfig(cfg))
+		}
+
+		return fbb.NewAnswering(partner, mailbox, fbbConfig(cfg))
+	}
+
+	if calling {
+		return mbl.NewCalling(partner, theirs, mailbox, forwardConfig(cfg))
+	}
+
+	return mbl.NewAnswering(partner, theirs, mailbox, forwardConfig(cfg))
 }
 
 // newDispatcher makes the dispatcher every session is run by: a user gets a
 // shell of their own over mailbox, and a partner that opens with its SID an
 // exchange of mail, unless busy says it is in one already.
 func newDispatcher(cfg config.Config, mailbox routedStore, busy *dispatcher.Busy) *dispatcher.Dispatcher {
-	var fcfg = forwardConfig(cfg)
-
 	var dcfg = new(dispatcher.Config)
 
 	dcfg.Banner = cfg.BannerLines()
-	dcfg.SID = fcfg.SID.String()
+	dcfg.SID = ourSID(cfg).String()
 	dcfg.IdleTimeout = cfg.IdleTimeout
 	dcfg.MaxLineLen = lines.DefaultMaxLen
 	dcfg.Busy = busy
@@ -299,7 +332,7 @@ func newDispatcher(cfg config.Config, mailbox routedStore, busy *dispatcher.Busy
 			return maybe.Nothing[dispatcher.Machine]()
 		}
 
-		return maybe.Just[dispatcher.Machine](mbl.NewAnswering(peer.Call, theirs, mailbox, fcfg))
+		return maybe.Just[dispatcher.Machine](forwarder(cfg, mailbox, peer.Call, theirs, false))
 	}
 
 	var scfg = shell.Config{Call: cfg.Call, Prompt: cfg.Prompt, HRoute: cfg.HRouteMaybe(), Now: nil}

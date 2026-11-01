@@ -200,6 +200,7 @@ done
 
 cat > samoyed-bbs.yaml << EOF
 call: Q2BBS
+fbb: true
 store: $PWD/bbs.db
 agw:
   addr: 127.0.0.1:$agw_b
@@ -209,9 +210,11 @@ partners:
     covers: ["*"]
 EOF
 
-# Q3BBS, on A, calls Q2BBS whenever it has mail for it.
+# Q3BBS, on A, calls Q2BBS whenever it has mail for it, both forwarding in
+# FBB's protocol.
 cat > samoyed-bbs3.yaml << EOF
 call: Q3BBS
+fbb: true
 store: $PWD/bbs3.db
 agw:
   addr: 127.0.0.1:$agw_a
@@ -272,8 +275,14 @@ printf 'SP Q1TEST@Q2BBS\nCalled in\nForwarded over the air.\n/EX\nB\n' |
 pids+=("$!")
 
 wait_for_log_line bbs3.log "Calling partner"
+wait_for_log_line bbs3.log "Forwarded with partner"
 wait_for_log_line bbs.log "Forwarding mail"
 wait_for_log_line bbs.log "End session" 3
+
+if ! grep -q 'msg="Forwarding protocol chosen" fbb=true' bbs.log; then
+	echo "FAIL: Q2BBS didn't forward in FBB's protocol with Q3BBS" >&2
+	exit 1
+fi
 
 python3 -I - "$PWD/bbs.db" "$PWD/bbs3.db" << 'EOF'
 import sqlite3
@@ -288,4 +297,4 @@ if states != ["forwarded"]:
     sys.exit(f"FAIL: Q3BBS's queue for Q2BBS is {states}, not forwarded")
 EOF
 
-echo "PASS: samoyed-bbs took and gave back a $body_bytes byte message over the air, was still there after its TNC restarted, and took mail from a partner that called it"
+echo "PASS: samoyed-bbs took and gave back a $body_bytes byte message over the air, was still there after its TNC restarted, and took mail from a partner that called it in FBB's protocol"

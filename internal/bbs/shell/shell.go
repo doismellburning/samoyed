@@ -96,7 +96,7 @@ func New(peer transport.Peer, box mailbox, cfg Config) *Machine {
 }
 
 // Start is what to send when the session begins.
-func (m *Machine) Start() []Action {
+func (m *Machine) Start(context.Context) []Action {
 	return []Action{m.prompt()}
 }
 

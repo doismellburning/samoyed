@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# An FB line without every field is an error, and the session ends.
+@answering
+> FB P Q2TEST Q1BBS Q1TEST 40_Q2BBS
+< *** Error: bad FB line: "FB P Q2TEST Q1BBS Q1TEST 40_Q2BBS" is not FB and six fields
+< *** disconnected
