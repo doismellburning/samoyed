@@ -14,7 +14,7 @@
 < de Q1BBS>
 > L
 < Msg#  TS Size  To     @BBS     From      Date   Title
-< 1     PN    13 Q1TEST          Q2TEST    31-Oct Hello
+< 1     PN    49 Q1TEST          Q2TEST    31-Oct Hello
 < de Q1BBS>
 > R 1
 < Msg #1  P  ID 1_Q1BBS
@@ -22,6 +22,20 @@
 < To:    Q1TEST
 < Date:  31-Oct-26 12:34Z
 < Title: Hello
+< Path:  Q1BBS
+<
+< Hello there.
+<
+< de Q1BBS>
+
+# RH shows the R: line in full: when, and where.
+> RH 1
+< Msg #1  P  ID 1_Q1BBS
+< From:  Q2TEST
+< To:    Q1TEST
+< Date:  31-Oct-26 12:34Z
+< Title: Hello
+< R:261031/1234Z @:Q1BBS.#77.GBR.EURO
 <
 < Hello there.
 <

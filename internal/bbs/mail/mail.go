@@ -110,9 +110,11 @@ type Address struct {
 	At maybe.Maybe[string]
 }
 
-// ParseAddress reads an address such as "Q1TEST", "Q1TEST@Q1BBS" or
-// "ALL@GBR".  It is upper-cased, and checked only for its length and the
-// characters in it.
+// ParseAddress reads an address such as "Q1TEST", "Q1TEST@Q1BBS",
+// "Q1TEST@Q1BBS.#77.GBR.EURO" or "ALL@GBR".  It is upper-cased.  After the @
+// is a hierarchical address: dot-separated elements, most specific first,
+// each letters, digits, hyphens and underscores, with a # allowed at the
+// start of one, as regions are written.
 func ParseAddress(s string) (Address, error) {
 	var to, at, hasAt = strings.Cut(strings.ToUpper(strings.TrimSpace(s)), "@")
 
@@ -125,8 +127,8 @@ func ParseAddress(s string) (Address, error) {
 	address.To = to
 
 	if hasAt {
-		if at == "" || len(at) > MaxAtLen || !onlyChars(at, ".#-_") {
-			return Address{}, fmt.Errorf("%w: %q after the @ is not a BBS or area of up to %d characters", ErrBadAddress, at, MaxAtLen)
+		if len(at) > MaxAtLen || !ValidHRoute(at) {
+			return Address{}, fmt.Errorf("%w: %q after the @ is not a hierarchical address of up to %d characters", ErrBadAddress, at, MaxAtLen)
 		}
 
 		address.At = maybe.Just(at)

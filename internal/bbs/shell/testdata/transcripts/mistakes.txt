@@ -13,7 +13,7 @@
 < LM         List messages to you.
 < LB, LP     List bulletins, or personal messages.
 < L< call    List messages from call.  L> call: to call.
-< R n        Read message n.  R n m ... reads several.
+< R n        Read message n.  R n m ... reads several; RH n shows headers.
 < S call     Send a personal message (SP too); SB area for a bulletin,
 <            ST for NTS traffic.  Add @bbs for one elsewhere, $bid for an ID.
 < K n        Kill message n.

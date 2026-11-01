@@ -27,7 +27,7 @@
 < de Q1BBS>
 > L
 < Msg#  TS Size  To     @BBS     From      Date   Title
-< 2     BN    14 ALL    WW       Q2TEST    31-Oct News
+< 2     BN    50 ALL    WW       Q2TEST    31-Oct News
 < de Q1BBS>
 > R 1
 < No message 1.
@@ -43,7 +43,7 @@
 < de Q1BBS>
 > LM
 < Msg#  TS Size  To     @BBS     From      Date   Title
-< 1     PN    17 Q1TEST          Q2TEST    31-Oct Private
+< 1     PN    53 Q1TEST          Q2TEST    31-Oct Private
 < de Q1BBS>
 > R 1
 < Msg #1  P  ID 1_Q1BBS
@@ -51,13 +51,14 @@
 < To:    Q1TEST
 < Date:  31-Oct-26 12:34Z
 < Title: Private
+< Path:  Q1BBS
 <
 < For Q1TEST only.
 <
 < de Q1BBS>
 > LM
 < Msg#  TS Size  To     @BBS     From      Date   Title
-< 1     PY    17 Q1TEST          Q2TEST    31-Oct Private
+< 1     PY    53 Q1TEST          Q2TEST    31-Oct Private
 < de Q1BBS>
 > K 1
 < Message 1 killed.
@@ -71,7 +72,7 @@
 < de Q1BBS>
 > L> ALL
 < Msg#  TS Size  To     @BBS     From      Date   Title
-< 2     BN    14 ALL    WW       Q2TEST    31-Oct News
+< 2     BN    50 ALL    WW       Q2TEST    31-Oct News
 < de Q1BBS>
 > K 2
 < Message 2 killed.
