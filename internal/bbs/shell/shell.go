@@ -396,7 +396,7 @@ func (m *Machine) bodyLine(ctx context.Context, line string) []Action {
 		body.WriteString(l + "\r")
 	}
 
-	d.message.Body = mail.PrependRLine([]byte(body.String()), m.rline())
+	d.message.Body = mail.Stamp([]byte(body.String()), m.cfg.Call, m.cfg.HRoute, m.now())
 
 	var stored, err = m.box.Accept(ctx, d.message, m.cfg.Call)
 	if errors.Is(err, mail.ErrDuplicateBID) {
@@ -461,19 +461,11 @@ func (m *Machine) killOne(ctx context.Context, field string) string {
 	return fmt.Sprintf("Message %d killed.", n)
 }
 
-// rline is the R: line for a message taken now.
-func (m *Machine) rline() mail.RLine {
-	var now = time.Now
-
+// now is the time, for R: lines.
+func (m *Machine) now() time.Time {
 	if m.cfg.Now != nil {
-		now = m.cfg.Now
+		return m.cfg.Now()
 	}
 
-	var r = new(mail.RLine)
-
-	r.When = now().UTC()
-	r.BBS = baseCall(m.cfg.Call)
-	r.HRoute = m.cfg.HRoute
-
-	return *r
+	return time.Now()
 }

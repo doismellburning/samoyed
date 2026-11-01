@@ -173,3 +173,17 @@ func FuzzParseRLine(f *testing.F) {
 		}
 	})
 }
+
+func TestStamp(t *testing.T) {
+	t.Parallel()
+
+	var when = time.Date(2026, 11, 1, 9, 5, 0, 0, time.FixedZone("CET", 3600))
+	var earlier = []byte("R:261031/1200Z @:Q2BBS.GBR.EURO\rHi.\r")
+
+	var stamped = Stamp(earlier, "q1bbs-3", maybe.Just("#77.GBR.EURO"), when)
+
+	assert.Equal(t, "R:261101/0805Z @:Q1BBS.#77.GBR.EURO\rR:261031/1200Z @:Q2BBS.GBR.EURO\rHi.\r", string(stamped))
+	assert.Equal(t, []string{"Q1BBS", "Q2BBS"}, Path(stamped))
+
+	assert.Equal(t, "R:261101/0805Z @:Q1BBS\r", string(Stamp(nil, "Q1BBS", maybe.Nothing[string](), when)))
+}

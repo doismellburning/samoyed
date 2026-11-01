@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# With a partner that doesn't use BIDs, messages are offered without them.
+@queued SP Q1TEST @ Q2BBS < Q9TEST $5_Q1BBS
+@answering [OLD-1.0-H]
+< de Q1BBS>
+> F>
+< SP Q1TEST @ Q2BBS < Q9TEST
+> NO
+< *** DONE
+< *** disconnected

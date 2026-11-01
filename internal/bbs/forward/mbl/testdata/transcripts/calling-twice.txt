@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A partner that hands the turn back after its own: this side has had its
+# second turn, so ends the exchange rather than handing over again.
+@calling
+> [FBB-7.0-ABFHM$]
+> Q2BBS>
+< [SAMBBS-0.0-H$]
+> Q2BBS>
+< F>
+> F>
+< *** DONE
+< *** disconnected

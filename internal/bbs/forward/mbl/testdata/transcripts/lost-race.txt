@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A message whose ID arrives from elsewhere while it is being sent has been
+# taken already, so is prompted for as if it had been taken now.
+@answering [FBB-7.0-ABFHM$]
+< de Q1BBS>
+> SP Q1TEST < Q9TEST $12_Q2BBS
+< OK
+> Hello
+@seen 12_Q2BBS
+> /EX
+< de Q1BBS>
+@check accepted=0 forwarded=0 refused=0 pending=0

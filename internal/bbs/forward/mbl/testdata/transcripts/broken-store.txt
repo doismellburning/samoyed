@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A message that can't be stored isn't prompted for, which would tell the
+# partner it was taken: the session is ended instead, leaving it queued there.
+@answering [FBB-7.0-ABFHM$]
+< de Q1BBS>
+> SP Q1TEST < Q9TEST $12_Q2BBS
+< OK
+> Hello
+@broken
+> /EX
+< *** Error: the message couldn't be stored
+< *** disconnected
