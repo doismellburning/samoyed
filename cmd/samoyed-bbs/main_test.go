@@ -17,6 +17,7 @@ import (
 
 	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/agwpe"
+	"github.com/doismellburning/samoyed/internal/bbs/store/sqlite"
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -243,4 +244,31 @@ func TestServingOverAGW(t *testing.T) {
 
 	p.Signal(t, syscall.SIGTERM)
 	assert.Equal(t, 0, p.Wait())
+}
+
+// A user's message for another BBS is queued for the partner that covers it,
+// or held if none does.
+func TestRoutingWhatUsersSend(t *testing.T) {
+	t.Parallel()
+
+	var dir = t.TempDir()
+	var file = filepath.Join(dir, "samoyed-bbs.yaml")
+	var db = filepath.Join(dir, "bbs.db")
+
+	require.NoError(t, os.WriteFile(file, []byte("call: Q1BBS\nstore: "+db+"\npartners:\n  - call: Q3BBS\n    covers: [GBR.EURO]\n"), 0o600))
+
+	var result = testutils.RunMain(t, "SP Q1TEST@Q6BBS.GBR.EURO\nNear\nHi.\n/EX\nSP Q1TEST@Q6BBS.USA.NOAM\nFar\nHi.\n/EX\nB\n", "-c", file, "--console", "Q2TEST")
+
+	assert.Equal(t, 0, result.Status, result.Output())
+	assert.Contains(t, result.Output(), "Message 1 saved, ID 1_Q1BBS.\nde Q1BBS>")
+	assert.Contains(t, result.Output(), "Message 2 saved, ID 2_Q1BBS.\nIt is held for the sysop")
+
+	var store, err = sqlite.Open(t.Context(), db)
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = store.Close() })
+
+	var queue, queueErr = store.QueueFor(t.Context(), "Q3BBS")
+	require.NoError(t, queueErr)
+	assert.Equal(t, []int{1}, queue)
 }

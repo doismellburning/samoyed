@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/bbs/routing"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -192,4 +193,58 @@ agw:
 
 	var _, negativeErr = ParseWithEnv([]byte("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\n  highWater: -1\n"), env(nil))
 	require.Error(t, negativeErr)
+}
+
+func TestParsePartners(t *testing.T) {
+	t.Parallel()
+
+	var cfg, err = Parse([]byte(`
+call: Q1BBS-1
+store: bbs.db
+partners:
+  - call: q2bbs
+    covers: ["#77.gbr.euro"]
+    floods: [gbr]
+  - call: Q3BBS-2
+    covers: ["*"]
+    floods: ["*"]
+`))
+	require.NoError(t, err)
+
+	assert.Equal(t, routing.Self{Call: "Q1BBS"}, cfg.RoutingSelf())
+	assert.Equal(t, []routing.Partner{
+		{Call: "Q2BBS", Covers: []string{"#77.GBR.EURO"}, Floods: []string{"GBR"}},
+		{Call: "Q3BBS", Covers: []string{"*"}, Floods: []string{"*"}},
+	}, cfg.RoutingPartners())
+
+	var none, noneErr = Parse([]byte("call: Q1BBS\nstore: bbs.db\n"))
+	require.NoError(t, noneErr)
+	assert.Empty(t, none.RoutingPartners())
+}
+
+func TestParsePartnerProblems(t *testing.T) {
+	t.Parallel()
+
+	var _, err = Parse([]byte(`
+call: Q1BBS
+store: bbs.db
+partners:
+  - call: not a call
+  - call: Q1BBS-2
+  - call: Q2BBS
+    covers: ["GBR..EURO"]
+    floods: ["G R"]
+  - call: Q2BBS-1
+`))
+	require.Error(t, err)
+
+	for _, want := range []string{
+		`partners[0].call: "not a call" is not a callsign`,
+		"partners[1].call: Q1BBS-2 is this BBS",
+		`partners[2].covers: "GBR..EURO" is not a hierarchical address`,
+		`partners[2].floods: "G R" is not a distribution`,
+		"partners[3].call: Q2BBS-1 is already a partner",
+	} {
+		assert.Contains(t, err.Error(), want)
+	}
 }

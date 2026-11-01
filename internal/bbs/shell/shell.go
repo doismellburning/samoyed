@@ -410,7 +410,13 @@ func (m *Machine) bodyLine(ctx context.Context, line string) []Action {
 		return m.say("Sorry, the message couldn't be saved: " + err.Error())
 	}
 
-	return m.say(fmt.Sprintf("Message %d saved, ID %s.", stored.Number, stored.MID))
+	var saved = fmt.Sprintf("Message %d saved, ID %s.", stored.Number, stored.MID)
+
+	if stored.Status == mail.Held {
+		return m.say(saved, "It is held for the sysop: this BBS doesn't know where to send it on to.")
+	}
+
+	return m.say(saved)
 }
 
 // kill kills each message numbered in args that the user may kill: their own,
