@@ -26,7 +26,8 @@ goto_tmpdir
 # check-udp-audio-connect, with samoyed-bbs attached to B as Q2BBS.  A station
 # on A connects over the air, sends a long message and reads it back, then
 # hangs up.  B's TNC is then restarted, and the station comes back to find the
-# message still there once the BBS has reattached.
+# message still there once the BBS has reattached.  Last, a second BBS, Q3BBS,
+# attached to A, calls Q2BBS over the air to forward it a message.
 
 pids=()
 tnc_b_pid=
@@ -38,7 +39,7 @@ cleanup() {
 	if ((status != 0)); then
 		echo "--- FAILURE: dumping logs from $PWD for diagnosis ---" >&2
 
-		for log in direwolf-a.log direwolf-b.log bbs.log station.log station-again.log; do
+		for log in direwolf-a.log direwolf-b.log bbs.log station.log station-again.log bbs3.log; do
 			echo "--- $log ---" >&2
 			cat "$log" >&2 2> /dev/null || echo "(missing)" >&2
 		done
@@ -203,6 +204,23 @@ store: $PWD/bbs.db
 agw:
   addr: 127.0.0.1:$agw_b
   paclen: 256
+partners:
+  - call: Q3BBS
+    covers: ["*"]
+EOF
+
+# Q3BBS, on A, calls Q2BBS whenever it has mail for it.
+cat > samoyed-bbs3.yaml << EOF
+call: Q3BBS
+store: $PWD/bbs3.db
+agw:
+  addr: 127.0.0.1:$agw_a
+  paclen: 256
+partners:
+  - call: Q2BBS
+    covers: ["*"]
+    connect:
+      port: 0
 EOF
 
 # --- start the TNCs and the BBS --------------------------------------------
@@ -245,4 +263,29 @@ if ! python3 -I station.py "$agw_a" list 0 > station-again.log 2>&1; then
 	exit 1
 fi
 
-echo "PASS: samoyed-bbs took and gave back a $body_bytes byte message over the air, and was still there after its TNC restarted"
+# --- a partner calls in -----------------------------------------------------
+
+printf 'SP Q1TEST@Q2BBS\nCalled in\nForwarded over the air.\n/EX\nB\n' |
+	"$BBS" -c samoyed-bbs3.yaml --console Q9TEST > bbs3-console.log 2>&1
+
+"$BBS" -c samoyed-bbs3.yaml -v > bbs3.log 2>&1 &
+pids+=("$!")
+
+wait_for_log_line bbs3.log "Calling partner"
+wait_for_log_line bbs.log "Forwarding mail"
+wait_for_log_line bbs.log "End session" 3
+
+python3 -I - "$PWD/bbs.db" "$PWD/bbs3.db" << 'EOF'
+import sqlite3
+import sys
+
+titles = [row[0] for row in sqlite3.connect(sys.argv[1]).execute("SELECT title FROM messages")]
+if "Called in" not in titles:
+    sys.exit(f"FAIL: Q2BBS doesn't have Q3BBS's message, only {titles}")
+
+states = [row[0] for row in sqlite3.connect(sys.argv[2]).execute("SELECT state FROM forward_queue")]
+if states != ["forwarded"]:
+    sys.exit(f"FAIL: Q3BBS's queue for Q2BBS is {states}, not forwarded")
+EOF
+
+echo "PASS: samoyed-bbs took and gave back a $body_bytes byte message over the air, was still there after its TNC restarted, and took mail from a partner that called it"

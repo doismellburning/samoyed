@@ -25,6 +25,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
 	"github.com/doismellburning/samoyed/internal/bbs/routing"
+	"github.com/doismellburning/samoyed/internal/bbs/scheduler"
 	"github.com/doismellburning/samoyed/internal/bbs/shell"
 	"github.com/doismellburning/samoyed/internal/bbs/store/sqlite"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
@@ -149,7 +150,7 @@ func serveConsole(ctx context.Context, cfg config.Config, session transport.Sess
 
 	defer func() { _ = store.Close() }()
 
-	return newDispatcher(cfg, store).Serve(ctx, session)
+	return newDispatcher(cfg, newMailbox(cfg, store, nil), nil).Serve(ctx, session)
 }
 
 // serveAGW serves each station that connects through the AGW server, each
@@ -164,7 +165,23 @@ func serveAGW(ctx context.Context, cfg config.Config, agwCfg agwclient.Config) e
 
 	var client = agwclient.New(agwCfg)
 	var listener = agwt.NewListener(client.Accept, agwt.DefaultDrainTimeout)
-	var d = newDispatcher(cfg, store)
+	var busy = new(dispatcher.Busy)
+
+	// The scheduler is kicked when mail is queued, so the mailbox needs it,
+	// and it calls through a dispatcher over that mailbox: a cycle, broken
+	// by handing the mailbox a kick that reaches the scheduler once it has
+	// been made, before anything runs.
+	var sched *scheduler.Scheduler
+
+	var mailbox = newMailbox(cfg, store, func(partner string) { sched.Kick(partner) })
+	var d = newDispatcher(cfg, mailbox, busy)
+
+	sched = scheduler.New(callTargets(cfg), store, busy, scheduler.Config{
+		Call:        newCaller(cfg, client, d, mailbox).call,
+		MaxAttempts: 0,
+		MinBackoff:  0,
+		After:       nil,
+	})
 
 	logrus.WithFields(logrus.Fields{"call": cfg.Call, "addr": agwCfg.Addr}).Info("Serving stations over AGW")
 
@@ -172,6 +189,7 @@ func serveAGW(ctx context.Context, cfg config.Config, agwCfg agwclient.Config) e
 
 	group.Go(func() error { return client.Run(groupCtx) })
 	group.Go(func() error { return acceptSessions(groupCtx, listener, d) })
+	group.Go(func() error { return runScheduler(groupCtx, client.Ready(), sched) })
 
 	return group.Wait()
 }
@@ -205,17 +223,36 @@ type routedStore struct {
 	call     string
 	self     routing.Self
 	partners []routing.Partner
+
+	// kick, if given, is told of each partner a message is queued for.
+	kick func(partner string)
 }
 
 // Accept routes m, which a user sent, and stores it.
 func (r routedStore) Accept(ctx context.Context, m mail.NewMessage, bbsCall string) (mail.Message, error) {
-	return r.AcceptRouted(ctx, m, bbsCall, routing.Route(m, maybe.Nothing[string](), r.self, r.partners))
+	return r.accept(ctx, m, bbsCall, routing.Route(m, maybe.Nothing[string](), r.self, r.partners))
 }
 
 // AcceptForwarded routes m, which the partner from sent, and stores it.  It is
 // never routed back to from.
 func (r routedStore) AcceptForwarded(ctx context.Context, m mail.NewMessage, from string) (mail.Message, error) {
-	return r.AcceptRouted(ctx, m, r.call, routing.Route(m, maybe.Just(from), r.self, r.partners))
+	return r.accept(ctx, m, r.call, routing.Route(m, maybe.Just(from), r.self, r.partners))
+}
+
+// accept stores m as route says, and kicks the partners it is queued for.
+func (r routedStore) accept(ctx context.Context, m mail.NewMessage, bbsCall string, route routing.Decision) (mail.Message, error) {
+	var stored, err = r.AcceptRouted(ctx, m, bbsCall, route)
+	if err != nil {
+		return stored, err
+	}
+
+	if r.kick != nil && route.Held.IsNothing() {
+		for _, partner := range route.Partners {
+			r.kick(partner)
+		}
+	}
+
+	return stored, nil
 }
 
 // isPartner says whether call, with or without an SSID, is a partner's.
@@ -225,8 +262,10 @@ func (r routedStore) isPartner(call string) bool {
 	return slices.ContainsFunc(r.partners, func(p routing.Partner) bool { return p.Call == base })
 }
 
-func newMailbox(cfg config.Config, store *sqlite.Store) routedStore {
-	return routedStore{Store: store, call: cfg.Call, self: cfg.RoutingSelf(), partners: cfg.RoutingPartners()}
+// newMailbox is store with routing in front of it, kicking whatever kick is
+// handed - the scheduler - when mail is queued.
+func newMailbox(cfg config.Config, store *sqlite.Store, kick func(partner string)) routedStore {
+	return routedStore{Store: store, call: cfg.Call, self: cfg.RoutingSelf(), partners: cfg.RoutingPartners(), kick: kick}
 }
 
 // forwardConfig is how this BBS forwards mail with its partners.  Its prompt
@@ -241,10 +280,9 @@ func forwardConfig(cfg config.Config) mbl.Config {
 }
 
 // newDispatcher makes the dispatcher every session is run by: a user gets a
-// shell of their own over store, routing what they send, and a partner that
-// opens with its SID an exchange of mail.
-func newDispatcher(cfg config.Config, store *sqlite.Store) *dispatcher.Dispatcher {
-	var mailbox = newMailbox(cfg, store)
+// shell of their own over mailbox, and a partner that opens with its SID an
+// exchange of mail, unless busy says it is in one already.
+func newDispatcher(cfg config.Config, mailbox routedStore, busy *dispatcher.Busy) *dispatcher.Dispatcher {
 	var fcfg = forwardConfig(cfg)
 
 	var dcfg = new(dispatcher.Config)
@@ -253,6 +291,7 @@ func newDispatcher(cfg config.Config, store *sqlite.Store) *dispatcher.Dispatche
 	dcfg.SID = fcfg.SID.String()
 	dcfg.IdleTimeout = cfg.IdleTimeout
 	dcfg.MaxLineLen = lines.DefaultMaxLen
+	dcfg.Busy = busy
 
 	// The console is the sysop, not a BBS.
 	dcfg.Forwarder = func(peer transport.Peer, theirs sid.SID) maybe.Maybe[dispatcher.Machine] {

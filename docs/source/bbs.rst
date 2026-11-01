@@ -13,7 +13,7 @@ BBS
     Expect missing features, and changes - to its configuration, to what it sends other BBSes,
     and to its message database - without notice,
     and don't rely on it for mail that matters.
-    In particular, it forwards mail only with partners that connect to it, and not yet in FBB's batched protocol,
+    In particular, it doesn't forward in FBB's batched protocol yet, nor reach partners over TCP,
     and its forwarding has been tried against LinBPQ alone, not yet FBB or XRouter (see below).
     It says so when it starts, in ``--help``, and in the banner it greets stations with.
 
@@ -175,6 +175,37 @@ Configuration
         such as ``GBR`` or ``WW``,
         or ``*`` for all of them.
 
+    ``connect``
+        Optionally, how this BBS calls the partner, as described under Calling partners below.
+        Left out, the partner calls this BBS.
+        It has:
+
+        ``port``
+            The AGW server port to call on, counting from 0.
+
+        ``to``
+            Optionally, who to connect to, if not the partner itself:
+            a node, say, which the script then tells to connect on.
+
+        ``via``
+            Optionally, digipeaters to connect through.
+
+        ``script``
+            Optionally, steps to take once connected, to reach the partner itself.
+            Each is one of
+            ``send``, a line to send;
+            ``sendEnv``, the name of an environment variable whose value is sent,
+            for a password, which is then never in the file or the logs;
+            or ``expect``, text to wait for in a line from the far end, in any case.
+
+        ``every``
+            How often to call, mail queued or not, such as ``30m``.
+            Left out, an hour; at least a minute.
+
+        ``timeout``
+            How long each ``expect`` waits.
+            Left out, two minutes.
+
 ``--config-check`` reports every problem in the file at once,
 and its exit status is 1 if there are any,
 so it can go in a systemd unit's ``ExecStartPre``.
@@ -319,8 +350,50 @@ though never back to the partner it came from.
 That is the exchange as seen forwarding with LinBPQ both ways.
 FBB and XRouter haven't been tried yet,
 so it may change.
-Calling partners to forward with them,
-and FBB's batched protocol, are still to come.
+FBB's batched protocol is still to come.
+
+Calling partners
+----------------
+
+A partner with a ``connect`` block is called by this BBS,
+over the same AGW server stations reach it through.
+It is called as soon as mail is queued for it,
+and every so often whatever is queued,
+so that it can send what it has.
+A partner already forwarding with this BBS isn't called,
+and one calling in while this BBS is forwarding with it is turned away,
+so the two never work through the same mail at once.
+
+Once connected, the BBS runs the partner's script, if it has one,
+and then forwards as the side that called:
+it sends what it has first,
+and then hands the partner the turn.
+This has been tried with LinBPQ,
+calling its BBS directly and through its node,
+whose ``BBS`` command connects on to it.
+
+.. code:: yaml
+
+    partners:
+      - call: Q3BPQ
+        covers: ["*"]
+        floods: ["*"]
+        connect:
+          port: 0
+          to: Q3NOD
+          script:
+            - send: C Q3BPQ
+            - expect: Connected to
+          every: 30m
+
+A call that fails - no answer, a script step that times out,
+or the partner hanging up before the exchange is over -
+is tried again after a minute,
+then after two, four and so on, up to the partner's ``every``.
+Each failure counts against the mail waiting for that partner,
+and mail that has waited through five is held for the sysop:
+personal mail and traffic outright,
+and a bulletin only for that partner, since it is here to be read too.
 
 References
 ----------
