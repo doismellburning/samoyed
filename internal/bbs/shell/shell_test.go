@@ -177,7 +177,7 @@ func runTranscript(t *testing.T, file string) {
 		case strings.HasPrefix(line, "@session "):
 			var fields = strings.Fields(line)
 			session = newSession(box, fields[1], len(fields) > 2 && fields[2] == "sysop")
-			got = append(got, render(session.Start())...)
+			got = append(got, render(session.Start(t.Context()))...)
 		case line == ">":
 			require.NotNil(t, session, "input before any @session")
 

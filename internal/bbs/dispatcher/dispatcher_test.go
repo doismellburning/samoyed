@@ -24,7 +24,9 @@ import (
 // echo is a shell that answers each line by repeating it, and says bye to BYE.
 type echo struct{ peer transport.Peer }
 
-func (e *echo) Start() []action.Action { return []action.Action{action.Prompt{Text: "de Q1BBS>"}} }
+func (e *echo) Start(context.Context) []action.Action {
+	return []action.Action{action.Prompt{Text: "de Q1BBS>"}}
+}
 
 func (e *echo) Line(_ context.Context, line string) []action.Action {
 	if line == "BYE" {
@@ -132,7 +134,7 @@ func TestASIDIsTurnedAway(t *testing.T) {
 // with, and hangs up when it says *** DONE.
 type forwarding struct{ theirs sid.SID }
 
-func (f *forwarding) Start() []action.Action {
+func (f *forwarding) Start(context.Context) []action.Action {
 	return []action.Action{action.Output{Lines: []string{"forwarding with " + f.theirs.Name}}}
 }
 

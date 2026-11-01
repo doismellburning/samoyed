@@ -4,9 +4,7 @@
 # Calling a partner and refusing what it offers: having made the connection,
 # this side follows its NO with F>, as LinBPQ does, not its prompt.
 @seen 40_Q2BBS
-@calling
-> [BPQ-6.0.26.1-IHJM$]
-> de Q2BBS>
+@calling [BPQ-6.0.26.1-IHJM$]
 < [SAMBBS-0.0-H$]
 > >
 < F>

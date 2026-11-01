@@ -14,8 +14,10 @@ import (
 	"github.com/doismellburning/samoyed/internal/agwclient"
 	"github.com/doismellburning/samoyed/internal/bbs/config"
 	"github.com/doismellburning/samoyed/internal/bbs/dispatcher"
+	"github.com/doismellburning/samoyed/internal/bbs/forward"
 	"github.com/doismellburning/samoyed/internal/bbs/forward/mbl"
 	"github.com/doismellburning/samoyed/internal/bbs/forward/script"
+	"github.com/doismellburning/samoyed/internal/bbs/forward/sid"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
 	"github.com/doismellburning/samoyed/internal/bbs/scheduler"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
@@ -95,7 +97,13 @@ func forwardWith(ctx context.Context, s transport.Session, d *dispatcher.Dispatc
 		return scriptErr
 	}
 
-	var err = d.Drive(ctx, s, reader, mbl.NewCalling(p.Call, mailbox, forwardConfig(cfg)))
+	var fcfg = forwardConfig(cfg)
+
+	var calling = forward.NewCalling(func(theirs sid.SID) forward.Machine {
+		return mbl.NewCalling(p.Call, theirs, mailbox, fcfg)
+	})
+
+	var err = d.Drive(ctx, s, reader, calling)
 	if errors.Is(err, io.EOF) {
 		return errHungUp
 	}
