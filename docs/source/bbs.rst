@@ -272,7 +272,11 @@ saying when it took the message and which BBS it is:
     R:261101/0905Z @:Q1BBS.#77.GBR.EURO
 
 That is the form this BBS writes.
-LinBPQ reads it,
+A blank line keeps a message's ``R:`` lines apart from its text,
+as on LinBPQ's messages:
+XRouter takes the lines above the first blank line for headers,
+so without it, the text doesn't show.
+LinBPQ reads this BBS's ``R:`` lines,
 taking a message's date from it,
 and writes its own as ``R:261101/0905Z 12@Q3BPQ.#33.GBR.EURO LinBPQ6.0.26``,
 the message's number there before the ``@``,

@@ -105,6 +105,12 @@ func TestSplitRLinesAndPath(t *testing.T) {
 	assert.Equal(t, []string{"Q1BBS", "Q3BBS"}, Path(body), "newest first, and only from the top")
 
 	assert.Empty(t, Path([]byte("Hello.\r")))
+
+	var _, afterBlank = SplitRLines([]byte("R:261101/1114Z 4@Q3BPQ.#33.GBR.EURO LinBPQ6.0.26\r\rWaiting.\r\r"))
+	assert.Equal(t, "Waiting.\r\r", string(afterBlank), "one blank line after the R: lines is theirs, not the text's")
+
+	var _, noRLines = SplitRLines([]byte("\rHello.\r"))
+	assert.Equal(t, "\rHello.\r", string(noRLines), "but a blank line with no R: lines above it is text")
 	assert.Equal(t, []string{"Q3BBS"}, Path([]byte("R:garbled\rR:261101/0905Z @:Q3BBS\rHi\r")), "an unreadable line is passed over")
 }
 
@@ -185,5 +191,29 @@ func TestStamp(t *testing.T) {
 	assert.Equal(t, "R:261101/0805Z @:Q1BBS.#77.GBR.EURO\rR:261031/1200Z @:Q2BBS.GBR.EURO\rHi.\r", string(stamped))
 	assert.Equal(t, []string{"Q1BBS", "Q2BBS"}, Path(stamped))
 
-	assert.Equal(t, "R:261101/0805Z @:Q1BBS\r", string(Stamp(nil, "Q1BBS", maybe.Nothing[string](), when)))
+	assert.Equal(t, "R:261101/0805Z @:Q1BBS\r\r", string(Stamp(nil, "Q1BBS", maybe.Nothing[string](), when)))
+}
+
+// A message's R: lines are kept apart from its text by a blank line, as
+// LinBPQ's are, and as XRouter needs: without it, XRouter takes the text for
+// more header lines, and doesn't show it.
+func TestStampSeparatesTheRLinesFromTheText(t *testing.T) {
+	t.Parallel()
+
+	var when = time.Date(2026, 11, 1, 18, 52, 0, 0, time.UTC)
+
+	var originated = Stamp([]byte("Hello from samoyed-bbs.\r"), "Q2BBS", maybe.Just("#77.GBR.EURO"), when)
+
+	assert.Equal(t, "R:261101/1852Z @:Q2BBS.#77.GBR.EURO\r\rHello from samoyed-bbs.\r", string(originated))
+
+	// A message that has been somewhere already has its blank line, so
+	// another R: line just goes on top.
+	var forwarded = Stamp(originated, "Q5NOD", maybe.Nothing[string](), when.Add(time.Minute))
+
+	assert.Equal(t, "R:261101/1853Z @:Q5NOD\rR:261101/1852Z @:Q2BBS.#77.GBR.EURO\r\rHello from samoyed-bbs.\r", string(forwarded))
+
+	var rlines, rest = SplitRLines(forwarded)
+
+	assert.Len(t, rlines, 2)
+	assert.Equal(t, "Hello from samoyed-bbs.\r", string(rest), "the blank line goes with the R: lines")
 }
