@@ -36,7 +36,7 @@ func testConfig() Config {
 	var cfg = new(Config)
 
 	cfg.Banner = []string{"Welcome to Q1BBS."}
-	cfg.SID = "[SAMBBS-0.0-$]"
+	cfg.SID = "[SAMBBS-0.0-H$]"
 	cfg.IdleTimeout = 5 * time.Second
 	cfg.MaxLineLen = 32
 
@@ -99,7 +99,7 @@ func TestASession(t *testing.T) {
 
 	var station, r, done = start(t, testConfig())
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 
 	say(t, station, "L")
 	expect(t, r, "Q2TEST said L", "de Q1BBS>")
@@ -118,7 +118,7 @@ func TestASIDIsTurnedAway(t *testing.T) {
 
 	var station, r, done = start(t, testConfig())
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 
 	say(t, station, "[FBB-7.0-ABFHM$]")
 	expect(t, r, "This BBS doesn't forward mail yet.  73.")
@@ -131,7 +131,7 @@ func TestASIDLaterIsJustALine(t *testing.T) {
 
 	var station, r, _ = start(t, testConfig())
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 
 	say(t, station, "L")
 	expect(t, r, "Q2TEST said L", "de Q1BBS>")
@@ -145,7 +145,7 @@ func TestTheStationLeaving(t *testing.T) {
 
 	var station, r, done = start(t, testConfig())
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 	require.NoError(t, station.Close())
 
 	require.NoError(t, result(t, done))
@@ -159,7 +159,7 @@ func TestIdleTimeout(t *testing.T) {
 
 	var _, r, done = start(t, cfg)
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>", "Nothing heard for 50ms, so disconnecting.  73.")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>", "Nothing heard for 50ms, so disconnecting.  73.")
 
 	require.NoError(t, result(t, done))
 }
@@ -169,7 +169,7 @@ func TestOverlongLine(t *testing.T) {
 
 	var station, r, done = start(t, testConfig())
 
-	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, r, "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 
 	go func() { _, _ = station.Write([]byte(strings.Repeat("x", 100))) }()
 
@@ -190,7 +190,7 @@ func TestShuttingDown(t *testing.T) {
 
 	go func() { done <- d.Serve(ctx, s) }()
 
-	expect(t, lines.NewReader(station, 1024), "Welcome to Q1BBS.", "[SAMBBS-0.0-$]", "de Q1BBS>")
+	expect(t, lines.NewReader(station, 1024), "Welcome to Q1BBS.", "[SAMBBS-0.0-H$]", "de Q1BBS>")
 	cancel()
 
 	require.NoError(t, result(t, done))
@@ -206,16 +206,4 @@ func TestAStationGoneBeforeTheGreeting(t *testing.T) {
 	var d = New(testConfig(), func(peer transport.Peer) *echo { return &echo{peer: peer} })
 
 	require.Error(t, d.Serve(t.Context(), s), "nobody there to greet")
-}
-
-func TestIsSID(t *testing.T) {
-	t.Parallel()
-
-	for _, sid := range []string{"[FBB-7.0-ABFHM$]", "[BPQ-6.0.24.1-B1FIHJM$]", "[SAMBBS-0.0-$]", "[MBL-5.14-H$]"} {
-		assert.True(t, IsSID(sid), sid)
-	}
-
-	for _, line := range []string{"", "L", "[FBB]", "FBB-7.0-ABFHM$", "[FBB-7.0-ABFHM$] extra", "[a b-1-$]"} {
-		assert.False(t, IsSID(line), line)
-	}
 }

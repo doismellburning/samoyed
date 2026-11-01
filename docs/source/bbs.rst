@@ -44,7 +44,7 @@ Check it, then start a session as yourself:
 
     $ samoyed-bbs -c samoyed-bbs.yaml --console Q1TEST
     Welcome to Q1BBS, a Samoyed BBS (experimental).
-    [SAMBBS-0.0-$]
+    [SAMBBS-0.0-H$]
     de Q1BBS>
 
 The line in square brackets is the BBS's system ID,

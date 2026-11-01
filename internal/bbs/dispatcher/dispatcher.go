@@ -11,10 +11,10 @@ import (
 	"context"
 	"errors"
 	"io"
-	"regexp"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/bbs/action"
+	"github.com/doismellburning/samoyed/internal/bbs/forward/sid"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
 	"github.com/sirupsen/logrus"
@@ -31,7 +31,7 @@ type Config struct {
 	// Banner is sent first, a line at a time.
 	Banner []string
 
-	// SID is the BBS's system ID, such as "[SAMBBS-0.0-$]", sent after the
+	// SID is the BBS's system ID, such as "[SAMBBS-0.0-H$]", sent after the
 	// banner as FBB-style BBSes do.
 	SID string
 
@@ -58,16 +58,6 @@ func New[M machine](cfg Config, newMachine func(peer transport.Peer) M) *Dispatc
 	d.newMachine = func(peer transport.Peer) machine { return newMachine(peer) }
 
 	return d
-}
-
-// sidPattern is an FBB-style system ID, such as "[FBB-7.0-ABFHM$]": a name,
-// a version and feature flags, in square brackets.
-var sidPattern = regexp.MustCompile(`^\[[A-Za-z0-9._]+-[A-Za-z0-9._]*-[A-Za-z0-9$]*\]$`)
-
-// IsSID says whether line is an FBB-style system ID, as a BBS sends on
-// connecting to forward mail.
-func IsSID(line string) bool {
-	return sidPattern.MatchString(line)
 }
 
 // Serve runs one session until the station leaves, says bye, stays idle too
@@ -110,7 +100,7 @@ func (d *Dispatcher) serve(ctx context.Context, s transport.Session, peer transp
 			return d.ended(ctx, s, readErr)
 		}
 
-		if first && IsSID(line) {
+		if first && sid.IsSID(line) {
 			return lines.Write(s, "This BBS doesn't forward mail yet.  73.")
 		}
 

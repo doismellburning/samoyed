@@ -19,6 +19,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/agwclient"
 	"github.com/doismellburning/samoyed/internal/bbs/config"
 	"github.com/doismellburning/samoyed/internal/bbs/dispatcher"
+	"github.com/doismellburning/samoyed/internal/bbs/forward/sid"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
 	"github.com/doismellburning/samoyed/internal/bbs/routing"
@@ -216,7 +217,7 @@ func newDispatcher(cfg config.Config, store *sqlite.Store) *dispatcher.Dispatche
 	var dcfg = new(dispatcher.Config)
 
 	dcfg.Banner = cfg.BannerLines()
-	dcfg.SID = fmt.Sprintf("[SAMBBS-%d.%d-$]", version.Major, version.Minor)
+	dcfg.SID = sid.Ours(version.Major, version.Minor).String()
 	dcfg.IdleTimeout = cfg.IdleTimeout
 	dcfg.MaxLineLen = lines.DefaultMaxLen
 

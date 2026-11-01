@@ -63,7 +63,7 @@ refuse() {
 	fi
 }
 
-expect first.log "[SAMBBS-0.0-\$]"
+expect first.log "[SAMBBS-0.0-H\$]"
 expect first.log "Message 1 saved, ID 1_Q1BBS."
 expect first.log "Message 2 saved, ID 2_Q1BBS."
 expect first.log "Message 2 killed."
