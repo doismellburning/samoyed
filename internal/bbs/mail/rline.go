@@ -167,7 +167,8 @@ func removeFirst(rest []string, field string) []string {
 }
 
 // SplitRLines splits a message body into the R: lines at its top and the rest
-// of it.  Bodies end each line with CR.
+// of it, less the blank line that keeps the two apart.  Bodies end each line
+// with CR.
 func SplitRLines(body []byte) ([]string, []byte) {
 	var rlines []string
 	var rest = body
@@ -180,6 +181,11 @@ func SplitRLines(body []byte) ([]string, []byte) {
 
 		rlines = append(rlines, string(line))
 		rest = after
+	}
+
+	// A blank line after them keeps them apart from the text.
+	if len(rlines) > 0 && bytes.HasPrefix(rest, []byte("\r")) {
+		rest = rest[1:]
 	}
 
 	return rlines, rest
@@ -210,7 +216,9 @@ func PrependRLine(body []byte, r RLine) []byte {
 // Stamp puts the R: line of a BBS taking a message at the top of its body:
 // bbsCall, without its SSID, with the rest of its hierarchical address if
 // given, taking it at when.  Any R: lines the message already has stay below,
-// so the newest is first.
+// so the newest is first; a message with none gets a blank line between its
+// R: line and its text, as LinBPQ's have, and as XRouter needs to tell the
+// text from the header lines above it.
 func Stamp(body []byte, bbsCall string, hroute maybe.Maybe[string], when time.Time) []byte {
 	var base, _, _ = strings.Cut(strings.ToUpper(bbsCall), "-")
 
@@ -219,6 +227,12 @@ func Stamp(body []byte, bbsCall string, hroute maybe.Maybe[string], when time.Ti
 	r.When = when.UTC()
 	r.BBS = base
 	r.HRoute = hroute
+
+	// The R: lines are kept apart from the text by a blank line, which a
+	// message that has been somewhere already has.
+	if !bytes.HasPrefix(body, []byte("R:")) {
+		body = append([]byte("\r"), body...)
+	}
 
 	return PrependRLine(body, *r)
 }

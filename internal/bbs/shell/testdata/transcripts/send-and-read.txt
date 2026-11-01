@@ -14,7 +14,7 @@
 < de Q1BBS>
 > L
 < Msg#  TS Size  To     @BBS     From      Date   Title
-< 1     PN    49 Q1TEST          Q2TEST    31-Oct Hello
+< 1     PN    50 Q1TEST          Q2TEST    31-Oct Hello
 < de Q1BBS>
 > R 1
 < Msg #1  P  ID 1_Q1BBS

@@ -45,10 +45,10 @@
 < de Q1BBS>
 > L 2-2
 < Msg#  TS Size  To     @BBS     From      Date   Title
-< 2     TN    36 Q1TEST Q1BBS.#77.GBR Q2TEST    31-Oct
+< 2     TN    37 Q1TEST Q1BBS.#77.GBR Q2TEST    31-Oct
 < de Q1BBS>
 > L< Q2TEST
 < Msg#  TS Size  To     @BBS     From      Date   Title
-< 2     TN    36 Q1TEST Q1BBS.#77.GBR Q2TEST    31-Oct
-< 1     BN    59 ALL             Q2TEST    31-Oct News
+< 2     TN    37 Q1TEST Q1BBS.#77.GBR Q2TEST    31-Oct
+< 1     BN    60 ALL             Q2TEST    31-Oct News
 < de Q1BBS>
