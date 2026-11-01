@@ -14,16 +14,16 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/bbs/action"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
-	"github.com/doismellburning/samoyed/internal/bbs/shell"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
 	"github.com/sirupsen/logrus"
 )
 
 // machine is a user shell, as a session drives it.
 type machine interface {
-	Start() []shell.Action
-	Line(ctx context.Context, line string) []shell.Action
+	Start() []action.Action
+	Line(ctx context.Context, line string) []action.Action
 }
 
 // Config is how sessions are run.
@@ -148,18 +148,18 @@ func (d *Dispatcher) ended(ctx context.Context, s transport.Session, err error) 
 	}
 }
 
-// perform carries out a shell's actions, reporting whether one ended the
+// perform carries out a machine's actions, reporting whether one ended the
 // session.
-func perform(s transport.Session, actions []shell.Action) (bool, error) {
-	for _, action := range actions {
+func perform(s transport.Session, actions []action.Action) (bool, error) {
+	for _, next := range actions {
 		var err error
 
-		switch a := action.(type) {
-		case shell.Output:
+		switch a := next.(type) {
+		case action.Output:
 			err = lines.Write(s, a.Lines...)
-		case shell.Prompt:
+		case action.Prompt:
 			err = lines.Write(s, a.Text)
-		case shell.Disconnect:
+		case action.Disconnect:
 			return true, nil
 		}
 

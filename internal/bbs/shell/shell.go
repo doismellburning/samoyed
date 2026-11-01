@@ -16,27 +16,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/bbs/action"
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
-// Action is something to do in answer to a line.
-type Action interface{ isAction() }
+// Action is something to do in answer to a line; see package action.
+type Action = action.Action
 
 // Output is lines to send the user.
-type Output struct{ Lines []string }
+type Output = action.Output
 
 // Prompt is the prompt to send the user, when the machine is ready for its
 // next command.
-type Prompt struct{ Text string }
+type Prompt = action.Prompt
 
 // Disconnect is ending the session.
-type Disconnect struct{}
-
-func (Output) isAction()     {}
-func (Prompt) isAction()     {}
-func (Disconnect) isAction() {}
+type Disconnect = action.Disconnect
 
 // mailbox is what the shell needs of the message store.
 type mailbox interface {

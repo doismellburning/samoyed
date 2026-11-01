@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/bbs/action"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
-	"github.com/doismellburning/samoyed/internal/bbs/shell"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
 	"github.com/doismellburning/samoyed/internal/bbs/transport/memt"
 	"github.com/stretchr/testify/assert"
@@ -22,14 +22,14 @@ import (
 // echo is a shell that answers each line by repeating it, and says bye to BYE.
 type echo struct{ peer transport.Peer }
 
-func (e *echo) Start() []shell.Action { return []shell.Action{shell.Prompt{Text: "de Q1BBS>"}} }
+func (e *echo) Start() []action.Action { return []action.Action{action.Prompt{Text: "de Q1BBS>"}} }
 
-func (e *echo) Line(_ context.Context, line string) []shell.Action {
+func (e *echo) Line(_ context.Context, line string) []action.Action {
 	if line == "BYE" {
-		return []shell.Action{shell.Output{Lines: []string{"73"}}, shell.Disconnect{}}
+		return []action.Action{action.Output{Lines: []string{"73"}}, action.Disconnect{}}
 	}
 
-	return []shell.Action{shell.Output{Lines: []string{e.peer.Call + " said " + line}}, shell.Prompt{Text: "de Q1BBS>"}}
+	return []action.Action{action.Output{Lines: []string{e.peer.Call + " said " + line}}, action.Prompt{Text: "de Q1BBS>"}}
 }
 
 func testConfig() Config {
