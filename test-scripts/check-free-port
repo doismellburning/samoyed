@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+set -eu
+set -o pipefail
+
+# free_port must keep out of the kernel's ephemeral range, where an outgoing
+# connection from another script can take the port before the server it was
+# picked for binds it (#1209), and inside the range direwolf's config accepts.
+
+source "$(dirname "$(realpath "$0")")/common"
+
+if ! command -v python3 > /dev/null; then
+	echo "FAIL: python3 not found, required by free_port" >&2
+	exit 1
+fi
+
+range=/proc/sys/net/ipv4/ip_local_port_range
+if [[ -r $range ]]; then
+	read -r low high < "$range"
+else
+	low=49152 high=65535
+fi
+
+for _ in $(seq 50); do
+	for proto in tcp udp; do
+		port=$(free_port "$proto")
+
+		if ((port < 1024 || port > 49151)); then
+			echo "FAIL: free_port $proto gave $port, outside 1024-49151" >&2
+			exit 1
+		fi
+
+		if ((port >= low && port <= high)); then
+			echo "FAIL: free_port $proto gave $port, in the ephemeral range $low-$high" >&2
+			exit 1
+		fi
+	done
+done
+
+echo "PASS: free_port kept out of the ephemeral range ($low-$high)"

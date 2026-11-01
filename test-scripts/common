@@ -52,6 +52,15 @@ function run_parallel() {
 # the other.  There's still a TOCTOU race against anything else grabbing the
 # port between us closing the probe socket and direwolf/kissutil binding it,
 # but that's an acceptable risk for a test script.
+#
+# Two things keep that race narrow.  The port is never in the kernel's
+# ephemeral range, which outgoing connections take their local ports from:
+# runall runs every script at once, and between them they make plenty of
+# connections, any of which could otherwise be given the port in that gap.
+# Linux's range is 32768-60999 by default and is read from /proc; macOS's,
+# 49152-65535, is already above the top of ours.  And the probe binds the
+# wildcard address, as the servers do, so a socket on the port at some other
+# address counts as in use.
 free_port() {
 	local proto=$1
 	shift
@@ -65,14 +74,25 @@ proto = sys.argv[1]
 exclude = {int(p) for p in sys.argv[2:]}
 sock_type = socket.SOCK_STREAM if proto == "tcp" else socket.SOCK_DGRAM
 
+try:
+	with open("/proc/sys/net/ipv4/ip_local_port_range") as f:
+		ephemeral_low, ephemeral_high = (int(p) for p in f.read().split())
+except OSError:
+	ephemeral_low, ephemeral_high = 49152, 65535
+
+candidates = [p for p in range(1024, 49152) if not ephemeral_low <= p <= ephemeral_high]
+if not candidates:
+	# An ephemeral range that covers all of ours: better a racy port than none.
+	candidates = list(range(1024, 49152))
+
 for _ in range(200):
-	port = random.randint(1024, 49151)
+	port = random.choice(candidates)
 	if port in exclude:
 		continue
 
 	probe = socket.socket(socket.AF_INET, sock_type)
 	try:
-		probe.bind(("127.0.0.1", port))
+		probe.bind(("", port))
 	except OSError:
 		continue
 	finally:
