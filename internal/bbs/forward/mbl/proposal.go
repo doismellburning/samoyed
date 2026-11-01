@@ -21,8 +21,9 @@ var ErrBadProposal = errors.New("bad proposal")
 // it or not, and S on its own is a personal message.  The title and body
 // follow on lines of their own.
 //
-// This is the form FBB's and W0RLI's documentation give, as best recalled;
-// it is to be checked against captures (#1152).
+// LinBPQ 6.0.26.1 sends this form, with spaces round the @ and <, and takes
+// it from this BBS written so, which is how ProposalFor writes it.  FBB's and
+// XRouter's are still to be checked (#1152).
 func ParseProposal(line string) (mail.NewMessage, error) {
 	var fields = strings.Fields(line)
 	if len(fields) == 0 || len(fields[0]) > 2 || !strings.EqualFold(fields[0][:1], "S") {

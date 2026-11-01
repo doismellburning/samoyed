@@ -10,12 +10,15 @@
 // Whichever BBS made the connection - the calling one - sends first.  Each
 // message is offered with a proposal ("SP Q1TEST @ Q1BBS < Q2TEST $BID"),
 // which the other side answers OK or NO; an accepted one follows as its
-// title, its body, and /EX, and the other side's prompt says it has been
-// taken.  "F>" hands the turn over, and "*** DONE" ends the exchange.
+// title, its body, and /EX.  After each message, and after each NO, the
+// receiving side says it is ready for the next: with "F>" if it made the
+// connection, or with its prompt if it was called.  A sender with nothing
+// more to send hands the turn over with "F>" when it was answered with a
+// prompt, and ends the exchange with "*** DONE" when it was answered with
+// "F>".
 //
-// That is the exchange as FBB's and W0RLI's documentation describe it, as
-// best recalled: the exact lines are constants and small functions here, to
-// be checked against captures from FBB, BPQ and XRouter (#1152).
+// That is the exchange as seen forwarding with LinBPQ 6.0.26.1 both ways;
+// FBB and XRouter are still to be checked (#1152).
 package mbl
 
 import (
@@ -96,9 +99,11 @@ const (
 	stateTitle
 	stateBody
 
-	// Sending: the answer to a proposal, then the prompt after a message.
+	// Sending: the answer to a proposal, then the other side saying it is
+	// ready after a message, or after refusing one.
 	stateAnswer
 	statePrompt
+	stateRefused
 
 	// Calling, before the exchange begins: the other side's SID and
 	// prompt, then its prompt again once it has ours.
@@ -192,6 +197,12 @@ func (m *Machine) Line(ctx context.Context, line string) []action.Action {
 		return m.answer(ctx, line)
 	case statePrompt:
 		return m.sent(ctx, line)
+	case stateRefused:
+		if isReady(line) {
+			return m.next(ctx)
+		}
+
+		return nil
 	default:
 		return m.proposal(ctx, strings.TrimSpace(line))
 	}
@@ -267,7 +278,17 @@ func (m *Machine) proposal(ctx context.Context, line string) []action.Action {
 }
 
 func (m *Machine) refuse() []action.Action {
-	return []action.Action{action.Output{Lines: []string{refuse}}, m.prompt()}
+	return append([]action.Action{action.Output{Lines: []string{refuse}}}, m.ready()...)
+}
+
+// ready is what the receiving side says when it is ready for the next
+// message: F> if it made the connection, its prompt if it was called.
+func (m *Machine) ready() []action.Action {
+	if m.calling {
+		return []action.Action{action.Output{Lines: []string{handOver}}}
+	}
+
+	return []action.Action{m.prompt()}
 }
 
 // title takes an accepted message's title, cut to fit.
@@ -311,14 +332,14 @@ func (m *Machine) bodyLine(ctx context.Context, line string) []action.Action {
 
 	var _, err = m.store.AcceptForwarded(ctx, msg, m.partner)
 	if err != nil && !errors.Is(err, mail.ErrDuplicateBID) {
-		// Prompting would tell the other side the message was taken, so it
+		// Saying so would tell the other side the message was taken, so it
 		// would never be sent again.  Hanging up leaves it queued there.
 		return []action.Action{action.Output{Lines: []string{"*** Error: the message couldn't be stored"}}, action.Disconnect{}}
 	}
 
 	// A message whose ID turned up from elsewhere meanwhile has been taken
 	// already, which is as good as taking it.
-	return []action.Action{m.prompt()}
+	return m.ready()
 }
 
 // startTurn begins this side's turn at sending, with what is queued for the
@@ -364,6 +385,8 @@ func (m *Machine) next(ctx context.Context) []action.Action {
 // endTurn hands the turn over, or, if the other side has had one, ends the
 // exchange.  The calling side sends first, so has the first turn; the
 // answering side's turn, or the calling side's second, is the last.
+// LinBPQ, calling in, hands over with F> once this BBS prompts it, and takes
+// the *** DONE that ends this BBS's turn.
 func (m *Machine) endTurn() []action.Action {
 	if m.calling && m.turns == 1 {
 		m.state = stateProposal
@@ -388,7 +411,10 @@ func (m *Machine) answer(ctx context.Context, line string) []action.Action {
 			return []action.Action{action.Output{Lines: []string{"*** Error: the forwarding queue couldn't be updated"}}, action.Disconnect{}}
 		}
 
-		return m.next(ctx)
+		// The other side says it is ready again before the next is offered.
+		m.state = stateRefused
+
+		return nil
 	default:
 		return nil
 	}
@@ -417,9 +443,10 @@ func (m *Machine) send(ctx context.Context) []action.Action {
 	return []action.Action{action.Output{Lines: lines}}
 }
 
-// sent waits for the other side's prompt, saying it has taken the message.
+// sent waits for the other side to say it is ready again, which says it has
+// taken the message.
 func (m *Machine) sent(ctx context.Context, line string) []action.Action {
-	if !isPrompt(line) {
+	if !isReady(line) {
 		return nil
 	}
 
@@ -429,6 +456,12 @@ func (m *Machine) sent(ctx context.Context, line string) []action.Action {
 	}
 
 	return m.next(ctx)
+}
+
+// isReady says whether line is the other side saying it is ready for the
+// next message: its prompt, or F>.
+func isReady(line string) bool {
+	return isPrompt(line) || strings.EqualFold(strings.TrimSpace(line), handOver)
 }
 
 // isPrompt says whether line is a BBS's prompt, which ends in >.

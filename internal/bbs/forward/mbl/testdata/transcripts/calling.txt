@@ -3,7 +3,9 @@
 
 # Calling a partner: its greeting and SID, then its prompt, which this side
 # answers with its own SID.  The next prompt starts this side's turn, and its
-# end hands over; the partner's turn ends with *** DONE.
+# end hands over.  Having made the connection, this side says F> rather than
+# its prompt after each message it takes, as LinBPQ does; the partner's turn
+# ends with *** DONE.
 @queued SP Q1TEST @ Q2BBS < Q9TEST $5_Q1BBS
 @calling
 > Welcome to Q2BBS.
@@ -24,7 +26,7 @@
 > Back to you
 > Hi.
 > /EX
-< de Q1BBS>
+< F>
 > *** DONE
 < *** disconnected
 @check accepted=1 forwarded=1 refused=0 pending=0

@@ -25,10 +25,11 @@ const rlineTime = "060102/1504"
 // way it came, newest first, which is how a BBS sees a message has been
 // round before.
 //
-// The form written here, "R:YYMMDD/HHMMZ @:CALL.HROUTE #:n $:MID", is the
-// one this BBS believes is usual, but no specification of it has been found:
-// it is to be checked against captures from FBB, BPQ and XRouter (#1152).
-// Reading is lenient for the same reason.
+// The form written here, "R:YYMMDD/HHMMZ @:CALL.HROUTE #:n $:MID", is one
+// LinBPQ 6.0.26.1 reads, taking a message's date from it; LinBPQ writes
+// "R:YYMMDD/HHMMZ n@CALL.HROUTE LinBPQ6.0.26", which ParseRLine reads too.
+// No specification of either has been found, and FBB's and XRouter's are
+// still to be checked (#1152), so reading is lenient.
 type RLine struct {
 	// When the BBS took the message, in UTC.
 	When time.Time
