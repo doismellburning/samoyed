@@ -29,6 +29,18 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// underBBS puts content under a top-level "bbs" key.
+func underBBS(content string) []byte {
+	var lines = strings.Split(content, "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = "  " + line
+		}
+	}
+
+	return []byte("bbs:\n" + strings.Join(lines, "\n"))
+}
+
 // writeConfig writes a configuration with its store in the test's directory.
 func writeConfig(t *testing.T) string {
 	t.Helper()
@@ -36,7 +48,7 @@ func writeConfig(t *testing.T) string {
 	var dir = t.TempDir()
 	var file = filepath.Join(dir, "samoyed-bbs.yaml")
 
-	require.NoError(t, os.WriteFile(file, []byte("call: Q1BBS\nstore: "+filepath.Join(dir, "bbs.db")+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(file, underBBS("call: Q1BBS\nstore: "+filepath.Join(dir, "bbs.db")+"\n"), 0o600))
 
 	return file
 }
@@ -60,12 +72,12 @@ func TestConfigCheck(t *testing.T) {
 	assert.NotContains(t, good.Output(), "experimental", "a check is for scripts, so says only how the file is")
 
 	var badFile = filepath.Join(t.TempDir(), "bad.yaml")
-	require.NoError(t, os.WriteFile(badFile, []byte("call: Q1BBS-16\n"), 0o600))
+	require.NoError(t, os.WriteFile(badFile, underBBS("call: Q1BBS-16\n"), 0o600))
 
 	var bad = testutils.RunMain(t, "", "-c", badFile, "--config-check")
 	assert.Equal(t, 1, bad.Status)
-	assert.Contains(t, bad.Output(), `call: "Q1BBS-16" is not a callsign`)
-	assert.Contains(t, bad.Output(), "store: the path of the message database is needed")
+	assert.Contains(t, bad.Output(), `bbs.call: "Q1BBS-16" is not a callsign`)
+	assert.Contains(t, bad.Output(), "bbs.store: the path of the message database is needed")
 
 	var missing = testutils.RunMain(t, "", "-c", filepath.Join(t.TempDir(), "missing.yaml"))
 	assert.Equal(t, 1, missing.Status)
@@ -117,7 +129,7 @@ func TestConsoleWithAnUnopenableStore(t *testing.T) {
 	t.Parallel()
 
 	var file = filepath.Join(t.TempDir(), "samoyed-bbs.yaml")
-	require.NoError(t, os.WriteFile(file, []byte("call: Q1BBS\nstore: "+filepath.Join(t.TempDir(), "no", "such", "dir", "bbs.db")+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(file, underBBS("call: Q1BBS\nstore: "+filepath.Join(t.TempDir(), "no", "such", "dir", "bbs.db")+"\n"), 0o600))
 
 	var result = testutils.RunMain(t, "", "-c", file, "--console", "Q1TEST")
 
@@ -205,7 +217,7 @@ func TestServingOverAGW(t *testing.T) {
 	var dir = t.TempDir()
 	var file = filepath.Join(dir, "samoyed-bbs.yaml")
 
-	require.NoError(t, os.WriteFile(file, []byte("call: Q1BBS\nstore: "+filepath.Join(dir, "bbs.db")+"\nagw:\n  addr: 127.0.0.1:"+port+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(file, underBBS("call: Q1BBS\nstore: "+filepath.Join(dir, "bbs.db")+"\nagw:\n  addr: 127.0.0.1:"+port+"\n"), 0o600))
 
 	var p = testutils.StartMain(t, "-c", file)
 	var tnc = testutils.Accept(t, ln)
@@ -255,7 +267,7 @@ func TestRoutingWhatUsersSend(t *testing.T) {
 	var file = filepath.Join(dir, "samoyed-bbs.yaml")
 	var db = filepath.Join(dir, "bbs.db")
 
-	require.NoError(t, os.WriteFile(file, []byte("call: Q1BBS\nstore: "+db+"\npartners:\n  - call: Q3BBS\n    covers: [GBR.EURO]\n"), 0o600))
+	require.NoError(t, os.WriteFile(file, underBBS("call: Q1BBS\nstore: "+db+"\npartners:\n  - call: Q3BBS\n    covers: [GBR.EURO]\n"), 0o600))
 
 	var result = testutils.RunMain(t, "SP Q1TEST@Q6BBS.GBR.EURO\nNear\nHi.\n/EX\nSP Q1TEST@Q6BBS.USA.NOAM\nFar\nHi.\n/EX\nB\n", "-c", file, "--console", "Q2TEST")
 

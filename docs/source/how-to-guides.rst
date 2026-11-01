@@ -938,7 +938,7 @@ needs nothing but a configuration file naming the BBS and its message database:
 
 .. code::
 
-    $ printf 'call: Q1BBS\nstore: bbs.db\n' > samoyed-bbs.yaml
+    $ printf 'bbs:\n  call: Q1BBS\n  store: bbs.db\n' > samoyed-bbs.yaml
     $ samoyed-bbs --console Q1TEST
 
 :doc:`bbs` describes putting it on the air, the configuration and the commands.

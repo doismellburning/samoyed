@@ -87,8 +87,11 @@ Reference
 ---------
 
 Every setting goes under a top-level ``samoyed`` key,
-leaving the rest of the file free for anything else that might one day want a place in it.
-A file with settings outside it is refused.
+leaving the rest of the file free for anything else that wants a place in it.
+``samoyed-bbs``'s settings can go beside it, under ``bbs``,
+so that the two share a file (see :doc:`bbs`);
+``samoyed-direwolf`` leaves them alone.
+A file with settings outside either is refused.
 These are the keys under ``samoyed``:
 
 ``audioDevices``

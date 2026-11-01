@@ -4,12 +4,16 @@
 // Package config is samoyed-bbs's configuration file: YAML, read and checked
 // in full before anything starts, so every problem in it can be reported at
 // once.
+//
+// Everything sits under a top-level "bbs" key, so that the file can be the
+// one samoyed-direwolf reads its settings from, under "samoyed", too.
 package config
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"regexp"
@@ -24,7 +28,18 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// Config is samoyed-bbs's configuration.
+// file is the whole of a configuration file.
+type file struct {
+	// BBS is samoyed-bbs's own settings.
+	BBS *Config `yaml:"bbs"`
+
+	// Samoyed is samoyed-direwolf's settings, for a file the two share.
+	// They are its to check, so they are taken as they are and left alone.
+	Samoyed yaml.Node `yaml:"samoyed"`
+}
+
+// Config is samoyed-bbs's configuration: what is under a configuration file's
+// "bbs" key.
 type Config struct {
 	// Call is the BBS's callsign, with any SSID.
 	Call string `yaml:"call"`
@@ -195,14 +210,26 @@ func Parse(data []byte) (Config, error) {
 
 // ParseWithEnv is Parse, looking environment variables up with lookupEnv.
 func ParseWithEnv(data []byte, lookupEnv func(name string) (string, bool)) (Config, error) {
-	var cfg = new(Config)
+	var doc = new(file)
 
 	var decoder = yaml.NewDecoder(bytes.NewReader(data))
 	decoder.KnownFields(true)
 
-	var decodeErr = decoder.Decode(cfg)
-	if decodeErr != nil {
+	var decodeErr = decoder.Decode(doc)
+	if decodeErr != nil && !errors.Is(decodeErr, io.EOF) {
+		if !hasBBSKey(data) {
+			return Config{}, errors.Join(
+				fmt.Errorf("reading YAML: %w", decodeErr),
+				errors.New(`settings go under a top-level "bbs" key`),
+			)
+		}
+
 		return Config{}, fmt.Errorf("reading YAML: %w", decodeErr)
+	}
+
+	var cfg = doc.BBS
+	if cfg == nil {
+		return Config{}, errors.New(`settings go under a top-level "bbs" key, and there is none`)
 	}
 
 	cfg.Call = strings.ToUpper(strings.TrimSpace(cfg.Call))
@@ -245,9 +272,35 @@ func ParseWithEnv(data []byte, lookupEnv func(name string) (string, bool)) (Conf
 	return *cfg, nil
 }
 
-// validate checks everything that must be right, returning every problem.
-// It also takes the AGW password from the environment.
+// hasBBSKey says whether data, as YAML, has a "bbs" key at its top level -
+// one without is most likely laid out as it was before there was one.
+func hasBBSKey(data []byte) bool {
+	var doc map[string]yaml.Node
+
+	if yaml.Unmarshal(data, &doc) != nil {
+		return true // Not a mapping at all, which is complaint enough.
+	}
+
+	var _, ok = doc["bbs"]
+
+	return ok
+}
+
+// validate checks everything that must be right, returning every problem,
+// each named by where it is under the file's "bbs" key.  It also takes the
+// AGW password from the environment.
 func (c Config) validate(lookupEnv func(name string) (string, bool)) error {
+	var problems = c.problems(lookupEnv)
+
+	for i, problem := range problems {
+		problems[i] = fmt.Errorf("bbs.%w", problem)
+	}
+
+	return errors.Join(problems...)
+}
+
+// problems is everything wrong with the configuration.
+func (c Config) problems(lookupEnv func(name string) (string, bool)) []error {
 	var problems []error
 
 	if !ValidCall(c.Call) {
@@ -273,7 +326,7 @@ func (c Config) validate(lookupEnv func(name string) (string, bool)) error {
 	problems = append(problems, c.validatePartners()...)
 	problems = append(problems, c.validateConnects(lookupEnv)...)
 
-	return errors.Join(problems...)
+	return problems
 }
 
 // validateConnects checks how partners are called: over the AGW server, so

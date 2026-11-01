@@ -6,6 +6,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 func TestParse(t *testing.T) {
 	t.Parallel()
 
-	var cfg, err = Parse([]byte(`
+	var cfg, err = Parse(underBBS(`
 call: q1bbs-3
 hroute: "#77.gbr.euro"
 store: /var/lib/samoyed-bbs/bbs.db
@@ -41,7 +42,7 @@ idleTimeout: 5m
 func TestParseDefaults(t *testing.T) {
 	t.Parallel()
 
-	var cfg, err = Parse([]byte("call: Q1BBS\nstore: bbs.db\n"))
+	var cfg, err = Parse(underBBS("call: Q1BBS\nstore: bbs.db\n"))
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"Welcome to Q1BBS, a Samoyed BBS (experimental)."}, cfg.BannerLines())
@@ -53,27 +54,27 @@ func TestParseDefaults(t *testing.T) {
 func TestParseReportsEveryProblem(t *testing.T) {
 	t.Parallel()
 
-	var _, err = Parse([]byte("call: Q1BBS-16\nhroute: GBR..EURO\nidleTimeout: -1s\n"))
+	var _, err = Parse(underBBS("call: Q1BBS-16\nhroute: GBR..EURO\nidleTimeout: -1s\n"))
 	require.Error(t, err)
 
-	assert.Contains(t, err.Error(), `hroute: "GBR..EURO" is not a hierarchical address`)
-	assert.Contains(t, err.Error(), `call: "Q1BBS-16" is not a callsign`)
-	assert.Contains(t, err.Error(), "store: the path of the message database is needed")
-	assert.Contains(t, err.Error(), "idleTimeout: -1s is negative")
+	assert.Contains(t, err.Error(), `bbs.hroute: "GBR..EURO" is not a hierarchical address`)
+	assert.Contains(t, err.Error(), `bbs.call: "Q1BBS-16" is not a callsign`)
+	assert.Contains(t, err.Error(), "bbs.store: the path of the message database is needed")
+	assert.Contains(t, err.Error(), "bbs.idleTimeout: -1s is negative")
 }
 
 func TestParseRefusesUnknownSettings(t *testing.T) {
 	t.Parallel()
 
-	var _, err = Parse([]byte("call: Q1BBS\nstore: bbs.db\nsysop: Q1TEST\n"))
+	var _, err = Parse(underBBS("call: Q1BBS\nstore: bbs.db\nsysop: Q1TEST\n"))
 	require.ErrorContains(t, err, "sysop")
 }
 
 func TestParseRefusesNonsense(t *testing.T) {
 	t.Parallel()
 
-	for _, data := range []string{"call: [", "idleTimeout: soon\n", ""} {
-		var _, err = Parse([]byte(data))
+	for _, data := range []string{"call: [", "bbs.idleTimeout: soon\n", ""} {
+		var _, err = Parse(underBBS(data))
 		require.Error(t, err, "%q", data)
 	}
 }
@@ -82,7 +83,7 @@ func TestLoad(t *testing.T) {
 	t.Parallel()
 
 	var file = filepath.Join(t.TempDir(), "samoyed-bbs.yaml")
-	require.NoError(t, os.WriteFile(file, []byte("call: Q1BBS\nstore: bbs.db\n"), 0o600))
+	require.NoError(t, os.WriteFile(file, underBBS("call: Q1BBS\nstore: bbs.db\n"), 0o600))
 
 	var cfg, err = Load(file)
 	require.NoError(t, err)
@@ -104,6 +105,52 @@ func TestValidCall(t *testing.T) {
 	}
 }
 
+// underBBS puts content under a top-level "bbs" key.
+func underBBS(content string) []byte {
+	var lines = strings.Split(strings.TrimPrefix(content, "\n"), "\n")
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = "  " + line
+		}
+	}
+
+	return []byte("bbs:\n" + strings.Join(lines, "\n"))
+}
+
+func TestParseRefusesSettingsOutsideBBS(t *testing.T) {
+	t.Parallel()
+
+	var _, err = Parse([]byte("call: Q1BBS\nstore: bbs.db\n"))
+	require.ErrorContains(t, err, `settings go under a top-level "bbs" key`)
+
+	var _, emptyErr = Parse([]byte("samoyed:\n  agwPort: 8000\n"))
+	require.ErrorContains(t, emptyErr, `settings go under a top-level "bbs" key, and there is none`)
+
+	var _, otherErr = Parse([]byte("bbs:\n  call: Q1BBS\n  store: bbs.db\nbbbs:\n  call: Q2BBS\n"))
+	require.ErrorContains(t, otherErr, "bbbs")
+}
+
+func TestParseSharesAFileWithSamoyedDirewolf(t *testing.T) {
+	t.Parallel()
+
+	var cfg, err = Parse([]byte(`
+samoyed:
+  channels:
+    - {channel: 0, mycall: Q1TEST}
+  agwPort: 8000
+  legacy: |
+    ANYTHING samoyed-direwolf likes
+bbs:
+  call: Q1BBS
+  store: bbs.db
+  agw:
+    addr: localhost:8000
+`))
+	require.NoError(t, err)
+	assert.Equal(t, "Q1BBS", cfg.Call)
+	assert.True(t, cfg.AGWClient().IsJust())
+}
+
 // env is an environment with just the variables given.
 func env(vars map[string]string) func(name string) (string, bool) {
 	return func(name string) (string, bool) {
@@ -116,7 +163,7 @@ func env(vars map[string]string) func(name string) (string, bool) {
 func TestParseAGW(t *testing.T) {
 	t.Parallel()
 
-	var cfg, err = ParseWithEnv([]byte(`
+	var cfg, err = ParseWithEnv(underBBS(`
 call: Q1BBS
 store: bbs.db
 agw:
@@ -147,7 +194,7 @@ agw:
 func TestParseAGWDefaults(t *testing.T) {
 	t.Parallel()
 
-	var cfg, err = ParseWithEnv([]byte("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\n"), env(nil))
+	var cfg, err = ParseWithEnv(underBBS("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\n"), env(nil))
 	require.NoError(t, err)
 
 	var client, ok = cfg.AGWClient().Get()
@@ -160,7 +207,7 @@ func TestParseAGWDefaults(t *testing.T) {
 func TestParseWithoutAGW(t *testing.T) {
 	t.Parallel()
 
-	var cfg, err = ParseWithEnv([]byte("call: Q1BBS\nstore: bbs.db\n"), env(nil))
+	var cfg, err = ParseWithEnv(underBBS("call: Q1BBS\nstore: bbs.db\n"), env(nil))
 	require.NoError(t, err)
 	assert.True(t, cfg.AGWClient().IsNothing())
 }
@@ -168,7 +215,7 @@ func TestParseWithoutAGW(t *testing.T) {
 func TestParseAGWProblems(t *testing.T) {
 	t.Parallel()
 
-	var _, err = ParseWithEnv([]byte(`
+	var _, err = ParseWithEnv(underBBS(`
 call: Q1BBS
 store: bbs.db
 agw:
@@ -180,25 +227,25 @@ agw:
 	require.Error(t, err)
 
 	for _, want := range []string{
-		`agw.addr: "localhost" is not a host:port`,
-		"agw.passwordEnv: a user name needs the variable its password is in",
-		"agw.ports: 256 is not a port from 0 to 255",
-		"agw.paclen: 4096 is not from 1 to 2048",
+		`bbs.agw.addr: "localhost" is not a host:port`,
+		"bbs.agw.passwordEnv: a user name needs the variable its password is in",
+		"bbs.agw.ports: 256 is not a port from 0 to 255",
+		"bbs.agw.paclen: 4096 is not from 1 to 2048",
 	} {
 		assert.Contains(t, err.Error(), want)
 	}
 
-	var _, unsetErr = ParseWithEnv([]byte("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\n  passwordEnv: NOT_SET\n"), env(nil))
-	require.ErrorContains(t, unsetErr, "agw.passwordEnv: NOT_SET is not set")
+	var _, unsetErr = ParseWithEnv(underBBS("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\n  passwordEnv: NOT_SET\n"), env(nil))
+	require.ErrorContains(t, unsetErr, "bbs.agw.passwordEnv: NOT_SET is not set")
 
-	var _, negativeErr = ParseWithEnv([]byte("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\n  highWater: -1\n"), env(nil))
+	var _, negativeErr = ParseWithEnv(underBBS("call: Q1BBS\nstore: bbs.db\nagw:\n  addr: localhost:8000\n  highWater: -1\n"), env(nil))
 	require.Error(t, negativeErr)
 }
 
 func TestParsePartners(t *testing.T) {
 	t.Parallel()
 
-	var cfg, err = Parse([]byte(`
+	var cfg, err = Parse(underBBS(`
 call: Q1BBS-1
 store: bbs.db
 partners:
@@ -217,7 +264,7 @@ partners:
 		{Call: "Q3BBS", Covers: []string{"*"}, Floods: []string{"*"}},
 	}, cfg.RoutingPartners())
 
-	var none, noneErr = Parse([]byte("call: Q1BBS\nstore: bbs.db\n"))
+	var none, noneErr = Parse(underBBS("call: Q1BBS\nstore: bbs.db\n"))
 	require.NoError(t, noneErr)
 	assert.Empty(t, none.RoutingPartners())
 }
@@ -225,7 +272,7 @@ partners:
 func TestParsePartnerProblems(t *testing.T) {
 	t.Parallel()
 
-	var _, err = Parse([]byte(`
+	var _, err = Parse(underBBS(`
 call: Q1BBS
 store: bbs.db
 partners:
@@ -239,11 +286,11 @@ partners:
 	require.Error(t, err)
 
 	for _, want := range []string{
-		`partners[0].call: "not a call" is not a callsign`,
-		"partners[1].call: Q1BBS-2 is this BBS",
-		`partners[2].covers: "GBR..EURO" is not a hierarchical address`,
-		`partners[2].floods: "G R" is not a distribution`,
-		"partners[3].call: Q2BBS-1 is already a partner",
+		`bbs.partners[0].call: "not a call" is not a callsign`,
+		"bbs.partners[1].call: Q1BBS-2 is this BBS",
+		`bbs.partners[2].covers: "GBR..EURO" is not a hierarchical address`,
+		`bbs.partners[2].floods: "G R" is not a distribution`,
+		"bbs.partners[3].call: Q2BBS-1 is already a partner",
 	} {
 		assert.Contains(t, err.Error(), want)
 	}
@@ -252,7 +299,7 @@ partners:
 func TestParseConnect(t *testing.T) {
 	t.Parallel()
 
-	var cfg, err = ParseWithEnv([]byte(`
+	var cfg, err = ParseWithEnv(underBBS(`
 call: Q1BBS
 store: bbs.db
 agw:
@@ -300,7 +347,7 @@ partners:
 func TestParseConnectProblems(t *testing.T) {
 	t.Parallel()
 
-	var _, err = ParseWithEnv([]byte(`
+	var _, err = ParseWithEnv(underBBS(`
 call: Q1BBS
 store: bbs.db
 partners:
@@ -319,14 +366,14 @@ partners:
 	require.Error(t, err)
 
 	for _, want := range []string{
-		"partners[0].connect: calling a partner needs an agw block",
-		"partners[0].connect.port: 300 is not a port",
-		`partners[0].connect: "not a call" is not a callsign`,
-		`partners[0].connect: "Q5-DIGI" is not a callsign`,
-		"partners[0].connect.every: 10s is less than 1m0s",
-		"partners[0].connect.timeout: -1s is negative",
-		"partners[0].connect.script[0]: a step needs exactly one of send, sendEnv and expect",
-		"partners[0].connect.script[1].sendEnv: NOT_SET is not set",
+		"bbs.partners[0].connect: calling a partner needs an agw block",
+		"bbs.partners[0].connect.port: 300 is not a port",
+		`bbs.partners[0].connect: "not a call" is not a callsign`,
+		`bbs.partners[0].connect: "Q5-DIGI" is not a callsign`,
+		"bbs.partners[0].connect.every: 10s is less than 1m0s",
+		"bbs.partners[0].connect.timeout: -1s is negative",
+		"bbs.partners[0].connect.script[0]: a step needs exactly one of send, sendEnv and expect",
+		"bbs.partners[0].connect.script[1].sendEnv: NOT_SET is not set",
 	} {
 		assert.Contains(t, err.Error(), want)
 	}
@@ -335,11 +382,11 @@ partners:
 func TestParseFBB(t *testing.T) {
 	t.Parallel()
 
-	var byDefault, err = Parse([]byte("call: Q1BBS\nstore: bbs.db\n"))
+	var byDefault, err = Parse(underBBS("call: Q1BBS\nstore: bbs.db\n"))
 	require.NoError(t, err)
 	assert.False(t, byDefault.UseFBB(), "off unless turned on")
 
-	var on, onErr = Parse([]byte("call: Q1BBS\nstore: bbs.db\nfbb: true\n"))
+	var on, onErr = Parse(underBBS("call: Q1BBS\nstore: bbs.db\nfbb: true\n"))
 	require.NoError(t, onErr)
 	assert.True(t, on.UseFBB())
 }

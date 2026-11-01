@@ -11,7 +11,8 @@ package direwolf
 // format, in a "legacy" block.
 //
 // Everything sits under a top-level "samoyed" key, leaving the rest of the
-// file free for whatever else might one day want a place in it.
+// file free for whatever else wants a place in it: samoyed-bbs's settings,
+// under "bbs", so that the two can share a file.
 
 import (
 	"bytes"
@@ -29,6 +30,10 @@ import (
 // ConfigFile is the whole of a YAML configuration file.
 type ConfigFile struct {
 	Samoyed *SamoyedConfig `yaml:"samoyed"`
+
+	// BBS is samoyed-bbs's settings, for a file the two share.  They are its
+	// to check, so they are taken as they are and left alone.
+	BBS yaml.Node `yaml:"bbs"`
 }
 
 // SamoyedConfig is the settings under a YAML configuration file's "samoyed"
