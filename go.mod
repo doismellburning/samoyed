@@ -9,7 +9,7 @@ require (
 	github.com/ebitengine/purego v0.11.2
 	github.com/golang/geo v0.0.0-20180826223333-635502111454
 	github.com/gordonklaus/portaudio v0.0.0-20250206071425-98a94950218b
-	github.com/lestrrat-go/strftime v1.2.0
+	github.com/lestrrat-go/strftime v1.2.1
 	github.com/pkg/term v1.1.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/sirupsen/logrus v1.10.2
