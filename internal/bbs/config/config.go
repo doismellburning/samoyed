@@ -18,6 +18,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/agwclient"
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
+	"github.com/doismellburning/samoyed/internal/bbs/routing"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"go.yaml.in/yaml/v3"
 )
@@ -50,6 +51,24 @@ type Config struct {
 
 	// AGW, if given, is the AGW server stations reach the BBS through.
 	AGW *AGW `yaml:"agw"`
+
+	// Partners are the BBSes this one forwards mail to.
+	Partners []Partner `yaml:"partners"`
+}
+
+// Partner is a BBS this one forwards mail to, and what for.
+type Partner struct {
+	// Call is the partner's callsign.
+	Call string `yaml:"call"`
+
+	// Covers are where personal mail and traffic is sent to this partner
+	// for, as hierarchical addresses such as "GBR.EURO", or "*" for
+	// anywhere.  Mail for the partner itself always goes to it.
+	Covers []string `yaml:"covers"`
+
+	// Floods are the bulletin distributions passed on to this partner,
+	// such as "GBR" or "WW", or "*" for all of them.
+	Floods []string `yaml:"floods"`
 }
 
 // AGW is the AGW server stations reach the BBS through, such as
@@ -174,6 +193,8 @@ func (c Config) validate(lookupEnv func(name string) (string, bool)) error {
 		problems = append(problems, c.AGW.validate(lookupEnv)...)
 	}
 
+	problems = append(problems, c.validatePartners()...)
+
 	return errors.Join(problems...)
 }
 
@@ -247,4 +268,79 @@ func (c Config) HRouteMaybe() maybe.Maybe[string] {
 	}
 
 	return maybe.Just(c.HRoute)
+}
+
+// validatePartners checks the partners list.
+func (c Config) validatePartners() []error {
+	var problems []error
+	var seen = make(map[string]bool)
+
+	for i, p := range c.Partners {
+		var where = fmt.Sprintf("partners[%d]", i)
+		var call = strings.ToUpper(strings.TrimSpace(p.Call))
+
+		switch {
+		case !ValidCall(call):
+			problems = append(problems, fmt.Errorf("%s.call: %q is not a callsign", where, p.Call))
+		case baseCall(call) == baseCall(c.Call):
+			problems = append(problems, fmt.Errorf("%s.call: %s is this BBS", where, call))
+		case seen[baseCall(call)]:
+			problems = append(problems, fmt.Errorf("%s.call: %s is already a partner", where, call))
+		}
+
+		seen[baseCall(call)] = true
+
+		for _, cover := range p.Covers {
+			if cover != routing.Wildcard && !mail.ValidHRoute(strings.ToUpper(cover)) {
+				problems = append(problems, fmt.Errorf("%s.covers: %q is not a hierarchical address, such as GBR.EURO, or *", where, cover))
+			}
+		}
+
+		for _, flood := range p.Floods {
+			if flood != routing.Wildcard && !mail.ValidHRoute(strings.ToUpper(flood)) {
+				problems = append(problems, fmt.Errorf("%s.floods: %q is not a distribution, such as GBR or WW, or *", where, flood))
+			}
+		}
+	}
+
+	return problems
+}
+
+// RoutingSelf is this BBS, as routing needs it.
+func (c Config) RoutingSelf() routing.Self {
+	return routing.Self{Call: baseCall(c.Call)}
+}
+
+// RoutingPartners are the partners, as routing needs them.
+func (c Config) RoutingPartners() []routing.Partner {
+	var partners = make([]routing.Partner, 0, len(c.Partners))
+
+	for _, p := range c.Partners {
+		var partner = new(routing.Partner)
+
+		partner.Call = baseCall(p.Call)
+		partner.Covers = upper(p.Covers)
+		partner.Floods = upper(p.Floods)
+
+		partners = append(partners, *partner)
+	}
+
+	return partners
+}
+
+// baseCall is a callsign without its SSID, upper-cased.
+func baseCall(call string) string {
+	var base, _, _ = strings.Cut(strings.ToUpper(strings.TrimSpace(call)), "-")
+
+	return base
+}
+
+func upper(values []string) []string {
+	var out = make([]string, 0, len(values))
+
+	for _, v := range values {
+		out = append(out, strings.ToUpper(strings.TrimSpace(v)))
+	}
+
+	return out
 }

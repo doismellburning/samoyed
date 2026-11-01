@@ -19,6 +19,7 @@ import (
 
 	"github.com/ccoveille/go-safecast/v2"
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
+	"github.com/doismellburning/samoyed/internal/bbs/routing"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	_ "modernc.org/sqlite" // The "sqlite" database/sql driver
 )
@@ -139,11 +140,18 @@ func applyMigration(ctx context.Context, db *sql.DB, name string, version int) e
 	return tx.Commit()
 }
 
-// Accept stores a new message, numbering it and, if it has no ID yet, giving
-// it one made from that number and bbsCall.  The message and its ID are
-// recorded in one transaction: a message whose ID has been seen before is
-// turned away with ErrDuplicateBID, and nothing changes.
+// Accept stores a new message to be kept here, numbering it and, if it has
+// no ID yet, giving it one made from that number and bbsCall.  The message
+// and its ID are recorded in one transaction: a message whose ID has been
+// seen before is turned away with ErrDuplicateBID, and nothing changes.
 func (s *Store) Accept(ctx context.Context, m mail.NewMessage, bbsCall string) (mail.Message, error) {
+	return s.AcceptRouted(ctx, m, bbsCall, routing.Local())
+}
+
+// AcceptRouted is Accept for a message routing has decided about: it is
+// queued for each partner the decision names, in the same transaction, and
+// held for the sysop if the decision says so.
+func (s *Store) AcceptRouted(ctx context.Context, m mail.NewMessage, bbsCall string, route routing.Decision) (mail.Message, error) {
 	var validErr = m.Validate()
 	if validErr != nil {
 		return mail.Message{}, validErr
@@ -158,10 +166,15 @@ func (s *Store) Accept(ctx context.Context, m mail.NewMessage, bbsCall string) (
 
 	var created = s.now().UTC().Truncate(time.Second)
 
+	var status = mail.New
+	if route.Held.IsJust() {
+		status = mail.Held
+	}
+
 	var result, insertErr = tx.ExecContext(ctx,
 		`INSERT INTO messages (type, status, from_call, to_call, at, title, body, created)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.Type.String(), mail.New.String(), strings.ToUpper(m.From), m.To.To, nullable(m.To.At), m.Title, m.Body, created.Unix())
+		m.Type.String(), status.String(), strings.ToUpper(m.From), m.To.To, nullable(m.To.At), m.Title, m.Body, created.Unix())
 	if insertErr != nil {
 		return mail.Message{}, fmt.Errorf("storing message: %w", insertErr)
 	}
@@ -199,6 +212,15 @@ func (s *Store) Accept(ctx context.Context, m mail.NewMessage, bbsCall string) (
 		return mail.Message{}, fmt.Errorf("recording message ID: %w", midErr)
 	}
 
+	if route.Held.IsNothing() {
+		for _, partner := range route.Partners {
+			var _, queueErr = tx.ExecContext(ctx, "INSERT INTO forward_queue (msg, partner, state) VALUES (?, ?, 'pending')", number, partner)
+			if queueErr != nil {
+				return mail.Message{}, fmt.Errorf("queueing message for %s: %w", partner, queueErr)
+			}
+		}
+	}
+
 	var commitErr = tx.Commit()
 	if commitErr != nil {
 		return mail.Message{}, fmt.Errorf("storing message: %w", commitErr)
@@ -209,7 +231,7 @@ func (s *Store) Accept(ctx context.Context, m mail.NewMessage, bbsCall string) (
 	stored.Number = number
 	stored.MID = mid
 	stored.Type = m.Type
-	stored.Status = mail.New
+	stored.Status = status
 	stored.From = strings.ToUpper(m.From)
 	stored.To = m.To
 	stored.Title = m.Title
@@ -411,4 +433,80 @@ func nullable(m maybe.Maybe[string]) sql.NullString {
 	var value, ok = m.Get()
 
 	return sql.NullString{String: value, Valid: ok}
+}
+
+// QueueFor is the messages waiting to be forwarded to partner, oldest first.
+// Killed messages are left out: there is no point sending them.
+func (s *Store) QueueFor(ctx context.Context, partner string) ([]int, error) {
+	var rows, err = s.db.QueryContext(ctx,
+		`SELECT q.msg FROM forward_queue q JOIN messages m ON m.number = q.msg
+		 WHERE q.partner = ? AND q.state = 'pending' AND m.status != ?
+		 ORDER BY q.msg`, strings.ToUpper(partner), mail.Killed.String())
+	if err != nil {
+		return nil, fmt.Errorf("reading the queue for %s: %w", partner, err)
+	}
+
+	defer func() { _ = rows.Close() }()
+
+	var queue []int
+
+	for rows.Next() {
+		var n int
+
+		var scanErr = rows.Scan(&n)
+		if scanErr != nil {
+			return nil, fmt.Errorf("reading the queue for %s: %w", partner, scanErr)
+		}
+
+		queue = append(queue, n)
+	}
+
+	return queue, rows.Err()
+}
+
+// MarkForwarded records that partner has taken message n.
+func (s *Store) MarkForwarded(ctx context.Context, n int, partner string) error {
+	return s.finishForward(ctx, n, partner, "forwarded")
+}
+
+// MarkRefused records that partner turned message n down, as one it already
+// has: it isn't offered to that partner again.
+func (s *Store) MarkRefused(ctx context.Context, n int, partner string) error {
+	return s.finishForward(ctx, n, partner, "refused")
+}
+
+// finishForward ends message n's place in partner's queue.  Personal mail and
+// traffic are here only to be sent on, so once nobody is left to send one
+// to, it is marked forwarded; a bulletin is kept here to be read as well, so
+// it keeps its status.
+func (s *Store) finishForward(ctx context.Context, n int, partner string, state string) error {
+	var tx, txErr = s.db.BeginTx(ctx, nil)
+	if txErr != nil {
+		return fmt.Errorf("updating the queue: %w", txErr)
+	}
+
+	defer func() { _ = tx.Rollback() }()
+
+	var result, updateErr = tx.ExecContext(ctx,
+		"UPDATE forward_queue SET state = ?, attempts = attempts + 1, last_try = ? WHERE msg = ? AND partner = ? AND state = 'pending'",
+		state, s.now().Unix(), n, strings.ToUpper(partner))
+	if updateErr != nil {
+		return fmt.Errorf("updating the queue: %w", updateErr)
+	}
+
+	var changed, _ = result.RowsAffected()
+	if changed == 0 {
+		return fmt.Errorf("%w: %d isn't waiting for %s", ErrNoSuchMessage, n, partner)
+	}
+
+	var _, statusErr = tx.ExecContext(ctx,
+		`UPDATE messages SET status = ?
+		 WHERE number = ? AND type != 'B' AND status NOT IN (?, ?)
+		 AND NOT EXISTS (SELECT 1 FROM forward_queue WHERE msg = ? AND state = 'pending')`,
+		mail.Forwarded.String(), n, mail.Killed.String(), mail.Held.String(), n)
+	if statusErr != nil {
+		return fmt.Errorf("updating message %d: %w", n, statusErr)
+	}
+
+	return tx.Commit()
 }

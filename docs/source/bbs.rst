@@ -155,6 +155,24 @@ Configuration
         Optionally, how many of a station's frames may be unacknowledged before the BBS waits to send more,
         so a long message doesn't flood the TNC's transmit queue.
 
+``partners``
+    The BBSes this one forwards mail to, as described under Routing below.
+    Each has:
+
+    ``call``
+        The partner's callsign.
+
+    ``covers``
+        Where personal mail and traffic is sent to this partner for,
+        as hierarchical addresses such as ``GBR.EURO``,
+        or ``*`` for anywhere.
+        Mail for the partner itself always goes to it.
+
+    ``floods``
+        The bulletin distributions passed on to this partner,
+        such as ``GBR`` or ``WW``,
+        or ``*`` for all of them.
+
 ``--config-check`` reports every problem in the file at once,
 and its exit status is 1 if there are any,
 so it can go in a systemd unit's ``ExecStartPre``.
@@ -217,3 +235,44 @@ That is the form this BBS writes.
 It hasn't yet been checked against what FBB, BPQ and XRouter write and expect,
 so it may change;
 it reads other BBSes' lines leniently, needing only the date, the time and the BBS's callsign.
+
+Routing
+-------
+
+Each message sent at the BBS is routed as it is taken,
+and queued for the partners it is to go on to.
+Sending it on is still to come:
+for now, it waits in the queue.
+
+Personal mail and traffic for a user here,
+with no ``@``, or with an ``@`` naming this BBS,
+stays here.
+Anything else goes to the one partner whose ``covers`` best fit its address:
+mail for the partner itself first,
+then the cover that matches the most of the address,
+read from its least specific end,
+then a ``*``.
+With equal fits, the partner listed first wins.
+If nothing fits, the message is held for the sysop,
+and its sender is told so.
+
+A bulletin is kept here to be read,
+and passed to every partner whose ``floods`` include its distribution,
+the area after its ``@``.
+A bulletin with no ``@`` stays here.
+
+Neither is ever sent to a partner it came from,
+or to a BBS already in its ``R:`` lines.
+
+.. code:: yaml
+
+    call: Q1BBS
+    hroute: "#77.GBR.EURO"
+    store: /var/lib/samoyed-bbs/bbs.db
+    partners:
+      - call: Q2BBS
+        covers: ["#77.GBR.EURO"]
+        floods: ["#77", GBR]
+      - call: Q3BBS
+        covers: ["*"]
+        floods: ["*"]

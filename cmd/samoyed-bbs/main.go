@@ -20,11 +20,14 @@ import (
 	"github.com/doismellburning/samoyed/internal/bbs/config"
 	"github.com/doismellburning/samoyed/internal/bbs/dispatcher"
 	"github.com/doismellburning/samoyed/internal/bbs/lines"
+	"github.com/doismellburning/samoyed/internal/bbs/mail"
+	"github.com/doismellburning/samoyed/internal/bbs/routing"
 	"github.com/doismellburning/samoyed/internal/bbs/shell"
 	"github.com/doismellburning/samoyed/internal/bbs/store/sqlite"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
 	"github.com/doismellburning/samoyed/internal/bbs/transport/agwt"
 	"github.com/doismellburning/samoyed/internal/bbs/transport/console"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/version"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -190,9 +193,26 @@ func acceptSessions(ctx context.Context, listener *agwt.Listener, d *dispatcher.
 	}
 }
 
+// routedStore is the message store with routing in front of it: a message a
+// user sends is routed as it is taken, and queued for whichever partners it
+// is to go on to, or held if there are none.
+type routedStore struct {
+	*sqlite.Store
+
+	self     routing.Self
+	partners []routing.Partner
+}
+
+// Accept routes m and stores it.
+func (r routedStore) Accept(ctx context.Context, m mail.NewMessage, bbsCall string) (mail.Message, error) {
+	return r.AcceptRouted(ctx, m, bbsCall, routing.Route(m, maybe.Nothing[string](), r.self, r.partners))
+}
+
 // newDispatcher makes the dispatcher every session is run by, each with a
-// shell of its own over store.
+// shell of its own over store, routing what users send.
 func newDispatcher(cfg config.Config, store *sqlite.Store) *dispatcher.Dispatcher {
+	var mailbox = routedStore{Store: store, self: cfg.RoutingSelf(), partners: cfg.RoutingPartners()}
+
 	var dcfg = new(dispatcher.Config)
 
 	dcfg.Banner = cfg.BannerLines()
@@ -203,6 +223,6 @@ func newDispatcher(cfg config.Config, store *sqlite.Store) *dispatcher.Dispatche
 	var scfg = shell.Config{Call: cfg.Call, Prompt: cfg.Prompt, HRoute: cfg.HRouteMaybe(), Now: nil}
 
 	return dispatcher.New(*dcfg, func(peer transport.Peer) *shell.Machine {
-		return shell.New(peer, store, scfg)
+		return shell.New(peer, mailbox, scfg)
 	})
 }
