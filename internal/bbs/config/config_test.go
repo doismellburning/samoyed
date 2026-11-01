@@ -248,3 +248,86 @@ partners:
 		assert.Contains(t, err.Error(), want)
 	}
 }
+
+func TestParseConnect(t *testing.T) {
+	t.Parallel()
+
+	var cfg, err = ParseWithEnv([]byte(`
+call: Q1BBS
+store: bbs.db
+agw:
+  addr: localhost:8000
+partners:
+  - call: Q3BPQ
+    covers: ["*"]
+    connect:
+      port: 1
+      to: q3nod
+      via: [q5digi]
+      script:
+        - send: C Q3BPQ
+        - expect: Connected to
+        - sendEnv: BPQ_PASS
+      every: 30m
+      timeout: 1m
+  - call: Q4BBS-1
+    connect: {}
+  - call: Q5BBS
+`), env(map[string]string{"BPQ_PASS": "sekrit"}))
+	require.NoError(t, err)
+
+	var full = cfg.Partners[0].Connect
+
+	require.NotNil(t, full)
+	assert.Equal(t, 1, full.Port)
+	assert.Equal(t, "Q3NOD", full.Target("Q3BPQ"))
+	assert.Equal(t, []string{"Q5DIGI"}, full.Via)
+	assert.Len(t, full.Script, 3)
+	assert.Equal(t, "BPQ_PASS", full.Script[2].SendEnv)
+	assert.Equal(t, 30*time.Minute, full.Every)
+	assert.Equal(t, time.Minute, full.Timeout)
+
+	var bare = cfg.Partners[1].Connect
+
+	require.NotNil(t, bare)
+	assert.Equal(t, "Q4BBS-1", bare.Target("Q4BBS-1"), "the partner itself")
+	assert.Equal(t, DefaultCallEvery, bare.Every)
+	assert.Equal(t, DefaultScriptTimeout, bare.Timeout)
+
+	assert.Nil(t, cfg.Partners[2].Connect, "a partner that calls this BBS")
+}
+
+func TestParseConnectProblems(t *testing.T) {
+	t.Parallel()
+
+	var _, err = ParseWithEnv([]byte(`
+call: Q1BBS
+store: bbs.db
+partners:
+  - call: Q3BPQ
+    connect:
+      port: 300
+      to: not a call
+      via: [Q5-DIGI]
+      script:
+        - send: C Q3BPQ
+          expect: Connected
+        - sendEnv: NOT_SET
+      every: 10s
+      timeout: -1s
+`), env(nil))
+	require.Error(t, err)
+
+	for _, want := range []string{
+		"partners[0].connect: calling a partner needs an agw block",
+		"partners[0].connect.port: 300 is not a port",
+		`partners[0].connect: "not a call" is not a callsign`,
+		`partners[0].connect: "Q5-DIGI" is not a callsign`,
+		"partners[0].connect.every: 10s is less than 1m0s",
+		"partners[0].connect.timeout: -1s is negative",
+		"partners[0].connect.script[0]: a step needs exactly one of send, sendEnv and expect",
+		"partners[0].connect.script[1].sendEnv: NOT_SET is not set",
+	} {
+		assert.Contains(t, err.Error(), want)
+	}
+}

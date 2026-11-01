@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/agwclient"
+	"github.com/doismellburning/samoyed/internal/bbs/forward/script"
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
 	"github.com/doismellburning/samoyed/internal/bbs/routing"
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -69,6 +70,59 @@ type Partner struct {
 	// Floods are the bulletin distributions passed on to this partner,
 	// such as "GBR" or "WW", or "*" for all of them.
 	Floods []string `yaml:"floods"`
+
+	// Connect, if given, is how this BBS calls the partner.  Left out, the
+	// partner calls this BBS.
+	Connect *Connect `yaml:"connect"`
+}
+
+// Connect is how this BBS calls a partner over AGW.
+type Connect struct {
+	// Port is the AGW server port to call on, counting from 0.
+	Port int `yaml:"port"`
+
+	// To is who to connect to, if not the partner itself: a node to go
+	// through, say, whose script then connects on.
+	To string `yaml:"to"`
+
+	// Via are digipeaters to connect through.
+	Via []string `yaml:"via"`
+
+	// Script is what to send, and wait for, once connected to reach the
+	// partner itself.
+	Script []script.Step `yaml:"script"`
+
+	// Every is how often to call, mail queued or not.  Left out,
+	// DefaultCallEvery.
+	Every time.Duration `yaml:"every"`
+
+	// Timeout is how long each of the script's steps may wait.  Left out,
+	// DefaultScriptTimeout.
+	Timeout time.Duration `yaml:"timeout"`
+}
+
+const (
+	// DefaultCallEvery is how often a partner is called, if its connect
+	// block doesn't say.
+	DefaultCallEvery = time.Hour
+
+	// MinCallEvery is the least a partner may be called every, so as not
+	// to keep the channel busy.
+	MinCallEvery = time.Minute
+
+	// DefaultScriptTimeout is how long a connect script's step waits, if
+	// the connect block doesn't say.
+	DefaultScriptTimeout = 2 * time.Minute
+)
+
+// Target is who to connect to for this partner: its To, or the partner
+// itself.
+func (c Connect) Target(partner string) string {
+	if c.To != "" {
+		return c.To
+	}
+
+	return strings.ToUpper(partner)
 }
 
 // AGW is the AGW server stations reach the BBS through, such as
@@ -165,6 +219,23 @@ func ParseWithEnv(data []byte, lookupEnv func(name string) (string, bool)) (Conf
 		cfg.IdleTimeout = DefaultIdleTimeout
 	}
 
+	for _, p := range cfg.Partners {
+		if p.Connect == nil {
+			continue
+		}
+
+		p.Connect.To = strings.ToUpper(p.Connect.To)
+		p.Connect.Via = upper(p.Connect.Via)
+
+		if p.Connect.Every == 0 {
+			p.Connect.Every = DefaultCallEvery
+		}
+
+		if p.Connect.Timeout == 0 {
+			p.Connect.Timeout = DefaultScriptTimeout
+		}
+	}
+
 	return *cfg, nil
 }
 
@@ -194,8 +265,62 @@ func (c Config) validate(lookupEnv func(name string) (string, bool)) error {
 	}
 
 	problems = append(problems, c.validatePartners()...)
+	problems = append(problems, c.validateConnects(lookupEnv)...)
 
 	return errors.Join(problems...)
+}
+
+// validateConnects checks how partners are called: over the AGW server, so
+// there must be one, and with secrets the environment has.
+func (c Config) validateConnects(lookupEnv func(name string) (string, bool)) []error {
+	var problems []error
+
+	for i, p := range c.Partners {
+		if p.Connect == nil {
+			continue
+		}
+
+		var where = fmt.Sprintf("partners[%d].connect", i)
+		var conn = p.Connect
+
+		if c.AGW == nil {
+			problems = append(problems, fmt.Errorf("%s: calling a partner needs an agw block to call through", where))
+		}
+
+		if conn.Port < 0 || conn.Port > 255 {
+			problems = append(problems, fmt.Errorf("%s.port: %d is not a port from 0 to 255", where, conn.Port))
+		}
+
+		for _, call := range append([]string{conn.To}, conn.Via...) {
+			if call != "" && !ValidCall(strings.ToUpper(call)) {
+				problems = append(problems, fmt.Errorf("%s: %q is not a callsign", where, call))
+			}
+		}
+
+		if conn.Every != 0 && conn.Every < MinCallEvery {
+			problems = append(problems, fmt.Errorf("%s.every: %v is less than %v", where, conn.Every, MinCallEvery))
+		}
+
+		if conn.Timeout < 0 {
+			problems = append(problems, fmt.Errorf("%s.timeout: %v is negative", where, conn.Timeout))
+		}
+
+		for j, step := range conn.Script {
+			var stepErr = step.Validate()
+			if stepErr != nil {
+				problems = append(problems, fmt.Errorf("%s.script[%d]: %w", where, j, stepErr))
+			}
+
+			if step.SendEnv != "" {
+				var _, ok = lookupEnv(step.SendEnv)
+				if !ok {
+					problems = append(problems, fmt.Errorf("%s.script[%d].sendEnv: %s is not set", where, j, step.SendEnv))
+				}
+			}
+		}
+	}
+
+	return problems
 }
 
 // validate checks the AGW settings, and takes the password from the

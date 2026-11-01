@@ -5,20 +5,21 @@ package main
 
 import (
 	"context"
-	"errors"
-	"io"
+	"net"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/doismellburning/samoyed/internal/bbs/action"
+	"github.com/doismellburning/samoyed/internal/agwclient"
 	"github.com/doismellburning/samoyed/internal/bbs/config"
-	"github.com/doismellburning/samoyed/internal/bbs/forward/mbl"
-	"github.com/doismellburning/samoyed/internal/bbs/lines"
+	"github.com/doismellburning/samoyed/internal/bbs/dispatcher"
+	"github.com/doismellburning/samoyed/internal/bbs/forward/script"
 	"github.com/doismellburning/samoyed/internal/bbs/mail"
+	"github.com/doismellburning/samoyed/internal/bbs/scheduler"
 	"github.com/doismellburning/samoyed/internal/bbs/store/sqlite"
 	"github.com/doismellburning/samoyed/internal/bbs/transport"
 	"github.com/doismellburning/samoyed/internal/bbs/transport/memt"
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,7 +59,7 @@ func (b bbs) send(t *testing.T, typ mail.Type, to string, title string) mail.Mes
 	m.Title = title
 	m.Body = mail.Stamp([]byte(title+" body.\r"), b.cfg.Call, b.cfg.HRouteMaybe(), time.Now())
 
-	var stored, acceptErr = newMailbox(b.cfg, b.store).Accept(t.Context(), *m, b.cfg.Call)
+	var stored, acceptErr = newMailbox(b.cfg, b.store, nil).Accept(t.Context(), *m, b.cfg.Call)
 	require.NoError(t, acceptErr)
 
 	return stored
@@ -105,9 +106,19 @@ func everything() mail.ListQuery {
 	return *q
 }
 
-// call has caller connect to answerer over an in-memory link and forward
-// with it, as caller's calling side, until one of them hangs up.
-func call(t *testing.T, caller bbs, answerer bbs) {
+// farEnd is the calling BBS's end of an in-memory session.
+type farEnd struct {
+	net.Conn
+
+	peer transport.Peer
+}
+
+func (f farEnd) Peer() transport.Peer { return f.peer }
+
+// callWith has caller connect to answerer over an in-memory link, run
+// script, and forward with it as the calling side, until one of them hangs
+// up; it returns what came of the call.
+func callWith(t *testing.T, caller bbs, answerer bbs, steps ...script.Step) error {
 	t.Helper()
 
 	var ctx, cancel = context.WithTimeout(t.Context(), 10*time.Second)
@@ -117,35 +128,35 @@ func call(t *testing.T, caller bbs, answerer bbs) {
 
 	var served = make(chan error, 1)
 
-	go func() { served <- newDispatcher(answerer.cfg, answerer.store).Serve(ctx, session) }()
+	go func() {
+		served <- newDispatcher(answerer.cfg, newMailbox(answerer.cfg, answerer.store, nil), new(dispatcher.Busy)).Serve(ctx, session)
+	}()
 
-	var m = mbl.NewCalling(answerer.cfg.Call, newMailbox(caller.cfg, caller.store), forwardConfig(caller.cfg))
-	var reader = lines.NewReader(station, lines.DefaultMaxLen)
-
-	var hungUp = false
-
-	for !hungUp {
-		var line, err = reader.ReadLine(ctx)
-		if errors.Is(err, io.EOF) {
-			break
-		}
-
-		require.NoError(t, err)
-
-		for _, next := range m.Line(ctx, line) {
-			switch a := next.(type) {
-			case action.Output:
-				require.NoError(t, lines.Write(station, a.Lines...))
-			case action.Prompt:
-				require.NoError(t, lines.Write(station, a.Text))
-			case action.Disconnect:
-				hungUp = true
-			}
-		}
+	var partner = config.Partner{
+		Call:   answerer.cfg.Call,
+		Covers: nil,
+		Floods: nil,
+		Connect: &config.Connect{
+			Port: 0, To: "", Via: nil, Script: steps, Every: time.Hour, Timeout: time.Second,
+		},
 	}
+
+	var callerSide = farEnd{Conn: station, peer: transport.Peer{Call: answerer.cfg.Call, Kind: transport.Memory, Authenticated: false}}
+	var callerDispatcher = newDispatcher(caller.cfg, newMailbox(caller.cfg, caller.store, nil), nil)
+
+	var err = forwardWith(ctx, callerSide, callerDispatcher, newMailbox(caller.cfg, caller.store, nil), caller.cfg, partner)
 
 	require.NoError(t, station.Close())
 	require.NoError(t, <-served)
+
+	return err
+}
+
+// call is callWith, for a call that should go well.
+func call(t *testing.T, caller bbs, answerer bbs) {
+	t.Helper()
+
+	require.NoError(t, callWith(t, caller, answerer))
 }
 
 func TestForwardingBothWays(t *testing.T) {
@@ -203,7 +214,107 @@ func TestForwardingIsOnlyForPartners(t *testing.T) {
 
 	q3.send(t, mail.Personal, "Q1TEST@Q1BBS", "Unwanted")
 
-	call(t, q3, q1)
+	require.ErrorIs(t, callWith(t, q3, q1), errHungUp, "turned away")
 
-	assert.Equal(t, []int{1}, q3.queueFor(t, "Q1BBS"), "turned away, so still queued")
+	assert.Equal(t, []int{1}, q3.queueFor(t, "Q1BBS"), "so still queued")
+}
+
+func TestCallingThroughAConnectScript(t *testing.T) {
+	t.Parallel()
+
+	var q1 = newBBS(t, "call: Q1BBS\npartners:\n  - call: Q2BBS\n    covers: [\"*\"]\n")
+	var q2 = newBBS(t, "call: Q2BBS\npartners:\n  - call: Q1BBS\n    covers: [\"*\"]\n")
+
+	q2.send(t, mail.Personal, "Q1TEST@Q1BBS", "Through")
+
+	// The script waits for the banner, as one would for a node's
+	// "Connected to"; the exchange carries on from what follows.
+	require.NoError(t, callWith(t, q2, q1, script.ExpectText("welcome to q1bbs")))
+
+	assert.Equal(t, "Through", q1.byTitle(t, "Through").Title)
+	assert.Empty(t, q2.queueFor(t, "Q1BBS"))
+}
+
+func TestACallWhoseScriptFails(t *testing.T) {
+	t.Parallel()
+
+	var q1 = newBBS(t, "call: Q1BBS\npartners:\n  - call: Q2BBS\n    covers: [\"*\"]\n")
+	var q2 = newBBS(t, "call: Q2BBS\npartners:\n  - call: Q1BBS\n    covers: [\"*\"]\n")
+
+	q2.send(t, mail.Personal, "Q1TEST@Q1BBS", "Stuck")
+
+	var err = callWith(t, q2, q1, script.ExpectText("Connected to Q1BBS"))
+
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.Contains(t, err.Error(), `step 1 (expect "Connected to Q1BBS")`)
+	assert.Equal(t, []int{1}, q2.queueFor(t, "Q1BBS"), "still queued")
+}
+
+func TestQueueingMailKicksThePartner(t *testing.T) {
+	t.Parallel()
+
+	var q1 = newBBS(t, "call: Q1BBS\npartners:\n  - call: Q2BBS\n    covers: [GBR.EURO]\n    floods: [GBR]\n  - call: Q3BBS\n    floods: [GBR]\n")
+
+	var kicked []string
+	var mailbox = newMailbox(q1.cfg, q1.store, func(partner string) { kicked = append(kicked, partner) })
+
+	var accept = func(typ mail.Type, to string) {
+		var address, err = mail.ParseAddress(to)
+		require.NoError(t, err)
+
+		var m = new(mail.NewMessage)
+
+		m.Type = typ
+		m.From = "Q9TEST"
+		m.To = address
+		m.Title = to
+		m.Body = []byte("Hi.\r")
+
+		var _, acceptErr = mailbox.Accept(t.Context(), *m, q1.cfg.Call)
+		require.NoError(t, acceptErr)
+	}
+
+	accept(mail.Personal, "Q1TEST@Q6BBS.GBR.EURO")
+	assert.Equal(t, []string{"Q2BBS"}, kicked)
+
+	accept(mail.Bulletin, "ALL@GBR")
+	assert.Equal(t, []string{"Q2BBS", "Q2BBS", "Q3BBS"}, kicked)
+
+	accept(mail.Personal, "Q1TEST@Q6BBS.USA.NOAM")
+	assert.Len(t, kicked, 3, "held mail kicks nobody")
+
+	accept(mail.Personal, "Q1TEST")
+	assert.Len(t, kicked, 3, "nor does mail that stays here")
+}
+
+func TestAFailedConnectIsAnError(t *testing.T) {
+	t.Parallel()
+
+	var q1 = newBBS(t, "call: Q1BBS\nagw:\n  addr: localhost:8000\npartners:\n  - call: Q2BBS\n    connect:\n      to: Q2NOD\n")
+
+	var c = newCaller(q1.cfg, agwclient.New(maybe.FromJust(q1.cfg.AGWClient())), newDispatcher(q1.cfg, newMailbox(q1.cfg, q1.store, nil), nil), newMailbox(q1.cfg, q1.store, nil))
+
+	var asked []string
+
+	c.connect = func(_ context.Context, _ int, from string, to string, _ []string) (*agwclient.Link, error) {
+		asked = append(asked, from+">"+to)
+
+		return nil, agwclient.ErrConnectFailed
+	}
+
+	var err = c.call(t.Context(), callTargets(q1.cfg)[0])
+
+	require.ErrorIs(t, err, agwclient.ErrConnectFailed)
+	assert.Contains(t, err.Error(), "connecting to Q2NOD")
+	assert.Equal(t, []string{"Q1BBS>Q2NOD"}, asked)
+
+	require.Error(t, c.call(t.Context(), scheduler.Target{Partner: "Q9BBS", Every: time.Hour}), "not a partner this BBS calls")
+}
+
+func TestCallTargets(t *testing.T) {
+	t.Parallel()
+
+	var q1 = newBBS(t, "call: Q1BBS\nagw:\n  addr: localhost:8000\npartners:\n  - call: Q2BBS-3\n    connect: {every: 15m}\n  - call: Q3BBS\n")
+
+	assert.Equal(t, []scheduler.Target{{Partner: "Q2BBS", Every: 15 * time.Minute}}, callTargets(q1.cfg))
 }

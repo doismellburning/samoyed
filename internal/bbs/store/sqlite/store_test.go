@@ -280,7 +280,7 @@ func TestReopening(t *testing.T) {
 
 	var version int
 	require.NoError(t, again.db.QueryRowContext(t.Context(), "PRAGMA user_version").Scan(&version))
-	assert.Equal(t, 2, version, "migrations aren't applied twice")
+	assert.Equal(t, 3, version, "migrations aren't applied twice")
 }
 
 func TestOpenRefusesANewerSchema(t *testing.T) {
@@ -454,4 +454,94 @@ func TestMigratingAVersion1Store(t *testing.T) {
 
 	var got, _ = again.Get(t.Context(), 1)
 	assert.Equal(t, "Old", maybe.FromJust(got).Title, "and the old messages are kept")
+}
+
+func TestFailedAttemptsHoldMailForThePartner(t *testing.T) {
+	t.Parallel()
+
+	var s, _ = openTest(t)
+
+	var personal, err = s.AcceptRouted(t.Context(), message("Q2TEST", "Q1TEST@Q6BBS", mail.Personal, "Away"), testBBS, forwardTo("Q3BBS"))
+	require.NoError(t, err)
+
+	var bulletin, bullErr = s.AcceptRouted(t.Context(), message("Q2TEST", "ALL@GBR", mail.Bulletin, "News"), testBBS,
+		routing.Decision{Local: true, Partners: []string{"Q3BBS", "Q4BBS"}, Held: maybe.Nothing[string]()})
+	require.NoError(t, bullErr)
+
+	for range 2 {
+		var held, failErr = s.RecordFailedAttempt(t.Context(), "q3bbs", 3)
+		require.NoError(t, failErr)
+		assert.Empty(t, held, "not yet")
+	}
+
+	var queue, _ = s.QueueFor(t.Context(), "Q3BBS")
+	assert.Equal(t, []int{personal.Number, bulletin.Number}, queue, "still waiting")
+
+	var held, failErr = s.RecordFailedAttempt(t.Context(), "Q3BBS", 3)
+	require.NoError(t, failErr)
+	assert.Equal(t, []int{personal.Number, bulletin.Number}, held)
+
+	queue, _ = s.QueueFor(t.Context(), "Q3BBS")
+	assert.Empty(t, queue, "held mail waits no longer")
+
+	var got, _ = s.Get(t.Context(), personal.Number)
+	assert.Equal(t, mail.Held, maybe.FromJust(got).Status, "personal mail is held for the sysop")
+
+	var news, _ = s.Get(t.Context(), bulletin.Number)
+	assert.Equal(t, mail.New, maybe.FromJust(news).Status, "a bulletin is still here to be read")
+
+	var forQ4, _ = s.QueueFor(t.Context(), "Q4BBS")
+	assert.Equal(t, []int{bulletin.Number}, forQ4, "and still goes to the partners that can be reached")
+
+	require.ErrorIs(t, s.MarkForwarded(t.Context(), personal.Number, "Q3BBS"), ErrNoSuchMessage, "held, not pending")
+}
+
+func TestAFailedAttemptOnlyCountsWhatIsWaiting(t *testing.T) {
+	t.Parallel()
+
+	var s, _ = openTest(t)
+
+	var m, err = s.AcceptRouted(t.Context(), message("Q2TEST", "Q1TEST@Q6BBS", mail.Personal, "Away"), testBBS, forwardTo("Q3BBS"))
+	require.NoError(t, err)
+	require.NoError(t, s.MarkForwarded(t.Context(), m.Number, "Q3BBS"))
+
+	var held, failErr = s.RecordFailedAttempt(t.Context(), "Q3BBS", 1)
+	require.NoError(t, failErr)
+	assert.Empty(t, held, "what has gone isn't held")
+
+	var got, _ = s.Get(t.Context(), m.Number)
+	assert.Equal(t, mail.Forwarded, maybe.FromJust(got).Status)
+}
+
+func TestMigratingAVersion2StoreKeepsTheQueue(t *testing.T) {
+	t.Parallel()
+
+	var s, file = openTest(t)
+
+	var m, err = s.AcceptRouted(t.Context(), message("Q2TEST", "Q1TEST@Q6BBS", mail.Personal, "Away"), testBBS, forwardTo("Q3BBS"))
+	require.NoError(t, err)
+
+	// Back to how version 2 left it: no held state, so remake its table.
+	var _, downErr = s.db.ExecContext(t.Context(), `
+		CREATE TABLE q2 (msg INTEGER NOT NULL REFERENCES messages (number), partner TEXT NOT NULL,
+			state TEXT NOT NULL CHECK (state IN ('pending', 'forwarded', 'refused')),
+			attempts INTEGER NOT NULL DEFAULT 0, last_try INTEGER, PRIMARY KEY (msg, partner));
+		INSERT INTO q2 (msg, partner, state, attempts, last_try) SELECT msg, partner, state, attempts, last_try FROM forward_queue;
+		DROP TABLE forward_queue;
+		ALTER TABLE q2 RENAME TO forward_queue;
+		PRAGMA user_version = 2`)
+	require.NoError(t, downErr)
+	require.NoError(t, s.Close())
+
+	var again, openErr = Open(t.Context(), file)
+	require.NoError(t, openErr)
+
+	t.Cleanup(func() { _ = again.Close() })
+
+	var queue, _ = again.QueueFor(t.Context(), "Q3BBS")
+	assert.Equal(t, []int{m.Number}, queue, "the queue is kept")
+
+	var held, failErr = again.RecordFailedAttempt(t.Context(), "Q3BBS", 1)
+	require.NoError(t, failErr)
+	assert.Equal(t, []int{m.Number}, held, "and can hold mail now")
 }
